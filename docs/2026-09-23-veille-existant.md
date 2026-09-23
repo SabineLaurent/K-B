@@ -497,6 +497,39 @@ scoring, la décroissance et l'automatisation, qui répondent à un autre cas d'
 
 ---
 
+## Ajout du 2026-09-24 — `skyllwt/AutoSci`
+
+Plateforme de recherche « wiki-centrée » pilotée par Claude Code (Python, 26 skills, 1 686 étoiles,
+dernier commit le 2026-09-18). Vérifiée avant clonage : sans piège, mais victime d'une attaque de
+chaîne d'approvisionnement du 12 au 18/09 (dépendance `requests` remplacée par un fork malveillant,
+corrigée depuis). Fiche détaillée : `docs/veille/2026-09-23-fiches-existant/skyllwt_AutoSci.md`.
+
+**Il nuance le constat « aucun ne fait de veille ».** C'est le premier à avoir un vrai pipeline de
+veille : collecte arXiv quotidienne, dédoublonnage par identifiant canonique, pré-classement par
+script, puis **une seule** décision LLM encadrée par le code. Les identifiants proposés par le LLM
+sont filtrés contre une liste blanche (`tools/daily_arxiv.py:1192`), et si le LLM est indisponible, le
+classement par script s'affiche seul. Il utilise aussi **le wiki comme profil d'intérêt** pour classer
+la veille : une idée à reprendre pour le triage.
+
+Mais il ne comble pas notre manque n°1 : les items ne sont pas conservés (fichier jetable), il n'y a
+pas de date de collecte, et une seule source (arXiv).
+
+| À retenir | À éviter |
+|---|---|
+| Collecte déterministe, une seule décision LLM, sortie filtrée sur une liste blanche | Droits d'écriture déclarés mais **non appliqués** : « STATUS: SPEC, NOT A RUNTIME GATE » (`runtime/policy/writers.yaml:3`) |
+| Le wiki comme profil d'intérêt pour classer la veille | Confiance posée par le LLM sur chaque relation |
+| Schéma en YAML lu par le code, transitions d'état vérifiées | Tokenisation ASCII seule : le français cassé, encore |
+| L'interface web n'appelle jamais le LLM : elle prépare la commande que l'humain lance | Aucune péremption, aucun contrôle avant fusion, un seul test |
+
+**Sécurité, à retenir pour K-B.** `setup.sh` installe une configuration qui accorde à Claude Code
+`Bash(*)`, `WebFetch(*)` et tous les serveurs MCP sans confirmation
+(`config/settings.local.json.example:4`). La CI donne `Bash` à Claude sur des résumés arXiv non
+fiables, puis pousse sur `main` (`.github/workflows/`, `contents: write`). Et `tools/_env.py:30`
+charge aussi le `~/.env` du répertoire personnel. C'est exactement la combinaison « contenu non fiable
++ agent aux pleins pouvoirs » que K-B doit s'interdire.
+
+---
+
 ## Ce qui converge
 
 **1. Le Markdown fait foi, l'index se reconstruit.** marc-server, link, suwonleee, ai-memory,
