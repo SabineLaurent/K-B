@@ -24,6 +24,14 @@ personnel.
 - Une branche par changement, puis une PR vers `main`. Jamais de commit direct sur `main`.
 - La CI (GitHub Actions) fait passer les tests sur chaque PR : une PR rouge ne se fusionne pas.
 - Pas de journal de méthode ni de cycle de travail formalisé : le livrable d'abord.
+- **Board** (GitHub Project n° 12) : ne jamais toucher `Iteration`, jalons, champs ni vues —
+  time-knight les tient. Pour `Status` et `Size`, annoncer : carte, champ, avant → après.
+- Une PR ferme ses issues par `Closes #n` (un mot-clé par issue).
+- **Reprise** : lire `MISSION.md`, puis `git status` et la branche, puis le dernier commentaire
+  de l'issue en cours. Le board seulement s'il n'y a pas de mission.
+- **Fin de session** : committer le travail en cours sur sa branche, et laisser sur l'issue un
+  commentaire « point d'arrêt » — branche, fait, état des tests, prochaine étape, question en
+  attente.
 
 ## Sécurité
 
