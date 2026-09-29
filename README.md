@@ -15,7 +15,7 @@ K-B a deux portes d'entrée :
 
 Les données restent sur ma machine, et l'inférence passe par une API. Je lis dans Obsidian et
 j'interroge depuis le terminal. La revue des implémentations existantes est dans
-[docs/2026-09-23-veille-existant.md](docs/2026-09-23-veille-existant.md). Le constat principal :
+[docs/veille/2026-09-23-veille-existant.md](docs/veille/2026-09-23-veille-existant.md). Le constat principal :
 aucune ne fait de veille datée.
 
 ## Utilisateurs
