@@ -5,6 +5,14 @@ session (budget, critère de fin), déposé par time-knight. Il prime sur toute 
 
 Le produit est décrit dans le `README.md` (objectif, utilisateurs, périmètre de la v0).
 
+## Mémoire du projet
+
+@MEMORY.md
+
+La mémoire du projet (décisions, leur pourquoi, consignes propres à K-B) s'écrit dans `MEMORY.md`,
+versionné avec le dépôt, et non dans la mémoire locale `~/.claude`. Le dépôt est public : rien de
+personnel.
+
 ## Pile
 
 - Python uniquement ; dépendances et environnement avec `uv` (`uv add`, `uv run`), pas de `pip`.
