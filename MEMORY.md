@@ -9,6 +9,9 @@ chaque session par le `CLAUDE.md`. Le dépôt est public : rien de personnel ici
   (RNCP37827). Idéalement, il couvre aussi le reste de la certif, hors big data et machine learning.
   Le suivi de la certif vit dans un dépôt séparé, pas ici. Les dates sont tenues par time-knight.
 - Les critères de la certif deviennent des exigences de K-B seulement là où ils servent le produit.
+- **Binôme** : Sabine travaille avec Claude Code. Claude écrit l'essentiel du code et de la doc ;
+  Sabine pilote, relit, teste et décide. Les estimations en tiennent compte : les comptes, la prise
+  en main d'outils nouveaux, les décisions et la relecture ne s'accélèrent pas.
 
 ## Décisions du 2026-09-29
 
@@ -51,6 +54,15 @@ chaque session par le `CLAUDE.md`. Le dépôt est public : rien de personnel ici
   - Bac à sable, **sans compte de facturation rattaché** : au-delà d'1 To par mois, la requête
     est refusée, pas facturée.
   - Chaque requête est vérifiée par `dry_run` et plafonnée par `maximum_bytes_billed`.
+
+## Estimations (relues le 2026-09-29)
+
+- Chaque issue porte une ligne « Estimation : X h » ; le label `size:*` n'est qu'un ordre de
+  grandeur. Les estimations ont été relues à l'aveugle par un agent indépendant : environ 98 h pour
+  la v0.
+- La surveillance des exécutions (« monitoré », échéance du 25/10) est reportée après E1 : environ
+  4 h, sans issue pour l'instant.
+- Aucune coupe décidée. arXiv et Zotero vont ensemble ; l'ingester arXiv est repris de brief09.
 
 ## Consignes de travail
 
