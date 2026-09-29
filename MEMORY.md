@@ -28,13 +28,16 @@ chaque session par le `CLAUDE.md`. Le dépôt est public : rien de personnel ici
   | Source | Type |
   |---|---|
   | API GitHub, API arXiv | service web |
-  | Web Clipper (`.md`) | fichier |
+  | Catalogue CISA KEV (CSV), Web Clipper (`.md`) | fichier |
   | tldr.tech | scraping |
   | Zotero | base de données |
   | GH Archive sur BigQuery | big data |
 
   - Le scraper TLDR est repris de `brief09_assistant-veille-tech`, relu comme un dépôt tiers
     avant d'être repris. Le `robots.txt` de tldr.tech l'autorise.
+  - Le catalogue CISA KEV (vulnérabilités activement exploitées, CSV public, sans clé) a été ajouté
+    parce qu'un jury pourrait voir un `.md` comme un document plutôt qu'un fichier de données. Il
+    sert aussi un vrai besoin : croiser les failles exploitées avec l'outillage suivi.
   - Zotero : Sabine enregistre ses papiers avec le connecteur et les lit dans Zotero. K-B lit une
     copie de `zotero.sqlite` (papiers, surlignages). Les surlignages alimentent un bloc « Mes
     surlignages » dans les fiches.
