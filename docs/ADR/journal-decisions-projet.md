@@ -88,13 +88,11 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
 - **Le jeton vit dans `KB_GITHUB_TOKEN`, et non `GITHUB_TOKEN`.** Pourquoi : la CLI `gh` lit
   `GITHUB_TOKEN` en priorité sur la connexion de l'utilisatrice ; ce jeton sans permission aurait
   alors bloqué toute écriture par `gh` (PR, issues). — PR de #24
-- **Le jeton est rangé dans le trousseau macOS, et passé à la seule commande qui l'utilise.**
-  Choix de Sabine. La variable `KB_GITHUB_TOKEN` est remplie depuis le trousseau au lancement de
-  la commande ; le code ne lit que la variable. Options écartées : le `.env` du dépôt (ignoré par
-  git, mais jeton en clair sur le disque), d'abord retenu puis abandonné le même jour ; un
-  `export` dans `~/.zshrc`, qui met le jeton dans tous les processus de tous les terminaux.
-  Limite assumée : propre à macOS ; une autre machine ou la CI fournira la variable autrement.
-  — PR de #24
+- **Le jeton est rangé dans le `.env` du dépôt, ignoré par git, et chargé au lancement.** Choix de
+  Sabine. Options écartées : le trousseau macOS avec un `export` dans `~/.zshrc`, qui met le jeton
+  dans tous les processus de tous les terminaux ; le trousseau lu commande par commande, plus
+  strict mais plus lourd. Limite assumée : le jeton est en clair sur le disque, acceptable pour
+  un jeton en lecture publique seule, sans permission et qui expire. — PR de #24
 
 ## Décisions encore ouvertes
 
