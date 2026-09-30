@@ -9,9 +9,10 @@ Le produit est décrit dans le `README.md` (objectif, utilisateurs, périmètre 
 
 @MEMORY.md
 
-La mémoire du projet (décisions, leur pourquoi, consignes propres à K-B) s'écrit dans `MEMORY.md`,
-versionné avec le dépôt, et non dans la mémoire locale `~/.claude`. Le dépôt est public : rien de
-personnel.
+La mémoire du projet (contexte, estimations, consignes propres à K-B) s'écrit dans `MEMORY.md`,
+versionné avec le dépôt, et non dans la mémoire locale `~/.claude`. Les décisions et leur pourquoi
+vont dans `docs/ADR/journal-decisions-projet.md`, plus dans `MEMORY.md`. Le dépôt est public :
+rien de personnel.
 
 ## Pile
 
@@ -20,20 +21,14 @@ personnel.
 
 ## Façon de travailler
 
-- Tests d'abord : écrire le test qui échoue, puis le code qui le fait passer.
+Le cycle d'une PR (tests d'abord, revue, note pédagogique, reprise, fin de session) est dans
+`.claude/rules/methode.md`. Ce qui suit est propre à K-B et prime.
+
 - Une branche par changement, puis une PR vers `main`. Jamais de commit direct sur `main`.
 - La CI (GitHub Actions) fait passer les tests sur chaque PR : une PR rouge ne se fusionne pas.
-- Pas de journal de méthode ni de cycle de travail formalisé : le livrable d'abord.
 - **Board** (GitHub Project n° 12) : ne jamais toucher `Iteration`, jalons, champs ni vues —
   time-knight les tient. Pour `Status` et `Size`, annoncer : carte, champ, avant → après.
 - Une PR ferme ses issues par `Closes #n` (un mot-clé par issue).
-- Avant d'ouvrir une PR de code : invoquer `/note-pedago-ls` via l'outil Skill ; la note
-  (`docs/journaling/`) entre dans la PR.
-- **Reprise** : lire `MISSION.md`, puis `git status` et la branche, puis le dernier commentaire
-  de l'issue en cours. Le board seulement s'il n'y a pas de mission.
-- **Fin de session** : committer le travail en cours sur sa branche, et laisser sur l'issue un
-  commentaire « point d'arrêt » — branche, fait, état des tests, prochaine étape, question en
-  attente.
 
 ## Sécurité
 
