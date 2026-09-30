@@ -31,10 +31,21 @@ publiques. S'il fuite, il ne lit aucun dépôt privé et n'écrit nulle part.
 
 ## Le ranger
 
-Dans le `.env` à la racine du dépôt, ignoré par git :
+Dans le trousseau macOS, chiffré, jamais en clair sur le disque :
 
 ```
-KB_GITHUB_TOKEN=<le jeton>
+security add-generic-password -a "$USER" -s KB_GITHUB_TOKEN -w
+```
+
+Avec `-w` en fin de commande, macOS demande le jeton au clavier, sans l'afficher ni le garder dans
+l'historique du shell.
+
+Le programme le reçoit par la variable d'environnement `KB_GITHUB_TOKEN`, remplie depuis le
+trousseau pour la seule commande lancée, et non dans `~/.zshrc`, qui la donnerait à tous les
+processus de tous les terminaux :
+
+```
+KB_GITHUB_TOKEN="$(security find-generic-password -a "$USER" -s KB_GITHUB_TOKEN -w)" uv run …
 ```
 
 Le nom n'est pas `GITHUB_TOKEN` : la CLI `gh` lit cette variable en priorité sur la connexion de
@@ -45,12 +56,12 @@ l'utilisateur, et ce jeton sans permission bloquerait alors les PR et les issues
 Depuis la racine du dépôt :
 
 ```
-uv run --env-file .env python -c "import os,json,urllib.request as u; t=os.environ.get('KB_GITHUB_TOKEN',''); print('présente' if t else 'ABSENTE'); r=u.Request('https://api.github.com/rate_limit',headers={'Authorization':'Bearer '+t}); c=json.load(u.urlopen(r))['resources']['core']; print('quota :', c['limit'], '— restant :', c['remaining'])"
+KB_GITHUB_TOKEN="$(security find-generic-password -a "$USER" -s KB_GITHUB_TOKEN -w)" uv run python -c "import os,json,urllib.request as u; t=os.environ.get('KB_GITHUB_TOKEN',''); print('présente' if t else 'ABSENTE'); r=u.Request('https://api.github.com/rate_limit',headers={'Authorization':'Bearer '+t}); c=json.load(u.urlopen(r))['resources']['core']; print('quota :', c['limit'], '— restant :', c['remaining'])"
 ```
 
 La commande n'affiche jamais le jeton, seulement :
 
-- `présente` ou `ABSENTE` : la variable est lue, ou non ;
+- `présente` ou `ABSENTE` : le jeton est trouvé dans le trousseau, ou non ;
 - `quota : 5000` : le jeton est pris en compte (`60` : il ne l'est pas) ;
 - `restant` : les requêtes encore disponibles dans l'heure. L'appel à `/rate_limit` ne les
   décompte pas.
@@ -63,3 +74,4 @@ Un jeton expiré ou révoqué fait échouer la commande avec `HTTP Error 401`.
 - [Introducing fine-grained personal access tokens](https://github.blog/security/application-security/introducing-fine-grained-personal-access-tokens-for-github/)
 - [Permissions required for fine-grained personal access tokens](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens)
 - [Rate limits for the REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
+- [`security` : add-generic-password, find-generic-password](https://ss64.com/mac/security-password.html)
