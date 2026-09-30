@@ -70,11 +70,11 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   (environ 940 papiers par semaine), `cs.AI` et `cs.LG` (plus de 2 000 chacune : trop de bruit).
   Six mots-clés de départ sont notés dans `docs/sources.md` ; leur usage reste ouvert (voir
   plus bas). — PR de #24
-- **Dépôts GitHub suivis pour démarrer : `langchain-ai/langchain`, `langchain-ai/langgraph` et
-  `run-llama/llama_index`.** Pourquoi : démarrer petit (choix de Sabine). Onze autres dépôts
-  proposés sont gardés sous le coude dans `docs/sources.md` : l'outillage de K-B (uv, pytest,
-  FastAPI, Pydantic, Claude Code, SDK Anthropic), le reste de l'écosystème LLM, le top 10 LLM
-  d'OWASP et Obsidian. Écartés : les dépôts qui ne publient que des tags (`python/cpython`,
+- **Dépôts GitHub suivis pour démarrer : `langchain-ai/langchain`, `langchain-ai/langgraph`,
+  `run-llama/llama_index` et `anthropics/claude-code`.** Pourquoi : démarrer petit (choix de
+  Sabine). Dix autres dépôts proposés sont gardés sous le coude dans `docs/sources.md` :
+  l'outillage de K-B (uv, pytest, FastAPI, Pydantic, SDK Anthropic), le reste de l'écosystème
+  LLM, le top 10 LLM d'OWASP et Obsidian. Écartés : les dépôts qui ne publient que des tags (`python/cpython`,
   `OWASP/Top10`), car l'API des releases n'y trouve rien. Limite assumée :
   `langchain-ai/langchain` est un monorepo qui publie une release par paquet, donc bruyant.
   — PR de #24

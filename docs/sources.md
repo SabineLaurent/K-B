@@ -30,6 +30,7 @@ départ sont dans [sources-detaillees.md](sources-detaillees.md).
 | `langchain-ai/langchain` | écosystème LLM (monorepo : une release par paquet, bruyant) |
 | `langchain-ai/langgraph` | écosystème LLM, agents |
 | `run-llama/llama_index` | écosystème LLM, RAG |
+| `anthropics/claude-code` | outil de travail du binôme |
 
 Sous le coude, à ajouter plus tard :
 
@@ -39,7 +40,6 @@ Sous le coude, à ajouter plus tard :
 | `pytest-dev/pytest` | outil du projet |
 | `fastapi/fastapi` | API REST de la v0 |
 | `pydantic/pydantic` | validation des entrées à la frontière |
-| `anthropics/claude-code` | outil de travail du binôme |
 | `anthropics/anthropic-sdk-python` | inférence par API |
 | `huggingface/transformers` | écosystème LLM |
 | `mistralai/client-python` | écosystème LLM |
