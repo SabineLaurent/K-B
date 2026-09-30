@@ -18,6 +18,16 @@ Au moins une source par type exigé par la certif, décidées le 2026-09-29 (le 
 Écartées de la v0 : Gmail, flux RSS des éditeurs, scraping d'Anthropic, historique Brave, favoris
 Firefox.
 
+## Sources étendues
+
+Pour les compétences de veille:
+
+- OWASP: webapp top 10, llm top 10, agents top 10
+- accessibilité: webaim, wcag, ...
+- ecoconception du numérique: ecoindex, ...
+- articles de blog de cyberattaque par agent
+- site "c'est qui qui a fuité"
+
 ## Notes de départ
 
 - github: api rest, releases de dépots choisis (frameworks, outils, owasp, etc), alertes de sécurités, repo top étoiles, repo meilleures progression étoiles
