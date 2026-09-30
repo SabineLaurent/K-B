@@ -1,0 +1,35 @@
+"""Command line: `kb collect`."""
+
+import argparse
+import os
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
+
+from k_b.collect import SOURCES, collect_all_sources
+
+DATA_DIR_VARIABLE = "KB_DATA_DIR"
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="kb")
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("collect", help="run every source and store its raw output in raw/")
+    parser.parse_args(argv)
+
+    data_dir = os.environ.get(DATA_DIR_VARIABLE)
+    if not data_dir:
+        print(f"error: {DATA_DIR_VARIABLE} must point to the data directory", file=sys.stderr)
+        return 2
+    if not Path(data_dir).is_dir():
+        print(f"error: {DATA_DIR_VARIABLE} is not an existing directory", file=sys.stderr)
+        return 2
+
+    if not SOURCES:
+        print("no source registered")
+    errors_by_source = collect_all_sources(SOURCES, Path(data_dir) / "raw", datetime.now(UTC))
+    for source_name, error in errors_by_source.items():
+        outcome = "ok" if error is None else f"failed ({type(error).__name__})"
+        print(f"{source_name}: {outcome}")
+    has_failure = any(error is not None for error in errors_by_source.values())
+    return 1 if has_failure else 0

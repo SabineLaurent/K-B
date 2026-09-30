@@ -69,3 +69,5 @@ chaque session par le `CLAUDE.md`. Le dépôt est public : rien de personnel ici
 - Pour la documentation d'une bibliothèque ou d'un service, utiliser Context7 plutôt qu'une
   lecture de page web.
 - Vérifier les faits avant de les présenter comme sûrs, sources à l'appui.
+- Après chaque code livré, Claude explique à Sabine le pourquoi et le comment, sans zone
+  d'ombre : Sabine doit maîtriser le code.
