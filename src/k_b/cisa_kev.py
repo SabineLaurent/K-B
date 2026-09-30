@@ -4,7 +4,7 @@ import csv
 import io
 import re
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 CVE_ID = re.compile(r"CVE-\d{4}-\d{4,}")
 REQUIRED_COLUMNS = (
@@ -30,11 +30,13 @@ class Vulnerability:
 def read_new_vulnerabilities(
     raw_catalog: bytes, last_collected_at: datetime | None
 ) -> list[Vulnerability]:
-    """One vulnerability per row added on or after the day of the last collection (None: all).
+    """One vulnerability per row added since the day before the last collection (None: all).
 
-    The day itself is kept: a row added that day after the collection would otherwise be lost.
+    dateAdded is a day without a time zone, not an instant: it is not converted, it is compared
+    with a day of margin, so no row is lost whatever its zone. Duplicates go at the merge.
     """
-    rows = csv.DictReader(io.StringIO(raw_catalog.decode("utf-8"), newline=""))
+    # utf-8-sig: a byte order mark would otherwise stick to the first column name.
+    rows = csv.DictReader(io.StringIO(raw_catalog.decode("utf-8-sig"), newline=""))
     columns = rows.fieldnames or []
     missing_columns = [column for column in REQUIRED_COLUMNS if column not in columns]
     if missing_columns:
@@ -42,7 +44,7 @@ def read_new_vulnerabilities(
     vulnerabilities = [parse_vulnerability(row, rows.line_num) for row in rows]
     if last_collected_at is None:
         return vulnerabilities
-    since = last_collected_at.date()
+    since = last_collected_at.date() - timedelta(days=1)
     return [vulnerability for vulnerability in vulnerabilities if vulnerability.date_added >= since]
 
 

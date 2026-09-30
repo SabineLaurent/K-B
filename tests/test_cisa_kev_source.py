@@ -10,11 +10,18 @@ from k_b.cisa_kev_source import CisaKevSource
 CATALOG = b"cveID,dateAdded\nCVE-2026-1234,2026-09-29\n"
 
 
+class FakeResponse(io.BytesIO):
+    def __init__(self, body, url):
+        super().__init__(body)
+        self.url = url
+
+
 class FakeUrlopen:
     """Stands for urllib's urlopen: records the request, answers without any network."""
 
-    def __init__(self, body=CATALOG, error=None):
+    def __init__(self, body=CATALOG, error=None, final_url=cisa_kev_source.CATALOG_URL):
         self.body = body
+        self.final_url = final_url
         self.error = error
         self.requests = []
         self.timeouts = []
@@ -24,7 +31,7 @@ class FakeUrlopen:
         self.timeouts.append(timeout)
         if self.error:
             raise self.error
-        return io.BytesIO(self.body)
+        return FakeResponse(self.body, self.final_url)
 
 
 @pytest.fixture
@@ -72,4 +79,18 @@ def test_a_catalog_larger_than_the_limit_is_refused(fake_urlopen, monkeypatch):
     monkeypatch.setattr(cisa_kev_source, "MAX_CATALOG_BYTES", len(CATALOG) - 1)
 
     with pytest.raises(ValueError, match="larger than"):
+        CisaKevSource().fetch(last_collected_at=None)
+
+
+@pytest.mark.parametrize(
+    "final_url",
+    [
+        "http://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv",
+        "https://www.cisa.gov.example.com/known_exploited_vulnerabilities.csv",
+    ],
+)
+def test_a_redirection_away_from_https_cisa_gov_is_refused(fake_urlopen, final_url):
+    fake_urlopen.final_url = final_url
+
+    with pytest.raises(ValueError, match="redirected"):
         CisaKevSource().fetch(last_collected_at=None)

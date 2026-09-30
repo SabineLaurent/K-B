@@ -19,8 +19,8 @@ def test_the_first_collection_reads_the_whole_catalog():
     ]
 
 
-def test_only_vulnerabilities_added_since_the_day_of_the_last_collection_are_read():
-    last_collected_at = datetime(2026, 9, 27, 18, 0, tzinfo=UTC)
+def test_only_vulnerabilities_added_since_the_day_before_the_last_collection_are_read():
+    last_collected_at = datetime(2026, 9, 28, 18, 0, tzinfo=UTC)
 
     vulnerabilities = read_new_vulnerabilities(EXTRACT, last_collected_at)
 
@@ -65,3 +65,18 @@ def test_a_row_with_missing_fields_is_refused():
 
     with pytest.raises(ValueError, match="line 2: missing fields"):
         read_new_vulnerabilities(f"{header}\nCVE-2026-1234,Apple\n".encode(), None)
+
+
+def test_a_vulnerability_dated_the_day_before_a_collection_run_after_midnight_utc_is_kept():
+    # 02:00 UTC on the 30th is still the 29th in the Americas: rows dated the 29th may follow.
+    last_collected_at = datetime(2026, 9, 30, 2, 0, tzinfo=UTC)
+
+    vulnerabilities = read_new_vulnerabilities(EXTRACT, last_collected_at)
+
+    assert [vulnerability.cve_id for vulnerability in vulnerabilities] == ["CVE-2026-86950"]
+
+
+def test_a_catalog_starting_with_a_byte_order_mark_is_read():
+    vulnerabilities = read_new_vulnerabilities(b"\xef\xbb\xbf" + EXTRACT, None)
+
+    assert len(vulnerabilities) == 4

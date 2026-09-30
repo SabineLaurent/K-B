@@ -10,6 +10,8 @@ USER_AGENT = "K-B (+https://github.com/SabineLaurent/K-B)"
 TIMEOUT_SECONDS = 30
 # The catalog weighs about 1 MB in 2026: ten times that is not a catalog any more.
 MAX_CATALOG_BYTES = 10 * 1024 * 1024
+# urlopen follows redirections, even to plain HTTP: only a catalog served from here is trusted.
+TRUSTED_URL_PREFIX = "https://www.cisa.gov/"
 HTTP_NOT_MODIFIED = 304
 
 
@@ -25,9 +27,12 @@ class CisaKevSource:
         request = Request(CATALOG_URL, headers=headers)
         try:
             with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+                if not response.url.startswith(TRUSTED_URL_PREFIX):
+                    raise ValueError(f"catalog redirected outside {TRUSTED_URL_PREFIX}, refused")
                 catalog = response.read(MAX_CATALOG_BYTES + 1)
         except HTTPError as error:
             if error.code == HTTP_NOT_MODIFIED:
+                error.close()
                 return None
             raise
         if len(catalog) > MAX_CATALOG_BYTES:

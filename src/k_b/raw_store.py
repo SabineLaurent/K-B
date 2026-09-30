@@ -37,13 +37,13 @@ def load_last_collection_dates(raw_dir: Path) -> dict[str, datetime]:
     if not state_path.exists():
         return {}
     try:
-        state_content = state_path.read_text(encoding="utf-8")
+        state_content = state_path.read_bytes()
     except OSError as error:
         raise InvalidCollectionStateError(
             f"{state_path} cannot be read: {error.strerror}"
         ) from error
     try:
-        stored_dates = json.loads(state_content)
+        stored_dates = json.loads(state_content.decode("utf-8"))
         if not isinstance(stored_dates, dict):
             raise ValueError("expected an object mapping each source name to a date")
         return {
