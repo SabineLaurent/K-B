@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from k_b.collect import SOURCES, collect_all_sources
+from k_b.raw_store import InvalidCollectionStateError
 
 DATA_DIR_VARIABLE = "KB_DATA_DIR"
 
@@ -27,7 +28,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if not SOURCES:
         print("no source registered")
-    errors_by_source = collect_all_sources(SOURCES, Path(data_dir) / "raw", datetime.now(UTC))
+    try:
+        errors_by_source = collect_all_sources(SOURCES, Path(data_dir) / "raw", datetime.now(UTC))
+    except InvalidCollectionStateError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
     for source_name, error in errors_by_source.items():
         outcome = "ok" if error is None else f"failed ({type(error).__name__})"
         print(f"{source_name}: {outcome}")

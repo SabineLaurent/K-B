@@ -9,6 +9,10 @@ from pathlib import Path
 COLLECTION_STATE_FILENAME = "collection_state.json"
 
 
+class InvalidCollectionStateError(ValueError):
+    """The collection state file cannot be trusted: collecting from it could skip data."""
+
+
 def write_file_atomically(path: Path, content: bytes) -> None:
     """Write to a temporary file, then rename it: a reader never sees a half-written file."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -32,13 +36,19 @@ def load_last_collection_dates(raw_dir: Path) -> dict[str, datetime]:
     state_path = raw_dir / COLLECTION_STATE_FILENAME
     if not state_path.exists():
         return {}
-    stored_dates = json.loads(state_path.read_text(encoding="utf-8"))
-    if not isinstance(stored_dates, dict):
-        raise ValueError(f"{state_path} must map each source name to a date")
-    return {
-        source_name: parse_utc_aware_datetime(stored_date)
-        for source_name, stored_date in stored_dates.items()
-    }
+    try:
+        stored_dates = json.loads(state_path.read_text(encoding="utf-8"))
+        if not isinstance(stored_dates, dict):
+            raise ValueError("expected an object mapping each source name to a date")
+        return {
+            source_name: parse_utc_aware_datetime(stored_date)
+            for source_name, stored_date in stored_dates.items()
+        }
+    except ValueError as error:
+        raise InvalidCollectionStateError(
+            f"{state_path} is invalid ({error}); fix it, or delete it to collect every source "
+            "from scratch"
+        ) from error
 
 
 def save_last_collection_dates(raw_dir: Path, last_collection_dates: dict[str, datetime]) -> None:

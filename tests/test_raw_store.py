@@ -4,6 +4,7 @@ import pytest
 
 from k_b.raw_store import (
     COLLECTION_STATE_FILENAME,
+    InvalidCollectionStateError,
     load_last_collection_dates,
     save_last_collection_dates,
     write_new_raw_file,
@@ -41,10 +42,11 @@ def test_last_collection_dates_round_trip_as_utc_aware_datetimes(tmp_path):
         '{"fake": "not a date"}',
         '{"fake": 42}',
         '["fake"]',
+        '{"fake": ',  # truncated JSON
     ],
 )
 def test_invalid_collection_state_is_refused(tmp_path, state_file_content):
     (tmp_path / COLLECTION_STATE_FILENAME).write_text(state_file_content, encoding="utf-8")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidCollectionStateError):
         load_last_collection_dates(tmp_path)
