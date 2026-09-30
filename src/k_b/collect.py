@@ -1,0 +1,57 @@
+"""Run every source and store its raw output; a failing source never stops the others."""
+
+import logging
+import re
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Protocol
+
+from k_b.raw_store import load_last_collection_dates, save_last_collection_dates, write_new_raw_file
+
+logger = logging.getLogger(__name__)
+
+SAFE_PATH_SEGMENT = re.compile(r"[a-z0-9_]+")
+
+
+class Source(Protocol):
+    name: str
+    extension: str
+
+    def fetch(self, last_collected_at: datetime | None) -> bytes:
+        """Return the raw content published since last_collected_at (None: first collection)."""
+        ...
+
+
+SOURCES: list[Source] = []
+
+
+def collect_all_sources(
+    sources: list[Source], raw_dir: Path, now: datetime
+) -> dict[str, Exception | None]:
+    """Collect each source; return, per source name, its error or None if it succeeded."""
+    if now.utcoffset() != timedelta(0):
+        raise ValueError(f"collection time must be in UTC, got {now!r}")
+    last_collection_dates = load_last_collection_dates(raw_dir)
+    errors_by_source: dict[str, Exception | None] = {}
+    for source in sources:
+        try:
+            collect_one_source(source, raw_dir, now, last_collection_dates.get(source.name))
+        except Exception as error:
+            logger.exception("collection failed for source %r", source.name)
+            errors_by_source[source.name] = error
+        else:
+            last_collection_dates[source.name] = now
+            errors_by_source[source.name] = None
+    save_last_collection_dates(raw_dir, last_collection_dates)
+    return errors_by_source
+
+
+def collect_one_source(
+    source: Source, raw_dir: Path, now: datetime, last_collected_at: datetime | None
+) -> None:
+    for path_segment in (source.name, source.extension):
+        if not SAFE_PATH_SEGMENT.fullmatch(path_segment):
+            raise ValueError(f"not a safe path segment: {path_segment!r}")
+    raw_content = source.fetch(last_collected_at)
+    raw_file_name = f"{now:%Y-%m-%dT%H%M%SZ}.{source.extension}"
+    write_new_raw_file(raw_dir / "automation" / source.name / raw_file_name, raw_content)
