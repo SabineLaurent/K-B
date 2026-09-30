@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Protocol
 
+from k_b.cisa_kev_source import CisaKevSource
 from k_b.raw_store import load_last_collection_dates, save_last_collection_dates, write_new_raw_file
 
 logger = logging.getLogger(__name__)
@@ -17,12 +18,15 @@ class Source(Protocol):
     name: str
     extension: str
 
-    def fetch(self, last_collected_at: datetime | None) -> bytes:
-        """Return the raw content published since last_collected_at (None: first collection)."""
+    def fetch(self, last_collected_at: datetime | None) -> bytes | None:
+        """Return the raw content published since last_collected_at (None: first collection).
+
+        Return None when the source says nothing changed since last_collected_at.
+        """
         ...
 
 
-SOURCES: list[Source] = []
+SOURCES: list[Source] = [CisaKevSource()]
 
 
 def collect_all_sources(
@@ -53,5 +57,7 @@ def collect_one_source(
         if not SAFE_PATH_SEGMENT.fullmatch(path_segment):
             raise ValueError(f"not a safe path segment: {path_segment!r}")
     raw_content = source.fetch(last_collected_at)
+    if raw_content is None:
+        return
     raw_file_name = f"{now:%Y-%m-%dT%H%M%SZ}.{source.extension}"
     write_new_raw_file(raw_dir / "automation" / source.name / raw_file_name, raw_content)
