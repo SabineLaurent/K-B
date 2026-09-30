@@ -26,8 +26,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {DATA_DIR_VARIABLE} is not an existing directory", file=sys.stderr)
         return 2
 
-    if not SOURCES:
-        print("no source registered")
     try:
         errors_by_source = collect_all_sources(SOURCES, Path(data_dir) / "raw", datetime.now(UTC))
     except InvalidCollectionStateError as error:

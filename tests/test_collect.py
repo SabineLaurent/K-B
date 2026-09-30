@@ -70,3 +70,19 @@ def test_a_source_name_that_is_not_a_safe_path_segment_is_refused(tmp_path):
     assert isinstance(errors_by_source["../escape"], ValueError)
     assert not (raw_dir / "escape").exists()
     assert not (raw_dir / "automation").exists()
+
+
+class UnchangedSource:
+    name = "unchanged"
+    extension = "csv"
+
+    def fetch(self, last_collected_at):
+        return None
+
+
+def test_a_source_with_nothing_new_writes_no_raw_file_but_succeeds(tmp_path):
+    errors_by_source = collect_all_sources([UnchangedSource()], tmp_path, FIRST_RUN_AT)
+
+    assert errors_by_source == {"unchanged": None}
+    assert not (tmp_path / "automation").exists()
+    assert load_last_collection_dates(tmp_path) == {"unchanged": FIRST_RUN_AT}

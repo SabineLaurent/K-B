@@ -1,3 +1,7 @@
+import os
+
+import pytest
+
 from test_collect import BrokenSource, WorkingSource
 
 from k_b import cli
@@ -45,3 +49,37 @@ def test_collect_fails_closed_with_a_clear_message_on_a_corrupted_state(
     assert "Traceback" not in error_output
     assert not (tmp_path / "raw" / "automation").exists()
     assert state_path.read_text(encoding="utf-8") == '{"working": '
+
+
+def test_collect_prints_nothing_but_the_error_on_a_corrupted_state(monkeypatch, tmp_path, capsys):
+    state_path = tmp_path / "raw" / "collection_state.json"
+    state_path.parent.mkdir()
+    state_path.write_text("[]", encoding="utf-8")
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(cli, "SOURCES", [])
+
+    assert cli.main(["collect"]) == 2
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads a file whatever its permissions")
+def test_collect_fails_closed_with_a_clear_message_on_an_unreadable_state(
+    monkeypatch, tmp_path, capsys
+):
+    state_path = tmp_path / "raw" / "collection_state.json"
+    state_path.parent.mkdir()
+    state_path.write_text("{}", encoding="utf-8")
+    state_path.chmod(0o000)
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(cli, "SOURCES", [WorkingSource()])
+
+    try:
+        exit_code = cli.main(["collect"])
+    finally:
+        state_path.chmod(0o600)
+
+    assert exit_code == 2
+    error_output = capsys.readouterr().err
+    assert "collection_state.json" in error_output
+    assert "permission" in error_output.lower()
+    assert not (tmp_path / "raw" / "automation").exists()
