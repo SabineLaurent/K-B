@@ -1,7 +1,8 @@
 # La commande `kb collect` : un squelette de collecte qui ne perd rien
 
 - **Date** : 2026-09-30
-- **Branche** : `feat/collect-command` (commit `8720ff4`)
+- **Branche** : `feat/collect-command` (commits `8eb2e99` pour la commande, `d2b987f` pour l'état
+  corrompu)
 - **Issue** : #9 « Lancer toutes les collectes d'une seule commande »
 - **Fichiers principaux** : `src/k_b/raw_store.py`, `src/k_b/collect.py`, `src/k_b/cli.py`, et
   leurs tests `tests/test_raw_store.py`, `tests/test_collect.py`, `tests/test_cli.py`.
@@ -80,7 +81,7 @@ La fonction renvoie `{nom de source: erreur ou None}` au lieu d'afficher quoi qu
 
 ### 3. Le brut immuable, écrit de façon atomique
 
-`src/k_b/raw_store.py:12-28` : deux fonctions empilées.
+`src/k_b/raw_store.py:16-32` : deux fonctions empilées.
 
 ```python
     with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as temporary_file:
@@ -94,7 +95,7 @@ La fonction renvoie `{nom de source: erreur ou None}` au lieu d'afficher quoi qu
   fichier final est soit absent, soit complet, jamais à moitié écrit, même si le programme est tué
   en cours de route. Le temporaire est créé **dans le même dossier** (`dir=path.parent`) pour
   garantir qu'il est sur le même disque.
-- **Immuabilité.** `write_new_raw_file` (`raw_store.py:26-27`) refuse d'écrire si le fichier
+- **Immuabilité.** `write_new_raw_file` (`raw_store.py:30-31`) refuse d'écrire si le fichier
   existe déjà. Un brut n'est jamais remplacé.
 
 Le chemin du brut est construit dans `src/k_b/collect.py:56-57` :
@@ -106,7 +107,7 @@ l'ISO 8601, qui posent problème dans les noms de fichiers sur certains système
 L'état est un fichier JSON, `raw/collection_state.json` :
 `{"working": "2026-09-30T10:00:00+00:00"}`. Il vient de l'extérieur du programme : on peut
 l'éditer à la main, le corrompre, le remplir d'une date sans fuseau. Il est donc validé dès sa
-lecture (`src/k_b/raw_store.py:53-60`) :
+lecture (`src/k_b/raw_store.py:63-70`) :
 
 ```python
     parsed_date = datetime.fromisoformat(stored_date)
@@ -118,6 +119,24 @@ Une date **naïve** (sans fuseau) est refusée, parce qu'elle ne se compare pas 
 date **aware** (avec fuseau). C'est le second défaut de brief09. Le refus arrête toute la collecte :
 mieux vaut ne pas collecter que collecter à partir d'un curseur douteux (principe « échouer
 fermé »).
+
+Tous les défauts possibles du fichier sont ramenés à une seule erreur, `InvalidCollectionStateError`
+(`src/k_b/raw_store.py:47-51`) : JSON tronqué, contenu qui n'est pas un objet, date illisible ou
+naïve.
+
+```python
+    except ValueError as error:
+        raise InvalidCollectionStateError(
+            f"{state_path} is invalid ({error}); fix it, or delete it to collect every source "
+            "from scratch"
+        ) from error
+```
+
+Un seul `except ValueError` suffit, parce que `json.JSONDecodeError` et `UnicodeDecodeError` sont
+tous deux des sous-classes de `ValueError`. La commande attrape cette erreur précise
+(`src/k_b/cli.py:31-35`) : elle affiche le message sur stderr et sort avec le code 2, sans trace
+Python. Le message dit quel fichier pose problème, pourquoi, et quoi faire. `from error` garde la
+cause d'origine pour qui débogue.
 
 ### 5. Les chemins protégés contre les noms dangereux
 
@@ -136,7 +155,7 @@ source mal nommée n'est même pas interrogée.
 
 ### 6. La ligne de commande, et le dossier de données obligatoire
 
-`src/k_b/cli.py:20-26` : `KB_DATA_DIR` doit être définie et désigner un dossier existant, sinon le
+`src/k_b/cli.py:21-27` : `KB_DATA_DIR` doit être définie et désigner un dossier existant, sinon le
 programme s'arrête avec le code 2.
 
 ```python
@@ -151,8 +170,8 @@ Les données collectées ne doivent jamais se retrouver dans le dépôt de code,
 « dossier existant » protège d'une faute de frappe dans le chemin, qui créerait sinon une
 arborescence au mauvais endroit.
 
-Codes de sortie (`cli.py:34-35`) : 0 si tout a réussi, 1 si au moins une source a échoué, 2 si la
-configuration est invalide. Un futur planificateur pourra ainsi détecter une collecte partielle.
+Codes de sortie (`cli.py:24-40`) : 0 si tout a réussi, 1 si au moins une source a échoué, 2 si la
+configuration ou l'état de collecte est invalide. Un futur planificateur pourra ainsi détecter une collecte partielle.
 L'affichage ne montre que le type d'erreur (`failed (ConnectionError)`) ; le détail complet va
 dans le journal.
 
@@ -168,6 +187,7 @@ dans le journal.
 | Trois modules | Tout dans `collect.py` | Consigne SoC de `.claude/rules/code.md` : fichiers, logique et présentation séparés. |
 | Bibliothèque standard seule (`argparse`, `json`, `tempfile`) | Click, Typer, Pydantic | Aucune dépendance nouvelle pour un squelette. La mission interdit de toucher aux dépendances. |
 | Vérification d'existence avant l'écriture | Verrou de fichier | Pas de collectes simultanées prévues pour l'instant (YAGNI). Voir « Zones non vérifiées ». |
+| Exception dédiée `InvalidCollectionStateError`, attrapée par la commande | Attraper `ValueError` dans `cli.py` | `collect_all_sources` lève aussi `ValueError` pour une heure non UTC, qui est un bug du programme et doit rester visible. L'exception dédiée ne vise que le fichier d'état. |
 | Reportés à #23 : timeout, User-Agent, ETag/304, date de publication | Les coder maintenant | Ils n'ont de sens qu'avec une vraie source HTTP. |
 
 ## Preuve
@@ -181,13 +201,15 @@ dans le journal.
 | `test_write_new_raw_file_refuses_to_overwrite` | Le premier contenu reste intact après une tentative d'écrasement. |
 | `test_a_source_name_that_is_not_a_safe_path_segment_is_refused` | `../escape` est refusé, rien n'est écrit. |
 | `test_last_collection_dates_round_trip_as_utc_aware_datetimes` | Une date sauvegardée se relit identique, avec son fuseau. |
-| `test_invalid_collection_state_is_refused` (4 cas) | Date naïve, texte, nombre, liste : tous refusés par `ValueError`. |
+| `test_invalid_collection_state_is_refused` (5 cas) | Date naïve, texte, nombre, liste, JSON tronqué : tous refusés par `InvalidCollectionStateError`. |
 | `test_collect_refuses_to_run_without_a_data_directory`, `..._that_does_not_exist` | Code 2 sans configuration valide. |
 | `test_collect_reports_a_failure_but_still_stores_the_other_sources` | Le chemin complet par la commande : code 1 et le brut de la source réussie écrit. |
-| `uv run pytest` | 16 tests passent. |
+| `test_collect_fails_closed_with_a_clear_message_on_a_corrupted_state` | État corrompu : code 2, message qui nomme `collection_state.json`, aucune trace, rien collecté, fichier d'état laissé tel quel. |
+| `uv run pytest` | 18 tests passent. |
 | `kb collect` avec une source factice en panne (lancé à la main) | Affiche `broken: failed (ConnectionError)`, code 1. La trace complète part sur stderr alors que `logging` n'est pas configuré : c'est son gestionnaire de secours qui l'affiche. |
 | `ls -l raw/` après une collecte | `collection_state.json` est en `-rw-------` : `NamedTemporaryFile` crée en `0600`, et le renommage garde ces droits. Les fichiers ne sont lisibles que par leur propriétaire. |
 | `KB_DATA_DIR=<dossier> uv run kb collect` | Affiche `no source registered`, code 0, crée `raw/collection_state.json` contenant `{}`. |
+| La même commande avec une date naïve dans l'état (lancée à la main) | `error: …/collection_state.json is invalid (date without a time zone: '2026-09-30T10:00:00'); fix it, or delete it…`, code 2. |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -201,27 +223,30 @@ dans le journal.
    à la fusion. Voir `collect.py:45`.
 3. **« Où est la sécurité ? »**
    - Les noms qui forment des chemins sont validés (`collect.py:52-54`).
-   - L'état relu est validé et refusé en cas de doute (`raw_store.py:53-60`).
-   - Les données ne peuvent pas atterrir dans le dépôt (`cli.py:20-26`).
-   - Les messages affichés ne montrent que le type d'erreur (`cli.py:32`).
+   - L'état relu est validé et refusé en cas de doute (`raw_store.py:63-70`), avec un message
+     clair et sans trace (`cli.py:31-35`).
+   - Les données ne peuvent pas atterrir dans le dépôt (`cli.py:21-27`).
+   - Les messages affichés ne montrent que le type d'erreur (`cli.py:37`).
 4. **« Pourquoi attraper `Exception`, ce qui est d'habitude déconseillé ? »** Parce qu'une source
    peut échouer de n'importe quelle façon (réseau, format, bug), et qu'aucune ne doit arrêter les
    autres. L'erreur n'est pas avalée : elle est journalisée avec sa trace, renvoyée, et elle
    produit le code de sortie 1. Voir `collect.py:39-41`.
 5. **« Pourquoi un fichier temporaire, au lieu d'écrire directement ? »** Pour qu'une coupure en
    pleine écriture ne laisse jamais un fichier tronqué, qu'on prendrait ensuite pour un brut
-   valide. Voir `raw_store.py:15-18`.
+   valide. Voir `raw_store.py:19-22`.
 
 ## Zones non vérifiées
 
 - **Fichier temporaire orphelin.** Si `temporary_file.write(content)` échoue (disque plein), le
   fichier temporaire reste dans le dossier : le `try` ne couvre que `os.replace`
-  (`raw_store.py:15-21`). Cas non testé.
-- **État corrompu vu par l'utilisateur.** Un `collection_state.json` invalide arrête bien la
-  collecte, mais par une exception non rattrapée dans `cli.py` : l'utilisateur voit une trace
-  Python, pas un message propre. Seule la fonction de lecture est testée, pas ce chemin de bout en
-  bout. Un JSON illisible lève `json.JSONDecodeError`, une sous-classe de `ValueError` : non testé
-  non plus.
+  (`raw_store.py:19-25`). Cas non testé.
+- **État illisible.** Un fichier d'état qui n'est pas en UTF-8 lève `UnicodeDecodeError`, qui est
+  couvert par le même `except ValueError`. Ce cas n'est pas testé. Un fichier d'état que le
+  programme n'a pas le droit de lire lève `PermissionError`, qui n'est pas une `ValueError` : il
+  s'affiche encore comme une trace Python.
+- **Ordre de l'affichage.** Sur un état corrompu sans source enregistrée, `no source registered`
+  (stdout) s'affiche avant le message d'erreur (stderr). C'est sans conséquence, mais un peu
+  déroutant.
 - **Collectes simultanées.** Entre `path.exists()` et `os.replace`, une autre collecte pourrait
   écrire le même fichier. Improbable (même seconde, même source), non protégé.
 - **Windows.** L'atomicité de `os.replace` est supposée pour macOS et Linux uniquement.
