@@ -27,6 +27,9 @@ personnel.
 - **Board** (GitHub Project n° 12) : ne jamais toucher `Iteration`, jalons, champs ni vues —
   time-knight les tient. Pour `Status` et `Size`, annoncer : carte, champ, avant → après.
 - Une PR ferme ses issues par `Closes #n` (un mot-clé par issue).
+- Avant d'ouvrir une PR de code, tests verts : `/code-review` dans un sous-agent sans contexte,
+  plus `/security-review` si la PR touche une entrée externe. Constats rapportés, corrigés sur
+  accord de Sabine ; la note pédagogique vient après ; compte rendu en commentaire de la PR.
 - Avant d'ouvrir une PR de code : invoquer `/note-pedago-ls` via l'outil Skill ; la note
   (`docs/journaling/`) entre dans la PR.
 - **Reprise** : lire `MISSION.md`, puis `git status` et la branche, puis le dernier commentaire
