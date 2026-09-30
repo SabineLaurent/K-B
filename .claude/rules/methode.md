@@ -1,4 +1,4 @@
-<!-- consignes/methode.md v2026-09-30 — source : time-knight. Ne pas modifier ici sans la reporter. -->
+<!-- consignes/methode.md v2026-09-30b — source : time-knight. Ne pas modifier ici sans la reporter. -->
 # Méthode de travail
 
 Le cycle de toute PR de code. Ce qui est propre au dépôt (board, taille des PR, briques en cycle
@@ -25,6 +25,17 @@ complet) reste dans son `CLAUDE.md` et prime.
 9. **Sabine fusionne.** Claude ne fusionne jamais.
 
 Une PR de documentation ou de configuration seule saute les étapes 3, 5 et 6.
+
+## Tenir le board
+
+La carte suit l'issue ; chaque changement de `Status` s'annonce (carte, avant → après).
+
+| Moment | Status |
+|---|---|
+| On commence l'issue | In progress |
+| Sa PR est ouverte | In review |
+| L'issue est fermée | Done (le workflow du board le fait ; sinon à la main) |
+| Une issue fermée débloque une autre (« Dépend de ») | la débloquée passe en Ready, si toutes ses dépendances sont fermées |
 
 ## Actions que l'outil peut refuser
 
