@@ -62,6 +62,43 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   chaque collecte où le catalogue a changé stocke le catalogue entier (environ 1 Mo en 2026).
   Une collecte sans changement n'écrit rien (réponse HTTP 304). — PR de #23
 
+### Sources suivies et accès
+
+- **arXiv : une seule catégorie pour démarrer, `cs.CR`.** Pourquoi : démarrer avec le minimum et
+  grossir à l'usage (choix de Sabine). `cs.CR` couvre la sécurité, en lien avec OWASP et CISA KEV.
+  Options écartées pour l'instant : `cs.SE` et `cs.IR` (proposées, remises à plus tard), `cs.CL`
+  (environ 940 papiers par semaine), `cs.AI` et `cs.LG` (plus de 2 000 chacune : trop de bruit).
+  Six mots-clés de départ sont notés dans `docs/sources.md` ; leur usage reste ouvert (voir
+  plus bas). — PR de #24
+- **Dépôts GitHub suivis pour démarrer : `langchain-ai/langchain`, `langchain-ai/langgraph` et
+  `run-llama/llama_index`.** Pourquoi : démarrer petit (choix de Sabine). Onze autres dépôts
+  proposés sont gardés sous le coude dans `docs/sources.md` : l'outillage de K-B (uv, pytest,
+  FastAPI, Pydantic, Claude Code, SDK Anthropic), le reste de l'écosystème LLM, le top 10 LLM
+  d'OWASP et Obsidian. Écartés : les dépôts qui ne publient que des tags (`python/cpython`,
+  `OWASP/Top10`), car l'API des releases n'y trouve rien. Limite assumée :
+  `langchain-ai/langchain` est un monorepo qui publie une release par paquet, donc bruyant.
+  — PR de #24
+- **Jeton GitHub *fine-grained*, accès aux dépôts publics seulement, sans aucune permission.**
+  Pourquoi : moindre privilège. La collecte ne lit que des données publiques (releases,
+  advisories, recherche de dépôts), qui ne demandent aucune permission ; le jeton ne sert qu'à
+  relever le quota de 60 à 5 000 requêtes par heure (vérifié le 2026-09-30). S'il fuite, il ne
+  lit aucun dépôt privé et n'écrit nulle part. Option écartée : un jeton *classic*, dont les
+  scopes sont larges (`repo` ouvre tous les dépôts privés en écriture). Expiration fixée à la
+  création. — PR de #24
+- **Le jeton vit dans `KB_GITHUB_TOKEN`, et non `GITHUB_TOKEN`.** Pourquoi : la CLI `gh` lit
+  `GITHUB_TOKEN` en priorité sur la connexion de l'utilisatrice ; ce jeton sans permission aurait
+  alors bloqué toute écriture par `gh` (PR, issues). — PR de #24
+- **Le jeton est rangé dans le `.env` du dépôt, ignoré par git, et chargé au lancement.** Choix de
+  Sabine. Options écartées : le trousseau macOS avec un `export` dans `~/.zshrc`, qui met le jeton
+  dans tous les processus de tous les terminaux ; le trousseau lu commande par commande, plus
+  strict mais plus lourd. Limite assumée : le jeton est en clair sur le disque, acceptable pour
+  un jeton en lecture publique seule, sans permission et qui expire. — PR de #24
+
 ## Décisions encore ouvertes
 
-_Aucune pour l'instant._
+- **arXiv : filtrer par mots-clés à la requête ou à la lecture ?** Filtrer à la requête réduit le
+  volume mais revient à filtrer à la collecte, ce que la décision du 2026-09-30 sur le brut
+  intact écarte. À trancher dans les spécifications (#6).
+- **BigQuery : en attente.** Le bac à sable (sans compte de facturation) n'est pas créé, et le
+  mode d'authentification du pipeline n'est pas choisi : compte de service au rôle minimal
+  (BigQuery Job User), clé hors du dépôt, ou identifiants par défaut via `gcloud`. Bloque #16.
