@@ -145,12 +145,14 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   presque rien. Limite assumée : un papier au vocabulaire nouveau, ou classé en `cs.CR` avec
   `cs.CL` ou `cs.LG` seulement, n'est pas collecté. — PR de #6
 - **arXiv ne suit pas les LLM, les agents et les nouvelles architectures en général ; Hugging Face
-  *Daily Papers*, qui les sélectionne, est gardé pour plus tard.** Choix de Sabine. Pourquoi :
-  `cs.CL` et `cs.AI` publient 600 à 1 350 papiers par semaine, et aucun mot-clé ne rend ce flux
-  lisible ; il faut une sélection faite par d'autres. En v0, l'édition AI de TLDR (#13) donne
-  l'actualité générale de l'IA. Hugging Face, une sélection votée par la communauté (131 à 165 papiers par semaine, dont on garderait
-  les 10 plus votés), ajouterait une source à dix jours du jalon ; ses mesures sont notées dans
-  `docs/sources.md`. Limite assumée : en v0, aucune source ne suit les papiers de ce sujet. — PR de #6
+  *Daily Papers*, une sélection générale de papiers d'IA, est gardé pour plus tard.** Choix de
+  Sabine. Pourquoi : `cs.CL` et `cs.AI` publient 600 à 1 350 papiers par semaine, et aucun mot-clé
+  ne rend ce flux lisible ; il faut une sélection faite par d'autres. En v0, l'édition AI de TLDR
+  (#13) donne l'actualité générale de l'IA. Hugging Face, une sélection votée par la communauté
+  (131 à 165 papiers par semaine, dont environ 60 % parlent de LLM ou d'agents et le reste surtout
+  de vision ; on garderait les 10 plus votés), ajouterait une source à dix jours du jalon ; ses
+  mesures sont notées dans `docs/sources.md`. Limite assumée : en v0, aucune source ne suit les
+  papiers de ce sujet. — PR de #6
 
 ## Décisions encore ouvertes
 

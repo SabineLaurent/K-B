@@ -75,8 +75,9 @@ Le nom seulement, jamais la valeur.
 
 ### Pour plus tard : Hugging Face *Daily Papers*
 
-Papiers (surtout arXiv) sélectionnés et votés par la communauté : LLM, agents, nouvelles
-architectures. API JSON `https://huggingface.co/api/daily_papers?week=AAAA-Www&limit=100&p=<page>`,
+Papiers (surtout arXiv) sélectionnés et votés par la communauté : une sélection générale d'IA.
+Semaine 39 : 87 papiers sur 140 parlent de LLM ou d'agents, 71 de vision, image, vidéo ou 3D ;
+parmi les 10 plus votés, 6 parlent de LLM ou d'agents (comptage par mots du titre et du résumé). API JSON `https://huggingface.co/api/daily_papers?week=AAAA-Www&limit=100&p=<page>`,
 sans authentification, documentée seulement de façon
 [non officielle](https://github.com/0x0is1/hf-papers-api-docs). Mesuré le 2026-10-01 : 131 à 165
 papiers par semaine (semaines 36 à 39), deux pages ; semaine 39, le 10ᵉ papier a 130 votes, le
