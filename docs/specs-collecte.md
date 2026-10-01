@@ -151,8 +151,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    `brief09_assistant-veille-tech` (relu le 2026-10-01) a servi d'indication, pas de modèle : il
    ne fait pas autorité. On y retrouve un modèle d'article commun et la date de révision arXiv. À
    l'inverse, brief09 ne dédoublonne que sur l'URL exacte, ignore les révisions (première version
-   gardée), date la collecte sans fuseau et retire les doublons sans trace. Laissé de côté : un même article publié sous deux URL (hash du contenu), et les
-   étiquettes posées par un LLM, hors de la v0.
+   gardée), date la collecte sans fuseau et retire les doublons sans trace. Laissé de côté : un
+   même article publié sous deux URL (hash du contenu), et les étiquettes posées par un LLM, hors
+   de la v0.
 4. **Stockage** du jeu d'items dans la base (hors du périmètre de ce document).
 
 ## Pourquoi BigQuery
