@@ -41,7 +41,7 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
 - **BigQuery.**
   - Pourquoi : l'API GitHub ne peut pas repérer les dépôts qui montent. Sa recherche s'arrête à
     1 000 résultats et trie par total d'étoiles, et `/events` est plafonné à 300 événements.
-  - Bac à sable, **sans compte de facturation rattaché** : au-delà d'1 To par mois, la requête
+  - Bac à sable, **sans compte de facturation rattaché** : au-delà d'1 Tio par mois, la requête
     est refusée, pas facturée.
   - Chaque requête est vérifiée par `dry_run` et plafonnée par `maximum_bytes_billed`.
 
