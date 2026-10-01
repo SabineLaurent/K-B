@@ -11,7 +11,7 @@ Au moins une source par type exigé par la certif, décidées le 2026-09-29 (le 
 | API arXiv | service web | nouveaux papiers : métadonnées et résumé |
 | Catalogue CISA KEV (CSV) | fichier | vulnérabilités activement exploitées, ajoutées depuis la dernière collecte |
 | Web Clipper | fichier | pages gardées à la main, en `.md` |
-| tldr.tech | scraping | un item par article de chaque édition (dont l'édition AI) |
+| tldr.tech | scraping | un item par article de chaque édition |
 | Zotero (`zotero.sqlite`) | base de données | papiers lus, surlignages, chemin du PDF |
 | GH Archive sur BigQuery | big data | dépôts qui gagnent le plus d'étoiles sur 3 jours |
 

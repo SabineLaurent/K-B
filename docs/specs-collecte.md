@@ -49,8 +49,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Limites** : une requête toutes les 3 secondes au plus, une connexion à la fois, pour toutes
   les machines ensemble ; 2 000 résultats au plus par page. Piège : avec `max_results=0`, le
   total renvoyé vaut toujours 1 ; demander au moins un résultat pour le lire.
-- **Ce qu'on suit** : la sécurité de l'IA (agents, LLM, failles apportées par ces briques). Les
-  papiers sur les LLM, les agents et les architectures passent par TLDR AI.
+- **Ce qu'on suit** : la sécurité de l'IA (agents, LLM, failles apportées par ces briques).
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-01) : les
   papiers classés à la fois en `cs.CR` et en `cs.AI`, et dont le résumé contient un mot-clé :
   `cat:cs.CR AND cat:cs.AI AND (abs:"prompt injection" OR abs:jailbreak OR abs:"red teaming" OR
@@ -100,8 +99,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   pages. Les liens portent des paramètres de suivi `utm_*` et certaines entrées sont
   sponsorisées : à traiter à la lecture.
 - **Données personnelles** : aucune attendue.
-- **Suivi** : l'édition **AI** est retenue (2026-10-01) : elle couvre les LLM, les agents et les
-  nouvelles architectures. Les autres éditions sont à choisir dans #13 (neuf candidates dans
+- **Suivi** : l'édition **AI** est retenue (2026-10-01). Les autres éditions sont à choisir dans
+  #13 (neuf candidates dans
   [sources-detaillees.md](sources-detaillees.md)).
 
 ### Zotero — base de données

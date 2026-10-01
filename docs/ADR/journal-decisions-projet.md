@@ -144,13 +144,13 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   (99 à 113), trop pour être lus. Retirés : `LLM security` et `agent hijacking`, qui ne ramenaient
   presque rien. Limite assumée : un papier au vocabulaire nouveau, ou classé en `cs.CR` avec
   `cs.CL` ou `cs.LG` seulement, n'est pas collecté. — PR de #6
-- **Les LLM, les agents et les nouvelles architectures passent par TLDR AI en v0 ; Hugging Face
-  *Daily Papers* est gardé pour plus tard.** Choix de Sabine. Pourquoi : `cs.CL` et `cs.AI`
-  publient 600 à 1 350 papiers par semaine, et aucun mot-clé ne rend ce flux lisible ; il faut une
-  sélection faite par d'autres. TLDR AI, une sélection éditoriale, est déjà en v0 (#13). Hugging
-  Face, une sélection votée par la communauté (131 à 165 papiers par semaine, dont on garderait
+- **arXiv ne suit pas les LLM, les agents et les nouvelles architectures en général ; Hugging Face
+  *Daily Papers*, qui les sélectionne, est gardé pour plus tard.** Choix de Sabine. Pourquoi :
+  `cs.CL` et `cs.AI` publient 600 à 1 350 papiers par semaine, et aucun mot-clé ne rend ce flux
+  lisible ; il faut une sélection faite par d'autres. En v0, l'édition AI de TLDR (#13) donne
+  l'actualité générale de l'IA. Hugging Face, une sélection votée par la communauté (131 à 165 papiers par semaine, dont on garderait
   les 10 plus votés), ajouterait une source à dix jours du jalon ; ses mesures sont notées dans
-  `docs/sources.md`. Limite assumée : en v0, ce sujet ne dépend que d'une sélection éditoriale. — PR de #6
+  `docs/sources.md`. Limite assumée : en v0, aucune source ne suit les papiers de ce sujet. — PR de #6
 
 ## Décisions encore ouvertes
 
