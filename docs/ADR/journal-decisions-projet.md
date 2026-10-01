@@ -119,7 +119,7 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   arXiv cible la sécurité des LLM, des agents et de l'IA en général, et les papiers qui documentent
   une attaque et son déroulé. Elle ne vise pas une liste exhaustive, qui n'aurait pas d'intérêt et
   noierait l'information. Mesuré sur la semaine du 2026-09-24 au 2026-10-01 : 45 papiers en
-  `cs.CR` avec les mots-clés, contre 358 sans. Option écartée : collecter tout `cs.CR` et filtrer
+  `cs.CR` avec les 6 mots-clés de départ, contre 358 sans. Option écartée : collecter tout `cs.CR` et filtrer
   à la lecture, cohérent avec la règle mais hors du besoin. Limite assumée : un papier que les
   mots-clés manquent n'est jamais collecté, et un mot-clé ajouté ne s'applique pas aux semaines
   passées. — PR de #6
@@ -134,8 +134,8 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   (minimisation, RGPD art. 5.1.c). Il reste dans le brut, intact. — PR de #6
 - **arXiv ne suit que la sécurité de l'IA : papiers classés à la fois en `cs.CR` et `cs.AI`, avec
   8 mots-clés** (`prompt injection`, `jailbreak`, `red teaming`, `adversarial attack`,
-  `backdoor`, `poisoning`, `membership inference`, `agent security`). Remplace la requête du
-  2026-09-30 (`cs.CR` et 6 mots-clés). Choix de Sabine. Pourquoi : le croisement garantit le sujet
+  `backdoor`, `poisoning`, `membership inference`, `agent security`). Remplace le choix du
+  2026-09-30 (`cs.CR` seule, 6 mots-clés de départ). Choix de Sabine. Pourquoi : le croisement garantit le sujet
   par le classement de l'auteur, et les mots-clés gardent un flux lisible, environ 20 papiers par
   semaine (19 à 22 en moyenne sur septembre et avril 2026). Options écartées, mesurées sur ces
   deux mois : `cs.CR` avec les mots-clés seuls (38 à 52 par semaine) ; les mots-clés sur `cs.CR`,
@@ -146,13 +146,13 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   `cs.CL` ou `cs.LG` seulement, n'est pas collecté. — PR de #6
 - **arXiv ne suit pas les LLM, les agents et les nouvelles architectures en général ; Hugging Face
   *Daily Papers*, une sélection générale de papiers d'IA, est gardé pour plus tard.** Choix de
-  Sabine. Pourquoi : `cs.CL` et `cs.AI` publient 600 à 1 350 papiers par semaine, et aucun mot-clé
+  Sabine. Pourquoi : `cs.CL` et `cs.AI` publient 590 à 1 350 papiers par semaine, et aucun mot-clé
   ne rend ce flux lisible ; il faut une sélection faite par d'autres. En v0, l'édition AI de TLDR
   (#13) donne l'actualité générale de l'IA. Hugging Face, une sélection votée par la communauté
   (131 à 165 papiers par semaine, dont environ 60 % parlent de LLM ou d'agents et le reste surtout
   de vision ; on garderait les 10 plus votés), ajouterait une source à dix jours du jalon ; elle
-  est notée « pour plus tard » dans `docs/sources.md`. Limite assumée : en v0, aucune source ne suit les
-  papiers de ce sujet. — PR de #6
+  est notée « pour plus tard » dans `docs/sources.md`. Limite assumée : en v0, aucune source ne
+  suit les papiers de ce sujet. — PR de #6
 
 ## Décisions encore ouvertes
 

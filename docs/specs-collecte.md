@@ -1,8 +1,8 @@
 # Spécifications de la collecte et de l'agrégation
 
-Pour chacune des 7 sources de la v0 : la technologie, l'accès et l'authentification, les limites de débit,
-les données personnelles, et ce qu'on suit. Puis le chemin du brut jusqu'au jeu d'items final, et
-la justification de BigQuery. Les décisions et leur pourquoi sont dans le
+Pour chacune des 7 sources de la v0 : la technologie, l'accès et l'authentification, les limites
+de débit, les données personnelles, et ce qu'on suit. Puis le chemin du brut jusqu'au jeu d'items
+final, et la justification de BigQuery. Les décisions et leur pourquoi sont dans le
 [journal ADR](ADR/journal-decisions-projet.md) ; les listes suivies, dans [sources.md](sources.md).
 
 Faits vérifiés le 2026-10-01, sources en fin de page.
@@ -47,8 +47,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Ce qu'on en tire** : métadonnées et résumé des papiers soumis depuis la dernière collecte.
 - **Accès** : sans authentification.
 - **Limites** : une requête toutes les 3 secondes au plus, une connexion à la fois, pour toutes
-  les machines ensemble ; 2 000 résultats au plus par page. Piège : avec `max_results=0`, le
-  total renvoyé vaut toujours 1 ; demander au moins un résultat pour le lire.
+  les machines ensemble ; 2 000 résultats au plus par page.
 - **Ce qu'on suit** : la sécurité de l'IA (agents, LLM, failles apportées par ces briques).
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-01) : les
   papiers classés à la fois en `cs.CR` et en `cs.AI`, et dont le résumé contient un mot-clé :
@@ -57,7 +56,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   abs:"agent security") AND submittedDate:[<dernière collecte> TO <maintenant>]`.
 - **Volume mesuré** (moyenne par 7 jours, septembre / avril 2026) : `cs.CR` sans filtre 276 / 199 ;
   `cs.CR` × `cs.AI` 78 / 70 ; avec les mots-clés, **22 / 19**.
-- **Pièges de l'API** : avec `max_results=0`, le total renvoyé vaut toujours 1 ; les parenthèses
+- **Pièges de l'API** : avec `max_results=0`, le total renvoyé vaut toujours 1 (demander au moins
+  un résultat pour le lire) ; les parenthèses
   imbriquées et `ANDNOT` combiné à d'autres opérateurs donnent des totaux faux. Sous charge,
   l'API répond `503` ou ne répond pas : le collecteur réessaie plus tard au lieu d'échouer.
 - **Données personnelles** : noms des auteurs des papiers, publiés par eux ; gardés, car ils
@@ -100,8 +100,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   sponsorisées : à traiter à la lecture.
 - **Données personnelles** : aucune attendue.
 - **Suivi** : l'édition **AI** est retenue (2026-10-01). Les autres éditions sont à choisir dans
-  #13 (neuf candidates dans
-  [sources-detaillees.md](sources-detaillees.md)).
+  #13 (neuf candidates dans [sources-detaillees.md](sources-detaillees.md)).
 
 ### Zotero — base de données
 
@@ -151,9 +150,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 
    `brief09_assistant-veille-tech` (relu le 2026-10-01) a servi d'indication, pas de modèle : il
    ne fait pas autorité. On y retrouve un modèle d'article commun et la date de révision arXiv. À
-   l'inverse, brief09 ne dédoublonne que sur l'URL exacte, ignore les
-   révisions (première version gardée), date la collecte sans fuseau et retire les doublons sans
-   trace. Laissé de côté : un même article publié sous deux URL (hash du contenu), et les
+   l'inverse, brief09 ne dédoublonne que sur l'URL exacte, ignore les révisions (première version
+   gardée), date la collecte sans fuseau et retire les doublons sans trace. Laissé de côté : un même article publié sous deux URL (hash du contenu), et les
    étiquettes posées par un LLM, hors de la v0.
 4. **Stockage** du jeu d'items dans la base (hors du périmètre de ce document).
 
