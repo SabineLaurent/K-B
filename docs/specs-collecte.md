@@ -1,6 +1,6 @@
 # Spécifications de la collecte et de l'agrégation
 
-Pour chacune des 8 sources de la v0 : la technologie, l'accès et l'authentification, les limites de débit,
+Pour chacune des 7 sources de la v0 : la technologie, l'accès et l'authentification, les limites de débit,
 les données personnelles, et ce qu'on suit. Puis le chemin du brut jusqu'au jeu d'items final, et
 la justification de BigQuery. Les décisions et leur pourquoi sont dans le
 [journal ADR](ADR/journal-decisions-projet.md) ; les listes suivies, dans [sources.md](sources.md).
@@ -50,7 +50,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   les machines ensemble ; 2 000 résultats au plus par page. Piège : avec `max_results=0`, le
   total renvoyé vaut toujours 1 ; demander au moins un résultat pour le lire.
 - **Ce qu'on suit** : la sécurité de l'IA (agents, LLM, failles apportées par ces briques). Les
-  papiers sur les LLM, les agents et les architectures passent par TLDR AI et Hugging Face.
+  papiers sur les LLM, les agents et les architectures passent par TLDR AI.
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-01) : les
   papiers classés à la fois en `cs.CR` et en `cs.AI`, et dont le résumé contient un mot-clé :
   `cat:cs.CR AND cat:cs.AI AND (abs:"prompt injection" OR abs:jailbreak OR abs:"red teaming" OR
@@ -103,25 +103,6 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Suivi** : l'édition **AI** est retenue (2026-10-01) : elle couvre les LLM, les agents et les
   nouvelles architectures. Les autres éditions sont à choisir dans #13 (neuf candidates dans
   [sources-detaillees.md](sources-detaillees.md)).
-
-### Hugging Face *Daily Papers* — service web
-
-- **Technologie** : API JSON `https://huggingface.co/api/daily_papers`, paramètres `week`
-  (`AAAA-Www`), `limit` (100 au plus) et `p` (page). Documentation non officielle seulement.
-- **Ce qu'on en tire** : les papiers (surtout arXiv) soumis à la sélection quotidienne de Hugging
-  Face et votés par la communauté : titre, résumé, identifiant arXiv, nombre de votes. Sert les
-  LLM, les agents et les nouvelles architectures.
-- **Accès** : sans authentification, lecture seule.
-- **Limites** : pas de quota publié ; 100 papiers au plus par page, donc pagination. Volume
-  mesuré : 131 à 165 papiers par semaine (semaines 36 à 39 de 2026), soit deux pages. L'API peut changer sans préavis : le
-  lecteur valide le JSON et refuse ce qui n'est pas prévu.
-- **Sélection** : toute la semaine est stockée brute ; les **10 papiers les plus votés** de la
-  semaine sont retenus à la lecture (2026-10-01, pour se faire une idée ; à ajuster à l'usage).
-  L'API ne donne pas le nombre de lectures : les votes en tiennent lieu. Semaine 39 : le 10ᵉ papier
-  a 130 votes, le médian 18.
-- **Données personnelles** : le nom d'utilisateur de la personne qui a soumis le papier, non
-  conservé dans les items (comme les logins GitHub) ; les auteurs des papiers, gardés.
-- **État** : nouvelle source décidée le 2026-10-01, issue à créer.
 
 ### Zotero — base de données
 
@@ -190,7 +171,6 @@ facturation, le dépassement est refusé.
 - [Rate limits for the REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api) — GitHub
 - [Terms of Use for arXiv APIs](https://info.arxiv.org/help/api/tou.html)
 - [arXiv category taxonomy](https://arxiv.org/category_taxonomy)
-- [Hugging Face Papers API (documentation non officielle)](https://github.com/0x0is1/hf-papers-api-docs)
 - [Try BigQuery using the sandbox](https://docs.cloud.google.com/bigquery/docs/sandbox)
 - [Les six grands principes du RGPD](https://www.cnil.fr/fr/comprendre-le-rgpd/les-six-grands-principes-du-rgpd) — CNIL
 - [Access annotation database](https://forums.zotero.org/discussion/101244/access-annotation-database) — forum Zotero

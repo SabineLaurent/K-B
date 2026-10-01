@@ -12,7 +12,6 @@ Au moins une source par type exigé par la certif, décidées le 2026-09-29 (le 
 | Catalogue CISA KEV (CSV) | fichier | vulnérabilités activement exploitées, ajoutées depuis la dernière collecte |
 | Web Clipper | fichier | pages gardées à la main, en `.md` |
 | tldr.tech | scraping | un item par article de chaque édition (dont l'édition AI) |
-| Hugging Face *Daily Papers* | service web | papiers votés par la communauté : LLM, agents, architectures (ajoutée le 2026-10-01) |
 | Zotero (`zotero.sqlite`) | base de données | papiers lus, surlignages, chemin du PDF |
 | GH Archive sur BigQuery | big data | dépôts qui gagnent le plus d'étoiles sur 3 jours |
 
@@ -73,6 +72,18 @@ Le nom seulement, jamais la valeur.
 | `KB_GITHUB_TOKEN` | jeton GitHub *fine-grained*, lecture seule des dépôts publics, sans permission ; création et vérification : [jeton-github.md](jeton-github.md) |
 
 ## Sources étendues
+
+### Pour plus tard : Hugging Face *Daily Papers*
+
+Papiers (surtout arXiv) sélectionnés et votés par la communauté : LLM, agents, nouvelles
+architectures. API JSON `https://huggingface.co/api/daily_papers?week=AAAA-Www&limit=100&p=<page>`,
+sans authentification, documentée seulement de façon
+[non officielle](https://github.com/0x0is1/hf-papers-api-docs). Mesuré le 2026-10-01 : 131 à 165
+papiers par semaine (semaines 36 à 39), deux pages ; semaine 39, le 10ᵉ papier a 130 votes, le
+médian 18. Idée retenue : stocker toute la semaine, garder les 10 plus votés à la lecture. Le nom
+d'utilisateur de la personne qui soumet le papier n'entrerait pas dans les items.
+
+### Autres pistes
 
 Pour les compétences de veille:
 
