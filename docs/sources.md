@@ -54,11 +54,14 @@ Sans release GitHub (tags seuls), donc non suivis par cette source : `python/cpy
 
 | Catégorie | Pourquoi |
 |---|---|
-| `cs.CR` | sécurité ; environ 365 papiers par semaine (mesuré le 2026-09-30) |
+| `cs.CR` | *Cryptography and Security* : sécurité ; environ 365 papiers par semaine sans filtre (mesuré le 2026-09-30) |
+| `cs.CL` | *Computation and Language* : langage, donc les LLM (ajoutée le 2026-10-01) |
+| `cs.AI` | *Artificial Intelligence* : IA générale, agents (ajoutée le 2026-10-01) |
+| `cs.LG` | *Machine Learning* : apprentissage, robustesse des modèles (ajoutée le 2026-10-01) |
 
 Mots-clés de départ : `prompt injection`, `jailbreak`, `LLM security`,
 `adversarial attack`, `red teaming`, `agent hijacking`. Ils filtrent à la requête (journal du
-2026-10-01) : environ 45 papiers par semaine. Détail dans [specs-collecte.md](specs-collecte.md).
+2026-10-01) : environ 70 papiers par semaine sur les quatre catégories. Détail dans [specs-collecte.md](specs-collecte.md).
 
 ### Variables d'environnement
 

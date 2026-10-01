@@ -131,9 +131,13 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
 - **GitHub : le login de l'auteur d'une release ou d'une alerte n'entre pas dans les items.** Choix
   de Sabine. Pourquoi : la veille n'en a pas besoin, et c'est une donnée personnelle
   (minimisation, RGPD art. 5.1.c). Il reste dans le brut, intact. — PR de #6
+- **arXiv : `cs.CL`, `cs.AI` et `cs.LG` rejoignent `cs.CR`.** Revient sur l'écart de ces
+  catégories du 2026-09-30. Ce qui a changé : elles avaient été écartées pour leur volume sans
+  filtre ; avec les mots-clés à la requête, les quatre catégories donnent 70 papiers par semaine,
+  contre 45 pour `cs.CR` seule (mesuré le 2026-10-01). Choix de Sabine. Pourquoi : la sécurité des
+  LLM, des agents et de l'IA se publie aussi en langage (`cs.CL`), IA (`cs.AI`) et apprentissage
+  (`cs.LG`). — PR de #6
 
 ## Décisions encore ouvertes
 
-- **arXiv : élargir à `cs.CL`, `cs.AI` et `cs.LG` ?** Écartées le 2026-09-30 pour leur volume
-  sans filtre. Avec les mots-clés à la requête, les quatre catégories donnent 70 papiers par
-  semaine au lieu de 45 (mesuré le 2026-10-01).
+Aucune pour l'instant.

@@ -50,12 +50,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   les machines ensemble ; 2 000 résultats au plus par page. Piège : avec `max_results=0`, le
   total renvoyé vaut toujours 1 ; demander au moins un résultat pour le lire.
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-01) :
-  `cat:cs.CR AND (abs:"prompt injection" OR abs:jailbreak OR abs:"LLM security" OR
+  `(cat:cs.CR OR cat:cs.CL OR cat:cs.AI OR cat:cs.LG) AND (abs:"prompt injection" OR abs:jailbreak OR abs:"LLM security" OR
   abs:"adversarial attack" OR abs:"red teaming" OR abs:"agent hijacking") AND
   submittedDate:[<dernière collecte> TO <maintenant>]`.
 - **Volume mesuré** (semaine du 2026-09-24 au 2026-10-01) : 358 papiers en `cs.CR` sans filtre,
-  **45** avec les mots-clés ; **70** si l'on ajoute `cs.CL`, `cs.AI` et `cs.LG` (question
-  ouverte, plus bas).
+  45 en `cs.CR` avec les mots-clés, **70** sur les quatre catégories avec les mots-clés.
 - **Données personnelles** : noms des auteurs des papiers, publiés par eux ; gardés, car ils
   identifient le papier.
 
@@ -143,8 +142,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    - une révision (arXiv `v2`) met à jour l'item existant au lieu d'être ignorée ;
    - chaque rejet et chaque doublon retiré est tracé, avec sa règle.
 
-   Repris de `brief09_assistant-veille-tech` (relu le 2026-10-01) : le modèle d'article commun et
-   la date de révision arXiv. Corrigé : brief09 ne dédoublonne que sur l'URL exacte, ignore les
+   `brief09_assistant-veille-tech` (relu le 2026-10-01) a servi d'indication, pas de modèle : il
+   ne fait pas autorité. On y retrouve un modèle d'article commun et la date de révision arXiv. À
+   l'inverse, brief09 ne dédoublonne que sur l'URL exacte, ignore les
    révisions (première version gardée), date la collecte sans fuseau et retire les doublons sans
    trace. Laissé de côté : un même article publié sous deux URL (hash du contenu), et les
    étiquettes posées par un LLM, hors de la v0.
@@ -157,12 +157,6 @@ s'arrête à 1 000 résultats, et `/events` est plafonné à 300 événements. G
 tous les événements publics de GitHub, dont chaque étoile donnée ; BigQuery permet de les compter
 par dépôt sur 3 jours sans rien télécharger. Le bac à sable rend le coût nul et borné : sans
 facturation, le dépassement est refusé.
-
-## Questions ouvertes
-
-- **Élargir arXiv à `cs.CL`, `cs.AI` et `cs.LG` ?** Avec les mots-clés à la requête, cela fait
-  70 papiers par semaine au lieu de 45 (mesuré le 2026-10-01). Le 2026-09-30, ces catégories
-  avaient été écartées pour leur volume sans filtre.
 
 ## Sources (consultées le 2026-10-01)
 
