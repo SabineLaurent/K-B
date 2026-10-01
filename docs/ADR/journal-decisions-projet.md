@@ -150,8 +150,8 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   ne rend ce flux lisible ; il faut une sélection faite par d'autres. En v0, l'édition AI de TLDR
   (#13) donne l'actualité générale de l'IA. Hugging Face, une sélection votée par la communauté
   (131 à 165 papiers par semaine, dont environ 60 % parlent de LLM ou d'agents et le reste surtout
-  de vision ; on garderait les 10 plus votés), ajouterait une source à dix jours du jalon ; ses
-  mesures sont notées dans `docs/sources.md`. Limite assumée : en v0, aucune source ne suit les
+  de vision ; on garderait les 10 plus votés), ajouterait une source à dix jours du jalon ; elle
+  est notée « pour plus tard » dans `docs/sources.md`. Limite assumée : en v0, aucune source ne suit les
   papiers de ce sujet. — PR de #6
 
 ## Décisions encore ouvertes
