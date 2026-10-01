@@ -94,11 +94,26 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   strict mais plus lourd. Limite assumée : le jeton est en clair sur le disque, acceptable pour
   un jeton en lecture publique seule, sans permission et qui expire. — PR de #24
 
+## 2026-10-01
+
+### Sources suivies et accès
+
+- **BigQuery : un compte de service `k-b-collecte` au seul rôle BigQuery Job User, dans un projet
+  bac à sable sans facturation (`k-b-bigquery`).** Sa clé JSON est rangée hors du dépôt, dans un
+  dossier personnel non synchronisé, lisible par sa seule propriétaire, et désignée par
+  `GOOGLE_APPLICATION_CREDENTIALS` dans le `.env`. Choix de Sabine, sur recommandation. Pourquoi :
+  moindre privilège, puisque le compte ne peut que lancer des requêtes dans ce projet, et GH
+  Archive est public. Le critère de #36 veut aussi des identifiants en variable
+  d'environnement. Options écartées : les identifiants `gcloud` de l'utilisatrice, qui ouvrent
+  tout son compte Google, ne passent pas par une variable et demandent d'installer le SDK ; la
+  fédération d'identité de charge de travail, sans objet tant que le pipeline tourne sur un Mac
+  sans fournisseur d'identité, à reconsidérer si la collecte passe en CI. Limite assumée : la clé
+  n'expire pas. Si elle fuit, le pire est la consommation du quota gratuit, car rien n'est
+  facturable ; Google désactive aussi les clés détectées dans un dépôt public. Vérifié le
+  2026-10-01 : un `dry_run` sur une journée de GH Archive lit 16,5 Mo. — PR de #36
+
 ## Décisions encore ouvertes
 
 - **arXiv : filtrer par mots-clés à la requête ou à la lecture ?** Filtrer à la requête réduit le
   volume mais revient à filtrer à la collecte, ce que la décision du 2026-09-30 sur le brut
   intact écarte. À trancher dans les spécifications (#6).
-- **BigQuery : en attente.** Le bac à sable (sans compte de facturation) n'est pas créé, et le
-  mode d'authentification du pipeline n'est pas choisi : compte de service au rôle minimal
-  (BigQuery Job User), clé hors du dépôt, ou identifiants par défaut via `gcloud`. Bloque #16.
