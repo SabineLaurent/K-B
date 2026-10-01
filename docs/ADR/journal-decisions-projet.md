@@ -123,6 +123,14 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   à la lecture, cohérent avec la règle mais hors du besoin. Limite assumée : un papier que les
   mots-clés manquent n'est jamais collecté, et un mot-clé ajouté ne s'applique pas aux semaines
   passées. — PR de #6
+- **Zotero : le brut est la copie entière de `zotero.sqlite`, pas le résultat d'une requête.**
+  Choix de Sabine. Pourquoi : la règle du brut intact (2026-09-30) s'applique, et la requête peut
+  changer et se rejouer. Option écartée : n'écrire que le résultat de la requête, plus léger et
+  qui ne stocke pas toute la bibliothèque. Limite assumée : chaque collecte où la base a changé
+  stocke une copie entière ; elle contient toute la bibliothèque, hors du dépôt de code. — PR de #6
+- **GitHub : le login de l'auteur d'une release ou d'une alerte n'entre pas dans les items.** Choix
+  de Sabine. Pourquoi : la veille n'en a pas besoin, et c'est une donnée personnelle
+  (minimisation, RGPD art. 5.1.c). Il reste dans le brut, intact. — PR de #6
 
 ## Décisions encore ouvertes
 

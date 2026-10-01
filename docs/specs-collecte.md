@@ -36,8 +36,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   `KB_GITHUB_TOKEN` ([jeton-github.md](jeton-github.md)).
 - **Limites** : 5 000 requêtes par heure avec jeton (60 sans) ; la recherche a sa propre limite,
   30 requêtes par minute, et ne renvoie jamais plus de 1 000 résultats.
-- **Données personnelles** : les releases et alertes portent le login de leur auteur. Non
-  nécessaire à la veille : non conservé dans les items.
+- **Données personnelles** : les releases et alertes portent le login de leur auteur, une donnée
+  personnelle (pseudonyme rattaché à une personne). Non nécessaire à la veille : il reste dans le
+  brut mais n'entre pas dans les items (minimisation, RGPD art. 5.1.c).
 - **Suivi** : 4 dépôts, liste et réserve dans [sources.md](sources.md).
 
 ### API arXiv — service web
@@ -105,9 +106,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   auteurs, date, étiquettes, chemin du PDF, texte surligné.
 - **Accès** : fichier local, lecture seule.
 - **Limites** : aucune.
-- **Données personnelles** : les auteurs des papiers (publics) et les surlignages de
-  l'utilisatrice. La copie de la base reste hors de `raw/` : seul le résultat de la requête y est
-  écrit, pour ne pas stocker toute la bibliothèque.
+- **Brut** : la copie entière de la base est le brut, écrite dans `raw/automation/zotero/`
+  seulement si la base a changé depuis la dernière collecte. La requête se fait à la lecture.
+- **Données personnelles** : les auteurs des papiers (publics), et toute la bibliothèque de
+  l'utilisatrice, notes et surlignages compris. Le brut vit hors du dépôt de code et n'est jamais
+  publié.
 - **Prérequis** : Zotero installé (#15).
 
 ### GH Archive sur BigQuery — big data
@@ -127,14 +130,24 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 ## Du brut au jeu d'items
 
 1. **Collecte** : chaque source écrit son brut dans `raw/automation/<source>/` (règles communes).
-2. **Lecture** : un lecteur par source transforme le brut en items, avec les mêmes champs :
-   source, identifiant dans la source, titre, URL, date de publication en UTC, résumé, chemin du
-   brut d'origine. Une ligne illisible est rejetée et journalisée, pas devinée.
+2. **Lecture** : un lecteur par source transforme le brut en items validés par un modèle
+   Pydantic, avec les mêmes champs : source, identifiant dans la source, titre, URL, auteurs
+   (sauf GitHub), date de publication et date de révision (arXiv), contenu ou résumé, date de
+   collecte, chemin du brut d'origine. Toutes les dates sont en UTC, avec fuseau. Une ligne
+   illisible est rejetée et journalisée, pas devinée.
 3. **Fusion** en un seul jeu d'items :
    - dates normalisées en UTC ;
    - URL normalisées (paramètres `utm_*` retirés) ;
-   - doublons retirés : même URL normalisée, ou même identifiant (arXiv, CVE) ;
+   - doublons retirés : même URL normalisée, ou même identifiant (CVE ; arXiv sans son suffixe
+     de version `v1`, `v2`…) ;
+   - une révision (arXiv `v2`) met à jour l'item existant au lieu d'être ignorée ;
    - chaque rejet et chaque doublon retiré est tracé, avec sa règle.
+
+   Repris de `brief09_assistant-veille-tech` (relu le 2026-10-01) : le modèle d'article commun et
+   la date de révision arXiv. Corrigé : brief09 ne dédoublonne que sur l'URL exacte, ignore les
+   révisions (première version gardée), date la collecte sans fuseau et retire les doublons sans
+   trace. Laissé de côté : un même article publié sous deux URL (hash du contenu), et les
+   étiquettes posées par un LLM, hors de la v0.
 4. **Stockage** du jeu d'items dans la base (hors du périmètre de ce document).
 
 ## Pourquoi BigQuery
@@ -157,5 +170,6 @@ facturation, le dépassement est refusé.
 - [Terms of Use for arXiv APIs](https://info.arxiv.org/help/api/tou.html)
 - [arXiv category taxonomy](https://arxiv.org/category_taxonomy)
 - [Try BigQuery using the sandbox](https://docs.cloud.google.com/bigquery/docs/sandbox)
+- [Les six grands principes du RGPD](https://www.cnil.fr/fr/comprendre-le-rgpd/les-six-grands-principes-du-rgpd) — CNIL
 - [Access annotation database](https://forums.zotero.org/discussion/101244/access-annotation-database) — forum Zotero
 - `https://tldr.tech/robots.txt`, lu le 2026-10-01
