@@ -57,8 +57,8 @@ Sans release GitHub (tags seuls), donc non suivis par cette source : `python/cpy
 | `cs.CR` | sécurité ; environ 365 papiers par semaine (mesuré le 2026-09-30) |
 
 Mots-clés de départ : `prompt injection`, `jailbreak`, `LLM security`,
-`adversarial attack`, `red teaming`, `agent hijacking`. Filtrer à la requête ou à la lecture se
-tranche dans les spécifications (#6), au regard du brut stocké intact (journal du 2026-09-30).
+`adversarial attack`, `red teaming`, `agent hijacking`. Ils filtrent à la requête (journal du
+2026-10-01) : environ 45 papiers par semaine. Détail dans [specs-collecte.md](specs-collecte.md).
 
 ### Variables d'environnement
 

@@ -112,8 +112,20 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   facturable ; Google désactive aussi les clés détectées dans un dépôt public. Vérifié le
   2026-10-01 : un `dry_run` sur une journée de GH Archive lit 16,5 Mo. — PR de #36
 
+### Collecte
+
+- **arXiv : les mots-clés filtrent à la requête, pas à la lecture.** Exception assumée à la règle
+  du 2026-09-30 (brut stocké intact, filtre à la lecture). Choix de Sabine. Pourquoi : la veille
+  arXiv cible la sécurité des LLM, des agents et de l'IA en général, et les papiers qui documentent
+  une attaque et son déroulé. Elle ne vise pas une liste exhaustive, qui n'aurait pas d'intérêt et
+  noierait l'information. Mesuré sur la semaine du 2026-09-24 au 2026-10-01 : 45 papiers en
+  `cs.CR` avec les mots-clés, contre 358 sans. Option écartée : collecter tout `cs.CR` et filtrer
+  à la lecture, cohérent avec la règle mais hors du besoin. Limite assumée : un papier que les
+  mots-clés manquent n'est jamais collecté, et un mot-clé ajouté ne s'applique pas aux semaines
+  passées. — PR de #6
+
 ## Décisions encore ouvertes
 
-- **arXiv : filtrer par mots-clés à la requête ou à la lecture ?** Filtrer à la requête réduit le
-  volume mais revient à filtrer à la collecte, ce que la décision du 2026-09-30 sur le brut
-  intact écarte. À trancher dans les spécifications (#6).
+- **arXiv : élargir à `cs.CL`, `cs.AI` et `cs.LG` ?** Écartées le 2026-09-30 pour leur volume
+  sans filtre. Avec les mots-clés à la requête, les quatre catégories donnent 70 papiers par
+  semaine au lieu de 45 (mesuré le 2026-10-01).
