@@ -132,12 +132,26 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
 - **GitHub : le login de l'auteur d'une release ou d'une alerte n'entre pas dans les items.** Choix
   de Sabine. Pourquoi : la veille n'en a pas besoin, et c'est une donnée personnelle
   (minimisation, RGPD art. 5.1.c). Il reste dans le brut, intact. — PR de #6
-- **arXiv : `cs.CL`, `cs.AI` et `cs.LG` rejoignent `cs.CR`.** Revient sur l'écart de ces
-  catégories du 2026-09-30. Ce qui a changé : elles avaient été écartées pour leur volume sans
-  filtre ; avec les mots-clés à la requête, les quatre catégories donnent 70 papiers par semaine,
-  contre 45 pour `cs.CR` seule (mesuré le 2026-10-01). Choix de Sabine. Pourquoi : la sécurité des
-  LLM, des agents et de l'IA se publie aussi en langage (`cs.CL`), IA (`cs.AI`) et apprentissage
-  (`cs.LG`). — PR de #6
+- **arXiv ne suit que la sécurité de l'IA : papiers classés à la fois en `cs.CR` et `cs.AI`, avec
+  8 mots-clés** (`prompt injection`, `jailbreak`, `red teaming`, `adversarial attack`,
+  `backdoor`, `poisoning`, `membership inference`, `agent security`). Remplace la requête du
+  2026-09-30 (`cs.CR` et 6 mots-clés). Choix de Sabine. Pourquoi : le croisement garantit le sujet
+  par le classement de l'auteur, et les mots-clés gardent un flux lisible, environ 20 papiers par
+  semaine (19 à 22 en moyenne sur septembre et avril 2026). Options écartées, mesurées sur ces
+  deux mois : `cs.CR` avec les mots-clés seuls (38 à 52 par semaine) ; les mots-clés sur `cs.CR`,
+  `cs.CL`, `cs.AI` et `cs.LG` (63 à 75) ; une liste de mots-clés par catégorie, même volume pour
+  trois listes de plus ; les croisements de `cs.CR` avec `cs.AI`, `cs.CL` et `cs.LG` sans mots-clés
+  (99 à 113), trop pour être lus. Retirés : `LLM security` et `agent hijacking`, qui ne ramenaient
+  presque rien. Limite assumée : un papier au vocabulaire nouveau, ou classé en `cs.CR` avec
+  `cs.CL` ou `cs.LG` seulement, n'est pas collecté. — PR de #6
+- **Les LLM, les agents et les nouvelles architectures passent par TLDR AI et par une nouvelle
+  source, Hugging Face *Daily Papers*.** Choix de Sabine. Pourquoi : `cs.CL` et `cs.AI` publient
+  600 à 1 350 papiers par semaine, et aucun mot-clé ne rend ce flux lisible ; il faut une
+  sélection faite par d'autres. TLDR AI est une sélection éditoriale ; Hugging Face, une
+  sélection votée par la communauté (131 à 165 papiers par semaine), dont on garde les 10 plus
+  votés de la semaine, à la lecture, pour commencer. Limites assumées :
+  l'API de Hugging Face n'a pas de documentation officielle et peut changer ; la sélection suit la
+  popularité. Hugging Face entre en v0 à dix jours du jalon : une issue de plus. — PR de #6
 
 ## Décisions encore ouvertes
 

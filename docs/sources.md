@@ -11,7 +11,8 @@ Au moins une source par type exigé par la certif, décidées le 2026-09-29 (le 
 | API arXiv | service web | nouveaux papiers : métadonnées et résumé |
 | Catalogue CISA KEV (CSV) | fichier | vulnérabilités activement exploitées, ajoutées depuis la dernière collecte |
 | Web Clipper | fichier | pages gardées à la main, en `.md` |
-| tldr.tech | scraping | un item par article de chaque édition |
+| tldr.tech | scraping | un item par article de chaque édition (dont l'édition AI) |
+| Hugging Face *Daily Papers* | service web | papiers votés par la communauté : LLM, agents, architectures (ajoutée le 2026-10-01) |
 | Zotero (`zotero.sqlite`) | base de données | papiers lus, surlignages, chemin du PDF |
 | GH Archive sur BigQuery | big data | dépôts qui gagnent le plus d'étoiles sur 3 jours |
 
@@ -55,13 +56,13 @@ Sans release GitHub (tags seuls), donc non suivis par cette source : `python/cpy
 | Catégorie | Pourquoi |
 |---|---|
 | `cs.CR` | *Cryptography and Security* : sécurité ; environ 365 papiers par semaine sans filtre (mesuré le 2026-09-30) |
-| `cs.CL` | *Computation and Language* : langage, donc les LLM (ajoutée le 2026-10-01) |
-| `cs.AI` | *Artificial Intelligence* : IA générale, agents (ajoutée le 2026-10-01) |
-| `cs.LG` | *Machine Learning* : apprentissage, robustesse des modèles (ajoutée le 2026-10-01) |
+| `cs.AI` | *Artificial Intelligence* : IA générale, agents ; croisée avec `cs.CR` (2026-10-01) |
 
-Mots-clés de départ : `prompt injection`, `jailbreak`, `LLM security`,
-`adversarial attack`, `red teaming`, `agent hijacking`. Ils filtrent à la requête (journal du
-2026-10-01) : environ 70 papiers par semaine sur les quatre catégories. Détail dans [specs-collecte.md](specs-collecte.md).
+On ne garde que les papiers classés **à la fois** en `cs.CR` et en `cs.AI`, et dont le résumé
+contient un de ces mots-clés : `prompt injection`, `jailbreak`, `red teaming`,
+`adversarial attack`, `backdoor`, `poisoning`, `membership inference`, `agent security`. Filtre à
+la requête (journal du 2026-10-01) : environ 20 papiers par semaine. Détail dans
+[specs-collecte.md](specs-collecte.md).
 
 ### Variables d'environnement
 
