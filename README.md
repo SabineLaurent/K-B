@@ -30,13 +30,16 @@ La v0 couvre la porte « veille » :
 
 - **Collecte**, avec un point de lancement unique, une panne isolée par source et une sauvegarde
   brute :
-  - API GitHub (dépôts et sujets suivis : liste à venir) ;
-  - API arXiv (sélection à venir) : métadonnées et résumé ;
-  - newsletters reçues sur une adresse Gmail dédiée (analyse du corps du mail) ;
+  - API GitHub : releases des dépôts suivis, alertes de sécurité, dépôts les plus étoilés ;
+  - API arXiv : papiers sur la sécurité de l'IA, métadonnées et résumé ;
+  - catalogue CISA des vulnérabilités activement exploitées (fichier CSV) ;
   - Markdown produit par Obsidian Web Clipper, dans un coffre Obsidian dédié (à créer) ;
-  - au moins une page web sans flux ni API, lue par scraping (changelog, blog d'éditeur) ;
-  - l'historique d'un profil Brave réservé à K-B (base SQLite existante) ;
-  - les dépôts GitHub qui montent chaque semaine, calculés depuis GH Archive sur BigQuery.
+  - newsletters tldr.tech, lues par scraping ;
+  - mes papiers lus dans Zotero et leurs surlignages (base SQLite) ;
+  - les dépôts GitHub qui montent sur 3 jours, calculés depuis GH Archive sur BigQuery.
+
+  Les sources suivies sont dans [docs/sources.md](docs/sources.md), leur accès et leurs limites
+  dans [docs/specs-collecte.md](docs/specs-collecte.md).
 - **Fusion** en un seul jeu d'items : dates normalisées, doublons retirés, rejets tracés, règles
   écrites.
 - **Stockage** dans une base modélisée avec Merise, avec une installation qu'un tiers peut rejouer.
