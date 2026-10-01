@@ -124,7 +124,8 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   mots-clés manquent n'est jamais collecté, et un mot-clé ajouté ne s'applique pas aux semaines
   passées. — PR de #6
 - **Zotero : le brut est la copie entière de `zotero.sqlite`, pas le résultat d'une requête.**
-  Choix de Sabine. Pourquoi : la règle du brut intact (2026-09-30) s'applique, et la requête peut
+  Provisoire : à revoir dans #15, une fois la taille et le schéma de la base connus. Choix de
+  Sabine. Pourquoi : la règle du brut intact (2026-09-30) s'applique, et la requête peut
   changer et se rejouer. Option écartée : n'écrire que le résultat de la requête, plus léger et
   qui ne stocke pas toute la bibliothèque. Limite assumée : chaque collecte où la base a changé
   stocke une copie entière ; elle contient toute la bibliothèque, hors du dépôt de code. — PR de #6
@@ -140,4 +141,5 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
 
 ## Décisions encore ouvertes
 
-Aucune pour l'instant.
+- **Zotero : garder la copie entière comme brut ?** Décidé à titre provisoire le 2026-10-01 ; à
+  revoir dans #15 selon la taille de `zotero.sqlite` et son schéma.

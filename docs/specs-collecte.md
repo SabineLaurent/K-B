@@ -107,6 +107,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Limites** : aucune.
 - **Brut** : la copie entière de la base est le brut, écrite dans `raw/automation/zotero/`
   seulement si la base a changé depuis la dernière collecte. La requête se fait à la lecture.
+  Provisoire : à revoir dans #15 selon la taille de la base et son schéma.
 - **Données personnelles** : les auteurs des papiers (publics), et toute la bibliothèque de
   l'utilisatrice, notes et surlignages compris. Le brut vit hors du dépôt de code et n'est jamais
   publié.
