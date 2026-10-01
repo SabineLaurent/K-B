@@ -54,11 +54,14 @@ Sans release GitHub (tags seuls), donc non suivis par cette source : `python/cpy
 
 | Catégorie | Pourquoi |
 |---|---|
-| `cs.CR` | sécurité ; environ 365 papiers par semaine (mesuré le 2026-09-30) |
+| `cs.CR` | *Cryptography and Security* : sécurité ; environ 365 papiers par semaine sans filtre (mesuré le 2026-09-30) |
+| `cs.AI` | *Artificial Intelligence* : IA générale, agents ; croisée avec `cs.CR` (2026-10-01) |
 
-Mots-clés de départ : `prompt injection`, `jailbreak`, `LLM security`,
-`adversarial attack`, `red teaming`, `agent hijacking`. Filtrer à la requête ou à la lecture se
-tranche dans les spécifications (#6), au regard du brut stocké intact (journal du 2026-09-30).
+On ne garde que les papiers classés **à la fois** en `cs.CR` et en `cs.AI`, et dont le résumé
+contient un de ces mots-clés : `prompt injection`, `jailbreak`, `red teaming`,
+`adversarial attack`, `backdoor`, `poisoning`, `membership inference`, `agent security`. Filtre à
+la requête (journal du 2026-10-01) : environ 20 papiers par semaine. Détail dans
+[specs-collecte.md](specs-collecte.md).
 
 ### Variables d'environnement
 
@@ -69,6 +72,19 @@ Le nom seulement, jamais la valeur.
 | `KB_GITHUB_TOKEN` | jeton GitHub *fine-grained*, lecture seule des dépôts publics, sans permission ; création et vérification : [jeton-github.md](jeton-github.md) |
 
 ## Sources étendues
+
+### Pour plus tard : Hugging Face *Daily Papers*
+
+Papiers (surtout arXiv) sélectionnés et votés par la communauté : une sélection générale d'IA,
+où les LLM et les agents côtoient surtout la vision. API JSON
+`https://huggingface.co/api/daily_papers?week=AAAA-Www&limit=100&p=<page>`, sans
+authentification, documentée seulement de façon
+[non officielle](https://github.com/0x0is1/hf-papers-api-docs). Idée retenue : stocker toute la
+semaine, garder les 10 plus votés à la lecture. Le nom d'utilisateur de la personne qui soumet le
+papier n'entrerait pas dans les items. Les mesures du 2026-10-01 sont dans le
+[journal ADR](ADR/journal-decisions-projet.md).
+
+### Autres pistes
 
 Pour les compétences de veille:
 

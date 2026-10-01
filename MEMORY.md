@@ -28,3 +28,5 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 - Pour la documentation d'une bibliothèque ou d'un service, utiliser Context7 plutôt qu'une
   lecture de page web.
 - Vérifier les faits avant de les présenter comme sûrs, sources à l'appui.
+- `brief09_assistant-veille-tech` est indicatif, il ne fait pas autorité : une décision concertée
+  qui fait mieux, ou plus conforme aux pratiques reconnues, l'emporte.

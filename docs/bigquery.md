@@ -2,7 +2,7 @@
 
 La collecte « dépôts qui montent » (#16) interroge GH Archive, un jeu de données public sur
 BigQuery. Elle tourne dans un projet Google Cloud **sans compte de facturation** : c'est le bac à
-sable. Au-delà du quota gratuit (1 To lu par mois), une requête est refusée, jamais facturée.
+sable. Au-delà du quota gratuit (1 Tio lu par mois), une requête est refusée, jamais facturée.
 
 ## Le projet
 
