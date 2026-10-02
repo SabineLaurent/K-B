@@ -30,6 +30,7 @@ def test_a_recorded_response_gives_one_advisory_per_entry_newest_first():
     assert newest.severity == "medium"
     assert newest.url == "https://github.com/advisories/GHSA-fjqc-hq36-qh5p"
     assert newest.published_at == datetime(2026, 6, 25, 18, 25, 42, tzinfo=UTC)
+    assert newest.reviewed_at == datetime(2026, 6, 25, 18, 25, 42, tzinfo=UTC)
     assert newest.summary
 
 
@@ -63,6 +64,7 @@ def test_a_response_that_is_not_a_list_is_refused():
         {"summary": None},
         {"html_url": "https://evil.example.com/advisories/GHSA-fjqc-hq36-qh5p"},
         {"published_at": "2026-06-25T18:25:42"},
+        {"github_reviewed_at": None},
         {"vulnerabilities": [{"package": {"name": 42}}]},
     ],
 )

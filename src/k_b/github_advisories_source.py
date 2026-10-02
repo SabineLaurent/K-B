@@ -25,7 +25,10 @@ class GithubAdvisoriesSource:
         self.name = f"github_advisories_{ecosystem}"
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
-        """Return the advisories of the packages; None if none is newer than last_collected_at.
+        """Return the advisories of the packages; None if none was reviewed since last_collected_at.
+
+        Only reviewed advisories are asked for, and GitHub may review one days after publishing
+        it: the publication date would miss it, so collections follow the review date.
 
         The packages are filtered in the request, not at the reading: the whole ecosystem would
         exceed a page (npm publishes more than 100 advisories a week).
@@ -39,17 +42,17 @@ class GithubAdvisoriesSource:
         if last_collected_at is not None:
             # The filter is checked to the day only: a day of margin, then the exact comparison.
             since = last_collected_at.astimezone(UTC).date() - timedelta(days=1)
-            query["published"] = f">={since.isoformat()}"
+            query["reviewed"] = f">={since.isoformat()}"
         raw_response = get_from_github_api(f"advisories?{urlencode(query)}")
-        publication_dates = [advisory.published_at for advisory in read_advisories(raw_response)]
-        if not publication_dates:
+        review_dates = [advisory.reviewed_at for advisory in read_advisories(raw_response)]
+        if not review_dates:
             return None
         if last_collected_at is None:
             return raw_response
-        if not any(published_at > last_collected_at for published_at in publication_dates):
+        if not any(reviewed_at > last_collected_at for reviewed_at in review_dates):
             return None
-        is_page_full = len(publication_dates) >= ADVISORIES_PER_PAGE
-        if is_page_full and min(publication_dates) > last_collected_at:
+        is_page_full = len(review_dates) >= ADVISORIES_PER_PAGE
+        if is_page_full and min(review_dates) > last_collected_at:
             logger.warning(
                 "%s: more than %d advisories since the last collection, some may be missing; "
                 "time to read the next pages",

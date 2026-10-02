@@ -18,9 +18,7 @@ class TrackedRepository:
 
 TRACKED_REPOSITORIES = (
     TrackedRepository(
-        "langchain-ai/langchain",
-        "pip",
-        ("langchain", "langchain-core", "langchain-classic", "langchain-text-splitters"),
+        "langchain-ai/langchain", "pip", ("langchain", "langchain-core", "langchain-text-splitters")
     ),
     TrackedRepository("langchain-ai/langgraph", "pip", ("langgraph", "langgraph-checkpoint")),
     TrackedRepository("run-llama/llama_index", "pip", ("llama-index", "llama-index-core")),

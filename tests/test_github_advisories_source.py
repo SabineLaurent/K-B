@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,7 +12,7 @@ from k_b.github_advisories_source import GithubAdvisoriesSource
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_advisories_extract.json").read_bytes()
-# The recorded advisories were published on 2026-05-13, 06-16 and 06-25.
+# The recorded advisories were published and reviewed on 2026-05-13, 06-16 and 06-25.
 BEFORE_ALL_ADVISORIES = datetime(2026, 5, 1, 0, 0, tzinfo=UTC)
 BETWEEN_ADVISORIES = datetime(2026, 6, 20, 0, 0, tzinfo=UTC)
 AFTER_ALL_ADVISORIES = datetime(2026, 6, 26, 0, 0, tzinfo=UTC)
@@ -62,10 +63,26 @@ def test_a_first_collection_asks_for_the_reviewed_advisories_of_the_packages(fak
     }
 
 
-def test_a_later_collection_asks_from_the_day_before_the_last_one(fake_github_api):
+def test_a_later_collection_asks_for_advisories_reviewed_from_the_day_before_the_last_one(
+    fake_github_api,
+):
     GithubAdvisoriesSource("pip", PACKAGES).fetch(last_collected_at=BETWEEN_ADVISORIES)
 
-    assert query_of(fake_github_api.paths[0])["published"] == ">=2026-06-19"
+    query = query_of(fake_github_api.paths[0])
+    assert query["reviewed"] == ">=2026-06-19"
+    assert "published" not in query
+
+
+def test_an_advisory_published_before_the_last_collection_but_reviewed_after_is_new(
+    fake_github_api,
+):
+    entries = json.loads(RECORDED_RESPONSE)
+    entries[0]["published_at"] = "2026-06-10T00:00:00Z"
+    fake_github_api.response = json.dumps(entries).encode()
+
+    raw_response = GithubAdvisoriesSource("pip", PACKAGES).fetch(BETWEEN_ADVISORIES)
+
+    assert raw_response == fake_github_api.response
 
 
 def test_a_page_with_an_advisory_newer_than_the_last_collection_is_returned(fake_github_api):

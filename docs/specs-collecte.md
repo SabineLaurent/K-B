@@ -48,8 +48,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **État** : releases collectées (PR de #10) : un brut par dépôt, la première page de 100
   releases ; un avertissement est journalisé si la page entière est plus récente que la dernière
   collecte (des releases ont pu manquer, il faudra lire les pages suivantes).
-  Alertes collectées (PR de #11) : un brut par écosystème (`pip`, `npm`), publiées depuis la
-  veille de la dernière collecte, même avertissement si la page de 100 est pleine.
+  Alertes collectées (PR de #11) : un brut par écosystème (`pip`, `npm`), relues par GitHub
+  depuis la veille de la dernière collecte (date de revue, pas de publication : GitHub relit
+  parfois une alerte des jours après l'avoir publiée), même avertissement si la page de 100 est
+  pleine.
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-02) : les
   alertes sont demandées pour les seuls paquets suivis (`affects=`). Tout l'écosystème `npm`
   dépasse 100 alertes par semaine et obligerait à paginer.

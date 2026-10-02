@@ -22,6 +22,8 @@ class Advisory:
     severity: str
     url: str
     published_at: datetime
+    # GitHub may review an advisory days after publishing it: collections follow this date.
+    reviewed_at: datetime
     packages: tuple[str, ...]
 
 
@@ -57,7 +59,8 @@ def parse_advisory(entry: object, position: int) -> Advisory:
         summary=summary,
         severity=severity,
         url=url,
-        published_at=parse_publication_date(entry.get("published_at"), position),
+        published_at=parse_github_date(entry, "published_at", position),
+        reviewed_at=parse_github_date(entry, "github_reviewed_at", position),
         packages=parse_package_names(entry.get("vulnerabilities"), position),
     )
 
@@ -77,14 +80,15 @@ def parse_package_names(vulnerabilities: object, position: int) -> tuple[str, ..
     return tuple(package_names)
 
 
-def parse_publication_date(published_at: object, position: int) -> datetime:
+def parse_github_date(entry: dict, field: str, position: int) -> datetime:
     """Refuse a date without a time zone: GitHub dates are UTC, written with a final Z."""
-    if not isinstance(published_at, str):
-        raise ValueError(f"advisory {position}: published_at is not a date")
+    stored_date = entry.get(field)
+    if not isinstance(stored_date, str):
+        raise ValueError(f"advisory {position}: {field} is not a date")
     try:
-        parsed_date = datetime.fromisoformat(published_at)
+        parsed_date = datetime.fromisoformat(stored_date)
     except ValueError as error:
-        raise ValueError(f"advisory {position}: invalid published_at: {published_at!r}") from error
+        raise ValueError(f"advisory {position}: invalid {field}: {stored_date!r}") from error
     if parsed_date.tzinfo is None:
-        raise ValueError(f"advisory {position}: published_at without a time zone")
+        raise ValueError(f"advisory {position}: {field} without a time zone")
     return parsed_date
