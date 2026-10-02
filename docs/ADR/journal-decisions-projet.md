@@ -307,7 +307,7 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   classement dit ce qui s'est installé au sommet, pas ce qui monte, rôle de #16 (BigQuery).
   — PR de #11
 - **arXiv : la fenêtre `submittedDate` part de 7 jours avant la dernière collecte réussie (la
-  première collecte prend les 7 derniers jours).** C'est la correction du bug de watermark de
+  première collecte remonte au 01/05/2026, début de la formation).** C'est la correction du bug de watermark de
   brief09. Proposé par Claude, validé par Sabine. Pourquoi : `submittedDate` est le seul filtre de
   date de l'API, et un papier n'y apparaît qu'à son annonce, jusqu'à 3,5 jours après sa
   soumission (jeudi 14 h → dimanche 20 h, heure de New York), plus les jours fériés ; une fenêtre
@@ -316,7 +316,12 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   bruts se recouvrent donc d'environ 7 jours, et une source sans rien de neuf écrit quand même ;
   la fusion dédoublonne par identifiant arXiv. Limites assumées : un papier retenu en modération
   plus de 7 jours est manqué ; la révision (`v2`) d'un papier soumis avant la fenêtre n'est pas
-  collectée. — PR de #12
+  collectée. Date de la première collecte : choix de Sabine, pour que la base et la liste de
+  lecture démarrent avec un vrai passé (488 papiers, 1,2 Mo, mesurés le 2026-10-02 : une page
+  suffit). Options écartées : les 7 derniers jours (une vingtaine de papiers, trop peu pour roder
+  la suite) ; une profondeur relative, comme 60 jours (contenu qui dépend du jour du lancement).
+  Limite assumée : si l'état des collectes est effacé dans quelques années, la fenêtre dépassera
+  2 000 papiers et la collecte échouera, avec un message. — PR de #12
 - **arXiv : une seule page de 2 000 résultats (le maximum de l'API) ; si `totalResults` dépasse ce
   que la page contient, la collecte échoue et sa date n'avance pas.** Proposé par Claude, validé
   par Sabine. Pourquoi : environ 40 papiers par fenêtre de 7 jours et plus ; échouer garde la
