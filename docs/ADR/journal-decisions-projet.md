@@ -306,6 +306,25 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   l'évolution des étoiles) ; couper cette source au profit de #16. Limite assumée : ce
   classement dit ce qui s'est installé au sommet, pas ce qui monte, rôle de #16 (BigQuery).
   — PR de #11
+- **arXiv : la fenêtre `submittedDate` part de 7 jours avant la dernière collecte réussie (la
+  première collecte prend les 7 derniers jours).** C'est la correction du bug de watermark de
+  brief09. Proposé par Claude, validé par Sabine. Pourquoi : `submittedDate` est le seul filtre de
+  date de l'API, et un papier n'y apparaît qu'à son annonce, jusqu'à 3,5 jours après sa
+  soumission (jeudi 14 h → dimanche 20 h, heure de New York), plus les jours fériés ; une fenêtre
+  qui partirait de la dernière collecte perdrait ces papiers pour toujours. Option écartée : le
+  tri par `lastUpdatedDate` arrêté au premier papier déjà vu (brief09), cause de la perte. Les
+  bruts se recouvrent donc d'environ 7 jours, et une source sans rien de neuf écrit quand même ;
+  la fusion dédoublonne par identifiant arXiv. Limites assumées : un papier retenu en modération
+  plus de 7 jours est manqué ; la révision (`v2`) d'un papier soumis avant la fenêtre n'est pas
+  collectée. — PR de #12
+- **arXiv : une seule page de 2 000 résultats (le maximum de l'API) ; si `totalResults` dépasse ce
+  que la page contient, la collecte échoue et sa date n'avance pas.** Proposé par Claude, validé
+  par Sabine. Pourquoi : environ 40 papiers par fenêtre de 7 jours et plus ; échouer garde la
+  fenêtre entière pour la collecte suivante, alors que brief09 avançait son watermark après une
+  page plafonnée et sautait le reste pour toujours. Option écartée : paginer, avec 3 s de pause
+  entre deux pages, sans usage à ce volume. Un `503` ou un délai dépassé fait aussi échouer la
+  source, réessayée au prochain `kb collect` ; écarté : réessayer dans la même exécution.
+  — PR de #12
 
 ## Décisions encore ouvertes
 
