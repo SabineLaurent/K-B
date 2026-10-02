@@ -35,7 +35,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   - alertes de sécurité : `GET /advisories` (base publique des *security advisories*), relues
     par GitHub, pour les paquets publiés par les dépôts suivis ; la sécurité des projets de
     Sabine relève de Dependabot, pas de K-B ;
-  - dépôts les plus étoilés : `GET /search/repositories`, tri par étoiles.
+  - dépôts les plus étoilés : `GET /search/repositories`, tri par étoiles : le top 100 de tout
+    GitHub, sans filtre par topic.
 - **Accès** : jeton *fine-grained*, dépôts publics seulement, sans permission, dans
   `KB_GITHUB_TOKEN` ([jeton-github.md](jeton-github.md)).
 - **Limites** : 5 000 requêtes par heure avec jeton (60 sans) ; la recherche a sa propre limite,
@@ -52,6 +53,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   depuis la veille de la dernière collecte (date de revue, pas de publication : GitHub relit
   parfois une alerte des jours après l'avoir publiée), même avertissement si la page de 100 est
   pleine.
+  Dépôts les plus étoilés collectés (PR de #11) : un instantané du top 100 à chaque collecte
+  (un classement change toujours) ; entrées, sorties et montées se calculent à la lecture en
+  comparant deux instantanés. Une réponse marquée `incomplete_results`, ou de moins de 100 dépôts, est
+  refusée.
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-02) : les
   alertes sont demandées pour les seuls paquets suivis (`affects=`). Tout l'écosystème `npm`
   dépasse 100 alertes par semaine et obligerait à paginer.

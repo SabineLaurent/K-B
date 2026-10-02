@@ -8,6 +8,7 @@ from typing import Protocol
 
 from k_b.cisa_kev_source import CisaKevSource
 from k_b.github_advisories_source import GithubAdvisoriesSource
+from k_b.github_most_starred_source import GithubMostStarredSource
 from k_b.github_releases_source import GithubReleasesSource
 from k_b.raw_store import load_last_collection_dates, save_last_collection_dates, write_new_raw_file
 from k_b.tracked_repositories import TRACKED_REPOSITORIES, list_packages_by_ecosystem
@@ -36,6 +37,7 @@ SOURCES: list[Source] = [
         GithubAdvisoriesSource(ecosystem, packages)
         for ecosystem, packages in list_packages_by_ecosystem(TRACKED_REPOSITORIES).items()
     ),
+    GithubMostStarredSource(),
 ]
 
 
