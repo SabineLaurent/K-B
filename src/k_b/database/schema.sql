@@ -1,5 +1,6 @@
 -- K-B: physical data model (MPD) of the items database, SQLite.
 -- Conceptual and logical models, and the reasons behind them: docs/stockage.md.
+-- Reference data (the sources) is in seed_sources.sql, run right after this script.
 -- Every connection must run PRAGMA foreign_keys = ON: SQLite ignores foreign keys otherwise.
 -- Dates are UTC text, 'YYYY-MM-DDTHH:MM:SSZ'; the CHECK refuses any other form.
 
@@ -9,15 +10,6 @@ CREATE TABLE source (
     source_type TEXT NOT NULL
         CHECK (source_type IN ('web_service', 'file', 'scraping', 'database', 'big_data'))
 ) STRICT;
-
-INSERT INTO source (source_code, label, source_type) VALUES
-    ('github',     'API GitHub',              'web_service'),
-    ('arxiv',      'API arXiv',               'web_service'),
-    ('cisa_kev',   'Catalogue CISA KEV',      'file'),
-    ('clipper',    'Obsidian Web Clipper',    'file'),
-    ('tldr',       'tldr.tech',               'scraping'),
-    ('zotero',     'Zotero',                  'database'),
-    ('gh_archive', 'GH Archive sur BigQuery', 'big_data');
 
 CREATE TABLE collection (
     collection_id   INTEGER PRIMARY KEY,

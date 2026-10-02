@@ -212,8 +212,17 @@ d'étoiles. `cve` est vide pour une alerte GitHub sans CVE.
 
 ## MPD
 
-Le script [`src/k_b/database/schema.sql`](../src/k_b/database/schema.sql) crée la base et insère
-les 7 sources. Noms SQL en anglais, comme le code ; correspondance avec le MLD :
+Deux scripts, exécutés dans cet ordre à la création de la base :
+
+- [`schema.sql`](../src/k_b/database/schema.sql) crée les tables, contraintes et index ;
+- [`seed_sources.sql`](../src/k_b/database/seed_sources.sql) insère les 7 sources (données de
+  référence). Il se rejoue sans risque : une source déjà présente est laissée telle quelle.
+  Sans lui, aucun item ne peut entrer (clé étrangère vers `source`).
+
+La structure et les données de référence changent pour des raisons différentes : ajouter une
+source ne touche pas aux tables.
+
+Noms SQL en anglais, comme le code ; correspondance avec le MLD :
 
 | MLD | Table | Colonnes |
 |---|---|---|

@@ -177,7 +177,11 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   imite la notation Merise sans la vérifier. — PR de #7
 - **Le script du schéma vit dans `src/k_b/database/schema.sql`, paquet qui recevra aussi le code
   de connexion (#20).** Choix de Sabine : le schéma et le code qui l'ouvre restent ensemble.
-  Option écartée : `docs/`, d'où une copie du schéma finirait par diverger du code. — PR de #7
+  Option écartée : `docs/`, d'où une copie du schéma finirait par diverger du code. Les données
+  de référence (les 7 sources) sont dans un fichier séparé, `seed_sources.sql`, qui se rejoue
+  sans risque. Choix de Sabine : la structure et les valeurs de départ changent pour des
+  raisons différentes. Limite assumée : les deux scripts s'exécutent toujours ensemble, dans
+  l'ordre, car un item exige sa source. — PR de #7
 - **ITEM porte le socle commun ; les champs propres à une nature d'item vont dans des sous-types
   (spécialisation Merise) : DÉPÔT (`nom_dépôt`) et VULNÉRABILITÉ (`cve`).** Choix de Sabine, sur
   recommandation. Pourquoi : la fusion et « quoi de neuf » ont besoin d'un socle commun à toutes
