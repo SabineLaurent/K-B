@@ -242,6 +242,29 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   les personnes, les données et les durées diffèrent entre les deux. Option écartée : une seule
   fiche, qui mêlerait données de tiers et données de l'utilisatrice. — PR de #8
 
+### Collecte
+
+- **Une réponse d'API = un brut, octet pour octet ; une source par dépôt GitHub suivi.** Choix de
+  Sabine. Pourquoi : c'est la règle du brut intact (2026-09-30) appliquée aux API qui demandent
+  un appel par objet suivi. Une panne d'un dépôt n'arrête pas les autres, et seul un dépôt qui a
+  du neuf écrit un fichier. `collect.py` n'a pas changé : chaque dépôt est une instance de source,
+  avec sa date de dernière collecte. Options écartées : un JSON commun aux dépôts, qui réécrit
+  les octets reçus, bloque tous les dépôts sur une seule panne et se réécrit dès qu'un dépôt a du
+  neuf ; des sous-dossiers `github_releases/<owner>/<repo>/`, qui obligent à modifier
+  `collect.py` pour un gain seulement visuel. Limite assumée : seule la première page (100
+  releases) est lue. Un avertissement est journalisé quand elle est entièrement plus récente que
+  la dernière collecte, signe qu'il faut gérer la pagination. L'en-tête `Link: rel="next"` a été
+  écarté comme signal, car il est toujours présent. — PR de #10
+- **Un `User-Agent` commun à toutes les sources : `K-B (+https://github.com/SabineLaurent)`,
+  dans `k_b/user_agent.py`.** Choix de Sabine. Pourquoi : GitHub refuse une requête sans
+  `User-Agent`, et un site sans compte n'a que cet en-tête pour savoir qui l'interroge et qui
+  prévenir. Le profil est une page publique. Options écartées : l'URL du dépôt, qui mène à un 404
+  (dépôt privé) et révèle le nom d'un dépôt privé ; `K-B` seul, qui ne dit à personne qui est
+  derrière les requêtes. Limite assumée : chaque site interrogé reçoit le login de Sabine. D'où
+  la condition posée dans #13 : vérifier le droit de scraper (`robots.txt` et conditions
+  d'utilisation) avant tout scraping, puisque la requête identifie Sabine. Remplace la valeur
+  `K-B (+https://github.com/SabineLaurent/K-B)` de `specs-collecte.md`. — PR de #10
+
 ## Décisions encore ouvertes
 
 - **Zotero : garder la copie entière comme brut ?** Décidé à titre provisoire le 2026-10-01 ; à
