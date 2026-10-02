@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from k_b.arxiv_papers import read_papers, read_total_results
+from k_b.arxiv_papers import count_papers, read_papers, read_total_results
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "arxiv_extract.xml").read_bytes()
@@ -65,14 +65,13 @@ def test_a_feed_without_entries_gives_no_paper():
 @pytest.mark.parametrize(
     "entry_id",
     [
-        "http://arxiv.org/api/errors#incorrect_id_format_for_1234",
         "https://evil.example/abs/2609.31282v1",
         "http://arxiv.org/abs/2609.31282",
     ],
 )
-def test_an_entry_that_is_not_an_arxiv_paper_is_refused(entry_id):
-    with pytest.raises(ValueError, match="entry 0"):
-        read_papers(feed_with_entry(entry_xml(entry_id=entry_id)))
+def test_an_entry_that_is_not_an_arxiv_paper_is_rejected_and_logged(entry_id, caplog):
+    assert read_papers(feed_with_entry(entry_xml(entry_id=entry_id))) == []
+    assert "entry 0" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -85,9 +84,27 @@ def test_an_entry_that_is_not_an_arxiv_paper_is_refused(entry_id):
         {"published": "<published>2026-09-25T13:53:50</published>"},
     ],
 )
-def test_an_entry_with_a_missing_or_invalid_field_is_refused(changes):
-    with pytest.raises(ValueError, match="entry 0"):
-        read_papers(feed_with_entry(entry_xml(**changes)))
+def test_an_entry_with_a_missing_or_invalid_field_is_rejected_and_logged(changes, caplog):
+    assert read_papers(feed_with_entry(entry_xml(**changes))) == []
+    assert "entry 0" in caplog.text
+
+
+def test_a_rejected_entry_does_not_hide_the_valid_ones():
+    feed = feed_with_entry(entry_xml(authors="") + entry_xml())
+
+    assert [paper.arxiv_id for paper in read_papers(feed)] == ["2609.31282"]
+
+
+def test_every_entry_is_counted_even_an_invalid_one():
+    assert count_papers(RECORDED_RESPONSE) == 3
+    assert count_papers(feed_with_entry(entry_xml(authors=""))) == 1
+
+
+def test_a_feed_reporting_an_api_error_is_refused():
+    error_entry = entry_xml(entry_id="http://arxiv.org/api/errors#incorrect_id_format_for_1234")
+
+    with pytest.raises(ValueError, match="incorrect_id_format_for_1234"):
+        count_papers(feed_with_entry(error_entry))
 
 
 @pytest.mark.parametrize(

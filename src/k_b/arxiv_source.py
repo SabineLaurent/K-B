@@ -4,13 +4,13 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from k_b.arxiv_papers import read_papers, read_total_results
+from k_b.arxiv_papers import count_papers, read_total_results
 from k_b.user_agent import USER_AGENT
 
 API_URL = "https://export.arxiv.org/api/query"
 TIMEOUT_SECONDS = 30
-# A page of 35 papers weighs 93 KB in 2026: 2,000 papers stay under 5 MB.
-MAX_RESPONSE_BYTES = 5 * 1024 * 1024
+# A page of 35 papers weighs 93 KB in 2026, about 2.7 KB a paper: 2,000 papers weigh 5.3 MB.
+MAX_RESPONSE_BYTES = 6 * 1024 * 1024
 # The API maximum. About 40 papers per window: one page holds them all.
 PAPERS_PER_PAGE = 2000
 # Papers both in cs.CR and cs.AI whose abstract has one of these keywords (decided in #6).
@@ -43,7 +43,7 @@ class ArxivSource:
         now = datetime.now(UTC)
         window_start = (last_collected_at or now) - ANNOUNCEMENT_DELAY_MARGIN
         raw_response = download(build_search_query(window_start, now))
-        paper_count = len(read_papers(raw_response))
+        paper_count = count_papers(raw_response)
         total_results = read_total_results(raw_response)
         if total_results > paper_count:
             # Failing keeps the last collection date: the next collection asks again.
@@ -57,6 +57,8 @@ def build_search_query(window_start: datetime, window_end: datetime) -> str:
     keywords = " OR ".join(
         f'abs:"{keyword}"' if " " in keyword else f"abs:{keyword}" for keyword in KEYWORDS
     )
+    # The API reads these dates in GMT.
+    window_start, window_end = window_start.astimezone(UTC), window_end.astimezone(UTC)
     submission_window = f"{window_start:%Y%m%d%H%M} TO {window_end:%Y%m%d%H%M}"
     return f"cat:cs.CR AND cat:cs.AI AND ({keywords}) AND submittedDate:[{submission_window}]"
 
