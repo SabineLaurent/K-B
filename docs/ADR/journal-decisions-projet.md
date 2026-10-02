@@ -264,6 +264,35 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   la condition posée dans #13 : vérifier le droit de scraper (`robots.txt` et conditions
   d'utilisation) avant tout scraping, puisque la requête identifie Sabine. Remplace la valeur
   `K-B (+https://github.com/SabineLaurent/K-B)` de `specs-collecte.md`. — PR de #10
+- **La sécurité des projets de Sabine relève de Dependabot ; K-B ne suit que les alertes des
+  paquets publiés par les dépôts de la veille.** Choix de Sabine. Pourquoi : Dependabot lit les
+  fichiers de verrouillage de chaque dépôt (`uv.lock`, `pnpm-lock.yaml`), dépendances indirectes
+  et GitHub Actions comprises, et propose la correction. K-B le referait moins bien, et il
+  faudrait donner au jeton la permission de lire ces alertes, contre le moindre privilège. Les
+  deux canaux n'ont pas le même but : corriger ses projets, savoir ce qui arrive aux outils
+  suivis. Options écartées : tout l'écosystème `pip` (43 alertes par semaine, recoupe
+  Dependabot) ; tous les écosystèmes (plus de 180 par semaine, dont plus de 100 pour npm) ;
+  l'écosystème `actions` (déjà couvert par Dependabot pour les actions référencées par version) ;
+  `pnpm` (pas utilisé pour le moment). Limites assumées : deux endroits à regarder ; les outils
+  installés sur le poste (hors de tout dépôt) n'ont d'alerte que s'ils sont dans la liste suivie.
+  — PR de #11
+- **Les paquets suivis découlent des dépôts suivis : chaque dépôt déclare son écosystème et ses
+  paquets principaux, au même endroit (`tracked_repositories.py`).** Choix de Sabine. Pourquoi :
+  une seule liste pilote la veille GitHub ; suivre un nouveau dépôt donne à la fois ses releases
+  et ses alertes. Seuls les paquets publiés par le dépôt lui-même (vérifié sur PyPI et npm) et
+  encore maintenus entrent : `langchain-community` et `langchain-experimental` sont écartés
+  (dépôts archivés), `langchain-classic` aussi (compatibilité avec la v0, non utilisée). Limite
+  assumée : la liste se tient à la main ; un monorepo publie des dizaines de paquets
+  d'intégration, ajoutés quand ils servent. — PR de #11
+- **Alertes : le filtre par paquets se fait dans la requête (`affects=`), et la date suivie est
+  celle de la revue par GitHub, pas de la publication.** Exception à la règle du brut intact
+  (2026-09-30), comme arXiv : tout l'écosystème npm dépasse 100 alertes par semaine et obligerait
+  à paginer. La date de revue : constat de la revue de code, vérifié sur l'API (12 alertes Maven
+  sur 100 relues jusqu'à deux semaines après leur publication) ; avec la date de publication, une
+  alerte relue après la collecte suivante serait perdue sans avertissement. Correction décidée par
+  Sabine. Option écartée : la date de mise à jour (`updated`), qui ramène une alerte à chaque
+  modification. Limite assumée : une alerte modifiée après sa revue (gravité, retrait) n'est pas
+  recollectée. — PR de #11
 
 ## Décisions encore ouvertes
 

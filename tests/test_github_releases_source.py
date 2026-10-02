@@ -6,7 +6,8 @@ import pytest
 
 from k_b import github_releases_source
 from k_b.collect import SOURCES
-from k_b.github_releases_source import TRACKED_REPOSITORIES, GithubReleasesSource
+from k_b.github_releases_source import GithubReleasesSource
+from k_b.tracked_repositories import TRACKED_REPOSITORIES
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_releases_extract.json").read_bytes()
@@ -35,7 +36,8 @@ def test_each_tracked_repository_is_a_source_of_kb_collect():
     assert "github_releases_langchain_ai_langchain" in source_names
     assert "github_releases_run_llama_llama_index" in source_names
     assert all(
-        GithubReleasesSource(repository).name in source_names for repository in TRACKED_REPOSITORIES
+        GithubReleasesSource(repository.name).name in source_names
+        for repository in TRACKED_REPOSITORIES
     )
 
 

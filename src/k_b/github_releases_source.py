@@ -9,13 +9,6 @@ from k_b.github_releases import read_releases
 
 logger = logging.getLogger(__name__)
 
-# The list and the reasons for each repository are in docs/sources.md.
-TRACKED_REPOSITORIES = (
-    "langchain-ai/langchain",
-    "langchain-ai/langgraph",
-    "run-llama/llama_index",
-    "anthropics/claude-code",
-)
 # The API maximum. Only the first page is read: see the warning in fetch.
 RELEASES_PER_PAGE = 100
 OWNER_SLASH_NAME = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")

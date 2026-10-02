@@ -19,7 +19,7 @@ sous-traitant.
 
 | Source | Donnée personnelle | Écartée dès la collecte | Gardée dans le brut | Gardée dans la base |
 |---|---|---|---|---|
-| API GitHub | login de l'auteur d'une release ou d'une alerte | — | oui | **non** : écarté à la lecture (minimisation) |
+| API GitHub | login de l'auteur d'une release ou d'une alerte ; login des personnes créditées dans une alerte (`credits` : qui a trouvé ou corrigé la faille) | — | oui | **non** : écarté à la lecture (minimisation) |
 | GH Archive | login de l'auteur de chaque événement (`actor`) | **oui** : la requête ne le sélectionne pas | non | non |
 | API arXiv | noms des auteurs des papiers | — | oui | oui, `author` |
 | Web Clipper | auteur de l'article gardé (`author`) ; date où l'utilisatrice l'a gardé (`created`) | — | oui | oui, `author` et `item.saved_at` |
@@ -36,7 +36,7 @@ entreprise.
 |---|---|
 | Finalité | Suivre l'actualité tech (papiers, vulnérabilités, versions, dépôts, articles) et répondre à « quoi de neuf cette semaine ». |
 | Base légale | Intérêt légitime (art. 6.1.f) : veille professionnelle et formation. Les données sont publiées par les personnes elles-mêmes pour être diffusées, et réduites à un nom. |
-| Personnes concernées | Auteurs de papiers arXiv, auteurs d'articles gardés avec Web Clipper, auteurs de releases et d'alertes GitHub. |
+| Personnes concernées | Auteurs de papiers arXiv, auteurs d'articles gardés avec Web Clipper, auteurs de releases et d'alertes GitHub, personnes créditées dans une alerte GitHub. |
 | Données | Nom d'auteur et ordre dans la liste des auteurs (`author`, `item_author`). Login GitHub : brut seulement. |
 | Destinataires | L'utilisatrice ; les agents qu'elle lance, par l'API REST. |
 | Transferts hors UE | Quand un agent comme Claude Code lit les items par l'API, les noms d'auteurs lus partent chez le fournisseur du modèle, aux États-Unis. Cadre juridique de ce transfert non vérifié. |
@@ -64,7 +64,7 @@ jamais les noms).
 
 | # | Traitement | Étape | Automatisée | Fréquence |
 |---|---|---|---|---|
-| 1 | Veille (fiche 1) | Le login GitHub n'est pas lu dans les items ; GH Archive ne sélectionne pas `actor`. | oui, à la lecture et à la requête | à chaque collecte (hebdomadaire) |
+| 1 | Veille (fiche 1) | Les logins GitHub (auteurs, personnes créditées) ne sont pas lus dans les items ; GH Archive ne sélectionne pas `actor`. | oui, à la lecture et à la requête | à chaque collecte (hebdomadaire) |
 | 2 | Veille (fiche 1) | Supprimer les items collectés il y a plus de 2 ans ; la cascade retire leurs liens d'auteurs, surlignages et sous-types. | oui, dernière étape de la collecte | hebdomadaire |
 | 3 | Veille (fiche 1) | Supprimer les auteurs qui n'ont plus aucun item. | oui, après l'étape 2 | hebdomadaire |
 | 4 | Veille (fiche 1) | Supprimer les fichiers bruts de plus de 2 ans dans `raw/automation/`. | oui, après l'étape 3 | hebdomadaire |
