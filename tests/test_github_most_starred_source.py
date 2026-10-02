@@ -12,10 +12,21 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_most_starred_extract.json").read_bytes()
 
 
+def ranking_of(size):
+    """A search response of size repositories, built by repeating the recorded ones."""
+    response = json.loads(RECORDED_RESPONSE)
+    recorded_items = response["items"]
+    response["items"] = [recorded_items[rank % len(recorded_items)] for rank in range(size)]
+    return json.dumps(response).encode()
+
+
+FULL_RANKING = ranking_of(100)
+
+
 @pytest.fixture
 def fake_github_api(monkeypatch):
     class FakeGithubApi:
-        response = RECORDED_RESPONSE
+        response = FULL_RANKING
         paths = []
 
         def __call__(self, path):
@@ -47,12 +58,19 @@ def test_the_request_asks_for_the_100_most_starred_repositories(fake_github_api)
 def test_every_collection_writes_a_snapshot_of_the_ranking(fake_github_api):
     source = GithubMostStarredSource()
 
-    assert source.fetch(last_collected_at=None) == RECORDED_RESPONSE
-    assert source.fetch(last_collected_at=None) == RECORDED_RESPONSE
+    assert source.fetch(last_collected_at=None) == FULL_RANKING
+    assert source.fetch(last_collected_at=None) == FULL_RANKING
+
+
+def test_a_ranking_shorter_than_100_is_not_written(fake_github_api):
+    fake_github_api.response = ranking_of(99)
+
+    with pytest.raises(ValueError, match="99 repositories, expected 100"):
+        GithubMostStarredSource().fetch(last_collected_at=None)
 
 
 def test_an_incomplete_ranking_is_not_written(fake_github_api):
-    response = json.loads(RECORDED_RESPONSE)
+    response = json.loads(FULL_RANKING)
     response["incomplete_results"] = True
     fake_github_api.response = json.dumps(response).encode()
 

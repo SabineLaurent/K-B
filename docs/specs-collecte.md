@@ -55,7 +55,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   pleine.
   Dépôts les plus étoilés collectés (PR de #11) : un instantané du top 100 à chaque collecte
   (un classement change toujours) ; entrées, sorties et montées se calculent à la lecture en
-  comparant deux instantanés. Une réponse marquée `incomplete_results` est refusée.
+  comparant deux instantanés. Une réponse marquée `incomplete_results`, ou de moins de 100 dépôts, est
+  refusée.
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-02) : les
   alertes sont demandées pour les seuls paquets suivis (`affects=`). Tout l'écosystème `npm`
   dépasse 100 alertes par semaine et obligerait à paginer.

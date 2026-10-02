@@ -38,7 +38,7 @@ entreprise.
 | Finalité | Suivre l'actualité tech (papiers, vulnérabilités, versions, dépôts, articles) et répondre à « quoi de neuf cette semaine ». |
 | Base légale | Intérêt légitime (art. 6.1.f) : veille professionnelle et formation. Les données sont publiées par les personnes elles-mêmes pour être diffusées, et réduites à un nom. |
 | Personnes concernées | Auteurs de papiers arXiv, auteurs d'articles gardés avec Web Clipper, auteurs de releases et d'alertes GitHub, personnes créditées dans une alerte GitHub, propriétaires d'un dépôt du top 100 GitHub. |
-| Données | Nom d'auteur et ordre dans la liste des auteurs (`author`, `item_author`). Login GitHub : brut seulement, sauf celui du propriétaire d'un dépôt du top 100, gardé dans le nom du dépôt. |
+| Données | Nom d'auteur et ordre dans la liste des auteurs (`author`, `item_author`). Login GitHub : brut seulement, sauf celui du propriétaire d'un dépôt du top 100, gardé dans le nom du dépôt. Le brut GitHub contient aussi, pour chaque compte cité (auteur, personne créditée, propriétaire), son identifiant numérique et l'URL de son avatar, qui peut être une photo de la personne : brut seulement. |
 | Destinataires | L'utilisatrice ; les agents qu'elle lance, par l'API REST. |
 | Transferts hors UE | Quand un agent comme Claude Code lit les items par l'API, les noms d'auteurs lus partent chez le fournisseur du modèle, aux États-Unis. Cadre juridique de ce transfert non vérifié. |
 | Durée de conservation | **2 ans après la collecte**, dans la base et dans le brut (provisoire, à confirmer dans #20). Le brut et la base ont la même durée : la base doit rester reconstructible depuis le brut. |

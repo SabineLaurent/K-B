@@ -67,7 +67,9 @@ Quand la recherche de GitHub prend trop de temps, elle s'arrête et renvoie ce q
 avec `incomplete_results: true`. Un classement partiel ferait croire, à la comparaison, que des
 dépôts sont **sortis** du top. On refuse donc la réponse : `fetch` lève une erreur, rien n'est
 écrit, la date de dernière collecte n'avance pas, et la collecte suivante réessaiera. Le test
-`is not False` refuse aussi un champ absent ou mal typé : on échoue fermé.
+`is not False` refuse aussi un champ absent ou mal typé : on échoue fermé. Pour la même raison,
+un classement de moins de 100 dépôts est refusé (`expected_size`, ajouté après la revue de code) :
+plus de 5 600 dépôts dépassent le seuil, une page courte est forcément une anomalie.
 
 ### 4. La lecture : des champs contrôlés
 
@@ -130,10 +132,11 @@ comportement n'a pas bougé.
 | `test_the_request_asks_for_the_100_most_starred_repositories` | La requête exacte : `q`, `sort`, `order`, `per_page` |
 | `test_every_collection_writes_a_snapshot_of_the_ranking` | Deux collectes écrivent deux photos, même sans changement |
 | `test_an_incomplete_ranking_is_refused`, `test_an_incomplete_ranking_is_not_written` | Une réponse incomplète lève une erreur, donc rien n'est écrit |
+| `test_a_ranking_shorter_than_expected_is_refused`, `test_a_ranking_shorter_than_100_is_not_written` | Un classement de moins de 100 dépôts est refusé (ajouté après la revue de code, avec l'accord de Sabine) |
 | `test_a_recorded_response_gives_the_repositories_by_rank` | Une vraie réponse donne rang, nom, URL, étoiles, topics, date UTC |
 | `test_an_invalid_repository_is_refused_with_its_rank` (6 cas) | `../escape`, URL étrangère, étoiles non entières ou booléennes, topics mal typés, date sans fuseau : refusés |
 | `test_github_dates.py` (5 cas) | Le contrôle commun accepte une date UTC et refuse tout le reste |
-| `uv run pytest` : 111 tests verts | Les releases et les alertes passent toujours après la factorisation |
+| `uv run pytest` : 113 tests verts | Les releases et les alertes passent toujours après la factorisation |
 | Vrai `kb collect` : 8 sources `ok`, photo de 100 dépôts lue sans erreur (1er à 551 156 étoiles, 100e à 116 163) | Fonctionne sur la vraie API |
 
 ## Ce que tu dois pouvoir défendre
@@ -167,5 +170,8 @@ comportement n'a pas bougé.
 
 - **La comparaison de deux photos** (entrées, sorties, montées) : à la lecture, avec l'item
   commun et la fusion.
+- **Les ex æquo** : deux dépôts au même nombre d'étoiles peuvent revenir dans un ordre différent
+  d'une collecte à l'autre (constat de la revue de code). La comparaison ne devra pas prendre un
+  échange de rang dû à une égalité, ou à quelques étoiles d'écart, pour un événement.
 - **Ce qui monte en ce moment** : #16, GH Archive sur BigQuery.
 - **La purge des photos** au bout de 2 ans : avec celle des autres bruts (#20).

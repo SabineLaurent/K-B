@@ -24,5 +24,5 @@ class GithubMostStarredSource:
         """
         query = {"q": SEARCH_QUERY, "sort": "stars", "order": "desc", "per_page": RANKING_SIZE}
         raw_response = get_from_github_api(f"search/repositories?{urlencode(query)}")
-        read_most_starred(raw_response)
+        read_most_starred(raw_response, expected_size=RANKING_SIZE)
         return raw_response

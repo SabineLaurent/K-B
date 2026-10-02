@@ -23,15 +23,20 @@ class StarredRepository:
     created_at: datetime
 
 
-def read_most_starred(raw_response: bytes) -> list[StarredRepository]:
-    """One repository per item of a `GET /search/repositories` response, by rank."""
+def read_most_starred(raw_response: bytes, expected_size: int) -> list[StarredRepository]:
+    """One repository per item of a `GET /search/repositories` response, by rank.
+
+    A ranking with fewer repositories than asked for, or marked incomplete, is refused: compared
+    with the previous one, it would show repositories leaving the top that never left it.
+    """
     response = json.loads(raw_response)
     items = response.get("items") if isinstance(response, dict) else None
     if not isinstance(items, list):
         raise ValueError("expected a search response with a list of items")
-    # GitHub cut the search short: a partial ranking would show false exits from the top.
     if response.get("incomplete_results") is not False:
         raise ValueError("incomplete search results, refused")
+    if len(items) != expected_size:
+        raise ValueError(f"{len(items)} repositories, expected {expected_size}, refused")
     return [parse_repository(item, rank) for rank, item in enumerate(items, start=1)]
 
 
