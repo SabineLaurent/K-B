@@ -228,6 +228,20 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   ils alimentent le wiki de savoir, qui est la v1. Le schéma les accueillera par une ligne de
   SOURCE et un chemin de brut sous `raw/manual/`. — PR de #7
 
+### Données personnelles
+
+- **Le registre des traitements est tenu, bien que K-B relève probablement de l'exemption des
+  activités strictement personnelles (RGPD art. 2.2.c).** Choix de Sabine. Pourquoi : le
+  registre et les procédures de tri sont trois critères d'évaluation d'E1 (référentiel, C4), et
+  l'exemption tomberait si l'outil servait un usage professionnel ou d'autres personnes. Une
+  donnée publique (nom d'auteur, login) reste une donnée personnelle. Option écartée : retirer
+  registre et purge de la v0, ce que le référentiel ne permet pas. — PR de #8
+- **Deux fiches de registre, par finalité : la veille technologique (données de tiers) et la
+  bibliothèque de lecture de l'utilisatrice (ses propres données Zotero et Obsidian).** Choix de
+  Sabine, sur recommandation. Pourquoi : la CNIL demande une fiche par finalité, pas par source ;
+  les personnes, les données et les durées diffèrent entre les deux. Option écartée : une seule
+  fiche, qui mêlerait données de tiers et données de l'utilisatrice. — PR de #8
+
 ## Décisions encore ouvertes
 
 - **Zotero : garder la copie entière comme brut ?** Décidé à titre provisoire le 2026-10-01 ; à
@@ -236,3 +250,10 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   renommages à l'usage, une fois les schémas sous les yeux.
 - **Règle de « quoi de neuf cette semaine »** (date de publication, d'ajout ou de collecte) : à
   décider dans #21.
+- **Durées de conservation et fréquence de la purge** : provisoirement 2 ans après la collecte
+  (base et brut), seule la dernière copie Zotero gardée, purge à chaque collecte hebdomadaire.
+  Sabine n'a pas tranché le 2026-10-02 ; à confirmer quand #20 code la purge.
+- **Liste d'exclusion** des personnes qui demandent l'effacement, pour qu'une collecte ou une
+  reconstruction ne les réintroduise pas : proposée dans le registre, à concevoir dans #20.
+- **Transfert hors UE par les agents** : un agent qui lit les items par l'API envoie leur contenu
+  au fournisseur du modèle (États-Unis). Cadre juridique non vérifié.

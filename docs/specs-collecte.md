@@ -21,7 +21,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   attendu. Le `User-Agent` est `K-B (+https://github.com/SabineLaurent/K-B)`.
 - **Secrets** : en variables d'environnement, chargées depuis le `.env` ignoré par git.
 - **Données personnelles** : on ne garde que ce qui sert la veille ; aucun identifiant de
-  personne n'est collecté s'il n'est pas nécessaire. Le registre des traitements reste à écrire.
+  personne n'est collecté s'il n'est pas nécessaire. Durées et purge : [registre des
+  traitements](registre-traitements.md).
 
 ## Les sources
 
