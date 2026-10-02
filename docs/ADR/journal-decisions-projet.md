@@ -154,7 +154,81 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   est notée « pour plus tard » dans `docs/sources.md`. Limite assumée : en v0, aucune source ne
   suit les papiers de ce sujet. — PR de #6
 
+## 2026-10-02
+
+### Base des items
+
+- **SGBD : SQLite, un fichier dans le dossier de données, lu par le module `sqlite3` de la
+  bibliothèque standard.** Choix de Sabine, « pour le moment ». Pourquoi : un utilisateur, un seul
+  écrivain par semaine (le pipeline), quelques milliers d'items par an ; aucun serveur à
+  installer, une installation qu'un tiers rejoue sans effort ; en mode WAL, l'API lit pendant
+  que le pipeline écrit. Option écartée : PostgreSQL, dont les rôles SQL (un rôle en lecture
+  seule pour l'API) et les écritures parallèles ne servent pas un outil local à un utilisateur,
+  au prix d'un serveur à faire tourner et sécuriser et d'un pilote à ajouter. Limite assumée :
+  pas de comptes dans la base ; le moindre privilège passe par l'ouverture en lecture seule et
+  les droits du fichier. Une migration vers PostgreSQL reste possible (SQL standard, hors
+  `STRICT` et `PRAGMA`). — PR de #7
+- **Schémas MCD et MLD en Mermaid dans le dépôt, MPD en script SQL.** Choix de Sabine. Pourquoi :
+  GitHub affiche le Mermaid sans rien installer, et le texte se relit dans une PR. Le dossier
+  écrit de la certif E1 pourra utiliser d'autres outils (Looping pour le MCD, draw.io pour le
+  MLD), à redéfinir à sa rédaction. Option écartée : Mocodo, outil Merise qui dérive MLD et SQL
+  du MCD, mais produit un SVG à régénérer et une dérivation automatique moins défendable à
+  l'oral que faite à la main. Limite assumée : le MCD est dessiné avec un `flowchart`, qui
+  imite la notation Merise sans la vérifier. — PR de #7
+- **Le script du schéma vit dans `src/k_b/database/schema.sql`, paquet qui recevra aussi le code
+  de connexion (#20).** Choix de Sabine : le schéma et le code qui l'ouvre restent ensemble.
+  Option écartée : `docs/`, d'où une copie du schéma finirait par diverger du code. — PR de #7
+- **ITEM porte le socle commun ; les champs propres à une nature d'item vont dans des sous-types
+  (spécialisation Merise) : DÉPÔT (`nom_dépôt`) et VULNÉRABILITÉ (`cve`).** Choix de Sabine, sur
+  recommandation. Pourquoi : la fusion et « quoi de neuf » ont besoin d'un socle commun à toutes
+  les sources, sans perdre ce qui fait l'intérêt de certaines (le CVE sert au dédoublonnage).
+  Un champ n'entre que si une question de veille le filtre, le trie ou l'affiche ; chaque issue
+  de source ajoute ensuite les siens dans sa PR (CISA KEV : dans #20). Options écartées : une
+  colonne JSON « extra » (défaut de brief09 : contraire à la 1re forme normale, non typée) ; une
+  table attribut/valeur (rien de typé, requêtes illisibles) ; le socle seul (perd le CVE) ; des
+  colonnes facultatives dans ITEM, plus simples pour trois champs, mais qui se remplissent de
+  `NULL` à mesure que les sources ajoutent les leurs. Limite assumée : l'exclusivité des
+  sous-types n'est pas portée par SQL, le code de fusion la vérifie. — PR de #7
+- **Une table COLLECTE (date et chemin du brut) plutôt que ces deux champs dans ITEM.** Pourquoi :
+  le chemin du brut détermine la date de collecte (horodatage dans le nom) ; les garder dans
+  ITEM casserait la 3e forme normale. Option écartée : les deux champs dans ITEM, comme le
+  modèle Pydantic de `specs-collecte.md`. — PR de #7
+- **Les auteurs sont une entité AUTEUR liée aux items, pas une liste dans ITEM.** Pourquoi : 1re
+  forme normale, et une purge RGPD qui devient un `DELETE` ciblé (#8). Option écartée : un champ
+  texte « auteurs » (brief09). Limite assumée : deux homonymes sont confondus. — PR de #7
+- **Les surlignages Zotero entrent dans la base (SURLIGNAGE).** Choix de Sabine, sur
+  recommandation. Pourquoi : c'est la valeur propre de Zotero, et les fiches prévoient un bloc
+  « Mes surlignages » (2026-09-29). — PR de #7
+- **`url` est obligatoire et unique pour tout item.** CISA KEV prend la fiche NVD construite
+  depuis le CVE (`https://nvd.nist.gov/vuln/detail/<CVE>`) ; Zotero, l'URL arXiv du papier ; Web
+  Clipper, sa propriété `source`. Choix de Sabine. Pourquoi : l'unicité porte dans la base le
+  dédoublonnage par URL de la fusion (deuxième contrôle si le code laisse passer un doublon).
+  Le CSV CISA n'a pas de colonne URL : ses liens sont dans `notes`, sans place fixe ; écarté
+  d'en extraire le premier, fragile. En v0, Zotero ne contient que des papiers arXiv ; écarté le
+  repli sur le DOI, sans usage. Limite assumée : un document sans URL est rejeté ; si Zotero
+  reçoit un jour des papiers hors arXiv, `url` redeviendra facultative. — PR de #7
+- **Une date absente reste vide : `date_publication` est facultative et n'est jamais remplacée
+  par une autre date. Une date d'ajout (`date_ajout`) est gardée à part pour Web Clipper
+  (`created`) et Zotero (`dateAdded`).** Choix de Sabine : « l'info n'est pas la même ». Option
+  écartée : prendre `created` quand `published` manque. Conséquence : « quoi de neuf » ne peut
+  pas filtrer sur la seule date de publication ; la règle se décide dans #21. — PR de #7
+- **Un dépôt est un seul item ; chaque fenêtre de 3 jours où il monte ajoute une MESURE (étoiles
+  gagnées), à identifiant relatif au dépôt.** Choix de Sabine, sur recommandation. Remplace, avant
+  toute PR, le choix pris plus tôt dans la session d'un item par dépôt et par fenêtre, qui
+  contredisait l'unicité de `url` (même page de dépôt pour deux fenêtres). Pourquoi : on garde
+  l'historique de la montée et l'URL unique, et un même dépôt vu par la recherche GitHub et par
+  GH Archive devient un seul item. Options écartées : retirer l'unicité de `url` (perd le
+  deuxième contrôle) ; un index unique partiel qui exempte GH Archive (exception cachée dans le
+  schéma). La date de publication d'un dépôt reste vide : ce n'est pas une publication. — PR de #7
+- **Les documents de `raw/manual/` n'entrent pas dans la base en v0.** Choix de Sabine. Pourquoi :
+  ils alimentent le wiki de savoir, qui est la v1. Le schéma les accueillera par une ligne de
+  SOURCE et un chemin de brut sous `raw/manual/`. — PR de #7
+
 ## Décisions encore ouvertes
 
 - **Zotero : garder la copie entière comme brut ?** Décidé à titre provisoire le 2026-10-01 ; à
   revoir dans #15 selon la taille de `zotero.sqlite` et son schéma.
+- **Nommage des tables et des colonnes.** Gardé tel quel le 2026-10-02 ; Sabine demandera les
+  renommages à l'usage, une fois les schémas sous les yeux.
+- **Règle de « quoi de neuf cette semaine »** (date de publication, d'ajout ou de collecte) : à
+  décider dans #21.
