@@ -29,6 +29,9 @@ KEYWORDS = [
 # before the last collection so that late announcements are not lost; the overlap with the
 # previous raw file is removed when merging, by arXiv identifier.
 ANNOUNCEMENT_DELAY_MARGIN = timedelta(days=7)
+# The first collection reaches back to the start of Sabine's training: 488 papers, 1.2 MB,
+# measured on 2026-10-02.
+FIRST_COLLECTION_START = datetime(2026, 5, 1, tzinfo=UTC)
 
 
 class ArxivSource:
@@ -38,10 +41,13 @@ class ArxivSource:
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
         """Return the papers submitted since 7 days before last_collected_at; None if none.
 
-        A first collection (last_collected_at is None) takes the last 7 days.
+        A first collection (last_collected_at is None) reaches back to FIRST_COLLECTION_START.
         """
         now = datetime.now(UTC)
-        window_start = (last_collected_at or now) - ANNOUNCEMENT_DELAY_MARGIN
+        if last_collected_at is None:
+            window_start = FIRST_COLLECTION_START
+        else:
+            window_start = last_collected_at - ANNOUNCEMENT_DELAY_MARGIN
         raw_response = download(build_search_query(window_start, now))
         paper_count = count_papers(raw_response)
         total_results = read_total_results(raw_response)

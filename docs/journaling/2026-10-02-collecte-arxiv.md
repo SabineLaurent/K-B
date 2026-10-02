@@ -47,10 +47,13 @@ l'écrire.
 
 ```python
 now = datetime.now(UTC)
-window_start = (last_collected_at or now) - ANNOUNCEMENT_DELAY_MARGIN
+if last_collected_at is None:
+    window_start = FIRST_COLLECTION_START
+else:
+    window_start = last_collected_at - ANNOUNCEMENT_DELAY_MARGIN
 raw_response = download(build_search_query(window_start, now))
 ```
-(`src/k_b/arxiv_source.py:43-45`)
+(`src/k_b/arxiv_source.py:47-51`)
 
 Le seul filtre de date de l'API est `submittedDate`, la date de **soumission**. Or un papier
 n'apparaît dans l'API qu'au moment de son **annonce**. Un papier soumis le jeudi à 15 h (heure de
@@ -63,20 +66,22 @@ délai normal d'annonce (3,5 jours au plus) et les jours fériés. En contrepart
 successifs se recouvrent. Ce n'est pas un problème : la fusion dédoublonne déjà par identifiant
 arXiv (`docs/specs-collecte.md`, « Du brut au jeu d'items »).
 
-`last_collected_at or now` gère la première collecte : sans date précédente, la fenêtre couvre
-les 7 derniers jours.
+La première collecte, sans date précédente, remonte au **01/05/2026**, début de la formation de
+Sabine (`FIRST_COLLECTION_START`). Choix de Sabine : la base et la liste de lecture Zotero
+démarrent avec un vrai passé, 488 papiers et 1,2 Mo, mesurés par un appel réel le 2026-10-02.
+Ça tient largement dans une page de 2 000.
 
 ### La requête
 
 ```python
 return f"cat:cs.CR AND cat:cs.AI AND ({keywords}) AND submittedDate:[{submission_window}]"
 ```
-(`src/k_b/arxiv_source.py:63`)
+(`src/k_b/arxiv_source.py:69`)
 
 Les mots-clés de plusieurs mots passent entre guillemets (`abs:"prompt injection"`), les autres
 sans (`abs:jailbreak`). Les dates suivent le format de l'API, `AAAAMMJJHHMM` en GMT : `now` est en
 UTC, et `last_collected_at` aussi, puisque `kb collect` refuse une date sans fuseau. La chaîne est
-encodée par `urlencode` (`:74`) et n'est jamais assemblée à la main dans l'URL.
+encodée par `urlencode` (`:80`) et n'est jamais assemblée à la main dans l'URL.
 
 ### Échouer plutôt que perdre
 
@@ -85,7 +90,7 @@ if total_results > paper_count:
     # Failing keeps the last collection date: the next collection asks again.
     raise ValueError(f"{total_results} papers found, only {paper_count} returned")
 ```
-(`src/k_b/arxiv_source.py:48-50`)
+(`src/k_b/arxiv_source.py:54-56`)
 
 On demande une page de 2 000 résultats, le maximum de l'API. Si l'API annonce plus de résultats
 que la page n'en contient, la source échoue au lieu d'écrire un brut incomplet. Comme la date de
@@ -157,7 +162,7 @@ rejette.
 | `test_a_page_with_an_invalid_entry_is_still_returned` | Un papier mal formé ne bloque pas la collecte |
 | `test_the_window_is_written_in_utc_whatever_the_stored_time_zone`, `test_the_window_ends_now` | Fenêtre en GMT quel que soit le fuseau stocké ; fin de fenêtre à maintenant |
 | `test_the_window_reaches_back_seven_days_before_the_last_collection` | Dernière collecte le 30/09 à 10 h 05 → fenêtre à partir du 23/09 à 10 h 05 |
-| `test_a_first_collection_takes_the_last_seven_days` | Sans collecte précédente, la fenêtre commence 7 jours avant maintenant |
+| `test_a_first_collection_reaches_back_to_may_2026` | Sans collecte précédente, la fenêtre commence le 01/05/2026 à 00 h 00 UTC |
 | `test_a_page_that_does_not_hold_every_result_is_refused` | `totalResults` supérieur à la page → échec, donc pas d'avance de la date |
 | `test_a_redirection_away_from_https_export_arxiv_org_is_refused`, `test_a_response_larger_than_the_limit_is_refused` | Contrôles de la frontière réseau |
 | Appel réel, `fetch` avec dernière collecte au 28/09 | L'API accepte la requête : 47 papiers, soumis du 21/09 au 01/10, lus sans erreur |
@@ -168,7 +173,7 @@ rejette.
 
 1. **Pourquoi pas un watermark comme brief09 ?** Il avance sur ce que la collecte a vu. Un papier
    annoncé en retard, avec une date de soumission antérieure au watermark, n'est jamais repris.
-   La fenêtre qui recule de 7 jours le reprend (`arxiv_source.py:44`).
+   La fenêtre qui recule de 7 jours le reprend (`arxiv_source.py:50`).
 2. **Les bruts se recouvrent : ce n'est pas du gaspillage ?** Environ 20 papiers en double par
    semaine, quelques dizaines de Ko. C'est le prix de « ne rien perdre en silence » ; la fusion
    dédoublonne par identifiant.
@@ -195,7 +200,7 @@ rejette.
   révisé reste trié selon la date de sa v1.
 - **L'entrée d'erreur** (`http://arxiv.org/api/errors#…`) vient du manuel de l'API et du
   relecteur ; on n'a pas provoqué d'erreur réelle pour vérifier son code HTTP.
-- Le test de la première collecte compare à l'horloge réelle, avec 2 minutes de tolérance.
+- Le test de fin de fenêtre compare à l'horloge réelle, avec 2 minutes de tolérance.
 
 ## Ce qui reste
 

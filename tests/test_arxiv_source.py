@@ -96,13 +96,10 @@ def test_the_window_ends_now(fake_urlopen):
     assert abs(datetime.now(UTC) - window_end) < timedelta(minutes=2)
 
 
-def test_a_first_collection_takes_the_last_seven_days(fake_urlopen):
+def test_a_first_collection_reaches_back_to_may_2026(fake_urlopen):
     ArxivSource().fetch(last_collected_at=None)
 
-    window_start = datetime.strptime(
-        fake_urlopen.search_query().split("submittedDate:[")[1][:12], "%Y%m%d%H%M"
-    ).replace(tzinfo=UTC)
-    assert abs(datetime.now(UTC) - timedelta(days=7) - window_start) < timedelta(minutes=2)
+    assert "submittedDate:[202605010000 TO " in fake_urlopen.search_query()
 
 
 def test_a_window_without_any_paper_returns_nothing(fake_urlopen):
