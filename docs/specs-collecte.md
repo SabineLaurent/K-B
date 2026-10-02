@@ -82,6 +82,17 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   l'API répond `503` ou ne répond pas : le collecteur réessaie plus tard au lieu d'échouer.
 - **Données personnelles** : noms des auteurs des papiers, publiés par eux ; gardés, car ils
   identifient le papier.
+- **État** : collecte en place (PR de #12). Une requête par collecte, une page de 2 000 ; si
+  l'API annonce plus de résultats que la page n'en contient, la collecte échoue et sa date
+  n'avance pas. La fenêtre `submittedDate` part de **7 jours avant** la dernière collecte (la
+  première collecte prend les 7 derniers jours) : un papier n'est visible dans l'API qu'à son
+  annonce, jusqu'à 3,5 jours après sa soumission (jeudi 14 h → dimanche 20 h, heure de New York),
+  plus les jours fériés ([Availability of
+  submissions](https://info.arxiv.org/help/availability.html)). Partir de la dernière collecte
+  perdrait ces papiers pour toujours (le bug de watermark de brief09). Chaque brut recouvre donc
+  le précédent ; la fusion dédoublonne par identifiant. Limites assumées : la révision (`v2`)
+  d'un papier soumis avant la fenêtre n'est pas collectée, ni un papier retenu en modération plus
+  de 7 jours.
 
 ### Catalogue CISA KEV — fichier
 
