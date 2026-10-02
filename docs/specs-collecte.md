@@ -137,8 +137,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 1. **Collecte** : chaque source écrit son brut dans `raw/automation/<source>/` (règles communes).
 2. **Lecture** : un lecteur par source transforme le brut en items validés par un modèle
    Pydantic, avec les mêmes champs : source, identifiant dans la source, titre, URL, auteurs
-   (sauf GitHub), date de publication et date de révision (arXiv), contenu ou résumé, date de
-   collecte, chemin du brut d'origine. Toutes les dates sont en UTC, avec fuseau. Une ligne
+   (sauf GitHub), date de publication et date de révision (arXiv), date d'ajout (Clipper, Zotero),
+   contenu ou résumé, date de collecte, chemin du brut d'origine. Une date absente reste vide. Toutes les dates sont en UTC, avec fuseau. Une ligne
    illisible est rejetée et journalisée, pas devinée.
 3. **Fusion** en un seul jeu d'items :
    - dates normalisées en UTC ;
@@ -154,7 +154,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    gardée), date la collecte sans fuseau et retire les doublons sans trace. Laissé de côté : un
    même article publié sous deux URL (hash du contenu), et les étiquettes posées par un LLM, hors
    de la v0.
-4. **Stockage** du jeu d'items dans la base (hors du périmètre de ce document).
+4. **Stockage** du jeu d'items dans la base : SGBD, modèles et ce que chaque source met dans
+   l'item, dans [stockage.md](stockage.md).
 
 ## Pourquoi BigQuery
 
