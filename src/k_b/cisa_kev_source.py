@@ -5,8 +5,9 @@ from email.utils import format_datetime
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from k_b.user_agent import USER_AGENT
+
 CATALOG_URL = "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv"
-USER_AGENT = "K-B (+https://github.com/SabineLaurent/K-B)"
 TIMEOUT_SECONDS = 30
 # The catalog weighs about 1 MB in 2026: ten times that is not a catalog any more.
 MAX_CATALOG_BYTES = 10 * 1024 * 1024

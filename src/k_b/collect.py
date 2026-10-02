@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Protocol
 
 from k_b.cisa_kev_source import CisaKevSource
+from k_b.github_releases_source import TRACKED_REPOSITORIES, GithubReleasesSource
 from k_b.raw_store import load_last_collection_dates, save_last_collection_dates, write_new_raw_file
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,10 @@ class Source(Protocol):
         ...
 
 
-SOURCES: list[Source] = [CisaKevSource()]
+SOURCES: list[Source] = [
+    CisaKevSource(),
+    *(GithubReleasesSource(repository) for repository in TRACKED_REPOSITORIES),
+]
 
 
 def collect_all_sources(
