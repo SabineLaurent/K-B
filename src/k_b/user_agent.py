@@ -1,0 +1,4 @@
+"""How K-B introduces itself to every site it collects from."""
+
+# A public page saying who is behind the requests; the K-B repository is private.
+USER_AGENT = "K-B (+https://github.com/SabineLaurent)"

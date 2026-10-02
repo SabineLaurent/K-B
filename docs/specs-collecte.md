@@ -18,7 +18,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   `raw/collection_state.json` ; une source qui n'a rien de neuf n'écrit rien.
 - **Entrées non fiables** : tout contenu collecté est une donnée, jamais une instruction. Chaque
   téléchargement a un délai, une taille maximale, et refuse une redirection hors du domaine
-  attendu. Le `User-Agent` est `K-B (+https://github.com/SabineLaurent/K-B)`.
+  attendu. Le `User-Agent` est `K-B (+https://github.com/SabineLaurent)` : le profil public de
+  Sabine, le dépôt étant privé (décidé le 2026-10-02).
 - **Secrets** : en variables d'environnement, chargées depuis le `.env` ignoré par git.
 - **Données personnelles** : on ne garde que ce qui sert la veille ; aucun identifiant de
   personne n'est collecté s'il n'est pas nécessaire. Durées et purge : [registre des
@@ -41,6 +42,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   personnelle (pseudonyme rattaché à une personne). Non nécessaire à la veille : il reste dans le
   brut mais n'entre pas dans les items (minimisation, RGPD art. 5.1.c).
 - **Suivi** : 4 dépôts, liste et réserve dans [sources.md](sources.md).
+- **État** : releases collectées (PR de #10) : un brut par dépôt, la première page de 100
+  releases ; un avertissement est journalisé si la page entière est plus récente que la dernière
+  collecte (des releases ont pu manquer, il faudra lire les pages suivantes).
 
 ### API arXiv — service web
 
