@@ -293,6 +293,19 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   Sabine. Option écartée : la date de mise à jour (`updated`), qui ramène une alerte à chaque
   modification. Limite assumée : une alerte modifiée après sa revue (gravité, retrait) n'est pas
   recollectée. — PR de #11
+- **Dépôts les plus étoilés : le top 100 de tout GitHub, sans filtre par topic, avec un instantané
+  écrit à chaque collecte.** Choix de Sabine. Pourquoi : à plus de 116 000 étoiles pour le 100e,
+  le classement ne s'achète pas ; mesuré le 2026-10-02, 36 dépôts sur 100 touchent à l'IA et 13
+  ont moins d'un an, donc une entrée dans le top est un signal de veille. 100 est le maximum d'une
+  page (une requête) et laisse voir un dépôt entrer par le bas du classement. Un classement change
+  toujours (les étoiles bougent), d'où l'exception à « une source qui n'a rien de neuf n'écrit
+  rien » : chaque instantané est un point de mesure, et les entrées, sorties et montées se
+  calculent à la lecture. Options écartées : un filtre par topic (étiquettes libres, sans
+  taxonomie ; plus de 14 000 nouveaux dépôts `llm` par mois) ; les dépôts récents les plus
+  étoilés (plus exposés aux étoiles achetées) ; n'écrire que si la liste change (on perd
+  l'évolution des étoiles) ; couper cette source au profit de #16. Limite assumée : ce
+  classement dit ce qui s'est installé au sommet, pas ce qui monte, rôle de #16 (BigQuery).
+  — PR de #11
 
 ## Décisions encore ouvertes
 
