@@ -72,11 +72,13 @@ la requête (journal du 2026-10-01) : environ 20 papiers par semaine. Détail da
 
 ### Variables d'environnement
 
-Le nom seulement, jamais la valeur.
+Le nom seulement, jamais la valeur. Modèle à copier en `.env` : `.env.example`.
 
 | Variable | Rôle |
 |---|---|
-| `KB_GITHUB_TOKEN` | jeton GitHub *fine-grained*, lecture seule des dépôts publics, sans permission ; création et vérification : [jeton-github.md](jeton-github.md) |
+| `KB_DATA_DIR` | **obligatoire** pour `kb collect` : dossier des données, hors du dépôt de code ; `raw/` y est écrit |
+| `KB_GITHUB_TOKEN` | facultatif (60 requêtes par heure sans, 5 000 avec) : jeton GitHub *fine-grained*, lecture seule des dépôts publics, sans permission ; création et vérification : [jeton-github.md](jeton-github.md) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | chemin de la clé du compte de service BigQuery, pour GH Archive : [bigquery.md](bigquery.md) |
 
 ## Sources étendues
 
