@@ -20,6 +20,7 @@ sous-traitant.
 | Source | Donnée personnelle | Écartée dès la collecte | Gardée dans le brut | Gardée dans la base |
 |---|---|---|---|---|
 | API GitHub | login de l'auteur d'une release ou d'une alerte ; login des personnes créditées dans une alerte (`credits` : qui a trouvé ou corrigé la faille) | — | oui | **non** : écarté à la lecture (minimisation) |
+| API GitHub (dépôts les plus étoilés) | login du propriétaire, dans le nom du dépôt (`owner/repo`), quand c'est une personne | — | oui | oui : il identifie le dépôt |
 | GH Archive | login de l'auteur de chaque événement (`actor`) | **oui** : la requête ne le sélectionne pas | non | non |
 | API arXiv | noms des auteurs des papiers | — | oui | oui, `author` |
 | Web Clipper | auteur de l'article gardé (`author`) ; date où l'utilisatrice l'a gardé (`created`) | — | oui | oui, `author` et `item.saved_at` |
@@ -36,8 +37,8 @@ entreprise.
 |---|---|
 | Finalité | Suivre l'actualité tech (papiers, vulnérabilités, versions, dépôts, articles) et répondre à « quoi de neuf cette semaine ». |
 | Base légale | Intérêt légitime (art. 6.1.f) : veille professionnelle et formation. Les données sont publiées par les personnes elles-mêmes pour être diffusées, et réduites à un nom. |
-| Personnes concernées | Auteurs de papiers arXiv, auteurs d'articles gardés avec Web Clipper, auteurs de releases et d'alertes GitHub, personnes créditées dans une alerte GitHub. |
-| Données | Nom d'auteur et ordre dans la liste des auteurs (`author`, `item_author`). Login GitHub : brut seulement. |
+| Personnes concernées | Auteurs de papiers arXiv, auteurs d'articles gardés avec Web Clipper, auteurs de releases et d'alertes GitHub, personnes créditées dans une alerte GitHub, propriétaires d'un dépôt du top 100 GitHub. |
+| Données | Nom d'auteur et ordre dans la liste des auteurs (`author`, `item_author`). Login GitHub : brut seulement, sauf celui du propriétaire d'un dépôt du top 100, gardé dans le nom du dépôt. |
 | Destinataires | L'utilisatrice ; les agents qu'elle lance, par l'API REST. |
 | Transferts hors UE | Quand un agent comme Claude Code lit les items par l'API, les noms d'auteurs lus partent chez le fournisseur du modèle, aux États-Unis. Cadre juridique de ce transfert non vérifié. |
 | Durée de conservation | **2 ans après la collecte**, dans la base et dans le brut (provisoire, à confirmer dans #20). Le brut et la base ont la même durée : la base doit rester reconstructible depuis le brut. |

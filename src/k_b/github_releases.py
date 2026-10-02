@@ -4,6 +4,8 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 
+from k_b.github_dates import parse_github_date
+
 RELEASE_URL_PREFIX = "https://github.com/"
 
 
@@ -49,20 +51,10 @@ def parse_release(entry: object, repository: str, position: int) -> Release:
         tag_name=tag_name,
         name=name,
         url=url,
-        published_at=parse_publication_date(entry.get("published_at"), position),
+        published_at=parse_github_date(
+            entry.get("published_at"), f"release {position}: published_at"
+        ),
         is_prerelease=is_prerelease,
         body=body,
     )
 
-
-def parse_publication_date(published_at: object, position: int) -> datetime:
-    """Refuse a date without a time zone: GitHub dates are UTC, written with a final Z."""
-    if not isinstance(published_at, str):
-        raise ValueError(f"release {position}: published_at is not a date")
-    try:
-        parsed_date = datetime.fromisoformat(published_at)
-    except ValueError as error:
-        raise ValueError(f"release {position}: invalid published_at: {published_at!r}") from error
-    if parsed_date.tzinfo is None:
-        raise ValueError(f"release {position}: published_at without a time zone")
-    return parsed_date

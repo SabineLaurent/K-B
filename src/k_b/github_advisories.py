@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from k_b.cisa_kev import CVE_ID
+from k_b.github_dates import parse_github_date
 
 GHSA_ID = re.compile(r"GHSA(-[23456789cfghjmpqrvwx]{4}){3}")
 ADVISORY_URL_PREFIX = "https://github.com/advisories/"
@@ -59,8 +60,12 @@ def parse_advisory(entry: object, position: int) -> Advisory:
         summary=summary,
         severity=severity,
         url=url,
-        published_at=parse_github_date(entry, "published_at", position),
-        reviewed_at=parse_github_date(entry, "github_reviewed_at", position),
+        published_at=parse_github_date(
+            entry.get("published_at"), f"advisory {position}: published_at"
+        ),
+        reviewed_at=parse_github_date(
+            entry.get("github_reviewed_at"), f"advisory {position}: github_reviewed_at"
+        ),
         packages=parse_package_names(entry.get("vulnerabilities"), position),
     )
 
@@ -79,16 +84,3 @@ def parse_package_names(vulnerabilities: object, position: int) -> tuple[str, ..
             package_names.append(name)
     return tuple(package_names)
 
-
-def parse_github_date(entry: dict, field: str, position: int) -> datetime:
-    """Refuse a date without a time zone: GitHub dates are UTC, written with a final Z."""
-    stored_date = entry.get(field)
-    if not isinstance(stored_date, str):
-        raise ValueError(f"advisory {position}: {field} is not a date")
-    try:
-        parsed_date = datetime.fromisoformat(stored_date)
-    except ValueError as error:
-        raise ValueError(f"advisory {position}: invalid {field}: {stored_date!r}") from error
-    if parsed_date.tzinfo is None:
-        raise ValueError(f"advisory {position}: {field} without a time zone")
-    return parsed_date
