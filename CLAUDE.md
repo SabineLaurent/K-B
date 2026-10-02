@@ -11,8 +11,8 @@ Le produit est décrit dans le `README.md` (objectif, utilisateurs, périmètre 
 
 La mémoire du projet (contexte, estimations, consignes propres à K-B) s'écrit dans `MEMORY.md`,
 versionné avec le dépôt, et non dans la mémoire locale `~/.claude`. Les décisions et leur pourquoi
-vont dans `docs/ADR/journal-decisions-projet.md`, plus dans `MEMORY.md`. Le dépôt est public :
-rien de personnel.
+vont dans `docs/ADR/journal-decisions-projet.md`, plus dans `MEMORY.md`. Le dépôt est privé, mais
+rien de personnel pour autant.
 
 ## Pile
 
