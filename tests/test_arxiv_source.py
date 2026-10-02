@@ -1,5 +1,5 @@
 import io
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -80,6 +80,22 @@ def test_the_window_reaches_back_seven_days_before_the_last_collection(fake_urlo
     assert "submittedDate:[202609231005 TO " in fake_urlopen.search_query()
 
 
+def test_the_window_is_written_in_utc_whatever_the_stored_time_zone(fake_urlopen):
+    paris = timezone(timedelta(hours=2))
+    ArxivSource().fetch(last_collected_at=datetime(2026, 9, 30, 12, 5, tzinfo=paris))
+
+    assert "submittedDate:[202609231005 TO " in fake_urlopen.search_query()
+
+
+def test_the_window_ends_now(fake_urlopen):
+    ArxivSource().fetch(last_collected_at=None)
+
+    window_end = datetime.strptime(
+        fake_urlopen.search_query().split(" TO ")[1][:12], "%Y%m%d%H%M"
+    ).replace(tzinfo=UTC)
+    assert abs(datetime.now(UTC) - window_end) < timedelta(minutes=2)
+
+
 def test_a_first_collection_takes_the_last_seven_days(fake_urlopen):
     ArxivSource().fetch(last_collected_at=None)
 
@@ -101,6 +117,21 @@ def test_a_page_that_does_not_hold_every_result_is_refused(fake_urlopen):
     )
 
     with pytest.raises(ValueError, match="2001"):
+        ArxivSource().fetch(last_collected_at=None)
+
+
+def test_a_page_with_an_invalid_entry_is_still_returned(fake_urlopen):
+    fake_urlopen.body = RECORDED_RESPONSE.replace(b"<name>Yixuan Liu</name>", b"")
+
+    assert ArxivSource().fetch(last_collected_at=None) == fake_urlopen.body
+
+
+def test_an_api_error_answered_with_http_200_is_refused(fake_urlopen):
+    fake_urlopen.body = RECORDED_RESPONSE.replace(
+        b"http://arxiv.org/abs/2609.31282v1", b"http://arxiv.org/api/errors#malformed"
+    )
+
+    with pytest.raises(ValueError, match="error"):
         ArxivSource().fetch(last_collected_at=None)
 
 

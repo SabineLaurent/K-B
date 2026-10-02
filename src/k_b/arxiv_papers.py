@@ -1,9 +1,12 @@
 """Read the papers of a raw arXiv API response (an Atom feed)."""
 
+import logging
 import re
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 # Python's expat (2.4.1 and later) refuses entity expansion attacks and never fetches
 # external entities: the standard library parser is safe on this untrusted feed.
@@ -11,6 +14,8 @@ ATOM = "{http://www.w3.org/2005/Atom}"
 OPENSEARCH = "{http://a9.com/-/spec/opensearch/1.1/}"
 # Only papers numbered since 2007 (YYMM.NNNNN) are expected in cs.CR × cs.AI.
 PAPER_ID = re.compile(r"https?://arxiv\.org/abs/(\d{4}\.\d{4,5})v(\d+)")
+# arXiv reports an error as a feed whose single entry carries this id.
+API_ERROR_ID = re.compile(r"https?://arxiv\.org/api/errors")
 ABSTRACT_PAGE_URL = "https://arxiv.org/abs/"
 
 
@@ -29,9 +34,31 @@ class Paper:
 
 
 def read_papers(raw_response: bytes) -> list[Paper]:
-    """One paper per entry of the feed, in the order of the response."""
+    """One paper per valid entry of the feed, in the order of the response.
+
+    An invalid entry is rejected and logged, not guessed: the others are still read.
+    """
+    papers = []
+    for position, entry in enumerate(parse_feed(raw_response).findall(f"{ATOM}entry")):
+        try:
+            papers.append(parse_paper(entry, position))
+        except ValueError as error:
+            logger.warning("arXiv paper rejected: %s", error)
+    return papers
+
+
+def count_papers(raw_response: bytes) -> int:
+    """Count every entry, valid or not; refuse a feed that reports an API error.
+
+    Entries are validated when read, not here: one malformed paper must not block the
+    collection, whose window would keep it forever.
+    """
     entries = parse_feed(raw_response).findall(f"{ATOM}entry")
-    return [parse_paper(entry, position) for position, entry in enumerate(entries)]
+    for entry in entries:
+        entry_id = (entry.findtext(f"{ATOM}id") or "").strip()
+        if API_ERROR_ID.match(entry_id):
+            raise ValueError(f"the arXiv API reports an error: {entry_id!r}")
+    return len(entries)
 
 
 def read_total_results(raw_response: bytes) -> int:

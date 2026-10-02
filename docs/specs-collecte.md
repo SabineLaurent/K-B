@@ -73,26 +73,28 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   papiers classés à la fois en `cs.CR` et en `cs.AI`, et dont le résumé contient un mot-clé :
   `cat:cs.CR AND cat:cs.AI AND (abs:"prompt injection" OR abs:jailbreak OR abs:"red teaming" OR
   abs:"adversarial attack" OR abs:backdoor OR abs:poisoning OR abs:"membership inference" OR
-  abs:"agent security") AND submittedDate:[<dernière collecte> TO <maintenant>]`.
+  abs:"agent security") AND submittedDate:[<dernière collecte − 7 jours> TO <maintenant>]`.
 - **Volume mesuré** (moyenne par 7 jours, septembre / avril 2026) : `cs.CR` sans filtre 276 / 199 ;
   `cs.CR` × `cs.AI` 78 / 70 ; avec les mots-clés, **22 / 19**.
 - **Pièges de l'API** : avec `max_results=0`, le total renvoyé vaut toujours 1 (demander au moins
   un résultat pour le lire) ; les parenthèses
   imbriquées et `ANDNOT` combiné à d'autres opérateurs donnent des totaux faux. Sous charge,
-  l'API répond `503` ou ne répond pas : le collecteur réessaie plus tard au lieu d'échouer.
+  l'API répond `503` ou ne répond pas : la source échoue sans bloquer les autres, et sa date
+  n'avance pas ; la collecte suivante redemande la même fenêtre.
 - **Données personnelles** : noms des auteurs des papiers, publiés par eux ; gardés, car ils
   identifient le papier.
-- **État** : collecte en place (PR de #12). Une requête par collecte, une page de 2 000 ; si
-  l'API annonce plus de résultats que la page n'en contient, la collecte échoue et sa date
-  n'avance pas. La fenêtre `submittedDate` part de **7 jours avant** la dernière collecte (la
-  première collecte prend les 7 derniers jours) : un papier n'est visible dans l'API qu'à son
-  annonce, jusqu'à 3,5 jours après sa soumission (jeudi 14 h → dimanche 20 h, heure de New York),
-  plus les jours fériés ([Availability of
-  submissions](https://info.arxiv.org/help/availability.html)). Partir de la dernière collecte
-  perdrait ces papiers pour toujours (le bug de watermark de brief09). Chaque brut recouvre donc
-  le précédent ; la fusion dédoublonne par identifiant. Limites assumées : la révision (`v2`)
-  d'un papier soumis avant la fenêtre n'est pas collectée, ni un papier retenu en modération plus
-  de 7 jours.
+- **État** : collecte en place (PR de #12). Une requête par collecte, une page de 2 000 ; si l'API
+  annonce plus de résultats que la page n'en contient, la collecte échoue et sa date n'avance pas.
+  La fenêtre `submittedDate` part de **7 jours avant** la dernière collecte (la première collecte
+  prend les 7 derniers jours) : un papier n'est visible dans l'API qu'à son annonce, jusqu'à 3,5
+  jours après sa soumission (jeudi 14 h → dimanche 20 h, heure de New York), plus les jours fériés
+  ([Availability of submissions](https://info.arxiv.org/help/availability.html)). Partir de la
+  dernière collecte perdrait ces papiers pour toujours (le bug de watermark de brief09). Chaque
+  brut recouvre donc le précédent ; la fusion dédoublonne par identifiant. Une entrée mal formée
+  ne fait pas échouer la collecte (sa fenêtre la garderait pour toujours) : elle entre dans le
+  brut, et sa lecture la rejette et la journalise. Une entrée d'erreur de l'API fait, elle,
+  échouer la collecte. Limites assumées : la révision (`v2`) d'un papier soumis avant la fenêtre
+  n'est pas collectée, ni un papier retenu en modération plus de 7 jours.
 
 ### Catalogue CISA KEV — fichier
 
