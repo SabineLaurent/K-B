@@ -23,16 +23,21 @@ Firefox.
 Décidé le 2026-09-30 (#24). On démarre petit ; les listes grossiront à l'usage. Les réglages de
 départ sont dans [sources-detaillees.md](sources-detaillees.md).
 
-### Dépôts GitHub (releases)
+### Dépôts GitHub (releases et alertes de sécurité)
 
-| Dépôt | Pourquoi |
-|---|---|
-| `langchain-ai/langchain` | écosystème LLM (monorepo : une release par paquet, bruyant) |
-| `langchain-ai/langgraph` | écosystème LLM, agents |
-| `run-llama/llama_index` | écosystème LLM, RAG |
-| `anthropics/claude-code` | outil de travail |
+Chaque dépôt suivi donne ses releases et les alertes de sécurité de ses paquets. Seuls les
+paquets principaux sont suivis ; une intégration (`langchain-anthropic`…) s'ajoute quand elle sert.
+La sécurité des projets de Sabine relève de Dependabot, pas de cette liste (décidé le 2026-10-02).
+La liste vit dans `src/k_b/tracked_repositories.py`.
 
-Sous le coude, à ajouter plus tard :
+| Dépôt | Pourquoi | Paquets (alertes) |
+|---|---|---|
+| `langchain-ai/langchain` | écosystème LLM (monorepo : une release par paquet, bruyant) | pip : `langchain`, `langchain-core`, `langchain-classic`, `langchain-text-splitters` |
+| `langchain-ai/langgraph` | écosystème LLM, agents | pip : `langgraph`, `langgraph-checkpoint` |
+| `run-llama/llama_index` | écosystème LLM, RAG | pip : `llama-index`, `llama-index-core` |
+| `anthropics/claude-code` | outil de travail | npm : `@anthropic-ai/claude-code` |
+
+Sous le coude, à ajouter plus tard, avec leurs paquets :
 
 | Dépôt | Pourquoi |
 |---|---|

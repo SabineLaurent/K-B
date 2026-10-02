@@ -32,19 +32,27 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Technologie** : API REST, JSON, `urllib` de la bibliothèque standard.
 - **Ce qu'on en tire** :
   - releases des dépôts suivis : `GET /repos/{owner}/{repo}/releases` ;
-  - alertes de sécurité : `GET /advisories` (base publique des *security advisories*) ;
+  - alertes de sécurité : `GET /advisories` (base publique des *security advisories*), relues
+    par GitHub, pour les paquets publiés par les dépôts suivis ; la sécurité des projets de
+    Sabine relève de Dependabot, pas de K-B ;
   - dépôts les plus étoilés : `GET /search/repositories`, tri par étoiles.
 - **Accès** : jeton *fine-grained*, dépôts publics seulement, sans permission, dans
   `KB_GITHUB_TOKEN` ([jeton-github.md](jeton-github.md)).
 - **Limites** : 5 000 requêtes par heure avec jeton (60 sans) ; la recherche a sa propre limite,
   30 requêtes par minute, et ne renvoie jamais plus de 1 000 résultats.
 - **Données personnelles** : les releases et alertes portent le login de leur auteur, une donnée
-  personnelle (pseudonyme rattaché à une personne). Non nécessaire à la veille : il reste dans le
+  personnelle (pseudonyme rattaché à une personne), comme celui des personnes créditées dans une
+  alerte (`credits`). Non nécessaire à la veille : il reste dans le
   brut mais n'entre pas dans les items (minimisation, RGPD art. 5.1.c).
 - **Suivi** : 4 dépôts, liste et réserve dans [sources.md](sources.md).
 - **État** : releases collectées (PR de #10) : un brut par dépôt, la première page de 100
   releases ; un avertissement est journalisé si la page entière est plus récente que la dernière
   collecte (des releases ont pu manquer, il faudra lire les pages suivantes).
+  Alertes collectées (PR de #11) : un brut par écosystème (`pip`, `npm`), publiées depuis la
+  veille de la dernière collecte, même avertissement si la page de 100 est pleine.
+- **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-02) : les
+  alertes sont demandées pour les seuls paquets suivis (`affects=`). Tout l'écosystème `npm`
+  dépasse 100 alertes par semaine et obligerait à paginer.
 
 ### API arXiv — service web
 
