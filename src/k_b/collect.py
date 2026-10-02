@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Protocol
 
+from k_b.arxiv_source import ArxivSource
 from k_b.cisa_kev_source import CisaKevSource
 from k_b.github_advisories_source import GithubAdvisoriesSource
 from k_b.github_most_starred_source import GithubMostStarredSource
@@ -38,6 +39,7 @@ SOURCES: list[Source] = [
         for ecosystem, packages in list_packages_by_ecosystem(TRACKED_REPOSITORIES).items()
     ),
     GithubMostStarredSource(),
+    ArxivSource(),
 ]
 
 
