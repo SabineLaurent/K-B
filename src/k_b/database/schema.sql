@@ -1,4 +1,5 @@
--- K-B: physical data model (MPD) of the items database, SQLite.
+-- K-B: physical data model (MPD) of the items database, written for SQLite.
+-- What is SQLite-specific, and its PostgreSQL equivalent: docs/stockage.md.
 -- Conceptual and logical models, and the reasons behind them: docs/stockage.md.
 -- Reference data (the sources) is in seed_sources.sql, run right after this script.
 -- Every connection must run PRAGMA foreign_keys = ON: SQLite ignores foreign keys otherwise.

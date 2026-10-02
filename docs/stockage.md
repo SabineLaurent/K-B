@@ -245,6 +245,24 @@ Noms SQL en anglais, comme le code ; correspondance avec le MLD :
 - **Formats contrôlés** : dates (ci-dessus), `cve` (`CVE-AAAA-NNNN…`), `repository_name`
   (`owner/repo`), `position` ≥ 1, `stars_gained` ≥ 0.
 
+### Ce qui est propre à SQLite
+
+Le MPD est écrit pour SQLite. Pour migrer vers un autre SGBD, voici ce qui change, avec
+l'équivalent PostgreSQL :
+
+| Dans le script SQLite | Pourquoi | En PostgreSQL |
+|---|---|---|
+| `STRICT` sur chaque table | sinon SQLite accepte une valeur du mauvais type | inutile : typage strict par défaut |
+| dates en `TEXT` + `CHECK (… IS strftime(…))` | SQLite n'a pas de type date | `timestamptz`, sans `CHECK` de format |
+| `INTEGER PRIMARY KEY` | numérotation automatique (alias de `rowid`) | `bigint GENERATED ALWAYS AS IDENTITY` |
+| `GLOB` dans les `CHECK` (`cve`, `repository_name`) | motif simple | `~` (expression régulière) |
+| `IS` dans les `CHECK` de date | compare sans que `NULL` fasse passer le contrôle | `IS NOT DISTINCT FROM` |
+| `PRAGMA foreign_keys = ON` à chaque connexion | clés étrangères ignorées sinon | inutile : toujours vérifiées |
+| `PRAGMA journal_mode = WAL` | lire pendant l'écriture | inutile : MVCC |
+
+Reste identique : les tables, les clés, `UNIQUE`, `ON DELETE CASCADE`, les index, et
+`ON CONFLICT (…) DO NOTHING` du seed. Le MCD et le MLD ne dépendent d'aucun SGBD.
+
 Vérifié le 2026-10-02 avec SQLite 3.50.4 : le script s'exécute, et chaque contrainte refuse une
 ligne fautive (date sans `Z`, 30 février, URL ou identifiant en double, source inconnue, CVE mal
 formée, texte dans une colonne entière, deux mesures sur la même fenêtre, mesure sur un
