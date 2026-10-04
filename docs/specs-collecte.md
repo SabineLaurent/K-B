@@ -12,7 +12,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Un point de lancement** : `kb collect` lance toutes les sources ; une source en panne
   n'arrête pas les autres (code de sortie 1, détail par source).
 - **Brut intact** : chaque collecte écrit ce que la source a renvoyé dans
-  `raw/automation/<source>/<AAAA-MM-JJTHHMMSSZ>.<ext>`, une seule fois, jamais réécrit. Le filtre
+  `raw/automation/<source>/<AAAA-MM-JJTHHMMSSZ>.<ext>`, une seule fois, jamais réécrit. Une
+  source qui lit plusieurs pages (site scrapé) écrit chaque page telle que reçue dans
+  `raw/automation/<source>/<AAAA-MM-JJTHHMMSSZ>/<page>.<ext>` (décidé le 2026-10-04). Le filtre
   se fait à la lecture, sauf exception décidée (arXiv, ci-dessous).
 - **Incrémental** : la date de la dernière collecte réussie de chaque source est dans
   `raw/collection_state.json` ; une source qui n'a rien de neuf n'écrit rien.
@@ -123,17 +125,32 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 ### tldr.tech — scraping
 
 - **Technologie** : pages HTML `https://tldr.tech/<édition>/<AAAA-MM-JJ>` (vérifié :
-  `https://tldr.tech/ai/2026-09-30` répond 200), lues avec un analyseur HTML. Le scraper de
-  `brief09_assistant-veille-tech` est relu comme un dépôt tiers avant d'être repris (#13).
+  `https://tldr.tech/ai/2026-09-30` répond 200). La collecte garde chaque page brute ; la lecture des articles se fait à la
+  transformation.
 - **Ce qu'on en tire** : un item par article de chaque édition suivie : titre, lien, résumé.
+- **Jours sans édition** : un jour redirigé vers la page d'accueil de l'édition,
+  `https://tldr.tech/<édition>`, n'a pas de page d'édition (observé pour le 2026-10-03 et le
+  2026-10-04) : il est journalisé avec l'adresse de redirection et sauté. Toute autre
+  redirection ou erreur HTTP fait échouer la source.
+- **Journal** : chaque jour donne une ligne, avec l'édition, le jour et ce qui a été observé :
+  page gardée (taille en octets), redirection vers la page d'accueil (adresse d'arrivée), ou
+  erreur (message reçu et URL demandée) ; une collecte sans aucune page le dit aussi.
+  `kb collect` affiche les lignes de niveau INFO et au-dessus.
+- **Fréquence** : une collecte par jour, lancée à la main
+  (`KB_DATA_DIR=<dossier> uv run --env-file .env kb collect`) ; l'automatisation viendra après.
+  Chaque collecte lit chaque jour depuis le jour de la dernière collecte, relu car son édition a
+  pu paraître après elle, jusqu'à aujourd'hui (UTC) ; la première lit les 7 jours précédents et
+  aujourd'hui. La page relue est en double dans deux collectes : le doublon est retiré à la
+  transformation.
 - **Accès** : sans authentification. Le `robots.txt` autorise tout, sauf les pages d'abonnement
   et de compte (`/subscribed`, `/manage`, `/info`…), qu'on ne lit pas.
 - **Limites** : pas de quota publié ; on s'impose une page à la fois, avec une pause entre deux
   pages. Les liens portent des paramètres de suivi `utm_*` et certaines entrées sont
   sponsorisées : à traiter à la lecture.
-- **Données personnelles** : aucune attendue.
-- **Suivi** : l'édition **AI** est retenue (2026-10-01). Les autres éditions sont à choisir dans
-  #13 (neuf candidates dans [sources-detaillees.md](sources-detaillees.md)).
+- **Données personnelles** : aucune (voir le registre des traitements).
+- **Suivi** : éditions **ai**, **infosec** et **dev** (ai le 2026-10-01, les deux autres le
+  2026-10-04), une source par édition (`tldr_ai`…), dans `TRACKED_EDITIONS` de
+  `k_b/tldr_source.py` (neuf candidates dans [sources-detaillees.md](sources-detaillees.md)).
 
 ### Zotero — base de données
 

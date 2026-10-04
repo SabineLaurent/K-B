@@ -4,7 +4,7 @@ from urllib.error import HTTPError
 import pytest
 
 from k_b import http_download
-from k_b.http_download import download
+from k_b.http_download import RedirectedOutsideError, download
 from k_b.user_agent import USER_AGENT
 
 BODY = b"<feed>one paper</feed>"
@@ -111,6 +111,19 @@ def test_a_badly_set_prefix_is_refused_before_any_request(fake_urlopen, url, tru
         download(url, trusted_url_prefix, max_bytes=1000)
 
     assert fake_urlopen.requests == []
+
+
+def test_a_refused_redirection_tells_where_it_led(fake_urlopen):
+    fake_urlopen.final_url = "https://example.org/landing"
+
+    with pytest.raises(RedirectedOutsideError) as refusal:
+        download(URL, URL, max_bytes=1000)
+
+    assert refusal.value.redirect_url == "https://example.org/landing"
+    assert isinstance(refusal.value, ValueError)
+    assert str(refusal.value) == (
+        f"response redirected to https://example.org/landing, outside {URL}, refused"
+    )
 
 
 def test_a_body_larger_than_the_limit_is_refused(fake_urlopen):

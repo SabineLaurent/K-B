@@ -86,3 +86,37 @@ def test_a_source_with_nothing_new_writes_no_raw_file_but_succeeds(tmp_path):
     assert errors_by_source == {"unchanged": None}
     assert not (tmp_path / "automation").exists()
     assert load_last_collection_dates(tmp_path) == {"unchanged": FIRST_RUN_AT}
+
+
+class ScrapedSource:
+    """Returns several pages, as a scraped source reading one page per day does."""
+
+    extension = "html"
+
+    def __init__(self, pages):
+        self.name = "scraped"
+        self.pages = pages
+
+    def fetch(self, last_collected_at):
+        return self.pages
+
+
+def test_each_page_of_a_source_is_written_as_received_in_a_folder_per_collection(tmp_path):
+    pages = {"2026-09-29": b"<html>monday</html>", "2026-09-30": b"<html>tuesday</html>"}
+
+    errors_by_source = collect_all_sources([ScrapedSource(pages)], tmp_path, FIRST_RUN_AT)
+
+    assert errors_by_source == {"scraped": None}
+    collection_dir = tmp_path / "automation" / "scraped" / "2026-09-30T100000Z"
+    assert (collection_dir / "2026-09-29.html").read_bytes() == b"<html>monday</html>"
+    assert (collection_dir / "2026-09-30.html").read_bytes() == b"<html>tuesday</html>"
+
+
+def test_a_page_name_that_is_not_a_safe_path_segment_is_refused_before_any_write(tmp_path):
+    pages = {"2026-09-29": b"<html>monday</html>", "../escape": b"<html>evil</html>"}
+
+    errors_by_source = collect_all_sources([ScrapedSource(pages)], tmp_path, FIRST_RUN_AT)
+
+    assert isinstance(errors_by_source["scraped"], ValueError)
+    assert not (tmp_path / "automation").exists()
+    assert not (tmp_path / "escape.html").exists()
