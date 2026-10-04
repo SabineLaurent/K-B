@@ -83,7 +83,8 @@ def collect_one_source(
     if isinstance(raw_content, bytes):
         write_new_raw_file(source_dir / f"{collection_name}.{source.extension}", raw_content)
         return
-    # Every name is checked before the first write: a refused page leaves no partial collection.
+    # Every name is checked before the first write: a refused name leaves no partial collection.
+    # A write that fails midway (disk full) does leave the pages already written.
     for page_name in raw_content:
         if not SAFE_PAGE_NAME.fullmatch(page_name):
             raise ValueError(f"not a safe page name: {page_name!r}")
