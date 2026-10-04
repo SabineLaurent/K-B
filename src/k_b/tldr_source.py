@@ -169,6 +169,7 @@ class TldrSource:
         return (
             parts.scheme == "https"
             and parts.hostname == "tldr.tech"
+            and "@" not in parts.netloc
             and parts.port is None
             and parts.path.rstrip("/") == f"/{self.edition}"
         )

@@ -42,7 +42,8 @@ class FakeTldr:
     def __call__(self, request, timeout):
         self.requested_urls.append(request.full_url)
         day = date.fromisoformat(request.full_url.rsplit("/", 1)[1])
-        if day.weekday() >= 5 or day in self.missing_days:
+        assert day.weekday() < 5, f"a weekend day was asked for: {day}"
+        if day in self.missing_days:
             # tldr.tech redirects a day without an edition to the landing page of the edition.
             return FakeResponse(LANDING_PAGE, self.landing_url)
         if day in self.failing_days:
@@ -203,7 +204,14 @@ def test_the_landing_page_is_recognised_in_its_variants(fake_tldr, pauses, landi
 
 @pytest.mark.parametrize(
     "landing_url",
-    ["https://tldr.tech/dev", "https://tldr.tech/ai/subscribe", "http://tldr.tech/ai"],
+    [
+        "https://tldr.tech/dev",
+        "https://tldr.tech/ai/subscribe",
+        "http://tldr.tech/ai",
+        "https://tldr.tech:443/ai",
+        "https://tldr.tech/AI",
+        "https://user@tldr.tech/ai",
+    ],
 )
 def test_a_redirection_elsewhere_is_refused(fake_tldr, pauses, landing_url):
     fake_tldr.landing_url = landing_url
@@ -311,3 +319,21 @@ def test_a_past_day_redirected_to_the_landing_page_is_logged_as_a_warning(
     assert [record.getMessage() for record in warnings] == [
         "tldr_ai 2026-10-05: no edition page, redirected to https://tldr.tech/ai/"
     ]
+
+
+def test_yesterday_without_article_and_today_not_out_fails_then_passes_the_next_day(
+    fake_tldr, pauses, monkeypatch
+):
+    fake_tldr.empty_days = {date(2026, 10, 7)}
+    fake_tldr.missing_days = {TODAY}
+    last_collection = datetime(2026, 10, 7, 6, tzinfo=UTC)
+
+    with pytest.raises(ValueError, match="no article in any of the 1 edition pages"):
+        TldrSource("ai", "AI").fetch(last_collected_at=last_collection)
+
+    # The failed collection kept its date: the next day, the window also holds 2026-10-08.
+    fake_tldr.missing_days = set()
+    monkeypatch.setattr(tldr_source, "current_day", lambda: date(2026, 10, 9))
+    pages = TldrSource("ai", "AI").fetch(last_collected_at=last_collection)
+
+    assert list(pages) == ["2026-10-07", "2026-10-08", "2026-10-09"]
