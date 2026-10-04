@@ -87,6 +87,23 @@ def test_a_redirection_away_from_the_trusted_prefix_is_refused(fake_urlopen, fin
         download(URL, TRUSTED_URL_PREFIX, max_bytes=1000)
 
 
+@pytest.mark.parametrize(
+    ("url", "trusted_url_prefix"),
+    [
+        (URL, "https://"),
+        ("http://example.org/feed", "http://example.org/"),
+        (URL, "https://example.org"),
+        (URL, "https://example.com/"),
+    ],
+    ids=["prefix-without-host", "prefix-not-https", "prefix-without-path", "url-outside-prefix"],
+)
+def test_a_badly_set_prefix_is_refused_before_any_request(fake_urlopen, url, trusted_url_prefix):
+    with pytest.raises(ValueError, match="trusted"):
+        download(url, trusted_url_prefix, max_bytes=1000)
+
+    assert fake_urlopen.requests == []
+
+
 def test_a_body_larger_than_the_limit_is_refused(fake_urlopen):
     with pytest.raises(ValueError, match="larger than"):
         download(URL, TRUSTED_URL_PREFIX, max_bytes=len(BODY) - 1)

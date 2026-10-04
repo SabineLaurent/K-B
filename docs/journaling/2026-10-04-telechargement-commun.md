@@ -58,6 +58,26 @@ On ne l'empêche pas : on vérifie **où l'on a fini** (`response.url`) avant de
 (`http_download.py:27`). Le préfixe se termine par `/` (`https://www.cisa.gov/`), si bien que
 `https://www.cisa.gov.example.com/` ne passe pas : c'est testé.
 
+### Le préfixe lui-même est contrôlé
+
+Le contrôle de redirection ne vaut que si le préfixe est bien réglé : avec `"https://"`, toute
+redirection vers un site HTTPS passerait. `check_trusted_url_prefix`
+(`src/k_b/http_download.py:36-51`) refuse donc, **avant toute requête**, un préfixe qui n'est pas
+`https`, qui n'a pas d'hôte, ou dont l'hôte n'est pas terminé par un chemin
+(`"https://example.org"`, que `"https://example.org.evil.com"` prolonge), ainsi qu'une URL que
+son préfixe ne couvre pas :
+
+```python
+is_prefix_strict = (
+    prefix_parts.scheme == "https"
+    and prefix_parts.netloc != ""
+    and prefix_parts.path.startswith("/")
+)
+```
+
+Une erreur de configuration d'une source, actuelle ou future (TLDR), casse donc tout de suite au
+lieu de rester muette. Ajouté après la revue de code, qui l'avait relevé (voir les choix).
+
 ### Le plafond lu à `max_bytes + 1`
 
 `response.read(max_bytes + 1)` (`http_download.py:29`) ne lit jamais plus d'un octet au-delà du
@@ -94,6 +114,7 @@ l'attrape autour de l'appel. Pour une autre source, un 304 inattendu reste une e
 | `HTTPError` remonte | le sens d'un code HTTP dépend de la source | Gérer le 304 dans la fonction commune : ce serait de la logique CISA hors de CISA |
 | `arxiv_source.download` renommée `download_papers` | éviter deux fonctions `download` dans le même module | — |
 | Tests de redirection et de taille regroupés dans `test_http_download.py` | le contrôle n'existe plus qu'à un endroit ; critère de fin de #50 | Les garder dans chaque source : trois copies de tests du même code |
+| Valider le préfixe dans `download()` | une seule règle pour toutes les sources, TLDR comprise ; comportement actuel inchangé (les trois préfixes la respectent) ; proposé par une évaluation indépendante | **Un test de redirection par source** : ne teste que le faux `urlopen`, et chaque nouvelle source devrait penser au sien. **Supprimer le préfixe, exiger la même origine que l'URL demandée** (ma première proposition) : l'URL deviendrait sa propre référence de confiance, perte de défense en profondeur ; arXiv s'élargirait sans gain |
 
 Factoriser à la troisième occurrence est imposé par `.claude/rules/code.md`. En passant, le
 commentaire de `user_agent.py` est mis à jour : le dépôt est privé jusqu'au 25/10, puis public
@@ -109,8 +130,9 @@ commentaire de `user_agent.py` est mis à jour : le dépôt est privé jusqu'au 
 | `test_a_redirection_away_from_the_trusted_prefix_is_refused` (`http://`, domaine suffixé) | le contrôle de l'URL finale tient |
 | `test_a_body_larger_than_the_limit_is_refused`, `..._exactly_at_the_limit_is_returned` | le plafond tombe au bon octet |
 | `test_an_http_error_is_raised_to_the_caller` | le 304 reste à la charge de la source |
+| `test_a_badly_set_prefix_is_refused_before_any_request` (4 cas), rouge avant le code | préfixe sans hôte, non `https`, sans chemin, ou URL hors préfixe : refus sans aucune requête |
 | Tests existants des sources (304 de CISA, jeton GitHub, fenêtre arXiv) verts, inchangés hormis la cible du faux `urlopen` | comportement inchangé |
-| `uv run pytest` : 146 passed | aucune régression |
+| `uv run pytest` : 150 passed | aucune régression |
 | `grep -rn urlopen src/` : seul `http_download.py` | plus aucune copie du bloc |
 | Revue de code et revue de sécurité en sous-agents : aucun constat | ni bogue ni contrôle affaibli relevé |
 
@@ -135,9 +157,15 @@ commentaire de `user_agent.py` est mis à jour : le dépôt est privé jusqu'au 
 - Les tests remplacent `urlopen` par un faux : on vérifie que `Authorization` n'est pas dans
   `request.headers`, et l'on s'appuie sur la documentation d'`urllib` pour le fait que seuls ces
   en-têtes sont recopiés lors d'une redirection. Aucune vraie redirection n'est jouée.
-- Remarque de la revue de code, non corrigée : les tests de redirection et de taille ne vivent
-  plus qu'une fois. Si une source passait un jour le mauvais préfixe ou le mauvais plafond à
-  `download` (arguments inversés, par exemple), aucun test ne le verrait.
+- Remarque de la revue de code : un préfixe mal réglé n'était attrapé par aucun test. Traitée
+  par la validation du préfixe. Reste non testé : un plafond trop grand (sans fuite ni
+  contournement, au pire une grosse réponse gardée).
+- Trou préexistant, relevé par l'évaluation indépendante et vérifié dans `urllib`
+  (`request.py`, `http_error_302`) : `urlopen` **suit d'abord** une redirection (jusqu'à 10
+  sauts, y compris vers `http`) et lit en entier le corps de chaque saut, sans plafond ; notre
+  contrôle n'arrive qu'après. Un 304 renvoyé par un hôte étranger lève `HTTPError` avant le
+  contrôle : CISA le prendrait pour « rien de neuf » (scénario non reproduit). À traiter dans une
+  issue à part : refuser une redirection avant de la suivre.
 - Le délai de 30 s ne borne que l'attente entre deux paquets, pas la durée totale d'un
   téléchargement (comportement d'`urllib`, déjà vrai avant cette PR).
 
