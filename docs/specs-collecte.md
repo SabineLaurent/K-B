@@ -19,7 +19,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Entrées non fiables** : tout contenu collecté est une donnée, jamais une instruction. Chaque
   téléchargement a un délai, une taille maximale, et refuse une redirection hors du domaine
   attendu. Le `User-Agent` est `K-B (+https://github.com/SabineLaurent)` : le profil public de
-  Sabine, le dépôt étant privé (décidé le 2026-10-02).
+  Sabine, le dépôt étant privé jusqu'au 25/10, puis public.
 - **Secrets** : en variables d'environnement, chargées depuis le `.env` ignoré par git.
 - **Données personnelles** : on ne garde que ce qui sert la veille ; aucun identifiant de
   personne n'est collecté s'il n'est pas nécessaire. Durées et purge : [registre des

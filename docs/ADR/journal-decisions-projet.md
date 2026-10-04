@@ -331,6 +331,15 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   source, réessayée au prochain `kb collect` ; écarté : réessayer dans la même exécution.
   — PR de #12
 
+## 2026-10-04
+
+### Visibilité du dépôt
+
+- **Le dépôt est privé jusqu'au 25/10, puis public, avant l'oral blanc du 29/10.** Choix de
+  Sabine, confirmé le 2026-10-02 au soir. Pourquoi : le jury doit pouvoir ouvrir le dépôt. Le
+  `User-Agent` décidé le 2026-10-02 (le profil public de Sabine) reste valable : il ne dépend pas
+  de la visibilité, et le profil ne change pas si le dépôt est renommé.
+
 ## Décisions encore ouvertes
 
 - **Zotero : garder la copie entière comme brut ?** Décidé à titre provisoire le 2026-10-01 ; à
