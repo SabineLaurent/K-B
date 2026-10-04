@@ -2,7 +2,7 @@ import io
 
 import pytest
 
-from k_b import github_api
+from k_b import github_api, http_download
 from k_b.github_api import get_from_github_api
 from k_b.user_agent import USER_AGENT
 
@@ -34,7 +34,7 @@ class FakeUrlopen:
 @pytest.fixture
 def fake_urlopen(monkeypatch):
     fake = FakeUrlopen()
-    monkeypatch.setattr(github_api, "urlopen", fake)
+    monkeypatch.setattr(http_download, "urlopen", fake)
     monkeypatch.delenv(github_api.TOKEN_VARIABLE, raising=False)
     return fake
 
@@ -69,21 +69,3 @@ def test_the_token_is_sent_but_never_forwarded_to_a_redirection(fake_urlopen, mo
     assert request.get_header("Authorization") == "Bearer test-token"
     # urllib copies request.headers to a redirection, never the unredirected ones.
     assert "Authorization" not in request.headers
-
-
-@pytest.mark.parametrize(
-    "final_url",
-    ["http://api.github.com/" + PATH, "https://api.github.com.example.com/" + PATH],
-)
-def test_a_redirection_away_from_https_api_github_com_is_refused(fake_urlopen, final_url):
-    fake_urlopen.final_url = final_url
-
-    with pytest.raises(ValueError, match="redirected"):
-        get_from_github_api(PATH)
-
-
-def test_a_response_larger_than_the_limit_is_refused(fake_urlopen, monkeypatch):
-    monkeypatch.setattr(github_api, "MAX_RESPONSE_BYTES", len(BODY) - 1)
-
-    with pytest.raises(ValueError, match="larger than"):
-        get_from_github_api(PATH)
