@@ -149,14 +149,20 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **État** : collecte en place (PR de #13). Une source par édition (`tldr_ai`…) ; chaque
   collecte lit les jours de semaine depuis le jour de la dernière collecte (inclus, son édition
   a pu paraître après elle ; le recouvrement est retiré à la fusion) jusqu'à **aujourd'hui**.
-  L'édition du jour peut ne pas être encore parue : pour aujourd'hui seulement, toute réponse qui
-  n'est pas une édition (redirection, erreur HTTP, page sans titre daté) n'est pas une erreur, et
-  la collecte suivante redemande ce jour. Première collecte : les 7 jours précédents et
-  aujourd'hui (pour tester ; à élargir à la mise en service). Chaque page est téléchargée avec sa
-  propre URL comme préfixe de confiance : une redirection vers la page d'accueil de l'édition
-  veut dire « pas d'édition ce jour-là » ; toute autre redirection, une page sans titre daté de
-  l'édition, ou des pages dont aucune n'a d'article, font échouer la collecte de l'édition
-  (structure du site changée). Une page datée sans article est gardée, avec un avertissement.
+  Première collecte : les 7 jours précédents et aujourd'hui (pour tester ; à élargir à la mise
+  en service). Chaque page est téléchargée avec sa propre URL comme préfixe de confiance.
+  Règles, toutes journalisées avec ce qui a été reçu (adresse de redirection, code HTTP, titre
+  trouvé et titre attendu) :
+  - **aujourd'hui** : toute réponse qui n'est pas l'édition est journalisée, pas refusée ; la
+    collecte suivante redemande ce jour ;
+  - **jour passé redirigé vers la page d'accueil de l'édition** : pas d'édition, avertissement ;
+  - **jour passé en HTTP 404 ou 410** : sauté, ou **page au titre inattendu** : gardée, avec un
+    avertissement, seulement si un jour plus récent de la fenêtre est une édition ; sinon la
+    collecte de l'édition échoue ;
+  - **autre erreur HTTP (5xx, 429) ou redirection ailleurs** : la collecte échoue (une erreur
+    passagère ne fait pas perdre de jour) ;
+  - **page d'édition sans article** : gardée, avec un avertissement ; aucune page d'édition avec
+    article dans la fenêtre : la collecte échoue.
 
 ### Zotero — base de données
 
