@@ -94,8 +94,17 @@ def test_a_redirection_away_from_the_trusted_prefix_is_refused(fake_urlopen, fin
         ("http://example.org/feed", "http://example.org/"),
         (URL, "https://example.org"),
         (URL, "https://example.com/"),
+        ("https://user@example.org/feed", "https://user@example.org/"),
+        ("https://@/feed", "https://@/"),
     ],
-    ids=["prefix-without-host", "prefix-not-https", "prefix-without-path", "url-outside-prefix"],
+    ids=[
+        "prefix-without-host",
+        "prefix-not-https",
+        "prefix-without-path",
+        "url-outside-prefix",
+        "prefix-with-user-info",
+        "prefix-with-empty-host",
+    ],
 )
 def test_a_badly_set_prefix_is_refused_before_any_request(fake_urlopen, url, trusted_url_prefix):
     with pytest.raises(ValueError, match="trusted"):

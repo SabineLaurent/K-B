@@ -39,14 +39,16 @@ def check_trusted_url_prefix(url: str, trusted_url_prefix: str) -> None:
 
     The prefix must name an https host and end it with a path, so that "https://" or
     "https://example.org" (which "https://example.org.evil.com" starts with) cannot be passed.
+    No user info either: urlsplit reads "https://evil.com\\@good.com/" as good.com, urllib does not.
     """
     prefix_parts = urlsplit(trusted_url_prefix)
     is_prefix_strict = (
         prefix_parts.scheme == "https"
-        and prefix_parts.netloc != ""
+        and bool(prefix_parts.hostname)
+        and "@" not in prefix_parts.netloc
         and prefix_parts.path.startswith("/")
     )
     if not is_prefix_strict:
         raise ValueError(f"trusted prefix {trusted_url_prefix!r} is not https://<host>/, refused")
     if not url.startswith(trusted_url_prefix):
-        raise ValueError(f"url outside its trusted prefix {trusted_url_prefix}, refused")
+        raise ValueError(f"url outside its trusted prefix {trusted_url_prefix!r}, refused")

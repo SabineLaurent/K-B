@@ -62,21 +62,27 @@ On ne l'empêche pas : on vérifie **où l'on a fini** (`response.url`) avant de
 
 Le contrôle de redirection ne vaut que si le préfixe est bien réglé : avec `"https://"`, toute
 redirection vers un site HTTPS passerait. `check_trusted_url_prefix`
-(`src/k_b/http_download.py:36-51`) refuse donc, **avant toute requête**, un préfixe qui n'est pas
-`https`, qui n'a pas d'hôte, ou dont l'hôte n'est pas terminé par un chemin
-(`"https://example.org"`, que `"https://example.org.evil.com"` prolonge), ainsi qu'une URL que
-son préfixe ne couvre pas :
+(`src/k_b/http_download.py:37-54`) refuse donc, **avant toute requête**, un préfixe qui n'est pas
+`https`, qui n'a pas d'hôte, qui porte des identifiants (`user@`), ou dont l'hôte n'est pas
+terminé par un chemin (`"https://example.org"`, que `"https://example.org.evil.com"` prolonge),
+ainsi qu'une URL que son préfixe ne couvre pas :
 
 ```python
 is_prefix_strict = (
     prefix_parts.scheme == "https"
-    and prefix_parts.netloc != ""
+    and bool(prefix_parts.hostname)
+    and "@" not in prefix_parts.netloc
     and prefix_parts.path.startswith("/")
 )
 ```
 
 Une erreur de configuration d'une source, actuelle ou future (TLDR), casse donc tout de suite au
 lieu de rester muette. Ajouté après la revue de code, qui l'avait relevé (voir les choix).
+
+Pourquoi refuser `@` : pour `"https://evil.com\@good.com/"`, `urlsplit` lit l'hôte `good.com`,
+mais `urllib` contacterait `evil.com\@good.com`. Les deux lecteurs d'URL ne s'accordent pas ; un
+préfixe avec identifiants n'étant jamais légitime, on le refuse (remarque d'un contrôle
+indépendant de la correction).
 
 ### Le plafond lu à `max_bytes + 1`
 
@@ -130,9 +136,10 @@ commentaire de `user_agent.py` est mis à jour : le dépôt est privé jusqu'au 
 | `test_a_redirection_away_from_the_trusted_prefix_is_refused` (`http://`, domaine suffixé) | le contrôle de l'URL finale tient |
 | `test_a_body_larger_than_the_limit_is_refused`, `..._exactly_at_the_limit_is_returned` | le plafond tombe au bon octet |
 | `test_an_http_error_is_raised_to_the_caller` | le 304 reste à la charge de la source |
-| `test_a_badly_set_prefix_is_refused_before_any_request` (4 cas), rouge avant le code | préfixe sans hôte, non `https`, sans chemin, ou URL hors préfixe : refus sans aucune requête |
+| `test_a_badly_set_prefix_is_refused_before_any_request` (6 cas), rouge avant le code | préfixe sans hôte, non `https`, sans chemin, avec identifiants, à hôte vide, ou URL hors préfixe : refus sans aucune requête |
+| Contrôle indépendant de la correction (une trentaine de préfixes piégés essayés) | aucun préfixe accepté ne fait confiance à plus d'un hôte ; aucun dommage collatéral |
 | Tests existants des sources (304 de CISA, jeton GitHub, fenêtre arXiv) verts, inchangés hormis la cible du faux `urlopen` | comportement inchangé |
-| `uv run pytest` : 150 passed | aucune régression |
+| `uv run pytest` : 152 passed | aucune régression |
 | `grep -rn urlopen src/` : seul `http_download.py` | plus aucune copie du bloc |
 | Revue de code et revue de sécurité en sous-agents : aucun constat | ni bogue ni contrôle affaibli relevé |
 
