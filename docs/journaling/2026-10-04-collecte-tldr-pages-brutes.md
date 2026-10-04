@@ -13,7 +13,7 @@ K-B doit collecter les newsletters tldr.tech (éditions ai, infosec, dev). tldr.
 d'API : on lit ses pages web, une par édition et par jour. Une première branche (`feat/tldr`)
 avait accumulé des règles (titre vérifié, « aujourd'hui » à part, 404/410 conditionnels, jours
 ouvrés, lecture des articles dès la collecte). Sabine a recadré : la collecte récupère les pages
-HTML **brutes**, au format d'URL éprouvé dans brief09, une fois par jour, lancée à la main. On est
+HTML **brutes**, une fois par jour, lancée à la main. On est
 reparti de `main` avec seulement ce qu'il faut. La lecture des articles viendra à l'étape de
 transformation, sur ce brut gardé intact.
 
@@ -33,7 +33,7 @@ try:
 ```
 `src/k_b/tldr_source.py:44`
 
-L'URL est celle de brief09, `https://tldr.tech/<édition>/<AAAA-MM-JJ>`. La page est gardée
+L'URL est `https://tldr.tech/<édition>/<AAAA-MM-JJ>`. La page est gardée
 octet pour octet, sans analyse.
 
 ### Un jour sans édition se reconnaît à sa redirection
@@ -122,7 +122,7 @@ laisse aucune collecte partielle.
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| `test_the_page_of_a_day_is_asked_at_its_brief09_url` | l'URL est `https://tldr.tech/ai/2026-10-04` |
+| `test_the_page_of_a_day_is_asked_at_its_edition_and_date_url` | l'URL est `https://tldr.tech/ai/2026-10-04` |
 | `test_every_day_from_the_last_collection_day_to_today_is_asked` | le dernier jour est relu, samedi et dimanche sont demandés |
 | `test_a_first_collection_asks_the_seven_days_before_today_and_today` | première collecte : 8 jours |
 | `test_an_edition_page_is_returned_unchanged_under_its_day` | la page est rendue octet pour octet |

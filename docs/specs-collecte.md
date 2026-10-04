@@ -124,9 +124,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 
 ### tldr.tech — scraping
 
-- **Technologie** : pages HTML `https://tldr.tech/<édition>/<AAAA-MM-JJ>`, le format d'URL du
-  scraper de `brief09_assistant-veille-tech` (vérifié : `https://tldr.tech/ai/2026-09-30`
-  répond 200). La collecte garde chaque page brute ; la lecture des articles se fait à la
+- **Technologie** : pages HTML `https://tldr.tech/<édition>/<AAAA-MM-JJ>` (vérifié :
+  `https://tldr.tech/ai/2026-09-30` répond 200). La collecte garde chaque page brute ; la lecture des articles se fait à la
   transformation.
 - **Ce qu'on en tire** : un item par article de chaque édition suivie : titre, lien, résumé.
 - **Jours sans édition** : tldr.tech redirige un jour sans édition (week-end, jour férié,

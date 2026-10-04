@@ -43,7 +43,7 @@ def test_each_tracked_edition_is_a_source_of_kb_collect():
     assert {"tldr_ai", "tldr_infosec", "tldr_dev"} <= set(names)
 
 
-def test_the_page_of_a_day_is_asked_at_its_brief09_url(fake_download):
+def test_the_page_of_a_day_is_asked_at_its_edition_and_date_url(fake_download):
     TldrSource("ai").fetch(datetime(2026, 10, 4, 8, 0, tzinfo=UTC))
 
     assert fake_download.urls == ["https://tldr.tech/ai/2026-10-04"]
