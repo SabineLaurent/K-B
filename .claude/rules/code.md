@@ -1,4 +1,4 @@
-<!-- consignes/code.md v2026-09-30 — source : time-knight. Ne pas modifier ici sans la reporter. -->
+<!-- consignes/code.md v2026-10-04 — source : time-knight. Ne pas modifier ici sans la reporter. -->
 # Principes de code
 
 Chaque règle dit quoi faire et où elle s'arrête. En cas de conflit :
@@ -10,6 +10,15 @@ Chaque règle dit quoi faire et où elle s'arrête. En cas de conflit :
   renvoient un booléen. Pas d'abréviation hors usage établi (`id`, `url`). Règles propres au
   projet : voir le document de nommage du dépôt s'il existe.
 - **Une fonction fait une chose.** Si son nom demande un « et », la couper.
+
+### Journalisation
+- **Un log dit ce qui a été observé, jamais ce qui est supposé.** Pas de cause devinée
+  (« probablement », « peut-être », « sans doute ») : l'indicateur mesuré à la place
+  (statut HTTP, URL, sélecteur absent, nombre d'éléments trouvés / attendus, exception levée).
+- Un échec est un état nommé et testable (ex. `edition_not_found`, `selector_missing`),
+  pas une phrase. L'interprétation revient à l'humain, ou à une documentation de dépannage.
+- Vaut pour tout ce qui est écrit (journal, erreur, doc, description de PR, commit) :
+  n'affirmer que l'observé, avec sa source ; une hypothèse est écrite comme telle.
 
 ### Simplicité (KISS, YAGNI)
 - Écrire le minimum qui satisfait le besoin présent. Pas de paramètre, d'interface ou de couche
@@ -56,3 +65,8 @@ Chaque règle dit quoi faire et où elle s'arrête. En cas de conflit :
 3. Aucun code mort, aucun `TODO` non rattaché à une issue, aucune abstraction sans second usage.
 4. Les noms se relisent sans contexte.
 5. Dire ce qui n'a pas été vérifié.
+6. Si le travail touche un domaine de `conformite.md`, dire quelles exigences sont tenues, et
+   lesquelles ne le sont pas.
+7. Une correction de fond (fait, hypothèse, nom, comportement) se reporte partout : chercher
+   ses occurrences dans le code, les tests, la doc, la description de PR et les commits
+   ouverts, pas seulement à l'endroit signalé.
