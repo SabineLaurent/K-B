@@ -2,7 +2,7 @@
 
 Ce que le code et le README ne disent pas : le contexte, les estimations et les consignes. Les
 décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque session par le
-`CLAUDE.md`. Le dépôt est privé, mais rien de personnel ici pour autant.
+`CLAUDE.md`. Le dépôt est privé jusqu'au 25/10, puis public : rien de personnel ici.
 
 ## Contexte
 

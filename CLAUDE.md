@@ -11,8 +11,8 @@ Le produit est décrit dans le `README.md` (objectif, utilisateurs, périmètre 
 
 La mémoire du projet (contexte, estimations, consignes propres à K-B) s'écrit dans `MEMORY.md`,
 versionné avec le dépôt, et non dans la mémoire locale `~/.claude`. Les décisions et leur pourquoi
-vont dans `docs/ADR/journal-decisions-projet.md`, plus dans `MEMORY.md`. Le dépôt est privé, mais
-rien de personnel pour autant.
+vont dans `docs/ADR/journal-decisions-projet.md`, plus dans `MEMORY.md`. Le dépôt est privé jusqu'au
+25/10, puis public : rien de personnel.
 
 ## Pile
 
@@ -26,8 +26,9 @@ Le cycle d'une PR (tests d'abord, revue, note pédagogique, reprise, fin de sess
 
 - Une branche par changement, puis une PR vers `main`. Jamais de commit direct sur `main`.
 - La CI (GitHub Actions) fait passer les tests sur chaque PR : une PR rouge ne se fusionne pas.
-- **Board** (GitHub Project n° 12) : ne jamais toucher `Iteration`, jalons, champs ni vues —
-  time-knight les tient. Pour `Status` et `Size`, annoncer : carte, champ, avant → après.
+- **Board** (GitHub Project n° 12) : ne jamais toucher `Iteration`, champs ni vues, ni créer,
+  renommer ou dater un jalon — time-knight les tient. Rattacher une issue à un jalon existant est
+  permis : annoncer issue, jalon. Pour `Status` et `Size`, annoncer : carte, champ, avant → après.
 - Une PR ferme ses issues par `Closes #n` (un mot-clé par issue).
 
 ## Sécurité
