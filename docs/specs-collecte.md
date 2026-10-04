@@ -12,7 +12,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Un point de lancement** : `kb collect` lance toutes les sources ; une source en panne
   n'arrête pas les autres (code de sortie 1, détail par source).
 - **Brut intact** : chaque collecte écrit ce que la source a renvoyé dans
-  `raw/automation/<source>/<AAAA-MM-JJTHHMMSSZ>.<ext>`, une seule fois, jamais réécrit. Le filtre
+  `raw/automation/<source>/<AAAA-MM-JJTHHMMSSZ>.<ext>`, une seule fois, jamais réécrit. Une
+  source qui lit plusieurs pages (site scrapé) écrit chaque page telle que reçue dans
+  `raw/automation/<source>/<AAAA-MM-JJTHHMMSSZ>/<page>.<ext>` (décidé le 2026-10-04). Le filtre
   se fait à la lecture, sauf exception décidée (arXiv, ci-dessous).
 - **Incrémental** : la date de la dernière collecte réussie de chaque source est dans
   `raw/collection_state.json` ; une source qui n'a rien de neuf n'écrit rien.
@@ -122,18 +124,32 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 
 ### tldr.tech — scraping
 
-- **Technologie** : pages HTML `https://tldr.tech/<édition>/<AAAA-MM-JJ>` (vérifié :
-  `https://tldr.tech/ai/2026-09-30` répond 200), lues avec un analyseur HTML. Le scraper de
-  `brief09_assistant-veille-tech` est relu comme un dépôt tiers avant d'être repris (#13).
+- **Technologie** : pages HTML `https://tldr.tech/<édition>/<AAAA-MM-JJ>`, rendues côté serveur
+  (vérifié le 2026-10-04), lues avec BeautifulSoup : `<h1>TLDR AI <date>`, puis un
+  `<article>` par entrée (`a.font-bold > h3` pour le titre et le lien, `div.newsletter-html`
+  pour le résumé). Un jour sans édition (week-end, jour férié, édition pas encore parue) ne
+  répond pas 404 : il **redirige vers la page d'accueil de l'édition**, reconnue à son titre sans
+  date. Le scraper de `brief09_assistant-veille-tech`, relu comme un dépôt tiers, a donné les
+  sélecteurs et le filtre des sponsors ; son code n'est pas repris (#13).
 - **Ce qu'on en tire** : un item par article de chaque édition suivie : titre, lien, résumé.
 - **Accès** : sans authentification. Le `robots.txt` autorise tout, sauf les pages d'abonnement
-  et de compte (`/subscribed`, `/manage`, `/info`…), qu'on ne lit pas.
-- **Limites** : pas de quota publié ; on s'impose une page à la fois, avec une pause entre deux
-  pages. Les liens portent des paramètres de suivi `utm_*` et certaines entrées sont
-  sponsorisées : à traiter à la lecture.
+  et de compte (`/subscribed`, `/manage`, `/info`…), qu'on ne lit pas. Les conditions
+  d'utilisation (`https://tldr.tech/terms`, lues en entier le 2026-10-04) n'interdisent pas
+  l'accès automatisé ; elles interdisent de perturber le fonctionnement d'un système.
+- **Limites** : pas de quota publié ; on s'impose une page à la fois, avec une pause de 2 s
+  entre deux pages. Les liens portent des paramètres de suivi `utm_*`, retirés à la lecture
+  (certains liens sont échappés deux fois) ; les entrées sponsorisées (« (Sponsor) » dans le
+  titre) sont écartées à la lecture.
 - **Données personnelles** : aucune attendue.
-- **Suivi** : l'édition **AI** est retenue (2026-10-01). Les autres éditions sont à choisir dans
-  #13 (neuf candidates dans [sources-detaillees.md](sources-detaillees.md)).
+- **Suivi** : éditions **ai**, **infosec** et **dev** (ai le 2026-10-01, les deux autres le
+  2026-10-04), dans `TRACKED_EDITIONS` de `k_b/tldr_source.py` : en ajouter une est ajouter son
+  nom (neuf candidates dans [sources-detaillees.md](sources-detaillees.md)).
+- **État** : collecte en place (PR de #13). Une source par édition (`tldr_ai`…) ; chaque
+  collecte lit les jours de semaine depuis la veille de la dernière collecte (la marge rattrape
+  une édition parue après elle ; le recouvrement est retiré à la fusion), les 7 derniers jours à
+  la première collecte (pour tester ; à élargir à la mise en service). Une page datée sans
+  article, ou aucune édition sur des jours de semaine passés (structure du site changée ?), fait
+  échouer la collecte de l'édition.
 
 ### Zotero — base de données
 

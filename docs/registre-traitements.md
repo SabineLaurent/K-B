@@ -25,7 +25,7 @@ sous-traitant.
 | API arXiv | noms des auteurs des papiers | — | oui | oui, `author` |
 | Web Clipper | auteur de l'article gardé (`author`) ; date où l'utilisatrice l'a gardé (`created`) | — | oui | oui, `author` et `item.saved_at` |
 | Zotero | auteurs des papiers ; toute la bibliothèque de l'utilisatrice (notes, surlignages, dates d'ajout) | — | oui, copie de la base | auteurs (`author`), surlignages (`highlight`), date d'ajout (`item.saved_at`) |
-| tldr.tech | aucune attendue ; noms d'auteurs d'articles possibles, à vérifier dans #13 | — | oui | non, tant que #13 ne l'a pas décidé |
+| tldr.tech | aucune : les pages ne portent ni auteur ni expéditeur (vérifié dans #13) ; un résumé peut citer une personnalité publique | — | oui | le résumé, tel quel |
 | CISA KEV | aucune | — | — | — |
 
 K-B ne lit aucun mail : tldr.tech est lu sur le web, et l'éditeur de la newsletter est une
