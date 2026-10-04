@@ -39,10 +39,10 @@ class TldrSource:
     def fetch(self, last_collected_at: datetime | None) -> dict[str, bytes] | None:
         """Return each edition page of the days to collect, by day; None if there is none.
 
-        A past day without an edition (weekend, holiday) is redirected to the landing page of
-        the edition; anything else that is not an edition page means the site has changed:
-        refused. Today's edition may not be out yet: whatever answers instead is no error, and
-        the next collection, which starts from today, asks again.
+        A past day redirected to the landing page of the edition has no edition. Any other
+        answer for a past day that is not its edition page is refused. Today's edition may not
+        be out yet: whatever answers instead is logged, not refused, and the next collection,
+        which starts from today, asks again.
         """
         pages = {}
         today = current_day()
@@ -60,10 +60,12 @@ class TldrSource:
                     f"{self.name} {day}: page title {read_page_title(page)!r}, "
                     f"expected {self.expected_title(day)!r}"
                 )
-            if not read_articles(page):
+            if not read_articles(page, f"{self.name} {day}"):
                 logger.warning("%s %s: an edition page with no article", self.name, day)
             pages[day.isoformat()] = page
-        if pages and not any(read_articles(page) for page in pages.values()):
+        if pages and not any(
+            read_articles(page, f"{self.name} {day}") for day, page in pages.items()
+        ):
             raise ValueError(f"{self.name}: no article in any of the {len(pages)} edition pages")
         return pages or None
 
@@ -77,6 +79,8 @@ class TldrSource:
             if self.is_landing_page(refusal.redirect_url):
                 return None
             raise
+        except HTTPError as error:
+            raise ValueError(f"{self.name} {day}: HTTP {error.code} from {page_url}") from error
 
     def download_edition_page_of_today(self, day: date) -> bytes | None:
         """Return today's edition page, or None, logging what answered instead.

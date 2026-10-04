@@ -238,3 +238,12 @@ def test_edition_pages_all_without_any_article_are_refused(fake_tldr, pauses):
 
     with pytest.raises(ValueError, match="no article in any of the 5 edition pages"):
         TldrSource("ai", "AI").fetch(last_collected_at=SINCE_OCTOBER_2)
+
+
+def test_an_http_error_on_a_past_day_names_the_day_the_code_and_the_url(fake_tldr, pauses):
+    fake_tldr.failing_days = {date(2026, 10, 6)}
+
+    with pytest.raises(ValueError) as refusal:
+        TldrSource("ai", "AI").fetch(last_collected_at=SINCE_OCTOBER_2)
+
+    assert str(refusal.value) == "tldr_ai 2026-10-06: HTTP 404 from https://tldr.tech/ai/2026-10-06"

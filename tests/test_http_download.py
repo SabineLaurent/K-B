@@ -121,6 +121,9 @@ def test_a_refused_redirection_tells_where_it_led(fake_urlopen):
 
     assert refusal.value.redirect_url == "https://example.org/landing"
     assert isinstance(refusal.value, ValueError)
+    assert str(refusal.value) == (
+        f"response redirected to https://example.org/landing, outside {URL}, refused"
+    )
 
 
 def test_a_body_larger_than_the_limit_is_refused(fake_urlopen):

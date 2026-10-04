@@ -17,7 +17,9 @@ class RedirectedOutsideError(ValueError):
     """
 
     def __init__(self, trusted_url_prefix: str, redirect_url: str):
-        super().__init__(f"response redirected outside {trusted_url_prefix}, refused")
+        super().__init__(
+            f"response redirected to {redirect_url}, outside {trusted_url_prefix}, refused"
+        )
         self.redirect_url = redirect_url
 
 

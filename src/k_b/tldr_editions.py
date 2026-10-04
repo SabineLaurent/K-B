@@ -36,10 +36,11 @@ def read_edition_date(page: bytes, edition_title: str) -> date | None:
     return date.fromisoformat(match.group(1)) if match else None
 
 
-def read_articles(page: bytes) -> list[TldrArticle]:
+def read_articles(page: bytes, page_name: str) -> list[TldrArticle]:
     """One article per entry of the edition, sponsored entries left out.
 
-    An invalid entry is rejected and logged, not guessed: the others are still read.
+    An invalid entry is rejected and logged under page_name, not guessed: the others are still
+    read.
     """
     articles = []
     for position, entry in enumerate(BeautifulSoup(page, "html.parser").select("article")):
@@ -50,7 +51,9 @@ def read_articles(page: bytes) -> list[TldrArticle]:
         href = link.get("href") if link else None
         url = remove_tracking(href) if isinstance(href, str) else None
         if not title or url is None:
-            logger.warning("TLDR article %d rejected: no title or no https link", position)
+            logger.warning(
+                "%s: article %d rejected, no title or no https link", page_name, position
+            )
             continue
         summary = entry.select_one("div.newsletter-html")
         articles.append(
