@@ -5,7 +5,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from k_b import arxiv_source
+from k_b import http_download
 from k_b.arxiv_source import ArxivSource
 from k_b.collect import SOURCES
 
@@ -45,7 +45,7 @@ class FakeUrlopen:
 @pytest.fixture
 def fake_urlopen(monkeypatch):
     fake = FakeUrlopen()
-    monkeypatch.setattr(arxiv_source, "urlopen", fake)
+    monkeypatch.setattr(http_download, "urlopen", fake)
     return fake
 
 
@@ -129,21 +129,4 @@ def test_an_api_error_answered_with_http_200_is_refused(fake_urlopen):
     )
 
     with pytest.raises(ValueError, match="error"):
-        ArxivSource().fetch(last_collected_at=None)
-
-
-@pytest.mark.parametrize(
-    "final_url", ["http://export.arxiv.org/api/query", "https://evil.example/api/query"]
-)
-def test_a_redirection_away_from_https_export_arxiv_org_is_refused(fake_urlopen, final_url):
-    fake_urlopen.final_url = final_url
-
-    with pytest.raises(ValueError, match="redirected"):
-        ArxivSource().fetch(last_collected_at=None)
-
-
-def test_a_response_larger_than_the_limit_is_refused(fake_urlopen, monkeypatch):
-    monkeypatch.setattr(arxiv_source, "MAX_RESPONSE_BYTES", 10)
-
-    with pytest.raises(ValueError, match="larger"):
         ArxivSource().fetch(last_collected_at=None)

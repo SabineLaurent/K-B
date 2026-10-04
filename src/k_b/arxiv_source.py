@@ -2,13 +2,11 @@
 
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 
 from k_b.arxiv_papers import count_papers, read_total_results
-from k_b.user_agent import USER_AGENT
+from k_b.http_download import download
 
 API_URL = "https://export.arxiv.org/api/query"
-TIMEOUT_SECONDS = 30
 # A page of 35 papers weighs 93 KB in 2026, about 2.7 KB a paper: 2,000 papers weigh 5.3 MB.
 MAX_RESPONSE_BYTES = 6 * 1024 * 1024
 # The API maximum. About 40 papers per window: one page holds them all.
@@ -48,7 +46,7 @@ class ArxivSource:
             window_start = FIRST_COLLECTION_START
         else:
             window_start = last_collected_at - ANNOUNCEMENT_DELAY_MARGIN
-        raw_response = download(build_search_query(window_start, now))
+        raw_response = download_papers(build_search_query(window_start, now))
         paper_count = count_papers(raw_response)
         total_results = read_total_results(raw_response)
         if total_results > paper_count:
@@ -69,7 +67,7 @@ def build_search_query(window_start: datetime, window_end: datetime) -> str:
     return f"cat:cs.CR AND cat:cs.AI AND ({keywords}) AND submittedDate:[{submission_window}]"
 
 
-def download(search_query: str) -> bytes:
+def download_papers(search_query: str) -> bytes:
     parameters = {
         "search_query": search_query,
         "start": 0,
@@ -77,12 +75,4 @@ def download(search_query: str) -> bytes:
         "sortBy": "submittedDate",
         "sortOrder": "ascending",
     }
-    request = Request(f"{API_URL}?{urlencode(parameters)}", headers={"User-Agent": USER_AGENT})
-    with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
-        # urlopen follows redirections, even to plain HTTP: only an answer from here is trusted.
-        if not response.url.startswith(API_URL):
-            raise ValueError(f"response redirected outside {API_URL}, refused")
-        body = response.read(MAX_RESPONSE_BYTES + 1)
-    if len(body) > MAX_RESPONSE_BYTES:
-        raise ValueError(f"response larger than {MAX_RESPONSE_BYTES} bytes, refused")
-    return body
+    return download(f"{API_URL}?{urlencode(parameters)}", API_URL, MAX_RESPONSE_BYTES)
