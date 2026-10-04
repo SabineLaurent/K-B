@@ -247,3 +247,18 @@ def test_an_http_error_on_a_past_day_names_the_day_the_code_and_the_url(fake_tld
         TldrSource("ai", "AI").fetch(last_collected_at=SINCE_OCTOBER_2)
 
     assert str(refusal.value) == "tldr_ai 2026-10-06: HTTP 404 from https://tldr.tech/ai/2026-10-06"
+
+
+def test_a_past_day_redirected_to_the_landing_page_is_logged_as_a_warning(
+    fake_tldr, pauses, caplog
+):
+    fake_tldr.missing_days = {date(2026, 10, 5)}
+    fake_tldr.landing_url = "https://tldr.tech/ai/"
+
+    with caplog.at_level(logging.WARNING, logger="k_b.tldr_source"):
+        TldrSource("ai", "AI").fetch(last_collected_at=SINCE_OCTOBER_2)
+
+    warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+    assert [record.getMessage() for record in warnings] == [
+        "tldr_ai 2026-10-05: no edition page, redirected to https://tldr.tech/ai/"
+    ]

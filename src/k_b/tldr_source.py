@@ -77,6 +77,11 @@ class TldrSource:
             return download(page_url, page_url, MAX_PAGE_BYTES)
         except RedirectedOutsideError as refusal:
             if self.is_landing_page(refusal.redirect_url):
+                # A weekday without an edition leaves a trace: a silent one would hide a site
+                # that sends every day to its landing page.
+                logger.warning(
+                    "%s %s: no edition page, redirected to %s", self.name, day, refusal.redirect_url
+                )
                 return None
             raise
         except HTTPError as error:
