@@ -8,6 +8,19 @@ from k_b.user_agent import USER_AGENT
 TIMEOUT_SECONDS = 30
 
 
+class RedirectedOutsideError(ValueError):
+    """The answer came from outside the trusted prefix; redirect_url says where it led.
+
+    A source may read it (tldr.tech redirects a day without an edition to its landing page).
+    Refusing a redirection before following it (#54) must keep raising this error, with the
+    redirection target resolved against the requested url.
+    """
+
+    def __init__(self, trusted_url_prefix: str, redirect_url: str):
+        super().__init__(f"response redirected outside {trusted_url_prefix}, refused")
+        self.redirect_url = redirect_url
+
+
 def download(
     url: str,
     trusted_url_prefix: str,
@@ -27,7 +40,7 @@ def download(
     with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
         # urlopen follows redirections, even to plain HTTP: only an answer from here is trusted.
         if not response.url.startswith(trusted_url_prefix):
-            raise ValueError(f"response redirected outside {trusted_url_prefix}, refused")
+            raise RedirectedOutsideError(trusted_url_prefix, response.url)
         body = response.read(max_bytes + 1)
     if len(body) > max_bytes:
         raise ValueError(f"response larger than {max_bytes} bytes, refused")

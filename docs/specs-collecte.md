@@ -147,11 +147,14 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   Security ») ; le titre vérifie qu'une page est bien de cette édition (neuf candidates dans
   [sources-detaillees.md](sources-detaillees.md)).
 - **État** : collecte en place (PR de #13). Une source par édition (`tldr_ai`…) ; chaque
-  collecte lit les jours de semaine depuis la veille de la dernière collecte (la marge rattrape
-  une édition parue après elle ; le recouvrement est retiré à la fusion), les 7 derniers jours à
-  la première collecte (pour tester ; à élargir à la mise en service). Une page datée sans
-  article, ou aucune édition sur des jours de semaine passés (structure du site changée ?), fait
-  échouer la collecte de l'édition.
+  collecte lit les jours de semaine depuis le jour de la dernière collecte (inclus) jusqu'à
+  **hier** : l'édition du jour n'est jamais demandée, elle le sera à la collecte suivante (une
+  édition pas encore parue ressemblerait à une édition absente). Première collecte : les 7 jours
+  précédents (pour tester ; à élargir à la mise en service). Chaque page est téléchargée avec sa
+  propre URL comme préfixe de confiance : une redirection vers la page d'accueil de l'édition
+  veut dire « pas d'édition ce jour-là » ; toute autre redirection, une page sans titre daté de
+  l'édition, ou des pages dont aucune n'a d'article, font échouer la collecte de l'édition
+  (structure du site changée). Une page datée sans article est gardée, avec un avertissement.
 
 ### Zotero — base de données
 

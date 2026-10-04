@@ -1,10 +1,12 @@
 """Download the TLDR edition pages published since the last collection, as tldr.tech serves them."""
 
+import logging
 import re
 from datetime import UTC, date, datetime, timedelta
 from time import sleep
+from urllib.parse import urlsplit
 
-from k_b.http_download import download
+from k_b.http_download import RedirectedOutsideError, download
 from k_b.tldr_editions import read_articles, read_edition_date
 
 # Adding an edition is adding a line: its slug, as in https://tldr.tech/<slug>/<YYYY-MM-DD>,
@@ -20,6 +22,8 @@ PAUSE_BETWEEN_PAGES_SECONDS = 2
 FIRST_COLLECTION_DAYS = 7
 SATURDAY = 5
 
+logger = logging.getLogger(__name__)
+
 
 class TldrSource:
     extension = "html"
@@ -32,39 +36,63 @@ class TldrSource:
         self.name = f"tldr_{edition}"
 
     def fetch(self, last_collected_at: datetime | None) -> dict[str, bytes] | None:
-        """Return each edition page since the day before last_collected_at, by day; None if none.
+        """Return each edition page of the days to collect, by day; None if there is none.
 
-        A day without an edition (weekend, holiday, not out yet) is redirected to the landing
-        page: it is recognised by its title, which carries no edition date. A page of another
-        edition is recognised the same way.
+        A day without an edition (weekend, holiday) is redirected to the landing page of the
+        edition. Anything else that is not an edition page means the site has changed: refused.
         """
-        today = datetime.now(UTC).date()
-        days = list_edition_days(last_collected_at, today)
         pages = {}
+        days = list_edition_days(last_collected_at, today=current_day())
         for position, day in enumerate(days):
             if position > 0:
                 sleep(PAUSE_BETWEEN_PAGES_SECONDS)
-            page = download(f"{SITE_URL}{self.edition}/{day.isoformat()}", SITE_URL, MAX_PAGE_BYTES)
-            if read_edition_date(page, self.edition_title) != day:
+            page = self.download_edition_page(day)
+            if page is None:
                 continue
+            if read_edition_date(page, self.edition_title) != day:
+                raise ValueError(f"{self.name} {day}: no dated edition title, structure changed?")
             if not read_articles(page):
-                raise ValueError(f"{self.name} {day}: an edition page with no article")
+                logger.warning("%s %s: an edition page with no article", self.name, day)
             pages[day.isoformat()] = page
-        if not pages and any(day < today for day in days):
-            # Past weekdays all without an edition: the page structure has probably changed.
-            raise ValueError(f"{self.name}: no edition found on past weekdays, refused")
+        if pages and not any(read_articles(page) for page in pages.values()):
+            raise ValueError(f"{self.name}: no article in any edition page, structure changed?")
         return pages or None
+
+    def download_edition_page(self, day: date) -> bytes | None:
+        """Return the edition page of day, or None if tldr.tech redirects to the landing page."""
+        page_url = f"{SITE_URL}{self.edition}/{day.isoformat()}"
+        try:
+            # The page url itself is the trusted prefix: any redirection is noticed.
+            return download(page_url, page_url, MAX_PAGE_BYTES)
+        except RedirectedOutsideError as refusal:
+            if self.is_landing_page(refusal.redirect_url):
+                return None
+            raise
+
+    def is_landing_page(self, url: str) -> bool:
+        """Whether url is https://tldr.tech/<edition>, give or take a final slash or a query."""
+        parts = urlsplit(url)
+        return (
+            parts.scheme == "https"
+            and parts.hostname == "tldr.tech"
+            and parts.port is None
+            and parts.path.rstrip("/") == f"/{self.edition}"
+        )
+
+
+def current_day() -> date:
+    return datetime.now(UTC).date()
 
 
 def list_edition_days(last_collected_at: datetime | None, today: date) -> list[date]:
-    """Weekdays from the day before the last collection (a margin), or the last 7 days, to today.
+    """Weekdays from the day of the last collection, or 7 days ago, to yesterday.
 
-    The day before is read again in case its edition came out after the last collection; the
-    overlap with the previous raw pages is removed when merging.
+    Today is never asked for: an edition not out yet would look like a missing one. The day of
+    the last collection was its today, so it has not been read yet.
     """
     if last_collected_at is None:
         first_day = today - timedelta(days=FIRST_COLLECTION_DAYS)
     else:
-        first_day = last_collected_at.astimezone(UTC).date() - timedelta(days=1)
-    days = (first_day + timedelta(days=offset) for offset in range((today - first_day).days + 1))
+        first_day = last_collected_at.astimezone(UTC).date()
+    days = (first_day + timedelta(days=offset) for offset in range((today - first_day).days))
     return [day for day in days if day.weekday() < SATURDAY]
