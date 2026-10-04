@@ -36,6 +36,7 @@ class FakeTldr:
         self.empty_days = set()
         self.undated_days = set()
         self.failing_days = set()
+        self.failing_status = 404
         self.landing_url = "https://tldr.tech/ai"
 
     def __call__(self, request, timeout):
@@ -45,7 +46,7 @@ class FakeTldr:
             # tldr.tech redirects a day without an edition to the landing page of the edition.
             return FakeResponse(LANDING_PAGE, self.landing_url)
         if day in self.failing_days:
-            raise HTTPError(request.full_url, 404, "Not Found", {}, None)
+            raise HTTPError(request.full_url, self.failing_status, "Error", {}, None)
         if day in self.undated_days:
             return FakeResponse(LANDING_PAGE, request.full_url)
         if day in self.empty_days:
@@ -165,7 +166,9 @@ def test_a_holiday_then_an_edition_of_today_not_out_yet_is_no_error(fake_tldr, p
 
 
 def test_a_past_day_that_is_not_an_edition_page_is_still_refused(fake_tldr, pauses):
+    # No later day is an edition: nothing tells the page apart from a site that has changed.
     fake_tldr.undated_days = {date(2026, 10, 7)}
+    fake_tldr.missing_days = {TODAY}
 
     with pytest.raises(ValueError) as refusal:
         TldrSource("ai", "AI").fetch(last_collected_at=datetime(2026, 10, 7, 6, tzinfo=UTC))
@@ -240,13 +243,59 @@ def test_edition_pages_all_without_any_article_are_refused(fake_tldr, pauses):
         TldrSource("ai", "AI").fetch(last_collected_at=SINCE_OCTOBER_2)
 
 
-def test_an_http_error_on_a_past_day_names_the_day_the_code_and_the_url(fake_tldr, pauses):
+@pytest.mark.parametrize("status", [500, 503, 429])
+def test_a_server_error_on_a_past_day_is_refused_and_named(fake_tldr, pauses, status):
+    # A transient error must not cost a day: the collection fails and asks again next time.
     fake_tldr.failing_days = {date(2026, 10, 6)}
+    fake_tldr.failing_status = status
 
     with pytest.raises(ValueError) as refusal:
         TldrSource("ai", "AI").fetch(last_collected_at=SINCE_OCTOBER_2)
 
-    assert str(refusal.value) == "tldr_ai 2026-10-06: HTTP 404 from https://tldr.tech/ai/2026-10-06"
+    assert str(refusal.value) == (
+        f"tldr_ai 2026-10-06: HTTP {status} from https://tldr.tech/ai/2026-10-06"
+    )
+
+
+@pytest.mark.parametrize("status", [404, 410])
+def test_a_past_day_gone_is_skipped_when_a_later_day_is_an_edition(
+    fake_tldr, pauses, caplog, status
+):
+    fake_tldr.failing_days = {date(2026, 10, 6)}
+    fake_tldr.failing_status = status
+
+    with caplog.at_level(logging.WARNING, logger="k_b.tldr_source"):
+        pages = TldrSource("ai", "AI").fetch(last_collected_at=SINCE_OCTOBER_2)
+
+    assert "2026-10-06" not in pages
+    assert "2026-10-07" in pages
+    assert (
+        f"tldr_ai 2026-10-06: HTTP {status} from https://tldr.tech/ai/2026-10-06, day skipped, "
+        "2026-10-08 is an edition page"
+    ) in caplog.text
+
+
+def test_a_past_day_gone_without_a_later_edition_is_refused(fake_tldr, pauses):
+    fake_tldr.failing_days = {date(2026, 10, 7)}
+    fake_tldr.missing_days = {TODAY}
+
+    with pytest.raises(ValueError, match="2026-10-07: HTTP 404 from"):
+        TldrSource("ai", "AI").fetch(last_collected_at=datetime(2026, 10, 7, 6, tzinfo=UTC))
+
+
+def test_a_past_page_with_another_title_is_kept_when_a_later_day_is_an_edition(
+    fake_tldr, pauses, caplog
+):
+    fake_tldr.undated_days = {date(2026, 10, 6)}
+
+    with caplog.at_level(logging.WARNING, logger="k_b.tldr_source"):
+        pages = TldrSource("ai", "AI").fetch(last_collected_at=SINCE_OCTOBER_2)
+
+    assert pages["2026-10-06"] == LANDING_PAGE
+    assert (
+        "tldr_ai 2026-10-06: page title 'Keep up with AI in 5 minutes', expected "
+        "'TLDR AI 2026-10-06', page kept, 2026-10-08 is an edition page"
+    ) in caplog.text
 
 
 def test_a_past_day_redirected_to_the_landing_page_is_logged_as_a_warning(
