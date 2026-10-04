@@ -140,3 +140,9 @@ def test_an_error_is_logged_with_its_day_and_url_then_raised(
 def test_an_edition_that_is_not_a_slug_is_refused(edition):
     with pytest.raises(ValueError, match="not a TLDR edition slug"):
         TldrSource(edition)
+
+
+def test_a_last_collection_after_today_is_refused_with_both_days(fake_download):
+    with pytest.raises(ValueError, match="last collection day 2026-10-05 is after today 2026-10-04"):
+        TldrSource("ai").fetch(datetime(2026, 10, 5, 6, 0, tzinfo=UTC))
+    assert fake_download.urls == []

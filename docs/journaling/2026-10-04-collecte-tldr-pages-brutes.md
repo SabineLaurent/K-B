@@ -161,7 +161,8 @@ laisse aucune collecte partielle.
 | `test_a_refused_redirection_tells_where_it_led` | l'erreur porte `redirect_url` et reste un `ValueError` |
 | Collecte réelle de `tldr_ai` du 02 au 04/10 | 02/10 : page de 81 913 octets ; 03/10 et 04/10 : `redirected to https://tldr.tech/ai` |
 | Collecte réelle de `tldr_infosec` du 02 au 04/10, avec `configure_logging()` | trois lignes INFO affichées : `edition page, 75510 bytes`, puis deux `redirected to https://tldr.tech/infosec` |
-| `uv run pytest` | 172 tests passent |
+| `test_a_last_collection_after_today_is_refused_with_both_days` | une date de dernière collecte dans le futur (horloge reculée) est refusée avec les deux jours, sans aucune requête |
+| `uv run pytest` | 173 tests passent |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -188,6 +189,11 @@ laisse aucune collecte partielle.
 
 - **Jours fériés** : seule la redirection d'un week-end a été observée (03 et 04/10). Qu'un jour
   férié ou une édition pas encore parue redirige de la même façon est supposé, pas observé.
+- **Un jour qui répond autrement bloque l'édition** (constat de la revue de code, gardé) : un
+  404 sur une date, ou une redirection d'une autre forme, fait échouer l'édition ; la date de
+  dernière collecte n'avance pas, et chaque collecte suivante bute sur le même jour, avec une
+  fenêtre qui grandit d'un jour. Jamais observé. La ligne ERROR donne le jour et l'URL : on
+  décidera sur ce qu'on observera (par exemple en avançant la date à la main).
 - **Heure de parution** des éditions : inconnue. Le rattrapage d'un jour suffit si l'édition
   paraît le jour même en UTC, ce qui n'a pas été mesuré.
 - **`urlopen` suit la redirection avant le contrôle du préfixe** : la requête atteint la cible

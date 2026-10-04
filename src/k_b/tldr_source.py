@@ -82,4 +82,6 @@ def list_days_to_collect(last_collected_at: datetime | None, today: date) -> lis
         first_day = today - timedelta(days=FIRST_COLLECTION_DAYS)
     else:
         first_day = last_collected_at.astimezone(UTC).date()
+    if first_day > today:
+        raise ValueError(f"last collection day {first_day} is after today {today}")
     return [first_day + timedelta(days=offset) for offset in range((today - first_day).days + 1)]
