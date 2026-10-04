@@ -142,8 +142,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   titre) sont écartées à la lecture.
 - **Données personnelles** : aucune attendue.
 - **Suivi** : éditions **ai**, **infosec** et **dev** (ai le 2026-10-01, les deux autres le
-  2026-10-04), dans `TRACKED_EDITIONS` de `k_b/tldr_source.py` : en ajouter une est ajouter son
-  nom (neuf candidates dans [sources-detaillees.md](sources-detaillees.md)).
+  2026-10-04), dans `TRACKED_EDITIONS` de `k_b/tldr_source.py` : en ajouter une est ajouter une
+  ligne, son nom dans l'URL et le titre de ses pages (`infosec` s'affiche « TLDR Information
+  Security ») ; le titre vérifie qu'une page est bien de cette édition (neuf candidates dans
+  [sources-detaillees.md](sources-detaillees.md)).
 - **État** : collecte en place (PR de #13). Une source par édition (`tldr_ai`…) ; chaque
   collecte lit les jours de semaine depuis la veille de la dernière collecte (la marge rattrape
   une édition parue après elle ; le recouvrement est retiré à la fusion), les 7 derniers jours à

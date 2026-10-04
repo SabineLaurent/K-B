@@ -10,8 +10,9 @@ from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
-# The title of an edition page, e.g. "TLDR AI 2026-10-01"; the landing page has no date.
-EDITION_TITLE = re.compile(r"TLDR .+ (\d{4}-\d{2}-\d{2})")
+# The title of an edition page is "TLDR <edition title> <date>", e.g. "TLDR AI 2026-10-01";
+# the landing page has no date.
+EDITION_DATE = r"(\d{4}-\d{2}-\d{2})"
 SPONSOR_MARK = "(Sponsor)"
 
 
@@ -22,10 +23,11 @@ class TldrArticle:
     summary: str
 
 
-def read_edition_date(page: bytes) -> date | None:
-    """Return the date in the page title, or None if the page is not an edition."""
+def read_edition_date(page: bytes, edition_title: str) -> date | None:
+    """Return the date in the page title, or None if the page is not an edition of edition_title."""
     title = BeautifulSoup(page, "html.parser").select_one("h1")
-    match = EDITION_TITLE.fullmatch(title.get_text(strip=True)) if title else None
+    expected_title = re.compile(f"TLDR {re.escape(edition_title)} {EDITION_DATE}")
+    match = expected_title.fullmatch(title.get_text(strip=True)) if title else None
     return date.fromisoformat(match.group(1)) if match else None
 
 

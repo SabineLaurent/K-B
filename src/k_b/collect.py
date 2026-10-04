@@ -44,7 +44,7 @@ SOURCES: list[Source] = [
     ),
     GithubMostStarredSource(),
     ArxivSource(),
-    *(TldrSource(edition) for edition in TRACKED_EDITIONS),
+    *(TldrSource(slug, title) for slug, title in TRACKED_EDITIONS.items()),
 ]
 
 

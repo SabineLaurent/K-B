@@ -17,12 +17,25 @@ def page_with_article(link: str, title: str = "A title (2 minute read)") -> byte
 
 
 def test_the_edition_date_is_read_from_the_page_title():
-    assert read_edition_date(RECORDED_PAGE) == date(2026, 10, 1)
+    assert read_edition_date(RECORDED_PAGE, edition_title="AI") == date(2026, 10, 1)
 
 
 def test_a_page_that_is_not_an_edition_has_no_date():
     # A day without an edition redirects to the landing page of the newsletter.
-    assert read_edition_date(LANDING_PAGE) is None
+    assert read_edition_date(LANDING_PAGE, edition_title="AI") is None
+
+
+def test_a_page_of_another_edition_has_no_date():
+    other_edition = RECORDED_PAGE.replace(b"TLDR AI 2026", b"TLDR Dev 2026")
+
+    assert read_edition_date(other_edition, edition_title="AI") is None
+
+
+def test_an_edition_title_is_matched_literally():
+    page = b"<html><body><h1>TLDR Information Security 2026-10-01</h1></body></html>"
+
+    assert read_edition_date(page, edition_title="Information Security") == date(2026, 10, 1)
+    assert read_edition_date(page, edition_title="Information.Security") is None
 
 
 def test_one_article_per_entry_without_the_sponsored_ones():

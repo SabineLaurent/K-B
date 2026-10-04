@@ -61,13 +61,13 @@ def pauses(monkeypatch):
 def test_the_tracked_editions_are_sources_of_kb_collect():
     source_names = {source.name for source in SOURCES}
 
-    assert {f"tldr_{edition}" for edition in TRACKED_EDITIONS} <= source_names
+    assert {f"tldr_{slug}" for slug in TRACKED_EDITIONS} <= source_names
     assert {"tldr_ai", "tldr_infosec", "tldr_dev"} <= source_names
 
 
 def test_an_edition_name_that_is_not_a_slug_is_refused():
     with pytest.raises(ValueError, match="edition"):
-        TldrSource("../ai")
+        TldrSource("../ai", "AI")
 
 
 def test_a_later_collection_reads_the_weekdays_since_the_day_before_the_last_one():
@@ -93,7 +93,7 @@ def test_a_first_collection_reads_the_weekdays_of_the_last_seven_days():
 def test_each_edition_page_is_returned_as_received_under_its_day(fake_tldr, pauses):
     yesterday = datetime.now(UTC) - timedelta(days=1)
 
-    pages = TldrSource("ai").fetch(last_collected_at=yesterday)
+    pages = TldrSource("ai", "AI").fetch(last_collected_at=yesterday)
 
     assert pages
     for name, page in pages.items():
@@ -102,7 +102,7 @@ def test_each_edition_page_is_returned_as_received_under_its_day(fake_tldr, paus
 
 
 def test_a_day_redirected_to_the_landing_page_has_no_edition(fake_tldr, pauses):
-    pages = TldrSource("ai").fetch(last_collected_at=datetime(2026, 10, 2, 8, tzinfo=UTC))
+    pages = TldrSource("ai", "AI").fetch(last_collected_at=datetime(2026, 10, 2, 8, tzinfo=UTC))
 
     assert "2026-10-03" not in pages
     assert "2026-10-04" not in pages
@@ -110,17 +110,23 @@ def test_a_day_redirected_to_the_landing_page_has_no_edition(fake_tldr, pauses):
 
 
 def test_the_site_is_paused_between_two_pages(fake_tldr, pauses):
-    TldrSource("ai").fetch(last_collected_at=datetime(2026, 10, 2, 8, tzinfo=UTC))
+    TldrSource("ai", "AI").fetch(last_collected_at=datetime(2026, 10, 2, 8, tzinfo=UTC))
 
     assert len(pauses) == len(fake_tldr.requested_urls) - 1
     assert all(pause >= 1 for pause in pauses)
+
+
+def test_a_page_of_another_edition_is_not_taken_for_this_one(fake_tldr, pauses):
+    # The fake site answers TLDR AI pages only: none of them may be stored as tldr_dev.
+    with pytest.raises(ValueError, match="no edition"):
+        TldrSource("dev", "Dev").fetch(last_collected_at=datetime(2026, 10, 2, 8, tzinfo=UTC))
 
 
 def test_an_edition_page_without_any_article_is_refused(fake_tldr, pauses):
     fake_tldr.empty_days = {date(2026, 10, 2)}
 
     with pytest.raises(ValueError, match="no article"):
-        TldrSource("ai").fetch(last_collected_at=datetime(2026, 10, 2, 8, tzinfo=UTC))
+        TldrSource("ai", "AI").fetch(last_collected_at=datetime(2026, 10, 2, 8, tzinfo=UTC))
 
 
 def test_past_weekdays_without_any_edition_are_refused(fake_tldr, pauses, monkeypatch):
@@ -128,7 +134,7 @@ def test_past_weekdays_without_any_edition_are_refused(fake_tldr, pauses, monkey
     monkeypatch.setattr(fake_tldr, "missing_days", _AllDays())
 
     with pytest.raises(ValueError, match="no edition"):
-        TldrSource("ai").fetch(last_collected_at=datetime(2026, 10, 2, 8, tzinfo=UTC))
+        TldrSource("ai", "AI").fetch(last_collected_at=datetime(2026, 10, 2, 8, tzinfo=UTC))
 
 
 def test_nothing_new_returns_nothing(fake_tldr, pauses, monkeypatch):
@@ -136,7 +142,7 @@ def test_nothing_new_returns_nothing(fake_tldr, pauses, monkeypatch):
     monkeypatch.setattr(tldr_source, "list_edition_days", lambda last, today: [today])
     monkeypatch.setattr(fake_tldr, "missing_days", _AllDays())
 
-    assert TldrSource("ai").fetch(last_collected_at=datetime.now(UTC)) is None
+    assert TldrSource("ai", "AI").fetch(last_collected_at=datetime.now(UTC)) is None
 
 
 class _AllDays:

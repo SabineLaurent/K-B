@@ -7,8 +7,9 @@ from time import sleep
 from k_b.http_download import download
 from k_b.tldr_editions import read_articles, read_edition_date
 
-# Adding an edition is adding its slug, as in https://tldr.tech/<edition>/<YYYY-MM-DD>.
-TRACKED_EDITIONS = ("ai", "infosec", "dev")
+# Adding an edition is adding a line: its slug, as in https://tldr.tech/<slug>/<YYYY-MM-DD>,
+# and the title its pages show, as in "TLDR Information Security 2026-10-01" (read 2026-10-04).
+TRACKED_EDITIONS = {"ai": "AI", "infosec": "Information Security", "dev": "Dev"}
 EDITION_SLUG = re.compile(r"[a-z]+")
 SITE_URL = "https://tldr.tech/"
 # An edition page weighs about 80 KB in 2026.
@@ -23,17 +24,19 @@ SATURDAY = 5
 class TldrSource:
     extension = "html"
 
-    def __init__(self, edition: str):
+    def __init__(self, edition: str, edition_title: str):
         if not EDITION_SLUG.fullmatch(edition):
             raise ValueError(f"not a TLDR edition slug: {edition!r}")
         self.edition = edition
+        self.edition_title = edition_title
         self.name = f"tldr_{edition}"
 
     def fetch(self, last_collected_at: datetime | None) -> dict[str, bytes] | None:
         """Return each edition page since the day before last_collected_at, by day; None if none.
 
         A day without an edition (weekend, holiday, not out yet) is redirected to the landing
-        page: it is recognised by its title, which carries no edition date.
+        page: it is recognised by its title, which carries no edition date. A page of another
+        edition is recognised the same way.
         """
         today = datetime.now(UTC).date()
         days = list_edition_days(last_collected_at, today)
@@ -42,7 +45,7 @@ class TldrSource:
             if position > 0:
                 sleep(PAUSE_BETWEEN_PAGES_SECONDS)
             page = download(f"{SITE_URL}{self.edition}/{day.isoformat()}", SITE_URL, MAX_PAGE_BYTES)
-            if read_edition_date(page) != day:
+            if read_edition_date(page, self.edition_title) != day:
                 continue
             if not read_articles(page):
                 raise ValueError(f"{self.name} {day}: an edition page with no article")
