@@ -30,3 +30,8 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 - Vérifier les faits avant de les présenter comme sûrs, sources à l'appui.
 - `brief09_assistant-veille-tech` est indicatif, il ne fait pas autorité : une décision concertée
   qui fait mieux, ou plus conforme aux pratiques reconnues, l'emporte.
+- **K-B est déterministe** dans sa conception, son code et ses journaux (consigne de Sabine,
+  2026-10-04) : un journal ou un message d'erreur dit ce qui a été observé (URL de redirection,
+  code HTTP, titre trouvé et titre attendu), jamais une supposition ni une interprétation
+  (« probablement », « structure changée ? »). Le pourquoi d'un choix va dans les commentaires
+  et la doc, pas dans les journaux.
