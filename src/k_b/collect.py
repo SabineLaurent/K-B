@@ -12,6 +12,7 @@ from k_b.github_advisories_source import GithubAdvisoriesSource
 from k_b.github_most_starred_source import GithubMostStarredSource
 from k_b.github_releases_source import GithubReleasesSource
 from k_b.raw_store import load_last_collection_dates, save_last_collection_dates, write_new_raw_file
+from k_b.tldr_source import TRACKED_EDITIONS, TldrSource
 from k_b.tracked_repositories import TRACKED_REPOSITORIES, list_packages_by_ecosystem
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ SOURCES: list[Source] = [
     ),
     GithubMostStarredSource(),
     ArxivSource(),
+    *(TldrSource(edition) for edition in TRACKED_EDITIONS),
 ]
 
 
