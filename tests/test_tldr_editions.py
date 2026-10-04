@@ -1,0 +1,71 @@
+from datetime import date
+from pathlib import Path
+
+from k_b.tldr_editions import TldrArticle, read_articles, read_edition_date
+
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
+RECORDED_PAGE = (FIXTURES_DIR / "tldr_ai_extract.html").read_bytes()
+LANDING_PAGE = b"<html><body><h1>Keep up with AI in 5 minutes</h1></body></html>"
+
+
+def page_with_article(link: str, title: str = "A title (2 minute read)") -> bytes:
+    return (
+        '<html><body><h1>TLDR AI 2026-10-01</h1><section><article class="mt-3">'
+        f'<a class="font-bold" href="{link}"><h3>{title}</h3></a>'
+        '<div class="newsletter-html">A summary.</div></article></section></body></html>'
+    ).encode()
+
+
+def test_the_edition_date_is_read_from_the_page_title():
+    assert read_edition_date(RECORDED_PAGE) == date(2026, 10, 1)
+
+
+def test_a_page_that_is_not_an_edition_has_no_date():
+    # A day without an edition redirects to the landing page of the newsletter.
+    assert read_edition_date(LANDING_PAGE) is None
+
+
+def test_one_article_per_entry_without_the_sponsored_ones():
+    articles = read_articles(RECORDED_PAGE)
+
+    assert [article.title for article in articles] == [
+        "Musk's SpaceXAI Considers Overhaul of Pricing for Grok, X Users (1 minute read)",
+        "We can and must solve alignment (14 minute read)",
+    ]
+
+
+def test_an_article_keeps_its_link_without_the_tracking_parameters():
+    articles = read_articles(RECORDED_PAGE)
+
+    assert articles[0].url == "https://links.tldrnewsletter.com/VezRJB"
+    assert articles[1].url == "https://www.goodfire.com/blog/we-can-and-must-solve-alignment?ref=k-b"
+
+
+def test_the_summary_is_plain_text():
+    article = read_articles(RECORDED_PAGE)[1]
+
+    assert article == TldrArticle(
+        title="We can and must solve alignment (14 minute read)",
+        url="https://www.goodfire.com/blog/we-can-and-must-solve-alignment?ref=k-b",
+        summary="A summary on interpretability as the main challenge of alignment. "
+        "Second paragraph.",
+    )
+
+
+def test_a_doubly_escaped_link_is_unescaped_before_its_tracking_is_removed():
+    page = page_with_article("https://example.org/?id=7&amp;amp;utm_source=tldrai&amp;amp;x=1")
+
+    assert read_articles(page)[0].url == "https://example.org/?id=7&x=1"
+
+
+def test_an_article_whose_link_is_not_https_is_rejected():
+    assert read_articles(page_with_article("javascript:alert(1)")) == []
+    assert read_articles(page_with_article("http://example.org/")) == []
+
+
+def test_an_article_without_a_title_is_rejected():
+    assert read_articles(page_with_article("https://example.org/", title="")) == []
+
+
+def test_a_page_without_any_article_gives_no_article():
+    assert read_articles(LANDING_PAGE) == []
