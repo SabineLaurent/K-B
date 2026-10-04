@@ -1,4 +1,4 @@
-# Un seul téléchargement pour toutes les sources
+# Une seule fonction de téléchargement pour toutes les sources
 
 - **Date** : 2026-10-04
 - **Branche** : `refactor/common-download`
