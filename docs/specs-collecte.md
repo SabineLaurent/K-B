@@ -147,10 +147,12 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   Security ») ; le titre vérifie qu'une page est bien de cette édition (neuf candidates dans
   [sources-detaillees.md](sources-detaillees.md)).
 - **État** : collecte en place (PR de #13). Une source par édition (`tldr_ai`…) ; chaque
-  collecte lit les jours de semaine depuis le jour de la dernière collecte (inclus) jusqu'à
-  **hier** : l'édition du jour n'est jamais demandée, elle le sera à la collecte suivante (une
-  édition pas encore parue ressemblerait à une édition absente). Première collecte : les 7 jours
-  précédents (pour tester ; à élargir à la mise en service). Chaque page est téléchargée avec sa
+  collecte lit les jours de semaine depuis le jour de la dernière collecte (inclus, son édition
+  a pu paraître après elle ; le recouvrement est retiré à la fusion) jusqu'à **aujourd'hui**.
+  L'édition du jour peut ne pas être encore parue : pour aujourd'hui seulement, toute réponse qui
+  n'est pas une édition (redirection, erreur HTTP, page sans titre daté) n'est pas une erreur, et
+  la collecte suivante redemande ce jour. Première collecte : les 7 jours précédents et
+  aujourd'hui (pour tester ; à élargir à la mise en service). Chaque page est téléchargée avec sa
   propre URL comme préfixe de confiance : une redirection vers la page d'accueil de l'édition
   veut dire « pas d'édition ce jour-là » ; toute autre redirection, une page sans titre daté de
   l'édition, ou des pages dont aucune n'a d'article, font échouer la collecte de l'édition

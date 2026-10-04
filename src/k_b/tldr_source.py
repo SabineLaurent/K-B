@@ -4,6 +4,7 @@ import logging
 import re
 from datetime import UTC, date, datetime, timedelta
 from time import sleep
+from urllib.error import HTTPError
 from urllib.parse import urlsplit
 
 from k_b.http_download import RedirectedOutsideError, download
@@ -38,15 +39,20 @@ class TldrSource:
     def fetch(self, last_collected_at: datetime | None) -> dict[str, bytes] | None:
         """Return each edition page of the days to collect, by day; None if there is none.
 
-        A day without an edition (weekend, holiday) is redirected to the landing page of the
-        edition. Anything else that is not an edition page means the site has changed: refused.
+        A past day without an edition (weekend, holiday) is redirected to the landing page of
+        the edition; anything else that is not an edition page means the site has changed:
+        refused. Today's edition may not be out yet: whatever answers instead is no error, and
+        the next collection, which starts from today, asks again.
         """
         pages = {}
-        days = list_edition_days(last_collected_at, today=current_day())
-        for position, day in enumerate(days):
+        today = current_day()
+        for position, day in enumerate(list_edition_days(last_collected_at, today)):
             if position > 0:
                 sleep(PAUSE_BETWEEN_PAGES_SECONDS)
-            page = self.download_edition_page(day)
+            if day == today:
+                page = self.download_edition_page_of_today(day)
+            else:
+                page = self.download_edition_page(day)
             if page is None:
                 continue
             if read_edition_date(page, self.edition_title) != day:
@@ -69,6 +75,18 @@ class TldrSource:
                 return None
             raise
 
+    def download_edition_page_of_today(self, day: date) -> bytes | None:
+        """Return today's edition page, or None if it does not look out yet."""
+        try:
+            page = self.download_edition_page(day)
+        except (RedirectedOutsideError, HTTPError) as answer:
+            logger.info("%s %s: edition not out yet (%s)", self.name, day, answer)
+            return None
+        if page is not None and read_edition_date(page, self.edition_title) != day:
+            logger.info("%s %s: edition not out yet (not an edition page)", self.name, day)
+            return None
+        return page
+
     def is_landing_page(self, url: str) -> bool:
         """Whether url is https://tldr.tech/<edition>, give or take a final slash or a query."""
         parts = urlsplit(url)
@@ -85,14 +103,14 @@ def current_day() -> date:
 
 
 def list_edition_days(last_collected_at: datetime | None, today: date) -> list[date]:
-    """Weekdays from the day of the last collection, or 7 days ago, to yesterday.
+    """Weekdays from the day of the last collection, or 7 days ago, to today.
 
-    Today is never asked for: an edition not out yet would look like a missing one. The day of
-    the last collection was its today, so it has not been read yet.
+    The day of the last collection is read again: its edition may have come out after it. The
+    overlap with the previous raw pages is removed when merging.
     """
     if last_collected_at is None:
         first_day = today - timedelta(days=FIRST_COLLECTION_DAYS)
     else:
         first_day = last_collected_at.astimezone(UTC).date()
-    days = (first_day + timedelta(days=offset) for offset in range((today - first_day).days))
+    days = (first_day + timedelta(days=offset) for offset in range((today - first_day).days + 1))
     return [day for day in days if day.weekday() < SATURDAY]

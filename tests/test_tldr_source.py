@@ -1,4 +1,5 @@
 import io
+from urllib.error import HTTPError
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -32,6 +33,8 @@ class FakeTldr:
         self.requested_urls = []
         self.missing_days = set()
         self.empty_days = set()
+        self.undated_days = set()
+        self.failing_days = set()
         self.landing_url = "https://tldr.tech/ai"
 
     def __call__(self, request, timeout):
@@ -40,6 +43,10 @@ class FakeTldr:
         if day.weekday() >= 5 or day in self.missing_days:
             # tldr.tech redirects a day without an edition to the landing page of the edition.
             return FakeResponse(LANDING_PAGE, self.landing_url)
+        if day in self.failing_days:
+            raise HTTPError(request.full_url, 404, "Not Found", {}, None)
+        if day in self.undated_days:
+            return FakeResponse(LANDING_PAGE, request.full_url)
         if day in self.empty_days:
             empty_page = EMPTY_EDITION.replace(b"{day}", day.isoformat().encode())
             return FakeResponse(empty_page, request.full_url)
@@ -82,14 +89,14 @@ def test_an_edition_name_that_is_not_a_slug_is_refused():
         TldrSource("../ai", "AI")
 
 
-def test_a_later_collection_reads_the_weekdays_from_the_last_one_to_yesterday():
+def test_a_later_collection_reads_the_weekdays_from_the_last_one_to_today():
     # Last collection on Friday 2026-10-09, next one on Tuesday 2026-10-13.
     days = list_edition_days(datetime(2026, 10, 9, 8, 0, tzinfo=UTC), today=date(2026, 10, 13))
 
-    assert days == [date(2026, 10, 9), date(2026, 10, 12)]
+    assert days == [date(2026, 10, 9), date(2026, 10, 12), date(2026, 10, 13)]
 
 
-def test_a_first_collection_reads_the_weekdays_of_the_seven_days_before_today():
+def test_a_first_collection_reads_the_weekdays_of_the_last_seven_days_and_today():
     days = list_edition_days(None, today=date(2026, 10, 13))
 
     assert days == [
@@ -98,6 +105,7 @@ def test_a_first_collection_reads_the_weekdays_of_the_seven_days_before_today():
         date(2026, 10, 8),
         date(2026, 10, 9),
         date(2026, 10, 12),
+        date(2026, 10, 13),
     ]
 
 
@@ -110,11 +118,38 @@ def test_each_edition_page_is_returned_as_received_under_its_day(fake_tldr, paus
     assert all(url.startswith("https://tldr.tech/ai/") for url in fake_tldr.requested_urls)
 
 
-def test_today_is_never_asked_for(fake_tldr, pauses):
-    thursday_morning = datetime(2026, 10, 8, 6, 0, tzinfo=UTC)
+THURSDAY_MORNING = datetime(2026, 10, 8, 6, 0, tzinfo=UTC)
+TODAY = date(2026, 10, 8)
 
-    assert TldrSource("ai", "AI").fetch(last_collected_at=thursday_morning) is None
-    assert fake_tldr.requested_urls == []
+
+def test_the_edition_of_today_is_read_once_out(fake_tldr, pauses):
+    pages = TldrSource("ai", "AI").fetch(last_collected_at=THURSDAY_MORNING)
+
+    assert list(pages) == ["2026-10-08"]
+
+
+@pytest.mark.parametrize("answer", ["missing_days", "failing_days", "undated_days"])
+def test_an_edition_of_today_not_out_yet_is_no_error(fake_tldr, pauses, answer):
+    # Redirected, not found or not an edition page: today's edition may simply be not out yet.
+    setattr(fake_tldr, answer, {TODAY})
+    fake_tldr.landing_url = "https://tldr.tech/somewhere-else"
+
+    assert TldrSource("ai", "AI").fetch(last_collected_at=THURSDAY_MORNING) is None
+
+
+def test_a_holiday_then_an_edition_of_today_not_out_yet_is_no_error(fake_tldr, pauses):
+    fake_tldr.missing_days = {date(2026, 10, 7), TODAY}
+
+    wednesday_morning = datetime(2026, 10, 7, 6, tzinfo=UTC)
+
+    assert TldrSource("ai", "AI").fetch(last_collected_at=wednesday_morning) is None
+
+
+def test_a_past_day_that_is_not_an_edition_page_is_still_refused(fake_tldr, pauses):
+    fake_tldr.undated_days = {date(2026, 10, 7)}
+
+    with pytest.raises(ValueError, match="structure"):
+        TldrSource("ai", "AI").fetch(last_collected_at=datetime(2026, 10, 7, 6, tzinfo=UTC))
 
 
 def test_a_holiday_redirected_to_the_landing_page_has_no_edition(fake_tldr, pauses):
