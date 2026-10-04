@@ -8,7 +8,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlsplit
 
 from k_b.http_download import RedirectedOutsideError, download
-from k_b.tldr_editions import read_articles, read_edition_date
+from k_b.tldr_editions import read_articles, read_edition_date, read_page_title
 
 # Adding an edition is adding a line: its slug, as in https://tldr.tech/<slug>/<YYYY-MM-DD>,
 # and the title its pages show, as in "TLDR Information Security 2026-10-01" (read 2026-10-04).
@@ -56,17 +56,20 @@ class TldrSource:
             if page is None:
                 continue
             if read_edition_date(page, self.edition_title) != day:
-                raise ValueError(f"{self.name} {day}: no dated edition title, structure changed?")
+                raise ValueError(
+                    f"{self.name} {day}: page title {read_page_title(page)!r}, "
+                    f"expected {self.expected_title(day)!r}"
+                )
             if not read_articles(page):
                 logger.warning("%s %s: an edition page with no article", self.name, day)
             pages[day.isoformat()] = page
         if pages and not any(read_articles(page) for page in pages.values()):
-            raise ValueError(f"{self.name}: no article in any edition page, structure changed?")
+            raise ValueError(f"{self.name}: no article in any of the {len(pages)} edition pages")
         return pages or None
 
     def download_edition_page(self, day: date) -> bytes | None:
         """Return the edition page of day, or None if tldr.tech redirects to the landing page."""
-        page_url = f"{SITE_URL}{self.edition}/{day.isoformat()}"
+        page_url = self.page_url(day)
         try:
             # The page url itself is the trusted prefix: any redirection is noticed.
             return download(page_url, page_url, MAX_PAGE_BYTES)
@@ -76,16 +79,33 @@ class TldrSource:
             raise
 
     def download_edition_page_of_today(self, day: date) -> bytes | None:
-        """Return today's edition page, or None if it does not look out yet."""
+        """Return today's edition page, or None, logging what answered instead.
+
+        Today's edition may not be out yet: no answer is an error, the next collection asks
+        for this day again.
+        """
+        page_url = self.page_url(day)
         try:
-            page = self.download_edition_page(day)
-        except (RedirectedOutsideError, HTTPError) as answer:
-            logger.info("%s %s: edition not out yet (%s)", self.name, day, answer)
+            page = download(page_url, page_url, MAX_PAGE_BYTES)
+        except RedirectedOutsideError as refusal:
+            self.log_no_edition_page(day, f"redirected to {refusal.redirect_url}")
             return None
-        if page is not None and read_edition_date(page, self.edition_title) != day:
-            logger.info("%s %s: edition not out yet (not an edition page)", self.name, day)
+        except HTTPError as error:
+            self.log_no_edition_page(day, f"HTTP {error.code}")
+            return None
+        if read_edition_date(page, self.edition_title) != day:
+            self.log_no_edition_page(day, f"page title {read_page_title(page)!r}")
             return None
         return page
+
+    def page_url(self, day: date) -> str:
+        return f"{SITE_URL}{self.edition}/{day.isoformat()}"
+
+    def log_no_edition_page(self, day: date, answer: str) -> None:
+        logger.info("%s %s: no edition page, %s", self.name, day, answer)
+
+    def expected_title(self, day: date) -> str:
+        return f"TLDR {self.edition_title} {day.isoformat()}"
 
     def is_landing_page(self, url: str) -> bool:
         """Whether url is https://tldr.tech/<edition>, give or take a final slash or a query."""

@@ -1,4 +1,5 @@
 import io
+import logging
 from urllib.error import HTTPError
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -128,13 +129,31 @@ def test_the_edition_of_today_is_read_once_out(fake_tldr, pauses):
     assert list(pages) == ["2026-10-08"]
 
 
-@pytest.mark.parametrize("answer", ["missing_days", "failing_days", "undated_days"])
-def test_an_edition_of_today_not_out_yet_is_no_error(fake_tldr, pauses, answer):
-    # Redirected, not found or not an edition page: today's edition may simply be not out yet.
-    setattr(fake_tldr, answer, {TODAY})
-    fake_tldr.landing_url = "https://tldr.tech/somewhere-else"
+@pytest.mark.parametrize(
+    ("answer", "logged_cause"),
+    [
+        ("missing_days", "redirected to https://tldr.tech/somewhere-else"),
+        ("landing_days", "redirected to https://tldr.tech/ai/?ref=home"),
+        ("failing_days", "HTTP 404"),
+        ("undated_days", "page title 'Keep up with AI in 5 minutes'"),
+    ],
+)
+def test_no_edition_page_today_is_no_error_and_logs_what_was_answered(
+    fake_tldr, pauses, caplog, answer, logged_cause
+):
+    # Today's edition may not be out yet: the next collection asks for this day again.
+    if answer == "landing_days":
+        fake_tldr.missing_days = {TODAY}
+        fake_tldr.landing_url = "https://tldr.tech/ai/?ref=home"
+    else:
+        setattr(fake_tldr, answer, {TODAY})
+        fake_tldr.landing_url = "https://tldr.tech/somewhere-else"
 
-    assert TldrSource("ai", "AI").fetch(last_collected_at=THURSDAY_MORNING) is None
+    with caplog.at_level(logging.INFO, logger="k_b.tldr_source"):
+        assert TldrSource("ai", "AI").fetch(last_collected_at=THURSDAY_MORNING) is None
+
+    assert f"tldr_ai 2026-10-08: no edition page, {logged_cause}" in caplog.text
+    assert "probably" not in caplog.text
 
 
 def test_a_holiday_then_an_edition_of_today_not_out_yet_is_no_error(fake_tldr, pauses):
@@ -148,8 +167,13 @@ def test_a_holiday_then_an_edition_of_today_not_out_yet_is_no_error(fake_tldr, p
 def test_a_past_day_that_is_not_an_edition_page_is_still_refused(fake_tldr, pauses):
     fake_tldr.undated_days = {date(2026, 10, 7)}
 
-    with pytest.raises(ValueError, match="structure"):
+    with pytest.raises(ValueError) as refusal:
         TldrSource("ai", "AI").fetch(last_collected_at=datetime(2026, 10, 7, 6, tzinfo=UTC))
+
+    assert str(refusal.value) == (
+        "tldr_ai 2026-10-07: page title 'Keep up with AI in 5 minutes', "
+        "expected 'TLDR AI 2026-10-07'"
+    )
 
 
 def test_a_holiday_redirected_to_the_landing_page_has_no_edition(fake_tldr, pauses):
@@ -188,7 +212,7 @@ def test_a_redirection_elsewhere_is_refused(fake_tldr, pauses, landing_url):
 
 def test_a_page_served_at_its_address_without_a_dated_title_is_refused(fake_tldr, pauses):
     # The fake site serves TLDR AI pages only: as tldr_dev they no longer look like an edition.
-    with pytest.raises(ValueError, match="structure"):
+    with pytest.raises(ValueError, match="expected 'TLDR Dev 2026-10-02'"):
         TldrSource("dev", "Dev").fetch(last_collected_at=SINCE_OCTOBER_2)
 
 
@@ -212,5 +236,5 @@ def test_edition_pages_all_without_any_article_are_refused(fake_tldr, pauses):
     # Every edition page is empty: the article selectors have probably stopped matching.
     fake_tldr.empty_days = AllDays()
 
-    with pytest.raises(ValueError, match="no article"):
+    with pytest.raises(ValueError, match="no article in any of the 5 edition pages"):
         TldrSource("ai", "AI").fetch(last_collected_at=SINCE_OCTOBER_2)

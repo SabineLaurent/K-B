@@ -23,11 +23,16 @@ class TldrArticle:
     summary: str
 
 
+def read_page_title(page: bytes) -> str:
+    """The text of the page title (its first h1), as written; empty if there is none."""
+    title = BeautifulSoup(page, "html.parser").select_one("h1")
+    return title.get_text(strip=True) if title else ""
+
+
 def read_edition_date(page: bytes, edition_title: str) -> date | None:
     """Return the date in the page title, or None if the page is not an edition of edition_title."""
-    title = BeautifulSoup(page, "html.parser").select_one("h1")
     expected_title = re.compile(f"TLDR {re.escape(edition_title)} {EDITION_DATE}")
-    match = expected_title.fullmatch(title.get_text(strip=True)) if title else None
+    match = expected_title.fullmatch(read_page_title(page))
     return date.fromisoformat(match.group(1)) if match else None
 
 

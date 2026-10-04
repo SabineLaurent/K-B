@@ -1,7 +1,7 @@
 from datetime import date
 from pathlib import Path
 
-from k_b.tldr_editions import TldrArticle, read_articles, read_edition_date
+from k_b.tldr_editions import TldrArticle, read_articles, read_edition_date, read_page_title
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 RECORDED_PAGE = (FIXTURES_DIR / "tldr_ai_extract.html").read_bytes()
@@ -82,3 +82,8 @@ def test_an_article_without_a_title_is_rejected():
 
 def test_a_page_without_any_article_gives_no_article():
     assert read_articles(LANDING_PAGE) == []
+
+
+def test_the_page_title_is_read_as_written():
+    assert read_page_title(LANDING_PAGE) == "Keep up with AI in 5 minutes"
+    assert read_page_title(b"<html><body><p>no title</p></body></html>") == ""
