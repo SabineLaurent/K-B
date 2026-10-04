@@ -33,9 +33,9 @@ class TldrSource:
     def fetch(self, last_collected_at: datetime | None) -> dict[str, bytes] | None:
         """Return the edition page of each day to collect, by day; None if there is none.
 
-        tldr.tech redirects a day without an edition (weekend, holiday, edition not out yet)
-        to the landing page of the edition: that day is logged and skipped, so no calendar is
-        needed. Any other redirection or HTTP error is raised.
+        A day redirected to the landing page of the edition (observed for 2026-10-03 and
+        2026-10-04) has no edition page: it is logged and skipped. Any other redirection or
+        HTTP error is raised.
         """
         pages = {}
         for position, day in enumerate(list_days_to_collect(last_collected_at, current_day())):

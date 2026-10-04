@@ -128,10 +128,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   `https://tldr.tech/ai/2026-09-30` répond 200). La collecte garde chaque page brute ; la lecture des articles se fait à la
   transformation.
 - **Ce qu'on en tire** : un item par article de chaque édition suivie : titre, lien, résumé.
-- **Jours sans édition** : tldr.tech redirige un jour sans édition (week-end, jour férié,
-  édition pas encore parue) vers la page d'accueil de l'édition, `https://tldr.tech/<édition>`
-  (constaté le 2026-10-04). Ce jour est journalisé avec l'adresse de redirection et sauté : pas
-  de calendrier à tenir. Toute autre redirection ou erreur HTTP fait échouer la source.
+- **Jours sans édition** : un jour redirigé vers la page d'accueil de l'édition,
+  `https://tldr.tech/<édition>`, n'a pas de page d'édition (observé pour le 2026-10-03 et le
+  2026-10-04) : il est journalisé avec l'adresse de redirection et sauté. Toute autre
+  redirection ou erreur HTTP fait échouer la source.
 - **Fréquence** : une collecte par jour, lancée à la main
   (`KB_DATA_DIR=<dossier> uv run --env-file .env kb collect`) ; l'automatisation viendra après.
   Chaque collecte lit chaque jour depuis le jour de la dernière collecte, relu car son édition a
