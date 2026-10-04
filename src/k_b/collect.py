@@ -12,21 +12,25 @@ from k_b.github_advisories_source import GithubAdvisoriesSource
 from k_b.github_most_starred_source import GithubMostStarredSource
 from k_b.github_releases_source import GithubReleasesSource
 from k_b.raw_store import load_last_collection_dates, save_last_collection_dates, write_new_raw_file
+from k_b.tldr_source import TRACKED_EDITIONS, TldrSource
 from k_b.tracked_repositories import TRACKED_REPOSITORIES, list_packages_by_ecosystem
 
 logger = logging.getLogger(__name__)
 
 SAFE_PATH_SEGMENT = re.compile(r"[a-z0-9_]+")
+# A page name is a file name under the collection folder: a date such as 2026-09-30.
+SAFE_PAGE_NAME = re.compile(r"[a-z0-9_-]+")
 
 
 class Source(Protocol):
     name: str
     extension: str
 
-    def fetch(self, last_collected_at: datetime | None) -> bytes | None:
+    def fetch(self, last_collected_at: datetime | None) -> bytes | dict[str, bytes] | None:
         """Return the raw content published since last_collected_at (None: first collection).
 
-        Return None when the source says nothing changed since last_collected_at.
+        A source that reads several pages (a scraped site) returns them by page name. Return
+        None when the source says nothing changed since last_collected_at.
         """
         ...
 
@@ -40,6 +44,7 @@ SOURCES: list[Source] = [
     ),
     GithubMostStarredSource(),
     ArxivSource(),
+    *(TldrSource(slug) for slug in TRACKED_EDITIONS),
 ]
 
 
@@ -73,5 +78,14 @@ def collect_one_source(
     raw_content = source.fetch(last_collected_at)
     if raw_content is None:
         return
-    raw_file_name = f"{now:%Y-%m-%dT%H%M%SZ}.{source.extension}"
-    write_new_raw_file(raw_dir / "automation" / source.name / raw_file_name, raw_content)
+    source_dir = raw_dir / "automation" / source.name
+    collection_name = f"{now:%Y-%m-%dT%H%M%SZ}"
+    if isinstance(raw_content, bytes):
+        write_new_raw_file(source_dir / f"{collection_name}.{source.extension}", raw_content)
+        return
+    # Every name is checked before the first write: a refused page leaves no partial collection.
+    for page_name in raw_content:
+        if not SAFE_PAGE_NAME.fullmatch(page_name):
+            raise ValueError(f"not a safe page name: {page_name!r}")
+    for page_name, page in raw_content.items():
+        write_new_raw_file(source_dir / collection_name / f"{page_name}.{source.extension}", page)
