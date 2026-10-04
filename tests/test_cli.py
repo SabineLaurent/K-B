@@ -1,4 +1,6 @@
 import os
+import subprocess
+import sys
 
 import pytest
 
@@ -83,3 +85,15 @@ def test_collect_fails_closed_with_a_clear_message_on_an_unreadable_state(
     assert "collection_state.json" in error_output
     assert "permission" in error_output.lower()
     assert not (tmp_path / "raw" / "automation").exists()
+
+
+def test_an_info_line_of_k_b_is_shown_once_logging_is_configured():
+    # A new interpreter: pytest's own log handlers would hide what kb collect shows.
+    script = (
+        "import logging; from k_b.cli import configure_logging; configure_logging(); "
+        "logging.getLogger('k_b.tldr_source').info('tldr_ai 2026-10-03: no edition page')"
+    )
+
+    result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+
+    assert "INFO k_b.tldr_source: tldr_ai 2026-10-03: no edition page" in result.stderr

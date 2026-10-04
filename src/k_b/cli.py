@@ -1,6 +1,7 @@
 """Command line: `kb collect`."""
 
 import argparse
+import logging
 import os
 import sys
 from datetime import UTC, datetime
@@ -12,11 +13,17 @@ from k_b.raw_store import InvalidCollectionStateError
 DATA_DIR_VARIABLE = "KB_DATA_DIR"
 
 
+def configure_logging() -> None:
+    """Show every log line of level INFO and above on stderr, with its level and logger."""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="kb")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("collect", help="run every source and store its raw output in raw/")
     parser.parse_args(argv)
+    configure_logging()
 
     data_dir = os.environ.get(DATA_DIR_VARIABLE)
     if not data_dir:

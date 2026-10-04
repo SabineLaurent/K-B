@@ -132,6 +132,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   `https://tldr.tech/<édition>`, n'a pas de page d'édition (observé pour le 2026-10-03 et le
   2026-10-04) : il est journalisé avec l'adresse de redirection et sauté. Toute autre
   redirection ou erreur HTTP fait échouer la source.
+- **Journal** : chaque jour donne une ligne, avec l'édition, le jour et ce qui a été observé :
+  page gardée (taille en octets), redirection vers la page d'accueil (adresse d'arrivée), ou
+  erreur (message reçu et URL demandée) ; une collecte sans aucune page le dit aussi.
+  `kb collect` affiche les lignes de niveau INFO et au-dessus.
 - **Fréquence** : une collecte par jour, lancée à la main
   (`KB_DATA_DIR=<dossier> uv run --env-file .env kb collect`) ; l'automatisation viendra après.
   Chaque collecte lit chaque jour depuis le jour de la dernière collecte, relu car son édition a

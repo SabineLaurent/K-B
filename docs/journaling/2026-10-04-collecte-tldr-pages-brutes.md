@@ -31,29 +31,48 @@ try:
     # The page url itself is the trusted prefix: any redirection is noticed.
     pages[day.isoformat()] = download(page_url, page_url, MAX_PAGE_BYTES)
 ```
-`src/k_b/tldr_source.py:44`
+`src/k_b/tldr_source.py:45`
 
 L'URL est `https://tldr.tech/<édition>/<AAAA-MM-JJ>`. La page est gardée
 octet pour octet, sans analyse.
 
 ### Un jour sans édition se reconnaît à sa redirection
 
-tldr.tech ne répond pas 404 pour un jour sans édition. Il redirige vers la page d'accueil de
-l'édition. En donnant l'URL de la page elle-même comme préfixe de confiance, toute redirection
-devient visible : `download` lève `RedirectedOutsideError`, qui porte l'adresse d'arrivée.
+Le 03 et le 04/10 (un week-end), tldr.tech n'a pas répondu 404 : il a redirigé vers la page
+d'accueil de l'édition. En donnant l'URL de la page elle-même comme préfixe de confiance, toute
+redirection devient visible : `download` lève `RedirectedOutsideError`, qui porte l'adresse
+d'arrivée.
 
 ```python
-except RedirectedOutsideError as refusal:
-    if refusal.redirect_url.rstrip("/") != f"{SITE_URL}{self.edition}":
-        raise
-    logger.info("%s %s: no edition page, redirected to %s", ...)
+except Exception as error:
+    if (
+        isinstance(error, RedirectedOutsideError)
+        and error.redirect_url.rstrip("/") == f"{SITE_URL}{self.edition}"
+    ):
 ```
-`src/k_b/tldr_source.py:48`
+`src/k_b/tldr_source.py:49`
 
-Seule la redirection vers `https://tldr.tech/<édition>` vaut « pas d'édition ». Le jour est
-journalisé avec ce qui a été observé, puis sauté. Une redirection ailleurs (page de connexion,
-anti-bot) remonte et fait échouer la source. Cette règle couvre les week-ends, les jours fériés
-et l'édition pas encore parue, **sans calendrier**.
+Seule la redirection vers `https://tldr.tech/<édition>` vaut « pas d'édition » : le jour est
+journalisé avec l'adresse d'arrivée, puis sauté (`continue`). Une redirection ailleurs (page de
+connexion, anti-bot) remonte et fait échouer la source.
+
+### Une ligne de journal par jour, affichée par `kb collect`
+
+```python
+logger.error("%s %s: %s, from %s", self.name, day, error, page_url)
+raise
+```
+`src/k_b/tldr_source.py:62`
+
+Chaque jour produit une ligne qui dit ce qui a été observé : `edition page, 75510 bytes`,
+`no edition page, redirected to https://tldr.tech/infosec`, ou l'erreur reçue suivie de l'URL
+demandée. Ce dernier cas compte : le message d'un `HTTPError` (`HTTP Error 500: Internal Server
+Error`) ou d'un délai dépassé (`<urlopen error timed out>`) ne dit ni le jour ni l'URL. Une
+collecte sans aucune page le dit aussi (`tldr_source.py:66`).
+
+Ces lignes sont de niveau INFO. Sans configuration, Python n'affiche que WARNING et au-dessus :
+`kb collect` appelle donc `configure_logging()` (`src/k_b/cli.py:18`), qui affiche INFO et
+au-dessus, avec le niveau et le module.
 
 ### L'erreur qui dit où la redirection a mené
 
@@ -75,7 +94,7 @@ if last_collected_at is None:
 else:
     first_day = last_collected_at.astimezone(UTC).date()
 ```
-`src/k_b/tldr_source.py:70`
+`src/k_b/tldr_source.py:81`
 
 Chaque collecte lit tous les jours, du jour de la dernière collecte (inclus) jusqu'à aujourd'hui
 en UTC. Le dernier jour est relu parce que son édition a pu paraître après la collecte. Un jour
@@ -103,7 +122,7 @@ laisse aucune collecte partielle.
   moins de 300, lisible d'un trait. `feat/tldr` est gardée : son analyseur servira à la
   transformation.
 - **Redirection vers la page d'accueil = pas d'édition**, plutôt qu'un calendrier des jours
-  ouvrés et fériés : une seule règle, observée sur le site, qui couvre tous les cas. Écarté :
+  ouvrés et fériés : une seule règle, observée sur le site le 03 et le 04/10. Écarté :
   « toute redirection = pas d'édition », plus simple mais qui confondrait une page anti-bot avec
   un week-end, sans erreur (constat de la relecture indépendante du plan).
 - **Comparaison exacte de l'URL d'arrivée** (`/` final toléré) plutôt qu'une analyse par
@@ -117,6 +136,13 @@ laisse aucune collecte partielle.
 - **Tous les jours sont demandés, week-end compris** : à 2 s de pause entre deux pages, un
   week-end coûte deux requêtes par édition, négligeable.
 - Pause de 2 s, une page à la fois : décidé dans #6, tldr.tech ne publie pas de limite.
+- **Journaliser l'erreur avec le jour et l'URL, puis relancer l'erreur d'origine**, plutôt que
+  l'envelopper dans un `ValueError` : `kb collect` affiche toujours le vrai type
+  (`failed (HTTPError)`). Consigne « K-B est déterministe » : chaque ligne dit ce qui a été
+  observé.
+- **`logging.basicConfig` dans `cli.py`**, plutôt qu'un gestionnaire propre au paquet `k_b` :
+  une ligne, la pratique de la bibliothèque standard pour un point d'entrée en ligne de
+  commande. Le changement vaut pour toutes les sources, pas seulement TLDR.
 
 ## Preuve
 
@@ -125,28 +151,32 @@ laisse aucune collecte partielle.
 | `test_the_page_of_a_day_is_asked_at_its_edition_and_date_url` | l'URL est `https://tldr.tech/ai/2026-10-04` |
 | `test_every_day_from_the_last_collection_day_to_today_is_asked` | le dernier jour est relu, samedi et dimanche sont demandés |
 | `test_a_first_collection_asks_the_seven_days_before_today_and_today` | première collecte : 8 jours |
-| `test_an_edition_page_is_returned_unchanged_under_its_day` | la page est rendue octet pour octet |
+| `test_an_edition_page_is_returned_unchanged_under_its_day_and_logged` | la page est rendue octet pour octet, une ligne donne sa taille |
 | `test_a_day_redirected_to_the_edition_landing_page_is_logged_and_skipped` | jour sans édition sauté, journal avec l'URL d'arrivée, avec ou sans `/` final |
-| `test_a_redirection_elsewhere_than_the_edition_landing_page_is_raised` | une autre redirection fait échouer la source |
-| `test_an_http_error_is_raised` | un HTTP 500 remonte |
+| `test_a_redirection_elsewhere_than_the_edition_landing_page_is_logged_and_raised` | une autre redirection est journalisée et fait échouer la source |
+| `test_an_error_is_logged_with_its_day_and_url_then_raised` | HTTP 500, délai dépassé, page trop grosse : une ligne avec le jour, le message reçu et l'URL, puis l'erreur remonte |
+| `test_no_edition_page_in_the_window_returns_none_and_is_logged` | une collecte sans page le dit, avec la fenêtre de jours |
+| `test_an_info_line_of_k_b_is_shown_once_logging_is_configured` | `configure_logging()` affiche une ligne INFO, dans un interpréteur neuf |
 | `test_a_page_name_that_is_not_a_safe_path_segment_is_refused_before_any_write` | `../escape` refusé, rien d'écrit |
 | `test_a_refused_redirection_tells_where_it_led` | l'erreur porte `redirect_url` et reste un `ValueError` |
 | Collecte réelle de `tldr_ai` du 02 au 04/10 | 02/10 : page de 81 913 octets ; 03/10 et 04/10 : `redirected to https://tldr.tech/ai` |
-| `uv run pytest` | 169 tests passent |
+| Collecte réelle de `tldr_infosec` du 02 au 04/10, avec `configure_logging()` | trois lignes INFO affichées : `edition page, 75510 bytes`, puis deux `redirected to https://tldr.tech/infosec` |
+| `uv run pytest` | 172 tests passent |
 
 ## Ce que tu dois pouvoir défendre
 
 1. **Pourquoi pas de calendrier des jours ouvrés ?** Le site dit lui-même qu'il n'y a pas
    d'édition en redirigeant vers sa page d'accueil. Un calendrier serait une seconde source de
    vérité, à tenir à jour (fériés américains), qui pourrait contredire le site
-   (`tldr_source.py:48`).
+   (`tldr_source.py:49`). Limite : seul un week-end a été observé (voir Zones non vérifiées).
 2. **Que se passe-t-il si tldr.tech redirige vers une page de connexion ?** La source échoue,
-   l'erreur donne l'URL d'arrivée. Les autres sources continuent, et la date de dernière
-   collecte de `tldr_ai` n'avance pas : tout sera redemandé la fois suivante (`tldr_source.py:49`,
+   le journal donne le jour, l'URL demandée et l'URL d'arrivée. Les autres sources continuent, et
+   la date de dernière collecte de `tldr_ai` n'avance pas : tout sera redemandé la fois suivante
+   (`tldr_source.py:62`,
    `collect.py`).
 3. **Si je collecte à 7 h et que l'édition du jour sort à 14 h ?** Le jour est journalisé comme
    sans édition. Le lendemain, la collecte repart de ce jour-là et le récupère
-   (`tldr_source.py:73`).
+   (`tldr_source.py:84`).
 4. **Où est la sécurité ?** Aucune redirection n'est suivie sans être vue (préfixe = URL de la
    page). Taille limitée à 1 Mo. Le slug d'édition et chaque nom de page sont validés par une
    expression fermée avant de construire un chemin de fichier. Rien n'est analysé ni exécuté à

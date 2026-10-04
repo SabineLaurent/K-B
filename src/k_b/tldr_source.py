@@ -37,23 +37,34 @@ class TldrSource:
         2026-10-04) has no edition page: it is logged and skipped. Any other redirection or
         HTTP error is raised.
         """
+        days = list_days_to_collect(last_collected_at, current_day())
         pages = {}
-        for position, day in enumerate(list_days_to_collect(last_collected_at, current_day())):
+        for position, day in enumerate(days):
             if position > 0:
                 sleep(PAUSE_BETWEEN_PAGES_SECONDS)
             page_url = f"{SITE_URL}{self.edition}/{day.isoformat()}"
             try:
                 # The page url itself is the trusted prefix: any redirection is noticed.
-                pages[day.isoformat()] = download(page_url, page_url, MAX_PAGE_BYTES)
-            except RedirectedOutsideError as refusal:
-                if refusal.redirect_url.rstrip("/") != f"{SITE_URL}{self.edition}":
-                    raise
-                logger.info(
-                    "%s %s: no edition page, redirected to %s",
-                    self.name,
-                    day,
-                    refusal.redirect_url,
-                )
+                page = download(page_url, page_url, MAX_PAGE_BYTES)
+            except Exception as error:
+                if (
+                    isinstance(error, RedirectedOutsideError)
+                    and error.redirect_url.rstrip("/") == f"{SITE_URL}{self.edition}"
+                ):
+                    logger.info(
+                        "%s %s: no edition page, redirected to %s",
+                        self.name,
+                        day,
+                        error.redirect_url,
+                    )
+                    continue
+                # The error alone does not always say which day and url it is about.
+                logger.error("%s %s: %s, from %s", self.name, day, error, page_url)
+                raise
+            logger.info("%s %s: edition page, %d bytes", self.name, day, len(page))
+            pages[day.isoformat()] = page
+        if not pages:
+            logger.info("%s: no edition page from %s to %s", self.name, days[0], days[-1])
         return pages or None
 
 
