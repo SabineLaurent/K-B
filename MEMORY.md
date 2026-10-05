@@ -23,6 +23,15 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   4 h, sans issue pour l'instant.
 - Aucune coupe décidée. arXiv et Zotero vont ensemble ; l'ingester arXiv est repris de brief09.
 
+## Problèmes connus, sans issue
+
+- **arXiv bloqué au-delà de 2 000 papiers** (constat du 2026-10-05, décision de Sabine : pas
+  d'issue pour l'instant, transmis à la certif). Si la fenêtre de collecte contient plus de
+  2 000 papiers, la source échoue et sa date reste (`arxiv_source.py:52-54`). La fenêtre
+  suivante part du même point et finit plus tard : elle dépasse encore le plafond, la source
+  échoue à chaque collecte. Cela contredit la consigne du 05/10 : lancée tous les jours, K-B
+  rattrape les jours manqués (#65).
+
 ## Consignes de travail
 
 - Pour la documentation d'une bibliothèque ou d'un service, utiliser Context7 plutôt qu'une
