@@ -136,3 +136,37 @@ def test_an_empty_raw_folder_gives_nothing(tmp_path):
 
     assert reading.items == []
     assert reading.rejections == []
+
+
+def test_an_entry_refused_as_an_item_is_rejected_and_the_others_of_its_file_are_read(
+    tmp_path, caplog
+):
+    catalog = (FIXTURES_DIR / "cisa_kev_extract.csv").read_text()
+    catalog = catalog.replace('"Citrix NetScaler Improper Input Validation Vulnerability"', '""')
+    source_dir = tmp_path / "automation" / "cisa_kev"
+    source_dir.mkdir(parents=True)
+    (source_dir / f"{COLLECTION_NAME}.csv").write_text(catalog)
+
+    with caplog.at_level(logging.WARNING):
+        reading = read_raw_items(tmp_path)
+
+    assert [item.source_item_id for item in reading.items] == [
+        "CVE-2026-86950",
+        "CVE-2026-88772",
+        "CVE-2020-29583",
+    ]
+    assert len(reading.rejections) == 1
+    rejection = reading.rejections[0]
+    assert rejection.raw_file_path == f"automation/cisa_kev/{COLLECTION_NAME}.csv"
+    assert rejection.reason.startswith("entry 2: ValidationError")
+    assert "entry 2" in caplog.text
+
+
+def test_hidden_files_are_ignored(tmp_path):
+    copy_fixture(tmp_path, "arxiv_extract.xml", "arxiv", "xml")
+    (tmp_path / "automation" / "arxiv" / ".DS_Store").write_bytes(b"\x00\x00\x00\x01Bud1")
+
+    reading = read_raw_items(tmp_path)
+
+    assert len(reading.items) == 3
+    assert reading.rejections == []
