@@ -345,9 +345,10 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
 ### Collecte
 
 - **Une collecte par jour ; une collecte manquée est rattrapée à la suivante.** Décision de
-  Sabine. Pourquoi : c'est le délai le plus court possible, et le plus juste pour les dépôts les
-  plus étoilés, un instantané qui ne se rattrape pas ; c'est acceptable tant que les autres
-  sources rattrapent les jours manqués. Tranche entre trois fréquences écrites (« chaque
+  Sabine. Pourquoi : collecter une fois par jour garde l'écart le plus court entre deux
+  collectes, ce qui compte pour les dépôts les plus étoilés, un instantané qui ne se rattrape
+  pas. Les autres sources rattrapent les jours manqués et pourraient avoir des collectes plus
+  espacées. Tranche entre trois fréquences écrites (« chaque
   semaine » dans le `README.md`, « une par jour » dans les specs, « hebdomadaire » dans le
   registre des traitements) ; le code ne planifie rien. Remplace la collecte hebdomadaire du
   `README.md` et du registre, et la purge « à chaque collecte hebdomadaire » des décisions
