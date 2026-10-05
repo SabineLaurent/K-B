@@ -345,13 +345,15 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
 ### Collecte
 
 - **Une collecte par jour ; une collecte manquée est rattrapée à la suivante.** Décision de
-  Sabine. Tranche entre trois fréquences écrites (« chaque semaine » dans le `README.md`,
-  « une par jour » dans les specs, « hebdomadaire » dans le registre des traitements) ; le code
-  ne planifie rien. Remplace la collecte hebdomadaire du `README.md` et du registre, et la purge
-  « à chaque collecte hebdomadaire » des décisions ouvertes. Le rattrapage suit ce que chaque
-  source fait déjà, détaillé dans les [specs de la collecte](../specs-collecte.md) ; les dépôts
-  les plus étoilés, un instantané, ne se rattrapent pas. Limite connue : au-delà de 2 000 papiers dans la fenêtre, arXiv échoue à
-  chaque collecte (#71). — PR de #65
+  Sabine. Pourquoi : c'est le délai le plus court possible, et le plus juste pour les dépôts les
+  plus étoilés, un instantané qui ne se rattrape pas ; c'est acceptable tant que les autres
+  sources rattrapent les jours manqués. Tranche entre trois fréquences écrites (« chaque
+  semaine » dans le `README.md`, « une par jour » dans les specs, « hebdomadaire » dans le
+  registre des traitements) ; le code ne planifie rien. Remplace la collecte hebdomadaire du
+  `README.md` et du registre, et la purge « à chaque collecte hebdomadaire » des décisions
+  ouvertes. Le rattrapage suit ce que chaque source fait déjà, détaillé dans les
+  [specs de la collecte](../specs-collecte.md). Limite connue : au-delà de 2 000 papiers dans la
+  fenêtre, arXiv échoue à chaque collecte (#71). — PR de #65
 
 ## Décisions encore ouvertes
 
@@ -364,6 +366,8 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
 - **Durées de conservation et fréquence de la purge** : provisoirement 2 ans après la collecte
   (base et brut), seule la dernière copie Zotero gardée, purge à chaque collecte (une par jour).
   Sabine n'a pas tranché le 2026-10-02 ; à confirmer quand #20 code la purge.
+- **Collecte automatisée et sa fréquence** : aujourd'hui lancée à la main, une fois par jour.
+  Le lancement automatique et sa fréquence seront définis plus tard (Sabine, 2026-10-05).
 - **Liste d'exclusion** des personnes qui demandent l'effacement, pour qu'une collecte ou une
   reconstruction ne les réintroduise pas : proposée dans le registre, à concevoir dans #20.
 - **Transfert hors UE par les agents** : un agent qui lit les items par l'API envoie leur contenu
