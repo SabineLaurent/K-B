@@ -113,9 +113,12 @@ KB_DATA_DIR=~/K-B-data uv run kb import
 
 `kb import` lit tout `<KB_DATA_DIR>/raw/`, fusionne les items et les écrit dans la base ; rejoué
 sur le même brut, il donne la même base. Il affiche le nombre d'items importés, de doublons
-retirés et de rejets, détaillés dans `<KB_DATA_DIR>/import-log.jsonl`. Code de sortie : 0 si
-l'import a réussi, 1 s'il a échoué (rien n'est écrit dans la base), 2 si `KB_DATA_DIR` manque ou
-si la base n'existe pas (`kb create-db`).
+retirés et de rejets, détaillés dans `<KB_DATA_DIR>/import-log.jsonl`. Code de sortie :
+
+- 0 : l'import a réussi ;
+- 1 : l'import a échoué. Une erreur dans la base n'y écrit rien. Le journal est écrit après la
+  base : s'il ne peut pas l'être, la base garde l'import et le journal précédent reste entier ;
+- 2 : `KB_DATA_DIR` manque, ou la base n'existe pas (`kb create-db`).
 
 **Lancer les tests** :
 

@@ -1,10 +1,12 @@
 """Import the raw files into the items database (docs/specs-collecte.md, step 4).
 
-Read, merge, then write in one transaction: an error writes nothing. Run again on the same raw,
-the import gives the same base and the same log.
+Read, merge, then write the base in one transaction: an error in the base writes nothing there.
+The log is written after the base, whole or not at all. Run again on the same raw, the import
+gives the same base and the same log.
 """
 
 import json
+import os
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
@@ -62,6 +64,7 @@ def import_items(raw_dir: Path, database_path: Path, log_path: Path) -> ImportSu
         with connection:
             for item in merged.items:
                 write_item(connection, item)
+            delete_orphan_authors(connection)
     finally:
         connection.close()
     write_import_log(log_path, reading.rejections, merged.discards)
@@ -134,12 +137,23 @@ def write_authors(connection: sqlite3.Connection, item_id: int, authors: tuple[s
         )
 
 
+def delete_orphan_authors(connection: sqlite3.Connection) -> None:
+    """An author whose items have all changed authors is personal data without use: deleted."""
+    connection.execute(
+        "DELETE FROM author WHERE author_id NOT IN (SELECT author_id FROM item_author)"
+    )
+
+
 def format_date(moment: datetime | None) -> str | None:
     return None if moment is None else moment.astimezone(UTC).strftime(DATABASE_DATE_FORMAT)
 
 
 def write_import_log(log_path: Path, rejections: list[Rejection], discards: list[Discard]) -> None:
-    """One JSON line per rejection, then per duplicate removed; the file is rewritten each time."""
+    """One JSON line per rejection, then per duplicate removed; the file is rewritten each time.
+
+    Written to a temporary file, then renamed over the log: a failed write leaves the previous
+    log whole, and no temporary file behind.
+    """
     lines = [
         {
             "kind": "rejection",
@@ -159,4 +173,13 @@ def write_import_log(log_path: Path, rejections: list[Rejection], discards: list
         }
         for discard in discards
     ]
-    log_path.write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
+    temporary_path = log_path.with_name(log_path.name + ".tmp")
+    try:
+        temporary_path.write_text(
+            "".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines)
+        )
+        os.replace(temporary_path, log_path)
+    except BaseException:
+        # BaseException: Ctrl-C during the write must not leave the temporary file either.
+        temporary_path.unlink(missing_ok=True)
+        raise

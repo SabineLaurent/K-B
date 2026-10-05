@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import subprocess
 import sys
 
@@ -184,3 +185,18 @@ def test_import_refuses_a_missing_database_and_does_not_create_it(monkeypatch, t
     assert exit_code == 2
     assert "kb create-db" in capsys.readouterr().err
     assert not (tmp_path / "k-b.sqlite").exists()
+
+
+def test_import_reports_a_failed_import_and_exits_1(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+
+    def fail_to_import(raw_dir, database_path, log_path):
+        raise sqlite3.IntegrityError("UNIQUE constraint failed: item.url")
+
+    monkeypatch.setattr(cli, "import_items", fail_to_import)
+
+    exit_code = cli.main(["import"])
+
+    assert exit_code == 1
+    assert "error: IntegrityError: UNIQUE constraint failed: item.url" in capsys.readouterr().err

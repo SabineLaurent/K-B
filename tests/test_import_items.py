@@ -6,6 +6,7 @@ import pytest
 
 from test_raw_items import FIXTURES_DIR, copy_fixture, write_most_starred_ranking
 
+from k_b import import_items as import_items_module
 from k_b.database import connect_database, create_database
 from k_b.import_items import MissingDatabaseError, import_items
 
@@ -205,3 +206,58 @@ def test_a_missing_database_is_refused_and_not_created(tmp_path):
         import_items(tmp_path / "raw", tmp_path / "k-b.sqlite", tmp_path / "import-log.jsonl")
 
     assert not (tmp_path / "k-b.sqlite").exists()
+
+
+def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir):
+    run_import(data_dir)
+    query = "SELECT item_id FROM item WHERE source_item_id = ?"
+    item_id = fetch_rows(data_dir, query, (FIRST_PAPER_ID,))[0][0]
+    revision = (data_dir / "raw/automation/arxiv/2026-10-05T093000Z.xml").read_text()
+    revision = revision.replace(
+        "<updated>2026-09-25T13:53:50Z</updated>", "<updated>2026-10-02T08:00:00Z</updated>", 1
+    ).replace("Asadullah Abdullah Khan", "Another Author")
+    (data_dir / "raw/automation/arxiv/2026-10-06T093000Z.xml").write_text(revision)
+
+    run_import(data_dir)
+
+    assert fetch_rows(
+        data_dir,
+        "SELECT item_id, revised_at, raw_file_path FROM item JOIN collection USING (collection_id)"
+        " WHERE source_item_id = ?",
+        (FIRST_PAPER_ID,),
+    ) == [(item_id, "2026-10-02T08:00:00Z", "automation/arxiv/2026-10-06T093000Z.xml")]
+    assert fetch_rows(data_dir, AUTHORS_QUERY, (FIRST_PAPER_ID,)) == [
+        ("Toqeer Ali Syed", 1),
+        ("Another Author", 2),
+    ]
+
+
+def test_an_author_left_without_item_is_deleted(data_dir):
+    run_import(data_dir)
+    path = data_dir / "raw/automation/arxiv/2026-10-05T093000Z.xml"
+    path.write_text(path.read_text().replace("Asadullah Abdullah Khan", "Another Author"))
+
+    run_import(data_dir)
+
+    assert (
+        fetch_rows(data_dir, "SELECT name FROM author WHERE name = ?", ("Asadullah Abdullah Khan",))
+        == []
+    )
+
+
+def test_a_log_that_cannot_be_written_keeps_the_previous_log_whole(data_dir, monkeypatch):
+    previous_log = '{"kind": "previous"}\n'
+    (data_dir / "import-log.jsonl").write_text(previous_log)
+
+    def fail_to_replace(source, destination):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(import_items_module.os, "replace", fail_to_replace)
+
+    with pytest.raises(OSError, match="disk full"):
+        run_import(data_dir)
+
+    # The base is written first, then the log: the base keeps its import.
+    assert count_rows(data_dir, "SELECT count(*) FROM item") == 3 + 4 + 3 + 3 + 100
+    assert (data_dir / "import-log.jsonl").read_text() == previous_log
+    assert not (data_dir / "import-log.jsonl.tmp").exists()

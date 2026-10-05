@@ -241,7 +241,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    de la v0.
 4. **Stockage** du jeu d'items dans la base : SGBD, modèles et ce que chaque source met dans
    l'item, dans [stockage.md](stockage.md). `kb import` (`src/k_b/import_items.py`) lit le brut,
-   le fusionne et écrit le jeu dans la base en une seule transaction : une erreur n'écrit rien.
+   le fusionne et écrit le jeu dans la base en une seule transaction : une erreur dans la base
+   n'y écrit rien. Le journal est écrit ensuite, entier ou pas du tout (fichier temporaire
+   renommé) : s'il échoue, la base garde l'import et le journal précédent reste.
    - Rejouable : un item déjà en base (même `source_code`, `source_item_id`) est réécrit sous le
      même `item_id`, que l'API exposera ; le même brut donne la même base.
    - Journal : `<KB_DATA_DIR>/import-log.jsonl`, réécrit à chaque import, une ligne JSON par rejet
@@ -249,6 +251,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      `source_item_id`, `url`, `raw_file_path`, `kept_url`).
    - Un nom répété dans les auteurs d'un item n'est lié qu'une fois, à sa première position : la
      base lie un auteur à un item une seule fois.
+   - Un auteur qui n'a plus d'item (une révision arXiv a changé ses auteurs) est supprimé dans
+     la même transaction : un nom sans usage n'est pas gardé.
 
 ## Pourquoi BigQuery
 
