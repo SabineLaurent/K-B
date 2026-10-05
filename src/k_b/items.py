@@ -6,7 +6,7 @@ Which source field goes into which item field: docs/stockage.md.
 from datetime import UTC, datetime, time
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, StringConstraints
+from pydantic import AwareDatetime, BaseModel, ConfigDict, StringConstraints, model_validator
 
 from k_b.arxiv_papers import Paper
 from k_b.cisa_kev import Vulnerability
@@ -47,7 +47,15 @@ class Item(BaseModel):
     raw_file_path: NonEmptyText
     # Fields of the item's subtype in the base (docs/stockage.md): vulnerability, repository.
     cve: CveId | None = None
+    # A GitHub advisory without CVE is still a vulnerability: the CVE alone cannot tell.
+    is_vulnerability: bool = False
     repository_name: RepositoryName | None = None
+
+    @model_validator(mode="after")
+    def check_a_cve_is_a_vulnerability(self) -> "Item":
+        if self.cve is not None and not self.is_vulnerability:
+            raise ValueError("an item with a CVE must be a vulnerability")
+        return self
 
 
 def convert_paper(paper: Paper, collected_at: datetime, raw_file_path: str) -> Item:
@@ -79,6 +87,7 @@ def convert_vulnerability(
         collected_at=collected_at,
         raw_file_path=raw_file_path,
         cve=vulnerability.cve_id,
+        is_vulnerability=True,
     )
 
 
@@ -105,6 +114,7 @@ def convert_advisory(advisory: Advisory, collected_at: datetime, raw_file_path: 
         collected_at=collected_at,
         raw_file_path=raw_file_path,
         cve=advisory.cve_id,
+        is_vulnerability=True,
     )
 
 

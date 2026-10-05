@@ -105,6 +105,21 @@ sortie : 0 si tout a réussi, 1 si au moins une source a échoué ou si l'état 
 pu être écrit, 2 si `KB_DATA_DIR` manque, n'est pas un dossier existant, ou si l'état de collecte
 est illisible.
 
+**Importer le brut dans la base** (après une collecte) :
+
+```sh
+KB_DATA_DIR=~/K-B-data uv run kb import
+```
+
+`kb import` lit tout `<KB_DATA_DIR>/raw/`, fusionne les items et les écrit dans la base ; rejoué
+sur le même brut, il donne la même base. Il affiche le nombre d'items importés, de doublons
+retirés et de rejets, détaillés dans `<KB_DATA_DIR>/import-log.jsonl`. Code de sortie :
+
+- 0 : l'import a réussi ;
+- 1 : l'import a échoué. Une erreur dans la base n'y écrit rien. Le journal est écrit après la
+  base : s'il ne peut pas l'être, la base garde l'import et le journal précédent reste entier ;
+- 2 : `KB_DATA_DIR` manque, ou la base n'existe pas (`kb create-db`).
+
 **Lancer les tests** :
 
 ```sh

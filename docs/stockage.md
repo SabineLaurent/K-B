@@ -207,10 +207,13 @@ Contraintes que SQL ne porte pas, vérifiées par le code de fusion (#20) :
 
 - un item a au plus un sous-type ;
 - DÉPÔT ne concerne que GitHub et GH Archive, VULNÉRABILITÉ que CISA KEV et les alertes GitHub ;
-- un auteur a au moins un item : la purge supprime les auteurs orphelins (#8).
+- un auteur a au moins un item : l'import (#82) et la purge (#8) suppriment les auteurs
+  orphelins.
 
 Un dépôt vu seulement par la recherche GitHub n'a pas de mesure : elle ne donne qu'un total
-d'étoiles. `cve` est vide pour une alerte GitHub sans CVE.
+d'étoiles. `cve` est vide pour une alerte GitHub sans CVE : elle a quand même sa ligne
+VULNÉRABILITÉ. Le CVE seul ne dit donc pas la nature de l'item : `Item.is_vulnerability` la porte,
+vrai pour CISA KEV et les alertes GitHub (décision de Sabine du 2026-10-05, #82).
 
 ## MPD
 

@@ -388,6 +388,31 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   aussi : garder les deux items, mais la CVE sur le premier seulement (le lien serait perdu).
   Conséquence : `cve` cesse d'être unique dans le schéma (#81). — PR de #80
 
+### Import dans la base
+
+- **La nature « vulnérabilité » est portée par l'item (`Item.is_vulnerability`), pas déduite de
+  la présence d'un CVE.** Décision de Sabine (option A). Raison présentée à Sabine, qui a retenu
+  A sans en donner d'autre : le modèle dit `cve` « facultatif » (`stockage.md`), donc une alerte
+  GitHub sans CVE est une vulnérabilité ; sans ce champ, l'import ne la distinguait pas d'une
+  release. Option écartée (B) : une ligne VULNÉRABILITÉ seulement s'il y a un CVE ; rien à
+  changer dans `Item`, mais elle contredit le modèle et les alertes sans CVE ne seraient plus
+  trouvables comme vulnérabilités. Un validateur refuse un CVE sur un item qui n'est pas une
+  vulnérabilité. Limite connue : l'exclusivité des sous-types (un item n'est pas à la fois dépôt
+  et vulnérabilité), annoncée le 2026-10-02 comme vérifiée par le code de fusion, ne l'est
+  toujours pas. — PR de #82
+- **L'import réécrit un item existant sous le même `item_id` (upsert sur `source_code`,
+  `source_item_id`).** Conception validée par Sabine. Pourquoi : l'API (#21) exposera `item_id`,
+  qui doit rester stable d'un import à l'autre ; une révision arXiv réécrit le papier sans
+  changer son identifiant. Option écartée : vider la base et tout réinsérer à chaque import,
+  plus simple, mais qui renumérote les items. Limite assumée : les clés internes
+  (`collection_id`, `author_id`) dépendent de l'ordre des imports ; le contenu de la base, lui,
+  ne dépend que du brut. — PR de #82
+- **Un auteur qui n'a plus d'item est supprimé à chaque import, dans la même transaction.**
+  Décision de Sabine, sur un constat de revue. Pourquoi : une révision arXiv qui change ses
+  auteurs laissait un nom de personne sans usage (RGPD, minimisation), et `stockage.md` exige
+  qu'un auteur ait au moins un item. Option écartée : laisser ce nettoyage à la purge (#8),
+  pas encore codée, le nom restant en base d'ici là. — PR de #82
+
 ## Décisions encore ouvertes
 
 - **Zotero : garder la copie entière comme brut ?** Décidé à titre provisoire le 2026-10-01 ; à

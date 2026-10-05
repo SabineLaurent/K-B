@@ -109,8 +109,9 @@ def test_the_same_cve_from_another_source_is_kept_as_a_second_item():
         source_item_id="CVE-2026-48775",
         url="https://nvd.nist.gov/vuln/detail/CVE-2026-48775",
         cve="CVE-2026-48775",
+        is_vulnerability=True,
     )
-    from_github = make_item(cve="CVE-2026-48775")
+    from_github = make_item(cve="CVE-2026-48775", is_vulnerability=True)
 
     merged = merge_items([from_cisa, from_github])
 
@@ -119,11 +120,12 @@ def test_the_same_cve_from_another_source_is_kept_as_a_second_item():
 
 
 def test_the_same_cve_within_one_source_is_discarded_and_the_first_seen_kept():
-    first = make_item(cve="CVE-2026-48775")
+    first = make_item(cve="CVE-2026-48775", is_vulnerability=True)
     same_cve = make_item(
         source_item_id="GHSA-gr75-jv2w-4656",
         url="https://github.com/advisories/GHSA-gr75-jv2w-4656",
         cve="CVE-2026-48775",
+        is_vulnerability=True,
     )
 
     merged = merge_items([first, same_cve])
