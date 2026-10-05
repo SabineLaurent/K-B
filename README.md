@@ -55,6 +55,46 @@ La v0 couvre la porte « veille » :
 - Le serveur MCP et le tableau de bord.
 - Tout entraînement de modèle.
 
+## Installer et lancer
+
+**Prérequis** : Python 3.13 ou plus récent (`requires-python` du `pyproject.toml`) et
+[uv](https://docs.astral.sh/uv/).
+
+**Installer** :
+
+```sh
+git clone https://github.com/SabineLaurent/K-B.git
+cd K-B
+uv sync
+```
+
+**Variables d'environnement** :
+
+| Variable | Obligatoire | Rôle |
+|---|---|---|
+| `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit dans `<KB_DATA_DIR>/raw/`. |
+| `KB_GITHUB_TOKEN` | non | jeton GitHub en lecture seule ([docs/jeton-github.md](docs/jeton-github.md)). Sans lui, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000. |
+
+**Lancer une collecte** (une par jour, voir [docs/specs-collecte.md](docs/specs-collecte.md)) :
+
+```sh
+mkdir -p ~/K-B-data
+KB_DATA_DIR=~/K-B-data uv run kb collect
+```
+
+Avec le jeton rangé dans le `.env` à la racine du dépôt, ignoré par git :
+`KB_DATA_DIR=~/K-B-data uv run --env-file .env kb collect`.
+
+`kb collect` affiche une ligne par source (`ok` ou `failed`, avec le type de l'erreur). Code de
+sortie : 0 si toutes les sources ont réussi, 1 si au moins une a échoué, 2 si `KB_DATA_DIR`
+manque, n'est pas un dossier existant, ou si l'état de collecte est illisible.
+
+**Lancer les tests** :
+
+```sh
+uv run pytest
+```
+
 ## Licence
 
 © 2026 Sabine Laurent — sous licence [Creative Commons Attribution - Pas d'Utilisation Commerciale 4.0 International (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/deed.fr).
