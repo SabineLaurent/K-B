@@ -55,6 +55,7 @@ def test_an_item_keeps_an_absence_as_an_absence():
     assert item.saved_at is None
     assert item.summary is None
     assert item.cve is None
+    assert item.is_vulnerability is False
     assert item.repository_name is None
 
 
@@ -70,6 +71,7 @@ def test_an_item_keeps_an_absence_as_an_absence():
         {"published_at": "2026-10-01T18:00:22Z"},
         {"collected_at": datetime(2026, 10, 5, 9, 30)},
         {"cve": "CVE-26-1"},
+        {"cve": "CVE-2026-48775", "is_vulnerability": False},
         {"repository_name": "no-slash"},
         {"stars": 3},
     ],
@@ -131,6 +133,7 @@ def test_a_vulnerability_points_to_its_nvd_page_and_is_dated_at_midnight_utc():
     assert item.published_at == datetime(2026, 9, 29, tzinfo=UTC)
     assert item.summary == "An out-of-bounds write."
     assert item.cve == "CVE-2026-86950"
+    assert item.is_vulnerability is True
 
 
 def test_a_release_is_identified_by_its_release_id():
@@ -194,9 +197,10 @@ def test_an_advisory_keeps_its_cve():
     assert item.url == "https://github.com/advisories/GHSA-fjqc-hq36-qh5p"
     assert item.published_at == PUBLISHED_AT
     assert item.cve == "CVE-2026-48775"
+    assert item.is_vulnerability is True
 
 
-def test_an_advisory_without_cve_has_none():
+def test_an_advisory_without_cve_is_still_a_vulnerability():
     advisory = Advisory(
         ghsa_id="GHSA-fjqc-hq36-qh5p",
         cve_id=None,
@@ -208,7 +212,10 @@ def test_an_advisory_without_cve_has_none():
         packages=("langchain",),
     )
 
-    assert convert_advisory(advisory, COLLECTED_AT, RAW_FILE_PATH).cve is None
+    item = convert_advisory(advisory, COLLECTED_AT, RAW_FILE_PATH)
+
+    assert item.cve is None
+    assert item.is_vulnerability is True
 
 
 def test_a_starred_repository_is_a_repository_without_publication_date():
