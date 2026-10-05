@@ -218,7 +218,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    - Dates ramenées en UTC.
    - URL normalisées : les paramètres `utm_*` sont retirés, les autres restent tels quels et
      dans leur ordre.
-   - Doublons retirés, une règle nommée par cas, testées dans cet ordre :
+   - Doublons retirés, une règle nommée par cas, cherchés dans cet ordre : identifiant, URL,
+     CVE. `arxiv_revision` est un sous-cas de la correspondance par identifiant :
 
      | Règle | Doublon quand | Gardé |
      |---|---|---|
