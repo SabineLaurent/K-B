@@ -81,7 +81,11 @@ CREATE TABLE star_gain (
 
 CREATE INDEX star_gain_window_end ON star_gain (window_end);
 
+-- A CVE is not unique: a CISA entry and a GitHub advisory of the same CVE are two items,
+-- linked by their CVE (docs/stockage.md).
 CREATE TABLE vulnerability (
     item_id INTEGER PRIMARY KEY REFERENCES item (item_id) ON DELETE CASCADE,
-    cve     TEXT UNIQUE CHECK (cve GLOB 'CVE-[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]*')
+    cve     TEXT CHECK (cve GLOB 'CVE-[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]*')
 ) STRICT;
+
+CREATE INDEX vulnerability_cve ON vulnerability (cve);
