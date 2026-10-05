@@ -340,6 +340,19 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   `User-Agent` décidé le 2026-10-02 (le profil public de Sabine) reste valable : il ne dépend pas
   de la visibilité, et le profil ne change pas si le dépôt est renommé.
 
+## 2026-10-05
+
+### Collecte
+
+- **Une collecte par jour ; une collecte manquée est rattrapée à la suivante.** Décision de
+  Sabine. Tranche entre trois fréquences écrites (« chaque semaine » dans le `README.md`,
+  « une par jour » dans les specs, « hebdomadaire » dans le registre des traitements) ; le code
+  ne planifie rien. Remplace la collecte hebdomadaire du `README.md` et du registre, et la purge
+  « à chaque collecte hebdomadaire » des décisions ouvertes. Le rattrapage suit ce que chaque
+  source fait déjà, détaillé dans les [specs de la collecte](../specs-collecte.md) ; les dépôts
+  les plus étoilés, un instantané, ne se rattrapent pas. Limite connue : au-delà de 2 000 papiers dans la fenêtre, arXiv échoue à
+  chaque collecte (#71). — PR de #65
+
 ## Décisions encore ouvertes
 
 - **Zotero : garder la copie entière comme brut ?** Décidé à titre provisoire le 2026-10-01 ; à
@@ -349,7 +362,7 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
 - **Règle de « quoi de neuf cette semaine »** (date de publication, d'ajout ou de collecte) : à
   décider dans #21.
 - **Durées de conservation et fréquence de la purge** : provisoirement 2 ans après la collecte
-  (base et brut), seule la dernière copie Zotero gardée, purge à chaque collecte hebdomadaire.
+  (base et brut), seule la dernière copie Zotero gardée, purge à chaque collecte (une par jour).
   Sabine n'a pas tranché le 2026-10-02 ; à confirmer quand #20 code la purge.
 - **Liste d'exclusion** des personnes qui demandent l'effacement, pour qu'une collecte ou une
   reconstruction ne les réintroduise pas : proposée dans le registre, à concevoir dans #20.

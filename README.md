@@ -6,8 +6,9 @@
 
 K-B a deux portes d'entrée :
 
-- **La veille** : un pipeline collecte chaque semaine l'actualité tech venue de plusieurs sources,
-  la range en items datés dans une base, puis répond à « quoi de neuf cette semaine ? ».
+- **La veille** : un pipeline collecte chaque jour l'actualité tech venue de plusieurs sources (une
+  collecte manquée est rattrapée à la suivante), la range en items datés dans une base, puis
+  répond à « quoi de neuf cette semaine ? ».
 - **La base de connaissance** : je dépose à la main les documents qui comptent. Une IA les
   compile en un wiki Markdown durable, à la façon du LLM wiki d'Andrej Karpathy : les sources
   restent immuables, et le wiki relie les pages, signale les contradictions et date ce qu'il

@@ -65,11 +65,11 @@ jamais les noms).
 
 | # | Traitement | Étape | Automatisée | Fréquence |
 |---|---|---|---|---|
-| 1 | Veille (fiche 1) | Les logins GitHub (auteurs, personnes créditées) ne sont pas lus dans les items ; GH Archive ne sélectionne pas `actor`. | oui, à la lecture et à la requête | à chaque collecte (hebdomadaire) |
-| 2 | Veille (fiche 1) | Supprimer les items collectés il y a plus de 2 ans ; la cascade retire leurs liens d'auteurs, surlignages et sous-types. | oui, dernière étape de la collecte | hebdomadaire |
-| 3 | Veille (fiche 1) | Supprimer les auteurs qui n'ont plus aucun item. | oui, après l'étape 2 | hebdomadaire |
-| 4 | Veille (fiche 1) | Supprimer les fichiers bruts de plus de 2 ans dans `raw/automation/`. | oui, après l'étape 3 | hebdomadaire |
-| 5 | Bibliothèque (fiche 2) | Supprimer les copies Zotero du brut sauf la plus récente. | oui, après chaque copie Zotero | hebdomadaire |
+| 1 | Veille (fiche 1) | Les logins GitHub (auteurs, personnes créditées) ne sont pas lus dans les items ; GH Archive ne sélectionne pas `actor`. | oui, à la lecture et à la requête | à chaque collecte (une par jour) |
+| 2 | Veille (fiche 1) | Supprimer les items collectés il y a plus de 2 ans ; la cascade retire leurs liens d'auteurs, surlignages et sous-types. | oui, dernière étape de la collecte | à chaque collecte (une par jour) |
+| 3 | Veille (fiche 1) | Supprimer les auteurs qui n'ont plus aucun item. | oui, après l'étape 2 | à chaque collecte (une par jour) |
+| 4 | Veille (fiche 1) | Supprimer les fichiers bruts de plus de 2 ans dans `raw/automation/`. | oui, après l'étape 3 | à chaque collecte (une par jour) |
+| 5 | Bibliothèque (fiche 2) | Supprimer les copies Zotero du brut sauf la plus récente. | oui, après chaque copie Zotero | à chaque copie Zotero |
 | 6 | Les deux | Demande d'une personne. Accès : lui dire ce qui est gardé à son nom. Effacement ou opposition : supprimer son nom de la base, supprimer les fichiers bruts qui le contiennent, et noter le nom dans une liste d'exclusion lue par la fusion, pour qu'une collecte ou une reconstruction ne le réintroduise pas. | non | à la demande, sous un mois (art. 12.3) |
 | 7 | Les deux | Relire ce registre : sources ajoutées, champs ajoutés à la base, durées. | non | une fois par an, et à chaque nouvelle source |
 

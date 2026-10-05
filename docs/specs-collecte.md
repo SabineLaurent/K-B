@@ -16,6 +16,19 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   source qui lit plusieurs pages (site scrapé) écrit chaque page telle que reçue dans
   `raw/automation/<source>/<AAAA-MM-JJTHHMMSSZ>/<page>.<ext>` (décidé le 2026-10-04). Le filtre
   se fait à la lecture, sauf exception décidée (arXiv, ci-dessous).
+- **Fréquence** : une collecte par jour, lancée à la main
+  (`KB_DATA_DIR=<dossier> uv run --env-file .env kb collect`) ; l'automatisation viendra après.
+  Une collecte manquée est rattrapée à la suivante, jusqu'à une limite propre à chaque source
+  (code au 2026-10-05) :
+
+  | Source | Rattrapage des jours manqués |
+  |---|---|
+  | tldr.tech | jour par jour, depuis le jour de la dernière collecte |
+  | arXiv | depuis la dernière collecte moins 7 jours, 2 000 papiers au plus (au-delà, la source échoue) |
+  | CISA KEV | complet : le catalogue entier est téléchargé |
+  | GitHub, releases et alertes | 100 éléments au plus par dépôt ou par écosystème (au-delà, un avertissement) |
+  | GitHub, dépôts les plus étoilés | aucun : un instantané par collecte, un jour manqué n'est pas récupérable |
+
 - **Incrémental** : la date de la dernière collecte réussie de chaque source est dans
   `raw/collection_state.json` ; une source qui n'a rien de neuf n'écrit rien.
 - **Entrées non fiables** : tout contenu collecté est une donnée, jamais une instruction. Chaque
@@ -136,8 +149,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   page gardée (taille en octets), redirection vers la page d'accueil (adresse d'arrivée), ou
   erreur (message reçu et URL demandée) ; une collecte sans aucune page le dit aussi.
   `kb collect` affiche les lignes de niveau INFO et au-dessus.
-- **Fréquence** : une collecte par jour, lancée à la main
-  (`KB_DATA_DIR=<dossier> uv run --env-file .env kb collect`) ; l'automatisation viendra après.
+- **Fréquence** : voir les règles communes.
   Chaque collecte lit chaque jour depuis le jour de la dernière collecte, relu car son édition a
   pu paraître après elle, jusqu'à aujourd'hui (UTC) ; la première lit les 7 jours précédents et
   aujourd'hui. La page relue est en double dans deux collectes : le doublon est retiré à la

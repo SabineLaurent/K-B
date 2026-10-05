@@ -27,7 +27,7 @@ le module `sqlite3` de la bibliothèque standard.
 | Typage | souple par défaut ; strict avec les tables `STRICT` | strict |
 | Dépendance | aucune | un pilote (`psycopg`) |
 
-Pourquoi : un utilisateur, un écrivain par semaine, quelques milliers d'items par an. Le besoin
+Pourquoi : un utilisateur, un écrivain par jour, quelques milliers d'items par an. Le besoin
 est local et léger : un serveur n'apporterait que de la charge. Limite assumée : pas de rôles
 dans la base. Une migration vers PostgreSQL reste possible si le besoin change (plusieurs
 écrivains, accès distant) : le schéma est du SQL standard, à part `STRICT` et les `PRAGMA`.
