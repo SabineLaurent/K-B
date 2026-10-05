@@ -355,6 +355,27 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   [specs de la collecte](../specs-collecte.md). Limite connue : au-delà de 2 000 papiers dans la
   fenêtre, arXiv échoue à chaque collecte (#71). — PR de #65
 
+### Lecture et fusion
+
+- **L'item commun est un modèle Pydantic (`Item`, `src/k_b/items.py`), fermé et strict.**
+  Décision de Sabine. Pourquoi, selon elle : FastAPI apportera Pydantic de toute façon avec
+  l'API (#21). Option écartée : une `dataclass` validée à la main, comme les lecteurs actuels.
+  Elle demande plus de code de validation, et il faudrait un second format pour l'API. Pydantic
+  devient la première dépendance d'exécution de K-B. — PR de #79
+- **Les lecteurs des sources restent en `dataclass` ; leur migration vers Pydantic est une issue
+  à part (#85), après #20.** Décision de Sabine. Pourquoi : tenir l'échéance du 07/10. La
+  migration dans #79 ajoutait environ 2,5 h, pour 13 h disponibles sur #20. Les lecteurs étaient
+  en `dataclass` parce que les dépendances étaient interdites
+  ([note du 30/09](../journaling/2026-09-30-commande-kb-collect.md), « la mission interdit de
+  toucher aux dépendances » ; [note du 02/10](../journaling/2026-10-02-collecte-releases-github.md),
+  Pydantic « n'est pas encore une dépendance du projet »). Cette raison ne tient plus depuis
+  l'ajout de Pydantic. Limite assumée : deux façons de valider une entrée externe coexistent
+  jusqu'à #85. — PR de #79
+- **`url` est un texte contraint à `https://`, pas le type `HttpUrl` de Pydantic.** Pourquoi :
+  `HttpUrl` réécrit l'URL (il ajoute par exemple un `/` final), alors que la fusion (#80) retire
+  les doublons en comparant les URL comme du texte. Option écartée : `HttpUrl`, qui valide
+  davantage (hôte, encodage), mais qui stockerait une autre URL que celle reçue. — PR de #79
+
 ## Décisions encore ouvertes
 
 - **Zotero : garder la copie entière comme brut ?** Décidé à titre provisoire le 2026-10-01 ; à
