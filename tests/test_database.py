@@ -2,6 +2,7 @@ import sqlite3
 
 import pytest
 
+import k_b.database
 from k_b.database import connect_database, create_database
 
 
@@ -39,3 +40,17 @@ def test_a_connection_checks_the_foreign_keys(tmp_path):
             " VALUES ('rss', 'x', 'A title', 'https://example.com/', 1)"
         )
     connection.close()
+
+
+def test_a_failed_creation_leaves_no_database_behind(monkeypatch, tmp_path):
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir()
+    (scripts_dir / "schema.sql").write_text("CREATE TABLE source (source_code TEXT);\nNOT SQL;")
+    (scripts_dir / "seed_sources.sql").write_text("")
+    monkeypatch.setattr(k_b.database, "DATABASE_SCRIPTS", scripts_dir)
+    database_path = tmp_path / "k-b.sqlite"
+
+    with pytest.raises(sqlite3.OperationalError):
+        create_database(database_path)
+
+    assert list(tmp_path.glob("k-b.sqlite*")) == []

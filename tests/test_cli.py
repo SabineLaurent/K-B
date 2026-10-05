@@ -145,3 +145,21 @@ def test_create_db_refuses_to_run_without_a_data_directory(monkeypatch, capsys):
 
     assert cli.main(["create-db"]) == 2
     assert "KB_DATA_DIR" in capsys.readouterr().err
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root writes a file whatever its permissions")
+def test_create_db_reports_a_database_that_cannot_be_written_and_exits_1(
+    monkeypatch, tmp_path, capsys
+):
+    read_only_dir = tmp_path / "read-only"
+    read_only_dir.mkdir()
+    read_only_dir.chmod(0o500)
+    monkeypatch.setenv("KB_DATA_DIR", str(read_only_dir))
+
+    try:
+        exit_code = cli.main(["create-db"])
+    finally:
+        read_only_dir.chmod(0o700)
+
+    assert exit_code == 1
+    assert "error:" in capsys.readouterr().err

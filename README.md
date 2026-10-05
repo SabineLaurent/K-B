@@ -83,8 +83,13 @@ KB_DATA_DIR=~/K-B-data uv run kb create-db
 ```
 
 `kb create-db` crée `<KB_DATA_DIR>/k-b.sqlite` : les tables, les 7 sources, le mode WAL. Code de
-sortie : 0 si la base est créée, 2 si `KB_DATA_DIR` manque ou n'est pas un dossier existant, ou si
-la base existe déjà. Elle n'est alors pas touchée : pour repartir de zéro, supprimer le fichier.
+sortie :
+
+- 0 : la base est créée ;
+- 1 : la création a échoué (dossier en lecture seule, disque plein…). Le message dit l'erreur, et
+  aucun fichier de base ne reste ;
+- 2 : `KB_DATA_DIR` manque ou n'est pas un dossier existant, ou la base existe déjà. Une base
+  existante n'est pas touchée : pour repartir de zéro, supprimer le fichier.
 
 **Lancer une collecte** (une par jour, voir [docs/specs-collecte.md](docs/specs-collecte.md)) :
 

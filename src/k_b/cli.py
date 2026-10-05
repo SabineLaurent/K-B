@@ -3,6 +3,7 @@
 import argparse
 import logging
 import os
+import sqlite3
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -54,6 +55,9 @@ def run_create_db(data_dir: Path) -> int:
     except FileExistsError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
+    except (sqlite3.Error, OSError) as error:
+        print(f"error: {database_path}: {type(error).__name__}: {error}", file=sys.stderr)
+        return 1
     print(f"database created: {database_path}")
     return 0
 
