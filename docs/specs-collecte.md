@@ -10,7 +10,14 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 ## Règles communes
 
 - **Un point de lancement** : `kb collect` lance toutes les sources ; une source en panne
-  n'arrête pas les autres (code de sortie 1, détail par source).
+  n'arrête pas les autres. Il affiche une ligne par source (`ok` ou `failed (<type d'erreur>)`).
+  Code de sortie : **0** si tout a réussi ; **1** si une source a échoué, ou si
+  `collection_state.json` n'a pas pu être écrit (disque plein, droits) ; **2** si la collecte n'a
+  pas eu lieu (`KB_DATA_DIR` absent ou pas un dossier, état de collecte illisible). Quand l'état
+  ne s'écrit pas, le brut est déjà écrit : `kb collect` journalise l'erreur avec le chemin du
+  fichier et ajoute la ligne `collection_state: failed (<type d'erreur>)`. Les dates de
+  dernière collecte n'avancent pas : la collecte suivante relit les mêmes fenêtres, et le brut en
+  double est retiré à la transformation.
 - **Brut intact** : chaque collecte écrit ce que la source a renvoyé dans
   `raw/automation/<source>/<AAAA-MM-JJTHHMMSSZ>.<ext>`, une seule fois, jamais réécrit. Une
   source qui lit plusieurs pages (site scrapé) écrit chaque page telle que reçue dans

@@ -34,6 +34,25 @@ def test_collect_reports_a_failure_but_still_stores_the_other_sources(monkeypatc
     assert list((tmp_path / "raw" / "automation" / "working").iterdir())
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root writes a file whatever its permissions")
+def test_collect_still_prints_the_summary_and_exits_1_when_the_state_cannot_be_written(
+    monkeypatch, tmp_path, capsys
+):
+    raw_dir = tmp_path / "raw"
+    (raw_dir / "automation").mkdir(parents=True)
+    raw_dir.chmod(0o500)
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(cli, "SOURCES", [WorkingSource()])
+
+    try:
+        exit_code = cli.main(["collect"])
+    finally:
+        raw_dir.chmod(0o700)
+
+    assert exit_code == 1
+    assert capsys.readouterr().out == "working: ok\ncollection_state: failed (PermissionError)\n"
+
+
 def test_collect_fails_closed_with_a_clear_message_on_a_corrupted_state(
     monkeypatch, tmp_path, capsys
 ):

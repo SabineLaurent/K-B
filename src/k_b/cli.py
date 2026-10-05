@@ -34,12 +34,19 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        errors_by_source = collect_all_sources(SOURCES, Path(data_dir) / "raw", datetime.now(UTC))
+        outcome = collect_all_sources(SOURCES, Path(data_dir) / "raw", datetime.now(UTC))
     except InvalidCollectionStateError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
-    for source_name, error in errors_by_source.items():
-        outcome = "ok" if error is None else f"failed ({type(error).__name__})"
-        print(f"{source_name}: {outcome}")
-    has_failure = any(error is not None for error in errors_by_source.values())
+    for source_name, error in outcome.errors_by_source.items():
+        print(f"{source_name}: {describe_outcome(error)}")
+    if outcome.state_error is not None:
+        print(f"collection_state: {describe_outcome(outcome.state_error)}")
+    has_failure = outcome.state_error is not None or any(
+        error is not None for error in outcome.errors_by_source.values()
+    )
     return 1 if has_failure else 0
+
+
+def describe_outcome(error: Exception | None) -> str:
+    return "ok" if error is None else f"failed ({type(error).__name__})"
