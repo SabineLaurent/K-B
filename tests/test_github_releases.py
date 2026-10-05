@@ -24,6 +24,7 @@ def test_a_recorded_response_gives_one_release_per_entry_newest_first():
     assert [release.tag_name for release in releases] == ["v2.1.287", "v2.1.286", "v2.1.285"]
     newest = releases[0]
     assert newest.repository == REPOSITORY
+    assert newest.release_id == 401174143
     assert newest.name == "v2.1.287"
     assert newest.url == "https://github.com/anthropics/claude-code/releases/tag/v2.1.287"
     assert newest.published_at == datetime(2026, 10, 1, 18, 0, 22, tzinfo=UTC)
@@ -50,6 +51,9 @@ def test_a_response_that_is_not_a_list_is_refused():
 @pytest.mark.parametrize(
     "changes",
     [
+        {"id": None},
+        {"id": "401174143"},
+        {"id": True},
         {"tag_name": None},
         {"published_at": None},
         {"published_at": "yesterday"},

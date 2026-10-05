@@ -14,6 +14,7 @@ class Release:
     """A release, without its author's login: not needed for the watch (GDPR minimisation)."""
 
     repository: str
+    release_id: int
     tag_name: str
     name: str | None
     url: str
@@ -33,6 +34,10 @@ def read_releases(raw_response: bytes, repository: str) -> list[Release]:
 def parse_release(entry: object, repository: str, position: int) -> Release:
     if not isinstance(entry, dict):
         raise ValueError(f"release {position}: not an object")
+    release_id = entry.get("id")
+    # bool is a subclass of int: refused explicitly.
+    if not isinstance(release_id, int) or isinstance(release_id, bool):
+        raise ValueError(f"release {position}: id is not an integer")
     tag_name = entry.get("tag_name")
     if not isinstance(tag_name, str):
         raise ValueError(f"release {position}: tag_name is not a string")
@@ -48,6 +53,7 @@ def parse_release(entry: object, repository: str, position: int) -> Release:
         raise ValueError(f"release {position}: name or body is not a string")
     return Release(
         repository=repository,
+        release_id=release_id,
         tag_name=tag_name,
         name=name,
         url=url,
