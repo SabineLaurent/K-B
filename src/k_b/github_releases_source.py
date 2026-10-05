@@ -28,11 +28,11 @@ class GithubReleasesSource:
         raw_response = get_from_github_api(
             f"repos/{self.repository}/releases?per_page={RELEASES_PER_PAGE}"
         )
+        # Read even at the first collection: a page that is not a list of releases raises.
+        releases = read_releases(raw_response, self.repository)
         if last_collected_at is None:
             return raw_response
-        publication_dates = [
-            release.published_at for release in read_releases(raw_response, self.repository)
-        ]
+        publication_dates = [release.published_at for release in releases]
         if not any(published_at > last_collected_at for published_at in publication_dates):
             return None
         is_page_full = len(publication_dates) >= RELEASES_PER_PAGE

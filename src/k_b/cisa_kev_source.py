@@ -4,6 +4,7 @@ from datetime import datetime
 from email.utils import format_datetime
 from urllib.error import HTTPError
 
+from k_b.cisa_kev import read_new_vulnerabilities
 from k_b.http_download import download
 
 CATALOG_URL = "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv"
@@ -19,14 +20,20 @@ class CisaKevSource:
     extension = "csv"
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
-        """Return the whole catalog, or None if it has not changed since last_collected_at."""
+        """Return the whole catalog, or None if it has not changed since last_collected_at.
+
+        The catalog is read before it is returned: a page that is not a catalog (maintenance,
+        captcha) raises ValueError instead of being stored as one.
+        """
         headers = {}
         if last_collected_at is not None:
             headers["If-Modified-Since"] = format_datetime(last_collected_at, usegmt=True)
         try:
-            return download(CATALOG_URL, TRUSTED_URL_PREFIX, MAX_CATALOG_BYTES, headers)
+            raw_catalog = download(CATALOG_URL, TRUSTED_URL_PREFIX, MAX_CATALOG_BYTES, headers)
         except HTTPError as error:
             if error.code == HTTP_NOT_MODIFIED:
                 error.close()
                 return None
             raise
+        read_new_vulnerabilities(raw_catalog, last_collected_at=None)
+        return raw_catalog

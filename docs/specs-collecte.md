@@ -62,8 +62,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   brut mais n'entre pas dans les items (minimisation, RGPD art. 5.1.c).
 - **Suivi** : 4 dépôts, liste et réserve dans [sources.md](sources.md).
 - **État** : releases collectées (PR de #10) : un brut par dépôt, la première page de 100
-  releases ; un avertissement est journalisé si la page entière est plus récente que la dernière
-  collecte (des releases ont pu manquer, il faudra lire les pages suivantes).
+  releases, lue avant d'être écrite, première collecte comprise (une page qui n'est pas une
+  liste de releases valides fait échouer la source) ; un avertissement est journalisé si la page
+  entière est plus récente que la dernière collecte (des releases ont pu manquer, il faudra lire les pages suivantes).
   Alertes collectées (PR de #11) : un brut par écosystème (`pip`, `npm`), relues par GitHub
   depuis la veille de la dernière collecte (date de revue, pas de publication : GitHub relit
   parfois une alerte des jours après l'avoir publiée), même avertissement si la page de 100 est
@@ -120,7 +121,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Accès** : sans authentification. Requête conditionnelle `If-Modified-Since` : une réponse 304
   n'écrit rien.
 - **Limites** : pas de quota publié ; une requête par collecte. Catalogue d'environ 1 Mo, refusé
-  au-delà de 10 Mo, et refusé s'il est servi hors de `https://www.cisa.gov/`.
+  au-delà de 10 Mo, et refusé s'il est servi hors de `https://www.cisa.gov/`. Le catalogue est
+  lu avant d'être écrit : une réponse qui n'en est pas un (page HTML, colonnes manquantes, ligne
+  invalide) fait échouer la source, sans brut écrit ni date avancée.
 - **Données personnelles** : aucune.
 - **État** : collecte en place (PR de #23).
 
