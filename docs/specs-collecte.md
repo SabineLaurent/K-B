@@ -212,13 +212,26 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    (sauf GitHub), date de publication et date de révision (arXiv), date d'ajout (Clipper, Zotero),
    contenu ou résumé, date de collecte, chemin du brut d'origine. Une date absente reste vide. Toutes les dates sont en UTC, avec fuseau. Une ligne
    illisible est rejetée et journalisée, pas devinée.
-3. **Fusion** en un seul jeu d'items :
-   - dates normalisées en UTC ;
-   - URL normalisées (paramètres `utm_*` retirés) ;
-   - doublons retirés : même URL normalisée, ou même identifiant (CVE ; arXiv sans son suffixe
-     de version `v1`, `v2`…) ;
-   - une révision (arXiv `v2`) met à jour l'item existant au lieu d'être ignorée ;
-   - chaque rejet et chaque doublon retiré est tracé, avec sa règle.
+3. **Fusion** en un seul jeu d'items (`merge_items`, `src/k_b/merge.py`). Les items arrivent
+   dans l'ordre des collectes, et la règle générale est de **garder le premier vu**, celui de la
+   collecte qui l'a apporté.
+   - Dates ramenées en UTC.
+   - URL normalisées : les paramètres `utm_*` sont retirés, les autres restent tels quels et
+     dans leur ordre.
+   - Doublons retirés, une règle nommée par cas, cherchés dans cet ordre : identifiant, URL,
+     CVE. `arxiv_revision` est un sous-cas de la correspondance par identifiant :
+
+     | Règle | Doublon quand | Gardé |
+     |---|---|---|
+     | `same_source_id` | même source et même identifiant dans la source (arXiv : identifiant sans version) | le premier vu |
+     | `arxiv_revision` | même papier arXiv, avec une date de révision plus récente | **le plus récent**, à la place du premier |
+     | `same_url` | même URL normalisée, quelle que soit la source | le premier vu |
+     | `same_cve` | même source et même CVE, sous deux identifiants (deux alertes GitHub) | le premier vu |
+
+   - Une même CVE dans deux sources (une entrée CISA et une alerte GitHub) n'est **pas** un
+     doublon : les deux items restent, reliés par leur CVE (décision de Sabine du 2026-10-05).
+   - Chaque item écarté est rendu avec sa règle et l'URL de l'item gardé à sa place. Le journal
+     où ils sont écrits relève de l'import (#82). Les rejets de lecture viennent de l'étape 2.
 
    `brief09_assistant-veille-tech` (relu le 2026-10-01) a servi d'indication, pas de modèle : il
    ne fait pas autorité. On y retrouve un modèle d'article commun et la date de révision arXiv. À

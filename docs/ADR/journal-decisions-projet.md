@@ -375,6 +375,18 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   `HttpUrl` réécrit l'URL (il ajoute par exemple un `/` final), alors que la fusion (#80) retire
   les doublons en comparant les URL comme du texte. Option écartée : `HttpUrl`, qui valide
   davantage (hôte, encodage), mais qui stockerait une autre URL que celle reçue. — PR de #79
+- **Une même CVE dans deux sources donne deux items, reliés par leur CVE. Le doublon `same_cve`
+  ne vaut qu'au sein d'une même source.** Décision de Sabine : « je veux rattacher, pas
+  dédoublonner ». Une alerte GitHub (un paquet vulnérable) et une entrée CISA (une faille
+  activement exploitée) sont deux informations, et `stockage.md` prévoit la CVE pour le
+  « croisement avec CISA ». **Inverse une décision prise le même jour** pendant la conception de
+  #80 (option a) : même CVE = doublon, on garde le premier vu, comme l'écrivait
+  `specs-collecte.md` et comme l'imposait l'unicité de `vulnerability.cve` dans le schéma. Ce
+  qui a changé : dédoublonner perdait l'information propre à chaque source, l'exploitation
+  active chez CISA, le paquet et les versions chez GitHub. Et `stockage.md` prévoyait déjà le
+  croisement avec CISA. Option écartée
+  aussi : garder les deux items, mais la CVE sur le premier seulement (le lien serait perdu).
+  Conséquence : `cve` cesse d'être unique dans le schéma (#81). — PR de #80
 
 ## Décisions encore ouvertes
 
