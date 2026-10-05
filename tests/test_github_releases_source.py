@@ -88,3 +88,12 @@ def test_no_warning_when_the_page_reaches_back_to_the_last_collection(
         GithubReleasesSource("anthropics/claude-code").fetch(last_collected_at)
 
     assert caplog.text == ""
+
+
+def test_a_page_that_is_not_a_list_of_releases_fails_the_first_collection(monkeypatch):
+    monkeypatch.setattr(
+        github_releases_source, "get_from_github_api", lambda path: b'{"message": "Not Found"}'
+    )
+
+    with pytest.raises(ValueError, match="expected a list of releases"):
+        GithubReleasesSource("anthropics/claude-code").fetch(last_collected_at=None)

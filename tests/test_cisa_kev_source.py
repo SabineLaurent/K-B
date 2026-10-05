@@ -1,5 +1,6 @@
 import io
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.error import HTTPError
 
 import pytest
@@ -7,7 +8,7 @@ import pytest
 from k_b import cisa_kev_source, http_download
 from k_b.cisa_kev_source import CisaKevSource
 
-CATALOG = b"cveID,dateAdded\nCVE-2026-1234,2026-09-29\n"
+CATALOG = (Path(__file__).parent / "fixtures" / "cisa_kev_extract.csv").read_bytes()
 
 
 class FakeResponse(io.BytesIO):
@@ -72,4 +73,12 @@ def test_another_http_error_is_raised(fake_urlopen):
     fake_urlopen.error = HTTPError(cisa_kev_source.CATALOG_URL, 503, "Unavailable", {}, None)
 
     with pytest.raises(HTTPError):
+        CisaKevSource().fetch(last_collected_at=None)
+
+
+def test_a_page_that_is_not_the_catalog_fails_the_collection(monkeypatch):
+    maintenance_page = b"<html><body>Site under maintenance</body></html>"
+    monkeypatch.setattr(http_download, "urlopen", FakeUrlopen(body=maintenance_page))
+
+    with pytest.raises(ValueError, match="catalog without the columns"):
         CisaKevSource().fetch(last_collected_at=None)
