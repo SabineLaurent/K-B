@@ -83,7 +83,7 @@ Exception : un CSV mal formé peut aussi lever `csv.Error`, qui ne dérive pas d
 | Choix | Retenu parce que | Écarté |
 |---|---|---|
 | Réutiliser les lecteurs existants | la connaissance du format vit à un seul endroit (règle DRY du dépôt) | **Un contrôle de forme propre à `fetch`** (première ligne du CSV, type JSON) : il dupliquerait cette connaissance, et les deux pourraient diverger |
-| Échouer sur une seule ligne ou release invalide | les lecteurs actuels lèvent dès un élément mal formé ; on échoue fermé (règle de sécurité du dépôt) | écarter l'élément et continuer : c'est #61, hors de cette issue |
+| Échouer sur une seule ligne ou release invalide | les lecteurs actuels lèvent dès un élément mal formé ; on échoue fermé (règle de sécurité du dépôt) | écarter l'élément et continuer : c'est #61 pour les releases, #77 pour CISA, hors de cette issue |
 | Lire tout le catalogue CISA (`last_collected_at=None`) | une ligne ancienne mal formée est aussi le signe d'un catalogue douteux | ne lire que les lignes récentes : laisserait passer un catalogue corrompu en partie |
 
 La conception a été validée par Sabine sur l'issue #53 avant le code, limite comprise.
@@ -105,7 +105,8 @@ La conception a été validée par Sabine sur l'issue #53 avant le code, limite 
    l'erreur loin de sa cause, avec une fenêtre de collecte déjà sautée (`cisa_kev_source.py:38`).
 2. **Le brut reste-t-il intact ?** Oui : on renvoie `raw_catalog` et `raw_response` tels que
    reçus. La lecture ne sert qu'à contrôler (`cisa_kev_source.py:39`, `github_releases_source.py:34`).
-3. **Une seule release mal formée fait-elle échouer toute la source ?** Oui, jusqu'à #61. C'est
+3. **Une seule ligne ou release mal formée fait-elle échouer toute la source ?** Oui, jusqu'à
+   #61 pour les releases et #77 pour CISA. C'est
    plus strict que le critère de l'issue, accepté par Sabine : on préfère refuser que stocker un
    contenu douteux.
 4. **Que se passe-t-il à la collecte suivante ?** La date n'ayant pas avancé, la même fenêtre est
@@ -123,6 +124,7 @@ La conception a été validée par Sabine sur l'issue #53 avant le code, limite 
 
 ## Ce qui reste
 
-- #61 : écarter et journaliser un élément invalide au sein d'une page valide, au lieu de faire
-  échouer toute la source.
+- #61 : écarter et journaliser une release ou une alerte GitHub invalide au sein d'une page
+  valide, au lieu de faire échouer toute la source.
+- #77 : la même chose pour une ligne invalide du catalogue CISA (#61 ne couvre pas CISA).
 - #54 : refuser une redirection hors du préfixe de confiance avant de la suivre.
