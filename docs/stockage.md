@@ -35,15 +35,17 @@ dans la base. Une migration vers PostgreSQL reste possible si le besoin change (
 ## Spécifications de stockage
 
 - **Clés étrangères** : SQLite les ignore si la connexion n'exécute pas `PRAGMA foreign_keys = ON`.
-  Le code de connexion (#20) l'exécute à chaque ouverture.
+  `connect_database` (`src/k_b/database/__init__.py`) l'exécute à chaque ouverture.
 - **Mode WAL** (`PRAGMA journal_mode = WAL`, gardé dans le fichier) : le pipeline écrit pendant
   que l'API lit, sans se bloquer. Tous les programmes tournent sur la même machine.
 - **Dates** : du texte `AAAA-MM-JJTHH:MM:SSZ`, en UTC. Un `CHECK` refuse toute autre forme. Une
   source qui ne donne qu'un jour est stockée à minuit UTC (convention d'écriture, pas de donnée
   ajoutée).
 - **Types** : tables `STRICT`, une valeur du mauvais type est refusée.
-- **Dédoublonnage porté par la base** : `url` et (`source_code`, `source_item_id`) sont uniques,
-  `cve` aussi. Si le code de fusion laisse passer un doublon, l'insertion échoue.
+- **Dédoublonnage porté par la base** : `url` et (`source_code`, `source_item_id`) sont uniques.
+  Si le code de fusion laisse passer un doublon, l'insertion échoue. `cve` n'est **pas** unique :
+  une entrée CISA et une alerte GitHub de même CVE sont deux items, reliés par leur CVE
+  (décision du 2026-10-05, journal ADR).
 
 ### Ce que chaque source met dans l'item
 
@@ -112,8 +114,8 @@ flowchart LR
   l'autre.
 - **Spécialisation** : DÉPÔT et VULNÉRABILITÉ sont des sous-types d'ITEM, exclusifs, qui portent
   les champs propres à une nature d'item. N'y entre qu'un champ dont une question de veille a
-  besoin : le nom du dépôt (« quels dépôts montent ? ») et le CVE (dédoublonnage, croisement
-  avec CISA).
+  besoin : le nom du dépôt (« quels dépôts montent ? ») et le CVE (croisement
+  entre CISA et les alertes GitHub).
 - **MESURE** : les étoiles gagnées par un dépôt sur une fenêtre de 3 jours (GH Archive). Son
   identifiant `date_fin_fenêtre` est relatif au dépôt, d'où le (1,1) entre parenthèses : une
   mesure n'existe pas sans son dépôt, et un dépôt n'a qu'une mesure par fenêtre.
@@ -193,7 +195,7 @@ erDiagram
     }
     VULNERABILITE {
         int id_item PK, FK
-        text cve UK "facultatif"
+        text cve "facultatif, indexé"
     }
 ```
 
@@ -237,7 +239,7 @@ Noms SQL en anglais, comme le code ; correspondance avec le MLD :
 | VULNÉRABILITÉ | `vulnerability` | `item_id`, `cve` |
 
 - **Index** : sur `published_at`, `saved_at` et `window_end` (« quoi de neuf », « quels dépôts
-  montent »), et sur les clés étrangères,
+  montent »), sur `cve` (croisement CISA ↔ GitHub), et sur les clés étrangères,
   que SQLite n'indexe pas d'office. Les contraintes `UNIQUE` créent leur propre index.
 - **Suppressions en cascade** : supprimer un item supprime ses liens d'auteurs, ses surlignages
   et son sous-type (et les mesures d'un dépôt) ; supprimer un auteur supprime ses liens. Pas de cascade vers `source` ni

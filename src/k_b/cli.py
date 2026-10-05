@@ -1,4 +1,4 @@
-"""Command line: `kb collect`."""
+"""Command line: `kb collect`, `kb create-db`."""
 
 import argparse
 import logging
@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from k_b.collect import SOURCES, collect_all_sources
+from k_b.database import DATABASE_FILE_NAME, create_database
 from k_b.raw_store import InvalidCollectionStateError
 
 DATA_DIR_VARIABLE = "KB_DATA_DIR"
@@ -22,19 +23,44 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="kb")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("collect", help="run every source and store its raw output in raw/")
-    parser.parse_args(argv)
+    commands.add_parser("create-db", help=f"create the items database, {DATABASE_FILE_NAME}")
+    arguments = parser.parse_args(argv)
     configure_logging()
 
+    data_dir = read_data_dir()
+    if data_dir is None:
+        return 2
+    if arguments.command == "create-db":
+        return run_create_db(data_dir)
+    return run_collect(data_dir)
+
+
+def read_data_dir() -> Path | None:
+    """The data directory, or None after printing why it cannot be used."""
     data_dir = os.environ.get(DATA_DIR_VARIABLE)
     if not data_dir:
         print(f"error: {DATA_DIR_VARIABLE} must point to the data directory", file=sys.stderr)
-        return 2
+        return None
     if not Path(data_dir).is_dir():
         print(f"error: {DATA_DIR_VARIABLE} is not an existing directory", file=sys.stderr)
-        return 2
+        return None
+    return Path(data_dir)
 
+
+def run_create_db(data_dir: Path) -> int:
+    database_path = data_dir / DATABASE_FILE_NAME
     try:
-        outcome = collect_all_sources(SOURCES, Path(data_dir) / "raw", datetime.now(UTC))
+        create_database(database_path)
+    except FileExistsError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    print(f"database created: {database_path}")
+    return 0
+
+
+def run_collect(data_dir: Path) -> int:
+    try:
+        outcome = collect_all_sources(SOURCES, data_dir / "raw", datetime.now(UTC))
     except InvalidCollectionStateError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

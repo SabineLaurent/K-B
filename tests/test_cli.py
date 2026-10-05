@@ -116,3 +116,32 @@ def test_an_info_line_of_k_b_is_shown_once_logging_is_configured():
     result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
 
     assert "INFO k_b.tldr_source: tldr_ai 2026-10-03: no edition page" in result.stderr
+
+
+def test_create_db_creates_the_database_in_the_data_directory(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+
+    exit_code = cli.main(["create-db"])
+
+    assert exit_code == 0
+    assert (tmp_path / "k-b.sqlite").is_file()
+    assert "k-b.sqlite" in capsys.readouterr().out
+
+
+def test_create_db_run_again_refuses_and_keeps_the_database(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    database_content = (tmp_path / "k-b.sqlite").read_bytes()
+
+    exit_code = cli.main(["create-db"])
+
+    assert exit_code == 2
+    assert "already exists" in capsys.readouterr().err
+    assert (tmp_path / "k-b.sqlite").read_bytes() == database_content
+
+
+def test_create_db_refuses_to_run_without_a_data_directory(monkeypatch, capsys):
+    monkeypatch.delenv("KB_DATA_DIR", raising=False)
+
+    assert cli.main(["create-db"]) == 2
+    assert "KB_DATA_DIR" in capsys.readouterr().err
