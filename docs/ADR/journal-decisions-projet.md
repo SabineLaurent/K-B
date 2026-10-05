@@ -382,9 +382,9 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   « croisement avec CISA ». **Inverse une décision prise le même jour** pendant la conception de
   #80 (option a) : même CVE = doublon, on garde le premier vu, comme l'écrivait
   `specs-collecte.md` et comme l'imposait l'unicité de `vulnerability.cve` dans le schéma. Ce
-  qui a changé, selon une déduction de Claude (à valider) : la limite de l'option a, proposée pour
-  l'ADR. Si l'alerte GitHub arrivait en premier, l'information « activement exploitée » de CISA
-  n'entrait pas en base. Option écartée
+  qui a changé : dédoublonner perdait l'information propre à chaque source, l'exploitation
+  active chez CISA, le paquet et les versions chez GitHub. Et `stockage.md` prévoyait déjà le
+  croisement avec CISA. Option écartée
   aussi : garder les deux items, mais la CVE sur le premier seulement (le lien serait perdu).
   Conséquence : `cve` cesse d'être unique dans le schéma (#81). — PR de #80
 
