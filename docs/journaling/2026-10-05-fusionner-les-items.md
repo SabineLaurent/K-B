@@ -14,12 +14,14 @@ Le brut contient le même élément plusieurs fois, pour trois raisons :
   collecte) ;
 - certaines sources sont des instantanés complets : le catalogue CISA entier, ou le classement
   des dépôts les plus étoilés, à chaque collecte ;
-- deux sources parlent parfois de la même chose : une même CVE chez CISA et dans une alerte
-  GitHub, ou une même URL.
+- deux sources donnent parfois la même URL, ou une même source donne une même CVE sous deux
+  identifiants (deux alertes GitHub).
 
-La base refuse ces doublons, avec des contraintes `UNIQUE` sur l'URL, le couple source et
-identifiant, et la CVE. Il faut donc les retirer avant l'import, et dire lesquels ont été
-retirés, et pourquoi.
+La base refuse ces doublons, avec des contraintes `UNIQUE` sur l'URL et sur le couple source et
+identifiant. Il faut donc les retirer avant l'import, et dire lesquels ont été retirés, et
+pourquoi. La CVE n'est pas un doublon d'une source à l'autre : une entrée CISA et une alerte
+GitHub de même CVE restent deux items, reliés par leur CVE. Le schéma perd son unicité sur
+`cve` avec #81.
 
 Cette PR fait l'étape 3 de `docs/specs-collecte.md`, la fusion. Elle reçoit les items lus par
 #79 et rend un seul jeu, plus la liste des items écartés, chacun avec le nom de sa règle. Elle
@@ -40,7 +42,7 @@ n'écrit rien : le journal des écartés et l'insertion en base relèvent de #82
 `src/k_b/merge.py:42-55`
 
 `merge_items` parcourt les items une seule fois. Elle tient trois dictionnaires : identifiant,
-URL et CVE, chacun associé à la position de l'item gardé dans la liste `kept`. Pour chaque
+URL, et CVE **par source** (le couple source et CVE), chacun associé à la position de l'item gardé dans la liste `kept`. Pour chaque
 nouvel item, elle regarde ces index **dans l'ordre du tableau de la spec** : identifiant, puis
 URL, puis CVE. Le premier qui correspond décide de la règle. Quand c'est l'identifiant, une
 révision arXiv plus récente donne `arxiv_revision` (2.2), et tout autre cas `same_source_id`.
@@ -114,8 +116,7 @@ alors plus celle que la source a donnée.
 | Choix | Retenu, et pourquoi | Écarté, et pourquoi |
 |---|---|---|
 | Quel doublon garder | **Le premier vu** : sa collecte l'a apporté, et la base le rattache à elle. | Le dernier vu : il aurait changé de collecte à chaque nouvelle collecte, par exemple pour CISA, téléchargé en entier chaque jour. |
-| Même CVE chez CISA et GitHub | **Option a, choix de Sabine** : c'est un doublon, et on garde le premier vu, comme le dit la spec. La base l'exige : `vulnerability.cve` est unique. | Option b : garder les deux items, avec la CVE sur le premier seulement. Il aurait fallu changer la spec. |
-| Ordre dans une même collecte | **L'ordre alphabétique des dossiers du brut**, tel que `read_raw_items` le produit (`cisa_kev` avant `github_…`). La doc le dit, après la revue de code (option a de Sabine). | Faire suivre l'ordre de `SOURCES` à `read_raw_items` : un changement dans #79 pour un cas qui n'arrive pas aujourd'hui. |
+| Même CVE chez CISA et GitHub | **Deux items, reliés par leur CVE** (décision de Sabine, 2026-10-05) : on rattache, on ne dédoublonne pas. `stockage.md` prévoit la CVE pour le « croisement avec CISA ». `same_cve` ne vaut qu'au sein d'une même source. | Un seul item, le premier vu (option a, d'abord retenue le même jour) : l'information « activement exploitée » de CISA pouvait disparaître de la base si l'alerte GitHub arrivait avant. Garder les deux avec la CVE sur le premier seulement (option b) : le lien entre eux serait perdu. |
 | Retrait de `utm_*` | **Découpage du texte de la requête**, le reste n'est pas touché. | `parse_qsl` et `urlencode` : ils réencodent l'URL. |
 | Copie de l'item normalisé | **`Item(**model_dump())`** : il est validé de nouveau. | `model_copy(update=...)` : il ne valide pas les champs modifiés. |
 | Résultat | **Une fonction pure** qui rend les items gardés et les écartés (`MergeResult`). | Écrire le journal ici : cela mêlerait le métier et les entrées/sorties (`code.md`, séparation des responsabilités). |
@@ -130,7 +131,8 @@ alors plus celle que la source a donnée.
 | `test_dates_are_brought_to_utc` | Une date à +02:00 est ramenée au même instant en UTC. |
 | `test_the_same_source_item_seen_again_is_discarded_and_the_first_collection_kept` | Règle `same_source_id` : la seconde collecte est écartée, avec l'URL de l'item gardé. |
 | `test_the_same_url_from_another_source_is_discarded` | Règle `same_url`, y compris quand l'URL n'est égale qu'une fois les `utm_*` retirés. |
-| `test_the_same_cve_from_another_source_is_discarded_and_the_first_seen_kept` | Règle `same_cve` : la vulnérabilité CISA vue en premier est gardée, et l'alerte GitHub est écartée. |
+| `test_the_same_cve_from_another_source_is_kept_as_a_second_item` | Une entrée CISA et une alerte GitHub de même CVE restent deux items, sans aucun écarté. |
+| `test_the_same_cve_within_one_source_is_discarded_and_the_first_seen_kept` | Règle `same_cve` : deux alertes GitHub de même CVE, la seconde est écartée avec l'URL de la première. |
 | `test_items_without_cve_are_not_duplicates_of_each_other` | Une CVE absente ne fait pas de doublon. |
 | `test_a_newer_arxiv_revision_replaces_the_kept_paper_in_place` | Règle `arxiv_revision` : la v2 prend la place de la v1, et la v1 est tracée comme écartée. |
 | `test_an_arxiv_paper_seen_again_without_revision_keeps_the_first_collection` | Le même papier sans révision plus récente suit `same_source_id`. |
@@ -141,10 +143,10 @@ alors plus celle que la source a donnée.
 1. **Pourquoi garder le premier et pas le dernier ?** La base rattache chaque item à la
    collecte qui l'a apporté. Garder le dernier ferait changer de collecte, chaque jour, les
    éléments que CISA ou le classement GitHub renvoient à chaque fois (`merge.py:33-34`).
-2. **Que se passe-t-il si une alerte GitHub arrive avant l'entrée CISA de la même CVE ?** On
-   garde l'alerte GitHub, et l'entrée CISA est écartée avec la règle `same_cve`. C'est la
-   limite de l'option a : l'information « activement exploitée » de CISA ne vient pas en base
-   pour cette CVE. Elle reste dans le journal des écartés, et dans le brut.
+2. **Une alerte GitHub et une entrée CISA de même CVE, est-ce un doublon ?** Non : ce sont deux
+   informations différentes, un paquet vulnérable et une faille activement exploitée. Les deux
+   items restent, et la CVE les relie, pour le croisement prévu par `stockage.md`. `same_cve`
+   ne s'applique qu'au sein d'une même source (`merge.py:39-40`, `57-60`).
 3. **Pourquoi l'ordre des règles compte-t-il ?** Un item peut correspondre à plusieurs règles.
    Il est tracé avec la première qui correspond, dans l'ordre identifiant, URL, CVE, comme dans
    le tableau de la spec. Un même papier arXiv revu **sans** révision plus récente est donc
@@ -167,7 +169,7 @@ alors plus celle que la source a donnée.
   réelles, avec #57.
 - **Aller-retour `urlsplit` / `urlunsplit`.** Je ne l'ai testé que sur les URL des tests. Une URL
   qui finit par un `?` vide le perd, par exemple. Je n'ai pas vérifié tous les cas limites.
-- **Une révision arXiv ne passe pas par les règles d'URL et de CVE.** C'est sans effet
+- **Une révision arXiv ne passe pas par les règles d'URL et de CVE par source.** C'est sans effet
   aujourd'hui, puisque l'URL d'un papier est construite à partir de son identifiant sans
   version, mais ce n'est pas testé.
 - Aucun brut réel n'a été fusionné : uniquement des items construits dans les tests.

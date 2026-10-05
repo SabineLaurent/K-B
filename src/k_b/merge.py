@@ -28,7 +28,7 @@ class MergeResult(NamedTuple):
 
 
 def merge_items(items: list[Item]) -> MergeResult:
-    """One item per source identifier, URL and CVE; each item removed is traced with its rule.
+    """One item per source identifier, URL, and CVE within a source; each removal is traced.
 
     The items come in collection order: the first one seen is kept, as its collection brought
     it, except for a newer arXiv revision, which takes the place of the paper kept.
@@ -36,7 +36,8 @@ def merge_items(items: list[Item]) -> MergeResult:
     kept: list[Item] = []
     position_by_source_id: dict[tuple[str, str], int] = {}
     position_by_url: dict[str, int] = {}
-    position_by_cve: dict[str, int] = {}
+    # By source: the same CVE from CISA and from GitHub gives two items, linked by their CVE.
+    position_by_source_cve: dict[tuple[str, str], int] = {}
     discards: list[Discard] = []
 
     for item in map(normalize_item, items):
@@ -53,15 +54,16 @@ def merge_items(items: list[Item]) -> MergeResult:
         if item.url in position_by_url:
             discards.append(Discard("same_url", item, kept[position_by_url[item.url]].url))
             continue
-        if item.cve is not None and item.cve in position_by_cve:
-            discards.append(Discard("same_cve", item, kept[position_by_cve[item.cve]].url))
+        source_cve = (item.source_code, item.cve) if item.cve is not None else None
+        if source_cve in position_by_source_cve:
+            discards.append(Discard("same_cve", item, kept[position_by_source_cve[source_cve]].url))
             continue
         position = len(kept)
         kept.append(item)
         position_by_source_id[(item.source_code, item.source_item_id)] = position
         position_by_url[item.url] = position
-        if item.cve is not None:
-            position_by_cve[item.cve] = position
+        if source_cve is not None:
+            position_by_source_cve[source_cve] = position
     return MergeResult(kept, discards)
 
 

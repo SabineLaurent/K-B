@@ -226,8 +226,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      | `same_source_id` | même source et même identifiant dans la source (arXiv : identifiant sans version) | le premier vu |
      | `arxiv_revision` | même papier arXiv, avec une date de révision plus récente | **le plus récent**, à la place du premier |
      | `same_url` | même URL normalisée, quelle que soit la source | le premier vu |
-     | `same_cve` | même CVE, par exemple une entrée CISA et une alerte GitHub | le premier vu ; dans une même collecte, celui dont le dossier brut vient en premier dans l'ordre alphabétique (`cisa_kev` avant `github_…`) |
+     | `same_cve` | même source et même CVE, sous deux identifiants (deux alertes GitHub) | le premier vu |
 
+   - Une même CVE dans deux sources (une entrée CISA et une alerte GitHub) n'est **pas** un
+     doublon : les deux items restent, reliés par leur CVE (décision de Sabine du 2026-10-05).
    - Chaque item écarté est rendu avec sa règle et l'URL de l'item gardé à sa place. Le journal
      où ils sont écrits relève de l'import (#82). Les rejets de lecture viennent de l'étape 2.
 

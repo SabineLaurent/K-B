@@ -103,7 +103,7 @@ def test_the_same_url_from_another_source_is_discarded():
     assert [discard.rule for discard in merged.discards] == ["same_url"]
 
 
-def test_the_same_cve_from_another_source_is_discarded_and_the_first_seen_kept():
+def test_the_same_cve_from_another_source_is_kept_as_a_second_item():
     from_cisa = make_item(
         source_code="cisa_kev",
         source_item_id="CVE-2026-48775",
@@ -114,9 +114,23 @@ def test_the_same_cve_from_another_source_is_discarded_and_the_first_seen_kept()
 
     merged = merge_items([from_cisa, from_github])
 
-    assert merged.items == [from_cisa]
-    assert [(discard.rule, discard.item) for discard in merged.discards] == [
-        ("same_cve", from_github)
+    assert merged.items == [from_cisa, from_github]
+    assert merged.discards == []
+
+
+def test_the_same_cve_within_one_source_is_discarded_and_the_first_seen_kept():
+    first = make_item(cve="CVE-2026-48775")
+    same_cve = make_item(
+        source_item_id="GHSA-gr75-jv2w-4656",
+        url="https://github.com/advisories/GHSA-gr75-jv2w-4656",
+        cve="CVE-2026-48775",
+    )
+
+    merged = merge_items([first, same_cve])
+
+    assert merged.items == [first]
+    assert [(discard.rule, discard.item, discard.kept_url) for discard in merged.discards] == [
+        ("same_cve", same_cve, first.url)
     ]
 
 
