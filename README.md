@@ -86,8 +86,9 @@ Avec le jeton rangé dans le `.env` à la racine du dépôt, ignoré par git :
 `KB_DATA_DIR=~/K-B-data uv run --env-file .env kb collect`.
 
 `kb collect` affiche une ligne par source (`ok` ou `failed`, avec le type de l'erreur). Code de
-sortie : 0 si toutes les sources ont réussi, 1 si au moins une a échoué, 2 si `KB_DATA_DIR`
-manque, n'est pas un dossier existant, ou si l'état de collecte est illisible.
+sortie : 0 si tout a réussi, 1 si au moins une source a échoué ou si l'état de collecte n'a pas
+pu être écrit, 2 si `KB_DATA_DIR` manque, n'est pas un dossier existant, ou si l'état de collecte
+est illisible.
 
 **Lancer les tests** :
 

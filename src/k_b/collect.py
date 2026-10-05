@@ -4,14 +4,19 @@ import logging
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Protocol
+from typing import NamedTuple, Protocol
 
 from k_b.arxiv_source import ArxivSource
 from k_b.cisa_kev_source import CisaKevSource
 from k_b.github_advisories_source import GithubAdvisoriesSource
 from k_b.github_most_starred_source import GithubMostStarredSource
 from k_b.github_releases_source import GithubReleasesSource
-from k_b.raw_store import load_last_collection_dates, save_last_collection_dates, write_new_raw_file
+from k_b.raw_store import (
+    COLLECTION_STATE_FILENAME,
+    load_last_collection_dates,
+    save_last_collection_dates,
+    write_new_raw_file,
+)
 from k_b.tldr_source import TRACKED_EDITIONS, TldrSource
 from k_b.tracked_repositories import TRACKED_REPOSITORIES, list_packages_by_ecosystem
 
@@ -48,10 +53,14 @@ SOURCES: list[Source] = [
 ]
 
 
-def collect_all_sources(
-    sources: list[Source], raw_dir: Path, now: datetime
-) -> dict[str, Exception | None]:
-    """Collect each source; return, per source name, its error or None if it succeeded."""
+class CollectionOutcome(NamedTuple):
+    errors_by_source: dict[str, Exception | None]
+    # The raw files are written even when the state is not: the next run collects again.
+    state_error: OSError | None
+
+
+def collect_all_sources(sources: list[Source], raw_dir: Path, now: datetime) -> CollectionOutcome:
+    """Collect each source; return each source's error (None: success) and the state's error."""
     if now.utcoffset() != timedelta(0):
         raise ValueError(f"collection time must be in UTC, got {now!r}")
     last_collection_dates = load_last_collection_dates(raw_dir)
@@ -65,8 +74,12 @@ def collect_all_sources(
         else:
             last_collection_dates[source.name] = now
             errors_by_source[source.name] = None
-    save_last_collection_dates(raw_dir, last_collection_dates)
-    return errors_by_source
+    try:
+        save_last_collection_dates(raw_dir, last_collection_dates)
+    except OSError as error:
+        logger.exception("collection state not written to %s", raw_dir / COLLECTION_STATE_FILENAME)
+        return CollectionOutcome(errors_by_source, error)
+    return CollectionOutcome(errors_by_source, None)
 
 
 def collect_one_source(
