@@ -26,11 +26,13 @@ ce qui lui est propre. Avant cette PR, trois défauts l'empêchaient :
 
 ### 1. Le contrat commun : `source.py`
 
-`src/k_b/source.py:39-46` :
+`src/k_b/source.py:40-49` :
 
 ```python
 class SourceKind(NamedTuple):
-    """A kind of source, declared once: its raw folders, its instances, its reader."""
+    """A kind of source, declared once: its raw folders, its instances, its reader.
+    ...
+    """
 
     # The name of its raw folders, alone or followed by _ (github_releases_<repository>).
     folder_prefix: str
@@ -60,7 +62,7 @@ sert au nom de ses instances et à sa sorte.
 
 ### 3. Le lecteur est retrouvé par le nom du dossier brut
 
-`src/k_b/source.py:53-61` (`find_source_kind`) et `src/k_b/raw_items.py:71-77` :
+`src/k_b/source.py:58-66` (`find_source_kind`) et `src/k_b/raw_items.py:71-77` :
 
 ```python
         kind = find_source_kind(source_dir.name, kinds)
@@ -84,7 +86,7 @@ dépassait la complexité de 10 que ruff impose au dépôt.
 READER: SourceReader[Paper] = SourceReader(read_papers, convert_paper)
 ```
 
-`SourceReader[EntryT]` (`source.py:28`) est générique : `read_entries` doit produire des `EntryT`,
+`SourceReader[EntryT]` (`source.py:29`) est générique : `read_entries` doit produire des `EntryT`,
 et `convert` doit les accepter. L'annotation `SourceReader[Paper]` fixe `EntryT`. mypy refuse
 alors `SourceReader(read_papers, convert_release)`. Une constante non annotée, écrite directement
 dans la `SourceKind`, aurait laissé passer l'erreur : `SourceKind.reader` est typé
@@ -98,11 +100,12 @@ du classement). La collecte les réutilise : la règle n'est écrite qu'une fois
 ### 5. Un test garde le sens des dépendances
 
 `tests/test_module_dependencies.py` lit les imports de chaque module avec `ast`, l'analyseur de
-syntaxe de Python, sans exécuter le code. Il couvre `import k_b.x`, `from k_b import x` et
-`from k_b.x import y`. Trois règles :
-- aucun module générique n'importe une source ou la composition (`:69`) ;
-- aucun module de source n'importe la composition (`:77`) ;
-- chaque module du paquet est rangé dans exactement une des trois listes (`:61`). Un nouveau module
+syntaxe de Python, sans exécuter le code. Il couvre `import k_b.x`, `from k_b import x`,
+`from k_b.x import y` et leurs formes relatives (`from .x import y`), chacune testée
+(`:89`). Trois règles :
+- aucun module générique n'importe une source ou la composition (`:101`) ;
+- aucun module de source n'importe la composition (`:109`) ;
+- chaque module du paquet est rangé dans exactement une des trois listes (`:93`). Un nouveau module
   fait donc échouer le test tant qu'il n'est pas classé.
 
 ## Choix faits et options écartées
@@ -121,20 +124,21 @@ syntaxe de Python, sans exécuter le code. Il couvre `import k_b.x`, `from k_b i
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| `test_the_sources_are_collected_in_the_order_of_2026_10_06` (`tests/test_source_kinds.py:5`) | Les 12 sources sont collectées dans le même ordre qu'avant. |
-| `test_each_source_belongs_to_its_own_kind`, `test_no_folder_prefix_covers_another` (`:22`, `:28`) | Aucune ambiguïté de préfixe sur les sources réelles. |
+| `test_the_sources_are_collected_in_the_order_of_2026_10_06` (`tests/test_source_kinds.py:7`) | Les 12 sources sont collectées dans le même ordre qu'avant. |
+| `test_each_source_belongs_to_its_own_kind`, `test_no_folder_prefix_covers_another` (`:24`, `:30`) | Aucune ambiguïté de préfixe sur les sources réelles. |
 | `test_the_raw_files_of_an_untracked_repository_and_ecosystem_are_read` (`tests/test_raw_items.py:144`) | Le premier cas de #87 est réglé. |
 | `test_a_folder_of_no_source_kind_is_skipped_and_logged` (`:133`), et le test TLDR (`:118`) | Les deux messages de dossier sauté sont distincts. |
 | Tests de `tests/test_module_dependencies.py`, rouges avant le code (`raw_items` importait les sources) | Le sens des dépendances est contrôlé. |
+| Revue de code : deux préfixes égaux n'étaient pas détectés (comparaison par identité), et les imports relatifs n'étaient pas lus ; corrigés, avec un test par forme d'import | Les deux gardes font ce que dit leur nom. |
 | Mutant : `arxiv_papers.READER` associé à `convert_release` → `mypy --strict` : `arxiv_papers.py:146: error: Argument 2 to "SourceReader" has incompatible type …` | La garde de typage fonctionne. |
 | `grep -rln source_kinds src/k_b` → `cli.py` ; `grep -nE "k_b\.collect\|partial\|lambda raw\|RANKING_SIZE\|last_collected_at=None" src/k_b/raw_items.py` → rien | Les deux `grep` du critère de fin. |
-| 294 tests, ruff, format et mypy verts | Rien d'autre n'a cassé. |
+| 301 tests, ruff, format et mypy verts | Rien d'autre n'a cassé. |
 
 ## Ce que tu dois pouvoir défendre
 
 1. **Pourquoi une sorte, et pas seulement une liste de sources ?** Parce que T lit des dossiers, pas
    des instances. Un dossier `github_releases_x` doit trouver son lecteur, même si le dépôt `x`
-   n'est plus suivi (`source.py:53-61`).
+   n'est plus suivi (`source.py:58-66`).
 2. **Pourquoi passer `SOURCE_KINDS` en paramètre plutôt que l'importer ?** Pour que les modules
    génériques ne connaissent aucune source. C'est l'injection de dépendances que demande `code.md`
    (« le métier reçoit ses dépendances en paramètre »), et c'est ce que le test de dépendances
