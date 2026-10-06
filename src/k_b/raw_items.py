@@ -29,44 +29,69 @@ class RawReading(NamedTuple):
 
 
 def read_raw_items(raw_dir: Path, kinds: Sequence[SourceKind]) -> RawReading:
-    """Every item of the raw files whose source kind has a reader, in collection order.
+    """Every item of the raw pages whose source kind has a reader, in collection order.
 
-    A file that cannot be read, or an entry refused as an item, is rejected and logged; the
-    other files and entries are still read.
+    A collection is a raw file, or a folder of pages; a raw file is read as a single page. A
+    collection not named by its time, a page that cannot be read, or an entry refused as an
+    item, is rejected and logged; the others are still read.
     """
-    items = []
-    rejections = []
-    for path, reader in list_raw_files(raw_dir, kinds):
-        raw_file_path = path.relative_to(raw_dir).as_posix()
+    reading = RawReading([], [])
+    for collection_path, reader in list_collections(raw_dir, kinds):
+        relative_collection_path = collection_path.relative_to(raw_dir).as_posix()
+        # A folder name is taken whole: a file name without its extension.
+        collection_name = (
+            collection_path.name if collection_path.is_dir() else collection_path.stem
+        )
         try:
-            collected_at = datetime.strptime(path.stem, COLLECTION_NAME_FORMAT).replace(
-                tzinfo=UTC
+            collected_at = datetime.strptime(
+                collection_name, COLLECTION_NAME_FORMAT
+            ).replace(tzinfo=UTC)
+        except ValueError as error:
+            reading.rejections.append(
+                reject(relative_collection_path, f"{type(error).__name__}: {error}")
             )
-            entries = reader.read_entries(path.read_bytes())
-        except (ValueError, csv.Error, OSError) as error:
-            rejections.append(reject(raw_file_path, f"{type(error).__name__}: {error}"))
             continue
-        for position, entry in enumerate(entries):
-            try:
-                items.append(reader.convert(entry, collected_at, raw_file_path))
-            except ValidationError as error:
-                rejections.append(
-                    reject(
-                        raw_file_path,
-                        f"entry {position}: {type(error).__name__}: {error}",
-                    )
+        for page_path in list_pages(collection_path, raw_dir):
+            read_page(page_path, raw_dir, reader, collected_at, reading)
+    # Stable sort: within a collection, the items keep their page and source order.
+    reading.items.sort(key=lambda item: item.collected_at)
+    return reading
+
+
+def read_page(
+    page_path: Path,
+    raw_dir: Path,
+    reader: SourceReader[Any],
+    collected_at: datetime,
+    reading: RawReading,
+) -> None:
+    """Add the items of a page to reading, and its rejections."""
+    raw_file_path = page_path.relative_to(raw_dir).as_posix()
+    try:
+        entries = reader.read_entries(page_path.read_bytes())
+    except (ValueError, csv.Error, OSError) as error:
+        reading.rejections.append(
+            reject(raw_file_path, f"{type(error).__name__}: {error}")
+        )
+        return
+    for position, entry in enumerate(entries):
+        try:
+            reading.items.append(reader.convert(entry, collected_at, raw_file_path))
+        except ValidationError as error:
+            reading.rejections.append(
+                reject(
+                    raw_file_path,
+                    f"entry {position}: {type(error).__name__}: {error}",
                 )
-    # Stable sort: within a collection, the items keep their source order.
-    items.sort(key=lambda item: item.collected_at)
-    return RawReading(items, rejections)
+            )
 
 
-def list_raw_files(
+def list_collections(
     raw_dir: Path, kinds: Sequence[SourceKind]
 ) -> list[tuple[Path, SourceReader[Any]]]:
-    """Each raw file with the reader of its kind, found by the name of its folder, whether its
-    source is still tracked or not."""
-    raw_files: list[tuple[Path, SourceReader[Any]]] = []
+    """Each collection (raw file or folder of pages) with the reader of its kind, found by the
+    name of its source folder, whether its source is still tracked or not."""
+    collections: list[tuple[Path, SourceReader[Any]]] = []
     for source_dir in sorted((raw_dir / "automation").glob("*/")):
         kind = find_source_kind(source_dir.name, kinds)
         if kind is None:
@@ -76,18 +101,30 @@ def list_raw_files(
         if reader is None:
             logger.info("source without a reader, skipped: %s", source_dir.name)
             continue
-        for path in sorted(source_dir.iterdir()):
-            # Hidden files are not raw files: .DS_Store written by macOS, for instance.
-            if path.name.startswith("."):
-                continue
-            if path.is_dir():
-                logger.info(
-                    "folder of pages without a reader, skipped: %s",
-                    path.relative_to(raw_dir).as_posix(),
-                )
-                continue
-            raw_files.append((path, reader))
-    return raw_files
+        collections.extend((path, reader) for path in list_visible_entries(source_dir))
+    return collections
+
+
+def list_pages(collection_path: Path, raw_dir: Path) -> list[Path]:
+    """The pages of a collection: the raw file itself, or the files of its folder."""
+    if not collection_path.is_dir():
+        return [collection_path]
+    pages = []
+    for path in list_visible_entries(collection_path):
+        if path.is_dir():
+            logger.info(
+                "folder inside a collection folder, skipped: %s",
+                path.relative_to(raw_dir).as_posix(),
+            )
+            continue
+        pages.append(path)
+    return pages
+
+
+def list_visible_entries(folder: Path) -> list[Path]:
+    """The entries of a folder in name order, hidden ones left out: they are not raw data
+    (.DS_Store written by macOS, for instance)."""
+    return sorted(path for path in folder.iterdir() if not path.name.startswith("."))
 
 
 def reject(raw_file_path: str, reason: str) -> Rejection:

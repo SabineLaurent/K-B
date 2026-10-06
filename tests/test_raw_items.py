@@ -4,12 +4,41 @@ import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
+from k_b.items import Item
 from k_b.raw_items import read_raw_items
+from k_b.source_contract import SourceKind, SourceReader
 from k_b.source_kinds import SOURCE_KINDS
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 COLLECTION_NAME = "2026-10-05T093000Z"
 COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
+
+
+def read_lines(raw: bytes) -> list[str]:
+    return raw.decode().splitlines()
+
+
+def convert_line(line: str, collected_at: datetime, raw_file_path: str) -> Item:
+    return Item(
+        source_code="tldr",
+        source_item_id=line,
+        title=line,
+        url=f"https://example.com/{line}",
+        collected_at=collected_at,
+        raw_file_path=raw_file_path,
+    )
+
+
+# A fake kind whose raw collections are folders of pages, each line of a page an entry.
+FAKE_PAGE_KINDS = [SourceKind("fake", (), SourceReader(read_lines, convert_line))]
+
+
+def write_pages(raw_dir: Path, collection_name: str, pages: dict[str, bytes]) -> Path:
+    pages_dir = raw_dir / "automation" / "fake" / collection_name
+    pages_dir.mkdir(parents=True)
+    for page_name, page in pages.items():
+        (pages_dir / page_name).write_bytes(page)
+    return pages_dir
 
 
 def copy_fixture(raw_dir: Path, fixture: str, source: str, extension: str) -> Path:
@@ -115,9 +144,7 @@ def test_a_file_name_that_is_not_a_collection_time_is_rejected(tmp_path):
     ]
 
 
-def test_a_source_without_reader_and_page_folders_are_skipped_and_logged(
-    tmp_path, caplog
-):
+def test_a_source_without_reader_is_skipped_and_logged(tmp_path, caplog):
     pages_dir = tmp_path / "automation" / "tldr_ai" / COLLECTION_NAME
     pages_dir.mkdir(parents=True)
     (pages_dir / "2026-10-05.html").write_text("<html></html>")
@@ -222,3 +249,85 @@ def test_hidden_files_are_ignored(tmp_path):
 
     assert len(reading.items) == 3
     assert reading.rejections == []
+
+
+def test_a_folder_of_pages_is_read_page_by_page(tmp_path):
+    # Written out of name order: the pages are read in name order.
+    write_pages(
+        tmp_path,
+        COLLECTION_NAME,
+        {"2026-10-05.html": b"c\nd", "2026-10-04.html": b"a\nb"},
+    )
+
+    reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS)
+
+    assert [
+        (item.source_item_id, item.raw_file_path, item.collected_at)
+        for item in reading.items
+    ] == [
+        ("a", f"automation/fake/{COLLECTION_NAME}/2026-10-04.html", COLLECTED_AT),
+        ("b", f"automation/fake/{COLLECTION_NAME}/2026-10-04.html", COLLECTED_AT),
+        ("c", f"automation/fake/{COLLECTION_NAME}/2026-10-05.html", COLLECTED_AT),
+        ("d", f"automation/fake/{COLLECTION_NAME}/2026-10-05.html", COLLECTED_AT),
+    ]
+    assert reading.rejections == []
+
+
+def test_a_hidden_file_in_a_folder_of_pages_is_skipped(tmp_path):
+    write_pages(
+        tmp_path, COLLECTION_NAME, {"2026-10-05.html": b"a", ".DS_Store": b"hidden"}
+    )
+
+    reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS)
+
+    assert [item.source_item_id for item in reading.items] == ["a"]
+    assert reading.rejections == []
+
+
+def test_a_folder_inside_a_folder_of_pages_is_skipped_and_logged(tmp_path, caplog):
+    pages_dir = write_pages(tmp_path, COLLECTION_NAME, {"2026-10-05.html": b"a"})
+    (pages_dir / "archive").mkdir()
+    (pages_dir / "archive" / "2026-10-04.html").write_bytes(b"inside")
+
+    with caplog.at_level(logging.INFO):
+        reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS)
+
+    assert [item.source_item_id for item in reading.items] == ["a"]
+    assert reading.rejections == []
+    assert (
+        f"folder inside a collection folder, skipped: automation/fake/{COLLECTION_NAME}/archive"
+        in caplog.text
+    )
+
+
+def test_a_folder_of_pages_not_named_by_a_collection_time_is_rejected_whole(
+    tmp_path,
+):
+    write_pages(tmp_path, "latest", {"2026-10-04.html": b"a", "2026-10-05.html": b"b"})
+
+    reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS)
+
+    assert reading.items == []
+    assert [rejection.raw_file_path for rejection in reading.rejections] == [
+        "automation/fake/latest"
+    ]
+
+
+def test_an_unreadable_page_is_rejected_and_the_others_of_its_folder_are_read(
+    tmp_path,
+):
+    write_pages(
+        tmp_path,
+        COLLECTION_NAME,
+        {"2026-10-04.html": b"\xff", "2026-10-05.html": b"a"},
+    )
+
+    reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS)
+
+    assert [item.source_item_id for item in reading.items] == ["a"]
+    assert len(reading.rejections) == 1
+    rejection = reading.rejections[0]
+    assert (
+        rejection.raw_file_path == f"automation/fake/{COLLECTION_NAME}/2026-10-04.html"
+    )
+    assert rejection.reason.startswith("UnicodeDecodeError")
