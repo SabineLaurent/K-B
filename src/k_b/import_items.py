@@ -8,6 +8,7 @@ gives the same base and the same log.
 import json
 import os
 import sqlite3
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -16,6 +17,7 @@ from k_b.database import connect_database
 from k_b.items import Item
 from k_b.merge import Discard, merge_items
 from k_b.raw_items import Rejection, read_raw_items
+from k_b.source import SourceKind
 
 # The date format the CHECK constraints of schema.sql accept.
 DATABASE_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -49,14 +51,19 @@ class ImportSummary(NamedTuple):
     rejection_count: int
 
 
-def import_items(raw_dir: Path, database_path: Path, log_path: Path) -> ImportSummary:
+def import_items(
+    raw_dir: Path,
+    database_path: Path,
+    log_path: Path,
+    kinds: Sequence[SourceKind],
+) -> ImportSummary:
     """Write the merged items of the raw files into the base, then the log of what was left out.
 
     The base must exist: connecting to a missing file would create an empty one.
     """
     if not database_path.is_file():
         raise MissingDatabaseError(f"{database_path} does not exist")
-    reading = read_raw_items(raw_dir)
+    reading = read_raw_items(raw_dir, kinds)
     merged = merge_items(reading.items)
     connection = connect_database(database_path)
     try:

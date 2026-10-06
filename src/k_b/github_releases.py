@@ -8,6 +8,7 @@ from urllib.parse import unquote
 
 from k_b.github_dates import parse_github_date
 from k_b.items import Item
+from k_b.source import SourceReader
 from k_b.tracked_repositories import OWNER_SLASH_NAME, is_repository_name
 
 # The repository is read in the release URL: the raw file can be read without its source.
@@ -101,3 +102,6 @@ def convert_release(
         collected_at=collected_at,
         raw_file_path=raw_file_path,
     )
+
+
+READER: SourceReader[Release] = SourceReader(read_releases, convert_release)

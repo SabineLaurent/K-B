@@ -21,6 +21,10 @@ FIRST_COLLECTION_DAYS = 7
 logger = logging.getLogger(__name__)
 
 
+# The name of its raw folders, written once: its instances and its kind use it.
+FOLDER_PREFIX = "tldr"
+
+
 class TldrSource:
     extension = "html"
 
@@ -28,7 +32,7 @@ class TldrSource:
         if not EDITION_SLUG.fullmatch(edition):
             raise ValueError(f"not a TLDR edition slug: {edition!r}")
         self.edition = edition
-        self.name = f"tldr_{edition}"
+        self.name = f"{FOLDER_PREFIX}_{edition}"
 
     def fetch(self, last_collected_at: datetime | None) -> dict[str, bytes] | None:
         """Return the edition page of each day to collect, by day; None if there is none.

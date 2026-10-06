@@ -8,10 +8,12 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from k_b.collect import SOURCES, collect_all_sources
+from k_b.collect import collect_all_sources
 from k_b.database import DATABASE_FILE_NAME, create_database
 from k_b.import_items import MissingDatabaseError, import_items
 from k_b.raw_store import InvalidCollectionStateError
+from k_b.source import list_sources
+from k_b.source_kinds import SOURCE_KINDS
 
 DATA_DIR_VARIABLE = "KB_DATA_DIR"
 IMPORT_LOG_FILE_NAME = "import-log.jsonl"
@@ -86,7 +88,7 @@ def run_import(data_dir: Path) -> int:
     database_path = data_dir / DATABASE_FILE_NAME
     log_path = data_dir / IMPORT_LOG_FILE_NAME
     try:
-        summary = import_items(data_dir / "raw", database_path, log_path)
+        summary = import_items(data_dir / "raw", database_path, log_path, SOURCE_KINDS)
     except MissingDatabaseError as error:
         print(f"error: {error}; create it with kb create-db", file=sys.stderr)
         return 2
@@ -102,7 +104,9 @@ def run_import(data_dir: Path) -> int:
 
 def run_collect(data_dir: Path) -> int:
     try:
-        outcome = collect_all_sources(SOURCES, data_dir / "raw", datetime.now(UTC))
+        outcome = collect_all_sources(
+            list_sources(SOURCE_KINDS), data_dir / "raw", datetime.now(UTC)
+        )
     except InvalidCollectionStateError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

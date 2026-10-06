@@ -5,8 +5,9 @@ from pathlib import Path
 import pytest
 
 from k_b import github_releases_source
-from k_b.collect import SOURCES
 from k_b.github_releases_source import GithubReleasesSource
+from k_b.source import list_sources
+from k_b.source_kinds import SOURCE_KINDS
 from k_b.tracked_repositories import TRACKED_REPOSITORIES
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -32,7 +33,7 @@ def requested_paths(monkeypatch):
 
 
 def test_each_tracked_repository_is_a_source_of_kb_collect():
-    source_names = {source.name for source in SOURCES}
+    source_names = {source.name for source in list_sources(SOURCE_KINDS)}
 
     assert len(TRACKED_REPOSITORIES) == 4
     assert "github_releases_langchain_ai_langchain" in source_names

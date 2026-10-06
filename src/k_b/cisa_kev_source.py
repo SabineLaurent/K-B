@@ -4,7 +4,7 @@ from datetime import datetime
 from email.utils import format_datetime
 from urllib.error import HTTPError
 
-from k_b.cisa_kev import read_new_vulnerabilities
+from k_b.cisa_kev import read_catalog
 from k_b.http_download import download
 
 CATALOG_URL = (
@@ -17,8 +17,12 @@ TRUSTED_URL_PREFIX = "https://www.cisa.gov/"
 HTTP_NOT_MODIFIED = 304
 
 
+# The name of its raw folders, written once: its instances and its kind use it.
+FOLDER_PREFIX = "cisa_kev"
+
+
 class CisaKevSource:
-    name = "cisa_kev"
+    name = FOLDER_PREFIX
     extension = "csv"
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
@@ -41,5 +45,5 @@ class CisaKevSource:
                 error.close()
                 return None
             raise
-        read_new_vulnerabilities(raw_catalog, last_collected_at=None)
+        read_catalog(raw_catalog)
         return raw_catalog

@@ -6,9 +6,12 @@ from datetime import datetime
 
 from k_b.github_dates import parse_github_date
 from k_b.items import Item
+from k_b.source import SourceReader
 from k_b.tracked_repositories import is_repository_name
 
 REPOSITORY_URL_PREFIX = "https://github.com/"
+# The API maximum: one request, deep enough to see a repository enter the top.
+RANKING_SIZE = 100
 
 
 @dataclass(frozen=True)
@@ -93,3 +96,12 @@ def convert_starred_repository(
         raw_file_path=raw_file_path,
         repository_name=repository.full_name,
     )
+
+
+def read_ranking(raw_response: bytes) -> list[StarredRepository]:
+    return read_most_starred(raw_response, expected_size=RANKING_SIZE)
+
+
+READER: SourceReader[StarredRepository] = SourceReader(
+    read_ranking, convert_starred_repository
+)

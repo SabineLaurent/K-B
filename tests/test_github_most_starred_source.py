@@ -5,8 +5,9 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 from k_b import github_most_starred_source
-from k_b.collect import SOURCES
 from k_b.github_most_starred_source import GithubMostStarredSource
+from k_b.source import list_sources
+from k_b.source_kinds import SOURCE_KINDS
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_most_starred_extract.json").read_bytes()
@@ -41,7 +42,9 @@ def fake_github_api(monkeypatch):
 
 
 def test_the_most_starred_repositories_are_a_source_of_kb_collect():
-    assert "github_most_starred" in {source.name for source in SOURCES}
+    assert "github_most_starred" in {
+        source.name for source in list_sources(SOURCE_KINDS)
+    }
 
 
 def test_the_request_asks_for_the_100_most_starred_repositories(fake_github_api):

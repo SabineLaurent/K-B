@@ -4,57 +4,21 @@ import logging
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import NamedTuple, Protocol
+from typing import NamedTuple
 
-from k_b.arxiv_source import ArxivSource
-from k_b.cisa_kev_source import CisaKevSource
-from k_b.github_advisories_source import GithubAdvisoriesSource
-from k_b.github_most_starred_source import GithubMostStarredSource
-from k_b.github_releases_source import GithubReleasesSource
 from k_b.raw_store import (
     COLLECTION_STATE_FILENAME,
     load_last_collection_dates,
     save_last_collection_dates,
     write_new_raw_file,
 )
-from k_b.tldr_source import TRACKED_EDITIONS, TldrSource
-from k_b.tracked_repositories import TRACKED_REPOSITORIES, list_packages_by_ecosystem
+from k_b.source import Source
 
 logger = logging.getLogger(__name__)
 
 SAFE_PATH_SEGMENT = re.compile(r"[a-z0-9_]+")
 # A page name is a file name under the collection folder: a date such as 2026-09-30.
 SAFE_PAGE_NAME = re.compile(r"[a-z0-9_-]+")
-
-
-class Source(Protocol):
-    name: str
-    extension: str
-
-    def fetch(
-        self, last_collected_at: datetime | None
-    ) -> bytes | dict[str, bytes] | None:
-        """Return the raw content published since last_collected_at (None: first collection).
-
-        A source that reads several pages (a scraped site) returns them by page name. Return
-        None when the source says nothing changed since last_collected_at.
-        """
-        ...
-
-
-SOURCES: list[Source] = [
-    CisaKevSource(),
-    *(GithubReleasesSource(repository.name) for repository in TRACKED_REPOSITORIES),
-    *(
-        GithubAdvisoriesSource(ecosystem, packages)
-        for ecosystem, packages in list_packages_by_ecosystem(
-            TRACKED_REPOSITORIES
-        ).items()
-    ),
-    GithubMostStarredSource(),
-    ArxivSource(),
-    *(TldrSource(slug) for slug in TRACKED_EDITIONS),
-]
 
 
 class CollectionOutcome(NamedTuple):

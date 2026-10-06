@@ -7,8 +7,9 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 from k_b import github_advisories_source
-from k_b.collect import SOURCES
 from k_b.github_advisories_source import GithubAdvisoriesSource
+from k_b.source import list_sources
+from k_b.source_kinds import SOURCE_KINDS
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_advisories_extract.json").read_bytes()
@@ -41,7 +42,7 @@ def query_of(path):
 
 
 def test_each_ecosystem_of_the_tracked_repositories_is_a_source_of_kb_collect():
-    source_names = {source.name for source in SOURCES}
+    source_names = {source.name for source in list_sources(SOURCE_KINDS)}
 
     assert {"github_advisories_pip", "github_advisories_npm"} <= source_names
 

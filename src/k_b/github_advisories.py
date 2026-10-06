@@ -7,6 +7,7 @@ from datetime import datetime
 
 from k_b.github_dates import parse_github_date
 from k_b.items import CVE_ID, Item
+from k_b.source import SourceReader
 
 GHSA_ID = re.compile(r"GHSA(-[23456789cfghjmpqrvwx]{4}){3}")
 ADVISORY_URL_PREFIX = "https://github.com/advisories/"
@@ -107,3 +108,6 @@ def convert_advisory(
         cve=advisory.cve_id,
         is_vulnerability=True,
     )
+
+
+READER: SourceReader[Advisory] = SourceReader(read_advisories, convert_advisory)

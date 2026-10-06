@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from k_b.items import Item
+from k_b.source import SourceReader
 
 logger = logging.getLogger(__name__)
 
@@ -139,3 +140,6 @@ def convert_paper(paper: Paper, collected_at: datetime, raw_file_path: str) -> I
         collected_at=collected_at,
         raw_file_path=raw_file_path,
     )
+
+
+READER: SourceReader[Paper] = SourceReader(read_papers, convert_paper)
