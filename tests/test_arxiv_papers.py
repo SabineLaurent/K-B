@@ -3,10 +3,18 @@ from pathlib import Path
 
 import pytest
 
-from k_b.arxiv_papers import count_papers, read_papers, read_total_results
+from k_b.arxiv_papers import (
+    Paper,
+    convert_paper,
+    count_papers,
+    read_papers,
+    read_total_results,
+)
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "arxiv_extract.xml").read_bytes()
+COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
+RAW_FILE_PATH = "automation/arxiv/2026-10-05T093000Z.xml"
 
 
 def feed_with_entry(entry: str) -> bytes:
@@ -128,3 +136,29 @@ def test_a_feed_reporting_an_api_error_is_refused():
 def test_a_response_that_is_not_an_arxiv_feed_is_refused(raw_response):
     with pytest.raises(ValueError):
         read_total_results(raw_response)
+
+
+def test_a_paper_keeps_its_id_without_version_and_its_revision_date():
+    paper = Paper(
+        arxiv_id="2509.12345",
+        version=2,
+        title="A paper",
+        summary="What it says.",
+        authors=("Ada Lovelace", "Alan Turing"),
+        published_at=datetime(2025, 9, 15, 17, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 9, 20, 12, 0, tzinfo=UTC),
+        url="https://arxiv.org/abs/2509.12345",
+    )
+
+    item = convert_paper(paper, COLLECTED_AT, RAW_FILE_PATH)
+
+    assert item.source_code == "arxiv"
+    assert item.source_item_id == "2509.12345"
+    assert item.title == "A paper"
+    assert item.url == "https://arxiv.org/abs/2509.12345"
+    assert item.authors == ("Ada Lovelace", "Alan Turing")
+    assert item.published_at == datetime(2025, 9, 15, 17, 0, tzinfo=UTC)
+    assert item.revised_at == datetime(2025, 9, 20, 12, 0, tzinfo=UTC)
+    assert item.summary == "What it says."
+    assert item.collected_at == COLLECTED_AT
+    assert item.raw_file_path == RAW_FILE_PATH

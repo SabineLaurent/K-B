@@ -1,12 +1,15 @@
-"""Read the vulnerabilities of a raw CISA KEV catalog that were added since the last collection."""
+"""Read the vulnerabilities of a raw CISA KEV catalog that were added since the last collection,
+and convert each one into an item.
+"""
 
 import csv
 import io
-import re
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
-CVE_ID = re.compile(r"CVE-\d{4}-\d{4,}")
+from k_b.items import CVE_ID, Item
+
+NVD_PAGE_URL = "https://nvd.nist.gov/vuln/detail/"
 REQUIRED_COLUMNS = (
     "cveID",
     "vendorProject",
@@ -71,4 +74,22 @@ def parse_vulnerability(row: dict[str, str], line_number: int) -> Vulnerability:
         vulnerability_name=row["vulnerabilityName"],
         date_added=date_added,
         short_description=row["shortDescription"],
+    )
+
+
+def convert_vulnerability(
+    vulnerability: Vulnerability, collected_at: datetime, raw_file_path: str
+) -> Item:
+    return Item(
+        source_code="cisa_kev",
+        source_item_id=vulnerability.cve_id,
+        title=vulnerability.vulnerability_name,
+        url=NVD_PAGE_URL + vulnerability.cve_id,
+        # dateAdded is a day: stored at midnight UTC, a writing convention (docs/stockage.md).
+        published_at=datetime.combine(vulnerability.date_added, time(), tzinfo=UTC),
+        summary=vulnerability.short_description,
+        collected_at=collected_at,
+        raw_file_path=raw_file_path,
+        cve=vulnerability.cve_id,
+        is_vulnerability=True,
     )

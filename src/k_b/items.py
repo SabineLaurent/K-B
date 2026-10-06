@@ -3,7 +3,7 @@
 Which source field goes into which item field: docs/stockage.md.
 """
 
-from datetime import UTC, datetime, time
+import re
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -14,18 +14,12 @@ from pydantic import (
     model_validator,
 )
 
-from k_b.arxiv_papers import Paper
-from k_b.cisa_kev import Vulnerability
-from k_b.github_advisories import Advisory
-from k_b.github_most_starred import StarredRepository
-from k_b.github_releases import Release
-
 # The sources of seed_sources.sql: a test keeps both lists equal.
 SourceCode = Literal[
     "github", "arxiv", "cisa_kev", "clipper", "tldr", "zotero", "gh_archive"
 ]
 
-NVD_PAGE_URL = "https://nvd.nist.gov/vuln/detail/"
+CVE_ID = re.compile(r"CVE-\d{4}-\d{4,}")
 
 NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
 # Kept as given, not as pydantic's HttpUrl, which rewrites it (adds a final slash): the merge
@@ -64,82 +58,3 @@ class Item(BaseModel):
         if self.cve is not None and not self.is_vulnerability:
             raise ValueError("an item with a CVE must be a vulnerability")
         return self
-
-
-def convert_paper(paper: Paper, collected_at: datetime, raw_file_path: str) -> Item:
-    return Item(
-        source_code="arxiv",
-        source_item_id=paper.arxiv_id,
-        title=paper.title,
-        url=paper.url,
-        authors=paper.authors,
-        published_at=paper.published_at,
-        revised_at=paper.updated_at,
-        summary=paper.summary,
-        collected_at=collected_at,
-        raw_file_path=raw_file_path,
-    )
-
-
-def convert_vulnerability(
-    vulnerability: Vulnerability, collected_at: datetime, raw_file_path: str
-) -> Item:
-    return Item(
-        source_code="cisa_kev",
-        source_item_id=vulnerability.cve_id,
-        title=vulnerability.vulnerability_name,
-        url=NVD_PAGE_URL + vulnerability.cve_id,
-        # dateAdded is a day: stored at midnight UTC, a writing convention (docs/stockage.md).
-        published_at=datetime.combine(vulnerability.date_added, time(), tzinfo=UTC),
-        summary=vulnerability.short_description,
-        collected_at=collected_at,
-        raw_file_path=raw_file_path,
-        cve=vulnerability.cve_id,
-        is_vulnerability=True,
-    )
-
-
-def convert_release(
-    release: Release, collected_at: datetime, raw_file_path: str
-) -> Item:
-    return Item(
-        source_code="github",
-        source_item_id=str(release.release_id),
-        title=f"{release.repository} {release.name or release.tag_name}",
-        url=release.url,
-        published_at=release.published_at,
-        summary=release.body,
-        collected_at=collected_at,
-        raw_file_path=raw_file_path,
-    )
-
-
-def convert_advisory(
-    advisory: Advisory, collected_at: datetime, raw_file_path: str
-) -> Item:
-    return Item(
-        source_code="github",
-        source_item_id=advisory.ghsa_id,
-        title=advisory.summary,
-        url=advisory.url,
-        published_at=advisory.published_at,
-        collected_at=collected_at,
-        raw_file_path=raw_file_path,
-        cve=advisory.cve_id,
-        is_vulnerability=True,
-    )
-
-
-def convert_starred_repository(
-    repository: StarredRepository, collected_at: datetime, raw_file_path: str
-) -> Item:
-    return Item(
-        source_code="github",
-        source_item_id=repository.full_name,
-        title=repository.full_name,
-        url=repository.url,
-        summary=repository.description,
-        collected_at=collected_at,
-        raw_file_path=raw_file_path,
-        repository_name=repository.full_name,
-    )

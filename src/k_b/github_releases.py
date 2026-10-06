@@ -1,10 +1,11 @@
-"""Read the releases of a raw GitHub API response."""
+"""Read the releases of a raw GitHub API response, and convert each one into an item."""
 
 import json
 from dataclasses import dataclass
 from datetime import datetime
 
 from k_b.github_dates import parse_github_date
+from k_b.items import Item
 
 RELEASE_URL_PREFIX = "https://github.com/"
 
@@ -67,4 +68,19 @@ def parse_release(entry: object, repository: str, position: int) -> Release:
         ),
         is_prerelease=is_prerelease,
         body=body,
+    )
+
+
+def convert_release(
+    release: Release, collected_at: datetime, raw_file_path: str
+) -> Item:
+    return Item(
+        source_code="github",
+        source_item_id=str(release.release_id),
+        title=f"{release.repository} {release.name or release.tag_name}",
+        url=release.url,
+        published_at=release.published_at,
+        summary=release.body,
+        collected_at=collected_at,
+        raw_file_path=raw_file_path,
     )

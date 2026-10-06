@@ -1,4 +1,4 @@
-"""Read a raw ranking of the most starred GitHub repositories."""
+"""Read a raw ranking of the most starred GitHub repositories, and convert each one into an item."""
 
 import json
 import re
@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from k_b.github_dates import parse_github_date
+from k_b.items import Item
 
 OWNER_SLASH_NAME = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 REPOSITORY_URL_PREFIX = "https://github.com/"
@@ -81,4 +82,19 @@ def parse_repository(item: object, rank: int) -> StarredRepository:
         created_at=parse_github_date(
             item.get("created_at"), f"repository {rank}: created_at"
         ),
+    )
+
+
+def convert_starred_repository(
+    repository: StarredRepository, collected_at: datetime, raw_file_path: str
+) -> Item:
+    return Item(
+        source_code="github",
+        source_item_id=repository.full_name,
+        title=repository.full_name,
+        url=repository.url,
+        summary=repository.description,
+        collected_at=collected_at,
+        raw_file_path=raw_file_path,
+        repository_name=repository.full_name,
     )
