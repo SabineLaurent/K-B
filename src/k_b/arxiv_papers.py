@@ -71,7 +71,7 @@ def read_total_results(raw_response: bytes) -> int:
 
 def parse_feed(raw_response: bytes) -> ElementTree.Element:
     try:
-        feed = ElementTree.fromstring(raw_response)
+        feed = ElementTree.fromstring(raw_response)  # noqa: S314 — XML entities: #69
     except ElementTree.ParseError as error:
         raise ValueError(f"not an XML document: {error}") from error
     if feed.tag != f"{ATOM}feed":

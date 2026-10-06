@@ -115,7 +115,7 @@ def write_collection(
     (collection_id,) = connection.execute(
         "SELECT collection_id FROM collection WHERE raw_file_path = ?", (raw_file_path,)
     ).fetchone()
-    return collection_id
+    return int(collection_id)
 
 
 def write_authors(

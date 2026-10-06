@@ -6,7 +6,7 @@ from k_b.http_download import download
 
 API_URL = "https://api.github.com/"
 API_VERSION = "2026-03-10"
-TOKEN_VARIABLE = "KB_GITHUB_TOKEN"
+TOKEN_VARIABLE = "KB_GITHUB_TOKEN"  # noqa: S105 — the variable's name, not a token
 # A page of 100 releases of anthropics/claude-code weighs 2.2 MB in 2026.
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 

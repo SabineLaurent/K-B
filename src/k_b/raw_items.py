@@ -4,6 +4,7 @@ import csv
 import logging
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -124,7 +125,7 @@ def list_readers_by_source() -> dict[str, SourceReader]:
                 )
             case GithubReleasesSource(repository=repository):
                 readers[source.name] = SourceReader(
-                    lambda raw, repository=repository: read_releases(raw, repository),
+                    partial(read_releases, repository=repository),
                     convert_release,
                 )
             case GithubAdvisoriesSource():

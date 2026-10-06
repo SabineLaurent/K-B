@@ -124,7 +124,7 @@ def test_an_info_line_of_k_b_is_shown_once_logging_is_configured():
         "logging.getLogger('k_b.tldr_source').info('tldr_ai 2026-10-03: no edition page')"
     )
 
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603 — runs this interpreter on a fixed script
         [sys.executable, "-c", script], capture_output=True, text=True
     )
 

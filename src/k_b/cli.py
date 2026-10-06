@@ -106,8 +106,8 @@ def run_collect(data_dir: Path) -> int:
     except InvalidCollectionStateError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
-    for source_name, error in outcome.errors_by_source.items():
-        print(f"{source_name}: {describe_outcome(error)}")
+    for source_name, source_error in outcome.errors_by_source.items():
+        print(f"{source_name}: {describe_outcome(source_error)}")
     if outcome.state_error is not None:
         print(f"collection_state: {describe_outcome(outcome.state_error)}")
     has_failure = outcome.state_error is not None or any(
