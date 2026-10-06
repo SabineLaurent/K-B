@@ -311,6 +311,7 @@ def test_a_folder_of_pages_not_named_by_a_collection_time_is_rejected_whole(
     assert [rejection.raw_file_path for rejection in reading.rejections] == [
         "automation/fake/latest"
     ]
+    assert reading.rejections[0].reason.startswith("ValueError: time data 'latest'")
 
 
 def test_an_unreadable_page_is_rejected_and_the_others_of_its_folder_are_read(
@@ -331,3 +332,21 @@ def test_an_unreadable_page_is_rejected_and_the_others_of_its_folder_are_read(
         rejection.raw_file_path == f"automation/fake/{COLLECTION_NAME}/2026-10-04.html"
     )
     assert rejection.reason.startswith("UnicodeDecodeError")
+
+
+def test_an_unreadable_folder_of_pages_is_rejected_and_the_others_are_read(tmp_path):
+    unreadable_dir = write_pages(
+        tmp_path, "2026-10-04T093000Z", {"2026-10-04.html": b"a"}
+    )
+    write_pages(tmp_path, COLLECTION_NAME, {"2026-10-05.html": b"b"})
+    unreadable_dir.chmod(0)
+    try:
+        reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS)
+    finally:
+        unreadable_dir.chmod(0o755)
+
+    assert [item.source_item_id for item in reading.items] == ["b"]
+    assert len(reading.rejections) == 1
+    rejection = reading.rejections[0]
+    assert rejection.raw_file_path == "automation/fake/2026-10-04T093000Z"
+    assert rejection.reason.startswith("PermissionError")

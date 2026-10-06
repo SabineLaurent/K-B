@@ -32,58 +32,74 @@ def read_raw_items(raw_dir: Path, kinds: Sequence[SourceKind]) -> RawReading:
     """Every item of the raw pages whose source kind has a reader, in collection order.
 
     A collection is a raw file, or a folder of pages; a raw file is read as a single page. A
-    collection not named by its time, a page that cannot be read, or an entry refused as an
-    item, is rejected and logged; the others are still read.
+    collection not named by its time or that cannot be listed, a page that cannot be read, or
+    an entry refused as an item, is rejected and logged; the others are still read.
     """
-    reading = RawReading([], [])
+    items = []
+    rejections = []
     for collection_path, reader in list_collections(raw_dir, kinds):
-        relative_collection_path = collection_path.relative_to(raw_dir).as_posix()
-        # A folder name is taken whole: a file name without its extension.
-        collection_name = (
-            collection_path.name if collection_path.is_dir() else collection_path.stem
-        )
-        try:
-            collected_at = datetime.strptime(
-                collection_name, COLLECTION_NAME_FORMAT
-            ).replace(tzinfo=UTC)
-        except ValueError as error:
-            reading.rejections.append(
-                reject(relative_collection_path, f"{type(error).__name__}: {error}")
-            )
-            continue
-        for page_path in list_pages(collection_path, raw_dir):
-            read_page(page_path, raw_dir, reader, collected_at, reading)
+        collection_reading = read_collection(collection_path, raw_dir, reader)
+        items.extend(collection_reading.items)
+        rejections.extend(collection_reading.rejections)
     # Stable sort: within a collection, the items keep their page and source order.
-    reading.items.sort(key=lambda item: item.collected_at)
-    return reading
+    items.sort(key=lambda item: item.collected_at)
+    return RawReading(items, rejections)
+
+
+def read_collection(
+    collection_path: Path, raw_dir: Path, reader: SourceReader[Any]
+) -> RawReading:
+    try:
+        if collection_path.is_dir():
+            # A folder name is taken whole: a file name without its extension.
+            collected_at = parse_collection_name(collection_path.name)
+            pages = list_pages(collection_path, raw_dir)
+        else:
+            collected_at = parse_collection_name(collection_path.stem)
+            pages = [collection_path]
+    except (ValueError, OSError) as error:
+        relative_collection_path = collection_path.relative_to(raw_dir).as_posix()
+        return RawReading(
+            [], [reject(relative_collection_path, f"{type(error).__name__}: {error}")]
+        )
+    items = []
+    rejections = []
+    for page_path in pages:
+        page_reading = read_page(page_path, raw_dir, reader, collected_at)
+        items.extend(page_reading.items)
+        rejections.extend(page_reading.rejections)
+    return RawReading(items, rejections)
+
+
+def parse_collection_name(collection_name: str) -> datetime:
+    return datetime.strptime(collection_name, COLLECTION_NAME_FORMAT).replace(
+        tzinfo=UTC
+    )
 
 
 def read_page(
-    page_path: Path,
-    raw_dir: Path,
-    reader: SourceReader[Any],
-    collected_at: datetime,
-    reading: RawReading,
-) -> None:
-    """Add the items of a page to reading, and its rejections."""
+    page_path: Path, raw_dir: Path, reader: SourceReader[Any], collected_at: datetime
+) -> RawReading:
     raw_file_path = page_path.relative_to(raw_dir).as_posix()
     try:
         entries = reader.read_entries(page_path.read_bytes())
     except (ValueError, csv.Error, OSError) as error:
-        reading.rejections.append(
-            reject(raw_file_path, f"{type(error).__name__}: {error}")
+        return RawReading(
+            [], [reject(raw_file_path, f"{type(error).__name__}: {error}")]
         )
-        return
+    items = []
+    rejections = []
     for position, entry in enumerate(entries):
         try:
-            reading.items.append(reader.convert(entry, collected_at, raw_file_path))
+            items.append(reader.convert(entry, collected_at, raw_file_path))
         except ValidationError as error:
-            reading.rejections.append(
+            rejections.append(
                 reject(
                     raw_file_path,
                     f"entry {position}: {type(error).__name__}: {error}",
                 )
             )
+    return RawReading(items, rejections)
 
 
 def list_collections(
@@ -105,12 +121,10 @@ def list_collections(
     return collections
 
 
-def list_pages(collection_path: Path, raw_dir: Path) -> list[Path]:
-    """The pages of a collection: the raw file itself, or the files of its folder."""
-    if not collection_path.is_dir():
-        return [collection_path]
+def list_pages(collection_dir: Path, raw_dir: Path) -> list[Path]:
+    """The files of a collection folder."""
     pages = []
-    for path in list_visible_entries(collection_path):
+    for path in list_visible_entries(collection_dir):
         if path.is_dir():
             logger.info(
                 "folder inside a collection folder, skipped: %s",
