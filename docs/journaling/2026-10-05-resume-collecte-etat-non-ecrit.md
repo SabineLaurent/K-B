@@ -44,14 +44,12 @@ pour chaque source.
 `src/k_b/collect.py:77-82`
 
 ```python
-try:
-    save_last_collection_dates(raw_dir, last_collection_dates)
-except OSError as error:
-    logger.exception(
-        "collection state not written to %s", raw_dir / COLLECTION_STATE_FILENAME
-    )
-    return CollectionOutcome(errors_by_source, error)
-return CollectionOutcome(errors_by_source, None)
+    try:
+        save_last_collection_dates(raw_dir, last_collection_dates)
+    except OSError as error:
+        logger.exception("collection state not written to %s", raw_dir / COLLECTION_STATE_FILENAME)
+        return CollectionOutcome(errors_by_source, error)
+    return CollectionOutcome(errors_by_source, None)
 ```
 
 On ne rattrape que `OSError`, la famille des erreurs du système de fichiers (`PermissionError`,

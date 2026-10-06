@@ -96,7 +96,7 @@ grosse et refusée. Un test vérifie qu'une réponse **exactement** au plafond p
 
 ```python
 # Never forwarded to a redirection: the token stays with api.github.com.
-unredirected_headers = ({"Authorization": f"Bearer {token}"} if token else None,)
+unredirected_headers={"Authorization": f"Bearer {token}"} if token else None,
 ```
 
 `urllib` distingue deux sortes d'en-têtes : ceux de `request.headers`, recopiés sur la requête

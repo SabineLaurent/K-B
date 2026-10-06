@@ -33,16 +33,10 @@ qu'elle suit. CISA KEV, déjà en place, dit en plus si une faille est activemen
 ```python
 TRACKED_REPOSITORIES = (
     TrackedRepository(
-        "langchain-ai/langchain",
-        "pip",
-        ("langchain", "langchain-core", "langchain-text-splitters"),
+        "langchain-ai/langchain", "pip", ("langchain", "langchain-core", "langchain-text-splitters")
     ),
-    TrackedRepository(
-        "langchain-ai/langgraph", "pip", ("langgraph", "langgraph-checkpoint")
-    ),
-    TrackedRepository(
-        "run-llama/llama_index", "pip", ("llama-index", "llama-index-core")
-    ),
+    TrackedRepository("langchain-ai/langgraph", "pip", ("langgraph", "langgraph-checkpoint")),
+    TrackedRepository("run-llama/llama_index", "pip", ("llama-index", "llama-index-core")),
     TrackedRepository("anthropics/claude-code", "npm", ("@anthropic-ai/claude-code",)),
 )
 ```

@@ -159,12 +159,10 @@ source mal nommée n'est même pas interrogée.
 programme s'arrête avec le code 2.
 
 ```python
-data_dir = os.environ.get(DATA_DIR_VARIABLE)
-if not data_dir:
-    print(
-        f"error: {DATA_DIR_VARIABLE} must point to the data directory", file=sys.stderr
-    )
-    return 2
+    data_dir = os.environ.get(DATA_DIR_VARIABLE)
+    if not data_dir:
+        print(f"error: {DATA_DIR_VARIABLE} must point to the data directory", file=sys.stderr)
+        return 2
 ```
 
 Les données collectées ne doivent jamais se retrouver dans le dépôt de code, qui est public
