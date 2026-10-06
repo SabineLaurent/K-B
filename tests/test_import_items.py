@@ -8,6 +8,7 @@ from test_raw_items import FIXTURES_DIR, copy_fixture, write_most_starred_rankin
 from k_b import import_items as import_items_module
 from k_b.database import connect_database, create_database
 from k_b.import_items import MissingDatabaseError, import_items
+from k_b.source_kinds import SOURCE_KINDS
 
 FIRST_PAPER_ID = "2609.31282"
 FIRST_PAPER_AUTHORS = [("Toqeer Ali Syed", 1), ("Asadullah Abdullah Khan", 2)]
@@ -38,7 +39,10 @@ def data_dir(tmp_path):
 
 def run_import(data_dir):
     return import_items(
-        data_dir / "raw", data_dir / "k-b.sqlite", data_dir / "import-log.jsonl"
+        data_dir / "raw",
+        data_dir / "k-b.sqlite",
+        data_dir / "import-log.jsonl",
+        SOURCE_KINDS,
     )
 
 
@@ -219,7 +223,10 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(data_dir):
 def test_a_missing_database_is_refused_and_not_created(tmp_path):
     with pytest.raises(MissingDatabaseError):
         import_items(
-            tmp_path / "raw", tmp_path / "k-b.sqlite", tmp_path / "import-log.jsonl"
+            tmp_path / "raw",
+            tmp_path / "k-b.sqlite",
+            tmp_path / "import-log.jsonl",
+            SOURCE_KINDS,
         )
 
     assert not (tmp_path / "k-b.sqlite").exists()

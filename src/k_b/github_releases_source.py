@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__)
 RELEASES_PER_PAGE = 100
 
 
+# The name of its raw folders, written once: its instances and its kind use it.
+FOLDER_PREFIX = "github_releases"
+
+
 class GithubReleasesSource:
     extension = "json"
 
@@ -21,7 +25,7 @@ class GithubReleasesSource:
         if not is_repository_name(repository):
             raise ValueError(f"not an owner/name repository: {repository!r}")
         self.repository = repository
-        self.name = "github_releases_" + re.sub(r"[^a-z0-9]+", "_", repository.lower())
+        self.name = f"{FOLDER_PREFIX}_" + re.sub(r"[^a-z0-9]+", "_", repository.lower())
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
         """Return the first page of releases; None if none is newer than last_collected_at."""

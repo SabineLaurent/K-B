@@ -5,8 +5,9 @@ from urllib.error import HTTPError, URLError
 import pytest
 
 from k_b import tldr_source
-from k_b.collect import SOURCES
 from k_b.http_download import RedirectedOutsideError
+from k_b.source import list_sources
+from k_b.source_kinds import SOURCE_KINDS
 from k_b.tldr_source import TldrSource
 
 # Sunday: the window of a collection on this day holds a weekend.
@@ -41,7 +42,7 @@ def fake_download(monkeypatch):
 
 
 def test_each_tracked_edition_is_a_source_of_kb_collect():
-    names = [source.name for source in SOURCES]
+    names = [source.name for source in list_sources(SOURCE_KINDS)]
     assert {"tldr_ai", "tldr_infosec", "tldr_dev"} <= set(names)
 
 

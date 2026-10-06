@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 
 from k_b.items import CVE_ID, Item
+from k_b.source import SourceReader
 
 NVD_PAGE_URL = "https://nvd.nist.gov/vuln/detail/"
 REQUIRED_COLUMNS = (
@@ -93,3 +94,11 @@ def convert_vulnerability(
         cve=vulnerability.cve_id,
         is_vulnerability=True,
     )
+
+
+def read_catalog(raw_catalog: bytes) -> list[Vulnerability]:
+    """The whole catalog: duplicates between collections are removed by the merge."""
+    return read_new_vulnerabilities(raw_catalog, last_collected_at=None)
+
+
+READER: SourceReader[Vulnerability] = SourceReader(read_catalog, convert_vulnerability)

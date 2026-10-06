@@ -7,6 +7,12 @@ import pytest
 from test_collect import BrokenSource, WorkingSource
 
 from k_b import cli
+from k_b.source import SourceKind
+
+
+def collected_kinds(*sources):
+    """One kind without a reader: the collection tests only need its sources."""
+    return (SourceKind("test", sources, None),)
 
 
 def test_collect_refuses_to_run_without_a_data_directory(monkeypatch, capsys):
@@ -28,7 +34,9 @@ def test_collect_reports_a_failure_but_still_stores_the_other_sources(
     monkeypatch, tmp_path
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(cli, "SOURCES", [BrokenSource(), WorkingSource()])
+    monkeypatch.setattr(
+        cli, "SOURCE_KINDS", collected_kinds(BrokenSource(), WorkingSource())
+    )
 
     exit_code = cli.main(["collect"])
 
@@ -46,7 +54,7 @@ def test_collect_still_prints_the_summary_and_exits_1_when_the_state_cannot_be_w
     (raw_dir / "automation").mkdir(parents=True)
     raw_dir.chmod(0o500)
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(cli, "SOURCES", [WorkingSource()])
+    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
 
     try:
         exit_code = cli.main(["collect"])
@@ -67,7 +75,7 @@ def test_collect_fails_closed_with_a_clear_message_on_a_corrupted_state(
     state_path.parent.mkdir()
     state_path.write_text('{"working": ', encoding="utf-8")
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(cli, "SOURCES", [WorkingSource()])
+    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
 
     exit_code = cli.main(["collect"])
 
@@ -86,7 +94,7 @@ def test_collect_prints_nothing_but_the_error_on_a_corrupted_state(
     state_path.parent.mkdir()
     state_path.write_text("[]", encoding="utf-8")
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(cli, "SOURCES", [])
+    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
 
     assert cli.main(["collect"]) == 2
     assert capsys.readouterr().out == ""
@@ -103,7 +111,7 @@ def test_collect_fails_closed_with_a_clear_message_on_an_unreadable_state(
     state_path.write_text("{}", encoding="utf-8")
     state_path.chmod(0o000)
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(cli, "SOURCES", [WorkingSource()])
+    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
 
     try:
         exit_code = cli.main(["collect"])
@@ -211,7 +219,7 @@ def test_import_reports_a_failed_import_and_exits_1(monkeypatch, tmp_path, capsy
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
 
-    def fail_to_import(raw_dir, database_path, log_path):
+    def fail_to_import(raw_dir, database_path, log_path, source_kinds):
         raise sqlite3.IntegrityError("UNIQUE constraint failed: item.url")
 
     monkeypatch.setattr(cli, "import_items", fail_to_import)

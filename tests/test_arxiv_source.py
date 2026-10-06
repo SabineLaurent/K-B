@@ -7,7 +7,8 @@ import pytest
 
 from k_b import http_download
 from k_b.arxiv_source import ArxivSource
-from k_b.collect import SOURCES
+from k_b.source import list_sources
+from k_b.source_kinds import SOURCE_KINDS
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "arxiv_extract.xml").read_bytes()
@@ -50,7 +51,7 @@ def fake_urlopen(monkeypatch):
 
 
 def test_arxiv_is_a_source_of_kb_collect():
-    assert "arxiv" in [source.name for source in SOURCES]
+    assert "arxiv" in [source.name for source in list_sources(SOURCE_KINDS)]
 
 
 def test_the_response_is_returned_unchanged(fake_urlopen):

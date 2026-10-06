@@ -32,8 +32,12 @@ ANNOUNCEMENT_DELAY_MARGIN = timedelta(days=7)
 FIRST_COLLECTION_START = datetime(2026, 5, 1, tzinfo=UTC)
 
 
+# The name of its raw folders, written once: its instances and its kind use it.
+FOLDER_PREFIX = "arxiv"
+
+
 class ArxivSource:
-    name = "arxiv"
+    name = FOLDER_PREFIX
     extension = "xml"
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:

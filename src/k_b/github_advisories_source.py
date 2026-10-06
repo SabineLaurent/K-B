@@ -14,6 +14,10 @@ ECOSYSTEMS = ("pip", "npm")
 ADVISORIES_PER_PAGE = 100
 
 
+# The name of its raw folders, written once: its instances and its kind use it.
+FOLDER_PREFIX = "github_advisories"
+
+
 class GithubAdvisoriesSource:
     extension = "json"
 
@@ -22,7 +26,7 @@ class GithubAdvisoriesSource:
             raise ValueError(f"not a tracked ecosystem: {ecosystem!r}")
         self.ecosystem = ecosystem
         self.packages = packages
-        self.name = f"github_advisories_{ecosystem}"
+        self.name = f"{FOLDER_PREFIX}_{ecosystem}"
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
         """Return the advisories of the packages; None if none was reviewed since last_collected_at.

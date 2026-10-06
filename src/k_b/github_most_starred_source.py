@@ -4,17 +4,19 @@ from datetime import datetime
 from urllib.parse import urlencode
 
 from k_b.github_api import get_from_github_api
-from k_b.github_most_starred import read_most_starred
+from k_b.github_most_starred import RANKING_SIZE, read_ranking
 
 # The search needs a criterion: this one keeps the whole top 100 (the 100th had 116,161 stars on
 # 2026-10-02).
 SEARCH_QUERY = "stars:>10000"
-# The API maximum: one request, deep enough to see a repository enter the top.
-RANKING_SIZE = 100
+
+
+# The name of its raw folders, written once: its instances and its kind use it.
+FOLDER_PREFIX = "github_most_starred"
 
 
 class GithubMostStarredSource:
-    name = "github_most_starred"
+    name = FOLDER_PREFIX
     extension = "json"
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
@@ -29,5 +31,5 @@ class GithubMostStarredSource:
             "per_page": RANKING_SIZE,
         }
         raw_response = get_from_github_api(f"search/repositories?{urlencode(query)}")
-        read_most_starred(raw_response, expected_size=RANKING_SIZE)
+        read_ranking(raw_response)
         return raw_response
