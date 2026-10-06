@@ -5,7 +5,7 @@ from urllib.error import HTTPError, URLError
 import pytest
 
 from k_b.http_download import RedirectedOutsideError
-from k_b.source import list_sources
+from k_b.source_contract import list_sources
 from k_b.source_kinds import SOURCE_KINDS
 from k_b.sources import tldr
 from k_b.sources.tldr import TldrSource

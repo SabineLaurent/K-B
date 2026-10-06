@@ -12,7 +12,7 @@ from k_b.raw_store import (
     save_last_collection_dates,
     write_new_raw_file,
 )
-from k_b.source import Source
+from k_b.source_contract import Source
 
 logger = logging.getLogger(__name__)
 

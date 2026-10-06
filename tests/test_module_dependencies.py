@@ -12,7 +12,7 @@ PACKAGE_DIR = Path(k_b.__file__).parent
 SOURCES_DIR = PACKAGE_DIR / "sources"
 GENERIC_MODULES = {
     "items",
-    "source",
+    "source_contract",
     "collect",
     "raw_store",
     "raw_items",

@@ -10,7 +10,7 @@ from typing import Any, NamedTuple
 from pydantic import ValidationError
 
 from k_b.items import Item
-from k_b.source import SourceKind, SourceReader, find_source_kind
+from k_b.source_contract import SourceKind, SourceReader, find_source_kind
 
 logger = logging.getLogger(__name__)
 
