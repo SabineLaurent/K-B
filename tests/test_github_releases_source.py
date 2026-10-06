@@ -44,7 +44,8 @@ def test_each_tracked_repository_is_a_source_of_kb_collect():
 
 
 @pytest.mark.parametrize(
-    "repository", ["../escape", "owner", "owner/repo/extra", "owner/re po"]
+    "repository",
+    ["../escape", "./x", "x/.", "owner", "owner/repo/extra", "owner/re po"],
 )
 def test_a_repository_that_is_not_owner_slash_name_is_refused(repository):
     with pytest.raises(ValueError, match="repository"):
@@ -56,6 +57,20 @@ def test_a_first_collection_returns_the_first_page_unchanged(requested_paths):
 
     assert source.fetch(last_collected_at=None) == RECORDED_RESPONSE
     assert requested_paths == ["repos/anthropics/claude-code/releases?per_page=100"]
+
+
+@pytest.mark.parametrize("last_collected_at", [None, BETWEEN_RELEASES])
+def test_a_page_of_another_repository_is_refused(requested_paths, last_collected_at):
+    source = GithubReleasesSource("anthropics/another-repository")
+
+    with pytest.raises(ValueError, match="anthropics/claude-code"):
+        source.fetch(last_collected_at)
+
+
+def test_the_case_of_the_repository_name_is_ignored(requested_paths):
+    source = GithubReleasesSource("Anthropics/Claude-Code")
+
+    assert source.fetch(last_collected_at=None) == RECORDED_RESPONSE
 
 
 def test_a_page_with_a_release_newer_than_the_last_collection_is_returned(

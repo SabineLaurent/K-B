@@ -6,19 +6,19 @@ from datetime import datetime
 
 from k_b.github_api import get_from_github_api
 from k_b.github_releases import read_releases
+from k_b.tracked_repositories import is_repository_name
 
 logger = logging.getLogger(__name__)
 
 # The API maximum. Only the first page is read: see the warning in fetch.
 RELEASES_PER_PAGE = 100
-OWNER_SLASH_NAME = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 
 
 class GithubReleasesSource:
     extension = "json"
 
     def __init__(self, repository: str):
-        if not OWNER_SLASH_NAME.fullmatch(repository) or ".." in repository:
+        if not is_repository_name(repository):
             raise ValueError(f"not an owner/name repository: {repository!r}")
         self.repository = repository
         self.name = "github_releases_" + re.sub(r"[^a-z0-9]+", "_", repository.lower())
@@ -29,7 +29,15 @@ class GithubReleasesSource:
             f"repos/{self.repository}/releases?per_page={RELEASES_PER_PAGE}"
         )
         # Read even at the first collection: a page that is not a list of releases raises.
-        releases = read_releases(raw_response, self.repository)
+        releases = read_releases(raw_response)
+        # Defence in depth: the page must be of the tracked repository, whose case GitHub may
+        # write differently.
+        for position, release in enumerate(releases):
+            if release.repository.lower() != self.repository.lower():
+                raise ValueError(
+                    f"{self.repository}: release {position} is of the repository "
+                    f"{release.repository!r}"
+                )
         if last_collected_at is None:
             return raw_response
         publication_dates = [release.published_at for release in releases]

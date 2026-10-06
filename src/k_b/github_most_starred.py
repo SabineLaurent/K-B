@@ -1,14 +1,13 @@
 """Read a raw ranking of the most starred GitHub repositories, and convert each one into an item."""
 
 import json
-import re
 from dataclasses import dataclass
 from datetime import datetime
 
 from k_b.github_dates import parse_github_date
 from k_b.items import Item
+from k_b.tracked_repositories import is_repository_name
 
-OWNER_SLASH_NAME = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 REPOSITORY_URL_PREFIX = "https://github.com/"
 
 
@@ -49,11 +48,7 @@ def parse_repository(item: object, rank: int) -> StarredRepository:
     if not isinstance(item, dict):
         raise ValueError(f"repository {rank}: not an object")
     full_name = item.get("full_name")
-    if (
-        not isinstance(full_name, str)
-        or not OWNER_SLASH_NAME.fullmatch(full_name)
-        or ".." in full_name
-    ):
+    if not isinstance(full_name, str) or not is_repository_name(full_name):
         raise ValueError(f"repository {rank}: not an owner/name: {full_name!r}")
     url = item.get("html_url")
     if not isinstance(url, str) or not url.startswith(REPOSITORY_URL_PREFIX):

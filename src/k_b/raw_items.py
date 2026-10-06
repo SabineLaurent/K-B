@@ -4,7 +4,6 @@ import csv
 import logging
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
-from functools import partial
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -116,11 +115,10 @@ def list_readers_by_source() -> dict[str, SourceReader]:
                     lambda raw: read_new_vulnerabilities(raw, last_collected_at=None),
                     convert_vulnerability,
                 )
-            case GithubReleasesSource(repository=repository):
-                readers[source.name] = SourceReader(
-                    partial(read_releases, repository=repository),
-                    convert_release,
-                )
+            case GithubReleasesSource():
+                # The repository comes from each release URL; the collection has already
+                # refused a page of another repository than the tracked one.
+                readers[source.name] = SourceReader(read_releases, convert_release)
             case GithubAdvisoriesSource():
                 readers[source.name] = SourceReader(read_advisories, convert_advisory)
             case GithubMostStarredSource():
