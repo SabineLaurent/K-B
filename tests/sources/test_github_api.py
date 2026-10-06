@@ -2,8 +2,9 @@ import io
 
 import pytest
 
-from k_b import github_api, http_download
-from k_b.github_api import get_from_github_api
+from k_b import http_download
+from k_b.sources import github_api
+from k_b.sources.github_api import get_from_github_api
 from k_b.user_agent import USER_AGENT
 
 BODY = b'[{"tag_name": "v1.0.0"}]'
