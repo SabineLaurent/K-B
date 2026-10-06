@@ -7,7 +7,7 @@
   `src/k_b/github_releases_source.py`
 - **Série** : suit `2026-10-06-ranger-les-conversions.md` (PR #102). La branche part de celle de la
   PR #102, dont les 4 commits (`c0cfc54` à `10f26a7`) sont expliqués dans cette note-là. Celle-ci
-  ne couvre que `8e13f33` et `aa3b1da`.
+  ne couvre que `8e13f33`, `aa3b1da` et `597b929`.
 
 ## Le pourquoi
 
@@ -36,7 +36,7 @@ def is_repository_name(text: str) -> bool:
 
 La même règle était écrite deux fois, dans `github_releases_source.py` et
 `github_most_starred.py`. Elle n'existe plus qu'ici, et les trois usagers l'importent
-(`github_releases.py:10`, `github_releases_source.py:21`, `github_most_starred.py:51`).
+(appels : `github_releases.py:58`, `github_releases_source.py:21`, `github_most_starred.py:51`).
 `tracked_repositories.py` ne fait aucun appel externe et sert déjà toutes les sources GitHub.
 La règle refuse tout ce qui l'était déjà, et en plus un propriétaire ou un nom égal à `.`.
 
@@ -90,7 +90,7 @@ un segment que le navigateur garderait entier. Ce n'est pas un trou de sécurit�
 
 ### 4. La collecte refuse une page d'un autre dépôt
 
-`src/k_b/github_releases_source.py:35-41` :
+`src/k_b/github_releases_source.py:35-37` :
 
 ```python
         for position, release in enumerate(releases):
@@ -101,7 +101,7 @@ un segment que le navigateur garderait entier. Ce n'est pas un trou de sécurit�
 C'est la défense en profondeur : le lecteur fait maintenant confiance à l'URL, alors la collecte
 vérifie que la page reçue est bien celle du dépôt demandé. La casse est ignorée, car GitHub peut
 écrire `Anthropics/Claude-Code` là où la liste suivie écrit `anthropics/claude-code`. Le contrôle
-passe **avant** le retour de la première collecte (ligne 41) : sans cela, la première collecte y
+passe **avant** le retour de la première collecte (ligne 42) : sans cela, la première collecte y
 échapperait.
 
 ## Choix faits et options écartées
