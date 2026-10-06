@@ -22,7 +22,12 @@ class GithubMostStarredSource:
 
         Entries, exits and climbs are found at the reading, by comparing two snapshots.
         """
-        query = {"q": SEARCH_QUERY, "sort": "stars", "order": "desc", "per_page": RANKING_SIZE}
+        query = {
+            "q": SEARCH_QUERY,
+            "sort": "stars",
+            "order": "desc",
+            "per_page": RANKING_SIZE,
+        }
         raw_response = get_from_github_api(f"search/repositories?{urlencode(query)}")
         read_most_starred(raw_response, expected_size=RANKING_SIZE)
         return raw_response

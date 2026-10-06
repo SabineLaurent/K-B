@@ -18,10 +18,16 @@ class TrackedRepository:
 
 TRACKED_REPOSITORIES = (
     TrackedRepository(
-        "langchain-ai/langchain", "pip", ("langchain", "langchain-core", "langchain-text-splitters")
+        "langchain-ai/langchain",
+        "pip",
+        ("langchain", "langchain-core", "langchain-text-splitters"),
     ),
-    TrackedRepository("langchain-ai/langgraph", "pip", ("langgraph", "langgraph-checkpoint")),
-    TrackedRepository("run-llama/llama_index", "pip", ("llama-index", "llama-index-core")),
+    TrackedRepository(
+        "langchain-ai/langgraph", "pip", ("langgraph", "langgraph-checkpoint")
+    ),
+    TrackedRepository(
+        "run-llama/llama_index", "pip", ("llama-index", "llama-index-core")
+    ),
     TrackedRepository("anthropics/claude-code", "npm", ("@anthropic-ai/claude-code",)),
 )
 
@@ -32,5 +38,7 @@ def list_packages_by_ecosystem(
     packages_by_ecosystem: dict[str, tuple[str, ...]] = {}
     for repository in repositories:
         known_packages = packages_by_ecosystem.get(repository.ecosystem, ())
-        packages_by_ecosystem[repository.ecosystem] = known_packages + repository.packages
+        packages_by_ecosystem[repository.ecosystem] = (
+            known_packages + repository.packages
+        )
     return packages_by_ecosystem

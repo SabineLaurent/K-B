@@ -46,14 +46,18 @@ def test_last_collection_dates_round_trip_as_utc_aware_datetimes(tmp_path):
     ],
 )
 def test_invalid_collection_state_is_refused(tmp_path, state_file_content):
-    (tmp_path / COLLECTION_STATE_FILENAME).write_text(state_file_content, encoding="utf-8")
+    (tmp_path / COLLECTION_STATE_FILENAME).write_text(
+        state_file_content, encoding="utf-8"
+    )
 
     with pytest.raises(InvalidCollectionStateError):
         load_last_collection_dates(tmp_path)
 
 
 def test_a_collection_state_that_is_not_utf8_is_refused(tmp_path):
-    (tmp_path / COLLECTION_STATE_FILENAME).write_bytes('{"caf\u00e9": 1}'.encode("latin-1"))
+    (tmp_path / COLLECTION_STATE_FILENAME).write_bytes(
+        '{"caf\u00e9": 1}'.encode("latin-1")
+    )
 
     with pytest.raises(InvalidCollectionStateError):
         load_last_collection_dates(tmp_path)

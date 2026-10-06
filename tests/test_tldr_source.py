@@ -23,7 +23,9 @@ class FakeDownload:
 
     def __call__(self, url, trusted_url_prefix, max_bytes):
         self.urls.append(url)
-        answer = self.answers.get(url, RedirectedOutsideError(url, "https://tldr.tech/ai"))
+        answer = self.answers.get(
+            url, RedirectedOutsideError(url, "https://tldr.tech/ai")
+        )
         if isinstance(answer, Exception):
             raise answer
         return answer
@@ -66,7 +68,9 @@ def test_a_first_collection_asks_the_seven_days_before_today_and_today(fake_down
     assert len(fake_download.urls) == 8
 
 
-def test_an_edition_page_is_returned_unchanged_under_its_day_and_logged(fake_download, caplog):
+def test_an_edition_page_is_returned_unchanged_under_its_day_and_logged(
+    fake_download, caplog
+):
     fake_download.answers["https://tldr.tech/ai/2026-10-02"] = EDITION_PAGE
     caplog.set_level(logging.INFO, logger="k_b.tldr_source")
 
@@ -76,7 +80,9 @@ def test_an_edition_page_is_returned_unchanged_under_its_day_and_logged(fake_dow
     assert f"tldr_ai 2026-10-02: edition page, {len(EDITION_PAGE)} bytes" in caplog.text
 
 
-@pytest.mark.parametrize("landing_url", ["https://tldr.tech/ai", "https://tldr.tech/ai/"])
+@pytest.mark.parametrize(
+    "landing_url", ["https://tldr.tech/ai", "https://tldr.tech/ai/"]
+)
 def test_a_day_redirected_to_the_edition_landing_page_is_logged_and_skipped(
     fake_download, caplog, landing_url
 ):
@@ -89,7 +95,10 @@ def test_a_day_redirected_to_the_edition_landing_page_is_logged_and_skipped(
     pages = TldrSource("ai").fetch(datetime(2026, 10, 2, 6, 0, tzinfo=UTC))
 
     assert list(pages) == ["2026-10-02"]
-    assert f"tldr_ai 2026-10-03: no edition page, redirected to {landing_url}" in caplog.text
+    assert (
+        f"tldr_ai 2026-10-03: no edition page, redirected to {landing_url}"
+        in caplog.text
+    )
 
 
 def test_a_redirection_elsewhere_than_the_edition_landing_page_is_logged_and_raised(
@@ -107,7 +116,9 @@ def test_a_redirection_elsewhere_than_the_edition_landing_page_is_logged_and_rai
     ) in caplog.text
 
 
-def test_no_edition_page_in_the_window_returns_none_and_is_logged(fake_download, caplog):
+def test_no_edition_page_in_the_window_returns_none_and_is_logged(
+    fake_download, caplog
+):
     caplog.set_level(logging.INFO, logger="k_b.tldr_source")
 
     assert TldrSource("ai").fetch(datetime(2026, 10, 2, 6, 0, tzinfo=UTC)) is None
@@ -118,11 +129,20 @@ def test_no_edition_page_in_the_window_returns_none_and_is_logged(fake_download,
     ("error", "observed"),
     [
         (
-            HTTPError("https://tldr.tech/ai/2026-10-04", 500, "Internal Server Error", {}, None),
+            HTTPError(
+                "https://tldr.tech/ai/2026-10-04",
+                500,
+                "Internal Server Error",
+                {},
+                None,
+            ),
             "HTTP Error 500: Internal Server Error",
         ),
         (URLError("timed out"), "<urlopen error timed out>"),
-        (ValueError("response larger than 1048576 bytes, refused"), "response larger than"),
+        (
+            ValueError("response larger than 1048576 bytes, refused"),
+            "response larger than",
+        ),
     ],
 )
 def test_an_error_is_logged_with_its_day_and_url_then_raised(
@@ -143,6 +163,8 @@ def test_an_edition_that_is_not_a_slug_is_refused(edition):
 
 
 def test_a_last_collection_after_today_is_refused_with_both_days(fake_download):
-    with pytest.raises(ValueError, match="last collection day 2026-10-05 is after today 2026-10-04"):
+    with pytest.raises(
+        ValueError, match="last collection day 2026-10-05 is after today 2026-10-04"
+    ):
         TldrSource("ai").fetch(datetime(2026, 10, 5, 6, 0, tzinfo=UTC))
     assert fake_download.urls == []

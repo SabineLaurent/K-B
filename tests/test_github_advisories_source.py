@@ -51,7 +51,9 @@ def test_an_unknown_ecosystem_is_refused():
         GithubAdvisoriesSource("../escape", PACKAGES)
 
 
-def test_a_first_collection_asks_for_the_reviewed_advisories_of_the_packages(fake_github_api):
+def test_a_first_collection_asks_for_the_reviewed_advisories_of_the_packages(
+    fake_github_api,
+):
     raw_response = GithubAdvisoriesSource("pip", PACKAGES).fetch(last_collected_at=None)
 
     assert raw_response == RECORDED_RESPONSE
@@ -85,7 +87,9 @@ def test_an_advisory_published_before_the_last_collection_but_reviewed_after_is_
     assert raw_response == fake_github_api.response
 
 
-def test_a_page_with_an_advisory_newer_than_the_last_collection_is_returned(fake_github_api):
+def test_a_page_with_an_advisory_newer_than_the_last_collection_is_returned(
+    fake_github_api,
+):
     source = GithubAdvisoriesSource("pip", PACKAGES)
 
     assert source.fetch(last_collected_at=BETWEEN_ADVISORIES) == RECORDED_RESPONSE
@@ -109,7 +113,9 @@ def test_a_full_page_of_new_advisories_warns_that_some_may_be_missing(
     monkeypatch.setattr(github_advisories_source, "ADVISORIES_PER_PAGE", 3)
 
     with caplog.at_level(logging.WARNING):
-        GithubAdvisoriesSource("pip", PACKAGES).fetch(last_collected_at=BEFORE_ALL_ADVISORIES)
+        GithubAdvisoriesSource("pip", PACKAGES).fetch(
+            last_collected_at=BEFORE_ALL_ADVISORIES
+        )
 
     assert "github_advisories_pip" in caplog.text
     assert "may be missing" in caplog.text
@@ -121,6 +127,8 @@ def test_no_warning_when_the_page_reaches_back_to_the_last_collection(
     monkeypatch.setattr(github_advisories_source, "ADVISORIES_PER_PAGE", 3)
 
     with caplog.at_level(logging.WARNING):
-        GithubAdvisoriesSource("pip", PACKAGES).fetch(last_collected_at=BETWEEN_ADVISORIES)
+        GithubAdvisoriesSource("pip", PACKAGES).fetch(
+            last_collected_at=BETWEEN_ADVISORIES
+        )
 
     assert caplog.text == ""

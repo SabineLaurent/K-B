@@ -57,13 +57,17 @@ def load_last_collection_dates(raw_dir: Path) -> dict[str, datetime]:
         ) from error
 
 
-def save_last_collection_dates(raw_dir: Path, last_collection_dates: dict[str, datetime]) -> None:
+def save_last_collection_dates(
+    raw_dir: Path, last_collection_dates: dict[str, datetime]
+) -> None:
     stored_dates = {
         source_name: collected_at.isoformat()
         for source_name, collected_at in last_collection_dates.items()
     }
     state_content = json.dumps(stored_dates, indent=2, sort_keys=True) + "\n"
-    write_file_atomically(raw_dir / COLLECTION_STATE_FILENAME, state_content.encode("utf-8"))
+    write_file_atomically(
+        raw_dir / COLLECTION_STATE_FILENAME, state_content.encode("utf-8")
+    )
 
 
 def parse_utc_aware_datetime(stored_date: object) -> datetime:

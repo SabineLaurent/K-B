@@ -37,7 +37,10 @@ def test_a_vulnerability_keeps_its_publication_date_and_description():
     assert newest.date_added == date(2026, 9, 29)
     assert newest.vendor_project == "Apple"
     assert newest.product == "Multiple Products"
-    assert newest.vulnerability_name == "Apple Multiple Products Out-of-Bounds Write Vulnerability"
+    assert (
+        newest.vulnerability_name
+        == "Apple Multiple Products Out-of-Bounds Write Vulnerability"
+    )
     assert newest.short_description.startswith("Apple iOS, macOS, and iPadOS contain")
 
 
@@ -73,7 +76,9 @@ def test_a_vulnerability_dated_the_day_before_a_collection_run_after_midnight_ut
 
     vulnerabilities = read_new_vulnerabilities(EXTRACT, last_collected_at)
 
-    assert [vulnerability.cve_id for vulnerability in vulnerabilities] == ["CVE-2026-86950"]
+    assert [vulnerability.cve_id for vulnerability in vulnerabilities] == [
+        "CVE-2026-86950"
+    ]
 
 
 def test_a_catalog_starting_with_a_byte_order_mark_is_read():

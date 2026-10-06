@@ -32,10 +32,16 @@ def entry_xml(
 def test_a_recorded_response_gives_one_paper_per_entry():
     papers = read_papers(RECORDED_RESPONSE)
 
-    assert [paper.arxiv_id for paper in papers] == ["2609.31282", "2609.33401", "2610.01349"]
+    assert [paper.arxiv_id for paper in papers] == [
+        "2609.31282",
+        "2609.33401",
+        "2610.01349",
+    ]
     first = papers[0]
     assert first.version == 1
-    assert first.title.startswith("Resource-Optimized and Energy-Aware Agentic AI Framework")
+    assert first.title.startswith(
+        "Resource-Optimized and Energy-Aware Agentic AI Framework"
+    )
     assert first.summary.startswith("This paper proposes a blockchain-backed agentic")
     assert first.authors == ("Toqeer Ali Syed", "Asadullah Abdullah Khan")
     assert first.published_at == datetime(2026, 9, 25, 13, 53, 50, tzinfo=UTC)
@@ -84,7 +90,9 @@ def test_an_entry_that_is_not_an_arxiv_paper_is_rejected_and_logged(entry_id, ca
         {"published": "<published>2026-09-25T13:53:50</published>"},
     ],
 )
-def test_an_entry_with_a_missing_or_invalid_field_is_rejected_and_logged(changes, caplog):
+def test_an_entry_with_a_missing_or_invalid_field_is_rejected_and_logged(
+    changes, caplog
+):
     assert read_papers(feed_with_entry(entry_xml(**changes))) == []
     assert "entry 0" in caplog.text
 
@@ -101,7 +109,9 @@ def test_every_entry_is_counted_even_an_invalid_one():
 
 
 def test_a_feed_reporting_an_api_error_is_refused():
-    error_entry = entry_xml(entry_id="http://arxiv.org/api/errors#incorrect_id_format_for_1234")
+    error_entry = entry_xml(
+        entry_id="http://arxiv.org/api/errors#incorrect_id_format_for_1234"
+    )
 
     with pytest.raises(ValueError, match="incorrect_id_format_for_1234"):
         count_papers(feed_with_entry(error_entry))
@@ -109,7 +119,11 @@ def test_a_feed_reporting_an_api_error_is_refused():
 
 @pytest.mark.parametrize(
     "raw_response",
-    [b"not xml", b'<feed xmlns="http://www.w3.org/2005/Atom"></feed>', b"<html></html>"],
+    [
+        b"not xml",
+        b'<feed xmlns="http://www.w3.org/2005/Atom"></feed>',
+        b"<html></html>",
+    ],
 )
 def test_a_response_that_is_not_an_arxiv_feed_is_refused(raw_response):
     with pytest.raises(ValueError):

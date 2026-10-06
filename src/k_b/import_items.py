@@ -68,7 +68,9 @@ def import_items(raw_dir: Path, database_path: Path, log_path: Path) -> ImportSu
     finally:
         connection.close()
     write_import_log(log_path, reading.rejections, merged.discards)
-    return ImportSummary(len(merged.items), len(merged.discards), len(reading.rejections))
+    return ImportSummary(
+        len(merged.items), len(merged.discards), len(reading.rejections)
+    )
 
 
 def write_item(connection: sqlite3.Connection, item: Item) -> None:
@@ -113,10 +115,12 @@ def write_collection(
     (collection_id,) = connection.execute(
         "SELECT collection_id FROM collection WHERE raw_file_path = ?", (raw_file_path,)
     ).fetchone()
-    return collection_id
+    return int(collection_id)
 
 
-def write_authors(connection: sqlite3.Connection, item_id: int, authors: tuple[str, ...]) -> None:
+def write_authors(
+    connection: sqlite3.Connection, item_id: int, authors: tuple[str, ...]
+) -> None:
     """The authors of the item, in their order; a name repeated in the list is kept once.
 
     The base links an author to an item once (primary key item_id, author_id): a repeated name
@@ -145,10 +149,16 @@ def delete_orphan_authors(connection: sqlite3.Connection) -> None:
 
 
 def format_date(moment: datetime | None) -> str | None:
-    return None if moment is None else moment.astimezone(UTC).strftime(DATABASE_DATE_FORMAT)
+    return (
+        None
+        if moment is None
+        else moment.astimezone(UTC).strftime(DATABASE_DATE_FORMAT)
+    )
 
 
-def write_import_log(log_path: Path, rejections: list[Rejection], discards: list[Discard]) -> None:
+def write_import_log(
+    log_path: Path, rejections: list[Rejection], discards: list[Discard]
+) -> None:
     """One JSON line per rejection, then per duplicate removed; the file is rewritten each time.
 
     Written to a temporary file, then renamed over the log: a failed write leaves the previous

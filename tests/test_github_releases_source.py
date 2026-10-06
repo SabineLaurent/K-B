@@ -25,7 +25,9 @@ def requested_paths(monkeypatch):
         paths.append(path)
         return RECORDED_RESPONSE
 
-    monkeypatch.setattr(github_releases_source, "get_from_github_api", fake_get_from_github_api)
+    monkeypatch.setattr(
+        github_releases_source, "get_from_github_api", fake_get_from_github_api
+    )
     return paths
 
 
@@ -41,7 +43,9 @@ def test_each_tracked_repository_is_a_source_of_kb_collect():
     )
 
 
-@pytest.mark.parametrize("repository", ["../escape", "owner", "owner/repo/extra", "owner/re po"])
+@pytest.mark.parametrize(
+    "repository", ["../escape", "owner", "owner/repo/extra", "owner/re po"]
+)
 def test_a_repository_that_is_not_owner_slash_name_is_refused(repository):
     with pytest.raises(ValueError, match="repository"):
         GithubReleasesSource(repository)
@@ -54,7 +58,9 @@ def test_a_first_collection_returns_the_first_page_unchanged(requested_paths):
     assert requested_paths == ["repos/anthropics/claude-code/releases?per_page=100"]
 
 
-def test_a_page_with_a_release_newer_than_the_last_collection_is_returned(requested_paths):
+def test_a_page_with_a_release_newer_than_the_last_collection_is_returned(
+    requested_paths,
+):
     source = GithubReleasesSource("anthropics/claude-code")
 
     assert source.fetch(last_collected_at=BETWEEN_RELEASES) == RECORDED_RESPONSE
@@ -72,7 +78,9 @@ def test_a_full_page_of_new_releases_warns_that_some_may_be_missing(
     monkeypatch.setattr(github_releases_source, "RELEASES_PER_PAGE", 3)
 
     with caplog.at_level(logging.WARNING):
-        GithubReleasesSource("anthropics/claude-code").fetch(last_collected_at=BEFORE_ALL_RELEASES)
+        GithubReleasesSource("anthropics/claude-code").fetch(
+            last_collected_at=BEFORE_ALL_RELEASES
+        )
 
     assert "anthropics/claude-code" in caplog.text
     assert "may be missing" in caplog.text
@@ -92,7 +100,9 @@ def test_no_warning_when_the_page_reaches_back_to_the_last_collection(
 
 def test_a_page_that_is_not_a_list_of_releases_fails_the_first_collection(monkeypatch):
     monkeypatch.setattr(
-        github_releases_source, "get_from_github_api", lambda path: b'{"message": "Not Found"}'
+        github_releases_source,
+        "get_from_github_api",
+        lambda path: b'{"message": "Not Found"}',
     )
 
     with pytest.raises(ValueError, match="expected a list of releases"):

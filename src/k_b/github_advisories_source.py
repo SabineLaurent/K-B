@@ -44,7 +44,9 @@ class GithubAdvisoriesSource:
             since = last_collected_at.astimezone(UTC).date() - timedelta(days=1)
             query["reviewed"] = f">={since.isoformat()}"
         raw_response = get_from_github_api(f"advisories?{urlencode(query)}")
-        review_dates = [advisory.reviewed_at for advisory in read_advisories(raw_response)]
+        review_dates = [
+            advisory.reviewed_at for advisory in read_advisories(raw_response)
+        ]
         if not review_dates:
             return None
         if last_collected_at is None:

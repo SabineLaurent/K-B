@@ -16,7 +16,9 @@ def ranking_of(size):
     """A search response of size repositories, built by repeating the recorded ones."""
     response = json.loads(RECORDED_RESPONSE)
     recorded_items = response["items"]
-    response["items"] = [recorded_items[rank % len(recorded_items)] for rank in range(size)]
+    response["items"] = [
+        recorded_items[rank % len(recorded_items)] for rank in range(size)
+    ]
     return json.dumps(response).encode()
 
 

@@ -43,7 +43,9 @@ def parse_advisory(entry: object, position: int) -> Advisory:
     if not isinstance(ghsa_id, str) or not GHSA_ID.fullmatch(ghsa_id):
         raise ValueError(f"advisory {position}: not a GHSA identifier: {ghsa_id!r}")
     cve_id = entry.get("cve_id")
-    if cve_id is not None and not (isinstance(cve_id, str) and CVE_ID.fullmatch(cve_id)):
+    if cve_id is not None and not (
+        isinstance(cve_id, str) and CVE_ID.fullmatch(cve_id)
+    ):
         raise ValueError(f"advisory {position}: not a CVE identifier: {cve_id!r}")
     summary = entry.get("summary")
     if not isinstance(summary, str):
@@ -53,7 +55,9 @@ def parse_advisory(entry: object, position: int) -> Advisory:
         raise ValueError(f"advisory {position}: unknown severity: {severity!r}")
     url = entry.get("html_url")
     if not isinstance(url, str) or not url.startswith(ADVISORY_URL_PREFIX):
-        raise ValueError(f"advisory {position}: html_url is not a {ADVISORY_URL_PREFIX} URL")
+        raise ValueError(
+            f"advisory {position}: html_url is not a {ADVISORY_URL_PREFIX} URL"
+        )
     return Advisory(
         ghsa_id=ghsa_id,
         cve_id=cve_id,
@@ -76,11 +80,14 @@ def parse_package_names(vulnerabilities: object, position: int) -> tuple[str, ..
         raise ValueError(f"advisory {position}: vulnerabilities is not a list")
     package_names: list[str] = []
     for vulnerability in vulnerabilities:
-        package = vulnerability.get("package") if isinstance(vulnerability, dict) else None
+        package = (
+            vulnerability.get("package") if isinstance(vulnerability, dict) else None
+        )
         name = package.get("name") if isinstance(package, dict) else None
         if not isinstance(name, str):
-            raise ValueError(f"advisory {position}: a vulnerability has no package name")
+            raise ValueError(
+                f"advisory {position}: a vulnerability has no package name"
+            )
         if name not in package_names:
             package_names.append(name)
     return tuple(package_names)
-

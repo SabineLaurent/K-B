@@ -28,7 +28,10 @@ def read_releases(raw_response: bytes, repository: str) -> list[Release]:
     entries = json.loads(raw_response)
     if not isinstance(entries, list):
         raise ValueError("expected a list of releases")
-    return [parse_release(entry, repository, position) for position, entry in enumerate(entries)]
+    return [
+        parse_release(entry, repository, position)
+        for position, entry in enumerate(entries)
+    ]
 
 
 def parse_release(entry: object, repository: str, position: int) -> Release:
@@ -43,7 +46,9 @@ def parse_release(entry: object, repository: str, position: int) -> Release:
         raise ValueError(f"release {position}: tag_name is not a string")
     url = entry.get("html_url")
     if not isinstance(url, str) or not url.startswith(RELEASE_URL_PREFIX):
-        raise ValueError(f"release {position}: html_url is not a {RELEASE_URL_PREFIX} URL")
+        raise ValueError(
+            f"release {position}: html_url is not a {RELEASE_URL_PREFIX} URL"
+        )
     is_prerelease = entry.get("prerelease")
     if not isinstance(is_prerelease, bool):
         raise ValueError(f"release {position}: prerelease is not a boolean")
@@ -63,4 +68,3 @@ def parse_release(entry: object, repository: str, position: int) -> Release:
         is_prerelease=is_prerelease,
         body=body,
     )
-

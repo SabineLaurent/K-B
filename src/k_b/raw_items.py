@@ -4,6 +4,7 @@ import csv
 import logging
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -82,7 +83,9 @@ def read_raw_items(raw_dir: Path) -> RawReading:
     for path, reader in raw_files:
         raw_file_path = path.relative_to(raw_dir).as_posix()
         try:
-            collected_at = datetime.strptime(path.stem, COLLECTION_NAME_FORMAT).replace(tzinfo=UTC)
+            collected_at = datetime.strptime(path.stem, COLLECTION_NAME_FORMAT).replace(
+                tzinfo=UTC
+            )
             entries = reader.read_entries(path.read_bytes())
         except (ValueError, csv.Error, OSError) as error:
             rejections.append(reject(raw_file_path, f"{type(error).__name__}: {error}"))
@@ -92,7 +95,10 @@ def read_raw_items(raw_dir: Path) -> RawReading:
                 items.append(reader.convert(entry, collected_at, raw_file_path))
             except ValidationError as error:
                 rejections.append(
-                    reject(raw_file_path, f"entry {position}: {type(error).__name__}: {error}")
+                    reject(
+                        raw_file_path,
+                        f"entry {position}: {type(error).__name__}: {error}",
+                    )
                 )
     # Stable sort: within a collection, the items keep their source order.
     items.sort(key=lambda item: item.collected_at)
@@ -119,7 +125,7 @@ def list_readers_by_source() -> dict[str, SourceReader]:
                 )
             case GithubReleasesSource(repository=repository):
                 readers[source.name] = SourceReader(
-                    lambda raw, repository=repository: read_releases(raw, repository),
+                    partial(read_releases, repository=repository),
                     convert_release,
                 )
             case GithubAdvisoriesSource():

@@ -64,7 +64,9 @@ class TldrSource:
             logger.info("%s %s: edition page, %d bytes", self.name, day, len(page))
             pages[day.isoformat()] = page
         if not pages:
-            logger.info("%s: no edition page from %s to %s", self.name, days[0], days[-1])
+            logger.info(
+                "%s: no edition page from %s to %s", self.name, days[0], days[-1]
+            )
         return pages or None
 
 
@@ -84,4 +86,7 @@ def list_days_to_collect(last_collected_at: datetime | None, today: date) -> lis
         first_day = last_collected_at.astimezone(UTC).date()
     if first_day > today:
         raise ValueError(f"last collection day {first_day} is after today {today}")
-    return [first_day + timedelta(days=offset) for offset in range((today - first_day).days + 1)]
+    return [
+        first_day + timedelta(days=offset)
+        for offset in range((today - first_day).days + 1)
+    ]

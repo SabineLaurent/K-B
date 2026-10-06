@@ -7,7 +7,9 @@ from urllib.error import HTTPError
 from k_b.cisa_kev import read_new_vulnerabilities
 from k_b.http_download import download
 
-CATALOG_URL = "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv"
+CATALOG_URL = (
+    "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv"
+)
 # The catalog weighs about 1 MB in 2026: ten times that is not a catalog any more.
 MAX_CATALOG_BYTES = 10 * 1024 * 1024
 # Redirections are followed, even to plain HTTP: only a catalog served from here is trusted.
@@ -27,9 +29,13 @@ class CisaKevSource:
         """
         headers = {}
         if last_collected_at is not None:
-            headers["If-Modified-Since"] = format_datetime(last_collected_at, usegmt=True)
+            headers["If-Modified-Since"] = format_datetime(
+                last_collected_at, usegmt=True
+            )
         try:
-            raw_catalog = download(CATALOG_URL, TRUSTED_URL_PREFIX, MAX_CATALOG_BYTES, headers)
+            raw_catalog = download(
+                CATALOG_URL, TRUSTED_URL_PREFIX, MAX_CATALOG_BYTES, headers
+            )
         except HTTPError as error:
             if error.code == HTTP_NOT_MODIFIED:
                 error.close()

@@ -56,7 +56,9 @@ def test_the_request_names_k_b_and_has_a_timeout(fake_urlopen):
     assert not request.has_header("If-modified-since")
 
 
-def test_a_later_collection_asks_only_for_a_catalog_modified_since_the_last_one(fake_urlopen):
+def test_a_later_collection_asks_only_for_a_catalog_modified_since_the_last_one(
+    fake_urlopen,
+):
     CisaKevSource().fetch(last_collected_at=datetime(2026, 9, 30, 10, 0, tzinfo=UTC))
 
     request = fake_urlopen.requests[0]
@@ -64,13 +66,17 @@ def test_a_later_collection_asks_only_for_a_catalog_modified_since_the_last_one(
 
 
 def test_an_unmodified_catalog_returns_nothing(fake_urlopen):
-    fake_urlopen.error = HTTPError(cisa_kev_source.CATALOG_URL, 304, "Not Modified", {}, None)
+    fake_urlopen.error = HTTPError(
+        cisa_kev_source.CATALOG_URL, 304, "Not Modified", {}, None
+    )
 
     assert CisaKevSource().fetch(datetime(2026, 9, 30, 10, 0, tzinfo=UTC)) is None
 
 
 def test_another_http_error_is_raised(fake_urlopen):
-    fake_urlopen.error = HTTPError(cisa_kev_source.CATALOG_URL, 503, "Unavailable", {}, None)
+    fake_urlopen.error = HTTPError(
+        cisa_kev_source.CATALOG_URL, 503, "Unavailable", {}, None
+    )
 
     with pytest.raises(HTTPError):
         CisaKevSource().fetch(last_collected_at=None)

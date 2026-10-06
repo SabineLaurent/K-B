@@ -52,11 +52,15 @@ def merge_items(items: list[Item]) -> MergeResult:
                 discards.append(Discard("same_source_id", item, previous.url))
             continue
         if item.url in position_by_url:
-            discards.append(Discard("same_url", item, kept[position_by_url[item.url]].url))
+            discards.append(
+                Discard("same_url", item, kept[position_by_url[item.url]].url)
+            )
             continue
         source_cve = (item.source_code, item.cve) if item.cve is not None else None
         if source_cve in position_by_source_cve:
-            discards.append(Discard("same_cve", item, kept[position_by_source_cve[source_cve]].url))
+            discards.append(
+                Discard("same_cve", item, kept[position_by_source_cve[source_cve]].url)
+            )
             continue
         position = len(kept)
         kept.append(item)

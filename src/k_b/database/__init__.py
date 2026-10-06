@@ -28,8 +28,12 @@ def create_database(database_path: Path) -> None:
         try:
             # Kept in the file: the pipeline writes while the API reads (docs/stockage.md).
             connection.execute("PRAGMA journal_mode = WAL")
-            connection.executescript(DATABASE_SCRIPTS.joinpath("schema.sql").read_text())
-            connection.executescript(DATABASE_SCRIPTS.joinpath("seed_sources.sql").read_text())
+            connection.executescript(
+                DATABASE_SCRIPTS.joinpath("schema.sql").read_text()
+            )
+            connection.executescript(
+                DATABASE_SCRIPTS.joinpath("seed_sources.sql").read_text()
+            )
         finally:
             connection.close()
     except BaseException:

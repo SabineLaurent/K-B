@@ -45,7 +45,11 @@ def read_new_vulnerabilities(
     if last_collected_at is None:
         return vulnerabilities
     since = last_collected_at.date() - timedelta(days=1)
-    return [vulnerability for vulnerability in vulnerabilities if vulnerability.date_added >= since]
+    return [
+        vulnerability
+        for vulnerability in vulnerabilities
+        if vulnerability.date_added >= since
+    ]
 
 
 def parse_vulnerability(row: dict[str, str], line_number: int) -> Vulnerability:
@@ -57,7 +61,9 @@ def parse_vulnerability(row: dict[str, str], line_number: int) -> Vulnerability:
     try:
         date_added = date.fromisoformat(row["dateAdded"])
     except ValueError as error:
-        raise ValueError(f"line {line_number}: invalid dateAdded: {row['dateAdded']!r}") from error
+        raise ValueError(
+            f"line {line_number}: invalid dateAdded: {row['dateAdded']!r}"
+        ) from error
     return Vulnerability(
         cve_id=cve_id,
         vendor_project=row["vendorProject"],
