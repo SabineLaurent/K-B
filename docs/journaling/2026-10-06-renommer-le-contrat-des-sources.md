@@ -16,7 +16,7 @@ Le package contenait deux noms à une lettre d'écart, pour deux rôles opposés
   un module générique ;
 - `k_b.sources` : les **sources concrètes** (arXiv, GitHub, CISA KEV…), qui dépendent de ce contrat.
 
-Un import mal tapé passait d'un rôle à l'autre sans que le nom alerte le lecteur. Le plan ETL
+Les deux noms se confondent à la lecture : rien dans le nom ne dit lequel est le contrat. Le plan ETL
 l'appelait déjà « le contrat » (`docs/2026-10-06-plan-etl.md:87`). Le nom `source_contract` a été
 choisi par Sabine le 06/10. Le renommer avant #101, qui modifie `raw_items.py`, un des modules qui
 importe le contrat, donne une base stable à #101.
@@ -39,10 +39,11 @@ package.
 (`git diff -M main --summary` : `rename src/k_b/{source.py => source_contract.py} (100%)`).
 L'historique du fichier reste donc lisible avec `git log --follow`.
 
-### 2. Les 20 imports suivent
+### 2. Les 18 imports suivent
 
-Chaque `from k_b.source import …` devient `from k_b.source_contract import …`. On en compte 10
-dans `src` et 10 dans `tests`. Exemple, `src/k_b/sources/arxiv.py:17` :
+Chaque `from k_b.source import …` devient `from k_b.source_contract import …`. On en compte 18 :
+10 dans `src` et 8 dans `tests` (`grep -rn k_b.source_contract src | wc -l` → 10, même commande
+sur `tests` → 8). La 19ᵉ ligne modifiée est la chaîne de `GENERIC_MODULES` (section 3). Exemple, `src/k_b/sources/arxiv.py:17` :
 
 ```python
 from k_b.source_contract import SourceReader
@@ -90,13 +91,13 @@ empêche donc d'oublier ce renommage.
 | `grep -rnE "k_b\.source\b\|k_b/source\.py" src tests` : aucune sortie | Plus aucun import de l'ancien nom |
 | `grep -rnE "(^\|[^_])source\.py\|k_b\.source\b" README.md docs --exclude-dir=journaling --exclude-dir=ADR \| grep -v "^docs/20"` : aucune sortie | Aucune doc non datée ne cite l'ancien nom |
 | `uv run pytest` : 307 passed, dont `test_every_module_is_in_exactly_one_list` | Le comportement est inchangé et `GENERIC_MODULES` est à jour |
-| `uv run ruff check`, `ruff format --check`, `mypy --strict` : verts | L'ordre des imports et le typage tiennent |
+| `uv run ruff check`, `ruff format --check`, `mypy --strict` : verts | L'ordre des imports tient ; le typage de `src` tient (mypy ne couvre pas `tests/`) |
 
 ## Ce que tu dois pouvoir défendre
 
 1. **Pourquoi renommer un module qui marchait ?** Deux noms à une lettre d'écart (`source`,
-   `sources`) désignaient deux rôles opposés : le contrat générique et ses implémentations. Le
-   nom guide le lecteur vers le bon rôle. Ce renommage ne change aucun comportement.
+   `sources`) désignaient deux rôles opposés : le contrat générique et ses implémentations. Ils
+   se confondaient à la lecture ; le nouveau nom dit le rôle. Ce renommage ne change aucun comportement.
 2. **Comment sais-tu qu'aucun comportement n'a changé ?** Le module est renommé à 100 % sans
    modification. Seules les lignes d'import changent, et les 307 tests passent.
 3. **Qu'arriverait-il si on oubliait un import ?** Un `ModuleNotFoundError` au chargement. Les
@@ -110,7 +111,9 @@ empêche donc d'oublier ce renommage.
 
 ## Zones non vérifiées
 
-Aucune.
+- `mypy --strict` ne vérifie que `src` (`pyproject.toml:42`, `files = ["src"]`) : les 8 imports
+  modifiés dans `tests/` sont vérifiés par pytest (ils s'exécutent au chargement des tests), pas
+  par mypy.
 
 ## Ce qui reste
 
