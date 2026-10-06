@@ -207,8 +207,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 ## Du brut au jeu d'items
 
 1. **Collecte** : chaque source écrit son brut dans `raw/automation/<source>/` (règles communes).
-2. **Lecture** : un lecteur par source transforme le brut en items validés par un modèle
-   Pydantic, avec les mêmes champs : source, identifiant dans la source, titre, URL, auteurs
+2. **Lecture** : un lecteur par sorte de source transforme le brut en items validés par un modèle
+   Pydantic. Le lecteur est retrouvé par le nom du dossier brut (`github_releases_<dépôt>/` est
+   lu par celui des releases), que la source soit encore suivie ou non. Les sortes sont déclarées
+   une seule fois, dans `source_kinds.py`. Les items ont les mêmes champs : source, identifiant dans la source, titre, URL, auteurs
    (sauf GitHub), date de publication et date de révision (arXiv), date d'ajout (Clipper, Zotero),
    contenu ou résumé, date de collecte, chemin du brut d'origine. Une date absente reste vide. Toutes les dates sont en UTC, avec fuseau. Une ligne
    illisible est rejetée et journalisée, pas devinée.
