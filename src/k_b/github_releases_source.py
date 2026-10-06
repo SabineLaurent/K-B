@@ -33,7 +33,9 @@ class GithubReleasesSource:
         if last_collected_at is None:
             return raw_response
         publication_dates = [release.published_at for release in releases]
-        if not any(published_at > last_collected_at for published_at in publication_dates):
+        if not any(
+            published_at > last_collected_at for published_at in publication_dates
+        ):
             return None
         is_page_full = len(publication_dates) >= RELEASES_PER_PAGE
         if is_page_full and min(publication_dates) > last_collected_at:

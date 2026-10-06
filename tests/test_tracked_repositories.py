@@ -25,4 +25,6 @@ def test_the_tracked_repositories_are_those_of_docs_sources():
         "run-llama/llama_index",
         "anthropics/claude-code",
     ]
-    assert list_packages_by_ecosystem(TRACKED_REPOSITORIES)["npm"] == ("@anthropic-ai/claude-code",)
+    assert list_packages_by_ecosystem(TRACKED_REPOSITORIES)["npm"] == (
+        "@anthropic-ai/claude-code",
+    )

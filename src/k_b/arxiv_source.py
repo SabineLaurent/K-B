@@ -51,7 +51,9 @@ class ArxivSource:
         total_results = read_total_results(raw_response)
         if total_results > paper_count:
             # Failing keeps the last collection date: the next collection asks again.
-            raise ValueError(f"{total_results} papers found, only {paper_count} returned")
+            raise ValueError(
+                f"{total_results} papers found, only {paper_count} returned"
+            )
         if paper_count == 0:
             return None
         return raw_response
@@ -59,7 +61,8 @@ class ArxivSource:
 
 def build_search_query(window_start: datetime, window_end: datetime) -> str:
     keywords = " OR ".join(
-        f'abs:"{keyword}"' if " " in keyword else f"abs:{keyword}" for keyword in KEYWORDS
+        f'abs:"{keyword}"' if " " in keyword else f"abs:{keyword}"
+        for keyword in KEYWORDS
     )
     # The API reads these dates in GMT.
     window_start, window_end = window_start.astimezone(UTC), window_end.astimezone(UTC)

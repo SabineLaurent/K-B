@@ -21,7 +21,10 @@ def get_from_github_api(path_and_query: str) -> bytes:
         API_URL + path_and_query,
         trusted_url_prefix=API_URL,
         max_bytes=MAX_RESPONSE_BYTES,
-        headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": API_VERSION},
+        headers={
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": API_VERSION,
+        },
         # Never forwarded to a redirection: the token stays with api.github.com.
         unredirected_headers={"Authorization": f"Bearer {token}"} if token else None,
     )

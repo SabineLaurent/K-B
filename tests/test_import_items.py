@@ -3,7 +3,6 @@ import shutil
 import sqlite3
 
 import pytest
-
 from test_raw_items import FIXTURES_DIR, copy_fixture, write_most_starred_ranking
 
 from k_b import import_items as import_items_module
@@ -29,14 +28,18 @@ def data_dir(tmp_path):
         "github_releases_anthropics_claude_code",
         "json",
     )
-    copy_fixture(raw_dir, "github_advisories_extract.json", "github_advisories_pip", "json")
+    copy_fixture(
+        raw_dir, "github_advisories_extract.json", "github_advisories_pip", "json"
+    )
     write_most_starred_ranking(raw_dir)
     create_database(tmp_path / "k-b.sqlite")
     return tmp_path
 
 
 def run_import(data_dir):
-    return import_items(data_dir / "raw", data_dir / "k-b.sqlite", data_dir / "import-log.jsonl")
+    return import_items(
+        data_dir / "raw", data_dir / "k-b.sqlite", data_dir / "import-log.jsonl"
+    )
 
 
 def dump_database(data_dir):
@@ -61,7 +64,10 @@ def count_rows(data_dir, query):
 
 
 def read_log(data_dir):
-    return [json.loads(line) for line in (data_dir / "import-log.jsonl").read_text().splitlines()]
+    return [
+        json.loads(line)
+        for line in (data_dir / "import-log.jsonl").read_text().splitlines()
+    ]
 
 
 def test_the_raw_files_go_into_the_database(data_dir):
@@ -84,7 +90,9 @@ def test_an_item_points_to_the_raw_file_and_date_of_its_collection(data_dir):
         " WHERE source_code = 'cisa_kev'",
     )
 
-    assert rows == [("2026-10-05T09:30:00Z", "automation/cisa_kev/2026-10-05T093000Z.csv")]
+    assert rows == [
+        ("2026-10-05T09:30:00Z", "automation/cisa_kev/2026-10-05T093000Z.csv")
+    ]
 
 
 def test_the_authors_keep_their_order(data_dir):
@@ -95,11 +103,15 @@ def test_the_authors_keep_their_order(data_dir):
 
 def test_a_name_repeated_in_the_authors_keeps_its_first_position(data_dir):
     path = data_dir / "raw/automation/arxiv/2026-10-05T093000Z.xml"
-    path.write_text(path.read_text().replace("Asadullah Abdullah Khan", "Toqeer Ali Syed"))
+    path.write_text(
+        path.read_text().replace("Asadullah Abdullah Khan", "Toqeer Ali Syed")
+    )
 
     run_import(data_dir)
 
-    assert fetch_rows(data_dir, AUTHORS_QUERY, (FIRST_PAPER_ID,)) == [("Toqeer Ali Syed", 1)]
+    assert fetch_rows(data_dir, AUTHORS_QUERY, (FIRST_PAPER_ID,)) == [
+        ("Toqeer Ali Syed", 1)
+    ]
 
 
 def test_an_import_run_again_on_the_same_raw_gives_the_same_database_and_log(data_dir):
@@ -125,7 +137,10 @@ def test_a_new_collection_keeps_the_identifier_of_an_item_already_imported(data_
     run_import(data_dir)
 
     assert count_rows(data_dir, query) == item_id
-    assert count_rows(data_dir, "SELECT count(*) FROM item WHERE source_code = 'github'") == 106
+    assert (
+        count_rows(data_dir, "SELECT count(*) FROM item WHERE source_code = 'github'")
+        == 106
+    )
 
 
 def test_each_duplicate_removed_is_written_to_the_log_with_its_rule(data_dir):
@@ -203,7 +218,9 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(data_dir):
 
 def test_a_missing_database_is_refused_and_not_created(tmp_path):
     with pytest.raises(MissingDatabaseError):
-        import_items(tmp_path / "raw", tmp_path / "k-b.sqlite", tmp_path / "import-log.jsonl")
+        import_items(
+            tmp_path / "raw", tmp_path / "k-b.sqlite", tmp_path / "import-log.jsonl"
+        )
 
     assert not (tmp_path / "k-b.sqlite").exists()
 
@@ -214,7 +231,9 @@ def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir)
     item_id = fetch_rows(data_dir, query, (FIRST_PAPER_ID,))[0][0]
     revision = (data_dir / "raw/automation/arxiv/2026-10-05T093000Z.xml").read_text()
     revision = revision.replace(
-        "<updated>2026-09-25T13:53:50Z</updated>", "<updated>2026-10-02T08:00:00Z</updated>", 1
+        "<updated>2026-09-25T13:53:50Z</updated>",
+        "<updated>2026-10-02T08:00:00Z</updated>",
+        1,
     ).replace("Asadullah Abdullah Khan", "Another Author")
     (data_dir / "raw/automation/arxiv/2026-10-06T093000Z.xml").write_text(revision)
 
@@ -235,17 +254,25 @@ def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir)
 def test_an_author_left_without_item_is_deleted(data_dir):
     run_import(data_dir)
     path = data_dir / "raw/automation/arxiv/2026-10-05T093000Z.xml"
-    path.write_text(path.read_text().replace("Asadullah Abdullah Khan", "Another Author"))
+    path.write_text(
+        path.read_text().replace("Asadullah Abdullah Khan", "Another Author")
+    )
 
     run_import(data_dir)
 
     assert (
-        fetch_rows(data_dir, "SELECT name FROM author WHERE name = ?", ("Asadullah Abdullah Khan",))
+        fetch_rows(
+            data_dir,
+            "SELECT name FROM author WHERE name = ?",
+            ("Asadullah Abdullah Khan",),
+        )
         == []
     )
 
 
-def test_a_log_that_cannot_be_written_keeps_the_previous_log_whole(data_dir, monkeypatch):
+def test_a_log_that_cannot_be_written_keeps_the_previous_log_whole(
+    data_dir, monkeypatch
+):
     previous_log = '{"kind": "previous"}\n'
     (data_dir / "import-log.jsonl").write_text(previous_log)
 

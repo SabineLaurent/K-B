@@ -62,7 +62,9 @@ def test_the_given_headers_are_sent(fake_urlopen):
     assert fake_urlopen.requests[0].get_header("Accept") == "text/csv"
 
 
-def test_an_unredirected_header_is_sent_but_never_forwarded_to_a_redirection(fake_urlopen):
+def test_an_unredirected_header_is_sent_but_never_forwarded_to_a_redirection(
+    fake_urlopen,
+):
     download(
         URL,
         TRUSTED_URL_PREFIX,
@@ -106,7 +108,9 @@ def test_a_redirection_away_from_the_trusted_prefix_is_refused(fake_urlopen, fin
         "prefix-with-empty-host",
     ],
 )
-def test_a_badly_set_prefix_is_refused_before_any_request(fake_urlopen, url, trusted_url_prefix):
+def test_a_badly_set_prefix_is_refused_before_any_request(
+    fake_urlopen, url, trusted_url_prefix
+):
     with pytest.raises(ValueError, match="trusted"):
         download(url, trusted_url_prefix, max_bytes=1000)
 

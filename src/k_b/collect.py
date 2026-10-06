@@ -31,7 +31,9 @@ class Source(Protocol):
     name: str
     extension: str
 
-    def fetch(self, last_collected_at: datetime | None) -> bytes | dict[str, bytes] | None:
+    def fetch(
+        self, last_collected_at: datetime | None
+    ) -> bytes | dict[str, bytes] | None:
         """Return the raw content published since last_collected_at (None: first collection).
 
         A source that reads several pages (a scraped site) returns them by page name. Return
@@ -45,7 +47,9 @@ SOURCES: list[Source] = [
     *(GithubReleasesSource(repository.name) for repository in TRACKED_REPOSITORIES),
     *(
         GithubAdvisoriesSource(ecosystem, packages)
-        for ecosystem, packages in list_packages_by_ecosystem(TRACKED_REPOSITORIES).items()
+        for ecosystem, packages in list_packages_by_ecosystem(
+            TRACKED_REPOSITORIES
+        ).items()
     ),
     GithubMostStarredSource(),
     ArxivSource(),
@@ -59,7 +63,9 @@ class CollectionOutcome(NamedTuple):
     state_error: OSError | None
 
 
-def collect_all_sources(sources: list[Source], raw_dir: Path, now: datetime) -> CollectionOutcome:
+def collect_all_sources(
+    sources: list[Source], raw_dir: Path, now: datetime
+) -> CollectionOutcome:
     """Collect each source; return each source's error (None: success) and the state's error."""
     if now.utcoffset() != timedelta(0):
         raise ValueError(f"collection time must be in UTC, got {now!r}")
@@ -67,7 +73,9 @@ def collect_all_sources(sources: list[Source], raw_dir: Path, now: datetime) -> 
     errors_by_source: dict[str, Exception | None] = {}
     for source in sources:
         try:
-            collect_one_source(source, raw_dir, now, last_collection_dates.get(source.name))
+            collect_one_source(
+                source, raw_dir, now, last_collection_dates.get(source.name)
+            )
         except Exception as error:
             logger.exception("collection failed for source %r", source.name)
             errors_by_source[source.name] = error
@@ -77,7 +85,9 @@ def collect_all_sources(sources: list[Source], raw_dir: Path, now: datetime) -> 
     try:
         save_last_collection_dates(raw_dir, last_collection_dates)
     except OSError as error:
-        logger.exception("collection state not written to %s", raw_dir / COLLECTION_STATE_FILENAME)
+        logger.exception(
+            "collection state not written to %s", raw_dir / COLLECTION_STATE_FILENAME
+        )
         return CollectionOutcome(errors_by_source, error)
     return CollectionOutcome(errors_by_source, None)
 
@@ -94,7 +104,9 @@ def collect_one_source(
     source_dir = raw_dir / "automation" / source.name
     collection_name = f"{now:%Y-%m-%dT%H%M%SZ}"
     if isinstance(raw_content, bytes):
-        write_new_raw_file(source_dir / f"{collection_name}.{source.extension}", raw_content)
+        write_new_raw_file(
+            source_dir / f"{collection_name}.{source.extension}", raw_content
+        )
         return
     # Every name is checked before the first write: a refused name leaves no partial collection.
     # A write that fails midway (disk full) does leave the pages already written.
@@ -102,4 +114,6 @@ def collect_one_source(
         if not SAFE_PAGE_NAME.fullmatch(page_name):
             raise ValueError(f"not a safe page name: {page_name!r}")
     for page_name, page in raw_content.items():
-        write_new_raw_file(source_dir / collection_name / f"{page_name}.{source.extension}", page)
+        write_new_raw_file(
+            source_dir / collection_name / f"{page_name}.{source.extension}", page
+        )

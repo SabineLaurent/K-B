@@ -27,6 +27,12 @@ kb = "k_b.cli:main"
 
 [tool.ruff.lint]
 extend-select = ["I", "B", "UP", "S", "N", "SIM", "C90"]
+# Règles actives par défaut depuis ruff 0.16, hors de .claude/rules/outillage.md : désactivées
+# tant que Sabine n'a pas décidé (2026-10-06).
+ignore = ["TRY004", "DTZ001", "RUF012", "PLR0402", "PLW1510"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]  # assert est l'outil des tests
+
+[tool.mypy]
+files = ["src"]

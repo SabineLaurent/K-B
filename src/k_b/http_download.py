@@ -64,6 +64,10 @@ def check_trusted_url_prefix(url: str, trusted_url_prefix: str) -> None:
         and prefix_parts.path.startswith("/")
     )
     if not is_prefix_strict:
-        raise ValueError(f"trusted prefix {trusted_url_prefix!r} is not https://<host>/, refused")
+        raise ValueError(
+            f"trusted prefix {trusted_url_prefix!r} is not https://<host>/, refused"
+        )
     if not url.startswith(trusted_url_prefix):
-        raise ValueError(f"url outside its trusted prefix {trusted_url_prefix!r}, refused")
+        raise ValueError(
+            f"url outside its trusted prefix {trusted_url_prefix!r}, refused"
+        )

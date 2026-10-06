@@ -74,7 +74,9 @@ démarrent avec un vrai passé, 488 papiers et 1,2 Mo, mesurés par un appel ré
 ### La requête
 
 ```python
-return f"cat:cs.CR AND cat:cs.AI AND ({keywords}) AND submittedDate:[{submission_window}]"
+return (
+    f"cat:cs.CR AND cat:cs.AI AND ({keywords}) AND submittedDate:[{submission_window}]"
+)
 ```
 (`src/k_b/arxiv_source.py:69`)
 

@@ -4,7 +4,6 @@ import subprocess
 import sys
 
 import pytest
-
 from test_collect import BrokenSource, WorkingSource
 
 from k_b import cli
@@ -25,7 +24,9 @@ def test_collect_refuses_a_data_directory_that_does_not_exist(monkeypatch, tmp_p
     assert cli.main(["collect"]) == 2
 
 
-def test_collect_reports_a_failure_but_still_stores_the_other_sources(monkeypatch, tmp_path):
+def test_collect_reports_a_failure_but_still_stores_the_other_sources(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(cli, "SOURCES", [BrokenSource(), WorkingSource()])
 
@@ -35,7 +36,9 @@ def test_collect_reports_a_failure_but_still_stores_the_other_sources(monkeypatc
     assert list((tmp_path / "raw" / "automation" / "working").iterdir())
 
 
-@pytest.mark.skipif(os.geteuid() == 0, reason="root writes a file whatever its permissions")
+@pytest.mark.skipif(
+    os.geteuid() == 0, reason="root writes a file whatever its permissions"
+)
 def test_collect_still_prints_the_summary_and_exits_1_when_the_state_cannot_be_written(
     monkeypatch, tmp_path, capsys
 ):
@@ -51,7 +54,10 @@ def test_collect_still_prints_the_summary_and_exits_1_when_the_state_cannot_be_w
         raw_dir.chmod(0o700)
 
     assert exit_code == 1
-    assert capsys.readouterr().out == "working: ok\ncollection_state: failed (PermissionError)\n"
+    assert (
+        capsys.readouterr().out
+        == "working: ok\ncollection_state: failed (PermissionError)\n"
+    )
 
 
 def test_collect_fails_closed_with_a_clear_message_on_a_corrupted_state(
@@ -73,7 +79,9 @@ def test_collect_fails_closed_with_a_clear_message_on_a_corrupted_state(
     assert state_path.read_text(encoding="utf-8") == '{"working": '
 
 
-def test_collect_prints_nothing_but_the_error_on_a_corrupted_state(monkeypatch, tmp_path, capsys):
+def test_collect_prints_nothing_but_the_error_on_a_corrupted_state(
+    monkeypatch, tmp_path, capsys
+):
     state_path = tmp_path / "raw" / "collection_state.json"
     state_path.parent.mkdir()
     state_path.write_text("[]", encoding="utf-8")
@@ -84,7 +92,9 @@ def test_collect_prints_nothing_but_the_error_on_a_corrupted_state(monkeypatch, 
     assert capsys.readouterr().out == ""
 
 
-@pytest.mark.skipif(os.geteuid() == 0, reason="root reads a file whatever its permissions")
+@pytest.mark.skipif(
+    os.geteuid() == 0, reason="root reads a file whatever its permissions"
+)
 def test_collect_fails_closed_with_a_clear_message_on_an_unreadable_state(
     monkeypatch, tmp_path, capsys
 ):
@@ -114,12 +124,16 @@ def test_an_info_line_of_k_b_is_shown_once_logging_is_configured():
         "logging.getLogger('k_b.tldr_source').info('tldr_ai 2026-10-03: no edition page')"
     )
 
-    result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True
+    )
 
     assert "INFO k_b.tldr_source: tldr_ai 2026-10-03: no edition page" in result.stderr
 
 
-def test_create_db_creates_the_database_in_the_data_directory(monkeypatch, tmp_path, capsys):
+def test_create_db_creates_the_database_in_the_data_directory(
+    monkeypatch, tmp_path, capsys
+):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
 
     exit_code = cli.main(["create-db"])
@@ -129,7 +143,9 @@ def test_create_db_creates_the_database_in_the_data_directory(monkeypatch, tmp_p
     assert "k-b.sqlite" in capsys.readouterr().out
 
 
-def test_create_db_run_again_refuses_and_keeps_the_database(monkeypatch, tmp_path, capsys):
+def test_create_db_run_again_refuses_and_keeps_the_database(
+    monkeypatch, tmp_path, capsys
+):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
     database_content = (tmp_path / "k-b.sqlite").read_bytes()
@@ -148,7 +164,9 @@ def test_create_db_refuses_to_run_without_a_data_directory(monkeypatch, capsys):
     assert "KB_DATA_DIR" in capsys.readouterr().err
 
 
-@pytest.mark.skipif(os.geteuid() == 0, reason="root writes a file whatever its permissions")
+@pytest.mark.skipif(
+    os.geteuid() == 0, reason="root writes a file whatever its permissions"
+)
 def test_create_db_reports_a_database_that_cannot_be_written_and_exits_1(
     monkeypatch, tmp_path, capsys
 ):
@@ -177,7 +195,9 @@ def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, ca
     assert (tmp_path / "import-log.jsonl").is_file()
 
 
-def test_import_refuses_a_missing_database_and_does_not_create_it(monkeypatch, tmp_path, capsys):
+def test_import_refuses_a_missing_database_and_does_not_create_it(
+    monkeypatch, tmp_path, capsys
+):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
 
     exit_code = cli.main(["import"])
@@ -199,4 +219,7 @@ def test_import_reports_a_failed_import_and_exits_1(monkeypatch, tmp_path, capsy
     exit_code = cli.main(["import"])
 
     assert exit_code == 1
-    assert "error: IntegrityError: UNIQUE constraint failed: item.url" in capsys.readouterr().err
+    assert (
+        "error: IntegrityError: UNIQUE constraint failed: item.url"
+        in capsys.readouterr().err
+    )

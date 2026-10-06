@@ -107,7 +107,9 @@ for page_name in raw_content:
     if not SAFE_PAGE_NAME.fullmatch(page_name):
         raise ValueError(f"not a safe page name: {page_name!r}")
 for page_name, page in raw_content.items():
-    write_new_raw_file(source_dir / collection_name / f"{page_name}.{source.extension}", page)
+    write_new_raw_file(
+        source_dir / collection_name / f"{page_name}.{source.extension}", page
+    )
 ```
 `src/k_b/collect.py:88`
 

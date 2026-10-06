@@ -53,7 +53,9 @@ def test_utm_parameters_are_removed_and_the_others_kept_in_order():
         url="https://example.com/post?utm_source=tldrai&id=7&utm_medium=newsletter&page=2#part",
     )
 
-    assert merge_items([item]).items[0].url == "https://example.com/post?id=7&page=2#part"
+    assert (
+        merge_items([item]).items[0].url == "https://example.com/post?id=7&page=2#part"
+    )
 
 
 def test_a_query_made_only_of_utm_parameters_disappears():
@@ -86,15 +88,19 @@ def test_the_same_source_item_seen_again_is_discarded_and_the_first_collection_k
     merged = merge_items([first, again])
 
     assert merged.items == [first]
-    assert [(discard.rule, discard.item, discard.kept_url) for discard in merged.discards] == [
-        ("same_source_id", again, first.url)
-    ]
+    assert [
+        (discard.rule, discard.item, discard.kept_url) for discard in merged.discards
+    ] == [("same_source_id", again, first.url)]
 
 
 def test_the_same_url_from_another_source_is_discarded():
-    first = make_item(source_code="tldr", source_item_id="article", url="https://example.com/post")
+    first = make_item(
+        source_code="tldr", source_item_id="article", url="https://example.com/post"
+    )
     same_url = make_item(
-        source_code="clipper", source_item_id="post.md", url="https://example.com/post?utm_source=x"
+        source_code="clipper",
+        source_item_id="post.md",
+        url="https://example.com/post?utm_source=x",
     )
 
     merged = merge_items([first, same_url])
@@ -131,9 +137,9 @@ def test_the_same_cve_within_one_source_is_discarded_and_the_first_seen_kept():
     merged = merge_items([first, same_cve])
 
     assert merged.items == [first]
-    assert [(discard.rule, discard.item, discard.kept_url) for discard in merged.discards] == [
-        ("same_cve", same_cve, first.url)
-    ]
+    assert [
+        (discard.rule, discard.item, discard.kept_url) for discard in merged.discards
+    ] == [("same_cve", same_cve, first.url)]
 
 
 def test_items_without_cve_are_not_duplicates_of_each_other():
@@ -150,15 +156,17 @@ def test_a_newer_arxiv_revision_replaces_the_kept_paper_in_place():
     other = make_item()
     version_1 = make_paper(datetime(2025, 9, 15, 17, 0, tzinfo=UTC), FIRST_COLLECTION)
     version_2 = make_paper(
-        datetime(2025, 9, 20, 12, 0, tzinfo=UTC), SECOND_COLLECTION, title="A paper, revised"
+        datetime(2025, 9, 20, 12, 0, tzinfo=UTC),
+        SECOND_COLLECTION,
+        title="A paper, revised",
     )
 
     merged = merge_items([version_1, other, version_2])
 
     assert merged.items == [version_2, other]
-    assert [(discard.rule, discard.item, discard.kept_url) for discard in merged.discards] == [
-        ("arxiv_revision", version_1, version_2.url)
-    ]
+    assert [
+        (discard.rule, discard.item, discard.kept_url) for discard in merged.discards
+    ] == [("arxiv_revision", version_1, version_2.url)]
 
 
 def test_an_arxiv_paper_seen_again_without_revision_keeps_the_first_collection():

@@ -29,7 +29,10 @@ def database():
 
 def test_the_schema_and_the_sources_load_with_every_expected_table(database):
     tables = {
-        name for (name,) in database.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        name
+        for (name,) in database.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        )
     }
 
     assert tables == EXPECTED_TABLES
@@ -40,10 +43,17 @@ def insert_vulnerability(database, item_id, url):
     database.execute(
         "INSERT INTO item (item_id, source_code, source_item_id, title, url, collection_id)"
         " VALUES (?, ?, ?, ?, ?, 1)",
-        (item_id, "github" if item_id == 1 else "cisa_kev", f"id-{item_id}", "A title", url),
+        (
+            item_id,
+            "github" if item_id == 1 else "cisa_kev",
+            f"id-{item_id}",
+            "A title",
+            url,
+        ),
     )
     database.execute(
-        "INSERT INTO vulnerability (item_id, cve) VALUES (?, 'CVE-2026-48775')", (item_id,)
+        "INSERT INTO vulnerability (item_id, cve) VALUES (?, 'CVE-2026-48775')",
+        (item_id,),
     )
 
 
@@ -53,7 +63,9 @@ def test_two_sources_can_share_a_cve(database):
         " VALUES (1, '2026-10-05T09:30:00Z', 'automation/x/2026-10-05T093000Z.json')"
     )
 
-    insert_vulnerability(database, 1, "https://github.com/advisories/GHSA-fjqc-hq36-qh5p")
+    insert_vulnerability(
+        database, 1, "https://github.com/advisories/GHSA-fjqc-hq36-qh5p"
+    )
     insert_vulnerability(database, 2, "https://nvd.nist.gov/vuln/detail/CVE-2026-48775")
 
     assert database.execute(

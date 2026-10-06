@@ -21,7 +21,9 @@ from k_b.items import (
     convert_vulnerability,
 )
 
-SEED_SOURCES = Path(__file__).parent.parent / "src" / "k_b" / "database" / "seed_sources.sql"
+SEED_SOURCES = (
+    Path(__file__).parent.parent / "src" / "k_b" / "database" / "seed_sources.sql"
+)
 COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
 RAW_FILE_PATH = "automation/arxiv/2026-10-05T093000Z.xml"
 PUBLISHED_AT = datetime(2026, 10, 1, 18, 0, 22, tzinfo=UTC)

@@ -61,7 +61,9 @@ def test_a_source_receives_its_last_successful_collection_date(tmp_path):
 def test_a_second_run_at_the_same_instant_fails_without_overwriting(tmp_path):
     collect_all_sources([WorkingSource()], tmp_path, FIRST_RUN_AT)
 
-    errors_by_source = collect_all_sources([WorkingSource()], tmp_path, FIRST_RUN_AT).errors_by_source
+    errors_by_source = collect_all_sources(
+        [WorkingSource()], tmp_path, FIRST_RUN_AT
+    ).errors_by_source
 
     assert isinstance(errors_by_source["working"], FileExistsError)
 
@@ -69,7 +71,9 @@ def test_a_second_run_at_the_same_instant_fails_without_overwriting(tmp_path):
 def test_a_source_name_that_is_not_a_safe_path_segment_is_refused(tmp_path):
     raw_dir = tmp_path / "raw"
 
-    errors_by_source = collect_all_sources([WorkingSource(name="../escape")], raw_dir, FIRST_RUN_AT).errors_by_source
+    errors_by_source = collect_all_sources(
+        [WorkingSource(name="../escape")], raw_dir, FIRST_RUN_AT
+    ).errors_by_source
 
     assert isinstance(errors_by_source["../escape"], ValueError)
     assert not (raw_dir / "escape").exists()
@@ -85,7 +89,9 @@ class UnchangedSource:
 
 
 def test_a_source_with_nothing_new_writes_no_raw_file_but_succeeds(tmp_path):
-    errors_by_source = collect_all_sources([UnchangedSource()], tmp_path, FIRST_RUN_AT).errors_by_source
+    errors_by_source = collect_all_sources(
+        [UnchangedSource()], tmp_path, FIRST_RUN_AT
+    ).errors_by_source
 
     assert errors_by_source == {"unchanged": None}
     assert not (tmp_path / "automation").exists()
@@ -105,10 +111,17 @@ class ScrapedSource:
         return self.pages
 
 
-def test_each_page_of_a_source_is_written_as_received_in_a_folder_per_collection(tmp_path):
-    pages = {"2026-09-29": b"<html>monday</html>", "2026-09-30": b"<html>tuesday</html>"}
+def test_each_page_of_a_source_is_written_as_received_in_a_folder_per_collection(
+    tmp_path,
+):
+    pages = {
+        "2026-09-29": b"<html>monday</html>",
+        "2026-09-30": b"<html>tuesday</html>",
+    }
 
-    errors_by_source = collect_all_sources([ScrapedSource(pages)], tmp_path, FIRST_RUN_AT).errors_by_source
+    errors_by_source = collect_all_sources(
+        [ScrapedSource(pages)], tmp_path, FIRST_RUN_AT
+    ).errors_by_source
 
     assert errors_by_source == {"scraped": None}
     collection_dir = tmp_path / "automation" / "scraped" / "2026-09-30T100000Z"
@@ -116,18 +129,26 @@ def test_each_page_of_a_source_is_written_as_received_in_a_folder_per_collection
     assert (collection_dir / "2026-09-30.html").read_bytes() == b"<html>tuesday</html>"
 
 
-def test_a_page_name_that_is_not_a_safe_path_segment_is_refused_before_any_write(tmp_path):
+def test_a_page_name_that_is_not_a_safe_path_segment_is_refused_before_any_write(
+    tmp_path,
+):
     pages = {"2026-09-29": b"<html>monday</html>", "../escape": b"<html>evil</html>"}
 
-    errors_by_source = collect_all_sources([ScrapedSource(pages)], tmp_path, FIRST_RUN_AT).errors_by_source
+    errors_by_source = collect_all_sources(
+        [ScrapedSource(pages)], tmp_path, FIRST_RUN_AT
+    ).errors_by_source
 
     assert isinstance(errors_by_source["scraped"], ValueError)
     assert not (tmp_path / "automation").exists()
     assert not (tmp_path / "escape.html").exists()
 
 
-@pytest.mark.skipif(os.geteuid() == 0, reason="root writes a file whatever its permissions")
-def test_a_state_that_cannot_be_written_is_returned_and_logged_with_its_path(tmp_path, caplog):
+@pytest.mark.skipif(
+    os.geteuid() == 0, reason="root writes a file whatever its permissions"
+)
+def test_a_state_that_cannot_be_written_is_returned_and_logged_with_its_path(
+    tmp_path, caplog
+):
     (tmp_path / "automation").mkdir()
     tmp_path.chmod(0o500)
 

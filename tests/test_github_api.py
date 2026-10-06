@@ -60,7 +60,9 @@ def test_without_a_token_the_request_is_anonymous(fake_urlopen):
     assert not fake_urlopen.requests[0].has_header("Authorization")
 
 
-def test_the_token_is_sent_but_never_forwarded_to_a_redirection(fake_urlopen, monkeypatch):
+def test_the_token_is_sent_but_never_forwarded_to_a_redirection(
+    fake_urlopen, monkeypatch
+):
     monkeypatch.setenv(github_api.TOKEN_VARIABLE, "test-token")
 
     get_from_github_api(PATH)

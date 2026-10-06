@@ -6,7 +6,13 @@ Which source field goes into which item field: docs/stockage.md.
 from datetime import UTC, datetime, time
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, StringConstraints, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    StringConstraints,
+    model_validator,
+)
 
 from k_b.arxiv_papers import Paper
 from k_b.cisa_kev import Vulnerability
@@ -15,7 +21,9 @@ from k_b.github_most_starred import StarredRepository
 from k_b.github_releases import Release
 
 # The sources of seed_sources.sql: a test keeps both lists equal.
-SourceCode = Literal["github", "arxiv", "cisa_kev", "clipper", "tldr", "zotero", "gh_archive"]
+SourceCode = Literal[
+    "github", "arxiv", "cisa_kev", "clipper", "tldr", "zotero", "gh_archive"
+]
 
 NVD_PAGE_URL = "https://nvd.nist.gov/vuln/detail/"
 
@@ -91,7 +99,9 @@ def convert_vulnerability(
     )
 
 
-def convert_release(release: Release, collected_at: datetime, raw_file_path: str) -> Item:
+def convert_release(
+    release: Release, collected_at: datetime, raw_file_path: str
+) -> Item:
     return Item(
         source_code="github",
         source_item_id=str(release.release_id),
@@ -104,7 +114,9 @@ def convert_release(release: Release, collected_at: datetime, raw_file_path: str
     )
 
 
-def convert_advisory(advisory: Advisory, collected_at: datetime, raw_file_path: str) -> Item:
+def convert_advisory(
+    advisory: Advisory, collected_at: datetime, raw_file_path: str
+) -> Item:
     return Item(
         source_code="github",
         source_item_id=advisory.ghsa_id,
