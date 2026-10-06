@@ -60,7 +60,7 @@ ajouter ceux des lecteurs dans le même commit garde chaque état du dépôt imp
 
 ### 5. Les tests suivent leur fonction
 
-Les 8 tests de conversion quittent `tests/test_items.py` pour le fichier de test de chaque lecteur.
+Les 7 tests de conversion quittent `tests/test_items.py` pour le fichier de test de chaque lecteur.
 Chaque fichier y gagne ses constantes d'exemple, avec un chemin brut de sa propre source
 (`tests/test_cisa_kev.py:14`) :
 
@@ -108,7 +108,7 @@ qui compare `SourceCode` aux sources de la base (`SEED_SOURCES`).
 4. **Le format CVE n'est-il pas toujours écrit deux fois ?** Si : `CVE_ID` (`items.py:22`) et
    `CveId` (`items.py:28`), plus le `CHECK` SQL. Les unifier est le point S6, désormais faisable
    puisque l'import circulaire a disparu.
-5. **Comment sait-on que rien n'a changé ?** Les 8 tests de conversion sont recopiés tels quels,
+5. **Comment sait-on que rien n'a changé ?** Les 7 tests de conversion sont recopiés tels quels,
    seule leur constante de chemin change, et les 251 tests passent avant et après.
 
 ## Zones non vérifiées
