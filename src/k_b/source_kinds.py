@@ -4,7 +4,7 @@ In the package, only cli.py imports it: it gives it to the collection (E) and to
 (T then L).
 """
 
-from k_b.source import SourceKind
+from k_b.source_contract import SourceKind
 from k_b.sources import (
     arxiv,
     cisa_kev,

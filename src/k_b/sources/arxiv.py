@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 
 from k_b.http_download import download
 from k_b.items import Item
-from k_b.source import SourceReader
+from k_b.source_contract import SourceReader
 
 logger = logging.getLogger(__name__)
 

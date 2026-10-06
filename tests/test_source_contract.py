@@ -1,4 +1,4 @@
-from k_b.source import SourceKind, find_source_kind, list_sources
+from k_b.source_contract import SourceKind, find_source_kind, list_sources
 
 RELEASES = SourceKind("github_releases", (), None)
 STARRED = SourceKind("github_most_starred", (), None)

@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 from k_b import http_download
-from k_b.source import list_sources
+from k_b.source_contract import list_sources
 from k_b.source_kinds import SOURCE_KINDS
 from k_b.sources.arxiv import (
     ArxivSource,

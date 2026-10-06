@@ -17,7 +17,7 @@ from k_b.database import connect_database
 from k_b.items import Item
 from k_b.merge import Discard, merge_items
 from k_b.raw_items import Rejection, read_raw_items
-from k_b.source import SourceKind
+from k_b.source_contract import SourceKind
 
 # The date format the CHECK constraints of schema.sql accept.
 DATABASE_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"

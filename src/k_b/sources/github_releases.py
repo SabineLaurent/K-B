@@ -13,7 +13,7 @@ from datetime import datetime
 from urllib.parse import unquote
 
 from k_b.items import Item
-from k_b.source import SourceReader
+from k_b.source_contract import SourceReader
 from k_b.sources.github_api import get_from_github_api
 from k_b.sources.github_dates import parse_github_date
 from k_b.sources.tracked_repositories import OWNER_SLASH_NAME, is_repository_name

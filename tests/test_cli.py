@@ -7,7 +7,7 @@ import pytest
 from test_collect import BrokenSource, WorkingSource
 
 from k_b import cli
-from k_b.source import SourceKind
+from k_b.source_contract import SourceKind
 
 
 def collected_kinds(*sources):

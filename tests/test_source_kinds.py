@@ -1,6 +1,6 @@
 from itertools import permutations
 
-from k_b.source import find_source_kind, list_sources
+from k_b.source_contract import find_source_kind, list_sources
 from k_b.source_kinds import SOURCE_KINDS
 
 
