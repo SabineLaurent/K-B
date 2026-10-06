@@ -15,7 +15,7 @@ from k_b.tracked_repositories import OWNER_SLASH_NAME, is_repository_name
 # takes only the path characters of RFC 3986 and /, so no query, fragment, space or non-ASCII.
 RELEASE_URL = re.compile(
     rf"https://github\.com/({OWNER_SLASH_NAME.pattern})/releases/tag/"
-    r"[A-Za-z0-9._~!$&'()*+,;=:@%/-]+"
+    r"(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9A-Fa-f]{2})+"
 )
 
 

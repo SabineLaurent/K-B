@@ -88,6 +88,15 @@ def test_the_repository_is_read_in_the_release_url():
 
 
 @pytest.mark.parametrize(
+    "tag", ["release/1.0", "v1.0+build.5", "langchain-core==0.3.1", "v1%E2%80%A6"]
+)
+def test_a_release_url_with_any_path_character_in_its_tag_is_read(tag):
+    payload = release_payload(html_url=f"https://github.com/a/b/releases/tag/{tag}")
+
+    assert read_releases(payload)[0].repository == "a/b"
+
+
+@pytest.mark.parametrize(
     "html_url",
     [
         None,
@@ -105,6 +114,13 @@ def test_the_repository_is_read_in_the_release_url():
         "https://github.com/a/b/releases/tag/v1\n",
         "https://github.com/a/b/releases/tag/v1\u202e",
         "https://github.com/a/b/releases/v1",
+        # Refused by the repository name rule alone: ... is not a dot segment.
+        "https://github.com/a/.../releases/tag/v1",
+        "https://github.com/a/b/releases/tag/.%2e/.%2e/x",
+        "https://github.com/a/b/releases/tag/%2E./%2E./x",
+        "https://github.com/a/b/releases/tag/..\\..\\x",
+        "https://github.com/a/b/releases/tag/%",
+        "https://github.com/a/b/releases/tag/v1%2",
     ],
 )
 def test_a_release_url_without_a_repository_is_refused_with_the_url(html_url):
