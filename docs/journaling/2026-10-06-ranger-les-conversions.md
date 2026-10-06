@@ -77,7 +77,7 @@ qui compare `SourceCode` aux sources de la base (`SEED_SOURCES`).
 | Choix | Retenu parce que | Écarté |
 |---|---|---|
 | Conversion dans le module du lecteur | Le plan ETL validé le 06/10 le prévoit : un module par source porte lecture et conversion (T). | La conversion dans la classe source (`x_source.py`) : mêlerait le téléchargement (E) et la transformation (T). |
-| Conversion en fin de module | Le lecteur et ses fonctions d'aide restent groupés en tête ; la conversion vient après, puisqu'elle prend ce que le lecteur produit. | « Juste après le lecteur » : couperait le lecteur de ses fonctions d'aide (arXiv : `read_papers`, puis `parse_paper`, `read_text`, `read_date`). |
+| Conversion en fin de module | Le lecteur et ses fonctions d'aide restent groupés en tête ; la conversion vient après, puisqu'elle prend ce que le lecteur produit. | « Juste après le lecteur » : couperait le lecteur de ses fonctions d'aide (arXiv : `read_papers`, `count_papers` et `read_total_results`, puis leurs fonctions d'aide `parse_feed`, `parse_paper`, `read_text`, `read_date`). |
 | `CVE_ID` dans `items.py` | C'est le modèle commun que toutes les sources importent déjà ; le plan l'y place. | Le laisser dans `cisa_kev.py` : le couplage entre deux sources restait. |
 | Ne pas dériver `CveId` de `CVE_ID` | Ce serait changer une définition, pas déplacer du code. C'est le point S6 de la revue d'architecture, à part. | L'unifier ici : mélangerait deux sujets dans une PR qui promet « aucun comportement ne change ». |
 | Un chemin brut par source dans les tests | Décision de Sabine : un chemin arXiv dans le test de CISA se lit mal. Le comportement ne change pas : la conversion recopie le chemin sans le lire. | Copier le chemin arXiv partout (déplacement strict). |
@@ -100,26 +100,30 @@ qui compare `SourceCode` aux sources de la base (`SEED_SOURCES`).
    qui importe chaque source doit changer à chaque nouvelle source. Ici, la source dépend du
    modèle commun, jamais l'inverse (`items.py:6-15`).
 2. **Que se passe-t-il si quelqu'un réimporte un lecteur dans `items.py` ?** Import circulaire :
-   `items` et le lecteur s'attendent l'un l'autre. Le critère de fin le surveille par un `grep`.
-   Un test de dépendances l'automatisera à l'étape 3 du plan.
+   `items` et le lecteur s'attendent l'un l'autre. Le `grep` du critère de fin l'a vérifié une
+   fois ; il ne tourne pas en CI. Ce qui protège aujourd'hui, c'est l'échec à l'import :
+   `from k_b.arxiv_papers import Paper` ajouté en tête de `items.py` fait échouer 17 fichiers de
+   test dès leur chargement (essayé, puis retiré). Un test de dépendances le dira explicitement à
+   l'étape 3 du plan.
 3. **Pourquoi le motif CVE dans le modèle commun, et pas dans un module « CVE » à part ?** Parce
    qu'il n'a que deux usagers, tous deux importent déjà `items`, et qu'un nouveau module pour une
    ligne serait une abstraction sans besoin (`code.md`, KISS).
 4. **Le format CVE n'est-il pas toujours écrit deux fois ?** Si : `CVE_ID` (`items.py:22`) et
    `CveId` (`items.py:28`), plus le `CHECK` SQL. Les unifier est le point S6, désormais faisable
    puisque l'import circulaire a disparu.
-5. **Comment sait-on que rien n'a changé ?** Les 7 tests de conversion sont recopiés tels quels,
-   seule leur constante de chemin change, et les 251 tests passent avant et après.
+5. **Comment sait-on que rien n'a changé ?** Un relecteur indépendant a comparé, par leur arbre
+   syntaxique (`ast.get_source_segment`), chaque fonction de `items.py` sur `main` à celle de
+   même nom sur la branche : les 5 `convert_*` et les 7 tests de conversion sont identiques ;
+   seule la constante de chemin des tests change. Les 251 tests passent avant et après.
 
 ## Zones non vérifiées
 
-- Les 5 corps de `convert_*` ont été déplacés par script, par plages de lignes. Leur identité avec
-  l'original est montrée par les tests, pas par une comparaison ligne à ligne faite à la main.
 - Le motif CVE reste dupliqué (voir question 4) : non traité ici.
 
 ## Ce qui reste
 
 - **Releases autonomes** (#98) : le lecteur des releases tire le dépôt de son brut.
 - **Une seule liste des sources** (#99) : le contrat `SourceReader` gagne un typage qui lie un
-  lecteur à sa conversion (constat 3 de la revue de cette PR).
+  lecteur à sa conversion : aujourd'hui, `SourceReader.convert` est typé avec `Any`
+  (`raw_items.py:36`), et `SourceReader(read_papers, convert_release)` passerait mypy.
 - **S6** : un seul type Python pour le format CVE.
