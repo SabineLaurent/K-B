@@ -83,24 +83,29 @@ import de `sources`.
 
 Le point délicat est l'import relatif. Dans un module de `k_b.sources`, `from .. import cli`
 remonte d'un cran, à `k_b`. Le test résout donc chaque import relatif à partir du paquet du
-module (`tests/test_module_dependencies.py:49-52`) :
+module (`tests/test_module_dependencies.py:54-55`) :
 
 ```python
-base = ".".join(
-    package.split(".")[: len(package.split(".")) - node.level + 1]
-)
+base = ".".join(package_parts[: len(package_parts) - node.level + 1])
 origin = f"{base}.{node.module}" if node.module else base
 ```
 
 Avec `package="k_b.sources"`, `.` (level 1) donne `k_b.sources` et `..` (level 2) donne `k_b`.
-Ce cas est testé à la ligne 87 : `("from .. import cli", {"cli"})`. Aucun module de K-B n'utilise
+Ce cas est testé à la ligne 90 : `("from .. import cli", {"cli"})`. Aucun module de K-B n'utilise
 d'import relatif aujourd'hui. Le test le prévoit quand même, parce que sinon un import interdit de
 `cli` écrit ainsi passerait inaperçu.
 
+Deux garde-fous viennent de la revue de code :
+- **Un import qui remonte au-dessus de `k_b` est refusé.** `from ... import cli` depuis
+  `k_b.sources` lève une `ValueError` au lieu d'être ignoré : le test échoue fermé
+  (`tests/test_module_dependencies.py:50-53`).
+- **Un module générique qui est un paquet est lu avec son propre paquet.** `database/__init__.py`
+  est résolu contre `k_b.database`, et non contre `k_b`. C'est le rôle de `list_generic_modules`.
+
 Le test vérifie aussi deux choses :
 - les modules de premier niveau sont exactement les génériques, plus `sources`, plus la
-  composition (ligne 99). Un module de source oublié à plat le fait donc échouer ;
-- la liste des fichiers de `sources/` n'est pas vide (ligne 120), pour que la vérification ne
+  composition (ligne 107). Un module de source oublié à plat le fait donc échouer ;
+- la liste des fichiers de `sources/` n'est pas vide (ligne 134), pour que la vérification ne
   passe pas « à vide ».
 
 ### Les tests suivent le code
@@ -130,7 +135,7 @@ remontent par `Path(__file__).parent.parent / "fixtures"`
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| `uv run pytest` : 306 passed (301 avant la PR) | Rien ne casse. +5 = un cas de forme d'import et quatre cas d'import relatif, ajoutés au test de dépendances. Aucun test n'est perdu. |
+| `uv run pytest` : 307 passed (301 avant la PR) | Rien ne casse. +6 = un cas de forme d'import, quatre cas d'import relatif et le refus d'un import au-dessus de `k_b`, ajoutés au test de dépendances. Aucun test n'est perdu. |
 | Lignes `def`/`assert`/`@pytest` des anciens fichiers de test toutes retrouvées dans les nouveaux, sauf 3 lignes CISA | Les 3 lignes ne diffèrent que par les renommages (`CATALOG` → `EXTRACT`, `cisa_kev_source.` → `cisa_kev.`). |
 | `test_every_module_is_in_exactly_one_list` | Plus aucun module de source à plat dans `src/k_b/`. |
 | `test_no_module_of_the_sources_imports_the_composition` | Le test de dépendances porte sur le paquet `k_b.sources`. |
@@ -151,9 +156,9 @@ remontent par `Path(__file__).parent.parent / "fixtures"`
    vérifie `test_no_generic_module_imports_the_sources_or_the_composition`.
 3. **« Qu'est-ce qui empêche une source d'importer `cli` ? »**
    `test_no_module_of_the_sources_imports_the_composition` parcourt chaque fichier de
-   `sources/` et résout aussi les imports relatifs (`tests/test_module_dependencies.py:49-52`).
-4. **« Comment savez-vous qu'aucun test n'a été perdu dans la fusion ? »** Le décompte (301 + 5
-   ajoutés = 306) et la comparaison ligne à ligne des `def` et `assert` des anciens fichiers.
+   `sources/` et résout aussi les imports relatifs (`tests/test_module_dependencies.py:54-55`).
+4. **« Comment savez-vous qu'aucun test n'a été perdu dans la fusion ? »** Le décompte (301 + 6
+   ajoutés = 307) et la comparaison ligne à ligne des `def` et `assert` des anciens fichiers.
 5. **« Un fichier fusionné de 230 lignes, ce n'est pas trop long ? »** Le module le plus long est
    `arxiv.py`, avec 231 lignes, pour une seule source. Une fonction fait toujours une chose. Le
    critère était « un module par source », pas une taille.

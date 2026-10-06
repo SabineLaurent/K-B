@@ -46,13 +46,16 @@ def parse_imported_modules(code: str, package: str = "k_b") -> set[str]:
         elif isinstance(node, ast.ImportFrom):
             if node.level > 0:
                 # A relative import starts from the package, one level up per extra dot.
-                base = ".".join(
-                    package.split(".")[: len(package.split(".")) - node.level + 1]
-                )
+                package_parts = package.split(".")
+                if node.level > len(package_parts):
+                    raise ValueError(
+                        f"relative import of level {node.level} above the package {package}"
+                    )
+                base = ".".join(package_parts[: len(package_parts) - node.level + 1])
                 origin = f"{base}.{node.module}" if node.module else base
             else:
                 origin = node.module or ""
-            if origin in ("k_b", f"k_b.{SOURCES_PACKAGE}"):
+            if origin == "k_b":
                 names = [f"{origin}.{alias.name}" for alias in node.names]
             else:
                 names = [origin]
@@ -92,6 +95,11 @@ def test_relative_imports_inside_sources_are_resolved(code, expected):
     assert parse_imported_modules(code, package="k_b.sources") == expected
 
 
+def test_a_relative_import_above_k_b_is_refused():
+    with pytest.raises(ValueError, match="level 3 above the package k_b.sources"):
+        parse_imported_modules("from ... import cli", package="k_b.sources")
+
+
 def test_every_module_is_in_exactly_one_list():
     modules = {module.name for module in pkgutil.iter_modules([str(PACKAGE_DIR)])}
     lists = (GENERIC_MODULES, {SOURCES_PACKAGE}, COMPOSITION_MODULES)
@@ -100,17 +108,21 @@ def test_every_module_is_in_exactly_one_list():
     assert sum(len(modules_of_list) for modules_of_list in lists) == len(modules)
 
 
-def list_generic_module_paths() -> list[Path]:
-    paths = []
+def list_generic_modules() -> list[tuple[Path, str]]:
+    """Each generic module: its path, and the package its relative imports start from."""
+    modules = []
     for module in GENERIC_MODULES:
         path = PACKAGE_DIR / f"{module}.py"
-        paths.append(path if path.exists() else PACKAGE_DIR / module / "__init__.py")
-    return paths
+        if path.exists():
+            modules.append((path, "k_b"))
+        else:
+            modules.append((PACKAGE_DIR / module / "__init__.py", f"k_b.{module}"))
+    return modules
 
 
 def test_no_generic_module_imports_the_sources_or_the_composition():
-    for path in list_generic_module_paths():
-        forbidden = list_imported_modules(path, "k_b") & (
+    for path, package in list_generic_modules():
+        forbidden = list_imported_modules(path, package) & (
             {SOURCES_PACKAGE} | COMPOSITION_MODULES
         )
         assert forbidden == set(), path
