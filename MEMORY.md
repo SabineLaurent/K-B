@@ -27,7 +27,7 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 - **arXiv bloqué au-delà de 2 000 papiers** (constat du 2026-10-05, porté par #71, hors E1 et
   non planifié). Si la fenêtre de collecte contient plus de
-  2 000 papiers, la source échoue et sa date reste (`sources/arxiv.py:66-70`). La fenêtre
+  2 000 papiers, la source échoue et sa date reste (`sources/arxiv.py:79-83`). La fenêtre
   suivante part du même point et finit plus tard : elle dépasse encore le plafond, la source
   échoue à chaque collecte. Cela contredit la consigne du 05/10 : lancée tous les jours, K-B
   rattrape les jours manqués (#65).

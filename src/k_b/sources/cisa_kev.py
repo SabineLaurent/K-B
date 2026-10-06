@@ -27,6 +27,17 @@ TRUSTED_URL_PREFIX = "https://www.cisa.gov/"
 HTTP_NOT_MODIFIED = 304
 
 
+NVD_PAGE_URL = "https://nvd.nist.gov/vuln/detail/"
+REQUIRED_COLUMNS = (
+    "cveID",
+    "vendorProject",
+    "product",
+    "vulnerabilityName",
+    "dateAdded",
+    "shortDescription",
+)
+
+
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "cisa_kev"
 
@@ -57,17 +68,6 @@ class CisaKevSource:
             raise
         read_catalog(raw_catalog)
         return raw_catalog
-
-
-NVD_PAGE_URL = "https://nvd.nist.gov/vuln/detail/"
-REQUIRED_COLUMNS = (
-    "cveID",
-    "vendorProject",
-    "product",
-    "vulnerabilityName",
-    "dateAdded",
-    "shortDescription",
-)
 
 
 @dataclass(frozen=True)

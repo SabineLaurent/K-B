@@ -21,6 +21,11 @@ from k_b.sources.tracked_repositories import is_repository_name
 SEARCH_QUERY = "stars:>10000"
 
 
+REPOSITORY_URL_PREFIX = "https://github.com/"
+# The API maximum: one request, deep enough to see a repository enter the top.
+RANKING_SIZE = 100
+
+
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "github_most_starred"
 
@@ -43,11 +48,6 @@ class GithubMostStarredSource:
         raw_response = get_from_github_api(f"search/repositories?{urlencode(query)}")
         read_ranking(raw_response)
         return raw_response
-
-
-REPOSITORY_URL_PREFIX = "https://github.com/"
-# The API maximum: one request, deep enough to see a repository enter the top.
-RANKING_SIZE = 100
 
 
 @dataclass(frozen=True)

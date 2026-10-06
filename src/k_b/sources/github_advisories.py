@@ -24,6 +24,11 @@ ECOSYSTEMS = ("pip", "npm")
 ADVISORIES_PER_PAGE = 100
 
 
+GHSA_ID = re.compile(r"GHSA(-[23456789cfghjmpqrvwx]{4}){3}")
+ADVISORY_URL_PREFIX = "https://github.com/advisories/"
+SEVERITIES = ("low", "medium", "high", "critical", "unknown")
+
+
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "github_advisories"
 
@@ -76,11 +81,6 @@ class GithubAdvisoriesSource:
                 ADVISORIES_PER_PAGE,
             )
         return raw_response
-
-
-GHSA_ID = re.compile(r"GHSA(-[23456789cfghjmpqrvwx]{4}){3}")
-ADVISORY_URL_PREFIX = "https://github.com/advisories/"
-SEVERITIES = ("low", "medium", "high", "critical", "unknown")
 
 
 @dataclass(frozen=True)

@@ -24,6 +24,15 @@ logger = logging.getLogger(__name__)
 RELEASES_PER_PAGE = 100
 
 
+# The repository is read in the release URL: the raw file can be read without its source.
+# The whole URL is checked, so that the link opens the repository of the title: the tag part
+# takes only the path characters of RFC 3986 and /, so no query, fragment, space or non-ASCII.
+RELEASE_URL = re.compile(
+    rf"https://github\.com/({OWNER_SLASH_NAME.pattern})/releases/tag/"
+    r"(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9A-Fa-f]{2})+"
+)
+
+
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "github_releases"
 
@@ -68,15 +77,6 @@ class GithubReleasesSource:
                 RELEASES_PER_PAGE,
             )
         return raw_response
-
-
-# The repository is read in the release URL: the raw file can be read without its source.
-# The whole URL is checked, so that the link opens the repository of the title: the tag part
-# takes only the path characters of RFC 3986 and /, so no query, fragment, space or non-ASCII.
-RELEASE_URL = re.compile(
-    rf"https://github\.com/({OWNER_SLASH_NAME.pattern})/releases/tag/"
-    r"(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9A-Fa-f]{2})+"
-)
 
 
 @dataclass(frozen=True)

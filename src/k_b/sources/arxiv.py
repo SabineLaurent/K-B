@@ -16,6 +16,8 @@ from k_b.http_download import download
 from k_b.items import Item
 from k_b.source import SourceReader
 
+logger = logging.getLogger(__name__)
+
 API_URL = "https://export.arxiv.org/api/query"
 # A page of 35 papers weighs 93 KB in 2026, about 2.7 KB a paper: 2,000 papers weigh 5.3 MB.
 MAX_RESPONSE_BYTES = 6 * 1024 * 1024
@@ -40,6 +42,17 @@ ANNOUNCEMENT_DELAY_MARGIN = timedelta(days=7)
 # The first collection reaches back to the start of Sabine's training: 488 papers, 1.2 MB,
 # measured on 2026-10-02.
 FIRST_COLLECTION_START = datetime(2026, 5, 1, tzinfo=UTC)
+
+
+# Python's expat (2.4.1 and later) refuses entity expansion attacks and never fetches
+# external entities: the standard library parser is safe on this untrusted feed.
+ATOM = "{http://www.w3.org/2005/Atom}"
+OPENSEARCH = "{http://a9.com/-/spec/opensearch/1.1/}"
+# Only papers numbered since 2007 (YYMM.NNNNN) are expected in cs.CR × cs.AI.
+PAPER_ID = re.compile(r"https?://arxiv\.org/abs/(\d{4}\.\d{4,5})v(\d+)")
+# arXiv reports an error as a feed whose single entry carries this id.
+API_ERROR_ID = re.compile(r"https?://arxiv\.org/api/errors")
+ABSTRACT_PAGE_URL = "https://arxiv.org/abs/"
 
 
 # The name of its raw folders, written once: its instances and its kind use it.
@@ -93,19 +106,6 @@ def download_papers(search_query: str) -> bytes:
         "sortOrder": "ascending",
     }
     return download(f"{API_URL}?{urlencode(parameters)}", API_URL, MAX_RESPONSE_BYTES)
-
-
-logger = logging.getLogger(__name__)
-
-# Python's expat (2.4.1 and later) refuses entity expansion attacks and never fetches
-# external entities: the standard library parser is safe on this untrusted feed.
-ATOM = "{http://www.w3.org/2005/Atom}"
-OPENSEARCH = "{http://a9.com/-/spec/opensearch/1.1/}"
-# Only papers numbered since 2007 (YYMM.NNNNN) are expected in cs.CR × cs.AI.
-PAPER_ID = re.compile(r"https?://arxiv\.org/abs/(\d{4}\.\d{4,5})v(\d+)")
-# arXiv reports an error as a feed whose single entry carries this id.
-API_ERROR_ID = re.compile(r"https?://arxiv\.org/api/errors")
-ABSTRACT_PAGE_URL = "https://arxiv.org/abs/"
 
 
 @dataclass(frozen=True)

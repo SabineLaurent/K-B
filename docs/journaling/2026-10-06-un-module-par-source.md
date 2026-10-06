@@ -42,9 +42,12 @@ Read the papers of a raw arXiv API response (an Atom feed), and convert each one
 """
 ```
 
-Viennent ensuite la partie téléchargement (`FOLDER_PREFIX` en `arxiv.py:46`, `ArxivSource` en
-`:49`), puis la partie lecture (`read_papers` en `:125`), et enfin le lecteur déclaré
-(`arxiv.py:231`) :
+Après les imports viennent `logger` (`arxiv.py:19`) et toutes les constantes du module, celles du
+téléchargement puis celles de la lecture, et enfin `FOLDER_PREFIX` (`:59`). C'est l'usage courant
+en Python, dans l'ordre que donne PEP 8 (docstring, imports, puis variables du module) : un
+lecteur trouve toute la configuration en tête. Puis les fonctions, dans l'ordre E puis T : la
+partie téléchargement (`ArxivSource` en `:62`), la partie lecture (`read_papers` en `:125`), et
+enfin le lecteur déclaré (`arxiv.py:231`) :
 
 ```python
 READER: SourceReader[Paper] = SourceReader(read_papers, convert_paper)
@@ -123,7 +126,7 @@ remontent par `Path(__file__).parent.parent / "fixtures"`
 | Choix | Retenu, et pourquoi | Écarté, et pourquoi |
 |---|---|---|
 | Nom des journaux | `logging.getLogger(__name__)` inchangé : `k_b.tldr_source` devient `k_b.sources.tldr` (et de même pour arxiv, github_releases, github_advisories). Le nom dit où est le code. Validé par Sabine le 06/10. | Figer les anciens noms en dur : la sortie ne changerait pas, mais elle désignerait des modules qui n'existent plus. |
-| Ordre dans un module | Téléchargement, puis lecture, puis `READER` : l'ordre E puis T du pipeline. | Lecture d'abord : aussi valide pour Python, moins lisible. |
+| Ordre dans un module | `logger` et toutes les constantes en tête (usage courant, ordre de PEP 8), puis les fonctions du téléchargement, puis celles de la lecture, puis `READER` : l'ordre E puis T du pipeline. Constat 8 de la revue de code, validé par Sabine. | Chaque partie avec ses constantes, ce qui place une partie des constantes au milieu du fichier : c'était le premier jet, relevé par la revue. Lecture d'abord : aussi valide pour Python, moins lisible. |
 | Fusion des tests | Un fichier de test par module, en miroir de `src/`. | Garder deux fichiers de test par source : le miroir module ↔ test serait perdu. |
 | Fixtures | Restent dans `tests/fixtures/`. | Les déplacer dans `tests/sources/fixtures/` : `test_raw_items.py` s'en sert aussi. |
 | `__init__.py` | Vide, selon le critère de #100. | Y réexporter les sources : du code dans un `__init__`, ce que Sabine veut éviter. |
