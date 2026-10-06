@@ -1,12 +1,12 @@
-"""Read the security advisories of a raw GitHub API response."""
+"""Read the security advisories of a raw GitHub API response, and convert each one into an item."""
 
 import json
 import re
 from dataclasses import dataclass
 from datetime import datetime
 
-from k_b.cisa_kev import CVE_ID
 from k_b.github_dates import parse_github_date
+from k_b.items import CVE_ID, Item
 
 GHSA_ID = re.compile(r"GHSA(-[23456789cfghjmpqrvwx]{4}){3}")
 ADVISORY_URL_PREFIX = "https://github.com/advisories/"
@@ -91,3 +91,19 @@ def parse_package_names(vulnerabilities: object, position: int) -> tuple[str, ..
         if name not in package_names:
             package_names.append(name)
     return tuple(package_names)
+
+
+def convert_advisory(
+    advisory: Advisory, collected_at: datetime, raw_file_path: str
+) -> Item:
+    return Item(
+        source_code="github",
+        source_item_id=advisory.ghsa_id,
+        title=advisory.summary,
+        url=advisory.url,
+        published_at=advisory.published_at,
+        collected_at=collected_at,
+        raw_file_path=raw_file_path,
+        cve=advisory.cve_id,
+        is_vulnerability=True,
+    )

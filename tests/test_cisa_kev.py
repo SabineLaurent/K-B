@@ -3,9 +3,15 @@ from pathlib import Path
 
 import pytest
 
-from k_b.cisa_kev import read_new_vulnerabilities
+from k_b.cisa_kev import (
+    Vulnerability,
+    convert_vulnerability,
+    read_new_vulnerabilities,
+)
 
 EXTRACT = (Path(__file__).parent / "fixtures" / "cisa_kev_extract.csv").read_bytes()
+COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
+RAW_FILE_PATH = "automation/cisa_kev/2026-10-05T093000Z.csv"
 
 
 def test_the_first_collection_reads_the_whole_catalog():
@@ -85,3 +91,25 @@ def test_a_catalog_starting_with_a_byte_order_mark_is_read():
     vulnerabilities = read_new_vulnerabilities(b"\xef\xbb\xbf" + EXTRACT, None)
 
     assert len(vulnerabilities) == 4
+
+
+def test_a_vulnerability_points_to_its_nvd_page_and_is_dated_at_midnight_utc():
+    vulnerability = Vulnerability(
+        cve_id="CVE-2026-86950",
+        vendor_project="Apple",
+        product="Multiple Products",
+        vulnerability_name="Apple Multiple Products Out-of-Bounds Write Vulnerability",
+        date_added=date(2026, 9, 29),
+        short_description="An out-of-bounds write.",
+    )
+
+    item = convert_vulnerability(vulnerability, COLLECTED_AT, RAW_FILE_PATH)
+
+    assert item.source_code == "cisa_kev"
+    assert item.source_item_id == "CVE-2026-86950"
+    assert item.title == "Apple Multiple Products Out-of-Bounds Write Vulnerability"
+    assert item.url == "https://nvd.nist.gov/vuln/detail/CVE-2026-86950"
+    assert item.published_at == datetime(2026, 9, 29, tzinfo=UTC)
+    assert item.summary == "An out-of-bounds write."
+    assert item.cve == "CVE-2026-86950"
+    assert item.is_vulnerability is True

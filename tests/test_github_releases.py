@@ -5,11 +5,16 @@ from pathlib import Path
 
 import pytest
 
-from k_b.github_releases import Release, read_releases
+from k_b.github_releases import Release, convert_release, read_releases
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_releases_extract.json").read_bytes()
 REPOSITORY = "anthropics/claude-code"
+COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
+RAW_FILE_PATH = (
+    "automation/github_releases_anthropics_claude_code/2026-10-05T093000Z.json"
+)
+PUBLISHED_AT = datetime(2026, 10, 1, 18, 0, 22, tzinfo=UTC)
 
 
 def release_payload(**changes):
@@ -71,3 +76,44 @@ def test_a_response_that_is_not_a_list_is_refused():
 def test_an_invalid_release_is_refused_with_its_position(changes):
     with pytest.raises(ValueError, match="release 0"):
         read_releases(release_payload(**changes), REPOSITORY)
+
+
+def test_a_release_is_identified_by_its_release_id():
+    release = Release(
+        repository="anthropics/claude-code",
+        release_id=401174143,
+        tag_name="v2.1.287",
+        name=None,
+        url="https://github.com/anthropics/claude-code/releases/tag/v2.1.287",
+        published_at=PUBLISHED_AT,
+        is_prerelease=False,
+        body="## What's changed",
+    )
+
+    item = convert_release(release, COLLECTED_AT, RAW_FILE_PATH)
+
+    assert item.source_code == "github"
+    assert item.source_item_id == "401174143"
+    assert item.title == "anthropics/claude-code v2.1.287"
+    assert item.url == "https://github.com/anthropics/claude-code/releases/tag/v2.1.287"
+    assert item.published_at == PUBLISHED_AT
+    assert item.summary == "## What's changed"
+    assert item.repository_name is None
+
+
+def test_a_named_release_is_titled_by_its_name():
+    release = Release(
+        repository="langchain-ai/langgraph",
+        release_id=1,
+        tag_name="0.6.0",
+        name="LangGraph 0.6",
+        url="https://github.com/langchain-ai/langgraph/releases/tag/0.6.0",
+        published_at=PUBLISHED_AT,
+        is_prerelease=False,
+        body=None,
+    )
+
+    item = convert_release(release, COLLECTED_AT, RAW_FILE_PATH)
+
+    assert item.title == "langchain-ai/langgraph LangGraph 0.6"
+    assert item.summary is None

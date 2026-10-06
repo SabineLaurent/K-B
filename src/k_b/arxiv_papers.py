@@ -1,10 +1,12 @@
-"""Read the papers of a raw arXiv API response (an Atom feed)."""
+"""Read the papers of a raw arXiv API response (an Atom feed), and convert each one into an item."""
 
 import logging
 import re
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
 from datetime import datetime
+
+from k_b.items import Item
 
 logger = logging.getLogger(__name__)
 
@@ -122,3 +124,18 @@ def read_date(entry: ElementTree.Element, field: str, label: str) -> datetime:
     if parsed_date.tzinfo is None:
         raise ValueError(f"{label}: {field} has no time zone")
     return parsed_date
+
+
+def convert_paper(paper: Paper, collected_at: datetime, raw_file_path: str) -> Item:
+    return Item(
+        source_code="arxiv",
+        source_item_id=paper.arxiv_id,
+        title=paper.title,
+        url=paper.url,
+        authors=paper.authors,
+        published_at=paper.published_at,
+        revised_at=paper.updated_at,
+        summary=paper.summary,
+        collected_at=collected_at,
+        raw_file_path=raw_file_path,
+    )

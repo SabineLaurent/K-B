@@ -4,10 +4,17 @@ from pathlib import Path
 
 import pytest
 
-from k_b.github_most_starred import read_most_starred
+from k_b.github_most_starred import (
+    StarredRepository,
+    convert_starred_repository,
+    read_most_starred,
+)
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_most_starred_extract.json").read_bytes()
+COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
+RAW_FILE_PATH = "automation/github_most_starred/2026-10-05T093000Z.json"
+PUBLISHED_AT = datetime(2026, 10, 1, 18, 0, 22, tzinfo=UTC)
 
 
 def response_with(**changes):
@@ -70,3 +77,25 @@ def test_a_response_without_a_list_of_items_is_refused():
 def test_an_invalid_repository_is_refused_with_its_rank(changes):
     with pytest.raises(ValueError, match="repository 1"):
         read_most_starred(response_with(**changes), expected_size=3)
+
+
+def test_a_starred_repository_is_a_repository_without_publication_date():
+    repository = StarredRepository(
+        rank=1,
+        full_name="codecrafters-io/build-your-own-x",
+        url="https://github.com/codecrafters-io/build-your-own-x",
+        description="Master programming by recreating your favorite technologies",
+        stars=400000,
+        topics=(),
+        created_at=PUBLISHED_AT,
+    )
+
+    item = convert_starred_repository(repository, COLLECTED_AT, RAW_FILE_PATH)
+
+    assert item.source_code == "github"
+    assert item.source_item_id == "codecrafters-io/build-your-own-x"
+    assert item.title == "codecrafters-io/build-your-own-x"
+    assert item.url == "https://github.com/codecrafters-io/build-your-own-x"
+    assert item.published_at is None
+    assert item.summary == "Master programming by recreating your favorite technologies"
+    assert item.repository_name == "codecrafters-io/build-your-own-x"
