@@ -67,6 +67,7 @@ def test_a_response_without_a_list_of_items_is_refused():
     "changes",
     [
         {"full_name": "../escape"},
+        {"full_name": "owner/."},
         {"html_url": "https://evil.example.com/codecrafters-io/build-your-own-x"},
         {"stargazers_count": "many"},
         {"stargazers_count": True},

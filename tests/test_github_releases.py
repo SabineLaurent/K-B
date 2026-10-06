@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import fields
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,7 +25,7 @@ def release_payload(**changes):
 
 
 def test_a_recorded_response_gives_one_release_per_entry_newest_first():
-    releases = read_releases(RECORDED_RESPONSE, REPOSITORY)
+    releases = read_releases(RECORDED_RESPONSE)
 
     assert [release.tag_name for release in releases] == [
         "v2.1.287",
@@ -48,7 +49,7 @@ def test_the_author_login_is_not_kept():
 
 
 def test_a_missing_name_or_body_stays_empty():
-    release = read_releases(release_payload(name=None, body=None), REPOSITORY)[0]
+    release = read_releases(release_payload(name=None, body=None))[0]
 
     assert release.name is None
     assert release.body is None
@@ -56,7 +57,7 @@ def test_a_missing_name_or_body_stays_empty():
 
 def test_a_response_that_is_not_a_list_is_refused():
     with pytest.raises(ValueError, match="list"):
-        read_releases(b'{"message": "Not Found"}', REPOSITORY)
+        read_releases(b'{"message": "Not Found"}')
 
 
 @pytest.mark.parametrize(
@@ -75,7 +76,30 @@ def test_a_response_that_is_not_a_list_is_refused():
 )
 def test_an_invalid_release_is_refused_with_its_position(changes):
     with pytest.raises(ValueError, match="release 0"):
-        read_releases(release_payload(**changes), REPOSITORY)
+        read_releases(release_payload(**changes))
+
+
+def test_the_repository_is_read_in_the_release_url():
+    payload = release_payload(
+        html_url="https://github.com/someone/untracked/releases/tag/v1"
+    )
+
+    assert read_releases(payload)[0].repository == "someone/untracked"
+
+
+@pytest.mark.parametrize(
+    "html_url",
+    [
+        None,
+        "https://github.com/../x/releases/tag/v1",
+        "https://github.com/a/./releases/tag/v1",
+        "https://github.com/a/releases/tag/v1",
+        "https://example.com/a/b/releases/tag/v1",
+    ],
+)
+def test_a_release_url_without_a_repository_is_refused_with_the_url(html_url):
+    with pytest.raises(ValueError, match=re.escape(repr(html_url))):
+        read_releases(release_payload(html_url=html_url))
 
 
 def test_a_release_is_identified_by_its_release_id():

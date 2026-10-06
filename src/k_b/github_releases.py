@@ -1,13 +1,16 @@
 """Read the releases of a raw GitHub API response, and convert each one into an item."""
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime
 
 from k_b.github_dates import parse_github_date
 from k_b.items import Item
+from k_b.tracked_repositories import OWNER_SLASH_NAME, is_repository_name
 
-RELEASE_URL_PREFIX = "https://github.com/"
+# The repository is read in the release URL: the raw file can be read without its source.
+RELEASE_URL = re.compile(rf"https://github\.com/({OWNER_SLASH_NAME.pattern})/releases/")
 
 
 @dataclass(frozen=True)
@@ -24,18 +27,15 @@ class Release:
     body: str | None
 
 
-def read_releases(raw_response: bytes, repository: str) -> list[Release]:
+def read_releases(raw_response: bytes) -> list[Release]:
     """One release per entry of a `GET /repos/{owner}/{repo}/releases` response, newest first."""
     entries = json.loads(raw_response)
     if not isinstance(entries, list):
         raise ValueError("expected a list of releases")
-    return [
-        parse_release(entry, repository, position)
-        for position, entry in enumerate(entries)
-    ]
+    return [parse_release(entry, position) for position, entry in enumerate(entries)]
 
 
-def parse_release(entry: object, repository: str, position: int) -> Release:
+def parse_release(entry: object, position: int) -> Release:
     if not isinstance(entry, dict):
         raise ValueError(f"release {position}: not an object")
     release_id = entry.get("id")
@@ -46,9 +46,10 @@ def parse_release(entry: object, repository: str, position: int) -> Release:
     if not isinstance(tag_name, str):
         raise ValueError(f"release {position}: tag_name is not a string")
     url = entry.get("html_url")
-    if not isinstance(url, str) or not url.startswith(RELEASE_URL_PREFIX):
+    url_match = RELEASE_URL.match(url) if isinstance(url, str) else None
+    if url_match is None or not is_repository_name(url_match.group(1)):
         raise ValueError(
-            f"release {position}: html_url is not a {RELEASE_URL_PREFIX} URL"
+            f"release {position}: html_url gives no owner/name repository: {url!r}"
         )
     is_prerelease = entry.get("prerelease")
     if not isinstance(is_prerelease, bool):
@@ -58,11 +59,11 @@ def parse_release(entry: object, repository: str, position: int) -> Release:
     if not isinstance(name, str | None) or not isinstance(body, str | None):
         raise ValueError(f"release {position}: name or body is not a string")
     return Release(
-        repository=repository,
+        repository=url_match.group(1),
         release_id=release_id,
         tag_name=tag_name,
         name=name,
-        url=url,
+        url=url_match.string,
         published_at=parse_github_date(
             entry.get("published_at"), f"release {position}: published_at"
         ),

@@ -1,11 +1,15 @@
-"""The GitHub repositories K-B watches, and the packages each one publishes.
+"""The GitHub repositories K-B watches, the packages each one publishes, and what a repository
+name is.
 
 The list and the reasons for each repository are in docs/sources.md. A repository gives its
 releases; its packages give its security advisories.
 """
 
+import re
 from dataclasses import dataclass
 from typing import Literal
+
+OWNER_SLASH_NAME = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 
 
 @dataclass(frozen=True)
@@ -42,3 +46,12 @@ def list_packages_by_ecosystem(
             known_packages + repository.packages
         )
     return packages_by_ecosystem
+
+
+def is_repository_name(text: str) -> bool:
+    """owner/name, where neither part is `.` nor contains `..`: the name goes into paths."""
+    return (
+        OWNER_SLASH_NAME.fullmatch(text) is not None
+        and ".." not in text
+        and "." not in text.split("/")
+    )

@@ -70,11 +70,12 @@ def test_every_source_with_a_reader_gives_its_items(tmp_path):
     assert reading.rejections == []
 
 
-def test_a_release_keeps_the_repository_of_its_source(tmp_path):
+def test_a_release_is_titled_by_the_repository_of_its_url(tmp_path):
+    # The releases of claude-code, in the folder of another tracked repository.
     copy_fixture(
         tmp_path,
         "github_releases_extract.json",
-        "github_releases_anthropics_claude_code",
+        "github_releases_langchain_ai_langchain",
         "json",
     )
 
