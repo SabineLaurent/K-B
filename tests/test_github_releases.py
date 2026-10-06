@@ -95,6 +95,16 @@ def test_the_repository_is_read_in_the_release_url():
         "https://github.com/a/./releases/tag/v1",
         "https://github.com/a/releases/tag/v1",
         "https://example.com/a/b/releases/tag/v1",
+        # A browser resolves the dots: the link would open another repository than the title's.
+        "https://github.com/a/b/releases/../../../evil/x/releases/tag/v9",
+        "https://github.com/a/b/releases/tag/../../../../evil/x",
+        "https://github.com/a/b/releases/tag/%2e%2e/%2E%2E/x",
+        "https://github.com/a/b/releases/tag/v1?next=https://evil.example.com",
+        "https://github.com/a/b/releases/tag/v1#fragment",
+        "https://github.com/a/b/releases/tag/v1 ",
+        "https://github.com/a/b/releases/tag/v1\n",
+        "https://github.com/a/b/releases/tag/v1\u202e",
+        "https://github.com/a/b/releases/v1",
     ],
 )
 def test_a_release_url_without_a_repository_is_refused_with_the_url(html_url):

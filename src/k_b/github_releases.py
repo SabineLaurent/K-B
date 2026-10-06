@@ -4,13 +4,19 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from urllib.parse import unquote
 
 from k_b.github_dates import parse_github_date
 from k_b.items import Item
 from k_b.tracked_repositories import OWNER_SLASH_NAME, is_repository_name
 
 # The repository is read in the release URL: the raw file can be read without its source.
-RELEASE_URL = re.compile(rf"https://github\.com/({OWNER_SLASH_NAME.pattern})/releases/")
+# The whole URL is checked, so that the link opens the repository of the title: the tag part
+# takes only the path characters of RFC 3986 and /, so no query, fragment, space or non-ASCII.
+RELEASE_URL = re.compile(
+    rf"https://github\.com/({OWNER_SLASH_NAME.pattern})/releases/tag/"
+    r"[A-Za-z0-9._~!$&'()*+,;=:@%/-]+"
+)
 
 
 @dataclass(frozen=True)
@@ -46,10 +52,15 @@ def parse_release(entry: object, position: int) -> Release:
     if not isinstance(tag_name, str):
         raise ValueError(f"release {position}: tag_name is not a string")
     url = entry.get("html_url")
-    url_match = RELEASE_URL.match(url) if isinstance(url, str) else None
-    if url_match is None or not is_repository_name(url_match.group(1)):
+    url_match = RELEASE_URL.fullmatch(url) if isinstance(url, str) else None
+    if (
+        url_match is None
+        or not is_repository_name(url_match.group(1))
+        or has_dot_segment(url_match.string)
+    ):
         raise ValueError(
-            f"release {position}: html_url gives no owner/name repository: {url!r}"
+            f"release {position}: html_url is not a release URL of an owner/name "
+            f"repository: {url!r}"
         )
     is_prerelease = entry.get("prerelease")
     if not isinstance(is_prerelease, bool):
@@ -70,6 +81,11 @@ def parse_release(entry: object, position: int) -> Release:
         is_prerelease=is_prerelease,
         body=body,
     )
+
+
+def has_dot_segment(url: str) -> bool:
+    """A `.` or `..` path segment, even percent-encoded: a browser would resolve it."""
+    return any(segment in (".", "..") for segment in unquote(url).split("/"))
 
 
 def convert_release(

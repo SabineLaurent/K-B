@@ -116,6 +116,8 @@ def list_readers_by_source() -> dict[str, SourceReader]:
                     convert_vulnerability,
                 )
             case GithubReleasesSource():
+                # The repository comes from each release URL; the collection has already
+                # refused a page of another repository than the tracked one.
                 readers[source.name] = SourceReader(read_releases, convert_release)
             case GithubAdvisoriesSource():
                 readers[source.name] = SourceReader(read_advisories, convert_advisory)
