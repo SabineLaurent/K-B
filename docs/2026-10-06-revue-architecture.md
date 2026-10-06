@@ -22,14 +22,53 @@ Trois commandes : `kb collect` (télécharger, contrôler, écrire le brut), `kb
 `kb import` (relire tout le brut, le convertir en items, fusionner, écrire la base et le journal
 d'import). Le chemin est linéaire et chaque étape a un seul point d'entrée.
 
+### W0 — L'import rejoue tout le brut : à remplacer par un import incrémental
+
+**Décision de Sabine (2026-10-06)** : le rejeu complet de `raw/` à chaque `kb import` est
+abandonné. La collecte est incrémentale ; l'import doit l'être aussi.
+
+**Ce qui est.**
+- `kb import` relit et revalide **tout** `raw/` à chaque exécution (`raw_items.py:64-79`).
+- La fusion se fait **en mémoire** (`merge.py:30-71`) : elle ne voit que ce qu'elle a chargé, d'où la relecture complète.
+- Deux de ses trois règles, « même identifiant de source » et « même URL », sont déjà des contraintes `UNIQUE` de la base (`schema.sql:36`, `:27`) : elles sont donc vérifiées deux fois.
+- Chaque import refait le travail des précédents pour aboutir à la même base, plus les nouveautés ; le journal d'import se remplit de doublons attendus (W5).
+- La collecte et la base tiennent chacune leur mémoire (`raw/collection_state.json`, et la table `collection`).
+
+**Référence : brief09** (`brief09_assistant-veille-tech`, indicatif selon `MEMORY.md`).
+- Chaque exécution ne récupère que les nouveautés, depuis un repère calculé dans la base (`SELECT MAX(published_date) … WHERE source = ?`, `app/data/article_store.py:58`, et `docs/steps/12-ingestion-incrementale-watermark.md` : « Zéro nouvel état, rien à synchroniser »).
+- Elle écrit ces articles seuls, avec `INSERT OR IGNORE` : **la base dédoublonne** par sa contrainte d'unicité (`app/ingest/ingester.py:36-63`).
+- Rien n'est jamais rejoué.
+- Ce que brief09 n'avait pas, et que K-B garde : la couche brute immuable (exigée par la v0, et qui permet de reconstruire la base) et la trace des doublons (`INSERT OR IGNORE` les jetait sans trace).
+
+**Proposition** : la mécanique de brief09, avec le brut en plus.
+1. L'import ne lit que les fichiers bruts **pas encore importés**, notés dans un registre en base. Un fichier lu y entre même s'il n'a produit aucun item (sinon il serait relu et rejeté à chaque import) ; un fichier sauté faute de lecteur n'y entre pas (il sera lu quand le lecteur existera, par exemple TLDR avec #57). Aujourd'hui, la table `collection` n'a une ligne que pour un fichier qui a produit un item (`import_items.py:77`) : elle ne suffit pas comme registre.
+2. **La base dédoublonne** par ses contraintes (`INSERT … ON CONFLICT DO NOTHING`). Une ligne non écrite est un doublon, tracé dans le journal d'import avec sa règle. Il faut ajouter une contrainte pour « même CVE dans une source », que SQL ne porte pas aujourd'hui. `merge.py` se réduit à ce qu'aucune contrainte ne sait faire : normaliser les URL et les dates, et remplacer un papier arXiv par sa révision plus récente.
+3. La **reconstruction complète** reste possible et exceptionnelle : supprimer la base, puis `kb create-db` et `kb import`. Pas d'option à ajouter pour la v0.
+
+**Effets sur les autres constats.**
+- W2 disparaît.
+- W5 diminue sans disparaître : les anciens fichiers ne sont plus relus, mais chaque **nouveau** fichier d'une source qui republie tout (catalogue CISA, classement, page de 100 releases) redonne presque tous ses items comme doublons.
+- D7 se règle : un conflit d'URL devient un doublon tracé, plus une erreur qui fait échouer l'import.
+- D6 reste à décider : la base garderait le premier vu, comme aujourd'hui.
+
+**Question ouverte, à trancher par Sabine** : dériver aussi le repère de collecte de la base, comme brief09, plutôt que de `collection_state.json` ? Ce serait une seule mémoire au lieu de deux. Mais la collecte dépendrait alors de la base, alors qu'aujourd'hui on collecte sans base. Pas de recommandation tranchée.
+
+**Coût** : 3 à 4 h avec les tests (estimation non relue), pour réécrire `merge.py`, `import_items.py` et leurs tests, en retirant du code. C'est une décision structurante : `/adr-ls` dans la PR qui la code. Elle change le contrat écrit en tête de `import_items.py:1-6`.
+
+| Décision | Fin du rejeu complet : **retenue**. Proposition 1-3 : à valider. Question du repère de collecte : à trancher. |
+|---|---|
+
+### Autres constats
+
 | # | Ce qui est | Plus simple | Coût | Décision |
 |---|---|---|---|---|
 | W1 | Deux horloges. `collect_all_sources` reçoit `now` (`cli.py:105`), mais `ArxivSource.fetch` relit l'heure (`arxiv_source.py:44`), comme `TldrSource` (`tldr_source.py:40`, `73-74`). La fin de la fenêtre arXiv et le nom du fichier brut viennent donc de deux instants différents. Les tests TLDR remplacent `current_day` par un faux (`test_tldr_source.py:38`) ; le test arXiv `test_the_window_ends_now` lit la vraie horloge avec une tolérance (`test_arxiv_source.py:88-94`), c'est un test qui dépend de l'heure. | Passer `now` à `fetch(last_collected_at, now)`, dans le `Protocol` de `collect.py:30-42`. | 1 h : 6 sources et leurs tests. | |
-| W2 | `kb import` relit et revalide **tout** le brut à chaque fois (`raw_items.py:64-79`). C'est simple et rejouable (même brut → même base, `import_items.py:4-5`), mais le coût croît avec le brut. Le volume n'a pas été mesuré. | Garder tel quel pour la v0 ; mesurer quand #25 (rodage sur données réelles) aura du brut. | 0 | |
+| W2 | `kb import` relit et revalide **tout** le brut à chaque fois (`raw_items.py:64-79`). C'est simple et rejouable (même brut → même base, `import_items.py:4-5`), mais le coût croît avec le brut. Le volume n'a pas été mesuré. | Remplacé par W0. | — | Voir W0 |
 | W3 | Le brut TLDR est collecté chaque jour (3 pages d'environ 80 Ko) mais jamais lu : aucun lecteur `tldr_*` n'est déclaré, et le dossier est sauté comme « source without a reader » (`raw_items.py:65-68`) ; lecture dans #57. | Rien à changer si #57 vient vite ; sinon, suspendre la collecte TLDR jusqu'à #57 (RGESN 1.6 : ne pas collecter ce qui ne sert pas). | 0, ou 5 min | |
 | W4 | Chaque source est lue deux fois : à la collecte, pour refuser une page qui n'est pas ce qu'on attend (`cisa_kev_source.py:44`, `github_most_starred_source.py:32`…), puis à l'import. | C'est voulu : échouer avant d'écrire un brut faux. À garder. | 0 | |
-| W5 *(2nd passage)* | **Le journal d'import grossit à chaque collecte.** Chaque doublon retiré y est écrit (`import_items.py:174-185`). Or chaque nouveau catalogue CISA, classement ou page de releases relu produit surtout des `same_source_id` attendus : `import-log.jsonl` noiera les vrais rejets. | Ne journaliser que les rejets et les doublons entre **sources différentes** ; compter les `same_source_id` sans les écrire un par un. | 30 min | |
+| W5 *(2nd passage)* | **Le journal d'import grossit à chaque collecte.** Chaque doublon retiré y est écrit (`import_items.py:174-185`). Or chaque nouveau catalogue CISA, classement ou page de releases relu produit surtout des `same_source_id` attendus : `import-log.jsonl` noiera les vrais rejets. | W0 retire les doublons dus à la relecture des anciens fichiers. Restent ceux des sources qui republient tout : compter les doublons d'un même identifiant de source sans les écrire un par un, et n'écrire que les rejets et les doublons entre sources différentes. | 30 min, après W0 | |
 | W6 *(2nd passage)* | **Sobriété de la collecte (RGESN 1.6).** CISA retélécharge et stocke le catalogue entier, environ 1 Mo (`cisa_kev_source.py:13`), à chaque modification. Les releases stockent la page de 100 releases, 2,2 Mo pour claude-code (`github_api.py:10`), dès qu'une seule est nouvelle (`github_releases_source.py:33-48`). Ces volumes viennent des commentaires du code, pas d'une mesure. | Mesurer d'abord avec #25. Si le volume pèse : réduire `per_page` des releases après la première collecte, ou ne garder du brut CISA que les lignes ajoutées. Le second va contre l'immuabilité du brut « tel que publié » : à décider. | Mesure : avec #25 ; correction : 1 h | |
+| W7 | **Pas de migration du schéma.** `kb create-db` crée la base d'un bloc et refuse une base existante (`database/__init__.py:18-43`). Tout changement de schéma oblige à supprimer la base, puis à tout réimporter. Avec W0, c'est acceptable tant que la base ne contient que des données d'essai. | Des migrations numérotées en préfixe (`database/migrations/001_create_schema.sql`, `002_seed_sources.sql`, …). Le numéro de la dernière migration appliquée est gardé dans `PRAGMA user_version` (un entier de l'en-tête SQLite). Chaque migration suivante est appliquée dans sa transaction. Environ vingt lignes de Python, sans dépendance : Alembic suppose SQLAlchemy, que K-B n'utilise pas. Ce que ça ne couvre pas : un lecteur corrigé ou enrichi, qui demande de relire le brut, donc une reconstruction. brief09 avait des migrations additives (`docs/steps/16-migration-additive-colonne-db-existante.md`). À introduire au premier changement de schéma une fois la base remplie de données réelles, après #25. | 1 h, au moment voulu | |
 
 ## 2. Étapes génériques communes à toutes les sources
 
