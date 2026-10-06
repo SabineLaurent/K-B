@@ -172,7 +172,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Données personnelles** : aucune (voir le registre des traitements).
 - **Suivi** : éditions **ai**, **infosec** et **dev** (ai le 2026-10-01, les deux autres le
   2026-10-04), une source par édition (`tldr_ai`…), dans `TRACKED_EDITIONS` de
-  `k_b/tldr_source.py` (neuf candidates dans [sources-detaillees.md](sources-detaillees.md)).
+  `k_b/sources/tldr.py` (neuf candidates dans [sources-detaillees.md](sources-detaillees.md)).
 
 ### Zotero — base de données
 

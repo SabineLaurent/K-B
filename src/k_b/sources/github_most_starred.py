@@ -1,17 +1,53 @@
-"""Read a raw ranking of the most starred GitHub repositories, and convert each one into an item."""
+"""The most starred GitHub repositories source: its download (E), then its reader (T).
+
+Download the ranking of the most starred GitHub repositories, as published.
+
+Read a raw ranking of the most starred GitHub repositories, and convert each one into an item.
+"""
 
 import json
 from dataclasses import dataclass
 from datetime import datetime
+from urllib.parse import urlencode
 
-from k_b.github_dates import parse_github_date
 from k_b.items import Item
 from k_b.source import SourceReader
-from k_b.tracked_repositories import is_repository_name
+from k_b.sources.github_api import get_from_github_api
+from k_b.sources.github_dates import parse_github_date
+from k_b.sources.tracked_repositories import is_repository_name
+
+# The search needs a criterion: this one keeps the whole top 100 (the 100th had 116,161 stars on
+# 2026-10-02).
+SEARCH_QUERY = "stars:>10000"
+
 
 REPOSITORY_URL_PREFIX = "https://github.com/"
 # The API maximum: one request, deep enough to see a repository enter the top.
 RANKING_SIZE = 100
+
+
+# The name of its raw folders, written once: its instances and its kind use it.
+FOLDER_PREFIX = "github_most_starred"
+
+
+class GithubMostStarredSource:
+    name = FOLDER_PREFIX
+    extension = "json"
+
+    def fetch(self, last_collected_at: datetime | None) -> bytes | None:
+        """Return a snapshot of the ranking at every collection: star counts always change.
+
+        Entries, exits and climbs are found at the reading, by comparing two snapshots.
+        """
+        query = {
+            "q": SEARCH_QUERY,
+            "sort": "stars",
+            "order": "desc",
+            "per_page": RANKING_SIZE,
+        }
+        raw_response = get_from_github_api(f"search/repositories?{urlencode(query)}")
+        read_ranking(raw_response)
+        return raw_response
 
 
 @dataclass(frozen=True)
