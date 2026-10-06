@@ -1,6 +1,7 @@
 """What a source gives the generic steps: how to collect it (E), how to read its raw files (T).
 
-The sources themselves are declared once, in a list that only the command line reads.
+The sources themselves are declared once, in SOURCE_KINDS, that only cli.py imports in the
+package.
 """
 
 from collections.abc import Callable, Sequence
@@ -37,7 +38,11 @@ class SourceReader[EntryT](NamedTuple):
 
 
 class SourceKind(NamedTuple):
-    """A kind of source, declared once: its raw folders, its instances, its reader."""
+    """A kind of source, declared once: its raw folders, its instances, its reader.
+
+    Pass the READER constant of the reader module, never a SourceReader built here: only an
+    annotated constant lets mypy refuse a converter of another source.
+    """
 
     # The name of its raw folders, alone or followed by _ (github_releases_<repository>).
     folder_prefix: str

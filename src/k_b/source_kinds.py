@@ -1,6 +1,7 @@
-"""SOURCE_KINDS: the only declaration of the sources, one kind per line, in collection order.
+"""SOURCE_KINDS: the only declaration of the sources, one kind per entry, in collection order.
 
-Only cli.py imports it: it gives it to the collection (E) and to the import (T then L).
+In the package, only cli.py imports it: it gives it to the collection (E) and to the import
+(T then L).
 """
 
 from k_b import (

@@ -1,3 +1,5 @@
+from itertools import permutations
+
 from k_b.source import find_source_kind, list_sources
 from k_b.source_kinds import SOURCE_KINDS
 
@@ -26,9 +28,8 @@ def test_each_source_belongs_to_its_own_kind():
 
 
 def test_no_folder_prefix_covers_another():
+    # By position: two equal strings may be the same object, so identity cannot tell them apart.
     prefixes = [kind.folder_prefix for kind in SOURCE_KINDS]
-    for prefix in prefixes:
-        for other in prefixes:
-            if other is not prefix:
-                assert other != prefix
-                assert not other.startswith(prefix + "_")
+    for prefix, other in permutations(prefixes, 2):
+        assert other != prefix
+        assert not other.startswith(prefix + "_")

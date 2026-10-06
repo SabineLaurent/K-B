@@ -4,6 +4,8 @@ import ast
 import pkgutil
 from pathlib import Path
 
+import pytest
+
 import k_b
 
 PACKAGE_DIR = Path(k_b.__file__).parent
@@ -39,23 +41,53 @@ COMPOSITION_MODULES = {"cli", "source_kinds"}
 
 
 def list_imported_modules(module: str) -> set[str]:
-    """The k_b modules a module imports, whatever the form of its import statements."""
+    """The k_b modules a module imports."""
     path = PACKAGE_DIR / f"{module}.py"
     if not path.exists():
         path = PACKAGE_DIR / module / "__init__.py"
+    return parse_imported_modules(path.read_text())
+
+
+def parse_imported_modules(code: str) -> set[str]:
+    """The k_b modules imported by `import k_b.x`, `from k_b import x`, `from k_b.x import y`,
+    and their relative forms (`from . import x`, `from .x import y`).
+
+    A dynamic import (importlib.import_module) is not seen: there is none in k_b.
+    """
     imported: set[str] = set()
-    for node in ast.walk(ast.parse(path.read_text())):
+    for node in ast.walk(ast.parse(code)):
         if isinstance(node, ast.Import):
             names = [alias.name for alias in node.names]
-        elif isinstance(node, ast.ImportFrom) and node.module is not None:
-            if node.module == "k_b":
+        elif isinstance(node, ast.ImportFrom):
+            # A relative import (from . or from .x) is an import from the package itself.
+            if node.level > 0:
+                origin = f"k_b.{node.module}" if node.module else "k_b"
+            else:
+                origin = node.module or ""
+            if origin == "k_b":
                 names = [f"k_b.{alias.name}" for alias in node.names]
             else:
-                names = [node.module]
+                names = [origin]
         else:
             continue
         imported |= {name.split(".")[1] for name in names if name.startswith("k_b.")}
     return imported
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "import k_b.arxiv_source",
+        "import k_b.arxiv_source as source",
+        "from k_b import arxiv_source",
+        "from k_b.arxiv_source import ArxivSource",
+        "from . import arxiv_source",
+        "from .arxiv_source import ArxivSource",
+        "def f():\n    from k_b.arxiv_source import ArxivSource",
+    ],
+)
+def test_every_form_of_import_is_seen(code):
+    assert parse_imported_modules(code) == {"arxiv_source"}
 
 
 def test_every_module_is_in_exactly_one_list():
