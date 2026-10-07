@@ -157,7 +157,7 @@ d'historique en base, pas de liste CVE).
    `paper_author` en relisant le brut (`:208-212`).
 3. **Que se passe-t-il quand CISA modifie une ligne ?** La ligne est reconnue par son CVE, son
    contenu est remplacé, `revised_at` prend la date de la collecte : P1 la montre comme nouvelle
-   (`:160-162`).
+   (`:163-165`).
 4. **Pourquoi CISA fait-il foi sur les CVE alors que l'autorité est le programme CVE ?** Le
    périmètre de K-B est celui des failles exploitées de façon avérée ; pour ce périmètre, la liste
    officielle est KEV. Élargir le périmètre ajouterait la liste CVE comme source, sans changer la
