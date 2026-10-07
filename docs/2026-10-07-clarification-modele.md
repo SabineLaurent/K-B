@@ -163,7 +163,7 @@ SOURCE ──0,n── (FOURNIR) ──1,1── COLLECTE ──1,1── (DÉCL
   - une ligne connue garde son identité (`item_id`, CVE) ; tout le reste, titre compris, est
     remplacé par la dernière version si le contenu diffère, et `revised_at` prend la date de la
     collecte qui a constaté le changement ; une ligne identique ne change rien ;
-  - une ligne connue absent du catalogue est marquée retirée : `withdrawn_at` prend la date de la
+  - une ligne connue absente du catalogue est marquée retirée : `withdrawn_at` prend la date de la
     collecte qui a constaté son absence ; si elle réapparaît, `withdrawn_at` est vidé et
     `revised_at` daté ;
   - l'historique des versions n'est pas en base : le brut le garde (RGESN 1.6).
