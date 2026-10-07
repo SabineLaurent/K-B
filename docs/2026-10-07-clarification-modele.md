@@ -210,6 +210,18 @@ reconnaître un item déjà vu, quelle que soit la source.
   mention d'affichage que la base ne découpe jamais. Purger le papier purge ses auteurs ; la
   purge d'une personne dans tous ses papiers n'est plus possible par un `DELETE` ciblé. Le
   registre des traitements est à mettre à jour.
+- **NEWSLETTER_ARTICLE, TLDR fait foi pour son résumé** : édition, date d'édition, rang, titre,
+  résumé, URL de l'article d'origine sans `utm_*` (non unique : deux éditions peuvent résumer le
+  même article), clé étrangère facultative vers le PAPER cité. Clé naturelle : (édition, date,
+  rang).
+- **Option D : ITEM minimal, clé partagée.** ITEM ne porte que `item_id`, la donnée brute de sa
+  version actuelle et `kind` (`paper`, `vulnerability`, `newsletter_article`). Chaque sous-type
+  (PAPER, CVE, NEWSLETTER_ARTICLE) a pour clé primaire `item_id`, qui est aussi sa clé étrangère
+  vers ITEM (règle 4 du MLD de `docs/stockage.md`). L'exclusivité (D1) est portée par une clé
+  étrangère composée (`item_id`, `kind`). Écartés : B, ITEM table de trace avec des clés
+  étrangères facultatives vers chaque référentiel (doublon de rôle) ; C, pas de table ITEM et une
+  vue `UNION` (il faudrait une table de liaison par type pour les notes du point 4). Raison : ITEM
+  reste le point d'entrée unique pour les notes, la recherche et P1.
 - Le modèle n'a plus de table de liaison : toutes les associations sont en 1,n ou 0,1.
 - **Périmètre des failles : celles dont l'exploitation est avérée.** Pas de collecte de la liste
   CVE (cve.org, dépôt `CVEProject/cvelistV5`, 3,9 Go décompressé). Constaté sur un record
