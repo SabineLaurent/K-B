@@ -185,7 +185,27 @@ chaque fois ; les releases relisent leur première page ; arXiv (7 jours), les a
 TLDR (1 jour) se recouvrent volontairement. Les répétitions sont la règle : la base doit
 reconnaître un item déjà vu, quelle que soit la source.
 
-**En réflexion** : un item décrit une chose (la faille, l'article) que d'autres items peuvent
+### Référentiels : PAPER et CVE
+
+**Décidé par Sabine** :
+
+- **Un référentiel est une chose de référence vers laquelle des items pointent**, avec un
+  identifiant officiel et stable. Il remplace la piste SUJET (nom écarté par Sabine). ITEM
+  porte une clé étrangère facultative par référentiel (`paper_id`, `cve_id`) : vide si l'item ne
+  porte sur aucun papier ou aucune faille (cardinalité 0,1).
+- **Référentiel épais** : il porte le contenu de la chose, donné par la source qui fait foi.
+  L'item garde ce qui est propre à la collecte (donnée brute, source, clé vers le référentiel).
+- **PAPER, arXiv fait foi** : `arxiv_id`, titre, résumé, auteurs, dates de soumission et de
+  révision. Raison : Zotero, source prévue en v0, ne contient que des papiers arXiv et doit se
+  recouper avec la collecte arXiv (`docs/stockage.md:63-65`) ; l'item Zotero pointera vers le
+  même PAPER.
+- **Périmètre des failles : celles dont l'exploitation est avérée.** Pas de collecte de la liste
+  CVE (cve.org, dépôt `CVEProject/cvelistV5`, 3,9 Go décompressé). Constaté sur un record
+  (`CVE-2026-69086`) : un conteneur `cna` (description, produits touchés avec `packageURL`,
+  CVSS) et un conteneur `CISA-ADP` avec une évaluation SSVC (`"Exploitation": "none"`). Piste
+  future si le périmètre s'élargit, sans issue.
+
+**Écarté** (piste du matin) : un item décrit une chose (la faille, l'article) que d'autres items peuvent
 décrire aussi : ITEM ─1,1─ (DÉCRIRE) ─1,n─ SUJET (nom provisoire), identifié par le CVE ou par
 l'URL normalisée. Il réglerait le croisement CISA × GitHub (P4), le lien résumé TLDR → article
 (3c) et `UNIQUE (source, sujet)` (#105). Non décidé, comme 3a, 3b et 3c.
