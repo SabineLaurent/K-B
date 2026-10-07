@@ -247,11 +247,18 @@ Proposition de la session, selon l'option D :
 - **RELEASE** (GitHub fait foi, flux, premier vu) : `release_id` unique, `repository_name`
   (colonne, pas clé étrangère : les dépôts suivis ne sont pas tous dans le top 100), `tag_name`,
   `name`, `body`, `published_at`. Règle D3.
-- **Tops (P7, P8)** : Sabine écarte « dépôts en items + une mesure par instantané » (environ
-  36 500 lignes par an). Proposition en attente : une table d'état `ranking (criterion, rank,
-  full_name, description, stars, forks, raw_data_id)`, clé (`criterion`, `rank`), le top 10 par
-  critère (étoiles, forks), remplacée entière à chaque collecte. Le dépôt n'est alors pas un item
-  et REPOSITORY n'est pas un sous-type en v0. P5 (GH Archive) pourrait suivre la même logique.
+- **Tops (P7, P8), décidé par Sabine** : en v0, le top du jour seulement, sans historique ni
+  comparaison de positions. Les classements n'entrent pas en base : le dépôt n'est pas un item et
+  REPOSITORY n'est pas un sous-type. La collecte passe par l'API GraphQL de GitHub (jeton
+  obligatoire, `KB_GITHUB_TOKEN`), qui ne renvoie que les champs demandés : `nameWithOwner`,
+  `description`, `stargazerCount`, `forkCount`. Deux requêtes, le top 100 par étoiles et le top
+  100 par forks ; le rang est la position dans `data.search.nodes`. Le JSON reçu est à la fois le
+  brut et le top du jour : un fichier par critère, seul le dernier est gardé. Ce qui s'affiche
+  (top 10 ou plus) se décidera plus tard. Écartés : « dépôts en items + une mesure par
+  instantané » (environ 36 500 lignes par an), la table d'état `ranking` (une base pour un simple
+  affichage), l'API REST (82 champs par dépôt, sans choix des champs). À vérifier au codage : la
+  chaîne de recherche (`stars:>1 sort:stars-desc`, non testée en GraphQL) ; une erreur GraphQL
+  peut arriver avec un statut 200, dans la clé `errors`.
 
 <!-- Points 4 et 5 : à suivre. -->
 
