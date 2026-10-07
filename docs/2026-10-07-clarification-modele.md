@@ -234,6 +234,25 @@ décrire aussi : ITEM ─1,1─ (DÉCRIRE) ─1,n─ SUJET (nom provisoire), ide
 l'URL normalisée. Il réglerait le croisement CISA × GitHub (P4), le lien résumé TLDR → article
 (3c) et `UNIQUE (source, sujet)` (#105). Non décidé, comme 3a, 3b et 3c.
 
+### GitHub (en réflexion, non décidé)
+
+Proposition de la session, selon l'option D :
+
+- **ADVISORY** (GitHub fait foi, flux, premier vu) : `ghsa_id` unique, `cve_id` facultatif,
+  `summary`, `severity`, `published_at`, `withdrawn_at`. `cve_id` n'est pas une clé étrangère
+  vers CVE : CVE ne contient que les failles de KEV ; P4 devient « les alertes dont le `cve_id`
+  est aussi dans CVE ». Les paquets touchés, que P3 filtre, vont dans
+  `advisory_package (item_id, package_name)` : ici la base découpe la liste, un JSON enfreindrait
+  la 1re forme normale.
+- **RELEASE** (GitHub fait foi, flux, premier vu) : `release_id` unique, `repository_name`
+  (colonne, pas clé étrangère : les dépôts suivis ne sont pas tous dans le top 100), `tag_name`,
+  `name`, `body`, `published_at`. Règle D3.
+- **Tops (P7, P8)** : Sabine écarte « dépôts en items + une mesure par instantané » (environ
+  36 500 lignes par an). Proposition en attente : une table d'état `ranking (criterion, rank,
+  full_name, description, stars, forks, raw_data_id)`, clé (`criterion`, `rank`), le top 10 par
+  critère (étoiles, forks), remplacée entière à chaque collecte. Le dépôt n'est alors pas un item
+  et REPOSITORY n'est pas un sous-type en v0. P5 (GH Archive) pourrait suivre la même logique.
+
 <!-- Points 4 et 5 : à suivre. -->
 
 ## Annexe : les sources, champ par champ
