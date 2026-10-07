@@ -23,26 +23,43 @@ Le détail, champ par champ, est en [annexe](#annexe--les-sources-champ-par-cham
 
 ## 2. Les parcours de Sabine en v0
 
-En v0, il n'y a pas de LLM : une question est une requête à l'API REST (filtre, tri, top N), pas
-une phrase en langage naturel. Version légère ; la version formelle (user stories, wireframes)
-relève de C14 et E4.
+En v0, il n'y a pas de LLM : on ne pose pas de question en langage naturel. K-B offre **un champ
+de recherche** (titre et résumé), **des filtres** (période, type d'item, source) et **trois
+classements** (vent en poupe, plus étoilés, plus forkés). Les parcours ci-dessous disent lequel des
+trois sert. Version légère ; la version formelle (user stories, wireframes) relève de C14 et E4.
 
-| # | Question | Ce qu'elle demande à la base | Aujourd'hui |
-|---|---|---|---|
-| P1 | Quoi de neuf depuis N jours, toutes sources ou par thème ? | une date par item pour filtrer | `published_at` vide pour certains items ; règle à fixer (#21) |
-| P2 | Quelles nouvelles versions de mes outils ? | relier une release à son dépôt | le dépôt n'est que dans `item.title` |
-| P3 | Quelles failles touchent mes outils, mes paquets ? | les paquets touchés par une alerte | paquets lus, non gardés |
-| P4 | Cette faille est-elle exploitée activement ? | croiser CISA et GitHub par CVE | `vulnerability.cve`, non unique : possible |
-| P5 | Quels dépôts ont le vent en poupe ? Tous les dépôts, via GH Archive, par fenêtre de 3 jours | étoiles gagnées par dépôt et par fenêtre | `star_gain` existe, vide ; GH Archive pas codé |
-| P6 | Quels papiers récents sur un sujet (prompt injection…) ? | le mot-clé ou le texte du papier | titre et résumé gardés ; mot-clé de la requête non gardé |
-| P7 | Quels sont les dépôts les plus étoilés (top 10) ? | les étoiles d'un dépôt à une date | `stargazers_count` lu, non gardé |
-| P8 | Quels sont les dépôts les plus forkés de GitHub (top 10) ? | les forks d'un dépôt à une date, sur tout GitHub | non collecté : la recherche est triée par étoiles ; une requête triée par forks en plus |
-| P9 | Quoi de neuf dans l'écosystème LangChain ? | les dépôts et paquets suivis, plus les items qui citent `langchain` ou `langgraph` | liste dans `tracked_repositories.py` ; recherche dans le texte à faire |
+| Parcours | Moyen en v0 |
+|---|---|
+| P1 | filtre de période |
+| P2, P3 | filtre de type (release, vulnérabilité), combiné à la recherche (`langgraph`) |
+| P4 | croisement par CVE, affiché avec la vulnérabilité |
+| P5, P7, P8 | classement |
+| P6, P9 | champ de recherche |
 
-- **Question ouverte** : « quels sujets cartonnent en ce moment ? ». Sans LLM, ce qu'on compte
-  n'est pas décidé (topics GitHub, mots-clés arXiv, rubriques ou domaines TLDR).
-- **Pas en v0** : ce que j'ai lu ou surligné (Zotero, clips), d'où vient une affirmation de ma
-  fiche, ce qu'une fiche cite, le doublon entre un résumé TLDR et son article d'origine.
+Effet sur le modèle : un index plein texte sur `item.title` et `item.summary` (FTS5 dans SQLite,
+`tsvector` dans PostgreSQL), et un type d'item qui se filtre directement.
+
+| # | Question | Ce qu'elle demande à la base | Aujourd'hui | LLM ? |
+|---|---|---|---|---|
+| P1 | Quoi de neuf depuis N jours, toutes sources ou par thème ? | une date par item pour filtrer | `published_at` vide pour certains items ; règle à fixer (#21) | non |
+| P2 | Quelles nouvelles versions de mes outils ? | relier une release à son dépôt | le dépôt n'est que dans `item.title` | non |
+| P3 | Quelles failles touchent mes outils, mes paquets ? | les paquets touchés par une alerte | paquets lus, non gardés | non |
+| P4 | Cette faille est-elle exploitée activement ? | croiser CISA et GitHub par CVE | `vulnerability.cve`, non unique : possible | non |
+| P5 | Quels dépôts ont le vent en poupe ? Tous les dépôts, via GH Archive, par fenêtre de 3 jours | étoiles gagnées par dépôt et par fenêtre | `star_gain` existe, vide ; GH Archive pas codé | non |
+| P6 | Quels papiers récents sur un sujet (prompt injection…) ? | le mot-clé ou le texte du papier | titre et résumé gardés ; mot-clé de la requête non gardé | non par mots-clés, oui par le sens |
+| P7 | Quels sont les dépôts les plus étoilés (top 10) ? | les étoiles d'un dépôt à une date | `stargazers_count` lu, non gardé | non |
+| P8 | Quels sont les dépôts les plus forkés de GitHub (top 10) ? | les forks d'un dépôt à une date, sur tout GitHub | non collecté : la recherche est triée par étoiles ; une requête triée par forks en plus | non |
+| P9 | Quoi de neuf dans l'écosystème LangChain ? | les dépôts et paquets suivis, plus les items qui citent `langchain` ou `langgraph` | liste dans `tracked_repositories.py` ; recherche dans le texte à faire | non par mots-clés, oui par le sens |
+
+- **Question ouverte** : « quels sujets cartonnent en ce moment ? ». LLM : non si l'on compte des
+  étiquettes existantes (topics GitHub, mots-clés arXiv, rubriques ou domaines TLDR), oui pour des
+  thèmes que personne n'a étiquetés. Ce qu'on compte n'est pas décidé.
+- **Pas en v0** : ce que j'ai lu ou surligné, Zotero et clips (LLM : non) ; ce qu'une fiche cite
+  (non) ; le doublon entre un résumé TLDR et son article d'origine (non, par l'URL) ; d'où vient
+  une affirmation de ma fiche (non si la fiche cite ses items, oui s'il faut la retrouver à partir
+  du texte).
+- La colonne LLM ne décide pas du modèle : ce qui le décide, c'est si la donnée est collectée et
+  gardée. Elle dit seulement ce qui attend le LLM, et la place à laisser à des embeddings.
 
 <!-- Points 3 à 5 : à suivre dans la séance. -->
 
