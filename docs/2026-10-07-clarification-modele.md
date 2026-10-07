@@ -286,6 +286,17 @@ Proposition de la session, selon l'option D :
   étrangère composée (`item_id`, `kind`). Écarté : l'identifiant naturel en clé primaire, lisible
   sans jointure mais lié à un identifiant externe.
 
+**Pistes notées en séance 2, à reprendre dans la liste des issues** :
+
+- durée de conservation et purge des fichiers de classement GitHub (RGESN 1.6, même sans donnée
+  personnelle) ;
+- collecter le SBOM des dépôts suivis pour élargir P3 aux dépendances, hors v0 (l'appel direct
+  `GET /repos/{owner}/{repo}/dependency-graph/sbom` ferme le 13/11/2026 selon la doc GitHub ; flux
+  asynchrone à la place) ;
+- activer Dependabot sur le dépôt K-B (sécurité de la chaîne d'approvisionnement, hors modèle) ;
+- vérifier ce que la BOD 26-04 de la CISA change pour le catalogue KEV (la BOD 22-01 est
+  marquée révoquée sur cisa.gov).
+
 <!-- Points 4 et 5 : à suivre. -->
 
 ## Annexe : les sources, champ par champ
