@@ -253,7 +253,8 @@ Proposition de la session, selon l'option D :
   obligatoire, `KB_GITHUB_TOKEN`), qui ne renvoie que les champs demandés : `nameWithOwner`,
   `description`, `stargazerCount`, `forkCount`. Deux requêtes, le top 100 par étoiles et le top
   100 par forks ; le rang est la position dans `data.search.nodes`. Le JSON reçu est à la fois le
-  brut et le top du jour : un fichier par critère, seul le dernier est gardé. Ce qui s'affiche
+  brut et le top du jour : un fichier par critère et par collecte, tous gardés ; la durée
+  de conservation et la purge seront décidées plus tard. Ce qui s'affiche
   (top 10 ou plus) se décidera plus tard. Écartés : « dépôts en items + une mesure par
   instantané » (environ 36 500 lignes par an), la table d'état `ranking` (une base pour un simple
   affichage), l'API REST (82 champs par dépôt, sans choix des champs). À vérifier au codage : la
