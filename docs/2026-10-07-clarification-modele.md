@@ -190,9 +190,9 @@ reconnaître un item déjà vu, quelle que soit la source.
 **Décidé par Sabine** :
 
 - **Un référentiel est une chose de référence vers laquelle des items pointent**, avec un
-  identifiant officiel et stable. Il remplace la piste SUJET (nom écarté par Sabine). ITEM
-  porte une clé étrangère facultative par référentiel (`paper_id`, `cve_id`) : vide si l'item ne
-  porte sur aucun papier ou aucune faille (cardinalité 0,1).
+  identifiant officiel et stable. Il remplace la piste SUJET (nom écarté par Sabine). Sa
+  traduction en tables est l'option D ci-dessous (sous-types à clé partagée), qui remplace la
+  première idée d'une clé étrangère facultative par référentiel dans ITEM (option B).
 - **Référentiel épais** : il porte le contenu de la chose, donné par la source qui fait foi.
   L'item garde ce qui est propre à la collecte (donnée brute, source, clé vers le référentiel).
 - **PAPER, arXiv fait foi** : `arxiv_id`, titre, résumé, auteurs, dates de soumission et de
