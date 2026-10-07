@@ -139,6 +139,57 @@ SOURCE ──0,n── (FOURNIR) ──1,1── COLLECTE ──1,1── (DÉCL
   par une clé étrangère composée (`collection_id`, `source_code`) ; une page TLDR reste une
   collecte.
 
+### Le MCD de Sabine (séance de l'après-midi)
+
+**Décidé par Sabine** :
+
+- **SOURCE ─0,n─ (FOURNIR) ─1,1─ DONNÉE BRUTE ─1,n─ (CONTENIR) ─1,1─ ITEM.** Une donnée brute
+  est un fichier de `raw/` : le `.xml` d'arXiv, le `.csv` de CISA, un `.html` de TLDR (une
+  édition, un jour). Un item est une entrée de ce fichier : une `<entry>`, une ligne, un
+  `<article>`. « Donnée brute » remplace « collecte », qui faisait penser au lancement de
+  `kb collect`. Pas d'entité LANCEMENT pour l'instant.
+- **Sous-catégorie d'une source** : un attribut `flux` de DONNÉE BRUTE, qui vaut le nom du
+  dossier brut (`tldr_ai`, `tldr_infosec`…). Écartés : une source par édition (GitHub en
+  compterait une douzaine) ; une entité FLUX (pas d'attribut propre à porter pour l'instant).
+  Les filtres d'arXiv ne sont pas une sous-catégorie : une requête, un flux.
+- **GitHub est mis de côté** : le modèle se pose d'abord sur arXiv, CISA et TLDR.
+- **CISA KEV est un catalogue d'état**, pas un flux de nouveautés : chaque collecte télécharge le
+  catalogue entier (`cisa_kev.py:49-70`) ; une ligne est modifiée sur place (le brut du
+  2026-10-07 est trié par `dateAdded` décroissant, sans CVE en double ; `knownRansomwareCampaignUse`
+  change en silence, 41 fois d'octobre 2023 à juillet 2024 selon
+  [GreyNoise](https://www.greynoise.io/blog/unveiling-vulnerability-insights-from-the-cisa-kev-catalog-at-bsideslv)).
+  À chaque collecte :
+  - une ligne nouvelle crée un item ;
+  - une ligne connue garde son identité (`item_id`, CVE) ; tout le reste, titre compris, est
+    remplacé par la dernière version si le contenu diffère, et `revised_at` prend la date de la
+    collecte qui a constaté le changement ; une ligne identique ne change rien ;
+  - une ligne connue absent du catalogue est marquée retirée : `withdrawn_at` prend la date de la
+    collecte qui a constaté son absence ; si elle réapparaît, `withdrawn_at` est vidé et
+    `revised_at` daté ;
+  - l'historique des versions n'est pas en base : le brut le garde (RGESN 1.6).
+
+**Conséquences** : pour un catalogue d'état, CONTENIR relie l'item à la donnée brute qui a
+apporté sa version actuelle. La règle « premier vu ou dernier vu » (D6) se règle par nature de
+source :
+
+| Nature | Sources | Item déjà vu |
+|---|---|---|
+| flux de nouveautés | TLDR, alertes GitHub, releases | inchangé (premier vu) |
+| catalogue d'état | CISA (et le top 100 GitHub, mis de côté) | dernière version, `revised_at` daté, `withdrawn_at` si absent |
+| flux avec révisions | arXiv | remplacé si `updated` est plus récent (déjà le cas) |
+
+P1 filtre alors sur « publié ou révisé depuis N jours ».
+
+**Incrémentalité des sources** (relevé du code) : CISA et le top 100 GitHub téléchargent tout à
+chaque fois ; les releases relisent leur première page ; arXiv (7 jours), les alertes (1 jour) et
+TLDR (1 jour) se recouvrent volontairement. Les répétitions sont la règle : la base doit
+reconnaître un item déjà vu, quelle que soit la source.
+
+**En réflexion** : un item décrit une chose (la faille, l'article) que d'autres items peuvent
+décrire aussi : ITEM ─1,1─ (DÉCRIRE) ─1,n─ SUJET (nom provisoire), identifié par le CVE ou par
+l'URL normalisée. Il réglerait le croisement CISA × GitHub (P4), le lien résumé TLDR → article
+(3c) et `UNIQUE (source, sujet)` (#105). Non décidé, comme 3a, 3b et 3c.
+
 <!-- Points 4 et 5 : à suivre. -->
 
 ## Annexe : les sources, champ par champ
