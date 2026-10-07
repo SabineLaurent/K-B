@@ -61,7 +61,85 @@ Effet sur le modèle : un index plein texte sur `item.title` et `item.summary` (
 - La colonne LLM ne décide pas du modèle : ce qui le décide, c'est si la donnée est collectée et
   gardée. Elle dit seulement ce qui attend le LLM, et la place à laisser à des embeddings.
 
-<!-- Points 3 à 5 : à suivre dans la séance. -->
+## 3. Pistes en réflexion (non décidées)
+
+Rien de cette section n'est décidé : Sabine y réfléchit avant de trancher. Les recommandations
+sont celles de la session.
+
+### Trois axes à ne pas confondre
+
+| Source | Type de source (`source.source_type`) | Types d'items qu'elle donne (piste 3a) |
+|---|---|---|
+| GitHub | service web | `vulnerability` (alertes), `release`, `repository` |
+| arXiv | service web | `article` |
+| CISA KEV | fichier | `vulnerability` |
+| Clips Obsidian | fichier | `article` |
+| tldr.tech | scraping | `summary` |
+| Zotero | base de données | `article` |
+| GH Archive | big data | `repository` (et des mesures d'étoiles) |
+
+- Le type de source décrit la source : il vit dans `source`, comme aujourd'hui.
+- Le type d'item décrit l'item : il ne se déduit pas de la source (GitHub en donne trois).
+- Un même type d'item arrive par plusieurs sources : c'est là que se jouent doublons et
+  croisements (CVE pour les failles, URL pour les dépôts et les articles).
+
+### Types d'items
+
+- **Constat** : une release n'a pas de sous-type, elle se reconnaît par élimination (D3). Un
+  résumé TLDR prend l'URL de l'article dont il parle (`docs/stockage.md:59`) ; avec `url`
+  unique dans toute la table, un résumé et son article d'origine ne peuvent pas coexister. Les
+  vrais liens TLDR ont la forme des items existants : `arxiv.org/abs/2609.38149`,
+  `github.com/NVIDIA/OpenShell` (aucun n'est dans la collecte du 2026-10-07).
+- **3a, types** — recommandé : `article` (arXiv, clip, Zotero), `summary` (TLDR),
+  `vulnerability` (CISA, alerte GitHub), `repository`, `release`. Étoiles et forks sont des
+  mesures sur un dépôt, pas des items.
+- **3b, colonne ou sous-type** — recommandé : `item.kind` obligatoire (CHECK sur les cinq
+  valeurs), plus une sous-table pour les types qui ont des champs propres (`vulnerability`,
+  `repository`, et `release` avec le dépôt). Écartés : sous-tables seules (jointure pour filtrer,
+  rien pour `article` et `summary`) ; colonne seule (champs propres souvent vides dans `item`).
+- **3c, lien résumé → article** — recommandé : le résumé a sa propre identité
+  (`ai/2026-10-06#2`), son `url` est celle de l'article, `UNIQUE (source_code, url)` remplace
+  `UNIQUE (url)`, et le lien se fait par jointure sur l'URL. Écartés : clé étrangère vers
+  l'article (l'ordre d'import compte) ; résumé comme simple mention (le modèle change plus).
+
+Exemple, avec les vrais items du 2026-10-07 (ligne 7 inventée) :
+
+| item_id | source_code | source_item_id | kind | url |
+|---|---|---|---|---|
+| 1 | cisa_kev | CVE-2026-88779 | vulnerability | nvd.nist.gov/vuln/detail/CVE-2026-88779 |
+| 2 | github | GHSA-fjqc-hq36-qh5p | vulnerability | github.com/advisories/GHSA-fjqc-hq36-qh5p |
+| 3 | github | 404958910 | release | github.com/anthropics/claude-code/releases/tag/v2.1.292 |
+| 4 | github | codecrafters-io/build-your-own-x | repository | github.com/codecrafters-io/build-your-own-x |
+| 5 | arxiv | 2605.00955 | article | arxiv.org/abs/2605.00955 |
+| 6 | tldr | ai/2026-10-06#2 | summary | openai.com/index/eu-text-provenance/ |
+| 7 | tldr | ai/2026-10-08#5 | summary | arxiv.org/abs/2605.00955 |
+
+### Source, collecte et lancement
+
+- **Constat** : SOURCE et COLLECTE ne sont pas reliées au MCD (`docs/stockage.md:95-96`). Une
+  collecte en base est un fichier brut (`docs/stockage.md:107`), pas un lancement de
+  `kb collect` : elle appartient à une seule source. La source d'une collecte ne se lit que dans
+  son chemin ou par ses items : `item.source_code` dépend de `item.collection_id`.
+- **Idée de Sabine** : SOURCE et LANCEMENT en plusieurs à plusieurs, la table de liaison portant
+  les items par source et par date de collecte. Cette table de liaison est le fichier brut : une
+  source × un lancement. Réifiée, elle devient l'entité COLLECTE.
+
+```
+SOURCE ──0,n── (FOURNIR) ──1,1── COLLECTE ──1,1── (DÉCLENCHER) ──1,n── LANCEMENT
+                                    │ 1,n
+                                (EXTRAIRE)
+                                    │ 1,1
+                                  ITEM
+```
+
+- PUBLIER (SOURCE → ITEM) devient redondante au MCD.
+- Recommandations : FOURNIR maintenant (`collection.source_code`, au niveau de la table
+  `source`) ; LANCEMENT et DÉCLENCHER plus tard, avec la surveillance des exécutions (aucun
+  parcours v0 ne s'en sert) ; `item.source_code` gardé pour les contraintes d'unicité, contrôlé
+  par une clé étrangère composée (`collection_id`, `source_code`) ; une page TLDR reste une
+  collecte.
+
+<!-- Points 4 et 5 : à suivre. -->
 
 ## Annexe : les sources, champ par champ
 
