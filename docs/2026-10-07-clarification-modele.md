@@ -199,7 +199,7 @@ reconnaître un item déjà vu, quelle que soit la source.
   révision. Raison : Zotero, source prévue en v0, ne contient que des papiers arXiv et doit se
   recouper avec la collecte arXiv (`docs/stockage.md:63-65`) ; l'item Zotero pointera vers le
   même PAPER.
-- **CVE, CISA KEV fait foi** : `cve_id`, nom (`vulnerabilityName`), description
+- **CVE, CISA KEV fait foi** (forme revue en séance 2, voir « Référentiels et clés ») : `cve_id`, nom (`vulnerabilityName`), description
   (`shortDescription`), éditeur (`vendorProject`) et produit (`product`), ce qui règle #84, date
   d'ajout (`dateAdded`), usage connu par un rançongiciel (`knownRansomwareCampaignUse`, `Known` ou
   `Unknown`), `revised_at`, `withdrawn_at`. Raison : dans le périmètre de K-B, le catalogue KEV est
@@ -215,14 +215,14 @@ reconnaître un item déjà vu, quelle que soit la source.
   même article), clé étrangère facultative vers le PAPER cité. Clé naturelle : (édition, date,
   rang).
 - **Option D : ITEM minimal, clé partagée.** ITEM ne porte que `item_id`, la donnée brute de sa
-  version actuelle et `kind` (`paper`, `vulnerability`, `newsletter_article`). Chaque sous-type
+  version actuelle et `kind` (`paper`, `vulnerability`, `newsletter_article`). Chaque sous-type (clé revue en séance 2 : `id` technique)
   (PAPER, CVE, NEWSLETTER_ARTICLE) a pour clé primaire `item_id`, qui est aussi sa clé étrangère
   vers ITEM (règle 4 du MLD de `docs/stockage.md`). L'exclusivité (D1) est portée par une clé
   étrangère composée (`item_id`, `kind`). Écartés : B, ITEM table de trace avec des clés
   étrangères facultatives vers chaque référentiel (doublon de rôle) ; C, pas de table ITEM et une
   vue `UNION` (il faudrait une table de liaison par type pour les notes du point 4). Raison : ITEM
   reste le point d'entrée unique pour les notes, la recherche et P1.
-- Le modèle n'a plus de table de liaison : toutes les associations sont en 1,n ou 0,1.
+- Le modèle n'a plus de table de liaison : toutes les associations sont en 1,n ou 0,1 (les listes de paquets du lot GitHub, en réflexion, sont aussi en 1,n).
 - **Périmètre des failles : celles dont l'exploitation est avérée.** Pas de collecte de la liste
   CVE (cve.org, dépôt `CVEProject/cvelistV5`, 3,9 Go décompressé). Constaté sur un record
   (`CVE-2026-69086`) : un conteneur `cna` (description, produits touchés avec `packageURL`,
@@ -260,6 +260,31 @@ Proposition de la session, selon l'option D :
   affichage), l'API REST (82 champs par dépôt, sans choix des champs). À vérifier au codage : la
   chaîne de recherche (`stars:>1 sort:stars-desc`, non testée en GraphQL) ; une erreur GraphQL
   peut arriver avec un statut 200, dans la clé `errors`.
+
+### Référentiels et clés (séance 2)
+
+**Décidé par Sabine** :
+
+- **Une source qui cite un CVE le crée.** Constat qui l'impose : les 55 alertes pip du
+  2026-10-07 ont toutes un `cve_id`, aucun n'est dans le CSV CISA du même jour (1 734 CVE). Avec
+  CVE en sous-type d'ITEM, une alerte ne pouvait pas créer sa CVE sans une fausse ligne KEV.
+- **CVE devient un référentiel à clé propre** : `cve_id` unique, `item_id` clé étrangère
+  facultative et unique vers l'item KEV, colonnes de KEV facultatives. « Exploitée » se lit
+  `item_id IS NOT NULL`, sans attribut en double. Un `CHECK` impose : colonnes de KEV remplies si
+  et seulement si `item_id` l'est. ADVISORY porte une clé étrangère facultative vers CVE ; P4 est
+  la jointure ADVISORY → CVE dont `item_id` est rempli. Écartés : `cve_id` en simple colonne sans
+  clé étrangère ; un attribut `is_exploited` (doublon de `item_id`) ; une table KEV_ENTRY séparée
+  (une table de plus, pour éviter des colonnes vides que le `CHECK` tient).
+- **Règle des référentiels** : un référentiel a pour clé unique son identifiant officiel
+  (`cve_id`, `arxiv_id`) et pointe vers l'item de la source qui fait foi, quand elle l'a vu. CVE
+  l'applique en v0 ; PAPER y passera avec Zotero (#15), qui décidera qui remplit ses colonnes
+  quand arXiv n'a pas vu le papier.
+- **Chaque table a un `id` technique** comme clé primaire. Les identifiants naturels (`arxiv_id`,
+  `cve_id`, `ghsa_id`, `release_id`, édition + date + rang) deviennent des contraintes `UNIQUE`.
+  Conséquence sur l'option D : un sous-type n'a plus `item_id` pour clé primaire, mais une clé
+  étrangère `item_id` obligatoire et unique ; l'exclusivité (D1) reste portée par la clé
+  étrangère composée (`item_id`, `kind`). Écarté : l'identifiant naturel en clé primaire, lisible
+  sans jointure mais lié à un identifiant externe.
 
 <!-- Points 4 et 5 : à suivre. -->
 
