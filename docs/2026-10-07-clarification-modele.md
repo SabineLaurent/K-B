@@ -199,6 +199,18 @@ reconnaître un item déjà vu, quelle que soit la source.
   révision. Raison : Zotero, source prévue en v0, ne contient que des papiers arXiv et doit se
   recouper avec la collecte arXiv (`docs/stockage.md:63-65`) ; l'item Zotero pointera vers le
   même PAPER.
+- **CVE, CISA KEV fait foi** : `cve_id`, nom (`vulnerabilityName`), description
+  (`shortDescription`), éditeur (`vendorProject`) et produit (`product`), ce qui règle #84, date
+  d'ajout (`dateAdded`), usage connu par un rançongiciel (`knownRansomwareCampaignUse`, `Known` ou
+  `Unknown`), `revised_at`, `withdrawn_at`. Raison : dans le périmètre de K-B, le catalogue KEV est
+  la liste officielle des failles exploitées. `knownRansomwareCampaignUse` est le champ que CISA
+  modifie en silence : sans lui, `revised_at` ne dirait pas pourquoi une faille a changé.
+- **Auteurs : un attribut de PAPER** (tableau JSON, dans l'ordre d'arXiv), pas de table `author`
+  ni de table de liaison. Raison : aucun parcours ne cherche par auteur ; la valeur est une
+  mention d'affichage que la base ne découpe jamais. Purger le papier purge ses auteurs ; la
+  purge d'une personne dans tous ses papiers n'est plus possible par un `DELETE` ciblé. Le
+  registre des traitements est à mettre à jour.
+- Le modèle n'a plus de table de liaison : toutes les associations sont en 1,n ou 0,1.
 - **Périmètre des failles : celles dont l'exploitation est avérée.** Pas de collecte de la liste
   CVE (cve.org, dépôt `CVEProject/cvelistV5`, 3,9 Go décompressé). Constaté sur un record
   (`CVE-2026-69086`) : un conteneur `cna` (description, produits touchés avec `packageURL`,
