@@ -349,6 +349,14 @@ ne les donne pas : il enregistre des événements, sans les étoiles d'avant 201
 Écarté : l'API REST (une requête par dépôt, environ 82 champs sans choix). À vérifier au codage :
 un dépôt renommé interrogé par son ancien nom ; le plafond d'alias et le coût d'une requête.
 
+### Liens (séance 3)
+
+**Décidé par Sabine (2026-10-08)** : l'URL d'un dépôt (DÉPÔT SUIVI, TENDANCE) et celle d'un papier
+arXiv se déduisent de leur nom ou de leur référence (`https://github.com/` + `owner/name`,
+`https://arxiv.org/abs/` + référence) : données calculées, non stockées. L'URL d'une release est
+gardée telle que GitHub la donne (`html_url`) : une étiquette peut contenir des caractères à
+encoder, la reconstruire serait moins sûr.
+
 ### Longueurs maximales (séance 3)
 
 **Décidé par Sabine (2026-10-08)** : une longueur maximale du dictionnaire de données est tenue
