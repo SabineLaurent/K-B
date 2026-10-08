@@ -236,6 +236,32 @@ l'URL normalisée. Il réglerait le croisement CISA × GitHub (P4), le lien rés
 
 ### GitHub (en réflexion, non décidé)
 
+**Décidé par Sabine (2026-10-08)** : les paquets touchés par une alerte sont une liste JSON,
+attribut de l'alerte, comme les auteurs d'un papier, et non la table `advisory_package` proposée
+ci-dessous. Raison : en v0, la liste est seulement affichée ; P3 (filtrer par paquet) n'est pas
+planifié. Si P3 est fait, une migration de la base la découpe en table. Constat dans le brut du
+2026-10-07 (55 alertes pip) : 42 alertes touchent 1 paquet, 11 en touchent 2, 1 en touche 3, 1 en
+touche 4. Écartées : des colonnes Paquet 1…N (groupe répétitif, 1re forme normale) ; la table dès
+la v0 (pas de filtre à servir).
+
+**Décidé par Sabine (2026-10-08)** : une entité DÉPÔT SUIVI, à laquelle chaque RELEASE est
+rattachée (un dépôt suivi publie 1,n releases, une release vient d'un seul dépôt). Ses données :
+nom du dépôt (`owner/name`), écosystème (`pip`, `npm`), paquets suivis. « Nom du dépôt » quitte
+RELEASE. Raison : la liste des dépôts suivis existe déjà avec ses propres données, dans le code
+(`src/k_b/sources/tracked_repositories.py`, 4 dépôts) ; l'objection de la proposition ci-dessous
+(« les dépôts suivis ne sont pas tous dans le top 100 ») est tombée avec la sortie des classements
+de la base. DÉPÔT SUIVI est une table de référence, comme SOURCE, pas un item. La liste fait foi
+dans le code, qui remplit la table (décidé par Sabine le 2026-10-08) : la collecte la lit déjà là.
+Les paquets suivis sont une liste choisie à la main ; ils filtrent la collecte des alertes
+(`affects`, `src/k_b/sources/github_advisories.py:58`) : une alerte qui ne touche aucun paquet
+suivi n'est pas collectée.
+
+**Décidé par Sabine (2026-10-08)** : RELEASE garde la référence GitHub (`id`), l'étiquette
+(`tag_name`), le nom (`name`), les notes (`body`, texte Markdown gardé tel que reçu) et la date de
+publication (`published_at`), et se rattache à son DÉPÔT SUIVI. Constat dans le brut du 2026-10-07
+(100 releases de `anthropics/claude-code`) : 99 notes en Markdown (titres, puces), 1 vide, la plus
+longue fait 28 783 caractères.
+
 Proposition de la session, selon l'option D :
 
 - **ADVISORY** (GitHub fait foi, flux, premier vu) : `ghsa_id` unique, `cve_id` facultatif,
@@ -296,6 +322,18 @@ Proposition de la session, selon l'option D :
 - activer Dependabot sur le dépôt K-B (sécurité de la chaîne d'approvisionnement, hors modèle) ;
 - vérifier ce que la BOD 26-04 de la CISA change pour le catalogue KEV (la BOD 22-01 est
   marquée révoquée sur cisa.gov).
+
+### Longueurs maximales (séance 3)
+
+**Décidé par Sabine (2026-10-08)** : une longueur maximale du dictionnaire de données est tenue
+deux fois, par Pydantic à la lecture du brut et par un `CHECK (length(col) <= n)` dans le schéma.
+Raison : défense en profondeur (`.claude/rules/code.md`), comme pour les dates (Pydantic, puis
+`CHECK` de `schema.sql`). Constat : SQLite ignore la longueur d'un `VARCHAR(n)` (affinité TEXT) ;
+les colonnes restent en `TEXT`. Coût : la même limite écrite en Python et en SQL ; un test vérifie
+qu'elles concordent. Écartés : un seul des deux contrôles ; la convention VARCHAR / TEXT de MySQL,
+sans effet sur SQLite. Une valeur plus longue que la limite fait refuser l'item, et le journal dit
+quel champ dépasse et de combien (décidé par Sabine le 2026-10-08) ; écarté : tronquer, qui
+modifie la donnée sans le dire.
 
 <!-- Points 4 et 5 : à suivre. -->
 
