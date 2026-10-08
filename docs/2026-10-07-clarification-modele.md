@@ -357,6 +357,11 @@ arXiv se déduisent de leur nom ou de leur référence (`https://github.com/` + 
 gardée telle que GitHub la donne (`html_url`) : une étiquette peut contenir des caractères à
 encoder, la reconstruire serait moins sûr.
 
+**Décidé par Sabine (2026-10-08)** : le chemin de la donnée brute est stocké (`raw_file_path`) ;
+le nom du fichier en est le dernier élément, calculé et absent du MLD. Écarté : stocker le nom et
+reconstruire le chemin, qui demanderait de recoder les règles de rangement de chaque source (mode
+`automation` ou `manual`, dossier de collecte de TLDR).
+
 ### Longueurs maximales (séance 3)
 
 **Décidé par Sabine (2026-10-08)** : une longueur maximale du dictionnaire de données est tenue
