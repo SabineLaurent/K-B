@@ -355,7 +355,9 @@ un dépôt renommé interrogé par son ancien nom ; le plafond d'alias et le co�
 arXiv se déduisent de leur nom ou de leur référence (`https://github.com/` + `owner/name`,
 `https://arxiv.org/abs/` + référence) : données calculées, non stockées. L'URL d'une release est
 gardée telle que GitHub la donne (`html_url`) : une étiquette peut contenir des caractères à
-encoder, la reconstruire serait moins sûr.
+encoder, la reconstruire serait moins sûr. De même, l'URL d'une alerte GitHub est gardée telle que
+donnée (`html_url`) ; celle d'une faille se déduit du numéro CVE
+(`https://nvd.nist.gov/vuln/detail/` + numéro), comme le fait déjà le lecteur CISA.
 
 **Décidé par Sabine (2026-10-08)** : le chemin de la donnée brute est stocké (`raw_file_path`) ;
 le nom du fichier en est le dernier élément, calculé et absent du MLD. Écarté : stocker le nom et
