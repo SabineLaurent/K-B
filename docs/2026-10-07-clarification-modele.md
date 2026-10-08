@@ -342,6 +342,13 @@ deux lignes) ; un top 100 (plus que l'affichage n'en demande, RGESN 1.6). Consta
 sur la journée du 2026-10-06, aucun `repo.id` n'apparaît sous deux noms dans ces événements
 (71,6 Mo lus) ; le regroupement par `repo.id` couvre un renommage en cours de fenêtre.
 
+**Décidé par Sabine (2026-10-08)** : TENDANCE garde aussi les étoiles totales et les forks
+totaux de chaque dépôt, lus le jour de la collecte par l'API GraphQL de GitHub (une requête, un
+alias par dépôt, `stargazerCount` et `forkCount`, `databaseId` comparé au `repo.id`). GH Archive
+ne les donne pas : il enregistre des événements, sans les étoiles d'avant 2011 ni les retraits.
+Écarté : l'API REST (une requête par dépôt, environ 82 champs sans choix). À vérifier au codage :
+un dépôt renommé interrogé par son ancien nom ; le plafond d'alias et le coût d'une requête.
+
 ### Longueurs maximales (séance 3)
 
 **Décidé par Sabine (2026-10-08)** : une longueur maximale du dictionnaire de données est tenue
