@@ -383,6 +383,14 @@ le nom du fichier en est le dernier élément, calculé et absent du MLD. Écart
 reconstruire le chemin, qui demanderait de recoder les règles de rangement de chaque source (mode
 `automation` ou `manual`, dossier de collecte de TLDR).
 
+### Noms des associations (séance 3)
+
+**Validés par Sabine (2026-10-08)** : FOURNIR (SOURCE, DONNÉE BRUTE), CONTENIR (DONNÉE BRUTE, ITEM),
+PRODUIRE (DONNÉE BRUTE, TENDANCE), RECENSER (ITEM, VULNÉRABILITÉ), DÉCRIRE (ITEM, PUBLICATION),
+CITER (ALERTE GITHUB, VULNÉRABILITÉ), RÉSUMER (ARTICLE DE NEWSLETTER, PUBLICATION), PUBLIER (DÉPÔT
+SUIVI, RELEASE). MCD et MLD du jour : `temp/mcd-k-b.drawio`, `temp/mld-k-b-2026-10-08.drawio`
+(hors git).
+
 ### Longueurs maximales (séance 3)
 
 **Décidé par Sabine (2026-10-08)** : une longueur maximale du dictionnaire de données est tenue
