@@ -349,6 +349,17 @@ ne les donne pas : il enregistre des événements, sans les étoiles d'avant 201
 Écarté : l'API REST (une requête par dépôt, environ 82 champs sans choix). À vérifier au codage :
 un dépôt renommé interrogé par son ancien nom ; le plafond d'alias et le coût d'une requête.
 
+### PUBLICATION devient un référentiel (séance 3)
+
+**Décidé par Sabine (2026-10-08)**, revient sur la règle des référentiels de la séance 2 (« PAPER y
+passera avec Zotero ») : PUBLICATION est un référentiel dès la v0, comme VULNÉRABILITÉ. Sa clé
+unique est la référence arXiv ; elle pointe vers l'item arXiv quand arXiv l'a vue (`item_id`
+facultatif et unique) ; titre, résumé, auteurs et dates sont remplis si et seulement si cet item
+existe (`CHECK`, comme pour CVE). Une source qui cite un papier le crée : un article de newsletter
+peut pointer vers un papier que la collecte arXiv n'a pas vu. L'item arXiv n'a plus de sous-type ;
+la spécialisation de ITEM ne compte plus que ARTICLE DE NEWSLETTER, RELEASE et ALERTE GITHUB.
+Zotero (#15) décidera toujours qui remplit les colonnes quand arXiv n'a pas vu le papier.
+
 ### Liens (séance 3)
 
 **Décidé par Sabine (2026-10-08)** : l'URL d'un dépôt (DÉPÔT SUIVI, TENDANCE) et celle d'un papier
