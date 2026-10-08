@@ -342,6 +342,14 @@ deux lignes) ; un top 100 (plus que l'affichage n'en demande, RGESN 1.6). Consta
 sur la journée du 2026-10-06, aucun `repo.id` n'apparaît sous deux noms dans ces événements
 (71,6 Mo lus) ; le regroupement par `repo.id` couvre un renommage en cours de fenêtre.
 
+**Décidé par Sabine (2026-10-08)** : TENDANCE est rattachée à la chaîne de traçabilité. Le résultat
+de la requête BigQuery est une donnée brute de la source `gh_archive` (déjà dans
+`src/k_b/database/seed_sources.sql`), un fichier par collecte sous `raw/automation/gh_archive/` ;
+DONNÉE BRUTE ─0,n─ (PRODUIRE) ─1,1─ TENDANCE, soit `trend.raw_data_id` au MLD. TENDANCE n'est pas un
+item. Raison : toute donnée en base remonte à un fichier brut et à sa source, et TENDANCE se
+reconstruit depuis le brut sans relancer BigQuery. Écarté : TENDANCE sans lien (seule table hors
+de la chaîne).
+
 **Décidé par Sabine (2026-10-08)** : TENDANCE garde aussi les étoiles totales et les forks
 totaux de chaque dépôt, lus le jour de la collecte par l'API GraphQL de GitHub (une requête, un
 alias par dépôt, `stargazerCount` et `forkCount`, `databaseId` comparé au `repo.id`). GH Archive
