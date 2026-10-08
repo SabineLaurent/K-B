@@ -323,6 +323,25 @@ Proposition de la session, selon l'option D :
 - vérifier ce que la BOD 26-04 de la CISA change pour le catalogue KEV (la BOD 22-01 est
   marquée révoquée sur cisa.gov).
 
+### GH Archive (séance 3)
+
+**Décidé par Sabine (2026-10-08)** : les dépôts qui montent (P5, #16) entrent en base, dans une
+table TENDANCE : nom du dépôt, fin de la fenêtre de 3 jours, étoiles gagnées, rang. Ce n'est pas un
+item ni un sous-type ; elle remplace `repository` et `star_gain` de `docs/stockage.md`. Raison :
+GH Archive est la seule source big data, et le bloc E1 demande d'agréger toutes les sources dans
+le jeu de données stocké (critères exacts non relus ici). Écarté : un fichier par collecte hors
+base, comme les tops GitHub (cohérent, mais la source big data n'entrerait pas en base).
+
+**Décidé par Sabine (2026-10-08)**, forme de TENDANCE : une ligne par dépôt et par fenêtre, avec deux
+mesures, étoiles gagnées (`WatchEvent`) et forks gagnés (`ForkEvent`), tirées d'une seule requête.
+Le rang n'est pas stocké : il se calcule par un tri (type C). Sont gardés les 30 premiers par
+étoiles et les 30 premiers par forks, réunis (60 dépôts au plus par fenêtre). La requête regroupe
+par `repo.id`, gardé en base (référence du dépôt), avec le dernier nom vu. Écartés : deux tables TENDANCE ÉTOILES et TENDANCE FORKS
+(mêmes données, signe d'une seule entité) ; une ligne par critère (un dépôt des deux tops sur
+deux lignes) ; un top 100 (plus que l'affichage n'en demande, RGESN 1.6). Constat du 2026-10-08 :
+sur la journée du 2026-10-06, aucun `repo.id` n'apparaît sous deux noms dans ces événements
+(71,6 Mo lus) ; le regroupement par `repo.id` couvre un renommage en cours de fenêtre.
+
 ### Longueurs maximales (séance 3)
 
 **Décidé par Sabine (2026-10-08)** : une longueur maximale du dictionnaire de données est tenue
