@@ -32,6 +32,16 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   échoue à chaque collecte. Cela contredit la consigne du 05/10 : lancée tous les jours, K-B
   rattrape les jours manqués (#65).
 
+## Interface : choix et suite envisagée (Sabine, 2026-10-08)
+
+- K-B tourne en local et s'installe comme outil CLI (`uv tool install --editable`).
+- La veille s'interroge par des commandes (`kb search … --since --kind --source`, `kb top`),
+  puis par un menu à questions par-dessus, qui remplit les mêmes options.
+- Évolutions possibles, sans issue : une TUI plein écran (type Textual), puis à long terme une
+  application de bureau installable avec Tauri (hors « Python uniquement » : à décider le moment
+  venu).
+- Livrable E1 : présenter cette suite envisagée du projet.
+
 ## Consignes de travail
 
 - Pour la documentation d'une bibliothèque ou d'un service, utiliser Context7 plutôt qu'une
