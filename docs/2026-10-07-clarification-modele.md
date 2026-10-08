@@ -388,7 +388,7 @@ reconstruire le chemin, qui demanderait de recoder les règles de rangement de c
 **Validés par Sabine (2026-10-08)** : FOURNIR (SOURCE, DONNÉE BRUTE), CONTENIR (DONNÉE BRUTE, ITEM),
 PRODUIRE (DONNÉE BRUTE, TENDANCE), RECENSER (ITEM, VULNÉRABILITÉ), DÉCRIRE (ITEM, PUBLICATION),
 CITER (ALERTE GITHUB, VULNÉRABILITÉ), RÉSUMER (ARTICLE DE NEWSLETTER, PUBLICATION), PUBLIER (DÉPÔT
-SUIVI, RELEASE). MCD et MLD du jour : `docs/mcd-k-b.drawio`, `docs/mld-k-b.drawio`.
+SUIVI, RELEASE). MCD et MLD du jour : `docs/merise/mcd-k-b.drawio`, `docs/merise/mld-k-b.drawio`.
 
 ### Longueurs maximales (séance 3)
 
