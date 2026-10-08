@@ -376,6 +376,14 @@ sans effet sur SQLite. Une valeur plus longue que la limite fait refuser l'item,
 quel champ dépasse et de combien (décidé par Sabine le 2026-10-08) ; écarté : tronquer, qui
 modifie la donnée sans le dire.
 
+### À reprendre dans la liste des issues (séance 3)
+
+- **Revoir les paquets principaux des dépôts suivis** (demande de Sabine, 2026-10-08). La collecte
+  des alertes ne demande que les alertes qui touchent un paquet suivi (`affects`,
+  `src/k_b/sources/github_advisories.py:58`) : une alerte qui ne touche qu'un paquet absent de la
+  liste n'est pas collectée. La liste actuelle (7 paquets pip, 1 npm) et ses exclusions
+  (`langchain-community`, `langchain-experimental`, `langchain-classic`) sont dans `docs/sources.md`.
+
 <!-- Points 4 et 5 : à suivre. -->
 
 ## Annexe : les sources, champ par champ
