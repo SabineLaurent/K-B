@@ -462,8 +462,22 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   fusion, l'indexation en base et `kb search`. La ligne `wiki` de ORIGIN leur laisse la porte
   ouverte. Écartée pour la v0 : NOTE et une table de liaison « une note cite des items »
   (plusieurs à plusieurs), qui supposaient des fiches en v0.
-- En suspens : la place de Zotero (copie de la base, aujourd'hui sous `raw/automation/zotero/`,
-  `docs/specs-collecte.md:185`) et de ses PDF.
+- **Zotero, recommandation pour #15** (Sabine favorable, 2026-10-09 ; à décider dans #15). Zotero
+  reste une source « base de données », interrogée en SQL. Constat : l'accès direct à
+  `zotero.sqlite` doit se faire en lecture seule, et Zotero casse le verrouillage normal de
+  SQLite ([doc Zotero](https://www.zotero.org/support/dev/client_coding/direct_sqlite_database_access)) :
+  Zotero ouvert, une lecture en place échoue (« database is locked »). Recommandé : (1) copier
+  `zotero.sqlite` dans un dossier temporaire, Zotero ouvert ou non ; (2) `PRAGMA integrity_check`
+  sur la copie, et en cas d'échec un état nommé (ex. `zotero_copy_inconsistent`), rattrapé à la
+  collecte suivante ; (3) requête SQL en lecture seule sur la copie ; (4) écrire comme brut le
+  résultat de la requête (titres, URL, dates, surlignages, chemin des PDF) en JSON sous
+  `raw/selected_library/zotero/`, puis supprimer la copie. Les PDF restent dans le stockage de
+  Zotero ; K-B garde leur chemin. Écartés : un script qui ferme Zotero puis le rouvre
+  (interrompt l'usage, risque d'écriture interrompue, K-B piloterait une application) ; lire
+  seulement Zotero fermé (jamais collecté si Zotero reste ouvert) ; la base entière comme brut
+  (contraire à la minimisation, CNIL et RGESN 1.6) ; l'API locale de Zotero 7 (plus de source
+  « base de données ») ; `zotero.sqlite.bak` (fréquence et fraîcheur non vérifiées). Non
+  vérifié : la fiabilité d'une copie à chaud, d'où le contrôle d'intégrité.
 
 ### À reprendre dans la liste des issues (séance 3)
 
@@ -483,6 +497,10 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   qui vérifie la fiche produite (#26) passent après la collecte, l'indexation et `kb search` ;
   l'ADR « Deux wikis » (fiches figées dans `wiki/veille/`) et la chaîne de `docs/stockage.md:4`
   et `:10` (« base → API REST → fiches, agents ») sont à mettre à jour.
+- **Zotero (#15)** (séance 4) : reprendre la recommandation ci-dessus dans l'issue ; mettre à
+  jour `docs/specs-collecte.md:185` (aujourd'hui, la copie entière comme brut sous
+  `raw/automation/zotero/`) et le registre (fiche 2 et règle 5, « supprimer les copies Zotero du
+  brut sauf la plus récente », sans objet si la copie n'est plus gardée).
 
 <!-- Points 4 et 5 : à suivre. -->
 
