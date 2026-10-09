@@ -89,10 +89,11 @@ pas décidé tel quel. Les recommandations sont celles de la session.
 ### Types d'items
 
 - **Constat** : une release n'a pas de sous-type, elle se reconnaît par élimination (D3). Un
-  résumé TLDR prend l'URL de l'article dont il parle (`docs/stockage.md:59`) ; avec `url`
+  résumé TLDR prend l'URL de l'article dont il parle (`docs/stockage.md:67`) ; avec `url`
   unique dans toute la table, un résumé et son article d'origine ne peuvent pas coexister. Les
   vrais liens TLDR ont la forme des items existants : `arxiv.org/abs/2609.38149`,
-  `github.com/NVIDIA/OpenShell` (aucun n'est dans la collecte du 2026-10-07).
+  `github.com/NVIDIA/OpenShell` (tous deux cités par la page TLDR du 2026-10-01, aucun n'est un item
+  d'une autre source dans la collecte du 2026-10-07).
 - **3a, types** (piste remplacée par la liste de `kind` de l'option D, ci-dessous) — recommandé : `article` (arXiv, clip, Zotero), `summary` (TLDR),
   `vulnerability` (CISA, alerte GitHub), `repository`, `release`. Étoiles et forks sont des
   mesures sur un dépôt, pas des items.
@@ -119,8 +120,8 @@ Exemple, avec les vrais items du 2026-10-07 (ligne 7 inventée) :
 
 ### Source, collecte et lancement
 
-- **Constat** : SOURCE et COLLECTE ne sont pas reliées au MCD (`docs/stockage.md:95-96`). Une
-  collecte en base est un fichier brut (`docs/stockage.md:107`), pas un lancement de
+- **Constat** : SOURCE et COLLECTE ne sont pas reliées au MCD (`docs/stockage.md:103-104`). Une
+  collecte en base est un fichier brut (`docs/stockage.md:115`), pas un lancement de
   `kb collect` : elle appartient à une seule source. La source d'une collecte ne se lit que dans
   son chemin ou par ses items : `item.source_code` dépend de `item.collection_id`.
 - **Idée de Sabine** : SOURCE et LANCEMENT en plusieurs à plusieurs, la table de liaison portant
@@ -203,7 +204,7 @@ reconnaître un item déjà vu, quelle que soit la source.
   L'item garde ce qui est propre à la collecte (donnée brute, source, clé vers le référentiel).
 - **PAPER, arXiv fait foi** : `arxiv_id`, titre, résumé, auteurs, dates de soumission et de
   révision. Raison : Zotero, source prévue en v0, ne contient que des papiers arXiv et doit se
-  recouper avec la collecte arXiv (`docs/stockage.md:63-65`) ; l'item Zotero pointera vers le
+  recouper avec la collecte arXiv (`docs/stockage.md:71-73`) ; l'item Zotero pointera vers le
   même PAPER.
 - **CVE, CISA KEV fait foi** (forme revue en séance 2, voir « Référentiels et clés ») : `cve_id`, nom (`vulnerabilityName`), description
   (`shortDescription`), éditeur (`vendorProject`) et produit (`product`), ce qui règle #84, date
@@ -253,8 +254,8 @@ d'ARTICLE DE NEWSLETTER remplace 3c et son `UNIQUE (source_code, url)`.
 attribut de l'alerte, comme les auteurs d'un papier, et non la table `advisory_package` proposée
 ci-dessous. Raison : en v0, la liste est seulement affichée ; P3 (filtrer par paquet) n'est pas
 planifié. Si P3 est fait, une migration de la base la découpe en table. Constat dans le brut du
-2026-10-07 (55 alertes pip) : 42 alertes touchent 1 paquet, 11 en touchent 2, 1 en touche 3, 1 en
-touche 4. Écartées : des colonnes Paquet 1…N (groupe répétitif, 1re forme normale) ; la table dès
+2026-10-07 (55 alertes pip) : 47 alertes touchent 1 paquet, 7 en touchent 2, 1 en touche 3 (paquets
+distincts ; compté le 2026-10-09, le premier compte portait sur les plages de versions). Écartées : des colonnes Paquet 1…N (groupe répétitif, 1re forme normale) ; la table dès
 la v0 (pas de filtre à servir).
 
 **Décidé par Sabine (2026-10-08)** : une entité DÉPÔT SUIVI, à laquelle chaque RELEASE est
@@ -339,7 +340,7 @@ Proposition de la session, selon l'option D (non décidée telle quelle ; les d�
 ### GH Archive (séance 3)
 
 **Décidé par Sabine (2026-10-08)** : les dépôts qui montent (P5, #16) entrent en base, dans une
-table TENDANCE : nom du dépôt, fin de la fenêtre de 3 jours, étoiles gagnées, rang. Ce n'est pas un
+table TENDANCE : nom du dépôt, fin de la fenêtre de 3 jours, étoiles gagnées (rang : voir la forme ci-dessous). Ce n'est pas un
 item ni un sous-type ; elle remplace `repository` et `star_gain` de `docs/stockage.md`. Raison :
 GH Archive est la seule source big data, et le bloc E1 demande d'agréger toutes les sources dans
 le jeu de données stocké (critères exacts non relus ici). Écarté : un fichier par collecte hors
@@ -544,11 +545,11 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   auteurs possibles) ; corps de 517 octets à 42,7 ko (400 ko pour les 26), avec le bruit de la
   page (images, mentions du site). Correspondance : `title` → `item.title`, `source` →
   `item.url`, `published` → `item.published_at` (vide si absente), `created` → `item.saved_at`,
-  `author` → `author.name`, **`description` → `item.summary`** (absente de `docs/stockage.md:58`),
+  `author` → `author.name`, **`description` → `item.summary`** (absente de `docs/stockage.md:66`),
   `tags` : rien en v0, corps → texte complet.
 - **Dossier de données (décidé par Sabine, 2026-10-09)** : `KB_DATA_DIR=~/.knowledge_base` (brut,
   base, journal d'import), réglé dans `~/.zshrc` ; c'est un réglage d'installation, pas une règle du
-  code (`src/k_b/cli.py:18` lit la variable). Deux règles : hors de tout dossier synchronisé par
+  code (`src/k_b/cli.py:56` lit la variable). Deux règles : hors de tout dossier synchronisé par
   iCloud (base SQLite, données hors machine) ; compris dans une sauvegarde (c'est le brut
   qu'on sauvegarde, W7). À la sauvegarde de Sabine,
   ajouter `~/.knowledge_base`, au moins `raw/` et `collection_state.json` ; `k-b.sqlite` peut
@@ -566,7 +567,7 @@ Objectif à terme : K-B installé sur la machine de travail quotidien de Sabine 
 
 **Déjà en place** (constaté dans le code le 2026-10-09) : une CLI sans port ouvert, avec les
 droits du compte, sans `sudo` ; une dépendance de production (`pydantic`) ; des téléchargements
-bornés (taille, délai, redirection hors du domaine refusée, jeton jamais transmis à une
+bornés (taille, délai, réponse refusée si une redirection sort du domaine, le refus avant de la suivre étant #54, jeton jamais transmis à une
 redirection, `src/k_b/http_download.py`) ; le XML d'arXiv lu par `xml.etree` sur expat 2.6.3, qui
 refuse les entités externes et résiste aux « bombes XML » selon la doc de sécurité de Python ; les
 noms de pages TLDR contrôlés avant écriture (`collect.py`).
@@ -673,7 +674,7 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   à chaque collecte (`save_last_collection_dates`, `src/k_b/raw_store.py:60`), alors que `raw/`
   est « écrit une fois, jamais réécrit » ; `raw/` pourra être protégé en lecture seule, et
   synchronisé sans l'état propre à chaque machine qui collecte. Il ne se déduit pas du brut : une
-  source sans nouveauté n'écrit rien mais avance sa date (`docs/specs-collecte.md:40`). Touche
+  source sans nouveauté n'écrit rien (`docs/specs-collecte.md:40`) mais avance sa date (`src/k_b/collect.py:47`). Touche
   `raw_store.py:35-69` (lu et écrit à partir de `raw_dir`), les tests et `specs-collecte.md:40`.
   Dans la même issue : reproduire l'architecture cible dans `temp/.knowledge_base/` (hors git),
   en y déplaçant la collecte réelle du 2026-10-07 de `temp/raw/`, pour les essais avec
@@ -715,8 +716,8 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   copié (avec l'issue des clips, #14).
 - **Fiches de veille reportées** (séance 4) : l'epic des fiches (#22) et le test de bout en bout
   qui vérifie la fiche produite (#26) passent après la collecte, l'indexation et `kb search` ;
-  l'ADR « Deux wikis » (fiches figées dans `wiki/veille/`) et la chaîne de `docs/stockage.md:4`
-  et `:10` (« base → API REST → fiches, agents ») sont à mettre à jour.
+  l'ADR « Deux wikis » (fiches figées dans `wiki/veille/`) et la chaîne de `docs/stockage.md:12`
+  et `:18` (« base → API REST → fiches, agents ») sont à mettre à jour.
 - **Zotero (#15)** (séance 4) : reprendre la décision ci-dessus dans l'issue ; ADR de la PR de #6 à réviser ; mettre à
   jour `docs/specs-collecte.md:185` (aujourd'hui, la copie entière comme brut sous
   `raw/automation/zotero/`) et le registre (fiche 2 et règle 5, « supprimer les copies Zotero du
@@ -724,7 +725,7 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
 
 ## Issues touchées, pour le découpage
 
-La liste regroupe ce que les séances 1 à 5 changent aux issues, ou font naître. Rien n'est créé ni
+La liste regroupe ce que les séances 1 à 4 changent aux issues, ou font naître. Rien n'est créé ni
 modifié ici : le découpage se fera dans une session à part (`/split-project-ls`). « Relecture n »
 renvoie au point n de la relecture indépendante du 2026-10-09 (hors git) ; D2, D6 et D7 à la
 [revue d'architecture](2026-10-06-revue-architecture.md). La colonne « Ajout S4 » chiffre ce
@@ -870,7 +871,7 @@ Exemplaire : vraie collecte du 2026-10-07, `raw/automation/arxiv/2026-10-07T0843
 | `author/name` | 7 auteurs, dont `Zelin Guan`, `Shengda Zhuo` | gardé, dans l'ordre | `author.name`, `item_author.position` |
 | `published` | `2026-05-01T12:30:00Z` | gardé | `item.published_at` |
 | `updated` | `2026-05-01T12:30:00Z` | gardé | `item.revised_at` |
-| `link` PDF, `category`, `primary_category` | `https://arxiv.org/pdf/2605.00955v1`, `cs.CR`, `cs.AI` | non lu | — |
+| `link` PDF, `category`, `primary_category` | `https://arxiv.org/pdf/2605.00955v1`, `cs.CR` et `cs.AI` ; principale `cs.CR` | non lu | — |
 
 ### tldr.tech (`tldr`, pages HTML, une par édition et par jour)
 
@@ -892,7 +893,7 @@ prévoit d'en garder. Exemplaire : vraie collecte du 2026-10-07,
 Mentions sur les 80 articles : `N minute read` 75, `GitHub Repo` 2, `Hugging Face Repo` 1,
 `Website` 1, une offre d'emploi 1. Domaines des liens les plus fréquents : `x.com` 7, `openai.com` 5,
 `techcrunch.com` 5, `www.anthropic.com` 3, `links.tldrnewsletter.com` 3 ; `github.com` 2,
-`arxiv.org` 2. La page ne porte ni auteur ni expéditeur (aucune occurrence de `author`).
+`arxiv.org` 2. La page ne porte ni auteur ni expéditeur (aucun champ auteur ; le mot n'apparaît que dans le texte, « authorized »).
 
 ### À venir : clips Obsidian (#14), Zotero (#15), GH Archive
 
@@ -900,6 +901,6 @@ D'après `docs/stockage.md`, `docs/specs-collecte.md` et `docs/registre-traiteme
 
 | Source | Ce qu'elle donnera | `table.colonne` prévue |
 |---|---|---|
-| Clips Obsidian | un fichier `.md` par page gardée : en-tête YAML (`source`, `published`, `created`, `author`) et le texte gardé | `item.url` (`source`), `item.published_at` (`published`, vide si absent), `item.saved_at` (`created`), `author.name` (`author`) ; le texte gardé n'a pas de colonne |
+| Clips Obsidian | un fichier `.md` par page gardée : en-tête YAML (`source`, `published`, `created`, `author`) et le texte gardé | `item.url` (`source`), `item.published_at` (`published`, vide si absent), `item.saved_at` (`created`), `author.name` (`author`) ; le texte gardé : texte complet en base pour FTS5, `description` → `item.summary` (séance 4) |
 | Zotero | papiers lus (titre, auteurs, date, étiquettes, chemin du PDF) et leurs surlignages | `item.*`, `item.saved_at` (`dateAdded`), `author.name`, `highlight.*` ; étiquettes hors base |
-| GH Archive | les dépôts qui gagnent le plus d'étoiles sur 3 jours | `repository`, `star_gain.stars_gained`, `star_gain.window_end` |
+| GH Archive | les dépôts qui gagnent le plus d'étoiles sur 3 jours | `repository`, `star_gain.stars_gained`, `star_gain.window_end` ; remplacés par TENDANCE (séance 3) |

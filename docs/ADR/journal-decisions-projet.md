@@ -618,7 +618,8 @@ encore l'ancien modèle.
   GraphQL.** Décision de Sabine, après la relecture du 2026-10-09 (point 8). Pourquoi, selon
   elle : la certif demande une base de données parmi les sources (Zotero, source « base de
   données » depuis le 2026-09-29) ; pour TENDANCE, le pourquoi est celui du 2026-10-08. Limite :
-  aucun de ces ajouts n'a d'estimation, pour une échéance au 25/10.
+  aucun de ces ajouts n'avait d'estimation au moment de la décision, pour une échéance au 25/10 ;
+  estimés depuis à environ 16,5 h par la session, non relus (clarification, « Issues touchées »).
 
 ### Bibliothèque et recherche
 
