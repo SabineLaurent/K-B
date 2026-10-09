@@ -478,6 +478,10 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   (contraire à la minimisation, CNIL et RGESN 1.6) ; l'API locale de Zotero 7 (plus de source
   « base de données ») ; `zotero.sqlite.bak` (fréquence et fraîcheur non vérifiées). Non
   vérifié : la fiabilité d'une copie à chaud, d'où le contrôle d'intégrité.
+- **Surlignages (décidé par Sabine, 2026-10-09)** : en v0, ils sont gardés en base et **affichés
+  avec leur papier** dans les résultats de `kb search`, seulement si le papier en a. Ils ne sont
+  pas cherchables par leurs mots. Écartés : les rendre cherchables (un index de plus sur un texte
+  déjà lu) ; ne pas les collecter en v0 (perd ce que la requête Zotero ramène de toute façon).
 
 ### À reprendre dans la liste des issues (séance 3)
 
