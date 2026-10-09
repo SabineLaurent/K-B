@@ -402,6 +402,30 @@ sans effet sur SQLite. Une valeur plus longue que la limite fait refuser l'item,
 quel champ dépasse et de combien (décidé par Sabine le 2026-10-08) ; écarté : tronquer, qui
 modifie la donnée sans le dire.
 
+### Collecte large et sources choisies (séance 4)
+
+**Décidé par Sabine (2026-10-09)** : les deux dossiers du brut disent la finalité, pas le mode
+d'arrivée. `raw/automation/` devient `raw/automated_watch/` (la collecte large de la veille) ;
+`raw/manual/` devient `raw/selected_library/` (les sources que Sabine choisit sciemment). Ils
+répondent aux deux portes du README (veille, base de connaissance) et aux deux finalités du
+registre (`docs/registre-traitements.md`, fiches 1 et 2). Écartés : `choosen_files` (« files »
+dit le format, et Zotero n'est pas un dépôt de fichiers) ; `curated_library` (en ingénierie des
+données, la zone *curated* d'un lac de données est la donnée traitée, contraire de `raw/`) ;
+`hand_picked` (ne dit pas la finalité) ; `personal_library` (se confond avec « données
+personnelles »).
+
+Ce que Sabine y range : les clips du Web Clipper d'Obsidian (Markdown, frontmatter écrit par le
+clipper), ses notes et PDF déposés, plus tard des livres PDF ou EPUB (après la v0). Un article
+de la veille que Sabine creuse et met dans Zotero relève ensuite de la bibliothèque choisie.
+
+- Le Web Clipper écrit chaque clip dans le dossier « Note location » de son modèle, chemin
+  relatif au coffre ([aide Obsidian](https://obsidian.md/help/web-clipper/capture)) ; le coffre
+  est le dossier de données (ADR). Non testé.
+- En suspens : la place de Zotero (copie de la base, aujourd'hui sous `raw/automation/zotero/`,
+  `docs/specs-collecte.md:185`) et de ses PDF ; ce que la porte « connaissance » fait en v0 (l'ADR
+  de la PR de #7 dit que `raw/manual/` n'entre pas dans la base en v0, alors que les clips (#14)
+  et Zotero (#15) sont en v0).
+
 ### À reprendre dans la liste des issues (séance 3)
 
 - **Revoir les paquets principaux des dépôts suivis** (demande de Sabine, 2026-10-08). La collecte
@@ -409,6 +433,9 @@ modifie la donnée sans le dire.
   `src/k_b/sources/github_advisories.py:58`) : une alerte qui ne touche qu'un paquet absent de la
   liste n'est pas collectée. La liste actuelle (7 paquets pip, 1 npm) et ses exclusions
   (`langchain-community`, `langchain-experimental`, `langchain-classic`) sont dans `docs/sources.md`.
+- **Renommer `raw/automation/` en `raw/automated_watch/`** (séance 4) : code
+  (`src/k_b/collect.py:68`, `src/k_b/raw_items.py:111`), tests, `docs/specs-collecte.md`, règle 4
+  du registre. Les bruts déjà écrits sont à déplacer.
 
 <!-- Points 4 et 5 : à suivre. -->
 
