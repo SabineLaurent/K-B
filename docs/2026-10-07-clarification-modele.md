@@ -722,7 +722,47 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   `raw/automation/zotero/`) et le registre (fiche 2 et règle 5, « supprimer les copies Zotero du
   brut sauf la plus récente », sans objet si la copie n'est plus gardée).
 
-<!-- Points 4 et 5 : à suivre. -->
+## Issues touchées, pour le découpage
+
+La liste regroupe ce que les séances 1 à 5 changent aux issues, ou font naître. Rien n'est créé ni
+modifié ici : le découpage se fera dans une session à part (`/split-project-ls`). « Relecture n »
+renvoie au point n de la relecture indépendante du 2026-10-09 (hors git) ; D2, D6 et D7 à la
+[revue d'architecture](2026-10-06-revue-architecture.md). La colonne « Ajout S4 » chiffre ce
+qu'ajoutent les décisions de la séance 4 et le point 8 de la relecture (TENDANCE, tops GraphQL) :
+**estimations de la session, non relues à l'aveugle**.
+
+**En tête : le schéma (« Laisser la base dédoublonner les items », #105).** Sa conception
+(estimée 3,5 h) est remplacée par le modèle de ce document : option D, référentiels VULNÉRABILITÉ
+et PUBLICATION, natures de source (CISA en catalogue d'état), DÉPÔT SUIVI, RELEASE, ALERTE GITHUB,
+ARTICLE DE NEWSLETTER, `id` technique, longueurs en `CHECK` et Pydantic. S'y rattachent D2 (retirer
+l'ancien sous-type), D6 (réglé par nature de source) et D7 (à revérifier : ITEM n'a plus d'URL).
+Attend une décision : titre, résumé et date communs (relecture 2). **À réestimer au découpage.**
+
+| Issue | Ce qui change | Ajout S4 |
+|---|---|---|
+| Décider les champs de CISA KEV (#84) | réglé par VULNÉRABILITÉ (`vendorProject`, `product`) : à fermer ou fondre dans #105 | 0 |
+| Purger les données (#83) | durée lue dans ACQUISITION_MODE ; purge table par table (relecture 6, recommandation à valider) ; fichiers de classement GitHub (séance 2) ; liste d'exclusion si `item_id` reste stable (relecture 4) | 0,5 h |
+| Collecter les clips (#14) | copie horodatée vers `raw/selected_library/clipping/`, chemin de `Clippings/` en variable d'environnement, correspondance du frontmatter, texte complet en base, contrôle du nom ; attend la décision sur les versions d'un clip annoté (relecture 11) | 2 h |
+| Extraire Zotero (#15) | extrait JSON comme brut (revient sur l'ADR de #6), copie temporaire, `integrity_check` et mode WAL, surlignages en base et affichés, lien avec l'item de veille ; attend le modèle de la bibliothèque (relecture 3) ; texte des PDF non compté (dépendance à décider) | 2,5 h |
+| Dépôts qui montent (#16) | table TENDANCE, top 30 étoiles et forks, `repo.id` ; totaux par GraphQL : brut rattaché ou retrait (relecture 5, recommandation à valider) | 1,5 h |
+| Lire les pages TLDR (#57) | résumé dans ARTICLE DE NEWSLETTER ; brief09 comme point de départ | 0 |
+| API « quoi de neuf » (#21) | `kb search` : FTS5 et BM25, `--in`, caractères de contrôle retirés à l'affichage ; API REST locale en E1 ; attend les décisions `item_id` stable (relecture 4) et `--kind vulnerability` avec les alertes | 2,5 h |
+| Fiches de veille (#22) et test de bout en bout (#26) | reportées après la collecte, l'indexation et `kb search` ; ADR « Deux wikis » et `docs/stockage.md` à mettre à jour | sortent du chemin : 9 h + 2,5 h selon leurs estimations |
+| Aligner `docs/specs-collecte.md` (#64) | dossiers du brut renommés, `collection_state.json` déplacé, Zotero (`:185`) | compté plus bas |
+
+| Issue à créer | Origine | Ajout S4 |
+|---|---|---|
+| Renommer les dossiers du brut, sortir `collection_state.json` de `raw/` | séance 4 | 1,5 h |
+| Table ACQUISITION_MODE (attend la décision : table ou colonne de SOURCE, relecture 10) | séance 4 | 1,5 h |
+| Indexer les notes déposées (lecture de `raw/selected_library/`, texte complet) | séance 4 | 2 h |
+| Passer les tops GitHub en GraphQL et ajouter le top forks (relecture 13) | séances 2 et 3 | 2 h |
+| Alertes GitHub : lire `description` | séance 4 | 0,5 h |
+| Installation locale, launchd, doc du README, `/security-review` | 08/10, précautions en séance 4 | hors S4 |
+| Renommer le flux arXiv en `arxiv_cscr_x_csai`, reporter sa date de dernière collecte | 08/10 | hors S4 |
+| Revoir les paquets suivis ; Dependabot ; BOD 26-04 de la CISA ; SBOM (hors v0) | séances 2 et 3 | hors S4 |
+
+**Total de la séance 4 : environ 16,5 h**, plus le texte des PDF de Zotero s'il est retenu. Les
+fiches (#22, #26) sortent du chemin. La réécriture du schéma (#105) n'est pas chiffrée ici.
 
 ## Annexe : les sources, champ par champ
 
