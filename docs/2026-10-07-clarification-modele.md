@@ -500,6 +500,17 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   avec leur papier** dans les résultats de `kb search`, seulement si le papier en a. Ils ne sont
   pas cherchables par leurs mots. Écartés : les rendre cherchables (un index de plus sur un texte
   déjà lu) ; ne pas les collecter en v0 (perd ce que la requête Zotero ramène de toute façon).
+- **Index plein texte (décidé par Sabine, 2026-10-09)** : FTS5, le module de recherche plein
+  texte intégré à SQLite (aucune dépendance ; essayé avec le SQLite 3.50.4 de K-B : mot, phrase
+  exacte, préfixe, racine des mots anglais avec `porter`, accents neutralisés). **Tri** : avec des
+  mots à chercher, par pertinence BM25 (fonction `bm25()` de FTS5, plus bas = plus pertinent) ;
+  sans mots, par date. **Couverture** : titre et résumé des items ; pour les clips et les notes
+  déposées, titre et **texte complet**, stocké en base. Écartés : tri par date seulement (un papier
+  qui cite le terme une fois au rang d'un papier consacré au sujet) ; tri par date avec
+  `--sort relevance` (une option de plus) ; titre seul pour la bibliothèque (un clip ne se
+  retrouve que par son titre). Limites : `porter` ne ramène à leur racine que les mots anglais ;
+  FTS5 est propre à SQLite (PostgreSQL : `tsvector`). Reste au modèle : la colonne qui porte le
+  texte complet d'un document de la bibliothèque.
 
 ### Question ouverte : miroir et multi-machines (séance 4)
 
