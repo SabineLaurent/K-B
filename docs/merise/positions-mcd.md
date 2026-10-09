@@ -21,8 +21,7 @@ sont dans la même colonne**. Les cardinalités se lisent depuis l'entité voisi
 
 Cardinalités relevées dans `mcd-k-b.drawio` le 2026-10-09. Le sujet de chaque association est le
 premier terme de la liste validée le 2026-10-08 (« DÉCRIRE (ITEM, PUBLICATION) », « RECENSER (ITEM,
-VULNÉRABILITÉ) ») ; la légende des deux diagrammes dit l'inverse (« VULNÉRABILITÉ les recense,
-PUBLICATION les décrit ») et est à corriger.
+VULNÉRABILITÉ) »)  ; la légende de `mcd-k-b.drawio` est corrigée dans ce sens.
 
 Une disposition conforme est à refaire (un premier essai, construit avec le mauvais sujet pour
 DÉCRIRE et RECENSER, a été supprimé). Question ouverte (Sabine) : la règle « à gauche » admet un sujet plus bas que son complément (ex.
