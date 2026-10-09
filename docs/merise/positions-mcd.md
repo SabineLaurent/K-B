@@ -21,3 +21,8 @@ sont dans la même colonne**. Les cardinalités se lisent depuis l'entité voisi
 
 Cardinalités relevées dans `mcd-k-b.drawio` le 2026-10-09 ; le sujet de RECENSER et de DÉCRIRE
 vient de la légende du diagramme (« VULNÉRABILITÉ les recense, PUBLICATION les décrit »).
+
+`mcd-k-b-compliant.drawio` (2026-10-09) reprend le même MCD dans une disposition qui respecte
+toutes ces contraintes, spécialisation comprise. Contrôlé par un script sur les coordonnées du
+fichier : aucune entité ni association ne se chevauche, et aucun lien ne traverse une autre
+boîte.
