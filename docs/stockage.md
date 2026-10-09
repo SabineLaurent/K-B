@@ -6,6 +6,14 @@ le SGBD, et les trois modèles Merise : MCD, MLD, MPD. Le MPD est le script
 [`src/k_b/database/schema.sql`](../src/k_b/database/schema.sql). Les décisions et leur pourquoi
 sont aussi dans le [journal ADR](ADR/journal-decisions-projet.md).
 
+> **Modèle en cours de remplacement.** Ce document décrit le schéma codé aujourd'hui
+> (`schema.sql`). Le modèle décidé du 07 au 09/10 (donnée brute, référentiels, option D,
+> TENDANCE, mode d'acquisition, bibliothèque indexée, dossier `~/.knowledge_base`) est dans
+> [la clarification du modèle](2026-10-07-clarification-modele.md) et dans
+> [`docs/merise/`](merise/) ; il remplace notamment AUTEUR, DÉPÔT, MESURE, l'URL unique de tout
+> item et l'exclusion de `raw/manual/`. Ce document sera mis à jour avec la réécriture de
+> `schema.sql`.
+
 ```
 collecte → raw/ (brut intact) → lecture + fusion → base → API REST → fiches, agents
 ```

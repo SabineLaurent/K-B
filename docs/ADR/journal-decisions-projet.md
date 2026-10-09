@@ -413,20 +413,279 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   qu'un auteur ait au moins un item. Option écartée : laisser ce nettoyage à la purge (#8),
   pas encore codée, le nom restant en base d'ici là. — PR de #82
 
+## 2026-10-07
+
+Décisions de la clarification du modèle ; le détail et les constats sont dans
+[la clarification](../2026-10-07-clarification-modele.md). Le schéma codé (`schema.sql`) suit
+encore l'ancien modèle.
+
+### Modèle de la base
+
+- **Une DONNÉE BRUTE (un fichier de `raw/`) remplace COLLECTE : une source fournit des données
+  brutes, une donnée brute contient des items. La sous-catégorie d'une source (édition TLDR,
+  dépôt suivi) est l'attribut `flux` de la donnée brute. Pas d'entité LANCEMENT pour
+  l'instant.** Décision de Sabine. Pourquoi : « collecte » faisait penser au lancement de
+  `kb collect`, alors qu'une collecte en base est un fichier brut, d'une seule source ; SOURCE et
+  COLLECTE n'étaient pas reliées au MCD. Options écartées : une source par édition (GitHub en
+  compterait une douzaine) ; une entité FLUX (aucun attribut propre à porter) ; SOURCE et
+  LANCEMENT en plusieurs à plusieurs (aucun parcours v0 ne se sert du lancement). Prolonge la
+  table COLLECTE du 2026-10-02 (PR de #7), renommée et reliée à SOURCE.
+- **CISA KEV est un catalogue d'état : une ligne connue garde son identité et prend la dernière
+  version (`revised_at` daté) ; une ligne absente est marquée retirée (`withdrawn_at`).** Décision
+  de Sabine. Pourquoi : chaque collecte télécharge le catalogue entier, et CISA modifie des
+  lignes sur place (`knownRansomwareCampaignUse`, 41 fois d'octobre 2023 à juillet 2024 selon
+  GreyNoise). La règle « premier vu ou dernier vu » (D6 de la revue d'architecture) se règle par
+  nature de source : flux de nouveautés (TLDR, alertes, releases) premier vu ; catalogue d'état
+  dernière version ; flux avec révisions (arXiv) remplacé si `updated` est plus récent. Limite
+  assumée : l'historique des versions n'est pas en base, le brut le garde (RGESN 1.6).
+- **Un référentiel est une chose de référence, à identifiant officiel et stable, vers laquelle
+  les items pointent : VULNÉRABILITÉ (numéro CVE) dès le 07/10, PUBLICATION (référence arXiv)
+  le 08/10. Il porte le contenu donné par la source qui fait foi (CISA KEV, arXiv) et pointe vers
+  l'item de cette source quand elle l'a vu ; une source qui cite un référentiel le crée.**
+  Décision de Sabine. Pourquoi : les 55 alertes pip du 2026-10-07 ont toutes un CVE, aucun n'est
+  dans le CSV CISA du même jour, donc une alerte doit créer sa CVE sans fausse ligne KEV ; un
+  article TLDR peut citer un papier qu'arXiv n'a pas vu. CISA fait foi : dans le périmètre de
+  K-B, KEV est la liste officielle des failles exploitées. « Exploitée » se lit
+  `item_id IS NOT NULL` ; un `CHECK` impose que les colonnes de la source qui fait foi soient
+  remplies si et seulement si `item_id` l'est. Options écartées : une entité SUJET identifiée
+  par le CVE ou l'URL ; `cve_id` en simple colonne sans clé étrangère ; un attribut
+  `is_exploited` (doublon de `item_id`) ; une table KEV_ENTRY séparée (une table de plus pour
+  éviter des colonnes vides que le `CHECK` tient). Remplace le sous-type VULNÉRABILITÉ (`cve`)
+  du 2026-10-02 (PR de #7) et `Item.is_vulnerability` du 2026-10-05 (PR de #82), que porte
+  désormais `kind`. Garde le principe du 2026-10-05 (PR de #80) : deux sources d'un même CVE
+  sont rattachées, pas dédoublonnées. Périmètre : les failles dont l'exploitation est avérée ;
+  la liste CVE complète (`CVEProject/cvelistV5`, 3,9 Go) n'est pas collectée.
+- **Les auteurs d'un papier sont une liste JSON, attribut de PUBLICATION, dans l'ordre
+  d'arXiv.** Décision de Sabine. Pourquoi : aucun parcours ne cherche par auteur ; la valeur est
+  une mention d'affichage que la base ne découpe jamais. **Inverse** l'entité AUTEUR du
+  2026-10-02 (PR de #7), choisie pour la 1re forme normale et une purge par `DELETE` ciblé, et
+  rend sans objet la suppression des auteurs sans item du 2026-10-05 (PR de #82). Limite
+  assumée : la purge d'une personne dans tous ses papiers n'est plus un `DELETE` ciblé ; le
+  registre des traitements est à mettre à jour.
+- **Option D : ITEM minimal (`id`, donnée brute de sa version actuelle, `kind`) ; chaque
+  sous-type a une clé étrangère `item_id` obligatoire et unique ; l'exclusivité des sous-types
+  est portée par une clé étrangère composée (`item_id`, `kind`).** Décision de Sabine. Pourquoi :
+  ITEM reste le point d'entrée unique pour les notes, la recherche et P1. Options écartées : B,
+  ITEM table de trace avec une clé étrangère facultative vers chaque référentiel (doublon de
+  rôle) ; C, pas de table ITEM et une vue `UNION` (une table de liaison par type pour les
+  notes). Remplace le « socle commun » d'ITEM du 2026-10-02 (PR de #7), dont la limite
+  (« exclusivité non portée par SQL ») tombe. Conséquence : ITEM n'a plus d'URL, et l'ADR
+  « `url` obligatoire et unique pour tout item » (2026-10-02, PR de #7) ne s'applique plus ;
+  l'unicité passe par l'identifiant naturel de chaque table. Limite relevée par la relecture du
+  09/10 : titre, résumé et date commune ne sont plus dans ITEM, alors que la recherche et P1 les
+  demandent (question ouverte, ci-dessous).
+- **Chaque table a un `id` technique pour clé primaire ; les identifiants naturels (`arxiv_id`,
+  `cve_id`, `ghsa_id`, `release_id`, édition + date + rang) deviennent des contraintes
+  `UNIQUE`.** Décision de Sabine. Option écartée : l'identifiant naturel en clé primaire, lisible
+  sans jointure mais lié à un identifiant externe.
+- **ARTICLE DE NEWSLETTER, sous-type d'ITEM (TLDR fait foi pour son résumé) : édition, date
+  d'édition, rang, titre, résumé, URL de l'article d'origine sans `utm_*`, clé étrangère
+  facultative vers la PUBLICATION citée ; clé naturelle (édition, date, rang).** Décision de
+  Sabine. Pourquoi l'URL n'est pas unique : deux éditions peuvent résumer le même article.
+  Remplace la règle de `stockage.md` où un résumé TLDR prenait l'URL de l'article qu'il résume,
+  incompatible avec une URL unique.
+
+### Collecte
+
+- **Tops GitHub (P7, P8) hors de la base : le top 100 du jour par étoiles et le top 100 par
+  forks, collectés par l'API GraphQL ; le JSON reçu est à la fois le brut et le top du jour, un
+  fichier par critère et par collecte.** Décision de Sabine. Pourquoi : en v0, le top du jour
+  seulement, sans historique ni comparaison de positions. Options écartées : des dépôts en items
+  avec une mesure par instantané (environ 36 500 lignes par an) ; une table d'état `ranking` (une
+  base pour un simple affichage) ; l'API REST (82 champs par dépôt, sans choix des champs).
+  Remplace, pour l'API et l'entrée en base, l'ADR du 2026-10-02 sur les plus étoilés (PR de
+  #11), qui garde le top 100 de tout GitHub et l'instantané quotidien. Exception à la règle du
+  brut intact (2026-09-30), comme arXiv et les alertes : GraphQL ne renvoie que les champs
+  demandés. Limite : durée de conservation des fichiers non décidée.
+
+## 2026-10-08
+
+### Modèle de la base
+
+- **Les paquets touchés par une alerte GitHub sont une liste JSON, attribut de l'alerte.**
+  Décision de Sabine. Pourquoi : en v0, la liste est seulement affichée ; filtrer par paquet (P3)
+  n'est pas planifié. Constat : sur 55 alertes pip, 42 touchent 1 paquet, 11 en touchent 2, 1 en
+  touche 3, 1 en touche 4. Options écartées : des colonnes Paquet 1…N (groupe répétitif, 1re
+  forme normale) ; une table `advisory_package` dès la v0 (pas de filtre à servir). Limite
+  assumée : si P3 est fait, la liste est découpée en table.
+- **DÉPÔT SUIVI est une table de référence (nom `owner/name`, écosystème, paquets suivis), à
+  laquelle chaque RELEASE est rattachée ; la liste fait foi dans le code
+  (`tracked_repositories.py`), qui remplit la table. RELEASE garde `id`, `tag_name`, `name`,
+  `body` (Markdown tel que reçu) et `published_at`.** Décision de Sabine. Pourquoi : la liste des
+  dépôts suivis existe déjà avec ses données, et la collecte la lit là. Option écartée : le nom du
+  dépôt en simple colonne de RELEASE.
+- **GH Archive : les dépôts qui montent entrent en base dans une table TENDANCE, qui n'est pas un
+  item : une ligne par dépôt (`repo.id`, dernier nom vu) et par fenêtre de 3 jours, étoiles et
+  forks gagnés, étoiles et forks totaux lus par GraphQL ; les 30 premiers par étoiles et les 30
+  premiers par forks, réunis. Elle est produite par une donnée brute de `gh_archive` (le
+  résultat de la requête BigQuery).** Décision de Sabine. Pourquoi : GH Archive est la seule
+  source big data, et le bloc E1 demande d'agréger toutes les sources dans le jeu de données
+  stocké (critères exacts non relus) ; toute donnée en base remonte à un fichier brut. Le rang se
+  calcule par un tri. Options écartées : un fichier hors base, comme les tops GitHub ; deux
+  tables par critère (mêmes données) ; une ligne par critère ; un top 100 (RGESN 1.6) ; TENDANCE
+  sans lien au brut ; l'API REST pour les totaux (une requête par dépôt). **Inverse** l'ADR du
+  2026-10-02 (PR de #7) : un dépôt n'est plus un item avec des MESURES. Limite relevée par la
+  relecture du 09/10 : les totaux GraphQL n'ont pas de brut rattaché (à trancher).
+- **L'URL d'un dépôt, d'un papier arXiv et d'une faille se déduit de son identifiant ; celle
+  d'une release ou d'une alerte est gardée telle que GitHub la donne (`html_url`). Le chemin du
+  brut est stocké, son nom de fichier en est déduit.** Décision de Sabine. Pourquoi : une
+  étiquette de release peut contenir des caractères à encoder, la reconstruire serait moins sûr ;
+  stocker le nom et reconstruire le chemin demanderait de recoder le rangement de chaque source.
+- **Une longueur maximale est tenue deux fois, par Pydantic à la lecture du brut et par un
+  `CHECK (length(col) <= n)` ; une valeur trop longue fait refuser l'item, et le journal dit quel
+  champ dépasse et de combien.** Décision de Sabine. Pourquoi : défense en profondeur, comme
+  pour les dates ; SQLite ignore la longueur d'un `VARCHAR(n)`. Options écartées : un seul des
+  deux contrôles ; tronquer (modifie la donnée sans le dire). Limite assumée : la même limite
+  écrite en Python et en SQL, un test vérifie qu'elles concordent.
+
+### Collecte
+
+- **Le flux arXiv s'appelle `arxiv_cscr_x_csai`, d'après sa requête (`cat:cs.CR AND cat:cs.AI`,
+  `src/k_b/sources/arxiv.py:97`) ; comme tout flux, c'est le nom de son dossier brut.** Décision
+  de Sabine (2026-10-08 ; pourquoi redit le 2026-10-09). Pourquoi : préciser le flux, et préparer
+  d'autres catégories arXiv quand K-B tournera pour de vrai, une requête par flux. Aucune autre
+  option discutée. Ne revient pas sur le choix des catégories (2026-10-01) : il nomme le flux
+  existant. Limite : le changement de code (`name = FOLDER_PREFIX` devient
+  `f"{FOLDER_PREFIX}_cscr_x_csai"`, `arxiv.py:63`) se fait dans une issue et une PR à part, et
+  doit reporter la date de dernière collecte sous le nouveau nom, sinon la collecte repart du
+  2026-05-01 (`collect.py:47`, `arxiv.py:44`). — PR #115
+
+### Installation et interface
+
+- **K-B tourne sur la machine de Sabine et s'installe comme une commande `kb`
+  (`uv tool install --editable`) ; la veille s'interroge par des commandes (`kb search`,
+  `kb top`).** Décision de Sabine. Pourquoi, selon elle : en ligne, elle ne voyait pas comment
+  téléverser ni stocker les documents qu'elle dépose (bibliothèque choisie, futur wiki LLM) ;
+  installé en local, le terminal est plus simple qu'une interface graphique. Une commande
+  n'exclut pas une API REST locale (question ouverte, ci-dessous). Évolutions notées, sans
+  issue : une TUI plein écran, puis une application de bureau (Tauri, hors « Python
+  uniquement »).
+
+### Schémas
+
+- **MCD et MLD dessinés avec draw.io (`docs/merise/*.drawio`) ; le MPD reste le script SQL.**
+  Décision de Sabine. Pourquoi : draw.io respecte mieux les conventions Merise, selon elle.
+  **Inverse** le choix de Mermaid du 2026-10-02 (PR de #7), dont la limite était déjà
+  qu'un `flowchart` imite la notation Merise sans la respecter. Limite (constat) : GitHub
+  n'affiche pas un `.drawio` dans une PR, il montre son XML ; la relecture d'un changement se
+  fait en ouvrant le fichier dans draw.io.
+
+## 2026-10-09
+
+### Collecte et stockage
+
+- **Les dossiers du brut disent la finalité : `raw/automated_watch/` (la veille) et
+  `raw/selected_library/` (ce que Sabine choisit).** Décision de Sabine. Pourquoi : ils répondent
+  aux deux portes du README et aux deux fiches du registre. Options écartées : `choosen_files`,
+  `curated_library` (la zone *curated* d'un lac de données est la donnée traitée),
+  `hand_picked`, `personal_library`. Remplace `raw/automation/` et `raw/manual/` du 2026-09-29.
+- **`collection_state.json` sort de `raw/`, vers la racine du dossier de données.** Décision de
+  Sabine. Pourquoi : c'est le seul fichier de `raw/` réécrit à chaque collecte, alors que `raw/`
+  est écrit une fois ; `raw/` pourra être en lecture seule et synchronisé sans l'état propre à
+  chaque machine.
+- **Le dossier de données est `~/.knowledge_base`, hors de tout dossier synchronisé et compris
+  dans une sauvegarde.** Décision de Sabine. Pourquoi : la base SQLite et les données restent sur
+  la machine ; c'est le brut qu'on sauvegarde. Options écartées : `~/.local/share/k-b`
+  (convention XDG, moins connue sur Mac), `~/Library/Application Support/K-B` (pensé pour les
+  applications graphiques), `~/K-B-data` (exemple du 2026-09-29, un dossier visible de plus).
+- **Le coffre Obsidian et le dossier de données sont séparés : K-B copie chaque clip nouveau ou
+  modifié, horodaté, dans `raw/selected_library/clipping/`.** Décision de Sabine. Pourquoi : lire
+  les clips en place, que Sabine annote, ferait changer ce que K-B reconstruit. Options écartées :
+  lire `Clippings/` en place ; faire écrire le Web Clipper dans le brut (le dossier de données
+  devrait être le coffre, et le clip serait à la fois note vivante et brut). **Inverse** l'ADR
+  « Données hors du dépôt de code » du 2026-09-29, où le dossier de données servait aussi de
+  coffre Obsidian.
+- **Zotero : le brut est le résultat d'une requête SQL en lecture seule sur une copie temporaire
+  de `zotero.sqlite`, vérifiée par `PRAGMA integrity_check` puis supprimée ; les PDF restent dans
+  Zotero, K-B garde leur chemin.** Décision de Sabine. Pourquoi : Zotero ouvert, une lecture en
+  place échoue (« database is locked ») ; la base entière comme brut est contraire à la
+  minimisation (CNIL, RGESN 1.6). Options écartées : fermer et rouvrir Zotero par script ; ne
+  lire que Zotero fermé ; l'API locale de Zotero 7 (plus de source « base de données ») ;
+  `zotero.sqlite.bak` (fraîcheur non vérifiée). **Inverse** l'ADR provisoire du 2026-10-01 (PR
+  de #6, « copie entière comme brut »). Limites : un champ non extrait aujourd'hui manque aux
+  anciens bruts ; `zotero.sqlite` est en mode WAL (constaté le 09/10), et la copie du seul
+  `.sqlite` peut manquer les dernières écritures sans que le contrôle d'intégrité le voie : la
+  méthode de copie est à revoir avec #15.
+- **La base reste jetable : un changement de schéma = recréer la base et tout réimporter depuis
+  le brut, sans migration (W7).** Décision de Sabine. Pourquoi : la base doit rester
+  reconstructible depuis le brut (registre, fiche 1), et c'est le brut qu'on sauvegarde. Options
+  écartées : des migrations numérotées avec `PRAGMA user_version` ; Alembic et SQLAlchemy (deux
+  dépendances, schéma à réécrire en Python). Limite : des migrations deviendront nécessaires le
+  jour où la base gardera des données sans brut. **Contredit** l'ADR du 2026-10-05 (PR de #82),
+  qui écartait la reconstruction parce qu'elle renumérote `item_id`, que l'API exposera : la
+  stabilité de `item_id` est ouverte (ci-dessous).
+
+### Interface
+
+- **Une API REST locale (sur `localhost`, à côté de la commande `kb`) fait partie d'E1 ; la page
+  web et le déploiement relèvent d'un autre livrable.** Décision de Sabine. Pourquoi : l'API est
+  attendue dans E1 ; une commande n'exclut pas une API, et une API locale ne revient pas sur la
+  décision « local » du 2026-10-08. Conséquence : la
+  stabilité de `item_id` face à une base jetable reste à trancher (question ouverte, ci-dessous).
+
+### Périmètre
+
+- **Tous les ajouts de la séance 4 restent dans E1 : bibliothèque indexée (texte complet des
+  clips et des notes), Zotero et ses surlignages, clips, ACQUISITION_MODE, TENDANCE, tops
+  GraphQL.** Décision de Sabine, après la relecture du 2026-10-09 (point 8). Pourquoi, selon
+  elle : la certif demande une base de données parmi les sources (Zotero, source « base de
+  données » depuis le 2026-09-29) ; pour TENDANCE, le pourquoi est celui du 2026-10-08. Limite :
+  aucun de ces ajouts n'avait d'estimation au moment de la décision, pour une échéance au 25/10 ;
+  estimés depuis par une relecture à l'aveugle à environ 36 h, plus environ 24 h de réécriture
+  du schéma ; le report des fiches ne libère rien avant le 25/10 (jalon daté du 01/11). Décision à
+  revoir avec time-knight (clarification, « Issues touchées »).
+
+### Bibliothèque et recherche
+
+- **En v0, K-B indexe la bibliothèque choisie (clips, Zotero, notes déposées) : chaque document
+  devient une entrée en base, cherchable par `kb search`, et un item de la veille peut être relié
+  à sa version creusée dans Zotero.** Décision de Sabine. Pourquoi : sinon la base ne verrait pas
+  qu'un item a été creusé. Options écartées : stocker seulement ; compiler le wiki LLM (v1).
+  **Inverse** l'ADR du 2026-10-02 (PR de #7) : « les documents de `raw/manual/` n'entrent pas
+  dans la base en v0 ».
+- **Une table de référence ACQUISITION_MODE (`watch`, `library`, `wiki`) regroupe les sources ;
+  `kb search --in watch|library|wiki` filtre sur elle ; elle porte la durée de conservation que la
+  purge lit.** Décision de Sabine. Pourquoi : la purge doit connaître le mode, sinon un document
+  de la bibliothèque purgé serait recréé à la collecte suivante ; le contenu généré par un LLM se
+  distingue du contenu collecté. Options écartées : un `CHECK` sur SOURCE ; la déduire du chemin
+  du brut ; une colonne sur ITEM ; `--in clip|zotero|note` (doublon de `--source`) ; les noms
+  ORIGIN, PROVENANCE, CANAL, `--mode`, `--scope`, `--from`.
+- **En v0, la base ne garde que les items ; les fiches de veille et les notes du wiki LLM sont
+  reportées après la collecte, l'indexation et `kb search`.** Décision de Sabine. Option écartée
+  pour la v0 : une table NOTE et « une note cite des items ». Revient sur le périmètre v0 du
+  2026-09-29 (« et fiches de veille ») et sur le calendrier des « Deux wikis ».
+- **Les surlignages Zotero sont gardés en base et affichés avec leur papier dans `kb search`, sans
+  être cherchables par leurs mots.** Décision de Sabine. Options écartées : les rendre
+  cherchables (un index de plus) ; ne pas les collecter. Remplace le bloc « Mes surlignages » des
+  fiches (2026-09-29, 2026-10-02), reportées.
+- **Recherche plein texte par FTS5, triée par pertinence BM25 quand il y a des mots, par date
+  sinon ; elle couvre le titre et le résumé des items, et le texte complet des clips et des
+  notes déposées.** Décision de Sabine. Pourquoi : aucune dépendance ; un papier qui cite le
+  terme une fois ne doit pas valoir un papier consacré au sujet. Options écartées : tri par date
+  seul ; une option `--sort relevance` ; titre seul pour la bibliothèque. Limites : `porter` ne
+  ramène à leur racine que les mots anglais ; FTS5 est propre à SQLite.
+
 ## Décisions encore ouvertes
 
-- **Zotero : garder la copie entière comme brut ?** Décidé à titre provisoire le 2026-10-01 ; à
-  revoir dans #15 selon la taille de `zotero.sqlite` et son schéma.
 - **Nommage des tables et des colonnes.** Gardé tel quel le 2026-10-02 ; Sabine demandera les
   renommages à l'usage, une fois les schémas sous les yeux.
 - **Règle de « quoi de neuf cette semaine »** (date de publication, d'ajout ou de collecte) : à
   décider dans #21.
 - **Durées de conservation et fréquence de la purge** : provisoirement 2 ans après la collecte
-  (base et brut), seule la dernière copie Zotero gardée, purge à chaque collecte (une par jour).
-  Sabine n'a pas tranché le 2026-10-02 ; à confirmer quand #20 code la purge.
+  (base et brut), purge à chaque collecte (une par jour) ; la durée sera portée par
+  ACQUISITION_MODE (2026-10-09), à revoir. Sabine n'a pas tranché le 2026-10-02 ; à confirmer
+  quand #20 code la purge. La purge des tables nouvelles (référentiels, TENDANCE, bibliothèque)
+  n'est pas définie (relecture du 2026-10-09).
 - **Collecte automatisée et sa fréquence** : aujourd'hui lancée à la main, une fois par jour.
   Le lancement automatique et sa fréquence seront définis plus tard (Sabine, 2026-10-05).
 - **Liste d'exclusion** des personnes qui demandent l'effacement, pour qu'une collecte ou une
   reconstruction ne les réintroduise pas : proposée dans le registre, à concevoir dans #20.
+  Indispensable avec une base reconstruite à chaque changement de schéma (2026-10-09).
+- **Questions laissées par la relecture indépendante du 2026-10-09**, à décider par Sabine :
+  un `item_id` stable pour l'API malgré une base jetable ; où vivent le titre, le résumé et la
+  date communs à tous les items (recherche, P1) ; le modèle de la bibliothèque (DOCUMENT ou CONTENU, une publication décrite par plusieurs
+  items, un article Zotero hors arXiv) ; garder ACQUISITION_MODE ou revenir à une colonne de
+  SOURCE ; les versions d'un clip annoté ; si `kb search --kind vulnerability` ramène aussi les
+  alertes GitHub (`kind` = `advisory`).
 - **Transfert hors UE par les agents** : un agent qui lit les items par l'API envoie leur contenu
   au fournisseur du modèle (États-Unis). Cadre juridique non vérifié.
