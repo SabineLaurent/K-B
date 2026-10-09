@@ -8,7 +8,7 @@ sont dans la même colonne**. Les cardinalités se lisent depuis l'entité voisi
 |---|---|---|---|---|---|
 | REGROUPER | MODE D'ACQUISITION (0,n) | SOURCE (1,1) | un mode d'acquisition regroupe 0 à n sources | une source est regroupée dans un seul mode d'acquisition | oui |
 | FOURNIR | SOURCE (0,n) | DONNÉE BRUTE (1,1) | une source fournit 0 à n données brutes | une donnée brute est fournie par une seule source | oui |
-| CONTENIR | DONNÉE BRUTE (1,n) | ITEM (1,1) | une donnée brute contient 1 à n items | un item est contenu dans une seule donnée brute | oui |
+| CONTENIR | DONNÉE BRUTE (0,n) | ITEM (1,1) | une donnée brute contient 0 à n items | un item est contenu dans une seule donnée brute | oui |
 | PRODUIRE | DONNÉE BRUTE (0,n) | TENDANCE (1,1) | une donnée brute produit 0 à n tendances | une tendance est produite par une seule donnée brute | oui |
 | DÉCRIRE | ITEM (0,1) | PUBLICATION (0,1) | un item décrit 0 ou 1 publication | une publication est décrite par 0 ou 1 item | non : PUBLICATION est à gauche de ITEM |
 | CITER | ALERTE GITHUB (0,1) | VULNÉRABILITÉ (0,n) | une alerte GitHub cite 0 ou 1 vulnérabilité | une vulnérabilité est citée par 0 à n alertes GitHub | oui |
