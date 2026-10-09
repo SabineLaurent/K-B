@@ -429,24 +429,30 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   dans Zotero. Revient sur l'ADR de la PR de #7 (« les documents de `raw/manual/` n'entrent pas
   dans la base en v0 »). Écartés : stocker seulement (la base ne verrait pas qu'un item a été
   creusé) ; compiler le wiki LLM (v1).
-- **Décidé par Sabine (2026-10-09)** : `kb search` prend un filtre `--origin watch|library|wiki`,
-  la provenance du contenu. Le détail (clip, Zotero, note, arXiv…) passe par `--source`. Écartés :
-  `--origin clip|zotero|note` (doublon de `--source` si chaque dépôt est une ligne de SOURCE) ; un
-  filtre à deux sens.
-- **Décidé par Sabine (2026-10-09) : une table de référence ORIGIN**, dès la v0, trois lignes.
-  SOURCE pointe vers elle : une source a une seule origine, une origine a 0 à n sources.
+- **Décidé par Sabine (2026-10-09)** : `kb search` prend un filtre `--in watch|library|wiki`, le
+  mode d'acquisition ; l'aide de la commande le dit (« --in watch|library|wiki : restreint au mode
+  d'acquisition »). Le détail (clip, Zotero, note, arXiv…) passe par `--source`. Écartés :
+  `--in clip|zotero|note` (doublon de `--source` si chaque dépôt est une ligne de SOURCE) ; un
+  filtre à deux sens ; `--origin` (nom abandonné, voir plus bas) ; `--mode` (« mode de quoi ? ») ;
+  `--scope` (abstrait) ; `--acquisition` (long) ; `--from` (se confond avec `--source` et une date).
+- **Décidé par Sabine (2026-10-09) : une table de référence ACQUISITION_MODE** (mode
+  d'acquisition), dès la v0, trois lignes. Association **RELEVER** : une source relève d'un seul
+  mode d'acquisition (1,1) ; un mode d'acquisition regroupe 0 à n sources. Écartés pour l'entité :
+  ORIGIN et PROVENANCE (synonymes de « source » dans la langue courante), CANAL (se confond avec
+  le flux d'une source), MODE D'ENTRÉE (`intake`, peu connu). Écartés pour l'association : ÊTRE
+  OBTENU PAR et ÊTRE COLLECTÉE (passifs, seules exceptions aux huit associations validées ; un
+  contenu `wiki` n'est pas collecté), APPARTENIR, DÉTERMINER.
 
-  | `origin_code` (base et `--origin`) | `label` | Dossier du brut | Exemples de sources |
+  | `acquisition_mode_code` (base et `--in`) | `label` | Dossier du brut | Exemples de sources |
   |---|---|---|---|
   | `watch` | system automation | `raw/automated_watch/` | arXiv, CISA, GitHub, TLDR, GH Archive |
   | `library` | user selection | `raw/selected_library/` | clips, Zotero, notes déposées |
   | `wiki` | llm generation | aucun (une note générée n'est pas un brut) | notes du wiki LLM (v1) |
 
-  ORIGIN porte aussi la **durée de conservation**, que la purge lit au lieu de la coder. Les **2 ans
-  restent pour le moment** et sont **à revoir**, peut-être au cas par cas (registre : 2 ans pour
-  la veille, fiche 1 ; bibliothèque gérée par Sabine dans ses outils, fiche 2 ; rien pour le
-  wiki). Pourquoi la provenance : la purge doit
-  la connaître, sinon un document de la bibliothèque purgé à 2 ans serait recréé à la collecte
+  ACQUISITION_MODE porte aussi la **durée de conservation**, que la purge lit au lieu de la coder.
+  Les **2 ans restent pour le moment** et sont **à revoir**, peut-être au cas par cas (registre :
+  2 ans pour la veille, fiche 1 ; bibliothèque gérée par Sabine dans ses outils, fiche 2 ; rien
+  pour le wiki). Pourquoi le mode d'acquisition : la purge doit le connaître, sinon un document de la bibliothèque purgé à 2 ans serait recréé à la collecte
   suivante depuis `selected_library/` ; et le contenu généré par un LLM se distingue du contenu
   collecté (K-B déterministe, « d'où vient cette affirmation »). Codes courts et libellés, comme
   SOURCE (`source_code`, `label`). Écartés : une contrainte `CHECK` sur SOURCE (durée et dossier
@@ -456,17 +462,17 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   des alias dans la CLI (une correspondance à tenir). Ouvert : comment une note générée entre en
   base, quand le wiki sera conçu.
 
-  Au MLD, selon la règle de l'`id` technique (séance 2) : `origin (id PK, origin_code UNIQUE,
-  label, raw_folder, retention…)` et `source (id PK, source_code UNIQUE, label, source_type,
-  origin_id FK → origin.id NOT NULL)`. Les codes courts servent à la CLI ; les jointures passent
-  par l'`id`. Aujourd'hui `source_code` est la clé primaire (`src/k_b/database/schema.sql:9`).
-  La forme de `retention` se décidera avec la revue des durées. Nom de l'association SOURCE →
-  ORIGIN : à valider (piste : APPARTENIR).
+  Au MLD, selon la règle de l'`id` technique (séance 2) : `acquisition_mode (id PK,
+  acquisition_mode_code UNIQUE, label, raw_folder, retention…)` et `source (id PK, source_code
+  UNIQUE, label, source_type, acquisition_mode_id FK → acquisition_mode.id NOT NULL)`. Les codes
+  courts servent à la CLI ; les jointures passent par l'`id`. Aujourd'hui `source_code` est la clé
+  primaire (`src/k_b/database/schema.sql:9`). La forme de `retention` se décidera avec la revue
+  des durées.
 - **Point 4, notes (décidé par Sabine, 2026-10-09)** : en v0, la base ne garde que les items ; la
   CLI (`kb search`, `kb top`) affiche les résultats sans les inscrire dans une note. Les fiches de
   veille (gabarit, sans LLM) et les notes du wiki LLM ne sont **pas abandonnées** : elles sont
   **reportées**, avec ou sans LLM, et se décideront une fois bouclés la chaîne de collecte et de
-  fusion, l'indexation en base et `kb search`. La ligne `wiki` de ORIGIN leur laisse la porte
+  fusion, l'indexation en base et `kb search`. La ligne `wiki` de ACQUISITION_MODE leur laisse la porte
   ouverte. Écartée pour la v0 : NOTE et une table de liaison « une note cite des items »
   (plusieurs à plusieurs), qui supposaient des fiches en v0.
 - **Zotero, recommandation pour #15** (Sabine favorable, 2026-10-09 ; à décider dans #15). Zotero
@@ -527,8 +533,8 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
 - **Renommer `raw/automation/` en `raw/automated_watch/`** (séance 4) : code
   (`src/k_b/collect.py:68`, `src/k_b/raw_items.py:111`), tests, `docs/specs-collecte.md`, règle 4
   du registre. Les bruts déjà écrits sont à déplacer.
-- **Table ORIGIN** (séance 4) : schéma, colonne `origin_code` dans SOURCE, `seed_sources.sql`, une
-  ligne de SOURCE pour les notes déposées ; purge qui lit la durée dans ORIGIN ; registre des
+- **Table ACQUISITION_MODE** (séance 4) : schéma, colonne `acquisition_mode_id` dans SOURCE, `seed_sources.sql`, une
+  ligne de SOURCE pour les notes déposées ; purge qui lit la durée dans ACQUISITION_MODE ; registre des
   traitements, règle 2 (aujourd'hui « les items collectés il y a plus de 2 ans », sans
   distinguer la provenance) et durées à revoir.
 - **Fiches de veille reportées** (séance 4) : l'epic des fiches (#22) et le test de bout en bout
