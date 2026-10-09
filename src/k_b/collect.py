@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from k_b.raw_store import (
+    AUTOMATED_WATCH_DIR_NAME,
     COLLECTION_STATE_FILENAME,
     load_last_collection_dates,
     save_last_collection_dates,
@@ -28,12 +29,12 @@ class CollectionOutcome(NamedTuple):
 
 
 def collect_all_sources(
-    sources: list[Source], raw_dir: Path, now: datetime
+    sources: list[Source], raw_dir: Path, data_dir: Path, now: datetime
 ) -> CollectionOutcome:
     """Collect each source; return each source's error (None: success) and the state's error."""
     if now.utcoffset() != timedelta(0):
         raise ValueError(f"collection time must be in UTC, got {now!r}")
-    last_collection_dates = load_last_collection_dates(raw_dir)
+    last_collection_dates = load_last_collection_dates(data_dir)
     errors_by_source: dict[str, Exception | None] = {}
     for source in sources:
         try:
@@ -47,10 +48,10 @@ def collect_all_sources(
             last_collection_dates[source.name] = now
             errors_by_source[source.name] = None
     try:
-        save_last_collection_dates(raw_dir, last_collection_dates)
+        save_last_collection_dates(data_dir, last_collection_dates)
     except OSError as error:
         logger.exception(
-            "collection state not written to %s", raw_dir / COLLECTION_STATE_FILENAME
+            "collection state not written to %s", data_dir / COLLECTION_STATE_FILENAME
         )
         return CollectionOutcome(errors_by_source, error)
     return CollectionOutcome(errors_by_source, None)
@@ -65,7 +66,7 @@ def collect_one_source(
     raw_content = source.fetch(last_collected_at)
     if raw_content is None:
         return
-    source_dir = raw_dir / "automation" / source.name
+    source_dir = raw_dir / AUTOMATED_WATCH_DIR_NAME / source.name
     collection_name = f"{now:%Y-%m-%dT%H%M%SZ}"
     if isinstance(raw_content, bytes):
         write_new_raw_file(

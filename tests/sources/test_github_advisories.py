@@ -142,7 +142,7 @@ def test_no_warning_when_the_page_reaches_back_to_the_last_collection(
 
 
 COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
-RAW_FILE_PATH = "automation/github_advisories_pip/2026-10-05T093000Z.json"
+RAW_FILE_PATH = "automated_watch/github_advisories_pip/2026-10-05T093000Z.json"
 PUBLISHED_AT = datetime(2026, 10, 1, 18, 0, 22, tzinfo=UTC)
 
 

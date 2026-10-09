@@ -34,7 +34,7 @@ FAKE_PAGE_KINDS = [SourceKind("fake", (), SourceReader(read_lines, convert_line)
 
 
 def write_pages(raw_dir: Path, collection_name: str, pages: dict[str, bytes]) -> Path:
-    pages_dir = raw_dir / "automation" / "fake" / collection_name
+    pages_dir = raw_dir / "automated_watch" / "fake" / collection_name
     pages_dir.mkdir(parents=True)
     for page_name, page in pages.items():
         (pages_dir / page_name).write_bytes(page)
@@ -42,7 +42,7 @@ def write_pages(raw_dir: Path, collection_name: str, pages: dict[str, bytes]) ->
 
 
 def copy_fixture(raw_dir: Path, fixture: str, source: str, extension: str) -> Path:
-    source_dir = raw_dir / "automation" / source
+    source_dir = raw_dir / "automated_watch" / source
     source_dir.mkdir(parents=True, exist_ok=True)
     path = source_dir / f"{COLLECTION_NAME}.{extension}"
     shutil.copyfile(FIXTURES_DIR / fixture, path)
@@ -63,7 +63,7 @@ def write_most_starred_ranking(raw_dir: Path) -> None:
         }
         for rank in range(1, 101)
     ]
-    source_dir = raw_dir / "automation" / "github_most_starred"
+    source_dir = raw_dir / "automated_watch" / "github_most_starred"
     source_dir.mkdir(parents=True)
     (source_dir / f"{COLLECTION_NAME}.json").write_text(json.dumps(response))
 
@@ -90,11 +90,11 @@ def test_every_source_with_a_reader_gives_its_items(tmp_path):
             count_by_raw_file.get(item.raw_file_path, 0) + 1
         )
     assert count_by_raw_file == {
-        f"automation/arxiv/{COLLECTION_NAME}.xml": 3,
-        f"automation/cisa_kev/{COLLECTION_NAME}.csv": 4,
-        f"automation/github_releases_anthropics_claude_code/{COLLECTION_NAME}.json": 3,
-        f"automation/github_advisories_pip/{COLLECTION_NAME}.json": 3,
-        f"automation/github_most_starred/{COLLECTION_NAME}.json": 100,
+        f"automated_watch/arxiv/{COLLECTION_NAME}.xml": 3,
+        f"automated_watch/cisa_kev/{COLLECTION_NAME}.csv": 4,
+        f"automated_watch/github_releases_anthropics_claude_code/{COLLECTION_NAME}.json": 3,
+        f"automated_watch/github_advisories_pip/{COLLECTION_NAME}.json": 3,
+        f"automated_watch/github_most_starred/{COLLECTION_NAME}.json": 100,
     }
     assert {item.collected_at for item in reading.items} == {COLLECTED_AT}
     assert reading.rejections == []
@@ -116,7 +116,7 @@ def test_a_release_is_titled_by_the_repository_of_its_url(tmp_path):
 
 def test_an_unreadable_file_is_rejected_and_the_others_are_read(tmp_path, caplog):
     copy_fixture(tmp_path, "arxiv_extract.xml", "arxiv", "xml")
-    broken = tmp_path / "automation" / "cisa_kev" / f"{COLLECTION_NAME}.csv"
+    broken = tmp_path / "automated_watch" / "cisa_kev" / f"{COLLECTION_NAME}.csv"
     broken.parent.mkdir(parents=True)
     broken.write_bytes(b"<html>not a catalog</html>")
 
@@ -126,13 +126,13 @@ def test_an_unreadable_file_is_rejected_and_the_others_are_read(tmp_path, caplog
     assert len(reading.items) == 3
     assert len(reading.rejections) == 1
     rejection = reading.rejections[0]
-    assert rejection.raw_file_path == f"automation/cisa_kev/{COLLECTION_NAME}.csv"
+    assert rejection.raw_file_path == f"automated_watch/cisa_kev/{COLLECTION_NAME}.csv"
     assert rejection.reason.startswith("ValueError: catalog without the columns")
-    assert f"automation/cisa_kev/{COLLECTION_NAME}.csv" in caplog.text
+    assert f"automated_watch/cisa_kev/{COLLECTION_NAME}.csv" in caplog.text
 
 
 def test_a_file_name_that_is_not_a_collection_time_is_rejected(tmp_path):
-    source_dir = tmp_path / "automation" / "arxiv"
+    source_dir = tmp_path / "automated_watch" / "arxiv"
     source_dir.mkdir(parents=True)
     shutil.copyfile(FIXTURES_DIR / "arxiv_extract.xml", source_dir / "latest.xml")
 
@@ -140,12 +140,12 @@ def test_a_file_name_that_is_not_a_collection_time_is_rejected(tmp_path):
 
     assert reading.items == []
     assert [rejection.raw_file_path for rejection in reading.rejections] == [
-        "automation/arxiv/latest.xml"
+        "automated_watch/arxiv/latest.xml"
     ]
 
 
 def test_a_source_without_reader_is_skipped_and_logged(tmp_path, caplog):
-    pages_dir = tmp_path / "automation" / "tldr_ai" / COLLECTION_NAME
+    pages_dir = tmp_path / "automated_watch" / "tldr_ai" / COLLECTION_NAME
     pages_dir.mkdir(parents=True)
     (pages_dir / "2026-10-05.html").write_text("<html></html>")
 
@@ -193,7 +193,7 @@ def test_the_raw_files_of_an_untracked_repository_and_ecosystem_are_read(tmp_pat
 
 def test_files_are_read_in_collection_order(tmp_path):
     for collection_name in ("2026-10-06T093000Z", "2026-10-05T093000Z"):
-        source_dir = tmp_path / "automation" / "arxiv"
+        source_dir = tmp_path / "automated_watch" / "arxiv"
         source_dir.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(
             FIXTURES_DIR / "arxiv_extract.xml", source_dir / f"{collection_name}.xml"
@@ -220,7 +220,7 @@ def test_an_entry_refused_as_an_item_is_rejected_and_the_others_of_its_file_are_
     catalog = catalog.replace(
         '"Citrix NetScaler Improper Input Validation Vulnerability"', '""'
     )
-    source_dir = tmp_path / "automation" / "cisa_kev"
+    source_dir = tmp_path / "automated_watch" / "cisa_kev"
     source_dir.mkdir(parents=True)
     (source_dir / f"{COLLECTION_NAME}.csv").write_text(catalog)
 
@@ -234,14 +234,14 @@ def test_an_entry_refused_as_an_item_is_rejected_and_the_others_of_its_file_are_
     ]
     assert len(reading.rejections) == 1
     rejection = reading.rejections[0]
-    assert rejection.raw_file_path == f"automation/cisa_kev/{COLLECTION_NAME}.csv"
+    assert rejection.raw_file_path == f"automated_watch/cisa_kev/{COLLECTION_NAME}.csv"
     assert rejection.reason.startswith("entry 2: ValidationError")
     assert "entry 2" in caplog.text
 
 
 def test_hidden_files_are_ignored(tmp_path):
     copy_fixture(tmp_path, "arxiv_extract.xml", "arxiv", "xml")
-    (tmp_path / "automation" / "arxiv" / ".DS_Store").write_bytes(
+    (tmp_path / "automated_watch" / "arxiv" / ".DS_Store").write_bytes(
         b"\x00\x00\x00\x01Bud1"
     )
 
@@ -265,10 +265,10 @@ def test_a_folder_of_pages_is_read_page_by_page(tmp_path):
         (item.source_item_id, item.raw_file_path, item.collected_at)
         for item in reading.items
     ] == [
-        ("a", f"automation/fake/{COLLECTION_NAME}/2026-10-04.html", COLLECTED_AT),
-        ("b", f"automation/fake/{COLLECTION_NAME}/2026-10-04.html", COLLECTED_AT),
-        ("c", f"automation/fake/{COLLECTION_NAME}/2026-10-05.html", COLLECTED_AT),
-        ("d", f"automation/fake/{COLLECTION_NAME}/2026-10-05.html", COLLECTED_AT),
+        ("a", f"automated_watch/fake/{COLLECTION_NAME}/2026-10-04.html", COLLECTED_AT),
+        ("b", f"automated_watch/fake/{COLLECTION_NAME}/2026-10-04.html", COLLECTED_AT),
+        ("c", f"automated_watch/fake/{COLLECTION_NAME}/2026-10-05.html", COLLECTED_AT),
+        ("d", f"automated_watch/fake/{COLLECTION_NAME}/2026-10-05.html", COLLECTED_AT),
     ]
     assert reading.rejections == []
 
@@ -295,7 +295,7 @@ def test_a_folder_inside_a_folder_of_pages_is_skipped_and_logged(tmp_path, caplo
     assert [item.source_item_id for item in reading.items] == ["a"]
     assert reading.rejections == []
     assert (
-        f"folder inside a collection folder, skipped: automation/fake/{COLLECTION_NAME}/archive"
+        f"folder inside a collection folder, skipped: automated_watch/fake/{COLLECTION_NAME}/archive"
         in caplog.text
     )
 
@@ -309,7 +309,7 @@ def test_a_folder_of_pages_not_named_by_a_collection_time_is_rejected_whole(
 
     assert reading.items == []
     assert [rejection.raw_file_path for rejection in reading.rejections] == [
-        "automation/fake/latest"
+        "automated_watch/fake/latest"
     ]
     assert reading.rejections[0].reason.startswith("ValueError: time data 'latest'")
 
@@ -329,7 +329,8 @@ def test_an_unreadable_page_is_rejected_and_the_others_of_its_folder_are_read(
     assert len(reading.rejections) == 1
     rejection = reading.rejections[0]
     assert (
-        rejection.raw_file_path == f"automation/fake/{COLLECTION_NAME}/2026-10-04.html"
+        rejection.raw_file_path
+        == f"automated_watch/fake/{COLLECTION_NAME}/2026-10-04.html"
     )
     assert rejection.reason.startswith("UnicodeDecodeError")
 
@@ -348,5 +349,5 @@ def test_an_unreadable_folder_of_pages_is_rejected_and_the_others_are_read(tmp_p
     assert [item.source_item_id for item in reading.items] == ["b"]
     assert len(reading.rejections) == 1
     rejection = reading.rejections[0]
-    assert rejection.raw_file_path == "automation/fake/2026-10-04T093000Z"
+    assert rejection.raw_file_path == "automated_watch/fake/2026-10-04T093000Z"
     assert rejection.reason.startswith("PermissionError")

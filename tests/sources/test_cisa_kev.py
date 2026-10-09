@@ -95,7 +95,7 @@ def test_a_page_that_is_not_the_catalog_fails_the_collection(monkeypatch):
 
 
 COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
-RAW_FILE_PATH = "automation/cisa_kev/2026-10-05T093000Z.csv"
+RAW_FILE_PATH = "automated_watch/cisa_kev/2026-10-05T093000Z.csv"
 
 
 def test_the_first_collection_reads_the_whole_catalog():

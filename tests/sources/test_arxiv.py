@@ -141,7 +141,7 @@ def test_an_api_error_answered_with_http_200_is_refused(fake_urlopen):
 
 
 COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
-RAW_FILE_PATH = "automation/arxiv/2026-10-05T093000Z.xml"
+RAW_FILE_PATH = "automated_watch/arxiv/2026-10-05T093000Z.xml"
 
 
 def feed_with_entry(entry: str) -> bytes:

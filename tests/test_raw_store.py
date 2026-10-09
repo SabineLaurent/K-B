@@ -12,7 +12,7 @@ from k_b.raw_store import (
 
 
 def test_write_new_raw_file_refuses_to_overwrite(tmp_path):
-    raw_file_path = tmp_path / "automation" / "fake" / "2026-09-30T100000Z.json"
+    raw_file_path = tmp_path / "automated_watch" / "fake" / "2026-09-30T100000Z.json"
     write_new_raw_file(raw_file_path, b"first")
 
     with pytest.raises(FileExistsError):

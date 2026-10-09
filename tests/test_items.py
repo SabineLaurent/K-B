@@ -12,7 +12,7 @@ SEED_SOURCES = (
     Path(__file__).parent.parent / "src" / "k_b" / "database" / "seed_sources.sql"
 )
 COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
-RAW_FILE_PATH = "automation/arxiv/2026-10-05T093000Z.xml"
+RAW_FILE_PATH = "automated_watch/arxiv/2026-10-05T093000Z.xml"
 
 
 def item_fields(**changes):

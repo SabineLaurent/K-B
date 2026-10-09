@@ -41,7 +41,20 @@ def test_collect_reports_a_failure_but_still_stores_the_other_sources(
     exit_code = cli.main(["collect"])
 
     assert exit_code == 1
-    assert list((tmp_path / "raw" / "automation" / "working").iterdir())
+    assert list((tmp_path / "raw" / "automated_watch" / "working").iterdir())
+
+
+def test_collect_writes_its_state_at_the_root_of_the_data_directory_not_in_raw(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
+
+    exit_code = cli.main(["collect"])
+
+    assert exit_code == 0
+    assert (tmp_path / "collection_state.json").is_file()
+    assert not (tmp_path / "raw" / "collection_state.json").exists()
 
 
 @pytest.mark.skipif(
@@ -50,16 +63,15 @@ def test_collect_reports_a_failure_but_still_stores_the_other_sources(
 def test_collect_still_prints_the_summary_and_exits_1_when_the_state_cannot_be_written(
     monkeypatch, tmp_path, capsys
 ):
-    raw_dir = tmp_path / "raw"
-    (raw_dir / "automation").mkdir(parents=True)
-    raw_dir.chmod(0o500)
+    (tmp_path / "raw" / "automated_watch").mkdir(parents=True)
+    tmp_path.chmod(0o500)
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
 
     try:
         exit_code = cli.main(["collect"])
     finally:
-        raw_dir.chmod(0o700)
+        tmp_path.chmod(0o700)
 
     assert exit_code == 1
     assert (
@@ -71,8 +83,7 @@ def test_collect_still_prints_the_summary_and_exits_1_when_the_state_cannot_be_w
 def test_collect_fails_closed_with_a_clear_message_on_a_corrupted_state(
     monkeypatch, tmp_path, capsys
 ):
-    state_path = tmp_path / "raw" / "collection_state.json"
-    state_path.parent.mkdir()
+    state_path = tmp_path / "collection_state.json"
     state_path.write_text('{"working": ', encoding="utf-8")
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
@@ -83,15 +94,14 @@ def test_collect_fails_closed_with_a_clear_message_on_a_corrupted_state(
     error_output = capsys.readouterr().err
     assert "collection_state.json" in error_output
     assert "Traceback" not in error_output
-    assert not (tmp_path / "raw" / "automation").exists()
+    assert not (tmp_path / "raw" / "automated_watch").exists()
     assert state_path.read_text(encoding="utf-8") == '{"working": '
 
 
 def test_collect_prints_nothing_but_the_error_on_a_corrupted_state(
     monkeypatch, tmp_path, capsys
 ):
-    state_path = tmp_path / "raw" / "collection_state.json"
-    state_path.parent.mkdir()
+    state_path = tmp_path / "collection_state.json"
     state_path.write_text("[]", encoding="utf-8")
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
@@ -106,8 +116,7 @@ def test_collect_prints_nothing_but_the_error_on_a_corrupted_state(
 def test_collect_fails_closed_with_a_clear_message_on_an_unreadable_state(
     monkeypatch, tmp_path, capsys
 ):
-    state_path = tmp_path / "raw" / "collection_state.json"
-    state_path.parent.mkdir()
+    state_path = tmp_path / "collection_state.json"
     state_path.write_text("{}", encoding="utf-8")
     state_path.chmod(0o000)
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
@@ -122,7 +131,7 @@ def test_collect_fails_closed_with_a_clear_message_on_an_unreadable_state(
     error_output = capsys.readouterr().err
     assert "collection_state.json" in error_output
     assert "permission" in error_output.lower()
-    assert not (tmp_path / "raw" / "automation").exists()
+    assert not (tmp_path / "raw" / "automated_watch").exists()
 
 
 def test_an_info_line_of_k_b_is_shown_once_logging_is_configured():

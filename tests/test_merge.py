@@ -14,7 +14,7 @@ def make_item(**changes):
         "title": "Path traversal in langchain",
         "url": "https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
         "collected_at": FIRST_COLLECTION,
-        "raw_file_path": "automation/github_advisories_pip/2026-10-05T093000Z.json",
+        "raw_file_path": "automated_watch/github_advisories_pip/2026-10-05T093000Z.json",
     }
     fields.update(changes)
     return Item(**fields)
@@ -82,7 +82,7 @@ def test_the_same_source_item_seen_again_is_discarded_and_the_first_collection_k
     first = make_item()
     again = make_item(
         collected_at=SECOND_COLLECTION,
-        raw_file_path="automation/github_advisories_pip/2026-10-06T093000Z.json",
+        raw_file_path="automated_watch/github_advisories_pip/2026-10-06T093000Z.json",
     )
 
     merged = merge_items([first, again])

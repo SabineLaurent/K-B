@@ -90,7 +90,7 @@ def test_an_incomplete_ranking_is_not_written(fake_github_api):
 
 
 COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
-RAW_FILE_PATH = "automation/github_most_starred/2026-10-05T093000Z.json"
+RAW_FILE_PATH = "automated_watch/github_most_starred/2026-10-05T093000Z.json"
 PUBLISHED_AT = datetime(2026, 10, 1, 18, 0, 22, tzinfo=UTC)
 
 

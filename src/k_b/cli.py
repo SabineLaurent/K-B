@@ -105,7 +105,10 @@ def run_import(data_dir: Path) -> int:
 def run_collect(data_dir: Path) -> int:
     try:
         outcome = collect_all_sources(
-            list_sources(SOURCE_KINDS), data_dir / "raw", datetime.now(UTC)
+            list_sources(SOURCE_KINDS),
+            data_dir / "raw",
+            data_dir,
+            datetime.now(UTC),
         )
     except InvalidCollectionStateError as error:
         print(f"error: {error}", file=sys.stderr)
