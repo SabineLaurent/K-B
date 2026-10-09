@@ -583,6 +583,37 @@ pas sauvegardé. Ce que ça apporte : les données suivent le disque d'une machi
 **Non vérifié** : le code de collecte n'a pas été relu en entier sous l'angle de la sécurité ;
 une revue dédiée (`/security-review`) est à faire avant l'installation.
 
+### Questions ouvertes : texte complet, recherche dans le coffre, clips (séance 4)
+
+**Non décidé ; à re-réfléchir par Sabine.**
+
+- **Où garder le texte complet.** Périmètre précisé par Sabine : le texte entier vaut surtout
+  pour ce qu'elle dépose (clips, `.md` déposés, articles arXiv de Zotero, donc le texte de leurs
+  PDF) ; pour la veille, un résumé court suffit. Constat (base construite depuis la collecte du
+  2026-10-07) : `item.summary` porte déjà des textes de nature différente, abstracts arXiv
+  (~1 500 caractères), descriptions CISA (~200), descriptions de dépôts (~90), mais aussi les
+  notes de release entières (~5 500, jusqu'à 28 783). Options : une sous-entité **DOCUMENT** de
+  ITEM pour la bibliothèque (texte complet, chemin du fichier d'origine ; un papier Zotero peut
+  être DOCUMENT et décrire une PUBLICATION, DÉCRIRE n'étant pas une sous-entité), cohérente
+  avec l'option D, recommandée par la session ; une table **CONTENU** facultative pour tout item,
+  plus générale qu'il n'en faut si la veille n'en a pas besoin ; une colonne sur ITEM, contraire à
+  l'option D.
+- **Recherche dans le coffre : Obsidian ou K-B.** Le LLM wiki sera en Markdown dans le coffre, à
+  côté des clips. La recherche d'Obsidian filtre par mots-clés (pas de tri par pertinence trouvé
+  dans sa doc) ; le plugin communautaire Omnisearch ajoute BM25. Soit chacun son domaine (K-B ne
+  garde du coffre que les métadonnées, moins de doublons, mais `kb search --in library` ne
+  trouve plus un clip par son contenu, ce qui revient sur l'index décidé ce jour), soit K-B
+  indexe tout (une seule recherche pour la veille, la bibliothèque et le wiki, texte en double).
+  Critère : croiser la veille et le coffre dans une même recherche est-il un besoin ?
+- **Nettoyage des clips.** Le Web Clipper extrait déjà le contenu principal (bibliothèque
+  Defuddle) ; il reste le bruit de la page. Nettoyer à la capture (modèle du clipper, sélection
+  du passage) ou à la lecture par K-B (le brut reste le clip d'origine).
+- **Images et schémas** (mis de côté par Sabine). Mesuré sur les 26 clips : 58 images dans 17
+  clips, dont 56 liens vers le site d'origine, pas des fichiers du coffre : elles peuvent
+  disparaître, et chaque ouverture les recharge depuis le site. Options : garder les liens ;
+  télécharger les images dans le coffre (moyen non vérifié) ; les copier avec le clip dans
+  `raw/selected_library/clipping/` (brut complet, plus lourd).
+
 ### Question ouverte : miroir et multi-machines (séance 4)
 
 **Non décidé ; à réfléchir par Sabine.** Besoins : collecter quand la machine qui collecte est éteinte ;
@@ -651,6 +682,16 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   (séance 4), ainsi que les précautions de la section « Installation locale » (droits du dossier,
   FileVault, sauvegarde de `~/.knowledge_base`, jetons, launchd dans `~/Library/LaunchAgents`) ; revue de sécurité
   (`/security-review`) avant l'installation.
+- **Alertes GitHub : lire `description`** (séance 4, à revoir selon Sabine, « ce serait
+  dommage ») : aujourd'hui `summary` va dans le titre et `description` n'est pas lue ; 0 alerte
+  sur 55 n'a de résumé dans la base construite depuis la collecte du 2026-10-07.
+- **TLDR : coder la lecture des pages** (séance 4) : la collecte écrit les pages, rien ne les lit
+  (`src/k_b/sources/tldr.py` n'a que `fetch`) ; 0 item TLDR en base. Le résumé de chaque article
+  va dans `item.summary`, comme dans brief09 (`app/ingest/sources_ingesters/tldr_scraper.py:206-207`,
+  `div.newsletter-html` converti en Markdown, rangé dans `content`).
+- **Zotero : texte des PDF** (séance 4, avec #15) : extraire le texte des articles déposés
+  demande une bibliothèque de plus (pistes : `pypdf`, `pymupdf`, `markitdown`, non comparées) ;
+  dépendance à décider par Sabine.
 - **Sécurité de l'affichage et des noms** (séance 4) : retirer les caractères de contrôle avant
   tout affichage de `kb search` (avec l'issue de `kb search`) ; contrôler le nom de chaque clip
   copié (avec l'issue des clips, #14).
