@@ -665,6 +665,82 @@ encore l'ancien modèle.
   seul ; une option `--sort relevance` ; titre seul pour la bibliothèque. Limites : `porter` ne
   ramène à leur racine que les mots anglais ; FTS5 est propre à SQLite.
 
+## 2026-10-10
+
+### Modèle de la base
+
+- **La base n'est jetable qu'en développement ; en usage réel elle est sauvegardée, et l'`id`
+  technique des items reste stable.** Décision de Sabine. Pourquoi, selon elle : en usage réel la
+  base aura des sauvegardes, et peut-être des exports `.csv` ou `.json` qui porteront l'`id`
+  technique ; l'API REST locale l'expose aussi. **Inverse** en partie W7 (2026-10-09) : « la base
+  reste jetable, sans migration » ne vaut plus que pour le développement. Options écartées :
+  sortir l'API d'E1 ; exposer un identifiant instable ; une reconstruction qui remet à chaque item
+  son ancien `id` par sa clé naturelle (mécanisme maison). Limite : la liste d'exclusion reste à
+  concevoir (#20).
+- **Les changements de schéma de la base d'usage réel passent par des migrations Alembic, écrites
+  à la main en SQL ; le code de K-B garde `sqlite3` et le SQL ; SQLAlchemy n'entre que comme
+  moteur d'Alembic.** Décision de Sabine. Pourquoi des migrations : la base d'usage réel est
+  gardée (entrée précédente). Pourquoi Alembic plutôt que des scripts numérotés avec
+  `PRAGMA user_version` : il fournit le suivi de version, le mode « batch » pour les tables que
+  SQLite ne sait pas modifier en place, et le retour arrière, qu'il faudrait sinon coder. Pourquoi
+  pas l'ORM : K-B écrit à un seul endroit (l'import) et lit surtout par une requête qui reste en
+  SQL (entrée sur le titre et la date, ci-dessous) ; l'ORM aurait couvert une minorité de requêtes
+  pour une seconde description des tables, un outil à apprendre et environ +4 à 6 h (estimation de
+  la session, non relue). Il ne protège pas mieux de l'injection SQL : les requêtes sont déjà
+  paramétrées (`?`), et ruff (règle S608) signale en CI une requête construite par concaténation.
+  Un LLM ne le justifierait pas non plus : les agents lisent par l'API, et un LLM qui écrirait du
+  SQL demanderait une connexion en lecture seule, pas un ORM. **Inverse** en partie W7
+  (2026-10-09), qui écartait Alembic et SQLAlchemy ; une dépendance de plus (Alembic, qui apporte
+  SQLAlchemy), acceptée par Sabine. Options écartées : l'ORM SQLAlchemy avec Alembic (retenu un
+  temps, puis écarté par Sabine comme surdimensionné pour K-B) ; des scripts numérotés ; la
+  réflexion de SQLAlchemy. Limite : Alembic n'est nécessaire qu'à partir de l'installation locale ;
+  en développement, la base se recrée. L'ORM reste possible plus tard (passage à PostgreSQL, API
+  qui écrit), par-dessus le même `schema.sql`.
+- **`schema.sql` reste le MPD et fait foi ; la première migration Alembic l'exécute ; un test
+  compare la structure de la base créée par `schema.sql` et de la base migrée jusqu'à la dernière
+  révision (`PRAGMA` des colonnes, index, clés étrangères, `STRICT`), et le comportement des
+  `CHECK`.** Décision de Sabine, sur l'alternative d'une relecture indépendante. Pourquoi
+  `schema.sql` : c'est le MPD de la démarche Merise. Pourquoi ce contrôle : seul un test prouve
+  que le SQL et les migrations décrivent la même base. Options écartées : une date dans
+  `schema.sql` recopiée en commentaire ailleurs (rien ne vérifie qu'elle suit le code) ;
+  l'identifiant de révision Alembic en en-tête de `schema.sql` (ne prouve rien sur le contenu) ;
+  comparer le texte de `sqlite_schema` (SQLite garde le `CREATE` tel qu'il a été écrit, constaté
+  le 2026-10-10). Limite : selon la doc d'Alembic, son mode batch ne recopie pas les `CHECK` d'une
+  table recréée ; une migration peut les perdre sans bruit, d'où le test de comportement.
+- **Le titre, le résumé et les dates restent dans chaque sous-type (article de newsletter,
+  release, alerte) ou référentiel (publication, vulnérabilité) ; ITEM reste minimal ; les listes
+  qui mélangent les sortes (`kb search`, « quoi de neuf », l'API) passent par une seule requête
+  SQL imbriquée en `UNION ALL`, une branche par sorte, à paramètres liés.** Décision de Sabine,
+  à revoir à l'usage. Pourquoi, selon elle : les informations propres à une publication, une
+  vulnérabilité ou un article sont portées par sa table ; une requête SQL se lit et se teste, une
+  vue est un concept qu'elle ne maîtrise pas encore ; une requête complexe s'écrit en SQL. La
+  requête est écrite une fois et partagée. Un test vérifie que chaque `kind` a sa branche ; la
+  table FTS5 est remplie à l'import. Options écartées : recopier titre, résumé et date dans ITEM (doublon) ; une
+  table d'affichage remplie à l'import (même doublon, à remettre à jour à chaque révision CISA ou
+  arXiv ; gardée en réserve) ; une vue SQL (même coût que la requête imbriquée, mesuré). Mesure (maquette en mémoire,
+  1 million d'items, SQLite 3.51) : avec un filtre de date, 0,2 ms ; « les 50 plus récents » sans
+  filtre, 69 ms, contre 0 ms pour une table recopiée. Ferme le point 2 de la relecture du
+  2026-10-09.
+- **Le mode d'acquisition (`watch`, `library`, `wiki`) est une colonne de SOURCE, tenue par un
+  `CHECK` ; sa durée de conservation est dans `config.py`.** Décision de Sabine, sur la
+  recommandation de la session. Pourquoi : la durée de conservation est un paramètre modulable,
+  donc de configuration (Sabine) ; la table ne porterait plus qu'un code et un libellé, et le
+  dossier du brut est déjà dans le code (`collect.py:68`, `raw_items.py:111`) ; ajouter un mode
+  est rare (`wiki` en v1). **Inverse** la table ACQUISITION_MODE du 2026-10-09. Options écartées :
+  garder la table (une table, un modèle et une jointure pour trois lignes). Limites : ajouter un
+  mode demandera une migration qui recrée SOURCE ; un test vérifie que chaque mode du `CHECK` a
+  une durée dans `config.py`. `kb search --in watch|library|wiki` ne change pas.
+
+### Configuration
+
+- **Les paramètres modulables de la veille sont rassemblés dans `config.py`** : mots-clés et date
+  de première collecte d'arXiv, éditions TLDR, dépôts et écosystèmes suivis, seuil et taille du
+  top GitHub, durées de conservation, délai réseau. Décision de Sabine. Pourquoi, selon elle :
+  sortir du code ce qui se règle. Restent dans le code : les faits des API et des formats (URL,
+  expressions régulières, formats de date) et les plafonds de taille, garde-fous de sécurité
+  qu'on ne doit pas relâcher en croyant régler la veille. Restent en variables d'environnement :
+  les secrets et le dossier de données.
+
 ## Décisions encore ouvertes
 
 - **Nommage des tables et des colonnes.** Gardé tel quel le 2026-10-02 ; Sabine demandera les
@@ -672,20 +748,18 @@ encore l'ancien modèle.
 - **Règle de « quoi de neuf cette semaine »** (date de publication, d'ajout ou de collecte) : à
   décider dans #21.
 - **Durées de conservation et fréquence de la purge** : provisoirement 2 ans après la collecte
-  (base et brut), purge à chaque collecte (une par jour) ; la durée sera portée par
-  ACQUISITION_MODE (2026-10-09), à revoir. Sabine n'a pas tranché le 2026-10-02 ; à confirmer
+  (base et brut), purge à chaque collecte (une par jour) ; la durée, par mode d'acquisition,
+  sera dans `config.py` (2026-10-10), à revoir. Sabine n'a pas tranché le 2026-10-02 ; à confirmer
   quand #20 code la purge. La purge des tables nouvelles (référentiels, TENDANCE, bibliothèque)
   n'est pas définie (relecture du 2026-10-09).
 - **Collecte automatisée et sa fréquence** : aujourd'hui lancée à la main, une fois par jour.
   Le lancement automatique et sa fréquence seront définis plus tard (Sabine, 2026-10-05).
 - **Liste d'exclusion** des personnes qui demandent l'effacement, pour qu'une collecte ou une
   reconstruction ne les réintroduise pas : proposée dans le registre, à concevoir dans #20.
-  Indispensable avec une base reconstruite à chaque changement de schéma (2026-10-09).
+  Indispensable avec une base reconstruite, en développement (2026-10-10).
 - **Questions laissées par la relecture indépendante du 2026-10-09**, à décider par Sabine :
-  un `item_id` stable pour l'API malgré une base jetable ; où vivent le titre, le résumé et la
-  date communs à tous les items (recherche, P1) ; le modèle de la bibliothèque (DOCUMENT ou CONTENU, une publication décrite par plusieurs
-  items, un article Zotero hors arXiv) ; garder ACQUISITION_MODE ou revenir à une colonne de
-  SOURCE ; les versions d'un clip annoté ; si `kb search --kind vulnerability` ramène aussi les
+  le modèle de la bibliothèque (DOCUMENT ou CONTENU, une publication décrite par plusieurs
+  items, un article Zotero hors arXiv) ; les versions d'un clip annoté ; si `kb search --kind vulnerability` ramène aussi les
   alertes GitHub (`kind` = `advisory`).
 - **Transfert hors UE par les agents** : un agent qui lit les items par l'API envoie leur contenu
   au fournisseur du modèle (États-Unis). Cadre juridique non vérifié.
