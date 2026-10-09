@@ -782,11 +782,12 @@ nature de source) et D7 (ITEM n'a plus d'URL). Attend une décision : titre, ré
 | Revoir les paquets suivis | | — | 0,5 |
 | Dependabot ; BOD 26-04 de la CISA (SBOM hors v0) | | — | 1 |
 
-**Totaux de la relecture à l'aveugle** : les ajouts de la séance 4 font environ **39 h** (la
-session les estimait à 16,5 h), plus 3 h si le texte des PDF est retenu ; la réécriture du schéma
-environ **24 h**. Le report des fiches (#22, #26) ne libère rien avant le 25/10 : leur jalon
+**Totaux, colonne « Aveugle »** (additionnés depuis les tableaux) : les ajouts de la séance 4
+font environ **36 h** (la session les estimait à 16,5 h ; le rapport de la relecture annonçait
+39 h, en comptant aussi 3 h hors séance 4), plus 3 h si le texte des PDF est retenu ; les
+ajouts hors séance 4, environ 4,5 h ; la réécriture du schéma, environ **24 h**. Le report des fiches (#22, #26) ne libère rien avant le 25/10 : leur jalon
 « Fiches de veille tous les 3 jours » est daté du 2026-11-01. **Constat, à arbitrer par Sabine** :
-environ 63 h s'ajoutent au chemin d'E1 pour une échéance au 25/10 ; la décision « tous les
+environ 64,5 h (36 + 4,5 + 24) s'ajoutent au chemin d'E1 pour une échéance au 25/10 ; la décision « tous les
 ajouts de la séance 4 restent dans E1 » (point 8) est à revoir avec time-knight. Non estimé :
 l'index FTS5 tant que la place du titre, du résumé et du texte complet n'est pas décidée (±2 h),
 la copie de Zotero en mode WAL, la forme de la durée de conservation, la règle de #87.
