@@ -533,7 +533,12 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   base, journal d'import), réglé dans `~/.zshrc` ; c'est un réglage d'installation, pas une règle du
   code (`src/k_b/cli.py:18` lit la variable). Deux règles : hors de tout dossier synchronisé par
   iCloud (base SQLite, données hors machine) ; compris dans une sauvegarde (c'est le brut
-  qu'on sauvegarde, W7 ; moyen de sauvegarde à choisir). Écartés : `~/.local/share/k-b`
+  qu'on sauvegarde, W7). À la sauvegarde de Sabine,
+  ajouter `~/.knowledge_base`, au moins `raw/` et `collection_state.json` ; `k-b.sqlite` peut
+  être exclu (jetable, et une copie prise pendant une écriture serait incohérente) ; lancer la
+  sauvegarde après la collecte ; en mode miroir, une suppression (purge) se propage à la sauvegarde :
+  voulu pour le registre, mais une suppression par erreur aussi. Non vérifié : que l'outil de
+  sauvegarde copie les dossiers cachés avec ses réglages. Écartés : `~/.local/share/k-b`
   (convention XDG, moins connue sur Mac), `~/Library/Application Support/K-B` (pensé pour les
   applications graphiques), `~/K-B-data` (exemple de l'ADR, un dossier visible de plus).
 
@@ -644,7 +649,7 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
 - **Installation et launchd** (issue à créer, décidée le 2026-10-08) : la doc d'installation du
   README donne `KB_DATA_DIR=~/.knowledge_base` et le chemin du dossier `Clippings/` du coffre
   (séance 4), ainsi que les précautions de la section « Installation locale » (droits du dossier,
-  FileVault, moyen de sauvegarde du brut, jetons, launchd dans `~/Library/LaunchAgents`) ; revue de sécurité
+  FileVault, sauvegarde de `~/.knowledge_base`, jetons, launchd dans `~/Library/LaunchAgents`) ; revue de sécurité
   (`/security-review`) avant l'installation.
 - **Sécurité de l'affichage et des noms** (séance 4) : retirer les caractères de contrôle avant
   tout affichage de `kb search` (avec l'issue de `kb search`) ; contrôler le nom de chaque clip
