@@ -19,9 +19,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   dernière collecte n'avancent pas : la collecte suivante relit les mêmes fenêtres, et le brut en
   double est retiré à la transformation.
 - **Brut intact** : chaque collecte écrit ce que la source a renvoyé dans
-  `raw/automation/<source>/<AAAA-MM-JJTHHMMSSZ>.<ext>`, une seule fois, jamais réécrit. Une
+  `raw/automated_watch/<source>/<AAAA-MM-JJTHHMMSSZ>.<ext>`, une seule fois, jamais réécrit. Une
   source qui lit plusieurs pages (site scrapé) écrit chaque page telle que reçue dans
-  `raw/automation/<source>/<AAAA-MM-JJTHHMMSSZ>/<page>.<ext>` (décidé le 2026-10-04). Le filtre
+  `raw/automated_watch/<source>/<AAAA-MM-JJTHHMMSSZ>/<page>.<ext>` (décidé le 2026-10-04). Le filtre
   se fait à la lecture, sauf exception décidée (arXiv, ci-dessous).
 - **Fréquence** : une collecte par jour, lancée à la main
   (`KB_DATA_DIR=<dossier> uv run --env-file .env kb collect`) ; l'automatisation viendra après.
@@ -37,7 +37,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   | GitHub, dépôts les plus étoilés | aucun : un instantané par collecte, un jour manqué n'est pas récupérable |
 
 - **Incrémental** : la date de la dernière collecte réussie de chaque source est dans
-  `raw/collection_state.json` ; une source qui n'a rien de neuf n'écrit rien.
+  `collection_state.json`, à la racine du dossier de données et hors de `raw/` ; une source qui
+  n'a rien de neuf n'écrit rien.
 - **Entrées non fiables** : tout contenu collecté est une donnée, jamais une instruction. Chaque
   téléchargement a un délai, une taille maximale, et refuse une redirection hors du domaine
   attendu. Le `User-Agent` est `K-B (+https://github.com/SabineLaurent)` : le profil public de
@@ -182,7 +183,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   auteurs, date, étiquettes, chemin du PDF, texte surligné.
 - **Accès** : fichier local, lecture seule.
 - **Limites** : aucune.
-- **Brut** : la copie entière de la base est le brut, écrite dans `raw/automation/zotero/`
+- **Brut** : la copie entière de la base est le brut, écrite dans `raw/automated_watch/zotero/`
   seulement si la base a changé depuis la dernière collecte. La requête se fait à la lecture.
   Provisoire : à revoir dans #15 selon la taille de la base et son schéma.
 - **Données personnelles** : les auteurs des papiers (publics), et toute la bibliothèque de
@@ -206,7 +207,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 
 ## Du brut au jeu d'items
 
-1. **Collecte** : chaque source écrit son brut dans `raw/automation/<source>/` (règles communes).
+1. **Collecte** : chaque source écrit son brut dans `raw/automated_watch/<source>/` (règles communes).
 2. **Lecture** : un lecteur par sorte de source transforme le brut en items validés par un modèle
    Pydantic. Le lecteur est retrouvé par le nom du dossier brut (`github_releases_<dépôt>/` est
    lu par celui des releases), que la source soit encore suivie ou non. Les sortes sont déclarées

@@ -1,4 +1,5 @@
-"""Files under raw/: the raw output of each collection and the date of the last one per source."""
+"""The raw output of each collection, under raw/, and the date of the last one per source, in
+the collection state file at the root of the data directory."""
 
 import json
 import os
@@ -6,6 +7,8 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+# The folder of raw/ that holds what the watch collects, one folder per source.
+AUTOMATED_WATCH_DIR_NAME = "automated_watch"
 COLLECTION_STATE_FILENAME = "collection_state.json"
 
 
@@ -32,8 +35,8 @@ def write_new_raw_file(path: Path, content: bytes) -> None:
     write_file_atomically(path, content)
 
 
-def load_last_collection_dates(raw_dir: Path) -> dict[str, datetime]:
-    state_path = raw_dir / COLLECTION_STATE_FILENAME
+def load_last_collection_dates(data_dir: Path) -> dict[str, datetime]:
+    state_path = data_dir / COLLECTION_STATE_FILENAME
     if not state_path.exists():
         return {}
     try:
@@ -58,7 +61,7 @@ def load_last_collection_dates(raw_dir: Path) -> dict[str, datetime]:
 
 
 def save_last_collection_dates(
-    raw_dir: Path, last_collection_dates: dict[str, datetime]
+    data_dir: Path, last_collection_dates: dict[str, datetime]
 ) -> None:
     stored_dates = {
         source_name: collected_at.isoformat()
@@ -66,7 +69,7 @@ def save_last_collection_dates(
     }
     state_content = json.dumps(stored_dates, indent=2, sort_keys=True) + "\n"
     write_file_atomically(
-        raw_dir / COLLECTION_STATE_FILENAME, state_content.encode("utf-8")
+        data_dir / COLLECTION_STATE_FILENAME, state_content.encode("utf-8")
     )
 
 

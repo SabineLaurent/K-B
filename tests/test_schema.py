@@ -60,7 +60,7 @@ def insert_vulnerability(database, item_id, url):
 def test_two_sources_can_share_a_cve(database):
     database.execute(
         "INSERT INTO collection (collection_id, collected_at, raw_file_path)"
-        " VALUES (1, '2026-10-05T09:30:00Z', 'automation/x/2026-10-05T093000Z.json')"
+        " VALUES (1, '2026-10-05T09:30:00Z', 'automated_watch/x/2026-10-05T093000Z.json')"
     )
 
     insert_vulnerability(

@@ -136,7 +136,7 @@ def test_a_page_that_is_not_a_list_of_releases_fails_the_first_collection(monkey
 REPOSITORY = "anthropics/claude-code"
 COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
 RAW_FILE_PATH = (
-    "automation/github_releases_anthropics_claude_code/2026-10-05T093000Z.json"
+    "automated_watch/github_releases_anthropics_claude_code/2026-10-05T093000Z.json"
 )
 PUBLISHED_AT = datetime(2026, 10, 1, 18, 0, 22, tzinfo=UTC)
 

@@ -360,7 +360,7 @@ sur la journée du 2026-10-06, aucun `repo.id` n'apparaît sous deux noms dans c
 
 **Décidé par Sabine (2026-10-08)** : TENDANCE est rattachée à la chaîne de traçabilité. Le résultat
 de la requête BigQuery est une donnée brute de la source `gh_archive` (déjà dans
-`src/k_b/database/seed_sources.sql`), un fichier par collecte sous `raw/automation/gh_archive/` ;
+`src/k_b/database/seed_sources.sql`), un fichier par collecte sous `raw/automated_watch/gh_archive/` ;
 DONNÉE BRUTE ─0,n─ (PRODUIRE) ─1,1─ TENDANCE, soit `trend.raw_data_id` au MLD. TENDANCE n'est pas un
 item. Raison : toute donnée en base remonte à un fichier brut et à sa source, et TENDANCE se
 reconstruit depuis le brut sans relancer BigQuery. Écarté : TENDANCE sans lien (seule table hors
@@ -721,8 +721,8 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   l'ADR « Deux wikis » (fiches figées dans `wiki/veille/`) et la chaîne de `docs/stockage.md:12`
   et `:18` (« base → API REST → fiches, agents ») sont à mettre à jour.
 - **Zotero (#15)** (séance 4) : reprendre la décision ci-dessus dans l'issue ; ADR de la PR de #6 à réviser ; mettre à
-  jour `docs/specs-collecte.md:185` (aujourd'hui, la copie entière comme brut sous
-  `raw/automation/zotero/`) et le registre (fiche 2 et règle 5, « supprimer les copies Zotero du
+  jour `docs/specs-collecte.md:186` (aujourd'hui, la copie entière comme brut sous
+  `raw/automated_watch/zotero/`) et le registre (fiche 2 et règle 5, « supprimer les copies Zotero du
   brut sauf la plus récente », sans objet si la copie n'est plus gardée).
 
 ## Issues touchées, pour le découpage
@@ -807,7 +807,7 @@ Légende : **gardé** = écrit en base ; **lu** = lu et validé par le lecteur, 
 
 ### CISA KEV (`cisa_kev`, fichier CSV)
 
-Exemplaire : vraie collecte du 2026-10-07, `raw/automation/cisa_kev/2026-10-07T083507Z.csv`,
+Exemplaire : vraie collecte du 2026-10-07, `raw/automated_watch/cisa_kev/2026-10-07T083507Z.csv`,
 ligne 2 (le catalogue entier : 1 734 vulnérabilités, `dateAdded` du 2021-11-03 au 2026-10-04).
 
 | Champ | Exemple | Sort | `table.colonne` |
@@ -825,7 +825,7 @@ ligne 2 (le catalogue entier : 1 734 vulnérabilités, `dateAdded` du 2021-11-03
 
 ### GitHub, alertes de sécurité (`github`, API REST `GET /advisories`)
 
-Exemplaire : vraie collecte du 2026-10-07, `raw/automation/github_advisories_pip/2026-10-07T083812Z.json`,
+Exemplaire : vraie collecte du 2026-10-07, `raw/automated_watch/github_advisories_pip/2026-10-07T083812Z.json`,
 entrée 0 (première collecte : 55 alertes, toutes avec un CVE, revues du 2023-04-05 au 2026-06-25).
 C'est la même alerte que l'entrée 0 de la fixture ; le vrai brut a en plus le champ `comments`.
 Les paquets cités par ces 55 alertes dépassent la liste suivie : `langchain-community`, `numexpr`,
@@ -851,7 +851,7 @@ Les paquets cités par ces 55 alertes dépassent la liste suivie : `langchain-co
 ### GitHub, releases (`github`, API REST `GET /repos/{owner}/{repo}/releases`)
 
 Exemplaire : vraie collecte du 2026-10-07,
-`raw/automation/github_releases_anthropics_claude_code/2026-10-07T084008Z.json`, entrée 0
+`raw/automated_watch/github_releases_anthropics_claude_code/2026-10-07T084008Z.json`, entrée 0
 (première collecte : 100 releases, la page entière, publiées du 2026-06-11 au 2026-10-06 ; aucune
 préversion ; `name` égal à `tag_name` pour les 100 ; 2,2 Mo, surtout la liste `assets`). La
 fixture avait `assets` vide et pas de champ `reactions`.
@@ -870,7 +870,7 @@ fixture avait `assets` vide et pas de champ `reactions`.
 
 ### GitHub, 100 dépôts les plus étoilés (`github`, API REST `GET /search/repositories`)
 
-Exemplaire : vraie collecte du 2026-10-07, `raw/automation/github_most_starred/2026-10-07T084154Z.json`,
+Exemplaire : vraie collecte du 2026-10-07, `raw/automated_watch/github_most_starred/2026-10-07T084154Z.json`,
 `items[0]` (100 dépôts, `incomplete_results` à `false` ; 82 champs par dépôt ; 560 Ko). Même
 dépôt en tête que dans la fixture.
 
@@ -886,7 +886,7 @@ dépôt en tête que dans la fixture.
 
 ### arXiv (`arxiv`, API Atom)
 
-Exemplaire : vraie collecte du 2026-10-07, `raw/automation/arxiv/2026-10-07T084333Z.xml`, première
+Exemplaire : vraie collecte du 2026-10-07, `raw/automated_watch/arxiv/2026-10-07T084333Z.xml`, première
 `<entry>` (première collecte, depuis `FIRST_COLLECTION_START` = 2026-05-01 : `totalResults` 511,
 511 entrées, publiées du 2026-05-01 au 2026-10-06 ; 1,3 Mo).
 
@@ -906,7 +906,7 @@ Exemplaire : vraie collecte du 2026-10-07, `raw/automation/arxiv/2026-10-07T0843
 
 Pas encore de lecteur (#57) : le tableau dit ce que la page contient, et ce que `docs/stockage.md`
 prévoit d'en garder. Exemplaire : vraie collecte du 2026-10-07,
-`raw/automation/tldr_ai/2026-10-07T084509Z/2026-10-06.html`, deuxième `<article>` (5 pages, du
+`raw/automated_watch/tldr_ai/2026-10-07T084509Z/2026-10-06.html`, deuxième `<article>` (5 pages, du
 2026-09-30 au 2026-10-06, sans le 03, le 04 ni le 07 ; 74 à 84 Ko chacune). Sur les 5 pages :
 80 articles hors sponsor, et 3 sponsors sur la page du 06.
 

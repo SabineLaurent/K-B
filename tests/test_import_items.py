@@ -95,7 +95,7 @@ def test_an_item_points_to_the_raw_file_and_date_of_its_collection(data_dir):
     )
 
     assert rows == [
-        ("2026-10-05T09:30:00Z", "automation/cisa_kev/2026-10-05T093000Z.csv")
+        ("2026-10-05T09:30:00Z", "automated_watch/cisa_kev/2026-10-05T093000Z.csv")
     ]
 
 
@@ -106,7 +106,7 @@ def test_the_authors_keep_their_order(data_dir):
 
 
 def test_a_name_repeated_in_the_authors_keeps_its_first_position(data_dir):
-    path = data_dir / "raw/automation/arxiv/2026-10-05T093000Z.xml"
+    path = data_dir / "raw/automated_watch/arxiv/2026-10-05T093000Z.xml"
     path.write_text(
         path.read_text().replace("Asadullah Abdullah Khan", "Toqeer Ali Syed")
     )
@@ -135,7 +135,7 @@ def test_a_new_collection_keeps_the_identifier_of_an_item_already_imported(data_
     item_id = count_rows(data_dir, query)
     shutil.copyfile(
         FIXTURES_DIR / "github_advisories_extract.json",
-        data_dir / "raw/automation/github_advisories_pip/2026-10-06T093000Z.json",
+        data_dir / "raw/automated_watch/github_advisories_pip/2026-10-06T093000Z.json",
     )
 
     run_import(data_dir)
@@ -150,7 +150,7 @@ def test_a_new_collection_keeps_the_identifier_of_an_item_already_imported(data_
 def test_each_duplicate_removed_is_written_to_the_log_with_its_rule(data_dir):
     shutil.copyfile(
         FIXTURES_DIR / "github_advisories_extract.json",
-        data_dir / "raw/automation/github_advisories_pip/2026-10-06T093000Z.json",
+        data_dir / "raw/automated_watch/github_advisories_pip/2026-10-06T093000Z.json",
     )
 
     summary = run_import(data_dir)
@@ -163,24 +163,30 @@ def test_each_duplicate_removed_is_written_to_the_log_with_its_rule(data_dir):
         "source_code": "github",
         "source_item_id": "GHSA-fjqc-hq36-qh5p",
         "url": "https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
-        "raw_file_path": "automation/github_advisories_pip/2026-10-06T093000Z.json",
+        "raw_file_path": "automated_watch/github_advisories_pip/2026-10-06T093000Z.json",
         "kept_url": "https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
     }
 
 
 def test_each_rejected_file_is_written_to_the_log(data_dir):
-    (data_dir / "raw/automation/arxiv/2026-10-06T093000Z.xml").write_text("not xml")
+    (data_dir / "raw/automated_watch/arxiv/2026-10-06T093000Z.xml").write_text(
+        "not xml"
+    )
 
     summary = run_import(data_dir)
 
     rejections = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
     assert summary.rejection_count == len(rejections) == 1
-    assert rejections[0]["raw_file_path"] == "automation/arxiv/2026-10-06T093000Z.xml"
+    assert (
+        rejections[0]["raw_file_path"] == "automated_watch/arxiv/2026-10-06T093000Z.xml"
+    )
     assert rejections[0]["reason"]
 
 
 def test_an_advisory_without_cve_is_a_vulnerability_without_cve(data_dir):
-    path = data_dir / "raw/automation/github_advisories_pip/2026-10-05T093000Z.json"
+    path = (
+        data_dir / "raw/automated_watch/github_advisories_pip/2026-10-05T093000Z.json"
+    )
     advisories = json.loads(path.read_text())
     advisories[0]["cve_id"] = None
     path.write_text(json.dumps(advisories))
@@ -202,7 +208,7 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(data_dir):
     with connection:
         connection.execute(
             "INSERT INTO collection (collected_at, raw_file_path) VALUES (?, ?)",
-            ("2026-10-01T00:00:00Z", "automation/other.json"),
+            ("2026-10-01T00:00:00Z", "automated_watch/other.json"),
         )
         # Same URL as an advisory of the fixture, under another identifier: refused by the base.
         connection.execute(
@@ -236,13 +242,15 @@ def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir)
     run_import(data_dir)
     query = "SELECT item_id FROM item WHERE source_item_id = ?"
     item_id = fetch_rows(data_dir, query, (FIRST_PAPER_ID,))[0][0]
-    revision = (data_dir / "raw/automation/arxiv/2026-10-05T093000Z.xml").read_text()
+    revision = (
+        data_dir / "raw/automated_watch/arxiv/2026-10-05T093000Z.xml"
+    ).read_text()
     revision = revision.replace(
         "<updated>2026-09-25T13:53:50Z</updated>",
         "<updated>2026-10-02T08:00:00Z</updated>",
         1,
     ).replace("Asadullah Abdullah Khan", "Another Author")
-    (data_dir / "raw/automation/arxiv/2026-10-06T093000Z.xml").write_text(revision)
+    (data_dir / "raw/automated_watch/arxiv/2026-10-06T093000Z.xml").write_text(revision)
 
     run_import(data_dir)
 
@@ -251,7 +259,13 @@ def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir)
         "SELECT item_id, revised_at, raw_file_path FROM item JOIN collection USING (collection_id)"
         " WHERE source_item_id = ?",
         (FIRST_PAPER_ID,),
-    ) == [(item_id, "2026-10-02T08:00:00Z", "automation/arxiv/2026-10-06T093000Z.xml")]
+    ) == [
+        (
+            item_id,
+            "2026-10-02T08:00:00Z",
+            "automated_watch/arxiv/2026-10-06T093000Z.xml",
+        )
+    ]
     assert fetch_rows(data_dir, AUTHORS_QUERY, (FIRST_PAPER_ID,)) == [
         ("Toqeer Ali Syed", 1),
         ("Another Author", 2),
@@ -260,7 +274,7 @@ def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir)
 
 def test_an_author_left_without_item_is_deleted(data_dir):
     run_import(data_dir)
-    path = data_dir / "raw/automation/arxiv/2026-10-05T093000Z.xml"
+    path = data_dir / "raw/automated_watch/arxiv/2026-10-05T093000Z.xml"
     path.write_text(
         path.read_text().replace("Asadullah Abdullah Khan", "Another Author")
     )
