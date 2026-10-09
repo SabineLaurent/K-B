@@ -455,6 +455,13 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   chaque item, alors qu'elle dépend de la source) ; des codes longs (`system_automation`…) avec
   des alias dans la CLI (une correspondance à tenir). Ouvert : comment une note générée entre en
   base, quand le wiki sera conçu.
+- **Point 4, notes (décidé par Sabine, 2026-10-09)** : en v0, la base ne garde que les items ; la
+  CLI (`kb search`, `kb top`) affiche les résultats sans les inscrire dans une note. Les fiches de
+  veille (gabarit, sans LLM) et les notes du wiki LLM ne sont **pas abandonnées** : elles sont
+  **reportées**, avec ou sans LLM, et se décideront une fois bouclés la chaîne de collecte et de
+  fusion, l'indexation en base et `kb search`. La ligne `wiki` de ORIGIN leur laisse la porte
+  ouverte. Écartée pour la v0 : NOTE et une table de liaison « une note cite des items »
+  (plusieurs à plusieurs), qui supposaient des fiches en v0.
 - En suspens : la place de Zotero (copie de la base, aujourd'hui sous `raw/automation/zotero/`,
   `docs/specs-collecte.md:185`) et de ses PDF.
 
@@ -472,6 +479,10 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   ligne de SOURCE pour les notes déposées ; purge qui lit la durée dans ORIGIN ; registre des
   traitements, règle 2 (aujourd'hui « les items collectés il y a plus de 2 ans », sans
   distinguer la provenance) et durées à revoir.
+- **Fiches de veille reportées** (séance 4) : l'epic des fiches (#22) et le test de bout en bout
+  qui vérifie la fiche produite (#26) passent après la collecte, l'indexation et `kb search` ;
+  l'ADR « Deux wikis » (fiches figées dans `wiki/veille/`) et la chaîne de `docs/stockage.md:4`
+  et `:10` (« base → API REST → fiches, agents ») sont à mettre à jour.
 
 <!-- Points 4 et 5 : à suivre. -->
 
