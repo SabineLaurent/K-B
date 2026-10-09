@@ -54,7 +54,9 @@ Effet sur le modèle : un index plein texte sur `item.title` et `item.summary` (
 - **Question ouverte** : « quels sujets cartonnent en ce moment ? ». LLM : non si l'on compte des
   étiquettes existantes (topics GitHub, mots-clés arXiv, rubriques ou domaines TLDR), oui pour des
   thèmes que personne n'a étiquetés. Ce qu'on compte n'est pas décidé.
-- **Pas en v0** : ce que j'ai lu ou surligné, Zotero et clips (LLM : non) ; ce qu'une fiche cite
+- **En v0 depuis la séance 4** : Zotero et clips, cherchables par `kb search` (LLM : non ; voir
+  « Collecte large et sources choisies »). La recherche dans les surlignages n'est pas décidée.
+- **Pas en v0** : ce qu'une fiche cite
   (non) ; le doublon entre un résumé TLDR et son article d'origine (non, par l'URL) ; d'où vient
   une affirmation de ma fiche (non si la fiche cite ses items, oui s'il faut la retrouver à partir
   du texte).
@@ -421,10 +423,14 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
 - Le Web Clipper écrit chaque clip dans le dossier « Note location » de son modèle, chemin
   relatif au coffre ([aide Obsidian](https://obsidian.md/help/web-clipper/capture)) ; le coffre
   est le dossier de données (ADR). Non testé.
+- **Décidé par Sabine (2026-10-09)** : en v0, K-B **indexe** la bibliothèque choisie. Chaque
+  document déposé devient une entrée en base (titre, URL, date de dépôt, origine : clip, Zotero,
+  note), cherchable par `kb search` ; un item de la veille peut être relié à sa version creusée
+  dans Zotero. Revient sur l'ADR de la PR de #7 (« les documents de `raw/manual/` n'entrent pas
+  dans la base en v0 »). Écartés : stocker seulement (la base ne verrait pas qu'un item a été
+  creusé) ; compiler le wiki LLM (v1).
 - En suspens : la place de Zotero (copie de la base, aujourd'hui sous `raw/automation/zotero/`,
-  `docs/specs-collecte.md:185`) et de ses PDF ; ce que la porte « connaissance » fait en v0 (l'ADR
-  de la PR de #7 dit que `raw/manual/` n'entre pas dans la base en v0, alors que les clips (#14)
-  et Zotero (#15) sont en v0).
+  `docs/specs-collecte.md:185`) et de ses PDF.
 
 ### À reprendre dans la liste des issues (séance 3)
 
