@@ -573,7 +573,14 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   (`langchain-community`, `langchain-experimental`, `langchain-classic`) sont dans `docs/sources.md`.
 - **Renommer `raw/automation/` en `raw/automated_watch/`** (séance 4) : code
   (`src/k_b/collect.py:68`, `src/k_b/raw_items.py:111`), tests, `docs/specs-collecte.md`, règle 4
-  du registre. Les bruts déjà écrits sont à déplacer.
+  du registre. Les bruts déjà écrits sont à déplacer. Dans la même issue (décidé par Sabine,
+  2026-10-09) : **sortir `collection_state.json` de `raw/`** vers la racine du dossier de données,
+  à côté de `k-b.sqlite` et `import-log.jsonl`. Pourquoi : c'est le seul fichier de `raw/` réécrit
+  à chaque collecte (`save_last_collection_dates`, `src/k_b/raw_store.py:60`), alors que `raw/`
+  est « écrit une fois, jamais réécrit » ; `raw/` pourra être protégé en lecture seule, et
+  synchronisé sans l'état propre à chaque machine qui collecte. Il ne se déduit pas du brut : une
+  source sans nouveauté n'écrit rien mais avance sa date (`docs/specs-collecte.md:40`). Touche
+  `raw_store.py:35-69` (lu et écrit à partir de `raw_dir`), les tests et `specs-collecte.md:40`.
 - **Table ACQUISITION_MODE** (séance 4) : schéma, colonne `acquisition_mode_id` dans SOURCE, `seed_sources.sql`, une
   ligne de SOURCE pour les notes déposées ; purge qui lit la durée dans ACQUISITION_MODE ; registre des
   traitements, règle 2 (aujourd'hui « les items collectés il y a plus de 2 ans », sans
