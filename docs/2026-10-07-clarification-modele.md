@@ -539,6 +539,18 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   ligne de SOURCE pour les notes déposées ; purge qui lit la durée dans ACQUISITION_MODE ; registre des
   traitements, règle 2 (aujourd'hui « les items collectés il y a plus de 2 ans », sans
   distinguer la provenance) et durées à revoir.
+- **W7, migrations de schéma** (revue d'architecture ; décidé par Sabine, 2026-10-09) : **la base
+  reste jetable**. Un changement de schéma = recréer la base puis tout réimporter depuis le brut
+  (« la base doit rester reconstructible depuis le brut », registre, fiche 1) ; pas de migration ;
+  c'est le brut qu'on sauvegarde. Écartés pour la v0 : les migrations numérotées avec
+  `PRAGMA user_version` proposées par la revue ; Alembic + SQLAlchemy (deux dépendances, schéma à
+  réécrire en Python ; son mode « batch » recrée les tables que SQLite ne sait pas modifier). La
+  base devra être sauvegardée, avec des migrations (numérotées ou Alembic, à choisir alors), le
+  jour où elle gardera des données sans brut : notes du wiki LLM si elles ne vivent pas en
+  fichiers dans `wiki/`, ou brut purgé avant la base. Mesure (collecte réelle du 2026-10-07,
+  2 500 items) : brut 5,6 Mo (1,03 Mo compressé), base 3,1 Mo (0,97 Mo compressée, sans index
+  plein texte) ; dans la durée le brut grossit plus vite (chaque collecte s'ajoute, CISA et le top
+  étoiles réécrivent tout), la base ne grossit que des nouveautés (déduit, non mesuré).
 - **Fiches de veille reportées** (séance 4) : l'epic des fiches (#22) et le test de bout en bout
   qui vérifie la fiche produite (#26) passent après la collecte, l'indexation et `kb search` ;
   l'ADR « Deux wikis » (fiches figées dans `wiki/veille/`) et la chaîne de `docs/stockage.md:4`
