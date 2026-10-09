@@ -537,6 +537,47 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   (convention XDG, moins connue sur Mac), `~/Library/Application Support/K-B` (pensé pour les
   applications graphiques), `~/K-B-data` (exemple de l'ADR, un dossier visible de plus).
 
+### Installation locale : ce qu'il faut prendre en compte (séance 4)
+
+Objectif à terme : K-B installé sur la machine de travail quotidien de Sabine (décidé le
+2026-10-08 : local, `uv tool install --editable`, collecte quotidienne par launchd).
+
+**Déjà en place** (constaté dans le code le 2026-10-09) : une CLI sans port ouvert, avec les
+droits du compte, sans `sudo` ; une dépendance de production (`pydantic`) ; des téléchargements
+bornés (taille, délai, redirection hors du domaine refusée, jeton jamais transmis à une
+redirection, `src/k_b/http_download.py`) ; le XML d'arXiv lu par `xml.etree` sur expat 2.6.3, qui
+refuse les entités externes et résiste aux « bombes XML » selon la doc de sécurité de Python ; les
+noms de pages TLDR contrôlés avant écriture (`collect.py`).
+
+| Risque | Précaution | État |
+|---|---|---|
+| Contenu collecté piégé (pages, clips, alertes) | donnée, jamais instruction ; validation Pydantic à l'entrée | règle en place |
+| Injection dans le terminal : un titre venu du web contient des séquences d'échappement ANSI | retirer les caractères de contrôle avant tout affichage de `kb search` | **à faire** |
+| Nom de fichier venu de l'extérieur (copie d'un clip) qui écrit ailleurs (`../`) | contrôler chaque nom, comme les pages TLDR | **à faire** |
+| Jetons (`KB_GITHUB_TOKEN`, BigQuery) en clair dans `~/.zshrc`, visibles par tout programme du terminal | jeton GitHub à grain fin sans permission (données publiques) ; compte BigQuery en lecture seule avec plafond de dépense ; piste : Trousseau macOS | à décider à l'installation |
+| Code installé en `--editable`, exécuté chaque jour par launchd | ne fusionner que du code relu ; `uv.lock` versionné | méthode en place |
+| Base Zotero | copie temporaire ouverte en lecture seule, jamais l'original | décidé (séance 4) |
+| Disque rempli par le brut | tailles maximales par source ; purge des 2 ans | en place / #83 |
+| Accès aux données par un autre compte ou en cas de vol | `chmod 700 ~/.knowledge_base` ; FileVault ; sauvegarde Time Machine chiffrée | à l'installation |
+| Tâche planifiée trop privilégiée | launchd dans `~/Library/LaunchAgents` (le compte), jamais `/Library/LaunchDaemons` (root) | à l'installation |
+| Dossier de données synchronisé hors machine | hors iCloud (« Bureau et Documents ») | décidé (séance 4) |
+
+**Quand un LLM entrera en jeu (wiki)** : le contenu collecté devient un vecteur d'injection de
+prompt. Un modèle qui lit ce contenu n'aura aucun outil qui écrit, exécute ou appelle le réseau,
+et les secrets resteront hors de sa portée. À concevoir avec le wiki.
+
+**Sur un disque externe** (question de Sabine) : possible, `KB_DATA_DIR` désigne n'importe quel
+dossier. Ce qui change : FileVault ne couvre pas le disque externe, il faut le formater en APFS
+chiffré ; APFS et non exFAT ou FAT, qui n'ont ni droits Unix (le `chmod 700` ne protège plus
+rien) ni un verrouillage fiable pour SQLite ; disque débranché = collecte launchd en échec, puis
+rattrapage à la suivante (#65) ; le chemin `/Volumes/<nom>` change si le disque est renommé ;
+Time Machine exclut les disques externes par défaut (à vérifier) : à inclure, sinon le brut
+n'est pas sauvegardé. Ce que ça apporte : les données suivent le disque d'une machine à l'autre
+(une réponse partielle à la question du miroir, sans collecte quand le disque n'est pas branché).
+
+**Non vérifié** : le code de collecte n'a pas été relu en entier sous l'angle de la sécurité ;
+une revue dédiée (`/security-review`) est à faire avant l'installation.
+
 ### Question ouverte : miroir et multi-machines (séance 4)
 
 **Non décidé ; à réfléchir par Sabine.** Besoins : collecter quand la machine qui collecte est éteinte ;
@@ -602,7 +643,12 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   étoiles réécrivent tout), la base ne grossit que des nouveautés (déduit, non mesuré).
 - **Installation et launchd** (issue à créer, décidée le 2026-10-08) : la doc d'installation du
   README donne `KB_DATA_DIR=~/.knowledge_base` et le chemin du dossier `Clippings/` du coffre
-  (séance 4).
+  (séance 4), ainsi que les précautions de la section « Installation locale » (droits du dossier,
+  FileVault, Time Machine, jetons, launchd dans `~/Library/LaunchAgents`) ; revue de sécurité
+  (`/security-review`) avant l'installation.
+- **Sécurité de l'affichage et des noms** (séance 4) : retirer les caractères de contrôle avant
+  tout affichage de `kb search` (avec l'issue de `kb search`) ; contrôler le nom de chaque clip
+  copié (avec l'issue des clips, #14).
 - **Fiches de veille reportées** (séance 4) : l'epic des fiches (#22) et le test de bout en bout
   qui vérifie la fiche produite (#26) passent après la collecte, l'indexation et `kb search` ;
   l'ADR « Deux wikis » (fiches figées dans `wiki/veille/`) et la chaîne de `docs/stockage.md:4`
