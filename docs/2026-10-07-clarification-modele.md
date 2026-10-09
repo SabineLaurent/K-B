@@ -158,6 +158,8 @@ SOURCE ──0,n── (FOURNIR) ──1,1── COLLECTE ──1,1── (DÉCL
   dossier brut (`tldr_ai`, `tldr_infosec`…). Écartés : une source par édition (GitHub en
   compterait une douzaine) ; une entité FLUX (pas d'attribut propre à porter pour l'instant).
   Les filtres d'arXiv ne sont pas une sous-catégorie : une requête, un flux.
+  **Décidé par Sabine (2026-10-08)** : le flux arXiv s'appelle `arxiv_cscr_x_csai`, pour préciser
+  le flux et préparer d'autres catégories arXiv plus tard (code à changer dans une issue à part).
 - **GitHub est mis de côté** : le modèle se pose d'abord sur arXiv, CISA et TLDR.
 - **CISA KEV est un catalogue d'état**, pas un flux de nouveautés : une collecte télécharge le
   catalogue entier quand il a changé, et rien sinon (`If-Modified-Since`, réponse 304 sans

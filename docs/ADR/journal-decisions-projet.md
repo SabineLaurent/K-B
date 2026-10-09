@@ -538,6 +538,18 @@ encore l'ancien modèle.
   deux contrôles ; tronquer (modifie la donnée sans le dire). Limite assumée : la même limite
   écrite en Python et en SQL, un test vérifie qu'elles concordent.
 
+### Collecte
+
+- **Le flux arXiv s'appelle `arxiv_cscr_x_csai`, d'après sa requête (`cat:cs.CR AND cat:cs.AI`,
+  `src/k_b/sources/arxiv.py:97`) ; comme tout flux, c'est le nom de son dossier brut.** Décision
+  de Sabine (2026-10-08 ; pourquoi redit le 2026-10-09). Pourquoi : préciser le flux, et préparer
+  d'autres catégories arXiv quand K-B tournera pour de vrai, une requête par flux. Aucune autre
+  option discutée. Ne revient pas sur le choix des catégories (2026-10-01) : il nomme le flux
+  existant. Limite : le changement de code (`name = FOLDER_PREFIX` devient
+  `f"{FOLDER_PREFIX}_cscr_x_csai"`, `arxiv.py:63`) se fait dans une issue et une PR à part, et
+  doit reporter la date de dernière collecte sous le nouveau nom, sinon la collecte repart du
+  2026-05-01 (`collect.py:47`, `arxiv.py:44`). — PR #115
+
 ### Installation et interface
 
 - **K-B tourne sur la machine de Sabine et s'installe comme une commande `kb`
