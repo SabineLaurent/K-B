@@ -611,6 +611,15 @@ encore l'ancien modèle.
   décision « local » du 2026-10-08. Conséquence : la
   stabilité de `item_id` face à une base jetable reste à trancher (question ouverte, ci-dessous).
 
+### Périmètre
+
+- **Tous les ajouts de la séance 4 restent dans E1 : bibliothèque indexée (texte complet des
+  clips et des notes), Zotero et ses surlignages, clips, ACQUISITION_MODE, TENDANCE, tops
+  GraphQL.** Décision de Sabine, après la relecture du 2026-10-09 (point 8). Pourquoi, selon
+  elle : la certif demande une base de données parmi les sources (Zotero, source « base de
+  données » depuis le 2026-09-29) ; pour TENDANCE, le pourquoi est celui du 2026-10-08. Limite :
+  aucun de ces ajouts n'a d'estimation, pour une échéance au 25/10.
+
 ### Bibliothèque et recherche
 
 - **En v0, K-B indexe la bibliothèque choisie (clips, Zotero, notes déposées) : chaque document
@@ -658,9 +667,8 @@ encore l'ancien modèle.
   reconstruction ne les réintroduise pas : proposée dans le registre, à concevoir dans #20.
   Indispensable avec une base reconstruite à chaque changement de schéma (2026-10-09).
 - **Questions laissées par la relecture indépendante du 2026-10-09**, à décider par Sabine :
-  le périmètre d'E1 au 25/10 (la séance 4 a ajouté la bibliothèque, Zotero, les clips, TENDANCE,
-  les tops GraphQL, sans estimation) ; un `item_id` stable pour l'API malgré une base jetable ; où vivent le titre, le résumé et la date communs à tous les items (recherche, P1) ;
-  le modèle de la bibliothèque (DOCUMENT ou CONTENU, une publication décrite par plusieurs
+  un `item_id` stable pour l'API malgré une base jetable ; où vivent le titre, le résumé et la
+  date communs à tous les items (recherche, P1) ; le modèle de la bibliothèque (DOCUMENT ou CONTENU, une publication décrite par plusieurs
   items, un article Zotero hors arXiv) ; garder ACQUISITION_MODE ou revenir à une colonne de
   SOURCE ; les versions d'un clip annoté ; si `kb search --kind vulnerability` ramène aussi les
   alertes GitHub (`kind` = `advisory`).
