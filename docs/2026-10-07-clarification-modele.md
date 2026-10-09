@@ -442,10 +442,10 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   | `library` | user selection | `raw/selected_library/` | clips, Zotero, notes déposées |
   | `wiki` | llm generation | aucun (une note générée n'est pas un brut) | notes du wiki LLM (v1) |
 
-  ORIGIN porte aussi la **durée de conservation**, que la purge lit au lieu de la coder. Les deux
-  attributs (durée, dossier) restent sur ORIGIN ; la durée est **à revoir**, peut-être au cas par
-  cas (aujourd'hui : 2 ans pour la veille, fiche 1 du registre ; gérée par Sabine dans ses outils
-  pour la bibliothèque, fiche 2 ; non définie pour le wiki). Pourquoi la provenance : la purge doit
+  ORIGIN porte aussi la **durée de conservation**, que la purge lit au lieu de la coder. Les **2 ans
+  restent pour le moment** et sont **à revoir**, peut-être au cas par cas (registre : 2 ans pour
+  la veille, fiche 1 ; bibliothèque gérée par Sabine dans ses outils, fiche 2 ; rien pour le
+  wiki). Pourquoi la provenance : la purge doit
   la connaître, sinon un document de la bibliothèque purgé à 2 ans serait recréé à la collecte
   suivante depuis `selected_library/` ; et le contenu généré par un LLM se distingue du contenu
   collecté (K-B déterministe, « d'où vient cette affirmation »). Codes courts et libellés, comme
