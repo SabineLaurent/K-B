@@ -24,9 +24,7 @@ premier terme de la liste validée le 2026-10-08 (« DÉCRIRE (ITEM, PUBLICATION
 VULNÉRABILITÉ) ») ; la légende des deux diagrammes dit l'inverse (« VULNÉRABILITÉ les recense,
 PUBLICATION les décrit ») et est à corriger.
 
-`mcd-k-b-compliant.drawio` (2026-10-09) reprend le même MCD dans une disposition contrôlée par
-un script (aucun chevauchement, aucun lien à travers une boîte), mais construite avec le mauvais
-sujet pour DÉCRIRE et RECENSER : PUBLICATION et VULNÉRABILITÉ y sont au-dessus de ITEM. À refaire.
-Question ouverte (Sabine) : la règle « à gauche » admet un sujet plus bas que son complément (ex.
+Une disposition conforme est à refaire (un premier essai, construit avec le mauvais sujet pour
+DÉCRIRE et RECENSER, a été supprimé). Question ouverte (Sabine) : la règle « à gauche » admet un sujet plus bas que son complément (ex.
 ARTICLE DE NEWSLETTER à gauche mais en dessous de PUBLICATION) ; une règle plus stricte serait
 « le sujet en haut à gauche du complément ».
