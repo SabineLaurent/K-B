@@ -455,6 +455,13 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   chaque item, alors qu'elle dépend de la source) ; des codes longs (`system_automation`…) avec
   des alias dans la CLI (une correspondance à tenir). Ouvert : comment une note générée entre en
   base, quand le wiki sera conçu.
+
+  Au MLD, selon la règle de l'`id` technique (séance 2) : `origin (id PK, origin_code UNIQUE,
+  label, raw_folder, retention…)` et `source (id PK, source_code UNIQUE, label, source_type,
+  origin_id FK → origin.id NOT NULL)`. Les codes courts servent à la CLI ; les jointures passent
+  par l'`id`. Aujourd'hui `source_code` est la clé primaire (`src/k_b/database/schema.sql:9`).
+  La forme de `retention` se décidera avec la revue des durées. Nom de l'association SOURCE →
+  ORIGIN : à valider (piste : APPARTENIR).
 - **Point 4, notes (décidé par Sabine, 2026-10-09)** : en v0, la base ne garde que les items ; la
   CLI (`kb search`, `kb top`) affiche les résultats sans les inscrire dans une note. Les fiches de
   veille (gabarit, sans LLM) et les notes du wiki LLM ne sont **pas abandonnées** : elles sont
