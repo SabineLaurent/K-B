@@ -19,3 +19,6 @@ htmlcov/
 
 # macOS
 .DS_Store
+
+# Données locales (KB_DATA_DIR pendant les essais)
+temp/
