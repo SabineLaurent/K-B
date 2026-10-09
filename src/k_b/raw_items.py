@@ -1,4 +1,5 @@
-"""Read every raw file of raw/automated_watch/ into common items (docs/specs-collecte.md, step 2)."""
+"""Read every raw file of raw/automated_watch/ into common items (docs/specs-collecte.md,
+step 2)."""
 
 import csv
 import logging

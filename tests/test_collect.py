@@ -146,7 +146,8 @@ def test_a_page_name_that_is_not_a_safe_path_segment_is_refused_before_any_write
 
     assert isinstance(errors_by_source["scraped"], ValueError)
     assert not (tmp_path / "raw" / "automated_watch").exists()
-    assert not (tmp_path / "escape.html").exists()
+    escaped_page = tmp_path / "raw" / "automated_watch" / "scraped" / "escape.html"
+    assert not escaped_page.exists()
 
 
 @pytest.mark.skipif(

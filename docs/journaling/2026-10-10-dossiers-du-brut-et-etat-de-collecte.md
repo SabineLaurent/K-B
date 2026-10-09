@@ -50,7 +50,7 @@ source_dir = raw_dir / AUTOMATED_WATCH_DIR_NAME / source.name
 ```
 
 ```python
-# src/k_b/raw_items.py:112
+# src/k_b/raw_items.py:113
 for source_dir in sorted((raw_dir / AUTOMATED_WATCH_DIR_NAME).glob("*/")):
 ```
 
@@ -179,5 +179,6 @@ Puis recréer la base et réimporter : le chemin du brut stocké en base
 - Les documents datés (`docs/2026-10-04-flux-donnees.md`, `docs/2026-10-06-revue-architecture.md`,
   les notes de `docs/journaling/`, le journal ADR) citent encore les anciens noms : ils décrivent
   l'état à leur date. Dans `docs/2026-10-07-clarification-modele.md`, seuls les six exemplaires
-  ont été mis à jour ; les lignes 363 et 725 citent encore `raw/automation/`.
+  et les lignes 363 et 725 ont été mis à jour ; les passages qui racontent la décision gardent
+  l'ancien nom.
 - La mise en lecture seule de `raw/` et sa synchronisation ne sont pas faites.

@@ -360,7 +360,7 @@ sur la journée du 2026-10-06, aucun `repo.id` n'apparaît sous deux noms dans c
 
 **Décidé par Sabine (2026-10-08)** : TENDANCE est rattachée à la chaîne de traçabilité. Le résultat
 de la requête BigQuery est une donnée brute de la source `gh_archive` (déjà dans
-`src/k_b/database/seed_sources.sql`), un fichier par collecte sous `raw/automation/gh_archive/` ;
+`src/k_b/database/seed_sources.sql`), un fichier par collecte sous `raw/automated_watch/gh_archive/` ;
 DONNÉE BRUTE ─0,n─ (PRODUIRE) ─1,1─ TENDANCE, soit `trend.raw_data_id` au MLD. TENDANCE n'est pas un
 item. Raison : toute donnée en base remonte à un fichier brut et à sa source, et TENDANCE se
 reconstruit depuis le brut sans relancer BigQuery. Écarté : TENDANCE sans lien (seule table hors
@@ -721,8 +721,8 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   l'ADR « Deux wikis » (fiches figées dans `wiki/veille/`) et la chaîne de `docs/stockage.md:12`
   et `:18` (« base → API REST → fiches, agents ») sont à mettre à jour.
 - **Zotero (#15)** (séance 4) : reprendre la décision ci-dessus dans l'issue ; ADR de la PR de #6 à réviser ; mettre à
-  jour `docs/specs-collecte.md:185` (aujourd'hui, la copie entière comme brut sous
-  `raw/automation/zotero/`) et le registre (fiche 2 et règle 5, « supprimer les copies Zotero du
+  jour `docs/specs-collecte.md:186` (aujourd'hui, la copie entière comme brut sous
+  `raw/automated_watch/zotero/`) et le registre (fiche 2 et règle 5, « supprimer les copies Zotero du
   brut sauf la plus récente », sans objet si la copie n'est plus gardée).
 
 ## Issues touchées, pour le découpage
