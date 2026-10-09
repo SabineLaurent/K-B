@@ -687,8 +687,9 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   sur 55 n'a de résumé dans la base construite depuis la collecte du 2026-10-07.
 - **TLDR : coder la lecture des pages** (séance 4) : la collecte écrit les pages, rien ne les lit
   (`src/k_b/sources/tldr.py` n'a que `fetch`) ; 0 item TLDR en base. Le résumé de chaque article
-  va dans `item.summary`, comme dans brief09 (`app/ingest/sources_ingesters/tldr_scraper.py:206-207`,
-  `div.newsletter-html` converti en Markdown, rangé dans `content`).
+  va dans `item.summary`. brief09 le gardait déjà (`app/ingest/sources_ingesters/tldr_scraper.py:206-207`,
+  `div.newsletter-html` converti en Markdown, rangé dans `content`) : point de départ indicatif,
+  à reprendre en mieux là où c'est possible, pas à recopier.
 - **Zotero : texte des PDF** (séance 4, avec #15) : extraire le texte des articles déposés
   demande une bibliothèque de plus (pistes : `pypdf`, `pymupdf`, `markitdown`, non comparées) ;
   dépendance à décider par Sabine.
