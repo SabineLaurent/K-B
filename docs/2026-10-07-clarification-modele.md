@@ -477,7 +477,10 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   fusion, l'indexation en base et `kb search`. La ligne `wiki` de ACQUISITION_MODE leur laisse la porte
   ouverte. Écartée pour la v0 : NOTE et une table de liaison « une note cite des items »
   (plusieurs à plusieurs), qui supposaient des fiches en v0.
-- **Zotero, recommandation pour #15** (Sabine favorable, 2026-10-09 ; à décider dans #15). Zotero
+- **Zotero (décidé par Sabine, 2026-10-09)**, revient sur l'ADR de la PR de #6 (« le brut est la
+  copie entière de `zotero.sqlite`, pas le résultat d'une requête », provisoire, à revoir dans
+  #15). Coût assumé : un champ non extrait aujourd'hui (étiquettes, collections…) n'est pas dans
+  les anciens bruts ; il faudra relancer la requête sur la base Zotero du moment. Zotero
   reste une source « base de données », interrogée en SQL. Constat : l'accès direct à
   `zotero.sqlite` doit se faire en lecture seule, et Zotero casse le verrouillage normal de
   SQLite ([doc Zotero](https://www.zotero.org/support/dev/client_coding/direct_sqlite_database_access)) :
@@ -555,7 +558,7 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   qui vérifie la fiche produite (#26) passent après la collecte, l'indexation et `kb search` ;
   l'ADR « Deux wikis » (fiches figées dans `wiki/veille/`) et la chaîne de `docs/stockage.md:4`
   et `:10` (« base → API REST → fiches, agents ») sont à mettre à jour.
-- **Zotero (#15)** (séance 4) : reprendre la recommandation ci-dessus dans l'issue ; mettre à
+- **Zotero (#15)** (séance 4) : reprendre la décision ci-dessus dans l'issue ; ADR de la PR de #6 à réviser ; mettre à
   jour `docs/specs-collecte.md:185` (aujourd'hui, la copie entière comme brut sous
   `raw/automation/zotero/`) et le registre (fiche 2 et règle 5, « supprimer les copies Zotero du
   brut sauf la plus récente », sans objet si la copie n'est plus gardée).
