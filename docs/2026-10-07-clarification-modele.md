@@ -63,10 +63,11 @@ Effet sur le modèle : un index plein texte sur `item.title` et `item.summary` (
 - La colonne LLM ne décide pas du modèle : ce qui le décide, c'est si la donnée est collectée et
   gardée. Elle dit seulement ce qui attend le LLM, et la place à laisser à des embeddings.
 
-## 3. Pistes en réflexion (non décidées)
+## 3. Types d'items et modèle de la base
 
-Rien de cette section n'est décidé : Sabine y réfléchit avant de trancher. Les recommandations
-sont celles de la session.
+Cette section mêle des pistes et des décisions. Une décision est marquée « Décidé par Sabine »,
+avec sa date ; le reste (pistes 3a, 3b, 3c du matin du 07/10, propositions de la session) n'est
+pas décidé tel quel. Les recommandations sont celles de la session.
 
 ### Trois axes à ne pas confondre
 
@@ -92,7 +93,7 @@ sont celles de la session.
   unique dans toute la table, un résumé et son article d'origine ne peuvent pas coexister. Les
   vrais liens TLDR ont la forme des items existants : `arxiv.org/abs/2609.38149`,
   `github.com/NVIDIA/OpenShell` (aucun n'est dans la collecte du 2026-10-07).
-- **3a, types** — recommandé : `article` (arXiv, clip, Zotero), `summary` (TLDR),
+- **3a, types** (piste remplacée par la liste de `kind` de l'option D, ci-dessous) — recommandé : `article` (arXiv, clip, Zotero), `summary` (TLDR),
   `vulnerability` (CISA, alerte GitHub), `repository`, `release`. Étoiles et forks sont des
   mesures sur un dépôt, pas des items.
 - **3b, colonne ou sous-type** — recommandé : `item.kind` obligatoire (CHECK sur les cinq
@@ -145,18 +146,21 @@ SOURCE ──0,n── (FOURNIR) ──1,1── COLLECTE ──1,1── (DÉCL
 
 **Décidé par Sabine** :
 
-- **SOURCE ─0,n─ (FOURNIR) ─1,1─ DONNÉE BRUTE ─1,n─ (CONTENIR) ─1,1─ ITEM.** Une donnée brute
+- **SOURCE ─0,n─ (FOURNIR) ─1,1─ DONNÉE BRUTE ─0,n─ (CONTENIR) ─1,1─ ITEM.** Une donnée brute
   est un fichier de `raw/` : le `.xml` d'arXiv, le `.csv` de CISA, un `.html` de TLDR (une
   édition, un jour). Un item est une entrée de ce fichier : une `<entry>`, une ligne, un
   `<article>`. « Donnée brute » remplace « collecte », qui faisait penser au lancement de
-  `kb collect`. Pas d'entité LANCEMENT pour l'instant.
+  `kb collect`. Pas d'entité LANCEMENT pour l'instant. CONTENIR est en 0,n côté donnée brute
+  (corrigé le 09/10 après la relecture) : un brut `gh_archive`, un top GraphQL ou un catalogue
+  CISA sans ligne nouvelle ni modifiée ne contient aucun item.
 - **Sous-catégorie d'une source** : un attribut `flux` de DONNÉE BRUTE, qui vaut le nom du
   dossier brut (`tldr_ai`, `tldr_infosec`…). Écartés : une source par édition (GitHub en
   compterait une douzaine) ; une entité FLUX (pas d'attribut propre à porter pour l'instant).
   Les filtres d'arXiv ne sont pas une sous-catégorie : une requête, un flux.
 - **GitHub est mis de côté** : le modèle se pose d'abord sur arXiv, CISA et TLDR.
-- **CISA KEV est un catalogue d'état**, pas un flux de nouveautés : chaque collecte télécharge le
-  catalogue entier (`cisa_kev.py:49-70`) ; une ligne est modifiée sur place (le brut du
+- **CISA KEV est un catalogue d'état**, pas un flux de nouveautés : une collecte télécharge le
+  catalogue entier quand il a changé, et rien sinon (`If-Modified-Since`, réponse 304 sans
+  écriture, `cisa_kev.py:57`, `:65-67`) ; une ligne est modifiée sur place (le brut du
   2026-10-07 est trié par `dateAdded` décroissant, sans CVE en double ; `knownRansomwareCampaignUse`
   change en silence, 41 fois d'octobre 2023 à juillet 2024 selon
   [GreyNoise](https://www.greynoise.io/blog/unveiling-vulnerability-insights-from-the-cisa-kev-catalog-at-bsideslv)).
@@ -182,8 +186,8 @@ source :
 
 P1 filtre alors sur « publié ou révisé depuis N jours ».
 
-**Incrémentalité des sources** (relevé du code) : CISA et le top 100 GitHub téléchargent tout à
-chaque fois ; les releases relisent leur première page ; arXiv (7 jours), les alertes (1 jour) et
+**Incrémentalité des sources** (relevé du code) : le top 100 GitHub télécharge tout à chaque fois ;
+CISA télécharge le catalogue entier s'il a changé, rien sinon (réponse 304) ; les releases relisent leur première page ; arXiv (7 jours), les alertes (1 jour) et
 TLDR (1 jour) se recouvrent volontairement. Les répétitions sont la règle : la base doit
 reconnaître un item déjà vu, quelle que soit la source.
 
@@ -217,13 +221,18 @@ reconnaître un item déjà vu, quelle que soit la source.
   même article), clé étrangère facultative vers le PAPER cité. Clé naturelle : (édition, date,
   rang).
 - **Option D : ITEM minimal, clé partagée.** ITEM ne porte que `item_id`, la donnée brute de sa
-  version actuelle et `kind` (`paper`, `vulnerability`, `newsletter_article`). Chaque sous-type (clé revue en séance 2 : `id` technique)
+  version actuelle et `kind` (valeurs plus bas). Chaque sous-type (clé revue en séance 2 : `id` technique)
   (PAPER, CVE, NEWSLETTER_ARTICLE) a pour clé primaire `item_id`, qui est aussi sa clé étrangère
   vers ITEM (règle 4 du MLD de `docs/stockage.md`). L'exclusivité (D1) est portée par une clé
   étrangère composée (`item_id`, `kind`). Écartés : B, ITEM table de trace avec des clés
   étrangères facultatives vers chaque référentiel (doublon de rôle) ; C, pas de table ITEM et une
   vue `UNION` (il faudrait une table de liaison par type pour les notes du point 4). Raison : ITEM
   reste le point d'entrée unique pour les notes, la recherche et P1.
+- **Valeurs de `kind`** (la seule liste, tenue à jour ici et dans `docs/merise/mld-k-b.drawio`) :
+  `paper` (item arXiv), `vulnerability` (item CISA KEV), `newsletter_article`, `release`,
+  `advisory` (alerte GitHub). Les trois premières viennent de l'option D (07/10), les deux
+  dernières du lot GitHub (08/10). Les valeurs de la bibliothèque (clip, Zotero, note) attendent
+  son modèle. Ouvert : si `kb search --kind vulnerability` ramène aussi les `advisory`.
 - Le modèle n'a plus de table de liaison : toutes les associations sont en 1,n ou 0,1 (les listes de paquets du lot GitHub, en réflexion, sont aussi en 1,n).
 - **Périmètre des failles : celles dont l'exploitation est avérée.** Pas de collecte de la liste
   CVE (cve.org, dépôt `CVEProject/cvelistV5`, 3,9 Go décompressé). Constaté sur un record
@@ -234,9 +243,11 @@ reconnaître un item déjà vu, quelle que soit la source.
 **Écarté** (piste du matin) : un item décrit une chose (la faille, l'article) que d'autres items peuvent
 décrire aussi : ITEM ─1,1─ (DÉCRIRE) ─1,n─ SUJET (nom provisoire), identifié par le CVE ou par
 l'URL normalisée. Il réglerait le croisement CISA × GitHub (P4), le lien résumé TLDR → article
-(3c) et `UNIQUE (source, sujet)` (#105). Non décidé, comme 3a, 3b et 3c.
+(3c) et `UNIQUE (source, sujet)` (#105). Les pistes 3a, 3b et 3c n'ont pas été décidées
+telles quelles : l'option D (ITEM, `kind`, sous-types) remplace 3a et 3b, et la clé naturelle
+d'ARTICLE DE NEWSLETTER remplace 3c et son `UNIQUE (source_code, url)`.
 
-### GitHub (en réflexion, non décidé)
+### GitHub
 
 **Décidé par Sabine (2026-10-08)** : les paquets touchés par une alerte sont une liste JSON,
 attribut de l'alerte, comme les auteurs d'un papier, et non la table `advisory_package` proposée
@@ -247,7 +258,7 @@ touche 4. Écartées : des colonnes Paquet 1…N (groupe répétitif, 1re forme 
 la v0 (pas de filtre à servir).
 
 **Décidé par Sabine (2026-10-08)** : une entité DÉPÔT SUIVI, à laquelle chaque RELEASE est
-rattachée (un dépôt suivi publie 1,n releases, une release vient d'un seul dépôt). Ses données :
+rattachée (un dépôt suivi publie 0 à n releases, une release vient d'un seul dépôt). Ses données :
 nom du dépôt (`owner/name`), écosystème (`pip`, `npm`), paquets suivis. « Nom du dépôt » quitte
 RELEASE. Raison : la liste des dépôts suivis existe déjà avec ses propres données, dans le code
 (`src/k_b/sources/tracked_repositories.py`, 4 dépôts) ; l'objection de la proposition ci-dessous
@@ -264,7 +275,7 @@ publication (`published_at`), et se rattache à son DÉPÔT SUIVI. Constat dans 
 (100 releases de `anthropics/claude-code`) : 99 notes en Markdown (titres, puces), 1 vide, la plus
 longue fait 28 783 caractères.
 
-Proposition de la session, selon l'option D :
+Proposition de la session, selon l'option D (non décidée telle quelle ; les décisions ci-dessus la remplacent en partie) :
 
 - **ADVISORY** (GitHub fait foi, flux, premier vu) : `ghsa_id` unique, `cve_id` facultatif,
   `summary`, `severity`, `published_at`, `withdrawn_at`. `cve_id` n'est pas une clé étrangère
@@ -495,7 +506,13 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   seulement Zotero fermé (jamais collecté si Zotero reste ouvert) ; la base entière comme brut
   (contraire à la minimisation, CNIL et RGESN 1.6) ; l'API locale de Zotero 7 (plus de source
   « base de données ») ; `zotero.sqlite.bak` (fréquence et fraîcheur non vérifiées). Non
-  vérifié : la fiabilité d'une copie à chaud, d'où le contrôle d'intégrité.
+  vérifié : la fiabilité d'une copie à chaud, d'où le contrôle d'intégrité. Constat du 2026-10-09
+  (relecture) : `zotero.sqlite` est en mode WAL (octets 18 et 19 de l'en-tête à `2`, lus par
+  `xxd -s 18 -l 2`, Zotero fermé ; un fichier `zotero.sqlite-wal` de 0 octet est à côté ; valeur 2
+  = WAL selon le [format de fichier SQLite](https://www.sqlite.org/fileformat.html)). Zotero
+  ouvert, les dernières écritures peuvent n'être que dans le `-wal` : une copie du seul `.sqlite`
+  serait alors ancienne mais cohérente, et `PRAGMA integrity_check` ne le verrait pas. La façon de
+  copier est à revoir avec #15.
 - **Surlignages (décidé par Sabine, 2026-10-09)** : en v0, ils sont gardés en base et **affichés
   avec leur papier** dans les résultats de `kb search`, seulement si le papier en a. Ils ne sont
   pas cherchables par leurs mots. Écartés : les rendre cherchables (un index de plus sur un texte
@@ -675,8 +692,8 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   jour où elle gardera des données sans brut : notes du wiki LLM si elles ne vivent pas en
   fichiers dans `wiki/`, ou brut purgé avant la base. Mesure (collecte réelle du 2026-10-07,
   2 500 items) : brut 5,6 Mo (1,03 Mo compressé), base 3,1 Mo (0,97 Mo compressée, sans index
-  plein texte) ; dans la durée le brut grossit plus vite (chaque collecte s'ajoute, CISA et le top
-  étoiles réécrivent tout), la base ne grossit que des nouveautés (déduit, non mesuré).
+  plein texte) ; dans la durée le brut grossit plus vite (chaque collecte s'ajoute, le top étoiles
+  réécrit tout, CISA aussi dès que le catalogue change), la base ne grossit que des nouveautés (déduit, non mesuré).
 - **Installation et launchd** (issue à créer, décidée le 2026-10-08) : la doc d'installation du
   README donne `KB_DATA_DIR=~/.knowledge_base` et le chemin du dossier `Clippings/` du coffre
   (séance 4), ainsi que les précautions de la section « Installation locale » (droits du dossier,
