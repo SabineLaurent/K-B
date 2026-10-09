@@ -581,6 +581,9 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   synchronisé sans l'état propre à chaque machine qui collecte. Il ne se déduit pas du brut : une
   source sans nouveauté n'écrit rien mais avance sa date (`docs/specs-collecte.md:40`). Touche
   `raw_store.py:35-69` (lu et écrit à partir de `raw_dir`), les tests et `specs-collecte.md:40`.
+  Dans la même issue : reproduire l'architecture cible dans `temp/.knowledge_base/` (hors git),
+  en y déplaçant la collecte réelle du 2026-10-07 de `temp/raw/`, pour les essais avec
+  `KB_DATA_DIR` ; les exemplaires cités dans ce document (`raw/automation/…`) sont à mettre à jour.
 - **Table ACQUISITION_MODE** (séance 4) : schéma, colonne `acquisition_mode_id` dans SOURCE, `seed_sources.sql`, une
   ligne de SOURCE pour les notes déposées ; purge qui lit la durée dans ACQUISITION_MODE ; registre des
   traitements, règle 2 (aujourd'hui « les items collectés il y a plus de 2 ans », sans
