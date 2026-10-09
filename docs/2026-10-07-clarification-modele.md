@@ -468,7 +468,7 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
 - **Renommer `raw/automation/` en `raw/automated_watch/`** (séance 4) : code
   (`src/k_b/collect.py:68`, `src/k_b/raw_items.py:111`), tests, `docs/specs-collecte.md`, règle 4
   du registre. Les bruts déjà écrits sont à déplacer.
-- **Table ORIGIN** (séance 4) : schéma, ligne `origin_code` dans SOURCE, `seed_sources.sql`, une
+- **Table ORIGIN** (séance 4) : schéma, colonne `origin_code` dans SOURCE, `seed_sources.sql`, une
   ligne de SOURCE pour les notes déposées ; purge qui lit la durée dans ORIGIN ; registre des
   traitements, règle 2 (aujourd'hui « les items collectés il y a plus de 2 ans », sans
   distinguer la provenance) et durées à revoir.
