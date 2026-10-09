@@ -538,6 +538,17 @@ encore l'ancien modèle.
   deux contrôles ; tronquer (modifie la donnée sans le dire). Limite assumée : la même limite
   écrite en Python et en SQL, un test vérifie qu'elles concordent.
 
+### Installation et interface
+
+- **K-B tourne sur la machine de Sabine et s'installe comme une commande `kb`
+  (`uv tool install --editable`) ; la veille s'interroge par des commandes (`kb search`,
+  `kb top`).** Décision de Sabine. Pourquoi, selon elle : en ligne, elle ne voyait pas comment
+  téléverser ni stocker les documents qu'elle dépose (bibliothèque choisie, futur wiki LLM) ;
+  installé en local, le terminal est plus simple qu'une interface graphique. Une commande
+  n'exclut pas une API REST locale (question ouverte, ci-dessous). Évolutions notées, sans
+  issue : une TUI plein écran, puis une application de bureau (Tauri, hors « Python
+  uniquement »).
+
 ### Schémas
 
 - **MCD et MLD dessinés avec draw.io (`docs/merise/*.drawio`) ; le MPD reste le script SQL.**
@@ -592,6 +603,14 @@ encore l'ancien modèle.
   qui écartait la reconstruction parce qu'elle renumérote `item_id`, que l'API exposera : la
   stabilité de `item_id` est ouverte (ci-dessous).
 
+### Interface
+
+- **Une API REST locale (sur `localhost`, à côté de la commande `kb`) fait partie d'E1 ; la page
+  web et le déploiement relèvent d'un autre livrable.** Décision de Sabine. Pourquoi : l'API est
+  attendue dans E1 ; une commande n'exclut pas une API, et une API locale ne revient pas sur la
+  décision « local » du 2026-10-08. Conséquence : la
+  stabilité de `item_id` face à une base jetable reste à trancher (question ouverte, ci-dessous).
+
 ### Bibliothèque et recherche
 
 - **En v0, K-B indexe la bibliothèque choisie (clips, Zotero, notes déposées) : chaque document
@@ -640,8 +659,7 @@ encore l'ancien modèle.
   Indispensable avec une base reconstruite à chaque changement de schéma (2026-10-09).
 - **Questions laissées par la relecture indépendante du 2026-10-09**, à décider par Sabine :
   le périmètre d'E1 au 25/10 (la séance 4 a ajouté la bibliothèque, Zotero, les clips, TENDANCE,
-  les tops GraphQL, sans estimation) ; l'API REST en v0 et un `item_id` stable malgré une base
-  jetable ; où vivent le titre, le résumé et la date communs à tous les items (recherche, P1) ;
+  les tops GraphQL, sans estimation) ; un `item_id` stable pour l'API malgré une base jetable ; où vivent le titre, le résumé et la date communs à tous les items (recherche, P1) ;
   le modèle de la bibliothèque (DOCUMENT ou CONTENU, une publication décrite par plusieurs
   items, un article Zotero hors arXiv) ; garder ACQUISITION_MODE ou revenir à une colonne de
   SOURCE ; les versions d'un clip annoté ; si `kb search --kind vulnerability` ramène aussi les
