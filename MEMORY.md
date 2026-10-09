@@ -35,7 +35,7 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 ## Interface : choix et suite envisagée (Sabine, 2026-10-08)
 
 - K-B tourne en local et s'installe comme outil CLI (`uv tool install --editable`).
-- La veille s'interroge par des commandes (`kb search … --since --kind --source`, `kb top`),
+- La veille s'interroge par des commandes (`kb search … --since --kind --source --origin`, `kb top`),
   puis par un menu à questions par-dessus, qui remplit les mêmes options.
 - Évolutions possibles, sans issue : une TUI plein écran (type Textual), puis à long terme une
   application de bureau installable avec Tauri (hors « Python uniquement » : à décider le moment

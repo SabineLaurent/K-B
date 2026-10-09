@@ -424,11 +424,16 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   relatif au coffre ([aide Obsidian](https://obsidian.md/help/web-clipper/capture)) ; le coffre
   est le dossier de données (ADR). Non testé.
 - **Décidé par Sabine (2026-10-09)** : en v0, K-B **indexe** la bibliothèque choisie. Chaque
-  document déposé devient une entrée en base (titre, URL, date de dépôt, origine : clip, Zotero,
+  document déposé devient une entrée en base (titre, URL, date de dépôt, source : clip, Zotero,
   note), cherchable par `kb search` ; un item de la veille peut être relié à sa version creusée
   dans Zotero. Revient sur l'ADR de la PR de #7 (« les documents de `raw/manual/` n'entrent pas
   dans la base en v0 »). Écartés : stocker seulement (la base ne verrait pas qu'un item a été
   creusé) ; compiler le wiki LLM (v1).
+- **Décidé par Sabine (2026-10-09)** : `kb search` prend un filtre `--origin watch|library`, la
+  finalité (collecte large ou bibliothèque choisie). Le détail (clip, Zotero, note, arXiv…) passe
+  par `--source`. Écartés : `--origin clip|zotero|note` (doublon de `--source` si chaque dépôt
+  est une ligne de SOURCE) ; un filtre à deux sens. Pour le modèle (point 5) : où porter la
+  finalité (une colonne de SOURCE, ou déduite du chemin du brut).
 - En suspens : la place de Zotero (copie de la base, aujourd'hui sous `raw/automation/zotero/`,
   `docs/specs-collecte.md:185`) et de ses PDF.
 
