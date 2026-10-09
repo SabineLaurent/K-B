@@ -529,6 +529,13 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   `item.url`, `published` → `item.published_at` (vide si absente), `created` → `item.saved_at`,
   `author` → `author.name`, **`description` → `item.summary`** (absente de `docs/stockage.md:58`),
   `tags` : rien en v0, corps → texte complet.
+- **Dossier de données (décidé par Sabine, 2026-10-09)** : `KB_DATA_DIR=~/.knowledge_base` (brut,
+  base, journal d'import), réglé dans `~/.zshrc` ; c'est un réglage d'installation, pas une règle du
+  code (`src/k_b/cli.py:18` lit la variable). Deux règles : hors de tout dossier synchronisé par
+  iCloud (base SQLite, données hors machine) ; dans la sauvegarde Time Machine (c'est le brut
+  qu'on sauvegarde, W7 ; sauvegarde des dossiers cachés non vérifiée). Écartés : `~/.local/share/k-b`
+  (convention XDG, moins connue sur Mac), `~/Library/Application Support/K-B` (pensé pour les
+  applications graphiques), `~/K-B-data` (exemple de l'ADR, un dossier visible de plus).
 
 ### Question ouverte : miroir et multi-machines (séance 4)
 
@@ -583,6 +590,9 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
   2 500 items) : brut 5,6 Mo (1,03 Mo compressé), base 3,1 Mo (0,97 Mo compressée, sans index
   plein texte) ; dans la durée le brut grossit plus vite (chaque collecte s'ajoute, CISA et le top
   étoiles réécrivent tout), la base ne grossit que des nouveautés (déduit, non mesuré).
+- **Installation et launchd** (issue à créer, décidée le 2026-10-08) : la doc d'installation du
+  README donne `KB_DATA_DIR=~/.knowledge_base` et le chemin du dossier `Clippings/` du coffre
+  (séance 4).
 - **Fiches de veille reportées** (séance 4) : l'epic des fiches (#22) et le test de bout en bout
   qui vérifie la fiche produite (#26) passent après la collecte, l'indexation et `kb search` ;
   l'ADR « Deux wikis » (fiches figées dans `wiki/veille/`) et la chaîne de `docs/stockage.md:4`
