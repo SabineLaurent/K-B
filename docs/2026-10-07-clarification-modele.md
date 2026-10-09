@@ -429,11 +429,32 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   dans Zotero. Revient sur l'ADR de la PR de #7 (« les documents de `raw/manual/` n'entrent pas
   dans la base en v0 »). Écartés : stocker seulement (la base ne verrait pas qu'un item a été
   creusé) ; compiler le wiki LLM (v1).
-- **Décidé par Sabine (2026-10-09)** : `kb search` prend un filtre `--origin watch|library`, la
-  finalité (collecte large ou bibliothèque choisie). Le détail (clip, Zotero, note, arXiv…) passe
-  par `--source`. Écartés : `--origin clip|zotero|note` (doublon de `--source` si chaque dépôt
-  est une ligne de SOURCE) ; un filtre à deux sens. Pour le modèle (point 5) : où porter la
-  finalité (une colonne de SOURCE, ou déduite du chemin du brut).
+- **Décidé par Sabine (2026-10-09)** : `kb search` prend un filtre `--origin watch|library|wiki`,
+  la provenance du contenu. Le détail (clip, Zotero, note, arXiv…) passe par `--source`. Écartés :
+  `--origin clip|zotero|note` (doublon de `--source` si chaque dépôt est une ligne de SOURCE) ; un
+  filtre à deux sens.
+- **Décidé par Sabine (2026-10-09) : une table de référence ORIGIN**, dès la v0, trois lignes.
+  SOURCE pointe vers elle : une source a une seule origine, une origine a 0 à n sources.
+
+  | `origin_code` (base et `--origin`) | `label` | Dossier du brut | Exemples de sources |
+  |---|---|---|---|
+  | `watch` | system automation | `raw/automated_watch/` | arXiv, CISA, GitHub, TLDR, GH Archive |
+  | `library` | user selection | `raw/selected_library/` | clips, Zotero, notes déposées |
+  | `wiki` | llm generation | aucun (une note générée n'est pas un brut) | notes du wiki LLM (v1) |
+
+  ORIGIN porte aussi la **durée de conservation**, que la purge lit au lieu de la coder. Les deux
+  attributs (durée, dossier) restent sur ORIGIN ; la durée est **à revoir**, peut-être au cas par
+  cas (aujourd'hui : 2 ans pour la veille, fiche 1 du registre ; gérée par Sabine dans ses outils
+  pour la bibliothèque, fiche 2 ; non définie pour le wiki). Pourquoi la provenance : la purge doit
+  la connaître, sinon un document de la bibliothèque purgé à 2 ans serait recréé à la collecte
+  suivante depuis `selected_library/` ; et le contenu généré par un LLM se distingue du contenu
+  collecté (K-B déterministe, « d'où vient cette affirmation »). Codes courts et libellés, comme
+  SOURCE (`source_code`, `label`). Écartés : une contrainte `CHECK` sur SOURCE (durée et dossier
+  dans le code ; ajouter une valeur oblige SQLite à recréer la table) ; la déduire du chemin du
+  brut (une règle de rétention dépendrait d'un nom de dossier) ; une colonne sur ITEM (répétée sur
+  chaque item, alors qu'elle dépend de la source) ; des codes longs (`system_automation`…) avec
+  des alias dans la CLI (une correspondance à tenir). Ouvert : comment une note générée entre en
+  base, quand le wiki sera conçu.
 - En suspens : la place de Zotero (copie de la base, aujourd'hui sous `raw/automation/zotero/`,
   `docs/specs-collecte.md:185`) et de ses PDF.
 
@@ -447,6 +468,10 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
 - **Renommer `raw/automation/` en `raw/automated_watch/`** (séance 4) : code
   (`src/k_b/collect.py:68`, `src/k_b/raw_items.py:111`), tests, `docs/specs-collecte.md`, règle 4
   du registre. Les bruts déjà écrits sont à déplacer.
+- **Table ORIGIN** (séance 4) : schéma, ligne `origin_code` dans SOURCE, `seed_sources.sql`, une
+  ligne de SOURCE pour les notes déposées ; purge qui lit la durée dans ORIGIN ; registre des
+  traitements, règle 2 (aujourd'hui « les items collectés il y a plus de 2 ans », sans
+  distinguer la provenance) et durées à revoir.
 
 <!-- Points 4 et 5 : à suivre. -->
 
