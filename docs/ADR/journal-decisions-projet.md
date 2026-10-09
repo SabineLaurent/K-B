@@ -619,7 +619,9 @@ encore l'ancien modèle.
   elle : la certif demande une base de données parmi les sources (Zotero, source « base de
   données » depuis le 2026-09-29) ; pour TENDANCE, le pourquoi est celui du 2026-10-08. Limite :
   aucun de ces ajouts n'avait d'estimation au moment de la décision, pour une échéance au 25/10 ;
-  estimés depuis à environ 16,5 h par la session, non relus (clarification, « Issues touchées »).
+  estimés depuis par une relecture à l'aveugle à environ 39 h, plus environ 24 h de réécriture
+  du schéma ; le report des fiches ne libère rien avant le 25/10 (jalon daté du 01/11). Décision à
+  revoir avec time-knight (clarification, « Issues touchées »).
 
 ### Bibliothèque et recherche
 

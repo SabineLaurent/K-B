@@ -728,42 +728,68 @@ Sabine : allumer la machine qui collecte automatiquement (`pmset`).
 La liste regroupe ce que les séances 1 à 4 changent aux issues, ou font naître. Rien n'est créé ni
 modifié ici : le découpage se fera dans une session à part (`/split-project-ls`). « Relecture n »
 renvoie au point n de la relecture indépendante du 2026-10-09 (hors git) ; D2, D6 et D7 à la
-[revue d'architecture](2026-10-06-revue-architecture.md). La colonne « Ajout S4 » chiffre ce
-qu'ajoutent les décisions de la séance 4 et le point 8 de la relecture (TENDANCE, tops GraphQL) :
-**estimations de la session, non relues à l'aveugle**.
+[revue d'architecture](2026-10-06-revue-architecture.md).
 
-**En tête : le schéma (« Laisser la base dédoublonner les items », #105).** Sa conception
-(estimée 3,5 h) est remplacée par le modèle de ce document : option D, référentiels VULNÉRABILITÉ
-et PUBLICATION, natures de source (CISA en catalogue d'état), DÉPÔT SUIVI, RELEASE, ALERTE GITHUB,
-ARTICLE DE NEWSLETTER, `id` technique, longueurs en `CHECK` et Pydantic. S'y rattachent D2 (retirer
-l'ancien sous-type), D6 (réglé par nature de source) et D7 (à revérifier : ITEM n'a plus d'URL).
-Attend une décision : titre, résumé et date communs (relecture 2). **À réestimer au découpage.**
+Deux estimations, en heures, pour le binôme et le cycle complet de PR : celle de la session
+(« Session ») et celle d'une relecture à l'aveugle du 2026-10-09 (« Aveugle »), faite par un
+sous-agent sans contexte qui n'a vu ni ce document ni les chiffres de la session. **L'estimation
+de référence est celle de la relecture à l'aveugle**, appuyée sur le code (comptes par commande).
+Pour une issue existante, le chiffre est l'**ajout** à son estimation actuelle ; pour une issue à
+créer, son coût total. « S4 » marque ce qui vient de la séance 4 et du point 8 de la relecture
+(TENDANCE, tops GraphQL).
 
-| Issue | Ce qui change | Ajout S4 |
-|---|---|---|
-| Décider les champs de CISA KEV (#84) | réglé par VULNÉRABILITÉ (`vendorProject`, `product`) : à fermer ou fondre dans #105 | 0 |
-| Purger les données (#83) | durée lue dans ACQUISITION_MODE ; purge table par table (relecture 6, recommandation à valider) ; fichiers de classement GitHub (séance 2) ; liste d'exclusion si `item_id` reste stable (relecture 4) | 0,5 h |
-| Collecter les clips (#14) | copie horodatée vers `raw/selected_library/clipping/`, chemin de `Clippings/` en variable d'environnement, correspondance du frontmatter, texte complet en base, contrôle du nom ; attend la décision sur les versions d'un clip annoté (relecture 11) | 2 h |
-| Extraire Zotero (#15) | extrait JSON comme brut (revient sur l'ADR de #6), copie temporaire, `integrity_check` et mode WAL, surlignages en base et affichés, lien avec l'item de veille ; attend le modèle de la bibliothèque (relecture 3) ; texte des PDF non compté (dépendance à décider) | 2,5 h |
-| Dépôts qui montent (#16) | table TENDANCE, top 30 étoiles et forks, `repo.id` ; totaux par GraphQL : brut rattaché ou retrait (relecture 5, recommandation à valider) | 1,5 h |
-| Lire les pages TLDR (#57) | résumé dans ARTICLE DE NEWSLETTER ; brief09 comme point de départ | 0 |
-| API « quoi de neuf » (#21) | `kb search` : FTS5 et BM25, `--in`, caractères de contrôle retirés à l'affichage ; API REST locale en E1 ; attend les décisions `item_id` stable (relecture 4) et `--kind vulnerability` avec les alertes | 2,5 h |
-| Fiches de veille (#22) et test de bout en bout (#26) | reportées après la collecte, l'indexation et `kb search` ; ADR « Deux wikis » et `docs/stockage.md` à mettre à jour | sortent du chemin : 9 h + 2,5 h selon leurs estimations |
-| Aligner `docs/specs-collecte.md` (#64) | dossiers du brut renommés, `collection_state.json` déplacé, Zotero (`:185`) | compté plus bas |
+**En tête : réécrire le schéma (issue à créer), puis « Laisser la base dédoublonner les items »
+(#105).** Le modèle de ce document remplace la conception de #105 (estimée 3,5 h) : option D,
+référentiels VULNÉRABILITÉ et PUBLICATION, natures de source (CISA en catalogue d'état), DÉPÔT
+SUIVI, RELEASE, ALERTE GITHUB, ARTICLE DE NEWSLETTER, ACQUISITION_MODE, `id` technique, longueurs
+en `CHECK` et Pydantic. Relecture à l'aveugle : **environ 24 h (20 à 28 h)**, en 3 ou 4 PR (tables
+de référence ; ITEM et sous-types ; référentiels ; longueurs et test de concordance) ; `schema.sql`
+(91 lignes), `items.py`, `import_items.py` (202 lignes), `merge.py`, les cinq lecteurs et environ
+46 tests à reprendre. #105 vient **après** et se réduit à environ 2 h (règles par nature de
+source) ; « Décider les champs de CISA KEV » (#84) s'y fond. S'y rattachent D2, D6 (réglé par
+nature de source) et D7 (ITEM n'a plus d'URL). Attend une décision : titre, résumé et date communs
+(relecture 2).
 
-| Issue à créer | Origine | Ajout S4 |
-|---|---|---|
-| Renommer les dossiers du brut, sortir `collection_state.json` de `raw/` | séance 4 | 1,5 h |
-| Table ACQUISITION_MODE (attend la décision : table ou colonne de SOURCE, relecture 10) | séance 4 | 1,5 h |
-| Indexer les notes déposées (lecture de `raw/selected_library/`, texte complet) | séance 4 | 2 h |
-| Passer les tops GitHub en GraphQL et ajouter le top forks (relecture 13) | séances 2 et 3 | 2 h |
-| Alertes GitHub : lire `description` | séance 4 | 0,5 h |
-| Installation locale, launchd, doc du README, `/security-review` | 08/10, précautions en séance 4 | hors S4 |
-| Renommer le flux arXiv en `arxiv_cscr_x_csai`, reporter sa date de dernière collecte | 08/10 | hors S4 |
-| Revoir les paquets suivis ; Dependabot ; BOD 26-04 de la CISA ; SBOM (hors v0) | séances 2 et 3 | hors S4 |
+| Issue existante | Ce qui change | S4 | Session | Aveugle |
+|---|---|---|---|---|
+| N'importer que les bruts pas encore importés (#106) | catalogue CISA : une ligne retirée se voit en comparant au catalogue précédent | | — | 0,5 |
+| Purger les données (#83) | durée lue dans ACQUISITION_MODE ; purge table par table (relecture 6) ; fichiers des tops et de TENDANCE ; liste d'exclusion si `item_id` reste stable (relecture 4) | oui | 0,5 | 1,5 |
+| Lire les pages TLDR (#57) | ARTICLE DE NEWSLETTER, clé (édition, date, rang), PUBLICATION créée si le lien cite arXiv ; analyseur HTML à choisir | oui | 0 | 2,5 |
+| Dépôts qui montent (#16) | TENDANCE, `raw_data_id`, top 30 étoiles et forks ; totaux par GraphQL (relecture 5) | oui | 1,5 | 3 |
+| Extraire Zotero (#15) | extrait JSON comme brut, copie temporaire, `integrity_check`, mode WAL, surlignages affichés ; attend le modèle de la bibliothèque (relecture 3) ; texte des PDF hors v0 selon le README, +3 h s'il est retenu | oui | 2,5 | 3 |
+| Collecter les clips (#14) | copie horodatée depuis `Clippings/`, noms contrôlés, auteurs `[[…]]` nettoyés, texte complet en base (colonne non décidée), notes déposées (même format) ; versions d'un clip annoté (relecture 11) | oui | 2 | 2,5 |
+| API « quoi de neuf » (#21) | filtres alignés sur `kb search`, requêtes partagées avec la CLI ; `item_id` stable (relecture 4) | oui | 2,5 | 1 |
+| Lire le brut des sources plus suivies (#87) | une release d'un dépôt retiré de la liste n'a plus de DÉPÔT SUIVI | | — | 1 |
+| Migrer les lecteurs vers Pydantic (#85) | longueurs maximales (`max_length`) | | — | 1 |
+| Écarter une ligne CISA, une release ou une alerte invalide (#77, #61) | journal d'une valeur trop longue (champ, dépassement) | | — | 0,5 |
+| Documenter les requêtes d'extraction (#17) | requêtes GraphQL et Zotero | oui | — | 0,5 |
+| Roder la collecte sur données réelles (#25) | nouveaux dossiers, tops GraphQL | oui | — | 0,5 |
+| Aligner `docs/specs-collecte.md` (#64) | lignes du renommage et de Zotero, renvoyées à l'issue du renommage | | — | 0 |
+| Passer à httpx (#86) | le POST de GraphQL se fait ici ou dans l'issue des tops, pas deux fois | | — | — |
+| Fiches de veille (#22), test de bout en bout (#26) | reportées après la collecte, l'indexation et `kb search` ; ADR « Deux wikis » et `docs/stockage.md:12`, `:18` à mettre à jour | oui | −11,5 | −11,5 |
 
-**Total de la séance 4 : environ 16,5 h**, plus le texte des PDF de Zotero s'il est retenu. Les
-fiches (#22, #26) sortent du chemin. La réécriture du schéma (#105) n'est pas chiffrée ici.
+| Issue à créer | S4 | Session | Aveugle |
+|---|---|---|---|
+| `kb search` : FTS5 et BM25, `--since`, `--kind`, `--source`, `--in`, surlignages affichés, caractères de contrôle retirés ; attend `--kind vulnerability` et les alertes | oui | (dans #21) | 7 |
+| `kb top` et tops GitHub en GraphQL, top forks (relecture 13) : POST, `errors` avec un statut 200 | oui | 2 | 5 |
+| Installation locale, launchd, doc du README, `/security-review` (recouvre #5 et #63) | oui | — | 4 |
+| Renommer les dossiers du brut, sortir `collection_state.json` de `raw/` (65 occurrences, 15 fichiers de tests) | oui | 1,5 | 2,5 |
+| Table ACQUISITION_MODE : la table entre dans la réécriture du schéma, reste le registre (relecture 10) | oui | 1,5 | 0,5 |
+| Indexer les notes déposées | oui | 2 | (dans #14) |
+| Décider où vit le texte complet d'un document de la bibliothèque (bloque `kb search` et #14) | oui | — | 1 |
+| Alertes GitHub : `severity`, paquets en JSON, `html_url`, `description` (seule `description` vient de S4) | en partie | 0,5 | 1,5 |
+| Renommer le flux arXiv en `arxiv_cscr_x_csai`, reporter sa date de dernière collecte | | — | — |
+| Revoir les paquets suivis | | — | 0,5 |
+| Dependabot ; BOD 26-04 de la CISA (SBOM hors v0) | | — | 1 |
+
+**Totaux de la relecture à l'aveugle** : les ajouts de la séance 4 font environ **39 h** (la
+session les estimait à 16,5 h), plus 3 h si le texte des PDF est retenu ; la réécriture du schéma
+environ **24 h**. Le report des fiches (#22, #26) ne libère rien avant le 25/10 : leur jalon
+« Fiches de veille tous les 3 jours » est daté du 2026-11-01. **Constat, à arbitrer par Sabine** :
+environ 63 h s'ajoutent au chemin d'E1 pour une échéance au 25/10 ; la décision « tous les
+ajouts de la séance 4 restent dans E1 » (point 8) est à revoir avec time-knight. Non estimé :
+l'index FTS5 tant que la place du titre, du résumé et du texte complet n'est pas décidée (±2 h),
+la copie de Zotero en mode WAL, la forme de la durée de conservation, la règle de #87.
 
 ## Annexe : les sources, champ par champ
 
