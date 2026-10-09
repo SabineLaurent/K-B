@@ -490,6 +490,33 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   pas cherchables par leurs mots. Écartés : les rendre cherchables (un index de plus sur un texte
   déjà lu) ; ne pas les collecter en v0 (perd ce que la requête Zotero ramène de toute façon).
 
+### Question ouverte : miroir et multi-machines (séance 4)
+
+**Non décidé ; à réfléchir par Sabine.** Besoins : collecter quand la machine qui collecte est éteinte ;
+travailler la veille sur une autre machine (un portable, peut-être une tablette). Écarté par
+Sabine : allumer la machine qui collecte automatiquement (`pmset`).
+
+- **Ce qu'une collecte manquée fait perdre** : presque rien. arXiv, TLDR, alertes et releases
+  GitHub, CISA, GH Archive repartent de la dernière collecte (#65) ; seules les photos de
+  classement (top étoiles et forks) d'un jour manqué sont perdues. Zotero, clips et notes sont sur
+  le Mac : un miroir en ligne ne les lirait pas.
+- **Synchroniser le brut, jamais la base** : le brut est écrit une fois, jamais réécrit, horodaté,
+  donc sans conflit ; chaque machine reconstruit sa base. Un fichier SQLite partagé ou dans un
+  dossier cloud se corrompt facilement.
+- **Tablette** : K-B (CLI Python) n'y tourne pas ; on y lirait (Obsidian), on n'y interrogerait pas
+  sans une autre interface (feuille de route : TUI, Tauri, sans issue).
+- **Contrainte** : le registre et sa purge sont tenus par choix, bien que K-B relève
+  probablement de l'exemption des activités strictement personnelles (ADR, PR de #8). Un dépôt
+  git garde dans son historique ce que la purge supprime. Une sauvegarde de la base ou un export
+  CSV n'y change rien (mêmes données personnelles ; binaire recopié à chaque version) et
+  empêcherait de retraiter le brut.
+
+| Piste | Pour | Contre |
+|---|---|---|
+| Dépôt git privé du brut, plus une GitHub Action programmée | collecte machine éteinte ; autre machine à jour par `pull` | purge sans effet sur l'historique ; données hors machine (revient sur la décision « local » du 08/10) ; jetons dans les secrets GitHub ; deux collecteurs à départager ; 2 000 min/mois d'Actions en privé |
+| Synchronisation de fichiers du brut (iCloud Drive, Syncthing) | la suppression se propage, la purge tient | pas de collecte Mac éteint ; iCloud garde les fichiers hors machine (Syncthing non) |
+| Rien : tout sur la machine qui collecte, rattrapage au démarrage | simple ; décision « local » intacte | photos de classement des jours éteints perdues ; pas d'autre machine |
+
 ### À reprendre dans la liste des issues (séance 3)
 
 - **Revoir les paquets principaux des dépôts suivis** (demande de Sabine, 2026-10-08). La collecte
