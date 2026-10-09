@@ -436,12 +436,14 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   filtre à deux sens ; `--origin` (nom abandonné, voir plus bas) ; `--mode` (« mode de quoi ? ») ;
   `--scope` (abstrait) ; `--acquisition` (long) ; `--from` (se confond avec `--source` et une date).
 - **Décidé par Sabine (2026-10-09) : une table de référence ACQUISITION_MODE** (mode
-  d'acquisition), dès la v0, trois lignes. Association **RELEVER** : une source relève d'un seul
-  mode d'acquisition (1,1) ; un mode d'acquisition regroupe 0 à n sources. Écartés pour l'entité :
+  d'acquisition), dès la v0, trois lignes. Association **REGROUPER** : un mode d'acquisition
+  regroupe 0 à n sources ; une source est regroupée dans un seul mode (1,1). Le sujet est le mode
+  d'acquisition, placé à gauche de SOURCE au MCD (`docs/merise/mcd-k-b.drawio`). Écartés pour l'entité :
   ORIGIN et PROVENANCE (synonymes de « source » dans la langue courante), CANAL (se confond avec
   le flux d'une source), MODE D'ENTRÉE (`intake`, peu connu). Écartés pour l'association : ÊTRE
   OBTENU PAR et ÊTRE COLLECTÉE (passifs, seules exceptions aux huit associations validées ; un
-  contenu `wiki` n'est pas collecté), APPARTENIR, DÉTERMINER.
+  contenu `wiki` n'est pas collecté), RELEVER (retenu d'abord, remplacé par REGROUPER au choix de
+  Sabine), APPARTENIR, DÉTERMINER.
 
   | `acquisition_mode_code` (base et `--in`) | `label` | Dossier du brut | Exemples de sources |
   |---|---|---|---|
