@@ -511,6 +511,24 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
   retrouve que par son titre). Limites : `porter` ne ramène à leur racine que les mots anglais ;
   FTS5 est propre à SQLite (PostgreSQL : `tsvector`). Reste au modèle : la colonne qui porte le
   texte complet d'un document de la bibliothèque.
+- **Clips (décidé par Sabine, 2026-10-09)** : les clips vivent dans le dossier `Clippings/` du
+  coffre Obsidian de la knowledge base, où Sabine les annote librement. K-B **copie** chaque clip
+  nouveau ou modifié, horodaté, dans `raw/selected_library/clipping/` ; le chemin de `Clippings/`
+  se règle par une variable d'environnement, comme `KB_DATA_DIR`. Le coffre et le dossier de
+  données de K-B sont **séparés** : revient sur l'ADR « Données hors du dépôt de code », qui
+  faisait du dossier de données le coffre Obsidian. Écartés : lire `Clippings/` en place (le brut
+  ne serait plus figé : une annotation changerait ce que K-B reconstruit) ; faire écrire le Web
+  Clipper dans `raw/selected_library/clipping/` (possible seulement si le dossier de données est
+  le coffre, puisque la « Note location » est relative au coffre ; le clip serait à la fois note
+  vivante et brut, et le coffre contiendrait les bruts de la veille et la base).
+  Relevé sur les 26 clips du coffre de Sabine (2026-10-09, par commande) : `title`, `source`,
+  `author`, `published`, `created`, `description`, `tags` présents dans les 26 ; `published` vide
+  dans 12 ; `author` est une liste de liens Obsidian (`- "[[Nom]]"`, à nettoyer, plusieurs
+  auteurs possibles) ; corps de 517 octets à 42,7 ko (400 ko pour les 26), avec le bruit de la
+  page (images, mentions du site). Correspondance : `title` → `item.title`, `source` →
+  `item.url`, `published` → `item.published_at` (vide si absente), `created` → `item.saved_at`,
+  `author` → `author.name`, **`description` → `item.summary`** (absente de `docs/stockage.md:58`),
+  `tags` : rien en v0, corps → texte complet.
 
 ### Question ouverte : miroir et multi-machines (séance 4)
 
