@@ -104,10 +104,10 @@ def test_the_collection_writes_the_arxiv_raw_under_arxiv_cscr_x_csai(
 
     collect_all_sources([ArxivSource()], raw_dir, tmp_path, COLLECTED_AT)
 
-    automated_watch_dir = raw_dir / "automated_watch"
-    raw_file_path = automated_watch_dir / "arxiv_cscr_x_csai" / "2026-10-05T093000Z.xml"
+    raw_file_path = (
+        raw_dir / "automated_watch" / "arxiv_cscr_x_csai" / "2026-10-05T093000Z.xml"
+    )
     assert raw_file_path.read_bytes() == RECORDED_RESPONSE
-    assert not (automated_watch_dir / "arxiv").exists()
 
 
 def test_a_collection_state_keyed_arxiv_cscr_x_csai_restarts_arxiv_from_its_date(

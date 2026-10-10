@@ -115,8 +115,8 @@ soit :
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| `test_the_collection_writes_the_arxiv_raw_under_arxiv_cscr_x_csai` (`tests/sources/test_arxiv.py:100`) | la collecte écrit `raw/automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml`, et rien sous `arxiv/` |
-| `test_a_collection_state_keyed_arxiv_cscr_x_csai_restarts_arxiv_from_its_date` (`:113`) | une clé `arxiv_cscr_x_csai` au 30/09 10:05 fait partir la requête de `202609231005`, soit la date moins 7 jours, et non du 1er mai |
+| `test_the_collection_writes_the_arxiv_raw_under_arxiv_cscr_x_csai` (`tests/sources/test_arxiv.py:100`) | la collecte écrit `raw/automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml` |
+| `test_a_collection_state_keyed_arxiv_cscr_x_csai_restarts_arxiv_from_its_date` (`:113`) | une clé `arxiv_cscr_x_csai` au 30/09 10:05 fait partir la requête de `202609231005`, soit la date moins 7 jours, et non du 1er mai ; la collecte réécrit la date sous la même clé |
 | Avant le changement de `FOLDER_PREFIX` : 4 échecs (les 2 tests ci-dessus, `test_arxiv_is_a_source_of_kb_collect`, `test_the_sources_are_collected_in_the_order_of_2026_10_06`) | les tests échouaient bien avant le code |
 | Après : `316 passed`, `ruff check`, `ruff format --check`, `mypy --strict` verts | rien d'autre n'est cassé |
 | `grep -rn '"arxiv"' src/k_b/sources/arxiv.py` → seule la ligne 218 (`source_code`) | critère de fin de #117 |
@@ -127,8 +127,9 @@ soit :
    puis réutilisé partout : `name`, `SOURCE_KINDS`, dossier et clé d'état (`collect.py:42,48,69`).
 2. **Que se passe-t-il si on collecte sans avoir lancé la commande ?** La clé
    `arxiv_cscr_x_csai` est absente : la collecte repart du 1er mai 2026, retélécharge tous
-   les papiers depuis (488 papiers mesurés au 02/10, `arxiv.py:42-43`, davantage aujourd'hui, non mesuré) et les écrit dans le nouveau dossier. Les bruts de `arxiv/` sont ignorés à
-   l'import (`source_contract.py:62-66`). Rien n'est perdu, mais le travail est refait.
+   les papiers depuis (488 papiers mesurés au 02/10, `arxiv.py:42-43`, davantage aujourd'hui,
+   non mesuré) et les écrit dans le nouveau dossier. Les bruts de `arxiv/` restent sur disque
+   mais ne sont plus lus par l'import (`source_contract.py:62-66`).
 3. **Pourquoi `source_code` ne change pas ?** C'est l'identité de la source dans la base (clé de
    `source`, règle `arxiv_revision`). Le flux est une autre notion. Le changer obligerait à
    modifier la base.
