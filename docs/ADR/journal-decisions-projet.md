@@ -730,6 +730,58 @@ encore l'ancien modèle.
   garder la table (une table, un modèle et une jointure pour trois lignes). Limites : ajouter un
   mode demandera une migration qui recrée SOURCE ; un test vérifie que chaque mode du `CHECK` a
   une durée dans `config.py`. `kb search --in watch|library|wiki` ne change pas.
+- **Les longueurs maximales ont leurs valeurs, en caractères : `publication` (`arxiv_id` 20,
+  `title` 500, `summary` 5 000), `vulnerability` (`cve_id` 20, `name` 500, `description` 5 000,
+  `vendor` 200, `product` 500), `release` (`tag_name` 255, `name` 255, `body` 125 000, `url`
+  2 000), `advisory` (`ghsa_id` 19, `summary` 1 000, `url` 2 000). Elles vivent dans `items.py`,
+  seul endroit à lire ; `stockage.md` y renvoie sans les recopier.** Décision de Sabine, sur la
+  proposition de la session. Pourquoi ces valeurs : aucune n'était écrite. « Aux valeurs du
+  document », dans l'issue, désignait le
+  [dictionnaire de données Merise](https://docs.google.com/spreadsheets/d/1SnPOPJVSiNrmeTety9z_KOB0wJjqIFbGWdhPUJwQbgk/edit)
+  (Google Sheet, état des décisions au 2026-10-08), qui ne donne aucune longueur de texte,
+  seulement 19 pour la référence GHSA (constat de Sabine). Les autres partent du plus long texte
+  de la collecte du 2026-10-07, avec une marge : aucune n'écarte un item de cette collecte (la
+  plus longue note de release fait 28 783 caractères ; une borne à 10 000 en aurait écarté 22 sur
+  100). Pourquoi pas de copie dans `stockage.md` : ce serait une troisième copie, qu'aucun test ne
+  tient. Précise la décision du 2026-10-08 (« tenue deux fois »), sans la changer. Limites : les
+  limites de GitHub pour `tag_name`, `name` et le résumé d'une alerte ne sont pas vérifiées ;
+  125 000 vient d'un message d'erreur de l'API GitHub rapporté par des tiers, 1 920 pour un
+  résumé arXiv de la page d'aide d'arXiv ; les autres dépôts suivis et les alertes `npm` ne sont
+  pas dans la collecte mesurée ; `length()` de SQLite s'arrête au premier caractère NUL.
+- **Côté Pydantic, les longueurs sont une table des bornes par sorte d'item dans `items.py`, lue
+  par un contrôle du modèle, et non un `max_length` par champ.** Décision de Sabine, sur la
+  recommandation de la session. Pourquoi : `Item` est un modèle commun, et son champ `summary`
+  alimente le résumé arXiv, la description CISA et la note de release ; avec la table, chaque
+  colonne garde sa borne, et le message dit le champ, la longueur reçue et le maximum, comme le
+  demande la décision du 2026-10-08. Options écartées : un `max_length` par champ (une seule
+  borne, 125 000, pour les trois textes ; le message de Pydantic ne dit pas la longueur reçue) ;
+  un modèle Pydantic par sorte (refonte d'`Item`, hors de l'issue). Une sorte sans table en base
+  (`newsletter_article`) n'a pas de borne : elle vient avec sa table. Limite : le critère de
+  l'issue sur le motif des rejets (#92, « le champ et le type d'erreur Pydantic […], sans la
+  valeur reçue ») effacerait la longueur et le maximum ; son texte est à accorder.
+- **Une liste JSON (`publication.authors`, `advisory.packages`) est bornée en nombre d'éléments,
+  en base et dans l'item (1 000 auteurs, 100 paquets) ; la longueur de chaque élément (200 et 255
+  caractères) n'est tenue que par l'item.** Décision de Sabine, sur la proposition de la session.
+  Pourquoi : un `CHECK` de SQLite ne peut pas parcourir les éléments d'une liste (pas de
+  sous-requête dans un `CHECK`). Le nombre d'éléments a son propre `CHECK`, séparé de celui de la
+  forme JSON : SQLite nomme dans son message le `CHECK` qui refuse. Option écartée : borner la
+  longueur du texte JSON (aucune borne égale côté item, le texte JSON est produit par l'import).
+  Limite assumée : la longueur d'un nom **déroge** à « tenue deux fois » (2026-10-08).
+- **Restent sans borne de longueur : les colonnes que le code remplit (`source`,
+  `tracked_repository`, le chemin et le flux de `raw_data`), les dates, qui gardent leur `CHECK`
+  de format, et `highlight`, `repository` et `star_gain`.** Décision de Sabine. Pourquoi : la
+  borne tient ce qu'une source peut écrire ; ces colonnes n'ont pas de modèle Pydantic en face.
+  Limite : les bornes de `highlight` sont à fixer avec son lecteur ; `repository` et `star_gain`
+  sont des tables du modèle précédent, sans écrivain, dont le sort n'est pas décidé ici.
+- **Chaque `CHECK` de `schema.sql` a sa valeur refusée dans un test, qui attend le texte de ce
+  `CHECK` dans le message de SQLite ; une garde fait échouer la suite si un `CHECK` est ajouté
+  sans sa valeur refusée.** Décision de Sabine, sur la proposition de la session et de la
+  relecture du plan. Pourquoi : la décision du jour sur `schema.sql` demande un test du
+  comportement des `CHECK`, qu'une migration peut perdre sans bruit ; compter les cas ne prouve
+  pas que chaque `CHECK` a le sien. Options écartées : nommer les contraintes (`CONSTRAINT nom`),
+  un essai de la relecture ayant vu un nom ressortir pour un autre `CHECK` ; déplacer les 11
+  tests de refus déjà écrits dans la table des cas (retouche de code qui marche). Limite
+  assumée : ces 11 `CHECK` sont testés deux fois.
 
 ### Configuration
 
@@ -763,3 +815,9 @@ encore l'ancien modèle.
   alertes GitHub (`kind` = `advisory`).
 - **Transfert hors UE par les agents** : un agent qui lit les items par l'API envoie leur contenu
   au fournisseur du modèle (États-Unis). Cadre juridique non vérifié.
+- **Motif d'un rejet pour longueur** : le critère de l'issue sur le motif des rejets (#92) ne
+  garde que le champ et le type d'erreur, alors que la décision du 2026-10-08 demande la longueur
+  reçue et le maximum. À accorder par Sabine avant de coder #92 (2026-10-10).
+- **Tables `repository` et `star_gain`** : restées dans `schema.sql` après la réécriture, sans
+  écrivain ; la clarification les remplace par TENDANCE. Quand les retirer n'est pas décidé
+  (2026-10-10).
