@@ -218,6 +218,36 @@ def test_an_entry_refused_as_an_item_is_rejected_and_the_others_of_its_file_are_
     assert "entry 2" in caplog.text
 
 
+def test_a_title_too_long_is_rejected_and_logged_and_the_other_papers_are_read(
+    tmp_path, caplog
+):
+    feed = (FIXTURES_DIR / "arxiv_extract.xml").read_text()
+    title = (
+        "Resource-Optimized and Energy-Aware Agentic AI Framework Anchored on"
+        " Blockchain for Secure Software Supply Chains"
+    )
+    assert feed.count(f"<title>{title}</title>") == 1
+    too_long_title = title + " and" * 100
+    feed = feed.replace(f"<title>{title}</title>", f"<title>{too_long_title}</title>")
+    source_dir = tmp_path / "automated_watch" / "arxiv_cscr_x_csai"
+    source_dir.mkdir(parents=True)
+    (source_dir / f"{COLLECTION_NAME}.xml").write_text(feed)
+
+    with caplog.at_level(logging.WARNING):
+        reading = read_raw_items(tmp_path, SOURCE_KINDS)
+
+    assert len(reading.items) == 2
+    assert "2609.31282" not in [item.source_item_id for item in reading.items]
+    observed = f"title too long: {len(too_long_title)} characters, maximum 500"
+    (rejection,) = reading.rejections
+    assert rejection.raw_file_path == (
+        f"automated_watch/arxiv_cscr_x_csai/{COLLECTION_NAME}.xml"
+    )
+    assert rejection.reason.startswith("entry 0: ValidationError")
+    assert observed in rejection.reason
+    assert observed in caplog.text
+
+
 def test_hidden_files_are_ignored(tmp_path):
     copy_fixture(tmp_path, "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml")
     (tmp_path / "automated_watch" / "arxiv_cscr_x_csai" / ".DS_Store").write_bytes(

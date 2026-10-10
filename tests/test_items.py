@@ -229,3 +229,112 @@ def test_an_invalid_release_is_refused(changes):
 def test_an_invalid_advisory_is_refused(changes):
     with pytest.raises(ValidationError):
         Item(**advisory_fields(**changes))
+
+
+def text_of_length(field, length):
+    """A text of this length that the format of its field accepts."""
+    if field == "url":
+        return "https://" + "x" * (length - len("https://"))
+    if field == "cve":
+        return "CVE-2026-" + "1" * (length - len("CVE-2026-"))
+    return "x" * length
+
+
+@pytest.mark.parametrize(
+    "build_fields, field, maximum",
+    [
+        (item_fields, "source_item_id", 20),
+        (item_fields, "title", 500),
+        (item_fields, "summary", 5_000),
+        (vulnerability_fields, "cve", 20),
+        (vulnerability_fields, "title", 500),
+        (vulnerability_fields, "summary", 5_000),
+        (vulnerability_fields, "vendor", 200),
+        (vulnerability_fields, "product", 500),
+        (release_fields, "tag_name", 255),
+        (release_fields, "release_name", 255),
+        (release_fields, "summary", 125_000),
+        (release_fields, "url", 2_000),
+        (advisory_fields, "source_item_id", 19),
+        (advisory_fields, "cve", 20),
+        (advisory_fields, "title", 1_000),
+        (advisory_fields, "url", 2_000),
+    ],
+)
+def test_a_text_is_accepted_up_to_its_maximum_length_and_refused_beyond(
+    build_fields, field, maximum
+):
+    longest = text_of_length(field, maximum)
+    assert getattr(Item(**build_fields(**{field: longest})), field) == longest
+
+    with pytest.raises(ValidationError) as refusal:
+        Item(**build_fields(**{field: text_of_length(field, maximum + 1)}))
+
+    assert f"{field} too long: {maximum + 1} characters, maximum {maximum}" in str(
+        refusal.value
+    )
+
+
+@pytest.mark.parametrize(
+    "build_fields, field, maximum",
+    [(item_fields, "authors", 1_000), (advisory_fields, "package_names", 100)],
+)
+def test_a_list_is_accepted_up_to_its_maximum_count_and_refused_beyond(
+    build_fields, field, maximum
+):
+    assert len(getattr(Item(**build_fields(**{field: ("x",) * maximum})), field)) == (
+        maximum
+    )
+
+    with pytest.raises(ValidationError) as refusal:
+        Item(**build_fields(**{field: ("x",) * (maximum + 1)}))
+
+    assert f"{field} too long: {maximum + 1} elements, maximum {maximum}" in str(
+        refusal.value
+    )
+
+
+@pytest.mark.parametrize(
+    "build_fields, field, maximum",
+    [(item_fields, "authors", 200), (advisory_fields, "package_names", 255)],
+)
+def test_an_element_of_a_list_is_accepted_up_to_its_maximum_length_and_refused_beyond(
+    build_fields, field, maximum
+):
+    longest = "x" * maximum
+    assert getattr(Item(**build_fields(**{field: ("x", longest)})), field) == (
+        "x",
+        longest,
+    )
+
+    with pytest.raises(ValidationError) as refusal:
+        Item(**build_fields(**{field: ("x", longest + "x")}))
+
+    assert (
+        f"an element of {field} too long: {maximum + 1} characters, maximum {maximum}"
+        in str(refusal.value)
+    )
+
+
+def test_every_text_too_long_of_an_item_is_named():
+    with pytest.raises(ValidationError) as refusal:
+        Item(**item_fields(title="x" * 501, summary="x" * 5_001))
+
+    assert "title too long: 501 characters, maximum 500" in str(refusal.value)
+    assert "summary too long: 5001 characters, maximum 5000" in str(refusal.value)
+
+
+def test_a_kind_without_a_table_in_the_database_has_no_maximum_length():
+    title = "x" * 200_000
+
+    item = Item(
+        **item_fields(
+            source_code="tldr",
+            kind="newsletter_article",
+            title=title,
+            authors=(),
+            revised_at=None,
+        )
+    )
+
+    assert item.title == title
