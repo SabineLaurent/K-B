@@ -20,9 +20,10 @@ sous-traitant.
 | Source | Donnée personnelle | Écartée dès la collecte | Gardée dans le brut | Gardée dans la base |
 |---|---|---|---|---|
 | API GitHub | login de l'auteur d'une release ou d'une alerte ; login des personnes créditées dans une alerte (`credits` : qui a trouvé ou corrigé la faille) | — | oui | **non** : écarté à la lecture (minimisation) |
+| API GitHub (texte d'une release) | login ou @mention écrits par les auteurs de la release dans ses notes (`body`), texte libre | — | oui | oui, `release.body`, gardé tel que reçu, sans filtre |
 | API GitHub (dépôts les plus étoilés) | login du propriétaire, dans le nom du dépôt (`owner/repo`), quand c'est une personne | — | oui | oui : il identifie le dépôt |
 | GH Archive | login de l'auteur de chaque événement (`actor`) | **oui** : la requête ne le sélectionne pas | non | non |
-| API arXiv | noms des auteurs des papiers | — | oui | oui, `author` |
+| API arXiv | noms des auteurs des papiers | — | oui | oui, `publication.authors` (liste JSON, dans l'ordre d'arXiv) |
 | Web Clipper | auteur de l'article gardé (`author`) ; date où l'utilisatrice l'a gardé (`created`) | — | oui | oui, `author` et `item.saved_at` |
 | Zotero | auteurs des papiers ; toute la bibliothèque de l'utilisatrice (notes, surlignages, dates d'ajout) | — | oui, copie de la base | auteurs (`author`), surlignages (`highlight`), date d'ajout (`item.saved_at`) |
 | tldr.tech | aucune : les pages ne portent ni auteur ni expéditeur (vérifié dans #13) ; un résumé peut citer une personnalité publique | — | oui | sans objet (aucune donnée personnelle collectée) |
@@ -37,11 +38,11 @@ entreprise.
 |---|---|
 | Finalité | Suivre l'actualité tech (papiers, vulnérabilités, versions, dépôts, articles) et répondre à « quoi de neuf cette semaine ». |
 | Base légale | Intérêt légitime (art. 6.1.f) : veille professionnelle et formation. Les données sont publiées par les personnes elles-mêmes pour être diffusées, et réduites à un nom. |
-| Personnes concernées | Auteurs de papiers arXiv, auteurs d'articles gardés avec Web Clipper, auteurs de releases et d'alertes GitHub, personnes créditées dans une alerte GitHub, propriétaires d'un dépôt du top 100 GitHub. |
-| Données | Nom d'auteur et ordre dans la liste des auteurs (`author`, `item_author`). Login GitHub : brut seulement, sauf celui du propriétaire d'un dépôt du top 100, gardé dans le nom du dépôt. Le brut GitHub contient aussi, pour chaque compte cité (auteur, personne créditée, propriétaire), son identifiant numérique et l'URL de son avatar, qui peut être une photo de la personne : brut seulement. |
+| Personnes concernées | Auteurs de papiers arXiv, auteurs d'articles gardés avec Web Clipper, auteurs de releases et d'alertes GitHub, personnes créditées dans une alerte GitHub, personnes citées dans les notes d'une release, propriétaires d'un dépôt du top 100 GitHub. |
+| Données | Noms des auteurs d'un papier, en liste JSON dans l'ordre d'arXiv (`publication.authors`). Login GitHub : brut seulement, sauf celui du propriétaire d'un dépôt du top 100, gardé dans le nom du dépôt, et sauf un login ou une @mention écrits dans les notes d'une release, gardées telles que reçues (`release.body`). Constat sur la collecte du 2026-10-07 : 12 des 100 notes de release contiennent un `@mot` (`@Claude`, `@file`, `@mention`, `@team`…) ; aucun n'a été vérifié comme étant un compte. Le brut GitHub contient aussi, pour chaque compte cité (auteur, personne créditée, propriétaire), son identifiant numérique et l'URL de son avatar, qui peut être une photo de la personne : brut seulement. |
 | Destinataires | L'utilisatrice ; les agents qu'elle lance, par l'API REST. |
 | Transferts hors UE | Quand un agent comme Claude Code lit les items par l'API, les noms d'auteurs lus partent chez le fournisseur du modèle, aux États-Unis. Cadre juridique de ce transfert non vérifié. |
-| Durée de conservation | **2 ans après la collecte**, dans la base et dans le brut (provisoire, à confirmer dans #20). Le brut et la base ont la même durée : la base doit rester reconstructible depuis le brut. |
+| Durée de conservation | Celle du mode d'acquisition de la source, tenue dans `src/k_b/config.py` (`RETENTION_YEARS_BY_ACQUISITION_MODE`) : pour la veille (`watch`), **2 ans après la collecte**, dans la base et dans le brut (provisoire, à confirmer dans #20). Le brut et la base ont la même durée : la base doit rester reconstructible depuis le brut. |
 | Sécurité | Données hors du dépôt de code (`~/K-B-data/`), jamais publiées ; fichiers lisibles par la seule utilisatrice ; l'API ouvre la base en lecture seule ; secrets en variables d'environnement. |
 
 ## Fiche 2 — Bibliothèque de lecture de l'utilisatrice
@@ -65,15 +66,14 @@ jamais les noms).
 
 | # | Traitement | Étape | Automatisée | Fréquence |
 |---|---|---|---|---|
-| 1 | Veille (fiche 1) | Les logins GitHub (auteurs, personnes créditées) ne sont pas lus dans les items ; GH Archive ne sélectionne pas `actor`. | oui, à la lecture et à la requête | à chaque collecte (une par jour) |
-| 2 | Veille (fiche 1) | Supprimer les items collectés il y a plus de 2 ans ; la cascade retire leurs liens d'auteurs, surlignages et sous-types. | oui, dernière étape de la collecte | à chaque collecte (une par jour) |
-| 3 | Veille (fiche 1) | Supprimer les auteurs qui n'ont plus aucun item. | oui, après l'étape 2 | à chaque collecte (une par jour) |
-| 4 | Veille (fiche 1) | Supprimer les fichiers bruts de plus de 2 ans dans `raw/automated_watch/`. | oui, après l'étape 3 | à chaque collecte (une par jour) |
-| 5 | Bibliothèque (fiche 2) | Supprimer les copies Zotero du brut sauf la plus récente. | oui, après chaque copie Zotero | à chaque copie Zotero |
-| 6 | Les deux | Demande d'une personne. Accès : lui dire ce qui est gardé à son nom. Effacement ou opposition : supprimer son nom de la base, supprimer les fichiers bruts qui le contiennent, et noter le nom dans une liste d'exclusion lue par la fusion, pour qu'une collecte ou une reconstruction ne le réintroduise pas. | non | à la demande, sous un mois (art. 12.3) |
-| 7 | Les deux | Relire ce registre : sources ajoutées, champs ajoutés à la base, durées. | non | une fois par an, et à chaque nouvelle source |
+| 1 | Veille (fiche 1) | Les logins GitHub des champs d'auteur et de crédit (auteurs, personnes créditées) ne sont pas lus dans les items ; GH Archive ne sélectionne pas `actor`. Les notes d'une release sont lues telles que reçues, avec les logins ou @mentions qu'elles contiennent. | oui, à la lecture et à la requête | à chaque collecte (une par jour) |
+| 2 | Veille (fiche 1) | Supprimer les items collectés depuis plus longtemps que la durée de leur mode d'acquisition (`src/k_b/config.py` ; 2 ans pour la veille). Les auteurs d'un papier partent avec lui : ils sont une colonne de `publication`. Constat : le schéma n'a de suppression en cascade ni vers les sous-types (`release`, `advisory`) ni vers les référentiels (`publication`, `vulnerability`). | prévue en dernière étape de la collecte ; pas encore codée (#83) | à chaque collecte (une par jour) |
+| 3 | Veille (fiche 1) | Supprimer les fichiers bruts de `raw/automated_watch/` plus anciens que la durée du mode `watch` (`src/k_b/config.py` ; 2 ans). | prévue après l'étape 2 ; pas encore codée (#83) | à chaque collecte (une par jour) |
+| 4 | Bibliothèque (fiche 2) | Supprimer les copies Zotero du brut sauf la plus récente. | oui, après chaque copie Zotero | à chaque copie Zotero |
+| 5 | Les deux | Demande d'une personne. Accès : lui dire ce qui est gardé à son nom. Effacement ou opposition : supprimer son nom de la base, supprimer les fichiers bruts qui le contiennent, et noter le nom dans une liste d'exclusion lue par la fusion, pour qu'une collecte ou une reconstruction ne le réintroduise pas. Dans la base, un nom d'auteur est dans la liste JSON de chaque papier (`publication.authors`) et un login peut être dans les notes d'une release (`release.body`) : l'effacement réécrit ces valeurs, ce n'est pas une suppression de ligne. | non | à la demande, sous un mois (art. 12.3) |
+| 6 | Les deux | Relire ce registre : sources ajoutées, champs ajoutés à la base, durées. | non | une fois par an, et à chaque nouvelle source |
 
-L'étape 6 est une exception assumée à la règle du brut jamais modifié : une obligation légale
+L'étape 5 est une exception assumée à la règle du brut jamais modifié : une obligation légale
 prime. La liste d'exclusion est elle-même une donnée personnelle ; elle vit hors du dépôt, avec
 les données.
 
