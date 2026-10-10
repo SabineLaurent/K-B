@@ -26,7 +26,6 @@ EMPTY_FEED = (
     b'xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">'
     b"<opensearch:totalResults>0</opensearch:totalResults></feed>"
 )
-COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
 
 
 class FakeResponse(io.BytesIO):
