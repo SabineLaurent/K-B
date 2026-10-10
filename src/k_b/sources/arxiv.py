@@ -56,7 +56,7 @@ ABSTRACT_PAGE_URL = "https://arxiv.org/abs/"
 
 
 # The name of its raw folders, written once: its instances and its kind use it.
-FOLDER_PREFIX = "arxiv"
+FOLDER_PREFIX = "arxiv_cscr_x_csai"
 
 
 class ArxivSource:

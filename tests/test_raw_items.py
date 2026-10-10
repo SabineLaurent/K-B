@@ -69,7 +69,7 @@ def write_most_starred_ranking(raw_dir: Path) -> None:
 
 
 def test_every_source_with_a_reader_gives_its_items(tmp_path):
-    copy_fixture(tmp_path, "arxiv_extract.xml", "arxiv", "xml")
+    copy_fixture(tmp_path, "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml")
     copy_fixture(tmp_path, "cisa_kev_extract.csv", "cisa_kev", "csv")
     copy_fixture(
         tmp_path,
@@ -90,7 +90,7 @@ def test_every_source_with_a_reader_gives_its_items(tmp_path):
             count_by_raw_file.get(item.raw_file_path, 0) + 1
         )
     assert count_by_raw_file == {
-        f"automated_watch/arxiv/{COLLECTION_NAME}.xml": 3,
+        f"automated_watch/arxiv_cscr_x_csai/{COLLECTION_NAME}.xml": 3,
         f"automated_watch/cisa_kev/{COLLECTION_NAME}.csv": 4,
         f"automated_watch/github_releases_anthropics_claude_code/{COLLECTION_NAME}.json": 3,
         f"automated_watch/github_advisories_pip/{COLLECTION_NAME}.json": 3,
@@ -115,7 +115,7 @@ def test_a_release_is_titled_by_the_repository_of_its_url(tmp_path):
 
 
 def test_an_unreadable_file_is_rejected_and_the_others_are_read(tmp_path, caplog):
-    copy_fixture(tmp_path, "arxiv_extract.xml", "arxiv", "xml")
+    copy_fixture(tmp_path, "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml")
     broken = tmp_path / "automated_watch" / "cisa_kev" / f"{COLLECTION_NAME}.csv"
     broken.parent.mkdir(parents=True)
     broken.write_bytes(b"<html>not a catalog</html>")
@@ -132,7 +132,7 @@ def test_an_unreadable_file_is_rejected_and_the_others_are_read(tmp_path, caplog
 
 
 def test_a_file_name_that_is_not_a_collection_time_is_rejected(tmp_path):
-    source_dir = tmp_path / "automated_watch" / "arxiv"
+    source_dir = tmp_path / "automated_watch" / "arxiv_cscr_x_csai"
     source_dir.mkdir(parents=True)
     shutil.copyfile(FIXTURES_DIR / "arxiv_extract.xml", source_dir / "latest.xml")
 
@@ -140,7 +140,7 @@ def test_a_file_name_that_is_not_a_collection_time_is_rejected(tmp_path):
 
     assert reading.items == []
     assert [rejection.raw_file_path for rejection in reading.rejections] == [
-        "automated_watch/arxiv/latest.xml"
+        "automated_watch/arxiv_cscr_x_csai/latest.xml"
     ]
 
 
@@ -193,7 +193,7 @@ def test_the_raw_files_of_an_untracked_repository_and_ecosystem_are_read(tmp_pat
 
 def test_files_are_read_in_collection_order(tmp_path):
     for collection_name in ("2026-10-06T093000Z", "2026-10-05T093000Z"):
-        source_dir = tmp_path / "automated_watch" / "arxiv"
+        source_dir = tmp_path / "automated_watch" / "arxiv_cscr_x_csai"
         source_dir.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(
             FIXTURES_DIR / "arxiv_extract.xml", source_dir / f"{collection_name}.xml"
@@ -240,8 +240,8 @@ def test_an_entry_refused_as_an_item_is_rejected_and_the_others_of_its_file_are_
 
 
 def test_hidden_files_are_ignored(tmp_path):
-    copy_fixture(tmp_path, "arxiv_extract.xml", "arxiv", "xml")
-    (tmp_path / "automated_watch" / "arxiv" / ".DS_Store").write_bytes(
+    copy_fixture(tmp_path, "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml")
+    (tmp_path / "automated_watch" / "arxiv_cscr_x_csai" / ".DS_Store").write_bytes(
         b"\x00\x00\x00\x01Bud1"
     )
 

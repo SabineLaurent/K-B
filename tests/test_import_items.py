@@ -21,7 +21,7 @@ AUTHORS_QUERY = (
 @pytest.fixture
 def data_dir(tmp_path):
     raw_dir = tmp_path / "raw"
-    copy_fixture(raw_dir, "arxiv_extract.xml", "arxiv", "xml")
+    copy_fixture(raw_dir, "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml")
     copy_fixture(raw_dir, "cisa_kev_extract.csv", "cisa_kev", "csv")
     copy_fixture(
         raw_dir,
@@ -106,7 +106,7 @@ def test_the_authors_keep_their_order(data_dir):
 
 
 def test_a_name_repeated_in_the_authors_keeps_its_first_position(data_dir):
-    path = data_dir / "raw/automated_watch/arxiv/2026-10-05T093000Z.xml"
+    path = data_dir / "raw/automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
     path.write_text(
         path.read_text().replace("Asadullah Abdullah Khan", "Toqeer Ali Syed")
     )
@@ -169,16 +169,17 @@ def test_each_duplicate_removed_is_written_to_the_log_with_its_rule(data_dir):
 
 
 def test_each_rejected_file_is_written_to_the_log(data_dir):
-    (data_dir / "raw/automated_watch/arxiv/2026-10-06T093000Z.xml").write_text(
-        "not xml"
-    )
+    (
+        data_dir / "raw/automated_watch/arxiv_cscr_x_csai/2026-10-06T093000Z.xml"
+    ).write_text("not xml")
 
     summary = run_import(data_dir)
 
     rejections = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
     assert summary.rejection_count == len(rejections) == 1
     assert (
-        rejections[0]["raw_file_path"] == "automated_watch/arxiv/2026-10-06T093000Z.xml"
+        rejections[0]["raw_file_path"]
+        == "automated_watch/arxiv_cscr_x_csai/2026-10-06T093000Z.xml"
     )
     assert rejections[0]["reason"]
 
@@ -243,14 +244,16 @@ def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir)
     query = "SELECT item_id FROM item WHERE source_item_id = ?"
     item_id = fetch_rows(data_dir, query, (FIRST_PAPER_ID,))[0][0]
     revision = (
-        data_dir / "raw/automated_watch/arxiv/2026-10-05T093000Z.xml"
+        data_dir / "raw/automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
     ).read_text()
     revision = revision.replace(
         "<updated>2026-09-25T13:53:50Z</updated>",
         "<updated>2026-10-02T08:00:00Z</updated>",
         1,
     ).replace("Asadullah Abdullah Khan", "Another Author")
-    (data_dir / "raw/automated_watch/arxiv/2026-10-06T093000Z.xml").write_text(revision)
+    (
+        data_dir / "raw/automated_watch/arxiv_cscr_x_csai/2026-10-06T093000Z.xml"
+    ).write_text(revision)
 
     run_import(data_dir)
 
@@ -263,7 +266,7 @@ def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir)
         (
             item_id,
             "2026-10-02T08:00:00Z",
-            "automated_watch/arxiv/2026-10-06T093000Z.xml",
+            "automated_watch/arxiv_cscr_x_csai/2026-10-06T093000Z.xml",
         )
     ]
     assert fetch_rows(data_dir, AUTHORS_QUERY, (FIRST_PAPER_ID,)) == [
@@ -274,7 +277,7 @@ def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir)
 
 def test_an_author_left_without_item_is_deleted(data_dir):
     run_import(data_dir)
-    path = data_dir / "raw/automated_watch/arxiv/2026-10-05T093000Z.xml"
+    path = data_dir / "raw/automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
     path.write_text(
         path.read_text().replace("Asadullah Abdullah Khan", "Another Author")
     )
