@@ -3,6 +3,15 @@ import shutil
 import sqlite3
 
 import pytest
+from test_items import (
+    COLLECTED_AT,
+    RAW_FILE_PATH,
+    advisory_fields,
+    item_fields,
+    release_fields,
+    text_of_length,
+    vulnerability_fields,
+)
 from test_raw_items import FIXTURES_DIR, copy_fixture
 
 from k_b import import_items as import_items_module
@@ -14,7 +23,12 @@ from k_b.import_items import (
     UnknownSourceError,
     import_items,
 )
-from k_b.items import Item
+from k_b.items import (
+    MAX_COUNT_BY_KIND,
+    MAX_ELEMENT_LENGTH_BY_KIND,
+    MAX_LENGTH_BY_KIND,
+    Item,
+)
 from k_b.source_contract import SourceKind, SourceReader
 from k_b.source_kinds import SOURCE_KINDS
 from k_b.sources.tracked_repositories import TRACKED_REPOSITORIES
@@ -515,3 +529,92 @@ def test_a_log_that_cannot_be_written_keeps_the_previous_log_whole(
     assert count_rows(data_dir, "SELECT count(*) FROM item") == 3 + 4 + 3 + 3
     assert (data_dir / "import-log.jsonl").read_text() == previous_log
     assert not (data_dir / "import-log.jsonl.tmp").exists()
+
+
+def text_at_its_maximum(kind, field, maximum):
+    """A text of the maximum length that names its kind and its field: no two columns hold
+    the same, so a writer that takes one field for another is seen."""
+    if field == "cve":
+        return text_of_length(field, maximum)
+    prefix = {"url": "https://", "source_item_id": "GHSA-" * (kind == "advisory")}.get(
+        field, ""
+    )
+    repeated = f"{kind}.{field}-" * maximum
+    return (prefix + repeated)[:maximum]
+
+
+def build_item_at_its_maximums(build_fields, collected_at, raw_file_path):
+    """An item of the kind of build_fields, each bounded text and list at its maximum."""
+    kind = build_fields()["kind"]
+    fields = {
+        field: text_at_its_maximum(kind, field, maximum)
+        for field, maximum in MAX_LENGTH_BY_KIND[kind].items()
+    }
+    for field, maximum_count in MAX_COUNT_BY_KIND.get(kind, {}).items():
+        fields[field] = ("x" * MAX_ELEMENT_LENGTH_BY_KIND[kind][field],) * maximum_count
+    return Item(
+        **build_fields(collected_at=collected_at, raw_file_path=raw_file_path, **fields)
+    )
+
+
+def test_an_item_with_every_text_and_list_at_its_maximum_goes_into_the_database(
+    tmp_path,
+):
+    source_dir = tmp_path / "raw" / "automated_watch" / "fake"
+    source_dir.mkdir(parents=True)
+    (source_dir / "2026-10-05T093000Z.txt").write_text("")
+    create_database(tmp_path / "k-b.sqlite")
+    builders = [item_fields, vulnerability_fields, release_fields, advisory_fields]
+    kinds = [
+        SourceKind(
+            "fake", (), SourceReader(lambda raw: builders, build_item_at_its_maximums)
+        )
+    ]
+
+    summary = import_items(
+        tmp_path / "raw",
+        tmp_path / "k-b.sqlite",
+        tmp_path / "import-log.jsonl",
+        kinds,
+        TRACKED_REPOSITORIES,
+    )
+
+    assert summary == (4, 0, 0)
+    paper, vulnerability, release, advisory = (
+        build_item_at_its_maximums(build_fields, COLLECTED_AT, RAW_FILE_PATH)
+        for build_fields in builders
+    )
+    assert fetch_rows(
+        tmp_path, "SELECT arxiv_id, title, summary, authors FROM publication"
+    ) == [
+        (
+            paper.source_item_id,
+            paper.title,
+            paper.summary,
+            json.dumps(list(paper.authors)),
+        )
+    ]
+    assert fetch_rows(
+        tmp_path, "SELECT cve_id, name, description, vendor, product FROM vulnerability"
+    ) == [
+        (
+            vulnerability.cve,
+            vulnerability.title,
+            vulnerability.summary,
+            vulnerability.vendor,
+            vulnerability.product,
+        )
+    ]
+    assert fetch_rows(tmp_path, "SELECT tag_name, name, body, url FROM release") == [
+        (release.tag_name, release.release_name, release.summary, release.url)
+    ]
+    assert fetch_rows(
+        tmp_path, "SELECT ghsa_id, summary, url, packages FROM advisory"
+    ) == [
+        (
+            advisory.source_item_id,
+            advisory.title,
+            advisory.url,
+            json.dumps(list(advisory.package_names)),
+        )
+    ]

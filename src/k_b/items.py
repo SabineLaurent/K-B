@@ -69,6 +69,44 @@ FIELDS_OF_ONE_KIND = {
 }
 KINDS_WITH_CVE = ("vulnerability", "advisory")
 
+# The longest text a source may write in each column of schema.sql, in characters, by kind and
+# by the field that fills the column. Held twice (ADR of 2026-10-08): here when the raw is
+# read, and by a CHECK of the column; a test keeps both equal. A kind without a table in the
+# base has no maximum yet.
+CVE_MAX_LENGTH = 20
+MAX_LENGTH_BY_KIND: dict[ItemKind, dict[str, int]] = {
+    "paper": {"source_item_id": 20, "title": 500, "summary": 5_000},
+    "vulnerability": {
+        "cve": CVE_MAX_LENGTH,
+        "title": 500,
+        "summary": 5_000,
+        "vendor": 200,
+        "product": 500,
+    },
+    "release": {
+        "tag_name": 255,
+        "release_name": 255,
+        "summary": 125_000,
+        "url": 2_000,
+    },
+    "advisory": {
+        "source_item_id": 19,
+        "cve": CVE_MAX_LENGTH,
+        "title": 1_024,
+        "url": 2_000,
+    },
+}
+# The lists written as JSON: the most elements, held by a CHECK too, and the longest element,
+# held here only (a CHECK of SQLite cannot go through the elements of a JSON list).
+MAX_COUNT_BY_KIND: dict[ItemKind, dict[str, int]] = {
+    "paper": {"authors": 1_000},
+    "advisory": {"package_names": 100},
+}
+MAX_ELEMENT_LENGTH_BY_KIND: dict[ItemKind, dict[str, int]] = {
+    "paper": {"authors": 200},
+    "advisory": {"package_names": 255},
+}
+
 
 class Item(BaseModel):
     # strict: a date given as text is refused, not parsed.
@@ -108,6 +146,7 @@ class Item(BaseModel):
         check_required_fields(self)
         check_fields_of_other_kinds(self)
         check_cve(self)
+        check_lengths(self)
         return self
 
 
@@ -146,3 +185,38 @@ def check_fields_of_other_kinds(item: Item) -> None:
 def check_cve(item: Item) -> None:
     if item.cve is not None and item.kind not in KINDS_WITH_CVE:
         raise ValueError(f"a {item.kind} item with a CVE")
+
+
+def check_lengths(item: Item) -> None:
+    """Refuse a text or a list longer than its maximum: the message says which field, its
+    length and the maximum."""
+    too_long = list_texts_too_long(item) + list_lists_too_long(item)
+    if too_long:
+        raise ValueError("; ".join(too_long))
+
+
+def list_texts_too_long(item: Item) -> list[str]:
+    too_long = []
+    for field, maximum in MAX_LENGTH_BY_KIND.get(item.kind, {}).items():
+        text = getattr(item, field)
+        if text is not None and len(text) > maximum:
+            too_long.append(
+                f"{field} too long: {len(text)} characters, maximum {maximum}"
+            )
+    return too_long
+
+
+def list_lists_too_long(item: Item) -> list[str]:
+    too_long = []
+    for field, maximum in MAX_COUNT_BY_KIND.get(item.kind, {}).items():
+        count = len(getattr(item, field))
+        if count > maximum:
+            too_long.append(f"{field} too long: {count} elements, maximum {maximum}")
+    for field, maximum in MAX_ELEMENT_LENGTH_BY_KIND.get(item.kind, {}).items():
+        longest = max(map(len, getattr(item, field)), default=0)
+        if longest > maximum:
+            too_long.append(
+                f"an element of {field} too long: {longest} characters,"
+                f" maximum {maximum}"
+            )
+    return too_long

@@ -5,6 +5,10 @@
 -- Reference data (the sources) is in seed_sources.sql, run right after this script.
 -- Every connection must run PRAGMA foreign_keys = ON: SQLite ignores foreign keys otherwise.
 -- Dates are UTC text, 'YYYY-MM-DDTHH:MM:SSZ'; the CHECK refuses any other form.
+-- A text a source writes has a maximum length, in characters, held twice: by the items
+-- (src/k_b/items.py) when the raw is read, and by a CHECK here; a test keeps both equal. A JSON
+-- list has a maximum count; the length of its elements is held by the items only, a CHECK
+-- cannot go through them.
 
 CREATE TABLE source (
     id               INTEGER PRIMARY KEY,
@@ -47,14 +51,15 @@ CREATE INDEX item_raw_data_id ON item (raw_data_id);
 -- arXiv columns are filled if and only if item_id points to the arXiv item.
 CREATE TABLE publication (
     id           INTEGER PRIMARY KEY,
-    arxiv_id     TEXT NOT NULL UNIQUE,
+    arxiv_id     TEXT NOT NULL UNIQUE CHECK (length(arxiv_id) <= 20),
     item_id      INTEGER UNIQUE REFERENCES item (id),
-    title        TEXT,
-    summary      TEXT,
+    title        TEXT CHECK (length(title) <= 500),
+    summary      TEXT CHECK (length(summary) <= 5000),
     -- The names, in arXiv's order.
     authors      TEXT
         CHECK (json_valid(authors) AND json_type(authors) = 'array'
-            AND json_array_length(authors) > 0),
+            AND json_array_length(authors) > 0)
+        CHECK (json_array_length(authors) <= 1000),
     submitted_at TEXT
         CHECK (submitted_at IS strftime('%Y-%m-%dT%H:%M:%SZ', submitted_at)),
     revised_at   TEXT
@@ -98,12 +103,13 @@ CREATE INDEX star_gain_window_end ON star_gain (window_end);
 CREATE TABLE vulnerability (
     id             INTEGER PRIMARY KEY,
     cve_id         TEXT NOT NULL UNIQUE
-        CHECK (cve_id GLOB 'CVE-[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]*'),
+        CHECK (cve_id GLOB 'CVE-[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]*')
+        CHECK (length(cve_id) <= 20),
     item_id        INTEGER UNIQUE REFERENCES item (id),
-    name           TEXT,
-    description    TEXT,
-    vendor         TEXT,
-    product        TEXT,
+    name           TEXT CHECK (length(name) <= 500),
+    description    TEXT CHECK (length(description) <= 5000),
+    vendor         TEXT CHECK (length(vendor) <= 200),
+    product        TEXT CHECK (length(product) <= 500),
     -- dateAdded is a day: written at midnight UTC (docs/stockage.md).
     date_added     TEXT
         CHECK (date_added IS strftime('%Y-%m-%dT%H:%M:%SZ', date_added)),
@@ -144,14 +150,18 @@ CREATE TABLE release (
     kind                  TEXT NOT NULL CHECK (kind = 'release'),
     tracked_repository_id INTEGER NOT NULL REFERENCES tracked_repository (id),
     release_id            INTEGER NOT NULL UNIQUE,
-    tag_name              TEXT NOT NULL CHECK (length(tag_name) > 0),
+    tag_name              TEXT NOT NULL
+        CHECK (length(tag_name) > 0)
+        CHECK (length(tag_name) <= 255),
     -- As GitHub gives them: name may be NULL, body is Markdown.
-    name                  TEXT,
-    body                  TEXT,
+    name                  TEXT CHECK (length(name) <= 255),
+    body                  TEXT CHECK (length(body) <= 125000),
     published_at          TEXT NOT NULL
         CHECK (published_at IS strftime('%Y-%m-%dT%H:%M:%SZ', published_at)),
     -- html_url, kept as given: a tag may hold characters to encode.
-    url                   TEXT NOT NULL CHECK (url GLOB 'https://*'),
+    url                   TEXT NOT NULL
+        CHECK (url GLOB 'https://*')
+        CHECK (length(url) <= 2000),
     FOREIGN KEY (item_id, kind) REFERENCES item (id, kind)
 ) STRICT;
 
@@ -163,17 +173,22 @@ CREATE TABLE advisory (
     id               INTEGER PRIMARY KEY,
     item_id          INTEGER NOT NULL UNIQUE,
     kind             TEXT NOT NULL CHECK (kind = 'advisory'),
-    ghsa_id          TEXT NOT NULL UNIQUE CHECK (ghsa_id GLOB 'GHSA-*'),
+    ghsa_id          TEXT NOT NULL UNIQUE
+        CHECK (ghsa_id GLOB 'GHSA-*')
+        CHECK (length(ghsa_id) <= 19),
     vulnerability_id INTEGER REFERENCES vulnerability (id),
-    summary          TEXT NOT NULL,
+    summary          TEXT NOT NULL CHECK (length(summary) <= 1024),
     published_at     TEXT NOT NULL
         CHECK (published_at IS strftime('%Y-%m-%dT%H:%M:%SZ', published_at)),
     -- html_url, kept as given.
-    url              TEXT NOT NULL CHECK (url GLOB 'https://*'),
+    url              TEXT NOT NULL
+        CHECK (url GLOB 'https://*')
+        CHECK (length(url) <= 2000),
     -- The affected packages, each once (decision of 2026-10-08: displayed, not filtered).
     packages         TEXT NOT NULL
         CHECK (json_valid(packages) AND json_type(packages) = 'array'
-            AND json_array_length(packages) > 0),
+            AND json_array_length(packages) > 0)
+        CHECK (json_array_length(packages) <= 100),
     FOREIGN KEY (item_id, kind) REFERENCES item (id, kind)
 ) STRICT;
 
