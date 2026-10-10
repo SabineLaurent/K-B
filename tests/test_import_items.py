@@ -217,7 +217,7 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(data_dir):
     with connection:
         connection.execute(
             "INSERT INTO raw_data (source_id, raw_file_path, stream, collected_at)"
-            " VALUES (1, ?, 'other', ?)",
+            " VALUES ((SELECT id FROM source WHERE source_code = 'github'), ?, 'other', ?)",
             ("automated_watch/other/x.json", "2026-10-01T00:00:00Z"),
         )
         # Same URL as an advisory of the fixture, under another identifier: refused by the base.

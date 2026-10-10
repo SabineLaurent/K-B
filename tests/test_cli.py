@@ -7,6 +7,7 @@ import pytest
 from test_collect import BrokenSource, WorkingSource
 
 from k_b import cli
+from k_b.import_items import UnknownSourceError
 from k_b.source_contract import SourceKind
 
 
@@ -238,5 +239,25 @@ def test_import_reports_a_failed_import_and_exits_1(monkeypatch, tmp_path, capsy
     assert exit_code == 1
     assert (
         "error: IntegrityError: UNIQUE constraint failed: item.url"
+        in capsys.readouterr().err
+    )
+
+
+def test_import_reports_a_source_missing_from_the_database_and_exits_1(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+
+    def fail_to_import(raw_dir, database_path, log_path, source_kinds):
+        raise UnknownSourceError("source_code not in the source table: cisa_kev")
+
+    monkeypatch.setattr(cli, "import_items", fail_to_import)
+
+    exit_code = cli.main(["import"])
+
+    assert exit_code == 1
+    assert (
+        "error: UnknownSourceError: source_code not in the source table: cisa_kev"
         in capsys.readouterr().err
     )

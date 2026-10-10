@@ -11,7 +11,7 @@ from pathlib import Path
 from k_b.collect import collect_all_sources
 from k_b.database.connection import DATABASE_FILE_NAME
 from k_b.database.creation import create_database
-from k_b.import_items import MissingDatabaseError, import_items
+from k_b.import_items import MissingDatabaseError, UnknownSourceError, import_items
 from k_b.raw_store import InvalidCollectionStateError
 from k_b.source_contract import list_sources
 from k_b.source_kinds import SOURCE_KINDS
@@ -93,7 +93,7 @@ def run_import(data_dir: Path) -> int:
     except MissingDatabaseError as error:
         print(f"error: {error}; create it with kb create-db", file=sys.stderr)
         return 2
-    except (sqlite3.Error, OSError) as error:
+    except (sqlite3.Error, OSError, UnknownSourceError) as error:
         print(f"error: {type(error).__name__}: {error}", file=sys.stderr)
         return 1
     print(f"items imported: {summary.item_count}")
