@@ -8,7 +8,7 @@ gives the same base and the same log.
 import json
 import os
 import sqlite3
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -99,15 +99,13 @@ def import_items(
 
 
 def write_item(connection: sqlite3.Connection, item: Item) -> None:
-    if item.kind not in ("paper", "vulnerability"):
+    write_kind = WRITER_BY_KIND.get(item.kind)
+    if write_kind is None:
         raise KindWithoutTableError(f"kind without a table in the base: {item.kind}")
     raw_data_id = write_raw_data(
         connection, item.source_code, item.collected_at, item.raw_file_path
     )
-    if item.kind == "paper":
-        write_paper(connection, item, raw_data_id)
-    else:
-        write_vulnerability(connection, item, raw_data_id)
+    write_kind(connection, item, raw_data_id)
 
 
 def write_paper(connection: sqlite3.Connection, item: Item, raw_data_id: int) -> None:
@@ -170,6 +168,13 @@ def upsert_item(
         "UPDATE item SET raw_data_id = ? WHERE id = ?", (raw_data_id, item_id)
     )
     return item_id
+
+
+# The kinds that have a table in the base, each with its writer.
+WRITER_BY_KIND: dict[str, Callable[[sqlite3.Connection, Item, int], None]] = {
+    "paper": write_paper,
+    "vulnerability": write_vulnerability,
+}
 
 
 def write_raw_data(

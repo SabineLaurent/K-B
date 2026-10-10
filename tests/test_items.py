@@ -100,6 +100,7 @@ def test_a_paper_and_a_vulnerability_with_their_fields_are_accepted():
         {"published_at": "2026-10-01T18:00:22Z"},
         {"collected_at": datetime(2026, 10, 5, 9, 30)},
         {"kind": "tweet"},
+        {"source_code": "zotero"},
         {"cve": "CVE-2026-48775"},
         {"vendor": "Apple"},
         {"summary": None},
@@ -116,6 +117,7 @@ def test_an_invalid_item_is_refused(changes):
 @pytest.mark.parametrize(
     "changes",
     [
+        {"source_code": "github"},
         {"cve": "CVE-26-1"},
         {"cve": None},
         {"vendor": None},

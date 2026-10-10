@@ -18,7 +18,7 @@ DATE_FIELDS = ("published_at", "revised_at", "saved_at", "collected_at")
 class Discard(NamedTuple):
     rule: DiscardRule
     item: Item
-    # The URL of the item kept in its place, to find it in the base.
+    # The URL of the item kept in its place.
     kept_url: str
 
 

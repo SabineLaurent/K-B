@@ -48,6 +48,9 @@ REQUIRED_FIELDS_BY_KIND = {
         "ransomware_use",
     ),
 }
+# The kinds written to a reference table as the item of its source of truth: an item of another
+# source would mark a CVE as exploited, or overwrite a paper (#15 widens it for Zotero).
+SOURCE_BY_KIND = {"paper": "arxiv", "vulnerability": "cisa_kev"}
 KEV_FIELDS = ("vendor", "product", "ransomware_use")
 KINDS_WITH_CVE = ("vulnerability", "advisory")
 
@@ -80,10 +83,17 @@ class Item(BaseModel):
 
     @model_validator(mode="after")
     def check_the_fields_of_its_kind(self) -> "Item":
+        check_source(self)
         check_required_fields(self)
         check_kev_fields(self)
         check_cve(self)
         return self
+
+
+def check_source(item: Item) -> None:
+    source_code = SOURCE_BY_KIND.get(item.kind, item.source_code)
+    if item.source_code != source_code:
+        raise ValueError(f"a {item.kind} item from {item.source_code}")
 
 
 def check_required_fields(item: Item) -> None:

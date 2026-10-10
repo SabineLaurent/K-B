@@ -235,8 +235,8 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(
     def refuse_vulnerability(connection, item, raw_data_id):
         raise sqlite3.IntegrityError("CHECK constraint failed: vulnerability")
 
-    monkeypatch.setattr(
-        import_items_module, "write_vulnerability", refuse_vulnerability
+    monkeypatch.setitem(
+        import_items_module.WRITER_BY_KIND, "vulnerability", refuse_vulnerability
     )
 
     with pytest.raises(sqlite3.IntegrityError):
