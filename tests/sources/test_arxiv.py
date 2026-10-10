@@ -7,7 +7,7 @@ import pytest
 
 from k_b import http_download
 from k_b.collect import collect_all_sources
-from k_b.raw_store import save_last_collection_dates
+from k_b.raw_store import load_last_collection_dates, save_last_collection_dates
 from k_b.source_contract import list_sources
 from k_b.source_kinds import SOURCE_KINDS
 from k_b.sources.arxiv import (
@@ -119,6 +119,7 @@ def test_a_collection_state_keyed_arxiv_cscr_x_csai_restarts_arxiv_from_its_date
     collect_all_sources([ArxivSource()], tmp_path / "raw", tmp_path, COLLECTED_AT)
 
     assert "submittedDate:[202609231005 TO " in fake_urlopen.search_query()
+    assert load_last_collection_dates(tmp_path)["arxiv_cscr_x_csai"] == COLLECTED_AT
 
 
 def test_the_window_ends_now(fake_urlopen):

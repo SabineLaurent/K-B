@@ -127,7 +127,7 @@ soit :
    puis réutilisé partout : `name`, `SOURCE_KINDS`, dossier et clé d'état (`collect.py:42,48,69`).
 2. **Que se passe-t-il si on collecte sans avoir lancé la commande ?** La clé
    `arxiv_cscr_x_csai` est absente : la collecte repart du 1er mai 2026, retélécharge tous
-   les papiers depuis (488 au 02/10, `arxiv.py:42-43`) et les écrit dans le nouveau dossier. Les bruts de `arxiv/` sont ignorés à
+   les papiers depuis (488 papiers mesurés au 02/10, `arxiv.py:42-43`, davantage aujourd'hui, non mesuré) et les écrit dans le nouveau dossier. Les bruts de `arxiv/` sont ignorés à
    l'import (`source_contract.py:62-66`). Rien n'est perdu, mais le travail est refait.
 3. **Pourquoi `source_code` ne change pas ?** C'est l'identité de la source dans la base (clé de
    `source`, règle `arxiv_revision`). Le flux est une autre notion. Le changer obligerait à
@@ -143,8 +143,8 @@ soit :
 
 ## Zones non vérifiées
 
-- La commande de migration n'a pas encore été lancée au moment de la note. Sa sortie sera ajoutée
-  à la PR une fois lancée sur `temp/.knowledge_base/`.
+- La commande de migration a été lancée sur `temp/.knowledge_base/` seulement (sortie dans la PR),
+  pas sur le vrai dossier de données.
 - Le réimport sur une vraie base après migration n'a pas été lancé. Le comportement décrit à la
   question 5 vient de la lecture du SQL, pas d'une exécution.
 
