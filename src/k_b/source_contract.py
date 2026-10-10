@@ -47,7 +47,7 @@ class SourceKind(NamedTuple):
     # The name of its raw folders, alone or followed by _ (github_releases_<repository>).
     folder_prefix: str
     sources: tuple[Source, ...]
-    # None while the kind has no reader yet.
+    # None: its raw files are not imported (no reader yet, or none planned).
     reader: SourceReader[Any] | None
 
 

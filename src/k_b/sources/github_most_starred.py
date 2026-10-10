@@ -1,8 +1,9 @@
-"""The most starred GitHub repositories source: its download (E), then its reader (T).
+"""The most starred GitHub repositories source: its download (E), and the reading of its ranking.
 
 Download the ranking of the most starred GitHub repositories, as published.
 
-Read a raw ranking of the most starred GitHub repositories, and convert each one into an item.
+Read a raw ranking of the most starred GitHub repositories: the download checks its response with
+it. The ranking gives no item: it does not enter the base (decision "Tops", 2026-10-08).
 """
 
 import json
@@ -10,8 +11,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import urlencode
 
-from k_b.items import Item
-from k_b.source_contract import SourceReader
 from k_b.sources.github_api import get_from_github_api
 from k_b.sources.github_dates import parse_github_date
 from k_b.sources.tracked_repositories import is_repository_name
@@ -119,25 +118,5 @@ def parse_repository(item: object, rank: int) -> StarredRepository:
     )
 
 
-def convert_starred_repository(
-    repository: StarredRepository, collected_at: datetime, raw_file_path: str
-) -> Item:
-    return Item(
-        source_code="github",
-        source_item_id=repository.full_name,
-        title=repository.full_name,
-        url=repository.url,
-        summary=repository.description,
-        collected_at=collected_at,
-        raw_file_path=raw_file_path,
-        repository_name=repository.full_name,
-    )
-
-
 def read_ranking(raw_response: bytes) -> list[StarredRepository]:
     return read_most_starred(raw_response, expected_size=RANKING_SIZE)
-
-
-READER: SourceReader[StarredRepository] = SourceReader(
-    read_ranking, convert_starred_repository
-)

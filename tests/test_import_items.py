@@ -1,21 +1,30 @@
 import json
+import logging
 import shutil
 import sqlite3
 
 import pytest
-from test_raw_items import FIXTURES_DIR, copy_fixture, write_most_starred_ranking
+from test_raw_items import FIXTURES_DIR, copy_fixture
 
 from k_b import import_items as import_items_module
 from k_b.database.connection import connect_database
 from k_b.database.creation import create_database
-from k_b.import_items import MissingDatabaseError, UnknownSourceError, import_items
+from k_b.import_items import (
+    KindWithoutTableError,
+    MissingDatabaseError,
+    UnknownSourceError,
+    import_items,
+)
+from k_b.items import Item
+from k_b.source_contract import SourceKind, SourceReader
 from k_b.source_kinds import SOURCE_KINDS
 
 FIRST_PAPER_ID = "2609.31282"
-FIRST_PAPER_AUTHORS = [("Toqeer Ali Syed", 1), ("Asadullah Abdullah Khan", 2)]
-AUTHORS_QUERY = (
-    "SELECT name, position FROM item_author JOIN author USING (author_id)"
-    " JOIN item USING (item_id) WHERE source_item_id = ? ORDER BY position"
+FIRST_CVE_ID = "CVE-2026-86950"
+PAPER_QUERY = (
+    "SELECT item.id, item.kind, raw_file_path, title, authors, submitted_at, revised_at"
+    " FROM publication JOIN item ON item.id = publication.item_id"
+    " JOIN raw_data ON raw_data.id = item.raw_data_id WHERE arxiv_id = ?"
 )
 
 
@@ -24,16 +33,6 @@ def data_dir(tmp_path):
     raw_dir = tmp_path / "raw"
     copy_fixture(raw_dir, "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml")
     copy_fixture(raw_dir, "cisa_kev_extract.csv", "cisa_kev", "csv")
-    copy_fixture(
-        raw_dir,
-        "github_releases_extract.json",
-        "github_releases_anthropics_claude_code",
-        "json",
-    )
-    copy_fixture(
-        raw_dir, "github_advisories_extract.json", "github_advisories_pip", "json"
-    )
-    write_most_starred_ranking(raw_dir)
     create_database(tmp_path / "k-b.sqlite")
     return tmp_path
 
@@ -78,12 +77,49 @@ def read_log(data_dir):
 def test_the_raw_files_go_into_the_database(data_dir):
     summary = run_import(data_dir)
 
-    assert summary.item_count == 3 + 4 + 3 + 3 + 100
+    assert summary.item_count == 3 + 4
     assert count_rows(data_dir, "SELECT count(*) FROM item") == summary.item_count
-    assert count_rows(data_dir, "SELECT count(*) FROM raw_data") == 5
-    assert count_rows(data_dir, "SELECT count(*) FROM item_author") == 11
-    assert count_rows(data_dir, "SELECT count(*) FROM repository") == 100
-    assert count_rows(data_dir, "SELECT count(*) FROM vulnerability") == 4 + 3
+    assert count_rows(data_dir, "SELECT count(*) FROM raw_data") == 2
+    assert count_rows(data_dir, "SELECT count(*) FROM publication") == 3
+    assert count_rows(data_dir, "SELECT count(*) FROM vulnerability") == 4
+
+
+def test_an_arxiv_item_gives_an_item_and_its_publication(data_dir):
+    run_import(data_dir)
+
+    ((_, kind, raw_file_path, title, authors, submitted_at, revised_at),) = fetch_rows(
+        data_dir, PAPER_QUERY, (FIRST_PAPER_ID,)
+    )
+    assert kind == "paper"
+    assert raw_file_path == "automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
+    assert title.startswith("Resource-Optimized and Energy-Aware Agentic AI")
+    assert json.loads(authors) == ["Toqeer Ali Syed", "Asadullah Abdullah Khan"]
+    assert submitted_at == revised_at == "2026-09-25T13:53:50Z"
+
+
+def test_a_cisa_row_gives_an_item_and_its_vulnerability(data_dir):
+    run_import(data_dir)
+
+    assert fetch_rows(
+        data_dir,
+        "SELECT item.kind, name, vendor, product, date_added, ransomware_use,"
+        " revised_at, withdrawn_at, substr(description, 1, 25)"
+        " FROM vulnerability JOIN item ON item.id = vulnerability.item_id"
+        " WHERE cve_id = ?",
+        (FIRST_CVE_ID,),
+    ) == [
+        (
+            "vulnerability",
+            "Apple Multiple Products Out-of-Bounds Write Vulnerability",
+            "Apple",
+            "Multiple Products",
+            "2026-09-29T00:00:00Z",
+            "Unknown",
+            None,
+            None,
+            "Apple iOS, macOS, and iPa",
+        )
+    ]
 
 
 def test_an_item_points_to_the_raw_file_and_date_of_its_collection(data_dir):
@@ -94,7 +130,7 @@ def test_an_item_points_to_the_raw_file_and_date_of_its_collection(data_dir):
         "SELECT DISTINCT collected_at, raw_file_path, stream, source.source_code"
         " FROM item JOIN raw_data ON raw_data.id = item.raw_data_id"
         " JOIN source ON source.id = raw_data.source_id"
-        " WHERE item.source_code = 'cisa_kev'",
+        " WHERE item.kind = 'vulnerability'",
     )
 
     assert rows == [
@@ -107,23 +143,24 @@ def test_an_item_points_to_the_raw_file_and_date_of_its_collection(data_dir):
     ]
 
 
-def test_the_authors_keep_their_order(data_dir):
-    run_import(data_dir)
-
-    assert fetch_rows(data_dir, AUTHORS_QUERY, (FIRST_PAPER_ID,)) == FIRST_PAPER_AUTHORS
-
-
-def test_a_name_repeated_in_the_authors_keeps_its_first_position(data_dir):
-    path = data_dir / "raw/automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
-    path.write_text(
-        path.read_text().replace("Asadullah Abdullah Khan", "Toqeer Ali Syed")
+def test_a_raw_file_of_releases_is_skipped_and_logged(data_dir, caplog):
+    copy_fixture(
+        data_dir / "raw",
+        "github_releases_extract.json",
+        "github_releases_anthropics_claude_code",
+        "json",
     )
 
-    run_import(data_dir)
+    with caplog.at_level(logging.INFO):
+        summary = run_import(data_dir)
 
-    assert fetch_rows(data_dir, AUTHORS_QUERY, (FIRST_PAPER_ID,)) == [
-        ("Toqeer Ali Syed", 1)
-    ]
+    assert summary.item_count == 3 + 4
+    assert summary.rejection_count == 0
+    assert count_rows(data_dir, "SELECT count(*) FROM raw_data") == 2
+    assert (
+        "source without a reader, skipped: github_releases_anthropics_claude_code"
+        in caplog.text
+    )
 
 
 def test_an_import_run_again_on_the_same_raw_gives_the_same_database_and_log(data_dir):
@@ -139,40 +176,37 @@ def test_an_import_run_again_on_the_same_raw_gives_the_same_database_and_log(dat
 
 def test_a_new_collection_keeps_the_identifier_of_an_item_already_imported(data_dir):
     run_import(data_dir)
-    query = "SELECT item_id FROM item WHERE source_item_id = 'GHSA-fjqc-hq36-qh5p'"
-    item_id = count_rows(data_dir, query)
+    query = "SELECT item_id FROM vulnerability WHERE cve_id = ?"
+    item_id = fetch_rows(data_dir, query, (FIRST_CVE_ID,))[0][0]
     shutil.copyfile(
-        FIXTURES_DIR / "github_advisories_extract.json",
-        data_dir / "raw/automated_watch/github_advisories_pip/2026-10-06T093000Z.json",
+        FIXTURES_DIR / "cisa_kev_extract.csv",
+        data_dir / "raw/automated_watch/cisa_kev/2026-10-06T093000Z.csv",
     )
 
     run_import(data_dir)
 
-    assert count_rows(data_dir, query) == item_id
-    assert (
-        count_rows(data_dir, "SELECT count(*) FROM item WHERE source_code = 'github'")
-        == 106
-    )
+    assert fetch_rows(data_dir, query, (FIRST_CVE_ID,))[0][0] == item_id
+    assert count_rows(data_dir, "SELECT count(*) FROM item") == 3 + 4
 
 
 def test_each_duplicate_removed_is_written_to_the_log_with_its_rule(data_dir):
     shutil.copyfile(
-        FIXTURES_DIR / "github_advisories_extract.json",
-        data_dir / "raw/automated_watch/github_advisories_pip/2026-10-06T093000Z.json",
+        FIXTURES_DIR / "cisa_kev_extract.csv",
+        data_dir / "raw/automated_watch/cisa_kev/2026-10-06T093000Z.csv",
     )
 
     summary = run_import(data_dir)
 
     discards = [line for line in read_log(data_dir) if line["kind"] == "discard"]
-    assert summary.discard_count == len(discards) == 3
+    assert summary.discard_count == len(discards) == 4
     assert discards[0] == {
         "kind": "discard",
         "rule": "same_source_id",
-        "source_code": "github",
-        "source_item_id": "GHSA-fjqc-hq36-qh5p",
-        "url": "https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
-        "raw_file_path": "automated_watch/github_advisories_pip/2026-10-06T093000Z.json",
-        "kept_url": "https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
+        "source_code": "cisa_kev",
+        "source_item_id": FIRST_CVE_ID,
+        "url": f"https://nvd.nist.gov/vuln/detail/{FIRST_CVE_ID}",
+        "raw_file_path": "automated_watch/cisa_kev/2026-10-06T093000Z.csv",
+        "kept_url": f"https://nvd.nist.gov/vuln/detail/{FIRST_CVE_ID}",
     }
 
 
@@ -192,48 +226,63 @@ def test_each_rejected_file_is_written_to_the_log(data_dir):
     assert rejections[0]["reason"]
 
 
-def test_an_advisory_without_cve_is_a_vulnerability_without_cve(data_dir):
-    path = (
-        data_dir / "raw/automated_watch/github_advisories_pip/2026-10-05T093000Z.json"
-    )
-    advisories = json.loads(path.read_text())
-    advisories[0]["cve_id"] = None
-    path.write_text(json.dumps(advisories))
-
-    run_import(data_dir)
-
-    assert (
-        count_rows(
-            data_dir,
-            "SELECT count(*) FROM vulnerability JOIN item USING (item_id)"
-            " WHERE source_item_id = 'GHSA-fjqc-hq36-qh5p' AND cve IS NULL",
-        )
-        == 1
-    )
-
-
-def test_a_failed_import_leaves_the_database_and_the_log_unchanged(data_dir):
-    connection = connect_database(data_dir / "k-b.sqlite")
-    with connection:
-        connection.execute(
-            "INSERT INTO raw_data (source_id, raw_file_path, stream, collected_at)"
-            " VALUES ((SELECT id FROM source WHERE source_code = 'github'), ?, 'other', ?)",
-            ("automated_watch/other/x.json", "2026-10-01T00:00:00Z"),
-        )
-        # Same URL as an advisory of the fixture, under another identifier: refused by the base.
-        connection.execute(
-            "INSERT INTO item (source_code, source_item_id, title, url, raw_data_id)"
-            " VALUES ('github', 'other', 'Other', ?, 1)",
-            ("https://github.com/advisories/GHSA-fjqc-hq36-qh5p",),
-        )
-    connection.close()
+def test_a_failed_import_leaves_the_database_and_the_log_unchanged(
+    data_dir, monkeypatch
+):
     tables_before = dump_database(data_dir)
+
+    # The papers come first, in folder order: they are written, then a vulnerability fails.
+    def refuse_vulnerability(connection, item, raw_data_id):
+        raise sqlite3.IntegrityError("CHECK constraint failed: vulnerability")
+
+    monkeypatch.setattr(
+        import_items_module, "write_vulnerability", refuse_vulnerability
+    )
 
     with pytest.raises(sqlite3.IntegrityError):
         run_import(data_dir)
 
     assert dump_database(data_dir) == tables_before
     assert not (data_dir / "import-log.jsonl").exists()
+
+
+def convert_line_to_release(line, collected_at, raw_file_path):
+    return Item(
+        source_code="github",
+        source_item_id=line,
+        kind="release",
+        title=line,
+        url=f"https://github.com/owner/repository/releases/tag/{line}",
+        collected_at=collected_at,
+        raw_file_path=raw_file_path,
+    )
+
+
+def test_an_item_of_a_kind_without_table_is_refused_and_nothing_written(tmp_path):
+    source_dir = tmp_path / "raw" / "automated_watch" / "fake"
+    source_dir.mkdir(parents=True)
+    (source_dir / "2026-10-05T093000Z.txt").write_text("v1.0\n")
+    create_database(tmp_path / "k-b.sqlite")
+    kinds = [
+        SourceKind(
+            "fake",
+            (),
+            SourceReader(
+                lambda raw: raw.decode().splitlines(), convert_line_to_release
+            ),
+        )
+    ]
+
+    with pytest.raises(KindWithoutTableError, match="release"):
+        import_items(
+            tmp_path / "raw",
+            tmp_path / "k-b.sqlite",
+            tmp_path / "import-log.jsonl",
+            kinds,
+        )
+
+    assert count_rows(tmp_path, "SELECT count(*) FROM item") == 0
+    assert count_rows(tmp_path, "SELECT count(*) FROM raw_data") == 0
 
 
 def test_an_item_of_a_source_missing_from_the_database_is_refused(data_dir):
@@ -262,8 +311,7 @@ def test_a_missing_database_is_refused_and_not_created(tmp_path):
 
 def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir):
     run_import(data_dir)
-    query = "SELECT item_id FROM item WHERE source_item_id = ?"
-    item_id = fetch_rows(data_dir, query, (FIRST_PAPER_ID,))[0][0]
+    item_id = fetch_rows(data_dir, PAPER_QUERY, (FIRST_PAPER_ID,))[0][0]
     revision = (
         data_dir / "raw/automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
     ).read_text()
@@ -278,42 +326,17 @@ def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir)
 
     run_import(data_dir)
 
-    assert fetch_rows(
-        data_dir,
-        "SELECT item_id, revised_at, raw_file_path FROM item"
-        " JOIN raw_data ON raw_data.id = item.raw_data_id"
-        " WHERE source_item_id = ?",
-        (FIRST_PAPER_ID,),
-    ) == [
-        (
-            item_id,
-            "2026-10-02T08:00:00Z",
-            "automated_watch/arxiv_cscr_x_csai/2026-10-06T093000Z.xml",
-        )
-    ]
-    assert fetch_rows(data_dir, AUTHORS_QUERY, (FIRST_PAPER_ID,)) == [
-        ("Toqeer Ali Syed", 1),
-        ("Another Author", 2),
-    ]
-
-
-def test_an_author_left_without_item_is_deleted(data_dir):
-    run_import(data_dir)
-    path = data_dir / "raw/automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
-    path.write_text(
-        path.read_text().replace("Asadullah Abdullah Khan", "Another Author")
+    ((new_item_id, _, raw_file_path, _, authors, submitted_at, revised_at),) = (
+        fetch_rows(data_dir, PAPER_QUERY, (FIRST_PAPER_ID,))
     )
-
-    run_import(data_dir)
-
-    assert (
-        fetch_rows(
-            data_dir,
-            "SELECT name FROM author WHERE name = ?",
-            ("Asadullah Abdullah Khan",),
-        )
-        == []
+    assert new_item_id == item_id
+    assert raw_file_path == "automated_watch/arxiv_cscr_x_csai/2026-10-06T093000Z.xml"
+    assert json.loads(authors) == ["Toqeer Ali Syed", "Another Author"]
+    assert (submitted_at, revised_at) == (
+        "2026-09-25T13:53:50Z",
+        "2026-10-02T08:00:00Z",
     )
+    assert count_rows(data_dir, "SELECT count(*) FROM item") == 3 + 4
 
 
 def test_a_log_that_cannot_be_written_keeps_the_previous_log_whole(
@@ -331,6 +354,6 @@ def test_a_log_that_cannot_be_written_keeps_the_previous_log_whole(
         run_import(data_dir)
 
     # The base is written first, then the log: the base keeps its import.
-    assert count_rows(data_dir, "SELECT count(*) FROM item") == 3 + 4 + 3 + 3 + 100
+    assert count_rows(data_dir, "SELECT count(*) FROM item") == 3 + 4
     assert (data_dir / "import-log.jsonl").read_text() == previous_log
     assert not (data_dir / "import-log.jsonl.tmp").exists()

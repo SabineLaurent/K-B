@@ -1,9 +1,11 @@
 import io
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from urllib.error import HTTPError
 
 import pytest
+from pydantic import ValidationError
 
 from k_b import http_download
 from k_b.sources import cisa_kev
@@ -127,6 +129,7 @@ def test_a_vulnerability_keeps_its_publication_date_and_description():
     assert newest.date_added == date(2026, 9, 29)
     assert newest.vendor_project == "Apple"
     assert newest.product == "Multiple Products"
+    assert newest.known_ransomware_campaign_use == "Unknown"
     assert (
         newest.vulnerability_name
         == "Apple Multiple Products Out-of-Bounds Write Vulnerability"
@@ -137,6 +140,16 @@ def test_a_vulnerability_keeps_its_publication_date_and_description():
 def test_a_catalog_without_the_expected_columns_is_refused():
     with pytest.raises(ValueError, match="dateAdded"):
         read_new_vulnerabilities(b"cveID,vendorProject\nCVE-2026-1234,Apple\n", None)
+
+
+def test_a_catalog_without_the_ransomware_column_is_refused():
+    header, first_row = EXTRACT.decode("utf-8").splitlines()[:2]
+    catalog = f"{header}\n{first_row}\n".replace(
+        "knownRansomwareCampaignUse", "otherColumn"
+    )
+
+    with pytest.raises(ValueError, match="knownRansomwareCampaignUse"):
+        read_new_vulnerabilities(catalog.encode(), None)
 
 
 @pytest.mark.parametrize(
@@ -185,15 +198,30 @@ def test_a_vulnerability_points_to_its_nvd_page_and_is_dated_at_midnight_utc():
         vulnerability_name="Apple Multiple Products Out-of-Bounds Write Vulnerability",
         date_added=date(2026, 9, 29),
         short_description="An out-of-bounds write.",
+        known_ransomware_campaign_use="Known",
     )
 
     item = convert_vulnerability(vulnerability, COLLECTED_AT, RAW_FILE_PATH)
 
     assert item.source_code == "cisa_kev"
+    assert item.kind == "vulnerability"
     assert item.source_item_id == "CVE-2026-86950"
     assert item.title == "Apple Multiple Products Out-of-Bounds Write Vulnerability"
     assert item.url == "https://nvd.nist.gov/vuln/detail/CVE-2026-86950"
     assert item.published_at == datetime(2026, 9, 29, tzinfo=UTC)
     assert item.summary == "An out-of-bounds write."
     assert item.cve == "CVE-2026-86950"
-    assert item.is_vulnerability is True
+    assert item.vendor == "Apple"
+    assert item.product == "Multiple Products"
+    assert item.ransomware_use == "Known"
+
+
+def test_a_ransomware_use_outside_known_and_unknown_is_refused_as_an_item():
+    vulnerability = read_new_vulnerabilities(EXTRACT, last_collected_at=None)[0]
+
+    with pytest.raises(ValidationError):
+        convert_vulnerability(
+            replace(vulnerability, known_ransomware_campaign_use="Yes"),
+            COLLECTED_AT,
+            RAW_FILE_PATH,
+        )

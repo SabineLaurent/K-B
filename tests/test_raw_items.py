@@ -1,8 +1,9 @@
-import json
 import logging
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
+
+import pytest
 
 from k_b.items import Item
 from k_b.raw_items import read_raw_items
@@ -22,6 +23,7 @@ def convert_line(line: str, collected_at: datetime, raw_file_path: str) -> Item:
     return Item(
         source_code="tldr",
         source_item_id=line,
+        kind="newsletter_article",
         title=line,
         url=f"https://example.com/{line}",
         collected_at=collected_at,
@@ -49,38 +51,9 @@ def copy_fixture(raw_dir: Path, fixture: str, source: str, extension: str) -> Pa
     return path
 
 
-def write_most_starred_ranking(raw_dir: Path) -> None:
-    """A ranking of 100 repositories, the size the source asks for, built from the fixture."""
-    response = json.loads(
-        (FIXTURES_DIR / "github_most_starred_extract.json").read_bytes()
-    )
-    model = response["items"][0]
-    response["items"] = [
-        {
-            **model,
-            "full_name": f"owner/repository-{rank}",
-            "html_url": f"https://github.com/owner/repository-{rank}",
-        }
-        for rank in range(1, 101)
-    ]
-    source_dir = raw_dir / "automated_watch" / "github_most_starred"
-    source_dir.mkdir(parents=True)
-    (source_dir / f"{COLLECTION_NAME}.json").write_text(json.dumps(response))
-
-
 def test_every_source_with_a_reader_gives_its_items(tmp_path):
     copy_fixture(tmp_path, "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml")
     copy_fixture(tmp_path, "cisa_kev_extract.csv", "cisa_kev", "csv")
-    copy_fixture(
-        tmp_path,
-        "github_releases_extract.json",
-        "github_releases_anthropics_claude_code",
-        "json",
-    )
-    copy_fixture(
-        tmp_path, "github_advisories_extract.json", "github_advisories_pip", "json"
-    )
-    write_most_starred_ranking(tmp_path)
 
     reading = read_raw_items(tmp_path, SOURCE_KINDS)
 
@@ -92,26 +65,9 @@ def test_every_source_with_a_reader_gives_its_items(tmp_path):
     assert count_by_raw_file == {
         f"automated_watch/arxiv_cscr_x_csai/{COLLECTION_NAME}.xml": 3,
         f"automated_watch/cisa_kev/{COLLECTION_NAME}.csv": 4,
-        f"automated_watch/github_releases_anthropics_claude_code/{COLLECTION_NAME}.json": 3,
-        f"automated_watch/github_advisories_pip/{COLLECTION_NAME}.json": 3,
-        f"automated_watch/github_most_starred/{COLLECTION_NAME}.json": 100,
     }
     assert {item.collected_at for item in reading.items} == {COLLECTED_AT}
     assert reading.rejections == []
-
-
-def test_a_release_is_titled_by_the_repository_of_its_url(tmp_path):
-    # The releases of claude-code, in the folder of another tracked repository.
-    copy_fixture(
-        tmp_path,
-        "github_releases_extract.json",
-        "github_releases_langchain_ai_langchain",
-        "json",
-    )
-
-    titles = [item.title for item in read_raw_items(tmp_path, SOURCE_KINDS).items]
-
-    assert titles[0].startswith("anthropics/claude-code ")
 
 
 def test_an_unreadable_file_is_rejected_and_the_others_are_read(tmp_path, caplog):
@@ -168,27 +124,34 @@ def test_a_folder_of_no_source_kind_is_skipped_and_logged(tmp_path, caplog):
     assert "folder without a source kind, skipped: unknown" in caplog.text
 
 
-def test_the_raw_files_of_an_untracked_repository_and_ecosystem_are_read(tmp_path):
-    copy_fixture(
-        tmp_path,
-        "github_releases_extract.json",
-        "github_releases_someone_untracked",
-        "json",
-    )
-    copy_fixture(
-        tmp_path,
-        "github_advisories_extract.json",
-        "github_advisories_rubygems",
-        "json",
-    )
+def test_the_raw_files_of_a_folder_no_longer_tracked_are_read(tmp_path):
+    copy_fixture(tmp_path, "cisa_kev_extract.csv", "cisa_kev_old", "csv")
 
     reading = read_raw_items(tmp_path, SOURCE_KINDS)
 
     assert {item.raw_file_path.split("/")[1] for item in reading.items} == {
-        "github_releases_someone_untracked",
-        "github_advisories_rubygems",
+        "cisa_kev_old"
     }
     assert reading.rejections == []
+
+
+@pytest.mark.parametrize(
+    "folder_name",
+    [
+        "github_releases_anthropics_claude_code",
+        "github_advisories_pip",
+        "github_most_starred",
+    ],
+)
+def test_the_github_raw_files_are_skipped_and_logged(tmp_path, caplog, folder_name):
+    copy_fixture(tmp_path, "github_releases_extract.json", folder_name, "json")
+
+    with caplog.at_level(logging.INFO):
+        reading = read_raw_items(tmp_path, SOURCE_KINDS)
+
+    assert reading.items == []
+    assert reading.rejections == []
+    assert f"source without a reader, skipped: {folder_name}" in caplog.text
 
 
 def test_files_are_read_in_collection_order(tmp_path):

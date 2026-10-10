@@ -11,6 +11,7 @@ def make_item(**changes):
     fields = {
         "source_code": "github",
         "source_item_id": "GHSA-fjqc-hq36-qh5p",
+        "kind": "advisory",
         "title": "Path traversal in langchain",
         "url": "https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
         "collected_at": FIRST_COLLECTION,
@@ -24,9 +25,11 @@ def make_paper(revised_at, collected_at, title="A paper"):
     return make_item(
         source_code="arxiv",
         source_item_id="2509.12345",
+        kind="paper",
         title=title,
         url="https://arxiv.org/abs/2509.12345",
         authors=("Ada Lovelace",),
+        summary="What it says.",
         published_at=datetime(2025, 9, 15, 17, 0, tzinfo=UTC),
         revised_at=revised_at,
         collected_at=collected_at,
@@ -113,11 +116,16 @@ def test_the_same_cve_from_another_source_is_kept_as_a_second_item():
     from_cisa = make_item(
         source_code="cisa_kev",
         source_item_id="CVE-2026-48775",
+        kind="vulnerability",
         url="https://nvd.nist.gov/vuln/detail/CVE-2026-48775",
+        published_at=datetime(2026, 9, 29, tzinfo=UTC),
+        summary="A vulnerability.",
         cve="CVE-2026-48775",
-        is_vulnerability=True,
+        vendor="LangChain",
+        product="langchain",
+        ransomware_use="Unknown",
     )
-    from_github = make_item(cve="CVE-2026-48775", is_vulnerability=True)
+    from_github = make_item(cve="CVE-2026-48775")
 
     merged = merge_items([from_cisa, from_github])
 
@@ -126,12 +134,11 @@ def test_the_same_cve_from_another_source_is_kept_as_a_second_item():
 
 
 def test_the_same_cve_within_one_source_is_discarded_and_the_first_seen_kept():
-    first = make_item(cve="CVE-2026-48775", is_vulnerability=True)
+    first = make_item(cve="CVE-2026-48775")
     same_cve = make_item(
         source_item_id="GHSA-gr75-jv2w-4656",
         url="https://github.com/advisories/GHSA-gr75-jv2w-4656",
         cve="CVE-2026-48775",
-        is_vulnerability=True,
     )
 
     merged = merge_items([first, same_cve])

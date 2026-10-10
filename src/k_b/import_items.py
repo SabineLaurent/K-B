@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from k_b.database.connection import connect_database
-from k_b.items import Item
+from k_b.items import Item, ItemKind
 from k_b.merge import Discard, merge_items
 from k_b.raw_items import Rejection, read_raw_items
 from k_b.raw_store import find_stream
@@ -23,22 +23,32 @@ from k_b.source_contract import SourceKind
 # The date format the CHECK constraints of schema.sql accept.
 DATABASE_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
-# Every field of an item but its identifier is rewritten when the item is imported again:
-# a newer arXiv revision replaces the paper, under the same item_id.
-UPSERT_ITEM = """
-INSERT INTO item (
-    source_code, source_item_id, title, url, published_at, revised_at, saved_at, summary,
-    raw_data_id
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT (source_code, source_item_id) DO UPDATE SET
+# A paper seen again (a newer arXiv revision) rewrites its arXiv columns, under the same item.
+UPSERT_PUBLICATION = """
+INSERT INTO publication (arxiv_id, item_id, title, summary, authors, submitted_at, revised_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT (arxiv_id) DO UPDATE SET
+    item_id = excluded.item_id,
     title = excluded.title,
-    url = excluded.url,
-    published_at = excluded.published_at,
-    revised_at = excluded.revised_at,
-    saved_at = excluded.saved_at,
     summary = excluded.summary,
-    raw_data_id = excluded.raw_data_id
-RETURNING item_id
+    authors = excluded.authors,
+    submitted_at = excluded.submitted_at,
+    revised_at = excluded.revised_at
+"""
+
+# revised_at and withdrawn_at are left as they are: their rules are #105 and #106.
+UPSERT_VULNERABILITY = """
+INSERT INTO vulnerability (
+    cve_id, item_id, name, description, vendor, product, date_added, ransomware_use
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT (cve_id) DO UPDATE SET
+    item_id = excluded.item_id,
+    name = excluded.name,
+    description = excluded.description,
+    vendor = excluded.vendor,
+    product = excluded.product,
+    date_added = excluded.date_added,
+    ransomware_use = excluded.ransomware_use
 """
 
 
@@ -48,6 +58,10 @@ class MissingDatabaseError(FileNotFoundError):
 
 class UnknownSourceError(LookupError):
     """An item's source_code has no row in the source table of the base."""
+
+
+class KindWithoutTableError(LookupError):
+    """An item's kind has no table in the base yet: the import refuses it."""
 
 
 class ImportSummary(NamedTuple):
@@ -76,7 +90,6 @@ def import_items(
         with connection:
             for item in merged.items:
                 write_item(connection, item)
-            delete_orphan_authors(connection)
     finally:
         connection.close()
     write_import_log(log_path, reading.rejections, merged.discards)
@@ -86,36 +99,77 @@ def import_items(
 
 
 def write_item(connection: sqlite3.Connection, item: Item) -> None:
+    if item.kind not in ("paper", "vulnerability"):
+        raise KindWithoutTableError(f"kind without a table in the base: {item.kind}")
     raw_data_id = write_raw_data(
         connection, item.source_code, item.collected_at, item.raw_file_path
     )
-    (item_id,) = connection.execute(
-        UPSERT_ITEM,
+    if item.kind == "paper":
+        write_paper(connection, item, raw_data_id)
+    else:
+        write_vulnerability(connection, item, raw_data_id)
+
+
+def write_paper(connection: sqlite3.Connection, item: Item, raw_data_id: int) -> None:
+    """The arXiv item and its publication, found by its arXiv identifier."""
+    row = connection.execute(
+        "SELECT item_id FROM publication WHERE arxiv_id = ?", (item.source_item_id,)
+    ).fetchone()
+    item_id = upsert_item(connection, "paper", raw_data_id, row and row[0])
+    connection.execute(
+        UPSERT_PUBLICATION,
         (
-            item.source_code,
             item.source_item_id,
+            item_id,
             item.title,
-            item.url,
+            item.summary,
+            json.dumps(list(item.authors), ensure_ascii=False),
             format_date(item.published_at),
             format_date(item.revised_at),
-            format_date(item.saved_at),
-            item.summary,
-            raw_data_id,
         ),
+    )
+
+
+def write_vulnerability(
+    connection: sqlite3.Connection, item: Item, raw_data_id: int
+) -> None:
+    """The CISA KEV item and its vulnerability, found by its CVE."""
+    row = connection.execute(
+        "SELECT item_id FROM vulnerability WHERE cve_id = ?", (item.cve,)
     ).fetchone()
-    write_authors(connection, item_id, item.authors)
-    if item.repository_name is not None:
-        connection.execute(
-            "INSERT INTO repository (item_id, repository_name) VALUES (?, ?)"
-            " ON CONFLICT (item_id) DO UPDATE SET repository_name = excluded.repository_name",
-            (item_id, item.repository_name),
-        )
-    if item.is_vulnerability:
-        connection.execute(
-            "INSERT INTO vulnerability (item_id, cve) VALUES (?, ?)"
-            " ON CONFLICT (item_id) DO UPDATE SET cve = excluded.cve",
-            (item_id, item.cve),
-        )
+    item_id = upsert_item(connection, "vulnerability", raw_data_id, row and row[0])
+    connection.execute(
+        UPSERT_VULNERABILITY,
+        (
+            item.cve,
+            item_id,
+            item.title,
+            item.summary,
+            item.vendor,
+            item.product,
+            format_date(item.published_at),
+            item.ransomware_use,
+        ),
+    )
+
+
+def upsert_item(
+    connection: sqlite3.Connection,
+    kind: ItemKind,
+    raw_data_id: int,
+    item_id: int | None,
+) -> int:
+    """A new item, or the known one pointed at the raw data of its current version."""
+    if item_id is None:
+        (new_item_id,) = connection.execute(
+            "INSERT INTO item (kind, raw_data_id) VALUES (?, ?) RETURNING id",
+            (kind, raw_data_id),
+        ).fetchone()
+        return int(new_item_id)
+    connection.execute(
+        "UPDATE item SET raw_data_id = ? WHERE id = ?", (raw_data_id, item_id)
+    )
+    return item_id
 
 
 def write_raw_data(
@@ -143,36 +197,6 @@ def write_raw_data(
         "SELECT id FROM raw_data WHERE raw_file_path = ?", (raw_file_path,)
     ).fetchone()
     return int(raw_data_id)
-
-
-def write_authors(
-    connection: sqlite3.Connection, item_id: int, authors: tuple[str, ...]
-) -> None:
-    """The authors of the item, in their order; a name repeated in the list is kept once.
-
-    The base links an author to an item once (primary key item_id, author_id): a repeated name
-    keeps its first position.
-    """
-    connection.execute("DELETE FROM item_author WHERE item_id = ?", (item_id,))
-    for position, name in enumerate(dict.fromkeys(authors), start=1):
-        connection.execute(
-            "INSERT INTO author (name) VALUES (?) ON CONFLICT (name) DO NOTHING",
-            (name,),
-        )
-        (author_id,) = connection.execute(
-            "SELECT author_id FROM author WHERE name = ?", (name,)
-        ).fetchone()
-        connection.execute(
-            "INSERT INTO item_author (item_id, author_id, position) VALUES (?, ?, ?)",
-            (item_id, author_id, position),
-        )
-
-
-def delete_orphan_authors(connection: sqlite3.Connection) -> None:
-    """An author whose items have all changed authors is personal data without use: deleted."""
-    connection.execute(
-        "DELETE FROM author WHERE author_id NOT IN (SELECT author_id FROM item_author)"
-    )
 
 
 def format_date(moment: datetime | None) -> str | None:
