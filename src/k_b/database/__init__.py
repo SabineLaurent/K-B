@@ -1,1 +1,2 @@
-"""The items database: SQL scripts, and connection.py, which creates and opens it."""
+"""The items database: SQL scripts, creation.py, which creates it, and connection.py, which
+opens it."""

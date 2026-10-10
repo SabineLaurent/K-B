@@ -1,23 +1,33 @@
 -- K-B: physical data model (MPD) of the items database, written for SQLite.
 -- What is SQLite-specific, and its PostgreSQL equivalent: docs/stockage.md.
--- Conceptual and logical models, and the reasons behind them: docs/stockage.md.
+-- Conceptual and logical models: docs/merise/; the reasons behind them: docs/stockage.md and
+-- docs/ADR/journal-decisions-projet.md.
 -- Reference data (the sources) is in seed_sources.sql, run right after this script.
 -- Every connection must run PRAGMA foreign_keys = ON: SQLite ignores foreign keys otherwise.
 -- Dates are UTC text, 'YYYY-MM-DDTHH:MM:SSZ'; the CHECK refuses any other form.
 
 CREATE TABLE source (
-    source_code TEXT PRIMARY KEY,
-    label       TEXT NOT NULL,
-    source_type TEXT NOT NULL
-        CHECK (source_type IN ('web_service', 'file', 'scraping', 'database', 'big_data'))
+    id               INTEGER PRIMARY KEY,
+    source_code      TEXT NOT NULL UNIQUE,
+    label            TEXT NOT NULL,
+    source_type      TEXT NOT NULL
+        CHECK (source_type IN ('web_service', 'file', 'scraping', 'database', 'big_data')),
+    -- Each value has its retention in src/k_b/config.py; a test keeps both lists equal.
+    acquisition_mode TEXT NOT NULL CHECK (acquisition_mode IN ('watch', 'library', 'wiki'))
 ) STRICT;
 
-CREATE TABLE collection (
-    collection_id   INTEGER PRIMARY KEY,
-    collected_at    TEXT NOT NULL
-        CHECK (collected_at IS strftime('%Y-%m-%dT%H:%M:%SZ', collected_at)),
-    raw_file_path   TEXT NOT NULL UNIQUE
+-- A raw data is one file of raw/, provided by one source; stream is the name of its source
+-- folder (tldr_ai, arxiv_cscr_x_csai). It may contain no item.
+CREATE TABLE raw_data (
+    id            INTEGER PRIMARY KEY,
+    source_id     INTEGER NOT NULL REFERENCES source (id),
+    raw_file_path TEXT NOT NULL UNIQUE,
+    stream        TEXT NOT NULL,
+    collected_at  TEXT NOT NULL
+        CHECK (collected_at IS strftime('%Y-%m-%dT%H:%M:%SZ', collected_at))
 ) STRICT;
+
+CREATE INDEX raw_data_source_id ON raw_data (source_id);
 
 CREATE TABLE item (
     item_id        INTEGER PRIMARY KEY,
@@ -32,13 +42,13 @@ CREATE TABLE item (
     saved_at       TEXT
         CHECK (saved_at IS strftime('%Y-%m-%dT%H:%M:%SZ', saved_at)),
     summary        TEXT,
-    collection_id  INTEGER NOT NULL REFERENCES collection (collection_id),
+    raw_data_id    INTEGER NOT NULL REFERENCES raw_data (id),
     UNIQUE (source_code, source_item_id)
 ) STRICT;
 
 CREATE INDEX item_published_at ON item (published_at);
 CREATE INDEX item_saved_at ON item (saved_at);
-CREATE INDEX item_collection_id ON item (collection_id);
+CREATE INDEX item_raw_data_id ON item (raw_data_id);
 
 CREATE TABLE author (
     author_id INTEGER PRIMARY KEY,

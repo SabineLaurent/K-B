@@ -5,6 +5,7 @@ import pytest
 from k_b.raw_store import (
     COLLECTION_STATE_FILENAME,
     InvalidCollectionStateError,
+    find_stream,
     load_last_collection_dates,
     save_last_collection_dates,
     write_new_raw_file,
@@ -61,3 +62,19 @@ def test_a_collection_state_that_is_not_utf8_is_refused(tmp_path):
 
     with pytest.raises(InvalidCollectionStateError):
         load_last_collection_dates(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("raw_file_path", "stream"),
+    [
+        ("automated_watch/cisa_kev/2026-10-05T093000Z.csv", "cisa_kev"),
+        ("automated_watch/tldr_ai/2026-10-07T084509Z/2026-10-07.html", "tldr_ai"),
+    ],
+)
+def test_the_stream_is_the_folder_of_the_source(raw_file_path, stream):
+    assert find_stream(raw_file_path) == stream
+
+
+def test_a_path_without_a_source_folder_is_refused():
+    with pytest.raises(ValueError, match="cisa_kev.csv"):
+        find_stream("automated_watch/cisa_kev.csv")

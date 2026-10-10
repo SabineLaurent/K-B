@@ -9,7 +9,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from k_b.collect import collect_all_sources
-from k_b.database.connection import DATABASE_FILE_NAME, create_database
+from k_b.database.connection import DATABASE_FILE_NAME
+from k_b.database.creation import create_database
 from k_b.import_items import MissingDatabaseError, import_items
 from k_b.raw_store import InvalidCollectionStateError
 from k_b.source_contract import list_sources

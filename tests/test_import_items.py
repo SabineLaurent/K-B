@@ -6,8 +6,9 @@ import pytest
 from test_raw_items import FIXTURES_DIR, copy_fixture, write_most_starred_ranking
 
 from k_b import import_items as import_items_module
-from k_b.database.connection import connect_database, create_database
-from k_b.import_items import MissingDatabaseError, import_items
+from k_b.database.connection import connect_database
+from k_b.database.creation import create_database
+from k_b.import_items import MissingDatabaseError, UnknownSourceError, import_items
 from k_b.source_kinds import SOURCE_KINDS
 
 FIRST_PAPER_ID = "2609.31282"
@@ -79,7 +80,7 @@ def test_the_raw_files_go_into_the_database(data_dir):
 
     assert summary.item_count == 3 + 4 + 3 + 3 + 100
     assert count_rows(data_dir, "SELECT count(*) FROM item") == summary.item_count
-    assert count_rows(data_dir, "SELECT count(*) FROM collection") == 5
+    assert count_rows(data_dir, "SELECT count(*) FROM raw_data") == 5
     assert count_rows(data_dir, "SELECT count(*) FROM item_author") == 11
     assert count_rows(data_dir, "SELECT count(*) FROM repository") == 100
     assert count_rows(data_dir, "SELECT count(*) FROM vulnerability") == 4 + 3
@@ -90,12 +91,19 @@ def test_an_item_points_to_the_raw_file_and_date_of_its_collection(data_dir):
 
     rows = fetch_rows(
         data_dir,
-        "SELECT DISTINCT collected_at, raw_file_path FROM item JOIN collection USING (collection_id)"
-        " WHERE source_code = 'cisa_kev'",
+        "SELECT DISTINCT collected_at, raw_file_path, stream, source.source_code"
+        " FROM item JOIN raw_data ON raw_data.id = item.raw_data_id"
+        " JOIN source ON source.id = raw_data.source_id"
+        " WHERE item.source_code = 'cisa_kev'",
     )
 
     assert rows == [
-        ("2026-10-05T09:30:00Z", "automated_watch/cisa_kev/2026-10-05T093000Z.csv")
+        (
+            "2026-10-05T09:30:00Z",
+            "automated_watch/cisa_kev/2026-10-05T093000Z.csv",
+            "cisa_kev",
+            "cisa_kev",
+        )
     ]
 
 
@@ -208,12 +216,13 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(data_dir):
     connection = connect_database(data_dir / "k-b.sqlite")
     with connection:
         connection.execute(
-            "INSERT INTO collection (collected_at, raw_file_path) VALUES (?, ?)",
-            ("2026-10-01T00:00:00Z", "automated_watch/other.json"),
+            "INSERT INTO raw_data (source_id, raw_file_path, stream, collected_at)"
+            " VALUES (1, ?, 'other', ?)",
+            ("automated_watch/other/x.json", "2026-10-01T00:00:00Z"),
         )
         # Same URL as an advisory of the fixture, under another identifier: refused by the base.
         connection.execute(
-            "INSERT INTO item (source_code, source_item_id, title, url, collection_id)"
+            "INSERT INTO item (source_code, source_item_id, title, url, raw_data_id)"
             " VALUES ('github', 'other', 'Other', ?, 1)",
             ("https://github.com/advisories/GHSA-fjqc-hq36-qh5p",),
         )
@@ -225,6 +234,18 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(data_dir):
 
     assert dump_database(data_dir) == tables_before
     assert not (data_dir / "import-log.jsonl").exists()
+
+
+def test_an_item_of_a_source_missing_from_the_database_is_refused(data_dir):
+    connection = connect_database(data_dir / "k-b.sqlite")
+    with connection:
+        connection.execute("DELETE FROM source WHERE source_code = 'cisa_kev'")
+    connection.close()
+
+    with pytest.raises(UnknownSourceError, match="cisa_kev"):
+        run_import(data_dir)
+
+    assert count_rows(data_dir, "SELECT count(*) FROM item") == 0
 
 
 def test_a_missing_database_is_refused_and_not_created(tmp_path):
@@ -259,7 +280,8 @@ def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir)
 
     assert fetch_rows(
         data_dir,
-        "SELECT item_id, revised_at, raw_file_path FROM item JOIN collection USING (collection_id)"
+        "SELECT item_id, revised_at, raw_file_path FROM item"
+        " JOIN raw_data ON raw_data.id = item.raw_data_id"
         " WHERE source_item_id = ?",
         (FIRST_PAPER_ID,),
     ) == [

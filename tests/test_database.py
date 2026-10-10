@@ -2,8 +2,9 @@ import sqlite3
 
 import pytest
 
-import k_b.database.connection
-from k_b.database.connection import connect_database, create_database
+import k_b.database.creation
+from k_b.database.connection import connect_database
+from k_b.database.creation import create_database
 
 
 def test_a_new_database_has_the_sources_and_the_wal_mode(tmp_path):
@@ -36,7 +37,7 @@ def test_a_connection_checks_the_foreign_keys(tmp_path):
     assert connection.execute("PRAGMA foreign_keys").fetchone() == (1,)
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute(
-            "INSERT INTO item (source_code, source_item_id, title, url, collection_id)"
+            "INSERT INTO item (source_code, source_item_id, title, url, raw_data_id)"
             " VALUES ('rss', 'x', 'A title', 'https://example.com/', 1)"
         )
     connection.close()
@@ -49,7 +50,7 @@ def test_a_failed_creation_leaves_no_database_behind(monkeypatch, tmp_path):
         "CREATE TABLE source (source_code TEXT);\nNOT SQL;"
     )
     (scripts_dir / "seed_sources.sql").write_text("")
-    monkeypatch.setattr(k_b.database.connection, "DATABASE_SCRIPTS", scripts_dir)
+    monkeypatch.setattr(k_b.database.creation, "DATABASE_SCRIPTS", scripts_dir)
     database_path = tmp_path / "k-b.sqlite"
 
     with pytest.raises(sqlite3.OperationalError):

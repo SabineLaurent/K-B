@@ -17,6 +17,7 @@ from k_b.database.connection import connect_database
 from k_b.items import Item
 from k_b.merge import Discard, merge_items
 from k_b.raw_items import Rejection, read_raw_items
+from k_b.raw_store import find_stream
 from k_b.source_contract import SourceKind
 
 # The date format the CHECK constraints of schema.sql accept.
@@ -27,7 +28,7 @@ DATABASE_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 UPSERT_ITEM = """
 INSERT INTO item (
     source_code, source_item_id, title, url, published_at, revised_at, saved_at, summary,
-    collection_id
+    raw_data_id
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (source_code, source_item_id) DO UPDATE SET
     title = excluded.title,
@@ -36,13 +37,17 @@ ON CONFLICT (source_code, source_item_id) DO UPDATE SET
     revised_at = excluded.revised_at,
     saved_at = excluded.saved_at,
     summary = excluded.summary,
-    collection_id = excluded.collection_id
+    raw_data_id = excluded.raw_data_id
 RETURNING item_id
 """
 
 
 class MissingDatabaseError(FileNotFoundError):
     pass
+
+
+class UnknownSourceError(LookupError):
+    """An item's source_code has no row in the source table of the base."""
 
 
 class ImportSummary(NamedTuple):
@@ -81,7 +86,9 @@ def import_items(
 
 
 def write_item(connection: sqlite3.Connection, item: Item) -> None:
-    collection_id = write_collection(connection, item.collected_at, item.raw_file_path)
+    raw_data_id = write_raw_data(
+        connection, item.source_code, item.collected_at, item.raw_file_path
+    )
     (item_id,) = connection.execute(
         UPSERT_ITEM,
         (
@@ -93,7 +100,7 @@ def write_item(connection: sqlite3.Connection, item: Item) -> None:
             format_date(item.revised_at),
             format_date(item.saved_at),
             item.summary,
-            collection_id,
+            raw_data_id,
         ),
     ).fetchone()
     write_authors(connection, item_id, item.authors)
@@ -111,18 +118,31 @@ def write_item(connection: sqlite3.Connection, item: Item) -> None:
         )
 
 
-def write_collection(
-    connection: sqlite3.Connection, collected_at: datetime, raw_file_path: str
+def write_raw_data(
+    connection: sqlite3.Connection,
+    source_code: str,
+    collected_at: datetime,
+    raw_file_path: str,
 ) -> int:
-    connection.execute(
-        "INSERT INTO collection (collected_at, raw_file_path) VALUES (?, ?)"
-        " ON CONFLICT (raw_file_path) DO NOTHING",
-        (format_date(collected_at), raw_file_path),
-    )
-    (collection_id,) = connection.execute(
-        "SELECT collection_id FROM collection WHERE raw_file_path = ?", (raw_file_path,)
+    source_row = connection.execute(
+        "SELECT id FROM source WHERE source_code = ?", (source_code,)
     ).fetchone()
-    return int(collection_id)
+    if source_row is None:
+        raise UnknownSourceError(f"source_code not in the source table: {source_code}")
+    connection.execute(
+        "INSERT INTO raw_data (source_id, raw_file_path, stream, collected_at)"
+        " VALUES (?, ?, ?, ?) ON CONFLICT (raw_file_path) DO NOTHING",
+        (
+            source_row[0],
+            raw_file_path,
+            find_stream(raw_file_path),
+            format_date(collected_at),
+        ),
+    )
+    (raw_data_id,) = connection.execute(
+        "SELECT id FROM raw_data WHERE raw_file_path = ?", (raw_file_path,)
+    ).fetchone()
+    return int(raw_data_id)
 
 
 def write_authors(
