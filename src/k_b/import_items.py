@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 
-from k_b.database import connect_database
+from k_b.database.connection import connect_database
 from k_b.items import Item
 from k_b.merge import Discard, merge_items
 from k_b.raw_items import Rejection, read_raw_items

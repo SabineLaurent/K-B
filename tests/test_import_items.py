@@ -6,7 +6,7 @@ import pytest
 from test_raw_items import FIXTURES_DIR, copy_fixture, write_most_starred_ranking
 
 from k_b import import_items as import_items_module
-from k_b.database import connect_database, create_database
+from k_b.database.connection import connect_database, create_database
 from k_b.import_items import MissingDatabaseError, import_items
 from k_b.source_kinds import SOURCE_KINDS
 
