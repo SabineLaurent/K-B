@@ -44,7 +44,7 @@ Le seed (`seed_sources.sql:4-12`) donne `watch` aux sources de `raw/automated_wa
 
 ### 2. Un `id` technique, l'identifiant naturel en `UNIQUE`
 
-`src/k_b/database/schema.sql:9-10`
+`src/k_b/database/schema.sql:10-11`
 
 ```sql
 id               INTEGER PRIMARY KEY,
