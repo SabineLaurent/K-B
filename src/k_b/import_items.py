@@ -13,10 +13,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 
+from k_b.config import TrackedRepository
 from k_b.database.connection import connect_database
 from k_b.items import Item, ItemKind
 from k_b.merge import Discard, merge_items
-from k_b.raw_items import Rejection, read_raw_items
+from k_b.raw_items import Rejection, read_raw_items, reject
 from k_b.raw_store import find_stream
 from k_b.source_contract import SourceKind
 
@@ -52,6 +53,28 @@ ON CONFLICT (cve_id) DO UPDATE SET
 """
 
 
+# The list of the code is the source of truth: a repository seen again takes its values.
+UPSERT_TRACKED_REPOSITORY = """
+INSERT INTO tracked_repository (repository_name, ecosystem, packages) VALUES (?, ?, ?)
+ON CONFLICT (repository_name) DO UPDATE SET
+    repository_name = excluded.repository_name,
+    ecosystem = excluded.ecosystem,
+    packages = excluded.packages
+"""
+
+INSERT_RELEASE = """
+INSERT INTO release (
+    item_id, kind, tracked_repository_id, release_id, tag_name, name, body, published_at, url
+) VALUES (?, 'release', ?, ?, ?, ?, ?, ?, ?)
+"""
+
+INSERT_ADVISORY = """
+INSERT INTO advisory (
+    item_id, kind, ghsa_id, vulnerability_id, summary, published_at, url, packages
+) VALUES (?, 'advisory', ?, ?, ?, ?, ?, ?)
+"""
+
+
 class MissingDatabaseError(FileNotFoundError):
     pass
 
@@ -75,26 +98,72 @@ def import_items(
     database_path: Path,
     log_path: Path,
     kinds: Sequence[SourceKind],
+    tracked_repositories: Sequence[TrackedRepository],
 ) -> ImportSummary:
-    """Write the merged items of the raw files into the base, then the log of what was left out.
+    """Write the tracked repositories and the merged items of the raw files into the base, then
+    the log of what was left out.
 
     The base must exist: connecting to a missing file would create an empty one.
     """
     if not database_path.is_file():
         raise MissingDatabaseError(f"{database_path} does not exist")
     reading = read_raw_items(raw_dir, kinds)
-    merged = merge_items(reading.items)
+    items, untracked = reject_untracked_releases(reading.items, tracked_repositories)
+    rejections = reading.rejections + untracked
+    merged = merge_items(items)
     connection = connect_database(database_path)
     try:
         # The context manager commits on success and rolls back on any error.
         with connection:
+            write_tracked_repositories(connection, tracked_repositories)
             for item in merged.items:
                 write_item(connection, item)
     finally:
         connection.close()
-    write_import_log(log_path, reading.rejections, merged.discards)
-    return ImportSummary(
-        len(merged.items), len(merged.discards), len(reading.rejections)
+    write_import_log(log_path, rejections, merged.discards)
+    return ImportSummary(len(merged.items), len(merged.discards), len(rejections))
+
+
+def reject_untracked_releases(
+    items: list[Item], tracked_repositories: Sequence[TrackedRepository]
+) -> tuple[list[Item], list[Rejection]]:
+    """The items without the releases of a repository out of the list, each one rejected.
+
+    The import goes on, as for an entry refused when read (#87 reads them again).
+    """
+    tracked_names = {repository.name.lower() for repository in tracked_repositories}
+    kept = []
+    rejections = []
+    for item in items:
+        if (
+            # A release always has its repository (items.py): str() only satisfies the typing.
+            item.kind == "release"
+            and str(item.repository_name).lower() not in tracked_names
+        ):
+            rejections.append(
+                reject(
+                    item.raw_file_path,
+                    f"repository not in the tracked list: {item.repository_name}",
+                )
+            )
+        else:
+            kept.append(item)
+    return kept, rejections
+
+
+def write_tracked_repositories(
+    connection: sqlite3.Connection, tracked_repositories: Sequence[TrackedRepository]
+) -> None:
+    connection.executemany(
+        UPSERT_TRACKED_REPOSITORY,
+        [
+            (
+                repository.name,
+                repository.ecosystem,
+                json.dumps(repository.packages, ensure_ascii=False),
+            )
+            for repository in tracked_repositories
+        ],
     )
 
 
@@ -151,6 +220,68 @@ def write_vulnerability(
     )
 
 
+def write_release(connection: sqlite3.Connection, item: Item, raw_data_id: int) -> None:
+    """The GitHub item and its release, unless the release is known: the first seen is kept."""
+    if connection.execute(
+        "SELECT 1 FROM release WHERE release_id = ?", (int(item.source_item_id),)
+    ).fetchone():
+        return
+    # The releases of a repository out of the list were rejected before the merge.
+    (tracked_repository_id,) = connection.execute(
+        "SELECT id FROM tracked_repository WHERE repository_name = ?",
+        (item.repository_name,),
+    ).fetchone()
+    item_id = upsert_item(connection, "release", raw_data_id, None)
+    connection.execute(
+        INSERT_RELEASE,
+        (
+            item_id,
+            tracked_repository_id,
+            int(item.source_item_id),
+            item.tag_name,
+            item.release_name,
+            item.summary,
+            format_date(item.published_at),
+            item.url,
+        ),
+    )
+
+
+def write_advisory(
+    connection: sqlite3.Connection, item: Item, raw_data_id: int
+) -> None:
+    """The GitHub item and its advisory, unless the advisory is known: the first seen is kept.
+
+    The CVE it cites is created without its KEV columns if no source has cited it yet.
+    """
+    if connection.execute(
+        "SELECT 1 FROM advisory WHERE ghsa_id = ?", (item.source_item_id,)
+    ).fetchone():
+        return
+    vulnerability_id = None
+    if item.cve is not None:
+        connection.execute(
+            "INSERT INTO vulnerability (cve_id) VALUES (?) ON CONFLICT (cve_id) DO NOTHING",
+            (item.cve,),
+        )
+        (vulnerability_id,) = connection.execute(
+            "SELECT id FROM vulnerability WHERE cve_id = ?", (item.cve,)
+        ).fetchone()
+    item_id = upsert_item(connection, "advisory", raw_data_id, None)
+    connection.execute(
+        INSERT_ADVISORY,
+        (
+            item_id,
+            item.source_item_id,
+            vulnerability_id,
+            item.title,
+            format_date(item.published_at),
+            item.url,
+            json.dumps(list(item.package_names), ensure_ascii=False),
+        ),
+    )
+
+
 def upsert_item(
     connection: sqlite3.Connection,
     kind: ItemKind,
@@ -174,6 +305,8 @@ def upsert_item(
 WRITER_BY_KIND: dict[str, Callable[[sqlite3.Connection, Item, int], None]] = {
     "paper": write_paper,
     "vulnerability": write_vulnerability,
+    "release": write_release,
+    "advisory": write_advisory,
 }
 
 

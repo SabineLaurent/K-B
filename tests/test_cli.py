@@ -229,7 +229,9 @@ def test_import_reports_a_failed_import_and_exits_1(monkeypatch, tmp_path, capsy
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
 
-    def fail_to_import(raw_dir, database_path, log_path, source_kinds):
+    def fail_to_import(
+        raw_dir, database_path, log_path, source_kinds, tracked_repositories
+    ):
         raise sqlite3.IntegrityError("CHECK constraint failed: publication")
 
     monkeypatch.setattr(cli, "import_items", fail_to_import)
@@ -249,7 +251,9 @@ def test_import_reports_a_source_missing_from_the_database_and_exits_1(
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
 
-    def fail_to_import(raw_dir, database_path, log_path, source_kinds):
+    def fail_to_import(
+        raw_dir, database_path, log_path, source_kinds, tracked_repositories
+    ):
         raise UnknownSourceError("source_code not in the source table: cisa_kev")
 
     monkeypatch.setattr(cli, "import_items", fail_to_import)
@@ -267,8 +271,12 @@ def test_import_reports_a_kind_without_table_and_exits_1(monkeypatch, tmp_path, 
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
 
-    def fail_to_import(raw_dir, database_path, log_path, source_kinds):
-        raise KindWithoutTableError("kind without a table in the base: release")
+    def fail_to_import(
+        raw_dir, database_path, log_path, source_kinds, tracked_repositories
+    ):
+        raise KindWithoutTableError(
+            "kind without a table in the base: newsletter_article"
+        )
 
     monkeypatch.setattr(cli, "import_items", fail_to_import)
 
@@ -276,6 +284,6 @@ def test_import_reports_a_kind_without_table_and_exits_1(monkeypatch, tmp_path, 
 
     assert exit_code == 1
     assert (
-        "error: KindWithoutTableError: kind without a table in the base: release"
+        "error: KindWithoutTableError: kind without a table in the base: newsletter_article"
         in capsys.readouterr().err
     )

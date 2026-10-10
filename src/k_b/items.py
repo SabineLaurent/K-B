@@ -34,6 +34,8 @@ NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
 # compares URLs as text.
 HttpsUrl = Annotated[str, StringConstraints(pattern=r"^https://\S+$")]
 CveId = Annotated[str, StringConstraints(pattern=r"^CVE-\d{4}-\d{4,}$")]
+# owner/name; the GLOB of tracked_repository.repository_name in schema.sql.
+RepositoryName = Annotated[str, StringConstraints(pattern=r"^[^/\s]+/[^/\s]+$")]
 
 # The fields each kind must fill, so that an entry the base would refuse is refused when read:
 # one refused row would otherwise fail the whole import.
@@ -47,11 +49,24 @@ REQUIRED_FIELDS_BY_KIND = {
         "product",
         "ransomware_use",
     ),
+    "release": ("published_at", "repository_name", "tag_name"),
+    "advisory": ("published_at",),
 }
-# The kinds written to a reference table as the item of its source of truth: an item of another
-# source would mark a CVE as exploited, or overwrite a paper (#15 widens it for Zotero).
-SOURCE_BY_KIND = {"paper": "arxiv", "vulnerability": "cisa_kev"}
-KEV_FIELDS = ("vendor", "product", "ransomware_use")
+# The source of each kind. Written to a reference table as the item of its source of truth, an
+# item of another source would mark a CVE as exploited, or overwrite a paper (#15 widens it for
+# Zotero); a release or an advisory is a GitHub subtype.
+SOURCE_BY_KIND = {
+    "paper": "arxiv",
+    "vulnerability": "cisa_kev",
+    "release": "github",
+    "advisory": "github",
+}
+# The fields only one kind may fill.
+FIELDS_OF_ONE_KIND = {
+    "vulnerability": ("vendor", "product", "ransomware_use"),
+    "release": ("repository_name", "tag_name", "release_name"),
+    "advisory": ("package_names",),
+}
 KINDS_WITH_CVE = ("vulnerability", "advisory")
 
 
@@ -80,12 +95,18 @@ class Item(BaseModel):
     ransomware_use: RansomwareUse | None = None
     # A vulnerability (CISA KEV) or an advisory (GitHub).
     cve: CveId | None = None
+    # GitHub release only: its repository, tag_name, and name (None when GitHub gives none).
+    repository_name: RepositoryName | None = None
+    tag_name: NonEmptyText | None = None
+    release_name: str | None = None
+    # GitHub advisory only: the affected packages, each once.
+    package_names: tuple[NonEmptyText, ...] = ()
 
     @model_validator(mode="after")
     def check_the_fields_of_its_kind(self) -> "Item":
         check_source(self)
         check_required_fields(self)
-        check_kev_fields(self)
+        check_fields_of_other_kinds(self)
         check_cve(self)
         return self
 
@@ -106,11 +127,19 @@ def check_required_fields(item: Item) -> None:
         raise ValueError(f"a {item.kind} item without {', '.join(missing)}")
     if item.kind == "paper" and not item.authors:
         raise ValueError("a paper item without authors")
+    if item.kind == "advisory" and not item.package_names:
+        raise ValueError("an advisory item without packages")
 
 
-def check_kev_fields(item: Item) -> None:
-    filled = [field for field in KEV_FIELDS if getattr(item, field) is not None]
-    if filled and item.kind != "vulnerability":
+def check_fields_of_other_kinds(item: Item) -> None:
+    filled = [
+        field
+        for kind, fields in FIELDS_OF_ONE_KIND.items()
+        if kind != item.kind
+        for field in fields
+        if getattr(item, field) not in (None, ())
+    ]
+    if filled:
         raise ValueError(f"a {item.kind} item with {', '.join(filled)}")
 
 

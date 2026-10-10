@@ -6,18 +6,10 @@ releases; its packages give its security advisories.
 """
 
 import re
-from dataclasses import dataclass
-from typing import Literal
+
+from k_b.config import TrackedRepository
 
 OWNER_SLASH_NAME = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
-
-
-@dataclass(frozen=True)
-class TrackedRepository:
-    name: str
-    ecosystem: Literal["pip", "npm"]
-    # Only the main packages: integrations are added when they are used.
-    packages: tuple[str, ...]
 
 
 TRACKED_REPOSITORIES = (

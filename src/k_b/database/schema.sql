@@ -36,7 +36,9 @@ CREATE TABLE item (
     id          INTEGER PRIMARY KEY,
     kind        TEXT NOT NULL
         CHECK (kind IN ('paper', 'vulnerability', 'newsletter_article', 'release', 'advisory')),
-    raw_data_id INTEGER NOT NULL REFERENCES raw_data (id)
+    raw_data_id INTEGER NOT NULL REFERENCES raw_data (id),
+    -- The target of the (item_id, kind) foreign key of each subtype: an item has one subtype.
+    UNIQUE (id, kind)
 ) STRICT;
 
 CREATE INDEX item_raw_data_id ON item (raw_data_id);
@@ -119,3 +121,60 @@ CREATE TABLE vulnerability (
         AND (item_id IS NULL) = (ransomware_use IS NULL)
         AND (item_id IS NOT NULL OR (revised_at IS NULL AND withdrawn_at IS NULL)))
 ) STRICT;
+
+-- A reference table, like source: the list of src/k_b/sources/tracked_repositories.py is the
+-- source of truth; each import adds its repositories or updates them, and a repository removed
+-- from the list keeps its row (#87). GitHub ignores the case of a repository name.
+CREATE TABLE tracked_repository (
+    id              INTEGER PRIMARY KEY,
+    repository_name TEXT NOT NULL UNIQUE COLLATE NOCASE CHECK (repository_name GLOB '?*/?*'),
+    -- The ecosystems of src/k_b/sources/github_advisories.py: a test keeps both lists equal.
+    ecosystem       TEXT NOT NULL CHECK (ecosystem IN ('pip', 'npm')),
+    -- The tracked packages, in the order of the list.
+    packages        TEXT NOT NULL
+        CHECK (json_valid(packages) AND json_type(packages) = 'array'
+            AND json_array_length(packages) > 0)
+) STRICT;
+
+-- A subtype of item; GitHub is the source of truth, and the first version seen is kept.
+-- kind NOT NULL: a NULL kind would pass its CHECK and skip the foreign key.
+CREATE TABLE release (
+    id                    INTEGER PRIMARY KEY,
+    item_id               INTEGER NOT NULL UNIQUE,
+    kind                  TEXT NOT NULL CHECK (kind = 'release'),
+    tracked_repository_id INTEGER NOT NULL REFERENCES tracked_repository (id),
+    release_id            INTEGER NOT NULL UNIQUE,
+    tag_name              TEXT NOT NULL CHECK (length(tag_name) > 0),
+    -- As GitHub gives them: name may be NULL, body is Markdown.
+    name                  TEXT,
+    body                  TEXT,
+    published_at          TEXT NOT NULL
+        CHECK (published_at IS strftime('%Y-%m-%dT%H:%M:%SZ', published_at)),
+    -- html_url, kept as given: a tag may hold characters to encode.
+    url                   TEXT NOT NULL CHECK (url GLOB 'https://*'),
+    FOREIGN KEY (item_id, kind) REFERENCES item (id, kind)
+) STRICT;
+
+CREATE INDEX release_tracked_repository_id ON release (tracked_repository_id);
+
+-- A subtype of item; GitHub is the source of truth, and the first version seen is kept. The CVE
+-- it cites is created in vulnerability without its KEV columns when no source has cited it yet.
+CREATE TABLE advisory (
+    id               INTEGER PRIMARY KEY,
+    item_id          INTEGER NOT NULL UNIQUE,
+    kind             TEXT NOT NULL CHECK (kind = 'advisory'),
+    ghsa_id          TEXT NOT NULL UNIQUE CHECK (ghsa_id GLOB 'GHSA-*'),
+    vulnerability_id INTEGER REFERENCES vulnerability (id),
+    summary          TEXT NOT NULL,
+    published_at     TEXT NOT NULL
+        CHECK (published_at IS strftime('%Y-%m-%dT%H:%M:%SZ', published_at)),
+    -- html_url, kept as given.
+    url              TEXT NOT NULL CHECK (url GLOB 'https://*'),
+    -- The affected packages, each once (decision of 2026-10-08: displayed, not filtered).
+    packages         TEXT NOT NULL
+        CHECK (json_valid(packages) AND json_type(packages) = 'array'
+            AND json_array_length(packages) > 0),
+    FOREIGN KEY (item_id, kind) REFERENCES item (id, kind)
+) STRICT;
+
+CREATE INDEX advisory_vulnerability_id ON advisory (vulnerability_id);

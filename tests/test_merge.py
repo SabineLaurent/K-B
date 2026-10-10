@@ -14,6 +14,8 @@ def make_item(**changes):
         "kind": "advisory",
         "title": "Path traversal in langchain",
         "url": "https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
+        "published_at": datetime(2026, 6, 25, 18, 25, 42, tzinfo=UTC),
+        "package_names": ("langchain",),
         "collected_at": FIRST_COLLECTION,
         "raw_file_path": "automated_watch/github_advisories_pip/2026-10-05T093000Z.json",
     }
@@ -26,6 +28,7 @@ def make_paper(revised_at, collected_at, title="A paper"):
         source_code="arxiv",
         source_item_id="2509.12345",
         kind="paper",
+        package_names=(),
         title=title,
         url="https://arxiv.org/abs/2509.12345",
         authors=("Ada Lovelace",),
@@ -52,6 +55,8 @@ def test_distinct_items_are_all_kept_in_order():
 def test_utm_parameters_are_removed_and_the_others_kept_in_order():
     item = make_item(
         source_code="tldr",
+        kind="newsletter_article",
+        package_names=(),
         source_item_id="article",
         url="https://example.com/post?utm_source=tldrai&id=7&utm_medium=newsletter&page=2#part",
     )
@@ -64,6 +69,8 @@ def test_utm_parameters_are_removed_and_the_others_kept_in_order():
 def test_a_query_made_only_of_utm_parameters_disappears():
     item = make_item(
         source_code="tldr",
+        kind="newsletter_article",
+        package_names=(),
         source_item_id="article",
         url="https://example.com/post?utm_source=tldrai",
     )
@@ -98,10 +105,16 @@ def test_the_same_source_item_seen_again_is_discarded_and_the_first_collection_k
 
 def test_the_same_url_from_another_source_is_discarded():
     first = make_item(
-        source_code="tldr", source_item_id="article", url="https://example.com/post"
+        source_code="tldr",
+        kind="newsletter_article",
+        package_names=(),
+        source_item_id="article",
+        url="https://example.com/post",
     )
     same_url = make_item(
         source_code="clipper",
+        kind="newsletter_article",
+        package_names=(),
         source_item_id="post.md",
         url="https://example.com/post?utm_source=x",
     )
@@ -117,6 +130,7 @@ def test_the_same_cve_from_another_source_is_kept_as_a_second_item():
         source_code="cisa_kev",
         source_item_id="CVE-2026-48775",
         kind="vulnerability",
+        package_names=(),
         url="https://nvd.nist.gov/vuln/detail/CVE-2026-48775",
         published_at=datetime(2026, 9, 29, tzinfo=UTC),
         summary="A vulnerability.",

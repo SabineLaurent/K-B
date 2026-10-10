@@ -1,9 +1,8 @@
-"""The GitHub releases source: its download (E), and the reading of its raw response.
+"""The GitHub releases source: its download (E), then its reader (T).
 
 Download the latest releases of a tracked GitHub repository, as published.
 
-Read the releases of a raw GitHub API response: the download checks its response with it. No
-item yet: the releases are skipped at the import until #121.
+Read the releases of a raw GitHub API response, and convert each one into an item.
 """
 
 import json
@@ -13,6 +12,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import unquote
 
+from k_b.items import Item
+from k_b.source_contract import SourceReader
 from k_b.sources.github_api import get_from_github_api
 from k_b.sources.github_dates import parse_github_date
 from k_b.sources.tracked_repositories import OWNER_SLASH_NAME, is_repository_name
@@ -145,3 +146,25 @@ def parse_release(entry: object, position: int) -> Release:
 def has_dot_segment(url: str) -> bool:
     """A `.` or `..` path segment, even percent-encoded: a browser would resolve it."""
     return any(segment in (".", "..") for segment in unquote(url).split("/"))
+
+
+def convert_release(
+    release: Release, collected_at: datetime, raw_file_path: str
+) -> Item:
+    return Item(
+        source_code="github",
+        source_item_id=str(release.release_id),
+        kind="release",
+        title=f"{release.repository} {release.name or release.tag_name}",
+        url=release.url,
+        published_at=release.published_at,
+        summary=release.body,
+        collected_at=collected_at,
+        raw_file_path=raw_file_path,
+        repository_name=release.repository,
+        tag_name=release.tag_name,
+        release_name=release.name,
+    )
+
+
+READER: SourceReader[Release] = SourceReader(read_releases, convert_release)

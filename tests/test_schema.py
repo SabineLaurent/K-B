@@ -7,6 +7,7 @@ import pytest
 from k_b.config import RETENTION_YEARS_BY_ACQUISITION_MODE
 from k_b.database.creation import DATABASE_SCRIPTS
 from k_b.items import ItemKind
+from k_b.sources.github_advisories import ECOSYSTEMS
 
 EXPECTED_TABLES = {
     "source",
@@ -17,6 +18,9 @@ EXPECTED_TABLES = {
     "repository",
     "star_gain",
     "vulnerability",
+    "tracked_repository",
+    "release",
+    "advisory",
 }
 
 PAPER_COLUMNS = (
@@ -238,3 +242,183 @@ def test_a_cve_identifier_is_unique(database):
 
     with pytest.raises(sqlite3.IntegrityError, match="UNIQUE"):
         database.execute("INSERT INTO vulnerability (cve_id) VALUES ('CVE-2026-86950')")
+
+
+def test_the_ecosystems_of_the_schema_are_those_of_the_advisories():
+    schema = DATABASE_SCRIPTS.joinpath("schema.sql").read_text()
+    (allowed_values,) = re.findall(r"ecosystem IN \(([^)]*)\)", schema)
+
+    assert set(re.findall(r"'(\w+)'", allowed_values)) == set(ECOSYSTEMS)
+
+
+INSERT_TRACKED_REPOSITORY = (
+    "INSERT INTO tracked_repository (repository_name, ecosystem, packages)"
+    " VALUES (?, ?, ?) RETURNING id"
+)
+
+
+@pytest.fixture
+def tracked_repository_id(database):
+    return database.execute(
+        INSERT_TRACKED_REPOSITORY,
+        ("anthropics/claude-code", "npm", '["@anthropic-ai/claude-code"]'),
+    ).fetchone()[0]
+
+
+def test_an_ecosystem_outside_the_list_is_refused(database):
+    with pytest.raises(sqlite3.IntegrityError, match="CHECK"):
+        database.execute(
+            INSERT_TRACKED_REPOSITORY, ("rust-lang/rust", "cargo", '["rustc"]')
+        )
+
+
+@pytest.mark.parametrize("packages", ["langchain", "[]"])
+def test_tracked_packages_that_are_not_a_json_list_are_refused(database, packages):
+    with pytest.raises(sqlite3.IntegrityError, match="CHECK"):
+        database.execute(
+            INSERT_TRACKED_REPOSITORY, ("langchain-ai/langchain", "pip", packages)
+        )
+
+
+def test_a_tracked_repository_name_is_unique_whatever_its_case(
+    database, tracked_repository_id
+):
+    with pytest.raises(sqlite3.IntegrityError, match="UNIQUE"):
+        database.execute(
+            INSERT_TRACKED_REPOSITORY,
+            ("Anthropics/Claude-Code", "npm", '["@anthropic-ai/claude-code"]'),
+        )
+
+
+def insert_item(database, kind):
+    database.execute(
+        "INSERT OR IGNORE INTO raw_data (id, source_id, raw_file_path, stream,"
+        " collected_at) VALUES (1, 1, 'automated_watch/x/2026-10-05T093000Z.json',"
+        " 'x', '2026-10-05T09:30:00Z')"
+    )
+    return database.execute(
+        "INSERT INTO item (kind, raw_data_id) VALUES (?, 1) RETURNING id", (kind,)
+    ).fetchone()[0]
+
+
+INSERT_RELEASE = (
+    "INSERT INTO release (item_id, kind, tracked_repository_id, release_id, tag_name,"
+    " name, body, published_at, url) VALUES (?, ?, ?, ?, 'v2.1.287', 'v2.1.287',"
+    " '## What''s changed', '2026-10-01T18:00:22Z',"
+    " 'https://github.com/anthropics/claude-code/releases/tag/v2.1.287')"
+)
+INSERT_ADVISORY = (
+    "INSERT INTO advisory (item_id, kind, ghsa_id, vulnerability_id, summary,"
+    " published_at, url, packages) VALUES (?, ?, ?, ?, 'A summary',"
+    " '2026-06-25T18:25:42Z', 'https://github.com/advisories/GHSA-fjqc-hq36-qh5p', ?)"
+)
+
+
+def test_a_release_of_its_tracked_repository_is_accepted(
+    database, tracked_repository_id
+):
+    item_id = insert_item(database, "release")
+    database.execute(
+        INSERT_RELEASE, (item_id, "release", tracked_repository_id, 401174143)
+    )
+
+    assert database.execute("SELECT count(*) FROM release").fetchone() == (1,)
+
+
+def test_a_release_without_tracked_repository_is_refused(database):
+    item_id = insert_item(database, "release")
+
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        database.execute(INSERT_RELEASE, (item_id, "release", 99, 401174143))
+
+
+def test_a_release_identifier_is_unique(database, tracked_repository_id):
+    database.execute(
+        INSERT_RELEASE,
+        (insert_item(database, "release"), "release", tracked_repository_id, 1),
+    )
+
+    with pytest.raises(sqlite3.IntegrityError, match="UNIQUE"):
+        database.execute(
+            INSERT_RELEASE,
+            (insert_item(database, "release"), "release", tracked_repository_id, 1),
+        )
+
+
+def test_a_release_pointing_to_an_item_of_another_kind_is_refused(
+    database, tracked_repository_id
+):
+    paper_item_id = insert_item(database, "paper")
+
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        database.execute(
+            INSERT_RELEASE, (paper_item_id, "release", tracked_repository_id, 1)
+        )
+
+
+@pytest.mark.parametrize("kind", [None, "paper"])
+def test_a_release_whose_kind_is_not_release_is_refused(
+    database, tracked_repository_id, kind
+):
+    paper_item_id = insert_item(database, "paper")
+
+    with pytest.raises(sqlite3.IntegrityError, match="NOT NULL|CHECK"):
+        database.execute(
+            INSERT_RELEASE, (paper_item_id, kind, tracked_repository_id, 1)
+        )
+
+
+def test_an_advisory_without_vulnerability_is_accepted(database):
+    item_id = insert_item(database, "advisory")
+    database.execute(
+        INSERT_ADVISORY,
+        (item_id, "advisory", "GHSA-fjqc-hq36-qh5p", None, '["langgraph-checkpoint"]'),
+    )
+
+    assert database.execute("SELECT count(*) FROM advisory").fetchone() == (1,)
+
+
+def test_an_advisory_identifier_is_unique(database):
+    parameters = ("advisory", "GHSA-fjqc-hq36-qh5p", None, '["langgraph"]')
+    database.execute(INSERT_ADVISORY, (insert_item(database, "advisory"), *parameters))
+
+    with pytest.raises(sqlite3.IntegrityError, match="UNIQUE"):
+        database.execute(
+            INSERT_ADVISORY, (insert_item(database, "advisory"), *parameters)
+        )
+
+
+@pytest.mark.parametrize("kind", [None, "paper"])
+def test_an_advisory_whose_kind_is_not_advisory_is_refused(database, kind):
+    paper_item_id = insert_item(database, "paper")
+
+    with pytest.raises(sqlite3.IntegrityError, match="NOT NULL|CHECK"):
+        database.execute(
+            INSERT_ADVISORY,
+            (paper_item_id, kind, "GHSA-fjqc-hq36-qh5p", None, '["langgraph"]'),
+        )
+
+
+def test_an_advisory_pointing_to_an_item_of_another_kind_is_refused(database):
+    paper_item_id = insert_item(database, "paper")
+
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        database.execute(
+            INSERT_ADVISORY,
+            (paper_item_id, "advisory", "GHSA-fjqc-hq36-qh5p", None, '["langgraph"]'),
+        )
+
+
+@pytest.mark.parametrize("packages", ["langgraph", '{"name": "langgraph"}', "[]"])
+def test_advisory_packages_that_are_not_a_json_list_are_refused(database, packages):
+    with pytest.raises(sqlite3.IntegrityError, match="CHECK"):
+        database.execute(
+            INSERT_ADVISORY,
+            (
+                insert_item(database, "advisory"),
+                "advisory",
+                "GHSA-fjqc-hq36-qh5p",
+                None,
+                packages,
+            ),
+        )
