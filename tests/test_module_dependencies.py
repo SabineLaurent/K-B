@@ -109,14 +109,15 @@ def test_every_module_is_in_exactly_one_list():
 
 
 def list_generic_modules() -> list[tuple[Path, str]]:
-    """Each generic module: its path, and the package its relative imports start from."""
+    """Each file of the generic modules: its path, and the package its relative imports start from."""
     modules = []
     for module in GENERIC_MODULES:
         path = PACKAGE_DIR / f"{module}.py"
         if path.exists():
             modules.append((path, "k_b"))
         else:
-            modules.append((PACKAGE_DIR / module / "__init__.py", f"k_b.{module}"))
+            for module_path in sorted((PACKAGE_DIR / module).glob("*.py")):
+                modules.append((module_path, f"k_b.{module}"))
     return modules
 
 

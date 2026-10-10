@@ -43,7 +43,7 @@ dans la base. Une migration vers PostgreSQL reste possible si le besoin change (
 ## Spécifications de stockage
 
 - **Clés étrangères** : SQLite les ignore si la connexion n'exécute pas `PRAGMA foreign_keys = ON`.
-  `connect_database` (`src/k_b/database/__init__.py`) l'exécute à chaque ouverture.
+  `connect_database` (`src/k_b/database/connection.py`) l'exécute à chaque ouverture.
 - **Mode WAL** (`PRAGMA journal_mode = WAL`, gardé dans le fichier) : le pipeline écrit pendant
   que l'API lit, sans se bloquer. Tous les programmes tournent sur la même machine.
 - **Dates** : du texte `AAAA-MM-JJTHH:MM:SSZ`, en UTC. Un `CHECK` refuse toute autre forme. Une
