@@ -1,1 +1,1 @@
-"""The items database: its schema and sources (SQL scripts), and the code that opens it (connection)."""
+"""The items database: SQL scripts, and connection.py, which creates and opens it."""
