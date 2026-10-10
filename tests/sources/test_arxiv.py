@@ -6,6 +6,8 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 from k_b import http_download
+from k_b.collect import collect_all_sources
+from k_b.raw_store import load_last_collection_dates, save_last_collection_dates
 from k_b.source_contract import list_sources
 from k_b.source_kinds import SOURCE_KINDS
 from k_b.sources.arxiv import (
@@ -58,7 +60,7 @@ def fake_urlopen(monkeypatch):
 
 
 def test_arxiv_is_a_source_of_kb_collect():
-    assert "arxiv" in [source.name for source in list_sources(SOURCE_KINDS)]
+    assert "arxiv_cscr_x_csai" in [source.name for source in list_sources(SOURCE_KINDS)]
 
 
 def test_the_response_is_returned_unchanged(fake_urlopen):
@@ -93,6 +95,31 @@ def test_the_window_is_written_in_utc_whatever_the_stored_time_zone(fake_urlopen
     ArxivSource().fetch(last_collected_at=datetime(2026, 9, 30, 12, 5, tzinfo=paris))
 
     assert "submittedDate:[202609231005 TO " in fake_urlopen.search_query()
+
+
+def test_the_collection_writes_the_arxiv_raw_under_arxiv_cscr_x_csai(
+    fake_urlopen, tmp_path
+):
+    raw_dir = tmp_path / "raw"
+
+    collect_all_sources([ArxivSource()], raw_dir, tmp_path, COLLECTED_AT)
+
+    raw_file_path = (
+        raw_dir / "automated_watch" / "arxiv_cscr_x_csai" / "2026-10-05T093000Z.xml"
+    )
+    assert raw_file_path.read_bytes() == RECORDED_RESPONSE
+
+
+def test_a_collection_state_keyed_arxiv_cscr_x_csai_restarts_arxiv_from_its_date(
+    fake_urlopen, tmp_path
+):
+    last_collected_at = datetime(2026, 9, 30, 10, 5, tzinfo=UTC)
+    save_last_collection_dates(tmp_path, {"arxiv_cscr_x_csai": last_collected_at})
+
+    collect_all_sources([ArxivSource()], tmp_path / "raw", tmp_path, COLLECTED_AT)
+
+    assert "submittedDate:[202609231005 TO " in fake_urlopen.search_query()
+    assert load_last_collection_dates(tmp_path)["arxiv_cscr_x_csai"] == COLLECTED_AT
 
 
 def test_the_window_ends_now(fake_urlopen):
@@ -141,7 +168,7 @@ def test_an_api_error_answered_with_http_200_is_refused(fake_urlopen):
 
 
 COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
-RAW_FILE_PATH = "automated_watch/arxiv/2026-10-05T093000Z.xml"
+RAW_FILE_PATH = "automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
 
 
 def feed_with_entry(entry: str) -> bytes:

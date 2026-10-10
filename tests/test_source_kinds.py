@@ -14,7 +14,7 @@ def test_the_sources_are_collected_in_the_order_of_2026_10_06():
         "github_advisories_pip",
         "github_advisories_npm",
         "github_most_starred",
-        "arxiv",
+        "arxiv_cscr_x_csai",
         "tldr_ai",
         "tldr_infosec",
         "tldr_dev",
