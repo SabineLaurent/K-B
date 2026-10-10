@@ -4,6 +4,8 @@ import sqlite3
 
 import pytest
 from test_items import (
+    COLLECTED_AT,
+    RAW_FILE_PATH,
     advisory_fields,
     item_fields,
     release_fields,
@@ -529,20 +531,27 @@ def test_a_log_that_cannot_be_written_keeps_the_previous_log_whole(
     assert not (data_dir / "import-log.jsonl.tmp").exists()
 
 
+def text_at_its_maximum(kind, field, maximum):
+    """A text of the maximum length that names its kind and its field: no two columns hold
+    the same, so a writer that takes one field for another is seen."""
+    if field == "cve":
+        return text_of_length(field, maximum)
+    prefix = {"url": "https://", "source_item_id": "GHSA-" * (kind == "advisory")}.get(
+        field, ""
+    )
+    repeated = f"{kind}.{field}-" * maximum
+    return (prefix + repeated)[:maximum]
+
+
 def build_item_at_its_maximums(build_fields, collected_at, raw_file_path):
     """An item of the kind of build_fields, each bounded text and list at its maximum."""
     kind = build_fields()["kind"]
     fields = {
-        field: text_of_length(field, maximum)
+        field: text_at_its_maximum(kind, field, maximum)
         for field, maximum in MAX_LENGTH_BY_KIND[kind].items()
     }
     for field, maximum_count in MAX_COUNT_BY_KIND.get(kind, {}).items():
         fields[field] = ("x" * MAX_ELEMENT_LENGTH_BY_KIND[kind][field],) * maximum_count
-    if kind == "advisory":
-        # Not the URL of the release: the merge keeps one item per URL.
-        fields["url"] = fields["url"][:-1] + "a"
-        # The form the base asks of a GHSA identifier, that the reader checks before the item.
-        fields["source_item_id"] = "GHSA-" + fields["source_item_id"][len("GHSA-") :]
     return Item(
         **build_fields(collected_at=collected_at, raw_file_path=raw_file_path, **fields)
     )
@@ -572,54 +581,40 @@ def test_an_item_with_every_text_and_list_at_its_maximum_goes_into_the_database(
 
     assert summary == (4, 0, 0)
     paper, vulnerability, release, advisory = (
-        MAX_LENGTH_BY_KIND[kind]
-        for kind in ("paper", "vulnerability", "release", "advisory")
+        build_item_at_its_maximums(build_fields, COLLECTED_AT, RAW_FILE_PATH)
+        for build_fields in builders
     )
     assert fetch_rows(
-        tmp_path,
-        "SELECT length(arxiv_id), length(title), length(summary),"
-        " json_array_length(authors) FROM publication",
+        tmp_path, "SELECT arxiv_id, title, summary, authors FROM publication"
     ) == [
         (
-            paper["source_item_id"],
-            paper["title"],
-            paper["summary"],
-            MAX_COUNT_BY_KIND["paper"]["authors"],
+            paper.source_item_id,
+            paper.title,
+            paper.summary,
+            json.dumps(list(paper.authors)),
         )
     ]
     assert fetch_rows(
-        tmp_path,
-        "SELECT length(cve_id), length(name), length(description), length(vendor),"
-        " length(product) FROM vulnerability",
+        tmp_path, "SELECT cve_id, name, description, vendor, product FROM vulnerability"
     ) == [
         (
-            vulnerability["cve"],
-            vulnerability["title"],
-            vulnerability["summary"],
-            vulnerability["vendor"],
-            vulnerability["product"],
+            vulnerability.cve,
+            vulnerability.title,
+            vulnerability.summary,
+            vulnerability.vendor,
+            vulnerability.product,
         )
     ]
-    assert fetch_rows(
-        tmp_path,
-        "SELECT length(tag_name), length(name), length(body), length(url) FROM release",
-    ) == [
-        (
-            release["tag_name"],
-            release["release_name"],
-            release["summary"],
-            release["url"],
-        )
+    assert fetch_rows(tmp_path, "SELECT tag_name, name, body, url FROM release") == [
+        (release.tag_name, release.release_name, release.summary, release.url)
     ]
     assert fetch_rows(
-        tmp_path,
-        "SELECT length(ghsa_id), length(summary), length(url),"
-        " json_array_length(packages) FROM advisory",
+        tmp_path, "SELECT ghsa_id, summary, url, packages FROM advisory"
     ) == [
         (
-            advisory["source_item_id"],
-            advisory["title"],
-            advisory["url"],
-            MAX_COUNT_BY_KIND["advisory"]["package_names"],
+            advisory.source_item_id,
+            advisory.title,
+            advisory.url,
+            json.dumps(list(advisory.package_names)),
         )
     ]

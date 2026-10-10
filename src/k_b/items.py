@@ -74,7 +74,7 @@ KINDS_WITH_CVE = ("vulnerability", "advisory")
 # read, and by a CHECK of the column; a test keeps both equal. A kind without a table in the
 # base has no maximum yet.
 CVE_MAX_LENGTH = 20
-MAX_LENGTH_BY_KIND: dict[str, dict[str, int]] = {
+MAX_LENGTH_BY_KIND: dict[ItemKind, dict[str, int]] = {
     "paper": {"source_item_id": 20, "title": 500, "summary": 5_000},
     "vulnerability": {
         "cve": CVE_MAX_LENGTH,
@@ -98,11 +98,11 @@ MAX_LENGTH_BY_KIND: dict[str, dict[str, int]] = {
 }
 # The lists written as JSON: the most elements, held by a CHECK too, and the longest element,
 # held here only (a CHECK of SQLite cannot go through the elements of a JSON list).
-MAX_COUNT_BY_KIND: dict[str, dict[str, int]] = {
+MAX_COUNT_BY_KIND: dict[ItemKind, dict[str, int]] = {
     "paper": {"authors": 1_000},
     "advisory": {"package_names": 100},
 }
-MAX_ELEMENT_LENGTH_BY_KIND: dict[str, dict[str, int]] = {
+MAX_ELEMENT_LENGTH_BY_KIND: dict[ItemKind, dict[str, int]] = {
     "paper": {"authors": 200},
     "advisory": {"package_names": 255},
 }

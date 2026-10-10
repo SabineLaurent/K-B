@@ -36,7 +36,7 @@ bornes sont donc rangées par sorte (`kind`), puis par champ :
 
 ```python
 # src/k_b/items.py:77
-MAX_LENGTH_BY_KIND: dict[str, dict[str, int]] = {
+MAX_LENGTH_BY_KIND: dict[ItemKind, dict[str, int]] = {
     "paper": {"source_item_id": 20, "title": 500, "summary": 5_000},
     "vulnerability": {
         "cve": CVE_MAX_LENGTH,
@@ -47,7 +47,7 @@ Chaque valeur est la borne de la colonne que ce champ remplit pour cette sorte :
 `CVE_MAX_LENGTH` est une constante à part parce que deux sortes (la faille CISA et l'alerte
 GitHub) écrivent dans la même colonne `vulnerability.cve_id` : une seule connaissance, un seul
 endroit. Une sorte absente de la table (`newsletter_article`, qui n'a pas encore de table en
-base) n'a pas de borne.
+base) n'a pas de borne. Les clés sont typées `ItemKind` : mypy refuse une sorte mal écrite.
 
 ### 2. Le contrôle, dans le validateur du modèle
 
@@ -131,11 +131,16 @@ correspondance écrite dans le test (`COLUMN_BY_KIND_AND_FIELD`, `test_schema.py
 de deux dictionnaires joue dans les deux sens : une borne changée d'un seul côté, un `CHECK` sans
 borne dans l'item, ou une borne sans `CHECK`, font échouer le test.
 
-Cette table de correspondance recopie ce que fait l'import. Un second test la rend inutile à
-croire sur parole : `test_an_item_with_every_text_and_list_at_its_maximum_goes_into_the_database`
-(`tests/test_import_items.py:551`) fabrique un item de chaque sorte, chaque champ à son maximum,
-et le fait passer par le vrai import dans une base créée par `schema.sql`. Si un écrivain de
-`import_items.py` met un champ dans une autre colonne, c'est ce test qui échoue.
+Cette table de correspondance recopie ce que fait l'import. Un second test évite de la croire
+sur parole : `test_an_item_with_every_text_and_list_at_its_maximum_goes_into_the_database`
+(`tests/test_import_items.py:560`) fabrique un item de chaque sorte, chaque champ à son maximum,
+et le fait passer par le vrai import dans une base créée par `schema.sql`. Chaque texte nomme sa
+sorte et son champ (`release.tag_name-release.tag_name-…`, `text_at_its_maximum`,
+`test_import_items.py:534`), et le test compare les **valeurs** écrites dans chaque colonne, pas
+leur longueur. Si un écrivain de `import_items.py` met un champ dans une autre colonne, même de
+même borne (`tag_name` et `name` d'une release, à 255 toutes les deux), ce test échoue. La
+première version du test ne comparait que des longueurs de textes identiques et ne voyait pas
+cet échange : la seconde revue de code l'a montré par mutation.
 
 ### 6. Le test de comportement des `CHECK`, et sa garde
 
@@ -158,6 +163,15 @@ trois choses : le texte attendu figure une fois, et une seule, dans la définiti
 aucun `CHECK` n'a deux cas ; le nombre de cas égale le nombre de `CHECK` de `schema.sql`. Un
 `CHECK` ajouté sans sa valeur refusée fait donc échouer la suite.
 
+Deux `CHECK` de table portent plusieurs clauses réunies par `AND` : « les colonnes de la source
+qui fait foi sont remplies si et seulement si `item_id` l'est », dans `publication` et
+`vulnerability`. Un cas par `CHECK` ne suffit pas pour eux : une clause peut disparaître sans que
+le `CHECK` disparaisse. Chaque colonne nommée a donc son propre cas
+(`test_a_reference_row_with_its_item_but_without_one_of_its_columns_is_refused`,
+`test_schema.py:736`), et une seconde garde compare les colonnes lues dans le `CHECK` à la liste
+des colonnes testées (`test_each_clause_of_the_reference_checks_has_its_refused_value`,
+`test_schema.py:761`).
+
 ## Choix faits et options écartées
 
 | Choix | Retenu, et pourquoi | Écarté, et pourquoi |
@@ -175,7 +189,7 @@ aucun `CHECK` n'a deux cas ; le nombre de cas égale le nombre de `CHECK` de `sc
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| `uv run pytest` : 488 tests passent (403 avant la PR) | Rien d'existant n'est cassé ; aucune fixture ne dépassait une borne. |
+| `uv run pytest` : 502 tests passent (403 avant la PR) | Rien d'existant n'est cassé ; aucune fixture ne dépassait une borne. |
 | `test_a_text_is_accepted_up_to_its_maximum_length_and_refused_beyond` (16 cas) | Chaque borne accepte la valeur au maximum et refuse un caractère de plus, avec le champ, la longueur et le maximum dans le message. |
 | `test_a_title_too_long_is_rejected_and_logged_and_the_other_papers_are_read` | Un titre trop long dans un flux arXiv issu de la collecte est écarté, journalisé, et les deux autres papiers sont lus. |
 | `test_each_maximum_length_of_the_items_is_the_check_of_its_column`, et son pendant pour les nombres | Les bornes de `items.py` et les `CHECK` de `schema.sql` sont égaux. |
@@ -183,7 +197,9 @@ aucun `CHECK` n'a deux cas ; le nombre de cas égale le nombre de `CHECK` de `sc
 | `test_an_item_with_every_text_and_list_at_its_maximum_goes_into_the_database` | Un item à ses maximums passe le vrai import : item, écrivain et `CHECK` disent la même chose. |
 | Casse volontaire, faite à la main puis défaite : borne du titre à 600 dans `items.py` seul | Le test de concordance échoue (4 tests rouges). |
 | Casse volontaire : `CHECK` de `publication.summary` retiré, puis `CHECK` de date de `raw_data` retiré | Le test de comportement et la garde échouent. |
-| Casse volontaire : l'écrivain met le titre dans `release.name` | Le test d'import aux maximums échoue. |
+| `test_a_reference_row_with_its_item_but_without_one_of_its_columns_is_refused` (11 cas), le cas des deux dates sans item, et leur garde | Chaque clause des deux `CHECK` « si et seulement si » refuse une valeur interdite. |
+| Casse volontaire : l'écrivain met le titre dans `release.name`, puis échange `tag_name` et `name` | Le test d'import aux maximums échoue dans les deux cas. |
+| Casse volontaire : clause `authors` retirée du `CHECK` de `publication`, clause `description` puis `withdrawn_at` retirées de celui de `vulnerability` | Le cas de la colonne et la garde des clauses échouent. |
 | `kb create-db` puis `kb import` sur une copie neuve de la collecte du 2026-10-07 | 2 400 items (github 155, arxiv 511, cisa_kev 1 734), 0 rejet : comme avant la PR. |
 
 ## Ce que tu dois pouvoir défendre
@@ -201,7 +217,8 @@ aucun `CHECK` n'a deux cas ; le nombre de cas égale le nombre de `CHECK` de `sc
    CISA refusée, son CVE reste lu comme non exploité (journal ADR, 2026-10-10).
 4. **Comment sais-tu qu'un `CHECK` n'a pas été oublié dans les tests ?** La garde compte les
    `CHECK` de `schema.sql` et exige un cas pour chacun, identifié par son texte
-   (`test_schema.py:696`).
+   (`test_schema.py:696`) ; pour les deux `CHECK` à plusieurs clauses, une seconde garde exige
+   un cas par colonne (`test_schema.py:761`).
 5. **Pourquoi la longueur d'un nom d'auteur n'est-elle pas en base ?** Un `CHECK` de SQLite ne
    peut pas parcourir une liste JSON. Le nombre d'auteurs, lui, est tenu des deux côtés
    (`schema.sql:62`).
@@ -217,6 +234,10 @@ aucun `CHECK` n'a deux cas ; le nombre de cas égale le nombre de `CHECK` de `sc
 - `length()` de SQLite s'arrête au premier caractère NUL, alors que Python les compte tous. Le
   comportement est constaté (SQLite 3.50.4), pas traité : un texte avec un NUL peut diverger entre
   les deux contrôles.
+- Pendant une casse volontaire, un test est resté rouge après la remise en place du fichier :
+  Python relisait le bytecode en cache de la version cassée (même taille, même seconde de
+  modification). Constaté, puis levé en changeant la date du fichier ; à savoir pour rejouer ces
+  casses.
 - L'ordre d'évaluation des `CHECK` d'une colonne (le premier écrit refuse d'abord) est constaté
   par un essai, pas lu dans la documentation de SQLite.
 

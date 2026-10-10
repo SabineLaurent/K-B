@@ -706,3 +706,67 @@ def test_each_check_of_the_schema_has_its_refused_value():
         len(re.findall(r"\bCHECK \(", definition))
         for definition in definitions.values()
     )
+
+
+# The columns the source of truth of a reference table fills: the table CHECK holds one clause
+# for each, "filled if and only if item_id is".
+COLUMNS_FILLED_WITH_THEIR_ITEM = {
+    "publication": ("title", "summary", "authors", "submitted_at", "revised_at"),
+    "vulnerability": (
+        "name",
+        "description",
+        "vendor",
+        "product",
+        "date_added",
+        "ransomware_use",
+    ),
+}
+# The columns of vulnerability that may be filled only with item_id, in the last clause.
+COLUMNS_ALLOWED_ONLY_WITH_THEIR_ITEM = ("revised_at", "withdrawn_at")
+
+
+@pytest.mark.parametrize(
+    "table, column",
+    [
+        (table, column)
+        for table, columns in COLUMNS_FILLED_WITH_THEIR_ITEM.items()
+        for column in columns
+    ],
+)
+def test_a_reference_row_with_its_item_but_without_one_of_its_columns_is_refused(
+    filled_database, table, column
+):
+    with pytest.raises(
+        sqlite3.IntegrityError,
+        match=re.escape("CHECK constraint failed: (item_id IS NULL) = ("),
+    ):
+        insert_row(filled_database, table, **{column: None})
+
+
+@pytest.mark.parametrize("column", COLUMNS_ALLOWED_ONLY_WITH_THEIR_ITEM)
+def test_a_vulnerability_without_item_but_with_a_later_date_is_refused(
+    filled_database, column
+):
+    without_item = dict.fromkeys(
+        ("item_id", *COLUMNS_FILLED_WITH_THEIR_ITEM["vulnerability"])
+    )
+
+    with pytest.raises(
+        sqlite3.IntegrityError,
+        match=re.escape("CHECK constraint failed: (item_id IS NULL) = ("),
+    ):
+        insert_row(filled_database, "vulnerability", **without_item, **{column: DATE})
+
+
+def test_each_clause_of_the_reference_checks_has_its_refused_value():
+    """A clause added to these CHECK, or lost, without its refused value fails here."""
+    definitions = read_table_definitions()
+
+    for table, columns in COLUMNS_FILLED_WITH_THEIR_ITEM.items():
+        assert re.findall(
+            r"\(item_id IS NULL\) = \((\w+) IS NULL\)", definitions[table]
+        ) == list(columns)
+    assert re.findall(
+        r"item_id IS NOT NULL OR \((\w+) IS NULL AND (\w+) IS NULL\)",
+        definitions["vulnerability"],
+    ) == [COLUMNS_ALLOWED_ONLY_WITH_THEIR_ITEM]
