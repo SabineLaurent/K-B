@@ -13,7 +13,6 @@ from k_b.sources import github_advisories
 from k_b.sources.github_advisories import (
     Advisory,
     GithubAdvisoriesSource,
-    convert_advisory,
     read_advisories,
 )
 
@@ -206,44 +205,3 @@ def test_a_response_that_is_not_a_list_is_refused():
 def test_an_invalid_advisory_is_refused_with_its_position(changes):
     with pytest.raises(ValueError, match="advisory 0"):
         read_advisories(advisory_payload(**changes))
-
-
-def test_an_advisory_keeps_its_cve():
-    advisory = Advisory(
-        ghsa_id="GHSA-fjqc-hq36-qh5p",
-        cve_id="CVE-2026-48775",
-        summary="Path traversal in langchain",
-        severity="high",
-        url="https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
-        published_at=PUBLISHED_AT,
-        reviewed_at=COLLECTED_AT,
-        packages=("langchain",),
-    )
-
-    item = convert_advisory(advisory, COLLECTED_AT, RAW_FILE_PATH)
-
-    assert item.source_code == "github"
-    assert item.source_item_id == "GHSA-fjqc-hq36-qh5p"
-    assert item.title == "Path traversal in langchain"
-    assert item.url == "https://github.com/advisories/GHSA-fjqc-hq36-qh5p"
-    assert item.published_at == PUBLISHED_AT
-    assert item.cve == "CVE-2026-48775"
-    assert item.is_vulnerability is True
-
-
-def test_an_advisory_without_cve_is_still_a_vulnerability():
-    advisory = Advisory(
-        ghsa_id="GHSA-fjqc-hq36-qh5p",
-        cve_id=None,
-        summary="Path traversal in langchain",
-        severity="high",
-        url="https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
-        published_at=PUBLISHED_AT,
-        reviewed_at=COLLECTED_AT,
-        packages=("langchain",),
-    )
-
-    item = convert_advisory(advisory, COLLECTED_AT, RAW_FILE_PATH)
-
-    assert item.cve is None
-    assert item.is_vulnerability is True

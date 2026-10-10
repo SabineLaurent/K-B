@@ -217,6 +217,7 @@ def convert_paper(paper: Paper, collected_at: datetime, raw_file_path: str) -> I
     return Item(
         source_code="arxiv",
         source_item_id=paper.arxiv_id,
+        kind="paper",
         title=paper.title,
         url=paper.url,
         authors=paper.authors,

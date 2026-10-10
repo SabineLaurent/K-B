@@ -31,7 +31,8 @@ SOURCE_KINDS = (
         tuple(
             GithubReleasesSource(repository.name) for repository in TRACKED_REPOSITORIES
         ),
-        github_releases.READER,
+        # No reader: the releases are skipped at the import until #121.
+        None,
     ),
     SourceKind(
         github_advisories.FOLDER_PREFIX,
@@ -41,12 +42,14 @@ SOURCE_KINDS = (
                 TRACKED_REPOSITORIES
             ).items()
         ),
-        github_advisories.READER,
+        # No reader: the advisories are skipped at the import until #121.
+        None,
     ),
     SourceKind(
         github_most_starred.FOLDER_PREFIX,
         (GithubMostStarredSource(),),
-        github_most_starred.READER,
+        # No reader: the ranking does not enter the base (decision "Tops", 2026-10-08).
+        None,
     ),
     SourceKind(arxiv.FOLDER_PREFIX, (ArxivSource(),), arxiv.READER),
     # No reader yet: its pages are skipped at the import until #57.

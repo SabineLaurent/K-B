@@ -19,6 +19,14 @@ SourceCode = Literal[
     "github", "arxiv", "cisa_kev", "clipper", "tldr", "zotero", "gh_archive"
 ]
 
+# The kinds of item of schema.sql: a test keeps both lists equal.
+ItemKind = Literal[
+    "paper", "vulnerability", "newsletter_article", "release", "advisory"
+]
+
+# knownRansomwareCampaignUse of CISA KEV.
+RansomwareUse = Literal["Known", "Unknown"]
+
 CVE_ID = re.compile(r"CVE-\d{4}-\d{4,}")
 
 NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
@@ -26,7 +34,25 @@ NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
 # compares URLs as text.
 HttpsUrl = Annotated[str, StringConstraints(pattern=r"^https://\S+$")]
 CveId = Annotated[str, StringConstraints(pattern=r"^CVE-\d{4}-\d{4,}$")]
-RepositoryName = Annotated[str, StringConstraints(pattern=r"^[^/\s]+/[^/\s]+$")]
+
+# The fields each kind must fill, so that an entry the base would refuse is refused when read:
+# one refused row would otherwise fail the whole import.
+REQUIRED_FIELDS_BY_KIND = {
+    "paper": ("summary", "published_at", "revised_at"),
+    "vulnerability": (
+        "cve",
+        "summary",
+        "published_at",
+        "vendor",
+        "product",
+        "ransomware_use",
+    ),
+}
+# The kinds written to a reference table as the item of its source of truth: an item of another
+# source would mark a CVE as exploited, or overwrite a paper (#15 widens it for Zotero).
+SOURCE_BY_KIND = {"paper": "arxiv", "vulnerability": "cisa_kev"}
+KEV_FIELDS = ("vendor", "product", "ransomware_use")
+KINDS_WITH_CVE = ("vulnerability", "advisory")
 
 
 class Item(BaseModel):
@@ -35,6 +61,7 @@ class Item(BaseModel):
 
     source_code: SourceCode
     source_item_id: NonEmptyText
+    kind: ItemKind
     title: NonEmptyText
     url: HttpsUrl
     authors: tuple[NonEmptyText, ...] = ()
@@ -47,14 +74,46 @@ class Item(BaseModel):
     collected_at: AwareDatetime
     # Relative to the raw folder, so the base can be rebuilt from a copy of it elsewhere.
     raw_file_path: NonEmptyText
-    # Fields of the item's subtype in the base (docs/stockage.md): vulnerability, repository.
+    # CISA KEV only (vulnerability): vendorProject, product, knownRansomwareCampaignUse.
+    vendor: NonEmptyText | None = None
+    product: NonEmptyText | None = None
+    ransomware_use: RansomwareUse | None = None
+    # A vulnerability (CISA KEV) or an advisory (GitHub).
     cve: CveId | None = None
-    # A GitHub advisory without CVE is still a vulnerability: the CVE alone cannot tell.
-    is_vulnerability: bool = False
-    repository_name: RepositoryName | None = None
 
     @model_validator(mode="after")
-    def check_a_cve_is_a_vulnerability(self) -> "Item":
-        if self.cve is not None and not self.is_vulnerability:
-            raise ValueError("an item with a CVE must be a vulnerability")
+    def check_the_fields_of_its_kind(self) -> "Item":
+        check_source(self)
+        check_required_fields(self)
+        check_kev_fields(self)
+        check_cve(self)
         return self
+
+
+def check_source(item: Item) -> None:
+    source_code = SOURCE_BY_KIND.get(item.kind, item.source_code)
+    if item.source_code != source_code:
+        raise ValueError(f"a {item.kind} item from {item.source_code}")
+
+
+def check_required_fields(item: Item) -> None:
+    missing = [
+        field
+        for field in REQUIRED_FIELDS_BY_KIND.get(item.kind, ())
+        if getattr(item, field) is None
+    ]
+    if missing:
+        raise ValueError(f"a {item.kind} item without {', '.join(missing)}")
+    if item.kind == "paper" and not item.authors:
+        raise ValueError("a paper item without authors")
+
+
+def check_kev_fields(item: Item) -> None:
+    filled = [field for field in KEV_FIELDS if getattr(item, field) is not None]
+    if filled and item.kind != "vulnerability":
+        raise ValueError(f"a {item.kind} item with {', '.join(filled)}")
+
+
+def check_cve(item: Item) -> None:
+    if item.cve is not None and item.kind not in KINDS_WITH_CVE:
+        raise ValueError(f"a {item.kind} item with a CVE")

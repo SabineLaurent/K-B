@@ -29,41 +29,40 @@ CREATE TABLE raw_data (
 
 CREATE INDEX raw_data_source_id ON raw_data (source_id);
 
+-- ITEM is minimal (option D): what an item says is in its subtype or its reference table.
+-- The kinds: docs/2026-10-07-clarification-modele.md, "Valeurs de kind"; a test keeps this list
+-- equal to ItemKind in items.py.
 CREATE TABLE item (
-    item_id        INTEGER PRIMARY KEY,
-    source_code    TEXT NOT NULL REFERENCES source (source_code),
-    source_item_id TEXT NOT NULL,
-    title          TEXT NOT NULL,
-    url            TEXT NOT NULL UNIQUE,
-    published_at   TEXT
-        CHECK (published_at IS strftime('%Y-%m-%dT%H:%M:%SZ', published_at)),
-    revised_at     TEXT
-        CHECK (revised_at IS strftime('%Y-%m-%dT%H:%M:%SZ', revised_at)),
-    saved_at       TEXT
-        CHECK (saved_at IS strftime('%Y-%m-%dT%H:%M:%SZ', saved_at)),
-    summary        TEXT,
-    raw_data_id    INTEGER NOT NULL REFERENCES raw_data (id),
-    UNIQUE (source_code, source_item_id)
+    id          INTEGER PRIMARY KEY,
+    kind        TEXT NOT NULL
+        CHECK (kind IN ('paper', 'vulnerability', 'newsletter_article', 'release', 'advisory')),
+    raw_data_id INTEGER NOT NULL REFERENCES raw_data (id)
 ) STRICT;
 
-CREATE INDEX item_published_at ON item (published_at);
-CREATE INDEX item_saved_at ON item (saved_at);
 CREATE INDEX item_raw_data_id ON item (raw_data_id);
 
-CREATE TABLE author (
-    author_id INTEGER PRIMARY KEY,
-    name      TEXT NOT NULL UNIQUE
+-- A reference table: a paper exists once a source cites it; arXiv is the source of truth. Its
+-- arXiv columns are filled if and only if item_id points to the arXiv item.
+CREATE TABLE publication (
+    id           INTEGER PRIMARY KEY,
+    arxiv_id     TEXT NOT NULL UNIQUE,
+    item_id      INTEGER UNIQUE REFERENCES item (id),
+    title        TEXT,
+    summary      TEXT,
+    -- The names, in arXiv's order.
+    authors      TEXT
+        CHECK (json_valid(authors) AND json_type(authors) = 'array'
+            AND json_array_length(authors) > 0),
+    submitted_at TEXT
+        CHECK (submitted_at IS strftime('%Y-%m-%dT%H:%M:%SZ', submitted_at)),
+    revised_at   TEXT
+        CHECK (revised_at IS strftime('%Y-%m-%dT%H:%M:%SZ', revised_at)),
+    CHECK ((item_id IS NULL) = (title IS NULL)
+        AND (item_id IS NULL) = (summary IS NULL)
+        AND (item_id IS NULL) = (authors IS NULL)
+        AND (item_id IS NULL) = (submitted_at IS NULL)
+        AND (item_id IS NULL) = (revised_at IS NULL))
 ) STRICT;
-
-CREATE TABLE item_author (
-    item_id   INTEGER NOT NULL REFERENCES item (item_id) ON DELETE CASCADE,
-    author_id INTEGER NOT NULL REFERENCES author (author_id) ON DELETE CASCADE,
-    position  INTEGER NOT NULL CHECK (position >= 1),
-    PRIMARY KEY (item_id, author_id),
-    UNIQUE (item_id, position)
-) STRICT;
-
-CREATE INDEX item_author_author_id ON item_author (author_id);
 
 CREATE TABLE highlight (
     highlight_id     INTEGER PRIMARY KEY,
@@ -71,13 +70,13 @@ CREATE TABLE highlight (
     text             TEXT NOT NULL,
     highlighted_at   TEXT NOT NULL
         CHECK (highlighted_at IS strftime('%Y-%m-%dT%H:%M:%SZ', highlighted_at)),
-    item_id          INTEGER NOT NULL REFERENCES item (item_id) ON DELETE CASCADE
+    item_id          INTEGER NOT NULL REFERENCES item (id) ON DELETE CASCADE
 ) STRICT;
 
 CREATE INDEX highlight_item_id ON highlight (item_id);
 
 CREATE TABLE repository (
-    item_id         INTEGER PRIMARY KEY REFERENCES item (item_id) ON DELETE CASCADE,
+    item_id         INTEGER PRIMARY KEY REFERENCES item (id) ON DELETE CASCADE,
     repository_name TEXT NOT NULL CHECK (repository_name GLOB '?*/?*')
 ) STRICT;
 
@@ -91,11 +90,32 @@ CREATE TABLE star_gain (
 
 CREATE INDEX star_gain_window_end ON star_gain (window_end);
 
--- A CVE is not unique: a CISA entry and a GitHub advisory of the same CVE are two items,
--- linked by their CVE (docs/stockage.md).
+-- A reference table: a CVE exists once a source cites it; CISA KEV is the source of truth, and
+-- "exploited" reads item_id IS NOT NULL. Its KEV columns are filled if and only if item_id points
+-- to the KEV item; revised_at and withdrawn_at may stay empty, but only with item_id.
 CREATE TABLE vulnerability (
-    item_id INTEGER PRIMARY KEY REFERENCES item (item_id) ON DELETE CASCADE,
-    cve     TEXT CHECK (cve GLOB 'CVE-[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]*')
+    id             INTEGER PRIMARY KEY,
+    cve_id         TEXT NOT NULL UNIQUE
+        CHECK (cve_id GLOB 'CVE-[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]*'),
+    item_id        INTEGER UNIQUE REFERENCES item (id),
+    name           TEXT,
+    description    TEXT,
+    vendor         TEXT,
+    product        TEXT,
+    -- dateAdded is a day: written at midnight UTC (docs/stockage.md).
+    date_added     TEXT
+        CHECK (date_added IS strftime('%Y-%m-%dT%H:%M:%SZ', date_added)),
+    -- knownRansomwareCampaignUse.
+    ransomware_use TEXT CHECK (ransomware_use IN ('Known', 'Unknown')),
+    revised_at     TEXT
+        CHECK (revised_at IS strftime('%Y-%m-%dT%H:%M:%SZ', revised_at)),
+    withdrawn_at   TEXT
+        CHECK (withdrawn_at IS strftime('%Y-%m-%dT%H:%M:%SZ', withdrawn_at)),
+    CHECK ((item_id IS NULL) = (name IS NULL)
+        AND (item_id IS NULL) = (description IS NULL)
+        AND (item_id IS NULL) = (vendor IS NULL)
+        AND (item_id IS NULL) = (product IS NULL)
+        AND (item_id IS NULL) = (date_added IS NULL)
+        AND (item_id IS NULL) = (ransomware_use IS NULL)
+        AND (item_id IS NOT NULL OR (revised_at IS NULL AND withdrawn_at IS NULL)))
 ) STRICT;
-
-CREATE INDEX vulnerability_cve ON vulnerability (cve);

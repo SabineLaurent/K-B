@@ -36,10 +36,7 @@ def test_a_connection_checks_the_foreign_keys(tmp_path):
 
     assert connection.execute("PRAGMA foreign_keys").fetchone() == (1,)
     with pytest.raises(sqlite3.IntegrityError):
-        connection.execute(
-            "INSERT INTO item (source_code, source_item_id, title, url, raw_data_id)"
-            " VALUES ('rss', 'x', 'A title', 'https://example.com/', 1)"
-        )
+        connection.execute("INSERT INTO item (kind, raw_data_id) VALUES ('paper', 1)")
     connection.close()
 
 

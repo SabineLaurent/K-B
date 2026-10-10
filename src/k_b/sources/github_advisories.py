@@ -1,8 +1,9 @@
-"""The GitHub security advisories source: its download (E), then its reader (T).
+"""The GitHub security advisories source: its download (E), and the reading of its raw response.
 
 Download the security advisories of the tracked packages of one ecosystem, as published.
 
-Read the security advisories of a raw GitHub API response, and convert each one into an item.
+Read the security advisories of a raw GitHub API response: the download uses it to tell the new
+ones. No item yet: the advisories are skipped at the import until #121.
 """
 
 import json
@@ -12,8 +13,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
-from k_b.items import CVE_ID, Item
-from k_b.source_contract import SourceReader
+from k_b.items import CVE_ID
 from k_b.sources.github_api import get_from_github_api
 from k_b.sources.github_dates import parse_github_date
 
@@ -161,22 +161,3 @@ def parse_package_names(vulnerabilities: object, position: int) -> tuple[str, ..
         if name not in package_names:
             package_names.append(name)
     return tuple(package_names)
-
-
-def convert_advisory(
-    advisory: Advisory, collected_at: datetime, raw_file_path: str
-) -> Item:
-    return Item(
-        source_code="github",
-        source_item_id=advisory.ghsa_id,
-        title=advisory.summary,
-        url=advisory.url,
-        published_at=advisory.published_at,
-        collected_at=collected_at,
-        raw_file_path=raw_file_path,
-        cve=advisory.cve_id,
-        is_vulnerability=True,
-    )
-
-
-READER: SourceReader[Advisory] = SourceReader(read_advisories, convert_advisory)

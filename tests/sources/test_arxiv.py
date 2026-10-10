@@ -307,6 +307,7 @@ def test_a_paper_keeps_its_id_without_version_and_its_revision_date():
     item = convert_paper(paper, COLLECTED_AT, RAW_FILE_PATH)
 
     assert item.source_code == "arxiv"
+    assert item.kind == "paper"
     assert item.source_item_id == "2509.12345"
     assert item.title == "A paper"
     assert item.url == "https://arxiv.org/abs/2509.12345"

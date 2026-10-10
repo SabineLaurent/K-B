@@ -11,10 +11,11 @@ import io
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from email.utils import format_datetime
+from typing import cast
 from urllib.error import HTTPError
 
 from k_b.http_download import download
-from k_b.items import CVE_ID, Item
+from k_b.items import CVE_ID, Item, RansomwareUse
 from k_b.source_contract import SourceReader
 
 CATALOG_URL = (
@@ -35,6 +36,7 @@ REQUIRED_COLUMNS = (
     "vulnerabilityName",
     "dateAdded",
     "shortDescription",
+    "knownRansomwareCampaignUse",
 )
 
 
@@ -78,6 +80,8 @@ class Vulnerability:
     vulnerability_name: str
     date_added: date
     short_description: str
+    # Known or Unknown in the catalog: another value is refused when converted to an item.
+    known_ransomware_campaign_use: str
 
 
 def read_new_vulnerabilities(
@@ -124,6 +128,7 @@ def parse_vulnerability(row: dict[str, str], line_number: int) -> Vulnerability:
         vulnerability_name=row["vulnerabilityName"],
         date_added=date_added,
         short_description=row["shortDescription"],
+        known_ransomware_campaign_use=row["knownRansomwareCampaignUse"],
     )
 
 
@@ -133,6 +138,7 @@ def convert_vulnerability(
     return Item(
         source_code="cisa_kev",
         source_item_id=vulnerability.cve_id,
+        kind="vulnerability",
         title=vulnerability.vulnerability_name,
         url=NVD_PAGE_URL + vulnerability.cve_id,
         # dateAdded is a day: stored at midnight UTC, a writing convention (docs/stockage.md).
@@ -141,7 +147,10 @@ def convert_vulnerability(
         collected_at=collected_at,
         raw_file_path=raw_file_path,
         cve=vulnerability.cve_id,
-        is_vulnerability=True,
+        vendor=vulnerability.vendor_project,
+        product=vulnerability.product,
+        # Not checked here: the item refuses a value outside RansomwareUse (strict Literal).
+        ransomware_use=cast(RansomwareUse, vulnerability.known_ransomware_campaign_use),
     )
 
 
