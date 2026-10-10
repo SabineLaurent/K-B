@@ -135,23 +135,39 @@ def test_the_raw_files_of_a_folder_no_longer_tracked_are_read(tmp_path):
     assert reading.rejections == []
 
 
-@pytest.mark.parametrize(
-    "folder_name",
-    [
-        "github_releases_anthropics_claude_code",
-        "github_advisories_pip",
-        "github_most_starred",
-    ],
-)
-def test_the_github_raw_files_are_skipped_and_logged(tmp_path, caplog, folder_name):
-    copy_fixture(tmp_path, "github_releases_extract.json", folder_name, "json")
+def test_the_github_ranking_is_skipped_and_logged(tmp_path, caplog):
+    copy_fixture(
+        tmp_path, "github_most_starred_extract.json", "github_most_starred", "json"
+    )
 
     with caplog.at_level(logging.INFO):
         reading = read_raw_items(tmp_path, SOURCE_KINDS)
 
     assert reading.items == []
     assert reading.rejections == []
-    assert f"source without a reader, skipped: {folder_name}" in caplog.text
+    assert "source without a reader, skipped: github_most_starred" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "fixture_name, folder_name, kind",
+    [
+        (
+            "github_releases_extract.json",
+            "github_releases_anthropics_claude_code",
+            "release",
+        ),
+        ("github_advisories_extract.json", "github_advisories_pip", "advisory"),
+    ],
+)
+def test_the_github_releases_and_advisories_are_read(
+    tmp_path, fixture_name, folder_name, kind
+):
+    copy_fixture(tmp_path, fixture_name, folder_name, "json")
+
+    reading = read_raw_items(tmp_path, SOURCE_KINDS)
+
+    assert [item.kind for item in reading.items] == [kind] * 3
+    assert reading.rejections == []
 
 
 def test_files_are_read_in_collection_order(tmp_path):

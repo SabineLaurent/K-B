@@ -1,6 +1,6 @@
+from k_b.config import TrackedRepository
 from k_b.sources.tracked_repositories import (
     TRACKED_REPOSITORIES,
-    TrackedRepository,
     list_packages_by_ecosystem,
 )
 

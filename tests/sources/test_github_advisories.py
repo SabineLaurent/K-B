@@ -13,6 +13,7 @@ from k_b.sources import github_advisories
 from k_b.sources.github_advisories import (
     Advisory,
     GithubAdvisoriesSource,
+    convert_advisory,
     read_advisories,
 )
 
@@ -205,3 +206,18 @@ def test_a_response_that_is_not_a_list_is_refused():
 def test_an_invalid_advisory_is_refused_with_its_position(changes):
     with pytest.raises(ValueError, match="advisory 0"):
         read_advisories(advisory_payload(**changes))
+
+
+def test_a_recorded_advisory_gives_its_item_with_its_cve_and_packages():
+    advisory = read_advisories(RECORDED_RESPONSE)[2]
+
+    item = convert_advisory(advisory, COLLECTED_AT, RAW_FILE_PATH)
+
+    assert item.source_code == "github"
+    assert item.kind == "advisory"
+    assert item.source_item_id == "GHSA-3644-q5cj-c5c7"
+    assert item.title == advisory.summary
+    assert item.url == advisory.url
+    assert item.published_at == advisory.published_at
+    assert item.cve == "CVE-2026-45134"
+    assert item.package_names == ("langsmith", "langchain-classic", "langchain")

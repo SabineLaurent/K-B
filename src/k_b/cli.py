@@ -20,6 +20,7 @@ from k_b.import_items import (
 from k_b.raw_store import InvalidCollectionStateError
 from k_b.source_contract import list_sources
 from k_b.source_kinds import SOURCE_KINDS
+from k_b.sources.tracked_repositories import TRACKED_REPOSITORIES
 
 DATA_DIR_VARIABLE = "KB_DATA_DIR"
 IMPORT_LOG_FILE_NAME = "import-log.jsonl"
@@ -94,7 +95,13 @@ def run_import(data_dir: Path) -> int:
     database_path = data_dir / DATABASE_FILE_NAME
     log_path = data_dir / IMPORT_LOG_FILE_NAME
     try:
-        summary = import_items(data_dir / "raw", database_path, log_path, SOURCE_KINDS)
+        summary = import_items(
+            data_dir / "raw",
+            database_path,
+            log_path,
+            SOURCE_KINDS,
+            TRACKED_REPOSITORIES,
+        )
     except MissingDatabaseError as error:
         print(f"error: {error}; create it with kb create-db", file=sys.stderr)
         return 2

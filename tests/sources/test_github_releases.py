@@ -13,6 +13,7 @@ from k_b.sources import github_releases
 from k_b.sources.github_releases import (
     GithubReleasesSource,
     Release,
+    convert_release,
     read_releases,
 )
 from k_b.sources.tracked_repositories import TRACKED_REPOSITORIES
@@ -248,3 +249,30 @@ def test_a_release_url_with_any_path_character_in_its_tag_is_read(tag):
 def test_a_release_url_without_a_repository_is_refused_with_the_url(html_url):
     with pytest.raises(ValueError, match=re.escape(repr(html_url))):
         read_releases(release_payload(html_url=html_url))
+
+
+def test_a_recorded_release_gives_its_item_with_its_repository_and_tag():
+    release = read_releases(RECORDED_RESPONSE)[0]
+
+    item = convert_release(release, COLLECTED_AT, RAW_FILE_PATH)
+
+    assert item.source_code == "github"
+    assert item.kind == "release"
+    assert item.source_item_id == "401174143"
+    assert item.title == "anthropics/claude-code v2.1.287"
+    assert item.url == "https://github.com/anthropics/claude-code/releases/tag/v2.1.287"
+    assert item.published_at == release.published_at
+    assert item.summary == release.body
+    assert item.repository_name == "anthropics/claude-code"
+    assert item.tag_name == "v2.1.287"
+    assert item.release_name == "v2.1.287"
+
+
+def test_a_release_without_name_is_titled_by_its_tag_and_keeps_its_name_empty():
+    release = read_releases(RECORDED_RESPONSE)[0]
+    unnamed = Release(**{**release.__dict__, "name": None})
+
+    item = convert_release(unnamed, COLLECTED_AT, RAW_FILE_PATH)
+
+    assert item.title == "anthropics/claude-code v2.1.287"
+    assert item.release_name is None

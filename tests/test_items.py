@@ -55,6 +55,47 @@ def vulnerability_fields(**changes):
     return fields
 
 
+def release_fields(**changes):
+    """A GitHub release, with every field its kind requires."""
+    fields = {
+        "source_code": "github",
+        "source_item_id": "401174143",
+        "kind": "release",
+        "title": "anthropics/claude-code v2.1.287",
+        "url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.287",
+        "published_at": datetime(2026, 10, 1, 18, 0, 22, tzinfo=UTC),
+        "summary": "## What's changed",
+        "collected_at": COLLECTED_AT,
+        "raw_file_path": (
+            "automated_watch/github_releases_anthropics_claude_code/"
+            "2026-10-05T093000Z.json"
+        ),
+        "repository_name": "anthropics/claude-code",
+        "tag_name": "v2.1.287",
+        "release_name": "v2.1.287",
+    }
+    fields.update(changes)
+    return fields
+
+
+def advisory_fields(**changes):
+    """A GitHub advisory, with every field its kind requires."""
+    fields = {
+        "source_code": "github",
+        "source_item_id": "GHSA-fjqc-hq36-qh5p",
+        "kind": "advisory",
+        "title": "LangGraph Checkpoint: Unsafe JSON deserialization",
+        "url": "https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
+        "published_at": datetime(2026, 6, 25, 18, 25, 42, tzinfo=UTC),
+        "collected_at": COLLECTED_AT,
+        "raw_file_path": "automated_watch/github_advisories_pip/2026-10-05T093000Z.json",
+        "cve": "CVE-2026-48775",
+        "package_names": ("langgraph-checkpoint",),
+    }
+    fields.update(changes)
+    return fields
+
+
 def test_the_source_codes_are_those_of_the_database():
     seeded_codes = re.findall(r"\('(\w+)',", SEED_SOURCES.read_text())
 
@@ -81,11 +122,22 @@ def test_an_item_keeps_an_absence_as_an_absence():
     assert item.vendor is None
     assert item.product is None
     assert item.ransomware_use is None
+    assert item.repository_name is None
+    assert item.tag_name is None
+    assert item.release_name is None
+    assert item.package_names == ()
 
 
 def test_a_paper_and_a_vulnerability_with_their_fields_are_accepted():
     assert Item(**item_fields()).kind == "paper"
     assert Item(**vulnerability_fields()).kind == "vulnerability"
+
+
+def test_a_release_and_an_advisory_with_their_fields_are_accepted():
+    assert Item(**release_fields()).kind == "release"
+    assert Item(**release_fields(release_name=None, summary=None)).release_name is None
+    assert Item(**advisory_fields()).kind == "advisory"
+    assert Item(**advisory_fields(cve=None)).cve is None
 
 
 @pytest.mark.parametrize(
@@ -106,6 +158,10 @@ def test_a_paper_and_a_vulnerability_with_their_fields_are_accepted():
         {"summary": None},
         {"authors": ()},
         {"revised_at": None},
+        {"repository_name": "anthropics/claude-code"},
+        {"tag_name": "v2.1.287"},
+        {"release_name": "v2.1.287"},
+        {"package_names": ("langchain",)},
         {"stars": 3},
     ],
 )
@@ -139,3 +195,37 @@ def test_an_item_cannot_be_changed():
 
     with pytest.raises(ValidationError):
         item.title = "Another title"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"source_code": "arxiv"},
+        {"repository_name": None},
+        {"repository_name": "claude-code"},
+        {"tag_name": None},
+        {"tag_name": ""},
+        {"published_at": None},
+        {"cve": "CVE-2026-48775"},
+        {"package_names": ("langchain",)},
+    ],
+)
+def test_an_invalid_release_is_refused(changes):
+    with pytest.raises(ValidationError):
+        Item(**release_fields(**changes))
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"source_code": "cisa_kev"},
+        {"published_at": None},
+        {"package_names": ()},
+        {"package_names": ("",)},
+        {"tag_name": "v2.1.287"},
+        {"vendor": "Apple"},
+    ],
+)
+def test_an_invalid_advisory_is_refused(changes):
+    with pytest.raises(ValidationError):
+        Item(**advisory_fields(**changes))
