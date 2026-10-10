@@ -123,7 +123,8 @@ CREATE TABLE vulnerability (
 ) STRICT;
 
 -- A reference table, like source: the list of src/k_b/sources/tracked_repositories.py is the
--- source of truth, written again at each import. GitHub ignores the case of a repository name.
+-- source of truth; each import adds its repositories or updates them, and a repository removed
+-- from the list keeps its row (#87). GitHub ignores the case of a repository name.
 CREATE TABLE tracked_repository (
     id              INTEGER PRIMARY KEY,
     repository_name TEXT NOT NULL UNIQUE COLLATE NOCASE CHECK (repository_name GLOB '?*/?*'),

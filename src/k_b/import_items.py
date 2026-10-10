@@ -136,11 +136,15 @@ def reject_untracked_releases(
     rejections = []
     for item in items:
         if (
-            item.repository_name is not None
-            and item.repository_name.lower() not in tracked_names
+            # A release always has its repository (items.py): str() only satisfies the typing.
+            item.kind == "release"
+            and str(item.repository_name).lower() not in tracked_names
         ):
             rejections.append(
-                reject(item.raw_file_path, f"dépôt plus suivi : {item.repository_name}")
+                reject(
+                    item.raw_file_path,
+                    f"repository not in the tracked list: {item.repository_name}",
+                )
             )
         else:
             kept.append(item)
@@ -153,7 +157,11 @@ def write_tracked_repositories(
     connection.executemany(
         UPSERT_TRACKED_REPOSITORY,
         [
-            (repository.name, repository.ecosystem, json.dumps(repository.packages))
+            (
+                repository.name,
+                repository.ecosystem,
+                json.dumps(repository.packages, ensure_ascii=False),
+            )
             for repository in tracked_repositories
         ],
     )

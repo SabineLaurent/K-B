@@ -290,7 +290,7 @@ def test_a_release_of_a_repository_no_longer_tracked_is_rejected_and_logged(data
         "raw_file_path": (
             "automated_watch/github_releases_anthropics_claude_code/2026-10-05T093000Z.json"
         ),
-        "reason": "dépôt plus suivi : anthropics/claude-code",
+        "reason": "repository not in the tracked list: anthropics/claude-code",
     }
     assert summary.item_count == 3 + 4 + 3
     assert count_rows(data_dir, "SELECT count(*) FROM release") == 0
