@@ -79,9 +79,12 @@ elles ne sont pas recopiées ici. Un test (`tests/test_schema.py`) vérifie que 
   et le flux de `raw_data`) ; les dates et les listes fermées, tenues par leur propre `CHECK` ;
   `highlight`, pas encore remplie, dont les bornes sont à fixer avec son lecteur ; `repository`
   et `star_gain` (voir le MPD).
-- **Limite de SQLite** : `length()` compte les caractères jusqu'au premier caractère NUL. Un
-  texte qui en contient un peut donc passer le `CHECK` en étant plus long ; l'item, lui, compte
-  tous les caractères.
+- **Limite de SQLite** : `length()` compte les caractères jusqu'au premier caractère NUL, alors
+  que l'item les compte tous. Les deux contrôles peuvent donc diverger, dans les deux sens : un
+  texte qui contient un NUL peut passer le `CHECK` en étant plus long que le maximum ; un
+  `tag_name` qui commence par un NUL est accepté par l'item (3 caractères pour `"\0v1"`) et refusé
+  par `CHECK (length(tag_name) > 0)`, ce qui annule l'import entier. Ce second cas n'est pas
+  traité.
 
 ### Ce que chaque source met dans l'item, puis dans la base
 

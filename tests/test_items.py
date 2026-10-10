@@ -257,7 +257,7 @@ def text_of_length(field, length):
         (release_fields, "url", 2_000),
         (advisory_fields, "source_item_id", 19),
         (advisory_fields, "cve", 20),
-        (advisory_fields, "title", 1_000),
+        (advisory_fields, "title", 1_024),
         (advisory_fields, "url", 2_000),
     ],
 )

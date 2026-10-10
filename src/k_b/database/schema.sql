@@ -177,7 +177,7 @@ CREATE TABLE advisory (
         CHECK (ghsa_id GLOB 'GHSA-*')
         CHECK (length(ghsa_id) <= 19),
     vulnerability_id INTEGER REFERENCES vulnerability (id),
-    summary          TEXT NOT NULL CHECK (length(summary) <= 1000),
+    summary          TEXT NOT NULL CHECK (length(summary) <= 1024),
     published_at     TEXT NOT NULL
         CHECK (published_at IS strftime('%Y-%m-%dT%H:%M:%SZ', published_at)),
     -- html_url, kept as given.

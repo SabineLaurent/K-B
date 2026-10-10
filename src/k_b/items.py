@@ -92,7 +92,7 @@ MAX_LENGTH_BY_KIND: dict[str, dict[str, int]] = {
     "advisory": {
         "source_item_id": 19,
         "cve": CVE_MAX_LENGTH,
-        "title": 1_000,
+        "title": 1_024,
         "url": 2_000,
     },
 }

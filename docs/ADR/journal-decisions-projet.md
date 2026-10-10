@@ -733,7 +733,7 @@ encore l'ancien modèle.
 - **Les longueurs maximales ont leurs valeurs, en caractères : `publication` (`arxiv_id` 20,
   `title` 500, `summary` 5 000), `vulnerability` (`cve_id` 20, `name` 500, `description` 5 000,
   `vendor` 200, `product` 500), `release` (`tag_name` 255, `name` 255, `body` 125 000, `url`
-  2 000), `advisory` (`ghsa_id` 19, `summary` 1 000, `url` 2 000). Elles vivent dans `items.py`,
+  2 000), `advisory` (`ghsa_id` 19, `summary` 1 024, `url` 2 000). Elles vivent dans `items.py`,
   seul endroit à lire ; `stockage.md` y renvoie sans les recopier.** Décision de Sabine, sur la
   proposition de la session. Pourquoi ces valeurs : aucune n'était écrite. « Aux valeurs du
   document », dans l'issue, désignait le
@@ -744,10 +744,17 @@ encore l'ancien modèle.
   plus longue note de release fait 28 783 caractères ; une borne à 10 000 en aurait écarté 22 sur
   100). Pourquoi pas de copie dans `stockage.md` : ce serait une troisième copie, qu'aucun test ne
   tient. Précise la décision du 2026-10-08 (« tenue deux fois »), sans la changer. Limites : les
-  limites de GitHub pour `tag_name`, `name` et le résumé d'une alerte ne sont pas vérifiées ;
-  125 000 vient d'un message d'erreur de l'API GitHub rapporté par des tiers, 1 920 pour un
-  résumé arXiv de la page d'aide d'arXiv ; les autres dépôts suivis et les alertes `npm` ne sont
-  pas dans la collecte mesurée ; `length()` de SQLite s'arrête au premier caractère NUL.
+  limites de GitHub pour `tag_name` et `name` ne sont pas vérifiées ; 1 024 pour le résumé d'une
+  alerte (1 000 proposé d'abord) vient d'une copie tierce du schéma de l'API GitHub, relevée par
+  la revue de code, **non vérifiée à la source** ; 125 000 vient d'un message d'erreur de l'API
+  GitHub rapporté par des tiers, 1 920 pour un résumé arXiv de la page d'aide d'arXiv ; les
+  autres dépôts suivis et les alertes `npm` ne sont pas dans la collecte mesurée ; une étiquette
+  de release non ASCII, encodée dans l'URL, peut dépasser 2 000 caractères en restant sous 255 ;
+  `length()` de SQLite s'arrête au premier caractère NUL. Conséquence assumée de « rien n'est
+  tronqué » (2026-10-08) : un texte trop long écarte l'entrée entière ; une ligne CISA KEV
+  refusée pour sa description laisse son CVE lu comme non exploité (`item_id` vide), et une
+  révision arXiv refusée laisse en base la version précédente, avec pour seule trace une ligne
+  du journal d'import, à chaque import.
 - **Côté Pydantic, les longueurs sont une table des bornes par sorte d'item dans `items.py`, lue
   par un contrôle du modèle, et non un `max_length` par champ.** Décision de Sabine, sur la
   recommandation de la session. Pourquoi : `Item` est un modèle commun, et son champ `summary`
@@ -766,7 +773,9 @@ encore l'ancien modèle.
   sous-requête dans un `CHECK`). Le nombre d'éléments a son propre `CHECK`, séparé de celui de la
   forme JSON : SQLite nomme dans son message le `CHECK` qui refuse. Option écartée : borner la
   longueur du texte JSON (aucune borne égale côté item, le texte JSON est produit par l'import).
-  Limite assumée : la longueur d'un nom **déroge** à « tenue deux fois » (2026-10-08).
+  Limites assumées : la longueur d'un nom **déroge** à « tenue deux fois » (2026-10-08) ; un
+  papier de plus de 1 000 auteurs (grande collaboration) serait écarté, la collecte du
+  2026-10-07 en compte 24 au plus.
 - **Restent sans borne de longueur : les colonnes que le code remplit (`source`,
   `tracked_repository`, le chemin et le flux de `raw_data`), les dates, qui gardent leur `CHECK`
   de format, et `highlight`, `repository` et `star_gain`.** Décision de Sabine. Pourquoi : la

@@ -501,6 +501,8 @@ ADVISORY_ITEM_ID = 3
 REPOSITORY_ITEM_ID = 4
 
 # A row every constraint of its table accepts, in a base that holds the rows of filled_database.
+# The values are those of tests/fixtures (the collection), the long texts cut short; a new source,
+# a highlight and a star gain have no collected example.
 VALID_ROW_BY_TABLE = {
     "source": {
         "source_code": "rss",
@@ -510,19 +512,22 @@ VALID_ROW_BY_TABLE = {
     },
     "raw_data": {
         "source_id": 1,
-        "raw_file_path": "automated_watch/y/2026-10-05T093000Z.json",
-        "stream": "y",
+        "raw_file_path": "automated_watch/cisa_kev/2026-10-05T093000Z.csv",
+        "stream": "cisa_kev",
         "collected_at": DATE,
     },
     "item": {"kind": "paper", "raw_data_id": 1},
     "publication": {
         "arxiv_id": "2609.31282",
         "item_id": PAPER_ITEM_ID,
-        "title": "A title",
-        "summary": "A summary",
-        "authors": '["Ada Lovelace"]',
-        "submitted_at": DATE,
-        "revised_at": DATE,
+        "title": (
+            "Resource-Optimized and Energy-Aware Agentic AI Framework Anchored on"
+            " Blockchain for Secure Software Supply Chains"
+        ),
+        "summary": "This paper proposes a blockchain-backed agentic security framework",
+        "authors": '["Toqeer Ali Syed", "Asadullah Abdullah Khan"]',
+        "submitted_at": "2026-09-25T13:53:50Z",
+        "revised_at": "2026-09-25T13:53:50Z",
     },
     "highlight": {
         "zotero_key": "ABCD2345",
@@ -542,8 +547,8 @@ VALID_ROW_BY_TABLE = {
     "vulnerability": {
         "cve_id": "CVE-2026-86950",
         "item_id": PAPER_ITEM_ID,
-        "name": "A name",
-        "description": "A description",
+        "name": "Apple Multiple Products Out-of-Bounds Write Vulnerability",
+        "description": "Apple iOS, macOS, and iPadOS contain an out-of-bounds write",
         "vendor": "Apple",
         "product": "Multiple Products",
         "date_added": "2026-09-29T00:00:00Z",
@@ -562,15 +567,15 @@ VALID_ROW_BY_TABLE = {
         "tag_name": "v2.1.287",
         "name": "v2.1.287",
         "body": "## What's changed",
-        "published_at": DATE,
+        "published_at": "2026-10-01T18:00:22Z",
         "url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.287",
     },
     "advisory": {
         "item_id": ADVISORY_ITEM_ID,
         "kind": "advisory",
         "ghsa_id": "GHSA-fjqc-hq36-qh5p",
-        "summary": "A summary",
-        "published_at": DATE,
+        "summary": "LangGraph Checkpoint: Unsafe JSON deserialization in checkpoint loading",
+        "published_at": "2026-06-25T18:25:42Z",
         "url": "https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
         "packages": '["langgraph-checkpoint"]',
     },
@@ -633,7 +638,7 @@ REFUSED_VALUES = [
     ("advisory", "kind = 'advisory'", {"kind": "paper"}),
     ("advisory", "ghsa_id GLOB", {"ghsa_id": "CVE-2026-48775"}),
     ("advisory", "length(ghsa_id) <= 19", {"ghsa_id": "GHSA-fjqc-hq36-qh5pp"}),
-    ("advisory", "length(summary) <= 1000", {"summary": "x" * 1_001}),
+    ("advisory", "length(summary) <= 1024", {"summary": "x" * 1_025}),
     ("advisory", "published_at IS strftime", {"published_at": INVALID_DATE}),
     ("advisory", "url GLOB", {"url": "http://github.com/advisories"}),
     ("advisory", "length(url) <= 2000", {"url": "https://" + "x" * 1_993}),
@@ -645,7 +650,13 @@ REFUSED_VALUES = [
 @pytest.fixture
 def filled_database(database):
     """The base with the rows a valid row of each table points to."""
-    insert_row(database, "raw_data", id=1, raw_file_path="automated_watch/x/a.json")
+    insert_row(
+        database,
+        "raw_data",
+        id=1,
+        raw_file_path="automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml",
+        stream="arxiv_cscr_x_csai",
+    )
     for item_id, kind in (
         (PAPER_ITEM_ID, "paper"),
         (RELEASE_ITEM_ID, "release"),
