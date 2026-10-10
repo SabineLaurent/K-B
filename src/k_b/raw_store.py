@@ -5,11 +5,20 @@ import json
 import os
 import tempfile
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 # The folder of raw/ that holds what the watch collects, one folder per source.
 AUTOMATED_WATCH_DIR_NAME = "automated_watch"
 COLLECTION_STATE_FILENAME = "collection_state.json"
+
+
+def find_stream(raw_file_path: str) -> str:
+    """The stream of a raw file: the name of its source folder, second part of its path
+    relative to raw/ (automated_watch/<stream>/...)."""
+    parts = PurePosixPath(raw_file_path).parts
+    if len(parts) < 3:
+        raise ValueError(f"raw file path without a source folder: {raw_file_path}")
+    return parts[1]
 
 
 class InvalidCollectionStateError(ValueError):

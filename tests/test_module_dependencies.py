@@ -11,6 +11,7 @@ import k_b
 PACKAGE_DIR = Path(k_b.__file__).parent
 SOURCES_DIR = PACKAGE_DIR / "sources"
 GENERIC_MODULES = {
+    "config",
     "items",
     "source_contract",
     "collect",

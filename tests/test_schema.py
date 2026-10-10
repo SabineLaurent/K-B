@@ -1,12 +1,14 @@
+import re
 import sqlite3
-from importlib.resources import files
 
 import pytest
 
-DATABASE_SCRIPTS = files("k_b.database")
+from k_b.config import RETENTION_YEARS_BY_ACQUISITION_MODE
+from k_b.database.creation import DATABASE_SCRIPTS
+
 EXPECTED_TABLES = {
     "source",
-    "collection",
+    "raw_data",
     "item",
     "author",
     "item_author",
@@ -39,9 +41,48 @@ def test_the_schema_and_the_sources_load_with_every_expected_table(database):
     assert database.execute("SELECT count(*) FROM source").fetchone() == (7,)
 
 
+def test_each_acquisition_mode_of_the_schema_has_a_retention_in_the_config():
+    schema = DATABASE_SCRIPTS.joinpath("schema.sql").read_text()
+    (allowed_values,) = re.findall(r"acquisition_mode IN \(([^)]*)\)", schema)
+
+    assert set(re.findall(r"'(\w+)'", allowed_values)) == set(
+        RETENTION_YEARS_BY_ACQUISITION_MODE
+    )
+
+
+def test_an_acquisition_mode_outside_the_list_is_refused(database):
+    with pytest.raises(sqlite3.IntegrityError, match="CHECK"):
+        database.execute(
+            "INSERT INTO source (source_code, label, source_type, acquisition_mode)"
+            " VALUES ('rss', 'RSS', 'web_service', 'archive')"
+        )
+
+
+def test_each_seeded_source_has_its_acquisition_mode(database):
+    modes = dict(database.execute("SELECT source_code, acquisition_mode FROM source"))
+
+    assert modes == {
+        "github": "watch",
+        "arxiv": "watch",
+        "cisa_kev": "watch",
+        "clipper": "library",
+        "tldr": "watch",
+        "zotero": "library",
+        "gh_archive": "watch",
+    }
+
+
+def test_a_raw_data_of_an_unknown_source_is_refused(database):
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        database.execute(
+            "INSERT INTO raw_data (source_id, raw_file_path, stream, collected_at)"
+            " VALUES (99, 'automated_watch/rss/x.xml', 'rss', '2026-10-05T09:30:00Z')"
+        )
+
+
 def insert_vulnerability(database, item_id, url):
     database.execute(
-        "INSERT INTO item (item_id, source_code, source_item_id, title, url, collection_id)"
+        "INSERT INTO item (item_id, source_code, source_item_id, title, url, raw_data_id)"
         " VALUES (?, ?, ?, ?, ?, 1)",
         (
             item_id,
@@ -59,8 +100,9 @@ def insert_vulnerability(database, item_id, url):
 
 def test_two_sources_can_share_a_cve(database):
     database.execute(
-        "INSERT INTO collection (collection_id, collected_at, raw_file_path)"
-        " VALUES (1, '2026-10-05T09:30:00Z', 'automated_watch/x/2026-10-05T093000Z.json')"
+        "INSERT INTO raw_data (id, source_id, raw_file_path, stream, collected_at)"
+        " VALUES (1, 1, 'automated_watch/x/2026-10-05T093000Z.json', 'x',"
+        " '2026-10-05T09:30:00Z')"
     )
 
     insert_vulnerability(
