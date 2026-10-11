@@ -946,7 +946,7 @@ encore l'ancien modèle.
   fenêtre ; le rattrapage maximal mesuré tient sous la borne (mesures, calcul et commandes datés
   dans [bigquery.md](../bigquery.md#mesures-du-2026-10-11)). Pourquoi : une collecte ordinaire qui
   lirait 20 fois trop est arrêtée au `dry_run` ; « 4 Go après réflexion ça fait beaucoup »
-  (Sabine). Options écartées : 4 Go fixes (proposition de la session) ; 200 Mo par fenêtre (13 des
+  (Sabine). Options écartées : 4 Go fixes (proposition de la session) ; 200 Mo par fenêtre (12 des
   15 fenêtres mesurées auraient échoué seules) ; 300 Mo par fenêtre ; retirer des fenêtres sous la
   borne (le plafond y baisse plus que le volume : second `/code-review`). Limite : en période
   lourde, le rattrapage maximal dépasserait la borne et perdrait ses plus anciennes fenêtres (pire

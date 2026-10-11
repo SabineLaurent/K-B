@@ -144,7 +144,7 @@ faux client sans jamais appeler BigQuery.
 | BigQuery plutôt que PySpark | voir la sous-section ci-dessous | PySpark sur les fichiers bruts |
 | Fenêtre J-3 à J-1, glissante | trois jours complets ; le jour en cours est partiel | inclure aujourd'hui |
 | Rattrapage, 15 fenêtres au plus | les tables passées restent lisibles (ADR du 2026-10-05) ; au-delà de deux semaines, un dépôt qui a monté n'apporte plus grand-chose (Sabine) | pas de rattrapage ; 30 fenêtres ; échouer au-delà (bloquerait la source, comme arXiv #71) |
-| 650 Mo par fenêtre, 2 Go au plus | fenêtre la plus lourde mesurée × 1,5 ; le rattrapage maximal mesuré tient sous la borne | 4 Go fixes ; 200 Mo et 300 Mo par fenêtre (13 et 11 des 15 fenêtres mesurées auraient échoué seules) |
+| 650 Mo par fenêtre, 2 Go au plus | fenêtre la plus lourde mesurée × 1,5 ; le rattrapage maximal mesuré tient sous la borne | 4 Go fixes ; 200 Mo et 300 Mo par fenêtre (12 et 10 des 15 fenêtres mesurées auraient échoué seules) |
 | Table de la veille « close » | sa dernière heure arrive vers 00:08 UTC le lendemain | aucun contrôle |
 | Source sautée sans la clé | une machine sans clé ne fait pas échouer chaque collecte | toujours lancer et échouer |
 | Fixture tirée d'une vraie collecte | consigne de Sabine du 2026-10-10 | une fixture inventée |

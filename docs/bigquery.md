@@ -129,8 +129,8 @@ for count in (1, 7, 15, 30):
 
 - **Par fenêtre** : la fenêtre la plus lourde prise seule lit 433 499 230 octets ; × 1,5 = 650 Mo,
   arrondi. Une collecte quotidienne ordinaire (une fenêtre) qui lirait 20 fois son volume
-  habituel est arrêtée au `dry_run`. Avec 200 Mo, 13 des 15 fenêtres mesurées auraient échoué
-  seules ; avec 300 Mo, 11.
+  habituel est arrêtée au `dry_run`. Avec 200 Mo, 12 des 15 fenêtres mesurées auraient échoué
+  seules ; avec 300 Mo, 10.
 - **Borne** : le rattrapage maximal mesuré, 15 fenêtres (17 jours, du 24/09 au 10/10, période
   lourde de fin septembre comprise), lit 1,58 Go : il tient sous 2 Go, marge × 1,26. Le **pire
   cas**, 17 jours tous au rythme de la fenêtre la plus lourde (433,5 / 3 = 144,5 Mo par jour),
