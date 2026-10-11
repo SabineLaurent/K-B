@@ -255,8 +255,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   comptées sur deux jours au lieu de trois ; des **heures manquantes ou appauvries** dans une
   table présente ne se voient pas non plus. Ni l'une ni l'autre ne laisse de trace dans le brut
   ou le journal.
-- **Fait constaté le 2026-10-11** : depuis le 2026-10-06 à 18:00 UTC, les tables BigQuery de GH
-  Archive ont des heures appauvries (environ dix fois moins d'événements jusqu'au 08/10 à 02:59,
+- **Fait constaté le 2026-10-11** : depuis le 2026-10-06 (baisse dès 17:00 UTC, franche à 18:00,
+  complète à 19:00), les tables BigQuery de GH Archive ont des heures appauvries (environ dix fois
+  moins d'événements jusqu'au 08/10 à 02:59,
   puis environ moitié moins, avec une nouvelle chute du 09/10 15:00 au 10/10 00:59), alors que
   les fichiers source de chaque heure existent ; détail et limite de la conclusion dans
   [bigquery.md](bigquery.md#anomalie-constatée--les-tables-de-gh-archive-incomplètes-depuis-le-2026-10-06).

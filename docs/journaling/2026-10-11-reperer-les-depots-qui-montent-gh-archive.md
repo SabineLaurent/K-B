@@ -189,11 +189,12 @@ Ce travail a produit un exemple de contrôle qualité, de la mesure à la docume
    07/10 a 162 528 lignes contre 1 505 681 la veille. Les fichiers source (en-têtes, rien
    téléchargé) : les 24 heures existent, le volume ne baisse que de 42 %. Une petite requête
    réelle (49 Mo, accordée par Sabine), puis la même pour garder les 144 comptes heure par
-   heure : aucune heure ne manque, mais à partir du 06/10 à 18:00 UTC les heures ont environ dix
-   fois moins d'événements qu'avant (fichier joint à `docs/bigquery.md`).
+   heure : aucune heure ne manque, mais le 06/10 la baisse commence dès 17:00 UTC (déjà sous le
+   minimum de la période normale), devient franche à 18:00 et complète à 19:00 ; ensuite, les
+   heures ont environ dix fois moins d'événements qu'avant (fichier joint à `docs/bigquery.md`).
 4. **Conclusion et sa limite.** Les tables BigQuery sont très probablement incomplètes par rapport
-   aux fichiers source depuis le 06/10 à 18:00 UTC : un défaut de la source, pas de K-B. Ce n'est pas démontré
-   au sens strict (les fichiers n'ont pas été comptés). La collecte réelle du jour en dépend.
+   aux fichiers source depuis le 06/10 en fin de journée (UTC) : un défaut de la source, pas de
+   K-B. Ce n'est pas démontré au sens strict (les fichiers n'ont pas été comptés). La collecte réelle du jour en dépend.
 5. **Documentation.** Chiffres datés, commandes exactes, conclusion et limite dans
    `docs/bigquery.md` et dans les specs ; un contrôle de complétude est proposé en issue de suite.
 

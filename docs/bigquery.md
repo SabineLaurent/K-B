@@ -203,8 +203,9 @@ les 144 comptes sont dans
 | Période (UTC) | Heures | Événements par heure |
 |---|---|---|
 | 05/10 00:00 → 06/10 16:59 | 41 | 68 888 à 90 974 |
-| 06/10 17:00 | 1 | 60 968 |
-| 06/10 18:00 | 1 | 27 666 : la chute commence |
+| 06/10 17:00 | 1 | 60 968 : déjà sous le minimum de la période normale, la baisse commence |
+| 06/10 18:00 | 1 | 27 666 : la baisse devient franche |
+| 06/10 19:00 | 1 | 6 815 : la chute est complète (première heure de la ligne suivante) |
 | 06/10 19:00 → 08/10 02:59 | 32 | 4 552 à 9 182 (environ dix fois moins) |
 | 08/10 03:00 → 08:59 | 6 | 18 204 à 42 890 (remontée) |
 | 08/10 09:00 → 09/10 14:59 | 30 | 36 755 à 50 750 (environ la moitié d'avant) |
@@ -216,10 +217,12 @@ les 144 comptes sont dans
 Le script qui a produit le fichier : la requête ci-dessus, exécutée avec
 `QueryJobConfig(maximum_bytes_billed=100_000_000)`, chaque ligne écrite par `csv.writer`.
 
-**Constat.** Aucune heure n'est absente, mais des heures sont appauvries : à partir du 06/10 à
-18:00 UTC, les heures comptent environ dix fois moins d'événements qu'avant, jusqu'au 08/10 à
-02:59 ; ensuite, environ moitié moins, avec une nouvelle chute du 09/10 15:00 au 10/10 00:59. Le 07/10, les fichiers source ne pèsent que 42 % de moins que le 06/10,
-quand BigQuery compte 89 % d'événements en moins.
+**Constat.** Aucune heure n'est absente, mais des heures sont appauvries. Le 06/10, la baisse
+commence dès 17:00 UTC (60 968, sous le minimum de 68 888 de la période normale), devient franche à
+18:00 (27 666) et complète à 19:00 (6 815) ; les heures comptent ensuite environ dix fois moins
+d'événements qu'avant, jusqu'au 08/10 à 02:59, puis environ moitié moins, avec une nouvelle chute
+du 09/10 15:00 au 10/10 00:59. Le 07/10, les fichiers source ne pèsent que 42 % de moins que le
+06/10, quand BigQuery compte 89 % d'événements en moins.
 
 **Conclusion, avec sa limite.** Les tables BigQuery de GH Archive sont très probablement
 incomplètes par rapport aux fichiers source depuis le 2026-10-06 : un défaut de la source, pas du
