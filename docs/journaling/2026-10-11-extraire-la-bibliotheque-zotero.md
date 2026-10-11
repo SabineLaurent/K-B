@@ -228,7 +228,7 @@ sortie ne change pas : une machine sans Zotero ne voit pas sa collecte échouer.
 | Le brut est le résultat de la requête, en JSON | minimisation : la base entière contient toute la bibliothèque (ADR du 2026-10-09) | la copie entière comme brut |
 | Copier `zotero.sqlite` **et** son `-wal` | documentation de Zotero, et constat du 2026-10-11 | l'API de sauvegarde de SQLite : elle ouvre l'original, que Zotero verrouille ; `immutable=1` sur l'original : ignore le `-wal` |
 | Garde avant et après la copie | une paire mal assortie passe `integrity_check` | s'en remettre au seul contrôle d'intégrité |
-| Dossier temporaire du système | la source ne connaît pas le dossier de données ; une copie entière n'a pas à passer par un dossier sauvegardé | un temporaire caché dans le dossier de données (convention 2) |
+| Dossier temporaire du système | la source ne connaît pas le dossier de données ; une copie entière n'a pas à passer par un dossier sauvegardé ; la règle 2 des conventions est précisée dans cette PR | un temporaire caché dans le dossier de données, comme pour les fichiers que K-B écrit |
 | Une instruction SQL avec agrégats JSON | « document » défini une fois ; le résultat est ce que la requête rend | quatre requêtes assemblées en Python : filtre répété ; une requête par document : N+1 |
 | Tous les documents hors corbeille | Zotero n'a pas d'état « lu » | seulement les documents surlignés ; seulement ceux dont le PDF a été ouvert (`lastRead`, sens non vérifié) |
 | PDF du stockage de Zotero seulement | un PDF lié garde son propre chemin, qui peut contenir le nom du compte | tous les PDF |
@@ -316,5 +316,3 @@ sortie ne change pas : une machine sans Zotero ne voit pas sa collecte échouer.
   tard par Sabine), les PDF liés, les surlignages d'un EPUB ou d'une capture web, un PDF sans
   document parent, un titre rangé sous un autre champ que `title`.
 - **`KB_ZOTERO_DIR` dans `.env.example`** : à ajouter par Sabine, hors de cette PR.
-- **La règle 2 des conventions** ne dit pas encore que la copie temporaire d'une base source est
-  hors de son champ : texte validé, en attente de l'accord de Sabine pour modifier le fichier.

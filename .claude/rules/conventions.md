@@ -42,9 +42,14 @@ refuse.
 par une seule fonction, `write_file_atomically` : un temporaire **caché** dans le dossier cible
 (nom commençant par `.`), renommé sur la cible, et supprimé sur toute exception, Ctrl-C compris
 (`except BaseException`). La base SQLite, que SQLite écrit lui-même, est hors de cette règle.
+La copie temporaire d'une base source (Zotero) est hors de cette règle elle aussi : elle vit dans
+un `tempfile.TemporaryDirectory` du système, hors du dossier de données, et elle est supprimée
+sur toute sortie.
 
-**Vérifier.** `grep -rn "NamedTemporaryFile\|\.tmp\|os\.replace" src/k_b` ne renvoie que
-`write_file_atomically`.
+**Vérifier.**
+- `grep -rn "NamedTemporaryFile\|\.tmp\|os\.replace" src/k_b` ne renvoie que
+  `write_file_atomically`.
+- `grep -rn "TemporaryDirectory" src/k_b` ne renvoie que la copie d'une base source.
 
 **Pourquoi.** Un nom caché est déjà sauté par l'import (`list_visible_entries`) : un reste
 d'écriture interrompue n'est jamais lu comme une page. Une seule fonction à corriger pour trois
