@@ -11,7 +11,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 
 - **Un point de lancement** : `kb collect` lance toutes les sources ; une source en panne
   n'arrête pas les autres. Il affiche une ligne par source (`ok` ou `failed (<type d'erreur>)`),
-  et `zotero: skipped (KB_ZOTERO_DIR not set)` quand le dossier de Zotero n'est pas donné.
+  `zotero: skipped (KB_ZOTERO_DIR not set)` quand le dossier de Zotero n'est pas donné, et
+  `gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)` sans la clé BigQuery.
   Code de sortie : **0** si tout a réussi ; **1** si une source a échoué, ou si
   `collection_state.json` n'a pas pu être écrit (disque plein, droits) ; **2** si la collecte n'a
   pas eu lieu (`KB_DATA_DIR` absent ou pas un dossier, état de collecte illisible). Quand l'état
@@ -38,6 +39,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   | GitHub, releases et alertes | 100 éléments au plus par dépôt ou par écosystème (au-delà, un avertissement) |
   | GitHub, dépôts les plus étoilés | aucun : un instantané par collecte, un jour manqué n'est pas récupérable |
   | Zotero | complet : chaque extrait contient toute la bibliothèque |
+  | GH Archive | chaque fenêtre de 3 jours manquée depuis la dernière collecte, 30 au plus (les plus récentes), en une requête |
 
 - **Incrémental** : la date de la dernière collecte réussie de chaque source est dans
   `collection_state.json`, à la racine du dossier de données et hors de `raw/` ; une source qui
@@ -229,15 +231,35 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 
 - **Technologie** : SQL BigQuery sur les tables publiques `githubarchive.day.AAAAMMJJ` (un
   événement GitHub public par ligne), client `google-cloud-bigquery`.
-- **Ce qu'on en tire** : les N dépôts qui gagnent le plus d'étoiles (`WatchEvent`) sur 3 jours.
+- **Ce qu'on en tire** : pour chaque fenêtre de 3 jours UTC complets (J-3 à J-1), les étoiles
+  (`WatchEvent`) et les forks (`ForkEvent`) gagnés par dépôt (`repo.id`, dernier nom vu) ; les 30
+  premiers par étoiles et les 30 premiers par forks, réunis (60 dépôts au plus par fenêtre). On
+  compte des événements, pas des personnes. Un événement sans `repo.id` est écarté (14 `ForkEvent`
+  sans dépôt le 2026-10-10). Le brut, `raw/automated_watch/gh_archive/<collecte>.json`, donne les
+  fenêtres couvertes et les lignes ; il est refusé entier si une ligne est invalide (un classement).
+  Requête : `TRENDS_QUERY`, `src/k_b/sources/gh_archive.py`. Pas encore lu vers la base (TENDANCE,
+  issue de suite).
+- **Rattrapage** : les fenêtres manquées depuis la dernière collecte, 30 au plus, en une seule
+  requête qui lit chaque jour une fois. La table de la veille doit être close (modifiée après
+  minuit UTC ; constaté le 2026-10-11 : sa dernière heure arrive vers 00:08 UTC) ; sinon la source
+  échoue (`DayTableNotClosedError`) et la collecte suivante reprend.
 - **Accès** : compte de service `k-b-collecte`, seul rôle Utilisateur de job BigQuery, clé
   désignée par `GOOGLE_APPLICATION_CREDENTIALS` ([bigquery.md](bigquery.md)).
 - **Limites** : bac à sable sans facturation : 1 Tio lu par mois, 10 Gio de stockage, tables
   expirées après 60 jours. Une requête au-delà est refusée, jamais facturée. Chaque requête passe
-  d'abord par un `dry_run`, puis s'exécute avec `maximum_bytes_billed`. Mesuré : une journée
-  filtrée sur `WatchEvent` lit 16,5 Mo, donc environ 50 Mo pour 3 jours.
+  d'abord par un `dry_run`, puis s'exécute avec `maximum_bytes_billed` = 4 Go. Au-delà du
+  plafond, la fenêtre la plus ancienne est retirée et un nouveau `dry_run` est fait ; une seule
+  fenêtre au-delà fait échouer la source (`DryRunOverLimitError`). Délai : 300 s. Mesuré le
+  2026-10-11 (`dry_run` de la requête, 4 colonnes, étoiles et forks) : 133,8 Mo pour une fenêtre
+  (3 jours), 3,22 Go pour 30 fenêtres (32 jours) ; le plafond est cette mesure plus 25 %. Une
+  requête sur des tables à joker (`day.20*`) n'est pas mise en cache : chaque exécution est
+  facturée au quota (constaté le 2026-10-11).
 - **Données personnelles** : chaque événement porte le login de son auteur (`actor`). La requête
-  ne le sélectionne pas : elle ne renvoie que des comptes d'étoiles par dépôt.
+  ne le sélectionne pas : elle ne renvoie que des comptes par dépôt. Le nom du dépôt
+  (`owner/repo`) porte le login de son propriétaire quand c'est une personne : gardé, il identifie
+  le dépôt ([registre](registre-traitements.md)). Un message d'erreur n'en cite que la longueur.
+- **Prérequis** : la clé du compte de service ; sans `GOOGLE_APPLICATION_CREDENTIALS`, la source
+  est sautée.
 
 ## Du brut au jeu d'items
 

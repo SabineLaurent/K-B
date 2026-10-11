@@ -58,6 +58,15 @@ La commande n'affiche jamais la clé, seulement :
 
 `--with` fournit la bibliothèque pour cette seule commande, sans l'ajouter au projet.
 
+## Le plafond de la collecte
+
+`kb collect` (source `gh_archive`) fait un `dry_run`, puis exécute la requête avec
+`maximum_bytes_billed` = 4 Go (`MAX_BYTES_BILLED`, `src/k_b/sources/gh_archive.py`). Mesuré le
+2026-10-11 : 133,8 Mo pour une fenêtre de 3 jours, 3,22 Go pour 30 fenêtres, le rattrapage
+maximal ; le plafond est cette mesure plus 25 %. Une collecte quotidienne lit environ 134 Mo, soit
+environ 4 Go par mois sur le 1 Tio gratuit. Sans la variable `GOOGLE_APPLICATION_CREDENTIALS`, la
+source est sautée.
+
 ## Sources (consultées le 2026-10-01)
 
 - [Try BigQuery using the sandbox](https://docs.cloud.google.com/bigquery/docs/sandbox)
