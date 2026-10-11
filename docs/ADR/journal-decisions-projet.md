@@ -891,6 +891,80 @@ encore l'ancien modèle.
   la comparaison se fait sur la machine de Sabine, pas dans la CI ; un changement de sens sans
   changement de structure ne serait pas vu. — PR de #15
 
+### Collecte : GH Archive
+
+- **GH Archive : #16 s'arrête à l'extraction ; la table TENDANCE et les étoiles et forks totaux lus
+  par GraphQL viennent dans une issue de suite.** Décision de Sabine, sur la recommandation de la
+  session. Pourquoi : l'estimation de 7 h tenait ; l'écrivain de TENDANCE aurait ajouté du SQL
+  dans `import_items.py` avant que #135 ne le déplace dans `src/k_b/database/` (règle 5 des
+  conventions) ; la file de Sabine met la chaîne ETL après BigQuery ; le POST que GraphQL demande
+  viendra avec le passage à httpx (#86) ou après. Option écartée : aller jusqu'à TENDANCE dans #16.
+  Limite : à la fin de #16, la source big data n'est pas encore en base ; la requête produit déjà
+  la forme décidée le 2026-10-08 (étoiles et forks gagnés, 30 + 30 par fenêtre). — PR de #16
+- **Client `google-cloud-bigquery` (>=3.46,<4).** Décision de Sabine, sur recommandation.
+  Pourquoi : le client officiel, déjà nommé par les specs, qui porte `dry_run`,
+  `maximum_bytes_billed` et la lecture de la clé par `GOOGLE_APPLICATION_CREDENTIALS`. Option
+  écartée : appeler l'API REST de BigQuery soi-même (la clé doit signer un jeton, donc
+  `google-auth` ou `cryptography` quand même, et un POST). Limite : 26 paquets ajoutés, dont
+  `grpcio` et `cryptography` ; l'import coûte environ 90 ms à chaque commande `kb` (mesuré le
+  2026-10-11), accepté par Sabine plutôt qu'un import dans les fonctions. — PR de #16
+- **BigQuery plutôt que PySpark sur les fichiers bruts de GH Archive.** Décision de Sabine ;
+  complète l'entrée « BigQuery » du 2026-09-29, qui le justifiait face à l'API GitHub. Option
+  écartée : télécharger les fichiers de `data.gharchive.org` (un JSON compressé par heure) et les
+  traiter avec PySpark. Pourquoi :
+  - le volume à rapatrier : 24 fichiers et 272 Mo compressés pour la seule journée du 2026-10-10
+    (en-têtes `Content-Length`, lus le 2026-10-11 sans télécharger), soit 72 fichiers et environ
+    0,8 Go compressés pour une fenêtre de 3 jours, à décompresser et à lire en entier ; avec
+    BigQuery, le calcul se fait là où les données sont déjà chargées, et seul le résultat arrive
+    dans `raw/` (8 764 octets pour la fenêtre du 2026-10-10) ;
+  - le stockage en colonnes : BigQuery ne lit que les 4 colonnes demandées, 133,8 Mo pour 3 jours,
+    alors que la table d'une seule journée pèse 1 060 Mo (métadonnées du 2026-10-11) ; un JSON se
+    lit ligne entière ;
+  - aucune infrastructure : BigQuery est sans serveur, gratuit et plafonné en bac à sable ; Spark
+    demande Java et de la mémoire sur le Mac, ou un cluster payant (Dataproc, Databricks) ;
+  - la minimisation : `actor` n'est jamais sélectionné, donc jamais reçu ; avec les fichiers, il
+    serait téléchargé puis à écarter (RGPD art. 5.1.c) ;
+  - le besoin tient en SQL : filtrer, compter, classer.
+  Limite : K-B dépend d'un service de Google et de la présence de GH Archive dans BigQuery. Spark
+  redeviendrait le bon outil si les données étaient déjà chez nous en fichiers, si le traitement
+  dépassait le SQL (apprentissage automatique, transformations en Python), ou pour un flux continu
+  (Structured Streaming). — PR de #16
+- **Une fenêtre = 3 jours UTC complets, de J-3 à J-1, glissante ; les fenêtres manquées sont
+  rattrapées, 15 au plus (les plus récentes), en une seule requête.** Décision de Sabine.
+  Pourquoi : les tables passées de GH Archive restent lisibles, donc l'ADR du 2026-10-05 (« une
+  collecte manquée est rattrapée à la suivante ») s'applique ; la limite de 15 tient à la
+  pertinence, selon Sabine : un dépôt qui a monté il y a plus de deux semaines n'apporte plus
+  grand-chose à la veille. **S'écarte** de l'ADR du 2026-10-05 au-delà de 15 jours manqués.
+  Options écartées : pas de rattrapage (comme les dépôts les plus étoilés, un instantané qui ne
+  se rattrape pas) ; 30 fenêtres (proposition de la session) ; échouer au-delà de la limite (la
+  source échouerait à chaque collecte, comme arXiv, #71). Limite : une collecte qui passe minuit
+  UTC reprend une fenêtre déjà collectée (un brut en double, sans perte). — PR de #16
+- **Plafond d'une requête : 200 Mo par fenêtre, 2 Go au plus ; au-delà, la fenêtre la plus
+  ancienne est retirée et le `dry_run` refait ; une fenêtre seule au-delà, ou un `dry_run` sans
+  volume, fait échouer la source.** Décision de Sabine (« 4 Go après réflexion ça fait
+  beaucoup »). Pourquoi : une collecte ordinaire (une fenêtre, 133,8 Mo mesurés le 2026-10-11)
+  qui lirait 20 fois trop est arrêtée au `dry_run`, sans rien exécuter ; 15 fenêtres lisent
+  1,58 Go (`dry_run` du même jour), sous la borne. Options écartées : 4 Go fixes (proposition de
+  la session : un plafond qui laisse passer 30 fois une collecte ordinaire) ; 300 Mo par fenêtre ;
+  échouer dès que le plafond est dépassé (la source resterait bloquée si GH Archive grossit).
+  Limite : la marge sous 2 Go est de ×1,26 pour 15 fenêtres ; si GH Archive grossit, le
+  rattrapage maximal perd ses plus anciennes fenêtres. — PR de #16
+- **La table de la veille doit être close (modifiée après minuit UTC) ; sinon la source échoue
+  et la collecte suivante reprend.** Décision de Sabine (plan validé). Pourquoi : GH Archive ajoute
+  chaque heure à la table de son jour, la dernière vers 00:08 UTC le lendemain (constaté le
+  2026-10-11) ; une collecte lancée juste après minuit compterait un jour incomplet. Limite
+  (relecture du plan, constat 7) : c'est un indice, pas une preuve ; une heure manquante au milieu
+  d'un jour, ou une table manquante au milieu d'un rattrapage, ne se voit pas. — PR de #16
+- **Sans `GOOGLE_APPLICATION_CREDENTIALS`, `kb collect` saute GH Archive et le dit ; un résultat
+  avec une ligne invalide est refusé entier.** Décision de Sabine (plan, puis tri de la revue).
+  Pourquoi : une machine sans clé (CI, autre poste) ne doit pas faire échouer chaque collecte,
+  comme Zotero sans son dossier ; le résultat est un classement, que la règle 1 des conventions
+  refuse en entier. Option écartée : refuser seulement la fenêtre fautive (une exception de plus à
+  la règle 1). Limite assumée : une ligne invalide revient avec sa fenêtre et bloque la source
+  jusqu'à ce que la fenêtre sorte du rattrapage (15 jours au plus) ; risque jugé faible, la
+  requête écartant les dépôts sans identifiant ni nom (14 `ForkEvent` sans dépôt le 2026-10-10).
+  — PR de #16
+
 ## Décisions encore ouvertes
 
 - **Durée de conservation et purge des extraits Zotero** (2026-10-11) : ils sont tous gardés,
@@ -933,3 +1007,7 @@ encore l'ancien modèle.
 - **Tables `repository` et `star_gain`** : restées dans `schema.sql` après la réécriture, sans
   écrivain ; la clarification les remplace par TENDANCE. Quand les retirer n'est pas décidé
   (2026-10-10).
+- **TENDANCE en base et ses totaux GraphQL** (2026-10-11) : reportés par #16, qui s'arrête à
+  l'extraction. Restent à trancher avec l'issue de suite : le brut des totaux GraphQL (relecture
+  du 2026-10-09), le lecteur et l'écrivain de TENDANCE, et la borne des entiers sur 64 bits, à
+  déplacer dans `items.py` quand la base contraindra `repository_id` (règle 4).
