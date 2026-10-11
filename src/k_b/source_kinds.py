@@ -1,14 +1,15 @@
 """SOURCE_KINDS: the only declaration of the sources, one kind per entry, in collection order.
 
 In the package, only cli.py imports it: it gives it to the collection (E) and to the import
-(T then L). The Zotero kind has no instance here: cli.py creates it, on a machine that says
-where the Zotero data directory is.
+(T then L). The Zotero and GH Archive kinds have no instance here: cli.py creates them, on a
+machine that says where the Zotero data directory, or the BigQuery key, is.
 """
 
 from k_b.source_contract import SourceKind
 from k_b.sources import (
     arxiv,
     cisa_kev,
+    gh_archive,
     github_advisories,
     github_most_starred,
     github_releases,
@@ -61,4 +62,7 @@ SOURCE_KINDS = (
     # No instance: cli.py adds ZoteroSource when KB_ZOTERO_DIR is set. No reader yet: its
     # extracts, under raw/selected_library/, are not read into the base.
     SourceKind(zotero.FOLDER_PREFIX, (), None),
+    # No instance: cli.py adds GhArchiveSource when GOOGLE_APPLICATION_CREDENTIALS is set. No
+    # reader: its trends do not enter the base in #16.
+    SourceKind(gh_archive.FOLDER_PREFIX, (), None),
 )
