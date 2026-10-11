@@ -247,7 +247,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   monté il y a plus de deux semaines n'apporte plus grand-chose à la veille), en une seule
   requête qui lit chaque jour une fois. La table de la veille doit être close (modifiée après
   minuit UTC ; constaté le 2026-10-11 : sa dernière heure arrive vers 00:08 UTC) ; sinon la source
-  échoue (`DayTableNotClosedError`) et la collecte suivante reprend.
+  échoue (`DayTableNotClosedError`) et la collecte suivante reprend. Lancer `kb collect` après
+  00:10 UTC (02:10 à Paris en été, 01:10 en hiver) : lancé chaque jour plus tôt, GH Archive
+  échouerait chaque jour.
+- **Limites acceptées (Sabine, 2026-10-11)** : une table de jour **absente** au milieu des jours
+  lus (panne de GH Archive) est sautée sans bruit par le joker `day.20*`, et ses fenêtres sont
+  comptées sur deux jours au lieu de trois ; des **heures manquantes** dans une table présente ne
+  se voient pas non plus. Ni l'une ni l'autre ne laisse de trace dans le brut ou le journal.
 - **Accès** : compte de service `k-b-collecte`, seul rôle Utilisateur de job BigQuery, clé
   désignée par `GOOGLE_APPLICATION_CREDENTIALS` ([bigquery.md](bigquery.md)).
 - **Limites** : bac à sable sans facturation : 1 Tio lu par mois, 10 Gio de stockage, tables
