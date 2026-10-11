@@ -39,7 +39,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   | GitHub, releases et alertes | 100 éléments au plus par dépôt ou par écosystème (au-delà, un avertissement) |
   | GitHub, dépôts les plus étoilés | aucun : un instantané par collecte, un jour manqué n'est pas récupérable |
   | Zotero | complet : chaque extrait contient toute la bibliothèque |
-  | GH Archive | chaque fenêtre de 3 jours manquée depuis la dernière collecte, 30 au plus (les plus récentes), en une requête |
+  | GH Archive | chaque fenêtre de 3 jours manquée depuis la dernière collecte, 15 au plus (les plus récentes), en une requête |
 
 - **Incrémental** : la date de la dernière collecte réussie de chaque source est dans
   `collection_state.json`, à la racine du dossier de données et hors de `raw/` ; une source qui
@@ -234,12 +234,17 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Ce qu'on en tire** : pour chaque fenêtre de 3 jours UTC complets (J-3 à J-1), les étoiles
   (`WatchEvent`) et les forks (`ForkEvent`) gagnés par dépôt (`repo.id`, dernier nom vu) ; les 30
   premiers par étoiles et les 30 premiers par forks, réunis (60 dépôts au plus par fenêtre). On
-  compte des événements, pas des personnes. Un événement sans `repo.id` est écarté (14 `ForkEvent`
-  sans dépôt le 2026-10-10). Le brut, `raw/automated_watch/gh_archive/<collecte>.json`, donne les
-  fenêtres couvertes et les lignes ; il est refusé entier si une ligne est invalide (un classement).
+  compte des événements, pas des personnes. Un événement sans `repo.id` ou sans `repo.name` est
+  écarté (14 `ForkEvent` sans dépôt le 2026-10-10). Le brut,
+  `raw/automated_watch/gh_archive/<collecte>.json`, donne les fenêtres couvertes et les lignes ; il
+  est refusé entier si une ligne est invalide (un classement, règle 1). Risque accepté (Sabine,
+  2026-10-11) : une ligne invalide revient avec sa fenêtre à chaque collecte, et la source échoue
+  jusqu'à ce que cette fenêtre sorte du rattrapage (15 jours au plus) ; il est faible, les valeurs
+  vides étant écartées par la requête et la règle du nom (`owner/name`, sans espace) étant large.
   Requête : `TRENDS_QUERY`, `src/k_b/sources/gh_archive.py`. Pas encore lu vers la base (TENDANCE,
   issue de suite).
-- **Rattrapage** : les fenêtres manquées depuis la dernière collecte, 30 au plus, en une seule
+- **Rattrapage** : les fenêtres manquées depuis la dernière collecte, 15 au plus (un dépôt qui a
+  monté il y a plus de deux semaines n'apporte plus grand-chose à la veille), en une seule
   requête qui lit chaque jour une fois. La table de la veille doit être close (modifiée après
   minuit UTC ; constaté le 2026-10-11 : sa dernière heure arrive vers 00:08 UTC) ; sinon la source
   échoue (`DayTableNotClosedError`) et la collecte suivante reprend.
@@ -247,11 +252,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   désignée par `GOOGLE_APPLICATION_CREDENTIALS` ([bigquery.md](bigquery.md)).
 - **Limites** : bac à sable sans facturation : 1 Tio lu par mois, 10 Gio de stockage, tables
   expirées après 60 jours. Une requête au-delà est refusée, jamais facturée. Chaque requête passe
-  d'abord par un `dry_run`, puis s'exécute avec `maximum_bytes_billed` = 4 Go. Au-delà du
-  plafond, la fenêtre la plus ancienne est retirée et un nouveau `dry_run` est fait ; une seule
-  fenêtre au-delà fait échouer la source (`DryRunOverLimitError`). Délai : 300 s. Mesuré le
-  2026-10-11 (`dry_run` de la requête, 4 colonnes, étoiles et forks) : 133,8 Mo pour une fenêtre
-  (3 jours), 3,22 Go pour 30 fenêtres (32 jours) ; le plafond est cette mesure plus 25 %. Une
+  d'abord par un `dry_run`, puis s'exécute avec `maximum_bytes_billed` au plafond, qui grandit
+  avec les fenêtres : 200 Mo par fenêtre, 2 Go au plus. Au-delà du plafond, la fenêtre la plus
+  ancienne est retirée et un nouveau `dry_run` est fait ; une seule fenêtre au-delà, ou un
+  `dry_run` sans volume, fait échouer la source (`DryRunOverLimitError`,
+  `DryRunVolumeUnknownError`). Délai : 300 s. Mesuré le 2026-10-11 (`dry_run` de la requête,
+  4 colonnes, étoiles et forks) : 133,8 Mo pour une fenêtre (3 jours), 1,58 Go pour 15 fenêtres
+  (17 jours). Une collecte quotidienne qui lirait 20 fois son volume est arrêtée au `dry_run`. Une
   requête sur des tables à joker (`day.20*`) n'est pas mise en cache : chaque exécution est
   facturée au quota (constaté le 2026-10-11).
 - **Données personnelles** : chaque événement porte le login de son auteur (`actor`). La requête
