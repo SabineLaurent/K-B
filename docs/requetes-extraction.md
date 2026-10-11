@@ -5,14 +5,16 @@ GH Archive sur BigQuery), puis les paramètres des requêtes faites aux API. Pou
 les tables et les colonnes lues, les filtres, les jointures, le regroupement, et ce qui la rend
 économe.
 
-**Règle du document** : il cite, il ne recopie pas. Le SQL vit dans le code, sous le nom de sa
-constante ; les mesures, les plafonds et les valeurs de réglage vivent dans le code et dans
-[specs-collecte.md](specs-collecte.md) ou [bigquery.md](bigquery.md), où ce document renvoie.
+**Règle du document** : il cite. Aucune requête n'y est recopiée : le SQL vit dans le code, sous le
+nom de sa constante, et seules des clauses courtes (un filtre, un nom de colonne) sont citées en
+ligne pour le décrire. Les mesures, les plafonds et les valeurs de réglage vivent dans le code et
+dans [specs-collecte.md](specs-collecte.md) ou [bigquery.md](bigquery.md), où ce document renvoie.
 Une référence au code donne le fichier et le nom de la constante, de la fonction ou de la méthode,
 jamais un numéro de ligne. Seule la mesure de la section 2 est écrite ici, parce qu'elle n'existe
 nulle part ailleurs.
 
-**Hors de ce document** : le SQL de la base K-B (écriture et lecture, sous `src/k_b/database/`) ;
+**Hors de ce document** : le SQL de la base K-B (aujourd'hui dans `src/k_b/import_items.py` ; la
+règle 5 de `.claude/rules/conventions.md` le range sous `src/k_b/database/`) ;
 la panne des tables GH Archive constatée depuis le 2026-10-06
 ([bigquery.md](bigquery.md#anomalie-constatée--les-tables-de-gh-archive-incomplètes-depuis-le-2026-10-06)).
 
@@ -27,15 +29,18 @@ Fichier : `src/k_b/sources/zotero.py`. Spécifications de la source :
 
 ### Où elle tourne
 
-`ZoteroSource.fetch` copie la base (`copy_library`) dans un dossier temporaire, puis
-`extract_documents` ouvre la copie en lecture seule (`mode=ro`), la vérifie (`check_integrity`),
-et lance `EXTRACTION_QUERY`. La base de Zotero elle-même n'est jamais ouverte par SQLite.
+`ZoteroSource.fetch` retire d'abord les copies qu'un processus tué aurait laissées
+(`remove_left_copies`). Il s'arrête là, sans copie ni requête, si ni la base ni son journal
+d'écriture n'ont été modifiés depuis la dernière collecte (`was_modified_since`). Sinon, il copie
+la base (`copy_library`) dans un dossier temporaire, puis `extract_documents` ouvre la copie en
+lecture seule (`mode=ro`), la vérifie (`check_integrity`), et lance `EXTRACTION_QUERY`. La base de
+Zotero elle-même n'est jamais ouverte par SQLite.
 
 ### Tables et colonnes lues
 
 | Table | Colonnes lues | Rôle |
 |---|---|---|
-| `items` | `itemID`, `key`, `itemTypeID`, `libraryID`, `dateAdded` | le document, et sous les alias `attachment` et `annotation`, la clé et la date d'un PDF ou d'un surlignage |
+| `items` | `itemID`, `key`, `itemTypeID`, `libraryID`, `dateAdded` | le document ; sous l'alias `attachment`, la clé d'un PDF ; sous l'alias `annotation`, la clé et la date d'un surlignage |
 | `itemTypes` | `itemTypeID`, `typeName` | le type du document |
 | `libraries` | `libraryID`, `type` | la bibliothèque (personnelle ou de groupe) |
 | `deletedItems` | `itemID` | la corbeille |
@@ -70,7 +75,7 @@ Tous écrits dans le SQL :
   un fichier lié ailleurs sur le disque n'est pas lu ;
 - **les surlignages** : `itemAnnotations.type = 1`.
 
-Ce qui n'est pas lu, et pourquoi (minimisation) : [specs-collecte.md](specs-collecte.md#zotero--base-de-données).
+Ce qui n'est pas lu : [specs-collecte.md](specs-collecte.md#zotero--base-de-données).
 
 ### Jointures
 
@@ -99,8 +104,9 @@ Le résultat est trié par `document.dateAdded`, puis `document.itemID` : la mê
 donne le même extrait.
 
 SQLite construit chaque liste en texte JSON ; `extract_documents` relit ce texte (`json.loads`
-sur les colonnes de `JSON_COLUMNS`), et `ZoteroSource.fetch` écrit l'extrait entier au brut
-(`json.dumps`).
+sur les colonnes de `JSON_COLUMNS`), et `ZoteroSource.fetch` rend l'extrait entier en JSON
+(`json.dumps`) ; l'écriture au brut est faite par la collecte (`write_new_raw_file`,
+`src/k_b/collect.py`).
 
 ### Ce qui la rend économe
 
@@ -109,9 +115,11 @@ sur les colonnes de `JSON_COLUMNS`), et `ZoteroSource.fetch` écrit l'extrait en
 - **Seuls les champs utiles sont nommés**, et tous les filtres sont dans le SQL : rien n'est lu
   pour être jeté ensuite en Python.
 - **Une copie, lue seule** : la requête ne prend aucun verrou sur la base de Zotero.
+- **Rien quand rien n'a changé** : sans modification des fichiers de la bibliothèque depuis la
+  dernière collecte, il n'y a ni copie ni requête (`was_modified_since`, dans
+  `ZoteroSource.fetch`).
 
-Cette économie n'est **pas mesurée** : ni plan d'exécution, ni temps (décision de Sabine du
-2026-10-11).
+Cette économie n'est **pas mesurée** : ni plan d'exécution, ni temps.
 
 ### Ce qu'elle suppose
 
@@ -153,19 +161,20 @@ Dans la CTE `events` :
 ### Jointure
 
 `UNNEST(@window_ends)` fait une ligne par fin de fenêtre ; chaque événement y est joint quand son
-jour tombe dans la fenêtre (`event_day BETWEEN DATE_SUB(window_end, INTERVAL @window_days - 1 DAY)
-AND window_end`). Un événement compte ainsi dans chaque fenêtre qui couvre son jour, et un
+jour tombe dans la fenêtre, c'est-à-dire entre la fin de fenêtre moins `@window_days` jours, plus
+un, et la fin de fenêtre. Un événement compte ainsi dans chaque fenêtre qui couvre son jour, et un
 rattrapage de plusieurs fenêtres lit chaque jour une fois.
 
 ### Regroupement
 
 - La CTE `counts` regroupe par `window_end, repository_id` : `COUNTIF` compte les étoiles et les
-  forks ; le dernier nom vu du dépôt est pris par `ARRAY_AGG(... ORDER BY created_at DESC,
-  repository_name DESC LIMIT 1)`.
+  forks ; le dernier nom vu du dépôt est pris par `ARRAY_AGG`, trié par date d'événement
+  décroissante, puis par nom décroissant.
 - La CTE `ranked` classe les dépôts de chaque fenêtre deux fois, par `ROW_NUMBER()` : par étoiles,
   puis par forks, départagés par `repository_id`.
-- La requête garde `star_rank <= @top_size OR fork_rank <= @top_size`, triée par `window_end`,
-  `stars_gained DESC`, `repository_id` : les mêmes tables donnent le même résultat.
+- La requête garde les dépôts dont l'un des deux rangs ne dépasse pas `@top_size`, triés par
+  `window_end`, puis `stars_gained` décroissant, puis `repository_id` : les mêmes tables donnent
+  le même résultat.
 
 ### Paramètres
 
@@ -175,8 +184,12 @@ Posés par `configure_query`, jamais collés dans le texte :
 - `@window_days` : `WINDOW_DAYS` ;
 - `@top_size` : `TOP_SIZE`.
 
-Les valeurs qui changent d'une collecte à l'autre sont des paramètres ; seuls la table et les
-types d'événement sont écrits dans le texte.
+Les jours et les fenêtres changent d'une collecte à l'autre. `@window_days` et `@top_size` ne
+changent pas : ils sont des paramètres pour que `WINDOW_DAYS` et `TOP_SIZE` ne soient écrits qu'à un
+endroit (un test de `tests/sources/test_gh_archive.py` vérifie que la taille du classement n'est
+pas dans le texte de la requête). Restent écrits dans le texte : la table, les types d'événement,
+et ce qui reconstruit le jour à partir du nom de la table (le préfixe du siècle, le format de
+date).
 
 ### Ce qui la rend économe
 
@@ -186,9 +199,10 @@ types d'événement sont écrits dans le texte.
   des jours voulus.
 - **Une requête pour toutes les fenêtres dues** : chaque jour est lu une fois, même quand
   plusieurs fenêtres le couvrent.
-- **`dry_run` d'abord** : `drop_windows_over_the_cap` demande le volume sans rien lire ; au-delà
+- **`dry_run` d'abord** : `drop_windows_over_the_cap` demande le volume sans rien lire. Au-delà
   du plafond, la source retire les fenêtres les plus anciennes quand la borne s'applique, ou
-  échoue sans rien exécuter (`DryRunOverLimitError`, `DryRunVolumeUnknownError`).
+  échoue sans rien exécuter (`DryRunOverLimitError`). Si le `dry_run` ne rend aucun volume, elle
+  échoue aussi sans rien exécuter (`DryRunVolumeUnknownError`).
 - **Puis l'exécution plafonnée** : `maximum_bytes_billed` vaut `compute_bytes_cap`
   (`MAX_BYTES_PER_WINDOW` par fenêtre, `MAX_BYTES_BILLED` au plus), et `job_timeout_ms` arrête le
   job chez BigQuery (`QUERY_TIMEOUT_SECONDS`).
@@ -270,7 +284,7 @@ sélection de toutes les colonnes.
 
 ## 3. Paramètres des requêtes aux API
 
-Chaque source construit une requête par appel ; les valeurs des constantes (tailles de page,
+Chaque source construit ses requêtes dans son module ; les valeurs des constantes (tailles de page,
 plafonds, délais) sont dans le code, et leur justification dans la section de la source de
 [specs-collecte.md](specs-collecte.md). Chaque téléchargement passe par `download`
 (`src/k_b/http_download.py`) : délai (`TIMEOUT_SECONDS`), taille maximale, préfixe d'URL de
@@ -281,13 +295,14 @@ confiance
 |---|---|---|---|---|---|
 | arXiv | `src/k_b/sources/arxiv.py` | `ArxivSource.fetch`, `build_search_query`, `download_papers` | URL `API_URL` ; `search_query` ; `start` ; `max_results` (`PAPERS_PER_PAGE`) ; `sortBy` et `sortOrder` (date de soumission, croissante) ; réponse plafonnée par `MAX_RESPONSE_BYTES` | `cat:cs.CR AND cat:cs.AI`, un mot-clé de `KEYWORDS` dans le résumé (`abs:`), `submittedDate` depuis la dernière collecte moins `ANNOUNCEMENT_DELAY_MARGIN` (première collecte : `FIRST_COLLECTION_START`) | [API arXiv](specs-collecte.md#api-arxiv--service-web) |
 | GitHub, releases | `src/k_b/sources/github_releases.py` | `GithubReleasesSource.fetch` | chemin `repos/<dépôt>/releases`, dépôt pris dans `TRACKED_REPOSITORIES` (`tracked_repositories.py`) ; `per_page` (`RELEASES_PER_PAGE`) | aucun : `fetch` compare les dates de la page à la dernière collecte | [API GitHub](specs-collecte.md#api-github--service-web) |
-| GitHub, alertes | `src/k_b/sources/github_advisories.py` | `GithubAdvisoriesSource.fetch` | chemin `advisories` ; `type=reviewed` ; `ecosystem` (un de `ECOSYSTEMS`) ; `affects` ; `per_page` (`ADVISORIES_PER_PAGE`) ; `reviewed` | `affects` : les paquets suivis, donnés par `list_packages_by_ecosystem` (`tracked_repositories.py`) ; `reviewed` : relues depuis la veille de la dernière collecte | [API GitHub](specs-collecte.md#api-github--service-web) |
-| GitHub, dépôts les plus étoilés | `src/k_b/sources/github_most_starred.py` | `GithubMostStarredSource.fetch` | chemin `search/repositories` ; `q` (`SEARCH_QUERY`) ; `sort=stars` ; `order=desc` ; `per_page` (`RANKING_SIZE`) | `SEARCH_QUERY` | [API GitHub](specs-collecte.md#api-github--service-web) |
+| GitHub, alertes | `src/k_b/sources/github_advisories.py` | `GithubAdvisoriesSource.fetch` | chemin `advisories` ; `type=reviewed` ; `ecosystem` (un de `ECOSYSTEMS`) ; `affects` ; `per_page` (`ADVISORIES_PER_PAGE`) ; `reviewed`, seulement s'il y a une dernière collecte | `affects` : les paquets suivis, donnés par `list_packages_by_ecosystem` (`tracked_repositories.py`) ; `reviewed` : relues depuis la veille de la dernière collecte, puis `fetch` compare les dates de revue à la dernière collecte | [API GitHub](specs-collecte.md#api-github--service-web) |
+| GitHub, dépôts les plus étoilés | `src/k_b/sources/github_most_starred.py` | `GithubMostStarredSource.fetch` | chemin `search/repositories` ; `q` (`SEARCH_QUERY`) ; `sort=stars` ; `order=desc` ; `per_page` (`RANKING_SIZE`) | aucun : la recherche exige un critère, et `SEARCH_QUERY` garde tout le classement (commentaire de la constante) | [API GitHub](specs-collecte.md#api-github--service-web) |
 | GitHub, commun aux trois | `src/k_b/sources/github_api.py` | `get_from_github_api` | URL `API_URL` ; en-têtes `Accept` et `X-GitHub-Api-Version` (`API_VERSION`) ; jeton (`TOKEN_VARIABLE`) en `Authorization`, jamais transmis à une redirection ; réponse plafonnée par `MAX_RESPONSE_BYTES` | — | [jeton-github.md](jeton-github.md) |
-| CISA KEV | `src/k_b/sources/cisa_kev.py` | `CisaKevSource.fetch` | URL `CATALOG_URL` ; en-tête `If-Modified-Since` (date de la dernière collecte) ; réponse plafonnée par `MAX_CATALOG_BYTES`, servie sous `TRUSTED_URL_PREFIX` | aucun : le catalogue entier, ou rien s'il n'a pas changé (`HTTP_NOT_MODIFIED`) | [Catalogue CISA KEV](specs-collecte.md#catalogue-cisa-kev--fichier) |
+| CISA KEV | `src/k_b/sources/cisa_kev.py` | `CisaKevSource.fetch` | URL `CATALOG_URL` ; en-tête `If-Modified-Since` (date de la dernière collecte), seulement s'il y en a une ; réponse plafonnée par `MAX_CATALOG_BYTES`, servie sous `TRUSTED_URL_PREFIX` | aucun : le catalogue entier, ou rien s'il n'a pas changé (`HTTP_NOT_MODIFIED`) | [Catalogue CISA KEV](specs-collecte.md#catalogue-cisa-kev--fichier) |
 | tldr.tech | `src/k_b/sources/tldr.py` | `TldrSource.fetch` | URL `SITE_URL` + édition (une de `TRACKED_EDITIONS`) + jour ; jours donnés par `list_days_to_collect` (première collecte : `FIRST_COLLECTION_DAYS`) ; `PAUSE_BETWEEN_PAGES_SECONDS` entre deux pages ; page plafonnée par `MAX_PAGE_BYTES` | le jour, dans l'URL | [tldr.tech](specs-collecte.md#tldrtech--scraping) |
 
-Ce qui rend ces requêtes économes : un filtre posé à la requête quand la source le permet (arXiv,
-alertes GitHub), plutôt qu'à la lecture ; une seule page par appel ; une requête conditionnelle
-(`If-Modified-Since`) pour un catalogue qui change rarement ; une pause entre deux pages pour un
-site sans quota publié.
+Par défaut, K-B filtre à la lecture, pas à la requête
+([règles communes](specs-collecte.md#règles-communes)). Deux exceptions décidées posent le filtre
+dans la requête : arXiv et les alertes GitHub ; leur raison est dans la section de chaque source
+des specs. Deux autres économies : une requête conditionnelle (`If-Modified-Since`), qui ne
+retélécharge pas un catalogue inchangé, et une pause entre deux pages de tldr.tech.
