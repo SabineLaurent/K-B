@@ -118,6 +118,19 @@ def test_a_raw_folder_that_is_not_a_safe_path_segment_is_refused(tmp_path):
     assert not (tmp_path / "raw").exists()
 
 
+def test_a_raw_folder_that_is_not_one_of_the_two_folders_of_raw_is_refused(tmp_path):
+    source = WorkingSource()
+    source.acquisition_dir_name = "automated_watchs"
+
+    errors_by_source = collect_all_sources(
+        [source], tmp_path / "raw", tmp_path, FIRST_RUN_AT
+    ).errors_by_source
+
+    assert isinstance(errors_by_source["working"], ValueError)
+    assert "automated_watchs" in str(errors_by_source["working"])
+    assert not (tmp_path / "raw").exists()
+
+
 class UnchangedSource:
     name = "unchanged"
     extension = "csv"

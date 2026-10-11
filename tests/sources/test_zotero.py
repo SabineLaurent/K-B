@@ -17,8 +17,6 @@ from k_b.sources.zotero import (
     ZoteroSource,
 )
 
-LIBRARY_SCRIPT = Path(__file__).parent.parent / "fixtures" / "zotero_extract.sql"
-
 PAPER_WITH_HIGHLIGHTS = {
     "key": "AAAAAAA1",
     "item_type": "preprint",
@@ -84,24 +82,6 @@ def temporary_root(tmp_path, monkeypatch):
     return root
 
 
-@pytest.fixture
-def zotero_dir(tmp_path):
-    """A Zotero data directory with the fabricated library, in WAL mode, closed cleanly."""
-    directory = tmp_path / "Zotero"
-    directory.mkdir()
-    run_on_library(directory, LIBRARY_SCRIPT.read_text())
-    return directory
-
-
-def run_on_library(zotero_dir, script):
-    connection = sqlite3.connect(zotero_dir / "zotero.sqlite")
-    try:
-        connection.execute("PRAGMA journal_mode = WAL")
-        connection.executescript(script)
-    finally:
-        connection.close()
-
-
 def extract(zotero_dir, last_collected_at=None):
     raw_extract = ZoteroSource(zotero_dir).fetch(last_collected_at)
     return json.loads(raw_extract)
@@ -133,8 +113,10 @@ def test_only_the_documents_of_the_user_library_out_of_the_trash_are_extracted(
     ]
 
 
-def test_the_extract_is_utf8_json_and_the_same_bytes_for_the_same_library(zotero_dir):
-    run_on_library(
+def test_the_extract_is_utf8_json_and_the_same_bytes_for_the_same_library(
+    zotero_dir, run_on_zotero_library
+):
+    run_on_zotero_library(
         zotero_dir, "UPDATE itemDataValues SET value = 'Résumé' WHERE valueID = 6"
     )
     source = ZoteroSource(zotero_dir)
@@ -187,12 +169,41 @@ def test_the_temporary_copy_is_deleted_after_an_extraction(zotero_dir, temporary
     assert list(temporary_root.iterdir()) == []
 
 
-def test_the_temporary_copy_is_deleted_after_a_failure(zotero_dir, temporary_root):
-    run_on_library(zotero_dir, "DROP TABLE itemAnnotations")
+def test_the_temporary_copy_is_deleted_after_a_failure(
+    zotero_dir, temporary_root, run_on_zotero_library
+):
+    run_on_zotero_library(zotero_dir, "DROP TABLE itemAnnotations")
 
     with pytest.raises(ZoteroQueryFailedError):
         extract(zotero_dir)
 
+    assert list(temporary_root.iterdir()) == []
+
+
+def test_the_copies_a_killed_process_left_are_removed_before_an_extraction(
+    zotero_dir, temporary_root
+):
+    left_copy = temporary_root / "kb-zotero-left"
+    left_copy.mkdir()
+    (left_copy / "zotero.sqlite").write_bytes(b"a whole library")
+    (temporary_root / "another-program").mkdir()
+    (temporary_root / "kb-zotero-not-a-folder").write_bytes(b"")
+
+    extract(zotero_dir)
+
+    assert sorted(path.name for path in temporary_root.iterdir()) == [
+        "another-program",
+        "kb-zotero-not-a-folder",
+    ]
+
+
+def test_the_copies_a_killed_process_left_are_removed_even_with_nothing_new(
+    zotero_dir, temporary_root
+):
+    (temporary_root / "kb-zotero-left").mkdir()
+    last_collected_at = datetime.now(UTC) + timedelta(minutes=1)
+
+    assert ZoteroSource(zotero_dir).fetch(last_collected_at) is None
     assert list(temporary_root.iterdir()) == []
 
 
@@ -216,10 +227,12 @@ def test_the_copy_is_made_in_a_folder_named_after_k_b_and_opened_read_only(
     assert options == {"uri": True}
 
 
-def test_a_copy_whose_integrity_check_reports_a_problem_is_refused(zotero_dir):
+def test_a_copy_whose_integrity_check_reports_a_problem_is_refused(
+    zotero_dir, run_on_zotero_library
+):
     # An index declared on another column than the one it was built on: SQLite opens the
     # base, and integrity_check reports the rows missing from the index.
-    run_on_library(
+    run_on_zotero_library(
         zotero_dir,
         "CREATE INDEX items_key ON items (key);"
         "PRAGMA writable_schema = ON;"
@@ -294,8 +307,10 @@ def test_a_write_ahead_log_that_appears_during_the_copy_is_refused(
         extract(zotero_dir)
 
 
-def test_a_library_without_a_table_the_query_reads_fails_naming_the_table(zotero_dir):
-    run_on_library(zotero_dir, "DROP TABLE itemAnnotations")
+def test_a_library_without_a_table_the_query_reads_fails_naming_the_table(
+    zotero_dir, run_on_zotero_library
+):
+    run_on_zotero_library(zotero_dir, "DROP TABLE itemAnnotations")
 
     with pytest.raises(ZoteroQueryFailedError, match="no such table: itemAnnotations"):
         extract(zotero_dir)
@@ -303,8 +318,11 @@ def test_a_library_without_a_table_the_query_reads_fails_naming_the_table(zotero
 
 def test_a_library_without_a_column_the_query_reads_fails_naming_the_column(
     zotero_dir,
+    run_on_zotero_library,
 ):
-    run_on_library(zotero_dir, "ALTER TABLE itemAnnotations DROP COLUMN pageLabel")
+    run_on_zotero_library(
+        zotero_dir, "ALTER TABLE itemAnnotations DROP COLUMN pageLabel"
+    )
 
     with pytest.raises(
         ZoteroQueryFailedError, match="no such column: itemAnnotations.pageLabel"
@@ -314,8 +332,9 @@ def test_a_library_without_a_column_the_query_reads_fails_naming_the_column(
 
 def test_a_value_sqlite_cannot_put_in_json_fails_with_the_name_sqlite_gives_the_error(
     zotero_dir,
+    run_on_zotero_library,
 ):
-    run_on_library(
+    run_on_zotero_library(
         zotero_dir, "UPDATE itemAnnotations SET text = x'00ff' WHERE itemID = 4"
     )
 
@@ -353,9 +372,10 @@ def test_a_query_error_is_described_without_what_sqlite_quotes_of_the_library(
 
 def test_a_text_that_is_not_utf8_fails_without_its_content_in_the_error(
     zotero_dir,
+    run_on_zotero_library,
 ):
     # A text that is not UTF-8: sqlite3 quotes it in its message, which the log must not get.
-    run_on_library(
+    run_on_zotero_library(
         zotero_dir,
         "UPDATE itemDataValues SET value = CAST(x'5365637265742074697472653a20ff' AS TEXT)"
         " WHERE valueID = 6",

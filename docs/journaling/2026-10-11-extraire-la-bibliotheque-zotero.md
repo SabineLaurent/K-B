@@ -35,7 +35,8 @@ Deux contraintes pèsent sur tout le code :
 faire si rien n'a changé, copier, interroger la copie, rendre le JSON.
 
 ```python
-# src/k_b/sources/zotero.py:170-184
+# src/k_b/sources/zotero.py:173-189
+remove_left_copies()
 if last_collected_at is not None and not was_modified_since(
     read_file_states(self.zotero_dir), last_collected_at
 ):
@@ -53,7 +54,12 @@ return (json.dumps(documents, ensure_ascii=False, indent=2) + "\n").encode()
   est la même pour toutes les sources (`source_contract.py`).
 - `tempfile.TemporaryDirectory` crée un dossier lisible par la seule utilisatrice, au nom qui
   commence par `kb-zotero-`, et le supprime à la sortie du bloc `with`, que l'on sorte par un
-  succès, une erreur ou un Ctrl-C. La copie de la bibliothèque ne survit donc pas à l'extraction.
+  succès, une erreur ou un Ctrl-C. Un processus tué (`kill`, terminal fermé) ne passe pas par
+  cette sortie : sa copie reste. D'où `remove_left_copies`, appelée en tête de `fetch` : elle
+  retire les dossiers `kb-zotero-…` de l'utilisatrice restés dans le dossier temporaire. Ce qui
+  reste serait la base entière, notes et résumés compris, que la requête fait exprès de ne pas
+  lire. Limite : deux `kb collect` lancés en même temps peuvent se retirer leur copie l'un à
+  l'autre, K-B n'a pas de verrou.
 - Le journal donne deux nombres, rien d'autre.
 
 ### 2. Copier sans jamais ouvrir l'original
@@ -64,7 +70,7 @@ second fichier, `zotero.sqlite-wal`, et ne rejoignent `zotero.sqlite` que plus t
 copier le seul fichier principal aurait donné une bibliothèque vieille de quatre jours.
 
 ```python
-# src/k_b/sources/zotero.py:220-232
+# src/k_b/sources/zotero.py:242-251
 states_before = read_file_states(zotero_dir)
 copy_path = copy_dir / DATABASE_FILE_NAME
 shutil.copyfile(zotero_dir / DATABASE_FILE_NAME, copy_path)
@@ -90,7 +96,7 @@ if states_after != states_before:
 ### 3. Vérifier la copie, puis l'ouvrir en lecture seule
 
 ```python
-# src/k_b/sources/zotero.py:239-248
+# src/k_b/sources/zotero.py:261-270
 with contextlib.closing(
     sqlite3.connect(f"{copy_path.as_uri()}?mode=ro", uri=True)
 ) as connection:
@@ -174,7 +180,7 @@ index que Zotero a déjà.
 ### 5. Un échec dit ce qui a été observé, pas le contenu de la bibliothèque
 
 ```python
-# src/k_b/sources/zotero.py:273-283
+# src/k_b/sources/zotero.py:295-305
 def describe_query_error(error: sqlite3.DatabaseError) -> str:
     message = str(error)
     if MESSAGE_ABOUT_THE_QUERY.fullmatch(message):
@@ -199,12 +205,13 @@ a choisi : son brut va sous `raw/selected_library/` (décision du 2026-10-09). C
 donc son dossier, et la collecte le lit :
 
 ```python
-# src/k_b/collect.py:72
+# src/k_b/collect.py:71
 source_dir = raw_dir / source.acquisition_dir_name / source.name
 ```
 
-Ce nom entre dans un chemin de fichier : il est contrôlé comme le nom et l'extension de la
-source (`collect.py:62-67`), par le motif `[a-z0-9_]+`, avant toute écriture.
+Ce nom entre dans un chemin de fichier : avant toute écriture, `collect.py:63-64` refuse tout
+autre nom que les deux dossiers connus (`RAW_DIR_NAMES`, dans `raw_store.py`). Une liste fermée,
+et non un simple motif : un nom mal orthographié écrirait le brut là où aucun lecteur ne le cherche.
 
 Le dossier de Zotero n'est pas le même d'une machine à l'autre. `cli.py` le lit dans une
 variable d'environnement et n'ajoute la source que si elle est donnée :
@@ -250,6 +257,8 @@ sortie ne change pas : une machine sans Zotero ne voit pas sa collecte échouer.
 | `test_what_zotero_has_only_written_to_its_write_ahead_log_is_extracted` | ce qui n'est que dans le `-wal`, Zotero ouvert, est lu |
 | `test_the_original_is_left_byte_for_byte_and_nothing_is_created_next_to_it` | l'original n'est ni modifié ni accompagné d'un nouveau fichier |
 | `test_the_temporary_copy_is_deleted_after_an_extraction` et `..._after_a_failure` | la copie ne survit ni à un succès ni à un échec |
+| les deux tests `test_the_copies_a_killed_process_left_are_removed_...` | une copie laissée par un processus tué est retirée à l'extraction suivante, même sans rien de neuf ; un autre dossier ou un fichier au même préfixe restent |
+| `test_a_raw_folder_that_is_not_one_of_the_two_folders_of_raw_is_refused` | un dossier du brut mal orthographié est refusé avant toute écriture |
 | `test_the_copy_is_made_in_a_folder_named_after_k_b_and_opened_read_only` | la copie est ouverte avec `mode=ro` |
 | `test_a_copy_whose_integrity_check_reports_a_problem_is_refused`, `test_a_copy_that_integrity_check_cannot_read_is_refused` | une copie incohérente est refusée par un état nommé |
 | les trois tests `..._during_the_copy_is_refused` | fichier principal modifié, `-wal` modifié, `-wal` apparu : la garde les voit |
@@ -267,16 +276,16 @@ sortie ne change pas : une machine sans Zotero ne voit pas sa collecte échouer.
 1. **Pourquoi copier la base au lieu de la lire ?**
    Zotero verrouille sa base quand il tourne, et sa documentation demande un accès en lecture
    seule. La copie se lit sans rien demander à Zotero, et l'original n'est jamais ouvert par
-   SQLite (`copy_library`, `zotero.py:213`).
+   SQLite (`copy_library`, `zotero.py:235`).
 2. **Que se passe-t-il si Zotero écrit pendant la copie ?**
-   La garde compare l'état des deux fichiers avant et après (`zotero.py:228`). Au moindre écart,
+   La garde compare l'état des deux fichiers avant et après (`zotero.py:250`). Au moindre écart,
    `ZoteroChangedDuringCopyError` : rien n'est écrit, la date de dernière collecte reste, et la
    collecte suivante recommence.
 3. **Où est la sécurité des données personnelles ?**
    Dans quatre endroits : la requête ne lit que les colonnes utiles (pas les notes, pas les
    résumés) ; la copie vit dans un dossier temporaire supprimé à la sortie ; le journal ne donne
    que deux nombres ; un message d'erreur de SQLite n'est repris que s'il ne cite que la requête
-   (`describe_query_error`, `zotero.py:273`).
+   (`describe_query_error`, `zotero.py:295`).
 4. **Pourquoi une seule grosse requête plutôt que plusieurs petites ?**
    La définition d'un document n'est écrite qu'une fois, et le résultat est directement ce que
    la requête rend. Quatre requêtes auraient répété le filtre, ou l'auraient déplacé en Python.
@@ -303,7 +312,10 @@ sortie ne change pas : une machine sans Zotero ne voit pas sa collecte échouer.
 - **La comparaison de structure et la collecte réelle** ont été faites sur la machine de Sabine,
   une fois. La CI n'a pas de base Zotero.
 - **Les tests ont été écrits avant le code, mais lancés après** : la preuve qu'ils échouent
-  vient du code cassé exprès.
+  vient du code cassé exprès. Les tests des corrections de la seconde revue (copies laissées,
+  liste fermée des dossiers) ont, eux, été vus échouer avant le code.
+- **Le dossier d'une autre utilisatrice n'est pas retiré** (`st_uid` comparé à `os.getuid()`) :
+  non testé, un test ne peut pas créer un dossier au nom d'un autre compte.
 
 ## Ce qui reste
 

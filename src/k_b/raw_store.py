@@ -11,6 +11,9 @@ from pathlib import Path, PurePosixPath
 AUTOMATED_WATCH_DIR_NAME = "automated_watch"
 # The folder of raw/ that holds what the user selected (ADR of 2026-10-09).
 SELECTED_LIBRARY_DIR_NAME = "selected_library"
+# The only folders of raw/ a source may write to: a misspelt one would hold raw files that
+# no reader looks for.
+RAW_DIR_NAMES = (AUTOMATED_WATCH_DIR_NAME, SELECTED_LIBRARY_DIR_NAME)
 COLLECTION_STATE_FILENAME = "collection_state.json"
 
 

@@ -43,8 +43,9 @@ par une seule fonction, `write_file_atomically` : un temporaire **caché** dans 
 (nom commençant par `.`), renommé sur la cible, et supprimé sur toute exception, Ctrl-C compris
 (`except BaseException`). La base SQLite, que SQLite écrit lui-même, est hors de cette règle.
 La copie temporaire d'une base source (Zotero) est hors de cette règle elle aussi : elle vit dans
-un `tempfile.TemporaryDirectory` du système, hors du dossier de données, et elle est supprimée
-sur toute sortie.
+un `tempfile.TemporaryDirectory` du système, hors du dossier de données, supprimé sur un succès,
+une erreur ou un Ctrl-C ; chaque extraction retire d'abord les copies qu'un processus tué aurait
+laissées.
 
 **Vérifier.**
 - `grep -rn "NamedTemporaryFile\|\.tmp\|os\.replace" src/k_b` ne renvoie que
@@ -128,7 +129,7 @@ statu quo).
 - Le module de chargement orchestre la transaction et le journal, sans SQL.
 
 **Vérifier.**
-- `grep -rlE "INSERT INTO|SELECT |UPDATE |DELETE FROM" src/k_b --include='*.py' --exclude-dir=sources`
+- `grep -rlE "INSERT INTO|SELECT |UPDATE |DELETE FROM" src/k_b --include='*.py' --exclude=zotero.py`
   ne renvoie que des fichiers de `src/k_b/database/`.
 - `grep -rlE "INSERT INTO|UPDATE |DELETE FROM" src/k_b/sources --include='*.py'` ne renvoie rien
   (une source ne fait que lire).

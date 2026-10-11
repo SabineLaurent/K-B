@@ -184,8 +184,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   une requête SQL (`src/k_b/sources/zotero.py`). Zotero verrouille sa base quand il tourne, et
   ses dernières écritures sont dans `zotero.sqlite-wal` : K-B copie les deux fichiers dans un
   dossier temporaire, vérifie la copie (`PRAGMA integrity_check`), l'ouvre en lecture seule,
-  lance la requête, puis supprime la copie, erreur comprise. L'original n'est jamais ouvert par
-  SQLite.
+  lance la requête, puis supprime la copie, après un succès, une erreur ou un Ctrl-C. Un
+  processus tué laisse sa copie dans le dossier temporaire du système (`kb-zotero-…`) : chaque
+  extraction retire d'abord celles de l'utilisatrice. Deux `kb collect` lancés en même temps
+  peuvent se retirer leur copie l'un à l'autre : K-B n'a pas de verrou. L'original n'est jamais
+  ouvert par SQLite.
 - **Ce qu'on en tire** : chaque document de premier niveau de la bibliothèque personnelle, hors
   corbeille : clé Zotero, type, titre, date, date d'ajout, URL, référence arXiv (`archiveID`),
   auteurs dans leur ordre, étiquettes avec leur type (0 : posée à la main ; 1 : automatique),

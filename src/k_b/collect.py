@@ -8,6 +8,7 @@ from typing import NamedTuple
 
 from k_b.raw_store import (
     COLLECTION_STATE_FILENAME,
+    RAW_DIR_NAMES,
     load_last_collection_dates,
     save_last_collection_dates,
     write_new_raw_file,
@@ -59,11 +60,9 @@ def collect_all_sources(
 def collect_one_source(
     source: Source, raw_dir: Path, now: datetime, last_collected_at: datetime | None
 ) -> None:
-    for path_segment in (
-        source.acquisition_dir_name,
-        source.name,
-        source.extension,
-    ):
+    if source.acquisition_dir_name not in RAW_DIR_NAMES:
+        raise ValueError(f"not a folder of raw/: {source.acquisition_dir_name!r}")
+    for path_segment in (source.name, source.extension):
         if not SAFE_PATH_SEGMENT.fullmatch(path_segment):
             raise ValueError(f"not a safe path segment: {path_segment!r}")
     raw_content = source.fetch(last_collected_at)

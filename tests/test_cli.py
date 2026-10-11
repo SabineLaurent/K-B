@@ -3,7 +3,6 @@ import os
 import sqlite3
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 from test_collect import BrokenSource, WorkingSource
@@ -11,8 +10,6 @@ from test_collect import BrokenSource, WorkingSource
 from k_b import cli
 from k_b.import_items import KindWithoutTableError, UnknownSourceError
 from k_b.source_contract import SourceKind
-
-ZOTERO_LIBRARY_SCRIPT = Path(__file__).parent / "fixtures" / "zotero_extract.sql"
 
 
 @pytest.fixture(autouse=True)
@@ -24,18 +21,6 @@ def no_zotero_directory(monkeypatch):
 def collected_kinds(*sources):
     """One kind without a reader: the collection tests only need its sources."""
     return (SourceKind("test", sources, None),)
-
-
-def create_zotero_dir(tmp_path):
-    """A Zotero data directory holding the fabricated library."""
-    zotero_dir = tmp_path / "Zotero"
-    zotero_dir.mkdir()
-    connection = sqlite3.connect(zotero_dir / "zotero.sqlite")
-    try:
-        connection.executescript(ZOTERO_LIBRARY_SCRIPT.read_text())
-    finally:
-        connection.close()
-    return zotero_dir
 
 
 def test_collect_refuses_to_run_without_a_data_directory(monkeypatch, capsys):
@@ -126,12 +111,12 @@ def test_collect_skips_zotero_and_says_so_without_its_directory(
 
 
 def test_collect_extracts_zotero_into_the_selected_library_with_its_directory(
-    monkeypatch, tmp_path, capsys
+    monkeypatch, tmp_path, capsys, zotero_dir
 ):
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     monkeypatch.setenv("KB_DATA_DIR", str(data_dir))
-    monkeypatch.setenv("KB_ZOTERO_DIR", str(create_zotero_dir(tmp_path)))
+    monkeypatch.setenv("KB_ZOTERO_DIR", str(zotero_dir))
     monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
 
     exit_code = cli.main(["collect"])

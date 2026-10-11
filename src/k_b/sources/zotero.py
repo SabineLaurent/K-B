@@ -8,9 +8,11 @@ the copy, queries it read-only, and deletes it. What the query returns is the ra
 import contextlib
 import json
 import logging
+import os
 import re
 import shutil
 import sqlite3
+import stat
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,7 +28,8 @@ FOLDER_PREFIX = "zotero"
 DATABASE_FILE_NAME = "zotero.sqlite"
 # Zotero's last writes are here while it runs: the main file alone would be an older library.
 WRITE_AHEAD_LOG_FILE_NAME = "zotero.sqlite-wal"
-# The temporary folder is recognisable: one left behind by a killed process can be found.
+# The temporary folder is recognisable: one left behind by a killed process is found and
+# removed by the next extraction.
 TEMPORARY_DIR_PREFIX = "kb-zotero-"
 # How much of what integrity_check answers, or of the error it raises, goes into the error.
 MAX_REPORTED_PROBLEM_LENGTH = 200
@@ -167,12 +170,14 @@ class ZoteroSource:
         Zotero running writes to its log even when the library does not change: an extract
         equal to the previous one is then returned.
         """
+        remove_left_copies()
         if last_collected_at is not None and not was_modified_since(
             read_file_states(self.zotero_dir), last_collected_at
         ):
             return None
-        # Deleted on any exit, an error or Ctrl-C included. In the system's temporary folder,
-        # not in the data directory: a whole library has no place in what gets backed up.
+        # Deleted on a success, an error or Ctrl-C; a killed process leaves it, and the next
+        # extraction removes it. In the system's temporary folder, not in the data directory:
+        # a whole library has no place in what gets backed up.
         with tempfile.TemporaryDirectory(prefix=TEMPORARY_DIR_PREFIX) as copy_dir:
             copy_path = copy_library(self.zotero_dir, Path(copy_dir))
             documents = extract_documents(copy_path)
@@ -182,6 +187,23 @@ class ZoteroSource:
             sum(len(document["highlights"]) for document in documents),
         )
         return (json.dumps(documents, ensure_ascii=False, indent=2) + "\n").encode()
+
+
+def remove_left_copies() -> None:
+    """Remove the copies of the library that a killed process left in the temporary folder.
+
+    Only the folders of this user: in a temporary folder shared by several users, another
+    user's folder is neither removed nor a reason to fail. Two runs of kb collect at the same
+    time can remove each other's copy: K-B has no lock against it.
+    """
+    removed_count = 0
+    for path in Path(tempfile.gettempdir()).glob(TEMPORARY_DIR_PREFIX + "*"):
+        status = path.lstat()
+        if stat.S_ISDIR(status.st_mode) and status.st_uid == os.getuid():
+            shutil.rmtree(path)
+            removed_count += 1
+    if removed_count:
+        logger.info("zotero: %d copies left by a stopped run removed", removed_count)
 
 
 def read_file_states(zotero_dir: Path) -> tuple[FileState, FileState | None]:

@@ -846,9 +846,11 @@ encore l'ancien modèle.
   verrouille) ; `immutable=1` sur l'original (ignore le `-wal`) ; un temporaire caché dans le
   dossier de données, comme le veut la convention 2 pour les fichiers que K-B écrit ; un
   plafond de taille sur la base copiée (arbitraire : un disque plein arrête déjà la copie).
-  Limites assumées : un arrêt brutal (`kill -9`, coupure) laisse le dossier `kb-zotero-…` dans
-  le dossier temporaire du système ; la règle commune « chaque téléchargement a une taille
-  maximale » ne s'applique pas à cette copie. — PR de #15
+  Limites assumées : un processus tué (`kill`, terminal fermé, coupure) laisse le dossier
+  `kb-zotero-…` dans le dossier temporaire du système jusqu'à l'extraction suivante, qui le
+  retire ; deux `kb collect` lancés en même temps peuvent se retirer leur copie l'un à l'autre
+  (K-B n'a pas de verrou) ; la règle commune « chaque téléchargement a une taille maximale » ne
+  s'applique pas à cette copie. — PR de #15
 - **La requête d'extraction d'une source qui est elle-même une base vit dans le module de cette
   source (`src/k_b/sources/zotero.py`), pas dans `src/k_b/database/` ; la règle 5 des
   conventions et sa commande sont précisées (« le SQL de la base K-B »).** Décision de Sabine,
@@ -874,7 +876,10 @@ encore l'ancien modèle.
   dernier extrait. Limites assumées : Zotero ouvert écrit dans son `-wal` sans que la
   bibliothèque change, et un extrait identique au précédent est alors écrit (9 Ko le
   2026-10-11) ; une base restaurée avec d'anciennes dates n'est pas extraite tant qu'elle ne
-  change pas. — PR de #15
+  change pas ; la date de dernière collecte est rangée sous la clé `zotero`, sans lien avec le
+  dossier : si `KB_ZOTERO_DIR` désigne ensuite un autre dossier dont les fichiers sont plus
+  anciens que cette date, `kb collect` affiche `zotero: ok` et n'extrait rien tant que Zotero
+  n'y écrit pas. — PR de #15
 - **La base d'essai Zotero est un script SQL versionné : les 15 tables utiles, réécrites avec
   toutes leurs colonnes et contraintes relevées sur la base réelle, et des valeurs inventées.**
   Décision de Sabine (« si base réduite est fiable ok alors »). Pourquoi réduite : les 44
@@ -893,7 +898,8 @@ encore l'ancien modèle.
   donnée personnelle (noms d'auteurs, textes surlignés). Remplace la règle provisoire du
   registre (« seule la dernière copie est gardée »), sans objet depuis que la copie est
   temporaire. Une issue à part, à valider par Sabine ; la comparaison d'un extrait au précédent
-  (ne pas réécrire un extrait identique) relève de la même décision.
+  (ne pas réécrire un extrait identique, et extraire un autre dossier Zotero même plus ancien)
+  relève de la même décision.
 - **Licence du schéma de Zotero** (2026-10-11) : le code de Zotero est sous AGPL v3 « sauf
   fichier qui dit autrement » (page « Licensing » de zotero.org), K-B sous CC BY-NC 4.0.
   La base d'essai réécrit 15 tables aux noms et types de Zotero ; si cela pose une question de
