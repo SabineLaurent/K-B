@@ -32,10 +32,14 @@ WINDOW_DAYS = 3
 # The 30 first by stars and the 30 first by forks, together (decision of 2026-10-08).
 TOP_SIZE = 30
 MAX_ROWS_PER_WINDOW = 2 * TOP_SIZE
-# A month of missed collections. Beyond, the most recent windows are kept.
-MAX_CATCH_UP_WINDOWS = 30
-# 30 windows (32 days) read 3.22 GB on 2026-10-11 (dry run), plus 25 % for GH Archive to grow.
-MAX_BYTES_BILLED = 4_000_000_000
+# Two weeks of missed collections: a repository that rose earlier adds little to the watch
+# (decision of 2026-10-11). Beyond, the most recent windows are kept.
+MAX_CATCH_UP_WINDOWS = 15
+# The cap grows with the windows, up to a bound (decision of 2026-10-11). Measured on 2026-10-11
+# (dry run): 1 window 133.8 MB, 15 windows 1.58 GB. A daily collection that reads 20 times its
+# usual volume is stopped by the dry run.
+MAX_BYTES_PER_WINDOW = 200_000_000
+MAX_BYTES_BILLED = 2_000_000_000
 QUERY_TIMEOUT_SECONDS = 300
 # An identifier BigQuery gives as INT64.
 MAX_INT64 = 2**63 - 1
@@ -48,11 +52,12 @@ TABLE_PREFIX = "githubarchive.day."
 # With the wildcard day.20*, _TABLE_SUFFIX is what follows "20": YYMMDD (261008 for 2026-10-08).
 TABLE_SUFFIX_FORMAT = "%y%m%d"
 
-# Reads 4 columns of the events: never actor, payload or org. An event without repo.id is left
-# out: on 2026-10-10, 14 ForkEvent had neither repo.id nor repo.name (seen on 2026-10-11). A WatchEvent is a star given (GH
-# Archive does not record a star removed): events are counted, not people. Ties are broken by
-# repository_id, and the last name seen by the name, so that the same tables give the same
-# result.
+# Reads 4 columns of the events: never actor, payload or org. An event without repo.id or
+# repo.name is left out: on 2026-10-10, 14 ForkEvent had neither (seen on 2026-10-11). A
+# WatchEvent is a star given (GH Archive does not record a star removed): events are counted,
+# not people. Ties are broken by repository_id, and the last name seen by the name, so that the
+# same tables give the same result. The table is written in the query (a table cannot be a
+# parameter): a test keeps it equal to TABLE_PREFIX.
 TRENDS_QUERY = """
 WITH events AS (
   SELECT repo.id AS repository_id, repo.name AS repository_name, type, created_at,
@@ -61,6 +66,7 @@ WITH events AS (
   WHERE _TABLE_SUFFIX BETWEEN @first_suffix AND @last_suffix
     AND type IN ('WatchEvent', 'ForkEvent')
     AND repo.id IS NOT NULL
+    AND repo.name IS NOT NULL
 ),
 counts AS (
   SELECT window_end, repository_id,
@@ -69,7 +75,8 @@ counts AS (
     COUNTIF(type = 'WatchEvent') AS stars_gained,
     COUNTIF(type = 'ForkEvent') AS forks_gained
   FROM UNNEST(@window_ends) AS window_end
-  JOIN events ON event_day BETWEEN DATE_SUB(window_end, INTERVAL 2 DAY) AND window_end
+  JOIN events
+    ON event_day BETWEEN DATE_SUB(window_end, INTERVAL @window_days - 1 DAY) AND window_end
   GROUP BY window_end, repository_id
 ),
 ranked AS (
@@ -82,7 +89,7 @@ ranked AS (
 )
 SELECT window_end, repository_id, repository_name, stars_gained, forks_gained
 FROM ranked
-WHERE star_rank <= 30 OR fork_rank <= 30
+WHERE star_rank <= @top_size OR fork_rank <= @top_size
 ORDER BY window_end, stars_gained DESC, repository_id
 """
 
@@ -92,7 +99,11 @@ class DayTableNotClosedError(Exception):
 
 
 class DryRunOverLimitError(Exception):
-    """The dry run of a single window announces more bytes than the cap."""
+    """The dry run of a single window announces more bytes than its cap."""
+
+
+class DryRunVolumeUnknownError(Exception):
+    """The dry run gives no volume: the query is not run (fail closed)."""
 
 
 class TrendsExtractInvalidError(ValueError):
@@ -126,7 +137,12 @@ class GhArchiveSource:
         self.create_client = create_client
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
-        """Return the trends of every window due since last_collected_at; None if none is due."""
+        """Return the trends of every window due since last_collected_at; None if none is due.
+
+        The day is read from the clock when the source runs, not when the collection started: a
+        collection that runs past midnight UTC collects the next window, and the next collection
+        takes it again (a raw file twice, nothing lost).
+        """
         window_ends = list_window_ends(last_collected_at, current_day())
         if not window_ends:
             return None
@@ -154,6 +170,10 @@ class GhArchiveSource:
 
 def create_bigquery_client() -> bigquery.Client:
     return bigquery.Client()
+
+
+def compute_bytes_cap(window_count: int) -> int:
+    return min(window_count * MAX_BYTES_PER_WINDOW, MAX_BYTES_BILLED)
 
 
 def current_day() -> date:
@@ -208,7 +228,7 @@ def describe_time(moment: datetime | None) -> str:
 def drop_windows_over_the_cap(
     client: bigquery.Client, window_ends: list[date]
 ) -> list[date]:
-    """Drop the oldest windows until the dry run fits the cap; refuse one window over it.
+    """Drop the oldest windows until the dry run fits their cap; refuse one window over it.
 
     Failing instead would fail every collection once the windows due are over the cap.
     """
@@ -218,19 +238,24 @@ def drop_windows_over_the_cap(
             job_config=configure_query(window_ends, dry_run=True),
             timeout=QUERY_TIMEOUT_SECONDS,
         )
-        bytes_processed = dry_run.total_bytes_processed or 0
-        if bytes_processed <= MAX_BYTES_BILLED:
+        bytes_processed = dry_run.total_bytes_processed
+        if bytes_processed is None:
+            raise DryRunVolumeUnknownError(
+                f"dry run of {len(window_ends)} window(s): total_bytes_processed is None"
+            )
+        cap = compute_bytes_cap(len(window_ends))
+        if bytes_processed <= cap:
             return window_ends
         if len(window_ends) == 1:
             raise DryRunOverLimitError(
                 f"dry run of the window ending {window_ends[0]}: {bytes_processed} bytes,"
-                f" maximum {MAX_BYTES_BILLED}"
+                f" maximum {cap}"
             )
         logger.info(
             "gh_archive: dry run of %d windows: %d bytes, maximum %d; window ending %s dropped",
             len(window_ends),
             bytes_processed,
-            MAX_BYTES_BILLED,
+            cap,
             window_ends[0],
         )
         window_ends = window_ends[1:]
@@ -246,13 +271,16 @@ def configure_query(window_ends: list[date], dry_run: bool) -> bigquery.QueryJob
             "last_suffix", "STRING", f"{window_ends[-1]:{TABLE_SUFFIX_FORMAT}}"
         ),
         bigquery.ArrayQueryParameter("window_ends", "DATE", window_ends),
+        bigquery.ScalarQueryParameter("window_days", "INT64", WINDOW_DAYS),
+        bigquery.ScalarQueryParameter("top_size", "INT64", TOP_SIZE),
     ]
     if dry_run:
         return bigquery.QueryJobConfig(
             dry_run=True, use_query_cache=False, query_parameters=parameters
         )
     return bigquery.QueryJobConfig(
-        maximum_bytes_billed=MAX_BYTES_BILLED, query_parameters=parameters
+        maximum_bytes_billed=compute_bytes_cap(len(window_ends)),
+        query_parameters=parameters,
     )
 
 
@@ -306,7 +334,10 @@ def describe_validation_error(error: ValidationError) -> str:
     else:
         place = ".".join(str(part) for part in location) or "result"
     value = first.get("input")
-    if location[-1:] and location[-1] in FIELDS_NEVER_QUOTED:
+    if isinstance(value, dict | list):
+        # A missing field or a wrong row gives the whole row: it holds the repository name.
+        quoted = f"{type(value).__name__} of {len(value)}"
+    elif location[-1:] and location[-1] in FIELDS_NEVER_QUOTED:
         quoted = (
             f"length {len(value)}" if isinstance(value, str) else type(value).__name__
         )

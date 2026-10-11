@@ -7,13 +7,16 @@ import pytest
 from k_b.sources import gh_archive
 from k_b.sources.gh_archive import (
     MAX_BYTES_BILLED,
+    MAX_BYTES_PER_WINDOW,
     MAX_CATCH_UP_WINDOWS,
     QUERY_TIMEOUT_SECONDS,
     TRENDS_QUERY,
     DayTableNotClosedError,
     DryRunOverLimitError,
+    DryRunVolumeUnknownError,
     GhArchiveSource,
     TrendsExtractInvalidError,
+    compute_bytes_cap,
     list_window_ends,
     read_trends,
 )
@@ -59,8 +62,12 @@ class FakeJob:
 class FakeClient:
     """Answers like BigQuery: a dry run gives a volume, a job gives the rows of its windows."""
 
-    def __init__(self, bytes_per_window=134_000_000, table_modified=CLOSED_AT):
-        self.bytes_per_window = bytes_per_window
+    def __init__(
+        self,
+        dry_run_bytes=lambda window_count: 134_000_000 * window_count,
+        table_modified=CLOSED_AT,
+    ):
+        self.dry_run_bytes = dry_run_bytes
         self.table_modified = table_modified
         self.table_requests = []
         self.queries = []
@@ -74,7 +81,7 @@ class FakeClient:
         self.queries.append((query, job_config, timeout))
         window_ends = read_parameters(job_config)["window_ends"]
         if job_config.dry_run:
-            job = FakeJob(self.bytes_per_window * len(window_ends), [])
+            job = FakeJob(self.dry_run_bytes(len(window_ends)), [])
         else:
             job = FakeJob(None, fixture_rows_for(window_ends))
         self.jobs.append(job)
@@ -134,13 +141,26 @@ def test_a_second_collection_the_same_day_takes_no_window():
 
 
 def test_the_catch_up_keeps_the_most_recent_windows_up_to_its_maximum():
-    last_collected_at = datetime(2026, 8, 27, 9, 0, tzinfo=UTC)
+    last_collected_at = datetime(2026, 9, 1, 9, 0, tzinfo=UTC)
 
     window_ends = list_window_ends(last_collected_at, TODAY)
 
-    assert len(window_ends) == MAX_CATCH_UP_WINDOWS == 30
+    assert len(window_ends) == MAX_CATCH_UP_WINDOWS == 15
     assert window_ends[-1] == YESTERDAY
-    assert window_ends[0] == YESTERDAY - timedelta(days=29)
+    assert window_ends[0] == YESTERDAY - timedelta(days=14)
+
+
+# The cap grows with the windows, up to a bound.
+
+
+@pytest.mark.parametrize(
+    ("window_count", "cap"),
+    [(1, 200_000_000), (7, 1_400_000_000), (10, 2_000_000_000), (15, 2_000_000_000)],
+)
+def test_the_cap_is_200_mb_a_window_up_to_2_gb(window_count, cap):
+    assert MAX_BYTES_PER_WINDOW == 200_000_000
+    assert MAX_BYTES_BILLED == 2_000_000_000
+    assert compute_bytes_cap(window_count) == cap
 
 
 def test_the_day_of_the_last_collection_is_read_in_utc():
@@ -169,12 +189,14 @@ def test_fetch_runs_a_dry_run_then_the_query_capped_with_its_parameters(today):
     assert dry_run[1].dry_run is True
     assert dry_run[1].use_query_cache is False
     assert executed[1].dry_run is not True
-    assert executed[1].maximum_bytes_billed == MAX_BYTES_BILLED
+    assert executed[1].maximum_bytes_billed == MAX_BYTES_PER_WINDOW
     # With the table wildcard day.20*, _TABLE_SUFFIX is YYMMDD.
     assert read_parameters(executed[1]) == {
         "first_suffix": "261008",
         "last_suffix": "261010",
         "window_ends": [YESTERDAY],
+        "window_days": 3,
+        "top_size": 30,
     }
     assert read_parameters(dry_run[1]) == read_parameters(executed[1])
     assert json.loads(raw)["window_ends"] == ["2026-10-10"]
@@ -202,6 +224,7 @@ def test_fetch_catches_up_every_missed_window_in_one_query(today):
     raw = GhArchiveSource(lambda: client).fetch(datetime(2026, 10, 8, 9, 0, tzinfo=UTC))
 
     [executed] = client.executed_configs()
+    assert executed.maximum_bytes_billed == 3 * MAX_BYTES_PER_WINDOW
     assert read_parameters(executed)["first_suffix"] == "261006"
     assert read_parameters(executed)["window_ends"] == [
         date(2026, 10, 8),
@@ -212,8 +235,12 @@ def test_fetch_catches_up_every_missed_window_in_one_query(today):
 
 
 def test_fetch_drops_the_oldest_windows_until_the_dry_run_fits_the_cap(today):
-    # Three windows read more than the cap, two fit.
-    client = FakeClient(bytes_per_window=MAX_BYTES_BILLED // 2)
+    # Three windows read more than their cap (600 MB), two fit theirs (400 MB).
+    client = FakeClient(
+        dry_run_bytes=lambda window_count: (
+            900_000_000 if window_count == 3 else 300_000_000
+        )
+    )
 
     raw = GhArchiveSource(lambda: client).fetch(datetime(2026, 10, 8, 9, 0, tzinfo=UTC))
 
@@ -230,14 +257,24 @@ def test_fetch_drops_the_oldest_windows_until_the_dry_run_fits_the_cap(today):
 
 
 def test_fetch_refuses_to_run_a_single_window_over_the_cap(today):
-    client = FakeClient(bytes_per_window=MAX_BYTES_BILLED + 1)
+    # A daily collection that would read 20 times its usual volume.
+    client = FakeClient(dry_run_bytes=lambda window_count: 2_700_000_000)
 
     with pytest.raises(DryRunOverLimitError) as raised:
         GhArchiveSource(lambda: client).fetch(None)
 
     assert client.executed_configs() == []
-    assert str(MAX_BYTES_BILLED + 1) in str(raised.value)
-    assert str(MAX_BYTES_BILLED) in str(raised.value)
+    assert "2700000000" in str(raised.value)
+    assert str(MAX_BYTES_PER_WINDOW) in str(raised.value)
+
+
+def test_fetch_refuses_to_run_when_the_dry_run_gives_no_volume(today):
+    client = FakeClient(dry_run_bytes=lambda window_count: None)
+
+    with pytest.raises(DryRunVolumeUnknownError):
+        GhArchiveSource(lambda: client).fetch(None)
+
+    assert client.executed_configs() == []
 
 
 def test_fetch_refuses_a_window_whose_last_day_is_not_closed(today):
@@ -300,6 +337,15 @@ def test_the_source_writes_json_into_the_watch():
 
 def test_the_query_leaves_out_the_events_without_a_repository():
     assert "AND repo.id IS NOT NULL" in TRENDS_QUERY
+    # Else the last name seen of a repository could be NULL, and the ranking refused.
+    assert "AND repo.name IS NOT NULL" in TRENDS_QUERY
+
+
+def test_the_query_reads_its_sizes_from_parameters_and_the_tables_of_the_prefix():
+    assert "@top_size" in TRENDS_QUERY
+    assert "@window_days" in TRENDS_QUERY
+    assert "30" not in TRENDS_QUERY
+    assert f"`{gh_archive.TABLE_PREFIX}20*`" in TRENDS_QUERY
 
 
 def test_the_query_never_reads_the_actor():
@@ -404,6 +450,20 @@ def test_the_message_quotes_a_value_truncated_and_escaped_and_never_a_name():
     assert "\n" not in message
     assert "line one\\nline two" in message
     assert "x" * 200 not in message
+
+
+def test_the_message_never_quotes_a_whole_row():
+    # A missing field: Pydantic gives the whole row as the value, the name with it.
+    row = {**first_row(), "repository_name": "some-person/repository"}
+    del row["stars_gained"]
+
+    with pytest.raises(TrendsExtractInvalidError) as raised:
+        read_trends(make_raw([row]))
+
+    message = str(raised.value)
+    assert "row 0: stars_gained (missing)" in message
+    assert "some-person" not in message
+    assert "dict of 4" in message
 
 
 def test_the_message_gives_the_length_of_a_repository_name_not_the_name():
