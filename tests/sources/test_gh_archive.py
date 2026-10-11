@@ -155,10 +155,11 @@ def test_the_catch_up_keeps_the_most_recent_windows_up_to_its_maximum():
 
 @pytest.mark.parametrize(
     ("window_count", "cap"),
-    [(1, 200_000_000), (7, 1_400_000_000), (10, 2_000_000_000), (15, 2_000_000_000)],
+    [(1, 650_000_000), (3, 1_950_000_000), (4, 2_000_000_000), (15, 2_000_000_000)],
 )
-def test_the_cap_is_200_mb_a_window_up_to_2_gb(window_count, cap):
-    assert MAX_BYTES_PER_WINDOW == 200_000_000
+def test_the_cap_is_650_mb_a_window_up_to_2_gb(window_count, cap):
+    # The heaviest window alone, 433.5 MB (ending 2026-09-28, dry run of 2026-10-11), x 1.5.
+    assert MAX_BYTES_PER_WINDOW == 650_000_000
     assert MAX_BYTES_BILLED == 2_000_000_000
     assert compute_bytes_cap(window_count) == cap
 

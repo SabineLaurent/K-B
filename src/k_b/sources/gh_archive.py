@@ -35,10 +35,10 @@ MAX_ROWS_PER_WINDOW = 2 * TOP_SIZE
 # Two weeks of missed collections: a repository that rose earlier adds little to the watch
 # (decision of 2026-10-11). Beyond, the most recent windows are kept.
 MAX_CATCH_UP_WINDOWS = 15
-# The cap grows with the windows, up to a bound (decision of 2026-10-11). Measured on 2026-10-11
-# (dry run): 1 window 133.8 MB, 15 windows 1.58 GB. A daily collection that reads 20 times its
-# usual volume is stopped by the dry run.
-MAX_BYTES_PER_WINDOW = 200_000_000
+# The cap grows with the windows, up to a bound (decision of 2026-10-11): the heaviest window
+# alone read 433.5 MB, x 1.5; 15 windows read 1.58 GB (dry runs of 2026-10-11, measures and
+# reckoning in docs/bigquery.md).
+MAX_BYTES_PER_WINDOW = 650_000_000
 MAX_BYTES_BILLED = 2_000_000_000
 QUERY_TIMEOUT_SECONDS = 300
 # An identifier BigQuery gives as INT64.
