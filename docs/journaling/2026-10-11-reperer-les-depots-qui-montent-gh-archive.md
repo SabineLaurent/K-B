@@ -81,7 +81,10 @@ def compute_bytes_cap(window_count: int) -> int:
 Un `dry_run` demande à BigQuery combien la requête lirait, sans l'exécuter ni consommer de quota.
 Si c'est au-dessus du plafond (650 Mo par fenêtre, 2 Go au plus), la requête n'est pas lancée.
 Sinon elle s'exécute avec `maximum_bytes_billed` au même plafond : si BigQuery devait lire plus,
-il refuserait lui-même. Deux contrôles, l'un avant, l'autre pendant (défense en profondeur).
+il refuserait lui-même. Deux contrôles, l'un avant, l'autre pendant (défense en profondeur). Le
+délai de 300 s est posé deux fois : côté client (`timeout=`) et côté BigQuery (`job_timeout_ms`).
+Le second compte : le délai du client seul laisserait la requête tourner chez BigQuery, facturée,
+et la collecte suivante la relancerait (troisième `/code-review`).
 
 Retirer la plus ancienne fenêtre n'aide que quand la borne de 2 Go s'applique : en dessous, chaque
 fenêtre retirée baisse le plafond de 650 Mo mais le volume d'un seul jour lu. Le second
