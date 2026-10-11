@@ -194,12 +194,31 @@ ORDER BY day, hour
 | 2026-10-09 | 24 | 4 389 | 47 331 | 701 573 |
 | 2026-10-10 | 24 | 5 394 | 42 227 | 803 270 |
 
-Le détail heure par heure n'a pas été gardé : seuls le minimum, le maximum et le total par jour
-ont été affichés.
+**Le détail heure par heure** (une seconde exécution de la même requête, accordée par Sabine,
+49 283 072 octets facturés, le 2026-10-11 ; sortie écrite telle quelle avant tout traitement) :
+les 144 comptes sont dans
+[2026-10-11-gh-archive-evenements-par-heure.csv](2026-10-11-gh-archive-evenements-par-heure.csv)
+(colonnes `day`, `hour_utc`, `events`), trop longs pour un tableau ici. Ce qu'ils montrent :
 
-**Constat.** Aucune heure n'est absente, mais des heures sont appauvries : à partir du 06/10,
-certaines heures comptent environ dix fois moins d'événements qu'avant, et toute la journée du
-07/10 est dans ce cas. Le 07/10, les fichiers source ne pèsent que 42 % de moins que le 06/10,
+| Période (UTC) | Heures | Événements par heure |
+|---|---|---|
+| 05/10 00:00 → 06/10 16:59 | 41 | 68 888 à 90 974 |
+| 06/10 17:00 | 1 | 60 968 |
+| 06/10 18:00 | 1 | 27 666 : la chute commence |
+| 06/10 19:00 → 08/10 02:59 | 32 | 4 552 à 9 182 (environ dix fois moins) |
+| 08/10 03:00 → 08:59 | 6 | 18 204 à 42 890 (remontée) |
+| 08/10 09:00 → 09/10 14:59 | 30 | 36 755 à 50 750 (environ la moitié d'avant) |
+| 09/10 15:00 | 1 | 12 743 |
+| 09/10 16:00 → 10/10 00:59 | 9 | 4 389 à 6 602 (nouvelle chute) |
+| 10/10 01:00 → 05:59 | 5 | 14 340 à 28 577 (remontée) |
+| 10/10 06:00 → 23:59 | 18 | 30 480 à 42 227 |
+
+Le script qui a produit le fichier : la requête ci-dessus, exécutée avec
+`QueryJobConfig(maximum_bytes_billed=100_000_000)`, chaque ligne écrite par `csv.writer`.
+
+**Constat.** Aucune heure n'est absente, mais des heures sont appauvries : à partir du 06/10 à
+18:00 UTC, les heures comptent environ dix fois moins d'événements qu'avant, jusqu'au 08/10 à
+02:59 ; ensuite, environ moitié moins, avec une nouvelle chute du 09/10 15:00 au 10/10 00:59. Le 07/10, les fichiers source ne pèsent que 42 % de moins que le 06/10,
 quand BigQuery compte 89 % d'événements en moins.
 
 **Conclusion, avec sa limite.** Les tables BigQuery de GH Archive sont très probablement
