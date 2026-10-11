@@ -23,6 +23,7 @@ sous-traitant.
 | API GitHub (texte d'une release) | login ou @mention écrits par les auteurs de la release dans ses notes (`body`), texte libre | — | oui | oui, `release.body`, gardé tel que reçu, sans filtre |
 | API GitHub (dépôts les plus étoilés) | login du propriétaire, dans le nom du dépôt (`owner/repo`), quand c'est une personne | — | oui | oui : il identifie le dépôt |
 | GH Archive | login de l'auteur de chaque événement (`actor`) | **oui** : la requête ne le sélectionne pas | non | non |
+| GH Archive (dépôts qui montent) | login du propriétaire, dans le nom du dépôt (`repo.name`, `owner/repo`), quand c'est une personne | — | oui | non : le résultat n'est pas encore lu vers la base (TENDANCE, issue de suite) ; il identifie le dépôt |
 | API arXiv | noms des auteurs des papiers | — | oui | oui, `publication.authors` (liste JSON, dans l'ordre d'arXiv) |
 | Web Clipper | auteur de l'article gardé (`author`) ; date où l'utilisatrice l'a gardé (`created`) | — | oui | oui, `author` et `item.saved_at` |
 | Zotero | auteurs des papiers ; ce que l'utilisatrice a enregistré et surligné (titres, étiquettes, surlignages et commentaires, dates d'ajout, nom du fichier PDF) | **oui** : la requête ne lit ni les notes, ni les résumés, ni les autres annotations, ni les bibliothèques de groupe | oui, l'extrait JSON de chaque collecte | non : l'extrait n'est pas encore lu vers la base |

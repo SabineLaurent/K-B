@@ -20,6 +20,8 @@ from k_b.import_items import (
 from k_b.raw_store import InvalidCollectionStateError
 from k_b.source_contract import list_sources
 from k_b.source_kinds import SOURCE_KINDS
+from k_b.sources.gh_archive import FOLDER_PREFIX as GH_ARCHIVE_SOURCE_NAME
+from k_b.sources.gh_archive import GhArchiveSource, create_bigquery_client
 from k_b.sources.tracked_repositories import TRACKED_REPOSITORIES
 from k_b.sources.zotero import FOLDER_PREFIX as ZOTERO_SOURCE_NAME
 from k_b.sources.zotero import ZoteroSource
@@ -27,6 +29,8 @@ from k_b.sources.zotero import ZoteroSource
 DATA_DIR_VARIABLE = "KB_DATA_DIR"
 # The Zotero data directory, the one that holds zotero.sqlite. Not set: Zotero is skipped.
 ZOTERO_DIR_VARIABLE = "KB_ZOTERO_DIR"
+# The path of the BigQuery service account key, read by the client. Not set: GH Archive is skipped.
+BIGQUERY_KEY_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS"
 IMPORT_LOG_FILE_NAME = "import-log.jsonl"
 
 
@@ -129,6 +133,9 @@ def run_collect(data_dir: Path) -> int:
     zotero_dir = os.environ.get(ZOTERO_DIR_VARIABLE)
     if zotero_dir:
         sources.append(ZoteroSource(Path(zotero_dir)))
+    bigquery_key = os.environ.get(BIGQUERY_KEY_VARIABLE)
+    if bigquery_key:
+        sources.append(GhArchiveSource(create_bigquery_client))
     try:
         outcome = collect_all_sources(
             sources,
@@ -143,6 +150,8 @@ def run_collect(data_dir: Path) -> int:
         print(f"{source_name}: {describe_outcome(source_error)}")
     if not zotero_dir:
         print(f"{ZOTERO_SOURCE_NAME}: skipped ({ZOTERO_DIR_VARIABLE} not set)")
+    if not bigquery_key:
+        print(f"{GH_ARCHIVE_SOURCE_NAME}: skipped ({BIGQUERY_KEY_VARIABLE} not set)")
     if outcome.state_error is not None:
         print(f"collection_state: {describe_outcome(outcome.state_error)}")
     has_failure = outcome.state_error is not None or any(

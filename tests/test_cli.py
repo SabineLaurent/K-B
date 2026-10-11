@@ -18,6 +18,12 @@ def no_zotero_directory(monkeypatch):
     monkeypatch.delenv("KB_ZOTERO_DIR", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def no_bigquery_key(monkeypatch):
+    """A terminal that exports the BigQuery key must not make the tests query BigQuery."""
+    monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
+
+
 def collected_kinds(*sources):
     """One kind without a reader: the collection tests only need its sources."""
     return (SourceKind("test", sources, None),)
@@ -85,6 +91,7 @@ def test_collect_still_prints_the_summary_and_exits_1_when_the_state_cannot_be_w
     assert (
         capsys.readouterr().out
         == "working: ok\nzotero: skipped (KB_ZOTERO_DIR not set)\n"
+        "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
         "collection_state: failed (PermissionError)\n"
     )
 
@@ -106,6 +113,7 @@ def test_collect_skips_zotero_and_says_so_without_its_directory(
     assert (
         capsys.readouterr().out
         == "working: ok\nzotero: skipped (KB_ZOTERO_DIR not set)\n"
+        "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
     )
     assert not (data_dir / "raw" / "selected_library").exists()
 
@@ -122,7 +130,9 @@ def test_collect_extracts_zotero_into_the_selected_library_with_its_directory(
     exit_code = cli.main(["collect"])
 
     assert exit_code == 0
-    assert capsys.readouterr().out == "zotero: ok\n"
+    assert capsys.readouterr().out == (
+        "zotero: ok\ngh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
+    )
     [extract_path] = (data_dir / "raw" / "selected_library" / "zotero").iterdir()
     assert extract_path.suffix == ".json"
     assert [document["key"] for document in json.loads(extract_path.read_bytes())] == [
@@ -146,9 +156,49 @@ def test_collect_reports_a_zotero_failure_and_keeps_its_last_collection_date(
     exit_code = cli.main(["collect"])
 
     assert exit_code == 1
-    assert capsys.readouterr().out == "zotero: failed (FileNotFoundError)\n"
+    assert capsys.readouterr().out == (
+        "zotero: failed (FileNotFoundError)\ngh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
+    )
     assert json.loads((data_dir / "collection_state.json").read_text()) == {}
     assert not (data_dir / "raw").exists()
+
+
+@pytest.mark.parametrize("bigquery_key_variable", [None, ""])
+def test_collect_skips_gh_archive_and_says_so_without_the_bigquery_key(
+    monkeypatch, tmp_path, capsys, bigquery_key_variable
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    if bigquery_key_variable is not None:
+        monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", bigquery_key_variable)
+    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
+
+    assert cli.main(["collect"]) == 0
+    assert "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n" in (
+        capsys.readouterr().out
+    )
+
+
+def test_collect_runs_gh_archive_with_the_bigquery_key(monkeypatch, tmp_path, capsys):
+    created = []
+
+    class FakeGhArchiveSource(WorkingSource):
+        def __init__(self, create_client):
+            super().__init__("gh_archive")
+            created.append(create_client)
+
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "/path/to/a/key.json")
+    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
+    monkeypatch.setattr(cli, "GhArchiveSource", FakeGhArchiveSource)
+
+    exit_code = cli.main(["collect"])
+
+    assert exit_code == 0
+    assert created == [cli.create_bigquery_client]
+    output = capsys.readouterr().out
+    assert "gh_archive: ok\n" in output
+    assert "gh_archive: skipped" not in output
+    assert list((tmp_path / "raw" / "automated_watch" / "gh_archive").iterdir())
 
 
 def test_collect_fails_closed_with_a_clear_message_on_a_corrupted_state(
