@@ -45,8 +45,12 @@ QUERY_TIMEOUT_SECONDS = 300
 MAX_INT64 = 2**63 - 1
 # How much of an invalid value goes into the error.
 MAX_QUOTED_VALUE_LENGTH = 100
-# Holds the owner's login when the owner is a person: never quoted, only its length.
-FIELDS_NEVER_QUOTED = frozenset({"repository_name"})
+# The only fields whose value is quoted: a date or a number. Any other value (a repository name,
+# that holds the owner's login when the owner is a person, a whole row, the raw document) is
+# described by its type and its length.
+FIELDS_QUOTED = frozenset(
+    {"window_end", "repository_id", "stars_gained", "forks_gained"}
+)
 
 TABLE_PREFIX = "githubarchive.day."
 # With the wildcard day.20*, _TABLE_SUFFIX is what follows "20": YYMMDD (261008 for 2026-10-08).
@@ -228,9 +232,11 @@ def describe_time(moment: datetime | None) -> str:
 def drop_windows_over_the_cap(
     client: bigquery.Client, window_ends: list[date]
 ) -> list[date]:
-    """Drop the oldest windows until the dry run fits their cap; refuse one window over it.
+    """Drop the oldest windows while the bound caps them, until the dry run fits; else refuse.
 
-    Failing instead would fail every collection once the windows due are over the cap.
+    Under the bound, the cap grows by a whole window and the volume by one day of events: a
+    window dropped lowers the cap more than the volume, so dropping cannot fit. Under the bound
+    alone, a long catch-up whose windows are over it would fail every collection.
     """
     while True:
         dry_run = client.query(
@@ -246,10 +252,10 @@ def drop_windows_over_the_cap(
         cap = compute_bytes_cap(len(window_ends))
         if bytes_processed <= cap:
             return window_ends
-        if len(window_ends) == 1:
+        if cap < MAX_BYTES_BILLED or len(window_ends) == 1:
             raise DryRunOverLimitError(
-                f"dry run of the window ending {window_ends[0]}: {bytes_processed} bytes,"
-                f" maximum {cap}"
+                f"dry run of {len(window_ends)} window(s) ending {window_ends[0]} to"
+                f" {window_ends[-1]}: {bytes_processed} bytes, maximum {cap}"
             )
         logger.info(
             "gh_archive: dry run of %d windows: %d bytes, maximum %d; window ending %s dropped",
@@ -326,21 +332,24 @@ def read_trends(raw_result: bytes) -> TrendsExtract:
 
 
 def describe_validation_error(error: ValidationError) -> str:
-    """The first error: its place, its type and the value, quoted short and escaped."""
+    """The first error: its place, its type, and its value, quoted only for a date or a number."""
     first = error.errors()[0]
     location = first["loc"]
     if location[:1] == ("rows",) and len(location) >= 2:
-        place = f"row {location[1]}: {'.'.join(str(part) for part in location[2:])}"
+        field = ".".join(str(part) for part in location[2:])
+        place = f"row {location[1]}: {field}" if field else f"row {location[1]}"
     else:
         place = ".".join(str(part) for part in location) or "result"
-    value = first.get("input")
+    described = describe_value(first.get("input"), location[-1] if location else None)
+    return f"{place} ({first['type']}): {described}; {error.error_count()} error(s)"
+
+
+def describe_value(value: object, field: object) -> str:
+    # A missing field gives the whole row as its value, even for a field quoted otherwise.
     if isinstance(value, dict | list):
-        # A missing field or a wrong row gives the whole row: it holds the repository name.
-        quoted = f"{type(value).__name__} of {len(value)}"
-    elif location[-1:] and location[-1] in FIELDS_NEVER_QUOTED:
-        quoted = (
-            f"length {len(value)}" if isinstance(value, str) else type(value).__name__
-        )
-    else:
-        quoted = repr(value)[:MAX_QUOTED_VALUE_LENGTH]
-    return f"{place} ({first['type']}): {quoted}; {error.error_count()} error(s)"
+        return f"{type(value).__name__} of {len(value)}"
+    if field in FIELDS_QUOTED:
+        return repr(value)[:MAX_QUOTED_VALUE_LENGTH]
+    if isinstance(value, str | bytes):
+        return f"{type(value).__name__} of length {len(value)}"
+    return type(value).__name__

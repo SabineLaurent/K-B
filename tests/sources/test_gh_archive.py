@@ -234,26 +234,37 @@ def test_fetch_catches_up_every_missed_window_in_one_query(today):
     assert json.loads(raw)["window_ends"] == ["2026-10-08", "2026-10-09", "2026-10-10"]
 
 
-def test_fetch_drops_the_oldest_windows_until_the_dry_run_fits_the_cap(today):
-    # Three windows read more than their cap (600 MB), two fit theirs (400 MB).
+def test_fetch_drops_the_oldest_windows_while_the_bound_applies(today):
+    # 15 windows (the most a catch-up takes) and 14 are both capped by the bound: dropping the
+    # oldest lowers the volume, not the cap.
     client = FakeClient(
         dry_run_bytes=lambda window_count: (
-            900_000_000 if window_count == 3 else 300_000_000
+            MAX_BYTES_BILLED + 1 if window_count == 15 else MAX_BYTES_BILLED
         )
     )
 
-    raw = GhArchiveSource(lambda: client).fetch(datetime(2026, 10, 8, 9, 0, tzinfo=UTC))
+    raw = GhArchiveSource(lambda: client).fetch(datetime(2026, 9, 26, 9, 0, tzinfo=UTC))
 
+    assert compute_bytes_cap(14) == compute_bytes_cap(15) == MAX_BYTES_BILLED
     assert [
         len(read_parameters(config)["window_ends"])
         for config in client.dry_run_configs()
-    ] == [3, 2]
+    ] == [15, 14]
     [executed] = client.executed_configs()
-    assert read_parameters(executed)["window_ends"] == [
-        date(2026, 10, 9),
-        date(2026, 10, 10),
-    ]
-    assert json.loads(raw)["window_ends"] == ["2026-10-09", "2026-10-10"]
+    assert read_parameters(executed)["window_ends"][0] == date(2026, 9, 27)
+    assert json.loads(raw)["window_ends"][-1] == "2026-10-10"
+
+
+def test_fetch_drops_no_window_below_the_bound(today):
+    # Below the bound, a window dropped lowers the cap by a whole window and the volume by one
+    # day: dropping can never fit the cap.
+    client = FakeClient(dry_run_bytes=lambda window_count: 10 * MAX_BYTES_BILLED)
+
+    with pytest.raises(DryRunOverLimitError):
+        GhArchiveSource(lambda: client).fetch(datetime(2026, 10, 8, 9, 0, tzinfo=UTC))
+
+    assert len(client.dry_run_configs()) == 1
+    assert client.executed_configs() == []
 
 
 def test_fetch_refuses_to_run_a_single_window_over_the_cap(today):
@@ -464,6 +475,26 @@ def test_the_message_never_quotes_a_whole_row():
     assert "row 0: stars_gained (missing)" in message
     assert "some-person" not in message
     assert "dict of 4" in message
+
+
+def test_the_message_never_quotes_a_truncated_document():
+    raw = b'{"window_ends": ["2026-10-10"], "rows": [{"repository_name": "some-person/repo'
+
+    with pytest.raises(TrendsExtractInvalidError) as raised:
+        read_trends(raw)
+
+    message = str(raised.value)
+    assert "some-person" not in message
+    assert "(json_invalid)" in message
+
+
+def test_the_message_never_quotes_a_row_that_is_a_string():
+    with pytest.raises(TrendsExtractInvalidError) as raised:
+        read_trends(make_raw(["some-person/repository"]))
+
+    message = str(raised.value)
+    assert "some-person" not in message
+    assert message.startswith("row 0 (model_type): str of length 22")
 
 
 def test_the_message_gives_the_length_of_a_repository_name_not_the_name():
