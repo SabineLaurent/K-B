@@ -233,6 +233,30 @@ table a été modifiée vers 00:08 le lendemain) : il ne protège pas de ce cas,
 heures présentes non plus ; il faudrait comparer les volumes d'un jour aux jours précédents. La
 fenêtre la plus lourde, qui fixe le plafond par fenêtre, est antérieure à l'anomalie.
 
+**Une piste, pas une cause : les incidents de GitHub sur ces dates.** Recherche du 2026-10-11 sur
+la page d'état officielle de GitHub ([githubstatus.com](https://www.githubstatus.com/), historique
+des incidents), vue par des résultats de recherche web : aucune page d'incident n'a été ouverte une
+à une, et aucun lien direct vers un incident n'a été trouvé. Incidents rapportés :
+
+| Date (UTC) | Services | Ce que la page d'état en dit |
+|---|---|---|
+| 05/10 23:05 → 06/10 00:11 | facturation et réglages des organisations | une panne réseau entre un centre de données et des bases hébergées dans le cloud |
+| 06/10 à partir de 19:57 | Pull Requests, Webhooks | performances dégradées ; migrations d'entreprise suspendues |
+| 07/10, impact large de 15:06 à 15:16, résolu à 18:04 | Git Operations, Issues, Actions, Pull Requests | analyse des causes annoncée, non publiée à la date de la recherche |
+| 08/10 → 10/10 | — | aucun incident trouvé |
+
+Ce que ces dates disent, et ne disent pas :
+- La baisse dans BigQuery commence le 06/10 à 17:00 UTC, près de trois heures **avant**
+  l'incident de 19:57. L'incident du 06/10 ne l'explique donc pas à lui seul. Une source
+  secondaire non vérifiée cite aussi un incident le 06/10 vers 21:01 UTC ; il n'a pas été retrouvé
+  sur la page officielle.
+- Aucun incident n'est rapporté du 08 au 10/10, alors que les heures restent appauvries et
+  rechutent du 09/10 15:00 au 10/10 00:59.
+- Deux baisses peuvent se cumuler : celle des fichiers source le 07/10 (- 42 %) pourrait venir de
+  GitHub lui-même, qui aurait émis moins d'événements pendant ses incidents ; celle de BigQuery
+  (- 89 %) viendrait plutôt du chargement des fichiers dans les tables. Rien de ceci n'est
+  démontré.
+
 ## Sources (consultées le 2026-10-01)
 
 - [Try BigQuery using the sandbox](https://docs.cloud.google.com/bigquery/docs/sandbox)
