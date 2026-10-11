@@ -252,19 +252,26 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   échouerait chaque jour.
 - **Limites acceptées (Sabine, 2026-10-11)** : une table de jour **absente** au milieu des jours
   lus (panne de GH Archive) est sautée sans bruit par le joker `day.20*`, et ses fenêtres sont
-  comptées sur deux jours au lieu de trois ; des **heures manquantes** dans une table présente ne
-  se voient pas non plus. Ni l'une ni l'autre ne laisse de trace dans le brut ou le journal.
+  comptées sur deux jours au lieu de trois ; des **heures manquantes ou appauvries** dans une
+  table présente ne se voient pas non plus. Ni l'une ni l'autre ne laisse de trace dans le brut
+  ou le journal.
+- **Fait constaté le 2026-10-11** : depuis le 2026-10-06, les tables BigQuery de GH Archive ont des
+  heures appauvries (environ dix fois moins d'événements ; la journée du 07/10 entière), alors que
+  les fichiers source de chaque heure existent ; détail et limite de la conclusion dans
+  [bigquery.md](bigquery.md#anomalie-constatée--les-tables-de-gh-archive-incomplètes-depuis-le-2026-10-06).
+  La collecte réelle du 2026-10-11 (fenêtre du 08 au 10/10, 48 dépôts) a été faite sur ces
+  données partielles : ses comptes sont trop bas, son classement possiblement faux. Les contrôles
+  de la source (table close, résultat valide) sont passés.
 - **Accès** : compte de service `k-b-collecte`, seul rôle Utilisateur de job BigQuery, clé
   désignée par `GOOGLE_APPLICATION_CREDENTIALS` ([bigquery.md](bigquery.md)).
 - **Limites** : bac à sable sans facturation : 1 Tio lu par mois, 10 Gio de stockage, tables
   expirées après 60 jours. Une requête au-delà est refusée, jamais facturée. Chaque requête passe
   d'abord par un `dry_run`, puis s'exécute avec `maximum_bytes_billed` au plafond, qui grandit
-  avec les fenêtres : 200 Mo par fenêtre, 2 Go au plus. Au-delà du plafond, la fenêtre la plus
-  ancienne est retirée et un nouveau `dry_run` est fait ; une seule fenêtre au-delà, ou un
-  `dry_run` sans volume, fait échouer la source (`DryRunOverLimitError`,
-  `DryRunVolumeUnknownError`). Délai : 300 s. Mesuré le 2026-10-11 (`dry_run` de la requête,
-  4 colonnes, étoiles et forks) : 133,8 Mo pour une fenêtre (3 jours), 1,58 Go pour 15 fenêtres
-  (17 jours). Une collecte quotidienne qui lirait 20 fois son volume est arrêtée au `dry_run`. Une
+  avec les fenêtres : 650 Mo par fenêtre, 2 Go au plus. Quand la borne de 2 Go s'applique (dès
+  4 fenêtres), la fenêtre la plus ancienne est retirée et un nouveau `dry_run` est fait ; sinon,
+  ou avec un `dry_run` sans volume, la source échoue (`DryRunOverLimitError`,
+  `DryRunVolumeUnknownError`). Délai : 300 s. Mesures et calcul des bornes, datés, avec leurs
+  commandes : [bigquery.md](bigquery.md#mesures-du-2026-10-11). Une
   requête sur des tables à joker (`day.20*`) n'est pas mise en cache : chaque exécution est
   facturée au quota (constaté le 2026-10-11).
 - **Données personnelles** : chaque événement porte le login de son auteur (`actor`). La requête

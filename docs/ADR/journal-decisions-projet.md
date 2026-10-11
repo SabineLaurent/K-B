@@ -939,22 +939,27 @@ encore l'ancien modèle.
   se rattrape pas) ; 30 fenêtres (proposition de la session) ; échouer au-delà de la limite (la
   source échouerait à chaque collecte, comme arXiv, #71). Limite : une collecte qui passe minuit
   UTC reprend une fenêtre déjà collectée (un brut en double, sans perte). — PR de #16
-- **Plafond d'une requête : 200 Mo par fenêtre, 2 Go au plus ; au-delà, la fenêtre la plus
-  ancienne est retirée et le `dry_run` refait ; une fenêtre seule au-delà, ou un `dry_run` sans
-  volume, fait échouer la source.** Décision de Sabine (« 4 Go après réflexion ça fait
-  beaucoup »). Pourquoi : une collecte ordinaire (une fenêtre, 133,8 Mo mesurés le 2026-10-11)
-  qui lirait 20 fois trop est arrêtée au `dry_run`, sans rien exécuter ; 15 fenêtres lisent
-  1,58 Go (`dry_run` du même jour), sous la borne. Options écartées : 4 Go fixes (proposition de
-  la session : un plafond qui laisse passer 30 fois une collecte ordinaire) ; 300 Mo par fenêtre ;
-  échouer dès que le plafond est dépassé (la source resterait bloquée si GH Archive grossit).
-  Limite : la marge sous 2 Go est de ×1,26 pour 15 fenêtres ; si GH Archive grossit, le
-  rattrapage maximal perd ses plus anciennes fenêtres. — PR de #16
+- **Plafond d'une requête : 650 Mo par fenêtre, 2 Go au plus ; quand la borne s'applique, la
+  fenêtre la plus ancienne est retirée et le `dry_run` refait ; sinon, ou avec un `dry_run` sans
+  volume, la source échoue sans rien exécuter.** Décision de Sabine, sur des valeurs mesurées et
+  non choisies au jugé : la fenêtre la plus lourde prise seule × 1,5 donne le plafond par
+  fenêtre ; le rattrapage maximal mesuré tient sous la borne (mesures, calcul et commandes datés
+  dans [bigquery.md](../bigquery.md#mesures-du-2026-10-11)). Pourquoi : une collecte ordinaire qui
+  lirait 20 fois trop est arrêtée au `dry_run` ; « 4 Go après réflexion ça fait beaucoup »
+  (Sabine). Options écartées : 4 Go fixes (proposition de la session) ; 200 Mo par fenêtre (13 des
+  15 fenêtres mesurées auraient échoué seules) ; 300 Mo par fenêtre ; retirer des fenêtres sous la
+  borne (le plafond y baisse plus que le volume : second `/code-review`). Limite : en période
+  lourde, le rattrapage maximal dépasserait la borne et perdrait ses plus anciennes fenêtres (pire
+  cas estimé, pas mesuré). — PR de #16
 - **La table de la veille doit être close (modifiée après minuit UTC) ; sinon la source échoue
   et la collecte suivante reprend.** Décision de Sabine (plan validé). Pourquoi : GH Archive ajoute
   chaque heure à la table de son jour, la dernière vers 00:08 UTC le lendemain (constaté le
   2026-10-11) ; une collecte lancée juste après minuit compterait un jour incomplet. Limite
-  (relecture du plan, constat 7) : c'est un indice, pas une preuve ; une heure manquante au milieu
-  d'un jour, ou une table manquante au milieu d'un rattrapage, ne se voit pas. — PR de #16
+  (relecture du plan, constat 7) : c'est un indice, pas une preuve ; une heure manquante ou
+  appauvrie, ou une table manquante au milieu d'un rattrapage, ne se voit pas. Constaté le
+  2026-10-11 : les tables depuis le 2026-10-06 ont des heures appauvries et ont pourtant passé ce
+  contrôle ([bigquery.md](../bigquery.md)) ; un contrôle de complétude est proposé en issue de
+  suite. — PR de #16
 - **Sans `GOOGLE_APPLICATION_CREDENTIALS`, `kb collect` saute GH Archive et le dit ; un résultat
   avec une ligne invalide est refusé entier.** Décision de Sabine (plan, puis tri de la revue).
   Pourquoi : une machine sans clé (CI, autre poste) ne doit pas faire échouer chaque collecte,
