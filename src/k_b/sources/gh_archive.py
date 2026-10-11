@@ -49,7 +49,7 @@ MAX_QUOTED_VALUE_LENGTH = 100
 # that holds the owner's login when the owner is a person, a whole row, the raw document) is
 # described by its type and its length.
 FIELDS_QUOTED = frozenset(
-    {"window_end", "repository_id", "stars_gained", "forks_gained"}
+    {"window_ends", "window_end", "repository_id", "stars_gained", "forks_gained"}
 )
 
 TABLE_PREFIX = "githubarchive.day."
@@ -150,16 +150,16 @@ class GhArchiveSource:
         window_ends = list_window_ends(last_collected_at, current_day())
         if not window_ends:
             return None
-        client = self.create_client()
-        check_day_table_closed(client, window_ends[-1])
-        window_ends = drop_windows_over_the_cap(client, window_ends)
-        job = client.query(
-            TRENDS_QUERY,
-            job_config=configure_query(window_ends, dry_run=False),
-            timeout=QUERY_TIMEOUT_SECONDS,
-        )
-        rows = job.result(timeout=QUERY_TIMEOUT_SECONDS)
-        raw_result = encode_result(window_ends, (dict(row.items()) for row in rows))
+        with self.create_client() as client:
+            check_day_table_closed(client, window_ends[-1])
+            window_ends = drop_windows_over_the_cap(client, window_ends)
+            job = client.query(
+                TRENDS_QUERY,
+                job_config=configure_query(window_ends, dry_run=False),
+                timeout=QUERY_TIMEOUT_SECONDS,
+            )
+            rows = job.result(timeout=QUERY_TIMEOUT_SECONDS)
+            raw_result = encode_result(window_ends, (dict(row.items()) for row in rows))
         extract = read_trends(raw_result)
         logger.info(
             "gh_archive: %d window(s) from %s to %s, %s bytes processed, %d rows",
@@ -209,7 +209,9 @@ def list_window_ends(last_collected_at: datetime | None, today: date) -> list[da
 
 
 def check_day_table_closed(client: bigquery.Client, day: date) -> None:
-    """Refuse a day whose table was last modified before the day ended: hours may be missing.
+    """Refuse a day whose table was last modified before the day ended.
+
+    An hour added to the table after its last modification is not in it yet.
 
     GH Archive adds each hour to the table of its day; the last one arrived around 00:08 UTC the
     next day (seen on 2026-10-11).
@@ -286,6 +288,8 @@ def configure_query(window_ends: list[date], dry_run: bool) -> bigquery.QueryJob
         )
     return bigquery.QueryJobConfig(
         maximum_bytes_billed=compute_bytes_cap(len(window_ends)),
+        # BigQuery stops the job itself: a client timeout alone leaves it running, and billed.
+        job_timeout_ms=QUERY_TIMEOUT_SECONDS * 1000,
         query_parameters=parameters,
     )
 
@@ -310,6 +314,15 @@ def read_trends(raw_result: bytes) -> TrendsExtract:
         extract = TrendsExtract.model_validate_json(raw_result)
     except ValidationError as error:
         raise TrendsExtractInvalidError(describe_validation_error(error)) from None
+    if any(
+        later <= earlier
+        for earlier, later in zip(
+            extract.window_ends, extract.window_ends[1:], strict=False
+        )
+    ):
+        raise TrendsExtractInvalidError(
+            f"window_ends not in strictly increasing order: {len(extract.window_ends)} dates"
+        )
     announced = set(extract.window_ends)
     for position, row in enumerate(extract.rows):
         if row.window_end not in announced:
@@ -340,7 +353,9 @@ def describe_validation_error(error: ValidationError) -> str:
         place = f"row {location[1]}: {field}" if field else f"row {location[1]}"
     else:
         place = ".".join(str(part) for part in location) or "result"
-    described = describe_value(first.get("input"), location[-1] if location else None)
+    # The field is the last name of the place: a list index (window_ends.0) is not one.
+    names = [part for part in location if isinstance(part, str)]
+    described = describe_value(first.get("input"), names[-1] if names else None)
     return f"{place} ({first['type']}): {described}; {error.error_count()} error(s)"
 
 

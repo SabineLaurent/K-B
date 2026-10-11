@@ -72,6 +72,13 @@ class FakeClient:
         self.table_requests = []
         self.queries = []
         self.jobs = []
+        self.closed = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exception):
+        self.closed = True
 
     def get_table(self, table_id, timeout=None):
         self.table_requests.append((table_id, timeout))
@@ -209,6 +216,11 @@ def test_fetch_gives_the_query_and_its_result_a_timeout(today):
 
     GhArchiveSource(lambda: client).fetch(None)
 
+    # On BigQuery's side too: a client timeout alone leaves the job running, and billed.
+    [executed] = client.executed_configs()
+    # The library keeps it as the REST API writes it: a string of milliseconds.
+    assert int(executed.job_timeout_ms) == QUERY_TIMEOUT_SECONDS * 1000
+
     assert [timeout for _, _, timeout in client.queries] == [
         QUERY_TIMEOUT_SECONDS,
         QUERY_TIMEOUT_SECONDS,
@@ -334,6 +346,23 @@ def test_fetch_refuses_a_result_it_cannot_read(today):
         GhArchiveSource(lambda: client).fetch(None)
 
 
+def test_fetch_closes_its_client(today):
+    client = FakeClient()
+
+    GhArchiveSource(lambda: client).fetch(None)
+
+    assert client.closed
+
+
+def test_fetch_closes_its_client_when_it_fails(today):
+    client = FakeClient(dry_run_bytes=lambda window_count: None)
+
+    with pytest.raises(DryRunVolumeUnknownError):
+        GhArchiveSource(lambda: client).fetch(None)
+
+    assert client.closed
+
+
 def test_the_source_writes_json_into_the_watch():
     source = GhArchiveSource(lambda: FakeClient())
 
@@ -444,6 +473,25 @@ def test_a_repository_twice_in_a_window_is_refused():
 def test_a_result_without_windows_is_refused():
     with pytest.raises(TrendsExtractInvalidError, match="window_ends"):
         read_trends(make_raw([], window_ends=[]))
+
+
+@pytest.mark.parametrize(
+    "window_ends",
+    [["2026-10-10", "2026-10-10"], ["2026-10-10", "2026-10-09"]],
+)
+def test_windows_not_strictly_in_order_are_refused(window_ends):
+    rows = [{**first_row(), "window_end": "2026-10-10"}]
+
+    with pytest.raises(TrendsExtractInvalidError, match="window_ends not in strictly"):
+        read_trends(make_raw(rows, window_ends=window_ends))
+
+
+def test_the_message_quotes_an_invalid_window_date():
+    with pytest.raises(TrendsExtractInvalidError) as raised:
+        read_trends(make_raw([], window_ends=["2026-13-01"]))
+
+    assert "window_ends.0" in str(raised.value)
+    assert "'2026-13-01'" in str(raised.value)
 
 
 def test_a_result_that_is_not_json_is_refused():
