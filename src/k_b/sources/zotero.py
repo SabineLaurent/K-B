@@ -28,10 +28,13 @@ DATABASE_FILE_NAME = "zotero.sqlite"
 WRITE_AHEAD_LOG_FILE_NAME = "zotero.sqlite-wal"
 # The temporary folder is recognisable: one left behind by a killed process can be found.
 TEMPORARY_DIR_PREFIX = "kb-zotero-"
-# How much of the first problem reported by integrity_check goes into the error.
+# How much of what integrity_check answers, or of the error it raises, goes into the error.
 MAX_REPORTED_PROBLEM_LENGTH = 200
-# The only messages of SQLite kept as they are: another one may quote the content of the base.
-MISSING_TABLE_OR_COLUMN = re.compile(r"no such (table|column): [\w.]+")
+# The only messages of SQLite kept as they are: they quote the query, which is a constant.
+# Another message can quote the content of the base (a text that is not UTF-8).
+MESSAGE_ABOUT_THE_QUERY = re.compile(
+    r'no such (table|column): [\w.]+|near "[^"]*": syntax error'
+)
 
 # One statement for the whole library. A document is defined once: an item of the user's
 # library, that is not a file, a note or an annotation, out of the trash. Of the fields Zotero
@@ -138,8 +141,9 @@ class ZoteroChangedDuringCopyError(Exception):
 
 
 class ZoteroQueryFailedError(Exception):
-    """SQLite refused the extraction query: a table or a column it reads is missing, when
-    the message names one."""
+    """SQLite refused the extraction query. The message names the missing table or column,
+    or the syntax SQLite does not know (ORDER BY in an aggregate needs SQLite 3.44); for any
+    other failure, it gives the type of the error and SQLite's name for it."""
 
 
 class FileState(NamedTuple):
@@ -239,7 +243,7 @@ def extract_documents(copy_path: Path) -> list[dict[str, Any]]:
         check_integrity(connection)
         try:
             rows = connection.execute(EXTRACTION_QUERY).fetchall()
-        except sqlite3.OperationalError as error:
+        except sqlite3.DatabaseError as error:
             # from None: the traceback logged by the collection would show SQLite's message.
             raise ZoteroQueryFailedError(describe_query_error(error)) from None
     return [
@@ -256,7 +260,8 @@ def check_integrity(connection: sqlite3.Connection) -> None:
         problems = [row[0] for row in connection.execute("PRAGMA integrity_check")]
     except sqlite3.DatabaseError as error:
         raise ZoteroCopyInconsistentError(
-            f"integrity_check raised {type(error).__name__}: {error}"
+            f"integrity_check raised {type(error).__name__}:"
+            f" {str(error)[:MAX_REPORTED_PROBLEM_LENGTH]!r}"
         ) from error
     if problems != ["ok"]:
         raise ZoteroCopyInconsistentError(
@@ -265,9 +270,14 @@ def check_integrity(connection: sqlite3.Connection) -> None:
         )
 
 
-def describe_query_error(error: sqlite3.OperationalError) -> str:
-    """SQLite's message when it only names a missing table or column, else the error type."""
+def describe_query_error(error: sqlite3.DatabaseError) -> str:
+    """SQLite's message when it only quotes the query; else the type of the error, with the
+    name SQLite gives it (SQLITE_CORRUPT, SQLITE_IOERR...), which quotes nothing."""
     message = str(error)
-    if MISSING_TABLE_OR_COLUMN.fullmatch(message):
+    if MESSAGE_ABOUT_THE_QUERY.fullmatch(message):
         return message
-    return type(error).__name__
+    # An error raised by the sqlite3 module itself, not by SQLite, has no such name.
+    sqlite_error_name = getattr(error, "sqlite_errorname", None)
+    if sqlite_error_name is None:
+        return type(error).__name__
+    return f"{type(error).__name__} ({sqlite_error_name})"

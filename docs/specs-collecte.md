@@ -193,10 +193,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   surlignages de ces PDF (annotations de type 1 : clé, texte, commentaire, page, date d'ajout),
   dans l'ordre du document. Ne sont pas lus : les notes, les résumés, les autres types
   d'annotation, les PDF liés hors du stockage de Zotero, les surlignages d'un fichier qui n'est
-  pas un PDF, les bibliothèques de groupe.
+  pas un PDF, un PDF enregistré sans document parent et ses surlignages, les bibliothèques de
+  groupe. Le titre et la date sont lus dans les champs `title` et `date` de Zotero : un type de
+  document qui les range sous un autre champ (décision de justice, mail, brevet) sort avec un
+  titre ou une date vide.
 - **Accès** : fichier local. Le dossier de données de Zotero est donné par la variable
-  d'environnement `KB_ZOTERO_DIR`. Absente ou vide : Zotero est sauté, `kb collect` l'affiche,
-  et son code de sortie ne change pas.
+  d'environnement `KB_ZOTERO_DIR`, en chemin complet (K-B ne développe pas un `~`). Absente ou
+  vide : Zotero est sauté, `kb collect` l'affiche, et son code de sortie ne change pas.
 - **Limites** : aucune limite de débit. Pas de taille maximale sur la base copiée, à la
   différence des téléchargements (règles communes) : un disque plein arrête la copie, et le
   dossier temporaire est supprimé.
@@ -210,8 +213,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   collecte reste ; la collecte suivante recommence. Les états :
   `ZoteroCopyInconsistentError` (le contrôle d'intégrité refuse la copie),
   `ZoteroChangedDuringCopyError` (un des deux fichiers a changé pendant la copie),
-  `ZoteroQueryFailedError` (la requête échoue ; le message nomme la table ou la colonne absente,
-  et rien d'autre), `FileNotFoundError` (pas de `zotero.sqlite` dans le dossier).
+  `ZoteroQueryFailedError` (la requête échoue ; le message nomme la table ou la colonne
+  absente, sinon le type de l'erreur et le nom que SQLite lui donne, jamais un contenu de la
+  bibliothèque), `FileNotFoundError` (pas de `zotero.sqlite` dans le dossier).
 - **Données personnelles** : les auteurs des papiers (publics), et ce que l'utilisatrice a
   enregistré et surligné. Le journal ne cite ni auteur, ni titre, ni texte surligné : deux
   nombres seulement. Le brut vit hors du dépôt de code et n'est jamais publié

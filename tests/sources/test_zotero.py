@@ -238,7 +238,10 @@ def test_a_copy_that_integrity_check_cannot_read_is_refused(zotero_dir):
         database_path.read_bytes()[: database_path.stat().st_size // 2]
     )
 
-    with pytest.raises(ZoteroCopyInconsistentError, match="DatabaseError"):
+    with pytest.raises(
+        ZoteroCopyInconsistentError,
+        match="integrity_check raised DatabaseError: 'database disk image is malformed'",
+    ):
         extract(zotero_dir)
 
 
@@ -309,7 +312,46 @@ def test_a_library_without_a_column_the_query_reads_fails_naming_the_column(
         extract(zotero_dir)
 
 
-def test_a_query_failure_that_is_not_a_missing_table_or_column_says_only_its_type(
+def test_a_value_sqlite_cannot_put_in_json_fails_with_the_name_sqlite_gives_the_error(
+    zotero_dir,
+):
+    run_on_library(
+        zotero_dir, "UPDATE itemAnnotations SET text = x'00ff' WHERE itemID = 4"
+    )
+
+    with pytest.raises(ZoteroQueryFailedError) as failure:
+        extract(zotero_dir)
+
+    assert str(failure.value) == "OperationalError (SQLITE_ERROR)"
+
+
+@pytest.mark.parametrize(
+    ("error", "description"),
+    [
+        (
+            # What a SQLite older than 3.44 answers to ORDER BY in an aggregate.
+            sqlite3.OperationalError('near "ORDER": syntax error'),
+            'near "ORDER": syntax error',
+        ),
+        (
+            sqlite3.DatabaseError("database disk image is malformed"),
+            "DatabaseError",
+        ),
+        (
+            sqlite3.OperationalError(
+                "Could not decode to UTF-8 column 'title' with text 'A private title'"
+            ),
+            "OperationalError",
+        ),
+    ],
+)
+def test_a_query_error_is_described_without_what_sqlite_quotes_of_the_library(
+    error, description
+):
+    assert zotero.describe_query_error(error) == description
+
+
+def test_a_text_that_is_not_utf8_fails_without_its_content_in_the_error(
     zotero_dir,
 ):
     # A text that is not UTF-8: sqlite3 quotes it in its message, which the log must not get.

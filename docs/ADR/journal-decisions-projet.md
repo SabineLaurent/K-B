@@ -802,7 +802,104 @@ encore l'ancien modèle.
   qu'on ne doit pas relâcher en croyant régler la veille. Restent en variables d'environnement :
   les secrets et le dossier de données.
 
+## 2026-10-11
+
+### Collecte : Zotero
+
+- **L'issue Zotero s'arrête au brut : `kb collect` extrait la bibliothèque dans un fichier JSON,
+  et rien de Zotero n'entre dans la base ; lire cet extrait vers la base est une issue à part.**
+  Décision de Sabine, sur la recommandation de la session. Pourquoi, selon cette
+  recommandation : le modèle de la bibliothèque est ouvert depuis le 2026-10-09 (ci-dessous) et
+  touche aussi les clips Obsidian ; le trancher dans cette issue l'élargissait au-delà de son
+  critère et de ses 5 h. Options écartées : aller jusqu'à la base avec un modèle minimal décidé
+  le jour même (un sous-type d'item pour le papier Zotero ; environ 3 h de plus, estimation de la
+  session, non relue) ; rattacher les surlignages à l'item arXiv existant (un papier que la
+  collecte arXiv n'a pas vu perdrait ses surlignages). Limite assumée : la table `highlight`
+  reste vide, et aucune commande ne montre encore un surlignage. — PR de #15
+- **La requête ramène chaque document de premier niveau de la bibliothèque personnelle, hors
+  corbeille, avec ses auteurs, ses étiquettes et leur type, les PDF rangés dans le stockage de
+  Zotero, et les surlignages de ces PDF (annotations de type 1) avec leur commentaire.**
+  Décision de Sabine, sur les propositions de la session. Pourquoi tous les documents : Zotero
+  n'a pas d'état « lu », et un papier enregistré sans surlignage reste visible. Pourquoi les
+  seuls PDF du stockage : un PDF lié garde son propre chemin, qui peut être absolu et contenir
+  le nom du compte. Options écartées : seulement les documents surlignés (2 sur 5 le
+  2026-10-11) ; seulement ceux dont le PDF a une date de dernière lecture (sens de `lastRead`
+  non vérifié) ; tous les types d'annotation (aucun exemple observé) ; ne pas extraire les
+  étiquettes (les 11 observées sont automatiques, l'issue les demandait). Les notes et les
+  autres types d'annotation sont remis à plus tard par Sabine (« on verra plus tard »). Limites
+  assumées : un PDF enregistré sans document parent, un surlignage sur un EPUB ou une capture de
+  page web, et un titre rangé par Zotero sous un autre champ que `title` ne sont pas extraits ;
+  « type 1 = surlignage » est déduit des 6 annotations observées, la documentation de Zotero
+  consultée ne le dit pas. — PR de #15
+- **La base Zotero est lue par une copie de `zotero.sqlite` et de son `-wal`, faite dans un
+  dossier temporaire du système, vérifiée par `PRAGMA integrity_check` et gardée par une
+  comparaison des deux fichiers (présence, taille, date de modification, inode) avant et après
+  la copie.** Décision de Sabine, sur la proposition de la session ; ferme « la méthode de copie
+  est à revoir avec #15 » (2026-10-09). Pourquoi les deux fichiers : la documentation de Zotero
+  demande de garder le `-wal` avec la base quand on la copie, et le 2026-10-11, Zotero ouvert,
+  le fichier principal datait du 7 octobre quand le `-wal` était du jour. Pourquoi la
+  comparaison : les deux fichiers ne sont pas copiés au même instant, et la relecture du plan a
+  montré, sur une base fabriquée, qu'une paire mal assortie passe `integrity_check`. Pourquoi
+  le dossier temporaire du système : la source ne connaît pas le dossier de données, et une
+  copie entière de la bibliothèque n'a pas à passer par un dossier compris dans une sauvegarde.
+  Options écartées : l'API de sauvegarde de SQLite (elle ouvre l'original, que Zotero
+  verrouille) ; `immutable=1` sur l'original (ignore le `-wal`) ; un temporaire caché dans le
+  dossier de données, comme le veut la convention 2 pour les fichiers que K-B écrit ; un
+  plafond de taille sur la base copiée (arbitraire : un disque plein arrête déjà la copie).
+  Limites assumées : un arrêt brutal (`kill -9`, coupure) laisse le dossier `kb-zotero-…` dans
+  le dossier temporaire du système ; la règle commune « chaque téléchargement a une taille
+  maximale » ne s'applique pas à cette copie. — PR de #15
+- **La requête d'extraction d'une source qui est elle-même une base vit dans le module de cette
+  source (`src/k_b/sources/zotero.py`), pas dans `src/k_b/database/` ; la règle 5 des
+  conventions et sa commande sont précisées (« le SQL de la base K-B »).** Décision de Sabine,
+  sur la recommandation de la session. Pourquoi : la base Zotero est une source externe, lue
+  comme une API, pas la base de K-B ; l'issue GH Archive aura le même cas avec son SQL
+  BigQuery. Option écartée : la ranger dans `src/k_b/database/` (la commande de la règle était
+  respectée, mais le module d'accès à la base K-B aurait porté le schéma d'une source).
+  Conséquence : la commande de l'issue qui déplace le SQL d'écriture (#135) change de la même
+  façon. — PR de #15
+- **Une source dit dans quel dossier de `raw/` va son brut (`acquisition_dir_name` :
+  `automated_watch` ou `selected_library`) ; le dossier de données de Zotero est donné par la
+  variable d'environnement `KB_ZOTERO_DIR`, et sans elle `kb collect` saute Zotero et
+  l'affiche.** Décision de Sabine, sur les propositions de la session ; applique aux dossiers
+  du brut la décision du 2026-10-09. Pourquoi une variable : un chemin de machine n'a pas sa
+  place dans un dépôt public. Options écartées : porter le dossier par la sorte de source
+  (`SourceKind` : il fallait changer la signature de la collecte et 14 appels de tests) ; une
+  constante dans `config.py` ; faire échouer la collecte sur une machine sans Zotero. Limite
+  assumée : le dossier redit, dans le code, le mode d'acquisition que `seed_sources.sql` porte
+  déjà, et les six sources de la veille répètent la même ligne. — PR de #15
+- **« Rien de neuf » se décide à la date de modification des deux fichiers de Zotero, et chaque
+  extrait contient toute la bibliothèque.** Proposition de la session, validée par Sabine avec
+  le plan. Pourquoi : la source ne lit pas le brut déjà écrit, elle ne peut pas comparer au
+  dernier extrait. Limites assumées : Zotero ouvert écrit dans son `-wal` sans que la
+  bibliothèque change, et un extrait identique au précédent est alors écrit (9 Ko le
+  2026-10-11) ; une base restaurée avec d'anciennes dates n'est pas extraite tant qu'elle ne
+  change pas. — PR de #15
+- **La base d'essai Zotero est un script SQL versionné : les 15 tables utiles, réécrites avec
+  toutes leurs colonnes et contraintes relevées sur la base réelle, et des valeurs inventées.**
+  Décision de Sabine (« si base réduite est fiable ok alors »). Pourquoi réduite : les 44
+  autres tables ne sont jamais lues par la requête. Ce qui la rend fiable : `PRAGMA table_info`
+  comparé à une copie de la base réelle (0 écart sur les 15 tables le 2026-10-11), et la
+  collecte sur cette copie (5 documents, 6 surlignages). Options écartées : un fichier binaire
+  versionné (illisible dans une PR ; une base réelle vidée peut garder des restes dans ses
+  pages libres) ; les 59 tables ; les `CREATE TABLE` de Zotero recopiés mot pour mot. Limites :
+  la comparaison se fait sur la machine de Sabine, pas dans la CI ; un changement de sens sans
+  changement de structure ne serait pas vu. — PR de #15
+
 ## Décisions encore ouvertes
+
+- **Durée de conservation et purge des extraits Zotero** (2026-10-11) : ils sont tous gardés,
+  sans durée au registre ni purge codée, ce que `.claude/rules/conformite.md` demande pour une
+  donnée personnelle (noms d'auteurs, textes surlignés). Remplace la règle provisoire du
+  registre (« seule la dernière copie est gardée »), sans objet depuis que la copie est
+  temporaire. Une issue à part, à valider par Sabine ; la comparaison d'un extrait au précédent
+  (ne pas réécrire un extrait identique) relève de la même décision.
+- **Licence du schéma de Zotero** (2026-10-11) : le code de Zotero est sous AGPL v3 « sauf
+  fichier qui dit autrement » (page « Licensing » de zotero.org), K-B sous CC BY-NC 4.0.
+  La base d'essai réécrit 15 tables aux noms et types de Zotero ; si cela pose une question de
+  licence n'est pas tranché, et l'en-tête du fichier de schéma de Zotero n'a pas été lu.
+- **Notes Zotero et autres types d'annotation** (soulignement, note, encre, image) : remis à
+  plus tard par Sabine le 2026-10-11.
 
 - **Nommage des tables et des colonnes.** Gardé tel quel le 2026-10-02 ; Sabine demandera les
   renommages à l'usage, une fois les schémas sous les yeux.
