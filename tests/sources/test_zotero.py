@@ -197,6 +197,36 @@ def test_the_copies_a_killed_process_left_are_removed_before_an_extraction(
     ]
 
 
+@pytest.mark.parametrize("vanishes_at", ["lstat", "rmtree"])
+def test_a_left_copy_that_another_run_removes_first_is_passed_over(
+    zotero_dir, temporary_root, monkeypatch, vanishes_at
+):
+    left_copy = temporary_root / "kb-zotero-left"
+    left_copy.mkdir()
+    if vanishes_at == "lstat":
+        lstat = Path.lstat
+
+        def vanish_then_lstat(self):
+            if self.name == "kb-zotero-left":
+                self.rmdir()
+            return lstat(self)
+
+        monkeypatch.setattr(Path, "lstat", vanish_then_lstat)
+    else:
+        rmtree = shutil.rmtree
+
+        def vanish_then_rmtree(folder, **options):
+            rmtree(folder, **options)
+            # tempfile removes its own folder with rmtree too: only the left copy vanishes.
+            if Path(folder).name == "kb-zotero-left":
+                raise FileNotFoundError(folder)
+
+        monkeypatch.setattr(zotero.shutil, "rmtree", vanish_then_rmtree)
+
+    assert len(extract(zotero_dir)) == 2
+    assert not left_copy.exists()
+
+
 def test_the_copies_a_killed_process_left_are_removed_even_with_nothing_new(
     zotero_dir, temporary_root
 ):
@@ -408,6 +438,24 @@ def test_a_library_not_modified_since_the_last_collection_is_not_copied(
 
 def test_a_library_modified_since_the_last_collection_is_extracted(zotero_dir):
     last_collected_at = datetime.now(UTC) - timedelta(minutes=1)
+
+    assert len(extract(zotero_dir, last_collected_at)) == 2
+
+
+def test_a_write_less_than_a_microsecond_after_the_last_collection_is_extracted(
+    zotero_dir,
+):
+    # The last collection is a datetime, to the microsecond; a file date is in nanoseconds.
+    last_collected_at = datetime(2026, 10, 11, 12, 0, 0, 123456, tzinfo=UTC)
+    last_collected_at_ns = (
+        (last_collected_at - datetime(1970, 1, 1, tzinfo=UTC))
+        // timedelta(microseconds=1)
+        * 1000
+    )
+    os.utime(zotero_dir / "zotero.sqlite", ns=(1, 1))
+    wal_path = zotero_dir / "zotero.sqlite-wal"
+    wal_path.write_bytes(b"")
+    os.utime(wal_path, ns=(last_collected_at_ns + 500, last_collected_at_ns + 500))
 
     assert len(extract(zotero_dir, last_collected_at)) == 2
 

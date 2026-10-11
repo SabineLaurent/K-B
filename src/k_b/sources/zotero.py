@@ -14,7 +14,7 @@ import shutil
 import sqlite3
 import stat
 import tempfile
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 FOLDER_PREFIX = "zotero"
 
 DATABASE_FILE_NAME = "zotero.sqlite"
+# A file date is in nanoseconds since EPOCH; a datetime, in microseconds.
+EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+ONE_MICROSECOND = timedelta(microseconds=1)
 # Zotero's last writes are here while it runs: the main file alone would be an older library.
 WRITE_AHEAD_LOG_FILE_NAME = "zotero.sqlite-wal"
 # The temporary folder is recognisable: one left behind by a killed process is found and
@@ -198,10 +201,14 @@ def remove_left_copies() -> None:
     """
     removed_count = 0
     for path in Path(tempfile.gettempdir()).glob(TEMPORARY_DIR_PREFIX + "*"):
-        status = path.lstat()
-        if stat.S_ISDIR(status.st_mode) and status.st_uid == os.getuid():
-            shutil.rmtree(path)
-            removed_count += 1
+        # Another run may remove it first: a copy already gone is passed over.
+        try:
+            status = path.lstat()
+            if stat.S_ISDIR(status.st_mode) and status.st_uid == os.getuid():
+                shutil.rmtree(path)
+                removed_count += 1
+        except FileNotFoundError:
+            continue
     if removed_count:
         logger.info("zotero: %d copies left by a stopped run removed", removed_count)
 
@@ -228,8 +235,10 @@ def was_modified_since(
     last_modified_at_ns = max(
         state.modified_at_ns for state in states if state is not None
     )
-    last_modified_at = datetime.fromtimestamp(last_modified_at_ns / 1e9, tz=UTC)
-    return last_modified_at > last_collected_at
+    # In whole nanoseconds: a float would round a write made in the same microsecond as the
+    # last collection onto it, and the write would be taken as not newer.
+    last_collected_at_ns = (last_collected_at - EPOCH) // ONE_MICROSECOND * 1000
+    return last_modified_at_ns > last_collected_at_ns
 
 
 def copy_library(zotero_dir: Path, copy_dir: Path) -> Path:
