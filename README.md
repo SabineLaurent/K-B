@@ -73,6 +73,7 @@ uv sync
 | Variable | Obligatoire | Rôle |
 |---|---|---|
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
+| `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
 | `KB_GITHUB_TOKEN` | non | jeton GitHub en lecture seule ([docs/jeton-github.md](docs/jeton-github.md)). Sans lui, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000. |
 
 **Créer la base** (une fois) :
@@ -100,7 +101,8 @@ KB_DATA_DIR=~/K-B-data uv run kb collect
 Avec le jeton rangé dans le `.env` à la racine du dépôt, ignoré par git :
 `KB_DATA_DIR=~/K-B-data uv run --env-file .env kb collect`.
 
-`kb collect` affiche une ligne par source (`ok` ou `failed`, avec le type de l'erreur). Code de
+`kb collect` affiche une ligne par source (`ok` ou `failed`, avec le type de l'erreur ; `skipped`
+pour Zotero sans `KB_ZOTERO_DIR`). Code de
 sortie : 0 si tout a réussi, 1 si au moins une source a échoué ou si l'état de collecte n'a pas
 pu être écrit, 2 si `KB_DATA_DIR` manque, n'est pas un dossier existant, ou si l'état de collecte
 est illisible.
@@ -111,7 +113,7 @@ est illisible.
 KB_DATA_DIR=~/K-B-data uv run kb import
 ```
 
-`kb import` lit tout `<KB_DATA_DIR>/raw/`, fusionne les items et les écrit dans la base ; rejoué
+`kb import` lit `<KB_DATA_DIR>/raw/automated_watch/`, fusionne les items et les écrit dans la base ; rejoué
 sur le même brut, il donne la même base. Il affiche le nombre d'items importés, de doublons
 retirés et de rejets, détaillés dans `<KB_DATA_DIR>/import-log.jsonl`. Code de sortie :
 

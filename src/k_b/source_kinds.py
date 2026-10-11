@@ -1,7 +1,8 @@
 """SOURCE_KINDS: the only declaration of the sources, one kind per entry, in collection order.
 
 In the package, only cli.py imports it: it gives it to the collection (E) and to the import
-(T then L).
+(T then L). The Zotero kind has no instance here: cli.py creates it, on a machine that says
+where the Zotero data directory is.
 """
 
 from k_b.source_contract import SourceKind
@@ -12,6 +13,7 @@ from k_b.sources import (
     github_most_starred,
     github_releases,
     tldr,
+    zotero,
 )
 from k_b.sources.arxiv import ArxivSource
 from k_b.sources.cisa_kev import CisaKevSource
@@ -56,4 +58,7 @@ SOURCE_KINDS = (
         tuple(TldrSource(edition) for edition in TRACKED_EDITIONS),
         None,
     ),
+    # No instance: cli.py adds ZoteroSource when KB_ZOTERO_DIR is set. No reader yet: its
+    # extracts, under raw/selected_library/, are not read into the base.
+    SourceKind(zotero.FOLDER_PREFIX, (), None),
 )

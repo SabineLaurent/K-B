@@ -42,9 +42,15 @@ refuse.
 par une seule fonction, `write_file_atomically` : un temporaire **caché** dans le dossier cible
 (nom commençant par `.`), renommé sur la cible, et supprimé sur toute exception, Ctrl-C compris
 (`except BaseException`). La base SQLite, que SQLite écrit lui-même, est hors de cette règle.
+La copie temporaire d'une base source (Zotero) est hors de cette règle elle aussi : elle vit dans
+un `tempfile.TemporaryDirectory` du système, hors du dossier de données, supprimé sur un succès,
+une erreur ou un Ctrl-C ; chaque extraction retire d'abord les copies qu'un processus tué aurait
+laissées.
 
-**Vérifier.** `grep -rn "NamedTemporaryFile\|\.tmp\|os\.replace" src/k_b` ne renvoie que
-`write_file_atomically`.
+**Vérifier.**
+- `grep -rn "NamedTemporaryFile\|\.tmp\|os\.replace" src/k_b` ne renvoie que
+  `write_file_atomically`.
+- `grep -rn "TemporaryDirectory" src/k_b` ne renvoie que la copie d'une base source.
 
 **Pourquoi.** Un nom caché est déjà sauté par l'import (`list_visible_entries`) : un reste
 d'écriture interrompue n'est jamais lu comme une page. Une seule fonction à corriger pour trois
@@ -114,13 +120,19 @@ statu quo).
 - **Architecture en couches** : présentation (`cli.py`, routes de l'API), métier et ETL
   (`items.py`, `merge.py`, `collect.py`, `raw_items.py`, `import_items.py`), accès aux données
   (`database/`). Une couche n'appelle que celle du dessous.
-- Le SQL vit dans `src/k_b/database/` : un module d'écriture (un écrivain par sorte d'item) et
-  un module de lecture (la requête `UNION ALL`, partagée par `kb search`, « quoi de neuf » et
-  l'API). Les migrations Alembic aussi.
+- Le SQL **de la base K-B** vit dans `src/k_b/database/` : un module d'écriture (un écrivain par
+  sorte d'item) et un module de lecture (la requête `UNION ALL`, partagée par `kb search`, « quoi
+  de neuf » et l'API). Les migrations Alembic aussi.
+- La requête d'extraction d'une source qui est elle-même une base (Zotero) vit dans le module de
+  cette source, `src/k_b/sources/<source>.py`, comme la requête d'une API : elle lit une source
+  externe, en lecture seule, pas la base K-B.
 - Le module de chargement orchestre la transaction et le journal, sans SQL.
 
-**Vérifier.** `grep -rlE "INSERT INTO|SELECT |UPDATE |DELETE FROM" src/k_b --include='*.py'`
-ne renvoie que des fichiers de `src/k_b/database/`.
+**Vérifier.**
+- `grep -rlE "INSERT INTO|SELECT |UPDATE |DELETE FROM" src/k_b --include='*.py' --exclude=zotero.py`
+  ne renvoie que des fichiers de `src/k_b/database/`.
+- `grep -rlE "INSERT INTO|UPDATE |DELETE FROM" src/k_b/sources --include='*.py'` ne renvoie rien
+  (une source ne fait que lire).
 
 **Pourquoi.** Un seul écrivain et une seule requête partagée : deux modules suffisent, et la
 requête ne dépend pas de son premier appelant (décision du 2026-10-10 : `sqlite3` et SQL, pas

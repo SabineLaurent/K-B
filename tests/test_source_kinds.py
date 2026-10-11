@@ -33,3 +33,11 @@ def test_no_folder_prefix_covers_another():
     for prefix, other in permutations(prefixes, 2):
         assert other != prefix
         assert not other.startswith(prefix + "_")
+
+
+def test_zotero_is_declared_without_a_reader_and_without_an_instance():
+    # Its instance needs the Zotero data directory: cli.py creates it from KB_ZOTERO_DIR.
+    kind = find_source_kind("zotero", SOURCE_KINDS)
+
+    assert kind is not None
+    assert (kind.folder_prefix, kind.sources, kind.reader) == ("zotero", (), None)

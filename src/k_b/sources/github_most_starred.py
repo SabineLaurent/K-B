@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import urlencode
 
+from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.sources.github_api import get_from_github_api
 from k_b.sources.github_dates import parse_github_date
 from k_b.sources.tracked_repositories import is_repository_name
@@ -32,6 +33,7 @@ FOLDER_PREFIX = "github_most_starred"
 class GithubMostStarredSource:
     name = FOLDER_PREFIX
     extension = "json"
+    acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
         """Return a snapshot of the ranking at every collection: star counts always change.

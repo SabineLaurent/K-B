@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 from k_b.items import CVE_ID, Item
+from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.source_contract import SourceReader
 from k_b.sources.github_api import get_from_github_api
 from k_b.sources.github_dates import parse_github_date
@@ -35,6 +36,7 @@ FOLDER_PREFIX = "github_advisories"
 
 class GithubAdvisoriesSource:
     extension = "json"
+    acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
 
     def __init__(self, ecosystem: str, packages: tuple[str, ...]):
         if ecosystem not in ECOSYSTEMS:

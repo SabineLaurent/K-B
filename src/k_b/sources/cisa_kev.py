@@ -16,6 +16,7 @@ from urllib.error import HTTPError
 
 from k_b.http_download import download
 from k_b.items import CVE_ID, Item, RansomwareUse
+from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.source_contract import SourceReader
 
 CATALOG_URL = (
@@ -47,6 +48,7 @@ FOLDER_PREFIX = "cisa_kev"
 class CisaKevSource:
     name = FOLDER_PREFIX
     extension = "csv"
+    acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
         """Return the whole catalog, or None if it has not changed since last_collected_at.
