@@ -53,7 +53,7 @@ REQUIRED_FIELDS_BY_KIND = {
     "advisory": ("published_at",),
 }
 # The source of each kind. Written to a reference table as the item of its source of truth, an
-# item of another source would mark a CVE as exploited, or overwrite a paper (#15 widens it for
+# item of another source would mark a CVE as exploited, or overwrite a paper (#138 widens it for
 # Zotero); a release or an advisory is a GitHub subtype.
 SOURCE_BY_KIND = {
     "paper": "arxiv",
