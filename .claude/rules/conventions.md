@@ -123,13 +123,13 @@ statu quo).
 - Le SQL **de la base K-B** vit dans `src/k_b/database/` : un module d'écriture (un écrivain par
   sorte d'item) et un module de lecture (la requête `UNION ALL`, partagée par `kb search`, « quoi
   de neuf » et l'API). Les migrations Alembic aussi.
-- La requête d'extraction d'une source qui est elle-même une base (Zotero) vit dans le module de
-  cette source, `src/k_b/sources/<source>.py`, comme la requête d'une API : elle lit une source
-  externe, en lecture seule, pas la base K-B.
+- La requête d'extraction d'une source qui est elle-même une base (Zotero, GH Archive sur
+  BigQuery) vit dans le module de cette source, `src/k_b/sources/<source>.py`, comme la requête
+  d'une API : elle lit une source externe, en lecture seule, pas la base K-B.
 - Le module de chargement orchestre la transaction et le journal, sans SQL.
 
 **Vérifier.**
-- `grep -rlE "INSERT INTO|SELECT |UPDATE |DELETE FROM" src/k_b --include='*.py' --exclude=zotero.py`
+- `grep -rlE "INSERT INTO|SELECT |UPDATE |DELETE FROM" src/k_b --include='*.py' --exclude=zotero.py --exclude=gh_archive.py`
   ne renvoie que des fichiers de `src/k_b/database/`.
 - `grep -rlE "INSERT INTO|UPDATE |DELETE FROM" src/k_b/sources --include='*.py'` ne renvoie rien
   (une source ne fait que lire).
