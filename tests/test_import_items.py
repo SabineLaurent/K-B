@@ -113,6 +113,22 @@ def test_the_raw_files_go_into_the_database(data_dir):
     assert count_rows(data_dir, "SELECT count(*) FROM advisory") == 3
 
 
+def test_a_zotero_extract_is_not_read_into_the_database(data_dir):
+    # Zotero has no reader yet: its extracts, under raw/selected_library/, are left alone.
+    extract_dir = data_dir / "raw" / "selected_library" / "zotero"
+    extract_dir.mkdir(parents=True)
+    (extract_dir / "2026-10-11T120000Z.json").write_text(
+        '[{"key": "AAAAAAA1", "highlights": [{"key": "ANNOTAA1"}]}]'
+    )
+
+    summary = run_import(data_dir)
+
+    assert summary.item_count == 3 + 4 + 3 + 3
+    assert summary.rejection_count == 0
+    assert count_rows(data_dir, "SELECT count(*) FROM highlight") == 0
+    assert count_rows(data_dir, "SELECT count(*) FROM raw_data") == 4
+
+
 def test_an_arxiv_item_gives_an_item_and_its_publication(data_dir):
     run_import(data_dir)
 

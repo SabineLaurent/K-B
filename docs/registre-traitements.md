@@ -25,7 +25,7 @@ sous-traitant.
 | GH Archive | login de l'auteur de chaque événement (`actor`) | **oui** : la requête ne le sélectionne pas | non | non |
 | API arXiv | noms des auteurs des papiers | — | oui | oui, `publication.authors` (liste JSON, dans l'ordre d'arXiv) |
 | Web Clipper | auteur de l'article gardé (`author`) ; date où l'utilisatrice l'a gardé (`created`) | — | oui | oui, `author` et `item.saved_at` |
-| Zotero | auteurs des papiers ; toute la bibliothèque de l'utilisatrice (notes, surlignages, dates d'ajout) | — | oui, copie de la base | auteurs (`author`), surlignages (`highlight`), date d'ajout (`item.saved_at`) |
+| Zotero | auteurs des papiers ; ce que l'utilisatrice a enregistré et surligné (titres, étiquettes, surlignages et commentaires, dates d'ajout, nom du fichier PDF) | **oui** : la requête ne lit ni les notes, ni les résumés, ni les autres annotations, ni les bibliothèques de groupe | oui, l'extrait JSON de chaque collecte | non : l'extrait n'est pas encore lu vers la base |
 | tldr.tech | aucune : les pages ne portent ni auteur ni expéditeur (vérifié dans #13) ; un résumé peut citer une personnalité publique | — | oui | sans objet (aucune donnée personnelle collectée) |
 | CISA KEV | aucune | — | — | — |
 
@@ -52,11 +52,11 @@ entreprise.
 | Finalité | Garder les papiers lus et les articles choisis par l'utilisatrice, avec ses surlignages, pour les rapprocher de la veille (bloc « Mes surlignages » des fiches). |
 | Base légale | Intérêt légitime (art. 6.1.f) : l'utilisatrice traite ses propres données, pour son usage. |
 | Personnes concernées | L'utilisatrice ; les auteurs des papiers et articles gardés (déjà couverts par la fiche 1). |
-| Données | Copie de la base Zotero : bibliothèque, notes, surlignages, dates d'ajout. Dans la base K-B : surlignages (`highlight`) et date d'ajout (`item.saved_at`). Le coffre Obsidian (articles gardés avec Web Clipper) reste chez l'utilisatrice. |
+| Données | Extrait JSON de la bibliothèque Zotero, écrit à chaque collecte : documents, auteurs, étiquettes, surlignages et commentaires, dates d'ajout, nom du fichier PDF ; pas les notes. Dans la base K-B : rien pour l'instant, l'extrait n'est pas encore lu. Le coffre Obsidian (articles gardés avec Web Clipper) reste chez l'utilisatrice. |
 | Destinataires | L'utilisatrice ; les agents qu'elle lance, par l'API REST. |
 | Transferts hors UE | Comme la fiche 1 : surlignages lus par un agent, envoyés au fournisseur du modèle. |
-| Durée de conservation | Copie Zotero du brut : **seule la dernière est gardée** (provisoire). Surlignages et date d'ajout dans la base : comme l'item auquel ils sont rattachés. Zotero et le coffre Obsidian : gérés par l'utilisatrice dans ces outils, pas par K-B. |
-| Sécurité | Comme la fiche 1. La copie Zotero n'est jamais publiée ni versionnée. |
+| Durée de conservation | Extraits Zotero du brut : tous gardés ; **aucune durée décidée, aucune purge codée** (constat du 2026-10-11). Surlignages et date d'ajout dans la base : comme l'item auquel ils sont rattachés. Zotero et le coffre Obsidian : gérés par l'utilisatrice dans ces outils, pas par K-B. |
+| Sécurité | Comme la fiche 1. La base Zotero n'est lue que par une copie temporaire, supprimée à la fin de chaque extraction ; ni cette copie ni les extraits ne sont publiés ou versionnés. |
 
 ## Procédure de tri
 
@@ -69,7 +69,7 @@ jamais les noms).
 | 1 | Veille (fiche 1) | Les logins GitHub des champs d'auteur et de crédit (auteurs, personnes créditées) ne sont pas lus dans les items ; GH Archive ne sélectionne pas `actor`. Les notes d'une release sont lues telles que reçues, avec les logins ou @mentions qu'elles contiennent. | oui, à la lecture et à la requête | à chaque collecte (une par jour) |
 | 2 | Veille (fiche 1) | Supprimer les items collectés depuis plus longtemps que la durée de leur mode d'acquisition (`src/k_b/config.py` ; 2 ans pour la veille). Les auteurs d'un papier partent avec lui : ils sont une colonne de `publication`. Constat : le schéma n'a de suppression en cascade ni vers les sous-types (`release`, `advisory`) ni vers les référentiels (`publication`, `vulnerability`). | prévue en dernière étape de la collecte ; pas encore codée (#83) | à chaque collecte (une par jour) |
 | 3 | Veille (fiche 1) | Supprimer les fichiers bruts de `raw/automated_watch/` plus anciens que la durée du mode `watch` (`src/k_b/config.py` ; 2 ans). | prévue après l'étape 2 ; pas encore codée (#83) | à chaque collecte (une par jour) |
-| 4 | Bibliothèque (fiche 2) | Supprimer les copies Zotero du brut sauf la plus récente. | oui, après chaque copie Zotero | à chaque copie Zotero |
+| 4 | Bibliothèque (fiche 2) | Supprimer la copie temporaire de la base Zotero, succès ou échec. | oui, à la fin de chaque extraction (testé) | à chaque collecte |
 | 5 | Les deux | Demande d'une personne. Accès : lui dire ce qui est gardé à son nom. Effacement ou opposition : supprimer son nom de la base, supprimer les fichiers bruts qui le contiennent, et noter le nom dans une liste d'exclusion lue par la fusion, pour qu'une collecte ou une reconstruction ne le réintroduise pas. Dans la base, un nom d'auteur est dans la liste JSON de chaque papier (`publication.authors`) et un login peut être dans les notes d'une release (`release.body`) : l'effacement réécrit ces valeurs, ce n'est pas une suppression de ligne. | non | à la demande, sous un mois (art. 12.3) |
 | 6 | Les deux | Relire ce registre : sources ajoutées, champs ajoutés à la base, durées. | non | une fois par an, et à chaque nouvelle source |
 

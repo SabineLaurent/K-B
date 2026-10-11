@@ -10,7 +10,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 ## Règles communes
 
 - **Un point de lancement** : `kb collect` lance toutes les sources ; une source en panne
-  n'arrête pas les autres. Il affiche une ligne par source (`ok` ou `failed (<type d'erreur>)`).
+  n'arrête pas les autres. Il affiche une ligne par source (`ok` ou `failed (<type d'erreur>)`),
+  et `zotero: skipped (KB_ZOTERO_DIR not set)` quand le dossier de Zotero n'est pas donné.
   Code de sortie : **0** si tout a réussi ; **1** si une source a échoué, ou si
   `collection_state.json` n'a pas pu être écrit (disque plein, droits) ; **2** si la collecte n'a
   pas eu lieu (`KB_DATA_DIR` absent ou pas un dossier, état de collecte illisible). Quand l'état
@@ -22,7 +23,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   `raw/automated_watch/<source>/<AAAA-MM-JJTHHMMSSZ>.<ext>`, une seule fois, jamais réécrit. Une
   source qui lit plusieurs pages (site scrapé) écrit chaque page telle que reçue dans
   `raw/automated_watch/<source>/<AAAA-MM-JJTHHMMSSZ>/<page>.<ext>` (décidé le 2026-10-04). Le filtre
-  se fait à la lecture, sauf exception décidée (arXiv, ci-dessous).
+  se fait à la lecture, sauf exception décidée (arXiv, ci-dessous). Ce que l'utilisatrice a
+  choisi (Zotero) va dans `raw/selected_library/<source>/` (journal ADR, 2026-10-09).
 - **Fréquence** : une collecte par jour, lancée à la main
   (`KB_DATA_DIR=<dossier> uv run --env-file .env kb collect`) ; l'automatisation viendra après.
   Une collecte manquée est rattrapée à la suivante, jusqu'à une limite propre à chaque source
@@ -35,6 +37,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   | CISA KEV | complet : le catalogue entier est téléchargé |
   | GitHub, releases et alertes | 100 éléments au plus par dépôt ou par écosystème (au-delà, un avertissement) |
   | GitHub, dépôts les plus étoilés | aucun : un instantané par collecte, un jour manqué n'est pas récupérable |
+  | Zotero | complet : chaque extrait contient toute la bibliothèque |
 
 - **Incrémental** : la date de la dernière collecte réussie de chaque source est dans
   `collection_state.json`, à la racine du dossier de données et hors de `raw/` ; une source qui
@@ -177,19 +180,43 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 
 ### Zotero — base de données
 
-- **Technologie** : base SQLite `zotero.sqlite`, lue en SQL. Zotero verrouille la base quand il
-  tourne : on travaille sur une **copie**, jamais sur l'original.
-- **Ce qu'on en tire** : papiers lus et leurs surlignages (table `itemAnnotations`) : titre,
-  auteurs, date, étiquettes, chemin du PDF, texte surligné.
-- **Accès** : fichier local, lecture seule.
-- **Limites** : aucune.
-- **Brut** : la copie entière de la base est le brut, écrite dans `raw/automated_watch/zotero/`
-  seulement si la base a changé depuis la dernière collecte. La requête se fait à la lecture.
-  Provisoire : à revoir dans #15 selon la taille de la base et son schéma.
-- **Données personnelles** : les auteurs des papiers (publics), et toute la bibliothèque de
-  l'utilisatrice, notes et surlignages compris. Le brut vit hors du dépôt de code et n'est jamais
-  publié.
-- **Prérequis** : Zotero installé (#15).
+- **Technologie** : base SQLite `zotero.sqlite`, dans le dossier de données de Zotero, lue par
+  une requête SQL (`src/k_b/sources/zotero.py`). Zotero verrouille sa base quand il tourne, et
+  ses dernières écritures sont dans `zotero.sqlite-wal` : K-B copie les deux fichiers dans un
+  dossier temporaire, vérifie la copie (`PRAGMA integrity_check`), l'ouvre en lecture seule,
+  lance la requête, puis supprime la copie, erreur comprise. L'original n'est jamais ouvert par
+  SQLite.
+- **Ce qu'on en tire** : chaque document de premier niveau de la bibliothèque personnelle, hors
+  corbeille : clé Zotero, type, titre, date, date d'ajout, URL, référence arXiv (`archiveID`),
+  auteurs dans leur ordre, étiquettes avec leur type (0 : posée à la main ; 1 : automatique),
+  clé et chemin de chaque PDF rangé dans le stockage de Zotero (`storage:<fichier>`), et les
+  surlignages de ces PDF (annotations de type 1 : clé, texte, commentaire, page, date d'ajout),
+  dans l'ordre du document. Ne sont pas lus : les notes, les résumés, les autres types
+  d'annotation, les PDF liés hors du stockage de Zotero, les surlignages d'un fichier qui n'est
+  pas un PDF, les bibliothèques de groupe.
+- **Accès** : fichier local. Le dossier de données de Zotero est donné par la variable
+  d'environnement `KB_ZOTERO_DIR`. Absente ou vide : Zotero est sauté, `kb collect` l'affiche,
+  et son code de sortie ne change pas.
+- **Limites** : aucune limite de débit. Pas de taille maximale sur la base copiée, à la
+  différence des téléchargements (règles communes) : un disque plein arrête la copie, et le
+  dossier temporaire est supprimé.
+- **Brut** : le résultat de la requête, en JSON, dans
+  `raw/selected_library/zotero/<AAAA-MM-JJTHHMMSSZ>.json` (journal ADR, 2026-10-09), écrit
+  seulement si `zotero.sqlite` ou son `-wal` a été modifié depuis la dernière collecte. Les
+  valeurs sont celles de Zotero, sans conversion (dates `AAAA-MM-JJ HH:MM:SS` en UTC). Zotero
+  ouvert écrit dans son `-wal` sans que la bibliothèque change : un extrait peut être identique
+  au précédent. `kb import` ne lit pas encore ces extraits : rien de Zotero n'entre dans la base.
+- **En cas de panne :** la source échoue par un état nommé, n'écrit rien, et sa date de dernière
+  collecte reste ; la collecte suivante recommence. Les états :
+  `ZoteroCopyInconsistentError` (le contrôle d'intégrité refuse la copie),
+  `ZoteroChangedDuringCopyError` (un des deux fichiers a changé pendant la copie),
+  `ZoteroQueryFailedError` (la requête échoue ; le message nomme la table ou la colonne absente,
+  et rien d'autre), `FileNotFoundError` (pas de `zotero.sqlite` dans le dossier).
+- **Données personnelles** : les auteurs des papiers (publics), et ce que l'utilisatrice a
+  enregistré et surligné. Le journal ne cite ni auteur, ni titre, ni texte surligné : deux
+  nombres seulement. Le brut vit hors du dépôt de code et n'est jamais publié
+  ([registre des traitements](registre-traitements.md), fiche 2).
+- **Prérequis** : Zotero installé.
 
 ### GH Archive sur BigQuery — big data
 

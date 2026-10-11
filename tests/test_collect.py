@@ -13,6 +13,7 @@ SECOND_RUN_AT = FIRST_RUN_AT + timedelta(hours=1)
 
 class WorkingSource:
     extension = "json"
+    acquisition_dir_name = "automated_watch"
 
     def __init__(self, name="working"):
         self.name = name
@@ -26,6 +27,7 @@ class WorkingSource:
 class BrokenSource:
     name = "broken"
     extension = "json"
+    acquisition_dir_name = "automated_watch"
 
     def fetch(self, last_collected_at):
         raise ConnectionError("source is down")
@@ -84,9 +86,42 @@ def test_a_source_name_that_is_not_a_safe_path_segment_is_refused(tmp_path):
     assert not (raw_dir / "automated_watch").exists()
 
 
+class LibrarySource(WorkingSource):
+    """A source of what the user selected, as Zotero is."""
+
+    acquisition_dir_name = "selected_library"
+
+
+def test_a_source_of_the_selected_library_is_stored_in_its_own_folder_of_raw(tmp_path):
+    errors_by_source = collect_all_sources(
+        [LibrarySource(name="library")], tmp_path / "raw", tmp_path, FIRST_RUN_AT
+    ).errors_by_source
+
+    assert errors_by_source == {"library": None}
+    raw_file_path = (
+        tmp_path / "raw" / "selected_library" / "library" / "2026-09-30T100000Z.json"
+    )
+    assert raw_file_path.read_bytes() == b'{"items": []}'
+    assert not (tmp_path / "raw" / "automated_watch").exists()
+
+
+def test_a_raw_folder_that_is_not_a_safe_path_segment_is_refused(tmp_path):
+    source = WorkingSource()
+    source.acquisition_dir_name = "../escape"
+
+    errors_by_source = collect_all_sources(
+        [source], tmp_path / "raw", tmp_path, FIRST_RUN_AT
+    ).errors_by_source
+
+    assert isinstance(errors_by_source["working"], ValueError)
+    assert not (tmp_path / "escape").exists()
+    assert not (tmp_path / "raw").exists()
+
+
 class UnchangedSource:
     name = "unchanged"
     extension = "csv"
+    acquisition_dir_name = "automated_watch"
 
     def fetch(self, last_collected_at):
         return None
@@ -106,6 +141,7 @@ class ScrapedSource:
     """Returns several pages, as a scraped source reading one page per day does."""
 
     extension = "html"
+    acquisition_dir_name = "automated_watch"
 
     def __init__(self, pages):
         self.name = "scraped"

@@ -14,6 +14,8 @@ from k_b.items import Item
 class Source(Protocol):
     name: str
     extension: str
+    # The folder of raw/ its raw files go to: the watch, or what the user selected.
+    acquisition_dir_name: str
 
     def fetch(
         self, last_collected_at: datetime | None

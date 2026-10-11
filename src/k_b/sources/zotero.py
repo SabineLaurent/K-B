@@ -1,0 +1,273 @@
+"""The Zotero source: extract the documents of the user's library and their highlights (E).
+
+Zotero keeps its library in an SQLite database, zotero.sqlite, that it locks while it runs. The
+source never opens it: it copies the file and its write-ahead log to a temporary folder, checks
+the copy, queries it read-only, and deletes it. What the query returns is the raw extract.
+"""
+
+import contextlib
+import json
+import logging
+import re
+import shutil
+import sqlite3
+import tempfile
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any, NamedTuple
+
+from k_b.raw_store import SELECTED_LIBRARY_DIR_NAME
+
+logger = logging.getLogger(__name__)
+
+# The name of its raw folders, written once: its instances and its kind use it.
+FOLDER_PREFIX = "zotero"
+
+DATABASE_FILE_NAME = "zotero.sqlite"
+# Zotero's last writes are here while it runs: the main file alone would be an older library.
+WRITE_AHEAD_LOG_FILE_NAME = "zotero.sqlite-wal"
+# The temporary folder is recognisable: one left behind by a killed process can be found.
+TEMPORARY_DIR_PREFIX = "kb-zotero-"
+# How much of the first problem reported by integrity_check goes into the error.
+MAX_REPORTED_PROBLEM_LENGTH = 200
+# The only messages of SQLite kept as they are: another one may quote the content of the base.
+MISSING_TABLE_OR_COLUMN = re.compile(r"no such (table|column): [\w.]+")
+
+# One statement for the whole library. A document is defined once: an item of the user's
+# library, that is not a file, a note or an annotation, out of the trash. Of the fields Zotero
+# keeps as rows (itemData), only four are read. The lists come back as JSON, in a stable order.
+# Not read: the abstracts, the notes, the annotations that are not highlights (type 1), the
+# files outside Zotero's storage (a linked file keeps its own path), the group libraries.
+EXTRACTION_QUERY = """
+WITH document AS (
+    SELECT items.itemID, items.key, itemTypes.typeName, items.dateAdded
+    FROM items
+    JOIN itemTypes ON itemTypes.itemTypeID = items.itemTypeID
+    JOIN libraries ON libraries.libraryID = items.libraryID
+    WHERE libraries.type = 'user'
+        AND itemTypes.typeName NOT IN ('attachment', 'note', 'annotation')
+        AND items.itemID NOT IN (SELECT itemID FROM deletedItems)
+),
+field_value AS (
+    SELECT itemData.itemID, fields.fieldName, itemDataValues.value
+    FROM itemData
+    JOIN fields ON fields.fieldID = itemData.fieldID
+    JOIN itemDataValues ON itemDataValues.valueID = itemData.valueID
+    WHERE fields.fieldName IN ('title', 'date', 'url', 'archiveID')
+)
+SELECT
+    document.key,
+    document.typeName AS item_type,
+    (SELECT value FROM field_value
+        WHERE itemID = document.itemID AND fieldName = 'title') AS title,
+    (SELECT value FROM field_value
+        WHERE itemID = document.itemID AND fieldName = 'date') AS date,
+    document.dateAdded AS date_added,
+    (SELECT value FROM field_value
+        WHERE itemID = document.itemID AND fieldName = 'url') AS url,
+    (SELECT value FROM field_value
+        WHERE itemID = document.itemID AND fieldName = 'archiveID') AS archive_id,
+    (
+        SELECT json_group_array(
+            json_object('first_name', creators.firstName, 'last_name', creators.lastName)
+            ORDER BY itemCreators.orderIndex
+        )
+        FROM itemCreators
+        JOIN creators ON creators.creatorID = itemCreators.creatorID
+        JOIN creatorTypes ON creatorTypes.creatorTypeID = itemCreators.creatorTypeID
+        WHERE itemCreators.itemID = document.itemID
+            AND creatorTypes.creatorType = 'author'
+    ) AS authors,
+    (
+        SELECT json_group_array(
+            json_object('name', tags.name, 'type', itemTags.type) ORDER BY tags.name
+        )
+        FROM itemTags
+        JOIN tags ON tags.tagID = itemTags.tagID
+        WHERE itemTags.itemID = document.itemID
+    ) AS tags,
+    (
+        SELECT json_group_array(
+            json_object('key', attachment.key, 'path', itemAttachments.path)
+            ORDER BY attachment.itemID
+        )
+        FROM itemAttachments
+        JOIN items AS attachment ON attachment.itemID = itemAttachments.itemID
+        WHERE itemAttachments.parentItemID = document.itemID
+            AND itemAttachments.contentType = 'application/pdf'
+            AND itemAttachments.path LIKE 'storage:%'
+            AND itemAttachments.itemID NOT IN (SELECT itemID FROM deletedItems)
+    ) AS pdfs,
+    (
+        SELECT json_group_array(
+            json_object(
+                'key', annotation.key,
+                'pdf_key', attachment.key,
+                'text', itemAnnotations.text,
+                'comment', itemAnnotations.comment,
+                'page_label', itemAnnotations.pageLabel,
+                'date_added', annotation.dateAdded
+            )
+            ORDER BY attachment.itemID, itemAnnotations.sortIndex, annotation.itemID
+        )
+        FROM itemAttachments
+        JOIN items AS attachment ON attachment.itemID = itemAttachments.itemID
+        JOIN itemAnnotations ON itemAnnotations.parentItemID = itemAttachments.itemID
+        JOIN items AS annotation ON annotation.itemID = itemAnnotations.itemID
+        WHERE itemAttachments.parentItemID = document.itemID
+            AND itemAttachments.contentType = 'application/pdf'
+            AND itemAttachments.path LIKE 'storage:%'
+            AND itemAttachments.itemID NOT IN (SELECT itemID FROM deletedItems)
+            AND itemAnnotations.type = 1
+            AND itemAnnotations.itemID NOT IN (SELECT itemID FROM deletedItems)
+    ) AS highlights
+FROM document
+ORDER BY document.dateAdded, document.itemID
+"""
+# The columns the query returns as a JSON list.
+JSON_COLUMNS = ("authors", "tags", "pdfs", "highlights")
+
+
+class ZoteroCopyInconsistentError(Exception):
+    """PRAGMA integrity_check did not answer ok on the copy, or could not read it."""
+
+
+class ZoteroChangedDuringCopyError(Exception):
+    """The main file or its write-ahead log changed while they were copied: the two copies
+    may not go together."""
+
+
+class ZoteroQueryFailedError(Exception):
+    """SQLite refused the extraction query: a table or a column it reads is missing, when
+    the message names one."""
+
+
+class FileState(NamedTuple):
+    size: int
+    modified_at_ns: int
+    inode: int
+
+
+class ZoteroSource:
+    name = FOLDER_PREFIX
+    extension = "json"
+    acquisition_dir_name = SELECTED_LIBRARY_DIR_NAME
+
+    def __init__(self, zotero_dir: Path) -> None:
+        self.zotero_dir = zotero_dir
+
+    def fetch(self, last_collected_at: datetime | None) -> bytes | None:
+        """Return the documents of the library and their highlights as JSON, or None if
+        neither file of the library was modified since last_collected_at.
+
+        Zotero running writes to its log even when the library does not change: an extract
+        equal to the previous one is then returned.
+        """
+        if last_collected_at is not None and not was_modified_since(
+            read_file_states(self.zotero_dir), last_collected_at
+        ):
+            return None
+        # Deleted on any exit, an error or Ctrl-C included. In the system's temporary folder,
+        # not in the data directory: a whole library has no place in what gets backed up.
+        with tempfile.TemporaryDirectory(prefix=TEMPORARY_DIR_PREFIX) as copy_dir:
+            copy_path = copy_library(self.zotero_dir, Path(copy_dir))
+            documents = extract_documents(copy_path)
+        logger.info(
+            "zotero: %d documents, %d highlights extracted",
+            len(documents),
+            sum(len(document["highlights"]) for document in documents),
+        )
+        return (json.dumps(documents, ensure_ascii=False, indent=2) + "\n").encode()
+
+
+def read_file_states(zotero_dir: Path) -> tuple[FileState, FileState | None]:
+    """The state of the main file, which must exist, and of its write-ahead log, None when
+    there is none (Zotero closed cleanly may leave none)."""
+    database_state = read_file_state(zotero_dir / DATABASE_FILE_NAME)
+    try:
+        log_state = read_file_state(zotero_dir / WRITE_AHEAD_LOG_FILE_NAME)
+    except FileNotFoundError:
+        log_state = None
+    return database_state, log_state
+
+
+def read_file_state(path: Path) -> FileState:
+    status = path.stat()
+    return FileState(status.st_size, status.st_mtime_ns, status.st_ino)
+
+
+def was_modified_since(
+    states: tuple[FileState, FileState | None], last_collected_at: datetime
+) -> bool:
+    last_modified_at_ns = max(
+        state.modified_at_ns for state in states if state is not None
+    )
+    last_modified_at = datetime.fromtimestamp(last_modified_at_ns / 1e9, tz=UTC)
+    return last_modified_at > last_collected_at
+
+
+def copy_library(zotero_dir: Path, copy_dir: Path) -> Path:
+    """Copy the main file, then its write-ahead log if there is one; return the copy of the
+    main file. The originals are read as files, never opened by SQLite.
+
+    The two files are not copied at the same instant, and a pair that does not go together
+    passes integrity_check: their states are compared before and after the copy.
+    """
+    states_before = read_file_states(zotero_dir)
+    copy_path = copy_dir / DATABASE_FILE_NAME
+    shutil.copyfile(zotero_dir / DATABASE_FILE_NAME, copy_path)
+    with contextlib.suppress(FileNotFoundError):
+        shutil.copyfile(
+            zotero_dir / WRITE_AHEAD_LOG_FILE_NAME, copy_dir / WRITE_AHEAD_LOG_FILE_NAME
+        )
+    states_after = read_file_states(zotero_dir)
+    if states_after != states_before:
+        raise ZoteroChangedDuringCopyError(
+            f"{DATABASE_FILE_NAME} and {WRITE_AHEAD_LOG_FILE_NAME}:"
+            f" before the copy {states_before!r}, after {states_after!r}"
+        )
+    return copy_path
+
+
+def extract_documents(copy_path: Path) -> list[dict[str, Any]]:
+    """Check the copy, then run the extraction query on it, read-only."""
+    # as_uri: a ?, a # or a % in the path of the temporary folder would break the URI.
+    with contextlib.closing(
+        sqlite3.connect(f"{copy_path.as_uri()}?mode=ro", uri=True)
+    ) as connection:
+        connection.row_factory = sqlite3.Row
+        check_integrity(connection)
+        try:
+            rows = connection.execute(EXTRACTION_QUERY).fetchall()
+        except sqlite3.OperationalError as error:
+            # from None: the traceback logged by the collection would show SQLite's message.
+            raise ZoteroQueryFailedError(describe_query_error(error)) from None
+    return [
+        {
+            column: json.loads(row[column]) if column in JSON_COLUMNS else row[column]
+            for column in row.keys()  # noqa: SIM118 — a Row iterates over its values
+        }
+        for row in rows
+    ]
+
+
+def check_integrity(connection: sqlite3.Connection) -> None:
+    try:
+        problems = [row[0] for row in connection.execute("PRAGMA integrity_check")]
+    except sqlite3.DatabaseError as error:
+        raise ZoteroCopyInconsistentError(
+            f"integrity_check raised {type(error).__name__}: {error}"
+        ) from error
+    if problems != ["ok"]:
+        raise ZoteroCopyInconsistentError(
+            f"integrity_check reported {len(problems)} problems, the first:"
+            f" {str(problems[0])[:MAX_REPORTED_PROBLEM_LENGTH]!r}"
+        )
+
+
+def describe_query_error(error: sqlite3.OperationalError) -> str:
+    """SQLite's message when it only names a missing table or column, else the error type."""
+    message = str(error)
+    if MISSING_TABLE_OR_COLUMN.fullmatch(message):
+        return message
+    return type(error).__name__

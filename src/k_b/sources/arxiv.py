@@ -14,6 +14,7 @@ from urllib.parse import urlencode
 
 from k_b.http_download import download
 from k_b.items import Item
+from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.source_contract import SourceReader
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ FOLDER_PREFIX = "arxiv_cscr_x_csai"
 class ArxivSource:
     name = FOLDER_PREFIX
     extension = "xml"
+    acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
         """Return the papers submitted since 7 days before last_collected_at; None if none.

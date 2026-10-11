@@ -13,6 +13,7 @@ from datetime import datetime
 from urllib.parse import unquote
 
 from k_b.items import Item
+from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.source_contract import SourceReader
 from k_b.sources.github_api import get_from_github_api
 from k_b.sources.github_dates import parse_github_date
@@ -39,6 +40,7 @@ FOLDER_PREFIX = "github_releases"
 
 class GithubReleasesSource:
     extension = "json"
+    acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
 
     def __init__(self, repository: str):
         if not is_repository_name(repository):

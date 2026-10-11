@@ -21,8 +21,12 @@ from k_b.raw_store import InvalidCollectionStateError
 from k_b.source_contract import list_sources
 from k_b.source_kinds import SOURCE_KINDS
 from k_b.sources.tracked_repositories import TRACKED_REPOSITORIES
+from k_b.sources.zotero import FOLDER_PREFIX as ZOTERO_SOURCE_NAME
+from k_b.sources.zotero import ZoteroSource
 
 DATA_DIR_VARIABLE = "KB_DATA_DIR"
+# The Zotero data directory, the one that holds zotero.sqlite. Not set: Zotero is skipped.
+ZOTERO_DIR_VARIABLE = "KB_ZOTERO_DIR"
 IMPORT_LOG_FILE_NAME = "import-log.jsonl"
 
 
@@ -121,9 +125,13 @@ def run_import(data_dir: Path) -> int:
 
 
 def run_collect(data_dir: Path) -> int:
+    sources = list_sources(SOURCE_KINDS)
+    zotero_dir = os.environ.get(ZOTERO_DIR_VARIABLE)
+    if zotero_dir:
+        sources.append(ZoteroSource(Path(zotero_dir)))
     try:
         outcome = collect_all_sources(
-            list_sources(SOURCE_KINDS),
+            sources,
             data_dir / "raw",
             data_dir,
             datetime.now(UTC),
@@ -133,6 +141,8 @@ def run_collect(data_dir: Path) -> int:
         return 2
     for source_name, source_error in outcome.errors_by_source.items():
         print(f"{source_name}: {describe_outcome(source_error)}")
+    if not zotero_dir:
+        print(f"{ZOTERO_SOURCE_NAME}: skipped ({ZOTERO_DIR_VARIABLE} not set)")
     if outcome.state_error is not None:
         print(f"collection_state: {describe_outcome(outcome.state_error)}")
     has_failure = outcome.state_error is not None or any(

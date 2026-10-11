@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from time import sleep
 
 from k_b.http_download import RedirectedOutsideError, download
+from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 
 # Adding an edition is adding its slug, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
 TRACKED_EDITIONS = ("ai", "infosec", "dev")
@@ -27,6 +28,7 @@ FOLDER_PREFIX = "tldr"
 
 class TldrSource:
     extension = "html"
+    acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
 
     def __init__(self, edition: str):
         if not EDITION_SLUG.fullmatch(edition):
