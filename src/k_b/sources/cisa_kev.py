@@ -92,7 +92,7 @@ def read_new_vulnerabilities(
     """One vulnerability per row added since the day before the last collection (None: all).
 
     dateAdded is a day without a time zone, not an instant: it is not converted, it is compared
-    with a day of margin, so no row is lost whatever its zone. Duplicates go at the merge.
+    with a day of margin, so no row is lost whatever its zone. Duplicates are removed by the base, at the import.
     """
     # utf-8-sig: a byte order mark would otherwise stick to the first column name.
     rows = csv.DictReader(io.StringIO(raw_catalog.decode("utf-8-sig"), newline=""))
@@ -157,7 +157,7 @@ def convert_vulnerability(
 
 
 def read_catalog(raw_catalog: bytes) -> list[Vulnerability]:
-    """The whole catalog: duplicates between collections are removed by the merge."""
+    """The whole catalog: duplicates between collections are removed by the base, at the import."""
     return read_new_vulnerabilities(raw_catalog, last_collected_at=None)
 
 

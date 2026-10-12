@@ -55,7 +55,7 @@ abandonné. La collecte est incrémentale ; l'import doit l'être aussi.
 
 **Coût** : 3 à 4 h avec les tests (estimation non relue), pour réécrire `merge.py`, `import_items.py` et leurs tests, en retirant du code. C'est une décision structurante : `/adr-ls` dans la PR qui la code. Elle change le contrat écrit en tête de `import_items.py:1-6`.
 
-| Décision | Fin du rejeu complet : **retenue**. Proposition 1-3 : à valider. Question du repère de collecte : à trancher. |
+| Décision | Fin du rejeu complet : **retenue**. Proposition 2 : **retenue** (2026-10-06), codée par #105 avec une règle par nature de source (décisions du 2026-10-12) ; « même CVE dans une source » n'est plus un doublon (deux alertes d'un même CVE pointent vers la même vulnérabilité). Propositions 1 et 3 : critère de #106. Question du repère de collecte : à trancher. |
 |---|---|
 
 ### Autres constats

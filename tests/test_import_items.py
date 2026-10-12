@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import shutil
 import sqlite3
@@ -37,6 +39,12 @@ FIRST_PAPER_ID = "2609.31282"
 FIRST_CVE_ID = "CVE-2026-86950"
 FIRST_RELEASE_ID = 401174143
 ADVISORY_WITH_TWO_PACKAGES = "GHSA-gr75-jv2w-4656"
+AUTOMATED_WATCH = "automated_watch"
+CISA_KEV_DIR = "cisa_kev"
+RELEASES_DIR = "github_releases_anthropics_claude_code"
+ADVISORIES_DIR = "github_advisories_pip"
+ARXIV_DIR = "arxiv_cscr_x_csai"
+FIRST_COLLECTION = "2026-10-05T093000Z"
 PAPER_QUERY = (
     "SELECT item.id, item.kind, raw_file_path, title, authors, submitted_at, revised_at"
     " FROM publication JOIN item ON item.id = publication.item_id"
@@ -98,6 +106,49 @@ def read_log(data_dir):
         json.loads(line)
         for line in (data_dir / "import-log.jsonl").read_text().splitlines()
     ]
+
+
+def read_discards(data_dir, source_item_id=None):
+    return [
+        line
+        for line in read_log(data_dir)
+        if line["kind"] == "discard"
+        and source_item_id in (None, line["source_item_id"])
+    ]
+
+
+def write_collection(data_dir, folder, collection, content):
+    """A raw file of a later collection, written as its source would."""
+    extension = {
+        CISA_KEV_DIR: "csv",
+        RELEASES_DIR: "json",
+        ADVISORIES_DIR: "json",
+        ARXIV_DIR: "xml",
+    }[folder]
+    (data_dir / "raw" / AUTOMATED_WATCH / folder).joinpath(
+        f"{collection}.{extension}"
+    ).write_text(content)
+    return f"{AUTOMATED_WATCH}/{folder}/{collection}.{extension}"
+
+
+def kev_catalog(ransomware_use_of_first_cve="Unknown"):
+    """The recorded catalog, with knownRansomwareCampaignUse of its first CVE as given."""
+    rows = list(
+        csv.DictReader(io.StringIO((FIXTURES_DIR / "cisa_kev_extract.csv").read_text()))
+    )
+    rows[0]["knownRansomwareCampaignUse"] = ransomware_use_of_first_cve
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=list(rows[0]), lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    return output.getvalue()
+
+
+KEV_QUERY = (
+    "SELECT vulnerability.item_id, ransomware_use, revised_at, raw_file_path"
+    " FROM vulnerability JOIN item ON item.id = vulnerability.item_id"
+    " JOIN raw_data ON raw_data.id = item.raw_data_id WHERE cve_id = ?"
+)
 
 
 def test_the_raw_files_go_into_the_database(data_dir):
@@ -295,6 +346,7 @@ def test_an_advisory_and_a_kev_row_of_the_same_cve_share_one_vulnerability(
         " WHERE cve_id = ?",
         (FIRST_CVE_ID,),
     ) == [(1, "vulnerability", "Apple")]
+    assert fetch_rows(data_dir, KEV_QUERY, (FIRST_CVE_ID,))[0][2] is None
     assert (
         count_rows(
             data_dir,
@@ -326,15 +378,37 @@ def test_a_release_of_a_repository_no_longer_tracked_is_rejected_and_logged(data
     assert count_rows(data_dir, "SELECT count(*) FROM release") == 0
 
 
-def test_an_import_run_again_on_the_same_raw_gives_the_same_database_and_log(data_dir):
-    run_import(data_dir)
+def test_an_import_run_again_gives_the_same_database_and_logs_every_item_as_a_discard(
+    data_dir,
+):
+    # Two catalogs that differ: the older one must not be written over the newer.
+    newer_catalog = write_collection(
+        data_dir, CISA_KEV_DIR, "2026-10-06T093000Z", kev_catalog("Known")
+    )
+    first = run_import(data_dir)
     first_tables = dump_database(data_dir)
-    first_log = (data_dir / "import-log.jsonl").read_bytes()
 
-    run_import(data_dir)
+    second = run_import(data_dir)
 
     assert dump_database(data_dir) == first_tables
-    assert (data_dir / "import-log.jsonl").read_bytes() == first_log
+    assert second.item_count == 0
+    discards = read_discards(data_dir)
+    assert (
+        second.discard_count == len(discards) == first.item_count + first.discard_count
+    )
+    rules_by_file = {}
+    for line in discards:
+        rules_by_file.setdefault(line["raw_file_path"], set()).add(line["rule"])
+    assert rules_by_file == {
+        f"{AUTOMATED_WATCH}/{ARXIV_DIR}/{FIRST_COLLECTION}.xml": {"revision_not_newer"},
+        f"{AUTOMATED_WATCH}/{CISA_KEV_DIR}/{FIRST_COLLECTION}.csv": {
+            "no_newer_version"
+        },
+        # The first CVE has its version in this very catalog; the others, in the older one.
+        newer_catalog: {"no_newer_version", "unchanged"},
+        f"{AUTOMATED_WATCH}/{RELEASES_DIR}/{FIRST_COLLECTION}.json": {"already_seen"},
+        f"{AUTOMATED_WATCH}/{ADVISORIES_DIR}/{FIRST_COLLECTION}.json": {"already_seen"},
+    }
 
 
 def test_a_new_collection_keeps_the_identifier_of_an_item_already_imported(data_dir):
@@ -352,47 +426,176 @@ def test_a_new_collection_keeps_the_identifier_of_an_item_already_imported(data_
     assert count_rows(data_dir, "SELECT count(*) FROM item") == 3 + 4 + 3 + 3
 
 
-def test_a_release_seen_again_keeps_its_first_collection(data_dir):
-    run_import(data_dir)
-    shutil.copyfile(
-        FIXTURES_DIR / "github_releases_extract.json",
-        data_dir
-        / "raw/automated_watch/github_releases_anthropics_claude_code/2026-10-06T093000Z.json",
+def test_a_release_seen_again_keeps_its_first_collection_and_is_logged_already_seen(
+    data_dir,
+):
+    releases = json.loads((FIXTURES_DIR / "github_releases_extract.json").read_text())
+    releases[0]["body"] = "Edited after the first collection."
+    again = write_collection(
+        data_dir, RELEASES_DIR, "2026-10-06T093000Z", json.dumps(releases)
     )
 
     run_import(data_dir)
 
     assert fetch_rows(
         data_dir,
-        "SELECT raw_file_path FROM release JOIN item ON item.id = release.item_id"
+        "SELECT substr(body, 1, 17), raw_file_path FROM release"
+        " JOIN item ON item.id = release.item_id"
         " JOIN raw_data ON raw_data.id = item.raw_data_id WHERE release_id = ?",
         (FIRST_RELEASE_ID,),
     ) == [
         (
-            "automated_watch/github_releases_anthropics_claude_code/2026-10-05T093000Z.json",
+            "## What's changed",
+            f"{AUTOMATED_WATCH}/{RELEASES_DIR}/{FIRST_COLLECTION}.json",
         )
+    ]
+    assert count_rows(data_dir, "SELECT count(*) FROM release") == 3
+    assert read_discards(data_dir, str(FIRST_RELEASE_ID)) == [
+        {
+            "kind": "discard",
+            "rule": "already_seen",
+            "source_code": "github",
+            "source_item_id": str(FIRST_RELEASE_ID),
+            "raw_file_path": again,
+            "compared_with_collected_at": "2026-10-05T09:30:00Z",
+        }
     ]
 
 
-def test_each_duplicate_removed_is_written_to_the_log_with_its_rule(data_dir):
-    shutil.copyfile(
-        FIXTURES_DIR / "cisa_kev_extract.csv",
-        data_dir / "raw/automated_watch/cisa_kev/2026-10-06T093000Z.csv",
+def test_an_advisory_seen_again_keeps_its_first_collection_and_is_logged_already_seen(
+    data_dir,
+):
+    advisories = json.loads(
+        (FIXTURES_DIR / "github_advisories_extract.json").read_text()
+    )
+    ghsa_id = advisories[0]["ghsa_id"]
+    first_summary = advisories[0]["summary"]
+    advisories[0]["summary"] = "Edited after the first collection."
+    again = write_collection(
+        data_dir, ADVISORIES_DIR, "2026-10-06T093000Z", json.dumps(advisories)
+    )
+
+    run_import(data_dir)
+
+    assert fetch_rows(
+        data_dir,
+        "SELECT summary, raw_file_path FROM advisory"
+        " JOIN item ON item.id = advisory.item_id"
+        " JOIN raw_data ON raw_data.id = item.raw_data_id WHERE ghsa_id = ?",
+        (ghsa_id,),
+    ) == [
+        (
+            first_summary,
+            f"{AUTOMATED_WATCH}/{ADVISORIES_DIR}/{FIRST_COLLECTION}.json",
+        )
+    ]
+    assert count_rows(data_dir, "SELECT count(*) FROM advisory") == 3
+    assert read_discards(data_dir, ghsa_id) == [
+        {
+            "kind": "discard",
+            "rule": "already_seen",
+            "source_code": "github",
+            "source_item_id": ghsa_id,
+            "raw_file_path": again,
+            "compared_with_collected_at": "2026-10-05T09:30:00Z",
+        }
+    ]
+
+
+def test_two_advisories_of_the_same_cve_are_both_kept_and_share_one_vulnerability(
+    data_dir,
+):
+    advisories = json.loads(
+        (FIXTURES_DIR / "github_advisories_extract.json").read_text()
+    )
+    advisories[1]["cve_id"] = advisories[0]["cve_id"]
+    write_collection(data_dir, ADVISORIES_DIR, FIRST_COLLECTION, json.dumps(advisories))
+
+    run_import(data_dir)
+
+    assert fetch_rows(
+        data_dir,
+        "SELECT count(*), count(DISTINCT vulnerability_id) FROM advisory"
+        " JOIN vulnerability ON vulnerability.id = advisory.vulnerability_id"
+        " WHERE cve_id = ?",
+        (advisories[0]["cve_id"],),
+    ) == [(2, 1)]
+    assert read_discards(data_dir) == []
+
+
+def test_a_modified_kev_row_replaces_the_previous_one_and_dates_revised_at(data_dir):
+    run_import(data_dir)
+    ((item_id, _, _, _),) = fetch_rows(data_dir, KEV_QUERY, (FIRST_CVE_ID,))
+    newer = write_collection(
+        data_dir, CISA_KEV_DIR, "2026-10-06T093000Z", kev_catalog("Known")
+    )
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, KEV_QUERY, (FIRST_CVE_ID,)) == [
+        (item_id, "Known", "2026-10-06T09:30:00Z", newer)
+    ]
+    assert all(
+        line["raw_file_path"] != newer for line in read_discards(data_dir, FIRST_CVE_ID)
+    )
+
+
+def test_an_identical_kev_row_of_a_newer_catalog_changes_nothing_and_is_logged_unchanged(
+    data_dir,
+):
+    newer = write_collection(
+        data_dir, CISA_KEV_DIR, "2026-10-06T093000Z", kev_catalog()
     )
 
     summary = run_import(data_dir)
 
-    discards = [line for line in read_log(data_dir) if line["kind"] == "discard"]
+    assert fetch_rows(data_dir, KEV_QUERY, (FIRST_CVE_ID,))[0][1:] == (
+        "Unknown",
+        None,
+        f"{AUTOMATED_WATCH}/{CISA_KEV_DIR}/{FIRST_COLLECTION}.csv",
+    )
+    discards = read_discards(data_dir)
     assert summary.discard_count == len(discards) == 4
     assert discards[0] == {
         "kind": "discard",
-        "rule": "same_source_id",
+        "rule": "unchanged",
         "source_code": "cisa_kev",
         "source_item_id": FIRST_CVE_ID,
-        "url": f"https://nvd.nist.gov/vuln/detail/{FIRST_CVE_ID}",
-        "raw_file_path": "automated_watch/cisa_kev/2026-10-06T093000Z.csv",
-        "kept_url": f"https://nvd.nist.gov/vuln/detail/{FIRST_CVE_ID}",
+        "raw_file_path": newer,
+        "compared_with_collected_at": "2026-10-05T09:30:00Z",
     }
+
+
+def test_a_kev_row_of_an_older_catalog_changes_nothing_and_is_logged_no_newer_version(
+    data_dir,
+):
+    run_import(data_dir)
+    # A file left unimported, older than the catalog already imported.
+    older = write_collection(
+        data_dir, CISA_KEV_DIR, "2026-10-04T093000Z", kev_catalog("Known")
+    )
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, KEV_QUERY, (FIRST_CVE_ID,))[0][1:] == (
+        "Unknown",
+        None,
+        f"{AUTOMATED_WATCH}/{CISA_KEV_DIR}/{FIRST_COLLECTION}.csv",
+    )
+    assert [
+        line
+        for line in read_discards(data_dir, FIRST_CVE_ID)
+        if line["raw_file_path"] == older
+    ] == [
+        {
+            "kind": "discard",
+            "rule": "no_newer_version",
+            "source_code": "cisa_kev",
+            "source_item_id": FIRST_CVE_ID,
+            "raw_file_path": older,
+            "compared_with_collected_at": "2026-10-05T09:30:00Z",
+        }
+    ]
 
 
 def test_each_rejected_file_is_written_to_the_log(data_dir):
@@ -525,6 +728,46 @@ def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir)
         "2026-10-02T08:00:00Z",
     )
     assert count_rows(data_dir, "SELECT count(*) FROM item") == 3 + 4 + 3 + 3
+
+
+@pytest.mark.parametrize("last_revision", ["older", "equal"])
+def test_an_arxiv_revision_not_newer_is_discarded_as_revision_not_newer(
+    data_dir, last_revision
+):
+    recorded = (FIXTURES_DIR / "arxiv_extract.xml").read_text()
+    revision = recorded.replace(
+        "<updated>2026-09-25T13:53:50Z</updated>",
+        "<updated>2026-10-02T08:00:00Z</updated>",
+        1,
+    )
+    newer = write_collection(data_dir, ARXIV_DIR, "2026-10-06T093000Z", revision)
+    last = write_collection(
+        data_dir,
+        ARXIV_DIR,
+        "2026-10-07T093000Z",
+        recorded if last_revision == "older" else revision,
+    )
+
+    run_import(data_dir)
+
+    ((_, _, raw_file_path, _, _, _, revised_at),) = fetch_rows(
+        data_dir, PAPER_QUERY, (FIRST_PAPER_ID,)
+    )
+    assert (raw_file_path, revised_at) == (newer, "2026-10-02T08:00:00Z")
+    assert [
+        line
+        for line in read_discards(data_dir, FIRST_PAPER_ID)
+        if line["raw_file_path"] == last
+    ] == [
+        {
+            "kind": "discard",
+            "rule": "revision_not_newer",
+            "source_code": "arxiv",
+            "source_item_id": FIRST_PAPER_ID,
+            "raw_file_path": last,
+            "compared_with_revised_at": "2026-10-02T08:00:00Z",
+        }
+    ]
 
 
 def test_a_log_that_cannot_be_written_keeps_the_previous_log_whole(

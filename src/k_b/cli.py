@@ -51,7 +51,8 @@ def main(argv: list[str] | None = None) -> int:
         "create-db", help=f"create the items database, {DATABASE_FILE_NAME}"
     )
     commands.add_parser(
-        "import", help="merge the raw items and write them into the database"
+        "import",
+        help="read the raw items and write them into the database, which removes the duplicates",
     )
     arguments = parser.parse_args(argv)
     configure_logging()
@@ -121,8 +122,8 @@ def run_import(data_dir: Path) -> int:
     ) as error:
         print(f"error: {type(error).__name__}: {error}", file=sys.stderr)
         return 1
-    print(f"items imported: {summary.item_count}")
-    print(f"duplicates removed: {summary.discard_count}")
+    print(f"items written (new or updated): {summary.item_count}")
+    print(f"items left out (duplicates or versions not newer): {summary.discard_count}")
     print(f"rejections: {summary.rejection_count}")
     print(f"log: {log_path}")
     return 0
