@@ -1,4 +1,4 @@
-"""The common item every source is read into, before the merge (docs/specs-collecte.md, step 2).
+"""The common item every source is read into, before the import (docs/specs-collecte.md, step 2).
 
 Which source field goes into which item field: docs/stockage.md.
 """
@@ -30,8 +30,8 @@ RansomwareUse = Literal["Known", "Unknown"]
 CVE_ID = re.compile(r"CVE-\d{4}-\d{4,}")
 
 NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
-# Kept as given, not as pydantic's HttpUrl, which rewrites it (adds a final slash): the merge
-# compares URLs as text.
+# Kept as given, not as pydantic's HttpUrl, which rewrites it (adds a final slash): the base
+# keeps the URL the source gave.
 HttpsUrl = Annotated[str, StringConstraints(pattern=r"^https://\S+$")]
 CveId = Annotated[str, StringConstraints(pattern=r"^CVE-\d{4}-\d{4,}$")]
 # owner/name; the GLOB of tracked_repository.repository_name in schema.sql.

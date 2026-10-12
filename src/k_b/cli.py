@@ -51,7 +51,8 @@ def main(argv: list[str] | None = None) -> int:
         "create-db", help=f"create the items database, {DATABASE_FILE_NAME}"
     )
     commands.add_parser(
-        "import", help="merge the raw items and write them into the database"
+        "import",
+        help="read the raw items and write them into the database, which removes the duplicates",
     )
     arguments = parser.parse_args(argv)
     configure_logging()
