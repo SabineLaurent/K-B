@@ -129,7 +129,7 @@ class TldrArticle:
     title: str
     # The href as written, "" if there is none.
     link: str
-    # Plain text, as displayed; "" if there is none.
+    # Plain text; "" if there is none.
     summary: str
 
 
@@ -139,8 +139,8 @@ def read_articles(page: bytes) -> list[TldrArticle]:
 
     An entry is returned as read, even without a title, a link or a summary: the item refuses
     it, and the others are still read. A page that is not UTF-8, whose first h1 is not the
-    title of an edition, or without any complete article (a selector no longer matches) is
-    refused whole.
+    title of an edition, with an article inside another, or without any complete article (a
+    selector no longer matches) is refused whole.
     """
     try:
         # Decoded here: BeautifulSoup would guess the encoding of bytes.
@@ -148,6 +148,10 @@ def read_articles(page: bytes) -> list[TldrArticle]:
     except ParserRejectedMarkup as error:
         raise ValueError(f"page rejected by html.parser: {error}") from error
     edition_date = read_edition_date(soup)
+    # Refused before its entries are read: each article is searched whole, and a page of
+    # articles inside one another would be searched as many times as it has articles.
+    if soup.select_one("article article") is not None:
+        raise ValueError("article element inside an article element")
     entries = soup.select("article")
     articles = [
         article
@@ -197,9 +201,9 @@ def read_article(entry: Tag, edition_date: date, rank: int) -> TldrArticle:
 
 
 def read_text(element: Tag | None) -> str:
-    """The text of an element as displayed, each run of white space as one space; "" without
-    the element."""
-    return " ".join(element.get_text().split()) if element else ""
+    """The text of an element, its pieces (paragraphs, links) a space apart and each run of
+    white space as one space; "" without the element."""
+    return " ".join(element.get_text(" ").split()) if element else ""
 
 
 def is_left_out(article: TldrArticle) -> bool:

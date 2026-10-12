@@ -33,15 +33,22 @@ RansomwareUse = Literal["Known", "Unknown"]
 CVE_ID = re.compile(r"CVE-\d{4}-\d{4,}")
 # The slug of a newsletter edition, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
 EDITION_SLUG = re.compile(r"[a-z]+")
+# The largest integer SQLite holds, and BigQuery gives (INT64).
+MAX_INT64 = 2**63 - 1
 
 
-def check_url_can_be_split(url: str) -> str:
-    """Refuse the URL urlsplit refuses (an unclosed bracket, a host NFKC rewrites): merge.py
-    splits every URL at the import, where one refused would stop it all."""
+def check_url_can_be_normalized(url: str) -> str:
+    """Refuse the URL urlsplit refuses (an unclosed bracket, a host NFKC rewrites), and the URL
+    without a host, which may be "https://" once its utm_* parameters are removed: merge.py
+    splits every URL at the import, then validates the item again, where one refused would
+    stop it all."""
     try:
-        urlsplit(url)
-    except ValueError as error:
-        raise ValueError(f"url cannot be split: {error}") from error
+        host = urlsplit(url).hostname
+    except ValueError:
+        # The error of urlsplit quotes the host as written: only the state is kept.
+        raise ValueError(f"url cannot be split: {len(url)} characters") from None
+    if not host:
+        raise ValueError(f"url without a host: {len(url)} characters")
     return url
 
 
@@ -51,7 +58,7 @@ NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
 HttpsUrl = Annotated[
     str,
     StringConstraints(pattern=r"^https://\S+$"),
-    AfterValidator(check_url_can_be_split),
+    AfterValidator(check_url_can_be_normalized),
 ]
 CveId = Annotated[str, StringConstraints(pattern=r"^CVE-\d{4}-\d{4,}$")]
 # owner/name; the GLOB of tracked_repository.repository_name in schema.sql.
@@ -175,7 +182,7 @@ class Item(BaseModel):
     # Newsletter article only: the slug of its edition, and its position in the edition page,
     # from 1. published_at is the day of the edition, at midnight UTC.
     edition: NewsletterEdition | None = None
-    rank: Annotated[int, Field(ge=1)] | None = None
+    rank: Annotated[int, Field(ge=1, le=MAX_INT64)] | None = None
 
     @model_validator(mode="after")
     def check_the_fields_of_its_kind(self) -> "Item":

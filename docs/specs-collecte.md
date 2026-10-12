@@ -160,7 +160,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Lecture d'une page** (#57, `read_articles`, `k_b/sources/tldr.py`, avec BeautifulSoup et
   l'analyseur `html.parser` de la bibliothèque standard) : une entrée par `<article>` de la
   page. Le titre est le texte de `a.font-bold`, le lien son `href`, le résumé le texte de
-  `div.newsletter-html`, tel qu'affiché. L'édition est lue dans le nom du dossier brut
+  `div.newsletter-html`, ses morceaux (paragraphes, liens) séparés par une espace. L'édition est lue dans le nom du dossier brut
   (`tldr_ai` → `ai`), la date de l'édition dans le premier `h1` de la page
   (`TLDR AI 2026-10-08`), le rang est la position de l'entrée parmi les `<article>` de la
   page, à partir de 1.
@@ -171,10 +171,14 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   - **Page refusée entière** (rejet au journal d'import, page non inscrite au registre, relue à
     chaque import) : elle n'est pas en UTF-8 ; elle n'a pas de `h1` ; son premier `h1` n'est
     pas « TLDR <titre> <date> » (le `h1` trouvé est cité, échappé et coupé à 100 caractères) ;
+    un `<article>` en contient un autre (refusée avant la lecture des entrées : une page
+    d'articles imbriqués coûterait un temps quadratique, 18 s mesurées pour 50 Ko) ;
     aucun de ses articles n'a à la fois un titre, un lien et un résumé (le nombre d'`<article>`
     trouvés est cité).
   - **Entrée refusée** (rejet au journal d'import, les autres entrées sont lues) : sans titre,
-    sans lien `https`, sans résumé, ou avec un texte trop long. Dans le motif, `entry N` est
+    sans lien `https` (un lien sans hôte, ou que `urlsplit` refuse, est refusé aussi, pour
+    toutes les sources : le motif dit l'état et la longueur du lien, sans le recopier), sans
+    résumé, ou avec un texte trop long. Dans le motif, `entry N` est
     la position de l'entrée parmi les entrées lues, à partir de 0, entrées écartées non
     comptées : ce n'est pas le rang.
   - Certains liens sont échappés deux fois dans la page (`&amp;amp;`) : le lecteur défait le
@@ -183,10 +187,19 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   - **Limites** (mesures sur les 18 pages collectées du 2026-09-30 au 2026-10-09, 315
     entrées) : le titre d'édition du `h1` n'est pas comparé au dossier : une page d'une autre
     édition rangée sous `tldr_ai` entrerait comme édition `ai`. Si la date du `h1` diffère de
-    celle du nom du fichier, celle du `h1` l'emporte (18 pages sur 18 ont la même). Une offre
+    celle du nom du fichier, celle du `h1` l'emporte (18 pages sur 18 ont la même) : une page
+    de la veille servie à l'adresse du jour voit ses articles écartés `already_seen` ; une
+    page qui se dirait d'un jour à venir prendrait la clé de ce jour, et l'édition de ce jour
+    serait écartée à son tour. Le `h1` doit porter un nom d'édition entre « TLDR » et la
+    date : une édition titrée « TLDR <date> » serait refusée à chaque import (forme non
+    observée ; à vérifier quand une édition est ajoutée à `TRACKED_EDITIONS`). Une offre
     d'emploi publiée ailleurs que sur le site d'offres de TLDR entre comme article. Un lien
     qui passe par `links.tldrnewsletter.com` est gardé tel quel (3 liens) : l'adresse de
     l'article demanderait un appel réseau.
+  - **Dépendance** : `beautifulsoup4` (4.15.0, du 2026-06-07) amène `soupsieve`, verrouillé
+    en 2.10 (du 2026-09-24) dans `uv.lock` : la 3.0.3 que `uv` avait choisie datait du jour
+    même (décision de Sabine du 2026-10-12, constat de la revue de sécurité). **Limite** :
+    `pyproject.toml` ne porte pas cette borne ; un `uv lock --upgrade` remontera `soupsieve`.
 - **Jours sans édition** : un jour redirigé vers la page d'accueil de l'édition,
   `https://tldr.tech/<édition>`, n'a pas de page d'édition (observé pour le 2026-10-03 et le
   2026-10-04) : il est journalisé avec l'adresse de redirection et sauté. Toute autre
@@ -199,7 +212,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   Chaque collecte lit chaque jour depuis le jour de la dernière collecte, relu car son édition a
   pu paraître après elle, jusqu'à aujourd'hui (UTC) ; la première lit les 7 jours précédents et
   aujourd'hui. La page relue est en double dans deux collectes : ses articles sont écartés à
-  l'import, `already_seen` (15 à 21 lignes au journal d'import par page relue).
+  l'import, `already_seen` (12 à 18 lignes au journal d'import par page relue : ses
+  articles gardés).
 - **Accès** : sans authentification. Le `robots.txt` autorise tout, sauf les pages d'abonnement
   et de compte (`/subscribed`, `/manage`, `/info`…), qu'on ne lit pas.
 - **Limites** : pas de quota publié ; on s'impose une page à la fois, avec une pause entre deux

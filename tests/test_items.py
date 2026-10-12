@@ -266,8 +266,9 @@ def test_a_newsletter_article_with_its_fields_is_accepted():
         {"edition": "ai_old"},
         {"edition": "ai\n"},
         {"edition": "AI ai"},
-        # What the CHECK of newsletter_article.rank refuses.
+        # What the CHECK of newsletter_article.rank refuses, and an integer SQLite cannot hold.
         {"rank": 0},
+        {"rank": 2**63},
         {"rank": "2"},
         {"rank": True},
         {"repository_name": "anthropics/claude-code"},
@@ -291,7 +292,42 @@ def test_a_link_that_cannot_be_split_is_refused(url):
     with pytest.raises(ValidationError) as refusal:
         Item(**newsletter_article_fields(url=url))
 
-    assert "url cannot be split" in str(refusal.value)
+    assert f"url cannot be split: {len(url)} characters" in str(refusal.value)
+
+
+def test_a_link_that_cannot_be_split_is_not_copied_whole_into_the_refusal():
+    # urlsplit quotes the host in its error, as written: an escape sequence, 3 000 letters.
+    url = "https://a\u2100\x1b[2J" + "b" * 3_000 + "/x"
+
+    with pytest.raises(ValidationError) as refusal:
+        Item(**newsletter_article_fields(url=url))
+
+    message = str(refusal.value)
+    assert f"url cannot be split: {len(url)} characters" in message
+    assert "\x1b" not in message
+    assert len(message) < 500
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        # Without its utm_* parameter, the first one is "https://": merge.py would raise.
+        "https://?utm_source=tldrai",
+        "https://#part",
+        "https:///path",
+        "https://:443/path",
+        "https://user@/path",
+    ],
+)
+def test_a_link_without_a_host_is_refused(url):
+    with pytest.raises(ValidationError) as refusal:
+        Item(**newsletter_article_fields(url=url))
+
+    assert f"url without a host: {len(url)} characters" in str(refusal.value)
+
+
+def test_the_largest_rank_sqlite_holds_is_accepted():
+    assert Item(**newsletter_article_fields(rank=2**63 - 1)).rank == 2**63 - 1
 
 
 def text_of_length(field, length):

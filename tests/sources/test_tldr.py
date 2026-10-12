@@ -253,6 +253,18 @@ def test_a_summary_with_a_link_is_read_as_displayed():
     assert read_articles(page)[0].summary == "Copilot. Read the Report"
 
 
+def test_the_paragraphs_of_a_summary_are_read_apart():
+    # Two paragraphs written as in the sponsored entries collected: text<p></p><p>text.
+    page = AI_PAGE.replace(
+        b"multimodal model positioned", b"multimodal model.<p></p><p>Positioned"
+    )
+
+    assert read_articles(page)[0].summary == (
+        "Mistral Large 4 is a one-trillion-parameter multimodal model. Positioned as a"
+        " European alternative to leading closed and open AI systems."
+    )
+
+
 def test_an_article_gives_an_item_of_its_edition_dated_at_midnight_utc():
     item = convert_article(MISTRAL_ARTICLE, COLLECTED_AT, AI_PAGE_PATH)
 
@@ -322,6 +334,22 @@ def test_a_link_escaped_twice_in_the_page_loses_its_tracking_parameters():
             AI_PAGE.replace(b"<article", b"<div").replace(b"</article>", b"</div>"),
             "no article with a title, a link and a summary among 0 article elements",
         ),
+        (
+            # The second entry now holds the third one.
+            AI_PAGE.replace(b"</article><article", b"<article", 1),
+            "article element inside an article element",
+        ),
+    ],
+    ids=[
+        "not utf-8",
+        "no h1",
+        "landing page",
+        "no such day",
+        "text after the date",
+        "no title link",
+        "no summary",
+        "no article",
+        "nested articles",
     ],
 )
 def test_a_page_that_is_not_a_readable_edition_is_refused_whole(page, refusal):
@@ -366,6 +394,7 @@ def test_a_page_the_html_parser_rejects_is_refused_whole(monkeypatch):
         {"link": "http://mistral.ai/news/mistral-large-4/"},
         {"link": "javascript:alert(1)"},
         {"link": "https://[mistral.ai/news/"},
+        {"link": "https://?utm_source=tldrai"},
         {"summary": ""},
         {"title": "x" * 501},
     ],
