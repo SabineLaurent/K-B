@@ -12,11 +12,12 @@ from test_items import (
     RAW_FILE_PATH,
     advisory_fields,
     item_fields,
+    newsletter_article_fields,
     release_fields,
     text_of_length,
     vulnerability_fields,
 )
-from test_raw_items import FIXTURES_DIR, copy_fixture
+from test_raw_items import FIXTURES_DIR, convert_line, copy_fixture
 
 from k_b import import_items as import_items_module
 from k_b.database.connection import connect_database
@@ -692,19 +693,11 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(
     assert list_logs(data_dir) == []
 
 
-def convert_line_to_newsletter_article(line, collected_at, raw_file_path):
-    return Item(
-        source_code="tldr",
-        source_item_id=line,
-        kind="newsletter_article",
-        title=line,
-        url=f"https://example.com/{line}",
-        collected_at=collected_at,
-        raw_file_path=raw_file_path,
-    )
-
-
-def test_an_item_of_a_kind_without_table_is_refused_and_nothing_written(tmp_path):
+def test_an_item_of_a_kind_without_writer_is_refused_and_nothing_written(
+    tmp_path, monkeypatch
+):
+    # Every kind has its writer: one is removed, as for a kind added before its table.
+    monkeypatch.delitem(import_items_module.WRITER_BY_KIND, "newsletter_article")
     source_dir = tmp_path / "raw" / "automated_watch" / "fake"
     source_dir.mkdir(parents=True)
     (source_dir / "2026-10-05T093000Z.txt").write_text("v1.0\n")
@@ -716,7 +709,7 @@ def test_an_item_of_a_kind_without_table_is_refused_and_nothing_written(tmp_path
             SourceReader(
                 "tldr",
                 lambda raw: raw.decode().splitlines(),
-                convert_line_to_newsletter_article,
+                convert_line,
             ),
         )
     ]
@@ -891,7 +884,7 @@ def test_a_ctrl_c_after_the_log_is_written_leaves_neither_the_import_nor_its_log
 def text_at_its_maximum(kind, field, maximum):
     """A text of the maximum length that names its kind and its field: no two columns hold
     the same, so a writer that takes one field for another is seen."""
-    if field == "cve":
+    if field in ("cve", "edition"):
         return text_of_length(field, maximum)
     prefix = {"url": "https://", "source_item_id": "GHSA-" * (kind == "advisory")}.get(
         field, ""
@@ -921,7 +914,13 @@ def test_an_item_with_every_text_and_list_at_its_maximum_goes_into_the_database(
     source_dir.mkdir(parents=True)
     (source_dir / "2026-10-05T093000Z.txt").write_text("")
     create_database(tmp_path / "k-b.sqlite")
-    builders = [item_fields, vulnerability_fields, release_fields, advisory_fields]
+    builders = [
+        item_fields,
+        vulnerability_fields,
+        release_fields,
+        advisory_fields,
+        newsletter_article_fields,
+    ]
     kinds = [
         SourceKind(
             "fake",
@@ -932,8 +931,8 @@ def test_an_item_with_every_text_and_list_at_its_maximum_goes_into_the_database(
 
     summary = run_import(tmp_path, kinds=kinds)
 
-    assert summary == (4, 0, 0, 1, 0)
-    paper, vulnerability, release, advisory = (
+    assert summary == (5, 0, 0, 1, 0)
+    paper, vulnerability, release, advisory, newsletter_article = (
         build_item_at_its_maximums(build_fields, COLLECTED_AT, RAW_FILE_PATH)
         for build_fields in builders
     )
@@ -969,6 +968,16 @@ def test_an_item_with_every_text_and_list_at_its_maximum_goes_into_the_database(
             advisory.title,
             advisory.url,
             json.dumps(list(advisory.package_names)),
+        )
+    ]
+    assert fetch_rows(
+        tmp_path, "SELECT edition, title, summary, url FROM newsletter_article"
+    ) == [
+        (
+            newsletter_article.edition,
+            newsletter_article.title,
+            newsletter_article.summary,
+            newsletter_article.url,
         )
     ]
 
@@ -1015,15 +1024,18 @@ def test_a_file_read_with_a_rejected_entry_is_registered_and_not_read_again(data
 
 def test_an_unreadable_file_and_a_file_without_reader_are_not_registered(data_dir):
     unreadable = write_collection(data_dir, ARXIV_DIR, "2026-10-06T093000Z", "not xml")
-    pages_dir = data_dir / "raw" / AUTOMATED_WATCH / "tldr_ai" / FIRST_COLLECTION
-    pages_dir.mkdir(parents=True)
-    (pages_dir / "2026-10-05.html").write_text("<html></html>")
+    copy_fixture(
+        data_dir / "raw",
+        "github_most_starred_extract.json",
+        "github_most_starred",
+        "json",
+    )
 
     run_import(data_dir)
     second = run_import(data_dir)
 
     assert unreadable not in registered_paths(data_dir)
-    assert all("tldr_ai" not in path for path in registered_paths(data_dir))
+    assert all("github_most_starred" not in path for path in registered_paths(data_dir))
     # The unreadable file is read and rejected at each import (decision of 2026-10-12).
     assert (second.read_count, second.rejection_count) == (1, 1)
 
@@ -1279,3 +1291,154 @@ def test_a_rebuilt_database_has_the_content_and_withdrawals_of_one_kept_with_a_l
 
     assert fetch_rows(data_dir, KEV_CONTENT_QUERY) == kept
     assert (WITHDRAWN_CVE_ID, True) in [(row[0], bool(row[-1])) for row in kept]
+
+
+# A reduced extract of the TLDR AI page of 2026-10-07, as collected on 2026-10-11: a sponsored
+# entry, three articles, a job offer of TLDR.
+TLDR_AI_PAGE = (FIXTURES_DIR / "tldr_ai_extract.html").read_text()
+TLDR_FIRST_COLLECTION = "2026-10-11T153130Z"
+TLDR_SECOND_COLLECTION = "2026-10-12T153130Z"
+MISTRAL_ARTICLE_ID = "ai/2026-10-07#2"
+MISTRAL_TITLE = "Mistral Large 4 (9 minute read)"
+MISTRAL_SUMMARY = (
+    "Mistral Large 4 is a one-trillion-parameter multimodal model positioned as a"
+    " European alternative to leading closed and open AI systems."
+)
+NEWSLETTER_ARTICLE_QUERY = (
+    "SELECT edition, edition_date, rank, title, summary, url, publication_id,"
+    " item.kind, raw_file_path FROM newsletter_article"
+    " JOIN item ON item.id = newsletter_article.item_id"
+    " JOIN raw_data ON raw_data.id = item.raw_data_id"
+    " ORDER BY edition, edition_date, rank"
+)
+
+
+def write_tldr_page(data_dir, folder, collection, page):
+    """The page of 2026-10-07 of an edition folder, in a collection."""
+    pages_dir = data_dir / "raw" / AUTOMATED_WATCH / folder / collection
+    pages_dir.mkdir(parents=True)
+    (pages_dir / "2026-10-07.html").write_text(page)
+    return f"{AUTOMATED_WATCH}/{folder}/{collection}/2026-10-07.html"
+
+
+@pytest.fixture
+def tldr_data_dir(tmp_path):
+    create_database(tmp_path / "k-b.sqlite")
+    write_tldr_page(tmp_path, "tldr_ai", TLDR_FIRST_COLLECTION, TLDR_AI_PAGE)
+    return tmp_path
+
+
+def test_a_tldr_page_gives_an_item_and_its_newsletter_article_per_article(
+    tldr_data_dir,
+):
+    first_page = f"{AUTOMATED_WATCH}/tldr_ai/{TLDR_FIRST_COLLECTION}/2026-10-07.html"
+
+    summary = run_import(tldr_data_dir)
+
+    assert summary == (3, 0, 0, 1, 0)
+    rows = fetch_rows(tldr_data_dir, NEWSLETTER_ARTICLE_QUERY)
+    assert rows[0] == (
+        "ai",
+        "2026-10-07T00:00:00Z",
+        2,
+        MISTRAL_TITLE,
+        MISTRAL_SUMMARY,
+        "https://mistral.ai/news/mistral-large-4/",
+        None,
+        "newsletter_article",
+        first_page,
+    )
+    # The ranks count the sponsored entry (1) and leave out the job offer (5); the utm_*
+    # parameters are removed, the others kept; no publication is cited yet.
+    assert [(row[2], row[5], row[6]) for row in rows] == [
+        (2, "https://mistral.ai/news/mistral-large-4/", None),
+        (3, "https://openai.com/index/sharing-ai-progress-in-mathematics/", None),
+        (
+            4,
+            (
+                "https://www.nytimes.com/2026/10/06/science/"
+                "china-ai-research-recruitment.html"
+                "?unlocked_article_code=1.G1E.vzNX.LAgmpYtxdpWb&smid=url-share"
+            ),
+            None,
+        ),
+    ]
+    assert fetch_rows(tldr_data_dir, "SELECT stream, raw_file_path FROM raw_data") == [
+        ("tldr_ai", first_page)
+    ]
+
+
+def test_an_article_seen_again_keeps_its_first_collection_and_is_logged_already_seen(
+    tldr_data_dir,
+):
+    run_import(tldr_data_dir)
+    rows_of_the_first_import = fetch_rows(tldr_data_dir, NEWSLETTER_ARTICLE_QUERY)
+    # The day of the last collection is collected again: the same page, edited since.
+    edited_page = TLDR_AI_PAGE.replace(
+        MISTRAL_TITLE, "Mistral Large 4, edited"
+    ).replace(MISTRAL_SUMMARY, "Edited after the first collection.")
+    assert edited_page.count("dited") == 2
+    again = write_tldr_page(
+        tldr_data_dir, "tldr_ai", TLDR_SECOND_COLLECTION, edited_page
+    )
+
+    second = run_import(tldr_data_dir)
+
+    assert second == (0, 3, 0, 1, 0)
+    assert fetch_rows(tldr_data_dir, NEWSLETTER_ARTICLE_QUERY) == (
+        rows_of_the_first_import
+    )
+    assert rows_of_the_first_import[0][3:5] == (MISTRAL_TITLE, MISTRAL_SUMMARY)
+    assert again in registered_paths(tldr_data_dir)
+    assert read_discards(tldr_data_dir, MISTRAL_ARTICLE_ID) == [
+        {
+            "kind": "discard",
+            "rule": "already_seen",
+            "source_code": "tldr",
+            "source_item_id": MISTRAL_ARTICLE_ID,
+            "raw_file_path": again,
+            "compared_with_collected_at": "2026-10-11T15:31:30Z",
+        }
+    ]
+
+
+def test_the_same_article_summarized_by_two_editions_is_kept_twice(tldr_data_dir):
+    # The same page under the folder of another edition: every URL is seen twice.
+    write_tldr_page(tldr_data_dir, "tldr_dev", TLDR_FIRST_COLLECTION, TLDR_AI_PAGE)
+
+    summary = run_import(tldr_data_dir)
+
+    assert summary == (6, 0, 0, 2, 0)
+    assert fetch_rows(
+        tldr_data_dir,
+        "SELECT edition, count(*), count(DISTINCT url) FROM newsletter_article"
+        " GROUP BY edition ORDER BY edition",
+    ) == [("ai", 3, 3), ("dev", 3, 3)]
+    assert (
+        count_rows(tldr_data_dir, "SELECT count(DISTINCT url) FROM newsletter_article")
+        == 3
+    )
+
+
+def test_a_tldr_page_without_edition_title_is_rejected_and_not_registered(
+    tldr_data_dir,
+):
+    landing_page = write_tldr_page(
+        tldr_data_dir,
+        "tldr_ai",
+        TLDR_SECOND_COLLECTION,
+        TLDR_AI_PAGE.replace("TLDR AI 2026-10-07</h1>", "Keep up with AI</h1>"),
+    )
+
+    summary = run_import(tldr_data_dir)
+
+    assert (summary.item_count, summary.rejection_count) == (3, 1)
+    assert landing_page not in registered_paths(tldr_data_dir)
+    assert read_log(tldr_data_dir) == [
+        {
+            "kind": "rejection",
+            "raw_file_path": landing_page,
+            "reason": "ValueError: first h1 is not an edition title with its date: "
+            "'Keep up with AI'",
+        }
+    ]

@@ -1,14 +1,24 @@
 import logging
 from datetime import UTC, date, datetime
+from pathlib import Path
 from urllib.error import HTTPError, URLError
 
 import pytest
+from bs4.exceptions import ParserRejectedMarkup
+from pydantic import ValidationError
 
 from k_b.http_download import RedirectedOutsideError
-from k_b.source_contract import list_sources
+from k_b.merge import normalize_item
+from k_b.raw_items import read_raw_items
+from k_b.source_contract import find_source_kind, list_sources
 from k_b.source_kinds import SOURCE_KINDS
 from k_b.sources import tldr
-from k_b.sources.tldr import TldrSource
+from k_b.sources.tldr import (
+    TldrArticle,
+    TldrSource,
+    convert_article,
+    read_articles,
+)
 
 # Sunday: the window of a collection on this day holds a weekend.
 TODAY = date(2026, 10, 4)
@@ -169,3 +179,235 @@ def test_a_last_collection_after_today_is_refused_with_both_days(fake_download):
     ):
         TldrSource("ai").fetch(datetime(2026, 10, 5, 6, 0, tzinfo=UTC))
     assert fake_download.urls == []
+
+
+# The reader. Both pages are reduced extracts of collected pages: some entries, as written,
+# their summaries cut to their first sentence.
+FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
+AI_PAGE = (FIXTURES_DIR / "tldr_ai_extract.html").read_bytes()
+DEV_PAGE = (FIXTURES_DIR / "tldr_dev_extract.html").read_bytes()
+AI_PAGE_PATH = "automated_watch/tldr_ai/2026-10-11T153130Z/2026-10-07.html"
+DEV_PAGE_PATH = "automated_watch/tldr_dev/2026-10-11T153130Z/2026-10-05.html"
+COLLECTED_AT = datetime(2026, 10, 11, 15, 31, 30, tzinfo=UTC)
+AI_HEADING = b"TLDR AI 2026-10-07</h1>"
+MISTRAL_ARTICLE = TldrArticle(
+    edition_date=date(2026, 10, 7),
+    rank=2,
+    title="Mistral Large 4 (9 minute read)",
+    link="https://mistral.ai/news/mistral-large-4/?utm_source=tldrai",
+    summary=(
+        "Mistral Large 4 is a one-trillion-parameter multimodal model positioned as a"
+        " European alternative to leading closed and open AI systems."
+    ),
+)
+
+
+def test_one_article_per_entry_without_the_sponsored_one_that_its_rank_counts():
+    # The page holds five entries: a sponsored one, three articles, a job offer of TLDR.
+    articles = read_articles(AI_PAGE)
+
+    assert [(article.rank, article.title) for article in articles] == [
+        (2, "Mistral Large 4 (9 minute read)"),
+        (3, "Sharing AI progress in mathematics (2 minute read)"),
+        (
+            4,
+            (
+                "In Race With US, China Struggles to Recruit Foreign AI Researchers"
+                " (6 minute read)"
+            ),
+        ),
+    ]
+
+
+def test_a_job_offer_of_tldr_is_left_out_by_its_link_not_by_its_title():
+    # The link of the offer, given to the article before it: the article is left out too.
+    nytimes_link = (
+        b"https://www.nytimes.com/2026/10/06/science/china-ai-research-recruitment.html"
+        b"?unlocked_article_code=1.G1E.vzNX.LAgmpYtxdpWb&amp;smid=url-share"
+        b"&amp;utm_source=tldrai"
+    )
+    job_offer_link = b"https://jobs.ashbyhq.com/tldr.tech/897f4391?utm_source=tldr"
+    assert nytimes_link in AI_PAGE
+
+    articles = read_articles(AI_PAGE.replace(nytimes_link, job_offer_link))
+
+    assert [article.rank for article in articles] == [2, 3]
+
+
+def test_an_article_about_jobs_elsewhere_than_the_job_board_of_tldr_is_kept():
+    page = AI_PAGE.replace(
+        b"https://jobs.ashbyhq.com/tldr.tech/", b"https://jobs.ashbyhq.com/openai/"
+    )
+
+    assert [article.rank for article in read_articles(page)] == [2, 3, 4, 5]
+
+
+def test_an_article_is_read_with_the_date_of_its_edition_its_link_and_its_summary():
+    assert read_articles(AI_PAGE)[0] == MISTRAL_ARTICLE
+
+
+def test_a_summary_with_a_link_is_read_as_displayed():
+    # The sponsored entry, read as an article: its summary holds a link.
+    page = AI_PAGE.replace(b" (Sponsor)", b"")
+
+    assert read_articles(page)[0].summary == "Copilot. Read the Report"
+
+
+def test_an_article_gives_an_item_of_its_edition_dated_at_midnight_utc():
+    item = convert_article(MISTRAL_ARTICLE, COLLECTED_AT, AI_PAGE_PATH)
+
+    assert item.model_dump(exclude_defaults=True) == {
+        "source_code": "tldr",
+        "source_item_id": "ai/2026-10-07#2",
+        "kind": "newsletter_article",
+        "title": MISTRAL_ARTICLE.title,
+        "url": MISTRAL_ARTICLE.link,
+        "published_at": datetime(2026, 10, 7, tzinfo=UTC),
+        "summary": MISTRAL_ARTICLE.summary,
+        "collected_at": COLLECTED_AT,
+        "raw_file_path": AI_PAGE_PATH,
+        "edition": "ai",
+        "rank": 2,
+    }
+
+
+def test_a_link_escaped_twice_in_the_page_loses_its_tracking_parameters():
+    article = read_articles(DEV_PAGE)[1]
+    assert article.link.endswith("&amp;utm_source=tldrdev")
+
+    item = convert_article(article, COLLECTED_AT, DEV_PAGE_PATH)
+
+    assert normalize_item(item).url == (
+        "https://www.theatlantic.com/technology/2026/10/openai-safety-team-resignation/"
+        "688881/?gift=v5U_UzUTothfWXsPxtvNVAh7esWToMRD6XnbXmc5WgA"
+    )
+
+
+@pytest.mark.parametrize(
+    "page, refusal",
+    [
+        (b"\xff" + AI_PAGE, "'utf-8' codec can't decode byte 0xff in position 0"),
+        (
+            AI_PAGE.replace(b"<h1", b"<p").replace(b"</h1>", b"</p>"),
+            "no h1 in the page",
+        ),
+        (
+            # The landing page of an edition, as feat/tldr recorded its title.
+            AI_PAGE.replace(AI_HEADING, b"Keep up with AI in 5 minutes</h1>"),
+            (
+                "first h1 is not an edition title with its date: "
+                "'Keep up with AI in 5 minutes'"
+            ),
+        ),
+        (
+            AI_PAGE.replace(AI_HEADING, b"TLDR AI 2026-13-45</h1>"),
+            "first h1 is not an edition title with its date: 'TLDR AI 2026-13-45'",
+        ),
+        (
+            AI_PAGE.replace(AI_HEADING, b"TLDR AI 2026-10-07 and more</h1>"),
+            (
+                "first h1 is not an edition title with its date: "
+                "'TLDR AI 2026-10-07 and more'"
+            ),
+        ),
+        (
+            AI_PAGE.replace(b'class="font-bold"', b'class="font-semibold"'),
+            "no article with a title, a link and a summary among 5 article elements",
+        ),
+        (
+            AI_PAGE.replace(b'class="newsletter-html"', b'class="newsletter"'),
+            "no article with a title, a link and a summary among 5 article elements",
+        ),
+        (
+            AI_PAGE.replace(b"<article", b"<div").replace(b"</article>", b"</div>"),
+            "no article with a title, a link and a summary among 0 article elements",
+        ),
+    ],
+)
+def test_a_page_that_is_not_a_readable_edition_is_refused_whole(page, refusal):
+    with pytest.raises(ValueError) as error:
+        read_articles(page)
+
+    assert refusal in str(error.value)
+
+
+def test_the_title_found_is_quoted_escaped_and_cut_in_the_refusal():
+    # A line break is read as displayed, as a space; a control character is escaped.
+    title = b"Ignore the rules\n2026-10-12 INFO a forged line \x1b[31m" + b"x" * 300
+    page = AI_PAGE.replace(AI_HEADING, title + b"</h1>")
+
+    with pytest.raises(ValueError) as error:
+        read_articles(page)
+
+    message = str(error.value)
+    assert "'Ignore the rules 2026-10-12 INFO a forged line \\x1b[31mxxx" in message
+    assert "\n" not in message
+    assert "\x1b" not in message
+    assert len(message) == len("first h1 is not an edition title with its date: ") + 100
+
+
+def test_a_page_the_html_parser_rejects_is_refused_whole(monkeypatch):
+    def reject_markup(markup, parser):
+        raise ParserRejectedMarkup("expected name token")
+
+    monkeypatch.setattr(tldr, "BeautifulSoup", reject_markup)
+
+    with pytest.raises(
+        ValueError, match="page rejected by html.parser: expected name token"
+    ):
+        read_articles(AI_PAGE)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"title": ""},
+        {"link": ""},
+        {"link": "http://mistral.ai/news/mistral-large-4/"},
+        {"link": "javascript:alert(1)"},
+        {"link": "https://[mistral.ai/news/"},
+        {"summary": ""},
+        {"title": "x" * 501},
+    ],
+)
+def test_an_entry_without_title_https_link_or_summary_is_refused_as_an_item(changes):
+    article = TldrArticle(**(vars(MISTRAL_ARTICLE) | changes))
+
+    with pytest.raises(ValidationError):
+        convert_article(article, COLLECTED_AT, AI_PAGE_PATH)
+
+
+@pytest.mark.parametrize("folder", ["tldr", "tldr_ai_old", "tldr_AI"])
+def test_an_article_of_a_folder_without_an_edition_slug_is_refused_as_an_item(folder):
+    raw_file_path = f"automated_watch/{folder}/2026-10-11T153130Z/2026-10-07.html"
+
+    with pytest.raises(ValidationError, match="edition"):
+        convert_article(MISTRAL_ARTICLE, COLLECTED_AT, raw_file_path)
+
+
+def test_the_tldr_pages_are_read_with_the_tldr_reader():
+    kind = find_source_kind("tldr_ai", SOURCE_KINDS)
+
+    assert kind is not None
+    assert kind.reader is tldr.READER
+
+
+def test_an_entry_refused_is_rejected_and_the_others_of_its_page_are_read(tmp_path):
+    # The second article loses its summary: the class of its summary is renamed.
+    before, mistral, after = AI_PAGE.partition(b"mistral-large-4")
+    openai_without_summary = after.replace(
+        b'class="newsletter-html"', b'class="newsletter"', 2
+    ).replace(b'class="newsletter"', b'class="newsletter-html"', 1)
+    page_path = tmp_path / AI_PAGE_PATH
+    page_path.parent.mkdir(parents=True)
+    page_path.write_bytes(before + mistral + openai_without_summary)
+
+    reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+
+    (raw_file,) = reading.files
+    assert [item.rank for item in raw_file.items] == [2, 4]
+    (rejection,) = reading.rejections
+    assert rejection.raw_file_path == AI_PAGE_PATH
+    # The position among the entries read, sponsored ones left out, from 0: not the rank.
+    assert rejection.reason.startswith("entry 1: ValidationError")
+    assert "a newsletter_article item without summary" in rejection.reason

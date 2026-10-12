@@ -1,16 +1,27 @@
-"""Download the raw TLDR edition pages, one per day, as tldr.tech serves them."""
+"""The TLDR source: its download (E), then its reader (T).
+
+Download the raw TLDR edition pages, one per day, as tldr.tech serves them.
+
+Read the articles of a raw edition page, and convert each one into an item.
+"""
 
 import logging
 import re
-from datetime import UTC, date, datetime, timedelta
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, time, timedelta
 from time import sleep
 
-from k_b.http_download import RedirectedOutsideError, download
-from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
+from bs4 import BeautifulSoup, Tag
+from bs4.exceptions import ParserRejectedMarkup
 
+from k_b.http_download import RedirectedOutsideError, download
+from k_b.items import EDITION_SLUG, Item, SourceCode
+from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME, find_stream
+from k_b.source_contract import SourceReader
+
+SOURCE_CODE: SourceCode = "tldr"
 # Adding an edition is adding its slug, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
 TRACKED_EDITIONS = ("ai", "infosec", "dev")
-EDITION_SLUG = re.compile(r"[a-z]+")
 SITE_URL = "https://tldr.tech/"
 # An edition page weighs about 80 KB in 2026.
 MAX_PAGE_BYTES = 1024 * 1024
@@ -84,7 +95,7 @@ def list_days_to_collect(last_collected_at: datetime | None, today: date) -> lis
     """Every day from the day of the last collection, or 7 days ago, to today.
 
     The day of the last collection is read again: its edition may have come out after it. The
-    duplicate page is removed when transforming.
+    articles of a page collected twice are left out at the import, as already seen.
     """
     if last_collected_at is None:
         first_day = today - timedelta(days=FIRST_COLLECTION_DAYS)
@@ -96,3 +107,130 @@ def list_days_to_collect(last_collected_at: datetime | None, today: date) -> lis
         first_day + timedelta(days=offset)
         for offset in range((today - first_day).days + 1)
     ]
+
+
+# The first h1 of an edition page: "TLDR AI 2026-10-08"; the landing page has no date.
+EDITION_PAGE_TITLE = re.compile(r"TLDR .+ (\d{4}-\d{2}-\d{2})")
+SPONSOR_MARK = "(Sponsor)"
+# The job board of TLDR itself: its offers are published among the articles, without a mark.
+TLDR_JOB_OFFER_URL_PREFIX = "https://jobs.ashbyhq.com/tldr.tech/"
+# The longest title found quoted in a refusal, quotes and escapes included.
+MAX_QUOTED_TITLE_LENGTH = 100
+
+
+@dataclass(frozen=True)
+class TldrArticle:
+    """An entry of an edition page, as read: the item refuses an invalid one."""
+
+    edition_date: date
+    # Its position among the article elements of the page, from 1, sponsored entries and job
+    # offers counted: a change of what is left out renumbers nothing.
+    rank: int
+    title: str
+    # The href as written, "" if there is none.
+    link: str
+    # Plain text, as displayed; "" if there is none.
+    summary: str
+
+
+def read_articles(page: bytes) -> list[TldrArticle]:
+    """One article per entry of an edition page, sponsored entries and job offers of TLDR left
+    out.
+
+    An entry is returned as read, even without a title, a link or a summary: the item refuses
+    it, and the others are still read. A page that is not UTF-8, whose first h1 is not the
+    title of an edition, or without any complete article (a selector no longer matches) is
+    refused whole.
+    """
+    try:
+        # Decoded here: BeautifulSoup would guess the encoding of bytes.
+        soup = BeautifulSoup(page.decode("utf-8"), "html.parser")
+    except ParserRejectedMarkup as error:
+        raise ValueError(f"page rejected by html.parser: {error}") from error
+    edition_date = read_edition_date(soup)
+    entries = soup.select("article")
+    articles = [
+        article
+        for rank, entry in enumerate(entries, start=1)
+        if not is_left_out(article := read_article(entry, edition_date, rank))
+    ]
+    if not any(
+        article.title and article.link and article.summary for article in articles
+    ):
+        raise ValueError(
+            "no article with a title, a link and a summary among "
+            f"{len(entries)} article elements"
+        )
+    return articles
+
+
+def read_edition_date(soup: BeautifulSoup) -> date:
+    heading = soup.select_one("h1")
+    if heading is None:
+        raise ValueError("no h1 in the page")
+    title = read_text(heading)
+    refusal = ValueError(
+        "first h1 is not an edition title with its date: "
+        + repr(title)[:MAX_QUOTED_TITLE_LENGTH]
+    )
+    match = EDITION_PAGE_TITLE.fullmatch(title)
+    if match is None:
+        raise refusal
+    try:
+        return date.fromisoformat(match.group(1))
+    except ValueError:
+        # The form of a date, but no such day (2026-13-45).
+        raise refusal from None
+
+
+def read_article(entry: Tag, edition_date: date, rank: int) -> TldrArticle:
+    link = entry.select_one("a.font-bold")
+    href = link.get("href") if link else None
+    return TldrArticle(
+        edition_date=edition_date,
+        rank=rank,
+        title=read_text(link),
+        # A str for one href; BeautifulSoup types every attribute as a str or a list.
+        link=href if isinstance(href, str) else "",
+        summary=read_text(entry.select_one("div.newsletter-html")),
+    )
+
+
+def read_text(element: Tag | None) -> str:
+    """The text of an element as displayed, each run of white space as one space; "" without
+    the element."""
+    return " ".join(element.get_text().split()) if element else ""
+
+
+def is_left_out(article: TldrArticle) -> bool:
+    return SPONSOR_MARK in article.title or article.link.startswith(
+        TLDR_JOB_OFFER_URL_PREFIX
+    )
+
+
+def convert_article(
+    article: TldrArticle, collected_at: datetime, raw_file_path: str
+) -> Item:
+    # The edition is the end of the name of its raw folder (tldr_ai). find_stream cannot
+    # raise here: the path of a page read holds its source folder.
+    edition = find_stream(raw_file_path).removeprefix(FOLDER_PREFIX).removeprefix("_")
+    return Item(
+        source_code=SOURCE_CODE,
+        source_item_id=f"{edition}/{article.edition_date.isoformat()}#{article.rank}",
+        kind="newsletter_article",
+        title=article.title,
+        # Some links are escaped twice in the page: "&amp;" is still there once the HTML is
+        # parsed. The utm_* parameters are removed with those of every item (merge.py).
+        url=article.link.replace("&amp;", "&"),
+        published_at=datetime.combine(article.edition_date, time.min, tzinfo=UTC),
+        summary=article.summary or None,
+        collected_at=collected_at,
+        raw_file_path=raw_file_path,
+        edition=edition,
+        rank=article.rank,
+    )
+
+
+READER: SourceReader[TldrArticle] = SourceReader(
+    SOURCE_CODE, read_articles, convert_article
+)

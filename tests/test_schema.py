@@ -25,6 +25,7 @@ EXPECTED_TABLES = {
     "tracked_repository",
     "release",
     "advisory",
+    "newsletter_article",
 }
 
 PAPER_COLUMNS = (
@@ -448,6 +449,10 @@ COLUMN_BY_KIND_AND_FIELD = {
     ("advisory", "title"): ("advisory", "summary"),
     ("advisory", "url"): ("advisory", "url"),
     ("advisory", "package_names"): ("advisory", "packages"),
+    ("newsletter_article", "edition"): ("newsletter_article", "edition"),
+    ("newsletter_article", "title"): ("newsletter_article", "title"),
+    ("newsletter_article", "summary"): ("newsletter_article", "summary"),
+    ("newsletter_article", "url"): ("newsletter_article", "url"),
 }
 
 
@@ -499,6 +504,7 @@ PAPER_ITEM_ID = 1
 RELEASE_ITEM_ID = 2
 ADVISORY_ITEM_ID = 3
 REPOSITORY_ITEM_ID = 4
+NEWSLETTER_ARTICLE_ITEM_ID = 5
 
 # A row every constraint of its table accepts, in a base that holds the rows of filled_database.
 # The values are those of tests/fixtures (the collection), the long texts cut short; a new source,
@@ -579,6 +585,16 @@ VALID_ROW_BY_TABLE = {
         "url": "https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
         "packages": '["langgraph-checkpoint"]',
     },
+    "newsletter_article": {
+        "item_id": NEWSLETTER_ARTICLE_ITEM_ID,
+        "kind": "newsletter_article",
+        "edition": "ai",
+        "edition_date": "2026-10-07T00:00:00Z",
+        "rank": 2,
+        "title": "Mistral Large 4 (9 minute read)",
+        "summary": "Mistral Large 4 is a one-trillion-parameter multimodal model",
+        "url": "https://mistral.ai/news/mistral-large-4/",
+    },
 }
 
 
@@ -644,6 +660,15 @@ REFUSED_VALUES = [
     ("advisory", "length(url) <= 2000", {"url": "https://" + "x" * 1_993}),
     ("advisory", "json_valid(packages)", {"packages": "[]"}),
     ("advisory", "json_array_length(packages) <= 100", {"packages": json_list(101)}),
+    ("newsletter_article", "kind = 'newsletter_article'", {"kind": "paper"}),
+    ("newsletter_article", "edition <> ''", {"edition": "AI"}),
+    ("newsletter_article", "length(edition) <= 20", {"edition": "a" * 21}),
+    ("newsletter_article", "edition_date IS strftime", {"edition_date": INVALID_DATE}),
+    ("newsletter_article", "rank >= 1", {"rank": 0}),
+    ("newsletter_article", "length(title) <= 500", {"title": "x" * 501}),
+    ("newsletter_article", "length(summary) <= 5000", {"summary": "x" * 5_001}),
+    ("newsletter_article", "url GLOB", {"url": "http://mistral.ai/news/"}),
+    ("newsletter_article", "length(url) <= 2000", {"url": "https://" + "x" * 1_993}),
 ]
 
 
@@ -662,6 +687,7 @@ def filled_database(database):
         (RELEASE_ITEM_ID, "release"),
         (ADVISORY_ITEM_ID, "advisory"),
         (REPOSITORY_ITEM_ID, "paper"),
+        (NEWSLETTER_ARTICLE_ITEM_ID, "newsletter_article"),
     ):
         insert_row(database, "item", id=item_id, kind=kind)
     insert_row(
@@ -706,6 +732,65 @@ def test_each_check_of_the_schema_has_its_refused_value():
         len(re.findall(r"\bCHECK \(", definition))
         for definition in definitions.values()
     )
+
+
+# The editions the item refuses too (tests/test_items.py): the base refuses nothing the item
+# accepts.
+@pytest.mark.parametrize("edition", ["", "AI", "a1", "ai_old", "ai\n", "AI ai", "aé"])
+def test_an_edition_that_is_not_a_slug_is_refused(filled_database, edition):
+    with pytest.raises(
+        sqlite3.IntegrityError,
+        match=re.escape("CHECK constraint failed: edition <> ''"),
+    ):
+        insert_row(filled_database, "newsletter_article", edition=edition)
+
+
+def insert_second_newsletter_article(database, **changes):
+    insert_row(database, "newsletter_article")
+    insert_row(database, "item", id=6, kind="newsletter_article")
+    insert_row(database, "newsletter_article", item_id=6, **changes)
+
+
+def test_an_edition_a_day_and_a_rank_are_one_newsletter_article(filled_database):
+    with pytest.raises(sqlite3.IntegrityError, match="UNIQUE"):
+        insert_second_newsletter_article(filled_database)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [{"edition": "dev"}, {"edition_date": "2026-10-08T00:00:00Z"}, {"rank": 3}],
+)
+def test_the_same_url_is_accepted_in_another_edition_day_or_rank(
+    filled_database, changes
+):
+    # Two editions may summarize the same article (ADR of 2026-10-07).
+    insert_second_newsletter_article(filled_database, **changes)
+
+    assert filled_database.execute(
+        "SELECT count(DISTINCT url), count(*) FROM newsletter_article"
+    ).fetchone() == (1, 2)
+
+
+def test_a_newsletter_article_pointing_to_an_item_of_another_kind_is_refused(
+    filled_database,
+):
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        insert_row(filled_database, "newsletter_article", item_id=PAPER_ITEM_ID)
+
+
+def test_a_newsletter_article_without_kind_is_refused(filled_database):
+    with pytest.raises(sqlite3.IntegrityError, match="NOT NULL"):
+        insert_row(filled_database, "newsletter_article", kind=None)
+
+
+def test_a_newsletter_article_cites_no_publication_or_a_known_one(filled_database):
+    insert_row(filled_database, "newsletter_article")
+    assert filled_database.execute(
+        "SELECT publication_id FROM newsletter_article"
+    ).fetchone() == (None,)
+
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        filled_database.execute("UPDATE newsletter_article SET publication_id = 99")
 
 
 # The columns the source of truth of a reference table fills: the table CHECK holds one clause

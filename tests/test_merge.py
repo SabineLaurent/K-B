@@ -24,10 +24,6 @@ def make_item(**changes):
 
 def test_utm_parameters_are_removed_and_the_others_kept_in_order():
     item = make_item(
-        source_code="tldr",
-        kind="newsletter_article",
-        package_names=(),
-        source_item_id="article",
         url="https://example.com/post?utm_source=tldrai&id=7&utm_medium=newsletter&page=2#part",
     )
 
@@ -36,10 +32,6 @@ def test_utm_parameters_are_removed_and_the_others_kept_in_order():
 
 def test_a_query_made_only_of_utm_parameters_disappears():
     item = make_item(
-        source_code="tldr",
-        kind="newsletter_article",
-        package_names=(),
-        source_item_id="article",
         url="https://example.com/post?utm_source=tldrai",
     )
 
