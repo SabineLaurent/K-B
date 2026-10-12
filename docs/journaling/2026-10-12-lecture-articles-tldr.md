@@ -237,10 +237,10 @@ ceux de la session, validés avec le plan.
 | Qui refuse une entrée invalide | l'`Item`, par `convert_article` : seul chemin de rejet du contrat, et aucun `logger.warning` dans la source (règle 1 des conventions) | le lecteur, comme `feat/tldr` : une exception y rejette toute la page |
 | D'où vient la date | du `h1` : c'est ce que la page dit d'elle-même | du nom du fichier : c'est ce que K-B a demandé, pas ce qu'il a reçu |
 | Titre d'édition du `h1` | non comparé au dossier | le comparer, comme `feat/tldr` : il faudrait une table « ai → AI, infosec → Information Security », alors que la collecte demande déjà l'URL de l'édition sans accepter de redirection |
-| Résumé | texte simple, morceaux séparés par une espace, comme `feat/tldr` | le Markdown de brief09 (son module de nettoyage n'est pas repris) ; les morceaux collés, d'abord retenu puis corrigé après la revue de code : deux paragraphes donnaient « …ends.Next… ». Sur les 272 articles gardés, les deux lectures donnent le même texte |
-| Retrait des `utm_*` | par `merge.py`, pour tout item | une fonction propre à TLDR, comme `feat/tldr` et brief09 : la même règle écrite deux fois |
+| Résumé | texte simple, morceaux séparés par une espace, comme `feat/tldr` | le Markdown d'un autre projet personnel (son module de nettoyage n'est pas repris) ; les morceaux collés, d'abord retenu puis corrigé après la revue de code : deux paragraphes donnaient « …ends.Next… ». Sur les 272 articles gardés, les deux lectures donnent le même texte |
+| Retrait des `utm_*` | par `merge.py`, pour tout item | une fonction propre à TLDR, comme `feat/tldr` et un autre projet personnel : la même règle écrite deux fois |
 | Encodage | UTF-8 décodé par K-B | laisser BeautifulSoup deviner |
-| « (Sponsor) » | cherché dans tout le titre, comme brief09 et `feat/tldr` | seulement en fin de titre : une marque suivie d'un autre texte laisserait entrer une publicité |
+| « (Sponsor) » | cherché dans tout le titre, comme un autre projet personnel et `feat/tldr` | seulement en fin de titre : une marque suivie d'un autre texte laisserait entrer une publicité |
 | Les trois écrivains du flux de nouveautés | laissés côte à côte | les factoriser ici : le déplacement du SQL (#135) est le moment |
 | SQL de l'écrivain | dans `import_items.py`, avec les autres | dans `database/` (règle 5) : écart temporaire, imposé par la mission, que #135 rattrape |
 | `KindWithoutTableError` | gardée, comme garde qui échoue fermé | la retirer : une sorte ajoutée sans écrivain finirait en `KeyError` |
@@ -248,9 +248,10 @@ ceux de la session, validés avec le plan.
 | `soupsieve` | verrouillé en 2.10 dans `uv.lock` (décision de Sabine) | la 3.0.3 choisie par `uv`, publiée le jour même |
 | Fixtures | deux extraits de pages collectées, résumés coupés à leur première phrase | la fixture de `feat/tldr`, dont les résumés étaient remplacés et un paramètre ajouté à la main (consigne : une fixture part d'un exemple collecté) |
 
-Repris de l'existant : de brief09, un item par `<article>`, les sélecteurs `a.font-bold` et
-`div.newsletter-html`, le filtre « (Sponsor) », BeautifulSoup ; de `feat/tldr`, la forme de
-`read_articles`, le contrôle du `h1`, le double échappement défait, les cas de ses tests.
+Repris de l'existant : réutilisation à partir d'un autre projet personnel, un item par
+`<article>`, les sélecteurs `a.font-bold` et `div.newsletter-html`, le filtre « (Sponsor) »,
+BeautifulSoup ; de `feat/tldr`, la forme de `read_articles`, le contrôle du `h1`, le double
+échappement défait, les cas de ses tests.
 
 ## 4. Preuve
 
@@ -296,7 +297,7 @@ Repris de l'existant : de brief09, un item par `<article>`, les sélecteurs `a.f
    pas les liens. Reste un écart connu, pour toutes les sources : un caractère de contrôle
    passe l'item et est rangé tel quel (section 7).
 4. **Pourquoi BeautifulSoup alors que le projet limite ses dépendances ?** Décision de Sabine :
-   réemployer ce qui marche dans brief09 et `feat/tldr`. La dépendance est contenue :
+   réemployer ce qui marche dans un autre projet personnel et `feat/tldr`. La dépendance est contenue :
    l'analyseur reste celui de la bibliothèque standard, `lxml` n'est pas ajouté, `soupsieve`
    est verrouillé sur une version de 18 jours et non sur celle du jour, et la CI audite
    `uv.lock` avec `pip-audit`.
