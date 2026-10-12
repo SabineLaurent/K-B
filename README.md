@@ -25,9 +25,13 @@ aucune ne fait de veille datée.
 2. Des agents (Claude Code…), qui interrogent la base par l'API REST.
 3. Plus tard, les mêmes agents via un serveur MCP.
 
-## Périmètre de la v0 — le pipeline de veille
+## Périmètre de la v0
 
-La v0 couvre la porte « veille » :
+La v0 se fait en deux étapes.
+
+### Étape 1 — l'import des données : le pipeline de veille
+
+L'étape 1 couvre la porte « veille » :
 
 - **Collecte**, avec un point de lancement unique, une panne isolée par source et une sauvegarde
   brute :
@@ -48,11 +52,33 @@ La v0 couvre la porte « veille » :
   cette semaine ».
 - **Données personnelles** : un registre des traitements et une procédure de purge.
 
+### Étape 2 — le wiki
+
+L'étape 2 ouvre la porte « base de connaissance », d'abord pour mes clips du Web Clipper, puis
+pour les papiers que je garde dans Zotero :
+
+- **Ingest** : de chaque document, le modèle écrit une note de lecture, comme après une lecture
+  du texte entier : le clip tel quel, puis le texte intégral du PDF d'un papier. Il met aussi à
+  jour les fiches thématiques que le document touche : une fiche par sujet, qui rassemble ce
+  qu'en disent les documents, chaque affirmation renvoyant au sien. Les sujets viennent d'une
+  liste que je tiens ; un sujet nouveau proposé par le modèle attend mon accord.
+- **Contrôles** : le modèle renvoie des opérations JSON ; le code les valide (liste fermée
+  d'opérations, sujets connus, citations, nombres et dates retrouvés mot pour mot dans la source,
+  liens et frontmatter), puis écrit dans le wiki si tout passe. Sinon, la proposition attend dans
+  une file « à voir ».
+- **API IA authentifiée**, distincte de l'API de données et documentée en OpenAPI. La commande
+  `kb` en est le client. L'inférence passe par Azure, en API compatible OpenAI : le modèle se
+  choisit en configuration.
+- **Métriques** de chaque appel (durée, jetons, coût, erreurs, fidélité, propositions
+  acceptées), émises en OpenTelemetry, gardées sur ma machine et restituées en temps réel, avec
+  une alerte sur seuil, par un outil à choisir.
+
 ## Hors périmètre de la v0
 
-- Le wiki compilé par l'IA (ingest, liens, contradictions, lint) : c'est la v1.
-- Les livres en PDF, le texte intégral des PDF, et leurs images, tableaux et pages scannées.
-- Le serveur MCP et le tableau de bord.
+- Les contradictions signalées entre pages du wiki, son interrogation, le lint par l'IA.
+- Mes notes comme entrées du wiki.
+- Les livres en PDF, et les images, tableaux et pages scannées des PDF.
+- Le serveur MCP.
 - Tout entraînement de modèle.
 
 ## Installer et lancer
