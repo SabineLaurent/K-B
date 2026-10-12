@@ -1178,6 +1178,52 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   journal l'inverse de ce qui s'est passé pour un catalogue plus récent mais identique ; un champ
   commun au nom neutre (`compared_with`), qui ne dit pas d'où vient la date ; un horodatage par
   ligne, que #106 met dans le nom du fichier. — PR de #105
+- **Le registre des fichiers bruts importés est la table `raw_data` : un fichier lu y entre,
+  même sans item ou avec des entrées rejetées ; un fichier illisible n'y entre pas, il est relu
+  et rejeté à chaque import.** Décision de Sabine (option A). Raison présentée à Sabine, qui a
+  retenu A sans en donner d'autre : une page illisible signale un défaut du lecteur ou du brut,
+  pas une donnée ; la garder visible jusqu'à sa correction coûte une relecture, et l'import qui
+  suit la correction la lit sans reconstruction. Option écartée (B) : inscrire le fichier
+  illisible ; lu une fois, il n'aurait été relu que par une reconstruction (un écart de plus
+  entre la base tenue et la base reconstruite), et un catalogue CISA illisible serait devenu le
+  « dernier catalogue importé », qui bloque les catalogues valides plus anciens. Une collecte mal
+  nommée n'a pas de date de collecte (`collected_at` NOT NULL) : elle n'est jamais inscrite.
+  Limite assumée : un fichier illisible revient dans le journal de chaque import. — PR de #106
+- **Le journal d'import est écrit dans la transaction, avant la validation de la base, et
+  supprimé si la validation échoue.** Décision de Sabine. **Inverse** le choix de #105 (« le
+  journal est écrit après la base ; s'il échoue, la base garde l'import »). Ce qui a changé : un
+  fichier inscrit au registre n'est plus relu, donc un journal perdu après la validation
+  perdrait pour toujours la trace de ses rejets et de ses écarts (raison présentée à Sabine,
+  qui l'a retenue). — PR de #106
+- **Un journal par import, `import-log-<AAAA-MM-JJTHHMMSSZ>.jsonl`, jamais réécrit, et chaque
+  ligne porte l'instant de son import (`imported_at`, ISO 8601 UTC à la seconde).** Décision de
+  Sabine du 2026-10-12, d'après le Logging Cheat Sheet de l'OWASP (« Log date and time
+  (international format) »). **Inverse** l'option écartée par #105 dans l'entrée précédente
+  (« un horodatage par ligne, que #106 met dans le nom du fichier ») : le nom et chaque ligne
+  sont maintenant datés. La valeur est l'instant de l'import, le même que le nom du fichier :
+  l'heure de chaque constat n'est pas mesurée, tout se fait dans une transaction. Un journal de
+  la même seconde arrête l'import sans rien écrire. — PR de #106
+- **Catalogue d'état : une ligne connue absente d'un catalogue collecté après le dernier
+  catalogue importé est retirée (`withdrawn_at` = sa collecte, la première absence garde sa
+  date) ; si elle réapparaît, elle est réécrite, `withdrawn_at` vidé et `revised_at` daté. Un
+  catalogue dont une entrée est rejetée, ou qui ne donne aucun item, ne retire rien.** Décision
+  de Sabine, qui applique le MCD du 2026-10-07 avec la règle du catalogue d'état de #105.
+  **Écart au MCD**, accepté par Sabine : une ligne absente d'un catalogue avec rejet est retirée
+  au catalogue propre suivant, et datée de lui, pas du premier qui a constaté son absence. Raison
+  présentée à Sabine, qui l'a retenue : une ligne rejetée est présente, pas absente, et la
+  retirer serait faux (échouer fermé). Le retrait est déclenché après les items d'un fichier de
+  sorte `vulnerability` : la règle de la nature reste dans l'écrivain de sa sorte. — PR de #106
+- **Un CVE qu'un catalogue importé en retard est seul à apporter, ou dont il remplit les
+  colonnes KEV (CVE créé par une alerte), est écrit retiré, à la date du dernier catalogue
+  importé ; le catalogue en retard ne retire rien d'autre et ne fait rien réapparaître.**
+  Décision de Sabine. **Remplace pour ce cas** la règle de #105 (un fichier plus ancien que le
+  dernier catalogue n'écrit rien en base, et laisse quand même une ligne au journal) et la
+  limite acceptée dans le commentaire de #106. Pourquoi, selon elle : la reconstruction donne le
+  même contenu. Le constat (relecture du plan, simulé sur le schéma) : sans cela, un catalogue en
+  retard rendait actif un CVE que le dernier catalogue ne liste pas, et la base tenue différait
+  de la base reconstruite par son contenu, pas seulement par ses dates. Limite assumée : après un
+  catalogue en retard, une base reconstruite peut différer par `revised_at`, `withdrawn_at` et le
+  fichier rattaché à l'item, pas par son contenu ni par ses lignes retirées. — PR de #106
 
 ### Wiki : le modèle de la démonstration (découpage de l'après-midi)
 
