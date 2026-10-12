@@ -1300,10 +1300,10 @@ Mesures citées : les 18 pages collectées du 2026-09-30 au 2026-10-09 (3 éditi
 - **Le HTML des pages TLDR est lu avec BeautifulSoup (`beautifulsoup4`), sur l'analyseur
   `html.parser` de la bibliothèque standard.** Décision de Sabine (« je veux beautiful soup »),
   qui écarte la proposition de la session : `html.parser` seul, sans dépendance nouvelle.
-  Pourquoi : réemployer ce qui marche, un autre projet personnel et `feat/tldr` lisant déjà
-  ces pages avec BeautifulSoup (motif relayé par time-knight, dans la ligne de la consigne du
-  12/10 sur le réemploi de cet autre projet). Non ajouté : `lxml`, son analyseur, une
-  dépendance de plus à soumettre. Conséquence : deux paquets de plus dans `uv.lock` (`beautifulsoup4`,
+  Pourquoi : réemployer ce qui marche, brief09 et `feat/tldr` lisant déjà ces pages avec
+  BeautifulSoup (motif relayé par time-knight, dans la ligne de la consigne du 12/10 sur le
+  réemploi de brief09). Non ajouté : `lxml`, l'analyseur de brief09, une dépendance de plus à
+  soumettre. Conséquence : deux paquets de plus dans `uv.lock` (`beautifulsoup4`,
   `soupsieve`). K-B décode lui-même l'UTF-8 : BeautifulSoup devinerait l'encodage.
   **`soupsieve` est verrouillé en 2.10 (du 2026-09-24), pas en 3.0.3** : décision de Sabine,
   sur recommandation, après un constat de la revue de sécurité. Pourquoi : la 3.0.3 avait été
