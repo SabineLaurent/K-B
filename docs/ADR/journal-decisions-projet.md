@@ -970,6 +970,108 @@ encore l'ancien modèle.
   requête écartant les dépôts sans identifiant ni nom (14 `ForkEvent` sans dépôt le 2026-10-10).
   — PR de #16
 
+## 2026-10-12
+
+### Wiki : décisions de la nuit du 11 au 12/10
+
+Prises par Sabine hors session, transmises par l'ordre de mission du 2026-10-12 ; consignées ici
+telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
+
+- **Pas de Claude dans la chaîne du wiki (ni Claude Code ni modèle Claude), et pas de tri ni de
+  score de la veille par un modèle.** Décision de Sabine ; pourquoi non transmis.
+- **Inférence sur Azure, en API compatible OpenAI ; le modèle est choisi par rôle en
+  configuration.** Décision de Sabine. Pourquoi (transmis) : le modèle reste interchangeable.
+- **Une API dédiée à l'IA, distincte de l'API de données (#21).** Décision de Sabine. Pourquoi
+  (transmis) : deux choses distinctes à montrer, et la voie du wiki n'attend pas celle des
+  données.
+- **Contrat entre les deux voies : l'ETL fournit des `.md` *cleansed*, la partie LLM produit des
+  `.md` *curated*.** Décision de Sabine. Limite : aujourd'hui l'ETL écrit en SQLite, pas en
+  `.md` ; la forme du contrat reste à fixer avant le code (« Décisions encore ouvertes »).
+- **Le modèle renvoie des opérations JSON, validées puis appliquées par le code ; les jetons et
+  le coût de chaque appel sont journalisés.** Décision de Sabine. Rejoint la veille du
+  2026-09-23 (« Ce qui converge », points 3 et 5 : vocabulaire d'actions fermé, règle vérifiée
+  par du code).
+- **Écriture automatique quand les contrôles passent ; Sabine n'est sollicitée qu'en cas de
+  doute.** Décision de Sabine. Pourquoi : « montrer la proposition avant d'écrire ne cadre pas
+  avec le concept de la bibliothèque qui se range toute seule ». **Inverse** le choix de la
+  veille du 2026-09-23 (« le LLM propose un plan, l'humain coche, le code applique. C'est notre
+  choix. »).
+
+### Wiki : la première version (v1)
+
+- **La v1 du wiki fait l'ingest seul : un document déposé devient des opérations JSON (une note
+  de lecture, des pages reliées), contrôlées par le code (liste fermée d'opérations, fidélité,
+  lint mécanique), écrites si les contrôles passent, sinon mises dans une file « à voir ».**
+  Décision de Sabine, sur recommandation. Pourquoi : c'est le noyau qui donne un point d'API
+  appelant le modèle, un client et des métriques de fidélité et d'acceptation ; le reste double
+  ce qu'il faut tester et surveiller. Options gardées pour plus tard : les contradictions
+  signalées (un second appel par ingest, une métrique difficile à définir) ; l'interrogation du
+  wiki (`kb ask`, un second point d'API).
+- **En v1, le wiki prend les papiers Zotero seuls ; les clips viendront après #14, les notes
+  plus tard.** Recommandation présentée à Sabine et non contredite ; à confirmer par elle à la
+  relecture de cette PR. Pourquoi : l'extrait Zotero existe (#15), et le résumé d'un papier
+  Zotero était déjà décidé. Le wiki lit l'extrait, pas la base : #138 ne le bloque pas.
+- **Pour un papier Zotero, le wiki écrit une note de lecture, comme si quelqu'un avait lu
+  l'article entier ; le modèle reçoit donc le texte intégral.** Décision de Sabine. Option
+  écartée : un résumé fait du résumé de l'article et des surlignages (Sabine veut une note de
+  lecture, pas un résumé du résumé).
+- **Le texte intégral vient du PDF que Zotero garde en local, pour tous les papiers.** Décision
+  de Sabine. Pourquoi, selon elle : la variété des sources (un papier hors arXiv a aussi son
+  PDF). Options écartées : la page HTML d'arXiv (plus propre, mais seulement pour les articles
+  LaTeX soumis depuis le 2023-12-01 et convertis sans erreur, 75 % selon arXiv 2605.16562 ; et
+  l'accès est à vérifier contre la politique de collecte d'arXiv) ; le HTML d'abord et le PDF en
+  repli (deux chemins à tester) ; les deux textes donnés au modèle (jetons doublés, et la
+  fidélité n'y gagne rien : c'est le code qui la mesure). Limite assumée : le texte extrait d'un
+  PDF porte des ligatures, des mots coupés et un ordre de lecture à reconstruire sur deux
+  colonnes ; le vérificateur de fidélité normalise les deux textes avant de comparer ; formules
+  et tableaux sortent abîmés. Un papier sans PDF, ou au PDF scanné, passe à l'état
+  `full_text_unavailable` et va dans la file « à voir ». Fait entrer dans le wiki le texte
+  intégral des PDF, hors v0 au README.
+- **La bibliothèque d'extraction est choisie après un essai sur 5 PDF de Sabine : la part des
+  citations retrouvées mot pour mot, pour un extracteur simple (pypdf ou PyMuPDF), pymupdf4llm
+  et Unstructured.** Décision de Sabine. Pourquoi : aucun banc d'essai trouvé ne compare ces
+  outils sur des articles scientifiques ; les extracteurs simples rendent le texte plus
+  fidèlement que les outils « pour LLM » sur DocLayNet (banc de 2026, pas sur des articles), et
+  GROBID est en tête sur des articles arXiv (eSciBench, LREC 2026). La licence compte dans le
+  choix : Unstructured est sous Apache 2.0 mais demande Tesseract et Poppler ; la mise en page
+  de pymupdf4llm passe par PyMuPDF-Layout, sous licence propre et non open source ; PyMuPDF
+  serait sous AGPL (non vérifié).
+
+### Wiki : API et client
+
+- **La commande `kb` passe par l'API IA pour atteindre le modèle (`kb` → API IA authentifiée →
+  Azure).** Décision de Sabine, sur recommandation. Pourquoi : avec une API dédiée à l'IA, `kb`
+  en est le client naturel ; un seul chemin et un seul endroit où l'on mesure jetons et coût ;
+  les agents passeront par la même porte. Option écartée : `kb` appelle le modèle en direct
+  (plus simple, mais l'API IA n'aurait plus de client, et il en faudrait un pour la grille
+  seulement). Limite assumée : l'API doit tourner pour ingérer.
+
+### Wiki : métriques
+
+- **L'API émet ses mesures en OpenTelemetry (durée, jetons, coût, erreurs, fidélité,
+  acceptation) et en garde une copie en local, une ligne par appel ; l'outil de restitution et
+  d'alerte est choisi après une comparaison courte (Langfuse Cloud, Grafana Cloud, Azure
+  Monitor, Grafana local).** Décision de Sabine. Pourquoi : la destination reste
+  interchangeable, comme le modèle ; la copie locale garde l'historique quelle que soit la
+  conservation de l'outil (30 jours sur Langfuse Hobby, 14 jours sur LangSmith Developer,
+  pages de prix lues le 2026-10-12) et permet de changer d'outil sans rien perdre ; la fidélité
+  est calculée par K-B de toute façon. Sabine accepte un outil dans le cloud, l'inférence y
+  étant déjà. Critères de la comparaison : temps réel, alerte sur seuil, accessibilité de
+  l'interface, région UE, coût. Options écartées : une commande `kb metrics` seule (pas un
+  vecteur de restitution en temps réel) ; Dash en local (recommandé d'abord sur une contrainte
+  « local » qui ne venait pas de Sabine) ; LangSmith (auto-hébergé sous contrat Enterprise
+  seulement) ; Langfuse auto-hébergé (6 services, environ 11 CPU et 25 Gio). **Revient** sur
+  « tableau de bord : plus tard » (2026-09-29) et sur le README (hors v0) : un outil de
+  restitution entre en v1.
+
+### Périmètre
+
+- **Les numéros de version restent : la v0 est la veille, la v1 est le wiki ; le README gagne
+  une section « Périmètre de la v1 », sans date.** Décision de Sabine, sur recommandation.
+  Pourquoi : README et journal parlent déjà de « v1 = le wiki » ; renuméroter obligerait à tout
+  reprendre. Option écartée : fondre le wiki dans la v0. Les dates restent tenues par
+  time-knight.
+
 ## Décisions encore ouvertes
 
 - **Durée de conservation et purge des extraits Zotero** (2026-10-11) : ils sont tous gardés,
@@ -1016,3 +1118,16 @@ encore l'ancien modèle.
   l'extraction. Restent à trancher avec l'issue de suite : le brut des totaux GraphQL (relecture
   du 2026-10-09), le lecteur et l'écrivain de TENDANCE, et la borne des entiers sur 64 bits, à
   déplacer dans `items.py` quand la base contraindra `repository_id` (règle 4).
+- **Wiki : le texte envoyé au modèle et reçu de lui, dans l'outil de suivi** (2026-10-12) : jamais
+  (mesures seules), seulement en environnement d'essai, ou toujours (et inscrit au registre).
+  Sabine tranchera à la comparaison des outils de restitution. La trace d'un outil comme Langfuse
+  tire son intérêt de ce texte, qui contient les noms des auteurs.
+- **Wiki : forme du contrat `.md` *cleansed*** (2026-10-12) : l'ETL écrit en SQLite ; ce que la
+  partie LLM reçoit d'un papier Zotero (texte du PDF, métadonnées, surlignages) est à fixer avant
+  le code.
+- **Wiki : questions laissées par la session du 2026-10-12**, faute de temps : l'API IA en local
+  ou sur Azure ; si la veille automatique nourrit le wiki ou seulement les dépôts de Sabine
+  (Sabine : « on verra ») ; les données envoyées à Azure et à l'outil de suivi, à inscrire au
+  registre ; un accès à l'API qui expire, ou documenté comme sans expiration (décision 5 de la
+  certif) ; installer un service d'inférence avant la démonstration, ou démontrer sur le modèle
+  de remplacement (décision 3).

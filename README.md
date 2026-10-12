@@ -50,10 +50,33 @@ La v0 couvre la porte « veille » :
 
 ## Hors périmètre de la v0
 
-- Le wiki compilé par l'IA (ingest, liens, contradictions, lint) : c'est la v1.
+- Le wiki compilé par l'IA : c'est la v1.
 - Les livres en PDF, le texte intégral des PDF, et leurs images, tableaux et pages scannées.
 - Le serveur MCP et le tableau de bord.
 - Tout entraînement de modèle.
+
+## Périmètre de la v1 — le wiki
+
+La v1 ouvre la porte « base de connaissance », pour les papiers que je garde dans Zotero :
+
+- **Ingest** : de chaque papier, le modèle écrit une note de lecture, comme après une lecture de
+  l'article entier, à partir du texte intégral de son PDF. Il renvoie des opérations JSON ; le
+  code les valide (liste fermée d'opérations, citations, nombres et dates retrouvés mot pour mot
+  dans la source, liens et frontmatter), puis écrit dans le wiki si tout passe. Sinon, la
+  proposition attend dans une file « à voir ».
+- **API IA authentifiée**, distincte de l'API de données et documentée en OpenAPI. La commande
+  `kb` en est le client. L'inférence passe par Azure, en API compatible OpenAI : le modèle se
+  choisit en configuration.
+- **Métriques** de chaque appel (durée, jetons, coût, erreurs, fidélité, propositions
+  acceptées), émises en OpenTelemetry, gardées sur ma machine et restituées en temps réel, avec
+  une alerte sur seuil, par un outil à choisir.
+
+## Hors périmètre de la v1
+
+- Les contradictions signalées entre pages, l'interrogation du wiki, le lint par l'IA.
+- Les clips Obsidian et mes notes comme entrées du wiki.
+- Les images, tableaux et pages scannées des PDF ; les livres.
+- Le serveur MCP et tout entraînement de modèle.
 
 ## Installer et lancer
 
