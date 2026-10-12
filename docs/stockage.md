@@ -12,8 +12,10 @@ collecte → raw/ (brut intact) → lecture + normalisation → base (qui dédou
 ```
 
 La base n'est pas le brut : elle se reconstruit en rejouant la lecture et l'import sur `raw/`, à
-une limite près : un catalogue CISA importé en retard (étape 4 de
-[specs-collecte.md](specs-collecte.md)).
+une limite près : après un catalogue CISA importé en retard, les dates d'une ligne (`revised_at`,
+`withdrawn_at`) et le fichier rattaché à son item peuvent différer, pas son contenu (étape 4 de
+[specs-collecte.md](specs-collecte.md)). `kb import` n'importe que les fichiers bruts pas encore
+importés : leur registre est la table `raw_data`.
 Elle ne contient que ce que le brut contient (les papiers arXiv écartés à la requête n'y sont pas).
 Ce qui la lira (les commandes `kb search` et `kb top`, une API REST locale) est décidé et pas
 encore codé (journal ADR, 2026-10-08 et 2026-10-09).
