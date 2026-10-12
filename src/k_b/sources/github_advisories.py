@@ -15,7 +15,7 @@ from urllib.parse import urlencode
 from k_b.items import CVE_ID, Item
 from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.source_contract import SourceReader
-from k_b.sources.github_api import get_from_github_api
+from k_b.sources.github_api import SOURCE_CODE, get_from_github_api
 from k_b.sources.github_dates import parse_github_date
 
 logger = logging.getLogger(__name__)
@@ -169,7 +169,7 @@ def convert_advisory(
     advisory: Advisory, collected_at: datetime, raw_file_path: str
 ) -> Item:
     return Item(
-        source_code="github",
+        source_code=SOURCE_CODE,
         source_item_id=advisory.ghsa_id,
         kind="advisory",
         title=advisory.summary,
@@ -182,4 +182,6 @@ def convert_advisory(
     )
 
 
-READER: SourceReader[Advisory] = SourceReader(read_advisories, convert_advisory)
+READER: SourceReader[Advisory] = SourceReader(
+    SOURCE_CODE, read_advisories, convert_advisory
+)

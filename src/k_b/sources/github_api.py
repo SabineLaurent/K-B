@@ -3,7 +3,10 @@
 import os
 
 from k_b.http_download import download
+from k_b.items import SourceCode
 
+# The source of every GitHub module, in the source table of the base.
+SOURCE_CODE: SourceCode = "github"
 API_URL = "https://api.github.com/"
 API_VERSION = "2026-03-10"
 TOKEN_VARIABLE = "KB_GITHUB_TOKEN"  # noqa: S105 — the variable's name, not a token

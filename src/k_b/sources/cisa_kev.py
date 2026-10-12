@@ -15,7 +15,7 @@ from typing import cast
 from urllib.error import HTTPError
 
 from k_b.http_download import download
-from k_b.items import CVE_ID, Item, RansomwareUse
+from k_b.items import CVE_ID, Item, RansomwareUse, SourceCode
 from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.source_contract import SourceReader
 
@@ -43,6 +43,8 @@ REQUIRED_COLUMNS = (
 
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "cisa_kev"
+# The source of its items, in the source table of the base.
+SOURCE_CODE: SourceCode = "cisa_kev"
 
 
 class CisaKevSource:
@@ -138,7 +140,7 @@ def convert_vulnerability(
     vulnerability: Vulnerability, collected_at: datetime, raw_file_path: str
 ) -> Item:
     return Item(
-        source_code="cisa_kev",
+        source_code=SOURCE_CODE,
         source_item_id=vulnerability.cve_id,
         kind="vulnerability",
         title=vulnerability.vulnerability_name,
@@ -161,4 +163,6 @@ def read_catalog(raw_catalog: bytes) -> list[Vulnerability]:
     return read_new_vulnerabilities(raw_catalog, last_collected_at=None)
 
 
-READER: SourceReader[Vulnerability] = SourceReader(read_catalog, convert_vulnerability)
+READER: SourceReader[Vulnerability] = SourceReader(
+    SOURCE_CODE, read_catalog, convert_vulnerability
+)

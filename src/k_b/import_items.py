@@ -1,14 +1,16 @@
-"""Import the raw files into the items database (docs/specs-collecte.md, step 4).
+"""Import the raw files not imported yet into the items database (docs/specs-collecte.md,
+step 4).
 
-Read, normalize, then write the base in one transaction: an error in the base writes nothing
-there. The log is written after the base, whole or not at all.
+The registry of the files already imported is raw_data, read before the raw. The files read,
+their items and the log of the import are then written in one transaction: an error writes
+nothing in the base, and leaves no log. A file registered is not read again, except by a
+rebuild of the base.
 
 The base removes the duplicates. The writer of each kind holds, in its SQL, the rule of the
 nature of its source: a news feed keeps the first version seen; a state catalog keeps the
 version of its latest collection; a feed with revisions keeps the newest revision. An item left
 out is returned with its rule and the date it was compared with, then written to the log. Run
-again on the same raw, the import gives the same base, and its log holds every item as a
-duplicate, until only the raw files not yet imported are read (#106).
+again on the same raw, the import gives the same base.
 
 Only exact duplicates are found: the same identifier within its source (a replay, collections
 that overlap). The same content under another identifier (another URL, another Zotero key) is
@@ -16,7 +18,6 @@ left to #57 and #138.
 """
 
 import json
-import os
 import sqlite3
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
@@ -25,11 +26,11 @@ from typing import Literal, NamedTuple
 
 from k_b.config import TrackedRepository
 from k_b.database.connection import connect_database
+from k_b.database.reading import read_raw_file_paths
 from k_b.items import Item, ItemKind
 from k_b.merge import normalize_item
-from k_b.raw_items import Rejection, read_raw_items, reject
-from k_b.raw_store import find_stream
-from k_b.source_contract import SourceKind
+from k_b.raw_items import RawFile, RawReading, Rejection, reject
+from k_b.raw_store import find_stream, write_file_atomically
 
 # The date format the CHECK constraints of schema.sql accept.
 DATABASE_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -55,7 +56,8 @@ RETURNING id
 
 # State catalog: the collection of the latest catalog of the source already imported, and
 # whether the file being imported was collected after it. That file is left out, unless it
-# brought the version in the base (a replay).
+# brought the version in the base: a replay, which the registry prevents since #106, kept for
+# a base of before it, or for two imports at once.
 SELECT_LATEST_CATALOG = """
 SELECT max(raw_data.collected_at), :collected_at > max(raw_data.collected_at) FROM raw_data
 JOIN source ON source.id = raw_data.source_id
@@ -65,13 +67,17 @@ WHERE source.source_code = :source_code
 """
 
 # State catalog (CISA KEV): a known row takes the version of a catalog collected after the
-# latest one imported, if its content differs; revised_at is then the date of that collection.
-# A CVE an advisory created takes its first KEV row: not a revision. withdrawn_at is #106.
+# latest one imported, if its content differs or if it was withdrawn; revised_at is then the
+# date of that collection, and withdrawn_at is emptied. A CVE an advisory created takes its
+# first KEV row: not a revision. A CVE only a catalog older than the latest one brings is
+# absent from the latest one: :withdrawn_at is then the collection of the latest one.
 UPSERT_VULNERABILITY = """
 INSERT INTO vulnerability (
-    cve_id, item_id, name, description, vendor, product, date_added, ransomware_use
+    cve_id, item_id, name, description, vendor, product, date_added, ransomware_use,
+    withdrawn_at
 ) VALUES (
-    :cve_id, :item_id, :name, :description, :vendor, :product, :date_added, :ransomware_use
+    :cve_id, :item_id, :name, :description, :vendor, :product, :date_added, :ransomware_use,
+    :withdrawn_at
 )
 ON CONFLICT (cve_id) DO UPDATE SET
     item_id = excluded.item_id,
@@ -81,14 +87,26 @@ ON CONFLICT (cve_id) DO UPDATE SET
     product = excluded.product,
     date_added = excluded.date_added,
     ransomware_use = excluded.ransomware_use,
-    revised_at = iif(vulnerability.item_id IS NULL, NULL, :collected_at)
+    revised_at = iif(vulnerability.item_id IS NULL, NULL, :collected_at),
+    withdrawn_at = excluded.withdrawn_at
 WHERE vulnerability.item_id IS NULL
     OR (:is_after_latest_catalog
-        AND (vulnerability.name, vulnerability.description, vulnerability.vendor,
-            vulnerability.product, vulnerability.date_added, vulnerability.ransomware_use)
-        IS NOT (excluded.name, excluded.description, excluded.vendor,
-            excluded.product, excluded.date_added, excluded.ransomware_use))
+        AND (vulnerability.withdrawn_at IS NOT NULL
+            OR (vulnerability.name, vulnerability.description, vulnerability.vendor,
+                vulnerability.product, vulnerability.date_added,
+                vulnerability.ransomware_use)
+            IS NOT (excluded.name, excluded.description, excluded.vendor,
+                excluded.product, excluded.date_added, excluded.ransomware_use)))
 RETURNING id
+"""
+
+# State catalog (CISA KEV): a CVE of a KEV item absent from a catalog collected after the
+# latest one imported is withdrawn at that collection; the first absence keeps its date.
+WITHDRAW_ABSENT_VULNERABILITIES = """
+UPDATE vulnerability SET withdrawn_at = :collected_at
+WHERE item_id IS NOT NULL
+    AND withdrawn_at IS NULL
+    AND cve_id NOT IN (SELECT value FROM json_each(:present_cve_ids))
 """
 
 # News feed (releases, advisories): the item is created only if its subtype is not known yet,
@@ -139,6 +157,10 @@ class MissingDatabaseError(FileNotFoundError):
     pass
 
 
+class ImportLogExistsError(FileExistsError):
+    """The log of this second is already written: the log of an import is never rewritten."""
+
+
 class UnknownSourceError(LookupError):
     """An item's source_code has no row in the source table of the base."""
 
@@ -176,42 +198,88 @@ class ImportSummary(NamedTuple):
     item_count: int
     discard_count: int
     rejection_count: int
+    read_count: int
+    withdrawn_count: int
+
+
+def check_database_exists(database_path: Path) -> None:
+    """Connecting to a missing file would create an empty base."""
+    if not database_path.is_file():
+        raise MissingDatabaseError(f"{database_path} does not exist")
+
+
+def read_imported_paths(database_path: Path) -> frozenset[str]:
+    """The raw files already imported, from the registry of the base."""
+    check_database_exists(database_path)
+    connection = connect_database(database_path)
+    try:
+        return read_raw_file_paths(connection)
+    finally:
+        connection.close()
 
 
 def import_items(
-    raw_dir: Path,
+    reading: RawReading,
     database_path: Path,
     log_path: Path,
-    kinds: Sequence[SourceKind],
+    imported_at: datetime,
     tracked_repositories: Sequence[TrackedRepository],
 ) -> ImportSummary:
-    """Write the tracked repositories and the items of the raw files into the base, then the
-    log of what was left out.
+    """Write the tracked repositories, each file read and its items into the base, then the
+    log of what was left out, all in one transaction.
 
-    The base must exist: connecting to a missing file would create an empty one.
+    The log is written before the commit: a file registered is not read again, its log must
+    not be lost. A commit that fails removes the log written.
     """
-    if not database_path.is_file():
-        raise MissingDatabaseError(f"{database_path} does not exist")
-    reading = read_raw_items(raw_dir, kinds)
-    items, untracked = reject_untracked_releases(reading.items, tracked_repositories)
-    rejections = reading.rejections + untracked
+    check_database_exists(database_path)
+    rejections = list(reading.rejections)
     written_count = 0
+    withdrawn_count = 0
     discards = []
     connection = connect_database(database_path)
     try:
-        # The context manager commits on success and rolls back on any error.
-        with connection:
+        try:
             write_tracked_repositories(connection, tracked_repositories)
-            for item in map(normalize_item, items):
-                discard = write_item(connection, item)
-                if discard is None:
-                    written_count += 1
-                else:
-                    discards.append(discard)
+            for raw_file in reading.files:
+                items, untracked = reject_untracked_releases(
+                    raw_file.items, tracked_repositories
+                )
+                rejections.extend(untracked)
+                raw_data_id = write_raw_data(connection, raw_file)
+                for item in map(normalize_item, items):
+                    discard = write_item(connection, item, raw_data_id)
+                    if discard is None:
+                        written_count += 1
+                    else:
+                        discards.append(discard)
+                withdrawn_count += withdraw_absent_vulnerabilities(
+                    connection, raw_file, raw_data_id
+                )
+            # Written once the base holds the write lock: two imports of the same second
+            # cannot both find no log.
+            write_import_log(log_path, imported_at, rejections, discards)
+            commit_or_remove_log(connection, log_path)
+        except BaseException:
+            # BaseException: Ctrl-C must not leave half an import either.
+            connection.rollback()
+            raise
     finally:
         connection.close()
-    write_import_log(log_path, rejections, discards)
-    return ImportSummary(written_count, len(discards), len(rejections))
+    return ImportSummary(
+        written_count,
+        len(discards),
+        len(rejections),
+        reading.read_count,
+        withdrawn_count,
+    )
+
+
+def commit_or_remove_log(connection: sqlite3.Connection, log_path: Path) -> None:
+    try:
+        connection.commit()
+    except BaseException:
+        log_path.unlink(missing_ok=True)
+        raise
 
 
 def reject_untracked_releases(
@@ -257,14 +325,13 @@ def write_tracked_repositories(
     )
 
 
-def write_item(connection: sqlite3.Connection, item: Item) -> Discard | None:
-    """Write the item, or return why the base left it out."""
+def write_item(
+    connection: sqlite3.Connection, item: Item, raw_data_id: int
+) -> Discard | None:
+    """Write the item of the raw data raw_data_id, or return why the base left it out."""
     write_kind = WRITER_BY_KIND.get(item.kind)
     if write_kind is None:
         raise KindWithoutTableError(f"kind without a table in the base: {item.kind}")
-    raw_data_id = write_raw_data(
-        connection, item.source_code, item.collected_at, item.raw_file_path
-    )
     return write_kind(connection, item, raw_data_id)
 
 
@@ -337,6 +404,10 @@ def write_vulnerability(
             "ransomware_use": item.ransomware_use,
             "collected_at": format_date(item.collected_at),
             "is_after_latest_catalog": is_after_latest_catalog,
+            # Without a latest catalog, is_after_latest_catalog is NULL: nothing to compare.
+            "withdrawn_at": None
+            if is_after_latest_catalog or latest_collected_at is None
+            else latest_collected_at,
         },
     ).fetchone()
     if written is None:
@@ -428,6 +499,44 @@ def write_advisory(
     return None
 
 
+def withdraw_absent_vulnerabilities(
+    connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
+) -> int:
+    """Withdraw the CVE a catalog collected after the latest one imported no longer lists;
+    return how many.
+
+    Only a file of vulnerabilities, all of its entries read: a rejected row is in the catalog,
+    not absent from it. A CVE written or left out is in the catalog alike. The item withdrawn
+    keeps the raw data of its version: an absence is not a version.
+    """
+    present_cve_ids = [
+        item.cve
+        for item in raw_file.items
+        if item.kind == "vulnerability" and item.cve is not None
+    ]
+    if not present_cve_ids or raw_file.rejection_count:
+        return 0
+    _, is_after_latest_catalog = connection.execute(
+        SELECT_LATEST_CATALOG,
+        {
+            "source_code": raw_file.source_code,
+            "raw_data_id": raw_data_id,
+            # No item: only the other files of the source are compared.
+            "item_id": None,
+            "collected_at": format_date(raw_file.collected_at),
+        },
+    ).fetchone()
+    if not is_after_latest_catalog:
+        return 0
+    return connection.execute(
+        WITHDRAW_ABSENT_VULNERABILITIES,
+        {
+            "collected_at": format_date(raw_file.collected_at),
+            "present_cve_ids": json.dumps(present_cve_ids),
+        },
+    ).rowcount
+
+
 def insert_item(
     connection: sqlite3.Connection, kind: ItemKind, raw_data_id: int
 ) -> int:
@@ -463,29 +572,27 @@ WRITER_BY_KIND: dict[str, Callable[[sqlite3.Connection, Item, int], Discard | No
 }
 
 
-def write_raw_data(
-    connection: sqlite3.Connection,
-    source_code: str,
-    collected_at: datetime,
-    raw_file_path: str,
-) -> int:
+def write_raw_data(connection: sqlite3.Connection, raw_file: RawFile) -> int:
+    """Register the file read, even without item: the next import does not read it again."""
     source_row = connection.execute(
-        "SELECT id FROM source WHERE source_code = ?", (source_code,)
+        "SELECT id FROM source WHERE source_code = ?", (raw_file.source_code,)
     ).fetchone()
     if source_row is None:
-        raise UnknownSourceError(f"source_code not in the source table: {source_code}")
+        raise UnknownSourceError(
+            f"source_code not in the source table: {raw_file.source_code}"
+        )
     connection.execute(
         "INSERT INTO raw_data (source_id, raw_file_path, stream, collected_at)"
         " VALUES (?, ?, ?, ?) ON CONFLICT (raw_file_path) DO NOTHING",
         (
             source_row[0],
-            raw_file_path,
-            find_stream(raw_file_path),
-            format_date(collected_at),
+            raw_file.raw_file_path,
+            find_stream(raw_file.raw_file_path),
+            format_date(raw_file.collected_at),
         ),
     )
     (raw_data_id,) = connection.execute(
-        "SELECT id FROM raw_data WHERE raw_file_path = ?", (raw_file_path,)
+        "SELECT id FROM raw_data WHERE raw_file_path = ?", (raw_file.raw_file_path,)
     ).fetchone()
     return int(raw_data_id)
 
@@ -499,15 +606,21 @@ def format_date(moment: datetime | None) -> str | None:
 
 
 def write_import_log(
-    log_path: Path, rejections: list[Rejection], discards: list[Discard]
+    log_path: Path,
+    imported_at: datetime,
+    rejections: list[Rejection],
+    discards: list[Discard],
 ) -> None:
-    """One JSON line per rejection, then per item left out; the file is rewritten each time.
+    """One JSON line per rejection, then per item left out, each dated by its import.
 
-    Written to a temporary file, then renamed over the log: a failed write leaves the previous
-    log whole, and no temporary file behind.
+    The log of an import is never rewritten: one already at log_path stops the import.
     """
+    if log_path.exists():
+        raise ImportLogExistsError(f"{log_path} already exists")
+    logged_at = format_date(imported_at)
     lines = [
         {
+            "imported_at": logged_at,
             "kind": "rejection",
             "raw_file_path": rejection.raw_file_path,
             "reason": rejection.reason,
@@ -515,6 +628,7 @@ def write_import_log(
         for rejection in rejections
     ] + [
         {
+            "imported_at": logged_at,
             "kind": "discard",
             "rule": discard.rule,
             "source_code": discard.item.source_code,
@@ -524,13 +638,7 @@ def write_import_log(
         }
         for discard in discards
     ]
-    temporary_path = log_path.with_name(log_path.name + ".tmp")
-    try:
-        temporary_path.write_text(
-            "".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines)
-        )
-        os.replace(temporary_path, log_path)
-    except BaseException:
-        # BaseException: Ctrl-C during the write must not leave the temporary file either.
-        temporary_path.unlink(missing_ok=True)
-        raise
+    write_file_atomically(
+        log_path,
+        "".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines).encode(),
+    )

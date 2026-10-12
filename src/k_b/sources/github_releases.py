@@ -15,7 +15,7 @@ from urllib.parse import unquote
 from k_b.items import Item
 from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.source_contract import SourceReader
-from k_b.sources.github_api import get_from_github_api
+from k_b.sources.github_api import SOURCE_CODE, get_from_github_api
 from k_b.sources.github_dates import parse_github_date
 from k_b.sources.tracked_repositories import OWNER_SLASH_NAME, is_repository_name
 
@@ -154,7 +154,7 @@ def convert_release(
     release: Release, collected_at: datetime, raw_file_path: str
 ) -> Item:
     return Item(
-        source_code="github",
+        source_code=SOURCE_CODE,
         source_item_id=str(release.release_id),
         kind="release",
         title=f"{release.repository} {release.name or release.tag_name}",
@@ -169,4 +169,6 @@ def convert_release(
     )
 
 
-READER: SourceReader[Release] = SourceReader(read_releases, convert_release)
+READER: SourceReader[Release] = SourceReader(
+    SOURCE_CODE, read_releases, convert_release
+)

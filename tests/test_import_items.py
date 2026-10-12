@@ -1,8 +1,10 @@
 import csv
 import io
 import json
+import re
 import shutil
 import sqlite3
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from test_items import (
@@ -20,10 +22,12 @@ from k_b import import_items as import_items_module
 from k_b.database.connection import connect_database
 from k_b.database.creation import create_database
 from k_b.import_items import (
+    ImportLogExistsError,
     KindWithoutTableError,
     MissingDatabaseError,
     UnknownSourceError,
     import_items,
+    read_imported_paths,
 )
 from k_b.items import (
     MAX_COUNT_BY_KIND,
@@ -31,12 +35,18 @@ from k_b.items import (
     MAX_LENGTH_BY_KIND,
     Item,
 )
+from k_b.raw_items import RawReading, read_raw_items
 from k_b.source_contract import SourceKind, SourceReader
 from k_b.source_kinds import SOURCE_KINDS
 from k_b.sources.tracked_repositories import TRACKED_REPOSITORIES
 
 FIRST_PAPER_ID = "2609.31282"
 FIRST_CVE_ID = "CVE-2026-86950"
+# The CVE of the recorded catalog, in its order; the last one is the one withdrawn.
+CVE_IDS = (FIRST_CVE_ID, "CVE-2026-88772", "CVE-2026-88771", "CVE-2020-29583")
+WITHDRAWN_CVE_ID = "CVE-2020-29583"
+# A CVE the recorded advisories cite, absent from the recorded catalog.
+ADVISORY_CVE_ID = "CVE-2026-48775"
 FIRST_RELEASE_ID = 401174143
 ADVISORY_WITH_TWO_PACKAGES = "GHSA-gr75-jv2w-4656"
 AUTOMATED_WATCH = "automated_watch"
@@ -45,6 +55,7 @@ RELEASES_DIR = "github_releases_anthropics_claude_code"
 ADVISORIES_DIR = "github_advisories_pip"
 ARXIV_DIR = "arxiv_cscr_x_csai"
 FIRST_COLLECTION = "2026-10-05T093000Z"
+FIRST_IMPORT_AT = datetime(2026, 10, 12, 15, 49, 3, tzinfo=UTC)
 PAPER_QUERY = (
     "SELECT item.id, item.kind, raw_file_path, title, authors, submitted_at, revised_at"
     " FROM publication JOIN item ON item.id = publication.item_id"
@@ -70,12 +81,32 @@ def data_dir(tmp_path):
     return tmp_path
 
 
-def run_import(data_dir, tracked_repositories=TRACKED_REPOSITORIES):
+def log_path_at(data_dir, imported_at):
+    return data_dir / f"import-log-{imported_at:%Y-%m-%dT%H%M%SZ}.jsonl"
+
+
+def list_logs(data_dir):
+    return sorted(data_dir.glob("import-log-*.jsonl"))
+
+
+def run_import(
+    data_dir,
+    tracked_repositories=TRACKED_REPOSITORIES,
+    kinds=SOURCE_KINDS,
+    read_again=False,
+):
+    """kb import, one second after the import before it: each import writes its own log.
+
+    read_again: every raw file is read, as by a base of before #106 that has no registry.
+    """
+    imported_at = FIRST_IMPORT_AT + timedelta(seconds=len(list_logs(data_dir)))
+    database_path = data_dir / "k-b.sqlite"
+    imported_paths = frozenset() if read_again else read_imported_paths(database_path)
     return import_items(
-        data_dir / "raw",
-        data_dir / "k-b.sqlite",
-        data_dir / "import-log.jsonl",
-        SOURCE_KINDS,
+        read_raw_items(data_dir / "raw", kinds, imported_paths),
+        database_path,
+        log_path_at(data_dir, imported_at),
+        imported_at,
         tracked_repositories,
     )
 
@@ -101,11 +132,20 @@ def count_rows(data_dir, query):
     return fetch_rows(data_dir, query)[0][0]
 
 
-def read_log(data_dir):
+def read_log_lines(data_dir):
+    """The lines of the log of the latest import."""
     return [
-        json.loads(line)
-        for line in (data_dir / "import-log.jsonl").read_text().splitlines()
+        json.loads(line) for line in list_logs(data_dir)[-1].read_text().splitlines()
     ]
+
+
+def read_log(data_dir):
+    """The lines of the latest log, without the time each one carries: a test of its own
+    checks it."""
+    lines = read_log_lines(data_dir)
+    for line in lines:
+        del line["imported_at"]
+    return lines
 
 
 def read_discards(data_dir, source_item_id=None):
@@ -131,14 +171,19 @@ def write_collection(data_dir, folder, collection, content):
     return f"{AUTOMATED_WATCH}/{folder}/{collection}.{extension}"
 
 
-def kev_catalog(ransomware_use_of_first_cve="Unknown"):
-    """The recorded catalog, with knownRansomwareCampaignUse of its first CVE as given."""
+def kev_catalog(ransomware_use_of_first_cve="Unknown", without=(), renamed=None):
+    """The recorded catalog, with knownRansomwareCampaignUse of its first CVE as given, each
+    CVE of renamed under its new identifier, then the CVE of without left out."""
     rows = list(
         csv.DictReader(io.StringIO((FIXTURES_DIR / "cisa_kev_extract.csv").read_text()))
     )
+    columns = list(rows[0])
     rows[0]["knownRansomwareCampaignUse"] = ransomware_use_of_first_cve
+    for row in rows:
+        row["cveID"] = (renamed or {}).get(row["cveID"], row["cveID"])
+    rows = [row for row in rows if row["cveID"] not in without]
     output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=list(rows[0]), lineterminator="\n")
+    writer = csv.DictWriter(output, fieldnames=columns, lineterminator="\n")
     writer.writeheader()
     writer.writerows(rows)
     return output.getvalue()
@@ -378,9 +423,22 @@ def test_a_release_of_a_repository_no_longer_tracked_is_rejected_and_logged(data
     assert count_rows(data_dir, "SELECT count(*) FROM release") == 0
 
 
-def test_an_import_run_again_gives_the_same_database_and_logs_every_item_as_a_discard(
+def test_a_second_import_without_new_raw_reads_nothing_and_changes_nothing(data_dir):
+    first = run_import(data_dir)
+    tables = dump_database(data_dir)
+
+    second = run_import(data_dir)
+
+    assert first.read_count == 4
+    assert second == (0, 0, 0, 0, 0)
+    assert dump_database(data_dir) == tables
+    assert read_log(data_dir) == []
+
+
+def test_raw_files_read_again_give_the_same_database_and_log_every_item_as_a_discard(
     data_dir,
 ):
+    # A base of before #106 reads every file again: the base still removes the duplicates.
     # Two catalogs that differ: the older one must not be written over the newer.
     newer_catalog = write_collection(
         data_dir, CISA_KEV_DIR, "2026-10-06T093000Z", kev_catalog("Known")
@@ -388,7 +446,7 @@ def test_an_import_run_again_gives_the_same_database_and_logs_every_item_as_a_di
     first = run_import(data_dir)
     first_tables = dump_database(data_dir)
 
-    second = run_import(data_dir)
+    second = run_import(data_dir, read_again=True)
 
     assert dump_database(data_dir) == first_tables
     assert second.item_count == 0
@@ -631,7 +689,7 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(
         run_import(data_dir)
 
     assert dump_database(data_dir) == tables_before
-    assert not (data_dir / "import-log.jsonl").exists()
+    assert list_logs(data_dir) == []
 
 
 def convert_line_to_newsletter_article(line, collected_at, raw_file_path):
@@ -656,6 +714,7 @@ def test_an_item_of_a_kind_without_table_is_refused_and_nothing_written(tmp_path
             "fake",
             (),
             SourceReader(
+                "tldr",
                 lambda raw: raw.decode().splitlines(),
                 convert_line_to_newsletter_article,
             ),
@@ -663,13 +722,7 @@ def test_an_item_of_a_kind_without_table_is_refused_and_nothing_written(tmp_path
     ]
 
     with pytest.raises(KindWithoutTableError, match="newsletter_article"):
-        import_items(
-            tmp_path / "raw",
-            tmp_path / "k-b.sqlite",
-            tmp_path / "import-log.jsonl",
-            kinds,
-            TRACKED_REPOSITORIES,
-        )
+        run_import(tmp_path, kinds=kinds)
 
     assert count_rows(tmp_path, "SELECT count(*) FROM item") == 0
     assert count_rows(tmp_path, "SELECT count(*) FROM raw_data") == 0
@@ -689,11 +742,13 @@ def test_an_item_of_a_source_missing_from_the_database_is_refused(data_dir):
 
 def test_a_missing_database_is_refused_and_not_created(tmp_path):
     with pytest.raises(MissingDatabaseError):
+        read_imported_paths(tmp_path / "k-b.sqlite")
+    with pytest.raises(MissingDatabaseError):
         import_items(
-            tmp_path / "raw",
+            RawReading([], [], 0),
             tmp_path / "k-b.sqlite",
-            tmp_path / "import-log.jsonl",
-            SOURCE_KINDS,
+            log_path_at(tmp_path, FIRST_IMPORT_AT),
+            FIRST_IMPORT_AT,
             TRACKED_REPOSITORIES,
         )
 
@@ -770,24 +825,48 @@ def test_an_arxiv_revision_not_newer_is_discarded_as_revision_not_newer(
     ]
 
 
-def test_a_log_that_cannot_be_written_keeps_the_previous_log_whole(
+def test_a_log_that_cannot_be_written_leaves_the_database_unchanged(
     data_dir, monkeypatch
 ):
-    previous_log = '{"kind": "previous"}\n'
-    (data_dir / "import-log.jsonl").write_text(previous_log)
+    tables_before = dump_database(data_dir)
 
-    def fail_to_replace(source, destination):
+    def fail_to_write(path, content):
         raise OSError("disk full")
 
-    monkeypatch.setattr(import_items_module.os, "replace", fail_to_replace)
+    monkeypatch.setattr(import_items_module, "write_file_atomically", fail_to_write)
 
     with pytest.raises(OSError, match="disk full"):
         run_import(data_dir)
 
-    # The base is written first, then the log: the base keeps its import.
-    assert count_rows(data_dir, "SELECT count(*) FROM item") == 3 + 4 + 3 + 3
-    assert (data_dir / "import-log.jsonl").read_text() == previous_log
-    assert not (data_dir / "import-log.jsonl.tmp").exists()
+    # The log is written before the commit: no file is registered, all are read again.
+    assert dump_database(data_dir) == tables_before
+    assert list_logs(data_dir) == []
+
+
+class CommitFailingConnection(sqlite3.Connection):
+    def commit(self):
+        raise sqlite3.OperationalError("disk I/O error")
+
+
+def test_a_commit_that_fails_leaves_neither_the_import_nor_its_log(
+    data_dir, monkeypatch
+):
+    tables_before = dump_database(data_dir)
+
+    def connect_with_failing_commit(database_path):
+        connection = sqlite3.connect(database_path, factory=CommitFailingConnection)
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection
+
+    monkeypatch.setattr(
+        import_items_module, "connect_database", connect_with_failing_commit
+    )
+
+    with pytest.raises(sqlite3.OperationalError, match="disk I/O error"):
+        run_import(data_dir)
+
+    assert dump_database(data_dir) == tables_before
+    assert list_logs(data_dir) == []
 
 
 def text_at_its_maximum(kind, field, maximum):
@@ -826,19 +905,15 @@ def test_an_item_with_every_text_and_list_at_its_maximum_goes_into_the_database(
     builders = [item_fields, vulnerability_fields, release_fields, advisory_fields]
     kinds = [
         SourceKind(
-            "fake", (), SourceReader(lambda raw: builders, build_item_at_its_maximums)
+            "fake",
+            (),
+            SourceReader("arxiv", lambda raw: builders, build_item_at_its_maximums),
         )
     ]
 
-    summary = import_items(
-        tmp_path / "raw",
-        tmp_path / "k-b.sqlite",
-        tmp_path / "import-log.jsonl",
-        kinds,
-        TRACKED_REPOSITORIES,
-    )
+    summary = run_import(tmp_path, kinds=kinds)
 
-    assert summary == (4, 0, 0)
+    assert summary == (4, 0, 0, 1, 0)
     paper, vulnerability, release, advisory = (
         build_item_at_its_maximums(build_fields, COLLECTED_AT, RAW_FILE_PATH)
         for build_fields in builders
@@ -877,3 +952,311 @@ def test_an_item_with_every_text_and_list_at_its_maximum_goes_into_the_database(
             json.dumps(list(advisory.package_names)),
         )
     ]
+
+
+def registered_paths(data_dir):
+    return {
+        path for (path,) in fetch_rows(data_dir, "SELECT raw_file_path FROM raw_data")
+    }
+
+
+def test_a_file_read_without_item_is_registered_and_not_read_again(data_dir):
+    empty = write_collection(
+        data_dir, CISA_KEV_DIR, "2026-10-06T093000Z", kev_catalog(without=CVE_IDS)
+    )
+
+    first = run_import(data_dir)
+    second = run_import(data_dir)
+
+    assert empty in registered_paths(data_dir)
+    assert (first.read_count, second.read_count) == (5, 0)
+    # A catalog without any row is not a catalog that withdrew every CVE.
+    assert first.withdrawn_count == 0
+
+
+def test_a_file_read_with_a_rejected_entry_is_registered_and_not_read_again(data_dir):
+    catalog = kev_catalog()
+    assert (
+        catalog.count("Citrix NetScaler Improper Input Validation Vulnerability") == 1
+    )
+    with_rejection = write_collection(
+        data_dir,
+        CISA_KEV_DIR,
+        "2026-10-06T093000Z",
+        catalog.replace("Citrix NetScaler Improper Input Validation Vulnerability", ""),
+    )
+
+    first = run_import(data_dir)
+    second = run_import(data_dir)
+
+    assert with_rejection in registered_paths(data_dir)
+    assert first.rejection_count == 1
+    assert (second.read_count, second.rejection_count) == (0, 0)
+
+
+def test_an_unreadable_file_and_a_file_without_reader_are_not_registered(data_dir):
+    unreadable = write_collection(data_dir, ARXIV_DIR, "2026-10-06T093000Z", "not xml")
+    pages_dir = data_dir / "raw" / AUTOMATED_WATCH / "tldr_ai" / FIRST_COLLECTION
+    pages_dir.mkdir(parents=True)
+    (pages_dir / "2026-10-05.html").write_text("<html></html>")
+
+    run_import(data_dir)
+    second = run_import(data_dir)
+
+    assert unreadable not in registered_paths(data_dir)
+    assert all("tldr_ai" not in path for path in registered_paths(data_dir))
+    # The unreadable file is read and rejected at each import (decision of 2026-10-12).
+    assert (second.read_count, second.rejection_count) == (1, 1)
+
+
+def test_only_a_new_raw_file_is_read_and_the_log_of_the_first_import_stays_whole(
+    data_dir,
+):
+    run_import(data_dir)
+    (first_log,) = list_logs(data_dir)
+    first_log_content = first_log.read_bytes()
+    write_collection(data_dir, CISA_KEV_DIR, "2026-10-06T093000Z", kev_catalog("Known"))
+
+    second = run_import(data_dir)
+
+    assert second.read_count == 1
+    assert second.item_count == 1
+    assert len(list_logs(data_dir)) == 2
+    assert first_log.read_bytes() == first_log_content
+
+
+def test_a_log_of_the_same_second_stops_the_import_before_the_database(data_dir):
+    log_path = log_path_at(data_dir, FIRST_IMPORT_AT)
+    log_path.write_text("earlier import\n")
+    tables_before = dump_database(data_dir)
+    database_path = data_dir / "k-b.sqlite"
+    reading = read_raw_items(
+        data_dir / "raw", SOURCE_KINDS, read_imported_paths(database_path)
+    )
+
+    with pytest.raises(ImportLogExistsError):
+        import_items(
+            reading, database_path, log_path, FIRST_IMPORT_AT, TRACKED_REPOSITORIES
+        )
+
+    assert dump_database(data_dir) == tables_before
+    assert log_path.read_text() == "earlier import\n"
+
+
+def test_each_line_of_the_log_carries_the_time_of_its_import(data_dir):
+    write_collection(data_dir, ARXIV_DIR, "2026-10-06T093000Z", "not xml")
+    releases = (FIXTURES_DIR / "github_releases_extract.json").read_text()
+    write_collection(data_dir, RELEASES_DIR, "2026-10-06T093000Z", releases)
+
+    run_import(data_dir)
+
+    lines = read_log_lines(data_dir)
+    assert {line["kind"] for line in lines} == {"rejection", "discard"}
+    assert {line["imported_at"] for line in lines} == {"2026-10-12T15:49:03Z"}
+    assert all(
+        re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", line["imported_at"])
+        for line in lines
+    )
+
+
+WITHDRAWAL_QUERY = (
+    "SELECT withdrawn_at, revised_at, raw_file_path"
+    " FROM vulnerability JOIN item ON item.id = vulnerability.item_id"
+    " JOIN raw_data ON raw_data.id = item.raw_data_id WHERE cve_id = ?"
+)
+WITHDRAWN_COUNT_QUERY = (
+    "SELECT count(*) FROM vulnerability WHERE withdrawn_at IS NOT NULL"
+)
+
+
+def test_a_kev_row_absent_from_a_newer_catalog_is_withdrawn_at_its_collection(
+    data_dir,
+):
+    run_import(data_dir)
+    write_collection(
+        data_dir,
+        CISA_KEV_DIR,
+        "2026-10-06T093000Z",
+        kev_catalog(without=(WITHDRAWN_CVE_ID,)),
+    )
+
+    summary = run_import(data_dir)
+
+    assert summary.withdrawn_count == 1
+    # The item keeps the file of its version: an absence is not a version.
+    assert fetch_rows(data_dir, WITHDRAWAL_QUERY, (WITHDRAWN_CVE_ID,)) == [
+        (
+            "2026-10-06T09:30:00Z",
+            None,
+            f"{AUTOMATED_WATCH}/{CISA_KEV_DIR}/{FIRST_COLLECTION}.csv",
+        )
+    ]
+    # The rows present, though not written (unchanged), are not withdrawn.
+    assert count_rows(data_dir, WITHDRAWN_COUNT_QUERY) == 1
+    assert {line["rule"] for line in read_discards(data_dir)} == {"unchanged"}
+
+
+def test_a_withdrawn_kev_row_back_in_a_newer_catalog_is_written_again_and_dated(
+    data_dir,
+):
+    write_collection(
+        data_dir,
+        CISA_KEV_DIR,
+        "2026-10-06T093000Z",
+        kev_catalog(without=(WITHDRAWN_CVE_ID,)),
+    )
+    run_import(data_dir)
+    query = "SELECT item_id FROM vulnerability WHERE cve_id = ?"
+    ((item_id,),) = fetch_rows(data_dir, query, (WITHDRAWN_CVE_ID,))
+    back = write_collection(data_dir, CISA_KEV_DIR, "2026-10-07T093000Z", kev_catalog())
+
+    summary = run_import(data_dir)
+
+    # Its content is the same: only its return is written.
+    assert summary.item_count == 1
+    assert fetch_rows(data_dir, query, (WITHDRAWN_CVE_ID,)) == [(item_id,)]
+    assert fetch_rows(data_dir, WITHDRAWAL_QUERY, (WITHDRAWN_CVE_ID,)) == [
+        (None, "2026-10-07T09:30:00Z", back)
+    ]
+
+
+def test_a_kev_row_absent_from_two_catalogs_keeps_the_date_of_the_first(data_dir):
+    for collection in ("2026-10-06T093000Z", "2026-10-07T093000Z"):
+        write_collection(
+            data_dir,
+            CISA_KEV_DIR,
+            collection,
+            kev_catalog(without=(WITHDRAWN_CVE_ID,)),
+        )
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, WITHDRAWAL_QUERY, (WITHDRAWN_CVE_ID,))[0][0] == (
+        "2026-10-06T09:30:00Z"
+    )
+
+
+def test_a_catalog_with_a_rejected_row_withdraws_nothing(data_dir):
+    run_import(data_dir)
+    catalog = kev_catalog(without=(WITHDRAWN_CVE_ID,))
+    write_collection(
+        data_dir,
+        CISA_KEV_DIR,
+        "2026-10-06T093000Z",
+        catalog.replace("Citrix NetScaler Improper Input Validation Vulnerability", ""),
+    )
+
+    summary = run_import(data_dir)
+
+    # A rejected row is in the catalog, not absent from it.
+    assert (summary.rejection_count, summary.withdrawn_count) == (1, 0)
+    assert count_rows(data_dir, WITHDRAWN_COUNT_QUERY) == 0
+
+
+def test_a_catalog_older_than_the_latest_imported_withdraws_nothing(data_dir):
+    run_import(data_dir)
+    write_collection(
+        data_dir,
+        CISA_KEV_DIR,
+        "2026-10-04T093000Z",
+        kev_catalog(without=(WITHDRAWN_CVE_ID,)),
+    )
+
+    summary = run_import(data_dir)
+
+    assert summary.withdrawn_count == 0
+    assert count_rows(data_dir, WITHDRAWN_COUNT_QUERY) == 0
+
+
+def test_a_cve_only_an_older_catalog_brings_is_written_withdrawn_at_the_latest_catalog(
+    data_dir,
+):
+    write_collection(
+        data_dir,
+        CISA_KEV_DIR,
+        FIRST_COLLECTION,
+        kev_catalog(without=(WITHDRAWN_CVE_ID,)),
+    )
+    run_import(data_dir)
+    late = write_collection(data_dir, CISA_KEV_DIR, "2026-10-04T093000Z", kev_catalog())
+
+    run_import(data_dir)
+
+    # The latest catalog does not list it: it is withdrawn, as a rebuild would find it.
+    assert fetch_rows(data_dir, WITHDRAWAL_QUERY, (WITHDRAWN_CVE_ID,)) == [
+        ("2026-10-05T09:30:00Z", None, late)
+    ]
+
+
+def test_a_cve_of_an_advisory_an_older_catalog_fills_is_written_withdrawn(data_dir):
+    run_import(data_dir)
+    late = write_collection(
+        data_dir,
+        CISA_KEV_DIR,
+        "2026-10-04T093000Z",
+        kev_catalog(renamed={WITHDRAWN_CVE_ID: ADVISORY_CVE_ID}),
+    )
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, WITHDRAWAL_QUERY, (ADVISORY_CVE_ID,)) == [
+        ("2026-10-05T09:30:00Z", None, late)
+    ]
+
+
+def rebuild_database(data_dir):
+    """Delete the base, create it, and import every raw file: kb create-db, kb import."""
+    for suffix in ("", "-wal", "-shm"):
+        (data_dir / f"k-b.sqlite{suffix}").unlink(missing_ok=True)
+    create_database(data_dir / "k-b.sqlite")
+    run_import(data_dir)
+
+
+def test_a_rebuilt_database_equals_the_one_kept_import_after_import(data_dir):
+    run_import(data_dir)
+    write_collection(
+        data_dir,
+        CISA_KEV_DIR,
+        "2026-10-06T093000Z",
+        kev_catalog(without=(WITHDRAWN_CVE_ID,)),
+    )
+    run_import(data_dir)
+    write_collection(data_dir, CISA_KEV_DIR, "2026-10-07T093000Z", kev_catalog("Known"))
+    run_import(data_dir)
+    kept = dump_database(data_dir)
+
+    rebuild_database(data_dir)
+
+    assert dump_database(data_dir) == kept
+
+
+KEV_CONTENT_QUERY = (
+    "SELECT cve_id, name, description, vendor, product, date_added, ransomware_use,"
+    " withdrawn_at IS NOT NULL FROM vulnerability ORDER BY cve_id"
+)
+
+
+def test_a_rebuilt_database_has_the_content_and_withdrawals_of_one_kept_with_a_late_catalog(
+    data_dir, tmp_path_factory
+):
+    first_catalog = (
+        data_dir / "raw" / AUTOMATED_WATCH / CISA_KEV_DIR / (f"{FIRST_COLLECTION}.csv")
+    )
+    set_aside = tmp_path_factory.mktemp("set_aside") / first_catalog.name
+    shutil.move(first_catalog, set_aside)
+    write_collection(
+        data_dir,
+        CISA_KEV_DIR,
+        "2026-10-07T093000Z",
+        kev_catalog(without=(WITHDRAWN_CVE_ID,)),
+    )
+    run_import(data_dir)
+    # The first catalog comes late: imported after a newer one.
+    shutil.move(set_aside, first_catalog)
+    run_import(data_dir)
+    kept = fetch_rows(data_dir, KEV_CONTENT_QUERY)
+
+    rebuild_database(data_dir)
+
+    assert fetch_rows(data_dir, KEV_CONTENT_QUERY) == kept
+    assert (WITHDRAWN_CVE_ID, True) in [(row[0], bool(row[-1])) for row in kept]

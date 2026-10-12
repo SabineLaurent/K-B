@@ -1,8 +1,10 @@
 import json
 import os
+import re
 import sqlite3
 import subprocess
 import sys
+from datetime import UTC, datetime
 
 import pytest
 from test_collect import BrokenSource, WorkingSource
@@ -330,9 +332,35 @@ def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, ca
 
     assert exit_code == 0
     output = capsys.readouterr().out
+    assert "raw files read: 0" in output
     assert "items written (new or updated): 0" in output
     assert "items left out (duplicates or versions not newer): 0" in output
-    assert (tmp_path / "import-log.jsonl").is_file()
+    assert "vulnerabilities withdrawn: 0" in output
+    (log_path,) = tmp_path.glob("import-log-*.jsonl")
+    assert re.fullmatch(r"import-log-\d{4}-\d{2}-\d{2}T\d{6}Z\.jsonl", log_path.name)
+    assert f"log: {log_path}" in output
+
+
+class FrozenDatetime(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return datetime(2026, 10, 12, 15, 49, 3, 250000, tzinfo=UTC)
+
+
+def test_import_refuses_to_rewrite_the_log_of_its_second_and_exits_2(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    monkeypatch.setattr(cli, "datetime", FrozenDatetime)
+    log_path = tmp_path / "import-log-2026-10-12T154903Z.jsonl"
+    log_path.write_text("earlier import\n")
+
+    exit_code = cli.main(["import"])
+
+    assert exit_code == 2
+    assert str(log_path) in capsys.readouterr().err
+    assert log_path.read_text() == "earlier import\n"
 
 
 def test_import_refuses_a_missing_database_and_does_not_create_it(
@@ -352,7 +380,7 @@ def test_import_reports_a_failed_import_and_exits_1(monkeypatch, tmp_path, capsy
     cli.main(["create-db"])
 
     def fail_to_import(
-        raw_dir, database_path, log_path, source_kinds, tracked_repositories
+        reading, database_path, log_path, imported_at, tracked_repositories
     ):
         raise sqlite3.IntegrityError("CHECK constraint failed: publication")
 
@@ -374,7 +402,7 @@ def test_import_reports_a_source_missing_from_the_database_and_exits_1(
     cli.main(["create-db"])
 
     def fail_to_import(
-        raw_dir, database_path, log_path, source_kinds, tracked_repositories
+        reading, database_path, log_path, imported_at, tracked_repositories
     ):
         raise UnknownSourceError("source_code not in the source table: cisa_kev")
 
@@ -394,7 +422,7 @@ def test_import_reports_a_kind_without_table_and_exits_1(monkeypatch, tmp_path, 
     cli.main(["create-db"])
 
     def fail_to_import(
-        raw_dir, database_path, log_path, source_kinds, tracked_repositories
+        reading, database_path, log_path, imported_at, tracked_repositories
     ):
         raise KindWithoutTableError(
             "kind without a table in the base: newsletter_article"
