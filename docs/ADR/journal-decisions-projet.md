@@ -1259,7 +1259,84 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   Limite assumée : un même article gardé sous deux URL donne deux clips. La nature de la source
   (règle de dédoublonnage par la base) reste à décider par #14, comme le prévoit l'entrée de #105. — #14
 
+### Collecte : articles TLDR
+
+Mesures citées : les 18 pages collectées du 2026-09-30 au 2026-10-09 (3 éditions, 315 entrées,
+40 sponsorisées, 3 offres d'emploi de TLDR, 272 articles).
+
+- **La clé d'un article TLDR reste (édition, date de l'édition, rang), celle de l'entrée du
+  2026-10-07 ; l'URL est rangée sans `utm_*`, ni unique ni dans la clé ; pas d'empreinte de
+  contenu, les limites sont écrites dans `docs/specs-collecte.md`.** Décision de Sabine, sur
+  recommandation (« ok avec 1 A »). Pourquoi, celui de la recommandation : avec cette clé, l'URL
+  n'entre pas dans l'identité, donc sa normalisation ne change aucun doublon, et la règle est la
+  même pour toute la base, comme pour les clips ; la clé ne donne aucune collision sur le brut.
+  Options écartées : la clé (édition, date, URL), qui tient si une page est réordonnée entre
+  deux collectes, mais revient sur la clé du 07/10 pour un cas non observé ; une empreinte du
+  titre et du résumé normalisés (environ 1 h, pour 1 cas sur le brut, une offre d'emploi) ; une
+  normalisation plus large de l'URL (casse de l'hôte, `www.`, paramètres), qui ne fusionnerait
+  que cette offre et casserait les URL du type `?id=123`. Limites assumées : un même article
+  résumé par deux éditions, ou repris un autre jour, fait deux lignes (10 URL sous deux clés,
+  toujours avec deux résumés différents) ; un même contenu sous une autre URL n'est pas
+  reconnu. Tranche, pour TLDR, ce que l'entrée de #105 laissait à #57 ; #138 reste concerné
+  pour Zotero. — PR de #57
+- **Le rang compte tous les `<article>` de la page, entrées sponsorisées et offres d'emploi
+  comprises.** Décision de Sabine, sur recommandation (« Je valide tes recommandations »).
+  Pourquoi, celui de la recommandation : le rang se vérifie à l'œil sur la page brute, et
+  changer ce qui est écarté ne renumérote aucun article (les offres d'emploi ont été écartées
+  le jour même sans décaler un rang). Option écartée : le rang parmi les articles gardés, qui
+  ne bouge pas si un encart sponsor change mais dépend du filtre de K-B. Limite assumée : le
+  jour de la dernière collecte est relu à chaque collecte ; si tldr.tech a modifié la page
+  entre-temps (entrée ajoutée, retirée ou déplacée), la première version vue reste et un
+  article décalé peut être écarté à tort ou entrer deux fois. Non mesurable sur le brut, où
+  aucune page n'est collectée deux fois. — PR de #57
+- **La colonne `newsletter_article.publication_id` (papier cité, entrée du 2026-10-07) est
+  créée et laissée vide.** Décision de Sabine (« 2 B »), contre la recommandation de la
+  session, qui était de la remplir pour un lien `https://arxiv.org/abs/<id>` (environ 20 min,
+  2 articles sur le brut). Pourquoi : Sabine ne l'a pas dit ; l'option lui était présentée
+  comme celle qui tient l'estimation de l'issue (déduction de la session, non confirmée).
+  Option écartée aussi : ne pas créer la colonne, un écart à l'entrée du 07/10. Limite
+  assumée : une colonne et son index sans écrivain, jusqu'à l'issue qui la remplira
+  (« Décisions encore ouvertes »). — PR de #57
+- **Le HTML des pages TLDR est lu avec BeautifulSoup (`beautifulsoup4`), sur l'analyseur
+  `html.parser` de la bibliothèque standard.** Décision de Sabine (« je veux beautiful soup »),
+  qui écarte la proposition de la session : `html.parser` seul, sans dépendance nouvelle.
+  Pourquoi : réemployer ce qui marche, brief09 et `feat/tldr` lisant déjà ces pages avec
+  BeautifulSoup (motif relayé par time-knight, dans la ligne de la consigne du 12/10 sur le
+  réemploi de brief09). Non ajouté : `lxml`, l'analyseur de brief09, une dépendance de plus à
+  soumettre. Conséquence : deux paquets de plus dans `uv.lock` (`beautifulsoup4`,
+  `soupsieve`). K-B décode lui-même l'UTF-8 : BeautifulSoup devinerait l'encodage.
+  **`soupsieve` est verrouillé en 2.10 (du 2026-09-24), pas en 3.0.3** : décision de Sabine,
+  sur recommandation, après un constat de la revue de sécurité. Pourquoi : la 3.0.3 avait été
+  publiée le jour même, 5 heures avant le commit, et aucune base d'alertes ne connaît encore
+  une version si récente ; `beautifulsoup4` 4.15.0 accepte `soupsieve>=1.6.1`. Limite
+  assumée : la borne n'est que dans `uv.lock`, un `uv lock --upgrade` la lèvera. — PR de #57
+- **Les offres d'emploi de TLDR sont écartées comme les entrées sponsorisées, sans rejet ni
+  ligne de journal, reconnues par leur lien (`https://jobs.ashbyhq.com/tldr.tech/`).**
+  Décision de Sabine : « Ce ne sont pas des articles souhaités ». Ajout au périmètre de #57,
+  dont le critère de fin a été modifié. Règles écartées, mesurées sur le brut : par les mots
+  du titre ou du lien (« job », « hiring », « recruit »…), qui écartait à tort 3 vrais
+  articles sur 6 entrées trouvées ; par la parenthèse finale du titre, qui écarterait tout
+  article dont TLDR invente une mention ; par la phrase du résumé, qui dépend de la rédaction
+  de chaque offre. Limite assumée : une offre publiée ailleurs que sur ce site d'offres entre
+  comme article. — PR de #57
+- **`HttpsUrl`, le type d'URL commun à toutes les sources, refuse ce que `urlsplit` refuse,
+  et un lien sans hôte.**
+  Décision de Sabine, sur recommandation, après un constat de la relecture du plan : un lien
+  mal formé (`https://[x`) passait l'item, puis faisait lever `urlsplit` à la normalisation
+  (`merge.py`) ; l'import s'arrêtait sur une trace Python, et de même à chaque import suivant.
+  Les deux revues de la PR ont trouvé le même arrêt pour un lien sans hôte
+  (`https://?utm_source=…`, réduit à `https://` une fois ses `utm_*` retirés) : refusé aussi.
+  Pourquoi, celui de la recommandation : une seule entrée ne doit pas bloquer tout l'import
+  (règle 1 des conventions) ; TLDR est la première source dont les liens viennent de tiers.
+  Option écartée : ne rien changer et écrire la limite. Aucun des liens collectés ne
+  déclenche le cas. — PR de #57
+
 ## Décisions encore ouvertes
+
+- **Remplir `newsletter_article.publication_id`** (2026-10-12) : quand le lien d'un article TLDR
+  est `https://arxiv.org/abs/<id>`, le rattacher à sa PUBLICATION, créée sans ses colonnes arXiv
+  si arXiv ne l'a pas encore donnée (ce qu'une alerte GitHub fait déjà pour sa CVE). Signalé par
+  #57, sans issue ; 2 articles sur les 272 du brut du 2026-09-30 au 2026-10-09.
 
 - **Noms des colonnes de date** (2026-10-12) : ils ne disent pas d'où vient la date
   (`vulnerability.date_added` est une date CISA, `vulnerability.revised_at` et `withdrawn_at`
@@ -1308,8 +1385,9 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   (2026-10-10).
 - **TENDANCE en base et ses totaux GraphQL** (2026-10-11) : reportés par #16, qui s'arrête à
   l'extraction. Restent à trancher avec l'issue de suite : le brut des totaux GraphQL (relecture
-  du 2026-10-09), le lecteur et l'écrivain de TENDANCE, et la borne des entiers sur 64 bits, à
-  déplacer dans `items.py` quand la base contraindra `repository_id` (règle 4).
+  du 2026-10-09), le lecteur et l'écrivain de TENDANCE. La borne des entiers sur 64 bits
+  (`MAX_INT64`) est passée dans `items.py` avec #57, qui en borne le rang d'un article TLDR ;
+  `gh_archive.py` l'importe (règle 4).
 - **Wiki : le texte envoyé au modèle et reçu de lui, dans l'outil de suivi** (2026-10-12) : jamais
   (mesures seules), seulement en environnement d'essai, ou toujours (et inscrit au registre).
   Sabine tranchera à la comparaison des outils de restitution. La trace d'un outil comme Langfuse
