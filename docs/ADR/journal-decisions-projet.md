@@ -1104,14 +1104,15 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
 
 ### Import dans la base
 
-- **`kb import` ne rejoue plus tout `raw/` à chaque exécution : il n'importera que les fichiers
-  bruts pas encore importés.** Décision de Sabine du 2026-10-06 (revue d'architecture, W0),
-  consignée ici après coup avec la PR qui en pose la condition. Pourquoi, selon elle : « la
-  collecte est incrémentale ; l'import doit l'être aussi ». Rejouer tout le brut refait le
-  travail des imports précédents, et le journal se remplit de doublons attendus (W5). Les options
-  écartées n'ont pas été écrites le 2026-10-06. Limite assumée : la reconstruction complète
-  (supprimer la base, `kb create-db`, `kb import`) reste possible et exceptionnelle. Jusqu'à #106,
-  qui code l'import incrémental, chaque import relit encore tout. — PR de #105
+- **Fin du rejeu complet : `kb import` ne rejoue plus tout `raw/` à chaque exécution, il
+  n'importera que les fichiers bruts pas encore importés.** Décision de Sabine du 2026-10-06
+  (revue d'architecture, W0), consignée ici après coup avec la PR qui en pose la condition.
+  Pourquoi, selon elle : « la collecte est incrémentale ; l'import doit l'être aussi ». Rejouer
+  tout le brut refait le travail des imports précédents, et le journal se remplit de doublons
+  attendus (W5). Les options écartées n'ont pas été écrites le 2026-10-06. Limite assumée : la
+  reconstruction complète (supprimer la base, `kb create-db`, `kb import`) reste possible et
+  exceptionnelle. Jusqu'à #106, qui code l'import incrémental, chaque import relit encore tout. —
+  PR de #105
 - **La base dédoublonne les items ; la fusion en mémoire (`merge_items`) disparaît, et
   `merge.py` ne garde que la normalisation. La règle de chaque nature de source est une clause
   SQL de l'écrivain de sa sorte d'item, et nulle part ailleurs.** Décision de Sabine. Pourquoi :
