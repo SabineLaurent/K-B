@@ -54,13 +54,18 @@ L'étape 1 couvre la porte « veille » :
 
 ### Étape 2 — le wiki
 
-L'étape 2 ouvre la porte « base de connaissance », pour les papiers que je garde dans Zotero :
+L'étape 2 ouvre la porte « base de connaissance », d'abord pour mes clips du Web Clipper, puis
+pour les papiers que je garde dans Zotero :
 
-- **Ingest** : de chaque papier, le modèle écrit une note de lecture, comme après une lecture de
-  l'article entier, à partir du texte intégral de son PDF. Il renvoie des opérations JSON ; le
-  code les valide (liste fermée d'opérations, citations, nombres et dates retrouvés mot pour mot
-  dans la source, liens et frontmatter), puis écrit dans le wiki si tout passe. Sinon, la
-  proposition attend dans une file « à voir ».
+- **Ingest** : de chaque document, le modèle écrit une note de lecture, comme après une lecture
+  du texte entier : le clip tel quel, puis le texte intégral du PDF d'un papier. Il met aussi à
+  jour les fiches thématiques que le document touche : une fiche par sujet, qui rassemble ce
+  qu'en disent les documents, chaque affirmation renvoyant au sien. Les sujets viennent d'une
+  liste que je tiens ; un sujet nouveau proposé par le modèle attend mon accord.
+- **Contrôles** : le modèle renvoie des opérations JSON ; le code les valide (liste fermée
+  d'opérations, sujets connus, citations, nombres et dates retrouvés mot pour mot dans la source,
+  liens et frontmatter), puis écrit dans le wiki si tout passe. Sinon, la proposition attend dans
+  une file « à voir ».
 - **API IA authentifiée**, distincte de l'API de données et documentée en OpenAPI. La commande
   `kb` en est le client. L'inférence passe par Azure, en API compatible OpenAI : le modèle se
   choisit en configuration.
@@ -71,7 +76,7 @@ L'étape 2 ouvre la porte « base de connaissance », pour les papiers que je ga
 ## Hors périmètre de la v0
 
 - Les contradictions signalées entre pages du wiki, son interrogation, le lint par l'IA.
-- Les clips Obsidian et mes notes comme entrées du wiki.
+- Mes notes comme entrées du wiki.
 - Les livres en PDF, et les images, tableaux et pages scannées des PDF.
 - Le serveur MCP.
 - Tout entraînement de modèle.

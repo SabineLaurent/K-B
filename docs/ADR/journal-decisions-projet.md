@@ -1074,6 +1074,34 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   (« v1 : wiki de savoir ») ; les mentions antérieures de « v1 » dans ce journal désignent
   désormais l'étape 2 de la v0. Les dates restent tenues par time-knight.
 
+### Wiki : les clips avant les PDF (révision de l'après-midi)
+
+- **Le wiki prend d'abord les clips du Web Clipper ; les papiers Zotero, lus depuis leur PDF,
+  viennent ensuite comme seconde source de `.md` *cleansed*.** Décision de Sabine. Pourquoi,
+  selon elle : plus simple, un wiki qui marche plus vite, les PDF s'ajoutant après. Ce que cela
+  évite au départ : l'essai d'extraction, le choix d'une bibliothèque et de sa licence, la
+  normalisation du texte avant la vérification de fidélité ; un clip est déjà du Markdown.
+  **Inverse** l'entrée « le wiki prend les papiers Zotero seuls » ci-dessus ; « le texte intégral
+  vient du PDF » et « essai sur 5 PDF » restent décidés, pour la seconde source. Limites
+  assumées : #14 (collecte des clips) dépend d'un coffre Obsidian qui n'existe pas encore, et
+  elle est hors de la file E1 (son ordre revient à time-knight) ; les fixtures demandent de vrais
+  clips de Sabine ; une page web porte un risque d'injection de consignes plus fort qu'un article
+  publié, à tester avec un clip piégé ; un clip peut porter des noms, à inscrire au registre avec
+  l'envoi à Azure.
+- **Un clip produit sa note de lecture et met à jour les fiches thématiques qu'il touche : une
+  fiche par sujet, qui rassemble ce qu'en disent les clips, chaque affirmation renvoyant au sien.**
+  Décision de Sabine (reformulation confirmée). Ce sont les pages « concept » du wiki de Karpathy,
+  déjà comprises dans l'ingest (« des pages reliées ») ; à ne pas confondre avec les fiches de
+  veille du 2026-09-29, périodiques, faites sans LLM et reportées.
+- **Les sujets forment une liste fermée tenue par Sabine en configuration ; le modèle peut
+  proposer un sujet nouveau, qui va dans la file « à voir ».** Décision de Sabine, sur
+  recommandation. Pourquoi : même règle que l'écriture automatique (Sabine sollicitée seulement en
+  cas de doute, et un sujet nouveau en est un) ; le code refuse un sujet hors liste. Options
+  écartées : une liste fermée sans proposition (un nouveau sujet attend qu'elle l'ajoute) ; des
+  sujets créés librement par le modèle (fiches qui risquent de proliférer et de se doublonner,
+  par exemple « prompt injection » et « injection de prompt » ; la veille du 2026-09-23 note que
+  WeKnora contrôle les slugs en double et dédoublonne avant d'interroger le LLM, l. 96 et 98).
+
 ## Décisions encore ouvertes
 
 - **Durée de conservation et purge des extraits Zotero** (2026-10-11) : ils sont tous gardés,
