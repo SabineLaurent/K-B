@@ -5,11 +5,14 @@ Which source field goes into which item field: docs/stockage.md.
 
 import re
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
 from pydantic import (
+    AfterValidator,
     AwareDatetime,
     BaseModel,
     ConfigDict,
+    Field,
     StringConstraints,
     model_validator,
 )
@@ -28,14 +31,43 @@ ItemKind = Literal[
 RansomwareUse = Literal["Known", "Unknown"]
 
 CVE_ID = re.compile(r"CVE-\d{4}-\d{4,}")
+# The slug of a newsletter edition, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
+EDITION_SLUG = re.compile(r"[a-z]+")
+# The largest integer SQLite holds, and BigQuery gives (INT64).
+MAX_INT64 = 2**63 - 1
+
+
+def check_url_can_be_normalized(url: str) -> str:
+    """Refuse the URL urlsplit refuses (an unclosed bracket, a host NFKC rewrites), and the URL
+    without a host, which may be "https://" once its utm_* parameters are removed: merge.py
+    splits every URL at the import, then validates the item again, where one refused would
+    stop it all."""
+    try:
+        host = urlsplit(url).hostname
+    except ValueError:
+        # The error of urlsplit quotes the host as written: only the state is kept.
+        raise ValueError(f"url cannot be split: {len(url)} characters") from None
+    if not host:
+        raise ValueError(f"url without a host: {len(url)} characters")
+    return url
+
 
 NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
 # Kept as given, not as pydantic's HttpUrl, which rewrites it (adds a final slash): the base
 # keeps the URL the source gave, without its utm_* parameters (merge.py).
-HttpsUrl = Annotated[str, StringConstraints(pattern=r"^https://\S+$")]
+HttpsUrl = Annotated[
+    str,
+    StringConstraints(pattern=r"^https://\S+$"),
+    AfterValidator(check_url_can_be_normalized),
+]
 CveId = Annotated[str, StringConstraints(pattern=r"^CVE-\d{4}-\d{4,}$")]
 # owner/name; the GLOB of tracked_repository.repository_name in schema.sql.
 RepositoryName = Annotated[str, StringConstraints(pattern=r"^[^/\s]+/[^/\s]+$")]
+# The CHECK of newsletter_article.edition in schema.sql. Anchored, and given as text: pydantic
+# searches an unanchored pattern, and a compiled one would accept a final line break.
+NewsletterEdition = Annotated[
+    str, StringConstraints(pattern=f"^{EDITION_SLUG.pattern}$")
+]
 
 # The fields each kind must fill, so that an entry the base would refuse is refused when read:
 # one refused row would otherwise fail the whole import.
@@ -51,28 +83,30 @@ REQUIRED_FIELDS_BY_KIND = {
     ),
     "release": ("published_at", "repository_name", "tag_name"),
     "advisory": ("published_at",),
+    "newsletter_article": ("summary", "published_at", "edition", "rank"),
 }
 # The source of each kind. Written to a reference table as the item of its source of truth, an
 # item of another source would mark a CVE as exploited, or overwrite a paper (#138 widens it for
-# Zotero); a release or an advisory is a GitHub subtype.
+# Zotero); a release or an advisory is a GitHub subtype, a newsletter article a TLDR one.
 SOURCE_BY_KIND = {
     "paper": "arxiv",
     "vulnerability": "cisa_kev",
     "release": "github",
     "advisory": "github",
+    "newsletter_article": "tldr",
 }
 # The fields only one kind may fill.
 FIELDS_OF_ONE_KIND = {
     "vulnerability": ("vendor", "product", "ransomware_use"),
     "release": ("repository_name", "tag_name", "release_name"),
     "advisory": ("package_names",),
+    "newsletter_article": ("edition", "rank"),
 }
 KINDS_WITH_CVE = ("vulnerability", "advisory")
 
 # The longest text a source may write in each column of schema.sql, in characters, by kind and
 # by the field that fills the column. Held twice (ADR of 2026-10-08): here when the raw is
-# read, and by a CHECK of the column; a test keeps both equal. A kind without a table in the
-# base has no maximum yet.
+# read, and by a CHECK of the column; a test keeps both equal.
 CVE_MAX_LENGTH = 20
 MAX_LENGTH_BY_KIND: dict[ItemKind, dict[str, int]] = {
     "paper": {"source_item_id": 20, "title": 500, "summary": 5_000},
@@ -93,6 +127,12 @@ MAX_LENGTH_BY_KIND: dict[ItemKind, dict[str, int]] = {
         "source_item_id": 19,
         "cve": CVE_MAX_LENGTH,
         "title": 1_024,
+        "url": 2_000,
+    },
+    "newsletter_article": {
+        "edition": 20,
+        "title": 500,
+        "summary": 5_000,
         "url": 2_000,
     },
 }
@@ -139,6 +179,10 @@ class Item(BaseModel):
     release_name: str | None = None
     # GitHub advisory only: the affected packages, each once.
     package_names: tuple[NonEmptyText, ...] = ()
+    # Newsletter article only: the slug of its edition, and its position in the edition page,
+    # from 1. published_at is the day of the edition, at midnight UTC.
+    edition: NewsletterEdition | None = None
+    rank: Annotated[int, Field(ge=1, le=MAX_INT64)] | None = None
 
     @model_validator(mode="after")
     def check_the_fields_of_its_kind(self) -> "Item":

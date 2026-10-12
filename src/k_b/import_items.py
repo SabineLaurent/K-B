@@ -13,8 +13,9 @@ out is returned with its rule and the date it was compared with, then written to
 again on the same raw, the import gives the same base.
 
 Only exact duplicates are found: the same identifier within its source (a replay, collections
-that overlap). The same content under another identifier (another URL, another Zotero key) is
-left to #57 and #138.
+that overlap). The same content under another identifier is not found: for TLDR (another URL,
+another edition) it is a written limit, without a content fingerprint (decision of 2026-10-12,
+docs/specs-collecte.md); for Zotero (another key) it is left to #138.
 """
 
 import json
@@ -109,9 +110,9 @@ WHERE item_id IS NOT NULL
     AND cve_id NOT IN (SELECT value FROM json_each(:present_cve_ids))
 """
 
-# News feed (releases, advisories): the item is created only if its subtype is not known yet,
-# and the first version seen is kept. The subtype needs its item first: no ON CONFLICT can come
-# before the item; its UNIQUE constraint stays the safety net.
+# News feed (releases, advisories, TLDR articles): the item is created only if its subtype is
+# not known yet, and the first version seen is kept. The subtype needs its item first: no ON
+# CONFLICT can come before the item; its UNIQUE constraint stays the safety net.
 INSERT_ITEM_OF_NEW_RELEASE = """
 INSERT INTO item (kind, raw_data_id)
 SELECT 'release', ? WHERE NOT EXISTS (SELECT 1 FROM release WHERE release_id = ?)
@@ -122,6 +123,21 @@ INSERT_ITEM_OF_NEW_ADVISORY = """
 INSERT INTO item (kind, raw_data_id)
 SELECT 'advisory', ? WHERE NOT EXISTS (SELECT 1 FROM advisory WHERE ghsa_id = ?)
 RETURNING id
+"""
+
+# A TLDR article is known by its natural key: its edition, the day of the edition, its rank.
+INSERT_ITEM_OF_NEW_NEWSLETTER_ARTICLE = """
+INSERT INTO item (kind, raw_data_id)
+SELECT 'newsletter_article', :raw_data_id WHERE NOT EXISTS (
+    SELECT 1 FROM newsletter_article
+    WHERE edition = :edition AND edition_date = :edition_date AND rank = :rank
+)
+RETURNING id
+"""
+
+SELECT_NEWSLETTER_ARTICLE_ITEM = """
+SELECT item_id FROM newsletter_article
+WHERE edition = :edition AND edition_date = :edition_date AND rank = :rank
 """
 
 SELECT_ITEM_COLLECTED_AT = """
@@ -150,6 +166,16 @@ INSERT_ADVISORY = """
 INSERT INTO advisory (
     item_id, kind, ghsa_id, vulnerability_id, summary, published_at, url, packages
 ) VALUES (?, 'advisory', ?, ?, ?, ?, ?, ?)
+"""
+
+
+# publication_id stays empty: the paper an article cites is not looked for yet.
+INSERT_NEWSLETTER_ARTICLE = """
+INSERT INTO newsletter_article (
+    item_id, kind, edition, edition_date, rank, title, summary, url
+) VALUES (
+    :item_id, 'newsletter_article', :edition, :edition_date, :rank, :title, :summary, :url
+)
 """
 
 
@@ -498,6 +524,39 @@ def write_advisory(
     return None
 
 
+def write_newsletter_article(
+    connection: sqlite3.Connection, item: Item, raw_data_id: int
+) -> Discard | None:
+    """The TLDR item and its article, unless the article is known: the first seen is kept."""
+    natural_key = {
+        "edition": item.edition,
+        "edition_date": format_date(item.published_at),
+        "rank": item.rank,
+    }
+    row = connection.execute(
+        INSERT_ITEM_OF_NEW_NEWSLETTER_ARTICLE,
+        {"raw_data_id": raw_data_id} | natural_key,
+    ).fetchone()
+    if row is None:
+        (known_item_id,) = connection.execute(
+            SELECT_NEWSLETTER_ARTICLE_ITEM, natural_key
+        ).fetchone()
+        return Discard(
+            "already_seen", item, read_item_collected_at(connection, known_item_id)
+        )
+    connection.execute(
+        INSERT_NEWSLETTER_ARTICLE,
+        {
+            "item_id": row[0],
+            "title": item.title,
+            "summary": item.summary,
+            "url": item.url,
+        }
+        | natural_key,
+    )
+    return None
+
+
 def withdraw_absent_vulnerabilities(
     connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
 ) -> int:
@@ -568,6 +627,7 @@ WRITER_BY_KIND: dict[str, Callable[[sqlite3.Connection, Item, int], Discard | No
     "vulnerability": write_vulnerability,
     "release": write_release,
     "advisory": write_advisory,
+    "newsletter_article": write_newsletter_article,
 }
 
 

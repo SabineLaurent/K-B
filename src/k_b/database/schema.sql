@@ -193,3 +193,34 @@ CREATE TABLE advisory (
 ) STRICT;
 
 CREATE INDEX advisory_vulnerability_id ON advisory (vulnerability_id);
+
+-- A subtype of item; TLDR is the source of truth for its summary, and the first version seen is
+-- kept. Its natural key is (edition, edition_date, rank): the URL is not unique, two editions
+-- may summarize the same article (ADR of 2026-10-07).
+CREATE TABLE newsletter_article (
+    id             INTEGER PRIMARY KEY,
+    item_id        INTEGER NOT NULL UNIQUE,
+    kind           TEXT NOT NULL CHECK (kind = 'newsletter_article'),
+    -- The slug of the edition, as in https://tldr.tech/<edition>/<YYYY-MM-DD>.
+    edition        TEXT NOT NULL
+        CHECK (edition <> '' AND edition NOT GLOB '*[^a-z]*')
+        CHECK (length(edition) <= 20),
+    -- The day of the edition, written at midnight UTC.
+    edition_date   TEXT NOT NULL
+        CHECK (edition_date IS strftime('%Y-%m-%dT%H:%M:%SZ', edition_date)),
+    -- The position of the article in the edition page, from 1, sponsored entries and job
+    -- offers counted.
+    rank           INTEGER NOT NULL CHECK (rank >= 1),
+    title          TEXT NOT NULL CHECK (length(title) <= 500),
+    summary        TEXT NOT NULL CHECK (length(summary) <= 5000),
+    -- The article summarized, without its utm_* parameters; not unique.
+    url            TEXT NOT NULL
+        CHECK (url GLOB 'https://*')
+        CHECK (length(url) <= 2000),
+    -- The paper the article cites: not filled yet (decision of 2026-10-12).
+    publication_id INTEGER REFERENCES publication (id),
+    UNIQUE (edition, edition_date, rank),
+    FOREIGN KEY (item_id, kind) REFERENCES item (id, kind)
+) STRICT;
+
+CREATE INDEX newsletter_article_publication_id ON newsletter_article (publication_id);

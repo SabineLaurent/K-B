@@ -96,6 +96,25 @@ def advisory_fields(**changes):
     return fields
 
 
+def newsletter_article_fields(**changes):
+    """A TLDR article, with every field its kind requires."""
+    fields = {
+        "source_code": "tldr",
+        "source_item_id": "ai/2026-10-07#2",
+        "kind": "newsletter_article",
+        "title": "Mistral Large 4 (9 minute read)",
+        "url": "https://mistral.ai/news/mistral-large-4/",
+        "published_at": datetime(2026, 10, 7, tzinfo=UTC),
+        "summary": "Mistral Large 4 is a one-trillion-parameter multimodal model.",
+        "collected_at": COLLECTED_AT,
+        "raw_file_path": "automated_watch/tldr_ai/2026-10-11T153130Z/2026-10-07.html",
+        "edition": "ai",
+        "rank": 2,
+    }
+    fields.update(changes)
+    return fields
+
+
 def test_the_source_codes_are_those_of_the_database():
     seeded_codes = re.findall(r"\('(\w+)',", SEED_SOURCES.read_text())
 
@@ -103,18 +122,9 @@ def test_the_source_codes_are_those_of_the_database():
 
 
 def test_an_item_keeps_an_absence_as_an_absence():
-    item = Item(
-        source_code="tldr",
-        source_item_id="ai/2026-10-06#2",
-        kind="newsletter_article",
-        title="An article",
-        url="https://openai.com/index/eu-text-provenance/",
-        collected_at=COLLECTED_AT,
-        raw_file_path="automated_watch/tldr_ai/2026-10-06T093000Z/2026-10-06.html",
-    )
+    item = Item(**advisory_fields(cve=None))
 
     assert item.authors == ()
-    assert item.published_at is None
     assert item.revised_at is None
     assert item.saved_at is None
     assert item.summary is None
@@ -125,7 +135,9 @@ def test_an_item_keeps_an_absence_as_an_absence():
     assert item.repository_name is None
     assert item.tag_name is None
     assert item.release_name is None
-    assert item.package_names == ()
+    assert item.edition is None
+    assert item.rank is None
+    assert Item(**item_fields()).package_names == ()
 
 
 def test_a_paper_and_a_vulnerability_with_their_fields_are_accepted():
@@ -162,6 +174,8 @@ def test_a_release_and_an_advisory_with_their_fields_are_accepted():
         {"tag_name": "v2.1.287"},
         {"release_name": "v2.1.287"},
         {"package_names": ("langchain",)},
+        {"edition": "ai"},
+        {"rank": 2},
         {"stars": 3},
     ],
 )
@@ -231,8 +245,95 @@ def test_an_invalid_advisory_is_refused(changes):
         Item(**advisory_fields(**changes))
 
 
+def test_a_newsletter_article_with_its_fields_is_accepted():
+    item = Item(**newsletter_article_fields())
+
+    assert (item.kind, item.edition, item.rank) == ("newsletter_article", "ai", 2)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"source_code": "arxiv"},
+        {"summary": None},
+        {"published_at": None},
+        {"edition": None},
+        {"rank": None},
+        # What the CHECK of newsletter_article.edition refuses.
+        {"edition": ""},
+        {"edition": "AI"},
+        {"edition": "a1"},
+        {"edition": "ai_old"},
+        {"edition": "ai\n"},
+        {"edition": "AI ai"},
+        # What the CHECK of newsletter_article.rank refuses, and an integer SQLite cannot hold.
+        {"rank": 0},
+        {"rank": 2**63},
+        {"rank": "2"},
+        {"rank": True},
+        {"repository_name": "anthropics/claude-code"},
+        {"cve": "CVE-2026-48775"},
+    ],
+)
+def test_an_invalid_newsletter_article_is_refused(changes):
+    with pytest.raises(ValidationError):
+        Item(**newsletter_article_fields(**changes))
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        # urlsplit refuses both: merge.py would raise at the import.
+        "https://[x",
+        "https://exam\u2100ple.com/a",
+    ],
+)
+def test_a_link_that_cannot_be_split_is_refused(url):
+    with pytest.raises(ValidationError) as refusal:
+        Item(**newsletter_article_fields(url=url))
+
+    assert f"url cannot be split: {len(url)} characters" in str(refusal.value)
+
+
+def test_a_link_that_cannot_be_split_is_not_copied_whole_into_the_refusal():
+    # urlsplit quotes the host in its error, as written: an escape sequence, 3 000 letters.
+    url = "https://a\u2100\x1b[2J" + "b" * 3_000 + "/x"
+
+    with pytest.raises(ValidationError) as refusal:
+        Item(**newsletter_article_fields(url=url))
+
+    message = str(refusal.value)
+    assert f"url cannot be split: {len(url)} characters" in message
+    assert "\x1b" not in message
+    assert len(message) < 500
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        # Without its utm_* parameter, the first one is "https://": merge.py would raise.
+        "https://?utm_source=tldrai",
+        "https://#part",
+        "https:///path",
+        "https://:443/path",
+        "https://user@/path",
+    ],
+)
+def test_a_link_without_a_host_is_refused(url):
+    with pytest.raises(ValidationError) as refusal:
+        Item(**newsletter_article_fields(url=url))
+
+    assert f"url without a host: {len(url)} characters" in str(refusal.value)
+
+
+def test_the_largest_rank_sqlite_holds_is_accepted():
+    assert Item(**newsletter_article_fields(rank=2**63 - 1)).rank == 2**63 - 1
+
+
 def text_of_length(field, length):
     """A text of this length that the format of its field accepts."""
+    if field == "edition":
+        return "a" * length
     if field == "url":
         return "https://" + "x" * (length - len("https://"))
     if field == "cve":
@@ -259,6 +360,10 @@ def text_of_length(field, length):
         (advisory_fields, "cve", 20),
         (advisory_fields, "title", 1_024),
         (advisory_fields, "url", 2_000),
+        (newsletter_article_fields, "edition", 20),
+        (newsletter_article_fields, "title", 500),
+        (newsletter_article_fields, "summary", 5_000),
+        (newsletter_article_fields, "url", 2_000),
     ],
 )
 def test_a_text_is_accepted_up_to_its_maximum_length_and_refused_beyond(
@@ -322,19 +427,3 @@ def test_every_text_too_long_of_an_item_is_named():
 
     assert "title too long: 501 characters, maximum 500" in str(refusal.value)
     assert "summary too long: 5001 characters, maximum 5000" in str(refusal.value)
-
-
-def test_a_kind_without_a_table_in_the_database_has_no_maximum_length():
-    title = "x" * 200_000
-
-    item = Item(
-        **item_fields(
-            source_code="tldr",
-            kind="newsletter_article",
-            title=title,
-            authors=(),
-            revised_at=None,
-        )
-    )
-
-    assert item.title == title

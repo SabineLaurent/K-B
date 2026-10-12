@@ -53,11 +53,10 @@ SOURCE_KINDS = (
         None,
     ),
     SourceKind(arxiv.FOLDER_PREFIX, (ArxivSource(),), arxiv.READER),
-    # No reader yet: its pages are skipped at the import until #57.
     SourceKind(
         tldr.FOLDER_PREFIX,
         tuple(TldrSource(edition) for edition in TRACKED_EDITIONS),
-        None,
+        tldr.READER,
     ),
     # No instance: cli.py adds ZoteroSource when KB_ZOTERO_DIR is set. No reader yet: its
     # extracts, under raw/selected_library/, are not read into the base.

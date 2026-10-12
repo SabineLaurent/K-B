@@ -26,8 +26,12 @@ def convert_line(line: str, collected_at: datetime, raw_file_path: str) -> Item:
         kind="newsletter_article",
         title=line,
         url=f"https://example.com/{line}",
+        published_at=collected_at,
+        summary=line,
         collected_at=collected_at,
         raw_file_path=raw_file_path,
+        edition="ai",
+        rank=1,
     )
 
 
@@ -105,19 +109,6 @@ def test_a_file_name_that_is_not_a_collection_time_is_rejected(tmp_path):
     assert [rejection.raw_file_path for rejection in reading.rejections] == [
         "automated_watch/arxiv_cscr_x_csai/latest.xml"
     ]
-
-
-def test_a_source_without_reader_is_skipped_and_logged(tmp_path, caplog):
-    pages_dir = tmp_path / "automated_watch" / "tldr_ai" / COLLECTION_NAME
-    pages_dir.mkdir(parents=True)
-    (pages_dir / "2026-10-05.html").write_text("<html></html>")
-
-    with caplog.at_level(logging.INFO):
-        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
-
-    assert items_of(reading) == []
-    assert reading.rejections == []
-    assert "source without a reader, skipped: tldr_ai" in caplog.text
 
 
 def test_a_folder_of_no_source_kind_is_skipped_and_logged(tmp_path, caplog):

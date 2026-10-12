@@ -74,7 +74,7 @@ elles ne sont pas recopiées ici. Un test (`tests/test_schema.py`) vérifie que 
 `items.py` est égal au `CHECK` de sa colonne, dans les deux sens.
 
 - **Colonnes bornées** : celles qu'une source remplit, dans `publication`, `vulnerability`,
-  `release` et `advisory`.
+  `release`, `advisory` et `newsletter_article`.
 - **Listes JSON** : le nombre d'éléments est borné deux fois, par l'item et par un
   `CHECK (json_array_length(colonne) <= n)`. La longueur de chaque élément n'est tenue que par
   l'item : un `CHECK` de SQLite ne peut pas parcourir les éléments d'une liste (pas de
@@ -92,7 +92,7 @@ elles ne sont pas recopiées ici. Un test (`tests/test_schema.py`) vérifie que 
 
 ### Ce que chaque source met dans l'item, puis dans la base
 
-Les lecteurs écrits à ce jour : arXiv, CISA KEV, releases et alertes GitHub. Chaque entrée du
+Les lecteurs écrits à ce jour : arXiv, CISA KEV, releases et alertes GitHub, tldr.tech. Chaque entrée du
 brut devient un item (`src/k_b/items.py`), que l'import (`src/k_b/import_items.py`) écrit dans la
 table de sa sorte (`kind`).
 
@@ -116,6 +116,11 @@ table de sa sorte (`kind`).
 | | `title` | `summary` | `advisory.summary` |
 | | `published_at`, `url` | `published_at`, `html_url` | `advisory.published_at`, `advisory.url` |
 | | `package_names` | paquets touchés, chacun une fois | `advisory.packages` (liste JSON) |
+| tldr.tech (`newsletter_article`) | `edition` | nom du dossier brut sans `tldr_` (`ai`) | `newsletter_article.edition` |
+| | `published_at` | date du premier `h1` de la page, à minuit UTC | `newsletter_article.edition_date` |
+| | `rank` | position de l'entrée parmi les `<article>` de la page, à partir de 1 | `newsletter_article.rank` |
+| | `title`, `summary` | texte de `a.font-bold`, texte de `div.newsletter-html` | `newsletter_article.title`, `newsletter_article.summary` |
+| | `url` | `href` de `a.font-bold`, sans ses `utm_*` | `newsletter_article.url` |
 | toutes | `source_code`, `collected_at`, `raw_file_path` | le fichier brut lu | `raw_data` (`source_id`, `collected_at`, `raw_file_path`, `stream`) |
 
 - L'URL d'un papier arXiv (`https://arxiv.org/abs/<id>`) et d'une faille
@@ -129,7 +134,10 @@ table de sa sorte (`kind`).
   specs-collecte.md). Le texte d'une release (`body`) est gardé tel que reçu : il peut contenir un
   login ou une @mention écrits par ses auteurs (voir le
   [registre des traitements](registre-traitements.md)).
-- Pas encore lus : les pages tldr.tech, les clips du Web Clipper, Zotero, GH Archive. Le
+- L'identifiant d'un article TLDR dans l'item (`ai/2026-10-08#3` : édition, date, rang) n'est
+  pas stocké : ses trois parties sont les colonnes de sa clé. `newsletter_article.publication_id`
+  (le papier cité) n'est pas encore rempli.
+- Pas encore lus : les clips du Web Clipper, Zotero, GH Archive. Le
   classement des dépôts les plus étoilés n'entre pas dans la base (journal
   ADR, 2026-10-07).
 
@@ -163,6 +171,7 @@ source ne touche pas aux tables.
 | `tracked_repository` | les dépôts GitHub suivis (table de référence) | `id`, `repository_name`, `ecosystem`, `packages` |
 | `release` | sous-type d'item : une release d'un dépôt suivi | `id`, `item_id`, `kind`, `tracked_repository_id`, `release_id`, `tag_name`, `name`, `body`, `published_at`, `url` |
 | `advisory` | sous-type d'item : une alerte de sécurité GitHub | `id`, `item_id`, `kind`, `ghsa_id`, `vulnerability_id`, `summary`, `published_at`, `url`, `packages` |
+| `newsletter_article` | sous-type d'item : un article résumé par une édition TLDR ; clé (édition, date, rang) | `id`, `item_id`, `kind`, `edition`, `edition_date`, `rank`, `title`, `summary`, `url`, `publication_id` |
 | `highlight` | les surlignages Zotero ; pas encore remplie | `highlight_id`, `zotero_key`, `text`, `highlighted_at`, `item_id` |
 | `repository`, `star_gain` | tables du modèle précédent, sans écrivain ; la clarification du modèle les remplace par TENDANCE, pas encore codée | `item_id`, `repository_name` ; `item_id`, `window_end`, `stars_gained` |
 
@@ -178,14 +187,15 @@ source ne touche pas aux tables.
   `vulnerability`.
 - **Index** : sur les clés étrangères, que SQLite n'indexe pas d'office (`raw_data.source_id`,
   `item.raw_data_id`, `highlight.item_id`, `release.tracked_repository_id`,
-  `advisory.vulnerability_id`), et sur `star_gain.window_end`. Les contraintes `UNIQUE` créent
+  `advisory.vulnerability_id`, `newsletter_article.publication_id`), et sur
+  `star_gain.window_end`. Les contraintes `UNIQUE` créent
   leur propre index.
 - **Suppressions en cascade** : seulement de `item` vers `highlight` et `repository`, et de
-  `repository` vers `star_gain`. Il n'y en a pas vers `publication`, `vulnerability`, `release`
-  ni `advisory` : supprimer un item qu'une de ces tables référence est refusé par la clé
+  `repository` vers `star_gain`. Il n'y en a pas vers `publication`, `vulnerability`, `release`,
+  `advisory` ni `newsletter_article` : supprimer un item qu'une de ces tables référence est refusé par la clé
   étrangère. La purge n'est pas codée.
 - **Formats contrôlés** par un `CHECK` : les dates (ci-dessus) ; `cve_id` (`CVE-AAAA-NNNN…`) ;
-  `repository_name` (`owner/repo`) ; `ghsa_id` (`GHSA-…`) ; `url` (`https://…`) ; les listes
+  `repository_name` (`owner/repo`) ; `ghsa_id` (`GHSA-…`) ; `url` (`https://…`) ; `edition` (lettres minuscules sans accent) ; les listes
   fermées (`source_type`, `acquisition_mode`, `kind`, `ransomware_use`, `ecosystem`) ; les listes
   JSON non vides ; `tag_name` non vide ; `stars_gained` ≥ 0 ; les longueurs maximales.
 
@@ -199,7 +209,7 @@ l'équivalent PostgreSQL :
 | `STRICT` sur chaque table | sinon SQLite accepte une valeur du mauvais type | inutile : typage strict par défaut |
 | dates en `TEXT` + `CHECK (… IS strftime(…))` | SQLite n'a pas de type date | `timestamptz`, sans `CHECK` de format |
 | `INTEGER PRIMARY KEY` | numérotation automatique (alias de `rowid`) | `bigint GENERATED ALWAYS AS IDENTITY` |
-| `GLOB` dans les `CHECK` (`cve_id`, `repository_name`, `ghsa_id`, `url`) | motif simple | `~` (expression régulière) |
+| `GLOB` dans les `CHECK` (`cve_id`, `repository_name`, `ghsa_id`, `url`, `edition`) | motif simple | `~` (expression régulière) |
 | `IS` dans les `CHECK` de date | compare sans que `NULL` fasse passer le contrôle | `IS NOT DISTINCT FROM` |
 | `CHECK (length(colonne) <= n)` | SQLite ignore la longueur d'un `VARCHAR(n)` | `varchar(n)` |
 | listes en `TEXT` + `json_valid`, `json_type`, `json_array_length` | SQLite n'a pas de type JSON | `jsonb`, `jsonb_typeof`, `jsonb_array_length` |

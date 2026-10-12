@@ -20,7 +20,7 @@ from typing import Annotated, Any
 from google.cloud import bigquery
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from k_b.items import RepositoryName
+from k_b.items import MAX_INT64, RepositoryName
 from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 
 logger = logging.getLogger(__name__)
@@ -41,8 +41,6 @@ MAX_CATCH_UP_WINDOWS = 15
 MAX_BYTES_PER_WINDOW = 650_000_000
 MAX_BYTES_BILLED = 2_000_000_000
 QUERY_TIMEOUT_SECONDS = 300
-# An identifier BigQuery gives as INT64.
-MAX_INT64 = 2**63 - 1
 # How much of an invalid value goes into the error.
 MAX_QUOTED_VALUE_LENGTH = 100
 # The only fields whose value is quoted: a date or a number. Any other value (a repository name,
