@@ -323,10 +323,15 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    - **Une transaction** : chaque fichier lu est inscrit au registre, puis ses items sont
      écrits ; le journal est écrit avant la validation (`COMMIT`). Une erreur dans la base, ou
      un journal qui ne s'écrit pas, n'écrit rien : aucun fichier n'est inscrit, tous seront
-     relus. Si la validation échoue, le journal écrit est supprimé. Pourquoi : un fichier
+     relus. Si la validation échoue, ou sur une interruption (Ctrl-C), le journal écrit est
+     supprimé. Pourquoi : un fichier
      inscrit n'est plus relu, un journal perdu après la validation perdrait pour toujours la
      trace de ses rejets et de ses écarts (décision de Sabine du 2026-10-12, qui revient sur le
      journal écrit après la base de #105).
+     **Limites** (constats de revue, acceptées par Sabine le 2026-10-12) : un `SIGKILL` entre
+     l'écriture du journal et la validation laisse le journal d'un import annulé ; une
+     interruption qui arrive juste après la validation, avant la fin du bloc qui la protège,
+     supprime le journal d'un import validé (une fenêtre de quelques instructions Python).
    - **Reconstruction complète** : supprimer la base, `kb create-db`, puis `kb import`, qui
      relit tout `raw/`. Pas d'option : une base vide n'a rien au registre.
 

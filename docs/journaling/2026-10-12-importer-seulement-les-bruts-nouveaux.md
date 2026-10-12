@@ -197,7 +197,9 @@ de sortie 2). L'écriture passe par `write_file_atomically` (règle 2 des conven
    catalogue » et bloquerait les catalogues valides plus anciens (`src/k_b/raw_items.py:118`).
 2. **Que se passe-t-il si on coupe l'import au milieu ?** La transaction est annulée et le
    journal de cet import supprimé (`src/k_b/import_items.py:260-271`) : aucun fichier n'est
-   inscrit, tout sera relu. Seul un `SIGKILL` peut laisser un journal orphelin.
+   inscrit, tout sera relu. Deux limites, acceptées par Sabine : un `SIGKILL` peut laisser
+   un journal orphelin, et une interruption juste après le `commit()`, avant la sortie du
+   `try`, supprime le journal d'un import validé.
 3. **Le retrait d'une CVE n'est-il pas dangereux sur un catalogue partiel ?** Si. C'est pour cela
    qu'un catalogue avec un rejet, ou sans item, ne retire rien
    (`src/k_b/import_items.py:516`). Le lecteur CISA refuse aussi la page entière sur une ligne

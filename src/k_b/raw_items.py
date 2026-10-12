@@ -10,7 +10,7 @@ from typing import Any, NamedTuple
 
 from pydantic import ValidationError
 
-from k_b.items import Item
+from k_b.items import Item, SourceCode
 from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.source_contract import SourceKind, SourceReader, find_source_kind
 
@@ -29,7 +29,7 @@ class RawFile(NamedTuple):
     """A raw file read: a page, for a collection that is a folder of pages."""
 
     raw_file_path: str
-    source_code: str
+    source_code: SourceCode
     collected_at: datetime
     items: list[Item]
     # Its entries refused as items: a catalog with one of them withdraws nothing (#106).
