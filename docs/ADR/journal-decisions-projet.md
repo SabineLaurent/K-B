@@ -1142,7 +1142,11 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   propre à CISA. Option écartée : comparer à la collecte de la version en base. Une ligne
   identique ne déplace pas cette version, et un fichier importé en retard pouvait réécrire une
   version périmée. Précise l'entrée du 2026-10-07 (« dernière version »). Les retraits
-  (`withdrawn_at`, #106) s'appuient sur cette règle. — PR de #105
+  (`withdrawn_at`, #106) s'appuient sur cette règle. Limite assumée (constat de `/code-review`,
+  écarté par Sabine) : une version que seul un fichier importé en retard porte n'entre jamais en
+  base ; une base reconstruite dans l'ordre des collectes peut alors différer de la base tenue
+  au fil des imports par `revised_at` et par le fichier rattaché à l'item, pas par le contenu.
+  Signalé à #106. — PR de #105
 - **Une ligne du journal d'import pour chaque item écarté, avec sa règle et la date comparée,
   dans un champ qui dit d'où vient la date.** Règles : `already_seen`, `unchanged`,
   `no_newer_version` et `revision_not_newer` ; champs : `compared_with_collected_at` et

@@ -141,8 +141,8 @@ KB_DATA_DIR=~/K-B-data uv run kb import
 
 `kb import` lit `<KB_DATA_DIR>/raw/automated_watch/` et écrit les items dans la base, qui écarte
 les doublons ; rejoué sur le même brut, il donne la même base. Il affiche le nombre d'items
-importés (écrits ou mis à jour : 0 sur un brut déjà importé), de doublons écartés et de rejets,
-détaillés dans `<KB_DATA_DIR>/import-log.jsonl`. Code de sortie :
+importés (écrits ou mis à jour : 0 sur un brut déjà importé), d'items écartés (doublons, ou
+versions qui ne sont pas plus récentes que celle de la base) et de rejets, détaillés dans `<KB_DATA_DIR>/import-log.jsonl`. Code de sortie :
 
 - 0 : l'import a réussi ;
 - 1 : l'import a échoué. Une erreur dans la base n'y écrit rien. Le journal est écrit après la

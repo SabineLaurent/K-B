@@ -53,10 +53,11 @@ WHERE publication.item_id IS NULL OR excluded.revised_at > publication.revised_a
 RETURNING id
 """
 
-# State catalog: the collection of the latest catalog of the source already imported. The file
-# being imported is left out, unless it brought the version in the base (a replay).
-SELECT_LATEST_CATALOG_COLLECTED_AT = """
-SELECT max(raw_data.collected_at) FROM raw_data
+# State catalog: the collection of the latest catalog of the source already imported, and
+# whether the file being imported was collected after it. That file is left out, unless it
+# brought the version in the base (a replay).
+SELECT_LATEST_CATALOG = """
+SELECT max(raw_data.collected_at), :collected_at > max(raw_data.collected_at) FROM raw_data
 JOIN source ON source.id = raw_data.source_id
 WHERE source.source_code = :source_code
     AND (raw_data.id <> :raw_data_id
@@ -82,7 +83,7 @@ ON CONFLICT (cve_id) DO UPDATE SET
     ransomware_use = excluded.ransomware_use,
     revised_at = iif(vulnerability.item_id IS NULL, NULL, :collected_at)
 WHERE vulnerability.item_id IS NULL
-    OR (:collected_at > :latest_collected_at
+    OR (:is_after_latest_catalog
         AND (vulnerability.name, vulnerability.description, vulnerability.vendor,
             vulnerability.product, vulnerability.date_added, vulnerability.ransomware_use)
         IS NOT (excluded.name, excluded.description, excluded.vendor,
@@ -103,20 +104,6 @@ INSERT_ITEM_OF_NEW_ADVISORY = """
 INSERT INTO item (kind, raw_data_id)
 SELECT 'advisory', ? WHERE NOT EXISTS (SELECT 1 FROM advisory WHERE ghsa_id = ?)
 RETURNING id
-"""
-
-SELECT_RELEASE_COLLECTED_AT = """
-SELECT raw_data.collected_at FROM release
-JOIN item ON item.id = release.item_id
-JOIN raw_data ON raw_data.id = item.raw_data_id
-WHERE release_id = ?
-"""
-
-SELECT_ADVISORY_COLLECTED_AT = """
-SELECT raw_data.collected_at FROM advisory
-JOIN item ON item.id = advisory.item_id
-JOIN raw_data ON raw_data.id = item.raw_data_id
-WHERE ghsa_id = ?
 """
 
 SELECT_ITEM_COLLECTED_AT = """
@@ -323,12 +310,13 @@ def write_vulnerability(
         "SELECT item_id FROM vulnerability WHERE cve_id = ?", (item.cve,)
     ).fetchone()
     known_item_id = row[0] if row else None
-    (latest_collected_at,) = connection.execute(
-        SELECT_LATEST_CATALOG_COLLECTED_AT,
+    latest_collected_at, is_after_latest_catalog = connection.execute(
+        SELECT_LATEST_CATALOG,
         {
             "source_code": item.source_code,
             "raw_data_id": raw_data_id,
             "item_id": known_item_id,
+            "collected_at": format_date(item.collected_at),
         },
     ).fetchone()
     item_id = (
@@ -336,7 +324,6 @@ def write_vulnerability(
         if known_item_id is None
         else known_item_id
     )
-    collected_at = format_date(item.collected_at)
     written = connection.execute(
         UPSERT_VULNERABILITY,
         {
@@ -348,13 +335,13 @@ def write_vulnerability(
             "product": item.product,
             "date_added": format_date(item.published_at),
             "ransomware_use": item.ransomware_use,
-            "collected_at": collected_at,
-            "latest_collected_at": latest_collected_at,
+            "collected_at": format_date(item.collected_at),
+            "is_after_latest_catalog": is_after_latest_catalog,
         },
     ).fetchone()
     if written is None:
         # The base wrote nothing; the rule names which of its two conditions failed.
-        if collected_at is not None and collected_at > latest_collected_at:
+        if is_after_latest_catalog:
             return Discard(
                 "unchanged", item, read_item_collected_at(connection, item_id)
             )
@@ -373,10 +360,12 @@ def write_release(
         INSERT_ITEM_OF_NEW_RELEASE, (raw_data_id, release_id)
     ).fetchone()
     if row is None:
-        (collected_at,) = connection.execute(
-            SELECT_RELEASE_COLLECTED_AT, (release_id,)
+        (known_item_id,) = connection.execute(
+            "SELECT item_id FROM release WHERE release_id = ?", (release_id,)
         ).fetchone()
-        return Discard("already_seen", item, collected_at)
+        return Discard(
+            "already_seen", item, read_item_collected_at(connection, known_item_id)
+        )
     # The releases of a repository out of the list were rejected before the import.
     (tracked_repository_id,) = connection.execute(
         "SELECT id FROM tracked_repository WHERE repository_name = ?",
@@ -409,10 +398,12 @@ def write_advisory(
         INSERT_ITEM_OF_NEW_ADVISORY, (raw_data_id, item.source_item_id)
     ).fetchone()
     if row is None:
-        (collected_at,) = connection.execute(
-            SELECT_ADVISORY_COLLECTED_AT, (item.source_item_id,)
+        (known_item_id,) = connection.execute(
+            "SELECT item_id FROM advisory WHERE ghsa_id = ?", (item.source_item_id,)
         ).fetchone()
-        return Discard("already_seen", item, collected_at)
+        return Discard(
+            "already_seen", item, read_item_collected_at(connection, known_item_id)
+        )
     vulnerability_id = None
     if item.cve is not None:
         connection.execute(

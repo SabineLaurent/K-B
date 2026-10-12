@@ -329,7 +329,9 @@ def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, ca
     exit_code = cli.main(["import"])
 
     assert exit_code == 0
-    assert "items imported: 0" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "items imported: 0" in output
+    assert "items left out (duplicates or versions not newer): 0" in output
     assert (tmp_path / "import-log.jsonl").is_file()
 
 

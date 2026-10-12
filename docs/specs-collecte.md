@@ -331,7 +331,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      jour, à 9 h et à 18 h, celui de 18 h l'emporte. Le fichier en cours n'en est pas, sauf s'il
      porte déjà la version en base (un rejeu). Un fichier plus ancien ne peut venir que de
      `raw/` : un rejeu jusqu'à #106, ou un fichier resté non importé. Il ne change rien, même si
-     son contenu diffère. Une ligne connue rattache son item au fichier qui a apporté sa version
+     son contenu diffère. **Limite** : une version que seul un fichier importé en retard porte
+     n'entre jamais en base. Le contenu final est le même (celui du dernier catalogue), mais une
+     base reconstruite en important tous les fichiers dans l'ordre des collectes peut différer
+     de la base tenue au fil des imports par `revised_at` et par le fichier rattaché à l'item.
+     Signalé à #106. Une ligne connue rattache son item au fichier qui a apporté sa version
      actuelle. Le CVE qu'une alerte a déjà créé, sans colonnes KEV, prend ses colonnes à sa
      première ligne CISA, sans `revised_at`. La ligne retirée du catalogue (`withdrawn_at`) est
      #106, qui s'appuie sur cette règle.

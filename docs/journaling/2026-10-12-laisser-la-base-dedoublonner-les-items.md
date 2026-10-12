@@ -35,7 +35,7 @@ contre laquelle il a été comparé.
 
 `merge.py` ne garde que `normalize_item` et `remove_tracking_parameters` : les dates en UTC et
 l'URL sans `utm_*`, ce qu'aucune contrainte de base ne sait faire. L'import normalise chaque item
-puis l'écrit, un par un, dans la transaction (`src/k_b/import_items.py:218`) :
+puis l'écrit, un par un, dans la transaction (`src/k_b/import_items.py:205`) :
 
 ```python
 for item in map(normalize_item, items):
@@ -72,10 +72,12 @@ ne le fait encore, #138 le fera.
 
 ### 2.3 Catalogue d'état : comparer au dernier catalogue importé
 
-Deux requêtes. D'abord la date du dernier catalogue de la source déjà importé
-(`src/k_b/import_items.py:58-64`) :
+Deux requêtes. D'abord la date du dernier catalogue de la source déjà importé, et si le fichier
+en cours a été collecté après lui (`src/k_b/import_items.py:59-66`) :
 
 ```sql
+SELECT max(raw_data.collected_at), :collected_at > max(raw_data.collected_at) FROM raw_data
+JOIN source ON source.id = raw_data.source_id
 WHERE source.source_code = :source_code
     AND (raw_data.id <> :raw_data_id
         OR raw_data.id = (SELECT raw_data_id FROM item WHERE id = :item_id))
@@ -85,12 +87,16 @@ Le fichier en cours est enregistré dans `raw_data` avant ses items : sans l'exc
 toujours « le dernier », et rien ne pourrait plus être écrit. Mais au rejeu, si la version en base
 vient de ce fichier même, il compte : sinon, la date comparée serait vide (NULL).
 
-Puis l'upsert, dont le `WHERE` porte la règle (`src/k_b/import_items.py:83-90`) :
+La comparaison des dates est faite là, en SQL, une seule fois : l'upsert et l'écrivain lisent le
+même drapeau (constat 3 de `/code-review`, corrigé : Python refaisait la comparaison pour nommer
+la règle).
+
+Puis l'upsert, dont le `WHERE` porte la règle (`src/k_b/import_items.py:84-91`) :
 
 ```sql
 revised_at = iif(vulnerability.item_id IS NULL, NULL, :collected_at)
 WHERE vulnerability.item_id IS NULL
-    OR (:collected_at > :latest_collected_at
+    OR (:is_after_latest_catalog
         AND (vulnerability.name, …) IS NOT (excluded.name, …))
 ```
 
@@ -102,13 +108,13 @@ valeur, ce que le test 6 vérifie. `IS NOT` sur un groupe de colonnes compare li
 traite NULL comme une valeur.
 
 Quand rien n'est rendu, l'écrivain nomme la condition qui a échoué
-(`src/k_b/import_items.py:357`) : fichier plus récent → `unchanged` (le contenu était le même),
+(`src/k_b/import_items.py:344`), en lisant le drapeau : fichier plus récent → `unchanged` (le contenu était le même),
 sinon `no_newer_version`. Une écriture sur un item connu rattache celui-ci au nouveau brut
 (`point_item_at_raw_data`).
 
 ### 2.4 Flux de nouveautés : `INSERT … WHERE NOT EXISTS`
 
-`src/k_b/import_items.py:96-100` :
+`src/k_b/import_items.py:97-101` :
 
 ```sql
 INSERT INTO item (kind, raw_data_id)
@@ -121,12 +127,14 @@ de clé naturelle sur laquelle porter un `ON CONFLICT`. L'item n'est donc créé
 est absente. Rien rendu → `already_seen`. La contrainte `UNIQUE (release_id)` reste le filet :
 l'étape 8 l'a montré, en neutralisant le `WHERE NOT EXISTS`, l'import échoue sur
 `UNIQUE constraint failed`. L'alerte suit la même forme sur `ghsa_id`, et ne crée le CVE cité
-qu'une fois reconnue nouvelle.
+qu'une fois reconnue nouvelle. Pour dater le doublon, l'écrivain lit l'item gardé dans le
+sous-type, puis sa date de collecte par une seule fonction, `read_item_collected_at`, commune
+aux trois écrivains concernés (constat 7 de `/code-review`, corrigé).
 
 ### 2.5 Le journal dit la date comparée
 
 `Discard` porte la règle, l'item et la date comparée. Le nom du champ au journal dépend de la
-règle (`COMPARED_FIELD_BY_RULE`, `src/k_b/import_items.py:532`) : `compared_with_collected_at`
+règle (`COMPARED_FIELD_BY_RULE`, `src/k_b/import_items.py:523`) : `compared_with_collected_at`
 pour une date de collecte, `compared_with_revised_at` pour une révision arXiv. Un nom de date dit
 d'où vient la date (décision de Sabine).
 
@@ -162,8 +170,8 @@ d'où vient la date (décision de Sabine).
 
 1. **Pourquoi la règle dans le SQL plutôt qu'en Python ?** La base est la seule à voir tout ce
    qui a été importé. Un test en Python avant l'écriture redirait la règle à deux endroits. Ici,
-   le `WHERE` décide, et Python ne fait que nommer la condition observée
-   (`import_items.py:357`).
+   le `WHERE` décide, et Python ne fait que nommer la condition observée, d'après le drapeau
+   que la base a calculé (`import_items.py:344`).
 2. **Que se passe-t-il au rejeu d'un vieux catalogue CISA ?** Sa date n'est pas plus récente que
    le dernier catalogue importé : rien n'est écrit, et la ligne est `no_newer_version`
    (test du rejeu ; avant la garde, il réécrivait l'ancienne version, constat de la relecture).
@@ -179,6 +187,14 @@ d'où vient la date (décision de Sabine).
 
 - **Coût de la requête du dernier catalogue** : elle est lancée pour chaque ligne CISA (chaque
   ligne de chaque catalogue relu). Non mesuré. Elle passe par l'index `raw_data_source_id`.
+  Constat 2 de `/code-review`, écarté par Sabine : la relecture complète disparaît avec #106.
+- **Un catalogue importé en retard** (constat 1 de `/code-review`, écarté par Sabine) : un
+  fichier CISA plus ancien que le dernier importé n'écrit rien. Si, faute d'avoir été importé à
+  temps, il est le seul à porter une version intermédiaire, celle-ci n'entre pas en base, et une
+  base reconstruite dans l'ordre des collectes peut différer de la base tenue au fil des
+  imports par `revised_at` et par le fichier rattaché à l'item (le contenu final est celui du
+  dernier catalogue dans les deux cas). Raisonnement, non testé. C'est la règle voulue (seul le dernier catalogue compte) ; la limite est écrite dans
+  `docs/specs-collecte.md` et l'ADR, et signalée à #106.
 - **L'étape 8 n'a pas cassé la règle des alertes**, seulement celle des releases : la symétrie
   est supposée, et le test 2 la couvre en fonctionnement normal.
 - **Un CVE en double dans un même catalogue** : le raisonnement dit `no_newer_version`, mais ce
