@@ -1045,6 +1045,26 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   les agents passeront par la même porte. Option écartée : `kb` appelle le modèle en direct
   (plus simple, mais l'API IA n'aurait plus de client, et il en faudrait un pour la grille
   seulement). Limite assumée : l'API doit tourner pour ingérer.
+- **L'API IA tourne en local, sur la machine de Sabine, comme le reste de K-B ; pas d'hébergement
+  en v0.** Décision de Sabine, sur recommandation (découpage de l'après-midi). Pourquoi, celui de
+  la recommandation : cohérent avec le README (« les données restent sur ma machine ») et avec
+  « K-B tourne en local » (2026-10-08) ; rien à déployer ; l'API n'est pas exposée à Internet.
+  Option écartée : l'API sur Azure (une issue de déploiement d'environ 6 h, et une
+  authentification exposée à Internet). — #156
+- **Le client `kb` s'authentifie par un jeton d'accès de courte durée et un *refresh token* qui
+  change à chaque usage ; l'API les délivre elle-même, sans implémenter le protocole OAuth 2.**
+  Décision de Sabine. Pourquoi : le client doit renouveler son accès quand il expire, et c'est le
+  schéma que recommande l'OWASP : jetons d'accès courts, *refresh tokens* protégés par rotation
+  (OAuth 2.0 Cheat Sheet ; Secrets Management Cheat Sheet, § 2.12 : « Use short-lived access
+  tokens and implement a secure refresh token rotation strategy » ; lus par Context7 le
+  2026-10-12) ; Azure CLI suit ce schéma (Microsoft Learn, « Authenticate to Azure using Azure
+  CLI »). Options écartées : une clé fixe sans expiration (recommandée d'abord ; selon OWASP
+  API2:2023, une clé d'API authentifie un client, pas une utilisatrice, d'après un résumé de
+  recherche, page non lue en entier) ; un jeton renouvelé à la main par `kb login` (pas de
+  renouvellement automatique). Limites assumées : sans fournisseur d'identité, c'est le code de
+  K-B qui délivre les jetons ; environ 5 h, mécanisme connu de Sabine mais pas pratiqué depuis
+  plusieurs mois. Suivre OAuth 2 en entier reste à voir au début de #160 (Sabine : peut-être lourd
+  ici). — #160
 
 ### Wiki : métriques
 
@@ -1159,6 +1179,33 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   commun au nom neutre (`compared_with`), qui ne dit pas d'où vient la date ; un horodatage par
   ligne, que #106 met dans le nom du fichier. — PR de #105
 
+### Wiki : le modèle de la démonstration (découpage de l'après-midi)
+
+- **La démonstration de l'oral blanc des 29 et 30/10 se fait sur un vrai modèle, qui compile un
+  clip nouveau en direct.** Décision de Sabine ; pourquoi non dit. Options écartées : démontrer
+  sur le modèle de remplacement, avec des clips aux réponses préparées (recommandée : le jalon
+  est déjà chargé et le chemin complet tourne sans vrai modèle) ; le remplacement d'abord, le vrai
+  modèle si le temps le permet. Le modèle de remplacement reste celui des tests et de la CI.
+  — #158
+- **Une clé gratuite (Gemini ou Mistral, que Sabine a déjà) d'abord, puis Azure, sur le compte
+  payé par l'école.** Décision de Sabine. Pourquoi, selon elle : limiter les coûts pendant le
+  développement. **Modifie** « inférence sur Azure » (nuit du 11 au 12/10) : Azure vient en second.
+  Option écartée : Azure d'emblée. Limites assumées : en offre gratuite, le texte envoyé peut
+  servir à l'entraînement du fournisseur (Gemini : page de prix ; Mistral : plan Experiment,
+  retrait possible ; recherches du 2026-10-12), à inscrire au registre (#157) ; changer de modèle
+  peut changer la fidélité, la consigne sera peut-être à reprendre (#170). — #158, #170
+
+### Collecte : clips
+
+- **La clé d'un clip est son URL source, paramètres `utm_*` retirés comme pour les autres
+  sources ; pas d'empreinte de contenu, la limite est écrite.** Décision de Sabine, sur
+  recommandation. Pourquoi, celui de la recommandation : c'est la normalisation déjà codée
+  (`remove_tracking_parameters`, `merge.py`), sans ajout. Options écartées :
+  une empreinte du titre et du texte normalisés contre les quasi-doublons (environ 1 h de plus,
+  et « normalisé » à définir) ; une normalisation plus poussée de l'URL (une règle propre aux
+  clips) ; le chemin du fichier dans le coffre (un même article gardé deux fois fait deux clips).
+  Limite assumée : un même article gardé sous deux URL donne deux clips. La nature de la source
+  (règle de dédoublonnage par la base) reste à décider par #14, comme le prévoit l'entrée de #105. — #14
 
 ## Décisions encore ouvertes
 
@@ -1218,9 +1265,11 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
 - **Wiki : forme du contrat `.md` *cleansed*** (2026-10-12) : l'ETL écrit en SQLite ; ce que la
   partie LLM reçoit d'un papier Zotero (texte du PDF, métadonnées, surlignages) est à fixer avant
   le code.
-- **Wiki : questions laissées par la session du 2026-10-12**, faute de temps : l'API IA en local
-  ou sur Azure ; si la veille automatique nourrit le wiki ou seulement les dépôts de Sabine
-  (Sabine : « on verra ») ; les données envoyées à Azure et à l'outil de suivi, à inscrire au
-  registre ; un accès à l'API qui expire, ou documenté comme sans expiration (décision 5 de la
-  certif) ; installer un service d'inférence avant la démonstration, ou démontrer sur le modèle
-  de remplacement (décision 3).
+- **Wiki : questions laissées par la session du 2026-10-12**, faute de temps : si la veille
+  automatique nourrit le wiki ou seulement les dépôts de Sabine (Sabine : « on verra ») ; les
+  données envoyées au fournisseur du modèle et à l'outil de suivi, à inscrire au registre (#157,
+  #163, #170). Tranchées l'après-midi : l'API IA en local, l'accès qui expire, le vrai modèle
+  pour la démonstration (entrées du 2026-10-12).
+- **Wiki : la clé gratuite, Gemini ou Mistral** (2026-10-12) : à choisir au début de #158.
+- **Wiki : suivre OAuth 2 en entier, ou le schéma de jetons seul** (2026-10-12) : à voir au début
+  de #160.
