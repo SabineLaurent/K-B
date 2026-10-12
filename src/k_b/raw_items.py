@@ -1,5 +1,5 @@
-"""Read every raw file of raw/automated_watch/ into common items (docs/specs-collecte.md,
-step 2)."""
+"""Read the raw files of raw/automated_watch/ not imported yet into common items
+(docs/specs-collecte.md, step 2)."""
 
 import csv
 import logging
@@ -10,7 +10,7 @@ from typing import Any, NamedTuple
 
 from pydantic import ValidationError
 
-from k_b.items import Item
+from k_b.items import Item, SourceCode
 from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.source_contract import SourceKind, SourceReader, find_source_kind
 
@@ -25,31 +25,59 @@ class Rejection(NamedTuple):
     reason: str
 
 
-class RawReading(NamedTuple):
+class RawFile(NamedTuple):
+    """A raw file read: a page, for a collection that is a folder of pages."""
+
+    raw_file_path: str
+    source_code: SourceCode
+    collected_at: datetime
     items: list[Item]
+    # Its entries refused as items: a catalog with one of them withdraws nothing (#106).
+    rejection_count: int
+
+
+class RawReading(NamedTuple):
+    files: list[RawFile]
     rejections: list[Rejection]
+    # The pages opened, readable or not.
+    read_count: int
 
 
-def read_raw_items(raw_dir: Path, kinds: Sequence[SourceKind]) -> RawReading:
-    """Every item of the raw pages whose source kind has a reader, in collection order.
+def read_raw_items(
+    raw_dir: Path, kinds: Sequence[SourceKind], imported_paths: frozenset[str]
+) -> RawReading:
+    """Every raw file whose source kind has a reader and that is not in imported_paths, in
+    collection order.
 
     A collection is a raw file, or a folder of pages; a raw file is read as a single page. A
     collection not named by its time or that cannot be listed, a page that cannot be read, or
-    an entry refused as an item, is rejected and logged; the others are still read.
+    an entry refused as an item, is rejected and logged; the others are still read. A page
+    already imported is not opened.
     """
-    items = []
-    rejections = []
-    for collection_path, reader in list_collections(raw_dir, kinds):
-        collection_reading = read_collection(collection_path, raw_dir, reader)
-        items.extend(collection_reading.items)
-        rejections.extend(collection_reading.rejections)
-    # Stable sort: within a collection, the items keep their page and source order.
-    items.sort(key=lambda item: item.collected_at)
-    return RawReading(items, rejections)
+    reading = join_readings(
+        [
+            read_collection(collection_path, raw_dir, reader, imported_paths)
+            for collection_path, reader in list_collections(raw_dir, kinds)
+        ]
+    )
+    # Stable sort: within a collection, the files keep their page order.
+    reading.files.sort(key=lambda raw_file: raw_file.collected_at)
+    return reading
+
+
+def join_readings(readings: list[RawReading]) -> RawReading:
+    return RawReading(
+        [raw_file for reading in readings for raw_file in reading.files],
+        [rejection for reading in readings for rejection in reading.rejections],
+        sum(reading.read_count for reading in readings),
+    )
 
 
 def read_collection(
-    collection_path: Path, raw_dir: Path, reader: SourceReader[Any]
+    collection_path: Path,
+    raw_dir: Path,
+    reader: SourceReader[Any],
+    imported_paths: frozenset[str],
 ) -> RawReading:
     try:
         if collection_path.is_dir():
@@ -62,15 +90,17 @@ def read_collection(
     except (ValueError, OSError) as error:
         relative_collection_path = collection_path.relative_to(raw_dir).as_posix()
         return RawReading(
-            [], [reject(relative_collection_path, f"{type(error).__name__}: {error}")]
+            [],
+            [reject(relative_collection_path, f"{type(error).__name__}: {error}")],
+            0,
         )
-    items = []
-    rejections = []
-    for page_path in pages:
-        page_reading = read_page(page_path, raw_dir, reader, collected_at)
-        items.extend(page_reading.items)
-        rejections.extend(page_reading.rejections)
-    return RawReading(items, rejections)
+    return join_readings(
+        [
+            read_page(page_path, raw_dir, reader, collected_at)
+            for page_path in pages
+            if page_path.relative_to(raw_dir).as_posix() not in imported_paths
+        ]
+    )
 
 
 def parse_collection_name(collection_name: str) -> datetime:
@@ -86,8 +116,9 @@ def read_page(
     try:
         entries = reader.read_entries(page_path.read_bytes())
     except (ValueError, csv.Error, OSError) as error:
+        # Not a file read: it is not registered, and is read again at the next import.
         return RawReading(
-            [], [reject(raw_file_path, f"{type(error).__name__}: {error}")]
+            [], [reject(raw_file_path, f"{type(error).__name__}: {error}")], 1
         )
     items = []
     rejections = []
@@ -101,7 +132,10 @@ def read_page(
                     f"entry {position}: {type(error).__name__}: {error}",
                 )
             )
-    return RawReading(items, rejections)
+    raw_file = RawFile(
+        raw_file_path, reader.source_code, collected_at, items, len(rejections)
+    )
+    return RawReading([raw_file], rejections, 1)
 
 
 def list_collections(

@@ -8,7 +8,7 @@ from collections.abc import Callable, Sequence
 from datetime import datetime
 from typing import Any, NamedTuple, Protocol
 
-from k_b.items import Item
+from k_b.items import Item, SourceCode
 
 
 class Source(Protocol):
@@ -35,6 +35,8 @@ class SourceReader[EntryT](NamedTuple):
     another source.
     """
 
+    # The source_code of its items, and of its raw files in the base, even one without item.
+    source_code: SourceCode
     read_entries: Callable[[bytes], Sequence[EntryT]]
     convert: Callable[[EntryT, datetime, str], Item]
 

@@ -305,10 +305,35 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    gardée), date la collecte sans fuseau et retire les doublons sans trace. Laissé de côté : les
    étiquettes posées par un LLM, hors de la v0.
 4. **Stockage** des items dans la base : SGBD, modèles et ce que chaque source met dans l'item,
-   dans [stockage.md](stockage.md). `kb import` (`src/k_b/import_items.py`) lit le brut, le
-   normalise et écrit les items dans la base en une seule transaction : une erreur dans la base
-   n'y écrit rien. Le journal est écrit ensuite, entier ou pas du tout (fichier temporaire
-   renommé) : s'il échoue, la base garde l'import et le journal précédent reste.
+   dans [stockage.md](stockage.md). `kb import` (`run_import`, `src/k_b/cli.py`) n'importe que
+   les fichiers bruts pas encore importés (#106) : il lit le registre de la base
+   (`read_imported_paths`, `src/k_b/import_items.py`), puis les fichiers qui n'y sont pas
+   (`read_raw_items`, `src/k_b/raw_items.py`), puis écrit la base (`import_items`). Il affiche
+   le nombre de fichiers bruts lus (`raw files read`).
+
+   - **Registre** : la table `raw_data`, une ligne par fichier lu, ou par page d'un dossier de
+     pages. Un fichier lu y entre, même s'il n'a donné aucun item, et même si certaines de ses
+     entrées sont rejetées : celles-ci ne seront relues que par une reconstruction. Un fichier
+     sauté faute de lecteur n'y entre pas. **Un fichier illisible n'y entre pas** (décision de
+     Sabine du 2026-10-12) : il est relu et rejeté à chaque import, et l'import qui suit la
+     correction du lecteur ou du brut le lit, sans reconstruction. Une collecte mal nommée
+     (dossier ou fichier dont le nom n'est pas une date) n'a pas de date de collecte : elle
+     n'entre pas non plus au registre, et elle est rejetée à chaque import, sans compter dans
+     `raw files read`.
+   - **Une transaction** : chaque fichier lu est inscrit au registre, puis ses items sont
+     écrits ; le journal est écrit avant la validation (`COMMIT`). Une erreur dans la base, ou
+     un journal qui ne s'écrit pas, n'écrit rien : aucun fichier n'est inscrit, tous seront
+     relus. Si la validation échoue, ou sur une interruption (Ctrl-C), le journal écrit est
+     supprimé. Pourquoi : un fichier
+     inscrit n'est plus relu, un journal perdu après la validation perdrait pour toujours la
+     trace de ses rejets et de ses écarts (décision de Sabine du 2026-10-12, qui revient sur le
+     journal écrit après la base de #105).
+     **Limites** (constats de revue, acceptées par Sabine le 2026-10-12) : un `SIGKILL` entre
+     l'écriture du journal et la validation laisse le journal d'un import annulé ; une
+     interruption qui arrive juste après la validation, avant la fin du bloc qui la protège,
+     supprime le journal d'un import validé (une fenêtre de quelques instructions Python).
+   - **Reconstruction complète** : supprimer la base, `kb create-db`, puis `kb import`, qui
+     relit tout `raw/`. Pas d'option : une base vide n'a rien au registre.
 
    **La base dédoublonne** (#105, décisions de Sabine du 2026-10-12). Les items arrivent dans
    l'ordre des collectes. Un item déjà en base est reconnu par la clé naturelle de son sous-type
@@ -329,16 +354,40 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      qui cumule tout), et seule la collecte la plus récente compte. Une ligne est comparée au
      dernier catalogue de la même source déjà importé, à la seconde : deux catalogues du même
      jour, à 9 h et à 18 h, celui de 18 h l'emporte. Le fichier en cours n'en est pas, sauf s'il
-     porte déjà la version en base (un rejeu). Un fichier plus ancien ne peut venir que de
-     `raw/` : un rejeu jusqu'à #106, ou un fichier resté non importé. Il ne change rien, même si
-     son contenu diffère. **Limite** : une version que seul un fichier importé en retard porte
-     n'entre jamais en base. Le contenu final est le même (celui du dernier catalogue), mais une
-     base reconstruite en important tous les fichiers dans l'ordre des collectes peut différer
-     de la base tenue au fil des imports par `revised_at` et par le fichier rattaché à l'item.
-     Signalé à #106. Une ligne connue rattache son item au fichier qui a apporté sa version
-     actuelle. Le CVE qu'une alerte a déjà créé, sans colonnes KEV, prend ses colonnes à sa
-     première ligne CISA, sans `revised_at`. La ligne retirée du catalogue (`withdrawn_at`) est
-     #106, qui s'appuie sur cette règle.
+     porte déjà la version en base (un rejeu, que le registre empêche depuis #106 ; gardé pour
+     une base d'avant #106 ou deux imports simultanés). Un fichier plus ancien est un fichier
+     importé en retard : il ne change pas une ligne connue, même si son contenu diffère. Une
+     ligne connue rattache son item au fichier qui a apporté sa version actuelle. Le CVE qu'une
+     alerte a déjà créé, sans colonnes KEV, prend ses colonnes à sa première ligne CISA, sans
+     `revised_at`.
+   - **Ligne retirée du catalogue** (#106, « Le MCD de Sabine »,
+     [clarification du modèle](2026-10-07-clarification-modele.md)) : un catalogue collecté
+     après le dernier catalogue importé marque retirée chaque ligne connue (item KEV) qui n'y
+     figure pas, écrite ou écartée : `withdrawn_at` prend la date de sa collecte, et la
+     première absence garde sa date. L'item garde le fichier de sa version : une absence n'est
+     pas une version. Si la ligne réapparaît dans un catalogue plus récent, elle est réécrite
+     même à contenu identique : `withdrawn_at` est vidé, `revised_at` daté, l'item pointe vers
+     ce fichier. `kb import` affiche le nombre de lignes retirées
+     (`vulnerabilities withdrawn`).
+     - **Écart au MCD** (décision de Sabine du 2026-10-12) : un catalogue dont une entrée est
+       rejetée, ou qui ne donne aucun item, ne retire rien. Une ligne rejetée est présente, pas
+       absente. Une ligne absente d'un tel catalogue est donc retirée au catalogue propre
+       suivant, et datée de lui, pas du premier catalogue qui a constaté son absence.
+     - **Catalogue importé en retard** (plus ancien que le dernier importé, ou au même
+       instant) : il ne retire rien et ne fait rien réapparaître. Un CVE qu'il est seul à
+       apporter, ou dont il remplit les colonnes KEV (CVE créé par une alerte), est écrit
+       **retiré**, à la date du dernier catalogue importé, qui ne le liste pas (décision de
+       Sabine du 2026-10-12 : une base reconstruite le trouve retiré elle aussi).
+     - **Limite** : une base reconstruite, qui importe tous les fichiers dans l'ordre des
+       collectes, a le même contenu et les mêmes lignes retirées que la base tenue au fil des
+       imports. Après un catalogue importé en retard, elle peut en différer par les dates
+       (`revised_at`, `withdrawn_at`) et par le fichier rattaché à l'item. Exception (constat
+       de revue, limite acceptée par Sabine le 2026-10-12) : si la ligne d'un CVE est rejetée
+       dans le dernier catalogue importé, et qu'un catalogue en retard apporte ce CVE, il est
+       écrit retiré alors que le dernier catalogue le liste ; une base reconstruite le trouve
+       actif. De même, un catalogue dont toutes les lignes sont rejetées est inscrit au
+       registre et compte comme le dernier catalogue importé. Le cas demande deux anomalies à
+       la fois ; une reconstruction le règle une fois le rejet corrigé.
    - **Sources sans import** (`zotero`, `gh_archive`, `clipper`, classement des plus étoilés) :
      leur nature est décidée par leur issue d'import (#138, #142, #14). Zotero, extrait complet
      lui aussi, entrera peut-être dans le catalogue d'état : #138 le dira.
@@ -349,10 +398,15 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      rejeu de l'ETL, des collectes qui se chevauchent). Le quasi-doublon (même contenu, autre
      métadonnée : autre URL, autre clé Zotero) est laissé à #57 et #138, qui soumettront une
      empreinte de contenu.
-   - **Journal** : `<KB_DATA_DIR>/import-log.jsonl`, réécrit à chaque import, une ligne JSON par
-     rejet (`raw_file_path`, `reason`), puis par item écarté (`rule`, `source_code`,
-     `source_item_id`, `raw_file_path` et la date comparée). La date comparée est dans un champ
-     qui dit d'où elle vient :
+   - **Journal** : `<KB_DATA_DIR>/import-log-<AAAA-MM-JJTHHMMSSZ>.jsonl`, un fichier par
+     import, nommé par sa seconde au format des noms de bruts, jamais réécrit : si le journal
+     de cette seconde existe déjà, l'import s'arrête sans rien écrire (code de sortie 2). Une
+     ligne JSON par rejet (`raw_file_path`, `reason`), puis par item écarté (`rule`,
+     `source_code`, `source_item_id`, `raw_file_path` et la date comparée). Chaque ligne porte
+     l'instant de son import, `imported_at`, en ISO 8601 UTC à la seconde, au format des dates
+     de la base (`2026-10-12T15:49:03Z`, décision de Sabine du 2026-10-12, d'après le
+     [Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html)
+     de l'OWASP). La date comparée est dans un champ qui dit d'où elle vient :
 
      | Règle | Constat | Champ | Date |
      |---|---|---|---|
@@ -361,9 +415,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      | `no_newer_version` | fichier collecté avant le dernier catalogue importé, ou au même instant | `compared_with_collected_at` | collecte de ce dernier catalogue |
      | `revision_not_newer` | révision arXiv plus ancienne ou égale | `compared_with_revised_at` | révision arXiv de la version gardée |
 
-   - **Rejouable** : sur le même brut, l'import donne la même base, et un item déjà en base garde
-     son `item_id`, que l'API exposera. Le journal, lui, consigne alors chaque item comme écarté,
-     jusqu'à ce que l'import ne lise que les fichiers pas encore importés (#106).
+   - **Rejouable** : un second import sans nouveau brut ne lit aucun fichier (sauf un fichier
+     illisible ou une collecte mal nommée) et ne change pas la base ; un item déjà en base garde
+     son `item_id`, que l'API exposera.
    - Un nom répété dans les auteurs d'un item n'est lié qu'une fois, à sa première position : la
      base lie un auteur à un item une seule fois.
    - Un auteur qui n'a plus d'item (une révision arXiv a changé ses auteurs) est supprimé dans

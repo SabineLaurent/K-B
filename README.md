@@ -139,16 +139,20 @@ est illisible.
 KB_DATA_DIR=~/K-B-data uv run kb import
 ```
 
-`kb import` lit `<KB_DATA_DIR>/raw/automated_watch/` et écrit les items dans la base, qui écarte
-les doublons ; rejoué sur le même brut, il donne la même base. Il affiche le nombre d'items
-écrits (nouveaux ou mis à jour : 0 sur un brut déjà importé), d'items écartés (doublons, ou
-versions qui ne sont pas plus récentes que celle de la base) et de rejets, détaillés dans
-`<KB_DATA_DIR>/import-log.jsonl`. Code de sortie :
+`kb import` lit les fichiers de `<KB_DATA_DIR>/raw/automated_watch/` pas encore importés et
+écrit leurs items dans la base, qui écarte les doublons ; sans nouveau brut, il ne lit rien,
+sauf un fichier illisible, relu et rejeté à chaque import. Il affiche le nombre de fichiers bruts lus, d'items écrits (nouveaux ou mis à jour), d'items écartés
+(doublons, ou versions qui ne sont pas plus récentes que celle de la base), de lignes CISA
+retirées du catalogue et de rejets, détaillés dans
+`<KB_DATA_DIR>/import-log-<AAAA-MM-JJTHHMMSSZ>.jsonl`, un journal par import. Pour reconstruire
+la base depuis tout le brut : supprimer `k-b.sqlite`, puis `kb create-db` et `kb import`. Code de
+sortie :
 
 - 0 : l'import a réussi ;
-- 1 : l'import a échoué. Une erreur dans la base n'y écrit rien. Le journal est écrit après la
-  base : s'il ne peut pas l'être, la base garde l'import et le journal précédent reste entier ;
-- 2 : `KB_DATA_DIR` manque, ou la base n'existe pas (`kb create-db`).
+- 1 : l'import a échoué. Il n'écrit rien, ni dans la base ni au journal : le journal est écrit
+  avant la validation de la base ;
+- 2 : `KB_DATA_DIR` manque, la base n'existe pas (`kb create-db`), ou le journal de cette
+  seconde existe déjà (relancer `kb import`).
 
 **Lancer les tests** :
 

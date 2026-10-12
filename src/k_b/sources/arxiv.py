@@ -13,12 +13,14 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 from k_b.http_download import download
-from k_b.items import Item
+from k_b.items import Item, SourceCode
 from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.source_contract import SourceReader
 
 logger = logging.getLogger(__name__)
 
+# The source of its items, in the source table of the base.
+SOURCE_CODE: SourceCode = "arxiv"
 API_URL = "https://export.arxiv.org/api/query"
 # A page of 35 papers weighs 93 KB in 2026, about 2.7 KB a paper: 2,000 papers weigh 5.3 MB.
 MAX_RESPONSE_BYTES = 6 * 1024 * 1024
@@ -217,7 +219,7 @@ def read_date(entry: ElementTree.Element, field: str, label: str) -> datetime:
 
 def convert_paper(paper: Paper, collected_at: datetime, raw_file_path: str) -> Item:
     return Item(
-        source_code="arxiv",
+        source_code=SOURCE_CODE,
         source_item_id=paper.arxiv_id,
         kind="paper",
         title=paper.title,
@@ -231,4 +233,4 @@ def convert_paper(paper: Paper, collected_at: datetime, raw_file_path: str) -> I
     )
 
 
-READER: SourceReader[Paper] = SourceReader(read_papers, convert_paper)
+READER: SourceReader[Paper] = SourceReader(SOURCE_CODE, read_papers, convert_paper)
