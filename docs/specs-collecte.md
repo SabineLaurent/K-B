@@ -376,7 +376,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      - **Limite** : une base reconstruite, qui importe tous les fichiers dans l'ordre des
        collectes, a le même contenu et les mêmes lignes retirées que la base tenue au fil des
        imports. Après un catalogue importé en retard, elle peut en différer par les dates
-       (`revised_at`, `withdrawn_at`) et par le fichier rattaché à l'item.
+       (`revised_at`, `withdrawn_at`) et par le fichier rattaché à l'item. Exception (constat
+       de revue, limite acceptée par Sabine le 2026-10-12) : si la ligne d'un CVE est rejetée
+       dans le dernier catalogue importé, et qu'un catalogue en retard apporte ce CVE, il est
+       écrit retiré alors que le dernier catalogue le liste ; une base reconstruite le trouve
+       actif. De même, un catalogue dont toutes les lignes sont rejetées est inscrit au
+       registre et compte comme le dernier catalogue importé. Le cas demande deux anomalies à
+       la fois ; une reconstruction le règle une fois le rejet corrigé.
    - **Sources sans import** (`zotero`, `gh_archive`, `clipper`, classement des plus étoilés) :
      leur nature est décidée par leur issue d'import (#138, #142, #14). Zotero, extrait complet
      lui aussi, entrera peut-être dans le catalogue d'état : #138 le dira.

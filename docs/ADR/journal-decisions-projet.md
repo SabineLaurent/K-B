@@ -1223,7 +1223,13 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   retard rendait actif un CVE que le dernier catalogue ne liste pas, et la base tenue différait
   de la base reconstruite par son contenu, pas seulement par ses dates. Limite assumée : après un
   catalogue en retard, une base reconstruite peut différer par `revised_at`, `withdrawn_at` et le
-  fichier rattaché à l'item, pas par son contenu ni par ses lignes retirées. — PR de #106
+  fichier rattaché à l'item, pas par son contenu ni par ses lignes retirées, sauf dans un cas
+  (constat de `/code-review`, limite acceptée par Sabine, option A) : un CVE dont la ligne est
+  rejetée dans le dernier catalogue, puis apporté par un catalogue en retard, est écrit retiré
+  alors qu'une base reconstruite le trouve actif ; un catalogue dont toutes les lignes sont
+  rejetées compte comme le dernier catalogue. Options écartées : garder dans `raw_data` le nombre
+  de rejets d'un fichier (une colonne de plus, qui change le MCD et sort de #106) ; écrire actifs
+  les CVE d'un catalogue en retard (le contenu différerait dans le cas courant). — PR de #106
 
 ### Wiki : le modèle de la démonstration (découpage de l'après-midi)
 

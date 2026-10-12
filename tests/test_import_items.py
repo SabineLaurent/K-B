@@ -869,6 +869,25 @@ def test_a_commit_that_fails_leaves_neither_the_import_nor_its_log(
     assert list_logs(data_dir) == []
 
 
+def test_a_ctrl_c_after_the_log_is_written_leaves_neither_the_import_nor_its_log(
+    data_dir, monkeypatch
+):
+    tables_before = dump_database(data_dir)
+    write_import_log = import_items_module.write_import_log
+
+    def write_then_interrupt(*arguments):
+        write_import_log(*arguments)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(import_items_module, "write_import_log", write_then_interrupt)
+
+    with pytest.raises(KeyboardInterrupt):
+        run_import(data_dir)
+
+    assert dump_database(data_dir) == tables_before
+    assert list_logs(data_dir) == []
+
+
 def text_at_its_maximum(kind, field, maximum):
     """A text of the maximum length that names its kind and its field: no two columns hold
     the same, so a writer that takes one field for another is seen."""

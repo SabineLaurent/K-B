@@ -229,7 +229,7 @@ def import_items(
     log of what was left out, all in one transaction.
 
     The log is written before the commit: a file registered is not read again, its log must
-    not be lost. A commit that fails removes the log written.
+    not be lost. A commit that fails, or an interruption, removes the log written.
     """
     check_database_exists(database_path)
     rejections = list(reading.rejections)
@@ -255,10 +255,16 @@ def import_items(
                 withdrawn_count += withdraw_absent_vulnerabilities(
                     connection, raw_file, raw_data_id
                 )
-            # Written once the base holds the write lock: two imports of the same second
+            # Checked once the base holds the write lock: two imports of the same second
             # cannot both find no log.
-            write_import_log(log_path, imported_at, rejections, discards)
-            commit_or_remove_log(connection, log_path)
+            check_log_absent(log_path)
+            try:
+                write_import_log(log_path, imported_at, rejections, discards)
+                connection.commit()
+            except BaseException:
+                # The log at log_path can only be this import's: it was absent above.
+                log_path.unlink(missing_ok=True)
+                raise
         except BaseException:
             # BaseException: Ctrl-C must not leave half an import either.
             connection.rollback()
@@ -274,20 +280,13 @@ def import_items(
     )
 
 
-def commit_or_remove_log(connection: sqlite3.Connection, log_path: Path) -> None:
-    try:
-        connection.commit()
-    except BaseException:
-        log_path.unlink(missing_ok=True)
-        raise
-
-
 def reject_untracked_releases(
     items: list[Item], tracked_repositories: Sequence[TrackedRepository]
 ) -> tuple[list[Item], list[Rejection]]:
     """The items without the releases of a repository out of the list, each one rejected.
 
-    The import goes on, as for an entry refused when read (#87 reads them again).
+    The import goes on, as for an entry refused when read. Their file is registered: only a
+    rebuild of the base reads them again.
     """
     tracked_names = {repository.name.lower() for repository in tracked_repositories}
     kept = []
@@ -605,18 +604,19 @@ def format_date(moment: datetime | None) -> str | None:
     )
 
 
+def check_log_absent(log_path: Path) -> None:
+    """The log of an import is never rewritten: one already at log_path stops the import."""
+    if log_path.exists():
+        raise ImportLogExistsError(f"{log_path} already exists")
+
+
 def write_import_log(
     log_path: Path,
     imported_at: datetime,
     rejections: list[Rejection],
     discards: list[Discard],
 ) -> None:
-    """One JSON line per rejection, then per item left out, each dated by its import.
-
-    The log of an import is never rewritten: one already at log_path stops the import.
-    """
-    if log_path.exists():
-        raise ImportLogExistsError(f"{log_path} already exists")
+    """One JSON line per rejection, then per item left out, each dated by its import."""
     logged_at = format_date(imported_at)
     lines = [
         {
