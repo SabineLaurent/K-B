@@ -157,6 +157,36 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   `https://tldr.tech/ai/2026-09-30` répond 200). La collecte garde chaque page brute ; la lecture des articles se fait à la
   transformation.
 - **Ce qu'on en tire** : un item par article de chaque édition suivie : titre, lien, résumé.
+- **Lecture d'une page** (#57, `read_articles`, `k_b/sources/tldr.py`, avec BeautifulSoup et
+  l'analyseur `html.parser` de la bibliothèque standard) : une entrée par `<article>` de la
+  page. Le titre est le texte de `a.font-bold`, le lien son `href`, le résumé le texte de
+  `div.newsletter-html`, tel qu'affiché. L'édition est lue dans le nom du dossier brut
+  (`tldr_ai` → `ai`), la date de l'édition dans le premier `h1` de la page
+  (`TLDR AI 2026-10-08`), le rang est la position de l'entrée parmi les `<article>` de la
+  page, à partir de 1.
+  - **Entrées écartées**, sans rejet ni ligne de journal : celles dont le titre contient
+    « (Sponsor) », et les offres d'emploi de TLDR, reconnues par leur lien
+    (`https://jobs.ashbyhq.com/tldr.tech/`, décision de Sabine du 2026-10-12). Elles comptent
+    dans le rang : changer ce qui est écarté ne renumérote aucun article.
+  - **Page refusée entière** (rejet au journal d'import, page non inscrite au registre, relue à
+    chaque import) : elle n'est pas en UTF-8 ; elle n'a pas de `h1` ; son premier `h1` n'est
+    pas « TLDR <titre> <date> » (le `h1` trouvé est cité, échappé et coupé à 100 caractères) ;
+    aucun de ses articles n'a à la fois un titre, un lien et un résumé (le nombre d'`<article>`
+    trouvés est cité).
+  - **Entrée refusée** (rejet au journal d'import, les autres entrées sont lues) : sans titre,
+    sans lien `https`, sans résumé, ou avec un texte trop long. Dans le motif, `entry N` est
+    la position de l'entrée parmi les entrées lues, à partir de 0, entrées écartées non
+    comptées : ce n'est pas le rang.
+  - Certains liens sont échappés deux fois dans la page (`&amp;amp;`) : le lecteur défait le
+    second échappement, sinon leur `utm_*` resterait. Les `utm_*` sont retirés à la
+    normalisation, comme pour tout item.
+  - **Limites** (mesures sur les 18 pages collectées du 2026-09-30 au 2026-10-09, 315
+    entrées) : le titre d'édition du `h1` n'est pas comparé au dossier : une page d'une autre
+    édition rangée sous `tldr_ai` entrerait comme édition `ai`. Si la date du `h1` diffère de
+    celle du nom du fichier, celle du `h1` l'emporte (18 pages sur 18 ont la même). Une offre
+    d'emploi publiée ailleurs que sur le site d'offres de TLDR entre comme article. Un lien
+    qui passe par `links.tldrnewsletter.com` est gardé tel quel (3 liens) : l'adresse de
+    l'article demanderait un appel réseau.
 - **Jours sans édition** : un jour redirigé vers la page d'accueil de l'édition,
   `https://tldr.tech/<édition>`, n'a pas de page d'édition (observé pour le 2026-10-03 et le
   2026-10-04) : il est journalisé avec l'adresse de redirection et sauté. Toute autre
@@ -168,13 +198,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Fréquence** : voir les règles communes.
   Chaque collecte lit chaque jour depuis le jour de la dernière collecte, relu car son édition a
   pu paraître après elle, jusqu'à aujourd'hui (UTC) ; la première lit les 7 jours précédents et
-  aujourd'hui. La page relue est en double dans deux collectes : le doublon est retiré à la
-  transformation.
+  aujourd'hui. La page relue est en double dans deux collectes : ses articles sont écartés à
+  l'import, `already_seen` (15 à 21 lignes au journal d'import par page relue).
 - **Accès** : sans authentification. Le `robots.txt` autorise tout, sauf les pages d'abonnement
   et de compte (`/subscribed`, `/manage`, `/info`…), qu'on ne lit pas.
 - **Limites** : pas de quota publié ; on s'impose une page à la fois, avec une pause entre deux
   pages. Les liens portent des paramètres de suivi `utm_*` et certaines entrées sont
-  sponsorisées : à traiter à la lecture.
+  sponsorisées : traité à la lecture (ci-dessus).
 - **Données personnelles** : aucune (voir le registre des traitements).
 - **Suivi** : éditions **ai**, **infosec** et **dev** (ai le 2026-10-01, les deux autres le
   2026-10-04), une source par édition (`tldr_ai`…), dans `TRACKED_EDITIONS` de
@@ -337,13 +367,14 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 
    **La base dédoublonne** (#105, décisions de Sabine du 2026-10-12). Les items arrivent dans
    l'ordre des collectes. Un item déjà en base est reconnu par la clé naturelle de son sous-type
-   ou de son référentiel (`release_id`, `ghsa_id`, `cve_id`, `arxiv_id`) ; ce qu'il en advient
+   ou de son référentiel (`release_id`, `ghsa_id`, `cve_id`, `arxiv_id` ; édition, date et
+   rang pour un article TLDR) ; ce qu'il en advient
    dépend de la **nature** de sa source. La règle de chaque nature est une clause SQL de
    l'écrivain de sa sorte d'item, et nulle part ailleurs :
 
    | Nature | Sources | Item déjà vu | SQL | Règle au journal |
    |---|---|---|---|---|
-   | flux de nouveautés | releases, alertes GitHub ; TLDR quand ses articles seront lus (#57) | inchangé : la première version vue est gardée | `INSERT INTO item … SELECT … WHERE NOT EXISTS (sous-type de même clé) RETURNING id` | `already_seen` |
+   | flux de nouveautés | releases, alertes GitHub, articles TLDR | inchangé : la première version vue est gardée | `INSERT INTO item … SELECT … WHERE NOT EXISTS (sous-type de même clé) RETURNING id` | `already_seen` |
    | catalogue d'état | CISA KEV | remplacé si son fichier est collecté après le dernier catalogue de la source déjà importé et que son contenu diffère ; `revised_at` prend la date de cette collecte | `ON CONFLICT (cve_id) DO UPDATE … WHERE` (collecte plus récente et contenu différent) `RETURNING id` | `unchanged`, `no_newer_version` |
    | flux avec révisions | arXiv | remplacé si sa révision (`updated`) est plus récente | `ON CONFLICT (arxiv_id) DO UPDATE … WHERE excluded.revised_at > publication.revised_at RETURNING id` | `revision_not_newer` |
 
@@ -396,8 +427,23 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      même vulnérabilité (`vulnerability.cve_id` unique).
    - **Limite** : la base ne trouve que le doublon exact, le même identifiant dans sa source (un
      rejeu de l'ETL, des collectes qui se chevauchent). Le quasi-doublon (même contenu, autre
-     métadonnée : autre URL, autre clé Zotero) est laissé à #57 et #138, qui soumettront une
-     empreinte de contenu.
+     métadonnée) n'est pas trouvé. Pour Zotero (autre clé), il est laissé à #138, qui soumettra
+     une empreinte de contenu.
+   - **Articles TLDR** (#57, décisions de Sabine du 2026-10-12) : la clé est (édition, date de
+     l'édition, rang), celle de l'ADR du 2026-10-07 ; l'URL, rangée sans `utm_*`, n'est ni
+     unique ni dans la clé ; pas d'empreinte de contenu. Mesuré sur les 18 pages collectées
+     (272 articles) :
+     - un même article résumé par deux éditions, ou repris un autre jour, fait deux lignes :
+       voulu par l'ADR (10 URL sous deux clés, toujours avec deux résumés différents) ;
+     - un même contenu sous une autre URL n'est pas reconnu (aucun cas parmi les 272 ; le seul
+       du brut était une offre d'emploi, écartée) ;
+     - le rang est une position : le jour de la dernière collecte est relu, et si tldr.tech a
+       modifié la page entre-temps (entrée ajoutée, retirée ou déplacée, encart sponsor
+       compris), la première version vue reste, et un article décalé peut être écarté à tort
+       ou entrer deux fois. Non mesurable sur ce brut, où aucune page n'est collectée deux
+       fois.
+     - La colonne `publication_id` (papier cité) est créée et laissée vide : la remplir pour
+       un lien `https://arxiv.org/abs/<id>` (2 articles sur 272) n'est pas fait.
    - **Journal** : `<KB_DATA_DIR>/import-log-<AAAA-MM-JJTHHMMSSZ>.jsonl`, un fichier par
      import, nommé par sa seconde au format des noms de bruts, jamais réécrit : si le journal
      de cette seconde existe déjà, l'import s'arrête sans rien écrire (code de sortie 2). Une
