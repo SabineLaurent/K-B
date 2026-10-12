@@ -1,6 +1,6 @@
 # Spécifications de stockage et modèles de la base
 
-La base garde le jeu d'items fusionné (étape 4 de [specs-collecte.md](specs-collecte.md)). Ce
+La base garde les items, dédoublonnés par ses règles (étape 4 de [specs-collecte.md](specs-collecte.md)). Ce
 document fixe le SGBD, les règles de stockage, ce que chaque source écrit, et le MPD, qui est le
 script [`src/k_b/database/schema.sql`](../src/k_b/database/schema.sql). Il décrit le schéma codé.
 Les décisions et leur pourquoi sont dans le [journal ADR](ADR/journal-decisions-projet.md) et
@@ -8,10 +8,10 @@ dans [la clarification du modèle](2026-10-07-clarification-modele.md) ; pour la
 schéma, l'entrée du 2026-10-10 du journal fait foi.
 
 ```
-collecte → raw/ (brut intact) → lecture + fusion → base
+collecte → raw/ (brut intact) → lecture + normalisation → base (qui dédoublonne)
 ```
 
-La base n'est pas le brut : elle se reconstruit en rejouant la lecture et la fusion sur `raw/`.
+La base n'est pas le brut : elle se reconstruit en rejouant la lecture et l'import sur `raw/`.
 Elle ne contient que ce que le brut contient (les papiers arXiv écartés à la requête n'y sont pas).
 Ce qui la lira (les commandes `kb search` et `kb top`, une API REST locale) est décidé et pas
 encore codé (journal ADR, 2026-10-08 et 2026-10-09).

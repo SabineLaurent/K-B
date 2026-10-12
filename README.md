@@ -41,8 +41,8 @@ La v0 couvre la porte « veille » :
 
   Les sources suivies sont dans [docs/sources.md](docs/sources.md), leur accès et leurs limites
   dans [docs/specs-collecte.md](docs/specs-collecte.md).
-- **Fusion** en un seul jeu d'items : dates normalisées, doublons retirés, rejets tracés, règles
-  écrites.
+- **Dédoublonnage par la base** : dates normalisées, doublons écartés selon la nature de chaque
+  source, écarts et rejets tracés, règles écrites.
 - **Stockage** dans une base modélisée avec Merise, avec une installation qu'un tiers peut rejouer.
 - **API REST authentifiée**, documentée en OpenAPI, qui sert les items et répond à « quoi de neuf
   cette semaine ».
@@ -113,9 +113,10 @@ est illisible.
 KB_DATA_DIR=~/K-B-data uv run kb import
 ```
 
-`kb import` lit `<KB_DATA_DIR>/raw/automated_watch/`, fusionne les items et les écrit dans la base ; rejoué
-sur le même brut, il donne la même base. Il affiche le nombre d'items importés, de doublons
-retirés et de rejets, détaillés dans `<KB_DATA_DIR>/import-log.jsonl`. Code de sortie :
+`kb import` lit `<KB_DATA_DIR>/raw/automated_watch/` et écrit les items dans la base, qui écarte
+les doublons ; rejoué sur le même brut, il donne la même base. Il affiche le nombre d'items
+importés (écrits ou mis à jour : 0 sur un brut déjà importé), de doublons écartés et de rejets,
+détaillés dans `<KB_DATA_DIR>/import-log.jsonl`. Code de sortie :
 
 - 0 : l'import a réussi ;
 - 1 : l'import a échoué. Une erreur dans la base n'y écrit rien. Le journal est écrit après la

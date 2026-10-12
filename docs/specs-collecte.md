@@ -119,7 +119,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   jours après sa soumission (jeudi 14 h → dimanche 20 h, heure de New York), plus les jours fériés
   ([Availability of submissions](https://info.arxiv.org/help/availability.html)). Partir de la
   dernière collecte perdrait ces papiers pour toujours (le bug de watermark de brief09). Chaque
-  brut recouvre donc le précédent ; la fusion dédoublonne par identifiant. Une entrée mal formée
+  brut recouvre donc le précédent ; la base dédoublonne par identifiant (étape 4). Une entrée mal formée
   ne fait pas échouer la collecte (sa fenêtre la garderait pour toujours) : elle entre dans le
   brut, et sa lecture la rejette et la journalise. Une entrée d'erreur de l'API fait, elle,
   échouer la collecte. Limites assumées : la révision (`v2`) d'un papier soumis avant la fenêtre
@@ -294,43 +294,72 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    titre, URL, auteurs (sauf GitHub), date de publication et date de révision (arXiv), date d'ajout (Clipper, Zotero),
    contenu ou résumé, date de collecte, chemin du brut d'origine. Une date absente reste vide. Toutes les dates sont en UTC, avec fuseau. Une ligne
    illisible est rejetée et journalisée, pas devinée.
-3. **Fusion** en un seul jeu d'items (`merge_items`, `src/k_b/merge.py`). Les items arrivent
-   dans l'ordre des collectes, et la règle générale est de **garder le premier vu**, celui de la
-   collecte qui l'a apporté.
-   - Dates ramenées en UTC.
+3. **Normalisation** des items lus (`normalize_item`, `src/k_b/merge.py`) :
+   - dates ramenées en UTC ;
    - URL normalisées : les paramètres `utm_*` sont retirés, les autres restent tels quels et
      dans leur ordre.
-   - Doublons retirés, une règle nommée par cas, cherchés dans cet ordre : identifiant, URL,
-     CVE. `arxiv_revision` est un sous-cas de la correspondance par identifiant :
-
-     | Règle | Doublon quand | Gardé |
-     |---|---|---|
-     | `same_source_id` | même source et même identifiant dans la source (arXiv : identifiant sans version) | le premier vu |
-     | `arxiv_revision` | même papier arXiv, avec une date de révision plus récente | **le plus récent**, à la place du premier |
-     | `same_url` | même URL normalisée, quelle que soit la source | le premier vu |
-     | `same_cve` | même source et même CVE, sous deux identifiants (deux alertes GitHub) | le premier vu |
-
-   - Une même CVE dans deux sources (une entrée CISA et une alerte GitHub) n'est **pas** un
-     doublon : les deux items restent, reliés par leur CVE (décision de Sabine du 2026-10-05).
-   - Chaque item écarté est rendu avec sa règle et l'URL de l'item gardé à sa place. L'import
-     l'écrit dans le journal d'import (étape 4), avec les rejets de lecture de l'étape 2.
 
    `brief09_assistant-veille-tech` (relu le 2026-10-01) a servi d'indication, pas de modèle : il
    ne fait pas autorité. On y retrouve un modèle d'article commun et la date de révision arXiv. À
    l'inverse, brief09 ne dédoublonne que sur l'URL exacte, ignore les révisions (première version
-   gardée), date la collecte sans fuseau et retire les doublons sans trace. Laissé de côté : un
-   même article publié sous deux URL (hash du contenu), et les étiquettes posées par un LLM, hors
-   de la v0.
-4. **Stockage** du jeu d'items dans la base : SGBD, modèles et ce que chaque source met dans
-   l'item, dans [stockage.md](stockage.md). `kb import` (`src/k_b/import_items.py`) lit le brut,
-   le fusionne et écrit le jeu dans la base en une seule transaction : une erreur dans la base
+   gardée), date la collecte sans fuseau et retire les doublons sans trace. Laissé de côté : les
+   étiquettes posées par un LLM, hors de la v0.
+4. **Stockage** des items dans la base : SGBD, modèles et ce que chaque source met dans l'item,
+   dans [stockage.md](stockage.md). `kb import` (`src/k_b/import_items.py`) lit le brut, le
+   normalise et écrit les items dans la base en une seule transaction : une erreur dans la base
    n'y écrit rien. Le journal est écrit ensuite, entier ou pas du tout (fichier temporaire
    renommé) : s'il échoue, la base garde l'import et le journal précédent reste.
-   - Rejouable : un item déjà en base (même `source_code`, `source_item_id`) est réécrit sous le
-     même `item_id`, que l'API exposera ; le même brut donne la même base.
-   - Journal : `<KB_DATA_DIR>/import-log.jsonl`, réécrit à chaque import, une ligne JSON par rejet
-     (`raw_file_path`, `reason`) puis par doublon retiré (`rule`, `source_code`,
-     `source_item_id`, `url`, `raw_file_path`, `kept_url`).
+
+   **La base dédoublonne** (#105, décisions de Sabine du 2026-10-12). Les items arrivent dans
+   l'ordre des collectes. Un item déjà en base est reconnu par la clé naturelle de son sous-type
+   ou de son référentiel (`release_id`, `ghsa_id`, `cve_id`, `arxiv_id`) ; ce qu'il en advient
+   dépend de la **nature** de sa source. La règle de chaque nature est une clause SQL de
+   l'écrivain de sa sorte d'item, et nulle part ailleurs :
+
+   | Nature | Sources | Item déjà vu | SQL | Règle au journal |
+   |---|---|---|---|---|
+   | flux de nouveautés | releases, alertes GitHub ; TLDR quand ses articles seront lus (#57) | inchangé : la première version vue est gardée | `INSERT INTO item … SELECT … WHERE NOT EXISTS (sous-type de même clé) RETURNING id` | `already_seen` |
+   | catalogue d'état | CISA KEV | remplacé si son fichier est collecté après le dernier catalogue de la source déjà importé et que son contenu diffère ; `revised_at` prend la date de cette collecte | `ON CONFLICT (cve_id) DO UPDATE … WHERE` (collecte plus récente et contenu différent) `RETURNING id` | `unchanged`, `no_newer_version` |
+   | flux avec révisions | arXiv | remplacé si sa révision (`updated`) est plus récente | `ON CONFLICT (arxiv_id) DO UPDATE … WHERE excluded.revised_at > publication.revised_at RETURNING id` | `revision_not_newer` |
+
+   - Le flux de nouveautés n'a pas d'`ON CONFLICT` : le sous-type exige un item déjà créé, et
+     ITEM n'a pas de clé naturelle. L'item n'est donc créé que si le sous-type est absent ; la
+     contrainte `UNIQUE` du sous-type reste le filet.
+   - **Catalogue d'état** : un catalogue est complet (CISA ne donne que son catalogue du jour,
+     qui cumule tout), et seule la collecte la plus récente compte. Une ligne est comparée au
+     dernier catalogue de la même source déjà importé, à la seconde : deux catalogues du même
+     jour, à 9 h et à 18 h, celui de 18 h l'emporte. Le fichier en cours n'en est pas, sauf s'il
+     porte déjà la version en base (un rejeu). Un fichier plus ancien ne peut venir que de
+     `raw/` : un rejeu jusqu'à #106, ou un fichier resté non importé. Il ne change rien, même si
+     son contenu diffère. Une ligne connue rattache son item au fichier qui a apporté sa version
+     actuelle. Le CVE qu'une alerte a déjà créé, sans colonnes KEV, prend ses colonnes à sa
+     première ligne CISA, sans `revised_at`. La ligne retirée du catalogue (`withdrawn_at`) est
+     #106, qui s'appuie sur cette règle.
+   - **Sources sans import** (`zotero`, `gh_archive`, `clipper`, classement des plus étoilés) :
+     leur nature est décidée par leur issue d'import (#138, #142, #14). Zotero, extrait complet
+     lui aussi, entrera peut-être dans le catalogue d'état : #138 le dira.
+   - Une même CVE dans deux sources (une entrée CISA et une alerte GitHub), ou citée par deux
+     alertes, n'est **pas** un doublon : chaque alerte est gardée, et toutes pointent vers la
+     même vulnérabilité (`vulnerability.cve_id` unique).
+   - **Limite** : la base ne trouve que le doublon exact, le même identifiant dans sa source (un
+     rejeu de l'ETL, des collectes qui se chevauchent). Le quasi-doublon (même contenu, autre
+     métadonnée : autre URL, autre clé Zotero) est laissé à #57 et #138, qui soumettront une
+     empreinte de contenu.
+   - **Journal** : `<KB_DATA_DIR>/import-log.jsonl`, réécrit à chaque import, une ligne JSON par
+     rejet (`raw_file_path`, `reason`), puis par item écarté (`rule`, `source_code`,
+     `source_item_id`, `raw_file_path` et la date comparée). La date comparée est dans un champ
+     qui dit d'où elle vient :
+
+     | Règle | Constat | Champ | Date |
+     |---|---|---|---|
+     | `already_seen` | le sous-type est déjà en base | `compared_with_collected_at` | collecte de la version gardée |
+     | `unchanged` | fichier plus récent que le dernier catalogue importé, contenu identique | `compared_with_collected_at` | collecte de la version gardée, la seule comparée au contenu |
+     | `no_newer_version` | fichier collecté avant le dernier catalogue importé, ou au même instant | `compared_with_collected_at` | collecte de ce dernier catalogue |
+     | `revision_not_newer` | révision arXiv plus ancienne ou égale | `compared_with_revised_at` | révision arXiv de la version gardée |
+
+   - **Rejouable** : sur le même brut, l'import donne la même base, et un item déjà en base garde
+     son `item_id`, que l'API exposera. Le journal, lui, consigne alors chaque item comme écarté,
+     jusqu'à ce que l'import ne lise que les fichiers pas encore importés (#106).
    - Un nom répété dans les auteurs d'un item n'est lié qu'une fois, à sa première position : la
      base lie un auteur à un item une seule fois.
    - Un auteur qui n'a plus d'item (une révision arXiv a changé ses auteurs) est supprimé dans

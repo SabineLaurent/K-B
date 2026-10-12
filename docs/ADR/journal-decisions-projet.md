@@ -970,7 +970,65 @@ encore l'ancien modèle.
   requête écartant les dépôts sans identifiant ni nom (14 `ForkEvent` sans dépôt le 2026-10-10).
   — PR de #16
 
+## 2026-10-12
+
+### Import dans la base
+
+- **`kb import` ne rejoue plus tout `raw/` à chaque exécution : il n'importera que les fichiers
+  bruts pas encore importés.** Décision de Sabine du 2026-10-06 (revue d'architecture, W0),
+  consignée ici après coup avec la PR qui en pose la condition. Pourquoi, selon elle : « la
+  collecte est incrémentale ; l'import doit l'être aussi ». Rejouer tout le brut refait le
+  travail des imports précédents, et le journal se remplit de doublons attendus (W5). Les options
+  écartées n'ont pas été écrites le 2026-10-06. Limite assumée : la reconstruction complète
+  (supprimer la base, `kb create-db`, `kb import`) reste possible et exceptionnelle. Jusqu'à #106,
+  qui code l'import incrémental, chaque import relit encore tout. — PR de #105
+- **La base dédoublonne les items ; la fusion en mémoire (`merge_items`) disparaît, et
+  `merge.py` ne garde que la normalisation. La règle de chaque nature de source est une clause
+  SQL de l'écrivain de sa sorte d'item, et nulle part ailleurs.** Décision de Sabine. Pourquoi :
+  la fusion ne voyait que ce qu'elle avait chargé, ce qui obligeait à relire tout le brut ; c'est
+  la condition de l'entrée précédente. Règles : flux de nouveautés (releases, alertes), premier vu
+  gardé, par `INSERT INTO item … WHERE NOT EXISTS` ; catalogue d'état (CISA KEV) et flux avec
+  révisions (arXiv), par `ON CONFLICT … DO UPDATE … WHERE … RETURNING`. Le flux de nouveautés n'a
+  pas d'`ON CONFLICT` : le sous-type exige un item déjà créé, et ITEM n'a pas de clé naturelle.
+  Options écartées, pour la place de la nature (raisons données dans la question, option retenue
+  par Sabine) : une colonne `source.nature`, que rien ne lirait et qui changeait le MCD/MLD ; une
+  constante Python, qui redisait le SQL sans contrôle de concordance. Écarté pour le flux de
+  nouveautés : créer l'item, puis le supprimer si le sous-type existait (un `DELETE` hors purge,
+  règle 5 des conventions). **Inverse** deux points du 2026-10-05 : `same_cve` (deux alertes d'un
+  même CVE dans une source) n'est plus un doublon, les deux alertes pointent vers la même
+  vulnérabilité ; et la raison de garder `url` en texte plutôt qu'en `HttpUrl` n'est plus « la
+  fusion compare les URL », mais « la base garde l'URL donnée par la source ». Ce qui a changé :
+  le modèle du 2026-10-10 (ITEM sans URL, `vulnerability.cve_id` unique). Limite assumée : seul le
+  doublon exact (même identifiant dans sa source) est trouvé ; le quasi-doublon (autre URL, autre
+  clé Zotero) est laissé à #57 et #138, avec une empreinte de contenu. La nature des sources sans
+  import est décidée par leur issue d'import (#138, #142, #14). — PR de #105
+- **Catalogue d'état : un catalogue est complet, et seule sa collecte la plus récente compte.**
+  Décision de Sabine : une ligne n'est écrite que si son fichier est collecté après le dernier
+  catalogue de la même source déjà importé, à la seconde, et que son contenu diffère ;
+  `revised_at` prend alors la date de cette collecte. Le fichier en cours ne compte pas comme
+  « déjà importé », sauf s'il porte la version en base (un rejeu). Pourquoi : sans cette garde,
+  un rejeu réappliquait un ancien catalogue par-dessus le récent (constat de la relecture du
+  plan). Selon Sabine, « catalogue complet » est la définition de la nature, pas une exception
+  propre à CISA. Option écartée : comparer à la collecte de la version en base. Une ligne
+  identique ne déplace pas cette version, et un fichier importé en retard pouvait réécrire une
+  version périmée. Précise l'entrée du 2026-10-07 (« dernière version »). Les retraits
+  (`withdrawn_at`, #106) s'appuient sur cette règle. — PR de #105
+- **Une ligne du journal d'import pour chaque item écarté, avec sa règle et la date comparée,
+  dans un champ qui dit d'où vient la date.** Règles : `already_seen`, `unchanged`,
+  `no_newer_version` et `revision_not_newer` ; champs : `compared_with_collected_at` et
+  `compared_with_revised_at`. Plus d'`url` ni de `kept_url`. Décision de Sabine. Pourquoi, selon
+  elle : le journal montre la date contre laquelle on a comparé, et un nom de date dit d'où vient
+  la date. Options écartées : une seule étiquette pour le catalogue d'état, qui ferait dire au
+  journal l'inverse de ce qui s'est passé pour un catalogue plus récent mais identique ; un champ
+  commun au nom neutre (`compared_with`), qui ne dit pas d'où vient la date ; un horodatage par
+  ligne, que #106 met dans le nom du fichier. — PR de #105
+
 ## Décisions encore ouvertes
+
+- **Noms des colonnes de date** (2026-10-12) : ils ne disent pas d'où vient la date
+  (`vulnerability.date_added` est une date CISA, `vulnerability.revised_at` et `withdrawn_at`
+  sont des dates K-B, `publication.revised_at` est une date arXiv). Le renommage sera décidé avec
+  le modèle des publications (Sabine, relevé à la PR de #105).
 
 - **Durée de conservation et purge des extraits Zotero** (2026-10-11) : ils sont tous gardés,
   sans durée au registre ni purge codée, ce que `.claude/rules/conformite.md` demande pour une
