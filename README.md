@@ -25,9 +25,13 @@ aucune ne fait de veille datée.
 2. Des agents (Claude Code…), qui interrogent la base par l'API REST.
 3. Plus tard, les mêmes agents via un serveur MCP.
 
-## Périmètre de la v0 — le pipeline de veille
+## Périmètre de la v0
 
-La v0 couvre la porte « veille » :
+La v0 se fait en deux étapes.
+
+### Étape 1 — l'import des données : le pipeline de veille
+
+L'étape 1 couvre la porte « veille » :
 
 - **Collecte**, avec un point de lancement unique, une panne isolée par source et une sauvegarde
   brute :
@@ -48,16 +52,9 @@ La v0 couvre la porte « veille » :
   cette semaine ».
 - **Données personnelles** : un registre des traitements et une procédure de purge.
 
-## Hors périmètre de la v0
+### Étape 2 — le wiki
 
-- Le wiki compilé par l'IA : c'est la v1.
-- Les livres en PDF, le texte intégral des PDF, et leurs images, tableaux et pages scannées.
-- Le serveur MCP et le tableau de bord.
-- Tout entraînement de modèle.
-
-## Périmètre de la v1 — le wiki
-
-La v1 ouvre la porte « base de connaissance », pour les papiers que je garde dans Zotero :
+L'étape 2 ouvre la porte « base de connaissance », pour les papiers que je garde dans Zotero :
 
 - **Ingest** : de chaque papier, le modèle écrit une note de lecture, comme après une lecture de
   l'article entier, à partir du texte intégral de son PDF. Il renvoie des opérations JSON ; le
@@ -71,12 +68,13 @@ La v1 ouvre la porte « base de connaissance », pour les papiers que je garde d
   acceptées), émises en OpenTelemetry, gardées sur ma machine et restituées en temps réel, avec
   une alerte sur seuil, par un outil à choisir.
 
-## Hors périmètre de la v1
+## Hors périmètre de la v0
 
-- Les contradictions signalées entre pages, l'interrogation du wiki, le lint par l'IA.
+- Les contradictions signalées entre pages du wiki, son interrogation, le lint par l'IA.
 - Les clips Obsidian et mes notes comme entrées du wiki.
-- Les images, tableaux et pages scannées des PDF ; les livres.
-- Le serveur MCP et tout entraînement de modèle.
+- Les livres en PDF, et les images, tableaux et pages scannées des PDF.
+- Le serveur MCP.
+- Tout entraînement de modèle.
 
 ## Installer et lancer
 

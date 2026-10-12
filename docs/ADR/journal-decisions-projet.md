@@ -989,17 +989,17 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   `.md` ; la forme du contrat reste à fixer avant le code (« Décisions encore ouvertes »).
 - **Le modèle renvoie des opérations JSON, validées puis appliquées par le code ; les jetons et
   le coût de chaque appel sont journalisés.** Décision de Sabine. Rejoint la veille du
-  2026-09-23 (« Ce qui converge », points 3 et 5 : vocabulaire d'actions fermé, règle vérifiée
-  par du code).
+  2026-09-23 (« Ce qui converge », point 3 : vocabulaire d'actions fermé, règle vérifiée par du
+  code).
 - **Écriture automatique quand les contrôles passent ; Sabine n'est sollicitée qu'en cas de
   doute.** Décision de Sabine. Pourquoi : « montrer la proposition avant d'écrire ne cadre pas
   avec le concept de la bibliothèque qui se range toute seule ». **Inverse** le choix de la
   veille du 2026-09-23 (« le LLM propose un plan, l'humain coche, le code applique. C'est notre
   choix. »).
 
-### Wiki : la première version (v1)
+### Wiki : la première version (v0, étape 2)
 
-- **La v1 du wiki fait l'ingest seul : un document déposé devient des opérations JSON (une note
+- **La première version du wiki fait l'ingest seul : un document déposé devient des opérations JSON (une note
   de lecture, des pages reliées), contrôlées par le code (liste fermée d'opérations, fidélité,
   lint mécanique), écrites si les contrôles passent, sinon mises dans une file « à voir ».**
   Décision de Sabine, sur recommandation. Pourquoi : c'est le noyau qui donne un point d'API
@@ -1007,10 +1007,10 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   ce qu'il faut tester et surveiller. Options gardées pour plus tard : les contradictions
   signalées (un second appel par ingest, une métrique difficile à définir) ; l'interrogation du
   wiki (`kb ask`, un second point d'API).
-- **En v1, le wiki prend les papiers Zotero seuls ; les clips viendront après #14, les notes
+- **Dans sa première version, le wiki prend les papiers Zotero seuls ; les clips viendront après #14, les notes
   plus tard.** Recommandation présentée à Sabine et non contredite ; à confirmer par elle à la
   relecture de cette PR. Pourquoi : l'extrait Zotero existe (#15), et le résumé d'un papier
-  Zotero était déjà décidé. Le wiki lit l'extrait, pas la base : #138 ne le bloque pas.
+  Zotero avait été décidé dans la nuit du 11 au 12/10 (ordre de mission). Le wiki lit l'extrait, pas la base : #138 ne le bloque pas.
 - **Pour un papier Zotero, le wiki écrit une note de lecture, comme si quelqu'un avait lu
   l'article entier ; le modèle reçoit donc le texte intégral.** Décision de Sabine. Option
   écartée : un résumé fait du résumé de l'article et des surlignages (Sabine veut une note de
@@ -1026,7 +1026,7 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   colonnes ; le vérificateur de fidélité normalise les deux textes avant de comparer ; formules
   et tableaux sortent abîmés. Un papier sans PDF, ou au PDF scanné, passe à l'état
   `full_text_unavailable` et va dans la file « à voir ». Fait entrer dans le wiki le texte
-  intégral des PDF, hors v0 au README.
+  intégral des PDF, jusque-là hors v0 au README.
 - **La bibliothèque d'extraction est choisie après un essai sur 5 PDF de Sabine : la part des
   citations retrouvées mot pour mot, pour un extracteur simple (pypdf ou PyMuPDF), pymupdf4llm
   et Unstructured.** Décision de Sabine. Pourquoi : aucun banc d'essai trouvé ne compare ces
@@ -1062,15 +1062,17 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   « local » qui ne venait pas de Sabine) ; LangSmith (auto-hébergé sous contrat Enterprise
   seulement) ; Langfuse auto-hébergé (6 services, environ 11 CPU et 25 Gio). **Revient** sur
   « tableau de bord : plus tard » (2026-09-29) et sur le README (hors v0) : un outil de
-  restitution entre en v1.
+  restitution entre en v0, étape 2.
 
 ### Périmètre
 
-- **Les numéros de version restent : la v0 est la veille, la v1 est le wiki ; le README gagne
-  une section « Périmètre de la v1 », sans date.** Décision de Sabine, sur recommandation.
-  Pourquoi : README et journal parlent déjà de « v1 = le wiki » ; renuméroter obligerait à tout
-  reprendre. Option écartée : fondre le wiki dans la v0. Les dates restent tenues par
-  time-knight.
+- **La v0 se fait en deux étapes : l'étape 1 est l'import des données (le pipeline de veille),
+  l'étape 2 est le wiki LLM ; le README les décrit sans date.** Décision de Sabine. Option
+  écartée : garder « v1 = le wiki » et ajouter une section « Périmètre de la v1 » (recommandée,
+  puis retirée par Sabine). Pourquoi : non dit ; je comprends (déduction, à confirmer) que le
+  wiki entre dans la même livraison que la veille. **Inverse** le périmètre du 2026-09-29
+  (« v1 : wiki de savoir ») ; les mentions antérieures de « v1 » dans ce journal désignent
+  désormais l'étape 2 de la v0. Les dates restent tenues par time-knight.
 
 ## Décisions encore ouvertes
 
