@@ -1113,11 +1113,11 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   reconstruction complète (supprimer la base, `kb create-db`, `kb import`) reste possible et
   exceptionnelle. Jusqu'à #106, qui code l'import incrémental, chaque import relit encore tout. —
   PR de #105
-- **La base dédoublonne les items ; la fusion en mémoire (`merge_items`) disparaît, et
-  `merge.py` ne garde que la normalisation. La règle de chaque nature de source est une clause
-  SQL de l'écrivain de sa sorte d'item, et nulle part ailleurs.** Décision de Sabine. Pourquoi :
-  la fusion ne voyait que ce qu'elle avait chargé, ce qui obligeait à relire tout le brut ; c'est
-  la condition de l'entrée précédente. Règles : flux de nouveautés (releases, alertes), premier vu
+- **La base dédoublonne les items ; la fusion en mémoire (`merge_items`) disparaît, et `merge.py`
+  ne garde que la normalisation. La règle de chaque nature de source est une clause SQL de
+  l'écrivain de sa sorte d'item, et nulle part ailleurs.** Décision de Sabine. Pourquoi : la
+  fusion ne voyait que ce qu'elle avait chargé, ce qui obligeait à relire tout le brut ; c'est la
+  condition de l'entrée précédente. Règles : flux de nouveautés (releases, alertes), premier vu
   gardé, par `INSERT INTO item … WHERE NOT EXISTS` ; catalogue d'état (CISA KEV) et flux avec
   révisions (arXiv), par `ON CONFLICT … DO UPDATE … WHERE … RETURNING`. Le flux de nouveautés n'a
   pas d'`ON CONFLICT` : le sous-type exige un item déjà créé, et ITEM n'a pas de clé naturelle.
@@ -1128,11 +1128,12 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   règle 5 des conventions). **Inverse** deux points du 2026-10-05 : `same_cve` (deux alertes d'un
   même CVE dans une source) n'est plus un doublon, les deux alertes pointent vers la même
   vulnérabilité ; et la raison de garder `url` en texte plutôt qu'en `HttpUrl` n'est plus « la
-  fusion compare les URL », mais « la base garde l'URL donnée par la source ». Ce qui a changé :
-  le modèle du 2026-10-10 (ITEM sans URL, `vulnerability.cve_id` unique). Limite assumée : seul le
-  doublon exact (même identifiant dans sa source) est trouvé ; le quasi-doublon (autre URL, autre
-  clé Zotero) est laissé à #57 et #138, avec une empreinte de contenu. La nature des sources sans
-  import est décidée par leur issue d'import (#138, #142, #14). — PR de #105
+  fusion compare les URL », mais « la base garde l'URL donnée par la source, sans ses paramètres
+  utm_* ». Ce qui a changé : le modèle du 2026-10-10 (ITEM sans URL, `vulnerability.cve_id`
+  unique). Limite assumée : seul le doublon exact (même identifiant dans sa source) est trouvé ;
+  le quasi-doublon (autre URL, autre clé Zotero) est laissé à #57 et #138, avec une empreinte de
+  contenu. La nature des sources sans import est décidée par leur issue d'import (#138, #142,
+  #14). — PR de #105
 - **Catalogue d'état : un catalogue est complet, et seule sa collecte la plus récente compte.**
   Décision de Sabine : une ligne n'est écrite que si son fichier est collecté après le dernier
   catalogue de la même source déjà importé, à la seconde, et que son contenu diffère ;

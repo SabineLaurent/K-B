@@ -31,7 +31,7 @@ CVE_ID = re.compile(r"CVE-\d{4}-\d{4,}")
 
 NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
 # Kept as given, not as pydantic's HttpUrl, which rewrites it (adds a final slash): the base
-# keeps the URL the source gave.
+# keeps the URL the source gave, without its utm_* parameters (merge.py).
 HttpsUrl = Annotated[str, StringConstraints(pattern=r"^https://\S+$")]
 CveId = Annotated[str, StringConstraints(pattern=r"^CVE-\d{4}-\d{4,}$")]
 # owner/name; the GLOB of tracked_repository.repository_name in schema.sql.

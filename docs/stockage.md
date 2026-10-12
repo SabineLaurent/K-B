@@ -11,7 +11,9 @@ schéma, l'entrée du 2026-10-10 du journal fait foi.
 collecte → raw/ (brut intact) → lecture + normalisation → base (qui dédoublonne)
 ```
 
-La base n'est pas le brut : elle se reconstruit en rejouant la lecture et l'import sur `raw/`.
+La base n'est pas le brut : elle se reconstruit en rejouant la lecture et l'import sur `raw/`, à
+une limite près : un catalogue CISA importé en retard (étape 4 de
+[specs-collecte.md](specs-collecte.md)).
 Elle ne contient que ce que le brut contient (les papiers arXiv écartés à la requête n'y sont pas).
 Ce qui la lira (les commandes `kb search` et `kb top`, une API REST locale) est décidé et pas
 encore codé (journal ADR, 2026-10-08 et 2026-10-09).
