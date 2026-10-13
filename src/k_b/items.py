@@ -39,8 +39,8 @@ ItemKind = Literal[
 # knownRansomwareCampaignUse of CISA KEV.
 RansomwareUse = Literal["Known", "Unknown"]
 
-# The forms below are written once, as text: each type anchors its own, and the readers apply
-# it with re.fullmatch. [0-9], not \d: \d matches any Unicode digit, which the GLOB of
+# CVE_ID, GHSA_ID and REPOSITORY_NAME are written once, as text: each type anchors its own,
+# and the readers apply it with re.fullmatch. [0-9], not \d: \d matches any Unicode digit, which the GLOB of
 # schema.sql refuses.
 CVE_ID = r"CVE-[0-9]{4}-[0-9]{4,}"
 # The alphabet of the GitHub Advisory Database.
@@ -192,11 +192,13 @@ FIELDS_OF_ONE_KIND = {
 KINDS_WITH_CVE = ("vulnerability", "advisory")
 KINDS_WITH_HTTP_URL = ("zotero_entry",)
 # The form of source_item_id, for the kinds whose base column holds it: the GLOB of zotero_key,
-# the GLOB of ghsa_id, the integer release_id (its range is checked apart).
+# the GLOB of ghsa_id, the integer release_id. A release identifier is positive, written
+# without a leading zero ("0007" and "7" would be one release in the base), in 19 digits at
+# most, as MAX_INT64; its range is checked apart.
 SOURCE_ITEM_ID_BY_KIND = {
     "zotero_entry": ZOTERO_KEY,
     "advisory": GHSA_ID,
-    "release": "[0-9]+",
+    "release": "[1-9][0-9]{0,18}",
 }
 
 # The longest text a source may write in each column of schema.sql, in characters, by kind and

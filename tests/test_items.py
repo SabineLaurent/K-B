@@ -639,7 +639,21 @@ def test_an_advisory_whose_identifier_is_not_a_ghsa_is_refused(ghsa_id):
 
 
 # The import writes the identifier of a release as an integer of SQLite (etl/load.py).
-@pytest.mark.parametrize("release_id", [str(2**63), "１２", " 12", "1_0", "-1", "abc"])
+@pytest.mark.parametrize(
+    "release_id",
+    [
+        str(2**63),
+        "9999999999999999999",
+        pytest.param("9" * 5_000, id="5000 digits"),
+        "0007",
+        "0",
+        "\uff11\uff12",
+        " 12",
+        "1_0",
+        "-1",
+        "abc",
+    ],
+)
 def test_a_release_whose_identifier_is_not_an_integer_sqlite_holds_is_refused(
     release_id,
 ):
