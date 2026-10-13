@@ -1,4 +1,4 @@
-<!-- consignes/code.md v2026-10-04 — source : time-knight. Ne pas modifier ici sans la reporter. -->
+<!-- consignes/code.md v2026-10-13 — source : time-knight. Ne pas modifier ici sans la reporter. -->
 # Principes de code
 
 Chaque règle dit quoi faire et où elle s'arrête. En cas de conflit :
@@ -10,6 +10,15 @@ Chaque règle dit quoi faire et où elle s'arrête. En cas de conflit :
   renvoient un booléen. Pas d'abréviation hors usage établi (`id`, `url`). Règles propres au
   projet : voir le document de nommage du dépôt s'il existe.
 - **Une fonction fait une chose.** Si son nom demande un « et », la couper.
+- **Un module se lit comme une table des matières** : il dit quoi faire, dans l'ordre, et renvoie
+  aux modules qui disent comment. Un seul niveau de détail par module et par fonction ; un module
+  long est un module qui mélange les niveaux.
+- **Une fonction se lit comme une recette** : ses étapes dans l'ordre, le cas qui s'arrête tôt
+  traité dès qu'il est vu (retour anticipé), le chemin normal sans imbrication. Une erreur se lève
+  (`raise`) ; un rejet attendu reste un état nommé.
+- **Le nom d'une variable dit son contenu et son état** (`raw_entry`, `validated_item`). **Une
+  même action porte le même verbe pour chaque entité**, sans répéter ce que le module dit déjà
+  (`paper.write`, pas `paper.write_paper`).
 
 ### Journalisation
 - **Un log dit ce qui a été observé, jamais ce qui est supposé.** Pas de cause devinée
@@ -30,11 +39,18 @@ Chaque règle dit quoi faire et où elle s'arrête. En cas de conflit :
 - Une **connaissance** (règle métier, constante, schéma) vit à un seul endroit.
 - Du **code** qui se ressemble se factorise à la troisième occurrence, pas avant. Deux blocs
   identiques qui changeront pour des raisons différentes restent séparés.
+- **Ce qui vaut pour toutes les entités s'écrit une fois et les enveloppe**, par un context
+  manager ou un décorateur : gestion d'erreur, rejet, citation d'une valeur au journal. Un outil
+  générique ne connaît aucun cas particulier.
 
 ### Séparation des responsabilités (SoC)
 - Métier, entrées/sorties (réseau, fichiers, modèle) et présentation dans des modules distincts.
   Le métier ne fait aucun appel externe : il reçoit ses dépendances en paramètre.
 - Les dépendances vont dans un seul sens ; un import qui remonte le courant est une erreur.
+- **Un dossier par rôle ; un module par entité quand elle a assez de code ; les petites fonctions
+  proches regroupées dans un module par thème.** `__init__.py` reste vide, sauf raison écrite.
+- **Un parcours s'écrit comme une suite d'étapes nommées**, chacune dans son module : on lit le
+  chemin sans ouvrir les étapes.
 
 ### Sécurité dès la conception
 - **Toute entrée externe est non fiable** (utilisateur, API, fichier, page web, sortie de LLM) :
