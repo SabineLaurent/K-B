@@ -15,9 +15,8 @@ from urllib.parse import unquote
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import SourceReader
 from k_b.etl.sources.github_api import SOURCE_CODE, get_from_github_api
-from k_b.etl.sources.github_dates import parse_github_date
-from k_b.etl.sources.tracked_repositories import OWNER_SLASH_NAME, is_repository_name
-from k_b.items import Item
+from k_b.etl.sources.tracked_repositories import is_repository_name
+from k_b.items import REPOSITORY_NAME, Item, parse_aware_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ RELEASES_PER_PAGE = 100
 # The whole URL is checked, so that the link opens the repository of the title: the tag part
 # takes only the path characters of RFC 3986 and /, so no query, fragment, space or non-ASCII.
 RELEASE_URL = re.compile(
-    rf"https://github\.com/({OWNER_SLASH_NAME.pattern})/releases/tag/"
+    rf"https://github\.com/({REPOSITORY_NAME})/releases/tag/"
     r"(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9A-Fa-f]{2})+"
 )
 
@@ -137,7 +136,7 @@ def parse_release(entry: object, position: int) -> Release:
         tag_name=tag_name,
         name=name,
         url=url_match.string,
-        published_at=parse_github_date(
+        published_at=parse_aware_datetime(
             entry.get("published_at"), f"release {position}: published_at"
         ),
         is_prerelease=is_prerelease,

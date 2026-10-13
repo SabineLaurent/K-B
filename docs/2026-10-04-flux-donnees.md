@@ -151,7 +151,7 @@ Toutes passent par le filet de 2.1 : la source échoue, les suivantes continuent
 | Première collecte, réponse mal formée | non détectée | écrite telle quelle (pas de lecture) | `github_releases_source.py:31-32` |
 | Corps non JSON | rattrapée par le filet | `json.JSONDecodeError` | `github_releases.py:27` |
 | JSON qui n'est pas une liste | refusée | `expected a list of releases` | `github_releases.py:28-29` |
-| Une entrée invalide | refusée | `release <n>: not an object` / `tag_name is not a string` / `html_url is not a https://github.com/ URL` / `prerelease is not a boolean` / `name or body is not a string` / `release <n>: published_at is not a date` / `… is invalid: '<v>'` / `… has no time zone` | `github_releases.py:33-59`, `github_dates.py:11-18` |
+| Une entrée invalide | refusée | `release <n>: not an object` / `tag_name is not a string` / `html_url is not a https://github.com/ URL` / `prerelease is not a boolean` / `name or body is not a string` / `release <n>: published_at is not a date` / `… is invalid: '<v>'` / `… has no time zone` | `github_releases.py:33-59`, `items.py:112-119` (`parse_aware_datetime`) |
 | Conséquence d'une entrée invalide | — | toute la source échoue, la date n'avance pas ; tant que l'entrée reste dans la première page de 100, la source échoue à chaque exécution (déduit du code, **non observé**) | `github_releases_source.py:33-35`, `collect.py:62-66` |
 | Page pleine plus récente que la dernière collecte | avertissement, la source réussit | WARNING `<dépôt>: more than 100 releases since the last collection, some may be missing; time to read the next pages` | `github_releases_source.py:38-45` |
 
@@ -161,7 +161,7 @@ Toutes passent par le filet de 2.1 : la source échoue, les suivantes continuent
 |---|---|---|---|
 | Corps non JSON | rattrapée par le filet | `json.JSONDecodeError` | `github_advisories.py:33` |
 | JSON qui n'est pas une liste | refusée | `expected a list of advisories` | `github_advisories.py:34-35` |
-| Une entrée invalide (y compris à la première collecte) | refusée | `advisory <n>: not an object` / `not a GHSA identifier: …` / `not a CVE identifier: …` / `summary is not a string` / `unknown severity: …` / `html_url is not a https://github.com/advisories/ URL` / dates comme ci-dessus (`published_at`, `github_reviewed_at`) / `vulnerabilities is not a list` / `a vulnerability has no package name` | `github_advisories.py:39-85`, `github_dates.py:11-18` |
+| Une entrée invalide (y compris à la première collecte) | refusée | `advisory <n>: not an object` / `not a GHSA identifier: …` / `not a CVE identifier: …` / `summary is not a string` / `unknown severity: …` / `html_url is not a https://github.com/advisories/ URL` / dates comme ci-dessus (`published_at`, `github_reviewed_at`) / `vulnerabilities is not a list` / `a vulnerability has no package name` | `github_advisories.py:39-85`, `items.py:112-119` (`parse_aware_datetime`) |
 | Conséquence d'une entrée invalide | — | la fenêtre `reviewed>=` part de la dernière collecte **réussie** : l'entrée y reste, et la source échoue à chaque exécution (déduit du code, **non observé**) | `github_advisories_source.py:42-47`, `collect.py:66` |
 | Page pleine plus récente que la dernière collecte | avertissement | WARNING `<name>: more than 100 advisories since the last collection, some may be missing; time to read the next pages` | `github_advisories_source.py:54-61` |
 

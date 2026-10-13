@@ -8,9 +8,7 @@ releases; its packages give its security advisories.
 import re
 
 from k_b.core.config import TrackedRepository
-
-OWNER_SLASH_NAME = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
-
+from k_b.items import REPOSITORY_NAME
 
 TRACKED_REPOSITORIES = (
     TrackedRepository(
@@ -43,7 +41,7 @@ def list_packages_by_ecosystem(
 def is_repository_name(text: str) -> bool:
     """owner/name, where neither part is `.` nor contains `..`: the name goes into paths."""
     return (
-        OWNER_SLASH_NAME.fullmatch(text) is not None
+        re.fullmatch(REPOSITORY_NAME, text) is not None
         and ".." not in text
         and "." not in text.split("/")
     )

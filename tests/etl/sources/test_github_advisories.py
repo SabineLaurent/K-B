@@ -195,6 +195,7 @@ def test_a_response_that_is_not_a_list_is_refused():
     [
         {"ghsa_id": "GHSA-../../etc"},
         {"cve_id": "CVE-26-1"},
+        {"cve_id": "CVE-\uff12\uff10\uff12\uff16-1234"},
         {"severity": "urgent"},
         {"summary": None},
         {"html_url": "https://evil.example.com/advisories/GHSA-fjqc-hq36-qh5p"},

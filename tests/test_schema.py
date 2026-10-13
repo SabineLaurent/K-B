@@ -5,20 +5,27 @@ import typing
 from datetime import UTC, datetime
 
 import pytest
-from pydantic import ValidationError
+from pydantic import ConfigDict, TypeAdapter, ValidationError
 
 from k_b.core.config import RETENTION_YEARS_BY_ACQUISITION_MODE
 from k_b.database.creation import DATABASE_SCRIPTS
 from k_b.etl.sources.github_advisories import ECOSYSTEMS
 from k_b.items import (
+    GHSA_ID,
     HIGHLIGHT_MAX_LENGTH_BY_FIELD,
     MAX_COUNT_BY_KIND,
     MAX_INT64,
     MAX_LENGTH_BY_KIND,
     TREND_REPOSITORY_NAME_MAX_LENGTH,
+    CveId,
     Highlight,
+    Int64,
     ItemKind,
+    NonEmptyText,
+    RepositoryName,
+    Text,
     TrendRow,
+    UtcDatetime,
 )
 
 EXPECTED_TABLES = {
@@ -957,8 +964,9 @@ def test_an_integer_over_64_bits_is_refused_by_the_trend_row_as_sqlite_cannot_ho
         insert_row(filled_database, "trend", **{field: MAX_INT64 + 1})
 
 
-# GLOB stops at the first NUL: the base refuses a name the pattern of RepositoryName accepts.
-# The other control characters would reach a terminal with the name (an escape sequence).
+# GLOB stops at the first NUL: the base would accept a name with one. The other control
+# characters would reach a terminal with the name (an escape sequence). The ASCII pattern of
+# RepositoryName refuses them all.
 @pytest.mark.parametrize(
     "repository_name",
     [
@@ -974,8 +982,83 @@ def test_an_integer_over_64_bits_is_refused_by_the_trend_row_as_sqlite_cannot_ho
 def test_a_repository_name_with_a_control_character_is_refused_by_the_trend_row(
     repository_name,
 ):
-    with pytest.raises(ValidationError, match="control_character"):
+    with pytest.raises(ValidationError, match="repository_name"):
         validate_trend_row(repository_name=repository_name)
+
+
+# Rule 4 of the conventions: each type items.py defines once refuses a value the base
+# refuses, with the CHECK or the error of sqlite3 that refuses it.
+FULLWIDTH_CVE = "CVE-\uff12\uff10\uff12\uff16-1234"
+
+
+def validate(shared_type, value):
+    return TypeAdapter(shared_type, config=ConfigDict(strict=True)).validate_python(
+        value
+    )
+
+
+def test_a_cve_with_fullwidth_digits_is_refused_by_its_type_and_by_the_base(
+    filled_database,
+):
+    with pytest.raises(ValidationError):
+        validate(CveId, FULLWIDTH_CVE)
+    with pytest.raises(sqlite3.IntegrityError, match="cve_id GLOB"):
+        insert_row(filled_database, "vulnerability", cve_id=FULLWIDTH_CVE)
+
+
+def test_an_identifier_not_of_the_ghsa_form_is_refused_by_its_rule_and_by_the_base(
+    filled_database,
+):
+    ghsa_id = "XHSA-fjqc-hq36-qh5p"
+
+    assert re.fullmatch(GHSA_ID, ghsa_id) is None
+    with pytest.raises(sqlite3.IntegrityError, match="ghsa_id GLOB"):
+        insert_row(filled_database, "advisory", ghsa_id=ghsa_id)
+
+
+def test_a_repository_name_without_owner_is_refused_by_its_type_and_by_the_base(
+    filled_database,
+):
+    with pytest.raises(ValidationError):
+        validate(RepositoryName, "langchain")
+    with pytest.raises(sqlite3.IntegrityError, match="repository_name GLOB"):
+        insert_row(filled_database, "tracked_repository", repository_name="langchain")
+
+
+def test_a_date_without_time_zone_is_refused_by_its_type_and_by_the_base(
+    filled_database,
+):
+    with pytest.raises(ValidationError):
+        validate(UtcDatetime, datetime(2026, 10, 13, 22, 0))
+    with pytest.raises(sqlite3.IntegrityError, match="published_at IS strftime"):
+        insert_row(filled_database, "release", published_at="2026-10-13T22:00:00")
+
+
+def test_a_text_that_starts_with_a_nul_is_refused_by_its_type_and_by_the_base(
+    filled_database,
+):
+    with pytest.raises(ValidationError):
+        validate(NonEmptyText, "\0v1")
+    with pytest.raises(sqlite3.IntegrityError, match="length\\(tag_name\\) > 0"):
+        insert_row(filled_database, "release", tag_name="\0v1")
+
+
+def test_a_text_with_a_lone_surrogate_is_refused_by_its_type_and_by_the_base(
+    filled_database,
+):
+    with pytest.raises(ValidationError):
+        validate(Text, "v1\ud800")
+    with pytest.raises(UnicodeEncodeError):
+        insert_row(filled_database, "release", name="v1\ud800")
+
+
+def test_an_integer_over_64_bits_is_refused_by_its_type_and_by_the_base(
+    filled_database,
+):
+    with pytest.raises(ValidationError):
+        validate(Int64, MAX_INT64 + 1)
+    with pytest.raises(OverflowError):
+        insert_row(filled_database, "newsletter_article", rank=MAX_INT64 + 1)
 
 
 # The columns the source of truth of a reference table fills: the table CHECK holds one clause

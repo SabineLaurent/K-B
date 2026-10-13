@@ -15,8 +15,7 @@ from urllib.parse import urlencode
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import SourceReader
 from k_b.etl.sources.github_api import SOURCE_CODE, get_from_github_api
-from k_b.etl.sources.github_dates import parse_github_date
-from k_b.items import CVE_ID, Item
+from k_b.items import CVE_ID, GHSA_ID, Item, parse_aware_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,6 @@ ECOSYSTEMS = ("pip", "npm")
 ADVISORIES_PER_PAGE = 100
 
 
-GHSA_ID = re.compile(r"GHSA(-[23456789cfghjmpqrvwx]{4}){3}")
 ADVISORY_URL_PREFIX = "https://github.com/advisories/"
 SEVERITIES = ("low", "medium", "high", "critical", "unknown")
 
@@ -112,11 +110,11 @@ def parse_advisory(entry: object, position: int) -> Advisory:
     if not isinstance(entry, dict):
         raise ValueError(f"advisory {position}: not an object")
     ghsa_id = entry.get("ghsa_id")
-    if not isinstance(ghsa_id, str) or not GHSA_ID.fullmatch(ghsa_id):
+    if not isinstance(ghsa_id, str) or not re.fullmatch(GHSA_ID, ghsa_id):
         raise ValueError(f"advisory {position}: not a GHSA identifier: {ghsa_id!r}")
     cve_id = entry.get("cve_id")
     if cve_id is not None and not (
-        isinstance(cve_id, str) and CVE_ID.fullmatch(cve_id)
+        isinstance(cve_id, str) and re.fullmatch(CVE_ID, cve_id)
     ):
         raise ValueError(f"advisory {position}: not a CVE identifier: {cve_id!r}")
     summary = entry.get("summary")
@@ -136,10 +134,10 @@ def parse_advisory(entry: object, position: int) -> Advisory:
         summary=summary,
         severity=severity,
         url=url,
-        published_at=parse_github_date(
+        published_at=parse_aware_datetime(
             entry.get("published_at"), f"advisory {position}: published_at"
         ),
-        reviewed_at=parse_github_date(
+        reviewed_at=parse_aware_datetime(
             entry.get("github_reviewed_at"), f"advisory {position}: github_reviewed_at"
         ),
         packages=parse_package_names(entry.get("vulnerabilities"), position),

@@ -871,11 +871,9 @@ def test_a_ctrl_c_after_the_log_is_written_leaves_neither_the_import_nor_its_log
 def text_at_its_maximum(kind, field, maximum):
     """A text of the maximum length that names its kind and its field: no two columns hold
     the same, so a writer that takes one field for another is seen."""
-    if field in ("cve", "edition"):
-        return text_of_length(field, maximum)
-    prefix = {"url": "https://", "source_item_id": "GHSA-" * (kind == "advisory")}.get(
-        field, ""
-    )
+    if field in ("cve", "edition") or (kind, field) == ("advisory", "source_item_id"):
+        return text_of_length(field, maximum, kind)
+    prefix = {"url": "https://"}.get(field, "")
     repeated = f"{kind}.{field}-" * maximum
     return (prefix + repeated)[:maximum]
 

@@ -7,8 +7,7 @@ import, which cannot import a source, writes it.
 """
 
 import re
-import unicodedata
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
@@ -21,7 +20,6 @@ from pydantic import (
     StringConstraints,
     model_validator,
 )
-from pydantic_core import PydanticCustomError
 
 # The sources of seed_sources.sql: a test keeps both lists equal.
 SourceCode = Literal[
@@ -41,7 +39,14 @@ ItemKind = Literal[
 # knownRansomwareCampaignUse of CISA KEV.
 RansomwareUse = Literal["Known", "Unknown"]
 
-CVE_ID = re.compile(r"CVE-\d{4}-\d{4,}")
+# CVE_ID, GHSA_ID and REPOSITORY_NAME are written once, as text: each type anchors its own,
+# and the readers apply it with re.fullmatch. [0-9], not \d: \d matches any Unicode digit, which the GLOB of
+# schema.sql refuses.
+CVE_ID = r"CVE-[0-9]{4}-[0-9]{4,}"
+# The alphabet of the GitHub Advisory Database.
+GHSA_ID = r"GHSA(?:-[23456789cfghjmpqrvwx]{4}){3}"
+# owner/name, in the letters, digits and signs GitHub uses; a control character is refused too.
+REPOSITORY_NAME = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
 # The slug of a newsletter edition, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
 EDITION_SLUG = re.compile(r"[a-z]+")
 # An arXiv identifier without its version, as text: the form of since 2007 (2609.31282), or the
@@ -52,7 +57,8 @@ ARXIV_ID = r"(?:[0-9]{4}\.[0-9]{4,5}|[a-z]+(?:-[a-z]+)?(?:\.[A-Z]{2})?/[0-9]{7})
 # The key Zotero gives a document or an annotation; the GLOB of schema.sql. Zotero's own
 # alphabet is narrower: this form refuses no key it gives.
 ZOTERO_KEY = r"[0-9A-Z]{8}"
-# The largest integer SQLite holds, and BigQuery gives (INT64).
+# The integers SQLite holds, and BigQuery gives (INT64).
+MIN_INT64 = -(2**63)
 MAX_INT64 = 2**63 - 1
 # The longest name a ranking may write in trend.repository_name, held by a CHECK too. A wide
 # bound, not the one of GitHub: the longest of the collection of 2026-10-11 has 38 characters.
@@ -74,21 +80,51 @@ def check_url_can_be_normalized(url: str) -> str:
     return url
 
 
-def check_text_has_no_control_character(text: str) -> str:
-    """Refuse a control character, a NUL among them. SQLite stops a GLOB and a length() at the
-    first NUL: the base would refuse, or measure short, a text the pattern accepts. Another
-    one (an escape sequence) would reach the terminal that displays the text."""
-    if any(unicodedata.category(character) == "Cc" for character in text):
-        # A named error type: the refusal is told apart from any other value error.
-        raise PydanticCustomError(
-            "control_character",
-            "text with a control character: {length} characters",
-            {"length": len(text)},
-        )
+# A NUL, or a surrogate code point: sqlite3 cannot encode a lone one in UTF-8.
+UNSTORABLE_CHARACTER = re.compile("[\0\ud800-\udfff]")
+
+
+def check_text_can_be_stored(text: str) -> str:
+    """Refuse a NUL and a lone surrogate, nothing more: a line break and a tab are kept. SQLite
+    stops a GLOB and a length() at the first NUL: the base would refuse, or measure short, a
+    text the item accepts; sqlite3 fails to write a lone surrogate. A ValueError: a reader
+    rebuilds the errors by their type (etl/sources/zotero.py), which must be one pydantic
+    knows."""
+    if UNSTORABLE_CHARACTER.search(text):
+        raise ValueError(f"text with a NUL or a lone surrogate: {len(text)} characters")
     return text
 
 
-NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
+def convert_to_utc(moment: datetime) -> datetime:
+    """The same moment in UTC, as the base writes it. A moment out of the range of datetime
+    once in UTC (the first day, east of UTC) is refused, not raised as an OverflowError."""
+    try:
+        return moment.astimezone(UTC)
+    except OverflowError:
+        raise ValueError("date out of range once in UTC") from None
+
+
+def parse_aware_datetime(stored_date: object, label: str) -> datetime:
+    """Read an ISO 8601 date, refusing one without a time zone: naive dates compare wrongly.
+
+    label names the date in error messages, such as "release 0: published_at".
+    """
+    if not isinstance(stored_date, str):
+        raise ValueError(f"{label} is not a date")
+    try:
+        parsed_date = datetime.fromisoformat(stored_date)
+    except ValueError as error:
+        raise ValueError(f"{label} is invalid: {stored_date!r}") from error
+    if parsed_date.tzinfo is None:
+        raise ValueError(f"{label} has no time zone")
+    return parsed_date
+
+
+# Each text type ends with this check: after its length or its pattern, so that pydantic
+# checks them on the string, and names them as it does for a string (string_too_long).
+CAN_BE_STORED = AfterValidator(check_text_can_be_stored)
+Text = Annotated[str, CAN_BE_STORED]
+NonEmptyText = Annotated[str, StringConstraints(min_length=1), CAN_BE_STORED]
 # Kept as given, not as pydantic's HttpUrl, which rewrites it (adds a final slash): the base
 # keeps the URL the source gave, without its utm_* parameters (etl/normalize.py). http is
 # accepted for a Zotero entry only (check_url_scheme): Zotero keeps the URL a document was saved
@@ -97,10 +133,12 @@ WebUrl = Annotated[
     str,
     StringConstraints(pattern=r"^https?://\S+$"),
     AfterValidator(check_url_can_be_normalized),
+    CAN_BE_STORED,
 ]
-CveId = Annotated[str, StringConstraints(pattern=r"^CVE-\d{4}-\d{4,}$")]
-# owner/name; the GLOB of tracked_repository.repository_name in schema.sql.
-RepositoryName = Annotated[str, StringConstraints(pattern=r"^[^/\s]+/[^/\s]+$")]
+# The ASCII patterns below refuse a NUL and a surrogate already.
+CveId = Annotated[str, StringConstraints(pattern=f"^{CVE_ID}$")]
+# Narrower than the GLOB '?*/?*' of tracked_repository and trend in schema.sql.
+RepositoryName = Annotated[str, StringConstraints(pattern=f"^{REPOSITORY_NAME}$")]
 # The CHECK of newsletter_article.edition in schema.sql. Anchored, and given as text: pydantic
 # searches an unanchored pattern, and a compiled one would accept a final line break.
 NewsletterEdition = Annotated[
@@ -108,6 +146,10 @@ NewsletterEdition = Annotated[
 ]
 ArxivId = Annotated[str, StringConstraints(pattern=f"^{ARXIV_ID}$")]
 ZoteroKey = Annotated[str, StringConstraints(pattern=f"^{ZOTERO_KEY}$")]
+# A date with its time zone, held in UTC.
+UtcDatetime = Annotated[AwareDatetime, AfterValidator(convert_to_utc)]
+# An integer SQLite holds: a larger one fails to be written.
+Int64 = Annotated[int, Field(ge=MIN_INT64, le=MAX_INT64)]
 
 # The fields each kind must fill, so that an entry the base would refuse is refused when read:
 # one refused row would otherwise fail the whole import.
@@ -149,6 +191,15 @@ FIELDS_OF_ONE_KIND = {
 }
 KINDS_WITH_CVE = ("vulnerability", "advisory")
 KINDS_WITH_HTTP_URL = ("zotero_entry",)
+# The form of source_item_id, for the kinds whose base column holds it: the GLOB of zotero_key,
+# the GLOB of ghsa_id, the integer release_id. A release identifier is positive, written
+# without a leading zero ("0007" and "7" would be one release in the base), in 19 digits at
+# most, as MAX_INT64; its range is checked apart.
+SOURCE_ITEM_ID_BY_KIND = {
+    "zotero_entry": ZOTERO_KEY,
+    "advisory": GHSA_ID,
+    "release": "[1-9][0-9]{0,18}",
+}
 
 # The longest text a source may write in each column of schema.sql, in characters, by kind and
 # by the field that fills the column. Held twice (ADR of 2026-10-08): here when the raw is
@@ -210,13 +261,24 @@ class Highlight(BaseModel):
     zotero_key: ZoteroKey
     # Absent when Zotero gives none: the highlight is kept for its comment (decision of
     # 2026-10-13). A highlight without either is not one (check_text_or_comment).
-    text: Annotated[str, Field(max_length=HIGHLIGHT_MAX_LENGTH_BY_FIELD["text"])] | None
+    text: (
+        Annotated[
+            str,
+            Field(max_length=HIGHLIGHT_MAX_LENGTH_BY_FIELD["text"]),
+            CAN_BE_STORED,
+        ]
+        | None
+    )
     comment: (
-        Annotated[str, Field(max_length=HIGHLIGHT_MAX_LENGTH_BY_FIELD["comment"])]
+        Annotated[
+            str,
+            Field(max_length=HIGHLIGHT_MAX_LENGTH_BY_FIELD["comment"]),
+            CAN_BE_STORED,
+        ]
         | None
     )
     # dateAdded of Zotero.
-    highlighted_at: AwareDatetime
+    highlighted_at: UtcDatetime
 
     @model_validator(mode="after")
     def check_text_or_comment(self) -> "Highlight":
@@ -236,13 +298,13 @@ class Item(BaseModel):
     # None for a Zotero entry only (REQUIRED_FIELDS_BY_KIND).
     url: WebUrl | None = None
     authors: tuple[NonEmptyText, ...] = ()
-    published_at: AwareDatetime | None = None
+    published_at: UtcDatetime | None = None
     # arXiv only: the date of the version read.
-    revised_at: AwareDatetime | None = None
+    revised_at: UtcDatetime | None = None
     # Clipper and Zotero only: the day the document was saved by hand.
-    saved_at: AwareDatetime | None = None
-    summary: str | None = None
-    collected_at: AwareDatetime
+    saved_at: UtcDatetime | None = None
+    summary: Text | None = None
+    collected_at: UtcDatetime
     # Relative to the raw folder, so the base can be rebuilt from a copy of it elsewhere.
     raw_file_path: NonEmptyText
     # CISA KEV only (vulnerability): vendorProject, product, knownRansomwareCampaignUse.
@@ -254,13 +316,13 @@ class Item(BaseModel):
     # GitHub release only: its repository, tag_name, and name (None when GitHub gives none).
     repository_name: RepositoryName | None = None
     tag_name: NonEmptyText | None = None
-    release_name: str | None = None
+    release_name: Text | None = None
     # GitHub advisory only: the affected packages, each once.
     package_names: tuple[NonEmptyText, ...] = ()
     # Newsletter article only: the slug of its edition, and its position in the edition page,
     # from 1. published_at is the day of the edition, at midnight UTC.
     edition: NewsletterEdition | None = None
-    rank: Annotated[int, Field(ge=1, le=MAX_INT64)] | None = None
+    rank: Annotated[Int64, Field(ge=1)] | None = None
     # Zotero entry only: source_item_id is its Zotero key; its type of document, its arXiv
     # reference without version, and the highlights of its PDF, in the order of the extract.
     item_type: NonEmptyText | None = None
@@ -275,7 +337,7 @@ class Item(BaseModel):
         check_cve(self)
         check_lengths(self)
         check_url_scheme(self)
-        check_zotero_key(self)
+        check_source_item_id(self)
         return self
 
 
@@ -327,12 +389,16 @@ def check_url_scheme(item: Item) -> None:
         )
 
 
-def check_zotero_key(item: Item) -> None:
-    if item.kind == "zotero_entry" and not re.fullmatch(
-        ZOTERO_KEY, item.source_item_id
-    ):
+def check_source_item_id(item: Item) -> None:
+    form = SOURCE_ITEM_ID_BY_KIND.get(item.kind)
+    if form is not None and not re.fullmatch(form, item.source_item_id):
         raise ValueError(
-            f"source_item_id not a Zotero key: {len(item.source_item_id)} characters"
+            f"source_item_id not of the form of a {item.kind}:"
+            f" {len(item.source_item_id)} characters"
+        )
+    if item.kind == "release" and int(item.source_item_id) > MAX_INT64:
+        raise ValueError(
+            f"source_item_id of a release over 64 bits: {len(item.source_item_id)} digits"
         )
 
 
@@ -381,11 +447,9 @@ class TrendRow(BaseModel):
     # The last day of the window.
     window_end: date
     # repo.id of GitHub, and the last name seen in the window.
-    repository_id: Annotated[int, Field(gt=0, le=MAX_INT64)]
+    repository_id: Annotated[Int64, Field(gt=0)]
     repository_name: Annotated[
-        RepositoryName,
-        Field(max_length=TREND_REPOSITORY_NAME_MAX_LENGTH),
-        AfterValidator(check_text_has_no_control_character),
+        RepositoryName, Field(max_length=TREND_REPOSITORY_NAME_MAX_LENGTH)
     ]
-    stars_gained: Annotated[int, Field(ge=0, le=MAX_INT64)]
-    forks_gained: Annotated[int, Field(ge=0, le=MAX_INT64)]
+    stars_gained: Annotated[Int64, Field(ge=0)]
+    forks_gained: Annotated[Int64, Field(ge=0)]

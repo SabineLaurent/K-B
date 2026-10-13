@@ -1,16 +1,18 @@
+import json
 import re
 import typing
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from k_b.items import Highlight, Item, SourceCode
+from k_b.items import Highlight, Item, SourceCode, TrendRow, parse_aware_datetime
 
 SEED_SOURCES = (
     Path(__file__).parent.parent / "src" / "k_b" / "database" / "seed_sources.sql"
 )
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
 COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
 RAW_FILE_PATH = "automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
 
@@ -365,8 +367,10 @@ def test_the_largest_rank_sqlite_holds_is_accepted():
     assert Item(**newsletter_article_fields(rank=2**63 - 1)).rank == 2**63 - 1
 
 
-def text_of_length(field, length):
+def text_of_length(field, length, kind=None):
     """A text of this length that the format of its field accepts."""
+    if (kind, field) == ("advisory", "source_item_id"):
+        return "GHSA-fjqc-hq36-qh5p" + "x" * (length - len("GHSA-fjqc-hq36-qh5p"))
     if field == "edition":
         return "a" * length
     if field == "url":
@@ -410,11 +414,12 @@ def text_of_length(field, length):
 def test_a_text_is_accepted_up_to_its_maximum_length_and_refused_beyond(
     build_fields, field, maximum
 ):
-    longest = text_of_length(field, maximum)
+    kind = build_fields()["kind"]
+    longest = text_of_length(field, maximum, kind)
     assert getattr(Item(**build_fields(**{field: longest})), field) == longest
 
     with pytest.raises(ValidationError) as refusal:
-        Item(**build_fields(**{field: text_of_length(field, maximum + 1)}))
+        Item(**build_fields(**{field: text_of_length(field, maximum + 1, kind)}))
 
     assert f"{field} too long: {maximum + 1} characters, maximum {maximum}" in str(
         refusal.value
@@ -613,3 +618,147 @@ def test_an_arxiv_reference_with_other_than_ascii_digits_or_its_form_is_refused(
 ):
     with pytest.raises(ValidationError):
         Item(**zotero_entry_fields(arxiv_id=arxiv_id))
+
+
+# Rule 4 of the conventions: one rule per shared type, written once in items.py.
+FULLWIDTH_CVE = "CVE-２０２６-1234"
+
+
+@pytest.mark.parametrize("build_fields", [vulnerability_fields, advisory_fields])
+def test_a_cve_with_other_than_ascii_digits_is_refused(build_fields):
+    with pytest.raises(ValidationError, match="cve"):
+        Item(**build_fields(cve=FULLWIDTH_CVE))
+
+
+@pytest.mark.parametrize(
+    "ghsa_id", ["GHSA-fjqc-hq36-qh5", "GHSA-fjqc-hq36-qh5a", "CVE-2026-48775"]
+)
+def test_an_advisory_whose_identifier_is_not_a_ghsa_is_refused(ghsa_id):
+    with pytest.raises(ValidationError, match="source_item_id"):
+        Item(**advisory_fields(source_item_id=ghsa_id))
+
+
+# The import writes the identifier of a release as an integer of SQLite (etl/load.py).
+@pytest.mark.parametrize(
+    "release_id",
+    [
+        str(2**63),
+        "9999999999999999999",
+        pytest.param("9" * 5_000, id="5000 digits"),
+        "0007",
+        "0",
+        "\uff11\uff12",
+        " 12",
+        "1_0",
+        "-1",
+        "abc",
+    ],
+)
+def test_a_release_whose_identifier_is_not_an_integer_sqlite_holds_is_refused(
+    release_id,
+):
+    with pytest.raises(ValidationError, match="source_item_id"):
+        Item(**release_fields(source_item_id=release_id))
+
+
+def test_the_largest_release_identifier_sqlite_holds_is_accepted():
+    assert Item(**release_fields(source_item_id=str(2**63 - 1)))
+
+
+# Each text field of each kind, with a value that holds the character.
+TEXT_FIELDS = [
+    (build_fields, field)
+    for build_fields, fields in [
+        (
+            item_fields,
+            ("source_item_id", "title", "url", "summary", "raw_file_path", "authors"),
+        ),
+        (vulnerability_fields, ("cve", "vendor", "product")),
+        (release_fields, ("repository_name", "tag_name", "release_name")),
+        (advisory_fields, ("package_names",)),
+        (newsletter_article_fields, ("edition",)),
+        (zotero_entry_fields, ("item_type", "arxiv_id")),
+    ]
+    for field in fields
+]
+
+
+def with_character(build_fields, field, character):
+    value = build_fields()[field]
+    if isinstance(value, tuple):
+        return build_fields(**{field: (value[0] + character,)})
+    return build_fields(**{field: value + character})
+
+
+@pytest.mark.parametrize("character", ["\0", "\ud800"])
+@pytest.mark.parametrize(("build_fields", "field"), TEXT_FIELDS)
+def test_a_text_field_of_an_item_with_a_nul_or_a_lone_surrogate_is_refused(
+    build_fields, field, character
+):
+    with pytest.raises(ValidationError) as refusal:
+        Item(**with_character(build_fields, field, character))
+
+    assert refusal.value.errors()[0]["loc"][0] == field
+
+
+@pytest.mark.parametrize("character", ["\0", "\ud800"])
+@pytest.mark.parametrize("field", ["zotero_key", "text", "comment"])
+def test_a_text_field_of_a_highlight_with_a_nul_or_a_lone_surrogate_is_refused(
+    field, character
+):
+    with pytest.raises(ValidationError) as refusal:
+        Highlight(**with_character(highlight_fields, field, character))
+
+    assert refusal.value.errors()[0]["loc"][0] == field
+
+
+@pytest.mark.parametrize("character", ["\0", "\ud800"])
+def test_the_repository_name_of_a_trend_row_with_a_nul_or_a_lone_surrogate_is_refused(
+    character,
+):
+    with pytest.raises(ValidationError, match="repository_name"):
+        TrendRow(
+            window_end=date(2026, 10, 10),
+            repository_id=1,
+            repository_name="morluto/rea" + character,
+            stars_gained=0,
+            forks_gained=0,
+        )
+
+
+def test_a_summary_on_several_lines_with_a_tab_is_accepted():
+    # The description of an advisory, as GitHub gives it: Markdown on several lines.
+    advisories = json.loads(
+        (FIXTURES_DIR / "github_advisories_extract.json").read_text()
+    )
+    summary = advisories[0]["description"] + "\n\tindented"
+
+    assert Item(**release_fields(summary=summary)).summary == summary
+
+
+def test_a_date_with_another_time_zone_is_kept_in_utc():
+    paris = timezone(timedelta(hours=2))
+
+    item = Item(**item_fields(published_at=datetime(2026, 10, 13, 22, 0, tzinfo=paris)))
+
+    assert item.published_at == datetime(2026, 10, 13, 20, 0, tzinfo=UTC)
+    assert item.published_at.utcoffset() == timedelta(0)
+
+
+def test_a_date_that_cannot_be_put_in_utc_is_refused():
+    first_day_east_of_utc = datetime(1, 1, 1, tzinfo=timezone(timedelta(hours=1)))
+
+    with pytest.raises(ValidationError, match="published_at"):
+        Item(**item_fields(published_at=first_day_east_of_utc))
+
+
+def test_a_date_with_a_time_zone_is_read():
+    assert parse_aware_datetime(
+        "2026-10-01T18:00:22Z", "release 0: published_at"
+    ) == datetime(2026, 10, 1, 18, 0, 22, tzinfo=UTC)
+
+
+@pytest.mark.parametrize("stored_date", [None, 42, "yesterday", "2026-10-01T18:00:22"])
+def test_anything_but_a_date_with_a_time_zone_is_refused_with_its_label(stored_date):
+    with pytest.raises(ValueError, match="release 0: published_at"):
+        parse_aware_datetime(stored_date, "release 0: published_at")
