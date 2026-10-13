@@ -13,8 +13,8 @@ Une référence au code donne le fichier et le nom de la constante, de la foncti
 jamais un numéro de ligne. Seule la mesure de la section 2 est écrite ici, parce qu'elle n'existe
 nulle part ailleurs.
 
-**Hors de ce document** : le SQL de la base K-B (aujourd'hui dans `src/k_b/etl/load.py` ; la
-règle 5 de `.claude/rules/conventions.md` le range sous `src/k_b/database/`) ;
+**Hors de ce document** : le SQL de la base K-B (sous `src/k_b/database/`, règle 5 de
+`.claude/rules/conventions.md`) ;
 la panne des tables GH Archive constatée depuis le 2026-10-06
 ([bigquery.md](bigquery.md#anomalie-constatée--les-tables-de-gh-archive-incomplètes-depuis-le-2026-10-06)).
 

@@ -638,7 +638,8 @@ def test_an_advisory_whose_identifier_is_not_a_ghsa_is_refused(ghsa_id):
         Item(**advisory_fields(source_item_id=ghsa_id))
 
 
-# The import writes the identifier of a release as an integer of SQLite (etl/load.py).
+# The import writes the identifier of a release as an integer of SQLite
+# (database/writers/release_writer.py).
 @pytest.mark.parametrize(
     "release_id",
     [
