@@ -1,4 +1,9 @@
-"""The dependencies go one way: composition → sources → generic modules (plan ETL)."""
+"""The dependencies go one way, read at two levels (conventions.md, rule 5).
+
+Under k_b: core and items are the common vocabulary, database reads and writes the base, etl runs
+the pipeline, cli composes. Under k_b.etl: the composition (source_kinds) → the sources → the
+modules of the pipeline.
+"""
 
 import ast
 import pkgutil
@@ -9,23 +14,21 @@ import pytest
 import k_b
 
 PACKAGE_DIR = Path(k_b.__file__).parent
-SOURCES_DIR = PACKAGE_DIR / "sources"
-GENERIC_MODULES = {
-    "config",
-    "items",
-    "source_contract",
-    "collect",
-    "raw_store",
-    "raw_items",
-    "merge",
-    "import_items",
-    "database",
-    "http_download",
-    "user_agent",
+TOP_LEVEL_MODULES = {"cli", "items", "core", "database", "etl"}
+# Under k_b.etl, each module is in exactly one of the three.
+ETL_COMPOSITION_MODULES = {"etl.source_kinds"}
+ETL_SOURCES_PACKAGE = "etl.sources"
+ETL_PIPELINE_MODULES = {
+    "etl.extract",
+    "etl.transform",
+    "etl.load",
+    "etl.normalize",
+    "etl.raw_store",
+    "etl.source_contract",
+    "etl.http_download",
+    "etl.user_agent",
 }
-# The package k_b.sources: every source, and what only sources use.
-SOURCES_PACKAGE = "sources"
-COMPOSITION_MODULES = {"cli", "source_kinds"}
+COMPOSITION_MODULES = {"cli"} | ETL_COMPOSITION_MODULES
 
 
 def list_imported_modules(path: Path, package: str) -> set[str]:
@@ -36,7 +39,11 @@ def list_imported_modules(path: Path, package: str) -> set[str]:
 def parse_imported_modules(code: str, package: str = "k_b") -> set[str]:
     """The k_b modules imported by `import k_b.x`, `from k_b import x`, `from k_b.x import y`,
     and their relative forms (`from . import x`, `from .x import y`, `from .. import x`),
-    resolved against the package of the module. A module of k_b.sources is seen as "sources".
+    resolved against the package of the module.
+
+    Each name is given below k_b, cut at two levels: `etl.sources` for any module of
+    k_b.etl.sources, `core.config` for k_b.core.config. A name imported from a module counts as
+    its second level (`items.Item`): a rule compares by prefix (see is_within).
 
     A dynamic import (importlib.import_module) is not seen: there is none in k_b.
     """
@@ -56,86 +63,146 @@ def parse_imported_modules(code: str, package: str = "k_b") -> set[str]:
                 origin = f"{base}.{node.module}" if node.module else base
             else:
                 origin = node.module or ""
-            if origin == "k_b":
-                names = [f"{origin}.{alias.name}" for alias in node.names]
-            else:
-                names = [origin]
+            # The imported name may be a module of the package (`from k_b.etl import sources`).
+            names = [f"{origin}.{alias.name}" for alias in node.names]
         else:
             continue
-        imported |= {name.split(".")[1] for name in names if name.startswith("k_b.")}
+        imported |= {
+            ".".join(name.split(".")[1:3]) for name in names if name.startswith("k_b.")
+        }
     return imported
+
+
+def is_within(name: str, modules: set[str]) -> bool:
+    """Whether name is one of the modules, or a part of one of them."""
+    return any(name == module or name.startswith(f"{module}.") for module in modules)
+
+
+def list_python_files(module: str) -> list[Path]:
+    """The Python files of a k_b module (`items`) or package (`etl.sources`)."""
+    path = PACKAGE_DIR.joinpath(*module.split("."))
+    if path.with_suffix(".py").exists():
+        return [path.with_suffix(".py")]
+    paths = sorted(path.glob("*.py"))
+    assert paths, f"no Python file in {path}"
+    return paths
+
+
+def find_package(path: Path) -> str:
+    """The package of the relative imports of the module at path."""
+    return ".".join(("k_b", *path.parent.relative_to(PACKAGE_DIR).parts))
 
 
 @pytest.mark.parametrize(
     "code",
     [
-        "import k_b.sources.arxiv",
-        "import k_b.sources.arxiv as source",
-        "from k_b import sources",
-        "from k_b.sources import arxiv",
-        "from k_b.sources.arxiv import ArxivSource",
-        "from . import sources",
-        "from .sources.arxiv import ArxivSource",
-        "def f():\n    from k_b.sources.arxiv import ArxivSource",
+        "import k_b.etl.sources.arxiv",
+        "import k_b.etl.sources.arxiv as source",
+        "from k_b.etl import sources",
+        "from k_b.etl.sources import arxiv",
+        "from k_b.etl.sources.arxiv import ArxivSource",
+        "from .etl import sources",
+        "from .etl.sources.arxiv import ArxivSource",
+        "def f():\n    from k_b.etl.sources.arxiv import ArxivSource",
     ],
 )
 def test_every_form_of_import_is_seen(code):
-    assert parse_imported_modules(code) == {"sources"}
+    assert parse_imported_modules(code) == {"etl.sources"}
 
 
 @pytest.mark.parametrize(
     ("code", "expected"),
     [
-        ("from . import github_api", {"sources"}),
-        ("from .github_api import get_from_github_api", {"sources"}),
-        ("from .. import cli", {"cli"}),
-        ("from ..cli import main", {"cli"}),
+        ("from k_b import cli", {"cli"}),
+        ("from k_b.items import Item", {"items.Item"}),
+        ("from k_b.core.config import TrackedRepository", {"core.config"}),
     ],
 )
-def test_relative_imports_inside_sources_are_resolved(code, expected):
-    assert parse_imported_modules(code, package="k_b.sources") == expected
+def test_a_name_is_cut_at_two_levels(code, expected):
+    assert parse_imported_modules(code) == expected
+
+
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        ("from . import github_api", {"etl.sources"}),
+        ("from .github_api import get_from_github_api", {"etl.sources"}),
+        ("from .. import source_kinds", {"etl.source_kinds"}),
+        ("from ... import cli", {"cli"}),
+        ("from ...cli import main", {"cli.main"}),
+    ],
+)
+def test_relative_imports_inside_the_sources_are_resolved(code, expected):
+    assert parse_imported_modules(code, package="k_b.etl.sources") == expected
 
 
 def test_a_relative_import_above_k_b_is_refused():
-    with pytest.raises(ValueError, match="level 3 above the package k_b.sources"):
-        parse_imported_modules("from ... import cli", package="k_b.sources")
+    with pytest.raises(ValueError, match="level 4 above the package k_b.etl.sources"):
+        parse_imported_modules("from .... import cli", package="k_b.etl.sources")
 
 
-def test_every_module_is_in_exactly_one_list():
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [("core", True), ("core.config", True), ("corepart", False), ("items.Item", False)],
+)
+def test_a_name_is_within_a_module_by_prefix(name, expected):
+    assert is_within(name, {"core"}) is expected
+
+
+def test_every_module_of_k_b_is_listed():
     modules = {module.name for module in pkgutil.iter_modules([str(PACKAGE_DIR)])}
-    lists = (GENERIC_MODULES, {SOURCES_PACKAGE}, COMPOSITION_MODULES)
+
+    assert modules == TOP_LEVEL_MODULES
+
+
+def test_every_module_of_etl_is_in_exactly_one_list():
+    modules = {
+        f"etl.{module.name}"
+        for module in pkgutil.iter_modules([str(PACKAGE_DIR / "etl")])
+    }
+    lists = (ETL_COMPOSITION_MODULES, {ETL_SOURCES_PACKAGE}, ETL_PIPELINE_MODULES)
 
     assert modules == set().union(*lists)
     assert sum(len(modules_of_list) for modules_of_list in lists) == len(modules)
 
 
-def list_generic_modules() -> list[tuple[Path, str]]:
-    """Each generic module file: its path, and the package of its relative imports."""
-    modules = []
-    for module in GENERIC_MODULES:
-        path = PACKAGE_DIR / f"{module}.py"
-        if path.exists():
-            modules.append((path, "k_b"))
-        else:
-            module_paths = sorted((PACKAGE_DIR / module).glob("*.py"))
-            assert module_paths, f"no Python file in {PACKAGE_DIR / module}"
-            for module_path in module_paths:
-                modules.append((module_path, f"k_b.{module}"))
-    return modules
-
-
-def test_no_generic_module_imports_the_sources_or_the_composition():
-    for path, package in list_generic_modules():
-        forbidden = list_imported_modules(path, package) & (
-            {SOURCES_PACKAGE} | COMPOSITION_MODULES
+def test_core_imports_nothing_of_k_b():
+    for path in list_python_files("core"):
+        imported = list_imported_modules(path, find_package(path))
+        assert {name for name in imported if not is_within(name, {"core"})} == set(), (
+            path
         )
-        assert forbidden == set(), path
+
+
+def test_database_imports_only_items_and_core():
+    allowed = {"database", "items", "core"}
+    for path in list_python_files("database"):
+        imported = list_imported_modules(path, find_package(path))
+        assert {name for name in imported if not is_within(name, allowed)} == set(), (
+            path
+        )
+
+
+def test_items_imports_neither_the_sources_nor_the_composition():
+    forbidden = {ETL_SOURCES_PACKAGE} | COMPOSITION_MODULES
+    for path in list_python_files("items"):
+        imported = list_imported_modules(path, find_package(path))
+        assert {name for name in imported if is_within(name, forbidden)} == set(), path
+
+
+def test_no_module_of_the_pipeline_imports_the_sources_or_the_composition():
+    forbidden = {ETL_SOURCES_PACKAGE} | COMPOSITION_MODULES
+    for module in sorted(ETL_PIPELINE_MODULES):
+        for path in list_python_files(module):
+            imported = list_imported_modules(path, find_package(path))
+            assert {name for name in imported if is_within(name, forbidden)} == set(), (
+                path
+            )
 
 
 def test_no_module_of_the_sources_imports_the_composition():
-    paths = sorted(SOURCES_DIR.glob("*.py"))
-
-    assert paths
-    for path in paths:
-        imported = list_imported_modules(path, f"k_b.{SOURCES_PACKAGE}")
-        assert imported & COMPOSITION_MODULES == set(), path
+    for path in list_python_files(ETL_SOURCES_PACKAGE):
+        imported = list_imported_modules(path, find_package(path))
+        assert {
+            name for name in imported if is_within(name, COMPOSITION_MODULES)
+        } == set(), path
