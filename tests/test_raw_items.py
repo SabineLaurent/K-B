@@ -9,6 +9,7 @@ from k_b.items import Item
 from k_b.raw_items import RawFile, RawReading, read_raw_items
 from k_b.source_contract import SourceKind, SourceReader
 from k_b.source_kinds import SOURCE_KINDS
+from k_b.sources.zotero import ZoteroSource
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 COLLECTION_NAME = "2026-10-05T093000Z"
@@ -485,3 +486,35 @@ def test_the_source_of_a_file_read_is_the_source_of_its_items(
 
     assert raw_file.items
     assert {item.source_code for item in raw_file.items} == {raw_file.source_code}
+
+
+def test_the_extracts_of_the_selected_library_are_read(tmp_path, zotero_dir):
+    extract_dir = tmp_path / "selected_library" / "zotero"
+    extract_dir.mkdir(parents=True)
+    (extract_dir / f"{COLLECTION_NAME}.json").write_bytes(
+        ZoteroSource(zotero_dir).fetch(None)
+    )
+
+    reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+
+    assert [
+        (raw_file.raw_file_path, raw_file.source_code, raw_file.collected_at)
+        for raw_file in reading.files
+    ] == [(f"selected_library/zotero/{COLLECTION_NAME}.json", "zotero", COLLECTED_AT)]
+    assert [item.source_item_id for item in items_of(reading)] == [
+        "AAAAAAA1",
+        "BBBBBBB2",
+    ]
+    assert reading.rejections == []
+
+
+def test_a_folder_of_the_selected_library_without_a_source_kind_is_skipped(
+    tmp_path, caplog
+):
+    (tmp_path / "selected_library" / "clipping").mkdir(parents=True)
+
+    with caplog.at_level(logging.INFO):
+        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+
+    assert reading.files == []
+    assert "folder without a source kind, skipped: clipping" in caplog.text
