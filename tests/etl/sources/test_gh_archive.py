@@ -23,7 +23,9 @@ from k_b.etl.sources.gh_archive import (
 )
 from k_b.etl.transform import RawFile
 
-FIXTURE_PATH = Path(__file__).parent.parent / "fixtures" / "gh_archive_extract.json"
+FIXTURE_PATH = (
+    Path(__file__).parent.parent.parent / "fixtures" / "gh_archive_extract.json"
+)
 TODAY = date(2026, 10, 11)
 YESTERDAY = TODAY - timedelta(days=1)
 # The table of yesterday took its last hour at 00:08 UTC today (seen on 2026-10-11).

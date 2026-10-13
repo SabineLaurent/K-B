@@ -17,7 +17,7 @@ from k_b.etl.sources.github_advisories import (
     read_advisories,
 )
 
-FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
+FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_advisories_extract.json").read_bytes()
 # The recorded advisories were published and reviewed on 2026-05-13, 06-16 and 06-25.
 BEFORE_ALL_ADVISORIES = datetime(2026, 5, 1, 0, 0, tzinfo=UTC)

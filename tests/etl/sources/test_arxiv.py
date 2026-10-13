@@ -19,7 +19,7 @@ from k_b.etl.sources.arxiv import (
     read_total_results,
 )
 
-FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
+FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "arxiv_extract.xml").read_bytes()
 EMPTY_FEED = (
     b'<feed xmlns="http://www.w3.org/2005/Atom" '

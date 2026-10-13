@@ -17,7 +17,7 @@ from k_b.etl.sources.cisa_kev import (
 )
 
 EXTRACT = (
-    Path(__file__).parent.parent / "fixtures" / "cisa_kev_extract.csv"
+    Path(__file__).parent.parent.parent / "fixtures" / "cisa_kev_extract.csv"
 ).read_bytes()
 
 

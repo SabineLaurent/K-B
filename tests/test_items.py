@@ -318,7 +318,7 @@ def test_an_invalid_newsletter_article_is_refused(changes):
 @pytest.mark.parametrize(
     "url",
     [
-        # urlsplit refuses both: merge.py would raise at the import.
+        # urlsplit refuses both: etl/normalize.py would raise at the import.
         "https://[x",
         "https://exam\u2100ple.com/a",
     ],
@@ -346,7 +346,7 @@ def test_a_link_that_cannot_be_split_is_not_copied_whole_into_the_refusal():
 @pytest.mark.parametrize(
     "url",
     [
-        # Without its utm_* parameter, the first one is "https://": merge.py would raise.
+        # Without its utm_* parameter, the first one is "https://": etl/normalize.py would raise.
         "https://?utm_source=tldrai",
         "https://#part",
         "https:///path",

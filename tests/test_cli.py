@@ -8,8 +8,8 @@ import sys
 from datetime import UTC, datetime
 
 import pytest
-from test_collect import BrokenSource, WorkingSource
-from test_raw_items import FIXTURES_DIR
+from etl.test_extract import BrokenSource, WorkingSource
+from etl.test_transform import FIXTURES_DIR
 
 from k_b import cli
 from k_b.etl.load import KindWithoutTableError, UnknownSourceError

@@ -1,4 +1,4 @@
--- A fabricated Zotero library, built by tests/sources/test_zotero.py. No real data: every value
+-- A fabricated Zotero library, built by tests/etl/sources/test_zotero.py. No real data: every value
 -- is invented, in the forms observed on a real library on 2026-10-11 (keys of 8 characters,
 -- dates as 'YYYY-MM-DD HH:MM:SS' in UTC, a paper date as 'YYYY-MM-DD YYYY-MM-DD', an archiveID
 -- as 'arXiv:NNNN.NNNNN', a PDF path as 'storage:<file>', a sortIndex as 'NNNNN|NNNNNN|NNNNN').

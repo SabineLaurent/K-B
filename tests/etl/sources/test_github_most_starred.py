@@ -13,7 +13,7 @@ from k_b.etl.sources.github_most_starred import (
     read_most_starred,
 )
 
-FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
+FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_most_starred_extract.json").read_bytes()
 
 

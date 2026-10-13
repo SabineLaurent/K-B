@@ -183,7 +183,7 @@ def test_a_last_collection_after_today_is_refused_with_both_days(fake_download):
 
 # The reader. Both pages are reduced extracts of collected pages: some entries, as written,
 # their summaries cut to their first sentence.
-FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
+FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 AI_PAGE = (FIXTURES_DIR / "tldr_ai_extract.html").read_bytes()
 DEV_PAGE = (FIXTURES_DIR / "tldr_dev_extract.html").read_bytes()
 AI_PAGE_PATH = "automated_watch/tldr_ai/2026-10-11T153130Z/2026-10-07.html"

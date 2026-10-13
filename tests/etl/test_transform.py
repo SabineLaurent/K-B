@@ -11,7 +11,7 @@ from k_b.etl.sources.zotero import ZoteroSource
 from k_b.etl.transform import RawFile, RawReading, read_raw_items
 from k_b.items import Item
 
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
+FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 COLLECTION_NAME = "2026-10-05T093000Z"
 COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
 

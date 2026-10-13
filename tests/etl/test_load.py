@@ -17,7 +17,7 @@ from test_items import (
     text_of_length,
     vulnerability_fields,
 )
-from test_raw_items import FIXTURES_DIR, convert_line, copy_fixture
+from test_transform import FIXTURES_DIR, convert_line, copy_fixture
 
 from k_b.database.connection import connect_database
 from k_b.database.creation import create_database

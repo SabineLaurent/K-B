@@ -18,7 +18,7 @@ from k_b.etl.sources.github_releases import (
 )
 from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 
-FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
+FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_releases_extract.json").read_bytes()
 # The recorded releases were published on 2026-09-29, 09-30 and 10-01.
 BEFORE_ALL_RELEASES = datetime(2026, 9, 29, 0, 0, tzinfo=UTC)

@@ -6,7 +6,7 @@ import json
 import tempfile
 
 import pytest
-from test_import_items import (
+from test_load import (
     count_rows,
     dump_database,
     fetch_rows,
@@ -14,7 +14,7 @@ from test_import_items import (
     read_log,
     run_import,
 )
-from test_raw_items import copy_fixture
+from test_transform import copy_fixture
 
 from k_b.database.creation import create_database
 from k_b.etl.sources.zotero import ZoteroSource
