@@ -44,9 +44,11 @@ RansomwareUse = Literal["Known", "Unknown"]
 CVE_ID = re.compile(r"CVE-\d{4}-\d{4,}")
 # The slug of a newsletter edition, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
 EDITION_SLUG = re.compile(r"[a-z]+")
-# An arXiv identifier without its version (2609.31282), as text: sources/arxiv.py reads it in
-# the identifier of a paper, sources/zotero.py in the reference of a document.
-ARXIV_ID = r"\d{4}\.\d{4,5}"
+# An arXiv identifier without its version, as text: the form of since 2007 (2609.31282), or the
+# one of before (hep-th/9901001, math.GT/0309136). sources/arxiv.py reads it in the identifier
+# of a paper, sources/zotero.py in the reference of a document. [0-9], not \d: \d matches any
+# Unicode digit, and a fullwidth one would make another publication.
+ARXIV_ID = r"(?:[0-9]{4}\.[0-9]{4,5}|[a-z]+(?:-[a-z]+)?(?:\.[A-Z]{2})?/[0-9]{7})"
 # The key Zotero gives a document or an annotation; the GLOB of schema.sql. Zotero's own
 # alphabet is narrower: this form refuses no key it gives.
 ZOTERO_KEY = r"[0-9A-Z]{8}"
@@ -205,9 +207,8 @@ class Highlight(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     zotero_key: ZoteroKey
-    text: Annotated[
-        NonEmptyText, Field(max_length=HIGHLIGHT_MAX_LENGTH_BY_FIELD["text"])
-    ]
+    # May be absent: kept with its comment, as Zotero gives it (decision of 2026-10-13).
+    text: Annotated[str, Field(max_length=HIGHLIGHT_MAX_LENGTH_BY_FIELD["text"])] | None
     comment: (
         Annotated[str, Field(max_length=HIGHLIGHT_MAX_LENGTH_BY_FIELD["comment"])]
         | None

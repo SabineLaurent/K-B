@@ -132,7 +132,7 @@ table de sa sorte (`kind`). Exception : GH Archive, dont chaque ligne de classem
 | | `item_type`, `title` | `item_type`, `title` | `zotero_entry.item_type`, `zotero_entry.title` |
 | | `url` | `url`, `http` ou `https`, sans ses `utm_*` ; peut manquer | `zotero_entry.url` |
 | | `saved_at` | `date_added` (date de Zotero, UTC) | `zotero_entry.saved_at` |
-| | `arxiv_id` | `archive_id` `arXiv:<id>`, sans préfixe ni version | `zotero_entry.publication_id` (`publication.arxiv_id`) |
+| | `arxiv_id` | `archive_id` `arXiv:<id>`, sans préfixe ni version, forme d'après 2007 (`2609.31282`) ou d'avant (`hep-th/9901001`) | `zotero_entry.publication_id` (`publication.arxiv_id`) |
 | | `highlights` (`Highlight`) | `key`, `text`, `comment`, `date_added` de chaque surlignage | `highlight.zotero_key`, `highlight.text`, `highlight.comment`, `highlight.highlighted_at` |
 | GH Archive (pas un item : `TrendRow`) | `window_end` | dernier jour de la fenêtre de 3 jours, à minuit UTC | `trend.window_end` |
 | | `repository_id`, `repository_name` | `repo.id`, dernier `repo.name` vu dans la fenêtre | `trend.repository_id`, `trend.repository_name` |
@@ -162,9 +162,11 @@ table de sa sorte (`kind`). Exception : GH Archive, dont chaque ligne de classem
     (chemin et clé), la page d'un surlignage ; ils restent dans l'extrait brut. Un document hors
     arXiv n'a donc ni date de publication ni auteurs en base, et `kb search` ne peut pas filtrer
     par étiquette.
-  - Un `archive_id` qui commence par `arXiv:` sans en avoir la forme, une date d'une autre forme
-    que `AAAA-MM-JJ HH:MM:SS`, un titre absent ou un surlignage sans texte font rejeter le
-    document entier, au journal d'import. Le motif du rejet nomme le champ, l'erreur et la
+  - Un `archive_id` qui commence par `arXiv:` sans en avoir l'une des deux formes (chiffres
+    ASCII seulement), une date d'une autre forme que `AAAA-MM-JJ HH:MM:SS` ou un titre absent
+    font rejeter le document entier, au journal d'import. Un surlignage sans texte est gardé,
+    avec son commentaire (`highlight.text` vide). Un extrait qui n'est pas une liste JSON, ou
+    trop imbriqué pour être lu, est rejeté entier. Le motif du rejet nomme le champ, l'erreur et la
     mesure, jamais la valeur : un titre ou un surlignage est une donnée personnelle.
   - L'URL est gardée en `http` si Zotero la donne ainsi (les 5 documents de l'extrait du
     2026-10-13) ; les autres sortes exigent `https`.

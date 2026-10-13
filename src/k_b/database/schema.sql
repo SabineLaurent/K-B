@@ -83,7 +83,8 @@ CREATE TABLE highlight (
     -- The key Zotero gives the annotation: 8 characters of 0-9A-Z.
     zotero_key       TEXT NOT NULL UNIQUE
         CHECK (zotero_key GLOB '[0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z]'),
-    text             TEXT NOT NULL CHECK (length(text) <= 10000),
+    -- May be absent: a highlight Zotero keeps without its text keeps its comment.
+    text             TEXT CHECK (length(text) <= 10000),
     comment          TEXT CHECK (length(comment) <= 10000),
     highlighted_at   TEXT NOT NULL
         CHECK (highlighted_at IS strftime('%Y-%m-%dT%H:%M:%SZ', highlighted_at)),

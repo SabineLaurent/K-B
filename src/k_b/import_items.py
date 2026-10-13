@@ -553,15 +553,7 @@ def write_vulnerability(
         "SELECT item_id FROM vulnerability WHERE cve_id = ?", (item.cve,)
     ).fetchone()
     known_item_id = row[0] if row else None
-    latest_collected_at, is_after_latest_catalog = connection.execute(
-        SELECT_LATEST_CATALOG,
-        {
-            "source_code": item.source_code,
-            "raw_data_id": raw_data_id,
-            "item_id": known_item_id,
-            "collected_at": format_date(item.collected_at),
-        },
-    ).fetchone()
+    latest = read_latest_catalog(connection, item, raw_data_id, known_item_id)
     item_id = (
         insert_item(connection, "vulnerability", raw_data_id)
         if known_item_id is None
@@ -579,20 +571,12 @@ def write_vulnerability(
             "date_added": format_date(item.published_at),
             "ransomware_use": item.ransomware_use,
             "collected_at": format_date(item.collected_at),
-            "is_after_latest_catalog": is_after_latest_catalog,
-            # Without a latest catalog, is_after_latest_catalog is NULL: nothing to compare.
-            "withdrawn_at": None
-            if is_after_latest_catalog or latest_collected_at is None
-            else latest_collected_at,
+            "is_after_latest_catalog": latest.is_file_after,
+            "withdrawn_at": find_withdrawn_at_of_new_row(latest),
         },
     ).fetchone()
     if written is None:
-        # The base wrote nothing; the rule names which of its two conditions failed.
-        if is_after_latest_catalog:
-            return Discard(
-                "unchanged", item, read_item_collected_at(connection, item_id)
-            )
-        return Discard("no_newer_version", item, latest_collected_at)
+        return discard_from_catalog(connection, item, item_id, latest)
     if known_item_id is not None:
         point_item_at_raw_data(connection, known_item_id, raw_data_id)
     return None
@@ -720,15 +704,7 @@ def write_zotero_entry(
         "SELECT item_id FROM zotero_entry WHERE zotero_key = ?", (item.source_item_id,)
     ).fetchone()
     known_item_id = row[0] if row else None
-    latest_collected_at, is_after_latest_catalog = connection.execute(
-        SELECT_LATEST_CATALOG,
-        {
-            "source_code": item.source_code,
-            "raw_data_id": raw_data_id,
-            "item_id": known_item_id,
-            "collected_at": format_date(item.collected_at),
-        },
-    ).fetchone()
+    latest = read_latest_catalog(connection, item, raw_data_id, known_item_id)
     item_id = (
         insert_item(connection, "zotero_entry", raw_data_id)
         if known_item_id is None
@@ -736,12 +712,16 @@ def write_zotero_entry(
     )
     catalog = {
         "collected_at": format_date(item.collected_at),
-        "is_after_latest_catalog": is_after_latest_catalog,
-        # Without a latest catalog, is_after_latest_catalog is NULL: nothing to compare.
-        "withdrawn_at": None
-        if is_after_latest_catalog or latest_collected_at is None
-        else latest_collected_at,
+        "is_after_latest_catalog": latest.is_file_after,
+        "withdrawn_at": find_withdrawn_at_of_new_row(latest),
     }
+    # C3 of the review: a known entry of an extract imported late is not written, its
+    # publication is only looked for; created, it would be one no entry points to.
+    publication_id = (
+        write_cited_publication(connection, item.arxiv_id)
+        if known_item_id is None or latest.is_file_after
+        else find_publication(connection, item.arxiv_id)
+    )
     entry_written = connection.execute(
         UPSERT_ZOTERO_ENTRY,
         {
@@ -751,7 +731,7 @@ def write_zotero_entry(
             "title": item.title,
             "url": item.url,
             "saved_at": format_date(item.saved_at),
-            "publication_id": write_cited_publication(connection, item.arxiv_id),
+            "publication_id": publication_id,
         }
         | catalog,
     ).fetchone()
@@ -771,14 +751,9 @@ def write_zotero_entry(
         for highlight in item.highlights
     ]
     if entry_written is None and not any(highlights_written):
-        # The base wrote nothing; the rule names which of its two conditions failed.
-        if is_after_latest_catalog:
-            return Discard(
-                "unchanged", item, read_item_collected_at(connection, item_id)
-            )
-        return Discard("no_newer_version", item, latest_collected_at)
+        return discard_from_catalog(connection, item, item_id, latest)
     # An extract imported late writes only what it alone brings, withdrawn: not a version.
-    if known_item_id is not None and is_after_latest_catalog:
+    if known_item_id is not None and latest.is_file_after:
         point_item_at_raw_data(connection, known_item_id, raw_data_id)
     return None
 
@@ -790,10 +765,18 @@ def write_cited_publication(
     if arxiv_id is None:
         return None
     connection.execute(INSERT_CITED_PUBLICATION, (arxiv_id,))
-    (publication_id,) = connection.execute(
+    return find_publication(connection, arxiv_id)
+
+
+def find_publication(
+    connection: sqlite3.Connection, arxiv_id: str | None
+) -> int | None:
+    if arxiv_id is None:
+        return None
+    row = connection.execute(
         "SELECT id FROM publication WHERE arxiv_id = ?", (arxiv_id,)
     ).fetchone()
-    return int(publication_id)
+    return None if row is None else int(row[0])
 
 
 def write_trend_file(
@@ -866,7 +849,7 @@ def withdraw_absent_vulnerabilities(
     ]
     if not present_cve_ids or raw_file.rejection_count:
         return 0
-    if not is_after_latest_catalog(connection, raw_file, raw_data_id):
+    if not read_file_latest_catalog(connection, raw_file, raw_data_id).is_file_after:
         return 0
     return connection.execute(
         WITHDRAW_ABSENT_VULNERABILITIES,
@@ -890,7 +873,7 @@ def withdraw_absent_zotero_rows(
     entries = [item for item in raw_file.items if item.kind == "zotero_entry"]
     if not entries or raw_file.rejection_count:
         return 0
-    if not is_after_latest_catalog(connection, raw_file, raw_data_id):
+    if not read_file_latest_catalog(connection, raw_file, raw_data_id).is_file_after:
         return 0
     collected_at = format_date(raw_file.collected_at)
     entry_keys = [entry.source_item_id for entry in entries]
@@ -908,21 +891,72 @@ def withdraw_absent_zotero_rows(
     return withdrawn_entries + withdrawn_highlights
 
 
-def is_after_latest_catalog(
+class LatestCatalog(NamedTuple):
+    """The latest catalog of a source already imported, seen from the file being imported."""
+
+    # Its collection, in the format of the base; None when the source has none yet.
+    collected_at: str | None
+    # Whether the file being imported was collected after it: 1 or 0; None when there is none.
+    is_file_after: int | None
+
+
+def read_latest_catalog(
+    connection: sqlite3.Connection,
+    item: Item,
+    raw_data_id: int,
+    known_item_id: int | None,
+) -> LatestCatalog:
+    """The latest catalog of the source of item, the file that brought its version in the
+    base not left out."""
+    return query_latest_catalog(
+        connection, item.source_code, item.collected_at, raw_data_id, known_item_id
+    )
+
+
+def read_file_latest_catalog(
     connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
-) -> bool:
-    """Whether raw_file was collected after the latest catalog of its source imported."""
-    _, is_after = connection.execute(
+) -> LatestCatalog:
+    """The latest catalog of the source of raw_file. No item: only the other files of the
+    source are compared."""
+    return query_latest_catalog(
+        connection, raw_file.source_code, raw_file.collected_at, raw_data_id, None
+    )
+
+
+def query_latest_catalog(
+    connection: sqlite3.Connection,
+    source_code: str,
+    collected_at: datetime,
+    raw_data_id: int,
+    item_id: int | None,
+) -> LatestCatalog:
+    collected_at_of_latest, is_file_after = connection.execute(
         SELECT_LATEST_CATALOG,
         {
-            "source_code": raw_file.source_code,
+            "source_code": source_code,
             "raw_data_id": raw_data_id,
-            # No item: only the other files of the source are compared.
-            "item_id": None,
-            "collected_at": format_date(raw_file.collected_at),
+            "item_id": item_id,
+            "collected_at": format_date(collected_at),
         },
     ).fetchone()
-    return bool(is_after)
+    return LatestCatalog(collected_at_of_latest, is_file_after)
+
+
+def find_withdrawn_at_of_new_row(latest: LatestCatalog) -> str | None:
+    """A row only a file older than the latest catalog brings is absent from the latest one:
+    it is written withdrawn at it. Without a latest catalog, nothing to compare."""
+    if latest.is_file_after or latest.collected_at is None:
+        return None
+    return latest.collected_at
+
+
+def discard_from_catalog(
+    connection: sqlite3.Connection, item: Item, item_id: int, latest: LatestCatalog
+) -> Discard:
+    """The base wrote nothing; the rule names which of its two conditions failed."""
+    if latest.is_file_after:
+        return Discard("unchanged", item, read_item_collected_at(connection, item_id))
+    return Discard("no_newer_version", item, str(latest.collected_at))
 
 
 def insert_item(

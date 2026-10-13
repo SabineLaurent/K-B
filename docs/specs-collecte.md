@@ -481,8 +481,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
        (acceptée par Sabine le 2026-10-13) : l'extrait étant complet, un document invalide
        revient dans chaque extrait, et plus rien n'est retiré tant qu'il n'est pas corrigé dans
        Zotero ; le rejet est écrit au journal et compté par `kb import` à chaque import ;
-     - un extrait importé en retard ne change rien ; ce qu'il est seul à apporter est écrit
-       retiré, à la date du dernier extrait importé.
+     - un extrait importé en retard ne change rien ; ce qu'il est seul à apporter (une entrée,
+       un surlignage) est écrit retiré, à la date du dernier extrait importé, et son entrée est
+       comptée écrite. Il ne crée pas de publication pour une entrée qu'il n'écrit pas.
+       **Limite** (constat de revue, comme celle de CISA KEV du 2026-10-12) : une entrée
+       rejetée dans le dernier extrait, qu'un extrait plus ancien importé en retard apporte
+       valide, est écrite retirée alors qu'elle est encore dans Zotero ; une reconstruction de
+       la base, une fois le rejet corrigé, la règle.
    - **Sources sans import** (`clipper`, classement des plus étoilés) :
      leur nature est décidée par leur issue d'import (#14).
    - Une même CVE dans deux sources (une entrée CISA et une alerte GitHub), ou citée par deux

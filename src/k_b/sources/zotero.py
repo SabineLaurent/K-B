@@ -152,10 +152,10 @@ JSON_COLUMNS = ("authors", "tags", "pdfs", "highlights")
 
 SOURCE_CODE: SourceCode = "zotero"
 # A date of Zotero: UTC, written without its time zone (2026-10-01 08:15:00).
-ZOTERO_DATE = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+ZOTERO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}")
 ARXIV_REFERENCE_PREFIX = "arXiv:"
 # archiveID of an arXiv paper, its version left out: the publication is known without it.
-ARXIV_REFERENCE = re.compile(rf"{ARXIV_REFERENCE_PREFIX}({ARXIV_ID})(?:v\d+)?")
+ARXIV_REFERENCE = re.compile(rf"{ARXIV_REFERENCE_PREFIX}({ARXIV_ID})(?:v[0-9]+)?")
 
 
 class ZoteroCopyInconsistentError(Exception):
@@ -364,7 +364,7 @@ class ZoteroHighlight(BaseModel):
     model_config = ConfigDict(frozen=True, extra="ignore")
 
     key: str
-    text: str
+    text: str | None
     comment: str | None
     date_added: ZoteroDate
 
@@ -394,6 +394,8 @@ def read_documents(raw_extract: bytes) -> list[object]:
         documents = json.loads(raw_extract)
     except ValueError:
         documents = None
+    except RecursionError:
+        raise ValueError("extract nested too deep to read") from None
     if not isinstance(documents, list):
         raise ValueError("extract not a JSON list")
     return documents
