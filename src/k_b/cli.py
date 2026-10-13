@@ -8,10 +8,10 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from k_b.collect import collect_all_sources
 from k_b.database.connection import DATABASE_FILE_NAME
 from k_b.database.creation import create_database
-from k_b.import_items import (
+from k_b.etl.extract import collect_all_sources
+from k_b.etl.load import (
     ImportLogExistsError,
     KindWithoutTableError,
     MissingDatabaseError,
@@ -19,19 +19,19 @@ from k_b.import_items import (
     import_items,
     read_imported_paths,
 )
-from k_b.raw_items import COLLECTION_NAME_FORMAT, read_raw_items
-from k_b.raw_store import InvalidCollectionStateError
-from k_b.source_contract import list_sources
-from k_b.source_kinds import SOURCE_KINDS
-from k_b.sources.gh_archive import FOLDER_PREFIX as GH_ARCHIVE_SOURCE_NAME
-from k_b.sources.gh_archive import (
+from k_b.etl.raw_store import InvalidCollectionStateError
+from k_b.etl.source_contract import list_sources
+from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.etl.sources.gh_archive import FOLDER_PREFIX as GH_ARCHIVE_SOURCE_NAME
+from k_b.etl.sources.gh_archive import (
     GhArchiveSource,
     create_bigquery_client,
     read_trend_files,
 )
-from k_b.sources.tracked_repositories import TRACKED_REPOSITORIES
-from k_b.sources.zotero import FOLDER_PREFIX as ZOTERO_SOURCE_NAME
-from k_b.sources.zotero import ZoteroSource
+from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
+from k_b.etl.sources.zotero import FOLDER_PREFIX as ZOTERO_SOURCE_NAME
+from k_b.etl.sources.zotero import ZoteroSource
+from k_b.etl.transform import COLLECTION_NAME_FORMAT, read_raw_items
 
 DATA_DIR_VARIABLE = "KB_DATA_DIR"
 # The Zotero data directory, the one that holds zotero.sqlite. Not set: Zotero is skipped.

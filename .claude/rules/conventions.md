@@ -10,7 +10,7 @@ la commande. Complète `code.md` (comment coder) et `conformite.md` (selon quell
 **Règle.**
 - Un lecteur (`read_entries`) ne lève que pour une **page illisible** (pas du JSON, pas du CSV,
   colonnes manquantes, pas un flux Atom). Une **entrée** invalide devient un rejet nommé, rendu
-  avec les entrées lues, et suit un seul chemin (`reject`, `raw_items.py`) jusqu'au journal
+  avec les entrées lues, et suit un seul chemin (`reject`, `etl/transform.py`) jusqu'au journal
   d'import.
 - À la collecte, une source n'échoue que si sa page est illisible ou si toutes ses entrées sont
   invalides (`all_items_invalid`) ; sa date de dernière collecte reste alors inchangée.
@@ -23,7 +23,7 @@ la commande. Complète `code.md` (comment coder) et `conformite.md` (selon quell
   par cas. Une erreur du système (disque plein, base verrouillée) arrête tout l'import.
 
 **Vérifier.**
-- `grep -n "logger.warning" src/k_b/sources/*.py` ne renvoie aucun rejet d'entrée.
+- `grep -n "logger.warning" src/k_b/etl/sources/*.py` ne renvoie aucun rejet d'entrée.
 - `grep -rn "SAVEPOINT" src/k_b` renvoie l'écriture d'un item, sous `src/k_b/database/`.
 - `uv run pytest` : un test par erreur rattrapée, et un test où une erreur du système arrête
   l'import.
@@ -95,7 +95,7 @@ valeur, tronquée (un nom d'auteur finit au journal).
 - Un type qui sert à plus d'un module, ou que la base contraint, est défini **une fois**, dans
   `items.py` : identifiants (`CveId` en chiffres ASCII, `GhsaId`, `RepositoryName`), date UTC
   avec fuseau, texte sans NUL ni surrogate isolé, entier tenu sur 64 bits.
-- Chaque source garde son modèle Pydantic dans son module (`sources/<source>.py`).
+- Chaque source garde son modèle Pydantic dans son module (`etl/sources/<source>.py`).
 - Tout ce que la base refuse, l'item le refuse avant ; un test compare chaque type à son
   `CHECK`, comme pour les longueurs.
 
@@ -117,22 +117,28 @@ statu quo).
 ## 5. Couche d'accès aux données
 
 **Règle.**
-- **Architecture en couches** : présentation (`cli.py`, routes de l'API), métier et ETL
-  (`items.py`, `merge.py`, `collect.py`, `raw_items.py`, `import_items.py`), accès aux données
-  (`database/`). Une couche n'appelle que celle du dessous.
+- **Architecture en couches** : présentation (`cli.py`, routes de l'API), métier et ETL (`etl/` :
+  `extract.py`, `transform.py`, `normalize.py`, `load.py`, les sources dans `etl/sources/`), accès
+  aux données (`database/`). Une couche n'appelle que celle du dessous.
+- `items.py` et `core/` sont le vocabulaire commun à toutes les couches : chacune peut les
+  importer.
+- Une API importe `database`, `items` et `core`, jamais `etl` ni `database/writers` (sa ligne dans
+  `tests/test_module_dependencies.py` s'ajoute à la création du paquet d'API).
 - Le SQL **de la base K-B** vit dans `src/k_b/database/` : un module d'écriture (un écrivain par
   sorte d'item) et un module de lecture (la requête `UNION ALL`, partagée par `kb search`, « quoi
   de neuf » et l'API). Les migrations Alembic aussi.
 - La requête d'extraction d'une source qui est elle-même une base (Zotero, GH Archive sur
-  BigQuery) vit dans le module de cette source, `src/k_b/sources/<source>.py`, comme la requête
-  d'une API : elle lit une source externe, en lecture seule, pas la base K-B.
+  BigQuery) vit dans le module de cette source, `src/k_b/etl/sources/<source>.py`, comme la
+  requête d'une API : elle lit une source externe, en lecture seule, pas la base K-B.
 - Le module de chargement orchestre la transaction et le journal, sans SQL.
 
 **Vérifier.**
 - `grep -rlE "INSERT INTO|SELECT |UPDATE |DELETE FROM" src/k_b --include='*.py' --exclude=zotero.py --exclude=gh_archive.py`
   ne renvoie que des fichiers de `src/k_b/database/`.
-- `grep -rlE "INSERT INTO|UPDATE |DELETE FROM" src/k_b/sources --include='*.py'` ne renvoie rien
-  (une source ne fait que lire).
+- `grep -rlE "INSERT INTO|UPDATE |DELETE FROM" src/k_b/etl/sources --include='*.py'` ne renvoie
+  rien (une source ne fait que lire).
+- `uv run pytest tests/test_module_dependencies.py` : les dépendances, lues à deux niveaux
+  (`core`, `database`, `etl`, `etl/sources`).
 
 **Pourquoi.** Un seul écrivain et une seule requête partagée : deux modules suffisent, et la
 requête ne dépend pas de son premier appelant (décision du 2026-10-10 : `sqlite3` et SQL, pas

@@ -45,8 +45,8 @@ CVE_ID = re.compile(r"CVE-\d{4}-\d{4,}")
 # The slug of a newsletter edition, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
 EDITION_SLUG = re.compile(r"[a-z]+")
 # An arXiv identifier without its version, as text: the form of since 2007 (2609.31282), or the
-# one of before (hep-th/9901001, math.GT/0309136). sources/arxiv.py reads it in the identifier
-# of a paper, sources/zotero.py in the reference of a document. [0-9], not \d: \d matches any
+# one of before (hep-th/9901001, math.GT/0309136). etl/sources/arxiv.py reads it in the identifier
+# of a paper, etl/sources/zotero.py in the reference of a document. [0-9], not \d: \d matches any
 # Unicode digit, and a fullwidth one would make another publication.
 ARXIV_ID = r"(?:[0-9]{4}\.[0-9]{4,5}|[a-z]+(?:-[a-z]+)?(?:\.[A-Z]{2})?/[0-9]{7})"
 # The key Zotero gives a document or an annotation; the GLOB of schema.sql. Zotero's own
@@ -61,7 +61,7 @@ TREND_REPOSITORY_NAME_MAX_LENGTH = 255
 
 def check_url_can_be_normalized(url: str) -> str:
     """Refuse the URL urlsplit refuses (an unclosed bracket, a host NFKC rewrites), and the URL
-    without a host, which may be "https://" once its utm_* parameters are removed: merge.py
+    without a host, which may be "https://" once its utm_* parameters are removed: etl/normalize.py
     splits every URL at the import, then validates the item again, where one refused would
     stop it all."""
     try:
@@ -90,8 +90,9 @@ def check_text_has_no_control_character(text: str) -> str:
 
 NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
 # Kept as given, not as pydantic's HttpUrl, which rewrites it (adds a final slash): the base
-# keeps the URL the source gave, without its utm_* parameters (merge.py). http is accepted for
-# a Zotero entry only (check_url_scheme): Zotero keeps the URL a document was saved from.
+# keeps the URL the source gave, without its utm_* parameters (etl/normalize.py). http is
+# accepted for a Zotero entry only (check_url_scheme): Zotero keeps the URL a document was saved
+# from.
 WebUrl = Annotated[
     str,
     StringConstraints(pattern=r"^https?://\S+$"),
