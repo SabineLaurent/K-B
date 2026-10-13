@@ -53,7 +53,8 @@ dans la base. Une migration vers PostgreSQL reste possible si le besoin change (
 - **Identifiants** : chaque table du modèle clarifié a un `id` technique pour clé primaire ;
   l'identifiant naturel de chaque chose est tenu par une contrainte `UNIQUE` : `arxiv_id`,
   `cve_id`, `release_id`, `ghsa_id`, `raw_file_path`, `source_code`, le nom d'un dépôt suivi
-  (sans tenir compte de la casse), `zotero_key`. Un item n'a plus d'URL commune ni d'URL unique.
+  (sans tenir compte de la casse), `zotero_key`, la fenêtre et le dépôt d'une tendance
+  (`window_end`, `repository_id`). Un item n'a plus d'URL commune ni d'URL unique.
 - **Une absence reste une absence** : une date ou un nom manquant n'est pas remplacé.
 - **Listes** : les auteurs d'un papier et les paquets d'une alerte ou d'un dépôt suivi sont une
   liste JSON dans une colonne texte, non vide, dans l'ordre reçu.
@@ -74,27 +75,30 @@ elles ne sont pas recopiées ici. Un test (`tests/test_schema.py`) vérifie que 
 `items.py` est égal au `CHECK` de sa colonne, dans les deux sens.
 
 - **Colonnes bornées** : celles qu'une source remplit, dans `publication`, `vulnerability`,
-  `release`, `advisory` et `newsletter_article`.
+  `release`, `advisory` et `newsletter_article` ; et `trend.repository_name`, dont le maximum
+  est tenu par `TrendRow` (`TREND_REPOSITORY_NAME_MAX_LENGTH`, même fichier), une ligne de
+  classement n'étant pas un item. Un nom plus long fait refuser le classement entier.
 - **Listes JSON** : le nombre d'éléments est borné deux fois, par l'item et par un
   `CHECK (json_array_length(colonne) <= n)`. La longueur de chaque élément n'est tenue que par
   l'item : un `CHECK` de SQLite ne peut pas parcourir les éléments d'une liste (pas de
   sous-requête dans un `CHECK`).
 - **Colonnes sans borne** : celles que le code remplit (`source`, `tracked_repository`, le chemin
   et le flux de `raw_data`) ; les dates et les listes fermées, tenues par leur propre `CHECK` ;
-  `highlight`, pas encore remplie, dont les bornes sont à fixer avec son lecteur ; `repository`
-  et `star_gain` (voir le MPD).
+  `highlight`, pas encore remplie, dont les bornes sont à fixer avec son lecteur.
 - **Limite de SQLite** : `length()` compte les caractères jusqu'au premier caractère NUL, alors
   que l'item les compte tous. Les deux contrôles peuvent donc diverger, dans les deux sens : un
   texte qui contient un NUL peut passer le `CHECK` en étant plus long que le maximum ; un
   `tag_name` qui commence par un NUL est accepté par l'item (3 caractères pour `"\0v1"`) et refusé
   par `CHECK (length(tag_name) > 0)`, ce qui annule l'import entier. Ce second cas n'est pas
-  traité.
+  traité. Pour `trend`, il l'est : `GLOB` s'arrête lui aussi au premier NUL, et `TrendRow` refuse
+  un nom de dépôt qui en contient un.
 
 ### Ce que chaque source met dans l'item, puis dans la base
 
 Les lecteurs écrits à ce jour : arXiv, CISA KEV, releases et alertes GitHub, tldr.tech. Chaque entrée du
 brut devient un item (`src/k_b/items.py`), que l'import (`src/k_b/import_items.py`) écrit dans la
-table de sa sorte (`kind`).
+table de sa sorte (`kind`). Exception : GH Archive, dont chaque ligne de classement (`TrendRow`,
+`src/k_b/items.py`) devient une ligne de `trend`, sans item.
 
 | Source (`kind`) | Champ de l'item | Vient de | Colonne |
 |---|---|---|---|
@@ -121,6 +125,9 @@ table de sa sorte (`kind`).
 | | `rank` | position de l'entrée parmi les `<article>` de la page, à partir de 1 | `newsletter_article.rank` |
 | | `title`, `summary` | texte de `a.font-bold`, texte de `div.newsletter-html` | `newsletter_article.title`, `newsletter_article.summary` |
 | | `url` | `href` de `a.font-bold`, sans ses `utm_*` | `newsletter_article.url` |
+| GH Archive (pas un item : `TrendRow`) | `window_end` | dernier jour de la fenêtre de 3 jours, à minuit UTC | `trend.window_end` |
+| | `repository_id`, `repository_name` | `repo.id`, dernier `repo.name` vu dans la fenêtre | `trend.repository_id`, `trend.repository_name` |
+| | `stars_gained`, `forks_gained` | nombre de `WatchEvent` et de `ForkEvent` de la fenêtre | `trend.stars_gained`, `trend.forks_gained` |
 | toutes | `source_code`, `collected_at`, `raw_file_path` | le fichier brut lu | `raw_data` (`source_id`, `collected_at`, `raw_file_path`, `stream`) |
 
 - L'URL d'un papier arXiv (`https://arxiv.org/abs/<id>`) et d'une faille
@@ -137,7 +144,7 @@ table de sa sorte (`kind`).
 - L'identifiant d'un article TLDR dans l'item (`ai/2026-10-08#3` : édition, date, rang) n'est
   pas stocké : ses trois parties sont les colonnes de sa clé. `newsletter_article.publication_id`
   (le papier cité) n'est pas encore rempli.
-- Pas encore lus : les clips du Web Clipper, Zotero, GH Archive. Le
+- Pas encore lus : les clips du Web Clipper, Zotero. Le
   classement des dépôts les plus étoilés n'entre pas dans la base (journal
   ADR, 2026-10-07).
 
@@ -173,7 +180,7 @@ source ne touche pas aux tables.
 | `advisory` | sous-type d'item : une alerte de sécurité GitHub | `id`, `item_id`, `kind`, `ghsa_id`, `vulnerability_id`, `summary`, `published_at`, `url`, `packages` |
 | `newsletter_article` | sous-type d'item : un article résumé par une édition TLDR ; clé (édition, date, rang) | `id`, `item_id`, `kind`, `edition`, `edition_date`, `rank`, `title`, `summary`, `url`, `publication_id` |
 | `highlight` | les surlignages Zotero ; pas encore remplie | `highlight_id`, `zotero_key`, `text`, `highlighted_at`, `item_id` |
-| `repository`, `star_gain` | tables du modèle précédent, sans écrivain ; la clarification du modèle les remplace par TENDANCE, pas encore codée | `item_id`, `repository_name` ; `item_id`, `window_end`, `stars_gained` |
+| `trend` | TENDANCE : les dépôts qui montent d'un classement GH Archive, une ligne par fenêtre de 3 jours et par dépôt ; pas un item ; clé (`window_end`, `repository_id`) | `id`, `raw_data_id`, `window_end`, `repository_id`, `repository_name`, `stars_gained`, `forks_gained` |
 
 - **Mode d'acquisition** : `source.acquisition_mode` vaut `watch`, `library` ou `wiki`, tenu par
   un `CHECK` (journal ADR, 2026-10-10). La durée de conservation de chaque mode est dans
@@ -187,17 +194,17 @@ source ne touche pas aux tables.
   `vulnerability`.
 - **Index** : sur les clés étrangères, que SQLite n'indexe pas d'office (`raw_data.source_id`,
   `item.raw_data_id`, `highlight.item_id`, `release.tracked_repository_id`,
-  `advisory.vulnerability_id`, `newsletter_article.publication_id`), et sur
-  `star_gain.window_end`. Les contraintes `UNIQUE` créent
+  `advisory.vulnerability_id`, `newsletter_article.publication_id`, `trend.raw_data_id`). Les
+  contraintes `UNIQUE` créent
   leur propre index.
-- **Suppressions en cascade** : seulement de `item` vers `highlight` et `repository`, et de
-  `repository` vers `star_gain`. Il n'y en a pas vers `publication`, `vulnerability`, `release`,
+- **Suppressions en cascade** : seulement de `item` vers `highlight`. Il n'y en a pas vers `publication`, `vulnerability`, `release`,
   `advisory` ni `newsletter_article` : supprimer un item qu'une de ces tables référence est refusé par la clé
   étrangère. La purge n'est pas codée.
 - **Formats contrôlés** par un `CHECK` : les dates (ci-dessus) ; `cve_id` (`CVE-AAAA-NNNN…`) ;
   `repository_name` (`owner/repo`) ; `ghsa_id` (`GHSA-…`) ; `url` (`https://…`) ; `edition` (lettres minuscules sans accent) ; les listes
   fermées (`source_type`, `acquisition_mode`, `kind`, `ransomware_use`, `ecosystem`) ; les listes
-  JSON non vides ; `tag_name` non vide ; `stars_gained` ≥ 0 ; les longueurs maximales.
+  JSON non vides ; `tag_name` non vide ; dans `trend`, `window_end` à minuit UTC, `repository_id` > 0,
+  `stars_gained` et `forks_gained` ≥ 0 ; les longueurs maximales.
 
 ### Ce qui est propre à SQLite
 
