@@ -154,7 +154,12 @@ def test_a_catalog_without_the_ransomware_column_is_refused():
 
 @pytest.mark.parametrize(
     ("cve_id", "date_added"),
-    [("not-a-cve", "2026-09-29"), ("CVE-2026-1234", "29/09/2026")],
+    [
+        ("not-a-cve", "2026-09-29"),
+        # Fullwidth digits: \d would accept them, the base refuses them.
+        ("CVE-\uff12\uff10\uff12\uff16-1234", "2026-09-29"),
+        ("CVE-2026-1234", "29/09/2026"),
+    ],
 )
 def test_a_malformed_row_is_refused(cve_id, date_added):
     header, first_row = EXTRACT.decode("utf-8").splitlines()[:2]

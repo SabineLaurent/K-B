@@ -483,7 +483,9 @@ def test_the_message_names_the_refusal_of_a_control_character_not_the_name():
 
     message = str(raised.value)
     assert "some-person" not in message
-    assert "row 0: repository_name (control_character): str of length 21" in message
+    assert (
+        "row 0: repository_name (string_pattern_mismatch): str of length 21" in message
+    )
 
 
 def test_a_row_of_a_window_not_announced_is_refused():

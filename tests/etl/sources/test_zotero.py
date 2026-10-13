@@ -626,6 +626,8 @@ def test_a_document_without_url_is_read():
         with_changes(PAPER_WITH_HIGHLIGHTS, date_added="2026-10-01T08:15:00Z"),
         with_changes(PAPER_WITH_HIGHLIGHTS, date_added=None),
         with_changes(PAPER_WITH_HIGHLIGHTS, title=None),
+        with_changes(PAPER_WITH_HIGHLIGHTS, title="A\0title"),
+        with_first_highlight_changed(PAPER_WITH_HIGHLIGHTS, text="A \ud800 highlight"),
         with_changes(PAPER_WITH_HIGHLIGHTS, key=None),
         with_changes(PAPER_WITH_HIGHLIGHTS, url="ftp://arxiv.org/abs/2609.00001"),
         with_first_highlight_changed(PAPER_WITH_HIGHLIGHTS, date_added="2026-10-05"),
