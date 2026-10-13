@@ -243,7 +243,7 @@ def write_trend_file(
     """Register the ranking and write its rows; return how many were written, and each window
     the base left out."""
     raw_data_id = register_raw_file(connection, trend_file.raw_file)
-    written_count, collected_at_by_window_left_out = trend_writer.write_trends(
+    written_count, collected_at_by_window_left_out = trend_writer.write(
         connection, trend_file.rows, raw_data_id
     )
     discards = [
@@ -268,7 +268,7 @@ def withdraw_absent_vulnerabilities(
     ]
     if not present_cve_ids or raw_file.rejection_count:
         return 0
-    return vulnerability_writer.withdraw_absent_vulnerabilities(
+    return vulnerability_writer.withdraw_absent(
         connection,
         raw_file.source_code,
         raw_file.collected_at,
@@ -289,19 +289,19 @@ def withdraw_absent_zotero_rows(
     entries = [item for item in raw_file.items if item.kind == "zotero_entry"]
     if not entries or raw_file.rejection_count:
         return 0
-    return zotero_entry_writer.withdraw_absent_zotero_rows(
+    return zotero_entry_writer.withdraw_absent(
         connection, raw_file.source_code, raw_file.collected_at, raw_data_id, entries
     )
 
 
 # The kinds that have a table in the base, each with its writer.
 WRITER_BY_KIND: dict[str, Callable[[sqlite3.Connection, Item, int], Discard | None]] = {
-    "paper": paper_writer.write_paper,
-    "vulnerability": vulnerability_writer.write_vulnerability,
-    "release": release_writer.write_release,
-    "advisory": advisory_writer.write_advisory,
-    "newsletter_article": newsletter_article_writer.write_newsletter_article,
-    "zotero_entry": zotero_entry_writer.write_zotero_entry,
+    "paper": paper_writer.write,
+    "vulnerability": vulnerability_writer.write,
+    "release": release_writer.write,
+    "advisory": advisory_writer.write,
+    "newsletter_article": newsletter_article_writer.write,
+    "zotero_entry": zotero_entry_writer.write,
 }
 
 

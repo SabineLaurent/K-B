@@ -52,7 +52,7 @@ def write_tracked_repositories(
     )
 
 
-def write_release(
+def write(
     connection: sqlite3.Connection, item: Item, raw_data_id: int
 ) -> Discard | None:
     """The GitHub item and its release, unless the release is known: the first seen is kept."""

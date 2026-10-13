@@ -33,7 +33,7 @@ INSERT INTO newsletter_article (
 """
 
 
-def write_newsletter_article(
+def write(
     connection: sqlite3.Connection, item: Item, raw_data_id: int
 ) -> Discard | None:
     """The TLDR item and its article, unless the article is known: the first seen is kept."""

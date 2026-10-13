@@ -25,7 +25,7 @@ RETURNING id
 """
 
 
-def write_paper(
+def write(
     connection: sqlite3.Connection, item: Item, raw_data_id: int
 ) -> Discard | None:
     """The arXiv item and its publication, found by its arXiv identifier."""

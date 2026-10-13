@@ -81,7 +81,7 @@ WHERE withdrawn_at IS NULL
 """
 
 
-def write_zotero_entry(
+def write(
     connection: sqlite3.Connection, item: Item, raw_data_id: int
 ) -> Discard | None:
     """The Zotero item, its entry and its highlights, found by their Zotero keys.
@@ -93,7 +93,7 @@ def write_zotero_entry(
         "SELECT item_id FROM zotero_entry WHERE zotero_key = ?", (item.source_item_id,)
     ).fetchone()
     known_item_id = row[0] if row else None
-    latest = catalog.read_latest_catalog(
+    latest = catalog.read_latest(
         connection, item.source_code, item.collected_at, raw_data_id, known_item_id
     )
     item_id = (
@@ -143,7 +143,7 @@ def write_zotero_entry(
         for highlight in item.highlights
     ]
     if entry_written is None and not any(highlights_written):
-        return catalog.discard_from_catalog(connection, item, item_id, latest)
+        return catalog.build_discard(connection, item, item_id, latest)
     # An extract imported late writes only what it alone brings, withdrawn: not a version.
     if known_item_id is not None and latest.is_file_after:
         shared_rows.point_item_at_raw_data(connection, known_item_id, raw_data_id)
@@ -163,7 +163,7 @@ def write_cited_publication(
     return int(publication_id)
 
 
-def withdraw_absent_zotero_rows(
+def withdraw_absent(
     connection: sqlite3.Connection,
     source_code: str,
     collected_at: datetime,
@@ -177,7 +177,7 @@ def withdraw_absent_zotero_rows(
     library deleted in Zotero is withdrawn too.
     """
     # No item: only the other files of the source are compared.
-    latest = catalog.read_latest_catalog(
+    latest = catalog.read_latest(
         connection, source_code, collected_at, raw_data_id, None
     )
     if not latest.is_file_after:

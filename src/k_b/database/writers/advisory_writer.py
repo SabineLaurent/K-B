@@ -22,7 +22,7 @@ INSERT INTO advisory (
 """
 
 
-def write_advisory(
+def write(
     connection: sqlite3.Connection, item: Item, raw_data_id: int
 ) -> Discard | None:
     """The GitHub item and its advisory, unless the advisory is known: the first seen is kept.

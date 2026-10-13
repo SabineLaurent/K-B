@@ -33,7 +33,7 @@ LIMIT 1
 """
 
 
-def write_trends(
+def write(
     connection: sqlite3.Connection, rows: Sequence[TrendRow], raw_data_id: int
 ) -> tuple[int, dict[date, str]]:
     """Write the rows of the ranking of the raw data raw_data_id; return how many were
@@ -43,19 +43,17 @@ def write_trends(
     # A dict keeps the windows left out once each, in the order of the rows.
     windows_left_out: dict[date, None] = {}
     for row in rows:
-        if write_trend(connection, row, raw_data_id):
+        if write_row(connection, row, raw_data_id):
             written_count += 1
         else:
             windows_left_out[row.window_end] = None
     return written_count, {
-        window_end: read_trend_window_collected_at(connection, window_end)
+        window_end: read_window_collected_at(connection, window_end)
         for window_end in windows_left_out
     }
 
 
-def write_trend(
-    connection: sqlite3.Connection, row: TrendRow, raw_data_id: int
-) -> bool:
+def write_row(connection: sqlite3.Connection, row: TrendRow, raw_data_id: int) -> bool:
     """Write the row of the raw data raw_data_id, unless another raw file brought its window:
     the first ranking seen is kept. Return whether the base wrote it."""
     written = connection.execute(
@@ -72,9 +70,7 @@ def write_trend(
     return written is not None
 
 
-def read_trend_window_collected_at(
-    connection: sqlite3.Connection, window_end: date
-) -> str:
+def read_window_collected_at(connection: sqlite3.Connection, window_end: date) -> str:
     (collected_at,) = connection.execute(
         SELECT_TREND_WINDOW_COLLECTED_AT, (format_day(window_end),)
     ).fetchone()

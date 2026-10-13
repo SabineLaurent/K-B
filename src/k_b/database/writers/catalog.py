@@ -32,7 +32,7 @@ class LatestCatalog(NamedTuple):
     is_file_after: int | None
 
 
-def read_latest_catalog(
+def read_latest(
     connection: sqlite3.Connection,
     source_code: str,
     collected_at: datetime,
@@ -61,7 +61,7 @@ def find_withdrawn_at_of_new_row(latest: LatestCatalog) -> str | None:
     return latest.collected_at
 
 
-def discard_from_catalog(
+def build_discard(
     connection: sqlite3.Connection, item: Item, item_id: int, latest: LatestCatalog
 ) -> Discard:
     """The base wrote nothing; the rule names which of its two conditions failed."""
