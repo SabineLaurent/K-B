@@ -15,7 +15,7 @@ from urllib.parse import urlencode
 from k_b.etl.http_download import download
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import SourceReader
-from k_b.items import ARXIV_ID, Item, SourceCode
+from k_b.items import ARXIV_ID, Item, SourceCode, parse_aware_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -192,8 +192,12 @@ def parse_paper(entry: ElementTree.Element, position: int) -> Paper:
         title=read_text(entry, "title", label),
         summary=read_text(entry, "summary", label),
         authors=authors,
-        published_at=read_date(entry, "published", label),
-        updated_at=read_date(entry, "updated", label),
+        published_at=parse_aware_datetime(
+            read_text(entry, "published", label), f"{label}: published"
+        ),
+        updated_at=parse_aware_datetime(
+            read_text(entry, "updated", label), f"{label}: updated"
+        ),
         url=ABSTRACT_PAGE_URL + arxiv_id,
     )
 
@@ -203,18 +207,6 @@ def read_text(entry: ElementTree.Element, field: str, label: str) -> str:
     if not text:
         raise ValueError(f"{label}: {field} is missing")
     return text
-
-
-def read_date(entry: ElementTree.Element, field: str, label: str) -> datetime:
-    """Refuse a date without a time zone: arXiv dates are UTC, written with a final Z."""
-    text = read_text(entry, field, label)
-    try:
-        parsed_date = datetime.fromisoformat(text)
-    except ValueError as error:
-        raise ValueError(f"{label}: {field} is invalid: {text!r}") from error
-    if parsed_date.tzinfo is None:
-        raise ValueError(f"{label}: {field} has no time zone")
-    return parsed_date
 
 
 def convert_paper(paper: Paper, collected_at: datetime, raw_file_path: str) -> Item:

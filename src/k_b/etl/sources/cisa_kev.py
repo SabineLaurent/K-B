@@ -8,6 +8,7 @@ and convert each one into an item.
 
 import csv
 import io
+import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from email.utils import format_datetime
@@ -117,7 +118,7 @@ def parse_vulnerability(row: dict[str, str], line_number: int) -> Vulnerability:
     if any(row[column] is None for column in REQUIRED_COLUMNS):
         raise ValueError(f"line {line_number}: missing fields")
     cve_id = row["cveID"]
-    if not CVE_ID.fullmatch(cve_id):
+    if not re.fullmatch(CVE_ID, cve_id):
         raise ValueError(f"line {line_number}: not a CVE identifier: {cve_id!r}")
     try:
         date_added = date.fromisoformat(row["dateAdded"])

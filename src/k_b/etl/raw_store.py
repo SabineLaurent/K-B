@@ -7,6 +7,8 @@ import tempfile
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
+from k_b.items import parse_aware_datetime
+
 # The folder of raw/ that holds what the watch collects, one folder per source.
 AUTOMATED_WATCH_DIR_NAME = "automated_watch"
 # The folder of raw/ that holds what the user selected (ADR of 2026-10-09).
@@ -64,7 +66,7 @@ def load_last_collection_dates(data_dir: Path) -> dict[str, datetime]:
         if not isinstance(stored_dates, dict):
             raise ValueError("expected an object mapping each source name to a date")
         return {
-            source_name: parse_utc_aware_datetime(stored_date)
+            source_name: parse_aware_datetime(stored_date, f"date of {source_name!r}")
             for source_name, stored_date in stored_dates.items()
         }
     except ValueError as error:
@@ -85,13 +87,3 @@ def save_last_collection_dates(
     write_file_atomically(
         data_dir / COLLECTION_STATE_FILENAME, state_content.encode("utf-8")
     )
-
-
-def parse_utc_aware_datetime(stored_date: object) -> datetime:
-    """Refuse anything but an ISO 8601 date with a time zone: naive dates compare wrongly."""
-    if not isinstance(stored_date, str):
-        raise ValueError(f"expected an ISO 8601 date, got {stored_date!r}")
-    parsed_date = datetime.fromisoformat(stored_date)
-    if parsed_date.tzinfo is None:
-        raise ValueError(f"date without a time zone: {stored_date!r}")
-    return parsed_date
