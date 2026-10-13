@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 from k_b.http_download import download
-from k_b.items import Item, SourceCode
+from k_b.items import ARXIV_ID, Item, SourceCode
 from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.source_contract import SourceReader
 
@@ -51,8 +51,8 @@ FIRST_COLLECTION_START = datetime(2026, 5, 1, tzinfo=UTC)
 # external entities: the standard library parser is safe on this untrusted feed.
 ATOM = "{http://www.w3.org/2005/Atom}"
 OPENSEARCH = "{http://a9.com/-/spec/opensearch/1.1/}"
-# Only papers numbered since 2007 (YYMM.NNNNN) are expected in cs.CR × cs.AI.
-PAPER_ID = re.compile(r"https?://arxiv\.org/abs/(\d{4}\.\d{4,5})v(\d+)")
+# The identifier of an arXiv paper, of either form (items.ARXIV_ID), and its version.
+PAPER_ID = re.compile(rf"https?://arxiv\.org/abs/({ARXIV_ID})v([0-9]+)")
 # arXiv reports an error as a feed whose single entry carries this id.
 API_ERROR_ID = re.compile(r"https?://arxiv\.org/api/errors")
 ABSTRACT_PAGE_URL = "https://arxiv.org/abs/"

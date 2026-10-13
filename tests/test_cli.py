@@ -341,7 +341,7 @@ def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, ca
         in output
     )
     assert "trend rows written: 0" in output
-    assert "vulnerabilities withdrawn: 0" in output
+    assert "rows withdrawn (vulnerabilities, Zotero entries, highlights): 0" in output
     (log_path,) = tmp_path.glob("import-log-*.jsonl")
     assert re.fullmatch(r"import-log-\d{4}-\d{2}-\d{2}T\d{6}Z\.jsonl", log_path.name)
     assert f"log: {log_path}" in output

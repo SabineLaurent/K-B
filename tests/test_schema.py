@@ -2,6 +2,7 @@ import json
 import re
 import sqlite3
 import typing
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -9,10 +10,12 @@ from pydantic import ValidationError
 from k_b.config import RETENTION_YEARS_BY_ACQUISITION_MODE
 from k_b.database.creation import DATABASE_SCRIPTS
 from k_b.items import (
+    HIGHLIGHT_MAX_LENGTH_BY_FIELD,
     MAX_COUNT_BY_KIND,
     MAX_INT64,
     MAX_LENGTH_BY_KIND,
     TREND_REPOSITORY_NAME_MAX_LENGTH,
+    Highlight,
     ItemKind,
     TrendRow,
 )
@@ -30,6 +33,7 @@ EXPECTED_TABLES = {
     "release",
     "advisory",
     "newsletter_article",
+    "zotero_entry",
 }
 
 PAPER_COLUMNS = (
@@ -457,6 +461,10 @@ COLUMN_BY_KIND_AND_FIELD = {
     ("newsletter_article", "title"): ("newsletter_article", "title"),
     ("newsletter_article", "summary"): ("newsletter_article", "summary"),
     ("newsletter_article", "url"): ("newsletter_article", "url"),
+    ("zotero_entry", "item_type"): ("zotero_entry", "item_type"),
+    ("zotero_entry", "title"): ("zotero_entry", "title"),
+    ("zotero_entry", "url"): ("zotero_entry", "url"),
+    ("zotero_entry", "arxiv_id"): ("publication", "arxiv_id"),
 }
 
 
@@ -489,12 +497,15 @@ def list_maximums_of_the_items(maximum_by_kind):
 
 
 def test_each_maximum_length_of_the_items_is_the_check_of_its_column():
-    # \b: not the length( inside json_array_length(. A trend row is not an item: its maximum is
-    # held by TrendRow.
+    # \b: not the length( inside json_array_length(. A trend row and a highlight are not items:
+    # their maximums are held by TrendRow and Highlight.
     assert read_maximums_of_the_schema(
         r"\blength\((\w+)\) <= (\d+)"
     ) == list_maximums_of_the_items(MAX_LENGTH_BY_KIND) | {
         ("trend", "repository_name"): TREND_REPOSITORY_NAME_MAX_LENGTH
+    } | {
+        ("highlight", field): maximum
+        for field, maximum in HIGHLIGHT_MAX_LENGTH_BY_FIELD.items()
     }
 
 
@@ -505,16 +516,18 @@ def test_each_maximum_count_of_the_items_is_the_check_of_its_column():
 
 
 DATE = "2026-10-05T09:30:00Z"
+DATETIME = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
 # A day that does not exist, in the right form.
 INVALID_DATE = "2026-02-30T09:30:00Z"
 PAPER_ITEM_ID = 1
 RELEASE_ITEM_ID = 2
 ADVISORY_ITEM_ID = 3
 NEWSLETTER_ARTICLE_ITEM_ID = 5
+ZOTERO_ENTRY_ITEM_ID = 7
 
 # A row every constraint of its table accepts, in a base that holds the rows of filled_database.
-# The values are those of tests/fixtures (the collection), the long texts cut short; a new source,
-# and a highlight have no collected example.
+# The values are those of tests/fixtures (the collection), the long texts cut short; a new source
+# has no collected example. The Zotero rows are those of the fabricated library.
 VALID_ROW_BY_TABLE = {
     "source": {
         "source_code": "rss",
@@ -542,10 +555,13 @@ VALID_ROW_BY_TABLE = {
         "revised_at": "2026-09-25T13:53:50Z",
     },
     "highlight": {
-        "zotero_key": "ABCD2345",
-        "text": "A highlight",
+        "zotero_key": "ANNOTAA2",
+        "text": "A highlighted sentence on the first page.",
+        "comment": "A comment on it.",
         "highlighted_at": DATE,
-        "item_id": PAPER_ITEM_ID,
+        "revised_at": DATE,
+        "withdrawn_at": DATE,
+        "item_id": ZOTERO_ENTRY_ITEM_ID,
     },
     "trend": {
         "raw_data_id": 1,
@@ -600,6 +616,17 @@ VALID_ROW_BY_TABLE = {
         "summary": "Mistral Large 4 is a one-trillion-parameter multimodal model",
         "url": "https://mistral.ai/news/mistral-large-4/",
     },
+    "zotero_entry": {
+        "item_id": ZOTERO_ENTRY_ITEM_ID,
+        "kind": "zotero_entry",
+        "zotero_key": "AAAAAAA1",
+        "item_type": "preprint",
+        "title": "Prompt injection through tool results",
+        "url": "http://arxiv.org/abs/2609.00001",
+        "saved_at": "2026-10-01T08:15:00Z",
+        "revised_at": DATE,
+        "withdrawn_at": DATE,
+    },
 }
 
 
@@ -626,7 +653,17 @@ REFUSED_VALUES = [
     ("publication", "submitted_at IS strftime", {"submitted_at": INVALID_DATE}),
     ("publication", "revised_at IS strftime", {"revised_at": INVALID_DATE}),
     ("publication", "(item_id IS NULL) = (title IS NULL)", {"title": None}),
+    ("highlight", "zotero_key GLOB", {"zotero_key": "annotaa2"}),
+    (
+        "highlight",
+        "text IS NOT NULL OR comment IS NOT NULL",
+        {"text": None, "comment": None},
+    ),
+    ("highlight", "length(text) <= 10000", {"text": "x" * 10_001}),
+    ("highlight", "length(comment) <= 10000", {"comment": "x" * 10_001}),
     ("highlight", "highlighted_at IS strftime", {"highlighted_at": INVALID_DATE}),
+    ("highlight", "revised_at IS strftime", {"revised_at": INVALID_DATE}),
+    ("highlight", "withdrawn_at IS strftime", {"withdrawn_at": INVALID_DATE}),
     # A window ends on a day: an hour of that day is refused.
     ("trend", "window_end IS strftime", {"window_end": "2026-10-10T09:30:00Z"}),
     ("trend", "repository_id > 0", {"repository_id": 0}),
@@ -682,6 +719,15 @@ REFUSED_VALUES = [
     ("newsletter_article", "length(summary) <= 5000", {"summary": "x" * 5_001}),
     ("newsletter_article", "url GLOB", {"url": "http://mistral.ai/news/"}),
     ("newsletter_article", "length(url) <= 2000", {"url": "https://" + "x" * 1_993}),
+    ("zotero_entry", "kind = 'zotero_entry'", {"kind": "paper"}),
+    ("zotero_entry", "zotero_key GLOB", {"zotero_key": "aaaaaaa1"}),
+    ("zotero_entry", "length(item_type) <= 100", {"item_type": "x" * 101}),
+    ("zotero_entry", "length(title) <= 1000", {"title": "x" * 1_001}),
+    ("zotero_entry", "url GLOB", {"url": "ftp://arxiv.org/abs/2609.00001"}),
+    ("zotero_entry", "length(url) <= 2000", {"url": "https://" + "x" * 1_993}),
+    ("zotero_entry", "saved_at IS strftime", {"saved_at": INVALID_DATE}),
+    ("zotero_entry", "revised_at IS strftime", {"revised_at": INVALID_DATE}),
+    ("zotero_entry", "withdrawn_at IS strftime", {"withdrawn_at": INVALID_DATE}),
 ]
 
 
@@ -700,6 +746,7 @@ def filled_database(database):
         (RELEASE_ITEM_ID, "release"),
         (ADVISORY_ITEM_ID, "advisory"),
         (NEWSLETTER_ARTICLE_ITEM_ID, "newsletter_article"),
+        (ZOTERO_ENTRY_ITEM_ID, "zotero_entry"),
     ):
         insert_row(database, "item", id=item_id, kind=kind)
     insert_row(
@@ -993,3 +1040,29 @@ def test_each_clause_of_the_reference_checks_has_its_refused_value():
         r"item_id IS NOT NULL OR \((\w+) IS NULL AND (\w+) IS NULL\)",
         definitions["vulnerability"],
     ) == [COLUMNS_ALLOWED_ONLY_WITH_THEIR_ITEM]
+
+
+# The Zotero keys the item refuses: the base refuses them too, in both tables.
+@pytest.mark.parametrize(
+    "zotero_key", ["", "annotaa2", "ANNOTAA", "ANNOTAA22", "ANNOT-A2", "ANNOTA\u00c92"]
+)
+@pytest.mark.parametrize("table", ["highlight", "zotero_entry"])
+def test_a_zotero_key_the_item_refuses_is_refused_by_the_base(
+    filled_database, table, zotero_key
+):
+    with pytest.raises(ValidationError):
+        Highlight(
+            zotero_key=zotero_key,
+            text="A highlighted sentence on the first page.",
+            comment=None,
+            highlighted_at=DATETIME,
+        )
+    with pytest.raises(
+        sqlite3.IntegrityError,
+        match=re.escape("CHECK constraint failed: zotero_key GLOB"),
+    ):
+        insert_row(filled_database, table, zotero_key=zotero_key)
+
+
+def test_a_highlight_without_text_is_accepted(filled_database):
+    insert_row(filled_database, "highlight", text=None)

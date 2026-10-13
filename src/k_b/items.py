@@ -30,7 +30,12 @@ SourceCode = Literal[
 
 # The kinds of item of schema.sql: a test keeps both lists equal.
 ItemKind = Literal[
-    "paper", "vulnerability", "newsletter_article", "release", "advisory"
+    "paper",
+    "vulnerability",
+    "newsletter_article",
+    "release",
+    "advisory",
+    "zotero_entry",
 ]
 
 # knownRansomwareCampaignUse of CISA KEV.
@@ -39,6 +44,14 @@ RansomwareUse = Literal["Known", "Unknown"]
 CVE_ID = re.compile(r"CVE-\d{4}-\d{4,}")
 # The slug of a newsletter edition, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
 EDITION_SLUG = re.compile(r"[a-z]+")
+# An arXiv identifier without its version, as text: the form of since 2007 (2609.31282), or the
+# one of before (hep-th/9901001, math.GT/0309136). sources/arxiv.py reads it in the identifier
+# of a paper, sources/zotero.py in the reference of a document. [0-9], not \d: \d matches any
+# Unicode digit, and a fullwidth one would make another publication.
+ARXIV_ID = r"(?:[0-9]{4}\.[0-9]{4,5}|[a-z]+(?:-[a-z]+)?(?:\.[A-Z]{2})?/[0-9]{7})"
+# The key Zotero gives a document or an annotation; the GLOB of schema.sql. Zotero's own
+# alphabet is narrower: this form refuses no key it gives.
+ZOTERO_KEY = r"[0-9A-Z]{8}"
 # The largest integer SQLite holds, and BigQuery gives (INT64).
 MAX_INT64 = 2**63 - 1
 # The longest name a ranking may write in trend.repository_name, held by a CHECK too. A wide
@@ -77,10 +90,11 @@ def check_text_has_no_control_character(text: str) -> str:
 
 NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
 # Kept as given, not as pydantic's HttpUrl, which rewrites it (adds a final slash): the base
-# keeps the URL the source gave, without its utm_* parameters (merge.py).
-HttpsUrl = Annotated[
+# keeps the URL the source gave, without its utm_* parameters (merge.py). http is accepted for
+# a Zotero entry only (check_url_scheme): Zotero keeps the URL a document was saved from.
+WebUrl = Annotated[
     str,
-    StringConstraints(pattern=r"^https://\S+$"),
+    StringConstraints(pattern=r"^https?://\S+$"),
     AfterValidator(check_url_can_be_normalized),
 ]
 CveId = Annotated[str, StringConstraints(pattern=r"^CVE-\d{4}-\d{4,}$")]
@@ -91,12 +105,15 @@ RepositoryName = Annotated[str, StringConstraints(pattern=r"^[^/\s]+/[^/\s]+$")]
 NewsletterEdition = Annotated[
     str, StringConstraints(pattern=f"^{EDITION_SLUG.pattern}$")
 ]
+ArxivId = Annotated[str, StringConstraints(pattern=f"^{ARXIV_ID}$")]
+ZoteroKey = Annotated[str, StringConstraints(pattern=f"^{ZOTERO_KEY}$")]
 
 # The fields each kind must fill, so that an entry the base would refuse is refused when read:
 # one refused row would otherwise fail the whole import.
 REQUIRED_FIELDS_BY_KIND = {
-    "paper": ("summary", "published_at", "revised_at"),
+    "paper": ("url", "summary", "published_at", "revised_at"),
     "vulnerability": (
+        "url",
         "cve",
         "summary",
         "published_at",
@@ -104,19 +121,22 @@ REQUIRED_FIELDS_BY_KIND = {
         "product",
         "ransomware_use",
     ),
-    "release": ("published_at", "repository_name", "tag_name"),
-    "advisory": ("published_at",),
-    "newsletter_article": ("summary", "published_at", "edition", "rank"),
+    "release": ("url", "published_at", "repository_name", "tag_name"),
+    "advisory": ("url", "published_at"),
+    "newsletter_article": ("url", "summary", "published_at", "edition", "rank"),
+    # A Zotero entry may have no URL (ADR of 2026-10-13).
+    "zotero_entry": ("item_type", "saved_at"),
 }
 # The source of each kind. Written to a reference table as the item of its source of truth, an
-# item of another source would mark a CVE as exploited, or overwrite a paper (#138 widens it for
-# Zotero); a release or an advisory is a GitHub subtype, a newsletter article a TLDR one.
+# item of another source would mark a CVE as exploited, or overwrite a paper; a release or an
+# advisory is a GitHub subtype, a newsletter article a TLDR one, an entry a Zotero one.
 SOURCE_BY_KIND = {
     "paper": "arxiv",
     "vulnerability": "cisa_kev",
     "release": "github",
     "advisory": "github",
     "newsletter_article": "tldr",
+    "zotero_entry": "zotero",
 }
 # The fields only one kind may fill.
 FIELDS_OF_ONE_KIND = {
@@ -124,8 +144,10 @@ FIELDS_OF_ONE_KIND = {
     "release": ("repository_name", "tag_name", "release_name"),
     "advisory": ("package_names",),
     "newsletter_article": ("edition", "rank"),
+    "zotero_entry": ("item_type", "arxiv_id", "highlights"),
 }
 KINDS_WITH_CVE = ("vulnerability", "advisory")
+KINDS_WITH_HTTP_URL = ("zotero_entry",)
 
 # The longest text a source may write in each column of schema.sql, in characters, by kind and
 # by the field that fills the column. Held twice (ADR of 2026-10-08): here when the raw is
@@ -158,6 +180,8 @@ MAX_LENGTH_BY_KIND: dict[ItemKind, dict[str, int]] = {
         "summary": 5_000,
         "url": 2_000,
     },
+    # Wide bounds: 91 characters at most for a title of the extract of 2026-10-13.
+    "zotero_entry": {"item_type": 100, "title": 1_000, "url": 2_000, "arxiv_id": 20},
 }
 # The lists written as JSON: the most elements, held by a CHECK too, and the longest element,
 # held here only (a CHECK of SQLite cannot go through the elements of a JSON list).
@@ -171,6 +195,35 @@ MAX_ELEMENT_LENGTH_BY_KIND: dict[ItemKind, dict[str, int]] = {
 }
 
 
+# The longest text of a highlight, in characters, held by a CHECK of highlight too; a test keeps
+# both equal. A wide bound: 825 characters at most in the extract of 2026-10-13.
+HIGHLIGHT_MAX_LENGTH_BY_FIELD = {"text": 10_000, "comment": 10_000}
+
+
+class Highlight(BaseModel):
+    """A highlight of a PDF of a Zotero entry: a row of the highlight table, written with its
+    entry."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    zotero_key: ZoteroKey
+    # Absent when Zotero gives none: the highlight is kept for its comment (decision of
+    # 2026-10-13). A highlight without either is not one (check_text_or_comment).
+    text: Annotated[str, Field(max_length=HIGHLIGHT_MAX_LENGTH_BY_FIELD["text"])] | None
+    comment: (
+        Annotated[str, Field(max_length=HIGHLIGHT_MAX_LENGTH_BY_FIELD["comment"])]
+        | None
+    )
+    # dateAdded of Zotero.
+    highlighted_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def check_text_or_comment(self) -> "Highlight":
+        if self.text is None and self.comment is None:
+            raise ValueError("a highlight without text or comment")
+        return self
+
+
 class Item(BaseModel):
     # strict: a date given as text is refused, not parsed.
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
@@ -179,7 +232,8 @@ class Item(BaseModel):
     source_item_id: NonEmptyText
     kind: ItemKind
     title: NonEmptyText
-    url: HttpsUrl
+    # None for a Zotero entry only (REQUIRED_FIELDS_BY_KIND).
+    url: WebUrl | None = None
     authors: tuple[NonEmptyText, ...] = ()
     published_at: AwareDatetime | None = None
     # arXiv only: the date of the version read.
@@ -206,6 +260,11 @@ class Item(BaseModel):
     # from 1. published_at is the day of the edition, at midnight UTC.
     edition: NewsletterEdition | None = None
     rank: Annotated[int, Field(ge=1, le=MAX_INT64)] | None = None
+    # Zotero entry only: source_item_id is its Zotero key; its type of document, its arXiv
+    # reference without version, and the highlights of its PDF, in the order of the extract.
+    item_type: NonEmptyText | None = None
+    arxiv_id: ArxivId | None = None
+    highlights: tuple[Highlight, ...] = ()
 
     @model_validator(mode="after")
     def check_the_fields_of_its_kind(self) -> "Item":
@@ -214,6 +273,8 @@ class Item(BaseModel):
         check_fields_of_other_kinds(self)
         check_cve(self)
         check_lengths(self)
+        check_url_scheme(self)
+        check_zotero_key(self)
         return self
 
 
@@ -252,6 +313,26 @@ def check_fields_of_other_kinds(item: Item) -> None:
 def check_cve(item: Item) -> None:
     if item.cve is not None and item.kind not in KINDS_WITH_CVE:
         raise ValueError(f"a {item.kind} item with a CVE")
+
+
+def check_url_scheme(item: Item) -> None:
+    if (
+        item.url is not None
+        and not item.url.startswith("https://")
+        and item.kind not in KINDS_WITH_HTTP_URL
+    ):
+        raise ValueError(
+            f"url not https for a {item.kind} item: {len(item.url)} characters"
+        )
+
+
+def check_zotero_key(item: Item) -> None:
+    if item.kind == "zotero_entry" and not re.fullmatch(
+        ZOTERO_KEY, item.source_item_id
+    ):
+        raise ValueError(
+            f"source_item_id not a Zotero key: {len(item.source_item_id)} characters"
+        )
 
 
 def check_lengths(item: Item) -> None:

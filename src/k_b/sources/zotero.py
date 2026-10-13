@@ -1,4 +1,5 @@
-"""The Zotero source: extract the documents of the user's library and their highlights (E).
+"""The Zotero source: extract the documents of the user's library and their highlights (E),
+then read an extract into Zotero entries (T).
 
 Zotero keeps its library in an SQLite database, zotero.sqlite, that it locks while it runs. The
 source never opens it: it copies the file and its write-ahead log to a temporary folder, checks
@@ -16,9 +17,22 @@ import stat
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Annotated, Any, NamedTuple
 
+from pydantic import (
+    AfterValidator,
+    AwareDatetime,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    ValidationError,
+)
+from pydantic_core import InitErrorDetails
+
+from k_b.items import ARXIV_ID, Highlight, Item, SourceCode
 from k_b.raw_store import SELECTED_LIBRARY_DIR_NAME
+from k_b.source_contract import SourceReader
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +149,13 @@ ORDER BY document.dateAdded, document.itemID
 """
 # The columns the query returns as a JSON list.
 JSON_COLUMNS = ("authors", "tags", "pdfs", "highlights")
+
+SOURCE_CODE: SourceCode = "zotero"
+# A date of Zotero: UTC, written without its time zone (2026-10-01 08:15:00).
+ZOTERO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}")
+ARXIV_REFERENCE_PREFIX = "arXiv:"
+# archiveID of an arXiv paper, its version left out: the publication is known without it.
+ARXIV_REFERENCE = re.compile(rf"{ARXIV_REFERENCE_PREFIX}({ARXIV_ID})(?:v[0-9]+)?")
 
 
 class ZoteroCopyInconsistentError(Exception):
@@ -312,3 +333,127 @@ def describe_query_error(error: sqlite3.DatabaseError) -> str:
     if sqlite_error_name is None:
         return type(error).__name__
     return f"{type(error).__name__} ({sqlite_error_name})"
+
+
+def mark_as_utc(zotero_date: object) -> object:
+    """Give a date of Zotero its time zone, UTC; pydantic then reads it, and refuses a day that
+    does not exist."""
+    if not isinstance(zotero_date, str) or not ZOTERO_DATE.fullmatch(zotero_date):
+        raise ValueError("not a date of Zotero (YYYY-MM-DD HH:MM:SS)")
+    return f"{zotero_date}Z"
+
+
+def read_arxiv_id(archive_id: str | None) -> str | None:
+    """The arXiv identifier of an archiveID; None when the document has no arXiv reference."""
+    if not archive_id or not archive_id.startswith(ARXIV_REFERENCE_PREFIX):
+        return None
+    reference = ARXIV_REFERENCE.fullmatch(archive_id)
+    if reference is None:
+        raise ValueError(
+            f"archive_id not an arXiv reference: {len(archive_id)} characters"
+        )
+    return reference.group(1)
+
+
+ZoteroDate = Annotated[AwareDatetime, BeforeValidator(mark_as_utc)]
+
+
+class ZoteroHighlight(BaseModel):
+    """A highlight of the extract. Not read: its PDF and its page (ADR of 2026-10-13)."""
+
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    key: str
+    text: str | None
+    comment: str | None
+    date_added: ZoteroDate
+
+
+class ZoteroDocument(BaseModel):
+    """A document of the extract. Not read, to keep out of the base (ADR of 2026-10-13): its
+    date, its authors, its tags, its PDF; validating them would refuse a document for a field
+    the base does not keep."""
+
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    key: str
+    item_type: str
+    title: str
+    date_added: ZoteroDate
+    url: str | None
+    arxiv_id: Annotated[str | None, AfterValidator(read_arxiv_id)] = Field(
+        validation_alias="archive_id"
+    )
+    highlights: list[ZoteroHighlight]
+
+
+def read_documents(raw_extract: bytes) -> list[object]:
+    """The entries of an extract; an extract that is not a JSON list cannot be read. Each entry
+    is validated when converted: one invalid entry is rejected alone."""
+    try:
+        documents = json.loads(raw_extract)
+    except ValueError:
+        documents = None
+    if not isinstance(documents, list):
+        raise ValueError("extract not a JSON list")
+    return documents
+
+
+def convert_document(entry: object, collected_at: datetime, raw_file_path: str) -> Item:
+    """A document of the extract as a Zotero entry, with its highlights.
+
+    Refused, the error names each field, its error and its measure, never its value: a title or
+    a highlight is a personal data of the user, and goes into the import log.
+    """
+    try:
+        document = ZoteroDocument.model_validate(entry)
+        return Item(
+            source_code=SOURCE_CODE,
+            source_item_id=document.key,
+            kind="zotero_entry",
+            title=document.title,
+            url=document.url,
+            saved_at=document.date_added,
+            collected_at=collected_at,
+            raw_file_path=raw_file_path,
+            item_type=document.item_type,
+            arxiv_id=document.arxiv_id,
+            highlights=tuple(
+                Highlight(
+                    zotero_key=highlight.key,
+                    # An empty text or comment is an absent one: stored NULL alike, the next
+                    # extract giving the other form is not a revision.
+                    text=highlight.text or None,
+                    comment=highlight.comment or None,
+                    highlighted_at=highlight.date_added,
+                )
+                for highlight in document.highlights
+                # Without text or comment, a highlight says nothing: left out, its document
+                # is not refused (decision of 2026-10-13).
+                if highlight.text or highlight.comment
+            ),
+        )
+    except ValidationError as error:
+        raise without_values(error) from None
+
+
+def without_values(error: ValidationError) -> ValidationError:
+    """The same errors, without the value each one received."""
+    line_errors = []
+    for detail in error.errors():
+        line_error: InitErrorDetails = {
+            "type": detail["type"],
+            "loc": detail["loc"],
+            "input": None,
+        }
+        if "ctx" in detail:
+            line_error["ctx"] = detail["ctx"]
+        line_errors.append(line_error)
+    return ValidationError.from_exception_data(
+        error.title, line_errors, hide_input=True
+    )
+
+
+READER: SourceReader[object] = SourceReader(
+    SOURCE_CODE, read_documents, convert_document
+)

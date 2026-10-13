@@ -2,6 +2,7 @@ from itertools import permutations
 
 from k_b.source_contract import find_source_kind, list_sources
 from k_b.source_kinds import SOURCE_KINDS
+from k_b.sources.zotero import READER
 
 
 def test_the_sources_are_collected_in_the_order_of_2026_10_06():
@@ -35,9 +36,9 @@ def test_no_folder_prefix_covers_another():
         assert not other.startswith(prefix + "_")
 
 
-def test_zotero_is_declared_without_a_reader_and_without_an_instance():
+def test_zotero_is_declared_with_its_reader_and_without_an_instance():
     # Its instance needs the Zotero data directory: cli.py creates it from KB_ZOTERO_DIR.
     kind = find_source_kind("zotero", SOURCE_KINDS)
 
     assert kind is not None
-    assert (kind.folder_prefix, kind.sources, kind.reader) == ("zotero", (), None)
+    assert (kind.folder_prefix, kind.sources, kind.reader) == ("zotero", (), READER)

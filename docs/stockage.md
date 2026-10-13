@@ -75,16 +75,19 @@ elles ne sont pas recopiées ici. Un test (`tests/test_schema.py`) vérifie que 
 `items.py` est égal au `CHECK` de sa colonne, dans les deux sens.
 
 - **Colonnes bornées** : celles qu'une source remplit, dans `publication`, `vulnerability`,
-  `release`, `advisory` et `newsletter_article` ; et `trend.repository_name`, dont le maximum
-  est tenu par `TrendRow` (`TREND_REPOSITORY_NAME_MAX_LENGTH`, même fichier), une ligne de
-  classement n'étant pas un item. Un nom plus long fait refuser le classement entier.
+  `release`, `advisory`, `newsletter_article` et `zotero_entry` ; `trend.repository_name`, dont
+  le maximum est tenu par `TrendRow` (`TREND_REPOSITORY_NAME_MAX_LENGTH`, même fichier), une
+  ligne de classement n'étant pas un item : un nom plus long fait refuser le classement entier ;
+  `highlight.text` et `highlight.comment`, tenus par `Highlight`
+  (`HIGHLIGHT_MAX_LENGTH_BY_FIELD`, même fichier) : un surlignage trop long fait rejeter son
+  document entier. La clé Zotero (`zotero_key`, 8 caractères) est tenue par sa forme
+  (`GLOB`), pas par une longueur.
 - **Listes JSON** : le nombre d'éléments est borné deux fois, par l'item et par un
   `CHECK (json_array_length(colonne) <= n)`. La longueur de chaque élément n'est tenue que par
   l'item : un `CHECK` de SQLite ne peut pas parcourir les éléments d'une liste (pas de
   sous-requête dans un `CHECK`).
 - **Colonnes sans borne** : celles que le code remplit (`source`, `tracked_repository`, le chemin
-  et le flux de `raw_data`) ; les dates et les listes fermées, tenues par leur propre `CHECK` ;
-  `highlight`, pas encore remplie, dont les bornes sont à fixer avec son lecteur.
+  et le flux de `raw_data`) ; les dates et les listes fermées, tenues par leur propre `CHECK`.
 - **Limite de SQLite** : `length()` compte les caractères jusqu'au premier caractère NUL, alors
   que l'item les compte tous. Les deux contrôles peuvent donc diverger, dans les deux sens : un
   texte qui contient un NUL peut passer le `CHECK` en étant plus long que le maximum ; un
@@ -95,7 +98,7 @@ elles ne sont pas recopiées ici. Un test (`tests/test_schema.py`) vérifie que 
 
 ### Ce que chaque source met dans l'item, puis dans la base
 
-Les lecteurs écrits à ce jour : arXiv, CISA KEV, releases et alertes GitHub, tldr.tech. Chaque entrée du
+Les lecteurs écrits à ce jour : arXiv, CISA KEV, releases et alertes GitHub, tldr.tech, Zotero. Chaque entrée du
 brut devient un item (`src/k_b/items.py`), que l'import (`src/k_b/import_items.py`) écrit dans la
 table de sa sorte (`kind`). Exception : GH Archive, dont chaque ligne de classement (`TrendRow`,
 `src/k_b/items.py`) devient une ligne de `trend`, sans item.
@@ -125,6 +128,12 @@ table de sa sorte (`kind`). Exception : GH Archive, dont chaque ligne de classem
 | | `rank` | position de l'entrée parmi les `<article>` de la page, à partir de 1 | `newsletter_article.rank` |
 | | `title`, `summary` | texte de `a.font-bold`, texte de `div.newsletter-html` | `newsletter_article.title`, `newsletter_article.summary` |
 | | `url` | `href` de `a.font-bold`, sans ses `utm_*` | `newsletter_article.url` |
+| Zotero (`zotero_entry`) | `source_item_id` | `key` du document | `zotero_entry.zotero_key` |
+| | `item_type`, `title` | `item_type`, `title` | `zotero_entry.item_type`, `zotero_entry.title` |
+| | `url` | `url`, `http` ou `https`, sans ses `utm_*` ; peut manquer | `zotero_entry.url` |
+| | `saved_at` | `date_added` (date de Zotero, UTC) | `zotero_entry.saved_at` |
+| | `arxiv_id` | `archive_id` `arXiv:<id>`, sans préfixe ni version, forme d'après 2007 (`2609.31282`) ou d'avant (`hep-th/9901001`) | `zotero_entry.publication_id` (`publication.arxiv_id`) |
+| | `highlights` (`Highlight`) | `key`, `text`, `comment`, `date_added` de chaque surlignage | `highlight.zotero_key`, `highlight.text`, `highlight.comment`, `highlight.highlighted_at` |
 | GH Archive (pas un item : `TrendRow`) | `window_end` | dernier jour de la fenêtre de 3 jours, à minuit UTC | `trend.window_end` |
 | | `repository_id`, `repository_name` | `repo.id`, dernier `repo.name` vu dans la fenêtre | `trend.repository_id`, `trend.repository_name` |
 | | `stars_gained`, `forks_gained` | nombre de `WatchEvent` et de `ForkEvent` de la fenêtre | `trend.stars_gained`, `trend.forks_gained` |
@@ -144,7 +153,29 @@ table de sa sorte (`kind`). Exception : GH Archive, dont chaque ligne de classem
 - L'identifiant d'un article TLDR dans l'item (`ai/2026-10-08#3` : édition, date, rang) n'est
   pas stocké : ses trois parties sont les colonnes de sa clé. `newsletter_article.publication_id`
   (le papier cité) n'est pas encore rempli.
-- Pas encore lus : les clips du Web Clipper, Zotero. Le
+- **Zotero** (#138, journal ADR, 2026-10-13) :
+  - Un document dont `archive_id` est une référence arXiv pointe vers sa `publication`, créée
+    avec sa seule référence si arXiv ne l'a pas encore donnée (ses colonnes arXiv restent vides
+    jusque-là). Un document sans référence arXiv n'a pas de publication. Deux entrées du même
+    papier arXiv pointent vers la même publication.
+  - Ne vont pas en base : le champ `date` du document, ses auteurs, ses étiquettes, ses PDF
+    (chemin et clé), la page d'un surlignage ; ils restent dans l'extrait brut. Un document hors
+    arXiv n'a donc ni date de publication ni auteurs en base, et `kb search` ne peut pas filtrer
+    par étiquette.
+  - Un `archive_id` qui commence par `arXiv:` sans en avoir l'une des deux formes (chiffres
+    ASCII seulement), une date d'une autre forme que `AAAA-MM-JJ HH:MM:SS` ou un titre absent
+    font rejeter le document entier, au journal d'import. Un surlignage sans texte est gardé
+    pour son commentaire (`highlight.text` absent) ; sans texte ni commentaire, il n'entre pas
+    en base, et son document n'est pas rejeté (un `CHECK` de `highlight` exige l'un des deux).
+    Un texte ou un commentaire vide est rangé absent (NULL) : un extrait qui donnerait l'autre
+    forme ne date pas de révision. Un extrait qui n'est pas une liste JSON, ou trop imbriqué
+    pour être lu (`RecursionError`, pour toutes les sources, #103), est rejeté entier. Le motif du rejet nomme le champ, l'erreur et la
+    mesure, jamais la valeur : un titre ou un surlignage est une donnée personnelle.
+  - L'URL est gardée en `http` si Zotero la donne ainsi (les 5 documents de l'extrait du
+    2026-10-13) ; les autres sortes exigent `https`.
+  - Un texte de surlignage n'est pas contrôlé pour le caractère NUL, comme les autres textes
+    (« Limite de SQLite » ci-dessus).
+- Pas encore lus : les clips du Web Clipper. Le
   classement des dépôts les plus étoilés n'entre pas dans la base (journal
   ADR, 2026-10-07).
 
@@ -179,7 +210,8 @@ source ne touche pas aux tables.
 | `release` | sous-type d'item : une release d'un dépôt suivi | `id`, `item_id`, `kind`, `tracked_repository_id`, `release_id`, `tag_name`, `name`, `body`, `published_at`, `url` |
 | `advisory` | sous-type d'item : une alerte de sécurité GitHub | `id`, `item_id`, `kind`, `ghsa_id`, `vulnerability_id`, `summary`, `published_at`, `url`, `packages` |
 | `newsletter_article` | sous-type d'item : un article résumé par une édition TLDR ; clé (édition, date, rang) | `id`, `item_id`, `kind`, `edition`, `edition_date`, `rank`, `title`, `summary`, `url`, `publication_id` |
-| `highlight` | les surlignages Zotero ; pas encore remplie | `highlight_id`, `zotero_key`, `text`, `highlighted_at`, `item_id` |
+| `zotero_entry` | sous-type d'item : un document de la bibliothèque Zotero ; catalogue d'état ; clé `zotero_key` | `id`, `item_id`, `kind`, `zotero_key`, `item_type`, `title`, `url`, `saved_at`, `publication_id`, `revised_at`, `withdrawn_at` |
+| `highlight` | un surlignage d'un PDF d'une entrée Zotero ; catalogue d'état ; clé `zotero_key` | `highlight_id`, `zotero_key`, `text`, `comment`, `highlighted_at`, `revised_at`, `withdrawn_at`, `item_id` |
 | `trend` | TENDANCE : les dépôts qui montent d'un classement GH Archive, une ligne par fenêtre de 3 jours et par dépôt ; pas un item ; clé (`window_end`, `repository_id`) | `id`, `raw_data_id`, `window_end`, `repository_id`, `repository_name`, `stars_gained`, `forks_gained` |
 
 - **Mode d'acquisition** : `source.acquisition_mode` vaut `watch`, `library` ou `wiki`, tenu par
@@ -194,14 +226,16 @@ source ne touche pas aux tables.
   `vulnerability`.
 - **Index** : sur les clés étrangères, que SQLite n'indexe pas d'office (`raw_data.source_id`,
   `item.raw_data_id`, `highlight.item_id`, `release.tracked_repository_id`,
-  `advisory.vulnerability_id`, `newsletter_article.publication_id`, `trend.raw_data_id`). Les
+  `advisory.vulnerability_id`, `newsletter_article.publication_id`, `trend.raw_data_id`,
+  `zotero_entry.publication_id`). Les
   contraintes `UNIQUE` créent
   leur propre index.
 - **Suppressions en cascade** : seulement de `item` vers `highlight`. Il n'y en a pas vers `publication`, `vulnerability`, `release`,
-  `advisory` ni `newsletter_article` : supprimer un item qu'une de ces tables référence est refusé par la clé
+  `advisory`, `newsletter_article` ni `zotero_entry` : supprimer un item qu'une de ces tables référence est refusé par la clé
   étrangère. La purge n'est pas codée.
 - **Formats contrôlés** par un `CHECK` : les dates (ci-dessus) ; `cve_id` (`CVE-AAAA-NNNN…`) ;
-  `repository_name` (`owner/repo`) ; `ghsa_id` (`GHSA-…`) ; `url` (`https://…`) ; `edition` (lettres minuscules sans accent) ; les listes
+  `repository_name` (`owner/repo`) ; `ghsa_id` (`GHSA-…`) ; `url` (`https://…`, ou `http://…`
+  pour `zotero_entry`) ; `zotero_key` (8 caractères `0-9A-Z`) ; `edition` (lettres minuscules sans accent) ; les listes
   fermées (`source_type`, `acquisition_mode`, `kind`, `ransomware_use`, `ecosystem`) ; les listes
   JSON non vides ; `tag_name` non vide ; dans `trend`, `window_end` à minuit UTC, `repository_id` > 0,
   `stars_gained` et `forks_gained` ≥ 0 ; les longueurs maximales.

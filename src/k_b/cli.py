@@ -149,7 +149,10 @@ def run_import(data_dir: Path) -> int:
         "items and trend windows left out (duplicates or versions not newer):"
         f" {summary.discard_count}"
     )
-    print(f"vulnerabilities withdrawn: {summary.withdrawn_count}")
+    print(
+        "rows withdrawn (vulnerabilities, Zotero entries, highlights):"
+        f" {summary.withdrawn_count}"
+    )
     print(f"rejections: {summary.rejection_count}")
     print(f"log: {log_path}")
     return 0

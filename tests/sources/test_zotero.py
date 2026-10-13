@@ -8,13 +8,18 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
+from k_b.items import Highlight
 from k_b.sources import zotero
 from k_b.sources.zotero import (
+    READER,
     ZoteroChangedDuringCopyError,
     ZoteroCopyInconsistentError,
     ZoteroQueryFailedError,
     ZoteroSource,
+    convert_document,
+    read_documents,
 )
 
 PAPER_WITH_HIGHLIGHTS = {
@@ -487,3 +492,184 @@ def test_zotero_is_stored_in_the_library_the_user_selected():
         "zotero",
         "json",
     )
+
+
+COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
+EXTRACT_PATH = "selected_library/zotero/2026-10-05T093000Z.json"
+
+
+def convert(document):
+    return convert_document(document, COLLECTED_AT, EXTRACT_PATH)
+
+
+def with_changes(document, **changes):
+    return {**document, **changes}
+
+
+def with_first_highlight_changed(document, **changes):
+    first, *others = document["highlights"]
+    return {**document, "highlights": [{**first, **changes}, *others]}
+
+
+def test_the_reader_reads_every_document_of_an_extract(zotero_dir):
+    raw_extract = ZoteroSource(zotero_dir).fetch(None)
+
+    documents = read_documents(raw_extract)
+
+    assert documents == [PAPER_WITH_HIGHLIGHTS, PAPER_WITHOUT_ANYTHING_ATTACHED]
+    assert READER.source_code == "zotero"
+
+
+def test_a_document_becomes_a_zotero_entry_with_its_highlights_in_order():
+    item = convert(PAPER_WITH_HIGHLIGHTS)
+
+    assert item.model_dump(exclude={"highlights"}, exclude_defaults=True) == {
+        "source_code": "zotero",
+        "source_item_id": "AAAAAAA1",
+        "kind": "zotero_entry",
+        "title": "Prompt injection through tool results",
+        "url": "http://arxiv.org/abs/2609.00001",
+        "saved_at": datetime(2026, 10, 1, 8, 15, tzinfo=UTC),
+        "collected_at": COLLECTED_AT,
+        "raw_file_path": EXTRACT_PATH,
+        "item_type": "preprint",
+        "arxiv_id": "2609.00001",
+    }
+    assert item.highlights == (
+        Highlight(
+            zotero_key="ANNOTAA2",
+            text="A highlighted sentence on the first page.",
+            comment="A comment on it.",
+            highlighted_at=datetime(2026, 10, 5, 8, 42, 30, tzinfo=UTC),
+        ),
+        Highlight(
+            zotero_key="ANNOTAA1",
+            text="A highlighted sentence on the third page.",
+            comment=None,
+            highlighted_at=datetime(2026, 10, 5, 8, 50, tzinfo=UTC),
+        ),
+    )
+
+
+def test_a_document_with_nothing_attached_becomes_an_entry_without_highlight():
+    assert convert(PAPER_WITHOUT_ANYTHING_ATTACHED).highlights == ()
+
+
+def test_the_version_of_an_arxiv_reference_is_left_out():
+    item = convert(with_changes(PAPER_WITH_HIGHLIGHTS, archive_id="arXiv:2609.00001v2"))
+
+    assert item.arxiv_id == "2609.00001"
+
+
+@pytest.mark.parametrize("archive_id", [None, "", "PMID:12345"])
+def test_a_document_without_arxiv_reference_has_no_publication(archive_id):
+    item = convert(with_changes(PAPER_WITH_HIGHLIGHTS, archive_id=archive_id))
+
+    assert item.arxiv_id is None
+
+
+@pytest.mark.parametrize(
+    "archive_id, arxiv_id",
+    [
+        ("arXiv:hep-th/9901001", "hep-th/9901001"),
+        ("arXiv:math.GT/0309136v3", "math.GT/0309136"),
+    ],
+)
+def test_an_arxiv_reference_of_before_2007_is_read(archive_id, arxiv_id):
+    assert convert(
+        with_changes(PAPER_WITH_HIGHLIGHTS, archive_id=archive_id)
+    ).arxiv_id == (arxiv_id)
+
+
+@pytest.mark.parametrize("text", [None, ""])
+def test_a_highlight_without_text_is_read_with_its_comment(text):
+    item = convert(with_first_highlight_changed(PAPER_WITH_HIGHLIGHTS, text=text))
+
+    assert (item.highlights[0].text, item.highlights[0].comment) == (
+        None,
+        "A comment on it.",
+    )
+
+
+@pytest.mark.parametrize(
+    "text, comment", [(None, None), ("", ""), (None, ""), ("", None)]
+)
+def test_a_highlight_without_text_or_comment_is_left_out_without_refusing_its_document(
+    text, comment
+):
+    item = convert(
+        with_first_highlight_changed(PAPER_WITH_HIGHLIGHTS, text=text, comment=comment)
+    )
+
+    assert [highlight.zotero_key for highlight in item.highlights] == ["ANNOTAA1"]
+
+
+def test_an_empty_comment_is_read_absent():
+    item = convert(with_first_highlight_changed(PAPER_WITH_HIGHLIGHTS, comment=""))
+
+    assert item.highlights[0].comment is None
+
+
+def test_a_document_without_url_is_read():
+    assert convert(with_changes(PAPER_WITH_HIGHLIGHTS, url=None)).url is None
+
+
+@pytest.mark.parametrize(
+    "document",
+    [
+        with_changes(PAPER_WITH_HIGHLIGHTS, archive_id="arXiv:cs/010100"),
+        with_changes(
+            PAPER_WITH_HIGHLIGHTS, archive_id="arXiv:\uff12\uff16\uff10\uff19.00001"
+        ),
+        with_changes(PAPER_WITH_HIGHLIGHTS, archive_id="arXiv:2609.00001 "),
+        with_changes(PAPER_WITH_HIGHLIGHTS, date_added="2026-13-45 10:00:00"),
+        with_changes(PAPER_WITH_HIGHLIGHTS, date_added="2026-10-01T08:15:00Z"),
+        with_changes(PAPER_WITH_HIGHLIGHTS, date_added=None),
+        with_changes(PAPER_WITH_HIGHLIGHTS, title=None),
+        with_changes(PAPER_WITH_HIGHLIGHTS, key=None),
+        with_changes(PAPER_WITH_HIGHLIGHTS, url="ftp://arxiv.org/abs/2609.00001"),
+        with_first_highlight_changed(PAPER_WITH_HIGHLIGHTS, date_added="2026-10-05"),
+        {key: value for key, value in PAPER_WITH_HIGHLIGHTS.items() if key != "key"},
+        "a document",
+        1,
+    ],
+)
+def test_an_invalid_document_is_refused_alone(document):
+    with pytest.raises(ValidationError):
+        convert(document)
+
+
+@pytest.mark.parametrize(
+    "document, measure",
+    [
+        (
+            with_changes(PAPER_WITH_HIGHLIGHTS, title="SECRET TITLE\n" * 100),
+            "title too long: 1300 characters, maximum 1000",
+        ),
+        (
+            with_first_highlight_changed(
+                PAPER_WITH_HIGHLIGHTS, text="SECRET HIGHLIGHT\n" * 1_000
+            ),
+            "at most 10000 characters",
+        ),
+        (
+            with_changes(PAPER_WITH_HIGHLIGHTS, archive_id="arXiv:SECRET"),
+            "archive_id",
+        ),
+    ],
+)
+def test_a_refused_document_is_described_by_its_field_and_measure_without_its_value(
+    document, measure
+):
+    with pytest.raises(ValidationError) as refusal:
+        convert(document)
+
+    reason = str(refusal.value)
+    assert "SECRET" not in reason
+    assert measure in reason
+
+
+@pytest.mark.parametrize("raw_extract", [b"not JSON", b"{}", b'"a list"'])
+def test_an_extract_that_is_not_a_json_list_is_unreadable(raw_extract):
+    with pytest.raises(ValueError, match="not a JSON list"):
+        read_documents(raw_extract)

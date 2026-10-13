@@ -257,7 +257,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   seulement si `zotero.sqlite` ou son `-wal` a été modifié depuis la dernière collecte. Les
   valeurs sont celles de Zotero, sans conversion (dates `AAAA-MM-JJ HH:MM:SS` en UTC). Zotero
   ouvert écrit dans son `-wal` sans que la bibliothèque change : un extrait peut être identique
-  au précédent. `kb import` ne lit pas encore ces extraits : rien de Zotero n'entre dans la base.
+  au précédent. `kb import` lit ces extraits vers `zotero_entry` et `highlight` (#138 ; voir
+  [stockage.md](stockage.md) et la règle du catalogue d'état, étape 4).
 - **En cas de panne :** la source échoue par un état nommé, n'écrit rien, et sa date de dernière
   collecte reste ; la collecte suivante recommence. Les états :
   `ZoteroCopyInconsistentError` (le contrôle d'intégrité refuse la copie),
@@ -398,6 +399,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    | flux de nouveautés, **par fenêtre** (variante propre aux classements, #142) | classements GH Archive (table `trend`, pas un item) | inchangée : le premier classement vu d'une fenêtre est gardé entier ; une fenêtre qu'un autre fichier brut a déjà apportée est écartée entière | `INSERT INTO trend … SELECT … WHERE NOT EXISTS (ligne de la même fenêtre venue d'un autre fichier brut) ON CONFLICT (window_end, repository_id) DO NOTHING RETURNING id` | `already_seen`, une ligne par fenêtre |
    | catalogue d'état | CISA KEV | remplacé si son fichier est collecté après le dernier catalogue de la source déjà importé et que son contenu diffère ; `revised_at` prend la date de cette collecte | `ON CONFLICT (cve_id) DO UPDATE … WHERE` (collecte plus récente et contenu différent) `RETURNING id` | `unchanged`, `no_newer_version` |
    | flux avec révisions | arXiv | remplacé si sa révision (`updated`) est plus récente | `ON CONFLICT (arxiv_id) DO UPDATE … WHERE excluded.revised_at > publication.revised_at RETURNING id` | `revision_not_newer` |
+   | catalogue d'état, **à deux niveaux** (#138) | Zotero : l'entrée et chacun de ses surlignages | comme CISA KEV : remplacé si son extrait est collecté après le dernier extrait importé et que son contenu diffère ; `revised_at` prend la date de cette collecte | `ON CONFLICT (zotero_key) DO UPDATE … WHERE` (extrait plus récent, et retiré ou contenu différent) `RETURNING`, pour `zotero_entry` et pour `highlight` | `unchanged`, `no_newer_version` |
 
    - Le flux de nouveautés n'a pas d'`ON CONFLICT` : le sous-type exige un item déjà créé, et
      ITEM n'a pas de clé naturelle. L'item n'est donc créé que si le sous-type est absent ; la
@@ -420,7 +422,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      pas une version. Si la ligne réapparaît dans un catalogue plus récent, elle est réécrite
      même à contenu identique : `withdrawn_at` est vidé, `revised_at` daté, l'item pointe vers
      ce fichier. `kb import` affiche le nombre de lignes retirées
-     (`vulnerabilities withdrawn`).
+     (`rows withdrawn (vulnerabilities, Zotero entries, highlights)`, qui compte aussi les
+     retraits Zotero).
      - **Écart au MCD** (décision de Sabine du 2026-10-12) : un catalogue dont une entrée est
        rejetée, ou qui ne donne aucun item, ne retire rien. Une ligne rejetée est présente, pas
        absente. Une ligne absente d'un tel catalogue est donc retirée au catalogue propre
@@ -460,16 +463,42 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
        l'ordre des collectes, garderait le plus ancien ;
      - une fenêtre annoncée par un fichier sans aucune ligne ne laisse pas de trace : un
        fichier ultérieur de cette fenêtre est écrit.
-   - **Sources sans import** (`zotero`, `clipper`, classement des plus étoilés) :
-     leur nature est décidée par leur issue d'import (#138, #14). Zotero, extrait complet
-     lui aussi, entrera peut-être dans le catalogue d'état : #138 le dira.
+   - **Zotero** (#138, décisions de Sabine du 2026-10-13) : l'extrait est complet à chaque
+     collecte ; seul le dernier compte, pour l'entrée comme pour chaque surlignage. Pourquoi,
+     selon Sabine : les fiches de lecture tirées d'un article restent dans son coffre même si
+     elle supprime l'article dans Zotero, et une modification d'un commentaire ou d'un
+     surlignage doit se reporter en base. Règles, celles de CISA KEV :
+     - un document ou un surlignage modifié dans Zotero est réécrit, `revised_at` daté ; un
+       surlignage modifié compte son entrée comme écrite, et l'item pointe alors vers ce
+       fichier ;
+     - un document ou un surlignage absent d'un extrait plus récent est marqué retiré
+       (`withdrawn_at`), jamais supprimé ; la première absence garde sa date ; un document
+       retiré retire ses surlignages (ils sont absents de l'extrait) ; s'il réapparaît, il est
+       réécrit, `withdrawn_at` vidé et `revised_at` daté, même à contenu identique ;
+     - une entrée dont seul un surlignage est retiré est journalisée `unchanged` et garde son
+       fichier : une absence n'est pas une version ;
+     - un extrait dont un document est rejeté, ou sans document, ne retire rien. **Limite**
+       (acceptée par Sabine le 2026-10-13) : l'extrait étant complet, un document invalide
+       revient dans chaque extrait, et plus rien n'est retiré tant qu'il n'est pas corrigé dans
+       Zotero ; le rejet est écrit au journal et compté par `kb import` à chaque import ;
+     - un extrait importé en retard ne change rien ; ce qu'il est seul à apporter (une entrée,
+       un surlignage) est écrit retiré, à la date du dernier extrait importé, et son entrée est
+       comptée écrite. Il ne crée pas de publication pour une entrée qu'il n'écrit pas.
+       **Limite** (constat de revue, comme celle de CISA KEV du 2026-10-12) : une entrée
+       rejetée dans le dernier extrait, qu'un extrait plus ancien importé en retard apporte
+       valide, est écrite retirée alors qu'elle est encore dans Zotero ; une reconstruction de
+       la base, une fois le rejet corrigé, la règle.
+   - **Sources sans import** (`clipper`, classement des plus étoilés) :
+     leur nature est décidée par leur issue d'import (#14).
    - Une même CVE dans deux sources (une entrée CISA et une alerte GitHub), ou citée par deux
      alertes, n'est **pas** un doublon : chaque alerte est gardée, et toutes pointent vers la
      même vulnérabilité (`vulnerability.cve_id` unique).
    - **Limite** : la base ne trouve que le doublon exact, le même identifiant dans sa source (un
      rejeu de l'ETL, des collectes qui se chevauchent). Le quasi-doublon (même contenu, autre
-     métadonnée) n'est pas trouvé. Pour Zotero (autre clé), il est laissé à #138, qui soumettra
-     une empreinte de contenu.
+     métadonnée) n'est pas trouvé. Pour Zotero (décision de Sabine du 2026-10-13) : la clé
+     est la clé Zotero seule, sans empreinte de contenu ; un même papier arXiv enregistré deux
+     fois fait deux entrées, qui pointent vers la même publication ; un document hors arXiv
+     enregistré deux fois fait deux entrées que rien ne relie.
    - **Articles TLDR** (#57, décisions de Sabine du 2026-10-12) : la clé est (édition, date de
      l'édition, rang), celle de l'ADR du 2026-10-07 ; l'URL, rangée sans `utm_*`, n'est ni
      unique ni dans la clé ; pas d'empreinte de contenu. Mesuré sur les 18 pages collectées
