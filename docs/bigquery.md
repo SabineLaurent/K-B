@@ -62,7 +62,7 @@ La commande n'affiche jamais la clé, seulement :
 
 `kb collect` (source `gh_archive`) fait un `dry_run`, puis exécute la requête avec
 `maximum_bytes_billed` = **650 Mo par fenêtre, 2 Go au plus** (`compute_bytes_cap`,
-`src/k_b/sources/gh_archive.py`). Au-delà, la source échoue sans rien exécuter ; seul un
+`src/k_b/etl/sources/gh_archive.py`). Au-delà, la source échoue sans rien exécuter ; seul un
 rattrapage déjà plafonné par la borne de 2 Go perd ses fenêtres les plus anciennes. Sans la
 variable `GOOGLE_APPLICATION_CREDENTIALS`, la source est sautée. Les valeurs viennent des mesures
 ci-dessous (décision de Sabine du 2026-10-11, journal ADR).
@@ -108,7 +108,7 @@ Commande (lancée par Sabine dans le terminal de K-B ; elle n'affiche que des oc
 
 ```python
 from datetime import date, timedelta
-from k_b.sources import gh_archive as g
+from k_b.etl.sources import gh_archive as g
 
 client = g.create_bigquery_client()
 last = date(2026, 10, 10)

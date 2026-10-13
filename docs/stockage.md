@@ -99,7 +99,7 @@ elles ne sont pas recopiées ici. Un test (`tests/test_schema.py`) vérifie que 
 ### Ce que chaque source met dans l'item, puis dans la base
 
 Les lecteurs écrits à ce jour : arXiv, CISA KEV, releases et alertes GitHub, tldr.tech, Zotero. Chaque entrée du
-brut devient un item (`src/k_b/items.py`), que l'import (`src/k_b/import_items.py`) écrit dans la
+brut devient un item (`src/k_b/items.py`), que l'import (`src/k_b/etl/load.py`) écrit dans la
 table de sa sorte (`kind`). Exception : GH Archive, dont chaque ligne de classement (`TrendRow`,
 `src/k_b/items.py`) devient une ligne de `trend`, sans item.
 
@@ -216,7 +216,7 @@ source ne touche pas aux tables.
 
 - **Mode d'acquisition** : `source.acquisition_mode` vaut `watch`, `library` ou `wiki`, tenu par
   un `CHECK` (journal ADR, 2026-10-10). La durée de conservation de chaque mode est dans
-  `src/k_b/config.py` ; un test vérifie que chaque mode du `CHECK` y a sa durée.
+  `src/k_b/core/config.py` ; un test vérifie que chaque mode du `CHECK` y a sa durée.
 - **ITEM minimal** : ce que dit un item est dans son sous-type (`release`, `advisory`) ou dans
   son référentiel (`publication`, `vulnerability`). Un sous-type pointe vers son item par la clé
   étrangère composée (`item_id`, `kind`) : un item n'a qu'un sous-type, celui de sa sorte.

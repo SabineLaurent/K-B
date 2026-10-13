@@ -157,7 +157,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   `https://tldr.tech/ai/2026-09-30` répond 200). La collecte garde chaque page brute ; la lecture des articles se fait à la
   transformation.
 - **Ce qu'on en tire** : un item par article de chaque édition suivie : titre, lien, résumé.
-- **Lecture d'une page** (#57, `read_articles`, `k_b/sources/tldr.py`, avec BeautifulSoup et
+- **Lecture d'une page** (#57, `read_articles`, `k_b/etl/sources/tldr.py`, avec BeautifulSoup et
   l'analyseur `html.parser` de la bibliothèque standard) : une entrée par `<article>` de la
   page. Le titre est le texte de `a.font-bold`, le lien son `href`, le résumé le texte de
   `div.newsletter-html`, ses morceaux (paragraphes, liens) séparés par une espace. L'édition est lue dans le nom du dossier brut
@@ -222,12 +222,12 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Données personnelles** : aucune (voir le registre des traitements).
 - **Suivi** : éditions **ai**, **infosec** et **dev** (ai le 2026-10-01, les deux autres le
   2026-10-04), une source par édition (`tldr_ai`…), dans `TRACKED_EDITIONS` de
-  `k_b/sources/tldr.py` (neuf candidates dans [sources-detaillees.md](sources-detaillees.md)).
+  `k_b/etl/sources/tldr.py` (neuf candidates dans [sources-detaillees.md](sources-detaillees.md)).
 
 ### Zotero — base de données
 
 - **Technologie** : base SQLite `zotero.sqlite`, dans le dossier de données de Zotero, lue par
-  une requête SQL (`src/k_b/sources/zotero.py`). Zotero verrouille sa base quand il tourne, et
+  une requête SQL (`src/k_b/etl/sources/zotero.py`). Zotero verrouille sa base quand il tourne, et
   ses dernières écritures sont dans `zotero.sqlite-wal` : K-B copie les deux fichiers dans un
   dossier temporaire, vérifie la copie (`PRAGMA integrity_check`), l'ouvre en lecture seule,
   lance la requête, puis supprime la copie, après un succès, une erreur ou un Ctrl-C. Un
@@ -286,8 +286,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   2026-10-11) : une ligne invalide revient avec sa fenêtre à chaque collecte, et la source échoue
   jusqu'à ce que cette fenêtre sorte du rattrapage (15 jours au plus) ; il est faible, les valeurs
   vides étant écartées par la requête et la règle du nom (`owner/name`, sans espace) étant large.
-  Requête : `TRENDS_QUERY`, `src/k_b/sources/gh_archive.py`. `kb import` écrit ses lignes dans la
-  table `trend` (« Du brut au jeu d'items », étape 4, « Classements GH Archive »).
+  Requête : `TRENDS_QUERY`, `src/k_b/etl/sources/gh_archive.py`. `kb import` écrit ses lignes dans
+  la table `trend` (« Du brut au jeu d'items », étape 4, « Classements GH Archive »).
 - **Rattrapage** : les fenêtres manquées depuis la dernière collecte, 15 au plus (un dépôt qui a
   monté il y a plus de deux semaines n'apporte plus grand-chose à la veille), en une seule
   requête qui lit chaque jour une fois. La table de la veille doit être close (modifiée après
@@ -337,12 +337,12 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    une seule fois, dans `source_kinds.py`. Un dossier qui n'appartient à aucune sorte est
    journalisé et sauté. Exception : un classement GH Archive n'est pas fait d'items (ADR du
    2026-10-08) ; ses lignes sont lues par un lecteur à part (`read_trend_files`,
-   `src/k_b/sources/gh_archive.py`), et la sorte `gh_archive` reste déclarée sans lecteur
+   `src/k_b/etl/sources/gh_archive.py`), et la sorte `gh_archive` reste déclarée sans lecteur
    d'items. Les items ont les mêmes champs : source, identifiant dans la source,
    titre, URL, auteurs (sauf GitHub), date de publication et date de révision (arXiv), date d'ajout (Clipper, Zotero),
    contenu ou résumé, date de collecte, chemin du brut d'origine. Une date absente reste vide. Toutes les dates sont en UTC, avec fuseau. Une ligne
    illisible est rejetée et journalisée, pas devinée.
-3. **Normalisation** des items lus (`normalize_item`, `src/k_b/merge.py`) :
+3. **Normalisation** des items lus (`normalize_item`, `src/k_b/etl/normalize.py`) :
    - dates ramenées en UTC ;
    - URL normalisées : les paramètres `utm_*` sont retirés, les autres restent tels quels et
      dans leur ordre.
@@ -355,9 +355,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 4. **Stockage** des items dans la base : SGBD, modèles et ce que chaque source met dans l'item,
    dans [stockage.md](stockage.md). `kb import` (`run_import`, `src/k_b/cli.py`) n'importe que
    les fichiers bruts pas encore importés (#106) : il lit le registre de la base
-   (`read_imported_paths`, `src/k_b/import_items.py`), puis les fichiers qui n'y sont pas
-   (`read_raw_items`, `src/k_b/raw_items.py`, pour les items ; `read_trend_files`,
-   `src/k_b/sources/gh_archive.py`, pour les classements GH Archive), puis écrit la base
+   (`read_imported_paths`, `src/k_b/etl/load.py`), puis les fichiers qui n'y sont pas
+   (`read_raw_items`, `src/k_b/etl/transform.py`, pour les items ; `read_trend_files`,
+   `src/k_b/etl/sources/gh_archive.py`, pour les classements GH Archive), puis écrit la base
    (`import_items`) : fichiers d'items et classements en une seule suite, dans l'ordre des
    collectes. Il affiche
    le nombre de fichiers bruts lus (`raw files read`).
