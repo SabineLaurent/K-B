@@ -99,8 +99,8 @@ elles ne sont pas recopiées ici. Un test (`tests/test_schema.py`) vérifie que 
 ### Ce que chaque source met dans l'item, puis dans la base
 
 Les lecteurs écrits à ce jour : arXiv, CISA KEV, releases et alertes GitHub, tldr.tech, Zotero. Chaque entrée du
-brut devient un item (`src/k_b/items.py`), que l'import (`src/k_b/etl/load.py`) écrit dans la
-table de sa sorte (`kind`). Exception : GH Archive, dont chaque ligne de classement (`TrendRow`,
+brut devient un item (`src/k_b/items.py`), que l'import (`src/k_b/etl/load.py`) fait écrire dans la
+table de sa sorte (`kind`) par l'écrivain de cette sorte (`src/k_b/database/writers/`). Exception : GH Archive, dont chaque ligne de classement (`TrendRow`,
 `src/k_b/items.py`) devient une ligne de `trend`, sans item.
 
 | Source (`kind`) | Champ de l'item | Vient de | Colonne |

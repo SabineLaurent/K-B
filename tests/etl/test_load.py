@@ -21,12 +21,12 @@ from test_transform import FIXTURES_DIR, convert_line, copy_fixture
 
 from k_b.database.connection import connect_database
 from k_b.database.creation import create_database
+from k_b.database.writers.shared_rows import UnknownSourceError
 from k_b.etl import load as import_items_module
 from k_b.etl.load import (
     ImportLogExistsError,
     KindWithoutTableError,
     MissingDatabaseError,
-    UnknownSourceError,
     import_items,
     read_imported_paths,
 )
@@ -813,7 +813,7 @@ def test_a_log_that_cannot_be_written_leaves_the_database_unchanged(
     def fail_to_write(path, content):
         raise OSError("disk full")
 
-    monkeypatch.setattr(import_items_module, "write_file_atomically", fail_to_write)
+    monkeypatch.setattr("k_b.etl.import_log.write_file_atomically", fail_to_write)
 
     with pytest.raises(OSError, match="disk full"):
         run_import(data_dir)

@@ -1,8 +1,8 @@
 """The dependencies go one way, read at two levels (conventions.md, rule 5).
 
-Under k_b: core and items are the common vocabulary, database reads and writes the base, etl runs
-the pipeline, cli composes. Under k_b.etl: the composition (source_kinds) → the sources → the
-modules of the pipeline.
+Under k_b: core and items are the common vocabulary, database reads and writes the base (its
+writers under database/writers), etl runs the pipeline, cli composes. Under k_b.etl: the
+composition (source_kinds) → the sources → the modules of the pipeline.
 """
 
 import ast
@@ -22,6 +22,7 @@ ETL_PIPELINE_MODULES = {
     "etl.extract",
     "etl.transform",
     "etl.load",
+    "etl.import_log",
     "etl.normalize",
     "etl.raw_store",
     "etl.source_contract",
@@ -87,11 +88,12 @@ def reaches(name: str, modules: set[str]) -> bool:
 
 
 def list_python_files(module: str) -> list[Path]:
-    """The Python files of a k_b module (`items`) or package (`etl.sources`)."""
+    """The Python files of a k_b module (`items`) or package (`etl.sources`), those of its
+    sub-folders included (`database/writers`)."""
     path = PACKAGE_DIR.joinpath(*module.split("."))
     if path.with_suffix(".py").exists():
         return [path.with_suffix(".py")]
-    paths = sorted(path.glob("*.py"))
+    paths = sorted(path.rglob("*.py"))
     assert paths, f"no Python file in {path}"
     return paths
 
@@ -188,6 +190,15 @@ def test_every_module_of_etl_is_in_exactly_one_list():
 
     assert modules == set().union(*lists)
     assert sum(len(modules_of_list) for modules_of_list in lists) == len(modules)
+
+
+def test_the_modules_of_a_sub_folder_of_a_package_are_listed():
+    paths = list_python_files("database")
+
+    assert PACKAGE_DIR / "database" / "writers" / "paper_writer.py" in paths
+    assert find_package(PACKAGE_DIR / "database" / "writers" / "paper_writer.py") == (
+        "k_b.database.writers"
+    )
 
 
 def test_core_imports_nothing_of_k_b():

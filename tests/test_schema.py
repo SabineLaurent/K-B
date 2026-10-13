@@ -444,7 +444,7 @@ def test_advisory_packages_that_are_not_a_json_list_are_refused(database, packag
         )
 
 
-# The column each bounded field of an item is written to (etl/load.py).
+# The column each bounded field of an item is written to (database/writers/).
 COLUMN_BY_KIND_AND_FIELD = {
     ("paper", "source_item_id"): ("publication", "arxiv_id"),
     ("paper", "title"): ("publication", "title"),

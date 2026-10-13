@@ -12,7 +12,8 @@ from etl.test_extract import BrokenSource, WorkingSource
 from etl.test_transform import FIXTURES_DIR
 
 from k_b import cli
-from k_b.etl.load import KindWithoutTableError, UnknownSourceError
+from k_b.database.writers.shared_rows import UnknownSourceError
+from k_b.etl.load import KindWithoutTableError
 from k_b.etl.source_contract import SourceKind
 
 
