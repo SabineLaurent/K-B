@@ -12,6 +12,9 @@ version of its latest collection; a feed with revisions keeps the newest revisio
 out is returned with its rule and the date it was compared with, then written to the log. Run
 again on the same raw, the import gives the same base.
 
+A ranking of GH Archive is not made of items: its rows go to the trend table, in the same
+transaction, and its rule is a news feed applied to the whole window.
+
 Only exact duplicates are found: the same identifier within its source (a replay, collections
 that overlap). The same content under another identifier is not found: for TLDR (another URL,
 another edition) it is a written limit, without a content fingerprint (decision of 2026-10-12,
@@ -21,16 +24,23 @@ docs/specs-collecte.md); for Zotero (another key) it is left to #138.
 import json
 import sqlite3
 from collections.abc import Callable, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Literal, NamedTuple
 
 from k_b.config import TrackedRepository
 from k_b.database.connection import connect_database
 from k_b.database.reading import read_raw_file_paths
-from k_b.items import Item, ItemKind
+from k_b.items import Item, ItemKind, TrendRow
 from k_b.merge import normalize_item
-from k_b.raw_items import RawFile, RawReading, Rejection, reject
+from k_b.raw_items import (
+    RawFile,
+    RawReading,
+    Rejection,
+    TrendFile,
+    TrendReading,
+    reject,
+)
 from k_b.raw_store import find_stream, write_file_atomically
 
 # The date format the CHECK constraints of schema.sql accept.
@@ -140,6 +150,30 @@ SELECT item_id FROM newsletter_article
 WHERE edition = :edition AND edition_date = :edition_date AND rank = :rank
 """
 
+# News feed, by window (GH Archive): the first ranking seen of a window is kept whole. A row is
+# written only if no other raw file has brought its window: the rows of the file being written
+# share its raw_data_id, and none is left out. The same file read again meets the UNIQUE key.
+INSERT_TREND_OF_NEW_WINDOW = """
+INSERT INTO trend (
+    raw_data_id, window_end, repository_id, repository_name, stars_gained, forks_gained
+)
+SELECT :raw_data_id, :window_end, :repository_id, :repository_name, :stars_gained,
+    :forks_gained
+WHERE NOT EXISTS (
+    SELECT 1 FROM trend WHERE window_end = :window_end AND raw_data_id <> :raw_data_id
+)
+ON CONFLICT (window_end, repository_id) DO NOTHING
+RETURNING id
+"""
+
+# Every row of a window comes from one raw file: any of them gives its collection.
+SELECT_TREND_WINDOW_COLLECTED_AT = """
+SELECT raw_data.collected_at FROM trend
+JOIN raw_data ON raw_data.id = trend.raw_data_id
+WHERE trend.window_end = ?
+LIMIT 1
+"""
+
 SELECT_ITEM_COLLECTED_AT = """
 SELECT raw_data.collected_at FROM item
 JOIN raw_data ON raw_data.id = item.raw_data_id
@@ -213,6 +247,10 @@ COMPARED_FIELD_BY_RULE: dict[DiscardRule, str] = {
 }
 
 
+# The rule of a window of a ranking left out: the one of a news feed.
+TREND_DISCARD_RULE: DiscardRule = "already_seen"
+
+
 class Discard(NamedTuple):
     rule: DiscardRule
     item: Item
@@ -220,12 +258,25 @@ class Discard(NamedTuple):
     compared_with: str
 
 
+class TrendDiscard(NamedTuple):
+    """A window of a ranking left out: another raw file brought it first."""
+
+    raw_file: RawFile
+    window_end: date
+    # The collection of the ranking kept, in the format of the base.
+    compared_with: str
+
+
 class ImportSummary(NamedTuple):
     item_count: int
+    # The items and the windows of a ranking left out.
     discard_count: int
     rejection_count: int
+    # The raw files opened, rankings included.
     read_count: int
     withdrawn_count: int
+    # The rows written to the trend table.
+    trend_count: int
 
 
 def check_database_exists(database_path: Path) -> None:
@@ -246,27 +297,39 @@ def read_imported_paths(database_path: Path) -> frozenset[str]:
 
 def import_items(
     reading: RawReading,
+    trend_reading: TrendReading,
     database_path: Path,
     log_path: Path,
     imported_at: datetime,
     tracked_repositories: Sequence[TrackedRepository],
 ) -> ImportSummary:
-    """Write the tracked repositories, each file read and its items into the base, then the
-    log of what was left out, all in one transaction.
+    """Write the tracked repositories, each file read with its items or its ranking into the
+    base, then the log of what was left out, all in one transaction.
+
+    The files of items and the rankings are written in one sequence, in collection order: a
+    base rebuilt registers them in the order the imports did.
 
     The log is written before the commit: a file registered is not read again, its log must
     not be lost. A commit that fails, or an interruption, removes the log written.
     """
     check_database_exists(database_path)
-    rejections = list(reading.rejections)
+    rejections = [*reading.rejections, *trend_reading.rejections]
     written_count = 0
     withdrawn_count = 0
+    trend_count = 0
     discards = []
+    trend_discards = []
     connection = connect_database(database_path)
     try:
         try:
             write_tracked_repositories(connection, tracked_repositories)
-            for raw_file in reading.files:
+            for file_read in list_files_in_collection_order(reading, trend_reading):
+                if isinstance(file_read, TrendFile):
+                    written, left_out = write_trend_file(connection, file_read)
+                    trend_count += written
+                    trend_discards.extend(left_out)
+                    continue
+                raw_file = file_read
                 items, untracked = reject_untracked_releases(
                     raw_file.items, tracked_repositories
                 )
@@ -285,7 +348,9 @@ def import_items(
             # cannot both find no log.
             check_log_absent(log_path)
             try:
-                write_import_log(log_path, imported_at, rejections, discards)
+                write_import_log(
+                    log_path, imported_at, rejections, discards, trend_discards
+                )
                 connection.commit()
             except BaseException:
                 # The log at log_path can only be this import's: it was absent above.
@@ -299,11 +364,26 @@ def import_items(
         connection.close()
     return ImportSummary(
         written_count,
-        len(discards),
+        len(discards) + len(trend_discards),
         len(rejections),
-        reading.read_count,
+        reading.read_count + trend_reading.read_count,
         withdrawn_count,
+        trend_count,
     )
+
+
+def list_files_in_collection_order(
+    reading: RawReading, trend_reading: TrendReading
+) -> list[RawFile | TrendFile]:
+    """The files of items and the rankings, oldest collection first; at the same collection,
+    the files of items first, in their reading order (the sort is stable)."""
+
+    def read_collected_at(file_read: RawFile | TrendFile) -> datetime:
+        if isinstance(file_read, TrendFile):
+            return file_read.raw_file.collected_at
+        return file_read.collected_at
+
+    return sorted([*reading.files, *trend_reading.files], key=read_collected_at)
 
 
 def reject_untracked_releases(
@@ -557,6 +637,59 @@ def write_newsletter_article(
     return None
 
 
+def write_trend_file(
+    connection: sqlite3.Connection, trend_file: TrendFile
+) -> tuple[int, list[TrendDiscard]]:
+    """Register the ranking and write its rows; return how many were written, and each window
+    the base left out."""
+    raw_data_id = write_raw_data(connection, trend_file.raw_file)
+    written_count = 0
+    # A dict keeps the windows left out once each, in the order of the rows.
+    windows_left_out: dict[date, None] = {}
+    for row in trend_file.rows:
+        if write_trend(connection, row, raw_data_id):
+            written_count += 1
+        else:
+            windows_left_out[row.window_end] = None
+    discards = [
+        TrendDiscard(
+            trend_file.raw_file,
+            window_end,
+            read_trend_window_collected_at(connection, window_end),
+        )
+        for window_end in windows_left_out
+    ]
+    return written_count, discards
+
+
+def write_trend(
+    connection: sqlite3.Connection, row: TrendRow, raw_data_id: int
+) -> bool:
+    """Write the row of the raw data raw_data_id, unless another raw file brought its window:
+    the first ranking seen is kept. Return whether the base wrote it."""
+    written = connection.execute(
+        INSERT_TREND_OF_NEW_WINDOW,
+        {
+            "raw_data_id": raw_data_id,
+            "window_end": format_day(row.window_end),
+            "repository_id": row.repository_id,
+            "repository_name": row.repository_name,
+            "stars_gained": row.stars_gained,
+            "forks_gained": row.forks_gained,
+        },
+    ).fetchone()
+    return written is not None
+
+
+def read_trend_window_collected_at(
+    connection: sqlite3.Connection, window_end: date
+) -> str:
+    (collected_at,) = connection.execute(
+        SELECT_TREND_WINDOW_COLLECTED_AT, (format_day(window_end),)
+    ).fetchone()
+    return str(collected_at)
+
+
 def withdraw_absent_vulnerabilities(
     connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
 ) -> int:
@@ -664,6 +797,14 @@ def format_date(moment: datetime | None) -> str | None:
     )
 
 
+def format_day(day: date) -> str:
+    """A day is written at midnight UTC (docs/stockage.md), in the format of the base.
+
+    isoformat always writes the year on 4 digits; strftime leaves it to the C library.
+    """
+    return f"{day.isoformat()}T00:00:00Z"
+
+
 def check_log_absent(log_path: Path) -> None:
     """The log of an import is never rewritten: one already at log_path stops the import."""
     if log_path.exists():
@@ -675,29 +816,50 @@ def write_import_log(
     imported_at: datetime,
     rejections: list[Rejection],
     discards: list[Discard],
+    trend_discards: list[TrendDiscard],
 ) -> None:
-    """One JSON line per rejection, then per item left out, each dated by its import."""
+    """One JSON line per rejection, then per item left out, then per window of a ranking left
+    out, each dated by its import.
+
+    A window is named by its last day, in the field that names an item: one form of line. No
+    repository is named: its name holds the login of its owner.
+    """
     logged_at = format_date(imported_at)
-    lines = [
-        {
-            "imported_at": logged_at,
-            "kind": "rejection",
-            "raw_file_path": rejection.raw_file_path,
-            "reason": rejection.reason,
-        }
-        for rejection in rejections
-    ] + [
-        {
-            "imported_at": logged_at,
-            "kind": "discard",
-            "rule": discard.rule,
-            "source_code": discard.item.source_code,
-            "source_item_id": discard.item.source_item_id,
-            "raw_file_path": discard.item.raw_file_path,
-            COMPARED_FIELD_BY_RULE[discard.rule]: discard.compared_with,
-        }
-        for discard in discards
-    ]
+    lines = (
+        [
+            {
+                "imported_at": logged_at,
+                "kind": "rejection",
+                "raw_file_path": rejection.raw_file_path,
+                "reason": rejection.reason,
+            }
+            for rejection in rejections
+        ]
+        + [
+            {
+                "imported_at": logged_at,
+                "kind": "discard",
+                "rule": discard.rule,
+                "source_code": discard.item.source_code,
+                "source_item_id": discard.item.source_item_id,
+                "raw_file_path": discard.item.raw_file_path,
+                COMPARED_FIELD_BY_RULE[discard.rule]: discard.compared_with,
+            }
+            for discard in discards
+        ]
+        + [
+            {
+                "imported_at": logged_at,
+                "kind": "discard",
+                "rule": TREND_DISCARD_RULE,
+                "source_code": discard.raw_file.source_code,
+                "source_item_id": discard.window_end.isoformat(),
+                "raw_file_path": discard.raw_file.raw_file_path,
+                COMPARED_FIELD_BY_RULE[TREND_DISCARD_RULE]: discard.compared_with,
+            }
+            for discard in trend_discards
+        ]
+    )
     write_file_atomically(
         log_path,
         "".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines).encode(),

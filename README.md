@@ -140,9 +140,10 @@ KB_DATA_DIR=~/K-B-data uv run kb import
 ```
 
 `kb import` lit les fichiers de `<KB_DATA_DIR>/raw/automated_watch/` pas encore importés et
-écrit leurs items dans la base, qui écarte les doublons ; sans nouveau brut, il ne lit rien,
-sauf un fichier illisible, relu et rejeté à chaque import. Il affiche le nombre de fichiers bruts lus, d'items écrits (nouveaux ou mis à jour), d'items écartés
-(doublons, ou versions qui ne sont pas plus récentes que celle de la base), de lignes CISA
+écrit leurs items dans la base, qui écarte les doublons, et les lignes des classements GH Archive
+dans sa table `trend` ; sans nouveau brut, il ne lit rien,
+sauf un fichier illisible, relu et rejeté à chaque import. Il affiche le nombre de fichiers bruts lus, d'items écrits (nouveaux ou mis à jour), de lignes de tendance écrites, d'items et de fenêtres de
+classement écartés (doublons, ou versions qui ne sont pas plus récentes que celle de la base), de lignes CISA
 retirées du catalogue et de rejets, détaillés dans
 `<KB_DATA_DIR>/import-log-<AAAA-MM-JJTHHMMSSZ>.jsonl`, un journal par import. Pour reconstruire
 la base depuis tout le brut : supprimer `k-b.sqlite`, puis `kb create-db` et `kb import`. Code de

@@ -1,15 +1,20 @@
+import json
 import re
 import sqlite3
 import typing
 
 import pytest
+from pydantic import ValidationError
 
 from k_b.config import RETENTION_YEARS_BY_ACQUISITION_MODE
 from k_b.database.creation import DATABASE_SCRIPTS
 from k_b.items import (
     MAX_COUNT_BY_KIND,
+    MAX_INT64,
     MAX_LENGTH_BY_KIND,
+    TREND_REPOSITORY_NAME_MAX_LENGTH,
     ItemKind,
+    TrendRow,
 )
 from k_b.sources.github_advisories import ECOSYSTEMS
 
@@ -19,8 +24,7 @@ EXPECTED_TABLES = {
     "item",
     "publication",
     "highlight",
-    "repository",
-    "star_gain",
+    "trend",
     "vulnerability",
     "tracked_repository",
     "release",
@@ -485,10 +489,13 @@ def list_maximums_of_the_items(maximum_by_kind):
 
 
 def test_each_maximum_length_of_the_items_is_the_check_of_its_column():
-    # \b: not the length( inside json_array_length(.
+    # \b: not the length( inside json_array_length(. A trend row is not an item: its maximum is
+    # held by TrendRow.
     assert read_maximums_of_the_schema(
         r"\blength\((\w+)\) <= (\d+)"
-    ) == list_maximums_of_the_items(MAX_LENGTH_BY_KIND)
+    ) == list_maximums_of_the_items(MAX_LENGTH_BY_KIND) | {
+        ("trend", "repository_name"): TREND_REPOSITORY_NAME_MAX_LENGTH
+    }
 
 
 def test_each_maximum_count_of_the_items_is_the_check_of_its_column():
@@ -503,12 +510,11 @@ INVALID_DATE = "2026-02-30T09:30:00Z"
 PAPER_ITEM_ID = 1
 RELEASE_ITEM_ID = 2
 ADVISORY_ITEM_ID = 3
-REPOSITORY_ITEM_ID = 4
 NEWSLETTER_ARTICLE_ITEM_ID = 5
 
 # A row every constraint of its table accepts, in a base that holds the rows of filled_database.
 # The values are those of tests/fixtures (the collection), the long texts cut short; a new source,
-# a highlight and a star gain have no collected example.
+# and a highlight have no collected example.
 VALID_ROW_BY_TABLE = {
     "source": {
         "source_code": "rss",
@@ -541,14 +547,13 @@ VALID_ROW_BY_TABLE = {
         "highlighted_at": DATE,
         "item_id": PAPER_ITEM_ID,
     },
-    "repository": {
-        "item_id": PAPER_ITEM_ID,
-        "repository_name": "anthropics/claude-code",
-    },
-    "star_gain": {
-        "item_id": REPOSITORY_ITEM_ID,
-        "window_end": DATE,
-        "stars_gained": 3,
+    "trend": {
+        "raw_data_id": 1,
+        "window_end": "2026-10-10T00:00:00Z",
+        "repository_id": 1209966933,
+        "repository_name": "morluto/rea",
+        "stars_gained": 1087,
+        "forks_gained": 215,
     },
     "vulnerability": {
         "cve_id": "CVE-2026-86950",
@@ -622,9 +627,17 @@ REFUSED_VALUES = [
     ("publication", "revised_at IS strftime", {"revised_at": INVALID_DATE}),
     ("publication", "(item_id IS NULL) = (title IS NULL)", {"title": None}),
     ("highlight", "highlighted_at IS strftime", {"highlighted_at": INVALID_DATE}),
-    ("repository", "repository_name GLOB", {"repository_name": "claude-code"}),
-    ("star_gain", "window_end IS strftime", {"window_end": INVALID_DATE}),
-    ("star_gain", "stars_gained >= 0", {"stars_gained": -1}),
+    # A window ends on a day: an hour of that day is refused.
+    ("trend", "window_end IS strftime", {"window_end": "2026-10-10T09:30:00Z"}),
+    ("trend", "repository_id > 0", {"repository_id": 0}),
+    ("trend", "repository_name GLOB", {"repository_name": "rea"}),
+    (
+        "trend",
+        "length(repository_name) <= 255",
+        {"repository_name": "morluto/" + "x" * 248},
+    ),
+    ("trend", "stars_gained >= 0", {"stars_gained": -1}),
+    ("trend", "forks_gained >= 0", {"forks_gained": -1}),
     ("vulnerability", "cve_id GLOB", {"cve_id": "CVE-26-1"}),
     (
         "vulnerability",
@@ -686,14 +699,12 @@ def filled_database(database):
         (PAPER_ITEM_ID, "paper"),
         (RELEASE_ITEM_ID, "release"),
         (ADVISORY_ITEM_ID, "advisory"),
-        (REPOSITORY_ITEM_ID, "paper"),
         (NEWSLETTER_ARTICLE_ITEM_ID, "newsletter_article"),
     ):
         insert_row(database, "item", id=item_id, kind=kind)
     insert_row(
         database, "tracked_repository", id=1, repository_name="anthropics/claude-code"
     )
-    insert_row(database, "repository", item_id=REPOSITORY_ITEM_ID)
     return database
 
 
@@ -791,6 +802,133 @@ def test_a_newsletter_article_cites_no_publication_or_a_known_one(filled_databas
 
     with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
         filled_database.execute("UPDATE newsletter_article SET publication_id = 99")
+
+
+def test_a_window_and_a_repository_are_one_trend_row(filled_database):
+    insert_row(filled_database, "trend")
+
+    with pytest.raises(sqlite3.IntegrityError, match="UNIQUE"):
+        insert_row(filled_database, "trend", stars_gained=1)
+
+
+def test_the_same_repository_is_accepted_in_another_window(filled_database):
+    insert_row(filled_database, "trend")
+    insert_row(filled_database, "trend", window_end="2026-10-11T00:00:00Z")
+
+    assert filled_database.execute("SELECT count(*) FROM trend").fetchone() == (2,)
+
+
+def test_a_trend_row_of_an_unknown_raw_data_is_refused(filled_database):
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        insert_row(filled_database, "trend", raw_data_id=99)
+
+
+# The fields of the valid trend row, as TrendRow holds them: its window is a day.
+TREND_ROW_FIELDS = VALID_ROW_BY_TABLE["trend"] | {"window_end": "2026-10-10"}
+del TREND_ROW_FIELDS["raw_data_id"]
+
+
+def validate_trend_row(**changes):
+    """A trend row as the raw result gives it: JSON, read in strict mode."""
+    return TrendRow.model_validate_json(json.dumps(TREND_ROW_FIELDS | changes))
+
+
+# Rule 4 of the conventions: what the base refuses, TrendRow refuses before. One value per
+# CHECK of trend that a row of a raw result could hold, with the CHECK that refuses it.
+@pytest.mark.parametrize(
+    "field, value, check",
+    [
+        ("repository_id", 0, "repository_id > 0"),
+        ("repository_name", "rea", "repository_name GLOB"),
+        (
+            "repository_name",
+            "morluto/" + "x" * 248,
+            "length(repository_name) <= 255",
+        ),
+        ("stars_gained", -1, "stars_gained >= 0"),
+        ("forks_gained", -1, "forks_gained >= 0"),
+    ],
+)
+def test_a_value_a_check_of_trend_refuses_is_refused_by_the_trend_row(
+    filled_database, field, value, check
+):
+    with pytest.raises(ValidationError, match=field):
+        validate_trend_row(**{field: value})
+    with pytest.raises(
+        sqlite3.IntegrityError, match=re.escape(f"CHECK constraint failed: {check}")
+    ):
+        insert_row(filled_database, "trend", **{field: value})
+
+
+@pytest.mark.parametrize(
+    "window_end, written",
+    [
+        # A day that does not exist; a time of a day.
+        ("2026-02-30", "2026-02-30T00:00:00Z"),
+        ("2026-10-10T09:30:00Z", "2026-10-10T09:30:00Z"),
+    ],
+)
+def test_a_window_end_that_is_not_a_day_is_refused_by_the_trend_row_and_by_the_base(
+    filled_database, window_end, written
+):
+    with pytest.raises(ValidationError, match="window_end"):
+        validate_trend_row(window_end=window_end)
+    with pytest.raises(
+        sqlite3.IntegrityError,
+        match=re.escape("CHECK constraint failed: window_end IS strftime"),
+    ):
+        insert_row(filled_database, "trend", window_end=written)
+
+
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("repository_id", 1),
+        ("repository_id", MAX_INT64),
+        ("repository_name", "morluto/" + "x" * 247),
+        ("stars_gained", 0),
+        ("stars_gained", MAX_INT64),
+        ("forks_gained", 0),
+        ("forks_gained", MAX_INT64),
+    ],
+)
+def test_a_value_at_a_bound_of_the_trend_row_is_accepted_by_the_base(
+    filled_database, field, value
+):
+    row = validate_trend_row(**{field: value})
+
+    insert_row(filled_database, "trend", **{field: getattr(row, field)})
+
+
+@pytest.mark.parametrize("field", ["repository_id", "stars_gained", "forks_gained"])
+def test_an_integer_over_64_bits_is_refused_by_the_trend_row_as_sqlite_cannot_hold_it(
+    filled_database, field
+):
+    with pytest.raises(ValidationError, match=field):
+        validate_trend_row(**{field: MAX_INT64 + 1})
+    with pytest.raises(OverflowError):
+        insert_row(filled_database, "trend", **{field: MAX_INT64 + 1})
+
+
+# GLOB stops at the first NUL: the base refuses a name the pattern of RepositoryName accepts.
+# The other control characters would reach a terminal with the name (an escape sequence).
+@pytest.mark.parametrize(
+    "repository_name",
+    [
+        "\0morluto/rea",
+        "mor\0luto/rea",
+        "morluto/\0rea",
+        "morluto/rea\0",
+        "morluto/rea\x1b[31m",
+        "morluto/rea\x7f",
+        "morluto/rea\x9b",
+    ],
+)
+def test_a_repository_name_with_a_control_character_is_refused_by_the_trend_row(
+    repository_name,
+):
+    with pytest.raises(ValidationError, match="control_character"):
+        validate_trend_row(repository_name=repository_name)
 
 
 # The columns the source of truth of a reference table fills: the table CHECK holds one clause

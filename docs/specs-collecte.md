@@ -285,8 +285,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   2026-10-11) : une ligne invalide revient avec sa fenêtre à chaque collecte, et la source échoue
   jusqu'à ce que cette fenêtre sorte du rattrapage (15 jours au plus) ; il est faible, les valeurs
   vides étant écartées par la requête et la règle du nom (`owner/name`, sans espace) étant large.
-  Requête : `TRENDS_QUERY`, `src/k_b/sources/gh_archive.py`. Pas encore lu vers la base (TENDANCE,
-  issue de suite).
+  Requête : `TRENDS_QUERY`, `src/k_b/sources/gh_archive.py`. `kb import` écrit ses lignes dans la
+  table `trend` (« Du brut au jeu d'items », étape 4, « Classements GH Archive »).
 - **Rattrapage** : les fenêtres manquées depuis la dernière collecte, 15 au plus (un dépôt qui a
   monté il y a plus de deux semaines n'apporte plus grand-chose à la veille), en une seule
   requête qui lit chaque jour une fois. La table de la veille doit être close (modifiée après
@@ -334,7 +334,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    Pydantic. Le lecteur est retrouvé par le nom du dossier brut (`github_releases_<dépôt>/` est
    lu par celui des releases), que la source soit encore suivie ou non. Les sortes sont déclarées
    une seule fois, dans `source_kinds.py`. Un dossier qui n'appartient à aucune sorte est
-   journalisé et sauté. Les items ont les mêmes champs : source, identifiant dans la source,
+   journalisé et sauté. Exception : un classement GH Archive n'est pas fait d'items (ADR du
+   2026-10-08) ; ses lignes sont lues par un lecteur à part (`read_trend_files`,
+   `src/k_b/sources/gh_archive.py`), et la sorte `gh_archive` reste déclarée sans lecteur
+   d'items. Les items ont les mêmes champs : source, identifiant dans la source,
    titre, URL, auteurs (sauf GitHub), date de publication et date de révision (arXiv), date d'ajout (Clipper, Zotero),
    contenu ou résumé, date de collecte, chemin du brut d'origine. Une date absente reste vide. Toutes les dates sont en UTC, avec fuseau. Une ligne
    illisible est rejetée et journalisée, pas devinée.
@@ -352,7 +355,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    dans [stockage.md](stockage.md). `kb import` (`run_import`, `src/k_b/cli.py`) n'importe que
    les fichiers bruts pas encore importés (#106) : il lit le registre de la base
    (`read_imported_paths`, `src/k_b/import_items.py`), puis les fichiers qui n'y sont pas
-   (`read_raw_items`, `src/k_b/raw_items.py`), puis écrit la base (`import_items`). Il affiche
+   (`read_raw_items`, `src/k_b/raw_items.py`, pour les items ; `read_trend_files`,
+   `src/k_b/sources/gh_archive.py`, pour les classements GH Archive), puis écrit la base
+   (`import_items`) : fichiers d'items et classements en une seule suite, dans l'ordre des
+   collectes. Il affiche
    le nombre de fichiers bruts lus (`raw files read`).
 
    - **Registre** : la table `raw_data`, une ligne par fichier lu, ou par page d'un dossier de
@@ -389,6 +395,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    | Nature | Sources | Item déjà vu | SQL | Règle au journal |
    |---|---|---|---|---|
    | flux de nouveautés | releases, alertes GitHub, articles TLDR | inchangé : la première version vue est gardée | `INSERT INTO item … SELECT … WHERE NOT EXISTS (sous-type de même clé) RETURNING id` | `already_seen` |
+   | flux de nouveautés, **par fenêtre** (variante propre aux classements, #142) | classements GH Archive (table `trend`, pas un item) | inchangée : le premier classement vu d'une fenêtre est gardé entier ; une fenêtre qu'un autre fichier brut a déjà apportée est écartée entière | `INSERT INTO trend … SELECT … WHERE NOT EXISTS (ligne de la même fenêtre venue d'un autre fichier brut) ON CONFLICT (window_end, repository_id) DO NOTHING RETURNING id` | `already_seen`, une ligne par fenêtre |
    | catalogue d'état | CISA KEV | remplacé si son fichier est collecté après le dernier catalogue de la source déjà importé et que son contenu diffère ; `revised_at` prend la date de cette collecte | `ON CONFLICT (cve_id) DO UPDATE … WHERE` (collecte plus récente et contenu différent) `RETURNING id` | `unchanged`, `no_newer_version` |
    | flux avec révisions | arXiv | remplacé si sa révision (`updated`) est plus récente | `ON CONFLICT (arxiv_id) DO UPDATE … WHERE excluded.revised_at > publication.revised_at RETURNING id` | `revision_not_newer` |
 
@@ -433,8 +440,28 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
        actif. De même, un catalogue dont toutes les lignes sont rejetées est inscrit au
        registre et compte comme le dernier catalogue importé. Le cas demande deux anomalies à
        la fois ; une reconstruction le règle une fois le rejet corrigé.
-   - **Sources sans import** (`zotero`, `gh_archive`, `clipper`, classement des plus étoilés) :
-     leur nature est décidée par leur issue d'import (#138, #142, #14). Zotero, extrait complet
+   - **Classements GH Archive** (#142, décisions de Sabine du 2026-10-13) : une ligne de
+     `trend` par fenêtre et par dépôt, avec ses étoiles et ses forks gagnés (les 30 premiers
+     par étoiles et les 30 premiers par forks, réunis). La clé est (`window_end`,
+     `repository_id`), mais la règle compare **par fenêtre**, et non par clé comme les autres
+     flux de nouveautés : un classement est un tout, et un dépôt entré dans le classement à
+     une seconde collecte aurait une clé nouvelle. Une ligne n'est écrite que si aucun autre
+     fichier brut n'a déjà apporté sa fenêtre ; les lignes du fichier en cours, qui partagent
+     sa donnée brute, ne s'écartent pas entre elles. Limites :
+     - un compte faux à la première collecte reste. Trois fenêtres ont été comptées, en tout
+       ou en partie, sur des tables de jour appauvries (ci-dessus, et
+       [bigquery.md](bigquery.md#relevé-du-2026-10-13)) : celle du 2026-10-10, collectée le
+       2026-10-11 ; celles du 2026-10-11 (deux jours appauvris sur trois, le 09/10 et le 10/10)
+       et du 2026-10-12 (un sur trois, le 10/10), collectées le 2026-10-13. Les corriger
+       demande de retirer leur fichier brut et de reconstruire la base. Aucune issue ne porte
+       la recollecte d'une fenêtre déjà prise ;
+     - « premier vu » veut dire premier importé : un fichier brut plus ancien, importé après
+       un plus récent de la même fenêtre, est écarté ; une base reconstruite, qui lit dans
+       l'ordre des collectes, garderait le plus ancien ;
+     - une fenêtre annoncée par un fichier sans aucune ligne ne laisse pas de trace : un
+       fichier ultérieur de cette fenêtre est écrit.
+   - **Sources sans import** (`zotero`, `clipper`, classement des plus étoilés) :
+     leur nature est décidée par leur issue d'import (#138, #14). Zotero, extrait complet
      lui aussi, entrera peut-être dans le catalogue d'état : #138 le dira.
    - Une même CVE dans deux sources (une entrée CISA et une alerte GitHub), ou citée par deux
      alertes, n'est **pas** un doublon : chaque alerte est gardée, et toutes pointent vers la
@@ -462,7 +489,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      import, nommé par sa seconde au format des noms de bruts, jamais réécrit : si le journal
      de cette seconde existe déjà, l'import s'arrête sans rien écrire (code de sortie 2). Une
      ligne JSON par rejet (`raw_file_path`, `reason`), puis par item écarté (`rule`,
-     `source_code`, `source_item_id`, `raw_file_path` et la date comparée). Chaque ligne porte
+     `source_code`, `source_item_id`, `raw_file_path` et la date comparée), puis par fenêtre
+     d'un classement GH Archive écartée, à la même forme : `source_item_id` y est le dernier
+     jour de la fenêtre (`2026-10-10`), et aucun dépôt n'est nommé (son nom porte le login de
+     son propriétaire). Chaque ligne porte
      l'instant de son import, `imported_at`, en ISO 8601 UTC à la seconde, au format des dates
      de la base (`2026-10-12T15:49:03Z`, décision de Sabine du 2026-10-12, d'après le
      [Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html)
@@ -470,7 +500,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 
      | Règle | Constat | Champ | Date |
      |---|---|---|---|
-     | `already_seen` | le sous-type est déjà en base | `compared_with_collected_at` | collecte de la version gardée |
+     | `already_seen` | le sous-type est déjà en base, ou la fenêtre d'un classement vient déjà d'un autre fichier brut | `compared_with_collected_at` | collecte de la version gardée |
      | `unchanged` | fichier plus récent que le dernier catalogue importé, contenu identique | `compared_with_collected_at` | collecte de la version gardée, la seule comparée au contenu |
      | `no_newer_version` | fichier collecté avant le dernier catalogue importé, ou au même instant | `compared_with_collected_at` | collecte de ce dernier catalogue |
      | `revision_not_newer` | révision arXiv plus ancienne ou égale | `compared_with_revised_at` | révision arXiv de la version gardée |

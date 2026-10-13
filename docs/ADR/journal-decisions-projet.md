@@ -1331,6 +1331,94 @@ Mesures citées : les 18 pages collectées du 2026-09-30 au 2026-10-09 (3 éditi
   Option écartée : ne rien changer et écrire la limite. Aucun des liens collectés ne
   déclenche le cas. — PR de #57
 
+## 2026-10-13
+
+### Modèle de la base : TENDANCE
+
+- **GH Archive est un flux de nouveautés appliqué à la fenêtre entière : le premier classement vu
+  d'une fenêtre est gardé entier ; une fenêtre qu'un autre fichier brut apporte de nouveau est
+  écartée entière et tracée au journal d'import.** Décision de Sabine, sur la recommandation de
+  la session ; raisons présentées, qu'elle a retenues sans en donner d'autre : une fenêtre de
+  3 jours clos est un fait publié qui ne devrait plus changer, comme une release ; c'est la
+  seule nature qui garde « une fenêtre = un classement cohérent » (30 premiers par étoiles et 30
+  premiers par forks d'un même comptage) sans colonne nouvelle ni suppression ; une base
+  reconstruite donne la même base. C'est une **variante nouvelle** du flux de nouveautés, qui
+  compare jusque-là par clé de sous-type (2026-10-12) : la clé de `trend` est (`window_end`,
+  `repository_id`), mais comparer par clé ajouterait à une fenêtre les dépôts entrés dans le
+  classement à une seconde collecte, et mélangerait deux comptages. Options écartées : catalogue
+  d'état (le dernier classement remplace l'ancien : il faut retirer les dépôts sortis du
+  classement, donc une colonne `withdrawn_at` que la table décidée le 2026-10-08 n'a pas, ou une
+  suppression hors purge, et une comparaison par fenêtre que la règle de CISA ne fait pas) ;
+  flux avec révisions (GH Archive ne donne pas de date de révision, il faudrait la date de
+  collecte, et les dépôts sortis du classement resteraient avec leurs anciens chiffres). Limites
+  assumées : un compte faux à la première collecte reste, et les fenêtres du 2026-10-10, du
+  2026-10-11 et du 2026-10-12 ont été comptées, en tout ou en partie, sur des tables appauvries
+  ([bigquery.md](../bigquery.md)) : les corriger demande de retirer leur fichier brut et de
+  reconstruire la base ; « premier vu » veut dire premier
+  importé ; une fenêtre annoncée sans aucune ligne ne laisse pas de trace. — PR de #142
+- **Les tables `repository` et `star_gain` sont retirées du schéma, avec leurs tests.** Décision
+  de Sabine, sur la recommandation de la session ; raison présentée, qu'elle a retenue : ce sont
+  les tables du modèle que TENDANCE remplace (2026-10-08), vides et sans code qui les lise ou les
+  écrive, et les garder ferait porter au schéma deux modèles de la même donnée. Option écartée :
+  les laisser (il aurait fallu dire jusqu'à quand). Clôt la décision ouverte du 2026-10-10.
+  Limite : le dépôt n'a pas d'outil de migration, une base existante garde ses deux tables
+  jusqu'à sa reconstruction, que `trend` demande déjà ; les MCD et MLD datés du 2026-10-12, qui
+  les nomment encore, sont des instantanés et ne sont pas corrigés. — PR de #142
+- **La table `trend` : une ligne par fenêtre et par dépôt, étoiles et forks gagnés, rattachée à
+  sa donnée brute ; `window_end` est un jour, écrit à minuit UTC, et son `CHECK` n'accepte que
+  minuit ; `repository_name` est borné à 255 caractères, dans `TrendRow` et par un `CHECK`, et
+  `TrendRow` y refuse tout caractère de contrôle, NUL compris ; les trois entiers sont tenus sur
+  64 bits.** Forme décidée le
+  2026-10-08 ; ces précisions sont des choix de la session, validés par Sabine avec le plan.
+  Pourquoi : deux heures d'un même jour feraient deux clés ; la borne applique la décision du
+  2026-10-10 (« la borne tient ce qu'une source peut écrire », tenue dans l'item et en base) ;
+  le `GLOB` de SQLite s'arrête au premier NUL et refuserait un nom que le motif accepte, ce qui
+  arrêterait chaque import (constat de la relecture du plan) ; un autre caractère de contrôle
+  (une séquence d'échappement) partirait au terminal qui affiche le nom (constat des deux
+  revues) ; `sqlite3` lève `OverflowError` au-delà de 64 bits (essai du 2026-10-13). 255 est une borne large, pas celle de GitHub : le
+  plus long nom de la collecte du 2026-10-11 fait 38 caractères, et la limite de GitHub n'a pas
+  été confirmée par une source officielle. Limite assumée : un nom plus long, ou avec un caractère de
+  contrôle, fait refuser le classement entier dès la collecte. Les totaux lus par GraphQL (`stars_total`,
+  `forks_total`) n'entrent pas ici : pas de colonne sans écrivain (#143). — PR de #142
+
+### Import dans la base : TENDANCE
+
+- **L'écrivain de `trend` vit dans `import_items.py`, comme celui des articles TLDR : écart
+  temporaire à la règle 5 des conventions.** Décision de Sabine : « on fait les sources
+  manquantes avant. je veux que ça marche, ensuite on range ». **Revient sur** la raison de
+  l'entrée du 2026-10-11 (#16 s'arrêtait à l'extraction pour ne pas ajouter de SQL dans
+  `import_items.py` avant son déplacement). Ce qui a changé : la source big data devait entrer
+  en base pour E1, et le déplacement du SQL d'écriture (#135) vient après les sources. La
+  commande de #135 (« ne renvoie que des fichiers de `src/k_b/database/` ») verra ce SQL ; sa
+  phrase « un écrivain par sorte d'item » ne nomme pas `trend`. — PR de #142
+- **Le brut `gh_archive` est lu par un lecteur à part, `read_trend_files`
+  (`src/k_b/sources/gh_archive.py`), que `run_import` appelle à côté du lecteur des items ; le
+  contrat `SourceReader` et le lecteur générique ne sont pas généralisés.** Décision de Sabine,
+  relayée par time-knight : que cela marche d'abord, la structure ensuite ; `trend` reste hors
+  d'`item` (2026-10-08). Option écartée : étendre `SourceReader`, qui rend un `Item`, à autre
+  chose qu'un item. Limite assumée : deux chemins de lecture, le second refaisant en une
+  vingtaine de lignes le parcours d'un dossier, le saut d'un fichier déjà importé et les
+  rejets ; la sorte `gh_archive` reste déclarée sans lecteur d'items dans `source_kinds.py`.
+  Aucune issue ne porte la réunion des deux chemins (ci-dessous, décisions ouvertes). — PR de #142
+- **`TrendRow` est défini dans `items.py`, et non dans le module de sa source : écart à la
+  2e puce de la règle 4 des conventions (« chaque source garde son modèle Pydantic dans son
+  module »).** Décision de Sabine, sur la recommandation de la session. Pourquoi : l'écrivain est
+  dans un module générique, et `tests/test_module_dependencies.py` interdit à un module générique
+  d'importer une source ; la 1re puce de la même règle met dans `items.py` « un type […] que la
+  base contraint ». `TrendsExtract`, le document brut, reste dans `gh_archive.py`. Options
+  écartées : un second type de 5 champs côté générique (les champs écrits deux fois) ; un
+  `Protocol` (abstraction sans second usage) ; l'écrivain dans `gh_archive.py` (une source ne
+  fait que lire, seconde commande de la règle 5). `.claude/rules/conventions.md` n'est pas
+  modifié. — PR de #142
+- **Les fichiers d'items et les classements sont écrits en une seule suite, dans l'ordre des
+  collectes ; au journal d'import, une fenêtre écartée fait une ligne, à la forme des autres
+  (`already_seen`, `source_item_id` = le dernier jour de la fenêtre), sans nom ni identifiant de
+  dépôt.** Choix de la session après la relecture du plan, validés par Sabine avec le plan.
+  Pourquoi : écrits après tous les items, les classements donnaient à une base reconstruite
+  d'autres `raw_data.id` qu'à une base tenue jour après jour ; c'est la fenêtre que la règle
+  écarte, et le nom d'un dépôt porte le login de son propriétaire. Option écartée : une ligne
+  par dépôt écarté (jusqu'à 60 par fenêtre, avec `repo.id`). — PR de #142
+
 ## Décisions encore ouvertes
 
 - **Remplir `newsletter_article.publication_id`** (2026-10-12) : quand le lien d'un article TLDR
@@ -1380,14 +1468,18 @@ Mesures citées : les 18 pages collectées du 2026-09-30 au 2026-10-09 (3 éditi
 - **Motif d'un rejet pour longueur** : le critère de l'issue sur le motif des rejets (#92) ne
   garde que le champ et le type d'erreur, alors que la décision du 2026-10-08 demande la longueur
   reçue et le maximum. À accorder par Sabine avant de coder #92 (2026-10-10).
-- **Tables `repository` et `star_gain`** : restées dans `schema.sql` après la réécriture, sans
-  écrivain ; la clarification les remplace par TENDANCE. Quand les retirer n'est pas décidé
-  (2026-10-10).
-- **TENDANCE en base et ses totaux GraphQL** (2026-10-11) : reportés par #16, qui s'arrête à
-  l'extraction. Restent à trancher avec l'issue de suite : le brut des totaux GraphQL (relecture
-  du 2026-10-09), le lecteur et l'écrivain de TENDANCE. La borne des entiers sur 64 bits
-  (`MAX_INT64`) est passée dans `items.py` avec #57, qui en borne le rang d'un article TLDR ;
-  `gh_archive.py` l'importe (règle 4).
+- **Totaux GraphQL de TENDANCE** (2026-10-11, réduit le 2026-10-13) : `trend` est en base
+  (#142) ; restent les étoiles et forks totaux lus par GraphQL (#143) et leur brut (relecture du
+  2026-10-09).
+- **Recollecter une fenêtre GH Archive déjà prise** (2026-10-13) : la règle par fenêtre garde le
+  premier classement vu ; un classement compté sur des tables appauvries (fenêtres du 2026-10-10,
+  du 2026-10-11 et du 2026-10-12) ne se corrige qu'en retirant son fichier brut et en
+  reconstruisant la base. Signalé par #142,
+  sans issue ; la détection d'une table incomplète (#141) empêche ou marque une collecte à
+  venir, elle ne reprend pas une fenêtre déjà collectée.
+- **Un seul chemin de lecture pour les items et les classements** (2026-10-13) : `trend` est lu
+  par `read_trend_files`, à côté du lecteur générique, dont le contrat rend un `Item`. Signalé
+  par #142, sans issue ; aucune issue du rangement (#107, #85, #135, #136) ne le porte.
 - **Wiki : le texte envoyé au modèle et reçu de lui, dans l'outil de suivi** (2026-10-12) : jamais
   (mesures seules), seulement en environnement d'essai, ou toujours (et inscrit au registre).
   Sabine tranchera à la comparaison des outils de restitution. La trace d'un outil comme Langfuse

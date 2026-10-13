@@ -10,7 +10,7 @@ from typing import Any, NamedTuple
 
 from pydantic import ValidationError
 
-from k_b.items import Item, SourceCode
+from k_b.items import Item, SourceCode, TrendRow
 from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.source_contract import SourceKind, SourceReader, find_source_kind
 
@@ -40,6 +40,21 @@ class RawReading(NamedTuple):
     files: list[RawFile]
     rejections: list[Rejection]
     # The pages opened, readable or not.
+    read_count: int
+
+
+class TrendFile(NamedTuple):
+    """A raw ranking of GH Archive read: the file to register, and its rows, which are not
+    items."""
+
+    raw_file: RawFile
+    rows: list[TrendRow]
+
+
+class TrendReading(NamedTuple):
+    files: list[TrendFile]
+    rejections: list[Rejection]
+    # The rankings opened, readable or not.
     read_count: int
 
 
@@ -151,7 +166,12 @@ def list_collections(
             continue
         reader = kind.reader
         if reader is None:
-            logger.info("source without a reader, skipped: %s", source_dir.name)
+            # Not always left unread: the rankings of GH Archive, which are not items, have
+            # their own reader (sources/gh_archive.py).
+            logger.info(
+                "source without a reader of items, skipped by the item reader: %s",
+                source_dir.name,
+            )
             continue
         collections.extend((path, reader) for path in list_visible_entries(source_dir))
     return collections

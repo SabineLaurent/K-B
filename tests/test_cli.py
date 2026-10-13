@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -8,6 +9,7 @@ from datetime import UTC, datetime
 
 import pytest
 from test_collect import BrokenSource, WorkingSource
+from test_raw_items import FIXTURES_DIR
 
 from k_b import cli
 from k_b.import_items import KindWithoutTableError, UnknownSourceError
@@ -334,11 +336,37 @@ def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, ca
     output = capsys.readouterr().out
     assert "raw files read: 0" in output
     assert "items written (new or updated): 0" in output
-    assert "items left out (duplicates or versions not newer): 0" in output
+    assert (
+        "items and trend windows left out (duplicates or versions not newer): 0"
+        in output
+    )
+    assert "trend rows written: 0" in output
     assert "vulnerabilities withdrawn: 0" in output
     (log_path,) = tmp_path.glob("import-log-*.jsonl")
     assert re.fullmatch(r"import-log-\d{4}-\d{2}-\d{2}T\d{6}Z\.jsonl", log_path.name)
     assert f"log: {log_path}" in output
+
+
+def test_import_writes_the_raw_rankings_of_gh_archive_into_the_trend_table(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    source_dir = tmp_path / "raw" / "automated_watch" / "gh_archive"
+    source_dir.mkdir(parents=True)
+    shutil.copyfile(
+        FIXTURES_DIR / "gh_archive_extract.json", source_dir / "2026-10-11T153130Z.json"
+    )
+
+    exit_code = cli.main(["import"])
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "raw files read: 1" in output
+    assert "trend rows written: 5" in output
+    connection = sqlite3.connect(tmp_path / "k-b.sqlite")
+    assert connection.execute("SELECT count(*) FROM trend").fetchone() == (5,)
+    connection.close()
 
 
 class FrozenDatetime(datetime):
@@ -380,7 +408,12 @@ def test_import_reports_a_failed_import_and_exits_1(monkeypatch, tmp_path, capsy
     cli.main(["create-db"])
 
     def fail_to_import(
-        reading, database_path, log_path, imported_at, tracked_repositories
+        reading,
+        trend_reading,
+        database_path,
+        log_path,
+        imported_at,
+        tracked_repositories,
     ):
         raise sqlite3.IntegrityError("CHECK constraint failed: publication")
 
@@ -402,7 +435,12 @@ def test_import_reports_a_source_missing_from_the_database_and_exits_1(
     cli.main(["create-db"])
 
     def fail_to_import(
-        reading, database_path, log_path, imported_at, tracked_repositories
+        reading,
+        trend_reading,
+        database_path,
+        log_path,
+        imported_at,
+        tracked_repositories,
     ):
         raise UnknownSourceError("source_code not in the source table: cisa_kev")
 
@@ -422,7 +460,12 @@ def test_import_reports_a_kind_without_table_and_exits_1(monkeypatch, tmp_path, 
     cli.main(["create-db"])
 
     def fail_to_import(
-        reading, database_path, log_path, imported_at, tracked_repositories
+        reading,
+        trend_reading,
+        database_path,
+        log_path,
+        imported_at,
+        tracked_repositories,
     ):
         raise KindWithoutTableError(
             "kind without a table in the base: newsletter_article"
