@@ -394,8 +394,6 @@ def read_documents(raw_extract: bytes) -> list[object]:
         documents = json.loads(raw_extract)
     except ValueError:
         documents = None
-    except RecursionError:
-        raise ValueError("extract nested too deep to read") from None
     if not isinstance(documents, list):
         raise ValueError("extract not a JSON list")
     return documents
@@ -423,11 +421,16 @@ def convert_document(entry: object, collected_at: datetime, raw_file_path: str) 
             highlights=tuple(
                 Highlight(
                     zotero_key=highlight.key,
-                    text=highlight.text,
-                    comment=highlight.comment,
+                    # An empty text or comment is an absent one: stored NULL alike, the next
+                    # extract giving the other form is not a revision.
+                    text=highlight.text or None,
+                    comment=highlight.comment or None,
                     highlighted_at=highlight.date_added,
                 )
                 for highlight in document.highlights
+                # Without text or comment, a highlight says nothing: left out, its document
+                # is not refused (decision of 2026-10-13).
+                if highlight.text or highlight.comment
             ),
         )
     except ValidationError as error:

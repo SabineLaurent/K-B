@@ -130,7 +130,8 @@ def read_page(
     raw_file_path = page_path.relative_to(raw_dir).as_posix()
     try:
         entries = reader.read_entries(page_path.read_bytes())
-    except (ValueError, csv.Error, OSError) as error:
+    # RecursionError: a JSON nested too deep (#103); the page alone is rejected.
+    except (ValueError, csv.Error, OSError, RecursionError) as error:
         # Not a file read: it is not registered, and is read again at the next import.
         return RawReading(
             [], [reject(raw_file_path, f"{type(error).__name__}: {error}")], 1

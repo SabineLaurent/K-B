@@ -83,7 +83,7 @@ CREATE TABLE highlight (
     -- The key Zotero gives the annotation: 8 characters of 0-9A-Z.
     zotero_key       TEXT NOT NULL UNIQUE
         CHECK (zotero_key GLOB '[0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z]'),
-    -- May be absent: a highlight Zotero keeps without its text keeps its comment.
+    -- Absent when Zotero gives none: the highlight is kept for its comment.
     text             TEXT CHECK (length(text) <= 10000),
     comment          TEXT CHECK (length(comment) <= 10000),
     highlighted_at   TEXT NOT NULL
@@ -92,7 +92,8 @@ CREATE TABLE highlight (
         CHECK (revised_at IS strftime('%Y-%m-%dT%H:%M:%SZ', revised_at)),
     withdrawn_at     TEXT
         CHECK (withdrawn_at IS strftime('%Y-%m-%dT%H:%M:%SZ', withdrawn_at)),
-    item_id          INTEGER NOT NULL REFERENCES item (id) ON DELETE CASCADE
+    item_id          INTEGER NOT NULL REFERENCES item (id) ON DELETE CASCADE,
+    CHECK (text IS NOT NULL OR comment IS NOT NULL)
 ) STRICT;
 
 CREATE INDEX highlight_item_id ON highlight (item_id);
@@ -263,7 +264,8 @@ CREATE TABLE zotero_entry (
     -- The type of document of Zotero (preprint, journalArticle...).
     item_type      TEXT NOT NULL CHECK (length(item_type) <= 100),
     title          TEXT NOT NULL CHECK (length(title) <= 1000),
-    -- As Zotero gives it, http or https, without its utm_* parameters; may be absent.
+    -- As Zotero gives it, http or https, without its utm_* parameters; absent when Zotero
+    -- has none.
     url            TEXT
         CHECK (url GLOB 'http://*' OR url GLOB 'https://*')
         CHECK (length(url) <= 2000),

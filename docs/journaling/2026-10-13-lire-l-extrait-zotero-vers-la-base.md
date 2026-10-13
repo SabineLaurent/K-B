@@ -38,8 +38,9 @@ effacée.
 ### 1. Le lecteur valide chaque document seul, et ne cite jamais sa valeur
 
 Le lecteur suit le contrat des sources (`SourceReader`) :
-- `read_documents` ne lève que si l'extrait entier est illisible (pas une liste JSON, ou trop
-  imbriqué) ;
+- `read_documents` ne lève que si l'extrait entier est illisible (pas une liste JSON) ; un
+  JSON trop imbriqué lève `RecursionError`, que `read_page` rattrape pour toutes les sources
+  (premier point de #103) ;
 - `convert_document` valide un document à la fois. Une erreur devient un rejet de ce document
   seul (règle 1 des conventions), écrit au journal d'import par `read_page` (`raw_items.py`).
 
@@ -195,7 +196,7 @@ désigne (constat de revue).
 | Quasi-doublon | Clé Zotero seule (Sabine) : la publication relie déjà deux entrées du même papier arXiv | Empreinte du titre (peu fiable sans texte) |
 | PDF, étiquettes, auteurs, champ `date` | Hors base, dans l'extrait (Sabine) : aucun usage en base, minimisation | Colonnes JSON ou tables (coût, MCD) |
 | Rejet persistant | Règle CISA gardée (Sabine) : un extrait avec rejet ne retire rien | Retirer en épargnant les rejetés (~30 min, écart à la règle du 12/10) |
-| Surlignage sans texte | Gardé, `text` facultatif (Sabine, constat de revue) | Rejet du document (bloquait les retraits) ; surlignage écarté |
+| Surlignage sans texte | Gardé pour son commentaire, `text` facultatif ; sans texte ni commentaire, laissé hors base sans rejet ; vide rangé absent (Sabine, constats de revue) | Rejet du document (bloquait les retraits) ; garder une ligne sans contenu (minimisation, RGESN 1.6) |
 | Modèle de l'extrait | `extra="ignore"` : ne valide que les champs gardés (choix de la session) | Valider aussi auteurs, étiquettes, PDF (un document rejeté pour un champ non gardé) |
 | Date Zotero | Forme vérifiée, puis `Z` ajouté et lecture par Pydantic : pas de nouvelle fonction de date (règle 4) | Une fonction `parse_…_date` de plus |
 | Clé Zotero | `GLOB` de 8 caractères `0-9A-Z`, sans `CHECK` de longueur (la forme suffit) | Alphabet exact de Zotero (non vérifié dans sa doc) |
@@ -216,7 +217,8 @@ désigne (constat de revue).
 | Clause de dédoublonnage de `UPSERT_ZOTERO_ENTRY` retirée à la main | 6 tests d'import Zotero échouent ; remise à la main, fichier identique à l'original |
 | `CHECK (length(text) <= 9000)` au lieu de 10 000 | 3 tests de `test_schema.py` échouent |
 | Import des 2 extraits réels dans une base neuve temporaire | 5 entrées, 6 surlignages, 5 publications à référence seule, second extrait écarté (5 `unchanged`), 0 rejet, 0 retrait |
-| `uv run pytest`, `ruff check`, `ruff format --check`, `mypy --strict` | Verts (899 tests après les corrections de revue) |
+| `tests/test_raw_items.py::test_a_raw_file_nested_too_deep_is_rejected_and_the_others_are_read` | Un brut `b"[" * 100000` est rejeté seul (#103, premier point) |
+| `uv run pytest`, `ruff check`, `ruff format --check`, `mypy --strict` | Verts (907 tests après les deux tours de revue) |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -243,6 +245,8 @@ désigne (constat de revue).
   consultée ne le dit pas.
 - Qu'un surlignage puisse être enregistré sans texte (PDF scanné) est l'hypothèse du relecteur ;
   le cas n'a pas été observé ni vérifié dans la doc de Zotero. Le code l'accepte quand même.
+- Les corrections du second `/code-review` n'ont pas été relues par une troisième revue
+  (décision de Sabine).
 - La forme ancienne des références arXiv dans `archiveID` de Zotero (`arXiv:hep-th/9901001`)
   n'a pas été observée : seule la forme récente l'a été (5 sur 5).
 - Le champ `date` de Zotero est décrit par sa forme observée (« AAAA-MM-JJ AAAA-MM-JJ ») ; son

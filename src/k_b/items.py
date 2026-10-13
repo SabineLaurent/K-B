@@ -181,7 +181,7 @@ MAX_LENGTH_BY_KIND: dict[ItemKind, dict[str, int]] = {
         "url": 2_000,
     },
     # Wide bounds: 91 characters at most for a title of the extract of 2026-10-13.
-    "zotero_entry": {"item_type": 100, "title": 1_000, "url": 2_000},
+    "zotero_entry": {"item_type": 100, "title": 1_000, "url": 2_000, "arxiv_id": 20},
 }
 # The lists written as JSON: the most elements, held by a CHECK too, and the longest element,
 # held here only (a CHECK of SQLite cannot go through the elements of a JSON list).
@@ -207,7 +207,8 @@ class Highlight(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     zotero_key: ZoteroKey
-    # May be absent: kept with its comment, as Zotero gives it (decision of 2026-10-13).
+    # Absent when Zotero gives none: the highlight is kept for its comment (decision of
+    # 2026-10-13). A highlight without either is not one (check_text_or_comment).
     text: Annotated[str, Field(max_length=HIGHLIGHT_MAX_LENGTH_BY_FIELD["text"])] | None
     comment: (
         Annotated[str, Field(max_length=HIGHLIGHT_MAX_LENGTH_BY_FIELD["comment"])]
@@ -215,6 +216,12 @@ class Highlight(BaseModel):
     )
     # dateAdded of Zotero.
     highlighted_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def check_text_or_comment(self) -> "Highlight":
+        if self.text is None and self.comment is None:
+            raise ValueError("a highlight without text or comment")
+        return self
 
 
 class Item(BaseModel):

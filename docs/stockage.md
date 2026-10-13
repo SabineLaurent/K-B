@@ -164,9 +164,12 @@ table de sa sorte (`kind`). Exception : GH Archive, dont chaque ligne de classem
     par étiquette.
   - Un `archive_id` qui commence par `arXiv:` sans en avoir l'une des deux formes (chiffres
     ASCII seulement), une date d'une autre forme que `AAAA-MM-JJ HH:MM:SS` ou un titre absent
-    font rejeter le document entier, au journal d'import. Un surlignage sans texte est gardé,
-    avec son commentaire (`highlight.text` vide). Un extrait qui n'est pas une liste JSON, ou
-    trop imbriqué pour être lu, est rejeté entier. Le motif du rejet nomme le champ, l'erreur et la
+    font rejeter le document entier, au journal d'import. Un surlignage sans texte est gardé
+    pour son commentaire (`highlight.text` absent) ; sans texte ni commentaire, il n'entre pas
+    en base, et son document n'est pas rejeté (un `CHECK` de `highlight` exige l'un des deux).
+    Un texte ou un commentaire vide est rangé absent (NULL) : un extrait qui donnerait l'autre
+    forme ne date pas de révision. Un extrait qui n'est pas une liste JSON, ou trop imbriqué
+    pour être lu (`RecursionError`, pour toutes les sources, #103), est rejeté entier. Le motif du rejet nomme le champ, l'erreur et la
     mesure, jamais la valeur : un titre ou un surlignage est une donnée personnelle.
   - L'URL est gardée en `http` si Zotero la donne ainsi (les 5 documents de l'extrait du
     2026-10-13) ; les autres sortes exigent `https`.
