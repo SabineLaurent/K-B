@@ -10,10 +10,10 @@ from pydantic import ValidationError
 from k_b.config import RETENTION_YEARS_BY_ACQUISITION_MODE
 from k_b.database.creation import DATABASE_SCRIPTS
 from k_b.items import (
+    HIGHLIGHT_MAX_LENGTH_BY_FIELD,
     MAX_COUNT_BY_KIND,
     MAX_INT64,
     MAX_LENGTH_BY_KIND,
-    HIGHLIGHT_MAX_LENGTH_BY_FIELD,
     TREND_REPOSITORY_NAME_MAX_LENGTH,
     Highlight,
     ItemKind,
@@ -522,11 +522,11 @@ PAPER_ITEM_ID = 1
 RELEASE_ITEM_ID = 2
 ADVISORY_ITEM_ID = 3
 NEWSLETTER_ARTICLE_ITEM_ID = 5
-ZOTERO_ENTRY_ITEM_ID = 6
+ZOTERO_ENTRY_ITEM_ID = 7
 
 # A row every constraint of its table accepts, in a base that holds the rows of filled_database.
-# The values are those of tests/fixtures (the collection), the long texts cut short; a new source,
-# and a highlight have no collected example.
+# The values are those of tests/fixtures (the collection), the long texts cut short; a new source
+# has no collected example. The Zotero rows are those of the fabricated library.
 VALID_ROW_BY_TABLE = {
     "source": {
         "source_code": "rss",
@@ -1052,6 +1052,7 @@ def test_a_zotero_key_the_item_refuses_is_refused_by_the_base(
             highlighted_at=DATETIME,
         )
     with pytest.raises(
-        sqlite3.IntegrityError, match=re.escape("CHECK constraint failed: zotero_key GLOB")
+        sqlite3.IntegrityError,
+        match=re.escape("CHECK constraint failed: zotero_key GLOB"),
     ):
         insert_row(filled_database, table, zotero_key=zotero_key)

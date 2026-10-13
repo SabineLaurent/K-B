@@ -83,7 +83,7 @@ def delete_in_zotero(run_on_zotero_library, zotero_dir, *item_ids):
     run_on_zotero_library(
         zotero_dir,
         "".join(
-            f"INSERT INTO deletedItems (itemID, dateDeleted)"
+            "INSERT INTO deletedItems (itemID, dateDeleted)"  # noqa: S608 — constants of the tests
             f" VALUES ({item_id}, '2026-10-05 20:00:00');"
             for item_id in item_ids
         ),
@@ -92,7 +92,8 @@ def delete_in_zotero(run_on_zotero_library, zotero_dir, *item_ids):
 
 def restore_in_zotero(run_on_zotero_library, zotero_dir, item_id):
     run_on_zotero_library(
-        zotero_dir, f"DELETE FROM deletedItems WHERE itemID = {item_id};"
+        zotero_dir,
+        f"DELETE FROM deletedItems WHERE itemID = {item_id};",  # noqa: S608 — constants of the tests
     )
 
 
@@ -148,9 +149,7 @@ def test_each_document_and_highlight_of_an_extract_goes_into_the_database(
             None,
         ),
     ]
-    assert fetch_rows(data_dir, "SELECT DISTINCT kind FROM item") == [
-        ("zotero_entry",)
-    ]
+    assert fetch_rows(data_dir, "SELECT DISTINCT kind FROM item") == [("zotero_entry",)]
 
 
 def test_the_publication_of_a_paper_arxiv_has_not_given_has_its_reference_alone(
@@ -162,7 +161,8 @@ def test_the_publication_of_a_paper_arxiv_has_not_given_has_its_reference_alone(
 
     assert fetch_rows(
         data_dir,
-        "SELECT zotero_key, arxiv_id, publication.item_id, title FROM zotero_entry"
+        "SELECT zotero_key, arxiv_id, publication.item_id, publication.title"
+        " FROM zotero_entry"
         " JOIN publication ON publication.id = zotero_entry.publication_id"
         " ORDER BY zotero_key",
     ) == [
@@ -176,7 +176,8 @@ def test_an_entry_of_a_paper_arxiv_has_given_points_to_its_publication(
 ):
     copy_fixture(data_dir / "raw", "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml")
     run_on_zotero_library(
-        zotero_dir, "UPDATE itemDataValues SET value = 'arXiv:2609.31282' WHERE valueID = 5;"
+        zotero_dir,
+        "UPDATE itemDataValues SET value = 'arXiv:2609.31282' WHERE valueID = 5;",
     )
     collect(data_dir, zotero_dir, SECOND)
 
@@ -254,7 +255,7 @@ def test_a_highlight_changed_in_zotero_is_written_again_and_its_entry_counted_wr
     run_import(data_dir)
     run_on_zotero_library(
         zotero_dir,
-        f"UPDATE itemAnnotations SET comment = 'Another comment'"
+        "UPDATE itemAnnotations SET comment = 'Another comment'"  # noqa: S608 — constants of the tests
         f" WHERE itemID = {THIRD_PAGE_HIGHLIGHT};",
     )
     second_path = collect(data_dir, zotero_dir, SECOND)
@@ -375,7 +376,7 @@ def test_an_extract_with_a_rejected_document_withdraws_nothing(
     delete_in_zotero(run_on_zotero_library, zotero_dir, THIRD_PAGE_HIGHLIGHT)
     run_on_zotero_library(
         zotero_dir,
-        f"UPDATE itemDataValues SET value = '{'x' * 1_001}' WHERE valueID = 6;",
+        f"UPDATE itemDataValues SET value = '{'x' * 1_001}' WHERE valueID = 6;",  # noqa: S608 — constants of the tests
     )
     collect(data_dir, zotero_dir, SECOND)
 
@@ -418,15 +419,19 @@ def test_a_rebuilt_database_has_the_content_of_the_one_kept_import_after_import(
         folder.mkdir()
         create_database(folder / "k-b.sqlite")
     changes = [
-        "",
-        f"UPDATE itemAnnotations SET comment = 'Another' WHERE itemID = {FIRST_PAGE_HIGHLIGHT};"
-        f" INSERT INTO deletedItems (itemID, dateDeleted)"
-        f" VALUES ({SECOND_DOCUMENT}, '2026-10-05 20:00:00');",
-        f"DELETE FROM deletedItems WHERE itemID = {SECOND_DOCUMENT};",
+        lambda: None,
+        lambda: (
+            run_on_zotero_library(
+                zotero_dir,
+                "UPDATE itemAnnotations SET comment = 'Another'"  # noqa: S608 — constants of the tests
+                f" WHERE itemID = {FIRST_PAGE_HIGHLIGHT};",
+            ),
+            delete_in_zotero(run_on_zotero_library, zotero_dir, SECOND_DOCUMENT),
+        ),
+        lambda: restore_in_zotero(run_on_zotero_library, zotero_dir, SECOND_DOCUMENT),
     ]
     for collection, change in zip((FIRST, SECOND, THIRD), changes, strict=True):
-        if change:
-            run_on_zotero_library(zotero_dir, change)
+        change()
         raw_extract = extract_of(zotero_dir)
         write_extract(kept_dir, collection, raw_extract)
         run_import(kept_dir)

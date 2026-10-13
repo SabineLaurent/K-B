@@ -1,5 +1,5 @@
-"""Read the raw files of raw/automated_watch/ not imported yet into common items
-(docs/specs-collecte.md, step 2)."""
+"""Read the raw files of raw/automated_watch/ and raw/selected_library/ not imported yet into
+common items (docs/specs-collecte.md, step 2)."""
 
 import csv
 import logging
@@ -11,7 +11,7 @@ from typing import Any, NamedTuple
 from pydantic import ValidationError
 
 from k_b.items import Item, SourceCode, TrendRow
-from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
+from k_b.raw_store import RAW_DIR_NAMES
 from k_b.source_contract import SourceKind, SourceReader, find_source_kind
 
 logger = logging.getLogger(__name__)
@@ -159,7 +159,12 @@ def list_collections(
     """Each collection (raw file or folder of pages) with the reader of its kind, found by the
     name of its source folder, whether its source is still tracked or not."""
     collections: list[tuple[Path, SourceReader[Any]]] = []
-    for source_dir in sorted((raw_dir / AUTOMATED_WATCH_DIR_NAME).glob("*/")):
+    source_dirs = [
+        source_dir
+        for raw_dir_name in RAW_DIR_NAMES
+        for source_dir in sorted((raw_dir / raw_dir_name).glob("*/"))
+    ]
+    for source_dir in source_dirs:
         kind = find_source_kind(source_dir.name, kinds)
         if kind is None:
             logger.info("folder without a source kind, skipped: %s", source_dir.name)

@@ -13,12 +13,14 @@ out is returned with its rule and the date it was compared with, then written to
 again on the same raw, the import gives the same base.
 
 A ranking of GH Archive is not made of items: its rows go to the trend table, in the same
-transaction, and its rule is a news feed applied to the whole window.
+transaction, and its rule is a news feed applied to the whole window. A Zotero entry is a state
+catalog, as CISA KEV, and so is each of its highlights (decision of 2026-10-13).
 
 Only exact duplicates are found: the same identifier within its source (a replay, collections
-that overlap). The same content under another identifier is not found: for TLDR (another URL,
-another edition) it is a written limit, without a content fingerprint (decision of 2026-10-12,
-docs/specs-collecte.md); for Zotero (another key) it is left to #138.
+that overlap). The same content under another identifier is not found, a written limit without
+a content fingerprint: for TLDR, another URL or another edition (decision of 2026-10-12); for
+Zotero, another key, though two entries of the same arXiv paper point to the same publication
+(decision of 2026-10-13; docs/specs-collecte.md).
 """
 
 import json
@@ -118,6 +120,75 @@ UPDATE vulnerability SET withdrawn_at = :collected_at
 WHERE item_id IS NOT NULL
     AND withdrawn_at IS NULL
     AND cve_id NOT IN (SELECT value FROM json_each(:present_cve_ids))
+"""
+
+# B1 of 2026-10-13: the paper a Zotero entry is, created with its arXiv reference alone when
+# arXiv has not given it, as a CVE an advisory cites.
+INSERT_CITED_PUBLICATION = """
+INSERT INTO publication (arxiv_id) VALUES (?) ON CONFLICT (arxiv_id) DO NOTHING
+"""
+
+# State catalog (Zotero), as UPSERT_VULNERABILITY: a known entry takes the version of an extract
+# collected after the latest one imported, if its content differs or if it was withdrawn;
+# revised_at is then the date of that collection, and withdrawn_at is emptied. An entry only an
+# extract older than the latest one brings is absent from the latest one: :withdrawn_at is then
+# the collection of the latest one.
+UPSERT_ZOTERO_ENTRY = """
+INSERT INTO zotero_entry (
+    item_id, kind, zotero_key, item_type, title, url, saved_at, publication_id, withdrawn_at
+) VALUES (
+    :item_id, 'zotero_entry', :zotero_key, :item_type, :title, :url, :saved_at,
+    :publication_id, :withdrawn_at
+)
+ON CONFLICT (zotero_key) DO UPDATE SET
+    item_type = excluded.item_type,
+    title = excluded.title,
+    url = excluded.url,
+    saved_at = excluded.saved_at,
+    publication_id = excluded.publication_id,
+    revised_at = :collected_at,
+    withdrawn_at = NULL
+WHERE :is_after_latest_catalog
+    AND (zotero_entry.withdrawn_at IS NOT NULL
+        OR (zotero_entry.item_type, zotero_entry.title, zotero_entry.url,
+            zotero_entry.saved_at, zotero_entry.publication_id)
+        IS NOT (excluded.item_type, excluded.title, excluded.url, excluded.saved_at,
+            excluded.publication_id))
+RETURNING id
+"""
+
+# State catalog (Zotero), the same rule for each highlight of an entry.
+UPSERT_HIGHLIGHT = """
+INSERT INTO highlight (zotero_key, text, comment, highlighted_at, item_id, withdrawn_at)
+VALUES (:zotero_key, :text, :comment, :highlighted_at, :item_id, :withdrawn_at)
+ON CONFLICT (zotero_key) DO UPDATE SET
+    text = excluded.text,
+    comment = excluded.comment,
+    highlighted_at = excluded.highlighted_at,
+    item_id = excluded.item_id,
+    revised_at = :collected_at,
+    withdrawn_at = NULL
+WHERE :is_after_latest_catalog
+    AND (highlight.withdrawn_at IS NOT NULL
+        OR (highlight.text, highlight.comment, highlight.highlighted_at, highlight.item_id)
+        IS NOT (excluded.text, excluded.comment, excluded.highlighted_at,
+            excluded.item_id))
+RETURNING highlight_id
+"""
+
+# State catalog (Zotero): an entry or a highlight absent from an extract collected after the
+# latest one imported is withdrawn at that collection, never removed; the first absence keeps
+# its date.
+WITHDRAW_ABSENT_ZOTERO_ENTRIES = """
+UPDATE zotero_entry SET withdrawn_at = :collected_at
+WHERE withdrawn_at IS NULL
+    AND zotero_key NOT IN (SELECT value FROM json_each(:present_keys))
+"""
+
+WITHDRAW_ABSENT_HIGHLIGHTS = """
+UPDATE highlight SET withdrawn_at = :collected_at
+WHERE withdrawn_at IS NULL
+    AND zotero_key NOT IN (SELECT value FROM json_each(:present_keys))
 """
 
 # News feed (releases, advisories, TLDR articles): the item is created only if its subtype is
@@ -343,7 +414,7 @@ def import_items(
                         discards.append(discard)
                 withdrawn_count += withdraw_absent_vulnerabilities(
                     connection, raw_file, raw_data_id
-                )
+                ) + withdraw_absent_zotero_rows(connection, raw_file, raw_data_id)
             # Checked once the base holds the write lock: two imports of the same second
             # cannot both find no log.
             check_log_absent(log_path)
@@ -637,6 +708,94 @@ def write_newsletter_article(
     return None
 
 
+def write_zotero_entry(
+    connection: sqlite3.Connection, item: Item, raw_data_id: int
+) -> Discard | None:
+    """The Zotero item, its entry and its highlights, found by their Zotero keys.
+
+    The entry counts as written if its row or one of its highlights was: a highlight changed
+    is a new version of the entry, whose item then points to this raw data.
+    """
+    row = connection.execute(
+        "SELECT item_id FROM zotero_entry WHERE zotero_key = ?", (item.source_item_id,)
+    ).fetchone()
+    known_item_id = row[0] if row else None
+    latest_collected_at, is_after_latest_catalog = connection.execute(
+        SELECT_LATEST_CATALOG,
+        {
+            "source_code": item.source_code,
+            "raw_data_id": raw_data_id,
+            "item_id": known_item_id,
+            "collected_at": format_date(item.collected_at),
+        },
+    ).fetchone()
+    item_id = (
+        insert_item(connection, "zotero_entry", raw_data_id)
+        if known_item_id is None
+        else known_item_id
+    )
+    catalog = {
+        "collected_at": format_date(item.collected_at),
+        "is_after_latest_catalog": is_after_latest_catalog,
+        # Without a latest catalog, is_after_latest_catalog is NULL: nothing to compare.
+        "withdrawn_at": None
+        if is_after_latest_catalog or latest_collected_at is None
+        else latest_collected_at,
+    }
+    entry_written = connection.execute(
+        UPSERT_ZOTERO_ENTRY,
+        {
+            "item_id": item_id,
+            "zotero_key": item.source_item_id,
+            "item_type": item.item_type,
+            "title": item.title,
+            "url": item.url,
+            "saved_at": format_date(item.saved_at),
+            "publication_id": write_cited_publication(connection, item.arxiv_id),
+        }
+        | catalog,
+    ).fetchone()
+    # A list, not a generator: every highlight is written, not only up to the first written.
+    highlights_written = [
+        connection.execute(
+            UPSERT_HIGHLIGHT,
+            {
+                "zotero_key": highlight.zotero_key,
+                "text": highlight.text,
+                "comment": highlight.comment,
+                "highlighted_at": format_date(highlight.highlighted_at),
+                "item_id": item_id,
+            }
+            | catalog,
+        ).fetchone()
+        for highlight in item.highlights
+    ]
+    if entry_written is None and not any(highlights_written):
+        # The base wrote nothing; the rule names which of its two conditions failed.
+        if is_after_latest_catalog:
+            return Discard(
+                "unchanged", item, read_item_collected_at(connection, item_id)
+            )
+        return Discard("no_newer_version", item, latest_collected_at)
+    # An extract imported late writes only what it alone brings, withdrawn: not a version.
+    if known_item_id is not None and is_after_latest_catalog:
+        point_item_at_raw_data(connection, known_item_id, raw_data_id)
+    return None
+
+
+def write_cited_publication(
+    connection: sqlite3.Connection, arxiv_id: str | None
+) -> int | None:
+    """The publication of arxiv_id, created without its arXiv columns if absent."""
+    if arxiv_id is None:
+        return None
+    connection.execute(INSERT_CITED_PUBLICATION, (arxiv_id,))
+    (publication_id,) = connection.execute(
+        "SELECT id FROM publication WHERE arxiv_id = ?", (arxiv_id,)
+    ).fetchone()
+    return int(publication_id)
+
+
 def write_trend_file(
     connection: sqlite3.Connection, trend_file: TrendFile
 ) -> tuple[int, list[TrendDiscard]]:
@@ -707,7 +866,53 @@ def withdraw_absent_vulnerabilities(
     ]
     if not present_cve_ids or raw_file.rejection_count:
         return 0
-    _, is_after_latest_catalog = connection.execute(
+    if not is_after_latest_catalog(connection, raw_file, raw_data_id):
+        return 0
+    return connection.execute(
+        WITHDRAW_ABSENT_VULNERABILITIES,
+        {
+            "collected_at": format_date(raw_file.collected_at),
+            "present_cve_ids": json.dumps(present_cve_ids),
+        },
+    ).rowcount
+
+
+def withdraw_absent_zotero_rows(
+    connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
+) -> int:
+    """Withdraw the entries and the highlights an extract collected after the latest one
+    imported no longer lists; return how many.
+
+    The same conditions as for a catalog of CISA KEV: an extract with a rejected entry, or
+    without entry, withdraws nothing. The highlights are compared with every highlight of the
+    extract: the last one of the library deleted in Zotero is withdrawn too.
+    """
+    entries = [item for item in raw_file.items if item.kind == "zotero_entry"]
+    if not entries or raw_file.rejection_count:
+        return 0
+    if not is_after_latest_catalog(connection, raw_file, raw_data_id):
+        return 0
+    collected_at = format_date(raw_file.collected_at)
+    entry_keys = [entry.source_item_id for entry in entries]
+    highlight_keys = [
+        highlight.zotero_key for entry in entries for highlight in entry.highlights
+    ]
+    withdrawn_entries = connection.execute(
+        WITHDRAW_ABSENT_ZOTERO_ENTRIES,
+        {"collected_at": collected_at, "present_keys": json.dumps(entry_keys)},
+    ).rowcount
+    withdrawn_highlights = connection.execute(
+        WITHDRAW_ABSENT_HIGHLIGHTS,
+        {"collected_at": collected_at, "present_keys": json.dumps(highlight_keys)},
+    ).rowcount
+    return withdrawn_entries + withdrawn_highlights
+
+
+def is_after_latest_catalog(
+    connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
+) -> bool:
+    """Whether raw_file was collected after the latest catalog of its source imported."""
+    _, is_after = connection.execute(
         SELECT_LATEST_CATALOG,
         {
             "source_code": raw_file.source_code,
@@ -717,15 +922,7 @@ def withdraw_absent_vulnerabilities(
             "collected_at": format_date(raw_file.collected_at),
         },
     ).fetchone()
-    if not is_after_latest_catalog:
-        return 0
-    return connection.execute(
-        WITHDRAW_ABSENT_VULNERABILITIES,
-        {
-            "collected_at": format_date(raw_file.collected_at),
-            "present_cve_ids": json.dumps(present_cve_ids),
-        },
-    ).rowcount
+    return bool(is_after)
 
 
 def insert_item(
@@ -761,6 +958,7 @@ WRITER_BY_KIND: dict[str, Callable[[sqlite3.Connection, Item, int], Discard | No
     "release": write_release,
     "advisory": write_advisory,
     "newsletter_article": write_newsletter_article,
+    "zotero_entry": write_zotero_entry,
 }
 
 

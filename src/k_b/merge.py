@@ -14,12 +14,16 @@ DATE_FIELDS = ("published_at", "revised_at", "saved_at", "collected_at")
 
 
 def normalize_item(item: Item) -> Item:
-    """The same item, with its URL without tracking parameters and its dates in UTC."""
+    """The same item, with its URL without tracking parameters and its dates in UTC, those of
+    its highlights too."""
     fields = item.model_dump()
-    fields["url"] = remove_tracking_parameters(item.url)
+    if item.url is not None:
+        fields["url"] = remove_tracking_parameters(item.url)
     for field in DATE_FIELDS:
         if fields[field] is not None:
             fields[field] = fields[field].astimezone(UTC)
+    for highlight in fields["highlights"]:
+        highlight["highlighted_at"] = highlight["highlighted_at"].astimezone(UTC)
     # Validated again: the normalized item must pass the same checks as the item read.
     return Item(**fields)
 
