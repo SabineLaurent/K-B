@@ -461,19 +461,23 @@ def test_a_rejected_document_is_logged_without_its_title_or_highlight_text(
     assert "title too long: 1300 characters, maximum 1000" in rejections[1]["reason"]
 
 
-def test_a_highlight_without_text_goes_into_the_database(
+def test_a_highlight_without_text_goes_into_the_database_with_its_comment_only(
     data_dir, zotero_dir, run_on_zotero_library
 ):
+    # The highlight of the first page has a comment, the one of the third page has none.
     run_on_zotero_library(
         zotero_dir,
-        f"UPDATE itemAnnotations SET text = NULL WHERE itemID = {THIRD_PAGE_HIGHLIGHT};",  # noqa: S608 — constants of the tests
+        "UPDATE itemAnnotations SET text = NULL"  # noqa: S608 — constants of the tests
+        f" WHERE itemID IN ({THIRD_PAGE_HIGHLIGHT}, {FIRST_PAGE_HIGHLIGHT});",
     )
     collect(data_dir, zotero_dir, FIRST)
 
     summary = run_import(data_dir)
 
     assert summary.rejection_count == 0
-    assert fetch_rows(data_dir, HIGHLIGHT_QUERY)[0][2:4] == (None, None)
+    assert [row[:4] for row in fetch_rows(data_dir, HIGHLIGHT_QUERY)] == [
+        ("ANNOTAA2", "AAAAAAA1", None, "A comment on it.")
+    ]
 
 
 def test_an_older_extract_imported_late_creates_no_publication_for_a_reference_since_changed(

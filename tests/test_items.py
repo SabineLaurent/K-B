@@ -373,6 +373,8 @@ def text_of_length(field, length):
         return "https://" + "x" * (length - len("https://"))
     if field == "cve":
         return "CVE-2026-" + "1" * (length - len("CVE-2026-"))
+    if field == "arxiv_id":
+        return "a" * (length - len("/9901001")) + "/9901001"
     return "x" * length
 
 
@@ -402,6 +404,7 @@ def text_of_length(field, length):
         (zotero_entry_fields, "item_type", 100),
         (zotero_entry_fields, "title", 1_000),
         (zotero_entry_fields, "url", 2_000),
+        (zotero_entry_fields, "arxiv_id", 20),
     ],
 )
 def test_a_text_is_accepted_up_to_its_maximum_length_and_refused_beyond(
@@ -578,10 +581,13 @@ def test_a_highlight_without_comment_is_accepted():
     assert Highlight(**highlight_fields(comment=None)).comment is None
 
 
-# A highlight Zotero keeps without its text (T1 of the review of 2026-10-13): kept as given.
-@pytest.mark.parametrize("text", [None, ""])
-def test_a_highlight_without_text_is_accepted(text):
-    assert Highlight(**highlight_fields(text=text)).text == text
+def test_a_highlight_without_text_is_accepted_with_its_comment():
+    assert Highlight(**highlight_fields(text=None)).text is None
+
+
+def test_a_highlight_without_text_or_comment_is_refused():
+    with pytest.raises(ValidationError):
+        Highlight(**highlight_fields(text=None, comment=None))
 
 
 # The new form, and the form of before 2007: archive, optional subject class, 7 digits.

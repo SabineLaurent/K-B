@@ -464,6 +464,7 @@ COLUMN_BY_KIND_AND_FIELD = {
     ("zotero_entry", "item_type"): ("zotero_entry", "item_type"),
     ("zotero_entry", "title"): ("zotero_entry", "title"),
     ("zotero_entry", "url"): ("zotero_entry", "url"),
+    ("zotero_entry", "arxiv_id"): ("publication", "arxiv_id"),
 }
 
 
@@ -653,6 +654,11 @@ REFUSED_VALUES = [
     ("publication", "revised_at IS strftime", {"revised_at": INVALID_DATE}),
     ("publication", "(item_id IS NULL) = (title IS NULL)", {"title": None}),
     ("highlight", "zotero_key GLOB", {"zotero_key": "annotaa2"}),
+    (
+        "highlight",
+        "text IS NOT NULL OR comment IS NOT NULL",
+        {"text": None, "comment": None},
+    ),
     ("highlight", "length(text) <= 10000", {"text": "x" * 10_001}),
     ("highlight", "length(comment) <= 10000", {"comment": "x" * 10_001}),
     ("highlight", "highlighted_at IS strftime", {"highlighted_at": INVALID_DATE}),

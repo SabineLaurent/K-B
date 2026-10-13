@@ -518,3 +518,21 @@ def test_a_folder_of_the_selected_library_without_a_source_kind_is_skipped(
 
     assert reading.files == []
     assert "folder without a source kind, skipped: clipping" in caplog.text
+
+
+def test_a_raw_file_nested_too_deep_is_rejected_and_the_others_are_read(tmp_path):
+    copy_fixture(tmp_path, "cisa_kev_extract.csv", "cisa_kev", "csv")
+    nested_path = (
+        tmp_path / "automated_watch" / "github_releases_anthropics_claude_code"
+    ) / f"{COLLECTION_NAME}.json"
+    nested_path.parent.mkdir(parents=True)
+    nested_path.write_bytes(b"[" * 100_000)
+
+    reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+
+    assert [raw_file.source_code for raw_file in reading.files] == ["cisa_kev"]
+    [rejection] = reading.rejections
+    assert rejection.raw_file_path == (
+        f"automated_watch/github_releases_anthropics_claude_code/{COLLECTION_NAME}.json"
+    )
+    assert rejection.reason.startswith("RecursionError: ")

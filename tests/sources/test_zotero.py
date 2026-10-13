@@ -581,8 +581,9 @@ def test_an_arxiv_reference_of_before_2007_is_read(archive_id, arxiv_id):
     ).arxiv_id == (arxiv_id)
 
 
-def test_a_highlight_without_text_is_read_with_its_comment():
-    item = convert(with_first_highlight_changed(PAPER_WITH_HIGHLIGHTS, text=None))
+@pytest.mark.parametrize("text", [None, ""])
+def test_a_highlight_without_text_is_read_with_its_comment(text):
+    item = convert(with_first_highlight_changed(PAPER_WITH_HIGHLIGHTS, text=text))
 
     assert (item.highlights[0].text, item.highlights[0].comment) == (
         None,
@@ -590,9 +591,23 @@ def test_a_highlight_without_text_is_read_with_its_comment():
     )
 
 
-def test_an_extract_nested_too_deep_is_unreadable():
-    with pytest.raises(ValueError, match="nested too deep"):
-        read_documents(b"[" * 100_000 + b"]" * 100_000)
+@pytest.mark.parametrize(
+    "text, comment", [(None, None), ("", ""), (None, ""), ("", None)]
+)
+def test_a_highlight_without_text_or_comment_is_left_out_without_refusing_its_document(
+    text, comment
+):
+    item = convert(
+        with_first_highlight_changed(PAPER_WITH_HIGHLIGHTS, text=text, comment=comment)
+    )
+
+    assert [highlight.zotero_key for highlight in item.highlights] == ["ANNOTAA1"]
+
+
+def test_an_empty_comment_is_read_absent():
+    item = convert(with_first_highlight_changed(PAPER_WITH_HIGHLIGHTS, comment=""))
+
+    assert item.highlights[0].comment is None
 
 
 def test_a_document_without_url_is_read():
