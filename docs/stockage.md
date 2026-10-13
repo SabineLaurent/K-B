@@ -91,7 +91,7 @@ elles ne sont pas recopiées ici. Un test (`tests/test_schema.py`) vérifie que 
   `tag_name` qui commence par un NUL est accepté par l'item (3 caractères pour `"\0v1"`) et refusé
   par `CHECK (length(tag_name) > 0)`, ce qui annule l'import entier. Ce second cas n'est pas
   traité. Pour `trend`, il l'est : `GLOB` s'arrête lui aussi au premier NUL, et `TrendRow` refuse
-  un nom de dépôt qui en contient un.
+  un nom de dépôt qui contient un caractère de contrôle, NUL compris.
 
 ### Ce que chaque source met dans l'item, puis dans la base
 

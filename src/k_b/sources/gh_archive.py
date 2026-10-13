@@ -133,6 +133,10 @@ class TrendsExtract(BaseModel):
     rows: list[TrendRow]
 
 
+# The names of the fields a raw result may hold: any other key is a value of the raw.
+KNOWN_FIELDS = frozenset(TrendsExtract.model_fields) | frozenset(TrendRow.model_fields)
+
+
 class GhArchiveSource:
     name = FOLDER_PREFIX
     extension = "json"
@@ -351,10 +355,10 @@ def describe_validation_error(error: ValidationError) -> str:
     first = error.errors()[0]
     location = first["loc"]
     if location[:1] == ("rows",) and len(location) >= 2:
-        field = ".".join(str(part) for part in location[2:])
+        field = ".".join(describe_location_part(part) for part in location[2:])
         place = f"row {location[1]}: {field}" if field else f"row {location[1]}"
     else:
-        place = ".".join(str(part) for part in location) or "result"
+        place = ".".join(describe_location_part(part) for part in location) or "result"
     # The field is the last name of the place: a list index (window_ends.0) is not one.
     names = [part for part in location if isinstance(part, str)]
     described = describe_value(first.get("input"), names[-1] if names else None)
@@ -362,6 +366,14 @@ def describe_validation_error(error: ValidationError) -> str:
     if maximum is not None:
         described = f"{described}, maximum {maximum}"
     return f"{place} ({first['type']}): {described}; {error.error_count()} error(s)"
+
+
+def describe_location_part(part: int | str) -> str:
+    """A position or a known field as it is; an unknown key, which the raw gives, escaped and
+    cut like a value."""
+    if isinstance(part, str) and part not in KNOWN_FIELDS:
+        return repr(part)[:MAX_QUOTED_VALUE_LENGTH]
+    return str(part)
 
 
 def describe_value(value: object, field: object) -> str:
@@ -381,7 +393,9 @@ def read_trend_files(raw_dir: Path, imported_paths: frozenset[str]) -> TrendRead
     As the reader of the items does (raw_items.py): a file not named by its collection time is
     rejected without being opened; a file that cannot be read, or that read_trends refuses, is
     rejected and counted as opened. A rejected file is not registered: the next import reads
-    it again. A file already imported is not opened.
+    it again. A file already imported is not opened. Unlike that reader, a folder is not a
+    collection of pages: the source writes one file per collection, and a folder is rejected
+    without being opened, its path left out of the reason.
     """
     source_dir = raw_dir / AUTOMATED_WATCH_DIR_NAME / FOLDER_PREFIX
     files: list[TrendFile] = []
@@ -393,6 +407,9 @@ def read_trend_files(raw_dir: Path, imported_paths: frozenset[str]) -> TrendRead
     for path in list_visible_entries(source_dir):
         raw_file_path = path.relative_to(raw_dir).as_posix()
         if raw_file_path in imported_paths:
+            continue
+        if path.is_dir():
+            rejections.append(reject(raw_file_path, "a folder, not a raw file"))
             continue
         try:
             collected_at = parse_collection_name(path.stem)

@@ -1684,3 +1684,21 @@ def test_a_rebuilt_database_with_rankings_equals_the_one_kept_import_after_impor
 
     assert count_rows(data_dir, "SELECT count(*) FROM trend") == 10
     assert dump_database(data_dir) == kept
+
+
+def test_a_window_of_the_year_1_is_written_with_a_year_of_four_digits(trend_data_dir):
+    # The base refuses a year not written on 4 digits: the day is not formatted by the C
+    # library, which does not pad the year on every platform.
+    write_ranking(
+        trend_data_dir,
+        LATER_COLLECTION,
+        rows_of_window("0001-01-01"),
+        window_ends=("0001-01-01",),
+    )
+
+    summary = run_import(trend_data_dir)
+
+    assert summary.trend_count == 10
+    assert fetch_rows(
+        trend_data_dir, "SELECT DISTINCT window_end FROM trend ORDER BY window_end"
+    ) == [("0001-01-01T00:00:00Z",), ("2026-10-10T00:00:00Z",)]

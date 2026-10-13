@@ -911,12 +911,23 @@ def test_an_integer_over_64_bits_is_refused_by_the_trend_row_as_sqlite_cannot_ho
 
 
 # GLOB stops at the first NUL: the base refuses a name the pattern of RepositoryName accepts.
+# The other control characters would reach a terminal with the name (an escape sequence).
 @pytest.mark.parametrize(
     "repository_name",
-    ["\0morluto/rea", "mor\0luto/rea", "morluto/\0rea", "morluto/rea\0"],
+    [
+        "\0morluto/rea",
+        "mor\0luto/rea",
+        "morluto/\0rea",
+        "morluto/rea\0",
+        "morluto/rea\x1b[31m",
+        "morluto/rea\x7f",
+        "morluto/rea\x9b",
+    ],
 )
-def test_a_repository_name_with_a_nul_is_refused_by_the_trend_row(repository_name):
-    with pytest.raises(ValidationError, match="repository_name"):
+def test_a_repository_name_with_a_control_character_is_refused_by_the_trend_row(
+    repository_name,
+):
+    with pytest.raises(ValidationError, match="control_character"):
         validate_trend_row(repository_name=repository_name)
 
 

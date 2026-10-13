@@ -24,7 +24,7 @@ docs/specs-collecte.md); for Zotero (another key) it is left to #138.
 import json
 import sqlite3
 from collections.abc import Callable, Sequence
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Literal, NamedTuple
 
@@ -798,8 +798,11 @@ def format_date(moment: datetime | None) -> str | None:
 
 
 def format_day(day: date) -> str:
-    """A day is written at midnight UTC (docs/stockage.md)."""
-    return datetime.combine(day, time.min, tzinfo=UTC).strftime(DATABASE_DATE_FORMAT)
+    """A day is written at midnight UTC (docs/stockage.md), in the format of the base.
+
+    isoformat always writes the year on 4 digits; strftime leaves it to the C library.
+    """
+    return f"{day.isoformat()}T00:00:00Z"
 
 
 def check_log_absent(log_path: Path) -> None:

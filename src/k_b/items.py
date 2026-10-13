@@ -7,6 +7,7 @@ import, which cannot import a source, writes it.
 """
 
 import re
+import unicodedata
 from datetime import date
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
@@ -20,6 +21,7 @@ from pydantic import (
     StringConstraints,
     model_validator,
 )
+from pydantic_core import PydanticCustomError
 
 # The sources of seed_sources.sql: a test keeps both lists equal.
 SourceCode = Literal[
@@ -59,11 +61,17 @@ def check_url_can_be_normalized(url: str) -> str:
     return url
 
 
-def check_text_has_no_nul(text: str) -> str:
-    """Refuse a NUL: SQLite stops a GLOB and a length() at the first one, so the base would
-    refuse, or measure short, a text the pattern accepts."""
-    if "\0" in text:
-        raise ValueError(f"text with a NUL character: {len(text)} characters")
+def check_text_has_no_control_character(text: str) -> str:
+    """Refuse a control character, a NUL among them. SQLite stops a GLOB and a length() at the
+    first NUL: the base would refuse, or measure short, a text the pattern accepts. Another
+    one (an escape sequence) would reach the terminal that displays the text."""
+    if any(unicodedata.category(character) == "Cc" for character in text):
+        # A named error type: the refusal is told apart from any other value error.
+        raise PydanticCustomError(
+            "control_character",
+            "text with a control character: {length} characters",
+            {"length": len(text)},
+        )
     return text
 
 
@@ -295,7 +303,7 @@ class TrendRow(BaseModel):
     repository_name: Annotated[
         RepositoryName,
         Field(max_length=TREND_REPOSITORY_NAME_MAX_LENGTH),
-        AfterValidator(check_text_has_no_nul),
+        AfterValidator(check_text_has_no_control_character),
     ]
     stars_gained: Annotated[int, Field(ge=0, le=MAX_INT64)]
     forks_gained: Annotated[int, Field(ge=0, le=MAX_INT64)]

@@ -456,8 +456,32 @@ def test_a_ranking_with_an_invalid_row_is_refused_whole(field, value):
 
 
 def test_a_row_with_an_unknown_field_is_refused():
-    with pytest.raises(TrendsExtractInvalidError, match="row 0: actor"):
+    with pytest.raises(TrendsExtractInvalidError, match="row 0: 'actor'"):
         read_trends(make_raw([{**first_row(), "actor": "someone"}]))
+
+
+def test_the_message_quotes_an_unknown_field_name_truncated_and_escaped():
+    # A key is a value of the raw: a line break in it would forge a log line.
+    key = "some-person/repository\n2026-10-13 WARNING forged line" + "x" * 500
+    with pytest.raises(TrendsExtractInvalidError) as raised:
+        read_trends(make_raw([{**first_row(), key: 1}]))
+
+    message = str(raised.value)
+    assert "\n" not in message
+    assert "row 0: 'some-person/repository\\n2026-10-13 WARNING forged line" in message
+    assert "x" * 100 not in message
+    assert "(extra_forbidden)" in message
+
+
+def test_the_message_names_the_refusal_of_a_control_character_not_the_name():
+    rows = [{**first_row(), "repository_name": "some-person/na\x1b[31mme"}]
+
+    with pytest.raises(TrendsExtractInvalidError) as raised:
+        read_trends(make_raw(rows))
+
+    message = str(raised.value)
+    assert "some-person" not in message
+    assert "row 0: repository_name (control_character): str of length 21" in message
 
 
 def test_a_row_of_a_window_not_announced_is_refused():
@@ -659,7 +683,10 @@ def test_a_raw_ranking_not_named_by_its_collection_time_is_rejected_unopened(
     assert reading.read_count == 0
 
 
-def test_a_folder_among_the_raw_rankings_is_rejected(tmp_path):
+def test_a_folder_among_the_raw_rankings_is_rejected_unopened_without_its_path(
+    tmp_path,
+):
+    # The source writes one file per collection, never a folder of pages.
     (tmp_path / "automated_watch" / "gh_archive" / COLLECTION).mkdir(parents=True)
 
     reading = read_trend_files(tmp_path, frozenset())
@@ -667,8 +694,8 @@ def test_a_folder_among_the_raw_rankings_is_rejected(tmp_path):
     assert reading.files == []
     [rejection] = reading.rejections
     assert rejection.raw_file_path == f"automated_watch/gh_archive/{COLLECTION}"
-    assert rejection.reason.startswith("IsADirectoryError: ")
-    assert reading.read_count == 1
+    assert rejection.reason == "a folder, not a raw file"
+    assert reading.read_count == 0
 
 
 def test_a_hidden_file_among_the_raw_rankings_is_skipped(tmp_path):
