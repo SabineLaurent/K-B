@@ -30,12 +30,12 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Literal, NamedTuple
 
-from k_b.config import TrackedRepository
+from k_b.core.config import TrackedRepository
 from k_b.database.connection import connect_database
 from k_b.database.reading import read_raw_file_paths
-from k_b.items import Item, ItemKind, TrendRow
-from k_b.merge import normalize_item
-from k_b.raw_items import (
+from k_b.etl.normalize import normalize_item
+from k_b.etl.raw_store import find_stream, write_file_atomically
+from k_b.etl.transform import (
     RawFile,
     RawReading,
     Rejection,
@@ -43,7 +43,7 @@ from k_b.raw_items import (
     TrendReading,
     reject,
 )
-from k_b.raw_store import find_stream, write_file_atomically
+from k_b.items import Item, ItemKind, TrendRow
 
 # The date format the CHECK constraints of schema.sql accept.
 DATABASE_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"

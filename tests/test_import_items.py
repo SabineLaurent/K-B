@@ -19,10 +19,10 @@ from test_items import (
 )
 from test_raw_items import FIXTURES_DIR, convert_line, copy_fixture
 
-from k_b import import_items as import_items_module
 from k_b.database.connection import connect_database
 from k_b.database.creation import create_database
-from k_b.import_items import (
+from k_b.etl import load as import_items_module
+from k_b.etl.load import (
     ImportLogExistsError,
     KindWithoutTableError,
     MissingDatabaseError,
@@ -30,17 +30,17 @@ from k_b.import_items import (
     import_items,
     read_imported_paths,
 )
+from k_b.etl.source_contract import SourceKind, SourceReader
+from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.etl.sources.gh_archive import read_trend_files
+from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
+from k_b.etl.transform import RawReading, TrendReading, read_raw_items
 from k_b.items import (
     MAX_COUNT_BY_KIND,
     MAX_ELEMENT_LENGTH_BY_KIND,
     MAX_LENGTH_BY_KIND,
     Item,
 )
-from k_b.raw_items import RawReading, TrendReading, read_raw_items
-from k_b.source_contract import SourceKind, SourceReader
-from k_b.source_kinds import SOURCE_KINDS
-from k_b.sources.gh_archive import read_trend_files
-from k_b.sources.tracked_repositories import TRACKED_REPOSITORIES
 
 FIRST_PAPER_ID = "2609.31282"
 FIRST_CVE_ID = "CVE-2026-86950"

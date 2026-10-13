@@ -11,10 +11,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import urlencode
 
-from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
-from k_b.sources.github_api import get_from_github_api
-from k_b.sources.github_dates import parse_github_date
-from k_b.sources.tracked_repositories import is_repository_name
+from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
+from k_b.etl.sources.github_api import get_from_github_api
+from k_b.etl.sources.github_dates import parse_github_date
+from k_b.etl.sources.tracked_repositories import is_repository_name
 
 # The search needs a criterion: this one keeps the whole top 100 (the 100th had 116,161 stars on
 # 2026-10-02).

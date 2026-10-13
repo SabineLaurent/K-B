@@ -10,9 +10,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from k_b.items import Highlight
-from k_b.sources import zotero
-from k_b.sources.zotero import (
+from k_b.etl.sources import zotero
+from k_b.etl.sources.zotero import (
     READER,
     ZoteroChangedDuringCopyError,
     ZoteroCopyInconsistentError,
@@ -21,6 +20,7 @@ from k_b.sources.zotero import (
     convert_document,
     read_documents,
 )
+from k_b.items import Highlight
 
 PAPER_WITH_HIGHLIGHTS = {
     "key": "AAAAAAA1",
@@ -478,7 +478,7 @@ def test_a_library_whose_only_recent_change_is_in_its_write_ahead_log_is_extract
 
 
 def test_the_log_gives_two_counts_and_no_author_title_or_highlight(zotero_dir, caplog):
-    with caplog.at_level(logging.INFO, logger="k_b.sources.zotero"):
+    with caplog.at_level(logging.INFO, logger="k_b.etl.sources.zotero"):
         extract(zotero_dir)
 
     assert caplog.messages == ["zotero: 2 documents, 2 highlights extracted"]

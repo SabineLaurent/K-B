@@ -17,7 +17,7 @@ from test_import_items import (
 from test_raw_items import copy_fixture
 
 from k_b.database.creation import create_database
-from k_b.sources.zotero import ZoteroSource
+from k_b.etl.sources.zotero import ZoteroSource
 
 FIRST = "2026-10-05T093000Z"
 SECOND = "2026-10-06T093000Z"

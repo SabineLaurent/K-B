@@ -7,10 +7,10 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from k_b.source_contract import list_sources
-from k_b.source_kinds import SOURCE_KINDS
-from k_b.sources import github_advisories
-from k_b.sources.github_advisories import (
+from k_b.etl.source_contract import list_sources
+from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.etl.sources import github_advisories
+from k_b.etl.sources.github_advisories import (
     Advisory,
     GithubAdvisoriesSource,
     convert_advisory,

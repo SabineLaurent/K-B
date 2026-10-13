@@ -7,9 +7,9 @@ from urllib.error import HTTPError
 import pytest
 from pydantic import ValidationError
 
-from k_b import http_download
-from k_b.sources import cisa_kev
-from k_b.sources.cisa_kev import (
+from k_b.etl import http_download
+from k_b.etl.sources import cisa_kev
+from k_b.etl.sources.cisa_kev import (
     CisaKevSource,
     Vulnerability,
     convert_vulnerability,

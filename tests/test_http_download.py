@@ -3,9 +3,9 @@ from urllib.error import HTTPError
 
 import pytest
 
-from k_b import http_download
-from k_b.http_download import RedirectedOutsideError, download
-from k_b.user_agent import USER_AGENT
+from k_b.etl import http_download
+from k_b.etl.http_download import RedirectedOutsideError, download
+from k_b.etl.user_agent import USER_AGENT
 
 BODY = b"<feed>one paper</feed>"
 TRUSTED_URL_PREFIX = "https://example.org/"

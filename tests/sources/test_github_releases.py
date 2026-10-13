@@ -7,16 +7,16 @@ from pathlib import Path
 
 import pytest
 
-from k_b.source_contract import list_sources
-from k_b.source_kinds import SOURCE_KINDS
-from k_b.sources import github_releases
-from k_b.sources.github_releases import (
+from k_b.etl.source_contract import list_sources
+from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.etl.sources import github_releases
+from k_b.etl.sources.github_releases import (
     GithubReleasesSource,
     Release,
     convert_release,
     read_releases,
 )
-from k_b.sources.tracked_repositories import TRACKED_REPOSITORIES
+from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_releases_extract.json").read_bytes()

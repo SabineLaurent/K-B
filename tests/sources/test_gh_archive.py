@@ -4,9 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from k_b.raw_items import RawFile
-from k_b.sources import gh_archive
-from k_b.sources.gh_archive import (
+from k_b.etl.sources import gh_archive
+from k_b.etl.sources.gh_archive import (
     MAX_BYTES_BILLED,
     MAX_BYTES_PER_WINDOW,
     MAX_CATCH_UP_WINDOWS,
@@ -22,6 +21,7 @@ from k_b.sources.gh_archive import (
     read_trend_files,
     read_trends,
 )
+from k_b.etl.transform import RawFile
 
 FIXTURE_PATH = Path(__file__).parent.parent / "fixtures" / "gh_archive_extract.json"
 TODAY = date(2026, 10, 11)

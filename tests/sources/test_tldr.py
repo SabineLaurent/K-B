@@ -7,18 +7,18 @@ import pytest
 from bs4.exceptions import ParserRejectedMarkup
 from pydantic import ValidationError
 
-from k_b.http_download import RedirectedOutsideError
-from k_b.merge import normalize_item
-from k_b.raw_items import read_raw_items
-from k_b.source_contract import find_source_kind, list_sources
-from k_b.source_kinds import SOURCE_KINDS
-from k_b.sources import tldr
-from k_b.sources.tldr import (
+from k_b.etl.http_download import RedirectedOutsideError
+from k_b.etl.normalize import normalize_item
+from k_b.etl.source_contract import find_source_kind, list_sources
+from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.etl.sources import tldr
+from k_b.etl.sources.tldr import (
     TldrArticle,
     TldrSource,
     convert_article,
     read_articles,
 )
+from k_b.etl.transform import read_raw_items
 
 # Sunday: the window of a collection on this day holds a weekend.
 TODAY = date(2026, 10, 4)
@@ -83,7 +83,7 @@ def test_an_edition_page_is_returned_unchanged_under_its_day_and_logged(
     fake_download, caplog
 ):
     fake_download.answers["https://tldr.tech/ai/2026-10-02"] = EDITION_PAGE
-    caplog.set_level(logging.INFO, logger="k_b.sources.tldr")
+    caplog.set_level(logging.INFO, logger="k_b.etl.sources.tldr")
 
     pages = TldrSource("ai").fetch(datetime(2026, 10, 2, 6, 0, tzinfo=UTC))
 
@@ -101,7 +101,7 @@ def test_a_day_redirected_to_the_edition_landing_page_is_logged_and_skipped(
     fake_download.answers["https://tldr.tech/ai/2026-10-03"] = RedirectedOutsideError(
         "https://tldr.tech/ai/2026-10-03", landing_url
     )
-    caplog.set_level(logging.INFO, logger="k_b.sources.tldr")
+    caplog.set_level(logging.INFO, logger="k_b.etl.sources.tldr")
 
     pages = TldrSource("ai").fetch(datetime(2026, 10, 2, 6, 0, tzinfo=UTC))
 
@@ -130,7 +130,7 @@ def test_a_redirection_elsewhere_than_the_edition_landing_page_is_logged_and_rai
 def test_no_edition_page_in_the_window_returns_none_and_is_logged(
     fake_download, caplog
 ):
-    caplog.set_level(logging.INFO, logger="k_b.sources.tldr")
+    caplog.set_level(logging.INFO, logger="k_b.etl.sources.tldr")
 
     assert TldrSource("ai").fetch(datetime(2026, 10, 2, 6, 0, tzinfo=UTC)) is None
     assert "tldr_ai: no edition page from 2026-10-02 to 2026-10-04" in caplog.text

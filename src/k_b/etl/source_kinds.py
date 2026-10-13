@@ -5,8 +5,8 @@ In the package, only cli.py imports it: it gives it to the collection (E) and to
 machine that says where the Zotero data directory, or the BigQuery key, is.
 """
 
-from k_b.source_contract import SourceKind
-from k_b.sources import (
+from k_b.etl.source_contract import SourceKind
+from k_b.etl.sources import (
     arxiv,
     cisa_kev,
     gh_archive,
@@ -16,13 +16,13 @@ from k_b.sources import (
     tldr,
     zotero,
 )
-from k_b.sources.arxiv import ArxivSource
-from k_b.sources.cisa_kev import CisaKevSource
-from k_b.sources.github_advisories import GithubAdvisoriesSource
-from k_b.sources.github_most_starred import GithubMostStarredSource
-from k_b.sources.github_releases import GithubReleasesSource
-from k_b.sources.tldr import TRACKED_EDITIONS, TldrSource
-from k_b.sources.tracked_repositories import (
+from k_b.etl.sources.arxiv import ArxivSource
+from k_b.etl.sources.cisa_kev import CisaKevSource
+from k_b.etl.sources.github_advisories import GithubAdvisoriesSource
+from k_b.etl.sources.github_most_starred import GithubMostStarredSource
+from k_b.etl.sources.github_releases import GithubReleasesSource
+from k_b.etl.sources.tldr import TRACKED_EDITIONS, TldrSource
+from k_b.etl.sources.tracked_repositories import (
     TRACKED_REPOSITORIES,
     list_packages_by_ecosystem,
 )

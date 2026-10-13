@@ -7,8 +7,9 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from k_b.config import RETENTION_YEARS_BY_ACQUISITION_MODE
+from k_b.core.config import RETENTION_YEARS_BY_ACQUISITION_MODE
 from k_b.database.creation import DATABASE_SCRIPTS
+from k_b.etl.sources.github_advisories import ECOSYSTEMS
 from k_b.items import (
     HIGHLIGHT_MAX_LENGTH_BY_FIELD,
     MAX_COUNT_BY_KIND,
@@ -19,7 +20,6 @@ from k_b.items import (
     ItemKind,
     TrendRow,
 )
-from k_b.sources.github_advisories import ECOSYSTEMS
 
 EXPECTED_TABLES = {
     "source",

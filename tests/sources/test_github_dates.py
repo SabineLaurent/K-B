@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from k_b.sources.github_dates import parse_github_date
+from k_b.etl.sources.github_dates import parse_github_date
 
 
 def test_a_github_date_is_read_in_utc():

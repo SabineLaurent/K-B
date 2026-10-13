@@ -24,8 +24,8 @@ from typing import Annotated, Any
 from google.cloud import bigquery
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from k_b.items import SourceCode, TrendRow
-from k_b.raw_items import (
+from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
+from k_b.etl.transform import (
     RawFile,
     Rejection,
     TrendFile,
@@ -34,7 +34,7 @@ from k_b.raw_items import (
     parse_collection_name,
     reject,
 )
-from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
+from k_b.items import SourceCode, TrendRow
 
 logger = logging.getLogger(__name__)
 
@@ -390,7 +390,7 @@ def describe_value(value: object, field: object) -> str:
 def read_trend_files(raw_dir: Path, imported_paths: frozenset[str]) -> TrendReading:
     """Every raw result of the source that is not in imported_paths, in collection order.
 
-    As the reader of the items does (raw_items.py): a file not named by its collection time is
+    As the reader of the items does (etl/transform.py): a file not named by its collection time is
     rejected without being opened; a file that cannot be read, or that read_trends refuses, is
     rejected and counted as opened. A rejected file is not registered: the next import reads
     it again. A file already imported is not opened. Unlike that reader, a folder is not a

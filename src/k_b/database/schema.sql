@@ -17,7 +17,7 @@ CREATE TABLE source (
     label            TEXT NOT NULL,
     source_type      TEXT NOT NULL
         CHECK (source_type IN ('web_service', 'file', 'scraping', 'database', 'big_data')),
-    -- Each value has its retention in src/k_b/config.py; a test keeps both lists equal.
+    -- Each value has its retention in src/k_b/core/config.py; a test keeps both lists equal.
     acquisition_mode TEXT NOT NULL CHECK (acquisition_mode IN ('watch', 'library', 'wiki'))
 ) STRICT;
 
@@ -152,13 +152,13 @@ CREATE TABLE vulnerability (
         AND (item_id IS NOT NULL OR (revised_at IS NULL AND withdrawn_at IS NULL)))
 ) STRICT;
 
--- A reference table, like source: the list of src/k_b/sources/tracked_repositories.py is the
+-- A reference table, like source: the list of src/k_b/etl/sources/tracked_repositories.py is the
 -- source of truth; each import adds its repositories or updates them, and a repository removed
 -- from the list keeps its row (#87). GitHub ignores the case of a repository name.
 CREATE TABLE tracked_repository (
     id              INTEGER PRIMARY KEY,
     repository_name TEXT NOT NULL UNIQUE COLLATE NOCASE CHECK (repository_name GLOB '?*/?*'),
-    -- The ecosystems of src/k_b/sources/github_advisories.py: a test keeps both lists equal.
+    -- The ecosystems of src/k_b/etl/sources/github_advisories.py: a test keeps both lists equal.
     ecosystem       TEXT NOT NULL CHECK (ecosystem IN ('pip', 'npm')),
     -- The tracked packages, in the order of the list.
     packages        TEXT NOT NULL

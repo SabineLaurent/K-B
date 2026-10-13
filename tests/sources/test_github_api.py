@@ -2,10 +2,10 @@ import io
 
 import pytest
 
-from k_b import http_download
-from k_b.sources import github_api
-from k_b.sources.github_api import get_from_github_api
-from k_b.user_agent import USER_AGENT
+from k_b.etl import http_download
+from k_b.etl.sources import github_api
+from k_b.etl.sources.github_api import get_from_github_api
+from k_b.etl.user_agent import USER_AGENT
 
 BODY = b'[{"tag_name": "v1.0.0"}]'
 PATH = "repos/octocat/hello-world/releases?per_page=100"

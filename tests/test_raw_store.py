@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from k_b.raw_store import (
+from k_b.etl.raw_store import (
     COLLECTION_STATE_FILENAME,
     InvalidCollectionStateError,
     find_stream,

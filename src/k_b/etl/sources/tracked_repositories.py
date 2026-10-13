@@ -7,7 +7,7 @@ releases; its packages give its security advisories.
 
 import re
 
-from k_b.config import TrackedRepository
+from k_b.core.config import TrackedRepository
 
 OWNER_SLASH_NAME = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 

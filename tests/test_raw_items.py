@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from k_b.etl.source_contract import SourceKind, SourceReader
+from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.etl.sources.zotero import ZoteroSource
+from k_b.etl.transform import RawFile, RawReading, read_raw_items
 from k_b.items import Item
-from k_b.raw_items import RawFile, RawReading, read_raw_items
-from k_b.source_contract import SourceKind, SourceReader
-from k_b.source_kinds import SOURCE_KINDS
-from k_b.sources.zotero import ZoteroSource
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 COLLECTION_NAME = "2026-10-05T093000Z"

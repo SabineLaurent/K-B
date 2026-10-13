@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 
-# A GitHub repository K-B watches; the list is in sources/tracked_repositories.py until #123
+# A GitHub repository K-B watches; the list is in etl/sources/tracked_repositories.py until #123
 # moves it here. Defined here, not with the list: the import writes it to the base, and a
 # generic module does not import the sources.
 @dataclass(frozen=True)

@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta, timezone
 
+from k_b.etl.normalize import normalize_item
 from k_b.items import Item
-from k_b.merge import normalize_item
 
 FIRST_COLLECTION = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
 

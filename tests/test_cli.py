@@ -12,8 +12,8 @@ from test_collect import BrokenSource, WorkingSource
 from test_raw_items import FIXTURES_DIR
 
 from k_b import cli
-from k_b.import_items import KindWithoutTableError, UnknownSourceError
-from k_b.source_contract import SourceKind
+from k_b.etl.load import KindWithoutTableError, UnknownSourceError
+from k_b.etl.source_contract import SourceKind
 
 
 @pytest.fixture(autouse=True)
@@ -263,14 +263,17 @@ def test_an_info_line_of_k_b_is_shown_once_logging_is_configured():
     # A new interpreter: pytest's own log handlers would hide what kb collect shows.
     script = (
         "import logging; from k_b.cli import configure_logging; configure_logging(); "
-        "logging.getLogger('k_b.sources.tldr').info('tldr_ai 2026-10-03: no edition page')"
+        "logging.getLogger('k_b.etl.sources.tldr').info('tldr_ai 2026-10-03: no edition page')"
     )
 
     result = subprocess.run(  # noqa: S603 — runs this interpreter on a fixed script
         [sys.executable, "-c", script], capture_output=True, text=True
     )
 
-    assert "INFO k_b.sources.tldr: tldr_ai 2026-10-03: no edition page" in result.stderr
+    assert (
+        "INFO k_b.etl.sources.tldr: tldr_ai 2026-10-03: no edition page"
+        in result.stderr
+    )
 
 
 def test_create_db_creates_the_database_in_the_data_directory(

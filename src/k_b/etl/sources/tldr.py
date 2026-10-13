@@ -14,10 +14,10 @@ from time import sleep
 from bs4 import BeautifulSoup, Tag
 from bs4.exceptions import ParserRejectedMarkup
 
-from k_b.http_download import RedirectedOutsideError, download
+from k_b.etl.http_download import RedirectedOutsideError, download
+from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME, find_stream
+from k_b.etl.source_contract import SourceReader
 from k_b.items import EDITION_SLUG, Item, SourceCode
-from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME, find_stream
-from k_b.source_contract import SourceReader
 
 SOURCE_CODE: SourceCode = "tldr"
 # Adding an edition is adding its slug, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
@@ -224,7 +224,7 @@ def convert_article(
         kind="newsletter_article",
         title=article.title,
         # Some links are escaped twice in the page: "&amp;" is still there once the HTML is
-        # parsed. The utm_* parameters are removed with those of every item (merge.py).
+        # parsed. The utm_* parameters are removed with those of every item (etl/normalize.py).
         url=article.link.replace("&amp;", "&"),
         published_at=datetime.combine(article.edition_date, time.min, tzinfo=UTC),
         summary=article.summary or None,

@@ -5,12 +5,12 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from k_b import http_download
-from k_b.collect import collect_all_sources
-from k_b.raw_store import load_last_collection_dates, save_last_collection_dates
-from k_b.source_contract import list_sources
-from k_b.source_kinds import SOURCE_KINDS
-from k_b.sources.arxiv import (
+from k_b.etl import http_download
+from k_b.etl.extract import collect_all_sources
+from k_b.etl.raw_store import load_last_collection_dates, save_last_collection_dates
+from k_b.etl.source_contract import list_sources
+from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.etl.sources.arxiv import (
     ArxivSource,
     Paper,
     convert_paper,

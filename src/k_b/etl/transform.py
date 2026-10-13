@@ -10,13 +10,13 @@ from typing import Any, NamedTuple
 
 from pydantic import ValidationError
 
+from k_b.etl.raw_store import RAW_DIR_NAMES
+from k_b.etl.source_contract import SourceKind, SourceReader, find_source_kind
 from k_b.items import Item, SourceCode, TrendRow
-from k_b.raw_store import RAW_DIR_NAMES
-from k_b.source_contract import SourceKind, SourceReader, find_source_kind
 
 logger = logging.getLogger(__name__)
 
-# The name collect.py gives every raw file of a collection.
+# The name etl/extract.py gives every raw file of a collection.
 COLLECTION_NAME_FORMAT = "%Y-%m-%dT%H%M%SZ"
 
 
@@ -173,7 +173,7 @@ def list_collections(
         reader = kind.reader
         if reader is None:
             # Not always left unread: the rankings of GH Archive, which are not items, have
-            # their own reader (sources/gh_archive.py).
+            # their own reader (etl/sources/gh_archive.py).
             logger.info(
                 "source without a reader of items, skipped by the item reader: %s",
                 source_dir.name,

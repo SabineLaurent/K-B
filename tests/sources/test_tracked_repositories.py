@@ -1,5 +1,5 @@
-from k_b.config import TrackedRepository
-from k_b.sources.tracked_repositories import (
+from k_b.core.config import TrackedRepository
+from k_b.etl.sources.tracked_repositories import (
     TRACKED_REPOSITORIES,
     list_packages_by_ecosystem,
 )

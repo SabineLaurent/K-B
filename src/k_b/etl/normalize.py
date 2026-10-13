@@ -1,7 +1,7 @@
 """Normalize the items read (docs/specs-collecte.md, step 3).
 
-No input or output here: the items come from raw_items.py; the base removes the duplicates at
-the import (import_items.py).
+No input or output here: the items come from etl/transform.py; the base removes the duplicates at
+the import (etl/load.py).
 """
 
 from datetime import UTC

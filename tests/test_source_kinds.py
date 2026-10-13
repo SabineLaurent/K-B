@@ -1,8 +1,8 @@
 from itertools import permutations
 
-from k_b.source_contract import find_source_kind, list_sources
-from k_b.source_kinds import SOURCE_KINDS
-from k_b.sources.zotero import READER
+from k_b.etl.source_contract import find_source_kind, list_sources
+from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.etl.sources.zotero import READER
 
 
 def test_the_sources_are_collected_in_the_order_of_2026_10_06():

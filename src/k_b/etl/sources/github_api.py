@@ -2,7 +2,7 @@
 
 import os
 
-from k_b.http_download import download
+from k_b.etl.http_download import download
 from k_b.items import SourceCode
 
 # The source of every GitHub module, in the source table of the base.

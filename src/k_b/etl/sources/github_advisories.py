@@ -12,11 +12,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
+from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
+from k_b.etl.source_contract import SourceReader
+from k_b.etl.sources.github_api import SOURCE_CODE, get_from_github_api
+from k_b.etl.sources.github_dates import parse_github_date
 from k_b.items import CVE_ID, Item
-from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
-from k_b.source_contract import SourceReader
-from k_b.sources.github_api import SOURCE_CODE, get_from_github_api
-from k_b.sources.github_dates import parse_github_date
 
 logger = logging.getLogger(__name__)
 

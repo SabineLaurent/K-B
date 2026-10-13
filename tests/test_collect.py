@@ -4,8 +4,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from k_b.collect import collect_all_sources
-from k_b.raw_store import load_last_collection_dates
+from k_b.etl.extract import collect_all_sources
+from k_b.etl.raw_store import load_last_collection_dates
 
 FIRST_RUN_AT = datetime(2026, 9, 30, 10, 0, tzinfo=UTC)
 SECOND_RUN_AT = FIRST_RUN_AT + timedelta(hours=1)
@@ -209,7 +209,7 @@ def test_a_state_that_cannot_be_written_is_returned_and_logged_with_its_path(
     tmp_path.chmod(0o500)
 
     try:
-        with caplog.at_level(logging.ERROR, logger="k_b.collect"):
+        with caplog.at_level(logging.ERROR, logger="k_b.etl.extract"):
             outcome = collect_all_sources(
                 [WorkingSource()], tmp_path / "raw", tmp_path, FIRST_RUN_AT
             )

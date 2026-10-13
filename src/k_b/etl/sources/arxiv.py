@@ -12,10 +12,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
-from k_b.http_download import download
+from k_b.etl.http_download import download
+from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
+from k_b.etl.source_contract import SourceReader
 from k_b.items import ARXIV_ID, Item, SourceCode
-from k_b.raw_store import AUTOMATED_WATCH_DIR_NAME
-from k_b.source_contract import SourceReader
 
 logger = logging.getLogger(__name__)
 

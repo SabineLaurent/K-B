@@ -3,7 +3,7 @@
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
-from k_b.user_agent import USER_AGENT
+from k_b.etl.user_agent import USER_AGENT
 
 TIMEOUT_SECONDS = 30
 
