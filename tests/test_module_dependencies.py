@@ -78,6 +78,14 @@ def is_within(name: str, modules: set[str]) -> bool:
     return any(name == module or name.startswith(f"{module}.") for module in modules)
 
 
+def reaches(name: str, modules: set[str]) -> bool:
+    """Whether importing name gives access to one of the modules: name is within one of them, or
+    is a package that holds one (`etl` holds `etl.sources`)."""
+    return is_within(name, modules) or any(
+        module.startswith(f"{name}.") for module in modules
+    )
+
+
 def list_python_files(module: str) -> list[Path]:
     """The Python files of a k_b module (`items`) or package (`etl.sources`)."""
     path = PACKAGE_DIR.joinpath(*module.split("."))
@@ -149,6 +157,22 @@ def test_a_name_is_within_a_module_by_prefix(name, expected):
     assert is_within(name, {"core"}) is expected
 
 
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        ("from k_b import etl", True),
+        ("import k_b.etl", True),
+        ("from k_b.etl import sources", True),
+        ("from k_b.etl import transform", False),
+    ],
+)
+def test_an_import_of_a_package_that_holds_a_forbidden_module_is_seen(code, expected):
+    forbidden = {ETL_SOURCES_PACKAGE} | COMPOSITION_MODULES
+    imported = parse_imported_modules(code)
+
+    assert any(reaches(name, forbidden) for name in imported) is expected
+
+
 def test_every_module_of_k_b_is_listed():
     modules = {module.name for module in pkgutil.iter_modules([str(PACKAGE_DIR)])}
 
@@ -187,7 +211,7 @@ def test_items_imports_neither_the_sources_nor_the_composition():
     forbidden = {ETL_SOURCES_PACKAGE} | COMPOSITION_MODULES
     for path in list_python_files("items"):
         imported = list_imported_modules(path, find_package(path))
-        assert {name for name in imported if is_within(name, forbidden)} == set(), path
+        assert {name for name in imported if reaches(name, forbidden)} == set(), path
 
 
 def test_no_module_of_the_pipeline_imports_the_sources_or_the_composition():
@@ -195,7 +219,7 @@ def test_no_module_of_the_pipeline_imports_the_sources_or_the_composition():
     for module in sorted(ETL_PIPELINE_MODULES):
         for path in list_python_files(module):
             imported = list_imported_modules(path, find_package(path))
-            assert {name for name in imported if is_within(name, forbidden)} == set(), (
+            assert {name for name in imported if reaches(name, forbidden)} == set(), (
                 path
             )
 
@@ -204,5 +228,5 @@ def test_no_module_of_the_sources_imports_the_composition():
     for path in list_python_files(ETL_SOURCES_PACKAGE):
         imported = list_imported_modules(path, find_package(path))
         assert {
-            name for name in imported if is_within(name, COMPOSITION_MODULES)
+            name for name in imported if reaches(name, COMPOSITION_MODULES)
         } == set(), path
