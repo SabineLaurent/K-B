@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from k_b.raw_items import RawFile
 from k_b.sources import gh_archive
 from k_b.sources.gh_archive import (
     MAX_BYTES_BILLED,
@@ -18,6 +19,7 @@ from k_b.sources.gh_archive import (
     TrendsExtractInvalidError,
     compute_bytes_cap,
     list_window_ends,
+    read_trend_files,
     read_trends,
 )
 
@@ -431,8 +433,13 @@ def first_row():
     [
         ("repository_name", "no-slash"),
         ("repository_name", "owner/name/extra"),
+        # SQLite stops its GLOB at a NUL: the base would refuse the name.
+        ("repository_name", "own\0er/name"),
         ("stars_gained", -1),
+        # SQLite cannot hold an integer over 64 bits.
+        ("stars_gained", 2**63),
         ("forks_gained", True),
+        ("forks_gained", 2**63),
         # Seen on 2026-10-10: 14 ForkEvent without repo.id nor repo.name.
         ("repository_id", None),
         ("repository_id", 0),
@@ -555,3 +562,120 @@ def test_the_message_gives_the_length_of_a_repository_name_not_the_name():
     message = str(raised.value)
     assert "some-person" not in message
     assert "length 25" in message
+
+
+def test_the_message_gives_the_length_and_the_maximum_of_a_name_too_long():
+    rows = [{**first_row(), "repository_name": "some-person/" + "x" * 288}]
+
+    with pytest.raises(TrendsExtractInvalidError) as raised:
+        read_trends(make_raw(rows))
+
+    message = str(raised.value)
+    assert "some-person" not in message
+    assert (
+        "row 0: repository_name (string_too_long): str of length 300, maximum 255"
+        in message
+    )
+
+
+COLLECTION = "2026-10-11T153130Z"
+RAW_FILE_PATH = f"automated_watch/gh_archive/{COLLECTION}.json"
+
+
+def write_raw(raw_dir, name, content):
+    """A raw file of the source, as the collection writes it under raw/."""
+    source_dir = raw_dir / "automated_watch" / "gh_archive"
+    source_dir.mkdir(parents=True, exist_ok=True)
+    path = source_dir / name
+    path.write_bytes(content)
+    return path
+
+
+def test_a_raw_ranking_is_read_with_its_file_its_collection_and_its_rows(tmp_path):
+    write_raw(tmp_path, f"{COLLECTION}.json", FIXTURE_PATH.read_bytes())
+
+    reading = read_trend_files(tmp_path, frozenset())
+
+    [trend_file] = reading.files
+    assert trend_file.raw_file == RawFile(
+        RAW_FILE_PATH,
+        "gh_archive",
+        datetime(2026, 10, 11, 15, 31, 30, tzinfo=UTC),
+        [],
+        0,
+    )
+    assert trend_file.rows == read_trends(FIXTURE_PATH.read_bytes()).rows
+    assert (reading.rejections, reading.read_count) == ([], 1)
+
+
+def test_the_raw_rankings_are_read_in_collection_order(tmp_path):
+    write_raw(tmp_path, "2026-10-12T021500Z.json", FIXTURE_PATH.read_bytes())
+    write_raw(tmp_path, f"{COLLECTION}.json", FIXTURE_PATH.read_bytes())
+
+    reading = read_trend_files(tmp_path, frozenset())
+
+    assert [trend_file.raw_file.raw_file_path for trend_file in reading.files] == [
+        RAW_FILE_PATH,
+        "automated_watch/gh_archive/2026-10-12T021500Z.json",
+    ]
+
+
+def test_a_raw_ranking_already_imported_is_not_opened(tmp_path):
+    # Not a ranking: opened, it would be rejected.
+    write_raw(tmp_path, f"{COLLECTION}.json", b"not json")
+
+    reading = read_trend_files(tmp_path, frozenset({RAW_FILE_PATH}))
+
+    assert reading == ([], [], 0)
+
+
+@pytest.mark.parametrize(
+    "content",
+    [b"not json", make_raw([{**first_row(), "stars_gained": -1}])],
+)
+def test_a_raw_ranking_refused_is_rejected_and_counted_as_opened(tmp_path, content):
+    write_raw(tmp_path, f"{COLLECTION}.json", content)
+
+    reading = read_trend_files(tmp_path, frozenset())
+
+    assert reading.files == []
+    [rejection] = reading.rejections
+    assert rejection.raw_file_path == RAW_FILE_PATH
+    assert rejection.reason.startswith("TrendsExtractInvalidError: ")
+    assert reading.read_count == 1
+
+
+def test_a_raw_ranking_not_named_by_its_collection_time_is_rejected_unopened(
+    tmp_path,
+):
+    write_raw(tmp_path, "latest.json", FIXTURE_PATH.read_bytes())
+
+    reading = read_trend_files(tmp_path, frozenset())
+
+    assert reading.files == []
+    [rejection] = reading.rejections
+    assert rejection.raw_file_path == "automated_watch/gh_archive/latest.json"
+    assert rejection.reason.startswith("ValueError: ")
+    assert reading.read_count == 0
+
+
+def test_a_folder_among_the_raw_rankings_is_rejected(tmp_path):
+    (tmp_path / "automated_watch" / "gh_archive" / COLLECTION).mkdir(parents=True)
+
+    reading = read_trend_files(tmp_path, frozenset())
+
+    assert reading.files == []
+    [rejection] = reading.rejections
+    assert rejection.raw_file_path == f"automated_watch/gh_archive/{COLLECTION}"
+    assert rejection.reason.startswith("IsADirectoryError: ")
+    assert reading.read_count == 1
+
+
+def test_a_hidden_file_among_the_raw_rankings_is_skipped(tmp_path):
+    write_raw(tmp_path, ".DS_Store", b"not json")
+
+    assert read_trend_files(tmp_path, frozenset()) == ([], [], 0)
+
+
+def test_no_raw_folder_of_the_source_gives_no_ranking(tmp_path):
+    assert read_trend_files(tmp_path, frozenset()) == ([], [], 0)

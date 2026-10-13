@@ -1,9 +1,13 @@
 """The common item every source is read into, before the import (docs/specs-collecte.md, step 2).
 
 Which source field goes into which item field: docs/stockage.md.
+
+And the row of a GH Archive ranking, which is not an item: the base constrains it, and the
+import, which cannot import a source, writes it.
 """
 
 import re
+from datetime import date
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
@@ -35,6 +39,9 @@ CVE_ID = re.compile(r"CVE-\d{4}-\d{4,}")
 EDITION_SLUG = re.compile(r"[a-z]+")
 # The largest integer SQLite holds, and BigQuery gives (INT64).
 MAX_INT64 = 2**63 - 1
+# The longest name a ranking may write in trend.repository_name, held by a CHECK too. A wide
+# bound, not the one of GitHub: the longest of the collection of 2026-10-11 has 38 characters.
+TREND_REPOSITORY_NAME_MAX_LENGTH = 255
 
 
 def check_url_can_be_normalized(url: str) -> str:
@@ -50,6 +57,14 @@ def check_url_can_be_normalized(url: str) -> str:
     if not host:
         raise ValueError(f"url without a host: {len(url)} characters")
     return url
+
+
+def check_text_has_no_nul(text: str) -> str:
+    """Refuse a NUL: SQLite stops a GLOB and a length() at the first one, so the base would
+    refuse, or measure short, a text the pattern accepts."""
+    if "\0" in text:
+        raise ValueError(f"text with a NUL character: {len(text)} characters")
+    return text
 
 
 NonEmptyText = Annotated[str, StringConstraints(min_length=1)]
@@ -264,3 +279,23 @@ def list_lists_too_long(item: Item) -> list[str]:
                 f" maximum {maximum}"
             )
     return too_long
+
+
+class TrendRow(BaseModel):
+    """A repository of a GH Archive ranking, in a window of 3 days: a row of the trend table,
+    not an item (ADR of 2026-10-08). Each CHECK of trend refuses nothing this row accepts; a
+    test keeps both in step."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    # The last day of the window.
+    window_end: date
+    # repo.id of GitHub, and the last name seen in the window.
+    repository_id: Annotated[int, Field(gt=0, le=MAX_INT64)]
+    repository_name: Annotated[
+        RepositoryName,
+        Field(max_length=TREND_REPOSITORY_NAME_MAX_LENGTH),
+        AfterValidator(check_text_has_no_nul),
+    ]
+    stars_gained: Annotated[int, Field(ge=0, le=MAX_INT64)]
+    forks_gained: Annotated[int, Field(ge=0, le=MAX_INT64)]

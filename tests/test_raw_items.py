@@ -143,7 +143,10 @@ def test_the_github_ranking_is_skipped_and_logged(tmp_path, caplog):
 
     assert items_of(reading) == []
     assert reading.rejections == []
-    assert "source without a reader, skipped: github_most_starred" in caplog.text
+    assert (
+        "source without a reader of items, skipped by the item reader:"
+        " github_most_starred"
+    ) in caplog.text
 
 
 @pytest.mark.parametrize(

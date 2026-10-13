@@ -5,8 +5,9 @@
 -- Reference data (the sources) is in seed_sources.sql, run right after this script.
 -- Every connection must run PRAGMA foreign_keys = ON: SQLite ignores foreign keys otherwise.
 -- Dates are UTC text, 'YYYY-MM-DDTHH:MM:SSZ'; the CHECK refuses any other form.
--- A text a source writes has a maximum length, in characters, held twice: by the items
--- (src/k_b/items.py) when the raw is read, and by a CHECK here; a test keeps both equal. A JSON
+-- A text a source writes has a maximum length, in characters, held twice: by the items and
+-- the trend row (src/k_b/items.py) when the raw is read, and by a CHECK here; a test keeps both
+-- equal. A JSON
 -- list has a maximum count; the length of its elements is held by the items only, a CHECK
 -- cannot go through them.
 
@@ -82,20 +83,28 @@ CREATE TABLE highlight (
 
 CREATE INDEX highlight_item_id ON highlight (item_id);
 
-CREATE TABLE repository (
-    item_id         INTEGER PRIMARY KEY REFERENCES item (id) ON DELETE CASCADE,
-    repository_name TEXT NOT NULL CHECK (repository_name GLOB '?*/?*')
+-- Not an item (ADR of 2026-10-08): the repositories that gained the most stars and forks over a
+-- window of 3 days, the 30 first by stars and the 30 first by forks together. One row per window
+-- and per repository, produced by a raw result of gh_archive. News feed, by window: the first
+-- ranking seen of a window is kept whole, so every row of a window has the same raw_data_id.
+-- Each CHECK refuses nothing TrendRow (src/k_b/items.py) accepts; a test keeps both in step.
+CREATE TABLE trend (
+    id              INTEGER PRIMARY KEY,
+    raw_data_id     INTEGER NOT NULL REFERENCES raw_data (id),
+    -- The last day of the window: a day, written at midnight UTC.
+    window_end      TEXT NOT NULL
+        CHECK (window_end IS strftime('%Y-%m-%dT00:00:00Z', window_end)),
+    -- repo.id of GitHub, and the last name seen in the window.
+    repository_id   INTEGER NOT NULL CHECK (repository_id > 0),
+    repository_name TEXT NOT NULL
+        CHECK (repository_name GLOB '?*/?*')
+        CHECK (length(repository_name) <= 255),
+    stars_gained    INTEGER NOT NULL CHECK (stars_gained >= 0),
+    forks_gained    INTEGER NOT NULL CHECK (forks_gained >= 0),
+    UNIQUE (window_end, repository_id)
 ) STRICT;
 
-CREATE TABLE star_gain (
-    item_id      INTEGER NOT NULL REFERENCES repository (item_id) ON DELETE CASCADE,
-    window_end   TEXT NOT NULL
-        CHECK (window_end IS strftime('%Y-%m-%dT%H:%M:%SZ', window_end)),
-    stars_gained INTEGER NOT NULL CHECK (stars_gained >= 0),
-    PRIMARY KEY (item_id, window_end)
-) STRICT;
-
-CREATE INDEX star_gain_window_end ON star_gain (window_end);
+CREATE INDEX trend_raw_data_id ON trend (raw_data_id);
 
 -- A reference table: a CVE exists once a source cites it; CISA KEV is the source of truth, and
 -- "exploited" reads item_id IS NOT NULL. Its KEV columns are filled if and only if item_id points

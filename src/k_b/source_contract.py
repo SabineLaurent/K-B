@@ -51,7 +51,8 @@ class SourceKind(NamedTuple):
     # The name of its raw folders, alone or followed by _ (github_releases_<repository>).
     folder_prefix: str
     sources: tuple[Source, ...]
-    # None: its raw files are not imported (no reader yet, or none planned).
+    # None: its raw files are not read into items (no reader yet, none planned, or raw files
+    # that are not items: the rankings of GH Archive).
     reader: SourceReader[Any] | None
 
 
