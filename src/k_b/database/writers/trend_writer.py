@@ -6,7 +6,11 @@ from collections.abc import Sequence
 from datetime import date
 
 from k_b.database.dates import format_day
+from k_b.database.writers.discard import DiscardRule
 from k_b.items import TrendRow
+
+# The rule of a window of a ranking left out: the one of a news feed.
+DISCARD_RULE: DiscardRule = "already_seen"
 
 # News feed, by window (GH Archive): the first ranking seen of a window is kept whole. A row is
 # written only if no other raw file has brought its window: the rows of the file being written

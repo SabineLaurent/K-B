@@ -6,11 +6,11 @@ their items and the log of the import are then written in one transaction: an er
 nothing in the base, and leaves no log. A file registered is not read again, except by a
 rebuild of the base.
 
-The base removes the duplicates. The writer of each kind (database/writers/) holds, in its SQL,
-the rule of the nature of its source: a news feed keeps the first version seen; a state catalog keeps the
-version of its latest collection; a feed with revisions keeps the newest revision. An item left
-out is returned with its rule and the date it was compared with, then written to the log. Run
-again on the same raw, the import gives the same base.
+The base removes the duplicates. The writer of each kind (database/writers/) holds, in its
+SQL, the rule of the nature of its source: a news feed keeps the first version seen; a state
+catalog keeps the version of its latest collection; a feed with revisions keeps the newest
+revision. An item left out is returned with its rule and the date it was compared with, then
+written to the log. Run again on the same raw, the import gives the same base.
 
 A ranking of GH Archive is not made of items: its rows go to the trend table, in the same
 transaction, and its rule is a news feed applied to the whole window. A Zotero entry is a state

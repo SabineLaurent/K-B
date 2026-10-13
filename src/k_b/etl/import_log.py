@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from k_b.database.dates import format_date
+from k_b.database.writers import trend_writer
 from k_b.database.writers.discard import Discard, DiscardRule
 from k_b.etl.raw_store import write_file_atomically
 from k_b.etl.transform import RawFile, Rejection
@@ -22,10 +23,6 @@ COMPARED_FIELD_BY_RULE: dict[DiscardRule, str] = {
     # The arXiv revision of the version kept.
     "revision_not_newer": "compared_with_revised_at",
 }
-
-
-# The rule of a window of a ranking left out: the one of a news feed.
-TREND_DISCARD_RULE: DiscardRule = "already_seen"
 
 
 class TrendDiscard(NamedTuple):
@@ -77,11 +74,13 @@ def write_import_log(
             {
                 "imported_at": logged_at,
                 "kind": "discard",
-                "rule": TREND_DISCARD_RULE,
+                "rule": trend_writer.DISCARD_RULE,
                 "source_code": discard.raw_file.source_code,
                 "source_item_id": discard.window_end.isoformat(),
                 "raw_file_path": discard.raw_file.raw_file_path,
-                COMPARED_FIELD_BY_RULE[TREND_DISCARD_RULE]: discard.compared_with,
+                COMPARED_FIELD_BY_RULE[
+                    trend_writer.DISCARD_RULE
+                ]: discard.compared_with,
             }
             for discard in trend_discards
         ]

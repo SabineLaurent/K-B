@@ -174,8 +174,11 @@ def withdraw_absent(
     imported no longer lists; return how many.
 
     The highlights are compared with every highlight of the extract: the last one of the
-    library deleted in Zotero is withdrawn too.
+    library deleted in Zotero is withdrawn too. Without an entry, nothing is withdrawn: an
+    empty list would withdraw every entry and every highlight of the base.
     """
+    if not entries:
+        return 0
     # No item: only the other files of the source are compared.
     latest = catalog.read_latest(
         connection, source_code, collected_at, raw_data_id, None
