@@ -124,9 +124,10 @@ statu quo).
   importer.
 - Une API importe `database`, `items` et `core`, jamais `etl` ni `database/writers` (sa ligne dans
   `tests/test_module_dependencies.py` s'ajoute à la création du paquet d'API).
-- Le SQL **de la base K-B** vit dans `src/k_b/database/` : un module d'écriture (un écrivain par
-  sorte d'item) et un module de lecture (la requête `UNION ALL`, partagée par `kb search`, « quoi
-  de neuf » et l'API). Les migrations Alembic aussi.
+- Le SQL **de la base K-B** vit dans `src/k_b/database/` : un dossier d'écriture, `writers/` (un
+  module par sorte d'item et un pour le classement, `<sorte>_writer.py`, chacun avec une fonction
+  `write`), et un module de lecture (la requête `UNION ALL`, partagée par `kb search`, « quoi de
+  neuf » et l'API). Les migrations Alembic aussi.
 - La requête d'extraction d'une source qui est elle-même une base (Zotero, GH Archive sur
   BigQuery) vit dans le module de cette source, `src/k_b/etl/sources/<source>.py`, comme la
   requête d'une API : elle lit une source externe, en lecture seule, pas la base K-B.
@@ -138,14 +139,18 @@ statu quo).
 - `grep -rlE "INSERT INTO|UPDATE |DELETE FROM" src/k_b/etl/sources --include='*.py'` ne renvoie
   rien (une source ne fait que lire).
 - `uv run pytest tests/test_module_dependencies.py` : les dépendances, lues à deux niveaux
-  (`core`, `database`, `etl`, `etl/sources`).
+  (`core`, `database`, `etl`, `etl/sources`) ; aucun module de `database/`, sous-dossiers
+  compris, n'importe de K-B autre chose que `database`, `items` et `core`.
+- `grep -c "execute" src/k_b/etl/load.py` renvoie 0.
 
-**Pourquoi.** Un seul écrivain et une seule requête partagée : deux modules suffisent, et la
-requête ne dépend pas de son premier appelant (décision du 2026-10-10 : `sqlite3` et SQL, pas
-d'ORM).
+**Pourquoi.** Un module par écrivain : les modules de `writers/` font 851 lignes à eux tous
+(relevé du 2026-10-14), et chaque sorte a assez de code pour son module (`code.md`). Une seule
+requête de lecture partagée : un module suffit, et la requête ne dépend pas de son premier
+appelant (décision du 2026-10-10 : `sqlite3` et SQL, pas d'ORM).
 
 **Écarté.**
-- Un module par objet métier : la requête `UNION ALL` n'appartient à aucun.
+- Un module par objet métier pour la lecture : la requête `UNION ALL` n'appartient à aucun.
+- Un seul module d'écriture : sept écrivains dans un fichier (écarté le 2026-10-13).
 - Un CRUD par table : K-B écrit un item et son sous-type ensemble, par upsert, ne supprime que
   par la purge et lit par une requête ; la plupart des fonctions seraient sans appelant (YAGNI).
 - MVC comme nom : K-B n'a ni vue à rafraîchir ni contrôleur d'événements ; le principe utile,
