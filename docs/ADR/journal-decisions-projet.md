@@ -1419,6 +1419,86 @@ Mesures citées : les 18 pages collectées du 2026-09-30 au 2026-10-09 (3 éditi
   écarte, et le nom d'un dépôt porte le login de son propriétaire. Option écartée : une ligne
   par dépôt écarté (jusqu'à 60 par fenêtre, avec `repo.id`). — PR de #142
 
+### Modèle de la base : bibliothèque Zotero
+
+Décisions de Sabine (« ok pour tout »), sur les recommandations de la session ; les pourquoi
+sont ceux de ces recommandations. Mesuré sur l'extrait réel du 2026-10-13 : 5 documents, tous
+arXiv, aucun dans le brut arXiv ; 6 surlignages ; 11 étiquettes, toutes automatiques ; un PDF
+par document.
+
+- **Un document Zotero est un sous-type d'item propre à Zotero, `zotero_entry`
+  (`kind` = `zotero_entry`) : clé Zotero unique, type, titre, URL, date d'ajout, et une clé
+  étrangère facultative vers PUBLICATION. Item > entrée Zotero > publication, à côté de item
+  arXiv > publication.** C'est la piste de Sabine du 2026-10-12. Pourquoi : le plus petit chemin
+  qui lit l'extrait vers la base. Options écartées : un sous-type DOCUMENT commun à la
+  bibliothèque, clips compris (environ 45 min de plus, et ce serait trancher dès maintenant ce
+  que les clips mettront en base, ce qui revient à #14) ; CONTENU, qui répond à « où garder le
+  texte complet », hors de cette issue. DOCUMENT ou CONTENU reste ouvert pour le texte complet.
+  Limite : si les clips demandent un sous-type commun, `zotero_entry` sera à généraliser.
+  — PR de #138
+- **Une publication peut être décrite par plusieurs items : son item arXiv
+  (`publication.item_id`, unique), 0 à n entrées Zotero, 0 à n articles TLDR. Quand arXiv n'a
+  pas vu le papier, personne ne remplit ses colonnes arXiv : la publication est créée avec sa
+  seule référence arXiv, comme une CVE créée par une alerte GitHub ; le titre vu par Zotero
+  reste dans `zotero_entry.title`.** Répond à la question que le 2026-10-08 laissait à Zotero
+  (« qui remplit les colonnes quand arXiv n'a pas vu le papier »). Pourquoi : le `CHECK` de
+  PUBLICATION ne change pas, et arXiv reste la seule source de vérité de ses colonnes. Option
+  écartée : Zotero les remplit et arXiv les remplace (un `CHECK` à changer, deux sources de
+  vérité). — PR de #138
+- **Un document Zotero hors arXiv est une entrée Zotero sans publication ; son URL est
+  facultative.** Pourquoi : ses surlignages gardent leur place, sans coût ; Zotero n'impose pas
+  d'URL. Aucun document hors arXiv dans l'extrait du 2026-10-13. — PR de #138
+- **Le chemin des PDF et les étiquettes restent hors base, dans l'extrait brut.** Pourquoi :
+  rien ne les lit en base aujourd'hui ; le wiki lit l'extrait (2026-10-12). Précise « K-B garde
+  leur chemin » (2026-10-09) : K-B le garde dans son brut. Options écartées : deux listes JSON
+  dans `zotero_entry` (environ 20 min de plus) ; des tables `zotero_pdf` et `tag` (environ 1 h
+  de plus, deux tables au MCD et au MLD). Limite : `kb search` ne peut pas filtrer par
+  étiquette. — PR de #138
+- **Les dates Zotero sont nommées par leur événement : `zotero_entry.saved_at` (date d'ajout du
+  document) et `highlight.highlighted_at` (date d'ajout du surlignage). Aucune date constatée
+  par K-B n'est ajoutée : la collecte est dans `raw_data.collected_at`. Le champ `date` du
+  document n'est pas gardé en base.** Pourquoi : pour un papier arXiv, arXiv donne la date
+  (`publication.submitted_at`) ; le champ `date` de Zotero, observé sous la forme
+  « AAAA-MM-JJ AAAA-MM-JJ », peut être partiel (une année seule), ce que le `CHECK` des dates
+  refuserait. Limite : un document hors arXiv n'a pas de date de publication en base. Le
+  renommage des colonnes de date existantes n'est pas tranché (« Décisions encore ouvertes »).
+  — PR de #138
+- **`highlight` reçoit le commentaire du surlignage (`comment`, facultatif) ; la page et la clé
+  du PDF restent dans l'extrait ; les auteurs vus par Zotero ne sont pas gardés en base.**
+  Pourquoi : le commentaire est déjà au registre ; la page et le PDF n'ont pas d'usage en base ;
+  minimisation (RGPD, RGESN 1.6) : arXiv donne les auteurs d'un papier arXiv. Limite : un
+  document hors arXiv n'a pas d'auteurs en base. — PR de #138
+
+### Import dans la base : Zotero
+
+- **Zotero est un catalogue d'état, aux deux niveaux, l'entrée Zotero et le surlignage : seul le
+  dernier extrait compte. Une entrée ou un surlignage modifié dans Zotero est réécrit, et
+  `revised_at` prend la date de la collecte ; une entrée ou un surlignage absent d'un extrait
+  plus récent est marqué retiré (`withdrawn_at`), jamais supprimé de la base.** Décision de
+  Sabine. Pourquoi, selon elle : « les articles et mes surlignages et annotation dans zotero
+  alimente le wiki. Les fiches de lecture qui découleront de ses articles doivent rester dans
+  mon coffre fort même si je supprime physiquement l'article dans zotero » ; « si je modifie un
+  commentaire ou un surlignage déjà importé, la base doit pouvoir se mettre à jour ». Suit le
+  précédent de CISA KEV (2026-10-12, « Catalogue d'état », `withdrawn_at`), avec ses écarts : un
+  extrait avec un rejet ne retire rien, un extrait importé en retard ne change rien. Retirer
+  sans supprimer suit aussi la règle 5 des conventions (`.claude/rules/conventions.md`,
+  « Écarté » : K-B « ne supprime que par la purge »). Options
+  écartées : flux de nouveautés (premier vu gardé : ne suit pas les modifications) ; flux avec
+  révisions (il faut la date de modification de Zotero, que la requête d'extraction de #15 ne
+  lit pas, et les extraits existants ne l'ont pas). Coût : environ 1 h 30 de plus que
+  l'estimation de l'issue (deux règles de retrait, `revised_at` et `withdrawn_at` sur
+  `zotero_entry` et `highlight`, leurs tests). — PR de #138
+- **Une entrée Zotero est reconnue par sa clé Zotero seule (`zotero_entry.zotero_key`, unique),
+  un surlignage par la sienne (`highlight.zotero_key`) ; pas d'empreinte de contenu, la limite
+  est écrite.** Décision de Sabine, sur la recommandation de la session. Pourquoi : deux entrées
+  du même papier arXiv pointent déjà vers la même publication (même `arxiv_id`), le doublon se
+  voit par une requête ; l'extrait n'a aucun texte du document, une empreinte ne porterait que
+  sur le titre (deux titres proches confondus, un titre retouché non reconnu). Précédents : les
+  clips et les articles TLDR, sans empreinte (2026-10-12). Option écartée : une colonne
+  `content_fingerprint` sur le titre normalisé (environ 45 min). Limite : un document hors arXiv
+  enregistré deux fois fait deux entrées que rien ne relie. La clé Zotero est unique dans une
+  bibliothèque ; seule la bibliothèque personnelle est extraite. — PR de #138
+
 ## Décisions encore ouvertes
 
 - **Remplir `newsletter_article.publication_id`** (2026-10-12) : quand le lien d'un article TLDR
@@ -1429,7 +1509,9 @@ Mesures citées : les 18 pages collectées du 2026-09-30 au 2026-10-09 (3 éditi
 - **Noms des colonnes de date** (2026-10-12) : ils ne disent pas d'où vient la date
   (`vulnerability.date_added` est une date CISA, `vulnerability.revised_at` et `withdrawn_at`
   sont des dates K-B, `publication.revised_at` est une date arXiv). Le renommage sera décidé avec
-  le modèle des publications (Sabine, relevé à la PR de #105).
+  le modèle des publications (Sabine, relevé à la PR de #105). Le modèle de la bibliothèque
+  (2026-10-13) nomme ses dates nouvelles par leur événement Zotero, sans renommer les colonnes
+  existantes.
 
 - **Durée de conservation et purge des extraits Zotero** (2026-10-11) : ils sont tous gardés,
   sans durée au registre ni purge codée, ce que `.claude/rules/conformite.md` demande pour une
@@ -1460,8 +1542,9 @@ Mesures citées : les 18 pages collectées du 2026-09-30 au 2026-10-09 (3 éditi
   reconstruction ne les réintroduise pas : proposée dans le registre, à concevoir dans #20.
   Indispensable avec une base reconstruite, en développement (2026-10-10).
 - **Questions laissées par la relecture indépendante du 2026-10-09**, à décider par Sabine :
-  le modèle de la bibliothèque (DOCUMENT ou CONTENU, une publication décrite par plusieurs
-  items, un article Zotero hors arXiv) ; les versions d'un clip annoté ; si `kb search --kind vulnerability` ramène aussi les
+  DOCUMENT ou CONTENU pour le texte complet (une publication décrite par plusieurs items et un
+  document Zotero hors arXiv sont tranchés le 2026-10-13, « Modèle de la base : bibliothèque
+  Zotero ») ; les versions d'un clip annoté ; si `kb search --kind vulnerability` ramène aussi les
   alertes GitHub (`kind` = `advisory`).
 - **Transfert hors UE par les agents** : un agent qui lit les items par l'API envoie leur contenu
   au fournisseur du modèle (États-Unis). Cadre juridique non vérifié.
