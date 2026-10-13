@@ -1056,3 +1056,7 @@ def test_a_zotero_key_the_item_refuses_is_refused_by_the_base(
         match=re.escape("CHECK constraint failed: zotero_key GLOB"),
     ):
         insert_row(filled_database, table, zotero_key=zotero_key)
+
+
+def test_a_highlight_without_text_is_accepted(filled_database):
+    insert_row(filled_database, "highlight", text=None)

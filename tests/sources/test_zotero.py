@@ -568,6 +568,33 @@ def test_a_document_without_arxiv_reference_has_no_publication(archive_id):
     assert item.arxiv_id is None
 
 
+@pytest.mark.parametrize(
+    "archive_id, arxiv_id",
+    [
+        ("arXiv:hep-th/9901001", "hep-th/9901001"),
+        ("arXiv:math.GT/0309136v3", "math.GT/0309136"),
+    ],
+)
+def test_an_arxiv_reference_of_before_2007_is_read(archive_id, arxiv_id):
+    assert convert(
+        with_changes(PAPER_WITH_HIGHLIGHTS, archive_id=archive_id)
+    ).arxiv_id == (arxiv_id)
+
+
+def test_a_highlight_without_text_is_read_with_its_comment():
+    item = convert(with_first_highlight_changed(PAPER_WITH_HIGHLIGHTS, text=None))
+
+    assert (item.highlights[0].text, item.highlights[0].comment) == (
+        None,
+        "A comment on it.",
+    )
+
+
+def test_an_extract_nested_too_deep_is_unreadable():
+    with pytest.raises(ValueError, match="nested too deep"):
+        read_documents(b"[" * 100_000 + b"]" * 100_000)
+
+
 def test_a_document_without_url_is_read():
     assert convert(with_changes(PAPER_WITH_HIGHLIGHTS, url=None)).url is None
 
@@ -575,7 +602,10 @@ def test_a_document_without_url_is_read():
 @pytest.mark.parametrize(
     "document",
     [
-        with_changes(PAPER_WITH_HIGHLIGHTS, archive_id="arXiv:cs/0101001"),
+        with_changes(PAPER_WITH_HIGHLIGHTS, archive_id="arXiv:cs/010100"),
+        with_changes(
+            PAPER_WITH_HIGHLIGHTS, archive_id="arXiv:\uff12\uff16\uff10\uff19.00001"
+        ),
         with_changes(PAPER_WITH_HIGHLIGHTS, archive_id="arXiv:2609.00001 "),
         with_changes(PAPER_WITH_HIGHLIGHTS, date_added="2026-13-45 10:00:00"),
         with_changes(PAPER_WITH_HIGHLIGHTS, date_added="2026-10-01T08:15:00Z"),
@@ -583,7 +613,6 @@ def test_a_document_without_url_is_read():
         with_changes(PAPER_WITH_HIGHLIGHTS, title=None),
         with_changes(PAPER_WITH_HIGHLIGHTS, key=None),
         with_changes(PAPER_WITH_HIGHLIGHTS, url="ftp://arxiv.org/abs/2609.00001"),
-        with_first_highlight_changed(PAPER_WITH_HIGHLIGHTS, text=None),
         with_first_highlight_changed(PAPER_WITH_HIGHLIGHTS, date_added="2026-10-05"),
         {key: value for key, value in PAPER_WITH_HIGHLIGHTS.items() if key != "key"},
         "a document",

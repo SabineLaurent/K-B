@@ -459,3 +459,44 @@ def test_a_rejected_document_is_logged_without_its_title_or_highlight_text(
     assert [line["raw_file_path"] for line in rejections] == [extract_path] * 2
     assert "SECRET" not in json.dumps(rejections)
     assert "title too long: 1300 characters, maximum 1000" in rejections[1]["reason"]
+
+
+def test_a_highlight_without_text_goes_into_the_database(
+    data_dir, zotero_dir, run_on_zotero_library
+):
+    run_on_zotero_library(
+        zotero_dir,
+        f"UPDATE itemAnnotations SET text = NULL WHERE itemID = {THIRD_PAGE_HIGHLIGHT};",  # noqa: S608 — constants of the tests
+    )
+    collect(data_dir, zotero_dir, FIRST)
+
+    summary = run_import(data_dir)
+
+    assert summary.rejection_count == 0
+    assert fetch_rows(data_dir, HIGHLIGHT_QUERY)[0][2:4] == (None, None)
+
+
+def test_an_older_extract_imported_late_creates_no_publication_for_a_reference_since_changed(
+    data_dir, zotero_dir, run_on_zotero_library
+):
+    run_on_zotero_library(
+        zotero_dir,
+        "UPDATE itemDataValues SET value = 'arXiv:2609.11111' WHERE valueID = 5;",
+    )
+    older_extract = extract_of(zotero_dir)
+    run_on_zotero_library(
+        zotero_dir,
+        "UPDATE itemDataValues SET value = 'arXiv:2609.00001' WHERE valueID = 5;",
+    )
+    collect(data_dir, zotero_dir, SECOND)
+    run_import(data_dir)
+    write_extract(data_dir, FIRST, older_extract)
+
+    run_import(data_dir)
+
+    assert fetch_rows(
+        data_dir, "SELECT arxiv_id FROM publication ORDER BY arxiv_id"
+    ) == [
+        ("2609.00001",),
+        ("2609.00002",),
+    ]

@@ -564,8 +564,6 @@ def test_a_highlight_text_is_accepted_up_to_its_maximum_length_and_refused_beyon
     [
         {"zotero_key": "annotaa2"},
         {"zotero_key": "ANNOTAA"},
-        {"text": ""},
-        {"text": None},
         {"highlighted_at": datetime(2026, 10, 5, 8, 42, 30)},
         {"highlighted_at": "2026-10-05 08:42:30"},
         {"page_label": "1"},
@@ -578,3 +576,34 @@ def test_an_invalid_highlight_is_refused(changes):
 
 def test_a_highlight_without_comment_is_accepted():
     assert Highlight(**highlight_fields(comment=None)).comment is None
+
+
+# A highlight Zotero keeps without its text (T1 of the review of 2026-10-13): kept as given.
+@pytest.mark.parametrize("text", [None, ""])
+def test_a_highlight_without_text_is_accepted(text):
+    assert Highlight(**highlight_fields(text=text)).text == text
+
+
+# The new form, and the form of before 2007: archive, optional subject class, 7 digits.
+@pytest.mark.parametrize(
+    "arxiv_id",
+    ["2609.00001", "0704.0001", "hep-th/9901001", "math.GT/0309136", "cs/0601001"],
+)
+def test_an_arxiv_reference_of_either_form_is_accepted(arxiv_id):
+    assert Item(**zotero_entry_fields(arxiv_id=arxiv_id)).arxiv_id == arxiv_id
+
+
+@pytest.mark.parametrize(
+    "arxiv_id",
+    [
+        "\uff12\uff16\uff10\uff19.00001",
+        "hep-th/990100\u0661",
+        "HEP-TH/9901001",
+        "hep-th/990100",
+    ],
+)
+def test_an_arxiv_reference_with_other_than_ascii_digits_or_its_form_is_refused(
+    arxiv_id,
+):
+    with pytest.raises(ValidationError):
+        Item(**zotero_entry_fields(arxiv_id=arxiv_id))
