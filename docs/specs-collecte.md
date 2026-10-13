@@ -448,10 +448,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      une seconde collecte aurait une clé nouvelle. Une ligne n'est écrite que si aucun autre
      fichier brut n'a déjà apporté sa fenêtre ; les lignes du fichier en cours, qui partagent
      sa donnée brute, ne s'écartent pas entre elles. Limites :
-     - un compte faux à la première collecte reste. La fenêtre du 2026-10-10 a été comptée
-       sur des tables appauvries (ci-dessus) : la corriger demande de retirer son fichier brut
-       et de reconstruire la base. Aucune issue ne porte la recollecte d'une fenêtre déjà
-       prise ;
+     - un compte faux à la première collecte reste. Trois fenêtres ont été comptées, en tout
+       ou en partie, sur des tables de jour appauvries (ci-dessus, et
+       [bigquery.md](bigquery.md#relevé-du-2026-10-13)) : celle du 2026-10-10, collectée le
+       2026-10-11 ; celles du 2026-10-11 (deux jours appauvris sur trois, le 09/10 et le 10/10)
+       et du 2026-10-12 (un sur trois, le 10/10), collectées le 2026-10-13. Les corriger
+       demande de retirer leur fichier brut et de reconstruire la base. Aucune issue ne porte
+       la recollecte d'une fenêtre déjà prise ;
      - « premier vu » veut dire premier importé : un fichier brut plus ancien, importé après
        un plus récent de la même fenêtre, est écarté ; une base reconstruite, qui lit dans
        l'ordre des collectes, garderait le plus ancien ;

@@ -218,6 +218,8 @@ stable : à date égale, les fichiers d'items passent d'abord, dans leur ordre d
 | `test_a_window_of_the_year_1_is_written_with_a_year_of_four_digits` | l'année est écrite sur 4 chiffres ; ce test passait déjà sur macOS avant la correction, c'est la CI Linux qui le rend probant |
 | `test_a_ranking_refused_is_rejected_logged_and_read_again_at_the_next_import` | un brut refusé : un rejet au journal, pas d'inscription au registre |
 | `kb import` sur le brut réel du 2026-10-11, base neuve dans un dossier temporaire : `trend rows written: 48` | les 48 dépôts de la collecte entrent en base ; une fenêtre (2026-10-10), 43 lignes avec des étoiles, 45 avec des forks |
+| `kb collect` réel du 2026-10-13, avec ce code : `gh_archive: ok`, 2 fenêtres (11/10 et 12/10), 287 455 627 octets lus, 97 lignes | la collecte accepte un vrai résultat BigQuery avec le modèle resserré (bornes, caractères de contrôle) |
+| `kb import` de tout le brut réel, base neuve à part : 37 fichiers lus, 3 078 items, 145 lignes de `trend` (48, 48 et 49 par fenêtre), 0 rejet ; un second import ne lit rien | le bout en bout sur données réelles, items et classements dans la même transaction |
 | Les deux commandes de la règle 5 : `import_items.py` et `database/reading.py` ; rien | aucun fichier de plus ne porte de SQL ; aucune source n'écrit |
 
 ## Ce que tu dois pouvoir défendre
@@ -248,8 +250,8 @@ stable : à date égale, les fichiers d'items passent d'abord, dans leur ordre d
   encore, et gardent cette exposition.
 - **Un fichier brut très gros** : la lecture n'a pas de taille maximale propre ; un classement de
   plus de 60 lignes par fenêtre est refusé, mais après avoir été lu en entier.
-- **La collecte réelle sur BigQuery avec ce code** : faite à part, après les revues ; sa sortie
-  est dans la PR.
+- **Les heures des tables du 11/10 et du 12/10** : leur nombre de lignes par jour est revenu au
+  niveau d'avant l'anomalie, mais elles n'ont pas été recomptées heure par heure.
 
 ## Ce qui reste
 
@@ -257,9 +259,9 @@ stable : à date égale, les fichiers d'items passent d'abord, dans leur ordre d
 - **Le SQL de `trend` dans `database/`** : #135.
 - **Un seul chemin de lecture** pour les items et les classements : aujourd'hui deux, et la sorte
   `gh_archive` reste déclarée sans lecteur d'items. Aucune issue ne le porte.
-- **Recollecter une fenêtre déjà prise** : la fenêtre du 2026-10-10 a été comptée sur des tables
-  appauvries, et ses chiffres restent. La corriger demande de retirer son fichier brut et de
-  reconstruire la base. Aucune issue ne le porte ; la détection d'une table incomplète (#141)
+- **Recollecter une fenêtre déjà prise** : les fenêtres du 2026-10-10, du 2026-10-11 et du
+  2026-10-12 ont été comptées, en tout ou en partie, sur des tables appauvries, et leurs chiffres
+  restent. Les corriger demande de retirer leur fichier brut et de reconstruire la base. Aucune issue ne le porte ; la détection d'une table incomplète (#141)
   concerne les collectes à venir.
 - **La purge de `trend`** : pas définie (journal ADR, « Décisions encore ouvertes »). Le critère
   de l'issue de la purge (#83) dit « une commande supprime de la base et du brut ce qui a plus de

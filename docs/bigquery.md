@@ -169,6 +169,23 @@ quota ; le 2026-10-11) :
 | 2026-10-09 | 701 573 | 882 329 676 | 2026-10-10 00:08 |
 | 2026-10-10 | 803 270 | 1 060 250 442 | 2026-10-11 00:08 |
 
+<a id="relevé-du-2026-10-13"></a>
+**Relevé du 2026-10-13** (mêmes métadonnées, avant la collecte du jour) : les tables du 09/10 et
+du 10/10 ont le même nombre de lignes et la même date de modification que ci-dessus, elles n'ont
+pas été complétées ; celles du 11/10 et du 12/10 sont revenues au niveau d'avant le 06/10. Le
+nombre de lignes d'un jour ne dit rien de ses heures, qui n'ont pas été recomptées.
+
+| Jour | Lignes (`num_rows`) | Dernière modification (UTC) |
+|---|---|---|
+| 2026-10-09 | 701 573 | 2026-10-10 00:08 |
+| 2026-10-10 | 803 270 | 2026-10-11 00:08 |
+| 2026-10-11 | 1 680 878 | 2026-10-12 00:08 |
+| 2026-10-12 | 1 981 978 | 2026-10-13 00:08 |
+
+La collecte du 2026-10-13 (fenêtres finissant le 11/10 et le 12/10, 97 lignes, 287 455 627
+octets lus pour un plafond de 1,3 Go) compte donc deux jours appauvris sur trois pour la
+première fenêtre, un sur trois pour la seconde.
+
 **2. Fichiers source** (`curl -sIL https://data.gharchive.org/AAAA-MM-JJ-H.json.gz`, en-têtes
 seulement, rien téléchargé ; le 2026-10-11) : les 24 fichiers horaires existent pour chacun des
 jours 06, 07, 08 et 10/10, aucun sous 3 Mo. Taille compressée : 06/10 338 Mo, 07/10 196 Mo,

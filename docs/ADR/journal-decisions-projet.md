@@ -1351,9 +1351,10 @@ Mesures citées : les 18 pages collectées du 2026-09-30 au 2026-10-09 (3 éditi
   suppression hors purge, et une comparaison par fenêtre que la règle de CISA ne fait pas) ;
   flux avec révisions (GH Archive ne donne pas de date de révision, il faudrait la date de
   collecte, et les dépôts sortis du classement resteraient avec leurs anciens chiffres). Limites
-  assumées : un compte faux à la première collecte reste, et la fenêtre du 2026-10-10 a été
-  comptée sur des tables appauvries ([bigquery.md](../bigquery.md)) : la corriger demande de
-  retirer son fichier brut et de reconstruire la base ; « premier vu » veut dire premier
+  assumées : un compte faux à la première collecte reste, et les fenêtres du 2026-10-10, du
+  2026-10-11 et du 2026-10-12 ont été comptées, en tout ou en partie, sur des tables appauvries
+  ([bigquery.md](../bigquery.md)) : les corriger demande de retirer leur fichier brut et de
+  reconstruire la base ; « premier vu » veut dire premier
   importé ; une fenêtre annoncée sans aucune ligne ne laisse pas de trace. — PR de #142
 - **Les tables `repository` et `star_gain` sont retirées du schéma, avec leurs tests.** Décision
   de Sabine, sur la recommandation de la session ; raison présentée, qu'elle a retenue : ce sont
@@ -1471,8 +1472,9 @@ Mesures citées : les 18 pages collectées du 2026-09-30 au 2026-10-09 (3 éditi
   (#142) ; restent les étoiles et forks totaux lus par GraphQL (#143) et leur brut (relecture du
   2026-10-09).
 - **Recollecter une fenêtre GH Archive déjà prise** (2026-10-13) : la règle par fenêtre garde le
-  premier classement vu ; un classement compté sur des tables appauvries (fenêtre du 2026-10-10)
-  ne se corrige qu'en retirant son fichier brut et en reconstruisant la base. Signalé par #142,
+  premier classement vu ; un classement compté sur des tables appauvries (fenêtres du 2026-10-10,
+  du 2026-10-11 et du 2026-10-12) ne se corrige qu'en retirant son fichier brut et en
+  reconstruisant la base. Signalé par #142,
   sans issue ; la détection d'une table incomplète (#141) empêche ou marque une collecte à
   venir, elle ne reprend pas une fenêtre déjà collectée.
 - **Un seul chemin de lecture pour les items et les classements** (2026-10-13) : `trend` est lu
