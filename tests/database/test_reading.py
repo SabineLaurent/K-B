@@ -2,16 +2,23 @@
 tests/fixtures/items_database.sql: its ids are the ones the tests name."""
 
 import typing
-from datetime import UTC, datetime, timedelta, timezone, tzinfo
+from datetime import UTC, date, datetime, timedelta, timezone, tzinfo
 
 import pytest
 
 from k_b.database.connection import connect_database_read_only
+from k_b.database.creation import create_database
 from k_b.database.reading import (
+    AdvisoryDetail,
+    ItemDetail,
     ListedItem,
     StoredHighlight,
+    StoredTrend,
+    TrendWindow,
     read_highlights,
+    read_item_detail,
     read_items,
+    read_trends,
 )
 from k_b.items import MAX_INT64, MIN_INT64, ItemKind
 
@@ -338,3 +345,125 @@ def test_an_item_id_beyond_64_bits_is_refused_by_its_bound(
         read_highlights(connection, item_id)
 
     assert str(refusal.value) == message
+
+
+def test_the_detail_of_an_item_holds_its_listed_fields(connection):
+    detail = read_item_detail(connection, 2)
+
+    assert isinstance(detail, ItemDetail)
+    assert detail.listed == read_item(connection, 2)
+
+
+def test_the_detail_of_a_paper_reads_its_arxiv_date_in_revised_at(connection):
+    detail = read_item_detail(connection, 2)
+
+    assert detail is not None
+    assert detail.listed.source_date == "2026-09-27T09:30:13Z"
+    assert detail.details._asdict() == {
+        "arxiv_id": "2609.33401",
+        "authors": ["Yixuan Liu"],
+        "summary": "Model-based judges support agent security by detecting prompt"
+        " injections, assessing interaction risks, and screening harmful requests.",
+        "arxiv_updated_at": "2026-09-29T16:41:24Z",
+    }
+
+
+@pytest.mark.parametrize(
+    ("item_id", "advisory"),
+    [
+        (9, AdvisoryDetail("GHSA-fjqc-hq36-qh5p", "CVE-2020-29583", True, ["langgraph-checkpoint"])),
+        (
+            17,
+            AdvisoryDetail(
+                "GHSA-3644-q5cj-c5c7",
+                "CVE-2026-45134",
+                False,
+                ["langsmith", "langchain-classic", "langchain"],
+            ),
+        ),
+        (
+            10,
+            AdvisoryDetail(
+                "GHSA-gr75-jv2w-4656", None, None, ["langchain", "langchain-anthropic"]
+            ),
+        ),
+    ],
+    ids=["in-kev-withdrawn-since", "not-in-kev", "without-cve"],
+)
+def test_exploited_reads_the_kev_catalog_as_a_boolean(connection, item_id, advisory):
+    detail = read_item_detail(connection, item_id)
+
+    assert detail is not None
+    assert detail.details == advisory
+    assert type(detail.details.exploited) is type(advisory.exploited)
+
+
+def test_the_detail_of_a_zotero_entry_holds_its_paper_and_its_highlights(connection):
+    detail = read_item_detail(connection, 14)
+
+    assert detail is not None
+    assert detail.details.arxiv_id == "2609.00001"
+    assert detail.details.revised_at == "2026-10-06T09:30:00Z"
+    assert detail.details.highlights == read_highlights(connection, 14)
+
+
+def test_a_zotero_entry_without_arxiv_reference_has_no_arxiv_id(connection):
+    detail = read_item_detail(connection, 16)
+
+    assert detail is not None
+    assert detail.details.arxiv_id is None
+
+
+@pytest.mark.parametrize("item_id", [999, 0, -1, MAX_INT64, MIN_INT64])
+def test_an_unknown_item_has_no_detail(connection, item_id):
+    assert read_item_detail(connection, item_id) is None
+
+
+def test_the_detail_of_an_item_id_beyond_64_bits_is_refused_by_its_bound(connection):
+    with pytest.raises(ValueError) as refusal:
+        read_item_detail(connection, MAX_INT64 + 1)
+
+    assert str(refusal.value) == f"item_id above maximum {MAX_INT64}"
+
+
+def test_the_detail_leaves_no_transaction_open(connection):
+    read_item_detail(connection, 14)
+
+    assert not connection.in_transaction
+
+
+LATEST_TRENDS = [
+    StoredTrend(1209966933, "morluto/rea", 1087, 215),
+    StoredTrend(1398080271, "storytold/photocraft", 449, 64),
+    StoredTrend(1322250666, "boykopovar/AnyPS5", 318, 17),
+    StoredTrend(1035334306, "wwwwwwworld/solana-trading-bot-v3", 0, 70),
+    StoredTrend(928981629, "rhtap-perf-test/nodejs-devfile-sample2", 0, 13),
+]
+
+
+def test_without_a_window_the_trends_are_those_of_the_latest(connection):
+    assert read_trends(connection) == TrendWindow(date(2026, 10, 10), LATEST_TRENDS)
+
+
+def test_the_trends_of_a_window_tie_on_stars_and_forks_by_repository_id(connection):
+    assert read_trends(connection, date(2026, 10, 9)) == TrendWindow(
+        date(2026, 10, 9),
+        [
+            StoredTrend(1209966933, "morluto/rea", 120, 9),
+            StoredTrend(1398080271, "storytold/photocraft", 120, 9),
+        ],
+    )
+
+
+def test_an_unknown_window_has_no_trend(connection):
+    assert read_trends(connection, date(2026, 1, 1)) is None
+
+
+def test_a_base_without_trend_has_no_latest_window(tmp_path):
+    database_path = tmp_path / "k-b.sqlite"
+    create_database(database_path)
+    connection = connect_database_read_only(database_path)
+    try:
+        assert read_trends(connection) is None
+    finally:
+        connection.close()
