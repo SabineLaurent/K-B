@@ -186,7 +186,8 @@ racine du dépôt. `kb serve` journalise une ligne par requête dans
 `<KB_DATA_DIR>/logs/kb-serve.log`, avec le nom du client, jamais sa clé. Code de sortie 2, sans
 lancer l'API, si `KB_DATA_DIR` manque, si aucune clé n'est donnée, si un nom de client est vide ou
 hors `A-Z`, `0-9` et `_`, si une clé a moins de 32 caractères, ou si deux clients ont la même clé :
-le message nomme la variable, jamais sa valeur.
+le message nomme la variable, jamais sa valeur. Si le port 8000 est déjà pris (par exemple par un
+autre `kb serve`), uvicorn écrit `address already in use` au journal et `kb serve` sort en code 3.
 
 Limites :
 
