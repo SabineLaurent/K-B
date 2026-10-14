@@ -24,6 +24,7 @@ from typing import Annotated, Any
 from google.cloud import bigquery
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.transform import (
     RawFile,
@@ -55,8 +56,6 @@ MAX_CATCH_UP_WINDOWS = 15
 MAX_BYTES_PER_WINDOW = 650_000_000
 MAX_BYTES_BILLED = 2_000_000_000
 QUERY_TIMEOUT_SECONDS = 300
-# How much of an invalid value goes into the error.
-MAX_QUOTED_VALUE_LENGTH = 100
 # The only fields whose value is quoted: a date or a number. Any other value (a repository name,
 # that holds the owner's login when the owner is a person, a whole row, the raw document) is
 # described by its type and its length.
@@ -372,7 +371,7 @@ def describe_location_part(part: int | str) -> str:
     """A position or a known field as it is; an unknown key, which the raw gives, escaped and
     cut like a value."""
     if isinstance(part, str) and part not in KNOWN_FIELDS:
-        return repr(part)[:MAX_QUOTED_VALUE_LENGTH]
+        return quote_value(part)
     return str(part)
 
 
@@ -381,7 +380,7 @@ def describe_value(value: object, field: object) -> str:
     if isinstance(value, dict | list):
         return f"{type(value).__name__} of {len(value)}"
     if field in FIELDS_QUOTED:
-        return repr(value)[:MAX_QUOTED_VALUE_LENGTH]
+        return quote_value(value)
     if isinstance(value, str | bytes):
         return f"{type(value).__name__} of length {len(value)}"
     return type(value).__name__

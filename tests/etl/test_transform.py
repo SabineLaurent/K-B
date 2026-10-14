@@ -166,7 +166,7 @@ def test_the_github_ranking_is_skipped_and_logged(tmp_path, caplog):
     assert reading.rejections == []
     assert (
         "source without a reader of items, skipped by the item reader:"
-        " github_most_starred"
+        " 'github_most_starred'"
     ) in caplog.text
 
 
@@ -327,7 +327,7 @@ def test_a_folder_inside_a_folder_of_pages_is_skipped_and_logged(tmp_path, caplo
     assert [item.source_item_id for item in items_of(reading)] == ["a"]
     assert reading.rejections == []
     assert (
-        f"folder inside a collection folder, skipped: automated_watch/fake/{COLLECTION_NAME}/archive"
+        f"folder inside a collection folder, skipped: 'automated_watch/fake/{COLLECTION_NAME}/archive'"
         in caplog.text
     )
 

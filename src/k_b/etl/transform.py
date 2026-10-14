@@ -10,6 +10,7 @@ from typing import Any, NamedTuple
 
 from pydantic import ValidationError
 
+from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import RAW_DIR_NAMES
 from k_b.etl.source_contract import SourceKind, SourceReader, find_source_kind
 from k_b.items import Item, SourceCode, TrendRow
@@ -18,8 +19,6 @@ logger = logging.getLogger(__name__)
 
 # The name etl/extract.py gives every raw file of a collection.
 COLLECTION_NAME_FORMAT = "%Y-%m-%dT%H%M%SZ"
-# The longest folder name quoted in a log line, quotes and escapes included.
-MAX_QUOTED_FOLDER_NAME_LENGTH = 100
 
 
 class Rejection(NamedTuple):
@@ -170,11 +169,10 @@ def list_collections(
     for source_dir in source_dirs:
         kind = find_source_kind(source_dir.name, kinds)
         if kind is None:
-            # The name of a folder of raw/ is not checked: quoted, escaped and truncated
-            # (conventions.md, rule 3).
+            # The name of a folder of raw/ is not checked: it is quoted.
             logger.info(
                 "folder without a source kind, skipped: %s",
-                repr(source_dir.name)[:MAX_QUOTED_FOLDER_NAME_LENGTH],
+                quote_value(source_dir.name),
             )
             continue
         reader = kind.reader
@@ -183,7 +181,7 @@ def list_collections(
             # their own reader (etl/sources/gh_archive.py).
             logger.info(
                 "source without a reader of items, skipped by the item reader: %s",
-                source_dir.name,
+                quote_value(source_dir.name),
             )
             continue
         collections.extend((path, reader) for path in list_visible_entries(source_dir))
@@ -197,7 +195,7 @@ def list_pages(collection_dir: Path, raw_dir: Path) -> list[Path]:
         if path.is_dir():
             logger.info(
                 "folder inside a collection folder, skipped: %s",
-                path.relative_to(raw_dir).as_posix(),
+                quote_value(path.relative_to(raw_dir).as_posix()),
             )
             continue
         pages.append(path)
