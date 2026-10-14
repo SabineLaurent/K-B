@@ -76,9 +76,9 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
   lui appartient (décision du 2026-10-14).
 - `print` donne le résultat d'une commande ; `logger` donne le déroulé. Un échec est journalisé
   une fois, là où il est traité.
-- Le journal de fonctionnement va sur la sortie d'erreur et dans `<KB_DATA_DIR>/logs/kb.log`,
-  réussites et échecs, tourné chaque jour à minuit UTC, `LOG_FILES_KEPT` fichiers gardés
-  (`core/config.py`). Le journal d'import garde sa règle : écrit seulement si l'import va au
+- Le journal de fonctionnement (le déroulé, réussites et échecs) va sur la sortie d'erreur et
+  dans `<KB_DATA_DIR>/logs/kb.log`, tourné chaque jour à minuit UTC, `LOG_FILES_KEPT` fichiers
+  gardés (`core/config.py`) ; le résultat d'une commande reste un `print`. Le journal d'import garde sa règle : écrit seulement si l'import va au
   bout de l'écriture en base.
 
 **Vérifier.**
