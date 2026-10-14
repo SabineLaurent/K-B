@@ -75,9 +75,9 @@ TREND_REPOSITORY_NAME_MAX_LENGTH = 255
 
 def check_url_can_be_normalized(url: str) -> str:
     """Refuse the URL urlsplit refuses (an unclosed bracket, a host NFKC rewrites), and the URL
-    without a host, which may be "https://" once its utm_* parameters are removed: etl/normalize.py
-    splits every URL at the import, then validates the item again, where one refused would
-    stop it all."""
+    without a host, as "https://?utm_source=x" is once its utm_* parameters are removed:
+    etl/normalize.py splits every URL at the import, then validates the item again, where one
+    refused would stop it all."""
     try:
         host = urlsplit(url).hostname
     except ValueError:
