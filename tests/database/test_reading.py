@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime, timedelta, timezone, tzinfo
 
 import pytest
 
-from k_b.database.connection import connect_database_read_only
+from k_b.database.connection import connect_database, connect_database_read_only
 from k_b.database.creation import create_database
 from k_b.database.reading import (
     AdvisoryDetail,
@@ -481,3 +481,54 @@ def test_a_base_without_trend_has_no_latest_window(tmp_path):
 def test_no_field_of_a_kind_takes_the_name_of_a_field_of_the_list(kind_detail):
     """The response joins both: a field of the kind would replace the one of the list."""
     assert not set(kind_detail._fields) & set(ListedItem._fields)
+
+
+@pytest.fixture
+def base_with_vulnerabilities_on_papers(tmp_path):
+    """Papers designated by a vulnerability row too: publication and vulnerability have no
+    (item_id, kind) foreign key, so the schema does not refuse it. Paper 1 has its publication;
+    paper 2 has none."""
+    database_path = tmp_path / "k-b.sqlite"
+    create_database(database_path)
+    connection = connect_database(database_path)
+    try:
+        connection.executescript(
+            """
+            INSERT INTO raw_data (id, source_id, raw_file_path, stream, collected_at)
+            VALUES (1, (SELECT id FROM source WHERE source_code = 'arxiv'), 'a.xml', 'arxiv',
+                '2026-10-05T09:30:00Z');
+            INSERT INTO item (id, kind, raw_data_id) VALUES (1, 'paper', 1), (2, 'paper', 1);
+            INSERT INTO publication (arxiv_id, item_id, title, summary, authors, submitted_at,
+                revised_at)
+            VALUES ('2609.31282', 1, 'A paper', 'Its summary.', '["A name"]',
+                '2026-09-25T13:53:50Z', '2026-09-25T13:53:50Z');
+            INSERT INTO vulnerability (cve_id, item_id, name, description, vendor, product,
+                date_added, ransomware_use)
+            VALUES
+                ('CVE-2026-86950', 1, 'A vulnerability', 'Its description.', 'V', 'P',
+                    '2026-09-29T00:00:00Z', 'Unknown'),
+                ('CVE-2026-88772', 2, 'Another one', 'Its description.', 'V', 'P',
+                    '2026-09-27T00:00:00Z', 'Unknown');
+            """
+        )
+    finally:
+        connection.close()
+    connection = connect_database_read_only(database_path)
+    yield connection
+    connection.close()
+
+
+def test_an_item_is_read_by_the_branch_of_its_kind_only(
+    base_with_vulnerabilities_on_papers,
+):
+    connection = base_with_vulnerabilities_on_papers
+
+    listed = read_items(connection, limit=100).items
+    detail = read_item_detail(connection, 1)
+
+    assert [(item.id, item.kind, item.title) for item in listed] == [
+        (1, "paper", "A paper")
+    ]
+    assert detail is not None
+    assert detail.listed.title == "A paper"
+    assert read_item_detail(connection, 2) is None

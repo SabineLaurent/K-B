@@ -30,16 +30,19 @@ SELECT_RAW_FILE_PATHS = "SELECT raw_file_path FROM raw_data"
 # One branch per ItemKind; its date is the one the source gives (docs/specs-api.md, "Date,
 # titre et résumé par sorte"). A kind without summary gives NULL: its title alone is searched.
 # Shared by the list and the detail: the title, date and URL of a kind are written once.
+# publication and vulnerability have no kind, unlike the four subtypes: their branch keeps the
+# items of its kind only, so that an item is read by the one branch of its kind.
 LISTED_ITEMS = """
     SELECT item.id, item.kind, item.raw_data_id, publication.title AS title,
         publication.summary AS summary, publication.submitted_at AS source_date,
         :arxiv_page_url || publication.arxiv_id AS url, NULL AS withdrawn_at
-    FROM item JOIN publication ON publication.item_id = item.id
+    FROM item JOIN publication ON publication.item_id = item.id AND item.kind = 'paper'
     UNION ALL
     SELECT item.id, item.kind, item.raw_data_id, vulnerability.name, vulnerability.description,
         vulnerability.date_added, :nvd_page_url || vulnerability.cve_id,
         vulnerability.withdrawn_at
-    FROM item JOIN vulnerability ON vulnerability.item_id = item.id
+    FROM item JOIN vulnerability
+        ON vulnerability.item_id = item.id AND item.kind = 'vulnerability'
     UNION ALL
     SELECT item.id, item.kind, item.raw_data_id,
         tracked_repository.repository_name || ' '
@@ -373,7 +376,9 @@ def read_item_detail(connection: sqlite3.Connection, item_id: int) -> ItemDetail
             listed, READ_DETAILS_BY_KIND[listed.kind](connection, item_id)
         )
     finally:
-        connection.rollback()
+        # SQLite may have ended it on an error: a ROLLBACK would then raise, in place of it.
+        if connection.in_transaction:
+            connection.rollback()
 
 
 def read_paper_detail(connection: sqlite3.Connection, item_id: int) -> PaperDetail:
@@ -434,11 +439,8 @@ def read_zotero_entry_detail(
 
 
 def fetch_row(connection: sqlite3.Connection, query: str, item_id: int) -> Any:
-    """The row of the subtype of an item the list has read. release, advisory,
-    newsletter_article and zotero_entry hold it by their (item_id, kind) foreign key;
-    publication and vulnerability have no kind, and a row of theirs linked to an item of another
-    kind leaves None here: its unpacking raises a TypeError, which the API answers with a 500
-    internal_error."""
+    """The row of the subtype of an item the list has read: the branch of its kind in
+    LISTED_ITEMS reads the same table by the same item_id, so it exists."""
     return connection.execute(query, (item_id,)).fetchone()
 
 

@@ -179,7 +179,8 @@ date arXiv ou date Zotero.
 `exploited` vaut vrai si la CVE de l'alerte est au catalogue CISA KEV
 (`vulnerability.item_id IS NOT NULL`) : faux veut dire « absente du catalogue KEV », pas « non
 exploitée ». Il est nul pour une alerte sans CVE. Il reste vrai si la CVE a été retirée du
-catalogue depuis : le retrait se lit dans `withdrawn_at`, au détail de la vulnérabilité.
+catalogue depuis : le retrait se lit dans `withdrawn_at`, au détail de la vulnérabilité, que
+le détail de l'alerte ne désigne pas encore (« Hors de cette version »).
 
 `source_date` et `arxiv_updated_at` sont des noms de champs de l'API : ils ne renomment aucune
 colonne (décision ouverte « Noms des colonnes de date », journal ADR).
