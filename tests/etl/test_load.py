@@ -19,14 +19,13 @@ from test_items import (
 )
 from test_transform import FIXTURES_DIR, convert_line, copy_fixture
 
-from k_b.database.connection import connect_database
+from k_b.database.connection import MissingDatabaseError, connect_database
 from k_b.database.creation import create_database
 from k_b.database.writers.shared_rows import UnknownSourceError
 from k_b.etl import load as import_items_module
 from k_b.etl.load import (
     ImportLogExistsError,
     KindWithoutTableError,
-    MissingDatabaseError,
     import_items,
     read_imported_paths,
 )

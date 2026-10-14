@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from k_b.core.config import TrackedRepository
-from k_b.database.connection import connect_database
+from k_b.database.connection import check_database_exists, connect_database
 from k_b.database.reading import read_raw_file_paths
 from k_b.database.writers import (
     advisory_writer,
@@ -57,10 +57,6 @@ from k_b.etl.transform import (
 from k_b.items import Item
 
 
-class MissingDatabaseError(FileNotFoundError):
-    pass
-
-
 class ImportLogExistsError(FileExistsError):
     """The log of this second is already written: the log of an import is never rewritten."""
 
@@ -79,12 +75,6 @@ class ImportSummary(NamedTuple):
     withdrawn_count: int
     # The rows written to the trend table.
     trend_count: int
-
-
-def check_database_exists(database_path: Path) -> None:
-    """Connecting to a missing file would create an empty base."""
-    if not database_path.is_file():
-        raise MissingDatabaseError(f"{database_path} does not exist")
 
 
 def read_imported_paths(database_path: Path) -> frozenset[str]:
