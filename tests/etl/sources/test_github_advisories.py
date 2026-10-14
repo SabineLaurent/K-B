@@ -114,7 +114,7 @@ def test_an_empty_first_collection_returns_nothing(fake_github_api):
     assert GithubAdvisoriesSource("pip", PACKAGES).fetch(last_collected_at=None) is None
 
 
-def test_a_full_page_of_new_advisories_warns_that_some_may_be_missing(
+def test_a_full_page_of_new_advisories_logs_the_count_read_and_the_oldest_date(
     fake_github_api, monkeypatch, caplog
 ):
     monkeypatch.setattr(github_advisories, "ADVISORIES_PER_PAGE", 3)
@@ -124,8 +124,12 @@ def test_a_full_page_of_new_advisories_warns_that_some_may_be_missing(
             last_collected_at=BEFORE_ALL_ADVISORIES
         )
 
-    assert "github_advisories_pip" in caplog.text
-    assert "may be missing" in caplog.text
+    [record] = caplog.records
+    assert record.getMessage() == (
+        "github_advisories_pip: 3 advisories read, page size 3; oldest reviewed at "
+        "2026-05-13T15:29:30+00:00, after the last collection at "
+        "2026-05-01T00:00:00+00:00; next pages not read"
+    )
 
 
 def test_no_warning_when_the_page_reaches_back_to_the_last_collection(

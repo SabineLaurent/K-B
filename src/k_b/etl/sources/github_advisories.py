@@ -75,10 +75,13 @@ class GithubAdvisoriesSource:
         is_page_full = len(review_dates) >= ADVISORIES_PER_PAGE
         if is_page_full and min(review_dates) > last_collected_at:
             logger.warning(
-                "%s: more than %d advisories since the last collection, some may be missing; "
-                "time to read the next pages",
+                "%s: %d advisories read, page size %d; oldest reviewed at %s, after the last "
+                "collection at %s; next pages not read",
                 self.name,
+                len(review_dates),
                 ADVISORIES_PER_PAGE,
+                min(review_dates).isoformat(),
+                last_collected_at.isoformat(),
             )
         return raw_response
 
