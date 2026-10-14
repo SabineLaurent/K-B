@@ -25,7 +25,10 @@ l'ordre des résultats, change la version.
   au schéma produit par l'app.
 - **Journal** : une ligne par requête, horodatée en ISO 8601 UTC, à la seconde. Elle donne la
   méthode, le gabarit de route (`/items/{item_id}`, pas l'identifiant), le statut, la durée en ms
-  et le nom du client ; jamais la clé, une valeur de paramètre ni un chemin brut.
+  et le nom du client ; jamais la clé, une valeur de paramètre ni un chemin brut. Elle va dans
+  `<KB_DATA_DIR>/logs/kb-serve.log`, à part de `kb.log` : `kb serve` tourne longtemps, et la rotation
+  de minuit faite par `kb collect` ou `kb import` dans un fichier partagé le laisserait écrire dans
+  le fichier de la veille (constat sur `TimedRotatingFileHandler`, Python 3.13).
 - **Organisation du code** : paquet `src/k_b/data_api/`, un dossier par rôle (`routers/`,
   `schemas/`) ; le détail et les options écartées sont au journal ADR (2026-10-14, « Paquet
   `src/k_b/data_api/` »).
@@ -104,7 +107,9 @@ cette semaine n'apparaît pas dans « quoi de neuf » (limite assumée, journal 
 ### Tri et pagination
 
 - Tri par `source_date` décroissante, puis par `id` décroissant.
-- La réponse donne `next_offset`, l'`offset` de la page suivante, nul à la dernière page.
+- La réponse donne `next_offset`, l'`offset` de la page suivante, nul à la dernière page, ou quand
+  l'offset suivant dépasserait 10 000 : les items au-delà ne sont pas servis par la liste ; affiner
+  par `since`, `kind` ou `q`.
 - Limite : un import qui écrit entre deux pages décale la pagination par `offset`.
 
 ### Réponse
