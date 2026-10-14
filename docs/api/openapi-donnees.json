@@ -135,7 +135,7 @@
             }
           },
           "500": {
-            "description": "database_error",
+            "description": "database_error, internal_error",
             "content": {
               "application/json": {
                 "schema": {

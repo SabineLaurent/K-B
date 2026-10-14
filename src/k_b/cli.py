@@ -72,6 +72,9 @@ API_KEY_VARIABLE_PREFIX = "KB_API_KEY_"
 CLIENT_NAME = re.compile(r"[A-Z0-9_]+")
 # secrets.token_urlsafe(32) gives 43 characters: 32 is the minimum checked.
 MIN_API_KEY_LENGTH = 32
+# The alphabet of token_urlsafe. HTTPBearer cuts the header at a space, and h11 drops a final
+# one: a key with a space would be accepted at the start and never received whole.
+API_KEY_CHARACTERS = re.compile(r"[A-Za-z0-9_-]+")
 # The data API is local: its host is not an option.
 DATA_API_HOST = "127.0.0.1"
 DATA_API_PORT = 8000
@@ -344,6 +347,8 @@ def find_api_key_refusal(
             f"{quote_value(variable)}: key of {len(key)} characters,"
             f" minimum {MIN_API_KEY_LENGTH}"
         )
+    if not API_KEY_CHARACTERS.fullmatch(key):
+        return f"{quote_value(variable)}: key with a character outside [A-Za-z0-9_-]"
     if key in variable_by_key:
         return (
             f"{quote_value(variable_by_key[key])} and {quote_value(variable)}: same key"
@@ -353,6 +358,14 @@ def find_api_key_refusal(
 
 def run_openapi() -> int:
     """Write the OpenAPI of the data API, versioned with the code (docs/specs-api.md)."""
+    # Run from another folder, it would write a document the repository never sees.
+    if not OPENAPI_PATH.parent.is_dir():
+        print(
+            f"error: {OPENAPI_PATH.parent} is not a directory of the current directory;"
+            " run kb openapi at the root of the repository",
+            file=sys.stderr,
+        )
+        return 2
     # The app is made without base nor key: its document does not depend on them.
     openapi = create_app(Path(DATABASE_FILE_NAME), {}).openapi()
     content = json.dumps(openapi, indent=2, ensure_ascii=False) + "\n"

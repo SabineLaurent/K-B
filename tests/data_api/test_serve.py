@@ -61,6 +61,11 @@ def make_key(length=43):
             {"KB_API_KEY_TERMINAL": ""},
             "'KB_API_KEY_TERMINAL': key of 0 characters, minimum 32",
         ),
+        # HTTPBearer cuts the header at a space: such a key would never be received whole.
+        (
+            {"KB_API_KEY_TERMINAL": make_key(20) + " " + make_key(22)},
+            "'KB_API_KEY_TERMINAL': key with a character outside [A-Za-z0-9_-]",
+        ),
     ],
 )
 def test_serve_exits_2_and_names_the_variable_without_its_value(
@@ -144,6 +149,7 @@ def test_serve_writes_its_own_log_file(monkeypatch, data_dir, uvicorn_calls):
 def test_openapi_writes_the_document_without_data_dir(monkeypatch, tmp_path):
     monkeypatch.delenv("KB_DATA_DIR", raising=False)
     monkeypatch.chdir(tmp_path)
+    (tmp_path / "docs" / "api").mkdir(parents=True)
 
     exit_code = cli.main(["openapi"])
 
@@ -153,3 +159,19 @@ def test_openapi_writes_the_document_without_data_dir(monkeypatch, tmp_path):
         encoding="utf-8"
     )
     assert not (tmp_path / "logs").exists()
+
+
+def test_openapi_writes_nothing_outside_the_root_of_the_repository(
+    monkeypatch, tmp_path, capsys
+):
+    """Run from another folder, it would write a document the repository never sees."""
+    monkeypatch.chdir(tmp_path)
+
+    exit_code = cli.main(["openapi"])
+
+    assert exit_code == 2
+    assert (
+        "docs/api is not a directory of the current directory"
+        in capsys.readouterr().err
+    )
+    assert list(tmp_path.iterdir()) == []

@@ -3,7 +3,7 @@ path, no value received (docs/specs-api.md, "Erreurs")."""
 
 import logging
 import sqlite3
-from collections.abc import Callable, Coroutine, Mapping
+from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from typing import Any
 
 from fastapi import Request
@@ -34,7 +34,7 @@ class InvalidParameterSchema(ErrorSchema):
 ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     401: {"model": ErrorSchema, "description": "invalid_api_key"},
     422: {"model": InvalidParameterSchema, "description": "invalid_parameter"},
-    500: {"model": ErrorSchema, "description": "database_error"},
+    500: {"model": ErrorSchema, "description": "database_error, internal_error"},
     503: {"model": ErrorSchema, "description": "database_missing"},
 }
 
@@ -89,6 +89,22 @@ async def handle_database_error(request: Request, error: sqlite3.Error) -> Respo
     # The type only: the message of SQLite may hold a path or a part of the query.
     logger.error("database_error: %s", type(error).__name__)
     return respond_with_error(500, "database_error")
+
+
+async def respond_to_unexpected_error(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """An exception no handler takes: a 500 with a named state, its type logged once, never its
+    message nor its stack, which may quote a value received.
+
+    A middleware, not a handler of Exception: Starlette raises the exception again after such a
+    handler (starlette/middleware/errors.py), and uvicorn would log its stack.
+    """
+    try:
+        return await call_next(request)
+    except Exception as error:  # noqa: BLE001 — every exception no handler takes
+        logger.error("internal_error: %s", type(error).__name__)
+        return respond_with_error(500, "internal_error")
 
 
 # Given to FastAPI(exception_handlers=...), whose type takes a handler of one exception class.

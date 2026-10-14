@@ -41,8 +41,9 @@ l'ordre des résultats, change la version.
   IA) ; aucune personne ne se connecte.
 - **Clé générée en 256 bits** par `secrets.token_urlsafe(32)` ; le minimum contrôlé est de
   32 caractères. Au démarrage, `kb serve` refuse un
-  nom de client vide ou hors `[A-Z0-9_]+`, une clé de moins de 32 caractères, deux clients de même
-  clé, et l'absence de toute clé (code de sortie 2, message qui nomme la variable sans sa valeur).
+  nom de client vide ou hors `[A-Z0-9_]+`, une clé de moins de 32 caractères, une clé hors de
+  l'alphabet de `token_urlsafe` (`[A-Za-z0-9_-]` : une espace couperait l'en-tête), deux clients de
+  même clé, et l'absence de toute clé (code de sortie 2, message qui nomme la variable sans sa valeur).
 - **Révocable seule** : retirer la variable d'un client et redémarrer l'API ; les autres clients
   restent servis. Un retrait ne prend effet qu'au redémarrage.
 - **Vérification** : comparaison en temps constant (`hmac.compare_digest`). Sans clé, ou avec une
@@ -215,6 +216,7 @@ valeur reçue.
 | `invalid_parameter` | 422 | paramètre hors bornes ou mal formé ; le corps ajoute `"parameters": [<noms>]`, sans les valeurs |
 | `database_missing` | 503 | la base n'existe pas |
 | `database_error` | 500 | toute autre erreur de la base, sans détail |
+| `internal_error` | 500 | toute autre erreur, sans détail ; journalisée par son type seul, sans pile ni message |
 
 Exception : un `Host` qui n'est ni `127.0.0.1` ni `localhost` reçoit le 400 de
 `TrustedHostMiddleware`, qui répond avant l'app, en texte.

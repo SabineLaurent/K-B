@@ -5,6 +5,8 @@ import logging
 
 import pytest
 
+from k_b.data_api.routers import item_router
+
 
 def test_a_host_other_than_localhost_gives_400(client, authorization):
     response = client.get("/items", headers={**authorization, "Host": "evil.example"})
@@ -75,3 +77,22 @@ def test_no_error_body_holds_a_raw_file_path_or_a_path(error_responses, tmp_path
             "k-b.sqlite",
         ):
             assert absent not in response.text
+
+
+def test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only(
+    client, authorization, monkeypatch, caplog
+):
+    def fail(*_, **__):
+        raise RuntimeError("value received by the test")
+
+    monkeypatch.setattr(item_router, "read_items", fail)
+
+    with caplog.at_level(logging.INFO, logger="k_b.data_api"):
+        response = client.get("/items", headers=authorization)
+
+    assert response.status_code == 500
+    assert response.json() == {"error": "internal_error"}
+    assert "internal_error: RuntimeError" in caplog.text
+    assert "status=500" in caplog.text
+    assert "value received by the test" not in caplog.text
+    assert "Traceback" not in caplog.text

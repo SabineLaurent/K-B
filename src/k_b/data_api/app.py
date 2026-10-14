@@ -9,7 +9,7 @@ from pydantic import SecretStr
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from k_b.data_api.dependencies import check_api_key
-from k_b.data_api.errors import ERROR_HANDLERS
+from k_b.data_api.errors import ERROR_HANDLERS, respond_to_unexpected_error
 from k_b.data_api.request_log import log_request
 from k_b.data_api.routers import item_router
 
@@ -25,15 +25,20 @@ def create_app(database_path: Path, api_keys: Mapping[str, SecretStr]) -> FastAP
         title="K-B data API",
         version=API_VERSION,
         # On the app, not on a router: no data route can leave it out. /docs and /openapi.json
-        # are routes of Starlette, outside: they hold no data. ReDoc is not served.
+        # are routes of Starlette, outside: they hold no data. ReDoc and the OAuth2 redirect of
+        # Swagger UI, which K-B does not use, are not served.
         dependencies=[Depends(check_api_key)],
         redoc_url=None,
+        swagger_ui_oauth2_redirect_url=None,
         exception_handlers=ERROR_HANDLERS,
     )
     app.state.database_path = database_path
     app.state.api_keys = dict(api_keys)
+    # The last added is the outermost.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
-    # Added last, the outermost: the 400 of TrustedHostMiddleware has its line too.
+    app.middleware("http")(respond_to_unexpected_error)
+    # The outermost: the 400 of TrustedHostMiddleware and the 500 of an unexpected error have
+    # their line too.
     app.middleware("http")(log_request)
     app.include_router(item_router.router)
     return app

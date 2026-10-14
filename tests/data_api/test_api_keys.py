@@ -105,7 +105,8 @@ def test_with_a_key_a_wrong_parameter_and_no_database_gives_503(
     assert response.status_code == 503
 
 
-def test_docs_and_openapi_are_public_and_redoc_is_not_served(client):
+def test_docs_and_openapi_are_public_and_no_other_page_is_served(client):
     assert client.get("/docs").status_code == 200
     assert client.get("/openapi.json").status_code == 200
     assert client.get("/redoc").status_code == 404
+    assert client.get("/docs/oauth2-redirect").status_code == 404
