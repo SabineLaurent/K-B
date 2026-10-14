@@ -209,6 +209,18 @@ def test_an_empty_search_is_refused(connection):
         read_items(connection, limit=100, search_text="")
 
 
+@pytest.mark.parametrize(
+    "search_text",
+    ["\x00", "Vulnerability\x00xyz", "a\udcff"],
+    ids=["nul", "nul-inside", "surrogate"],
+)
+def test_a_search_with_a_nul_or_a_lone_surrogate_is_refused(connection, search_text):
+    # SQLite stops a LIKE pattern at a NUL: "\x00" would find every item. sqlite3 cannot encode
+    # a lone surrogate, which a terminal argument that is not UTF-8 becomes.
+    with pytest.raises(ValueError, match="NUL or a lone surrogate"):
+        read_items(connection, limit=100, search_text=search_text)
+
+
 def test_the_search_reads_the_title_and_the_summary(connection):
     # The title of a release begins with its repository; lifecycle is in a summary only.
     assert read_ids(connection, search_text="claude-code") == [6, 7, 8]

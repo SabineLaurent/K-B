@@ -17,6 +17,7 @@ from k_b.items import (
     NVD_PAGE_URL,
     ItemKind,
     SearchableMode,
+    check_text_can_be_stored,
     convert_to_utc,
 )
 
@@ -174,6 +175,9 @@ def to_like_pattern(search_text: str) -> str:
     """A LIKE pattern that finds search_text anywhere, % and _ as written (ESCAPE '\\')."""
     if not search_text:
         raise ValueError("search_text is empty")
+    # SQLite stops a LIKE pattern at a NUL, which would find every item; sqlite3 cannot bind a
+    # lone surrogate.
+    check_text_can_be_stored(search_text)
     escaped = search_text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
 
