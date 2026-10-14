@@ -25,3 +25,7 @@ RETENTION_YEARS_BY_ACQUISITION_MODE: dict[str, int | None] = {
     "library": None,
     "wiki": None,
 }
+
+# How many log files of past days kb keeps (logs/kb.log.<day> of the data directory), the
+# oldest removed at the rotation: about a month of daily collections (Sabine, 2026-10-14).
+LOG_FILES_KEPT = 30
