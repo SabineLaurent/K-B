@@ -1,7 +1,7 @@
 """The dependencies go one way, read at two levels (conventions.md, rule 5).
 
 Under k_b: core and items are the common vocabulary, database reads and writes the base (its
-writers under database/writers), etl runs the pipeline, cli composes. Under k_b.etl: the
+writers under database/writers), etl runs the pipeline, data_api serves the base, cli composes. Under k_b.etl: the
 composition (source_kinds) → the sources → the modules of the pipeline.
 """
 
@@ -14,7 +14,7 @@ import pytest
 import k_b
 
 PACKAGE_DIR = Path(k_b.__file__).parent
-TOP_LEVEL_MODULES = {"cli", "items", "core", "database", "etl"}
+TOP_LEVEL_MODULES = {"cli", "items", "core", "database", "etl", "data_api"}
 # Under k_b.etl, each module is in exactly one of the three.
 ETL_COMPOSITION_MODULES = {"etl.source_kinds"}
 ETL_SOURCES_PACKAGE = "etl.sources"
@@ -216,6 +216,49 @@ def test_database_imports_only_items_and_core():
         assert {name for name in imported if not is_within(name, allowed)} == set(), (
             path
         )
+
+
+# The data API reads the base: never the pipeline nor the writers (conventions.md, rule 5).
+DATA_API_ALLOWED_MODULES = {"data_api", "database", "items", "core"}
+DATA_API_FORBIDDEN_MODULES = {"database.writers"}
+
+
+def list_forbidden_imports_of_the_data_api(imported: set[str]) -> set[str]:
+    """The names a module of data_api may not import. A name is cut at two levels: `from k_b
+    import database` gives `database`, allowed; `from k_b.database import writers` gives
+    `database.writers`, refused."""
+    return {
+        name
+        for name in imported
+        if not is_within(name, DATA_API_ALLOWED_MODULES)
+        or is_within(name, DATA_API_FORBIDDEN_MODULES)
+    }
+
+
+def test_data_api_imports_only_data_api_database_items_and_core():
+    for path in list_python_files("data_api"):
+        imported = list_imported_modules(path, find_package(path))
+        assert list_forbidden_imports_of_the_data_api(imported) == set(), path
+
+
+@pytest.mark.parametrize(
+    ("code", "is_refused"),
+    [
+        ("from k_b.etl import load", True),
+        ("from k_b.etl.sources.arxiv import ArxivSource", True),
+        ("from k_b import cli", True),
+        ("from k_b.database.writers import paper_writer", True),
+        ("from k_b.database import writers", True),
+        ("from k_b.database.writers.paper_writer import write", True),
+        ("from k_b import database", False),
+        ("from k_b.database.reading import read_items", False),
+        ("from k_b.data_api.errors import ApiError", False),
+    ],
+)
+def test_the_data_api_rule_refuses_etl_and_the_writers(code, is_refused):
+    imported = parse_imported_modules(code, package="k_b.data_api")
+
+    assert bool(list_forbidden_imports_of_the_data_api(imported)) is is_refused
 
 
 def test_items_imports_neither_the_sources_nor_the_composition():

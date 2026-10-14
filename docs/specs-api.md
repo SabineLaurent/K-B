@@ -25,7 +25,11 @@ l'ordre des résultats, change la version.
   au schéma produit par l'app.
 - **Journal** : une ligne par requête, horodatée en ISO 8601 UTC, à la seconde. Elle donne la
   méthode, le gabarit de route (`/items/{item_id}`, pas l'identifiant), le statut, la durée en ms
-  et le nom du client ; jamais la clé, une valeur de paramètre ni un chemin brut.
+  et le nom du client (`-` pour un statut sans réponse envoyée, une route inconnue ou un client
+  sans clé valide) ; jamais la clé, une valeur de paramètre ni un chemin brut. Elle va dans
+  `<KB_DATA_DIR>/logs/kb-serve.log`, à part de `kb.log` : `kb serve` tourne longtemps, et la rotation
+  de minuit faite par `kb collect` ou `kb import` dans un fichier partagé le laisserait écrire dans
+  le fichier de la veille (constat sur `TimedRotatingFileHandler`, Python 3.13).
 - **Organisation du code** : paquet `src/k_b/data_api/`, un dossier par rôle (`routers/`,
   `schemas/`) ; le détail et les options écartées sont au journal ADR (2026-10-14, « Paquet
   `src/k_b/data_api/` »).
@@ -38,8 +42,10 @@ l'ordre des résultats, change la version.
   IA) ; aucune personne ne se connecte.
 - **Clé générée en 256 bits** par `secrets.token_urlsafe(32)` ; le minimum contrôlé est de
   32 caractères. Au démarrage, `kb serve` refuse un
-  nom de client vide ou hors `[A-Z0-9_]+`, une clé de moins de 32 caractères, deux clients de même
-  clé, et l'absence de toute clé (code de sortie 2, message qui nomme la variable sans sa valeur).
+  nom de client vide ou hors `[A-Z0-9_]+`, une clé de moins de 32 caractères, une clé hors de
+  l'alphabet de `token_urlsafe` (`[A-Za-z0-9_-]` : les espaces autour de la clé reçue sont retirées,
+  une clé qui en porte ne serait jamais reconnue), deux clients de
+  même clé, et l'absence de toute clé (code de sortie 2, message qui nomme la variable sans sa valeur).
 - **Révocable seule** : retirer la variable d'un client et redémarrer l'API ; les autres clients
   restent servis. Un retrait ne prend effet qu'au redémarrage.
 - **Vérification** : comparaison en temps constant (`hmac.compare_digest`). Sans clé, ou avec une
@@ -75,7 +81,7 @@ dossier personnel (API3, ci-dessous).
 | Paramètre | Forme | Bornes | Défaut | Hors bornes |
 |---|---|---|---|---|
 | `kind` | une valeur d'`ItemKind`, répétable (`kind=paper&kind=release`) | valeurs exactes : `kind=vulnerability` ne ramène pas les alertes (`advisory`) | toutes les sortes | 422 |
-| `since` | date-heure ISO 8601 **avec fuseau** (`2026-10-07T00:00:00Z`, `2026-10-07T00:00:00%2B02:00`) ; dans l'URL, `+` s'écrit `%2B`, sinon il est lu comme une espace | — | aucun filtre de date | 422, sans fuseau compris |
+| `since` | date-heure ISO 8601 **avec fuseau** (`2026-10-07T00:00:00Z`, `2026-10-07T00:00:00%2B02:00`) ; dans l'URL, `+` s'écrit `%2B`, sinon il est lu comme une espace | — | aucun filtre de date | 422, sans fuseau compris, et pour un nombre (jamais lu comme une date Unix) |
 | `q` | texte | de 1 à 200 caractères | aucune recherche | 422 |
 | `limit` | entier | de 1 à 100 | 20 | 422 |
 | `offset` | entier | de 0 à 10 000 | 0 | 422 |
@@ -104,7 +110,9 @@ cette semaine n'apparaît pas dans « quoi de neuf » (limite assumée, journal 
 ### Tri et pagination
 
 - Tri par `source_date` décroissante, puis par `id` décroissant.
-- La réponse donne `next_offset`, l'`offset` de la page suivante, nul à la dernière page.
+- La réponse donne `next_offset`, l'`offset` de la page suivante, nul à la dernière page, ou quand
+  l'offset suivant dépasserait 10 000 : les items au-delà ne sont pas servis par la liste ; affiner
+  par `since`, `kind` ou `q`.
 - Limite : un import qui écrit entre deux pages décale la pagination par `offset`.
 
 ### Réponse
@@ -210,6 +218,7 @@ valeur reçue.
 | `invalid_parameter` | 422 | paramètre hors bornes ou mal formé ; le corps ajoute `"parameters": [<noms>]`, sans les valeurs |
 | `database_missing` | 503 | la base n'existe pas |
 | `database_error` | 500 | toute autre erreur de la base, sans détail |
+| `internal_error` | 500 | toute autre erreur, sans détail ; journalisée par son type seul, sans pile ni message |
 
 Exception : un `Host` qui n'est ni `127.0.0.1` ni `localhost` reçoit le 400 de
 `TrustedHostMiddleware`, qui répond avant l'app, en texte.

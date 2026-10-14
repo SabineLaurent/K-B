@@ -1583,6 +1583,27 @@ time-knight a recommandés et que Sabine a acceptés le 2026-10-14.
   recherche » du 2026-10-09 (`kb search --in watch|library|wiki`) et celle du 2026-10-10 qui la
   redit (« `kb search --in watch|library|wiki` ne change pas »). — PR de #182
 
+### Journaux
+
+- **`kb serve` écrit son journal de fonctionnement dans un fichier à part,
+  `<KB_DATA_DIR>/logs/kb-serve.log`, au même format et avec la même rotation que `kb.log`
+  (minuit UTC, `LOG_FILES_KEPT` fichiers gardés).** Décision de Sabine, sur recommandation de
+  la session K-B. Constat : dans CPython 3.13.13 (`logging/handlers.py:448-450`),
+  `TimedRotatingFileHandler.doRollover` revient sans rouvrir son flux ni recalculer sa
+  prochaine rotation quand le fichier daté existe déjà. Si `kb collect` ou `kb import` fait la
+  rotation de minuit avant que `kb serve` n'écrive, `kb serve` continue d'écrire dans
+  `kb.log.<veille>` jusqu'à son redémarrage. Et quand ce fichier est supprimé au bout de
+  `LOG_FILES_KEPT` jours, la rotation suivante de `kb serve` renommerait le `kb.log` en cours.
+  Pourquoi un fichier à part : `kb serve` est le seul processus long, et son port est une
+  constante, si bien qu'un second `kb serve` échoue au `bind` (constaté : code de sortie 3) ;
+  il est donc le seul à écrire ce fichier. Options écartées : garder le même fichier en écrivant
+  la limite (les lignes de l'API seraient rangées sous la mauvaise date, voire déplacées) ; un
+  gestionnaire sans rotation ou une rotation externe (défait la rotation décidée avec #134).
+  Complète la règle de #134 (le journal de fonctionnement dans `logs/kb.log`) : les règles 2 et
+  3 de `.claude/rules/conventions.md` nomment désormais le second fichier, avec l'accord de
+  Sabine. Limite assumée : `kb collect` et `kb import` partagent toujours `kb.log`, mais ils
+  sont courts et lancés à la main, une fois par jour. — PR #195 (#184)
+
 ## Décisions encore ouvertes
 
 - **Remplir `newsletter_article.publication_id`** (2026-10-12) : quand le lien d'un article TLDR

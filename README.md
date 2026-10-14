@@ -101,6 +101,7 @@ uv sync
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
 | `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
 | `KB_GITHUB_TOKEN` | non | jeton GitHub en lecture seule ([docs/jeton-github.md](docs/jeton-github.md)). Sans lui, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000. |
+| `KB_API_KEY_<CLIENT>` | pour `kb serve` | la clé d'un client de l'API de données (`<CLIENT>` en `A-Z`, `0-9` et `_`, par exemple `KB_API_KEY_TERMINAL`), une variable par client ([docs/specs-api.md](docs/specs-api.md)). |
 
 **Créer la base** (une fois) :
 
@@ -155,6 +156,56 @@ sortie :
   avant la validation de la base ;
 - 2 : `KB_DATA_DIR` manque, la base n'existe pas (`kb create-db`), ou le journal de cette
   seconde existe déjà (relancer `kb import`).
+
+**Lancer l'API** (la liste des items, en lecture seule, sur la machine ; voir
+[docs/specs-api.md](docs/specs-api.md)) :
+
+1. Créer une clé par client, qui identifie le programme qui appelle (le terminal, un script, un
+   agent) :
+
+   ```sh
+   uv run python -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+
+   et la ranger dans le `.env` : `KB_API_KEY_TERMINAL=<la clé>`.
+2. Lancer l'API, qui écoute sur `http://127.0.0.1:8000`, et seulement sur la machine :
+
+   ```sh
+   KB_DATA_DIR=~/K-B-data uv run --env-file .env kb serve
+   ```
+
+3. L'appeler avec la clé :
+
+   ```sh
+   curl -H "Authorization: Bearer <la clé>" "http://127.0.0.1:8000/items?kind=paper&limit=5"
+   ```
+
+La documentation de l'API est servie sur `http://127.0.0.1:8000/docs`, sans clé ; son OpenAPI est
+versionnée dans `docs/api/openapi-donnees.json`, réécrite par `uv run kb openapi` lancé à la
+racine du dépôt (ailleurs, sans dossier `docs/api`, il n'écrit rien et sort en code 2). `kb serve` journalise une ligne par requête dans
+`<KB_DATA_DIR>/logs/kb-serve.log`, avec le nom du client, jamais sa clé. Code de sortie 2, sans
+lancer l'API, si `KB_DATA_DIR` manque, si aucune clé n'est donnée, si un nom de client est vide ou
+hors `A-Z`, `0-9` et `_`, si une clé a moins de 32 caractères ou un caractère hors `A-Z`, `a-z`,
+`0-9`, `_` et `-` (l'alphabet de `token_urlsafe`), ou si deux clients ont la même clé :
+le message nomme la variable, jamais sa valeur. Si le port 8000 est déjà pris (par exemple par un
+autre `kb serve`), uvicorn écrit `address already in use` au journal et `kb serve` sort en code 3.
+
+Limites :
+
+- un client se retire en retirant sa variable, puis en redémarrant `kb serve` : un retrait ne
+  prend effet qu'au redémarrage ;
+- une variable `KB_API_KEY_*` exportée dans le profil du shell (`~/.zshrc`) reste valide même
+  retirée du `.env` : la retirer aussi de là ;
+- `uv run --env-file .env kb serve` charge tout le `.env`, donc aussi le jeton GitHub et les
+  identifiants Google, dont l'API n'a pas besoin : `kb serve` tourne avec plus de droits que sa
+  tâche n'en demande (moindre privilège).
+
+**Lire la base sans l'API** : la base s'ouvre en lecture seule avec `sqlite3`, sans clé ni
+serveur :
+
+```sh
+sqlite3 -readonly ~/K-B-data/k-b.sqlite "SELECT kind, count(*) FROM item GROUP BY kind"
+```
 
 **Lancer les tests** :
 
