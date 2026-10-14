@@ -66,8 +66,8 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
 - Un message dit le champ ou la position, l'état ou le type d'erreur, et la mesure (longueur
   reçue, maximum, nombre attendu). Un échec est un état nommé (`code.md`).
 - Une valeur observée (identifiant, URL, code HTTP, titre trouvé) est citée **tronquée** à une
-  longueur fixe et **échappée** (retours à la ligne et caractères de contrôle, par `repr()` ou
-  `%r`). `import-log.jsonl` est protégé par le JSON.
+  longueur fixe et **échappée** (retours à la ligne et caractères de contrôle), par une seule
+  fonction, `quote_value` (`core/quoting.py`). `import-log.jsonl` est protégé par le JSON.
 - Un champ qui porte une donnée personnelle au registre des traitements (les auteurs) n'est
   jamais cité : sa position et sa mesure seulement.
 - Chaque ligne de journal est **horodatée** (quand, où, qui, quoi) en ISO 8601, en UTC, à la
