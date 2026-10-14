@@ -302,7 +302,8 @@ def test_an_error_log_line_is_written_to_the_log_file_in_the_same_format(
     assert cli.main(["collect"]) == 1
 
     error_line = re.compile(
-        rf"{LOG_LINE_DATE} ERROR k_b\.etl\.extract: collection failed for source 'broken'"
+        rf"{LOG_LINE_DATE} ERROR k_b\.etl\.extract: collection failed for source 'broken':"
+        " ConnectionError 'source is down'"
     )
     [file_line] = [
         line
@@ -330,6 +331,40 @@ def test_collect_refuses_to_run_when_the_log_file_cannot_be_opened(
     assert exit_code == 2
     assert "error: log file not opened" in capsys.readouterr().err
     assert not (tmp_path / "raw").exists()
+
+
+def test_an_error_handled_by_kb_is_a_dated_log_line_of_the_log_file(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+
+    assert cli.main(["import"]) == 2
+
+    [file_line] = (tmp_path / "logs" / "kb.log").read_text("utf-8").splitlines()
+    assert re.fullmatch(
+        rf"{LOG_LINE_DATE} ERROR k_b\.cli: .*; create it with kb create-db", file_line
+    )
+    assert file_line in capsys.readouterr().err.splitlines()
+
+
+def test_an_exception_kb_does_not_handle_is_logged_in_the_log_file_then_raised(
+    monkeypatch, tmp_path
+):
+    def failing_collect(data_dir):
+        raise RuntimeError("not handled")
+
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(cli, "run_collect", failing_collect)
+
+    with pytest.raises(RuntimeError, match="not handled"):
+        cli.main(["collect"])
+
+    log_text = (tmp_path / "logs" / "kb.log").read_text("utf-8")
+    assert re.match(
+        rf"{LOG_LINE_DATE} ERROR k_b\.cli: kb stopped by an exception it does not handle\n",
+        log_text,
+    )
+    assert "RuntimeError: not handled" in log_text
 
 
 def test_a_log_file_of_an_earlier_utc_day_is_rotated_at_the_first_line(tmp_path):
@@ -400,7 +435,7 @@ def test_create_db_reports_a_database_that_cannot_be_written_and_exits_1(
         read_only_dir.chmod(0o700)
 
     assert exit_code == 1
-    assert "error:" in capsys.readouterr().err
+    assert "ERROR k_b.cli: " in capsys.readouterr().err
 
 
 def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, capsys):
@@ -500,7 +535,7 @@ def test_import_reports_a_failed_import_and_exits_1(monkeypatch, tmp_path, capsy
 
     assert exit_code == 1
     assert (
-        "error: IntegrityError: CHECK constraint failed: publication"
+        "ERROR k_b.cli: IntegrityError: CHECK constraint failed: publication"
         in capsys.readouterr().err
     )
 
@@ -527,7 +562,7 @@ def test_import_reports_a_source_missing_from_the_database_and_exits_1(
 
     assert exit_code == 1
     assert (
-        "error: UnknownSourceError: source_code not in the source table: cisa_kev"
+        "ERROR k_b.cli: UnknownSourceError: source_code not in the source table: cisa_kev"
         in capsys.readouterr().err
     )
 
@@ -554,6 +589,6 @@ def test_import_reports_a_kind_without_table_and_exits_1(monkeypatch, tmp_path, 
 
     assert exit_code == 1
     assert (
-        "error: KindWithoutTableError: kind without a table in the base: newsletter_article"
+        "ERROR k_b.cli: KindWithoutTableError: kind without a table in the base: newsletter_article"
         in capsys.readouterr().err
     )

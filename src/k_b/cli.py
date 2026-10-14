@@ -38,6 +38,8 @@ from k_b.etl.sources.zotero import FOLDER_PREFIX as ZOTERO_SOURCE_NAME
 from k_b.etl.sources.zotero import ZoteroSource
 from k_b.etl.transform import COLLECTION_NAME_FORMAT, read_raw_items
 
+logger = logging.getLogger(__name__)
+
 DATA_DIR_VARIABLE = "KB_DATA_DIR"
 # The Zotero data directory, the one that holds zotero.sqlite. Not set: Zotero is skipped.
 ZOTERO_DIR_VARIABLE = "KB_ZOTERO_DIR"
@@ -83,6 +85,11 @@ def logging_to(data_dir: Path) -> Iterator[None]:
     root_logger.setLevel(logging.INFO)
     try:
         yield
+    except Exception:
+        # Written while the handlers are there: the traceback Python prints next is not in
+        # the file.
+        logger.exception("kb stopped by an exception it does not handle")
+        raise
     finally:
         root_logger.setLevel(previous_level)
         for handler in handlers:
@@ -151,12 +158,10 @@ def run_create_db(data_dir: Path) -> int:
     try:
         create_database(database_path)
     except FileExistsError as error:
-        print(f"error: {error}", file=sys.stderr)
+        logger.error("%s", error)
         return 2
     except (sqlite3.Error, OSError) as error:
-        print(
-            f"error: {database_path}: {type(error).__name__}: {error}", file=sys.stderr
-        )
+        logger.error("%s: %s: %s", database_path, type(error).__name__, error)
         return 1
     print(f"database created: {database_path}")
     return 0
@@ -183,10 +188,10 @@ def run_import(data_dir: Path) -> int:
             TRACKED_REPOSITORIES,
         )
     except MissingDatabaseError as error:
-        print(f"error: {error}; create it with kb create-db", file=sys.stderr)
+        logger.error("%s; create it with kb create-db", error)
         return 2
     except ImportLogExistsError as error:
-        print(f"error: {error}; run kb import again", file=sys.stderr)
+        logger.error("%s; run kb import again", error)
         return 2
     except (
         sqlite3.Error,
@@ -194,7 +199,7 @@ def run_import(data_dir: Path) -> int:
         UnknownSourceError,
         KindWithoutTableError,
     ) as error:
-        print(f"error: {type(error).__name__}: {error}", file=sys.stderr)
+        logger.error("%s: %s", type(error).__name__, error)
         return 1
     print(f"raw files read: {summary.read_count}")
     print(f"items written (new or updated): {summary.item_count}")
@@ -228,7 +233,7 @@ def run_collect(data_dir: Path) -> int:
             datetime.now(UTC),
         )
     except InvalidCollectionStateError as error:
-        print(f"error: {error}", file=sys.stderr)
+        logger.error("%s", error)
         return 2
     for source_name, source_error in outcome.errors_by_source.items():
         print(f"{source_name}: {describe_outcome(source_error)}")
