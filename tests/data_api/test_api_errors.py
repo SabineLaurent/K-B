@@ -21,6 +21,13 @@ def test_an_unknown_route_gives_404_route_not_found(client, authorization):
     assert response.json() == {"error": "route_not_found"}
 
 
+def test_a_final_slash_gives_404_not_a_redirection(client, authorization):
+    response = client.get("/items/", headers=authorization, follow_redirects=False)
+
+    assert response.status_code == 404
+    assert response.json() == {"error": "route_not_found"}
+
+
 def test_a_missing_database_gives_503_without_its_path(
     make_client, tmp_path, api_keys, authorization
 ):

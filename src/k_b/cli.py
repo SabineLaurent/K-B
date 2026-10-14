@@ -72,8 +72,9 @@ API_KEY_VARIABLE_PREFIX = "KB_API_KEY_"
 CLIENT_NAME = re.compile(r"[A-Z0-9_]+")
 # secrets.token_urlsafe(32) gives 43 characters: 32 is the minimum checked.
 MIN_API_KEY_LENGTH = 32
-# The alphabet of token_urlsafe. HTTPBearer cuts the header at a space, and h11 drops a final
-# one: a key with a space would be accepted at the start and never received whole.
+# The alphabet of token_urlsafe, the way of making a key the README gives. HTTPBearer strips the
+# spaces around the key received (fastapi/security/utils.py): a key that starts or ends with one
+# would be accepted at the start and never match.
 API_KEY_CHARACTERS = re.compile(r"[A-Za-z0-9_-]+")
 # The data API is local: its host is not an option.
 DATA_API_HOST = "127.0.0.1"

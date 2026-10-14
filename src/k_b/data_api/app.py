@@ -30,6 +30,8 @@ def create_app(database_path: Path, api_keys: Mapping[str, SecretStr]) -> FastAP
         dependencies=[Depends(check_api_key)],
         redoc_url=None,
         swagger_ui_oauth2_redirect_url=None,
+        # /items/ is an unknown route (404), not a redirection to /items.
+        redirect_slashes=False,
         exception_handlers=ERROR_HANDLERS,
     )
     app.state.database_path = database_path

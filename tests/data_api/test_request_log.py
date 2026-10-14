@@ -70,6 +70,12 @@ def test_a_public_route_is_logged_by_its_path(client, request_lines, path):
     assert f"route={path} status=200" in line
 
 
+def test_a_request_without_response_is_logged_without_status():
+    line = format_request_line("GET", "/items", None, 3, "-")
+
+    assert line == "request method='GET' route=/items status=- duration_ms=3 client=-"
+
+
 def test_the_method_is_quoted():
     line = format_request_line("GET\nfake line", "-", 400, 0, "-")
 

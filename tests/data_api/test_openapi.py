@@ -31,3 +31,10 @@ def test_the_versioned_openapi_is_valid_and_declares_its_security_scheme():
         "HTTPBearer": {"type": "http", "scheme": "bearer"}
     }
     assert openapi["paths"]["/items"]["get"]["security"] == [{"HTTPBearer": []}]
+
+
+def test_since_is_declared_a_date_time():
+    parameters = read_versioned_openapi()["paths"]["/items"]["get"]["parameters"]
+    [since] = [parameter for parameter in parameters if parameter["name"] == "since"]
+
+    assert {"type": "string", "format": "date-time"} in since["schema"]["anyOf"]

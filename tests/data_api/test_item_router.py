@@ -67,6 +67,10 @@ def test_kind_since_q_limit_offset_filter_as_the_reading(
         ("since=2026-10-07T00:00:00", "since"),
         ("since=0001-01-01T00:00:00%2B01:00", "since"),
         ("since=9999-12-31T23:59:59.5Z", "since"),
+        # A number is not read as a Unix time: since is an ISO 8601 date with its zone.
+        ("since=20261007", "since"),
+        ("since=0", "since"),
+        ("since=1700000000", "since"),
     ],
 )
 def test_a_parameter_out_of_bounds_gives_422_with_its_name_only(

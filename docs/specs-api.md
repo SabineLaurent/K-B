@@ -25,7 +25,8 @@ l'ordre des résultats, change la version.
   au schéma produit par l'app.
 - **Journal** : une ligne par requête, horodatée en ISO 8601 UTC, à la seconde. Elle donne la
   méthode, le gabarit de route (`/items/{item_id}`, pas l'identifiant), le statut, la durée en ms
-  et le nom du client ; jamais la clé, une valeur de paramètre ni un chemin brut. Elle va dans
+  et le nom du client (`-` pour un statut sans réponse envoyée, une route inconnue ou un client
+  sans clé valide) ; jamais la clé, une valeur de paramètre ni un chemin brut. Elle va dans
   `<KB_DATA_DIR>/logs/kb-serve.log`, à part de `kb.log` : `kb serve` tourne longtemps, et la rotation
   de minuit faite par `kb collect` ou `kb import` dans un fichier partagé le laisserait écrire dans
   le fichier de la veille (constat sur `TimedRotatingFileHandler`, Python 3.13).
@@ -42,7 +43,8 @@ l'ordre des résultats, change la version.
 - **Clé générée en 256 bits** par `secrets.token_urlsafe(32)` ; le minimum contrôlé est de
   32 caractères. Au démarrage, `kb serve` refuse un
   nom de client vide ou hors `[A-Z0-9_]+`, une clé de moins de 32 caractères, une clé hors de
-  l'alphabet de `token_urlsafe` (`[A-Za-z0-9_-]` : une espace couperait l'en-tête), deux clients de
+  l'alphabet de `token_urlsafe` (`[A-Za-z0-9_-]` : les espaces autour de la clé reçue sont retirées,
+  une clé qui en porte ne serait jamais reconnue), deux clients de
   même clé, et l'absence de toute clé (code de sortie 2, message qui nomme la variable sans sa valeur).
 - **Révocable seule** : retirer la variable d'un client et redémarrer l'API ; les autres clients
   restent servis. Un retrait ne prend effet qu'au redémarrage.
@@ -79,7 +81,7 @@ dossier personnel (API3, ci-dessous).
 | Paramètre | Forme | Bornes | Défaut | Hors bornes |
 |---|---|---|---|---|
 | `kind` | une valeur d'`ItemKind`, répétable (`kind=paper&kind=release`) | valeurs exactes : `kind=vulnerability` ne ramène pas les alertes (`advisory`) | toutes les sortes | 422 |
-| `since` | date-heure ISO 8601 **avec fuseau** (`2026-10-07T00:00:00Z`, `2026-10-07T00:00:00%2B02:00`) ; dans l'URL, `+` s'écrit `%2B`, sinon il est lu comme une espace | — | aucun filtre de date | 422, sans fuseau compris |
+| `since` | date-heure ISO 8601 **avec fuseau** (`2026-10-07T00:00:00Z`, `2026-10-07T00:00:00%2B02:00`) ; dans l'URL, `+` s'écrit `%2B`, sinon il est lu comme une espace | — | aucun filtre de date | 422, sans fuseau compris, et pour un nombre (jamais lu comme une date Unix) |
 | `q` | texte | de 1 à 200 caractères | aucune recherche | 422 |
 | `limit` | entier | de 1 à 100 | 20 | 422 |
 | `offset` | entier | de 0 à 10 000 | 0 | 422 |

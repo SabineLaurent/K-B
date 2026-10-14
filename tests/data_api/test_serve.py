@@ -61,9 +61,9 @@ def make_key(length=43):
             {"KB_API_KEY_TERMINAL": ""},
             "'KB_API_KEY_TERMINAL': key of 0 characters, minimum 32",
         ),
-        # HTTPBearer cuts the header at a space: such a key would never be received whole.
+        # HTTPBearer strips the spaces around the key received: this key would never match.
         (
-            {"KB_API_KEY_TERMINAL": make_key(20) + " " + make_key(22)},
+            {"KB_API_KEY_TERMINAL": make_key() + " "},
             "'KB_API_KEY_TERMINAL': key with a character outside [A-Za-z0-9_-]",
         ),
     ],

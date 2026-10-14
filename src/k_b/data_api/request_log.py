@@ -11,17 +11,17 @@ from k_b.core.quoting import quote_value
 
 logger = logging.getLogger(__name__)
 
-# No route matched, or no client named by a valid key.
+# No route matched, no client named by a valid key, or no response sent.
 NONE_SEEN = "-"
 
 
 async def log_request(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
-    """Log the request once its response is known; in a finally, so that an exception the API
-    does not handle leaves its line, with the 500 Starlette answers."""
+    """Log the request once its response is known; in a finally, so that a request stopped
+    before its response (the client gone, the server stopped) leaves its line, without status."""
     started = time.perf_counter()
-    status_code = 500
+    status_code: int | None = None
     try:
         response = await call_next(request)
         status_code = response.status_code
@@ -54,10 +54,15 @@ def find_route_template(request: Request) -> str:
 
 
 def format_request_line(
-    method: str, route: str, status_code: int, duration_ms: int, client_name: str
+    method: str,
+    route: str,
+    status_code: int | None,
+    duration_ms: int,
+    client_name: str,
 ) -> str:
     # The method is the one value received: quoted, it cannot write a line of its own.
+    status = NONE_SEEN if status_code is None else status_code
     return (
-        f"request method={quote_value(method)} route={route} status={status_code}"
+        f"request method={quote_value(method)} route={route} status={status}"
         f" duration_ms={duration_ms} client={client_name}"
     )
