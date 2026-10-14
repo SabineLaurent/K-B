@@ -23,7 +23,10 @@ INSERT INTO raw_data (id, source_id, raw_file_path, stream, collected_at) VALUES
         'automated_watch/tldr_dev/2026-10-11T153130Z/2026-10-05.html', 'tldr_dev',
         '2026-10-11T15:31:30Z'),
     (7, (SELECT id FROM source WHERE source_code = 'zotero'),
-        'selected_library/zotero/2026-10-05T093000Z.json', 'zotero', '2026-10-05T09:30:00Z');
+        'selected_library/zotero/2026-10-05T093000Z.json', 'zotero', '2026-10-05T09:30:00Z'),
+    (8, (SELECT id FROM source WHERE source_code = 'gh_archive'),
+        'automated_watch/gh_archive/2026-10-11T093000Z.json', 'gh_archive',
+        '2026-10-11T09:30:00Z');
 
 INSERT INTO item (id, kind, raw_data_id) VALUES
     (1, 'paper', 1),
@@ -41,7 +44,8 @@ INSERT INTO item (id, kind, raw_data_id) VALUES
     (13, 'newsletter_article', 6),
     (14, 'zotero_entry', 7),
     (15, 'zotero_entry', 7),
-    (16, 'zotero_entry', 7);
+    (16, 'zotero_entry', 7),
+    (17, 'advisory', 4);
 
 -- arxiv_extract.xml, the first two entries. The summary is cut to its first sentence, the
 -- authors to the first name.
@@ -64,15 +68,18 @@ INSERT INTO vulnerability (
     ('CVE-2026-86950', 3, 'Apple Multiple Products Out-of-Bounds Write Vulnerability',
         'Apple iOS, macOS, and iPadOS contain an out-of-bounds write vulnerability in CoreGraphics that may lead to arbitrary code execution.',
         'Apple', 'Multiple Products', '2026-09-29T00:00:00Z', 'Unknown', NULL, NULL),
+    -- VARIANT, revised_at: changed in a later catalog (the detail serves it).
     ('CVE-2026-88772', 4,
         'Citrix NetScaler Improper Restriction of Operations within the Bounds of a Memory Buffer Vulnerability',
         'Citrix NetScaler ADC and NetScaler Gateway contain an improper restriction of operations within the bounds of a memory buffer vulnerability that could allow for remote code execution or denial of service',
-        'Citrix', 'NetScaler', '2026-09-27T00:00:00Z', 'Unknown', NULL, NULL),
+        'Citrix', 'NetScaler', '2026-09-27T00:00:00Z', 'Unknown', '2026-10-06T09:30:00Z', NULL),
     -- VARIANT, withdrawn_at: withdrawn from the catalog (a withdrawn row is listed).
     ('CVE-2020-29583', 5, 'Zyxel Multiple Products Use of Hard-Coded Credentials Vulnerability',
         'Zyxel firewalls (ATP, USG, VM) and AP Controllers (NXC2500 and NXC5500) contain a use of hard-coded credentials vulnerability in an undocumented account ("zyfwp") with an unchangeable password.',
         'Zyxel', 'Multiple Products', '2021-11-03T00:00:00Z', 'Unknown', NULL,
-        '2026-10-06T09:30:00Z');
+        '2026-10-06T09:30:00Z'),
+    -- The CVE of advisory 17, cited by GitHub, not in the KEV catalog: no KEV column.
+    ('CVE-2026-45134', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 -- tracked_repositories.py.
 INSERT INTO tracked_repository (id, repository_name, ecosystem, packages) VALUES
@@ -105,17 +112,27 @@ INSERT INTO release (
 - Added `claude --desktop` to open the Claude desktop app on the current directory, or on ',
         '2026-09-29T19:27:30Z', 'https://github.com/anthropics/claude-code/releases/tag/v2.1.285');
 
--- github_advisories_extract.json, the first two advisories. vulnerability_id is left empty: the
--- reading of the list does not read the CVE.
-INSERT INTO advisory (item_id, kind, ghsa_id, summary, published_at, url, packages) VALUES
+-- github_advisories_extract.json, its three advisories; the packages of the third are given once,
+-- as the import writes them.
+INSERT INTO advisory (
+    item_id, kind, ghsa_id, vulnerability_id, summary, published_at, url, packages
+) VALUES
+    -- VARIANT, the CVE: one of the KEV catalog, withdrawn since (exploited stays true).
     (9, 'advisory', 'GHSA-fjqc-hq36-qh5p',
+        (SELECT id FROM vulnerability WHERE cve_id = 'CVE-2020-29583'),
         'LangGraph Checkpoint: Unsafe JSON deserialization in checkpoint loading',
         '2026-06-25T18:25:42Z', 'https://github.com/advisories/GHSA-fjqc-hq36-qh5p',
         '["langgraph-checkpoint"]'),
-    (10, 'advisory', 'GHSA-gr75-jv2w-4656',
+    -- VARIANT, the CVE: none (cve_id and exploited null).
+    (10, 'advisory', 'GHSA-gr75-jv2w-4656', NULL,
         'LangChain: Path traversal and sandbox escape in LangChain file-search middleware and loaders',
         '2026-06-16T15:03:14Z', 'https://github.com/advisories/GHSA-gr75-jv2w-4656',
-        '["langchain", "langchain-anthropic"]');
+        '["langchain", "langchain-anthropic"]'),
+    (17, 'advisory', 'GHSA-3644-q5cj-c5c7',
+        (SELECT id FROM vulnerability WHERE cve_id = 'CVE-2026-45134'),
+        'LangSmith SDK: Public prompt pull deserializes untrusted manifests without trust boundary warning',
+        '2026-05-13T15:29:30Z', 'https://github.com/advisories/GHSA-3644-q5cj-c5c7',
+        '["langsmith", "langchain-classic", "langchain"]');
 
 -- tldr_ai_extract.html (edition of 2026-10-07), ranks 2 and 3: the same day, told apart by their
 -- id; tldr_dev_extract.html (edition of 2026-10-05), rank 2.
@@ -133,27 +150,51 @@ VALUES
         'This literate tutorial builds an LC-3 virtual machine in about 250 lines of C, covering registers, memory, opcodes, traps, loading programs, and platform-specific input.',
         'https://www.jmeiners.com/lc3-vm/');
 
--- zotero_extract.sql, items 1, 10 and 20. publication_id is left empty: the reading of the list
--- does not read it.
+-- The papers of the Zotero entries 14 and 15 (their archiveID in zotero_extract.sql), which arXiv
+-- has not given: created with their arXiv reference alone, as the import does.
+INSERT INTO publication (arxiv_id) VALUES ('2609.00001'), ('2609.00002');
+
+-- zotero_extract.sql, items 1, 10 and 20.
 INSERT INTO zotero_entry (
-    item_id, kind, zotero_key, item_type, title, url, saved_at, revised_at, withdrawn_at
+    item_id, kind, zotero_key, item_type, title, url, saved_at, publication_id, revised_at,
+    withdrawn_at
 ) VALUES
+    -- VARIANT, revised_at: changed in a later extract (the detail serves it).
     (14, 'zotero_entry', 'AAAAAAA1', 'preprint', 'Prompt injection through tool results',
-        'http://arxiv.org/abs/2609.00001', '2026-10-01T08:15:00Z', NULL, NULL),
+        'http://arxiv.org/abs/2609.00001', '2026-10-01T08:15:00Z',
+        (SELECT id FROM publication WHERE arxiv_id = '2609.00001'), '2026-10-06T09:30:00Z', NULL),
     -- VARIANT, withdrawn_at: absent from a later extract (a withdrawn row is listed).
     (15, 'zotero_entry', 'BBBBBBB2', 'preprint', 'A paper saved without its PDF',
-        'http://arxiv.org/abs/2609.00002', '2026-10-03T17:40:12Z', NULL, '2026-10-06T09:30:00Z'),
-    -- VARIANT: item 20 is in the trash, so not collected; it stands for an entry without URL.
+        'http://arxiv.org/abs/2609.00002', '2026-10-03T17:40:12Z',
+        (SELECT id FROM publication WHERE arxiv_id = '2609.00002'), NULL, '2026-10-06T09:30:00Z'),
+    -- VARIANT: item 20 is in the trash, so not collected; it stands for an entry without URL,
+    -- and without arXiv reference.
     (16, 'zotero_entry', 'CCCCCCC3', 'webpage', 'A web page in the trash', NULL,
-        '2026-09-20T10:00:00Z', NULL, NULL);
+        '2026-09-20T10:00:00Z', NULL, NULL, NULL);
 
 -- zotero_extract.sql, the highlights of item 1: annotations 4 and 5.
 INSERT INTO highlight (zotero_key, text, comment, highlighted_at, revised_at, withdrawn_at, item_id)
 VALUES
-    ('ANNOTAA1', 'A highlighted sentence on the third page.', NULL, '2026-10-05T08:50:00Z', NULL,
-        NULL, 14),
+    -- VARIANT, revised_at: changed in a later extract (the detail serves it).
+    ('ANNOTAA1', 'A highlighted sentence on the third page.', NULL, '2026-10-05T08:50:00Z',
+        '2026-10-06T09:30:00Z', NULL, 14),
     ('ANNOTAA2', 'A highlighted sentence on the first page.', 'A comment on it.',
         '2026-10-05T08:42:30Z', NULL, NULL, 14),
     -- VARIANT, withdrawn_at: annotation 7, in the trash, so absent from a later extract.
     ('ANNOTAA4', 'A highlight in the trash.', NULL, '2026-10-05T08:56:00Z', NULL,
         '2026-10-06T09:30:00Z', 14);
+
+-- gh_archive_extract.json, its five rows (window of 2026-10-10: two repositories without stars,
+-- told apart by their forks). VARIANT: an older window, 2026-10-09, written after the newer one so
+-- that the latest is not the last written; its two rows tie on stars and forks, told apart by
+-- repository_id.
+INSERT INTO trend (
+    raw_data_id, window_end, repository_id, repository_name, stars_gained, forks_gained
+) VALUES
+    (8, '2026-10-10T00:00:00Z', 1209966933, 'morluto/rea', 1087, 215),
+    (8, '2026-10-10T00:00:00Z', 1398080271, 'storytold/photocraft', 449, 64),
+    (8, '2026-10-10T00:00:00Z', 1322250666, 'boykopovar/AnyPS5', 318, 17),
+    (8, '2026-10-10T00:00:00Z', 928981629, 'rhtap-perf-test/nodejs-devfile-sample2', 0, 13),
+    (8, '2026-10-10T00:00:00Z', 1035334306, 'wwwwwwworld/solana-trading-bot-v3', 0, 70),
+    (8, '2026-10-09T00:00:00Z', 1398080271, 'storytold/photocraft', 120, 9),
+    (8, '2026-10-09T00:00:00Z', 1209966933, 'morluto/rea', 120, 9);

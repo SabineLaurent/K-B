@@ -16,7 +16,7 @@ from k_b.database.reading import (
 from k_b.items import MAX_INT64, MIN_INT64, ItemKind
 
 # Every item of the test base, in the order of the reading: source_date, then id, descending.
-ALL_IDS = [12, 11, 13, 15, 6, 14, 7, 8, 3, 2, 4, 1, 16, 9, 10, 5]
+ALL_IDS = [12, 11, 13, 15, 6, 14, 7, 8, 3, 2, 4, 1, 16, 9, 10, 17, 5]
 PLUS_TWO_HOURS = timezone(timedelta(hours=2))
 
 
@@ -305,7 +305,7 @@ def test_the_highlights_of_an_entry_withdrawn_ones_included(connection):
             "A highlighted sentence on the third page.",
             None,
             "2026-10-05T08:50:00Z",
-            None,
+            "2026-10-06T09:30:00Z",
             None,
         ),
         StoredHighlight(

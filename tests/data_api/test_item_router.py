@@ -37,7 +37,7 @@ def test_each_kind_is_listed_with_the_fields_of_the_spec(client, authorization):
 @pytest.mark.parametrize(
     ("params", "expected_ids"),
     [
-        ({"kind": ["paper", "advisory"]}, [2, 1, 9, 10]),
+        ({"kind": ["paper", "advisory"]}, [2, 1, 9, 10, 17]),
         ({"since": "2026-10-07T00:00:00+02:00"}, [12, 11]),
         ({"q": "blockchain"}, [1]),
         ({"limit": 2}, [12, 11]),
