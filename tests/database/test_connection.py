@@ -13,6 +13,17 @@ INSERT_SOURCE = (
 )
 
 
+def test_a_base_in_a_folder_named_with_a_space_and_a_hash_is_read(items_database):
+    folder_name = items_database.parent.name
+    assert " " in folder_name and "#" in folder_name
+
+    connection = connect_database_read_only(items_database)
+    try:
+        assert connection.execute("SELECT count(*) FROM item").fetchone() == (16,)
+    finally:
+        connection.close()
+
+
 def test_a_read_only_connection_cannot_write(tmp_path):
     database_path = tmp_path / "k-b.sqlite"
     create_database(database_path)
