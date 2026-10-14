@@ -42,15 +42,23 @@ Ce travail ne sert encore aucun utilisateur : il prépare #184, #185 et #187.
 ```
 
 - `uri=True` fait lire le premier argument comme une URI `file:` ; `?mode=ro` l'ouvre en lecture
-  seule. Une écriture lève alors `sqlite3.OperationalError: attempt to write a readonly database`
-  (`tests/database/test_connection.py`, `test_a_read_only_connection_cannot_write`).
+  seule, « as though the SQLITE_OPEN_READONLY flag had been passed to sqlite3_open_v2() »
+  (SQLite, « URI Filenames »). Une écriture lève alors
+  `sqlite3.OperationalError: attempt to write a readonly database` : c'est l'exemple de la
+  documentation Python (« How to work with SQLite URIs »), et le test
+  `test_a_read_only_connection_cannot_write` (`tests/database/test_connection.py`) le constate.
 - `as_uri()` encode les caractères qui ont un sens dans une URI : un dossier `a b#c?d%e` devient
-  `file:///…/a%20b%23c%3Fd%25e/…`. Sans cet encodage, un `?` dans le chemin commencerait les
-  paramètres et un `#` couperait l'URI. `as_uri()` refuse un chemin relatif (`ValueError: relative
-  path can't be expressed as a file URI`) : d'où `absolute()`, car `KB_DATA_DIR` peut être relatif.
-- `check_database_exists` passe d'abord : `mode=ro` ne crée pas de fichier, mais son erreur
-  (« unable to open database file ») ne se distingue pas d'une autre. `MissingDatabaseError` est
-  l'état nommé que l'API traduira en 503 `database_missing`. Elle quitte `etl/load.py` pour
+  `file:///…/a%20b%23c%3Fd%25e/…`. La page SQLite « URI Filenames » (§ 3.1) demande de convertir
+  chaque `?` en `%3f` et chaque `#` en `%23` : sans cela, un `?` commencerait les paramètres et un
+  `#` couperait l'URI. Pour le `%` écrit `%25`, c'est un constat sur `as_uri()` et sur le test du
+  dossier `data dir #1 ?%`, pas une phrase lue dans la doc SQLite. `as_uri()` refuse un chemin
+  relatif (`ValueError: relative path can't be expressed as a file URI`) : d'où `absolute()`, car
+  `KB_DATA_DIR` peut être relatif.
+- `check_database_exists` passe d'abord. En lecture seule, SQLite ne crée pas la base : « If the
+  database does not already exist, an error is returned » (SQLite, `sqlite3_open_v2`, à propos de
+  `SQLITE_OPEN_READONLY`). Mais c'est une erreur générique (« unable to open database file »), qui
+  ne se distingue pas d'une autre. `MissingDatabaseError` est l'état nommé que l'API traduira en
+  503 `database_missing`. Elle quitte `etl/load.py` pour
   `database/connection.py`, car un lecteur ne doit pas importer l'ETL (règle 5).
 
 **Ce que `mode=ro` écrit quand même.** Une base en mode WAL a deux fichiers voisins : `-wal` (le
@@ -131,17 +139,25 @@ utilisateur qui cherche `v2_1` ne veut pas trouver `v2.1`. `reading.py:189-190` 
 ```
 
 et la requête dit `LIKE :pattern ESCAPE '\'` : un `\` devant `%` ou `_` en fait un caractère
-ordinaire. L'ordre compte : `\` est doublé **en premier**, sinon les `\` ajoutés devant `%` seraient
-doublés à leur tour. Les `%` autour cherchent le texte n'importe où.
+ordinaire. C'est la règle de SQLite (« SQL Language Expressions », opérateur `LIKE`) :
+l'expression après `ESCAPE` « must evaluate to a string consisting of a single character », et ce
+caractère, placé devant `%` ou `_`, les fait chercher tels quels. L'ordre compte : `\` est doublé
+**en premier**, sinon les `\` ajoutés devant `%` seraient doublés à leur tour. Les `%` autour
+cherchent le texte n'importe où.
 
 Deux pièges relevés par la revue :
 - la requête est une chaîne Python **brute** (`r"""…"""`, `reading.py:30`) : dans une chaîne
-  ordinaire, `'\'` deviendrait `'` et SQLite recevrait `ESCAPE ''`, qu'il refuse ;
-- un NUL arrête SQLite dans la lecture du motif : `q="\x00"` devenait `%`, et trouvait les 16
-  items de la base d'essai. `check_text_can_be_stored` (`items.py`, la règle de tout texte stocké)
-  refuse le NUL et le surrogate isolé, que `sqlite3` ne sait pas envoyer.
+  ordinaire, `'\'` deviendrait `'` et SQLite recevrait `ESCAPE ''`, une chaîne qui n'a pas un seul
+  caractère ;
+- un NUL dans le texte cherché : la documentation SQLite (`sqlite3_bind_text`) dit qu'une valeur
+  liée peut contenir un NUL et que « The result of expressions involving strings with embedded NULs
+  is undefined ». Aucune page ne décrit `LIKE` en particulier. Le cas observé le 2026-10-14 : le
+  motif était coupé au NUL, `q="\x00"` devenait `%` et trouvait les 16 items de la base d'essai.
+  `check_text_can_be_stored` (`items.py`, la règle de tout texte stocké) refuse le NUL, et aussi le
+  surrogate isolé, que `sqlite3` ne sait pas envoyer.
 
-`LIKE` ignore la casse pour les lettres ASCII seulement : `vulnerabilite` ne trouve pas
+`LIKE` ignore la casse pour les lettres ASCII seulement : « SQLite only understands upper/lower
+case for ASCII characters by default » (même page). `vulnerabilite` ne trouve donc pas
 « Vulnérabilité ». C'est une limite écrite dans la spec, levée par FTS5 (#188).
 
 ### 5. La page suivante, dans la même requête
@@ -214,10 +230,15 @@ de l'URI lit cette base-là.
 
 ## Zones non vérifiées
 
-- La documentation SQLite de `LIKE … ESCAPE`, du NUL dans un motif et des URI `file:` n'a pas été
-  lue : ces comportements sont **constatés** (tests, sondes du 2026-10-14 sur SQLite 3.50.4), pas
-  sourcés. La limite de longueur d'un motif `LIKE` (50 000 octets) est rapportée par la troisième
-  revue, non relue dans la doc.
+- Le `%` d'un chemin écrit `%25` dans l'URI : constaté sur `as_uri()` et par le test du dossier
+  `data dir #1 ?%`. La page « URI Filenames » ne l'a pas confirmé dans la recherche du 2026-10-14
+  (un fil du forum SQLite de 2026 dit qu'elle devrait le dire).
+- Le texte de l'erreur d'un motif `LIKE` trop long (« LIKE or GLOB pattern too complex ») : rapporté
+  par la troisième revue. La limite elle-même est sourcée : 50 000 octets par défaut
+  (`SQLITE_MAX_LIKE_PATTERN_LENGTH`, « Implementation Limits For SQLite »).
+- La phrase « The use of NUL characters in SQL text strings is not recommended », que l'on attribue
+  à la page « NUL Characters In Strings » : la recherche du 2026-10-14 ne l'a trouvée que citée dans
+  un fil du forum. Elle n'est pas reprise ici ; le refus du NUL s'appuie sur `sqlite3_bind_text`.
 - Le coût de la requête : la première revue rapporte un parcours des six sous-types à chaque appel,
   un index automatique et un tri temporaire (plan `EXPLAIN` relevé par elle). Non mesuré ici ;
   jugé sans enjeu à quelques milliers d'items par an.
@@ -238,6 +259,23 @@ de l'URI lit cette base-là.
 
 ## Sources
 
-- [Write-Ahead Logging](https://www.sqlite.org/wal.html), § 5 « Read-Only Databases » — SQLite,
-  page mise à jour le 2026-08-25, consultée le 2026-10-14 : les conditions de lecture d'une base WAL
-  sans droit d'écriture (ce que la lecture seule écrit encore, `docs/stockage.md`).
+Consultées le 2026-10-14 ; chacune fonde un point de la note.
+
+- [Write-Ahead Logging](https://www.sqlite.org/wal.html), § 5 « Read-Only Databases » — SQLite
+  (page mise à jour le 2026-08-25) : les conditions de lecture d'une base WAL sans droit
+  d'écriture, donc ce que la lecture seule écrit encore (`docs/stockage.md`).
+- [SQL Language Expressions](https://www.sqlite.org/lang_expr.html), opérateur `LIKE` — SQLite :
+  le caractère d'`ESCAPE` est un seul caractère, devant `%` ou `_` il les fait chercher tels quels ;
+  la casse n'est ignorée que pour l'ASCII.
+- [Binding Values To Prepared Statements](https://www.sqlite.org/c3ref/bind_blob.html) — SQLite :
+  une expression sur un texte qui contient un NUL a un résultat indéfini (refus du NUL dans `q`).
+- [URI Filenames In SQLite](https://www.sqlite.org/uri.html), § 3.1 — SQLite : `?` s'écrit `%3f` et
+  `#` `%23` dans le chemin ; `mode=ro` vaut `SQLITE_OPEN_READONLY`.
+- [Opening A New Database Connection](https://www.sqlite.org/c3ref/open.html) — SQLite : en
+  lecture seule, une base absente donne une erreur, sans être créée (`check_database_exists` en fait
+  un état nommé).
+- [sqlite3 — How to work with SQLite URIs](https://docs.python.org/3/library/sqlite3.html) —
+  Python : `connect("file:…?mode=ro", uri=True)` ; une écriture lève
+  `OperationalError: attempt to write a readonly database`.
+- [Implementation Limits For SQLite](https://www.sqlite.org/limits.html) — SQLite : un motif `LIKE`
+  est limité à 50 000 octets par défaut (borne de `q` laissée à l'API et à `kb search`).
