@@ -18,7 +18,7 @@ from urllib.error import HTTPError
 from k_b.etl.http_download import download
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import SourceReader
-from k_b.items import CVE_ID, Item, RansomwareUse, SourceCode
+from k_b.items import CVE_ID, NVD_PAGE_URL, Item, RansomwareUse, SourceCode
 
 CATALOG_URL = (
     "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv"
@@ -30,7 +30,6 @@ TRUSTED_URL_PREFIX = "https://www.cisa.gov/"
 HTTP_NOT_MODIFIED = 304
 
 
-NVD_PAGE_URL = "https://nvd.nist.gov/vuln/detail/"
 REQUIRED_COLUMNS = (
     "cveID",
     "vendorProject",

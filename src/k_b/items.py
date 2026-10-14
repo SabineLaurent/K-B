@@ -36,6 +36,10 @@ ItemKind = Literal[
     "zotero_entry",
 ]
 
+# The acquisition modes a reader filters on (database/reading.py, kb search --in): those of
+# schema.sql but wiki, which no source has yet (decision of 2026-10-14).
+SearchableMode = Literal["watch", "library"]
+
 # knownRansomwareCampaignUse of CISA KEV.
 RansomwareUse = Literal["Known", "Unknown"]
 
@@ -54,6 +58,10 @@ EDITION_SLUG = re.compile(r"[a-z]+")
 # of a paper, etl/sources/zotero.py in the reference of a document. [0-9], not \d: \d matches any
 # Unicode digit, and a fullwidth one would make another publication.
 ARXIV_ID = r"(?:[0-9]{4}\.[0-9]{4,5}|[a-z]+(?:-[a-z]+)?(?:\.[A-Z]{2})?/[0-9]{7})"
+# The page of a paper and of a CVE, followed by its identifier: the base keeps the identifier,
+# arxiv.py and cisa_kev.py write the URL of the item, and database/reading.py the URL it lists.
+ARXIV_ABSTRACT_PAGE_URL = "https://arxiv.org/abs/"
+NVD_PAGE_URL = "https://nvd.nist.gov/vuln/detail/"
 # The key Zotero gives a document or an annotation; the GLOB of schema.sql. Zotero's own
 # alphabet is narrower: this form refuses no key it gives.
 ZOTERO_KEY = r"[0-9A-Z]{8}"
