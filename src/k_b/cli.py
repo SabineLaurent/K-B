@@ -1,18 +1,25 @@
-"""Command line: `kb collect`, `kb create-db`, `kb import`."""
+"""Command line: `kb collect`, `kb create-db`, `kb import`, `kb serve`, `kb openapi`."""
 
 import argparse
+import json
 import logging
 import os
+import re
 import sqlite3
 import sys
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import ExitStack, contextmanager
 from datetime import UTC, datetime
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
+import uvicorn
+from pydantic import SecretStr
+
 from k_b.core.config import LOG_FILES_KEPT
+from k_b.core.quoting import quote_value
+from k_b.data_api.app import create_app
 from k_b.database.connection import DATABASE_FILE_NAME, MissingDatabaseError
 from k_b.database.creation import create_database
 from k_b.database.dates import DATABASE_DATE_FORMAT
@@ -24,7 +31,7 @@ from k_b.etl.load import (
     import_items,
     read_imported_paths,
 )
-from k_b.etl.raw_store import InvalidCollectionStateError
+from k_b.etl.raw_store import InvalidCollectionStateError, write_file_atomically
 from k_b.etl.source_contract import list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.gh_archive import FOLDER_PREFIX as GH_ARCHIVE_SOURCE_NAME
@@ -52,19 +59,36 @@ IMPORT_LOG_FILE_NAME = "import-log-{imported_at}.jsonl"
 # The log of every run, successes and failures, apart from the import logs: those are written
 # only when an import reaches the end of its writing in the base.
 LOG_FILE_PATH = Path("logs") / "kb.log"
+# The log of kb serve, apart: a long run that shared kb.log would keep writing in the file of the
+# day before once a rotation done by kb collect or kb import has renamed it (docs/specs-api.md,
+# "Journal").
+SERVE_LOG_FILE_PATH = Path("logs") / "kb-serve.log"
 LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 
 
+# The key of each client of the data API: one variable KB_API_KEY_<CLIENT> per client
+# (docs/specs-api.md, "Accès par clé").
+API_KEY_VARIABLE_PREFIX = "KB_API_KEY_"
+CLIENT_NAME = re.compile(r"[A-Z0-9_]+")
+# secrets.token_urlsafe(32) gives 43 characters: 32 is the minimum checked.
+MIN_API_KEY_LENGTH = 32
+# The data API is local: its host is not an option.
+DATA_API_HOST = "127.0.0.1"
+DATA_API_PORT = 8000
+# Written from the root of the repository, which versions it.
+OPENAPI_PATH = Path("docs") / "api" / "openapi-donnees.json"
+
+
 @contextmanager
-def logging_to(data_dir: Path) -> Iterator[None]:
-    """Log every line of level INFO and above on stderr and in logs/kb.log of the data
-    directory, dated in UTC in the format of the base (2026-10-14T11:30:00Z); the file turns
-    at midnight UTC into kb.log.<day>.
+def logging_to(data_dir: Path, log_file_path: Path = LOG_FILE_PATH) -> Iterator[None]:
+    """Log every line of level INFO and above on stderr and in the log file of the data
+    directory (logs/kb.log, or logs/kb-serve.log for kb serve), dated in UTC in the format of
+    the base (2026-10-14T11:30:00Z); the file turns at midnight UTC into <file>.<day>.
 
     Raises OSError when the log file cannot be opened. On exit the handlers are closed and
     removed: the tests run kb many times in the interpreter of pytest.
     """
-    log_path = data_dir / LOG_FILE_PATH
+    log_path = data_dir / log_file_path
     log_path.parent.mkdir(exist_ok=True)
     file_handler = TimedRotatingFileHandler(
         log_path,
@@ -105,14 +129,27 @@ def main(argv: list[str] | None = None) -> int:
         "import",
         help="read the raw items and write them into the database, which removes the duplicates",
     )
+    commands.add_parser(
+        "serve",
+        help=f"serve the database, read only, on http://{DATA_API_HOST}:{DATA_API_PORT}",
+    )
+    commands.add_parser(
+        "openapi", help=f"write the OpenAPI of the data API in {OPENAPI_PATH}"
+    )
     arguments = parser.parse_args(argv)
 
+    # Neither data nor key: the document is the same on every machine.
+    if arguments.command == "openapi":
+        return run_openapi()
     data_dir = read_data_dir()
     if data_dir is None:
         return 2
+    log_file_path = (
+        SERVE_LOG_FILE_PATH if arguments.command == "serve" else LOG_FILE_PATH
+    )
     with ExitStack() as log_stack:
         try:
-            log_stack.enter_context(logging_to(data_dir))
+            log_stack.enter_context(logging_to(data_dir, log_file_path))
         except OSError as error:
             # A run without its log would lose the failures the log is kept for: none is run.
             print(
@@ -134,6 +171,8 @@ def run_command(command: str, data_dir: Path) -> int:
         return run_create_db(data_dir)
     if command == "import":
         return run_import(data_dir)
+    if command == "serve":
+        return run_serve(data_dir)
     return run_collect(data_dir)
 
 
@@ -252,3 +291,78 @@ def run_collect(data_dir: Path) -> int:
 
 def describe_outcome(error: Exception | None) -> str:
     return "ok" if error is None else f"failed ({type(error).__name__})"
+
+
+def run_serve(data_dir: Path) -> int:
+    """Serve the base with the keys of the environment; the log of uvicorn is the one of kb."""
+    api_keys = read_api_keys(os.environ)
+    if api_keys is None:
+        return 2
+    logger.info("API clients loaded: %s", ", ".join(sorted(api_keys)))
+    uvicorn.run(
+        create_app(data_dir / DATABASE_FILE_NAME, api_keys),
+        host=DATA_API_HOST,
+        port=DATA_API_PORT,
+        log_config=None,
+        access_log=False,
+    )
+    return 0
+
+
+def read_api_keys(environ: Mapping[str, str]) -> dict[str, SecretStr] | None:
+    """The key of each client, by its name, or None after logging the variable refused: the
+    name of the variable, never its value."""
+    variables = sorted(
+        name for name in environ if name.startswith(API_KEY_VARIABLE_PREFIX)
+    )
+    if not variables:
+        logger.error("no API key: set %s<CLIENT>", API_KEY_VARIABLE_PREFIX)
+        return None
+    api_keys: dict[str, SecretStr] = {}
+    variable_by_key: dict[str, str] = {}
+    for variable in variables:
+        key = environ[variable]
+        refusal = find_api_key_refusal(variable, key, variable_by_key)
+        if refusal is not None:
+            logger.error("%s", refusal)
+            return None
+        variable_by_key[key] = variable
+        api_keys[variable.removeprefix(API_KEY_VARIABLE_PREFIX)] = SecretStr(key)
+    return api_keys
+
+
+def find_api_key_refusal(
+    variable: str, key: str, variable_by_key: Mapping[str, str]
+) -> str | None:
+    """Why the variable of a client is refused, or None; variable_by_key holds the keys already
+    read. The variable is quoted: its name comes from the environment."""
+    client_name = variable.removeprefix(API_KEY_VARIABLE_PREFIX)
+    if not CLIENT_NAME.fullmatch(client_name):
+        return f"{quote_value(variable)}: client name empty or not [A-Z0-9_]+"
+    if len(key) < MIN_API_KEY_LENGTH:
+        return (
+            f"{quote_value(variable)}: key of {len(key)} characters,"
+            f" minimum {MIN_API_KEY_LENGTH}"
+        )
+    if key in variable_by_key:
+        return (
+            f"{quote_value(variable_by_key[key])} and {quote_value(variable)}: same key"
+        )
+    return None
+
+
+def run_openapi() -> int:
+    """Write the OpenAPI of the data API, versioned with the code (docs/specs-api.md)."""
+    # The app is made without base nor key: its document does not depend on them.
+    openapi = create_app(Path(DATABASE_FILE_NAME), {}).openapi()
+    content = json.dumps(openapi, indent=2, ensure_ascii=False) + "\n"
+    try:
+        write_file_atomically(OPENAPI_PATH, content.encode())
+    except OSError as error:
+        print(
+            f"error: {OPENAPI_PATH} not written: {type(error).__name__}",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"OpenAPI written: {OPENAPI_PATH}")
+    return 0
