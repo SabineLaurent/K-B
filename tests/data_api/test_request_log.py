@@ -62,6 +62,14 @@ def test_an_unknown_route_is_logged_without_its_path(
     assert "secret-path-of-the-test" not in line
 
 
+@pytest.mark.parametrize("path", ["/docs", "/openapi.json"])
+def test_a_public_route_is_logged_by_its_path(client, request_lines, path):
+    client.get(path)
+
+    [line] = request_lines()
+    assert f"route={path} status=200" in line
+
+
 def test_the_method_is_quoted():
     line = format_request_line("GET\nfake line", "-", 400, 0, "-")
 

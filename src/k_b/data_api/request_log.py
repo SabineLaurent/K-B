@@ -27,19 +27,30 @@ async def log_request(
         status_code = response.status_code
         return response
     finally:
-        # The router puts the route it matched in the scope; its path is the template
-        # (/items/{item_id}), not the path received.
-        route = request.scope.get("route")
         logger.info(
             "%s",
             format_request_line(
                 request.method,
-                getattr(route, "path", NONE_SEEN),
+                find_route_template(request),
                 status_code,
                 round((time.perf_counter() - started) * 1000),
                 getattr(request.state, "client_name", NONE_SEEN),
             ),
         )
+
+
+def find_route_template(request: Request) -> str:
+    """The template of the route matched (/items/{item_id}), never the path received.
+
+    FastAPI puts in the scope its own routes only (fastapi/routing.py, 0.143): /docs and
+    /openapi.json, without parameter, are named by their path, the one the app gives them.
+    """
+    route = request.scope.get("route")
+    if route is not None:
+        return str(route.path)
+    if request.url.path in {request.app.docs_url, request.app.openapi_url}:
+        return request.url.path
+    return NONE_SEEN
 
 
 def format_request_line(
