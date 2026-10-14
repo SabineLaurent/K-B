@@ -42,8 +42,8 @@ def run_on_zotero_library():
 @pytest.fixture(scope="session")
 def items_database(tmp_path_factory):
     """The path of the test base of the readers, built once for the session; its folder name
-    holds a space and a #, which its URI must escape. Read only: no test writes in it."""
-    database_dir = tmp_path_factory.mktemp("data dir #1", numbered=False)
+    holds a space, #, ? and %, which its URI must escape. Read only: no test writes in it."""
+    database_dir = tmp_path_factory.mktemp("data dir #1 ?%", numbered=False)
     database_path = database_dir / "k-b.sqlite"
     create_database(database_path)
     connection = connect_database(database_path)

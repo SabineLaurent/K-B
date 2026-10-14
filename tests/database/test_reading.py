@@ -13,7 +13,7 @@ from k_b.database.reading import (
     read_highlights,
     read_items,
 )
-from k_b.items import MAX_INT64, ItemKind
+from k_b.items import MAX_INT64, MIN_INT64, ItemKind
 
 # Every item of the test base, in the order of the reading: source_date, then id, descending.
 ALL_IDS = [12, 11, 13, 15, 6, 14, 7, 8, 3, 2, 4, 1, 16, 9, 10, 5]
@@ -257,19 +257,32 @@ def test_the_last_page_has_no_next_offset(connection):
 
 
 @pytest.mark.parametrize(
-    ("limit", "offset"),
-    [(0, 0), (-1, 0), (1, -1), (MAX_INT64, 0), (1, MAX_INT64 + 1)],
+    ("limit", "offset", "message"),
+    [
+        (0, 0, "limit below minimum 1"),
+        (-1, 0, "limit below minimum 1"),
+        (MAX_INT64, 0, f"limit above maximum {MAX_INT64 - 1}"),
+        (10**5000, 0, f"limit above maximum {MAX_INT64 - 1}"),
+        (1, -1, "offset below minimum 0"),
+        (1, MAX_INT64 + 1, f"offset above maximum {MAX_INT64}"),
+    ],
     ids=[
         "zero",
         "negative",
-        "negative-offset",
         "limit-beyond-64-bits",
+        "limit-of-5001-digits",
+        "negative-offset",
         "offset-beyond-64-bits",
     ],
 )
-def test_a_limit_or_an_offset_out_of_range_is_refused(connection, limit, offset):
-    with pytest.raises(ValueError, match="limit|offset"):
+def test_a_limit_or_an_offset_out_of_range_is_refused_by_its_bound(
+    connection, limit, offset, message
+):
+    # The message names the bound crossed, never the value received.
+    with pytest.raises(ValueError) as refusal:
         read_items(connection, limit=limit, offset=offset)
+
+    assert str(refusal.value) == message
 
 
 def test_the_withdrawn_rows_are_listed_with_their_date(connection):
@@ -308,3 +321,20 @@ def test_the_highlights_of_an_entry_withdrawn_ones_included(connection):
 
 def test_an_entry_without_highlight_has_none(connection):
     assert read_highlights(connection, 15) == []
+
+
+@pytest.mark.parametrize(
+    ("item_id", "message"),
+    [
+        (MAX_INT64 + 1, f"item_id above maximum {MAX_INT64}"),
+        (MIN_INT64 - 1, f"item_id below minimum {MIN_INT64}"),
+    ],
+    ids=["beyond-64-bits", "below-64-bits"],
+)
+def test_an_item_id_beyond_64_bits_is_refused_by_its_bound(
+    connection, item_id, message
+):
+    with pytest.raises(ValueError) as refusal:
+        read_highlights(connection, item_id)
+
+    assert str(refusal.value) == message

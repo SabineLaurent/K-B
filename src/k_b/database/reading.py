@@ -14,6 +14,7 @@ from typing import NamedTuple
 from k_b.items import (
     ARXIV_ABSTRACT_PAGE_URL,
     MAX_INT64,
+    MIN_INT64,
     NVD_PAGE_URL,
     ItemKind,
     SearchableMode,
@@ -128,10 +129,8 @@ def read_items(
     would misread or cannot bind: a negative LIMIT reads every row.
     """
     # limit + 1 is bound as a 64-bit integer: one more would raise an OverflowError.
-    if not 1 <= limit < MAX_INT64:
-        raise ValueError(f"limit out of 1 to {MAX_INT64 - 1}: {limit}")
-    if not 0 <= offset <= MAX_INT64:
-        raise ValueError(f"offset out of 0 to {MAX_INT64}: {offset}")
+    check_within_bounds("limit", limit, 1, MAX_INT64 - 1)
+    check_within_bounds("offset", offset, 0, MAX_INT64)
     # One row more than the page tells whether a next page exists, in the same query.
     rows = connection.execute(
         SELECT_ITEMS,
@@ -150,6 +149,15 @@ def read_items(
         [ListedItem._make(row) for row in rows[:limit]],
         offset + limit if len(rows) > limit else None,
     )
+
+
+def check_within_bounds(name: str, value: int, minimum: int, maximum: int) -> None:
+    """Refuse a value out of its bounds, naming the bound crossed, never the value: an integer
+    of thousands of digits cannot even be written (conventions.md, rule 3)."""
+    if value < minimum:
+        raise ValueError(f"{name} below minimum {minimum}")
+    if value > maximum:
+        raise ValueError(f"{name} above maximum {maximum}")
 
 
 def format_since(since: datetime) -> str:
@@ -185,7 +193,11 @@ def to_like_pattern(search_text: str) -> str:
 def read_highlights(
     connection: sqlite3.Connection, item_id: int
 ) -> list[StoredHighlight]:
-    """The highlights of a Zotero entry, the withdrawn ones included, by date of creation."""
+    """The highlights of a Zotero entry, the withdrawn ones included, by date of creation.
+
+    item_id is bound as a 64-bit integer: beyond, sqlite3 would raise an OverflowError.
+    """
+    check_within_bounds("item_id", item_id, MIN_INT64, MAX_INT64)
     return [
         StoredHighlight._make(row)
         for row in connection.execute(SELECT_HIGHLIGHTS, (item_id,))

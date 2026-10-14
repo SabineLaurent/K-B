@@ -13,9 +13,9 @@ INSERT_SOURCE = (
 )
 
 
-def test_a_base_in_a_folder_named_with_a_space_and_a_hash_is_read(items_database):
+def test_a_base_in_a_folder_named_with_characters_a_uri_escapes_is_read(items_database):
     folder_name = items_database.parent.name
-    assert " " in folder_name and "#" in folder_name
+    assert all(character in folder_name for character in " #?%")
 
     connection = connect_database_read_only(items_database)
     try:
