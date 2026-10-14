@@ -45,7 +45,8 @@ par une seule fonction, `write_file_atomically` : un temporaire **caché** dans 
 La copie temporaire d'une base source (Zotero) est hors de cette règle elle aussi : elle vit dans
 un `tempfile.TemporaryDirectory` du système, hors du dossier de données, supprimé sur un succès,
 une erreur ou un Ctrl-C ; chaque extraction retire d'abord les copies qu'un processus tué aurait
-laissées.
+laissées. Le journal de fonctionnement (`logs/kb.log`), ajouté ligne à ligne par `logging`, est
+hors de cette règle : il n'est jamais lu comme une page.
 
 **Vérifier.**
 - `grep -rn "NamedTemporaryFile\|\.tmp\|os\.replace" src/k_b` ne renvoie que
@@ -65,16 +66,26 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
 - Un message dit le champ ou la position, l'état ou le type d'erreur, et la mesure (longueur
   reçue, maximum, nombre attendu). Un échec est un état nommé (`code.md`).
 - Une valeur observée (identifiant, URL, code HTTP, titre trouvé) est citée **tronquée** à une
-  longueur fixe et **échappée** (retours à la ligne et caractères de contrôle, par `repr()` ou
-  `%r`). `import-log.jsonl` est protégé par le JSON.
+  longueur fixe et **échappée** (retours à la ligne et caractères de contrôle), par une seule
+  fonction, `quote_value` (`core/quoting.py`). `import-log.jsonl` est protégé par le JSON.
 - Un champ qui porte une donnée personnelle au registre des traitements (les auteurs) n'est
   jamais cité : sa position et sa mesure seulement.
-- Chaque ligne de journal est **horodatée** (quand, où, qui, quoi).
+- Chaque ligne de journal est **horodatée** (quand, où, qui, quoi) en ISO 8601, en UTC, à la
+  seconde, avec la zone (`2026-10-14T11:30:00Z`, le format des dates de la base ; décision du
+  2026-10-12). La règle vaut par enregistrement : la trace d'une erreur suit sa ligne datée et
+  lui appartient (décision du 2026-10-14).
 - `print` donne le résultat d'une commande ; `logger` donne le déroulé. Un échec est journalisé
   une fois, là où il est traité.
+- Le journal de fonctionnement (le déroulé, réussites et échecs) va sur la sortie d'erreur et
+  dans `<KB_DATA_DIR>/logs/kb.log`, tourné chaque jour à minuit UTC, `LOG_FILES_KEPT` fichiers
+  gardés (`core/config.py`) ; le résultat d'une commande reste un `print`. Le journal d'import garde sa règle : écrit seulement si l'import va au
+  bout de l'écriture en base.
 
 **Vérifier.**
-- `grep -n "asctime" src/k_b/cli.py` renvoie le format des journaux.
+- `grep -nE "asctime|gmtime|DATABASE_DATE_FORMAT" src/k_b/cli.py` renvoie le format des
+  journaux, l'horloge UTC et le format de date de la base.
+- `uv run pytest tests/test_cli.py -k log_line` : une ligne émise est datée en UTC avec sa zone,
+  sur la sortie d'erreur et, pour une erreur, dans le fichier, au même format.
 - `grep -rniE "may be|maybe|probably|perhaps" src/k_b` ne renvoie rien.
 - `uv run pytest` : un test donne une entrée refusée qui contient une valeur repérable sur
   plusieurs lignes et un auteur, et vérifie le message (valeur tronquée et échappée, auteur

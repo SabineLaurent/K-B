@@ -21,6 +21,8 @@ from pydantic import (
     model_validator,
 )
 
+from k_b.core.quoting import quote_value
+
 # The sources of seed_sources.sql: a test keeps both lists equal.
 SourceCode = Literal[
     "github", "arxiv", "cisa_kev", "clipper", "tldr", "zotero", "gh_archive"
@@ -75,9 +77,9 @@ TREND_REPOSITORY_NAME_MAX_LENGTH = 255
 
 def check_url_can_be_normalized(url: str) -> str:
     """Refuse the URL urlsplit refuses (an unclosed bracket, a host NFKC rewrites), and the URL
-    without a host, which may be "https://" once its utm_* parameters are removed: etl/normalize.py
-    splits every URL at the import, then validates the item again, where one refused would
-    stop it all."""
+    without a host, as "https://?utm_source=x" is once its utm_* parameters are removed:
+    etl/normalize.py splits every URL at the import, then validates the item again, where one
+    refused would stop it all."""
     try:
         host = urlsplit(url).hostname
     except ValueError:
@@ -122,7 +124,7 @@ def parse_aware_datetime(stored_date: object, label: str) -> datetime:
     try:
         parsed_date = datetime.fromisoformat(stored_date)
     except ValueError as error:
-        raise ValueError(f"{label} is invalid: {stored_date!r}") from error
+        raise ValueError(f"{label} is invalid: {quote_value(stored_date)}") from error
     if parsed_date.tzinfo is None:
         raise ValueError(f"{label} has no time zone")
     return parsed_date

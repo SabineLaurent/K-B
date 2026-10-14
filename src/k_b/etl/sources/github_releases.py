@@ -70,12 +70,16 @@ class GithubReleasesSource:
         ):
             return None
         is_page_full = len(publication_dates) >= RELEASES_PER_PAGE
-        if is_page_full and min(publication_dates) > last_collected_at:
+        oldest = min(publication_dates)
+        if is_page_full and oldest > last_collected_at:
             logger.warning(
-                "%s: more than %d releases since the last collection, some may be missing; "
-                "time to read the next pages",
+                "%s: %d releases read, page size %d; oldest published at %s, after the last "
+                "collection at %s; next pages not read",
                 self.repository,
+                len(publication_dates),
                 RELEASES_PER_PAGE,
+                oldest.isoformat(),
+                last_collected_at.isoformat(),
             )
         return raw_response
 

@@ -1,7 +1,9 @@
+import json
 from datetime import UTC, datetime
 
 import pytest
 
+from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import (
     COLLECTION_STATE_FILENAME,
     InvalidCollectionStateError,
@@ -78,3 +80,24 @@ def test_the_stream_is_the_folder_of_the_source(raw_file_path, stream):
 def test_a_path_without_a_source_folder_is_refused():
     with pytest.raises(ValueError, match="cisa_kev.csv"):
         find_stream("automated_watch/cisa_kev.csv")
+
+
+def test_a_long_source_name_and_date_of_the_state_are_quoted_cut_in_the_refusal(
+    tmp_path,
+):
+    long_name = "source\n" + "n" * 50_000
+    long_date = "date\n" + "d" * 50_000
+    (tmp_path / "collection_state.json").write_text(
+        json.dumps({long_name: long_date}), encoding="utf-8"
+    )
+
+    with pytest.raises(InvalidCollectionStateError) as raised:
+        load_last_collection_dates(tmp_path)
+
+    message = str(raised.value)
+    assert (
+        f"date of {quote_value(long_name)} is invalid: {quote_value(long_date)}"
+        in message
+    )
+    assert "\n" not in message
+    assert len(message) < 1_000

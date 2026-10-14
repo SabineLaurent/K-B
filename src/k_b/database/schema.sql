@@ -177,7 +177,7 @@ CREATE TABLE release (
     tag_name              TEXT NOT NULL
         CHECK (length(tag_name) > 0)
         CHECK (length(tag_name) <= 255),
-    -- As GitHub gives them: name may be NULL, body is Markdown.
+    -- As GitHub gives them: name NULL or text, body Markdown.
     name                  TEXT CHECK (length(name) <= 255),
     body                  TEXT CHECK (length(body) <= 125000),
     published_at          TEXT NOT NULL

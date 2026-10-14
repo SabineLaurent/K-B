@@ -5,11 +5,17 @@ import logging
 import os
 import sqlite3
 import sys
+import time
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from datetime import UTC, datetime
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
+from k_b.core.config import LOG_FILES_KEPT
 from k_b.database.connection import DATABASE_FILE_NAME, MissingDatabaseError
 from k_b.database.creation import create_database
+from k_b.database.dates import DATABASE_DATE_FORMAT
 from k_b.database.writers.shared_rows import UnknownSourceError
 from k_b.etl.extract import collect_all_sources
 from k_b.etl.load import (
@@ -32,6 +38,8 @@ from k_b.etl.sources.zotero import FOLDER_PREFIX as ZOTERO_SOURCE_NAME
 from k_b.etl.sources.zotero import ZoteroSource
 from k_b.etl.transform import COLLECTION_NAME_FORMAT, read_raw_items
 
+logger = logging.getLogger(__name__)
+
 DATA_DIR_VARIABLE = "KB_DATA_DIR"
 # The Zotero data directory, the one that holds zotero.sqlite. Not set: Zotero is skipped.
 ZOTERO_DIR_VARIABLE = "KB_ZOTERO_DIR"
@@ -41,11 +49,47 @@ BIGQUERY_KEY_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS"
 IMPORT_LOG_FILE_NAME = "import-log-{imported_at}.jsonl"
 
 
-def configure_logging() -> None:
-    """Show every log line of level INFO and above on stderr, with its level and logger."""
-    logging.basicConfig(
-        level=logging.INFO, format="%(levelname)s %(name)s: %(message)s"
+# The log of every run, successes and failures, apart from the import logs: those are written
+# only when an import reaches the end of its writing in the base.
+LOG_FILE_PATH = Path("logs") / "kb.log"
+LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+
+
+@contextmanager
+def logging_to(data_dir: Path) -> Iterator[None]:
+    """Log every line of level INFO and above on stderr and in logs/kb.log of the data
+    directory, dated in UTC in the format of the base (2026-10-14T11:30:00Z); the file turns
+    at midnight UTC into kb.log.<day>.
+
+    Raises OSError when the log file cannot be opened. On exit the handlers are closed and
+    removed: the tests run kb many times in the interpreter of pytest.
+    """
+    log_path = data_dir / LOG_FILE_PATH
+    log_path.parent.mkdir(exist_ok=True)
+    file_handler = TimedRotatingFileHandler(
+        log_path,
+        when="midnight",
+        utc=True,
+        backupCount=LOG_FILES_KEPT,
+        encoding="utf-8",
     )
+    formatter = logging.Formatter(LOG_LINE_FORMAT, datefmt=DATABASE_DATE_FORMAT)
+    # The Z of the format says UTC: the time is read in UTC, not in local time.
+    formatter.converter = time.gmtime
+    handlers: list[logging.Handler] = [logging.StreamHandler(), file_handler]
+    root_logger = logging.getLogger()
+    previous_level = root_logger.level
+    for handler in handlers:
+        handler.setFormatter(formatter)
+        root_logger.addHandler(handler)
+    root_logger.setLevel(logging.INFO)
+    try:
+        yield
+    finally:
+        root_logger.setLevel(previous_level)
+        for handler in handlers:
+            root_logger.removeHandler(handler)
+            handler.close()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -62,14 +106,33 @@ def main(argv: list[str] | None = None) -> int:
         help="read the raw items and write them into the database, which removes the duplicates",
     )
     arguments = parser.parse_args(argv)
-    configure_logging()
 
     data_dir = read_data_dir()
     if data_dir is None:
         return 2
-    if arguments.command == "create-db":
+    with ExitStack() as log_stack:
+        try:
+            log_stack.enter_context(logging_to(data_dir))
+        except OSError as error:
+            # A run without its log would lose the failures the log is kept for: none is run.
+            print(
+                f"error: log file not opened: {type(error).__name__}: {error}",
+                file=sys.stderr,
+            )
+            return 2
+        try:
+            return run_command(arguments.command, data_dir)
+        except Exception:
+            # Logged here, while the log file is open, and not raised again: Python would print
+            # its traceback a second time. 1, as Python exits on an exception: kb was run.
+            logger.exception("kb stopped by an exception it does not handle")
+            return 1
+
+
+def run_command(command: str, data_dir: Path) -> int:
+    if command == "create-db":
         return run_create_db(data_dir)
-    if arguments.command == "import":
+    if command == "import":
         return run_import(data_dir)
     return run_collect(data_dir)
 
@@ -96,12 +159,10 @@ def run_create_db(data_dir: Path) -> int:
     try:
         create_database(database_path)
     except FileExistsError as error:
-        print(f"error: {error}", file=sys.stderr)
+        logger.error("%s", error)
         return 2
     except (sqlite3.Error, OSError) as error:
-        print(
-            f"error: {database_path}: {type(error).__name__}: {error}", file=sys.stderr
-        )
+        logger.error("%s: %s: %s", database_path, type(error).__name__, error)
         return 1
     print(f"database created: {database_path}")
     return 0
@@ -128,10 +189,10 @@ def run_import(data_dir: Path) -> int:
             TRACKED_REPOSITORIES,
         )
     except MissingDatabaseError as error:
-        print(f"error: {error}; create it with kb create-db", file=sys.stderr)
+        logger.error("%s; create it with kb create-db", error)
         return 2
     except ImportLogExistsError as error:
-        print(f"error: {error}; run kb import again", file=sys.stderr)
+        logger.error("%s; run kb import again", error)
         return 2
     except (
         sqlite3.Error,
@@ -139,7 +200,7 @@ def run_import(data_dir: Path) -> int:
         UnknownSourceError,
         KindWithoutTableError,
     ) as error:
-        print(f"error: {type(error).__name__}: {error}", file=sys.stderr)
+        logger.error("%s: %s", type(error).__name__, error)
         return 1
     print(f"raw files read: {summary.read_count}")
     print(f"items written (new or updated): {summary.item_count}")
@@ -173,7 +234,7 @@ def run_collect(data_dir: Path) -> int:
             datetime.now(UTC),
         )
     except InvalidCollectionStateError as error:
-        print(f"error: {error}", file=sys.stderr)
+        logger.error("%s", error)
         return 2
     for source_name, source_error in outcome.errors_by_source.items():
         print(f"{source_name}: {describe_outcome(source_error)}")

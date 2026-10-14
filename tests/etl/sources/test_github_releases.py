@@ -96,7 +96,7 @@ def test_a_page_without_any_new_release_returns_nothing(requested_paths):
     assert source.fetch(last_collected_at=AFTER_ALL_RELEASES) is None
 
 
-def test_a_full_page_of_new_releases_warns_that_some_may_be_missing(
+def test_a_full_page_of_new_releases_logs_the_count_read_and_the_oldest_date(
     requested_paths, monkeypatch, caplog
 ):
     monkeypatch.setattr(github_releases, "RELEASES_PER_PAGE", 3)
@@ -106,8 +106,12 @@ def test_a_full_page_of_new_releases_warns_that_some_may_be_missing(
             last_collected_at=BEFORE_ALL_RELEASES
         )
 
-    assert "anthropics/claude-code" in caplog.text
-    assert "may be missing" in caplog.text
+    [record] = caplog.records
+    assert record.getMessage() == (
+        "anthropics/claude-code: 3 releases read, page size 3; oldest published at "
+        "2026-09-29T19:27:30+00:00, after the last collection at "
+        "2026-09-29T00:00:00+00:00; next pages not read"
+    )
 
 
 @pytest.mark.parametrize("last_collected_at", [None, BETWEEN_RELEASES])
