@@ -21,6 +21,8 @@ from pydantic import (
     model_validator,
 )
 
+from k_b.core.quoting import quote_value
+
 # The sources of seed_sources.sql: a test keeps both lists equal.
 SourceCode = Literal[
     "github", "arxiv", "cisa_kev", "clipper", "tldr", "zotero", "gh_archive"
@@ -122,7 +124,7 @@ def parse_aware_datetime(stored_date: object, label: str) -> datetime:
     try:
         parsed_date = datetime.fromisoformat(stored_date)
     except ValueError as error:
-        raise ValueError(f"{label} is invalid: {stored_date!r}") from error
+        raise ValueError(f"{label} is invalid: {quote_value(stored_date)}") from error
     if parsed_date.tzinfo is None:
         raise ValueError(f"{label} has no time zone")
     return parsed_date

@@ -7,6 +7,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
+from k_b.core.quoting import quote_value
 from k_b.items import parse_aware_datetime
 
 # The folder of raw/ that holds what the watch collects, one folder per source.
@@ -66,7 +67,9 @@ def load_last_collection_dates(data_dir: Path) -> dict[str, datetime]:
         if not isinstance(stored_dates, dict):
             raise ValueError("expected an object mapping each source name to a date")
         return {
-            source_name: parse_aware_datetime(stored_date, f"date of {source_name!r}")
+            source_name: parse_aware_datetime(
+                stored_date, f"date of {quote_value(source_name)}"
+            )
             for source_name, stored_date in stored_dates.items()
         }
     except ValueError as error:
