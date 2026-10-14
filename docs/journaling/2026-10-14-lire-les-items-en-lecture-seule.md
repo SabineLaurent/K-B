@@ -52,8 +52,10 @@ Ce travail ne sert encore aucun utilisateur : il prépare #184, #185 et #187.
   chaque `?` en `%3f` et chaque `#` en `%23` : sans cela, un `?` commencerait les paramètres et un
   `#` couperait l'URI. Pour le `%` écrit `%25`, c'est un constat sur `as_uri()` et sur le test du
   dossier `data dir #1 ?%`, pas une phrase lue dans la doc SQLite. `as_uri()` refuse un chemin
-  relatif (`ValueError: relative path can't be expressed as a file URI`) : d'où `absolute()`, car
-  `KB_DATA_DIR` peut être relatif.
+  relatif : « ValueError is raised if the path isn't absolute » (Python, `pathlib`). Le message
+  constaté est `relative path can't be expressed as a file URI`. D'où `absolute()`, car
+  `KB_DATA_DIR` peut être relatif. La doc de `pathlib` ne décrit pas l'encodage des caractères :
+  il est constaté.
 - `check_database_exists` passe d'abord. En lecture seule, SQLite ne crée pas la base : « If the
   database does not already exist, an error is returned » (SQLite, `sqlite3_open_v2`, à propos de
   `SQLITE_OPEN_READONLY`). Mais c'est une erreur générique (« unable to open database file »), qui
@@ -243,8 +245,13 @@ de l'URI lit cette base-là.
   un index automatique et un tri temporaire (plan `EXPLAIN` relevé par elle). Non mesuré ici ;
   jugé sans enjeu à quelques milliers d'items par an.
 - `-shm` et `-wal` : constatés sur macOS seulement, pas sur Linux (la CI).
-- La largeur de l'année écrite par `strftime` hors macOS : `isoformat` évite la question pour
-  `since`, mais `dates.format_date` (les écrivains) n'a pas été vérifié sous glibc.
+- La largeur de l'année écrite par `strftime` : la doc de `datetime` la laisse à la plateforme ;
+  le journal des changements de Python 3.13.0 dit que `datetime.strftime()` complète désormais par
+  des zéros, sous Linux, une année de moins de quatre chiffres pour `%Y` et `%G`. K-B exige
+  Python ≥ 3.13 (`pyproject.toml`), et macOS écrit `0999` (constaté). `dates.format_date` (les
+  écrivains) est donc sûr sur ces deux plateformes ; `isoformat` reste le choix de `since`, qui ne
+  dépend d'aucune plateforme. Ce point, lu dans un résumé de recherche, n'a pas été relu mot pour
+  mot dans le journal des changements.
 
 ## Ce qui reste
 
@@ -252,8 +259,7 @@ de l'URI lit cette base-là.
   appelleront cette lecture ; ils valident leurs paramètres (bornes de la spec) avant.
 - `--source` (filtre par source) : à `kb search` (#187), qui étendra la lecture ; la borne de
   longueur de son texte de recherche aussi.
-- Signalé, sans issue : le coût de la requête à chaque page ; `dates.format_date` par `strftime` ;
-  un nom de release fait d'espaces (gardé à l'import comme à la lecture) ; `next_offset` au-delà de
+- Signalé, sans issue : le coût de la requête à chaque page ; un nom de release fait d'espaces (gardé à l'import comme à la lecture) ; `next_offset` au-delà de
   10 000, borne d'`offset` de l'API ; une requête de surlignages par entrée dans `kb search` ; la
   règle « dépôt + nom ou tag » écrite deux fois (`github_releases.py` et la requête).
 
@@ -277,5 +283,10 @@ Consultées le 2026-10-14 ; chacune fonde un point de la note.
 - [sqlite3 — How to work with SQLite URIs](https://docs.python.org/3/library/sqlite3.html) —
   Python : `connect("file:…?mode=ro", uri=True)` ; une écriture lève
   `OperationalError: attempt to write a readonly database`.
+- [pathlib — `Path.as_uri()`](https://docs.python.org/3/library/pathlib.html) — Python : un chemin
+  qui n'est pas absolu lève `ValueError` (d'où `absolute()`).
+- [Changelog — Python 3.13.0](https://docs.python.org/release/3.13.0/whatsnew/changelog.html) —
+  Python : `datetime.strftime()` complète par des zéros l'année de moins de quatre chiffres sous
+  Linux (`%Y`, `%G`) ; le signalement sur `dates.format_date` est retiré.
 - [Implementation Limits For SQLite](https://www.sqlite.org/limits.html) — SQLite : un motif `LIKE`
   est limité à 50 000 octets par défaut (borne de `q` laissée à l'API et à `kb search`).
