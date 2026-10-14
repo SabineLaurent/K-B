@@ -259,6 +259,28 @@ def test_a_failed_tldr_page_is_logged_once_with_its_day_and_url(
     ]
     assert error_record.name == "k_b.etl.extract"
     assert error_record.getMessage() == (
-        "collection failed for source 'tldr_ai'; "
-        "tldr_ai 2026-10-04, from https://tldr.tech/ai/2026-10-04"
+        "collection failed for source 'tldr_ai': HTTPError "
+        "'HTTP Error 500: Internal Server Error'; "
+        "'tldr_ai 2026-10-04, from https://tldr.tech/ai/2026-10-04'"
+    )
+
+
+def test_the_error_and_the_notes_of_a_failed_source_are_quoted_escaped(
+    tmp_path, caplog
+):
+    class FailingSource(WorkingSource):
+        def fetch(self, last_collected_at):
+            error = ValueError("a value\nERROR forged")
+            error.add_note("a note\nERROR forged")
+            raise error
+
+    with caplog.at_level(logging.ERROR, logger="k_b.etl.extract"):
+        collect_all_sources(
+            [FailingSource("failing")], tmp_path / "raw", tmp_path, FIRST_RUN_AT
+        )
+
+    [record] = caplog.records
+    assert record.getMessage() == (
+        "collection failed for source 'failing': ValueError "
+        "'a value\\nERROR forged'; 'a note\\nERROR forged'"
     )

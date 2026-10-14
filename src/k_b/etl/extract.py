@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import NamedTuple
 
+from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import (
     COLLECTION_STATE_FILENAME,
     RAW_DIR_NAMES,
@@ -42,10 +43,19 @@ def collect_all_sources(
                 source, raw_dir, now, last_collection_dates.get(source.name)
             )
         except Exception as error:
-            # The notes of a source (the day and url of a page) go on the dated line; the
-            # error itself is in the traceback that follows it.
-            notes = "".join(f"; {note}" for note in getattr(error, "__notes__", []))
-            logger.exception("collection failed for source %r%s", source.name, notes)
+            # The error and the notes of a source (the day and url of a page) go on the dated
+            # line, quoted: any source may raise any text. The traceback follows it.
+            notes = "".join(
+                f"; {quote_value(note)}" for note in getattr(error, "__notes__", [])
+            )
+            logger.exception(
+                "collection failed for source %r: %s %s%s",
+                source.name,
+                type(error).__name__,
+                # On the dated line, quoted; the traceback gives it again with its stack.
+                quote_value(str(error)),  # noqa: TRY401
+                notes,
+            )
             errors_by_source[source.name] = error
         else:
             last_collection_dates[source.name] = now
