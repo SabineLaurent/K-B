@@ -1,14 +1,14 @@
 # Spécifications de l'API de données
 
 L'API de données sert la veille et la bibliothèque de K-B, en lecture seule, sur la machine de
-Sabine. Elle est appelée par Sabine, par ses scripts, par des agents, et par l'API IA si celle-ci
-lit la base. Ce document fixe ce qu'elle sert, la règle de « quoi de neuf », l'accès par clé, les
+Sabine. Elle est appelée par les programmes de Sabine (terminal, scripts), par des agents, et par
+l'API IA si celle-ci lit la base. Ce document fixe ce qu'elle sert, la règle de « quoi de neuf », l'accès par clé, les
 erreurs et les exigences de sécurité. Les décisions et leur pourquoi sont dans le
 [journal ADR](ADR/journal-decisions-projet.md) (entrées du 2026-10-14) ; la collecte, dans
 [specs-collecte.md](specs-collecte.md) ; la base, dans [stockage.md](stockage.md).
 
 **Version de la spec : 0.1.0**, la même que `info.version` de l'OpenAPI
-(`docs/api/openapi-donnees.json`). Un changement de comportement visible par un client, comme
+(`docs/api/openapi-donnees.json`, que #184 écrit). Un changement de comportement visible par un client, comme
 l'ordre des résultats, change la version.
 
 ## Règles communes
@@ -21,7 +21,7 @@ l'ordre des résultats, change la version.
   `/openapi.json` sont publics : ils ne contiennent aucune donnée.
 - **Réponses** : JSON, champs en liste blanche (modèles de réponse propres à l'API, jamais le
   modèle de lecture des sources).
-- **OpenAPI** : `kb openapi` écrit `docs/api/openapi-donnees.json`, versionné ; la CI le compare
+- **OpenAPI** : `kb openapi` (#184) écrit `docs/api/openapi-donnees.json`, versionné ; la CI le compare
   au schéma produit par l'app.
 - **Journal** : une ligne par requête, horodatée en ISO 8601 UTC, à la seconde. Elle donne la
   méthode, le gabarit de route (`/items/{item_id}`, pas l'identifiant), le statut, la durée en ms
@@ -33,8 +33,11 @@ l'ordre des résultats, change la version.
 ## Accès par clé
 
 - **Un client nommé, une clé** : la variable d'environnement `KB_API_KEY_<CLIENT>` porte la clé du
-  client `<CLIENT>` (`[A-Z0-9_]+`, par exemple `KB_API_KEY_SABINE`, `KB_API_KEY_AGENT`).
-- **Clé de 256 bits**, générée par `secrets.token_urlsafe(32)`. Au démarrage, `kb serve` refuse un
+  client `<CLIENT>` (`[A-Z0-9_]+`, par exemple `KB_API_KEY_TERMINAL`, `KB_API_KEY_AGENT`).
+  La clé identifie le programme qui appelle (le terminal ou un script de Sabine, un agent, l'API
+  IA) ; aucune personne ne se connecte.
+- **Clé générée en 256 bits** par `secrets.token_urlsafe(32)` ; le minimum contrôlé est de
+  32 caractères. Au démarrage, `kb serve` refuse un
   nom de client vide ou hors `[A-Z0-9_]+`, une clé de moins de 32 caractères, deux clients de même
   clé, et l'absence de toute clé (code de sortie 2, message qui nomme la variable sans sa valeur).
 - **Révocable seule** : retirer la variable d'un client et redémarrer l'API ; les autres clients
@@ -59,7 +62,7 @@ la route qui répond à chacun.
 | P5 | Quels dépôts ont le vent en poupe ? | `GET /trends?window_end=…` | — |
 | P6 | Quels papiers récents sur un sujet ? | `GET /items?kind=paper&q=…&since=…` | — |
 | P7 | Quels sont les dépôts les plus étoilés (top 10) ? | — | hors API : les tops sont hors base (journal ADR, 2026-10-07) ; la commande `kb top`, décidée le 2026-10-08, n'est pas codée |
-| P8 | Quels sont les dépôts les plus forkés (top 10) ? | — | hors API : le top des plus forkés n'est pas collecté (la recherche des plus étoilés trie par `stars`) |
+| P8 | Quels sont les dépôts les plus forkés (top 10) ? | — | hors API : les tops sont hors base (journal ADR, 2026-10-07), et le top des plus forkés n'est pas collecté (la recherche des plus étoilés trie par `stars`) |
 | P9 | Quoi de neuf dans l'écosystème LangChain ? | `GET /items?q=langchain`, puis `GET /items?q=langgraph` : un seul morceau de texte par `q` | — |
 
 Les chemins du brut (`raw_file_path`) ne sont servis par aucune route : un chemin local dévoile le
@@ -72,7 +75,7 @@ dossier personnel (API3, ci-dessous).
 | Paramètre | Forme | Bornes | Défaut | Hors bornes |
 |---|---|---|---|---|
 | `kind` | une valeur d'`ItemKind`, répétable (`kind=paper&kind=release`) | valeurs exactes : `kind=vulnerability` ne ramène pas les alertes (`advisory`) | toutes les sortes | 422 |
-| `since` | date-heure ISO 8601 **avec fuseau** (`2026-10-07T00:00:00+02:00`, `2026-10-07T00:00:00Z`) | — | aucun filtre de date | 422, sans fuseau compris |
+| `since` | date-heure ISO 8601 **avec fuseau** (`2026-10-07T00:00:00Z`, `2026-10-07T00:00:00%2B02:00`) ; dans l'URL, `+` s'écrit `%2B`, sinon il est lu comme une espace | — | aucun filtre de date | 422, sans fuseau compris |
 | `q` | texte | de 1 à 200 caractères | aucune recherche | 422 |
 | `limit` | entier | de 1 à 100 | 20 | 422 |
 | `offset` | entier | de 0 à 10 000 | 0 | 422 |
@@ -81,7 +84,7 @@ dossier personnel (API3, ci-dessous).
 
 `since` porte sur **la date que la source donne**, propre à chaque sorte (tableau ci-dessous). Il
 est converti en UTC, puis comparé en `>=` à cette date. Une date de jour (`date_added` de CISA,
-`edition_date` de TLDR) est écrite à minuit UTC : `since=2026-10-07T00:00:00+02:00`
+`edition_date` de TLDR) est écrite à minuit UTC : `since=2026-10-07T00:00:00%2B02:00`
 (soit `2026-10-06T22:00:00Z`) prend le 2026-10-07 et pas le 2026-10-06.
 
 Ni la date de collecte ni une date de révision n'entrent dans la règle : un item ancien découvert
@@ -97,6 +100,10 @@ cette semaine n'apparaît pas dans « quoi de neuf » (limite assumée, journal 
 | `advisory` | `advisory.published_at` | `advisory.summary` | aucun : K-B ne lit et ne garde que `summary` |
 | `newsletter_article` | `newsletter_article.edition_date` | `newsletter_article.title` | `newsletter_article.summary` |
 | `zotero_entry` | `zotero_entry.saved_at` | `zotero_entry.title` | aucun |
+
+Le critère de la lecture des items (#183) dit encore un titre de release sans son dépôt
+(`coalesce(nullif(name,''), tag_name)`) et un tri « puis par `item.id` » sans sens : cette spec
+fait foi, la mission de #183 mettra son critère à jour.
 
 ### Tri et pagination
 
@@ -145,15 +152,16 @@ la liste et, selon la sorte :
 | Sorte | Clés naturelles | En plus de la liste |
 |---|---|---|
 | `paper` | `arxiv_id` | les auteurs, le résumé, `arxiv_updated_at` (colonne `publication.revised_at`, date arXiv) |
-| `vulnerability` | `cve_id` | la description, `vendor`, `product`, `ransomware_use`, `revised_at` et `withdrawn_at` (dates K-B) |
+| `vulnerability` | `cve_id` | la description, `vendor`, `product`, `ransomware_use`, `revised_at` (date K-B) |
 | `release` | `release_id` | `repository_name`, `tag_name`, le corps |
 | `advisory` | `ghsa_id` | `cve_id` (nul si l'alerte ne cite aucune CVE), `exploited`, les paquets touchés |
 | `newsletter_article` | `edition`, `edition_date`, `rank` | le résumé |
-| `zotero_entry` | `zotero_key` | `item_type`, `arxiv_id` (lu par `publication_id`, nul hors arXiv), `revised_at` et `withdrawn_at` (dates K-B), les surlignages, retirés compris avec leur `withdrawn_at` |
+| `zotero_entry` | `zotero_key` | `item_type`, `arxiv_id` (lu par `publication_id`, nul hors arXiv), `revised_at` (date K-B), les surlignages, retirés compris avec leur `withdrawn_at` |
 
 `exploited` vaut vrai si la CVE de l'alerte est au catalogue CISA KEV
 (`vulnerability.item_id IS NOT NULL`) : faux veut dire « absente du catalogue KEV », pas « non
-exploitée ». Il est nul pour une alerte sans CVE.
+exploitée ». Il est nul pour une alerte sans CVE. Il reste vrai si la CVE a été retirée du
+catalogue depuis : le retrait se lit dans `withdrawn_at`, au détail de la vulnérabilité.
 
 `source_date` et `arxiv_updated_at` sont des noms de champs de l'API : ils ne renomment aucune
 colonne (décision ouverte « Noms des colonnes de date », journal ADR).
@@ -183,7 +191,8 @@ colonne (décision ouverte « Noms des colonnes de date », journal ADR).
 - Tri par `stars_gained` décroissant, puis `forks_gained` décroissant, puis `repository_id`.
 - `window_end` est stocké à minuit UTC et rendu en `AAAA-MM-JJ`.
 - **Fenêtre absente : 404 `trend_window_not_found`**, dans les deux cas du tableau des erreurs.
-  Une fenêtre n'existe en base que par ses lignes : une liste vide ne décrirait aucune fenêtre
+  Pourquoi (choix de la session K-B, validé par Sabine le 2026-10-14) : une fenêtre n'existe en
+  base que par ses lignes : une liste vide ne décrirait aucune fenêtre
   réelle, et le client ne distinguerait pas une date sans fenêtre d'une réponse valide. L'état
   nommé dit ce qui est observé, comme `item_not_found`.
 - Limite : les fenêtres glissent d'un jour et aucune route ne les liste ; sans `window_end`, la
@@ -235,8 +244,11 @@ Selon le [registre des traitements](registre-traitements.md) :
 
 - les noms des auteurs d'un papier et les logins écrits dans le corps d'une release : au détail
   seulement, jamais dans la liste ni au journal ;
-- le login du propriétaire d'un dépôt, dans `repository_name` : servi par `/trends` ;
-- les surlignages et commentaires Zotero de Sabine : au détail de leur entrée.
+- le login du propriétaire d'un dépôt, dans le nom du dépôt : servi par `/trends`
+  (`repository_name`), dans le titre d'une release (liste) et dans son `repository_name`
+  (détail) ;
+- les titres et dates des entrées Zotero de Sabine : dans la liste ; ses surlignages et
+  commentaires : au détail de leur entrée.
 
 Un agent qui lit ces données les envoie au fournisseur de son modèle : décision ouverte
 « Transfert hors UE par les agents » (journal ADR).
@@ -249,7 +261,7 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 | Exigence | Intention | Tenue, par quel test |
 |---|---|---|
 | API1:2023 Broken Object Level Authorization | Une seule propriétaire, Sabine : tout client authentifié lit tous les items. Un identifiant inconnu rend 404, jamais une erreur qui dirait autre chose. | |
-| API2:2023 Broken Authentication | Une clé de 256 bits par client ; pas de route de connexion ; comparaison en temps constant ; 401 testé sur chaque route. | |
+| API2:2023 Broken Authentication | Une clé par client, générée en 256 bits (minimum contrôlé : 32 caractères) ; pas de route de connexion ; comparaison en temps constant ; 401 testé sur chaque route de données. | |
 | API3:2023 Broken Object Property Level Authorization | Réponses en liste blanche : ni `raw_file_path`, ni `collected_at`, ni texte long dans la liste. | |
 | API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000) et `q` (200 caractères). Pas de limite de débit : le client est local. | |
 | API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon ; aucune route d'administration. | |
@@ -257,7 +269,7 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 | API7:2023 Server Side Request Forgery | Sans objet : l'API ne va chercher aucune adresse fournie par un client. | |
 | API8:2023 Security Misconfiguration | Hôte `127.0.0.1` en dur, `TrustedHostMiddleware`, pas de CORS, erreurs sans pile. Limite : Swagger UI (`/docs`) charge ses fichiers depuis un CDN. | |
 | API9:2023 Improper Inventory Management | OpenAPI versionnée (`docs/api/openapi-donnees.json`), comparée en CI au schéma produit. | |
-| API10:2023 Unsafe Consumption of APIs | Le contenu servi vient de tiers (arXiv, GitHub, CISA, TLDR, Zotero) : pour un client, et d'abord pour un agent, c'est une donnée, jamais une consigne. | |
+| API10:2023 Unsafe Consumption of APIs | Le contenu servi vient de tiers (arXiv, GitHub, CISA, TLDR, Zotero) : pour un client, et d'abord pour un agent, c'est une donnée, jamais une consigne. Côté K-B, la réponse d'une source est validée à la collecte (modèles de `items.py`, `CHECK` de `schema.sql`). | |
 
 ## Hors de cette version
 
@@ -270,7 +282,12 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 
 ## Sources (consultées le 2026-10-14)
 
-- [OWASP API Security Top 10 — 2023](https://owasp.org/API-Security/editions/2023/en/0x11-t10/)
-- [API2:2023 Broken Authentication](https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/) — OWASP
-- [Bigger Applications — Multiple Files](https://fastapi.tiangolo.com/tutorial/bigger-applications/) — FastAPI (Context7)
-- [Advanced Middleware, `TrustedHostMiddleware`](https://fastapi.tiangolo.com/advanced/middleware/) — FastAPI (Context7)
+- [OWASP Top 10 API Security Risks — 2023](https://api-security.owasp.org/editions/2023/en/0x11-t10/) : les noms et
+  le périmètre des dix exigences du tableau de sécurité.
+- [API2:2023 Broken Authentication](https://api-security.owasp.org/editions/2023/en/0xa2-broken-authentication/), section
+  « How To Prevent » — OWASP : une clé d'API authentifie un programme client, pas une personne
+  (accès par clé).
+- [Bigger Applications — Multiple Files](https://fastapi.tiangolo.com/tutorial/bigger-applications/) — FastAPI,
+  lu par Context7 : un `APIRouter` par module, `include_router` (organisation du paquet).
+- [Advanced Middleware, `TrustedHostMiddleware`](https://fastapi.tiangolo.com/advanced/middleware/) — FastAPI,
+  lu par Context7 : un `Host` non permis reçoit un 400 (erreurs).
