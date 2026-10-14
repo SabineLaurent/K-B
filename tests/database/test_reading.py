@@ -2,7 +2,7 @@
 tests/fixtures/items_database.sql: its ids are the ones the tests name."""
 
 import typing
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone, tzinfo
 
 import pytest
 
@@ -13,7 +13,7 @@ from k_b.database.reading import (
     read_highlights,
     read_items,
 )
-from k_b.items import ItemKind
+from k_b.items import MAX_INT64, ItemKind
 
 # Every item of the test base, in the order of the reading: source_date, then id, descending.
 ALL_IDS = [12, 11, 13, 15, 6, 14, 7, 8, 3, 2, 4, 1, 16, 9, 10, 5]
@@ -163,14 +163,27 @@ def test_since_within_a_second_leaves_out_the_item_of_that_second(connection):
     )
 
 
+class OffsetUnknown(tzinfo):
+    """A time zone that gives no offset: Python takes the date as naive."""
+
+    def utcoffset(self, moment):
+        return None
+
+
 @pytest.mark.parametrize(
     "since",
     [
         datetime(2026, 10, 7),
+        datetime(2026, 10, 7, tzinfo=OffsetUnknown()),
         datetime(9999, 12, 31, 23, 59, 59, 500_000, tzinfo=UTC),
         datetime(1, 1, 1, tzinfo=PLUS_TWO_HOURS),
     ],
-    ids=["naive", "beyond-the-last-second", "before-the-first-day-in-utc"],
+    ids=[
+        "naive",
+        "offset-unknown",
+        "beyond-the-last-second",
+        "before-the-first-day-in-utc",
+    ],
 )
 def test_a_since_without_time_zone_or_out_of_range_is_refused(connection, since):
     with pytest.raises(ValueError, match="since"):
@@ -232,9 +245,17 @@ def test_the_last_page_has_no_next_offset(connection):
 
 
 @pytest.mark.parametrize(
-    ("limit", "offset"), [(0, 0), (-1, 0), (1, -1)], ids=["zero", "negative", "offset"]
+    ("limit", "offset"),
+    [(0, 0), (-1, 0), (1, -1), (MAX_INT64, 0), (1, MAX_INT64 + 1)],
+    ids=[
+        "zero",
+        "negative",
+        "negative-offset",
+        "limit-beyond-64-bits",
+        "offset-beyond-64-bits",
+    ],
 )
-def test_a_limit_below_one_or_a_negative_offset_is_refused(connection, limit, offset):
+def test_a_limit_or_an_offset_out_of_range_is_refused(connection, limit, offset):
     with pytest.raises(ValueError, match="limit|offset"):
         read_items(connection, limit=limit, offset=offset)
 

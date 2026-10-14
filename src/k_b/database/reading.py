@@ -13,6 +13,7 @@ from typing import NamedTuple
 
 from k_b.items import (
     ARXIV_ABSTRACT_PAGE_URL,
+    MAX_INT64,
     NVD_PAGE_URL,
     ItemKind,
     SearchableMode,
@@ -123,12 +124,13 @@ def read_items(
     """A page of the items, the newest first; no kind given reads every kind.
 
     The bounds of the data API (docs/specs-api.md) are its own; this refuses only what SQLite
-    would misread: a negative LIMIT reads every row.
+    would misread or cannot bind: a negative LIMIT reads every row.
     """
-    if limit < 1:
-        raise ValueError(f"limit below 1: {limit}")
-    if offset < 0:
-        raise ValueError(f"offset below 0: {offset}")
+    # limit + 1 is bound as a 64-bit integer: one more would raise an OverflowError.
+    if not 1 <= limit < MAX_INT64:
+        raise ValueError(f"limit out of 1 to {MAX_INT64 - 1}: {limit}")
+    if not 0 <= offset <= MAX_INT64:
+        raise ValueError(f"offset out of 0 to {MAX_INT64}: {offset}")
     # One row more than the page tells whether a next page exists, in the same query.
     rows = connection.execute(
         SELECT_ITEMS,
@@ -156,7 +158,8 @@ def format_since(since: datetime) -> str:
     isoformat, not strftime: strftime leaves the width of the year to the C library, and since
     is given by the caller, the year 1 included.
     """
-    if since.tzinfo is None:
+    # utcoffset, not tzinfo: a tzinfo without offset leaves the date naive, read as local.
+    if since.utcoffset() is None:
         raise ValueError("since has no time zone")
     try:
         since_utc = convert_to_utc(since)

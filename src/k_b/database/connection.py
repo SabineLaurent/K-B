@@ -24,12 +24,12 @@ def connect_database(database_path: Path) -> sqlite3.Connection:
 
 
 def connect_database_read_only(database_path: Path) -> sqlite3.Connection:
-    """Open the database read only, for the readers (the data API, kb search).
+    """Open the database read only, for its readers to come (the data API, kb search).
 
     The base is checked first: mode=ro does not create a missing file, but its error does not
     tell it from another. as_uri escapes a space, # or ? of the path, and needs an absolute
-    one. check_same_thread=False: the data API opens the connection in one thread of its pool
-    and may use it in another.
+    one. check_same_thread=False: asked by #183 for the data API (#184), which opens the
+    connection in a dependency, one connection per request (docs/specs-api.md).
     """
     check_database_exists(database_path)
     connection = sqlite3.connect(

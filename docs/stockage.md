@@ -47,8 +47,8 @@ dans la base. Une migration vers PostgreSQL reste possible si le besoin change (
   l'exécutent à chaque ouverture.
 - **Mode WAL** (`PRAGMA journal_mode = WAL`, gardé dans le fichier) : le pipeline écrit pendant
   que l'API lit, sans se bloquer. Tous les programmes tournent sur la même machine.
-- **Lecture seule** : l'API de données et `kb search` ouvrent la base par
-  `connect_database_read_only`, en `mode=ro`. Une lecture en `mode=ro` crée les fichiers `-shm`
+- **Lecture seule** : `connect_database_read_only` ouvre la base en `mode=ro`, pour ses lecteurs
+  à venir (l'API de données, `kb search`). Une lecture en `mode=ro` crée les fichiers `-shm`
   et `-wal` s'ils manquent, dans le dossier de la base, et les laisse à sa fermeture
   (documentation SQLite, WAL, § 5 ; constat sur SQLite 3.50.4).
 - **Dates** : du texte `AAAA-MM-JJTHH:MM:SSZ`, en UTC. Un `CHECK` refuse toute autre forme, et
