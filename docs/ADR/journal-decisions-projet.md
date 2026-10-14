@@ -1499,6 +1499,90 @@ par document.
   enregistré deux fois fait deux entrées que rien ne relie. La clé Zotero est unique dans une
   bibliothèque ; seule la bibliothèque personnelle est extraite. — PR de #138
 
+## 2026-10-14
+
+### API de données
+
+La spécification est [specs-api.md](../specs-api.md). Décisions de Sabine du 2026-10-14
+(commentaire de l'épic #21) ; les pourquoi marqués « sur recommandation » sont ceux que
+time-knight a recommandés et que Sabine a acceptés le 2026-10-14.
+
+- **« Quoi de neuf » : `since` porte sur la date que la source donne, propre à chaque sorte
+  d'item : `publication.submitted_at`, `vulnerability.date_added`, `release.published_at`,
+  `advisory.published_at`, `newsletter_article.edition_date`, `zotero_entry.saved_at`.**
+  Décision de Sabine. Pourquoi, sur recommandation : la date de la source répond à « qu'est-ce
+  qui est sorti cette semaine ? ». Options écartées : la date de collecte (`raw_data.collected_at` :
+  un ajout de source ou une collecte relancée ferait passer des items anciens pour nouveaux) ; une
+  date de révision (une révision ferait remonter un item ancien comme nouveau ; raison confirmée
+  par Sabine). **Remplace** « P1 filtre alors sur publié ou révisé depuis N jours »
+  ([clarification du modèle](../2026-10-07-clarification-modele.md), 2026-10-07). Limite
+  assumée : un item ancien découvert cette semaine n'apparaît pas dans « quoi de neuf ». — PR de #182
+- **Identifiant : `item.id` dans le chemin (`/items/{item_id}`) ; les clés naturelles (`arxiv_id`,
+  `cve_id`, `ghsa_id`…) sont des champs de la réponse.** Décision de Sabine. Pourquoi, sur
+  recommandation : la clé naturelle change de forme selon la sorte, certaines contiennent un
+  « / » (l'ancien identifiant arXiv, `hep-th/9901001`), ce qui casse le chemin, et celle d'un article TLDR tient en trois champs
+  (`edition`, `edition_date`, `rank`). Option écartée : la clé naturelle dans le chemin, une
+  route par sorte. S'appuie sur l'`id` stable en usage réel (2026-10-10, « Modèle de la base »).
+  — PR de #182
+- **`kind` garde la valeur `paper`, et se filtre à valeurs exactes : `kind=vulnerability` ne
+  ramène pas les alertes GitHub (`advisory`).** Décision de Sabine. Pourquoi, sur
+  recommandation : `paper` est déjà la valeur du code et de la base ; en changer coûterait le
+  schéma, le code, les tests et le contrat d'API. Option écartée : `publication`, le nom de la
+  table de référence. Clôt la question ouverte de la relecture du 2026-10-09 (« si
+  `kb search --kind vulnerability` ramène aussi les alertes GitHub »). — PR de #182
+- **Accès par une clé fixe par client nommé : la variable `KB_API_KEY_<CLIENT>`, révocable seule ;
+  le journal nomme le client, jamais la clé.** Décision de Sabine. Pourquoi des clés fixes ici,
+  alors que l'entrée « Wiki : API et client » (2026-10-12) les écarte pour l'API IA, sur
+  recommandation : la clé identifie le programme qui appelle (le terminal ou un script de Sabine,
+  un agent, l'API IA) ; aucune personne ne se connecte, et l'API n'a qu'une propriétaire. C'est
+  l'usage admis par OWASP API2:2023, « How To Prevent » : « API keys should not be used for user
+  authentication. They should only be used for API clients authentication »
+  ([API2:2023](https://api-security.owasp.org/editions/2023/en/0xa2-broken-authentication/),
+  citation relevée par recherche web le 2026-10-14, confirmée par la relecture) ; l'API est
+  locale, en lecture seule. Options
+  écartées : une clé partagée (on ne retire pas un client seul) ; un jeton signé (JWT) avec
+  renouvellement, parce que la même API délivrerait et vérifierait le jeton, en local, pour
+  environ 5 h (route de connexion à protéger contre le forçage, clé de signature,
+  renouvellement), et que l'expiration et le renouvellement des jetons sont déjà portés par
+  l'API IA (#160). Limite assumée : une clé n'expire pas ; un retrait ne prend effet qu'au
+  redémarrage de l'API. — PR de #182
+- **Recherche `q` par `LIKE` maintenant, FTS5 triée par BM25 après l'oral blanc (#188) : écart
+  temporaire à l'entrée « Bibliothèque et recherche » du 2026-10-09.** Décision de Sabine.
+  Pourquoi, sur recommandation de time-knight, acceptée par Sabine le 2026-10-14 : FTS5 demande
+  une table à remplir à chaque import et une reconstruction de la base. Constat : la table est
+  ajoutée à une base existante par une migration (#186), selon le critère de #188. Limites assumées : `LIKE`
+  exige les accents exacts (`vulnerabilite` ne trouve pas « Vulnérabilité ») et trie par date ; le
+  passage à BM25 changera l'ordre des résultats avec `q`, annoncé par une nouvelle version de la
+  spec et de l'OpenAPI. — PR de #182
+- **Paquet `src/k_b/data_api/`, organisé par rôle : `app.py` (`create_app`, rassemble les
+  routers) ; `routers/item_router.py`, `routers/trend_router.py` (les routes, une entité par
+  fichier) ; `schemas/item_schema.py`, `schemas/trend_schema.py` (les modèles Pydantic des
+  réponses) ; `errors.py` (la gestion d'erreur, écrite une fois) ; `dependencies.py` (la clé par
+  client, la connexion par requête) ; `request_log.py` (une ligne de journal par requête).**
+  Décision de Sabine. Pourquoi, selon elle : c'est l'organisation apprise pendant la formation
+  DWWM (titre professionnel Développeur web et web mobile), un dossier par rôle, un fichier par
+  entité, où ce qui est où se lit d'un coup d'œil ; la doc FastAPI « Bigger Applications » suit
+  le même plan (un `APIRouter` par module, `include_router`). Options écartées : un dossier
+  `controllers/` (avec des routes en lecture seule, il ne ferait que passer l'appel à
+  `database/reading.py` ; en FastAPI, la fonction de route est le contrôleur) ; les fichiers à
+  plat `routes.py` et `responses.py` (moins lisibles quand l'API grandit, et quand l'API IA
+  reprendra le même plan). Les issues qui servent la liste (#184) et le détail (#185) décrivent
+  encore l'organisation à plat : leur mission les mettra à jour. — PR de #182
+- **Les lignes retirées d'un catalogue d'état (vulnérabilités, entrées Zotero, surlignages) sont
+  servies avec leur `withdrawn_at`, pas filtrées.** Décision de Sabine. Pourquoi, sur
+  recommandation : c'est plus honnête et traçable ; un retrait reste visible avec sa date, et un
+  client peut filtrer s'il le veut. — PR de #182
+
+### Interface
+
+- **`kb search --in` ne prend que `watch` et `library` : `--in wiki` est retiré tant que le wiki
+  n'entre pas en base ; `source.acquisition_mode` garde la valeur `wiki`.** Décision de Sabine.
+  Pourquoi, sur recommandation de time-knight, acceptée par Sabine le 2026-10-14 : une option qui
+  ne rend jamais rien est un piège ; elle sera ajoutée quand le wiki entrera en base. Constat :
+  aucune source de `seed_sources.sql` n'a le mode `wiki`. **Révise** l'entrée « Bibliothèque et
+  recherche » du 2026-10-09 (`kb search --in watch|library|wiki`) et celle du 2026-10-10 qui la
+  redit (« `kb search --in watch|library|wiki` ne change pas »). — PR de #182
+
 ## Décisions encore ouvertes
 
 - **Remplir `newsletter_article.publication_id`** (2026-10-12) : quand le lien d'un article TLDR
@@ -1529,8 +1613,6 @@ par document.
 
 - **Nommage des tables et des colonnes.** Gardé tel quel le 2026-10-02 ; Sabine demandera les
   renommages à l'usage, une fois les schémas sous les yeux.
-- **Règle de « quoi de neuf cette semaine »** (date de publication, d'ajout ou de collecte) : à
-  décider dans #21.
 - **Durées de conservation et fréquence de la purge** : provisoirement 2 ans après la collecte
   (base et brut), purge à chaque collecte (une par jour) ; la durée, par mode d'acquisition,
   sera dans `config.py` (2026-10-10), à revoir. Sabine n'a pas tranché le 2026-10-02 ; à confirmer
@@ -1544,8 +1626,7 @@ par document.
 - **Questions laissées par la relecture indépendante du 2026-10-09**, à décider par Sabine :
   DOCUMENT ou CONTENU pour le texte complet (une publication décrite par plusieurs items et un
   document Zotero hors arXiv sont tranchés le 2026-10-13, « Modèle de la base : bibliothèque
-  Zotero ») ; les versions d'un clip annoté ; si `kb search --kind vulnerability` ramène aussi les
-  alertes GitHub (`kind` = `advisory`).
+  Zotero ») ; les versions d'un clip annoté.
 - **Transfert hors UE par les agents** : un agent qui lit les items par l'API envoie leur contenu
   au fournisseur du modèle (États-Unis). Cadre juridique non vérifié.
 - **Motif d'un rejet pour longueur** : le critère de l'issue sur le motif des rejets (#92) ne
