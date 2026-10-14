@@ -371,7 +371,12 @@ def test_the_detail_of_a_paper_reads_its_arxiv_date_in_revised_at(connection):
 @pytest.mark.parametrize(
     ("item_id", "advisory"),
     [
-        (9, AdvisoryDetail("GHSA-fjqc-hq36-qh5p", "CVE-2020-29583", True, ["langgraph-checkpoint"])),
+        (
+            9,
+            AdvisoryDetail(
+                "GHSA-fjqc-hq36-qh5p", "CVE-2020-29583", True, ["langgraph-checkpoint"]
+            ),
+        ),
         (
             17,
             AdvisoryDetail(
