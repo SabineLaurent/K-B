@@ -7,9 +7,14 @@ erreurs et les exigences de sécurité. Les décisions et leur pourquoi sont dan
 [journal ADR](ADR/journal-decisions-projet.md) (entrées du 2026-10-14) ; la collecte, dans
 [specs-collecte.md](specs-collecte.md) ; la base, dans [stockage.md](stockage.md).
 
-**Version de la spec : 0.1.0**, la même que `info.version` de l'OpenAPI
+**Version de la spec : 0.2.0**, la même que `info.version` de l'OpenAPI
 (`docs/api/openapi-donnees.json`, que #184 écrit). Un changement de comportement visible par un client, comme
 l'ordre des résultats, change la version.
+
+| Version | Ce qui change pour un client |
+|---|---|
+| 0.1.0 | `GET /items` (#184) |
+| 0.2.0 | `GET /items/{item_id}` et `GET /trends` servis (#185) ; un `item_id` au-delà de 64 bits répond 422 |
 
 ## Règles communes
 
@@ -149,23 +154,33 @@ ou donnée personnelle, servis au détail), `raw_file_path` et `collected_at` (j
 
 ## `GET /items/{item_id}` : le détail
 
-`item.id` dans le chemin ; les clés naturelles sont des champs de la réponse. Un identifiant
-inconnu rend 404 `item_not_found` ; un identifiant non entier, 422. La réponse reprend les champs de
-la liste et, selon la sorte :
+`item.id` dans le chemin ; les clés naturelles sont des champs de la réponse. `item_id` est un
+entier écrit en chiffres, sans zéro en tête, sans `+`, sans espace ni décimale (`1`, `-1`, pas
+`01`, `1.0` ni `+1` : une seule URL par item), tenu sur 64 bits ; sinon 422 `invalid_parameter`.
+Un entier qu'aucun item ne porte rend 404 `item_not_found`. La réponse reprend les six champs de
+la liste et, selon la sorte (`kind`, qui dit le schéma suivi : `oneOf` et `discriminator` dans
+l'OpenAPI), exactement ceux-ci :
 
 | Sorte | Clés naturelles | En plus de la liste |
 |---|---|---|
-| `paper` | `arxiv_id` | les auteurs, le résumé, `arxiv_updated_at` (colonne `publication.revised_at`, date arXiv) |
-| `vulnerability` | `cve_id` | la description, `vendor`, `product`, `ransomware_use`, `revised_at` (date K-B) |
-| `release` | `release_id` | `repository_name`, `tag_name`, le corps |
-| `advisory` | `ghsa_id` | `cve_id` (nul si l'alerte ne cite aucune CVE), `exploited`, les paquets touchés |
-| `newsletter_article` | `edition`, `edition_date`, `rank` | le résumé |
-| `zotero_entry` | `zotero_key` | `item_type`, `arxiv_id` (lu par `publication_id`, nul hors arXiv), `revised_at` (date K-B), les surlignages, retirés compris avec leur `withdrawn_at` |
+| `paper` | `arxiv_id` | `authors` (les noms, dans l'ordre d'arXiv), `summary`, `arxiv_updated_at` (colonne `publication.revised_at`, date arXiv) |
+| `vulnerability` | `cve_id` | `description`, `vendor`, `product`, `ransomware_use`, `revised_at` (date K-B) |
+| `release` | `release_id` | `repository_name`, `tag_name`, `body` (le corps) |
+| `advisory` | `ghsa_id` | `cve_id` (nul si l'alerte ne cite aucune CVE), `exploited`, `packages` (les paquets touchés) |
+| `newsletter_article` | `edition`, `edition_date`, `rank` | `summary` |
+| `zotero_entry` | `zotero_key` | `item_type`, `arxiv_id` (lu par `publication_id`, nul hors arXiv), `revised_at` (date K-B), `highlights` : les surlignages, retirés compris, par date de création |
+
+Un surlignage sert `text`, `comment`, `highlighted_at` (date Zotero), `revised_at` et
+`withdrawn_at` (dates K-B) ; sa clé Zotero n'est pas servie. Le `name` d'une release n'est pas
+servi : il est dans `title`. Les dates sont servies comme en base (`AAAA-MM-JJTHH:MM:SSZ`).
+L'OpenAPI décrit chaque date par son origine : date K-B (la collecte qui a vu le changement),
+date arXiv ou date Zotero.
 
 `exploited` vaut vrai si la CVE de l'alerte est au catalogue CISA KEV
 (`vulnerability.item_id IS NOT NULL`) : faux veut dire « absente du catalogue KEV », pas « non
 exploitée ». Il est nul pour une alerte sans CVE. Il reste vrai si la CVE a été retirée du
-catalogue depuis : le retrait se lit dans `withdrawn_at`, au détail de la vulnérabilité.
+catalogue depuis : le retrait se lit dans `withdrawn_at`, au détail de la vulnérabilité, que
+le détail de l'alerte ne désigne pas encore (« Hors de cette version »).
 
 `source_date` et `arxiv_updated_at` sont des noms de champs de l'API : ils ne renomment aucune
 colonne (décision ouverte « Noms des colonnes de date », journal ADR).
@@ -174,7 +189,7 @@ colonne (décision ouverte « Noms des colonnes de date », journal ADR).
 
 | Paramètre | Forme | Défaut | Hors bornes |
 |---|---|---|---|
-| `window_end` | date `AAAA-MM-JJ`, le dernier jour d'une fenêtre de 3 jours | la fenêtre la plus récente en base | 422 |
+| `window_end` | date écrite `AAAA-MM-JJ` exactement, le dernier jour d'une fenêtre de 3 jours | la fenêtre la plus récente en base | 422 : une autre forme (`20261012`, `2026-10-12T00:00:00Z`), un nombre (jamais lu comme une date Unix), une date qui n'existe pas (`2026-02-30`) |
 
 ```json
 {
@@ -265,16 +280,16 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 
 | Exigence | Intention | Tenue, par quel test |
 |---|---|---|
-| API1:2023 Broken Object Level Authorization | Une seule propriétaire, Sabine : tout client authentifié lit tous les items. Un identifiant inconnu rend 404, jamais une erreur qui dirait autre chose. | |
-| API2:2023 Broken Authentication | Une clé par client, générée en 256 bits (minimum contrôlé : 32 caractères) ; pas de route de connexion ; comparaison en temps constant ; 401 testé sur chaque route de données. | |
-| API3:2023 Broken Object Property Level Authorization | Réponses en liste blanche : ni `raw_file_path`, ni `collected_at`, ni texte long dans la liste. | |
-| API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000) et `q` (200 caractères). Pas de limite de débit : le client est local. | |
-| API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon ; aucune route d'administration. | |
-| API6:2023 Unrestricted Access to Sensitive Business Flows | Sans objet : l'API n'a aucun flux métier à protéger (ni achat, ni réservation, ni création de compte), seulement des lectures. | |
-| API7:2023 Server Side Request Forgery | Sans objet : l'API ne va chercher aucune adresse fournie par un client. | |
-| API8:2023 Security Misconfiguration | Hôte `127.0.0.1` en dur, `TrustedHostMiddleware`, pas de CORS, erreurs sans pile. Limite : Swagger UI (`/docs`) charge ses fichiers depuis un CDN. | |
-| API9:2023 Improper Inventory Management | OpenAPI versionnée (`docs/api/openapi-donnees.json`), comparée en CI au schéma produit. | |
-| API10:2023 Unsafe Consumption of APIs | Le contenu servi vient de tiers (arXiv, GitHub, CISA, TLDR, Zotero) : pour un client, et d'abord pour un agent, c'est une donnée, jamais une consigne. Côté K-B, la réponse d'une source est validée à la collecte (modèles de `items.py`, `CHECK` de `schema.sql`). | |
+| API1:2023 Broken Object Level Authorization | Une seule propriétaire, Sabine : tout client authentifié lit tous les items. Un identifiant inconnu rend 404, jamais une erreur qui dirait autre chose. `item.id`, séquentiel, est dans l'URL : la recommandation d'identifiants difficiles à deviner est écartée tant que l'API n'a qu'une propriétaire (journal ADR, 2026-10-15). | **Tenue.** `test_each_client_is_served_with_its_key`, `test_an_unknown_item_id_gives_404_item_not_found`, `test_an_unknown_window_gives_404` |
+| API2:2023 Broken Authentication | Une clé par client, générée en 256 bits (minimum contrôlé : 32 caractères) ; pas de route de connexion ; comparaison en temps constant ; 401 testé sur chaque route de données. | **Tenue.** `test_every_data_route_refuses_a_missing_and_a_wrong_key_with_the_same_body` (les trois routes, lues dans l'app), `test_an_app_without_key_refuses_every_data_route`, `test_a_removed_key_gives_401_and_the_other_clients_are_still_served`, `test_serve_exits_2_and_names_the_variable_without_its_value` ; le temps constant n'est pas mesuré par un test (`hmac.compare_digest`, `dependencies.py`) |
+| API3:2023 Broken Object Property Level Authorization | Réponses en liste blanche : ni `raw_file_path`, ni `collected_at`, ni texte long dans la liste ; au détail, les champs du tableau de sa sorte et rien d'autre. | **Tenue.** `test_the_list_serves_only_the_six_fields`, `test_each_kind_has_its_detail` (corps entier, une sorte par cas), `test_no_detail_serves_a_raw_file_path_or_a_collection_date`, `test_trends_without_window_end_give_the_latest_window`, `test_no_error_body_holds_a_raw_file_path_or_a_path`, `test_no_route_documents_a_raw_file_path_or_a_collection_date` |
+| API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000) et `q` (200 caractères) ; `/trends` rend 60 lignes au plus, sans pagination. Pas de limite de débit : le client est local. | **Non tenue** : aucun délai de requête (« Hors de cette version »), aucune limite de débit, et le détail d'une entrée Zotero sert tous ses surlignages, sans borne de nombre (chacun jusqu'à 10 000 caractères de texte et autant de commentaire). Ce qui est tenu : les bornes et la taille de page, `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_next_offset_stops_at_the_offset_bound`, `test_an_item_id_not_written_as_an_integer_gives_422`, `test_a_malformed_window_end_gives_422` ; les 60 lignes d'une fenêtre sont bornées à la collecte (`gh_archive.py`), pas par l'API |
+| API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon ; aucune route d'administration. | **Tenue.** `test_every_data_route_refuses_another_method_with_405`, `test_the_data_routes_are_listed`, `test_docs_and_openapi_are_public_and_no_other_page_is_served` |
+| API6:2023 Unrestricted Access to Sensitive Business Flows | Sans objet : l'API n'a aucun flux métier à protéger (ni achat, ni réservation, ni création de compte), seulement des lectures. | Sans objet, sans test |
+| API7:2023 Server Side Request Forgery | Sans objet : l'API ne va chercher aucune adresse fournie par un client. | Sans objet, sans test |
+| API8:2023 Security Misconfiguration | Hôte `127.0.0.1` en dur, `TrustedHostMiddleware`, pas de CORS, erreurs sans pile. Limite : Swagger UI (`/docs`) charge ses fichiers depuis un CDN. | **Tenue, avec la limite du CDN.** `test_serve_listens_on_127_0_0_1_without_uvicorn_logging_config`, `test_a_host_other_than_localhost_gives_400`, `test_no_route_answers_cors`, `test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only`, `test_a_database_error_gives_500_without_detail_and_logs_its_type` |
+| API9:2023 Improper Inventory Management | OpenAPI versionnée (`docs/api/openapi-donnees.json`), comparée en CI au schéma produit. | **Tenue.** `test_the_versioned_openapi_is_the_one_the_app_produces`, `test_the_versioned_openapi_is_valid_and_declares_its_security_scheme`, `test_each_data_route_documents_its_errors` |
+| API10:2023 Unsafe Consumption of APIs | Le contenu servi vient de tiers (arXiv, GitHub, CISA, TLDR, Zotero) : pour un client, et d'abord pour un agent, c'est une donnée, jamais une consigne. Côté K-B, la réponse d'une source est validée à la collecte (modèles de `items.py`, `CHECK` de `schema.sql`). | **Tenue côté K-B** : `tests/test_schema.py` (chaque type refusé par l'item et par la base) et les tests de chaque source. Côté client, une consigne, sans test |
 
 ## Hors de cette version
 
@@ -284,6 +299,10 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 - Une limite de débit : le client est local.
 - **Un délai de requête : non tenu.** `conformite.md` (API4) cite le délai, et un `LIKE '%q%'`
   lit tout `release.body`, jusqu'à 125 000 caractères par release. Signalé, sans issue.
+- **D'une alerte à sa vulnérabilité** : le détail d'une alerte dit `cve_id` et `exploited`, pas
+  l'`id` de l'item vulnérabilité ; la liste n'a pas `cve_id` et `q` ne le cherche pas. Un client
+  ne peut donc pas lire au détail de la vulnérabilité si elle a été retirée du catalogue KEV.
+  Signalé ; une issue sera créée.
 
 ## Sources (consultées le 2026-10-14)
 

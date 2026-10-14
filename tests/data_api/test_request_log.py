@@ -84,3 +84,13 @@ def test_the_method_is_quoted():
         line
         == r"request method='GET\nfake line' route=- status=400 duration_ms=0 client=-"
     )
+
+
+def test_a_detail_is_logged_by_its_route_template_never_its_id(
+    client, authorization, request_lines
+):
+    client.get("/items/14", headers=authorization)
+
+    [line] = request_lines()
+    assert " route=/items/{item_id} status=200 " in line
+    assert "14" not in line.split(" duration_ms=")[0]

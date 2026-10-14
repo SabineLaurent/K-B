@@ -2,21 +2,29 @@
 tests/fixtures/items_database.sql: its ids are the ones the tests name."""
 
 import typing
-from datetime import UTC, datetime, timedelta, timezone, tzinfo
+from datetime import UTC, date, datetime, timedelta, timezone, tzinfo
 
 import pytest
 
-from k_b.database.connection import connect_database_read_only
+from k_b.database.connection import connect_database, connect_database_read_only
+from k_b.database.creation import create_database
 from k_b.database.reading import (
+    AdvisoryDetail,
+    ItemDetail,
+    KindDetail,
     ListedItem,
     StoredHighlight,
+    StoredTrend,
+    TrendWindow,
     read_highlights,
+    read_item_detail,
     read_items,
+    read_trends,
 )
 from k_b.items import MAX_INT64, MIN_INT64, ItemKind
 
 # Every item of the test base, in the order of the reading: source_date, then id, descending.
-ALL_IDS = [12, 11, 13, 15, 6, 14, 7, 8, 3, 2, 4, 1, 16, 9, 10, 5]
+ALL_IDS = [12, 11, 13, 15, 6, 14, 7, 8, 3, 2, 4, 1, 16, 9, 10, 17, 5]
 PLUS_TWO_HOURS = timezone(timedelta(hours=2))
 
 
@@ -305,7 +313,7 @@ def test_the_highlights_of_an_entry_withdrawn_ones_included(connection):
             "A highlighted sentence on the third page.",
             None,
             "2026-10-05T08:50:00Z",
-            None,
+            "2026-10-06T09:30:00Z",
             None,
         ),
         StoredHighlight(
@@ -338,3 +346,189 @@ def test_an_item_id_beyond_64_bits_is_refused_by_its_bound(
         read_highlights(connection, item_id)
 
     assert str(refusal.value) == message
+
+
+def test_the_detail_of_an_item_holds_its_listed_fields(connection):
+    detail = read_item_detail(connection, 2)
+
+    assert isinstance(detail, ItemDetail)
+    assert detail.listed == read_item(connection, 2)
+
+
+def test_the_detail_of_a_paper_reads_its_arxiv_date_in_revised_at(connection):
+    detail = read_item_detail(connection, 2)
+
+    assert detail is not None
+    assert detail.listed.source_date == "2026-09-27T09:30:13Z"
+    assert detail.details._asdict() == {
+        "arxiv_id": "2609.33401",
+        "authors": ["Yixuan Liu"],
+        "summary": "Model-based judges support agent security by detecting prompt"
+        " injections, assessing interaction risks, and screening harmful requests.",
+        "arxiv_updated_at": "2026-09-29T16:41:24Z",
+    }
+
+
+@pytest.mark.parametrize(
+    ("item_id", "advisory"),
+    [
+        (
+            9,
+            AdvisoryDetail(
+                "GHSA-fjqc-hq36-qh5p", "CVE-2020-29583", True, ["langgraph-checkpoint"]
+            ),
+        ),
+        (
+            17,
+            AdvisoryDetail(
+                "GHSA-3644-q5cj-c5c7",
+                "CVE-2026-45134",
+                False,
+                ["langsmith", "langchain-classic", "langchain"],
+            ),
+        ),
+        (
+            10,
+            AdvisoryDetail(
+                "GHSA-gr75-jv2w-4656", None, None, ["langchain", "langchain-anthropic"]
+            ),
+        ),
+    ],
+    ids=["in-kev-withdrawn-since", "not-in-kev", "without-cve"],
+)
+def test_exploited_reads_the_kev_catalog_as_a_boolean(connection, item_id, advisory):
+    detail = read_item_detail(connection, item_id)
+
+    assert detail is not None
+    assert detail.details == advisory
+    assert type(detail.details.exploited) is type(advisory.exploited)
+
+
+def test_the_detail_of_a_zotero_entry_holds_its_paper_and_its_highlights(connection):
+    detail = read_item_detail(connection, 14)
+
+    assert detail is not None
+    assert detail.details.arxiv_id == "2609.00001"
+    assert detail.details.revised_at == "2026-10-06T09:30:00Z"
+    assert detail.details.highlights == read_highlights(connection, 14)
+
+
+def test_a_zotero_entry_without_arxiv_reference_has_no_arxiv_id(connection):
+    detail = read_item_detail(connection, 16)
+
+    assert detail is not None
+    assert detail.details.arxiv_id is None
+
+
+@pytest.mark.parametrize("item_id", [999, 0, -1, MAX_INT64, MIN_INT64])
+def test_an_unknown_item_has_no_detail(connection, item_id):
+    assert read_item_detail(connection, item_id) is None
+
+
+def test_the_detail_of_an_item_id_beyond_64_bits_is_refused_by_its_bound(connection):
+    with pytest.raises(ValueError) as refusal:
+        read_item_detail(connection, MAX_INT64 + 1)
+
+    assert str(refusal.value) == f"item_id above maximum {MAX_INT64}"
+
+
+def test_the_detail_leaves_no_transaction_open(connection):
+    read_item_detail(connection, 14)
+
+    assert not connection.in_transaction
+
+
+LATEST_TRENDS = [
+    StoredTrend(1209966933, "morluto/rea", 1087, 215),
+    StoredTrend(1398080271, "storytold/photocraft", 449, 64),
+    StoredTrend(1322250666, "boykopovar/AnyPS5", 318, 17),
+    StoredTrend(1035334306, "wwwwwwworld/solana-trading-bot-v3", 0, 70),
+    StoredTrend(928981629, "rhtap-perf-test/nodejs-devfile-sample2", 0, 13),
+]
+
+
+def test_without_a_window_the_trends_are_those_of_the_latest(connection):
+    assert read_trends(connection) == TrendWindow(date(2026, 10, 10), LATEST_TRENDS)
+
+
+def test_the_trends_of_a_window_tie_on_stars_and_forks_by_repository_id(connection):
+    assert read_trends(connection, date(2026, 10, 9)) == TrendWindow(
+        date(2026, 10, 9),
+        [
+            StoredTrend(1209966933, "morluto/rea", 120, 9),
+            StoredTrend(1398080271, "storytold/photocraft", 120, 9),
+        ],
+    )
+
+
+def test_an_unknown_window_has_no_trend(connection):
+    assert read_trends(connection, date(2026, 1, 1)) is None
+
+
+def test_a_base_without_trend_has_no_latest_window(tmp_path):
+    database_path = tmp_path / "k-b.sqlite"
+    create_database(database_path)
+    connection = connect_database_read_only(database_path)
+    try:
+        assert read_trends(connection) is None
+    finally:
+        connection.close()
+
+
+@pytest.mark.parametrize(
+    "kind_detail", typing.get_args(KindDetail), ids=lambda detail: detail.__name__
+)
+def test_no_field_of_a_kind_takes_the_name_of_a_field_of_the_list(kind_detail):
+    """The response joins both: a field of the kind would replace the one of the list."""
+    assert not set(kind_detail._fields) & set(ListedItem._fields)
+
+
+@pytest.fixture
+def base_with_vulnerabilities_on_papers(tmp_path):
+    """Papers designated by a vulnerability row too: publication and vulnerability have no
+    (item_id, kind) foreign key, so the schema does not refuse it. Paper 1 has its publication;
+    paper 2 has none."""
+    database_path = tmp_path / "k-b.sqlite"
+    create_database(database_path)
+    connection = connect_database(database_path)
+    try:
+        connection.executescript(
+            """
+            INSERT INTO raw_data (id, source_id, raw_file_path, stream, collected_at)
+            VALUES (1, (SELECT id FROM source WHERE source_code = 'arxiv'), 'a.xml', 'arxiv',
+                '2026-10-05T09:30:00Z');
+            INSERT INTO item (id, kind, raw_data_id) VALUES (1, 'paper', 1), (2, 'paper', 1);
+            INSERT INTO publication (arxiv_id, item_id, title, summary, authors, submitted_at,
+                revised_at)
+            VALUES ('2609.31282', 1, 'A paper', 'Its summary.', '["A name"]',
+                '2026-09-25T13:53:50Z', '2026-09-25T13:53:50Z');
+            INSERT INTO vulnerability (cve_id, item_id, name, description, vendor, product,
+                date_added, ransomware_use)
+            VALUES
+                ('CVE-2026-86950', 1, 'A vulnerability', 'Its description.', 'V', 'P',
+                    '2026-09-29T00:00:00Z', 'Unknown'),
+                ('CVE-2026-88772', 2, 'Another one', 'Its description.', 'V', 'P',
+                    '2026-09-27T00:00:00Z', 'Unknown');
+            """
+        )
+    finally:
+        connection.close()
+    connection = connect_database_read_only(database_path)
+    yield connection
+    connection.close()
+
+
+def test_an_item_is_read_by_the_branch_of_its_kind_only(
+    base_with_vulnerabilities_on_papers,
+):
+    connection = base_with_vulnerabilities_on_papers
+
+    listed = read_items(connection, limit=100).items
+    detail = read_item_detail(connection, 1)
+
+    assert [(item.id, item.kind, item.title) for item in listed] == [
+        (1, "paper", "A paper")
+    ]
+    assert detail is not None
+    assert detail.listed.title == "A paper"
+    assert read_item_detail(connection, 2) is None

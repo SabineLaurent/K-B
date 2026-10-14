@@ -1,0 +1,52 @@
+"""GET /trends: the repositories that gained the most stars and forks over a window of 3 days
+(docs/specs-api.md, "GET /trends")."""
+
+import re
+from datetime import date
+from typing import Annotated
+
+from fastapi import APIRouter, Query
+from pydantic import BeforeValidator
+
+from k_b.data_api.dependencies import Database
+from k_b.data_api.errors import ERROR_RESPONSES, ApiError, ErrorSchema
+from k_b.data_api.schemas.trend_schema import TrendSchema, TrendWindowSchema
+from k_b.database.reading import read_trends
+
+# YYYY-MM-DD, as the spec writes a day: no time, no number of seconds.
+WINDOW_END_FORM = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+
+
+def check_window_end_form(window_end: object) -> object:
+    """window_end as written in the URL: left to pydantic, 1760227200 would be read as a Unix
+    time and 2026-10-12T00:00:00Z as a day. A ValueError, which pydantic turns into a 422; the
+    day is then read by pydantic, which refuses 2026-02-30."""
+    if not isinstance(window_end, str) or not WINDOW_END_FORM.fullmatch(window_end):
+        raise ValueError("window_end is not a day written YYYY-MM-DD")
+    return window_end
+
+
+# Still a date to pydantic: the OpenAPI declares it so.
+WindowEnd = Annotated[date, BeforeValidator(check_window_end_form)]
+
+router = APIRouter()
+
+TRENDS_RESPONSES = {
+    **ERROR_RESPONSES,
+    404: {"model": ErrorSchema, "description": "trend_window_not_found"},
+}
+
+
+@router.get("/trends", responses=TRENDS_RESPONSES)
+def list_trends(
+    connection: Database,
+    window_end: Annotated[WindowEnd | None, Query()] = None,
+) -> TrendWindowSchema:
+    """The trends of a window, the latest in the base when none is given."""
+    window = read_trends(connection, window_end)
+    if window is None:
+        raise ApiError(404, "trend_window_not_found")
+    return TrendWindowSchema(
+        window_end=window.window_end,
+        trends=[TrendSchema(**trend._asdict()) for trend in window.trends],
+    )

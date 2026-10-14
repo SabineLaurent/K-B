@@ -11,10 +11,10 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from k_b.data_api.dependencies import check_api_key
 from k_b.data_api.errors import ERROR_HANDLERS, respond_to_unexpected_error
 from k_b.data_api.request_log import log_request
-from k_b.data_api.routers import item_router
+from k_b.data_api.routers import item_router, trend_router
 
 # The version of docs/specs-api.md: a change a client can see changes both.
-API_VERSION = "0.1.0"
+API_VERSION = "0.2.0"
 ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 
@@ -43,4 +43,5 @@ def create_app(database_path: Path, api_keys: Mapping[str, SecretStr]) -> FastAP
     # their line too.
     app.middleware("http")(log_request)
     app.include_router(item_router.router)
+    app.include_router(trend_router.router)
     return app

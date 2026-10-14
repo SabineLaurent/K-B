@@ -1604,6 +1604,44 @@ time-knight a recommandés et que Sabine a acceptés le 2026-10-14.
   Sabine. Limite assumée : `kb collect` et `kb import` partagent toujours `kb.log`, mais ils
   sont courts et lancés à la main, une fois par jour. — PR #195 (#184)
 
+## 2026-10-15
+
+### API de données : détail et tendances
+
+Décisions de Sabine du 2026-10-15 (validation du plan de #185, relayée par time-knight), sur
+recommandation de la session K-B sauf mention.
+
+- **Le détail d'un item sert une liste blanche : les six champs de la liste, puis ceux de sa
+  sorte nommés par la spec, et rien d'autre ; ni la clé Zotero d'un surlignage, ni le `name`
+  d'une release.** Pourquoi : la spec liste ces champs, et ce qu'aucun client n'utilise ne sort
+  pas (minimisation). La clé d'un surlignage ne permet pas de l'ouvrir dans Zotero : la clé de
+  sa pièce jointe n'est pas gardée ; le `name` d'une release est déjà dans `title`. Option
+  écartée : servir la ligne de chaque table entière (des clés internes et des colonnes de
+  collecte sortiraient, API3). La réponse est une union discriminée par `kind` (`oneOf` et
+  `discriminator` dans l'OpenAPI) ; option écartée : un schéma unique aux champs tous
+  optionnels, qui ne dit pas quels champs une sorte a. — PR de #185
+- **`item_id` et `window_end` ont une seule forme écrite : un entier sans zéro en tête, sans
+  `+`, sans espace ni décimale, tenu sur 64 bits ; une date `AAAA-MM-JJ` exactement. Toute autre
+  forme répond 422.** Pourquoi : laissés à Pydantic, `1.0`, ` 1` et `01` seraient chacun une URL
+  de l'item 1, et `window_end=1760227200` serait lu comme une date Unix (constaté avec Pydantic
+  2.13.5), ce que `since` refuse déjà. Options écartées : l'`int` et la `date` de Pydantic seuls ;
+  un 404 au-delà de 64 bits (l'entier ne peut pas être lié à SQLite). — PR de #185
+- **L'API et sa spec passent en version 0.2.0.** Décision de Sabine, sur recommandation de
+  time-knight. Pourquoi : la règle de la spec s'applique (un changement visible par un client
+  change la version) : `/items/1` passe de 404 `route_not_found` à un item servi, et un
+  `item_id` au-delà de 64 bits passe de 404 à 422. Option écartée : garder 0.1.0 au motif que
+  la spec 0.1.0 décrivait déjà ces routes (recommandée par la session K-B). — PR de #185
+- **`item.id`, un identifiant séquentiel, reste dans l'URL : la recommandation d'OWASP
+  API1:2023 d'identifiants difficiles à deviner est écartée.** Décision de Sabine. Pourquoi :
+  K-B n'a qu'une propriétaire, et tout client authentifié lit tous les items (ligne API1 de
+  `specs-api.md`) : deviner un identifiant ne donne rien qu'un client n'ait déjà. OWASP range
+  les identifiants aléatoires et imprévisibles (GUID) parmi ses mesures de prévention, à côté
+  du contrôle d'autorisation à chaque accès à un objet
+  ([API1:2023](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/),
+  section « How To Prevent », relevé par recherche web le 2026-10-15). Complète l'entrée « Identifiant : `item.id` dans le chemin » du
+  2026-10-14. Limite assumée : à revoir si l'API a un jour plusieurs utilisateurs ou sert un
+  site public. — PR de #185
+
 ## Décisions encore ouvertes
 
 - **Remplir `newsletter_article.publication_id`** (2026-10-12) : quand le lien d'un article TLDR

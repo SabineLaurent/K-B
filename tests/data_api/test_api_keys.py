@@ -16,7 +16,11 @@ def list_data_routes(items_database, api_keys):
 
 
 def test_the_data_routes_are_listed(items_database, api_keys):
-    assert list_data_routes(items_database, api_keys) == ["/items"]
+    assert list_data_routes(items_database, api_keys) == [
+        "/items",
+        "/items/{item_id}",
+        "/trends",
+    ]
 
 
 @pytest.mark.parametrize(
