@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from k_b.items import ItemKind
+from k_b.items import ItemKind, RansomwareUse
 
 # The dates the response names by where they come from: a date of K-B is the collection that saw
 # a catalog row change, not a date of the source.
@@ -51,7 +51,7 @@ class VulnerabilityDetailSchema(ListedItemSchema):
     description: str
     vendor: str
     product: str
-    ransomware_use: str
+    ransomware_use: RansomwareUse
     revised_at: str | None = Field(description=DATE_OF_K_B)
 
 

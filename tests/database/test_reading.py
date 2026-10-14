@@ -11,6 +11,7 @@ from k_b.database.creation import create_database
 from k_b.database.reading import (
     AdvisoryDetail,
     ItemDetail,
+    KindDetail,
     ListedItem,
     StoredHighlight,
     StoredTrend,
@@ -472,3 +473,11 @@ def test_a_base_without_trend_has_no_latest_window(tmp_path):
         assert read_trends(connection) is None
     finally:
         connection.close()
+
+
+@pytest.mark.parametrize(
+    "kind_detail", typing.get_args(KindDetail), ids=lambda detail: detail.__name__
+)
+def test_no_field_of_a_kind_takes_the_name_of_a_field_of_the_list(kind_detail):
+    """The response joins both: a field of the kind would replace the one of the list."""
+    assert not set(kind_detail._fields) & set(ListedItem._fields)

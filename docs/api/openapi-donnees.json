@@ -994,6 +994,10 @@
           },
           "ransomware_use": {
             "type": "string",
+            "enum": [
+              "Known",
+              "Unknown"
+            ],
             "title": "Ransomware Use"
           },
           "revised_at": {

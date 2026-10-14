@@ -18,6 +18,7 @@ from k_b.items import (
     MIN_INT64,
     NVD_PAGE_URL,
     ItemKind,
+    RansomwareUse,
     SearchableMode,
     check_text_can_be_stored,
     convert_to_utc,
@@ -182,7 +183,7 @@ class VulnerabilityDetail(NamedTuple):
     description: str
     vendor: str
     product: str
-    ransomware_use: str
+    ransomware_use: RansomwareUse
     # A date of K-B: the collection that saw the row change.
     revised_at: str | None
 
@@ -351,7 +352,8 @@ def read_item_detail(connection: sqlite3.Connection, item_id: int) -> ItemDetail
     """An item with what its kind serves beyond the list, or None if no item has this id.
 
     Its queries share one read transaction: a write between them cannot mix two states of a
-    catalog row. item_id is bound as a 64-bit integer.
+    catalog row. The connection must hold no transaction: the data API opens one per request.
+    item_id is bound as a 64-bit integer.
     """
     check_within_bounds("item_id", item_id, MIN_INT64, MAX_INT64)
     connection.execute("BEGIN")
@@ -432,7 +434,11 @@ def read_zotero_entry_detail(
 
 
 def fetch_row(connection: sqlite3.Connection, query: str, item_id: int) -> Any:
-    """The row of the subtype of an item the list has read: the same join, so it exists."""
+    """The row of the subtype of an item the list has read. release, advisory,
+    newsletter_article and zotero_entry hold it by their (item_id, kind) foreign key;
+    publication and vulnerability have no kind, and a row of theirs linked to an item of another
+    kind leaves None here: its unpacking raises a TypeError, which the API answers with a 500
+    internal_error."""
     return connection.execute(query, (item_id,)).fetchone()
 
 
