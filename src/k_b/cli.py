@@ -85,11 +85,6 @@ def logging_to(data_dir: Path) -> Iterator[None]:
     root_logger.setLevel(logging.INFO)
     try:
         yield
-    except Exception:
-        # Written while the handlers are there: the traceback Python prints next is not in
-        # the file.
-        logger.exception("kb stopped by an exception it does not handle")
-        raise
     finally:
         root_logger.setLevel(previous_level)
         for handler in handlers:
@@ -125,7 +120,13 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
-        return run_command(arguments.command, data_dir)
+        try:
+            return run_command(arguments.command, data_dir)
+        except Exception:
+            # Logged here, while the log file is open, and not raised again: Python would print
+            # its traceback a second time. 1, as Python exits on an exception: kb was run.
+            logger.exception("kb stopped by an exception it does not handle")
+            return 1
 
 
 def run_command(command: str, data_dir: Path) -> int:

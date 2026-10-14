@@ -347,8 +347,8 @@ def test_an_error_handled_by_kb_is_a_dated_log_line_of_the_log_file(
     assert file_line in capsys.readouterr().err.splitlines()
 
 
-def test_an_exception_kb_does_not_handle_is_logged_in_the_log_file_then_raised(
-    monkeypatch, tmp_path
+def test_an_exception_kb_does_not_handle_is_logged_once_and_exits_1(
+    monkeypatch, tmp_path, capsys
 ):
     def failing_collect(data_dir):
         raise RuntimeError("not handled")
@@ -356,8 +356,10 @@ def test_an_exception_kb_does_not_handle_is_logged_in_the_log_file_then_raised(
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(cli, "run_collect", failing_collect)
 
-    with pytest.raises(RuntimeError, match="not handled"):
-        cli.main(["collect"])
+    assert cli.main(["collect"]) == 1
+
+    # Once on stderr: the traceback is not printed again by Python.
+    assert capsys.readouterr().err.count("RuntimeError: not handled") == 1
 
     log_text = (tmp_path / "logs" / "kb.log").read_text("utf-8")
     assert re.match(
