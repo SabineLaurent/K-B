@@ -103,3 +103,18 @@ def test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only(
     assert "status=500" in caplog.text
     assert "value received by the test" not in caplog.text
     assert "Traceback" not in caplog.text
+
+
+@pytest.mark.parametrize("path", ["/items", "/items/1", "/trends"])
+def test_no_route_answers_cors(client, authorization, path):
+    """No CORS: a page of another origin cannot read a response in a browser."""
+    origin = {"Origin": "https://evil.example"}
+
+    response = client.get(path, headers={**authorization, **origin})
+    preflight = client.options(
+        path, headers={**origin, "Access-Control-Request-Method": "GET"}
+    )
+
+    assert response.status_code == 200
+    assert "access-control-allow-origin" not in response.headers
+    assert "access-control-allow-origin" not in preflight.headers
