@@ -75,8 +75,9 @@ class TldrSource:
                         error.redirect_url,
                     )
                     continue
-                # The error alone does not always say which day and url it is about.
-                logger.error("%s %s: %s, from %s", self.name, day, error, page_url)
+                # The error alone does not always say which day and url it is about. Logged
+                # where the collection handles it (etl/extract.py), with this note.
+                error.add_note(f"{self.name} {day}, from {page_url}")
                 raise
             logger.info("%s %s: edition page, %d bytes", self.name, day, len(page))
             pages[day.isoformat()] = page

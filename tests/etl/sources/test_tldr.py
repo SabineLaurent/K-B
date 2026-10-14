@@ -112,19 +112,22 @@ def test_a_day_redirected_to_the_edition_landing_page_is_logged_and_skipped(
     )
 
 
-def test_a_redirection_elsewhere_than_the_edition_landing_page_is_logged_and_raised(
+def test_a_redirection_elsewhere_than_the_edition_landing_page_is_raised_with_its_day_and_url(
     fake_download, caplog
 ):
     fake_download.answers["https://tldr.tech/ai/2026-10-04"] = RedirectedOutsideError(
         "https://tldr.tech/ai/2026-10-04", "https://tldr.tech/login"
     )
 
-    with pytest.raises(RedirectedOutsideError, match="https://tldr.tech/login"):
+    with pytest.raises(
+        RedirectedOutsideError, match="https://tldr.tech/login"
+    ) as raised:
         TldrSource("ai").fetch(datetime(2026, 10, 4, 6, 0, tzinfo=UTC))
-    assert (
-        "tldr_ai 2026-10-04: response redirected to https://tldr.tech/login, outside "
-        "https://tldr.tech/ai/2026-10-04, refused, from https://tldr.tech/ai/2026-10-04"
-    ) in caplog.text
+    assert raised.value.__notes__ == [
+        "tldr_ai 2026-10-04, from https://tldr.tech/ai/2026-10-04"
+    ]
+    # Logged once, where the collection handles the failure (etl/extract.py).
+    assert not [record for record in caplog.records if record.levelno >= logging.ERROR]
 
 
 def test_no_edition_page_in_the_window_returns_none_and_is_logged(
@@ -156,15 +159,17 @@ def test_no_edition_page_in_the_window_returns_none_and_is_logged(
         ),
     ],
 )
-def test_an_error_is_logged_with_its_day_and_url_then_raised(
+def test_an_error_is_raised_with_its_day_and_url_and_not_logged_here(
     fake_download, caplog, error, observed
 ):
     fake_download.answers["https://tldr.tech/ai/2026-10-04"] = error
 
-    with pytest.raises(type(error)):
+    with pytest.raises(type(error), match=observed) as raised:
         TldrSource("ai").fetch(datetime(2026, 10, 4, 6, 0, tzinfo=UTC))
-    assert f"tldr_ai 2026-10-04: {observed}" in caplog.text
-    assert "from https://tldr.tech/ai/2026-10-04" in caplog.text
+    assert raised.value.__notes__ == [
+        "tldr_ai 2026-10-04, from https://tldr.tech/ai/2026-10-04"
+    ]
+    assert not [record for record in caplog.records if record.levelno >= logging.ERROR]
 
 
 @pytest.mark.parametrize("edition", ["", "AI", "ai/../x", "ai?x=1"])

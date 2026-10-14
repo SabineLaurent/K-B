@@ -42,7 +42,10 @@ def collect_all_sources(
                 source, raw_dir, now, last_collection_dates.get(source.name)
             )
         except Exception as error:
-            logger.exception("collection failed for source %r", source.name)
+            # The notes of a source (the day and url of a page) go on the dated line; the
+            # error itself is in the traceback that follows it.
+            notes = "".join(f"; {note}" for note in getattr(error, "__notes__", []))
+            logger.exception("collection failed for source %r%s", source.name, notes)
             errors_by_source[source.name] = error
         else:
             last_collection_dates[source.name] = now
