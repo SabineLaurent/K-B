@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 # The name etl/extract.py gives every raw file of a collection.
 COLLECTION_NAME_FORMAT = "%Y-%m-%dT%H%M%SZ"
+# The longest folder name quoted in a log line, quotes and escapes included.
+MAX_QUOTED_FOLDER_NAME_LENGTH = 100
 
 
 class Rejection(NamedTuple):
@@ -168,7 +170,12 @@ def list_collections(
     for source_dir in source_dirs:
         kind = find_source_kind(source_dir.name, kinds)
         if kind is None:
-            logger.info("folder without a source kind, skipped: %s", source_dir.name)
+            # The name of a folder of raw/ is not checked: quoted, escaped and truncated
+            # (conventions.md, rule 3).
+            logger.info(
+                "folder without a source kind, skipped: %s",
+                repr(source_dir.name)[:MAX_QUOTED_FOLDER_NAME_LENGTH],
+            )
             continue
         reader = kind.reader
         if reader is None:

@@ -120,7 +120,27 @@ def test_a_folder_of_no_source_kind_is_skipped_and_logged(tmp_path, caplog):
 
     assert items_of(reading) == []
     assert reading.rejections == []
-    assert "folder without a source kind, skipped: unknown" in caplog.text
+    assert "folder without a source kind, skipped: 'unknown'" in caplog.text
+
+
+def test_the_name_of_a_folder_of_no_source_kind_is_logged_escaped_and_truncated(
+    tmp_path, caplog
+):
+    folder_name = "line\nINFO forged" + "x" * 200
+    (tmp_path / "automated_watch" / folder_name).mkdir(parents=True)
+
+    with caplog.at_level(logging.INFO):
+        read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+
+    [message] = [
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("folder without a source kind")
+    ]
+    assert (
+        message == "folder without a source kind, skipped: " + repr(folder_name)[:100]
+    )
+    assert "\n" not in message
 
 
 def test_the_raw_files_of_a_folder_no_longer_tracked_are_read(tmp_path):
@@ -517,7 +537,7 @@ def test_a_folder_of_the_selected_library_without_a_source_kind_is_skipped(
         reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert reading.files == []
-    assert "folder without a source kind, skipped: clipping" in caplog.text
+    assert "folder without a source kind, skipped: 'clipping'" in caplog.text
 
 
 def test_a_raw_file_nested_too_deep_is_rejected_and_the_others_are_read(tmp_path):
