@@ -15,7 +15,13 @@ from urllib.parse import urlencode
 from k_b.etl.http_download import download
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import SourceReader
-from k_b.items import ARXIV_ID, Item, SourceCode, parse_aware_datetime
+from k_b.items import (
+    ARXIV_ABSTRACT_PAGE_URL,
+    ARXIV_ID,
+    Item,
+    SourceCode,
+    parse_aware_datetime,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +61,6 @@ OPENSEARCH = "{http://a9.com/-/spec/opensearch/1.1/}"
 PAPER_ID = re.compile(rf"https?://arxiv\.org/abs/({ARXIV_ID})v([0-9]+)")
 # arXiv reports an error as a feed whose single entry carries this id.
 API_ERROR_ID = re.compile(r"https?://arxiv\.org/api/errors")
-ABSTRACT_PAGE_URL = "https://arxiv.org/abs/"
 
 
 # The name of its raw folders, written once: its instances and its kind use it.
@@ -198,7 +203,7 @@ def parse_paper(entry: ElementTree.Element, position: int) -> Paper:
         updated_at=parse_aware_datetime(
             read_text(entry, "updated", label), f"{label}: updated"
         ),
-        url=ABSTRACT_PAGE_URL + arxiv_id,
+        url=ARXIV_ABSTRACT_PAGE_URL + arxiv_id,
     )
 
 

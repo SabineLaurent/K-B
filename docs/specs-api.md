@@ -101,10 +101,6 @@ cette semaine n'apparaît pas dans « quoi de neuf » (limite assumée, journal 
 | `newsletter_article` | `newsletter_article.edition_date` | `newsletter_article.title` | `newsletter_article.summary` |
 | `zotero_entry` | `zotero_entry.saved_at` | `zotero_entry.title` | aucun |
 
-Le critère de la lecture des items (#183) dit encore un titre de release sans son dépôt
-(`coalesce(nullif(name,''), tag_name)`) et un tri « puis par `item.id` » sans sens : cette spec
-fait foi, la mission de #183 mettra son critère à jour.
-
 ### Tri et pagination
 
 - Tri par `source_date` décroissante, puis par `id` décroissant.

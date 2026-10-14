@@ -8,14 +8,13 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from k_b.database.connection import DATABASE_FILE_NAME
+from k_b.database.connection import DATABASE_FILE_NAME, MissingDatabaseError
 from k_b.database.creation import create_database
 from k_b.database.writers.shared_rows import UnknownSourceError
 from k_b.etl.extract import collect_all_sources
 from k_b.etl.load import (
     ImportLogExistsError,
     KindWithoutTableError,
-    MissingDatabaseError,
     import_items,
     read_imported_paths,
 )
