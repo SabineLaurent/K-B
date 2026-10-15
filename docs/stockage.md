@@ -276,10 +276,17 @@ règle ci-dessus (`tests/test_database.py`).
 
 - **En développement, la base est jetable** : un changement de schéma = supprimer la base,
   `kb create-db`, puis `kb import`, qui la reconstruit depuis le brut. Pas de migration.
-- **En usage réel, la base est gardée** et l'`id` technique des items reste stable : les
-  changements de schéma passeront par des migrations Alembic écrites en SQL (journal ADR,
-  2026-10-10), pas encore codées. `schema.sql` reste le MPD et fait foi ; un test comparera la
-  base créée par `schema.sql` et la base migrée.
+- **En usage réel, la base est gardée** et l'`id` technique des items reste stable. SQLite au
+  25/10, PostgreSQL au 08/11 (journal ADR, 2026-10-15, « POC du 25/10 », décision 2) : les
+  migrations Alembic écrites en SQL (journal ADR, 2026-10-10), pas encore codées, sont à reprendre
+  pour PostgreSQL seulement, avec #186. `schema.sql` reste le MPD et fait foi.
+- **Au passage à PostgreSQL, l'`id` est copié tel quel.** Les lignes de chaque table sont
+  copiées avec leur `id` ; un `INSERT` dans une colonne `GENERATED ALWAYS AS IDENTITY` (tableau
+  ci-dessus) ne l'accepte qu'avec `OVERRIDING SYSTEM VALUE`. Puis la séquence de chaque table est
+  recalée sur le plus grand `id` copié, sans quoi le prochain `INSERT` sans `id` reprendrait à 1
+  et heurterait une clé existante :
+  `SELECT setval(pg_get_serial_sequence('<table>', '<colonne>'), max(<colonne>)) FROM <table>;`
+  pour les 12 tables à `INTEGER PRIMARY KEY` de `schema.sql`, `highlight_id` compris.
 - Les champs propres d'une source s'ajoutent quand on traite sa lecture : l'issue de la source
   ajoute ses colonnes, leurs longueurs maximales (dans `items.py` et en `CHECK`), et met à jour ce
   document dans sa PR.
@@ -292,3 +299,13 @@ règle ci-dessus (`tests/test_database.py`).
   déjà, ou si le dossier permet de les créer (lecture seule).
 - [ALTER TABLE](https://www.sqlite.org/lang_altertable.html) — SQLite
 - [MVCC](https://www.postgresql.org/docs/current/mvcc-intro.html) — PostgreSQL
+- [CREATE SEQUENCE](https://www.postgresql.org/docs/18/sql-createsequence.html) — PostgreSQL 18 ;
+  exemple `COPY` puis `SELECT setval('serial', max(id))` (consulté le 2026-10-15, par Context7).
+- [Sequence Manipulation Functions](https://www.postgresql.org/docs/18/functions-sequence.html) —
+  PostgreSQL 18 ; `setval` (consulté le 2026-10-15, par Context7).
+- [INSERT](https://www.postgresql.org/docs/current/sql-insert.html) — PostgreSQL 18 ;
+  `OVERRIDING SYSTEM VALUE` pour une colonne `GENERATED ALWAYS` (relevé par recherche web le
+  2026-10-15).
+- [System Information Functions](https://www.postgresql.org/docs/current/functions-info.html) —
+  PostgreSQL 18 ; `pg_get_serial_sequence` rend aussi la séquence d'une colonne d'identité
+  (relevé par recherche web le 2026-10-15).
