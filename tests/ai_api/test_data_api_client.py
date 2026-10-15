@@ -528,3 +528,78 @@ def test_a_newsletter_article_read_is_ready_for_the_writing(data_api):
             " platform-specific input."
         ),
     )
+
+
+# The bound of a body (MAX_DATA_API_BODY_BYTES), reduced for the tests.
+
+PAGE_OF_PAPER = json.dumps({"items": [LISTED_PAPER], "next_offset": None}).encode()
+
+
+def bound_bodies(monkeypatch, max_bytes):
+    monkeypatch.setattr(data_api_client, "MAX_DATA_API_BODY_BYTES", max_bytes)
+
+
+def test_a_body_up_to_the_bound_is_read(monkeypatch):
+    bound_bodies(monkeypatch, max(len(PAGE_OF_PAPER), len(json.dumps(PAPER_DETAIL))))
+    http_client, _ = simulate()
+
+    reading = read_watch(http_client, SINCE_ALL)
+
+    assert [item.item_id for item in reading.items] == [2]
+
+
+def test_a_list_above_the_bound_gives_data_api_invalid_response(monkeypatch):
+    bound_bodies(monkeypatch, len(PAGE_OF_PAPER) - 1)
+    http_client, _ = simulate()
+
+    with pytest.raises(DataApiError) as raised:
+        read_watch(http_client, SINCE_ALL)
+
+    assert raised.value.state == "data_api_invalid_response"
+    assert raised.value.http_status == 200
+    assert str(raised.value) == "data_api_invalid_response, HTTP 200"
+
+
+def test_a_detail_above_the_bound_gives_data_api_invalid_response(monkeypatch):
+    bound_bodies(monkeypatch, len(PAGE_OF_PAPER))
+    long_detail = PAPER_DETAIL | {"summary": "a" * len(PAGE_OF_PAPER)}
+    http_client, _ = simulate(answer_detail=lambda request: answer(body=long_detail))
+
+    with pytest.raises(DataApiError) as raised:
+        read_watch(http_client, SINCE_ALL)
+
+    assert raised.value.state == "data_api_invalid_response"
+    assert raised.value.http_status == 200
+
+
+def test_an_item_not_found_is_still_read_under_the_bound(monkeypatch):
+    bound_bodies(monkeypatch, len(PAGE_OF_PAPER))
+    http_client, _ = simulate(
+        answer_detail=lambda request: answer(404, {"error": "item_not_found"})
+    )
+
+    reading = read_watch(http_client, SINCE_ALL)
+
+    assert reading.items_dropped == 1
+
+
+class UnreadStream(httpx2.SyncByteStream):
+    """A body that fails the test if it is read."""
+
+    def __iter__(self):
+        raise AssertionError("the body was read")
+
+
+def test_a_content_length_above_the_bound_is_refused_before_reading(monkeypatch):
+    bound_bodies(monkeypatch, 1_000)
+    http_client, _ = simulate(
+        answer_list=lambda request: httpx2.Response(
+            200, headers={"Content-Length": "1001"}, stream=UnreadStream()
+        )
+    )
+
+    with pytest.raises(DataApiError) as raised:
+        read_watch(http_client, SINCE_ALL)
+
+    assert raised.value.state == "data_api_invalid_response"
+    assert raised.value.http_status == 200

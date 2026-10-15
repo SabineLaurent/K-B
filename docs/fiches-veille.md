@@ -133,7 +133,12 @@ qui envoie au compte-gouttes fait durer une requête sans fin ; et aux 300 déta
 pages de liste, jusqu'à 101 par sorte (les entrées retirées ne comptent pas sous le plafond).
 Seule `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205) bornera la lecture : `read_watch` ne se branche sur
 une route qu'avec cette échéance (constat de `/code-review` sur #204, tranché par time-knight,
-délégation de Sabine du 2026-10-15). **Offset** : `GET /items` rend `next_offset` nul
+délégation de Sabine du 2026-10-15). **Taille** : chaque réponse de l'API de données est lue en
+flux et refusée (`data_api_invalid_response`, sans rien citer du corps) au-delà de
+`MAX_DATA_API_BODY_BYTES = 4 000 000` octets décodés, avant toute lecture quand `Content-Length`
+l'annonce déjà ; au-dessus du pire honnête, estimé à environ 2 Mo pour une page de liste et
+0,75 Mo pour un détail. Défense en profondeur (OWASP API4:2023, API10:2023), décision de Sabine
+du 2026-10-15 : une borne dès maintenant, à corriger plus tard si besoin. **Offset** : `GET /items` rend `next_offset` nul
 au-delà de l'offset 10 000 ; une entrée retirée ne prenant pas de place sous le plafond, une sorte
 qui compterait plus de 10 000 entrées retirées dans la fenêtre serait coupée sans `capped_kind`.
 Seules les vulnérabilités KEV sont retirables parmi les sortes lues : limite assumée (constat de

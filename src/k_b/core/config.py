@@ -83,6 +83,12 @@ DATA_API_CONNECT_TIMEOUT_SECONDS = 5
 DATA_API_POOL_TIMEOUT_SECONDS = 5
 DATA_API_WRITE_TIMEOUT_SECONDS = 10
 DATA_API_READ_TIMEOUT_SECONDS = 10
+# The largest body of an answer of the data API, read or announced by Content-Length; beyond, the
+# reading stops with data_api_invalid_response (Sabine, 2026-10-15: a bound now, to be corrected
+# later if needed). Above the worst honest answer, estimated in the review of #204 at about 2 MB
+# for a page of the list and 0.75 MB for a detail. A defense in depth (OWASP API4:2023, API10:2023); the duration stays bounded by
+# DIGEST_REQUEST_TIMEOUT_SECONDS (#205).
+MAX_DATA_API_BODY_BYTES = 4_000_000
 # The items read for one request, at most: the rare kinds first (OWASP API4:2023).
 MAX_ITEMS_PER_DIGEST_REQUEST = 300
 # The items sent to the writing of one digest, the most recent first, and the length of each of

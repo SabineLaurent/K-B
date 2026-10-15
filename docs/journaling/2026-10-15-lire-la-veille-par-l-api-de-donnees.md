@@ -43,14 +43,14 @@ for kind in WATCH_KINDS:
         if listed_item.id in seen_ids:
             continue
 ```
-`src/k_b/ai_api/data_api_client.py:209-212`
+`src/k_b/ai_api/data_api_client.py:218-221`
 
 `list_kind` est un **générateur** : il demande une page, rend ses items un par un, et ne demande
 la page suivante (`offset = next_offset`) que si la boucle en a encore besoin. Quand le plafond
 est atteint, la boucle s'arrête : aucune page de plus n'est demandée, et les sortes suivantes ne
 sont pas lues du tout. Deux gardes protègent la pagination :
 
-- `if page.next_offset <= offset` (`data_api_client.py:243`) : une page qui ne fait pas avancer
+- `if page.next_offset <= offset` (`data_api_client.py:252`) : une page qui ne fait pas avancer
   l'offset serait redemandée sans fin. On la refuse (`data_api_invalid_response`).
 - `seen_ids` : un import qui écrit entre deux pages décale la pagination par offset
   (`docs/specs-api.md`, « Tri et pagination »). Le même item peut alors revenir. On le lit une
@@ -63,7 +63,7 @@ if len(kept) == MAX_ITEMS_PER_DIGEST_REQUEST:
     return ItemList(kept, withdrawn, kind, listed_item.source_date)
 kept.append(listed_item)
 ```
-`src/k_b/ai_api/data_api_client.py:217-219`
+`src/k_b/ai_api/data_api_client.py:226-228`
 
 Quand on voit un 301ᵉ item non retiré, on s'arrête. On rend la sorte où l'on est
 (`capped_kind`) et la date de **cet item laissé de côté** (`covered_after`).
@@ -90,31 +90,41 @@ except httpx2.TimeoutException:
 except httpx2.TransportError:
     raise DataApiError("data_api_unavailable") from None
 ```
-`src/k_b/ai_api/data_api_client.py:270-273`
+`src/k_b/ai_api/data_api_client.py:280-283`
 
 L'ordre des `except` compte : dans httpx2, `TimeoutException` hérite de `TransportError`
 (vérifié sur le paquet installé, 2.13.1). Mis dans l'autre ordre, un délai deviendrait
 « indisponible ». `from None` coupe la chaîne : l'exception d'httpx2 cite l'URL demandée, et
 `DataApiError` ne doit porter que l'état et le statut.
 
-Côté statut (`read_body`, `data_api_client.py:279`), un 401 donne `data_api_unauthorized` et un
+Côté statut (`read_body`, `data_api_client.py:310`), un 401 donne `data_api_unauthorized` et un
 5xx `data_api_unavailable`. Tout autre statut donne `data_api_invalid_response` : une
 redirection, qu'on ne suit pas ; le 400 d'un hôte refusé, le réglage le plus probable à manquer
 en conteneur ; un 422.
 
 Une seule exception : un 404 dont le corps est exactement `{"error": "item_not_found"}`, au
-détail (`data_api_client.py:253`). L'item a disparu entre la liste et le détail. On le saute et on
+détail (`data_api_client.py:262`). L'item a disparu entre la liste et le détail. On le saute et on
 le compte, ce n'est pas une panne. Un 404 avec un autre corps (une route inconnue, une mauvaise
 URL de base) reste un échec : c'est le test qui sépare « l'item est parti » de « je parle au
 mauvais service ».
 
-**`since` arrondi à la seconde suivante** (`format_since`, `data_api_client.py:186`). L'API de
+**`since` arrondi à la seconde suivante** (`format_since`, `data_api_client.py:195`). L'API de
 données lit `since` ainsi (`database/reading.py`, `format_since`), et l'API IA ne peut pas
 importer `database` : la règle est recopiée et cite sa source. Un instant 09:00:00,7 devient
 09:00:01, et un item daté 09:00:00, antérieur, n'est pas lu. Le garde porte sur `utcoffset()`, pas
 sur `tzinfo` : un fuseau sans décalage laisserait la date naïve, lue comme heure locale. Et
 `isoformat` remplace `strftime`, qui laisse la largeur de l'année à la bibliothèque C (constat de
 `/code-review`, corrigé).
+
+**Une borne de taille des corps** (`read_bounded_body`, appelée par `send`). Chaque réponse est
+lue en flux (`http_client.stream`, puis `iter_bytes`) et refusée en `data_api_invalid_response`
+dès que les octets lus dépassent `MAX_DATA_API_BODY_BYTES` (4 Mo, `core/config.py`). Elle est
+refusée avant toute lecture si `Content-Length` annonce déjà plus. `iter_bytes` rend des octets
+décodés : un corps compressé est borné par la place qu'il prend une fois lu. Sans cette borne,
+`response.content` lisait tout le corps en mémoire, quelle que soit sa taille. C'est une défense
+en profondeur : l'API de données est la nôtre, et ses réponses honnêtes restent loin dessous
+(environ 2 Mo au pire pour une page de liste, estimation de la revue). Décision de Sabine, prise
+sur un constat de `/code-review` : une borne dès maintenant, à corriger plus tard si besoin.
 
 Rien n'est journalisé ici : #156 journalisera l'état une fois, avec l'identifiant de la demande
 (règle 3 de `conventions.md` : un échec est journalisé là où il est traité).
@@ -124,16 +134,16 @@ Rien n'est journalisé ici : #156 journalisera l'état une fois, avec l'identifi
 ```python
 model_config = ConfigDict(extra="ignore", strict=True, frozen=True)
 ```
-`src/k_b/ai_api/data_api_client.py:65`
+`src/k_b/ai_api/data_api_client.py:66`
 
 L'API IA ne peut pas importer les schémas de `data_api` (règle des dépendances) : elle a ses
 propres modèles. Ils ne déclarent que les champs utiles, et `extra="ignore"` laisse tomber le
 reste **dès la lecture du JSON**. Les auteurs d'un papier, servis par le détail, ne sont donc
 jamais dans un objet Python de l'API IA. `strict=True` refuse un `id` envoyé en texte (`"2"`).
-Pour le détail, l'union discriminée par `kind` (`DETAIL`, `data_api_client.py:131`) refuse une
+Pour le détail, l'union discriminée par `kind` (`DETAIL`, `data_api_client.py:132`) refuse une
 sorte hors liste blanche, `zotero_entry` compris.
 
-`exploited` est renommé à la lecture (`validation_alias="exploited"`, `data_api_client.py:113`) :
+`exploited` est renommé à la lecture (`validation_alias="exploited"`, `data_api_client.py:114`) :
 le modèle recevra `cve_listed_in_cisa_kev`. Le nom d'origine l'inviterait à lire un « faux »
 comme « non exploitée ».
 
@@ -201,6 +211,7 @@ dans `core/config.py` : `kb serve` et l'API IA appliquent la même règle.
 | `test_an_item_gone_between_the_list_and_the_detail_is_skipped_and_counted` contre `test_a_detail_that_fails_gives_its_state` (404 `route_not_found`) | Un item parti est sauté ; un mauvais service est un échec |
 | `test_the_error_carries_neither_the_key_nor_what_was_received` | Ni la clé ni l'en-tête `Location` dans l'erreur ; pas de cause chaînée |
 | `test_since_is_sent_in_utc_to_the_second_rounded_up`, `test_a_since_without_time_zone_is_refused` | `since` arrondi à la seconde suivante, l'an 1 écrit sur quatre chiffres, un fuseau sans décalage refusé |
+| `test_a_body_up_to_the_bound_is_read`, `test_a_list_above_the_bound_gives_data_api_invalid_response`, `test_a_detail_above_the_bound_gives_data_api_invalid_response`, `test_an_item_not_found_is_still_read_under_the_bound`, `test_a_content_length_above_the_bound_is_refused_before_reading` | La borne de taille sur la liste et sur le détail ; un `Content-Length` trop grand refusé sans lire le corps (un corps qui fait échouer le test s'il est lu) |
 | `test_the_masking_of_a_release_body` | URL avant login, adresse mail laissée, portée npm masquée |
 | `test_the_client_reads_no_proxy_of_the_environment_and_follows_no_redirection` | Lu sur un client construit sans transport : avec un transport simulé, httpx2 ne lit jamais le proxy, et le test ne prouverait rien |
 | Démonstration : `kb serve` sur une base d'essai, port 8765 | 13 items en 66 ms, `items_dropped: 1` ; 5 listes et 13 détails au journal, `client=AI_DIGEST` ; API arrêtée : `state: data_api_unavailable, http_status: None` |

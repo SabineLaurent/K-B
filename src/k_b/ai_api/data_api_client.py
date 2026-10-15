@@ -30,6 +30,7 @@ from k_b.core.config import (
     DATA_API_POOL_TIMEOUT_SECONDS,
     DATA_API_READ_TIMEOUT_SECONDS,
     DATA_API_WRITE_TIMEOUT_SECONDS,
+    MAX_DATA_API_BODY_BYTES,
     MAX_ITEMS_PER_DIGEST_REQUEST,
 )
 from k_b.items import Int64, RansomwareUse, UtcDatetime
@@ -136,6 +137,14 @@ PAGE = TypeAdapter(ItemPage)
 
 class ErrorBody(DataApiModel):
     error: str
+
+
+@dataclass(frozen=True)
+class Answer:
+    """An answer of the data API, its body read whole within MAX_DATA_API_BODY_BYTES."""
+
+    status_code: int
+    content: bytes
 
 
 @dataclass(frozen=True)
@@ -262,11 +271,12 @@ def send(
     http_client: httpx2.Client,
     path: str,
     params: dict[str, str | int] | None = None,
-) -> httpx2.Response:
-    """One GET, its failure as a named state. Raised from None: the error of httpx2 names the
-    URL asked."""
+) -> Answer:
+    """One GET, its body read within its bound, its failure as a named state. Raised from None:
+    the error of httpx2 names the URL asked."""
     try:
-        return http_client.get(path, params=params)
+        with http_client.stream("GET", path, params=params) as response:
+            return Answer(response.status_code, read_bounded_body(response))
     except httpx2.TimeoutException:
         raise DataApiError("data_api_timeout") from None
     except httpx2.TransportError:
@@ -276,7 +286,28 @@ def send(
         raise DataApiError("data_api_invalid_response") from None
 
 
-def read_body[BodyT](response: httpx2.Response, adapter: TypeAdapter[BodyT]) -> BodyT:
+def read_bounded_body(response: httpx2.Response) -> bytes:
+    """The body, refused beyond MAX_DATA_API_BODY_BYTES, without quoting it: before reading when
+    Content-Length announces more, else as soon as the bytes read pass it."""
+    status = response.status_code
+    length = response.headers.get("Content-Length")
+    if (
+        length is not None
+        and length.isascii()
+        and length.isdigit()
+        and int(length) > MAX_DATA_API_BODY_BYTES
+    ):
+        raise DataApiError("data_api_invalid_response", status)
+    body = bytearray()
+    # Decoded bytes: a compressed body is bounded by what it takes once read.
+    for chunk in response.iter_bytes():
+        body += chunk
+        if len(body) > MAX_DATA_API_BODY_BYTES:
+            raise DataApiError("data_api_invalid_response", status)
+    return bytes(body)
+
+
+def read_body[BodyT](response: Answer, adapter: TypeAdapter[BodyT]) -> BodyT:
     """The body of a 200 in its schema; any other answer is a named state."""
     status = response.status_code
     if status == httpx2.codes.UNAUTHORIZED:
@@ -292,7 +323,7 @@ def read_body[BodyT](response: httpx2.Response, adapter: TypeAdapter[BodyT]) -> 
         raise DataApiError("data_api_invalid_response", status) from None
 
 
-def is_item_not_found(response: httpx2.Response) -> bool:
+def is_item_not_found(response: Answer) -> bool:
     try:
         return ErrorBody.model_validate_json(response.content).error == "item_not_found"
     except ValidationError:
