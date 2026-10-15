@@ -104,10 +104,18 @@ ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 6
   ancienne. Pourquoi : une coupe par date seule évincerait d'abord arXiv (daté par sa soumission,
   donc parmi les plus anciens) et les entrées KEV plus anciennes, la perte la plus grave pour une
   veille de sécurité.
-- **Coupe dite** : `items_capped` est vrai s'il reste au moins un item au-delà du plafond ; la
-  réponse donne alors `window.covered_since`, la date du plus ancien item gardé **de la sorte
-  coupée**, pour que `window.since` ne promette pas ce qui n'a pas été lu. Avec ce plafond,
-  l'offset 10 000 de `GET /items` n'est jamais atteint.
+- **Coupe dite** : `items_capped` est vrai s'il reste au moins un item non retiré au-delà du
+  plafond ; la réponse donne alors `window.capped_kind`, la sorte coupée, et
+  `window.covered_after`, la date du **premier item laissé de côté** de cette sorte, borne
+  exclue : tout item de la sorte coupée strictement plus récent a été lu, et les sortes qui la
+  suivent dans l'ordre ne sont pas lues du tout. Ainsi `window.since` ne promet pas ce qui n'a pas
+  été lu. Les deux valeurs sont nulles quand `items_capped` est faux. Pourquoi une borne exclue
+  (décision de Sabine du 2026-10-15, journal ADR, « Fiches de veille : la lecture par l'API de
+  données ») : les articles TLDR d'une édition ont tous la même date, minuit UTC ; une coupe au
+  milieu d'une édition aurait annoncé couvert un jour lu en partie. L'ordre de `GET /items`
+  (`source_date`, puis `id`, décroissants) est total : la borne est vraie même quand la coupe
+  tombe entre deux sortes. Une entrée retirée ne prend pas de place sous le plafond. Avec ce
+  plafond, l'offset 10 000 de `GET /items` n'est jamais atteint.
 - **Durée totale** : `DIGEST_REQUEST_TIMEOUT_SECONDS`, une constante nommée dans `core/config.py`,
   sa valeur fixée par #205. Au-delà, les sujets pas encore rédigés vont dans `failed_subjects`
   avec `llm_timeout`. Elle borne la demande ; le délai d'un appel (#150) ne borne que l'appel.
@@ -117,8 +125,24 @@ ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 6
 
 **Limites** : une seule demande à la fois est supposée (une seule utilisatrice, en local) ; les
 quotas du déploiement Foundry seront vérifiés par #158. Les sortes rares tiennent bien sous
-le plafond (≈ 150 items sur 14 jours) : si la coupe tombait sur l'une d'elles, `covered_since`
-vaudrait pour cette sorte, et les sortes suivantes ne seraient pas lues.
+le plafond (≈ 150 items sur 14 jours) : si la coupe tombait sur l'une d'elles, `capped_kind` la
+nommerait, et les sortes suivantes ne seraient pas lues. **Durée** : la lecture n'a pas de borne
+à elle. Les délais du client (`DATA_API_*_TIMEOUT_SECONDS`) bornent chaque attente, pas une
+requête ni la lecture : le délai de lecture vaut pour chaque morceau reçu, si bien qu'un serveur
+qui envoie au compte-gouttes fait durer une requête sans fin ; et aux 300 détails s'ajoutent les
+pages de liste, jusqu'à 101 par sorte (les entrées retirées ne comptent pas sous le plafond).
+Seule `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205) bornera la lecture : `read_watch` ne se branche sur
+une route qu'avec cette échéance (constat de `/code-review` sur #204, tranché par time-knight,
+délégation de Sabine du 2026-10-15). **Taille** : chaque réponse de l'API de données est lue en
+flux et refusée (`data_api_invalid_response`, sans rien citer du corps) au-delà de
+`MAX_DATA_API_BODY_BYTES = 4 000 000` octets décodés, avant toute lecture quand `Content-Length`
+l'annonce déjà ; au-dessus du pire honnête, estimé à environ 2 Mo pour une page de liste et
+0,75 Mo pour un détail. Défense en profondeur (OWASP API4:2023, API10:2023), décision de Sabine
+du 2026-10-15 : une borne dès maintenant, à corriger plus tard si besoin. **Offset** : `GET /items` rend `next_offset` nul
+au-delà de l'offset 10 000 ; une entrée retirée ne prenant pas de place sous le plafond, une sorte
+qui compterait plus de 10 000 entrées retirées dans la fenêtre serait coupée sans `capped_kind`.
+Seules les vulnérabilités KEV sont retirables parmi les sortes lues : limite assumée (constat de
+`/code-review` sur #204, écarté par time-knight, délégation de Sabine du 2026-10-15).
 
 ## Schémas
 
@@ -204,6 +228,11 @@ champs où la fidélité cherche un fait (section « Fidélité ») :
   caractères). La fidélité cherche dans le texte masqué, donc dans les champs envoyés. **Limite** :
   un domaine sans schéma (`example.com/x`) n'est ni masqué ni refusé ; il est rendu en texte non
   cliquable, car CommonMark et GFM ne font un lien que d'un schéma ou de `www.`.
+- **`@login` masqués** (#204, `ai_api/watch_items.py`), dans `release.body` seul, après les URL
+  (une URL peut porter un `@`) : `(?<![A-Za-z0-9_.@/-])@[A-Za-z0-9][A-Za-z0-9-]{0,38}` devient
+  `@user`. **Limites** : une adresse mail (`jane.doe@example.com`) n'est pas masquée, la règle ne
+  visant que les logins ; un paquet npm (`@anthropic-ai/claude-code`) devient `@user/claude-code`,
+  ce qui va dans le sens sûr.
 
 - `cve_listed_in_cisa_kev` est le champ `exploited` de l'API de données, renommé : vrai veut dire
   « la CVE a figuré au catalogue KEV », même si elle en a été retirée depuis ; faux, « absente du
@@ -216,8 +245,11 @@ champs où la fidélité cherche un fait (section « Fidélité ») :
 - **Au classement**, chaque item n'envoie que `item_id`, `kind`, `title` et son texte long
   (`summary`, `description` ou `body`) coupé à 500 caractères : classer demande moins de texte que
   rédiger (jetons, délai).
-- **À la rédaction**, chaque item envoie les champs du tableau, chacun coupé à 2 000 caractères ;
-  une fiche reçoit **60 items au plus** (#204), les plus récents d'abord.
+- **À la rédaction**, chaque item envoie les champs du tableau, chacun coupé à 2 000 caractères
+  (pour `packages`, chaque nom ; leur nombre est borné par la base, 100 noms de 255 caractères au
+  plus, `schema.sql` et `items.py`) ;
+  une fiche reçoit **60 items au plus**, les plus récents d'abord : le sujet n'étant connu qu'au
+  classement, #204 code la sélection (`select_for_writing`) et #205 l'appelle pour chaque sujet.
 - Le découpage des appels de classement est à #205, sous un plafond de caractères par appel
   (`input_chars`) que #205 fixe.
 - `items_truncated` compte les items dont un champ est coupé ; `items_dropped`, ceux laissés hors
@@ -297,7 +329,8 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
     "days": 3,
     "since": "2026-10-12T09:00:00Z",
     "until": "2026-10-15T09:00:00Z",
-    "covered_since": null
+    "capped_kind": null,
+    "covered_after": null
   },
   "digests": [
     {
@@ -324,7 +357,7 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
 | Champ | Contenu |
 |---|---|
 | `request_id` | identifiant de la demande (UUID), repris par chaque ligne de métrique |
-| `window` | `days`, et `since` et `until` en UTC, au format des dates de la base ; `covered_since`, la date du plus ancien item gardé de la sorte coupée quand `items_capped` est vrai, nul sinon |
+| `window` | `days`, et `since` et `until` en UTC, au format des dates de la base ; quand `items_capped` est vrai, `capped_kind`, la sorte coupée, et `covered_after`, la date de son premier item laissé de côté (borne exclue) ; nuls sinon (section « Lecture plafonnée ») |
 | `digests` | une fiche par sujet rédigé ; un sujet sans item n'a pas de fiche |
 | `digests[].claims` | les affirmations gardées après la fidélité, sans leurs `facts` (contrôle interne) |
 | `digests[].sources` | `item_id`, `kind`, `title`, `url` de chaque item des affirmations gardées, lus dans l'API de données, **jamais dans la sortie du modèle** ; une `url` qui ne commence ni par `http://` ni par `https://` est rendue nulle |

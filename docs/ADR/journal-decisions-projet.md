@@ -2051,6 +2051,48 @@ et [Microsoft Q&A 2044545](https://learn.microsoft.com/en-us/answers/questions/2
 (recherche web) ; [transports d'httpx](https://github.com/encode/httpx/blob/master/docs/advanced/transports.md)
 (Context7) ; [RFC 9110, § 10.2.3](https://www.rfc-editor.org/rfc/rfc9110#section-10.2.3).
 
+### Fiches de veille : la lecture par l'API de données
+
+Choix du plan de #204, relu par un agent architecte et validé par Sabine (15/10, relayé par
+time-knight, qui a vérifié les recommandations dans le code avant de les transmettre). Le détail
+est dans `src/k_b/ai_api/` et dans `docs/fiches-veille.md` (« Lecture plafonnée »).
+
+- **Quand la lecture atteint le plafond de 300 items, la réponse nomme la sorte coupée
+  (`window.capped_kind`) et la date de son premier item laissé de côté (`window.covered_after`),
+  borne exclue : tout item de cette sorte strictement plus récent a été lu, et les sortes qui la
+  suivent ne sont pas lues. Les deux champs sont nuls sans coupe.** Décision de Sabine (15/10,
+  vers 20 h pour la borne, vers 20 h 05 pour la sorte). Pourquoi : les articles TLDR d'une
+  édition, et les entrées KEV d'un jour, ont tous la même date, minuit UTC ; une coupe au milieu
+  d'une édition aurait annoncé couvert un jour lu en partie, et une coupe entre deux sortes
+  n'aurait laissé aucun item gardé à la sorte coupée (constat de l'architecte). L'ordre de
+  `GET /items` (`source_date` puis `id`, décroissants, `database/reading.py`) est total : la
+  borne exclue est vraie dans les deux cas. Sans le nom de la sorte, la date se lirait comme
+  valable pour toutes les sortes (ajout de time-knight). Forme : deux champs à plat dans
+  `window`, à côté de `since` et `until` (choix de la session K-B ; écarté : un objet `cap`, un
+  niveau de plus pour deux valeurs). Option écartée : garder « la date du plus ancien item gardé
+  de la sorte coupée » en écrivant ses deux limites (le champ aurait promis ce qui n'a pas été
+  lu). **Révise** la règle « Coupe dite » de la spec (`window.covered_since`, « Fiches de
+  veille : le contrat », plus haut). — PR de #204
+- **La vérification d'une URL (jamais citée) et la construction d'un client httpx2 (ni proxy ni
+  certificat de l'environnement, aucune redirection suivie) vivent une fois, dans
+  `ai_api/outbound.py`, pour le modèle et pour l'API de données. Les deux constantes de la clé
+  d'un client (32 caractères au moins, alphabet de `token_urlsafe`) passent de `cli.py` à
+  `core/config.py`, lues par `kb serve` et par l'API IA.** Décision de Sabine (point 2 du plan).
+  Pourquoi : ce sont des règles de sécurité, que deux copies feraient diverger (`code.md` met la
+  sécurité avant l'absence de duplication). Option écartée : les recopier dans les modules de
+  #204. Le module commun des clés par client reste à #156, dont c'est le critère (« reprise de
+  #184 dans un module commun ») : seules les constantes bougent ici (constat de l'architecte). —
+  PR de #204
+- **L'API IA envoie la clé lue dans `KB_API_KEY_AI_DIGEST`, la variable que `kb serve` lit pour
+  ce client ; l'URL de l'API de données se lit dans `KB_DATA_API_URL`, avec le défaut local
+  `http://127.0.0.1:8000` nommé dans `core/config.py`.** Choix de la session K-B dans le plan,
+  validé par Sabine. Pourquoi : une seule valeur pour les deux côtés, rien à tenir égal ; un
+  réglage de déploiement a un défaut local, un secret n'en a pas (règle 2 de `poc.md`). `http`
+  est accepté : l'API de données n'a pas de TLS avant ACA (`specs-api.md`, API8). Option
+  écartée : une variable `KB_DATA_API_KEY` de plus, à tenir égale à la première. Limite : le
+  défaut suit `DATA_API_PORT`, pas `KB_DATA_API_PORT` ; si Sabine change le port de `kb serve`,
+  elle change aussi `KB_DATA_API_URL` (`.env.example`). — PR de #204
+
 ## Décisions encore ouvertes
 
 - **Remplir `newsletter_article.publication_id`** (2026-10-12) : quand le lien d'un article TLDR

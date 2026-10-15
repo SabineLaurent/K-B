@@ -20,11 +20,13 @@ import uvicorn
 from pydantic import SecretStr
 
 from k_b.core.config import (
+    API_KEY_CHARACTERS,
     DATA_API_ALLOWED_HOSTS,
     DATA_API_HOST,
     DATA_API_PORT,
     LOG_FILES_KEPT,
     LOG_TO_FILE,
+    MIN_API_KEY_LENGTH,
 )
 from k_b.core.quoting import quote_value
 from k_b.data_api.app import create_app
@@ -81,12 +83,6 @@ LOG_TO_FILE_VALUES = {"true": True, "false": False}
 # (docs/specs-api.md, "Accès par clé").
 API_KEY_VARIABLE_PREFIX = "KB_API_KEY_"
 CLIENT_NAME = re.compile(r"[A-Z0-9_]+")
-# secrets.token_urlsafe(32) gives 43 characters: 32 is the minimum checked.
-MIN_API_KEY_LENGTH = 32
-# The alphabet of token_urlsafe, the way of making a key the README gives. HTTPBearer strips the
-# spaces around the key received (fastapi/security/utils.py): a key that starts or ends with one
-# would be accepted at the start and never match.
-API_KEY_CHARACTERS = re.compile(r"[A-Za-z0-9_-]+")
 # Where kb serve listens and the hosts it answers; not set: the defaults of core/config.py.
 DATA_API_HOST_VARIABLE = "KB_DATA_API_HOST"
 DATA_API_PORT_VARIABLE = "KB_DATA_API_PORT"

@@ -1,5 +1,6 @@
 """The adjustable settings of K-B (ADR of 2026-10-10, "Configuration")."""
 
+import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -36,6 +37,14 @@ LOG_FILES_KEPT = 30
 DATA_API_HOST = "127.0.0.1"
 DATA_API_PORT = 8000
 DATA_API_ALLOWED_HOSTS = ("127.0.0.1", "localhost")
+# The key of a client of the data API (docs/specs-api.md, "Accès par clé"), checked by kb serve
+# for each client and by the AI API for the key it sends. secrets.token_urlsafe(32) gives 43
+# characters: 32 is the minimum checked. The alphabet of token_urlsafe, the way of making a key
+# the README gives. HTTPBearer strips the spaces around the key received
+# (fastapi/security/utils.py): a key that starts or ends with one would be accepted at the start
+# and never match.
+MIN_API_KEY_LENGTH = 32
+API_KEY_CHARACTERS = re.compile(r"[A-Za-z0-9_-]+")
 # The log of kb in a file of the data directory as well as on stderr; KB_LOG_TO_FILE=false for
 # stderr only, as in a container, whose stderr is its log.
 LOG_TO_FILE = True
@@ -61,3 +70,28 @@ LLM_REASONING_EFFORT: Literal["none"] | None = None
 # The base URL of the replay provider: a reserved domain (RFC 6761), never resolved, since the
 # replay answers in the client itself.
 LLM_REPLAY_BASE_URL = "https://replay.invalid/v1"
+
+# The reading of the watch by the AI API through the data API (ai_api/data_api_client.py;
+# docs/fiches-veille.md, "Lecture plafonnée"). The URL of kb serve with its defaults, changed by
+# KB_DATA_API_URL; it does not follow KB_DATA_API_PORT: set KB_DATA_API_URL too when the port of
+# kb serve changes.
+DATA_API_URL = f"http://{DATA_API_HOST}:{DATA_API_PORT}"
+# Assumed values for a service on the same machine or in the same compose network. They bound
+# each wait (a connection, each piece of an answer read), neither a request nor the reading: the
+# bound of a digest request will be DIGEST_REQUEST_TIMEOUT_SECONDS, set by #205; until then, none.
+DATA_API_CONNECT_TIMEOUT_SECONDS = 5
+DATA_API_POOL_TIMEOUT_SECONDS = 5
+DATA_API_WRITE_TIMEOUT_SECONDS = 10
+DATA_API_READ_TIMEOUT_SECONDS = 10
+# The largest body of an answer of the data API, read or announced by Content-Length; beyond, the
+# reading stops with data_api_invalid_response (Sabine, 2026-10-15: a bound now, to be corrected
+# later if needed). Above the worst honest answer, estimated in the review of #204 at about 2 MB
+# for a page of the list and 0.75 MB for a detail. A defense in depth (OWASP API4:2023, API10:2023); the duration stays bounded by
+# DIGEST_REQUEST_TIMEOUT_SECONDS (#205).
+MAX_DATA_API_BODY_BYTES = 4_000_000
+# The items read for one request, at most: the rare kinds first (OWASP API4:2023).
+MAX_ITEMS_PER_DIGEST_REQUEST = 300
+# The items sent to the writing of one digest, the most recent first, and the length of each of
+# their fields once masked.
+MAX_ITEMS_PER_DIGEST = 60
+MAX_FIELD_CHARS_FOR_WRITING = 2000
