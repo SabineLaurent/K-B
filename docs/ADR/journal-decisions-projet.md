@@ -1780,7 +1780,7 @@ qui en découlent sont dans `.claude/rules/poc.md`.
   au code, mais n'est pas tranché : cela dépend de la souscription de l'école. **Révise**
   « inférence sur Azure » (nuit du 11 au 12/10) et « une clé gratuite d'abord, puis Azure »
   (2026-10-12). **Clôt** la question ouverte « Wiki : la clé gratuite, Gemini ou Mistral »
-  (2026-10-12). — PR de #198 **Révisée le 2026-10-15, vers 16:40** : gpt-5.6-luna sur Azure AI
+  (2026-10-12). — PR de #198 **Révisée le 2026-10-15** : gpt-5.6-luna sur Azure AI
   Foundry (« Modèle des fiches : gpt-5.6-luna sur Foundry », plus bas). « Données dans l'UE par
   défaut » était une erreur de fait : le point d'accès global `api.mistral.ai` ne s'engage sur
   aucun lieu d'inférence.
@@ -1920,7 +1920,7 @@ chaîne des fiches (#204 à #207, #156). Le détail est dans `docs/fiches-veille
 
 ### Modèle des fiches : gpt-5.6-luna sur Foundry
 
-Décision de Sabine (15/10, vers 16:40), relayée par time-knight, sur l'avis d'un expert IA neuf,
+Décision de Sabine (15/10, relayée par time-knight avant 16 h 30), sur l'avis d'un expert IA neuf,
 commandé sans biais (sans fournisseur ni choix antérieur). Le pourquoi et les options écartées
 sont ceux de cet avis, validé par Sabine.
 
