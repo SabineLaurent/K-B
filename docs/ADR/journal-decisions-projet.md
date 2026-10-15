@@ -2010,7 +2010,8 @@ Le détail est dans `src/k_b/ai_api/` et dans `docs/fiches-veille.md` (« États
   contrôle qui l'a refusée, fourni par l'étape appelante (#205, #206) ; après un 429, un 5xx ou une
   connexion refusée, après `Retry-After` en secondes (2 s sans lui), sauf au-delà de 20 s. Aucune
   après un autre 4xx, un délai dépassé, une sortie tronquée ou filtrée.** Pourquoi : à
-  `temperature=0`, la même demande rend la même sortie, d'où le rappel (commentaire du 15/10 sur
+  `temperature=0`, la même demande rend le plus souvent la même sortie (le déterminisme n'est pas
+  garanti, guide « Advanced usage » d'OpenAI), d'où le rappel (commentaire du 15/10 sur
   #150) ; une attente plus courte que `Retry-After` rendrait un second 429. Un appel dure 150 s
   quand ses réponses arrivent d'un bloc ; une réponse envoyée par morceaux peut durer plus, car
   chaque lecture a son délai : la borne totale est celle de la demande (#205). Option écartée : un

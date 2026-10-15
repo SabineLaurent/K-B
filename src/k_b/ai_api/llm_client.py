@@ -368,8 +368,8 @@ def check_completion[OutputT: BaseModel](
             retry_wait_seconds=0 if is_retried else None,
         )
 
-    # The same input to the same model gives the same output: a retry of a truncated or of a
-    # filtered output would give it again.
+    # The same input to the same model most often gives the same output (determinism is not
+    # guaranteed): a retry of a truncated or of a filtered output would most often give it again.
     if finish_reason == "length":
         return refuse("llm_truncated", None, is_retried=False)
     if finish_reason == "content_filter":
