@@ -1,5 +1,5 @@
 """The fabricated Zotero library, shared by the tests of the source and of the command line; the
-test base of the readers of the items."""
+test base of the readers of the items; the settings of kb read from the terminal, removed."""
 
 import sqlite3
 from pathlib import Path
@@ -12,6 +12,20 @@ from k_b.database.creation import create_database
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 ZOTERO_LIBRARY_SCRIPT = FIXTURES_DIR / "zotero_extract.sql"
 ITEMS_DATABASE_SCRIPT = FIXTURES_DIR / "items_database.sql"
+# The settings of kb serve and of the log, which a terminal may export (a .env loaded).
+KB_SETTINGS_VARIABLES = (
+    "KB_DATA_API_HOST",
+    "KB_DATA_API_PORT",
+    "KB_DATA_API_ALLOWED_HOSTS",
+    "KB_LOG_TO_FILE",
+)
+
+
+@pytest.fixture(autouse=True)
+def no_kb_setting_of_the_terminal(monkeypatch):
+    """A terminal that exports a setting of kb must not change what the tests check."""
+    for name in KB_SETTINGS_VARIABLES:
+        monkeypatch.delenv(name, raising=False)
 
 
 def run_on_library(zotero_dir, script):
