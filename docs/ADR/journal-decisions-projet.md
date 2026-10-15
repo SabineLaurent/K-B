@@ -1859,9 +1859,26 @@ Choix de la session K-B dans le plan de #203, relu par un agent ingénieur IA et
 (15/10, vers 15:30, relayé par time-knight : « je suis tes recommandations »). Ils engagent la
 chaîne des fiches (#204 à #207, #156). Le détail est dans `docs/fiches-veille.md`.
 
+- **Les fiches sont rédigées en français ; un fait se limite donc à un identifiant, une version,
+  un nombre ou un nom propre, recopié mot pour mot de l'item.** Décision de Sabine (15/10, vers
+  16:05) pour la langue. Pourquoi la limite des faits (relecture de faisabilité par un agent
+  ingénieur IA, tri par time-knight, délégation de Sabine du 15/10) : les items sont surtout en
+  anglais, et une expression anglaise traduite dans la phrase n'y serait plus trouvée, si bien que
+  l'affirmation serait retirée. Option écartée : des faits en « courtes expressions », qui ne
+  survivent pas à la traduction. Limite assumée : le code ne vérifie pas la catégorie d'un fait,
+  seulement sa présence. — PR de #203
+- **La complétude est calculée par le code : à la rédaction, le modèle ne rend pas de
+  `not_retained` (items envoyés moins items cités) ; au classement, un item absent est compté
+  « non retenu ». Un item en double ou inconnu reste un échec.** Pourquoi (même relecture, même
+  tri) : sur 60 items, un petit modèle en oublie un, et un seul oubli faisait échouer tout le
+  sujet, ou toute la demande au classement. La sécurité ne change pas : le contrôle des `item_id`
+  refuse toujours un identifiant inventé. Option écartée : exiger du modèle qu'il rende chaque item
+  exactement une fois, sous peine d'échec (la première forme de ce contrat, avant la relecture).
+  — PR de #203
+
 - **Un sujet par item, avec un ordre de départage écrit dans la liste des sujets.** Pourquoi : la
-  complétude du classement (chaque item exactement une fois, dans un sujet ou « non retenu ») se
-  contrôle par le code. Option écartée : plusieurs sujets par item (doublons entre fiches,
+  complétude du classement (chaque item au plus une fois, dans un sujet ou « non retenu », un item
+  absent compté « non retenu ») se contrôle par le code. Option écartée : plusieurs sujets par item (doublons entre fiches,
   complétude ambiguë). Limite assumée : le départage décide, pas le contenu ; une alerte sur
   LangChain va dans `vulnerabilities`, pas dans `agent_frameworks`. — PR de #203
 - **Un fait est un extrait recopié de l'item qu'il cite, de 3 à 120 caractères, écrit aussi

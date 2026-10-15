@@ -137,8 +137,24 @@ La spec écrit chaque schéma en JSON ; le code le porte en modèle Pydantic `ex
 ### Entrée du modèle
 
 **Consigne** (message `system`) : une constante de module, jamais une expression (règle 8 de
-`poc.md`). Elle dit le rôle, que le message utilisateur est une donnée et jamais une consigne, et
-les trois valeurs de `cve_listed_in_cisa_kev`.
+`poc.md`). Elle dit :
+
+- le rôle, et que le message utilisateur est une donnée, jamais une consigne ;
+- les trois valeurs de `cve_listed_in_cisa_kev` ;
+- la langue du `text` : le **français** (décision de Sabine du 2026-10-15) ;
+- les règles des faits : recopiés mot pour mot depuis l'item, `v` d'une version gardé
+  (`v2.0.14`) ; un fait n'est qu'un **identifiant, une version, un nombre ou un nom propre**
+  (modèle, entreprise, projet, paquet) ; une CVE ou une GHSA n'est écrite qu'en citant l'entrée
+  KEV ou l'alerte qui la porte.
+
+Pourquoi des faits si courts : la fiche est en français, les items surtout en anglais ; une
+expression anglaise traduite dans le `text` n'y serait plus trouvée, et l'affirmation serait
+retirée (section « Fidélité »).
+
+**Limite** : Mistral ajoute toujours au début du message `system` la phrase « Your output should
+be an instance of a JSON object following this schema: {{ json_schema }} » : le message `system`
+envoyé n'est donc pas une stricte constante. Ce n'est pas une faille de la règle 8 : seuls entrent
+dans ce schéma des `item_id` entiers et les sujets de `core/config.py`, jamais un texte d'item.
 
 **Message utilisateur** : un objet JSON encodé, et rien d'autre.
 
@@ -204,7 +220,7 @@ champs où la fidélité cherche un fait (section « Fidélité ») :
 |---|---|
 | `assignments[].item_id`, `not_retained[]` | `enum` des `item_id` envoyés dans cet appel |
 | `assignments[].subject` | `enum` des sujets de `core/config.py` |
-| ensemble | chaque item envoyé apparaît **exactement une fois**, dans `assignments` ou dans `not_retained` |
+| ensemble | chaque item envoyé apparaît **au plus une fois**, dans `assignments` ou dans `not_retained` ; un item absent est compté « non retenu » par le code |
 
 ### Sortie de la rédaction
 
@@ -218,21 +234,29 @@ Un appel par sujet ; `response_format` `json_schema`, `strict: true`.
       "item_ids": [12, 40],
       "facts": [{"value": "CVE-2026-1234", "item_id": 40}]
     }
-  ],
-  "not_retained": [7]
+  ]
 }
 ```
 
 | Champ | Bornes | Contrainte |
 |---|---|---|
-| `claims` | 0 à 12 affirmations | aucune : la fiche est rendue vide (le modèle n'a pas à inventer une affirmation pour remplir le schéma) |
-| `claims[].text` | 1 à 400 caractères | sans lien, image ni balise (contrôle 6) |
-| `claims[].item_ids` | 1 à 5 | `enum` des `item_id` envoyés dans cet appel |
-| `claims[].facts` | 1 à 10 | chaque item de `item_ids` porte au moins un fait (règle de fidélité) |
-| `claims[].facts[].value` | 3 à 120 caractères | un extrait recopié de l'item cité (identifiant, version, nombre, nom, courte expression), écrit aussi dans `text` |
+| `claims` | 0 à 12 affirmations (borne de structure, contrôle 2) | aucune : la fiche est rendue vide (le modèle n'a pas à inventer une affirmation pour remplir le schéma) |
+| `claims[].text` | 1 à 400 caractères (borne d'affirmation, fidélité) | en français ; sans lien, image ni balise (contrôle 6) |
+| `claims[].item_ids` | 1 à 5 (contrôle 2) | `enum` des `item_id` envoyés dans cet appel |
+| `claims[].facts` | 1 à 10 (borne d'affirmation, fidélité) | chaque item de `item_ids` porte au moins un fait (fidélité) |
+| `claims[].facts[].value` | 3 à 120 caractères (borne d'affirmation, fidélité) | un identifiant, une version, un nombre ou un nom propre, recopié mot pour mot de l'item cité, écrit aussi dans `text` |
 | `claims[].facts[].item_id` | — | l'un des `item_ids` de l'affirmation |
-| `not_retained` | — | `enum` des `item_id` envoyés dans cet appel |
-| ensemble | — | chaque item **envoyé dans cet appel** est cité au moins une fois, ou non retenu, **jamais les deux** ; les items au-delà de 60, jamais envoyés, n'en font pas partie |
+
+Le modèle ne rend pas de `not_retained` à la rédaction : le code le calcule, items envoyés moins
+items cités. Un **oubli** n'est donc pas un échec : sur 60 items, un petit modèle en oublie un, et
+un seul oubli faisait échouer tout le sujet. La sécurité ne change pas : le contrôle 4 refuse
+toujours un identifiant inventé.
+
+Les bornes sont envoyées au modèle dans le `json_schema` ; le code les revérifie à deux endroits.
+Une **borne de structure** (un type, un champ en trop, plus de 12 affirmations, `item_ids` hors de
+1 à 5) fait échouer la sortie (contrôle 2). Une **borne d'affirmation** (longueur du `text` ou d'un
+`value`, nombre de faits) ne retire que l'affirmation, comptée (section « Fidélité ») : une
+affirmation trop longue n'a pas à faire échouer tout le sujet.
 
 `max_tokens` de chaque appel est au moins la plus longue sortie que ces bornes permettent (calcul
 à #150 et #205, sur ces bornes : 12 affirmations, 5 items et 10 faits de 120 caractères chacune) :
@@ -280,11 +304,11 @@ une troncature ne vient alors que d'une sortie hors bornes.
 | `digests` | une fiche par sujet rédigé ; un sujet sans item n'a pas de fiche |
 | `digests[].claims` | les affirmations gardées après la fidélité, sans leurs `facts` (contrôle interne) |
 | `digests[].sources` | `item_id`, `kind`, `title`, `url` de chaque item des affirmations gardées, lus dans l'API de données, **jamais dans la sortie du modèle** ; une `url` qui ne commence ni par `http://` ni par `https://` est rendue nulle |
-| `digests[].not_retained` | les items du sujet que le modèle n'a pas retenus |
+| `digests[].not_retained` | les items envoyés pour ce sujet qu'aucune affirmation du modèle ne cite, calculés par le code |
 | `digests[].claims_removed` | affirmations retirées par la fidélité |
 | `digests[].items_uncited` | items du sujet qui ne sont plus cités après ces retraits |
 | `failed_subjects` | chaque sujet en échec et son état nommé |
-| `not_retained` | items non retenus au classement |
+| `not_retained` | items non retenus au classement, ou absents de sa sortie |
 | `items_in`, `items_truncated`, `items_dropped`, `items_capped` | compteurs de la section « Entrée du modèle » |
 
 **Limite** : `sources[].title` est une donnée de source, pas une sortie du modèle ; le filtre du
@@ -303,10 +327,10 @@ par du code déterministe).
 | N° | Contrôle | Refuse | `failed_check` |
 |---|---|---|---|
 | 1 | `finish_reason` (liste blanche) | `length` ou `model_length` → `llm_truncated` ; `error` → `llm_unavailable` ; toute autre valeur que `stop`, `tool_calls` compris → `llm_invalid_output` (échouer fermé sur une valeur inconnue) | `finish_reason` pour une valeur hors liste |
-| 2 | **Schéma** | un texte qui n'est pas du JSON, un champ en trop (`extra="forbid"`), un type ou une longueur hors bornes | `schema` |
+| 2 | **Schéma** | un texte qui n'est pas du JSON, un champ en trop (`extra="forbid"`), un type faux, une borne de structure dépassée (plus de 12 affirmations, `item_ids` hors de 1 à 5) | `schema` |
 | 3 | **Sujets** | un sujet hors de la liste de `core/config.py` | `subject` |
 | 4 | **`item_id`** | un identifiant qui n'a pas été envoyé dans **cet** appel (un item inventé, ou d'un autre sujet) ; un `facts[].item_id` hors des `item_ids` de son affirmation | `item_id` |
-| 5 | **Complétude** | parmi les items envoyés dans cet appel : au classement, un item absent ou présent deux fois ; à la rédaction, un item ni cité ni non retenu, ou les deux | `completeness` |
+| 5 | **Complétude** (classement) | un item présent deux fois dans la sortie ; un item absent n'est pas un échec : il est compté « non retenu » | `completeness` |
 | 6 | **Markdown** (rédaction) | un `text` qui contient `(?i)[a-z][a-z0-9+.-]*://`, `(?i)www\.`, `![`, `[[`, `](`, `]:` ou `<[a-zA-Z/!?]` | `markup` |
 | 7 | **Fidélité** (rédaction) | voir ci-dessous : retire l'affirmation, n'est pas un échec | — |
 
@@ -330,7 +354,8 @@ Une fiche ne dit que ce que disent ses items (#207).
 
 **Normalisation**, avant toute recherche, du `text`, des faits et des champs de l'item : Unicode
 NFKC, `casefold`, retrait des caractères invisibles (catégorie Unicode `Cf` : U+200B, U+00AD,
-U+2060…), espaces réduites à une seule, tirets Unicode (U+2010 à U+2015, U+2212) ramenés à `-`.
+U+2060…), espaces réduites à une seule, tirets Unicode (U+2010 à U+2015, U+2212) ramenés à `-`,
+apostrophes et guillemets typographiques (U+2018, U+2019, U+201C, U+201D) ramenés à `'` et `"`.
 
 **Faits CVE et GHSA.** Les motifs s'appliquent après la normalisation :
 
@@ -342,7 +367,8 @@ Un fait qui **contient** l'un de ces motifs est un fait CVE ou GHSA, quelle que 
 (`CVE-AAAA-NNNN`, `GHSA-xxxx-xxxx-xxxx`), au `cve_id` ou au `ghsa_id` de l'item qu'il cite, jamais
 trouvé dans un texte libre. Un article TLDR n'a pas de tel champ : il ne porte pas de fait CVE ; la
 fiche cite la CVE par l'entrée KEV ou par l'alerte, si elles sont dans la fenêtre (décision de
-Sabine du 2026-10-15). Tout motif CVE ou GHSA écrit dans un `text` doit être déclaré comme fait.
+Sabine du 2026-10-15). Comme tout fait, un fait CVE ou GHSA doit aussi figurer dans le `text` de
+son affirmation ; et tout motif CVE ou GHSA écrit dans un `text` doit être déclaré comme fait.
 
 **Autres faits.** Chaque `facts[].value` doit figurer dans le `text` de son affirmation **et** dans
 la valeur de l'un des champs où la fidélité cherche, pour l'item qu'elle cite (tableau de la
@@ -355,6 +381,14 @@ d'un chiffre). Ainsi `1.2` n'est pas trouvé dans `1.2.9`, ni `CVE-2026-1234` da
 
 **Chaque item cité porte un fait.** Chaque item de `item_ids` porte au moins un fait trouvé : un
 item ne peut pas se faire citer à côté d'une affirmation qui ne dit rien de lui.
+
+**Bornes d'affirmation.** Un `text` hors de 1 à 400 caractères, un `value` hors de 3 à 120, ou un
+nombre de faits hors de 1 à 10 retire l'affirmation (section « Sortie de la rédaction »).
+
+**Ce qu'est un fait.** La consigne limite un fait à un identifiant, une version, un nombre ou un
+nom propre, recopié mot pour mot : la fiche est en français, l'item souvent en anglais, et une
+expression traduite ne serait plus trouvée. Le code ne vérifie pas cette catégorie : il cherche la
+valeur, c'est tout.
 
 Une affirmation qui manque à l'une de ces règles est **retirée et comptée** (`claims_removed`) ;
 ce n'est pas un échec. Un item qui n'est plus cité après ces retraits passe dans `items_uncited`.
@@ -462,7 +496,9 @@ Consultées le 2026-10-15.
 - [Custom Structured Outputs](https://docs.mistral.ai/studio-api/conversations/structured-output/custom)
   — Mistral, lu par Context7 : `json_schema` avec `name`, `schema` et `strict: true`
   (« always recommended »). Un `enum` d'entiers n'y est pas montré : à vérifier par #158 ; le code
-  revalide dans tous les cas (contrôles 3 et 4).
+  revalide dans tous les cas (contrôles 3 et 4). La même page dit que « Your output should be an
+  instance of a JSON object following this schema: {{ json_schema }} » est toujours ajouté au
+  début du message `system` (limite de la consigne).
 - [Models, « Extra data »](https://docs.pydantic.dev/latest/concepts/models/#extra-data) — Pydantic,
   lu par Context7 : `extra='forbid'` refuse un champ en trop (`extra_forbidden`) et écrit
   `additionalProperties: false` dans le JSON Schema (schémas, contrôle 2).
