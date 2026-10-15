@@ -141,9 +141,11 @@ schéma (OpenAI, structured outputs) ; au plafond, environ 300 identifiants et 8
 sous la limite.
 
 **Réglages d'appel**, lus dans la configuration (#150) : `temperature=0` si le modèle l'accepte,
-sinon `reasoning_effort: "none"` ; la documentation d'OpenAI et celle d'Azure se contredisent sur
-ce point pour les modèles à raisonnement, et le premier essai le tranche (#158). Le déploiement
-est figé sur une version du modèle.
+sinon `reasoning_effort: "none"` (`KB_LLM_REASONING_EFFORT=none`, `.env.example`) ; la
+documentation d'OpenAI et celle d'Azure se contredisent sur ce point pour les modèles à
+raisonnement, et le premier essai le tranche (#158). Le déploiement est figé sur une version du
+modèle. Le fournisseur, son URL et le nom du modèle n'ont pas de valeur par défaut : sans eux,
+l'API IA ne démarre pas (journal ADR, « Appel du modèle »).
 
 ### Demande
 
@@ -466,7 +468,7 @@ durées sont cumulés sur la ligne.
 | `tokens_in`, `tokens_out` | `usage` rendu par le fournisseur |
 | `reasoning_tokens` | jetons de raisonnement rendus par le fournisseur, attendus à 0 avec `reasoning_effort: "none"` ; nul s'il ne les rend pas |
 | `data_fetch_ms` | durée de la lecture par l'API de données ; sur la première ligne de classement de la demande, nul ailleurs |
-| `llm_ms`, `check_ms` | durée des appels au modèle, durée des contrôles |
+| `llm_ms`, `check_ms` | durée des appels au modèle, nouvelle tentative et attente avant elle comprises ; durée des contrôles |
 | `attempts` | 1 ou 2 |
 | `outcome` | `ok`, ou l'état `llm_*` de l'appel |
 | `finish_reason` | celui de la dernière tentative |
@@ -489,10 +491,10 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 |---|---|---|---|
 | `llm_invalid_output` | contrôles 2 à 6, ou `finish_reason` hors liste, deux fois | 502 | le sujet va dans `failed_subjects` |
 | `llm_truncated` | `finish_reason` `length` ; pas de nouvelle tentative (même entrée, même modèle figé : même sortie attendue) | 502 | `failed_subjects` |
-| `llm_content_filtered` | `finish_reason` `content_filter` : le filtre de contenu du fournisseur a retenu la sortie (celui d'Azure peut réagir aux textes sur le jailbreak et l'injection, sujets de la veille) ; pas de nouvelle tentative (même entrée) | 502 | `failed_subjects` |
-| `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative | 503, avec `Retry-After` | `failed_subjects` |
-| `llm_unavailable` | 5xx ou connexion refusée, après la nouvelle tentative ; autre 4xx, sans nouvelle tentative | 502 | `failed_subjects` |
-| `llm_timeout` | pas de réponse dans le délai du client (#150) ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé | 504 | `failed_subjects` |
+| `llm_content_filtered` | `finish_reason` `content_filter` : le filtre de contenu du fournisseur a retenu la sortie (celui d'Azure peut réagir aux textes sur le jailbreak et l'injection, sujets de la veille) ; ou un 400 dont `error.code` vaut `content_filter` : il a retenu l'entrée ; pas de nouvelle tentative (même entrée) | 502 | `failed_subjects` |
+| `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec `Retry-After` | `failed_subjects` |
+| `llm_unavailable` | 5xx, connexion refusée ou coupée, après la nouvelle tentative ; autre 4xx, ou réponse 200 qui n'est pas une complétion lisible (pas du JSON, aucun `choices`, un type faux), sans nouvelle tentative | 502 | `failed_subjects` |
+| `llm_timeout` | pas de connexion ou pas de réponse dans le délai du client (#150), sans nouvelle tentative ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé | 504 | `failed_subjects` |
 | `data_api_unavailable` | API de données injoignable, ou 5xx | 502 | — |
 | `data_api_timeout` | délai de lecture dépassé | 504 | — |
 | `data_api_unauthorized` | 401 de l'API de données : clé `AI_DIGEST` refusée (sans clé, l'API IA ne démarre pas, règle 2 de `poc.md`) | 502 | — |
@@ -504,6 +506,12 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 - Les états `data_api_*` sont ceux de la lecture par l'API de données (#204). Un item disparu entre
   la liste et le détail (404 `item_not_found`) n'est pas un échec : il est sauté et compté
   (`items_dropped`).
+- **Nouvelle tentative** (#150, `core/config.py`) : une au plus par appel. Après un 429, un 5xx
+  ou une connexion refusée, elle attend `Retry-After` (en secondes ; une date HTTP compte comme un
+  en-tête absent), ou `LLM_RETRY_WAIT_SECONDS` sans lui ; un `Retry-After` au-delà de
+  `LLM_RETRY_AFTER_MAX_SECONDS` met fin à l'appel, car une attente plus courte rendrait la même
+  réponse. Un appel dure ainsi 150 s au plus (deux tentatives de 5 s de connexion et 60 s de
+  réponse, et 20 s d'attente), ce que `DIGEST_REQUEST_TIMEOUT_SECONDS` doit compter (#205).
 - 502, 503 et 504 disent la panne de l'amont, comme une passerelle (RFC 9110, § 15.6) : le client
   distingue « réessayer plus tard » (503, 504) d'une sortie fautive (502).
 - **Échec partiel** : la réponse est 200 dès que le classement a réussi ; chaque sujet en échec est
@@ -532,6 +540,11 @@ Consultées le 2026-10-15.
   — Microsoft, relevé par recherche web : les modèles à raisonnement ne prennent pas `temperature` ;
   une sortie retenue par le filtre rend `finish_reason` `content_filter` (contrôle 1, états
   nommés).
+- [Content filter and policy violation issues when using openAI API](https://learn.microsoft.com/en-us/answers/questions/2044545/content-filter-and-policy-violation-issues-when-us)
+  — Microsoft Q&A, relevé par recherche web : une entrée filtrée rend un 400, `error.code`
+  `content_filter`, `innererror.code` `ResponsibleAIPolicyViolation` ; la catégorie jailbreak peut
+  le déclencher sur une consigne ordinaire (constat du forum CrewAI, même recherche) (états nommés,
+  `llm_content_filtered` ; format à confirmer par #158).
 - [Custom Structured Outputs](https://docs.mistral.ai/studio-api/conversations/structured-output/custom)
   — Mistral, lu par Context7 : « Your output should be an instance of a JSON object following
   this schema: {{ json_schema }} » est toujours ajouté au début du message `system` (limite de la
