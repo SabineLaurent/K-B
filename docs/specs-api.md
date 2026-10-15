@@ -254,9 +254,10 @@ Exception : un `Host` qui n'est ni `127.0.0.1` ni `localhost` reçoit le 400 de
   | `É` | « é » | non |
 
 - Tri par date, comme sans `q`.
-- **Écart temporaire** à la recherche FTS5 triée par pertinence BM25 (journal ADR, 2026-10-09) :
-  le passage à FTS5 (#188) changera l'ordre des résultats avec `q`, et passera la spec et
-  l'OpenAPI à une nouvelle version.
+- **Écart temporaire** à la recherche plein texte triée par pertinence (journal ADR,
+  2026-10-09) : elle se fera avec PostgreSQL (`tsvector`) après le 08/11 (journal ADR,
+  2026-10-15, « POC du 25/10 », décision 2), changera l'ordre des résultats avec `q`, et passera
+  la spec et l'OpenAPI à une nouvelle version.
 
 ## Données personnelles
 

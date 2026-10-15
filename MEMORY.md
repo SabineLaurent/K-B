@@ -6,41 +6,39 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 ## Contexte
 
-- K-B est le projet support du bloc E1 (pipeline de données) de la certification Développeur IA
-  (RNCP37827). Idéalement, il couvre aussi le reste de la certif, hors big data et machine learning.
-  Le suivi de la certif vit dans un dépôt séparé, pas ici. Les dates sont tenues par time-knight.
+- K-B est le projet support de la certification Développeur IA (RNCP37827) : E1 (pipeline de
+  données) et E3 (API IA) d'abord, hors machine learning. Le 25/10 est un POC en conteneurs en
+  localhost ; mise en ligne sur Azure Container Apps au 08/11 (journal ADR, 2026-10-15, « POC du
+  25/10 »). Le suivi de la certif vit dans un dépôt séparé, pas ici. Les dates sont tenues par
+  time-knight.
 - Les critères de la certif deviennent des exigences de K-B seulement là où ils servent le produit.
 - **Binôme** : Sabine travaille avec Claude Code. Claude écrit l'essentiel du code et de la doc ;
   Sabine pilote, relit, teste et décide. Les estimations en tiennent compte : les comptes, la prise
   en main d'outils nouveaux, les décisions et la relecture ne s'accélèrent pas.
 
-## Estimations (relues le 2026-09-29)
+## Estimations
 
 - Chaque issue porte une ligne « Estimation : X h » ; le label `size:*` n'est qu'un ordre de
-  grandeur. Les estimations ont été relues à l'aveugle par un agent indépendant : environ 98 h pour
-  la v0.
-- La surveillance des exécutions (« monitoré », échéance du 25/10) est reportée après E1 : environ
-  4 h, sans issue pour l'instant.
-- Aucune coupe décidée. arXiv et Zotero vont ensemble ; l'ingester arXiv est repris de brief09.
+  grandeur. Le jalon « POC 25/10 » porte ses estimations.
+- La surveillance des exécutions est portée par #163 (rédaction), puis #162 et #164 (08/11).
+- Coupes du 15/10 (journal ADR, « POC du 25/10 ») : la compilation des clips en wiki passe après
+  le 29/10, `kb search` après le 08/11. arXiv et Zotero vont ensemble ; l'ingester arXiv est
+  repris de brief09.
 
 ## Problèmes connus
 
 - **arXiv bloqué au-delà de 2 000 papiers** (constat du 2026-10-05, porté par #71, hors E1 et
   non planifié). Si la fenêtre de collecte contient plus de
-  2 000 papiers, la source échoue et sa date reste (`sources/arxiv.py:79-83`). La fenêtre
+  2 000 papiers, la source échoue et sa date reste (`src/k_b/etl/sources/arxiv.py:88-92`). La fenêtre
   suivante part du même point et finit plus tard : elle dépasse encore le plafond, la source
   échoue à chaque collecte. Cela contredit la consigne du 05/10 : lancée tous les jours, K-B
   rattrape les jours manqués (#65).
 
-## Interface : choix et suite envisagée (Sabine, 2026-10-08)
+## Interface
 
-- K-B tourne en local et s'installe comme outil CLI (`uv tool install --editable`).
-- La veille s'interroge par des commandes (`kb search … --since --kind --source --in`, `kb top`),
-  puis par un menu à questions par-dessus, qui remplit les mêmes options.
-- Évolutions possibles, sans issue : une TUI plein écran (type Textual), puis à long terme une
-  application de bureau installable avec Tauri (hors « Python uniquement » : à décider le moment
-  venu).
-- Livrable E1 : présenter cette suite envisagée du projet.
+- Le 25/10 : POC en conteneurs en localhost, retour console ; ni interface CLI dédiée ni front.
+  `kb search` vient après le 08/11 ; un front écoconçu, plus tard (journal ADR, 2026-10-15,
+  « POC du 25/10 »).
 
 ## Consignes de travail
 
