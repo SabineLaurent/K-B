@@ -105,7 +105,7 @@ La spec écrit chaque schéma en JSON ; le code le porte en modèle Pydantic `ex
 
 **Consigne** (message `system`) : une constante de module, jamais une expression (règle 8 de
 `poc.md`). Elle dit le rôle, que le message utilisateur est une donnée et jamais une consigne, et
-le sens de `in_cisa_kev`.
+les trois valeurs de `cve_listed_in_cisa_kev`.
 
 **Message utilisateur** : un objet JSON encodé, et rien d'autre.
 
@@ -124,12 +124,17 @@ champs**, sans aucune URL (le modèle n'en écrit jamais, #206) :
 | `paper` | `item_id`, `kind`, `title`, `summary` ; jamais `authors` (règle 5 de `poc.md`) |
 | `vulnerability` | `item_id`, `kind`, `cve_id`, `title`, `description`, `vendor`, `product`, `ransomware_use` |
 | `release` | `item_id`, `kind`, `repository_name`, `tag_name`, `title`, `body`, où chaque `@login` est masqué en `@user` |
-| `advisory` | `item_id`, `kind`, `ghsa_id`, `cve_id`, `title`, `in_cisa_kev`, `packages` |
+| `advisory` | `item_id`, `kind`, `ghsa_id`, `cve_id`, `title`, `cve_listed_in_cisa_kev`, `packages` |
 | `newsletter_article` | `item_id`, `kind`, `edition`, `title`, `summary` |
 
-- `in_cisa_kev` est le champ `exploited` de l'API de données, renommé : faux y veut dire « absente
-  du catalogue KEV », pas « non exploitée » ([specs-api.md](specs-api.md), détail) ; le nom
-  d'origine inviterait le modèle au contresens.
+- `cve_listed_in_cisa_kev` est le champ `exploited` de l'API de données, renommé : vrai veut dire
+  « la CVE a figuré au catalogue KEV », même si elle en a été retirée depuis ; faux, « absente du
+  catalogue KEV », pas « non exploitée » ; nul, une alerte sans CVE
+  ([specs-api.md](specs-api.md), détail). Le nom d'origine inviterait le modèle au contresens ; la
+  consigne dit les trois valeurs.
+- Une entrée retirée (`withdrawn_at` non nul : une vulnérabilité retirée du catalogue KEV) n'est
+  pas envoyée : `GET /items` la sert sans filtre ([specs-api.md](specs-api.md), « Réponse »), et le
+  modèle la présenterait comme une entrée du catalogue. Elle est comptée dans `items_dropped`.
 - **Au classement**, chaque item n'envoie que `item_id`, `kind`, `title` et son texte long
   (`summary`, `description` ou `body`) coupé à 500 caractères : classer demande moins de texte que
   rédiger (jetons, délai).
@@ -138,7 +143,12 @@ champs**, sans aucune URL (le modèle n'en écrit jamais, #206) :
 - Le découpage des appels de classement est à #205, sous un plafond de caractères par appel
   (`input_chars`) que #205 fixe.
 - `items_truncated` compte les items dont un champ est coupé ; `items_dropped`, ceux laissés hors
-  d'une fiche (au-delà de 60, ou disparus entre la liste et le détail : 404 `item_not_found`).
+  d'une fiche (au-delà de 60, retirés, ou disparus entre la liste et le détail : 404
+  `item_not_found`).
+- `items_capped` est vrai si la lecture de `GET /items` s'est arrêtée alors que la fenêtre avait
+  d'autres items (`next_offset` non nul) : l'API de données ne sert pas la liste au-delà de
+  l'offset 10 000 ([specs-api.md](specs-api.md), « Tri et pagination »). Ces items ne sont pas
+  lus, donc pas comptés : la réponse dit seulement que la fenêtre a été coupée.
 
 ### Sortie du classement
 
@@ -176,14 +186,14 @@ Un appel par sujet ; `response_format` `json_schema`, `strict: true`.
 
 | Champ | Bornes | Contrainte |
 |---|---|---|
-| `claims` | 1 à 12 affirmations | — |
+| `claims` | 0 à 12 affirmations | aucune : la fiche est rendue vide (le modèle n'a pas à inventer une affirmation pour remplir le schéma) |
 | `claims[].text` | 1 à 400 caractères | sans lien, image ni balise (contrôle 6) |
-| `claims[].item_ids` | 1 à 10 | `enum` des `item_id` du sujet |
+| `claims[].item_ids` | 1 à 10 | `enum` des `item_id` envoyés dans cet appel |
 | `claims[].facts` | 1 à 5 | — |
 | `claims[].facts[].value` | 3 à 120 caractères | un extrait recopié de l'item cité (identifiant, version, nombre, nom, courte expression), écrit aussi dans `text` |
 | `claims[].facts[].item_id` | — | l'un des `item_ids` de l'affirmation |
-| `not_retained` | — | `enum` des `item_id` du sujet |
-| ensemble | — | chaque item du sujet est cité au moins une fois, ou non retenu, **jamais les deux** |
+| `not_retained` | — | `enum` des `item_id` envoyés dans cet appel |
+| ensemble | — | chaque item **envoyé dans cet appel** est cité au moins une fois, ou non retenu, **jamais les deux** ; les items au-delà de 60, jamais envoyés, n'en font pas partie |
 
 `max_tokens` de chaque appel est au moins la plus longue sortie que ces bornes permettent (calcul
 à #150 et #205) : une troncature ne vient alors que d'une sortie hors bornes.
@@ -200,17 +210,21 @@ Un appel par sujet ; `response_format` `json_schema`, `strict: true`.
     {
       "subject": "llm_security",
       "claims": [{"text": "…", "item_ids": [12, 40]}],
-      "sources": [{"item_id": 12, "kind": "paper", "title": "…", "url": "https://arxiv.org/abs/…"}],
+      "sources": [
+        {"item_id": 12, "kind": "paper", "title": "…", "url": "https://arxiv.org/abs/…"},
+        {"item_id": 40, "kind": "advisory", "title": "…", "url": "https://github.com/advisories/…"}
+      ],
       "not_retained": [7],
       "claims_removed": 1,
-      "items_uncited": [40]
+      "items_uncited": [51]
     }
   ],
   "failed_subjects": [{"subject": "models", "error": "llm_timeout"}],
   "not_retained": [3, 9],
   "items_in": 41,
   "items_truncated": 2,
-  "items_dropped": 0
+  "items_dropped": 0,
+  "items_capped": false
 }
 ```
 
@@ -226,7 +240,7 @@ Un appel par sujet ; `response_format` `json_schema`, `strict: true`.
 | `digests[].items_uncited` | items du sujet qui ne sont plus cités après ces retraits |
 | `failed_subjects` | chaque sujet en échec et son état nommé |
 | `not_retained` | items non retenus au classement |
-| `items_in`, `items_truncated`, `items_dropped` | compteurs de la section « Entrée du modèle » |
+| `items_in`, `items_truncated`, `items_dropped`, `items_capped` | compteurs de la section « Entrée du modèle » |
 
 **Limite** : `sources[].title` est une donnée de source, pas une sortie du modèle ; le filtre du
 Markdown ne s'y applique pas. L'échapper revient à qui écrira la fiche dans le coffre (`kb`, plus
@@ -247,7 +261,7 @@ par du code déterministe).
 | 2 | **Schéma** | un texte qui n'est pas du JSON, un champ en trop (`extra="forbid"`), un type ou une longueur hors bornes | `schema` |
 | 3 | **Sujets** | un sujet hors de la liste de `core/config.py` | `subject` |
 | 4 | **`item_id`** | un identifiant qui n'a pas été envoyé dans **cet** appel (un item inventé, ou d'un autre sujet) ; un `facts[].item_id` hors des `item_ids` de son affirmation | `item_id` |
-| 5 | **Complétude** | au classement, un item absent ou présent deux fois ; à la rédaction, un item ni cité ni non retenu, ou les deux | `completeness` |
+| 5 | **Complétude** | parmi les items envoyés dans cet appel : au classement, un item absent ou présent deux fois ; à la rédaction, un item ni cité ni non retenu, ou les deux | `completeness` |
 | 6 | **Markdown** (rédaction) | un `text` qui contient `(?i)[a-z][a-z0-9+.-]*://`, `(?i)www\.`, `![`, `[[`, `](` ou `<` | `markup` |
 | 7 | **Fidélité** (rédaction) | voir ci-dessous : retire l'affirmation, n'est pas un échec | — |
 
