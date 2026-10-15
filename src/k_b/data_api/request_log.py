@@ -28,16 +28,19 @@ async def log_request(
         status_code = response.status_code
         return response
     finally:
-        logger.info(
-            "%s",
-            format_request_line(
-                request.method,
-                find_route_template(request),
-                status_code,
-                round((time.perf_counter() - started) * 1000),
-                getattr(request.state, "client_name", NONE_SEEN),
-            ),
-        )
+        # A probe that answers 200 is not logged: one every few seconds would bury the requests
+        # of the clients. A probe that fails keeps its line.
+        if not (request.url.path == HEALTH_PATH and status_code == 200):
+            logger.info(
+                "%s",
+                format_request_line(
+                    request.method,
+                    find_route_template(request),
+                    status_code,
+                    round((time.perf_counter() - started) * 1000),
+                    getattr(request.state, "client_name", NONE_SEEN),
+                ),
+            )
 
 
 def find_route_template(request: Request) -> str:

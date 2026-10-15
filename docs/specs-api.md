@@ -22,15 +22,16 @@ l'ordre des résultats, change la version.
 - **Locale par défaut** : l'API écoute sur `127.0.0.1:8000` ; `TrustedHostMiddleware` n'accepte
   que les hôtes `127.0.0.1` et `localhost`. Les défauts sont nommés dans `core/config.py` ; chacun
   se change par une variable d'environnement (règle 2 de `.claude/rules/poc.md`) :
-  - `KB_DATA_API_HOST` : l'hôte d'écoute, une adresse IP (`0.0.0.0` en conteneur : le
-    `127.0.0.1` d'un conteneur est le sien, injoignable d'ailleurs) ;
+  - `KB_DATA_API_HOST` : l'hôte d'écoute, une adresse IPv4 (`0.0.0.0` en conteneur : le
+    `127.0.0.1` d'un conteneur est le sien, injoignable d'ailleurs). Pas d'IPv6 : le `Host` d'un
+    client en IPv6 garde ses crochets (`[::1]`), qu'aucun hôte permis ne peut nommer ;
   - `KB_DATA_API_PORT` : le port, des chiffres seuls, de 1 à 65535 ;
   - `KB_DATA_API_ALLOWED_HOSTS` : les hôtes permis, séparés par des virgules (`api-donnees,localhost`
     pour qu'un autre conteneur l'appelle par son nom de service). Chaque entrée est un nom en
     minuscules, sans `*` ni port : `TrustedHostMiddleware` compare le `Host` reçu tel quel, et `*`
     laisserait passer tout hôte.
 
-  Une valeur refusée (hôte hors adresse IP, port hors bornes, liste ou entrée vide, entrée avec
+  Une valeur refusée (hôte hors adresse IPv4, port hors bornes, liste ou entrée vide, entrée avec
   `*`, entrée hors motif) fait sortir `kb serve` en code 2 avant d'écouter, avec un message qui
   nomme la variable et la position de l'entrée. En conteneur, le port est publié sur `127.0.0.1`
   de la machine (#200). Pas de CORS.
@@ -43,7 +44,9 @@ l'ordre des résultats, change la version.
   sonde qui ouvrirait la base ferait redémarrer le conteneur en boucle tant que la base manque).
   C'est une route de Starlette, comme `/docs` : la clé reste posée sur toute l'app, et aucune route
   de données ne peut l'oublier. Elle est hors de l'OpenAPI, comme `/docs` ; ce document
-  l'inventorie. Le `Host` de la sonde doit être un hôte permis.
+  l'inventorie. Le `Host` de la sonde doit être un hôte permis. Un appel de `/health` qui répond
+  200 n'est pas journalisé (une sonde toutes les quelques secondes noierait les requêtes des
+  clients) ; tout autre statut l'est, si bien qu'une sonde mal réglée se voit.
 - **Réponses** : JSON, champs en liste blanche (modèles de réponse propres à l'API, jamais le
   modèle de lecture des sources).
 - **OpenAPI** : `kb openapi` (#184) écrit `docs/api/openapi-donnees.json`, versionné ; la CI le compare
@@ -312,7 +315,7 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 | API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon ; aucune route d'administration. | **Tenue.** `test_every_data_route_refuses_another_method_with_405`, `test_the_routes_are_listed`, `test_docs_openapi_and_health_are_public_and_no_other_page_is_served`, `test_health_refuses_another_method_with_405` |
 | API6:2023 Unrestricted Access to Sensitive Business Flows | Sans objet : l'API n'a aucun flux métier à protéger (ni achat, ni réservation, ni création de compte), seulement des lectures. | Sans objet, sans test |
 | API7:2023 Server Side Request Forgery | Sans objet : l'API ne va chercher aucune adresse fournie par un client. | Sans objet, sans test |
-| API8:2023 Security Misconfiguration | Hôte d'écoute réglable (`KB_DATA_API_HOST`, une adresse IP), `127.0.0.1` par défaut ; hôtes permis réglables (`KB_DATA_API_ALLOWED_HOSTS`), `127.0.0.1` et `localhost` par défaut ; `*`, une liste ou une entrée vide et un nom hors motif refusés au démarrage ; en conteneur, écoute sur `0.0.0.0` et port publié sur `127.0.0.1` de la machine (#200) ; pas de CORS ; erreurs sans pile ; `/health` ne dit que `ok`. Limites : Swagger UI (`/docs`) charge ses fichiers depuis un CDN ; pas de TLS, alors qu'OWASP le demande même pour une API interne (local et réseau compose au 25/10 ; l'entrée HTTPS d'ACA au 08/11). | **Tenue en partie** : sans TLS, et la publication sur `127.0.0.1` revient à #200 (critère « ports publiés sur `127.0.0.1` »), pas encore tenue. Ce qui est tenu : `test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_config`, `test_serve_listens_on_the_host_and_port_of_the_environment`, `test_serve_exits_2_on_a_host_or_port_refused`, `test_serve_exits_2_and_names_the_allowed_hosts_refused`, `test_serve_allows_the_hosts_of_the_environment_and_no_other`, `test_a_host_other_than_localhost_gives_400`, `test_a_host_other_than_the_allowed_ones_gives_400_on_health`, `test_health_answers_ok_without_key`, `test_no_route_answers_cors`, `test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only`, `test_a_database_error_gives_500_without_detail_and_logs_its_type` |
+| API8:2023 Security Misconfiguration | Hôte d'écoute réglable (`KB_DATA_API_HOST`, une adresse IPv4), `127.0.0.1` par défaut ; hôtes permis réglables (`KB_DATA_API_ALLOWED_HOSTS`), `127.0.0.1` et `localhost` par défaut ; `*`, une liste ou une entrée vide et un nom hors motif refusés au démarrage ; en conteneur, écoute sur `0.0.0.0` et port publié sur `127.0.0.1` de la machine (#200) ; pas de CORS ; erreurs sans pile ; `/health` ne dit que `ok`. Limites : Swagger UI (`/docs`) charge ses fichiers depuis un CDN ; pas de TLS, alors qu'OWASP le demande même pour une API interne (local et réseau compose au 25/10 ; l'entrée HTTPS d'ACA au 08/11). | **Tenue en partie** : sans TLS, et la publication sur `127.0.0.1` revient à #200 (critère « ports publiés sur `127.0.0.1` »), pas encore tenue. Ce qui est tenu : `test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_config`, `test_serve_listens_on_the_host_and_port_of_the_environment`, `test_serve_exits_2_on_a_host_or_port_refused`, `test_serve_exits_2_and_names_the_allowed_hosts_refused`, `test_serve_allows_the_hosts_of_the_environment_and_no_other`, `test_a_host_other_than_localhost_gives_400`, `test_a_host_other_than_the_allowed_ones_gives_400_on_health`, `test_health_answers_ok_without_key`, `test_no_route_answers_cors`, `test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only`, `test_a_database_error_gives_500_without_detail_and_logs_its_type` |
 | API9:2023 Improper Inventory Management | OpenAPI versionnée (`docs/api/openapi-donnees.json`), comparée en CI au schéma produit. `/health`, hors OpenAPI comme `/docs`, est inventoriée par ce document (« Santé »). | **Tenue.** `test_the_versioned_openapi_is_the_one_the_app_produces`, `test_the_versioned_openapi_is_valid_and_declares_its_security_scheme`, `test_each_data_route_documents_its_errors` |
 | API10:2023 Unsafe Consumption of APIs | Le contenu servi vient de tiers (arXiv, GitHub, CISA, TLDR, Zotero) : pour un client, et d'abord pour un agent, c'est une donnée, jamais une consigne. Côté K-B, la réponse d'une source est validée à la collecte (modèles de `items.py`, `CHECK` de `schema.sql`). | **Tenue côté K-B** : `tests/test_schema.py` (chaque type refusé par l'item et par la base) et les tests de chaque source. Côté client, une consigne, sans test |
 

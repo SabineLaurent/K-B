@@ -1802,13 +1802,16 @@ et les journaux par variables d'environnement, exposer `/health`) et la règle 2
 `.claude/rules/poc.md`.
 
 - **`kb serve` se règle par quatre variables, chacune avec un défaut local nommé dans
-  `core/config.py` : `KB_DATA_API_HOST` (une adresse IP, `127.0.0.1`), `KB_DATA_API_PORT` (des
+  `core/config.py` : `KB_DATA_API_HOST` (une adresse IPv4, `127.0.0.1`), `KB_DATA_API_PORT` (des
   chiffres, de 1 à 65535, `8000`), `KB_DATA_API_ALLOWED_HOSTS` (`127.0.0.1,localhost`) et
   `KB_LOG_TO_FILE` (`true`). Une valeur refusée fait sortir `kb serve` en code 2 avant
   d'écouter.** Pourquoi : un conteneur ne joint pas le `127.0.0.1` d'un autre (c'est le sien),
   donc l'API doit écouter sur `0.0.0.0` en conteneur et accepter le nom de service d'`api-ia`.
-  L'hôte est une adresse IP, un type fermé : la valeur vide, qu'uvicorn lierait à toutes les
-  interfaces, est refusée du même coup. Le port est lu en chiffres seuls (`int()` accepterait
+  L'hôte est une adresse IPv4, un type fermé : la valeur vide, qu'uvicorn lierait à toutes les
+  interfaces, est refusée du même coup, et une IPv6 aussi, car le `Host` d'un client en IPv6
+  garde ses crochets (`[::1]`), qu'aucun hôte permis ne peut nommer : un réglage accepté mais
+  injoignable est pire qu'un refus (constat de `/code-review`, tranché par time-knight, délégation
+  de Sabine du 15/10). Le port est lu en chiffres seuls (`int()` accepterait
   `+8000` ou `8_000`). Le préfixe `KB_DATA_API_` est celui du code (`DATA_API_HOST`) et de la doc
   (« API de données ») ; `KB_DATA_API_ALLOWED_HOSTS` est le choix de Sabine, à la place de
   `KB_ALLOWED_HOSTS` écrit dans l'issue, par cohérence avec les trois autres. Options écartées :
@@ -1835,8 +1838,13 @@ et les journaux par variables d'environnement, exposer `/health`) et la règle 2
   conteneur en boucle tant que la base manque. Options écartées : la clé posée sur chaque routeur
   pour faire de `/health` une *path operation* documentée (un routeur ajouté plus tard pourrait
   l'oublier) ; un sous-app monté (une couche de plus pour une route) ; une sonde qui vérifie la
-  base (disponibilité plutôt que vivacité). Limite assumée : chaque appel de `/health` écrit une
-  ligne de journal. — PR de #199
+  base (disponibilité plutôt que vivacité). — PR de #199
+- **Un appel de `/health` qui répond 200 n'écrit aucune ligne de journal ; tout autre statut en
+  écrit une.** Pourquoi : une sonde toutes les quelques secondes écrirait des milliers de lignes
+  par jour (≈ 8 640 pour une sonde toutes les 10 s), noierait les requêtes des clients et, au
+  08/11, coûterait dans Log Analytics, facturé au volume (minimisation, RGESN) ; une sonde mal
+  réglée (400, 405) reste visible. Option écartée : tout journaliser en écrivant la limite.
+  Constat de `/code-review`, tranché par time-knight, délégation de Sabine du 15/10. — PR de #199
 - **`KB_LOG_TO_FILE=false` envoie le journal de fonctionnement sur la sortie d'erreur seule, pour
   toutes les commandes ; toute autre valeur que `true` ou `false` est refusée (code 2).**
   Pourquoi : en conteneur, la sortie d'erreur part vers `docker compose logs`, puis Log Analytics

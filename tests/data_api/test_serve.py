@@ -151,11 +151,13 @@ def test_serve_listens_on_the_host_and_port_of_the_environment(
     ("variable", "value", "message"),
     [
         # uvicorn would bind an empty host to every interface.
-        ("KB_DATA_API_HOST", "", "KB_DATA_API_HOST: '' not an IP address"),
+        ("KB_DATA_API_HOST", "", "KB_DATA_API_HOST: '' not an IPv4 address"),
+        # A Host in IPv6 keeps its brackets, which no allowed host can name: never reached.
+        ("KB_DATA_API_HOST", "::1", "KB_DATA_API_HOST: '::1' not an IPv4 address"),
         (
             "KB_DATA_API_HOST",
             "api-donnees",
-            "KB_DATA_API_HOST: 'api-donnees' not an IP address",
+            "KB_DATA_API_HOST: 'api-donnees' not an IPv4 address",
         ),
         ("KB_DATA_API_PORT", "", "KB_DATA_API_PORT: '' not an integer from 1 to 65535"),
         (

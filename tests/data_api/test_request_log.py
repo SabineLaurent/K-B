@@ -62,12 +62,33 @@ def test_an_unknown_route_is_logged_without_its_path(
     assert "secret-path-of-the-test" not in line
 
 
-@pytest.mark.parametrize("path", ["/docs", "/openapi.json", "/health"])
+@pytest.mark.parametrize("path", ["/docs", "/openapi.json"])
 def test_a_public_route_is_logged_by_its_path(client, request_lines, path):
     client.get(path)
 
     [line] = request_lines()
     assert f"route={path} status=200" in line
+
+
+def test_a_health_check_that_answers_200_is_not_logged(client, request_lines):
+    """A probe every few seconds would bury the requests of the clients."""
+    client.get("/health")
+
+    assert request_lines() == []
+
+
+@pytest.mark.parametrize(
+    ("method", "headers", "status"),
+    [("GET", {"Host": "evil.example"}, 400), ("POST", {}, 405)],
+)
+def test_a_health_check_that_fails_is_logged_by_its_path(
+    client, request_lines, method, headers, status
+):
+    """A probe set wrong shows in the log."""
+    client.request(method, "/health", headers=headers)
+
+    [line] = request_lines()
+    assert f"route=/health status={status}" in line
 
 
 def test_a_request_without_response_is_logged_without_status():

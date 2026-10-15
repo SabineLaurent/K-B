@@ -376,31 +376,32 @@ def read_serve_settings(environ: Mapping[str, str]) -> ServeSettings | None:
     refused, with its value quoted. Not set: the default of core/config.py."""
     host = environ.get(DATA_API_HOST_VARIABLE, DATA_API_HOST)
     port = environ.get(DATA_API_PORT_VARIABLE, str(DATA_API_PORT))
-    allowed_hosts = environ.get(DATA_API_ALLOWED_HOSTS_VARIABLE)
-    refusal = find_host_refusal(host) or find_port_refusal(port)
-    if refusal is None and allowed_hosts is not None:
-        refusal = find_allowed_hosts_refusal(allowed_hosts)
+    allowed_hosts_value = environ.get(DATA_API_ALLOWED_HOSTS_VARIABLE)
+    # Split once: the list checked is the list served.
+    allowed_hosts = (
+        DATA_API_ALLOWED_HOSTS
+        if allowed_hosts_value is None
+        else split_allowed_hosts(allowed_hosts_value)
+    )
+    refusal = (
+        find_host_refusal(host)
+        or find_port_refusal(port)
+        or find_allowed_hosts_refusal(allowed_hosts)
+    )
     if refusal is not None:
         logger.error("%s", refusal)
         return None
-    return ServeSettings(
-        host=host,
-        port=int(port),
-        allowed_hosts=(
-            DATA_API_ALLOWED_HOSTS
-            if allowed_hosts is None
-            else split_allowed_hosts(allowed_hosts)
-        ),
-    )
+    return ServeSettings(host=host, port=int(port), allowed_hosts=allowed_hosts)
 
 
 def find_host_refusal(host: str) -> str | None:
-    """Why the host is refused, or None. An IP address only: uvicorn would bind an empty host to
-    every interface."""
+    """Why the host is refused, or None. An IPv4 address only: uvicorn would bind an empty host
+    to every interface, and the Host of a client in IPv6 keeps its brackets ([::1]), which no
+    allowed host can name."""
     try:
-        ipaddress.ip_address(host)
+        ipaddress.IPv4Address(host)
     except ValueError:
-        return f"{DATA_API_HOST_VARIABLE}: {quote_value(host)} not an IP address"
+        return f"{DATA_API_HOST_VARIABLE}: {quote_value(host)} not an IPv4 address"
     return None
 
 
@@ -418,14 +419,14 @@ def split_allowed_hosts(allowed_hosts: str) -> tuple[str, ...]:
     return tuple(entry.strip() for entry in allowed_hosts.split(","))
 
 
-def find_allowed_hosts_refusal(allowed_hosts: str) -> str | None:
-    """Why the list of the hosts allowed is refused, or None: TrustedHostMiddleware would serve
-    any host for a * (docs/specs-api.md, API8)."""
-    if not allowed_hosts.strip():
+def find_allowed_hosts_refusal(allowed_hosts: tuple[str, ...]) -> str | None:
+    """Why the hosts allowed are refused, or None: TrustedHostMiddleware would serve any host for
+    a * (docs/specs-api.md, API8)."""
+    # A value empty or made of spaces gives one empty entry.
+    if allowed_hosts == ("",):
         return f"{DATA_API_ALLOWED_HOSTS_VARIABLE}: empty, set the hosts separated by commas"
-    entries = split_allowed_hosts(allowed_hosts)
-    for position, entry in enumerate(entries, start=1):
-        where = f"{DATA_API_ALLOWED_HOSTS_VARIABLE}: entry {position} of {len(entries)}"
+    for position, entry in enumerate(allowed_hosts, start=1):
+        where = f"{DATA_API_ALLOWED_HOSTS_VARIABLE}: entry {position} of {len(allowed_hosts)}"
         if not entry:
             return f"{where} empty"
         if "*" in entry:

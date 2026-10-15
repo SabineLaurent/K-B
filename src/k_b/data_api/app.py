@@ -1,5 +1,6 @@
-"""The data API: the items of the base, read only, for the clients of Sabine on her machine
-(docs/specs-api.md). create_app gathers the routers, the key and the errors."""
+"""The data API: the items of the base, read only, for the clients of Sabine, on her machine by
+default, or in containers (docs/specs-api.md, "Règles communes"). create_app gathers the
+routers, the key and the errors."""
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path

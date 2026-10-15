@@ -189,7 +189,7 @@ racine du dépôt (ailleurs, sans dossier `docs/api`, il n'écrit rien et sort e
 lancer l'API, si `KB_DATA_DIR` manque, si aucune clé n'est donnée, si un nom de client est vide ou
 hors `A-Z`, `0-9` et `_`, si une clé a moins de 32 caractères ou un caractère hors `A-Z`, `a-z`,
 `0-9`, `_` et `-` (l'alphabet de `token_urlsafe`), ou si deux clients ont la même clé :
-le message nomme la variable, jamais sa valeur. Code 2 aussi si l'hôte n'est pas une adresse IP,
+le message nomme la variable, jamais sa valeur. Code 2 aussi si l'hôte n'est pas une adresse IPv4,
 si le port n'est pas un entier de 1 à 65535, si la liste des hôtes permis est vide ou contient une
 entrée vide, une entrée avec `*` ou une entrée hors nom en minuscules, ou si `KB_LOG_TO_FILE` n'est
 ni `true` ni `false` (`false` : journal sur la sortie d'erreur seule) ; le message nomme la
