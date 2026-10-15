@@ -9,10 +9,13 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   - v0 : pipeline de veille (collecte → fusion → base → API) et fiches de veille.
   - v1 : wiki de savoir à la Karpathy.
   - Plus tard : RAG, fiches rédigées par LLM, MCP, tableau de bord.
+    **Levée le 2026-10-15** pour les fiches de veille, que l'API IA rédige par sujet (« POC du 25/10 »,
+    décision 4).
 - **Deux wikis.**
   - *Veille* : fiches figées, une par question récurrente, tous les 3 jours
     (`wiki/veille/<question>/AAAA-MM-JJ.md`). Requête déterministe via l'API et gabarit, sans
-    LLM ni RAG.
+    LLM ni RAG. **Levée le 2026-10-15** : les fiches de veille sont faites par l'API IA, par
+    sujet (« POC du 25/10 », décision 4).
   - *Savoir* : pages vivantes, alimentées par `raw/manual/` et par les PDF retenus dans Zotero.
 - **Données hors du dépôt de code** (ex. `~/K-B-data/` : `raw/automation/`, `raw/manual/`, base,
   `wiki/`), qui sert aussi de coffre Obsidian. Pourquoi : ne jamais publier de données collectées.
@@ -167,7 +170,8 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   au prix d'un serveur à faire tourner et sécuriser et d'un pilote à ajouter. Limite assumée :
   pas de comptes dans la base ; le moindre privilège passe par l'ouverture en lecture seule et
   les droits du fichier. Une migration vers PostgreSQL reste possible (SQL standard, hors
-  `STRICT` et `PRAGMA`). — PR de #7
+  `STRICT` et `PRAGMA`). **Révisée le 2026-10-15** : SQLite au 25/10, PostgreSQL au 08/11
+  (« POC du 25/10 », décision 2). — PR de #7
 - **Schémas MCD et MLD en Mermaid dans le dépôt, MPD en script SQL.** Choix de Sabine. Pourquoi :
   GitHub affiche le Mermaid sans rien installer, et le texte se relit dans une PR. Le dossier
   écrit de la certif E1 pourra utiliser d'autres outils (Looping pour le MCD, draw.io pour le
@@ -559,7 +563,9 @@ encore l'ancien modèle.
   installé en local, le terminal est plus simple qu'une interface graphique. Une commande
   n'exclut pas une API REST locale (question ouverte, ci-dessous). Évolutions notées, sans
   issue : une TUI plein écran, puis une application de bureau (Tauri, hors « Python
-  uniquement »).
+  uniquement »). **Révisée le 2026-10-15** : le 25/10 est un POC en conteneurs en localhost,
+  sans interface CLI dédiée ni front ; `kb search` vient après le 08/11 ; mise en ligne sur
+  Azure Container Apps au 08/11 (« POC du 25/10 », décision 1).
 
 ### Schémas
 
@@ -588,6 +594,9 @@ encore l'ancien modèle.
   la machine ; c'est le brut qu'on sauvegarde. Options écartées : `~/.local/share/k-b`
   (convention XDG, moins connue sur Mac), `~/Library/Application Support/K-B` (pensé pour les
   applications graphiques), `~/K-B-data` (exemple du 2026-09-29, un dossier visible de plus).
+  **Révisée le 2026-10-15** : dans le POC, la base va dans un volume nommé et le brut dans un
+  dossier partagé avec les conteneurs ; mise en ligne sur ACA au 08/11 (« POC du 25/10 »,
+  décisions 1 et 2).
 - **Le coffre Obsidian et le dossier de données sont séparés : K-B copie chaque clip nouveau ou
   modifié, horodaté, dans `raw/selected_library/clipping/`.** Décision de Sabine. Pourquoi : lire
   les clips en place, que Sabine annote, ferait changer ce que K-B reconstruit. Options écartées :
@@ -613,7 +622,9 @@ encore l'ancien modèle.
   dépendances, schéma à réécrire en Python). Limite : des migrations deviendront nécessaires le
   jour où la base gardera des données sans brut. **Contredit** l'ADR du 2026-10-05 (PR de #82),
   qui écartait la reconstruction parce qu'elle renumérote `item_id`, que l'API exposera : la
-  stabilité de `item_id` est ouverte (ci-dessous).
+  stabilité de `item_id` est ouverte (ci-dessous). **Révisée le 2026-10-15** : la base passe à
+  PostgreSQL au 08/11 ; les migrations Alembic sont à reprendre pour PostgreSQL seulement,
+  avec #186 (« POC du 25/10 », décision 2).
 
 ### Interface
 
@@ -622,6 +633,8 @@ encore l'ancien modèle.
   attendue dans E1 ; une commande n'exclut pas une API, et une API locale ne revient pas sur la
   décision « local » du 2026-10-08. Conséquence : la
   stabilité de `item_id` face à une base jetable reste à trancher (question ouverte, ci-dessous).
+  **Révisée le 2026-10-15** : l'API est mise en ligne sur Azure Container Apps au 08/11
+  (« POC du 25/10 », décision 1).
 
 ### Périmètre
 
@@ -653,7 +666,9 @@ encore l'ancien modèle.
 - **En v0, la base ne garde que les items ; les fiches de veille et les notes du wiki LLM sont
   reportées après la collecte, l'indexation et `kb search`.** Décision de Sabine. Option écartée
   pour la v0 : une table NOTE et « une note cite des items ». Revient sur le périmètre v0 du
-  2026-09-29 (« et fiches de veille ») et sur le calendrier des « Deux wikis ».
+  2026-09-29 (« et fiches de veille ») et sur le calendrier des « Deux wikis ». **Révisée le
+  2026-10-15** : les fiches de veille par sujet sont faites par l'API IA au 25/10 (« POC du 25/10 »,
+  décision 4).
 - **Les surlignages Zotero sont gardés en base et affichés avec leur papier dans `kb search`, sans
   être cherchables par leurs mots.** Décision de Sabine. Options écartées : les rendre
   cherchables (un index de plus) ; ne pas les collecter. Remplace le bloc « Mes surlignages » des
@@ -663,7 +678,9 @@ encore l'ancien modèle.
   notes déposées.** Décision de Sabine. Pourquoi : aucune dépendance ; un papier qui cite le
   terme une fois ne doit pas valoir un papier consacré au sujet. Options écartées : tri par date
   seul ; une option `--sort relevance` ; titre seul pour la bibliothèque. Limites : `porter` ne
-  ramène à leur racine que les mots anglais ; FTS5 est propre à SQLite.
+  ramène à leur racine que les mots anglais ; FTS5 est propre à SQLite. **Révisée le
+  2026-10-15** : aucun FTS5 nouveau ; la recherche plein texte se fera avec PostgreSQL
+  (`tsvector`) après le 08/11, et #188 sera à reformuler (« POC du 25/10 », décision 2).
 
 ## 2026-10-10
 
@@ -695,7 +712,9 @@ encore l'ancien modèle.
   temps, puis écarté par Sabine comme surdimensionné pour K-B) ; des scripts numérotés ; la
   réflexion de SQLAlchemy. Limite : Alembic n'est nécessaire qu'à partir de l'installation locale ;
   en développement, la base se recrée. L'ORM reste possible plus tard (passage à PostgreSQL, API
-  qui écrit), par-dessus le même `schema.sql`.
+  qui écrit), par-dessus le même `schema.sql`. **Révisée le 2026-10-15** : la base passe à
+  PostgreSQL au 08/11 ; les migrations Alembic sont à reprendre pour PostgreSQL seulement,
+  avec #186 (« POC du 25/10 », décision 2).
 - **`schema.sql` reste le MPD et fait foi ; la première migration Alembic l'exécute ; un test
   compare la structure de la base créée par `schema.sql` et de la base migrée jusqu'à la dernière
   révision (`PRAGMA` des colonnes, index, clés étrangères, `STRICT`), et le comportement des
@@ -707,6 +726,8 @@ encore l'ancien modèle.
   comparer le texte de `sqlite_schema` (SQLite garde le `CREATE` tel qu'il a été écrit, constaté
   le 2026-10-10). Limite : selon la doc d'Alembic, son mode batch ne recopie pas les `CHECK` d'une
   table recréée ; une migration peut les perdre sans bruit, d'où le test de comportement.
+  **Révisée le 2026-10-15** : les migrations sont à reprendre pour PostgreSQL seulement, avec
+  #186 (« POC du 25/10 », décision 2).
 - **Le titre, le résumé et les dates restent dans chaque sous-type (article de newsletter,
   release, alerte) ou référentiel (publication, vulnérabilité) ; ITEM reste minimal ; les listes
   qui mélangent les sortes (`kb search`, « quoi de neuf », l'API) passent par une seule requête
@@ -715,7 +736,8 @@ encore l'ancien modèle.
   vulnérabilité ou un article sont portées par sa table ; une requête SQL se lit et se teste, une
   vue est un concept qu'elle ne maîtrise pas encore ; une requête complexe s'écrit en SQL. La
   requête est écrite une fois et partagée. Un test vérifie que chaque `kind` a sa branche ; la
-  table FTS5 est remplie à l'import. Options écartées : recopier titre, résumé et date dans ITEM (doublon) ; une
+  table FTS5 est remplie à l'import (**révisé le 2026-10-15** : pas de FTS5 nouveau,
+  « POC du 25/10 », décision 2). Options écartées : recopier titre, résumé et date dans ITEM (doublon) ; une
   table d'affichage remplie à l'import (même doublon, à remettre à jour à chaque révision CISA ou
   arXiv ; gardée en réserve) ; une vue SQL (même coût que la requête imbriquée, mesuré). Mesure (maquette en mémoire,
   1 million d'items, SQLite 3.51) : avec un filtre de date, 0,2 ms ; « les 50 plus récents » sans
@@ -800,7 +822,9 @@ encore l'ancien modèle.
   sortir du code ce qui se règle. Restent dans le code : les faits des API et des formats (URL,
   expressions régulières, formats de date) et les plafonds de taille, garde-fous de sécurité
   qu'on ne doit pas relâcher en croyant régler la veille. Restent en variables d'environnement :
-  les secrets et le dossier de données.
+  les secrets et le dossier de données. **Révisée le 2026-10-15** : s'y ajoutent les réglages
+  de déploiement (hôte, port, hôtes permis, chemins, fenêtres), règle 2 de
+  `.claude/rules/poc.md` (« POC du 25/10 », décision 8).
 
 ## 2026-10-11
 
@@ -978,9 +1002,14 @@ Prises par Sabine hors session, transmises par l'ordre de mission du 2026-10-12 
 telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
 
 - **Pas de Claude dans la chaîne du wiki (ni Claude Code ni modèle Claude), et pas de tri ni de
-  score de la veille par un modèle.** Décision de Sabine ; pourquoi non transmis.
+  score de la veille par un modèle.** Décision de Sabine ; pourquoi non transmis. **Levée le
+  2026-10-15** pour le classement de la veille par sujet, dans une liste fermée (« POC du 25/10 »,
+  décision 5).
 - **Inférence sur Azure, en API compatible OpenAI ; le modèle est choisi par rôle en
   configuration.** Décision de Sabine. Pourquoi (transmis) : le modèle reste interchangeable.
+  **Révisée le 2026-10-15** : Mistral pour le POC ; Azure (Foundry) pour l'inférence reste
+  possible au 08/11 par la configuration, sans toucher au code, mais n'est pas tranché : cela
+  dépend de la souscription de l'école (« POC du 25/10 », décision 6).
 - **Une API dédiée à l'IA, distincte de l'API de données (#21).** Décision de Sabine. Pourquoi
   (transmis) : deux choses distinctes à montrer, et la voie du wiki n'attend pas celle des
   données.
@@ -1044,13 +1073,16 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   en est le client naturel ; un seul chemin et un seul endroit où l'on mesure jetons et coût ;
   les agents passeront par la même porte. Option écartée : `kb` appelle le modèle en direct
   (plus simple, mais l'API IA n'aurait plus de client, et il en faudrait un pour la grille
-  seulement). Limite assumée : l'API doit tourner pour ingérer.
+  seulement). Limite assumée : l'API doit tourner pour ingérer. **Révisée le 2026-10-15** : pas
+  d'interface CLI dédiée au 25/10, et l'inférence passe par Mistral pour le POC (« POC du 25/10 »,
+  décisions 1 et 6).
 - **L'API IA tourne en local, sur la machine de Sabine, comme le reste de K-B ; pas d'hébergement
   en v0.** Décision de Sabine, sur recommandation (découpage de l'après-midi). Pourquoi, celui de
   la recommandation : cohérent avec le README (« les données restent sur ma machine ») et avec
   « K-B tourne en local » (2026-10-08) ; rien à déployer ; l'API n'est pas exposée à Internet.
   Option écartée : l'API sur Azure (une issue de déploiement d'environ 6 h, et une
-  authentification exposée à Internet). — #156
+  authentification exposée à Internet). **Révisée le 2026-10-15** : l'API IA est en local pour
+  l'oral blanc, sur Azure Container Apps au 08/11 (« POC du 25/10 », décision 1). — #156
 - **Le client `kb` s'authentifie par un jeton d'accès de courte durée et un *refresh token* qui
   change à chaque usage ; l'API les délivre elle-même, sans implémenter le protocole OAuth 2.**
   Décision de Sabine. Pourquoi : le client doit renouveler son accès quand il expire, et c'est le
@@ -1064,7 +1096,8 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   renouvellement automatique). Limites assumées : sans fournisseur d'identité, c'est le code de
   K-B qui délivre les jetons ; environ 5 h, mécanisme connu de Sabine mais pas pratiqué depuis
   plusieurs mois. Suivre OAuth 2 en entier reste à voir au début de #160 (Sabine : peut-être lourd
-  ici). — #160
+  ici). **Révisée le 2026-10-15** : au 29/10, les clés restent fixes ; les jetons qui expirent
+  sont prévus en ligne au 08/11 (« POC du 25/10 », décision 7). — #160
 
 ### Wiki : métriques
 
@@ -1082,7 +1115,8 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   « local » qui ne venait pas de Sabine) ; LangSmith (auto-hébergé sous contrat Enterprise
   seulement) ; Langfuse auto-hébergé (6 services, environ 11 CPU et 25 Gio). **Revient** sur
   « tableau de bord : plus tard » (2026-09-29) et sur le README (hors v0) : un outil de
-  restitution entre en v0, étape 2.
+  restitution entre en v0, étape 2. **Révisée le 2026-10-15** : la copie locale devient une
+  ligne JSON par appel, sur stdout (« POC du 25/10 », décision 8 ; règle 4 de `.claude/rules/poc.md`).
 
 ### Périmètre
 
@@ -1112,7 +1146,9 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   fiche par sujet, qui rassemble ce qu'en disent les clips, chaque affirmation renvoyant au sien.**
   Décision de Sabine (reformulation confirmée). Ce sont les pages « concept » du wiki de Karpathy,
   déjà comprises dans l'ingest (« des pages reliées ») ; à ne pas confondre avec les fiches de
-  veille du 2026-09-29, périodiques, faites sans LLM et reportées.
+  veille du 2026-09-29, périodiques, faites sans LLM et reportées. **Révisée le 2026-10-15** :
+  les fiches de veille par sujet sont faites par l'API IA au 25/10, et la compilation des
+  clips en wiki passe après le 29/10 (« POC du 25/10 », décision 4).
 - **Les sujets forment une liste fermée tenue par Sabine en configuration ; le modèle peut
   proposer un sujet nouveau, qui va dans la file « à voir ».** Décision de Sabine, sur
   recommandation. Pourquoi : même règle que l'écriture automatique (Sabine sollicitée seulement en
@@ -1121,6 +1157,8 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   sujets créés librement par le modèle (fiches qui risquent de proliférer et de se doublonner,
   par exemple « prompt injection » et « injection de prompt » ; la veille du 2026-09-23 note que
   WeKnora contrôle les slugs en double et dédoublonne avant d'interroger le LLM, l. 96 et 98).
+  **Révisée le 2026-10-15**, et inversée : le modèle ne choisit que dans la liste fermée, sans
+  proposer de sujet nouveau (« POC du 25/10 », décision 5).
 
 ### Import dans la base
 
@@ -1238,14 +1276,18 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   sur le modèle de remplacement, avec des clips aux réponses préparées (recommandée : le jalon
   est déjà chargé et le chemin complet tourne sans vrai modèle) ; le remplacement d'abord, le vrai
   modèle si le temps le permet. Le modèle de remplacement reste celui des tests et de la CI.
-  — #158
+  **Révisée le 2026-10-15** : la démonstration de l'oral blanc porte sur les fiches de veille
+  par sujet (« POC du 25/10 », décision 4). — #158
 - **Une clé gratuite (Gemini ou Mistral, que Sabine a déjà) d'abord, puis Azure, sur le compte
   payé par l'école.** Décision de Sabine. Pourquoi, selon elle : limiter les coûts pendant le
   développement. **Modifie** « inférence sur Azure » (nuit du 11 au 12/10) : Azure vient en second.
   Option écartée : Azure d'emblée. Limites assumées : en offre gratuite, le texte envoyé peut
   servir à l'entraînement du fournisseur (Gemini : page de prix ; Mistral : plan Experiment,
   retrait possible ; recherches du 2026-10-12), à inscrire au registre (#157) ; changer de modèle
-  peut changer la fidélité, la consigne sera peut-être à reprendre (#170). — #158, #170
+  peut changer la fidélité, la consigne sera peut-être à reprendre (#170). **Révisée le
+  2026-10-15** : Mistral pour le POC ; Azure (Foundry) pour l'inférence reste possible au
+  08/11 par la configuration, sans toucher au code, mais n'est pas tranché : cela dépend de la
+  souscription de l'école (« POC du 25/10 », décision 6). — #158, #170
 
 ### Collecte : clips
 
@@ -1553,7 +1595,9 @@ time-knight a recommandés et que Sabine a acceptés le 2026-10-14.
   ajoutée à une base existante par une migration (#186), selon le critère de #188. Limites assumées : `LIKE`
   exige les accents exacts (`vulnerabilite` ne trouve pas « Vulnérabilité ») et trie par date ; le
   passage à BM25 changera l'ordre des résultats avec `q`, annoncé par une nouvelle version de la
-  spec et de l'OpenAPI. — PR de #182
+  spec et de l'OpenAPI. **Révisée le 2026-10-15** : aucun FTS5 nouveau ; la recherche plein
+  texte se fera avec PostgreSQL (`tsvector`) après le 08/11, et #188 sera à reformuler
+  (« POC du 25/10 », décision 2). — PR de #182
 - **Paquet `src/k_b/data_api/`, organisé par rôle : `app.py` (`create_app`, rassemble les
   routers) ; `routers/item_router.py`, `routers/trend_router.py` (les routes, une entité par
   fichier) ; `schemas/item_schema.py`, `schemas/trend_schema.py` (les modèles Pydantic des
@@ -1581,7 +1625,8 @@ time-knight a recommandés et que Sabine a acceptés le 2026-10-14.
   ne rend jamais rien est un piège ; elle sera ajoutée quand le wiki entrera en base. Constat :
   aucune source de `seed_sources.sql` n'a le mode `wiki`. **Révise** l'entrée « Bibliothèque et
   recherche » du 2026-10-09 (`kb search --in watch|library|wiki`) et celle du 2026-10-10 qui la
-  redit (« `kb search --in watch|library|wiki` ne change pas »). — PR de #182
+  redit (« `kb search --in watch|library|wiki` ne change pas »). **Révisée le 2026-10-15** :
+  `kb search` vient après le 08/11 (« POC du 25/10 », décision 1). — PR de #182
 
 ### Journaux
 
@@ -1642,6 +1687,107 @@ recommandation de la session K-B sauf mention.
   2026-10-14. Limite assumée : à revoir si l'API a un jour plusieurs utilisateurs ou sert un
   site public. — PR de #185
 
+### POC du 25/10
+
+Décisions de Sabine du 2026-10-15, prises avec time-knight sur sa proposition du POC et
+relayées par lui. Le pourquoi et les options écartées sont ceux qu'il a transmis. Les règles
+qui en découlent sont dans `.claude/rules/poc.md`.
+
+- **1. Le 25/10 est un POC en conteneurs Docker en localhost : la collecte, l'API de données et
+  l'API IA ; l'inférence se fait chez un fournisseur distant ; il n'y a ni interface CLI dédiée
+  ni front ; le tout est transposable sur Azure Container Apps (ACA) au 08/11 sans refonte.**
+  Décision de Sabine (15/10, 11 h 16). Pourquoi : ACA fait tourner des conteneurs, si bien
+  qu'un POC en conteneurs est la meilleure répétition du 08/11. Il oblige dès maintenant à
+  régler l'hôte et les journaux par variables d'environnement, à gérer SIGTERM et à exposer
+  `/health`.
+  Options écartées :
+  - tout faire tourner sur le Mac, sans conteneurs (on ne répète pas la cible) ;
+  - mettre en ligne sur ACA dès le 25/10. Une décision de Sabine du 14/10, transmise par
+    time-knight et non consignée jusqu'ici, fixe l'API IA en local pour l'oral blanc et sur ACA
+    au 08/11 ; cette entrée la consigne ;
+  - une interface CLI dédiée et un front en localhost (Sabine, 15/10, 10 h 42 et 10 h 45 : le
+    retour console suffit au 25/10, les maquettes restent pour le 08/11) ;
+  - monter `zotero.sqlite` et le coffre dans le conteneur (on s'écarte de la cible, où le Mac
+    collecte ces deux sources, et on expose des fichiers personnels au conteneur).
+
+  **Révise** « Installation et interface » (2026-10-08), « Interface » (2026-10-09 et
+  2026-10-14 : `kb search` vient après le 08/11), la
+  décision qui garde la base et les données sur la machine (2026-10-09), et l'API IA « en local
+  […] pas d'hébergement en v0 » (2026-10-12). — PR de #198
+- **2. SQLite au 25/10, PostgreSQL au 08/11.** Décision de Sabine (15/10, 11 h 17). Pourquoi :
+  PostgreSQL ne sert que la mise en ligne, car sur ACA un fichier SQLite n'a pas de disque
+  fiable ; en localhost, SQLite fonctionne. La règle « aucun nouveau SQL propre à SQLite » (règle
+  1 de `poc.md`) évite de payer ce SQL au portage. La recherche plein texte se fera avec
+  PostgreSQL (`tsvector`) après le 08/11 ; #188 sera à reformuler à ce moment-là.
+  Options écartées :
+  - passer à PostgreSQL avant le 25/10 : le portage est chiffré XL (25 à 30 h), hors de la marge
+    du POC ;
+  - mettre la base dans un dossier du Mac partagé avec les conteneurs : la fiabilité du fichier
+    `-shm` du mode WAL à travers le partage de fichiers Mac ↔ VM n'est pas vérifiée. La base va
+    donc dans un volume nommé, et seul le brut va dans le dossier partagé.
+
+  **Révise** le choix du SGBD (2026-10-02, où PostgreSQL était écarté), W7 et la recherche par
+  FTS5 (2026-10-09), les migrations Alembic (2026-10-10) et la recherche `LIKE` puis FTS5
+  (2026-10-14). — PR de #198
+- **3. Pas de planificateur sur le Mac : la collecte et l'import sont lancés à la main, et
+  conçus comme des jobs. En ligne, un job ACA déclenché par cron, avec un lancement manuel
+  possible.** Décision de Sabine (15/10, 10 h 48). Pourquoi : la collecte, lancée à la main
+  mais conçue comme un job (une exécution qui se termine, avec un code de sortie nommé),
+  devient un job ACA sans refonte ; il n'y a pas de planificateur à construire.
+  Options écartées :
+  - planifier par launchd sur le Mac, comme le prévoyait l'épic #22 ;
+  - en ligne, un job déclenché par un événement (aucun signal extérieur n'existe).
+
+  ACA connaît trois déclencheurs de job : manuel, planifié (expression cron) et par événement
+  ([Jobs in Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/jobs),
+  relevé par recherche web le 2026-10-15). **Clôt** la question ouverte « Collecte automatisée
+  et sa fréquence » (2026-10-05). — PR de #198
+- **4. L'API IA fait des fiches de veille par sujet, sur une fenêtre réglable
+  (`KB_DIGEST_WINDOW_DAYS`, 3 jours par défaut) ; la compilation des clips en wiki passe après
+  le 29/10 ; la collecte des clips (#14) reste au 25/10.** Décision de Sabine (15/10, 11 h 25,
+  choix « a »). Pourquoi : les fiches s'appuient sur ce qui existe déjà (la veille en base,
+  l'API de données), montrent que l'API IA consomme le pipeline de données, et évitent de
+  construire une sorte d'item de plus avant le 25/10. Selon Sabine (11 h 22), les fiches
+  regroupées par sujet sont une fonction complémentaire du wiki, et regrouper et synthétiser
+  est le rôle d'une API IA. La fenêtre est une variable parce que Sabine la fixera plus tard.
+  Options écartées :
+  - (b) les fiches et le wiki des clips au 25/10 : deux chaînes LLM, qui ne tiennent pas dans la
+    marge (3 à 18 h) ;
+  - (c) le wiki des clips seul au 25/10, les fiches après ;
+  - les fiches sans LLM, par requête déterministe et gabarit (« Deux wikis », 2026-09-29).
+
+  **Lève** l'entrée « Deux wikis » et la ligne « Plus tard : … fiches rédigées par LLM »
+  (2026-09-29) sur ce point. **Révise** le report des fiches (2026-10-09 ; 2026-10-12, « Wiki :
+  les clips avant les PDF ») et la démonstration de l'oral blanc sur un clip compilé en direct
+  (2026-10-12) : elle porte sur les fiches. — PR de #198
+- **5. Les fiches regroupent la veille par une liste fermée de sujets tenue par Sabine : le
+  modèle ne choisit que dans la liste (`enum`), et le code refuse le reste.** Décision de
+  Sabine. Option écartée : le regroupement par sorte d'item, fait par le code. **Inverse** la
+  décision du 2026-10-12 où le modèle pouvait proposer un sujet nouveau, mis dans la file « à
+  voir » ; la liste fermée sans proposition était alors l'option écartée. Pourquoi ce
+  revirement : non transmis. **Lève**, pour le classement par sujet, « pas de tri ni de score
+  de la veille par un modèle » (nuit du 11 au 12/10). — PR de #198
+- **6. Le modèle est Mistral : clé gratuite, données dans l'UE par défaut, opt-out de
+  l'entraînement avant le premier appel, traitement inscrit au registre.** Décision de Sabine.
+  Option écartée : Gemini, dont les conditions pour l'Espace économique européen sont ambiguës.
+  Azure (Foundry) pour l'inférence reste possible au 08/11 par la configuration, sans toucher
+  au code, mais n'est pas tranché : cela dépend de la souscription de l'école. **Révise**
+  « inférence sur Azure » (nuit du 11 au 12/10) et « une clé gratuite d'abord, puis Azure »
+  (2026-10-12). **Clôt** la question ouverte « Wiki : la clé gratuite, Gemini ou Mistral »
+  (2026-10-12). — PR de #198
+- **7. Les jetons qui expirent ne sont pas couverts au 29/10 : les clés restent fixes ; les
+  jetons sont prévus en ligne au 08/11.** Décision de Sabine (15/10, 11 h 54). Option écartée :
+  les coder avant le 29/10, par Entra ID ou par #160. Pourquoi : 6 à 8 h, hors de la marge du
+  POC ; Entra ID dépend aussi de la souscription de l'école, où le droit d'enregistrer une
+  application n'est pas vérifié. **Révise** le jeton de courte durée et le *refresh token*
+  (2026-10-12, « Wiki : API et client »). — PR de #198
+- **8. Les recommandations des relectures plateforme et IA du 15/10 sont suivies ; elles
+  deviennent les huit règles de `.claude/rules/poc.md`.** Décision de Sabine (15/10, 11 h 54).
+  Options écartées : dans chaque issue qui porte une recommandation. **Révise** la copie locale
+  des mesures (2026-10-12, « Wiki : métriques ») : une ligne JSON par appel, sur stdout (règle
+  4). **Révise** « Restent en variables d'environnement : les secrets et le dossier de données »
+  (2026-10-10) : s'y ajoutent les réglages de déploiement (règle 2). — PR de #198
+
 ## Décisions encore ouvertes
 
 - **Remplir `newsletter_article.publication_id`** (2026-10-12) : quand le lien d'un article TLDR
@@ -1677,8 +1823,6 @@ recommandation de la session K-B sauf mention.
   sera dans `config.py` (2026-10-10), à revoir. Sabine n'a pas tranché le 2026-10-02 ; à confirmer
   quand #20 code la purge. La purge des tables nouvelles (référentiels, TENDANCE, bibliothèque)
   n'est pas définie (relecture du 2026-10-09).
-- **Collecte automatisée et sa fréquence** : aujourd'hui lancée à la main, une fois par jour.
-  Le lancement automatique et sa fréquence seront définis plus tard (Sabine, 2026-10-05).
 - **Liste d'exclusion** des personnes qui demandent l'effacement, pour qu'une collecte ou une
   reconstruction ne les réintroduise pas : proposée dans le registre, à concevoir dans #20.
   Indispensable avec une base reconstruite, en développement (2026-10-10).
@@ -1687,7 +1831,10 @@ recommandation de la session K-B sauf mention.
   document Zotero hors arXiv sont tranchés le 2026-10-13, « Modèle de la base : bibliothèque
   Zotero ») ; les versions d'un clip annoté.
 - **Transfert hors UE par les agents** : un agent qui lit les items par l'API envoie leur contenu
-  au fournisseur du modèle (États-Unis). Cadre juridique non vérifié.
+  au fournisseur du modèle (États-Unis). Cadre juridique non vérifié. **Révisée le
+  2026-10-15** : l'API IA appelle Mistral, données dans l'UE par défaut ; ses sous-traitants
+  restent à vérifier (« POC du 25/10 », décision 6). La question reste ouverte pour les clients de
+  l'API de données.
 - **Motif d'un rejet pour longueur** : le critère de l'issue sur le motif des rejets (#92) ne
   garde que le champ et le type d'erreur, alors que la décision du 2026-10-08 demande la longueur
   reçue et le maximum. À accorder par Sabine avant de coder #92 (2026-10-10).
@@ -1714,7 +1861,8 @@ recommandation de la session K-B sauf mention.
   automatique nourrit le wiki ou seulement les dépôts de Sabine (Sabine : « on verra ») ; les
   données envoyées au fournisseur du modèle et à l'outil de suivi, à inscrire au registre (#157,
   #163, #170). Tranchées l'après-midi : l'API IA en local, l'accès qui expire, le vrai modèle
-  pour la démonstration (entrées du 2026-10-12).
-- **Wiki : la clé gratuite, Gemini ou Mistral** (2026-10-12) : à choisir au début de #158.
+  pour la démonstration (entrées du 2026-10-12). **Révisée le 2026-10-15** : l'API IA est sur
+  Azure Container Apps au 08/11, et la démonstration porte sur les fiches de veille
+  (« POC du 25/10 », décisions 1 et 4).
 - **Wiki : suivre OAuth 2 en entier, ou le schéma de jetons seul** (2026-10-12) : à voir au début
   de #160.
