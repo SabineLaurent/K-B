@@ -26,7 +26,9 @@ contrôles, les états nommés et la ligne de métrique sont posés ici ; la sp�
 6. Réponse JSON ; une ligne de métrique par appel au modèle, sur la sortie standard (#156).
 
 L'appel au modèle, sa nouvelle tentative et le modèle de remplacement des tests sont à #150 ; le
-vrai modèle (Mistral) à #158. L'API IA n'écrit rien qui doive survivre à son redémarrage
+vrai modèle (gpt-5.6-luna sur Azure AI Foundry, décision de Sabine du 2026-10-15 ; journal ADR,
+« Modèle des fiches : gpt-5.6-luna sur Foundry ») à #158. La spec ne dépend d'aucun fournisseur :
+elle s'en tient à l'interface compatible OpenAI. L'API IA n'écrit rien qui doive survivre à son redémarrage
 (règle 7 de `poc.md`) : les fiches sont rendues, pas gardées.
 
 **Pas de tendances au 25/10** (décision de Sabine du 2026-10-15) : une tendance n'est pas un item
@@ -114,7 +116,7 @@ ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 6
   Ce nombre découle du plafond et des sujets : pas de constante de plus.
 
 **Limites** : une seule demande à la fois est supposée (une seule utilisatrice, en local) ; les
-limites du quota gratuit de Mistral seront vérifiées par #158. Les sortes rares tiennent bien sous
+quotas du déploiement Foundry seront vérifiés par #158. Les sortes rares tiennent bien sous
 le plafond (≈ 150 items sur 14 jours) : si la coupe tombait sur l'une d'elles, `covered_since`
 vaudrait pour cette sorte, et les sortes suivantes ne seraient pas lues.
 
@@ -122,9 +124,26 @@ vaudrait pour cette sorte, et les sortes suivantes ne seraient pas lues.
 
 La spec écrit chaque schéma en JSON ; le code le porte en modèle Pydantic `extra="forbid"`, ce qui
 écrit `additionalProperties: false` dans le JSON Schema qu'il produit. Le modèle Pydantic reste
-**statique** (`int`, `str`) : les `enum` des sujets et des `item_id` sont ajoutés au
+**statique** (`str`) : les `enum` des sujets et des identifiants d'items sont ajoutés au
 `json_schema` envoyé au modèle, et revérifiés par le code dans des contrôles à part (section
 « Contrôles »).
+
+**Identifiants d'items en chaînes.** Le modèle reçoit et rend chaque item sous un identifiant
+`"i<item_id>"` (`"i17"` pour l'item 17) : un `enum` d'entiers n'est confirmé chez aucun
+fournisseur. Le code fait la correspondance dans les deux sens ; la réponse de `POST /digests`
+rend les `item_id` entiers de l'API de données.
+
+**Schéma portable.** Le `json_schema` envoyé au modèle n'utilise que ce que les fournisseurs
+acceptent en mode strict : `additionalProperties: false`, **tous** les champs dans `required`, et
+ni `minLength`, ni `maxLength`, ni `minItems`, ni `maxItems` (Azure les refuse en mode strict).
+Les bornes de ce document sont vérifiées par le code. Limite : 1 000 valeurs d'`enum` au plus par
+schéma (OpenAI, structured outputs) ; au plafond, environ 300 identifiants et 8 sujets, donc
+sous la limite.
+
+**Réglages d'appel**, lus dans la configuration (#150) : `temperature=0` si le modèle l'accepte,
+sinon `reasoning_effort: "none"` ; la documentation d'OpenAI et celle d'Azure se contredisent sur
+ce point pour les modèles à raisonnement, et le premier essai le tranche (#158). Le déploiement
+est figé sur une version du modèle.
 
 ### Demande
 
@@ -151,17 +170,17 @@ Pourquoi des faits si courts : la fiche est en français, les items surtout en a
 expression anglaise traduite dans le `text` n'y serait plus trouvée, et l'affirmation serait
 retirée (section « Fidélité »).
 
-**Limite** : Mistral ajoute toujours au début du message `system` la phrase « Your output should
-be an instance of a JSON object following this schema: {{ json_schema }} » : le message `system`
-envoyé n'est donc pas une stricte constante. Ce n'est pas une faille de la règle 8 : seuls entrent
-dans ce schéma des `item_id` entiers et les sujets de `core/config.py`, jamais un texte d'item.
+**Limite** : certains fournisseurs ajoutent le schéma de sortie au message `system` (Mistral le
+documente) : le message `system` envoyé n'est donc pas une stricte constante. Ce n'est pas une
+faille de la règle 8 : seuls entrent dans ce schéma des identifiants d'items (`"i17"`) et les
+sujets de `core/config.py`, jamais un texte d'item.
 
 **Message utilisateur** : un objet JSON encodé, et rien d'autre.
 
 ```json
 {
   "subjects": [{"name": "llm_security", "definition": "…"}],
-  "items": [{"item_id": 12, "kind": "paper", "title": "…", "summary": "…"}]
+  "items": [{"item_id": "i12", "kind": "paper", "title": "…", "summary": "…"}]
 }
 ```
 
@@ -211,8 +230,8 @@ champs où la fidélité cherche un fait (section « Fidélité ») :
 
 ```json
 {
-  "assignments": [{"item_id": 12, "subject": "llm_security"}],
-  "not_retained": [7]
+  "assignments": [{"item_id": "i12", "subject": "llm_security"}],
+  "not_retained": ["i7"]
 }
 ```
 
@@ -231,8 +250,8 @@ Un appel par sujet ; `response_format` `json_schema`, `strict: true`.
   "claims": [
     {
       "text": "…",
-      "item_ids": [12, 40],
-      "facts": [{"value": "CVE-2026-1234", "item_id": 40}]
+      "item_ids": ["i12", "i40"],
+      "facts": [{"value": "CVE-2026-1234", "item_id": "i40"}]
     }
   ]
 }
@@ -258,9 +277,12 @@ Une **borne de structure** (un type, un champ en trop, plus de 12 affirmations, 
 `value`, nombre de faits) ne retire que l'affirmation, comptée (section « Fidélité ») : une
 affirmation trop longue n'a pas à faire échouer tout le sujet.
 
-`max_tokens` de chaque appel est au moins la plus longue sortie que ces bornes permettent (calcul
-à #150 et #205, sur ces bornes : 12 affirmations, 5 items et 10 faits de 120 caractères chacune) :
-une troncature ne vient alors que d'une sortie hors bornes.
+Le **plafond de sortie** de chaque appel (`max_completion_tokens` chez OpenAI et Azure) est au
+moins la plus longue sortie que ces bornes permettent (calcul à #150 et #205, sur ces bornes :
+12 affirmations, 5 items et 10 faits de 120 caractères chacune) : une troncature ne vient alors
+que d'une sortie hors bornes. Chez un modèle à raisonnement, ce plafond compte aussi les jetons
+de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_tokens`, section
+« Métriques »).
 
 ### Réponse
 
@@ -320,13 +342,13 @@ Une erreur rend `{"error": "<état>"}`, comme l'API de données (section « Éta
 ## Contrôles
 
 Chaque sortie du modèle passe ces contrôles **dans cet ordre**, avant tout usage ; le premier qui
-échoue nomme l'échec. `strict: true` demande au fournisseur de suivre le schéma ; le code ne s'y
+échoue nomme l'échec. Le mode strict demande au fournisseur de suivre le schéma ; le code ne s'y
 fie pas et revérifie tout (défense en profondeur ; OWASP LLM01:2025 : valider le format de sortie
 par du code déterministe).
 
 | N° | Contrôle | Refuse | `failed_check` |
 |---|---|---|---|
-| 1 | `finish_reason` (liste blanche) | `length` ou `model_length` → `llm_truncated` ; `error` → `llm_unavailable` ; toute autre valeur que `stop`, `tool_calls` compris → `llm_invalid_output` (échouer fermé sur une valeur inconnue) | `finish_reason` pour une valeur hors liste |
+| 1 | `finish_reason` (liste blanche) | `stop` passe ; `length` → `llm_truncated` ; `content_filter` → `llm_content_filtered` ; toute autre valeur → `llm_invalid_output` (échouer fermé sur une valeur inconnue, `tool_calls` compris) | `content_filter` pour un filtrage ; `finish_reason` pour une valeur hors liste |
 | 2 | **Schéma** | un texte qui n'est pas du JSON, un champ en trop (`extra="forbid"`), un type faux, une borne de structure dépassée (plus de 12 affirmations, `item_ids` hors de 1 à 5) | `schema` |
 | 3 | **Sujets** | un sujet hors de la liste de `core/config.py` | `subject` |
 | 4 | **`item_id`** | un identifiant qui n'a pas été envoyé dans **cet** appel (un item inventé, ou d'un autre sujet) ; un `facts[].item_id` hors des `item_ids` de son affirmation | `item_id` |
@@ -442,17 +464,19 @@ durées sont cumulés sur la ligne.
 | `items_dropped`, `items_capped` | compteurs de la demande (section « Entrée du modèle ») ; sur la première ligne de classement de la demande, nuls ailleurs |
 | `input_chars` | longueur du message utilisateur |
 | `tokens_in`, `tokens_out` | `usage` rendu par le fournisseur |
+| `reasoning_tokens` | jetons de raisonnement rendus par le fournisseur, attendus à 0 avec `reasoning_effort: "none"` ; nul s'il ne les rend pas |
 | `data_fetch_ms` | durée de la lecture par l'API de données ; sur la première ligne de classement de la demande, nul ailleurs |
 | `llm_ms`, `check_ms` | durée des appels au modèle, durée des contrôles |
 | `attempts` | 1 ou 2 |
 | `outcome` | `ok`, ou l'état `llm_*` de l'appel |
 | `finish_reason` | celui de la dernière tentative |
 | `schema_valid` | la dernière tentative a passé le contrôle 2 |
-| `failed_check` | le contrôle qui a refusé la dernière tentative (`finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`) ; nul si `ok` |
+| `failed_check` | le contrôle qui a refusé la dernière tentative (`content_filter`, `finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`) ; nul si `ok` |
 | `facts_checked`, `facts_found`, `claims_removed`, `items_uncited` | compteurs de la fidélité (rédaction) ; nuls au classement |
 | `cost_estimated` | jetons × prix au million lus dans `core/config.py` ; 0 en offre gratuite |
 
-`ts`, `stage`, `failed_check`, `items_dropped` et `items_capped` s'ajoutent à la liste de #156.
+`ts`, `stage`, `failed_check`, `items_dropped`, `items_capped` et `reasoning_tokens` s'ajoutent à la
+liste de #156.
 
 **Jamais** dans une ligne : le texte d'un item, la consigne, la sortie du modèle, un titre, un
 auteur, une clé (règle 5 de `poc.md`). Un échec `data_api_*` ne fait aucun appel au modèle, donc
@@ -464,9 +488,10 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 | État | Quand | Le classement échoue (toute la demande) | La rédaction d'un sujet échoue |
 |---|---|---|---|
 | `llm_invalid_output` | contrôles 2 à 6, ou `finish_reason` hors liste, deux fois | 502 | le sujet va dans `failed_subjects` |
-| `llm_truncated` | `finish_reason` `length` ou `model_length` ; pas de nouvelle tentative (même entrée, `temperature=0`) | 502 | `failed_subjects` |
+| `llm_truncated` | `finish_reason` `length` ; pas de nouvelle tentative (même entrée, même modèle figé : même sortie attendue) | 502 | `failed_subjects` |
+| `llm_content_filtered` | `finish_reason` `content_filter` : le filtre de contenu du fournisseur a retenu la sortie (celui d'Azure peut réagir aux textes sur le jailbreak et l'injection, sujets de la veille) ; pas de nouvelle tentative (même entrée) | 502 | `failed_subjects` |
 | `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative | 503, avec `Retry-After` | `failed_subjects` |
-| `llm_unavailable` | 5xx ou connexion refusée, après la nouvelle tentative ; autre 4xx, sans nouvelle tentative ; `finish_reason` `error` | 502 | `failed_subjects` |
+| `llm_unavailable` | 5xx ou connexion refusée, après la nouvelle tentative ; autre 4xx, sans nouvelle tentative | 502 | `failed_subjects` |
 | `llm_timeout` | pas de réponse dans le délai du client (#150) ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé | 504 | `failed_subjects` |
 | `data_api_unavailable` | API de données injoignable, ou 5xx | 502 | — |
 | `data_api_timeout` | délai de lecture dépassé | 504 | — |
@@ -489,16 +514,28 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 
 Consultées le 2026-10-15.
 
-- [Chat Completion API](https://docs.mistral.ai/api) — Mistral, lu par Context7
-  (`/mistralai/platform-docs-public`) : `response_format` `json_schema` « guarantees the message
-  the model generates is in JSON and follows the schema you provide » ; `finish_reason` parmi
-  `stop`, `length`, `model_length`, `error`, `tool_calls` (contrôle 1, états nommés).
+- [Data, privacy, and security for Foundry Models sold by Azure](https://learn.microsoft.com/en-us/azure/foundry/responsible-ai/openai/data-privacy)
+  — Microsoft, relevé par recherche web : les demandes et réponses ne servent pas à entraîner les
+  modèles ; un déploiement Data Zone traite dans la zone choisie (UE).
+- [Region availability of Foundry Models sold by Azure](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure-region-availability)
+  — Microsoft, relevé par recherche web : gpt-5.6-luna, version 2026-07-09.
+- [How to use structured outputs](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs)
+  — Microsoft, relevé par recherche web : en mode strict, tous les champs `required`, et
+  `minLength`, `maxLength`, `minItems`, `maxItems` non pris en charge (schéma portable).
+- [Structured model outputs](https://developers.openai.com/api/docs/guides/structured-outputs) —
+  OpenAI, relevé par recherche web : 1 000 valeurs d'`enum` au plus par schéma (schéma portable).
+- [Reasoning models](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/reasoning) —
+  Microsoft, relevé par recherche web : `reasoning_effort` accepte `none` pour GPT-5.6 ;
+  `max_completion_tokens` compte les jetons de raisonnement (réglages d'appel, plafond de sortie).
+- [Work with chat completion models](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/chatgpt)
+  et [Content filtering](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/concepts/content-filter)
+  — Microsoft, relevé par recherche web : les modèles à raisonnement ne prennent pas `temperature` ;
+  une sortie retenue par le filtre rend `finish_reason` `content_filter` (contrôle 1, états
+  nommés).
 - [Custom Structured Outputs](https://docs.mistral.ai/studio-api/conversations/structured-output/custom)
-  — Mistral, lu par Context7 : `json_schema` avec `name`, `schema` et `strict: true`
-  (« always recommended »). Un `enum` d'entiers n'y est pas montré : à vérifier par #158 ; le code
-  revalide dans tous les cas (contrôles 3 et 4). La même page dit que « Your output should be an
-  instance of a JSON object following this schema: {{ json_schema }} » est toujours ajouté au
-  début du message `system` (limite de la consigne).
+  — Mistral, lu par Context7 : « Your output should be an instance of a JSON object following
+  this schema: {{ json_schema }} » est toujours ajouté au début du message `system` (limite de la
+  consigne).
 - [Models, « Extra data »](https://docs.pydantic.dev/latest/concepts/models/#extra-data) — Pydantic,
   lu par Context7 : `extra='forbid'` refuse un champ en trop (`extra_forbidden`) et écrit
   `additionalProperties: false` dans le JSON Schema (schémas, contrôle 2).
