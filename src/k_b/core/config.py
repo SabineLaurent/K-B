@@ -72,11 +72,13 @@ LLM_REASONING_EFFORT: Literal["none"] | None = None
 LLM_REPLAY_BASE_URL = "https://replay.invalid/v1"
 
 # The reading of the watch by the AI API through the data API (ai_api/data_api_client.py;
-# docs/fiches-veille.md, "Lecture plafonnée"). The URL of kb serve with its defaults:
-# KB_DATA_API_URL changes it, with KB_DATA_API_PORT.
+# docs/fiches-veille.md, "Lecture plafonnée"). The URL of kb serve with its defaults, changed by
+# KB_DATA_API_URL; it does not follow KB_DATA_API_PORT: set KB_DATA_API_URL too when the port of
+# kb serve changes.
 DATA_API_URL = f"http://{DATA_API_HOST}:{DATA_API_PORT}"
-# Assumed values for a service on the same machine or in the same compose network; the bound of
-# the whole request is DIGEST_REQUEST_TIMEOUT_SECONDS (#205).
+# Assumed values for a service on the same machine or in the same compose network. They bound
+# each wait (a connection, each piece of an answer read), neither a request nor the reading: the
+# bound of a digest request will be DIGEST_REQUEST_TIMEOUT_SECONDS, set by #205; until then, none.
 DATA_API_CONNECT_TIMEOUT_SECONDS = 5
 DATA_API_POOL_TIMEOUT_SECONDS = 5
 DATA_API_WRITE_TIMEOUT_SECONDS = 10

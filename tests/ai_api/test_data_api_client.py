@@ -5,7 +5,7 @@ simulated transport for the answers the base cannot give."""
 import json
 import logging
 import secrets
-from datetime import UTC, datetime
+from datetime import UTC, datetime, tzinfo
 
 import httpx2
 import pytest
@@ -80,7 +80,7 @@ def test_an_item_read_keeps_its_source_and_sends_its_whitelist_only(data_api):
     assert paper.kind == "paper"
     assert paper.source_date == datetime(2026, 9, 27, 9, 30, 13, tzinfo=UTC)
     assert paper.url == "https://arxiv.org/abs/2609.33401"
-    assert paper.title.startswith("Evaluating System One Models")
+    assert paper.source_title.startswith("Evaluating System One Models")
     # Neither its authors nor its url: the model never receives them.
     assert isinstance(paper.fields, PaperFields)
     assert set(paper.fields.model_dump()) == {"title", "summary"}
@@ -172,27 +172,48 @@ def test_an_empty_window_asks_no_detail(data_api):
     assert data_api.paths == ["/items"] * 5
 
 
-def test_since_is_sent_in_utc_to_the_second(data_api):
+def read_since(data_api, since):
     queries = []
     data_api.event_hooks["request"].append(
         lambda request: queries.append(request.url.params)
     )
+    read_watch(data_api, since)
+    return queries
 
-    read_watch(data_api, datetime(2026, 10, 7, 2, 30, 15, 999, tzinfo=UTC))
-    read_watch(
-        data_api,
-        datetime.fromisoformat("2026-10-07T04:30:15+02:00"),
-    )
 
-    assert queries[0]["since"] == "2026-10-07T02:30:15Z"
+@pytest.mark.parametrize(
+    ("since", "sent"),
+    [
+        (datetime(2026, 10, 7, 2, 30, 15, tzinfo=UTC), "2026-10-07T02:30:15Z"),
+        (datetime.fromisoformat("2026-10-07T04:30:15+02:00"), "2026-10-07T02:30:15Z"),
+        # Rounded up, as the data API does (database/reading.py, format_since): an item dated
+        # 02:30:15 is before since, and is not read.
+        (datetime(2026, 10, 7, 2, 30, 15, 1, tzinfo=UTC), "2026-10-07T02:30:16Z"),
+        # The year 1, written on four digits whatever the C library.
+        (datetime(1, 1, 1, tzinfo=UTC), "0001-01-01T00:00:00Z"),
+    ],
+)
+def test_since_is_sent_in_utc_to_the_second_rounded_up(data_api, since, sent):
+    queries = read_since(data_api, since)
+
+    assert queries[0]["since"] == sent
     assert queries[0]["kind"] == "vulnerability"
     assert queries[0]["limit"] == "100"
-    assert queries[-1]["since"] == "2026-10-07T02:30:15Z"
 
 
-def test_a_since_without_time_zone_is_refused(data_api):
+class NoOffset(tzinfo):
+    """A time zone without offset: the date stays naive."""
+
+    def utcoffset(self, moment):
+        return None
+
+
+@pytest.mark.parametrize(
+    "since", [datetime(2026, 10, 7), datetime(2026, 10, 7, tzinfo=NoOffset())]
+)
+def test_a_since_without_time_zone_is_refused(data_api, since):
     with pytest.raises(ValueError, match="since without time zone"):
-        read_watch(data_api, datetime(2026, 10, 7))
+        read_watch(data_api, since)
 
 
 def test_a_key_refused_gives_data_api_unauthorized(items_database):

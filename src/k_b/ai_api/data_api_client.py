@@ -10,7 +10,7 @@ none.
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
 import httpx2
@@ -37,8 +37,6 @@ from k_b.items import Int64, RansomwareUse, UtcDatetime
 ITEMS_PATH = "items"
 # The largest page of GET /items (docs/specs-api.md, "Paramètres").
 LIST_PAGE_SIZE = 100
-# The date form of since, the one of the base: UTC, to the second.
-SINCE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 type DataApiState = Literal[
     "data_api_unavailable",
@@ -169,9 +167,7 @@ def build_data_api_client(
 def read_watch(http_client: httpx2.Client, since: datetime) -> WatchReading:
     """The items of the whitelist dated since `since` or later, MAX_ITEMS_PER_DIGEST_REQUEST at
     most, each read in its detail and masked. Raises DataApiError."""
-    if since.tzinfo is None:
-        raise ValueError("since without time zone")
-    item_list = list_items(http_client, since.astimezone(UTC).strftime(SINCE_FORMAT))
+    item_list = list_items(http_client, format_since(since))
     items = []
     for listed_item in item_list.items:
         detail = read_detail(http_client, listed_item)
@@ -185,6 +181,22 @@ def read_watch(http_client: httpx2.Client, since: datetime) -> WatchReading:
         capped_kind=item_list.capped_kind,
         covered_after=item_list.covered_after,
     )
+
+
+def format_since(since: datetime) -> str:
+    """since in UTC, to the second, rounded up: the rule of the data API, which reads since this
+    way (format_since of database/reading.py, which the AI API may not import). isoformat, not
+    strftime: strftime leaves the width of the year to the C library."""
+    # utcoffset, not tzinfo: a tzinfo without offset leaves the date naive, read as local.
+    if since.utcoffset() is None:
+        raise ValueError("since without time zone")
+    try:
+        since_utc = since.astimezone(UTC)
+        if since_utc.microsecond:
+            since_utc = since_utc.replace(microsecond=0) + timedelta(seconds=1)
+    except OverflowError:
+        raise ValueError("since out of range once in UTC") from None
+    return since_utc.replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
 
 
 def list_items(http_client: httpx2.Client, since: str) -> ItemList:
@@ -293,6 +305,6 @@ def to_watch_item(detail: KindDetail) -> WatchItem:
         kind=detail.kind,
         source_date=detail.source_date,
         url=detail.url,
-        title=detail.title,
+        source_title=detail.title,
         fields=build_fields(detail.kind, detail.model_dump()),
     )

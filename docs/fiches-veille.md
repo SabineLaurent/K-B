@@ -127,8 +127,17 @@ ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 6
 quotas du déploiement Foundry seront vérifiés par #158. Les sortes rares tiennent bien sous
 le plafond (≈ 150 items sur 14 jours) : si la coupe tombait sur l'une d'elles, `capped_kind` la
 nommerait, et les sortes suivantes ne seraient pas lues. **Durée** : la lecture n'a pas de borne
-à elle ; au pire, 300 détails de 10 s chacun. La borne est celle de la demande,
-`DIGEST_REQUEST_TIMEOUT_SECONDS` (#205).
+à elle. Les délais du client (`DATA_API_*_TIMEOUT_SECONDS`) bornent chaque attente, pas une
+requête ni la lecture : le délai de lecture vaut pour chaque morceau reçu, si bien qu'un serveur
+qui envoie au compte-gouttes fait durer une requête sans fin ; et aux 300 détails s'ajoutent les
+pages de liste, jusqu'à 101 par sorte (les entrées retirées ne comptent pas sous le plafond).
+Seule `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205) bornera la lecture : `read_watch` ne se branche sur
+une route qu'avec cette échéance (constat de `/code-review` sur #204, tranché par time-knight,
+délégation de Sabine du 2026-10-15). **Offset** : `GET /items` rend `next_offset` nul
+au-delà de l'offset 10 000 ; une entrée retirée ne prenant pas de place sous le plafond, une sorte
+qui compterait plus de 10 000 entrées retirées dans la fenêtre serait coupée sans `capped_kind`.
+Seules les vulnérabilités KEV sont retirables parmi les sortes lues : limite assumée (constat de
+`/code-review` sur #204, écarté par time-knight, délégation de Sabine du 2026-10-15).
 
 ## Schémas
 
@@ -231,7 +240,9 @@ champs où la fidélité cherche un fait (section « Fidélité ») :
 - **Au classement**, chaque item n'envoie que `item_id`, `kind`, `title` et son texte long
   (`summary`, `description` ou `body`) coupé à 500 caractères : classer demande moins de texte que
   rédiger (jetons, délai).
-- **À la rédaction**, chaque item envoie les champs du tableau, chacun coupé à 2 000 caractères ;
+- **À la rédaction**, chaque item envoie les champs du tableau, chacun coupé à 2 000 caractères
+  (pour `packages`, chaque nom ; leur nombre est borné par la base, 100 noms de 255 caractères au
+  plus, `schema.sql` et `items.py`) ;
   une fiche reçoit **60 items au plus**, les plus récents d'abord : le sujet n'étant connu qu'au
   classement, #204 code la sélection (`select_for_writing`) et #205 l'appelle pour chaque sujet.
 - Le découpage des appels de classement est à #205, sous un plafond de caractères par appel

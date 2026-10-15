@@ -62,5 +62,8 @@ def find_api_key_refusal(api_key: str) -> str | None:
             f" minimum {MIN_API_KEY_LENGTH}"
         )
     if not API_KEY_CHARACTERS.fullmatch(api_key):
-        return f"{DATA_API_KEY_VARIABLE}: key with a character outside [A-Za-z0-9_-]"
+        return (
+            f"{DATA_API_KEY_VARIABLE}: key with a character outside"
+            f" {API_KEY_CHARACTERS.pattern}"
+        )
     return None

@@ -70,7 +70,7 @@ def test_without_key_the_settings_are_refused(key, caplog):
         ),
         (
             TEST_API_KEY + " ",
-            "KB_API_KEY_AI_DIGEST: key with a character outside [A-Za-z0-9_-]",
+            "KB_API_KEY_AI_DIGEST: key with a character outside [A-Za-z0-9_-]+",
         ),
     ],
 )

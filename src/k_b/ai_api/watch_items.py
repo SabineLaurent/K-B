@@ -101,9 +101,10 @@ class WatchItem:
     item_id: int
     kind: WatchKind
     source_date: datetime
-    # As the data API serves them, for the sources of the answer; never sent to the model.
+    # As the data API serves them, neither masked nor cut: for the sources of the answer, never
+    # sent to the model, which receives fields.title, masked.
     url: str | None
-    title: str
+    source_title: str
     fields: WatchFields
 
 

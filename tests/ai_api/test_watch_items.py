@@ -137,7 +137,7 @@ def make_item(item_id, hours_ago, summary="A summary."):
         kind="newsletter_article",
         source_date=NOW - timedelta(hours=hours_ago),
         url=f"https://example.org/{item_id}",
-        title=f"Article {item_id}",
+        source_title=f"Article {item_id}",
         fields=NewsletterArticleFields(
             edition="ai", title=f"Article {item_id}", summary=summary
         ),
@@ -183,7 +183,7 @@ def test_the_writing_cuts_each_name_of_packages():
         kind="advisory",
         source_date=NOW,
         url=None,
-        title="An advisory",
+        source_title="An advisory",
         fields=build_fields(
             "advisory",
             {
