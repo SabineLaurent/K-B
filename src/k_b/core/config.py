@@ -39,3 +39,21 @@ DATA_API_ALLOWED_HOSTS = ("127.0.0.1", "localhost")
 # The log of kb in a file of the data directory as well as on stderr; KB_LOG_TO_FILE=false for
 # stderr only, as in a container, whose stderr is its log.
 LOG_TO_FILE = True
+
+# The call to the model by the AI API (ai_api/llm_client.py; docs/fiches-veille.md). Assumed
+# values, to be measured on the real model (#158). Waiting for a connection, then for the answer:
+# a call that is not streamed sends nothing before its answer is whole, so the read timeout
+# bounds the wait for the whole answer.
+LLM_CONNECT_TIMEOUT_SECONDS = 5
+LLM_CALL_TIMEOUT_SECONDS = 60
+# The wait before the retry after a 429, a 5xx or a failed connection without Retry-After; a
+# Retry-After above the maximum is not waited: the call ends there. With the timeouts, a call
+# lasts 2 × (5 + 60) + 20 = 150 seconds at most.
+LLM_RETRY_WAIT_SECONDS = 2
+LLM_RETRY_AFTER_MAX_SECONDS = 20
+# Not set: temperature=0. "none" for a reasoning model, which takes no temperature (ADR of
+# 2026-10-15, "Modèle des fiches : gpt-5.6-luna sur Foundry").
+LLM_REASONING_EFFORT: Literal["none"] | None = None
+# The base URL of the replay provider: a reserved domain (RFC 6761), never resolved, since the
+# replay answers in the client itself.
+LLM_REPLAY_BASE_URL = "https://replay.invalid/v1"
