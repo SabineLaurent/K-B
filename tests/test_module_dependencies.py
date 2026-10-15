@@ -1,7 +1,8 @@
 """The dependencies go one way, read at two levels (conventions.md, rule 5).
 
 Under k_b: core and items are the common vocabulary, database reads and writes the base (its
-writers under database/writers), etl runs the pipeline, data_api serves the base, cli composes. Under k_b.etl: the
+writers under database/writers), etl runs the pipeline, data_api serves the base, ai_api calls the
+model, cli composes. Under k_b.etl: the
 composition (source_kinds) → the sources → the modules of the pipeline.
 """
 
@@ -14,7 +15,7 @@ import pytest
 import k_b
 
 PACKAGE_DIR = Path(k_b.__file__).parent
-TOP_LEVEL_MODULES = {"cli", "items", "core", "database", "etl", "data_api"}
+TOP_LEVEL_MODULES = {"cli", "items", "core", "database", "etl", "data_api", "ai_api"}
 # Under k_b.etl, each module is in exactly one of the three.
 ETL_COMPOSITION_MODULES = {"etl.source_kinds"}
 ETL_SOURCES_PACKAGE = "etl.sources"
@@ -259,6 +260,45 @@ def test_the_data_api_rule_refuses_etl_and_the_writers(code, is_refused):
     imported = parse_imported_modules(code, package="k_b.data_api")
 
     assert bool(list_forbidden_imports_of_the_data_api(imported)) is is_refused
+
+
+# The AI API reads the watch through the data API, never the base (docs/fiches-veille.md, "Le
+# parcours d'une demande"), and writes nothing that must outlive it (.claude/rules/poc.md, rule
+# 7): neither database, its writers included, nor etl and its raw store.
+AI_API_ALLOWED_MODULES = {"ai_api", "items", "core"}
+
+
+def list_forbidden_imports_of_the_ai_api(imported: set[str]) -> set[str]:
+    return {name for name in imported if not is_within(name, AI_API_ALLOWED_MODULES)}
+
+
+def test_ai_api_imports_only_ai_api_items_and_core():
+    for path in list_python_files("ai_api"):
+        imported = list_imported_modules(path, find_package(path))
+        assert list_forbidden_imports_of_the_ai_api(imported) == set(), path
+
+
+@pytest.mark.parametrize(
+    ("code", "is_refused"),
+    [
+        ("from k_b import database", True),
+        ("from k_b.database.reading import read_items", True),
+        ("from k_b.database.writers import paper_writer", True),
+        ("from k_b.etl import raw_store", True),
+        ("from k_b.etl.raw_store import write_file_atomically", True),
+        ("from k_b import data_api", True),
+        ("from k_b import cli", True),
+        ("from k_b.core.config import LLM_CALL_TIMEOUT_SECONDS", False),
+        ("from k_b.core.quoting import quote_value", False),
+        ("from .llm_replay import ReplayTransport", False),
+    ],
+)
+def test_the_ai_api_rule_refuses_the_base_the_pipeline_and_the_other_apis(
+    code, is_refused
+):
+    imported = parse_imported_modules(code, package="k_b.ai_api")
+
+    assert bool(list_forbidden_imports_of_the_ai_api(imported)) is is_refused
 
 
 def test_items_imports_neither_the_sources_nor_the_composition():
