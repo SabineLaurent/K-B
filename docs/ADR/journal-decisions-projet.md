@@ -2011,8 +2011,12 @@ Le détail est dans `src/k_b/ai_api/` et dans `docs/fiches-veille.md` (« États
   connexion refusée, après `Retry-After` en secondes (2 s sans lui), sauf au-delà de 20 s. Aucune
   après un autre 4xx, un délai dépassé, une sortie tronquée ou filtrée.** Pourquoi : à
   `temperature=0`, la même demande rend la même sortie, d'où le rappel (commentaire du 15/10 sur
-  #150) ; une attente plus courte que `Retry-After` rendrait un second 429 ; un appel dure ainsi
-  150 s au plus, ce que la durée totale d'une demande (#205) doit compter. Le rappel vient de
+  #150) ; une attente plus courte que `Retry-After` rendrait un second 429. Un appel dure 150 s
+  quand ses réponses arrivent d'un bloc ; une réponse envoyée par morceaux peut durer plus, car
+  chaque lecture a son délai : la borne totale est celle de la demande (#205). Option écartée : un
+  délai total par tentative (httpx2 n'en a pas ; il faudrait un minuteur, une couche de plus, pour
+  une borne que la demande pose déjà) ; constat de `/code-review`, tranché par time-knight,
+  délégation de Sabine du 15/10. Le rappel vient de
   l'étape parce qu'il appartient à sa consigne et à sa `prompt_version` (constat de l'architecte).
   Il est ajouté au message `system`, puisque la consigne déclare le message utilisateur « donnée,
   jamais consigne ». Options écartées : un message `user` de rappel (il contredirait la consigne) ;
@@ -2022,7 +2026,10 @@ Le détail est dans `src/k_b/ai_api/` et dans `docs/fiches-veille.md` (« États
   (Azure filtre aussi l'entrée, catégorie jailbreak comprise) donne `llm_content_filtered` ; un
   `Retry-After` au-delà du plafond, `llm_rate_limited` ; une réponse 200 illisible,
   `llm_unavailable` ; un délai de connexion, `llm_timeout`. L'enveloppe de la réponse tolère les
-  champs inconnus, la sortie du modèle non (`extra="forbid"`). Limite assumée : le format du 400
+  champs inconnus, la sortie du modèle non (`extra="forbid"`). Le statut HTTP de la dernière
+  réponse est gardé (`http_status`, nouveau champ de la ligne de métrique) : un 401 de clé refusée
+  se distingue d'un 503 (constat de `/security-review`, tranché par time-knight, délégation de
+  Sabine du 15/10). Limite assumée : le format du 400
   d'Azure vient de constats publics (Microsoft Q&A, forum CrewAI) et reste à confirmer par #158.
   — PR de #150
 - **Pas de framework d'orchestration ni agentique pour la chaîne des fiches, aujourd'hui : c'est

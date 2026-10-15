@@ -471,14 +471,15 @@ durées sont cumulés sur la ligne.
 | `llm_ms`, `check_ms` | durée des appels au modèle, nouvelle tentative et attente avant elle comprises ; durée des contrôles |
 | `attempts` | 1 ou 2 |
 | `outcome` | `ok`, ou l'état `llm_*` de l'appel |
-| `finish_reason` | celui de la dernière tentative |
+| `finish_reason` | celui de la dernière tentative, coupé à 64 caractères ; nul s'il manque |
+| `http_status` | le statut HTTP de la dernière réponse du fournisseur (un 401 de clé refusée se distingue ainsi d'un 503) ; nul sans réponse (délai, connexion refusée) |
 | `schema_valid` | la dernière tentative a passé le contrôle 2 |
 | `failed_check` | le contrôle qui a refusé la dernière tentative (`content_filter`, `finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`) ; nul si `ok` |
 | `facts_checked`, `facts_found`, `claims_removed`, `items_uncited` | compteurs de la fidélité (rédaction) ; nuls au classement |
 | `cost_estimated` | jetons × prix au million lus dans `core/config.py` ; 0 en offre gratuite |
 
-`ts`, `stage`, `failed_check`, `items_dropped`, `items_capped` et `reasoning_tokens` s'ajoutent à la
-liste de #156.
+`ts`, `stage`, `failed_check`, `items_dropped`, `items_capped`, `reasoning_tokens` et `http_status`
+s'ajoutent à la liste de #156.
 
 **Jamais** dans une ligne : le texte d'un item, la consigne, la sortie du modèle, un titre, un
 auteur, une clé (règle 5 de `poc.md`). Un échec `data_api_*` ne fait aucun appel au modèle, donc
@@ -493,7 +494,7 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 | `llm_truncated` | `finish_reason` `length` ; pas de nouvelle tentative (même entrée, même modèle figé : même sortie attendue) | 502 | `failed_subjects` |
 | `llm_content_filtered` | `finish_reason` `content_filter` : le filtre de contenu du fournisseur a retenu la sortie (celui d'Azure peut réagir aux textes sur le jailbreak et l'injection, sujets de la veille) ; ou un 400 dont `error.code` vaut `content_filter` : il a retenu l'entrée ; pas de nouvelle tentative (même entrée) | 502 | `failed_subjects` |
 | `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec `Retry-After` | `failed_subjects` |
-| `llm_unavailable` | 5xx, connexion refusée ou coupée, après la nouvelle tentative ; autre 4xx, ou réponse 200 qui n'est pas une complétion lisible (pas du JSON, aucun `choices`, un type faux), sans nouvelle tentative | 502 | `failed_subjects` |
+| `llm_unavailable` | 5xx, connexion refusée ou coupée, après la nouvelle tentative ; autre 4xx, réponse qui ne se décode pas, ou réponse 200 qui n'est pas une complétion lisible (pas du JSON, aucun `choices`, un type faux), sans nouvelle tentative | 502 | `failed_subjects` |
 | `llm_timeout` | pas de connexion ou pas de réponse dans le délai du client (#150), sans nouvelle tentative ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé | 504 | `failed_subjects` |
 | `data_api_unavailable` | API de données injoignable, ou 5xx | 502 | — |
 | `data_api_timeout` | délai de lecture dépassé | 504 | — |
@@ -510,8 +511,10 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
   ou une connexion refusée, elle attend `Retry-After` (en secondes ; une date HTTP compte comme un
   en-tête absent), ou `LLM_RETRY_WAIT_SECONDS` sans lui ; un `Retry-After` au-delà de
   `LLM_RETRY_AFTER_MAX_SECONDS` met fin à l'appel, car une attente plus courte rendrait la même
-  réponse. Un appel dure ainsi 150 s au plus (deux tentatives de 5 s de connexion et 60 s de
-  réponse, et 20 s d'attente), ce que `DIGEST_REQUEST_TIMEOUT_SECONDS` doit compter (#205).
+  réponse. Un appel dure ainsi 150 s quand les réponses arrivent d'un bloc (deux tentatives de
+  5 s de connexion et 60 s de réponse, et 20 s d'attente) ; une réponse envoyée par morceaux peut
+  durer plus, car chaque lecture a son propre délai : la borne totale est celle de la demande,
+  `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205).
 - 502, 503 et 504 disent la panne de l'amont, comme une passerelle (RFC 9110, § 15.6) : le client
   distingue « réessayer plus tard » (503, 504) d'une sortie fautive (502).
 - **Échec partiel** : la réponse est 200 dès que le classement a réussi ; chaque sujet en échec est
