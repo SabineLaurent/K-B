@@ -379,5 +379,7 @@ Consultées le 2026-10-15.
 - [LLM01:2025 Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) — OWASP
   Gen AI Security Project, relevé par recherche web : définir et valider le format de sortie par du
   code déterministe ; borner le rôle dans la consigne ; filtrer les sorties (contrôles, injection).
-- [RFC 9110, § 15.6](https://www.rfc-editor.org/rfc/rfc9110#section-15.6) — IETF : 502 Bad
-  Gateway, 503 Service Unavailable, 504 Gateway Timeout (états nommés).
+- [RFC 9110, § 15.6](https://www.rfc-editor.org/rfc/rfc9110#section-15.6) — IETF, relevé par
+  recherche web : 502 (§ 15.6.3, une réponse invalide de l'amont), 503 (§ 15.6.4, indisponibilité
+  temporaire, `Retry-After` permis), 504 (§ 15.6.5, l'amont n'a pas répondu à temps), pour un
+  serveur qui agit en passerelle (états nommés).
