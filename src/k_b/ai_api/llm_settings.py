@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 
 from pydantic import SecretStr
 
+from k_b.ai_api.llm_replay import InvalidReplayFileError, ReplayStep, read_replay_steps
 from k_b.core.config import LLM_REASONING_EFFORT, LLM_REPLAY_BASE_URL
 from k_b.core.quoting import quote_value
 
@@ -33,6 +34,9 @@ PROVIDERS: tuple[LlmProvider, ...] = ("openai_compatible", "replay")
 REPLAY_MODEL = "replay"
 # A deployment name of Azure, a model of OpenAI or of Mistral; quoted in a log as it is.
 MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,99}")
+# A host name in lowercase, as urlsplit gives it: neither an IPv6 address nor a character an HTTP
+# client would refuse later.
+HOST_NAME = re.compile(r"[a-z0-9]([a-z0-9.-]*[a-z0-9])?")
 # Printable ASCII without space: the key goes into an HTTP header as it is.
 API_KEY_CHARACTERS = re.compile(r"[!-~]+")
 
@@ -45,7 +49,9 @@ class LlmSettings:
     # None for the replay, which sends no key.
     api_key: SecretStr | None
     reasoning_effort: Literal["none"] | None
-    replay_file: Path | None
+    # The steps of the replay, read with the settings: a file missing or out of the model stops
+    # the start, not the first call. None for a provider.
+    replay_steps: tuple[ReplayStep, ...] | None
 
 
 def read_llm_settings(environ: Mapping[str, str]) -> LlmSettings | None:
@@ -67,7 +73,8 @@ def read_settings_or_refusal(environ: Mapping[str, str]) -> LlmSettings | str:
     provider = environ.get(PROVIDER_VARIABLE)
     if not provider:
         return f"{PROVIDER_VARIABLE}: not set, {' or '.join(PROVIDERS)}"
-    reasoning_effort = environ.get(REASONING_EFFORT_VARIABLE)
+    # Empty is not set, as for every variable here.
+    reasoning_effort = environ.get(REASONING_EFFORT_VARIABLE) or None
     if reasoning_effort is not None and reasoning_effort != "none":
         return f"{REASONING_EFFORT_VARIABLE}: {quote_value(reasoning_effort)} not none"
     effort: Literal["none"] | None = (
@@ -88,13 +95,21 @@ def read_replay_settings(
         return (
             f"{REPLAY_FILE_VARIABLE}: not set, required by {PROVIDER_VARIABLE}=replay"
         )
+    # The path comes from the environment: quoted.
+    where = f"{REPLAY_FILE_VARIABLE}: {quote_value(replay_file)}"
+    try:
+        replay_steps = read_replay_steps(Path(replay_file))
+    except OSError as error:
+        return f"{where} unreadable, {type(error).__name__}"
+    except InvalidReplayFileError as error:
+        return f"{where} {error}"
     return LlmSettings(
         provider="replay",
         base_url=LLM_REPLAY_BASE_URL,
         model=REPLAY_MODEL,
         api_key=None,
         reasoning_effort=reasoning_effort,
-        replay_file=Path(replay_file),
+        replay_steps=tuple(replay_steps),
     )
 
 
@@ -120,7 +135,7 @@ def read_provider_settings(
         model=model,
         api_key=SecretStr(api_key),
         reasoning_effort=reasoning_effort,
-        replay_file=None,
+        replay_steps=None,
     )
 
 
@@ -130,12 +145,16 @@ def find_base_url_refusal(base_url: str) -> str | None:
     try:
         parts = urlsplit(base_url)
         has_user_information = parts.username is not None or parts.password is not None
+        # Read for its check: a port out of 0 to 65535, or not digits, raises.
+        parts.port  # noqa: B018
     except ValueError:
         return f"{BASE_URL_VARIABLE}: not a URL"
     if parts.scheme != "https":
         return f"{BASE_URL_VARIABLE}: scheme not https"
     if not parts.hostname:
         return f"{BASE_URL_VARIABLE}: no host"
+    if not HOST_NAME.fullmatch(parts.hostname):
+        return f"{BASE_URL_VARIABLE}: host not a lowercase host name"
     if has_user_information:
         return f"{BASE_URL_VARIABLE}: with user information"
     if parts.query or parts.fragment or "?" in base_url or "#" in base_url:

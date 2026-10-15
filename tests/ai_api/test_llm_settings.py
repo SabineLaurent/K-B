@@ -1,7 +1,7 @@
 """The settings of the model, read from a dict given as the environment: never from .env."""
 
+import json
 import logging
-from pathlib import Path
 
 import pytest
 
@@ -16,10 +16,14 @@ PROVIDER_ENVIRONMENT = {
     "KB_LLM_MODEL": "gpt-5.6-luna",
     "KB_LLM_API_KEY": TEST_API_KEY,
 }
-REPLAY_ENVIRONMENT = {
-    "KB_LLM_PROVIDER": "replay",
-    "KB_LLM_REPLAY_FILE": "tests/fixtures/llm_replay.json",
-}
+REPLAY_STEPS = [{"kind": "completion", "content": "{}"}, {"kind": "timeout"}]
+
+
+@pytest.fixture
+def replay_environment(tmp_path):
+    replay_file = tmp_path / "replay.json"
+    replay_file.write_text(json.dumps(REPLAY_STEPS))
+    return {"KB_LLM_PROVIDER": "replay", "KB_LLM_REPLAY_FILE": str(replay_file)}
 
 
 def test_the_settings_of_a_provider_are_read(caplog):
@@ -37,18 +41,50 @@ def test_the_settings_of_a_provider_are_read(caplog):
     assert caplog.messages == ["LLM provider openai_compatible, model gpt-5.6-luna"]
 
 
-def test_the_settings_of_the_replay_need_neither_url_nor_key(caplog):
+def test_the_settings_of_the_replay_need_neither_url_nor_key(
+    replay_environment, caplog
+):
     caplog.set_level(logging.INFO)
 
-    settings = read_llm_settings(REPLAY_ENVIRONMENT)
+    settings = read_llm_settings(replay_environment)
 
     assert settings is not None
     assert settings.provider == "replay"
     assert settings.base_url == LLM_REPLAY_BASE_URL
     assert settings.api_key is None
-    assert settings.replay_file == Path("tests/fixtures/llm_replay.json")
+    assert settings.replay_steps is not None
+    assert [step.kind for step in settings.replay_steps] == ["completion", "timeout"]
     # A container set on the replay by mistake says it.
     assert caplog.messages == ["LLM provider replay, model replay"]
+
+
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [
+        (None, "unreadable, FileNotFoundError"),
+        ('[{"kind": "sleep"}]', "step 1: union_tag_invalid; errors in the file: 1"),
+    ],
+    ids=["missing", "out-of-the-model"],
+)
+def test_a_replay_file_missing_or_out_of_the_model_stops_the_start(
+    tmp_path, content, message, caplog
+):
+    replay_file = tmp_path / "replay.json"
+    if content is not None:
+        replay_file.write_text(content)
+    environment = {"KB_LLM_PROVIDER": "replay", "KB_LLM_REPLAY_FILE": str(replay_file)}
+
+    assert read_llm_settings(environment) is None
+    (logged,) = caplog.messages
+    assert logged.startswith("KB_LLM_REPLAY_FILE: ")
+    assert logged.endswith(message)
+
+
+def test_an_empty_reasoning_effort_is_not_set():
+    settings = read_llm_settings(PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": ""})
+
+    assert settings is not None
+    assert settings.reasoning_effort is None
 
 
 def test_reasoning_effort_none_is_read():
@@ -97,6 +133,19 @@ def test_reasoning_effort_none_is_read():
             "KB_LLM_BASE_URL: not a URL",
         ),
         (
+            PROVIDER_ENVIRONMENT
+            | {"KB_LLM_BASE_URL": "https://res.openai.azure.com:99999/openai/v1"},
+            "KB_LLM_BASE_URL: not a URL",
+        ),
+        (
+            PROVIDER_ENVIRONMENT | {"KB_LLM_BASE_URL": "https://models.example:abc/v1"},
+            "KB_LLM_BASE_URL: not a URL",
+        ),
+        (
+            PROVIDER_ENVIRONMENT | {"KB_LLM_BASE_URL": "https://models_example!/v1"},
+            "KB_LLM_BASE_URL: host not a lowercase host name",
+        ),
+        (
             PROVIDER_ENVIRONMENT | {"KB_LLM_MODEL": "gpt 5\n"},
             r"KB_LLM_MODEL: 'gpt 5\n' not [A-Za-z0-9][A-Za-z0-9._:-]{0,99}",
         ),
@@ -115,6 +164,9 @@ def test_reasoning_effort_none_is_read():
         "http",
         "no-host",
         "not-a-url",
+        "port-out-of-range",
+        "port-not-digits",
+        "host-out-of-pattern",
         "model-out-of-pattern",
         "reasoning-effort-other-than-none",
     ],
