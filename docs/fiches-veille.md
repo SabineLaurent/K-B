@@ -16,7 +16,8 @@ contrôles, les états nommés et la ligne de métrique sont posés ici ; la sp�
 1. `POST /digests` sur l'API IA, avec une clé (#156) : la demande est validée (section
    « Fenêtre »), avant toute lecture et tout appel au modèle.
 2. L'API IA lit la veille de la fenêtre par l'API de données, avec la clé du client `AI_DIGEST`
-   (#204) : `GET /items`, puis `GET /items/{item_id}` pour chaque item. Elle ne lit pas la base.
+   (#204) : `GET /items` filtré par `kind=` et plafonné (section « Fenêtre »), puis
+   `GET /items/{item_id}` pour chaque item gardé. Elle ne lit pas la base.
 3. **Classement** (#205) : le modèle range chaque item dans un sujet, ou le dit « non retenu ».
 4. **Rédaction** (#205) : un appel par sujet ; le modèle écrit des affirmations qui citent leurs
    items.
@@ -85,6 +86,38 @@ si Sabine la modifie souvent.
   fenêtre de 3 jours prend 2 ou 3 éditions. Option écartée : arrondir `since` à minuit (une règle
   de plus, et la fenêtre ne dit plus « les N derniers jours »).
 
+### Lecture plafonnée
+
+La lecture et les appels au modèle sont bornés par demande (OWASP API4:2023, consommation de
+ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 600 sur 14 (TLDR
+≈ 450, arXiv ≈ 45, releases 20 à 60, KEV et alertes quelques-uns).
+
+- **Filtre** : `GET /items?since=…&kind=…`, avec les cinq sortes de la liste blanche (section
+  « Schémas ») ; `kind` est répétable ([specs-api.md](specs-api.md), « Paramètres »). Sans ce
+  filtre, un import Zotero en masse entrerait dans la lecture.
+- **Plafond** : `MAX_ITEMS_PER_DIGEST_REQUEST = 300`, dans `core/config.py`, appliqué à la liste,
+  avant les `GET /items/{item_id}`.
+- **Ordre** : les sortes rares d'abord, `vulnerability`, `advisory`, `paper`, `release`, puis
+  `newsletter_article` jusqu'au plafond ; dans chaque sorte, de la plus récente à la plus
+  ancienne. Pourquoi : une coupe par date seule évincerait d'abord arXiv (daté par sa soumission,
+  donc parmi les plus anciens) et les entrées KEV plus anciennes, la perte la plus grave pour une
+  veille de sécurité.
+- **Coupe dite** : `items_capped` est vrai s'il reste au moins un item au-delà du plafond ; la
+  réponse donne alors `window.covered_since`, la date du plus ancien item gardé **de la sorte
+  coupée**, pour que `window.since` ne promette pas ce qui n'a pas été lu. Avec ce plafond,
+  l'offset 10 000 de `GET /items` n'est jamais atteint.
+- **Durée totale** : `DIGEST_REQUEST_TIMEOUT_SECONDS`, une constante nommée dans `core/config.py`,
+  sa valeur fixée par #205. Au-delà, les sujets pas encore rédigés vont dans `failed_subjects`
+  avec `llm_timeout`. Elle borne la demande ; le délai d'un appel (#150) ne borne que l'appel.
+- **Appels au modèle** : au plafond, environ 6 classements (50 items par appel, découpage de
+  #205) et 8 rédactions (une par sujet), le double au plus avec les nouvelles tentatives, soit 28.
+  Ce nombre découle du plafond et des sujets : pas de constante de plus.
+
+**Limites** : une seule demande à la fois est supposée (une seule utilisatrice, en local) ; les
+limites du quota gratuit de Mistral seront vérifiées par #158. Les sortes rares tiennent bien sous
+le plafond (≈ 150 items sur 14 jours) : si la coupe tombait sur l'une d'elles, `covered_since`
+vaudrait pour cette sorte, et les sortes suivantes ne seraient pas lues.
+
 ## Schémas
 
 La spec écrit chaque schéma en JSON ; le code le porte en modèle Pydantic `extra="forbid"`, ce qui
@@ -145,10 +178,8 @@ champs**, sans aucune URL (le modèle n'en écrit jamais, #206) :
 - `items_truncated` compte les items dont un champ est coupé ; `items_dropped`, ceux laissés hors
   d'une fiche (au-delà de 60, retirés, ou disparus entre la liste et le détail : 404
   `item_not_found`).
-- `items_capped` est vrai si la lecture de `GET /items` s'est arrêtée alors que la fenêtre avait
-  d'autres items (`next_offset` non nul) : l'API de données ne sert pas la liste au-delà de
-  l'offset 10 000 ([specs-api.md](specs-api.md), « Tri et pagination »). Ces items ne sont pas
-  lus, donc pas comptés : la réponse dit seulement que la fenêtre a été coupée.
+- `items_capped` est vrai s'il reste au moins un item au-delà de `MAX_ITEMS_PER_DIGEST_REQUEST`
+  (section « Lecture plafonnée ») ; ces items ne sont pas lus, donc pas comptés.
 
 ### Sortie du classement
 
@@ -205,7 +236,12 @@ Un appel par sujet ; `response_format` `json_schema`, `strict: true`.
 ```json
 {
   "request_id": "1b4e28ba-2fa1-4d2e-9b5c-6c8e1f0a7d3e",
-  "window": {"days": 3, "since": "2026-10-12T09:00:00Z", "until": "2026-10-15T09:00:00Z"},
+  "window": {
+    "days": 3,
+    "since": "2026-10-12T09:00:00Z",
+    "until": "2026-10-15T09:00:00Z",
+    "covered_since": null
+  },
   "digests": [
     {
       "subject": "llm_security",
@@ -231,7 +267,7 @@ Un appel par sujet ; `response_format` `json_schema`, `strict: true`.
 | Champ | Contenu |
 |---|---|
 | `request_id` | identifiant de la demande (UUID), repris par chaque ligne de métrique |
-| `window` | `days`, et `since` et `until` en UTC, au format des dates de la base |
+| `window` | `days`, et `since` et `until` en UTC, au format des dates de la base ; `covered_since`, la date du plus ancien item gardé de la sorte coupée quand `items_capped` est vrai, nul sinon |
 | `digests` | une fiche par sujet rédigé ; un sujet sans item n'a pas de fiche |
 | `digests[].claims` | les affirmations gardées après la fidélité, sans leurs `facts` (contrôle interne) |
 | `digests[].sources` | `item_id`, `kind`, `title`, `url` de chaque item des affirmations gardées, lus dans l'API de données, **jamais dans la sortie du modèle** ; une `url` qui ne commence ni par `http://` ni par `https://` est rendue nulle |
@@ -357,7 +393,7 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 | `llm_truncated` | `finish_reason` `length` ou `model_length` ; pas de nouvelle tentative (même entrée, `temperature=0`) | 502 | `failed_subjects` |
 | `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative | 503, avec `Retry-After` | `failed_subjects` |
 | `llm_unavailable` | 5xx ou connexion refusée, après la nouvelle tentative ; autre 4xx, sans nouvelle tentative ; `finish_reason` `error` | 502 | `failed_subjects` |
-| `llm_timeout` | pas de réponse dans le délai du client (#150) | 504 | `failed_subjects` |
+| `llm_timeout` | pas de réponse dans le délai du client (#150) ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé | 504 | `failed_subjects` |
 | `data_api_unavailable` | API de données injoignable, ou 5xx | 502 | — |
 | `data_api_timeout` | délai de lecture dépassé | 504 | — |
 | `data_api_unauthorized` | 401 de l'API de données : clé `AI_DIGEST` refusée (sans clé, l'API IA ne démarre pas, règle 2 de `poc.md`) | 502 | — |
@@ -393,6 +429,10 @@ Consultées le 2026-10-15.
 - [LLM01:2025 Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) — OWASP
   Gen AI Security Project, relevé par recherche web : définir et valider le format de sortie par du
   code déterministe ; borner le rôle dans la consigne ; filtrer les sorties (contrôles, injection).
+- [API4:2023 Unrestricted Resource Consumption](https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/)
+  — OWASP, relevé par recherche web : une API qui ne borne pas les ressources qu'une demande
+  consomme, services tiers payés à l'appel compris, risque un déni de service ou un surcoût ;
+  borner le nombre d'enregistrements, les tailles, la durée (lecture plafonnée).
 - [RFC 9110, § 15.6](https://www.rfc-editor.org/rfc/rfc9110#section-15.6) — IETF, relevé par
   recherche web : 502 (§ 15.6.3, une réponse invalide de l'amont), 503 (§ 15.6.4, indisponibilité
   temporaire, `Retry-After` permis), 504 (§ 15.6.5, l'amont n'a pas répondu à temps), pour un
