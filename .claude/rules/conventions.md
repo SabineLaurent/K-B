@@ -78,7 +78,8 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
   une fois, là où il est traité.
 - Le journal de fonctionnement (le déroulé, réussites et échecs) va sur la sortie d'erreur et
   dans `<KB_DATA_DIR>/logs/kb.log` (`logs/kb-serve.log` pour `kb serve`), tourné chaque jour à minuit UTC, `LOG_FILES_KEPT` fichiers
-  gardés (`core/config.py`) ; le résultat d'une commande reste un `print`. Le journal d'import garde sa règle : écrit seulement si l'import va au
+  gardés (`core/config.py`), sauf `KB_LOG_TO_FILE=false` : sortie d'erreur seule, sans fichier (en
+  conteneur, la sortie d'erreur est le journal ; décision du 2026-10-15, #199) ; le résultat d'une commande reste un `print`. Le journal d'import garde sa règle : écrit seulement si l'import va au
   bout de l'écriture en base.
 
 **Vérifier.**

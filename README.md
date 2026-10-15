@@ -168,7 +168,9 @@ sortie :
    ```
 
    et la ranger dans le `.env` : `KB_API_KEY_TERMINAL=<la clé>`.
-2. Lancer l'API, qui écoute sur `http://127.0.0.1:8000`, et seulement sur la machine :
+2. Lancer l'API, qui écoute par défaut sur `http://127.0.0.1:8000`, et seulement sur la machine
+   (`KB_DATA_API_HOST`, `KB_DATA_API_PORT` et `KB_DATA_API_ALLOWED_HOSTS` changent l'hôte, le port
+   et les hôtes permis : `docs/specs-api.md`, « Règles communes ») :
 
    ```sh
    KB_DATA_DIR=~/K-B-data uv run --env-file .env kb serve
@@ -187,8 +189,12 @@ racine du dépôt (ailleurs, sans dossier `docs/api`, il n'écrit rien et sort e
 lancer l'API, si `KB_DATA_DIR` manque, si aucune clé n'est donnée, si un nom de client est vide ou
 hors `A-Z`, `0-9` et `_`, si une clé a moins de 32 caractères ou un caractère hors `A-Z`, `a-z`,
 `0-9`, `_` et `-` (l'alphabet de `token_urlsafe`), ou si deux clients ont la même clé :
-le message nomme la variable, jamais sa valeur. Si le port 8000 est déjà pris (par exemple par un
-autre `kb serve`), uvicorn écrit `address already in use` au journal et `kb serve` sort en code 3.
+le message nomme la variable, jamais sa valeur. Code 2 aussi si l'hôte n'est pas une adresse IP,
+si le port n'est pas un entier de 1 à 65535, si la liste des hôtes permis est vide ou contient une
+entrée vide, une entrée avec `*` ou une entrée hors nom en minuscules, ou si `KB_LOG_TO_FILE` n'est
+ni `true` ni `false` (`false` : journal sur la sortie d'erreur seule) ; le message nomme la
+variable et cite la valeur refusée. Si le port est déjà pris (par exemple par un autre
+`kb serve`), uvicorn écrit `address already in use` au journal et `kb serve` sort en code 3.
 
 Limites :
 
