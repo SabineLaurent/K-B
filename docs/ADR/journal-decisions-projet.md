@@ -1699,12 +1699,12 @@ qui en découlent sont dans `.claude/rules/poc.md`.
   Décision de Sabine (15/10, 11 h 16). Pourquoi : ACA fait tourner des conteneurs, si bien
   qu'un POC en conteneurs est la meilleure répétition du 08/11. Il oblige dès maintenant à
   régler l'hôte et les journaux par variables d'environnement, à gérer SIGTERM et à exposer
-  `/health`.
+  `/health`. Cette entrée consigne aussi une décision de Sabine du 14/10, transmise par
+  time-knight et non consignée jusqu'ici : l'API IA est en local pour l'oral blanc, et sur ACA
+  au 08/11.
   Options écartées :
   - tout faire tourner sur le Mac, sans conteneurs (on ne répète pas la cible) ;
-  - mettre en ligne sur ACA dès le 25/10. Une décision de Sabine du 14/10, transmise par
-    time-knight et non consignée jusqu'ici, fixe l'API IA en local pour l'oral blanc et sur ACA
-    au 08/11 ; cette entrée la consigne ;
+  - mettre en ligne sur ACA dès le 25/10 (décision du 14/10 ci-dessus) ;
   - une interface CLI dédiée et un front en localhost (Sabine, 15/10, 10 h 42 et 10 h 45 : le
     retour console suffit au 25/10, les maquettes restent pour le 08/11) ;
   - monter `zotero.sqlite` et le coffre dans le conteneur (on s'écarte de la cible, où le Mac
@@ -1865,4 +1865,5 @@ qui en découlent sont dans `.claude/rules/poc.md`.
   Azure Container Apps au 08/11, et la démonstration porte sur les fiches de veille
   (« POC du 25/10 », décisions 1 et 4).
 - **Wiki : suivre OAuth 2 en entier, ou le schéma de jetons seul** (2026-10-12) : à voir au début
-  de #160.
+  de #160. **Révisée le 2026-10-15** : #160 vient en ligne au 08/11 ; la question reste ouverte
+  jusque-là (« POC du 25/10 », décision 7).

@@ -305,7 +305,8 @@ règle ci-dessus (`tests/test_database.py`).
   PostgreSQL 18 ; `setval` (consulté le 2026-10-15, par Context7).
 - [INSERT](https://www.postgresql.org/docs/current/sql-insert.html) — PostgreSQL 18 ;
   `OVERRIDING SYSTEM VALUE` pour une colonne `GENERATED ALWAYS` (relevé par recherche web le
-  2026-10-15).
+  2026-10-15 ; confirmé par Context7 le 2026-10-15, avec
+  [Identity Columns](https://www.postgresql.org/docs/18/ddl-identity-columns.html)).
 - [System Information Functions](https://www.postgresql.org/docs/current/functions-info.html) —
   PostgreSQL 18 ; `pg_get_serial_sequence` rend aussi la séquence d'une colonne d'identité
-  (relevé par recherche web le 2026-10-15).
+  (relevé par recherche web le 2026-10-15 ; Context7 ne rend pas ce passage, le 2026-10-15).

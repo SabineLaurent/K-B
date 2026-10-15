@@ -12,17 +12,22 @@ chaque règle dit comment elle s'y accorde.
 ## 1. SQL portable
 
 **Règle.** Aucun nouveau `GLOB`, `strftime` SQL, `json_each`, `json_valid`, `json_type`,
-`json_array_length`, `PRAGMA` ni FTS5. Le SQL nouveau passe en SQLite comme en PostgreSQL :
-ni `iif(`, ni `INSERT OR …` ; un `LIKE` nouveau est testé sur les deux bases, car `LIKE` ignore la
-casse des lettres ASCII en SQLite et la respecte en PostgreSQL.
+`json_array_length`, `PRAGMA` ni FTS5. Le SQL nouveau, au style de marqueur près (`?` de
+`sqlite3`), passe en SQLite comme en PostgreSQL : ni `iif(`, ni `INSERT OR …` ; un `LIKE` nouveau
+est testé sur les deux bases, car `LIKE` ignore la casse des lettres ASCII en SQLite et la
+respecte en PostgreSQL. `STRICT` reste, comme sur chaque table : son retrait au portage est listé
+dans `docs/stockage.md`.
 
 **Vérifier.**
 - `grep -cE "GLOB|strftime|json_each|json_valid|json_type|json_array_length|PRAGMA" src/k_b/database/schema.sql`
   → 36 lignes au départ.
 - `grep -rhoE "GLOB|strftime|json_each|json_valid|json_type|json_array_length|PRAGMA" src/k_b/database --include='*.py' | wc -l`
-  → 11 occurrences au départ (dont 4 `strftime` Python : `database/dates.py`, `reading.py`).
+  → 11 occurrences au départ, dont 4 du mot `strftime` dans du Python : un appel
+  (`database/dates.py:16`) et trois dans des docstrings (`dates.py:23`, `reading.py:314`).
 - `grep -rhoiE "\b(glob|strftime|json_each|json_valid|json_type|json_array_length|pragma|fts5|iif|insert or)\b" src/k_b/database | wc -l`
-  → 52 occurrences au départ : ce compte-ci voit un second motif sur une ligne déjà comptée.
+  → 52 occurrences au départ. Il dépasse 36 + 11 : il compte chaque occurrence et non chaque
+  ligne (il voit un second motif sur une ligne déjà comptée), il ignore la casse, et il cherche
+  aussi `fts5`, `iif` et `insert or`.
 
 **Pourquoi.** La base passe à PostgreSQL au 08/11 (décision 2) : un SQL propre à SQLite écrit
 aujourd'hui serait à réécrire au portage. La recherche plein texte se fera en `tsvector`, pas en
@@ -58,9 +63,12 @@ reste la fonction d'écriture unique de la règle 2 de `conventions.md` ; cette 
 contraint que la signature des fonctions nouvelles de `raw_store.py`.
 
 **Vérifier.**
-- `grep -rnE "\.(read_bytes|read_text|write_bytes|write_text|iterdir|glob|unlink|exists|is_dir|stat)\(|rmtree|[^a-z_]open\(" src/k_b --include='*.py' | grep -v "etl/raw_store.py" | wc -l`
-  → 19 lignes au départ. Celles qui touchent le brut : `etl/transform.py:99,133,167,195,208`,
-  `etl/sources/gh_archive.py:403,410,420`.
+- `grep -rlE "\.(read_bytes|read_text|write_bytes|write_text|iterdir|r?glob|unlink|exists|is_dir|stat)\(|os\.(listdir|scandir|remove|path\.exists)|shutil\.|[^a-z_]open\(" src/k_b --include='*.py' | grep -v etl/raw_store.py`
+  → au départ, six fichiers. Deux touchent le brut : `etl/transform.py` et
+  `etl/sources/gh_archive.py`. Quatre ne le touchent pas : `cli.py` (dossier de données, OpenAPI),
+  `database/creation.py` (base), `etl/load.py` (journal d'import), `etl/sources/zotero.py` (copie
+  de la base source). Un fichier nouveau dans la liste se justifie dans la PR (il ne touche pas le
+  brut) ou enfreint la règle.
 - `grep -nA3 "^def " src/k_b/etl/raw_store.py | grep -E "def |Path"` : au départ,
   `write_file_atomically`, `write_new_raw_file`, `load_last_collection_dates` et
   `save_last_collection_dates` prennent un `Path` ; une fonction nouvelle n'en prend pas.
@@ -115,8 +123,9 @@ clip n'a rien à y faire.
 chiffre) et s'arrête proprement sur SIGTERM.
 
 **Vérifier.**
-- `grep -cE "return [0-9]+$|return [0-9]+ if" src/k_b/cli.py` → 17 au départ (codes écrits en
+- `grep -cE "return [0-9]+\b|else [0-9]+\b" src/k_b/cli.py` → 17 au départ (codes écrits en
   chiffres, que #193 nomme).
+- `grep -rnE "sys\.exit\([0-9]|SystemExit\([0-9]" src/k_b` → rien au départ.
 - `grep -rn "SIGTERM" src/k_b` → rien au départ.
 - La preuve est un test qui envoie SIGTERM à une commande en cours et lit son code de sortie
   (ajouté par #193).
@@ -154,11 +163,15 @@ jamais dans la consigne du modèle. Toute sortie du modèle passe par un schéma
 Pydantic, `enum` des sujets) avant d'être écrite ; une sortie hors schéma n'est jamais écrite.
 
 **Vérifier.**
-- `grep -rnE 'role.*system|SystemMessage' src/k_b` → rien au départ. Chaque ligne trouvée ensuite
-  porte une constante, jamais une f-string ni un `.format`.
+- `grep -rnE -C3 'role.*system|SystemMessage|system=|instructions=' src/k_b` → rien au départ.
+  Ensuite, le contenu de chaque consigne trouvée est une constante de module
+  (`NOM_EN_MAJUSCULES`), jamais une expression. Une constante est évaluée au chargement du
+  module, avant qu'un item existe : elle ne peut pas contenir le texte d'un item. Ce grep est un
+  repère ; la preuve est le test.
 - La preuve est un test, ajouté par l'issue qui code l'appel au modèle : un item ou un clip piégé
-  (une instruction dans son texte) arrive dans le message utilisateur, et une sortie hors schéma
-  n'est pas écrite.
+  (une instruction dans son texte) arrive dans le message utilisateur ; le test vérifie que le
+  texte piégé n'apparaît dans aucun message de rôle `system` envoyé au client simulé, et qu'une
+  sortie hors schéma n'est pas écrite.
 
 **Pourquoi.** `code.md`, « Sécurité dès la conception » : une instruction trouvée dans une donnée
 n'est jamais suivie. Le risque visé est l'injection d'instructions par un item ou un clip
