@@ -103,10 +103,16 @@ envoie la sortie standard vers Log Analytics, et `docker compose logs` la lit de
 
 **Règle.** Un journal ou une métrique ne contient ni le texte d'un item ou d'un clip (résumé,
 corps), ni un auteur. Un titre cité, tronqué et échappé par `quote_value`, reste permis (règle 3
-de `conventions.md`).
+de `conventions.md`). Une `ValidationError` de Pydantic n'est jamais journalisée ni gardée telle
+quelle : son texte cite la valeur reçue (`input_value=`). Elle passe par `without_values`
+(`etl/sources/zotero.py:440`) ou `describe_validation_error` (`etl/sources/gh_archive.py:352`),
+qui gardent le champ et le type d'erreur, jamais par `str(error)` ni par `{error}`.
 
-**Vérifier.**
-- `grep -rnE -A3 "logger\.[a-z]+\(" src/k_b | grep -iE "\.(summary|abstract|authors?|body|content|text)\b|clip_text"`
+**Vérifier.** Les commandes sont des repères ; la preuve est le test.
+- `grep -rn -A5 "except ValidationError" src/k_b | grep -E "\{error\}|str\(error\)"` → au
+  départ, `etl/transform.py:149` (une `ValidationError` citée par `{error}`), à corriger. Ce grep
+  ne voit pas `etl/transform.py:135-138` (une `ValueError` citée par `{error}`), à corriger aussi.
+- Repère secondaire : `grep -rnE -A3 "logger\.[a-z]+\(" src/k_b | grep -iE "\.(summary|abstract|authors?|body|content|text)\b|clip_text"`
   → rien au départ. `-A3` lit les appels écrits sur plusieurs lignes (14 sur 30 au départ).
 - `uv run pytest` : le test de la règle 3 de `conventions.md` (une entrée refusée avec un auteur ;
   l'auteur est absent du message).
