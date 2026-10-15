@@ -41,7 +41,10 @@ FTS5.
 dans une variable d'environnement, avec une valeur locale par défaut nommée dans `core/config.py`.
 Aucun hôte, port ou chemin en dur ailleurs. Les secrets et `KB_DATA_DIR` n'ont pas de valeur par
 défaut : sans eux, la commande échoue (échouer fermé, `code.md` ; ADR du 2026-10-10,
-« Configuration »).
+« Configuration »). Le fournisseur du modèle, son URL et le nom du modèle (`KB_LLM_PROVIDER`,
+`KB_LLM_BASE_URL`, `KB_LLM_MODEL`) n'en ont pas non plus : un fournisseur distant n'a pas de valeur
+locale, et un défaut enverrait la veille à un service que personne n'a choisi (ADR du 2026-10-15,
+« Appel du modèle »).
 
 **Vérifier.**
 - `grep -rnE '127\.0\.0\.1|localhost|0\.0\.0\.0|port *= *[0-9]|_PORT *= *[0-9]' src/k_b` ne renvoie

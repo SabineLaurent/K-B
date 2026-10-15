@@ -1962,6 +1962,95 @@ sont ceux de cet avis, validé par Sabine.
   [inférence régionale de Mistral](https://docs.mistral.ai/inference/regional-inference).
   — PR de #203
 
+### Appel du modèle
+
+Choix de la session K-B dans le plan de #150, relu par un agent architecte et validé par Sabine
+(15/10, relayé par time-knight : « je suis tes recommandations ») ; le choix du client HTTP et la
+ligne sur les frameworks sont des décisions de Sabine, relayées par time-knight avec leur pourquoi.
+Le détail est dans `src/k_b/ai_api/` et dans `docs/fiches-veille.md` (« États nommés »).
+
+- **Le modèle est appelé par httpx2 seul, pour le POC : `POST {KB_LLM_BASE_URL}/chat/completions`,
+  la clé en `Authorization: Bearer`, derrière `call_model` et `LlmCall` (`ai_api/llm_client.py`).**
+  Décision de Sabine (15/10, relayée par time-knight vers 18 h). Pourquoi : un code générique,
+  sans les types d'un fournisseur (préférence de Sabine) ; un seul point d'accès, sans diffusion
+  (streaming) ni outils ; aucune version de plus à suivre. L'appel reste isolé dans un module :
+  changer de client touche ce module, et les tests de l'interface ne changent pas. Option écartée :
+  le SDK `openai` (recommandé dans le plan) : son README avertit, pour son client Azure, que « The
+  Azure API shape differs from the core API shape which means that the static types for responses
+  / params won't always be correct » ; il lit l'environnement ambiant (`OPENAI_API_KEY`,
+  `OPENAI_BASE_URL`, `OPENAI_CUSTOM_HEADERS`, `src/openai/_client.py`) ; ses nouvelles tentatives
+  auraient été coupées de toute façon (la politique est celle de K-B) ; il sort une version tous
+  les 1 à 3 jours (3.25.0 le 06/10, 3.31.0 le 14/10, index PyPI). **À revoir au 08/11** si
+  l'identité managée (jeton Entra), l'API Responses ou un autre point d'accès le demandent.
+  Limites assumées : l'en-tête `Authorization: Bearer` avec une clé Azure n'est documenté que par
+  l'exemple Python de Microsoft (`OpenAI(api_key=…, base_url=".../openai/v1/")`), les exemples curl
+  utilisant `api-key` : à confirmer par #158, repli `api-key`. Le client ne lit ni proxy ni
+  certificat de l'environnement (`trust_env=False`) et ne suit aucune redirection. — PR de #150
+- **Le fournisseur de remplacement est un transport simulé d'httpx2 (`MockTransport`) sous le même
+  client que le vrai fournisseur ; il rend, dans l'ordre, des étapes connues d'avance (complétion,
+  réponse HTTP quelconque, délai, panne de connexion), écrites en code par les tests ou lues dans
+  le fichier `KB_LLM_REPLAY_FILE` quand `KB_LLM_PROVIDER=replay`.** Pourquoi : tout le code d'un
+  vrai appel (corps de requête, lecture de la réponse, correspondance des statuts et des pannes)
+  est exercé en test et en CI, sans réseau, sans clé ni dépense ; le fichier rend réel le choix
+  « en configuration » du critère de #150. Option écartée : une interface `Protocol` avec une
+  fausse implémentation au-dessus du client (le code HTTP ne serait jamais testé). Limites
+  assumées : les étapes supposent des appels l'un après l'autre (si #205 rédige en parallèle, il
+  choisira une étape d'après le corps de la requête) ; un fichier figé ne cite que les `item_id`
+  d'une veille connue d'avance. — PR de #150
+- **`KB_LLM_PROVIDER`, `KB_LLM_BASE_URL` et `KB_LLM_MODEL` n'ont pas de valeur par défaut : sans
+  eux, l'API IA ne démarre pas. La règle 2 de `.claude/rules/poc.md` le dit désormais.** Décision
+  de Sabine (point B du plan). Pourquoi : un fournisseur distant n'a pas de valeur locale ; un
+  défaut `replay` rendrait des fiches inventées sans le dire, et un défaut réel enverrait la veille
+  à un service que personne n'a choisi, alors que le traitement dans l'UE tient au déploiement
+  (« Modèle des fiches », plus haut). Échouer fermé (`code.md`). Option écartée : un défaut
+  `replay` en local. Une URL refusée n'est jamais citée au journal, car elle peut porter une clé
+  (`https://user:clé@hôte`, `?api-key=…`). Le choix fait est journalisé (« LLM provider replay »),
+  pour qu'un conteneur réglé par erreur le dise. — PR de #150
+- **Une seule nouvelle tentative par appel. Après une sortie refusée, avec le rappel constant du
+  contrôle qui l'a refusée, fourni par l'étape appelante (#205, #206) ; après un 429, un 5xx ou une
+  connexion refusée, après `Retry-After` en secondes (2 s sans lui), sauf au-delà de 20 s. Aucune
+  après un autre 4xx, un délai dépassé, une sortie tronquée ou filtrée.** Pourquoi : à
+  `temperature=0`, la même demande rend le plus souvent la même sortie (le déterminisme n'est pas
+  garanti, guide « Advanced usage » d'OpenAI), d'où le rappel (commentaire du 15/10 sur
+  #150) ; une attente plus courte que `Retry-After` rendrait un second 429. Un appel dure 150 s
+  quand ses réponses arrivent d'un bloc ; une réponse envoyée par morceaux peut durer plus, car
+  chaque lecture a son délai : la borne totale est celle de la demande (#205). Option écartée : un
+  délai total par tentative (httpx2 n'en a pas ; il faudrait un minuteur, une couche de plus, pour
+  une borne que la demande pose déjà) ; constat de `/code-review`, tranché par time-knight,
+  délégation de Sabine du 15/10. Le rappel vient de
+  l'étape parce qu'il appartient à sa consigne et à sa `prompt_version` (constat de l'architecte).
+  Il est ajouté au message `system`, puisque la consigne déclare le message utilisateur « donnée,
+  jamais consigne ». Options écartées : un message `user` de rappel (il contredirait la consigne) ;
+  un second message `system` après le message utilisateur (ordre non vérifié chez chaque
+  fournisseur) ; lire la forme « date HTTP » de `Retry-After` (rare : comptée comme un en-tête
+  absent). **Ajouts aux états nommés de la spec** : un 400 dont `error.code` vaut `content_filter`
+  (Azure filtre aussi l'entrée, catégorie jailbreak comprise) donne `llm_content_filtered` ; un
+  `Retry-After` au-delà du plafond, `llm_rate_limited` ; une réponse 200 illisible,
+  `llm_unavailable` ; un délai de connexion, `llm_timeout`. L'enveloppe de la réponse tolère les
+  champs inconnus, la sortie du modèle non (`extra="forbid"`). Le statut HTTP de la dernière
+  réponse est gardé (`http_status`, nouveau champ de la ligne de métrique) : un 401 de clé refusée
+  se distingue d'un 503 (constat de `/security-review`, tranché par time-knight, délégation de
+  Sabine du 15/10). Limite assumée : le format du 400
+  d'Azure vient de constats publics (Microsoft Q&A, forum CrewAI) et reste à confirmer par #158.
+  — PR de #150
+- **Pas de framework d'orchestration ni agentique pour la chaîne des fiches, aujourd'hui : c'est
+  un choix adapté au besoin actuel, pas une règle.** Formulation de Sabine (15/10, relayée par
+  time-knight). La chaîne est fixe et décidée par le code, sans outil confié au modèle ni état qui
+  dure entre deux demandes ; un framework n'y apporterait rien d'utilisé. Options examinées et
+  écartées pour ce besoin : LangChain, LangGraph et d'autres. À réexaminer dès qu'un besoin le
+  justifie : agent avec outils, RAG, reprise d'un traitement long. — PR de #150
+
+Sources (consultées le 2026-10-15) :
+[README du SDK `openai`, « Microsoft Azure OpenAI »](https://github.com/openai/openai-python/blob/main/README.md)
+et [`src/openai/_client.py`](https://github.com/openai/openai-python/blob/main/src/openai/_client.py)
+(lus par Context7) ; [index PyPI de `openai`](https://pypi.org/project/openai/) ;
+[cycle de vie des versions de l'API Azure OpenAI](https://learn.microsoft.com/en-my/Azure/foundry-classic/openai/api-version-lifecycle)
+et [Responses API, Foundry classic](https://learn.microsoft.com/en-us/azure/foundry-classic/openai/how-to/responses)
+(recherche web) ; [filtre de contenu d'Azure](https://learn.microsoft.com/azure/ai-foundry/openai/concepts/content-filter)
+et [Microsoft Q&A 2044545](https://learn.microsoft.com/en-us/answers/questions/2044545/content-filter-and-policy-violation-issues-when-us)
+(recherche web) ; [transports d'httpx](https://github.com/encode/httpx/blob/master/docs/advanced/transports.md)
+(Context7) ; [RFC 9110, § 10.2.3](https://www.rfc-editor.org/rfc/rfc9110#section-10.2.3).
+
 ## Décisions encore ouvertes
 
 - **Remplir `newsletter_article.publication_id`** (2026-10-12) : quand le lien d'un article TLDR
