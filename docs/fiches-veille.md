@@ -150,15 +150,23 @@ les trois valeurs de `cve_listed_in_cisa_kev`.
 ```
 
 **Liste blanche des sortes** : celle de #204, sans `zotero_entry` ni `clip`. **Liste blanche des
-champs**, sans aucune URL (le modèle n'en écrit jamais, #206) :
+champs**, sans le champ `url` de l'item (le modèle n'écrit jamais d'URL, #206), et la colonne des
+champs où la fidélité cherche un fait (section « Fidélité ») :
 
-| Sorte | Champs envoyés |
-|---|---|
-| `paper` | `item_id`, `kind`, `title`, `summary` ; jamais `authors` (règle 5 de `poc.md`) |
-| `vulnerability` | `item_id`, `kind`, `cve_id`, `title`, `description`, `vendor`, `product`, `ransomware_use` |
-| `release` | `item_id`, `kind`, `repository_name`, `tag_name`, `title`, `body`, où chaque `@login` est masqué en `@user` |
-| `advisory` | `item_id`, `kind`, `ghsa_id`, `cve_id`, `title`, `cve_listed_in_cisa_kev`, `packages` |
-| `newsletter_article` | `item_id`, `kind`, `edition`, `title`, `summary` |
+| Sorte | Champs envoyés | Champs où la fidélité cherche |
+|---|---|---|
+| `paper` | `item_id`, `kind`, `title`, `summary` ; jamais `authors` (règle 5 de `poc.md`) | `title`, `summary` |
+| `vulnerability` | `item_id`, `kind`, `cve_id`, `title`, `description`, `vendor`, `product`, `ransomware_use` | `cve_id` (égalité), `title`, `description`, `vendor`, `product`, `ransomware_use` |
+| `release` | `item_id`, `kind`, `repository_name`, `tag_name`, `title`, `body`, où chaque `@login` est masqué en `@user` | `repository_name`, `tag_name`, `title`, `body` |
+| `advisory` | `item_id`, `kind`, `ghsa_id`, `cve_id`, `title`, `cve_listed_in_cisa_kev`, `packages` | `ghsa_id` et `cve_id` (égalité), `title`, chaque nom de `packages` |
+| `newsletter_article` | `item_id`, `kind`, `edition`, `title`, `summary` | `title`, `summary` |
+
+- **URL masquées** : avant le prompt, dans chaque champ envoyé, toute URL
+  (`(?i)[a-z][a-z0-9+.-]*://\S+` et `(?i)www\.\S+`) est remplacée par `[url]`, comme les `@login`
+  par `@user` ; le masquage est codé par #204. Ordre : masquer, puis couper (500 ou 2 000
+  caractères). La fidélité cherche dans le texte masqué, donc dans les champs envoyés. **Limite** :
+  un domaine sans schéma (`example.com/x`) n'est ni masqué ni refusé ; il est rendu en texte non
+  cliquable, car CommonMark et GFM ne font un lien que d'un schéma ou de `www.`.
 
 - `cve_listed_in_cisa_kev` est le champ `exploited` de l'API de données, renommé : vrai veut dire
   « la CVE a figuré au catalogue KEV », même si elle en a été retirée depuis ; faux, « absente du
@@ -219,15 +227,16 @@ Un appel par sujet ; `response_format` `json_schema`, `strict: true`.
 |---|---|---|
 | `claims` | 0 à 12 affirmations | aucune : la fiche est rendue vide (le modèle n'a pas à inventer une affirmation pour remplir le schéma) |
 | `claims[].text` | 1 à 400 caractères | sans lien, image ni balise (contrôle 6) |
-| `claims[].item_ids` | 1 à 10 | `enum` des `item_id` envoyés dans cet appel |
-| `claims[].facts` | 1 à 5 | — |
+| `claims[].item_ids` | 1 à 5 | `enum` des `item_id` envoyés dans cet appel |
+| `claims[].facts` | 1 à 10 | chaque item de `item_ids` porte au moins un fait (règle de fidélité) |
 | `claims[].facts[].value` | 3 à 120 caractères | un extrait recopié de l'item cité (identifiant, version, nombre, nom, courte expression), écrit aussi dans `text` |
 | `claims[].facts[].item_id` | — | l'un des `item_ids` de l'affirmation |
 | `not_retained` | — | `enum` des `item_id` envoyés dans cet appel |
 | ensemble | — | chaque item **envoyé dans cet appel** est cité au moins une fois, ou non retenu, **jamais les deux** ; les items au-delà de 60, jamais envoyés, n'en font pas partie |
 
 `max_tokens` de chaque appel est au moins la plus longue sortie que ces bornes permettent (calcul
-à #150 et #205) : une troncature ne vient alors que d'une sortie hors bornes.
+à #150 et #205, sur ces bornes : 12 affirmations, 5 items et 10 faits de 120 caractères chacune) :
+une troncature ne vient alors que d'une sortie hors bornes.
 
 ### Réponse
 
@@ -293,46 +302,74 @@ par du code déterministe).
 
 | N° | Contrôle | Refuse | `failed_check` |
 |---|---|---|---|
-| 1 | `finish_reason` | `length` ou `model_length` → `llm_truncated` ; `error` → `llm_unavailable` | — |
+| 1 | `finish_reason` (liste blanche) | `length` ou `model_length` → `llm_truncated` ; `error` → `llm_unavailable` ; toute autre valeur que `stop`, `tool_calls` compris → `llm_invalid_output` (échouer fermé sur une valeur inconnue) | `finish_reason` pour une valeur hors liste |
 | 2 | **Schéma** | un texte qui n'est pas du JSON, un champ en trop (`extra="forbid"`), un type ou une longueur hors bornes | `schema` |
 | 3 | **Sujets** | un sujet hors de la liste de `core/config.py` | `subject` |
 | 4 | **`item_id`** | un identifiant qui n'a pas été envoyé dans **cet** appel (un item inventé, ou d'un autre sujet) ; un `facts[].item_id` hors des `item_ids` de son affirmation | `item_id` |
 | 5 | **Complétude** | parmi les items envoyés dans cet appel : au classement, un item absent ou présent deux fois ; à la rédaction, un item ni cité ni non retenu, ou les deux | `completeness` |
-| 6 | **Markdown** (rédaction) | un `text` qui contient `(?i)[a-z][a-z0-9+.-]*://`, `(?i)www\.`, `![`, `[[`, `](` ou `<` | `markup` |
+| 6 | **Markdown** (rédaction) | un `text` qui contient `(?i)[a-z][a-z0-9+.-]*://`, `(?i)www\.`, `![`, `[[`, `](`, `]:` ou `<[a-zA-Z/!?]` | `markup` |
 | 7 | **Fidélité** (rédaction) | voir ci-dessous : retire l'affirmation, n'est pas un échec | — |
 
-- **Contrôles 2 à 6** : `llm_invalid_output`, **une** nouvelle tentative (#150) ; au second échec,
+- **Contrôles 2 à 6, et une valeur de `finish_reason` hors liste** : `llm_invalid_output`, **une**
+  nouvelle tentative (#150) ; au second échec,
   le sujet échoue (rédaction) ou toute la demande (classement). Aucune fiche partielle n'est rendue.
   Une `ValidationError` n'est ni journalisée ni gardée : seul `failed_check` l'est (règle 5 de
   `poc.md`).
-- **Contrôle 6** reprend les motifs de #206, avec une différence : `://` sans casse à la place de
-  `http`. Chercher `http` refuserait « HTTP request smuggling », courant dans les descriptions du
-  catalogue KEV, et laisserait passer `HTTPS://`. `](` refuse un lien Markdown sans schéma.
+- **Contrôle 6** reprend les motifs de #206, avec trois différences (commentaire daté sur #206) :
+  - `://` sans casse à la place de `http` : chercher `http` refuserait « HTTP request smuggling »,
+    courant dans les descriptions du catalogue KEV, et laisserait passer `HTTPS://` ;
+  - `<` n'est refusé qu'au début d'une balise (`<` suivi d'une lettre, de `/`, `!` ou `?`) : une
+    plage de versions (« versions < 2.3.1 ») est courante dans les alertes et doit pouvoir être
+    recopiée comme fait ;
+  - `](` et `]:` s'ajoutent : un lien Markdown sans schéma, et une définition de lien par référence
+    (`[a]: javascript:…`, `[a]: //evil.example`), qui n'ont ni `://` ni `<`.
 
 ### Fidélité
 
-Une fiche ne dit que ce que disent ses items (#207). Avant toute recherche, les deux textes sont
-**normalisés** : Unicode NFKC, `casefold`, espaces réduites à une seule, tirets Unicode (U+2010 à
-U+2015, U+2212) ramenés à `-`.
+Une fiche ne dit que ce que disent ses items (#207).
 
-- Chaque `facts[].value` doit figurer dans le `text` de son affirmation **et** dans les champs
-  **envoyés** de l'item qu'elle cite (`facts[].item_id`).
-- Une valeur CVE (`CVE-…`) ou GHSA (`GHSA-…`) n'est trouvée que dans un champ identifiant
-  (`cve_id`, `ghsa_id`) de l'item cité, jamais dans un texte libre. Un article TLDR n'a pas de tel
-  champ : il ne porte pas de fait CVE ; la fiche cite la CVE par l'entrée KEV ou par l'alerte, si
-  elles sont dans la fenêtre (décision de Sabine du 2026-10-15).
-- Tout `CVE-…` ou `GHSA-…` écrit dans un `text` doit être déclaré comme fait.
+**Normalisation**, avant toute recherche, du `text`, des faits et des champs de l'item : Unicode
+NFKC, `casefold`, retrait des caractères invisibles (catégorie Unicode `Cf` : U+200B, U+00AD,
+U+2060…), espaces réduites à une seule, tirets Unicode (U+2010 à U+2015, U+2212) ramenés à `-`.
+
+**Faits CVE et GHSA.** Les motifs s'appliquent après la normalisation :
+
+- CVE : `(?i)CVE[\s-]*\d{4}[\s-]*\d{4,}` ;
+- GHSA : `(?i)GHSA[\s-]*[0-9a-z]{4}[\s-]*[0-9a-z]{4}[\s-]*[0-9a-z]{4}`.
+
+Un fait qui **contient** l'un de ces motifs est un fait CVE ou GHSA, quelle que soit son écriture
+(`cve 2026-1234` compris). Il doit être **égal**, une fois ramené à sa forme canonique
+(`CVE-AAAA-NNNN`, `GHSA-xxxx-xxxx-xxxx`), au `cve_id` ou au `ghsa_id` de l'item qu'il cite, jamais
+trouvé dans un texte libre. Un article TLDR n'a pas de tel champ : il ne porte pas de fait CVE ; la
+fiche cite la CVE par l'entrée KEV ou par l'alerte, si elles sont dans la fenêtre (décision de
+Sabine du 2026-10-15). Tout motif CVE ou GHSA écrit dans un `text` doit être déclaré comme fait.
+
+**Autres faits.** Chaque `facts[].value` doit figurer dans le `text` de son affirmation **et** dans
+la valeur de l'un des champs où la fidélité cherche, pour l'item qu'elle cite (tableau de la
+section « Entrée du modèle ») : champ par champ, jamais dans une concaténation de champs, jamais
+dans `kind`, `item_id` ni `cve_listed_in_cisa_kev`. Une valeur est trouvée seulement entre deux
+**limites** : juste après elle, ni lettre ni chiffre, ni `.` ou `-` suivi d'une lettre ou d'un
+chiffre ; juste avant, la même règle (ni lettre ni chiffre, ni `.` ou `-` précédé d'une lettre ou
+d'un chiffre). Ainsi `1.2` n'est pas trouvé dans `1.2.9`, ni `CVE-2026-1234` dans
+`CVE-2026-12345`.
+
+**Chaque item cité porte un fait.** Chaque item de `item_ids` porte au moins un fait trouvé : un
+item ne peut pas se faire citer à côté d'une affirmation qui ne dit rien de lui.
 
 Une affirmation qui manque à l'une de ces règles est **retirée et comptée** (`claims_removed`) ;
 ce n'est pas un échec. Un item qui n'est plus cité après ces retraits passe dans `items_uncited`.
 Si toutes les affirmations d'un sujet sont retirées, la fiche est rendue sans affirmation : c'est
 ce qui a été observé. `fidelity_rate` = `facts_found` / `facts_checked`.
 
-- **Ce qu'elle vérifie** : chaque valeur déclarée est écrite dans la phrase et existe dans l'item
-  qu'elle cite.
-- **Ce qu'elle ne vérifie pas** : le sens de la phrase (une négation, une paraphrase fausse), un
-  nombre écrit dans la phrase sans être déclaré, ni ce que l'item dit au-delà des 2 000 caractères
-  envoyés.
+- **Ce qu'elle vérifie** : chaque valeur déclarée est écrite dans la phrase et existe, entre ses
+  limites, dans un champ de l'item qu'elle cite ; chaque identifiant CVE ou GHSA de la phrase est
+  celui de l'item cité ; chaque item cité porte un fait.
+- **Ce qu'elle ne vérifie pas** : le sens de la phrase (une négation, une paraphrase fausse) ; un
+  nombre écrit dans la phrase sans être déclaré ; ce que l'item dit au-delà des caractères
+  envoyés. Un mot courant déclaré comme fait (« release », « model ») passe encore. Option
+  écartée : une liste de mots vides, une liste de plus à tenir pour un gain faible.
+- **Limite assumée** : `1.2.0` n'est pas trouvé dans `v1.2.0` ; l'affirmation est retirée,
+  l'erreur va donc dans le sens sûr.
 
 ### Injection d'instructions
 
@@ -341,9 +378,11 @@ spec :
 
 - la consigne est une constante de module ; sujets et items vont dans le message utilisateur,
   encodés en JSON ; aucun texte d'item n'entre dans un message `system` (règle 8 de `poc.md`) ;
-- le modèle ne reçoit aucune URL ; tout lien, image ou balise en sortie est refusé (contrôle 6) ;
+- les URL des champs envoyés sont masquées en `[url]`, et le champ `url` n'est pas envoyé ; tout
+  lien, image ou balise en sortie est refusé (contrôle 6) ;
 - un item piégé ne peut ni créer un sujet (contrôle 3), ni citer un item inventé (contrôle 4) ;
-- une affirmation sur une CVE tirée d'un texte libre est retirée (fidélité).
+- une affirmation sur une CVE tirée d'un texte libre est retirée, et un item cité sans fait trouvé
+  aussi (fidélité).
 
 La consigne n'est pas la défense ; le schéma fermé et les contrôles le sont. Ce que la spec ne
 couvre pas : un item qui oriente le classement entre deux sujets permis, ou qui fait écrire une
@@ -365,20 +404,21 @@ durées sont cumulés sur la ligne.
 | `provider`, `model` | lus dans la configuration (#150) |
 | `prompt_version` | constante de la consigne utilisée (`classify-1`, `write-1`), changée à la main avec elle |
 | `items_in` | items envoyés dans l'appel |
-| `items_truncated`, `items_dropped` | compteurs de la section « Entrée du modèle », pour cet appel |
+| `items_truncated` | items de cet appel dont un champ est coupé |
+| `items_dropped`, `items_capped` | compteurs de la demande (section « Entrée du modèle ») ; sur la première ligne de classement de la demande, nuls ailleurs |
 | `input_chars` | longueur du message utilisateur |
 | `tokens_in`, `tokens_out` | `usage` rendu par le fournisseur |
-| `data_fetch_ms` | durée de la lecture par l'API de données ; sur la ligne du classement seulement, nul ailleurs |
+| `data_fetch_ms` | durée de la lecture par l'API de données ; sur la première ligne de classement de la demande, nul ailleurs |
 | `llm_ms`, `check_ms` | durée des appels au modèle, durée des contrôles |
 | `attempts` | 1 ou 2 |
 | `outcome` | `ok`, ou l'état `llm_*` de l'appel |
 | `finish_reason` | celui de la dernière tentative |
 | `schema_valid` | la dernière tentative a passé le contrôle 2 |
-| `failed_check` | le contrôle qui a refusé la dernière tentative (section « Contrôles ») ; nul si `ok` |
+| `failed_check` | le contrôle qui a refusé la dernière tentative (`finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`) ; nul si `ok` |
 | `facts_checked`, `facts_found`, `claims_removed`, `items_uncited` | compteurs de la fidélité (rédaction) ; nuls au classement |
 | `cost_estimated` | jetons × prix au million lus dans `core/config.py` ; 0 en offre gratuite |
 
-`ts`, `stage`, `failed_check` et `items_dropped` s'ajoutent à la liste de #156.
+`ts`, `stage`, `failed_check`, `items_dropped` et `items_capped` s'ajoutent à la liste de #156.
 
 **Jamais** dans une ligne : le texte d'un item, la consigne, la sortie du modèle, un titre, un
 auteur, une clé (règle 5 de `poc.md`). Un échec `data_api_*` ne fait aucun appel au modèle, donc
@@ -389,7 +429,7 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 
 | État | Quand | Le classement échoue (toute la demande) | La rédaction d'un sujet échoue |
 |---|---|---|---|
-| `llm_invalid_output` | contrôles 2 à 6, deux fois | 502 | le sujet va dans `failed_subjects` |
+| `llm_invalid_output` | contrôles 2 à 6, ou `finish_reason` hors liste, deux fois | 502 | le sujet va dans `failed_subjects` |
 | `llm_truncated` | `finish_reason` `length` ou `model_length` ; pas de nouvelle tentative (même entrée, `temperature=0`) | 502 | `failed_subjects` |
 | `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative | 503, avec `Retry-After` | `failed_subjects` |
 | `llm_unavailable` | 5xx ou connexion refusée, après la nouvelle tentative ; autre 4xx, sans nouvelle tentative ; `finish_reason` `error` | 502 | `failed_subjects` |
