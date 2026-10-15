@@ -41,14 +41,18 @@ DATA_API_ALLOWED_HOSTS = ("127.0.0.1", "localhost")
 LOG_TO_FILE = True
 
 # The call to the model by the AI API (ai_api/llm_client.py; docs/fiches-veille.md). Assumed
-# values, to be measured on the real model (#158). Waiting for a connection, then for the answer:
-# a call that is not streamed sends nothing before its answer is whole, so the read timeout
-# bounds the wait for the whole answer.
+# values, to be measured on the real model (#158). Waiting for a connection, for a connection of
+# the pool, for each write of the request, and for each read of the answer: a call that is not
+# streamed sends nothing before its answer is whole, so the read timeout bounds the wait for an
+# answer that comes in one block.
 LLM_CONNECT_TIMEOUT_SECONDS = 5
+LLM_POOL_TIMEOUT_SECONDS = 5
+LLM_WRITE_TIMEOUT_SECONDS = 10
 LLM_CALL_TIMEOUT_SECONDS = 60
 # The wait before the retry after a 429, a 5xx or a failed connection without Retry-After; a
-# Retry-After above the maximum is not waited: the call ends there. With the timeouts, a call
-# lasts 2 × (5 + 60) + 20 = 150 seconds at most.
+# Retry-After above the maximum is not waited: the call ends there. A call lasts 2 × (5 + 60) +
+# 20 = 150 seconds when its answers come in one block; an answer sent in pieces can last longer,
+# since each read has its own timeout: the bound of the whole is the one of the request (#205).
 LLM_RETRY_WAIT_SECONDS = 2
 LLM_RETRY_AFTER_MAX_SECONDS = 20
 # Not set: temperature=0. "none" for a reasoning model, which takes no temperature (ADR of

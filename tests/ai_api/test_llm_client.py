@@ -5,18 +5,21 @@ import json
 from dataclasses import replace
 from typing import get_args
 
+import httpx2
 import pytest
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from k_b.ai_api.llm_client import FailedCheck, build_http_client, call_model
 from k_b.ai_api.llm_replay import ReplayTransport
-from k_b.ai_api.llm_settings import LlmSettings
+from k_b.ai_api.llm_settings import LlmSettings, read_llm_settings
 from k_b.core.config import (
     LLM_CALL_TIMEOUT_SECONDS,
     LLM_CONNECT_TIMEOUT_SECONDS,
+    LLM_POOL_TIMEOUT_SECONDS,
     LLM_REPLAY_BASE_URL,
     LLM_RETRY_AFTER_MAX_SECONDS,
     LLM_RETRY_WAIT_SECONDS,
+    LLM_WRITE_TIMEOUT_SECONDS,
 )
 
 # A system prompt of a stage, a module constant as the real ones will be (#205;
@@ -33,7 +36,7 @@ REPLAY_SETTINGS = LlmSettings(
     model="replay",
     api_key=None,
     reasoning_effort=None,
-    replay_file=None,
+    replay_steps=None,
 )
 # Made for the test: never a real key.
 TEST_API_KEY = "test-key-0123456789"
@@ -43,7 +46,7 @@ PROVIDER_SETTINGS = LlmSettings(
     model="test-model",
     api_key=SecretStr(TEST_API_KEY),
     reasoning_effort=None,
-    replay_file=None,
+    replay_steps=None,
 )
 
 
@@ -160,6 +163,7 @@ def test_a_valid_output_is_returned_with_its_measures():
     assert llm_call.llm_ms >= 0
     assert llm_call.check_ms >= 0
     assert llm_call.retry_after_seconds is None
+    assert llm_call.http_status == 200
 
 
 def test_the_request_is_a_chat_completion_with_a_strict_json_schema_written_as_a_dict():
@@ -535,9 +539,11 @@ def test_the_client_of_the_provider_sends_the_key_and_follows_no_redirection():
     assert str(request.url) == "https://models.example/openai/v1/chat/completions"
     assert request.headers["Authorization"] == f"Bearer {TEST_API_KEY}"
     assert json.loads(request.content)["model"] == "test-model"
-    assert (timeout.connect, timeout.read) == (
+    assert (timeout.connect, timeout.read, timeout.write, timeout.pool) == (
         LLM_CONNECT_TIMEOUT_SECONDS,
         LLM_CALL_TIMEOUT_SECONDS,
+        LLM_WRITE_TIMEOUT_SECONDS,
+        LLM_POOL_TIMEOUT_SECONDS,
     )
     # A redirection is an answer that is not a completion, never followed.
     assert llm_call.outcome == "llm_unavailable"
@@ -559,7 +565,10 @@ def test_the_replay_client_sends_no_key():
 def test_the_replay_chosen_by_the_settings_answers_from_its_file(tmp_path):
     replay_file = tmp_path / "replay.json"
     replay_file.write_text(json.dumps([completion(), response(503)]))
-    settings = replace(REPLAY_SETTINGS, replay_file=replay_file)
+    settings = read_llm_settings(
+        {"KB_LLM_PROVIDER": "replay", "KB_LLM_REPLAY_FILE": str(replay_file)}
+    )
+    assert settings is not None
 
     with build_http_client(settings) as http_client:
         answers = [
@@ -567,3 +576,112 @@ def test_the_replay_chosen_by_the_settings_answers_from_its_file(tmp_path):
         ]
 
     assert answers == [200, 503]
+
+
+def test_reminders_missing_for_a_check_are_refused_before_any_request():
+    transport = ReplayTransport([completion()])
+    reminders = {"subject": "Reminder."}
+
+    with (
+        build_http_client(REPLAY_SETTINGS, transport=transport) as http_client,
+        pytest.raises(
+            ValueError, match="retry_reminders without: content_filter, finish_reason"
+        ),
+    ):
+        call_model(
+            http_client,
+            REPLAY_SETTINGS,
+            system_prompt=SYSTEM_PROMPT,
+            user_data=USER_DATA,
+            output_model=Classification,
+            json_schema=CLASSIFICATION_SCHEMA,
+            schema_name="classification",
+            max_completion_tokens=500,
+            check_output=accept_every_output,
+            retry_reminders=reminders,
+            sleep=Sleeps(),
+        )
+
+    assert transport.requests == []
+
+
+def test_an_answer_that_cannot_be_decoded_is_llm_unavailable_without_retry():
+    requests: list[httpx2.Request] = []
+
+    def answer_badly_encoded(request):
+        requests.append(request)
+        return httpx2.Response(
+            200, headers={"Content-Encoding": "gzip"}, content=b"not gzip"
+        )
+
+    with build_http_client(
+        REPLAY_SETTINGS, transport=httpx2.MockTransport(answer_badly_encoded)
+    ) as http_client:
+        llm_call = call_model(
+            http_client,
+            REPLAY_SETTINGS,
+            system_prompt=SYSTEM_PROMPT,
+            user_data=USER_DATA,
+            output_model=Classification,
+            json_schema=CLASSIFICATION_SCHEMA,
+            schema_name="classification",
+            max_completion_tokens=500,
+            check_output=accept_every_output,
+            retry_reminders=RETRY_REMINDERS,
+            sleep=Sleeps(),
+        )
+
+    assert llm_call.outcome == "llm_unavailable"
+    assert llm_call.attempts == 1
+    assert llm_call.http_status is None
+    assert len(requests) == 1
+
+
+def test_a_retry_after_of_any_number_of_digits_is_compared_to_the_maximum():
+    llm_call, transport, sleeps = call(
+        [response(429, retry_after="3600000"), completion()]
+    )
+
+    assert llm_call.outcome == "llm_rate_limited"
+    assert llm_call.retry_after_seconds == 3600000
+    assert sleeps == []
+    assert len(transport.requests) == 1
+
+
+def test_a_finish_reason_null_is_refused_by_check_1_and_asked_again():
+    llm_call, transport, _ = call(
+        [completion(finish_reason=None), completion(finish_reason=None)]
+    )
+
+    assert llm_call.outcome == "llm_invalid_output"
+    assert llm_call.failed_check == "finish_reason"
+    assert llm_call.finish_reason is None
+    assert len(transport.requests) == 2
+
+
+def test_a_long_finish_reason_is_refused_by_check_1_and_cut_in_the_call():
+    long_reason = "x" * 200
+
+    llm_call, _, _ = call(
+        [completion(finish_reason=long_reason), completion(finish_reason=long_reason)]
+    )
+
+    assert llm_call.outcome == "llm_invalid_output"
+    assert llm_call.failed_check == "finish_reason"
+    assert llm_call.finish_reason == "x" * 64
+
+
+@pytest.mark.parametrize(
+    ("steps", "http_status"),
+    [
+        ([response(401)], 401),
+        ([response(503), response(503)], 503),
+        ([{"kind": "timeout"}], None),
+    ],
+    ids=["401", "503", "timeout"],
+)
+def test_the_status_of_the_last_answer_is_kept(steps, http_status):
+    llm_call, _, _ = call(steps)
+
+    assert llm_call.outcome in {"llm_unavailable", "llm_timeout"}
+    assert llm_call.http_status == http_status

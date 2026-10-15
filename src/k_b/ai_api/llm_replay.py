@@ -21,7 +21,7 @@ class CompletionStep(BaseModel):
 
     kind: Literal["completion"]
     content: str | None
-    finish_reason: str = "stop"
+    finish_reason: str | None = "stop"
     prompt_tokens: int = Field(default=0, ge=0)
     completion_tokens: int = Field(default=0, ge=0)
     # Not given by every provider.
