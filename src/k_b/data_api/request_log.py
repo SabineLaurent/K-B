@@ -8,6 +8,7 @@ from collections.abc import Awaitable, Callable
 from fastapi import Request, Response
 
 from k_b.core.quoting import quote_value
+from k_b.data_api.health import HEALTH_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -27,28 +28,32 @@ async def log_request(
         status_code = response.status_code
         return response
     finally:
-        logger.info(
-            "%s",
-            format_request_line(
-                request.method,
-                find_route_template(request),
-                status_code,
-                round((time.perf_counter() - started) * 1000),
-                getattr(request.state, "client_name", NONE_SEEN),
-            ),
-        )
+        # A probe that answers 200 is not logged: one every few seconds would bury the requests
+        # of the clients. A probe that fails keeps its line.
+        if not (request.url.path == HEALTH_PATH and status_code == 200):
+            logger.info(
+                "%s",
+                format_request_line(
+                    request.method,
+                    find_route_template(request),
+                    status_code,
+                    round((time.perf_counter() - started) * 1000),
+                    getattr(request.state, "client_name", NONE_SEEN),
+                ),
+            )
 
 
 def find_route_template(request: Request) -> str:
     """The template of the route matched (/items/{item_id}), never the path received.
 
-    FastAPI puts in the scope its own routes only (fastapi/routing.py, 0.143): /docs and
-    /openapi.json, without parameter, are named by their path, the one the app gives them.
+    FastAPI puts in the scope its own routes only (fastapi/routing.py, 0.143): /docs,
+    /openapi.json and /health, without parameter, are named by their path, the one the app gives
+    them.
     """
     route = request.scope.get("route")
     if route is not None:
         return str(route.path)
-    if request.url.path in {request.app.docs_url, request.app.openapi_url}:
+    if request.url.path in {request.app.docs_url, request.app.openapi_url, HEALTH_PATH}:
         return request.url.path
     return NONE_SEEN
 

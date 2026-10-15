@@ -70,6 +70,27 @@ def test_a_public_route_is_logged_by_its_path(client, request_lines, path):
     assert f"route={path} status=200" in line
 
 
+def test_a_health_check_that_answers_200_is_not_logged(client, request_lines):
+    """A probe every few seconds would bury the requests of the clients."""
+    client.get("/health")
+
+    assert request_lines() == []
+
+
+@pytest.mark.parametrize(
+    ("method", "headers", "status"),
+    [("GET", {"Host": "evil.example"}, 400), ("POST", {}, 405)],
+)
+def test_a_health_check_that_fails_is_logged_by_its_path(
+    client, request_lines, method, headers, status
+):
+    """A probe set wrong shows in the log."""
+    client.request(method, "/health", headers=headers)
+
+    [line] = request_lines()
+    assert f"route=/health status={status}" in line
+
+
 def test_a_request_without_response_is_logged_without_status():
     line = format_request_line("GET", "/items", None, 3, "-")
 

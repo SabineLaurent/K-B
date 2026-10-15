@@ -1611,7 +1611,8 @@ time-knight a recommandés et que Sabine a acceptés le 2026-10-14.
   `database/reading.py` ; en FastAPI, la fonction de route est le contrôleur) ; les fichiers à
   plat `routes.py` et `responses.py` (moins lisibles quand l'API grandit, et quand l'API IA
   reprendra le même plan). Les issues qui servent la liste (#184) et le détail (#185) décrivent
-  encore l'organisation à plat : leur mission les mettra à jour. — PR de #182
+  encore l'organisation à plat : leur mission les mettra à jour. **Complétée le 2026-10-15** :
+  `health.py` (la route `/health`, sans clé ; « API de données : réglages et santé »). — PR de #182
 - **Les lignes retirées d'un catalogue d'état (vulnérabilités, entrées Zotero, surlignages) sont
   servies avec leur `withdrawn_at`, pas filtrées.** Décision de Sabine. Pourquoi, sur
   recommandation : c'est plus honnête et traçable ; un retrait reste visible avec sa date, et un
@@ -1647,7 +1648,12 @@ time-knight a recommandés et que Sabine a acceptés le 2026-10-14.
   Complète la règle de #134 (le journal de fonctionnement dans `logs/kb.log`) : les règles 2 et
   3 de `.claude/rules/conventions.md` nomment désormais le second fichier, avec l'accord de
   Sabine. Limite assumée : `kb collect` et `kb import` partagent toujours `kb.log`, mais ils
-  sont courts et lancés à la main, une fois par jour. — PR #195 (#184)
+  sont courts et lancés à la main, une fois par jour. **Révisée le 2026-10-15** : le port de
+  `kb serve` est réglable (`KB_DATA_API_PORT`), si bien qu'un second `kb serve` sur un autre port
+  ne bute plus sur le `bind` et écrirait le même fichier. La limite devient une consigne écrite :
+  un seul `kb serve` par `KB_DATA_DIR` (`docs/specs-api.md`, « Journal ») ; aucun verrou n'est
+  codé, compose lançant un conteneur par service (« API de données : réglages et santé »).
+  — PR #195 (#184)
 
 ## 2026-10-15
 
@@ -1787,6 +1793,65 @@ qui en découlent sont dans `.claude/rules/poc.md`.
   des mesures (2026-10-12, « Wiki : métriques ») : une ligne JSON par appel, sur stdout (règle
   4). **Révise** « Restent en variables d'environnement : les secrets et le dossier de données »
   (2026-10-10) : s'y ajoutent les réglages de déploiement (règle 2). — PR de #198
+
+### API de données : réglages et santé
+
+Choix de la session K-B dans le plan de #199, relu par un agent architecte et validé par Sabine
+(15/10, relayé par time-knight). Ils appliquent la décision 1 du « POC du 25/10 » (régler l'hôte
+et les journaux par variables d'environnement, exposer `/health`) et la règle 2 de
+`.claude/rules/poc.md`.
+
+- **`kb serve` se règle par quatre variables, chacune avec un défaut local nommé dans
+  `core/config.py` : `KB_DATA_API_HOST` (une adresse IPv4, `127.0.0.1`), `KB_DATA_API_PORT` (des
+  chiffres, de 1 à 65535, `8000`), `KB_DATA_API_ALLOWED_HOSTS` (`127.0.0.1,localhost`) et
+  `KB_LOG_TO_FILE` (`true`). Une valeur refusée fait sortir `kb serve` en code 2 avant
+  d'écouter.** Pourquoi : un conteneur ne joint pas le `127.0.0.1` d'un autre (c'est le sien),
+  donc l'API doit écouter sur `0.0.0.0` en conteneur et accepter le nom de service d'`api-ia`.
+  L'hôte est une adresse IPv4, un type fermé : la valeur vide, qu'uvicorn lierait à toutes les
+  interfaces, est refusée du même coup, et une IPv6 aussi, car le `Host` d'un client en IPv6
+  garde ses crochets (`[::1]`), qu'aucun hôte permis ne peut nommer : un réglage accepté mais
+  injoignable est pire qu'un refus (constat de `/code-review`, tranché par time-knight, délégation
+  de Sabine du 15/10). Le port est lu en chiffres seuls (`int()` accepterait
+  `+8000` ou `8_000`). Le préfixe `KB_DATA_API_` est celui du code (`DATA_API_HOST`) et de la doc
+  (« API de données ») ; `KB_DATA_API_ALLOWED_HOSTS` est le choix de Sabine, à la place de
+  `KB_ALLOWED_HOSTS` écrit dans l'issue, par cohérence avec les trois autres. Options écartées :
+  `KB_HOST` et `KB_PORT` (ambigus dès que l'API IA tourne sur la même machine) ; `KB_SERVE_HOST`
+  (le nom de la commande, pas de ce qu'on règle) ; un hôte libre, que seul uvicorn refuserait
+  (code 3 au `bind`, après le démarrage). — PR de #199
+- **Chaque entrée de `KB_DATA_API_ALLOWED_HOSTS` est un nom en minuscules, sans `*` ni port
+  (`[a-z0-9]([a-z0-9.-]*[a-z0-9])?`) ; une liste vide, une entrée vide, une entrée avec `*` ou
+  hors motif sont refusées par un message qui nomme la position de l'entrée.** Pourquoi :
+  `TrustedHostMiddleware` laisse passer tout hôte pour `*` (OWASP API8:2023) et compare le
+  `Host` reçu tel quel, sans mise en minuscules (`starlette/middleware/trustedhost.py`, 1.8.0) ;
+  une entrée validée par le motif n'a rien à échapper au journal. Options écartées : mettre les
+  entrées en minuscules (la liste dirait autre chose que ce qui est écrit, et un client qui envoie
+  des majuscules serait refusé quand même : `urllib` garde la casse de l'URL) ; refuser `*` seul
+  (le joker de sous-domaine ne sert à aucun service nommé, et un motif `a*b` fait échouer
+  Starlette sur un `assert`). — PR de #199
+- **`GET /health` répond 200 `{"status": "ok"}`, sans clé : une route de Starlette ajoutée par
+  `app.add_route`, comme `/docs`, hors de l'OpenAPI ; une sonde de vivacité, qui n'ouvre pas la
+  base. L'API passe en 0.3.0.** Pourquoi : la dépendance de clé reste posée sur toute l'app, que
+  FastAPI applique à chaque *path operation* et pas à une route de Starlette ; aucune route de
+  données ne peut donc l'oublier, et un test parcourt les routes de l'app pour vérifier que
+  `/docs`, `/openapi.json` et `/health` sont les seules à répondre sans clé. `/health` ne dit ni
+  version, ni chemin, ni état de la base : une sonde qui ouvrirait la base ferait redémarrer le
+  conteneur en boucle tant que la base manque. Options écartées : la clé posée sur chaque routeur
+  pour faire de `/health` une *path operation* documentée (un routeur ajouté plus tard pourrait
+  l'oublier) ; un sous-app monté (une couche de plus pour une route) ; une sonde qui vérifie la
+  base (disponibilité plutôt que vivacité). — PR de #199
+- **Un appel de `/health` qui répond 200 n'écrit aucune ligne de journal ; tout autre statut en
+  écrit une.** Pourquoi : une sonde toutes les quelques secondes écrirait des milliers de lignes
+  par jour (≈ 8 640 pour une sonde toutes les 10 s), noierait les requêtes des clients et, au
+  08/11, coûterait dans Log Analytics, facturé au volume (minimisation, RGESN) ; une sonde mal
+  réglée (400, 405) reste visible. Option écartée : tout journaliser en écrivant la limite.
+  Constat de `/code-review`, tranché par time-knight, délégation de Sabine du 15/10. — PR de #199
+- **`KB_LOG_TO_FILE=false` envoie le journal de fonctionnement sur la sortie d'erreur seule, pour
+  toutes les commandes ; toute autre valeur que `true` ou `false` est refusée (code 2).**
+  Pourquoi : en conteneur, la sortie d'erreur part vers `docker compose logs`, puis Log Analytics
+  sur ACA (règle 4 de `poc.md`) ; le fichier en double sur le volume ne sert à rien. La règle 3 de
+  `.claude/rules/conventions.md` le dit désormais, avec l'accord de Sabine. Option écartée : un
+  chemin de fichier réglable (tout état reste sous `KB_DATA_DIR`, règle 4 de `poc.md`).
+  — PR de #199
 
 ## Décisions encore ouvertes
 

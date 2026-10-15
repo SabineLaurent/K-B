@@ -7,7 +7,7 @@ erreurs et les exigences de sécurité. Les décisions et leur pourquoi sont dan
 [journal ADR](ADR/journal-decisions-projet.md) (entrées du 2026-10-14) ; la collecte, dans
 [specs-collecte.md](specs-collecte.md) ; la base, dans [stockage.md](stockage.md).
 
-**Version de la spec : 0.2.0**, la même que `info.version` de l'OpenAPI
+**Version de la spec : 0.3.0**, la même que `info.version` de l'OpenAPI
 (`docs/api/openapi-donnees.json`, que #184 écrit). Un changement de comportement visible par un client, comme
 l'ordre des résultats, change la version.
 
@@ -15,15 +15,38 @@ l'ordre des résultats, change la version.
 |---|---|
 | 0.1.0 | `GET /items` (#184) |
 | 0.2.0 | `GET /items/{item_id}` et `GET /trends` servis (#185) ; un `item_id` au-delà de 64 bits répond 422 |
+| 0.3.0 | `GET /health` servi sans clé ; hôte, port et hôtes permis réglables (#199) |
 
 ## Règles communes
 
-- **Locale** : l'API écoute sur `127.0.0.1`, en dur ; `TrustedHostMiddleware` n'accepte que les
-  hôtes `127.0.0.1` et `localhost`. Pas de CORS.
+- **Locale par défaut** : l'API écoute sur `127.0.0.1:8000` ; `TrustedHostMiddleware` n'accepte
+  que les hôtes `127.0.0.1` et `localhost`. Les défauts sont nommés dans `core/config.py` ; chacun
+  se change par une variable d'environnement (règle 2 de `.claude/rules/poc.md`) :
+  - `KB_DATA_API_HOST` : l'hôte d'écoute, une adresse IPv4 (`0.0.0.0` en conteneur : le
+    `127.0.0.1` d'un conteneur est le sien, injoignable d'ailleurs). Pas d'IPv6 : le `Host` d'un
+    client en IPv6 garde ses crochets (`[::1]`), qu'aucun hôte permis ne peut nommer ;
+  - `KB_DATA_API_PORT` : le port, des chiffres seuls, de 1 à 65535 ;
+  - `KB_DATA_API_ALLOWED_HOSTS` : les hôtes permis, séparés par des virgules (`api-donnees,localhost`
+    pour qu'un autre conteneur l'appelle par son nom de service). Chaque entrée est un nom en
+    minuscules, sans `*` ni port : `TrustedHostMiddleware` compare le `Host` reçu tel quel, et `*`
+    laisserait passer tout hôte.
+
+  Une valeur refusée (hôte hors adresse IPv4, port hors bornes, liste ou entrée vide, entrée avec
+  `*`, entrée hors motif) fait sortir `kb serve` en code 2 avant d'écouter, avec un message qui
+  nomme la variable et la position de l'entrée. En conteneur, le port est publié sur `127.0.0.1`
+  de la machine (#200). Pas de CORS.
 - **Lecture seule** : GET seulement. La base est ouverte en lecture seule (`mode=ro`), une
   connexion par requête.
-- **Clé** : chaque route de données demande `Authorization: Bearer <clé>`. `/docs` et
-  `/openapi.json` sont publics : ils ne contiennent aucune donnée.
+- **Clé** : chaque route de données demande `Authorization: Bearer <clé>`. `/docs`,
+  `/openapi.json` et `/health` sont publics : ils ne contiennent aucune donnée.
+- **Santé** : `GET /health` répond 200 `{"status": "ok"}`, sans clé, pour la sonde d'un conteneur.
+  Il dit que le processus répond, rien d'autre : ni version, ni chemin, ni état de la base (une
+  sonde qui ouvrirait la base ferait redémarrer le conteneur en boucle tant que la base manque).
+  C'est une route de Starlette, comme `/docs` : la clé reste posée sur toute l'app, et aucune route
+  de données ne peut l'oublier. Elle est hors de l'OpenAPI, comme `/docs` ; ce document
+  l'inventorie. Le `Host` de la sonde doit être un hôte permis. Un appel de `/health` qui répond
+  200 n'est pas journalisé (une sonde toutes les quelques secondes noierait les requêtes des
+  clients) ; tout autre statut l'est, si bien qu'une sonde mal réglée se voit.
 - **Réponses** : JSON, champs en liste blanche (modèles de réponse propres à l'API, jamais le
   modèle de lecture des sources).
 - **OpenAPI** : `kb openapi` (#184) écrit `docs/api/openapi-donnees.json`, versionné ; la CI le compare
@@ -34,7 +57,11 @@ l'ordre des résultats, change la version.
   sans clé valide) ; jamais la clé, une valeur de paramètre ni un chemin brut. Elle va dans
   `<KB_DATA_DIR>/logs/kb-serve.log`, à part de `kb.log` : `kb serve` tourne longtemps, et la rotation
   de minuit faite par `kb collect` ou `kb import` dans un fichier partagé le laisserait écrire dans
-  le fichier de la veille (constat sur `TimedRotatingFileHandler`, Python 3.13).
+  le fichier de la veille (constat sur `TimedRotatingFileHandler`, Python 3.13). Limite : un seul
+  `kb serve` par `KB_DATA_DIR`. Le port étant réglable, un second `kb serve` sur un autre port ne
+  bute plus sur le `bind` et écrirait le même fichier (journal ADR, 2026-10-15). Avec
+  `KB_LOG_TO_FILE=false`, le journal va sur la sortie d'erreur seule, sans fichier : en conteneur,
+  la sortie d'erreur est le journal du conteneur.
 - **Organisation du code** : paquet `src/k_b/data_api/`, un dossier par rôle (`routers/`,
   `schemas/`) ; le détail et les options écartées sont au journal ADR (2026-10-14, « Paquet
   `src/k_b/data_api/` »).
@@ -235,8 +262,8 @@ valeur reçue.
 | `database_error` | 500 | toute autre erreur de la base, sans détail |
 | `internal_error` | 500 | toute autre erreur, sans détail ; journalisée par son type seul, sans pile ni message |
 
-Exception : un `Host` qui n'est ni `127.0.0.1` ni `localhost` reçoit le 400 de
-`TrustedHostMiddleware`, qui répond avant l'app, en texte.
+Exception : un `Host` hors des hôtes permis (`127.0.0.1` et `localhost` par défaut) reçoit le 400
+de `TrustedHostMiddleware`, qui répond avant l'app, en texte.
 
 ## Recherche `q`
 
@@ -282,14 +309,14 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 | Exigence | Intention | Tenue, par quel test |
 |---|---|---|
 | API1:2023 Broken Object Level Authorization | Une seule propriétaire, Sabine : tout client authentifié lit tous les items. Un identifiant inconnu rend 404, jamais une erreur qui dirait autre chose. `item.id`, séquentiel, est dans l'URL : la recommandation d'identifiants difficiles à deviner est écartée tant que l'API n'a qu'une propriétaire (journal ADR, 2026-10-15). | **Tenue.** `test_each_client_is_served_with_its_key`, `test_an_unknown_item_id_gives_404_item_not_found`, `test_an_unknown_window_gives_404` |
-| API2:2023 Broken Authentication | Une clé par client, générée en 256 bits (minimum contrôlé : 32 caractères) ; pas de route de connexion ; comparaison en temps constant ; 401 testé sur chaque route de données. | **Tenue.** `test_every_data_route_refuses_a_missing_and_a_wrong_key_with_the_same_body` (les trois routes, lues dans l'app), `test_an_app_without_key_refuses_every_data_route`, `test_a_removed_key_gives_401_and_the_other_clients_are_still_served`, `test_serve_exits_2_and_names_the_variable_without_its_value` ; le temps constant n'est pas mesuré par un test (`hmac.compare_digest`, `dependencies.py`) |
+| API2:2023 Broken Authentication | Une clé par client, générée en 256 bits (minimum contrôlé : 32 caractères) ; pas de route de connexion ; comparaison en temps constant ; 401 testé sur chaque route de données. | **Tenue.** `test_every_data_route_refuses_a_missing_and_a_wrong_key_with_the_same_body` (chaque route, lue dans l'app par le parcours de FastAPI, routes hors OpenAPI comprises), `test_only_the_public_routes_answer_without_a_key` (`/docs`, `/openapi.json` et `/health`, aucune autre), `test_an_app_without_key_refuses_every_data_route`, `test_a_removed_key_gives_401_and_the_other_clients_are_still_served`, `test_serve_exits_2_and_names_the_variable_without_its_value` ; le temps constant n'est pas mesuré par un test (`hmac.compare_digest`, `dependencies.py`) |
 | API3:2023 Broken Object Property Level Authorization | Réponses en liste blanche : ni `raw_file_path`, ni `collected_at`, ni texte long dans la liste ; au détail, les champs du tableau de sa sorte et rien d'autre. | **Tenue.** `test_the_list_serves_only_the_six_fields`, `test_each_kind_has_its_detail` (corps entier, une sorte par cas), `test_no_detail_serves_a_raw_file_path_or_a_collection_date`, `test_trends_without_window_end_give_the_latest_window`, `test_no_error_body_holds_a_raw_file_path_or_a_path`, `test_no_route_documents_a_raw_file_path_or_a_collection_date` |
 | API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000) et `q` (200 caractères) ; `/trends` rend 60 lignes au plus, sans pagination. Pas de limite de débit : le client est local. | **Non tenue** : aucun délai de requête (« Hors de cette version »), aucune limite de débit, et le détail d'une entrée Zotero sert tous ses surlignages, sans borne de nombre (chacun jusqu'à 10 000 caractères de texte et autant de commentaire). Ce qui est tenu : les bornes et la taille de page, `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_next_offset_stops_at_the_offset_bound`, `test_an_item_id_not_written_as_an_integer_gives_422`, `test_a_malformed_window_end_gives_422` ; les 60 lignes d'une fenêtre sont bornées à la collecte (`gh_archive.py`), pas par l'API |
-| API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon ; aucune route d'administration. | **Tenue.** `test_every_data_route_refuses_another_method_with_405`, `test_the_data_routes_are_listed`, `test_docs_and_openapi_are_public_and_no_other_page_is_served` |
+| API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon ; aucune route d'administration. | **Tenue.** `test_every_data_route_refuses_another_method_with_405`, `test_the_routes_are_listed`, `test_docs_openapi_and_health_are_public_and_no_other_page_is_served`, `test_health_refuses_another_method_with_405` |
 | API6:2023 Unrestricted Access to Sensitive Business Flows | Sans objet : l'API n'a aucun flux métier à protéger (ni achat, ni réservation, ni création de compte), seulement des lectures. | Sans objet, sans test |
 | API7:2023 Server Side Request Forgery | Sans objet : l'API ne va chercher aucune adresse fournie par un client. | Sans objet, sans test |
-| API8:2023 Security Misconfiguration | Hôte `127.0.0.1` en dur, `TrustedHostMiddleware`, pas de CORS, erreurs sans pile. Limite : Swagger UI (`/docs`) charge ses fichiers depuis un CDN. | **Tenue, avec la limite du CDN.** `test_serve_listens_on_127_0_0_1_without_uvicorn_logging_config`, `test_a_host_other_than_localhost_gives_400`, `test_no_route_answers_cors`, `test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only`, `test_a_database_error_gives_500_without_detail_and_logs_its_type` |
-| API9:2023 Improper Inventory Management | OpenAPI versionnée (`docs/api/openapi-donnees.json`), comparée en CI au schéma produit. | **Tenue.** `test_the_versioned_openapi_is_the_one_the_app_produces`, `test_the_versioned_openapi_is_valid_and_declares_its_security_scheme`, `test_each_data_route_documents_its_errors` |
+| API8:2023 Security Misconfiguration | Hôte d'écoute réglable (`KB_DATA_API_HOST`, une adresse IPv4), `127.0.0.1` par défaut ; hôtes permis réglables (`KB_DATA_API_ALLOWED_HOSTS`), `127.0.0.1` et `localhost` par défaut ; `*`, une liste ou une entrée vide et un nom hors motif refusés au démarrage ; en conteneur, écoute sur `0.0.0.0` et port publié sur `127.0.0.1` de la machine (#200) ; pas de CORS ; erreurs sans pile ; `/health` ne dit que `ok`. Limites : Swagger UI (`/docs`) charge ses fichiers depuis un CDN ; pas de TLS, alors qu'OWASP le demande même pour une API interne (local et réseau compose au 25/10 ; l'entrée HTTPS d'ACA au 08/11). | **Tenue en partie** : sans TLS, et la publication sur `127.0.0.1` revient à #200 (critère « ports publiés sur `127.0.0.1` »), pas encore tenue. Ce qui est tenu : `test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_config`, `test_serve_listens_on_the_host_and_port_of_the_environment`, `test_serve_exits_2_on_a_host_or_port_refused`, `test_serve_exits_2_and_names_the_allowed_hosts_refused`, `test_serve_allows_the_hosts_of_the_environment_and_no_other`, `test_a_host_other_than_localhost_gives_400`, `test_a_host_other_than_the_allowed_ones_gives_400_on_health`, `test_health_answers_ok_without_key`, `test_no_route_answers_cors`, `test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only`, `test_a_database_error_gives_500_without_detail_and_logs_its_type` |
+| API9:2023 Improper Inventory Management | OpenAPI versionnée (`docs/api/openapi-donnees.json`), comparée en CI au schéma produit. `/health`, hors OpenAPI comme `/docs`, est inventoriée par ce document (« Santé »). | **Tenue.** `test_the_versioned_openapi_is_the_one_the_app_produces`, `test_the_versioned_openapi_is_valid_and_declares_its_security_scheme`, `test_each_data_route_documents_its_errors` |
 | API10:2023 Unsafe Consumption of APIs | Le contenu servi vient de tiers (arXiv, GitHub, CISA, TLDR, Zotero) : pour un client, et d'abord pour un agent, c'est une donnée, jamais une consigne. Côté K-B, la réponse d'une source est validée à la collecte (modèles de `items.py`, `CHECK` de `schema.sql`). | **Tenue côté K-B** : `tests/test_schema.py` (chaque type refusé par l'item et par la base) et les tests de chaque source. Côté client, une consigne, sans test |
 
 ## Hors de cette version
@@ -305,7 +332,7 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
   ne peut donc pas lire au détail de la vulnérabilité si elle a été retirée du catalogue KEV.
   Signalé ; une issue sera créée.
 
-## Sources (consultées le 2026-10-14)
+## Sources (consultées le 2026-10-14, sauf mention)
 
 - [OWASP Top 10 API Security Risks — 2023](https://api-security.owasp.org/editions/2023/en/0x11-t10/) : les noms et
   le périmètre des dix exigences du tableau de sécurité.
@@ -316,3 +343,15 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
   lu par Context7 : un `APIRouter` par module, `include_router` (organisation du paquet).
 - [Advanced Middleware, `TrustedHostMiddleware`](https://fastapi.tiangolo.com/advanced/middleware/) — FastAPI,
   lu par Context7 : un `Host` non permis reçoit un 400 (erreurs).
+- [API8:2023 Security Misconfiguration](https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/),
+  section « How To Prevent » — OWASP, relevé par recherche web le 2026-10-15 : TLS pour tout
+  échange, interne ou public ; seules les méthodes utiles ; CORS ; erreurs sans détail interne
+  (ligne API8).
+- [Global Dependencies](https://fastapi.tiangolo.com/tutorial/dependencies/global-dependencies/) —
+  FastAPI, lu par Context7 le 2026-10-15 : les dépendances de l'app s'appliquent à toutes les
+  *path operations* ; `/health`, route de Starlette ajoutée par `add_route` comme `/docs`
+  (`fastapi/applications.py`, 0.143.1), n'en est pas une (santé).
+- [Middleware, `TrustedHostMiddleware`](https://www.starlette.io/middleware/#trustedhostmiddleware)
+  — Starlette, lu par Context7 le 2026-10-15 : `["*"]` permet tout hôte, un `Host` non permis
+  reçoit un 400 (hôtes permis) ; la comparaison telle quelle, sans mise en minuscules, est lue
+  dans le code installé (`starlette/middleware/trustedhost.py`, 1.8.0).

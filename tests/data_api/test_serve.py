@@ -1,11 +1,12 @@
-"""kb serve and kb openapi: the keys checked at the start, the host, the log of the API, the
-OpenAPI written without data directory."""
+"""kb serve and kb openapi: the keys and the settings checked at the start, the host and the port,
+the hosts allowed, the log of the API, the OpenAPI written without data directory."""
 
 import os
 import secrets
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 from k_b import cli
 
@@ -117,7 +118,7 @@ def test_serve_logs_the_names_of_the_clients_never_their_keys(
         assert value not in error_output
 
 
-def test_serve_listens_on_127_0_0_1_without_uvicorn_logging_config(
+def test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_config(
     monkeypatch, data_dir, uvicorn_calls
 ):
     monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
@@ -133,17 +134,180 @@ def test_serve_listens_on_127_0_0_1_without_uvicorn_logging_config(
     }
 
 
-def test_serve_writes_its_own_log_file(monkeypatch, data_dir, uvicorn_calls):
+def test_serve_listens_on_the_host_and_port_of_the_environment(
+    monkeypatch, data_dir, uvicorn_calls
+):
+    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_DATA_API_HOST", "192.0.2.10")
+    monkeypatch.setenv("KB_DATA_API_PORT", "8080")
+
+    cli.main(["serve"])
+
+    [(_, options)] = uvicorn_calls
+    assert (options["host"], options["port"]) == ("192.0.2.10", 8080)
+
+
+@pytest.mark.parametrize(
+    ("variable", "value", "message"),
+    [
+        # uvicorn would bind an empty host to every interface.
+        ("KB_DATA_API_HOST", "", "KB_DATA_API_HOST: '' not an IPv4 address"),
+        # A Host in IPv6 keeps its brackets, which no allowed host can name: never reached.
+        ("KB_DATA_API_HOST", "::1", "KB_DATA_API_HOST: '::1' not an IPv4 address"),
+        (
+            "KB_DATA_API_HOST",
+            "api-donnees",
+            "KB_DATA_API_HOST: 'api-donnees' not an IPv4 address",
+        ),
+        ("KB_DATA_API_PORT", "", "KB_DATA_API_PORT: '' not an integer from 1 to 65535"),
+        (
+            "KB_DATA_API_PORT",
+            "abc",
+            "KB_DATA_API_PORT: 'abc' not an integer from 1 to 65535",
+        ),
+        # int() would read these three.
+        (
+            "KB_DATA_API_PORT",
+            " 8000",
+            "KB_DATA_API_PORT: ' 8000' not an integer from 1 to 65535",
+        ),
+        (
+            "KB_DATA_API_PORT",
+            "+8000",
+            "KB_DATA_API_PORT: '+8000' not an integer from 1 to 65535",
+        ),
+        (
+            "KB_DATA_API_PORT",
+            "8_000",
+            "KB_DATA_API_PORT: '8_000' not an integer from 1 to 65535",
+        ),
+        (
+            "KB_DATA_API_PORT",
+            "0",
+            "KB_DATA_API_PORT: '0' not an integer from 1 to 65535",
+        ),
+        (
+            "KB_DATA_API_PORT",
+            "65536",
+            "KB_DATA_API_PORT: '65536' not an integer from 1 to 65535",
+        ),
+    ],
+)
+def test_serve_exits_2_on_a_host_or_port_refused(
+    monkeypatch, capsys, data_dir, uvicorn_calls, variable, value, message
+):
+    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv(variable, value)
+
+    exit_code = cli.main(["serve"])
+
+    assert exit_code == 2
+    assert message in capsys.readouterr().err
+    assert uvicorn_calls == []
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ("", "KB_DATA_API_ALLOWED_HOSTS: empty, set the hosts separated by commas"),
+        ("  ", "KB_DATA_API_ALLOWED_HOSTS: empty, set the hosts separated by commas"),
+        (" , ", "KB_DATA_API_ALLOWED_HOSTS: entry 1 of 2 empty"),
+        ("localhost,", "KB_DATA_API_ALLOWED_HOSTS: entry 2 of 2 empty"),
+        ("*", "KB_DATA_API_ALLOWED_HOSTS: entry 1 of 1 '*' with '*', name each host"),
+        (
+            "localhost,*.example.com",
+            "KB_DATA_API_ALLOWED_HOSTS: entry 2 of 2 '*.example.com' with '*', name each host",
+        ),
+        (
+            "API-donnees",
+            "KB_DATA_API_ALLOWED_HOSTS: entry 1 of 1 'API-donnees' not a lowercase host name",
+        ),
+        (
+            "localhost:8000",
+            "KB_DATA_API_ALLOWED_HOSTS: entry 1 of 1 'localhost:8000' not a lowercase host name",
+        ),
+        # A line break would write a line of its own in the log: quoted, it cannot.
+        (
+            "localhost\nfake",
+            "KB_DATA_API_ALLOWED_HOSTS: entry 1 of 1 'localhost\\nfake' not a lowercase host name",
+        ),
+    ],
+)
+def test_serve_exits_2_and_names_the_allowed_hosts_refused(
+    monkeypatch, capsys, data_dir, uvicorn_calls, value, message
+):
+    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_DATA_API_ALLOWED_HOSTS", value)
+
+    exit_code = cli.main(["serve"])
+
+    assert exit_code == 2
+    assert message in capsys.readouterr().err
+    assert uvicorn_calls == []
+
+
+def test_serve_allows_the_hosts_of_the_environment_and_no_other(
+    monkeypatch, capsys, data_dir, uvicorn_calls
+):
+    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_DATA_API_ALLOWED_HOSTS", " api-donnees ,localhost")
+
+    cli.main(["serve"])
+
+    [(app, _)] = uvicorn_calls
+    client = TestClient(app, base_url="http://api-donnees")
+    assert client.get("/health").status_code == 200
+    assert client.get("/health", headers={"Host": "127.0.0.1"}).status_code == 400
+    assert "API allowed hosts: api-donnees, localhost" in capsys.readouterr().err
+
+
+def test_serve_reads_the_base_and_writes_its_own_log_file_under_kb_data_dir(
+    monkeypatch, data_dir, uvicorn_calls
+):
     """kb serve runs for long: a rotation done by kb collect in kb.log would leave it writing in
     the file of the day before (docs/specs-api.md, "Journal")."""
     monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
 
     cli.main(["serve"])
 
+    [(app, _)] = uvicorn_calls
+    assert app.state.database_path == data_dir / "k-b.sqlite"
     assert "API clients loaded: TERMINAL" in (
         data_dir / "logs" / "kb-serve.log"
     ).read_text(encoding="utf-8")
     assert not (data_dir / "logs" / "kb.log").exists()
+
+
+def test_without_log_file_kb_logs_on_stderr_only(
+    monkeypatch, capsys, data_dir, uvicorn_calls
+):
+    """In a container, stderr goes to the logs of the container: a file would be a copy."""
+    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_LOG_TO_FILE", "false")
+
+    exit_code = cli.main(["serve"])
+
+    assert exit_code == 0
+    assert "API clients loaded: TERMINAL" in capsys.readouterr().err
+    assert not (data_dir / "logs").exists()
+
+
+@pytest.mark.parametrize("value", ["", "yes", "False", "0"])
+def test_a_log_to_file_value_refused_exits_2(
+    monkeypatch, capsys, data_dir, uvicorn_calls, value
+):
+    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_LOG_TO_FILE", value)
+
+    exit_code = cli.main(["serve"])
+
+    assert exit_code == 2
+    assert (
+        f"error: KB_LOG_TO_FILE: '{value}' neither true nor false"
+        in capsys.readouterr().err
+    )
+    assert uvicorn_calls == []
+    assert not (data_dir / "logs").exists()
 
 
 def test_openapi_writes_the_document_without_data_dir(monkeypatch, tmp_path):

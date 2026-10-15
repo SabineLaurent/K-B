@@ -1,6 +1,7 @@
 """Command line: `kb collect`, `kb create-db`, `kb import`, `kb serve`, `kb openapi`."""
 
 import argparse
+import ipaddress
 import json
 import logging
 import os
@@ -10,6 +11,7 @@ import sys
 import time
 from collections.abc import Iterator, Mapping
 from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
@@ -17,7 +19,13 @@ from pathlib import Path
 import uvicorn
 from pydantic import SecretStr
 
-from k_b.core.config import LOG_FILES_KEPT
+from k_b.core.config import (
+    DATA_API_ALLOWED_HOSTS,
+    DATA_API_HOST,
+    DATA_API_PORT,
+    LOG_FILES_KEPT,
+    LOG_TO_FILE,
+)
 from k_b.core.quoting import quote_value
 from k_b.data_api.app import create_app
 from k_b.database.connection import DATABASE_FILE_NAME, MissingDatabaseError
@@ -64,6 +72,9 @@ LOG_FILE_PATH = Path("logs") / "kb.log"
 # "Journal").
 SERVE_LOG_FILE_PATH = Path("logs") / "kb-serve.log"
 LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+# true or false; not set: LOG_TO_FILE of core/config.py.
+LOG_TO_FILE_VARIABLE = "KB_LOG_TO_FILE"
+LOG_TO_FILE_VALUES = {"true": True, "false": False}
 
 
 # The key of each client of the data API: one variable KB_API_KEY_<CLIENT> per client
@@ -76,35 +87,49 @@ MIN_API_KEY_LENGTH = 32
 # spaces around the key received (fastapi/security/utils.py): a key that starts or ends with one
 # would be accepted at the start and never match.
 API_KEY_CHARACTERS = re.compile(r"[A-Za-z0-9_-]+")
-# The data API is local: its host is not an option.
-DATA_API_HOST = "127.0.0.1"
-DATA_API_PORT = 8000
+# Where kb serve listens and the hosts it answers; not set: the defaults of core/config.py.
+DATA_API_HOST_VARIABLE = "KB_DATA_API_HOST"
+DATA_API_PORT_VARIABLE = "KB_DATA_API_PORT"
+DATA_API_ALLOWED_HOSTS_VARIABLE = "KB_DATA_API_ALLOWED_HOSTS"
+# Digits only: int() would also read " 8000", "+8000" and "8_000".
+PORT_DIGITS = re.compile(r"[0-9]{1,5}")
+PORT_NUMBERS = range(1, 65536)
+# A host name in lowercase, without * nor port: TrustedHostMiddleware compares the Host received
+# as it is (starlette/middleware/trustedhost.py), and an entry of this form has nothing to escape
+# in the log.
+ALLOWED_HOST = re.compile(r"[a-z0-9]([a-z0-9.-]*[a-z0-9])?")
 # Written from the root of the repository, which versions it.
 OPENAPI_PATH = Path("docs") / "api" / "openapi-donnees.json"
 
 
 @contextmanager
-def logging_to(data_dir: Path, log_file_path: Path = LOG_FILE_PATH) -> Iterator[None]:
-    """Log every line of level INFO and above on stderr and in the log file of the data
-    directory (logs/kb.log, or logs/kb-serve.log for kb serve), dated in UTC in the format of
-    the base (2026-10-14T11:30:00Z); the file turns at midnight UTC into <file>.<day>.
+def logging_to(
+    data_dir: Path, log_file_path: Path | None = LOG_FILE_PATH
+) -> Iterator[None]:
+    """Log every line of level INFO and above on stderr and, unless log_file_path is None, in
+    the log file of the data directory (logs/kb.log, or logs/kb-serve.log for kb serve), dated
+    in UTC in the format of the base (2026-10-14T11:30:00Z); the file turns at midnight UTC into
+    <file>.<day>.
 
     Raises OSError when the log file cannot be opened. On exit the handlers are closed and
     removed: the tests run kb many times in the interpreter of pytest.
     """
-    log_path = data_dir / log_file_path
-    log_path.parent.mkdir(exist_ok=True)
-    file_handler = TimedRotatingFileHandler(
-        log_path,
-        when="midnight",
-        utc=True,
-        backupCount=LOG_FILES_KEPT,
-        encoding="utf-8",
-    )
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    if log_file_path is not None:
+        log_path = data_dir / log_file_path
+        log_path.parent.mkdir(exist_ok=True)
+        handlers.append(
+            TimedRotatingFileHandler(
+                log_path,
+                when="midnight",
+                utc=True,
+                backupCount=LOG_FILES_KEPT,
+                encoding="utf-8",
+            )
+        )
     formatter = logging.Formatter(LOG_LINE_FORMAT, datefmt=DATABASE_DATE_FORMAT)
     # The Z of the format says UTC: the time is read in UTC, not in local time.
     formatter.converter = time.gmtime
-    handlers: list[logging.Handler] = [logging.StreamHandler(), file_handler]
     root_logger = logging.getLogger()
     previous_level = root_logger.level
     for handler in handlers:
@@ -135,7 +160,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     commands.add_parser(
         "serve",
-        help=f"serve the database, read only, on http://{DATA_API_HOST}:{DATA_API_PORT}",
+        help="serve the database, read only, on"
+        f" http://{DATA_API_HOST}:{DATA_API_PORT} by default",
     )
     commands.add_parser(
         "openapi", help=f"write the OpenAPI of the data API in {OPENAPI_PATH}"
@@ -146,11 +172,14 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.command == "openapi":
         return run_openapi()
     data_dir = read_data_dir()
-    if data_dir is None:
+    log_to_file = read_log_to_file()
+    if data_dir is None or log_to_file is None:
         return 2
-    log_file_path = (
-        SERVE_LOG_FILE_PATH if arguments.command == "serve" else LOG_FILE_PATH
-    )
+    log_file_path = None
+    if log_to_file:
+        log_file_path = (
+            SERVE_LOG_FILE_PATH if arguments.command == "serve" else LOG_FILE_PATH
+        )
     with ExitStack() as log_stack:
         try:
             log_stack.enter_context(logging_to(data_dir, log_file_path))
@@ -195,6 +224,21 @@ def read_data_dir() -> Path | None:
         )
         return None
     return Path(data_dir)
+
+
+def read_log_to_file() -> bool | None:
+    """Whether kb logs in a file as well as on stderr, or None after printing why the value is
+    refused: the log is not open yet."""
+    value = os.environ.get(LOG_TO_FILE_VARIABLE)
+    if value is None:
+        return LOG_TO_FILE
+    if value not in LOG_TO_FILE_VALUES:
+        print(
+            f"error: {LOG_TO_FILE_VARIABLE}: {quote_value(value)} neither true nor false",
+            file=sys.stderr,
+        )
+        return None
+    return LOG_TO_FILE_VALUES[value]
 
 
 def run_create_db(data_dir: Path) -> int:
@@ -297,20 +341,99 @@ def describe_outcome(error: Exception | None) -> str:
     return "ok" if error is None else f"failed ({type(error).__name__})"
 
 
+@dataclass(frozen=True)
+class ServeSettings:
+    host: str
+    port: int
+    allowed_hosts: tuple[str, ...]
+
+
 def run_serve(data_dir: Path) -> int:
-    """Serve the base with the keys of the environment; the log of uvicorn is the one of kb."""
+    """Serve the base with the keys and the settings of the environment; the log of uvicorn is
+    the one of kb."""
     api_keys = read_api_keys(os.environ)
-    if api_keys is None:
+    settings = read_serve_settings(os.environ)
+    if api_keys is None or settings is None:
         return 2
     logger.info("API clients loaded: %s", ", ".join(sorted(api_keys)))
+    logger.info("API allowed hosts: %s", ", ".join(settings.allowed_hosts))
     uvicorn.run(
-        create_app(data_dir / DATABASE_FILE_NAME, api_keys),
-        host=DATA_API_HOST,
-        port=DATA_API_PORT,
+        create_app(
+            data_dir / DATABASE_FILE_NAME,
+            api_keys,
+            allowed_hosts=settings.allowed_hosts,
+        ),
+        host=settings.host,
+        port=settings.port,
         log_config=None,
         access_log=False,
     )
     return 0
+
+
+def read_serve_settings(environ: Mapping[str, str]) -> ServeSettings | None:
+    """The host, the port and the hosts allowed of kb serve, or None after logging the variable
+    refused, with its value quoted. Not set: the default of core/config.py."""
+    host = environ.get(DATA_API_HOST_VARIABLE, DATA_API_HOST)
+    port = environ.get(DATA_API_PORT_VARIABLE, str(DATA_API_PORT))
+    allowed_hosts_value = environ.get(DATA_API_ALLOWED_HOSTS_VARIABLE)
+    # Split once: the list checked is the list served.
+    allowed_hosts = (
+        DATA_API_ALLOWED_HOSTS
+        if allowed_hosts_value is None
+        else split_allowed_hosts(allowed_hosts_value)
+    )
+    refusal = (
+        find_host_refusal(host)
+        or find_port_refusal(port)
+        or find_allowed_hosts_refusal(allowed_hosts)
+    )
+    if refusal is not None:
+        logger.error("%s", refusal)
+        return None
+    return ServeSettings(host=host, port=int(port), allowed_hosts=allowed_hosts)
+
+
+def find_host_refusal(host: str) -> str | None:
+    """Why the host is refused, or None. An IPv4 address only: uvicorn would bind an empty host
+    to every interface, and the Host of a client in IPv6 keeps its brackets ([::1]), which no
+    allowed host can name."""
+    try:
+        ipaddress.IPv4Address(host)
+    except ValueError:
+        return f"{DATA_API_HOST_VARIABLE}: {quote_value(host)} not an IPv4 address"
+    return None
+
+
+def find_port_refusal(port: str) -> str | None:
+    if PORT_DIGITS.fullmatch(port) and int(port) in PORT_NUMBERS:
+        return None
+    return (
+        f"{DATA_API_PORT_VARIABLE}: {quote_value(port)} not an integer"
+        f" from {PORT_NUMBERS.start} to {PORT_NUMBERS.stop - 1}"
+    )
+
+
+def split_allowed_hosts(allowed_hosts: str) -> tuple[str, ...]:
+    """The entries of the list, separated by commas, without the spaces around each."""
+    return tuple(entry.strip() for entry in allowed_hosts.split(","))
+
+
+def find_allowed_hosts_refusal(allowed_hosts: tuple[str, ...]) -> str | None:
+    """Why the hosts allowed are refused, or None: TrustedHostMiddleware would serve any host for
+    a * (docs/specs-api.md, API8)."""
+    # A value empty or made of spaces gives one empty entry.
+    if allowed_hosts == ("",):
+        return f"{DATA_API_ALLOWED_HOSTS_VARIABLE}: empty, set the hosts separated by commas"
+    for position, entry in enumerate(allowed_hosts, start=1):
+        where = f"{DATA_API_ALLOWED_HOSTS_VARIABLE}: entry {position} of {len(allowed_hosts)}"
+        if not entry:
+            return f"{where} empty"
+        if "*" in entry:
+            return f"{where} {quote_value(entry)} with '*', name each host"
+        if not ALLOWED_HOST.fullmatch(entry):
+            return f"{where} {quote_value(entry)} not a lowercase host name"
+    return None
 
 
 def read_api_keys(environ: Mapping[str, str]) -> dict[str, SecretStr] | None:

@@ -30,3 +30,12 @@ RETENTION_YEARS_BY_ACQUISITION_MODE: dict[str, int | None] = {
 # logs/kb-serve.log.<day> of the data directory), the oldest removed at the rotation: about a
 # month of daily collections (Sabine, 2026-10-14).
 LOG_FILES_KEPT = 30
+
+# The local defaults of kb serve, each changed by its variable (cli.py; .claude/rules/poc.md,
+# rule 2): the data API listens on the machine only and answers these hosts only.
+DATA_API_HOST = "127.0.0.1"
+DATA_API_PORT = 8000
+DATA_API_ALLOWED_HOSTS = ("127.0.0.1", "localhost")
+# The log of kb in a file of the data directory as well as on stderr; KB_LOG_TO_FILE=false for
+# stderr only, as in a container, whose stderr is its log.
+LOG_TO_FILE = True

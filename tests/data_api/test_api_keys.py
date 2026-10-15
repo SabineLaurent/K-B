@@ -3,24 +3,51 @@
 import secrets
 
 import pytest
+from fastapi.routing import iter_route_contexts
 
 from k_b.data_api.app import create_app
 
 INVALID_API_KEY = {"error": "invalid_api_key"}
+# Served without key: they hold no data.
+PUBLIC_ROUTES = {"/docs", "/openapi.json", "/health"}
+
+
+def list_routes(items_database, api_keys):
+    """Every route of the app, read from it: a route added later, documented or not, is tested as
+    well. app.routes holds an included router as one entry without path: the routes are read by
+    the walk FastAPI makes for its OpenAPI (fastapi/routing.py, 0.143), which the test of the
+    list below keeps from going empty."""
+    app = create_app(items_database, api_keys)
+    return [route.path for route in iter_route_contexts(app.routes)]
 
 
 def list_data_routes(items_database, api_keys):
-    """The routes the app documents, read from it: a route added later is tested as well. /docs
-    and /openapi.json are not documented."""
-    return list(create_app(items_database, api_keys).openapi()["paths"])
+    return [
+        path
+        for path in list_routes(items_database, api_keys)
+        if path not in PUBLIC_ROUTES
+    ]
 
 
-def test_the_data_routes_are_listed(items_database, api_keys):
-    assert list_data_routes(items_database, api_keys) == [
+def test_the_routes_are_listed(items_database, api_keys):
+    assert sorted(list_routes(items_database, api_keys)) == [
+        "/docs",
+        "/health",
         "/items",
         "/items/{item_id}",
+        "/openapi.json",
         "/trends",
     ]
+
+
+def test_only_the_public_routes_answer_without_a_key(client, items_database, api_keys):
+    answered_without_key = {
+        path
+        for path in list_routes(items_database, api_keys)
+        if client.get(path).status_code != 401
+    }
+
+    assert answered_without_key == PUBLIC_ROUTES
 
 
 @pytest.mark.parametrize(
@@ -109,8 +136,9 @@ def test_with_a_key_a_wrong_parameter_and_no_database_gives_503(
     assert response.status_code == 503
 
 
-def test_docs_and_openapi_are_public_and_no_other_page_is_served(client):
+def test_docs_openapi_and_health_are_public_and_no_other_page_is_served(client):
     assert client.get("/docs").status_code == 200
     assert client.get("/openapi.json").status_code == 200
+    assert client.get("/health").status_code == 200
     assert client.get("/redoc").status_code == 404
     assert client.get("/docs/oauth2-redirect").status_code == 404
