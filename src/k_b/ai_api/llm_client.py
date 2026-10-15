@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from k_b.ai_api.llm_replay import ReplayTransport
 from k_b.ai_api.llm_settings import LlmSettings
+from k_b.ai_api.outbound import open_http_client
 from k_b.core.config import (
     LLM_CALL_TIMEOUT_SECONDS,
     LLM_CONNECT_TIMEOUT_SECONDS,
@@ -155,8 +156,8 @@ def build_http_client(
     settings: LlmSettings, transport: httpx2.BaseTransport | None = None
 ) -> httpx2.Client:
     """The client of the provider of the settings, or of its replay, on the steps read with the
-    settings, when no transport is given. Neither a proxy nor a certificate of the environment is
-    read, no redirection is followed, and the transport makes no retry of its own."""
+    settings, when no transport is given. The rules of open_http_client apply, and the transport
+    makes no retry of its own."""
     if transport is None and settings.provider == "replay":
         if settings.replay_steps is None:
             raise ValueError("replay settings without replay steps")
@@ -166,18 +167,16 @@ def build_http_client(
         if settings.api_key is None
         else {"Authorization": f"Bearer {settings.api_key.get_secret_value()}"}
     )
-    return httpx2.Client(
-        base_url=settings.base_url,
-        headers=headers,
-        timeout=httpx2.Timeout(
+    return open_http_client(
+        settings.base_url,
+        headers,
+        httpx2.Timeout(
             connect=LLM_CONNECT_TIMEOUT_SECONDS,
             read=LLM_CALL_TIMEOUT_SECONDS,
             write=LLM_WRITE_TIMEOUT_SECONDS,
             pool=LLM_POOL_TIMEOUT_SECONDS,
         ),
-        follow_redirects=False,
-        trust_env=False,
-        transport=transport,
+        transport,
     )
 
 

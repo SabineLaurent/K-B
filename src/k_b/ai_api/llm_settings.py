@@ -11,11 +11,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urlsplit
 
 from pydantic import SecretStr
 
 from k_b.ai_api.llm_replay import InvalidReplayFileError, ReplayStep, read_replay_steps
+from k_b.ai_api.outbound import find_url_refusal
 from k_b.core.config import LLM_REASONING_EFFORT, LLM_REPLAY_BASE_URL
 from k_b.core.quoting import quote_value
 
@@ -34,9 +34,6 @@ PROVIDERS: tuple[LlmProvider, ...] = ("openai_compatible", "replay")
 REPLAY_MODEL = "replay"
 # A deployment name of Azure, a model of OpenAI or of Mistral; quoted in a log as it is.
 MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,99}")
-# A host name in lowercase, as urlsplit gives it: neither an IPv6 address nor a character an HTTP
-# client would refuse later.
-HOST_NAME = re.compile(r"[a-z0-9]([a-z0-9.-]*[a-z0-9])?")
 # Printable ASCII without space: the key goes into an HTTP header as it is.
 API_KEY_CHARACTERS = re.compile(r"[!-~]+")
 
@@ -123,7 +120,7 @@ def read_provider_settings(
     model = environ[MODEL_VARIABLE]
     api_key = environ[API_KEY_VARIABLE]
     refusal = (
-        find_base_url_refusal(base_url)
+        find_url_refusal(BASE_URL_VARIABLE, base_url, ("https",))
         or find_model_refusal(model)
         or find_api_key_refusal(api_key)
     )
@@ -137,29 +134,6 @@ def read_provider_settings(
         reasoning_effort=reasoning_effort,
         replay_steps=None,
     )
-
-
-def find_base_url_refusal(base_url: str) -> str | None:
-    """Why the URL is refused, or None. The URL is never quoted: a URL refused may carry a key
-    (`https://user:key@host`, `?api-key=…`)."""
-    try:
-        parts = urlsplit(base_url)
-        has_user_information = parts.username is not None or parts.password is not None
-        # Read for its check: a port out of 0 to 65535, or not digits, raises.
-        parts.port  # noqa: B018
-    except ValueError:
-        return f"{BASE_URL_VARIABLE}: not a URL"
-    if parts.scheme != "https":
-        return f"{BASE_URL_VARIABLE}: scheme not https"
-    if not parts.hostname:
-        return f"{BASE_URL_VARIABLE}: no host"
-    if not HOST_NAME.fullmatch(parts.hostname):
-        return f"{BASE_URL_VARIABLE}: host not a lowercase host name"
-    if has_user_information:
-        return f"{BASE_URL_VARIABLE}: with user information"
-    if parts.query or parts.fragment or "?" in base_url or "#" in base_url:
-        return f"{BASE_URL_VARIABLE}: with a query or a fragment"
-    return None
 
 
 def find_model_refusal(model: str) -> str | None:
