@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
+from k_b.core.quoting import quote_value
 from k_b.etl import http_download
 from k_b.etl.extract import collect_all_sources
 from k_b.etl.raw_store import load_last_collection_dates, save_last_collection_dates
@@ -299,6 +300,17 @@ def test_a_feed_reporting_an_api_error_is_refused():
 
     with pytest.raises(ValueError, match="incorrect_id_format_for_1234"):
         count_papers(feed_with_entry(error_entry))
+
+
+def test_the_id_of_an_api_error_is_quoted_cut():
+    error_id = "http://arxiv.org/api/errors#" + "x" * 200
+    error_entry = entry_xml(entry_id=error_id)
+
+    with pytest.raises(ValueError) as refusal:
+        count_papers(feed_with_entry(error_entry))
+
+    assert str(refusal.value).endswith(quote_value(error_id))
+    assert error_id not in str(refusal.value)
 
 
 @pytest.mark.parametrize(

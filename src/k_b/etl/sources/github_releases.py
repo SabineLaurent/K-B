@@ -68,7 +68,7 @@ class GithubReleasesSource:
             if release.repository.lower() != self.repository.lower():
                 raise ValueError(
                     f"{self.repository}: release {release.release_id} is of the repository "
-                    f"{release.repository!r}"
+                    f"{quote_value(release.repository)}"
                 )
         if last_collected_at is None:
             return raw_response

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from k_b.core.quoting import quote_value
 from k_b.etl.source_contract import list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources import github_releases
@@ -77,6 +78,20 @@ def test_a_page_of_another_repository_is_refused(requested_paths, last_collected
         match="release 401174143 is of the repository 'anthropics/claude-code'",
     ):
         source.fetch(last_collected_at)
+
+
+def test_the_repository_of_a_page_of_another_one_is_quoted_cut(monkeypatch):
+    long_repository = "someone/" + "x" * 200
+    page = release_payload(
+        html_url=f"https://github.com/{long_repository}/releases/tag/v1"
+    )
+    monkeypatch.setattr(github_releases, "get_from_github_api", lambda path: page)
+
+    with pytest.raises(ValueError) as refusal:
+        GithubReleasesSource(REPOSITORY).fetch(last_collected_at=None)
+
+    assert str(refusal.value).endswith(quote_value(long_repository))
+    assert long_repository not in str(refusal.value)
 
 
 def test_the_case_of_the_repository_name_is_ignored(requested_paths):

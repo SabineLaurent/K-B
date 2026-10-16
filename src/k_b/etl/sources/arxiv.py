@@ -157,7 +157,7 @@ def count_papers(raw_response: bytes) -> int:
     for entry in entries:
         entry_id = (entry.findtext(f"{ATOM}id") or "").strip()
         if API_ERROR_ID.match(entry_id):
-            raise ValueError(f"the arXiv API reports an error: {entry_id!r}")
+            raise ValueError(f"the arXiv API reports an error: {quote_value(entry_id)}")
     return len(entries)
 
 
