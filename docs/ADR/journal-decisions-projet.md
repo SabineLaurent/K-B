@@ -2124,9 +2124,13 @@ Recommandation de time-knight, retenue par Sabine le 16/10 (vers 11 h 45, heure 
   page des modèles à raisonnement, alors que le texte de la même page dit que les modèles à
   raisonnement autres que gpt-6-astra ne l'acceptent pas (la spec dit « `temperature` si
   acceptée ») ; le quota est « sans demande » pour gpt-6-luna à un endroit, « demande selon le
-  palier » pour la famille GPT-6 à un autre. Préalable : le compte Azure d'essai de Sabine est à
-  0 TPM ; elle le passe en paiement à l'usage, puis vérifie le quota de gpt-6-luna en Data Zone
-  UE (#158). Sources (consultées le 2026-10-16, relevées par time-knight) :
+  palier » pour la famille GPT-6 à un autre. Préalable : le compte Azure de #158 est un compte
+  personnel d'essai de Sabine, distinct de l'abonnement d'entreprise de l'entrée du 15/10
+  (réponse de Sabine du 16/10) ; il est à 0 TPM, elle le passe en paiement à l'usage, puis
+  vérifie le quota de gpt-6-luna en Data Zone UE (#158). Ce que le DPA de Microsoft couvre pour
+  un compte personnel en paiement à l'usage n'est pas vérifié : la page du DPA dit qu'il
+  s'applique aux produits souscrits sous les Product Terms ; #157 le lit dans les Product Terms
+  et le DPA avant le premier appel réel. Sources (consultées le 2026-10-16, relevées par time-knight) :
   [GPT-6 Astra, Sol and Luna sur Foundry](https://azure.microsoft.com/en-us/blog/gpt-6-astra-sol-and-luna-for-production-agents-in-microsoft-foundry/)
   (disponibilité générale, Data Zone UE, prix UE),
   [modèles vendus par Azure](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure)
@@ -2137,7 +2141,9 @@ Recommandation de time-knight, retenue par Sabine le 16/10 (vers 11 h 45, heure 
   [modèles à raisonnement](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/reasoning)
   (`none` accepté par gpt-6-luna),
   [quotas et limites](https://learn.microsoft.com/en-us/azure/foundry/openai/quotas-limits)
-  (paliers ; le palier gratuit ne contient pas gpt-6-luna). — PR #221
+  (paliers ; le palier gratuit ne contient pas gpt-6-luna),
+  [DPA de Microsoft](https://www.microsoft.com/licensing/docs/view/microsoft-products-and-services-data-protection-addendum-dpa)
+  (s'applique aux produits souscrits sous les Product Terms). — PR #221
 
 ## Décisions encore ouvertes
 
