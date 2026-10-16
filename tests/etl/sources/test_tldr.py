@@ -390,6 +390,7 @@ def test_a_page_the_html_parser_rejects_is_refused_whole(monkeypatch):
 
     # The message of html.parser may quote the page (#212).
     assert str(refusal.value) == "page rejected by html.parser"
+    assert refusal.value.__cause__ is None
 
 
 @pytest.mark.parametrize(
