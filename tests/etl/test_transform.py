@@ -614,8 +614,8 @@ def test_a_raw_file_nested_too_deep_is_rejected_and_the_others_are_read(tmp_path
 
 def test_a_summary_with_a_nul_is_rejected_without_its_text(tmp_path, caplog):
     releases = json.loads((FIXTURES_DIR / "github_releases_extract.json").read_text())
-    body = releases[0]["body"]
-    releases[0]["body"] = body + "\u0000"
+    # At the start of the text: pydantic quotes its start and end, and cuts the middle.
+    releases[0]["body"] = "RECEIVED_TEXT " + releases[0]["body"] + "\u0000"
     source_dir = tmp_path / "automated_watch" / "github_releases_anthropics_claude_code"
     source_dir.mkdir(parents=True)
     (source_dir / f"{COLLECTION_NAME}.json").write_text(json.dumps(releases))
@@ -628,10 +628,8 @@ def test_a_summary_with_a_nul_is_rejected_without_its_text(tmp_path, caplog):
     assert rejection.reason.startswith("read entry 0: ValidationError")
     assert "summary" in rejection.reason
     assert "text with a NUL" in rejection.reason
-    # The start of the body, which pydantic quotes before cutting the middle.
-    assert body.startswith("## What's changed")
-    assert "What's changed" not in rejection.reason
-    assert "What's changed" not in caplog.text
+    assert "RECEIVED_TEXT" not in rejection.reason
+    assert "RECEIVED_TEXT" not in caplog.text
 
 
 @pytest.mark.parametrize(

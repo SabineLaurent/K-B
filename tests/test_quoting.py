@@ -1,3 +1,4 @@
+import pytest
 from pydantic import BaseModel, ValidationError
 
 from k_b.core.quoting import MAX_QUOTED_VALUE_LENGTH, quote_value, without_values
@@ -19,10 +20,10 @@ class Summary(BaseModel):
 
 
 def test_an_error_without_values_keeps_its_field_and_type_but_not_its_value():
-    try:
+    with pytest.raises(ValidationError) as refusal:
         Summary.model_validate({"text": 1234567})
-    except ValidationError as error:
-        described = str(without_values(error))
+
+    described = str(without_values(refusal.value))
 
     assert "text" in described
     assert "string_type" in described
