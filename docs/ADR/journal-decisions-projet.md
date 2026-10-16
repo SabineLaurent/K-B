@@ -2296,7 +2296,7 @@ validées par Sabine avec le plan (16/10, vers 16 h 25).
   2026-10-16) : [inférence régionale de Mistral](https://docs.mistral.ai/inference/regional-inference),
   [conditions commerciales](https://legal.mistral.ai/terms/commercial-terms-of-service/),
   [DPA de Mistral](https://legal.mistral.ai/terms/data-processing-addendum/) ; les autres pages
-  lues sont au registre des traitements (« Sources du repli Mistral »). — PR de documentation de #227
+  lues sont au registre des traitements (« Sources du repli Mistral »). — PR #228
 
 ## Décisions encore ouvertes
 
