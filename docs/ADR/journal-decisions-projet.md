@@ -1780,8 +1780,9 @@ qui en découlent sont dans `.claude/rules/poc.md`.
   au code, mais n'est pas tranché : cela dépend de la souscription de l'école. **Révise**
   « inférence sur Azure » (nuit du 11 au 12/10) et « une clé gratuite d'abord, puis Azure »
   (2026-10-12). **Clôt** la question ouverte « Wiki : la clé gratuite, Gemini ou Mistral »
-  (2026-10-12). — PR de #198 **Révisée le 2026-10-15** : gpt-5.6-luna sur Azure AI
-  Foundry (« Modèle des fiches : gpt-5.6-luna sur Foundry », plus bas). « Données dans l'UE par
+  (2026-10-12). — PR de #198 **Révisée le 2026-10-15**, puis **le 2026-10-16** : Azure AI
+  Foundry, avec gpt-6-luna (« Modèle des fiches : gpt-6-luna sur Foundry », plus bas, qui révise
+  le choix du 15/10). « Données dans l'UE par
   défaut » était une erreur de fait : le point d'accès global `api.mistral.ai` ne s'engage sur
   aucun lieu d'inférence.
 - **7. Les jetons qui expirent ne sont pas couverts au 29/10 : les clés restent fixes ; les
@@ -1960,7 +1961,8 @@ sont ceux de cet avis, validé par Sabine.
   [annonce de GPT-5.6 sur Foundry](https://azure.microsoft.com/en-us/blog/gpt-5-6-now-available-in-microsoft-foundry/),
   [fiche de gpt-5.6-luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna),
   [inférence régionale de Mistral](https://docs.mistral.ai/inference/regional-inference).
-  — PR de #203
+  — PR de #203 **Révisée le 2026-10-16** : gpt-6-luna, repli gpt-5.6-luna (« Modèle des fiches :
+  gpt-6-luna sur Foundry », plus bas).
 
 ### Appel du modèle
 
@@ -2093,6 +2095,56 @@ est dans `src/k_b/ai_api/` et dans `docs/fiches-veille.md` (« Lecture plafonné
   défaut suit `DATA_API_PORT`, pas `KB_DATA_API_PORT` ; si Sabine change le port de `kb serve`,
   elle change aussi `KB_DATA_API_URL` (`.env.example`). — PR de #204
 
+## 2026-10-16
+
+### Modèle des fiches : gpt-6-luna sur Foundry
+
+Recommandation de time-knight, retenue par Sabine le 16/10 (vers 11 h 45, heure de Paris).
+
+- **Le modèle des fiches est gpt-6-luna (version 2026-09-22, en disponibilité générale) sur Azure
+  AI Foundry, en déploiement Data Zone Standard UE (Sweden Central ou France Central ; North
+  Europe exclu), `reasoning_effort: "none"`, version figée. Repli : gpt-5.6-luna (2026-07-09)
+  dans la même ressource.** **Révise** « Modèle des fiches : gpt-5.6-luna sur Foundry »
+  (2026-10-15). Pourquoi : gpt-6-luna est en disponibilité générale depuis le 22/09/2026, d'une
+  génération plus récente que gpt-5.6-luna, avec les mêmes capacités utiles aux fiches (Chat
+  Completions, sorties structurées, `reasoning_effort: "none"`, contexte de 1 050 000 jetons),
+  le même quota par palier (palier 1 : 333 000 TPM en DataZoneStandard) et les mêmes régions
+  Data Zone UE. Le code ne change pas : le nom du modèle est un réglage (`KB_LLM_MODEL`), et le
+  client de #150 est générique. Le prix ne décide pas : au pire environ 420 000 jetons par
+  demande, soit quelques centimes à 0,12 $ en entrée et 0,60 $ en sortie par million de jetons
+  (prix UE) ; celui de gpt-5.6-luna n'a pas été lu. Options écartées :
+  - gpt-5.6-luna comme modèle principal : il devient le repli, puisque c'est le choix du 15/10,
+    aux capacités déjà vérifiées, sur la même ressource et dans les mêmes régions ;
+  - gpt-5.4-mini et gpt-5.6-terra comme replis : un seul repli suffit, et c'est le modèle validé
+    la veille. Ce retrait est un choix de time-knight, annoncé à Sabine le 16/10 sans objection
+    de sa part.
+
+  Limites assumées : la doc de Microsoft se contredit sur deux points, que #158 mesure et que
+  cette entrée ne tranche pas. `temperature` est cochée pour gpt-6-luna dans le tableau de la
+  page des modèles à raisonnement, alors que le texte de la même page dit que les modèles à
+  raisonnement autres que gpt-6-astra ne l'acceptent pas (la spec dit « `temperature` si
+  acceptée ») ; le quota est « sans demande » pour gpt-6-luna à un endroit, « demande selon le
+  palier » pour la famille GPT-6 à un autre. Préalable : le compte Azure de #158 est un compte
+  personnel d'essai de Sabine, distinct de l'abonnement d'entreprise de l'entrée du 15/10
+  (réponse de Sabine du 16/10) ; il est à 0 TPM, elle le passe en paiement à l'usage, puis
+  vérifie le quota de gpt-6-luna en Data Zone UE (#158). Ce que le DPA de Microsoft couvre pour
+  un compte personnel en paiement à l'usage n'est pas vérifié : la page du DPA dit qu'il
+  s'applique aux produits souscrits sous les Product Terms ; #157 le lit dans les Product Terms
+  et le DPA avant le premier appel réel. Sources (consultées le 2026-10-16, relevées par time-knight) :
+  [GPT-6 Astra, Sol and Luna sur Foundry](https://azure.microsoft.com/en-us/blog/gpt-6-astra-sol-and-luna-for-production-agents-in-microsoft-foundry/)
+  (disponibilité générale, Data Zone UE, prix UE),
+  [modèles vendus par Azure](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure)
+  (Chat Completions, sorties structurées, contexte, sortie de 128 000 jetons au plus),
+  [disponibilité par région](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure-region-availability)
+  (onglet Data Zone Standard, Europe : gpt-6-luna et gpt-5.6-luna cochés pour francecentral et
+  swedencentral entre autres, non cochés pour northeurope),
+  [modèles à raisonnement](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/reasoning)
+  (`none` accepté par gpt-6-luna),
+  [quotas et limites](https://learn.microsoft.com/en-us/azure/foundry/openai/quotas-limits)
+  (paliers ; le palier gratuit ne contient pas gpt-6-luna),
+  [DPA de Microsoft](https://www.microsoft.com/licensing/docs/view/microsoft-products-and-services-data-protection-addendum-dpa)
+  (s'applique aux produits souscrits sous les Product Terms). — PR #221
+
 ## Décisions encore ouvertes
 
 - **Remplir `newsletter_article.publication_id`** (2026-10-12) : quand le lien d'un article TLDR
@@ -2137,8 +2189,8 @@ est dans `src/k_b/ai_api/` et dans `docs/fiches-veille.md` (« Lecture plafonné
   Zotero ») ; les versions d'un clip annoté.
 - **Transfert hors UE par les agents** : un agent qui lit les items par l'API envoie leur contenu
   au fournisseur du modèle (États-Unis). Cadre juridique non vérifié. **Révisée le
-  2026-10-15** : l'API IA appelle gpt-5.6-luna sur Azure AI Foundry, en déploiement Data Zone
-  Standard UE (« Modèle des fiches : gpt-5.6-luna sur Foundry ») ; à inscrire au registre (#157).
+  2026-10-15**, puis **le 2026-10-16** : l'API IA appelle gpt-6-luna sur Azure AI Foundry, en
+  déploiement Data Zone Standard UE (« Modèle des fiches : gpt-6-luna sur Foundry ») ; à inscrire au registre (#157).
   La question reste ouverte pour les clients de l'API de données.
 - **Motif d'un rejet pour longueur** : le critère de l'issue sur le motif des rejets (#92) ne
   garde que le champ et le type d'erreur, alors que la décision du 2026-10-08 demande la longueur

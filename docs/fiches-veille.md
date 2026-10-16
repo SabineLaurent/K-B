@@ -26,8 +26,8 @@ contrôles, les états nommés et la ligne de métrique sont posés ici ; la sp�
 6. Réponse JSON ; une ligne de métrique par appel au modèle, sur la sortie standard (#156).
 
 L'appel au modèle, sa nouvelle tentative et le modèle de remplacement des tests sont à #150 ; le
-vrai modèle (gpt-5.6-luna sur Azure AI Foundry, décision de Sabine du 2026-10-15 ; journal ADR,
-« Modèle des fiches : gpt-5.6-luna sur Foundry ») à #158. La spec ne dépend d'aucun fournisseur :
+vrai modèle (gpt-6-luna sur Azure AI Foundry, repli gpt-5.6-luna, décision de Sabine du
+2026-10-16 ; journal ADR, « Modèle des fiches : gpt-6-luna sur Foundry ») à #158. La spec ne dépend d'aucun fournisseur :
 elle s'en tient à l'interface compatible OpenAI. L'API IA n'écrit rien qui doive survivre à son redémarrage
 (règle 7 de `poc.md`) : les fiches sont rendues, pas gardées.
 
@@ -562,7 +562,13 @@ Consultées le 2026-10-15.
   — Microsoft, relevé par recherche web : les demandes et réponses ne servent pas à entraîner les
   modèles ; un déploiement Data Zone traite dans la zone choisie (UE).
 - [Region availability of Foundry Models sold by Azure](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure-region-availability)
-  — Microsoft, relevé par recherche web : gpt-5.6-luna, version 2026-07-09.
+  — Microsoft, relevé par recherche web : gpt-5.6-luna, version 2026-07-09. Consultée le
+  2026-10-16 par time-knight (onglet Data Zone Standard, Europe) : gpt-6-luna
+  (2026-09-22) et gpt-5.6-luna ont la même ligne, cochée pour francecentral et swedencentral
+  entre autres, non cochée pour northeurope.
+- [GPT-6 Astra, Sol and Luna for production agents in Microsoft Foundry](https://azure.microsoft.com/en-us/blog/gpt-6-astra-sol-and-luna-for-production-agents-in-microsoft-foundry/)
+  — Microsoft, consultée le 2026-10-16 (relevée par time-knight) : gpt-6-luna en disponibilité
+  générale, en Data Zone UE.
 - [How to use structured outputs](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs)
   — Microsoft, relevé par recherche web : en mode strict, tous les champs `required`, et
   `minLength`, `maxLength`, `minItems`, `maxItems` non pris en charge (schéma portable).
