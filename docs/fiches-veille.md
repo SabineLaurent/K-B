@@ -4,7 +4,8 @@ Une fiche de veille regroupe, pour un sujet d'une liste fermée, ce que la veill
 une fenêtre de quelques jours. C'est la première sortie d'un modèle dans K-B : ce document est son
 contrat, écrit avant le code. Il dit ce qui entre, ce qui sort, ce que le code refuse et ce qu'il
 mesure. Les décisions et leur pourquoi sont dans le [journal ADR](ADR/journal-decisions-projet.md)
-(2026-10-15, « POC du 25/10 », décisions 4, 5, 6 et 8 ; « Fiches de veille : le contrat ») ; les
+(2026-10-15, « POC du 25/10 », décisions 4, 5, 6 et 8 ; « Fiches de veille : le contrat » ;
+« Fiches de veille : le LLM juge ») ; les
 règles du POC, dans `.claude/rules/poc.md` ; l'API de données lue, dans [specs-api.md](specs-api.md).
 
 **Partie commune avec le wiki.** La liste fermée de sujets, les schémas validés par le code, les
@@ -23,7 +24,9 @@ contrôles, les états nommés et la ligne de métrique sont posés ici ; la sp�
    items.
 5. **Contrôles** (#206, #207, section « Contrôles ») : le code revalide chaque sortie avant de
    s'en servir.
-6. Réponse JSON ; une ligne de métrique par appel au modèle, sur la sortie standard (#156).
+6. **Juge** (#223, section « Juge ») : un appel par sujet ; un second modèle rend un verdict sur
+   chaque affirmation gardée par la fidélité, et le code retire celles qu'il n'appuie pas.
+7. Réponse JSON ; une ligne de métrique par appel au modèle, sur la sortie standard (#156).
 
 L'appel au modèle, sa nouvelle tentative et le modèle de remplacement des tests sont à #150 ; le
 vrai modèle (gpt-6-luna sur Azure AI Foundry, repli gpt-5.6-luna, décision de Sabine du
@@ -117,11 +120,13 @@ ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 6
   tombe entre deux sortes. Une entrée retirée ne prend pas de place sous le plafond. Avec ce
   plafond, l'offset 10 000 de `GET /items` n'est jamais atteint.
 - **Durée totale** : `DIGEST_REQUEST_TIMEOUT_SECONDS`, une constante nommée dans `core/config.py`,
-  sa valeur fixée par #205. Au-delà, les sujets pas encore rédigés vont dans `failed_subjects`
-  avec `llm_timeout`. Elle borne la demande ; le délai d'un appel (#150) ne borne que l'appel.
+  sa valeur fixée par #205, en comptant les appels du juge. Au-delà, les sujets pas encore
+  rédigés ou pas encore jugés vont dans `failed_subjects` avec `llm_timeout` et leur étape
+  (`write` ou `judge`). Elle borne la demande ; le délai d'un appel (#150) ne borne que l'appel.
 - **Appels au modèle** : au plafond, environ 6 classements (50 items par appel, découpage de
-  #205) et 8 rédactions (une par sujet), le double au plus avec les nouvelles tentatives, soit 28.
-  Ce nombre découle du plafond et des sujets : pas de constante de plus.
+  #205), 8 rédactions (une par sujet) et 8 jugements (un par sujet, section « Juge »), le double
+  au plus avec les nouvelles tentatives, soit 44 (28 sans le juge). Ce nombre découle du plafond
+  et des sujets : pas de constante de plus.
 
 **Limites** : une seule demande à la fois est supposée (une seule utilisatrice, en local) ; les
 quotas du déploiement Foundry seront vérifiés par #158. Les sortes rares tiennent bien sous
@@ -342,10 +347,11 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
       ],
       "not_retained": [7],
       "claims_removed": 1,
+      "claims_judged_removed": 1,
       "items_uncited": [51]
     }
   ],
-  "failed_subjects": [{"subject": "models", "error": "llm_timeout"}],
+  "failed_subjects": [{"subject": "models", "stage": "judge", "error": "llm_timeout"}],
   "not_retained": [3, 9],
   "items_in": 41,
   "items_truncated": 2,
@@ -359,12 +365,13 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
 | `request_id` | identifiant de la demande (UUID), repris par chaque ligne de métrique |
 | `window` | `days`, et `since` et `until` en UTC, au format des dates de la base ; quand `items_capped` est vrai, `capped_kind`, la sorte coupée, et `covered_after`, la date de son premier item laissé de côté (borne exclue) ; nuls sinon (section « Lecture plafonnée ») |
 | `digests` | une fiche par sujet rédigé ; un sujet sans item n'a pas de fiche |
-| `digests[].claims` | les affirmations gardées après la fidélité, sans leurs `facts` (contrôle interne) |
-| `digests[].sources` | `item_id`, `kind`, `title`, `url` de chaque item des affirmations gardées, lus dans l'API de données, **jamais dans la sortie du modèle** ; une `url` qui ne commence ni par `http://` ni par `https://` est rendue nulle |
+| `digests[].claims` | les affirmations gardées après la fidélité **et** le juge, sans leurs `facts` (contrôle interne) |
+| `digests[].sources` | `item_id`, `kind`, `title`, `url` de chaque item des affirmations gardées (après le juge), lus dans l'API de données, **jamais dans la sortie du modèle** ; une `url` qui ne commence ni par `http://` ni par `https://` est rendue nulle |
 | `digests[].not_retained` | les items envoyés pour ce sujet qu'aucune affirmation du modèle ne cite, calculés par le code |
 | `digests[].claims_removed` | affirmations retirées par la fidélité |
-| `digests[].items_uncited` | items du sujet qui ne sont plus cités après ces retraits |
-| `failed_subjects` | chaque sujet en échec et son état nommé |
+| `digests[].claims_judged_removed` | affirmations retirées par le juge (section « Juge ») |
+| `digests[].items_uncited` | items du sujet qui ne sont plus cités après les retraits de la fidélité et du juge |
+| `failed_subjects` | chaque sujet en échec, son étape (`stage` : `write` pour la rédaction, `judge` pour le juge) et son état nommé |
 | `not_retained` | items non retenus au classement, ou absents de sa sortie |
 | `items_in`, `items_truncated`, `items_dropped`, `items_capped` | compteurs de la section « Entrée du modèle » |
 
@@ -387,13 +394,14 @@ par du code déterministe).
 | 2 | **Schéma** | un texte qui n'est pas du JSON, un champ en trop (`extra="forbid"`), un type faux, une borne de structure dépassée (plus de 12 affirmations, `item_ids` hors de 1 à 5) | `schema` |
 | 3 | **Sujets** | un sujet hors de la liste de `core/config.py` | `subject` |
 | 4 | **`item_id`** | un identifiant qui n'a pas été envoyé dans **cet** appel (un item inventé, ou d'un autre sujet) ; un `facts[].item_id` hors des `item_ids` de son affirmation | `item_id` |
-| 5 | **Complétude** (classement) | un item présent deux fois dans la sortie ; un item absent n'est pas un échec : il est compté « non retenu » | `completeness` |
+| 5 | **Complétude** (classement, juge) | un item présent deux fois dans la sortie du classement, ou une affirmation jugée deux fois par le juge ; un item absent n'est pas un échec : il est compté « non retenu » ; une affirmation sans verdict non plus : elle est retirée (section « Juge ») | `completeness` |
 | 6 | **Markdown** (rédaction) | un `text` qui contient `(?i)[a-z][a-z0-9+.-]*://`, `(?i)www\.`, `![`, `[[`, `](`, `]:` ou `<[a-zA-Z/!?]` | `markup` |
 | 7 | **Fidélité** (rédaction) | voir ci-dessous : retire l'affirmation, n'est pas un échec | — |
+| 8 | **Juge** (après la fidélité) | section « Juge » : sa sortie passe les contrôles 1 et 2, puis `claim_id` (un identifiant d'affirmation qui n'a pas été envoyé) et 5 ; ses verdicts retirent des affirmations, ce qui n'est pas un échec | `claim_id` |
 
-- **Contrôles 2 à 6, et une valeur de `finish_reason` hors liste** : `llm_invalid_output`, **une**
-  nouvelle tentative (#150) ; au second échec,
-  le sujet échoue (rédaction) ou toute la demande (classement). Aucune fiche partielle n'est rendue.
+- **Contrôles 2 à 6, une valeur de `finish_reason` hors liste, et `claim_id`** : `llm_invalid_output`,
+  **une** nouvelle tentative (#150) ; au second échec, le sujet échoue (rédaction ou juge) ou toute
+  la demande (classement). Aucune fiche partielle n'est rendue.
   Une `ValidationError` n'est ni journalisée ni gardée : seul `failed_check` l'est (règle 5 de
   `poc.md`).
 - **Contrôle 6** reprend les motifs de #206, avec trois différences (commentaire daté sur #206) :
@@ -455,10 +463,13 @@ ce qui a été observé. `fidelity_rate` = `facts_found` / `facts_checked`.
 - **Ce qu'elle vérifie** : chaque valeur déclarée est écrite dans la phrase et existe, entre ses
   limites, dans un champ de l'item qu'elle cite ; chaque identifiant CVE ou GHSA de la phrase est
   celui de l'item cité ; chaque item cité porte un fait.
-- **Ce qu'elle ne vérifie pas** : le sens de la phrase (une négation, une paraphrase fausse) ; un
-  nombre écrit dans la phrase sans être déclaré ; ce que l'item dit au-delà des caractères
-  envoyés. Un mot courant déclaré comme fait (« release », « model ») passe encore. Option
-  écartée : une liste de mots vides, une liste de plus à tenir pour un gain faible.
+- **Ce qu'elle ne vérifie pas** : le sens de la phrase (une négation, une paraphrase fausse, un
+  sens changé à la traduction) ; un nombre écrit dans la phrase sans être déclaré ; ce que l'item
+  dit au-delà des caractères envoyés. Un mot courant déclaré comme fait (« release », « model »)
+  passe encore. Option écartée : une liste de mots vides, une liste de plus à tenir pour un gain
+  faible. Le sens de la phrase, le nombre non déclaré et la traduction sont confiés au juge
+  (contrôle 8, section « Juge »), qui ne lit lui aussi que les caractères envoyés ; la fidélité
+  reste sans modèle, et le juge vient après elle.
 - **Limite assumée** : `1.2.0` n'est pas trouvé dans `v1.2.0` ; l'affirmation est retirée,
   l'erreur va donc dans le sens sûr.
 
@@ -473,27 +484,305 @@ spec :
   lien, image ou balise en sortie est refusé (contrôle 6) ;
 - un item piégé ne peut ni créer un sujet (contrôle 3), ni citer un item inventé (contrôle 4) ;
 - une affirmation sur une CVE tirée d'un texte libre est retirée, et un item cité sans fait trouvé
-  aussi (fidélité).
+  aussi (fidélité) ;
+- une phrase fausse appuyée sur des faits vrais est soumise au juge (contrôle 8), qui ne peut que
+  retirer.
 
 La consigne n'est pas la défense ; le schéma fermé et les contrôles le sont. Ce que la spec ne
-couvre pas : un item qui oriente le classement entre deux sujets permis, ou qui fait écrire une
-phrase fausse appuyée sur des faits vrais.
+couvre pas : un item qui oriente le classement entre deux sujets permis ; un item qui trompe à la
+fois le rédacteur et le juge (une phrase fausse que le juge appuie quand même) ; un item qui
+pousse le juge à retirer les affirmations des autres items du sujet (section « Juge »,
+« Limites »).
+
+## Juge
+
+Un second modèle, le **juge**, vérifie le sens de chaque affirmation gardée par la fidélité :
+c'est le contrôle 8. La fidélité vérifie que les faits déclarés existent dans l'item cité, pas que
+la phrase dit vrai (« Ce qu'elle ne vérifie pas ») ; le juge comble ce manque, traduction
+comprise, sans relecture humaine des fiches. Le juge ne peut que **retirer** une affirmation : il
+n'en écrit ni n'en réécrit aucune. Décisions de Sabine des 15, 16 et 17/10 (journal ADR,
+« Fiches de veille : le LLM juge ») ; code à #223, étalonnage à #224.
+
+### Entrée du juge
+
+Un appel par sujet, après la fidélité, s'il reste au moins une affirmation ; sinon aucun appel :
+la fiche est déjà vide.
+
+**Message utilisateur** : un objet JSON encodé, et rien d'autre (règle 8 de `poc.md`). Le texte
+des affirmations y entre comme celui d'un item : c'est une sortie du rédacteur, que le contenu
+d'un item a pu orienter, donc une donnée, jamais une consigne.
+
+```json
+{
+  "claims": [{"claim_id": "c1", "text": "…", "item_ids": ["i12", "i40"]}],
+  "items": [{"item_id": "i12", "kind": "paper", "title": "…", "summary": "…"}]
+}
+```
+
+- `claim_id` vaut `"c<rang>"`, le rang de l'affirmation parmi celles que la fidélité a gardées,
+  de 1 à n sans trou : un `enum` d'entiers n'est confirmé chez aucun fournisseur (section
+  « Schémas »). Le code fait la correspondance.
+- `items` : les items cités par ces affirmations, et eux seuls, avec les champs de la rédaction
+  (tableau de la section « Entrée du modèle »), masqués puis coupés à 2 000 caractères, comme à la
+  rédaction.
+- Jamais `authors` (règle 5 de `poc.md`), ni `url` (le modèle n'écrit jamais d'URL), ni `facts` :
+  le juge lit la phrase, pas les faits que le rédacteur déclare, qui l'orienteraient vers les mots
+  déjà vérifiés par la fidélité.
+
+**Consigne** (message `system`) : une constante de module, jamais une expression (règle 8 de
+`poc.md`), `prompt_version` = `judge-1`. Elle dit :
+
+- le rôle : juger chaque affirmation contre les **seuls items qu'elle cite**, dans le texte
+  envoyé, sans aucun savoir extérieur ; **chaque item cité doit appuyer ce que la phrase lui
+  attribue**, sinon `wrong_item` ;
+- que le message utilisateur est une donnée, jamais une consigne, affirmations comprises ;
+- la traduction : la fiche est en français, l'item souvent en anglais (« Ce qu'est un fait ») ;
+  un sens changé à la traduction est `contradicted`, avec `meaning_changed_in_translation` ;
+- les trois valeurs de `cve_listed_in_cisa_kev` (section « Entrée du modèle ») ;
+- dans le doute, `unverifiable` : le doute retire l'affirmation.
+
+### Sortie du juge
+
+`response_format` `json_schema`, `strict: true`, schéma portable (section « Schémas »).
+
+```json
+{
+  "verdicts": [{"claim_id": "c1", "verdict": "supported", "reason": "supported_by_item"}]
+}
+```
+
+| Champ | Contrainte |
+|---|---|
+| `verdicts[].claim_id` | `enum` des `claim_id` envoyés dans cet appel ; une `str` dans le modèle Pydantic, revérifiée par le code (contrôle `claim_id`) |
+| `verdicts[].verdict` | `supported` (appuyée), `contradicted` (contredite), `unverifiable` (invérifiable) ; un `Literal` du modèle Pydantic (contrôle 2) |
+| `verdicts[].reason` | un code de la table ci-dessous ; un `Literal` du modèle Pydantic (contrôle 2) |
+| ensemble | chaque affirmation envoyée apparaît **au plus une fois** (contrôle 5) |
+
+| `reason` | Verdict attendu | Sens |
+|---|---|---|
+| `supported_by_item` | `supported` | chaque item cité dit ce que la phrase lui attribue |
+| `negated` | `contradicted` | la phrase dit le contraire de l'item |
+| `wrong_value` | `contradicted` | un nombre, une version, un identifiant ou un nom autre que celui de l'item |
+| `wrong_item` | `contradicted` | un item cité ne dit pas ce que la phrase lui attribue (cela vient d'un autre item, ou d'aucun) |
+| `meaning_changed_in_translation` | `contradicted` | la traduction en français change le sens de l'item |
+| `overstated` | `contradicted` | la phrase généralise, ou affirme plus fort que l'item (une possibilité devenue un fait, un cas devenu une règle) |
+| `not_in_item` | `unverifiable` | le texte envoyé de l'item cité ne dit rien de ce point |
+
+`reason` n'entre ni dans la réponse ni dans la métrique. Il sert à trois choses : la règle de
+garde (ci-dessous), la révision possible (« verdict en code fermé ») et l'analyse de
+l'étalonnage (#224). L'ordre des champs est celui du contrat ; option écartée : `reason` avant
+`verdict`, pour que le verdict suive la raison. Qu'un modèle produise les champs dans l'ordre du
+schéma n'est attesté que par des forums (recherche du 2026-10-17), pas par une documentation lue.
+
+**Plafond de sortie** : `max_completion_tokens` est au moins la plus longue sortie permise
+(12 verdicts, un par affirmation au plus, section « Sortie de la rédaction ») ; calcul à #223,
+comme pour la rédaction.
+
+### Contrôle 8
+
+La sortie du juge passe, dans cet ordre, les contrôles 1 (`finish_reason`) et 2 (schéma), puis
+`claim_id` (un identifiant d'affirmation qui n'a pas été envoyé) et 5 (une affirmation jugée deux
+fois). Un refus donne `llm_invalid_output` et **une** nouvelle tentative avec le rappel du
+contrôle (#150), comme à la rédaction.
+
+Sur une sortie valide :
+
+- une affirmation est gardée **seulement** si son verdict est `supported` **et** sa raison
+  `supported_by_item` ;
+- toute autre paire (`contradicted`, `unverifiable`, ou `supported` avec une autre raison) la
+  retire ; une affirmation sans verdict est retirée ;
+- chaque retrait est compté (`claims_judged_removed`) ; ce n'est pas un échec ;
+- `claims`, `sources` et `items_uncited` de la fiche sont recalculés après ces retraits ;
+- si toutes les affirmations sont retirées, la fiche est rendue sans affirmation, comme après la
+  fidélité : c'est ce qui a été observé.
+
+Pourquoi la paire et pas le seul verdict : un verdict qui se contredit (`supported` avec
+`negated`) n'est pas un appui, et le doute retire (échouer fermé, `code.md`). Options écartées :
+garder tout `supported` ; refuser toute la sortie pour une paire incohérente (un appel de plus, et
+le sujet perdu pour un seul verdict). Une affirmation jugée deux fois est un échec et non un
+retrait : deux verdicts pour une affirmation, c'est une sortie fautive, et choisir le pire serait
+une règle de plus.
+
+### Échecs du juge
+
+`FailedCheck` (`ai_api/llm_client.py`) gagne **une** valeur, `claim_id`. Le juge réutilise
+`content_filter` et `finish_reason` (contrôle 1), `schema` (contrôle 2) et `completeness`
+(contrôle 5, une affirmation jugée deux fois, comme un item présent deux fois au classement).
+
+**Effet sur #205** : `call_model` lève `ValueError` s'il manque un rappel pour une valeur de
+`FailedCheck`, avant tout appel payé (`ai_api/llm_client.py:200-202`). Le classement et la
+rédaction écrivent donc un rappel pour `claim_id`, et le juge un rappel pour `subject`, `item_id`
+et `markup`. Ces rappels ne sont jamais envoyés, car leur contrôle ne s'applique pas à l'étape :
+limite assumée ; changer `call_model` pour n'exiger que les contrôles d'une étape est hors de ce
+contrat.
+
+- Un juge en échec (tout état `llm_*` de la section « États nommés », après sa nouvelle tentative
+  s'il y en a une, ou l'échéance `DIGEST_REQUEST_TIMEOUT_SECONDS`) envoie le sujet dans
+  `failed_subjects`, avec `stage` = `judge` ; un échec de la rédaction y porte `stage` = `write`.
+  Aucune affirmation non jugée n'est rendue (échouer fermé) ; option écartée : rendre la fiche non
+  jugée, marquée comme telle (un statut à relire, que Sabine refuse).
+- Un juge qui retire tout rend une fiche vide.
+- La réponse gagne `claims_judged_removed` par fiche et `stage` dans `failed_subjects`, sans aucun
+  état : l'API IA reste sans état (règle 7 de `poc.md`).
+
+### Réglage
+
+`KB_LLM_JUDGE_MODEL` nomme le déploiement du juge, **sans valeur par défaut**, comme `KB_LLM_MODEL`
+(règle 2 de `poc.md`) : sans elle, l'API IA ne démarre pas. Même URL (`KB_LLM_BASE_URL`), même clé
+et même fournisseur que le rédacteur ; même effort de raisonnement, `KB_LLM_REASONING_EFFORT`,
+commun aux deux déploiements : que `reasoning_effort: "none"` vaille pour les deux reste ouvert
+jusqu'à #158 (« Réglages d'appel »). Option écartée : une variable d'effort propre au juge, sans
+besoin mesuré.
+
+- **En `replay`**, la variable est exigée aussi et validée comme un nom de modèle, mais elle n'est
+  envoyée nulle part ; le `model` de la métrique du juge vaut `replay`, comme celui du rédacteur.
+  Asymétrie assumée : en `replay`, `KB_LLM_MODEL` n'est pas lue (`ai_api/llm_settings.py`) ;
+  exiger celle du juge fait échouer fermé une configuration testée en `replay` comme en vrai.
+- **Cible** : `gpt-5.6-luna`, un autre déploiement que le rédacteur (`gpt-6-luna`), dans la même
+  ressource et la même zone de données UE. Pourquoi : un modèle juge tend à mieux noter les textes
+  qui lui sont familiers, donc les siens
+  ([Wataoka et al., arXiv 2410.21819](https://arxiv.org/abs/2410.21819)). Ce biais est mesuré sur
+  l'évaluation de réponses ; l'étendre à la vérification d'une affirmation contre sa source est
+  une **hypothèse**.
+- **Repli du déploiement** (décision de Sabine du 2026-10-16) : si le quota du second déploiement
+  n'est pas accordé à temps, `KB_LLM_JUDGE_MODEL` pointe vers `gpt-6-luna`, le déploiement du
+  rédacteur ; de même, si le rédacteur passe à son repli `gpt-5.6-luna`, les deux redeviennent le
+  même modèle. Au démarrage, en `openai_compatible`, si les deux variables portent le même nom, le
+  journal de fonctionnement le dit, en constat sur le nom, sans interprétation (« LLM judge model
+  same as writer model, <nom> ») ; la ligne de métrique du juge le montre aussi (`model`). Limite :
+  deux noms différents peuvent servir le même modèle ; ce cas n'est pas détecté.
+
+### Coût
+
+Recalculé sur les bornes de la section « Lecture plafonnée » et de la nouvelle tentative (« États
+nommés ») :
+
+- **Appels** : 8 jugements de plus au plus par demande (un par sujet), 16 avec les nouvelles
+  tentatives : 44 tentatives au lieu de 28 (environ 6 classements, 8 rédactions, 8 jugements,
+  soit 22 appels, chacun deux tentatives au plus) ; 8 / 14 ≈ 57 % d'**appels** de plus.
+- **Durée** : au pire, 22 × 150 s = 3 300 s en série, au lieu de 14 × 150 s = 2 100 s ; c'est
+  la borne dont #205 tient compte pour `DIGEST_REQUEST_TIMEOUT_SECONDS`.
+- **Jetons** : ceux du juge s'ajoutent à ceux de la demande. Son entrée reprend au plus les items
+  cités d'une rédaction, déjà coupés ; sa sortie est faite de codes courts. Ordre de grandeur
+  (hypothèse) : moins que l'entrée d'une rédaction, à mesurer par #158 (`tokens_in`,
+  `tokens_out`).
+- **RGESN 3.1** (`.claude/rules/conformite.md` : éviter une technologie gourmande, sauf à retenir
+  la solution la plus sobre et à le documenter ; libellé du référentiel non relu le 2026-10-17).
+  Le besoin : sans juge, le sens des fiches n'est vérifié par personne, et Sabine refuse une
+  relecture humaine. Sobriété retenue : un appel par sujet et non par affirmation, sur les seules
+  affirmations gardées par la fidélité, et aucun appel pour une fiche vide. Option écartée : un
+  petit modèle spécialisé de vérification, comme MiniCheck, que ses auteurs disent au niveau de
+  GPT-4 pour un coût 400 fois moindre
+  ([Tang, Laban et Durrett, arXiv 2404.10774](https://arxiv.org/abs/2404.10774)) : entraîné sur de
+  l'anglais alors que les fiches sont en français, il faudrait l'héberger, et le POC est hors
+  apprentissage automatique.
+
+### Limites
+
+- **Juge piégé.** Un item qui pousse le juge à dire `supported` ne fait pas pire que sans juge,
+  puisque le juge ne fait que retirer. Mais un item piégé peut faire retirer les affirmations des
+  autres items du sujet, ce qui se voit seulement par `claims_judged_removed`. Il a aussi une
+  seconde occasion de déclencher le filtre de contenu d'Azure, sur l'entrée du juge : tout le
+  sujet échoue alors (`llm_content_filtered`, `stage` = `judge`), au lieu de quelques
+  affirmations retirées. Une consigne écrite dans le `text` d'une affirmation (400 caractères qui
+  passent les contrôles 6 et 7) arrive au juge comme une donnée. Ce qu'un attaquant n'obtient
+  pas : un canal de sortie libre. La sortie du juge n'est faite que d'un `enum` et de codes
+  fermés, et le rappel d'une nouvelle tentative est une constante du message `system`.
+- **Chaque affirmation voit les items des autres.** L'appel est fait par sujet : seule la consigne
+  empêche le juge d'appuyer une affirmation sur un item qu'elle ne cite pas. Option écartée : un
+  appel par affirmation, jusqu'à 12 fois plus d'appels. Surveillé par les affirmations altérées
+  « mauvais item » de l'étalonnage.
+- **Une sortie vide vide la fiche.** Le mode strict ne peut pas imposer un nombre de verdicts (ni
+  `minItems`, section « Schémas ») : `{"verdicts": []}` passe les contrôles, et chaque affirmation,
+  sans verdict, est retirée. Une panne du juge ressemble alors à « rien d'appuyé » ; seule la
+  métrique la distingue (`claims_without_verdict`). Option écartée : en faire un échec
+  `completeness` avec nouvelle tentative, qui contredirait la règle « une affirmation sans verdict
+  est retirée ».
+- **Un LLM détecte mal une incohérence fine.** Sur des résumés modifiés à la main, la plupart des
+  LLM mesurés sont proches du hasard, et GPT-4 reste environ 8 points sous l'humain
+  ([Laban et al., arXiv 2305.14540](https://arxiv.org/abs/2305.14540)) : seul l'étalonnage dira
+  ce que vaut le juge ici.
+- **Même famille de modèles** : `gpt-5.6-luna` et `gpt-6-luna` ; leurs erreurs restent en partie
+  corrélées.
+- **Filtre de contenu d'Azure** : il lit aussi l'entrée du juge (`llm_content_filtered`).
+- **Données envoyées une seconde fois** : les mêmes champs d'items partent chez Microsoft pour le
+  juge ; le registre des traitements (#157) l'inscrit avant le premier envoi
+  (`.claude/rules/conformite.md`, sous-traitance).
+- **Pas de relecture avant le juge, ni de retour vers le rédacteur, au POC** (décision de Sabine
+  du 2026-10-16).
+
+### Étape possible, non codée : la révision après le juge
+
+Une révision en un seul tour. Seules les affirmations retirées par le juge repartent au rédacteur,
+avec leur verdict en code fermé (`verdict` et `reason`), jamais un texte libre du juge ; elles
+repassent ensuite les contrôles 1 à 7 et le juge à nouveau, sur elles seules ; il n'y a jamais de
+troisième tour. Elle serait déclenchée si l'étalonnage montre des fiches trop maigres (seuil
+d'utilité manqué, ci-dessous). Coût : jusqu'à 2 appels de plus par sujet touché (révision et
+nouveau jugement).
+
+### Étalonnage
+
+Méthode (décision de Sabine du 2026-10-16, journal ADR) : 30 affirmations réelles étiquetées par
+Sabine et 20 affirmations altérées par construction (négation, nombre ou CVE changé, mauvais item,
+contresens de traduction), prises **à l'entrée du juge**, sinon celles qu'il retire à tort ne se
+verraient pas ; deux passages, car `temperature=0` ne garantit pas le déterminisme. Sur les 30
+réelles, Sabine coche aussi « faute de français ou style maladroit » et « oubli important dans
+l'item cité », que le juge ne vérifie pas (« Ce que la spec ne couvre pas »).
+
+**Seuils** (décision de Sabine du 2026-10-17), écrits en comptes sur cet échantillon fixé :
+
+| Mesure | Seuil | Intervalle exact à 95 % au seuil |
+|---|---|---|
+| sécurité : altérées gardées | au plus 2 des 20 ; **aucune** pour la négation, ni pour le nombre ou la CVE changés | 1,2 % à 31,7 % pour 2 sur 20 |
+| utilité : réelles étiquetées « appuyée » retirées | au plus 6 sur 30 (20 %) | 7,7 % à 38,6 % pour 6 sur 30 |
+| stabilité : même décision, garder ou retirer, aux deux passages | au moins 45 des 50 | — |
+
+- Ce sont des **critères de passage** sur l'échantillon, pas l'estimation d'un taux : avec 20 ou
+  30 affirmations, l'intervalle est large (Clopper-Pearson, calculé par la PR de #222 ; #224
+  rapporte l'intervalle de chaque mesure). Le seuil de zéro sur environ 5 altérées d'une sorte est
+  un signal faible : pour 0 sur 5, l'intervalle exact à 95 % va de 0 à 52,2 %.
+- La stabilité porte sur la décision et non sur le verdict exact : un passage de `contradicted` à
+  `unverifiable` ne change rien à la fiche.
+- **Seuil manqué** : sécurité, la consigne change (`judge-2`) et la mesure est refaite sur
+  **20 nouvelles altérées**, sinon la consigne s'ajusterait au jeu d'étalonnage ; utilité, c'est
+  le déclencheur de la révision après le juge.
+- L'accord avec les étiquettes de Sabine se lit en comptes ; un kappa de Cohen, s'il est donné, ne
+  vient qu'en appoint. Ses partisans le préfèrent au taux d'accord brut, qui peut rester haut
+  alors que les notes divergent ([Thakur et al., arXiv 2406.12624](https://arxiv.org/abs/2406.12624),
+  v2) ; mais quand presque toutes les réelles sont « appuyées », l'accord attendu par hasard est
+  grand, et le kappa reste bas même si l'accord observé est haut (premier paradoxe de Feinstein
+  et Cicchetti, 1990, lu dans une source secondaire :
+  [Xie, FCSM 2013](https://apps.bea.gov/icsp/fcsm/assets/docs/J4_Xie_2013FCSM.pdf)).
+
+### Ce que la spec ne couvre pas
+
+Ce qu'un produit fini demanderait de plus ; rien n'est décidé ici.
+
+- La **complétude vérifiée par un modèle** : un point important d'un item cité que la fiche
+  oublierait.
+- La **correction du français et du style**.
+- La **révision après le juge** (étape possible, ci-dessus).
+- Le **lint périodique de l'ensemble des fiches** : contradictions entre fiches, péremption.
+- Le **réétalonnage du juge** à chaque changement de modèle ou de `prompt_version`.
+- Un **juge d'une autre famille de modèles** que le rédacteur (`gpt-5.6-luna` et `gpt-6-luna` sont
+  de la même famille).
+- Une **surveillance continue du taux de retraits du juge**, avec une alerte quand il bouge.
 
 ## Métriques
 
 Une ligne JSON par appel au modèle, sur la sortie standard, sans fichier (règle 4 de `poc.md`).
-Un **appel** est un classement, ou la rédaction d'un sujet, nouvelle tentative comprise : jetons et
-durées sont cumulés sur la ligne.
+Un **appel** est un classement, la rédaction d'un sujet ou son jugement, nouvelle tentative
+comprise : jetons et durées sont cumulés sur la ligne.
 
 | Champ | Contenu |
 |---|---|
 | `ts` | date de la ligne, ISO 8601 UTC à la seconde (`2026-10-15T09:00:00Z`, règle 3 de `conventions.md`) |
 | `event` | `llm_call` |
 | `request_id` | celui de la réponse |
-| `stage` | `classify` ou `write` |
-| `subject` | le sujet rédigé ; nul au classement |
-| `provider`, `model` | lus dans la configuration (#150) |
-| `prompt_version` | constante de la consigne utilisée (`classify-1`, `write-1`), changée à la main avec elle |
+| `stage` | `classify`, `write` ou `judge` |
+| `subject` | le sujet rédigé ou jugé ; nul au classement |
+| `provider`, `model` | lus dans la configuration (#150) ; pour le juge, `model` est `KB_LLM_JUDGE_MODEL` (`replay` en `replay`, section « Juge ») |
+| `prompt_version` | constante de la consigne utilisée (`classify-1`, `write-1`, `judge-1`), changée à la main avec elle |
 | `items_in` | items envoyés dans l'appel |
 | `items_truncated` | items de cet appel dont un champ est coupé |
 | `items_dropped`, `items_capped` | compteurs de la demande (section « Entrée du modèle ») ; sur la première ligne de classement de la demande, nuls ailleurs |
@@ -507,28 +796,32 @@ durées sont cumulés sur la ligne.
 | `finish_reason` | celui de la dernière tentative, coupé à 64 caractères ; nul s'il manque |
 | `http_status` | le statut HTTP de la dernière réponse du fournisseur (un 401 de clé refusée se distingue ainsi d'un 503) ; nul sans réponse (délai, connexion refusée) |
 | `schema_valid` | la dernière tentative a passé le contrôle 2 |
-| `failed_check` | le contrôle qui a refusé la dernière tentative (`content_filter`, `finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`) ; nul si `ok` |
-| `facts_checked`, `facts_found`, `claims_removed`, `items_uncited` | compteurs de la fidélité (rédaction) ; nuls au classement |
+| `failed_check` | le contrôle qui a refusé la dernière tentative (`content_filter`, `finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`, `claim_id`) ; nul si `ok` |
+| `facts_checked`, `facts_found`, `claims_removed`, `items_uncited` | compteurs de la fidélité (rédaction) ; nuls au classement et au juge |
+| `claims_judged` | affirmations envoyées au juge ; nul hors juge |
+| `verdicts_supported`, `verdicts_contradicted`, `verdicts_unverifiable` | nombre de verdicts rendus, par verdict ; nuls hors juge |
+| `claims_without_verdict` | affirmations envoyées sans verdict dans la sortie, donc retirées ; nul hors juge |
+| `claims_judged_removed` | affirmations retirées par le juge : contredites, invérifiables, sans verdict, et appuyées avec une autre raison que `supported_by_item` (cette dernière part n'a pas de compteur : elle se déduit des autres) ; nul hors juge |
 | `cost_estimated` | jetons × prix au million lus dans `core/config.py` ; 0 en offre gratuite |
 
 `ts`, `stage`, `failed_check`, `items_dropped`, `items_capped`, `reasoning_tokens` et `http_status`
-s'ajoutent à la liste de #156.
+s'ajoutent à la liste de #156, puis les compteurs du juge (#222).
 
-**Jamais** dans une ligne : le texte d'un item, la consigne, la sortie du modèle, un titre, un
-auteur, une clé (règle 5 de `poc.md`). Un échec `data_api_*` ne fait aucun appel au modèle, donc
+**Jamais** dans une ligne : le texte d'un item ou d'une affirmation, la consigne, la sortie du
+modèle, la `reason` d'un verdict, un titre, un auteur, une clé (règle 5 de `poc.md`). Un échec `data_api_*` ne fait aucun appel au modèle, donc
 aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), avec le
 `request_id`.
 
 ## États nommés
 
-| État | Quand | Le classement échoue (toute la demande) | La rédaction d'un sujet échoue |
+| État | Quand | Le classement échoue (toute la demande) | La rédaction ou le jugement d'un sujet échoue |
 |---|---|---|---|
-| `llm_invalid_output` | contrôles 2 à 6, ou `finish_reason` hors liste, deux fois | 502 | le sujet va dans `failed_subjects` |
+| `llm_invalid_output` | contrôles 2 à 6 ou `claim_id`, ou `finish_reason` hors liste, deux fois | 502 | le sujet va dans `failed_subjects`, avec son étape (`stage`) |
 | `llm_truncated` | `finish_reason` `length` ; pas de nouvelle tentative (même entrée, même modèle figé : même sortie attendue) | 502 | `failed_subjects` |
 | `llm_content_filtered` | `finish_reason` `content_filter` : le filtre de contenu du fournisseur a retenu la sortie (celui d'Azure peut réagir aux textes sur le jailbreak et l'injection, sujets de la veille) ; ou un 400 dont `error.code` vaut `content_filter` : il a retenu l'entrée ; pas de nouvelle tentative (même entrée) | 502 | `failed_subjects` |
 | `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec `Retry-After` | `failed_subjects` |
 | `llm_unavailable` | 5xx, connexion refusée ou coupée, après la nouvelle tentative ; autre 4xx, réponse qui ne se décode pas, ou réponse 200 qui n'est pas une complétion lisible (pas du JSON, aucun `choices`, un type faux), sans nouvelle tentative | 502 | `failed_subjects` |
-| `llm_timeout` | pas de connexion ou pas de réponse dans le délai du client (#150), sans nouvelle tentative ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé | 504 | `failed_subjects` |
+| `llm_timeout` | pas de connexion ou pas de réponse dans le délai du client (#150), sans nouvelle tentative ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé ou pas encore jugé | 504 | `failed_subjects` |
 | `data_api_unavailable` | API de données injoignable, ou 5xx | 502 | — |
 | `data_api_timeout` | délai de lecture dépassé | 504 | — |
 | `data_api_unauthorized` | 401 de l'API de données : clé `AI_DIGEST` refusée (sans clé, l'API IA ne démarre pas, règle 2 de `poc.md`) | 502 | — |
@@ -608,3 +901,27 @@ Consultées le 2026-10-15.
   recherche web : 502 (§ 15.6.3, une réponse invalide de l'amont), 503 (§ 15.6.4, indisponibilité
   temporaire, `Retry-After` permis), 504 (§ 15.6.5, l'amont n'a pas répondu à temps), pour un
   serveur qui agit en passerelle (états nommés).
+
+Consultées le 2026-10-17 (section « Juge »), relevées par recherche web :
+
+- [Self-Preference Bias in LLM-as-a-Judge](https://arxiv.org/abs/2410.21819) — Wataoka,
+  Takahashi et Ri, arXiv 2410.21819 : GPT-4 montre une préférence pour ses propres sorties ; les
+  auteurs la rattachent à la perplexité plus basse des textes familiers (réglage, cible du juge).
+- [Judging the Judges](https://arxiv.org/abs/2406.12624) — Thakur et al., arXiv 2406.12624, v2 :
+  le kappa de Cohen est préféré au taux d'accord brut, qui peut rester haut alors que les notes
+  divergent ; la v5 rapporte le π de Scott (étalonnage).
+- [Agree or Disagree? A Demonstration of An Alternative Statistic to Cohen's Kappa](https://apps.bea.gov/icsp/fcsm/assets/docs/J4_Xie_2013FCSM.pdf)
+  — Q. Xie, FCSM 2013, lu dans le PDF : « kappa is not a stable agreement measure and it varies
+  with prevalence and bias » ; cite les deux paradoxes de Feinstein et Cicchetti (1990), dont
+  « A low kappa can occur at a high agreement » (étalonnage).
+- [LLMs as Factual Reasoners](https://arxiv.org/abs/2305.14540) — Laban et al., arXiv 2305.14540
+  (EMNLP 2023, sous le titre « SummEdits ») : sur SummEdits, la plupart des LLM sont proches du
+  hasard, GPT-4 environ 8 points sous l'humain (limites, méthode des affirmations altérées).
+- [MiniCheck](https://arxiv.org/abs/2404.10774) — Tang, Laban et Durrett, arXiv 2404.10774
+  (EMNLP 2024) : petits modèles de vérification d'une affirmation contre un document, au niveau de
+  GPT-4 pour un coût 400 fois moindre selon les auteurs (coût, RGESN 3.1, option écartée).
+- [Key Ordering Issue in OpenAI Structured Outputs](https://community.openai.com/t/key-ordering-issue-in-openai-structured-outputs-despite-specified-sequence-in-json-schema/995040)
+  — forum OpenAI : l'ordre de génération selon le schéma y est cité et contesté ; aucune
+  documentation officielle lue (ordre des champs du juge).
+- Intervalles exacts de Clopper-Pearson à 95 % (étalonnage) : calculés par la commande de la PR
+  de #222 (loi binomiale, bornes par dichotomie), pas lus dans une source.
