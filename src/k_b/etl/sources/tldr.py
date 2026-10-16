@@ -17,7 +17,7 @@ from bs4.exceptions import ParserRejectedMarkup
 from k_b.core.quoting import quote_value
 from k_b.etl.http_download import RedirectedOutsideError, download
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME, find_stream
-from k_b.etl.source_contract import SourceReader
+from k_b.etl.source_contract import EntryReading, SourceReader
 from k_b.items import EDITION_SLUG, Item, SourceCode
 
 SOURCE_CODE: SourceCode = "tldr"
@@ -133,12 +133,12 @@ class TldrArticle:
     summary: str
 
 
-def read_articles(page: bytes) -> list[TldrArticle]:
+def read_articles(page: bytes) -> EntryReading[TldrArticle]:
     """One article per entry of an edition page, sponsored entries and job offers of TLDR left
     out.
 
     An entry is returned as read, even without a title, a link or a summary: the item refuses
-    it, and the others are still read. A page that is not UTF-8, whose first h1 is not the
+    it, and the others are still read; the reader itself rejects none. A page that is not UTF-8, whose first h1 is not the
     title of an edition, with an article inside another, or without any complete article (a
     selector no longer matches) is refused whole.
     """
@@ -165,7 +165,7 @@ def read_articles(page: bytes) -> list[TldrArticle]:
             "no article with a title, a link and a summary among "
             f"{len(entries)} article elements"
         )
-    return articles
+    return EntryReading(articles, [])
 
 
 def read_edition_date(soup: BeautifulSoup) -> date:

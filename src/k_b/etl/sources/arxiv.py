@@ -5,16 +5,21 @@ Download the AI security papers submitted to arXiv, as the API returns them.
 Read the papers of a raw arXiv API response (an Atom feed), and convert each one into an item.
 """
 
-import logging
 import re
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
+from k_b.core.quoting import quote_value
 from k_b.etl.http_download import download
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
-from k_b.etl.source_contract import SourceReader
+from k_b.etl.source_contract import (
+    EntryReading,
+    SourceReader,
+    check_not_all_invalid,
+    read_each_entry,
+)
 from k_b.items import (
     ARXIV_ABSTRACT_PAGE_URL,
     ARXIV_ID,
@@ -22,8 +27,6 @@ from k_b.items import (
     SourceCode,
     parse_aware_datetime,
 )
-
-logger = logging.getLogger(__name__)
 
 # The source of its items, in the source table of the base.
 SOURCE_CODE: SourceCode = "arxiv"
@@ -92,6 +95,9 @@ class ArxivSource:
             )
         if paper_count == 0:
             return None
+        # Checked once the API error and the count are: a page whose papers are all invalid
+        # raises.
+        check_not_all_invalid(read_papers(raw_response))
         return raw_response
 
 
@@ -131,25 +137,21 @@ class Paper:
     url: str
 
 
-def read_papers(raw_response: bytes) -> list[Paper]:
+def read_papers(raw_response: bytes) -> EntryReading[Paper]:
     """One paper per valid entry of the feed, in the order of the response.
 
-    An invalid entry is rejected and logged, not guessed: the others are still read.
+    An invalid entry is rejected with its position, not guessed: the others are still read.
     """
-    papers = []
-    for position, entry in enumerate(parse_feed(raw_response).findall(f"{ATOM}entry")):
-        try:
-            papers.append(parse_paper(entry, position))
-        except ValueError as error:
-            logger.warning("arXiv paper rejected: %s", error)
-    return papers
+    entries = parse_feed(raw_response).findall(f"{ATOM}entry")
+    return read_each_entry(enumerate(entries), parse_paper)
 
 
 def count_papers(raw_response: bytes) -> int:
     """Count every entry, valid or not; refuse a feed that reports an API error.
 
-    Entries are validated when read, not here: one malformed paper must not block the
-    collection, whose window would keep it forever.
+    Entries are validated by read_papers, not here: one malformed paper among valid ones must
+    not block the collection, whose window would keep it forever; only a page whose papers are
+    all invalid does.
     """
     entries = parse_feed(raw_response).findall(f"{ATOM}entry")
     for entry in entries:
@@ -182,8 +184,10 @@ def parse_paper(entry: ElementTree.Element, position: int) -> Paper:
     entry_id = read_text(entry, "id", label)
     paper_id = PAPER_ID.fullmatch(entry_id)
     if paper_id is None:
-        raise ValueError(f"{label}: id is not an arXiv paper: {entry_id!r}")
+        raise ValueError(f"{label}: id is not an arXiv paper: {quote_value(entry_id)}")
     arxiv_id, version = paper_id.groups()
+    # From here on, named by its arXiv identifier too: it is read.
+    label = f"entry {position} ({quote_value(arxiv_id)})"
     authors = tuple(
         name.text.strip()
         for name in entry.findall(f"{ATOM}author/{ATOM}name")

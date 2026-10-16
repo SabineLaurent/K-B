@@ -12,8 +12,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import unquote
 
+from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
-from k_b.etl.source_contract import SourceReader
+from k_b.etl.source_contract import (
+    EntryReading,
+    SourceReader,
+    check_not_all_invalid,
+    read_each_entry,
+)
 from k_b.etl.sources.github_api import SOURCE_CODE, get_from_github_api
 from k_b.etl.sources.tracked_repositories import is_repository_name
 from k_b.items import REPOSITORY_NAME, Item, parse_aware_datetime
@@ -52,31 +58,36 @@ class GithubReleasesSource:
         raw_response = get_from_github_api(
             f"repos/{self.repository}/releases?per_page={RELEASES_PER_PAGE}"
         )
-        # Read even at the first collection: a page that is not a list of releases raises.
-        releases = read_releases(raw_response)
+        # Read even at the first collection: a page that is not a list of releases, or whose
+        # releases are all invalid, raises.
+        reading = read_releases(raw_response)
+        check_not_all_invalid(reading)
         # Defence in depth: the page must be of the tracked repository, whose case GitHub may
         # write differently.
-        for position, release in enumerate(releases):
+        for release in reading.entries:
             if release.repository.lower() != self.repository.lower():
                 raise ValueError(
-                    f"{self.repository}: release {position} is of the repository "
+                    f"{self.repository}: release {release.release_id} is of the repository "
                     f"{release.repository!r}"
                 )
         if last_collected_at is None:
             return raw_response
-        publication_dates = [release.published_at for release in releases]
+        # A page whose only new release is invalid returns nothing: its rejection reaches the
+        # import log with the next page written, while it is among the RELEASES_PER_PAGE latest.
+        publication_dates = [release.published_at for release in reading.entries]
         if not any(
             published_at > last_collected_at for published_at in publication_dates
         ):
             return None
-        is_page_full = len(publication_dates) >= RELEASES_PER_PAGE
+        release_count = len(reading.entries) + len(reading.rejection_reasons)
+        is_page_full = release_count >= RELEASES_PER_PAGE
         oldest = min(publication_dates)
         if is_page_full and oldest > last_collected_at:
             logger.warning(
                 "%s: %d releases read, page size %d; oldest published at %s, after the last "
                 "collection at %s; next pages not read",
                 self.repository,
-                len(publication_dates),
+                release_count,
                 RELEASES_PER_PAGE,
                 oldest.isoformat(),
                 last_collected_at.isoformat(),
@@ -98,12 +109,13 @@ class Release:
     body: str | None
 
 
-def read_releases(raw_response: bytes) -> list[Release]:
-    """One release per entry of a `GET /repos/{owner}/{repo}/releases` response, newest first."""
+def read_releases(raw_response: bytes) -> EntryReading[Release]:
+    """One release per valid entry of a `GET /repos/{owner}/{repo}/releases` response, newest
+    first; an invalid one is rejected with its position."""
     entries = json.loads(raw_response)
     if not isinstance(entries, list):
         raise ValueError("expected a list of releases")
-    return [parse_release(entry, position) for position, entry in enumerate(entries)]
+    return read_each_entry(enumerate(entries), parse_release)
 
 
 def parse_release(entry: object, position: int) -> Release:
@@ -113,9 +125,11 @@ def parse_release(entry: object, position: int) -> Release:
     # bool is a subclass of int: refused explicitly.
     if not isinstance(release_id, int) or isinstance(release_id, bool):
         raise ValueError(f"release {position}: id is not an integer")
+    # Named by its id from here on: it is read.
+    label = f"release {position} (id {quote_value(release_id)})"
     tag_name = entry.get("tag_name")
     if not isinstance(tag_name, str):
-        raise ValueError(f"release {position}: tag_name is not a string")
+        raise ValueError(f"{label}: tag_name is not a string")
     url = entry.get("html_url")
     url_match = RELEASE_URL.fullmatch(url) if isinstance(url, str) else None
     if (
@@ -124,16 +138,16 @@ def parse_release(entry: object, position: int) -> Release:
         or has_dot_segment(url_match.string)
     ):
         raise ValueError(
-            f"release {position}: html_url is not a release URL of an owner/name "
-            f"repository: {url!r}"
+            f"{label}: html_url is not a release URL of an owner/name "
+            f"repository: {quote_value(url)}"
         )
     is_prerelease = entry.get("prerelease")
     if not isinstance(is_prerelease, bool):
-        raise ValueError(f"release {position}: prerelease is not a boolean")
+        raise ValueError(f"{label}: prerelease is not a boolean")
     name = entry.get("name")
     body = entry.get("body")
     if not isinstance(name, str | None) or not isinstance(body, str | None):
-        raise ValueError(f"release {position}: name or body is not a string")
+        raise ValueError(f"{label}: name or body is not a string")
     return Release(
         repository=url_match.group(1),
         release_id=release_id,
@@ -141,7 +155,7 @@ def parse_release(entry: object, position: int) -> Release:
         name=name,
         url=url_match.string,
         published_at=parse_aware_datetime(
-            entry.get("published_at"), f"release {position}: published_at"
+            entry.get("published_at"), f"{label}: published_at"
         ),
         is_prerelease=is_prerelease,
         body=body,

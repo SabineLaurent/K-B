@@ -33,7 +33,8 @@ class RawFile(NamedTuple):
     source_code: SourceCode
     collected_at: datetime
     items: list[Item]
-    # Its entries refused as items: a catalog with one of them withdraws nothing (#106).
+    # Its entries rejected by its reader or refused as items: a catalog with one of them
+    # withdraws nothing (#106).
     rejection_count: int
 
 
@@ -67,7 +68,8 @@ def read_raw_items(
 
     A collection is a raw file, or a folder of pages; a raw file is read as a single page. A
     collection not named by its time or that cannot be listed, a page that cannot be read, or
-    an entry refused as an item, is rejected and logged; the others are still read. A page
+    an entry rejected by its reader or refused as an item, is rejected and logged; the others
+    are still read. A page
     already imported is not opened.
     """
     reading = join_readings(
@@ -130,7 +132,7 @@ def read_page(
 ) -> RawReading:
     raw_file_path = page_path.relative_to(raw_dir).as_posix()
     try:
-        entries = reader.read_entries(page_path.read_bytes())
+        entry_reading = reader.read_entries(page_path.read_bytes())
     # RecursionError: a JSON nested too deep (#103); the page alone is rejected.
     except (ValueError, csv.Error, OSError, RecursionError) as error:
         # Not a file read: it is not registered, and is read again at the next import.
@@ -138,15 +140,18 @@ def read_page(
             [], [reject(raw_file_path, f"{type(error).__name__}: {error}")], 1
         )
     items = []
-    rejections = []
-    for position, entry in enumerate(entries):
+    rejections = [
+        reject(raw_file_path, reason) for reason in entry_reading.rejection_reasons
+    ]
+    # The position counts the entries read: those rejected by the reader are not.
+    for position, entry in enumerate(entry_reading.entries):
         try:
             items.append(reader.convert(entry, collected_at, raw_file_path))
         except ValidationError as error:
             rejections.append(
                 reject(
                     raw_file_path,
-                    f"entry {position}: {type(error).__name__}: {error}",
+                    f"read entry {position}: {type(error).__name__}: {error}",
                 )
             )
     raw_file = RawFile(

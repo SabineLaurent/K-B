@@ -4,7 +4,7 @@ The sources themselves are declared once, in SOURCE_KINDS, that only cli.py impo
 package.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from datetime import datetime
 from typing import Any, NamedTuple, Protocol
 
@@ -28,8 +28,51 @@ class Source(Protocol):
         ...
 
 
+class EntryReading[EntryT](NamedTuple):
+    """The entries of a raw file read, and the reason each invalid one was rejected."""
+
+    entries: list[EntryT]
+    # Each one names its entry (position or line, identifier once read) and its field.
+    rejection_reasons: list[str]
+
+
+def read_each_entry[RawEntryT, EntryT](
+    numbered_entries: Iterable[tuple[int, RawEntryT]],
+    parse: Callable[[RawEntryT, int], EntryT],
+) -> EntryReading[EntryT]:
+    """Parse each entry with its number; one that parse refuses (ValueError) is rejected with
+    its reason, and the others are still read (conventions.md, rule 1).
+
+    Only parse is guarded: an error while listing the entries (csv.Error) leaves the whole page
+    unreadable.
+    """
+    entries = []
+    rejection_reasons = []
+    for number, raw_entry in numbered_entries:
+        try:
+            entry = parse(raw_entry, number)
+        except ValueError as error:
+            rejection_reasons.append(str(error))
+            continue
+        entries.append(entry)
+    return EntryReading(entries, rejection_reasons)
+
+
+def check_not_all_invalid(reading: EntryReading[Any]) -> None:
+    """Refuse, at the collection, a page whose entries are all invalid (all_items_invalid): its
+    source fails, so its last collection date stays and nothing is written to raw/. A page
+    without any entry is not refused."""
+    if reading.rejection_reasons and not reading.entries:
+        raise ValueError(
+            f"all_items_invalid: {len(reading.rejection_reasons)} entries, all rejected; "
+            f"first: {reading.rejection_reasons[0]}"
+        )
+
+
 class SourceReader[EntryT](NamedTuple):
     """How to read a raw file of a source: its entries, then each entry as an item.
+
+    read_entries raises only for a page it cannot read; it rejects an invalid entry alone.
 
     Declared in a constant annotated with its entry type, so that mypy refuses a converter of
     another source.
@@ -37,7 +80,7 @@ class SourceReader[EntryT](NamedTuple):
 
     # The source_code of its items, and of its raw files in the base, even one without item.
     source_code: SourceCode
-    read_entries: Callable[[bytes], Sequence[EntryT]]
+    read_entries: Callable[[bytes], EntryReading[EntryT]]
     convert: Callable[[EntryT, datetime, str], Item]
 
 

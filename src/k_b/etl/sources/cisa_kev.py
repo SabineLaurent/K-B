@@ -12,12 +12,18 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from email.utils import format_datetime
-from typing import cast
+from typing import TypeIs, get_args
 from urllib.error import HTTPError
 
+from k_b.core.quoting import quote_value
 from k_b.etl.http_download import download
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
-from k_b.etl.source_contract import SourceReader
+from k_b.etl.source_contract import (
+    EntryReading,
+    SourceReader,
+    check_not_all_invalid,
+    read_each_entry,
+)
 from k_b.items import CVE_ID, NVD_PAGE_URL, Item, RansomwareUse, SourceCode
 
 CATALOG_URL = (
@@ -56,7 +62,17 @@ class CisaKevSource:
         """Return the whole catalog, or None if it has not changed since last_collected_at.
 
         The catalog is read before it is returned: a page that is not a catalog (maintenance,
-        captcha) raises ValueError instead of being stored as one.
+        captcha) raises instead of being stored as one. A catalog with an invalid row is
+        returned: the row is rejected at the import.
+
+        Raises:
+            HTTPError: any status but 304 (Not Modified).
+            URLError, TimeoutError: the network (urlopen).
+            RedirectedOutsideError: a redirection outside TRUSTED_URL_PREFIX.
+            ValueError: a catalog larger than MAX_CATALOG_BYTES, without the REQUIRED_COLUMNS,
+                or whose rows are all invalid (all_items_invalid).
+            UnicodeDecodeError: a catalog that is not UTF-8.
+            csv.Error: a catalog that the csv module cannot split into rows (a NUL byte).
         """
         headers = {}
         if last_collected_at is not None:
@@ -72,7 +88,7 @@ class CisaKevSource:
                 error.close()
                 return None
             raise
-        read_catalog(raw_catalog)
+        check_not_all_invalid(read_catalog(raw_catalog))
         return raw_catalog
 
 
@@ -84,14 +100,14 @@ class Vulnerability:
     vulnerability_name: str
     date_added: date
     short_description: str
-    # Known or Unknown in the catalog: another value is refused when converted to an item.
-    known_ransomware_campaign_use: str
+    known_ransomware_campaign_use: RansomwareUse
 
 
 def read_new_vulnerabilities(
     raw_catalog: bytes, last_collected_at: datetime | None
-) -> list[Vulnerability]:
-    """One vulnerability per row added since the day before the last collection (None: all).
+) -> EntryReading[Vulnerability]:
+    """One vulnerability per valid row added since the day before the last collection (None:
+    all); every invalid row is rejected with its line.
 
     dateAdded is a day without a time zone, not an instant: it is not converted, it is compared
     with a day of margin, so no row is lost whatever its zone. Duplicates are removed by the base, at the import.
@@ -102,29 +118,47 @@ def read_new_vulnerabilities(
     missing_columns = [column for column in REQUIRED_COLUMNS if column not in columns]
     if missing_columns:
         raise ValueError(f"catalog without the columns {', '.join(missing_columns)}")
-    vulnerabilities = [parse_vulnerability(row, rows.line_num) for row in rows]
+    # line_num is read once its row is: the line the row ends on.
+    reading = read_each_entry(
+        ((rows.line_num, row) for row in rows), parse_vulnerability
+    )
     if last_collected_at is None:
-        return vulnerabilities
+        return reading
     since = last_collected_at.date() - timedelta(days=1)
-    return [
-        vulnerability
-        for vulnerability in vulnerabilities
-        if vulnerability.date_added >= since
-    ]
+    return reading._replace(
+        entries=[
+            vulnerability
+            for vulnerability in reading.entries
+            if vulnerability.date_added >= since
+        ]
+    )
 
 
 def parse_vulnerability(row: dict[str, str], line_number: int) -> Vulnerability:
-    if any(row[column] is None for column in REQUIRED_COLUMNS):
-        raise ValueError(f"line {line_number}: missing fields")
+    missing_columns = [column for column in REQUIRED_COLUMNS if row[column] is None]
+    if missing_columns:
+        raise ValueError(
+            f"line {line_number}: missing fields {', '.join(missing_columns)}"
+        )
     cve_id = row["cveID"]
     if not re.fullmatch(CVE_ID, cve_id):
-        raise ValueError(f"line {line_number}: not a CVE identifier: {cve_id!r}")
+        raise ValueError(
+            f"line {line_number}: not a CVE identifier: {quote_value(cve_id)}"
+        )
+    # From here on, named by its CVE identifier too: it is read.
+    label = f"line {line_number} ({quote_value(cve_id)})"
     try:
         date_added = date.fromisoformat(row["dateAdded"])
     except ValueError as error:
         raise ValueError(
-            f"line {line_number}: invalid dateAdded: {row['dateAdded']!r}"
+            f"{label}: invalid dateAdded: {quote_value(row['dateAdded'])}"
         ) from error
+    ransomware_use = row["knownRansomwareCampaignUse"]
+    if not is_ransomware_use(ransomware_use):
+        raise ValueError(
+            f"{label}: knownRansomwareCampaignUse is not one of "
+            f"{get_args(RansomwareUse)}: {quote_value(ransomware_use)}"
+        )
     return Vulnerability(
         cve_id=cve_id,
         vendor_project=row["vendorProject"],
@@ -132,8 +166,12 @@ def parse_vulnerability(row: dict[str, str], line_number: int) -> Vulnerability:
         vulnerability_name=row["vulnerabilityName"],
         date_added=date_added,
         short_description=row["shortDescription"],
-        known_ransomware_campaign_use=row["knownRansomwareCampaignUse"],
+        known_ransomware_campaign_use=ransomware_use,
     )
+
+
+def is_ransomware_use(value: str) -> TypeIs[RansomwareUse]:
+    return value in get_args(RansomwareUse)
 
 
 def convert_vulnerability(
@@ -153,12 +191,11 @@ def convert_vulnerability(
         cve=vulnerability.cve_id,
         vendor=vulnerability.vendor_project,
         product=vulnerability.product,
-        # Not checked here: the item refuses a value outside RansomwareUse (strict Literal).
-        ransomware_use=cast(RansomwareUse, vulnerability.known_ransomware_campaign_use),
+        ransomware_use=vulnerability.known_ransomware_campaign_use,
     )
 
 
-def read_catalog(raw_catalog: bytes) -> list[Vulnerability]:
+def read_catalog(raw_catalog: bytes) -> EntryReading[Vulnerability]:
     """The whole catalog: duplicates between collections are removed by the base, at the import."""
     return read_new_vulnerabilities(raw_catalog, last_collected_at=None)
 
