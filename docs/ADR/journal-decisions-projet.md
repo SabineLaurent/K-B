@@ -2240,8 +2240,15 @@ contrat vient avec #222, le code avec #223, l'étalonnage avec #224.
 
   — PR #225
 - **Au POC, rien n'est relu avant le juge, et rien ne repart vers le rédacteur après lui. Une
-  révision après le juge, en un seul tour, est écrite comme étape possible, non codée.** Décision
-  de Sabine du 16/10 ; pourquoi non transmis. Dans cette révision, seules les affirmations
+  révision après le juge, en un seul tour, est écrite comme étape possible, non codée.**
+  Recommandation de time-knight, retenue par Sabine le 16/10 (« on reste sur le POC »). Pourquoi :
+  - le besoin n'est pas mesuré : seuls l'étalonnage (#224) et le compte des retraits du juge
+    (`claims_judged_removed`) diront si les fiches sortent trop maigres ;
+  - le coût : jusqu'à 2 appels de plus par sujet touché (révision et nouveau jugement), soit 76
+    appels au lieu de 44 au pire, nouvelles tentatives comprises ;
+  - le POC du 25/10 n'a ni la marge ni le quota (le compte est à 0 TPM le 16/10).
+
+  Dans cette révision, seules les affirmations
   retirées repartent au rédacteur, avec leur verdict en code fermé, jamais un texte libre du juge.
   Elles repassent ensuite les contrôles 1 à 7 et le juge, sur elles seules ; il n'y a jamais de
   troisième tour. Elle serait déclenchée si l'étalonnage montre des fiches trop maigres. Elle
