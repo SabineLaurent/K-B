@@ -97,9 +97,9 @@ UNSTORABLE_CHARACTER = re.compile("[\0\ud800-\udfff]")
 def check_text_can_be_stored(text: str) -> str:
     """Refuse a NUL and a lone surrogate, nothing more: a line break and a tab are kept. SQLite
     stops a GLOB and a length() at the first NUL: the base would refuse, or measure short, a
-    text the item accepts; sqlite3 fails to write a lone surrogate. A ValueError: a reader
-    rebuilds the errors by their type (etl/sources/zotero.py), which must be one pydantic
-    knows."""
+    text the item accepts; sqlite3 fails to write a lone surrogate. A ValueError: the import
+    rebuilds the errors by their type, without their value (core/quoting.py), which must be
+    one pydantic knows."""
     if UNSTORABLE_CHARACTER.search(text):
         raise ValueError(f"text with a NUL or a lone surrogate: {len(text)} characters")
     return text
@@ -266,7 +266,9 @@ class Highlight(BaseModel):
     """A highlight of a PDF of a Zotero entry: a row of the highlight table, written with its
     entry."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", strict=True, hide_input_in_errors=True
+    )
 
     zotero_key: ZoteroKey
     # Absent when Zotero gives none: the highlight is kept for its comment (decision of
@@ -299,7 +301,9 @@ class Highlight(BaseModel):
 
 class Item(BaseModel):
     # strict: a date given as text is refused, not parsed.
-    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", strict=True, hide_input_in_errors=True
+    )
 
     source_code: SourceCode
     source_item_id: NonEmptyText

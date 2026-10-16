@@ -763,3 +763,18 @@ def test_a_date_with_a_time_zone_is_read():
 def test_anything_but_a_date_with_a_time_zone_is_refused_with_its_label(stored_date):
     with pytest.raises(ValueError, match="release 0: published_at"):
         parse_aware_datetime(stored_date, "release 0: published_at")
+
+
+@pytest.mark.parametrize(
+    ("model", "fields"),
+    [
+        (Item, item_fields(summary="RECEIVED_TEXT \x00")),
+        (Highlight, highlight_fields(text="RECEIVED_TEXT \x00")),
+    ],
+)
+def test_a_refusal_does_not_quote_the_value_received(model, fields):
+    with pytest.raises(ValidationError) as refusal:
+        model(**fields)
+
+    # Defense in depth behind without_values (core/quoting.py, #212).
+    assert "RECEIVED_TEXT" not in str(refusal.value)

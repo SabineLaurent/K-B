@@ -15,6 +15,8 @@ from k_b.etl.sources.zotero import (
     READER,
     ZoteroChangedDuringCopyError,
     ZoteroCopyInconsistentError,
+    ZoteroDocument,
+    ZoteroHighlight,
     ZoteroQueryFailedError,
     ZoteroSource,
     convert_document,
@@ -675,3 +677,12 @@ def test_a_refused_document_is_described_by_its_field_and_measure_without_its_va
 def test_an_extract_that_is_not_a_json_list_is_unreadable(raw_extract):
     with pytest.raises(ValueError, match="not a JSON list"):
         read_documents(raw_extract)
+
+
+@pytest.mark.parametrize("model", [ZoteroDocument, ZoteroHighlight])
+def test_a_refusal_does_not_quote_the_value_received(model):
+    with pytest.raises(ValidationError) as refusal:
+        model.model_validate({"date_added": "RECEIVED_TEXT"})
+
+    # Defense in depth behind without_values (core/quoting.py, #212).
+    assert "RECEIVED_TEXT" not in str(refusal.value)

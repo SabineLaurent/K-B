@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -271,6 +272,9 @@ def test_a_title_too_long_is_rejected_and_logged_and_the_other_papers_are_read(
     assert rejection.reason.startswith("read entry 0: ValidationError")
     assert observed in rejection.reason
     assert observed in caplog.text
+    # Refused by a check of the whole item: pydantic quotes every field it received (#212).
+    assert "input_value" not in rejection.reason
+    assert "input_value" not in caplog.text
 
 
 def test_hidden_files_are_ignored(tmp_path):
@@ -606,3 +610,52 @@ def test_a_raw_file_nested_too_deep_is_rejected_and_the_others_are_read(tmp_path
         f"automated_watch/github_releases_anthropics_claude_code/{COLLECTION_NAME}.json"
     )
     assert rejection.reason.startswith("RecursionError: ")
+
+
+def test_a_summary_with_a_nul_is_rejected_without_its_text(tmp_path, caplog):
+    releases = json.loads((FIXTURES_DIR / "github_releases_extract.json").read_text())
+    # At the start of the text: pydantic quotes its start and end, and cuts the middle.
+    releases[0]["body"] = "RECEIVED_TEXT " + releases[0]["body"] + "\u0000"
+    source_dir = tmp_path / "automated_watch" / "github_releases_anthropics_claude_code"
+    source_dir.mkdir(parents=True)
+    (source_dir / f"{COLLECTION_NAME}.json").write_text(json.dumps(releases))
+
+    with caplog.at_level(logging.WARNING):
+        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+
+    assert len(items_of(reading)) == len(releases) - 1
+    (rejection,) = reading.rejections
+    assert rejection.reason.startswith("read entry 0: ValidationError")
+    assert "summary" in rejection.reason
+    assert "text with a NUL" in rejection.reason
+    assert "RECEIVED_TEXT" not in rejection.reason
+    assert "RECEIVED_TEXT" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "folder_name, extension, page",
+    [
+        (
+            "github_releases_anthropics_claude_code",
+            "json",
+            b'[{"body": "RECEIVED_TEXT"',
+        ),
+        ("github_releases_anthropics_claude_code", "json", b'["RECEIVED_TEXT\xff"]'),
+        ("arxiv_cscr_x_csai", "xml", b"<feed><entry>RECEIVED_TEXT &bogus;</entry>"),
+        ("cisa_kev", "csv", b"cveID\nRECEIVED_TEXT\xff\n"),
+        ("cisa_kev", "csv", b'cveID\n"RECEIVED_TEXT' + b"x" * 200_000 + b'"\n'),
+    ],
+)
+def test_an_unreadable_page_is_rejected_without_its_text(
+    tmp_path, caplog, folder_name, extension, page
+):
+    source_dir = tmp_path / "automated_watch" / folder_name
+    source_dir.mkdir(parents=True)
+    (source_dir / f"{COLLECTION_NAME}.{extension}").write_bytes(page)
+
+    with caplog.at_level(logging.WARNING):
+        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+
+    (rejection,) = reading.rejections
+    assert "RECEIVED_TEXT" not in rejection.reason
+    assert "RECEIVED_TEXT" not in caplog.text

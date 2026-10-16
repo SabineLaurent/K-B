@@ -28,8 +28,8 @@ from pydantic import (
     Field,
     ValidationError,
 )
-from pydantic_core import InitErrorDetails
 
+from k_b.core.quoting import without_values
 from k_b.etl.raw_store import SELECTED_LIBRARY_DIR_NAME
 from k_b.etl.source_contract import EntryReading, SourceReader
 from k_b.items import ARXIV_ID, Highlight, Item, SourceCode
@@ -361,7 +361,7 @@ ZoteroDate = Annotated[AwareDatetime, BeforeValidator(mark_as_utc)]
 class ZoteroHighlight(BaseModel):
     """A highlight of the extract. Not read: its PDF and its page (ADR of 2026-10-13)."""
 
-    model_config = ConfigDict(frozen=True, extra="ignore")
+    model_config = ConfigDict(frozen=True, extra="ignore", hide_input_in_errors=True)
 
     key: str
     text: str | None
@@ -374,7 +374,7 @@ class ZoteroDocument(BaseModel):
     date, its authors, its tags, its PDF; validating them would refuse a document for a field
     the base does not keep."""
 
-    model_config = ConfigDict(frozen=True, extra="ignore")
+    model_config = ConfigDict(frozen=True, extra="ignore", hide_input_in_errors=True)
 
     key: str
     item_type: str
@@ -435,23 +435,6 @@ def convert_document(entry: object, collected_at: datetime, raw_file_path: str) 
         )
     except ValidationError as error:
         raise without_values(error) from None
-
-
-def without_values(error: ValidationError) -> ValidationError:
-    """The same errors, without the value each one received."""
-    line_errors = []
-    for detail in error.errors():
-        line_error: InitErrorDetails = {
-            "type": detail["type"],
-            "loc": detail["loc"],
-            "input": None,
-        }
-        if "ctx" in detail:
-            line_error["ctx"] = detail["ctx"]
-        line_errors.append(line_error)
-    return ValidationError.from_exception_data(
-        error.title, line_errors, hide_input=True
-    )
 
 
 READER: SourceReader[object] = SourceReader(
