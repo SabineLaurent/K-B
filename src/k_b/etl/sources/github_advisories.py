@@ -12,8 +12,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
+from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
-from k_b.etl.source_contract import SourceReader
+from k_b.etl.source_contract import (
+    EntryReading,
+    SourceReader,
+    check_not_all_invalid,
+    read_each_entry,
+)
 from k_b.etl.sources.github_api import SOURCE_CODE, get_from_github_api
 from k_b.items import CVE_ID, GHSA_ID, Item, parse_aware_datetime
 
@@ -63,23 +69,29 @@ class GithubAdvisoriesSource:
             since = last_collected_at.astimezone(UTC).date() - timedelta(days=1)
             query["reviewed"] = f">={since.isoformat()}"
         raw_response = get_from_github_api(f"advisories?{urlencode(query)}")
-        review_dates = [
-            advisory.reviewed_at for advisory in read_advisories(raw_response)
-        ]
+        # A page whose advisories are all invalid raises.
+        reading = read_advisories(raw_response)
+        check_not_all_invalid(reading)
+        review_dates = [advisory.reviewed_at for advisory in reading.entries]
         if not review_dates:
             return None
         if last_collected_at is None:
             return raw_response
-        if not any(reviewed_at > last_collected_at for reviewed_at in review_dates):
+        # A rejected advisory leaves the page as the window moves on: its page is returned now,
+        # so that its rejection reaches the import log.
+        if not reading.rejection_reasons and not any(
+            reviewed_at > last_collected_at for reviewed_at in review_dates
+        ):
             return None
-        is_page_full = len(review_dates) >= ADVISORIES_PER_PAGE
+        advisory_count = len(reading.entries) + len(reading.rejection_reasons)
+        is_page_full = advisory_count >= ADVISORIES_PER_PAGE
         oldest = min(review_dates)
         if is_page_full and oldest > last_collected_at:
             logger.warning(
                 "%s: %d advisories read, page size %d; oldest reviewed at %s, after the last "
                 "collection at %s; next pages not read",
                 self.name,
-                len(review_dates),
+                advisory_count,
                 ADVISORIES_PER_PAGE,
                 oldest.isoformat(),
                 last_collected_at.isoformat(),
@@ -102,12 +114,13 @@ class Advisory:
     packages: tuple[str, ...]
 
 
-def read_advisories(raw_response: bytes) -> list[Advisory]:
-    """One advisory per entry of a `GET /advisories` response, newest first."""
+def read_advisories(raw_response: bytes) -> EntryReading[Advisory]:
+    """One advisory per valid entry of a `GET /advisories` response, newest first; an invalid
+    one is rejected with its position."""
     entries = json.loads(raw_response)
     if not isinstance(entries, list):
         raise ValueError("expected a list of advisories")
-    return [parse_advisory(entry, position) for position, entry in enumerate(entries)]
+    return read_each_entry(enumerate(entries), parse_advisory)
 
 
 def parse_advisory(entry: object, position: int) -> Advisory:
@@ -115,23 +128,25 @@ def parse_advisory(entry: object, position: int) -> Advisory:
         raise ValueError(f"advisory {position}: not an object")
     ghsa_id = entry.get("ghsa_id")
     if not isinstance(ghsa_id, str) or not re.fullmatch(GHSA_ID, ghsa_id):
-        raise ValueError(f"advisory {position}: not a GHSA identifier: {ghsa_id!r}")
+        raise ValueError(
+            f"advisory {position}: not a GHSA identifier: {quote_value(ghsa_id)}"
+        )
+    # From here on, named by its GHSA identifier too: it is read.
+    label = f"advisory {position} ({quote_value(ghsa_id)})"
     cve_id = entry.get("cve_id")
     if cve_id is not None and not (
         isinstance(cve_id, str) and re.fullmatch(CVE_ID, cve_id)
     ):
-        raise ValueError(f"advisory {position}: not a CVE identifier: {cve_id!r}")
+        raise ValueError(f"{label}: not a CVE identifier: {quote_value(cve_id)}")
     summary = entry.get("summary")
     if not isinstance(summary, str):
-        raise ValueError(f"advisory {position}: summary is not a string")
+        raise ValueError(f"{label}: summary is not a string")
     severity = entry.get("severity")
     if severity not in SEVERITIES:
-        raise ValueError(f"advisory {position}: unknown severity: {severity!r}")
+        raise ValueError(f"{label}: unknown severity: {quote_value(severity)}")
     url = entry.get("html_url")
     if not isinstance(url, str) or not url.startswith(ADVISORY_URL_PREFIX):
-        raise ValueError(
-            f"advisory {position}: html_url is not a {ADVISORY_URL_PREFIX} URL"
-        )
+        raise ValueError(f"{label}: html_url is not a {ADVISORY_URL_PREFIX} URL")
     return Advisory(
         ghsa_id=ghsa_id,
         cve_id=cve_id,
@@ -139,19 +154,19 @@ def parse_advisory(entry: object, position: int) -> Advisory:
         severity=severity,
         url=url,
         published_at=parse_aware_datetime(
-            entry.get("published_at"), f"advisory {position}: published_at"
+            entry.get("published_at"), f"{label}: published_at"
         ),
         reviewed_at=parse_aware_datetime(
-            entry.get("github_reviewed_at"), f"advisory {position}: github_reviewed_at"
+            entry.get("github_reviewed_at"), f"{label}: github_reviewed_at"
         ),
-        packages=parse_package_names(entry.get("vulnerabilities"), position),
+        packages=parse_package_names(entry.get("vulnerabilities"), label),
     )
 
 
-def parse_package_names(vulnerabilities: object, position: int) -> tuple[str, ...]:
+def parse_package_names(vulnerabilities: object, label: str) -> tuple[str, ...]:
     """The affected packages, each once: an advisory lists one package per vulnerable range."""
     if not isinstance(vulnerabilities, list):
-        raise ValueError(f"advisory {position}: vulnerabilities is not a list")
+        raise ValueError(f"{label}: vulnerabilities is not a list")
     package_names: list[str] = []
     for vulnerability in vulnerabilities:
         package = (
@@ -159,9 +174,7 @@ def parse_package_names(vulnerabilities: object, position: int) -> tuple[str, ..
         )
         name = package.get("name") if isinstance(package, dict) else None
         if not isinstance(name, str):
-            raise ValueError(
-                f"advisory {position}: a vulnerability has no package name"
-            )
+            raise ValueError(f"{label}: a vulnerability has no package name")
         if name not in package_names:
             package_names.append(name)
     return tuple(package_names)

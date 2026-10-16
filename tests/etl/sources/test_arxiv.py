@@ -5,10 +5,11 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
+from k_b.core.quoting import quote_value
 from k_b.etl import http_download
 from k_b.etl.extract import collect_all_sources
 from k_b.etl.raw_store import load_last_collection_dates, save_last_collection_dates
-from k_b.etl.source_contract import list_sources
+from k_b.etl.source_contract import EntryReading, list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.arxiv import (
     ArxivSource,
@@ -158,6 +159,15 @@ def test_a_page_with_an_invalid_entry_is_still_returned(fake_urlopen):
     assert ArxivSource().fetch(last_collected_at=None) == fake_urlopen.body
 
 
+def test_a_page_whose_entries_are_all_invalid_fails_the_collection(fake_urlopen):
+    fake_urlopen.body = RECORDED_RESPONSE.replace(
+        b"<author>", b"<contributor>"
+    ).replace(b"</author>", b"</contributor>")
+
+    with pytest.raises(ValueError, match="^all_items_invalid: 3 entries, all rejected"):
+        ArxivSource().fetch(last_collected_at=None)
+
+
 def test_an_api_error_answered_with_http_200_is_refused(fake_urlopen):
     fake_urlopen.body = RECORDED_RESPONSE.replace(
         b"http://arxiv.org/abs/2609.31282v1", b"http://arxiv.org/api/errors#malformed"
@@ -192,7 +202,7 @@ def entry_xml(
 
 
 def test_a_recorded_response_gives_one_paper_per_entry():
-    papers = read_papers(RECORDED_RESPONSE)
+    papers = read_papers(RECORDED_RESPONSE).entries
 
     assert [paper.arxiv_id for paper in papers] == [
         "2609.31282",
@@ -211,7 +221,7 @@ def test_a_recorded_response_gives_one_paper_per_entry():
 
 
 def test_a_revised_paper_keeps_its_version_apart_from_its_identifier():
-    revised = read_papers(RECORDED_RESPONSE)[1]
+    revised = read_papers(RECORDED_RESPONSE).entries[1]
 
     assert revised.version == 2
     assert revised.published_at == datetime(2026, 9, 27, 9, 30, 13, tzinfo=UTC)
@@ -219,7 +229,10 @@ def test_a_revised_paper_keeps_its_version_apart_from_its_identifier():
 
 
 def test_the_url_is_the_abstract_page_without_version():
-    assert read_papers(RECORDED_RESPONSE)[1].url == "https://arxiv.org/abs/2609.33401"
+    assert (
+        read_papers(RECORDED_RESPONSE).entries[1].url
+        == "https://arxiv.org/abs/2609.33401"
+    )
 
 
 def test_the_total_announced_by_the_api_is_read():
@@ -227,7 +240,7 @@ def test_the_total_announced_by_the_api_is_read():
 
 
 def test_a_feed_without_entries_gives_no_paper():
-    assert read_papers(feed_with_entry("")) == []
+    assert read_papers(feed_with_entry("")) == EntryReading([], [])
 
 
 @pytest.mark.parametrize(
@@ -237,9 +250,12 @@ def test_a_feed_without_entries_gives_no_paper():
         "http://arxiv.org/abs/2609.31282",
     ],
 )
-def test_an_entry_that_is_not_an_arxiv_paper_is_rejected_and_logged(entry_id, caplog):
-    assert read_papers(feed_with_entry(entry_xml(entry_id=entry_id))) == []
-    assert "entry 0" in caplog.text
+def test_an_entry_that_is_not_an_arxiv_paper_is_rejected_with_its_id(entry_id):
+    reading = read_papers(feed_with_entry(entry_xml(entry_id=entry_id)))
+
+    assert reading == EntryReading(
+        [], [f"entry 0: id is not an arXiv paper: {entry_id!r}"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -252,17 +268,24 @@ def test_an_entry_that_is_not_an_arxiv_paper_is_rejected_and_logged(entry_id, ca
         {"published": "<published>2026-09-25T13:53:50</published>"},
     ],
 )
-def test_an_entry_with_a_missing_or_invalid_field_is_rejected_and_logged(
-    changes, caplog
+def test_an_entry_with_a_missing_or_invalid_field_is_rejected_with_its_arxiv_id(
+    changes,
 ):
-    assert read_papers(feed_with_entry(entry_xml(**changes))) == []
-    assert "entry 0" in caplog.text
+    reading = read_papers(feed_with_entry(entry_xml(**changes)))
+
+    assert reading.entries == []
+    [reason] = reading.rejection_reasons
+    assert reason.startswith("entry 0 ('2609.31282'): ")
+    assert "Ada Lovelace" not in reason
 
 
 def test_a_rejected_entry_does_not_hide_the_valid_ones():
     feed = feed_with_entry(entry_xml(authors="") + entry_xml())
 
-    assert [paper.arxiv_id for paper in read_papers(feed)] == ["2609.31282"]
+    reading = read_papers(feed)
+
+    assert [paper.arxiv_id for paper in reading.entries] == ["2609.31282"]
+    assert reading.rejection_reasons == ["entry 0 ('2609.31282'): no author"]
 
 
 def test_every_entry_is_counted_even_an_invalid_one():
@@ -277,6 +300,17 @@ def test_a_feed_reporting_an_api_error_is_refused():
 
     with pytest.raises(ValueError, match="incorrect_id_format_for_1234"):
         count_papers(feed_with_entry(error_entry))
+
+
+def test_the_id_of_an_api_error_is_quoted_cut():
+    error_id = "http://arxiv.org/api/errors#" + "x" * 200
+    error_entry = entry_xml(entry_id=error_id)
+
+    with pytest.raises(ValueError) as refusal:
+        count_papers(feed_with_entry(error_entry))
+
+    assert str(refusal.value).endswith(quote_value(error_id))
+    assert error_id not in str(refusal.value)
 
 
 @pytest.mark.parametrize(

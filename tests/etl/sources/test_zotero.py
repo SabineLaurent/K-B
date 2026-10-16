@@ -514,7 +514,7 @@ def with_first_highlight_changed(document, **changes):
 def test_the_reader_reads_every_document_of_an_extract(zotero_dir):
     raw_extract = ZoteroSource(zotero_dir).fetch(None)
 
-    documents = read_documents(raw_extract)
+    documents = read_documents(raw_extract).entries
 
     assert documents == [PAPER_WITH_HIGHLIGHTS, PAPER_WITHOUT_ANYTHING_ATTACHED]
     assert READER.source_code == "zotero"

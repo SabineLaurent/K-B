@@ -44,6 +44,12 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Incrémental** : la date de la dernière collecte réussie de chaque source est dans
   `collection_state.json`, à la racine du dossier de données et hors de `raw/` ; une source qui
   n'a rien de neuf n'écrit rien.
+- **Entrée invalide** (règle 1 de `.claude/rules/conventions.md`) : une source n'échoue que si sa
+  page est illisible ou si toutes ses entrées sont invalides (`all_items_invalid`), sans brut
+  écrit ni date avancée. Une entrée invalide parmi des valides entre dans le brut ; à l'import,
+  le lecteur la rejette, et le rejet va au journal d'import avec sa position ou sa ligne,
+  son identifiant s'il est lisible et le champ en cause. Exception : un classement refuse sa page
+  entière.
 - **Entrées non fiables** : tout contenu collecté est une donnée, jamais une instruction. Chaque
   téléchargement a un délai, une taille maximale, et refuse une redirection hors du domaine
   attendu. Le `User-Agent` est `K-B (+https://github.com/SabineLaurent)` : le profil public de
@@ -76,12 +82,19 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Suivi** : 4 dépôts, liste et réserve dans [sources.md](sources.md).
 - **État** : releases collectées (PR de #10) : un brut par dépôt, la première page de 100
   releases, lue avant d'être écrite, première collecte comprise (une page qui n'est pas une
-  liste de releases valides fait échouer la source) ; un avertissement est journalisé si la page
-  entière est plus récente que la dernière collecte (des releases ont pu manquer, il faudra lire les pages suivantes).
+  liste de releases, ou dont toutes les releases sont invalides, fait échouer la source) ; un
+  avertissement est journalisé si la page entière est plus récente que la dernière collecte (des
+  releases ont pu manquer, il faudra lire les pages suivantes). Limite : une page dont la seule
+  release nouvelle est invalide n'est pas écrite ; son rejet n'atteint le journal d'import
+  qu'avec la page suivante écrite, tant qu'elle reste parmi les 100 dernières releases.
   Alertes collectées (PR de #11) : un brut par écosystème (`pip`, `npm`), relues par GitHub
   depuis la veille de la dernière collecte (date de revue, pas de publication : GitHub relit
   parfois une alerte des jours après l'avoir publiée), même avertissement si la page de 100 est
-  pleine.
+  pleine. Une page qui porte une alerte invalide est écrite, même sans alerte valide nouvelle :
+  l'alerte sort de la page à mesure que la fenêtre avance, et son rejet doit atteindre le journal
+  d'import.
+  Un écosystème dont la seule alerte de la fenêtre est invalide échoue à chaque collecte
+  (`all_items_invalid`, sa date reste), jusqu'à la première alerte valide revue.
   Dépôts les plus étoilés collectés (PR de #11) : un instantané du top 100 à chaque collecte
   (un classement change toujours) ; entrées, sorties et montées se calculent à la lecture en
   comparant deux instantanés. Une réponse marquée `incomplete_results`, ou de moins de 100 dépôts, est
@@ -120,8 +133,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   ([Availability of submissions](https://info.arxiv.org/help/availability.html)). Partir de la
   dernière collecte perdrait ces papiers pour toujours (le bug de watermark de brief09). Chaque
   brut recouvre donc le précédent ; la base dédoublonne par identifiant (étape 4). Une entrée mal formée
-  ne fait pas échouer la collecte (sa fenêtre la garderait pour toujours) : elle entre dans le
-  brut, et sa lecture la rejette et la journalise. Une entrée d'erreur de l'API fait, elle,
+  parmi des valides ne fait pas échouer la collecte (sa fenêtre la garderait pour toujours) :
+  elle entre dans le brut, et l'import la rejette au journal d'import. Si toutes le sont, la
+  source échoue (`all_items_invalid`). Une entrée d'erreur de l'API fait, elle,
   échouer la collecte. Limites assumées : la révision (`v2`) d'un papier soumis avant la fenêtre
   n'est pas collectée, ni un papier retenu en modération plus de 7 jours.
 
@@ -135,8 +149,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   n'écrit rien.
 - **Limites** : pas de quota publié ; une requête par collecte. Catalogue d'environ 1 Mo, refusé
   au-delà de 10 Mo, et refusé s'il est servi hors de `https://www.cisa.gov/`. Le catalogue est
-  lu avant d'être écrit : une réponse qui n'en est pas un (page HTML, colonnes manquantes, ligne
-  invalide) fait échouer la source, sans brut écrit ni date avancée.
+  lu avant d'être écrit : une réponse qui n'en est pas un (page HTML, colonnes manquantes), ou
+  dont toutes les lignes sont invalides, fait échouer la source, sans brut écrit ni date avancée.
+  Une ligne invalide parmi des valides est rejetée à l'import, avec son numéro et son `cveID`
+  s'il est lisible ; tant qu'un catalogue porte une ligne rejetée, il ne retire aucune
+  vulnérabilité.
 - **Données personnelles** : aucune.
 - **État** : collecte en place (PR de #23).
 

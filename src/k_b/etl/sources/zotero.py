@@ -31,7 +31,7 @@ from pydantic import (
 from pydantic_core import InitErrorDetails
 
 from k_b.etl.raw_store import SELECTED_LIBRARY_DIR_NAME
-from k_b.etl.source_contract import SourceReader
+from k_b.etl.source_contract import EntryReading, SourceReader
 from k_b.items import ARXIV_ID, Highlight, Item, SourceCode
 
 logger = logging.getLogger(__name__)
@@ -387,16 +387,16 @@ class ZoteroDocument(BaseModel):
     highlights: list[ZoteroHighlight]
 
 
-def read_documents(raw_extract: bytes) -> list[object]:
+def read_documents(raw_extract: bytes) -> EntryReading[object]:
     """The entries of an extract; an extract that is not a JSON list cannot be read. Each entry
-    is validated when converted: one invalid entry is rejected alone."""
+    is validated when converted: one invalid entry is rejected alone, the reader rejects none."""
     try:
         documents = json.loads(raw_extract)
     except ValueError:
         documents = None
     if not isinstance(documents, list):
         raise ValueError("extract not a JSON list")
-    return documents
+    return EntryReading(documents, [])
 
 
 def convert_document(entry: object, collected_at: datetime, raw_file_path: str) -> Item:

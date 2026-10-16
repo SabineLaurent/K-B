@@ -209,7 +209,7 @@ MISTRAL_ARTICLE = TldrArticle(
 
 def test_one_article_per_entry_without_the_sponsored_one_that_its_rank_counts():
     # The page holds five entries: a sponsored one, three articles, a job offer of TLDR.
-    articles = read_articles(AI_PAGE)
+    articles = read_articles(AI_PAGE).entries
 
     assert [(article.rank, article.title) for article in articles] == [
         (2, "Mistral Large 4 (9 minute read)"),
@@ -234,7 +234,7 @@ def test_a_job_offer_of_tldr_is_left_out_by_its_link_not_by_its_title():
     job_offer_link = b"https://jobs.ashbyhq.com/tldr.tech/897f4391?utm_source=tldr"
     assert nytimes_link in AI_PAGE
 
-    articles = read_articles(AI_PAGE.replace(nytimes_link, job_offer_link))
+    articles = read_articles(AI_PAGE.replace(nytimes_link, job_offer_link)).entries
 
     assert [article.rank for article in articles] == [2, 3]
 
@@ -244,18 +244,18 @@ def test_an_article_about_jobs_elsewhere_than_the_job_board_of_tldr_is_kept():
         b"https://jobs.ashbyhq.com/tldr.tech/", b"https://jobs.ashbyhq.com/openai/"
     )
 
-    assert [article.rank for article in read_articles(page)] == [2, 3, 4, 5]
+    assert [article.rank for article in read_articles(page).entries] == [2, 3, 4, 5]
 
 
 def test_an_article_is_read_with_the_date_of_its_edition_its_link_and_its_summary():
-    assert read_articles(AI_PAGE)[0] == MISTRAL_ARTICLE
+    assert read_articles(AI_PAGE).entries[0] == MISTRAL_ARTICLE
 
 
 def test_a_summary_with_a_link_is_read_as_displayed():
     # The sponsored entry, read as an article: its summary holds a link.
     page = AI_PAGE.replace(b" (Sponsor)", b"")
 
-    assert read_articles(page)[0].summary == "Copilot. Read the Report"
+    assert read_articles(page).entries[0].summary == "Copilot. Read the Report"
 
 
 def test_the_paragraphs_of_a_summary_are_read_apart():
@@ -264,7 +264,7 @@ def test_the_paragraphs_of_a_summary_are_read_apart():
         b"multimodal model positioned", b"multimodal model.<p></p><p>Positioned"
     )
 
-    assert read_articles(page)[0].summary == (
+    assert read_articles(page).entries[0].summary == (
         "Mistral Large 4 is a one-trillion-parameter multimodal model. Positioned as a"
         " European alternative to leading closed and open AI systems."
     )
@@ -289,7 +289,7 @@ def test_an_article_gives_an_item_of_its_edition_dated_at_midnight_utc():
 
 
 def test_a_link_escaped_twice_in_the_page_loses_its_tracking_parameters():
-    article = read_articles(DEV_PAGE)[1]
+    article = read_articles(DEV_PAGE).entries[1]
     assert article.link.endswith("&amp;utm_source=tldrdev")
 
     item = convert_article(article, COLLECTED_AT, DEV_PAGE_PATH)
@@ -443,5 +443,5 @@ def test_an_entry_refused_is_rejected_and_the_others_of_its_page_are_read(tmp_pa
     (rejection,) = reading.rejections
     assert rejection.raw_file_path == AI_PAGE_PATH
     # The position among the entries read, sponsored ones left out, from 0: not the rank.
-    assert rejection.reason.startswith("entry 1: ValidationError")
+    assert rejection.reason.startswith("read entry 1: ValidationError")
     assert "a newsletter_article item without summary" in rejection.reason
