@@ -396,7 +396,7 @@ def test_an_extract_with_a_document_the_base_refuses_withdraws_nothing(
     run_import(data_dir)
     delete_in_zotero(run_on_zotero_library, zotero_dir, THIRD_PAGE_HIGHLIGHT)
     collect(data_dir, zotero_dir, SECOND)
-    refuse_in_the_base(monkeypatch, "AAAAAAA1", title="Lone \ud800 surrogate")
+    refuse_in_the_base(monkeypatch, "AAAAAAA1", {"title": "Lone \ud800 surrogate"})
 
     summary = run_import(data_dir)
 

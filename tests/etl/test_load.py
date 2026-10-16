@@ -702,7 +702,7 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(
     assert list_logs(data_dir) == []
 
 
-def refuse_in_the_base(monkeypatch, source_item_id, **changes):
+def refuse_in_the_base(monkeypatch, source_item_id, changes):
     """The item of source_item_id reaches its writer with changes the item would refuse: they
     are made after its validation, as by an item that let them through (conventions.md, rule
     4); the base is the safety net behind it."""
@@ -732,33 +732,43 @@ CVE_ID_IN_ARABIC_INDIC_DIGITS = "CVE-2026-٨٦٩٥٠"
             str(FIRST_RELEASE_ID),
             {"source_item_id": str(2**63)},
             RELEASES_PATH,
-            "release '401174143' refused by the base: OverflowError: Python int too large"
-            " to convert to SQLite INTEGER",
+            # The identifier names the item, quoted (conventions.md, rule 3), even when it is
+            # the value refused; the refusal itself never quotes it.
+            (
+                "release '9223372036854775808' refused by the base: OverflowError: Python"
+                " int too large to convert to SQLite INTEGER"
+            ),
             str(2**63),
         ),
         (
             FIRST_CVE_ID,
             {"cve": CVE_ID_IN_ARABIC_INDIC_DIGITS},
             CISA_KEV_PATH,
-            "vulnerability 'CVE-2026-86950' refused by the base: SQLITE_CONSTRAINT_CHECK:"
-            " CHECK constraint failed: cve_id GLOB"
-            " 'CVE-[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]*'",
+            (
+                "vulnerability 'CVE-2026-86950' refused by the base:"
+                " SQLITE_CONSTRAINT_CHECK: CHECK constraint failed: cve_id GLOB"
+                " 'CVE-[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]*'"
+            ),
             "٨",
         ),
         (
             FIRST_PAPER_ID,
             {"title": "Lone \ud800 surrogate"},
             ARXIV_PATH,
-            "paper '2609.31282' refused by the base: UnicodeEncodeError: surrogates not"
-            " allowed at position 5",
+            (
+                "paper '2609.31282' refused by the base: UnicodeEncodeError: surrogates"
+                " not allowed at position 5"
+            ),
             "Lone",
         ),
         (
             "400266224",
             {"tag_name": "\x00v1.0.0"},
             RELEASES_PATH,
-            "release '400266224' refused by the base: SQLITE_CONSTRAINT_CHECK: CHECK"
-            " constraint failed: length(tag_name) > 0",
+            (
+                "release '400266224' refused by the base: SQLITE_CONSTRAINT_CHECK: CHECK"
+                " constraint failed: length(tag_name) > 0"
+            ),
             "v1.0.0",
         ),
     ],
@@ -766,7 +776,7 @@ CVE_ID_IN_ARABIC_INDIC_DIGITS = "CVE-2026-٨٦٩٥٠"
 def test_an_item_the_base_refuses_is_rejected_and_logged_and_the_others_are_imported(
     data_dir, monkeypatch, source_item_id, changes, raw_file_path, reason, value
 ):
-    refuse_in_the_base(monkeypatch, source_item_id, **changes)
+    refuse_in_the_base(monkeypatch, source_item_id, changes)
 
     summary = run_import(data_dir)
 
@@ -774,7 +784,7 @@ def test_an_item_the_base_refuses_is_rejected_and_logged_and_the_others_are_impo
     assert rejections == [
         {"kind": "rejection", "raw_file_path": raw_file_path, "reason": reason}
     ]
-    assert value not in rejections[0]["reason"]
+    assert value not in rejections[0]["reason"].partition("refused by the base: ")[2]
     assert summary.rejection_count == 1
     # The other items are written; the item refused is not counted, and leaves no row.
     assert summary.item_count == count_rows(data_dir, "SELECT count(*) FROM item") > 0
@@ -1298,7 +1308,9 @@ def test_a_catalog_with_a_row_the_base_refuses_withdraws_nothing(data_dir, monke
         "2026-10-06T093000Z",
         kev_catalog(without=(WITHDRAWN_CVE_ID,)),
     )
-    refuse_in_the_base(monkeypatch, FIRST_CVE_ID, cve=CVE_ID_IN_ARABIC_INDIC_DIGITS)
+    refuse_in_the_base(
+        monkeypatch, FIRST_CVE_ID, {"cve": CVE_ID_IN_ARABIC_INDIC_DIGITS}
+    )
 
     summary = run_import(data_dir)
 

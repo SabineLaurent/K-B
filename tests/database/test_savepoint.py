@@ -77,11 +77,9 @@ def test_a_savepoint_outside_a_transaction_is_refused(tmp_path):
 
 
 def test_only_the_errors_due_to_an_entry_are_those_of_a_refusal():
-    assert ENTRY_REFUSAL_ERRORS == (
-        sqlite3.IntegrityError,
-        OverflowError,
-        UnicodeEncodeError,
-    )
+    entry_errors = (sqlite3.IntegrityError, OverflowError, UnicodeEncodeError)
+
+    assert entry_errors == ENTRY_REFUSAL_ERRORS
 
 
 def test_a_constraint_refused_is_named_with_its_state_on_one_line(connection):
