@@ -97,9 +97,9 @@ UNSTORABLE_CHARACTER = re.compile("[\0\ud800-\udfff]")
 def check_text_can_be_stored(text: str) -> str:
     """Refuse a NUL and a lone surrogate, nothing more: a line break and a tab are kept. SQLite
     stops a GLOB and a length() at the first NUL: the base would refuse, or measure short, a
-    text the item accepts; sqlite3 fails to write a lone surrogate. A ValueError: a reader
-    rebuilds the errors by their type (etl/sources/zotero.py), which must be one pydantic
-    knows."""
+    text the item accepts; sqlite3 fails to write a lone surrogate. A ValueError: the import
+    rebuilds the errors by their type, without their value (core/quoting.py), which must be
+    one pydantic knows."""
     if UNSTORABLE_CHARACTER.search(text):
         raise ValueError(f"text with a NUL or a lone surrogate: {len(text)} characters")
     return text

@@ -10,7 +10,7 @@ from typing import Any, NamedTuple
 
 from pydantic import ValidationError
 
-from k_b.core.quoting import quote_value
+from k_b.core.quoting import quote_value, without_values
 from k_b.etl.raw_store import RAW_DIR_NAMES
 from k_b.etl.source_contract import SourceKind, SourceReader, find_source_kind
 from k_b.items import Item, SourceCode, TrendRow
@@ -151,7 +151,8 @@ def read_page(
             rejections.append(
                 reject(
                     raw_file_path,
-                    f"read entry {position}: {type(error).__name__}: {error}",
+                    f"read entry {position}: {type(error).__name__}: "
+                    f"{without_values(error)}",
                 )
             )
     raw_file = RawFile(
