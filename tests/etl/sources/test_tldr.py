@@ -381,14 +381,15 @@ def test_the_title_found_is_quoted_escaped_and_cut_in_the_refusal():
 
 def test_a_page_the_html_parser_rejects_is_refused_whole(monkeypatch):
     def reject_markup(markup, parser):
-        raise ParserRejectedMarkup("expected name token")
+        raise ParserRejectedMarkup("expected name token at '<!RECEIVED_TEXT'")
 
     monkeypatch.setattr(tldr, "BeautifulSoup", reject_markup)
 
-    with pytest.raises(
-        ValueError, match="page rejected by html.parser: expected name token"
-    ):
+    with pytest.raises(ValueError) as refusal:
         read_articles(AI_PAGE)
+
+    # The message of html.parser may quote the page (#212).
+    assert str(refusal.value) == "page rejected by html.parser"
 
 
 @pytest.mark.parametrize(

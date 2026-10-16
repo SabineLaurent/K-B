@@ -146,7 +146,8 @@ def read_articles(page: bytes) -> EntryReading[TldrArticle]:
         # Decoded here: BeautifulSoup would guess the encoding of bytes.
         soup = BeautifulSoup(page.decode("utf-8"), "html.parser")
     except ParserRejectedMarkup as error:
-        raise ValueError(f"page rejected by html.parser: {error}") from error
+        # Its message may quote the page (#212).
+        raise ValueError("page rejected by html.parser") from error
     edition_date = read_edition_date(soup)
     # Refused before its entries are read: each article is searched whole, and a page of
     # articles inside one another would be searched as many times as it has articles.
