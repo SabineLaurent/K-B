@@ -1004,7 +1004,8 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
 - **Pas de Claude dans la chaîne du wiki (ni Claude Code ni modèle Claude), et pas de tri ni de
   score de la veille par un modèle.** Décision de Sabine ; pourquoi non transmis. **Levée le
   2026-10-15** pour le classement de la veille par sujet, dans une liste fermée (« POC du 25/10 »,
-  décision 5).
+  décision 5), puis **le 2026-10-16** pour la vérification des fiches par un LLM juge
+  (« Fiches de veille : le LLM juge »).
 - **Inférence sur Azure, en API compatible OpenAI ; le modèle est choisi par rôle en
   configuration.** Décision de Sabine. Pourquoi (transmis) : le modèle reste interchangeable.
   **Révisée le 2026-10-15** : Mistral pour le POC ; Azure (Foundry) pour l'inférence reste
@@ -1901,7 +1902,9 @@ chaîne des fiches (#204 à #207, #156). Le détail est dans `docs/fiches-veille
   Limites assumées : la fidélité ne vérifie pas le sens d'une phrase (négation, paraphrase) ; un
   article TLDR seul ne porte plus de CVE, la fiche la cite par l'entrée KEV ou l'alerte si elles
   sont dans la fenêtre. #206 est accordé (commentaire du 15/10) : ce piège est retiré et compté,
-  pas un état nommé. — PR de #203
+  pas un état nommé. — PR de #203 **Complétée le 2026-10-16** : la recherche reste sans second
+  modèle, et un LLM juge vérifie ensuite le sens de chaque affirmation gardée (« Fiches de veille :
+  le LLM juge », plus bas).
 - **Le modèle ne reçoit pas le champ `url` d'un item, et les URL des champs de texte envoyés sont
   masquées en `[url]` avant le prompt ; les sources d'une fiche (titre, URL) sont rendues par le
   code, lues dans l'API de données.** Pourquoi : rien à recopier, donc tout `://` en sortie est
@@ -2145,7 +2148,115 @@ Recommandation de time-knight, retenue par Sabine le 16/10 (vers 11 h 45, heure 
   [DPA de Microsoft](https://www.microsoft.com/licensing/docs/view/microsoft-products-and-services-data-protection-addendum-dpa)
   (s'applique aux produits souscrits sous les Product Terms). — PR #221
 
+### Fiches de veille : le LLM juge
+
+Décisions de Sabine des 15 et 16/10, relayées par time-knight. Celles du 16/10 (14 h 53, heure de
+Paris) valident le découpage de la session K-B, relu par un agent ingénieur IA indépendant. Le
+contrat vient avec #222, le code avec #223, l'étalonnage avec #224.
+
+- **Un LLM juge vérifie chaque affirmation d'une fiche : c'est le contrôle 8, après la fidélité
+  (contrôle 7). Il rend
+  un verdict par affirmation : appuyée, contredite ou invérifiable. Seules les affirmations
+  appuyées sont gardées. Le juge ne peut que retirer.** Décision de Sabine du 15/10. Pourquoi
+  (Sabine) : « L'idée c'est de ne pas avoir à intervenir (en tant qu'Humain) sur la gestion du
+  contenu de kb » ; puis « Un llm as judge me semble indispensable ». C'est la promesse du
+  README : une bibliothèque de veille qui se range toute seule. La fidélité ne vérifie pas le sens
+  d'une phrase (négation, paraphrase, traduction ; `docs/fiches-veille.md`, « Ce qu'elle ne
+  vérifie pas »), et le juge comble ce manque. La traduction entre dans son rôle : la fiche est
+  en français, l'item souvent en anglais.
+  Options écartées :
+  - un statut « à relire » passé à la main, ou une file « à voir » (Sabine : pas d'intervention
+    humaine) ;
+  - la fidélité seule : le sens d'une phrase fausse appuyée sur des faits vrais n'est pas
+    vérifié (`docs/fiches-veille.md`, « Injection d'instructions »).
+
+  Le juge passe par le client de #150, sans framework (« Appel du modèle »), avec le modèle de
+  remplacement en CI. Il se code après #158, car un juge ne se mesure que sur un vrai modèle. Son
+  contrat est écrit avant #205, qui fixe la borne totale d'une demande en comptant ses appels.
+  S'il ne tient pas avant l'oral blanc du 29/10, il passe juste après, jamais abandonné.
+  **Lève**, pour la vérification des fiches, « pas de tri ni de score de la veille par un modèle »
+  (nuit du 11 au 12/10), déjà levée pour le classement le 15/10 (« POC du 25/10 », décision 5).
+  **Complète** « Un fait est un extrait recopié » (« Fiches de veille : le contrat ») : la
+  recherche des faits reste sans second modèle, et le juge vient après elle.
+  Limites assumées :
+  - le juge ajoute au plus 8 appels par demande, 16 avec les nouvelles tentatives, soit 44 au lieu
+    de 28 ;
+  - le filtre de contenu d'Azure lit aussi son entrée (`llm_content_filtered`) ;
+  - un item piégé ne peut pas faire garder une affirmation, puisque le juge ne fait que retirer ;
+    mais il peut faire retirer les affirmations des autres items du même sujet, ce qui se voit
+    seulement par le compte des retraits.
+
+  — PR de l'entrée
+- **Le juge appelle un autre déploiement que le rédacteur : `gpt-5.6-luna`, dans la même
+  ressource et la même zone de données UE, nommé par `KB_LLM_JUDGE_MODEL`, sans valeur par
+  défaut. Si le quota de ce second déploiement n'est pas accordé à temps, la variable pointe vers
+  `gpt-6-luna`, le déploiement du rédacteur, et le journal de fonctionnement le dit.** Décision
+  de Sabine du 16/10, sur la recommandation de la session ; le repli est un ajout de Sabine.
+  Pourquoi (recommandation de la session) : un modèle juge tend à mieux noter un texte qui lui est
+  familier, donc les siens. Wataoka et al. le mesurent sur l'évaluation de réponses, pas sur la
+  vérification d'une affirmation contre sa source : l'appliquer à notre cas est une hypothèse.
+  Autre raison, à vérifier par #158 : le quota d'Azure étant compté par modèle, le juge ne pèserait
+  pas sur celui du rédacteur. Le coût est un déploiement de plus à créer (préalable de #158), et
+  une variable.
+  Option écartée : le même déploiement que le rédacteur (aucun réglage de plus, mais des erreurs
+  corrélées entre rédacteur et juge). Elle reste le repli.
+  Limites assumées :
+  - les deux modèles sont de la même famille, donc leurs erreurs restent en partie corrélées ;
+  - si le rédacteur passe à son repli, `gpt-5.6-luna`, juge et rédacteur redeviennent le même
+    modèle ;
+  - les mêmes données partent une seconde fois chez Microsoft, à inscrire au registre (#157).
+
+  — PR de l'entrée
+- **Un juge en échec envoie le sujet dans `failed_subjects`, avec l'étape (`judge`). Un juge qui
+  retire tout rend une fiche vide. `POST /digests` gagne un compteur par fiche
+  (`claims_judged_removed`) et l'étape en échec, sans aucun état.** Décision de Sabine du 16/10.
+  Pourquoi (recommandation de la session) : échouer fermé (`code.md`), car aucune affirmation non
+  jugée n'est rendue. C'est
+  cohérent avec « aucune fiche partielle » et avec la fiche vide de la fidélité (« c'est ce qui
+  a été observé », `docs/fiches-veille.md`). La règle 7 de `poc.md` (API IA sans état) est
+  tenue.
+  Option écartée : rendre la fiche non jugée, marquée comme telle (un statut à relire, que
+  Sabine refuse). — PR de l'entrée
+- **Le juge est étalonné sur 30 affirmations réelles étiquetées par Sabine et 20 affirmations
+  altérées par construction, après l'oral blanc du 29/10. On mesure deux taux, les gardées à tort
+  (sécurité) et les retirées à tort (utilité), plus la stabilité sur deux passages.** Décision de
+  Sabine du 16/10. Pourquoi (relecture de l'ingénieur IA) :
+  - presque aucune affirmation contredite ne survit à la fidélité, et les altérées (négation,
+    nombre changé, mauvais item, contresens de traduction) rendent sa détection mesurable ;
+  - les affirmations sont prises à l'entrée du juge, sinon celles qu'il retire à tort ne se
+    verraient pas ;
+  - `temperature=0` ne garantit pas le déterminisme (« Appel du modèle »), d'où les deux
+    passages.
+
+  Sur les 30 réelles, Sabine coche aussi « faute de français ou style maladroit » et « oubli
+  important dans l'item cité » (ajout de Sabine du 16/10).
+  Option écartée : 40 affirmations réelles seules. Elles prenaient 2 à 2,5 h de Sabine, et la
+  détection des contredites restait non mesurable.
+  Limites assumées :
+  - avec 30 affirmations, un taux a une marge large, au-delà de ±10 points (estimation du
+    relecteur, ±10 pour 40) ;
+  - l'échantillon réel reste sous le dossier de données et n'est jamais committé (le dépôt devient
+    public) : seuls les étiquettes et les taux le sont.
+
+  — PR de l'entrée
+- **Au POC, rien n'est relu avant le juge, et rien ne repart vers le rédacteur après lui. Une
+  révision après le juge, en un seul tour, est écrite comme étape possible, non codée.** Décision
+  de Sabine du 16/10 ; pourquoi non transmis. Dans cette révision, seules les affirmations
+  retirées repartent au rédacteur, avec leur verdict en code fermé, jamais un texte libre du juge.
+  Elles repassent ensuite les contrôles 1 à 7 et le juge, sur elles seules ; il n'y a jamais de
+  troisième tour. Elle serait déclenchée si l'étalonnage montre des fiches trop maigres. Elle
+  coûterait jusqu'à 2 appels de plus par sujet touché. — PR de l'entrée
+
+Sources (consultée le 2026-10-16, relevée par recherche web) :
+[Wataoka, Takahashi et Ri, « Self-Preference Bias in LLM-as-a-Judge », arXiv 2410.21819](https://arxiv.org/abs/2410.21819)
+(GPT-4 montre une préférence pour ses propres sorties ; les auteurs la rattachent à la
+perplexité plus basse de ces sorties ; la revue de publication n'a pas été confirmée).
+
 ## Décisions encore ouvertes
+
+- **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
+  l'étalonnage du juge (#224), si les fiches sont trop maigres (« Fiches de veille : le LLM
+  juge »).
 
 - **Remplir `newsletter_article.publication_id`** (2026-10-12) : quand le lien d'un article TLDR
   est `https://arxiv.org/abs/<id>`, le rattacher à sa PUBLICATION, créée sans ses colonnes arXiv
