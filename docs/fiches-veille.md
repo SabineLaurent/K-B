@@ -378,7 +378,7 @@ Une erreur rend `{"error": "<état>"}`, comme l'API de données (section « Éta
 
 Chaque sortie du modèle passe ces contrôles **dans cet ordre**, avant tout usage ; le premier qui
 échoue nomme l'échec. Le mode strict demande au fournisseur de suivre le schéma ; le code ne s'y
-fie pas et revérifie tout (défense en profondeur ; OWASP LLM01:2025 : valider le format de sortie
+fie pas et revérifie tout (défense en profondeur ; OWASP LLM01:2026 : valider le format de sortie
 par du code déterministe).
 
 | N° | Contrôle | Refuse | `failed_check` |
@@ -464,7 +464,7 @@ ce qui a été observé. `fidelity_rate` = `facts_found` / `facts_checked`.
 
 ### Injection d'instructions
 
-Un item collecté peut porter une consigne (OWASP LLM01:2025, injection indirecte). Ce que fait la
+Un item collecté peut porter une consigne (OWASP LLM01:2026, injection indirecte). Ce que fait la
 spec :
 
 - la consigne est une constante de module ; sujets et items vont dans le message utilisateur,
@@ -588,9 +588,12 @@ Consultées le 2026-10-15.
 - [Models, « Extra data »](https://docs.pydantic.dev/latest/concepts/models/#extra-data) — Pydantic,
   lu par Context7 : `extra='forbid'` refuse un champ en trop (`extra_forbidden`) et écrit
   `additionalProperties: false` dans le JSON Schema (schémas, contrôle 2).
-- [LLM01:2025 Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) — OWASP
+- [LLM01 Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) — OWASP
   Gen AI Security Project, relevé par recherche web : définir et valider le format de sortie par du
   code déterministe ; borner le rôle dans la consigne ; filtrer les sorties (contrôles, injection).
+- [OWASP Top 10 for LLM Applications 2026](https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/)
+  — OWASP Gen AI Security Project, consultée le 2026-10-15 : l'édition 2026 (publiée le
+  03/08/2026) remplace la 2025 ; l'injection d'instructions reste LLM01.
 - [API4:2023 Unrestricted Resource Consumption](https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/)
   — OWASP, relevé par recherche web : une API qui ne borne pas les ressources qu'une demande
   consomme, services tiers payés à l'appel compris, risque un déni de service ou un surcoût ;
