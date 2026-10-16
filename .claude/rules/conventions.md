@@ -41,7 +41,9 @@ refuse.
 **Règle.** Tout fichier que K-B écrit lui-même (brut, état de collecte, journal d'import) passe
 par une seule fonction, `write_file_atomically` : un temporaire **caché** dans le dossier cible
 (nom commençant par `.`), renommé sur la cible, et supprimé sur toute exception, Ctrl-C compris
-(`except BaseException`). La base SQLite, que SQLite écrit lui-même, est hors de cette règle.
+(`except BaseException`). Le temporaire est vidé sur le disque (`fsync`) avant le renommage, puis
+le dossier après ; un dossier dont le système de fichiers refuse le `fsync` (`EINVAL`) ne fait
+pas échouer l'écriture (décision de Sabine du 2026-10-16, #62). La base SQLite, que SQLite écrit lui-même, est hors de cette règle.
 La copie temporaire d'une base source (Zotero) est hors de cette règle elle aussi : elle vit dans
 un `tempfile.TemporaryDirectory` du système, hors du dossier de données, supprimé sur un succès,
 une erreur ou un Ctrl-C ; chaque extraction retire d'abord les copies qu'un processus tué aurait
@@ -52,10 +54,14 @@ ajouté ligne à ligne par `logging`, est hors de cette règle : il n'est jamais
 - `grep -rn "NamedTemporaryFile\|\.tmp\|os\.replace" src/k_b` ne renvoie que
   `write_file_atomically`.
 - `grep -rn "TemporaryDirectory" src/k_b` ne renvoie que la copie d'une base source.
+- `uv run pytest tests/etl/test_raw_store.py` : `os.fsync` est appelé sur le temporaire avant le
+  renommage, puis sur le dossier.
 
 **Pourquoi.** Un nom caché est déjà sauté par l'import (`list_visible_entries`) : un reste
 d'écriture interrompue n'est jamais lu comme une page. Une seule fonction à corriger pour trois
-fichiers.
+fichiers. Le `fsync` : le brut est écrit avant l'état de collecte ; sans lui, une coupure de
+courant peut laisser l'état à jour et le brut vide ou tronqué, et la collecte suivante repart de
+la date avancée sans que rien ne le dise.
 
 **Écarté.** Nettoyer au démarrage (le reste reste visible entre-temps, une étape de plus à
 chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
