@@ -2137,7 +2137,7 @@ Recommandation de time-knight, retenue par Sabine le 16/10 (vers 11 h 45, heure 
   [modèles à raisonnement](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/reasoning)
   (`none` accepté par gpt-6-luna),
   [quotas et limites](https://learn.microsoft.com/en-us/azure/foundry/openai/quotas-limits)
-  (paliers ; le palier gratuit ne contient pas gpt-6-luna). — PR de la révision du 16/10
+  (paliers ; le palier gratuit ne contient pas gpt-6-luna). — PR #221
 
 ## Décisions encore ouvertes
 
