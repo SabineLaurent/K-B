@@ -3,6 +3,7 @@ the collection state file at the root of the data directory."""
 
 import contextlib
 import errno
+import itertools
 import json
 import os
 import tempfile
@@ -20,6 +21,11 @@ SELECTED_LIBRARY_DIR_NAME = "selected_library"
 # no reader looks for.
 RAW_DIR_NAMES = (AUTOMATED_WATCH_DIR_NAME, SELECTED_LIBRARY_DIR_NAME)
 COLLECTION_STATE_FILENAME = "collection_state.json"
+# The errors of a file system that does not support the sync of a folder: EINVAL (fsync(2)),
+# EBADF on some systems. PostgreSQL tolerates the same two, EINVAL since bug #15636 on Linux
+# CIFS (https://www.postgresql.org/message-id/E1gxrcU-0002A8-17%40gemulon.postgresql.org,
+# read on 2026-10-16). Any other error is raised: the rename is not known to be on disk.
+REFUSED_FOLDER_SYNC_ERRORS = (errno.EBADF, errno.EINVAL)
 
 
 def find_stream(raw_file_path: str) -> str:
@@ -36,10 +42,20 @@ class InvalidCollectionStateError(ValueError):
 
 
 def write_file_atomically(path: Path, content: bytes) -> None:
-    """Write to a hidden temporary file of the target folder, sync it to disk, then rename it:
-    a reader never sees a half-written file. On any exception, Ctrl-C included, the temporary
-    file is removed and the exception raised; a rest left by a killed process is hidden, so the
-    import skips it (list_visible_entries)."""
+    """Write to a hidden temporary file of the target folder, sync it to disk, rename it, then
+    sync the folder and each folder created for it: a reader never sees a half-written file,
+    and a power cut cannot keep a later file while losing this one. On any exception, Ctrl-C
+    included, the temporary file is removed and the exception raised; a rest left by a killed
+    process is hidden, so the import skips it (list_visible_entries)."""
+    # The folder of the target, then each new parent up to the first that exists: each holds
+    # the entry of a new file or folder.
+    folders_to_sync = [path.parent]
+    folders_to_sync += [
+        folder.parent
+        for folder in itertools.takewhile(
+            lambda folder: not folder.exists(), path.parents
+        )
+    ]
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False
@@ -51,23 +67,23 @@ def write_file_atomically(path: Path, content: bytes) -> None:
             temporary_file.close()
             os.replace(temporary_file.name, path)
         except BaseException:
-            # The original error is raised, even when the temporary file is already renamed
-            # (Ctrl-C right after os.replace) or cannot be removed.
+            # The original error is raised. A failed flush leaves data in the buffer: closed
+            # here, the file does not fail again on leaving the with block. The temporary file
+            # may already be renamed (Ctrl-C right after os.replace) or not removable.
+            with contextlib.suppress(OSError):
+                temporary_file.close()
             with contextlib.suppress(OSError):
                 os.remove(temporary_file.name)
             raise
-    # The folder holds the entry of the renamed file: without its sync, a power cut can lose
-    # the rename.
-    directory_descriptor = os.open(path.parent, os.O_RDONLY)
-    try:
-        os.fsync(directory_descriptor)
-    except OSError as error:
-        # EINVAL: the file system does not support the sync of a folder (fsync(2)); the file
-        # itself is synced.
-        if error.errno != errno.EINVAL:
-            raise
-    finally:
-        os.close(directory_descriptor)
+    for folder in folders_to_sync:
+        folder_descriptor = os.open(folder, os.O_RDONLY)
+        try:
+            os.fsync(folder_descriptor)
+        except OSError as error:
+            if error.errno not in REFUSED_FOLDER_SYNC_ERRORS:
+                raise
+        finally:
+            os.close(folder_descriptor)
 
 
 def write_new_raw_file(path: Path, content: bytes) -> None:
