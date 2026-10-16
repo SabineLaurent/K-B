@@ -115,31 +115,32 @@ def test_an_error_due_to_the_entry_is_refused_and_described_without_its_value(
 
 
 # Not due to the entry: a writer or a schema that does not match the base. They stop the
-# import, raised unchanged.
+# import, raised unchanged. Named by their extended code: Python 3.13 names the type refused
+# by a STRICT table "unknown" (observed on 2026-10-16, SQLite 3.50.4).
 @pytest.mark.parametrize(
-    ("statement", "error_name"),
+    ("statement", "error_code"),
     [
         (
             "INSERT INTO note (text, parent_id) VALUES ('orphan', 99)",
-            "SQLITE_CONSTRAINT_FOREIGNKEY",
+            787,  # SQLITE_CONSTRAINT_FOREIGNKEY
         ),
         (
             "INSERT INTO note (id, text) VALUES (1, 'same id')",
-            "SQLITE_CONSTRAINT_PRIMARYKEY",
+            1555,  # SQLITE_CONSTRAINT_PRIMARYKEY
         ),
         (
             "INSERT INTO note (text, rank) VALUES ('typed', 'not an integer')",
-            "SQLITE_CONSTRAINT_DATATYPE",
+            3091,  # SQLITE_CONSTRAINT_DATATYPE
         ),
     ],
 )
 def test_another_constraint_of_the_base_is_undone_and_raised_unchanged(
-    connection, statement, error_name
+    connection, statement, error_code
 ):
     with pytest.raises(sqlite3.IntegrityError) as error, write_in_savepoint(connection):
         connection.execute(statement)
 
-    assert error.value.sqlite_errorname == error_name
+    assert error.value.sqlite_errorcode == error_code
     assert read_notes(connection) == ["before"]
 
 

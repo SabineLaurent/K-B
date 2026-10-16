@@ -9,11 +9,20 @@ import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-# The errors due to the entry, the only ones an import turns into a rejection: a constraint of the
-# base (CHECK, UNIQUE, NOT NULL, FOREIGN KEY), and a value Python cannot hand to SQLite (an
-# integer beyond 64 bits, a lone surrogate). An error of the system (full disk, locked base) is
-# not one: it stops the import.
-ENTRY_REFUSAL_ERRORS = (sqlite3.IntegrityError, OverflowError, UnicodeEncodeError)
+# The constraints an entry breaks by its own values, the only ones an import turns into a
+# rejection (conventions.md, rule 1), with a value Python cannot hand to SQLite (an integer
+# beyond 64 bits, a lone surrogate). A FOREIGN KEY, a PRIMARY KEY or a type of a STRICT table
+# refused is not due to the entry: its writer chose the rows it points to, its key and the types
+# of its values; the writer or the schema is wrong, and the import stops, as on an error of the
+# system (full disk, locked base).
+ENTRY_CONSTRAINT_ERROR_NAMES = frozenset(
+    {"SQLITE_CONSTRAINT_CHECK", "SQLITE_CONSTRAINT_UNIQUE", "SQLITE_CONSTRAINT_NOTNULL"}
+)
+
+
+class EntryRefusedError(Exception):
+    """The base refused an entry: what it refused, without the value refused. Raised from the
+    error of the base."""
 
 
 class NoTransactionError(RuntimeError):
@@ -22,7 +31,8 @@ class NoTransactionError(RuntimeError):
 
 @contextmanager
 def write_in_savepoint(connection: sqlite3.Connection) -> Iterator[None]:
-    """Keep what the block writes, or undo it alone on any exception, raised again.
+    """Keep what the block writes, or undo it alone on any exception: an error due to the entry
+    is raised again as an EntryRefusedError, any other unchanged.
 
     SQLite undoes the whole transaction on some errors (a full disk, an I/O error): no savepoint
     is then left to roll back to, and the error of the base is raised unchanged.
@@ -34,15 +44,23 @@ def write_in_savepoint(connection: sqlite3.Connection) -> Iterator[None]:
     connection.execute("SAVEPOINT entry")
     try:
         yield
-    except BaseException:
+    except BaseException as error:
         if connection.in_transaction:
             connection.execute("ROLLBACK TO SAVEPOINT entry")
             connection.execute("RELEASE SAVEPOINT entry")
+        if is_entry_refusal(error):
+            raise EntryRefusedError(describe_refusal(error)) from error
         raise
     connection.execute("RELEASE SAVEPOINT entry")
 
 
-def describe_refusal(error: Exception) -> str:
+def is_entry_refusal(error: BaseException) -> bool:
+    if isinstance(error, sqlite3.IntegrityError):
+        return error.sqlite_errorname in ENTRY_CONSTRAINT_ERROR_NAMES
+    return isinstance(error, (OverflowError, UnicodeEncodeError))
+
+
+def describe_refusal(error: BaseException) -> str:
     """What the base refused, without the value refused (conventions.md, rule 3).
 
     A constraint is named by its state and by the message of SQLite, which names the constraint

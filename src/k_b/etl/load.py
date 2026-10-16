@@ -35,11 +35,7 @@ from k_b.core.config import TrackedRepository
 from k_b.core.quoting import quote_value
 from k_b.database.connection import check_database_exists, connect_database
 from k_b.database.reading import read_raw_file_paths
-from k_b.database.savepoint import (
-    ENTRY_REFUSAL_ERRORS,
-    describe_refusal,
-    write_in_savepoint,
-)
+from k_b.database.savepoint import EntryRefusedError, write_in_savepoint
 from k_b.database.writers import (
     advisory_writer,
     newsletter_article_writer,
@@ -153,7 +149,12 @@ def write_files(
 ) -> FileWriting:
     """Write each file in collection order; what the reading rejected comes first."""
     rejected_when_read = FileWriting(
-        0, [], [], [*reading.rejections, *trend_reading.rejections], 0, 0
+        item_count=0,
+        discards=[],
+        trend_discards=[],
+        rejections=[*reading.rejections, *trend_reading.rejections],
+        withdrawn_count=0,
+        trend_count=0,
     )
     return join_writings(
         [
@@ -168,12 +169,16 @@ def write_files(
 
 def join_writings(writings: list[FileWriting]) -> FileWriting:
     return FileWriting(
-        sum(writing.item_count for writing in writings),
-        [discard for writing in writings for discard in writing.discards],
-        [discard for writing in writings for discard in writing.trend_discards],
-        [rejection for writing in writings for rejection in writing.rejections],
-        sum(writing.withdrawn_count for writing in writings),
-        sum(writing.trend_count for writing in writings),
+        item_count=sum(writing.item_count for writing in writings),
+        discards=[discard for writing in writings for discard in writing.discards],
+        trend_discards=[
+            discard for writing in writings for discard in writing.trend_discards
+        ],
+        rejections=[
+            rejection for writing in writings for rejection in writing.rejections
+        ],
+        withdrawn_count=sum(writing.withdrawn_count for writing in writings),
+        trend_count=sum(writing.trend_count for writing in writings),
     )
 
 
@@ -285,12 +290,12 @@ def write_items_file(
         connection, counted_file, raw_data_id
     ) + withdraw_absent_zotero_rows(connection, counted_file, raw_data_id)
     return FileWriting(
-        outcomes.count(None),
-        discards,
-        [],
-        [*untracked, *refusals],
-        withdrawn_count,
-        0,
+        item_count=outcomes.count(None),
+        discards=discards,
+        trend_discards=[],
+        rejections=[*untracked, *refusals],
+        withdrawn_count=withdrawn_count,
+        trend_count=0,
     )
 
 
@@ -306,11 +311,11 @@ def write_item_in_savepoint(
     try:
         with write_in_savepoint(connection):
             return write_item(connection, item, raw_data_id)
-    except ENTRY_REFUSAL_ERRORS as error:
+    except EntryRefusedError as refusal:
         return reject(
             item.raw_file_path,
             f"{item.kind} {quote_value(item.source_item_id)} refused by the base: "
-            f"{describe_refusal(error)}",
+            f"{refusal}",
         )
 
 
@@ -352,16 +357,28 @@ def write_trend_file(
             written_count, collected_at_by_window_left_out = trend_writer.write(
                 connection, trend_file.rows, raw_data_id
             )
-    except ENTRY_REFUSAL_ERRORS as error:
-        rejection = reject(
-            raw_file_path, f"ranking refused by the base: {describe_refusal(error)}"
+    except EntryRefusedError as refusal:
+        rejection = reject(raw_file_path, f"ranking refused by the base: {refusal}")
+        return FileWriting(
+            item_count=0,
+            discards=[],
+            trend_discards=[],
+            rejections=[rejection],
+            withdrawn_count=0,
+            trend_count=0,
         )
-        return FileWriting(0, [], [], [rejection], 0, 0)
     discards = [
         TrendDiscard(trend_file.raw_file, window_end, collected_at)
         for window_end, collected_at in collected_at_by_window_left_out.items()
     ]
-    return FileWriting(0, [], discards, [], 0, written_count)
+    return FileWriting(
+        item_count=0,
+        discards=[],
+        trend_discards=discards,
+        rejections=[],
+        withdrawn_count=0,
+        trend_count=written_count,
+    )
 
 
 def withdraw_absent_vulnerabilities(
