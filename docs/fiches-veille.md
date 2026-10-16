@@ -756,19 +756,30 @@ nommés ») :
 Une révision en un seul tour. Seules les affirmations retirées par le juge repartent au rédacteur,
 avec leur verdict en code fermé (`verdict` et `reason`), jamais un texte libre du juge ; elles
 repassent ensuite les contrôles 1 à 7 et le juge à nouveau, sur elles seules ; il n'y a jamais de
-troisième tour. Elle serait déclenchée si l'étalonnage montre des fiches trop maigres (seuil
-d'utilité manqué, ci-dessous). Coût : jusqu'à 2 appels de plus par sujet touché (révision et
+troisième tour. Elle serait déclenchée si l'étalonnage montre des fiches trop maigres ; un seuil
+d'utilité manqué appelle d'abord une nouvelle consigne du juge (« Étalonnage »). Coût : jusqu'à 2 appels de plus par sujet touché (révision et
 nouveau jugement).
 
 ### Étalonnage
 
 Méthode (décision de Sabine du 2026-10-16, journal ADR) : 30 affirmations réelles étiquetées par
-Sabine et 20 affirmations altérées par construction (négation, nombre ou CVE changé, mauvais item,
-contresens de traduction), prises **à l'entrée du juge**, sinon celles qu'il retire à tort ne se
+Sabine et 20 affirmations altérées par construction, prises **à l'entrée du juge**, sinon celles
+qu'il retire à tort ne se
 verraient pas ; deux passages, car la même demande ne rend pas toujours la même sortie (journal
 ADR, « Appel du modèle » ; la cible du juge est un modèle à raisonnement, sans `temperature`). Sur
 les 30 réelles, Sabine coche aussi « faute de français ou style maladroit » et « oubli important
 dans l'item cité », que le juge ne vérifie pas (« Ce que la spec ne couvre pas »).
+
+**Les altérées** (décision de Sabine du 2026-10-17) : chacune passe les contrôles 1 à 7, comme
+une affirmation qui arrive au juge en production ; sinon elle mesurerait un cas qui n'arrive
+jamais. Quatre sortes :
+
+- **négation** : la phrase dit le contraire de l'item ;
+- **nombre changé**, un nombre **non déclaré** comme fait : un fait déclaré et changé serait
+  retiré par la fidélité ;
+- **mauvais item** : notamment une CVE d'un autre item cité de l'affirmation, à la place d'une
+  « CVE changée », que la fidélité retire toujours (section « Fidélité », faits CVE et GHSA) ;
+- **contresens de traduction**.
 
 **Où vit l'échantillon** : les 30 réelles et les 20 altérées sont capturées hors de l'API IA, qui
 n'écrit rien (règle 7 de `poc.md`), et gardées sous `KB_DATA_DIR`, jamais committées : elles
@@ -779,8 +790,9 @@ taux sont committés (#224).
 
 | Mesure | Seuil | Intervalle exact à 95 % au seuil |
 |---|---|---|
-| sécurité : altérées gardées | au plus 2 des 20 ; **aucune** pour la négation, ni pour le nombre ou la CVE changés | 1,2 % à 31,7 % pour 2 sur 20 |
-| utilité : réelles étiquetées « appuyée » retirées | au plus 6 sur 30 (20 %) | 7,7 % à 38,6 % pour 6 sur 30 |
+| sécurité : altérées gardées | au plus 2 des 20 ; **aucune** pour la négation, ni pour le nombre changé non déclaré | 1,2 % à 31,7 % pour 2 sur 20 |
+| utilité : réelles étiquetées « appuyée » retirées | au plus 20 % des réelles étiquetées « appuyée » (6 si les 30 le sont) | 7,7 % à 38,6 % pour 6 sur 30 |
+| réelles étiquetées « non appuyée » par Sabine, mais gardées par le juge | **sans seuil** : comptées à part et montrées à Sabine une par une | — |
 | stabilité : même décision, garder ou retirer, aux deux passages | au moins 45 des 50 | — |
 
 - Ce sont des **critères de passage** sur l'échantillon, pas l'estimation d'un taux : avec 20 ou
@@ -794,9 +806,13 @@ taux sont committés (#224).
   un signal faible : pour 0 sur 5, l'intervalle exact à 95 % va de 0 à 52,2 %.
 - La stabilité porte sur la décision et non sur le verdict exact : un passage de `contradicted` à
   `unverifiable` ne change rien à la fiche.
-- **Seuil manqué** : sécurité, la consigne change (`judge-2`) et la mesure est refaite sur
-  **20 nouvelles altérées**, sinon la consigne s'ajusterait au jeu d'étalonnage ; utilité, c'est
-  le déclencheur de la révision après le juge.
+- Les réelles « non appuyée » gardées n'ont pas de seuil : leur nombre n'est connu qu'après
+  l'étiquetage, et les mêler aux 20 altérées rendrait le dénominateur variable.
+- **Seuil manqué**, quel qu'il soit (sécurité, utilité ou stabilité) : la consigne change
+  (`judge-2`), et les **trois** mesures sont refaites, sur **20 nouvelles altérées**, sinon la
+  consigne s'ajusterait au jeu d'étalonnage. Une utilité manquée dit un juge trop sévère : on
+  change d'abord sa consigne. La révision après le juge garde son propre déclencheur, des fiches
+  trop maigres (journal ADR, « Fiches de veille : le LLM juge »).
 - L'accord avec les étiquettes de Sabine se lit en comptes ; un kappa de Cohen, s'il est donné, ne
   vient qu'en appoint. Ses partisans le préfèrent au taux d'accord brut, qui peut rester haut
   alors que les notes divergent ([Thakur et al., arXiv 2406.12624](https://arxiv.org/abs/2406.12624),
