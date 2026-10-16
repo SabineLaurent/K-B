@@ -184,8 +184,10 @@ Pydantic, `enum` des sujets) avant d'être écrite ; une sortie hors schéma n'e
 
 **Pourquoi.** `code.md`, « Sécurité dès la conception » : une instruction trouvée dans une donnée
 n'est jamais suivie. Le risque visé est l'injection d'instructions par un item ou un clip
-(OWASP Top 10 for LLM Applications 2025, LLM01 *Prompt Injection* :
+(OWASP Top 10 for LLM Applications 2026, LLM01 *Prompt Injection* :
 [genai.owasp.org/llm-top-10](https://genai.owasp.org/llm-top-10/), relevé par recherche web le
-2026-10-15). Le schéma fermé garantit qu'une sortie hors contrat n'est jamais écrite.
+2026-10-15 ; l'édition 2026, publiée le 03/08/2026, remplace la 2025 :
+[OWASP Top 10 for LLM Applications 2026](https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/),
+consultée le 2026-10-15). Le schéma fermé garantit qu'une sortie hors contrat n'est jamais écrite.
 
 **Écarté.** Dans l'issue qui porte la recommandation.

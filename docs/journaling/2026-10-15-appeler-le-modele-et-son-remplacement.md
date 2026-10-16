@@ -55,7 +55,7 @@ données sont encodées par le client lui-même, en JSON, dans le message `user`
 ```
 (`src/k_b/ai_api/llm_client.py:204`)
 
-C'est la règle 8 de `.claude/rules/poc.md` contre l'injection d'instructions (OWASP LLM01:2025) : un
+C'est la règle 8 de `.claude/rules/poc.md` contre l'injection d'instructions (OWASP LLM01:2026) : un
 item piégé ne peut pas devenir une consigne, il reste une donnée. `ensure_ascii=False` garde
 « Modèle européen » tel quel au lieu de `Modèle`, ce qui fausserait `input_chars` et coûterait
 des jetons (constat de l'architecte). Le test `test_a_trapped_item_stays_in_the_user_message_and_its_output_is_never_returned`
@@ -240,7 +240,10 @@ Consultées le 2026-10-15.
   lu par Context7 : `MockTransport(handler)` (section 3).
 - [RFC 9110, § 10.2.3](https://www.rfc-editor.org/rfc/rfc9110#section-10.2.3) — IETF : `Retry-After`
   en secondes ou en date HTTP (section 5).
-- [LLM01:2025 Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) — OWASP,
+- [LLM01 Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) — OWASP,
   relevé par recherche web (section 2).
+- [OWASP Top 10 for LLM Applications 2026](https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/)
+  — OWASP Gen AI Security Project, consultée le 2026-10-15 : l'édition 2026 (publiée le
+  03/08/2026) remplace la 2025 ; l'injection d'instructions reste LLM01.
 - [Microsoft Q&A 2044545](https://learn.microsoft.com/en-us/answers/questions/2044545/content-filter-and-policy-violation-issues-when-us)
   — relevé par recherche web : le 400 `content_filter` (zones non vérifiées).
