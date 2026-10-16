@@ -1,5 +1,6 @@
 """The savepoint each item is written in (conventions.md, rule 1): what it keeps, what it
-undoes, and how a refusal of the base is described without the value refused."""
+undoes, which errors of the base are those of an entry, and how a refusal is described without
+the value refused."""
 
 import sqlite3
 
@@ -7,51 +8,139 @@ import pytest
 
 from k_b.database.connection import connect_database
 from k_b.database.savepoint import (
-    ENTRY_REFUSAL_ERRORS,
+    EntryRefusedError,
     NoTransactionError,
-    describe_refusal,
     write_in_savepoint,
 )
+
+SCHEMA = """
+CREATE TABLE parent (id INTEGER PRIMARY KEY) STRICT;
+CREATE TABLE note (
+    id INTEGER PRIMARY KEY,
+    text TEXT NOT NULL UNIQUE CHECK (length(text) > 0),
+    rank INTEGER CHECK (
+        rank > 0
+    ),
+    parent_id INTEGER REFERENCES parent (id)
+) STRICT;
+"""
 
 
 @pytest.fixture
 def connection(tmp_path):
     connection = connect_database(tmp_path / "test.sqlite")
-    connection.execute(
-        "CREATE TABLE note (text TEXT NOT NULL CHECK (length(text) > 0))"
-    )
+    connection.executescript(SCHEMA)
     # The import opens its transaction with its first write, before any savepoint.
-    connection.execute("INSERT INTO note VALUES ('before')")
+    connection.execute("INSERT INTO note (id, text) VALUES (1, 'before')")
     yield connection
     connection.close()
 
 
 def read_notes(connection):
-    return [
-        text for (text,) in connection.execute("SELECT text FROM note ORDER BY rowid")
-    ]
+    return [text for (text,) in connection.execute("SELECT text FROM note ORDER BY id")]
 
 
 def test_what_is_written_in_a_savepoint_is_kept(connection):
     with write_in_savepoint(connection):
-        connection.execute("INSERT INTO note VALUES ('kept')")
+        connection.execute("INSERT INTO note (text) VALUES ('kept')")
 
     assert read_notes(connection) == ["before", "kept"]
     assert connection.in_transaction
 
 
-def test_an_error_in_a_savepoint_undoes_it_alone_and_is_raised_again(connection):
-    with pytest.raises(sqlite3.IntegrityError), write_in_savepoint(connection):
-        connection.execute("INSERT INTO note VALUES ('undone')")
-        connection.execute("INSERT INTO note VALUES ('')")
+def test_an_entry_refused_undoes_its_savepoint_alone_and_keeps_the_error_of_the_base(
+    connection,
+):
+    with pytest.raises(EntryRefusedError) as refusal, write_in_savepoint(connection):
+        connection.execute("INSERT INTO note (text) VALUES ('undone')")
+        connection.execute("INSERT INTO note (text) VALUES ('')")
 
+    assert isinstance(refusal.value.__cause__, sqlite3.IntegrityError)
     assert read_notes(connection) == ["before"]
     # The savepoint is released: the next one starts from a stack without it.
     with write_in_savepoint(connection):
-        connection.execute("INSERT INTO note VALUES ('after')")
+        connection.execute("INSERT INTO note (text) VALUES ('after')")
     # No release committed anything: the rollback of the transaction undoes it all.
     connection.rollback()
     assert read_notes(connection) == []
+
+
+# The errors due to the entry (conventions.md, rule 1), each with its description: the state
+# of SQLite and its message on one line, or the type of the Python error, never the value.
+# UNIQUE is tested here: the writers of K-B meet it only behind their ON CONFLICT or NOT
+# EXISTS, as a safety net no import reaches.
+@pytest.mark.parametrize(
+    ("statement", "parameters", "description"),
+    [
+        (
+            "INSERT INTO note (text) VALUES (?)",
+            ("",),
+            "SQLITE_CONSTRAINT_CHECK: CHECK constraint failed: length(text) > 0",
+        ),
+        (
+            "INSERT INTO note (text, rank) VALUES ('ranked', ?)",
+            (0,),
+            "SQLITE_CONSTRAINT_CHECK: CHECK constraint failed: rank > 0",
+        ),
+        (
+            "INSERT INTO note (text) VALUES (?)",
+            (None,),
+            "SQLITE_CONSTRAINT_NOTNULL: NOT NULL constraint failed: note.text",
+        ),
+        (
+            "INSERT INTO note (text) VALUES (?)",
+            ("before",),
+            "SQLITE_CONSTRAINT_UNIQUE: UNIQUE constraint failed: note.text",
+        ),
+        (
+            "INSERT INTO note (text, rank) VALUES ('ranked', ?)",
+            (2**63,),
+            "OverflowError: Python int too large to convert to SQLite INTEGER",
+        ),
+        (
+            "INSERT INTO note (text) VALUES (?)",
+            ("ab\ud800",),
+            "UnicodeEncodeError: surrogates not allowed at position 2",
+        ),
+    ],
+)
+def test_an_error_due_to_the_entry_is_refused_and_described_without_its_value(
+    connection, statement, parameters, description
+):
+    with pytest.raises(EntryRefusedError) as refusal, write_in_savepoint(connection):
+        connection.execute(statement, parameters)
+
+    assert str(refusal.value) == description
+    assert read_notes(connection) == ["before"]
+
+
+# Not due to the entry: a writer or a schema that does not match the base. They stop the
+# import, raised unchanged.
+@pytest.mark.parametrize(
+    ("statement", "error_name"),
+    [
+        (
+            "INSERT INTO note (text, parent_id) VALUES ('orphan', 99)",
+            "SQLITE_CONSTRAINT_FOREIGNKEY",
+        ),
+        (
+            "INSERT INTO note (id, text) VALUES (1, 'same id')",
+            "SQLITE_CONSTRAINT_PRIMARYKEY",
+        ),
+        (
+            "INSERT INTO note (text, rank) VALUES ('typed', 'not an integer')",
+            "SQLITE_CONSTRAINT_DATATYPE",
+        ),
+    ],
+)
+def test_another_constraint_of_the_base_is_undone_and_raised_unchanged(
+    connection, statement, error_name
+):
+    with pytest.raises(sqlite3.IntegrityError) as error, write_in_savepoint(connection):
+        connection.execute(statement)
+
+    assert error.value.sqlite_errorname == error_name
+    assert read_notes(connection) == ["before"]
 
 
 def test_an_error_after_the_base_undid_the_transaction_is_raised_unchanged(connection):
@@ -74,55 +163,3 @@ def test_a_savepoint_outside_a_transaction_is_refused(tmp_path):
         assert not connection.in_transaction
     finally:
         connection.close()
-
-
-def test_only_the_errors_due_to_an_entry_are_those_of_a_refusal():
-    entry_errors = (sqlite3.IntegrityError, OverflowError, UnicodeEncodeError)
-
-    assert entry_errors == ENTRY_REFUSAL_ERRORS
-
-
-def test_a_constraint_refused_is_named_with_its_state_on_one_line(connection):
-    with pytest.raises(sqlite3.IntegrityError) as refusal:
-        connection.execute("INSERT INTO note VALUES ('')")
-
-    assert (
-        describe_refusal(refusal.value)
-        == "SQLITE_CONSTRAINT_CHECK: CHECK constraint failed: length(text) > 0"
-    )
-
-
-def test_a_check_written_on_several_lines_is_described_on_one(tmp_path):
-    connection = connect_database(tmp_path / "test.sqlite")
-    try:
-        connection.execute("CREATE TABLE note (rank INTEGER CHECK (\n    rank > 0\n))")
-        with pytest.raises(sqlite3.IntegrityError) as refusal:
-            connection.execute("INSERT INTO note VALUES (0)")
-    finally:
-        connection.close()
-
-    assert describe_refusal(refusal.value) == (
-        "SQLITE_CONSTRAINT_CHECK: CHECK constraint failed: rank > 0"
-    )
-
-
-def test_an_integer_beyond_64_bits_is_described_without_its_value(connection):
-    with pytest.raises(OverflowError) as refusal:
-        connection.execute("SELECT ?", (2**63,))
-
-    description = describe_refusal(refusal.value)
-
-    assert description.startswith("OverflowError: ")
-    assert str(2**63) not in description
-
-
-def test_a_lone_surrogate_is_described_by_its_position_without_the_character(
-    connection,
-):
-    with pytest.raises(UnicodeEncodeError) as refusal:
-        connection.execute("SELECT ?", ("ab\ud800",))
-
-    description = describe_refusal(refusal.value)
-
-    assert description == "UnicodeEncodeError: surrogates not allowed at position 2"
-    assert "ud800" not in description

@@ -702,6 +702,30 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(
     assert list_logs(data_dir) == []
 
 
+def test_a_foreign_key_the_base_refuses_stops_the_import_and_writes_nothing(
+    data_dir, monkeypatch
+):
+    tables_before = dump_database(data_dir)
+    write_vulnerability = import_items_module.WRITER_BY_KIND["vulnerability"]
+
+    # A writer that points its item at a raw file the base does not have: not due to the
+    # entry, it is not a rejection.
+    def write_with_an_unknown_raw_file(connection, item, raw_data_id):
+        return write_vulnerability(connection, item, raw_data_id + 1_000)
+
+    monkeypatch.setitem(
+        import_items_module.WRITER_BY_KIND,
+        "vulnerability",
+        write_with_an_unknown_raw_file,
+    )
+
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        run_import(data_dir)
+
+    assert dump_database(data_dir) == tables_before
+    assert list_logs(data_dir) == []
+
+
 def refuse_in_the_base(monkeypatch, source_item_id, changes):
     """The item of source_item_id reaches its writer with changes the item would refuse: they
     are made after its validation, as by an item that let them through (conventions.md, rule
@@ -770,6 +794,17 @@ CVE_ID_IN_ARABIC_INDIC_DIGITS = "CVE-2026-٨٦٩٥٠"
                 " constraint failed: length(tag_name) > 0"
             ),
             "v1.0.0",
+        ),
+        # Beyond the four cases: a NOT NULL refused is due to the entry too.
+        (
+            "399375132",
+            {"tag_name": None},
+            RELEASES_PATH,
+            (
+                "release '399375132' refused by the base: SQLITE_CONSTRAINT_NOTNULL: NOT"
+                " NULL constraint failed: release.tag_name"
+            ),
+            "None",
         ),
     ],
 )
