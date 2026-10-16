@@ -20,7 +20,8 @@ def without_values(error: ValidationError) -> ValidationError:
     Each error is rebuilt by its type, which must be one pydantic knows: a validator raises a
     ValueError, never a PydanticCustomError, which this would refuse with a KeyError. Its place
     and message are kept: a place comes from the model, never from the input, and the message
-    of a validator never quotes the value (a measure, or quote_value: conventions.md, rule 3)."""
+    of a validator never quotes the value (a measure, or quote_value: conventions.md, rule 3).
+    Behind it, the models that read a source hide their input too (hide_input_in_errors)."""
     line_errors = []
     for detail in error.errors():
         line_error: InitErrorDetails = {

@@ -361,7 +361,7 @@ ZoteroDate = Annotated[AwareDatetime, BeforeValidator(mark_as_utc)]
 class ZoteroHighlight(BaseModel):
     """A highlight of the extract. Not read: its PDF and its page (ADR of 2026-10-13)."""
 
-    model_config = ConfigDict(frozen=True, extra="ignore")
+    model_config = ConfigDict(frozen=True, extra="ignore", hide_input_in_errors=True)
 
     key: str
     text: str | None
@@ -374,7 +374,7 @@ class ZoteroDocument(BaseModel):
     date, its authors, its tags, its PDF; validating them would refuse a document for a field
     the base does not keep."""
 
-    model_config = ConfigDict(frozen=True, extra="ignore")
+    model_config = ConfigDict(frozen=True, extra="ignore", hide_input_in_errors=True)
 
     key: str
     item_type: str

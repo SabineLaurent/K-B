@@ -266,7 +266,9 @@ class Highlight(BaseModel):
     """A highlight of a PDF of a Zotero entry: a row of the highlight table, written with its
     entry."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", strict=True, hide_input_in_errors=True
+    )
 
     zotero_key: ZoteroKey
     # Absent when Zotero gives none: the highlight is kept for its comment (decision of
@@ -299,7 +301,9 @@ class Highlight(BaseModel):
 
 class Item(BaseModel):
     # strict: a date given as text is refused, not parsed.
-    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", strict=True, hide_input_in_errors=True
+    )
 
     source_code: SourceCode
     source_item_id: NonEmptyText
