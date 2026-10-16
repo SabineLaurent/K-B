@@ -2298,6 +2298,59 @@ validées par Sabine avec le plan (16/10, vers 16 h 25).
   [DPA de Mistral](https://legal.mistral.ai/terms/data-processing-addendum/) ; les autres pages
   lues sont au registre des traitements (« Sources du repli Mistral »). — PR #228
 
+### Modèle des fiches : Gemini 2.5 Flash-Lite en repli temporaire
+
+Décisions de Sabine (16/10, entre 17 h 40 et 17 h 50, heure de Paris, relayées par time-knight).
+Mistral est bloqué : le débit de sa clé est à 0 requête par minute (429,
+`x-ratelimit-limit-req-minute: 0`, #227, commentaire du 16/10, 15:04Z). Le repli passe donc sur
+Gemini, en clé gratuite.
+
+- **Tant que #158 n'est pas faite, le modèle des fiches est `gemini-2.5-flash-lite` (Gemini 2.5
+  Flash-Lite), à l'adresse compatible OpenAI de Google,
+  `https://generativelanguage.googleapis.com/v1beta/openai`, en clé gratuite, par
+  `KB_LLM_PROVIDER=openai_compatible`, sans `KB_LLM_REASONING_EFFORT` (donc `temperature=0`).**
+  Remplace le repli sur Mistral Small 4 (entrée précédente) : ce qui a changé, c'est le débit à 0
+  de la clé Mistral. Ne révise pas « Modèle des fiches : gpt-6-luna sur Foundry » : gpt-6-luna
+  reste la cible. Pourquoi Flash-Lite : c'est le seul modèle de la clé de Sabine qui a répondu aux
+  appels réels du 16/10, et c'est le choix de Sabine après son propre essai (« ping »,
+  `finish_reason: length`). Options écartées :
+  - `gemini-3.8-flash`, le premier choix : 503 « This model is currently experiencing high demand »
+    aux 4 essais ;
+  - `gemini-3.5-flash` : le ping est passé, puis les 3 classements ont rendu 503, aux deux
+    tentatives de chacun ;
+  - `gemini-3.7-flash` : 503 ;
+  - `gemini-2.5-flash` : 404, « no longer available to new users » ;
+  - attendre que le débit de Mistral soit rouvert : délai inconnu, et le POC du 25/10 reste bloqué.
+
+  **RGPD** : Sabine, le 16/10 : « On laisse de côté le RGPD pour le moment, de toute façon c'est
+  pour du perso, on sort des cases. Je précise que c'est du temporaire. » Il n'y a donc pas de
+  section de registre pour Google, et les conditions de Google n'ont pas été lues. À savoir, sans
+  l'avoir tranché ni lu à la source : sur le palier gratuit, Google peut utiliser les contenus
+  envoyés pour améliorer ses produits.
+
+  **Aucun changement du client** (`ai_api/llm_client.py`) : Gemini n'en oblige aucun. Le seul écart
+  de format constaté est le corps d'erreur, une liste `[{"error": {...}}]` dont le `code` est un
+  entier. Il ne change que la lecture d'un 400 `content_filter`, le format d'Azure, qui n'a pas été
+  constaté chez Gemini. Option écartée : adapter `ErrorBody` à cette liste, c'est-à-dire du code
+  pour un cas non observé (choix tranché par time-knight, délégation de Sabine du 15/10).
+
+  Limites assumées :
+  - les mesures du 16/10 sont celles de Gemini 2.5 Flash-Lite en clé gratuite, pas de gpt-6-luna :
+    elles donnent un ordre de grandeur à #205, pas une valeur ;
+  - une rédaction (`llm_security`) a échoué au contrôle du schéma, aux deux tentatives ; la sortie
+    n'a pas été lue, donc la borne dépassée n'est pas connue ;
+  - le nombre de jetons de raisonnement n'est pas rendu ;
+  - aucun 429 n'a été obtenu, et les limites du palier gratuit de Flash-Lite n'ont pas été lues.
+    Celles de 3.8 Flash sont 5 RPM, 250 000 TPM et 20 RPD (console AI Studio, lue par Sabine le
+    2026-10-16) ;
+  - comme pour Mistral, rien de propre à Azure n'est mesuré : c'est à #158.
+
+  Ne change pas : #158 reste ouverte ; pas d'optimisation de prompt ; le LLM juge (#222 à #224)
+  n'entre pas dans ce repli. Fin du repli : quand #158 est faite. Issue : #227. Sources (consultées
+  le 2026-10-16) : [compatibilité OpenAI de Gemini](https://ai.google.dev/gemini-api/docs/openai),
+  [limites de débit](https://ai.google.dev/gemini-api/docs/rate-limits),
+  [guide Gemini 3](https://ai.google.dev/gemini-api/docs/gemini-3). — PR à venir
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
