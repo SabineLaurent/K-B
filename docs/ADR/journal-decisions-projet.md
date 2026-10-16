@@ -2259,6 +2259,45 @@ Sources (consultée le 2026-10-16, relevée par recherche web) :
 (GPT-4 montre une préférence pour ses propres sorties ; les auteurs la rattachent à la
 perplexité plus basse de ces sorties ; la revue de publication n'a pas été confirmée).
 
+### Modèle des fiches : Mistral Small 4 en repli temporaire
+
+Décision de Sabine (16/10, vers 15 h 45, heure de Paris, relayée par time-knight) : « Pour 158 le
+quota n'est pas réglé. On peut brancher Mistral pour mettre le code en place. » Repli temporaire,
+sans optimisation de prompt. Les options écartées sont celles de l'ordre de mission de time-knight,
+validées par Sabine avec le plan (16/10, vers 16 h 25).
+
+- **Tant que #158 n'est pas faite, le modèle des fiches est `mistral-small-2603` (Mistral Small 4)
+  sur le serveur UE de Mistral, `https://api.eu.mistral.ai/v1`, en clé gratuite, par
+  `KB_LLM_PROVIDER=openai_compatible`, sans `KB_LLM_REASONING_EFFORT` (donc `temperature=0`).**
+  Revient temporairement sur la décision 6 de « POC du 25/10 » (Mistral, clé gratuite), sans
+  réviser « Modèle des fiches : gpt-6-luna sur Foundry » : gpt-6-luna reste la cible. Ce qui a
+  changé depuis le 15/10 : le quota de gpt-6-luna est à 0 TPM, et la clé gratuite de Sabine est
+  acceptée par `api.eu.mistral.ai` (`GET /v1/models` lancé par Sabine le 16/10, qui rend
+  `mistral-small-2603` ; aucun appel au modèle), ce que l'entrée du 15/10 ne savait pas. Pourquoi :
+  faire marcher l'appel réel du POC du 25/10 ; le code accepte déjà Mistral par la configuration.
+  Options écartées :
+  - attendre le quota de gpt-6-luna : délai inconnu, le POC du 25/10 reste bloqué ;
+  - l'adresse globale de Mistral (`api.mistral.ai`) : « Mistral does not commit to a specific
+    inference location » ;
+  - Mistral Medium 3.5 : plus cher, et Small suffit pour faire marcher le POC.
+
+  Ne change pas : la cible gpt-6-luna et #158, qui reste ouverte ; pas d'optimisation de prompt ;
+  le LLM juge (#222 à #224) n'entre pas dans ce repli. Fondement contractuel : lecture retenue par
+  Sabine le 16/10, non confirmée par Mistral : elle se considère comme *Customer* des conditions
+  commerciales (« other entity that you represent »), et le DPA de Mistral s'applique (registre
+  des traitements, « Envoi des items au modèle des fiches : repli temporaire chez Mistral AI »).
+  Entraînement refusé par Sabine le 16/10 vers 14:02Z, avant tout appel.
+
+  Limites assumées : le plan de contrôle de Mistral (compte, clés, facturation, statistiques
+  d'usage) peut être traité hors de l'UE ; demandes et réponses gardées 30 jours glissants pour
+  la surveillance des abus, ZDR étant réservé au paiement à l'usage ; l'appel sur Mistral ne
+  mesure rien de propre à Azure (filtre de contenu, en-tête, `reasoning_effort`, quota TPM), qui
+  reste à #158. Fin du repli : quand #158 est faite. Issue : #227. Sources (consultées le
+  2026-10-16) : [inférence régionale de Mistral](https://docs.mistral.ai/inference/regional-inference),
+  [conditions commerciales](https://legal.mistral.ai/terms/commercial-terms-of-service/),
+  [DPA de Mistral](https://legal.mistral.ai/terms/data-processing-addendum/) ; les autres pages
+  lues sont au registre des traitements (« Sources du repli Mistral »). — PR #228
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de

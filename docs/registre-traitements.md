@@ -18,6 +18,12 @@ personnes.
 Foundry, zone de données UE). Contrat de sous-traitance : le *Microsoft Products and Services
 Data Protection Addendum* (DPA). Voir la section « Envoi des items au modèle des fiches ».
 
+**Sous-traitant temporaire** : Mistral AI, pour le même appel, en repli tant que le modèle de
+Microsoft n'est pas disponible (#227, jusqu'à la fin de #158). Contrat : les conditions
+commerciales de Mistral et leur *Data Processing Addendum* (DPA), selon la lecture retenue par
+l'utilisatrice. Voir la section « Envoi des items au modèle des fiches : repli temporaire chez
+Mistral AI ».
+
 ## Inventaire par source
 
 | Source | Donnée personnelle | Écartée dès la collecte | Gardée dans le brut | Gardée dans la base |
@@ -44,7 +50,7 @@ entreprise.
 | Base légale | Intérêt légitime (art. 6.1.f) : veille professionnelle et formation. Les données sont publiées par les personnes elles-mêmes pour être diffusées, et réduites à un nom. |
 | Personnes concernées | Auteurs de papiers arXiv, auteurs d'articles gardés avec Web Clipper, auteurs de releases et d'alertes GitHub, personnes créditées dans une alerte GitHub, personnes citées dans les notes d'une release, propriétaires d'un dépôt du top 100 GitHub, propriétaires d'un dépôt d'un classement GH Archive (dépôts qui montent). |
 | Données | Noms des auteurs d'un papier, en liste JSON dans l'ordre d'arXiv (`publication.authors`). Login GitHub : brut seulement, sauf celui du propriétaire d'un dépôt du top 100, gardé dans le nom du dépôt, celui du propriétaire d'un dépôt d'un classement GH Archive, gardé dans le nom du dépôt (`trend.repository_name`), et sauf un login ou une @mention écrits dans les notes d'une release, gardées telles que reçues (`release.body`). Constat sur la collecte du 2026-10-07 : 12 des 100 notes de release contiennent un `@mot` (`@Claude`, `@file`, `@mention`, `@team`…) ; aucun n'a été vérifié comme étant un compte. Le brut GitHub contient aussi, pour chaque compte cité (auteur, personne créditée, propriétaire), son identifiant numérique et l'URL de son avatar, qui peut être une photo de la personne : brut seulement. |
-| Destinataires | L'utilisatrice ; les agents qu'elle lance, par l'API REST. Sous-traitant : Microsoft (Azure AI Foundry, zone de données UE), qui reçoit les champs envoyés des items pour rédiger les fiches de veille, sans les auteurs ; contrat : le DPA de Microsoft (section « Envoi des items au modèle des fiches »). |
+| Destinataires | L'utilisatrice ; les agents qu'elle lance, par l'API REST. Sous-traitant : Microsoft (Azure AI Foundry, zone de données UE), qui reçoit les champs envoyés des items pour rédiger les fiches de veille, sans les auteurs ; contrat : le DPA de Microsoft (section « Envoi des items au modèle des fiches »). Sous-traitant temporaire : Mistral AI (serveur UE), qui reçoit les mêmes champs tant que dure le repli (#227) ; contrat : le DPA de Mistral, selon la lecture retenue par l'utilisatrice (section « Envoi des items au modèle des fiches : repli temporaire chez Mistral AI »). |
 | Transferts hors UE | Quand un agent comme Claude Code lit les items par l'API, les noms d'auteurs lus partent chez le fournisseur du modèle, aux États-Unis. Cadre juridique de ce transfert non vérifié. |
 | Durée de conservation | Celle du mode d'acquisition de la source, tenue dans `src/k_b/core/config.py` (`RETENTION_YEARS_BY_ACQUISITION_MODE`) : pour la veille (`watch`), **2 ans après la collecte**, dans la base et dans le brut (provisoire, à confirmer dans #20). Le brut et la base ont la même durée : la base doit rester reconstructible depuis le brut. |
 | Sécurité | Données hors du dépôt de code (`~/K-B-data/`), jamais publiées ; fichiers lisibles par la seule utilisatrice ; l'API ouvre la base en lecture seule ; secrets en variables d'environnement. |
@@ -78,6 +84,24 @@ Sources datées : section « Sources de l'envoi au modèle ».
 | Région | Déploiement Data Zone Standard dans une ressource située dans l'UE : « prompts and responses may be processed in that or any other European Union Member Nation » ; les données au repos, dont celles de la surveillance des abus, sont stockées dans la géographie de la ressource. |
 | Usage par le fournisseur | Ni entraînement ni amélioration des modèles : « prompts and completions are not used to train, retrain, or improve the base models » ; le modèle ne garde rien (« The models are stateless »). Surveillance des abus : la revue automatique ne stocke rien ; seules les demandes signalées par le système, ou qui font partie d'un usage qu'il juge potentiellement abusif, sont stockées pour une revue humaine, par des employés de Microsoft situés dans l'EEE pour un déploiement dans l'EEE. K-B n'appelle que `chat/completions`, sans `store` (`src/k_b/ai_api/llm_client.py`) : aucune des fonctions qui gardent des échanges chez Microsoft (Responses API, Assistants, Stored completions). |
 | Durée de conservation | Chez K-B : rien, l'API IA n'écrit rien (règle 7 de `.claude/rules/poc.md`). Chez Microsoft : revue automatique, aucun stockage ; données gardées pour la revue humaine, **durée non publiée** par Microsoft (ni la page « Data, privacy, and security » ni la page « Abuse monitoring » ne la donnent). Une durée de 30 jours n'apparaît que dans des réponses de Microsoft Q&A et des sources secondaires : elle n'est pas retenue ici. |
+
+## Envoi des items au modèle des fiches : repli temporaire chez Mistral AI
+
+Le quota du modèle de Microsoft (`gpt-6-luna`, #158) n'étant pas réglé, l'appel du modèle des
+fiches passe temporairement par Mistral AI (#227 ; journal ADR, « Modèle des fiches : Mistral
+Small 4 en repli temporaire », 16/10). Microsoft reste le sous-traitant cible. Le repli prend fin
+quand #158 est faite : cette section et la mention de Mistral AI en tête du registre sont alors
+retirées. Sources datées : section « Sources du repli Mistral ».
+
+| Rubrique | Contenu |
+|---|---|
+| Données envoyées | Les mêmes que pour Azure (section précédente, « Données envoyées » : liste blanche de #204, masquage, coupes). Le LLM juge (#223, pas encore codé) n'entre pas dans ce repli : les données ne partent qu'une fois. |
+| Données personnelles qui partent | Les mêmes que pour Azure (section précédente) : le login du propriétaire d'un dépôt dans `repository_name`, et ce que le masquage laisse passer. |
+| Destinataire | Mistral AI, modèle `mistral-small-2603` (Mistral Small 4), par le serveur UE `https://api.eu.mistral.ai/v1` (`KB_LLM_BASE_URL`), en clé gratuite. |
+| Fondement de la sous-traitance | Conditions commerciales de Mistral (version du 25/09/2026) et DPA (27/07/2026) ; l'utilisatrice se considère comme *Customer* (« other entity that you represent »), lecture retenue par elle le 2026-10-16, non confirmée par Mistral. Les conditions commerciales s'appliquent à « the organization, company, or other entity that you represent ("Customer") » ; une personne seule, sans société, n'y est pas nommée. Sur l'infrastructure de Mistral, « Mistral AI may Process Personal Data on behalf of Customer as a Data Processor » et le DPA s'applique (conditions commerciales, § 12.3). Le DPA fait de l'utilisatrice la responsable de traitement et de Mistral AI le sous-traitant (§ 2.1) ; Mistral AI y est responsable de traitement pour la surveillance automatique des abus sur ses API (sauf ZDR, *zero data retention*), pour les retours (*feedback*) et pour l'entraînement, sauf refus (§ 2.3). Les conditions grand public de l'EEE excluent l'accès aux API, réservé aux clients professionnels (lu seulement dans un extrait de recherche). |
+| Région | Serveur UE : « inference processing within the European Union », dans plusieurs centres de données de pays de l'UE et de l'AELE. Limite : « Regional inference does not provide regional storage for all control-plane data » : paramètres du compte, identifiants, facturation, gestion des accès et statistiques d'usage peuvent être traités hors de la zone. Sur l'adresse globale, « Mistral does not commit to a specific inference location » : elle n'est pas utilisée. Selon l'aide de Mistral, les données sont hébergées dans l'UE, et certaines fonctions peuvent les transférer temporairement hors de l'UE (pays listés au Trust Center). |
+| Usage par le fournisseur | Entraînement refusé par l'utilisatrice le 2026-10-16 vers 14:02Z, avant tout appel (console d'administration Mistral, page *Privacy*, réglage désactivé) ; les conditions commerciales excluent alors l'entraînement sur les données du client, hors retours, modèles *Labs* ou *Preview* et bon de commande (§ 4.2). Surveillance des abus : faite par Mistral AI comme responsable de traitement (DPA, § 2.3). Revue humaine : **non publiée** (aucune des pages lues n'en parle). |
+| Durée de conservation | Chez K-B : rien, l'API IA n'écrit rien (règle 7 de `.claude/rules/poc.md`). Chez Mistral AI : demandes et réponses gardées le temps de produire la réponse, puis **30 jours glissants** pour la surveillance des abus, sauf ZDR (politique de confidentialité, lue seulement dans un extrait de recherche). ZDR n'est ouvert qu'en paiement à l'usage, sur demande : **non actif** avec la clé gratuite. |
 
 ## Procédure de tri
 
@@ -115,3 +139,20 @@ les données.
 - [View your billing accounts in Azure portal](https://learn.microsoft.com/en-us/azure/cost-management-billing/manage/view-all-accounts) — Microsoft Learn, `ms.date` 2026-06-25 : types de compte de facturation et où lire le sien
 - [Legal information, Dynamics 365](https://www.microsoft.com/en-us/dynamics-365/business-applications/legal) — Microsoft, « Last updated » janvier 2024 : le Microsoft Customer Agreement incorpore les Product Terms et le DPA
 - Sources secondaires, non retenues pour la durée : [réponse Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/5609842/(urgent)-clarification-on-disabling-abuse-monitori), [réponse Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/2156579/azure-openai-data-management-and-abuse-monitoring)
+
+## Sources du repli Mistral (consultées le 2026-10-16)
+
+Pages lues :
+
+- [Commercial Terms of Service](https://legal.mistral.ai/terms/commercial-terms-of-service/) — Mistral AI, « Effective: September 25, 2026 » : définition de *Customer*, § 4.2 (entraînement), § 12.3 (sous-traitance et DPA)
+- [Data Processing Addendum](https://legal.mistral.ai/terms/data-processing-addendum/) — Mistral AI, « Effective: July 27, 2026 » : § 2.1 (rôles), § 2.3 (Mistral AI responsable de traitement), § 10.1 (suppression)
+- [Regional inference](https://docs.mistral.ai/inference/regional-inference) — documentation Mistral AI : serveur UE, limite du plan de contrôle, adresse globale, tarif 1,1 ×
+- [Can I activate Zero Data Retention (ZDR)?](https://help.mistral.ai/en/articles/347612-can-i-activate-zero-data-retention-zdr) — aide Mistral AI, mise à jour le 2026-08-12 : ZDR réservé au paiement à l'usage
+- [Can I opt out of my input or output data being used for training?](https://help.mistral.ai/en/articles/455207-can-i-opt-out-of-my-input-or-output-data-being-used-for-training) — aide Mistral AI, mise à jour le 2026-09-03 : refus de l'entraînement par la page *Privacy* de la console d'administration
+- [Where do you store my data or my Organization's data?](https://help.mistral.ai/en/articles/347629-where-do-you-store-my-data-or-my-organization-s-data) — aide Mistral AI, mise à jour le 2026-08-12 : hébergement dans l'UE, transferts temporaires hors UE
+
+Pages lues seulement dans un extrait de recherche (le texte de la page ne s'affiche pas à la
+lecture automatique) :
+
+- [Privacy Policy](https://legal.mistral.ai/terms/privacy-policy/) — Mistral AI : conservation des demandes et réponses de l'API, 30 jours glissants pour la surveillance des abus, sauf ZDR
+- [Terms of Service for consumers in the European Economic Area](https://legal.mistral.ai/terms/eu-consumers-terms-of-service/) — Mistral AI : accès aux API exclu, réservé aux clients professionnels
