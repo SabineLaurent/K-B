@@ -396,8 +396,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      écrits ; le journal est écrit avant la validation (`COMMIT`). Chaque item (une entrée
      Zotero avec ses surlignages et sa publication citée), et chaque classement avec son
      inscription, est écrit dans un `SAVEPOINT` (`database/savepoint.py`, #136) : une entrée que
-     la base refuse (`sqlite3.IntegrityError`, `OverflowError`, `UnicodeEncodeError`) est
-     annulée seule (`ROLLBACK TO SAVEPOINT`) et devient un rejet du journal ; l'import continue.
+     la base refuse pour ses propres valeurs (`CHECK`, `UNIQUE`, `NOT NULL`, entier au-delà de
+     64 bits, surrogate isolé) est annulée seule (`ROLLBACK TO SAVEPOINT`) et devient un rejet du
+     journal ; l'import continue. Une `FOREIGN KEY`, une `PRIMARY KEY` ou un type de table
+     `STRICT` refusés ne viennent pas de l'entrée mais de son écrivain ou du schéma : ils
+     arrêtent l'import.
      Le fichier d'un item refusé reste inscrit, comme celui d'une entrée rejetée à la lecture, et
      son catalogue (CISA KEV, Zotero) ne retire rien. Toute autre erreur dans la base (disque
      plein, base verrouillée), ou un journal qui ne s'écrit pas, n'écrit rien : aucun fichier
