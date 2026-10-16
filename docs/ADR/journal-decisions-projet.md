@@ -2351,6 +2351,80 @@ Gemini, en clé gratuite.
   [limites de débit](https://ai.google.dev/gemini-api/docs/rate-limits),
   [guide Gemini 3](https://ai.google.dev/gemini-api/docs/gemini-3). — PR #229
 
+## 2026-10-17
+
+### Fiches de veille : le contrat du LLM juge
+
+Contrat écrit par #222 dans `docs/fiches-veille.md`, section « Juge ». Plan de la session K-B,
+relu par un agent ingénieur IA indépendant, validé par Sabine le 17/10 (relayé par time-knight) ;
+spec relue par un second agent ingénieur IA ; constats tranchés par time-knight, délégation de
+Sabine du 15/10, sauf les seuils et les altérées, tranchés par Sabine. Complète « Fiches de
+veille : le LLM juge » (2026-10-16), sans la contredire.
+
+- **Les seuils de l'étalonnage sont écrits en comptes sur l'échantillon fixé, comme des critères
+  de passage : au plus 2 des 20 altérées gardées, aucune pour la négation ni pour le nombre changé
+  non déclaré ; au plus 20 % des réelles étiquetées « appuyée » retirées (6 si les 30 le sont) ;
+  même décision, garder ou retirer, aux deux passages pour au moins 45 des 50. Une réelle
+  étiquetée « non appuyée » mais gardée par le juge est comptée à part et montrée à Sabine une
+  par une, sans seuil. Tout seuil manqué donne une consigne `judge-2`, et les trois mesures sont
+  refaites sur 20 nouvelles altérées.** Décision de Sabine du 17/10 (« je valide », puis « 1 ok,
+  2 ok »). Précise « deux taux » de l'entrée du 16/10. Pourquoi (relectures des deux ingénieurs
+  IA) :
+  - avec 20 ou 30 affirmations, l'intervalle exact d'un taux est large (2 sur 20 : 1,2 % à
+    31,7 %) : un seuil ne vaut que comme critère de passage ;
+  - un dénominateur fixe : les réelles « non appuyée », dont le nombre n'est connu qu'après
+    l'étiquetage, rendraient variable celui des altérées ;
+  - remesurer `judge-2` sur les mêmes altérées ajusterait la consigne au jeu d'étalonnage ;
+  - la stabilité porte sur la décision, la seule qui change la fiche ;
+  - une utilité manquée dit un juge trop sévère : la révision du rédacteur ne vise pas cette
+    cause et garde son déclencheur, des fiches trop maigres.
+
+  Options écartées : laisser les seuils à #224 (un seuil fixé après la mesure se règle sur elle) ;
+  des seuils en taux ; compter les réelles « non appuyée » gardées avec les altérées (proposition
+  de la session, écartée par Sabine). Limite assumée : le zéro sur environ 5 altérées d'une sorte
+  est un signal faible (0 sur 5 : 0 à 52,2 %). — PR de #222
+- **Chaque altérée passe les contrôles 1 à 7. « CVE changée » est remplacée par la CVE d'un autre
+  item cité (cas « mauvais item ») ; un « nombre changé » est un nombre non déclaré comme fait.**
+  Décision de Sabine du 17/10. Pourquoi (relecture de la spec) : la fidélité retire toute CVE qui
+  n'est pas celle de l'item cité, et tout fait déclaré absent de l'item ; une altérée qui ne
+  passerait pas ces contrôles mesurerait un cas qui n'arrive jamais au juge. Option écartée :
+  retirer la sorte « CVE » sans la remplacer. — PR de #222
+- **Une affirmation n'est gardée que si son verdict est `supported` et sa raison
+  `supported_by_item` ; toute autre paire, ou l'absence de verdict, la retire. Une sortie vide
+  (`{"verdicts": []}`) retire donc tout, sans échec, et se voit par `claims_without_verdict`.**
+  Choix de la session (plan validé par Sabine) ; sortie vide tranchée par time-knight. Pourquoi :
+  un verdict qui se contredit n'est pas un appui (échouer fermé) ; la règle du critère de #222
+  (« une affirmation sans verdict est retirée ») est tenue. Options écartées : garder tout
+  `supported` ; refuser toute la sortie pour une paire incohérente (un appel de plus et le sujet
+  perdu) ; faire d'une sortie vide un échec `completeness` avec nouvelle tentative (contredit le
+  critère). Limite assumée : une panne du juge qui rend une liste vide ressemble à « rien
+  d'appuyé » ; seule la métrique la distingue. — PR de #222
+- **`FailedCheck` gagne une seule valeur, `claim_id` ; le juge réutilise `completeness` pour une
+  affirmation jugée deux fois.** Choix de la session. Pourquoi : `completeness` dit déjà « un
+  élément présent deux fois » au classement. Option écartée : réutiliser `item_id` pour un
+  identifiant d'affirmation (la métrique dirait un item pour une affirmation). Limite assumée :
+  `call_model` exige un rappel par valeur ; chaque étape écrit donc des rappels qu'elle n'envoie
+  jamais (`claim_id` au classement et à la rédaction ; `subject`, `item_id`, `markup` au juge).
+  — PR de #222
+- **Le juge n'envoie rien tant qu'un repli de fournisseur du rédacteur (Mistral, Gemini) est
+  actif ; #223 code un garde-fou vérifié avant l'appel. Le repli de déploiement Azure du 16/10 et
+  le `replay` restent permis.** Constat bloquant de la relecture de la spec, tranché par
+  time-knight. Pourquoi : les deux entrées de repli du 16/10 et le registre des traitements
+  disent que le juge n'entre pas dans ces replis ; la spec écrivait « même fournisseur que le
+  rédacteur », ce qui l'y aurait fait entrer. On ne peut pas compter sur l'échec de l'appel : le
+  corps de la requête, items compris, part avant toute réponse d'erreur. La condition dit quand
+  le juge peut envoyer, pas à qui : la spec reste indépendante du fournisseur. — PR de #222
+- **`KB_LLM_JUDGE_MODEL` est exigée aussi en `replay`, validée mais envoyée nulle part ;
+  `KB_LLM_REASONING_EFFORT` est commun au rédacteur et au juge.** Choix de la session, confirmé
+  par time-knight. Pourquoi : une configuration testée en `replay` échoue fermé comme en vrai ;
+  une variable de moins pour l'effort, sans besoin mesuré d'un réglage propre. Limites assumées :
+  en `replay`, `KB_LLM_MODEL` n'est pas lue, la variable du juge l'est (asymétrie) ; que
+  `reasoning_effort: "none"` vaille pour les deux déploiements reste ouvert jusqu'à #158.
+  — PR de #222
+
+Sources (consultées le 2026-10-17) : celles de `docs/fiches-veille.md`, « Sources », section
+« Juge ».
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
