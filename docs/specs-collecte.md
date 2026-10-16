@@ -387,11 +387,24 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      correction du lecteur ou du brut le lit, sans reconstruction. Une collecte mal nommée
      (dossier ou fichier dont le nom n'est pas une date) n'a pas de date de collecte : elle
      n'entre pas non plus au registre, et elle est rejetée à chaque import, sans compter dans
-     `raw files read`.
+     `raw files read`. **Un classement GH Archive dont la base refuse une ligne n'y entre pas
+     non plus** (décision de Sabine du 2026-10-13, #136) : il est refusé entier et relu à chaque
+     import. Limite, la même que pour un fichier illisible : une fois accepté, il est inscrit
+     après des classements collectés plus tard ; le premier classement vu d'une fenêtre peut
+     alors différer de celui d'une reconstruction.
    - **Une transaction** : chaque fichier lu est inscrit au registre, puis ses items sont
-     écrits ; le journal est écrit avant la validation (`COMMIT`). Une erreur dans la base, ou
-     un journal qui ne s'écrit pas, n'écrit rien : aucun fichier n'est inscrit, tous seront
-     relus. Si la validation échoue, ou sur une interruption (Ctrl-C), le journal écrit est
+     écrits ; le journal est écrit avant la validation (`COMMIT`). Chaque item (une entrée
+     Zotero avec ses surlignages et sa publication citée), et chaque classement avec son
+     inscription, est écrit dans un `SAVEPOINT` (`database/savepoint.py`, #136) : une entrée que
+     la base refuse pour ses propres valeurs (`CHECK`, `UNIQUE`, `NOT NULL`, entier au-delà de
+     64 bits, surrogate isolé) est annulée seule (`ROLLBACK TO SAVEPOINT`) et devient un rejet du
+     journal ; l'import continue. Une `FOREIGN KEY`, une `PRIMARY KEY` ou un type de table
+     `STRICT` refusés ne viennent pas de l'entrée mais de son écrivain ou du schéma : ils
+     arrêtent l'import.
+     Le fichier d'un item refusé reste inscrit, comme celui d'une entrée rejetée à la lecture, et
+     son catalogue (CISA KEV, Zotero) ne retire rien. Toute autre erreur dans la base (disque
+     plein, base verrouillée), ou un journal qui ne s'écrit pas, n'écrit rien : aucun fichier
+     n'est inscrit, tous seront relus. Si la validation échoue, ou sur une interruption (Ctrl-C), le journal écrit est
      supprimé. Pourquoi : un fichier
      inscrit n'est plus relu, un journal perdu après la validation perdrait pour toujours la
      trace de ses rejets et de ses écarts (décision de Sabine du 2026-10-12, qui revient sur le

@@ -29,6 +29,7 @@ from k_b.etl.load import (
     import_items,
     read_imported_paths,
 )
+from k_b.etl.normalize import normalize_item
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.gh_archive import read_trend_files
@@ -685,19 +686,154 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(
 ):
     tables_before = dump_database(data_dir)
 
-    # The papers come first, in folder order: they are written, then a vulnerability fails.
-    def refuse_vulnerability(connection, item, raw_data_id):
-        raise sqlite3.IntegrityError("CHECK constraint failed: vulnerability")
+    # The papers come first, in folder order: they are written, then the system fails on a
+    # vulnerability. An error of the system is not due to the entry: it stops the import.
+    def fail_on_vulnerability(connection, item, raw_data_id):
+        raise sqlite3.OperationalError("disk I/O error")
 
     monkeypatch.setitem(
-        import_items_module.WRITER_BY_KIND, "vulnerability", refuse_vulnerability
+        import_items_module.WRITER_BY_KIND, "vulnerability", fail_on_vulnerability
     )
 
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(sqlite3.OperationalError, match="disk I/O error"):
         run_import(data_dir)
 
     assert dump_database(data_dir) == tables_before
     assert list_logs(data_dir) == []
+
+
+def test_a_foreign_key_the_base_refuses_stops_the_import_and_writes_nothing(
+    data_dir, monkeypatch
+):
+    tables_before = dump_database(data_dir)
+    write_vulnerability = import_items_module.WRITER_BY_KIND["vulnerability"]
+
+    # A writer that points its item at a raw file the base does not have: not due to the
+    # entry, it is not a rejection.
+    def write_with_an_unknown_raw_file(connection, item, raw_data_id):
+        return write_vulnerability(connection, item, raw_data_id + 1_000)
+
+    monkeypatch.setitem(
+        import_items_module.WRITER_BY_KIND,
+        "vulnerability",
+        write_with_an_unknown_raw_file,
+    )
+
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        run_import(data_dir)
+
+    assert dump_database(data_dir) == tables_before
+    assert list_logs(data_dir) == []
+
+
+def refuse_in_the_base(monkeypatch, source_item_id, changes):
+    """The item of source_item_id reaches its writer with changes the item would refuse: they
+    are made after its validation, as by an item that let them through (conventions.md, rule
+    4); the base is the safety net behind it."""
+
+    def normalize_then_change(item):
+        normalized_item = normalize_item(item)
+        if normalized_item.source_item_id != source_item_id:
+            return normalized_item
+        return normalized_item.model_copy(update=changes)
+
+    monkeypatch.setattr(import_items_module, "normalize_item", normalize_then_change)
+
+
+RELEASES_PATH = f"{AUTOMATED_WATCH}/{RELEASES_DIR}/{FIRST_COLLECTION}.json"
+CISA_KEV_PATH = f"{AUTOMATED_WATCH}/{CISA_KEV_DIR}/{FIRST_COLLECTION}.csv"
+ARXIV_PATH = f"{AUTOMATED_WATCH}/{ARXIV_DIR}/{FIRST_COLLECTION}.xml"
+# CVE-2026-86950 in Arabic-Indic digits: Python's \d accepts them, the GLOB of the base does not.
+CVE_ID_IN_ARABIC_INDIC_DIGITS = "CVE-2026-٨٦٩٥٠"
+
+
+# The four cases of PR #131 (docs/2026-10-11-revue-homogeneite.md): each one written to the
+# base, the error it raises is one of an entry.
+@pytest.mark.parametrize(
+    ("source_item_id", "changes", "raw_file_path", "reason", "value"),
+    [
+        (
+            str(FIRST_RELEASE_ID),
+            {"source_item_id": str(2**63)},
+            RELEASES_PATH,
+            # The identifier names the item, quoted (conventions.md, rule 3), even when it is
+            # the value refused; the refusal itself never quotes it.
+            (
+                "release '9223372036854775808' refused by the base: OverflowError: Python"
+                " int too large to convert to SQLite INTEGER"
+            ),
+            str(2**63),
+        ),
+        (
+            FIRST_CVE_ID,
+            {"cve": CVE_ID_IN_ARABIC_INDIC_DIGITS},
+            CISA_KEV_PATH,
+            (
+                "vulnerability 'CVE-2026-86950' refused by the base:"
+                " SQLITE_CONSTRAINT_CHECK: CHECK constraint failed: cve_id GLOB"
+                " 'CVE-[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]*'"
+            ),
+            "٨",
+        ),
+        (
+            FIRST_PAPER_ID,
+            {"title": "Lone \ud800 surrogate"},
+            ARXIV_PATH,
+            (
+                "paper '2609.31282' refused by the base: UnicodeEncodeError: surrogates"
+                " not allowed at position 5"
+            ),
+            "Lone",
+        ),
+        (
+            "400266224",
+            {"tag_name": "\x00v1.0.0"},
+            RELEASES_PATH,
+            (
+                "release '400266224' refused by the base: SQLITE_CONSTRAINT_CHECK: CHECK"
+                " constraint failed: length(tag_name) > 0"
+            ),
+            "v1.0.0",
+        ),
+        # Beyond the four cases: a NOT NULL refused is due to the entry too.
+        (
+            "399375132",
+            {"tag_name": None},
+            RELEASES_PATH,
+            (
+                "release '399375132' refused by the base: SQLITE_CONSTRAINT_NOTNULL: NOT"
+                " NULL constraint failed: release.tag_name"
+            ),
+            "None",
+        ),
+    ],
+)
+def test_an_item_the_base_refuses_is_rejected_and_logged_and_the_others_are_imported(
+    data_dir, monkeypatch, source_item_id, changes, raw_file_path, reason, value
+):
+    refuse_in_the_base(monkeypatch, source_item_id, changes)
+
+    summary = run_import(data_dir)
+
+    rejections = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
+    assert rejections == [
+        {"kind": "rejection", "raw_file_path": raw_file_path, "reason": reason}
+    ]
+    assert value not in rejections[0]["reason"].partition("refused by the base: ")[2]
+    assert summary.rejection_count == 1
+    # The other items are written; the item refused is not counted, and leaves no row.
+    assert summary.item_count == count_rows(data_dir, "SELECT count(*) FROM item") > 0
+    assert (
+        count_rows(
+            data_dir,
+            "SELECT count(*) FROM item WHERE id NOT IN (SELECT item_id FROM publication"
+            " WHERE item_id IS NOT NULL UNION SELECT item_id FROM vulnerability"
+            " WHERE item_id IS NOT NULL UNION SELECT item_id FROM release"
+            " UNION SELECT item_id FROM advisory)",
+        )
+        == 0
+    )
+    assert raw_file_path in registered_paths(data_dir)
 
 
 def test_an_item_of_a_kind_without_writer_is_refused_and_nothing_written(
@@ -1199,6 +1335,25 @@ def test_a_catalog_with_a_rejected_row_withdraws_nothing(data_dir):
     assert count_rows(data_dir, WITHDRAWN_COUNT_QUERY) == 0
 
 
+def test_a_catalog_with_a_row_the_base_refuses_withdraws_nothing(data_dir, monkeypatch):
+    run_import(data_dir)
+    write_collection(
+        data_dir,
+        CISA_KEV_DIR,
+        "2026-10-06T093000Z",
+        kev_catalog(without=(WITHDRAWN_CVE_ID,)),
+    )
+    refuse_in_the_base(
+        monkeypatch, FIRST_CVE_ID, {"cve": CVE_ID_IN_ARABIC_INDIC_DIGITS}
+    )
+
+    summary = run_import(data_dir)
+
+    # A row the base refuses is in the catalog, as a row rejected when read.
+    assert (summary.rejection_count, summary.withdrawn_count) == (1, 0)
+    assert count_rows(data_dir, WITHDRAWN_COUNT_QUERY) == 0
+
+
 def test_a_catalog_older_than_the_latest_imported_withdraws_nothing(data_dir):
     run_import(data_dir)
     write_collection(
@@ -1668,6 +1823,67 @@ def test_a_ranking_refused_is_rejected_logged_and_read_again_at_the_next_import(
         "TrendsExtractInvalidError: row 0: stars_gained"
     )
     assert count_rows(trend_data_dir, "SELECT count(*) FROM trend") == 5
+
+
+def run_import_with_a_ranking_row_changed(data_dir, raw_file_path, **changes):
+    """kb import, with the last row of the ranking at raw_file_path changed after its
+    reading: as by a reader that let the change through (conventions.md, rule 4)."""
+    imported_at = FIRST_IMPORT_AT + timedelta(seconds=len(list_logs(data_dir)))
+    database_path = data_dir / "k-b.sqlite"
+    imported_paths = read_imported_paths(database_path)
+    trend_reading = read_trend_files(data_dir / "raw", imported_paths)
+    changed_files = [
+        trend_file._replace(
+            rows=[*trend_file.rows[:-1], trend_file.rows[-1].model_copy(update=changes)]
+        )
+        if trend_file.raw_file.raw_file_path == raw_file_path
+        else trend_file
+        for trend_file in trend_reading.files
+    ]
+    return import_items(
+        read_raw_items(data_dir / "raw", SOURCE_KINDS, imported_paths),
+        trend_reading._replace(files=changed_files),
+        database_path,
+        log_path_at(data_dir, imported_at),
+        imported_at,
+        TRACKED_REPOSITORIES,
+    )
+
+
+def test_a_ranking_with_a_row_the_base_refuses_is_refused_whole_and_read_again(
+    trend_data_dir,
+):
+    refused = write_ranking(
+        trend_data_dir,
+        LATER_COLLECTION,
+        rows_of_window(NEXT_WINDOW_END),
+        window_ends=(NEXT_WINDOW_END,),
+    )
+
+    first = run_import_with_a_ranking_row_changed(
+        trend_data_dir, refused, stars_gained=2**63
+    )
+
+    # The ranking of the fixture is written; none of the rows of the refused one is.
+    assert first == (0, 0, 1, 2, 0, 5)
+    assert refused not in registered_paths(trend_data_dir)
+    assert read_log(trend_data_dir) == [
+        {
+            "kind": "rejection",
+            "raw_file_path": refused,
+            "reason": "ranking refused by the base: OverflowError: Python int too large"
+            " to convert to SQLite INTEGER",
+        }
+    ]
+    assert fetch_rows(trend_data_dir, "SELECT DISTINCT window_end FROM trend") == [
+        ("2026-10-10T00:00:00Z",)
+    ]
+
+    # Read again by the next import, as an unreadable file: written once it is accepted.
+    second = run_import(trend_data_dir)
+
+    assert second == (0, 0, 0, 1, 0, 5)
+    assert refused in registered_paths(trend_data_dir)
 
 
 def test_a_rebuilt_database_with_rankings_equals_the_one_kept_import_after_import(

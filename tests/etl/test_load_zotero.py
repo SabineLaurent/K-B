@@ -12,11 +12,14 @@ from test_load import (
     fetch_rows,
     read_discards,
     read_log,
+    refuse_in_the_base,
     run_import,
 )
 from test_transform import copy_fixture
 
 from k_b.database.creation import create_database
+from k_b.etl import load as import_items_module
+from k_b.etl.normalize import normalize_item
 from k_b.etl.sources.zotero import ZoteroSource
 
 FIRST = "2026-10-05T093000Z"
@@ -384,6 +387,67 @@ def test_an_extract_with_a_rejected_document_withdraws_nothing(
 
     assert (summary.rejection_count, summary.withdrawn_count) == (1, 0)
     assert withdrawn_counts(data_dir) == (0, 0)
+
+
+def test_an_extract_with_a_document_the_base_refuses_withdraws_nothing(
+    data_dir, zotero_dir, run_on_zotero_library, monkeypatch
+):
+    collect(data_dir, zotero_dir, FIRST)
+    run_import(data_dir)
+    delete_in_zotero(run_on_zotero_library, zotero_dir, THIRD_PAGE_HIGHLIGHT)
+    collect(data_dir, zotero_dir, SECOND)
+    refuse_in_the_base(monkeypatch, "AAAAAAA1", {"title": "Lone \ud800 surrogate"})
+
+    summary = run_import(data_dir)
+
+    # A document the base refuses is in the extract, as a document rejected when read.
+    assert (summary.rejection_count, summary.withdrawn_count) == (1, 0)
+    assert withdrawn_counts(data_dir) == (0, 0)
+
+
+def test_a_document_with_a_highlight_the_base_refuses_is_written_in_none_of_its_parts(
+    data_dir, zotero_dir, monkeypatch
+):
+    extract_path = collect(data_dir, zotero_dir, FIRST)
+    [document] = [
+        document
+        for document in json.loads(extract_of(zotero_dir))
+        if document["key"] == "AAAAAAA1"
+    ]
+    assert document["highlights"]
+
+    def normalize_then_refuse_last_highlight(item):
+        normalized_item = normalize_item(item)
+        if normalized_item.source_item_id != "AAAAAAA1":
+            return normalized_item
+        *kept, last = normalized_item.highlights
+        refused = last.model_copy(update={"text": "\ud800"})
+        return normalized_item.model_copy(update={"highlights": [*kept, refused]})
+
+    monkeypatch.setattr(
+        import_items_module, "normalize_item", normalize_then_refuse_last_highlight
+    )
+
+    summary = run_import(data_dir)
+
+    # The entry, its highlights and the publication it cites share one savepoint.
+    assert (summary.item_count, summary.rejection_count) == (1, 1)
+    assert [row[0] for row in fetch_rows(data_dir, ENTRY_QUERY)] == ["BBBBBBB2"]
+    assert {row[1] for row in fetch_rows(data_dir, HIGHLIGHT_QUERY)} <= {"BBBBBBB2"}
+    assert (
+        count_rows(
+            data_dir, "SELECT count(*) FROM publication WHERE arxiv_id = '2609.00001'"
+        )
+        == 0
+    )
+    assert count_rows(data_dir, "SELECT count(*) FROM item") == 1
+    [rejection] = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
+    assert rejection == {
+        "kind": "rejection",
+        "raw_file_path": extract_path,
+        "reason": "zotero_entry 'AAAAAAA1' refused by the base: UnicodeEncodeError:"
+        " surrogates not allowed at position 0",
+    }
 
 
 def test_an_older_extract_imported_late_changes_nothing_and_writes_its_own_entry_withdrawn(

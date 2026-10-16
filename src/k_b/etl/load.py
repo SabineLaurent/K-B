@@ -2,7 +2,9 @@
 step 4).
 
 The registry of the files already imported is raw_data, read before the raw. The files read,
-their items and the log of the import are then written in one transaction: an error writes
+their items and the log of the import are then written in one transaction. Each item, and each
+ranking, is written in its savepoint (database/savepoint.py): an entry the base refuses is
+undone alone and becomes a rejection of the log, and the import goes on. Any other error writes
 nothing in the base, and leaves no log. A file registered is not read again, except by a
 rebuild of the base.
 
@@ -30,8 +32,10 @@ from pathlib import Path
 from typing import NamedTuple
 
 from k_b.core.config import TrackedRepository
+from k_b.core.quoting import quote_value
 from k_b.database.connection import check_database_exists, connect_database
 from k_b.database.reading import read_raw_file_paths
+from k_b.database.savepoint import EntryRefusedError, write_in_savepoint
 from k_b.database.writers import (
     advisory_writer,
     newsletter_article_writer,
@@ -87,6 +91,17 @@ def read_imported_paths(database_path: Path) -> frozenset[str]:
         connection.close()
 
 
+class FileWriting(NamedTuple):
+    """What the writing of files gave: one file, or the sum of several."""
+
+    item_count: int
+    discards: list[Discard]
+    trend_discards: list[TrendDiscard]
+    rejections: list[Rejection]
+    withdrawn_count: int
+    trend_count: int
+
+
 def import_items(
     reading: RawReading,
     trend_reading: TrendReading,
@@ -100,54 +115,16 @@ def import_items(
 
     The files of items and the rankings are written in one sequence, in collection order: a
     base rebuilt registers them in the order the imports did.
-
-    The log is written before the commit: a file registered is not read again, its log must
-    not be lost. A commit that fails, or an interruption, removes the log written.
     """
     check_database_exists(database_path)
-    rejections = [*reading.rejections, *trend_reading.rejections]
-    written_count = 0
-    withdrawn_count = 0
-    trend_count = 0
-    discards = []
-    trend_discards = []
     connection = connect_database(database_path)
     try:
         try:
             release_writer.write_tracked_repositories(connection, tracked_repositories)
-            for file_read in list_files_in_collection_order(reading, trend_reading):
-                if isinstance(file_read, TrendFile):
-                    written, left_out = write_trend_file(connection, file_read)
-                    trend_count += written
-                    trend_discards.extend(left_out)
-                    continue
-                raw_file = file_read
-                items, untracked = reject_untracked_releases(
-                    raw_file.items, tracked_repositories
-                )
-                rejections.extend(untracked)
-                raw_data_id = register_raw_file(connection, raw_file)
-                for item in map(normalize_item, items):
-                    discard = write_item(connection, item, raw_data_id)
-                    if discard is None:
-                        written_count += 1
-                    else:
-                        discards.append(discard)
-                withdrawn_count += withdraw_absent_vulnerabilities(
-                    connection, raw_file, raw_data_id
-                ) + withdraw_absent_zotero_rows(connection, raw_file, raw_data_id)
-            # Checked once the base holds the write lock: two imports of the same second
-            # cannot both find no log.
-            check_log_absent(log_path)
-            try:
-                write_import_log(
-                    log_path, imported_at, rejections, discards, trend_discards
-                )
-                connection.commit()
-            except BaseException:
-                # The log at log_path can only be this import's: it was absent above.
-                log_path.unlink(missing_ok=True)
-                raise
+            writing = write_files(
+                connection, reading, trend_reading, tracked_repositories
+            )
+            commit_with_log(connection, log_path, imported_at, writing)
         except BaseException:
             # BaseException: Ctrl-C must not leave half an import either.
             connection.rollback()
@@ -155,13 +132,93 @@ def import_items(
     finally:
         connection.close()
     return ImportSummary(
-        written_count,
-        len(discards) + len(trend_discards),
-        len(rejections),
+        writing.item_count,
+        len(writing.discards) + len(writing.trend_discards),
+        len(writing.rejections),
         reading.read_count + trend_reading.read_count,
-        withdrawn_count,
-        trend_count,
+        writing.withdrawn_count,
+        writing.trend_count,
     )
+
+
+def write_files(
+    connection: sqlite3.Connection,
+    reading: RawReading,
+    trend_reading: TrendReading,
+    tracked_repositories: Sequence[TrackedRepository],
+) -> FileWriting:
+    """Write each file in collection order; what the reading rejected comes first."""
+    rejected_when_read = FileWriting(
+        item_count=0,
+        discards=[],
+        trend_discards=[],
+        rejections=[*reading.rejections, *trend_reading.rejections],
+        withdrawn_count=0,
+        trend_count=0,
+    )
+    return join_writings(
+        [
+            rejected_when_read,
+            *(
+                write_file(connection, file_read, tracked_repositories)
+                for file_read in list_files_in_collection_order(reading, trend_reading)
+            ),
+        ]
+    )
+
+
+def join_writings(writings: list[FileWriting]) -> FileWriting:
+    return FileWriting(
+        item_count=sum(writing.item_count for writing in writings),
+        discards=[discard for writing in writings for discard in writing.discards],
+        trend_discards=[
+            discard for writing in writings for discard in writing.trend_discards
+        ],
+        rejections=[
+            rejection for writing in writings for rejection in writing.rejections
+        ],
+        withdrawn_count=sum(writing.withdrawn_count for writing in writings),
+        trend_count=sum(writing.trend_count for writing in writings),
+    )
+
+
+def write_file(
+    connection: sqlite3.Connection,
+    file_read: RawFile | TrendFile,
+    tracked_repositories: Sequence[TrackedRepository],
+) -> FileWriting:
+    if isinstance(file_read, TrendFile):
+        return write_trend_file(connection, file_read)
+    return write_items_file(connection, file_read, tracked_repositories)
+
+
+def commit_with_log(
+    connection: sqlite3.Connection,
+    log_path: Path,
+    imported_at: datetime,
+    writing: FileWriting,
+) -> None:
+    """Write the log, then commit.
+
+    The log is written before the commit: a file registered is not read again, its log must
+    not be lost. A commit that fails, or an interruption, removes the log written.
+    """
+    # Checked once the base holds the write lock: two imports of the same second cannot both
+    # find no log.
+    check_log_absent(log_path)
+    try:
+        write_import_log(
+            log_path,
+            imported_at,
+            writing.rejections,
+            writing.discards,
+            writing.trend_discards,
+        )
+        connection.commit()
+    except BaseException:
+        # The log at log_path can only be this import's: it was absent above.
+        log_path.unlink(missing_ok=True)
+        raise
 
 
 def list_files_in_collection_order(
@@ -206,6 +263,62 @@ def reject_untracked_releases(
     return kept, rejections
 
 
+def write_items_file(
+    connection: sqlite3.Connection,
+    raw_file: RawFile,
+    tracked_repositories: Sequence[TrackedRepository],
+) -> FileWriting:
+    """Register the file read, write each of its items, then withdraw what its catalog no
+    longer lists.
+
+    The file is registered even with an item the base refuses, as with an entry rejected when
+    read: only a rebuild of the base reads it again.
+    """
+    items, untracked = reject_untracked_releases(raw_file.items, tracked_repositories)
+    raw_data_id = register_raw_file(connection, raw_file)
+    outcomes = [
+        write_item_in_savepoint(connection, item, raw_data_id)
+        for item in map(normalize_item, items)
+    ]
+    discards = [outcome for outcome in outcomes if isinstance(outcome, Discard)]
+    refusals = [outcome for outcome in outcomes if isinstance(outcome, Rejection)]
+    # An item the base refuses is in its file: a catalog with one withdraws nothing.
+    counted_file = raw_file._replace(
+        rejection_count=raw_file.rejection_count + len(refusals)
+    )
+    withdrawn_count = withdraw_absent_vulnerabilities(
+        connection, counted_file, raw_data_id
+    ) + withdraw_absent_zotero_rows(connection, counted_file, raw_data_id)
+    return FileWriting(
+        item_count=outcomes.count(None),
+        discards=discards,
+        trend_discards=[],
+        rejections=[*untracked, *refusals],
+        withdrawn_count=withdrawn_count,
+        trend_count=0,
+    )
+
+
+def write_item_in_savepoint(
+    connection: sqlite3.Connection, item: Item, raw_data_id: int
+) -> Discard | Rejection | None:
+    """Write the item in its savepoint; an item the base refuses is undone alone and returned
+    as a rejection, an item it left out as a discard.
+
+    A Zotero entry, its highlights and the publication it cites are written by one writer:
+    they share the savepoint.
+    """
+    try:
+        with write_in_savepoint(connection):
+            return write_item(connection, item, raw_data_id)
+    except EntryRefusedError as refusal:
+        return reject(
+            item.raw_file_path,
+            f"{item.kind} {quote_value(item.source_item_id)} refused by the base: "
+            f"{refusal}",
+        )
+
+
 def write_item(
     connection: sqlite3.Connection, item: Item, raw_data_id: int
 ) -> Discard | None:
@@ -229,18 +342,43 @@ def register_raw_file(connection: sqlite3.Connection, raw_file: RawFile) -> int:
 
 def write_trend_file(
     connection: sqlite3.Connection, trend_file: TrendFile
-) -> tuple[int, list[TrendDiscard]]:
-    """Register the ranking and write its rows; return how many were written, and each window
-    the base left out."""
-    raw_data_id = register_raw_file(connection, trend_file.raw_file)
-    written_count, collected_at_by_window_left_out = trend_writer.write(
-        connection, trend_file.rows, raw_data_id
-    )
+) -> FileWriting:
+    """Register the ranking and write its rows in one savepoint; return how many were written,
+    and each window the base left out.
+
+    A ranking with a row the base refuses is refused whole (decision of Sabine of 2026-10-13):
+    none of its rows is written, it is not registered, and the next import reads it again, as
+    an unreadable file.
+    """
+    raw_file_path = trend_file.raw_file.raw_file_path
+    try:
+        with write_in_savepoint(connection):
+            raw_data_id = register_raw_file(connection, trend_file.raw_file)
+            written_count, collected_at_by_window_left_out = trend_writer.write(
+                connection, trend_file.rows, raw_data_id
+            )
+    except EntryRefusedError as refusal:
+        rejection = reject(raw_file_path, f"ranking refused by the base: {refusal}")
+        return FileWriting(
+            item_count=0,
+            discards=[],
+            trend_discards=[],
+            rejections=[rejection],
+            withdrawn_count=0,
+            trend_count=0,
+        )
     discards = [
         TrendDiscard(trend_file.raw_file, window_end, collected_at)
         for window_end, collected_at in collected_at_by_window_left_out.items()
     ]
-    return written_count, discards
+    return FileWriting(
+        item_count=0,
+        discards=[],
+        trend_discards=discards,
+        rejections=[],
+        withdrawn_count=0,
+        trend_count=written_count,
+    )
 
 
 def withdraw_absent_vulnerabilities(
