@@ -562,8 +562,8 @@ Consultées le 2026-10-15.
   — Microsoft, relevé par recherche web : les demandes et réponses ne servent pas à entraîner les
   modèles ; un déploiement Data Zone traite dans la zone choisie (UE).
 - [Region availability of Foundry Models sold by Azure](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure-region-availability)
-  — Microsoft, relevé par recherche web : gpt-5.6-luna, version 2026-07-09. Relue le 2026-10-16
-  par time-knight (onglet Data Zone Standard, Europe ; page `updated_at` 2026-09-04) : gpt-6-luna
+  — Microsoft, relevé par recherche web : gpt-5.6-luna, version 2026-07-09. Consultée le
+  2026-10-16 par time-knight (onglet Data Zone Standard, Europe) : gpt-6-luna
   (2026-09-22) et gpt-5.6-luna ont la même ligne, cochée pour francecentral et swedencentral
   entre autres, non cochée pour northeurope.
 - [GPT-6 Astra, Sol and Luna for production agents in Microsoft Foundry](https://azure.microsoft.com/en-us/blog/gpt-6-astra-sol-and-luna-for-production-agents-in-microsoft-foundry/)
