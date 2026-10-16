@@ -1,10 +1,12 @@
 import logging
+import os
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from k_b.etl.raw_store import write_file_atomically
 from k_b.etl.source_contract import SourceKind, SourceReader
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.zotero import ZoteroSource
@@ -309,6 +311,24 @@ def test_a_hidden_file_in_a_folder_of_pages_is_skipped(tmp_path):
     write_pages(
         tmp_path, COLLECTION_NAME, {"2026-10-05.html": b"a", ".DS_Store": b"hidden"}
     )
+
+    reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
+
+    assert [item.source_item_id for item in items_of(reading)] == ["a"]
+    assert reading.rejections == []
+
+
+def test_the_rest_of_an_interrupted_write_in_a_folder_of_pages_is_skipped(
+    tmp_path, monkeypatch
+):
+    pages_dir = write_pages(tmp_path, COLLECTION_NAME, {"2026-10-05.html": b"a"})
+    # The process killed between the write and the rename: the temporary file stays.
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "replace", lambda source, target: None)
+        write_file_atomically(pages_dir / "2026-10-06.html", b"partial")
+    (rest,) = [path for path in pages_dir.iterdir() if path.name != "2026-10-05.html"]
+    assert rest.name.startswith(".2026-10-06.html.")
+    assert rest.name.endswith(".tmp")
 
     reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
 
