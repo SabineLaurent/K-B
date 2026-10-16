@@ -77,8 +77,8 @@ class GithubAdvisoriesSource:
             return None
         if last_collected_at is None:
             return raw_response
-        # A rejected advisory leaves the page within a day or two (the reviewed filter): its
-        # page is returned, so that its rejection reaches the import log.
+        # A rejected advisory leaves the page as the window moves on: its page is returned now,
+        # so that its rejection reaches the import log.
         if not reading.rejection_reasons and not any(
             reviewed_at > last_collected_at for reviewed_at in review_dates
         ):

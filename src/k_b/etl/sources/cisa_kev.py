@@ -111,6 +111,7 @@ def read_new_vulnerabilities(
 
     dateAdded is a day without a time zone, not an instant: it is not converted, it is compared
     with a day of margin, so no row is lost whatever its zone. Duplicates are removed by the base, at the import.
+    Its rejection reasons are those of every row: the date of a rejected row is not read.
     """
     # utf-8-sig: a byte order mark would otherwise stick to the first column name.
     rows = csv.DictReader(io.StringIO(raw_catalog.decode("utf-8-sig"), newline=""))
