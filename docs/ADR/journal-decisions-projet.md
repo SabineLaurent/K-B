@@ -2186,7 +2186,7 @@ contrat vient avec #222, le code avec #223, l'étalonnage avec #224.
     mais il peut faire retirer les affirmations des autres items du même sujet, ce qui se voit
     seulement par le compte des retraits.
 
-  — PR de l'entrée
+  — PR #225
 - **Le juge appelle un autre déploiement que le rédacteur : `gpt-5.6-luna`, dans la même
   ressource et la même zone de données UE, nommé par `KB_LLM_JUDGE_MODEL`, sans valeur par
   défaut. Si le quota de ce second déploiement n'est pas accordé à temps, la variable pointe vers
@@ -2206,7 +2206,7 @@ contrat vient avec #222, le code avec #223, l'étalonnage avec #224.
     modèle ;
   - les mêmes données partent une seconde fois chez Microsoft, à inscrire au registre (#157).
 
-  — PR de l'entrée
+  — PR #225
 - **Un juge en échec envoie le sujet dans `failed_subjects`, avec l'étape (`judge`). Un juge qui
   retire tout rend une fiche vide. `POST /digests` gagne un compteur par fiche
   (`claims_judged_removed`) et l'étape en échec, sans aucun état.** Décision de Sabine du 16/10.
@@ -2216,7 +2216,7 @@ contrat vient avec #222, le code avec #223, l'étalonnage avec #224.
   a été observé », `docs/fiches-veille.md`). La règle 7 de `poc.md` (API IA sans état) est
   tenue.
   Option écartée : rendre la fiche non jugée, marquée comme telle (un statut à relire, que
-  Sabine refuse). — PR de l'entrée
+  Sabine refuse). — PR #225
 - **Le juge est étalonné sur 30 affirmations réelles étiquetées par Sabine et 20 affirmations
   altérées par construction, après l'oral blanc du 29/10. On mesure deux taux, les gardées à tort
   (sécurité) et les retirées à tort (utilité), plus la stabilité sur deux passages.** Décision de
@@ -2238,14 +2238,14 @@ contrat vient avec #222, le code avec #223, l'étalonnage avec #224.
   - l'échantillon réel reste sous le dossier de données et n'est jamais committé (le dépôt devient
     public) : seuls les étiquettes et les taux le sont.
 
-  — PR de l'entrée
+  — PR #225
 - **Au POC, rien n'est relu avant le juge, et rien ne repart vers le rédacteur après lui. Une
   révision après le juge, en un seul tour, est écrite comme étape possible, non codée.** Décision
   de Sabine du 16/10 ; pourquoi non transmis. Dans cette révision, seules les affirmations
   retirées repartent au rédacteur, avec leur verdict en code fermé, jamais un texte libre du juge.
   Elles repassent ensuite les contrôles 1 à 7 et le juge, sur elles seules ; il n'y a jamais de
   troisième tour. Elle serait déclenchée si l'étalonnage montre des fiches trop maigres. Elle
-  coûterait jusqu'à 2 appels de plus par sujet touché. — PR de l'entrée
+  coûterait jusqu'à 2 appels de plus par sujet touché. — PR #225
 
 Sources (consultée le 2026-10-16, relevée par recherche web) :
 [Wataoka, Takahashi et Ri, « Self-Preference Bias in LLM-as-a-Judge », arXiv 2410.21819](https://arxiv.org/abs/2410.21819)
