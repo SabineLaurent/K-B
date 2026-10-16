@@ -12,8 +12,11 @@ l'exemption des activités strictement personnelles (RGPD art. 2.2.c). Le regist
 quand même : l'exemption tomberait si l'outil servait un usage professionnel ou d'autres
 personnes.
 
-**Responsable des traitements** : l'utilisatrice de K-B, propriétaire du dépôt. Pas de
-sous-traitant.
+**Responsable des traitements** : l'utilisatrice de K-B, propriétaire du dépôt.
+
+**Sous-traitant** : Microsoft, pour l'appel du modèle qui rédige les fiches de veille (Azure AI
+Foundry, zone de données UE). Contrat de sous-traitance : le *Microsoft Products and Services
+Data Protection Addendum* (DPA). Voir la section « Envoi des items au modèle des fiches ».
 
 ## Inventaire par source
 
@@ -41,7 +44,7 @@ entreprise.
 | Base légale | Intérêt légitime (art. 6.1.f) : veille professionnelle et formation. Les données sont publiées par les personnes elles-mêmes pour être diffusées, et réduites à un nom. |
 | Personnes concernées | Auteurs de papiers arXiv, auteurs d'articles gardés avec Web Clipper, auteurs de releases et d'alertes GitHub, personnes créditées dans une alerte GitHub, personnes citées dans les notes d'une release, propriétaires d'un dépôt du top 100 GitHub, propriétaires d'un dépôt d'un classement GH Archive (dépôts qui montent). |
 | Données | Noms des auteurs d'un papier, en liste JSON dans l'ordre d'arXiv (`publication.authors`). Login GitHub : brut seulement, sauf celui du propriétaire d'un dépôt du top 100, gardé dans le nom du dépôt, celui du propriétaire d'un dépôt d'un classement GH Archive, gardé dans le nom du dépôt (`trend.repository_name`), et sauf un login ou une @mention écrits dans les notes d'une release, gardées telles que reçues (`release.body`). Constat sur la collecte du 2026-10-07 : 12 des 100 notes de release contiennent un `@mot` (`@Claude`, `@file`, `@mention`, `@team`…) ; aucun n'a été vérifié comme étant un compte. Le brut GitHub contient aussi, pour chaque compte cité (auteur, personne créditée, propriétaire), son identifiant numérique et l'URL de son avatar, qui peut être une photo de la personne : brut seulement. |
-| Destinataires | L'utilisatrice ; les agents qu'elle lance, par l'API REST. |
+| Destinataires | L'utilisatrice ; les agents qu'elle lance, par l'API REST. Sous-traitant : Microsoft (Azure AI Foundry, zone de données UE), qui reçoit les champs envoyés des items pour rédiger les fiches de veille, sans les auteurs ; contrat : le DPA de Microsoft (section « Envoi des items au modèle des fiches »). |
 | Transferts hors UE | Quand un agent comme Claude Code lit les items par l'API, les noms d'auteurs lus partent chez le fournisseur du modèle, aux États-Unis. Cadre juridique de ce transfert non vérifié. |
 | Durée de conservation | Celle du mode d'acquisition de la source, tenue dans `src/k_b/core/config.py` (`RETENTION_YEARS_BY_ACQUISITION_MODE`) : pour la veille (`watch`), **2 ans après la collecte**, dans la base et dans le brut (provisoire, à confirmer dans #20). Le brut et la base ont la même durée : la base doit rester reconstructible depuis le brut. |
 | Sécurité | Données hors du dépôt de code (`~/K-B-data/`), jamais publiées ; fichiers lisibles par la seule utilisatrice ; l'API ouvre la base en lecture seule ; secrets en variables d'environnement. |
@@ -58,6 +61,23 @@ entreprise.
 | Transferts hors UE | Comme la fiche 1 : surlignages lus par un agent, envoyés au fournisseur du modèle. |
 | Durée de conservation | Extraits Zotero du brut : tous gardés ; **aucune durée décidée, aucune purge codée** (constat du 2026-10-11). Documents et surlignages dans la base : comme l'item auquel ils sont rattachés ; un document ou un surlignage supprimé dans Zotero est marqué retiré (`withdrawn_at`), pas supprimé (décision de Sabine du 2026-10-13) : seule la purge supprime. Zotero et le coffre Obsidian : gérés par l'utilisatrice dans ces outils, pas par K-B. |
 | Sécurité | Comme la fiche 1. La base Zotero n'est lue que par une copie temporaire, supprimée à la fin de chaque extraction ; ni cette copie ni les extraits ne sont publiés ou versionnés. |
+
+## Envoi des items au modèle des fiches (Azure AI Foundry)
+
+Pour rédiger les fiches de veille (`docs/fiches-veille.md`), l'API IA envoie des champs des items
+au modèle, chez Microsoft. C'est un traitement de la fiche 1 ; la fiche 2 n'envoie rien : ni
+`zotero_entry` ni clip ne sont lus pour les fiches (`WatchKind`, `src/k_b/ai_api/watch_items.py`).
+Sources datées : section « Sources de l'envoi au modèle ».
+
+| Rubrique | Contenu |
+|---|---|
+| Données envoyées | La liste blanche de #204 (`docs/fiches-veille.md`, « Entrée du modèle » ; `FIELDS_BY_KIND`, `src/k_b/ai_api/watch_items.py`) : `paper` : `title`, `summary` ; `vulnerability` : `cve_id`, `title`, `description`, `vendor`, `product`, `ransomware_use` ; `release` : `repository_name`, `tag_name`, `title`, `body` ; `advisory` : `ghsa_id`, `cve_id`, `title`, `cve_listed_in_cisa_kev`, `packages` ; `newsletter_article` : `edition`, `title`, `summary` ; plus `item_id` et `kind` pour chacun. Jamais `authors` (jamais lu par l'API IA) ni `url`. Dans chaque champ, toute URL devient `[url]` ; dans `release.body`, chaque `@login` devient `@user` ; puis chaque texte est coupé. Au classement, chaque item n'envoie que `item_id`, `kind`, `title` et son texte long (`summary`, `description` ou `body`) coupé à 500 caractères ; à la rédaction, les champs ci-dessus, coupés à 2 000 caractères (`MAX_FIELD_CHARS_FOR_WRITING`, `src/k_b/core/config.py`). |
+| Données personnelles qui partent | Le login du propriétaire d'un dépôt, dans `repository_name` (`owner/repo`), quand c'est une personne : gardé, car il identifie le dépôt. Limites du masquage (`docs/fiches-veille.md`) : une adresse mail écrite dans `release.body` et un nom écrit en texte libre (notes d'une release, résumé d'un papier ou d'un article) partent tels quels. |
+| Destinataire | Microsoft, par Azure AI Foundry : le déploiement du rédacteur, `KB_LLM_MODEL` (`gpt-6-luna`, journal ADR, « Modèle des fiches : gpt-6-luna sur Foundry », 16/10), et celui du LLM juge, `KB_LLM_JUDGE_MODEL` (`gpt-5.6-luna`, journal ADR, « Fiches de veille : le LLM juge »), dans la même ressource et la même zone de données. Le juge reçoit les affirmations gardées et les mêmes champs, coupés et masqués, des items qu'elles citent : les mêmes données partent une seconde fois. Microsoft n'en donne l'accès ni à OpenAI ni aux autres fournisseurs de modèles (« are NOT available to OpenAI or other providers of Models sold by Azure »). |
+| Fondement de la sous-traitance | Le DPA de Microsoft, qui « governs data processing by Models sold by Azure » (page « Data, privacy, and security »). Le compte Azure est un compte personnel en paiement à l'usage, de type Microsoft Customer Agreement (« Contrat client Microsoft », type lu par Sabine dans le portail Azure le 2026-10-16). Le Microsoft Customer Agreement « incorporates the Product Terms and the Microsoft Products and Services Data Protection Addendum » (page juridique de Dynamics 365, sur les achats en ligne : « For customers who purchase or renew a subscription (including free trials) online from Microsoft »). Les Privacy and Security Terms des Product Terms, pour le programme Microsoft Customer Agreement, renvoient au DPA, qui prévaut sur les autres conditions en cas de conflit, et rangent « Foundry Models sold by Azure » dans les Azure Core Services ; ce service n'est pas dans la liste des produits hors DPA. Ce fondement vaut pour ce compte personnel en Microsoft Customer Agreement : un changement d'abonnement ou de compte de facturation (par exemple l'abonnement d'une école) oblige à relire le type du compte et la chaîne contractuelle avant le premier appel sur ce compte. |
+| Région | Déploiement Data Zone Standard dans une ressource située dans l'UE : « prompts and responses may be processed in that or any other European Union Member Nation » ; les données au repos, dont celles de la surveillance des abus, sont stockées dans la géographie de la ressource. |
+| Usage par le fournisseur | Ni entraînement ni amélioration des modèles : « prompts and completions are not used to train, retrain, or improve the base models » ; le modèle ne garde rien (« The models are stateless »). Surveillance des abus : la revue automatique ne stocke rien ; seules les demandes signalées par le système, ou qui font partie d'un usage qu'il juge potentiellement abusif, sont stockées pour une revue humaine, par des employés de Microsoft situés dans l'EEE pour un déploiement dans l'EEE. K-B n'appelle que `chat/completions`, sans `store` (`src/k_b/ai_api/llm_client.py`) : aucune des fonctions qui gardent des échanges chez Microsoft (Responses API, Assistants, Stored completions). |
+| Durée de conservation | Chez K-B : rien, l'API IA n'écrit rien (règle 7 de `.claude/rules/poc.md`). Chez Microsoft : revue automatique, aucun stockage ; données gardées pour la revue humaine, **durée non publiée** par Microsoft (ni la page « Data, privacy, and security » ni la page « Abuse monitoring » ne la donnent). Une durée de 30 jours n'apparaît que dans des réponses de Microsoft Q&A et des sources secondaires : elle n'est pas retenue ici. |
 
 ## Procédure de tri
 
@@ -84,3 +104,14 @@ les données.
 - [Exemple de registre](https://www.cnil.fr/sites/default/files/atoms/files/registre_rgpd_basique.pdf) — CNIL
 - [Le règlement général sur la protection des données](https://www.cnil.fr/fr/reglement-europeen-protection-donnees) — CNIL
 - [Les six grands principes du RGPD](https://www.cnil.fr/fr/comprendre-le-rgpd/les-six-grands-principes-du-rgpd) — CNIL
+
+## Sources de l'envoi au modèle (consultées le 2026-10-16)
+
+- [Data, privacy, and security for Foundry Models sold by Azure](https://learn.microsoft.com/en-us/azure/foundry/responsible-ai/openai/data-privacy) — Microsoft Learn, `ms.date` 2026-05-18 : DPA, entraînement, zone de données UE, surveillance des abus, revue humaine dans l'EEE
+- [Foundry Models sold by Azure abuse monitoring](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/abuse-monitoring) — Microsoft Learn, `ms.date` 2026-05-13 : revue automatique et humaine ; aucune durée de conservation
+- [Microsoft Products and Services Data Protection Addendum (DPA)](https://www.microsoft.com/licensing/docs/view/microsoft-products-and-services-data-protection-addendum-dpa) — Microsoft Licensing : addendum aux Product Terms ; version en vigueur de mai 2026
+- [Privacy and Security Terms](https://www.microsoft.com/licensing/terms/en-US/product/PrivacyandSecurityTerms/All) — Microsoft Product Terms : « Foundry Models sold by Azure » dans les Azure Core Services ; liste des produits hors DPA
+- [Privacy and Security Terms, programme Microsoft Customer Agreement](https://www.microsoft.com/licensing/terms/product/PrivacyandSecurityTerms/MCA) — Microsoft Product Terms : renvoi au DPA, qui prévaut ; « Foundry Models sold by Azure » dans les Azure Core Services
+- [View your billing accounts in Azure portal](https://learn.microsoft.com/en-us/azure/cost-management-billing/manage/view-all-accounts) — Microsoft Learn, `ms.date` 2026-06-25 : types de compte de facturation et où lire le sien
+- [Legal information, Dynamics 365](https://www.microsoft.com/en-us/dynamics-365/business-applications/legal) — Microsoft, « Last updated » janvier 2024 : le Microsoft Customer Agreement incorpore les Product Terms et le DPA
+- Sources secondaires, non retenues pour la durée : [réponse Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/5609842/(urgent)-clarification-on-disabling-abuse-monitori), [réponse Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/2156579/azure-openai-data-management-and-abuse-monitoring)
