@@ -1,4 +1,4 @@
-<!-- consignes/conformite.md v2026-10-04 — source : time-knight. Ne pas modifier ici sans la reporter. -->
+<!-- consignes/conformite.md v2026-10-15 — source : time-knight. Ne pas modifier ici sans la reporter. -->
 # Conformité — référentiels en vigueur
 
 Ce que le code des projets applique en sécurité, données, accessibilité et écoconception, dans la
@@ -12,6 +12,8 @@ version **en vigueur**. Complète `code.md`, qui dit comment coder ; ce fichier 
 | RGPD, fiche CNIL « intérêt légitime : collecte par moissonnage » | fiche en ligne | 2026-10-04 | https://www.cnil.fr/fr/focus-interet-legitime-collecte-par-moissonnage | collecte, scraping, base, purge |
 | RGAA | 4.1.2 (WCAG 2.1 AA) ; RGAA 5 (WCAG 2.2) annoncé fin 2026 | 2026-10-04 | https://accessibilite.numerique.gouv.fr/ | interfaces, documentation publiée |
 | RGESN | v2, 28/05/2024 | 2026-10-04 | https://ecoresponsable.numerique.gouv.fr/publications/referentiel-general-ecoconception/ | collecte, stockage, hébergement, IA |
+| OWASP Top 10 for LLM Applications | 2026 (août 2026 ; remplace 2025) | 2026-10-15 | https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/ | tout appel à un LLM : consigne, données envoyées, sortie, coût |
+| OWASP Top 10 for Agentic Applications | 2026 (publiée le 09/12/2025) | 2026-10-15 | https://genai.owasp.org/2025/12/09/owasp-top-10-for-agentic-applications-the-benchmark-for-agentic-security-in-the-age-of-autonomous-ai/ | tout agent qui choisit ses actions ou ses outils (aucun au POC du 25/10) |
 
 ## Ce que chacun impose ici
 
@@ -42,6 +44,31 @@ version **en vigueur**. Complète `code.md`, qui dit comment coder ; ce fichier 
 - 3.1 : éviter une technologie gourmande (apprentissage automatique notamment) sauf à retenir la
   solution la plus sobre et à le documenter.
 - Collecte incrémentale : ne pas retélécharger ce qui est déjà là ; limiter le volume lu par requête.
+
+**OWASP Top 10 for LLM Applications (2026)**
+(Publiée le 03/08/2026 selon la page officielle ; LLM01 et LLM03 confirmés par OWASP ; les autres intitulés
+viennent de sources secondaires concordantes, à revérifier dans le PDF officiel.)
+- LLM01 *Prompt Injection* : le texte d'une source est une donnée, jamais une consigne ; la consigne est
+  une constante ; la sortie est revalidée par le code (schéma, listes fermées) avant tout usage.
+- LLM02 *Sensitive Information Disclosure* : n'envoyer au modèle que ce qui sert ; données personnelles
+  retirées ou masquées avant l'envoi ; ni texte envoyé ni sortie dans les journaux.
+- LLM03 *Excessive Agency* : aucun outil confié au modèle sans besoin écrit ; s'il en faut, le Top 10
+  for Agentic Applications s'applique.
+- LLM04 *Supply Chain* : fournisseur et modèle choisis par décision écrite ; dépendances épinglées et
+  auditées.
+- LLM06 *Unbounded Consumption* : borner par demande le nombre d'appels, les jetons de sortie et les
+  délais.
+- LLM07 *Misinformation* : chaque affirmation d'une sortie se rattache à sa source et se vérifie.
+- LLM10 *Improper Output Handling* : la sortie est une entrée non fiable ; liens et balises refusés
+  avant tout rendu.
+- LLM05, LLM08, LLM09 : à relire à la source dès qu'un besoin les touche (entraînement, contexte caché,
+  recherche vectorielle).
+
+**OWASP Top 10 for Agentic Applications (2026)** — ASI01 à ASI10 confirmés sur la page officielle ; avant le
+premier agent, relire le guide en entier.
+- ASI01 *Agent Goal Hijack* : un contenu lu par l'agent ne change jamais son objectif.
+- ASI02 *Tool Misuse* : outils au plus juste, paramètres validés par le code.
+- ASI03 *Identity & Privilege Abuse* : l'agent agit avec ses propres droits, minimaux.
 
 ## Fraîcheur
 
