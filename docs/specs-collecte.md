@@ -91,7 +91,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   depuis la veille de la dernière collecte (date de revue, pas de publication : GitHub relit
   parfois une alerte des jours après l'avoir publiée), même avertissement si la page de 100 est
   pleine. Une page qui porte une alerte invalide est écrite, même sans alerte valide nouvelle :
-  l'alerte sort de la page en un ou deux jours, et son rejet doit atteindre le journal d'import.
+  l'alerte sort de la page à mesure que la fenêtre avance, et son rejet doit atteindre le journal
+  d'import.
   Un écosystème dont la seule alerte de la fenêtre est invalide échoue à chaque collecte
   (`all_items_invalid`, sa date reste), jusqu'à la première alerte valide revue.
   Dépôts les plus étoilés collectés (PR de #11) : un instantané du top 100 à chaque collecte
