@@ -3,9 +3,10 @@
 - **Date** : 2026-10-16
 - **Branche** : `fix/reject-without-received-value`
 - **Issue** : #212
-- **Fichiers principaux** : `src/k_b/core/quoting.py`, `src/k_b/etl/transform.py`,
+- **Fichiers principaux** : `src/k_b/core/quoting.py`, `src/k_b/etl/transform.py`, `src/k_b/items.py`,
   `src/k_b/etl/sources/tldr.py`, `src/k_b/etl/sources/zotero.py`, `.claude/rules/poc.md` ;
-  tests : `tests/test_quoting.py`, `tests/etl/test_transform.py`, `tests/etl/sources/test_tldr.py`
+  tests : `tests/test_quoting.py`, `tests/test_items.py`, `tests/etl/test_transform.py`,
+  `tests/etl/sources/test_tldr.py`, `tests/etl/sources/test_zotero.py`
 - **Note précédente de la série** : [Rejeter l'item que la base refuse](2026-10-16-rejeter-l-item-que-la-base-refuse.md)
   (#136, le même journal d'import, à l'écriture)
 
@@ -121,7 +122,30 @@ d'origine vient de `_markupbase`. Dans une 3.13 antérieure à 3.13.13, il peut 
 la page (`'unknown status keyword %r'`), et `pyproject.toml` admet toute 3.13. En 3.13.13, ce
 chemin n'est plus appelé.
 
-### 5. `from None` plutôt que `from error`
+### 5. Défense en profondeur : `hide_input_in_errors`
+
+`without_values` reconstruit l'erreur. Une erreur d'un type que pydantic ne connaît pas (une
+`PydanticCustomError`) lui ferait lever `KeyError` dans le `except` de `read_page`. Ce `KeyError`
+porterait l'erreur d'origine dans son `__context__`. Il remonterait jusqu'à `cli.py:194`
+(`logger.exception`), et la trace imprimerait l'`input_value` dans `kb.log` (constat CR1 de la
+revue). Ce n'est pas joignable aujourd'hui, mais Sabine a choisi de fermer ce chemin à la source.
+
+`src/k_b/items.py:302-304` :
+
+```python
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", strict=True, hide_input_in_errors=True
+    )
+```
+
+Avec ce réglage, l'erreur ne cite plus la valeur dès sa création, quel que soit le chemin qu'elle
+prend ensuite : rejet, trace ou `str()`. Il porte sur les quatre modèles qui valident les données
+d'une source : `Item` et `Highlight` (`items.py`), `ZoteroDocument` et `ZoteroHighlight`
+(`zotero.py`). Pour un modèle imbriqué, c'est le réglage du modèle extérieur qui décide.
+`without_values` reste, comme l'exige le critère (a) : deux contrôles valent mieux qu'un
+(`code.md`, « Défense en profondeur »).
+
+### 6. `from None` plutôt que `from error`
 
 `tldr.py:148-150` :
 
@@ -146,9 +170,8 @@ imprimée (documentation Python, « Exception context »). Le test vérifie
 | La fonction qui retire la valeur | `without_values` | `describe_validation_error` est propre à GH Archive : elle connaît ses champs (`KNOWN_FIELDS`, `rows`), ne garde que la première erreur et cite la valeur d'une date ou d'un nombre. Une copie est interdite par le critère (a). |
 | Son emplacement | `core/quoting.py` | `etl/source_contract.py` est permis, mais son thème est le contrat entre une source et le pipeline. Rester dans `zotero.py` est interdit par les dépendances. |
 | L'appel de `zotero.convert_document` | gardé | Le retirer serait plus DRY, mais hors de la demande. Deux appels donnent le même résultat. Décision du plan validé par Sabine, confirmée au tri des revues (CR4). |
-| Une `PydanticCustomError` ferait lever `KeyError` à `without_values` | pas de repli | Ce n'est pas joignable : il n'en existe aucune dans `src`. Une sonde a reconstruit tous les types d'erreur joignables. YAGNI, au plan validé. Le constat CR1 de la revue repose la question : décision de Sabine en attente. |
+| Une `PydanticCustomError` ferait lever `KeyError` à `without_values` (CR1) | `hide_input_in_errors=True` sur les quatre modèles, en plus de `without_values` (décision de Sabine du 16/10, recommandée par time-knight) | Rattraper le `KeyError` dans `read_page` : plus de code, et ne protège que ce chemin. Ne rien faire : la trace d'un `KeyError` imprimerait la valeur. |
 | Formater `error.errors(include_input=False)` sur une ligne | non | C'est une nouvelle fonction, contraire au critère (a). Signalé, avec le motif sur plusieurs lignes (CR5, CR6). |
-| `hide_input_in_errors=True` dans la configuration des modèles | non examiné à temps | Cette option de pydantic cache la valeur dès la source, pour tout modèle qui la porte. Elle a été trouvée dans la documentation après coup, en écrivant cette note : voir « Ce qui reste ». |
 | Le refus de `tldr` | message fixe, `from None` | Le signaler seulement : le dépôt devient public le 25/10, et la correction tient en une ligne (décision de Sabine). |
 
 ## Preuve
@@ -160,8 +183,9 @@ imprimée (documentation Python, « Exception context »). Le test vérifie
 | `test_an_unreadable_page_is_rejected_without_its_text` (5 cas) | Point (b) : une page illisible ne cite pas son contenu. Passait avant la correction : c'est une vérification, pas une correction. |
 | `test_a_page_the_html_parser_rejects_is_refused_whole` | Le message est fixe et `__cause__ is None`. Échouait avant. |
 | `test_an_error_without_values_keeps_its_field_and_type_but_not_its_value` | La fonction seule : champ et type gardés, valeur absente. |
+| `test_a_refusal_does_not_quote_the_value_received` (`test_items.py`, `test_zotero.py`, 4 cas) | `Item`, `Highlight`, `ZoteroDocument` et `ZoteroHighlight` ne citent pas la valeur reçue dans `str(error)`. Échouait avant le réglage. |
 | `grep -rn -A5 "except ValidationError" src/k_b \| grep -E "\{error\}\|str\(error\)"` | Ne rend plus rien (point (d)). |
-| `uv run pytest`, `ruff check`, `ruff format --check`, `mypy --strict` | 1521 tests verts, et les autres contrôles verts. |
+| `uv run pytest`, `ruff check`, `ruff format --check`, `mypy --strict` | 1525 tests verts, et les autres contrôles verts. |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -175,7 +199,8 @@ imprimée (documentation Python, « Exception context »). Le test vérifie
 3. **« Que se passe-t-il si un validateur écrit la valeur dans son message ? »** `without_values`
    garde le message : la valeur passerait. La garantie repose sur une règle du dépôt, écrite dans
    la docstring (`quoting.py:20-23`) : un message donne une mesure, ou passe par `quote_value`.
-   C'est une limite assumée, pas un filtre.
+   Derrière, `hide_input_in_errors` empêche le modèle de citer la valeur reçue (`input_value`) ;
+   il n'empêche pas un message de la recopier. La règle 3 tient ce cas.
 4. **« Pourquoi `from None` ? Le message est déjà retiré. »** Une trace imprime la cause
    chaînée : `from error` aurait gardé le texte du parseur dans `__cause__`
    (`tldr.py:150`, et le test qui vérifie `__cause__ is None`).
@@ -192,16 +217,14 @@ imprimée (documentation Python, « Exception context »). Le test vérifie
   sécurité.
 - La troncature d'`input_value` à environ 25 caractères de chaque côté est mesurée sur pydantic
   2.13.5, pas lue dans sa documentation.
-- `hide_input_in_errors` n'a pas été essayée sur les modèles de K-B.
+- `hide_input_in_errors` est testé sur un champ par modèle. Les autres types d'erreur ont été
+  sondés par time-knight (`PydanticCustomError`, `ValueError` de validateur, `string_type`,
+  `extra_forbidden`, `model_validator`, modèle imbriqué), mais ne sont pas tenus par un test.
 
 ## Ce qui reste
 
-- **CR1** : faut-il un repli si `without_values` lève un jour `KeyError` ? Décision de Sabine en
-  attente au moment d'écrire.
 - **Le motif sur plusieurs lignes** : les lignes suivantes de `kb.log` ne sont pas horodatées, et
   le motif porte une URL `errors.pydantic.dev` par erreur. Signalé sans issue (CR5, CR6).
-- **`hide_input_in_errors=True`** sur `Item`, `Highlight` et les modèles de Zotero : une option à
-  évaluer, qui ferait tenir la règle 5 dès la source. Signalé.
 - **Le chemin absolu** cité par une `OSError` (sous `KB_DATA_DIR`) : à rappeler pour la mise en
   ligne du 08/11.
 - Les `!r` non tronqués de quelques lecteurs (noms de dépôt, réglages) et la docstring périmée
@@ -209,8 +232,8 @@ imprimée (documentation Python, « Exception context »). Le test vérifie
 
 ## Sources
 
-- Pydantic, `ValidationError.from_exception_data`, paramètre `hide_input`, et
-  `hide_input_in_errors` : https://pydantic.dev/docs/validation/latest/api/pydantic-core/pydantic_core
+- Pydantic, `ValidationError.from_exception_data` (paramètre `hide_input`) et le réglage
+  `hide_input_in_errors` (« Hides the input value and type from error messages ») : https://pydantic.dev/docs/validation/latest/api/pydantic-core/pydantic_core
   et https://pydantic.dev/docs/validation/latest/api/pydantic/config, consultées par Context7 le
   2026-10-16.
 - Python, *Built-in Exceptions*, « Exception context » (`__cause__`, `__context__`,
