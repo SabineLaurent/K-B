@@ -1,4 +1,4 @@
-<!-- consignes/conformite.md v2026-10-15 — source : time-knight. Ne pas modifier ici sans la reporter. -->
+<!-- consignes/conformite.md v2026-10-16 — source : time-knight. Ne pas modifier ici sans la reporter. -->
 # Conformité — référentiels en vigueur
 
 Ce que le code des projets applique en sécurité, données, accessibilité et écoconception, dans la
@@ -14,6 +14,7 @@ version **en vigueur**. Complète `code.md`, qui dit comment coder ; ce fichier 
 | RGESN | v2, 28/05/2024 | 2026-10-04 | https://ecoresponsable.numerique.gouv.fr/publications/referentiel-general-ecoconception/ | collecte, stockage, hébergement, IA |
 | OWASP Top 10 for LLM Applications | 2026 (août 2026 ; remplace 2025) | 2026-10-15 | https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/ | tout appel à un LLM : consigne, données envoyées, sortie, coût |
 | OWASP Top 10 for Agentic Applications | 2026 (publiée le 09/12/2025) | 2026-10-15 | https://genai.owasp.org/2025/12/09/owasp-top-10-for-agentic-applications-the-benchmark-for-agentic-security-in-the-age-of-autonomous-ai/ | tout agent qui choisit ses actions ou ses outils (aucun au POC du 25/10) |
+| RGPD, sous-traitance et transferts (art. 28, 30, chap. V) ; fiche CNIL « registre » | règlement 2016/679 ; pages CNIL en ligne | 2026-10-16 | https://www.cnil.fr/fr/reglement-europeen-protection-donnees/chapitre4 ; https://www.cnil.fr/fr/RGPD-le-registre-des-activites-de-traitement | tout envoi de données à un fournisseur : modèle (LLM), hébergement |
 
 ## Ce que chacun impose ici
 
@@ -32,6 +33,14 @@ version **en vigueur**. Complète `code.md`, qui dit comment coder ; ce fichier 
   collectée par accident.
 - Chaque donnée personnelle (auteur, identifiant…) figure au registre des traitements, avec sa
   durée ; la purge est **codée et testée**, pas seulement décrite.
+
+**RGPD : sous-traitance et transferts**
+- Un fournisseur qui reçoit des données pour le compte de l'utilisatrice (modèle, hébergement) est un sous-traitant :
+  son contrat (DPA) est lu à la source **avant le premier envoi** (art. 28.3), et il est nommé au registre parmi les
+  destinataires (art. 30.1.d).
+- Lieu de traitement choisi et écrit (zone UE quand le fournisseur l'offre) ; un transfert hors UE est inscrit au
+  registre avec sa garantie (chap. V).
+- Un changement de fournisseur, de compte ou d'abonnement : relire le contrat et mettre le registre à jour avant.
 
 **RGAA 4.1.2**
 - Toute interface vise WCAG 2.1 AA ; un contrôle d'accessibilité en apporte la preuve.
