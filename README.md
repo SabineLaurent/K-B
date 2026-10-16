@@ -219,6 +219,10 @@ sqlite3 -readonly ~/K-B-data/k-b.sqlite "SELECT kind, count(*) FROM item GROUP B
 uv run pytest
 ```
 
+La CI (GitHub Actions, `.github/workflows/ci.yml`) lance quatre jobs, `audit` (pip-audit sur `uv.lock`),
+`tests` (pytest), `lint` (ruff check et ruff format --check) et `types` (mypy --strict), sur chaque PR vers
+`main` et sur chaque push sur `main`, donc après chaque fusion.
+
 ## Licence
 
 © 2026 Sabine Laurent — sous licence [Creative Commons Attribution - Pas d'Utilisation Commerciale 4.0 International (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/deed.fr).
