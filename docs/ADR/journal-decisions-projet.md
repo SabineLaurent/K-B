@@ -2349,7 +2349,7 @@ Gemini, en clé gratuite.
   n'entre pas dans ce repli. Fin du repli : quand #158 est faite. Issue : #227. Sources (consultées
   le 2026-10-16) : [compatibilité OpenAI de Gemini](https://ai.google.dev/gemini-api/docs/openai),
   [limites de débit](https://ai.google.dev/gemini-api/docs/rate-limits),
-  [guide Gemini 3](https://ai.google.dev/gemini-api/docs/gemini-3). — PR à venir
+  [guide Gemini 3](https://ai.google.dev/gemini-api/docs/gemini-3). — PR #229
 
 ## Décisions encore ouvertes
 
