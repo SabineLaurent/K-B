@@ -7,10 +7,10 @@ from pathlib import Path
 import pytest
 
 from k_b.etl.raw_store import write_file_atomically
-from k_b.etl.source_contract import SourceKind, SourceReader
+from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.zotero import ZoteroSource
-from k_b.etl.transform import RawFile, RawReading, read_raw_items
+from k_b.etl.transform import RawFile, RawReading, Rejection, read_raw_items
 from k_b.items import Item
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -18,8 +18,8 @@ COLLECTION_NAME = "2026-10-05T093000Z"
 COLLECTED_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
 
 
-def read_lines(raw: bytes) -> list[str]:
-    return raw.decode().splitlines()
+def read_lines(raw: bytes) -> EntryReading[str]:
+    return EntryReading(raw.decode().splitlines(), [])
 
 
 def convert_line(line: str, collected_at: datetime, raw_file_path: str) -> Item:
@@ -239,8 +239,8 @@ def test_an_entry_refused_as_an_item_is_rejected_and_the_others_of_its_file_are_
     assert len(reading.rejections) == 1
     rejection = reading.rejections[0]
     assert rejection.raw_file_path == f"automated_watch/cisa_kev/{COLLECTION_NAME}.csv"
-    assert rejection.reason.startswith("entry 2: ValidationError")
-    assert "entry 2" in caplog.text
+    assert rejection.reason.startswith("read entry 2: ValidationError")
+    assert "read entry 2" in caplog.text
 
 
 def test_a_title_too_long_is_rejected_and_logged_and_the_other_papers_are_read(
@@ -268,7 +268,7 @@ def test_a_title_too_long_is_rejected_and_logged_and_the_other_papers_are_read(
     assert rejection.raw_file_path == (
         f"automated_watch/arxiv_cscr_x_csai/{COLLECTION_NAME}.xml"
     )
-    assert rejection.reason.startswith("entry 0: ValidationError")
+    assert rejection.reason.startswith("read entry 0: ValidationError")
     assert observed in rejection.reason
     assert observed in caplog.text
 
@@ -502,6 +502,36 @@ def test_a_file_read_counts_its_rejected_entries(tmp_path):
     (raw_file,) = read_raw_items(tmp_path, SOURCE_KINDS, frozenset()).files
 
     assert (len(raw_file.items), raw_file.rejection_count) == (3, 1)
+
+
+def test_an_entry_rejected_by_its_reader_is_rejected_and_counted_with_its_file(
+    tmp_path, caplog
+):
+    catalog = (FIXTURES_DIR / "cisa_kev_extract.csv").read_text()
+    catalog = catalog.replace(",2026-09-27,", ",27/09/2026,", 1).replace(
+        '"Citrix NetScaler Improper Input Validation Vulnerability"', '""'
+    )
+    source_dir = tmp_path / "automated_watch" / "cisa_kev"
+    source_dir.mkdir(parents=True)
+    (source_dir / f"{COLLECTION_NAME}.csv").write_text(catalog)
+
+    with caplog.at_level(logging.WARNING):
+        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+
+    assert [item.source_item_id for item in items_of(reading)] == [
+        "CVE-2026-86950",
+        "CVE-2020-29583",
+    ]
+    reader_rejection, item_rejection = reading.rejections
+    raw_file_path = f"automated_watch/cisa_kev/{COLLECTION_NAME}.csv"
+    assert reader_rejection == Rejection(
+        raw_file_path, "line 3 ('CVE-2026-88772'): invalid dateAdded: '27/09/2026'"
+    )
+    assert "line 3 ('CVE-2026-88772')" in caplog.text
+    # Its position counts the entries read: the row rejected by the reader is not one.
+    assert item_rejection.reason.startswith("read entry 1: ValidationError")
+    (raw_file,) = reading.files
+    assert raw_file.rejection_count == 2
 
 
 @pytest.mark.parametrize(

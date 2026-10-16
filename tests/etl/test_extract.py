@@ -1,14 +1,16 @@
 import logging
 import os
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from urllib.error import HTTPError
 
 import pytest
 
 from k_b.etl.extract import collect_all_sources
 from k_b.etl.raw_store import load_last_collection_dates, save_last_collection_dates
-from k_b.etl.sources import tldr
+from k_b.etl.sources import cisa_kev, tldr
 
+FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 FIRST_RUN_AT = datetime(2026, 9, 30, 10, 0, tzinfo=UTC)
 SECOND_RUN_AT = FIRST_RUN_AT + timedelta(hours=1)
 
@@ -284,3 +286,26 @@ def test_the_error_and_the_notes_of_a_failed_source_are_quoted_escaped(
         "collection failed for source 'failing': ValueError "
         "'a value\\nERROR forged'; 'a note\\nERROR forged'"
     )
+
+
+def test_a_source_whose_entries_are_all_invalid_writes_no_raw_and_keeps_its_date(
+    tmp_path, monkeypatch, caplog
+):
+    catalog = (FIXTURES_DIR / "cisa_kev_extract.csv").read_text()
+    for date_added in ("2026-09-29", "2026-09-27", "2021-11-03"):
+        catalog = catalog.replace(f",{date_added},", ",not a date,")
+    monkeypatch.setattr(cisa_kev, "download", lambda *arguments: catalog.encode())
+    save_last_collection_dates(tmp_path, {"cisa_kev": FIRST_RUN_AT})
+
+    with caplog.at_level(logging.ERROR):
+        outcome = collect_all_sources(
+            [cisa_kev.CisaKevSource()], tmp_path / "raw", tmp_path, SECOND_RUN_AT
+        )
+
+    assert str(outcome.errors_by_source["cisa_kev"]).startswith(
+        "all_items_invalid: 4 entries, all rejected; first: line 2 ('CVE-2026-86950')"
+    )
+    assert not (tmp_path / "raw" / "automated_watch" / "cisa_kev").exists()
+    assert load_last_collection_dates(tmp_path) == {"cisa_kev": FIRST_RUN_AT}
+    [record] = caplog.records
+    assert "all_items_invalid" in record.getMessage()

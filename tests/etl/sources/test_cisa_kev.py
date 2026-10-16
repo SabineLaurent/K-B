@@ -1,11 +1,9 @@
 import io
-from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from urllib.error import HTTPError
 
 import pytest
-from pydantic import ValidationError
 
 from k_b.etl import http_download
 from k_b.etl.sources import cisa_kev
@@ -101,7 +99,7 @@ RAW_FILE_PATH = "automated_watch/cisa_kev/2026-10-05T093000Z.csv"
 
 
 def test_the_first_collection_reads_the_whole_catalog():
-    vulnerabilities = read_new_vulnerabilities(EXTRACT, last_collected_at=None)
+    vulnerabilities = read_new_vulnerabilities(EXTRACT, last_collected_at=None).entries
 
     assert [vulnerability.cve_id for vulnerability in vulnerabilities] == [
         "CVE-2026-86950",
@@ -114,7 +112,7 @@ def test_the_first_collection_reads_the_whole_catalog():
 def test_only_vulnerabilities_added_since_the_day_before_the_last_collection_are_read():
     last_collected_at = datetime(2026, 9, 28, 18, 0, tzinfo=UTC)
 
-    vulnerabilities = read_new_vulnerabilities(EXTRACT, last_collected_at)
+    vulnerabilities = read_new_vulnerabilities(EXTRACT, last_collected_at).entries
 
     assert [vulnerability.cve_id for vulnerability in vulnerabilities] == [
         "CVE-2026-86950",
@@ -124,7 +122,7 @@ def test_only_vulnerabilities_added_since_the_day_before_the_last_collection_are
 
 
 def test_a_vulnerability_keeps_its_publication_date_and_description():
-    newest = read_new_vulnerabilities(EXTRACT, last_collected_at=None)[0]
+    newest = read_new_vulnerabilities(EXTRACT, last_collected_at=None).entries[0]
 
     assert newest.date_added == date(2026, 9, 29)
     assert newest.vendor_project == "Apple"
@@ -161,28 +159,77 @@ def test_a_catalog_without_the_ransomware_column_is_refused():
         ("CVE-2026-1234", "29/09/2026"),
     ],
 )
-def test_a_malformed_row_is_refused(cve_id, date_added):
+def test_a_malformed_row_is_rejected_with_its_line(cve_id, date_added):
     header, first_row = EXTRACT.decode("utf-8").splitlines()[:2]
     fields = first_row.split(",", 5)
     fields[0], fields[4] = cve_id, date_added
     malformed_catalog = f"{header}\n{','.join(fields)}\n".encode()
 
-    with pytest.raises(ValueError, match="line 2"):
-        read_new_vulnerabilities(malformed_catalog, None)
+    reading = read_new_vulnerabilities(malformed_catalog, None)
+
+    assert reading.entries == []
+    [reason] = reading.rejection_reasons
+    assert reason.startswith("line 2")
 
 
-def test_a_row_with_missing_fields_is_refused():
+def test_a_row_with_missing_fields_is_rejected_with_the_fields():
     header = EXTRACT.decode("utf-8").splitlines()[0]
 
-    with pytest.raises(ValueError, match="line 2: missing fields"):
-        read_new_vulnerabilities(f"{header}\nCVE-2026-1234,Apple\n".encode(), None)
+    reading = read_new_vulnerabilities(
+        f"{header}\nCVE-2026-1234,Apple\n".encode(), None
+    )
+
+    assert reading.rejection_reasons == [
+        (
+            "line 2: missing fields product, vulnerabilityName, dateAdded, "
+            "shortDescription, knownRansomwareCampaignUse"
+        )
+    ]
+
+
+def catalog_with_invalid_rows(*positions):
+    """The recorded catalog, the dateAdded of its rows at these positions (from 0) day first."""
+    header, *rows = EXTRACT.decode("utf-8").splitlines()
+    for position in positions:
+        rows[position] = rows[position].replace(",2026-09-27,", ",27/09/2026,", 1)
+        rows[position] = rows[position].replace(",2026-09-29,", ",29/09/2026,", 1)
+        rows[position] = rows[position].replace(",2021-11-03,", ",03/11/2021,", 1)
+    return "\n".join([header, *rows, ""]).encode()
+
+
+def test_an_invalid_row_is_rejected_with_its_line_cve_and_field_and_the_others_are_read():
+    reading = read_new_vulnerabilities(catalog_with_invalid_rows(1), None)
+
+    assert [vulnerability.cve_id for vulnerability in reading.entries] == [
+        "CVE-2026-86950",
+        "CVE-2026-88771",
+        "CVE-2020-29583",
+    ]
+    assert reading.rejection_reasons == [
+        "line 3 ('CVE-2026-88772'): invalid dateAdded: '27/09/2026'"
+    ]
+
+
+def test_a_catalog_with_an_invalid_row_is_collected(monkeypatch):
+    catalog = catalog_with_invalid_rows(1)
+    monkeypatch.setattr(http_download, "urlopen", FakeUrlopen(body=catalog))
+
+    assert CisaKevSource().fetch(last_collected_at=None) == catalog
+
+
+def test_a_catalog_whose_rows_are_all_invalid_fails_the_collection(monkeypatch):
+    catalog = catalog_with_invalid_rows(0, 1, 2, 3)
+    monkeypatch.setattr(http_download, "urlopen", FakeUrlopen(body=catalog))
+
+    with pytest.raises(ValueError, match="^all_items_invalid: 4 entries, all rejected"):
+        CisaKevSource().fetch(last_collected_at=None)
 
 
 def test_a_vulnerability_dated_the_day_before_a_collection_run_after_midnight_utc_is_kept():
     # 02:00 UTC on the 30th is still the 29th in the Americas: rows dated the 29th may follow.
     last_collected_at = datetime(2026, 9, 30, 2, 0, tzinfo=UTC)
 
-    vulnerabilities = read_new_vulnerabilities(EXTRACT, last_collected_at)
+    vulnerabilities = read_new_vulnerabilities(EXTRACT, last_collected_at).entries
 
     assert [vulnerability.cve_id for vulnerability in vulnerabilities] == [
         "CVE-2026-86950"
@@ -190,7 +237,7 @@ def test_a_vulnerability_dated_the_day_before_a_collection_run_after_midnight_ut
 
 
 def test_a_catalog_starting_with_a_byte_order_mark_is_read():
-    vulnerabilities = read_new_vulnerabilities(b"\xef\xbb\xbf" + EXTRACT, None)
+    vulnerabilities = read_new_vulnerabilities(b"\xef\xbb\xbf" + EXTRACT, None).entries
 
     assert len(vulnerabilities) == 4
 
@@ -221,12 +268,15 @@ def test_a_vulnerability_points_to_its_nvd_page_and_is_dated_at_midnight_utc():
     assert item.ransomware_use == "Known"
 
 
-def test_a_ransomware_use_outside_known_and_unknown_is_refused_as_an_item():
-    vulnerability = read_new_vulnerabilities(EXTRACT, last_collected_at=None)[0]
+def test_a_ransomware_use_outside_known_and_unknown_is_rejected_with_its_line_and_cve():
+    header, first_row = EXTRACT.decode("utf-8").splitlines()[:2]
+    catalog = f"{header}\n{first_row.replace(',Unknown,', ',Yes,', 1)}\n".encode()
 
-    with pytest.raises(ValidationError):
-        convert_vulnerability(
-            replace(vulnerability, known_ransomware_campaign_use="Yes"),
-            COLLECTED_AT,
-            RAW_FILE_PATH,
+    reading = read_new_vulnerabilities(catalog, None)
+
+    assert reading.rejection_reasons == [
+        (
+            "line 2 ('CVE-2026-86950'): knownRansomwareCampaignUse is not one of "
+            "('Known', 'Unknown'): 'Yes'"
         )
+    ]

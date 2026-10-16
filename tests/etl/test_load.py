@@ -29,7 +29,7 @@ from k_b.etl.load import (
     import_items,
     read_imported_paths,
 )
-from k_b.etl.source_contract import SourceKind, SourceReader
+from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.gh_archive import read_trend_files
 from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
@@ -658,6 +658,28 @@ def test_each_rejected_file_is_written_to_the_log(data_dir):
     assert rejections[0]["reason"]
 
 
+def test_an_invalid_release_is_written_to_the_log_and_the_others_are_imported(
+    data_dir,
+):
+    releases = json.loads((FIXTURES_DIR / "github_releases_extract.json").read_text())
+    releases[1]["tag_name"] = None
+    raw_file_path = write_collection(
+        data_dir, RELEASES_DIR, "2026-10-06T093000Z", json.dumps(releases)
+    )
+
+    run_import(data_dir)
+
+    rejections = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
+    assert rejections == [
+        {
+            "kind": "rejection",
+            "raw_file_path": raw_file_path,
+            "reason": "release 1 (id 400266224): tag_name is not a string",
+        }
+    ]
+    assert count_rows(data_dir, "SELECT count(*) FROM release") == 3
+
+
 def test_a_failed_import_leaves_the_database_and_the_log_unchanged(
     data_dir, monkeypatch
 ):
@@ -693,7 +715,7 @@ def test_an_item_of_a_kind_without_writer_is_refused_and_nothing_written(
             (),
             SourceReader(
                 "tldr",
-                lambda raw: raw.decode().splitlines(),
+                lambda raw: EntryReading(raw.decode().splitlines(), []),
                 convert_line,
             ),
         )
@@ -909,7 +931,11 @@ def test_an_item_with_every_text_and_list_at_its_maximum_goes_into_the_database(
         SourceKind(
             "fake",
             (),
-            SourceReader("arxiv", lambda raw: builders, build_item_at_its_maximums),
+            SourceReader(
+                "arxiv",
+                lambda raw: EntryReading(builders, []),
+                build_item_at_its_maximums,
+            ),
         )
     ]
 

@@ -157,7 +157,7 @@ def advisory_payload(**changes):
 
 
 def test_a_recorded_response_gives_one_advisory_per_entry_newest_first():
-    advisories = read_advisories(RECORDED_RESPONSE)
+    advisories = read_advisories(RECORDED_RESPONSE).entries
 
     assert [advisory.ghsa_id for advisory in advisories] == [
         "GHSA-fjqc-hq36-qh5p",
@@ -174,7 +174,7 @@ def test_a_recorded_response_gives_one_advisory_per_entry_newest_first():
 
 
 def test_each_affected_package_is_kept_once_in_its_order():
-    assert read_advisories(RECORDED_RESPONSE)[2].packages == (
+    assert read_advisories(RECORDED_RESPONSE).entries[2].packages == (
         "langsmith",
         "langchain-classic",
         "langchain",
@@ -186,7 +186,7 @@ def test_the_credited_people_are_not_kept():
 
 
 def test_an_advisory_without_cve_keeps_an_empty_cve():
-    assert read_advisories(advisory_payload(cve_id=None))[0].cve_id is None
+    assert read_advisories(advisory_payload(cve_id=None)).entries[0].cve_id is None
 
 
 def test_a_response_that_is_not_a_list_is_refused():
@@ -208,13 +208,16 @@ def test_a_response_that_is_not_a_list_is_refused():
         {"vulnerabilities": [{"package": {"name": 42}}]},
     ],
 )
-def test_an_invalid_advisory_is_refused_with_its_position(changes):
-    with pytest.raises(ValueError, match="advisory 0"):
-        read_advisories(advisory_payload(**changes))
+def test_an_invalid_advisory_is_rejected_with_its_position(changes):
+    reading = read_advisories(advisory_payload(**changes))
+
+    assert reading.entries == []
+    [reason] = reading.rejection_reasons
+    assert reason.startswith("advisory 0")
 
 
 def test_a_recorded_advisory_gives_its_item_with_its_cve_and_packages():
-    advisory = read_advisories(RECORDED_RESPONSE)[2]
+    advisory = read_advisories(RECORDED_RESPONSE).entries[2]
 
     item = convert_advisory(advisory, COLLECTED_AT, RAW_FILE_PATH)
 
@@ -226,3 +229,69 @@ def test_a_recorded_advisory_gives_its_item_with_its_cve_and_packages():
     assert item.published_at == advisory.published_at
     assert item.cve == "CVE-2026-45134"
     assert item.package_names == ("langsmith", "langchain-classic", "langchain")
+
+
+def page_with_invalid_advisories(*positions):
+    """The recorded page, its advisories at these positions with an unknown severity."""
+    entries = json.loads(RECORDED_RESPONSE)
+    for position in positions:
+        entries[position]["severity"] = "urgent"
+    return json.dumps(entries).encode()
+
+
+def test_an_invalid_advisory_is_rejected_with_its_ghsa_and_field_and_the_others_are_read():
+    reading = read_advisories(page_with_invalid_advisories(1))
+
+    assert [advisory.ghsa_id for advisory in reading.entries] == [
+        "GHSA-fjqc-hq36-qh5p",
+        "GHSA-3644-q5cj-c5c7",
+    ]
+    assert reading.rejection_reasons == [
+        "advisory 1 ('GHSA-gr75-jv2w-4656'): unknown severity: 'urgent'"
+    ]
+
+
+def test_a_page_with_an_invalid_advisory_is_collected(fake_github_api):
+    fake_github_api.response = page_with_invalid_advisories(1)
+
+    assert (
+        GithubAdvisoriesSource("pip", PACKAGES).fetch(BETWEEN_ADVISORIES)
+        == fake_github_api.response
+    )
+
+
+def test_a_page_with_an_invalid_advisory_is_collected_even_without_a_new_valid_one(
+    fake_github_api,
+):
+    # The rejected advisory leaves the page within a day or two: kept now, it reaches the
+    # import log.
+    fake_github_api.response = page_with_invalid_advisories(1)
+
+    assert (
+        GithubAdvisoriesSource("pip", PACKAGES).fetch(AFTER_ALL_ADVISORIES)
+        == fake_github_api.response
+    )
+
+
+def test_a_page_whose_advisories_are_all_invalid_fails_the_collection(fake_github_api):
+    fake_github_api.response = page_with_invalid_advisories(0, 1, 2)
+
+    with pytest.raises(ValueError, match="^all_items_invalid: 3 entries, all rejected"):
+        GithubAdvisoriesSource("pip", PACKAGES).fetch(last_collected_at=None)
+
+
+def test_a_full_page_counts_its_rejected_advisories(
+    fake_github_api, monkeypatch, caplog
+):
+    fake_github_api.response = page_with_invalid_advisories(0)
+    monkeypatch.setattr(github_advisories, "ADVISORIES_PER_PAGE", 3)
+
+    with caplog.at_level(logging.WARNING):
+        GithubAdvisoriesSource("pip", PACKAGES).fetch(
+            last_collected_at=BEFORE_ALL_ADVISORIES
+        )
+
+    [record] = caplog.records
+    assert record.getMessage().startswith(
+        "github_advisories_pip: 3 advisories read, page size 3"
+    )
