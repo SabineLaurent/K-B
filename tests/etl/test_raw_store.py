@@ -1,4 +1,8 @@
+import errno
 import json
+import os
+import stat
+import tempfile
 from datetime import UTC, datetime
 
 import pytest
@@ -10,6 +14,7 @@ from k_b.etl.raw_store import (
     find_stream,
     load_last_collection_dates,
     save_last_collection_dates,
+    write_file_atomically,
     write_new_raw_file,
 )
 
@@ -22,6 +27,125 @@ def test_write_new_raw_file_refuses_to_overwrite(tmp_path):
         write_new_raw_file(raw_file_path, b"second")
 
     assert raw_file_path.read_bytes() == b"first"
+
+
+class FailingTemporaryFile:
+    """A real temporary file whose write or close fails as on a full disk."""
+
+    def __init__(self, temporary_file, failing_step):
+        self.temporary_file = temporary_file
+        self.failing_step = failing_step
+        self.name = temporary_file.name
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        self.temporary_file.close()
+
+    def write(self, content):
+        if self.failing_step == "write":
+            raise OSError(errno.ENOSPC, "No space left on device")
+        return self.temporary_file.write(content)
+
+    def flush(self):
+        self.temporary_file.flush()
+
+    def fileno(self):
+        return self.temporary_file.fileno()
+
+    def close(self):
+        self.temporary_file.close()
+        if self.failing_step == "close":
+            raise OSError(errno.ENOSPC, "No space left on device")
+
+
+def interrupt_the_rename(source, target):
+    raise KeyboardInterrupt
+
+
+@pytest.mark.parametrize(
+    ("failing_step", "expected_error"),
+    [("write", OSError), ("close", OSError), ("rename", KeyboardInterrupt)],
+)
+def test_a_failed_write_leaves_no_temporary_file_and_raises_its_error(
+    tmp_path, monkeypatch, failing_step, expected_error
+):
+    target = tmp_path / COLLECTION_STATE_FILENAME
+    target.write_bytes(b"previous")
+    real_named_temporary_file = tempfile.NamedTemporaryFile
+    monkeypatch.setattr(
+        tempfile,
+        "NamedTemporaryFile",
+        lambda **kwargs: FailingTemporaryFile(
+            real_named_temporary_file(**kwargs), failing_step
+        ),
+    )
+    if failing_step == "rename":
+        monkeypatch.setattr(os, "replace", interrupt_the_rename)
+
+    with pytest.raises(expected_error):
+        write_file_atomically(target, b"next")
+
+    assert list(tmp_path.iterdir()) == [target]
+    assert target.read_bytes() == b"previous"
+
+
+def test_the_temporary_file_is_synced_before_the_rename_then_its_folder(
+    tmp_path, monkeypatch
+):
+    events = []
+    real_fsync = os.fsync
+    real_replace = os.replace
+
+    def record_fsync(file_descriptor):
+        events.append(("fsync", os.fstat(file_descriptor).st_ino))
+        real_fsync(file_descriptor)
+
+    def record_replace(source, target):
+        events.append(("replace", None))
+        real_replace(source, target)
+
+    monkeypatch.setattr(os, "fsync", record_fsync)
+    monkeypatch.setattr(os, "replace", record_replace)
+    target = tmp_path / COLLECTION_STATE_FILENAME
+
+    write_file_atomically(target, b"{}")
+
+    assert events == [
+        ("fsync", target.stat().st_ino),
+        ("replace", None),
+        ("fsync", tmp_path.stat().st_ino),
+    ]
+
+
+def fail_the_fsync_of_a_folder(error_number):
+    real_fsync = os.fsync
+
+    def fsync(file_descriptor):
+        if stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+            raise OSError(error_number, os.strerror(error_number))
+        real_fsync(file_descriptor)
+
+    return fsync
+
+
+def test_a_folder_that_refuses_fsync_does_not_fail_the_write(tmp_path, monkeypatch):
+    monkeypatch.setattr(os, "fsync", fail_the_fsync_of_a_folder(errno.EINVAL))
+    target = tmp_path / COLLECTION_STATE_FILENAME
+
+    write_file_atomically(target, b"{}")
+
+    assert target.read_bytes() == b"{}"
+
+
+def test_a_failed_fsync_of_the_folder_is_raised(tmp_path, monkeypatch):
+    monkeypatch.setattr(os, "fsync", fail_the_fsync_of_a_folder(errno.EIO))
+
+    with pytest.raises(OSError) as raised:
+        write_file_atomically(tmp_path / COLLECTION_STATE_FILENAME, b"{}")
+
+    assert raised.value.errno == errno.EIO
 
 
 def test_last_collection_dates_are_empty_before_the_first_collection(tmp_path):

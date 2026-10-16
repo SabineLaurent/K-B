@@ -1,6 +1,8 @@
 """The raw output of each collection, under raw/, and the date of the last one per source, in
 the collection state file at the root of the data directory."""
 
+import contextlib
+import errno
 import json
 import os
 import tempfile
@@ -34,15 +36,38 @@ class InvalidCollectionStateError(ValueError):
 
 
 def write_file_atomically(path: Path, content: bytes) -> None:
-    """Write to a temporary file, then rename it: a reader never sees a half-written file."""
+    """Write to a hidden temporary file of the target folder, sync it to disk, then rename it:
+    a reader never sees a half-written file. On any exception, Ctrl-C included, the temporary
+    file is removed and the exception raised; a rest left by a killed process is hidden, so the
+    import skips it (list_visible_entries)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as temporary_file:
-        temporary_file.write(content)
+    with tempfile.NamedTemporaryFile(
+        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False
+    ) as temporary_file:
+        try:
+            temporary_file.write(content)
+            temporary_file.flush()
+            os.fsync(temporary_file.fileno())
+            temporary_file.close()
+            os.replace(temporary_file.name, path)
+        except BaseException:
+            # The original error is raised, even when the temporary file is already renamed
+            # (Ctrl-C right after os.replace) or cannot be removed.
+            with contextlib.suppress(OSError):
+                os.remove(temporary_file.name)
+            raise
+    # The folder holds the entry of the renamed file: without its sync, a power cut can lose
+    # the rename.
+    directory_descriptor = os.open(path.parent, os.O_RDONLY)
     try:
-        os.replace(temporary_file.name, path)
-    except OSError:
-        os.remove(temporary_file.name)
-        raise
+        os.fsync(directory_descriptor)
+    except OSError as error:
+        # EINVAL: the file system does not support the sync of a folder (fsync(2)); the file
+        # itself is synced.
+        if error.errno != errno.EINVAL:
+            raise
+    finally:
+        os.close(directory_descriptor)
 
 
 def write_new_raw_file(path: Path, content: bytes) -> None:
