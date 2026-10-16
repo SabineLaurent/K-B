@@ -92,6 +92,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   parfois une alerte des jours après l'avoir publiée), même avertissement si la page de 100 est
   pleine. Une page qui porte une alerte invalide est écrite, même sans alerte valide nouvelle :
   l'alerte sort de la page en un ou deux jours, et son rejet doit atteindre le journal d'import.
+  Un écosystème dont la seule alerte de la fenêtre est invalide échoue à chaque collecte
+  (`all_items_invalid`, sa date reste), jusqu'à la première alerte valide revue.
   Dépôts les plus étoilés collectés (PR de #11) : un instantané du top 100 à chaque collecte
   (un classement change toujours) ; entrées, sorties et montées se calculent à la lecture en
   comparant deux instantanés. Une réponse marquée `incomplete_results`, ou de moins de 100 dépôts, est
