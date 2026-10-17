@@ -29,8 +29,10 @@ contrôles, les états nommés et la ligne de métrique sont posés ici ; la sp�
 7. Réponse JSON ; une ligne de métrique par appel au modèle, sur la sortie standard (#156).
 
 L'appel au modèle, sa nouvelle tentative et le modèle de remplacement des tests sont à #150 ; le
-vrai modèle (gpt-6-luna sur Azure AI Foundry, repli gpt-5.6-luna, décision de Sabine du
-2026-10-16 ; journal ADR, « Modèle des fiches : gpt-6-luna sur Foundry ») à #158. La spec ne dépend d'aucun fournisseur :
+vrai modèle (gpt-6-luna sur Azure AI Foundry, décision de Sabine du 2026-10-16 ; déployé le
+2026-10-17 sur l'abonnement de son organisme de formation, rédacteur et juge des phases 1 et 2 ;
+journal ADR, « Modèle des fiches : gpt-6-luna sur l'abonnement de l'organisme de formation ») à
+#158. La spec ne dépend d'aucun fournisseur :
 elle s'en tient à l'interface compatible OpenAI. L'API IA n'écrit rien qui doive survivre à son redémarrage
 (règle 7 de `poc.md`) : les fiches sont rendues, pas gardées.
 
@@ -129,7 +131,8 @@ ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 6
   (28 sans le juge). Ce nombre découle du plafond et des sujets : pas de constante de plus.
 
 **Limites** : une seule demande à la fois est supposée (une seule utilisatrice, en local) ; les
-quotas du déploiement Foundry seront vérifiés par #158. Les sortes rares tiennent bien sous
+quota du déploiement Foundry est de 140 000 jetons et 140 requêtes par minute (en-têtes
+`x-ratelimit-limit-*`, mesure de #158 du 2026-10-17). Les sortes rares tiennent bien sous
 le plafond (≈ 150 items sur 14 jours) : si la coupe tombait sur l'une d'elles, `capped_kind` la
 nommerait, et les sortes suivantes ne seraient pas lues. **Durée** : la lecture n'a pas de borne
 à elle. Les délais du client (`DATA_API_*_TIMEOUT_SECONDS`) bornent chaque attente, pas une
@@ -169,12 +172,18 @@ Les bornes de ce document sont vérifiées par le code. Limite : 1 000 valeurs d
 schéma (OpenAI, structured outputs) ; au plafond, environ 300 identifiants et 8 sujets, donc
 sous la limite.
 
-**Réglages d'appel**, lus dans la configuration (#150) : `temperature=0` si le modèle l'accepte,
-sinon `reasoning_effort: "none"` (`KB_LLM_REASONING_EFFORT=none`, `.env.example`) ; la
-documentation d'OpenAI et celle d'Azure se contredisent sur ce point pour les modèles à
-raisonnement, et le premier essai le tranche (#158). Le déploiement est figé sur une version du
-modèle. Le fournisseur, son URL et le nom du modèle n'ont pas de valeur par défaut : sans eux,
-l'API IA ne démarre pas (journal ADR, « Appel du modèle »).
+**Réglages d'appel**, lus dans la configuration (#150) : `reasoning_effort: "none"`
+(`KB_LLM_REASONING_EFFORT=none`) pour un modèle à raisonnement, sinon `temperature=0`. Mesure de
+#158 sur gpt-6-luna (2026-10-17) : `temperature: 0` seul est refusé (400 `unsupported_value`,
+`param` `temperature`) ; avec `reasoning_effort: "none"`, il est accepté, sans preuve qu'il change
+la sortie ; `reasoning_tokens` vaut 0. Le client envoie donc `reasoning_effort: "none"` seul ;
+option écartée : envoyer les deux (effet non prouvé). Chaque requête coupe aussi le cache de
+prompt (`prompt_cache_options: {"mode": "explicit"}` sans point d'arrêt ; journal ADR, « Appel du
+modèle : cache de prompt coupé »). Sur Azure AI Foundry, l'URL de base est
+`https://<ressource>.openai.azure.com/openai/v1`, sans `api-version`, et la clé part en
+`Authorization: Bearer` (mesure de #158). Le déploiement est figé sur une version du modèle. Le
+fournisseur, son URL et le nom du modèle n'ont pas de valeur par défaut : sans eux, l'API IA ne
+démarre pas (journal ADR, « Appel du modèle »).
 
 ### Demande
 
@@ -652,8 +661,10 @@ demande ») : elle dit quand le juge peut envoyer, pas à qui.
 `KB_LLM_JUDGE_MODEL` nomme le déploiement du juge, **sans valeur par défaut**, comme `KB_LLM_MODEL`
 (règle 2 de `poc.md`) : sans elle, l'API IA ne démarre pas. Même URL (`KB_LLM_BASE_URL`), même clé
 et même fournisseur que le rédacteur ; même effort de raisonnement, `KB_LLM_REASONING_EFFORT`,
-commun aux deux déploiements : que `reasoning_effort: "none"` vaille pour les deux reste ouvert
-jusqu'à #158 (« Réglages d'appel »). Option écartée : une variable d'effort propre au juge, sans
+commun aux deux déploiements. En phases 1 et 2, le juge et le rédacteur sont le même déploiement,
+gpt-6-luna (repli ci-dessous, décision de Sabine du 2026-10-17) : `reasoning_effort: "none"`,
+mesuré par #158, vaut donc pour les deux ; pour un juge d'une autre famille (phase 3), la question
+se repose. Option écartée : une variable d'effort propre au juge, sans
 besoin mesuré.
 
 - **En `replay`**, la variable est exigée aussi et validée comme un nom de modèle, mais elle n'est
@@ -683,13 +694,16 @@ nommés ») :
   de plus avec les nouvelles tentatives : environ 44 tentatives au lieu de 28 (environ 6
   classements, 8 rédactions, 8 jugements, soit 22 appels, chacun deux tentatives au plus) ;
   8 / 14 ≈ 57 % d'**appels** de plus.
-- **Durée** : quand les réponses arrivent d'un bloc, 22 × 150 s = 3 300 s en série au plus, au
-  lieu de 14 × 150 s = 2 100 s ; une réponse envoyée par morceaux peut durer plus (« États
+- **Durée** : quand les réponses arrivent d'un bloc, 22 × 210 s = 4 620 s en série au plus, au
+  lieu de 14 × 210 s = 2 940 s (210 s par appel depuis #158, délai de lecture porté à 90 s) ;
+  mesuré par #158 sur gpt-6-luna, sans nouvelle tentative : environ 98 s en série pour 8 sujets
+  (classement ~3,2 s, rédaction ~8,3 s, jugement ~1,5 s, médianes) ; une réponse envoyée par morceaux peut durer plus (« États
   nommés », « Nouvelle tentative »). #205 en tient compte pour `DIGEST_REQUEST_TIMEOUT_SECONDS`.
 - **Jetons** : ceux du juge s'ajoutent à ceux de la demande. Son entrée reprend au plus les items
   cités d'une rédaction, déjà coupés ; sa sortie est faite de codes courts. Ordre de grandeur
-  (hypothèse) : moins que l'entrée d'une rédaction, à mesurer par #158 (`tokens_in`,
-  `tokens_out`).
+  mesuré par #158 (2026-10-17, gpt-6-luna) : pour 10 affirmations et 10 items cités, 2 012 jetons
+  en entrée et 184 en sortie, contre ~6 000 en entrée et ~1 100 en sortie pour une rédaction de
+  42 à 50 items.
 - **RGESN 3.1** (`.claude/rules/conformite.md` : éviter une technologie gourmande, sauf à retenir
   la solution la plus sobre et à le documenter ; libellé du référentiel non relu le 2026-10-17).
   Le besoin : sans juge, le sens des fiches n'est vérifié par personne, et Sabine refuse une
@@ -904,8 +918,9 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
   ou une connexion refusée, elle attend `Retry-After` (en secondes ; une date HTTP compte comme un
   en-tête absent), ou `LLM_RETRY_WAIT_SECONDS` sans lui ; un `Retry-After` au-delà de
   `LLM_RETRY_AFTER_MAX_SECONDS` met fin à l'appel, car une attente plus courte rendrait la même
-  réponse. Un appel dure ainsi 150 s quand les réponses arrivent d'un bloc (deux tentatives de
-  5 s de connexion et 60 s de réponse, et 20 s d'attente) ; une réponse envoyée par morceaux peut
+  réponse. Un appel dure ainsi 210 s quand les réponses arrivent d'un bloc (deux tentatives de
+  5 s de connexion et 90 s de réponse, et 20 s d'attente) ; 90 s couvrent une sortie de 8 192
+  jetons au débit mesuré par #158 sur gpt-6-luna (environ 7,35 ms par jeton, soit ~60 s) ; une réponse envoyée par morceaux peut
   durer plus, car chaque lecture a son propre délai : la borne totale est celle de la demande,
   `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205).
 - 502, 503 et 504 disent la panne de l'amont, comme une passerelle (RFC 9110, § 15.6) : le client
@@ -946,7 +961,8 @@ Consultées le 2026-10-15.
   — Microsoft Q&A, relevé par recherche web : une entrée filtrée rend un 400, `error.code`
   `content_filter`, `innererror.code` `ResponsibleAIPolicyViolation` ; la catégorie jailbreak peut
   le déclencher sur une consigne ordinaire (constat du forum CrewAI, même recherche) (états nommés,
-  `llm_content_filtered` ; format à confirmer par #158).
+  `llm_content_filtered`). Non observé par #158 : aucun filtre déclenché sur 20 appels réels, et
+  aucun essai provoqué (commentaire de #158 du 2026-10-17).
 - [Custom Structured Outputs](https://docs.mistral.ai/studio-api/conversations/structured-output/custom)
   — Mistral, lu par Context7 : « Your output should be an instance of a JSON object following
   this schema: {{ json_schema }} » est toujours ajouté au début du message `system` (limite de la
