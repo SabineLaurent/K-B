@@ -78,6 +78,7 @@ Le nom seulement, jamais la valeur. Modèle à copier en `.env` : `.env.example`
 |---|---|
 | `KB_DATA_DIR` | **obligatoire** pour `kb collect` : dossier des données, hors du dépôt de code ; le brut y est écrit dans `raw/`, l'état de collecte dans `collection_state.json` |
 | `KB_ZOTERO_DIR` | facultatif : dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé) ; sans elle, `kb collect` saute Zotero et l'affiche |
+| `KB_VAULT_DIR` | facultatif : dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet ; sans elle, `kb collect` saute les clips et l'affiche |
 | `KB_GITHUB_TOKEN` | facultatif (60 requêtes par heure sans, 5 000 avec) : jeton GitHub *fine-grained*, lecture seule des dépôts publics, sans permission ; création et vérification : [jeton-github.md](jeton-github.md) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | chemin de la clé du compte de service BigQuery, pour GH Archive : [bigquery.md](bigquery.md) |
 
