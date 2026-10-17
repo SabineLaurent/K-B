@@ -562,6 +562,20 @@ def test_the_client_of_the_provider_sends_the_key_and_follows_no_redirection():
     assert llm_call.outcome == "llm_unavailable"
 
 
+# Measured by #158 on gpt-6-luna (2026-10-17): about 7.35 ms per output token, a call not
+# streamed; 8,192 tokens, the output cap of its writing calls.
+MEASURED_MS_PER_OUTPUT_TOKEN = 7.35
+LONGEST_MEASURED_OUTPUT_CAP = 8192
+
+
+def test_the_read_timeout_covers_the_longest_output_at_the_measured_rate_with_a_margin():
+    """An answer not streamed comes in one block: a valid output near the cap must not end in
+    llm_timeout, then in a retry that times out the same way."""
+    seconds_at_cap = MEASURED_MS_PER_OUTPUT_TOKEN * LONGEST_MEASURED_OUTPUT_CAP / 1000
+
+    assert seconds_at_cap * 1.4 <= LLM_CALL_TIMEOUT_SECONDS
+
+
 def test_the_client_of_the_provider_reads_no_proxy_of_the_environment(monkeypatch):
     monkeypatch.setenv("HTTPS_PROXY", "http://proxy.example:8080")
 
