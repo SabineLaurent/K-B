@@ -38,7 +38,7 @@ L'étape 1 couvre la porte « veille » :
   - API GitHub : releases des dépôts suivis, alertes de sécurité, dépôts les plus étoilés ;
   - API arXiv : papiers sur la sécurité de l'IA, métadonnées et résumé ;
   - catalogue CISA des vulnérabilités activement exploitées (fichier CSV) ;
-  - Markdown produit par Obsidian Web Clipper, dans un coffre Obsidian dédié (à créer) ;
+  - Markdown produit par Obsidian Web Clipper, dans un coffre Obsidian dédié ;
   - newsletters tldr.tech, lues par scraping ;
   - mes papiers lus dans Zotero et leurs surlignages (base SQLite) ;
   - les dépôts GitHub qui montent sur 3 jours, calculés depuis GH Archive sur BigQuery.
@@ -100,6 +100,7 @@ uv sync
 |---|---|---|
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
 | `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
+| `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Aucune commande ne la lit encore : la collecte des clips vient avec #14. |
 | `KB_GITHUB_TOKEN` | non | jeton GitHub en lecture seule ([docs/jeton-github.md](docs/jeton-github.md)). Sans lui, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000. |
 | `KB_API_KEY_<CLIENT>` | pour `kb serve` | la clé d'un client de l'API de données (`<CLIENT>` en `A-Z`, `0-9` et `_`, par exemple `KB_API_KEY_TERMINAL`), une variable par client ([docs/specs-api.md](docs/specs-api.md)). |
 
