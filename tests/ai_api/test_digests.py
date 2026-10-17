@@ -719,3 +719,22 @@ def test_a_classification_whose_retry_the_deadline_cuts_gives_no_retry_after(rea
     assert result.retry_after_seconds is None
     # What was observed stays in the call, for the metric.
     assert result.stage_calls[0].llm_call.retry_after_seconds == 15
+
+
+def test_an_item_cut_for_the_writing_is_counted(reading):
+    long_summary = WatchReading(
+        items=tuple(
+            replace(item, fields=item.fields.model_copy(update={"summary": "s" * 2500}))
+            if item.item_id == 2
+            else item
+            for item in reading.items
+        ),
+        items_dropped=reading.items_dropped,
+        capped_kind=None,
+        covered_after=None,
+    )
+
+    result, _ = digest_of(long_summary, VALID_STEPS)
+
+    assert result.items_truncated == 1
+    assert result.stage_calls[3].items_truncated == 1
