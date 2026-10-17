@@ -225,8 +225,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   tronqué le resterait). Un clip dont la date a changé entre la liste du dossier et sa lecture
   (une synchronisation, une édition) est laissé de même à la collecte suivante. Un clip renommé ou
   supprimé entre la liste et la lecture est sauté, et compté au journal : son nouveau nom est lu à
-  la collecte suivante. Un coffre sans dossier `Clippings/` (Web Clipper le crée avec le premier
-  clip) ne donne aucun clip, sans échec ; un coffre qui n'existe pas fait échouer la source. Hypothèse, non
+  la collecte suivante. Hypothèse, non
   mesurée : l'horloge d'un système de fichiers peut être plus grossière que celle de `kb` (un
   tick sous Linux) ou en retard sur elle (coffre monté depuis l'hôte dans un conteneur, #200) ;
   sans marge, un clip écrit juste après le début d'une collecte serait daté d'avant elle et
@@ -248,11 +247,18 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   - `all_items_invalid`, cas limite assumé (règle 1, décision du 2026-10-17) : une note sans
     frontmatter posée seule dans `Clippings/` fait échouer la source à chaque collecte, jusqu'au
     clip valide suivant ; elle est alors copiée, et rejetée à chaque import ;
-  - `FileNotFoundError` : le dossier du coffre (`KB_VAULT_DIR`) n'existe pas ;
+  - `ClippingsFolderMissingError` (`clippings_folder_missing`, sans chemin dans le message) : le
+    coffre n'a pas de dossier `Clippings/`, ou n'existe pas. Créer `Clippings/`, ou attendre le
+    premier clip (Web Clipper le crée). Pas pris pour un coffre sans clip : la date de collecte
+    avancerait, et les clips qu'un montage ou une synchronisation apporteraient ensuite, avec
+    leurs dates anciennes, ne seraient jamais copiés (décision du 2026-10-17, tranchée par
+    time-knight sur délégation de Sabine, qui inverse une correction du même jour) ;
   - `PermissionError` : un clip ou le dossier ne se lit pas (droits) ;
   - `OSError` : un clip qui ne se lit pas pour une autre raison, dont `ELOOP` (un fichier
-    remplacé par un lien symbolique entre sa liste et sa lecture) et un fichier iCloud non
-    téléchargé. Un tel clip fait échouer la source, comme `clip_too_large`, au lieu d'être sauté :
+    remplacé par un lien symbolique entre sa liste et sa lecture). Hypothèse, non vérifiée : un
+    fichier iCloud non téléchargé pourrait lever une telle erreur ; macOS peut aussi le
+    télécharger à la lecture, ou le montrer sous un nom caché (`.icloud`), que la liste saute. Un
+    tel clip fait échouer la source, comme `clip_too_large`, au lieu d'être sauté :
     sauté pendant que la date avance, il ne serait plus revu tant qu'il ne change pas (décision
     du 2026-10-17, tranchée par time-knight sur délégation de Sabine).
 

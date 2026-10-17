@@ -302,8 +302,9 @@ Selon le [registre des traitements](registre-traitements.md) :
   commentaires : au détail de leur entrée ;
 - les titres et dates des clips de Sabine : dans la liste ; le texte d'un clip, qui peut nommer
   des personnes (la signature de l'article) et porter les notes de Sabine : au détail seulement,
-  jamais au journal. `q` cherche aussi dans ce texte, comme dans le corps d'une release : la
-  liste dit quels clips contiennent la chaîne cherchée, sans servir le texte. L'auteur d'un clip (`author`) n'est pas en base.
+  jamais au journal. L'auteur d'un clip (`author`) n'est pas en base. `q` cherche aussi dans ce
+  texte, comme dans le corps d'une release : la liste dit quels clips contiennent la chaîne
+  cherchée, sans servir le texte.
 
 Un agent qui lit ces données les envoie au fournisseur de son modèle : décision ouverte
 « Transfert hors UE par les agents » (journal ADR).

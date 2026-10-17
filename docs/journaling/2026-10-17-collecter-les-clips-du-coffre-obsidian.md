@@ -51,8 +51,10 @@ marge dans les deux sens :
 - Cette date est relue sur le fichier ouvert (`os.fstat`, `read_clip_file`) : si elle a changé
   depuis la liste, le clip est en train d'être réécrit (une synchronisation, une édition), et il
   est laissé à la collecte suivante.
-- Un coffre sans dossier `Clippings/` ne donne aucun clip (Web Clipper le crée avec le premier) ;
-  un coffre qui n'existe pas fait échouer la source, pour qu'un `KB_VAULT_DIR` mal écrit se voie.
+- Un coffre sans dossier `Clippings/`, ou qui n'existe pas, fait échouer la source
+  (`clippings_folder_missing`). Le prendre pour un coffre sans clip ferait avancer la date de
+  collecte : les clips qu'un montage ou une synchronisation apporteraient ensuite, avec leurs
+  dates anciennes, ne seraient jamais copiés.
 
 Le nom de chaque page est un hachage du nom de fichier :
 
@@ -170,7 +172,7 @@ refuse l'année sur 3 chiffres, et la forme complète est tenue par l'item.
 | `test_hidden_files_other_files_folders_and_links_are_not_copied`, `test_a_file_replaced_by_a_link_after_it_was_listed_is_not_followed` | rien hors des fichiers réguliers du dossier |
 | `test_a_clip_larger_than_the_maximum_fails_the_source_naming_it`, `test_a_clip_of_the_maximum_size_is_copied` | le plafond, à l'octet près |
 | `test_a_clip_rewritten_between_the_list_and_the_reading_is_left_to_the_next_collection`, `test_a_clip_gone_between_the_list_and_the_reading_is_skipped` | un clip qui bouge pendant la collecte n'est ni copié tronqué ni cause d'échec |
-| `test_a_vault_without_its_clippings_folder_yet_gives_nothing`, `test_a_vault_that_does_not_exist_fails` | pas encore de clip ≠ coffre mal désigné |
+| `test_a_vault_without_its_clippings_folder_fails_without_its_path`, `test_a_clip_too_large_but_changed_while_read_is_left_to_the_next_collection`, `test_the_byte_not_utf8_is_counted_from_the_start_of_the_file_byte_order_mark_included` | dossier absent visible, date avant taille, position exacte |
 | `test_a_clip_that_starts_with_a_byte_order_mark_is_read` | une marque d'ordre des octets est ignorée, comme par Obsidian |
 | `test_clips_all_unreadable_fail_the_source_as_all_items_invalid`, `test_clips_all_refused_as_items_fail_the_source_as_all_items_invalid` | règle 1 de `conventions.md` à la collecte, `RecursionError` comprise |
 | `test_a_python_tag_builds_no_object_and_its_value_is_refused_as_a_title` | `BaseLoader` n'applique pas d'étiquette |

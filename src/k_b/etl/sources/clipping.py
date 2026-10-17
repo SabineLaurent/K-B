@@ -8,6 +8,7 @@ raw/selected_library/clipping/ (ADR of 2026-10-09). A clip is part of the librar
 watch: no digest reads it (ai_api/watch_items.py).
 """
 
+import codecs
 import hashlib
 import logging
 import os
@@ -66,6 +67,13 @@ class ClipTooLargeError(Exception):
     bound passed is shown, not silent (decision of 2026-10-17)."""
 
 
+class ClippingsFolderMissingError(Exception):
+    """clippings_folder_missing: the vault has no Clippings folder, or does not exist. Not taken
+    for a vault without clips: the last collection date would move on, and the clips a mount or
+    a sync brings later, with their old dates, would never be copied (decision of 2026-10-17).
+    The message gives no path: it is a folder of the user's machine."""
+
+
 class ClipFile(NamedTuple):
     path: Path
     # The newest of its modification and change dates, in nanoseconds since EPOCH.
@@ -88,15 +96,16 @@ class ClippingSource:
         collection is copied again; a clip changed shortly before this one, which may still be
         written, is left to the next collection.
         """
-        clippings_dir = self.vault_dir / CLIPPINGS_DIR_NAME
-        # Web Clipper creates the folder with the first clip; a vault that does not exist
-        # fails, a KB_VAULT_DIR written wrong being shown.
-        if self.vault_dir.is_dir() and not clippings_dir.exists():
-            logger.info("clipping: no %s folder in the vault", CLIPPINGS_DIR_NAME)
-            return None
+        try:
+            clip_files = list_clip_files(self.vault_dir / CLIPPINGS_DIR_NAME)
+        except FileNotFoundError:
+            raise ClippingsFolderMissingError(
+                f"clippings_folder_missing: no {CLIPPINGS_DIR_NAME} folder in the vault of"
+                " KB_VAULT_DIR"
+            ) from None
         changed = [
             clip_file
-            for clip_file in list_clip_files(clippings_dir)
+            for clip_file in clip_files
             if last_collected_at is None
             or clip_file.changed_at_ns > to_ns(last_collected_at - CLIP_CHANGE_MARGIN)
         ]
@@ -158,10 +167,14 @@ def list_clip_files(clippings_dir: Path) -> list[ClipFile]:
             # Renamed or removed since the folder was listed: its new name is listed next time.
             continue
         if stat.S_ISREG(status.st_mode):
-            clip_files.append(
-                ClipFile(path, max(status.st_mtime_ns, status.st_ctime_ns))
-            )
+            clip_files.append(ClipFile(path, read_changed_at_ns(status)))
     return clip_files
+
+
+def read_changed_at_ns(status: os.stat_result) -> int:
+    """The change date of a clip, at its listing and at its reading alike: the newest of its
+    modification and change dates."""
+    return max(status.st_mtime_ns, status.st_ctime_ns)
 
 
 def read_clip_files(clip_files: list[ClipFile]) -> dict[str, bytes]:
@@ -172,14 +185,16 @@ def read_clip_files(clip_files: list[ClipFile]) -> dict[str, bytes]:
     gone_count = changed_count = 0
     for clip_file in clip_files:
         try:
-            content, changed_at_ns = read_clip_file(clip_file.path)
+            clip_read = read_clip_file(clip_file.path)
         except FileNotFoundError:
             gone_count += 1
             continue
-        if changed_at_ns != clip_file.changed_at_ns:
+        # Its date before its size: a clip rewritten while read is not measured.
+        if clip_read.changed_at_ns != clip_file.changed_at_ns:
             changed_count += 1
             continue
-        clips[make_page_name(clip_file.path)] = content
+        check_clip_size(clip_file.path, clip_read.size)
+        clips[make_page_name(clip_file.path)] = clip_read.content
     if gone_count:
         logger.info(
             "clipping: %d clips gone between the list and the reading", gone_count
@@ -196,21 +211,33 @@ def make_page_name(path: Path) -> str:
     return hashlib.sha256(os.fsencode(path.name)).hexdigest()[:PAGE_NAME_LENGTH]
 
 
-def read_clip_file(path: Path) -> tuple[bytes, int]:
-    """The bytes of the clip, read once, at most one more than the maximum, and its change date
-    once read, as list_clip_files gives it. A clip that grows after it was listed is measured
-    as read. O_NOFOLLOW: a file replaced by a link since it was listed is not followed."""
+class ClipRead(NamedTuple):
+    # At most one byte more than the maximum.
+    content: bytes
+    # The size of the file once read, or of the content if it grew since.
+    size: int
+    changed_at_ns: int
+
+
+def read_clip_file(path: Path) -> ClipRead:
+    """The bytes of the clip, read once, at most one more than the maximum, with its size and
+    its change date once read. O_NOFOLLOW: a file replaced by a link since it was listed is not
+    followed."""
     descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
     with os.fdopen(descriptor, "rb") as clip_file:
         content = clip_file.read(CLIP_MAX_BYTES + 1)
         status = os.fstat(clip_file.fileno())
-    size = max(len(content), status.st_size)
+    return ClipRead(
+        content, max(len(content), status.st_size), read_changed_at_ns(status)
+    )
+
+
+def check_clip_size(path: Path, size: int) -> None:
     if size > CLIP_MAX_BYTES:
         raise ClipTooLargeError(
             f"clip_too_large: {quote_value(path.name)}: {size} bytes,"
             f" maximum {CLIP_MAX_BYTES} bytes"
         )
-    return content, max(status.st_mtime_ns, status.st_ctime_ns)
 
 
 class ClipEntry(NamedTuple):
@@ -224,11 +251,14 @@ def read_clip(raw_clip: bytes) -> EntryReading[ClipEntry]:
     """A clip as its only entry. A clip that is not UTF-8, without frontmatter, whose frontmatter
     is not YAML or not a mapping cannot be read (conventions.md, rule 1). The error says where,
     never what: the YAML error of PyYAML quotes the text around it."""
+    # A byte order mark an editor adds is not part of the text, as for Obsidian; the position
+    # of a byte not UTF-8 is counted from the start of the file, the mark included.
+    without_mark = raw_clip.removeprefix(codecs.BOM_UTF8)
     try:
-        # utf-8-sig: a byte order mark an editor adds is not part of the text, as for Obsidian.
-        text = raw_clip.decode("utf-8-sig")
+        text = without_mark.decode("utf-8")
     except UnicodeDecodeError as error:
-        raise ValueError(f"clip not UTF-8: byte {error.start}") from None
+        position = error.start + len(raw_clip) - len(without_mark)
+        raise ValueError(f"clip not UTF-8: byte {position}") from None
     frontmatter, body = split_frontmatter(text)
     try:
         # BaseLoader resolves no type and builds no object: only str, list and dict. A tag such
@@ -271,9 +301,8 @@ def find_rejection_reason(page_name: str, raw_clip: bytes) -> str | None:
     except ValidationError as refusal:
         # convert_clip gives it without its values already.
         return f"ValidationError: {refusal}"
-    # The errors transform.read_page takes for an unreadable page, but csv.Error: RecursionError,
-    # a frontmatter nested too deep (#103).
-    except (ValueError, OSError, RecursionError) as unreadable:
+    # RecursionError: a frontmatter nested too deep, rejected at the import as well (#103).
+    except (ValueError, RecursionError) as unreadable:
         return f"{type(unreadable).__name__}: {unreadable}"
     return None
 

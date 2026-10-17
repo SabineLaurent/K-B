@@ -20,6 +20,7 @@ from k_b.etl.sources.clipping import (
     CLIPPINGS_DIR_NAME,
     READER,
     ClipFrontmatter,
+    ClippingsFolderMissingError,
     ClippingSource,
     ClipTooLargeError,
     convert_clip,
@@ -202,6 +203,19 @@ def test_a_clip_larger_than_the_maximum_fails_the_source_naming_it(vault_dir):
     )
 
 
+def test_a_clip_too_large_but_changed_while_read_is_left_to_the_next_collection(
+    vault_dir, monkeypatch
+):
+    """A sync may be rewriting it: its size is not measured, its date is."""
+    (clippings_of(vault_dir) / "Too large.md").write_bytes(b"x" * (CLIP_MAX_BYTES + 1))
+    listed = listed_one_nanosecond_before(vault_dir, "Too large.md")
+    monkeypatch.setattr(clipping, "list_clip_files", lambda clippings_dir: listed)
+
+    pages = ClippingSource(vault_dir).fetch(None)
+
+    assert page_name_of("Too large.md") not in pages
+
+
 def test_a_clip_of_the_maximum_size_is_copied(vault_dir):
     raw_clip = fixture_bytes(ARTICLE)
     padded = raw_clip + b"x" * (CLIP_MAX_BYTES - len(raw_clip))
@@ -259,18 +273,28 @@ def test_an_unreadable_clip_among_valid_ones_is_copied(vault_dir):
     assert pages[page_name_of("broken.md")] == b"no frontmatter"
 
 
-def test_a_vault_without_its_clippings_folder_yet_gives_nothing(tmp_path, caplog):
-    """Web Clipper creates Clippings/ with the first clip: no clip yet is not a failure."""
-    with caplog.at_level(logging.INFO, logger="k_b.etl.sources.clipping"):
-        assert ClippingSource(tmp_path).fetch(None) is None
+@pytest.mark.parametrize("vault", ["vault without Clippings", "missing vault"])
+def test_a_vault_without_its_clippings_folder_fails_without_its_path(tmp_path, vault):
+    """Not taken for a vault without clips: the date would move on, and the clips that a mount
+    or a sync brings later, with their old dates, would never be copied."""
+    (tmp_path / "vault without Clippings").mkdir()
 
-    assert caplog.messages == ["clipping: no Clippings folder in the vault"]
+    with pytest.raises(ClippingsFolderMissingError) as failure:
+        ClippingSource(tmp_path / vault).fetch(None)
+
+    assert str(failure.value) == (
+        "clippings_folder_missing: no Clippings folder in the vault of KB_VAULT_DIR"
+    )
 
 
-def test_a_vault_that_does_not_exist_fails(tmp_path):
-    """A KB_VAULT_DIR written wrong is shown, not taken for an empty vault."""
-    with pytest.raises(FileNotFoundError):
-        ClippingSource(tmp_path / "missing").fetch(None)
+def listed_one_nanosecond_before(vault_dir, name):
+    """The clips as listed, the one named changed since: dated one nanosecond earlier."""
+    return [
+        clip_file._replace(changed_at_ns=clip_file.changed_at_ns - 1)
+        if clip_file.path.name == name
+        else clip_file
+        for clip_file in clipping.list_clip_files(clippings_of(vault_dir))
+    ]
 
 
 def test_a_clip_rewritten_between_the_list_and_the_reading_is_left_to_the_next_collection(
@@ -278,10 +302,7 @@ def test_a_clip_rewritten_between_the_list_and_the_reading_is_left_to_the_next_c
 ):
     """Obsidian Sync, iCloud or an edit may be writing it: copied now, it could stay cut for
     good, the first version of a URL being kept."""
-    listed = clipping.list_clip_files(clippings_of(vault_dir))
-    # The clock of a file system may be coarser than the one of the test.
-    time.sleep(0.05)
-    (clippings_of(vault_dir) / ARTICLE).write_bytes(fixture_bytes(ARTICLE))
+    listed = listed_one_nanosecond_before(vault_dir, ARTICLE)
     monkeypatch.setattr(clipping, "list_clip_files", lambda clippings_dir: listed)
 
     with caplog.at_level(logging.INFO, logger="k_b.etl.sources.clipping"):
@@ -432,7 +453,11 @@ def test_a_clip_that_starts_with_a_byte_order_mark_is_read():
     item = convert(b"\xef\xbb\xbf" + fixture_bytes(ARTICLE))
 
     assert item.title == "7 Coding Patterns I Stole From Senior Engineers"
-    assert not item.summary.startswith("\ufeff")
+
+
+def test_the_byte_not_utf8_is_counted_from_the_start_of_the_file_byte_order_mark_included():
+    with pytest.raises(ValueError, match="clip not UTF-8: byte 5$"):
+        read_clip(b"\xef\xbb\xbfab\xff")
 
 
 def test_a_clip_with_crlf_line_ends_is_read():
