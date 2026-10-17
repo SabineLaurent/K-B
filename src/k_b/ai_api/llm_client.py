@@ -137,8 +137,9 @@ class LlmCall[OutputT: BaseModel]:
     retry_after_seconds: int | None
     # None when no answer came: a timeout, a failed connection.
     http_status: int | None
-    # Whether an attempt got a 429, whatever came after it: a retry that times out, gets a 5xx
-    # or is cut by the deadline does not erase it. The request sends nothing more after one.
+    # Whether an attempt got a 429: a retry that times out, gets a 5xx or is cut by the deadline
+    # does not erase it. After a call that failed with one, the request sends nothing more; a
+    # retry answered after its Retry-After got past it, and the next calls go.
     saw_rate_limit: bool
 
 

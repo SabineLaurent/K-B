@@ -981,15 +981,20 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
   distingue « réessayer plus tard » (503, 504) d'une sortie fautive (502).
 - **Échec partiel** : la réponse est 200 dès que le classement a réussi ; chaque sujet en échec est
   nommé dans `failed_subjects`, et les autres sont rendus (#205).
-- **Après un 429 à la rédaction, plus aucun envoi** (#205, constats de `/code-review`, tranchés
+- **Après un 429 que la rédaction n'a pas surmonté, plus aucun envoi** (#205, constats de `/code-review`, tranchés
   par time-knight, délégation de Sabine du 2026-10-15) : le fournisseur a dit d'attendre,
   et les items des sujets suivants partiraient pour une réponse refusée (minimisation, RGPD
   art. 5.1.c ; « les items ne partent pas pour une réponse que l'échéance jetterait »). Les
   sujets restants vont dans `failed_subjects`, `stage: write`, `llm_rate_limited`, qui veut dire
-  ici « pas envoyé : un sujet précédent a reçu un 429 ». Le code lit le 429 observé, quelle que
-  soit la suite de l'appel (`LlmCall.saw_rate_limit`) : une nouvelle tentative après un 429 qui
-  finit en délai dépassé, en 5xx, ou sautée par l'échéance (`llm_timeout`, décision de Sabine du
-  2026-10-17, plan de #205), arrête aussi les envois. Le `Retry-After` d'un classement en échec
+  ici « pas envoyé : un sujet précédent a reçu un 429 ». Le code lit le 429 observé sur l'une ou
+  l'autre tentative (`LlmCall.saw_rate_limit`), pas seulement l'état final : une nouvelle tentative
+  après un 429 qui finit en délai dépassé, en 5xx, ou sautée par l'échéance (`llm_timeout`,
+  décision de Sabine du 2026-10-17, plan de #205), arrête aussi les envois. En revanche, une
+  nouvelle tentative qui a attendu le `Retry-After` puis reçu une réponse a surmonté le 429 : le
+  fournisseur accepte de nouveau, et les sujets suivants partent vers un fournisseur qui répond,
+  pas vers une réponse refusée (tranché par time-knight, délégation de Sabine du 2026-10-15 ;
+  option écartée : arrêter après tout 429, même surmonté, qui ferait tomber des sujets
+  rédigeables). Le `Retry-After` d'un classement en échec
   n'est rendu qu'avec `llm_rate_limited` (503), jamais avec un 504 `llm_timeout` ni un 502. On
   n'arrête pas sur `llm_content_filtered`, `llm_truncated` ni `llm_invalid_output`, propres à un
   sujet, ni sur un `llm_timeout` sans 429 observé, que l'échéance garde déjà. **Limite** : on n'arrête pas non plus sur
