@@ -159,14 +159,44 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 
 ### Obsidian Web Clipper — fichier
 
-- **Technologie** : fichiers `.md` avec en-tête YAML (*frontmatter*), écrits par l'extension
-  Web Clipper dans le coffre Obsidian de K-B.
+- **Technologie** : fichiers `.md` avec en-tête YAML (*frontmatter*) entre deux lignes `---`,
+  puis le texte gardé en Markdown, écrits par l'extension Web Clipper dans le coffre Obsidian
+  de K-B (voir « Prérequis » : elle n'y écrit pas encore).
+- **Dossier** : le coffre est donné par la variable `KB_VAULT_DIR` ; son chemin n'est écrit dans
+  aucun fichier du dépôt. Les clips sont dans `<KB_VAULT_DIR>/Clippings/`, le dossier du gabarit
+  par défaut de Web Clipper.
+- **Gabarit** : relevé le 2026-10-17 sur les 5 clips du coffre, conforme au gabarit par défaut
+  de Web Clipper (mêmes clés, ordre, types, dossier et nom de fichier). Le nom du fichier est le
+  titre, privé des caractères qu'un nom de fichier refuse. Les 7 clés sont présentes dans chaque
+  clip, dans cet ordre ; une clé sans valeur se lit `null`.
+
+  | Clé | Forme relevée | Type par défaut dans Web Clipper | Valeur présente |
+  |---|---|---|---|
+  | `title` | texte entre guillemets | `text` | 5/5 |
+  | `source` | URL `https` entre guillemets ; chaîne de requête sur 2 | `text` | 5/5 |
+  | `author` | liste de liens `"[[Nom]]"` | `multitext` | 2/5 |
+  | `published` | date `AAAA-MM-JJ` sans guillemets, sans heure ni fuseau | `date` | 3/5 |
+  | `created` | date `AAAA-MM-JJ` sans guillemets, sans heure ni fuseau | `date` | 5/5 |
+  | `description` | texte entre guillemets | `text` | 4/5 |
+  | `tags` | liste, `"clippings"` | `multitext` | 5/5 |
+
+  Sans guillemets, une date est lue comme une date par un lecteur YAML, pas comme un texte. Sa
+  conversion en date UTC avec fuseau (« Du brut au jeu d'items ») est décidée par #14. La forme
+  dépend des réglages de Web Clipper (un type `datetime` changerait les dates) : elle sera
+  relevée de nouveau sur le vrai coffre. Source du gabarit par défaut (dossier `Clippings`, clés,
+  valeurs et types) : `createDefaultTemplate` et `updateGlobalPropertyTypes` dans
+  [`src/managers/template-manager.ts`](https://github.com/obsidianmd/obsidian-clipper/blob/c48ccdfe35a20e996d563fa843b17bb05bcb68c3/src/managers/template-manager.ts)
+  du dépôt officiel `obsidianmd/obsidian-clipper`, dernier commit du fichier `c48ccdf` du
+  2024-12-04, lue par l'API GitHub le 2026-10-17.
 - **Ce qu'on en tire** : un item par fichier : titre, URL source, date, et le texte gardé.
 - **Accès** : lecture du dossier local du coffre ; aucun réseau.
-- **Limites** : aucune ; taille de fichier plafonnée à la lecture.
+- **Limites** : aucune ; taille de fichier plafonnée à la lecture (le plus gros des 5 clips du
+  2026-10-17 fait 183 441 octets).
 - **Données personnelles** : le champ `author` de la page gardée, s'il existe ; c'est l'auteur
-  public de l'article.
-- **Prérequis** : le coffre Obsidian est à créer (#14).
+  public de l'article, écrit en liens `[[Nom]]`. La description, le texte gardé et ses liens
+  `[[…]]` sont du texte libre qui peut nommer des personnes ; le nom du fichier est le titre.
+- **Prérequis** : coffre créé le 2026-10-17 (#147), avec une copie de 5 clips ; Web Clipper n'y
+  écrit pas encore (réglage à venir).
 
 ### tldr.tech — scraping
 

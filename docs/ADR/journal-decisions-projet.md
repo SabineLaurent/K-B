@@ -19,6 +19,8 @@ méthode de travail n'y entre pas : elle vit dans les règles du dépôt.
   - *Savoir* : pages vivantes, alimentées par `raw/manual/` et par les PDF retenus dans Zotero.
 - **Données hors du dépôt de code** (ex. `~/K-B-data/` : `raw/automation/`, `raw/manual/`, base,
   `wiki/`), qui sert aussi de coffre Obsidian. Pourquoi : ne jamais publier de données collectées.
+  **Exception provisoire le 2026-10-17** (« Coffre Obsidian : une copie dans un dossier ignoré du
+  dépôt »).
 - **Sources de la v0**, une par type de source exigé par la certif, au minimum :
 
   | Source | Type |
@@ -2597,6 +2599,23 @@ du plan, que Sabine a validé. Tranche la question posée le 15/10 et écrite le
 
   **Accorde** la spec, qui disait « Les bornes sont envoyées au modèle dans le `json_schema` »
   (commentaire daté sur #205). — PR de #205
+
+### Coffre Obsidian : une copie dans un dossier ignoré du dépôt
+
+Décision de Sabine du 2026-10-17, relayée par time-knight.
+
+- **Exception provisoire à « Données hors du dépôt de code » (2026-09-29) : le coffre Obsidian
+  de K-B est une copie des clips existants, rangée dans un dossier du dépôt que git ignore (règle
+  `temp/` du `.gitignore`). Le code et la doc ne le désignent que par `KB_VAULT_DIR`, jamais par
+  son chemin complet.** Pourquoi, selon Sabine : la praticité en développement. La copie sert de
+  matière à la collecte des clips (#14, corps de #147) ; une fixture qui en est tirée est réduite
+  au minimum, auteur remplacé, extrait court. Option écartée : le coffre hors du dépôt (critère
+  initial de #147, conseil de time-knight), moins pratique en développement. La séparation du
+  coffre et du dossier de données (2026-10-09) reste. Levée avec le vrai coffre, quand Web
+  Clipper sera réglé pour y écrire (réglage à venir, sans issue). Limite assumée : des données
+  personnelles (des noms d'auteurs) sont dans le dossier d'un dépôt public au 25/10, protégées
+  par la seule règle `temp/` ; un `git clean -x` ou `-X`, ou une image construite sans
+  `.dockerignore` qui exclut `temp/`, les toucherait. — PR de #147
 
 ## Décisions encore ouvertes
 
