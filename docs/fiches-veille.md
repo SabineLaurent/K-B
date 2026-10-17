@@ -121,18 +121,49 @@ ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 6
   (`source_date`, puis `id`, décroissants) est total : la borne est vraie même quand la coupe
   tombe entre deux sortes. Une entrée retirée ne prend pas de place sous le plafond. Avec ce
   plafond, l'offset 10 000 de `GET /items` n'est jamais atteint.
-- **Durée totale** : `DIGEST_REQUEST_TIMEOUT_SECONDS`, une constante nommée dans `core/config.py`,
-  sa valeur fixée par #205, en comptant les appels du juge. Au-delà, les sujets pas encore
-  rédigés ou pas encore jugés vont dans `failed_subjects` avec `llm_timeout` et leur étape
-  (`write` ou `judge`). Elle borne la demande ; le délai d'un appel (#150) ne borne que l'appel.
-- **Appels au modèle** : au plafond, environ 6 classements (50 items par appel, découpage de
-  #205), 8 rédactions (une par sujet) et 8 jugements (un par sujet, section « Juge ») : environ
-  22 appels, et le double de tentatives au plus avec les nouvelles tentatives, soit environ 44
-  (28 sans le juge). Ce nombre découle du plafond et des sujets : pas de constante de plus.
+- **Durée totale** : `DIGEST_REQUEST_TIMEOUT_SECONDS` = 200 s (#205, `core/config.py`), comptée
+  dès l'arrivée de la demande ; elle borne la lecture et chaque appel au modèle, juge compris. Les
+  appels se font **en série**, un sujet après l'autre (décision de Sabine du 2026-10-17, plan de
+  #205) : la chaîne mesurée par #158 dure environ 98 s (113 s avec les appels les plus lents),
+  sous les 240 s que l'ingress HTTP d'Azure Container Apps laisse à une requête
+  ([Ingress in Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/ingress-overview),
+  section « HTTP ») ; 200 s gardent 40 s pour le dernier appel en cours et la réponse. Options
+  écartées : rédiger les sujets en parallèle (environ 30 s, mais un `replay` à refaire et des 429
+  possibles sous le quota, pour un gain sans besoin mesuré) ; une tâche de fond (un état gardé
+  entre deux requêtes, contraire à la règle 7 de `poc.md`, utile seulement au-delà de 240 s).
+  Le pire cas, 22 appels de 210 s, dépasse 240 s en série comme en parallèle : seule l'échéance
+  borne la demande.
+  - **Mécanisme** (`ai_api/deadline.py`) : aucune requête au modèle s'il reste moins de
+    `MIN_SECONDS_FOR_LLM_REQUEST` = 10 s, pour que les items ne partent pas pour une réponse
+    jetée ; les délais d'httpx2 de chaque requête (modèle et API de données) sont ramenés au
+    temps restant ; une nouvelle tentative qui ne tient plus n'est pas faite (`llm_timeout`, le
+    statut HTTP observé gardé) ; la lecture de l'API de données s'arrête dès que l'échéance passe
+    entre deux morceaux (`data_api_timeout`).
+  - **Ce que voit le client** : au-delà, chaque sujet pas encore rédigé ou pas encore jugé va dans
+    `failed_subjects` avec `llm_timeout` et son étape (`write` ou `judge`), et les autres fiches
+    sont rendues (200) ; un classement pas fini fait échouer la demande (`llm_timeout`, 504).
+  - **Limite** : ce n'est pas une borne dure. Le délai de lecture d'httpx2 vaut pour chaque morceau
+    reçu (« the maximum duration to wait for a chunk of data to be received »,
+    [Timeouts](https://github.com/pydantic/httpx2/blob/main/docs/advanced/timeouts.md), doc
+    d'httpx2, lue par Context7 le 2026-10-17 ; httpx2 2.13.1 n'a pas de délai total, vérifié
+    dans son code) : une réponse envoyée au compte-gouttes peut dépasser l'échéance, d'un délai de
+    lecture au plus pour l'API de données, de plus pour le modèle, dont httpx2 lit la réponse
+    entière. Le fournisseur répond d'un bloc (appel sans diffusion). Option écartée : lire la
+    réponse du modèle en flux pour contrôler l'échéance entre deux morceaux ; elle resterait
+    dépassable d'un délai de lecture.
+- **Appels au modèle** : au plafond, 6 classements ou plus (des lots de 50 items et de 36 000
+  caractères de message au plus, `MAX_ITEMS_PER_CLASSIFICATION_CALL` et
+  `MAX_CLASSIFICATION_INPUT_CHARS` ; jusqu'à environ 10 quand les titres sont longs), 8
+  rédactions (une par sujet) et 8 jugements (un par sujet, section « Juge ») : environ 22 appels,
+  et le double de tentatives au plus avec les nouvelles tentatives, soit environ 44 (28 sans le
+  juge). Ce nombre découle du plafond et des sujets : pas de constante de plus.
 
-**Limites** : une seule demande à la fois est supposée (une seule utilisatrice, en local) ; les
+**Limites** : une seule demande à la fois est supposée (une seule utilisatrice, en local) ; le
 quota du déploiement Foundry est de 140 000 jetons et 140 requêtes par minute (en-têtes
-`x-ratelimit-limit-*`, mesure de #158 du 2026-10-17). Les sortes rares tiennent bien sous
+`x-ratelimit-limit-*`, mesure de #158 du 2026-10-17). Selon le calcul de la doc « Manage quota »
+(entrée estimée plus `max_completion_tokens`), une demande approche 110 000 jetons estimés par
+minute, même en série : une seconde demande dans la même minute peut rendre un 429 (non observé :
+sur l'essai de #158, l'en-tête ne baissait que des jetons d'entrée). Les sortes rares tiennent bien sous
 le plafond (≈ 150 items sur 14 jours) : si la coupe tombait sur l'une d'elles, `capped_kind` la
 nommerait, et les sortes suivantes ne seraient pas lues. **Durée** : la lecture n'a pas de borne
 à elle. Les délais du client (`DATA_API_*_TIMEOUT_SECONDS`) bornent chaque attente, pas une
@@ -269,8 +300,10 @@ champs où la fidélité cherche un fait (section « Fidélité ») :
   plus, `schema.sql` et `items.py`) ;
   une fiche reçoit **60 items au plus**, les plus récents d'abord : le sujet n'étant connu qu'au
   classement, #204 code la sélection (`select_for_writing`) et #205 l'appelle pour chaque sujet.
-- Le découpage des appels de classement est à #205, sous un plafond de caractères par appel
-  (`input_chars`) que #205 fixe.
+- Le découpage des appels de classement (#205) : des lots dans l'ordre de lecture, de 50 items et
+  36 000 caractères de message utilisateur (`input_chars`) au plus, soit environ 9 000 jetons
+  (#158 : 46 items, environ 5 500 jetons). Une `advisory`, sans texte long, est classée par son
+  titre ; un `body` nul de release est envoyé nul.
 - `items_truncated` compte les items dont un champ est coupé ; `items_dropped`, ceux laissés hors
   d'une fiche (au-delà de 60, retirés, ou disparus entre la liste et le détail : 404
   `item_not_found`).
@@ -324,16 +357,24 @@ items cités. Un **oubli** n'est donc pas un échec : sur 60 items, un petit mod
 un seul oubli faisait échouer tout le sujet. La sécurité ne change pas : le contrôle 4 refuse
 toujours un identifiant inventé.
 
-Les bornes sont envoyées au modèle dans le `json_schema` ; le code les revérifie à deux endroits.
+Les bornes sont écrites dans la **consigne**, en texte, et non dans le `json_schema` : le schéma
+portable n'admet ni `minLength`, ni `maxLength`, ni `minItems`, ni `maxItems` (section
+« Schémas »). Le schéma envoyé est donc écrit à la main, et non dérivé du modèle Pydantic, qui
+écrirait ces mots-clés (accord du 2026-10-17, commentaire daté sur #205). Le code les vérifie à
+deux endroits.
 Une **borne de structure** (un type, un champ en trop, plus de 12 affirmations, `item_ids` hors de
 1 à 5) fait échouer la sortie (contrôle 2). Une **borne d'affirmation** (longueur du `text` ou d'un
 `value`, nombre de faits) ne retire que l'affirmation, comptée (section « Fidélité ») : une
 affirmation trop longue n'a pas à faire échouer tout le sujet.
 
 Le **plafond de sortie** de chaque appel (`max_completion_tokens` chez OpenAI et Azure) est au
-moins la plus longue sortie que ces bornes permettent (calcul à #150 et #205, sur ces bornes :
-12 affirmations, 5 items et 10 faits de 120 caractères chacune) : une troncature ne vient alors
-que d'une sortie hors bornes. Chez un modèle à raisonnement, ce plafond compte aussi les jetons
+moins la plus longue sortie que ces bornes permettent (12 affirmations, 5 items et 10 faits de
+120 caractères chacune) : une troncature ne vient alors que d'une sortie hors bornes. #205 le
+fixe à 8 192 jetons pour la rédaction (`WRITING_MAX_COMPLETION_TOKENS`) : une **estimation**,
+environ 24 500 caractères en JSON compact à 3 caractères par jeton (hypothèse ; la note de #158
+l'estime à 6 000-7 000 jetons). C'est aussi le plus haut que permet le délai de lecture de 90 s
+au débit mesuré par #158, avec 40 % de marge (environ 8 746 jetons ; un test le garde). Au
+classement, 2 048 (50 affectations d'environ 25 jetons). Chez un modèle à raisonnement, ce plafond compte aussi les jetons
 de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_tokens`, section
 « Métriques »).
 
@@ -882,6 +923,7 @@ comprise : jetons et durées sont cumulés sur la ligne.
 | `http_status` | le statut HTTP de la dernière réponse du fournisseur (un 401 de clé refusée se distingue ainsi d'un 503) ; nul sans réponse (délai, connexion refusée) |
 | `schema_valid` | la dernière tentative a passé le contrôle 2 |
 | `failed_check` | le contrôle qui a refusé la dernière tentative (`content_filter`, `finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`, `claim_id`) ; nul si `ok` |
+| `first_failed_check` | le contrôle qui a refusé la première tentative, quand une seconde a suivi ; nul sinon (#205, `LlmCall`, constat de #158 : le motif de la première tentative était perdu) |
 | `facts_checked`, `facts_found`, `claims_removed`, `items_uncited` | compteurs de la fidélité (rédaction) ; nuls au classement et au juge. `items_uncited` y est compté après la fidélité seule ; celui de la réponse l'est après la fidélité et le juge |
 | `claims_judged` | affirmations envoyées au juge ; nul hors juge. Les compteurs du juge ci-dessous sont nuls quand `outcome` n'est pas `ok` (aucun verdict n'est lu) |
 | `verdicts_supported`, `verdicts_contradicted`, `verdicts_unverifiable` | nombre de verdicts rendus, par verdict ; nuls hors juge |
@@ -890,7 +932,7 @@ comprise : jetons et durées sont cumulés sur la ligne.
 | `cost_estimated` | jetons × prix au million lus dans `core/config.py` ; 0 en offre gratuite |
 
 `ts`, `stage`, `failed_check`, `items_dropped`, `items_capped`, `reasoning_tokens` et `http_status`
-s'ajoutent à la liste de #156, puis les compteurs du juge (#222).
+s'ajoutent à la liste de #156, puis les compteurs du juge (#222), puis `first_failed_check` (#205).
 
 **Jamais** dans une ligne : le texte d'un item ou d'une affirmation, la consigne, la sortie du
 modèle, la `reason` d'un verdict, un titre, un auteur, une clé (règle 5 de `poc.md`). Un échec `data_api_*` ne fait aucun appel au modèle, donc
@@ -926,11 +968,19 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
   5 s de connexion et 90 s de réponse, et 20 s d'attente) ; 90 s couvrent une sortie de 8 192
   jetons au débit mesuré par #158 sur gpt-6-luna (environ 7,35 ms par jeton, soit ~60 s) ; une réponse envoyée par morceaux peut
   durer plus, car chaque lecture a son propre délai : la borne totale est celle de la demande,
-  `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205).
+  `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205), avec sa limite (section « Lecture plafonnée »).
 - 502, 503 et 504 disent la panne de l'amont, comme une passerelle (RFC 9110, § 15.6) : le client
   distingue « réessayer plus tard » (503, 504) d'une sortie fautive (502).
 - **Échec partiel** : la réponse est 200 dès que le classement a réussi ; chaque sujet en échec est
   nommé dans `failed_subjects`, et les autres sont rendus (#205).
+- **Limite : un lot de classement en échec fait échouer toute la demande.** Prompt Shields, actif
+  dans `DefaultV2`, lit le message utilisateur, où sont les items : un item réel qui parle
+  d'injection d'instructions peut faire rendre un 400 `content_filter` à tout un lot (502
+  `llm_content_filtered`, sans nouvelle tentative). Un seul item piégé peut aussi provoquer deux
+  sorties fautives de suite (un doublon, `completeness` ; une sortie sans fin, `llm_truncated`).
+  Non observé par #158 (aucun filtre sur 20 appels réels) ; renvoyé à #206 (décision de Sabine du
+  2026-10-17). Option écartée : couper le lot en deux et recommencer pour isoler l'item (jusqu'à
+  environ 12 appels de plus, et un contrat changé).
 - Une fenêtre sans item rend 200 avec `digests` vide, sans appel au modèle.
 
 ## Sources
