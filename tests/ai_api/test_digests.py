@@ -650,3 +650,34 @@ def test_an_item_cited_twice_in_a_claim_is_refused(reading):
 
     assert result.failed_subjects[0].subject == "security_alerts"
     assert result.stage_calls[1].llm_call.failed_check == "item_id"
+
+
+@pytest.mark.parametrize(
+    "rate_limited_steps",
+    [
+        # A Retry-After above the maximum: no retry.
+        [{"kind": "response", "status": 429, "retry_after": "60"}],
+        # A 429 again after the retry.
+        [
+            {"kind": "response", "status": 429, "retry_after": "1"},
+            {"kind": "response", "status": 429, "retry_after": "1"},
+        ],
+    ],
+)
+def test_after_a_writing_rate_limited_nothing_more_is_sent(reading, rate_limited_steps):
+    result, transport = digest_of(
+        reading, [classified(), written(SECURITY_CLAIM), *rate_limited_steps]
+    )
+
+    assert [digest.subject for digest in result.digests] == ["security_alerts"]
+    assert result.failed_subjects == (
+        FailedSubject(subject="agent_tools", stage="write", error="llm_rate_limited"),
+        FailedSubject(subject="research", stage="write", error="llm_rate_limited"),
+    )
+    # The items of research never left.
+    assert len(transport.requests) == 2 + len(rate_limited_steps)
+    assert [call.subject for call in result.stage_calls] == [
+        None,
+        "security_alerts",
+        "agent_tools",
+    ]

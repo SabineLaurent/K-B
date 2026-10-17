@@ -954,7 +954,7 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 | `llm_invalid_output` | contrôles 2 à 6 ou `claim_id`, ou `finish_reason` hors liste, deux fois | 502 | le sujet va dans `failed_subjects`, avec son étape (`stage`) |
 | `llm_truncated` | `finish_reason` `length` ; pas de nouvelle tentative (même entrée, même modèle figé : même sortie attendue) | 502 | `failed_subjects` |
 | `llm_content_filtered` | `finish_reason` `content_filter` : le filtre de contenu du fournisseur a retenu la sortie (celui d'Azure peut réagir aux textes sur le jailbreak et l'injection, sujets de la veille) ; ou un 400 dont `error.code` vaut `content_filter` : il a retenu l'entrée ; pas de nouvelle tentative (même entrée) | 502 | `failed_subjects` |
-| `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec `Retry-After` | `failed_subjects` |
+| `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec `Retry-After` | `failed_subjects`, et chaque sujet suivant, sans envoi (#205) |
 | `llm_unavailable` | 5xx, connexion refusée ou coupée, après la nouvelle tentative ; autre 4xx, réponse qui ne se décode pas, ou réponse 200 qui n'est pas une complétion lisible (pas du JSON, aucun `choices`, un type faux), sans nouvelle tentative | 502 | `failed_subjects` |
 | `llm_timeout` | pas de connexion ou pas de réponse dans le délai du client (#150), sans nouvelle tentative ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé ou pas encore jugé | 504 | `failed_subjects` |
 | `data_api_unavailable` | API de données injoignable, ou 5xx | 502 | — |
@@ -981,6 +981,16 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
   distingue « réessayer plus tard » (503, 504) d'une sortie fautive (502).
 - **Échec partiel** : la réponse est 200 dès que le classement a réussi ; chaque sujet en échec est
   nommé dans `failed_subjects`, et les autres sont rendus (#205).
+- **Après un `llm_rate_limited` à la rédaction, plus aucun envoi** (#205, constat de `/code-review`,
+  tranché par time-knight, délégation de Sabine du 2026-10-15) : le fournisseur a dit d'attendre,
+  et les items des sujets suivants partiraient pour une réponse refusée (minimisation, RGPD
+  art. 5.1.c ; « les items ne partent pas pour une réponse que l'échéance jetterait »). Les
+  sujets restants vont dans `failed_subjects`, `stage: write`, `llm_rate_limited`. On n'arrête
+  pas sur `llm_content_filtered`, `llm_truncated` ni `llm_invalid_output`, propres à un sujet, ni
+  sur `llm_timeout`, que l'échéance garde déjà. **Limite** : on n'arrête pas non plus sur
+  `llm_unavailable`, qui mêle les pannes du fournisseur (5xx, connexion refusée) et les refus
+  propres à une requête (un autre 4xx, une réponse illisible) : après une panne, les sujets
+  suivants partent encore.
 - **Limite : un lot de classement en échec fait échouer toute la demande.** Prompt Shields, actif
   dans `DefaultV2`, lit le message utilisateur, où sont les items : un item réel qui parle
   d'injection d'instructions peut faire rendre un 400 `content_filter` à tout un lot (502

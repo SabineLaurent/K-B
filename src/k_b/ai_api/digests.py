@@ -6,6 +6,8 @@ the result is returned, with one StageCall per call for the metrics, and the cal
 
 A classification that fails fails the request; a writing that fails, or that the deadline does
 not leave the time for, names its subject in failed_subjects, and the other digests are returned.
+After a writing rate limited, nothing more is sent: the provider said to wait, and the items of
+the next subjects would leave for an answer refused (minimisation, GDPR art. 5.1.c).
 The judge (#223) comes after the writing of each subject, in the same order of calls.
 """
 
@@ -156,6 +158,7 @@ def build_digests(
     stage_calls = list(classification.stage_calls)
     items_truncated = 0
     items_dropped = reading.items_dropped
+    is_rate_limited = False
     for subject in subjects:
         subject_items = [
             item
@@ -163,6 +166,11 @@ def build_digests(
             if classification.subject_by_item_id.get(item.item_id) == subject.name
         ]
         if not subject_items:
+            continue
+        if is_rate_limited:
+            failed_subjects.append(
+                FailedSubject(subject.name, "write", "llm_rate_limited")
+            )
             continue
         if not deadline.allows_llm_request():
             failed_subjects.append(FailedSubject(subject.name, "write", "llm_timeout"))
@@ -194,6 +202,7 @@ def build_digests(
             failed_subjects.append(
                 FailedSubject(subject.name, "write", llm_call.outcome)
             )
+            is_rate_limited = llm_call.outcome == "llm_rate_limited"
         else:
             digests.append(digest)
     return DigestsResult(
