@@ -2532,6 +2532,70 @@ Mesure de #158 sur gpt-6-luna (2026-10-17) ; tranché par time-knight (délégat
   90 s. Un test garde la raison : au débit mesuré, 8 192 jetons avec 40 % de marge tiennent dans
   le délai. — PR de #158
 
+### Fiches de veille : la durée d'une demande
+
+Plan de #205, relu par un agent architecte logiciel, validé par Sabine le 17/10 (relayé par
+time-knight, qui a vérifié les recommandations par commande ou à la source). Le pourquoi est celui
+du plan, que Sabine a validé. Tranche la question posée le 15/10 et écrite le 16/10 sur #205
+(point 5) : « rédiger les sujets en parallèle, ou passer `POST /digests` en tâche de fond ».
+
+- **Les appels au modèle se font en série, un sujet après l'autre, sous une échéance de 200 s
+  (`DIGEST_REQUEST_TIMEOUT_SECONDS`) comptée dès l'arrivée de la demande, qui borne aussi la
+  lecture par l'API de données. Ni parallèle, ni tâche de fond.** C'est une troisième option, que
+  la question du 15/10 ne posait pas. Pourquoi :
+  - la chaîne mesurée par #158 dure environ 98 s pour 8 sujets, juge compris (113 s avec les
+    appels les plus lents), sous les 240 s que l'ingress HTTP d'Azure Container Apps laisse à une
+    requête ;
+  - le pire cas (22 appels de 210 s) dépasse 240 s en série comme en parallèle : seule une
+    échéance borne la demande, quel que soit le choix ;
+  - la série garde le `replay` tel quel, puisqu'il donne ses étapes dans l'ordre (« Appel du
+    modèle »), et évite une pointe sous le quota de 140 000 jetons par minute.
+
+  Ce que voit le client : un sujet pas encore rédigé à l'échéance va dans `failed_subjects` avec
+  `llm_timeout`, et les autres sont rendus ; un classement pas fini donne 504. Aucune requête ne
+  part s'il reste moins de 10 s (`MIN_SECONDS_FOR_LLM_REQUEST`), au-dessus de la rédaction la plus
+  lente mesurée (9,3 s) : les items ne partent pas pour une réponse que l'échéance jetterait. Une
+  rédaction plus longue, jusqu'à environ 60 s au plafond de sortie, peut encore être coupée.
+  Options écartées :
+  - le parallèle : environ 30 s, mais un `replay` à refaire (choisir l'étape d'après le corps
+    de la requête) et des 429 possibles selon la doc « Manage quota », pour un gain sans besoin
+    mesuré ;
+  - la tâche de fond : elle demande un état gardé entre deux requêtes, contraire à la règle 7
+    de `poc.md`, et n'est utile qu'au-delà de 240 s.
+
+  Limite assumée : la spec suppose une demande à la fois ; une seconde demande dans la même minute
+  peut rendre un 429. — PR de #205
+- **L'échéance n'est pas une borne dure ; c'est écrit en limite.** Le délai de lecture d'httpx2
+  vaut pour chaque morceau reçu, et httpx2 2.13.1 n'a pas de délai total (doc d'httpx2,
+  « Timeouts », lue par Context7 le 2026-10-17 ; vérifié dans son code). L'échéance ramène les
+  délais de chaque requête au temps restant et se contrôle entre deux morceaux de l'API de
+  données. Chaque phase d'une requête (pool, connexion, écriture, lecture) étant ramenée
+  séparément, une requête lancée avant l'échéance peut la dépasser de la somme de ses délais :
+  30 s au plus pour l'API de données ; pour le modèle, 20 s plus sa lecture, et sans borne pour une
+  réponse envoyée au compte-gouttes, dont httpx2 lit la réponse entière (constat de `/code-review`,
+  tranché par time-knight, délégation de Sabine du 15/10).
+  **Revoit le motif** du rejet du « délai total par tentative » dans « Appel du modèle »
+  (2026-10-15), « pour une borne que la demande pose déjà » : la demande pose une borne, mais pas
+  une borne dure. Le rejet reste ; c'est son motif qui change.
+  Option écartée : lire la réponse du modèle en flux pour contrôler l'échéance entre deux morceaux
+  (relecture du plan) : elle resterait dépassable de la somme des délais, et le fournisseur répond
+  d'un bloc. — PR de #205
+- **Le schéma envoyé au modèle est écrit à la main, et les bornes des fiches vont dans la
+  consigne, en texte.** Pourquoi (constat de la relecture du plan, confirmé à la source par
+  time-knight) : Azure refuse `minItems`, `maxItems`, `minLength` et `maxLength` en mode strict
+  ([structured outputs](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs),
+  consultée le 2026-10-17). Le modèle Pydantic qui revérifie la sortie porte les bornes de
+  structure (12 affirmations, 1 à 5 items) et écrirait donc ces mots-clés dans un schéma dérivé.
+  Le `replay` ne lit pas le schéma : les tests seraient restés verts, et chaque vrai appel aurait
+  échoué. Un test parcourt chaque schéma envoyé.
+  Options écartées :
+  - dériver le schéma puis le nettoyer : les `$ref` et `$defs` de Pydantic ne sont pas vérifiés
+    chez Azure ;
+  - le mot-clé `description` du schéma pour les bornes : non vérifié chez Azure.
+
+  **Accorde** la spec, qui disait « Les bornes sont envoyées au modèle dans le `json_schema` »
+  (commentaire daté sur #205). — PR de #205
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de

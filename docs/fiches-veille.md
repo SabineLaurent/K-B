@@ -121,27 +121,63 @@ ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 6
   (`source_date`, puis `id`, décroissants) est total : la borne est vraie même quand la coupe
   tombe entre deux sortes. Une entrée retirée ne prend pas de place sous le plafond. Avec ce
   plafond, l'offset 10 000 de `GET /items` n'est jamais atteint.
-- **Durée totale** : `DIGEST_REQUEST_TIMEOUT_SECONDS`, une constante nommée dans `core/config.py`,
-  sa valeur fixée par #205, en comptant les appels du juge. Au-delà, les sujets pas encore
-  rédigés ou pas encore jugés vont dans `failed_subjects` avec `llm_timeout` et leur étape
-  (`write` ou `judge`). Elle borne la demande ; le délai d'un appel (#150) ne borne que l'appel.
-- **Appels au modèle** : au plafond, environ 6 classements (50 items par appel, découpage de
-  #205), 8 rédactions (une par sujet) et 8 jugements (un par sujet, section « Juge ») : environ
-  22 appels, et le double de tentatives au plus avec les nouvelles tentatives, soit environ 44
-  (28 sans le juge). Ce nombre découle du plafond et des sujets : pas de constante de plus.
+- **Durée totale** : `DIGEST_REQUEST_TIMEOUT_SECONDS` = 200 s (#205, `core/config.py`), comptée
+  dès l'arrivée de la demande ; elle borne la lecture et chaque appel au modèle, juge compris. Les
+  appels se font **en série**, un sujet après l'autre (décision de Sabine du 2026-10-17, plan de
+  #205) : la chaîne mesurée par #158 dure environ 98 s (113 s avec les appels les plus lents),
+  sous les 240 s que l'ingress HTTP d'Azure Container Apps laisse à une requête
+  ([Ingress in Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/ingress-overview),
+  section « HTTP ») ; 200 s gardent 40 s pour le dernier appel en cours et la réponse. Options
+  écartées : rédiger les sujets en parallèle (environ 30 s, mais un `replay` à refaire et des 429
+  possibles sous le quota, pour un gain sans besoin mesuré) ; une tâche de fond (un état gardé
+  entre deux requêtes, contraire à la règle 7 de `poc.md`, utile seulement au-delà de 240 s).
+  Le pire cas, 22 appels de 210 s, dépasse 240 s en série comme en parallèle : seule l'échéance
+  borne la demande.
+  - **Mécanisme** (`ai_api/deadline.py`) : aucune requête au modèle s'il reste moins de
+    `MIN_SECONDS_FOR_LLM_REQUEST` = 10 s, au-dessus de la rédaction la plus lente mesurée par #158
+    (9,3 s), pour que les items ne partent pas pour une réponse que l'échéance jetterait ; une
+    rédaction plus longue (jusqu'à environ 60 s au plafond de sortie) lancée avec moins de temps
+    peut encore finir en `llm_timeout` ; les délais d'httpx2 de chaque requête (modèle et API de données) sont ramenés au
+    temps restant ; une nouvelle tentative qui ne tient plus n'est pas faite (`llm_timeout`, le
+    statut HTTP observé gardé) ; la lecture de l'API de données s'arrête dès que l'échéance passe
+    entre deux morceaux (`data_api_timeout`).
+  - **Ce que voit le client** : au-delà, chaque sujet pas encore rédigé ou pas encore jugé va dans
+    `failed_subjects` avec `llm_timeout` et son étape (`write` ou `judge`), et les autres fiches
+    sont rendues (200) ; un classement pas fini fait échouer la demande (`llm_timeout`, 504).
+  - **Limite** : ce n'est pas une borne dure. Le délai de lecture d'httpx2 vaut pour chaque morceau
+    reçu (« the maximum duration to wait for a chunk of data to be received »,
+    [Timeouts](https://github.com/pydantic/httpx2/blob/main/docs/advanced/timeouts.md), doc
+    d'httpx2, lue par Context7 le 2026-10-17 ; httpx2 2.13.1 n'a pas de délai total, vérifié
+    dans son code) : chaque phase d'une requête (pool, connexion, écriture, lecture) est ramenée
+    séparément au temps restant à son départ, si bien qu'une requête lancée avant l'échéance peut
+    la dépasser de la somme de ses délais : 30 s au plus pour l'API de données (5 + 5 + 10 + 10) ;
+    pour le modèle, 20 s plus sa lecture, et sans borne pour une réponse envoyée au compte-gouttes,
+    dont httpx2 lit la réponse entière. Le fournisseur répond d'un bloc (appel sans diffusion), et
+    la marge de 40 s sous les 240 s de l'ingress reste au-dessus de ces dépassements. Option
+    écartée : lire la réponse du modèle en flux pour contrôler l'échéance entre deux morceaux ;
+    elle resterait dépassable de la somme des délais.
+- **Appels au modèle** : au plafond, 6 classements ou plus (des lots de 50 items et de 36 000
+  caractères de message au plus, `MAX_ITEMS_PER_CLASSIFICATION_CALL` et
+  `MAX_CLASSIFICATION_INPUT_CHARS` ; jusqu'à environ 10 quand les titres sont longs), 8
+  rédactions (une par sujet) et 8 jugements (un par sujet, section « Juge ») : environ 22 appels,
+  et le double de tentatives au plus avec les nouvelles tentatives, soit environ 44 (28 sans le
+  juge). Ce nombre découle du plafond et des sujets : pas de constante de plus.
 
-**Limites** : une seule demande à la fois est supposée (une seule utilisatrice, en local) ; les
+**Limites** : une seule demande à la fois est supposée (une seule utilisatrice, en local) ; le
 quota du déploiement Foundry est de 140 000 jetons et 140 requêtes par minute (en-têtes
-`x-ratelimit-limit-*`, mesure de #158 du 2026-10-17). Les sortes rares tiennent bien sous
+`x-ratelimit-limit-*`, mesure de #158 du 2026-10-17). Selon le calcul de la doc « Manage quota »
+(entrée estimée plus `max_completion_tokens`), une demande approche 110 000 jetons estimés par
+minute, même en série : une seconde demande dans la même minute peut rendre un 429 (non observé :
+sur l'essai de #158, l'en-tête ne baissait que des jetons d'entrée). Les sortes rares tiennent bien sous
 le plafond (≈ 150 items sur 14 jours) : si la coupe tombait sur l'une d'elles, `capped_kind` la
-nommerait, et les sortes suivantes ne seraient pas lues. **Durée** : la lecture n'a pas de borne
-à elle. Les délais du client (`DATA_API_*_TIMEOUT_SECONDS`) bornent chaque attente, pas une
-requête ni la lecture : le délai de lecture vaut pour chaque morceau reçu, si bien qu'un serveur
-qui envoie au compte-gouttes fait durer une requête sans fin ; et aux 300 détails s'ajoutent les
-pages de liste, jusqu'à 101 par sorte (les entrées retirées ne comptent pas sous le plafond).
-Seule `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205) bornera la lecture : `read_watch` ne se branche sur
-une route qu'avec cette échéance (constat de `/code-review` sur #204, tranché par time-knight,
-délégation de Sabine du 2026-10-15). **Taille** : chaque réponse de l'API de données est lue en
+nommerait, et les sortes suivantes ne seraient pas lues. **Durée** : les délais du client
+(`DATA_API_*_TIMEOUT_SECONDS`) bornent chaque attente, pas une requête ni la lecture : le délai de
+lecture vaut pour chaque morceau reçu, si bien qu'un serveur qui envoie au compte-gouttes ferait
+durer une requête sans fin ; et aux 300 détails s'ajoutent les pages de liste, jusqu'à 101 par
+sorte (les entrées retirées ne comptent pas sous le plafond). C'est `DIGEST_REQUEST_TIMEOUT_SECONDS`
+qui borne la lecture : `read_watch` exige l'échéance de la demande (paramètre sans valeur par
+défaut, #205 ; constat de `/code-review` sur #204, tranché par time-knight, délégation de Sabine
+du 2026-10-15), et s'arrête en `data_api_timeout` au-delà (« Durée totale », plus haut). **Taille** : chaque réponse de l'API de données est lue en
 flux et refusée (`data_api_invalid_response`, sans rien citer du corps) au-delà de
 `MAX_DATA_API_BODY_BYTES = 4 000 000` octets décodés, avant toute lecture quand `Content-Length`
 l'annonce déjà ; au-dessus du pire honnête, estimé à environ 2 Mo pour une page de liste et
@@ -269,11 +305,16 @@ champs où la fidélité cherche un fait (section « Fidélité ») :
   plus, `schema.sql` et `items.py`) ;
   une fiche reçoit **60 items au plus**, les plus récents d'abord : le sujet n'étant connu qu'au
   classement, #204 code la sélection (`select_for_writing`) et #205 l'appelle pour chaque sujet.
-- Le découpage des appels de classement est à #205, sous un plafond de caractères par appel
-  (`input_chars`) que #205 fixe.
-- `items_truncated` compte les items dont un champ est coupé ; `items_dropped`, ceux laissés hors
-  d'une fiche (au-delà de 60, retirés, ou disparus entre la liste et le détail : 404
-  `item_not_found`).
+- Le découpage des appels de classement (#205) : des lots dans l'ordre de lecture, de 50 items et
+  36 000 caractères de message utilisateur (`input_chars`) au plus, soit environ 9 000 jetons
+  (#158 : 46 items, environ 5 500 jetons). Une `advisory`, sans texte long, est classée par son
+  titre ; un `body` nul de release est envoyé nul.
+- `items_truncated` compte les items dont un champ est coupé à 2 000 caractères pour la
+  rédaction ; `items_dropped`, ceux laissés hors d'une fiche (au-delà de 60, retirés, ou disparus
+  entre la liste et le détail : 404 `item_not_found`). La coupe à 500 du classement n'y est pas
+  comptée (presque tous les items y passent) : elle est comptée par appel, dans la ligne de
+  métrique. **Limite** : la coupe et le plafond de 60 ne sont comptés que pour un sujet envoyé à
+  la rédaction ; un sujet laissé en `llm_timeout` avant l'envoi n'y ajoute rien.
 - `items_capped` est vrai s'il reste au moins un item au-delà de `MAX_ITEMS_PER_DIGEST_REQUEST`
   (section « Lecture plafonnée ») ; ces items ne sont pas lus, donc pas comptés.
 
@@ -324,16 +365,24 @@ items cités. Un **oubli** n'est donc pas un échec : sur 60 items, un petit mod
 un seul oubli faisait échouer tout le sujet. La sécurité ne change pas : le contrôle 4 refuse
 toujours un identifiant inventé.
 
-Les bornes sont envoyées au modèle dans le `json_schema` ; le code les revérifie à deux endroits.
+Les bornes sont écrites dans la **consigne**, en texte, et non dans le `json_schema` : le schéma
+portable n'admet ni `minLength`, ni `maxLength`, ni `minItems`, ni `maxItems` (section
+« Schémas »). Le schéma envoyé est donc écrit à la main, et non dérivé du modèle Pydantic, qui
+écrirait ces mots-clés (accord du 2026-10-17, commentaire daté sur #205). Le code les vérifie à
+deux endroits.
 Une **borne de structure** (un type, un champ en trop, plus de 12 affirmations, `item_ids` hors de
 1 à 5) fait échouer la sortie (contrôle 2). Une **borne d'affirmation** (longueur du `text` ou d'un
 `value`, nombre de faits) ne retire que l'affirmation, comptée (section « Fidélité ») : une
 affirmation trop longue n'a pas à faire échouer tout le sujet.
 
 Le **plafond de sortie** de chaque appel (`max_completion_tokens` chez OpenAI et Azure) est au
-moins la plus longue sortie que ces bornes permettent (calcul à #150 et #205, sur ces bornes :
-12 affirmations, 5 items et 10 faits de 120 caractères chacune) : une troncature ne vient alors
-que d'une sortie hors bornes. Chez un modèle à raisonnement, ce plafond compte aussi les jetons
+moins la plus longue sortie que ces bornes permettent (12 affirmations, 5 items et 10 faits de
+120 caractères chacune) : une troncature ne vient alors que d'une sortie hors bornes. #205 le
+fixe à 8 192 jetons pour la rédaction (`WRITING_MAX_COMPLETION_TOKENS`) : une **estimation**,
+environ 24 500 caractères en JSON compact à 3 caractères par jeton (hypothèse ; la note de #158
+l'estime à 6 000-7 000 jetons). C'est aussi le plus haut que permet le délai de lecture de 90 s
+au débit mesuré par #158, avec 40 % de marge (environ 8 746 jetons ; un test le garde). Au
+classement, 2 048 (50 affectations d'environ 25 jetons). Chez un modèle à raisonnement, ce plafond compte aussi les jetons
 de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_tokens`, section
 « Métriques »).
 
@@ -882,6 +931,7 @@ comprise : jetons et durées sont cumulés sur la ligne.
 | `http_status` | le statut HTTP de la dernière réponse du fournisseur (un 401 de clé refusée se distingue ainsi d'un 503) ; nul sans réponse (délai, connexion refusée) |
 | `schema_valid` | la dernière tentative a passé le contrôle 2 |
 | `failed_check` | le contrôle qui a refusé la dernière tentative (`content_filter`, `finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`, `claim_id`) ; nul si `ok` |
+| `first_failed_check` | le contrôle qui a refusé la première tentative, quand une seconde a suivi ; nul sinon (#205, `LlmCall`, constat de #158 : le motif de la première tentative était perdu) |
 | `facts_checked`, `facts_found`, `claims_removed`, `items_uncited` | compteurs de la fidélité (rédaction) ; nuls au classement et au juge. `items_uncited` y est compté après la fidélité seule ; celui de la réponse l'est après la fidélité et le juge |
 | `claims_judged` | affirmations envoyées au juge ; nul hors juge. Les compteurs du juge ci-dessous sont nuls quand `outcome` n'est pas `ok` (aucun verdict n'est lu) |
 | `verdicts_supported`, `verdicts_contradicted`, `verdicts_unverifiable` | nombre de verdicts rendus, par verdict ; nuls hors juge |
@@ -890,7 +940,7 @@ comprise : jetons et durées sont cumulés sur la ligne.
 | `cost_estimated` | jetons × prix au million lus dans `core/config.py` ; 0 en offre gratuite |
 
 `ts`, `stage`, `failed_check`, `items_dropped`, `items_capped`, `reasoning_tokens` et `http_status`
-s'ajoutent à la liste de #156, puis les compteurs du juge (#222).
+s'ajoutent à la liste de #156, puis les compteurs du juge (#222), puis `first_failed_check` (#205).
 
 **Jamais** dans une ligne : le texte d'un item ou d'une affirmation, la consigne, la sortie du
 modèle, la `reason` d'un verdict, un titre, un auteur, une clé (règle 5 de `poc.md`). Un échec `data_api_*` ne fait aucun appel au modèle, donc
@@ -904,7 +954,7 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 | `llm_invalid_output` | contrôles 2 à 6 ou `claim_id`, ou `finish_reason` hors liste, deux fois | 502 | le sujet va dans `failed_subjects`, avec son étape (`stage`) |
 | `llm_truncated` | `finish_reason` `length` ; pas de nouvelle tentative (même entrée, même modèle figé : même sortie attendue) | 502 | `failed_subjects` |
 | `llm_content_filtered` | `finish_reason` `content_filter` : le filtre de contenu du fournisseur a retenu la sortie (celui d'Azure peut réagir aux textes sur le jailbreak et l'injection, sujets de la veille) ; ou un 400 dont `error.code` vaut `content_filter` : il a retenu l'entrée ; pas de nouvelle tentative (même entrée) | 502 | `failed_subjects` |
-| `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec `Retry-After` | `failed_subjects` |
+| `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec `Retry-After` | `failed_subjects`, et chaque sujet suivant, sans envoi (#205) |
 | `llm_unavailable` | 5xx, connexion refusée ou coupée, après la nouvelle tentative ; autre 4xx, réponse qui ne se décode pas, ou réponse 200 qui n'est pas une complétion lisible (pas du JSON, aucun `choices`, un type faux), sans nouvelle tentative | 502 | `failed_subjects` |
 | `llm_timeout` | pas de connexion ou pas de réponse dans le délai du client (#150), sans nouvelle tentative ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé ou pas encore jugé | 504 | `failed_subjects` |
 | `data_api_unavailable` | API de données injoignable, ou 5xx | 502 | — |
@@ -926,11 +976,39 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
   5 s de connexion et 90 s de réponse, et 20 s d'attente) ; 90 s couvrent une sortie de 8 192
   jetons au débit mesuré par #158 sur gpt-6-luna (environ 7,35 ms par jeton, soit ~60 s) ; une réponse envoyée par morceaux peut
   durer plus, car chaque lecture a son propre délai : la borne totale est celle de la demande,
-  `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205).
+  `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205), avec sa limite (section « Lecture plafonnée »).
 - 502, 503 et 504 disent la panne de l'amont, comme une passerelle (RFC 9110, § 15.6) : le client
   distingue « réessayer plus tard » (503, 504) d'une sortie fautive (502).
 - **Échec partiel** : la réponse est 200 dès que le classement a réussi ; chaque sujet en échec est
   nommé dans `failed_subjects`, et les autres sont rendus (#205).
+- **Après un 429 que la rédaction n'a pas surmonté, plus aucun envoi** (#205, constats de `/code-review`, tranchés
+  par time-knight, délégation de Sabine du 2026-10-15) : le fournisseur a dit d'attendre,
+  et les items des sujets suivants partiraient pour une réponse refusée (minimisation, RGPD
+  art. 5.1.c ; « les items ne partent pas pour une réponse que l'échéance jetterait »). Les
+  sujets restants vont dans `failed_subjects`, `stage: write`, `llm_rate_limited`, qui veut dire
+  ici « pas envoyé : un sujet précédent a reçu un 429 ». Le code lit le 429 observé sur l'une ou
+  l'autre tentative (`LlmCall.saw_rate_limit`), pas seulement l'état final : une nouvelle tentative
+  après un 429 qui finit en délai dépassé, en 5xx, ou sautée par l'échéance (`llm_timeout`,
+  décision de Sabine du 2026-10-17, plan de #205), arrête aussi les envois. En revanche, une
+  nouvelle tentative qui a attendu le `Retry-After` puis reçu une réponse a surmonté le 429 : le
+  fournisseur accepte de nouveau, et les sujets suivants partent vers un fournisseur qui répond,
+  pas vers une réponse refusée (tranché par time-knight, délégation de Sabine du 2026-10-15 ;
+  option écartée : arrêter après tout 429, même surmonté, qui ferait tomber des sujets
+  rédigeables). Le `Retry-After` d'un classement en échec
+  n'est rendu qu'avec `llm_rate_limited` (503), jamais avec un 504 `llm_timeout` ni un 502. On
+  n'arrête pas sur `llm_content_filtered`, `llm_truncated` ni `llm_invalid_output`, propres à un
+  sujet, ni sur un `llm_timeout` sans 429 observé, que l'échéance garde déjà. **Limite** : on n'arrête pas non plus sur
+  `llm_unavailable`, qui mêle les pannes du fournisseur (5xx, connexion refusée) et les refus
+  propres à une requête (un autre 4xx, une réponse illisible) : après une panne, les sujets
+  suivants partent encore.
+- **Limite : un lot de classement en échec fait échouer toute la demande.** Prompt Shields, actif
+  dans `DefaultV2`, lit le message utilisateur, où sont les items : un item réel qui parle
+  d'injection d'instructions peut faire rendre un 400 `content_filter` à tout un lot (502
+  `llm_content_filtered`, sans nouvelle tentative). Un seul item piégé peut aussi provoquer deux
+  sorties fautives de suite (un doublon, `completeness` ; une sortie sans fin, `llm_truncated`).
+  Non observé par #158 (aucun filtre sur 20 appels réels) ; renvoyé à #206 (décision de Sabine du
+  2026-10-17). Option écartée : couper le lot en deux et recommencer pour isoler l'item (jusqu'à
+  environ 12 appels de plus, et un contrat changé).
 - Une fenêtre sans item rend 200 avec `digests` vide, sans appel au modèle.
 
 ## Sources

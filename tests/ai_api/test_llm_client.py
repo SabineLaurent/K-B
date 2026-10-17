@@ -9,9 +9,12 @@ import httpx2
 import pytest
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
+from k_b.ai_api.classification import CLASSIFICATION_MAX_COMPLETION_TOKENS
+from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.llm_client import FailedCheck, build_http_client, call_model
 from k_b.ai_api.llm_replay import ReplayTransport
 from k_b.ai_api.llm_settings import LlmSettings, read_llm_settings
+from k_b.ai_api.writing import WRITING_MAX_COMPLETION_TOKENS
 from k_b.core.config import (
     LLM_CALL_TIMEOUT_SECONDS,
     LLM_CONNECT_TIMEOUT_SECONDS,
@@ -20,6 +23,7 @@ from k_b.core.config import (
     LLM_RETRY_AFTER_MAX_SECONDS,
     LLM_RETRY_WAIT_SECONDS,
     LLM_WRITE_TIMEOUT_SECONDS,
+    MIN_SECONDS_FOR_LLM_REQUEST,
 )
 
 # A system prompt of a stage, a module constant as the real ones will be (#205;
@@ -96,6 +100,7 @@ def call(
     settings=REPLAY_SETTINGS,
     user_data=USER_DATA,
     check_output=accept_every_output,
+    deadline=None,
 ):
     """Call the model on the replay provider with these steps: the call, the transport, which
     kept every request, and the waits asked."""
@@ -113,6 +118,7 @@ def call(
             max_completion_tokens=500,
             check_output=check_output,
             retry_reminders=RETRY_REMINDERS,
+            deadline=deadline,
             sleep=sleeps,
         )
     return llm_call, transport, sleeps
@@ -534,6 +540,7 @@ def test_the_client_of_the_provider_sends_the_key_and_follows_no_redirection():
             max_completion_tokens=500,
             check_output=accept_every_output,
             retry_reminders=RETRY_REMINDERS,
+            deadline=None,
             sleep=Sleeps(),
         )
     (request,) = transport.requests
@@ -552,16 +559,20 @@ def test_the_client_of_the_provider_sends_the_key_and_follows_no_redirection():
 
 
 # Measured by #158 on gpt-6-luna (2026-10-17): about 7.35 ms per output token, a call not
-# streamed; 8,192 tokens, the output cap of its writing calls. #205 replaces the cap by the one it
-# sets for the writing, imported from its module.
+# streamed.
 MEASURED_MS_PER_OUTPUT_TOKEN = 7.35
-LONGEST_MEASURED_OUTPUT_CAP = 8192
 
 
-def test_the_read_timeout_covers_the_longest_output_at_the_measured_rate_with_a_margin():
+@pytest.mark.parametrize(
+    "output_cap",
+    [WRITING_MAX_COMPLETION_TOKENS, CLASSIFICATION_MAX_COMPLETION_TOKENS],
+)
+def test_the_read_timeout_covers_the_longest_output_at_the_measured_rate_with_a_margin(
+    output_cap,
+):
     """An answer not streamed comes in one block: a valid output near the cap must not end in
     llm_timeout, which is not retried, and loses the digest."""
-    seconds_at_cap = MEASURED_MS_PER_OUTPUT_TOKEN * LONGEST_MEASURED_OUTPUT_CAP / 1000
+    seconds_at_cap = MEASURED_MS_PER_OUTPUT_TOKEN * output_cap / 1000
 
     assert seconds_at_cap * 1.4 <= LLM_CALL_TIMEOUT_SECONDS
 
@@ -616,6 +627,7 @@ def test_reminders_missing_for_a_check_are_refused_before_any_request():
             max_completion_tokens=500,
             check_output=accept_every_output,
             retry_reminders=reminders,
+            deadline=None,
             sleep=Sleeps(),
         )
 
@@ -645,6 +657,7 @@ def test_an_answer_that_cannot_be_decoded_is_llm_unavailable_without_retry():
             max_completion_tokens=500,
             check_output=accept_every_output,
             retry_reminders=RETRY_REMINDERS,
+            deadline=None,
             sleep=Sleeps(),
         )
 
@@ -702,3 +715,90 @@ def test_the_status_of_the_last_answer_is_kept(steps, http_status):
 
     assert llm_call.outcome in {"llm_unavailable", "llm_timeout"}
     assert llm_call.http_status == http_status
+
+
+def test_the_check_that_refused_the_first_attempt_is_kept_after_a_retry():
+    llm_call, _, _ = call([completion("not json"), completion()])
+
+    assert llm_call.outcome == "ok"
+    assert llm_call.first_failed_check == "schema"
+    assert llm_call.failed_check is None
+
+
+def test_one_attempt_has_no_first_failed_check():
+    llm_call, _, _ = call([completion("finished", finish_reason="length")])
+
+    assert llm_call.attempts == 1
+    assert llm_call.outcome == "llm_truncated"
+    assert llm_call.first_failed_check is None
+
+
+class Clock:
+    """A clock set by the test: never the time of the machine."""
+
+    def __init__(self, now=1000.0):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+
+def test_the_timeouts_of_a_request_are_shortened_to_the_time_left():
+    deadline = Deadline.after(30, Clock())
+
+    _, transport, _ = call([completion()], deadline=deadline)
+
+    sent_timeout = transport.requests[0].extensions["timeout"]
+    assert sent_timeout["read"] == 30
+    assert sent_timeout["connect"] == LLM_CONNECT_TIMEOUT_SECONDS
+
+
+def test_a_retry_after_a_rate_limit_past_the_deadline_is_not_made():
+    deadline = Deadline.after(MIN_SECONDS_FOR_LLM_REQUEST + 1, Clock())
+
+    llm_call, transport, sleeps = call(
+        [response(429, retry_after="2"), completion()], deadline=deadline
+    )
+
+    assert llm_call.outcome == "llm_timeout"
+    assert llm_call.attempts == 1
+    # What was observed stays: the 429 and its Retry-After.
+    assert llm_call.http_status == 429
+    assert llm_call.retry_after_seconds == 2
+    assert sleeps == []
+    assert len(transport.requests) == 1
+
+
+def test_a_retry_after_an_output_refused_without_the_time_needed_is_not_made():
+    clock = Clock()
+    deadline = Deadline.after(MIN_SECONDS_FOR_LLM_REQUEST + 5, clock)
+
+    def refuse_and_let_time_pass(output):
+        clock.now += 6
+        return "subject"
+
+    llm_call, transport, _ = call(
+        [completion(), completion()],
+        check_output=refuse_and_let_time_pass,
+        deadline=deadline,
+    )
+
+    assert llm_call.outcome == "llm_timeout"
+    assert llm_call.failed_check == "subject"
+    assert len(transport.requests) == 1
+
+
+@pytest.mark.parametrize(
+    ("steps", "saw_rate_limit"),
+    [
+        ([response(429, retry_after="1"), {"kind": "timeout"}], True),
+        ([response(429, retry_after="1"), response(500)], True),
+        ([response(429, retry_after="1"), completion()], True),
+        ([response(500), response(500)], False),
+        ([completion()], False),
+    ],
+)
+def test_a_429_of_any_attempt_is_kept(steps, saw_rate_limit):
+    llm_call, _, _ = call(steps)
+
+    assert llm_call.saw_rate_limit is saw_rate_limit

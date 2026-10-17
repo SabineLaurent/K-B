@@ -136,6 +136,12 @@ class WritingSelection:
     items_dropped: int
 
 
+def to_item_ref(item_id: int) -> str:
+    """The identifier of an item for the model, "i17" for item 17: a string, an enum of integers
+    being confirmed by no provider (docs/fiches-veille.md, "Schémas")."""
+    return f"i{item_id}"
+
+
 def build_fields(kind: WatchKind, values: Mapping[str, object]) -> WatchFields:
     """The fields of the whitelist of the kind, taken from values, each text masked; the other
     values are not kept."""

@@ -23,6 +23,7 @@ from typing import Literal, get_args
 import httpx2
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.llm_replay import ReplayTransport
 from k_b.ai_api.llm_settings import LlmSettings
 from k_b.ai_api.outbound import open_http_client
@@ -124,6 +125,8 @@ class LlmCall[OutputT: BaseModel]:
     finish_reason: str | None
     schema_valid: bool
     failed_check: FailedCheck | None
+    # The check that refused the first attempt, when a second one followed; None otherwise.
+    first_failed_check: FailedCheck | None
     tokens_in: int
     tokens_out: int
     reasoning_tokens: int | None
@@ -134,6 +137,10 @@ class LlmCall[OutputT: BaseModel]:
     retry_after_seconds: int | None
     # None when no answer came: a timeout, a failed connection.
     http_status: int | None
+    # Whether an attempt got a 429: a retry that times out, gets a 5xx or is cut by the deadline
+    # does not erase it. After a call that failed with one, the request sends nothing more; a
+    # retry answered after its Retry-After got past it, and the next calls go.
+    saw_rate_limit: bool
 
 
 @dataclass(frozen=True)
@@ -193,15 +200,20 @@ def call_model[OutputT: BaseModel](
     max_completion_tokens: int,
     check_output: Callable[[OutputT], FailedCheck | None],
     retry_reminders: Mapping[FailedCheck, str],
+    deadline: Deadline | None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> LlmCall[OutputT]:
     """Ask the model for an output of output_model, check it, and ask once more if the first
     answer may change on a retry. retry_reminders holds one reminder per check: one missing is a
-    fault of the caller, raised before any request is paid."""
+    fault of the caller, raised before any request is paid.
+
+    With a deadline, the timeouts of each request are shortened to the time left, and a retry
+    that would not have the time it needs is not made: the call ends in llm_timeout, what the
+    first attempt observed kept. The caller checks the deadline before the call."""
     missing_reminders = [c for c in FAILED_CHECKS if c not in retry_reminders]
     if missing_reminders:
         raise ValueError(f"retry_reminders without: {', '.join(missing_reminders)}")
-    user_message = json.dumps(user_data, ensure_ascii=False, allow_nan=False)
+    user_message = encode_user_message(user_data)
     started = time.perf_counter()
 
     def ask(prompt: str) -> Attempt[OutputT]:
@@ -213,10 +225,22 @@ def call_model[OutputT: BaseModel](
             schema_name,
             max_completion_tokens,
         )
-        return send_and_check(http_client, body, output_model, check_output)
+        timeout = (
+            http_client.timeout
+            if deadline is None
+            else deadline.cap(http_client.timeout)
+        )
+        return send_and_check(http_client, body, output_model, check_output, timeout)
 
     attempts = [ask(system_prompt)]
     first = attempts[0]
+    if (
+        first.retry_wait_seconds is not None
+        and deadline is not None
+        and not deadline.allows_llm_request(first.retry_wait_seconds)
+    ):
+        call = summarize(attempts, len(user_message), time.perf_counter() - started)
+        return replace(call, outcome="llm_timeout", output=None)
     if first.retry_wait_seconds is not None:
         if first.failed_check is None:
             sleep(first.retry_wait_seconds)
@@ -227,6 +251,12 @@ def call_model[OutputT: BaseModel](
             )
     elapsed_seconds = time.perf_counter() - started
     return summarize(attempts, len(user_message), elapsed_seconds)
+
+
+def encode_user_message(user_data: Mapping[str, object]) -> str:
+    """The user message: the data of the stage in JSON, its text unescaped. Its length is the
+    input_chars of the call, which the batches of the classification bound."""
+    return json.dumps(user_data, ensure_ascii=False, allow_nan=False)
 
 
 def build_request_body(
@@ -266,10 +296,11 @@ def send_and_check[OutputT: BaseModel](
     body: dict[str, object],
     output_model: type[OutputT],
     check_output: Callable[[OutputT], FailedCheck | None],
+    timeout: httpx2.Timeout,
 ) -> Attempt[OutputT]:
     """One request: the state of a failure of the provider, or the checks of its completion."""
     try:
-        response = http_client.post(CHAT_COMPLETIONS_PATH, json=body)
+        response = http_client.post(CHAT_COMPLETIONS_PATH, json=body, timeout=timeout)
     except httpx2.TimeoutException:
         return Attempt(outcome="llm_timeout")
     except httpx2.TransportError:
@@ -421,6 +452,7 @@ def summarize[OutputT: BaseModel](
         finish_reason=last.finish_reason,
         schema_valid=last.schema_valid,
         failed_check=last.failed_check,
+        first_failed_check=attempts[0].failed_check if len(attempts) == 2 else None,
         tokens_in=sum(usage.prompt_tokens for usage in usages),
         tokens_out=sum(usage.completion_tokens for usage in usages),
         reasoning_tokens=sum(reasoning) if reasoning else None,
@@ -429,4 +461,7 @@ def summarize[OutputT: BaseModel](
         check_ms=round(check_seconds * 1000),
         retry_after_seconds=last.retry_after_seconds,
         http_status=last.http_status,
+        saw_rate_limit=any(
+            attempt.outcome == "llm_rate_limited" for attempt in attempts
+        ),
     )

@@ -80,7 +80,7 @@ LLM_REPLAY_BASE_URL = "https://replay.invalid/v1"
 DATA_API_URL = f"http://{DATA_API_HOST}:{DATA_API_PORT}"
 # Assumed values for a service on the same machine or in the same compose network. They bound
 # each wait (a connection, each piece of an answer read), neither a request nor the reading: the
-# bound of a digest request will be DIGEST_REQUEST_TIMEOUT_SECONDS, set by #205; until then, none.
+# bound of a digest request is DIGEST_REQUEST_TIMEOUT_SECONDS, which shortens them as it nears.
 DATA_API_CONNECT_TIMEOUT_SECONDS = 5
 DATA_API_POOL_TIMEOUT_SECONDS = 5
 DATA_API_WRITE_TIMEOUT_SECONDS = 10
@@ -97,3 +97,73 @@ MAX_ITEMS_PER_DIGEST_REQUEST = 300
 # their fields once masked.
 MAX_ITEMS_PER_DIGEST = 60
 MAX_FIELD_CHARS_FOR_WRITING = 2000
+
+# The classification of the items of a request (ai_api/classification.py): batches in the order
+# of the reading, each of 50 items and 36,000 characters of user message at most, about 9,000
+# input tokens (#158: 46 items took about 5,500). 300 items make 6 batches, up to about 10 when
+# the titles are long. The long text of an item is cut to 500 characters: sorting needs less text
+# than writing.
+MAX_ITEMS_PER_CLASSIFICATION_CALL = 50
+MAX_CLASSIFICATION_INPUT_CHARS = 36_000
+MAX_FIELD_CHARS_FOR_CLASSIFICATION = 500
+
+
+# A subject of the digests: its name, a value of enum and a folder name, and its definition, sent
+# to the model with it.
+@dataclass(frozen=True)
+class DigestSubject:
+    name: str
+    definition: str
+
+
+# The closed list of subjects, kept by Sabine (docs/fiches-veille.md, "Sujets"); an item that
+# fits several goes to the first of them, in this order. Changed by a PR; the tests use their own.
+DIGEST_SUBJECTS = (
+    DigestSubject(
+        "vulnerabilities",
+        "une faille identifiée (CVE, GHSA) : catalogue CISA KEV, alertes GitHub des paquets"
+        " suivis, article qui la décrit",
+    ),
+    DigestSubject(
+        "llm_security",
+        "attaques et défenses propres aux modèles et aux agents (injection d'instructions,"
+        " jailbreak, empoisonnement, porte dérobée), sans CVE ni GHSA",
+    ),
+    DigestSubject(
+        "agent_frameworks",
+        "versions et nouvelles de LangChain, LangGraph, LlamaIndex et des cadres d'agents",
+    ),
+    DigestSubject(
+        "coding_assistants",
+        "assistants de code (Claude Code et autres) : versions, fonctions, usages",
+    ),
+    DigestSubject(
+        "models",
+        "nouveaux modèles, évaluations, capacités et limites annoncées",
+    ),
+    DigestSubject(
+        "ai_industry",
+        "entreprises, produits, financements et régulation de l'IA",
+    ),
+    DigestSubject(
+        "cybersecurity",
+        "incidents, campagnes d'attaque, outils et pratiques de sécurité hors IA, sans CVE ni"
+        " GHSA",
+    ),
+    DigestSubject(
+        "software_engineering",
+        "outils, langages et pratiques de développement hors IA",
+    ),
+)
+
+# The bound of a digest request, from its arrival: the reading by the data API and every call to
+# the model, which go one after the other. Under the 240 seconds the HTTP ingress of Azure
+# Container Apps gives a request, with 40 for the last call under way and the answer. Measured by
+# #158 on gpt-6-luna: about 98 seconds for 8 subjects, the judge included (113 with the slowest
+# calls). Beyond it, a subject not yet written is llm_timeout, the others are returned.
+DIGEST_REQUEST_TIMEOUT_SECONDS = 200
+# The time a request to the model needs at least: none is sent with less left, so that the items
+# are not sent for an answer the deadline would throw away. Above the slowest writing measured by
+# #158 (9.3 s), not above the longest one the output cap allows (about 60 s): a longer writing
+# started with less time left can still end in llm_timeout.
+MIN_SECONDS_FOR_LLM_REQUEST = 10
