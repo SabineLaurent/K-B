@@ -981,11 +981,15 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
   distingue « réessayer plus tard » (503, 504) d'une sortie fautive (502).
 - **Échec partiel** : la réponse est 200 dès que le classement a réussi ; chaque sujet en échec est
   nommé dans `failed_subjects`, et les autres sont rendus (#205).
-- **Après un `llm_rate_limited` à la rédaction, plus aucun envoi** (#205, constat de `/code-review`,
-  tranché par time-knight, délégation de Sabine du 2026-10-15) : le fournisseur a dit d'attendre,
+- **Après un 429 à la rédaction, plus aucun envoi** (#205, constats de `/code-review`, tranchés
+  par time-knight, délégation de Sabine du 2026-10-15) : le fournisseur a dit d'attendre,
   et les items des sujets suivants partiraient pour une réponse refusée (minimisation, RGPD
   art. 5.1.c ; « les items ne partent pas pour une réponse que l'échéance jetterait »). Les
-  sujets restants vont dans `failed_subjects`, `stage: write`, `llm_rate_limited`. On n'arrête
+  sujets restants vont dans `failed_subjects`, `stage: write`, `llm_rate_limited`. Le code lit le
+  statut observé (`http_status` 429), pas l'état : une nouvelle tentative après un 429, sautée
+  par l'échéance, finit en `llm_timeout`, et arrête aussi les envois. Le `Retry-After` d'un
+  classement en échec n'est rendu qu'avec `llm_rate_limited` (503), jamais avec un 504
+  `llm_timeout`. On n'arrête
   pas sur `llm_content_filtered`, `llm_truncated` ni `llm_invalid_output`, propres à un sujet, ni
   sur `llm_timeout`, que l'échéance garde déjà. **Limite** : on n'arrête pas non plus sur
   `llm_unavailable`, qui mêle les pannes du fournisseur (5xx, connexion refusée) et les refus

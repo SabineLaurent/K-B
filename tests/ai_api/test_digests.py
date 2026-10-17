@@ -681,3 +681,41 @@ def test_after_a_writing_rate_limited_nothing_more_is_sent(reading, rate_limited
         "security_alerts",
         "agent_tools",
     ]
+
+
+def test_after_a_429_whose_retry_the_deadline_cuts_nothing_more_is_sent(reading):
+    # 25 s left: the retry after 20 s would leave 5, under the minimum; the next subject would
+    # still have 25.
+    deadline = Deadline.after(25, Clock())
+
+    result, transport = digest_of(
+        reading,
+        [
+            classified(),
+            written(SECURITY_CLAIM),
+            {"kind": "response", "status": 429, "retry_after": "20"},
+        ],
+        deadline=deadline,
+    )
+
+    assert result.failed_subjects == (
+        FailedSubject(subject="agent_tools", stage="write", error="llm_timeout"),
+        FailedSubject(subject="research", stage="write", error="llm_rate_limited"),
+    )
+    assert len(transport.requests) == 3
+
+
+def test_a_classification_whose_retry_the_deadline_cuts_gives_no_retry_after(reading):
+    deadline = Deadline.after(20, Clock())
+
+    result, _ = digest_of(
+        reading,
+        [{"kind": "response", "status": 429, "retry_after": "15"}],
+        deadline=deadline,
+    )
+
+    assert isinstance(result, ClassificationFailure)
+    assert result.state == "llm_timeout"
+    assert result.retry_after_seconds is None
+    # What was observed stays in the call, for the metric.
+    assert result.stage_calls[0].llm_call.retry_after_seconds == 15

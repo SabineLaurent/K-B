@@ -6,8 +6,9 @@ the result is returned, with one StageCall per call for the metrics, and the cal
 
 A classification that fails fails the request; a writing that fails, or that the deadline does
 not leave the time for, names its subject in failed_subjects, and the other digests are returned.
-After a writing rate limited, nothing more is sent: the provider said to wait, and the items of
-the next subjects would leave for an answer refused (minimisation, GDPR art. 5.1.c).
+After a 429 at a writing, nothing more is sent, whether the call ended rate limited or with its
+retry cut by the deadline: the provider said to wait, and the items of the next subjects would
+leave for an answer refused (minimisation, GDPR art. 5.1.c).
 The judge (#223) comes after the writing of each subject, in the same order of calls.
 """
 
@@ -202,7 +203,9 @@ def build_digests(
             failed_subjects.append(
                 FailedSubject(subject.name, "write", llm_call.outcome)
             )
-            is_rate_limited = llm_call.outcome == "llm_rate_limited"
+            # The status observed, not the outcome: a retry cut by the deadline ends in
+            # llm_timeout, its 429 kept.
+            is_rate_limited = llm_call.http_status == httpx2.codes.TOO_MANY_REQUESTS
         else:
             digests.append(digest)
     return DigestsResult(
@@ -244,8 +247,14 @@ def classify(
             )
         )
         if llm_call.output is None:
+            # A Retry-After only for a rate limit: not for a retry cut by the deadline.
+            retry_after = (
+                llm_call.retry_after_seconds
+                if llm_call.outcome == "llm_rate_limited"
+                else None
+            )
             return ClassificationFailure(
-                llm_call.outcome, llm_call.retry_after_seconds, tuple(stage_calls)
+                llm_call.outcome, retry_after, tuple(stage_calls)
             )
         subject_by_ref.update(
             {a.item_id: a.subject for a in llm_call.output.assignments}
@@ -272,6 +281,7 @@ def to_digest(
     kept = [claim for claim in output.claims if is_within_claim_bounds(claim)]
     cited_by_model = cited_refs(output.claims)
     cited_kept = cited_refs(kept)
+    uncited = cited_by_model - cited_kept
     item_id_by_ref = {to_item_ref(item.item_id): item.item_id for item in items_sent}
     return Digest(
         subject=subject,
@@ -288,9 +298,7 @@ def to_digest(
         ),
         claims_removed=len(output.claims) - len(kept),
         items_uncited=tuple(
-            item.item_id
-            for item in items_sent
-            if to_item_ref(item.item_id) in cited_by_model - cited_kept
+            item.item_id for item in items_sent if to_item_ref(item.item_id) in uncited
         ),
     )
 
