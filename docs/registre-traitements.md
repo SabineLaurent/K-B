@@ -12,7 +12,8 @@ l'exemption des activités strictement personnelles (RGPD art. 2.2.c). Le regist
 quand même : l'exemption tomberait si l'outil servait un usage professionnel ou d'autres
 personnes.
 
-**Responsable des traitements** : l'utilisatrice de K-B, propriétaire du dépôt.
+**Responsable des traitements** : l'utilisatrice de K-B, propriétaire du dépôt, dans le cadre de
+sa formation, sur une ressource fournie par l'organisme.
 
 **Sous-traitant** : Microsoft, pour l'appel du modèle qui rédige les fiches de veille (Azure AI
 Foundry, zone de données UE), sur l'abonnement Azure de l'organisme de formation de
