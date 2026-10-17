@@ -2481,7 +2481,13 @@ portail) ; plan de #158 relu par un agent architecte plateforme Azure, validé p
 - **Fin des replis de fournisseur de #227 (Mistral Small 4, puis Gemini 2.5 Flash-Lite) à la
   fusion de la PR de #158.** « Modèle des fiches : Mistral Small 4 en repli temporaire » et
   « Gemini 2.5 Flash-Lite en repli temporaire » prévoyaient « Fin du repli : quand #158 est
-  faite ». La section du registre sur Mistral est retirée ; Gemini n'en avait pas.
+  faite ». La section du registre sur Mistral est retirée : ses 4 sondes ne portaient aucune
+  donnée de K-B.
+
+- **Les envois à Google du 16/10 sont tracés au registre (« Repli temporaire chez Google »).**
+  Décision de Sabine du 17/10, relayée par time-knight. **Révise** le point RGPD de « Gemini 2.5
+  Flash-Lite en repli temporaire » (« On laisse de côté le RGPD pour le moment ») : de vrais
+  champs d'items y sont partis, et le registre doit nommer ce destinataire, même passé.
 
 Sources (consultées le 2026-10-17) : celles du registre des traitements, « Sources de l'envoi au
 modèle » ; [Deployment types](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/deployment-types) ;
