@@ -2508,6 +2508,24 @@ source ; tranché par time-knight le 17/10 (délégation de Sabine du 15/10).
   (#223, phase 3). Source : [Prompt caching](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/prompt-caching),
   consultée le 2026-10-17. — PR de #158
 
+### Appel du modèle : délai de lecture à 90 s
+
+Mesure de #158 sur gpt-6-luna (2026-10-17) ; tranché par time-knight (délégation de Sabine du
+15/10), sur la recommandation de la session.
+
+- **Le délai de lecture d'une réponse du modèle passe de 60 à 90 s (`LLM_CALL_TIMEOUT_SECONDS`) ;
+  la borne d'un appel passe de 150 à 210 s (2 × (5 + 90) + 20).** **Révise** la valeur supposée
+  de « Appel du modèle » (2026-10-15). Ce qui a changé : la mesure. Environ 7,35 ms par jeton de
+  sortie sur 12 appels réels, soit ~60 s pour une sortie de 8 192 jetons. L'appel n'étant pas en
+  diffusion, une sortie valide proche du plafond finirait en `llm_timeout`, puis en une nouvelle
+  tentative qui échouerait de même : la fiche perdue, et environ 130 s. Option écartée : garder
+  60 s et plafonner la rédaction vers 6 000 jetons, car la marge reposerait sur une estimation non
+  mesurée de la plus longue sortie permise par les bornes. Le choix de #205 entre parallèle et
+  tâche de fond n'en dépend pas : la chaîne mesurée fait ~98 s en série pour 8 sujets, sous les
+  240 s de l'ingress d'Azure Container Apps, et la borne de pire cas les dépasse avec 60 comme avec
+  90 s. Un test garde la raison : au débit mesuré, 8 192 jetons avec 40 % de marge tiennent dans
+  le délai. — PR de #158
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
