@@ -2460,12 +2460,23 @@ portail) ; plan de #158 relu par un agent architecte plateforme Azure, validé p
   l'accès de l'organisme n'est pas connue. L'organisme n'est nommé dans aucun fichier du dépôt
   (décision de Sabine du 17/10 : dépôt public le 25/10).
 
-- **Le juge suit le repli du déploiement du 16/10 : `KB_LLM_JUDGE_MODEL` pointe vers
-  `gpt-6-luna`, le déploiement du rédacteur ; `gpt-5.6-luna` n'est pas déployé.** Décision de
-  Sabine du 17/10 ; applique `docs/fiches-veille.md`, « Juge », « Réglage », « Repli du
-  déploiement », sans la réviser. Option écartée : déployer `gpt-5.6-luna` dans la même ressource,
-  comme le recommandait la session (un juge d'un autre modèle que le rédacteur). Limite assumée :
-  le biais d'un juge envers ses propres textes, que la spec voulait éviter, n'est pas écarté.
+- **Pour les phases 1 (mécanique) et 2 (rodage de l'ETL et des fiches), le rédacteur et le juge
+  sont `gpt-6-luna` : le juge suit le repli du déploiement du 16/10 ; le juge définitif se choisit
+  en phase 3 (fiabilité des LLM et de leurs sorties).** Décisions de Sabine du 17/10 ; applique
+  `docs/fiches-veille.md`, « Juge », « Réglage », « Repli du déploiement », sans la réviser.
+  Pourquoi, selon Sabine : « Le juge était le même modèle que le rédacteur parce que je n'avais pas
+  vraiment d'autres possibilités hier. Aujourd'hui que j'ai plus de liberté sur un choix de modèle,
+  je veux faire les choses de façon structurée. Si c'est prouvé et documenté qu'un juge d'une autre
+  famille est une bonne pratique, on le fera. » Le repli du 16/10 était donc une contrainte
+  d'accès, pas un choix de fond. L'étude des modèles du 17/10 (agent ingénieur IA, lecture seule)
+  recommande `gpt-6-luna` comme rédacteur ; pour le juge de la phase 3, deux candidats d'autres
+  familles : DeepSeek-V4-Flash (disponibilité générale, zone de données UE, retrait le 2028-02-20)
+  et Mistral-Large-3 (préversion, version non figée, français documenté) ; `gpt-5.4-mini` sera
+  comparé comme rédacteur en phase 3. #158 vérifie seulement que les deux candidats tiennent les
+  sorties structurées strictes, sur des données fabriquées. Option écartée : déployer
+  `gpt-5.6-luna` comme juge, que recommandait la session : un modèle de la même famille que le
+  rédacteur. Limite assumée en phases 1 et 2 : le biais d'un juge envers ses propres textes, que
+  la spec voulait éviter, n'est pas écarté.
 
 - **Fin des replis de fournisseur de #227 (Mistral Small 4, puis Gemini 2.5 Flash-Lite) à la
   fusion de la PR de #158.** « Modèle des fiches : Mistral Small 4 en repli temporaire » et
@@ -2476,6 +2487,26 @@ Sources (consultées le 2026-10-17) : celles du registre des traitements, « Sou
 modèle » ; [Deployment types](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/deployment-types) ;
 [Foundry Models lifecycle and support policy](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirements).
 — PR de #158
+
+### Appel du modèle : cache de prompt coupé
+
+Constat de la relecture du plan de #158 par un agent architecte plateforme Azure, vérifié à la
+source ; tranché par time-knight le 17/10 (délégation de Sabine du 15/10).
+
+- **Chaque requête au modèle envoie `prompt_cache_options: {"mode": "explicit"}` sans point
+  d'arrêt : le service n'écrit aucun cache de prompt.** À partir de GPT-5.6, le cache est actif par
+  défaut et s'écrit sur le dernier message, donc sur le texte des items ; il reste réutilisable
+  « for at least 30 minutes, but the service might retain it longer ». Pourquoi : une correction
+  de minimisation (RGPD, RGESN 1.6), pas un risque accepté ; chaque message de K-B est différent,
+  le cache n'apporterait presque rien ; la mesure de #158 reflète alors la production. Le champ
+  est envoyé à chaque appel, sans réglage : en phases 1 et 2, seul `gpt-6-luna` est appelé (choix
+  de la session, accordé par time-knight). Options écartées : garder le cache et le décrire au
+  registre (une rétention de plus pour un gain presque nul) ; une variable d'environnement pour
+  l'activer (un réglage sans second usage aujourd'hui). Limite assumée : selon la doc, un modèle
+  d'avant GPT-5.6 refuse le champ par un 400 (`gpt-5.4-mini`, candidat rédacteur de la phase 3) ;
+  les candidats juges sont mesurés par #158 ; un réglage viendra avec le second modèle, si besoin
+  (#223, phase 3). Source : [Prompt caching](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/prompt-caching),
+  consultée le 2026-10-17. — PR de #158
 
 ## Décisions encore ouvertes
 
