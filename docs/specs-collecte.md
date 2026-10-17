@@ -165,11 +165,12 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Dossier** : le coffre est donné par la variable `KB_VAULT_DIR` ; son chemin n'est écrit dans
   aucun fichier du dépôt. Les clips sont dans `<KB_VAULT_DIR>/Clippings/`, le dossier du gabarit
   par défaut de Web Clipper.
-- **Gabarit** : celui par défaut de Web Clipper ; le nom du fichier est le titre, privé des
-  caractères qu'un nom de fichier refuse. Relevé le 2026-10-17 sur les 5 clips du coffre : les
-  7 clés sont présentes dans chaque clip, dans cet ordre ; une clé sans valeur se lit `null`.
+- **Gabarit** : relevé le 2026-10-17 sur les 5 clips du coffre, conforme au gabarit par défaut
+  de Web Clipper (mêmes clés, ordre, types, dossier et nom de fichier). Le nom du fichier est le
+  titre, privé des caractères qu'un nom de fichier refuse. Les 7 clés sont présentes dans chaque
+  clip, dans cet ordre ; une clé sans valeur se lit `null`.
 
-  | Clé | Forme relevée | Type dans Web Clipper | Valeur présente |
+  | Clé | Forme relevée | Type par défaut dans Web Clipper | Valeur présente |
   |---|---|---|---|
   | `title` | texte entre guillemets | `text` | 5/5 |
   | `source` | URL `https` entre guillemets ; chaîne de requête sur 2 | `text` | 5/5 |
@@ -184,7 +185,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   dépend des réglages de Web Clipper (un type `datetime` changerait les dates) : elle sera
   relevée de nouveau sur le vrai coffre. Source du gabarit par défaut (dossier `Clippings`, clés,
   valeurs et types) : `createDefaultTemplate` et `updateGlobalPropertyTypes` dans
-  [`src/managers/template-manager.ts`](https://github.com/obsidianmd/obsidian-clipper/blob/main/src/managers/template-manager.ts)
+  [`src/managers/template-manager.ts`](https://github.com/obsidianmd/obsidian-clipper/blob/c48ccdfe35a20e996d563fa843b17bb05bcb68c3/src/managers/template-manager.ts)
   du dépôt officiel `obsidianmd/obsidian-clipper`, dernier commit du fichier `c48ccdf` du
   2024-12-04, lue par l'API GitHub le 2026-10-17.
 - **Ce qu'on en tire** : un item par fichier : titre, URL source, date, et le texte gardé.
