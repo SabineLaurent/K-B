@@ -48,6 +48,11 @@ marge dans les deux sens :
 - La date retenue est la plus récente de la date de modification et de la date de changement
   (`ctime`) : une copie faite par `cp -p` ou le Finder garde sa date de modification, mais pas sa
   date de changement.
+- Cette date est relue sur le fichier ouvert (`os.fstat`, `read_clip_file`) : si elle a changé
+  depuis la liste, le clip est en train d'être réécrit (une synchronisation, une édition), et il
+  est laissé à la collecte suivante.
+- Un coffre sans dossier `Clippings/` ne donne aucun clip (Web Clipper le crée avec le premier) ;
+  un coffre qui n'existe pas fait échouer la source, pour qu'un `KB_VAULT_DIR` mal écrit se voie.
 
 Le nom de chaque page est un hachage du nom de fichier :
 
@@ -164,6 +169,9 @@ refuse l'année sur 3 chiffres, et la forme complète est tenue par l'item.
 | `test_a_clip_changed_within_the_margin_before_the_last_collection_is_copied_again`, `test_a_clip_changed_less_than_the_margin_ago_is_left_to_the_next_collection`, `test_a_clip_left_to_the_next_collection_is_copied_by_it` | la marge, dans les deux sens |
 | `test_hidden_files_other_files_folders_and_links_are_not_copied`, `test_a_file_replaced_by_a_link_after_it_was_listed_is_not_followed` | rien hors des fichiers réguliers du dossier |
 | `test_a_clip_larger_than_the_maximum_fails_the_source_naming_it`, `test_a_clip_of_the_maximum_size_is_copied` | le plafond, à l'octet près |
+| `test_a_clip_rewritten_between_the_list_and_the_reading_is_left_to_the_next_collection`, `test_a_clip_gone_between_the_list_and_the_reading_is_skipped` | un clip qui bouge pendant la collecte n'est ni copié tronqué ni cause d'échec |
+| `test_a_vault_without_its_clippings_folder_yet_gives_nothing`, `test_a_vault_that_does_not_exist_fails` | pas encore de clip ≠ coffre mal désigné |
+| `test_a_clip_that_starts_with_a_byte_order_mark_is_read` | une marque d'ordre des octets est ignorée, comme par Obsidian |
 | `test_clips_all_unreadable_fail_the_source_as_all_items_invalid`, `test_clips_all_refused_as_items_fail_the_source_as_all_items_invalid` | règle 1 de `conventions.md` à la collecte, `RecursionError` comprise |
 | `test_a_python_tag_builds_no_object_and_its_value_is_refused_as_a_title` | `BaseLoader` n'applique pas d'étiquette |
 | `test_a_clip_that_cannot_be_read_is_unreadable_without_its_content` | aucun texte du clip dans le message ni dans la trace |
@@ -173,7 +181,7 @@ refuse l'année sur 3 chiffres, et la forme complète est tenue par l'item.
 | `test_each_kind_has_its_detail[clip]`, `test_the_versioned_openapi_is_the_one_the_app_produces` | `/items` sert les clips, OpenAPI 0.4.0 |
 | `test_a_clip_is_of_the_library_and_never_read_for_the_watch` | aucun clip n'entre dans les fiches de veille |
 | Mutations sur une copie du dépôt : 23 sur 23 tuées (relecture du diff contre le critère) ; 6 trous trouvés puis couverts | les tests attrapent un code cassé exprès |
-| `uv run pytest` 1706 passed ; `ruff check`, `ruff format --check`, `mypy --strict` verts | les contrôles du dépôt |
+| `uv run pytest` 1709 passed ; `ruff check`, `ruff format --check`, `mypy --strict` verts | les contrôles du dépôt |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -204,7 +212,11 @@ refuse l'année sur 3 chiffres, et la forme complète est tenue par l'item.
   défaut. Un autre réglage (type `datetime`) ferait rejeter les dates ; c'est voulu, mais non
   observé sur un vrai coffre (Web Clipper n'écrit pas encore dans le coffre de K-B).
 - **L'écriture d'un clip par Obsidian** : on suppose qu'un clip en cours d'écriture a une date de
-  changement récente. Une écriture plus longue que 60 s n'est pas couverte.
+  changement récente, ou qu'elle change pendant sa lecture. Une écriture plus longue que 60 s
+  qui ne touche pas le fichier pendant sa lecture n'est pas couverte.
+- **Une erreur de lecture d'un seul clip** (droits, fichier iCloud non téléchargé) fait échouer
+  toute la source, comme `clip_too_large` : choix assumé (un clip sauté ne serait plus revu),
+  non éprouvé sur un vrai coffre synchronisé.
 - **PostgreSQL** : la portabilité du SQL de `clip` (`substr`, `length`) n'est vérifiée que sous
   SQLite ; la limite d'un index B-tree sur `url` est lue dans la documentation, pas testée.
 

@@ -54,6 +54,10 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 - Vérifier les faits avant de les présenter comme sûrs, sources à l'appui.
 - `brief09_assistant-veille-tech` est indicatif, il ne fait pas autorité : une décision concertée
   qui fait mieux, ou plus conforme aux pratiques reconnues, l'emporte.
+- **Mutations sur une copie du dépôt** (constat du 2026-10-17, #14) : les lancer avec
+  `PYTHONDONTWRITEBYTECODE=1` et sans `__pycache__`. Une mutation qui garde la taille du fichier,
+  restaurée dans la même seconde, laisse sinon Python exécuter le bytecode de la version mutée :
+  les mutations suivantes semblent tuées ou survivantes à tort.
 - **Fixtures** (consigne de Sabine, 2026-10-10) : une fixture part toujours d'un exemple issu de
   la collecte.
 - **K-B est déterministe** dans sa conception, son code et ses journaux (consigne de Sabine,
