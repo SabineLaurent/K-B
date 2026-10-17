@@ -203,9 +203,7 @@ def build_digests(
             failed_subjects.append(
                 FailedSubject(subject.name, "write", llm_call.outcome)
             )
-            # The status observed, not the outcome: a retry cut by the deadline ends in
-            # llm_timeout, its 429 kept.
-            is_rate_limited = llm_call.http_status == httpx2.codes.TOO_MANY_REQUESTS
+            is_rate_limited = llm_call.saw_rate_limit
         else:
             digests.append(digest)
     return DigestsResult(
@@ -247,7 +245,8 @@ def classify(
             )
         )
         if llm_call.output is None:
-            # A Retry-After only for a rate limit: not for a retry cut by the deadline.
+            # A Retry-After only with llm_rate_limited, the one state of the spec that gives
+            # it (503): neither with a retry cut by the deadline (504) nor with a 5xx (502).
             retry_after = (
                 llm_call.retry_after_seconds
                 if llm_call.outcome == "llm_rate_limited"

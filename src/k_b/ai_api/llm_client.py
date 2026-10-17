@@ -137,6 +137,9 @@ class LlmCall[OutputT: BaseModel]:
     retry_after_seconds: int | None
     # None when no answer came: a timeout, a failed connection.
     http_status: int | None
+    # Whether an attempt got a 429, whatever came after it: a retry that times out, gets a 5xx
+    # or is cut by the deadline does not erase it. The request sends nothing more after one.
+    saw_rate_limit: bool
 
 
 @dataclass(frozen=True)
@@ -457,4 +460,7 @@ def summarize[OutputT: BaseModel](
         check_ms=round(check_seconds * 1000),
         retry_after_seconds=last.retry_after_seconds,
         http_status=last.http_status,
+        saw_rate_limit=any(
+            attempt.outcome == "llm_rate_limited" for attempt in attempts
+        ),
     )

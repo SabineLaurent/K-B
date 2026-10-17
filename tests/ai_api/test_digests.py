@@ -737,4 +737,36 @@ def test_an_item_cut_for_the_writing_is_counted(reading):
     result, _ = digest_of(long_summary, VALID_STEPS)
 
     assert result.items_truncated == 1
-    assert result.stage_calls[3].items_truncated == 1
+    (research_call,) = [c for c in result.stage_calls if c.subject == "research"]
+    assert research_call.items_truncated == 1
+
+
+@pytest.mark.parametrize(
+    "failed_retry",
+    [{"kind": "timeout"}, {"kind": "response", "status": 500}],
+)
+def test_a_429_is_not_erased_by_a_retry_that_fails(reading, failed_retry):
+    result, transport = digest_of(
+        reading,
+        [
+            classified(),
+            written(SECURITY_CLAIM),
+            {"kind": "response", "status": 429, "retry_after": "1"},
+            failed_retry,
+        ],
+    )
+
+    assert result.failed_subjects[1] == FailedSubject(
+        subject="research", stage="write", error="llm_rate_limited"
+    )
+    assert len(transport.requests) == 4
+
+
+def test_a_classification_down_gives_no_retry_after(reading):
+    result, _ = digest_of(
+        reading, [{"kind": "response", "status": 503, "retry_after": "30"}]
+    )
+
+    assert isinstance(result, ClassificationFailure)
+    assert result.state == "llm_unavailable"
+    assert result.retry_after_seconds is None

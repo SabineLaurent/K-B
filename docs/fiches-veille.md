@@ -985,13 +985,14 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
   par time-knight, délégation de Sabine du 2026-10-15) : le fournisseur a dit d'attendre,
   et les items des sujets suivants partiraient pour une réponse refusée (minimisation, RGPD
   art. 5.1.c ; « les items ne partent pas pour une réponse que l'échéance jetterait »). Les
-  sujets restants vont dans `failed_subjects`, `stage: write`, `llm_rate_limited`. Le code lit le
-  statut observé (`http_status` 429), pas l'état : une nouvelle tentative après un 429, sautée
-  par l'échéance, finit en `llm_timeout`, et arrête aussi les envois. Le `Retry-After` d'un
-  classement en échec n'est rendu qu'avec `llm_rate_limited` (503), jamais avec un 504
-  `llm_timeout`. On n'arrête
-  pas sur `llm_content_filtered`, `llm_truncated` ni `llm_invalid_output`, propres à un sujet, ni
-  sur `llm_timeout`, que l'échéance garde déjà. **Limite** : on n'arrête pas non plus sur
+  sujets restants vont dans `failed_subjects`, `stage: write`, `llm_rate_limited`, qui veut dire
+  ici « pas envoyé : un sujet précédent a reçu un 429 ». Le code lit le 429 observé, quelle que
+  soit la suite de l'appel (`LlmCall.saw_rate_limit`) : une nouvelle tentative après un 429 qui
+  finit en délai dépassé, en 5xx, ou sautée par l'échéance (`llm_timeout`, décision de Sabine du
+  2026-10-17, plan de #205), arrête aussi les envois. Le `Retry-After` d'un classement en échec
+  n'est rendu qu'avec `llm_rate_limited` (503), jamais avec un 504 `llm_timeout` ni un 502. On
+  n'arrête pas sur `llm_content_filtered`, `llm_truncated` ni `llm_invalid_output`, propres à un
+  sujet, ni sur un `llm_timeout` sans 429 observé, que l'échéance garde déjà. **Limite** : on n'arrête pas non plus sur
   `llm_unavailable`, qui mêle les pannes du fournisseur (5xx, connexion refusée) et les refus
   propres à une requête (un autre 4xx, une réponse illisible) : après une panne, les sujets
   suivants partent encore.

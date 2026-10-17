@@ -786,3 +786,19 @@ def test_a_retry_after_an_output_refused_without_the_time_needed_is_not_made():
     assert llm_call.outcome == "llm_timeout"
     assert llm_call.failed_check == "subject"
     assert len(transport.requests) == 1
+
+
+@pytest.mark.parametrize(
+    ("steps", "saw_rate_limit"),
+    [
+        ([response(429, retry_after="1"), {"kind": "timeout"}], True),
+        ([response(429, retry_after="1"), response(500)], True),
+        ([response(429, retry_after="1"), completion()], True),
+        ([response(500), response(500)], False),
+        ([completion()], False),
+    ],
+)
+def test_a_429_of_any_attempt_is_kept(steps, saw_rate_limit):
+    llm_call, _, _ = call(steps)
+
+    assert llm_call.saw_rate_limit is saw_rate_limit
