@@ -20,6 +20,7 @@ from typing import Annotated, Any, NamedTuple
 import yaml
 from pydantic import BaseModel, BeforeValidator, ConfigDict, ValidationError
 
+from k_b.core.config import CLIP_CHANGE_MARGIN
 from k_b.core.quoting import quote_value, without_values
 from k_b.etl.normalize import remove_tracking_parameters
 from k_b.etl.raw_store import SELECTED_LIBRARY_DIR_NAME
@@ -34,7 +35,6 @@ SOURCE_CODE: SourceCode = "clipper"
 # The folder of the vault the default template of Web Clipper writes to (docs/specs-collecte.md).
 CLIPPINGS_DIR_NAME = "Clippings"
 CLIP_EXTENSION = ".md"
-MAX_CLIP_BYTES = CLIP_MAX_BYTES
 # The page name of a clip: the start of the SHA-256 of its file name, in hexadecimal. The same
 # clip has the same name from one collection to the next, and its file name, which is its
 # title, goes neither into the path of the raw nor into the import log.
@@ -52,8 +52,10 @@ ABSENT_VALUES = ("", "null", "~")
 
 
 class ClipTooLargeError(Exception):
-    """clip_too_large: a clip of the vault is larger than MAX_CLIP_BYTES. Nothing is copied, and
-    the last collection date stays: the next collection tries again."""
+    """clip_too_large: a clip of the vault is larger than CLIP_MAX_BYTES. Nothing is copied, and
+    the last collection date stays: the next collection tries again. An exception to rule 1 of
+    conventions.md, which fails a source for an unreadable page only: a clip is a page, and the
+    bound passed is shown, not silent (decision of 2026-10-17)."""
 
 
 class ClippingSource:
@@ -70,12 +72,15 @@ class ClippingSource:
         clips = {
             make_page_name(path): read_clip_file(path)
             for path in list_clip_files(self.vault_dir / CLIPPINGS_DIR_NAME)
-            if last_collected_at is None or was_modified_since(path, last_collected_at)
+            if last_collected_at is None
+            or was_modified_since(path, last_collected_at - CLIP_CHANGE_MARGIN)
         }
         if not clips:
             return None
         # Read as the import will: clips all invalid fail the source (conventions.md, rule 1).
-        readings = [read_clip_safely(clip) for clip in clips.values()]
+        readings = [
+            read_clip_safely(page_name, clip) for page_name, clip in clips.items()
+        ]
         check_not_all_invalid(
             EntryReading(
                 [entry for reading in readings for entry in reading.entries],
@@ -103,15 +108,16 @@ def list_clip_files(clippings_dir: Path) -> list[Path]:
     )
 
 
-def was_modified_since(path: Path, last_collected_at: datetime) -> bool:
-    """Whether the clip was written or changed since last_collected_at. The change date counts
-    too: a copy that keeps the modification date (cp -p, the Finder, a sync) is a new clip."""
+def was_modified_since(path: Path, moment: datetime) -> bool:
+    """Whether the clip was written or changed after moment. The change date counts too: a copy
+    that keeps the modification date (cp -p, the Finder, a sync) is a new clip; so does a change
+    of its metadata (chmod, a Finder tag), a clip copied again for nothing."""
     status = path.lstat()
     changed_at_ns = max(status.st_mtime_ns, status.st_ctime_ns)
     # In whole nanoseconds: a float would round a write made in the same microsecond as the
     # last collection onto it.
-    last_collected_at_ns = (last_collected_at - EPOCH) // ONE_MICROSECOND * 1000
-    return changed_at_ns > last_collected_at_ns
+    moment_ns = (moment - EPOCH) // ONE_MICROSECOND * 1000
+    return changed_at_ns > moment_ns
 
 
 def make_page_name(path: Path) -> str:
@@ -124,11 +130,12 @@ def read_clip_file(path: Path) -> bytes:
     listed is not followed."""
     descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
     with os.fdopen(descriptor, "rb") as clip_file:
-        content = clip_file.read(MAX_CLIP_BYTES + 1)
-    if len(content) > MAX_CLIP_BYTES:
+        content = clip_file.read(CLIP_MAX_BYTES + 1)
+        size = max(len(content), os.fstat(clip_file.fileno()).st_size)
+    if size > CLIP_MAX_BYTES:
         raise ClipTooLargeError(
-            f"clip_too_large: {quote_value(path.name)}: more than {MAX_CLIP_BYTES} bytes,"
-            f" maximum {MAX_CLIP_BYTES} bytes"
+            f"clip_too_large: {quote_value(path.name)}: {size} bytes,"
+            f" maximum {CLIP_MAX_BYTES} bytes"
         )
     return content
 
@@ -181,18 +188,20 @@ def describe_yaml_error(error: yaml.YAMLError) -> str:
     return f"frontmatter not YAML: line {mark.line + 2}, column {mark.column + 1}"
 
 
-def read_clip_safely(raw_clip: bytes) -> EntryReading[ClipEntry]:
+def read_clip_safely(page_name: str, raw_clip: bytes) -> EntryReading[ClipEntry]:
     """A clip the import would reject is a rejection here, not a failure: the collection counts
-    the clips all invalid."""
+    the clips all invalid. Converted as the import will, the dates and the path aside: only
+    whether it is an item counts."""
     try:
         reading = read_clip(raw_clip)
-    except ValueError as unreadable:
-        return EntryReading([], [str(unreadable)])
-    try:
         for entry in reading.entries:
-            ClipFrontmatter.model_validate(entry.properties)
+            convert_clip(entry, EPOCH, page_name)
     except ValidationError as refusal:
-        return EntryReading([], [str(without_values(refusal))])
+        # convert_clip gives it without its values already.
+        return EntryReading([], [f"ValidationError: {refusal}"])
+    # RecursionError: a frontmatter nested too deep, rejected at the import as well (#103).
+    except (ValueError, RecursionError) as unreadable:
+        return EntryReading([], [f"{type(unreadable).__name__}: {unreadable}"])
     return reading
 
 

@@ -171,7 +171,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Gabarit** : relevé le 2026-10-17 sur les 5 clips du coffre, conforme au gabarit par défaut
   de Web Clipper (mêmes clés, ordre, types, dossier et nom de fichier). Le nom du fichier est le
   titre, privé des caractères qu'un nom de fichier refuse. Les 7 clés sont présentes dans chaque
-  clip, dans cet ordre ; une clé sans valeur est vide (`author:`), que K-B lit absente.
+  clip, dans cet ordre ; une clé sans valeur est vide (`author:`). K-B lit une valeur vide de
+  `published` absente ; un `title`, une `source` ou un `created` vide est refusé.
 
   | Clé | Forme relevée | Type par défaut dans Web Clipper | Valeur présente |
   |---|---|---|---|
@@ -183,8 +184,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   | `description` | texte entre guillemets | `text` | 4/5 |
   | `tags` | liste, `"clippings"` | `multitext` | 5/5 |
 
-  K-B lit le frontmatter avec PyYAML et son chargeur `BaseLoader`, qui ne devine aucun type :
-  chaque valeur est un texte ou une liste de textes, et une date est lue par K-B, pas par le
+  K-B lit le frontmatter avec PyYAML et son chargeur `BaseLoader`, qui ne devine aucun type
+  (« All scalars are loaded as strings »,
+  [PyYAML yaml.load(input) Deprecation](https://github.com/yaml/pyyaml/wiki/PyYAML-yaml.load(input)-Deprecation),
+  lue par Context7 le 2026-10-17) : chaque valeur est un texte ou une liste de textes, et une date est lue par K-B, pas par le
   lecteur YAML (« Du brut au jeu d'items », Clips). La forme des dates dépend des réglages de
   Web Clipper (un type `datetime` changerait les dates) : une autre forme est rejetée, pas
   devinée. Source du gabarit par défaut (dossier `Clippings`, clés,
@@ -214,13 +217,30 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   2026-10-09). Le nom est fait des 16 premiers caractères hexadécimaux du SHA-256 du nom du
   fichier dans le coffre : le même clip a le même nom d'une collecte à l'autre, et son titre
   n'entre ni dans le chemin du brut ni dans le journal d'import. Aucun clip changé : rien n'est
-  écrit. Limite : un clip supprimé du coffre n'est pas vu.
+  écrit. **Marge** : un clip changé jusqu'à `CLIP_CHANGE_MARGIN` (60 s, `core/config.py`) avant la
+  dernière collecte est copié de nouveau, puis écarté `already_seen` à l'import. Hypothèse, non
+  mesurée : l'horloge d'un système de fichiers peut être plus grossière que celle de `kb` (un
+  tick sous Linux) ou en retard sur elle (coffre monté depuis l'hôte dans un conteneur, #200) ;
+  sans marge, un clip écrit juste après le début d'une collecte serait daté d'avant elle et
+  jamais copié (décision du 2026-10-17 : une perte sans trace est pire que quelques octets
+  recopiés). Limites : un clip supprimé du coffre n'est pas vu ; un changement de ses seules
+  métadonnées (`chmod`, une étiquette du Finder) change sa date de changement, et le clip est
+  recopié pour rien (RGESN 1.6, quelques octets par clip).
 - **En cas de panne :** la source échoue, n'écrit rien, et sa date de dernière collecte reste ;
-  la collecte suivante recommence. Les états : `ClipTooLargeError` (`clip_too_large` : un clip
-  dépasse 1 000 000 octets ; le message cite son nom de fichier, tronqué et échappé par
-  `quote_value`, et la taille), `all_items_invalid` (tous les clips copiés seraient rejetés à
-  l'import), `FileNotFoundError` (pas de dossier `Clippings/` dans le coffre). Un clip illisible
-  parmi des clips valides est copié : l'import le rejette (règle 1 de
+  la collecte suivante recommence. Les états :
+  - `ClipTooLargeError` (`clip_too_large` : un clip dépasse 1 000 000 octets ; le message cite
+    son nom de fichier, tronqué et échappé par `quote_value`, sa taille et le maximum). **Exception
+    à la règle 1 de `.claude/rules/conventions.md`**, qui ne fait échouer une source que pour une
+    page illisible ou des entrées toutes invalides (décision du 2026-10-17, tranchée par
+    time-knight sur délégation de Sabine) : un clip est une page, et un plafond dépassé se voit à
+    chaque collecte au lieu de passer en silence. Tant que le fichier reste dans le coffre, aucun
+    clip nouveau n'est copié ;
+  - `all_items_invalid` : tous les clips copiés seraient rejetés à l'import (lus et convertis
+    comme par l'import, `RecursionError` comprise) ;
+  - `FileNotFoundError` : pas de dossier `Clippings/` dans le coffre ;
+  - `OSError` (`ELOOP`) : un fichier remplacé par un lien symbolique entre sa liste et sa lecture.
+
+  Un clip illisible parmi des clips valides est copié : l'import le rejette (règle 1 de
   `.claude/rules/conventions.md`). Le journal ne cite qu'un nombre de clips copiés.
 - **Données personnelles** : le champ `author` de la page gardée, s'il existe (l'auteur public de
   l'article, écrit en liens `[[Nom]]`) : copié dans le brut, jamais lu en base. La description, le
@@ -608,7 +628,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
        (décision de Sabine du 2026-10-17). Un clip copié de nouveau, ou une autre copie de la même
        URL, est écarté `already_seen` ; `compared_with_collected_at` est la collecte de la
        version gardée. **Limites** : un clip modifié quand même n'est pas repris ; deux fichiers
-       de même URL dans une même collecte : le premier dans l'ordre des noms de pages l'emporte ;
+       de même URL dans une même collecte : le premier dans l'ordre des noms de pages l'emporte, un
+       ordre fait par le hachage, donc arbitraire pour l'utilisatrice ;
        un même article gardé sous deux URL donne deux clips ; un clip supprimé du coffre reste en
        base.
    - **Source sans import** (classement des plus étoilés) : il n'entre pas dans la base (journal

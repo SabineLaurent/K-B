@@ -2,6 +2,7 @@
 
 import re
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Literal
 
 
@@ -26,6 +27,13 @@ RETENTION_YEARS_BY_ACQUISITION_MODE: dict[str, int | None] = {
     "library": None,
     "wiki": None,
 }
+
+# How long before the last collection a clip of the vault still counts as changed, and is copied
+# again: the clock of a file system can be coarser than, or lag behind, the one of kb (a tick of
+# Linux; a vault mounted from the host in a container, #200), an assumption not measured. A clip
+# copied again is left out already_seen at the import (decision of 2026-10-17: a loss without a
+# trace is worse than a few bytes of raw).
+CLIP_CHANGE_MARGIN = timedelta(seconds=60)
 
 # How many log files of past days kb keeps, of each log (logs/kb.log.<day> and
 # logs/kb-serve.log.<day> of the data directory), the oldest removed at the rotation: about a

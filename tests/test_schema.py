@@ -871,6 +871,23 @@ def test_a_newsletter_article_pointing_to_an_item_of_another_kind_is_refused(
         insert_row(filled_database, "newsletter_article", item_id=PAPER_ITEM_ID)
 
 
+def test_a_clip_kept_from_an_http_page_is_accepted(filled_database):
+    insert_row(filled_database, "clip", url="http://example.com/a-page-kept")
+
+
+def test_a_url_is_one_clip(filled_database):
+    insert_row(filled_database, "clip")
+    insert_row(filled_database, "item", id=9, kind="clip")
+
+    with pytest.raises(sqlite3.IntegrityError, match="UNIQUE"):
+        insert_row(filled_database, "clip", item_id=9)
+
+
+def test_a_clip_pointing_to_an_item_of_another_kind_is_refused(filled_database):
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        insert_row(filled_database, "clip", item_id=PAPER_ITEM_ID)
+
+
 def test_a_newsletter_article_without_kind_is_refused(filled_database):
     with pytest.raises(sqlite3.IntegrityError, match="NOT NULL"):
         insert_row(filled_database, "newsletter_article", kind=None)

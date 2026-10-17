@@ -2625,9 +2625,11 @@ Décisions de Sabine du 2026-10-17 sur le plan de #14, relayées par time-knight
   `BaseLoader`, et `types-pyyaml` entre dans les dépendances de développement.** Décision de
   Sabine, sur recommandation. Pourquoi, celui de la recommandation : Web Clipper écrit du YAML,
   avec ses guillemets et ses échappements, qu'un lecteur reconnu lit comme Obsidian ;
-  `BaseLoader` ne devine aucun type et ne construit aucun objet (des textes, des listes, des
-  dictionnaires ; une étiquette `!!python/…` n'est pas appliquée, sa valeur est lue comme du
-  texte), et K-B lit lui-même les dates. PyYAML était déjà dans `uv.lock`, par
+  `BaseLoader` ne devine aucun type et ne construit aucun objet (« Only loads the most basic
+  YAML. All scalars are loaded as strings », page
+  [PyYAML yaml.load(input) Deprecation](https://github.com/yaml/pyyaml/wiki/PyYAML-yaml.load(input)-Deprecation),
+  lue par Context7 le 2026-10-17 ; une étiquette `!!python/…` n'est pas appliquée, sa valeur
+  est lue comme du texte, vérifié par un test), et K-B lit lui-même les dates. PyYAML était déjà dans `uv.lock`, par
   `openapi-spec-validator` ; sans `types-pyyaml`, `mypy --strict` échoue. ruff prend
   `BaseLoader` pour un chargeur dangereux (S506) : `# noqa: S506`, avec la raison en commentaire.
   Options écartées : `yaml.safe_load`, qui devine les types (`yes` en booléen, un jour en date,
@@ -2701,7 +2703,7 @@ Décisions de Sabine du 2026-10-17 sur le plan de #14, relayées par time-knight
 - **Questions laissées par la relecture indépendante du 2026-10-09**, à décider par Sabine :
   DOCUMENT ou CONTENU pour le texte complet (une publication décrite par plusieurs items et un
   document Zotero hors arXiv sont tranchés le 2026-10-13, « Modèle de la base : bibliothèque
-  Zotero ; le texte d'un clip est rangé dans `clip.body` le 2026-10-17, en attendant) ; les
+  Zotero » ; le texte d'un clip est rangé dans `clip.body` le 2026-10-17, en attendant) ; les
   versions d'un clip annoté sont tranchées le 2026-10-17 (« Collecte : clips (suite) »).
 - **Transfert hors UE par les agents** : un agent qui lit les items par l'API envoie leur contenu
   au fournisseur du modèle (États-Unis). Cadre juridique non vérifié. **Révisée le

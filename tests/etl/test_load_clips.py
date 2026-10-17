@@ -116,6 +116,31 @@ def test_two_urls_that_differ_by_their_utm_parameters_are_one_clip(data_dir):
     assert [discard["rule"] for discard in read_discards(data_dir)] == ["already_seen"]
 
 
+def test_two_urls_are_two_clips_even_for_the_same_article(data_dir):
+    """The limit of the key (ADR, "Collecte : clips"): no content fingerprint."""
+    write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
+    other_url = fixture_text(ARTICLE).replace(
+        f'source: "{ARTICLE_URL}"', 'source: "https://example.com/the-same-article"'
+    )
+    write_clip(data_dir, FIRST, "a2", other_url)
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, "SELECT count(*), count(DISTINCT body) FROM clip") == [
+        (2, 1)
+    ]
+    assert read_discards(data_dir) == []
+
+
+def test_of_two_files_of_one_url_in_a_collection_the_first_page_name_is_kept(data_dir):
+    first_path = write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
+    write_clip(data_dir, FIRST, "b2", fixture_text(ARTICLE).replace("do not", "never"))
+
+    run_import(data_dir)
+
+    assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [first_path]
+
+
 def test_a_refused_clip_is_logged_by_its_field_without_its_title(data_dir):
     refused = fixture_text(ARTICLE).replace("created: 2026-09-17", "created: tomorrow")
     raw_file_path = write_clip(data_dir, FIRST, "a1", refused)

@@ -13,17 +13,19 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from k_b.core.config import CLIP_CHANGE_MARGIN
 from k_b.etl.source_contract import check_not_all_invalid
 from k_b.etl.sources.clipping import (
     CLIPPINGS_DIR_NAME,
-    MAX_CLIP_BYTES,
     READER,
     ClipFrontmatter,
     ClippingSource,
     ClipTooLargeError,
     convert_clip,
     read_clip,
+    read_clip_file,
 )
+from k_b.items import CLIP_MAX_BYTES
 
 FIXTURES_DIR = Path(__file__).parents[2] / "fixtures" / "clipping"
 ARTICLE = "article_with_author.md"
@@ -118,7 +120,8 @@ def last_change_of(paths):
 
 def test_only_the_clips_modified_since_the_last_collection_are_copied(vault_dir):
     unchanged = [clippings_of(vault_dir) / name for name in (ARTICLE, PAGE_WITH_A_RULE)]
-    last_collected_at = last_change_of(unchanged)
+    # A collection later than their last change by the margin exactly.
+    last_collected_at = last_change_of(unchanged) + CLIP_CHANGE_MARGIN
     # The clock of a file system may be coarser than the one of datetime: a change made in the
     # same tick would not be seen as later.
     time.sleep(0.05)
@@ -129,6 +132,19 @@ def test_only_the_clips_modified_since_the_last_collection_are_copied(vault_dir)
     pages = ClippingSource(vault_dir).fetch(last_collected_at)
 
     assert set(pages) == {page_name_of(PAGE_WITHOUT_AUTHOR)}
+
+
+def test_a_clip_changed_within_the_margin_before_the_last_collection_is_copied_again(
+    vault_dir,
+):
+    """The clock of the file system may lag behind the one of the collection: a clip written
+    right after a collection began would be dated before it, and never copied."""
+    clips = [clippings_of(vault_dir) / name for name in (ARTICLE,)]
+    within_the_margin = last_change_of(clips) + CLIP_CHANGE_MARGIN / 2
+    beyond_the_margin = last_change_of(clips) + CLIP_CHANGE_MARGIN * 2
+
+    assert page_name_of(ARTICLE) in ClippingSource(vault_dir).fetch(within_the_margin)
+    assert ClippingSource(vault_dir).fetch(beyond_the_margin) is None
 
 
 def test_a_clip_copied_into_the_vault_with_an_old_modification_date_is_collected(
@@ -163,21 +179,22 @@ def test_hidden_files_other_files_folders_and_links_are_not_copied(vault_dir, tm
 
 def test_a_clip_larger_than_the_maximum_fails_the_source_naming_it(vault_dir):
     (clippings_of(vault_dir) / "Too large.md").write_bytes(
-        fixture_bytes(ARTICLE) + b"x" * MAX_CLIP_BYTES
+        fixture_bytes(ARTICLE) + b"x" * CLIP_MAX_BYTES
     )
 
     with pytest.raises(ClipTooLargeError) as failure:
         ClippingSource(vault_dir).fetch(None)
 
     message = str(failure.value)
-    assert message.startswith("clip_too_large:")
-    assert "'Too large.md'" in message
-    assert f"maximum {MAX_CLIP_BYTES} bytes" in message
+    size = len(fixture_bytes(ARTICLE)) + CLIP_MAX_BYTES
+    assert message == (
+        f"clip_too_large: 'Too large.md': {size} bytes, maximum {CLIP_MAX_BYTES} bytes"
+    )
 
 
 def test_a_clip_of_the_maximum_size_is_copied(vault_dir):
     raw_clip = fixture_bytes(ARTICLE)
-    padded = raw_clip + b"x" * (MAX_CLIP_BYTES - len(raw_clip))
+    padded = raw_clip + b"x" * (CLIP_MAX_BYTES - len(raw_clip))
     (clippings_of(vault_dir) / "Largest.md").write_bytes(padded)
 
     pages = ClippingSource(vault_dir).fetch(None)
@@ -192,6 +209,35 @@ def test_clips_all_unreadable_fail_the_source_as_all_items_invalid(tmp_path):
     (clippings_dir / "b.md").write_bytes(b"\xff not UTF-8")
 
     with pytest.raises(ValueError, match="all_items_invalid: 2 entries"):
+        ClippingSource(tmp_path / "vault").fetch(None)
+
+
+def test_a_file_replaced_by_a_link_after_it_was_listed_is_not_followed(tmp_path):
+    outside = tmp_path / "outside.md"
+    outside.write_bytes(fixture_bytes(ARTICLE))
+    (tmp_path / "link.md").symlink_to(outside)
+
+    with pytest.raises(OSError):
+        read_clip_file(tmp_path / "link.md")
+
+
+@pytest.mark.parametrize(
+    "raw_clip",
+    [
+        # Readable, but its title too long for the item.
+        with_property(fixture_bytes(ARTICLE), "title", '"' + "x" * 1_001 + '"'),
+        # Nested too deep for PyYAML: a RecursionError, as at the import (#103).
+        b"---\ntitle: " + b"[" * 100_000 + b"\n---\n",
+    ],
+)
+def test_clips_all_refused_as_items_fail_the_source_as_all_items_invalid(
+    tmp_path, raw_clip
+):
+    clippings_dir = tmp_path / "vault" / CLIPPINGS_DIR_NAME
+    clippings_dir.mkdir(parents=True)
+    (clippings_dir / "a.md").write_bytes(raw_clip)
+
+    with pytest.raises(ValueError, match="all_items_invalid: 1 entries"):
         ClippingSource(tmp_path / "vault").fetch(None)
 
 

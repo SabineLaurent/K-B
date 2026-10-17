@@ -189,7 +189,8 @@ dans la table de sa sorte (`kind`) par l'écrivain de cette sorte
     pour être lu (`RecursionError`, pour toutes les sources, #103), est rejeté entier. Le motif du rejet nomme le champ, l'erreur et la
     mesure, jamais la valeur : un titre ou un surlignage est une donnée personnelle.
   - L'URL est gardée en `http` si Zotero la donne ainsi (les 5 documents de l'extrait du
-    2026-10-13) ; les autres sortes exigent `https`.
+    2026-10-13) ; les autres sortes exigent `https`, sauf `clip` (Web Clipper garde l'URL de la
+    page, `http` ou `https`).
   - Un texte de surlignage n'est pas contrôlé pour le caractère NUL, comme les autres textes
     (« Limite de SQLite » ci-dessus).
 - **Web Clipper** (#14, journal ADR, 2026-10-17) : un clip a un `item.id` technique, comme les

@@ -138,8 +138,8 @@ Text = Annotated[str, CAN_BE_STORED]
 NonEmptyText = Annotated[str, StringConstraints(min_length=1), CAN_BE_STORED]
 # Kept as given, not as pydantic's HttpUrl, which rewrites it (adds a final slash): the base
 # keeps the URL the source gave, without its utm_* parameters (etl/normalize.py). http is
-# accepted for a Zotero entry only (check_url_scheme): Zotero keeps the URL a document was saved
-# from.
+# accepted for a Zotero entry and a clip only (check_url_scheme): Zotero and Web Clipper keep the
+# URL a page was saved from.
 WebUrl = Annotated[
     str,
     StringConstraints(pattern=r"^https?://\S+$"),
