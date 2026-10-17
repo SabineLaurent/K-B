@@ -13,7 +13,7 @@ import logging
 import os
 import re
 import stat
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any, NamedTuple
 
@@ -25,7 +25,14 @@ from k_b.core.quoting import quote_value, without_values
 from k_b.etl.normalize import remove_tracking_parameters
 from k_b.etl.raw_store import SELECTED_LIBRARY_DIR_NAME
 from k_b.etl.source_contract import EntryReading, SourceReader, check_not_all_invalid
-from k_b.items import CLIP_MAX_BYTES, Item, NonEmptyText, SourceCode, WebUrl
+from k_b.items import (
+    CLIP_MAX_BYTES,
+    Item,
+    NonEmptyText,
+    SourceCode,
+    WebUrl,
+    at_midnight_utc,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +60,16 @@ ABSENT_VALUES = ("", "null", "~")
 
 class ClipTooLargeError(Exception):
     """clip_too_large: a clip of the vault is larger than CLIP_MAX_BYTES. Nothing is copied, and
-    the last collection date stays: the next collection tries again. An exception to rule 1 of
+    the last collection date stays: each collection fails again until the clip is shrunk or
+    removed from the vault. An exception to rule 1 of
     conventions.md, which fails a source for an unreadable page only: a clip is a page, and the
     bound passed is shown, not silent (decision of 2026-10-17)."""
+
+
+class ClipFile(NamedTuple):
+    path: Path
+    # The newest of its modification and change dates, in nanoseconds since EPOCH.
+    changed_at_ns: int
 
 
 class ClippingSource:
@@ -67,57 +81,98 @@ class ClippingSource:
         self.vault_dir = vault_dir
 
     def fetch(self, last_collected_at: datetime | None) -> dict[str, bytes] | None:
-        """Return each clip modified since last_collected_at (all, at the first collection), as
-        it is, by page name; None when none was."""
-        clips = {
-            make_page_name(path): read_clip_file(path)
-            for path in list_clip_files(self.vault_dir / CLIPPINGS_DIR_NAME)
+        """Return each clip changed since last_collected_at (all, at the first collection), as
+        it is, by page name; None when none was.
+
+        The margin goes both ways (CLIP_CHANGE_MARGIN): a clip changed shortly before the last
+        collection is copied again; a clip changed shortly before this one, which may still be
+        written, is left to the next collection.
+        """
+        changed = [
+            clip_file
+            for clip_file in list_clip_files(self.vault_dir / CLIPPINGS_DIR_NAME)
             if last_collected_at is None
-            or was_modified_since(path, last_collected_at - CLIP_CHANGE_MARGIN)
-        }
+            or clip_file.changed_at_ns > to_ns(last_collected_at - CLIP_CHANGE_MARGIN)
+        ]
+        settled_before_ns = to_ns(current_time() - CLIP_CHANGE_MARGIN)
+        settled = [
+            clip_file
+            for clip_file in changed
+            if clip_file.changed_at_ns <= settled_before_ns
+        ]
+        if len(settled) < len(changed):
+            logger.info(
+                "clipping: %d clips changed less than %d seconds ago,"
+                " left to the next collection",
+                len(changed) - len(settled),
+                CLIP_CHANGE_MARGIN.total_seconds(),
+            )
+        clips = read_clip_files(settled)
         if not clips:
             return None
         # Read as the import will: clips all invalid fail the source (conventions.md, rule 1).
-        readings = [
-            read_clip_safely(page_name, clip) for page_name, clip in clips.items()
-        ]
+        reasons_by_page = {
+            page_name: find_rejection_reason(page_name, clip)
+            for page_name, clip in clips.items()
+        }
         check_not_all_invalid(
             EntryReading(
-                [entry for reading in readings for entry in reading.entries],
-                [
-                    reason
-                    for reading in readings
-                    for reason in reading.rejection_reasons
-                ],
+                [page for page, reason in reasons_by_page.items() if reason is None],
+                [reason for reason in reasons_by_page.values() if reason is not None],
             )
         )
-        logger.info("clipping: %d clips copied", len(clips))
+        # Read, not copied: etl/extract.py writes the raw pages after.
+        logger.info("clipping: %d clips read", len(clips))
         return clips
 
 
-def list_clip_files(clippings_dir: Path) -> list[Path]:
+def current_time() -> datetime:
+    return datetime.now(UTC)
+
+
+def to_ns(moment: datetime) -> int:
+    """A moment in whole nanoseconds since EPOCH, as a file date: a float would round a write
+    made in the same microsecond onto it."""
+    return (moment - EPOCH) // ONE_MICROSECOND * 1000
+
+
+def list_clip_files(clippings_dir: Path) -> list[ClipFile]:
     """The clips of the folder, in name order: its Markdown files that are regular files, not
-    hidden. Its subfolders are not read, and a symbolic link is left: it may point out of the
-    vault."""
-    return sorted(
-        path
-        for path in clippings_dir.iterdir()
-        if not path.name.startswith(".")
-        and path.name.endswith(CLIP_EXTENSION)
-        and stat.S_ISREG(path.lstat().st_mode)
-    )
+    hidden. Its subfolders are not read, and a symbolic link is left: it could point out of the
+    vault. The change date counts with the modification date: a copy that keeps the
+    modification date (cp -p, the Finder, a sync) is a new clip; so is a change of its metadata
+    alone (chmod, a Finder tag), copied again for nothing."""
+    clip_files = []
+    for path in sorted(clippings_dir.iterdir()):
+        if path.name.startswith(".") or not path.name.endswith(CLIP_EXTENSION):
+            continue
+        try:
+            status = path.lstat()
+        except FileNotFoundError:
+            # Renamed or removed since the folder was listed: its new name is listed next time.
+            continue
+        if stat.S_ISREG(status.st_mode):
+            clip_files.append(
+                ClipFile(path, max(status.st_mtime_ns, status.st_ctime_ns))
+            )
+    return clip_files
 
 
-def was_modified_since(path: Path, moment: datetime) -> bool:
-    """Whether the clip was written or changed after moment. The change date counts too: a copy
-    that keeps the modification date (cp -p, the Finder, a sync) is a new clip; so does a change
-    of its metadata (chmod, a Finder tag), a clip copied again for nothing."""
-    status = path.lstat()
-    changed_at_ns = max(status.st_mtime_ns, status.st_ctime_ns)
-    # In whole nanoseconds: a float would round a write made in the same microsecond as the
-    # last collection onto it.
-    moment_ns = (moment - EPOCH) // ONE_MICROSECOND * 1000
-    return changed_at_ns > moment_ns
+def read_clip_files(clip_files: list[ClipFile]) -> dict[str, bytes]:
+    """The bytes of each clip by page name; a clip gone since it was listed (renamed in
+    Obsidian, a sync) is left out and counted: its new name is listed next time."""
+    clips = {}
+    for clip_file in clip_files:
+        try:
+            clips[make_page_name(clip_file.path)] = read_clip_file(clip_file.path)
+        except FileNotFoundError:
+            continue
+    gone_count = len(clip_files) - len(clips)
+    if gone_count:
+        logger.info(
+            "clipping: %d clips gone between the list and the reading", gone_count
+        )
+    return clips
 
 
 def make_page_name(path: Path) -> str:
@@ -188,21 +243,19 @@ def describe_yaml_error(error: yaml.YAMLError) -> str:
     return f"frontmatter not YAML: line {mark.line + 2}, column {mark.column + 1}"
 
 
-def read_clip_safely(page_name: str, raw_clip: bytes) -> EntryReading[ClipEntry]:
-    """A clip the import would reject is a rejection here, not a failure: the collection counts
-    the clips all invalid. Converted as the import will, the dates and the path aside: only
-    whether it is an item counts."""
+def find_rejection_reason(page_name: str, raw_clip: bytes) -> str | None:
+    """Why the import would reject the clip, or None: converted as the import will, the dates
+    and the path aside, since only whether it is an item counts."""
     try:
-        reading = read_clip(raw_clip)
-        for entry in reading.entries:
+        for entry in read_clip(raw_clip).entries:
             convert_clip(entry, EPOCH, page_name)
     except ValidationError as refusal:
         # convert_clip gives it without its values already.
-        return EntryReading([], [f"ValidationError: {refusal}"])
+        return f"ValidationError: {refusal}"
     # RecursionError: a frontmatter nested too deep, rejected at the import as well (#103).
     except (ValueError, RecursionError) as unreadable:
-        return EntryReading([], [f"{type(unreadable).__name__}: {unreadable}"])
-    return reading
+        return f"{type(unreadable).__name__}: {unreadable}"
+    return None
 
 
 def read_absent(value: object) -> object:
@@ -229,11 +282,6 @@ class ClipFrontmatter(BaseModel):
     source: WebUrl
     created: ClipDay
     published: Annotated[ClipDay | None, BeforeValidator(read_absent)] = None
-
-
-def at_midnight_utc(day: date) -> datetime:
-    """A day is written at midnight UTC (docs/stockage.md), as dateAdded of CISA KEV."""
-    return datetime.combine(day, time(), UTC)
 
 
 def convert_clip(entry: ClipEntry, collected_at: datetime, raw_file_path: str) -> Item:

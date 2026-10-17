@@ -7,7 +7,7 @@ import, which cannot import a source, writes it.
 """
 
 import re
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
@@ -113,6 +113,12 @@ def convert_to_utc(moment: datetime) -> datetime:
         return moment.astimezone(UTC)
     except OverflowError:
         raise ValueError("date out of range once in UTC") from None
+
+
+def at_midnight_utc(day: date) -> datetime:
+    """A source that gives a day only is stored at midnight UTC, a writing convention
+    (docs/stockage.md): dateAdded of CISA KEV, the edition of TLDR, the days of a clip."""
+    return datetime.combine(day, time(), UTC)
 
 
 def parse_aware_datetime(stored_date: object, label: str) -> datetime:

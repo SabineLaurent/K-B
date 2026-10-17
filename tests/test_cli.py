@@ -16,6 +16,7 @@ from k_b import cli
 from k_b.database.writers.shared_rows import UnknownSourceError
 from k_b.etl.load import KindWithoutTableError
 from k_b.etl.source_contract import SourceKind
+from k_b.etl.sources import clipping
 
 
 @pytest.fixture(autouse=True)
@@ -209,6 +210,10 @@ def test_collect_copies_the_clips_into_the_selected_library_with_the_vault(
     monkeypatch.setenv("KB_DATA_DIR", str(data_dir))
     monkeypatch.setenv("KB_VAULT_DIR", str(tmp_path / "vault"))
     monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
+    # A collection later than the margin after the clip written above (CLIP_CHANGE_MARGIN).
+    monkeypatch.setattr(
+        clipping, "current_time", lambda: datetime.now(UTC) + timedelta(minutes=5)
+    )
 
     exit_code = cli.main(["collect"])
 

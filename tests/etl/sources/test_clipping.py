@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from k_b.core.config import CLIP_CHANGE_MARGIN
 from k_b.etl.source_contract import check_not_all_invalid
+from k_b.etl.sources import clipping
 from k_b.etl.sources.clipping import (
     CLIPPINGS_DIR_NAME,
     READER,
@@ -44,6 +45,15 @@ def fixture_bytes(name):
 
 def page_name_of(file_name):
     return hashlib.sha256(os.fsencode(file_name)).hexdigest()[:16]
+
+
+@pytest.fixture(autouse=True)
+def collection_after_the_margin(monkeypatch):
+    """A collection that runs later than the margin after the clips the tests write: none is
+    left to the next collection, unless a test says otherwise."""
+    monkeypatch.setattr(
+        clipping, "current_time", lambda: datetime.now(UTC) + CLIP_CHANGE_MARGIN * 2
+    )
 
 
 @pytest.fixture
@@ -258,7 +268,62 @@ def test_the_log_gives_a_count_and_no_title_or_file_name(vault_dir, caplog):
     with caplog.at_level(logging.INFO, logger="k_b.etl.sources.clipping"):
         ClippingSource(vault_dir).fetch(None)
 
-    assert caplog.messages == ["clipping: 3 clips copied"]
+    # Read, not copied: etl/extract.py writes the raw pages after.
+    assert caplog.messages == ["clipping: 3 clips read"]
+
+
+def make_changed_now(vault_dir, monkeypatch):
+    """A collection that runs within the margin after the last change of every clip."""
+    clips = list(clippings_of(vault_dir).iterdir())
+    monkeypatch.setattr(
+        clipping, "current_time", lambda: last_change_of(clips) + CLIP_CHANGE_MARGIN / 2
+    )
+
+
+def test_a_clip_changed_less_than_the_margin_ago_is_left_to_the_next_collection(
+    vault_dir, monkeypatch, caplog
+):
+    """It may still be written (Obsidian, Web Clipper, a sync): copied now, it would stay cut
+    for good, the first version of a URL being kept."""
+    make_changed_now(vault_dir, monkeypatch)
+
+    with caplog.at_level(logging.INFO, logger="k_b.etl.sources.clipping"):
+        assert ClippingSource(vault_dir).fetch(None) is None
+
+    assert caplog.messages == [
+        "clipping: 3 clips changed less than 60 seconds ago, left to the next collection"
+    ]
+
+
+def test_a_clip_left_to_the_next_collection_is_copied_by_it(vault_dir, monkeypatch):
+    clips = list(clippings_of(vault_dir).iterdir())
+    collection = last_change_of(clips) + CLIP_CHANGE_MARGIN / 2
+    monkeypatch.setattr(clipping, "current_time", lambda: collection)
+    assert ClippingSource(vault_dir).fetch(None) is None
+
+    monkeypatch.setattr(
+        clipping, "current_time", lambda: collection + CLIP_CHANGE_MARGIN
+    )
+    pages = ClippingSource(vault_dir).fetch(collection)
+
+    assert len(pages) == 3
+
+
+def test_a_clip_gone_between_the_list_and_the_reading_is_skipped(
+    vault_dir, monkeypatch, caplog
+):
+    listed = clipping.list_clip_files(clippings_of(vault_dir))
+    (clippings_of(vault_dir) / ARTICLE).unlink()
+    monkeypatch.setattr(clipping, "list_clip_files", lambda clippings_dir: listed)
+
+    with caplog.at_level(logging.INFO, logger="k_b.etl.sources.clipping"):
+        pages = ClippingSource(vault_dir).fetch(None)
+
+    assert set(pages) == {
+        page_name_of(PAGE_WITHOUT_AUTHOR),
+        page_name_of(PAGE_WITH_A_RULE),
+    }
+    assert "clipping: 1 clips gone between the list and the reading" in caplog.messages
 
 
 # Reading (T).

@@ -30,7 +30,7 @@ SELECT_RAW_FILE_PATHS = "SELECT raw_file_path FROM raw_data"
 # One branch per ItemKind; its date is the one the source gives (docs/specs-api.md, "Date,
 # titre et résumé par sorte"). A kind without summary gives NULL: its title alone is searched.
 # Shared by the list and the detail: the title, date and URL of a kind are written once.
-# publication and vulnerability have no kind, unlike the four subtypes: their branch keeps the
+# publication and vulnerability have no kind, unlike the five subtypes: their branch keeps the
 # items of its kind only, so that an item is read by the one branch of its kind.
 LISTED_ITEMS = """
     SELECT item.id, item.kind, item.raw_data_id, publication.title AS title,

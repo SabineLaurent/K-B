@@ -7,7 +7,14 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from k_b.items import Highlight, Item, SourceCode, TrendRow, parse_aware_datetime
+from k_b.items import (
+    Highlight,
+    Item,
+    SourceCode,
+    TrendRow,
+    at_midnight_utc,
+    parse_aware_datetime,
+)
 
 SEED_SOURCES = (
     Path(__file__).parent.parent / "src" / "k_b" / "database" / "seed_sources.sql"
@@ -833,3 +840,7 @@ def test_a_refusal_does_not_quote_the_value_received(model, fields):
 
     # Defense in depth behind without_values (core/quoting.py, #212).
     assert "RECEIVED_TEXT" not in str(refusal.value)
+
+
+def test_a_day_is_written_at_midnight_utc():
+    assert at_midnight_utc(date(2026, 10, 17)) == datetime(2026, 10, 17, tzinfo=UTC)

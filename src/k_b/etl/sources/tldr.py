@@ -8,7 +8,7 @@ Read the articles of a raw edition page, and convert each one into an item.
 import logging
 import re
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, timedelta
 from time import sleep
 
 from bs4 import BeautifulSoup, Tag
@@ -18,7 +18,7 @@ from k_b.core.quoting import quote_value
 from k_b.etl.http_download import RedirectedOutsideError, download
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME, find_stream
 from k_b.etl.source_contract import EntryReading, SourceReader
-from k_b.items import EDITION_SLUG, Item, SourceCode
+from k_b.items import EDITION_SLUG, Item, SourceCode, at_midnight_utc
 
 SOURCE_CODE: SourceCode = "tldr"
 # Adding an edition is adding its slug, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
@@ -226,7 +226,7 @@ def convert_article(
         # Some links are escaped twice in the page: "&amp;" is still there once the HTML is
         # parsed. The utm_* parameters are removed with those of every item (etl/normalize.py).
         url=article.link.replace("&amp;", "&"),
-        published_at=datetime.combine(article.edition_date, time.min, tzinfo=UTC),
+        published_at=at_midnight_utc(article.edition_date),
         summary=article.summary or None,
         collected_at=collected_at,
         raw_file_path=raw_file_path,

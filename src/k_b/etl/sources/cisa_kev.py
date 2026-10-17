@@ -10,7 +10,7 @@ import csv
 import io
 import re
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, datetime, timedelta
 from email.utils import format_datetime
 from typing import TypeIs, get_args
 from urllib.error import HTTPError
@@ -24,7 +24,14 @@ from k_b.etl.source_contract import (
     check_not_all_invalid,
     read_each_entry,
 )
-from k_b.items import CVE_ID, NVD_PAGE_URL, Item, RansomwareUse, SourceCode
+from k_b.items import (
+    CVE_ID,
+    NVD_PAGE_URL,
+    Item,
+    RansomwareUse,
+    SourceCode,
+    at_midnight_utc,
+)
 
 CATALOG_URL = (
     "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv"
@@ -185,7 +192,7 @@ def convert_vulnerability(
         title=vulnerability.vulnerability_name,
         url=NVD_PAGE_URL + vulnerability.cve_id,
         # dateAdded is a day: stored at midnight UTC, a writing convention (docs/stockage.md).
-        published_at=datetime.combine(vulnerability.date_added, time(), tzinfo=UTC),
+        published_at=at_midnight_utc(vulnerability.date_added),
         summary=vulnerability.short_description,
         collected_at=collected_at,
         raw_file_path=raw_file_path,
