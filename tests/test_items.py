@@ -7,7 +7,14 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from k_b.items import Highlight, Item, SourceCode, TrendRow, parse_aware_datetime
+from k_b.items import (
+    Highlight,
+    Item,
+    SourceCode,
+    TrendRow,
+    at_midnight_utc,
+    parse_aware_datetime,
+)
 
 SEED_SOURCES = (
     Path(__file__).parent.parent / "src" / "k_b" / "database" / "seed_sources.sql"
@@ -144,6 +151,28 @@ def zotero_entry_fields(**changes):
         "item_type": "preprint",
         "arxiv_id": "2609.00001",
         "highlights": (Highlight(**highlight_fields()),),
+    }
+    fields.update(changes)
+    return fields
+
+
+def clip_fields(**changes):
+    """The article of tests/fixtures/clipping, with every field its kind requires."""
+    url = (
+        "https://medium.com/skillstuff/"
+        "7-coding-patterns-i-stole-from-senior-engineers-c95f757e52a6"
+    )
+    fields = {
+        "source_code": "clipper",
+        "source_item_id": url,
+        "kind": "clip",
+        "title": "7 Coding Patterns I Stole From Senior Engineers",
+        "url": url,
+        "saved_at": datetime(2026, 9, 17, tzinfo=UTC),
+        "published_at": datetime(2026, 6, 8, tzinfo=UTC),
+        "summary": "Most junior developers think senior engineers know more tricks.",
+        "collected_at": COLLECTED_AT,
+        "raw_file_path": "selected_library/clipping/2026-10-17T093000Z/0123456789abcdef.md",
     }
     fields.update(changes)
     return fields
@@ -409,6 +438,9 @@ def text_of_length(field, length, kind=None):
         (zotero_entry_fields, "title", 1_000),
         (zotero_entry_fields, "url", 2_000),
         (zotero_entry_fields, "arxiv_id", 20),
+        (clip_fields, "title", 1_000),
+        (clip_fields, "url", 2_000),
+        (clip_fields, "summary", 1_000_000),
     ],
 )
 def test_a_text_is_accepted_up_to_its_maximum_length_and_refused_beyond(
@@ -528,7 +560,8 @@ def test_the_fields_of_a_zotero_entry_are_refused_on_another_kind(changes):
         Item(**item_fields(**changes))
 
 
-OTHER_KINDS_THAN_ZOTERO = [
+# The kinds whose URL must be https: neither a Zotero entry nor a clip.
+KINDS_WITH_HTTPS_URL = [
     item_fields,
     vulnerability_fields,
     release_fields,
@@ -537,7 +570,7 @@ OTHER_KINDS_THAN_ZOTERO = [
 ]
 
 
-@pytest.mark.parametrize("build_fields", OTHER_KINDS_THAN_ZOTERO)
+@pytest.mark.parametrize("build_fields", [*KINDS_WITH_HTTPS_URL, clip_fields])
 def test_only_a_zotero_entry_may_have_no_url(build_fields):
     with pytest.raises(ValidationError) as refusal:
         Item(**build_fields(url=None))
@@ -545,14 +578,43 @@ def test_only_a_zotero_entry_may_have_no_url(build_fields):
     assert "without url" in str(refusal.value)
 
 
-@pytest.mark.parametrize("build_fields", OTHER_KINDS_THAN_ZOTERO)
-def test_only_a_zotero_entry_may_have_an_http_url(build_fields):
+@pytest.mark.parametrize("build_fields", KINDS_WITH_HTTPS_URL)
+def test_only_a_zotero_entry_or_a_clip_may_have_an_http_url(build_fields):
     url = build_fields()["url"].replace("https://", "http://", 1)
 
     with pytest.raises(ValidationError) as refusal:
         Item(**build_fields(url=url))
 
     assert "url not https" in str(refusal.value)
+
+
+def test_a_clip_with_its_fields_is_accepted_with_an_http_url():
+    url = "http://example.com/a-page-kept"
+
+    item = Item(**clip_fields(url=url, source_item_id=url, published_at=None))
+
+    assert (item.kind, item.source_code, item.url) == ("clip", "clipper", url)
+
+
+@pytest.mark.parametrize(
+    "changes, said",
+    [
+        ({"saved_at": None}, "without saved_at"),
+        ({"summary": None}, "without summary"),
+        ({"source_code": "zotero"}, "a clip item from zotero"),
+    ],
+)
+def test_a_clip_without_its_required_fields_or_of_another_source_is_refused(
+    changes, said
+):
+    with pytest.raises(ValidationError) as refusal:
+        Item(**clip_fields(**changes))
+
+    assert said in str(refusal.value)
+
+
+def test_an_empty_text_of_a_clip_is_accepted():
+    assert Item(**clip_fields(summary="")).summary == ""
 
 
 @pytest.mark.parametrize("field, maximum", [("text", 10_000), ("comment", 10_000)])
@@ -778,3 +840,7 @@ def test_a_refusal_does_not_quote_the_value_received(model, fields):
 
     # Defense in depth behind without_values (core/quoting.py, #212).
     assert "RECEIVED_TEXT" not in str(refusal.value)
+
+
+def test_a_day_is_written_at_midnight_utc():
+    assert at_midnight_utc(date(2026, 10, 17)) == datetime(2026, 10, 17, tzinfo=UTC)

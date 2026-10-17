@@ -7,7 +7,7 @@ import, which cannot import a source, writes it.
 """
 
 import re
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
@@ -36,6 +36,7 @@ ItemKind = Literal[
     "release",
     "advisory",
     "zotero_entry",
+    "clip",
 ]
 
 # The acquisition modes a reader filters on (database/reading.py, kb search --in): those of
@@ -114,6 +115,12 @@ def convert_to_utc(moment: datetime) -> datetime:
         raise ValueError("date out of range once in UTC") from None
 
 
+def at_midnight_utc(day: date) -> datetime:
+    """A source that gives a day only is stored at midnight UTC, a writing convention
+    (docs/stockage.md): dateAdded of CISA KEV, the edition of TLDR, the days of a clip."""
+    return datetime.combine(day, time(), UTC)
+
+
 def parse_aware_datetime(stored_date: object, label: str) -> datetime:
     """Read an ISO 8601 date, refusing one without a time zone: naive dates compare wrongly.
 
@@ -137,8 +144,8 @@ Text = Annotated[str, CAN_BE_STORED]
 NonEmptyText = Annotated[str, StringConstraints(min_length=1), CAN_BE_STORED]
 # Kept as given, not as pydantic's HttpUrl, which rewrites it (adds a final slash): the base
 # keeps the URL the source gave, without its utm_* parameters (etl/normalize.py). http is
-# accepted for a Zotero entry only (check_url_scheme): Zotero keeps the URL a document was saved
-# from.
+# accepted for a Zotero entry and a clip only (check_url_scheme): Zotero and Web Clipper keep the
+# URL a page was saved from.
 WebUrl = Annotated[
     str,
     StringConstraints(pattern=r"^https?://\S+$"),
@@ -179,10 +186,13 @@ REQUIRED_FIELDS_BY_KIND = {
     "newsletter_article": ("url", "summary", "published_at", "edition", "rank"),
     # A Zotero entry may have no URL (ADR of 2026-10-13).
     "zotero_entry": ("item_type", "saved_at"),
+    # Its URL is its key; its text, empty or not, is never absent.
+    "clip": ("url", "saved_at", "summary"),
 }
 # The source of each kind. Written to a reference table as the item of its source of truth, an
 # item of another source would mark a CVE as exploited, or overwrite a paper; a release or an
-# advisory is a GitHub subtype, a newsletter article a TLDR one, an entry a Zotero one.
+# advisory is a GitHub subtype, a newsletter article a TLDR one, an entry a Zotero one, a clip a
+# Web Clipper one.
 SOURCE_BY_KIND = {
     "paper": "arxiv",
     "vulnerability": "cisa_kev",
@@ -190,6 +200,7 @@ SOURCE_BY_KIND = {
     "advisory": "github",
     "newsletter_article": "tldr",
     "zotero_entry": "zotero",
+    "clip": "clipper",
 }
 # The fields only one kind may fill.
 FIELDS_OF_ONE_KIND = {
@@ -200,7 +211,8 @@ FIELDS_OF_ONE_KIND = {
     "zotero_entry": ("item_type", "arxiv_id", "highlights"),
 }
 KINDS_WITH_CVE = ("vulnerability", "advisory")
-KINDS_WITH_HTTP_URL = ("zotero_entry",)
+# Zotero and Web Clipper keep the URL a page was saved from.
+KINDS_WITH_HTTP_URL = ("zotero_entry", "clip")
 # The form of source_item_id, for the kinds whose base column holds it: the GLOB of zotero_key,
 # the GLOB of ghsa_id, the integer release_id. A release identifier is positive, written
 # without a leading zero ("0007" and "7" would be one release in the base), in 19 digits at
@@ -210,6 +222,11 @@ SOURCE_ITEM_ID_BY_KIND = {
     "advisory": GHSA_ID,
     "release": "[1-9][0-9]{0,18}",
 }
+
+# The largest clip copied from the vault, in bytes: a UTF-8 text of this size holds as many
+# characters at most, so that the text of a clip copied is never too long for the base. A wide
+# bound: 183 441 bytes for the largest clip of the vault of 2026-10-17.
+CLIP_MAX_BYTES = 1_000_000
 
 # The longest text a source may write in each column of schema.sql, in characters, by kind and
 # by the field that fills the column. Held twice (ADR of 2026-10-08): here when the raw is
@@ -244,6 +261,7 @@ MAX_LENGTH_BY_KIND: dict[ItemKind, dict[str, int]] = {
     },
     # Wide bounds: 91 characters at most for a title of the extract of 2026-10-13.
     "zotero_entry": {"item_type": 100, "title": 1_000, "url": 2_000, "arxiv_id": 20},
+    "clip": {"title": 1_000, "url": 2_000, "summary": CLIP_MAX_BYTES},
 }
 # The lists written as JSON: the most elements, held by a CHECK too, and the longest element,
 # held here only (a CHECK of SQLite cannot go through the elements of a JSON list).
@@ -315,7 +333,8 @@ class Item(BaseModel):
     published_at: UtcDatetime | None = None
     # arXiv only: the date of the version read.
     revised_at: UtcDatetime | None = None
-    # Clipper and Zotero only: the day the document was saved by hand.
+    # Clipper and Zotero only: the day the document was saved by hand (a Zotero date; for a
+    # clip, its day at midnight UTC).
     saved_at: UtcDatetime | None = None
     summary: Text | None = None
     collected_at: UtcDatetime

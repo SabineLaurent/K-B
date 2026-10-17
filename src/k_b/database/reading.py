@@ -30,7 +30,7 @@ SELECT_RAW_FILE_PATHS = "SELECT raw_file_path FROM raw_data"
 # One branch per ItemKind; its date is the one the source gives (docs/specs-api.md, "Date,
 # titre et résumé par sorte"). A kind without summary gives NULL: its title alone is searched.
 # Shared by the list and the detail: the title, date and URL of a kind are written once.
-# publication and vulnerability have no kind, unlike the four subtypes: their branch keeps the
+# publication and vulnerability have no kind, unlike the five subtypes: their branch keeps the
 # items of its kind only, so that an item is read by the one branch of its kind.
 LISTED_ITEMS = """
     SELECT item.id, item.kind, item.raw_data_id, publication.title AS title,
@@ -62,6 +62,10 @@ LISTED_ITEMS = """
     SELECT item.id, item.kind, item.raw_data_id, zotero_entry.title, NULL, zotero_entry.saved_at,
         zotero_entry.url, zotero_entry.withdrawn_at
     FROM item JOIN zotero_entry ON zotero_entry.item_id = item.id
+    UNION ALL
+    SELECT item.id, item.kind, item.raw_data_id, clip.title, clip.body, clip.saved_at, clip.url,
+        NULL
+    FROM item JOIN clip ON clip.item_id = item.id
 """
 
 LISTED_FIELDS = "listed.id, listed.kind, listed.title, listed.source_date, listed.url, listed.withdrawn_at"
@@ -134,6 +138,12 @@ SELECT zotero_entry.zotero_key, zotero_entry.item_type, publication.arxiv_id,
     zotero_entry.revised_at
 FROM zotero_entry LEFT JOIN publication ON publication.id = zotero_entry.publication_id
 WHERE zotero_entry.item_id = ?
+"""
+
+SELECT_CLIP = """
+SELECT published_at, body
+FROM clip
+WHERE item_id = ?
 """
 
 # The latest window when none is given; a window exists in the base by its rows only.
@@ -223,6 +233,13 @@ class ZoteroEntryDetail(NamedTuple):
     highlights: list[StoredHighlight]
 
 
+class ClipDetail(NamedTuple):
+    # published of Web Clipper, a day at midnight UTC; None when the page gives none.
+    published_at: str | None
+    # The text kept, as written.
+    body: str
+
+
 KindDetail = (
     PaperDetail
     | VulnerabilityDetail
@@ -230,6 +247,7 @@ KindDetail = (
     | AdvisoryDetail
     | NewsletterArticleDetail
     | ZoteroEntryDetail
+    | ClipDetail
 )
 
 
@@ -438,6 +456,10 @@ def read_zotero_entry_detail(
     )
 
 
+def read_clip_detail(connection: sqlite3.Connection, item_id: int) -> ClipDetail:
+    return ClipDetail._make(fetch_row(connection, SELECT_CLIP, item_id))
+
+
 def fetch_row(connection: sqlite3.Connection, query: str, item_id: int) -> Any:
     """The row of the subtype of an item the list has read: the branch of its kind in
     LISTED_ITEMS reads the same table by the same item_id, so it exists."""
@@ -453,6 +475,7 @@ READ_DETAILS_BY_KIND: dict[
     "advisory": read_advisory_detail,
     "newsletter_article": read_newsletter_article_detail,
     "zotero_entry": read_zotero_entry_detail,
+    "clip": read_clip_detail,
 }
 
 

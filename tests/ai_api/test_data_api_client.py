@@ -16,7 +16,7 @@ from k_b.ai_api import data_api_client
 from k_b.ai_api.data_api_client import DataApiError, build_data_api_client, read_watch
 from k_b.ai_api.data_api_settings import DataApiSettings
 from k_b.ai_api.deadline import Deadline
-from k_b.ai_api.watch_items import NewsletterArticleFields, PaperFields
+from k_b.ai_api.watch_items import WATCH_KINDS, NewsletterArticleFields, PaperFields
 from k_b.core.config import (
     DATA_API_CONNECT_TIMEOUT_SECONDS,
     DATA_API_POOL_TIMEOUT_SECONDS,
@@ -77,6 +77,22 @@ def test_the_reading_gives_the_items_of_the_whitelist_in_the_order_of_the_spec(
     assert reading.items_capped is False
     assert reading.capped_kind is None
     assert reading.covered_after is None
+
+
+def test_a_clip_is_of_the_library_and_never_read_for_the_watch(data_api):
+    """A clip is in the test base (item 18): the reading asks neither its kind nor its detail
+    (decision of Sabine of 2026-10-15, recalled on 2026-10-17)."""
+    queries = []
+    data_api.event_hooks["request"].append(
+        lambda request: queries.append(dict(request.url.params))
+    )
+
+    reading = read_watch(data_api, SINCE_ALL, deadline=far_deadline())
+
+    assert "clip" not in WATCH_KINDS
+    assert {query.get("kind") for query in queries} <= set(WATCH_KINDS) | {None}
+    assert "/items/18" not in data_api.paths
+    assert 18 not in [item.item_id for item in reading.items]
 
 
 def test_an_item_read_keeps_its_source_and_sends_its_whitelist_only(data_api):

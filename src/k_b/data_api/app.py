@@ -17,7 +17,7 @@ from k_b.data_api.request_log import log_request
 from k_b.data_api.routers import item_router, trend_router
 
 # The version of docs/specs-api.md: a change a client can see changes both.
-API_VERSION = "0.3.0"
+API_VERSION = "0.4.0"
 
 
 def create_app(

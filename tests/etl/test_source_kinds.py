@@ -2,6 +2,7 @@ from itertools import permutations
 
 from k_b.etl.source_contract import find_source_kind, list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.etl.sources import clipping
 from k_b.etl.sources.zotero import READER
 
 
@@ -42,3 +43,15 @@ def test_zotero_is_declared_with_its_reader_and_without_an_instance():
 
     assert kind is not None
     assert (kind.folder_prefix, kind.sources, kind.reader) == ("zotero", (), READER)
+
+
+def test_the_clips_are_declared_with_their_reader_and_without_an_instance():
+    # Its instance needs the vault: cli.py creates it from KB_VAULT_DIR.
+    kind = find_source_kind("clipping", SOURCE_KINDS)
+
+    assert kind is not None
+    assert (kind.folder_prefix, kind.sources, kind.reader) == (
+        "clipping",
+        (),
+        clipping.READER,
+    )

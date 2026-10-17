@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "K-B data API",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "paths": {
     "/items": {
@@ -31,7 +31,8 @@
                       "newsletter_article",
                       "release",
                       "advisory",
-                      "zotero_entry"
+                      "zotero_entry",
+                      "clip"
                     ],
                     "type": "string"
                   }
@@ -204,6 +205,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ZoteroEntryDetailSchema"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ClipDetailSchema"
                     }
                   ],
                   "discriminator": {
@@ -214,7 +218,8 @@
                       "release": "#/components/schemas/ReleaseDetailSchema",
                       "advisory": "#/components/schemas/AdvisoryDetailSchema",
                       "newsletter_article": "#/components/schemas/NewsletterArticleDetailSchema",
-                      "zotero_entry": "#/components/schemas/ZoteroEntryDetailSchema"
+                      "zotero_entry": "#/components/schemas/ZoteroEntryDetailSchema",
+                      "clip": "#/components/schemas/ClipDetailSchema"
                     }
                   },
                   "title": "Response Read Item Items  Item Id  Get"
@@ -463,6 +468,79 @@
         ],
         "title": "AdvisoryDetailSchema"
       },
+      "ClipDetailSchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "clip",
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source_date": {
+            "type": "string",
+            "title": "Source Date"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At",
+            "description": "Withdrawn from a catalog (vulnerability, Zotero entry). A date of K-B: the collection that saw the change."
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At",
+            "description": "A date of the page kept (published of Web Clipper): a day, at midnight UTC; null when the page gives none."
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "description": "The text kept, Markdown, as Web Clipper wrote it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "source_date",
+          "url",
+          "withdrawn_at",
+          "published_at",
+          "body"
+        ],
+        "title": "ClipDetailSchema"
+      },
       "ErrorSchema": {
         "properties": {
           "error": {
@@ -603,7 +681,8 @@
               "newsletter_article",
               "release",
               "advisory",
-              "zotero_entry"
+              "zotero_entry",
+              "clip"
             ],
             "title": "Kind"
           },

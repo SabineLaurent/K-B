@@ -103,12 +103,22 @@ class ZoteroEntryDetailSchema(ListedItemSchema):
     highlights: list[HighlightSchema]
 
 
+class ClipDetailSchema(ListedItemSchema):
+    kind: Literal["clip"]
+    published_at: str | None = Field(
+        description="A date of the page kept (published of Web Clipper): a day, at midnight"
+        " UTC; null when the page gives none."
+    )
+    body: str = Field(description="The text kept, Markdown, as Web Clipper wrote it.")
+
+
 ItemDetailSchema = Annotated[
     PaperDetailSchema
     | VulnerabilityDetailSchema
     | ReleaseDetailSchema
     | AdvisoryDetailSchema
     | NewsletterArticleDetailSchema
-    | ZoteroEntryDetailSchema,
+    | ZoteroEntryDetailSchema
+    | ClipDetailSchema,
     Field(discriminator="kind"),
 ]

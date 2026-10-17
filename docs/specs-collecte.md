@@ -11,7 +11,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 
 - **Un point de lancement** : `kb collect` lance toutes les sources ; une source en panne
   n'arrête pas les autres. Il affiche une ligne par source (`ok` ou `failed (<type d'erreur>)`),
-  `zotero: skipped (KB_ZOTERO_DIR not set)` quand le dossier de Zotero n'est pas donné, et
+  `zotero: skipped (KB_ZOTERO_DIR not set)` quand le dossier de Zotero n'est pas donné,
+  `clipping: skipped (KB_VAULT_DIR not set)` quand le coffre Obsidian ne l'est pas, et
   `gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)` sans la clé BigQuery.
   Code de sortie : **0** si tout a réussi ; **1** si une source a échoué, ou si
   `collection_state.json` n'a pas pu être écrit (disque plein, droits) ; **2** si la collecte n'a
@@ -25,7 +26,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   source qui lit plusieurs pages (site scrapé) écrit chaque page telle que reçue dans
   `raw/automated_watch/<source>/<AAAA-MM-JJTHHMMSSZ>/<page>.<ext>` (décidé le 2026-10-04). Le filtre
   se fait à la lecture, sauf exception décidée (arXiv, ci-dessous). Ce que l'utilisatrice a
-  choisi (Zotero) va dans `raw/selected_library/<source>/` (journal ADR, 2026-10-09).
+  choisi (Zotero, clips du Web Clipper) va dans `raw/selected_library/<source>/` (journal ADR,
+  2026-10-09).
 - **Fréquence** : une collecte par jour, lancée à la main
   (`KB_DATA_DIR=<dossier> uv run --env-file .env kb collect`) ; l'automatisation viendra après.
   Une collecte manquée est rattrapée à la suivante, jusqu'à une limite propre à chaque source
@@ -39,6 +41,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   | GitHub, releases et alertes | 100 éléments au plus par dépôt ou par écosystème (au-delà, un avertissement) |
   | GitHub, dépôts les plus étoilés | aucun : un instantané par collecte, un jour manqué n'est pas récupérable |
   | Zotero | complet : chaque extrait contient toute la bibliothèque |
+  | Web Clipper | complet : chaque clip écrit ou changé depuis la dernière collecte est copié |
   | GH Archive | chaque fenêtre de 3 jours manquée depuis la dernière collecte, 15 au plus (les plus récentes), en une requête |
 
 - **Incrémental** : la date de la dernière collecte réussie de chaque source est dans
@@ -168,7 +171,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Gabarit** : relevé le 2026-10-17 sur les 5 clips du coffre, conforme au gabarit par défaut
   de Web Clipper (mêmes clés, ordre, types, dossier et nom de fichier). Le nom du fichier est le
   titre, privé des caractères qu'un nom de fichier refuse. Les 7 clés sont présentes dans chaque
-  clip, dans cet ordre ; une clé sans valeur se lit `null`.
+  clip, dans cet ordre ; une clé sans valeur est vide (`author:`). K-B lit une valeur vide de
+  `published` absente ; un `title`, une `source` ou un `created` vide est refusé.
 
   | Clé | Forme relevée | Type par défaut dans Web Clipper | Valeur présente |
   |---|---|---|---|
@@ -180,21 +184,93 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   | `description` | texte entre guillemets | `text` | 4/5 |
   | `tags` | liste, `"clippings"` | `multitext` | 5/5 |
 
-  Sans guillemets, une date est lue comme une date par un lecteur YAML, pas comme un texte. Sa
-  conversion en date UTC avec fuseau (« Du brut au jeu d'items ») est décidée par #14. La forme
-  dépend des réglages de Web Clipper (un type `datetime` changerait les dates) : elle sera
-  relevée de nouveau sur le vrai coffre. Source du gabarit par défaut (dossier `Clippings`, clés,
+  K-B lit le frontmatter avec PyYAML et son chargeur `BaseLoader`, qui ne devine aucun type
+  (« All scalars are loaded as strings »,
+  [PyYAML yaml.load(input) Deprecation](https://github.com/yaml/pyyaml/wiki/PyYAML-yaml.load(input)-Deprecation),
+  lue par Context7 le 2026-10-17) : chaque valeur est un texte ou une liste de textes, et une date est lue par K-B, pas par le
+  lecteur YAML (« Du brut au jeu d'items », Clips). La forme des dates dépend des réglages de
+  Web Clipper (un type `datetime` changerait les dates) : une autre forme est rejetée, pas
+  devinée. Source du gabarit par défaut (dossier `Clippings`, clés,
   valeurs et types) : `createDefaultTemplate` et `updateGlobalPropertyTypes` dans
   [`src/managers/template-manager.ts`](https://github.com/obsidianmd/obsidian-clipper/blob/c48ccdfe35a20e996d563fa843b17bb05bcb68c3/src/managers/template-manager.ts)
   du dépôt officiel `obsidianmd/obsidian-clipper`, dernier commit du fichier `c48ccdf` du
   2024-12-04, lue par l'API GitHub le 2026-10-17.
-- **Ce qu'on en tire** : un item par fichier : titre, URL source, date, et le texte gardé.
-- **Accès** : lecture du dossier local du coffre ; aucun réseau.
-- **Limites** : aucune ; taille de fichier plafonnée à la lecture (le plus gros des 5 clips du
-  2026-10-17 fait 183 441 octets).
-- **Données personnelles** : le champ `author` de la page gardée, s'il existe ; c'est l'auteur
-  public de l'article, écrit en liens `[[Nom]]`. La description, le texte gardé et ses liens
-  `[[…]]` sont du texte libre qui peut nommer des personnes ; le nom du fichier est le titre.
+- **Ce qu'on en tire** : un item par fichier : titre (`title`), URL source (`source`), date
+  d'ajout (`created`), date de publication (`published`, si la page en donne une), et le texte
+  gardé, après le frontmatter. Ne sont pas lus : `author`, `description`, `tags`.
+- **Accès** : lecture du dossier local du coffre (`src/k_b/etl/sources/clipping.py`) ; aucun
+  réseau. Le coffre est donné par la variable `KB_VAULT_DIR`, en chemin complet ; absente ou
+  vide, les clips sont sautés, `kb collect` l'affiche, et son code de sortie ne change pas. Pas
+  de valeur par défaut, comme `KB_ZOTERO_DIR` : c'est un dossier de la machine de
+  l'utilisatrice (règle 2 de `.claude/rules/poc.md`). K-B ne fait que lire le coffre : il n'y
+  écrit, n'y déplace et n'y supprime rien.
+- **Ce qui est lu** : les fichiers `.md` de `Clippings/`, sans ses sous-dossiers ni les fichiers
+  cachés ; un lien symbolique est sauté (il pourrait pointer hors du coffre), et un fichier
+  remplacé par un lien entre sa liste et sa lecture n'est pas suivi (`O_NOFOLLOW`).
+- **Limites** : aucune limite de débit. Un clip fait au plus 1 000 000 octets
+  (`CLIP_MAX_BYTES`, `src/k_b/items.py` ; le plus gros des 5 clips du 2026-10-17 fait
+  183 441 octets), lu au plus un octet de plus.
+- **Brut** : chaque clip écrit ou changé depuis la dernière collecte (la plus récente de sa date
+  de modification et de sa date de changement : une copie qui garde la date de modification,
+  par `cp -p`, le Finder ou une synchronisation, a une date de changement nouvelle), copié **tel
+  quel** dans `raw/selected_library/clipping/<AAAA-MM-JJTHHMMSSZ>/<nom>.md` (journal ADR,
+  2026-10-09). Le nom est fait des 16 premiers caractères hexadécimaux du SHA-256 du nom du
+  fichier dans le coffre : le même clip a le même nom d'une collecte à l'autre, et son titre
+  n'entre ni dans le chemin du brut ni dans le journal d'import. Aucun clip changé : rien n'est
+  écrit. **Marge**, dans les deux sens (`CLIP_CHANGE_MARGIN`, 60 s, `core/config.py`) : un clip
+  changé jusqu'à 60 s avant la dernière collecte est copié de nouveau, puis écarté
+  `already_seen` à l'import ; un clip changé moins de 60 s avant la collecte en cours, qui peut
+  être encore en cours d'écriture (Obsidian, Web Clipper, une synchronisation), est laissé à la
+  collecte suivante, qui le prend (la première version d'une URL étant gardée, un clip copié
+  tronqué le resterait). Un clip dont la date a changé entre la liste du dossier et sa lecture
+  (une synchronisation, une édition) est laissé de même à la collecte suivante. Un clip renommé ou
+  supprimé entre la liste et la lecture est sauté, et compté au journal : son nouveau nom est lu à
+  la collecte suivante. Hypothèse, non
+  mesurée : l'horloge d'un système de fichiers peut être plus grossière que celle de `kb` (un
+  tick sous Linux) ou en retard sur elle (coffre monté depuis l'hôte dans un conteneur, #200) ;
+  sans marge, un clip écrit juste après le début d'une collecte serait daté d'avant elle et
+  jamais copié (décision du 2026-10-17 : une perte sans trace est pire que quelques octets
+  recopiés). Limites : un clip supprimé du coffre n'est pas vu ; un changement de ses seules
+  métadonnées (`chmod`, une étiquette du Finder) change sa date de changement, et le clip est
+  recopié pour rien (RGESN 1.6, quelques octets par clip).
+- **En cas de panne :** la source échoue, n'écrit rien, et sa date de dernière collecte reste ;
+  la collecte suivante recommence. Les états :
+  - `ClipTooLargeError` (`clip_too_large` : un clip dépasse 1 000 000 octets ; le message cite
+    son nom de fichier, tronqué et échappé par `quote_value`, sa taille et le maximum). **Exception
+    à la règle 1 de `.claude/rules/conventions.md`**, qui ne fait échouer une source que pour une
+    page illisible ou des entrées toutes invalides (décision du 2026-10-17, tranchée par
+    time-knight sur délégation de Sabine) : un clip est une page, et un plafond dépassé se voit à
+    chaque collecte au lieu de passer en silence. Tant que le fichier reste dans le coffre, aucun
+    clip nouveau n'est copié ;
+  - `all_items_invalid` : tous les clips copiés seraient rejetés à l'import (lus et convertis
+    comme par l'import, `RecursionError` comprise) ;
+  - `all_items_invalid`, cas limite assumé (règle 1, décision du 2026-10-17) : une note sans
+    frontmatter posée seule dans `Clippings/` fait échouer la source à chaque collecte, jusqu'au
+    clip valide suivant ; elle est alors copiée, et rejetée à chaque import ;
+  - `ClippingsFolderMissingError` (`clippings_folder_missing`, sans chemin dans le message) : le
+    coffre n'a pas de dossier `Clippings/`, ou n'existe pas. Créer `Clippings/`, ou attendre le
+    premier clip (Web Clipper le crée). Pas pris pour un coffre sans clip : la date de collecte
+    avancerait, et les clips qu'un montage ou une synchronisation apporteraient ensuite, avec
+    leurs dates anciennes, ne seraient jamais copiés (décision du 2026-10-17, tranchée par
+    time-knight sur délégation de Sabine, qui inverse une correction du même jour) ;
+  - `PermissionError` : un clip ou le dossier ne se lit pas (droits) ;
+  - `OSError` : un clip qui ne se lit pas pour une autre raison, dont `ELOOP` (un fichier
+    remplacé par un lien symbolique entre sa liste et sa lecture). Hypothèse, non vérifiée : un
+    fichier iCloud non téléchargé pourrait lever une telle erreur ; macOS peut aussi le
+    télécharger à la lecture, ou le montrer sous un nom caché (`.icloud`), que la liste saute. Un
+    tel clip fait échouer la source, comme `clip_too_large`, au lieu d'être sauté :
+    sauté pendant que la date avance, il ne serait plus revu tant qu'il ne change pas (décision
+    du 2026-10-17, tranchée par time-knight sur délégation de Sabine).
+
+  Un clip illisible parmi des clips valides est copié : l'import le rejette (règle 1 de
+  `.claude/rules/conventions.md`). Le journal ne cite que des nombres : clips lus, laissés à la
+  collecte suivante (changés depuis moins de 60 s, ou pendant leur lecture), disparus entre la
+  liste et la lecture.
+- **Données personnelles** : le champ `author` de la page gardée, s'il existe (l'auteur public de
+  l'article, écrit en liens `[[Nom]]`) : copié dans le brut, jamais lu en base. La description, le
+  texte gardé et ses liens `[[…]]` sont du texte libre qui peut nommer des personnes, et le
+  texte peut porter les notes de l'utilisatrice ; le texte va en base (`clip.body`). Le nom du
+  fichier est le titre. Voir le [registre des traitements](registre-traitements.md).
 - **Prérequis** : coffre créé le 2026-10-17 (#147), avec une copie de 5 clips ; Web Clipper n'y
   écrit pas encore (réglage à venir).
 
@@ -459,6 +535,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    | flux de nouveautés, **par fenêtre** (variante propre aux classements, #142) | classements GH Archive (table `trend`, pas un item) | inchangée : le premier classement vu d'une fenêtre est gardé entier ; une fenêtre qu'un autre fichier brut a déjà apportée est écartée entière | `INSERT INTO trend … SELECT … WHERE NOT EXISTS (ligne de la même fenêtre venue d'un autre fichier brut) ON CONFLICT (window_end, repository_id) DO NOTHING RETURNING id` | `already_seen`, une ligne par fenêtre |
    | catalogue d'état | CISA KEV | remplacé si son fichier est collecté après le dernier catalogue de la source déjà importé et que son contenu diffère ; `revised_at` prend la date de cette collecte | `ON CONFLICT (cve_id) DO UPDATE … WHERE` (collecte plus récente et contenu différent) `RETURNING id` | `unchanged`, `no_newer_version` |
    | flux avec révisions | arXiv | remplacé si sa révision (`updated`) est plus récente | `ON CONFLICT (arxiv_id) DO UPDATE … WHERE excluded.revised_at > publication.revised_at RETURNING id` | `revision_not_newer` |
+   | flux de nouveautés, **par URL** (#14) | clips du Web Clipper | inchangé : la première version vue d'une URL est gardée | `INSERT INTO item … SELECT … WHERE NOT EXISTS (clip de même URL) RETURNING id` | `already_seen` |
    | catalogue d'état, **à deux niveaux** (#138) | Zotero : l'entrée et chacun de ses surlignages | comme CISA KEV : remplacé si son extrait est collecté après le dernier extrait importé et que son contenu diffère ; `revised_at` prend la date de cette collecte | `ON CONFLICT (zotero_key) DO UPDATE … WHERE` (extrait plus récent, et retiré ou contenu différent) `RETURNING`, pour `zotero_entry` et pour `highlight` | `unchanged`, `no_newer_version` |
 
    - Le flux de nouveautés n'a pas d'`ON CONFLICT` : le sous-type exige un item déjà créé, et
@@ -548,8 +625,40 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
        rejetée dans le dernier extrait, qu'un extrait plus ancien importé en retard apporte
        valide, est écrite retirée alors qu'elle est encore dans Zotero ; une reconstruction de
        la base, une fois le rejet corrigé, la règle.
-   - **Sources sans import** (`clipper`, classement des plus étoilés) :
-     leur nature est décidée par leur issue d'import (#14).
+   - **Clips** (#14, décisions de Sabine du 2026-10-17) : un clip a un `item.id` technique, comme
+     les autres items ; son URL est sa clé naturelle (`clip.url`, unique). Agrégation :
+     - **champs lus** : `title` (texte non vide, au plus 1 000 caractères), `source` (URL `http`
+       ou `https`), `created` (obligatoire), `published` (facultative) et le texte après le
+       frontmatter (au plus 1 000 000 caractères), gardé tel quel, une ligne `---` plus bas
+       comprise (un filet du texte). Les autres propriétés sont ignorées ;
+     - **clé** : l'URL sans ses paramètres `utm_*` (`remove_tracking_parameters`), les autres
+       paramètres gardés tels quels et dans leur ordre ; pas d'empreinte de contenu (journal ADR,
+       « Collecte : clips ») ;
+     - **homogénéisation** : `created` et `published` sont des jours `AAAA-MM-JJ`, l'année sur
+       4 chiffres à partir de 1000, écrits à minuit UTC, comme `dateAdded` de CISA KEV. Le jour
+       est celui que Web Clipper a écrit, dans le fuseau de l'utilisatrice. Une valeur vide,
+       `null` ou `~` de `published` se lit absente. Une autre forme (heure, fuseau, nombre, forme
+       compacte, semaine ISO) est rejetée, pas devinée ;
+     - **rejets** : une marque d'ordre des octets en tête du clip est ignorée, comme par
+       Obsidian. Un clip qui n'est pas de l'UTF-8, sans frontmatter, dont le frontmatter n'est
+       pas du YAML ou pas un dictionnaire est une **page illisible** (règle 1 de
+       `.claude/rules/conventions.md`) : elle n'entre pas au registre et elle est rejetée à
+       chaque import. **Limite** (décision du 2026-10-17, tranchée par time-knight sur
+       délégation de Sabine) : le brut ne changeant pas, ce rejet revient à chaque import
+       jusqu'à la correction du lecteur ou le retrait du fichier brut. Le motif dit la ligne et
+       la colonne d'une erreur YAML, jamais le texte. Un clip lisible dont une propriété est
+       refusée est rejeté seul, une fois : le motif nomme le champ et son erreur, jamais la
+       valeur ;
+     - **nature** : flux de nouveautés par URL ; les clips ne sont pas modifiés une fois gardés
+       (décision de Sabine du 2026-10-17). Un clip copié de nouveau, ou une autre copie de la même
+       URL, est écarté `already_seen` ; `compared_with_collected_at` est la collecte de la
+       version gardée. **Limites** : un clip modifié quand même n'est pas repris ; deux fichiers
+       de même URL dans une même collecte : le premier dans l'ordre des noms de pages l'emporte, un
+       ordre fait par le hachage, donc arbitraire pour l'utilisatrice ;
+       un même article gardé sous deux URL donne deux clips ; un clip supprimé du coffre reste en
+       base.
+   - **Source sans import** (classement des plus étoilés) : il n'entre pas dans la base (journal
+     ADR, 2026-10-07).
    - Une même CVE dans deux sources (une entrée CISA et une alerte GitHub), ou citée par deux
      alertes, n'est **pas** un doublon : chaque alerte est gardée, et toutes pointent vers la
      même vulnérabilité (`vulnerability.cve_id` unique).

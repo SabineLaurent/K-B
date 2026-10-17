@@ -19,7 +19,7 @@ def test_a_base_in_a_folder_named_with_characters_a_uri_escapes_is_read(items_da
 
     connection = connect_database_read_only(items_database)
     try:
-        assert connection.execute("SELECT count(*) FROM item").fetchone() == (17,)
+        assert connection.execute("SELECT count(*) FROM item").fetchone() == (18,)
     finally:
         connection.close()
 

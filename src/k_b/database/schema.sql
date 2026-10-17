@@ -4,7 +4,9 @@
 -- docs/ADR/journal-decisions-projet.md.
 -- Reference data (the sources) is in seed_sources.sql, run right after this script.
 -- Every connection must run PRAGMA foreign_keys = ON: SQLite ignores foreign keys otherwise.
--- Dates are UTC text, 'YYYY-MM-DDTHH:MM:SSZ'; the CHECK refuses any other form.
+-- Dates are UTC text, 'YYYY-MM-DDTHH:MM:SSZ'; the CHECK refuses any other form, except in clip,
+-- written in portable SQL (.claude/rules/poc.md, rule 1): its CHECK holds the length and the
+-- place of T and Z only.
 -- A text a source writes has a maximum length, in characters, held twice: by the items and
 -- the trend row (src/k_b/items.py) when the raw is read, and by a CHECK here; a test keeps both
 -- equal. A JSON
@@ -41,7 +43,7 @@ CREATE TABLE item (
     id          INTEGER PRIMARY KEY,
     kind        TEXT NOT NULL
         CHECK (kind IN ('paper', 'vulnerability', 'newsletter_article', 'release', 'advisory',
-            'zotero_entry')),
+            'zotero_entry', 'clip')),
     raw_data_id INTEGER NOT NULL REFERENCES raw_data (id),
     -- The target of the (item_id, kind) foreign key of each subtype: an item has one subtype.
     UNIQUE (id, kind)
@@ -282,3 +284,32 @@ CREATE TABLE zotero_entry (
 ) STRICT;
 
 CREATE INDEX zotero_entry_publication_id ON zotero_entry (publication_id);
+
+-- A subtype of item: a page the user kept with Web Clipper in the Obsidian vault (#14). News
+-- feed: the first version seen of a URL is kept; the clips are not changed once kept (decision
+-- of Sabine of 2026-10-17). Written in portable SQL (.claude/rules/poc.md, rule 1). kind NOT
+-- NULL: a NULL kind would pass its CHECK and skip the foreign key.
+CREATE TABLE clip (
+    id           INTEGER PRIMARY KEY,
+    item_id      INTEGER NOT NULL UNIQUE,
+    kind         TEXT NOT NULL CHECK (kind = 'clip'),
+    -- source of the clip, without its utm_* parameters: its natural key. http or https, as Web
+    -- Clipper keeps it.
+    url          TEXT NOT NULL UNIQUE
+        CHECK (substr(url, 1, 8) = 'https://' OR substr(url, 1, 7) = 'http://')
+        CHECK (length(url) <= 2000),
+    title        TEXT NOT NULL
+        CHECK (length(title) > 0)
+        CHECK (length(title) <= 1000),
+    -- The text kept, the Markdown after the frontmatter, as written.
+    body         TEXT NOT NULL CHECK (length(body) <= 1000000),
+    -- created and published of Web Clipper: days, written at midnight UTC. The form is held in
+    -- part: its length, its T and its Z (a year on 3 digits is refused).
+    saved_at     TEXT NOT NULL
+        CHECK (length(saved_at) = 20 AND substr(saved_at, 11, 1) = 'T'
+            AND substr(saved_at, 20, 1) = 'Z'),
+    published_at TEXT
+        CHECK (length(published_at) = 20 AND substr(published_at, 11, 1) = 'T'
+            AND substr(published_at, 20, 1) = 'Z'),
+    FOREIGN KEY (item_id, kind) REFERENCES item (id, kind)
+) STRICT;

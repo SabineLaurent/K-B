@@ -52,14 +52,19 @@ dans la base. Une migration vers PostgreSQL reste possible si le besoin change (
   et `-wal` s'ils manquent, dans le dossier de la base, et les laisse à sa fermeture
   (documentation SQLite, WAL, § 5 ; constat sur SQLite 3.50.4).
 - **Dates** : du texte `AAAA-MM-JJTHH:MM:SSZ`, en UTC. Un `CHECK` refuse toute autre forme, et
-  un jour qui n'existe pas. Une source qui ne donne qu'un jour (`dateAdded` de CISA KEV) est
-  stockée à minuit UTC : convention d'écriture, pas de donnée ajoutée.
+  un jour qui n'existe pas. Exception, `clip` (#14), écrite en SQL portable (règle 1 de
+  `.claude/rules/poc.md`, sans `strftime`) : son `CHECK` ne tient que la longueur et la place du
+  `T` et du `Z` ; la forme complète est tenue par l'item. Une source qui ne donne qu'un jour
+  (`dateAdded` de CISA KEV, `created` et `published` de Web Clipper) est stockée à minuit UTC :
+  convention d'écriture, pas de donnée ajoutée.
 - **Types** : tables `STRICT`, une valeur du mauvais type est refusée.
 - **Identifiants** : chaque table du modèle clarifié a un `id` technique pour clé primaire ;
   l'identifiant naturel de chaque chose est tenu par une contrainte `UNIQUE` : `arxiv_id`,
   `cve_id`, `release_id`, `ghsa_id`, `raw_file_path`, `source_code`, le nom d'un dépôt suivi
-  (sans tenir compte de la casse), `zotero_key`, la fenêtre et le dépôt d'une tendance
-  (`window_end`, `repository_id`). Un item n'a plus d'URL commune ni d'URL unique.
+  (sans tenir compte de la casse), `zotero_key`, l'URL d'un clip (`clip.url`, sans ses `utm_*`),
+  la fenêtre et le dépôt d'une tendance (`window_end`, `repository_id`). Un item n'a plus d'URL
+  commune ; seule l'URL d'un clip est unique, parce qu'elle est sa clé (journal ADR, « Collecte :
+  clips »).
 - **Une absence reste une absence** : une date ou un nom manquant n'est pas remplacé.
 - **Listes** : les auteurs d'un papier et les paquets d'une alerte ou d'un dépôt suivi sont une
   liste JSON dans une colonne texte, non vide, dans l'ordre reçu.
@@ -80,7 +85,8 @@ elles ne sont pas recopiées ici. Un test (`tests/test_schema.py`) vérifie que 
 `items.py` est égal au `CHECK` de sa colonne, dans les deux sens.
 
 - **Colonnes bornées** : celles qu'une source remplit, dans `publication`, `vulnerability`,
-  `release`, `advisory`, `newsletter_article` et `zotero_entry` ; `trend.repository_name`, dont
+  `release`, `advisory`, `newsletter_article`, `zotero_entry` et `clip` (le texte d'un clip, au
+  plus `CLIP_MAX_BYTES` caractères, la taille maximale d'un clip copié) ; `trend.repository_name`, dont
   le maximum est tenu par `TrendRow` (`TREND_REPOSITORY_NAME_MAX_LENGTH`, même fichier), une
   ligne de classement n'étant pas un item : un nom plus long fait refuser le classement entier ;
   `highlight.text` et `highlight.comment`, tenus par `Highlight`
@@ -103,7 +109,8 @@ elles ne sont pas recopiées ici. Un test (`tests/test_schema.py`) vérifie que 
 
 ### Ce que chaque source met dans l'item, puis dans la base
 
-Les lecteurs écrits à ce jour : arXiv, CISA KEV, releases et alertes GitHub, tldr.tech, Zotero. Chaque entrée du
+Les lecteurs écrits à ce jour : arXiv, CISA KEV, releases et alertes GitHub, tldr.tech, Zotero,
+Web Clipper. Chaque entrée du
 brut devient un item (`src/k_b/items.py`), que l'import (`src/k_b/etl/load.py`) fait écrire
 dans la table de sa sorte (`kind`) par l'écrivain de cette sorte
 (`src/k_b/database/writers/`). Exception : GH Archive, dont chaque ligne de classement (`TrendRow`,
@@ -140,6 +147,10 @@ dans la table de sa sorte (`kind`) par l'écrivain de cette sorte
 | | `saved_at` | `date_added` (date de Zotero, UTC) | `zotero_entry.saved_at` |
 | | `arxiv_id` | `archive_id` `arXiv:<id>`, sans préfixe ni version, forme d'après 2007 (`2609.31282`) ou d'avant (`hep-th/9901001`) | `zotero_entry.publication_id` (`publication.arxiv_id`) |
 | | `highlights` (`Highlight`) | `key`, `text`, `comment`, `date_added` de chaque surlignage | `highlight.zotero_key`, `highlight.text`, `highlight.comment`, `highlight.highlighted_at` |
+| Web Clipper (`clip`) | `source_item_id`, `url` | `source`, `http` ou `https`, sans ses `utm_*` | `clip.url` |
+| | `title` | `title` | `clip.title` |
+| | `saved_at`, `published_at` | `created`, `published` (jours `AAAA-MM-JJ`), à minuit UTC ; `published` peut manquer | `clip.saved_at`, `clip.published_at` |
+| | `summary` | le texte après le frontmatter, tel quel | `clip.body` |
 | GH Archive (pas un item : `TrendRow`) | `window_end` | dernier jour de la fenêtre de 3 jours, à minuit UTC | `trend.window_end` |
 | | `repository_id`, `repository_name` | `repo.id`, dernier `repo.name` vu dans la fenêtre | `trend.repository_id`, `trend.repository_name` |
 | | `stars_gained`, `forks_gained` | nombre de `WatchEvent` et de `ForkEvent` de la fenêtre | `trend.stars_gained`, `trend.forks_gained` |
@@ -178,12 +189,17 @@ dans la table de sa sorte (`kind`) par l'écrivain de cette sorte
     pour être lu (`RecursionError`, pour toutes les sources, #103), est rejeté entier. Le motif du rejet nomme le champ, l'erreur et la
     mesure, jamais la valeur : un titre ou un surlignage est une donnée personnelle.
   - L'URL est gardée en `http` si Zotero la donne ainsi (les 5 documents de l'extrait du
-    2026-10-13) ; les autres sortes exigent `https`.
+    2026-10-13) ; les autres sortes exigent `https`, sauf `clip` (Web Clipper garde l'URL de la
+    page, `http` ou `https`).
   - Un texte de surlignage n'est pas contrôlé pour le caractère NUL, comme les autres textes
     (« Limite de SQLite » ci-dessus).
-- Pas encore lus : les clips du Web Clipper. Le
-  classement des dépôts les plus étoilés n'entre pas dans la base (journal
-  ADR, 2026-10-07).
+- **Web Clipper** (#14, journal ADR, 2026-10-17) : un clip a un `item.id` technique, comme les
+  autres items ; son URL sans `utm_*` est sa clé naturelle. Ne vont pas en base : `author`,
+  `description`, `tags` ; ils restent dans la copie brute. Le texte gardé (`clip.body`) peut
+  contenir la signature de l'article et les notes de l'utilisatrice
+  ([registre des traitements](registre-traitements.md)). Un clip déjà en base n'est jamais
+  remplacé : la première version vue d'une URL est gardée.
+- Le classement des dépôts les plus étoilés n'entre pas dans la base (journal ADR, 2026-10-07).
 
 ## MCD et MLD
 
@@ -217,6 +233,7 @@ source ne touche pas aux tables.
 | `advisory` | sous-type d'item : une alerte de sécurité GitHub | `id`, `item_id`, `kind`, `ghsa_id`, `vulnerability_id`, `summary`, `published_at`, `url`, `packages` |
 | `newsletter_article` | sous-type d'item : un article résumé par une édition TLDR ; clé (édition, date, rang) | `id`, `item_id`, `kind`, `edition`, `edition_date`, `rank`, `title`, `summary`, `url`, `publication_id` |
 | `zotero_entry` | sous-type d'item : un document de la bibliothèque Zotero ; catalogue d'état ; clé `zotero_key` | `id`, `item_id`, `kind`, `zotero_key`, `item_type`, `title`, `url`, `saved_at`, `publication_id`, `revised_at`, `withdrawn_at` |
+| `clip` | sous-type d'item : une page gardée avec Web Clipper ; flux de nouveautés ; clé `url` | `id`, `item_id`, `kind`, `url`, `title`, `body`, `saved_at`, `published_at` |
 | `highlight` | un surlignage d'un PDF d'une entrée Zotero ; catalogue d'état ; clé `zotero_key` | `highlight_id`, `zotero_key`, `text`, `comment`, `highlighted_at`, `revised_at`, `withdrawn_at`, `item_id` |
 | `trend` | TENDANCE : les dépôts qui montent d'un classement GH Archive, une ligne par fenêtre de 3 jours et par dépôt ; pas un item ; clé (`window_end`, `repository_id`) | `id`, `raw_data_id`, `window_end`, `repository_id`, `repository_name`, `stars_gained`, `forks_gained` |
 
@@ -237,11 +254,11 @@ source ne touche pas aux tables.
   contraintes `UNIQUE` créent
   leur propre index.
 - **Suppressions en cascade** : seulement de `item` vers `highlight`. Il n'y en a pas vers `publication`, `vulnerability`, `release`,
-  `advisory`, `newsletter_article` ni `zotero_entry` : supprimer un item qu'une de ces tables référence est refusé par la clé
+  `advisory`, `newsletter_article`, `zotero_entry` ni `clip` : supprimer un item qu'une de ces tables référence est refusé par la clé
   étrangère. La purge n'est pas codée.
 - **Formats contrôlés** par un `CHECK` : les dates (ci-dessus) ; `cve_id` (`CVE-AAAA-NNNN…`) ;
   `repository_name` (`owner/repo`) ; `ghsa_id` (`GHSA-…`) ; `url` (`https://…`, ou `http://…`
-  pour `zotero_entry`) ; `zotero_key` (8 caractères `0-9A-Z`) ; `edition` (lettres minuscules sans accent) ; les listes
+  pour `zotero_entry` et `clip`) ; `zotero_key` (8 caractères `0-9A-Z`) ; `edition` (lettres minuscules sans accent) ; les listes
   fermées (`source_type`, `acquisition_mode`, `kind`, `ransomware_use`, `ecosystem`) ; les listes
   JSON non vides ; `tag_name` non vide ; dans `trend`, `window_end` à minuit UTC, `repository_id` > 0,
   `stars_gained` et `forks_gained` ≥ 0 ; les longueurs maximales.
@@ -263,6 +280,8 @@ l'équivalent PostgreSQL :
 | `COLLATE NOCASE` sur le nom d'un dépôt suivi | unicité sans tenir compte de la casse | un index unique sur `lower(colonne)` |
 | `PRAGMA foreign_keys = ON` à chaque connexion | clés étrangères ignorées sinon | inutile : toujours vérifiées |
 | `PRAGMA journal_mode = WAL` | lire pendant l'écriture | inutile : MVCC |
+| `UNIQUE` sur `clip.url` (2 000 caractères au plus) | la clé d'un clip | une entrée d'index B-tree ne peut dépasser environ un tiers de page, 2 704 octets ([B-Tree Indexes](https://www.postgresql.org/docs/current/btree.html), PostgreSQL 18, lu le 2026-10-17), et 2 000 caractères UTF-8 peuvent en faire 8 000 : un index unique sur une empreinte de l'URL |
+| `CHECK` de forme des dates de `clip` (`length`, `substr`) | SQL portable, sans `strftime` | `timestamptz`, sans `CHECK` de format, comme les autres dates |
 
 Reste identique : les tables, les clés, `UNIQUE`, `ON DELETE CASCADE`, les index, et
 `ON CONFLICT (…) DO NOTHING` ou `DO UPDATE`. Le MCD et le MLD ne dépendent d'aucun SGBD.

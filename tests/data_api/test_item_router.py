@@ -23,6 +23,7 @@ def test_each_kind_is_listed_with_the_fields_of_the_spec(client, authorization):
         "advisory",
         "newsletter_article",
         "zotero_entry",
+        "clip",
     }
     paper = next(item for item in items if item["id"] == 1)
     assert paper == {
@@ -244,6 +245,18 @@ ZOTERO_ENTRY_14 = {
 }
 
 
+CLIP_18 = {
+    "id": 18,
+    "kind": "clip",
+    "title": "7 Coding Patterns I Stole From Senior Engineers",
+    "source_date": "2026-09-17T00:00:00Z",
+    "url": "https://medium.com/skillstuff/7-coding-patterns-i-stole-from-senior-engineers-c95f757e52a6",
+    "withdrawn_at": None,
+    "published_at": "2026-06-08T00:00:00Z",
+    "body": "Most junior developers think senior engineers know more tricks.",
+}
+
+
 @pytest.mark.parametrize(
     "detail",
     [
@@ -253,6 +266,7 @@ ZOTERO_ENTRY_14 = {
         ADVISORY_9,
         NEWSLETTER_ARTICLE_11,
         ZOTERO_ENTRY_14,
+        CLIP_18,
     ],
     ids=lambda detail: detail["kind"],
 )

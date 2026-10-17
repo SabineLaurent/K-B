@@ -41,6 +41,7 @@ EXPECTED_TABLES = {
     "advisory",
     "newsletter_article",
     "zotero_entry",
+    "clip",
 }
 
 PAPER_COLUMNS = (
@@ -472,6 +473,9 @@ COLUMN_BY_KIND_AND_FIELD = {
     ("zotero_entry", "title"): ("zotero_entry", "title"),
     ("zotero_entry", "url"): ("zotero_entry", "url"),
     ("zotero_entry", "arxiv_id"): ("publication", "arxiv_id"),
+    ("clip", "title"): ("clip", "title"),
+    ("clip", "url"): ("clip", "url"),
+    ("clip", "summary"): ("clip", "body"),
 }
 
 
@@ -531,6 +535,7 @@ RELEASE_ITEM_ID = 2
 ADVISORY_ITEM_ID = 3
 NEWSLETTER_ARTICLE_ITEM_ID = 5
 ZOTERO_ENTRY_ITEM_ID = 7
+CLIP_ITEM_ID = 8
 
 # A row every constraint of its table accepts, in a base that holds the rows of filled_database.
 # The values are those of tests/fixtures (the collection), the long texts cut short; a new source
@@ -634,6 +639,19 @@ VALID_ROW_BY_TABLE = {
         "revised_at": DATE,
         "withdrawn_at": DATE,
     },
+    # The article of tests/fixtures/clipping.
+    "clip": {
+        "item_id": CLIP_ITEM_ID,
+        "kind": "clip",
+        "url": (
+            "https://medium.com/skillstuff/"
+            "7-coding-patterns-i-stole-from-senior-engineers-c95f757e52a6"
+        ),
+        "title": "7 Coding Patterns I Stole From Senior Engineers",
+        "body": "Most junior developers think senior engineers know more tricks.",
+        "saved_at": "2026-09-17T00:00:00Z",
+        "published_at": "2026-06-08T00:00:00Z",
+    },
 }
 
 
@@ -735,6 +753,15 @@ REFUSED_VALUES = [
     ("zotero_entry", "saved_at IS strftime", {"saved_at": INVALID_DATE}),
     ("zotero_entry", "revised_at IS strftime", {"revised_at": INVALID_DATE}),
     ("zotero_entry", "withdrawn_at IS strftime", {"withdrawn_at": INVALID_DATE}),
+    ("clip", "kind = 'clip'", {"kind": "paper"}),
+    ("clip", "substr(url, 1, 8)", {"url": "ftp://medium.com/skillstuff"}),
+    ("clip", "length(url) <= 2000", {"url": "https://" + "x" * 1_993}),
+    ("clip", "length(title) > 0", {"title": ""}),
+    ("clip", "length(title) <= 1000", {"title": "x" * 1_001}),
+    ("clip", "length(body) <= 1000000", {"body": "x" * 1_000_001}),
+    # A year on 3 digits, as strftime writes it under Linux (database/dates.py).
+    ("clip", "length(saved_at) = 20", {"saved_at": "999-09-17T00:00:00Z"}),
+    ("clip", "length(published_at) = 20", {"published_at": "2026-06-08 00:00:00Z"}),
 ]
 
 
@@ -754,6 +781,7 @@ def filled_database(database):
         (ADVISORY_ITEM_ID, "advisory"),
         (NEWSLETTER_ARTICLE_ITEM_ID, "newsletter_article"),
         (ZOTERO_ENTRY_ITEM_ID, "zotero_entry"),
+        (CLIP_ITEM_ID, "clip"),
     ):
         insert_row(database, "item", id=item_id, kind=kind)
     insert_row(
@@ -841,6 +869,23 @@ def test_a_newsletter_article_pointing_to_an_item_of_another_kind_is_refused(
 ):
     with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
         insert_row(filled_database, "newsletter_article", item_id=PAPER_ITEM_ID)
+
+
+def test_a_clip_kept_from_an_http_page_is_accepted(filled_database):
+    insert_row(filled_database, "clip", url="http://example.com/a-page-kept")
+
+
+def test_a_url_is_one_clip(filled_database):
+    insert_row(filled_database, "clip")
+    insert_row(filled_database, "item", id=9, kind="clip")
+
+    with pytest.raises(sqlite3.IntegrityError, match="UNIQUE"):
+        insert_row(filled_database, "clip", item_id=9)
+
+
+def test_a_clip_pointing_to_an_item_of_another_kind_is_refused(filled_database):
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        insert_row(filled_database, "clip", item_id=PAPER_ITEM_ID)
 
 
 def test_a_newsletter_article_without_kind_is_refused(filled_database):

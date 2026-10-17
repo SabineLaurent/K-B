@@ -44,6 +44,8 @@ from k_b.etl.load import (
 from k_b.etl.raw_store import InvalidCollectionStateError, write_file_atomically
 from k_b.etl.source_contract import list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.etl.sources.clipping import FOLDER_PREFIX as CLIPPING_SOURCE_NAME
+from k_b.etl.sources.clipping import ClippingSource
 from k_b.etl.sources.gh_archive import FOLDER_PREFIX as GH_ARCHIVE_SOURCE_NAME
 from k_b.etl.sources.gh_archive import (
     GhArchiveSource,
@@ -60,6 +62,9 @@ logger = logging.getLogger(__name__)
 DATA_DIR_VARIABLE = "KB_DATA_DIR"
 # The Zotero data directory, the one that holds zotero.sqlite. Not set: Zotero is skipped.
 ZOTERO_DIR_VARIABLE = "KB_ZOTERO_DIR"
+# The Obsidian vault of K-B, the one that holds Clippings/. Not set: the clips are skipped. No
+# default (.claude/rules/poc.md, rule 2), as KB_ZOTERO_DIR: a folder of the user's machine.
+VAULT_DIR_VARIABLE = "KB_VAULT_DIR"
 # The path of the BigQuery service account key, read by the client. Not set: GH Archive is skipped.
 BIGQUERY_KEY_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS"
 # One log per import, named by its second as a raw file by its collection: never rewritten.
@@ -306,6 +311,9 @@ def run_collect(data_dir: Path) -> int:
     zotero_dir = os.environ.get(ZOTERO_DIR_VARIABLE)
     if zotero_dir:
         sources.append(ZoteroSource(Path(zotero_dir)))
+    vault_dir = os.environ.get(VAULT_DIR_VARIABLE)
+    if vault_dir:
+        sources.append(ClippingSource(Path(vault_dir)))
     bigquery_key = os.environ.get(BIGQUERY_KEY_VARIABLE)
     if bigquery_key:
         sources.append(GhArchiveSource(create_bigquery_client))
@@ -323,6 +331,8 @@ def run_collect(data_dir: Path) -> int:
         print(f"{source_name}: {describe_outcome(source_error)}")
     if not zotero_dir:
         print(f"{ZOTERO_SOURCE_NAME}: skipped ({ZOTERO_DIR_VARIABLE} not set)")
+    if not vault_dir:
+        print(f"{CLIPPING_SOURCE_NAME}: skipped ({VAULT_DIR_VARIABLE} not set)")
     if not bigquery_key:
         print(f"{GH_ARCHIVE_SOURCE_NAME}: skipped ({BIGQUERY_KEY_VARIABLE} not set)")
     if outcome.state_error is not None:

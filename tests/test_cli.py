@@ -16,12 +16,19 @@ from k_b import cli
 from k_b.database.writers.shared_rows import UnknownSourceError
 from k_b.etl.load import KindWithoutTableError
 from k_b.etl.source_contract import SourceKind
+from k_b.etl.sources import clipping
 
 
 @pytest.fixture(autouse=True)
 def no_zotero_directory(monkeypatch):
     """A terminal that exports KB_ZOTERO_DIR must not make the tests read a real library."""
     monkeypatch.delenv("KB_ZOTERO_DIR", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def no_vault_directory(monkeypatch):
+    """A terminal that exports KB_VAULT_DIR must not make the tests read a real vault."""
+    monkeypatch.delenv("KB_VAULT_DIR", raising=False)
 
 
 @pytest.fixture(autouse=True)
@@ -99,6 +106,7 @@ def test_collect_still_prints_the_summary_and_exits_1_when_the_state_cannot_be_w
     assert (
         capsys.readouterr().out
         == "working: ok\nzotero: skipped (KB_ZOTERO_DIR not set)\n"
+        "clipping: skipped (KB_VAULT_DIR not set)\n"
         "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
         "collection_state: failed (PermissionError)\n"
     )
@@ -121,6 +129,7 @@ def test_collect_skips_zotero_and_says_so_without_its_directory(
     assert (
         capsys.readouterr().out
         == "working: ok\nzotero: skipped (KB_ZOTERO_DIR not set)\n"
+        "clipping: skipped (KB_VAULT_DIR not set)\n"
         "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
     )
     assert not (data_dir / "raw" / "selected_library").exists()
@@ -139,7 +148,8 @@ def test_collect_extracts_zotero_into_the_selected_library_with_its_directory(
 
     assert exit_code == 0
     assert capsys.readouterr().out == (
-        "zotero: ok\ngh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
+        "zotero: ok\nclipping: skipped (KB_VAULT_DIR not set)\n"
+        "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
     )
     [extract_path] = (data_dir / "raw" / "selected_library" / "zotero").iterdir()
     assert extract_path.suffix == ".json"
@@ -165,10 +175,54 @@ def test_collect_reports_a_zotero_failure_and_keeps_its_last_collection_date(
 
     assert exit_code == 1
     assert capsys.readouterr().out == (
-        "zotero: failed (FileNotFoundError)\ngh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
+        "zotero: failed (FileNotFoundError)\nclipping: skipped (KB_VAULT_DIR not set)\n"
+        "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
     )
     assert json.loads((data_dir / "collection_state.json").read_text()) == {}
     assert not (data_dir / "raw").exists()
+
+
+@pytest.mark.parametrize("vault_dir_variable", [None, ""])
+def test_collect_skips_the_clips_and_says_so_without_the_vault(
+    monkeypatch, tmp_path, capsys, vault_dir_variable
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    if vault_dir_variable is not None:
+        monkeypatch.setenv("KB_VAULT_DIR", vault_dir_variable)
+    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
+
+    exit_code = cli.main(["collect"])
+
+    assert exit_code == 0
+    assert "clipping: skipped (KB_VAULT_DIR not set)\n" in capsys.readouterr().out
+    assert not (tmp_path / "raw" / "selected_library").exists()
+
+
+def test_collect_copies_the_clips_into_the_selected_library_with_the_vault(
+    monkeypatch, tmp_path, capsys
+):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    clippings_dir = tmp_path / "vault" / "Clippings"
+    clippings_dir.mkdir(parents=True)
+    clip = (FIXTURES_DIR / "clipping" / "article_with_author.md").read_bytes()
+    (clippings_dir / "A clip.md").write_bytes(clip)
+    monkeypatch.setenv("KB_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("KB_VAULT_DIR", str(tmp_path / "vault"))
+    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
+    # A collection later than the margin after the clip written above (CLIP_CHANGE_MARGIN).
+    monkeypatch.setattr(
+        clipping, "current_time", lambda: datetime.now(UTC) + timedelta(minutes=5)
+    )
+
+    exit_code = cli.main(["collect"])
+
+    assert exit_code == 0
+    assert "clipping: ok\n" in capsys.readouterr().out
+    [collection_dir] = (data_dir / "raw" / "selected_library" / "clipping").iterdir()
+    assert [page.read_bytes() for page in collection_dir.iterdir()] == [clip]
+    assert (clippings_dir / "A clip.md").read_bytes() == clip
+    assert "clipping" in json.loads((data_dir / "collection_state.json").read_text())
 
 
 @pytest.mark.parametrize("bigquery_key_variable", [None, ""])
