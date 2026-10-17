@@ -250,4 +250,7 @@ dépend pas du délai de lecture.
 - **#223** : un réglage du cache si le juge définitif est un modèle qui refuse `prompt_cache_options`.
 - **Fichier de Sabine** : `.env.example:48` cite encore `gpt-5.6-luna` comme modèle à
   raisonnement ; non touché.
-- Les replis de #227 (Mistral, puis Gemini) prennent fin à la fusion de cette PR.
+- Les replis de #227 (Mistral, puis Gemini) prennent fin à la fusion de cette PR. À la demande
+  de Sabine (17/10), le registre trace désormais les champs d'items envoyés à Google le 16/10
+  (section « Repli temporaire chez Google », avec les conditions du palier gratuit lues à la
+  source) ; la section Mistral est retirée, ses sondes ne portaient aucune donnée de K-B.
