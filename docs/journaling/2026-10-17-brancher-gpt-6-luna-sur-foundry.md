@@ -71,8 +71,10 @@ PROMPT_CACHE_OFF: Mapping[str, str] = {"mode": "explicit"}
 
 En mode `explicit`, seuls les points d'arrêt marqués par l'appelant sont mis en cache. K-B n'en
 marque aucun, donc rien n'est écrit. Le champ est envoyé à **chaque** requête, quel que soit le
-réglage d'effort : le test `test_every_request_turns_the_prompt_cache_off`
-(`tests/ai_api/test_llm_client.py:211`) le vérifie pour `reasoning_effort` absent et pour `"none"`.
+réglage d'effort : le test du corps exact
+(`test_the_request_is_a_chat_completion_with_a_strict_json_schema_written_as_a_dict`) le vérifie
+sans effort, et `test_a_reasoning_model_gets_reasoning_effort_none_and_no_temperature`
+(`tests/ai_api/test_llm_client.py:200`) avec `reasoning_effort: "none"`.
 
 ### 3. Le délai de lecture, confronté au débit mesuré
 
@@ -95,7 +97,7 @@ valeur :
 
     assert seconds_at_cap * 1.4 <= LLM_CALL_TIMEOUT_SECONDS
 ```
-(`tests/ai_api/test_llm_client.py:571-576`)
+(`tests/ai_api/test_llm_client.py:563-565`)
 
 Il échouait à 60 s (60,2 × 1,4 ≈ 84 s) et passe à 90 s.
 
@@ -168,7 +170,7 @@ Toutes les requêtes du 17/10 (UTC), sur `gpt-6-luna` :
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
 | `uv run pytest` : 1 528 tests verts ; ruff, format, mypy strict verts | le client et la config changés tiennent tous les contrôles |
-| `test_every_request_turns_the_prompt_cache_off`, `test_the_read_timeout_covers_…` : rouges avant le code, verts après | les deux changements sont écrits tests d'abord |
+| les assertions de `prompt_cache_options` et `test_the_read_timeout_covers_…` : rouges avant le code, verts après | les deux changements sont écrits tests d'abord |
 | `GET /openai/v1/models` (13:23:31Z) : `gpt-6-luna-2026-09-22`, `generally-available`, `deprecation.inference` = 2028-03-11 | date de retrait lue ; c'est la date du modèle de base sur ce point d'accès, pas par SKU de zone de données |
 | ping avec `Authorization: Bearer` : 200 ; `model` rendu `gpt-6-luna-2026-09-22` | en-tête confirmé, sans repli `api-key` ; version figée ; hôte `*.openai.azure.com/openai/v1` sans `api-version` |
 | ping `reasoning_effort: "none"` : `reasoning_tokens` 0 ; `temperature: 0` seul : 400 `unsupported_value` ; les deux : 200 | contradiction de la doc tranchée |
@@ -196,11 +198,13 @@ dépend pas du délai de lecture.
    ton contrat de formation (`docs/registre-traitements.md`, « Fondement de la sous-traitance »).
 2. **Pourquoi couper le cache, puisque Microsoft ne le partage pas entre abonnements ?** Parce
    qu'il garde le texte des items au moins 30 min, pour un gain presque nul : chaque message de
-   K-B est différent. C'est de la minimisation (RGPD, RGESN 1.6). Preuve : `cached_tokens` et
-   `cache_write_tokens` à 0 sur 20 réponses (`llm_client.py:254`).
+   K-B est différent. C'est de la minimisation (RGPD, RGESN 1.6). Preuve : `cache_write_tokens`
+   à 0 sur 20 réponses, vérifié une fois à l'essai (`cached_tokens`, à 0 aussi, compte les
+   lectures du cache, pas les écritures) (`llm_client.py:254`).
 3. **Pourquoi 90 s et pas 60 ?** Au débit mesuré, une sortie de 8 192 jetons prend environ 60 s.
-   À 60 s, elle finirait en `llm_timeout`, puis en une nouvelle tentative qui échouerait de même.
-   Le test le garde avec 40 % de marge (`test_llm_client.py:571`).
+   À 60 s, elle finirait en `llm_timeout`, que le client ne retente pas (`llm_client.py:273-274`) :
+   la fiche serait perdue. Le test le garde avec 40 % de marge (`test_llm_client.py`,
+   `test_the_read_timeout_covers_…`).
 4. **Que se passe-t-il si un item parle d'injection d'instructions ?** Prompt Shields lit le
    message utilisateur, là où sont les items. Il peut rendre un 400 `content_filter` pour tout le
    lot, que le client lit `llm_content_filtered`, sans nouvelle tentative

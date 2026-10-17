@@ -2517,8 +2517,8 @@ Mesure de #158 sur gpt-6-luna (2026-10-17) ; tranché par time-knight (délégat
   la borne d'un appel passe de 150 à 210 s (2 × (5 + 90) + 20).** **Révise** la valeur supposée
   de « Appel du modèle » (2026-10-15). Ce qui a changé : la mesure. Environ 7,35 ms par jeton de
   sortie sur 12 appels réels, soit ~60 s pour une sortie de 8 192 jetons. L'appel n'étant pas en
-  diffusion, une sortie valide proche du plafond finirait en `llm_timeout`, puis en une nouvelle
-  tentative qui échouerait de même : la fiche perdue, et environ 130 s. Option écartée : garder
+  diffusion, une sortie valide proche du plafond finirait en `llm_timeout`, sans nouvelle
+  tentative (`send_and_check`) : la fiche serait perdue. Option écartée : garder
   60 s et plafonner la rédaction vers 6 000 jetons, car la marge reposerait sur une estimation non
   mesurée de la plus longue sortie permise par les bornes. Le choix de #205 entre parallèle et
   tâche de fond n'en dépend pas : la chaîne mesurée fait ~98 s en série pour 8 sujets, sous les

@@ -177,9 +177,13 @@ sous la limite.
 #158 sur gpt-6-luna (2026-10-17) : `temperature: 0` seul est refusé (400 `unsupported_value`,
 `param` `temperature`) ; avec `reasoning_effort: "none"`, il est accepté, sans preuve qu'il change
 la sortie ; `reasoning_tokens` vaut 0. Le client envoie donc `reasoning_effort: "none"` seul ;
-option écartée : envoyer les deux (effet non prouvé). Chaque requête coupe aussi le cache de
-prompt (`prompt_cache_options: {"mode": "explicit"}` sans point d'arrêt ; journal ADR, « Appel du
-modèle : cache de prompt coupé »). Sur Azure AI Foundry, l'URL de base est
+option écartée : envoyer les deux (effet non prouvé). Pour gpt-6-luna,
+`KB_LLM_REASONING_EFFORT=none` est donc **obligatoire** : sans lui, chaque appel rend un 400, lu
+`llm_unavailable`, alors que l'API IA démarre. Chaque requête coupe aussi le cache de prompt
+(`prompt_cache_options: {"mode": "explicit"}` sans point d'arrêt ; journal ADR, « Appel du
+modèle : cache de prompt coupé ») : le client exige donc un modèle qui accepte ce champ (selon
+la doc, un modèle d'avant GPT-5.6 le refuse par un 400) ; un réglage viendra avec un modèle qui
+le refuse (phase 3, #223). Sur Azure AI Foundry, l'URL de base est
 `https://<ressource>.openai.azure.com/openai/v1`, sans `api-version`, et la clé part en
 `Authorization: Bearer` (mesure de #158). Le déploiement est figé sur une version du modèle. Le
 fournisseur, son URL et le nom du modèle n'ont pas de valeur par défaut : sans eux, l'API IA ne
