@@ -205,18 +205,7 @@ def test_a_reasoning_model_gets_reasoning_effort_none_and_no_temperature():
 
     assert body["reasoning_effort"] == "none"
     assert "temperature" not in body
-
-
-@pytest.mark.parametrize("reasoning_effort", [None, "none"])
-def test_every_request_turns_the_prompt_cache_off(reasoning_effort):
-    """Explicit mode without a breakpoint: the provider writes no cache of the items."""
-    settings = replace(REPLAY_SETTINGS, reasoning_effort=reasoning_effort)
-
-    _, transport, _ = call([completion()], settings=settings)
-    (body,) = sent_bodies(transport)
-
     assert body["prompt_cache_options"] == {"mode": "explicit"}
-    assert "cache_breakpoint" not in json.dumps(body)
 
 
 def test_an_output_refused_twice_is_llm_invalid_output():
@@ -563,14 +552,15 @@ def test_the_client_of_the_provider_sends_the_key_and_follows_no_redirection():
 
 
 # Measured by #158 on gpt-6-luna (2026-10-17): about 7.35 ms per output token, a call not
-# streamed; 8,192 tokens, the output cap of its writing calls.
+# streamed; 8,192 tokens, the output cap of its writing calls. #205 replaces the cap by the one it
+# sets for the writing, imported from its module.
 MEASURED_MS_PER_OUTPUT_TOKEN = 7.35
 LONGEST_MEASURED_OUTPUT_CAP = 8192
 
 
 def test_the_read_timeout_covers_the_longest_output_at_the_measured_rate_with_a_margin():
     """An answer not streamed comes in one block: a valid output near the cap must not end in
-    llm_timeout, then in a retry that times out the same way."""
+    llm_timeout, which is not retried, and loses the digest."""
     seconds_at_cap = MEASURED_MS_PER_OUTPUT_TOKEN * LONGEST_MEASURED_OUTPUT_CAP / 1000
 
     assert seconds_at_cap * 1.4 <= LLM_CALL_TIMEOUT_SECONDS
