@@ -217,8 +217,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   2026-10-09). Le nom est fait des 16 premiers caractères hexadécimaux du SHA-256 du nom du
   fichier dans le coffre : le même clip a le même nom d'une collecte à l'autre, et son titre
   n'entre ni dans le chemin du brut ni dans le journal d'import. Aucun clip changé : rien n'est
-  écrit. **Marge** : un clip changé jusqu'à `CLIP_CHANGE_MARGIN` (60 s, `core/config.py`) avant la
-  dernière collecte est copié de nouveau, puis écarté `already_seen` à l'import. Hypothèse, non
+  écrit. **Marge**, dans les deux sens (`CLIP_CHANGE_MARGIN`, 60 s, `core/config.py`) : un clip
+  changé jusqu'à 60 s avant la dernière collecte est copié de nouveau, puis écarté
+  `already_seen` à l'import ; un clip changé moins de 60 s avant la collecte en cours, qui peut
+  être encore en cours d'écriture (Obsidian, Web Clipper, une synchronisation), est laissé à la
+  collecte suivante, qui le prend (la première version d'une URL étant gardée, un clip copié
+  tronqué le resterait). Un clip renommé ou supprimé entre la liste du dossier et sa lecture est
+  sauté, et compté au journal : son nouveau nom est lu à la collecte suivante. Hypothèse, non
   mesurée : l'horloge d'un système de fichiers peut être plus grossière que celle de `kb` (un
   tick sous Linux) ou en retard sur elle (coffre monté depuis l'hôte dans un conteneur, #200) ;
   sans marge, un clip écrit juste après le début d'une collecte serait daté d'avant elle et
@@ -241,7 +246,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   - `OSError` (`ELOOP`) : un fichier remplacé par un lien symbolique entre sa liste et sa lecture.
 
   Un clip illisible parmi des clips valides est copié : l'import le rejette (règle 1 de
-  `.claude/rules/conventions.md`). Le journal ne cite qu'un nombre de clips copiés.
+  `.claude/rules/conventions.md`). Le journal ne cite que des nombres : clips lus, laissés à la
+  collecte suivante, disparus entre la liste et la lecture.
 - **Données personnelles** : le champ `author` de la page gardée, s'il existe (l'auteur public de
   l'article, écrit en liens `[[Nom]]`) : copié dans le brut, jamais lu en base. La description, le
   texte gardé et ses liens `[[…]]` sont du texte libre qui peut nommer des personnes, et le
