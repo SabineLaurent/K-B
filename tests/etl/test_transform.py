@@ -585,13 +585,13 @@ def test_the_extracts_of_the_selected_library_are_read(tmp_path, zotero_dir):
 def test_a_folder_of_the_selected_library_without_a_source_kind_is_skipped(
     tmp_path, caplog
 ):
-    (tmp_path / "selected_library" / "clipping").mkdir(parents=True)
+    (tmp_path / "selected_library" / "notes").mkdir(parents=True)
 
     with caplog.at_level(logging.INFO):
         reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert reading.files == []
-    assert "folder without a source kind, skipped: 'clipping'" in caplog.text
+    assert "folder without a source kind, skipped: 'notes'" in caplog.text
 
 
 def test_a_raw_file_nested_too_deep_is_rejected_and_the_others_are_read(tmp_path):

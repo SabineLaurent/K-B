@@ -16,13 +16,15 @@ written to the log. Run again on the same raw, the import gives the same base.
 
 A ranking of GH Archive is not made of items: its rows go to the trend table, in the same
 transaction, and its rule is a news feed applied to the whole window. A Zotero entry is a state
-catalog, as CISA KEV, and so is each of its highlights (decision of 2026-10-13).
+catalog, as CISA KEV, and so is each of its highlights (decision of 2026-10-13). A clip is a
+news feed, by URL: the clips are not changed once kept (decision of 2026-10-17).
 
 Only exact duplicates are found: the same identifier within its source (a replay, collections
 that overlap). The same content under another identifier is not found, a written limit without
 a content fingerprint: for TLDR, another URL or another edition (decision of 2026-10-12); for
 Zotero, another key, though two entries of the same arXiv paper point to the same publication
-(decision of 2026-10-13; docs/specs-collecte.md).
+(decision of 2026-10-13); for a clip, another URL (ADR, "Collecte : clips";
+docs/specs-collecte.md).
 """
 
 import sqlite3
@@ -38,6 +40,7 @@ from k_b.database.reading import read_raw_file_paths
 from k_b.database.savepoint import EntryRefusedError, write_in_savepoint
 from k_b.database.writers import (
     advisory_writer,
+    clip_writer,
     newsletter_article_writer,
     paper_writer,
     release_writer,
@@ -430,6 +433,7 @@ WRITER_BY_KIND: dict[str, Callable[[sqlite3.Connection, Item, int], Discard | No
     "advisory": advisory_writer.write,
     "newsletter_article": newsletter_article_writer.write,
     "zotero_entry": zotero_entry_writer.write,
+    "clip": clip_writer.write,
 }
 
 
