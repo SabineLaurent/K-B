@@ -2425,6 +2425,113 @@ veille : le LLM juge » (2026-10-16), sans la contredire.
 Sources (consultées le 2026-10-17) : celles de `docs/fiches-veille.md`, « Sources », section
 « Juge ».
 
+### Modèle des fiches : gpt-6-luna sur l'abonnement de l'organisme de formation
+
+Décisions de Sabine du 17/10 (relayées par time-knight, qui a guidé le déploiement dans le
+portail) ; plan de #158 relu par un agent architecte plateforme Azure, validé par Sabine.
+
+- **gpt-6-luna est déployé sur l'abonnement Azure de l'organisme de formation de Sabine, dans une
+  ressource en France Central, en Zone de données standard (zone de données EUR), version
+  2026-09-22 figée (« Refuser les mises à niveau automatiques »), 140 000 jetons par minute,
+  garde-fous `DefaultV2`.** Met en œuvre « Modèle des fiches : gpt-6-luna sur Foundry »
+  (2026-10-16) sur un autre compte que celui prévu : le compte personnel d'essai, à 0 TPM, n'est
+  plus utilisé. Pourquoi l'abonnement de l'organisme : Sabine, « j'ai mon contrat de formation et
+  la ressource est faite pour y déployer le projet de certification ». Options écartées :
+  - un premier déploiement en Global Standard : le traitement peut avoir lieu dans toute région
+    Azure, contraire à la règle « zone UE quand le fournisseur l'offre »
+    (`.claude/rules/conformite.md`) ;
+  - « Mettre à niveau une fois la nouvelle version par défaut disponible », proposée par défaut :
+    elle change le modèle sans prévenir, contraire à la version figée.
+
+- **Fondement de la sous-traitance : le contrat de formation de Sabine (lecture (a)).** Le client
+  de Microsoft est l'organisme (abonnement « Plan Azure », annuaire et compte de connexion de
+  l'organisme, rôle « Lecteur » de Sabine, aucun compte de facturation visible) ; selon le DPA de
+  Microsoft du 22/05/2026, Microsoft est le sous-traitant de son client. Registre des traitements,
+  « Envoi des items au modèle des fiches ». Options écartées par Sabine :
+  - (b) écrire une limite assumée, la chaîne Sabine → organisme → Microsoft n'étant pas
+    contractualisée, comme pour Gemini le 16/10 ;
+  - (c) ne pas envoyer de données réelles sur cet abonnement : la mesure de #158 se fait sur une
+    veille réelle.
+
+  Limites assumées : un administrateur général de l'annuaire de l'organisme peut se donner accès à
+  la ressource et à ses clés ; si l'organisme active les preuves des prompts de Defender for
+  Cloud, des extraits des prompts apparaissent dans ses alertes ; Sabine, « Lecteur », ne reçoit
+  pas le courriel d'avant retrait du modèle, envoyé aux propriétaires de l'abonnement ; la durée de
+  l'accès de l'organisme n'est pas connue. L'organisme n'est nommé dans aucun fichier du dépôt
+  (décision de Sabine du 17/10 : dépôt public le 25/10).
+
+- **Pour les phases 1 (mécanique) et 2 (rodage de l'ETL et des fiches), le rédacteur et le juge
+  sont `gpt-6-luna` : le juge suit le repli du déploiement du 16/10 ; le juge définitif se choisit
+  en phase 3 (fiabilité des LLM et de leurs sorties).** Décisions de Sabine du 17/10 ; applique
+  `docs/fiches-veille.md`, « Juge », « Réglage », « Repli du déploiement », sans la réviser.
+  Pourquoi, selon Sabine : « Le juge était le même modèle que le rédacteur parce que je n'avais pas
+  vraiment d'autres possibilités hier. Aujourd'hui que j'ai plus de liberté sur un choix de modèle,
+  je veux faire les choses de façon structurée. Si c'est prouvé et documenté qu'un juge d'une autre
+  famille est une bonne pratique, on le fera. » Le repli du 16/10 était donc une contrainte
+  d'accès, pas un choix de fond. L'étude des modèles du 17/10 (agent ingénieur IA, lecture seule)
+  recommande `gpt-6-luna` comme rédacteur ; pour le juge de la phase 3, deux candidats d'autres
+  familles : DeepSeek-V4-Flash (disponibilité générale, zone de données UE, retrait le 2028-02-20)
+  et Mistral-Large-3 (préversion, version non figée, français documenté) ; `gpt-5.4-mini` sera
+  comparé comme rédacteur en phase 3. #158 vérifie seulement que les deux candidats tiennent les
+  sorties structurées strictes, sur des données fabriquées. Option écartée : déployer
+  `gpt-5.6-luna` comme juge, que recommandait la session : un modèle de la même famille que le
+  rédacteur. Limite assumée en phases 1 et 2 : le biais d'un juge envers ses propres textes, que
+  la spec voulait éviter, n'est pas écarté.
+
+- **Fin des replis de fournisseur de #227 (Mistral Small 4, puis Gemini 2.5 Flash-Lite) à la
+  fusion de la PR de #158.** « Modèle des fiches : Mistral Small 4 en repli temporaire » et
+  « Gemini 2.5 Flash-Lite en repli temporaire » prévoyaient « Fin du repli : quand #158 est
+  faite ». La section du registre sur Mistral est retirée : ses 4 sondes ne portaient aucune
+  donnée de K-B.
+
+- **Les envois à Google du 16/10 sont tracés au registre (« Repli temporaire chez Google »).**
+  Décision de Sabine du 17/10, relayée par time-knight. **Révise** le point RGPD de « Gemini 2.5
+  Flash-Lite en repli temporaire » (« On laisse de côté le RGPD pour le moment ») : de vrais
+  champs d'items y sont partis, et le registre doit nommer ce destinataire, même passé.
+
+Sources (consultées le 2026-10-17) : celles du registre des traitements, « Sources de l'envoi au
+modèle » ; [Deployment types](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/deployment-types) ;
+[Foundry Models lifecycle and support policy](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirements).
+— PR de #158
+
+### Appel du modèle : cache de prompt coupé
+
+Constat de la relecture du plan de #158 par un agent architecte plateforme Azure, vérifié à la
+source ; tranché par time-knight le 17/10 (délégation de Sabine du 15/10).
+
+- **Chaque requête au modèle envoie `prompt_cache_options: {"mode": "explicit"}` sans point
+  d'arrêt : le service n'écrit aucun cache de prompt.** À partir de GPT-5.6, le cache est actif par
+  défaut et s'écrit sur le dernier message, donc sur le texte des items ; il reste réutilisable
+  « for at least 30 minutes, but the service might retain it longer ». Pourquoi : une correction
+  de minimisation (RGPD, RGESN 1.6), pas un risque accepté ; chaque message de K-B est différent,
+  le cache n'apporterait presque rien ; la mesure de #158 reflète alors la production. Le champ
+  est envoyé à chaque appel, sans réglage : en phases 1 et 2, seul `gpt-6-luna` est appelé (choix
+  de la session, accordé par time-knight). Options écartées : garder le cache et le décrire au
+  registre (une rétention de plus pour un gain presque nul) ; une variable d'environnement pour
+  l'activer (un réglage sans second usage aujourd'hui). Limite assumée : selon la doc, un modèle
+  d'avant GPT-5.6 refuse le champ par un 400 (`gpt-5.4-mini`, candidat rédacteur de la phase 3) ;
+  les candidats juges sont mesurés par #158 ; un réglage viendra avec le second modèle, si besoin
+  (#223, phase 3). Source : [Prompt caching](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/prompt-caching),
+  consultée le 2026-10-17. — PR de #158
+
+### Appel du modèle : délai de lecture à 90 s
+
+Mesure de #158 sur gpt-6-luna (2026-10-17) ; tranché par time-knight (délégation de Sabine du
+15/10), sur la recommandation de la session.
+
+- **Le délai de lecture d'une réponse du modèle passe de 60 à 90 s (`LLM_CALL_TIMEOUT_SECONDS`) ;
+  la borne d'un appel passe de 150 à 210 s (2 × (5 + 90) + 20).** **Révise** la valeur supposée
+  de « Appel du modèle » (2026-10-15). Ce qui a changé : la mesure. Environ 7,35 ms par jeton de
+  sortie sur 12 appels réels, soit ~60 s pour une sortie de 8 192 jetons. L'appel n'étant pas en
+  diffusion, une sortie valide proche du plafond finirait en `llm_timeout`, sans nouvelle
+  tentative (`send_and_check`) : la fiche serait perdue. Option écartée : garder
+  60 s et plafonner la rédaction vers 6 000 jetons, car la marge reposerait sur une estimation non
+  mesurée de la plus longue sortie permise par les bornes. Le choix de #205 entre parallèle et
+  tâche de fond n'en dépend pas : la chaîne mesurée fait ~98 s en série pour 8 sujets, sous les
+  240 s de l'ingress d'Azure Container Apps, et la borne de pire cas les dépasse avec 60 comme avec
+  90 s. Un test garde la raison : au débit mesuré, 8 192 jetons avec 40 % de marge tiennent dans
+  le délai. — PR de #158
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
