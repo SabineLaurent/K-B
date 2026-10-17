@@ -2553,8 +2553,9 @@ du plan, que Sabine a validé. Tranche la question posée le 15/10 et écrite le
 
   Ce que voit le client : un sujet pas encore rédigé à l'échéance va dans `failed_subjects` avec
   `llm_timeout`, et les autres sont rendus ; un classement pas fini donne 504. Aucune requête ne
-  part s'il reste moins de 10 s (`MIN_SECONDS_FOR_LLM_REQUEST`) : les items ne partent pas pour
-  une réponse jetée.
+  part s'il reste moins de 10 s (`MIN_SECONDS_FOR_LLM_REQUEST`), au-dessus de la rédaction la plus
+  lente mesurée (9,3 s) : les items ne partent pas pour une réponse que l'échéance jetterait. Une
+  rédaction plus longue, jusqu'à environ 60 s au plafond de sortie, peut encore être coupée.
   Options écartées :
   - le parallèle : environ 30 s, mais un `replay` à refaire (choisir l'étape d'après le corps
     de la requête) et des 429 possibles selon la doc « Manage quota », pour un gain sans besoin
@@ -2568,13 +2569,16 @@ du plan, que Sabine a validé. Tranche la question posée le 15/10 et écrite le
   vaut pour chaque morceau reçu, et httpx2 2.13.1 n'a pas de délai total (doc d'httpx2,
   « Timeouts », lue par Context7 le 2026-10-17 ; vérifié dans son code). L'échéance ramène les
   délais de chaque requête au temps restant et se contrôle entre deux morceaux de l'API de
-  données ; une réponse envoyée au compte-gouttes peut encore la dépasser, de plus d'un délai de
-  lecture pour le modèle, dont httpx2 lit la réponse entière.
+  données. Chaque phase d'une requête (pool, connexion, écriture, lecture) étant ramenée
+  séparément, une requête lancée avant l'échéance peut la dépasser de la somme de ses délais :
+  30 s au plus pour l'API de données ; pour le modèle, 20 s plus sa lecture, et sans borne pour une
+  réponse envoyée au compte-gouttes, dont httpx2 lit la réponse entière (constat de `/code-review`,
+  tranché par time-knight, délégation de Sabine du 15/10).
   **Revoit le motif** du rejet du « délai total par tentative » dans « Appel du modèle »
   (2026-10-15), « pour une borne que la demande pose déjà » : la demande pose une borne, mais pas
   une borne dure. Le rejet reste ; c'est son motif qui change.
   Option écartée : lire la réponse du modèle en flux pour contrôler l'échéance entre deux morceaux
-  (relecture du plan) : elle resterait dépassable d'un délai de lecture, et le fournisseur répond
+  (relecture du plan) : elle resterait dépassable de la somme des délais, et le fournisseur répond
   d'un bloc. — PR de #205
 - **Le schéma envoyé au modèle est écrit à la main, et les bornes des fiches vont dans la
   consigne, en texte.** Pourquoi (constat de la relecture du plan, confirmé à la source par

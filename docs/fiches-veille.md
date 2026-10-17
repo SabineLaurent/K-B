@@ -134,8 +134,10 @@ ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 6
   Le pire cas, 22 appels de 210 s, dépasse 240 s en série comme en parallèle : seule l'échéance
   borne la demande.
   - **Mécanisme** (`ai_api/deadline.py`) : aucune requête au modèle s'il reste moins de
-    `MIN_SECONDS_FOR_LLM_REQUEST` = 10 s, pour que les items ne partent pas pour une réponse
-    jetée ; les délais d'httpx2 de chaque requête (modèle et API de données) sont ramenés au
+    `MIN_SECONDS_FOR_LLM_REQUEST` = 10 s, au-dessus de la rédaction la plus lente mesurée par #158
+    (9,3 s), pour que les items ne partent pas pour une réponse que l'échéance jetterait ; une
+    rédaction plus longue (jusqu'à environ 60 s au plafond de sortie) lancée avec moins de temps
+    peut encore finir en `llm_timeout` ; les délais d'httpx2 de chaque requête (modèle et API de données) sont ramenés au
     temps restant ; une nouvelle tentative qui ne tient plus n'est pas faite (`llm_timeout`, le
     statut HTTP observé gardé) ; la lecture de l'API de données s'arrête dès que l'échéance passe
     entre deux morceaux (`data_api_timeout`).
@@ -146,11 +148,14 @@ ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 6
     reçu (« the maximum duration to wait for a chunk of data to be received »,
     [Timeouts](https://github.com/pydantic/httpx2/blob/main/docs/advanced/timeouts.md), doc
     d'httpx2, lue par Context7 le 2026-10-17 ; httpx2 2.13.1 n'a pas de délai total, vérifié
-    dans son code) : une réponse envoyée au compte-gouttes peut dépasser l'échéance, d'un délai de
-    lecture au plus pour l'API de données, de plus pour le modèle, dont httpx2 lit la réponse
-    entière. Le fournisseur répond d'un bloc (appel sans diffusion). Option écartée : lire la
-    réponse du modèle en flux pour contrôler l'échéance entre deux morceaux ; elle resterait
-    dépassable d'un délai de lecture.
+    dans son code) : chaque phase d'une requête (pool, connexion, écriture, lecture) est ramenée
+    séparément au temps restant à son départ, si bien qu'une requête lancée avant l'échéance peut
+    la dépasser de la somme de ses délais : 30 s au plus pour l'API de données (5 + 5 + 10 + 10) ;
+    pour le modèle, 20 s plus sa lecture, et sans borne pour une réponse envoyée au compte-gouttes,
+    dont httpx2 lit la réponse entière. Le fournisseur répond d'un bloc (appel sans diffusion), et
+    la marge de 40 s sous les 240 s de l'ingress reste au-dessus de ces dépassements. Option
+    écartée : lire la réponse du modèle en flux pour contrôler l'échéance entre deux morceaux ;
+    elle resterait dépassable de la somme des délais.
 - **Appels au modèle** : au plafond, 6 classements ou plus (des lots de 50 items et de 36 000
   caractères de message au plus, `MAX_ITEMS_PER_CLASSIFICATION_CALL` et
   `MAX_CLASSIFICATION_INPUT_CHARS` ; jusqu'à environ 10 quand les titres sont longs), 8
