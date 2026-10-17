@@ -27,5 +27,6 @@
       "Bash(git push --force*)",
       "Bash(git push -f*)"
     ]
-  }
+  },
+  "autoMemoryEnabled": false
 }
