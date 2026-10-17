@@ -2617,6 +2617,44 @@ Décision de Sabine du 2026-10-17, relayée par time-knight.
   par la seule règle `temp/` ; un `git clean -x` ou `-X`, ou une image construite sans
   `.dockerignore` qui exclut `temp/`, les toucherait. — PR de #147
 
+### Collecte : clips (suite)
+
+Décisions de Sabine du 2026-10-17 sur le plan de #14, relayées par time-knight.
+
+- **Le frontmatter d'un clip est lu par PyYAML (dépendance d'exécution), avec son chargeur
+  `BaseLoader`, et `types-pyyaml` entre dans les dépendances de développement.** Décision de
+  Sabine, sur recommandation. Pourquoi, celui de la recommandation : Web Clipper écrit du YAML,
+  avec ses guillemets et ses échappements, qu'un lecteur reconnu lit comme Obsidian ;
+  `BaseLoader` ne devine aucun type et ne construit aucun objet (des textes, des listes, des
+  dictionnaires ; une étiquette `!!python/…` n'est pas appliquée, sa valeur est lue comme du
+  texte), et K-B lit lui-même les dates. PyYAML était déjà dans `uv.lock`, par
+  `openapi-spec-validator` ; sans `types-pyyaml`, `mypy --strict` échoue. ruff prend
+  `BaseLoader` pour un chargeur dangereux (S506) : `# noqa: S506`, avec la raison en commentaire.
+  Options écartées : `yaml.safe_load`, qui devine les types (`yes` en booléen, un jour en date,
+  un nombre en entier) et multiplie les cas à tester ; une exception mypy dans `pyproject.toml`
+  au lieu des types ; une lecture faite à la main du gabarit relevé par #147 (environ 1 h de
+  plus, et un YAML qu'elle n'a pas prévu serait lu autrement qu'Obsidian). Limite assumée : deux
+  paquets de plus à suivre par l'audit des dépendances. — PR de #14
+- **Un clip est un flux de nouveautés par URL : la première version vue d'une URL est gardée ;
+  un clip copié de nouveau est écarté `already_seen`.** Décision de Sabine : ses clips restent
+  tels quels, elle ne les retouche pas. Ferme la question ouverte « les versions d'un clip
+  annoté » (relecture du 2026-10-09). Options écartées : remplacer la version en base quand le
+  clip change (la recommandation de la session, avec `revised_at` : sans objet si les clips ne
+  changent pas) ; un catalogue d'état comme Zotero (recopier tout le coffre à chaque collecte,
+  contraire à la copie de « chaque clip nouveau ou modifié » du 2026-10-09). Limites assumées : un
+  clip modifié quand même n'est pas repris ; un clip supprimé du coffre reste en base ; deux
+  fichiers de même URL dans une même collecte, le premier dans l'ordre des noms de pages
+  l'emporte. La collecte reste incrémentale et copie tout clip changé : le brut garde chaque
+  version. — PR de #14
+- **Le texte complet d'un clip va dans la colonne `clip.body` de son sous-type ; ni `author`, ni
+  `description`, ni `tags` n'entrent en base.** Décision de Sabine, sur recommandation. Pourquoi,
+  celui de la recommandation : la spec (« titre, URL source, date, et le texte gardé ») et la
+  minimisation, comme Zotero le 2026-10-13. La question « DOCUMENT ou CONTENU pour le texte
+  complet » **reste ouverte** (Sabine, à questionner plus tard) : une future table CONTENU
+  déplacerait cette colonne. Option écartée : créer CONTENU ici, hors du périmètre de #14.
+  Limite assumée : le texte peut contenir la signature de l'article et les notes de
+  l'utilisatrice (registre des traitements). — PR de #14
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
@@ -2641,7 +2679,8 @@ Décision de Sabine du 2026-10-17, relayée par time-knight.
   registre (« seule la dernière copie est gardée »), sans objet depuis que la copie est
   temporaire. Une issue à part, à valider par Sabine ; la comparaison d'un extrait au précédent
   (ne pas réécrire un extrait identique, et extraire un autre dossier Zotero même plus ancien)
-  relève de la même décision.
+  relève de la même décision. La durée des copies de clips (`raw/selected_library/clipping/`,
+  #14) se décide avec elle (décision de Sabine du 2026-10-17, #139).
 - **Licence du schéma de Zotero** (2026-10-11) : le code de Zotero est sous AGPL v3 « sauf
   fichier qui dit autrement » (page « Licensing » de zotero.org), K-B sous CC BY-NC 4.0.
   La base d'essai réécrit 15 tables aux noms et types de Zotero ; si cela pose une question de
@@ -2662,7 +2701,8 @@ Décision de Sabine du 2026-10-17, relayée par time-knight.
 - **Questions laissées par la relecture indépendante du 2026-10-09**, à décider par Sabine :
   DOCUMENT ou CONTENU pour le texte complet (une publication décrite par plusieurs items et un
   document Zotero hors arXiv sont tranchés le 2026-10-13, « Modèle de la base : bibliothèque
-  Zotero ») ; les versions d'un clip annoté.
+  Zotero ; le texte d'un clip est rangé dans `clip.body` le 2026-10-17, en attendant) ; les
+  versions d'un clip annoté sont tranchées le 2026-10-17 (« Collecte : clips (suite) »).
 - **Transfert hors UE par les agents** : un agent qui lit les items par l'API envoie leur contenu
   au fournisseur du modèle (États-Unis). Cadre juridique non vérifié. **Révisée le
   2026-10-15**, puis **le 2026-10-16** : l'API IA appelle gpt-6-luna sur Azure AI Foundry, en
