@@ -2206,7 +2206,9 @@ contrat vient avec #222, le code avec #223, l'étalonnage avec #224.
     modèle ;
   - les mêmes données partent une seconde fois chez Microsoft, à inscrire au registre (#157).
 
-  — PR #225
+  — PR #225 **Révisée le 2026-10-17** : juge `gpt-6-luna` en phases 1 et 2, juge définitif choisi
+  en phase 3 (« Modèle des fiches : gpt-6-luna sur l'abonnement de l'organisme de formation »,
+  plus bas).
 - **Un juge en échec envoie le sujet dans `failed_subjects`, avec l'étape (`judge`). Un juge qui
   retire tout rend une fiche vide. `POST /digests` gagne un compteur par fiche
   (`claims_judged_removed`) et l'étape en échec, sans aucun état.** Décision de Sabine du 16/10.
