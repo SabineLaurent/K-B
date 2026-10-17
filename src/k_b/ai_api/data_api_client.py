@@ -5,7 +5,7 @@ The AI API does not read the base: it lists the items of a window, kind after ki
 the detail of each item kept, one after the other. A failure of the data API stops the reading
 with a named state, raised as a DataApiError; nothing is logged here: the caller logs the state
 once, with its request (#156). No retry: the data API runs beside the AI API, and the spec gives
-none.
+none. The reading is bounded by the deadline of the request: beyond, data_api_timeout.
 """
 
 from collections.abc import Iterator
@@ -17,6 +17,7 @@ import httpx2
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from k_b.ai_api.data_api_settings import DataApiSettings
+from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.outbound import open_http_client
 from k_b.ai_api.watch_items import (
     WATCH_KINDS,
@@ -173,13 +174,16 @@ def build_data_api_client(
     )
 
 
-def read_watch(http_client: httpx2.Client, since: datetime) -> WatchReading:
+def read_watch(
+    http_client: httpx2.Client, since: datetime, *, deadline: Deadline
+) -> WatchReading:
     """The items of the whitelist dated since `since` or later, MAX_ITEMS_PER_DIGEST_REQUEST at
-    most, each read in its detail and masked. Raises DataApiError."""
-    item_list = list_items(http_client, format_since(since))
+    most, each read in its detail and masked. Raises DataApiError. The deadline is required: the
+    timeouts of the client bound each wait, never the reading (docs/fiches-veille.md)."""
+    item_list = list_items(http_client, format_since(since), deadline)
     items = []
     for listed_item in item_list.items:
-        detail = read_detail(http_client, listed_item)
+        detail = read_detail(http_client, listed_item, deadline)
         # Gone, or withdrawn, since the list.
         if detail is None or detail.withdrawn_at is not None:
             continue
@@ -208,7 +212,7 @@ def format_since(since: datetime) -> str:
     return since_utc.replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
 
 
-def list_items(http_client: httpx2.Client, since: str) -> ItemList:
+def list_items(http_client: httpx2.Client, since: str, deadline: Deadline) -> ItemList:
     """The items of each kind in the order of WATCH_KINDS, until the cap. A withdrawn entry is
     not kept, and takes no place under the cap; an item listed again, by a page shifted by an
     import, is read once."""
@@ -216,7 +220,7 @@ def list_items(http_client: httpx2.Client, since: str) -> ItemList:
     seen_ids: set[int] = set()
     withdrawn = 0
     for kind in WATCH_KINDS:
-        for listed_item in list_kind(http_client, since, kind):
+        for listed_item in list_kind(http_client, since, kind, deadline):
             if listed_item.id in seen_ids:
                 continue
             seen_ids.add(listed_item.id)
@@ -230,7 +234,7 @@ def list_items(http_client: httpx2.Client, since: str) -> ItemList:
 
 
 def list_kind(
-    http_client: httpx2.Client, since: str, kind: WatchKind
+    http_client: httpx2.Client, since: str, kind: WatchKind, deadline: Deadline
 ) -> Iterator[ListedItem]:
     """The items of a kind, the most recent first, page after page: a page is asked only when
     the one before is read to its end."""
@@ -240,6 +244,7 @@ def list_kind(
             http_client,
             ITEMS_PATH,
             {"since": since, "kind": kind, "limit": LIST_PAGE_SIZE, "offset": offset},
+            deadline,
         )
         page = read_body(response, PAGE)
         for listed_item in page.items:
@@ -255,10 +260,10 @@ def list_kind(
 
 
 def read_detail(
-    http_client: httpx2.Client, listed_item: ListedItem
+    http_client: httpx2.Client, listed_item: ListedItem, deadline: Deadline
 ) -> KindDetail | None:
     """The detail of the item listed, or None if it is gone since the list."""
-    response = send(http_client, f"{ITEMS_PATH}/{listed_item.id}")
+    response = send(http_client, f"{ITEMS_PATH}/{listed_item.id}", None, deadline)
     if response.status_code == httpx2.codes.NOT_FOUND and is_item_not_found(response):
         return None
     detail = read_body(response, DETAIL)
@@ -270,13 +275,18 @@ def read_detail(
 def send(
     http_client: httpx2.Client,
     path: str,
-    params: dict[str, str | int] | None = None,
+    params: dict[str, str | int] | None,
+    deadline: Deadline,
 ) -> Answer:
-    """One GET, its body read within its bound, its failure as a named state. Raised from None:
+    """One GET, its body read within its bounds, its failure as a named state. Raised from None:
     the error of httpx2 names the URL asked."""
+    if deadline.is_passed():
+        raise DataApiError("data_api_timeout")
     try:
-        with http_client.stream("GET", path, params=params) as response:
-            return Answer(response.status_code, read_bounded_body(response))
+        with http_client.stream(
+            "GET", path, params=params, timeout=deadline.cap(http_client.timeout)
+        ) as response:
+            return Answer(response.status_code, read_bounded_body(response, deadline))
     except httpx2.TimeoutException:
         raise DataApiError("data_api_timeout") from None
     except httpx2.TransportError:
@@ -286,9 +296,10 @@ def send(
         raise DataApiError("data_api_invalid_response") from None
 
 
-def read_bounded_body(response: httpx2.Response) -> bytes:
+def read_bounded_body(response: httpx2.Response, deadline: Deadline) -> bytes:
     """The body, refused beyond MAX_DATA_API_BODY_BYTES, without quoting it: before reading when
-    Content-Length announces more, else as soon as the bytes read pass it."""
+    Content-Length announces more, else as soon as the bytes read pass it. Stopped as soon as the
+    deadline passes between two pieces."""
     status = response.status_code
     length = response.headers.get("Content-Length")
     if (
@@ -304,6 +315,8 @@ def read_bounded_body(response: httpx2.Response) -> bytes:
         body += chunk
         if len(body) > MAX_DATA_API_BODY_BYTES:
             raise DataApiError("data_api_invalid_response", status)
+        if deadline.is_passed():
+            raise DataApiError("data_api_timeout", status)
     return bytes(body)
 
 

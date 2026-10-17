@@ -15,6 +15,7 @@ from pydantic import SecretStr
 from k_b.ai_api import data_api_client
 from k_b.ai_api.data_api_client import DataApiError, build_data_api_client, read_watch
 from k_b.ai_api.data_api_settings import DataApiSettings
+from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.watch_items import NewsletterArticleFields, PaperFields
 from k_b.core.config import (
     DATA_API_CONNECT_TIMEOUT_SECONDS,
@@ -32,6 +33,11 @@ SINCE_ALL = datetime(2020, 1, 1, tzinfo=UTC)
 # most recent, the same day by id (12 before 11); item 5, a withdrawn vulnerability, is left
 # out; the Zotero entries 14 to 16 are never read.
 ITEMS_READ = [3, 4, 9, 10, 17, 2, 1, 6, 7, 8, 12, 11, 13]
+
+
+def far_deadline():
+    """A deadline no test reaches: the timeouts of the client stay those of the settings."""
+    return Deadline.after(3600)
 
 
 @pytest.fixture
@@ -55,7 +61,7 @@ def data_api(items_database):
 def test_the_reading_gives_the_items_of_the_whitelist_in_the_order_of_the_spec(
     data_api,
 ):
-    reading = read_watch(data_api, SINCE_ALL)
+    reading = read_watch(data_api, SINCE_ALL, deadline=far_deadline())
 
     assert [item.item_id for item in reading.items] == ITEMS_READ
     assert {item.kind for item in reading.items} == {
@@ -74,7 +80,7 @@ def test_the_reading_gives_the_items_of_the_whitelist_in_the_order_of_the_spec(
 
 
 def test_an_item_read_keeps_its_source_and_sends_its_whitelist_only(data_api):
-    reading = read_watch(data_api, SINCE_ALL)
+    reading = read_watch(data_api, SINCE_ALL, deadline=far_deadline())
 
     paper = next(item for item in reading.items if item.item_id == 2)
     assert paper.kind == "paper"
@@ -88,7 +94,7 @@ def test_an_item_read_keeps_its_source_and_sends_its_whitelist_only(data_api):
 
 
 def test_the_advisory_says_whether_its_cve_was_in_the_kev_catalog(data_api):
-    reading = read_watch(data_api, SINCE_ALL)
+    reading = read_watch(data_api, SINCE_ALL, deadline=far_deadline())
 
     fields = {item.item_id: item.fields.model_dump() for item in reading.items}
     assert fields[9] == {
@@ -103,7 +109,7 @@ def test_the_advisory_says_whether_its_cve_was_in_the_kev_catalog(data_api):
 
 
 def test_the_url_of_a_text_sent_is_masked_but_kept_as_the_source(data_api):
-    reading = read_watch(data_api, SINCE_ALL)
+    reading = read_watch(data_api, SINCE_ALL, deadline=far_deadline())
 
     vulnerability = next(item for item in reading.items if item.item_id == 3)
     assert vulnerability.fields.model_dump() == {
@@ -122,7 +128,7 @@ def test_the_url_of_a_text_sent_is_masked_but_kept_as_the_source(data_api):
 def test_the_reading_follows_the_pages(data_api, monkeypatch):
     monkeypatch.setattr(data_api_client, "LIST_PAGE_SIZE", 2)
 
-    reading = read_watch(data_api, SINCE_ALL)
+    reading = read_watch(data_api, SINCE_ALL, deadline=far_deadline())
 
     assert [item.item_id for item in reading.items] == ITEMS_READ
     assert data_api.paths.count("/items") == 9
@@ -131,7 +137,7 @@ def test_the_reading_follows_the_pages(data_api, monkeypatch):
 def test_the_reading_is_capped_inside_a_kind(data_api, monkeypatch):
     monkeypatch.setattr(data_api_client, "MAX_ITEMS_PER_DIGEST_REQUEST", 3)
 
-    reading = read_watch(data_api, SINCE_ALL)
+    reading = read_watch(data_api, SINCE_ALL, deadline=far_deadline())
 
     # Vulnerabilities 3 and 4, then advisory 9; advisory 10 is the first left out.
     assert [item.item_id for item in reading.items] == [3, 4, 9]
@@ -145,7 +151,7 @@ def test_the_reading_is_capped_inside_a_kind(data_api, monkeypatch):
 def test_the_reading_capped_between_two_kinds_names_the_next_one(data_api, monkeypatch):
     monkeypatch.setattr(data_api_client, "MAX_ITEMS_PER_DIGEST_REQUEST", 2)
 
-    reading = read_watch(data_api, SINCE_ALL)
+    reading = read_watch(data_api, SINCE_ALL, deadline=far_deadline())
 
     assert [item.item_id for item in reading.items] == [3, 4]
     assert reading.capped_kind == "advisory"
@@ -157,7 +163,7 @@ def test_a_withdrawn_entry_takes_no_place_under_the_cap(data_api, monkeypatch):
     # within the advisories, not by the withdrawn entry.
     monkeypatch.setattr(data_api_client, "MAX_ITEMS_PER_DIGEST_REQUEST", 5)
 
-    reading = read_watch(data_api, SINCE_ALL)
+    reading = read_watch(data_api, SINCE_ALL, deadline=far_deadline())
 
     assert [item.item_id for item in reading.items] == [3, 4, 9, 10, 17]
     assert reading.items_dropped == 1
@@ -165,7 +171,9 @@ def test_a_withdrawn_entry_takes_no_place_under_the_cap(data_api, monkeypatch):
 
 
 def test_an_empty_window_asks_no_detail(data_api):
-    reading = read_watch(data_api, datetime(2030, 1, 1, tzinfo=UTC))
+    reading = read_watch(
+        data_api, datetime(2030, 1, 1, tzinfo=UTC), deadline=far_deadline()
+    )
 
     assert reading.items == ()
     assert reading.items_dropped == 0
@@ -177,7 +185,7 @@ def read_since(data_api, since):
     data_api.event_hooks["request"].append(
         lambda request: queries.append(request.url.params)
     )
-    read_watch(data_api, since)
+    read_watch(data_api, since, deadline=far_deadline())
     return queries
 
 
@@ -213,7 +221,7 @@ class NoOffset(tzinfo):
 )
 def test_a_since_without_time_zone_is_refused(data_api, since):
     with pytest.raises(ValueError, match="since without time zone"):
-        read_watch(data_api, since)
+        read_watch(data_api, since, deadline=far_deadline())
 
 
 def test_a_key_refused_gives_data_api_unauthorized(items_database):
@@ -224,7 +232,7 @@ def test_a_key_refused_gives_data_api_unauthorized(items_database):
     )
 
     with pytest.raises(DataApiError) as raised:
-        read_watch(client, SINCE_ALL)
+        read_watch(client, SINCE_ALL, deadline=far_deadline())
 
     assert raised.value.state == "data_api_unauthorized"
     assert raised.value.http_status == 401
@@ -289,7 +297,7 @@ def test_the_client_of_the_settings_sends_the_key_with_its_timeouts():
     http_client, requests = simulate()
 
     with http_client:
-        reading = read_watch(http_client, SINCE_ALL)
+        reading = read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert [item.item_id for item in reading.items] == [2]
     assert str(requests[0].url).startswith("http://api-donnees:8000/items?")
@@ -309,7 +317,7 @@ def test_an_item_gone_between_the_list_and_the_detail_is_skipped_and_counted():
         answer_detail=lambda request: answer(404, {"error": "item_not_found"})
     )
 
-    reading = read_watch(http_client, SINCE_ALL)
+    reading = read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert reading.items == ()
     assert reading.items_dropped == 1
@@ -319,7 +327,7 @@ def test_an_item_withdrawn_between_the_list_and_the_detail_is_skipped_and_counte
     withdrawn = PAPER_DETAIL | {"withdrawn_at": "2026-10-06T09:30:00Z"}
     http_client, _ = simulate(answer_detail=lambda request: answer(body=withdrawn))
 
-    reading = read_watch(http_client, SINCE_ALL)
+    reading = read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert reading.items == ()
     assert reading.items_dropped == 1
@@ -336,7 +344,7 @@ def test_an_item_listed_twice_is_read_once():
 
     http_client, requests = simulate(answer_list=answer_list)
 
-    reading = read_watch(http_client, SINCE_ALL)
+    reading = read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert [item.item_id for item in reading.items] == [2]
     assert [r.url.path for r in requests].count("/items/2") == 1
@@ -356,7 +364,7 @@ def test_a_failed_request_gives_its_state(error, state):
     http_client, _ = simulate(answer_list=raise_error(error))
 
     with pytest.raises(DataApiError) as raised:
-        read_watch(http_client, SINCE_ALL)
+        read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert raised.value.state == state
     assert raised.value.http_status is None
@@ -386,7 +394,7 @@ def test_an_answer_of_the_list_other_than_200_gives_its_state(
     )
 
     with pytest.raises(DataApiError) as raised:
-        read_watch(http_client, SINCE_ALL)
+        read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert raised.value.state == state
     assert raised.value.http_status == status
@@ -400,7 +408,7 @@ def test_the_400_of_a_host_refused_gives_data_api_invalid_response():
     )
 
     with pytest.raises(DataApiError) as raised:
-        read_watch(http_client, SINCE_ALL)
+        read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert raised.value.state == "data_api_invalid_response"
     assert raised.value.http_status == 400
@@ -430,7 +438,7 @@ def test_a_list_out_of_its_schema_gives_data_api_invalid_response(content):
     )
 
     with pytest.raises(DataApiError) as raised:
-        read_watch(http_client, SINCE_ALL)
+        read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert raised.value.state == "data_api_invalid_response"
 
@@ -444,7 +452,7 @@ def test_a_kind_other_than_the_one_asked_gives_data_api_invalid_response(kind):
     )
 
     with pytest.raises(DataApiError) as raised:
-        read_watch(http_client, SINCE_ALL)
+        read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert raised.value.state == "data_api_invalid_response"
 
@@ -467,7 +475,7 @@ def test_a_detail_other_than_the_item_listed_gives_data_api_invalid_response(det
     http_client, _ = simulate(answer_detail=lambda request: answer(body=detail))
 
     with pytest.raises(DataApiError) as raised:
-        read_watch(http_client, SINCE_ALL)
+        read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert raised.value.state == "data_api_invalid_response"
 
@@ -484,7 +492,7 @@ def test_a_detail_that_fails_gives_its_state(status, body, state):
     http_client, _ = simulate(answer_detail=lambda request: answer(status, body))
 
     with pytest.raises(DataApiError) as raised:
-        read_watch(http_client, SINCE_ALL)
+        read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert raised.value.state == state
     assert raised.value.http_status == status
@@ -499,7 +507,7 @@ def test_the_error_carries_neither_the_key_nor_what_was_received(caplog):
     )
 
     with pytest.raises(DataApiError) as raised:
-        read_watch(http_client, SINCE_ALL)
+        read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert str(raised.value) == "data_api_invalid_response, HTTP 307"
     assert TEST_API_KEY not in repr(raised.value)
@@ -510,13 +518,13 @@ def test_the_error_carries_neither_the_key_nor_what_was_received(caplog):
 def test_the_reading_never_logs(data_api, caplog):
     caplog.set_level(logging.DEBUG, logger="k_b")
 
-    read_watch(data_api, SINCE_ALL)
+    read_watch(data_api, SINCE_ALL, deadline=far_deadline())
 
     assert [r for r in caplog.records if r.name.startswith("k_b.ai_api")] == []
 
 
 def test_a_newsletter_article_read_is_ready_for_the_writing(data_api):
-    reading = read_watch(data_api, SINCE_ALL)
+    reading = read_watch(data_api, SINCE_ALL, deadline=far_deadline())
 
     article = next(item for item in reading.items if item.item_id == 13)
     assert article.fields == NewsletterArticleFields(
@@ -543,7 +551,7 @@ def test_a_body_up_to_the_bound_is_read(monkeypatch):
     bound_bodies(monkeypatch, max(len(PAGE_OF_PAPER), len(json.dumps(PAPER_DETAIL))))
     http_client, _ = simulate()
 
-    reading = read_watch(http_client, SINCE_ALL)
+    reading = read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert [item.item_id for item in reading.items] == [2]
 
@@ -553,7 +561,7 @@ def test_a_list_above_the_bound_gives_data_api_invalid_response(monkeypatch):
     http_client, _ = simulate()
 
     with pytest.raises(DataApiError) as raised:
-        read_watch(http_client, SINCE_ALL)
+        read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert raised.value.state == "data_api_invalid_response"
     assert raised.value.http_status == 200
@@ -566,7 +574,7 @@ def test_a_detail_above_the_bound_gives_data_api_invalid_response(monkeypatch):
     http_client, _ = simulate(answer_detail=lambda request: answer(body=long_detail))
 
     with pytest.raises(DataApiError) as raised:
-        read_watch(http_client, SINCE_ALL)
+        read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert raised.value.state == "data_api_invalid_response"
     assert raised.value.http_status == 200
@@ -578,7 +586,7 @@ def test_an_item_not_found_is_still_read_under_the_bound(monkeypatch):
         answer_detail=lambda request: answer(404, {"error": "item_not_found"})
     )
 
-    reading = read_watch(http_client, SINCE_ALL)
+    reading = read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert reading.items_dropped == 1
 
@@ -599,7 +607,62 @@ def test_a_content_length_above_the_bound_is_refused_before_reading(monkeypatch)
     )
 
     with pytest.raises(DataApiError) as raised:
-        read_watch(http_client, SINCE_ALL)
+        read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert raised.value.state == "data_api_invalid_response"
     assert raised.value.http_status == 200
+
+
+class Clock:
+    """A clock set by the test: never the time of the machine."""
+
+    def __init__(self, now=1000.0):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+
+def test_a_deadline_passed_stops_the_reading_before_any_request():
+    clock = Clock()
+    deadline = Deadline.after(5, clock)
+    clock.now += 5
+    http_client, requests = simulate()
+
+    with http_client, pytest.raises(DataApiError) as raised:
+        read_watch(http_client, SINCE_ALL, deadline=deadline)
+
+    assert raised.value.state == "data_api_timeout"
+    assert requests == []
+
+
+def test_the_timeouts_of_a_request_are_shortened_to_the_time_left():
+    deadline = Deadline.after(4, Clock())
+    http_client, requests = simulate()
+
+    with http_client:
+        read_watch(http_client, SINCE_ALL, deadline=deadline)
+
+    timeout = requests[0].extensions["timeout"]
+    assert (timeout["connect"], timeout["read"], timeout["write"], timeout["pool"]) == (
+        4,
+        4,
+        4,
+        4,
+    )
+
+
+def test_a_deadline_passed_while_an_answer_is_read_stops_the_reading():
+    clock = Clock()
+    deadline = Deadline.after(60, clock)
+
+    def answer_late(request):
+        clock.now += 60
+        return answer(body=PAPER_DETAIL)
+
+    http_client, _ = simulate(answer_detail=answer_late)
+
+    with http_client, pytest.raises(DataApiError) as raised:
+        read_watch(http_client, SINCE_ALL, deadline=deadline)
+
+    assert raised.value.state == "data_api_timeout"
