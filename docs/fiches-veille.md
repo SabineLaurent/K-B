@@ -165,14 +165,14 @@ quota du déploiement Foundry est de 140 000 jetons et 140 requêtes par minute 
 minute, même en série : une seconde demande dans la même minute peut rendre un 429 (non observé :
 sur l'essai de #158, l'en-tête ne baissait que des jetons d'entrée). Les sortes rares tiennent bien sous
 le plafond (≈ 150 items sur 14 jours) : si la coupe tombait sur l'une d'elles, `capped_kind` la
-nommerait, et les sortes suivantes ne seraient pas lues. **Durée** : la lecture n'a pas de borne
-à elle. Les délais du client (`DATA_API_*_TIMEOUT_SECONDS`) bornent chaque attente, pas une
-requête ni la lecture : le délai de lecture vaut pour chaque morceau reçu, si bien qu'un serveur
-qui envoie au compte-gouttes fait durer une requête sans fin ; et aux 300 détails s'ajoutent les
-pages de liste, jusqu'à 101 par sorte (les entrées retirées ne comptent pas sous le plafond).
-Seule `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205) bornera la lecture : `read_watch` ne se branche sur
-une route qu'avec cette échéance (constat de `/code-review` sur #204, tranché par time-knight,
-délégation de Sabine du 2026-10-15). **Taille** : chaque réponse de l'API de données est lue en
+nommerait, et les sortes suivantes ne seraient pas lues. **Durée** : les délais du client
+(`DATA_API_*_TIMEOUT_SECONDS`) bornent chaque attente, pas une requête ni la lecture : le délai de
+lecture vaut pour chaque morceau reçu, si bien qu'un serveur qui envoie au compte-gouttes ferait
+durer une requête sans fin ; et aux 300 détails s'ajoutent les pages de liste, jusqu'à 101 par
+sorte (les entrées retirées ne comptent pas sous le plafond). C'est `DIGEST_REQUEST_TIMEOUT_SECONDS`
+qui borne la lecture : `read_watch` exige l'échéance de la demande (paramètre sans valeur par
+défaut, #205 ; constat de `/code-review` sur #204, tranché par time-knight, délégation de Sabine
+du 2026-10-15), et s'arrête en `data_api_timeout` au-delà (« Durée totale », plus haut). **Taille** : chaque réponse de l'API de données est lue en
 flux et refusée (`data_api_invalid_response`, sans rien citer du corps) au-delà de
 `MAX_DATA_API_BODY_BYTES = 4 000 000` octets décodés, avant toute lecture quand `Content-Length`
 l'annonce déjà ; au-dessus du pire honnête, estimé à environ 2 Mo pour une page de liste et
@@ -304,9 +304,12 @@ champs où la fidélité cherche un fait (section « Fidélité ») :
   36 000 caractères de message utilisateur (`input_chars`) au plus, soit environ 9 000 jetons
   (#158 : 46 items, environ 5 500 jetons). Une `advisory`, sans texte long, est classée par son
   titre ; un `body` nul de release est envoyé nul.
-- `items_truncated` compte les items dont un champ est coupé ; `items_dropped`, ceux laissés hors
-  d'une fiche (au-delà de 60, retirés, ou disparus entre la liste et le détail : 404
-  `item_not_found`).
+- `items_truncated` compte les items dont un champ est coupé à 2 000 caractères pour la
+  rédaction ; `items_dropped`, ceux laissés hors d'une fiche (au-delà de 60, retirés, ou disparus
+  entre la liste et le détail : 404 `item_not_found`). La coupe à 500 du classement n'y est pas
+  comptée (presque tous les items y passent) : elle est comptée par appel, dans la ligne de
+  métrique. **Limite** : la coupe et le plafond de 60 ne sont comptés que pour un sujet envoyé à
+  la rédaction ; un sujet laissé en `llm_timeout` avant l'envoi n'y ajoute rien.
 - `items_capped` est vrai s'il reste au moins un item au-delà de `MAX_ITEMS_PER_DIGEST_REQUEST`
   (section « Lecture plafonnée ») ; ces items ne sont pas lus, donc pas comptés.
 
