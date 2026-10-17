@@ -2598,6 +2598,21 @@ du plan, que Sabine a validé. Tranche la question posée le 15/10 et écrite le
   **Accorde** la spec, qui disait « Les bornes sont envoyées au modèle dans le `json_schema` »
   (commentaire daté sur #205). — PR de #205
 
+### Coffre Obsidian : une copie dans un dossier ignoré du dépôt
+
+Décision de Sabine du 2026-10-17, relayée par time-knight.
+
+- **Exception provisoire à « Données hors du dépôt de code » (2026-09-29) : le coffre Obsidian
+  de K-B est une copie des clips existants, rangée dans un dossier du dépôt que git ignore (règle
+  `temp/` du `.gitignore`). Le code et la doc ne le désignent que par `KB_VAULT_DIR`, jamais par
+  son chemin.** Pourquoi, selon Sabine : la praticité en développement ; la copie sert de matière
+  à la collecte des clips (#14) et à ses fixtures. Option écartée : le coffre hors du dépôt
+  (conseil de time-knight), moins pratique en développement. Levée avec le vrai coffre, quand
+  Web Clipper sera réglé pour y écrire (réglage à venir, sans issue). Limite assumée : des
+  données personnelles (des noms d'auteurs) sont dans le dossier d'un dépôt public au 25/10,
+  protégées par la seule règle `temp/` ; un `git clean -x` ou un `.dockerignore` qui oublie
+  `temp/` les toucherait. — PR de #147
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
