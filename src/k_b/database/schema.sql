@@ -287,8 +287,8 @@ CREATE INDEX zotero_entry_publication_id ON zotero_entry (publication_id);
 
 -- A subtype of item: a page the user kept with Web Clipper in the Obsidian vault (#14). News
 -- feed: the first version seen of a URL is kept; the clips are not changed once kept (decision
--- of Sabine of 2026-10-17). Written in portable SQL (.claude/rules/poc.md, rule 1): no GLOB nor
--- strftime. kind NOT NULL: a NULL kind would pass its CHECK and skip the foreign key.
+-- of Sabine of 2026-10-17). Written in portable SQL (.claude/rules/poc.md, rule 1). kind NOT
+-- NULL: a NULL kind would pass its CHECK and skip the foreign key.
 CREATE TABLE clip (
     id           INTEGER PRIMARY KEY,
     item_id      INTEGER NOT NULL UNIQUE,

@@ -180,7 +180,7 @@ REQUIRED_FIELDS_BY_KIND = {
     "newsletter_article": ("url", "summary", "published_at", "edition", "rank"),
     # A Zotero entry may have no URL (ADR of 2026-10-13).
     "zotero_entry": ("item_type", "saved_at"),
-    # Its URL is its key; its text may be empty, never absent.
+    # Its URL is its key; its text, empty or not, is never absent.
     "clip": ("url", "saved_at", "summary"),
 }
 # The source of each kind. Written to a reference table as the item of its source of truth, an

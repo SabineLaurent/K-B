@@ -186,12 +186,13 @@ def read_clip_safely(raw_clip: bytes) -> EntryReading[ClipEntry]:
     the clips all invalid."""
     try:
         reading = read_clip(raw_clip)
+    except ValueError as unreadable:
+        return EntryReading([], [str(unreadable)])
+    try:
         for entry in reading.entries:
             ClipFrontmatter.model_validate(entry.properties)
-    except ValidationError as error:
-        return EntryReading([], [str(without_values(error))])
-    except ValueError as error:
-        return EntryReading([], [str(error)])
+    except ValidationError as refusal:
+        return EntryReading([], [str(without_values(refusal))])
     return reading
 
 
