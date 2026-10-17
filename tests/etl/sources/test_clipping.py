@@ -259,9 +259,42 @@ def test_an_unreadable_clip_among_valid_ones_is_copied(vault_dir):
     assert pages[page_name_of("broken.md")] == b"no frontmatter"
 
 
-def test_a_vault_without_its_clippings_folder_fails(tmp_path):
+def test_a_vault_without_its_clippings_folder_yet_gives_nothing(tmp_path, caplog):
+    """Web Clipper creates Clippings/ with the first clip: no clip yet is not a failure."""
+    with caplog.at_level(logging.INFO, logger="k_b.etl.sources.clipping"):
+        assert ClippingSource(tmp_path).fetch(None) is None
+
+    assert caplog.messages == ["clipping: no Clippings folder in the vault"]
+
+
+def test_a_vault_that_does_not_exist_fails(tmp_path):
+    """A KB_VAULT_DIR written wrong is shown, not taken for an empty vault."""
     with pytest.raises(FileNotFoundError):
-        ClippingSource(tmp_path).fetch(None)
+        ClippingSource(tmp_path / "missing").fetch(None)
+
+
+def test_a_clip_rewritten_between_the_list_and_the_reading_is_left_to_the_next_collection(
+    vault_dir, monkeypatch, caplog
+):
+    """Obsidian Sync, iCloud or an edit may be writing it: copied now, it could stay cut for
+    good, the first version of a URL being kept."""
+    listed = clipping.list_clip_files(clippings_of(vault_dir))
+    # The clock of a file system may be coarser than the one of the test.
+    time.sleep(0.05)
+    (clippings_of(vault_dir) / ARTICLE).write_bytes(fixture_bytes(ARTICLE))
+    monkeypatch.setattr(clipping, "list_clip_files", lambda clippings_dir: listed)
+
+    with caplog.at_level(logging.INFO, logger="k_b.etl.sources.clipping"):
+        pages = ClippingSource(vault_dir).fetch(None)
+
+    assert set(pages) == {
+        page_name_of(PAGE_WITHOUT_AUTHOR),
+        page_name_of(PAGE_WITH_A_RULE),
+    }
+    assert (
+        "clipping: 1 clips changed while read, left to the next collection"
+        in caplog.messages
+    )
 
 
 def test_the_log_gives_a_count_and_no_title_or_file_name(vault_dir, caplog):
@@ -392,6 +425,14 @@ def test_the_tracking_parameters_are_removed_from_the_key():
     item = convert(raw_clip)
 
     assert item.source_item_id == "https://www.w3.org/TR/WCAG22/?lang=en"
+
+
+def test_a_clip_that_starts_with_a_byte_order_mark_is_read():
+    """Obsidian reads it; an editor may add one."""
+    item = convert(b"\xef\xbb\xbf" + fixture_bytes(ARTICLE))
+
+    assert item.title == "7 Coding Patterns I Stole From Senior Engineers"
+    assert not item.summary.startswith("\ufeff")
 
 
 def test_a_clip_with_crlf_line_ends_is_read():

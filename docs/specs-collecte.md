@@ -222,8 +222,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   `already_seen` à l'import ; un clip changé moins de 60 s avant la collecte en cours, qui peut
   être encore en cours d'écriture (Obsidian, Web Clipper, une synchronisation), est laissé à la
   collecte suivante, qui le prend (la première version d'une URL étant gardée, un clip copié
-  tronqué le resterait). Un clip renommé ou supprimé entre la liste du dossier et sa lecture est
-  sauté, et compté au journal : son nouveau nom est lu à la collecte suivante. Hypothèse, non
+  tronqué le resterait). Un clip dont la date a changé entre la liste du dossier et sa lecture
+  (une synchronisation, une édition) est laissé de même à la collecte suivante. Un clip renommé ou
+  supprimé entre la liste et la lecture est sauté, et compté au journal : son nouveau nom est lu à
+  la collecte suivante. Un coffre sans dossier `Clippings/` (Web Clipper le crée avec le premier
+  clip) ne donne aucun clip, sans échec ; un coffre qui n'existe pas fait échouer la source. Hypothèse, non
   mesurée : l'horloge d'un système de fichiers peut être plus grossière que celle de `kb` (un
   tick sous Linux) ou en retard sur elle (coffre monté depuis l'hôte dans un conteneur, #200) ;
   sans marge, un clip écrit juste après le début d'une collecte serait daté d'avant elle et
@@ -242,12 +245,21 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
     clip nouveau n'est copié ;
   - `all_items_invalid` : tous les clips copiés seraient rejetés à l'import (lus et convertis
     comme par l'import, `RecursionError` comprise) ;
-  - `FileNotFoundError` : pas de dossier `Clippings/` dans le coffre ;
-  - `OSError` (`ELOOP`) : un fichier remplacé par un lien symbolique entre sa liste et sa lecture.
+  - `all_items_invalid`, cas limite assumé (règle 1, décision du 2026-10-17) : une note sans
+    frontmatter posée seule dans `Clippings/` fait échouer la source à chaque collecte, jusqu'au
+    clip valide suivant ; elle est alors copiée, et rejetée à chaque import ;
+  - `FileNotFoundError` : le dossier du coffre (`KB_VAULT_DIR`) n'existe pas ;
+  - `PermissionError` : un clip ou le dossier ne se lit pas (droits) ;
+  - `OSError` : un clip qui ne se lit pas pour une autre raison, dont `ELOOP` (un fichier
+    remplacé par un lien symbolique entre sa liste et sa lecture) et un fichier iCloud non
+    téléchargé. Un tel clip fait échouer la source, comme `clip_too_large`, au lieu d'être sauté :
+    sauté pendant que la date avance, il ne serait plus revu tant qu'il ne change pas (décision
+    du 2026-10-17, tranchée par time-knight sur délégation de Sabine).
 
   Un clip illisible parmi des clips valides est copié : l'import le rejette (règle 1 de
   `.claude/rules/conventions.md`). Le journal ne cite que des nombres : clips lus, laissés à la
-  collecte suivante, disparus entre la liste et la lecture.
+  collecte suivante (changés depuis moins de 60 s, ou pendant leur lecture), disparus entre la
+  liste et la lecture.
 - **Données personnelles** : le champ `author` de la page gardée, s'il existe (l'auteur public de
   l'article, écrit en liens `[[Nom]]`) : copié dans le brut, jamais lu en base. La description, le
   texte gardé et ses liens `[[…]]` sont du texte libre qui peut nommer des personnes, et le
@@ -621,7 +633,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
        est celui que Web Clipper a écrit, dans le fuseau de l'utilisatrice. Une valeur vide,
        `null` ou `~` de `published` se lit absente. Une autre forme (heure, fuseau, nombre, forme
        compacte, semaine ISO) est rejetée, pas devinée ;
-     - **rejets** : un clip qui n'est pas de l'UTF-8, sans frontmatter, dont le frontmatter n'est
+     - **rejets** : une marque d'ordre des octets en tête du clip est ignorée, comme par
+       Obsidian. Un clip qui n'est pas de l'UTF-8, sans frontmatter, dont le frontmatter n'est
        pas du YAML ou pas un dictionnaire est une **page illisible** (règle 1 de
        `.claude/rules/conventions.md`) : elle n'entre pas au registre et elle est rejetée à
        chaque import. **Limite** (décision du 2026-10-17, tranchée par time-knight sur
