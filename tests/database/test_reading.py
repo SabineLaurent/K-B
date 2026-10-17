@@ -10,6 +10,7 @@ from k_b.database.connection import connect_database, connect_database_read_only
 from k_b.database.creation import create_database
 from k_b.database.reading import (
     AdvisoryDetail,
+    ClipDetail,
     ItemDetail,
     KindDetail,
     ListedItem,
@@ -24,7 +25,7 @@ from k_b.database.reading import (
 from k_b.items import MAX_INT64, MIN_INT64, ItemKind
 
 # Every item of the test base, in the order of the reading: source_date, then id, descending.
-ALL_IDS = [12, 11, 13, 15, 6, 14, 7, 8, 3, 2, 4, 1, 16, 9, 10, 17, 5]
+ALL_IDS = [12, 11, 13, 15, 6, 14, 7, 8, 3, 2, 4, 1, 16, 18, 9, 10, 17, 5]
 PLUS_TWO_HOURS = timezone(timedelta(hours=2))
 
 
@@ -236,10 +237,10 @@ def test_the_search_reads_the_title_and_the_summary(connection):
 
 
 def test_the_mode_follows_the_source_of_the_item(connection):
-    assert read_ids(connection, mode="library") == [15, 14, 16]
+    assert read_ids(connection, mode="library") == [15, 14, 16, 18]
     assert {
         item.kind for item in read_items(connection, limit=100, mode="watch").items
-    } == set(typing.get_args(ItemKind)) - {"zotero_entry"}
+    } == set(typing.get_args(ItemKind)) - {"zotero_entry", "clip"}
 
 
 def test_the_items_are_sorted_by_date_then_by_id_descending(connection):
@@ -418,6 +419,30 @@ def test_a_zotero_entry_without_arxiv_reference_has_no_arxiv_id(connection):
 
     assert detail is not None
     assert detail.details.arxiv_id is None
+
+
+def test_a_clip_is_listed_by_its_day_saved_and_detailed_with_its_text(connection):
+    detail = read_item_detail(connection, 18)
+
+    assert detail == ItemDetail(
+        ListedItem(
+            18,
+            "clip",
+            "7 Coding Patterns I Stole From Senior Engineers",
+            "2026-09-17T00:00:00Z",
+            "https://medium.com/skillstuff/"
+            "7-coding-patterns-i-stole-from-senior-engineers-c95f757e52a6",
+            None,
+        ),
+        ClipDetail(
+            "2026-06-08T00:00:00Z",
+            "Most junior developers think senior engineers know more tricks.",
+        ),
+    )
+
+
+def test_the_text_of_a_clip_is_searched(connection):
+    assert read_ids(connection, search_text="junior developers") == [18]
 
 
 @pytest.mark.parametrize("item_id", [999, 0, -1, MAX_INT64, MIN_INT64])

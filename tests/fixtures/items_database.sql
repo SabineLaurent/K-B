@@ -26,7 +26,10 @@ INSERT INTO raw_data (id, source_id, raw_file_path, stream, collected_at) VALUES
         'selected_library/zotero/2026-10-05T093000Z.json', 'zotero', '2026-10-05T09:30:00Z'),
     (8, (SELECT id FROM source WHERE source_code = 'gh_archive'),
         'automated_watch/gh_archive/2026-10-11T093000Z.json', 'gh_archive',
-        '2026-10-11T09:30:00Z');
+        '2026-10-11T09:30:00Z'),
+    (9, (SELECT id FROM source WHERE source_code = 'clipper'),
+        'selected_library/clipping/2026-10-17T093000Z/0123456789abcdef.md', 'clipping',
+        '2026-10-17T09:30:00Z');
 
 INSERT INTO item (id, kind, raw_data_id) VALUES
     (1, 'paper', 1),
@@ -45,7 +48,8 @@ INSERT INTO item (id, kind, raw_data_id) VALUES
     (14, 'zotero_entry', 7),
     (15, 'zotero_entry', 7),
     (16, 'zotero_entry', 7),
-    (17, 'advisory', 4);
+    (17, 'advisory', 4),
+    (18, 'clip', 9);
 
 -- arxiv_extract.xml, the first two entries. The summary is cut to its first sentence, the
 -- authors to the first name.
@@ -198,3 +202,11 @@ INSERT INTO trend (
     (8, '2026-10-10T00:00:00Z', 1035334306, 'wwwwwwworld/solana-trading-bot-v3', 0, 70),
     (8, '2026-10-09T00:00:00Z', 1398080271, 'storytold/photocraft', 120, 9),
     (8, '2026-10-09T00:00:00Z', 1209966933, 'morluto/rea', 120, 9);
+
+-- clipping/article_with_author.md, the clip of the vault of 2026-10-17 cut down; its text cut.
+INSERT INTO clip (item_id, kind, url, title, body, saved_at, published_at) VALUES
+    (18, 'clip',
+        'https://medium.com/skillstuff/7-coding-patterns-i-stole-from-senior-engineers-c95f757e52a6',
+        '7 Coding Patterns I Stole From Senior Engineers',
+        'Most junior developers think senior engineers know more tricks.',
+        '2026-09-17T00:00:00Z', '2026-06-08T00:00:00Z');

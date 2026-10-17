@@ -27,7 +27,7 @@ def test_the_versioned_openapi_is_valid_and_declares_its_security_scheme():
     openapi = read_versioned_openapi()
 
     OpenAPIV31SpecValidator(openapi).validate()
-    assert openapi["info"]["version"] == "0.3.0"
+    assert openapi["info"]["version"] == "0.4.0"
     assert openapi["components"]["securitySchemes"] == {
         "HTTPBearer": {"type": "http", "scheme": "bearer"}
     }
@@ -81,8 +81,9 @@ def test_the_detail_is_a_union_discriminated_by_kind():
         "advisory",
         "newsletter_article",
         "zotero_entry",
+        "clip",
     }
-    assert len(schema["oneOf"]) == 6
+    assert len(schema["oneOf"]) == 7
 
 
 @pytest.mark.parametrize(
@@ -95,6 +96,7 @@ def test_the_detail_is_a_union_discriminated_by_kind():
         ("ListedItemSchema", "withdrawn_at", "A date of K-B"),
         ("PaperDetailSchema", "arxiv_updated_at", "A date of arXiv"),
         ("HighlightSchema", "highlighted_at", "A date of Zotero"),
+        ("ClipDetailSchema", "published_at", "A date of the page kept"),
     ],
 )
 def test_the_dates_of_k_b_and_of_the_sources_are_described(schema_name, field, said):
