@@ -169,7 +169,7 @@ Toutes les requêtes du 17/10 (UTC), sur `gpt-6-luna` :
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| `uv run pytest` : 1 528 tests verts ; ruff, format, mypy strict verts | le client et la config changés tiennent tous les contrôles |
+| `uv run pytest` : 1 526 tests verts ; ruff, format, mypy strict verts | le client et la config changés tiennent tous les contrôles |
 | les assertions de `prompt_cache_options` et `test_the_read_timeout_covers_…` : rouges avant le code, verts après | les deux changements sont écrits tests d'abord |
 | `GET /openai/v1/models` (13:23:31Z) : `gpt-6-luna-2026-09-22`, `generally-available`, `deprecation.inference` = 2028-03-11 | date de retrait lue ; c'est la date du modèle de base sur ce point d'accès, pas par SKU de zone de données |
 | ping avec `Authorization: Bearer` : 200 ; `model` rendu `gpt-6-luna-2026-09-22` | en-tête confirmé, sans repli `api-key` ; version figée ; hôte `*.openai.azure.com/openai/v1` sans `api-version` |
