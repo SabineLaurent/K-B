@@ -97,7 +97,7 @@ valeur :
 
     assert seconds_at_cap * 1.4 <= LLM_CALL_TIMEOUT_SECONDS
 ```
-(`tests/ai_api/test_llm_client.py:563-565`)
+(`tests/ai_api/test_llm_client.py:564-566`)
 
 Il échouait à 60 s (60,2 × 1,4 ≈ 84 s) et passe à 90 s.
 
@@ -248,6 +248,6 @@ dépend pas du délai de lecture.
   entrée et plafond), choix « parallèle ou tâche de fond », motif de la première tentative dans la
   métrique, lot refusé par Prompt Shields.
 - **#223** : un réglage du cache si le juge définitif est un modèle qui refuse `prompt_cache_options`.
-- **Fichier de Sabine** : `.env.example:47-48` cite encore `gpt-5.6-luna` comme modèle à
+- **Fichier de Sabine** : `.env.example:48` cite encore `gpt-5.6-luna` comme modèle à
   raisonnement ; non touché.
 - Les replis de #227 (Mistral, puis Gemini) prennent fin à la fusion de cette PR.
