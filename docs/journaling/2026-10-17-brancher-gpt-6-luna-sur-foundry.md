@@ -181,6 +181,10 @@ Toutes les requêtes du 17/10 (UTC), sur `gpt-6-luna` :
 | rédactions (13:24:47Z → 13:25:38Z), 42 à 50 items, ~6 000 jetons en entrée, 1 042 à 1 292 en sortie : 9 278 (1er), 7 747, 7 654, 8 881 ms ; 1 appel à 2 tentatives (18 936 ms) | médiane 8 314 ms, max 9 278 ; 9 à 11 affirmations |
 | 3 jugements (13:25:41Z → 13:25:49Z), 10 affirmations, 2 012 jetons en entrée, 184 en sortie : 1 514, 1 996, 1 403 ms | médiane 1 514 ms ; le juge coûte environ un tiers de l'entrée d'une rédaction |
 | ajustement linéaire sur 12 appels à une tentative : `llm_ms ≈ -306 + 7,35 × tokens_out` | 8 192 jetons ≈ 59,9 s : le délai de 60 s ne suffisait pas |
+| candidat juge `DeepSeek-V4-Flash` (13:45:54Z, données fabriquées), tel que K-B l'envoie : 400 `unrecognized_request_argument` | il refuse `prompt_cache_options` : le client ne peut pas l'appeler tel quel |
+| le même, sans `prompt_cache_options`, avec `reasoning_effort: "none"` : 3 × 200, `stop`, 4 verdicts valides au modèle Pydantic ; 1 381, 1 898, 3 952 ms ; 540 → 133 à 138 jetons | il tient le mode strict avec `enum` et accepte `reasoning_effort: "none"` |
+| le même : `cached_tokens` = 512 dès le 2e appel ; `model` rendu `DeepSeek-V4-Flash`, sans version ; ni `prompt_filter_results` ni `content_filter_results` ; quota 20 000 jetons et 20 requêtes par minute | il garde un cache que le champ de K-B ne coupe pas ; sa version (2026-04-23, panneau du portail) ne se lit pas dans la réponse |
+| candidat juge `Mistral-Large-3` : non déployable (« Quota insuffisant » en zone de données, seule version proposée : 1) | pas de sonde possible |
 
 **Pour #205.** La chaîne mesurée, sans nouvelle tentative, prend environ 98 s en série pour
 8 sujets (6 × 3,3 + 8 × 8,3 + 8 × 1,5). C'est sous les **240 s** que l'ingress HTTP d'Azure
@@ -230,13 +234,16 @@ dépend pas du délai de lecture.
   vides pour ces modèles ; des relevés tiers donnent 0,11 à 0,12 $ en entrée et 0,55 à 0,60 $ en
   sortie par million de jetons (non officiel).
 - **Ce que l'organisme active dans son annuaire** (Defender, journaux de diagnostic) : inconnu.
+- **DeepSeek-V4-Flash** : on ne voit pas si `DefaultV2` s'applique (aucun résultat de filtre dans la
+  réponse), ni comment couper son cache ; sa version ne se lit que dans le portail.
 - **La plus longue sortie permise par les bornes de la spec** (~6 000 à 7 000 jetons) : estimée,
   pas mesurée.
 
 ## Ce qui reste
 
-- **Candidats juges** (DeepSeek-V4-Flash, Mistral-Large-3) : mode strict à vérifier sur des
-  données fabriquées dès que Sabine les a déployés ; leur choix est en phase 3.
+- **Juge définitif** (phase 3) : DeepSeek-V4-Flash tient le mode strict, mais refuse
+  `prompt_cache_options` et garde un cache ; avant tout envoi de données réelles, il faudra un
+  réglage du client (#223) et une ligne au registre. Mistral-Large-3 n'a pas pu être déployé.
 - **#205** : plafonds de sortie, concurrence sous le quota (une rédaction ≈ 14 000 jetons estimés,
   entrée et plafond), choix « parallèle ou tâche de fond », motif de la première tentative dans la
   métrique, lot refusé par Prompt Shields.
