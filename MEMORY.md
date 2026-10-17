@@ -29,7 +29,7 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 - **arXiv bloqué au-delà de 2 000 papiers** (constat du 2026-10-05, porté par #71, hors E1 et
   non planifié). Si la fenêtre de collecte contient plus de
-  2 000 papiers, la source échoue et sa date reste (`src/k_b/etl/sources/arxiv.py:88-92`). La fenêtre
+  2 000 papiers, la source échoue et sa date reste (`src/k_b/etl/sources/arxiv.py:91-95`). La fenêtre
   suivante part du même point et finit plus tard : elle dépasse encore le plafond, la source
   échoue à chaque collecte. Cela contredit la consigne du 05/10 : lancée tous les jours, K-B
   rattrape les jours manqués (#65).
@@ -43,7 +43,14 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 ## Consignes de travail
 
 - Pour la documentation d'une bibliothèque ou d'un service, utiliser Context7 plutôt qu'une
-  lecture de page web.
+  lecture de page web. Ce que Context7 ne couvre pas : WebSearch, source et date à l'appui ;
+  WebFetch seulement sur une URL qu'une recherche du jour vient de rendre.
+- Une décision actée ne se repose pas, sauf si Sabine demande à la réviser ou si elle est notée
+  « à revoir » : chercher d'abord dans `MISSION.md`, le journal ADR et la conversation, et citer
+  d'où vient la réponse. Redemander un accord (commit, push) reste permis.
+- Un essai sur un fichier non committé ne s'annule jamais par `git checkout` (il efface aussi le
+  travail du fichier) : committer d'abord, essayer sur une copie dans le scratchpad, ou annuler
+  par une édition inverse.
 - Vérifier les faits avant de les présenter comme sûrs, sources à l'appui.
 - `brief09_assistant-veille-tech` est indicatif, il ne fait pas autorité : une décision concertée
   qui fait mieux, ou plus conforme aux pratiques reconnues, l'emporte.
@@ -54,3 +61,20 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   code HTTP, titre trouvé et titre attendu), jamais une supposition ni une interprétation
   (« probablement », « structure changée ? »). Le pourquoi d'un choix va dans les commentaires
   et la doc, pas dans les journaux.
+
+## Revue, PR et GitHub
+
+- Ordre fixe : commit → revue → rapport à Sabine → corrections sur accord → push → PR. Pas de
+  push tant que la revue n'a pas rendu son rapport.
+- `/code-review` est lancé directement par la session, jamais enveloppé dans un sous-agent : le
+  skill tourne déjà dans le sien.
+- Chaque constat de `/code-review` et `/security-review` est rapporté dans la conversation, avec
+  un avis (corriger ou non, pourquoi), avant d'ouvrir la PR. Le budget se signale ; il ne fait
+  sauter ni une étape ni ce rapport.
+- Un plan non trivial est relu par un sous-agent sans contexte avant d'être soumis, son verdict
+  rapporté en entier, sauf si la mission dit autrement.
+- Titre, description et commentaires d'une PR (compte rendu de revue compris) : en anglais. Une
+  issue et ses commentaires : en français.
+- Tout texte publié sur GitHub (description et commentaire de PR, commentaire d'issue) finit par
+  une ligne vide, `--`, puis `*Written by Claude Code*`. Un message de commit ne porte ni
+  `Co-Authored-By` ni `Claude-Session:` ; une PR ne porte pas de lien de session.

@@ -724,16 +724,17 @@ besoin mesuré.
   envoyée nulle part ; le `model` de la métrique du juge vaut `replay`, comme celui du rédacteur.
   Asymétrie assumée : en `replay`, `KB_LLM_MODEL` n'est pas lue (`ai_api/llm_settings.py`) ;
   exiger celle du juge fait échouer fermé une configuration testée en `replay` comme en vrai.
-- **Cible** : `gpt-5.6-luna`, un autre déploiement que le rédacteur (`gpt-6-luna`), dans la même
-  ressource et la même zone de données UE. Pourquoi : un modèle juge tend à mieux noter les textes
-  qui lui sont familiers, donc les siens
-  ([Wataoka et al., arXiv 2410.21819](https://arxiv.org/abs/2410.21819)). Ce biais est mesuré sur
-  l'évaluation de réponses ; l'étendre à la vérification d'une affirmation contre sa source est
-  une **hypothèse**.
-- **Repli du déploiement** (décision de Sabine du 2026-10-16) : si le quota du second déploiement
-  n'est pas accordé à temps, `KB_LLM_JUDGE_MODEL` pointe vers `gpt-6-luna`, le déploiement du
-  rédacteur ; de même, si le rédacteur passe à son repli `gpt-5.6-luna`, les deux redeviennent le
-  même modèle. Au démarrage, en `openai_compatible`, si les deux variables portent le même nom, le
+- **Cible** : en phases 1 et 2, `gpt-6-luna`, le même déploiement que le rédacteur ; le juge
+  définitif se choisit en phase 3 (fiabilité des LLM et de leurs sorties) ; candidats d'autres
+  familles relevés le 2026-10-17 : DeepSeek-V4-Flash, Mistral-Large-3 ; décisions de Sabine du 2026-10-17
+  (journal ADR, « Modèle des fiches : gpt-6-luna sur l'abonnement de l'organisme de formation »).
+  Pourquoi y penser : un modèle juge tend à mieux noter les textes qui lui sont familiers, donc
+  les siens ([Wataoka et al., arXiv 2410.21819](https://arxiv.org/abs/2410.21819)). Ce biais est
+  mesuré sur l'évaluation de réponses ; l'étendre à la vérification d'une affirmation contre sa
+  source est une **hypothèse**.
+- **Repli du déploiement** (décision de Sabine du 2026-10-16, appliquée en phases 1 et 2 par
+  celle du 2026-10-17) : `KB_LLM_JUDGE_MODEL` pointe vers `gpt-6-luna`, le déploiement du
+  rédacteur. Au démarrage, en `openai_compatible`, si les deux variables portent le même nom, le
   journal de fonctionnement le dit, en constat sur le nom, sans interprétation (« LLM judge model
   same as writer model, <nom> ») ; la ligne de métrique du juge le montre aussi (`model`). Limite :
   deux noms différents peuvent servir le même modèle ; ce cas n'est pas détecté.
@@ -803,8 +804,9 @@ nommés ») :
   et GPT-4 reste environ 8 points sous l'humain
   ([Laban et al., arXiv 2305.14540](https://arxiv.org/abs/2305.14540)) : seul l'étalonnage dira
   ce que vaut le juge ici.
-- **Même famille de modèles** : `gpt-5.6-luna` et `gpt-6-luna`. Hypothèse, non mesurée : leurs
-  erreurs restent en partie corrélées.
+- **Même modèle** : en phases 1 et 2, le juge et le rédacteur sont `gpt-6-luna`. Le biais d'un
+  juge envers ses propres textes (« Cible ») n'est pas écarté (limite assumée, journal ADR du
+  2026-10-17). Hypothèse, non mesurée : leurs erreurs restent corrélées.
 - **Filtre de contenu d'Azure** : il lit aussi l'entrée du juge (`llm_content_filtered`).
 - **Données envoyées une seconde fois** : le juge reçoit les affirmations gardées et les champs,
   coupés et masqués, des items qu'elles citent ; ces données partent une seconde fois chez le
@@ -898,8 +900,8 @@ Ce qu'un produit fini demanderait de plus ; rien n'est décidé ici.
 - La **révision après le juge** (étape possible, ci-dessus).
 - Le **lint périodique de l'ensemble des fiches** : contradictions entre fiches, péremption.
 - Le **réétalonnage du juge** à chaque changement de modèle ou de `prompt_version`.
-- Un **juge d'une autre famille de modèles** que le rédacteur (`gpt-5.6-luna` et `gpt-6-luna` sont
-  de la même famille).
+- Un **juge d'une autre famille de modèles** que le rédacteur (en phases 1 et 2, les deux sont
+  `gpt-6-luna` ; le choix se fait en phase 3).
 - Une **surveillance continue du taux de retraits du juge**, avec une alerte quand il bouge.
 
 ## Métriques
