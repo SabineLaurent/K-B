@@ -22,7 +22,7 @@ from k_b.ai_api.llm_client import (
     encode_user_message,
 )
 from k_b.ai_api.llm_settings import LlmSettings
-from k_b.ai_api.watch_items import WatchItem, WatchKind, to_item_ref
+from k_b.ai_api.watch_items import WatchItem, WatchKind, cut_value, to_item_ref
 from k_b.core.config import (
     MAX_CLASSIFICATION_INPUT_CHARS,
     MAX_FIELD_CHARS_FOR_CLASSIFICATION,
@@ -161,11 +161,10 @@ def project_for_classification(item: WatchItem) -> tuple[dict[str, object], bool
     if long_text_field is None:
         return projected, False
     long_text = fields[long_text_field]
-    if long_text is None:
-        projected[long_text_field] = None
-        return projected, False
-    projected[long_text_field] = long_text[:MAX_FIELD_CHARS_FOR_CLASSIFICATION]
-    return projected, len(long_text) > MAX_FIELD_CHARS_FOR_CLASSIFICATION
+    projected[long_text_field] = cut_value(
+        long_text, MAX_FIELD_CHARS_FOR_CLASSIFICATION
+    )
+    return projected, projected[long_text_field] != long_text
 
 
 def build_classification_schema(

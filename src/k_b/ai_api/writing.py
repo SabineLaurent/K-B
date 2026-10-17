@@ -60,8 +60,9 @@ WRITING_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
     "or a claim citing no item or more than 5. Answer with the JSON object of the schema only.",
     "subject": "Your previous answer was refused. Answer with the JSON object of the schema "
     "only.",
-    "item_id": 'Your previous answer cited an "item_id" that is not in "items", or a fact of '
-    "an item its claim does not cite. Cite only the item_id given.",
+    "item_id": 'Your previous answer cited an "item_id" that is not in "items", an item twice '
+    "in a claim, or a fact of an item its claim does not cite. Cite only the item_id given, "
+    "once per claim.",
     "completeness": "Your previous answer was refused. Answer with the JSON object of the "
     "schema only.",
     "markup": "Your previous answer had a link, an image or a tag in a text. Write plain text "
@@ -152,10 +153,12 @@ def build_writing_schema(item_refs: Sequence[str]) -> dict[str, object]:
 def check_writing(
     output: WritingOutput, item_refs: frozenset[str]
 ) -> FailedCheck | None:
-    """Check 4: each item cited was sent in this call, and each fact cites an item of its
-    claim."""
+    """Check 4: each item cited was sent in this call, once in its claim, and each fact cites
+    an item of its claim."""
     for claim in output.claims:
         if any(ref not in item_refs for ref in claim.item_ids):
+            return "item_id"
+        if len(set(claim.item_ids)) < len(claim.item_ids):
             return "item_id"
         if any(fact.item_id not in claim.item_ids for fact in claim.facts):
             return "item_id"

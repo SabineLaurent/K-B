@@ -639,3 +639,14 @@ def test_a_claim_citing_no_item_or_more_than_five_is_a_schema_failure(
 
     assert result.failed_subjects[0].subject == "security_alerts"
     assert result.stage_calls[1].llm_call.failed_check == "schema"
+
+
+def test_an_item_cited_twice_in_a_claim_is_refused(reading):
+    twice = written({**SECURITY_CLAIM, "item_ids": ["i9", "i9"]})
+
+    result, _ = digest_of(
+        reading, [classified(), twice, twice, written(AGENT_CLAIM), written()]
+    )
+
+    assert result.failed_subjects[0].subject == "security_alerts"
+    assert result.stage_calls[1].llm_call.failed_check == "item_id"

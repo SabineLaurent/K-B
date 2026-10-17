@@ -3,10 +3,12 @@ its reading by the data API and of its calls to the model (docs/fiches-veille.md
 plafonnée").
 
 The timeouts of httpx2 bound each wait, not a request: the read timeout applies to each piece of
-an answer. The deadline shortens them to the time left and is checked before each request, and,
-for the data API, between two pieces read. Limit written in the spec: an answer sent in pieces
-may still pass it; by one read timeout at most for the data API, by more for the model, whose
-answer httpx2 reads whole."""
+an answer. The deadline shortens each of them to the time left and is checked before each
+request, and, for the data API, between two pieces read. Limit written in the spec: a request
+started before the deadline may end past it by the sum of its timeouts (pool, connection, write,
+read), each shortened to the time left at its start: 30 seconds at most for the data API; for the
+model, 20 seconds and its read, without bound for an answer sent in pieces, which httpx2 reads
+whole."""
 
 import time
 from collections.abc import Callable

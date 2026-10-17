@@ -163,5 +163,7 @@ DIGEST_SUBJECTS = (
 # calls). Beyond it, a subject not yet written is llm_timeout, the others are returned.
 DIGEST_REQUEST_TIMEOUT_SECONDS = 200
 # The time a request to the model needs at least: none is sent with less left, so that the items
-# are not sent for an answer thrown away. Above the slowest writing measured by #158 (9.3 s).
+# are not sent for an answer the deadline would throw away. Above the slowest writing measured by
+# #158 (9.3 s), not above the longest one the output cap allows (about 60 s): a longer writing
+# started with less time left can still end in llm_timeout.
 MIN_SECONDS_FOR_LLM_REQUEST = 10

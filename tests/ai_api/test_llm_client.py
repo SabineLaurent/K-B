@@ -540,6 +540,7 @@ def test_the_client_of_the_provider_sends_the_key_and_follows_no_redirection():
             max_completion_tokens=500,
             check_output=accept_every_output,
             retry_reminders=RETRY_REMINDERS,
+            deadline=None,
             sleep=Sleeps(),
         )
     (request,) = transport.requests
@@ -626,6 +627,7 @@ def test_reminders_missing_for_a_check_are_refused_before_any_request():
             max_completion_tokens=500,
             check_output=accept_every_output,
             retry_reminders=reminders,
+            deadline=None,
             sleep=Sleeps(),
         )
 
@@ -655,6 +657,7 @@ def test_an_answer_that_cannot_be_decoded_is_llm_unavailable_without_retry():
             max_completion_tokens=500,
             check_output=accept_every_output,
             retry_reminders=RETRY_REMINDERS,
+            deadline=None,
             sleep=Sleeps(),
         )
 

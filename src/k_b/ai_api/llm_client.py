@@ -196,7 +196,7 @@ def call_model[OutputT: BaseModel](
     max_completion_tokens: int,
     check_output: Callable[[OutputT], FailedCheck | None],
     retry_reminders: Mapping[FailedCheck, str],
-    deadline: Deadline | None = None,
+    deadline: Deadline | None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> LlmCall[OutputT]:
     """Ask the model for an output of output_model, check it, and ask once more if the first
