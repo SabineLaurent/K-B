@@ -2425,6 +2425,58 @@ veille : le LLM juge » (2026-10-16), sans la contredire.
 Sources (consultées le 2026-10-17) : celles de `docs/fiches-veille.md`, « Sources », section
 « Juge ».
 
+### Modèle des fiches : gpt-6-luna sur l'abonnement de l'organisme de formation
+
+Décisions de Sabine du 17/10 (relayées par time-knight, qui a guidé le déploiement dans le
+portail) ; plan de #158 relu par un agent architecte plateforme Azure, validé par Sabine.
+
+- **gpt-6-luna est déployé sur l'abonnement Azure de l'organisme de formation de Sabine, dans une
+  ressource en France Central, en Zone de données standard (zone de données EUR), version
+  2026-09-22 figée (« Refuser les mises à niveau automatiques »), 140 000 jetons par minute,
+  garde-fous `DefaultV2`.** Met en œuvre « Modèle des fiches : gpt-6-luna sur Foundry »
+  (2026-10-16) sur un autre compte que celui prévu : le compte personnel d'essai, à 0 TPM, n'est
+  plus utilisé. Pourquoi l'abonnement de l'organisme : Sabine, « j'ai mon contrat de formation et
+  la ressource est faite pour y déployer le projet de certification ». Options écartées :
+  - un premier déploiement en Global Standard : le traitement peut avoir lieu dans toute région
+    Azure, contraire à la règle « zone UE quand le fournisseur l'offre »
+    (`.claude/rules/conformite.md`) ;
+  - « Mettre à niveau une fois la nouvelle version par défaut disponible », proposée par défaut :
+    elle change le modèle sans prévenir, contraire à la version figée.
+
+- **Fondement de la sous-traitance : le contrat de formation de Sabine (lecture (a)).** Le client
+  de Microsoft est l'organisme (abonnement « Plan Azure », annuaire et compte de connexion de
+  l'organisme, rôle « Lecteur » de Sabine, aucun compte de facturation visible) ; selon le DPA de
+  Microsoft du 22/05/2026, Microsoft est le sous-traitant de son client. Registre des traitements,
+  « Envoi des items au modèle des fiches ». Options écartées par Sabine :
+  - (b) écrire une limite assumée, la chaîne Sabine → organisme → Microsoft n'étant pas
+    contractualisée, comme pour Gemini le 16/10 ;
+  - (c) ne pas envoyer de données réelles sur cet abonnement : la mesure de #158 se fait sur une
+    veille réelle.
+
+  Limites assumées : un administrateur général de l'annuaire de l'organisme peut se donner accès à
+  la ressource et à ses clés ; si l'organisme active les preuves des prompts de Defender for
+  Cloud, des extraits des prompts apparaissent dans ses alertes ; Sabine, « Lecteur », ne reçoit
+  pas le courriel d'avant retrait du modèle, envoyé aux propriétaires de l'abonnement ; la durée de
+  l'accès de l'organisme n'est pas connue. L'organisme n'est nommé dans aucun fichier du dépôt
+  (décision de Sabine du 17/10 : dépôt public le 25/10).
+
+- **Le juge suit le repli du déploiement du 16/10 : `KB_LLM_JUDGE_MODEL` pointe vers
+  `gpt-6-luna`, le déploiement du rédacteur ; `gpt-5.6-luna` n'est pas déployé.** Décision de
+  Sabine du 17/10 ; applique `docs/fiches-veille.md`, « Juge », « Réglage », « Repli du
+  déploiement », sans la réviser. Option écartée : déployer `gpt-5.6-luna` dans la même ressource,
+  comme le recommandait la session (un juge d'un autre modèle que le rédacteur). Limite assumée :
+  le biais d'un juge envers ses propres textes, que la spec voulait éviter, n'est pas écarté.
+
+- **Fin des replis de fournisseur de #227 (Mistral Small 4, puis Gemini 2.5 Flash-Lite) à la
+  fusion de la PR de #158.** « Modèle des fiches : Mistral Small 4 en repli temporaire » et
+  « Gemini 2.5 Flash-Lite en repli temporaire » prévoyaient « Fin du repli : quand #158 est
+  faite ». La section du registre sur Mistral est retirée ; Gemini n'en avait pas.
+
+Sources (consultées le 2026-10-17) : celles du registre des traitements, « Sources de l'envoi au
+modèle » ; [Deployment types](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/deployment-types) ;
+[Foundry Models lifecycle and support policy](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirements).
+— PR de #158
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
