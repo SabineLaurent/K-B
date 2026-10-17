@@ -186,6 +186,7 @@ def test_the_request_is_a_chat_completion_with_a_strict_json_schema_written_as_a
             },
         },
         "max_completion_tokens": 500,
+        "prompt_cache_options": {"mode": "explicit"},
         "temperature": 0,
     }
 
@@ -204,6 +205,18 @@ def test_a_reasoning_model_gets_reasoning_effort_none_and_no_temperature():
 
     assert body["reasoning_effort"] == "none"
     assert "temperature" not in body
+
+
+@pytest.mark.parametrize("reasoning_effort", [None, "none"])
+def test_every_request_turns_the_prompt_cache_off(reasoning_effort):
+    """Explicit mode without a breakpoint: the provider writes no cache of the items."""
+    settings = replace(REPLAY_SETTINGS, reasoning_effort=reasoning_effort)
+
+    _, transport, _ = call([completion()], settings=settings)
+    (body,) = sent_bodies(transport)
+
+    assert body["prompt_cache_options"] == {"mode": "explicit"}
+    assert "cache_breakpoint" not in json.dumps(body)
 
 
 def test_an_output_refused_twice_is_llm_invalid_output():
