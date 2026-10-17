@@ -186,7 +186,7 @@ def test_a_valid_output_gives_a_digest_per_subject_with_its_sources(reading):
         (source.item_id, source.kind, source.title, source.url)
         for source in security.sources
     ] == [(9, "advisory", advisory.source_title, advisory.url)]
-    # Sent and not cited, in the order sent: the most recent first.
+    # Sent and not cited.
     assert sorted(security.not_retained) == [3, 4, 10, 17]
     assert security.claims_removed == 0
     assert security.items_uncited == ()
@@ -427,7 +427,15 @@ def test_a_classification_not_finished_by_the_deadline_is_llm_timeout(
     monkeypatch.setattr(classification, "MAX_ITEMS_PER_CLASSIFICATION_CALL", 10)
     clock = Clock()
     deadline = Deadline.after(30 + MIN_SECONDS_FOR_LLM_REQUEST - 1, clock)
-    steps = [classified(security=[3, 4, 9, 10, 17], agent=[6, 7, 8], research=[2, 1])]
+    # A valid output for the first batch: the deadline, not a refusal, stops the second.
+    steps = [
+        classified(
+            security=[3, 4, 9, 10, 17],
+            agent=[6, 7, 8],
+            research=[2, 1],
+            not_retained=[],
+        )
+    ]
     transport = SlowTransport(steps, clock, seconds_per_answer=30)
 
     result, _ = digest_of(reading, steps, deadline=deadline, transport=transport)
@@ -581,3 +589,53 @@ def test_the_retry_of_a_stage_sends_its_reminder(reading):
     assert messages_of(retry, "system")[0] != WRITING_SYSTEM_PROMPT
     assert messages_of(retry, "system")[0].startswith(WRITING_SYSTEM_PROMPT)
     assert result.stage_calls[2].llm_call.first_failed_check == "item_id"
+
+
+def schema_sent(body):
+    return body["response_format"]["json_schema"]["schema"]
+
+
+def test_the_schema_of_each_call_holds_the_items_of_this_call_only(reading):
+    _, transport = digest_of(reading, VALID_STEPS)
+
+    classification_body, security_body = sent_bodies(transport)[:2]
+    assignment = schema_sent(classification_body)["properties"]["assignments"]
+    assert assignment["items"]["properties"]["item_id"]["enum"] == [
+        f"i{item.item_id}" for item in reading.items
+    ]
+    claim = schema_sent(security_body)["properties"]["claims"]["items"]
+    sent_refs = [
+        item["item_id"]
+        for item in json.loads(messages_of(security_body, "user")[0])["items"]
+    ]
+    assert sorted(claim["properties"]["item_ids"]["items"]["enum"]) == sorted(sent_refs)
+    assert sorted(sent_refs) == sorted(f"i{item_id}" for item_id in SECURITY_ITEMS)
+
+
+def test_every_call_of_the_request_waits_no_longer_than_its_deadline(reading):
+    _, transport = digest_of(reading, VALID_STEPS, deadline=Deadline.after(50, Clock()))
+
+    assert [
+        request.extensions["timeout"]["read"] for request in transport.requests
+    ] == [50] * len(VALID_STEPS)
+
+
+@pytest.mark.parametrize("item_ids", [[], ["i3", "i4", "i9", "i10", "i17", "i3"]])
+def test_a_claim_citing_no_item_or_more_than_five_is_a_schema_failure(
+    reading, item_ids
+):
+    out_of_structure = written({**SECURITY_CLAIM, "item_ids": item_ids})
+
+    result, _ = digest_of(
+        reading,
+        [
+            classified(),
+            out_of_structure,
+            out_of_structure,
+            written(AGENT_CLAIM),
+            written(),
+        ],
+    )
+
+    assert result.failed_subjects[0].subject == "security_alerts"
+    assert result.stage_calls[1].llm_call.failed_check == "schema"
