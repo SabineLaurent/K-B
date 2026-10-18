@@ -16,7 +16,7 @@ from etl.test_transform import FIXTURES_DIR, copy_fixture
 
 from k_b import cli
 from k_b.database.writers.shared_rows import UnknownSourceError
-from k_b.etl import load
+from k_b.etl import collected_sources, load
 from k_b.etl.load import KindWithoutTableError
 from k_b.etl.source_contract import SourceKind
 from k_b.etl.sources import clipping
@@ -268,12 +268,12 @@ def test_collect_runs_gh_archive_with_the_bigquery_key(monkeypatch, tmp_path, ca
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "/path/to/a/key.json")
     monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
-    monkeypatch.setattr(cli, "GhArchiveSource", FakeGhArchiveSource)
+    monkeypatch.setattr(collected_sources, "GhArchiveSource", FakeGhArchiveSource)
 
     exit_code = cli.main(["collect"])
 
     assert exit_code == 0
-    assert created == [cli.create_bigquery_client]
+    assert created == [collected_sources.create_bigquery_client]
     output = capsys.readouterr().out
     assert "gh_archive: ok\n" in output
     assert "gh_archive: skipped" not in output
