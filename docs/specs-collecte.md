@@ -1,26 +1,41 @@
 # Spécifications de la collecte et de l'agrégation
 
-Pour chacune des 7 sources de la v0 : la technologie, l'accès et l'authentification, les limites
-de débit, les données personnelles, et ce qu'on suit. Puis le chemin du brut jusqu'au jeu d'items
-final, et la justification de BigQuery. Les décisions et leur pourquoi sont dans le
+Pour chacune des 9 sources de la v0, de 7 fournisseurs : la technologie, l'accès et
+l'authentification, les limites de débit, les données personnelles, ce qu'on suit, et ce qui se
+passe en cas de panne. Puis le chemin du brut jusqu'au jeu d'items final, et la justification de
+BigQuery. Les décisions et leur pourquoi sont dans le
 [journal ADR](ADR/journal-decisions-projet.md) ; les listes suivies, dans [sources.md](sources.md).
 
-Faits vérifiés le 2026-10-01, sources en fin de page.
+**Langage** : K-B est écrit en Python 3.13 (`.python-version` ; `requires-python = ">=3.13"` dans
+`pyproject.toml`), avec ses dépendances gérées par `uv`. Chaque source nomme ci-dessous sa
+bibliothèque de lecture.
+
+Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 2026-10-18 (#64).
 
 ## Règles communes
 
-- **Un point de lancement** : `kb collect` lance toutes les sources ; une source en panne
-  n'arrête pas les autres. Il affiche une ligne par source (`ok` ou `failed (<type d'erreur>)`),
+- **Un point de lancement** : `kb collect` lance toutes les sources, ou celles de
+  `KB_COLLECT_ONLY` (ci-dessous) ; une source en panne n'arrête pas les autres. Il affiche une
+  ligne par source (`ok` ou `failed (<type d'erreur>)`),
   `zotero: skipped (KB_ZOTERO_DIR not set)` quand le dossier de Zotero n'est pas donné,
   `clipping: skipped (KB_VAULT_DIR not set)` quand le coffre Obsidian ne l'est pas, et
-  `gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)` sans la clé BigQuery.
-  Code de sortie : **0** si tout a réussi ; **1** si une source a échoué, ou si
-  `collection_state.json` n'a pas pu être écrit (disque plein, droits) ; **2** si la collecte n'a
-  pas eu lieu (`KB_DATA_DIR` absent ou pas un dossier, état de collecte illisible). Quand l'état
-  ne s'écrit pas, le brut est déjà écrit : `kb collect` journalise l'erreur avec le chemin du
-  fichier et ajoute la ligne `collection_state: failed (<type d'erreur>)`. Les dates de
-  dernière collecte n'avancent pas : la collecte suivante relit les mêmes fenêtres, et le brut en
-  double est retiré à la transformation.
+  `gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)` sans la clé BigQuery. Quand
+  l'état ne s'écrit pas, le brut est déjà écrit : `kb collect` journalise l'erreur avec le chemin
+  du fichier et ajoute la ligne `collection_state: failed (<type d'erreur>)`. Les dates de
+  dernière collecte n'avancent pas : la collecte suivante relit les mêmes fenêtres, et l'import
+  écarte les items déjà en base (étape 4 de « Du brut au jeu d'items »).
+- **Codes de sortie** de `kb collect`, nommés par `ExitCode` (`src/k_b/commands/exit_codes.py`)
+  et listés par `kb --help` :
+
+  | Code | Nom | Quand |
+  |---|---|---|
+  | **0** | `SUCCEEDED` | chaque source lancée a réussi ; une source sans rien de neuf réussit (`ok`, rien d'écrit, sa date avance) |
+  | **1** | `FAILED` | aucune source lancée n'a réussi ; ou `collection_state.json` n'a pas pu être écrit (disque plein, droits), quel que soit le sort des sources ; ou une exception que `kb` ne traite pas, journalisée avec sa trace |
+  | **4** | `PARTIAL_FAILURE` | au moins une source a réussi, au moins une a échoué, et l'état est écrit : les sources réussies sont acquises, les autres repartent de leur date à la collecte suivante |
+  | **2** | `NOT_STARTED` | rien n'a été collecté, ni brut ni état écrit : `KB_DATA_DIR` absente ou vide ; `KB_DATA_DIR` qui n'est pas un dossier existant ; `KB_LOG_TO_FILE` qui n'est ni `true` ni `false` ; fichier de journal qui ne s'ouvre pas ; `collection_state.json` illisible ou invalide (pas du JSON, pas un objet, une date sans fuseau) ; `KB_COLLECT_ONLY` refusée (ci-dessous) ; commande absente ou inconnue, refusée par `argparse` (son message d'usage, sur la sortie d'erreur seulement : le journal n'est pas encore ouvert) |
+  | **143** | `STOPPED_BY_SIGTERM` | arrêt par SIGTERM (`docker stop`) : le brut déjà écrit reste, l'état n'est pas écrit, et la collecte suivante relit les mêmes fenêtres |
+
+  Le code 3 (`SERVER_NOT_STARTED`) est propre à `kb serve`.
 - **Choisir les sources** (#201) : `KB_COLLECT_ONLY`, posée, ne lance que les sources nommées,
   séparées par des virgules (`KB_COLLECT_ONLY=zotero,clipping`, la collecte du Mac au POC ; les
   conteneurs collectent le reste). Un nom est le dossier d'une source sous `raw/` (`FOLDER_PREFIX`) :
