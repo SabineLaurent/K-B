@@ -9,11 +9,12 @@ nothing in the base, and leaves no log; an interruption (Ctrl-C, SIGTERM) receiv
 has committed keeps the import and its log. A file registered is not read again, except by a
 rebuild of the base.
 
-The base removes the duplicates. The writer of each kind (database/writers/) holds, in its
-SQL, the rule of the nature of its source: a news feed keeps the first version seen; a state
-catalog keeps the version of its latest collection; a feed with revisions keeps the newest
-revision. An item left out is returned with its rule and the date it was compared with, then
-written to the log. Run again on the same raw, the import gives the same base.
+The base removes the duplicates. The writer of each kind (database/writers/, chosen by
+database/writing.py) holds, in its SQL, the rule of the nature of its source: a news feed keeps
+the first version seen; a state catalog keeps the version of its latest collection; a feed with
+revisions keeps the newest revision. An item left out is returned with its rule and the date
+it was compared with, then written to the log. Run again on the same raw, the import gives the
+same base.
 
 A ranking of GH Archive is not made of items: its rows go to the trend table, in the same
 transaction, and its rule is a news feed applied to the whole window. A Zotero entry is a state
@@ -30,7 +31,7 @@ docs/specs-collecte.md).
 
 import logging
 import sqlite3
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -40,18 +41,15 @@ from k_b.core.quoting import quote_value
 from k_b.database.connection import check_database_exists, connect_database
 from k_b.database.reading import read_raw_file_paths
 from k_b.database.savepoint import EntryRefusedError, write_in_savepoint
-from k_b.database.writers import (
-    advisory_writer,
-    clip_writer,
-    newsletter_article_writer,
-    paper_writer,
-    release_writer,
-    shared_rows,
-    trend_writer,
-    vulnerability_writer,
-    zotero_entry_writer,
+from k_b.database.writing import (
+    Discard,
+    mark_withdrawn_vulnerabilities_not_in,
+    mark_withdrawn_zotero_rows_not_in,
+    write_item,
+    write_raw_data,
+    write_tracked_repositories,
+    write_trend_rows,
 )
-from k_b.database.writers.discard import Discard
 from k_b.etl.import_log import TrendDiscard, write_import_log
 from k_b.etl.normalize import normalize_item
 from k_b.etl.raw_store import find_stream
@@ -70,10 +68,6 @@ logger = logging.getLogger(__name__)
 
 class ImportLogExistsError(FileExistsError):
     """The log of this second is already written: the log of an import is never rewritten."""
-
-
-class KindWithoutTableError(LookupError):
-    """An item's kind has no table in the base yet: the import refuses it."""
 
 
 class ImportSummary(NamedTuple):
@@ -127,7 +121,7 @@ def import_items(
     connection = connect_database(database_path)
     try:
         try:
-            release_writer.write_tracked_repositories(connection, tracked_repositories)
+            write_tracked_repositories(connection, tracked_repositories)
             writing = write_files(
                 connection, reading, trend_reading, tracked_repositories
             )
@@ -335,19 +329,9 @@ def write_item_in_savepoint(
         )
 
 
-def write_item(
-    connection: sqlite3.Connection, item: Item, raw_data_id: int
-) -> Discard | None:
-    """Write the item of the raw data raw_data_id, or return why the base left it out."""
-    write_kind = WRITER_BY_KIND.get(item.kind)
-    if write_kind is None:
-        raise KindWithoutTableError(f"kind without a table in the base: {item.kind}")
-    return write_kind(connection, item, raw_data_id)
-
-
 def register_raw_file(connection: sqlite3.Connection, raw_file: RawFile) -> int:
     """Register the file read under its stream, the name of its source folder."""
-    return shared_rows.write_raw_data(
+    return write_raw_data(
         connection,
         raw_file.source_code,
         raw_file.raw_file_path,
@@ -370,7 +354,7 @@ def write_trend_file(
     try:
         with write_in_savepoint(connection):
             raw_data_id = register_raw_file(connection, trend_file.raw_file)
-            written_count, collected_at_by_window_left_out = trend_writer.write(
+            written_count, collected_at_by_window_left_out = write_trend_rows(
                 connection, trend_file.rows, raw_data_id
             )
     except EntryRefusedError as refusal:
@@ -412,7 +396,7 @@ def withdraw_absent_vulnerabilities(
     ]
     if not present_cve_ids or raw_file.rejection_count:
         return 0
-    return vulnerability_writer.withdraw_absent(
+    return mark_withdrawn_vulnerabilities_not_in(
         connection,
         raw_file.source_code,
         raw_file.collected_at,
@@ -433,21 +417,9 @@ def withdraw_absent_zotero_rows(
     entries = [item for item in raw_file.items if item.kind == "zotero_entry"]
     if not entries or raw_file.rejection_count:
         return 0
-    return zotero_entry_writer.withdraw_absent(
+    return mark_withdrawn_zotero_rows_not_in(
         connection, raw_file.source_code, raw_file.collected_at, raw_data_id, entries
     )
-
-
-# The kinds that have a table in the base, each with its writer.
-WRITER_BY_KIND: dict[str, Callable[[sqlite3.Connection, Item, int], Discard | None]] = {
-    "paper": paper_writer.write,
-    "vulnerability": vulnerability_writer.write,
-    "release": release_writer.write,
-    "advisory": advisory_writer.write,
-    "newsletter_article": newsletter_article_writer.write,
-    "zotero_entry": zotero_entry_writer.write,
-    "clip": clip_writer.write,
-}
 
 
 def check_log_absent(log_path: Path) -> None:

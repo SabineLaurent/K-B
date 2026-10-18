@@ -2,11 +2,11 @@
 rule 5).
 
 Under k_b: core and items are the common vocabulary, database reads and writes the base (its
-writers under database/writers), etl runs the pipeline, data_api serves the base, ai_api calls the
-model, cli and commands compose. Under k_b.etl: the composition (source_kinds, collected_sources) →
-the sources → the modules of the pipeline. Under k_b.ai_api: digests → the stages → the clients →
-the settings → outbound and llm_replay → deadline and watch_items; a module imports only the layers
-below its own.
+writers under database/writers, behind database/writing), etl runs the pipeline, data_api serves
+the base, ai_api calls the model, cli and commands compose. Under k_b.etl: the composition
+(source_kinds, collected_sources) → the sources → the modules of the pipeline. Under k_b.ai_api:
+digests → the stages → the clients → the settings → outbound and llm_replay → deadline and
+watch_items; a module imports only the layers below its own.
 """
 
 import ast
@@ -263,9 +263,47 @@ def test_database_imports_only_items_and_core():
         )
 
 
-# The data API reads the base: never the pipeline nor the writers (conventions.md, rule 5).
+# database/writing.py is the only door to the writers: outside database, no module imports
+# database/writers (#251).
+def list_imports_of_the_writers(imported: set[str]) -> set[str]:
+    """The names, outside database, that give access to the writers: `from k_b import
+    database` reaches them, `from k_b.database import writing` does not."""
+    return {name for name in imported if reaches(name, {"database.writers"})}
+
+
+def test_only_database_imports_its_writers():
+    paths = [
+        path.relative_to(PACKAGE_DIR).as_posix()
+        for path in sorted(PACKAGE_DIR.rglob("*.py"))
+        if not path.is_relative_to(PACKAGE_DIR / "database")
+        and list_imports_of_the_writers(list_imported_modules(path, find_package(path)))
+    ]
+
+    assert paths == []
+
+
+@pytest.mark.parametrize(
+    ("package", "code", "is_refused"),
+    [
+        ("k_b.etl", "from k_b.database import writers", True),
+        ("k_b.etl", "import k_b.database.writers.paper_writer as writer", True),
+        ("k_b.etl", "from ..database.writers.discard import Discard", True),
+        ("k_b.etl.sources", "from ...database import writers", True),
+        ("k_b.etl", "from k_b import database", True),
+        ("k_b.etl", "from k_b.database.writing import write_item", False),
+        ("k_b.commands", "from k_b.database import writing", False),
+    ],
+)
+def test_the_rule_of_the_writers_refuses_every_way_to_them(package, code, is_refused):
+    imported = parse_imported_modules(code, package=package)
+
+    assert bool(list_imports_of_the_writers(imported)) is is_refused
+
+
+# The data API reads the base: never the pipeline, the writers nor their door (conventions.md,
+# rule 5).
 DATA_API_ALLOWED_MODULES = {"data_api", "database", "items", "core"}
-DATA_API_FORBIDDEN_MODULES = {"database.writers"}
+DATA_API_FORBIDDEN_MODULES = {"database.writers", "database.writing"}
 
 
 def list_forbidden_imports_of_the_data_api(imported: set[str]) -> set[str]:
@@ -295,6 +333,8 @@ def test_data_api_imports_only_data_api_database_items_and_core():
         ("from k_b.database.writers import paper_writer", True),
         ("from k_b.database import writers", True),
         ("from k_b.database.writers.paper_writer import write", True),
+        ("from k_b.database.writing import write_item", True),
+        ("from k_b.database import writing", True),
         ("from k_b import database", False),
         ("from k_b.database.reading import read_items", False),
         ("from k_b.data_api.errors import ApiError", False),

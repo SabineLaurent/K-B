@@ -8,10 +8,9 @@ from pathlib import Path
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME
 from k_b.database.connection import DATABASE_FILE_NAME, MissingDatabaseError
-from k_b.database.writers.shared_rows import UnknownSourceError
+from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl.load import (
     ImportLogExistsError,
-    KindWithoutTableError,
     import_items,
     read_imported_paths,
 )

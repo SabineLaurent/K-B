@@ -20,13 +20,14 @@ from test_items import (
 )
 from test_transform import FIXTURES_DIR, convert_line, copy_fixture
 
+from k_b.database import writing
 from k_b.database.connection import MissingDatabaseError, connect_database
 from k_b.database.creation import create_database
 from k_b.database.writers.shared_rows import UnknownSourceError
+from k_b.database.writing import KindWithoutTableError
 from k_b.etl import load as import_items_module
 from k_b.etl.load import (
     ImportLogExistsError,
-    KindWithoutTableError,
     import_items,
     read_imported_paths,
 )
@@ -692,9 +693,7 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(
     def fail_on_vulnerability(connection, item, raw_data_id):
         raise sqlite3.OperationalError("disk I/O error")
 
-    monkeypatch.setitem(
-        import_items_module.WRITER_BY_KIND, "vulnerability", fail_on_vulnerability
-    )
+    monkeypatch.setitem(writing.WRITER_BY_KIND, "vulnerability", fail_on_vulnerability)
 
     with pytest.raises(sqlite3.OperationalError, match="disk I/O error"):
         run_import(data_dir)
@@ -707,7 +706,7 @@ def test_a_foreign_key_the_base_refuses_stops_the_import_and_writes_nothing(
     data_dir, monkeypatch
 ):
     tables_before = dump_database(data_dir)
-    write_vulnerability = import_items_module.WRITER_BY_KIND["vulnerability"]
+    write_vulnerability = writing.WRITER_BY_KIND["vulnerability"]
 
     # A writer that points its item at a raw file the base does not have: not due to the
     # entry, it is not a rejection.
@@ -715,7 +714,7 @@ def test_a_foreign_key_the_base_refuses_stops_the_import_and_writes_nothing(
         return write_vulnerability(connection, item, raw_data_id + 1_000)
 
     monkeypatch.setitem(
-        import_items_module.WRITER_BY_KIND,
+        writing.WRITER_BY_KIND,
         "vulnerability",
         write_with_an_unknown_raw_file,
     )
@@ -841,7 +840,7 @@ def test_an_item_of_a_kind_without_writer_is_refused_and_nothing_written(
     tmp_path, monkeypatch
 ):
     # Every kind has its writer: one is removed, as for a kind added before its table.
-    monkeypatch.delitem(import_items_module.WRITER_BY_KIND, "newsletter_article")
+    monkeypatch.delitem(writing.WRITER_BY_KIND, "newsletter_article")
     source_dir = tmp_path / "raw" / "automated_watch" / "fake"
     source_dir.mkdir(parents=True)
     (source_dir / "2026-10-05T093000Z.txt").write_text("v1.0\n")
