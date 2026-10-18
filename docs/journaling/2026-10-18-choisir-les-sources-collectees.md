@@ -62,21 +62,24 @@ auraient cassé.
 
 ### 2.3 Lire une fois, vérifier tout, avant de collecter
 
-`read_collect_only` (`src/k_b/cli.py:446-459`) découpe la valeur aux virgules, retire les espaces et
-met chaque nom en minuscules, une seule fois :
+`read_collect_only` (`src/k_b/cli.py:447-459`) découpe la valeur aux virgules une seule fois et
+retire les espaces autour de chaque entrée :
 
 ```python
 entries = tuple(entry.strip() for entry in value.split(","))
-names = tuple(entry.lower() for entry in entries)
-refusal = find_collect_only_refusal(entries, names, environ)
+refusal = find_collect_only_refusal(entries, environ)
+...
+return CollectOnly(frozenset(entry.lower() for entry in entries))
 ```
 
-Deux tuples parallèles : `names` sert à comparer et à collecter ; `entries` garde la forme tapée
-pour la citer dans un refus (`TLDR_AI` est cité `'TLDR_AI'`, pas `'tldr_ai'`). La première passe
-de la revue de code avait relevé que la mise en minuscules était écrite trois fois. Elle est
-maintenant calculée une seule fois, et les noms vérifiés sont exactement les noms collectés.
+La mise en minuscules se fait à deux endroits, chacun une fois : dans la boucle de vérification
+(`name = entry.lower()`, `src/k_b/cli.py:474`) et pour l'ensemble retenu. `entries` garde la forme
+tapée, sans les espaces autour, pour la citer dans un refus (`TLDR_AI` est cité `'TLDR_AI'`, pas
+`'tldr_ai'`). La première revue avait relevé trois `.lower()` éparpillés. Un essai avec deux tuples
+parallèles (`entries` et `names`) a été écarté à la seconde revue : deux appels d'une fonction pure
+valent mieux qu'un second paramètre qui doit rester accordé au premier.
 
-`find_collect_only_refusal` (`src/k_b/cli.py:462-484`) refuse, dans l'ordre :
+`find_collect_only_refusal` (`src/k_b/cli.py:462-485`) refuse, dans l'ordre :
 - une valeur vide ou faite d'espaces (un seul élément vide après le découpage) ;
 - une entrée vide (`zotero,`) ;
 - un nom qui n'est pas un dossier de source ;
@@ -87,13 +90,12 @@ Ce dernier cas répond à un fait relevé par le relecteur du plan. Si plus aucu
 Python. Sans ce refus, `KB_COLLECT_ONLY=zotero` sans `KB_ZOTERO_DIR` sortirait avec 0 sans avoir rien
 fait.
 
-Le refus intervient avant `collect_all_sources` (`src/k_b/cli.py:425-427`) : ni brut ni
+Le refus intervient avant `collect_all_sources` (`src/k_b/cli.py:426-428`) : ni brut ni
 `collection_state.json` n'est écrit. Le refus va au journal, par `logger.error`, ouvert par `main`.
 
 ### 2.4 Une seule lecture de l'environnement
 
-`run_collect` (`src/k_b/cli.py:422-443`) lit `os.environ` une fois et passe le même objet aux trois
-fonctions :
+`run_collect` (`src/k_b/cli.py:422-444`) passe la même table, `os.environ`, aux trois fonctions :
 
 ```python
 environ = os.environ
@@ -105,10 +107,13 @@ list_collected_sources(collect_only, environ),
 La première version vérifiait les variables dans l'`environ` reçu, mais créait les sources en
 relisant `os.environ`. En production, c'est le même objet. Mais la règle « ce qui est vérifié est
 ce qui est utilisé » ne se lisait plus dans le code. C'est le constat 4 de la revue, corrigé.
+Limite, écrite dans le commentaire : le client BigQuery lit lui-même `os.environ`, et pas cette
+table. Une copie `dict(os.environ)` a été écartée pour cette raison : elle déplacerait l'écart au
+lieu de le fermer.
 
 ### 2.5 Une ligne par source, même écartée
 
-`print_skipped_sources` (`src/k_b/cli.py:508-518`) garde la règle « une ligne par source » de
+`print_skipped_sources` (`src/k_b/cli.py:509-519`) garde la règle « une ligne par source » de
 `docs/specs-collecte.md` :
 
 ```python
@@ -138,8 +143,9 @@ journal. Les 9 noms de dossier listés dans le message sont des constantes du co
 |---|---|---|
 | Nom de la variable | `KB_COLLECT_ONLY` : un filtre de `kb collect` (décision de Sabine, 18/10) | `KB_SOURCES` : laisse croire qu'elle définit les sources |
 | Noms admis | `folder_prefix` (critère de #201) | `source.name` (`tldr_ai`) : n'existe pas pour Zotero, les clips et GH Archive avant leur création ; `source_code` : `github` regroupe trois sources (critère de #201) |
-| Casse | Comparée en minuscules, entrée citée telle qu'écrite (décision de Sabine, 18/10) | Comparaison exacte (plan d'origine) : `Zotero` échouait pour rien |
+| Casse | Comparée en minuscules, entrée citée telle qu'écrite, sans les espaces autour (décision de Sabine, 18/10) | Comparaison exacte (plan d'origine) : `Zotero` échouait pour rien |
 | Hôtes de l'API | `KB_DATA_API_ALLOWED_HOSTS` reste strict (`cli.py:155-158`) : `TrustedHostMiddleware` compare le `Host` reçu tel quel | Les aligner : une mise en minuscules y changerait ce que le contrôle de sécurité compare. Un nom de `KB_COLLECT_ONLY` ne fait que désigner un des 9 dossiers |
+| Minuscules | Un `.lower()` dans la boucle de vérification, un pour l'ensemble retenu (seconde revue, tranché par time-knight) | Deux tuples parallèles gardés par `zip(strict=True)` : un paramètre de plus à garder accordé |
 | Valeur vide | Refusée, code 2 (échouer fermé, comme `KB_DATA_API_ALLOWED_HOSTS`) | Vide = non posée, comme `KB_ZOTERO_DIR` : un filtre posé vide par erreur collecterait tout |
 | Source choisie sans sa variable | Refusée, code 2 (décision de Sabine, option b) | (c) refuser seulement si rien ne tourne : `zotero,clipping` avec le coffre oublié sortirait 0 sans les clips ; (a) garder le saut : sortie 0 sans rien faire |
 | Source écartée | Une ligne `skipped (not in KB_COLLECT_ONLY)` (décision de Sabine) | Rien afficher : le résultat ne dirait plus qu'un filtre a joué |
@@ -167,7 +173,7 @@ journal. Les 9 noms de dossier listés dans le message sont des constantes du co
 1. **Pourquoi refuser `zotero` sans `KB_ZOTERO_DIR`, alors que sans filtre on saute simplement
    Zotero ?** Sans filtre, d'autres sources tournent toujours, et la ligne `skipped` le dit. Avec un
    filtre, un choix explicite qui ne peut pas tourner est un réglage faux. Et si c'était la seule
-   source choisie, `all([])` ferait sortir avec 0 sans rien faire (`cli.py:481-483`).
+   source choisie, `all([])` ferait sortir avec 0 sans rien faire (`cli.py:482-484`).
 2. **Pourquoi la casse ne compte pas ici, alors qu'elle compte pour les hôtes de l'API ?** Un nom
    de `KB_COLLECT_ONLY` ne fait que désigner un des 9 dossiers du code. Les minuscules ne peuvent
    rien élargir. Les hôtes de l'API, eux, sont comparés tels quels par `TrustedHostMiddleware` : un
