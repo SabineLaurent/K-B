@@ -1,11 +1,11 @@
-"""The dependencies go one way, read at two levels (conventions.md, rule 5).
+"""The dependencies go one way, read at two levels, three under k_b.ai_api (conventions.md,
+rule 5).
 
 Under k_b: core and items are the common vocabulary, database reads and writes the base (its
 writers under database/writers), etl runs the pipeline, data_api serves the base, ai_api calls the
-model, cli composes. Under k_b.etl: the
-composition (source_kinds) → the sources → the modules of the pipeline. Under k_b.ai_api, read at
-three levels: digests → the stages → the clients → the settings → outbound and llm_replay →
-deadline and watch_items; a module imports only the layers below its own.
+model, cli composes. Under k_b.etl: the composition (source_kinds) → the sources → the modules of
+the pipeline. Under k_b.ai_api: digests → the stages → the clients → the settings → outbound and
+llm_replay → deadline and watch_items; a module imports only the layers below its own.
 """
 
 import ast
@@ -36,7 +36,8 @@ COMPOSITION_MODULES = {"cli"} | ETL_COMPOSITION_MODULES
 
 
 def list_imported_modules(path: Path, package: str, depth: int = 2) -> set[str]:
-    """The k_b modules imported by the module at path, of the given package."""
+    """The k_b modules imported by the module at path, of the given package, cut at depth
+    levels (see parse_imported_modules)."""
     return parse_imported_modules(path.read_text(), package, depth)
 
 
@@ -345,7 +346,10 @@ def name_module(path: Path) -> str:
 def list_upward_imports_of_the_ai_api(module: str, imported: set[str]) -> set[str]:
     """The names a module of ai_api may not import: those that reach a module of its layer or
     of a layer above (`from k_b import ai_api` reaches them all)."""
-    layer = next(i for i, modules in enumerate(AI_API_LAYERS) if module in modules)
+    layer = next(
+        (i for i, modules in enumerate(AI_API_LAYERS) if module in modules), None
+    )
+    assert layer is not None, f"{module} is in no layer of AI_API_LAYERS"
     own_layer_and_above = set().union(*AI_API_LAYERS[layer:])
     return {name for name in imported if reaches(name, own_layer_and_above)}
 
