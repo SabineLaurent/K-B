@@ -17,8 +17,13 @@ une limite près : après un catalogue CISA importé en retard, les dates d'une 
 [specs-collecte.md](specs-collecte.md)). `kb import` n'importe que les fichiers bruts pas encore
 importés : leur registre est la table `raw_data`.
 Elle ne contient que ce que le brut contient (les papiers arXiv écartés à la requête n'y sont pas).
-Ce qui la lira (les commandes `kb search` et `kb top`, une API REST locale) est décidé et pas
-encore codé (journal ADR, 2026-10-08 et 2026-10-09).
+Elle est lue par l'API de données, lancée par `kb serve` ([specs-api.md](specs-api.md)) : routes
+`/items`, `/items/{item_id}` et `/trends` (`src/k_b/data_api/routers/item_router.py`,
+`trend_router.py`), qui ouvrent la base en lecture seule (`src/k_b/data_api/dependencies.py`,
+`connect_database_read_only`). Le code des fiches de veille (`src/k_b/ai_api/`) n'ouvre pas la
+base : il lit la veille par l'API de données (`ai_api/connectors/data_api_client.py`), et n'est
+pas encore servi (#156). `kb search` vient après le 08/11 (journal ADR, 2026-10-15, « POC du
+25/10 », décision 1).
 
 ## Le SGBD : SQLite
 
@@ -47,8 +52,8 @@ dans la base. Une migration vers PostgreSQL reste possible si le besoin change (
   l'exécutent à chaque ouverture.
 - **Mode WAL** (`PRAGMA journal_mode = WAL`, gardé dans le fichier) : le pipeline écrit pendant
   que l'API lit, sans se bloquer. Tous les programmes tournent sur la même machine.
-- **Lecture seule** : `connect_database_read_only` ouvre la base en `mode=ro`, pour ses lecteurs
-  à venir (l'API de données, `kb search`). Une lecture en `mode=ro` crée les fichiers `-shm`
+- **Lecture seule** : `connect_database_read_only` ouvre la base en `mode=ro`, pour l'API de
+  données. Une lecture en `mode=ro` crée les fichiers `-shm`
   et `-wal` s'ils manquent, dans le dossier de la base, et les laisse à sa fermeture
   (documentation SQLite, WAL, § 5 ; constat sur SQLite 3.50.4).
 - **Dates** : du texte `AAAA-MM-JJTHH:MM:SSZ`, en UTC. Un `CHECK` refuse toute autre forme, et
