@@ -2657,6 +2657,51 @@ Décisions de Sabine du 2026-10-17 sur le plan de #14, relayées par time-knight
   Limite assumée : le texte peut contenir la signature de l'article et les notes de
   l'utilisatrice (registre des traitements). — PR de #14
 
+## 2026-10-18
+
+### API IA : organisation par rôle
+
+Décisions de Sabine du 2026-10-17 et du 2026-10-18 sur #242, relayées par time-knight.
+
+- **Le paquet `src/k_b/ai_api/` reprend le plan de l'API de données : un dossier par rôle.
+  `connectors/` (`outbound.py`, `llm_replay.py`, `llm_settings.py`, `llm_client.py`,
+  `data_api_settings.py`, `data_api_client.py`) ; `stages/` (`classification.py`, `writing.py`,
+  les étapes qui appellent le modèle) ; à la racine, `digests.py` (le parcours), `deadline.py` et
+  `watch_items.py`. Après #156, la racine reçoit le plan de `data_api` : `app.py`, `routers/`,
+  `schemas/`, `errors.py`, `dependencies.py`, `health.py`, `request_log.py`.** Pourquoi, selon
+  Sabine : voir ce qui est où d'un coup d'œil, l'organisation apprise en DWWM, déjà celle de
+  `data_api` (entrée du 2026-10-14, « Paquet `src/k_b/data_api/`, organisé par rôle », qui
+  écartait les fichiers à plat « quand l'API IA reprendra le même plan »). Ranger avant #156 et
+  #206, pour qu'aucun code nouveau ne soit déplacé ensuite ; un déplacement seul, sans changement
+  de logique. `connectors/` regroupe le code par lequel l'API IA se connecte aux services
+  extérieurs, et chaque module y joue le rôle d'une Gateway au sens de Martin Fowler (« An object
+  that encapsulates access to an external system or resource »,
+  [Catalog of Patterns of Enterprise Application Architecture](https://martinfowler.com/eaaCatalog/),
+  entrée [Gateway](https://martinfowler.com/eaaCatalog/gateway.html), consulté le 2026-10-18).
+  Les noms de fichiers ne changent pas ; `tests/ai_api/` reste à plat, comme `tests/data_api/`.
+  Options écartées : un dossier `settings/` (`llm_settings` importe `llm_replay` : `settings/` et
+  `connectors/` s'importeraient l'un l'autre) ; un dossier `digests/` pour toute la chaîne
+  (`data_api_client` importe `watch_items`) ; `digests.py` dans `stages/` (c'est le parcours, pas
+  une étape) ; `deadline` et `watch_items` dans `common/` (un dossier pour deux modules) ; le nom
+  `clients/` (« client » désigne déjà, dans `data_api`, celui qui appelle l'API avec sa clé) ;
+  les noms `gateways/`, `adapters/`, `outgoing/`, un dossier `services/`, des fichiers renommés
+  en `<entité>_<rôle>.py` et `watch_items` sous `schemas/` (raison non consignée dans #242).
+  Limite assumée : le nom de journal de `llm_settings` et de `data_api_settings`
+  (`getLogger(__name__)`) devient `k_b.ai_api.connectors.*`, écrit dans chaque ligne ; rien ne
+  lance encore l'API IA. — PR de #242
+- **Le sens des imports dans `ai_api` est tenu par un test, lu à trois niveaux, en six couches
+  du bas vers le haut : `deadline` et `watch_items` ; `outbound` et `llm_replay` ; les deux
+  réglages ; les deux clients ; les deux étapes ; `digests`. Un module n'importe que les couches
+  sous la sienne : deux modules d'une même couche ne s'importent pas ; un `__init__.py` n'importe
+  rien d'`ai_api`.** Décision de Sabine du 2026-10-18, sur recommandation. Pourquoi, celui de la
+  recommandation : une liste par couche et une seule règle, sur le modèle de la règle interne
+  d'`etl` ; le code de `main` la respecte (25 imports internes, tous vers une couche
+  inférieure). Le test ajoute un paramètre `depth` (2 par défaut) à `parse_imported_modules` et
+  à `list_imported_modules` : les tests existants et `AI_API_ALLOWED_MODULES` ne changent pas.
+  Options écartées : les flèches de #242 seules, qui laissent deux étapes s'importer ; une table
+  « module → modules permis », plus longue que six couches. Limite assumée : un import latéral
+  dont on aurait besoin un jour se décidera alors, et changera le test. — PR de #242
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
