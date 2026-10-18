@@ -14,7 +14,8 @@ K-B a deux portes d'entrée :
   restent immuables, et le wiki relie les pages, signale les contradictions et date ce qu'il
   affirme.
 
-Les données restent sur ma machine, et l'inférence passe par une API. Je lis dans Obsidian et
+Au POC du 25/10, les données restent sur ma machine, et l'inférence passe par une API ; au 08/11,
+K-B est mis en ligne sur Azure (voir « Conduite du projet »). Je lis dans Obsidian et
 j'interroge depuis le terminal. La revue des implémentations existantes est dans
 [docs/veille/2026-09-23-veille-existant.md](docs/veille/2026-09-23-veille-existant.md). Le constat principal :
 aucune ne fait de veille datée.
@@ -80,6 +81,87 @@ pour les papiers que je garde dans Zotero :
 - Les livres en PDF, et les images, tableaux et pages scannées des PDF.
 - Le serveur MCP.
 - Tout entraînement de modèle.
+
+## Conduite du projet
+
+### Acteurs
+
+- **Moi** : je porte le projet, je le pilote, je relis, je teste, je décide et je fusionne. K-B
+  est mon projet support de la certification Développeur IA (RNCP37827).
+- **Claude Code** écrit l'essentiel du code et de la documentation, sous ma relecture.
+- **time-knight**, un agent Claude Code, tient les jalons et relaie mes décisions.
+- **Mon organisme de formation** fournit l'abonnement Azure sur lequel tourne le modèle.
+
+Les utilisateurs du produit sont décrits plus haut, dans « Utilisateurs ».
+
+### Contraintes techniques
+
+- **Python 3.13** (`.python-version`), seul langage du projet ; dépendances et environnement
+  par [uv](https://docs.astral.sh/uv/).
+- **Base** : SQLite au POC du 25/10, PostgreSQL à la mise en ligne du 08/11. D'ici là, aucun
+  SQL propre à SQLite n'est ajouté (règle 1 de `.claude/rules/poc.md`).
+- **Données hors du dépôt**, dans le dossier `KB_DATA_DIR` (`~/.knowledge_base` sur ma machine,
+  journal ADR du 2026-10-09). Au POC, la base ira dans un volume nommé et le brut dans un dossier
+  partagé avec les conteneurs (journal ADR, 2026-10-15, « POC du 25/10 », décision 2 ; #200).
+- **Réglages par variables d'environnement** : hôtes, ports, chemins et secrets ; un secret n'a
+  pas de valeur par défaut (règle 2 de `.claude/rules/poc.md`).
+- **Données personnelles** : le modèle traite en zone de données UE ; ce que K-B garde, et
+  combien de temps, est tenu par le [registre des traitements](docs/registre-traitements.md).
+- **Contrôles** : chaque PR vers `main`, branche protégée, passe les quatre jobs de la CI
+  (`audit`, `tests`, `lint`, `types`) avant d'être fusionnée.
+
+### Budget
+
+| Poste | Coût |
+|---|---|
+| API GitHub | un jeton en lecture seule, sans frais ([docs/jeton-github.md](docs/jeton-github.md)) |
+| BigQuery (GH Archive) | bac à sable sans compte de facturation : au-delà du quota gratuit (1 Tio lu par mois), une requête est refusée, jamais facturée ([docs/bigquery.md](docs/bigquery.md)) |
+| Modèle des fiches | gpt-6-luna sur Azure AI Foundry, sur l'abonnement Azure de mon organisme de formation, fourni pour ce projet : région France Central, zone de données UE, 140 000 jetons par minute (journal ADR, 2026-10-17). Je n'en vois pas la facturation. Ordre de grandeur : au pire environ 420 000 jetons par demande de fiches, à 0,12 $ en entrée et 0,60 $ en sortie par million de jetons, prix UE (journal ADR, 2026-10-16) |
+| Mise en ligne du 08/11 (Azure Container Apps, PostgreSQL, Blob Storage) | non chiffrée à ce jour |
+| Temps | chaque issue porte son estimation en heures ; les jalons les regroupent |
+
+### Organisation du travail
+
+Une issue par changement, suivie sur un board GitHub Project (Backlog, Ready, In progress, In
+review, Done). Chaque changement suit le même cycle : une conception courte dans l'issue, que je
+valide ; une branche ; les tests d'abord ; les contrôles du dépôt ; une revue par un agent sans
+contexte ; une note pédagogique ([docs/journaling/](docs/journaling/)) ; une PR vers `main`, que
+je fusionne. Les décisions et leur pourquoi sont consignées dans le
+[journal ADR](docs/ADR/journal-decisions-projet.md).
+
+### Planning
+
+Les jalons et leurs issues sont sur la
+[page des jalons](https://github.com/SabineLaurent/K-B/milestones). Les jalons à venir, relevés
+le 18/10/2026 :
+
+| Jalon | Échéance |
+|---|---|
+| POC 25/10 | 25/10/2026 |
+| Fiches de veille tous les 3 jours | 01/11/2026 |
+| Mise en ligne 08/11 | 08/11/2026 |
+| Wiki : ingest des clips | sans date, après le 29/10 |
+
+### Le POC du 25/10 et la suite
+
+**Le 25/10** (journal ADR, 2026-10-15, « POC du 25/10 ») : un POC en conteneurs Docker en
+localhost, qui fait tourner la collecte, l'API de données et l'API IA. L'API IA rédige des fiches
+de veille par sujet, sur une fenêtre réglable (`KB_DIGEST_WINDOW_DAYS`, 3 jours par défaut), avec
+gpt-6-luna ; le modèle ne choisit le sujet que dans une liste fermée que je tiens. Le retour se
+lit dans la console : ni interface dédiée ni front. Zotero et les clips restent collectés sur ma
+machine (`KB_COLLECT_ONLY`), sans que ma bibliothèque soit montée dans un conteneur. La collecte et
+l'import sont lancés à la main, et conçus comme des jobs.
+
+**Où on en est** : la collecte, l'import et l'API de données sont codés (voir « Installer et
+lancer »). Restent l'image et les conteneurs (#200), le service des fiches par l'API IA (#156) et
+l'installation par compose (#202).
+
+**La suite** :
+
+- au 08/11, mise en ligne sur Azure Container Apps : PostgreSQL, brut dans Azure Blob Storage,
+  collecte en job déclenché par cron ;
+- après le 29/10, la compilation des clips en wiki ;
+- après le 08/11, la recherche `kb search`.
 
 ## Installer et lancer
 
