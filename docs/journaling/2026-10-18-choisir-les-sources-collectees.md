@@ -144,7 +144,7 @@ journal. Les 9 noms de dossier listés dans le message sont des constantes du co
 | Nom de la variable | `KB_COLLECT_ONLY` : un filtre de `kb collect` (décision de Sabine, 18/10) | `KB_SOURCES` : laisse croire qu'elle définit les sources |
 | Noms admis | `folder_prefix` (critère de #201) | `source.name` (`tldr_ai`) : n'existe pas pour Zotero, les clips et GH Archive avant leur création ; `source_code` : `github` regroupe trois sources (critère de #201) |
 | Casse | Comparée en minuscules, entrée citée telle qu'écrite, sans les espaces autour (décision de Sabine, 18/10) | Comparaison exacte (plan d'origine) : `Zotero` échouait pour rien |
-| Hôtes de l'API | `KB_DATA_API_ALLOWED_HOSTS` reste strict (`cli.py:155-158`) : `TrustedHostMiddleware` compare le `Host` reçu tel quel | Les aligner : une mise en minuscules y changerait ce que le contrôle de sécurité compare. Un nom de `KB_COLLECT_ONLY` ne fait que désigner un des 9 dossiers |
+| Hôtes de l'API | `KB_DATA_API_ALLOWED_HOSTS` reste strict (`cli.py:156-159`) : `TrustedHostMiddleware` compare le `Host` reçu tel quel | Les aligner : une mise en minuscules y changerait ce que le contrôle de sécurité compare. Un nom de `KB_COLLECT_ONLY` ne fait que désigner un des 9 dossiers |
 | Minuscules | Un `.lower()` dans la boucle de vérification, un pour l'ensemble retenu (seconde revue, tranché par time-knight) | Deux tuples parallèles gardés par `zip(strict=True)` : un paramètre de plus à garder accordé |
 | Valeur vide | Refusée, code 2 (échouer fermé, comme `KB_DATA_API_ALLOWED_HOSTS`) | Vide = non posée, comme `KB_ZOTERO_DIR` : un filtre posé vide par erreur collecterait tout |
 | Source choisie sans sa variable | Refusée, code 2 (décision de Sabine, option b) | (c) refuser seulement si rien ne tourne : `zotero,clipping` avec le coffre oublié sortirait 0 sans les clips ; (a) garder le saut : sortie 0 sans rien faire |
@@ -177,7 +177,7 @@ journal. Les 9 noms de dossier listés dans le message sont des constantes du co
 2. **Pourquoi la casse ne compte pas ici, alors qu'elle compte pour les hôtes de l'API ?** Un nom
    de `KB_COLLECT_ONLY` ne fait que désigner un des 9 dossiers du code. Les minuscules ne peuvent
    rien élargir. Les hôtes de l'API, eux, sont comparés tels quels par `TrustedHostMiddleware` : un
-   contrôle de sécurité qui ne doit pas être réinterprété (`cli.py:155-158`).
+   contrôle de sécurité qui ne doit pas être réinterprété (`cli.py:156-159`).
 3. **Une valeur hostile dans `KB_COLLECT_ONLY` peut-elle toucher un fichier ou le journal ?**
    Non. Le nom n'est jamais joint à un chemin : il sert seulement à un test d'appartenance
    (`cli.py:418-419`). Un nom refusé est cité par `quote_value`, et un retour à la ligne ne peut pas
