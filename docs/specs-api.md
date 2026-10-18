@@ -64,8 +64,8 @@ l'ordre des résultats, change la version.
   `KB_LOG_TO_FILE=false`, le journal va sur la sortie d'erreur seule, sans fichier : en conteneur,
   la sortie d'erreur est le journal du conteneur.
 - **Organisation du code** : paquet `src/k_b/data_api/`, un dossier par rôle (`routers/`,
-  `schemas/`) ; `api_router.py` rassemble les routeurs ; le détail et les options écartées sont au journal ADR (2026-10-14, « Paquet
-  `src/k_b/data_api/` »).
+  `schemas/`) ; `api_router.py` rassemble les routeurs ; le détail et les options écartées sont
+  au journal ADR (2026-10-14, « Paquet `src/k_b/data_api/` »).
 
 ## Accès par clé
 

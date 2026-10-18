@@ -89,8 +89,11 @@ de K-B, coupé à trois niveaux (`data_api.routers.item_router`). Si `app.py` im
 routeur, le test échouerait. C'était le test rouge de la PR : avant le déplacement, il renvoyait
 `data_api.routers.item_router` et `data_api.routers.trend_router`.
 
-Le second test, `test_the_package_of_the_routers_imports_nothing` (l. 309), vérifie que
-`routers/__init__.py` ne contient aucune instruction `import` ni `from … import`.
+Le second test, `test_the_package_of_the_routers_is_empty` (l. 309), vérifie que
+`routers/__init__.py` est vide, au caractère près. D'abord écrit « n'importe rien » (aucune instruction
+`import`), il a été durci à la revue de code : un fichier qui relierait les routeurs sans import
+(`__all__`, par exemple) serait passé ; `code.md` dit « reste vide », et le test dit désormais la même
+chose.
 
 Pourquoi un test et pas seulement une commande de recherche dans le critère de fin de l'issue :
 l'ADR du 2026-10-18 (« Ligne de commande : une porte mince ») l'a tranché pour #247. Une commande de
@@ -100,10 +103,10 @@ recherche vérifie la PR une fois ; un test vérifie toutes celles qui suivront.
 
 | Choix | Retenu, et pourquoi | Écarté, et pourquoi |
 |---|---|---|
-| Où rassembler | Un module à part, `api_router.py`, à côté d'`app.py` | `routers/__init__.py` : interdit par `code.md` et l'ADR de #242 |
+| Où rassembler | Un module à part, `api_router.py`, à la racine de l'API, à côté d'`app.py` : « le routeur principal de l'API ; dans `routers/`, ce sont les routeurs secondaires importés par le principal » (Sabine, 18/10) | `routers/__init__.py` : interdit par `code.md` et l'ADR de #242. `routers/api_router.py` : il mêlerait le principal aux routeurs d'entité, et la garde ne serait plus « `app.py` n'importe rien de `routers/` » |
 | Nom | `api_router.py`, objet `api_router` : le nom du full-stack-fastapi-template (décision de Sabine) | `routers_index.py` (proposition de la session), `index_route.py` (c'est un routeur, pas une route), `router.py` (à une lettre de `routers/`), `routes.py` (se confond avec `routers/`), `routers.py` (impossible à côté du paquet `routers/`) |
 | Arguments d'inclusion | Aucun : la clé reste sur l'app | Une clé posée à l'inclusion : un routeur ajouté sans elle échapperait à la clé |
-| Garde de la règle | Deux tests, une chose chacun (décision de Sabine, puis tri de time-knight) | Un seul test à deux assertions ; un `grep` du critère de fin seul (ADR de #247) |
+| Garde de la règle | Deux tests, une chose chacun (décision de Sabine, puis tri de time-knight) ; `__init__.py` vide au caractère près (tri de la revue de code) | Un seul test à deux assertions ; un `grep` du critère de fin seul (ADR de #247) ; « n'importe rien » seul, moins strict que `code.md` |
 | Spec | Une demi-phrase dans `docs/specs-api.md:66`, sans changement de version | Changer la version : rien n'est visible par un client |
 
 ## 4. Preuve

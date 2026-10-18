@@ -306,11 +306,10 @@ def test_the_app_of_the_data_api_imports_no_router():
     assert {name for name in imported if is_within(name, {"data_api.routers"})} == set()
 
 
-def test_the_package_of_the_routers_imports_nothing():
+def test_the_package_of_the_routers_is_empty():
     path = PACKAGE_DIR / "data_api" / "routers" / "__init__.py"
-    nodes = ast.walk(ast.parse(path.read_text()))
 
-    assert not any(isinstance(node, ast.Import | ast.ImportFrom) for node in nodes)
+    assert path.read_text() == ""
 
 
 # The AI API reads the watch through the data API, never the base (docs/fiches-veille.md, "Le

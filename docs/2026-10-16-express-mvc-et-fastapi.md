@@ -38,3 +38,6 @@ Quand une logique métier apparaît entre la lecture et la réponse : plusieurs 
 un calcul, ou un même traitement partagé par l'API et une commande `kb`. Elle irait alors dans une
 fonction métier sous la présentation. L'API de données ne pourrait toujours importer ni `etl` ni
 `database/writers` (`.claude/rules/conventions.md`, règle 5).
+
+Révisé le 2026-10-18 (#246) : l'équivalent de `app.use('/api', router)` est désormais
+`data_api/api_router.py`, que `app.py` inclut seul.
