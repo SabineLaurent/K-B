@@ -1,11 +1,9 @@
 """Command line: `kb collect`, `kb create-db`, `kb import`, `kb serve`, `kb openapi`."""
 
 import argparse
-import ipaddress
 import json
 import logging
 import os
-import re
 import signal
 import sqlite3
 import sys
@@ -23,17 +21,16 @@ from typing import Self
 import uvicorn
 from pydantic import SecretStr
 
+from k_b.core.api_keys import read_api_keys_or_refusal
 from k_b.core.config import (
-    API_KEY_CHARACTERS,
-    DATA_API_ALLOWED_HOSTS,
     DATA_API_HOST,
     DATA_API_PORT,
     LOG_FILES_KEPT,
     LOG_TO_FILE,
-    MIN_API_KEY_LENGTH,
 )
 from k_b.core.quoting import quote_value
 from k_b.data_api.app import create_app
+from k_b.data_api.settings import ServeSettings, read_serve_settings_or_refusal
 from k_b.database.connection import DATABASE_FILE_NAME, MissingDatabaseError
 from k_b.database.creation import create_database
 from k_b.database.dates import DATABASE_DATE_FORMAT
@@ -142,21 +139,6 @@ LOG_TO_FILE_VARIABLE = "KB_LOG_TO_FILE"
 LOG_TO_FILE_VALUES = {"true": True, "false": False}
 
 
-# The key of each client of the data API: one variable KB_API_KEY_<CLIENT> per client
-# (docs/specs-api.md, "Accès par clé").
-API_KEY_VARIABLE_PREFIX = "KB_API_KEY_"
-CLIENT_NAME = re.compile(r"[A-Z0-9_]+")
-# Where kb serve listens and the hosts it answers; not set: the defaults of core/config.py.
-DATA_API_HOST_VARIABLE = "KB_DATA_API_HOST"
-DATA_API_PORT_VARIABLE = "KB_DATA_API_PORT"
-DATA_API_ALLOWED_HOSTS_VARIABLE = "KB_DATA_API_ALLOWED_HOSTS"
-# Digits only: int() would also read " 8000", "+8000" and "8_000".
-PORT_DIGITS = re.compile(r"[0-9]{1,5}")
-PORT_NUMBERS = range(1, 65536)
-# A host name in lowercase, without * nor port: TrustedHostMiddleware compares the Host received
-# as it is (starlette/middleware/trustedhost.py), and an entry of this form has nothing to escape
-# in the log.
-ALLOWED_HOST = re.compile(r"[a-z0-9]([a-z0-9.-]*[a-z0-9])?")
 # Written from the root of the repository, which versions it.
 OPENAPI_PATH = Path("docs") / "api" / "openapi-donnees.json"
 
@@ -536,13 +518,6 @@ def describe_outcome(error: Exception | None) -> str:
     return "ok" if error is None else f"failed ({type(error).__name__})"
 
 
-@dataclass(frozen=True)
-class ServeSettings:
-    host: str
-    port: int
-    allowed_hosts: tuple[str, ...]
-
-
 def run_serve(data_dir: Path) -> int:
     """Serve the base with the keys and the settings of the environment; the log of uvicorn is
     the one of kb."""
@@ -569,110 +544,21 @@ def run_serve(data_dir: Path) -> int:
 def read_serve_settings(environ: Mapping[str, str]) -> ServeSettings | None:
     """The host, the port and the hosts allowed of kb serve, or None after logging the variable
     refused, with its value quoted. Not set: the default of core/config.py."""
-    host = environ.get(DATA_API_HOST_VARIABLE, DATA_API_HOST)
-    port = environ.get(DATA_API_PORT_VARIABLE, str(DATA_API_PORT))
-    allowed_hosts_value = environ.get(DATA_API_ALLOWED_HOSTS_VARIABLE)
-    # Split once: the list checked is the list served.
-    allowed_hosts = (
-        DATA_API_ALLOWED_HOSTS
-        if allowed_hosts_value is None
-        else split_allowed_hosts(allowed_hosts_value)
-    )
-    refusal = (
-        find_host_refusal(host)
-        or find_port_refusal(port)
-        or find_allowed_hosts_refusal(allowed_hosts)
-    )
-    if refusal is not None:
-        logger.error("%s", refusal)
+    settings_or_refusal = read_serve_settings_or_refusal(environ)
+    if isinstance(settings_or_refusal, str):
+        logger.error("%s", settings_or_refusal)
         return None
-    return ServeSettings(host=host, port=int(port), allowed_hosts=allowed_hosts)
-
-
-def find_host_refusal(host: str) -> str | None:
-    """Why the host is refused, or None. An IPv4 address only: uvicorn would bind an empty host
-    to every interface, and the Host of a client in IPv6 keeps its brackets ([::1]), which no
-    allowed host can name."""
-    try:
-        ipaddress.IPv4Address(host)
-    except ValueError:
-        return f"{DATA_API_HOST_VARIABLE}: {quote_value(host)} not an IPv4 address"
-    return None
-
-
-def find_port_refusal(port: str) -> str | None:
-    if PORT_DIGITS.fullmatch(port) and int(port) in PORT_NUMBERS:
-        return None
-    return (
-        f"{DATA_API_PORT_VARIABLE}: {quote_value(port)} not an integer"
-        f" from {PORT_NUMBERS.start} to {PORT_NUMBERS.stop - 1}"
-    )
-
-
-def split_allowed_hosts(allowed_hosts: str) -> tuple[str, ...]:
-    """The entries of the list, separated by commas, without the spaces around each."""
-    return tuple(entry.strip() for entry in allowed_hosts.split(","))
-
-
-def find_allowed_hosts_refusal(allowed_hosts: tuple[str, ...]) -> str | None:
-    """Why the hosts allowed are refused, or None: TrustedHostMiddleware would serve any host for
-    a * (docs/specs-api.md, API8)."""
-    # A value empty or made of spaces gives one empty entry.
-    if allowed_hosts == ("",):
-        return f"{DATA_API_ALLOWED_HOSTS_VARIABLE}: empty, set the hosts separated by commas"
-    for position, entry in enumerate(allowed_hosts, start=1):
-        where = f"{DATA_API_ALLOWED_HOSTS_VARIABLE}: entry {position} of {len(allowed_hosts)}"
-        if not entry:
-            return f"{where} empty"
-        if "*" in entry:
-            return f"{where} {quote_value(entry)} with '*', name each host"
-        if not ALLOWED_HOST.fullmatch(entry):
-            return f"{where} {quote_value(entry)} not a lowercase host name"
-    return None
+    return settings_or_refusal
 
 
 def read_api_keys(environ: Mapping[str, str]) -> dict[str, SecretStr] | None:
     """The key of each client, by its name, or None after logging the variable refused: the
     name of the variable, never its value."""
-    variables = sorted(
-        name for name in environ if name.startswith(API_KEY_VARIABLE_PREFIX)
-    )
-    if not variables:
-        logger.error("no API key: set %s<CLIENT>", API_KEY_VARIABLE_PREFIX)
+    api_keys_or_refusal = read_api_keys_or_refusal(environ)
+    if isinstance(api_keys_or_refusal, str):
+        logger.error("%s", api_keys_or_refusal)
         return None
-    api_keys: dict[str, SecretStr] = {}
-    variable_by_key: dict[str, str] = {}
-    for variable in variables:
-        key = environ[variable]
-        refusal = find_api_key_refusal(variable, key, variable_by_key)
-        if refusal is not None:
-            logger.error("%s", refusal)
-            return None
-        variable_by_key[key] = variable
-        api_keys[variable.removeprefix(API_KEY_VARIABLE_PREFIX)] = SecretStr(key)
-    return api_keys
-
-
-def find_api_key_refusal(
-    variable: str, key: str, variable_by_key: Mapping[str, str]
-) -> str | None:
-    """Why the variable of a client is refused, or None; variable_by_key holds the keys already
-    read. The variable is quoted: its name comes from the environment."""
-    client_name = variable.removeprefix(API_KEY_VARIABLE_PREFIX)
-    if not CLIENT_NAME.fullmatch(client_name):
-        return f"{quote_value(variable)}: client name empty or not [A-Z0-9_]+"
-    if len(key) < MIN_API_KEY_LENGTH:
-        return (
-            f"{quote_value(variable)}: key of {len(key)} characters,"
-            f" minimum {MIN_API_KEY_LENGTH}"
-        )
-    if not API_KEY_CHARACTERS.fullmatch(key):
-        return f"{quote_value(variable)}: key with a character outside [A-Za-z0-9_-]"
-    if key in variable_by_key:
-        return (
-            f"{quote_value(variable_by_key[key])} and {quote_value(variable)}: same key"
-        )
-    return None
+    return api_keys_or_refusal
 
 
 def run_openapi() -> int:
