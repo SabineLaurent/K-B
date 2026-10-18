@@ -22,6 +22,8 @@ LOG_FILE_PATH = Path("logs") / "kb.log"
 SERVE_LOG_FILE_PATH = Path("logs") / "kb-serve.log"
 LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 
+logger = logging.getLogger(LOGGER_NAME)
+
 
 @contextmanager
 def logging_to(
@@ -64,3 +66,12 @@ def logging_to(
         for handler in handlers:
             root_logger.removeHandler(handler)
             handler.close()
+
+
+def log_refusal[ValueT](value_or_refusal: ValueT | str) -> ValueT | None:
+    """The value read by a layer, or None after logging why it refused it (conventions.md, rule
+    3: a failure is logged where it is handled)."""
+    if isinstance(value_or_refusal, str):
+        logger.error("%s", value_or_refusal)
+        return None
+    return value_or_refusal

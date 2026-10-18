@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from k_b.commands.exit_codes import ExitCode
-from k_b.commands.run_log import LOGGER_NAME
+from k_b.commands.run_log import LOGGER_NAME, log_refusal
 from k_b.etl.collected_sources import (
     COLLECT_ONLY_VARIABLE,
     VARIABLE_BY_SOURCE_NAME,
@@ -26,7 +26,7 @@ def run_collect(data_dir: Path) -> int:
     # The mapping the check reads is the one the sources are created from; the BigQuery client
     # reads os.environ itself.
     environ = os.environ
-    collect_only = read_collect_only(environ)
+    collect_only = log_refusal(read_collect_only_or_refusal(environ, SOURCE_KINDS))
     if collect_only is None:
         return ExitCode.NOT_STARTED
     try:
@@ -47,20 +47,12 @@ def run_collect(data_dir: Path) -> int:
     return find_collection_exit_code(outcome)
 
 
-def read_collect_only(environ: Mapping[str, str]) -> CollectOnly | None:
-    """The sources kb collect runs, or None after logging the entry refused, its value quoted."""
-    collect_only_or_refusal = read_collect_only_or_refusal(environ, SOURCE_KINDS)
-    if isinstance(collect_only_or_refusal, str):
-        logger.error("%s", collect_only_or_refusal)
-        return None
-    return collect_only_or_refusal
-
-
 def print_skipped_sources(
     collect_only: CollectOnly, environ: Mapping[str, str]
 ) -> None:
     """One line per source not run: not chosen, or, without KB_COLLECT_ONLY, its variable not
-    set. A source chosen without its variable never gets here: read_collect_only refuses it."""
+    set. A source chosen without its variable never gets here: read_collect_only_or_refusal
+    refuses it."""
     for kind in SOURCE_KINDS:
         if not collect_only.is_collected(kind.folder_prefix):
             print(f"{kind.folder_prefix}: skipped (not in {COLLECT_ONLY_VARIABLE})")
