@@ -57,7 +57,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 - **Mutations sur une copie du dépôt** (constat du 2026-10-17, #14) : les lancer avec
   `PYTHONDONTWRITEBYTECODE=1` et sans `__pycache__`. Une mutation qui garde la taille du fichier,
   restaurée dans la même seconde, laisse sinon Python exécuter le bytecode de la version mutée :
-  les mutations suivantes semblent tuées ou survivantes à tort.
+  les mutations suivantes semblent tuées ou survivantes à tort. Une copie qui garde le `.venv` du
+  dépôt lit le `src` du dépôt d'origine (`k_b.pth` y pointe ; constat du 2026-10-18, #242) :
+  vérifier d'abord que `import k_b; print(k_b.__file__)` donne le chemin de la copie.
 - **Fixtures** (consigne de Sabine, 2026-10-10) : une fixture part toujours d'un exemple issu de
   la collecte.
 - **K-B est déterministe** dans sa conception, son code et ses journaux (consigne de Sabine,
