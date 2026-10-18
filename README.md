@@ -101,6 +101,7 @@ uv sync
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
 | `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
 | `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais le coffre. |
+| `KB_COLLECT_ONLY` | non | les dossiers des sources que `kb collect` lance, séparés par des virgules (`zotero,clipping`) ; la casse ne compte pas. Sans elle, toutes les sources sont lancées. Une source écartée affiche `<dossier>: skipped (not in KB_COLLECT_ONLY)` ; un nom qui n'est pas un dossier de source, une valeur ou une entrée vide, ou une source choisie sans sa variable (`zotero` sans `KB_ZOTERO_DIR`) : code 2, rien n'est collecté ([docs/specs-collecte.md](docs/specs-collecte.md), « Choisir les sources »). |
 | `KB_GITHUB_TOKEN` | non | jeton GitHub en lecture seule ([docs/jeton-github.md](docs/jeton-github.md)). Sans lui, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000. |
 | `KB_API_KEY_<CLIENT>` | pour `kb serve` | la clé d'un client de l'API de données (`<CLIENT>` en `A-Z`, `0-9` et `_`, par exemple `KB_API_KEY_TERMINAL`), une variable par client ([docs/specs-api.md](docs/specs-api.md)). |
 
@@ -130,11 +131,12 @@ Avec le jeton rangé dans le `.env` à la racine du dépôt, ignoré par git :
 `KB_DATA_DIR=~/K-B-data uv run --env-file .env kb collect`.
 
 `kb collect` affiche une ligne par source (`ok` ou `failed`, avec le type de l'erreur ; `skipped`
-pour Zotero sans `KB_ZOTERO_DIR`, les clips sans `KB_VAULT_DIR`). Code de
+pour Zotero sans `KB_ZOTERO_DIR`, les clips sans `KB_VAULT_DIR`, une source que `KB_COLLECT_ONLY`
+écarte). Code de
 sortie : 0 si tout a réussi ; 4 si au moins une source a réussi et au moins une a échoué, l'état
 de collecte écrit ; 1 si aucune source lancée n'a réussi ou si l'état de collecte n'a pas pu être
-écrit ; 2 si `KB_DATA_DIR` manque, n'est pas un dossier existant, ou si l'état de collecte est
-illisible ; 143 si `kb collect` reçoit SIGTERM (`docker stop`) : ce qui a été fait avant le
+écrit ; 2 si `KB_DATA_DIR` manque, n'est pas un dossier existant, si l'état de collecte est
+illisible, ou si `KB_COLLECT_ONLY` est refusée ; 143 si `kb collect` reçoit SIGTERM (`docker stop`) : ce qui a été fait avant le
 signal est gardé ; reçu avant l'écriture de l'état de collecte, il laisse l'état inchangé, et la
 collecte suivante repart des mêmes dates.
 
