@@ -21,15 +21,17 @@ Elle est lue par l'API de données, lancée par `kb serve` ([specs-api.md](specs
 `/items`, `/items/{item_id}` et `/trends` (`src/k_b/data_api/routers/item_router.py`,
 `trend_router.py`), qui ouvrent la base en lecture seule (`src/k_b/data_api/dependencies.py`,
 `connect_database_read_only`). Le code des fiches de veille (`src/k_b/ai_api/`) n'ouvre pas la
-base : il lit la veille par l'API de données (`ai_api/connectors/data_api_client.py`), et n'est
+base : il lit la veille par l'API de données (`src/k_b/ai_api/connectors/data_api_client.py`), et n'est
 pas encore servi (#156). `kb search` vient après le 08/11 (journal ADR, 2026-10-15, « POC du
 25/10 », décision 1).
 
 ## Le SGBD : SQLite au POC du 25/10, PostgreSQL au 08/11
 
-Retenu au POC du 25/10 : **SQLite**, un fichier dans le dossier de données, hors du dépôt, lu avec le module
-`sqlite3` de la bibliothèque standard. Le dossier de données est donné par la variable
-`KB_DATA_DIR` ; le journal ADR du 2026-10-09 le fixe à `~/.knowledge_base`.
+Retenu au POC du 25/10 : **SQLite**, un fichier hors du dépôt, lu avec le module `sqlite3` de
+la bibliothèque standard. En local, il est dans le dossier de données, donné par la variable
+`KB_DATA_DIR`, que le journal ADR du 2026-10-09 fixe à `~/.knowledge_base`. Dans les conteneurs
+du POC, il sera dans un volume nommé (journal ADR, 2026-10-15, « POC du 25/10 », décision 2 ;
+#200).
 
 | | SQLite (au POC du 25/10) | PostgreSQL (prévu au 08/11) |
 |---|---|---|

@@ -96,8 +96,9 @@ Les utilisateurs du produit sont décrits plus haut, dans « Utilisateurs ».
 
 ### Contraintes techniques
 
-- **Python 3.13** (`.python-version`), seul langage du projet ; dépendances et environnement
-  par [uv](https://docs.astral.sh/uv/).
+- **Python 3.13** (`.python-version`), langage du code ; dépendances et environnement par
+  [uv](https://docs.astral.sh/uv/). **SQL** pour le schéma et les requêtes
+  (`src/k_b/database/schema.sql`, module `sqlite3`, sans ORM).
 - **Base** : SQLite au POC du 25/10, PostgreSQL à la mise en ligne du 08/11. D'ici là, aucun
   SQL propre à SQLite n'est ajouté (règle 1 de `.claude/rules/poc.md`).
 - **Données hors du dépôt**, dans le dossier `KB_DATA_DIR` (`~/.knowledge_base` sur ma machine,
@@ -116,7 +117,7 @@ Les utilisateurs du produit sont décrits plus haut, dans « Utilisateurs ».
 |---|---|
 | API GitHub | un jeton en lecture seule, sans frais ([docs/jeton-github.md](docs/jeton-github.md)) |
 | BigQuery (GH Archive) | bac à sable sans compte de facturation : au-delà du quota gratuit (1 Tio lu par mois), une requête est refusée, jamais facturée ([docs/bigquery.md](docs/bigquery.md)) |
-| Modèle des fiches | gpt-6-luna sur Azure AI Foundry, sur l'abonnement Azure de mon organisme de formation, fourni pour ce projet : région France Central, zone de données UE, 140 000 jetons par minute (journal ADR, 2026-10-17). Je n'en vois pas la facturation. Ordre de grandeur : au pire environ 420 000 jetons par demande de fiches, à 0,12 $ en entrée et 0,60 $ en sortie par million de jetons, prix UE (journal ADR, 2026-10-16) |
+| Modèle des fiches | gpt-6-luna sur Azure AI Foundry, sur l'abonnement Azure de mon organisme de formation, fourni pour ce projet : région France Central, zone de données UE, 140 000 jetons par minute (journal ADR, 2026-10-17). Je n'en vois pas la facturation. Ordre de grandeur : au pire environ 420 000 jetons par demande de fiches, à 0,12 $ en entrée et 0,60 $ en sortie par million de jetons, prix UE, soit quelques centimes (journal ADR, 2026-10-16) ; les appels et les jetons d'une demande sont détaillés dans [docs/fiches-veille.md](docs/fiches-veille.md), « Coût » |
 | Mise en ligne du 08/11 (Azure Container Apps, PostgreSQL, Blob Storage) | non chiffrée à ce jour |
 | Temps | chaque issue porte son estimation en heures ; les jalons les regroupent |
 
@@ -148,7 +149,7 @@ le 18/10/2026 :
 localhost, qui fait tourner la collecte, l'API de données et l'API IA. L'API IA rédige des fiches
 de veille par sujet, sur une fenêtre réglable (`KB_DIGEST_WINDOW_DAYS`, 3 jours par défaut), avec
 gpt-6-luna ; le modèle ne choisit le sujet que dans une liste fermée que je tiens. Le retour se
-lit dans la console : ni interface dédiée ni front. Zotero et les clips restent collectés sur ma
+lit dans la console : ni interface CLI dédiée ni front. Zotero et les clips restent collectés sur ma
 machine (`KB_COLLECT_ONLY`), sans que ma bibliothèque soit montée dans un conteneur. La collecte et
 l'import sont lancés à la main, et conçus comme des jobs.
 
