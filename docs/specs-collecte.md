@@ -89,6 +89,22 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   téléchargement a un délai, une taille maximale, et refuse une redirection hors du domaine
   attendu. Le `User-Agent` est `K-B (+https://github.com/SabineLaurent)` : le profil public de
   Sabine, le dépôt étant privé jusqu'au 25/10, puis public.
+- **Panne d'une source** (`src/k_b/etl/extract.py`) : toute erreur levée par une source est
+  rattrapée. La source affiche `failed (<type d'erreur>)`, l'erreur va au journal de
+  fonctionnement avec sa trace, sa date de dernière collecte reste, et les sources suivantes sont
+  lancées ; la collecte suivante redemande la même fenêtre. Le brut n'est écrit qu'une fois la
+  source allée au bout de sa lecture : une source en échec n'écrit rien. Exception : une source à
+  plusieurs pages (tldr) vérifie le nom de chaque page avant d'écrire la première, mais une
+  écriture qui échoue au milieu (disque plein) laisse les pages déjà écrites. Chaque source dit
+  ses états propres (« En cas de panne », dans sa section) ; deux familles valent pour plusieurs :
+  - **téléchargement** (`src/k_b/etl/http_download.py`), pour tldr, arXiv, CISA KEV et l'API
+    GitHub ; Zotero, les clips et GH Archive n'y passent pas : erreur réseau (DNS, connexion,
+    TLS, délai de 30 s dépassé) ; statut HTTP d'erreur (`HTTPError`, sauf le 304 de CISA KEV) ;
+    réponse servie, après une redirection, hors de l'adresse attendue (`RedirectedOutsideError`,
+    sauf la page d'accueil d'une édition tldr) ; réponse plus grande que le maximum de la source ;
+  - **écriture du brut** (`src/k_b/etl/raw_store.py`) : un fichier brut déjà présent (deux
+    collectes dans la même seconde) est refusé (`FileExistsError`) ; un dossier ou un fichier qui
+    ne s'écrit pas (droits, disque plein) lève une `OSError`.
 - **Secrets** : en variables d'environnement, chargées depuis le `.env` ignoré par git.
 - **Données personnelles** : on ne garde que ce qui sert la veille ; aucun identifiant de
   personne n'est collecté s'il n'est pas nécessaire. Durées et purge : [registre des
@@ -137,6 +153,24 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-02) : les
   alertes sont demandées pour les seuls paquets suivis (`affects=`). Tout l'écosystème `npm`
   dépasse 100 alertes par semaine et obligerait à paginer.
+- **Jeton** : sans `KB_GITHUB_TOKEN`, les requêtes partent sans jeton, avec la limite de 60
+  requêtes par heure, et sans ligne au journal ; un jeton que GitHub refuse donne un statut HTTP
+  d'erreur à chaque source GitHub (états communs du téléchargement).
+- **En cas de panne :** releases (`github_releases_<dépôt>`), en plus des états communs : la page
+  n'est pas du JSON, ou pas une liste ; toutes ses releases sont invalides (`all_items_invalid`) ;
+  une release est d'un autre dépôt que celui demandé (casse ignorée). Une release invalide parmi
+  des valides entre dans le brut, et l'import la rejette.
+- **En cas de panne :** alertes (`github_advisories_<écosystème>`), en plus des états communs : la
+  page n'est pas du JSON, ou pas une liste ; toutes ses alertes sont invalides
+  (`all_items_invalid` ; un écosystème dont la seule alerte de la fenêtre est invalide échoue à
+  chaque collecte, voir « État »).
+- **En cas de panne :** dépôts les plus étoilés (`github_most_starred`), en plus des états
+  communs : un classement refuse sa page entière (règle 1 de `.claude/rules/conventions.md`) :
+  pas du JSON ; pas une réponse de recherche avec une liste `items` ; `incomplete_results` autre
+  que `false` ; un nombre de dépôts autre que 100 ; un dépôt invalide (nom qui n'est pas
+  `owner/name`, URL hors de `https://github.com/`, nombre d'étoiles qui n'est pas un entier…).
+  Sans fenêtre de dates, un échec ne retarde rien : la collecte suivante prend un nouvel
+  instantané, et celui du jour manqué est perdu.
 
 ### API arXiv — service web
 
@@ -173,6 +207,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   source échoue (`all_items_invalid`). Une entrée d'erreur de l'API fait, elle,
   échouer la collecte. Limites assumées : la révision (`v2`) d'un papier soumis avant la fenêtre
   n'est pas collectée, ni un papier retenu en modération plus de 7 jours.
+- **En cas de panne :** en plus des états communs (dont le `503` sous charge, ci-dessus), la
+  source échoue si la réponse n'est pas du XML ou pas un flux Atom, si le flux porte une entrée
+  d'erreur de l'API, si `totalResults` manque ou n'est pas un nombre, si l'API annonce plus de
+  papiers que la page n'en contient, ou si toutes les entrées sont invalides
+  (`all_items_invalid`). La fenêtre partant de la dernière collecte réussie, un échec passager est
+  repris à la collecte suivante. Le dépassement des 2 000 papiers, lui, se répète tant que la
+  fenêtre les dépasse : elle part toujours du même point et s'allonge (problème connu, #71).
 
 ### Catalogue CISA KEV — fichier
 
@@ -191,6 +232,12 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   vulnérabilité.
 - **Données personnelles** : aucune.
 - **État** : collecte en place (PR de #23).
+- **En cas de panne :** en plus des états communs (tout statut HTTP autre que 304), la source
+  échoue si le catalogue dépasse 10 Mo, n'est pas en UTF-8 (`UnicodeDecodeError`), ne se découpe
+  pas en lignes CSV (`csv.Error`, un octet NUL), n'a pas les colonnes attendues, ou si toutes ses
+  lignes sont invalides (`all_items_invalid`). Cas limite : une date de dernière collecte qui
+  n'est pas en UTC (`collection_state.json` édité à la main) fait échouer l'en-tête
+  `If-Modified-Since` (`ValueError`), à chaque collecte jusqu'à ce que l'état soit corrigé.
 
 ### Obsidian Web Clipper — fichier
 
@@ -363,6 +410,16 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   page gardée (taille en octets), redirection vers la page d'accueil (adresse d'arrivée), ou
   erreur (message reçu et URL demandée) ; une collecte sans aucune page le dit aussi.
   `kb collect` affiche les lignes de niveau INFO et au-dessus.
+- **En cas de panne :** une erreur sur un jour (redirection autre que vers la page d'accueil de
+  l'édition, statut HTTP d'erreur, réseau, page de plus de 1 Mio) fait échouer l'édition (sa
+  source, `tldr_<édition>`) ; le journal donne l'erreur avec le jour et l'URL demandée. Les pages
+  déjà téléchargées pendant cette collecte ne sont pas écrites, et les jours suivants ne sont pas
+  demandés ; la collecte suivante reprend au jour de la dernière collecte réussie. Une date de
+  dernière collecte postérieure à aujourd'hui (UTC) fait échouer l'édition avant tout
+  téléchargement. **Écart à la règle 1** de `.claude/rules/conventions.md` (constaté le
+  2026-10-18, non tranché ici) : une page reçue n'est pas lue à la collecte ; une page qui n'est
+  pas une édition est écrite telle quelle, et refusée à chaque import (« Page refusée entière »,
+  ci-dessus).
 - **Fréquence** : voir les règles communes.
   Chaque collecte lit chaque jour depuis le jour de la dernière collecte, relu car son édition a
   pu paraître après elle, jusqu'à aujourd'hui (UTC) ; la première lit les 7 jours précédents et
@@ -476,6 +533,15 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   commandes : [bigquery.md](bigquery.md#mesures-du-2026-10-11). Une
   requête sur des tables à joker (`day.20*`) n'est pas mise en cache : chaque exécution est
   facturée au quota (constaté le 2026-10-11).
+- **En cas de panne :** sans `GOOGLE_APPLICATION_CREDENTIALS`, la source est sautée, pas en
+  échec. Avec elle, la source échoue si le fichier de clé est introuvable ou refusé à la création
+  du client BigQuery ; si la table de la veille n'est pas close (`DayTableNotClosedError`) ; si le
+  `dry_run` ne donne pas de volume (`DryRunVolumeUnknownError`) ou dépasse le plafond
+  (`DryRunOverLimitError`) ; si BigQuery refuse ou interrompt la requête (droits, quota du bac à
+  sable, délai de 300 s), avec l'erreur de son client ; si le résultat n'est pas un classement
+  lisible (`TrendsExtractInvalidError`, refusé entier) ; ou si la date de dernière collecte est
+  postérieure à aujourd'hui (UTC). Rien n'est écrit, et les fenêtres dues le restent : la
+  collecte suivante les reprend, 15 au plus.
 - **Données personnelles** : chaque événement porte le login de son auteur (`actor`). La requête
   ne le sélectionne pas : elle ne renvoie que des comptes par dépôt. Le nom du dépôt
   (`owner/repo`) porte le login de son propriétaire quand c'est une personne : gardé, il identifie
