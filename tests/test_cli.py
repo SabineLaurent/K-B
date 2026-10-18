@@ -749,6 +749,39 @@ def test_a_sigterm_after_the_import_log_is_written_leaves_neither_the_import_nor
     )
 
 
+class SigtermAfterCommitConnection(sqlite3.Connection):
+    """A SIGTERM received during the commit: its handler runs once the commit has returned."""
+
+    def commit(self):
+        super().commit()
+        signal.raise_signal(signal.SIGTERM)
+
+
+def test_a_sigterm_once_the_base_has_committed_keeps_the_import_and_its_log(
+    monkeypatch, tmp_path, sigterm_handler_of_the_test
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    copy_fixture(tmp_path / "raw", "cisa_kev_extract.csv", "cisa_kev", "csv")
+
+    def connect_with_sigterm_after_commit(database_path):
+        connection = sqlite3.connect(
+            database_path, factory=SigtermAfterCommitConnection
+        )
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection
+
+    monkeypatch.setattr(load, "connect_database", connect_with_sigterm_after_commit)
+
+    exit_code = cli.main(["import"])
+
+    assert exit_code == cli.ExitCode.STOPPED_BY_SIGTERM
+    connection = sqlite3.connect(tmp_path / "k-b.sqlite")
+    assert connection.execute("SELECT count(*) FROM raw_data").fetchone() == (1,)
+    connection.close()
+    assert len(list(tmp_path.glob("import-log-*.jsonl"))) == 1
+
+
 def test_a_sigterm_during_a_source_stops_kb_collect_and_keeps_the_collection_state(
     monkeypatch, tmp_path, sigterm_handler_of_the_test
 ):

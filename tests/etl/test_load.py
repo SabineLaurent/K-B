@@ -1006,6 +1006,70 @@ def test_a_commit_that_fails_leaves_neither_the_import_nor_its_log(
     assert list_logs(data_dir) == []
 
 
+class CommitUndoneBySqliteConnection(sqlite3.Connection):
+    """A commit refused that SQLite undoes itself (disk full, I/O error): the base has no
+    transaction left, as after a commit done."""
+
+    def commit(self):
+        self.rollback()
+        raise sqlite3.OperationalError("database or disk is full")
+
+
+def test_a_commit_undone_by_sqlite_leaves_neither_the_import_nor_its_log(
+    data_dir, monkeypatch
+):
+    tables_before = dump_database(data_dir)
+
+    def connect_with_commit_undone(database_path):
+        connection = sqlite3.connect(
+            database_path, factory=CommitUndoneBySqliteConnection
+        )
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection
+
+    monkeypatch.setattr(
+        import_items_module, "connect_database", connect_with_commit_undone
+    )
+
+    with pytest.raises(sqlite3.OperationalError, match="disk is full"):
+        run_import(data_dir)
+
+    assert dump_database(data_dir) == tables_before
+    assert list_logs(data_dir) == []
+
+
+class InterruptedAfterCommitConnection(sqlite3.Connection):
+    """A Ctrl-C handled once the commit has returned: Python runs a signal handler between two
+    bytecodes, after the C call of the commit."""
+
+    def commit(self):
+        super().commit()
+        raise KeyboardInterrupt
+
+
+def test_a_ctrl_c_once_the_base_has_committed_keeps_the_import_and_its_log(
+    data_dir, monkeypatch
+):
+    tables_before = dump_database(data_dir)
+
+    def connect_interrupted_after_commit(database_path):
+        connection = sqlite3.connect(
+            database_path, factory=InterruptedAfterCommitConnection
+        )
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection
+
+    monkeypatch.setattr(
+        import_items_module, "connect_database", connect_interrupted_after_commit
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        run_import(data_dir)
+
+    assert dump_database(data_dir) != tables_before
+    assert len(list_logs(data_dir)) == 1
+
+
 def test_a_ctrl_c_after_the_log_is_written_leaves_neither_the_import_nor_its_log(
     data_dir, monkeypatch
 ):

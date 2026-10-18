@@ -265,8 +265,9 @@ def describe_exit_codes() -> str:
 def stopping_on_sigterm(command: str) -> Iterator[None]:
     """For kb collect and kb import, turn SIGTERM into StoppedBySigtermError, a SystemExit: the
     import is undone and its log removed, the temporary files are removed, as on any exception.
-    Except a SIGTERM received during the commit of the import itself: the import is kept, and
-    its log removed (etl/load.py, commit_with_log). The handler found is set back on exit.
+    A SIGTERM received during the commit of the import is raised once the commit has returned:
+    the import and its log are kept (etl/load.py, commit_with_log). The handler found is set
+    back on exit.
     Called from the main thread only: Python sets a signal handler nowhere else."""
     if command not in COMMANDS_STOPPED_BY_SIGTERM:
         yield

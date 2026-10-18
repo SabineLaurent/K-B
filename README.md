@@ -161,7 +161,7 @@ sortie :
   seconde existe déjà (relancer `kb import`) ;
 - 143 : `kb import` a reçu SIGTERM (`docker stop`). Comme pour 1, il n'écrit rien, ni dans la
   base ni au journal, sauf un signal reçu pendant la validation de la base elle-même : l'import
-  est alors gardé, mais son journal supprimé.
+  est alors gardé, avec son journal.
 
 Les codes de toutes les commandes et leur sens sont listés par `uv run kb --help`.
 

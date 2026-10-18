@@ -204,7 +204,8 @@ def commit_with_log(
     """Write the log, then commit.
 
     The log is written before the commit: a file registered is not read again, its log must
-    not be lost. A commit that fails, or an interruption, removes the log written.
+    not be lost. A commit that fails, or an interruption before the commit, removes the log
+    written; an interruption once the base has committed keeps it.
     """
     # Checked once the base holds the write lock: two imports of the same second cannot both
     # find no log.
@@ -218,9 +219,13 @@ def commit_with_log(
             writing.trend_discards,
         )
         connection.commit()
-    except BaseException:
-        # The log at log_path can only be this import's: it was absent above.
-        log_path.unlink(missing_ok=True)
+    except BaseException as error:
+        # The log goes with the import it describes. A commit that fails raises a sqlite3.Error,
+        # whether SQLite keeps the transaction or undoes it itself. A Ctrl-C or a SIGTERM is
+        # raised by Python once the commit has returned: the base has no transaction left.
+        if isinstance(error, sqlite3.Error) or connection.in_transaction:
+            # The log at log_path can only be this import's: it was absent above.
+            log_path.unlink(missing_ok=True)
         raise
 
 
