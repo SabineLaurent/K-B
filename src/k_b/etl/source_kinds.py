@@ -60,13 +60,14 @@ SOURCE_KINDS = (
         tuple(TldrSource(edition) for edition in TRACKED_EDITIONS),
         tldr.READER,
     ),
-    # No instance: cli.py adds ZoteroSource when KB_ZOTERO_DIR is set. Its extracts are under
-    # raw/selected_library/.
+    # No instance: cli.py adds ZoteroSource when KB_ZOTERO_DIR is set, unless KB_COLLECT_ONLY
+    # leaves it out. Its extracts are under raw/selected_library/.
     SourceKind(zotero.FOLDER_PREFIX, (), zotero.READER),
-    # No instance: cli.py adds ClippingSource when KB_VAULT_DIR is set. Its copies are under
-    # raw/selected_library/.
+    # No instance: cli.py adds ClippingSource when KB_VAULT_DIR is set, unless KB_COLLECT_ONLY
+    # leaves it out. Its copies are under raw/selected_library/.
     SourceKind(clipping.FOLDER_PREFIX, (), clipping.READER),
-    # No instance: cli.py adds GhArchiveSource when GOOGLE_APPLICATION_CREDENTIALS is set. No
-    # reader of items: its rankings are not items, cli.py reads them with read_trend_files.
+    # No instance: cli.py adds GhArchiveSource when GOOGLE_APPLICATION_CREDENTIALS is set, unless
+    # KB_COLLECT_ONLY leaves it out. No reader of items: its rankings are not items, cli.py reads
+    # them with read_trend_files.
     SourceKind(gh_archive.FOLDER_PREFIX, (), None),
 )
