@@ -17,9 +17,8 @@ from etl.test_transform import FIXTURES_DIR, copy_fixture
 from k_b import cli
 from k_b.commands import collect_command, import_command
 from k_b.core import quoting
-from k_b.database.writers.shared_rows import UnknownSourceError
+from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl import collected_sources, load
-from k_b.etl.load import KindWithoutTableError
 from k_b.etl.source_contract import SourceKind
 from k_b.etl.sources import clipping
 

@@ -2,11 +2,11 @@
 rule 5).
 
 Under k_b: core and items are the common vocabulary, database reads and writes the base (its
-writers under database/writers), etl runs the pipeline, data_api serves the base, ai_api calls the
-model, cli and commands compose. Under k_b.etl: the composition (source_kinds, collected_sources) →
-the sources → the modules of the pipeline. Under k_b.ai_api: digests → the stages → the clients →
-the settings → outbound and llm_replay → deadline and watch_items; a module imports only the layers
-below its own.
+writers under database/writers, behind database/writing), etl runs the pipeline, data_api serves
+the base, ai_api calls the model, cli and commands compose. Under k_b.etl: the composition
+(source_kinds, collected_sources) → the sources → the modules of the pipeline. Under k_b.ai_api:
+digests → the stages → the clients → the settings → outbound and llm_replay → deadline and
+watch_items; a module imports only the layers below its own.
 """
 
 import ast
@@ -237,6 +237,15 @@ def test_the_modules_of_a_sub_folder_of_a_package_are_listed():
     )
 
 
+# Every __init__.py stays empty, those of a package created later included (code.md,
+# "Séparation des responsabilités"; #251): a package gathers its modules, it never re-exports them.
+def test_every_package_of_k_b_has_an_empty_init():
+    paths = sorted(PACKAGE_DIR.rglob("__init__.py"))
+
+    assert paths
+    assert [path for path in paths if path.read_text() != ""] == []
+
+
 def test_core_imports_nothing_of_k_b():
     for path in list_python_files("core"):
         imported = list_imported_modules(path, find_package(path))
@@ -254,20 +263,59 @@ def test_database_imports_only_items_and_core():
         )
 
 
-# The data API reads the base: never the pipeline nor the writers (conventions.md, rule 5).
+# database/writing.py is the only door to the writers: outside database, no module imports
+# database/writers (#251).
+def list_imports_of_the_writers(imported: set[str]) -> set[str]:
+    """The names, outside database, that give access to the writers: `from k_b import
+    database` reaches them, `from k_b.database import writing` does not."""
+    return {name for name in imported if reaches(name, {"database.writers"})}
+
+
+def test_only_database_imports_its_writers():
+    paths = [
+        path.relative_to(PACKAGE_DIR).as_posix()
+        for path in sorted(PACKAGE_DIR.rglob("*.py"))
+        if not path.is_relative_to(PACKAGE_DIR / "database")
+        and list_imports_of_the_writers(list_imported_modules(path, find_package(path)))
+    ]
+
+    assert paths == []
+
+
+@pytest.mark.parametrize(
+    ("package", "code", "is_refused"),
+    [
+        ("k_b.etl", "from k_b.database import writers", True),
+        ("k_b.etl", "import k_b.database.writers.paper_writer as writer", True),
+        ("k_b.etl", "from ..database.writers.discard import Discard", True),
+        ("k_b.etl.sources", "from ...database import writers", True),
+        ("k_b.etl", "from k_b import database", True),
+        ("k_b.etl", "from k_b.database.writing import write_item", False),
+        ("k_b.commands", "from k_b.database import writing", False),
+    ],
+)
+def test_the_rule_of_the_writers_refuses_every_way_to_them(package, code, is_refused):
+    imported = parse_imported_modules(code, package=package)
+
+    assert bool(list_imports_of_the_writers(imported)) is is_refused
+
+
+# The data API reads the base: never the pipeline, the writers nor their door (conventions.md,
+# rule 5).
 DATA_API_ALLOWED_MODULES = {"data_api", "database", "items", "core"}
-DATA_API_FORBIDDEN_MODULES = {"database.writers"}
+DATA_API_FORBIDDEN_MODULES = {"database.writers", "database.writing"}
 
 
 def list_forbidden_imports_of_the_data_api(imported: set[str]) -> set[str]:
-    """The names a module of data_api may not import. A name is cut at two levels: `from k_b
-    import database` gives `database`, allowed; `from k_b.database import writers` gives
-    `database.writers`, refused."""
+    """The names a module of data_api may not import. A name is cut at two levels, and read as
+    the rule of the writers reads it (reaches): `from k_b.database import reading` gives
+    `database.reading`, allowed; `from k_b.database import writers` gives `database.writers`,
+    refused, and so does `from k_b import database`, the package that holds them."""
     return {
         name
         for name in imported
         if not is_within(name, DATA_API_ALLOWED_MODULES)
-        or is_within(name, DATA_API_FORBIDDEN_MODULES)
+        or reaches(name, DATA_API_FORBIDDEN_MODULES)
     }
 
 
@@ -286,7 +334,10 @@ def test_data_api_imports_only_data_api_database_items_and_core():
         ("from k_b.database.writers import paper_writer", True),
         ("from k_b.database import writers", True),
         ("from k_b.database.writers.paper_writer import write", True),
-        ("from k_b import database", False),
+        ("from k_b.database.writing import write_item", True),
+        ("from k_b.database import writing", True),
+        ("from k_b import database", True),
+        ("from k_b.database import reading", False),
         ("from k_b.database.reading import read_items", False),
         ("from k_b.data_api.errors import ApiError", False),
     ],
@@ -297,19 +348,13 @@ def test_the_data_api_rule_refuses_etl_and_the_writers(code, is_refused):
     assert bool(list_forbidden_imports_of_the_data_api(imported)) is is_refused
 
 
-# api_router.py gathers the routers; the app plugs in it alone, and routers/__init__.py stays
-# empty (code.md, "Séparation des responsabilités"; #246).
+# api_router.py gathers the routers; the app plugs in it alone (code.md, "Séparation des
+# responsabilités"; #246).
 def test_the_app_of_the_data_api_imports_no_router():
     path = PACKAGE_DIR / "data_api" / "app.py"
     imported = list_imported_modules(path, find_package(path), depth=3)
 
     assert {name for name in imported if is_within(name, {"data_api.routers"})} == set()
-
-
-def test_the_package_of_the_routers_is_empty():
-    path = PACKAGE_DIR / "data_api" / "routers" / "__init__.py"
-
-    assert path.read_text() == ""
 
 
 # The AI API reads the watch through the data API, never the base (docs/fiches-veille.md, "Le
@@ -398,14 +443,6 @@ def test_a_module_of_ai_api_imports_only_the_layers_below_its_own():
         assert (
             list_upward_imports_of_the_ai_api(name_module(path), imported) == set()
         ), path
-
-
-def test_the_packages_of_ai_api_import_nothing_of_ai_api():
-    for path in list_python_files("ai_api"):
-        if path.name != "__init__.py":
-            continue
-        imported = list_imported_modules(path, find_package(path), depth=3)
-        assert {name for name in imported if is_within(name, {"ai_api"})} == set(), path
 
 
 @pytest.mark.parametrize(

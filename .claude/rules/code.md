@@ -48,7 +48,8 @@ Chaque règle dit quoi faire et où elle s'arrête. En cas de conflit :
   Le métier ne fait aucun appel externe : il reçoit ses dépendances en paramètre.
 - Les dépendances vont dans un seul sens ; un import qui remonte le courant est une erreur.
 - **Un dossier par rôle ; un module par entité quand elle a assez de code ; les petites fonctions
-  proches regroupées dans un module par thème.** `__init__.py` reste vide, sauf raison écrite.
+  proches regroupées dans un module par thème.** `__init__.py` reste vide (tenu par
+  `test_every_package_of_k_b_has_an_empty_init`, `tests/test_module_dependencies.py`).
 - **Un parcours s'écrit comme une suite d'étapes nommées**, chacune dans son module : on lit le
   chemin sans ouvrir les étapes.
 
