@@ -307,14 +307,15 @@ DATA_API_FORBIDDEN_MODULES = {"database.writers", "database.writing"}
 
 
 def list_forbidden_imports_of_the_data_api(imported: set[str]) -> set[str]:
-    """The names a module of data_api may not import. A name is cut at two levels: `from k_b
-    import database` gives `database`, allowed; `from k_b.database import writers` gives
-    `database.writers`, refused."""
+    """The names a module of data_api may not import. A name is cut at two levels, and read as
+    the rule of the writers reads it (reaches): `from k_b.database import reading` gives
+    `database.reading`, allowed; `from k_b.database import writers` gives `database.writers`,
+    refused, and so does `from k_b import database`, the package that holds them."""
     return {
         name
         for name in imported
         if not is_within(name, DATA_API_ALLOWED_MODULES)
-        or is_within(name, DATA_API_FORBIDDEN_MODULES)
+        or reaches(name, DATA_API_FORBIDDEN_MODULES)
     }
 
 
@@ -335,7 +336,8 @@ def test_data_api_imports_only_data_api_database_items_and_core():
         ("from k_b.database.writers.paper_writer import write", True),
         ("from k_b.database.writing import write_item", True),
         ("from k_b.database import writing", True),
-        ("from k_b import database", False),
+        ("from k_b import database", True),
+        ("from k_b.database import reading", False),
         ("from k_b.database.reading import read_items", False),
         ("from k_b.data_api.errors import ApiError", False),
     ],
