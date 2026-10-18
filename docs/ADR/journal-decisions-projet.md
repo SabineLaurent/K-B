@@ -2813,6 +2813,37 @@ time-knight (délégation de Sabine du 2026-10-15).
   par un test, comme pour `ai_api` (#242). Option écartée : un `grep` du critère de fin seul, qui
   ne protège pas la suite. — PR de #247
 
+### API de données : un module rassemble les routeurs
+
+- **Le dossier de routeurs d'une API est rassemblé par un module à part, à côté de l'app :
+  `data_api/api_router.py`, qui crée `api_router` et inclut `item_router.router` puis
+  `trend_router.router`, sans argument. L'app n'importe que lui et l'inclut une fois ;
+  `routers/__init__.py` reste vide. L'API IA suivra la même règle à #156.** Décision de Sabine
+  du 2026-10-18. Pourquoi, selon elle : le dossier `routers/` a son fichier qui le rassemble,
+  comme l'`index.js` de l'organisation apprise en DWWM, et chaque routeur ajouté ne touche plus
+  `app.py`. Le nom vient du full-stack-fastapi-template (`backend/app/api/main.py`). Complète
+  l'entrée du 2026-10-14 (« Paquet `src/k_b/data_api/` », où `app.py` rassemblait les
+  routeurs) et le plan de `data_api` annoncé pour l'API IA (entrée de #242), qui comprend
+  désormais `api_router.py`. Sa place, selon Sabine (18/10) : « router.py est le routeur
+  principal de l'api et dans routers/ ce sont les routeurs secondaires importés par le
+  principal » ; le principal est à la racine de l'API, comme `backend/app/api/main.py` hors de
+  `api/routes/` dans le modèle. Options écartées : `routers/api_router.py` (relevé par la revue
+  de code ; il mêlerait le principal aux routeurs d'entité, et la garde ne serait plus « `app.py`
+  n'importe rien de `routers/` ») ; `routers/__init__.py` comme rassembleur (`code.md` : un
+  `__init__.py` reste vide) ; les noms `index_route.py` (c'est un routeur, pas
+  une route), `routers_index.py` (proposition de la session), `router.py` (à une lettre de
+  `routers/`), `routes.py` (se confond avec `routers/`), `routers.py` (impossible à côté du
+  paquet `routers/`) ; laisser `app.py` inclure chaque routeur. Aucun argument à l'inclusion : la
+  clé reste une dépendance de l'app, qu'aucun routeur ajouté ne peut quitter. — PR de #246
+- **La règle est tenue par deux tests de `tests/test_module_dependencies.py` : `app.py`
+  n'importe aucun module de `data_api.routers`, et `routers/__init__.py` est vide.** Décision
+  de Sabine du 2026-10-18, sur la relecture du plan ; deux tests plutôt qu'un, et « vide »
+  plutôt que « n'importe rien », tris de time-knight (une fonction fait une chose ; `code.md` dit
+  « reste vide », et un `__init__.py` pourrait relier les routeurs sans import). Pourquoi :
+  comme pour #247, le rangement crée la règle et un test la tient. Limite assumée (tri de
+  time-knight) : aucun test ne vérifie que chaque module de `routers/` est inclus par
+  `api_router` ; les tests de route d'un nouveau routeur verraient son oubli. — PR de #246
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
