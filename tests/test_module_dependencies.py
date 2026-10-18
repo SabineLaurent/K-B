@@ -3,7 +3,9 @@
 Under k_b: core and items are the common vocabulary, database reads and writes the base (its
 writers under database/writers), etl runs the pipeline, data_api serves the base, ai_api calls the
 model, cli composes. Under k_b.etl: the
-composition (source_kinds) → the sources → the modules of the pipeline.
+composition (source_kinds) → the sources → the modules of the pipeline. Under k_b.ai_api, read at
+three levels: digests → the stages → the clients → the settings → outbound and llm_replay →
+deadline and watch_items; a module imports only the layers below its own.
 """
 
 import ast
@@ -33,19 +35,20 @@ ETL_PIPELINE_MODULES = {
 COMPOSITION_MODULES = {"cli"} | ETL_COMPOSITION_MODULES
 
 
-def list_imported_modules(path: Path, package: str) -> set[str]:
+def list_imported_modules(path: Path, package: str, depth: int = 2) -> set[str]:
     """The k_b modules imported by the module at path, of the given package."""
-    return parse_imported_modules(path.read_text(), package)
+    return parse_imported_modules(path.read_text(), package, depth)
 
 
-def parse_imported_modules(code: str, package: str = "k_b") -> set[str]:
+def parse_imported_modules(code: str, package: str = "k_b", depth: int = 2) -> set[str]:
     """The k_b modules imported by `import k_b.x`, `from k_b import x`, `from k_b.x import y`,
     and their relative forms (`from . import x`, `from .x import y`, `from .. import x`),
     resolved against the package of the module.
 
     Each name is given below k_b, cut at two levels: `etl.sources` for any module of
     k_b.etl.sources, `core.config` for k_b.core.config. A name imported from a module counts as
-    its second level (`items.Item`): a rule compares by prefix (see is_within).
+    its second level (`items.Item`): a rule compares by prefix (see is_within). A depth of three
+    tells the modules of a sub-folder apart (`ai_api.connectors.llm_client`).
 
     A dynamic import (importlib.import_module) is not seen: there is none in k_b.
     """
@@ -70,7 +73,9 @@ def parse_imported_modules(code: str, package: str = "k_b") -> set[str]:
         else:
             continue
         imported |= {
-            ".".join(name.split(".")[1:3]) for name in names if name.startswith("k_b.")
+            ".".join(name.split(".")[1 : 1 + depth])
+            for name in names
+            if name.startswith("k_b.")
         }
     return imported
 
@@ -131,6 +136,25 @@ def test_every_form_of_import_is_seen(code):
 )
 def test_a_name_is_cut_at_two_levels(code, expected):
     assert parse_imported_modules(code) == expected
+
+
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        ("from k_b import ai_api", {"ai_api"}),
+        ("from k_b.ai_api import connectors", {"ai_api.connectors"}),
+        (
+            "from k_b.ai_api.connectors.llm_client import call_model",
+            {"ai_api.connectors.llm_client"},
+        ),
+        ("from k_b.ai_api.deadline import Deadline", {"ai_api.deadline.Deadline"}),
+        ("from .llm_replay import ReplayTransport", {"ai_api.connectors.llm_replay"}),
+    ],
+)
+def test_a_name_is_cut_at_three_levels_when_asked(code, expected):
+    imported = parse_imported_modules(code, package="k_b.ai_api.connectors", depth=3)
+
+    assert imported == expected
 
 
 @pytest.mark.parametrize(
@@ -299,6 +323,91 @@ def test_the_ai_api_rule_refuses_the_base_the_pipeline_and_the_other_apis(
     imported = parse_imported_modules(code, package="k_b.ai_api")
 
     assert bool(list_forbidden_imports_of_the_ai_api(imported)) is is_refused
+
+
+# Under k_b.ai_api, each module is in exactly one layer, from the bottom up (#242). A module
+# imports only the layers below its own: two modules of one layer do not import each other.
+AI_API_LAYERS = (
+    {"ai_api.deadline", "ai_api.watch_items"},
+    {"ai_api.connectors.outbound", "ai_api.connectors.llm_replay"},
+    {"ai_api.connectors.llm_settings", "ai_api.connectors.data_api_settings"},
+    {"ai_api.connectors.llm_client", "ai_api.connectors.data_api_client"},
+    {"ai_api.stages.classification", "ai_api.stages.writing"},
+    {"ai_api.digests"},
+)
+
+
+def name_module(path: Path) -> str:
+    """The name below k_b of the module at path (`ai_api.connectors.llm_client`)."""
+    return ".".join(path.relative_to(PACKAGE_DIR).with_suffix("").parts)
+
+
+def list_upward_imports_of_the_ai_api(module: str, imported: set[str]) -> set[str]:
+    """The names a module of ai_api may not import: those that reach a module of its layer or
+    of a layer above (`from k_b import ai_api` reaches them all)."""
+    layer = next(i for i, modules in enumerate(AI_API_LAYERS) if module in modules)
+    own_layer_and_above = set().union(*AI_API_LAYERS[layer:])
+    return {name for name in imported if reaches(name, own_layer_and_above)}
+
+
+def test_every_module_of_ai_api_is_in_exactly_one_layer():
+    modules = {
+        name_module(path)
+        for path in list_python_files("ai_api")
+        if path.name != "__init__.py"
+    }
+
+    assert modules == set().union(*AI_API_LAYERS)
+    assert sum(len(layer) for layer in AI_API_LAYERS) == len(modules)
+
+
+def test_a_module_of_ai_api_imports_only_the_layers_below_its_own():
+    for path in list_python_files("ai_api"):
+        if path.name == "__init__.py":
+            continue
+        imported = list_imported_modules(path, find_package(path), depth=3)
+        assert (
+            list_upward_imports_of_the_ai_api(name_module(path), imported) == set()
+        ), path
+
+
+def test_the_packages_of_ai_api_import_nothing_of_ai_api():
+    for path in list_python_files("ai_api"):
+        if path.name != "__init__.py":
+            continue
+        imported = list_imported_modules(path, find_package(path), depth=3)
+        assert {name for name in imported if is_within(name, {"ai_api"})} == set(), path
+
+
+@pytest.mark.parametrize(
+    ("module", "code", "is_refused"),
+    [
+        (
+            "ai_api.digests",
+            "from k_b.ai_api.stages.writing import write_subject",
+            False,
+        ),
+        ("ai_api.digests", "from k_b import ai_api", True),
+        ("ai_api.stages.writing", "from k_b.ai_api import connectors", False),
+        ("ai_api.stages.writing", "from k_b.ai_api import stages", True),
+        ("ai_api.stages.classification", "from ..digests import build_digests", True),
+        ("ai_api.connectors.llm_client", "from .. import deadline", False),
+        ("ai_api.connectors.llm_client", "from k_b.ai_api import connectors", True),
+        ("ai_api.connectors.llm_client", "from ..stages import writing", True),
+        ("ai_api.connectors.llm_settings", "from . import llm_replay", False),
+        ("ai_api.connectors.llm_settings", "from .llm_client import call_model", True),
+        ("ai_api.connectors.outbound", "from .llm_replay import ReplayTransport", True),
+        ("ai_api.deadline", "from k_b.core.config import LLM_REPLAY_BASE_URL", False),
+        ("ai_api.deadline", "from k_b.ai_api.watch_items import WatchItem", True),
+    ],
+)
+def test_the_rule_of_ai_api_refuses_its_layer_and_the_layers_above(
+    module, code, is_refused
+):
+    package = "k_b." + module.rpartition(".")[0]
+    imported = parse_imported_modules(code, package=package, depth=3)
+
+    assert bool(list_upward_imports_of_the_ai_api(module, imported)) is is_refused
 
 
 def test_items_imports_neither_the_sources_nor_the_composition():
