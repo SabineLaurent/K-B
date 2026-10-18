@@ -121,9 +121,9 @@ VARIABLE_BY_SOURCE_NAME = {
     CLIPPING_SOURCE_NAME: VAULT_DIR_VARIABLE,
     GH_ARCHIVE_SOURCE_NAME: BIGQUERY_KEY_VARIABLE,
 }
-# The source folders kb collect runs, separated by commas: tldr runs every edition. Not set: every
-# source of SOURCE_KINDS; no default value in core/config.py, which cannot import etl
-# (.claude/rules/conventions.md, rule 5).
+# The source folders kb collect runs, separated by commas: tldr runs every edition. Not set: no
+# filter, every source runs as without it (Zotero, the clips and GH Archive with their variable).
+# No default in core/config.py: not set is no filter, not a value.
 COLLECT_ONLY_VARIABLE = "KB_COLLECT_ONLY"
 # One log per import, named by its second as a raw file by its collection: never rewritten.
 IMPORT_LOG_FILE_NAME = "import-log-{imported_at}.jsonl"
@@ -420,7 +420,8 @@ class CollectOnly:
 
 
 def run_collect(data_dir: Path) -> int:
-    # One environment for the check and the run: a variable checked is the variable used.
+    # The mapping the check reads is the one the sources are created from; the BigQuery client
+    # reads os.environ itself.
     environ = os.environ
     collect_only = read_collect_only(environ)
     if collect_only is None:
@@ -448,29 +449,29 @@ def read_collect_only(environ: Mapping[str, str]) -> CollectOnly | None:
     value = environ.get(COLLECT_ONLY_VARIABLE)
     if value is None:
         return CollectOnly(None)
-    # Split and lowercased once: the names checked are the names collected. Zotero is zotero
-    # (decision of Sabine, 2026-10-18): a name can only match one of the folders.
+    # Split once: the names checked are the names collected. Zotero is zotero (decision of
+    # Sabine, 2026-10-18): a name can only match one of the folders.
     entries = tuple(entry.strip() for entry in value.split(","))
-    names = tuple(entry.lower() for entry in entries)
-    refusal = find_collect_only_refusal(entries, names, environ)
+    refusal = find_collect_only_refusal(entries, environ)
     if refusal is not None:
         logger.error("%s", refusal)
         return None
-    return CollectOnly(frozenset(names))
+    return CollectOnly(frozenset(entry.lower() for entry in entries))
 
 
 def find_collect_only_refusal(
-    entries: tuple[str, ...], names: tuple[str, ...], environ: Mapping[str, str]
+    entries: tuple[str, ...], environ: Mapping[str, str]
 ) -> str | None:
-    """Why the sources chosen are refused, or None. Each name is its entry lowercased; the entry
-    refused is quoted as it was written. A source chosen without its variable is refused: it
-    would not run, and kb collect could exit 0 without having run anything."""
+    """Why the sources chosen are refused, or None. Each entry is compared lowercased, and
+    quoted as it was written, without the spaces around. A source chosen without its variable
+    is refused: it would not run, and kb collect could exit 0 without having run anything."""
     # A value empty or made of spaces gives one empty entry: it would choose no source.
     if entries == ("",):
         return f"{COLLECT_ONLY_VARIABLE}: empty, set the source folders separated by commas"
     folder_names = [kind.folder_prefix for kind in SOURCE_KINDS]
-    for position, (entry, name) in enumerate(zip(entries, names, strict=True), start=1):
+    for position, entry in enumerate(entries, start=1):
         where = f"{COLLECT_ONLY_VARIABLE}: entry {position} of {len(entries)}"
+        name = entry.lower()
         if not entry:
             return f"{where} empty"
         if name not in folder_names:

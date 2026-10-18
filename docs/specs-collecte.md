@@ -28,16 +28,16 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   `tldr`, `zotero`, `clipping`, `gh_archive` ; `tldr` lance toutes ses éditions, `github_releases`
   tous ses dépôts. Les espaces autour d'un nom sont retirés, puis le nom est mis en minuscules
   (`Zotero` est `zotero`, décision de Sabine du 2026-10-18) ; un nom refusé est cité tel qu'il est
-  écrit. Une source écartée affiche une seule ligne, `<dossier>: skipped (not in KB_COLLECT_ONLY)`,
-  au nom de son dossier (une source lancée affiche le nom de la source, `tldr_ai`), et sa date de
-  dernière collecte reste. Code de sortie **2**, sans rien collecter (ni brut ni état écrit ; le
-  refus va au journal), quand la valeur est vide, qu'une entrée est vide, qu'un nom n'est pas un
-  dossier de source (le nom est cité, tronqué et échappé), ou qu'une source choisie n'a pas sa
-  variable (`zotero` sans `KB_ZOTERO_DIR`, `clipping` sans `KB_VAULT_DIR`, `gh_archive` sans
-  `GOOGLE_APPLICATION_CREDENTIALS`) : un choix qui ne peut pas tourner est refusé (décision de
-  Sabine du 2026-10-18). Sans `KB_COLLECT_ONLY`, toutes les
-  sources sont lancées, et une source sans sa variable est sautée sans changer le code de sortie
-  (Zotero et clips ci-dessous).
+  écrit, sans les espaces autour. Une source écartée affiche une seule ligne,
+  `<dossier>: skipped (not in KB_COLLECT_ONLY)`, au nom de son dossier (une source lancée affiche
+  le nom de la source, `tldr_ai`), et sa date de dernière collecte reste. Code de sortie **2**,
+  sans rien collecter (ni brut ni état écrit ; le refus va au journal), quand la valeur est vide,
+  qu'une entrée est vide, qu'un nom n'est pas un dossier de source (le nom est cité, tronqué et
+  échappé), ou qu'une source choisie n'a pas sa variable (`zotero` sans `KB_ZOTERO_DIR`, `clipping`
+  sans `KB_VAULT_DIR`, `gh_archive` sans `GOOGLE_APPLICATION_CREDENTIALS`) : un choix qui ne peut
+  pas tourner est refusé (décision de Sabine du 2026-10-18). Sans `KB_COLLECT_ONLY`, pas de
+  filtre : toutes les sources sont lancées, et une source sans sa variable est sautée sans changer
+  le code de sortie (Zotero et clips ci-dessous).
 - **Brut intact** : chaque collecte écrit ce que la source a renvoyé dans
   `raw/automated_watch/<source>/<AAAA-MM-JJTHHMMSSZ>.<ext>`, une seule fois, jamais réécrit. Une
   source qui lit plusieurs pages (site scrapé) écrit chaque page telle que reçue dans
