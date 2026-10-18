@@ -158,7 +158,7 @@ coffre. Elle n'importe ni `etl`, ni `database/writers`, ni `database/writing`.
 **Vérifier.**
 - `grep -rnE "raw_store|writers|write_file_atomically|write_text|write_bytes|[^a-z_]open\(" <paquet de l'API IA>`
   → rien. Le paquet n'existe pas au départ.
-- `uv run pytest tests/test_module_dependencies.py` : la ligne de l'API IA s'ajoute à la création
+- `uv run pytest tests/architecture/test_apis.py` : la ligne de l'API IA s'ajoute à la création
   de son paquet, comme pour l'API de données (règle 5 de `conventions.md`). C'est elle qui prouve
   la règle.
 

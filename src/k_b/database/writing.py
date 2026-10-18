@@ -27,10 +27,10 @@ from k_b.database.writers.shared_rows import UnknownSourceError, write_raw_data
 from k_b.database.writers.trend_writer import DISCARD_RULE as TREND_DISCARD_RULE
 from k_b.database.writers.trend_writer import write as write_trend_rows
 from k_b.database.writers.vulnerability_writer import (
-    withdraw_absent as mark_withdrawn_vulnerabilities_not_in,
+    mark_withdrawn as mark_withdrawn_vulnerabilities_not_in,
 )
 from k_b.database.writers.zotero_entry_writer import (
-    withdraw_absent as mark_withdrawn_zotero_rows_not_in,
+    mark_withdrawn as mark_withdrawn_zotero_rows_not_in,
 )
 from k_b.items import Item
 

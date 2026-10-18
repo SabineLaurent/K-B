@@ -68,13 +68,13 @@ RETURNING highlight_id
 # State catalog (Zotero): an entry or a highlight absent from an extract collected after the
 # latest one imported is withdrawn at that collection, never removed; the first absence keeps
 # its date.
-WITHDRAW_ABSENT_ZOTERO_ENTRIES = """
+MARK_WITHDRAWN_ZOTERO_ENTRIES = """
 UPDATE zotero_entry SET withdrawn_at = :collected_at
 WHERE withdrawn_at IS NULL
     AND zotero_key NOT IN (SELECT value FROM json_each(:present_keys))
 """
 
-WITHDRAW_ABSENT_HIGHLIGHTS = """
+MARK_WITHDRAWN_HIGHLIGHTS = """
 UPDATE highlight SET withdrawn_at = :collected_at
 WHERE withdrawn_at IS NULL
     AND zotero_key NOT IN (SELECT value FROM json_each(:present_keys))
@@ -163,15 +163,15 @@ def write_cited_publication(
     return int(publication_id)
 
 
-def withdraw_absent(
+def mark_withdrawn(
     connection: sqlite3.Connection,
     source_code: str,
     collected_at: datetime,
     raw_data_id: int,
     entries: Sequence[Item],
 ) -> int:
-    """Withdraw the entries and the highlights an extract collected after the latest one
-    imported no longer lists; return how many.
+    """Mark as withdrawn the entries and the highlights an extract collected after the
+    latest one imported no longer lists; return how many.
 
     The highlights are compared with every highlight of the extract: the last one of the
     library deleted in Zotero is withdrawn too. Without an entry, nothing is withdrawn: an
@@ -191,14 +191,14 @@ def withdraw_absent(
         highlight.zotero_key for entry in entries for highlight in entry.highlights
     ]
     withdrawn_entries = connection.execute(
-        WITHDRAW_ABSENT_ZOTERO_ENTRIES,
+        MARK_WITHDRAWN_ZOTERO_ENTRIES,
         {
             "collected_at": formatted_collected_at,
             "present_keys": json.dumps(entry_keys),
         },
     ).rowcount
     withdrawn_highlights = connection.execute(
-        WITHDRAW_ABSENT_HIGHLIGHTS,
+        MARK_WITHDRAWN_HIGHLIGHTS,
         {
             "collected_at": formatted_collected_at,
             "present_keys": json.dumps(highlight_keys),
