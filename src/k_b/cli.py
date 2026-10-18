@@ -90,9 +90,11 @@ class ExitCode(IntEnum):
         4,
         "kb collect: at least one source collected, at least one failed, state written",
     )
-    # 128 + 15, the code of a process stopped by SIGTERM: kb serve, whose handler is the one of
-    # uvicorn, exits with it too.
-    STOPPED_BY_SIGTERM = 143, "kb collect, kb import: stopped by SIGTERM"
+    # 128 + 15, the code of a process stopped by SIGTERM.
+    STOPPED_BY_SIGTERM = (
+        143,
+        "kb collect, kb import: stopped by SIGTERM; what was done before it is kept",
+    )
 
 
 class StoppedBySigtermError(SystemExit):
@@ -433,9 +435,11 @@ def find_collection_exit_code(outcome: CollectionOutcome) -> ExitCode:
     """Partial when some sources failed and the others are kept for good; a state not written
     is a failure, as when every source fails: the next collection starts from the same dates."""
     errors = outcome.errors_by_source.values()
-    if all(error is None for error in errors) and outcome.state_error is None:
+    if outcome.state_error is not None:
+        return ExitCode.FAILED
+    if all(error is None for error in errors):
         return ExitCode.SUCCEEDED
-    if outcome.state_error is None and any(error is None for error in errors):
+    if any(error is None for error in errors):
         return ExitCode.PARTIAL_FAILURE
     return ExitCode.FAILED
 

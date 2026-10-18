@@ -21,6 +21,21 @@ KB_SETTINGS_VARIABLES = (
 )
 
 
+@pytest.fixture
+def connect_with_factory():
+    """connect_database, opening a subclass of sqlite3.Connection: the tests change its commit."""
+
+    def connect_with(factory):
+        def connect(database_path):
+            connection = sqlite3.connect(database_path, factory=factory)
+            connection.execute("PRAGMA foreign_keys = ON")
+            return connection
+
+        return connect
+
+    return connect_with
+
+
 @pytest.fixture(autouse=True)
 def no_kb_setting_of_the_terminal(monkeypatch):
     """A terminal that exports a setting of kb must not change what the tests check."""

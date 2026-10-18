@@ -510,15 +510,17 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
      Le fichier d'un item refusé reste inscrit, comme celui d'une entrée rejetée à la lecture, et
      son catalogue (CISA KEV, Zotero) ne retire rien. Toute autre erreur dans la base (disque
      plein, base verrouillée), ou un journal qui ne s'écrit pas, n'écrit rien : aucun fichier
-     n'est inscrit, tous seront relus. Si la validation échoue, ou sur une interruption (Ctrl-C), le journal écrit est
-     supprimé. Pourquoi : un fichier
+     n'est inscrit, tous seront relus. Si la validation échoue, ou sur une interruption (Ctrl-C,
+     SIGTERM) reçue avant elle, le journal écrit est supprimé ; une interruption reçue pendant ou
+     après la validation garde l'import et son journal, et le journal de fonctionnement le dit
+     (`import committed, log kept`). Pourquoi : un fichier
      inscrit n'est plus relu, un journal perdu après la validation perdrait pour toujours la
      trace de ses rejets et de ses écarts (décision de Sabine du 2026-10-12, qui revient sur le
      journal écrit après la base de #105).
-     **Limites** (constats de revue, acceptées par Sabine le 2026-10-12) : un `SIGKILL` entre
-     l'écriture du journal et la validation laisse le journal d'un import annulé ; une
-     interruption qui arrive juste après la validation, avant la fin du bloc qui la protège,
-     supprime le journal d'un import validé (une fenêtre de quelques instructions Python).
+     **Limite** (constat de revue, acceptée par Sabine le 2026-10-12) : un `SIGKILL` entre
+     l'écriture du journal et la validation laisse le journal d'un import annulé. L'autre limite
+     acceptée ce jour-là, une interruption juste après la validation qui supprimait le journal
+     d'un import validé, est levée par la décision de Sabine du 2026-10-18 (#193).
    - **Reconstruction complète** : supprimer la base, `kb create-db`, puis `kb import`, qui
      relit tout `raw/`. Pas d'option : une base vide n'a rien au registre.
 

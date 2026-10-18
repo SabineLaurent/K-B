@@ -758,20 +758,20 @@ class SigtermAfterCommitConnection(sqlite3.Connection):
 
 
 def test_a_sigterm_once_the_base_has_committed_keeps_the_import_and_its_log(
-    monkeypatch, tmp_path, sigterm_handler_of_the_test
+    monkeypatch, tmp_path, capsys, sigterm_handler_of_the_test, connect_with_factory
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
     copy_fixture(tmp_path / "raw", "cisa_kev_extract.csv", "cisa_kev", "csv")
-
-    def connect_with_sigterm_after_commit(database_path):
-        connection = sqlite3.connect(
-            database_path, factory=SigtermAfterCommitConnection
-        )
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
-
-    monkeypatch.setattr(load, "connect_database", connect_with_sigterm_after_commit)
+    # An unreadable page: a rejection, so that the log kept has a line.
+    unreadable_path = copy_fixture(
+        tmp_path / "raw", "cisa_kev_extract.csv", "github_advisories_pip", "json"
+    )
+    unreadable_path.write_text("not json", encoding="utf-8")
+    capsys.readouterr()
+    monkeypatch.setattr(
+        load, "connect_database", connect_with_factory(SigtermAfterCommitConnection)
+    )
 
     exit_code = cli.main(["import"])
 
@@ -779,7 +779,16 @@ def test_a_sigterm_once_the_base_has_committed_keeps_the_import_and_its_log(
     connection = sqlite3.connect(tmp_path / "k-b.sqlite")
     assert connection.execute("SELECT count(*) FROM raw_data").fetchone() == (1,)
     connection.close()
-    assert len(list(tmp_path.glob("import-log-*.jsonl"))) == 1
+    [log_path] = tmp_path.glob("import-log-*.jsonl")
+    log_lines = [json.loads(line) for line in log_path.read_text("utf-8").splitlines()]
+    assert [line["kind"] for line in log_lines] == ["rejection"]
+    imported_at = datetime.fromisoformat(log_lines[0]["imported_at"])
+    assert log_path.name == f"import-log-{imported_at:%Y-%m-%dT%H%M%SZ}.jsonl"
+    output = capsys.readouterr()
+    assert "raw files read" not in output.out
+    assert f"INFO k_b.etl.load: import committed, log kept: '{log_path.name}'" in (
+        output.err
+    )
 
 
 def test_a_sigterm_during_a_source_stops_kb_collect_and_keeps_the_collection_state(
@@ -802,3 +811,50 @@ def test_a_sigterm_during_a_source_stops_kb_collect_and_keeps_the_collection_sta
     assert not (tmp_path / "raw" / "automated_watch" / "after").exists()
     assert list_hidden_files(tmp_path) == []
     assert signal.getsignal(signal.SIGTERM) is sigterm_handler_of_the_test
+
+
+# kb collect run as the kb script runs it, sys.exit(main()), with a source that says it has
+# started, then waits for the signal.
+COLLECT_WAITING_FOR_SIGTERM = """
+import sys
+import time
+
+from k_b import cli
+from k_b.etl.source_contract import SourceKind
+
+
+class WaitingSource:
+    name = "waiting"
+    extension = "json"
+    acquisition_dir_name = "automated_watch"
+
+    def fetch(self, last_collected_at):
+        print("ready", flush=True)
+        time.sleep(60)
+        return b"{}"
+
+
+cli.SOURCE_KINDS = (SourceKind("test", (WaitingSource(),), None),)
+sys.exit(cli.main(["collect"]))
+"""
+
+
+def test_kb_collect_sent_sigterm_in_its_own_process_exits_with_143(tmp_path):
+    process = subprocess.Popen(  # noqa: S603 — runs this interpreter on a fixed script
+        [sys.executable, "-c", COLLECT_WAITING_FOR_SIGTERM],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env={**os.environ, "KB_DATA_DIR": str(tmp_path)},
+    )
+    try:
+        assert process.stdout.readline() == "ready\n"
+        process.send_signal(signal.SIGTERM)
+        _, error_output = process.communicate(timeout=30)
+    finally:
+        process.kill()
+        process.wait()
+
+    assert process.returncode == cli.ExitCode.STOPPED_BY_SIGTERM
+    assert "ERROR k_b.cli: kb stopped by SIGTERM" in error_output
+    assert not (tmp_path / "collection_state.json").exists()
