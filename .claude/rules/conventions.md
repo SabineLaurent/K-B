@@ -144,12 +144,17 @@ statu quo).
   `etl/sources/`), accès aux données (`database/`). Une couche n'appelle que celle du dessous.
 - `items.py` et `core/` sont le vocabulaire commun à toutes les couches : chacune peut les
   importer.
-- Une API importe `database`, `items` et `core`, jamais `etl` ni `database/writers` (sa ligne dans
-  `tests/test_module_dependencies.py` s'ajoute à la création du paquet d'API).
+- Une API importe `database`, `items` et `core`, jamais `etl`, `database/writers` ni
+  `database/writing` (sa ligne dans `tests/test_module_dependencies.py` s'ajoute à la création du
+  paquet d'API).
 - Le SQL **de la base K-B** vit dans `src/k_b/database/` : un dossier d'écriture, `writers/` (un
   module par sorte d'item et un pour le classement, `<sorte>_writer.py`, chacun avec une fonction
   `write`), et un module de lecture (la requête `UNION ALL`, partagée par `kb search`, « quoi de
   neuf » et l'API). Les migrations Alembic aussi.
+- `database/writing.py` est la seule porte vers `writers/` hors de `database/` : il choisit
+  l'écrivain de chaque sorte (`WRITER_BY_KIND`, `write_item`) et expose par `__all__` les objets
+  des écrivains que lit l'import, jamais un module de `writers/` (`mypy --strict` refuse tout
+  autre nom).
 - La requête d'extraction d'une source qui est elle-même une base (Zotero, GH Archive sur
   BigQuery) vit dans le module de cette source, `src/k_b/etl/sources/<source>.py`, comme la
   requête d'une API : elle lit une source externe, en lecture seule, pas la base K-B.
@@ -162,7 +167,8 @@ statu quo).
   rien (une source ne fait que lire).
 - `uv run pytest tests/test_module_dependencies.py` : les dépendances, lues à deux niveaux
   (`core`, `database`, `etl`, `etl/sources`) ; aucun module de `database/`, sous-dossiers
-  compris, n'importe de K-B autre chose que `database`, `items` et `core`.
+  compris, n'importe de K-B autre chose que `database`, `items` et `core` ; hors de `database/`,
+  aucun module n'atteint `database/writers` (`test_only_database_imports_its_writers`).
 - `grep -c "execute" src/k_b/etl/load.py` renvoie 0.
 
 **Pourquoi.** Un module par écrivain : les modules de `writers/` font 851 lignes à eux tous

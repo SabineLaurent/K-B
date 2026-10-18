@@ -153,7 +153,7 @@ recherche web le 2026-10-15).
 ## 7. API IA sans état
 
 **Règle.** L'API IA n'écrit rien qui doive survivre à son redémarrage : seul `kb` écrit dans le
-coffre. Elle n'importe ni `etl` ni `database/writers`.
+coffre. Elle n'importe ni `etl`, ni `database/writers`, ni `database/writing`.
 
 **Vérifier.**
 - `grep -rnE "raw_store|writers|write_file_atomically|write_text|write_bytes|[^a-z_]open\(" <paquet de l'API IA>`
