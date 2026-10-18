@@ -25,13 +25,13 @@ base : il lit la veille par l'API de données (`ai_api/connectors/data_api_clien
 pas encore servi (#156). `kb search` vient après le 08/11 (journal ADR, 2026-10-15, « POC du
 25/10 », décision 1).
 
-## Le SGBD : SQLite
+## Le SGBD : SQLite au POC du 25/10, PostgreSQL au 08/11
 
-Retenu : **SQLite**, un fichier dans le dossier de données, hors du dépôt, lu avec le module
+Retenu au POC du 25/10 : **SQLite**, un fichier dans le dossier de données, hors du dépôt, lu avec le module
 `sqlite3` de la bibliothèque standard. Le dossier de données est donné par la variable
 `KB_DATA_DIR` ; le journal ADR du 2026-10-09 le fixe à `~/.knowledge_base`.
 
-| | SQLite (retenu) | PostgreSQL (écarté pour l'instant) |
+| | SQLite (au POC du 25/10) | PostgreSQL (prévu au 08/11) |
 |---|---|---|
 | Installation | aucune : un fichier, rejouable par un tiers | un serveur à installer, lancer et sécuriser |
 | Écritures | une à la fois ; ici un seul écrivain, le pipeline | plusieurs en parallèle (MVCC) |
@@ -40,10 +40,12 @@ Retenu : **SQLite**, un fichier dans le dossier de données, hors du dépôt, lu
 | Typage | souple par défaut ; strict avec les tables `STRICT` | strict |
 | Dépendance | aucune | un pilote (`psycopg`) |
 
-Pourquoi : un utilisateur, un écrivain par jour, quelques milliers d'items par an. Le besoin
-est local et léger : un serveur n'apporterait que de la charge. Limite assumée : pas de rôles
-dans la base. Une migration vers PostgreSQL reste possible si le besoin change (plusieurs
-écrivains, accès distant) ; ce qui est propre à SQLite est listé plus bas.
+Pourquoi SQLite au POC du 25/10 : un utilisateur, un écrivain par jour, quelques milliers
+d'items par an ; en localhost, un fichier suffit. Limite assumée : pas de rôles dans la base.
+Pourquoi PostgreSQL au 08/11 : sur Azure Container Apps, un fichier SQLite n'a pas de disque
+fiable (journal ADR, 2026-10-15, « POC du 25/10 », décision 2). D'ici là, aucun SQL propre à
+SQLite n'est ajouté (règle 1 de `.claude/rules/poc.md`) ; ce qui l'est déjà est listé plus bas,
+avec son équivalent PostgreSQL.
 
 ## Spécifications de stockage
 
