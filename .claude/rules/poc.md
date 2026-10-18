@@ -133,8 +133,8 @@ clip n'a rien à y faire.
 chiffre) et s'arrête proprement sur SIGTERM.
 
 **Vérifier.**
-- `grep -cE "return [0-9]+\b|else [0-9]+\b" src/k_b/cli.py` → 17 au départ (codes écrits en
-  chiffres, que #193 nomme).
+- `cat src/k_b/cli.py src/k_b/commands/*.py | grep -cE "return [0-9]+\b|else [0-9]+\b"` → 17 au
+  départ (dans `cli.py`, codes écrits en chiffres, que #193 nomme).
 - `grep -rnE "sys\.exit\([0-9]|SystemExit\([0-9]" src/k_b` → rien au départ.
 - `grep -rn "SIGTERM" src/k_b` → rien au départ.
 - La preuve est un test qui envoie SIGTERM à une commande en cours et lit son code de sortie
