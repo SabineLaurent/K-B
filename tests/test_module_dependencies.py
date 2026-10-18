@@ -297,6 +297,22 @@ def test_the_data_api_rule_refuses_etl_and_the_writers(code, is_refused):
     assert bool(list_forbidden_imports_of_the_data_api(imported)) is is_refused
 
 
+# api_router.py gathers the routers; the app plugs in it alone, and routers/__init__.py stays
+# empty (code.md, "Séparation des responsabilités"; #246).
+def test_the_app_of_the_data_api_imports_no_router():
+    path = PACKAGE_DIR / "data_api" / "app.py"
+    imported = list_imported_modules(path, find_package(path), depth=3)
+
+    assert {name for name in imported if is_within(name, {"data_api.routers"})} == set()
+
+
+def test_the_package_of_the_routers_imports_nothing():
+    path = PACKAGE_DIR / "data_api" / "routers" / "__init__.py"
+    nodes = ast.walk(ast.parse(path.read_text()))
+
+    assert not any(isinstance(node, ast.Import | ast.ImportFrom) for node in nodes)
+
+
 # The AI API reads the watch through the data API, never the base (docs/fiches-veille.md, "Le
 # parcours d'une demande"), and writes nothing that must outlive it (.claude/rules/poc.md, rule
 # 7): neither database, its writers included, nor etl and its raw store.
