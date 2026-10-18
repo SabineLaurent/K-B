@@ -2702,6 +2702,71 @@ Décisions de Sabine du 2026-10-17 et du 2026-10-18 sur #242, relayées par time
   « module → modules permis », plus longue que six couches. Limite assumée : un import latéral
   dont on aurait besoin un jour se décidera alors, et changera le test. — PR de #242
 
+### Codes de sortie de kb
+
+Décisions de Sabine du 2026-10-18 sur #193, relayées par time-knight, sur recommandation du plan
+relu par un sous-agent.
+
+- **Les codes de sortie de `kb` sont les membres d'une énumération, `ExitCode` (`cli.py`), dont
+  chacun porte son sens : 0 `SUCCEEDED`, 1 `FAILED`, 2 `NOT_STARTED` (aussi l'usage refusé par
+  `argparse`), 3 `SERVER_NOT_STARTED` (rendu par uvicorn, pas par `kb`), 4 `PARTIAL_FAILURE`,
+  143 `STOPPED_BY_SIGTERM`. Ils sont listés par `kb --help`, généré depuis l'énumération ; le
+  `README.md` garde les cas de chaque commande.** Pourquoi : en job de conteneur, le code est la
+  seule façon de savoir ce qu'a fait `kb` sans lire le journal (règle 6 de `poc.md`). 0, 1 et 2
+  gardent le sens décidé le 2026-10-01. 4 est la première valeur libre après 3, que rend uvicorn
+  (`STARTUP_FAILURE`, `uvicorn/config.py:81`, 0.54.0) quand `kb serve` ne démarre pas. 143 est
+  128 + 15, le code d'un processus arrêté par SIGTERM
+  ([Bash Reference Manual, Simple Commands](https://www.gnu.org/software/bash/manual/html_node/Simple-Commands.html),
+  consulté le 2026-10-18) ; `kb serve` y sort aussi, hors PID 1 : uvicorn remet l'ancien
+  gestionnaire, `SIG_DFL`, et renvoie le signal (`uvicorn/server.py:339-349`), qu'un PID 1
+  ignore (non vérifié en conteneur). Options écartées : 3 pour l'échec partiel (celui d'uvicorn) ; 64 à
+  78 (`sysexits.h`, d'autres sens) ; 23 (propre à rsync) ; 1 pour SIGTERM (indistinct d'un
+  échec) ; un dictionnaire des sens à côté de l'énumération, ou le `README.md` seul (deux copies
+  à tenir). — PR de #193
+- **Le code d'échec partiel (4) vaut pour `kb collect` seul : au moins une source a réussi, au
+  moins une a échoué, et l'état de collecte est écrit. Toutes les sources lancées en échec, ou
+  l'état non écrit, restent 1 ; `kb import` garde 0, 1 et 2.** Écart à la lettre de #193, qui
+  prévoyait un code partiel pour `collect` et `import`. Pourquoi, celui de la recommandation :
+  l'import est une seule transaction, qui écrit tout ou rien (`etl/load.py`) ; un import avec
+  des rejets va au bout et sort en 0. L'état non écrit reste 1, comme l'écrivent #60 et #64 :
+  une panne de disque ou de droits revient au lancement suivant. Options écartées : un import
+  avec rejets en 4 (change le sens de 0, et un fichier illisible, relu et rejeté à chaque
+  import, ferait sortir chaque import suivant en 4) ; l'erreur de l'import en 4 (rien n'est
+  écrit, ce n'est pas partiel) ; l'état non écrit en 4 (contredit #60 et #64). — PR de #193
+- **Sur SIGTERM, `kb collect` et `kb import` lèvent `StoppedBySigtermError`, un `SystemExit`, et
+  sortent en 143 après le même nettoyage que pour toute exception ; `kb serve` garde le
+  gestionnaire d'uvicorn.** Pourquoi : `docker stop` envoie SIGTERM puis SIGKILL (règle 6 de
+  `poc.md`) ; une sous-classe dédiée laisse passer intact le `SystemExit(3)` d'uvicorn. 143 dit
+  « arrêté par SIGTERM ; ce qui a été validé avant le signal est gardé » : le gestionnaire reste
+  posé jusqu'à la fin de la commande, et un signal tardif, reçu après l'écriture de l'état de
+  collecte ou la validation de l'import, sort aussi en 143 (tri de la revue de code, tranché par
+  time-knight par délégation de Sabine). Ce n'est pas une régression : sans gestionnaire, le même
+  signal tuait déjà le processus avec 143 ; retirer le gestionnaire avant l'affichage laisserait
+  une autre fenêtre, entre l'écriture et le retrait. Limites assumées : `kb create-db` et
+  `kb openapi` n'ont pas de gestionnaire (périmètre de #193, écart à la règle 6 de `poc.md`, qui
+  dit « chaque commande ») ; un SIGTERM pendant la collecte perd les dates des sources déjà
+  collectées dans ce lancement, qui sont recollectées au suivant (déjà vrai sans gestionnaire).
+  — PR de #193
+- **Le journal d'import n'est supprimé que si la base n'a pas validé l'import : le `commit` a
+  levé une `sqlite3.Error`, ou une transaction reste ouverte. Une interruption (Ctrl-C, SIGTERM)
+  reçue une fois la base validée garde l'import et son journal, et le journal de fonctionnement
+  le dit (`import committed, log kept: '<nom du journal>'`, le nom et non le chemin, que
+  `quote_value` couperait avant le nom).** Décision de Sabine du
+  2026-10-18, ajoutée au périmètre de #193 (conception par l'architecte de données de
+  time-knight). Pourquoi : Python lève l'exception d'un signal une fois le `commit` revenu, encore
+  dans le `try` ; la version d'avant supprimait alors le journal d'un import validé, dont les
+  fichiers enregistrés ne sont plus relus. Constaté avec un vrai SIGTERM envoyé pendant des
+  `commit` (44 essais sur 300 : exception levée, base validée, plus de transaction ouverte).
+  Applique l'entrée « supprimé si la validation échoue » (journal d'import écrit avant la
+  validation) sans la contredire. Options écartées : masquer SIGTERM autour du `commit`
+  (`signal.pthread_sigmask` : plus de mécanique, Unix et thread principal seulement, mêlée au
+  gestionnaire de `cli.py`) ; écrire le journal après le `commit` (choix de #105, inversé par
+  #106) ; le journal en base, dans la même transaction que `raw_data` (taille L, aucun
+  code ne lit le journal, et la reconstruction de la base effacerait l'historique ; à rouvrir si
+  un lecteur programmatique apparaît). Limite assumée : un commit refusé suivi, dans la même
+  instruction, d'un signal remplace la `sqlite3.Error` par l'exception du signal ; si SQLite a
+  annulé de lui-même, le journal reste sans import. — PR de #193
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
