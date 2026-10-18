@@ -1,6 +1,6 @@
 """The data API: the items of the base, read only, for the clients of Sabine, on her machine by
-default, or in containers (docs/specs-api.md, "Règles communes"). create_app gathers the
-routers, the key and the errors."""
+default, or in containers (docs/specs-api.md, "Règles communes"). create_app plugs in the
+routers (gathered by api_router.py), the key and the errors."""
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -10,11 +10,11 @@ from pydantic import SecretStr
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from k_b.core.config import DATA_API_ALLOWED_HOSTS
+from k_b.data_api.api_router import api_router
 from k_b.data_api.dependencies import check_api_key
 from k_b.data_api.errors import ERROR_HANDLERS, respond_to_unexpected_error
 from k_b.data_api.health import HEALTH_PATH, answer_health
 from k_b.data_api.request_log import log_request
-from k_b.data_api.routers import item_router, trend_router
 
 # The version of docs/specs-api.md: a change a client can see changes both.
 API_VERSION = "0.4.0"
@@ -48,8 +48,7 @@ def create_app(
     # The outermost: the 400 of TrustedHostMiddleware and the 500 of an unexpected error have
     # their line too.
     app.middleware("http")(log_request)
-    app.include_router(item_router.router)
-    app.include_router(trend_router.router)
+    app.include_router(api_router)
     # add_route, as FastAPI adds /docs: a route of Starlette, which the key of the app does not
     # reach (fastapi/applications.py, 0.143).
     app.add_route(HEALTH_PATH, answer_health, methods=["GET"], include_in_schema=False)
