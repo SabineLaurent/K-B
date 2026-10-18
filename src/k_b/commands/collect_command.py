@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from k_b.commands.exit_codes import ExitCode
-from k_b.commands.run_log import LOGGER_NAME, log_refusal
+from k_b.commands.run_log import LOGGER_NAME, value_or_log_refusal
 from k_b.etl.collected_sources import (
     COLLECT_ONLY_VARIABLE,
     VARIABLE_BY_SOURCE_NAME,
@@ -26,7 +26,9 @@ def run_collect(data_dir: Path) -> int:
     # The mapping the check reads is the one the sources are created from; the BigQuery client
     # reads os.environ itself.
     environ = os.environ
-    collect_only = log_refusal(read_collect_only_or_refusal(environ, SOURCE_KINDS))
+    collect_only = value_or_log_refusal(
+        read_collect_only_or_refusal(environ, SOURCE_KINDS)
+    )
     if collect_only is None:
         return ExitCode.NOT_STARTED
     try:

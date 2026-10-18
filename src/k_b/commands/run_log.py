@@ -1,4 +1,4 @@
-"""The log of a run of kb: on stderr and in the log file of the data directory."""
+"""The log of a run of kb: where it goes, its format, and the refusals of the layers it records."""
 
 import logging
 import time
@@ -68,9 +68,9 @@ def logging_to(
             handler.close()
 
 
-def log_refusal[ValueT](value_or_refusal: ValueT | str) -> ValueT | None:
-    """The value read by a layer, or None after logging why it refused it (conventions.md, rule
-    3: a failure is logged where it is handled)."""
+def value_or_log_refusal[ValueT](value_or_refusal: ValueT | str) -> ValueT | None:
+    """The value read by a layer, or None after logging why the layer refused it; the caller
+    decides to stop. The value read is never a str: a str is the refusal."""
     if isinstance(value_or_refusal, str):
         logger.error("%s", value_or_refusal)
         return None
