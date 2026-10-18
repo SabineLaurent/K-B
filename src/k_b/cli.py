@@ -451,14 +451,17 @@ def read_collect_only(environ: Mapping[str, str]) -> CollectOnly | None:
     if refusal is not None:
         logger.error("%s", refusal)
         return None
-    return CollectOnly(frozenset(entries))
+    return CollectOnly(frozenset(entry.lower() for entry in entries))
 
 
 def find_collect_only_refusal(
     entries: tuple[str, ...], environ: Mapping[str, str]
 ) -> str | None:
     """Why the sources chosen are refused, or None. A source chosen without its variable is
-    refused: it would not run, and kb collect could exit 0 without having run anything."""
+    refused: it would not run, and kb collect could exit 0 without having run anything.
+
+    An entry is compared in lowercase: Zotero is zotero (decision of Sabine, 2026-10-18), as it
+    can only name one of the folders. The entry refused is quoted as it was written."""
     # A value empty or made of spaces gives one empty entry: it would choose no source.
     if entries == ("",):
         return f"{COLLECT_ONLY_VARIABLE}: empty, set the source folders separated by commas"
@@ -467,12 +470,12 @@ def find_collect_only_refusal(
         where = f"{COLLECT_ONLY_VARIABLE}: entry {position} of {len(entries)}"
         if not entry:
             return f"{where} empty"
-        if entry not in folder_names:
+        if entry.lower() not in folder_names:
             return (
                 f"{where} {quote_value(entry)} not a source folder;"
                 f" folders: {', '.join(folder_names)}"
             )
-        variable = VARIABLE_BY_SOURCE_NAME.get(entry)
+        variable = VARIABLE_BY_SOURCE_NAME.get(entry.lower())
         if variable is not None and not environ.get(variable):
             return f"{where} {quote_value(entry)} chosen, {variable} not set"
     return None

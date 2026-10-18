@@ -346,11 +346,11 @@ def test_collect_only_prints_one_line_for_a_source_not_chosen(
     )
 
 
-def test_collect_only_takes_the_names_with_spaces_around_and_twice(
+def test_collect_only_takes_the_names_with_spaces_around_in_any_case_and_twice(
     monkeypatch, tmp_path
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("KB_COLLECT_ONLY", " test , test")
+    monkeypatch.setenv("KB_COLLECT_ONLY", " Test , TEST,test")
     source = WorkingSource()
     monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(source))
 
@@ -388,15 +388,15 @@ def test_collect_only_refuses_a_name_that_is_not_a_source_folder_and_quotes_it(
     assert "\nERROR k_b.cli: forged line" not in error_output
 
 
-def test_collect_only_compares_the_names_as_they_are_written(
+def test_collect_only_quotes_a_name_refused_as_it_was_written(
     monkeypatch, tmp_path, capsys
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("KB_COLLECT_ONLY", "Test")
+    monkeypatch.setenv("KB_COLLECT_ONLY", "Test,TLDR_AI")
     monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(WorkingSource()))
 
     assert cli.main(["collect"]) == cli.ExitCode.NOT_STARTED
-    assert "entry 1 of 1 'Test' not a source folder" in capsys.readouterr().err
+    assert "entry 2 of 2 'TLDR_AI' not a source folder" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
@@ -425,6 +425,7 @@ def test_collect_only_refuses_an_empty_value_or_entry(
     ("name", "variable"),
     [
         ("zotero", "KB_ZOTERO_DIR"),
+        ("Zotero", "KB_ZOTERO_DIR"),
         ("clipping", "KB_VAULT_DIR"),
         ("gh_archive", "GOOGLE_APPLICATION_CREDENTIALS"),
     ],
