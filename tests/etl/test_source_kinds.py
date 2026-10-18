@@ -38,7 +38,8 @@ def test_no_folder_prefix_covers_another():
 
 
 def test_zotero_is_declared_with_its_reader_and_without_an_instance():
-    # Its instance needs the Zotero data directory: cli.py creates it from KB_ZOTERO_DIR.
+    # Its instance needs the Zotero data directory: etl/collected_sources.py creates it from
+    # KB_ZOTERO_DIR.
     kind = find_source_kind("zotero", SOURCE_KINDS)
 
     assert kind is not None
@@ -46,7 +47,7 @@ def test_zotero_is_declared_with_its_reader_and_without_an_instance():
 
 
 def test_the_clips_are_declared_with_their_reader_and_without_an_instance():
-    # Its instance needs the vault: cli.py creates it from KB_VAULT_DIR.
+    # Its instance needs the vault: etl/collected_sources.py creates it from KB_VAULT_DIR.
     kind = find_source_kind("clipping", SOURCE_KINDS)
 
     assert kind is not None

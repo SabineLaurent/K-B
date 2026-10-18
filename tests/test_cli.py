@@ -54,8 +54,8 @@ def collected_kinds(*sources):
 
 
 def declared_kinds(*sources):
-    """The kind of collected_kinds, and the three kinds whose source cli.py creates: names that
-    KB_COLLECT_ONLY can choose."""
+    """The kind of collected_kinds, and the three kinds whose source etl/collected_sources.py
+    creates: names that KB_COLLECT_ONLY can choose."""
     return collected_kinds(*sources) + tuple(
         SourceKind(name, (), None) for name in ("zotero", "clipping", "gh_archive")
     )

@@ -10,7 +10,7 @@ the query capped by maximum_bytes_billed. The service account key is found by th
 GOOGLE_APPLICATION_CREDENTIALS; the source never opens it.
 
 Then its reader (T): the raw results not imported yet, each read as a ranking. Its rows are not
-items: cli.py gives them to the import beside the items.
+items: commands/import_command.py gives them to the import beside the items.
 """
 
 import json

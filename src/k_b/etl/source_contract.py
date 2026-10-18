@@ -1,7 +1,7 @@
 """What a source gives the generic steps: how to collect it (E), how to read its raw files (T).
 
-The sources themselves are declared once, in SOURCE_KINDS, that only cli.py imports in the
-package.
+The sources themselves are declared once, in SOURCE_KINDS, that only commands/collect_command.py
+and commands/import_command.py import in the package.
 """
 
 from collections.abc import Callable, Iterable, Sequence
