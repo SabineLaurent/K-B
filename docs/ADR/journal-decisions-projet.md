@@ -2844,6 +2844,58 @@ time-knight (délégation de Sabine du 2026-10-15).
   time-knight) : aucun test ne vérifie que chaque module de `routers/` est inclus par
   `api_router` ; les tests de route d'un nouveau routeur verraient son oubli. — PR de #246
 
+### Base : une porte d'écriture
+
+- **`database/writing.py` est la seule porte de `src/k_b` vers `database/writers/`, hors de
+  `database/`. Il tient la table `WRITER_BY_KIND`, `write_item` et `KindWithoutTableError`,
+  déplacés sans changement d'`etl/load.py`, et réexporte par `__all__` les objets des écrivains
+  que lisent `load.py`, `import_log.py` et `import_command.py`, jamais un module de `writers/`.**
+  Décision de Sabine du 2026-10-18 (« writing maintenant »). Pourquoi, selon elle : c'est la base
+  qui sait quel écrivain écrit quelle sorte, et l'import lui parle par une seule porte, comme
+  `api_router.py` rassemble les routeurs (#246) et comme la ligne de commande est mince (#247). Le
+  nom est celui des voisins (`reading.py`, `creation.py`, `connection.py`), gardé malgré
+  l'homonyme `ai_api/stages/writing.py` (« pour la db on va garder les ing »). Restent dans
+  `load.py` ce qui lit `etl` (`write_item_in_savepoint`, `register_raw_file`, les conditions de
+  retrait), car `database` n'importe pas `etl` (`conventions.md`, règle 5). Options écartées : les
+  noms `db_writer.py` (« db_ » redit le dossier) et `writer.py` (une lettre d'écart avec
+  `writers/`) ; ne déplacer que la table (six modules de `writers/` restaient importés) ;
+  `writers/__init__.py` comme porte (`code.md`, décision de #246) ; laisser `import_log.py` et
+  `import_command.py` lire `writers/` (une règle à exceptions). Forme : `__all__`, car
+  `mypy --strict` refuse alors tout autre nom importé de la porte. Formes écartées, essayées le
+  2026-10-18 : l'import implicite (F401, mypy), `import x as x` (PLC0414), des affectations
+  `y = writer.x` (l'interface dispersée). Limite assumée : `KindWithoutTableError.__module__`
+  devient `k_b.database.writing`, et une trace montre le cadre de `writing.py`. — PR de #251
+- **Quatre objets sont renommés à l'import : `write_trend_rows`, `TREND_DISCARD_RULE`,
+  `mark_withdrawn_vulnerabilities_not_in` et `mark_withdrawn_zotero_rows_not_in`. Les fonctions
+  des écrivains et de `load.py` gardent leur nom.** Décision de Sabine du 2026-10-18, sur le plan
+  de la partie 2 (l'issue disait à tort qu'un seul nom changeait). Pourquoi : `write` et
+  `DISCARD_RULE` ne disent plus rien hors de leur module, et les deux `withdraw_absent` ne peuvent
+  pas coexister ; « mark » dit qu'il s'agit d'un `UPDATE` de `withdrawn_at` et non d'une
+  suppression, « not_in » dit ce que reçoit la fonction (la liste des présents). Options écartées :
+  `withdraw_…_not_in` et `…_not_listed` (« withdraw » laisse croire à une suppression),
+  `withdraw_unlisted_…` (proposition de la session ; « unlisted » redit « absent »). Limite
+  assumée : la porte et les écrivains portent deux noms pour une même fonction jusqu'au renommage
+  partout, dans une petite issue à part juste après #251 (décision de Sabine du 2026-10-18,
+  21:20Z). — PR de #251
+- **La porte est tenue par des tests de `tests/test_module_dependencies.py` : hors de `database/`,
+  aucun module n'atteint `database.writers` (`reaches` : `from k_b import database` est refusé), et
+  l'API de données n'importe pas `database.writing`. La règle de l'API lit désormais ses interdits
+  avec `reaches`, elle aussi : `from k_b import database` lui est refusé, alors que son cas de test
+  le permettait.** Pourquoi : une règle créée par un rangement se tient par un test (entrée de
+  #247), avec ses cas paramétrés ; et une seule façon de lire une interdiction (tri de la revue de
+  code par time-knight, délégation de Sabine du 2026-10-15). Option écartée : un `grep` du critère
+  de fin seul ; garder `is_within` pour l'API (le paquet `database` y donnait accès à la porte
+  d'écriture sans que le test le voie). — PR de #251
+- **Chaque `__init__.py` de `src/k_b` est vide, sans exception, tenu par un seul test,
+  `test_every_package_of_k_b_has_an_empty_init`. Il remplace le test de `routers/__init__.py`
+  (entrée de #246, « deux tests ») et celui des paquets d'`ai_api` qui n'importent rien
+  d'`ai_api` (#242).** Décision de Sabine du 2026-10-18, groupée dans #251. Pourquoi : la règle de
+  `code.md` vaut pour tous les paquets, ceux créés plus tard compris ; un fichier vide n'importe
+  rien, donc le test unique est plus strict que les deux qu'il remplace. Inverse en partie la forme
+  retenue à #246 (deux tests) : la garde de `app.py` reste, celle de `routers/__init__.py` passe dans
+  la règle générale. Limite assumée : le test ne voit pas un dossier de modules sans
+  `__init__.py`. — PR de #251
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
