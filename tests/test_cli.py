@@ -15,8 +15,10 @@ from etl.test_extract import BrokenSource, WorkingSource
 from etl.test_transform import FIXTURES_DIR, copy_fixture
 
 from k_b import cli
+from k_b.commands import collect_command, import_command
+from k_b.core import quoting
 from k_b.database.writers.shared_rows import UnknownSourceError
-from k_b.etl import load
+from k_b.etl import collected_sources, load
 from k_b.etl.load import KindWithoutTableError
 from k_b.etl.source_contract import SourceKind
 from k_b.etl.sources import clipping
@@ -52,8 +54,8 @@ def collected_kinds(*sources):
 
 
 def declared_kinds(*sources):
-    """The kind of collected_kinds, and the three kinds whose source cli.py creates: names that
-    KB_COLLECT_ONLY can choose."""
+    """The kind of collected_kinds, and the three kinds whose source etl/collected_sources.py
+    creates: names that KB_COLLECT_ONLY can choose."""
     return collected_kinds(*sources) + tuple(
         SourceKind(name, (), None) for name in ("zotero", "clipping", "gh_archive")
     )
@@ -79,7 +81,9 @@ def test_collect_reports_a_failure_but_still_stores_the_other_sources(
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(
-        cli, "SOURCE_KINDS", collected_kinds(BrokenSource(), WorkingSource())
+        collect_command,
+        "SOURCE_KINDS",
+        collected_kinds(BrokenSource(), WorkingSource()),
     )
 
     exit_code = cli.main(["collect"])
@@ -92,7 +96,9 @@ def test_collect_writes_its_state_at_the_root_of_the_data_directory_not_in_raw(
     monkeypatch, tmp_path
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", collected_kinds(WorkingSource())
+    )
 
     exit_code = cli.main(["collect"])
 
@@ -112,7 +118,9 @@ def test_collect_still_prints_the_summary_and_exits_1_when_the_state_cannot_be_w
     (tmp_path / "logs").mkdir()
     tmp_path.chmod(0o500)
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", collected_kinds(WorkingSource())
+    )
 
     try:
         exit_code = cli.main(["collect"])
@@ -138,7 +146,9 @@ def test_collect_skips_zotero_and_says_so_without_its_directory(
     monkeypatch.setenv("KB_DATA_DIR", str(data_dir))
     if zotero_dir_variable is not None:
         monkeypatch.setenv("KB_ZOTERO_DIR", zotero_dir_variable)
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", collected_kinds(WorkingSource())
+    )
 
     exit_code = cli.main(["collect"])
 
@@ -159,7 +169,7 @@ def test_collect_extracts_zotero_into_the_selected_library_with_its_directory(
     data_dir.mkdir()
     monkeypatch.setenv("KB_DATA_DIR", str(data_dir))
     monkeypatch.setenv("KB_ZOTERO_DIR", str(zotero_dir))
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
+    monkeypatch.setattr(collect_command, "SOURCE_KINDS", collected_kinds())
 
     exit_code = cli.main(["collect"])
 
@@ -186,7 +196,7 @@ def test_collect_reports_a_zotero_failure_and_keeps_its_last_collection_date(
     directory_without_a_library.mkdir()
     monkeypatch.setenv("KB_DATA_DIR", str(data_dir))
     monkeypatch.setenv("KB_ZOTERO_DIR", str(directory_without_a_library))
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
+    monkeypatch.setattr(collect_command, "SOURCE_KINDS", collected_kinds())
 
     exit_code = cli.main(["collect"])
 
@@ -206,7 +216,9 @@ def test_collect_skips_the_clips_and_says_so_without_the_vault(
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     if vault_dir_variable is not None:
         monkeypatch.setenv("KB_VAULT_DIR", vault_dir_variable)
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", collected_kinds(WorkingSource())
+    )
 
     exit_code = cli.main(["collect"])
 
@@ -226,7 +238,7 @@ def test_collect_copies_the_clips_into_the_selected_library_with_the_vault(
     (clippings_dir / "A clip.md").write_bytes(clip)
     monkeypatch.setenv("KB_DATA_DIR", str(data_dir))
     monkeypatch.setenv("KB_VAULT_DIR", str(tmp_path / "vault"))
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
+    monkeypatch.setattr(collect_command, "SOURCE_KINDS", collected_kinds())
     # A collection later than the margin after the clip written above (CLIP_CHANGE_MARGIN).
     monkeypatch.setattr(
         clipping, "current_time", lambda: datetime.now(UTC) + timedelta(minutes=5)
@@ -249,7 +261,7 @@ def test_collect_skips_gh_archive_and_says_so_without_the_bigquery_key(
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     if bigquery_key_variable is not None:
         monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", bigquery_key_variable)
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
+    monkeypatch.setattr(collect_command, "SOURCE_KINDS", collected_kinds())
 
     assert cli.main(["collect"]) == 0
     assert "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n" in (
@@ -267,13 +279,13 @@ def test_collect_runs_gh_archive_with_the_bigquery_key(monkeypatch, tmp_path, ca
 
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "/path/to/a/key.json")
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
-    monkeypatch.setattr(cli, "GhArchiveSource", FakeGhArchiveSource)
+    monkeypatch.setattr(collect_command, "SOURCE_KINDS", collected_kinds())
+    monkeypatch.setattr(collected_sources, "GhArchiveSource", FakeGhArchiveSource)
 
     exit_code = cli.main(["collect"])
 
     assert exit_code == 0
-    assert created == [cli.create_bigquery_client]
+    assert created == [collected_sources.create_bigquery_client]
     output = capsys.readouterr().out
     assert "gh_archive: ok\n" in output
     assert "gh_archive: skipped" not in output
@@ -296,7 +308,9 @@ def test_collect_only_runs_the_sources_chosen_and_keeps_the_date_of_the_others(
     monkeypatch.setenv("KB_ZOTERO_DIR", str(zotero_dir))
     monkeypatch.setenv("KB_VAULT_DIR", str(tmp_path / "vault"))
     monkeypatch.setenv("KB_COLLECT_ONLY", "zotero,clipping")
-    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", declared_kinds(WorkingSource())
+    )
     # A collection later than the margin after the clip written above (CLIP_CHANGE_MARGIN).
     monkeypatch.setattr(
         clipping, "current_time", lambda: datetime.now(UTC) + timedelta(minutes=5)
@@ -320,7 +334,9 @@ def test_collect_only_runs_the_sources_chosen_and_keeps_the_date_of_the_others(
 def test_collect_without_collect_only_runs_every_source(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(
-        cli, "SOURCE_KINDS", declared_kinds(WorkingSource(), WorkingSource("other"))
+        collect_command,
+        "SOURCE_KINDS",
+        declared_kinds(WorkingSource(), WorkingSource("other")),
     )
 
     assert cli.main(["collect"]) == 0
@@ -335,7 +351,9 @@ def test_collect_only_prints_one_line_for_a_source_not_chosen(
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("KB_COLLECT_ONLY", "test")
-    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", declared_kinds(WorkingSource())
+    )
 
     assert cli.main(["collect"]) == 0
     # Not "zotero: skipped (KB_ZOTERO_DIR not set)" as well: Zotero was not chosen.
@@ -352,7 +370,7 @@ def test_collect_only_takes_the_names_with_spaces_around_in_any_case_and_twice(
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("KB_COLLECT_ONLY", " Test , TEST,test")
     source = WorkingSource()
-    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(source))
+    monkeypatch.setattr(collect_command, "SOURCE_KINDS", declared_kinds(source))
 
     assert cli.main(["collect"]) == 0
     assert source.received_last_collected_at == [None]
@@ -371,7 +389,9 @@ def test_collect_only_refuses_a_name_that_is_not_a_source_folder_and_quotes_it(
     unknown_name = "tldr_ai\nERROR k_b.cli: forged line " + "x" * 200
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("KB_COLLECT_ONLY", f"test,{unknown_name}")
-    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", declared_kinds(WorkingSource())
+    )
 
     exit_code = cli.main(["collect"])
 
@@ -379,7 +399,7 @@ def test_collect_only_refuses_a_name_that_is_not_a_source_folder_and_quotes_it(
     output = capsys.readouterr()
     assert_nothing_collected(tmp_path, output.out)
     error_output = output.err
-    quoted_name = cli.quote_value(unknown_name)
+    quoted_name = quoting.quote_value(unknown_name)
     assert len(quoted_name) == 100
     assert (
         f"KB_COLLECT_ONLY: entry 2 of 2 {quoted_name} not a source folder;"
@@ -393,7 +413,9 @@ def test_collect_only_quotes_a_name_refused_as_it_was_written(
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("KB_COLLECT_ONLY", "Test,TLDR_AI")
-    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", declared_kinds(WorkingSource())
+    )
 
     assert cli.main(["collect"]) == cli.ExitCode.NOT_STARTED
     assert "entry 2 of 2 'TLDR_AI' not a source folder" in capsys.readouterr().err
@@ -413,7 +435,9 @@ def test_collect_only_refuses_an_empty_value_or_entry(
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("KB_COLLECT_ONLY", collect_only)
-    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", declared_kinds(WorkingSource())
+    )
 
     assert cli.main(["collect"]) == cli.ExitCode.NOT_STARTED
     output = capsys.readouterr()
@@ -435,7 +459,9 @@ def test_collect_only_refuses_a_source_chosen_without_its_variable(
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("KB_COLLECT_ONLY", f"test,{name}")
-    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", declared_kinds(WorkingSource())
+    )
 
     assert cli.main(["collect"]) == cli.ExitCode.NOT_STARTED
     output = capsys.readouterr()
@@ -451,7 +477,9 @@ def test_collect_fails_closed_with_a_clear_message_on_a_corrupted_state(
     state_path = tmp_path / "collection_state.json"
     state_path.write_text('{"working": ', encoding="utf-8")
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", collected_kinds(WorkingSource())
+    )
 
     exit_code = cli.main(["collect"])
 
@@ -469,7 +497,7 @@ def test_collect_prints_nothing_but_the_error_on_a_corrupted_state(
     state_path = tmp_path / "collection_state.json"
     state_path.write_text("[]", encoding="utf-8")
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds())
+    monkeypatch.setattr(collect_command, "SOURCE_KINDS", collected_kinds())
 
     assert cli.main(["collect"]) == 2
     assert capsys.readouterr().out == ""
@@ -485,7 +513,9 @@ def test_collect_fails_closed_with_a_clear_message_on_an_unreadable_state(
     state_path.write_text("{}", encoding="utf-8")
     state_path.chmod(0o000)
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", collected_kinds(WorkingSource())
+    )
 
     try:
         exit_code = cli.main(["collect"])
@@ -533,7 +563,9 @@ def test_an_error_log_line_is_written_to_the_log_file_in_the_same_format(
     monkeypatch, tmp_path, capsys
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(BrokenSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", collected_kinds(BrokenSource())
+    )
 
     assert cli.main(["collect"]) == 1
 
@@ -557,7 +589,9 @@ def test_collect_refuses_to_run_when_the_log_file_cannot_be_opened(
 ):
     tmp_path.chmod(0o500)
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", collected_kinds(WorkingSource())
+    )
 
     try:
         exit_code = cli.main(["collect"])
@@ -730,7 +764,7 @@ def test_import_refuses_to_rewrite_the_log_of_its_second_and_exits_2(
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
-    monkeypatch.setattr(cli, "datetime", FrozenDatetime)
+    monkeypatch.setattr(import_command, "datetime", FrozenDatetime)
     log_path = tmp_path / "import-log-2026-10-12T154903Z.jsonl"
     log_path.write_text("earlier import\n")
 
@@ -767,7 +801,7 @@ def test_import_reports_a_failed_import_and_exits_1(monkeypatch, tmp_path, capsy
     ):
         raise sqlite3.IntegrityError("CHECK constraint failed: publication")
 
-    monkeypatch.setattr(cli, "import_items", fail_to_import)
+    monkeypatch.setattr(import_command, "import_items", fail_to_import)
 
     exit_code = cli.main(["import"])
 
@@ -794,7 +828,7 @@ def test_import_reports_a_source_missing_from_the_database_and_exits_1(
     ):
         raise UnknownSourceError("source_code not in the source table: cisa_kev")
 
-    monkeypatch.setattr(cli, "import_items", fail_to_import)
+    monkeypatch.setattr(import_command, "import_items", fail_to_import)
 
     exit_code = cli.main(["import"])
 
@@ -821,7 +855,7 @@ def test_import_reports_a_kind_without_table_and_exits_1(monkeypatch, tmp_path, 
             "kind without a table in the base: newsletter_article"
         )
 
-    monkeypatch.setattr(cli, "import_items", fail_to_import)
+    monkeypatch.setattr(import_command, "import_items", fail_to_import)
 
     exit_code = cli.main(["import"])
 
@@ -974,11 +1008,13 @@ def test_a_sigterm_during_a_source_stops_kb_collect_and_keeps_the_collection_sta
     monkeypatch, tmp_path, sigterm_handler_of_the_test
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(cli, "SOURCE_KINDS", collected_kinds(WorkingSource()))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", collected_kinds(WorkingSource())
+    )
     cli.main(["collect"])
     state_before = (tmp_path / "collection_state.json").read_bytes()
     monkeypatch.setattr(
-        cli,
+        collect_command,
         "SOURCE_KINDS",
         collected_kinds(SigtermSource("stopped"), WorkingSource("after")),
     )
@@ -999,6 +1035,7 @@ import sys
 import time
 
 from k_b import cli
+from k_b.commands import collect_command
 from k_b.etl.source_contract import SourceKind
 
 
@@ -1013,7 +1050,7 @@ class WaitingSource:
         return b"{}"
 
 
-cli.SOURCE_KINDS = (SourceKind("test", (WaitingSource(),), None),)
+collect_command.SOURCE_KINDS = (SourceKind("test", (WaitingSource(),), None),)
 sys.exit(cli.main(["collect"]))
 """
 

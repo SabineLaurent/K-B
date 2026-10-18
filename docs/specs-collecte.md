@@ -493,8 +493,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    gardée), date la collecte sans fuseau et retire les doublons sans trace. Laissé de côté : les
    étiquettes posées par un LLM, hors de la v0.
 4. **Stockage** des items dans la base : SGBD, modèles et ce que chaque source met dans l'item,
-   dans [stockage.md](stockage.md). `kb import` (`run_import`, `src/k_b/cli.py`) n'importe que
-   les fichiers bruts pas encore importés (#106) : il lit le registre de la base
+   dans [stockage.md](stockage.md). `kb import` (`run_import`,
+   `src/k_b/commands/import_command.py`) n'importe que les fichiers bruts pas encore importés
+   (#106) : il lit le registre de la base
    (`read_imported_paths`, `src/k_b/etl/load.py`), puis les fichiers qui n'y sont pas
    (`read_raw_items`, `src/k_b/etl/transform.py`, pour les items ; `read_trend_files`,
    `src/k_b/etl/sources/gh_archive.py`, pour les classements GH Archive), puis écrit la base

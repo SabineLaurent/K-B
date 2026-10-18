@@ -40,8 +40,9 @@ CLIP_CHANGE_MARGIN = timedelta(seconds=60)
 # month of daily collections (Sabine, 2026-10-14).
 LOG_FILES_KEPT = 30
 
-# The local defaults of kb serve, each changed by its variable (cli.py; .claude/rules/poc.md,
-# rule 2): the data API listens on the machine only and answers these hosts only.
+# The local defaults of kb serve, each changed by its variable (data_api/settings.py;
+# .claude/rules/poc.md, rule 2): the data API listens on the machine only and answers these hosts
+# only.
 DATA_API_HOST = "127.0.0.1"
 DATA_API_PORT = 8000
 DATA_API_ALLOWED_HOSTS = ("127.0.0.1", "localhost")

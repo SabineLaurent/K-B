@@ -65,6 +65,11 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   les mutations suivantes semblent tuées ou survivantes à tort. Une copie qui garde le `.venv` du
   dépôt lit le `src` du dépôt d'origine (`k_b.pth` y pointe ; constat du 2026-10-18, #242) :
   vérifier d'abord que `import k_b; print(k_b.__file__)` donne le chemin de la copie.
+- **Liste des tests collectés** (constat du 2026-10-18, #247) : elle n'est pas stable d'une
+  exécution à l'autre. `test_a_key_refused_is_never_quoted` (`tests/ai_api/test_data_api_settings.py`)
+  est paramétré par une clé tirée par `secrets.token_urlsafe(32)` au chargement du module. Pour
+  comparer deux listes, remplacer d'abord cette clé par un repère :
+  `sed -E 's/(never_quoted)\[[A-Za-z0-9_-]{43} /\1[<random key> /'`.
 - **Fixtures** (consigne de Sabine, 2026-10-10) : une fixture part toujours d'un exemple issu de
   la collecte.
 - **K-B est déterministe** dans sa conception, son code et ses journaux (consigne de Sabine,

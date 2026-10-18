@@ -3,9 +3,10 @@ rule 5).
 
 Under k_b: core and items are the common vocabulary, database reads and writes the base (its
 writers under database/writers), etl runs the pipeline, data_api serves the base, ai_api calls the
-model, cli composes. Under k_b.etl: the composition (source_kinds) → the sources → the modules of
-the pipeline. Under k_b.ai_api: digests → the stages → the clients → the settings → outbound and
-llm_replay → deadline and watch_items; a module imports only the layers below its own.
+model, cli and commands compose. Under k_b.etl: the composition (source_kinds, collected_sources) →
+the sources → the modules of the pipeline. Under k_b.ai_api: digests → the stages → the clients →
+the settings → outbound and llm_replay → deadline and watch_items; a module imports only the layers
+below its own.
 """
 
 import ast
@@ -17,9 +18,18 @@ import pytest
 import k_b
 
 PACKAGE_DIR = Path(k_b.__file__).parent
-TOP_LEVEL_MODULES = {"cli", "items", "core", "database", "etl", "data_api", "ai_api"}
+TOP_LEVEL_MODULES = {
+    "cli",
+    "commands",
+    "items",
+    "core",
+    "database",
+    "etl",
+    "data_api",
+    "ai_api",
+}
 # Under k_b.etl, each module is in exactly one of the three.
-ETL_COMPOSITION_MODULES = {"etl.source_kinds"}
+ETL_COMPOSITION_MODULES = {"etl.source_kinds", "etl.collected_sources"}
 ETL_SOURCES_PACKAGE = "etl.sources"
 ETL_PIPELINE_MODULES = {
     "etl.extract",
@@ -32,7 +42,7 @@ ETL_PIPELINE_MODULES = {
     "etl.http_download",
     "etl.user_agent",
 }
-COMPOSITION_MODULES = {"cli"} | ETL_COMPOSITION_MODULES
+COMPOSITION_MODULES = {"cli", "commands"} | ETL_COMPOSITION_MODULES
 
 
 def list_imported_modules(path: Path, package: str, depth: int = 2) -> set[str]:
@@ -412,6 +422,22 @@ def test_the_rule_of_ai_api_refuses_its_layer_and_the_layers_above(
     imported = parse_imported_modules(code, package=package, depth=3)
 
     assert bool(list_upward_imports_of_the_ai_api(module, imported)) is is_refused
+
+
+# The command line is the top: commands/ does not import cli, which imports it; the composition of
+# etl, which commands/ imports, imports neither (#247).
+COMMAND_LINE_FORBIDDEN_MODULES = {"commands": {"cli"}} | {
+    module: {"cli", "commands"} for module in ETL_COMPOSITION_MODULES
+}
+
+
+def test_neither_commands_nor_the_composition_of_etl_imports_the_command_line_above():
+    for module, forbidden in sorted(COMMAND_LINE_FORBIDDEN_MODULES.items()):
+        for path in list_python_files(module):
+            imported = list_imported_modules(path, find_package(path))
+            assert {name for name in imported if reaches(name, forbidden)} == set(), (
+                path
+            )
 
 
 def test_items_imports_neither_the_sources_nor_the_composition():

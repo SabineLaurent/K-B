@@ -2767,6 +2767,52 @@ relu par un sous-agent.
   instruction, d'un signal remplace la `sqlite3.Error` par l'exception du signal ; si SQLite a
   annulé de lui-même, le journal reste sans import. — PR de #193
 
+### Ligne de commande : une porte mince
+
+Décisions de Sabine du 2026-10-18 sur #247, relayées par time-knight ; tri des revues par
+time-knight (délégation de Sabine du 2026-10-15).
+
+- **La ligne de commande est une porte : `cli.py` garde `main`, l'aiguillage et la liste des codes
+  de sortie ; chaque commande a son module dans `commands/` (`<commande>_command.py`), à côté de ce
+  qu'elles partagent, écrit une fois (`exit_codes.py`, `sigterm.py`, `run_log.py`,
+  `environment.py`) ; `commands/__init__.py` est vide.** Pourquoi, selon Sabine : « cli mince et
+  chaque réglage dans sa couche ». `cli.py` faisait 700 lignes sur `main` 4ebff3a, et #63, #200 et
+  #209 (`kb digest`) allaient l'allonger. Déplacement seul : aides, messages et codes de sortie
+  inchangés. `ExitCode` passe de `cli.py` (entrée « Codes de sortie de kb », plus haut) à
+  `commands/exit_codes.py`, sans autre changement. Options écartées : un paquet `cli/` dont
+  `__init__.py` porte `main` (`__init__.py` reste vide, `code.md`) ; un seul `cli.py` une fois les
+  règles sorties (environ 470 lignes) ; le nom `cli_commands/` (répète `cli`) ; des modules nus
+  (`import.py` est impossible, `import` est un mot réservé). — PR de #247
+- **Chaque règle qui n'est pas propre au terminal va dans sa couche, et se lit sous la forme
+  « valeur ou motif du refus » : les réglages de `kb serve` dans `data_api/settings.py`, les clés
+  des clients dans `core/api_keys.py`, le choix des sources (`KB_COLLECT_ONLY`) dans
+  `etl/collected_sources.py`, module de composition d'`etl` qui reçoit `SOURCE_KINDS` en paramètre.
+  La porte journalise le refus, sous le nom `k_b.cli` (`LOGGER_NAME`), et décide de s'arrêter.**
+  Pourquoi les clés dans `core/` : l'API IA ne peut importer que `ai_api`, `items` et `core`, et
+  #156 prévoit le module commun des clés : il serait sinon déplacé deux fois (décision de Sabine).
+  **Révise** l'entrée « Le module commun des clés par client reste à #156 » (PR de #204) : #247
+  pose le module, et #156 garde le préfixe `KB_AI_API_KEY_` de l'API IA. Pourquoi la porte
+  journalise : le nom de journal de chaque ligne ne change pas, et `tests/test_cli.py` le lit.
+  Options écartées : laisser la couche journaliser, comme `llm_settings` (le nom deviendrait
+  `k_b.data_api.settings`) ; `getLogger(__name__)` dans `commands/` (`k_b.commands.<module>` dans
+  chaque ligne) ; les clés dans `data_api/settings.py` ; `collected_sources` qui importe
+  `SOURCE_KINDS` (chaque test de collecte le remplacerait dans deux modules). — PR de #247
+- **Les trois lectures de la porte passent par une seule fonction,
+  `value_or_log_refusal` (`commands/run_log.py`) : la valeur lue, ou `None` après avoir journalisé
+  le refus.** Tri de la revue de code par time-knight. Pourquoi : la troisième occurrence du même
+  motif (`code.md`) ; le nom dit ce qui revient, l'appel étant une affectation, et fait pendant à
+  `*_or_refusal`. Options écartées : trois copies ; les noms `log_refusal` (ne dit pas qu'une
+  valeur revient) et `unwrap_or_log_refusal` (« unwrap » n'est pas un mot de K-B) ; un type
+  `Refusal` (aucun lecteur n'a une `str` pour succès). Limites assumées : un refus se reconnaît à
+  ce qu'il est une `str`, et un type sera posé si un lecteur dont le succès est une `str` arrive ;
+  les deux copies d'`ai_api` (`read_llm_settings`, `read_data_api_settings`) restent, et la
+  fonction rejoindra `core/` avec elles. — PR de #247
+- **Le sens des imports de la porte est tenu par un test : `commands/` n'importe pas `cli`, et la
+  composition d'`etl` (`source_kinds`, `collected_sources`) n'importe ni `cli` ni `commands`.**
+  Tri de la revue de code par time-knight. Pourquoi : le rangement crée la règle, et elle se tient
+  par un test, comme pour `ai_api` (#242). Option écartée : un `grep` du critère de fin seul, qui
+  ne protège pas la suite. — PR de #247
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
