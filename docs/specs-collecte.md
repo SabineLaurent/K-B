@@ -1,26 +1,43 @@
 # Spécifications de la collecte et de l'agrégation
 
-Pour chacune des 7 sources de la v0 : la technologie, l'accès et l'authentification, les limites
-de débit, les données personnelles, et ce qu'on suit. Puis le chemin du brut jusqu'au jeu d'items
-final, et la justification de BigQuery. Les décisions et leur pourquoi sont dans le
+Pour chacune des 9 sources de la v0, de 7 fournisseurs : la technologie, l'accès et
+l'authentification, les limites de débit, les données personnelles, ce qu'on suit, et ce qui se
+passe en cas de panne. Puis le chemin du brut jusqu'au jeu d'items final, et la justification de
+BigQuery. Les décisions et leur pourquoi sont dans le
 [journal ADR](ADR/journal-decisions-projet.md) ; les listes suivies, dans [sources.md](sources.md).
 
-Faits vérifiés le 2026-10-01, sources en fin de page.
+**Langage** : K-B est écrit en Python 3.13 (`.python-version` ; `requires-python = ">=3.13"` dans
+`pyproject.toml`), avec ses dépendances gérées par `uv`. Chaque source nomme ci-dessous, dans sa
+puce « Technologie », la bibliothèque qui la lit.
+
+Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 2026-10-18 (#64).
 
 ## Règles communes
 
-- **Un point de lancement** : `kb collect` lance toutes les sources ; une source en panne
-  n'arrête pas les autres. Il affiche une ligne par source (`ok` ou `failed (<type d'erreur>)`),
+- **Un point de lancement** : `kb collect` lance toutes les sources, ou celles de
+  `KB_COLLECT_ONLY` (ci-dessous) ; une source en panne n'arrête pas les autres. Il affiche une
+  ligne par source (`ok` ou `failed (<type d'erreur>)`),
   `zotero: skipped (KB_ZOTERO_DIR not set)` quand le dossier de Zotero n'est pas donné,
   `clipping: skipped (KB_VAULT_DIR not set)` quand le coffre Obsidian ne l'est pas, et
-  `gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)` sans la clé BigQuery.
-  Code de sortie : **0** si tout a réussi ; **1** si une source a échoué, ou si
-  `collection_state.json` n'a pas pu être écrit (disque plein, droits) ; **2** si la collecte n'a
-  pas eu lieu (`KB_DATA_DIR` absent ou pas un dossier, état de collecte illisible). Quand l'état
-  ne s'écrit pas, le brut est déjà écrit : `kb collect` journalise l'erreur avec le chemin du
-  fichier et ajoute la ligne `collection_state: failed (<type d'erreur>)`. Les dates de
-  dernière collecte n'avancent pas : la collecte suivante relit les mêmes fenêtres, et le brut en
-  double est retiré à la transformation.
+  `gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)` sans la clé BigQuery. Quand
+  l'état ne s'écrit pas, le brut est déjà écrit : `kb collect` journalise l'erreur avec le chemin
+  du fichier et ajoute la ligne `collection_state: failed (<type d'erreur>)`. Les dates de
+  dernière collecte n'avancent pas : la collecte suivante relit les mêmes fenêtres, et l'import
+  écarte les items déjà en base (étape 4 de « Du brut au jeu d'items »).
+- **Codes de sortie** de `kb collect`, nommés par `ExitCode` (`src/k_b/commands/exit_codes.py`)
+  et listés par `kb --help` :
+
+  | Code | Nom | Quand |
+  |---|---|---|
+  | **0** | `SUCCEEDED` | chaque source lancée a réussi ; une source sans rien de neuf réussit (`ok`, rien d'écrit, sa date avance) |
+  | **1** | `FAILED` | aucune source lancée n'a réussi ; ou `collection_state.json` n'a pas pu être écrit (disque plein, droits), quel que soit le sort des sources ; ou une exception que `kb` ne traite pas, journalisée avec sa trace |
+  | **2** | `NOT_STARTED` | rien n'a été collecté, ni brut ni état écrit : `KB_DATA_DIR` absente ou vide ; `KB_DATA_DIR` qui n'est pas un dossier existant ; `KB_LOG_TO_FILE` qui n'est ni `true` ni `false` ; fichier de journal qui ne s'ouvre pas ; `collection_state.json` illisible ou invalide (pas du JSON, pas un objet, une date sans fuseau) ; `KB_COLLECT_ONLY` refusée (ci-dessous) ; commande absente ou inconnue, refusée par `argparse` (son message d'usage, sur la sortie d'erreur seulement : le journal n'est pas encore ouvert) |
+  | **4** | `PARTIAL_FAILURE` | au moins une source a réussi, au moins une a échoué, et l'état est écrit : les sources réussies sont acquises, les autres repartent de leur date à la collecte suivante |
+  | **143** | `STOPPED_BY_SIGTERM` | arrêt par SIGTERM (`docker stop`) : le brut déjà écrit reste ; si l'arrêt vient avant l'écriture de l'état, l'état n'est pas écrit et la collecte suivante relit les mêmes fenêtres ; s'il vient après (pendant l'affichage des lignes), l'état est écrit et le code reste 143 |
+
+  Le code 3 (`SERVER_NOT_STARTED`) est propre à `kb serve`. Ctrl-C (SIGINT) n'est pas traité par
+  `kb` : Python affiche sa trace hors du journal daté, l'état n'est pas écrit si l'arrêt vient
+  avant lui, et le code de sortie, donné par le shell, est 130 ; aucun code nommé ne le décrit.
 - **Choisir les sources** (#201) : `KB_COLLECT_ONLY`, posée, ne lance que les sources nommées,
   séparées par des virgules (`KB_COLLECT_ONLY=zotero,clipping`, la collecte du Mac au POC ; les
   conteneurs collectent le reste). Un nom est le dossier d'une source sous `raw/` (`FOLDER_PREFIX`) :
@@ -74,6 +91,23 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   téléchargement a un délai, une taille maximale, et refuse une redirection hors du domaine
   attendu. Le `User-Agent` est `K-B (+https://github.com/SabineLaurent)` : le profil public de
   Sabine, le dépôt étant privé jusqu'au 25/10, puis public.
+- **Panne d'une source** (`src/k_b/etl/extract.py`) : toute erreur levée par une source est
+  rattrapée. La source affiche `failed (<type d'erreur>)`, l'erreur va au journal de
+  fonctionnement avec sa trace, sa date de dernière collecte reste, et les sources suivantes sont
+  lancées ; la collecte suivante redemande la même fenêtre. Le brut n'est écrit qu'une fois la
+  source allée au bout de sa lecture : une source en échec n'écrit rien. Exception : une source à
+  plusieurs pages (tldr, clips) vérifie le nom de chaque page avant d'écrire la première, mais
+  une écriture qui échoue au milieu (disque plein) laisse les pages déjà écrites. Chaque source dit
+  ses états propres (« En cas de panne », dans sa section) ; deux familles valent pour plusieurs :
+  - **téléchargement** (`src/k_b/etl/http_download.py`), pour tldr, arXiv, CISA KEV et l'API
+    GitHub ; Zotero, les clips et GH Archive n'y passent pas : erreur réseau (DNS, connexion,
+    TLS, 30 s sans réponse à une opération réseau : la connexion, ou chaque lecture ; la durée
+    totale d'un téléchargement n'est pas bornée) ; statut HTTP d'erreur (`HTTPError`, sauf le 304 de CISA KEV) ;
+    réponse servie, après une redirection, hors de l'adresse attendue (`RedirectedOutsideError`,
+    sauf la page d'accueil d'une édition tldr) ; réponse plus grande que le maximum de la source ;
+  - **écriture du brut** (`src/k_b/etl/raw_store.py`) : un fichier brut déjà présent (deux
+    collectes dans la même seconde) est refusé (`FileExistsError`) ; un dossier ou un fichier qui
+    ne s'écrit pas (droits, disque plein) lève une `OSError`.
 - **Secrets** : en variables d'environnement, chargées depuis le `.env` ignoré par git.
 - **Données personnelles** : on ne garde que ce qui sert la veille ; aucun identifiant de
   personne n'est collecté s'il n'est pas nécessaire. Durées et purge : [registre des
@@ -122,10 +156,30 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-02) : les
   alertes sont demandées pour les seuls paquets suivis (`affects=`). Tout l'écosystème `npm`
   dépasse 100 alertes par semaine et obligerait à paginer.
+- **Jeton** : sans `KB_GITHUB_TOKEN`, les requêtes partent sans jeton, avec la limite de 60
+  requêtes par heure, et sans ligne au journal ; un jeton que GitHub refuse donne un statut HTTP
+  d'erreur à chaque source GitHub (états communs du téléchargement).
+- **En cas de panne :** releases (`github_releases_<dépôt>`), en plus des états communs : la page
+  n'est pas du JSON, ou pas une liste ; toutes ses releases sont invalides (`all_items_invalid`) ;
+  une release est d'un autre dépôt que celui demandé (casse ignorée). Une release invalide parmi
+  des valides entre dans le brut quand la page est écrite, et l'import la rejette (limite : une
+  page dont la seule release nouvelle est invalide n'est pas écrite, voir « État »).
+- **En cas de panne :** alertes (`github_advisories_<écosystème>`), en plus des états communs : la
+  page n'est pas du JSON, ou pas une liste ; toutes ses alertes sont invalides
+  (`all_items_invalid` ; un écosystème dont la seule alerte de la fenêtre est invalide échoue à
+  chaque collecte, voir « État »).
+- **En cas de panne :** dépôts les plus étoilés (`github_most_starred`), en plus des états
+  communs : un classement refuse sa page entière (règle 1 de `.claude/rules/conventions.md`) :
+  pas du JSON ; pas une réponse de recherche avec une liste `items` ; `incomplete_results` autre
+  que `false` ; un nombre de dépôts autre que 100 ; un dépôt invalide (nom qui n'est pas
+  `owner/name`, URL hors de `https://github.com/`, nombre d'étoiles qui n'est pas un entier…).
+  Sans fenêtre de dates, un échec ne retarde rien : la collecte suivante prend un nouvel
+  instantané, et celui du jour manqué est perdu.
 
 ### API arXiv — service web
 
-- **Technologie** : API `https://export.arxiv.org/api/query`, réponse Atom (XML).
+- **Technologie** : API `https://export.arxiv.org/api/query`, réponse Atom (XML), lue avec
+  `xml.etree.ElementTree` de la bibliothèque standard.
 - **Ce qu'on en tire** : métadonnées et résumé des papiers soumis depuis la dernière collecte.
 - **Accès** : sans authentification.
 - **Limites** : une requête toutes les 3 secondes au plus, une connexion à la fois, pour toutes
@@ -158,17 +212,25 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   source échoue (`all_items_invalid`). Une entrée d'erreur de l'API fait, elle,
   échouer la collecte. Limites assumées : la révision (`v2`) d'un papier soumis avant la fenêtre
   n'est pas collectée, ni un papier retenu en modération plus de 7 jours.
+- **En cas de panne :** en plus des états communs (dont le `503` sous charge, ci-dessus), la
+  source échoue si la réponse n'est pas du XML ou pas un flux Atom, si le flux porte une entrée
+  d'erreur de l'API, si `totalResults` manque ou n'est pas un nombre, si l'API annonce plus de
+  papiers que la page n'en contient, ou si toutes les entrées sont invalides
+  (`all_items_invalid`). La fenêtre partant de la dernière collecte réussie, un échec passager est
+  repris à la collecte suivante. Le dépassement des 2 000 papiers, lui, se répète tant que la
+  fenêtre les dépasse : elle part toujours du même point et s'allonge (problème connu, #71).
 
 ### Catalogue CISA KEV — fichier
 
 - **Technologie** : fichier CSV téléchargé en HTTPS
-  (`https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv`).
+  (`https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv`), lu avec
+  le module `csv` de la bibliothèque standard.
 - **Ce qu'on en tire** : les vulnérabilités activement exploitées ajoutées depuis la dernière
   collecte (`dateAdded`), sélectionnées à la lecture.
 - **Accès** : sans authentification. Requête conditionnelle `If-Modified-Since` : une réponse 304
   n'écrit rien.
 - **Limites** : pas de quota publié ; une requête par collecte. Catalogue d'environ 1 Mo, refusé
-  au-delà de 10 Mo, et refusé s'il est servi hors de `https://www.cisa.gov/`. Le catalogue est
+  au-delà de 10 Mio, et refusé s'il est servi hors de `https://www.cisa.gov/`. Le catalogue est
   lu avant d'être écrit : une réponse qui n'en est pas un (page HTML, colonnes manquantes), ou
   dont toutes les lignes sont invalides, fait échouer la source, sans brut écrit ni date avancée.
   Une ligne invalide parmi des valides est rejetée à l'import, avec son numéro et son `cveID`
@@ -176,6 +238,14 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   vulnérabilité.
 - **Données personnelles** : aucune.
 - **État** : collecte en place (PR de #23).
+- **En cas de panne :** en plus des états communs (tout statut HTTP autre que 304), la source
+  échoue si le catalogue dépasse 10 Mio, n'est pas en UTF-8 (`UnicodeDecodeError`), ne se découpe
+  pas en lignes CSV (`csv.Error`, par exemple un champ de plus de 131 072 caractères, la limite
+  par défaut du module `csv`), n'a pas les colonnes attendues, ou si toutes ses lignes sont
+  invalides (`all_items_invalid`). Un octet NUL ne fait pas échouer la source (le module `csv` de
+  Python 3.13 le lit) : sa ligne entre dans le brut, et l'import la rejette. Cas limite : une date de dernière collecte qui
+  n'est pas en UTC (`collection_state.json` édité à la main) fait échouer l'en-tête
+  `If-Modified-Since` (`ValueError`), à chaque collecte jusqu'à ce que l'état soit corrigé.
 
 ### Obsidian Web Clipper — fichier
 
@@ -214,7 +284,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   2024-12-04, lue par l'API GitHub le 2026-10-17.
 - **Ce qu'on en tire** : un item par fichier : titre (`title`), URL source (`source`), date
   d'ajout (`created`), date de publication (`published`, si la page en donne une), et le texte
-  gardé, après le frontmatter. Ne sont pas lus : `author`, `description`, `tags`.
+  gardé, après le frontmatter. Ne sont pas lus : `author`, `description`, `tags`. Comment un clip
+  entre en base (champs, clé, dates, rejets, doublons) : « Du brut au jeu d'items », étape 4,
+  « Clips ».
 - **Accès** : lecture du dossier local du coffre (`src/k_b/etl/sources/clipping.py`) ; aucun
   réseau. Le coffre est donné par la variable `KB_VAULT_DIR`, en chemin complet ; absente ou
   vide, les clips sont sautés, `kb collect` l'affiche, et son code de sortie ne change pas. Pas
@@ -250,8 +322,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   recopiés). Limites : un clip supprimé du coffre n'est pas vu ; un changement de ses seules
   métadonnées (`chmod`, une étiquette du Finder) change sa date de changement, et le clip est
   recopié pour rien (RGESN 1.6, quelques octets par clip).
-- **En cas de panne :** la source échoue, n'écrit rien, et sa date de dernière collecte reste ;
-  la collecte suivante recommence. Les états :
+- **En cas de panne :** la source échoue, n'écrit rien (sauf une écriture qui échoue au milieu de
+  la copie : les clips déjà écrits restent, règles communes, « Panne d'une source »), et sa date
+  de dernière collecte reste ; la collecte suivante recommence. Les états :
   - `ClipTooLargeError` (`clip_too_large` : un clip dépasse 1 000 000 octets ; le message cite
     son nom de fichier, tronqué et échappé par `quote_value`, sa taille et le maximum). **Exception
     à la règle 1 de `.claude/rules/conventions.md`**, qui ne fait échouer une source que pour une
@@ -348,6 +421,16 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   page gardée (taille en octets), redirection vers la page d'accueil (adresse d'arrivée), ou
   erreur (message reçu et URL demandée) ; une collecte sans aucune page le dit aussi.
   `kb collect` affiche les lignes de niveau INFO et au-dessus.
+- **En cas de panne :** une erreur sur un jour (redirection autre que vers la page d'accueil de
+  l'édition, statut HTTP d'erreur, réseau, page de plus de 1 Mio) fait échouer l'édition (sa
+  source, `tldr_<édition>`) ; le journal donne l'erreur avec le jour et l'URL demandée. Les pages
+  déjà téléchargées pendant cette collecte ne sont pas écrites, et les jours suivants ne sont pas
+  demandés ; la collecte suivante reprend au jour de la dernière collecte réussie. Une date de
+  dernière collecte postérieure à aujourd'hui (UTC) fait échouer l'édition avant tout
+  téléchargement. **Écart à la règle 1** de `.claude/rules/conventions.md` (constaté le
+  2026-10-18, non tranché ici) : une page reçue n'est pas lue à la collecte ; une page qui n'est
+  pas une édition est écrite telle quelle, et refusée à chaque import (« Page refusée entière »,
+  ci-dessus).
 - **Fréquence** : voir les règles communes.
   Chaque collecte lit chaque jour depuis le jour de la dernière collecte, relu car son édition a
   pu paraître après elle, jusqu'à aujourd'hui (UTC) ; la première lit les 7 jours précédents et
@@ -367,7 +450,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 ### Zotero — base de données
 
 - **Technologie** : base SQLite `zotero.sqlite`, dans le dossier de données de Zotero, lue par
-  une requête SQL (`src/k_b/etl/sources/zotero.py`). Zotero verrouille sa base quand il tourne, et
+  une requête SQL avec le module `sqlite3` de la bibliothèque standard
+  (`src/k_b/etl/sources/zotero.py`). Zotero verrouille sa base quand il tourne, et
   ses dernières écritures sont dans `zotero.sqlite-wal` : K-B copie les deux fichiers dans un
   dossier temporaire, vérifie la copie (`PRAGMA integrity_check`), l'ouvre en lecture seule,
   lance la requête, puis supprime la copie, après un succès, une erreur ou un Ctrl-C. Un
@@ -461,6 +545,15 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
   commandes : [bigquery.md](bigquery.md#mesures-du-2026-10-11). Une
   requête sur des tables à joker (`day.20*`) n'est pas mise en cache : chaque exécution est
   facturée au quota (constaté le 2026-10-11).
+- **En cas de panne :** sans `GOOGLE_APPLICATION_CREDENTIALS`, la source est sautée, pas en
+  échec. Avec elle, la source échoue si le fichier de clé est introuvable ou refusé à la création
+  du client BigQuery ; si la table de la veille n'est pas close (`DayTableNotClosedError`) ; si le
+  `dry_run` ne donne pas de volume (`DryRunVolumeUnknownError`) ou dépasse le plafond
+  (`DryRunOverLimitError`) ; si BigQuery refuse ou interrompt la requête (droits, quota du bac à
+  sable, délai de 300 s), avec l'erreur de son client ; si le résultat n'est pas un classement
+  lisible (`TrendsExtractInvalidError`, refusé entier) ; ou si la date de dernière collecte est
+  postérieure à aujourd'hui (UTC). Rien n'est écrit, et les fenêtres dues le restent : la
+  collecte suivante les reprend, 15 au plus.
 - **Données personnelles** : chaque événement porte le login de son auteur (`actor`). La requête
   ne le sélectionne pas : elle ne renvoie que des comptes par dépôt. Le nom du dépôt
   (`owner/repo`) porte le login de son propriétaire quand c'est une personne : gardé, il identifie
@@ -470,7 +563,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 
 ## Du brut au jeu d'items
 
-1. **Collecte** : chaque source écrit son brut dans `raw/automated_watch/<source>/` (règles communes).
+1. **Collecte** : chaque source écrit son brut dans `raw/automated_watch/<source>/`, ou, pour ce
+   que l'utilisatrice a choisi (Zotero, clips), dans `raw/selected_library/<source>/` (règles
+   communes).
 2. **Lecture** : un lecteur par sorte de source transforme le brut en items validés par un modèle
    Pydantic. Le lecteur est retrouvé par le nom du dossier brut (`github_releases_<dépôt>/` est
    lu par celui des releases), que la source soit encore suivie ou non. Les sortes sont déclarées
@@ -479,7 +574,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
    2026-10-08) ; ses lignes sont lues par un lecteur à part (`read_trend_files`,
    `src/k_b/etl/sources/gh_archive.py`), et la sorte `gh_archive` reste déclarée sans lecteur
    d'items. Les items ont les mêmes champs : source, identifiant dans la source,
-   titre, URL, auteurs (sauf GitHub), date de publication et date de révision (arXiv), date d'ajout (Clipper, Zotero),
+   titre, URL, auteurs (arXiv), date de publication et date de révision (arXiv), date d'ajout (Clipper, Zotero),
    contenu ou résumé, date de collecte, chemin du brut d'origine. Une date absente reste vide. Toutes les dates sont en UTC, avec fuseau. Une ligne
    illisible est rejetée et journalisée, pas devinée.
 3. **Normalisation** des items lus (`normalize_item`, `src/k_b/etl/normalize.py`) :
@@ -725,11 +820,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page.
 
    - **Rejouable** : un second import sans nouveau brut ne lit aucun fichier (sauf un fichier
      illisible ou une collecte mal nommée) et ne change pas la base ; un item déjà en base garde
-     son `item_id`, que l'API exposera.
-   - Un nom répété dans les auteurs d'un item n'est lié qu'une fois, à sa première position : la
-     base lie un auteur à un item une seule fois.
-   - Un auteur qui n'a plus d'item (une révision arXiv a changé ses auteurs) est supprimé dans
-     la même transaction : un nom sans usage n'est pas gardé.
+     son `item_id`, que l'API de données expose (`GET /items/{item_id}`).
+   - **Auteurs** : il n'y a pas de table d'auteurs. Les auteurs d'un papier arXiv sont une liste
+     JSON de noms, dans l'ordre d'arXiv, dans la colonne `publication.authors`
+     (`src/k_b/database/schema.sql`), écrite telle quelle à l'import ; une révision arXiv plus
+     récente remplace la liste avec le reste du papier (règle « flux avec révisions »). Elle
+     reste vide tant que seul Zotero cite le papier. Les auteurs d'une entrée Zotero restent dans
+     son brut, et le champ `author` d'un clip n'est pas lu : aucun n'entre en base.
 
 ## Pourquoi BigQuery
 
