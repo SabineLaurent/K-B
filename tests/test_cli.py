@@ -40,9 +40,23 @@ def no_bigquery_key(monkeypatch):
     monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def no_collect_only(monkeypatch):
+    """A terminal that exports KB_COLLECT_ONLY must not filter the sources of the tests."""
+    monkeypatch.delenv("KB_COLLECT_ONLY", raising=False)
+
+
 def collected_kinds(*sources):
     """One kind without a reader: the collection tests only need its sources."""
     return (SourceKind("test", sources, None),)
+
+
+def declared_kinds(*sources):
+    """The kind of collected_kinds, and the three kinds whose source cli.py creates: names that
+    KB_COLLECT_ONLY can choose."""
+    return collected_kinds(*sources) + tuple(
+        SourceKind(name, (), None) for name in ("zotero", "clipping", "gh_archive")
+    )
 
 
 def test_collect_refuses_to_run_without_a_data_directory(monkeypatch, capsys):
@@ -264,6 +278,171 @@ def test_collect_runs_gh_archive_with_the_bigquery_key(monkeypatch, tmp_path, ca
     assert "gh_archive: ok\n" in output
     assert "gh_archive: skipped" not in output
     assert list((tmp_path / "raw" / "automated_watch" / "gh_archive").iterdir())
+
+
+def test_collect_only_runs_the_sources_chosen_and_keeps_the_date_of_the_others(
+    monkeypatch, tmp_path, capsys, zotero_dir
+):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "collection_state.json").write_text(
+        '{"working": "2026-10-17T06:00:00+00:00"}', encoding="utf-8"
+    )
+    clippings_dir = tmp_path / "vault" / "Clippings"
+    clippings_dir.mkdir(parents=True)
+    clip = (FIXTURES_DIR / "clipping" / "article_with_author.md").read_bytes()
+    (clippings_dir / "A clip.md").write_bytes(clip)
+    monkeypatch.setenv("KB_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("KB_ZOTERO_DIR", str(zotero_dir))
+    monkeypatch.setenv("KB_VAULT_DIR", str(tmp_path / "vault"))
+    monkeypatch.setenv("KB_COLLECT_ONLY", "zotero,clipping")
+    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(WorkingSource()))
+    # A collection later than the margin after the clip written above (CLIP_CHANGE_MARGIN).
+    monkeypatch.setattr(
+        clipping, "current_time", lambda: datetime.now(UTC) + timedelta(minutes=5)
+    )
+
+    exit_code = cli.main(["collect"])
+
+    assert exit_code == 0
+    assert capsys.readouterr().out == (
+        "zotero: ok\nclipping: ok\ntest: skipped (not in KB_COLLECT_ONLY)\n"
+        "gh_archive: skipped (not in KB_COLLECT_ONLY)\n"
+    )
+    assert sorted(path.name for path in (data_dir / "raw").iterdir()) == [
+        "selected_library"
+    ]
+    state = json.loads((data_dir / "collection_state.json").read_text())
+    assert state["working"] == "2026-10-17T06:00:00+00:00"
+    assert {"zotero", "clipping"} <= state.keys()
+
+
+def test_collect_without_collect_only_runs_every_source(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        cli, "SOURCE_KINDS", declared_kinds(WorkingSource(), WorkingSource("other"))
+    )
+
+    assert cli.main(["collect"]) == 0
+    assert capsys.readouterr().out.startswith("working: ok\nother: ok\n")
+    assert sorted(
+        path.name for path in (tmp_path / "raw" / "automated_watch").iterdir()
+    ) == ["other", "working"]
+
+
+def test_collect_only_prints_one_line_for_a_source_not_chosen(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("KB_COLLECT_ONLY", "test")
+    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(WorkingSource()))
+
+    assert cli.main(["collect"]) == 0
+    # Not "zotero: skipped (KB_ZOTERO_DIR not set)" as well: Zotero was not chosen.
+    assert capsys.readouterr().out == (
+        "working: ok\nzotero: skipped (not in KB_COLLECT_ONLY)\n"
+        "clipping: skipped (not in KB_COLLECT_ONLY)\n"
+        "gh_archive: skipped (not in KB_COLLECT_ONLY)\n"
+    )
+
+
+def test_collect_only_takes_the_names_with_spaces_around_in_any_case_and_twice(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("KB_COLLECT_ONLY", " Test , TEST,test")
+    source = WorkingSource()
+    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(source))
+
+    assert cli.main(["collect"]) == 0
+    assert source.received_last_collected_at == [None]
+
+
+def assert_nothing_collected(data_dir, output):
+    """Refused before the collection: no raw file, no state, no summary."""
+    assert not (data_dir / "raw").exists()
+    assert not (data_dir / "collection_state.json").exists()
+    assert output == ""
+
+
+def test_collect_only_refuses_a_name_that_is_not_a_source_folder_and_quotes_it(
+    monkeypatch, tmp_path, capsys
+):
+    unknown_name = "tldr_ai\nERROR k_b.cli: forged line " + "x" * 200
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("KB_COLLECT_ONLY", f"test,{unknown_name}")
+    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(WorkingSource()))
+
+    exit_code = cli.main(["collect"])
+
+    assert exit_code == cli.ExitCode.NOT_STARTED
+    output = capsys.readouterr()
+    assert_nothing_collected(tmp_path, output.out)
+    error_output = output.err
+    quoted_name = cli.quote_value(unknown_name)
+    assert len(quoted_name) == 100
+    assert (
+        f"KB_COLLECT_ONLY: entry 2 of 2 {quoted_name} not a source folder;"
+        " folders: test, zotero, clipping, gh_archive\n"
+    ) in error_output
+    assert "\nERROR k_b.cli: forged line" not in error_output
+
+
+def test_collect_only_quotes_a_name_refused_as_it_was_written(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("KB_COLLECT_ONLY", "Test,TLDR_AI")
+    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(WorkingSource()))
+
+    assert cli.main(["collect"]) == cli.ExitCode.NOT_STARTED
+    assert "entry 2 of 2 'TLDR_AI' not a source folder" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("collect_only", "refusal"),
+    [
+        ("", "KB_COLLECT_ONLY: empty"),
+        ("  ", "KB_COLLECT_ONLY: empty"),
+        ("test,", "KB_COLLECT_ONLY: entry 2 of 2 empty"),
+        ("test,,zotero", "KB_COLLECT_ONLY: entry 2 of 3 empty"),
+    ],
+)
+def test_collect_only_refuses_an_empty_value_or_entry(
+    monkeypatch, tmp_path, capsys, collect_only, refusal
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("KB_COLLECT_ONLY", collect_only)
+    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(WorkingSource()))
+
+    assert cli.main(["collect"]) == cli.ExitCode.NOT_STARTED
+    output = capsys.readouterr()
+    assert refusal in output.err
+    assert_nothing_collected(tmp_path, output.out)
+
+
+@pytest.mark.parametrize(
+    ("name", "variable"),
+    [
+        ("zotero", "KB_ZOTERO_DIR"),
+        ("Zotero", "KB_ZOTERO_DIR"),
+        ("clipping", "KB_VAULT_DIR"),
+        ("gh_archive", "GOOGLE_APPLICATION_CREDENTIALS"),
+    ],
+)
+def test_collect_only_refuses_a_source_chosen_without_its_variable(
+    monkeypatch, tmp_path, capsys, name, variable
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("KB_COLLECT_ONLY", f"test,{name}")
+    monkeypatch.setattr(cli, "SOURCE_KINDS", declared_kinds(WorkingSource()))
+
+    assert cli.main(["collect"]) == cli.ExitCode.NOT_STARTED
+    output = capsys.readouterr()
+    assert f"KB_COLLECT_ONLY: entry 2 of 2 '{name}' chosen, {variable} not set" in (
+        output.err
+    )
+    assert_nothing_collected(tmp_path, output.out)
 
 
 def test_collect_fails_closed_with_a_clear_message_on_a_corrupted_state(
@@ -845,7 +1024,14 @@ def test_kb_collect_sent_sigterm_in_its_own_process_exits_with_143(tmp_path):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        env={**os.environ, "KB_DATA_DIR": str(tmp_path)},
+        env={
+            **{
+                name: value
+                for name, value in os.environ.items()
+                if name != "KB_COLLECT_ONLY"
+            },
+            "KB_DATA_DIR": str(tmp_path),
+        },
     )
     try:
         assert process.stdout.readline() == "ready\n"

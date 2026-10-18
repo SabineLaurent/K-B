@@ -33,6 +33,11 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   suivante part du même point et finit plus tard : elle dépasse encore le plafond, la source
   échoue à chaque collecte. Cela contredit la consigne du 05/10 : lancée tous les jours, K-B
   rattrape les jours manqués (#65).
+- **Deux collectes en même temps perdent des dates** (relevé par la revue de #201, le 2026-10-18,
+  porteur à désigner par Sabine). `collect_all_sources` lit tout `collection_state.json` au début
+  et le réécrit en entier à la fin (`src/k_b/etl/extract.py`) : la dernière collecte qui écrit
+  l'emporte. Avec `KB_COLLECT_ONLY`, le Mac (`zotero,clipping`) et les conteneurs (le reste)
+  collectent à part ; s'ils partagent l'état (#200), leurs collectes ne doivent pas se chevaucher.
 
 ## Interface
 

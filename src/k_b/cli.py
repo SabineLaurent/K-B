@@ -46,7 +46,7 @@ from k_b.etl.load import (
     read_imported_paths,
 )
 from k_b.etl.raw_store import InvalidCollectionStateError, write_file_atomically
-from k_b.etl.source_contract import list_sources
+from k_b.etl.source_contract import Source, list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.clipping import FOLDER_PREFIX as CLIPPING_SOURCE_NAME
 from k_b.etl.sources.clipping import ClippingSource
@@ -115,6 +115,16 @@ ZOTERO_DIR_VARIABLE = "KB_ZOTERO_DIR"
 VAULT_DIR_VARIABLE = "KB_VAULT_DIR"
 # The path of the BigQuery service account key, read by the client. Not set: GH Archive is skipped.
 BIGQUERY_KEY_VARIABLE = "GOOGLE_APPLICATION_CREDENTIALS"
+# The sources cli.py creates, by the variable that says where each one reads.
+VARIABLE_BY_SOURCE_NAME = {
+    ZOTERO_SOURCE_NAME: ZOTERO_DIR_VARIABLE,
+    CLIPPING_SOURCE_NAME: VAULT_DIR_VARIABLE,
+    GH_ARCHIVE_SOURCE_NAME: BIGQUERY_KEY_VARIABLE,
+}
+# The source folders kb collect runs, separated by commas: tldr runs every edition. Not set: no
+# filter, every source runs as without it (Zotero, the clips and GH Archive with their variable).
+# No default in core/config.py: not set is no filter, not a value.
+COLLECT_ONLY_VARIABLE = "KB_COLLECT_ONLY"
 # One log per import, named by its second as a raw file by its collection: never rewritten.
 IMPORT_LOG_FILE_NAME = "import-log-{imported_at}.jsonl"
 
@@ -203,7 +213,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser(
-        "collect", help="run every source and store its raw output in raw/"
+        "collect",
+        help=f"run every source, or the ones of {COLLECT_ONLY_VARIABLE}, and store its raw"
+        " output in raw/",
     )
     commands.add_parser(
         "create-db", help=f"create the items database, {DATABASE_FILE_NAME}"
@@ -397,20 +409,26 @@ def run_import(data_dir: Path) -> int:
     return ExitCode.SUCCEEDED
 
 
+@dataclass(frozen=True)
+class CollectOnly:
+    """The source folders KB_COLLECT_ONLY chose; None: not set, every source is collected."""
+
+    folder_names: frozenset[str] | None
+
+    def is_collected(self, folder_name: str) -> bool:
+        return self.folder_names is None or folder_name in self.folder_names
+
+
 def run_collect(data_dir: Path) -> int:
-    sources = list_sources(SOURCE_KINDS)
-    zotero_dir = os.environ.get(ZOTERO_DIR_VARIABLE)
-    if zotero_dir:
-        sources.append(ZoteroSource(Path(zotero_dir)))
-    vault_dir = os.environ.get(VAULT_DIR_VARIABLE)
-    if vault_dir:
-        sources.append(ClippingSource(Path(vault_dir)))
-    bigquery_key = os.environ.get(BIGQUERY_KEY_VARIABLE)
-    if bigquery_key:
-        sources.append(GhArchiveSource(create_bigquery_client))
+    # The mapping the check reads is the one the sources are created from; the BigQuery client
+    # reads os.environ itself.
+    environ = os.environ
+    collect_only = read_collect_only(environ)
+    if collect_only is None:
+        return ExitCode.NOT_STARTED
     try:
         outcome = collect_all_sources(
-            sources,
+            list_collected_sources(collect_only, environ),
             data_dir / "raw",
             data_dir,
             datetime.now(UTC),
@@ -420,15 +438,85 @@ def run_collect(data_dir: Path) -> int:
         return ExitCode.NOT_STARTED
     for source_name, source_error in outcome.errors_by_source.items():
         print(f"{source_name}: {describe_outcome(source_error)}")
-    if not zotero_dir:
-        print(f"{ZOTERO_SOURCE_NAME}: skipped ({ZOTERO_DIR_VARIABLE} not set)")
-    if not vault_dir:
-        print(f"{CLIPPING_SOURCE_NAME}: skipped ({VAULT_DIR_VARIABLE} not set)")
-    if not bigquery_key:
-        print(f"{GH_ARCHIVE_SOURCE_NAME}: skipped ({BIGQUERY_KEY_VARIABLE} not set)")
+    print_skipped_sources(collect_only, environ)
     if outcome.state_error is not None:
         print(f"collection_state: {describe_outcome(outcome.state_error)}")
     return find_collection_exit_code(outcome)
+
+
+def read_collect_only(environ: Mapping[str, str]) -> CollectOnly | None:
+    """The sources kb collect runs, or None after logging the entry refused, its value quoted."""
+    value = environ.get(COLLECT_ONLY_VARIABLE)
+    if value is None:
+        return CollectOnly(None)
+    # Split once: the names checked are the names collected. Zotero is zotero (decision of
+    # Sabine, 2026-10-18): a name can only match one of the folders.
+    entries = tuple(entry.strip() for entry in value.split(","))
+    refusal = find_collect_only_refusal(entries, environ)
+    if refusal is not None:
+        logger.error("%s", refusal)
+        return None
+    return CollectOnly(frozenset(entry.lower() for entry in entries))
+
+
+def find_collect_only_refusal(
+    entries: tuple[str, ...], environ: Mapping[str, str]
+) -> str | None:
+    """Why the sources chosen are refused, or None. Each entry is compared lowercased, and
+    quoted as it was written, without the spaces around. A source chosen without its variable
+    is refused: it would not run, and kb collect could exit 0 without having run anything."""
+    # A value empty or made of spaces gives one empty entry: it would choose no source.
+    if entries == ("",):
+        return f"{COLLECT_ONLY_VARIABLE}: empty, set the source folders separated by commas"
+    folder_names = [kind.folder_prefix for kind in SOURCE_KINDS]
+    for position, entry in enumerate(entries, start=1):
+        where = f"{COLLECT_ONLY_VARIABLE}: entry {position} of {len(entries)}"
+        name = entry.lower()
+        if not entry:
+            return f"{where} empty"
+        if name not in folder_names:
+            return (
+                f"{where} {quote_value(entry)} not a source folder;"
+                f" folders: {', '.join(folder_names)}"
+            )
+        variable = VARIABLE_BY_SOURCE_NAME.get(name)
+        if variable is not None and not environ.get(variable):
+            return f"{where} {quote_value(entry)} chosen, {variable} not set"
+    return None
+
+
+def list_collected_sources(
+    collect_only: CollectOnly, environ: Mapping[str, str]
+) -> list[Source]:
+    """The sources of SOURCE_KINDS chosen, then Zotero, the clips and GH Archive, each when it
+    is chosen and its variable set."""
+    sources = list_sources(
+        [kind for kind in SOURCE_KINDS if collect_only.is_collected(kind.folder_prefix)]
+    )
+    zotero_dir = environ.get(ZOTERO_DIR_VARIABLE)
+    if zotero_dir and collect_only.is_collected(ZOTERO_SOURCE_NAME):
+        sources.append(ZoteroSource(Path(zotero_dir)))
+    vault_dir = environ.get(VAULT_DIR_VARIABLE)
+    if vault_dir and collect_only.is_collected(CLIPPING_SOURCE_NAME):
+        sources.append(ClippingSource(Path(vault_dir)))
+    if environ.get(BIGQUERY_KEY_VARIABLE) and collect_only.is_collected(
+        GH_ARCHIVE_SOURCE_NAME
+    ):
+        sources.append(GhArchiveSource(create_bigquery_client))
+    return sources
+
+
+def print_skipped_sources(
+    collect_only: CollectOnly, environ: Mapping[str, str]
+) -> None:
+    """One line per source not run: not chosen, or, without KB_COLLECT_ONLY, its variable not
+    set. A source chosen without its variable never gets here: read_collect_only refuses it."""
+    for kind in SOURCE_KINDS:
+        if not collect_only.is_collected(kind.folder_prefix):
+            print(f"{kind.folder_prefix}: skipped (not in {COLLECT_ONLY_VARIABLE})")
+    for source_name, variable in VARIABLE_BY_SOURCE_NAME.items():
+        if collect_only.is_collected(source_name) and not environ.get(variable):
+            print(f"{source_name}: skipped ({variable} not set)")
 
 
 def find_collection_exit_code(outcome: CollectionOutcome) -> ExitCode:
