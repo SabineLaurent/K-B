@@ -7,8 +7,8 @@ BigQuery. Les décisions et leur pourquoi sont dans le
 [journal ADR](ADR/journal-decisions-projet.md) ; les listes suivies, dans [sources.md](sources.md).
 
 **Langage** : K-B est écrit en Python 3.13 (`.python-version` ; `requires-python = ">=3.13"` dans
-`pyproject.toml`), avec ses dépendances gérées par `uv`. Chaque source nomme ci-dessous sa
-bibliothèque de lecture.
+`pyproject.toml`), avec ses dépendances gérées par `uv`. Chaque source nomme ci-dessous, dans sa
+puce « Technologie », la bibliothèque qui la lit.
 
 Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 2026-10-18 (#64).
 
@@ -31,11 +31,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   |---|---|---|
   | **0** | `SUCCEEDED` | chaque source lancée a réussi ; une source sans rien de neuf réussit (`ok`, rien d'écrit, sa date avance) |
   | **1** | `FAILED` | aucune source lancée n'a réussi ; ou `collection_state.json` n'a pas pu être écrit (disque plein, droits), quel que soit le sort des sources ; ou une exception que `kb` ne traite pas, journalisée avec sa trace |
-  | **4** | `PARTIAL_FAILURE` | au moins une source a réussi, au moins une a échoué, et l'état est écrit : les sources réussies sont acquises, les autres repartent de leur date à la collecte suivante |
   | **2** | `NOT_STARTED` | rien n'a été collecté, ni brut ni état écrit : `KB_DATA_DIR` absente ou vide ; `KB_DATA_DIR` qui n'est pas un dossier existant ; `KB_LOG_TO_FILE` qui n'est ni `true` ni `false` ; fichier de journal qui ne s'ouvre pas ; `collection_state.json` illisible ou invalide (pas du JSON, pas un objet, une date sans fuseau) ; `KB_COLLECT_ONLY` refusée (ci-dessous) ; commande absente ou inconnue, refusée par `argparse` (son message d'usage, sur la sortie d'erreur seulement : le journal n'est pas encore ouvert) |
-  | **143** | `STOPPED_BY_SIGTERM` | arrêt par SIGTERM (`docker stop`) : le brut déjà écrit reste, l'état n'est pas écrit, et la collecte suivante relit les mêmes fenêtres |
+  | **4** | `PARTIAL_FAILURE` | au moins une source a réussi, au moins une a échoué, et l'état est écrit : les sources réussies sont acquises, les autres repartent de leur date à la collecte suivante |
+  | **143** | `STOPPED_BY_SIGTERM` | arrêt par SIGTERM (`docker stop`) : le brut déjà écrit reste ; si l'arrêt vient avant l'écriture de l'état, l'état n'est pas écrit et la collecte suivante relit les mêmes fenêtres ; s'il vient après (pendant l'affichage des lignes), l'état est écrit et le code reste 143 |
 
-  Le code 3 (`SERVER_NOT_STARTED`) est propre à `kb serve`.
+  Le code 3 (`SERVER_NOT_STARTED`) est propre à `kb serve`. Ctrl-C (SIGINT) n'est pas traité par
+  `kb` : Python affiche sa trace hors du journal daté, l'état n'est pas écrit si l'arrêt vient
+  avant lui, et le code de sortie, donné par le shell, est 130 ; aucun code nommé ne le décrit.
 - **Choisir les sources** (#201) : `KB_COLLECT_ONLY`, posée, ne lance que les sources nommées,
   séparées par des virgules (`KB_COLLECT_ONLY=zotero,clipping`, la collecte du Mac au POC ; les
   conteneurs collectent le reste). Un nom est le dossier d'une source sous `raw/` (`FOLDER_PREFIX`) :
@@ -94,12 +96,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   fonctionnement avec sa trace, sa date de dernière collecte reste, et les sources suivantes sont
   lancées ; la collecte suivante redemande la même fenêtre. Le brut n'est écrit qu'une fois la
   source allée au bout de sa lecture : une source en échec n'écrit rien. Exception : une source à
-  plusieurs pages (tldr) vérifie le nom de chaque page avant d'écrire la première, mais une
-  écriture qui échoue au milieu (disque plein) laisse les pages déjà écrites. Chaque source dit
+  plusieurs pages (tldr, clips) vérifie le nom de chaque page avant d'écrire la première, mais
+  une écriture qui échoue au milieu (disque plein) laisse les pages déjà écrites. Chaque source dit
   ses états propres (« En cas de panne », dans sa section) ; deux familles valent pour plusieurs :
   - **téléchargement** (`src/k_b/etl/http_download.py`), pour tldr, arXiv, CISA KEV et l'API
     GitHub ; Zotero, les clips et GH Archive n'y passent pas : erreur réseau (DNS, connexion,
-    TLS, délai de 30 s dépassé) ; statut HTTP d'erreur (`HTTPError`, sauf le 304 de CISA KEV) ;
+    TLS, 30 s sans réponse à une opération réseau : la connexion, ou chaque lecture ; la durée
+    totale d'un téléchargement n'est pas bornée) ; statut HTTP d'erreur (`HTTPError`, sauf le 304 de CISA KEV) ;
     réponse servie, après une redirection, hors de l'adresse attendue (`RedirectedOutsideError`,
     sauf la page d'accueil d'une édition tldr) ; réponse plus grande que le maximum de la source ;
   - **écriture du brut** (`src/k_b/etl/raw_store.py`) : un fichier brut déjà présent (deux
@@ -159,7 +162,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 - **En cas de panne :** releases (`github_releases_<dépôt>`), en plus des états communs : la page
   n'est pas du JSON, ou pas une liste ; toutes ses releases sont invalides (`all_items_invalid`) ;
   une release est d'un autre dépôt que celui demandé (casse ignorée). Une release invalide parmi
-  des valides entre dans le brut, et l'import la rejette.
+  des valides entre dans le brut quand la page est écrite, et l'import la rejette (limite : une
+  page dont la seule release nouvelle est invalide n'est pas écrite, voir « État »).
 - **En cas de panne :** alertes (`github_advisories_<écosystème>`), en plus des états communs : la
   page n'est pas du JSON, ou pas une liste ; toutes ses alertes sont invalides
   (`all_items_invalid` ; un écosystème dont la seule alerte de la fenêtre est invalide échoue à
@@ -174,7 +178,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 
 ### API arXiv — service web
 
-- **Technologie** : API `https://export.arxiv.org/api/query`, réponse Atom (XML).
+- **Technologie** : API `https://export.arxiv.org/api/query`, réponse Atom (XML), lue avec
+  `xml.etree.ElementTree` de la bibliothèque standard.
 - **Ce qu'on en tire** : métadonnées et résumé des papiers soumis depuis la dernière collecte.
 - **Accès** : sans authentification.
 - **Limites** : une requête toutes les 3 secondes au plus, une connexion à la fois, pour toutes
@@ -218,13 +223,14 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 ### Catalogue CISA KEV — fichier
 
 - **Technologie** : fichier CSV téléchargé en HTTPS
-  (`https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv`).
+  (`https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv`), lu avec
+  le module `csv` de la bibliothèque standard.
 - **Ce qu'on en tire** : les vulnérabilités activement exploitées ajoutées depuis la dernière
   collecte (`dateAdded`), sélectionnées à la lecture.
 - **Accès** : sans authentification. Requête conditionnelle `If-Modified-Since` : une réponse 304
   n'écrit rien.
 - **Limites** : pas de quota publié ; une requête par collecte. Catalogue d'environ 1 Mo, refusé
-  au-delà de 10 Mo, et refusé s'il est servi hors de `https://www.cisa.gov/`. Le catalogue est
+  au-delà de 10 Mio, et refusé s'il est servi hors de `https://www.cisa.gov/`. Le catalogue est
   lu avant d'être écrit : une réponse qui n'en est pas un (page HTML, colonnes manquantes), ou
   dont toutes les lignes sont invalides, fait échouer la source, sans brut écrit ni date avancée.
   Une ligne invalide parmi des valides est rejetée à l'import, avec son numéro et son `cveID`
@@ -233,9 +239,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 - **Données personnelles** : aucune.
 - **État** : collecte en place (PR de #23).
 - **En cas de panne :** en plus des états communs (tout statut HTTP autre que 304), la source
-  échoue si le catalogue dépasse 10 Mo, n'est pas en UTF-8 (`UnicodeDecodeError`), ne se découpe
-  pas en lignes CSV (`csv.Error`, un octet NUL), n'a pas les colonnes attendues, ou si toutes ses
-  lignes sont invalides (`all_items_invalid`). Cas limite : une date de dernière collecte qui
+  échoue si le catalogue dépasse 10 Mio, n'est pas en UTF-8 (`UnicodeDecodeError`), ne se découpe
+  pas en lignes CSV (`csv.Error`, par exemple un champ de plus de 131 072 caractères, la limite
+  par défaut du module `csv`), n'a pas les colonnes attendues, ou si toutes ses lignes sont
+  invalides (`all_items_invalid`). Un octet NUL ne fait pas échouer la source (le module `csv` de
+  Python 3.13 le lit) : sa ligne entre dans le brut, et l'import la rejette. Cas limite : une date de dernière collecte qui
   n'est pas en UTC (`collection_state.json` édité à la main) fait échouer l'en-tête
   `If-Modified-Since` (`ValueError`), à chaque collecte jusqu'à ce que l'état soit corrigé.
 
@@ -314,8 +322,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   recopiés). Limites : un clip supprimé du coffre n'est pas vu ; un changement de ses seules
   métadonnées (`chmod`, une étiquette du Finder) change sa date de changement, et le clip est
   recopié pour rien (RGESN 1.6, quelques octets par clip).
-- **En cas de panne :** la source échoue, n'écrit rien, et sa date de dernière collecte reste ;
-  la collecte suivante recommence. Les états :
+- **En cas de panne :** la source échoue, n'écrit rien (sauf une écriture qui échoue au milieu de
+  la copie : les clips déjà écrits restent, règles communes, « Panne d'une source »), et sa date
+  de dernière collecte reste ; la collecte suivante recommence. Les états :
   - `ClipTooLargeError` (`clip_too_large` : un clip dépasse 1 000 000 octets ; le message cite
     son nom de fichier, tronqué et échappé par `quote_value`, sa taille et le maximum). **Exception
     à la règle 1 de `.claude/rules/conventions.md`**, qui ne fait échouer une source que pour une
@@ -441,7 +450,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 ### Zotero — base de données
 
 - **Technologie** : base SQLite `zotero.sqlite`, dans le dossier de données de Zotero, lue par
-  une requête SQL (`src/k_b/etl/sources/zotero.py`). Zotero verrouille sa base quand il tourne, et
+  une requête SQL avec le module `sqlite3` de la bibliothèque standard
+  (`src/k_b/etl/sources/zotero.py`). Zotero verrouille sa base quand il tourne, et
   ses dernières écritures sont dans `zotero.sqlite-wal` : K-B copie les deux fichiers dans un
   dossier temporaire, vérifie la copie (`PRAGMA integrity_check`), l'ouvre en lecture seule,
   lance la requête, puis supprime la copie, après un succès, une erreur ou un Ctrl-C. Un
