@@ -424,6 +424,22 @@ def test_the_rule_of_ai_api_refuses_its_layer_and_the_layers_above(
     assert bool(list_upward_imports_of_the_ai_api(module, imported)) is is_refused
 
 
+# The command line is the top: commands/ does not import cli, which imports it; the composition of
+# etl, which commands/ imports, imports neither (#247).
+COMMAND_LINE_FORBIDDEN_MODULES = {"commands": {"cli"}} | {
+    module: {"cli", "commands"} for module in ETL_COMPOSITION_MODULES
+}
+
+
+def test_neither_commands_nor_the_composition_of_etl_imports_the_command_line_above():
+    for module, forbidden in sorted(COMMAND_LINE_FORBIDDEN_MODULES.items()):
+        for path in list_python_files(module):
+            imported = list_imported_modules(path, find_package(path))
+            assert {name for name in imported if reaches(name, forbidden)} == set(), (
+                path
+            )
+
+
 def test_items_imports_neither_the_sources_nor_the_composition():
     forbidden = {ETL_SOURCES_PACKAGE} | COMPOSITION_MODULES
     for path in list_python_files("items"):
