@@ -1,168 +1,34 @@
-"""Command line: `kb collect`, `kb create-db`, `kb import`, `kb serve`, `kb openapi`."""
+"""Command line: `kb collect`, `kb create-db`, `kb import`, `kb serve`, `kb openapi`.
+
+The entry point of kb: it reads the command, opens the log and hands the run to its module in
+commands/.
+"""
 
 import argparse
-import json
 import logging
-import os
-import signal
-import sqlite3
 import sys
-import time
-from collections.abc import Iterator, Mapping
-from contextlib import ExitStack, contextmanager
-from datetime import UTC, datetime
-from enum import IntEnum
-from logging.handlers import TimedRotatingFileHandler
+from contextlib import ExitStack
 from pathlib import Path
-from types import FrameType
-from typing import Self
 
-import uvicorn
-from pydantic import SecretStr
-
-from k_b.core.api_keys import read_api_keys_or_refusal
-from k_b.core.config import (
-    DATA_API_HOST,
-    DATA_API_PORT,
-    LOG_FILES_KEPT,
-    LOG_TO_FILE,
+from k_b.commands.collect_command import run_collect
+from k_b.commands.create_db_command import run_create_db
+from k_b.commands.environment import read_data_dir, read_log_to_file
+from k_b.commands.exit_codes import ExitCode
+from k_b.commands.import_command import run_import
+from k_b.commands.openapi_command import OPENAPI_PATH, run_openapi
+from k_b.commands.run_log import (
+    LOG_FILE_PATH,
+    LOGGER_NAME,
+    SERVE_LOG_FILE_PATH,
+    logging_to,
 )
-from k_b.core.quoting import quote_value
-from k_b.data_api.app import create_app
-from k_b.data_api.settings import ServeSettings, read_serve_settings_or_refusal
-from k_b.database.connection import DATABASE_FILE_NAME, MissingDatabaseError
-from k_b.database.creation import create_database
-from k_b.database.dates import DATABASE_DATE_FORMAT
-from k_b.database.writers.shared_rows import UnknownSourceError
-from k_b.etl.collected_sources import (
-    COLLECT_ONLY_VARIABLE,
-    VARIABLE_BY_SOURCE_NAME,
-    CollectOnly,
-    list_collected_sources,
-    read_collect_only_or_refusal,
-)
-from k_b.etl.extract import CollectionOutcome, collect_all_sources
-from k_b.etl.load import (
-    ImportLogExistsError,
-    KindWithoutTableError,
-    import_items,
-    read_imported_paths,
-)
-from k_b.etl.raw_store import InvalidCollectionStateError, write_file_atomically
-from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources.gh_archive import read_trend_files
-from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
-from k_b.etl.transform import COLLECTION_NAME_FORMAT, read_raw_items
+from k_b.commands.serve_command import run_serve
+from k_b.commands.sigterm import StoppedBySigtermError, stopping_on_sigterm
+from k_b.core.config import DATA_API_HOST, DATA_API_PORT
+from k_b.database.connection import DATABASE_FILE_NAME
+from k_b.etl.collected_sources import COLLECT_ONLY_VARIABLE
 
-logger = logging.getLogger(__name__)
-
-
-class ExitCode(IntEnum):
-    """The code kb exits with, for who runs it: by hand, or as a job in a container, where the
-    code is the only way to know what kb did without reading its log. Listed by kb --help."""
-
-    meaning: str
-
-    def __new__(cls, value: int, meaning: str) -> Self:
-        member = int.__new__(cls, value)
-        member._value_ = value
-        member.meaning = meaning
-        return member
-
-    SUCCEEDED = 0, "the command succeeded"
-    FAILED = (
-        1,
-        "the command ran and failed; kb collect: no source collected, or state not written",
-    )
-    NOT_STARTED = 2, "nothing was run: a setting, a file or the command line is refused"
-    # Not returned by kb: uvicorn exits with it (STARTUP_FAILURE, uvicorn/config.py). Named here
-    # so that no other code takes its value.
-    SERVER_NOT_STARTED = 3, "kb serve: the server did not start"
-    # 4: the first value after the one of uvicorn.
-    PARTIAL_FAILURE = (
-        4,
-        "kb collect: at least one source collected, at least one failed, state written",
-    )
-    # 128 + 15, the code of a process stopped by SIGTERM.
-    STOPPED_BY_SIGTERM = (
-        143,
-        "kb collect, kb import: stopped by SIGTERM; what was done before it is kept",
-    )
-
-
-class StoppedBySigtermError(SystemExit):
-    """SIGTERM received by kb collect or kb import: docker stop sends it before SIGKILL."""
-
-    def __init__(self) -> None:
-        super().__init__(ExitCode.STOPPED_BY_SIGTERM)
-
-
-# The commands that stop on SIGTERM; kb serve keeps the handler of uvicorn.
-COMMANDS_STOPPED_BY_SIGTERM = frozenset({"collect", "import"})
-
-DATA_DIR_VARIABLE = "KB_DATA_DIR"
-# One log per import, named by its second as a raw file by its collection: never rewritten.
-IMPORT_LOG_FILE_NAME = "import-log-{imported_at}.jsonl"
-
-
-# The log of every run, successes and failures, apart from the import logs: those are written
-# only when an import reaches the end of its writing in the base.
-LOG_FILE_PATH = Path("logs") / "kb.log"
-# The log of kb serve, apart: a long run that shared kb.log would keep writing in the file of the
-# day before once a rotation done by kb collect or kb import has renamed it (docs/specs-api.md,
-# "Journal").
-SERVE_LOG_FILE_PATH = Path("logs") / "kb-serve.log"
-LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
-# true or false; not set: LOG_TO_FILE of core/config.py.
-LOG_TO_FILE_VARIABLE = "KB_LOG_TO_FILE"
-LOG_TO_FILE_VALUES = {"true": True, "false": False}
-
-
-# Written from the root of the repository, which versions it.
-OPENAPI_PATH = Path("docs") / "api" / "openapi-donnees.json"
-
-
-@contextmanager
-def logging_to(
-    data_dir: Path, log_file_path: Path | None = LOG_FILE_PATH
-) -> Iterator[None]:
-    """Log every line of level INFO and above on stderr and, unless log_file_path is None, in
-    the log file of the data directory (logs/kb.log, or logs/kb-serve.log for kb serve), dated
-    in UTC in the format of the base (2026-10-14T11:30:00Z); the file turns at midnight UTC into
-    <file>.<day>.
-
-    Raises OSError when the log file cannot be opened. On exit the handlers are closed and
-    removed: the tests run kb many times in the interpreter of pytest.
-    """
-    handlers: list[logging.Handler] = [logging.StreamHandler()]
-    if log_file_path is not None:
-        log_path = data_dir / log_file_path
-        log_path.parent.mkdir(exist_ok=True)
-        handlers.append(
-            TimedRotatingFileHandler(
-                log_path,
-                when="midnight",
-                utc=True,
-                backupCount=LOG_FILES_KEPT,
-                encoding="utf-8",
-            )
-        )
-    formatter = logging.Formatter(LOG_LINE_FORMAT, datefmt=DATABASE_DATE_FORMAT)
-    # The Z of the format says UTC: the time is read in UTC, not in local time.
-    formatter.converter = time.gmtime
-    root_logger = logging.getLogger()
-    previous_level = root_logger.level
-    for handler in handlers:
-        handler.setFormatter(formatter)
-        root_logger.addHandler(handler)
-    root_logger.setLevel(logging.INFO)
-    try:
-        yield
-    finally:
-        root_logger.setLevel(previous_level)
-        for handler in handlers:
-            root_logger.removeHandler(handler)
-            handler.close()
+logger = logging.getLogger(LOGGER_NAME)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -236,34 +102,6 @@ def describe_exit_codes() -> str:
     return "exit codes:\n" + "\n".join(lines)
 
 
-@contextmanager
-def stopping_on_sigterm(command: str) -> Iterator[None]:
-    """For kb collect and kb import, turn SIGTERM into StoppedBySigtermError, a SystemExit: the
-    import is undone and its log removed, the temporary files are removed, as on any exception.
-    A SIGTERM received during the commit of the import is raised once the commit has returned:
-    the import and its log are kept (etl/load.py, commit_with_log). The handler found is set
-    back on exit.
-    Called from the main thread only: Python sets a signal handler nowhere else."""
-    if command not in COMMANDS_STOPPED_BY_SIGTERM:
-        yield
-        return
-    previous_handler = signal.signal(signal.SIGTERM, raise_stopped_by_sigterm)
-    try:
-        yield
-    finally:
-        # None: a handler not set from Python, which signal.signal refuses.
-        signal.signal(
-            signal.SIGTERM,
-            signal.SIG_DFL if previous_handler is None else previous_handler,
-        )
-
-
-def raise_stopped_by_sigterm(signal_number: int, frame: FrameType | None) -> None:
-    # A second SIGTERM would stop the clean-up; Docker sends SIGKILL after its delay anyway.
-    signal.signal(signal.SIGTERM, signal.SIG_IGN)
-    raise StoppedBySigtermError
-
-
 def run_command(command: str, data_dir: Path) -> int:
     if command == "create-db":
         return run_create_db(data_dir)
@@ -272,231 +110,3 @@ def run_command(command: str, data_dir: Path) -> int:
     if command == "serve":
         return run_serve(data_dir)
     return run_collect(data_dir)
-
-
-def read_data_dir() -> Path | None:
-    """The data directory, or None after printing why it cannot be used."""
-    data_dir = os.environ.get(DATA_DIR_VARIABLE)
-    if not data_dir:
-        print(
-            f"error: {DATA_DIR_VARIABLE} must point to the data directory",
-            file=sys.stderr,
-        )
-        return None
-    if not Path(data_dir).is_dir():
-        print(
-            f"error: {DATA_DIR_VARIABLE} is not an existing directory", file=sys.stderr
-        )
-        return None
-    return Path(data_dir)
-
-
-def read_log_to_file() -> bool | None:
-    """Whether kb logs in a file as well as on stderr, or None after printing why the value is
-    refused: the log is not open yet."""
-    value = os.environ.get(LOG_TO_FILE_VARIABLE)
-    if value is None:
-        return LOG_TO_FILE
-    if value not in LOG_TO_FILE_VALUES:
-        print(
-            f"error: {LOG_TO_FILE_VARIABLE}: {quote_value(value)} neither true nor false",
-            file=sys.stderr,
-        )
-        return None
-    return LOG_TO_FILE_VALUES[value]
-
-
-def run_create_db(data_dir: Path) -> int:
-    database_path = data_dir / DATABASE_FILE_NAME
-    try:
-        create_database(database_path)
-    except FileExistsError as error:
-        logger.error("%s", error)
-        return ExitCode.NOT_STARTED
-    except (sqlite3.Error, OSError) as error:
-        logger.error("%s: %s: %s", database_path, type(error).__name__, error)
-        return ExitCode.FAILED
-    print(f"database created: {database_path}")
-    return ExitCode.SUCCEEDED
-
-
-def run_import(data_dir: Path) -> int:
-    """Read the registry of the base, then the raw files not in it (the items, then the
-    rankings of GH Archive), then write the base."""
-    database_path = data_dir / DATABASE_FILE_NAME
-    imported_at = datetime.now(UTC).replace(microsecond=0)
-    log_path = data_dir / IMPORT_LOG_FILE_NAME.format(
-        imported_at=imported_at.strftime(COLLECTION_NAME_FORMAT)
-    )
-    try:
-        imported_paths = read_imported_paths(database_path)
-        reading = read_raw_items(data_dir / "raw", SOURCE_KINDS, imported_paths)
-        trend_reading = read_trend_files(data_dir / "raw", imported_paths)
-        summary = import_items(
-            reading,
-            trend_reading,
-            database_path,
-            log_path,
-            imported_at,
-            TRACKED_REPOSITORIES,
-        )
-    except MissingDatabaseError as error:
-        logger.error("%s; create it with kb create-db", error)
-        return ExitCode.NOT_STARTED
-    except ImportLogExistsError as error:
-        logger.error("%s; run kb import again", error)
-        return ExitCode.NOT_STARTED
-    except (
-        sqlite3.Error,
-        OSError,
-        UnknownSourceError,
-        KindWithoutTableError,
-    ) as error:
-        logger.error("%s: %s", type(error).__name__, error)
-        return ExitCode.FAILED
-    print(f"raw files read: {summary.read_count}")
-    print(f"items written (new or updated): {summary.item_count}")
-    print(f"trend rows written: {summary.trend_count}")
-    print(
-        "items and trend windows left out (duplicates or versions not newer):"
-        f" {summary.discard_count}"
-    )
-    print(
-        "rows withdrawn (vulnerabilities, Zotero entries, highlights):"
-        f" {summary.withdrawn_count}"
-    )
-    print(f"rejections: {summary.rejection_count}")
-    print(f"log: {log_path}")
-    return ExitCode.SUCCEEDED
-
-
-def run_collect(data_dir: Path) -> int:
-    # The mapping the check reads is the one the sources are created from; the BigQuery client
-    # reads os.environ itself.
-    environ = os.environ
-    collect_only = read_collect_only(environ)
-    if collect_only is None:
-        return ExitCode.NOT_STARTED
-    try:
-        outcome = collect_all_sources(
-            list_collected_sources(collect_only, environ, SOURCE_KINDS),
-            data_dir / "raw",
-            data_dir,
-            datetime.now(UTC),
-        )
-    except InvalidCollectionStateError as error:
-        logger.error("%s", error)
-        return ExitCode.NOT_STARTED
-    for source_name, source_error in outcome.errors_by_source.items():
-        print(f"{source_name}: {describe_outcome(source_error)}")
-    print_skipped_sources(collect_only, environ)
-    if outcome.state_error is not None:
-        print(f"collection_state: {describe_outcome(outcome.state_error)}")
-    return find_collection_exit_code(outcome)
-
-
-def read_collect_only(environ: Mapping[str, str]) -> CollectOnly | None:
-    """The sources kb collect runs, or None after logging the entry refused, its value quoted."""
-    collect_only_or_refusal = read_collect_only_or_refusal(environ, SOURCE_KINDS)
-    if isinstance(collect_only_or_refusal, str):
-        logger.error("%s", collect_only_or_refusal)
-        return None
-    return collect_only_or_refusal
-
-
-def print_skipped_sources(
-    collect_only: CollectOnly, environ: Mapping[str, str]
-) -> None:
-    """One line per source not run: not chosen, or, without KB_COLLECT_ONLY, its variable not
-    set. A source chosen without its variable never gets here: read_collect_only refuses it."""
-    for kind in SOURCE_KINDS:
-        if not collect_only.is_collected(kind.folder_prefix):
-            print(f"{kind.folder_prefix}: skipped (not in {COLLECT_ONLY_VARIABLE})")
-    for source_name, variable in VARIABLE_BY_SOURCE_NAME.items():
-        if collect_only.is_collected(source_name) and not environ.get(variable):
-            print(f"{source_name}: skipped ({variable} not set)")
-
-
-def find_collection_exit_code(outcome: CollectionOutcome) -> ExitCode:
-    """Partial when some sources failed and the others are kept for good; a state not written
-    is a failure, as when every source fails: the next collection starts from the same dates."""
-    errors = outcome.errors_by_source.values()
-    if outcome.state_error is not None:
-        return ExitCode.FAILED
-    if all(error is None for error in errors):
-        return ExitCode.SUCCEEDED
-    if any(error is None for error in errors):
-        return ExitCode.PARTIAL_FAILURE
-    return ExitCode.FAILED
-
-
-def describe_outcome(error: Exception | None) -> str:
-    return "ok" if error is None else f"failed ({type(error).__name__})"
-
-
-def run_serve(data_dir: Path) -> int:
-    """Serve the base with the keys and the settings of the environment; the log of uvicorn is
-    the one of kb."""
-    api_keys = read_api_keys(os.environ)
-    settings = read_serve_settings(os.environ)
-    if api_keys is None or settings is None:
-        return ExitCode.NOT_STARTED
-    logger.info("API clients loaded: %s", ", ".join(sorted(api_keys)))
-    logger.info("API allowed hosts: %s", ", ".join(settings.allowed_hosts))
-    uvicorn.run(
-        create_app(
-            data_dir / DATABASE_FILE_NAME,
-            api_keys,
-            allowed_hosts=settings.allowed_hosts,
-        ),
-        host=settings.host,
-        port=settings.port,
-        log_config=None,
-        access_log=False,
-    )
-    return ExitCode.SUCCEEDED
-
-
-def read_serve_settings(environ: Mapping[str, str]) -> ServeSettings | None:
-    """The host, the port and the hosts allowed of kb serve, or None after logging the variable
-    refused, with its value quoted. Not set: the default of core/config.py."""
-    settings_or_refusal = read_serve_settings_or_refusal(environ)
-    if isinstance(settings_or_refusal, str):
-        logger.error("%s", settings_or_refusal)
-        return None
-    return settings_or_refusal
-
-
-def read_api_keys(environ: Mapping[str, str]) -> dict[str, SecretStr] | None:
-    """The key of each client, by its name, or None after logging the variable refused: the
-    name of the variable, never its value."""
-    api_keys_or_refusal = read_api_keys_or_refusal(environ)
-    if isinstance(api_keys_or_refusal, str):
-        logger.error("%s", api_keys_or_refusal)
-        return None
-    return api_keys_or_refusal
-
-
-def run_openapi() -> int:
-    """Write the OpenAPI of the data API, versioned with the code (docs/specs-api.md)."""
-    # Run from another folder, it would write a document the repository never sees.
-    if not OPENAPI_PATH.parent.is_dir():
-        print(
-            f"error: {OPENAPI_PATH.parent} is not a directory of the current directory;"
-            " run kb openapi at the root of the repository",
-            file=sys.stderr,
-        )
-        return ExitCode.NOT_STARTED
-    # The app is made without base nor key: its document does not depend on them.
-    openapi = create_app(Path(DATABASE_FILE_NAME), {}).openapi()
-    content = json.dumps(openapi, indent=2, ensure_ascii=False) + "\n"
-    try:
-        write_file_atomically(OPENAPI_PATH, content.encode())
-    except OSError as error:
-        print(
-            f"error: {OPENAPI_PATH} not written: {type(error).__name__}",
-            file=sys.stderr,
-        )
-        return ExitCode.FAILED
-    print(f"OpenAPI written: {OPENAPI_PATH}")
-    return ExitCode.SUCCEEDED

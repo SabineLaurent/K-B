@@ -12,6 +12,7 @@ import uvicorn.config
 from fastapi.testclient import TestClient
 
 from k_b import cli
+from k_b.commands import serve_command
 
 VERSIONED_OPENAPI = Path(__file__).parents[2] / "docs" / "api" / "openapi-donnees.json"
 
@@ -29,7 +30,9 @@ def uvicorn_calls(monkeypatch):
     """The calls kb serve makes to uvicorn.run, which is not run."""
     calls = []
     monkeypatch.setattr(
-        cli.uvicorn, "run", lambda app, **options: calls.append((app, options))
+        serve_command.uvicorn,
+        "run",
+        lambda app, **options: calls.append((app, options)),
     )
     return calls
 
@@ -355,7 +358,7 @@ def test_serve_exits_with_the_code_of_uvicorn_when_it_does_not_start_and_sets_no
         sigterm_handlers.append(signal.getsignal(signal.SIGTERM))
         sys.exit(uvicorn.config.STARTUP_FAILURE)
 
-    monkeypatch.setattr(cli.uvicorn, "run", fail_to_start)
+    monkeypatch.setattr(serve_command.uvicorn, "run", fail_to_start)
     handler_before = signal.getsignal(signal.SIGTERM)
 
     with pytest.raises(SystemExit) as stop:

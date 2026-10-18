@@ -3,10 +3,10 @@ rule 5).
 
 Under k_b: core and items are the common vocabulary, database reads and writes the base (its
 writers under database/writers), etl runs the pipeline, data_api serves the base, ai_api calls the
-model, cli composes. Under k_b.etl: the composition (source_kinds, collected_sources) → the sources
-→ the modules of the pipeline. Under k_b.ai_api: digests → the stages → the clients → the settings
-→ outbound and llm_replay → deadline and watch_items; a module imports only the layers below its
-own.
+model, cli and commands compose. Under k_b.etl: the composition (source_kinds, collected_sources) →
+the sources → the modules of the pipeline. Under k_b.ai_api: digests → the stages → the clients →
+the settings → outbound and llm_replay → deadline and watch_items; a module imports only the layers
+below its own.
 """
 
 import ast
@@ -18,7 +18,16 @@ import pytest
 import k_b
 
 PACKAGE_DIR = Path(k_b.__file__).parent
-TOP_LEVEL_MODULES = {"cli", "items", "core", "database", "etl", "data_api", "ai_api"}
+TOP_LEVEL_MODULES = {
+    "cli",
+    "commands",
+    "items",
+    "core",
+    "database",
+    "etl",
+    "data_api",
+    "ai_api",
+}
 # Under k_b.etl, each module is in exactly one of the three.
 ETL_COMPOSITION_MODULES = {"etl.source_kinds", "etl.collected_sources"}
 ETL_SOURCES_PACKAGE = "etl.sources"
@@ -33,7 +42,7 @@ ETL_PIPELINE_MODULES = {
     "etl.http_download",
     "etl.user_agent",
 }
-COMPOSITION_MODULES = {"cli"} | ETL_COMPOSITION_MODULES
+COMPOSITION_MODULES = {"cli", "commands"} | ETL_COMPOSITION_MODULES
 
 
 def list_imported_modules(path: Path, package: str, depth: int = 2) -> set[str]:
