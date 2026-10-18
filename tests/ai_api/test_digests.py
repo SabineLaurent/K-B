@@ -11,9 +11,11 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from k_b.ai_api import classification, watch_items
-from k_b.ai_api.classification import CLASSIFICATION_SYSTEM_PROMPT
-from k_b.ai_api.data_api_client import read_watch
+from k_b.ai_api import watch_items
+from k_b.ai_api.connectors.data_api_client import read_watch
+from k_b.ai_api.connectors.llm_client import build_http_client
+from k_b.ai_api.connectors.llm_replay import ReplayTransport
+from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.digests import (
     ClassificationFailure,
@@ -21,11 +23,10 @@ from k_b.ai_api.digests import (
     FailedSubject,
     build_digests,
 )
-from k_b.ai_api.llm_client import build_http_client
-from k_b.ai_api.llm_replay import ReplayTransport
-from k_b.ai_api.llm_settings import LlmSettings
+from k_b.ai_api.stages import classification
+from k_b.ai_api.stages.classification import CLASSIFICATION_SYSTEM_PROMPT
+from k_b.ai_api.stages.writing import WRITING_SYSTEM_PROMPT
 from k_b.ai_api.watch_items import WatchReading
-from k_b.ai_api.writing import WRITING_SYSTEM_PROMPT
 from k_b.core.config import (
     LLM_REPLAY_BASE_URL,
     MIN_SECONDS_FOR_LLM_REQUEST,

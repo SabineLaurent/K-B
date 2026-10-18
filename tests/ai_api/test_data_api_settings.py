@@ -5,7 +5,7 @@ import secrets
 
 import pytest
 
-from k_b.ai_api.data_api_settings import read_data_api_settings
+from k_b.ai_api.connectors.data_api_settings import read_data_api_settings
 from k_b.core.config import DATA_API_URL
 
 # Made for the test: never a real key.

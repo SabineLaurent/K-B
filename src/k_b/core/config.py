@@ -57,7 +57,7 @@ API_KEY_CHARACTERS = re.compile(r"[A-Za-z0-9_-]+")
 # stderr only, as in a container, whose stderr is its log.
 LOG_TO_FILE = True
 
-# The call to the model by the AI API (ai_api/llm_client.py; docs/fiches-veille.md). Waiting for
+# The call to the model by the AI API (ai_api/connectors/llm_client.py; docs/fiches-veille.md). Waiting for
 # a connection, for a connection of the pool, for each write of the request, and for each read of
 # the answer: a call that is not streamed sends nothing before its answer is whole, so the read
 # timeout bounds the wait for an answer that comes in one block. Measured by #158 on gpt-6-luna
@@ -81,7 +81,7 @@ LLM_REASONING_EFFORT: Literal["none"] | None = None
 # replay answers in the client itself.
 LLM_REPLAY_BASE_URL = "https://replay.invalid/v1"
 
-# The reading of the watch by the AI API through the data API (ai_api/data_api_client.py;
+# The reading of the watch by the AI API through the data API (ai_api/connectors/data_api_client.py;
 # docs/fiches-veille.md, "Lecture plafonnée"). The URL of kb serve with its defaults, changed by
 # KB_DATA_API_URL; it does not follow KB_DATA_API_PORT: set KB_DATA_API_URL too when the port of
 # kb serve changes.
@@ -106,7 +106,7 @@ MAX_ITEMS_PER_DIGEST_REQUEST = 300
 MAX_ITEMS_PER_DIGEST = 60
 MAX_FIELD_CHARS_FOR_WRITING = 2000
 
-# The classification of the items of a request (ai_api/classification.py): batches in the order
+# The classification of the items of a request (ai_api/stages/classification.py): batches in the order
 # of the reading, each of 50 items and 36,000 characters of user message at most, about 9,000
 # input tokens (#158: 46 items took about 5,500). 300 items make 6 batches, up to about 10 when
 # the titles are long. The long text of an item is cut to 500 characters: sorting needs less text

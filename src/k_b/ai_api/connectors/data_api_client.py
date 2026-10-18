@@ -16,9 +16,9 @@ from typing import Annotated, Literal
 import httpx2
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
-from k_b.ai_api.data_api_settings import DataApiSettings
+from k_b.ai_api.connectors.data_api_settings import DataApiSettings
+from k_b.ai_api.connectors.outbound import open_http_client
 from k_b.ai_api.deadline import Deadline
-from k_b.ai_api.outbound import open_http_client
 from k_b.ai_api.watch_items import (
     WATCH_KINDS,
     WatchItem,

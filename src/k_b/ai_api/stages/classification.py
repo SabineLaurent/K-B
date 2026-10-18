@@ -14,14 +14,14 @@ from dataclasses import dataclass
 import httpx2
 from pydantic import BaseModel, ConfigDict
 
-from k_b.ai_api.deadline import Deadline
-from k_b.ai_api.llm_client import (
+from k_b.ai_api.connectors.llm_client import (
     FailedCheck,
     LlmCall,
     call_model,
     encode_user_message,
 )
-from k_b.ai_api.llm_settings import LlmSettings
+from k_b.ai_api.connectors.llm_settings import LlmSettings
+from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.watch_items import WatchItem, WatchKind, cut_value, to_item_ref
 from k_b.core.config import (
     MAX_CLASSIFICATION_INPUT_CHARS,

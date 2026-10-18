@@ -5,7 +5,7 @@ import logging
 
 import pytest
 
-from k_b.ai_api.llm_settings import read_llm_settings
+from k_b.ai_api.connectors.llm_settings import read_llm_settings
 from k_b.core.config import LLM_REPLAY_BASE_URL
 
 # Made for the test: never a real key.

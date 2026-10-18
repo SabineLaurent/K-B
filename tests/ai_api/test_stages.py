@@ -9,7 +9,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from k_b.ai_api.classification import (
+from k_b.ai_api.connectors.llm_client import FAILED_CHECKS, encode_user_message
+from k_b.ai_api.stages.classification import (
     CLASSIFICATION_RETRY_REMINDERS,
     CLASSIFICATION_SYSTEM_PROMPT,
     ClassificationOutput,
@@ -17,9 +18,7 @@ from k_b.ai_api.classification import (
     build_classification_schema,
     project_for_classification,
 )
-from k_b.ai_api.llm_client import FAILED_CHECKS, encode_user_message
-from k_b.ai_api.watch_items import WatchItem, build_fields
-from k_b.ai_api.writing import (
+from k_b.ai_api.stages.writing import (
     FACT_VALUE_CHARS,
     FACTS_PER_CLAIM,
     ITEMS_PER_CLAIM,
@@ -31,6 +30,7 @@ from k_b.ai_api.writing import (
     build_writing_schema,
     project_for_writing,
 )
+from k_b.ai_api.watch_items import WatchItem, build_fields
 from k_b.core.config import (
     DIGEST_SUBJECTS,
     MAX_CLASSIFICATION_INPUT_CHARS,
