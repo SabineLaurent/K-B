@@ -20,27 +20,27 @@ from typing import Literal
 import httpx2
 from pydantic import BaseModel
 
-from k_b.ai_api.classification import (
+from k_b.ai_api.connectors.llm_client import LlmCall, LlmOutcome
+from k_b.ai_api.connectors.llm_settings import LlmSettings
+from k_b.ai_api.deadline import Deadline
+from k_b.ai_api.stages.classification import (
     CLASSIFICATION_PROMPT_VERSION,
     build_batches,
     classify_batch,
 )
-from k_b.ai_api.connectors.llm_client import LlmCall, LlmOutcome
-from k_b.ai_api.connectors.llm_settings import LlmSettings
-from k_b.ai_api.deadline import Deadline
+from k_b.ai_api.stages.writing import (
+    WRITING_PROMPT_VERSION,
+    Claim,
+    WritingOutput,
+    is_within_claim_bounds,
+    write_subject,
+)
 from k_b.ai_api.watch_items import (
     WatchItem,
     WatchKind,
     WatchReading,
     select_for_writing,
     to_item_ref,
-)
-from k_b.ai_api.writing import (
-    WRITING_PROMPT_VERSION,
-    Claim,
-    WritingOutput,
-    is_within_claim_bounds,
-    write_subject,
 )
 from k_b.core.config import DigestSubject
 

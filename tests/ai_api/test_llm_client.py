@@ -9,12 +9,12 @@ import httpx2
 import pytest
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
-from k_b.ai_api.classification import CLASSIFICATION_MAX_COMPLETION_TOKENS
 from k_b.ai_api.connectors.llm_client import FailedCheck, build_http_client, call_model
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
 from k_b.ai_api.connectors.llm_settings import LlmSettings, read_llm_settings
 from k_b.ai_api.deadline import Deadline
-from k_b.ai_api.writing import WRITING_MAX_COMPLETION_TOKENS
+from k_b.ai_api.stages.classification import CLASSIFICATION_MAX_COMPLETION_TOKENS
+from k_b.ai_api.stages.writing import WRITING_MAX_COMPLETION_TOKENS
 from k_b.core.config import (
     LLM_CALL_TIMEOUT_SECONDS,
     LLM_CONNECT_TIMEOUT_SECONDS,

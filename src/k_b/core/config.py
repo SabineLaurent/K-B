@@ -106,7 +106,7 @@ MAX_ITEMS_PER_DIGEST_REQUEST = 300
 MAX_ITEMS_PER_DIGEST = 60
 MAX_FIELD_CHARS_FOR_WRITING = 2000
 
-# The classification of the items of a request (ai_api/classification.py): batches in the order
+# The classification of the items of a request (ai_api/stages/classification.py): batches in the order
 # of the reading, each of 50 items and 36,000 characters of user message at most, about 9,000
 # input tokens (#158: 46 items took about 5,500). 300 items make 6 batches, up to about 10 when
 # the titles are long. The long text of an item is cut to 500 characters: sorting needs less text
