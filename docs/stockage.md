@@ -17,16 +17,23 @@ une limite près : après un catalogue CISA importé en retard, les dates d'une 
 [specs-collecte.md](specs-collecte.md)). `kb import` n'importe que les fichiers bruts pas encore
 importés : leur registre est la table `raw_data`.
 Elle ne contient que ce que le brut contient (les papiers arXiv écartés à la requête n'y sont pas).
-Ce qui la lira (les commandes `kb search` et `kb top`, une API REST locale) est décidé et pas
-encore codé (journal ADR, 2026-10-08 et 2026-10-09).
+Elle est lue par l'API de données, lancée par `kb serve` ([specs-api.md](specs-api.md)) : routes
+`/items`, `/items/{item_id}` et `/trends` (`src/k_b/data_api/routers/item_router.py`,
+`trend_router.py`), qui ouvrent la base en lecture seule (`src/k_b/data_api/dependencies.py`,
+`connect_database_read_only`). Le code des fiches de veille (`src/k_b/ai_api/`) n'ouvre pas la
+base : il lit la veille par l'API de données (`src/k_b/ai_api/connectors/data_api_client.py`), et n'est
+pas encore servi (#156). `kb search` vient après le 08/11 (journal ADR, 2026-10-15, « POC du
+25/10 », décision 1).
 
-## Le SGBD : SQLite
+## Le SGBD : SQLite au POC du 25/10, PostgreSQL au 08/11
 
-Retenu : **SQLite**, un fichier dans le dossier de données, hors du dépôt, lu avec le module
-`sqlite3` de la bibliothèque standard. Le dossier de données est donné par la variable
-`KB_DATA_DIR` ; le journal ADR du 2026-10-09 le fixe à `~/.knowledge_base`.
+Retenu au POC du 25/10 : **SQLite**, un fichier hors du dépôt, lu avec le module `sqlite3` de
+la bibliothèque standard. En local, il est dans le dossier de données, donné par la variable
+`KB_DATA_DIR`, que le journal ADR du 2026-10-09 fixe à `~/.knowledge_base`. Dans les conteneurs
+du POC, il sera dans un volume nommé (journal ADR, 2026-10-15, « POC du 25/10 », décision 2 ;
+#200).
 
-| | SQLite (retenu) | PostgreSQL (écarté pour l'instant) |
+| | SQLite (au POC du 25/10) | PostgreSQL (prévu au 08/11) |
 |---|---|---|
 | Installation | aucune : un fichier, rejouable par un tiers | un serveur à installer, lancer et sécuriser |
 | Écritures | une à la fois ; ici un seul écrivain, le pipeline | plusieurs en parallèle (MVCC) |
@@ -35,10 +42,12 @@ Retenu : **SQLite**, un fichier dans le dossier de données, hors du dépôt, lu
 | Typage | souple par défaut ; strict avec les tables `STRICT` | strict |
 | Dépendance | aucune | un pilote (`psycopg`) |
 
-Pourquoi : un utilisateur, un écrivain par jour, quelques milliers d'items par an. Le besoin
-est local et léger : un serveur n'apporterait que de la charge. Limite assumée : pas de rôles
-dans la base. Une migration vers PostgreSQL reste possible si le besoin change (plusieurs
-écrivains, accès distant) ; ce qui est propre à SQLite est listé plus bas.
+Pourquoi SQLite au POC du 25/10 : un utilisateur, un écrivain par jour, quelques milliers
+d'items par an ; en localhost, un fichier suffit. Limite assumée : pas de rôles dans la base.
+Pourquoi PostgreSQL au 08/11 : sur Azure Container Apps, un fichier SQLite n'a pas de disque
+fiable (journal ADR, 2026-10-15, « POC du 25/10 », décision 2). D'ici là, aucun SQL propre à
+SQLite n'est ajouté (règle 1 de `.claude/rules/poc.md`) ; ce qui l'est déjà est listé plus bas,
+avec son équivalent PostgreSQL.
 
 ## Spécifications de stockage
 
@@ -47,8 +56,8 @@ dans la base. Une migration vers PostgreSQL reste possible si le besoin change (
   l'exécutent à chaque ouverture.
 - **Mode WAL** (`PRAGMA journal_mode = WAL`, gardé dans le fichier) : le pipeline écrit pendant
   que l'API lit, sans se bloquer. Tous les programmes tournent sur la même machine.
-- **Lecture seule** : `connect_database_read_only` ouvre la base en `mode=ro`, pour ses lecteurs
-  à venir (l'API de données, `kb search`). Une lecture en `mode=ro` crée les fichiers `-shm`
+- **Lecture seule** : `connect_database_read_only` ouvre la base en `mode=ro`, pour l'API de
+  données. Une lecture en `mode=ro` crée les fichiers `-shm`
   et `-wal` s'ils manquent, dans le dossier de la base, et les laisse à sa fermeture
   (documentation SQLite, WAL, § 5 ; constat sur SQLite 3.50.4).
 - **Dates** : du texte `AAAA-MM-JJTHH:MM:SSZ`, en UTC. Un `CHECK` refuse toute autre forme, et

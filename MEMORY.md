@@ -42,6 +42,13 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   page reçue qui n'est pas une édition est écrite telle quelle, puis refusée à chaque import ;
   écart à la règle 1 de `conventions.md` (`src/k_b/etl/sources/tldr.py`, `fetch`). Écrit dans
   `docs/specs-collecte.md`, non tranché.
+- **Le README annonce des métriques « en OpenTelemetry, gardées sur ma machine »** (« Étape 2 »,
+  constat de la revue de #5, le 2026-10-18, sans issue) : contredit l'ADR du 15/10 (décision 8),
+  la règle 4 de `poc.md` (une ligne JSON par appel sur stdout) et l'observabilité dans le cloud
+  seulement (Sabine, 15/10). Périmètre de la v0, non corrigé.
+- **La ligne « Sécurité » du registre** (fiche 1 : fichiers lisibles par la seule utilisatrice)
+  devient fausse quand la base passe dans un volume Docker (#200), puis sur Azure au 08/11 : la PR
+  qui change l'hébergement la met à jour (revue de #5, le 2026-10-18).
 
 ## Interface
 
