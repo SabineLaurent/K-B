@@ -14,8 +14,12 @@ from typing import Literal
 
 from pydantic import SecretStr
 
-from k_b.ai_api.llm_replay import InvalidReplayFileError, ReplayStep, read_replay_steps
-from k_b.ai_api.outbound import find_url_refusal
+from k_b.ai_api.connectors.llm_replay import (
+    InvalidReplayFileError,
+    ReplayStep,
+    read_replay_steps,
+)
+from k_b.ai_api.connectors.outbound import find_url_refusal
 from k_b.core.config import LLM_REASONING_EFFORT, LLM_REPLAY_BASE_URL
 from k_b.core.quoting import quote_value
 

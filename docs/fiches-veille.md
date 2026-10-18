@@ -670,12 +670,12 @@ une règle de plus.
 
 ### Échecs du juge
 
-`FailedCheck` (`ai_api/llm_client.py`) gagne **une** valeur, `claim_id`. Le juge réutilise
+`FailedCheck` (`ai_api/connectors/llm_client.py`) gagne **une** valeur, `claim_id`. Le juge réutilise
 `content_filter` et `finish_reason` (contrôle 1), `schema` (contrôle 2) et `completeness`
 (contrôle 5, une affirmation jugée deux fois, comme un item présent deux fois au classement).
 
 **Effet sur #205** : `call_model` lève `ValueError` s'il manque un rappel pour une valeur de
-`FailedCheck`, avant tout appel payé (`ai_api/llm_client.py:200-202`). Le classement et la
+`FailedCheck`, avant tout appel payé (`ai_api/connectors/llm_client.py:213-215`). Le classement et la
 rédaction écrivent donc un rappel pour `claim_id`, et le juge un rappel pour `subject`, `item_id`
 et `markup`. Ces rappels ne sont jamais envoyés, car leur contrôle ne s'applique pas à l'étape :
 limite assumée ; changer `call_model` pour n'exiger que les contrôles d'une étape est hors de ce
@@ -706,7 +706,7 @@ fournisseur est actif ; il se code après #158 (journal ADR, « Fiches de veille
 dont #223 dépend. Exigence pour #223 : un garde-fou qui n'appelle pas le juge tant qu'un repli
 de fournisseur est actif, vérifié avant l'appel ; on ne peut pas compter sur l'échec de l'appel,
 car le corps de la requête, items compris, part avant toute réponse d'erreur
-(`ai_api/llm_client.py`, `call_model` puis `send_and_check`). Le repli de **déploiement** décidé le
+(`ai_api/connectors/llm_client.py`, `call_model` puis `send_and_check`). Le repli de **déploiement** décidé le
 2026-10-16 (ci-dessous) reste permis : il garde le même fournisseur et la même zone. Le `replay`
 aussi : il n'envoie rien. Cette condition ne lie pas la spec à un fournisseur (« Le parcours d'une
 demande ») : elle dit quand le juge peut envoyer, pas à qui.
@@ -722,7 +722,7 @@ besoin mesuré.
 
 - **En `replay`**, la variable est exigée aussi et validée comme un nom de modèle, mais elle n'est
   envoyée nulle part ; le `model` de la métrique du juge vaut `replay`, comme celui du rédacteur.
-  Asymétrie assumée : en `replay`, `KB_LLM_MODEL` n'est pas lue (`ai_api/llm_settings.py`) ;
+  Asymétrie assumée : en `replay`, `KB_LLM_MODEL` n'est pas lue (`ai_api/connectors/llm_settings.py`) ;
   exiger celle du juge fait échouer fermé une configuration testée en `replay` comme en vrai.
 - **Cible** : en phases 1 et 2, `gpt-6-luna`, le même déploiement que le rédacteur ; le juge
   définitif se choisit en phase 3 (fiabilité des LLM et de leurs sorties) ; candidats d'autres

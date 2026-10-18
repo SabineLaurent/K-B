@@ -5,7 +5,7 @@ import json
 import httpx2
 import pytest
 
-from k_b.ai_api.llm_replay import (
+from k_b.ai_api.connectors.llm_replay import (
     InvalidReplayFileError,
     ReplayExhaustedError,
     ReplayTransport,

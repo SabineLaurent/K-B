@@ -17,7 +17,7 @@ from k_b.ai_api.classification import (
     build_classification_schema,
     project_for_classification,
 )
-from k_b.ai_api.llm_client import FAILED_CHECKS, encode_user_message
+from k_b.ai_api.connectors.llm_client import FAILED_CHECKS, encode_user_message
 from k_b.ai_api.watch_items import WatchItem, build_fields
 from k_b.ai_api.writing import (
     FACT_VALUE_CHARS,

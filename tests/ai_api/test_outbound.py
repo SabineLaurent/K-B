@@ -3,7 +3,7 @@
 import httpx2
 import pytest
 
-from k_b.ai_api.outbound import find_url_refusal, open_http_client
+from k_b.ai_api.connectors.outbound import find_url_refusal, open_http_client
 
 VARIABLE = "KB_TEST_URL"
 

@@ -25,9 +25,9 @@ from k_b.ai_api.classification import (
     build_batches,
     classify_batch,
 )
+from k_b.ai_api.connectors.llm_client import LlmCall, LlmOutcome
+from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
-from k_b.ai_api.llm_client import LlmCall, LlmOutcome
-from k_b.ai_api.llm_settings import LlmSettings
 from k_b.ai_api.watch_items import (
     WatchItem,
     WatchKind,

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from pydantic import SecretStr
 
-from k_b.ai_api.outbound import find_url_refusal
+from k_b.ai_api.connectors.outbound import find_url_refusal
 from k_b.core.config import API_KEY_CHARACTERS, DATA_API_URL, MIN_API_KEY_LENGTH
 
 logger = logging.getLogger(__name__)

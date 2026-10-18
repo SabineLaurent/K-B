@@ -12,9 +12,13 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from k_b.ai_api import data_api_client
-from k_b.ai_api.data_api_client import DataApiError, build_data_api_client, read_watch
-from k_b.ai_api.data_api_settings import DataApiSettings
+from k_b.ai_api.connectors import data_api_client
+from k_b.ai_api.connectors.data_api_client import (
+    DataApiError,
+    build_data_api_client,
+    read_watch,
+)
+from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.watch_items import WATCH_KINDS, NewsletterArticleFields, PaperFields
 from k_b.core.config import (
