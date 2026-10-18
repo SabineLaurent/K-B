@@ -5,7 +5,8 @@ The registry of the files already imported is raw_data, read before the raw. The
 their items and the log of the import are then written in one transaction. Each item, and each
 ranking, is written in its savepoint (database/savepoint.py): an entry the base refuses is
 undone alone and becomes a rejection of the log, and the import goes on. Any other error writes
-nothing in the base, and leaves no log. A file registered is not read again, except by a
+nothing in the base, and leaves no log; an interruption (Ctrl-C, SIGTERM) received once the base
+has committed keeps the import and its log. A file registered is not read again, except by a
 rebuild of the base.
 
 The base removes the duplicates. The writer of each kind (database/writers/) holds, in its
@@ -27,6 +28,7 @@ Zotero, another key, though two entries of the same arXiv paper point to the sam
 docs/specs-collecte.md).
 """
 
+import logging
 import sqlite3
 from collections.abc import Callable, Sequence
 from datetime import datetime
@@ -62,6 +64,8 @@ from k_b.etl.transform import (
     reject,
 )
 from k_b.items import Item
+
+logger = logging.getLogger(__name__)
 
 
 class ImportLogExistsError(FileExistsError):
@@ -204,7 +208,8 @@ def commit_with_log(
     """Write the log, then commit.
 
     The log is written before the commit: a file registered is not read again, its log must
-    not be lost. A commit that fails, or an interruption, removes the log written.
+    not be lost. A commit that fails, or an interruption before the commit, removes the log
+    written; an interruption once the base has committed keeps it.
     """
     # Checked once the base holds the write lock: two imports of the same second cannot both
     # find no log.
@@ -218,9 +223,17 @@ def commit_with_log(
             writing.trend_discards,
         )
         connection.commit()
-    except BaseException:
-        # The log at log_path can only be this import's: it was absent above.
-        log_path.unlink(missing_ok=True)
+    except BaseException as error:
+        # The log goes with the import it describes. A commit that fails raises a sqlite3.Error,
+        # whether SQLite keeps the transaction or undoes it itself. A Ctrl-C or a SIGTERM
+        # received before the commit finds the transaction open; one received during the commit
+        # is raised by Python once the commit has returned, with no transaction left.
+        if isinstance(error, sqlite3.Error) or connection.in_transaction:
+            # The log at log_path can only be this import's: it was absent above.
+            log_path.unlink(missing_ok=True)
+        else:
+            # The name, not the path: quote_value cuts a long path before the name.
+            logger.info("import committed, log kept: %s", quote_value(log_path.name))
         raise
 
 

@@ -131,9 +131,12 @@ Avec le jeton rangé dans le `.env` à la racine du dépôt, ignoré par git :
 
 `kb collect` affiche une ligne par source (`ok` ou `failed`, avec le type de l'erreur ; `skipped`
 pour Zotero sans `KB_ZOTERO_DIR`, les clips sans `KB_VAULT_DIR`). Code de
-sortie : 0 si tout a réussi, 1 si au moins une source a échoué ou si l'état de collecte n'a pas
-pu être écrit, 2 si `KB_DATA_DIR` manque, n'est pas un dossier existant, ou si l'état de collecte
-est illisible.
+sortie : 0 si tout a réussi ; 4 si au moins une source a réussi et au moins une a échoué, l'état
+de collecte écrit ; 1 si aucune source lancée n'a réussi ou si l'état de collecte n'a pas pu être
+écrit ; 2 si `KB_DATA_DIR` manque, n'est pas un dossier existant, ou si l'état de collecte est
+illisible ; 143 si `kb collect` reçoit SIGTERM (`docker stop`) : ce qui a été fait avant le
+signal est gardé ; reçu avant l'écriture de l'état de collecte, il laisse l'état inchangé, et la
+collecte suivante repart des mêmes dates.
 
 **Importer le brut dans la base** (après une collecte) :
 
@@ -156,7 +159,12 @@ sortie :
 - 1 : l'import a échoué. Il n'écrit rien, ni dans la base ni au journal : le journal est écrit
   avant la validation de la base ;
 - 2 : `KB_DATA_DIR` manque, la base n'existe pas (`kb create-db`), ou le journal de cette
-  seconde existe déjà (relancer `kb import`).
+  seconde existe déjà (relancer `kb import`) ;
+- 143 : `kb import` a reçu SIGTERM (`docker stop`). Reçu avant la validation de la base, il
+  n'écrit rien, comme pour 1, ni dans la base ni au journal ; reçu pendant ou après, l'import est
+  gardé, avec son journal.
+
+Les codes de toutes les commandes et leur sens sont listés par `uv run kb --help`.
 
 **Lancer l'API** (la liste des items, en lecture seule, sur la machine ; voir
 [docs/specs-api.md](docs/specs-api.md)) :

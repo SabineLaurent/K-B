@@ -3,9 +3,12 @@ the hosts allowed, the log of the API, the OpenAPI written without data director
 
 import os
 import secrets
+import signal
+import sys
 from pathlib import Path
 
 import pytest
+import uvicorn.config
 from fastapi.testclient import TestClient
 
 from k_b import cli
@@ -339,3 +342,24 @@ def test_openapi_writes_nothing_outside_the_root_of_the_repository(
         in capsys.readouterr().err
     )
     assert list(tmp_path.iterdir()) == []
+
+
+def test_serve_exits_with_the_code_of_uvicorn_when_it_does_not_start_and_sets_no_sigterm_handler(
+    monkeypatch, data_dir
+):
+    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    sigterm_handlers = []
+
+    def fail_to_start(app, **options):
+        # uvicorn sets its own SIGTERM handler: kb serve leaves it the one it found.
+        sigterm_handlers.append(signal.getsignal(signal.SIGTERM))
+        sys.exit(uvicorn.config.STARTUP_FAILURE)
+
+    monkeypatch.setattr(cli.uvicorn, "run", fail_to_start)
+    handler_before = signal.getsignal(signal.SIGTERM)
+
+    with pytest.raises(SystemExit) as stop:
+        cli.main(["serve"])
+
+    assert stop.value.code == cli.ExitCode.SERVER_NOT_STARTED
+    assert sigterm_handlers == [handler_before]

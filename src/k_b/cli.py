@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import signal
 import sqlite3
 import sys
 import time
@@ -13,8 +14,11 @@ from collections.abc import Iterator, Mapping
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import IntEnum
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
+from types import FrameType
+from typing import Self
 
 import uvicorn
 from pydantic import SecretStr
@@ -34,7 +38,7 @@ from k_b.database.connection import DATABASE_FILE_NAME, MissingDatabaseError
 from k_b.database.creation import create_database
 from k_b.database.dates import DATABASE_DATE_FORMAT
 from k_b.database.writers.shared_rows import UnknownSourceError
-from k_b.etl.extract import collect_all_sources
+from k_b.etl.extract import CollectionOutcome, collect_all_sources
 from k_b.etl.load import (
     ImportLogExistsError,
     KindWithoutTableError,
@@ -58,6 +62,50 @@ from k_b.etl.sources.zotero import ZoteroSource
 from k_b.etl.transform import COLLECTION_NAME_FORMAT, read_raw_items
 
 logger = logging.getLogger(__name__)
+
+
+class ExitCode(IntEnum):
+    """The code kb exits with, for who runs it: by hand, or as a job in a container, where the
+    code is the only way to know what kb did without reading its log. Listed by kb --help."""
+
+    meaning: str
+
+    def __new__(cls, value: int, meaning: str) -> Self:
+        member = int.__new__(cls, value)
+        member._value_ = value
+        member.meaning = meaning
+        return member
+
+    SUCCEEDED = 0, "the command succeeded"
+    FAILED = (
+        1,
+        "the command ran and failed; kb collect: no source collected, or state not written",
+    )
+    NOT_STARTED = 2, "nothing was run: a setting, a file or the command line is refused"
+    # Not returned by kb: uvicorn exits with it (STARTUP_FAILURE, uvicorn/config.py). Named here
+    # so that no other code takes its value.
+    SERVER_NOT_STARTED = 3, "kb serve: the server did not start"
+    # 4: the first value after the one of uvicorn.
+    PARTIAL_FAILURE = (
+        4,
+        "kb collect: at least one source collected, at least one failed, state written",
+    )
+    # 128 + 15, the code of a process stopped by SIGTERM.
+    STOPPED_BY_SIGTERM = (
+        143,
+        "kb collect, kb import: stopped by SIGTERM; what was done before it is kept",
+    )
+
+
+class StoppedBySigtermError(SystemExit):
+    """SIGTERM received by kb collect or kb import: docker stop sends it before SIGKILL."""
+
+    def __init__(self) -> None:
+        super().__init__(ExitCode.STOPPED_BY_SIGTERM)
+
+
+# The commands that stop on SIGTERM; kb serve keeps the handler of uvicorn.
+COMMANDS_STOPPED_BY_SIGTERM = frozenset({"collect", "import"})
 
 DATA_DIR_VARIABLE = "KB_DATA_DIR"
 # The Zotero data directory, the one that holds zotero.sqlite. Not set: Zotero is skipped.
@@ -147,7 +195,12 @@ def logging_to(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="kb")
+    parser = argparse.ArgumentParser(
+        prog="kb",
+        epilog=describe_exit_codes(),
+        # Keeps the lines of the epilog: the default formatter joins them.
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser(
         "collect", help="run every source and store its raw output in raw/"
@@ -175,7 +228,7 @@ def main(argv: list[str] | None = None) -> int:
     data_dir = read_data_dir()
     log_to_file = read_log_to_file()
     if data_dir is None or log_to_file is None:
-        return 2
+        return ExitCode.NOT_STARTED
     log_file_path = None
     if log_to_file:
         log_file_path = (
@@ -190,14 +243,52 @@ def main(argv: list[str] | None = None) -> int:
                 f"error: log file not opened: {type(error).__name__}: {error}",
                 file=sys.stderr,
             )
-            return 2
+            return ExitCode.NOT_STARTED
         try:
-            return run_command(arguments.command, data_dir)
+            with stopping_on_sigterm(arguments.command):
+                return run_command(arguments.command, data_dir)
+        except StoppedBySigtermError:
+            # Caught once the import or the collection has cleaned up on its way out.
+            logger.error("kb stopped by SIGTERM")
+            return ExitCode.STOPPED_BY_SIGTERM
         except Exception:
             # Logged here, while the log file is open, and not raised again: Python would print
             # its traceback a second time. 1, as Python exits on an exception: kb was run.
             logger.exception("kb stopped by an exception it does not handle")
-            return 1
+            return ExitCode.FAILED
+
+
+def describe_exit_codes() -> str:
+    lines = [f"  {code.value:>3}  {code.meaning}" for code in ExitCode]
+    return "exit codes:\n" + "\n".join(lines)
+
+
+@contextmanager
+def stopping_on_sigterm(command: str) -> Iterator[None]:
+    """For kb collect and kb import, turn SIGTERM into StoppedBySigtermError, a SystemExit: the
+    import is undone and its log removed, the temporary files are removed, as on any exception.
+    A SIGTERM received during the commit of the import is raised once the commit has returned:
+    the import and its log are kept (etl/load.py, commit_with_log). The handler found is set
+    back on exit.
+    Called from the main thread only: Python sets a signal handler nowhere else."""
+    if command not in COMMANDS_STOPPED_BY_SIGTERM:
+        yield
+        return
+    previous_handler = signal.signal(signal.SIGTERM, raise_stopped_by_sigterm)
+    try:
+        yield
+    finally:
+        # None: a handler not set from Python, which signal.signal refuses.
+        signal.signal(
+            signal.SIGTERM,
+            signal.SIG_DFL if previous_handler is None else previous_handler,
+        )
+
+
+def raise_stopped_by_sigterm(signal_number: int, frame: FrameType | None) -> None:
+    # A second SIGTERM would stop the clean-up; Docker sends SIGKILL after its delay anyway.
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    raise StoppedBySigtermError
 
 
 def run_command(command: str, data_dir: Path) -> int:
@@ -248,12 +339,12 @@ def run_create_db(data_dir: Path) -> int:
         create_database(database_path)
     except FileExistsError as error:
         logger.error("%s", error)
-        return 2
+        return ExitCode.NOT_STARTED
     except (sqlite3.Error, OSError) as error:
         logger.error("%s: %s: %s", database_path, type(error).__name__, error)
-        return 1
+        return ExitCode.FAILED
     print(f"database created: {database_path}")
-    return 0
+    return ExitCode.SUCCEEDED
 
 
 def run_import(data_dir: Path) -> int:
@@ -278,10 +369,10 @@ def run_import(data_dir: Path) -> int:
         )
     except MissingDatabaseError as error:
         logger.error("%s; create it with kb create-db", error)
-        return 2
+        return ExitCode.NOT_STARTED
     except ImportLogExistsError as error:
         logger.error("%s; run kb import again", error)
-        return 2
+        return ExitCode.NOT_STARTED
     except (
         sqlite3.Error,
         OSError,
@@ -289,7 +380,7 @@ def run_import(data_dir: Path) -> int:
         KindWithoutTableError,
     ) as error:
         logger.error("%s: %s", type(error).__name__, error)
-        return 1
+        return ExitCode.FAILED
     print(f"raw files read: {summary.read_count}")
     print(f"items written (new or updated): {summary.item_count}")
     print(f"trend rows written: {summary.trend_count}")
@@ -303,7 +394,7 @@ def run_import(data_dir: Path) -> int:
     )
     print(f"rejections: {summary.rejection_count}")
     print(f"log: {log_path}")
-    return 0
+    return ExitCode.SUCCEEDED
 
 
 def run_collect(data_dir: Path) -> int:
@@ -326,7 +417,7 @@ def run_collect(data_dir: Path) -> int:
         )
     except InvalidCollectionStateError as error:
         logger.error("%s", error)
-        return 2
+        return ExitCode.NOT_STARTED
     for source_name, source_error in outcome.errors_by_source.items():
         print(f"{source_name}: {describe_outcome(source_error)}")
     if not zotero_dir:
@@ -337,10 +428,20 @@ def run_collect(data_dir: Path) -> int:
         print(f"{GH_ARCHIVE_SOURCE_NAME}: skipped ({BIGQUERY_KEY_VARIABLE} not set)")
     if outcome.state_error is not None:
         print(f"collection_state: {describe_outcome(outcome.state_error)}")
-    has_failure = outcome.state_error is not None or any(
-        error is not None for error in outcome.errors_by_source.values()
-    )
-    return 1 if has_failure else 0
+    return find_collection_exit_code(outcome)
+
+
+def find_collection_exit_code(outcome: CollectionOutcome) -> ExitCode:
+    """Partial when some sources failed and the others are kept for good; a state not written
+    is a failure, as when every source fails: the next collection starts from the same dates."""
+    errors = outcome.errors_by_source.values()
+    if outcome.state_error is not None:
+        return ExitCode.FAILED
+    if all(error is None for error in errors):
+        return ExitCode.SUCCEEDED
+    if any(error is None for error in errors):
+        return ExitCode.PARTIAL_FAILURE
+    return ExitCode.FAILED
 
 
 def describe_outcome(error: Exception | None) -> str:
@@ -360,7 +461,7 @@ def run_serve(data_dir: Path) -> int:
     api_keys = read_api_keys(os.environ)
     settings = read_serve_settings(os.environ)
     if api_keys is None or settings is None:
-        return 2
+        return ExitCode.NOT_STARTED
     logger.info("API clients loaded: %s", ", ".join(sorted(api_keys)))
     logger.info("API allowed hosts: %s", ", ".join(settings.allowed_hosts))
     uvicorn.run(
@@ -374,7 +475,7 @@ def run_serve(data_dir: Path) -> int:
         log_config=None,
         access_log=False,
     )
-    return 0
+    return ExitCode.SUCCEEDED
 
 
 def read_serve_settings(environ: Mapping[str, str]) -> ServeSettings | None:
@@ -495,7 +596,7 @@ def run_openapi() -> int:
             " run kb openapi at the root of the repository",
             file=sys.stderr,
         )
-        return 2
+        return ExitCode.NOT_STARTED
     # The app is made without base nor key: its document does not depend on them.
     openapi = create_app(Path(DATABASE_FILE_NAME), {}).openapi()
     content = json.dumps(openapi, indent=2, ensure_ascii=False) + "\n"
@@ -506,6 +607,6 @@ def run_openapi() -> int:
             f"error: {OPENAPI_PATH} not written: {type(error).__name__}",
             file=sys.stderr,
         )
-        return 1
+        return ExitCode.FAILED
     print(f"OpenAPI written: {OPENAPI_PATH}")
-    return 0
+    return ExitCode.SUCCEEDED
