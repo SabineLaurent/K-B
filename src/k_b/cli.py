@@ -38,25 +38,25 @@ def main(argv: list[str] | None = None) -> int:
         # Keeps the lines of the epilog: the default formatter joins them.
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser(
+    command_parsers = parser.add_subparsers(dest="command", required=True)
+    command_parsers.add_parser(
         "collect",
         help=f"run every source, or the ones of {COLLECT_ONLY_VARIABLE}, and store its raw"
         " output in raw/",
     )
-    commands.add_parser(
+    command_parsers.add_parser(
         "create-db", help=f"create the items database, {DATABASE_FILE_NAME}"
     )
-    commands.add_parser(
+    command_parsers.add_parser(
         "import",
         help="read the raw items and write them into the database, which removes the duplicates",
     )
-    commands.add_parser(
+    command_parsers.add_parser(
         "serve",
         help="serve the database, read only, on"
         f" http://{DATA_API_HOST}:{DATA_API_PORT} by default",
     )
-    commands.add_parser(
+    command_parsers.add_parser(
         "openapi", help=f"write the OpenAPI of the data API in {OPENAPI_PATH}"
     )
     arguments = parser.parse_args(argv)
