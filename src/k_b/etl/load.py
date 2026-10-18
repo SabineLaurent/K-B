@@ -278,8 +278,8 @@ def write_items_file(
     raw_file: RawFile,
     tracked_repositories: Sequence[TrackedRepository],
 ) -> FileWriting:
-    """Register the file read, write each of its items, then withdraw what its catalog no
-    longer lists.
+    """Register the file read, write each of its items, then mark as withdrawn what its
+    catalog no longer lists.
 
     The file is registered even with an item the base refuses, as with an entry rejected when
     read: only a rebuild of the base reads it again.
@@ -296,9 +296,9 @@ def write_items_file(
     counted_file = raw_file._replace(
         rejection_count=raw_file.rejection_count + len(refusals)
     )
-    withdrawn_count = withdraw_absent_vulnerabilities(
+    withdrawn_count = mark_withdrawn_vulnerabilities(
         connection, counted_file, raw_data_id
-    ) + withdraw_absent_zotero_rows(connection, counted_file, raw_data_id)
+    ) + mark_withdrawn_zotero_rows(connection, counted_file, raw_data_id)
     return FileWriting(
         item_count=outcomes.count(None),
         discards=discards,
@@ -381,10 +381,11 @@ def write_trend_file(
     )
 
 
-def withdraw_absent_vulnerabilities(
+def mark_withdrawn_vulnerabilities(
     connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
 ) -> int:
-    """Withdraw the CVE a catalog no longer lists (vulnerability_writer.py); return how many.
+    """Mark as withdrawn the CVE a catalog no longer lists (vulnerability_writer.py);
+    return how many.
 
     Only a file of vulnerabilities, all of its entries read: a rejected row is in the catalog,
     not absent from it.
@@ -405,10 +406,10 @@ def withdraw_absent_vulnerabilities(
     )
 
 
-def withdraw_absent_zotero_rows(
+def mark_withdrawn_zotero_rows(
     connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
 ) -> int:
-    """Withdraw the entries and the highlights an extract no longer lists
+    """Mark as withdrawn the entries and the highlights an extract no longer lists
     (zotero_entry_writer.py); return how many.
 
     The same conditions as for a catalog of CISA KEV: an extract with a rejected entry, or

@@ -41,7 +41,7 @@ def test_a_cisa_kev_withdrawal_without_cve_withdraws_nothing(connection):
         LATER_COLLECTED_AT,
     )
 
-    withdrawn_count = vulnerability_writer.withdraw_absent(
+    withdrawn_count = vulnerability_writer.mark_withdrawn(
         connection, "cisa_kev", LATER_COLLECTED_AT, later_raw_data_id, []
     )
 
@@ -65,7 +65,7 @@ def test_a_zotero_withdrawal_without_entry_withdraws_nothing(connection):
         LATER_COLLECTED_AT,
     )
 
-    withdrawn_count = zotero_entry_writer.withdraw_absent(
+    withdrawn_count = zotero_entry_writer.mark_withdrawn(
         connection, "zotero", LATER_COLLECTED_AT, later_raw_data_id, []
     )
 
