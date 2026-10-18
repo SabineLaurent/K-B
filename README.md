@@ -190,8 +190,8 @@ uv sync
 **Créer la base** (une fois) :
 
 ```sh
-mkdir -p ~/K-B-data
-KB_DATA_DIR=~/K-B-data uv run kb create-db
+mkdir -p ~/.knowledge_base
+KB_DATA_DIR=~/.knowledge_base uv run kb create-db
 ```
 
 `kb create-db` crée `<KB_DATA_DIR>/k-b.sqlite` : les tables, les 7 sources, le mode WAL. Code de
@@ -206,11 +206,11 @@ sortie :
 **Lancer une collecte** (une par jour, voir [docs/specs-collecte.md](docs/specs-collecte.md)) :
 
 ```sh
-KB_DATA_DIR=~/K-B-data uv run kb collect
+KB_DATA_DIR=~/.knowledge_base uv run kb collect
 ```
 
 Avec le jeton rangé dans le `.env` à la racine du dépôt, ignoré par git :
-`KB_DATA_DIR=~/K-B-data uv run --env-file .env kb collect`.
+`KB_DATA_DIR=~/.knowledge_base uv run --env-file .env kb collect`.
 
 `kb collect` affiche une ligne par source (`ok` ou `failed`, avec le type de l'erreur ; `skipped`
 pour Zotero sans `KB_ZOTERO_DIR`, les clips sans `KB_VAULT_DIR`, GH Archive sans
@@ -225,7 +225,7 @@ inchangé, et la collecte suivante repart des mêmes dates.
 **Importer le brut dans la base** (après une collecte) :
 
 ```sh
-KB_DATA_DIR=~/K-B-data uv run kb import
+KB_DATA_DIR=~/.knowledge_base uv run kb import
 ```
 
 `kb import` lit les fichiers de `<KB_DATA_DIR>/raw/automated_watch/` et de
@@ -266,7 +266,7 @@ Les codes de toutes les commandes et leur sens sont listés par `uv run kb --hel
    et les hôtes permis : `docs/specs-api.md`, « Règles communes ») :
 
    ```sh
-   KB_DATA_DIR=~/K-B-data uv run --env-file .env kb serve
+   KB_DATA_DIR=~/.knowledge_base uv run --env-file .env kb serve
    ```
 
 3. L'appeler avec la clé :
@@ -303,7 +303,7 @@ Limites :
 serveur :
 
 ```sh
-sqlite3 -readonly ~/K-B-data/k-b.sqlite "SELECT kind, count(*) FROM item GROUP BY kind"
+sqlite3 -readonly ~/.knowledge_base/k-b.sqlite "SELECT kind, count(*) FROM item GROUP BY kind"
 ```
 
 **Lancer les tests** :
