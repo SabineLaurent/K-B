@@ -237,6 +237,15 @@ def test_the_modules_of_a_sub_folder_of_a_package_are_listed():
     )
 
 
+# Every __init__.py stays empty, those of a package created later included (code.md,
+# "Séparation des responsabilités"; #251): a package gathers its modules, it never re-exports them.
+def test_every_package_of_k_b_has_an_empty_init():
+    paths = sorted(PACKAGE_DIR.rglob("__init__.py"))
+
+    assert paths
+    assert [path for path in paths if path.read_text() != ""] == []
+
+
 def test_core_imports_nothing_of_k_b():
     for path in list_python_files("core"):
         imported = list_imported_modules(path, find_package(path))
@@ -297,19 +306,13 @@ def test_the_data_api_rule_refuses_etl_and_the_writers(code, is_refused):
     assert bool(list_forbidden_imports_of_the_data_api(imported)) is is_refused
 
 
-# api_router.py gathers the routers; the app plugs in it alone, and routers/__init__.py stays
-# empty (code.md, "Séparation des responsabilités"; #246).
+# api_router.py gathers the routers; the app plugs in it alone (code.md, "Séparation des
+# responsabilités"; #246).
 def test_the_app_of_the_data_api_imports_no_router():
     path = PACKAGE_DIR / "data_api" / "app.py"
     imported = list_imported_modules(path, find_package(path), depth=3)
 
     assert {name for name in imported if is_within(name, {"data_api.routers"})} == set()
-
-
-def test_the_package_of_the_routers_is_empty():
-    path = PACKAGE_DIR / "data_api" / "routers" / "__init__.py"
-
-    assert path.read_text() == ""
 
 
 # The AI API reads the watch through the data API, never the base (docs/fiches-veille.md, "Le
@@ -398,14 +401,6 @@ def test_a_module_of_ai_api_imports_only_the_layers_below_its_own():
         assert (
             list_upward_imports_of_the_ai_api(name_module(path), imported) == set()
         ), path
-
-
-def test_the_packages_of_ai_api_import_nothing_of_ai_api():
-    for path in list_python_files("ai_api"):
-        if path.name != "__init__.py":
-            continue
-        imported = list_imported_modules(path, find_package(path), depth=3)
-        assert {name for name in imported if is_within(name, {"ai_api"})} == set(), path
 
 
 @pytest.mark.parametrize(
