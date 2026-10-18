@@ -93,8 +93,8 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
   bout de l'écriture en base.
 
 **Vérifier.**
-- `grep -nE "asctime|gmtime|DATABASE_DATE_FORMAT" src/k_b/cli.py` renvoie le format des
-  journaux, l'horloge UTC et le format de date de la base.
+- `grep -nE "asctime|gmtime|DATABASE_DATE_FORMAT" src/k_b/commands/run_log.py` renvoie le format
+  des journaux, l'horloge UTC et le format de date de la base.
 - `uv run pytest tests/test_cli.py -k log_line` : une ligne émise est datée en UTC avec sa zone,
   sur la sortie d'erreur et, pour une erreur, dans le fichier, au même format.
 - `grep -rniE "may be|maybe|probably|perhaps" src/k_b` ne renvoie rien.
@@ -139,9 +139,9 @@ statu quo).
 ## 5. Couche d'accès aux données
 
 **Règle.**
-- **Architecture en couches** : présentation (`cli.py`, routes de l'API), métier et ETL (`etl/` :
-  `extract.py`, `transform.py`, `normalize.py`, `load.py`, les sources dans `etl/sources/`), accès
-  aux données (`database/`). Une couche n'appelle que celle du dessous.
+- **Architecture en couches** : présentation (`cli.py` et `commands/`, routes de l'API), métier et
+  ETL (`etl/` : `extract.py`, `transform.py`, `normalize.py`, `load.py`, les sources dans
+  `etl/sources/`), accès aux données (`database/`). Une couche n'appelle que celle du dessous.
 - `items.py` et `core/` sont le vocabulaire commun à toutes les couches : chacune peut les
   importer.
 - Une API importe `database`, `items` et `core`, jamais `etl` ni `database/writers` (sa ligne dans
