@@ -276,7 +276,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   2024-12-04, lue par l'API GitHub le 2026-10-17.
 - **Ce qu'on en tire** : un item par fichier : titre (`title`), URL source (`source`), date
   d'ajout (`created`), date de publication (`published`, si la page en donne une), et le texte
-  gardé, après le frontmatter. Ne sont pas lus : `author`, `description`, `tags`.
+  gardé, après le frontmatter. Ne sont pas lus : `author`, `description`, `tags`. Comment un clip
+  entre en base (champs, clé, dates, rejets, doublons) : « Du brut au jeu d'items », étape 4,
+  « Clips ».
 - **Accès** : lecture du dossier local du coffre (`src/k_b/etl/sources/clipping.py`) ; aucun
   réseau. Le coffre est donné par la variable `KB_VAULT_DIR`, en chemin complet ; absente ou
   vide, les clips sont sautés, `kb collect` l'affiche, et son code de sortie ne change pas. Pas
@@ -551,7 +553,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 
 ## Du brut au jeu d'items
 
-1. **Collecte** : chaque source écrit son brut dans `raw/automated_watch/<source>/` (règles communes).
+1. **Collecte** : chaque source écrit son brut dans `raw/automated_watch/<source>/`, ou, pour ce
+   que l'utilisatrice a choisi (Zotero, clips), dans `raw/selected_library/<source>/` (règles
+   communes).
 2. **Lecture** : un lecteur par sorte de source transforme le brut en items validés par un modèle
    Pydantic. Le lecteur est retrouvé par le nom du dossier brut (`github_releases_<dépôt>/` est
    lu par celui des releases), que la source soit encore suivie ou non. Les sortes sont déclarées
@@ -560,7 +564,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
    2026-10-08) ; ses lignes sont lues par un lecteur à part (`read_trend_files`,
    `src/k_b/etl/sources/gh_archive.py`), et la sorte `gh_archive` reste déclarée sans lecteur
    d'items. Les items ont les mêmes champs : source, identifiant dans la source,
-   titre, URL, auteurs (sauf GitHub), date de publication et date de révision (arXiv), date d'ajout (Clipper, Zotero),
+   titre, URL, auteurs (arXiv), date de publication et date de révision (arXiv), date d'ajout (Clipper, Zotero),
    contenu ou résumé, date de collecte, chemin du brut d'origine. Une date absente reste vide. Toutes les dates sont en UTC, avec fuseau. Une ligne
    illisible est rejetée et journalisée, pas devinée.
 3. **Normalisation** des items lus (`normalize_item`, `src/k_b/etl/normalize.py`) :
@@ -806,11 +810,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 
    - **Rejouable** : un second import sans nouveau brut ne lit aucun fichier (sauf un fichier
      illisible ou une collecte mal nommée) et ne change pas la base ; un item déjà en base garde
-     son `item_id`, que l'API exposera.
-   - Un nom répété dans les auteurs d'un item n'est lié qu'une fois, à sa première position : la
-     base lie un auteur à un item une seule fois.
-   - Un auteur qui n'a plus d'item (une révision arXiv a changé ses auteurs) est supprimé dans
-     la même transaction : un nom sans usage n'est pas gardé.
+     son `item_id`, que l'API de données expose (`GET /items/{item_id}`).
+   - **Auteurs** : il n'y a pas de table d'auteurs. Les auteurs d'un papier arXiv sont une liste
+     JSON de noms, dans l'ordre d'arXiv, dans la colonne `publication.authors`
+     (`src/k_b/database/schema.sql`), écrite telle quelle à l'import ; une révision arXiv plus
+     récente remplace la liste avec le reste du papier (règle « flux avec révisions »). Elle
+     reste vide tant que seul Zotero cite le papier. Les auteurs d'une entrée Zotero restent dans
+     son brut, et le champ `author` d'un clip n'est pas lu : aucun n'entre en base.
 
 ## Pourquoi BigQuery
 
