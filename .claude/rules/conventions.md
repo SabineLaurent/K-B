@@ -145,7 +145,7 @@ statu quo).
 - `items.py` et `core/` sont le vocabulaire commun à toutes les couches : chacune peut les
   importer.
 - Une API importe `database`, `items` et `core`, jamais `etl`, `database/writers` ni
-  `database/writing` (sa ligne dans `tests/test_module_dependencies.py` s'ajoute à la création du
+  `database/writing` (sa ligne dans `tests/architecture/test_apis.py` s'ajoute à la création du
   paquet d'API).
 - Le SQL **de la base K-B** vit dans `src/k_b/database/` : un dossier d'écriture, `writers/` (un
   module par sorte d'item et un pour le classement, `<sorte>_writer.py`, chacun avec une fonction
@@ -165,7 +165,7 @@ statu quo).
   ne renvoie que des fichiers de `src/k_b/database/`.
 - `grep -rlE "INSERT INTO|UPDATE |DELETE FROM" src/k_b/etl/sources --include='*.py'` ne renvoie
   rien (une source ne fait que lire).
-- `uv run pytest tests/test_module_dependencies.py` : les dépendances, lues à deux niveaux
+- `uv run pytest tests/architecture/test_layers.py` : les dépendances, lues à deux niveaux
   (`core`, `database`, `etl`, `etl/sources`) ; aucun module de `database/`, sous-dossiers
   compris, n'importe de K-B autre chose que `database`, `items` et `core` ; hors de `database/`,
   aucun module n'atteint `database/writers` (`test_only_database_imports_its_writers`).
