@@ -248,7 +248,7 @@ source ne touche pas aux tables.
 | `newsletter_article` | sous-type d'item : un article résumé par une édition TLDR ; clé (édition, date, rang) | `id`, `item_id`, `kind`, `edition`, `edition_date`, `rank`, `title`, `summary`, `url`, `publication_id` |
 | `zotero_entry` | sous-type d'item : un document de la bibliothèque Zotero ; catalogue d'état ; clé `zotero_key` | `id`, `item_id`, `kind`, `zotero_key`, `item_type`, `title`, `url`, `saved_at`, `publication_id`, `revised_at`, `withdrawn_at` |
 | `clip` | sous-type d'item : une page gardée avec Web Clipper ; la dernière version d'une URL est gardée ; clé `url` | `id`, `item_id`, `kind`, `url`, `title`, `body`, `saved_at`, `published_at`, `revised_at` |
-| `tag` | un tag d'un `.md` importé, normalisé, partagé par les items qui le portent ; clé `name` (#260) | `id`, `name` |
+| `tag` | un tag d'un `.md` importé, normalisé, partagé par les items qui le portent ; clé `name` (#260) ; `id` interne, que SQLite peut redonner après une suppression | `id`, `name` |
 | `item_tag` | la liaison plusieurs-à-plusieurs d'un item à ses tags ; clé (`item_id`, `tag_id`) | `item_id`, `tag_id` |
 | `highlight` | un surlignage d'un PDF d'une entrée Zotero ; catalogue d'état ; clé `zotero_key` | `highlight_id`, `zotero_key`, `text`, `comment`, `highlighted_at`, `revised_at`, `withdrawn_at`, `item_id` |
 | `trend` | TENDANCE : les dépôts qui montent d'un classement GH Archive, une ligne par fenêtre de 3 jours et par dépôt ; pas un item ; clé (`window_end`, `repository_id`) | `id`, `raw_data_id`, `window_end`, `repository_id`, `repository_name`, `stars_gained`, `forks_gained` |
