@@ -97,12 +97,12 @@ commande : `etl/raw_purge.py` est une étape du pipeline, et un test d'architect
 
 ### 3. `RawStore` : des clés, pas des chemins (règle 3 du POC)
 
-`src/k_b/etl/raw_store.py:49-92`. La règle 3 de `.claude/rules/poc.md` demande qu'une fonction
+`src/k_b/etl/raw_store.py:48-97`. La règle 3 de `.claude/rules/poc.md` demande qu'une fonction
 nouvelle de `raw_store.py` prenne une clé POSIX relative au dossier de données, jamais un `Path` :
 au 08/11, le brut passe dans Azure Blob Storage, qui adresse un objet par une clé. `RawStore` est
 une `dataclass` gelée qui garde la racine (`data_dir`) ; ses méthodes `delete`, `has_file` et
 `read_latest` ne prennent qu'une clé. Elle refuse une clé qui sortirait du dossier
-(`raw_store.py:88-92`) :
+(`raw_store.py:88-93`) :
 
 ```python
             not key_path.parts
@@ -213,7 +213,7 @@ Sabine du 2026-10-15.
    08/11 couvre ce cas.
 4. **Où est la sécurité de la suppression ?** Les clés viennent de la base, pas d'une source ; la
    purge ne garde que les fichiers directement dans les deux dossiers ; `find_path` refuse toute clé
-   qui sortirait du dossier de données ; le journal ne donne qu'un nombre (`raw_store.py:84-96`).
+   qui sortirait du dossier de données ; le journal ne donne qu'un nombre (`raw_store.py:84-97`).
 5. **La traçabilité d'E1 est-elle cassée ?** Le lien item → `raw_data` existe toujours et dit quel
    fichier a apporté la donnée et quand ; c'est le fichier lui-même qui peut avoir disparu. C'est
    écrit au registre et dans l'ADR.
@@ -246,8 +246,8 @@ Sabine du 2026-10-15.
 - La conservation des « vieilles veilles » dans le *cleansed* : question ouverte (journal ADR).
 
 Hors de cette note : les commits et fichiers listés au lancement de la note avant 432cfea
-appartiennent à des PR déjà fusionnées sur `main` (#250 à #257) ; cette branche n'a que six commits
-(432cfea à fb1b30e), tous couverts ci-dessus. `core/config.py` (une ligne de commentaire) et
+appartiennent à des PR déjà fusionnées sur `main` (#250 à #257) ; cette branche a sept commits
+(432cfea à 2b9fc3d, ce dernier étant cette note), tous couverts ci-dessus. `core/config.py` (une ligne de commentaire) et
 `tests/architecture/module_imports.py` (le module de purge déclaré dans le pipeline) sont couverts
 par les sections 2 et 3.
 
