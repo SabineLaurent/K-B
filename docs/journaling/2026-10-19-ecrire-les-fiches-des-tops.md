@@ -60,10 +60,13 @@ lecteur existant, puis une `TopEntry` par dépôt, avec l'URL **construite depui
             continue
         readable_keys.append(key)
         written_count += write_sheet(vault_dir, sheets_dir, top, ranking)
+    # The sheets that justify the deletion, checked again: a sheet replaced meanwhile by a link
+    # or by a folder would leave its ranking deleted without a sheet.
     refuse_linked_folders(vault_dir, sheets_dir)
+    refuse_linked_sheets(vault_dir, sheets_dir, readable_keys)
     deleted_count = sum(store.delete(key) for key in readable_keys[:-1])
 ```
-(`src/k_b/etl/top_sheets.py:104-111`)
+(`src/k_b/etl/top_sheets.py:107-117`)
 
 Trois idées dans ces lignes :
 
@@ -74,7 +77,7 @@ Trois idées dans ces lignes :
   sans elle, un second relevé corrompu du même jour aurait passé pour « le dernier lisible », et le
   vrai dernier lisible aurait été supprimé.
 - **La suppression vient après la boucle.** Une exception levée pendant une lecture ou une écriture
-  (`OSError`, ou SIGTERM, qui arrive comme un `SystemExit`) sort de la fonction avant la ligne 111 :
+  (`OSError`, ou SIGTERM, qui arrive comme un `SystemExit`) sort de la fonction avant la ligne 117 :
   aucun relevé n'est supprimé. `readable_keys[:-1]` garde le dernier lisible, et tout ce qui le
   suit dans la liste (un illisible n'y est jamais).
 
@@ -83,11 +86,11 @@ Trois idées dans ces lignes :
 ```python
     sheet_path = find_sheet_path(sheets_dir, ranking.collected_at)
     refuse_linked_folders(vault_dir, sheets_dir)
-    if sheet_path.exists():
+    if has_sheet(sheet_path, vault_dir):
         logger.info("%s sheet of %s: sheet_exists, not rewritten", top.name, day)
         return False
 ```
-(`src/k_b/etl/top_sheets.py:205-209`)
+(`src/k_b/etl/top_sheets.py:227-231`)
 
 Le chemin est fait de constantes (`veille`, `tops`, le nom du top) et d'une date reformatée depuis un
 `datetime` : aucune valeur venue de GitHub n'y entre. Le jour vient du nom du fichier brut, contrôlé
@@ -97,7 +100,7 @@ par un aller-retour :
     if collected_at.strftime(COLLECTION_NAME_FORMAT) != collection_name:
         return None
 ```
-(`src/k_b/etl/top_sheets.py:154-155`)
+(`src/k_b/etl/top_sheets.py:160-161`)
 
 `strptime` accepte `2026-10-5T093000Z` ; l'aller-retour le refuse, sinon l'ordre des noms ne serait
 plus l'ordre du temps, et « le dernier » serait faux. Une fiche qui existe n'est jamais réécrite : la
@@ -112,7 +115,7 @@ chemin du coffre.
         for character in " ".join(visible.split())
     )
 ```
-(`src/k_b/etl/top_sheets.py:251-254`)
+(`src/k_b/etl/top_sheets.py:273-276`)
 
 Avant ces lignes, chaque contrôle (`Cc`), surrogate isolé (`Cs`) ou contrôle bidirectionnel devient
 une espace. Puis `split()` réduit tous les blancs, retours à la ligne compris, à une espace : la
@@ -139,7 +142,7 @@ lèverait `UnicodeEncodeError` et ferait tomber toute la commande.
 `KB_VAULT_DIR` créerait un faux coffre. Sans coffre, la commande sort en 2 (« rien n'a été lancé :
 un réglage est refusé »). Ensuite, chaque top est traité à part : une `OSError` sur l'un est
 journalisée (type et `strerror`, jamais un chemin) et l'autre top est écrit quand même ; la commande
-sort en 1 si un top a échoué ou garde un relevé illisible. Avant toute lecture du brut, chaque dossier `veille/`, `veille/tops/`, `veille/tops/<top>/`, puis la fiche de chaque relevé listé, est refusé s'il est un lien symbolique (`refuse_symbolic_links`, `src/k_b/etl/top_sheets.py`) : le refus est tout ou rien. Les dossiers sont recontrôlés avant chaque fiche et avant la suppression. « K-B ne suit jamais un lien symbolique dans le coffre » (décision de Sabine) ; la collecte des clips n'a pas encore cette règle pour le dossier `Clippings/`. `KB_VAULT_DIR` n'a qu'un lecteur,
+sort en 1 si un top a échoué ou garde un relevé illisible. Avant de lire un relevé et d'écrire une fiche, chaque dossier `veille/`, `veille/tops/`, `veille/tops/<top>/` est refusé s'il est un lien symbolique, et la fiche de chaque relevé listé s'il est un lien ou pas un fichier régulier (`refuse_linked_folders`, `refuse_linked_sheets`, `has_sheet`, `src/k_b/etl/top_sheets.py`) : le refus est tout ou rien. Les dossiers et la fiche sont recontrôlés avant chaque écriture, puis les dossiers et les fiches des relevés lisibles avant la suppression : une entrée prise pour une fiche écrite laisserait supprimer son relevé sans fiche. Décision de Sabine : `kb write-tops` ne suit jamais un lien symbolique dans le coffre, puisque c'est le dossier où il écrit qui est en jeu. `KB_VAULT_DIR` n'a qu'un lecteur,
 `read_vault_dir` (`src/k_b/etl/collected_sources.py:92`), que la collecte des clips et cette
 commande appellent.
 
@@ -155,7 +158,7 @@ commande appellent.
 | `#`, `%`, `$`, surrogates et contrôles bidirectionnels ajoutés à la liste du critère | Un tag, un commentaire, une formule ; un encodage qui échoue ; un affichage réordonné | Tout retirer de `Cf` : U+200D joint les émojis (la fixture contient « 🚀✨ ») |
 | `TOPS` dans `source_kinds.py` | `kb top` (#266) lira les mêmes relevés | Dans la commande, comme `LATEST_ONLY_FOLDER_KEYS` : #266 devrait le déplacer |
 | `read_top_entries` dans chaque source, sans factoriser | Deux occurrences ; on factorise à la troisième (`code.md`) ; #269 réécrit les deux lecteurs | Une fonction commune qui prendrait le nom du champ du compte |
-| Un lien symbolique dans `veille/…` refusé (`vault_link_refused`, sortie 1) | Décision de Sabine : « K-B ne suit jamais un lien symbolique dans le coffre », en lecture comme en écriture ; recontrôle avant chaque fiche et avant la suppression (time-knight) | Le suivre et l'écrire comme une limite (premier plan) ; écrire par descripteurs (`write_file_atomically` est partagée) |
+| Un lien symbolique dans `veille/…` refusé (`vault_link_refused`), une fiche qui n'est pas un fichier régulier aussi (`sheet_not_a_file`), sortie 1 | Décision de Sabine : `kb write-tops` ne suit jamais un lien symbolique dans le coffre, c'est le dossier où il écrit ; `sheet_not_a_file` et les recontrôles avant chaque écriture et avant la suppression (time-knight) | Le suivre et l'écrire comme une limite (premier plan) ; écrire par descripteurs (`write_file_atomically` est partagée) |
 | `read_latest` lit la dernière clé de `list_file_keys` | Une seule règle « fichiers visibles, ordre des noms » (constat 9 de la revue) | Deux compréhensions identiques |
 | `WATCH_DIR_NAME`, `TOPS_DIR_NAME` dans `core/config.py` | À côté de `DIGEST_SUBJECTS`, dont les noms sont des dossiers sous `veille/` : le test du nom réservé les compare | Dans `etl/` : `kb digest` (#209) devra les lire aussi |
 | Le compteur des relevés sautés s'appelle `skipped_count` | Il compte aussi un second relevé du même jour dont la fiche vient d'être écrite (constat 4 de la revue) | « already written », qui laissait croire que la fiche existait avant |
@@ -173,16 +176,16 @@ commande appellent.
 | `test_a_sheet_not_written_deletes_no_ranking` (`PermissionError`, `StoppedBySigtermError`) | Rien n'est supprimé avant que les fiches soient écrites |
 | `test_a_file_not_named_by_a_collection_time_is_kept_and_its_name_never_logged` | L'aller-retour du nom, et aucun nom de fichier au journal |
 | `test_a_description_is_neutralized_on_one_line` (15 cas), `test_a_trapped_description_stays_in_its_cell` | La neutralisation, ligne à ligne |
-| `test_a_folder_of_the_sheets_that_is_a_symbolic_link_is_refused_before_anything` (3 dossiers), `test_a_sheet_that_is_a_symbolic_link_refuses_its_top_before_any_sheet_is_written` (cible absente ou présente), `test_a_folder_replaced_by_a_link_while_the_sheets_are_written_deletes_no_ranking`, `test_a_folder_of_a_top_linked_elsewhere_is_refused_exits_1_and_the_other_top_is_written` | Un lien dans `veille/…` n'est jamais suivi : refus tout ou rien, rien n'est écrit à sa cible, aucun relevé n'est supprimé, sortie 1, l'autre top écrit |
+| `test_a_folder_of_the_sheets_that_is_a_symbolic_link_is_refused_before_any_ranking_is_read` (3 dossiers), `test_a_sheet_that_is_a_symbolic_link_refuses_its_top_before_any_sheet_is_written` (cible absente ou présente), `test_a_folder_replaced_by_a_link_while_the_sheets_are_written_deletes_no_ranking`, `test_a_sheet_replaced_by_a_link_while_the_sheets_are_written_deletes_no_ranking`, `test_a_folder_named_as_a_sheet_refuses_its_top_and_no_ranking_is_deleted`, `test_a_linked_sheet_of_an_unreadable_ranking_refuses_the_top_too`, `test_a_folder_of_a_top_linked_elsewhere_is_refused_exits_1_and_the_other_top_is_written` | Un lien dans `veille/…` n'est jamais suivi : refus tout ou rien, rien n'est écrit à sa cible, aucun relevé n'est supprimé, sortie 1, l'autre top écrit |
 | `test_no_value_of_github_enters_the_path_of_a_sheet` | L'ensemble des fichiers créés est exactement celui attendu, même avec `../` dans la description |
 | `tests/test_cli.py`, `test_write_tops_*` et `test_kb_import_writes_nothing_in_the_vault` | Codes 0, 1, 2 et 143 ; sans coffre, rien n'est supprimé ni créé ; `kb import` ne touche pas au coffre |
-| `uv run pytest -q` → 1941 passed ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | Les contrôles de la CI |
+| `uv run pytest -q` → 1945 passed ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | Les contrôles de la CI |
 
 ## Ce que tu dois pouvoir défendre
 
 1. **Pourquoi relire un relevé dont la fiche du jour existe déjà ?** Pour savoir s'il est lisible.
    Seul un relevé lu sans erreur peut devenir « le dernier lisible » qu'on garde ; sinon un second
-   relevé corrompu du même jour ferait supprimer le seul bon (`top_sheets.py:104-111`).
+   relevé corrompu du même jour ferait supprimer le seul bon (`top_sheets.py:107-117`).
 2. **Que se passe-t-il si la commande est tuée au milieu ?** Un SIGTERM arrive comme
    `StoppedBySigtermError`, qui remonte avant la suppression : les fiches déjà écrites restent,
    aucun relevé n'est supprimé, le code est 143. `write_file_atomically` retire son temporaire. Un
@@ -190,7 +193,7 @@ commande appellent.
 3. **Une description GitHub peut-elle injecter quelque chose dans le coffre ?** Ni chemin (il est fait
    de constantes et d'une date), ni ligne (tous les blancs deviennent une espace), ni lien, HTML, tag
    ou commentaire (échappés). Il reste de la mise en forme (`*`, `_`, `~`, `==`) et une URL nue,
-   cliquable comme sur GitHub (`top_sheets.py:238-254`).
+   cliquable comme sur GitHub (`top_sheets.py:260-276`).
 4. **Pourquoi la fiche contient-elle des logins, et combien de temps ?** Le nom `owner/repo` identifie
    le dépôt ; 36 des 100 plus forkés appartiennent à une personne. La fiche est du *curated*, gardée
    tant que Sabine la garde pour sa veille : un critère et non un chiffre, comme le permet
@@ -209,9 +212,9 @@ commande appellent.
 - **Les vrais relevés** : aucun `kb write-tops` n'a tourné sur le brut réel. Au premier lancement,
   tout l'historique des relevés devient des fiches, puis ces relevés sont supprimés ; un ancien relevé
   illisible ferait sortir la commande en 1 à chaque lancement.
-- **Un lien posé entre un contrôle et l'écriture** : les dossiers sont recontrôlés avant chaque
-  fiche et avant la suppression (testé), mais un dossier remplacé par un lien entre le dernier
-  contrôle et l'écriture serait suivi. Seul un processus qui a déjà le compte de l'utilisatrice
+- **Un lien posé entre un contrôle et l'écriture** : les dossiers et les fiches sont recontrôlés
+  avant chaque écriture et avant la suppression (testé), mais une entrée remplacée par un lien
+  entre le dernier contrôle et l'écriture serait suivie. Seul un processus qui a déjà le compte de l'utilisatrice
   peut exploiter cette course.
 - **Un coffre synchronisé** (iCloud, Obsidian Sync) ferait sortir les logins de la machine : non
   vérifié, écrit au registre.

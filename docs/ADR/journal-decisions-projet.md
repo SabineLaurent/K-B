@@ -3231,25 +3231,25 @@ time-knight (délégation de Sabine du 2026-10-15).
   syntaxe. Limites assumées : une URL nue reste cliquable dans Obsidian (lien vers une page
   publique ; la casser abîmerait le texte) ; `==`, `*`, `_` et `~` restent de la mise en forme ;
   un processus tué laisse un temporaire caché `.AAAA-MM-JJ.md.*.tmp` dans le coffre. — PR de #265
-- **K-B ne suit jamais un lien symbolique dans le coffre : si `veille/`, `veille/tops/`,
-  `veille/tops/<top>/` ou la fiche d'un des relevés est un lien symbolique, `kb write-tops` refuse
-  ce top avant d'en écrire aucune fiche (`vault_link_refused`, journalisé avec son chemin dans le
-  coffre), ne supprime aucun de ses relevés et sort en 1 ; l'autre top est traité.** Décision de
-  Sabine du 2026-10-19, 22:04Z (relayée par time-knight). Pourquoi, celui de Sabine : une seule
-  règle pour tout ce que K-B touche dans le coffre, en lecture comme en écriture (règle
-  d'harmonisation du 2026-10-18). Le contrôle lit le lien lui-même (`Path.is_symlink`, par
-  `lstat`) : les dossiers et la fiche de chaque relevé listé (son jour vient de son nom) avant
-  toute lecture et toute écriture, puis les dossiers de nouveau avant chaque fiche et avant la
-  suppression des relevés (tranché par time-knight, délégation de Sabine du 2026-10-15, après la
-  revue). Option écartée : suivre le lien et l'écrire comme une limite (premier plan) ; écrire
-  par descripteurs (`O_NOFOLLOW | O_DIRECTORY`), écarté par time-knight : `write_file_atomically`
-  est partagée par tout le projet, et aucune limite de droits n'est à défendre. Observé dans la
-  collecte des clips, qui n'a pas la même règle : un clip qui est un lien est sauté sans refus
-  (`lstat`) et jamais suivi (`O_NOFOLLOW`), mais un dossier `Clippings/` qui est un lien est suivi
-  (`iterdir`) ; l'harmonisation est portée par une issue à part. Limite assumée : un dossier
-  remplacé par un lien entre un contrôle et l'écriture qui le suit serait encore suivi ; seul un
-  processus qui a déjà le compte de l'utilisatrice peut exploiter cette course, et le contenu des
-  fiches est public. — PR de #265
+- **`kb write-tops` ne suit jamais un lien symbolique dans le coffre : si `veille/`, `veille/tops/`,
+  `veille/tops/<top>/` ou la fiche d'un des relevés est un lien symbolique
+  (`vault_link_refused`), ou si une fiche n'est pas un fichier régulier (`sheet_not_a_file` : un
+  dossier, par exemple), il refuse ce top avant d'en écrire aucune fiche, journalise le refus avec
+  son chemin dans le coffre, ne supprime aucun de ses relevés et sort en 1 ; l'autre top est
+  traité.** Décision de Sabine du 2026-10-19, 22:04Z (relayée par time-knight). Pourquoi, celui de
+  Sabine : c'est le dossier où `kb write-tops` écrit qui est en jeu ; une règle d'écriture, à part
+  de celle de la lecture et de l'import. `sheet_not_a_file` et les recontrôles sont tranchés par
+  time-knight (délégation de Sabine du 2026-10-15), après les revues : une entrée prise pour une
+  fiche écrite laisserait supprimer son relevé sans fiche. Le contrôle lit l'entrée elle-même
+  (`lstat`, jamais sa cible) : les dossiers et la fiche de chaque relevé listé (son jour vient de
+  son nom) avant de lire un relevé et d'écrire une fiche ; les dossiers et la fiche de nouveau
+  avant chaque écriture ; les dossiers et les fiches des relevés lisibles une dernière fois avant
+  la suppression. Options écartées : suivre le lien et l'écrire comme une limite (premier plan) ;
+  écrire par descripteurs (`O_NOFOLLOW | O_DIRECTORY`), écarté par time-knight :
+  `write_file_atomically` est partagée par tout le projet, et aucune limite de droits n'est à
+  défendre. Limite assumée : une entrée remplacée par un lien entre un contrôle et l'écriture qui
+  le suit serait encore suivie ; seul un processus qui a déjà le compte de l'utilisatrice peut
+  exploiter cette course, et le contenu des fiches est public. — PR de #265
 
 ## Décisions encore ouvertes
 
