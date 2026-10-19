@@ -93,7 +93,7 @@ Zotero : elle n'a rien à voir et ne change pas.
 | `item_has_tag` | Décision de Sabine (MLD et MPD). | Garder `item_tag`, le nom de #260. |
 | Renommer l'index | Les neuf index suivent `<table>_<colonne>` (critère de #263). | Garder `item_tag_tag_id` : seul nom hors format. |
 | `SELECT_ITEM_TAGS` inchangé | Il nomme ce qu'il rend (critère de #263). | Le renommer en `SELECT_ITEM_HAS_TAGS` : nom qui dit la table, pas le résultat. |
-| Base recréée, sans migration | Aucune migration dans le dépôt ; coût accepté par Sabine. | Un `ALTER TABLE … RENAME` écrit dans la PR : non retenu, comme pour #259. |
+| Base recréée, sans migration | Aucune migration dans le dépôt ; coût accepté par Sabine. | Un `ALTER TABLE … RENAME` écrit dans la PR : pas proposé cette fois ; pour #259, Sabine avait écarté l'`ALTER TABLE` à la main. |
 | Pas de test du nom de l'index | Le `grep` le prouve ; un test pour un nom serait du code sans second usage. | Un test qui lit `sqlite_master` (relecture du plan, constat 2, décidé par time-knight). |
 | Note et ADR datés non réécrits | Un écrit daté raconte son jour (décision de time-knight). | Réécrire l'ancien nom partout. |
 | Consigne des labels dans `MEMORY.md` | Demandée avec cette PR par time-knight ; une PR de doc à part coûterait un cycle pour trois lignes. | Une PR de documentation séparée. |
