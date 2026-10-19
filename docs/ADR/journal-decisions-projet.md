@@ -3230,9 +3230,20 @@ time-knight (délégation de Sabine du 2026-10-15).
   gardé). Pourquoi : une description est un texte libre venu de GitHub, une donnée et jamais une
   syntaxe. Limites assumées : une URL nue reste cliquable dans Obsidian (lien vers une page
   publique ; la casser abîmerait le texte) ; `==`, `*`, `_` et `~` restent de la mise en forme ;
-  un dossier `veille/tops/…` remplacé par un lien symbolique est suivi (le coffre est celui de
-  l'utilisatrice ; le refus, `O_NOFOLLOW` comme les clips, attend la décision de Sabine) ; un
-  processus tué laisse un temporaire caché `.AAAA-MM-JJ.md.*.tmp` dans le coffre. — PR de #265
+  un processus tué laisse un temporaire caché `.AAAA-MM-JJ.md.*.tmp` dans le coffre. — PR de #265
+- **K-B ne suit jamais un lien symbolique dans le coffre : si `veille/`, `veille/tops/`,
+  `veille/tops/<top>/` ou la fiche du jour est un lien symbolique, `kb write-tops` refuse ce top
+  (`vault_link_refused`, journalisé avec son chemin dans le coffre), ne supprime aucun de ses
+  relevés et sort en 1 ; l'autre top est traité.** Décision de Sabine du 2026-10-19, 22:04Z
+  (relayée par time-knight). Pourquoi, celui de Sabine : une seule règle pour tout ce que K-B
+  touche dans le coffre, en lecture comme en écriture (règle d'harmonisation du 2026-10-18) ; les
+  clips refusent déjà un lien (`lstat`, `O_NOFOLLOW`). Le contrôle lit le lien lui-même
+  (`Path.is_symlink`, par `lstat`), avant toute lecture du brut pour les dossiers, avant
+  l'écriture pour la fiche. Option écartée : suivre le lien et l'écrire comme une limite (le
+  coffre est celui de l'utilisatrice). Le mécanisme des clips n'est pas une fonction partagée :
+  il refuse un fichier à la lecture, celui-ci un dossier ou un fichier avant l'écriture. Limite
+  assumée : un dossier remplacé par un lien entre le contrôle et l'écriture serait suivi (une
+  course théorique, dans le coffre de l'utilisatrice). — PR de #265
 
 ## Décisions encore ouvertes
 
