@@ -77,6 +77,9 @@ TREND_REPOSITORY_NAME_MAX_LENGTH = 255
 # The longest tag, normalized, held by the CHECK of tag.name too; a test keeps both equal. A wide
 # bound, not measured: the vault is not read.
 TAG_MAX_LENGTH = 100
+# The most tags of an item: a bound on the statements one item writes (code.md, defense in
+# depth), not held by the base.
+TAG_MAX_COUNT = 100
 
 
 def check_url_can_be_normalized(url: str) -> str:
@@ -409,6 +412,7 @@ class Item(BaseModel):
         check_lengths(self)
         check_url_scheme(self)
         check_source_item_id(self)
+        check_tag_count(self)
         check_tags_once(self)
         return self
 
@@ -471,6 +475,13 @@ def check_source_item_id(item: Item) -> None:
     if item.kind == "release" and int(item.source_item_id) > MAX_INT64:
         raise ValueError(
             f"source_item_id of a release over 64 bits: {len(item.source_item_id)} digits"
+        )
+
+
+def check_tag_count(item: Item) -> None:
+    if len(item.tags) > TAG_MAX_COUNT:
+        raise ValueError(
+            f"tags too long: {len(item.tags)} elements, maximum {TAG_MAX_COUNT}"
         )
 
 

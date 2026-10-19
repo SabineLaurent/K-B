@@ -76,13 +76,10 @@ class ClipContent(NamedTuple):
     tags: frozenset[str]
 
     def to_columns(self) -> dict[str, str | None]:
-        """The columns of clip; the tags are rows of item_tag."""
-        return {
-            "title": self.title,
-            "body": self.body,
-            "saved_at": self.saved_at,
-            "published_at": self.published_at,
-        }
+        """The columns of clip, every field but the tags, which are rows of item_tag."""
+        columns = self._asdict()
+        del columns["tags"]
+        return columns
 
 
 def write(
