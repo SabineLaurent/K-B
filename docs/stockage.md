@@ -208,7 +208,7 @@ GH Archive, dont chaque ligne de classement (`TrendRow`, `src/k_b/items.py`) dev
   `description` ; ils restent dans la copie brute. Les `tags` y vont depuis #260 (journal ADR,
   2026-10-19) : normalisés (`normalize_tag`, `items.py` : en minuscules, sans espaces autour,
   sans `#` au début), une ligne par tag dans `tag`, partagée par tous les items qui le portent,
-  et une liaison plusieurs-à-plusieurs `item_tag` ; le tag `clippings` du gabarit est écarté. Le texte gardé (`clip.body`) peut
+  et une liaison plusieurs-à-plusieurs `item_has_tag` ; le tag `clippings` du gabarit est écarté. Le texte gardé (`clip.body`) peut
   contenir la signature de l'article et les notes de l'utilisatrice
   ([registre des traitements](registre-traitements.md)). La dernière version d'une URL est
   gardée : un clip dont le contenu a changé est réécrit, et `clip.revised_at` prend la date de la
@@ -249,7 +249,7 @@ source ne touche pas aux tables.
 | `zotero_entry` | sous-type d'item : un document de la bibliothèque Zotero ; catalogue d'état ; clé `zotero_key` | `id`, `item_id`, `kind`, `zotero_key`, `item_type`, `title`, `url`, `saved_at`, `publication_id`, `revised_at`, `withdrawn_at` |
 | `clip` | sous-type d'item : une page gardée avec Web Clipper ; la dernière version d'une URL est gardée ; clé `url` | `id`, `item_id`, `kind`, `url`, `title`, `body`, `saved_at`, `published_at`, `revised_at` |
 | `tag` | un tag d'un `.md` importé, normalisé, partagé par les items qui le portent ; clé `name` (#260) ; `id` interne, que SQLite peut redonner après une suppression | `id`, `name` |
-| `item_tag` | la liaison plusieurs-à-plusieurs d'un item à ses tags ; clé (`item_id`, `tag_id`) | `item_id`, `tag_id` |
+| `item_has_tag` | la liaison plusieurs-à-plusieurs d'un item à ses tags ; clé (`item_id`, `tag_id`) | `item_id`, `tag_id` |
 | `highlight` | un surlignage d'un PDF d'une entrée Zotero ; catalogue d'état ; clé `zotero_key` | `highlight_id`, `zotero_key`, `text`, `comment`, `highlighted_at`, `revised_at`, `withdrawn_at`, `item_id` |
 | `trend` | TENDANCE : les dépôts qui montent d'un classement GH Archive, une ligne par fenêtre de 3 jours et par dépôt ; pas un item ; clé (`window_end`, `repository_id`) | `id`, `raw_data_id`, `window_end`, `repository_id`, `repository_name`, `stars_gained`, `forks_gained` |
 
@@ -266,11 +266,11 @@ source ne touche pas aux tables.
 - **Index** : sur les clés étrangères, que SQLite n'indexe pas d'office (`raw_data.source_id`,
   `item.raw_data_id`, `highlight.item_id`, `release.tracked_repository_id`,
   `advisory.vulnerability_id`, `newsletter_article.publication_id`, `trend.raw_data_id`,
-  `zotero_entry.publication_id`, `item_tag.tag_id` ; `item_tag.item_id` est en tête de sa clé
+  `zotero_entry.publication_id`, `item_has_tag.tag_id` ; `item_has_tag.item_id` est en tête de sa clé
   primaire). Les
   contraintes `UNIQUE` créent
   leur propre index.
-- **Suppressions en cascade** : seulement de `item` vers `highlight` et vers `item_tag` (#260 ;
+- **Suppressions en cascade** : seulement de `item` vers `highlight` et vers `item_has_tag` (#260 ;
   un tag ainsi laissé sans liaison reste dans `tag` jusqu'à la purge, #83 ; celui dont une
   réécriture retire la dernière liaison est supprimé avec elle, journal ADR, 2026-10-19). Il n'y en a pas vers `publication`, `vulnerability`, `release`,
   `advisory`, `newsletter_article`, `zotero_entry` ni `clip` : supprimer un item qu'une de ces tables référence est refusé par la clé
