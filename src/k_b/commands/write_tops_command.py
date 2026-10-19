@@ -57,7 +57,8 @@ def describe_outcome(outcome: TopSheetsOutcome) -> str:
     if outcome == TopSheetsOutcome(0, 0, 0, 0):
         return "no ranking"
     return (
-        f"written {outcome.written_count}, already written {outcome.existing_count},"
+        f"written {outcome.written_count},"
+        f" rankings skipped (sheet of their day exists) {outcome.skipped_count},"
         f" superseded rankings deleted {outcome.deleted_count},"
         f" unreadable rankings kept {outcome.unreadable_count}"
     )

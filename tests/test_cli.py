@@ -1364,7 +1364,8 @@ def test_write_tops_writes_the_sheets_of_each_top_then_deletes_the_older_ranking
     output = capsys.readouterr().out
     for top_name in ("most_starred", "most_forked"):
         assert (
-            f"{top_name} sheets: written 2, already written 0,"
+            f"{top_name} sheets: written 2,"
+            " rankings skipped (sheet of their day exists) 0,"
             " superseded rankings deleted 1, unreadable rankings kept 0\n"
         ) in output
 
@@ -1377,7 +1378,8 @@ def test_write_tops_again_writes_nothing_new(data_and_vault_dirs, test_tops, cap
 
     assert cli.main(["write-tops"]) == 0
     assert (
-        "most_starred sheets: written 0, already written 1,"
+        "most_starred sheets: written 0,"
+        " rankings skipped (sheet of their day exists) 1,"
         " superseded rankings deleted 0, unreadable rankings kept 0\n"
     ) in capsys.readouterr().out
 
@@ -1478,7 +1480,8 @@ def test_an_unreadable_ranking_is_kept_and_write_tops_exits_1(
     assert rankings["most_starred"][0].exists()
     assert len(list_sheets(vault_dir)) == 2
     assert (
-        "most_starred sheets: written 1, already written 0,"
+        "most_starred sheets: written 1,"
+        " rankings skipped (sheet of their day exists) 0,"
         " superseded rankings deleted 0, unreadable rankings kept 1\n"
     ) in capsys.readouterr().out
 

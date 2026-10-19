@@ -67,23 +67,17 @@ class RawStore:
 
     def read_latest(self, folder_key: str) -> bytes | None:
         """The last raw file of a folder, in name order, that is collection order; None when
-        it has none. Hidden files are left out, as by list_visible_entries of etl/transform.py,
-        which imports this module: a rest of an interrupted write is not a raw file."""
-        folder = self.find_path(folder_key)
-        if not folder.is_dir():
+        it has none."""
+        keys = self.list_file_keys(folder_key)
+        if not keys:
             return None
-        raw_files = sorted(
-            path
-            for path in folder.iterdir()
-            if path.is_file() and not path.name.startswith(".")
-        )
-        if not raw_files:
-            return None
-        return raw_files[-1].read_bytes()
+        return self.read(keys[-1])
 
     def list_file_keys(self, folder_key: str) -> list[str]:
         """The keys of the files of a folder, in name order, that is collection order; none when
-        it does not exist. Hidden files are left out, as by read_latest, and the subfolders."""
+        it does not exist. Hidden files are left out, as by list_visible_entries of
+        etl/transform.py, which imports this module: a rest of an interrupted write is not a raw
+        file. The subfolders are left out too."""
         folder = self.find_path(folder_key)
         if not folder.is_dir():
             return []

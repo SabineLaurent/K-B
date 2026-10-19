@@ -4,7 +4,6 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from k_b.etl.top_sheets import TopEntry
 
 from k_b.etl.source_contract import list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
@@ -13,6 +12,7 @@ from k_b.etl.sources.github_most_starred import (
     GithubMostStarredSource,
     read_most_starred,
 )
+from k_b.etl.top_sheets import TopEntry
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_most_starred_extract.json").read_bytes()

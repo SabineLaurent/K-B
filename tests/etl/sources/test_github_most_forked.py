@@ -3,7 +3,6 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from k_b.etl.top_sheets import TopEntry
 
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import list_sources
@@ -13,6 +12,7 @@ from k_b.etl.sources.github_most_forked import (
     GithubMostForkedSource,
     read_most_forked,
 )
+from k_b.etl.top_sheets import TopEntry
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 # Ranks 4 to 6 of the collection of 2026-10-19: the first three are owned by persons (minimisation).

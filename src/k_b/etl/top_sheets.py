@@ -67,7 +67,9 @@ class Top:
 @dataclass(frozen=True)
 class TopSheetsOutcome:
     written_count: int
-    existing_count: int
+    # The rankings not written: the sheet of their day exists, written before or by an earlier
+    # ranking of the same day.
+    skipped_count: int
     deleted_count: int
     unreadable_count: int
 
@@ -100,7 +102,7 @@ def write_top_sheets(store: RawStore, vault_dir: Path, top: Top) -> TopSheetsOut
     logger.info("%s: %d superseded rankings deleted", top.name, deleted_count)
     return TopSheetsOutcome(
         written_count=written_count,
-        existing_count=len(readable_keys) - written_count,
+        skipped_count=len(readable_keys) - written_count,
         deleted_count=deleted_count,
         unreadable_count=len(keys) - len(readable_keys),
     )

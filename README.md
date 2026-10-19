@@ -264,8 +264,8 @@ nommée par le jour UTC du relevé. Une fiche qui existe n'est jamais réécrite
 même jour ne donnent qu'une fiche, celle du premier relevé de ce jour encore dans le brut. Une fois
 les fiches d'un top écrites, ses relevés lisibles plus anciens que le dernier relevé lisible sont
 supprimés du brut ; au premier lancement, tout l'historique des relevés devient des fiches, puis
-ces relevés sont supprimés. Il affiche une ligne par top (fiches écrites, déjà écrites, relevés
-supprimés, relevés illisibles gardés). Code de sortie :
+ces relevés sont supprimés. Il affiche une ligne par top (fiches écrites, relevés sautés parce que la fiche de leur jour
+existe, relevés supprimés, relevés illisibles gardés). Code de sortie :
 
 - 0 : chaque top a réussi, ou n'a aucun relevé ;
 - 1 : un relevé est illisible (gardé, jamais supprimé, tant qu'il est là) ou une fiche n'a pas pu

@@ -4,18 +4,18 @@ from functools import partial
 from pathlib import Path
 
 import pytest
-from k_b.etl.top_sheets import (
-    Top,
-    TopSheetsOutcome,
-    neutralize_description,
-    write_top_sheets,
-)
 
 from k_b.commands.sigterm import StoppedBySigtermError
 from k_b.core.config import DIGEST_SUBJECTS, TOPS_DIR_NAME, WATCH_DIR_NAME
 from k_b.etl import top_sheets
 from k_b.etl.raw_store import RawStore
 from k_b.etl.sources import github_most_forked, github_most_starred
+from k_b.etl.top_sheets import (
+    Top,
+    TopSheetsOutcome,
+    neutralize_description,
+    write_top_sheets,
+)
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 STARRED_RESPONSE = (FIXTURES_DIR / "github_most_starred_extract.json").read_bytes()
@@ -87,7 +87,7 @@ def test_a_ranking_gives_the_sheet_of_its_day_by_rank(data_dir, vault_dir):
     outcome = write_top_sheets(RawStore(data_dir), vault_dir, FORKED_TOP)
 
     assert outcome == TopSheetsOutcome(
-        written_count=1, existing_count=0, deleted_count=0, unreadable_count=0
+        written_count=1, skipped_count=0, deleted_count=0, unreadable_count=0
     )
     assert find_sheet(vault_dir, FORKED_TOP, "2026-10-05").read_text("utf-8") == (
         "---\n"
@@ -168,7 +168,7 @@ def test_each_day_of_collection_gets_its_sheet_and_the_older_rankings_are_delete
     outcome = write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
 
     assert outcome == TopSheetsOutcome(
-        written_count=3, existing_count=0, deleted_count=2, unreadable_count=0
+        written_count=3, skipped_count=0, deleted_count=2, unreadable_count=0
     )
     assert list_files(vault_dir) == [
         "veille/tops/most_starred/2026-10-05.md",
@@ -190,7 +190,7 @@ def test_two_rankings_of_a_day_give_one_sheet_the_one_of_the_first(data_dir, vau
     outcome = write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
 
     assert outcome == TopSheetsOutcome(
-        written_count=1, existing_count=1, deleted_count=1, unreadable_count=0
+        written_count=1, skipped_count=1, deleted_count=1, unreadable_count=0
     )
     sheet = find_sheet(vault_dir, STARRED_TOP, "2026-10-05").read_text("utf-8")
     assert "releve: 2026-10-05T09:30:00Z" in sheet
@@ -206,7 +206,7 @@ def test_a_sheet_that_exists_is_never_rewritten(data_dir, vault_dir):
 
     outcome = write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
 
-    assert outcome.existing_count == 1
+    assert outcome.skipped_count == 1
     assert outcome.written_count == 0
     assert sheet.read_bytes() == b"edited by the user\n"
 
@@ -218,7 +218,7 @@ def test_a_last_ranking_unreadable_keeps_the_last_readable_one(data_dir, vault_d
     outcome = write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
 
     assert outcome == TopSheetsOutcome(
-        written_count=1, existing_count=0, deleted_count=0, unreadable_count=1
+        written_count=1, skipped_count=0, deleted_count=0, unreadable_count=1
     )
     assert (readable.exists(), unreadable.exists()) == (True, True)
     assert list_files(vault_dir) == ["veille/tops/most_starred/2026-10-05.md"]
@@ -234,7 +234,7 @@ def test_a_second_ranking_of_a_day_unreadable_is_read_and_kept(data_dir, vault_d
     outcome = write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
 
     assert outcome == TopSheetsOutcome(
-        written_count=0, existing_count=1, deleted_count=0, unreadable_count=1
+        written_count=0, skipped_count=1, deleted_count=0, unreadable_count=1
     )
     assert (readable.exists(), unreadable.exists()) == (True, True)
 

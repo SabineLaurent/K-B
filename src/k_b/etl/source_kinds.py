@@ -1,8 +1,8 @@
 """SOURCE_KINDS: the only declaration of the sources, one kind per entry, in collection order.
 
-In the package, only commands/collect_command.py and commands/import_command.py import it: they
-give it to the collection (E) and to the import (T then L). TOPS: the top rankings whose sheets kb
-write-tops writes (commands/write_tops_command.py). The Zotero, clipping and GH Archive
+In the package, only the commands import this module: commands/collect_command.py and
+commands/import_command.py give SOURCE_KINDS to the collection (E) and to the import (T then L);
+commands/write_tops_command.py reads TOPS, the top rankings whose sheets kb write-tops writes. The Zotero, clipping and GH Archive
 kinds have no instance here: etl/collected_sources.py creates them, on a machine that says where
 the Zotero data directory, the Obsidian vault, or the BigQuery key, is.
 """
