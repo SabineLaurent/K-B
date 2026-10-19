@@ -504,6 +504,37 @@ def test_a_tag_removed_removes_only_its_link(data_dir):
     assert fetch_rows(data_dir, LINKS_QUERY) == [("agents", agents_rowid)]
 
 
+def test_the_last_link_of_a_tag_removed_removes_the_tag(data_dir):
+    """Decision of Sabine of 2026-10-19: a tag removed no longer exists in the base."""
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm", "agents"))
+    run_import(data_dir)
+    write_clip(data_dir, SECOND, "a1", with_tags(fixture_text(ARTICLE), "agents"))
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, "SELECT name FROM tag") == [("agents",)]
+
+
+def test_a_tag_another_clip_still_carries_stays(data_dir):
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
+    write_clip(
+        data_dir, FIRST, "b2", with_tags(fixture_text(PAGE_WITHOUT_AUTHOR), "llm")
+    )
+    run_import(data_dir)
+    write_clip(data_dir, SECOND, "a1", with_tags(fixture_text(ARTICLE), "agents"))
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, "SELECT name FROM tag ORDER BY name") == [
+        ("agents",),
+        ("llm",),
+    ]
+    assert fetch_rows(data_dir, TAGS_QUERY) == [
+        (ARTICLE_URL, "agents"),
+        (OTHER_URL, "llm"),
+    ]
+
+
 def test_an_identical_clip_changes_nothing(data_dir):
     write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
     run_import(data_dir)

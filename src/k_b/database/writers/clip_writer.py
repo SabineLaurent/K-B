@@ -52,6 +52,14 @@ DELETE FROM item_tag
 WHERE item_id = :item_id AND tag_id = (SELECT id FROM tag WHERE name = :name)
 """
 
+# A tag no item carries any more, once its last link removed: a tag removed no longer exists in
+# the base. The second exception to removing by the purge only (conventions.md, rule 5;
+# decision of Sabine of 2026-10-19).
+DELETE_TAG_WITHOUT_LINK = """
+DELETE FROM tag
+WHERE name = :name AND NOT EXISTS (SELECT 1 FROM item_tag WHERE item_tag.tag_id = tag.id)
+"""
+
 # A patch, not a put (decision of Sabine of 2026-10-19): the SET names only the columns that
 # changed, taken from the fields of ClipContent, never from a value read.
 UPDATE_CLIP = "UPDATE clip SET {assignments} WHERE item_id = :item_id"
@@ -174,9 +182,11 @@ def write_changed_tags(
     known: frozenset[str],
     tags: frozenset[str],
 ) -> None:
-    """Remove the links to the tags removed, and write those to the tags added, in order."""
+    """Remove the links to the tags removed, and a tag removed that no item carries any more;
+    write the links to the tags added, in order."""
     for removed in sorted(known - tags):
         connection.execute(DELETE_ITEM_TAG, {"item_id": item_id, "name": removed})
+        connection.execute(DELETE_TAG_WITHOUT_LINK, {"name": removed})
     write_tags(connection, item_id, tuple(sorted(tags - known)))
 
 
