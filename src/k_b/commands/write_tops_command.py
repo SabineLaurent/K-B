@@ -13,7 +13,7 @@ from k_b.etl.raw_store import RawStore
 from k_b.etl.source_kinds import TOPS
 from k_b.etl.top_sheets import (
     TopSheetsOutcome,
-    VaultLinkRefusedError,
+    VaultEntryRefusedError,
     write_top_sheets,
 )
 
@@ -41,7 +41,7 @@ def run_write_tops(data_dir: Path) -> int:
     for top in TOPS:
         try:
             outcome = write_top_sheets(store, vault_dir, top)
-        except (OSError, VaultLinkRefusedError) as error:
+        except (OSError, VaultEntryRefusedError) as error:
             logger.error("top sheets failed: %s: %s", top.name, describe_error(error))
             has_failed = True
             continue
@@ -50,10 +50,10 @@ def run_write_tops(data_dir: Path) -> int:
     return ExitCode.FAILED if has_failed else ExitCode.SUCCEEDED
 
 
-def describe_error(error: OSError | VaultLinkRefusedError) -> str:
+def describe_error(error: OSError | VaultEntryRefusedError) -> str:
     """A refused link by its named state and its path in the vault; an OSError by its type and
     its reason, never a path: it names the vault or a raw file."""
-    if isinstance(error, VaultLinkRefusedError):
+    if isinstance(error, VaultEntryRefusedError):
         return str(error)
     reason = f" ({error.strerror})" if error.strerror else ""
     return f"{type(error).__name__}{reason}; run kb write-tops again"
