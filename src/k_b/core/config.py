@@ -168,7 +168,7 @@ DIGEST_SUBJECTS = (
     ),
 )
 
-# The folder of the vault that kb writes (ADR of 2026-10-19, "Organisation du coffre"): the digests
+# The folder of the vault that kb writes (ADR of 2026-10-19, "Coffre : organisation"): the digests
 # of each subject in veille/<subject>/ (#209), the sheets of the top rankings in veille/tops/.
 WATCH_DIR_NAME = "veille"
 # A reserved name under veille/: no subject of DIGEST_SUBJECTS may take it, or its digests would be

@@ -268,17 +268,22 @@ ces relevés sont supprimés. Il affiche une ligne par top (fiches écrites, rel
 existe, relevés supprimés, relevés illisibles gardés). Code de sortie :
 
 - 0 : chaque top a réussi, ou n'a aucun relevé ;
-- 1 : un relevé est illisible (gardé, jamais supprimé, tant qu'il est là) ou une fiche n'a pas pu
-  être écrite (les relevés de ce top sont gardés) ; l'autre top est écrit quand même ;
+- 1 : un relevé est illisible (gardé, jamais supprimé, tant qu'il est là), ou une erreur de
+  lecture, d'écriture ou de suppression (`OSError`) arrête un top. Aucun relevé n'est supprimé
+  avant que les fiches de son top soient écrites ; une suppression qui échoue laisse celles déjà
+  faites. Un top arrêté n'a pas de ligne : son erreur est au journal. L'autre top est traité quand
+  même ;
 - 2 : `KB_DATA_DIR` manque, ou `KB_VAULT_DIR` manque ou n'est pas un dossier existant : rien n'est
-  lu, écrit ni supprimé, et aucun dossier n'est créé ;
+  lu dans le brut, rien n'est écrit dans le coffre ni supprimé, aucun dossier du coffre n'est créé ;
+  l'erreur va au journal ;
 - 143 : `kb write-tops` a reçu SIGTERM (`docker stop`) : les fiches déjà écrites sont gardées,
   aucun relevé n'est supprimé avant que ses fiches soient écrites.
 
 **Toute la chaîne en dev**, comme en ligne, où une automatisation enchaînera les étapes :
 
 ```sh
-kb collect; kb import; kb write-tops
+export KB_DATA_DIR=~/.knowledge_base KB_VAULT_DIR=<coffre>
+uv run --env-file .env kb collect; uv run --env-file .env kb import; uv run --env-file .env kb write-tops
 ```
 
 Chaque étape tourne même si la précédente a échoué en partie (un code 4 de `kb collect`, une
