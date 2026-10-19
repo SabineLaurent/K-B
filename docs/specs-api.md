@@ -100,8 +100,8 @@ la route qui répond à chacun.
 | P4 | Cette faille est-elle exploitée activement ? | `GET /items/{item_id}` d'une alerte : `cve_id` et `exploited` | — ; limite : la liste n'a pas de `cve_id` et `q` ne cherche pas dans `cve_id`, on le lit au détail de l'alerte |
 | P5 | Quels dépôts ont le vent en poupe ? | `GET /trends?window_end=…` | — |
 | P6 | Quels papiers récents sur un sujet ? | `GET /items?kind=paper&q=…&since=…` | — |
-| P7 | Quels sont les dépôts les plus étoilés (top 10) ? | — | hors API : les tops sont hors base (journal ADR, 2026-10-07) ; la commande `kb top`, décidée le 2026-10-08, n'est pas codée |
-| P8 | Quels sont les dépôts les plus forkés (top 10) ? | — | hors API : les tops sont hors base (journal ADR, 2026-10-07) ; le top des plus forkés est collecté depuis #264 (`github_most_forked`, recherche triée par `forks`) ; la commande `kb top`, décidée le 2026-10-08, n'est pas codée |
+| P7 | Quels sont les dépôts les plus étoilés (top 10) ? | — | hors API : les tops sont hors base (journal ADR, 2026-10-07) ; `kb write-tops` en écrit une fiche par jour dans le coffre, `veille/tops/most_starred/` (#265) ; la commande `kb top`, décidée le 2026-10-08, n'est pas codée |
+| P8 | Quels sont les dépôts les plus forkés (top 10) ? | — | hors API : les tops sont hors base (journal ADR, 2026-10-07) ; le top des plus forkés est collecté depuis #264 (`github_most_forked`, recherche triée par `forks`) ; `kb write-tops` en écrit une fiche par jour dans le coffre, `veille/tops/most_forked/` (#265) ; la commande `kb top`, décidée le 2026-10-08, n'est pas codée |
 | P9 | Quoi de neuf dans l'écosystème LangChain ? | `GET /items?q=langchain`, puis `GET /items?q=langgraph` : un seul morceau de texte par `q` | — |
 
 Les chemins du brut (`raw_file_path`) ne sont servis par aucune route : un chemin local dévoile le

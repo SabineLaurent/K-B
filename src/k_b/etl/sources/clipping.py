@@ -2,8 +2,9 @@
 each clip into an item (T).
 
 A clip is a Markdown file the Web Clipper extension writes into the vault: a YAML frontmatter
-between two --- lines, then the text kept. The vault stays the user's: K-B reads it, never writes
-to it, and copies each clip new or modified since the last collection under
+between two --- lines, then the text kept. The clips stay the user's: K-B reads them, never
+changes them (it writes only veille/ of the vault: kb write-tops), and copies each clip new or
+modified since the last collection under
 raw/selected_library/clipping/ (ADR of 2026-10-09). A clip is part of the library, never of the
 watch: no digest reads it (ai_api/watch_items.py).
 """

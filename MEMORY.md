@@ -54,7 +54,8 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 - Le 25/10 : POC en conteneurs en localhost, retour console ; ni interface CLI dédiée ni front.
   `kb search` vient après le 08/11 ; un front écoconçu, plus tard (journal ADR, 2026-10-15,
-  « POC du 25/10 »).
+  « POC du 25/10 »). Une commande de plus, `kb write-tops` (#265), écrit les fiches des tops dans
+  le coffre, après `kb import` (journal ADR, 2026-10-19, « Tops : les fiches par `kb write-tops` »).
 
 ## Consignes de travail
 
