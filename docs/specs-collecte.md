@@ -15,8 +15,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 ## Règles communes
 
 - **Un point de lancement** : `kb collect` lance toutes les sources, ou celles de
-  `KB_COLLECT_ONLY` (ci-dessous) ; une source en panne n'arrête pas les autres. Il affiche une
-  ligne par source (`ok` ou `failed (<type d'erreur>)`),
+  `KB_COLLECT_ONLY` (ci-dessous) ; une source en panne n'arrête pas les autres. Au lancement,
+  avant la première source et avant de lire l'état de collecte, il journalise une fois les
+  sources qu'il va collecter (`INFO k_b.cli: sources to collect: cisa_kev, …`), chacune sous le
+  nom de sa ligne de fin. À la fin, il affiche une ligne par source (`ok` ou
+  `failed (<type d'erreur>)`),
   `zotero: skipped (KB_ZOTERO_DIR not set)` quand le dossier de Zotero n'est pas donné,
   `clipping: skipped (KB_VAULT_DIR not set)` quand le coffre Obsidian ne l'est pas, et
   `gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)` sans la clé BigQuery. Quand
@@ -156,9 +159,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-02) : les
   alertes sont demandées pour les seuls paquets suivis (`affects=`). Tout l'écosystème `npm`
   dépasse 100 alertes par semaine et obligerait à paginer.
-- **Jeton** : sans `KB_GITHUB_TOKEN`, les requêtes partent sans jeton, avec la limite de 60
-  requêtes par heure, et sans ligne au journal ; un jeton que GitHub refuse donne un statut HTTP
-  d'erreur à chaque source GitHub (états communs du téléchargement).
+- **Jeton** : sans `KB_GITHUB_TOKEN` (ou vide), les requêtes partent sans jeton, avec la limite
+  de 60 requêtes par heure. Quand une source GitHub (releases, alertes, dépôts les plus étoilés)
+  est collectée, `kb collect` le journalise une fois, au lancement :
+  `WARNING k_b.cli: KB_GITHUB_TOKEN not set: the GitHub API allows 60 requests per hour instead
+  of 5,000`. Avec le jeton, rien n'est journalisé sur lui, et sa valeur n'entre dans aucun
+  message. Un jeton que GitHub refuse donne un statut HTTP d'erreur à chaque source GitHub
+  (états communs du téléchargement).
 - **En cas de panne :** releases (`github_releases_<dépôt>`), en plus des états communs : la page
   n'est pas du JSON, ou pas une liste ; toutes ses releases sont invalides (`all_items_invalid`) ;
   une release est d'un autre dépôt que celui demandé (casse ignorée). Une release invalide parmi
