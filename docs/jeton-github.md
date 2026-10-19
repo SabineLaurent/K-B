@@ -1,7 +1,9 @@
 # Jeton GitHub de K-B
 
-La collecte GitHub (releases, alertes de sécurité, dépôts les plus étoilés) ne lit que des données
-publiques. Sans jeton, l'API accepte 60 requêtes par heure ; avec un jeton, 5 000. Le jeton ne
+La collecte GitHub (releases, alertes de sécurité, dépôts les plus étoilés et les plus forkés) ne lit
+que des données publiques. Sans jeton, l'API accepte 60 requêtes par heure ; avec un jeton,
+5 000 : cette limite vaut pour les releases et les alertes. Les deux tops appellent la recherche,
+qui a son propre quota, à part ([specs-collecte.md](specs-collecte.md), « Limites »). Le jeton ne
 sert qu'à cela.
 
 ## Pourquoi un jeton *fine-grained*

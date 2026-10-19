@@ -7,7 +7,7 @@ Au moins une source par type exigé par la certif, décidées le 2026-09-29 (le 
 
 | Source | Type | Ce qu'on en tire |
 |---|---|---|
-| API GitHub | service web | releases des dépôts choisis, alertes de sécurité, dépôts les plus étoilés |
+| API GitHub | service web | releases des dépôts choisis, alertes de sécurité, dépôts les plus étoilés et les plus forkés |
 | API arXiv | service web | nouveaux papiers : métadonnées et résumé |
 | Catalogue CISA KEV (CSV) | fichier | vulnérabilités activement exploitées, ajoutées depuis la dernière collecte |
 | Web Clipper | fichier | pages gardées à la main, en `.md` |

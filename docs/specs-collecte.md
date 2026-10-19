@@ -1,6 +1,6 @@
 # Spécifications de la collecte et de l'agrégation
 
-Pour chacune des 9 sources de la v0, de 7 fournisseurs : la technologie, l'accès et
+Pour chacune des 10 sources de la v0, de 7 fournisseurs : la technologie, l'accès et
 l'authentification, les limites de débit, les données personnelles, ce qu'on suit, et ce qui se
 passe en cas de panne. Puis le chemin du brut jusqu'au jeu d'items final, et la justification de
 BigQuery. Les décisions et leur pourquoi sont dans le
@@ -44,11 +44,12 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 - **Choisir les sources** (#201) : `KB_COLLECT_ONLY`, posée, ne lance que les sources nommées,
   séparées par des virgules (`KB_COLLECT_ONLY=zotero,clipping`, la collecte du Mac au POC ; les
   conteneurs collectent le reste). Un nom est le dossier d'une source sous `raw/` (`FOLDER_PREFIX`) :
-  `cisa_kev`, `github_releases`, `github_advisories`, `github_most_starred`, `arxiv_cscr_x_csai`,
-  `tldr`, `zotero`, `clipping`, `gh_archive` ; `tldr` lance toutes ses éditions, `github_releases`
-  tous ses dépôts. Les espaces autour d'un nom sont retirés, puis le nom est mis en minuscules
-  (`Zotero` est `zotero`, décision de Sabine du 2026-10-18) ; un nom refusé est cité tel qu'il est
-  écrit, sans les espaces autour. Une source écartée affiche une seule ligne,
+  `cisa_kev`, `github_releases`, `github_advisories`, `github_most_starred`, `github_most_forked`,
+  `arxiv_cscr_x_csai`, `tldr`, `zotero`, `clipping`, `gh_archive` ; `tldr` lance toutes ses
+  éditions, `github_releases` tous ses dépôts. Les espaces autour d'un nom sont retirés, puis le
+  nom est mis en minuscules (`Zotero` est `zotero`, décision de Sabine du 2026-10-18) ; un nom
+  refusé est cité tel qu'il est écrit, sans les espaces autour. Une source écartée affiche une
+  seule ligne,
   `<dossier>: skipped (not in KB_COLLECT_ONLY)`, au nom de son dossier (une source lancée affiche
   le nom de la source, `tldr_ai`), et sa date de dernière collecte reste. Code de sortie **2**,
   sans rien collecter (ni brut ni état écrit ; le refus va au journal), quand la valeur est vide,
@@ -76,7 +77,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   | arXiv | depuis la dernière collecte moins 7 jours, 2 000 papiers au plus (au-delà, la source échoue) |
   | CISA KEV | complet : le catalogue entier est téléchargé |
   | GitHub, releases et alertes | 100 éléments au plus par dépôt ou par écosystème (au-delà, un avertissement) |
-  | GitHub, dépôts les plus étoilés | aucun : un instantané par collecte, un jour manqué n'est pas récupérable |
+  | GitHub, dépôts les plus étoilés et les plus forkés | aucun : un instantané par collecte, un jour manqué n'est pas récupérable |
   | Zotero | complet : chaque extrait contient toute la bibliothèque |
   | Web Clipper | complet : chaque clip écrit ou changé depuis la dernière collecte est copié |
   | GH Archive | chaque fenêtre de 3 jours manquée depuis la dernière collecte, 15 au plus (les plus récentes), en une requête |
@@ -129,7 +130,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     par GitHub, pour les paquets publiés par les dépôts suivis ; la sécurité des projets de
     Sabine relève de Dependabot, pas de K-B ;
   - dépôts les plus étoilés : `GET /search/repositories`, tri par étoiles : le top 100 de tout
-    GitHub, sans filtre par topic.
+    GitHub, sans filtre par topic ;
+  - dépôts les plus forkés (#264) : la même recherche, tri par forks (`sort=forks`), critère
+    `forks:>10000` (533 dépôts le 2026-10-19, le 100e à 27 552 forks). En REST au POC, et non en
+    GraphQL (journal ADR, 2026-10-19), jusqu'à #269.
 - **Accès** : jeton *fine-grained*, dépôts publics seulement, sans permission, dans
   `KB_GITHUB_TOKEN` ([jeton-github.md](jeton-github.md)).
 - **Limites** : 5 000 requêtes par heure avec jeton (60 sans) ; la recherche a sa propre limite,
@@ -157,7 +161,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   Dépôts les plus étoilés collectés (PR de #11) : un instantané du top 100 à chaque collecte
   (un classement change toujours) ; entrées, sorties et montées se calculent à la lecture en
   comparant deux instantanés. Une réponse marquée `incomplete_results`, ou de moins de 100 dépôts, est
-  refusée.
+  refusée. Dépôts les plus forkés collectés (#264) : de même, un instantané du top 100 à chaque
+  collecte, sous `raw/automated_watch/github_most_forked/`.
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-02) : les
   alertes sont demandées pour les seuls paquets suivis (`affects=`). Tout l'écosystème `npm`
   dépasse 100 alertes par semaine et obligerait à paginer.
@@ -166,8 +171,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   journalise une fois, au lancement :
   `WARNING k_b.cli: KB_GITHUB_TOKEN not set: the GitHub API allows 60 requests per hour instead
   of 5,000`. Avec le jeton, rien n'est journalisé sur lui, et sa valeur n'entre dans aucun
-  message. Les dépôts les plus étoilés seuls ne le déclenchent pas : ils appellent la recherche,
-  qui a son propre quota, à part. Un jeton que GitHub refuse donne un statut HTTP d'erreur à
+  message. Les dépôts les plus étoilés et les plus forkés seuls ne le déclenchent pas : ils
+  appellent la recherche, qui a son propre quota, à part. Un jeton que GitHub refuse donne un statut HTTP d'erreur à
   chaque source GitHub (états communs du téléchargement).
 - **En cas de panne :** releases (`github_releases_<dépôt>`), en plus des états communs : la page
   n'est pas du JSON, ou pas une liste ; toutes ses releases sont invalides (`all_items_invalid`) ;
@@ -185,6 +190,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   `owner/name`, URL hors de `https://github.com/`, nombre d'étoiles qui n'est pas un entier…).
   Sans fenêtre de dates, un échec ne retarde rien : la collecte suivante prend un nouvel
   instantané, et celui du jour manqué est perdu.
+- **En cas de panne :** dépôts les plus forkés (`github_most_forked`) : les refus des plus
+  étoilés, sauf sur `topics` et `created_at`, que son lecteur ne lit pas, et avec un nombre de
+  forks (`forks_count`) qui n'est pas un entier à la place du nombre d'étoiles. Pour les deux
+  classements, un nom refusé est cité par sa longueur seule (il porte le login du propriétaire),
+  un nom qui n'est pas du texte par son type.
 
 ### API arXiv — service web
 
@@ -821,8 +831,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
        le hachage, donc arbitraire pour l'utilisatrice ; un clip dont l'URL source change devient
        un nouveau clip, l'ancien reste en base ; un même article gardé sous deux URL donne deux
        clips ; un clip supprimé du coffre reste en base.
-   - **Source sans import** (classement des plus étoilés) : il n'entre pas dans la base (journal
-     ADR, 2026-10-07).
+   - **Source sans import** (classements des plus étoilés et des plus forkés) : ils n'entrent pas
+     dans la base (journal ADR, 2026-10-07).
    - Une même CVE dans deux sources (une entrée CISA et une alerte GitHub), ou citée par deux
      alertes, n'est **pas** un doublon : chaque alerte est gardée, et toutes pointent vers la
      même vulnérabilité (`vulnerability.cve_id` unique).

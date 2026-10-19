@@ -36,7 +36,8 @@ L'étape 1 couvre la porte « veille » :
 
 - **Collecte**, avec un point de lancement unique, une panne isolée par source et une sauvegarde
   brute :
-  - API GitHub : releases des dépôts suivis, alertes de sécurité, dépôts les plus étoilés ;
+  - API GitHub : releases des dépôts suivis, alertes de sécurité, dépôts les plus étoilés et les
+    plus forkés ;
   - API arXiv : papiers sur la sécurité de l'IA, métadonnées et résumé ;
   - catalogue CISA des vulnérabilités activement exploitées (fichier CSV) ;
   - Markdown produit par Obsidian Web Clipper, dans un coffre Obsidian dédié ;

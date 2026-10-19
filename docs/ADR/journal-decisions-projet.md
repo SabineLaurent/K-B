@@ -504,7 +504,9 @@ encore l'ancien modèle.
   Remplace, pour l'API et l'entrée en base, l'ADR du 2026-10-02 sur les plus étoilés (PR de
   #11), qui garde le top 100 de tout GitHub et l'instantané quotidien. Exception à la règle du
   brut intact (2026-09-30), comme arXiv et les alertes : GraphQL ne renvoie que les champs
-  demandés. Limite : durée de conservation des fichiers non décidée.
+  demandés. Limite : durée de conservation des fichiers non décidée. **Révisée le 2026-10-19**,
+  pour la méthode de collecte seule : les deux tops sont collectés par l'API REST au POC, jusqu'à
+  #269 (« Collecte : méthode des tops GitHub »).
 
 ## 2026-10-08
 
@@ -3122,6 +3124,30 @@ time-knight (délégation de Sabine du 2026-10-15).
   base recréée perd ce que le brut ne garde plus (les `withdrawn_at`, les `revised_at` passés
   et les lignes retirées, limite de « Brut : catalogues d'état et conservation »). Limite : le
   MLD du dépôt n'a pas encore les tables de tags (#211). — PR de #263
+
+### Collecte : méthode des tops GitHub
+
+- **Les deux tops GitHub, plus étoilés et plus forkés, sont collectés au POC par la recherche de
+  l'API REST (`GET /search/repositories`, `sort=stars` ou `sort=forks`), et non par l'API
+  GraphQL ; le passage à GraphQL est porté par #269, sans jalon.** Décision de Sabine.
+  **Révise** « Tops GitHub (P7, P8) » (2026-10-07) pour la méthode de collecte seule, et
+  **inverse** l'option qu'elle écartait : l'API REST (82 champs par dépôt, sans choix des
+  champs). Le reste de la décision tient : top du jour, hors base, un fichier par critère et par
+  collecte ; elle était complète dès l'origine (`docs/2026-10-07-clarification-modele.md:294-297`).
+  Pourquoi, celui de Sabine (arbitrage du 2026-10-19) : la date du 25/10. Aucun POST n'existe dans
+  K-B (`etl/http_download.py` ne fait que des GET) et la migration vers httpx (#86) venait avant
+  (remarque de Sabine du 2026-10-11). Les plus étoilés sont d'ailleurs en REST depuis le
+  2026-10-02 (PR de #11) : un seul chemin de collecte pour les deux. L'argument de frugalité du
+  2026-10-07 tient, mesuré le 2026-10-19 : JSON compact de chaque dépôt
+  (`json.dumps(item, separators=(",", ":"))`) contre un objet des 4 champs de GraphQL
+  (`nameWithOwner`, `description`, `stargazerCount`, `forkCount`) sérialisé de même. Sur
+  `tests/fixtures/github_most_starred_extract.json` : 5 878 o contre 177 o par dépôt, 574 Kio
+  contre 17 Kio pour un classement de 100, facteur 33,2 (5 880 et 178 dans #264 : arrondis). Sur
+  le relevé réel des plus forkés (appel du 2026-10-19, 17:40:43Z) : 5 523 o contre 194 o,
+  facteur 28,4. Conséquence : l'exception au brut intact de l'entrée du 2026-10-07 tombe jusqu'à
+  #269, le brut des tops est la réponse REST entière. Option écartée : GraphQL au POC, qui
+  demandait un client POST avant #86. Limite assumée : un brut environ 30 fois plus lourd que
+  nécessaire jusqu'à #269 (RGESN 1.6). — PR de #264
 
 ## Décisions encore ouvertes
 

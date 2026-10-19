@@ -6,7 +6,12 @@ from k_b.commands import collect_command
 from k_b.etl import sources
 from k_b.etl.source_contract import find_source_kind, list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources import clipping, github_api, github_most_starred
+from k_b.etl.sources import (
+    clipping,
+    github_api,
+    github_most_forked,
+    github_most_starred,
+)
 from k_b.etl.sources.zotero import READER
 
 
@@ -20,6 +25,7 @@ def test_the_sources_are_collected_in_the_order_of_2026_10_06():
         "github_advisories_pip",
         "github_advisories_npm",
         "github_most_starred",
+        "github_most_forked",
         "arxiv_cscr_x_csai",
         "tldr_ai",
         "tldr_infosec",
@@ -76,8 +82,8 @@ def test_the_github_core_quota_kinds_are_those_that_call_the_github_api_but_the_
         is github_api.get_from_github_api
     ]
 
-    # The ranking calls the search, which has its own quota, apart.
+    # The rankings call the search, which has its own quota, apart.
     assert {module.FOLDER_PREFIX for module in calling_modules} == (
         collect_command.GITHUB_CORE_QUOTA_FOLDER_PREFIXES
-        | {github_most_starred.FOLDER_PREFIX}
+        | {github_most_starred.FOLDER_PREFIX, github_most_forked.FOLDER_PREFIX}
     )
