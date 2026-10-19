@@ -153,3 +153,18 @@ def test_a_response_without_a_list_of_items_is_refused():
 def test_an_invalid_repository_is_refused_with_its_rank(changes):
     with pytest.raises(ValueError, match="repository 1"):
         read_most_starred(response_with(**changes), expected_size=3)
+
+
+def test_a_refused_name_is_quoted_by_its_length_only():
+    # The name carries the owner's login (register of processing activities).
+    with pytest.raises(ValueError) as refusal:
+        read_most_starred(response_with(full_name="jdoe/../escape"), expected_size=3)
+
+    assert str(refusal.value) == "repository 1: not an owner/name, length 14"
+
+
+def test_a_name_that_is_not_a_string_is_refused_by_its_type():
+    with pytest.raises(ValueError) as refusal:
+        read_most_starred(response_with(full_name=["jdoe/escape"]), expected_size=3)
+
+    assert str(refusal.value) == "repository 1: full_name is not a string"

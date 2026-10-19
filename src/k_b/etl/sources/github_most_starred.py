@@ -88,8 +88,13 @@ def parse_repository(item: object, rank: int) -> StarredRepository:
     if not isinstance(item, dict):
         raise ValueError(f"repository {rank}: not an object")
     full_name = item.get("full_name")
-    if not isinstance(full_name, str) or not is_repository_name(full_name):
-        raise ValueError(f"repository {rank}: not an owner/name: {full_name!r}")
+    if not isinstance(full_name, str):
+        raise ValueError(f"repository {rank}: full_name is not a string")
+    # Its length only: the name carries the owner's login.
+    if not is_repository_name(full_name):
+        raise ValueError(
+            f"repository {rank}: not an owner/name, length {len(full_name)}"
+        )
     url = item.get("html_url")
     if not isinstance(url, str) or not url.startswith(REPOSITORY_URL_PREFIX):
         raise ValueError(

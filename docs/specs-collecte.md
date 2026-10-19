@@ -192,9 +192,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   instantané, et celui du jour manqué est perdu.
 - **En cas de panne :** dépôts les plus forkés (`github_most_forked`) : les refus des plus
   étoilés, sauf sur `topics` et `created_at`, que son lecteur ne lit pas, et avec un nombre de
-  forks (`forks_count`) qui n'est pas un entier à la place du nombre d'étoiles. Un nom refusé est
-  cité par sa longueur seule (il porte le login du propriétaire), un nom qui n'est pas du texte
-  par son type.
+  forks (`forks_count`) qui n'est pas un entier à la place du nombre d'étoiles. Pour les deux
+  classements, un nom refusé est cité par sa longueur seule (il porte le login du propriétaire),
+  un nom qui n'est pas du texte par son type.
 
 ### API arXiv — service web
 
