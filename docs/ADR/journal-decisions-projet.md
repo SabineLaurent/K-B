@@ -3062,9 +3062,9 @@ time-knight (délégation de Sabine du 2026-10-15).
   d'accès aux données ne transforme pas, règle 5). Limites assumées, hypothèses non vérifiées
   sur le coffre : `tags: llm, ai` donne un seul tag `llm, ai` ; un mot sous deux formes Unicode
   (NFC et NFD) donne deux tags. — PR de #260
-- **Les tags d'un clip font partie de son contenu : un tag ajouté ou retiré réécrit le clip,
-  `revised_at` daté, et les liaisons de la version d'avant (`item_tag`) sont supprimées puis
-  écrites de nouveau.** Décision de Sabine. Pourquoi, celui de Sabine : « Un tag supprimé
+- **Les tags d'un clip font partie de son contenu : un tag ajouté ou retiré date `revised_at` ;
+  la liaison d'un tag retiré (`item_tag`) est supprimée, celle d'un tag ajouté écrite.**
+  Décision de Sabine. Pourquoi, celui de Sabine : « Un tag supprimé
   n'existe plus en base. Je ne vois pas l'utilité qu'aurait le fait de le garder en revised
   at. » **Exception nommée à la règle 5 de `conventions.md`** (« ne supprime que par la purge »),
   le premier `DELETE` de `src/k_b` : une liaison est une valeur d'une version du clip, comme une
@@ -3075,6 +3075,20 @@ time-knight (délégation de Sabine du 2026-10-15).
   colonne et un filtre à chaque lecture, pour un historique des tags que rien ne demande).
   Limite : `.claude/rules/conventions.md`, que la session ne modifie pas, ne nomme pas encore
   cette exception. — PR de #260
+- **Un `.md` changé est écrit en *patch*, pas en *put* : seules les colonnes qui ont changé
+  (titre, texte, dates) sont écrites, avec `revised_at` ; seules les liaisons des tags retirés
+  sont supprimées et celles des tags ajoutés écrites ; les liaisons inchangées ne bougent
+  pas.** Décision de Sabine. Pourquoi, celui de Sabine : « je veux le patch. C'est plus sobre et
+  propre ». Révise l'écriture livrée par #259 (« Collecte : mise à jour des `.md` importés »),
+  qui écrivait toutes les colonnes. Le `SET` de l'`UPDATE` ne nomme que les colonnes changées,
+  prises dans les champs de `ClipContent`, jamais dans une valeur lue. Option écartée : le *put*
+  (toutes les colonnes, et toutes les liaisons supprimées puis écrites de nouveau) : plus simple,
+  mais il écrit le texte entier, jusqu'à 1 Mo, pour un tag changé. Ce que le *patch* épargne sur
+  le disque, à vérifier sur la base : en PostgreSQL (08/11), un `UPDATE` laisse en place la
+  valeur hors ligne d'une colonne qui ne change pas (documentation TOAST) ; en SQLite, ce n'est
+  pas établi : SQLite n'écrit que les pages qui changent quand la cellule garde sa taille
+  (journal des sources de SQLite, 2018), mais des essais du forum montrent la ligne entière
+  réécrite dans d'autres cas, non mesuré ici. — PR de #260
 - **Suite prévue, sans code ici.** Le wiki regroupe les fiches par tag (#148) ; le LLM aura la
   main sur les tags, « de façon frugale », pour en créer et les revoir, par l'API de données,
   après le 25/10 ; la provenance d'un tag (Sabine ou LLM) n'est pas modélisée : Sabine préfère

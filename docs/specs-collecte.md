@@ -800,10 +800,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
      - **nature** : `.md` importé, par URL ; la dernière version est gardée (décision de Sabine
        du 2026-10-19, #259). Un clip copié de nouveau, ou une autre copie de la même URL, au même
        contenu (titre, texte, `created`, `published`, tags normalisés, sans leur ordre) est
-       écarté `already_seen` ; un contenu changé réécrit le clip, `revised_at` prend la date de la
-       collecte qui voit le changement, et les liaisons de la version d'avant à ses tags sont
-       supprimées puis écrites de nouveau (#260 ; exception à la règle 5 de
-       `.claude/rules/conventions.md`, journal ADR, 2026-10-19).
+       écarté `already_seen` ; un contenu changé est écrit en *patch* (décision de Sabine du
+       2026-10-19, #260) : seules les colonnes qui ont changé, la liaison de chaque tag retiré
+       supprimée (exception à la règle 5 de `.claude/rules/conventions.md`, journal ADR,
+       2026-10-19), celle de chaque tag ajouté écrite, les autres laissées telles quelles ;
+       `revised_at` prend la date de la collecte qui voit le changement.
        L'item pointe sur le brut le plus récent de son contenu, une copie au même contenu
        comprise. Une propriété que la base ne garde pas (`author`, `description`) ne réécrit
        rien. Un fichier collecté avant ce brut, au contenu différent, est écarté
