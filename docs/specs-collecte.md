@@ -772,12 +772,14 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
        minuscules ; `LLM`, ` llm ` et `#llm` donnent `llm`, une fois. Un tag vide une fois
        normalisé est ignoré ; `clippings`, que le gabarit par défaut met sur chaque clip (5 clips
        sur 5 relevés), est écarté. Un tag qui n'est pas du texte (une liste, un dictionnaire),
-       trop long (plus de 100 caractères) ou avec un NUL fait **refuser le clip entier**, par la
+       trop long (plus de 100 caractères) ou avec un NUL, ou plus de 100 tags, fait **refuser le
+       clip entier**, par la
        voie de rejet des autres propriétés ; de même un tag que la normalisation laisse sous une
        forme qu'elle changerait encore (`##llm` donne `#llm`). Un tag est une ligne de `tag`,
        partagée par les clips qui le portent, liée à chacun par `item_tag`. **Limites**
        (hypothèses, non vérifiées sur le coffre) : `tags: llm, ai` donne un seul tag `llm, ai`,
-       une virgule n'est pas lue comme un séparateur ; un même mot écrit sous deux formes
+       et `tags: "#ai #llm"` le seul tag `ai #llm` : ni une virgule ni une espace intérieure ne
+       sont lues comme un séparateur ; un même mot écrit sous deux formes
        Unicode (NFC et NFD) donne deux tags. Un `#tag` sans guillemets (`- #llm`, `tags: #llm`)
        est un commentaire YAML : lu absent, il est perdu sans trace (vérifié avec `BaseLoader` le
        2026-10-19 ; Web Clipper écrit ses tags entre guillemets). Les tags sont rangés par nom :

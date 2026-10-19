@@ -3051,14 +3051,18 @@ time-knight (délégation de Sabine du 2026-10-15).
   un seul `#` retiré (`removeprefix`), pas tous (`lstrip`), pour ne pas lire `##llm` comme
   `llm` sans décision ; la base ne tient que la longueur de `tag.name` (`CHECK`), car le
   `lower` de SQLite ne connaît que l'ASCII et celui de PostgreSQL tout Unicode ; 100 caractères
-  au plus, borne large non mesurée (le coffre n'est pas lu) ; pas de nombre maximum de tags, le
-  clip étant déjà borné à 1 Mo ; un tag en double est refusé par l'item, sinon la clé de
+  au plus, borne large non mesurée (le coffre n'est pas lu) ; 100 tags au plus par item
+  (`TAG_MAX_COUNT`, tenu par l'item seul), décision de time-knight sur un constat du second
+  `/code-review` (délégation de Sabine du 2026-10-15) : sans borne, un clip de 1 Mo fait de tags
+  d'une lettre écrirait environ 750 000 requêtes dans un seul savepoint (défense en profondeur,
+  `code.md`), ce qui revient sur « le clip est déjà borné à 1 Mo » du plan ; un tag en double est refusé par l'item, sinon la clé de
   `item_tag` le refuserait et arrêterait tout l'import. Options écartées : normaliser dans
   `normalize_item` (`etl/normalize.py`), car `clippings` est propre à Web Clipper et la
   normalisation doit précéder la validation par `Item` ; normaliser dans l'écrivain (la couche
   d'accès aux données ne transforme pas, règle 5). Limites assumées, hypothèses non vérifiées
-  sur le coffre : `tags: llm, ai` donne un seul tag `llm, ai` ; un mot sous deux formes Unicode
-  (NFC et NFD) donne deux tags. — PR de #260
+  sur le coffre : `tags: llm, ai` donne un seul tag `llm, ai`, et `tags: "#ai #llm"` le seul tag
+  `ai #llm` (une espace intérieure n'est pas lue comme un séparateur) ; un mot sous deux formes
+  Unicode (NFC et NFD) donne deux tags. — PR de #260
 - **Les tags d'un clip font partie de son contenu : un tag ajouté ou retiré date `revised_at` ;
   la liaison d'un tag retiré (`item_tag`) est supprimée, celle d'un tag ajouté écrite.**
   Décision de Sabine. Pourquoi, celui de Sabine : « Un tag supprimé
