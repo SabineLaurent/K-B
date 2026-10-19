@@ -64,8 +64,7 @@ def run_collect(data_dir: Path) -> int:
 def log_collection_start(sources: Sequence[Source], environ: Mapping[str, str]) -> None:
     """Once, before the first source: the sources run, by the name of their line at the end,
     then, when one of them uses the primary quota of the GitHub API without KB_GITHUB_TOKEN,
-    that quota. Of
-    the token, only whether it is set is read, never its value."""
+    that quota. Of the token, only whether it is set is read, never its value."""
     logger.info("sources to collect: %s", ", ".join(source.name for source in sources))
     if not environ.get(TOKEN_VARIABLE) and any(
         is_github_core_quota_source(source) for source in sources
