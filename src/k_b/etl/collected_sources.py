@@ -89,6 +89,13 @@ def find_collect_only_refusal(
     return None
 
 
+def read_vault_dir(environ: Mapping[str, str]) -> Path | None:
+    """The vault of KB_VAULT_DIR, the only reading of its value: the clips are copied from it,
+    and kb write-tops writes the sheets of the tops in it. None: not set, or empty."""
+    vault_dir = environ.get(VAULT_DIR_VARIABLE)
+    return Path(vault_dir) if vault_dir else None
+
+
 def list_collected_sources(
     collect_only: CollectOnly,
     environ: Mapping[str, str],
@@ -104,9 +111,9 @@ def list_collected_sources(
     zotero_dir = environ.get(ZOTERO_DIR_VARIABLE)
     if zotero_dir and collect_only.is_collected(ZOTERO_SOURCE_NAME):
         sources.append(ZoteroSource(Path(zotero_dir), store))
-    vault_dir = environ.get(VAULT_DIR_VARIABLE)
-    if vault_dir and collect_only.is_collected(CLIPPING_SOURCE_NAME):
-        sources.append(ClippingSource(Path(vault_dir)))
+    vault_dir = read_vault_dir(environ)
+    if vault_dir is not None and collect_only.is_collected(CLIPPING_SOURCE_NAME):
+        sources.append(ClippingSource(vault_dir))
     if environ.get(BIGQUERY_KEY_VARIABLE) and collect_only.is_collected(
         GH_ARCHIVE_SOURCE_NAME
     ):

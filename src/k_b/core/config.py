@@ -22,7 +22,9 @@ class TrackedRepository:
 # Obsidian (docs/registre-traitements.md, record 2). For now, to be reviewed (ADR of 2026-10-10).
 # One entry per value of the CHECK on source.acquisition_mode in schema.sql: a test keeps both
 # lists equal. Of a state catalog (Zotero, CISA KEV), the raw keeps only the last file imported,
-# whatever the duration: kb import deletes the others (etl/raw_purge.py, ADR of 2026-10-19).
+# whatever the duration: kb import deletes the others (etl/raw_purge.py, ADR of 2026-10-19). Of a
+# top ranking, the raw keeps only the last one readable: kb write-tops deletes the older ones once
+# their sheets are written (etl/top_sheets.py).
 RETENTION_YEARS_BY_ACQUISITION_MODE: dict[str, int | None] = {
     "watch": 2,
     "library": None,
@@ -165,6 +167,13 @@ DIGEST_SUBJECTS = (
         "outils, langages et pratiques de développement hors IA",
     ),
 )
+
+# The folder of the vault that kb writes (ADR of 2026-10-19, "Organisation du coffre"): the digests
+# of each subject in veille/<subject>/ (#209), the sheets of the top rankings in veille/tops/.
+WATCH_DIR_NAME = "veille"
+# A reserved name under veille/: no subject of DIGEST_SUBJECTS may take it, or its digests would be
+# written in the folder of the sheets of the tops (a test keeps it).
+TOPS_DIR_NAME = "tops"
 
 # The bound of a digest request, from its arrival: the reading by the data API and every call to
 # the model, which go one after the other. Under the 240 seconds the HTTP ingress of Azure

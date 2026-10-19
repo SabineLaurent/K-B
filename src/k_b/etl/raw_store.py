@@ -81,6 +81,21 @@ class RawStore:
             return None
         return raw_files[-1].read_bytes()
 
+    def list_file_keys(self, folder_key: str) -> list[str]:
+        """The keys of the files of a folder, in name order, that is collection order; none when
+        it does not exist. Hidden files are left out, as by read_latest, and the subfolders."""
+        folder = self.find_path(folder_key)
+        if not folder.is_dir():
+            return []
+        return sorted(
+            f"{folder_key}/{path.name}"
+            for path in folder.iterdir()
+            if path.is_file() and not path.name.startswith(".")
+        )
+
+    def read(self, key: str) -> bytes:
+        return self.find_path(key).read_bytes()
+
     def find_path(self, key: str) -> Path:
         """The path of key in the data directory. A key that is empty, absolute, that goes up
         (..) or holds a backslash is refused: the keys of the purge come from the base."""

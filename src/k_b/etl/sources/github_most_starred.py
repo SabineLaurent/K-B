@@ -14,6 +14,7 @@ from urllib.parse import urlencode
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.sources.github_api import get_from_github_api
 from k_b.etl.sources.tracked_repositories import is_repository_name
+from k_b.etl.top_sheets import TopEntry
 from k_b.items import parse_aware_datetime
 
 # The search needs a criterion: this one keeps the whole top 100 (the 100th had 116,161 stars on
@@ -127,3 +128,20 @@ def parse_repository(item: object, rank: int) -> StarredRepository:
 
 def read_ranking(raw_response: bytes) -> list[StarredRepository]:
     return read_most_starred(raw_response, expected_size=RANKING_SIZE)
+
+
+def read_top_entries(
+    raw_response: bytes, expected_size: int = RANKING_SIZE
+) -> list[TopEntry]:
+    """The ranking as its sheet shows it (etl/top_sheets.py), its URL built from the name, never
+    read in html_url (ADR of 2026-10-08)."""
+    return [
+        TopEntry(
+            rank=repository.rank,
+            full_name=repository.full_name,
+            url=f"{REPOSITORY_URL_PREFIX}{repository.full_name}",
+            description=repository.description,
+            count=repository.stars,
+        )
+        for repository in read_most_starred(raw_response, expected_size)
+    ]

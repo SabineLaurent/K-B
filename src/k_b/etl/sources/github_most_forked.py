@@ -20,6 +20,7 @@ from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.sources.github_api import get_from_github_api
 from k_b.etl.sources.github_most_starred import RANKING_SIZE, REPOSITORY_URL_PREFIX
 from k_b.etl.sources.tracked_repositories import is_repository_name
+from k_b.etl.top_sheets import TopEntry
 
 # The search needs a criterion: this one keeps the whole top 100 (533 repositories, the 100th had
 # 27,552 forks on 2026-10-19).
@@ -107,3 +108,19 @@ def parse_repository(item: object, rank: int) -> ForkedRepository:
 
 def read_ranking(raw_response: bytes) -> list[ForkedRepository]:
     return read_most_forked(raw_response, expected_size=RANKING_SIZE)
+
+
+def read_top_entries(
+    raw_response: bytes, expected_size: int = RANKING_SIZE
+) -> list[TopEntry]:
+    """The ranking as its sheet shows it (etl/top_sheets.py), its URL built from the name."""
+    return [
+        TopEntry(
+            rank=repository.rank,
+            full_name=repository.full_name,
+            url=f"{REPOSITORY_URL_PREFIX}{repository.full_name}",
+            description=repository.description,
+            count=repository.forks,
+        )
+        for repository in read_most_forked(raw_response, expected_size)
+    ]

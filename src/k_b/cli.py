@@ -1,4 +1,5 @@
-"""Command line: `kb collect`, `kb create-db`, `kb import`, `kb serve`, `kb openapi`.
+"""Command line: `kb collect`, `kb create-db`, `kb import`, `kb write-tops`, `kb serve`,
+`kb openapi`.
 
 The entry point of kb: it reads the command, opens the log and hands the run to its module in
 commands/.
@@ -24,6 +25,7 @@ from k_b.commands.run_log import (
 )
 from k_b.commands.serve_command import run_serve
 from k_b.commands.sigterm import StoppedBySigtermError, stopping_on_sigterm
+from k_b.commands.write_tops_command import run_write_tops
 from k_b.core.config import DATA_API_HOST, DATA_API_PORT
 from k_b.database.connection import DATABASE_FILE_NAME
 from k_b.etl.collected_sources import COLLECT_ONLY_VARIABLE
@@ -50,6 +52,11 @@ def main(argv: list[str] | None = None) -> int:
     command_parsers.add_parser(
         "import",
         help="read the raw items and write them into the database, which removes the duplicates",
+    )
+    command_parsers.add_parser(
+        "write-tops",
+        help="write the sheet of each top ranking in the vault of KB_VAULT_DIR, then delete"
+        " the rankings it supersedes",
     )
     command_parsers.add_parser(
         "serve",
@@ -107,6 +114,8 @@ def run_command(command: str, data_dir: Path) -> int:
         return run_create_db(data_dir)
     if command == "import":
         return run_import(data_dir)
+    if command == "write-tops":
+        return run_write_tops(data_dir)
     if command == "serve":
         return run_serve(data_dir)
     return run_collect(data_dir)
