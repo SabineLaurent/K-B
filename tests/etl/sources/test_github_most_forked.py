@@ -120,7 +120,7 @@ def test_a_recorded_response_gives_the_repositories_by_rank():
     )
 
 
-def test_a_repository_without_description_keeps_an_empty_description():
+def test_a_repository_without_description_has_none():
     repositories = read_most_forked(RECORDED_RESPONSE, expected_size=3)
 
     assert repositories[2].description is None
