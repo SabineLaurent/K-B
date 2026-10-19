@@ -12,6 +12,7 @@ from k_b.etl.sources.github_most_starred import (
     GithubMostStarredSource,
     read_most_starred,
 )
+from k_b.etl.top_sheets import TopEntry
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_most_starred_extract.json").read_bytes()
@@ -168,3 +169,27 @@ def test_a_name_that_is_not_a_string_is_refused_by_its_type():
         read_most_starred(response_with(full_name=["jdoe/escape"]), expected_size=3)
 
     assert str(refusal.value) == "repository 1: full_name is not a string"
+
+
+def test_its_entries_of_a_sheet_carry_the_stars_and_a_url_built_from_the_name():
+    changed = json.loads(RECORDED_RESPONSE)
+    changed["items"][0]["html_url"] = "https://github.com/someone/else"
+
+    entries = github_most_starred.read_top_entries(
+        json.dumps(changed).encode(), expected_size=3
+    )
+
+    assert entries[0] == TopEntry(
+        rank=1,
+        full_name="codecrafters-io/build-your-own-x",
+        url="https://github.com/codecrafters-io/build-your-own-x",
+        description=(
+            "Master programming by recreating your favorite technologies from scratch."
+        ),
+        count=551156,
+    )
+    assert [entry.count for entry in entries] == [551156, 485463, 456631]
+
+
+def test_its_entries_of_a_sheet_are_the_100_of_the_ranking_by_default():
+    assert len(github_most_starred.read_top_entries(FULL_RANKING)) == 100

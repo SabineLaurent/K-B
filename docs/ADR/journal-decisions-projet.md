@@ -506,7 +506,9 @@ encore l'ancien modèle.
   brut intact (2026-09-30), comme arXiv et les alertes : GraphQL ne renvoie que les champs
   demandés. Limite : durée de conservation des fichiers non décidée. **Révisée le 2026-10-19**,
   pour la méthode de collecte seule : les deux tops sont collectés par l'API REST au POC, jusqu'à
-  #269 (« Collecte : méthode des tops GitHub »).
+  #269 (« Collecte : méthode des tops GitHub »). **Révisée le 2026-10-19** encore : la durée du
+  brut est tranchée (le dernier relevé lisible) et une fiche par jour garde l'historique du top
+  (« Tops : les fiches par `kb write-tops` »).
 
 ## 2026-10-08
 
@@ -2953,7 +2955,9 @@ time-knight (délégation de Sabine du 2026-10-15).
 - **Le brut des clips (copies et recopies) n'est supprimé qu'une fois la base sauvegardée, au
   08/11, avec PostgreSQL et Alembic. Règle écrite au registre seulement, sans code au 25/10.**
   Décision de Sabine. Pourquoi, celui de Sabine : une sauvegarde native se migre par
-  `alembic_version`, un export CSV non. K-B ne touche jamais au coffre (`clipping.py`). Sort la
+  `alembic_version`, un export CSV non. K-B ne touche jamais au coffre (`clipping.py`) ;
+  **révisé le même jour** : K-B ne touche jamais aux clips, `kb write-tops` écrit `veille/tops/`
+  du coffre (« Coffre : organisation »). Sort la
   purge des copies de clips de #139, où l'avait mise la décision du 2026-10-17. Limite assumée :
   jusque-là, chaque version d'un clip reste dans le brut, sans durée. — PR de #139
 
@@ -3149,7 +3153,112 @@ time-knight (délégation de Sabine du 2026-10-15).
   demandait un client POST avant #86. Limite assumée : un brut environ 30 fois plus lourd que
   nécessaire jusqu'à #269 (RGESN 1.6). — PR de #264
 
+### Coffre : organisation
+
+- **À la racine du coffre (`KB_VAULT_DIR`) : `Clippings/` et le dossier des PDF, que Sabine
+  remplit ; `wiki/`, le savoir *curated*, à elle jusqu'à #148 ; `veille/`, que K-B écrit : les
+  fiches de veille par sujet (`veille/<sujet>/AAAA-MM-JJ.md`, #209) et les fiches des tops
+  (`veille/tops/`). K-B lit `Clippings/` et écrit `veille/`, rien d'autre.** Décision de Sabine
+  du 2026-10-17, jamais reportée jusqu'ici (compte rendu de time-knight du 2026-10-19), et sa
+  variante du 2026-10-19 pour les tops : « tops fait partie de la veille, donc veille/tops pour les
+  tops ». Ne réécrit pas l'entrée du 2026-09-29 (`wiki/veille/<question>/`) : elle la remplace
+  pour le chemin des fiches de veille. Options écartées : `tops/` à la racine, frère de `veille/`
+  (première version de l'arbitrage du 2026-10-19, révisée par Sabine) ; les tops sous
+  `wiki/veille/` (une fiche de top ferait passer le critère de #210 sans fiche du LLM). `tops`
+  devient un nom réservé sous `veille/` : aucun sujet de `DIGEST_SUBJECTS` ne peut le prendre,
+  sinon ses fiches iraient dans le dossier des tops (test de `tests/etl/test_top_sheets.py`).
+  **Révise** « K-B ne touche jamais au coffre » (« Brut : catalogues d'état et conservation »,
+  même jour) : K-B ne touche jamais aux clips. — PR de #265
+
+### Tops : les fiches par `kb write-tops`
+
+- **Les fiches des deux tops sont écrites par une commande à part, `kb write-tops`, avec son
+  propre code de sortie ; `kb import` ne lit pas `KB_VAULT_DIR` et ne touche pas au coffre. En
+  dev, la chaîne se lance par `kb collect; kb import; kb write-tops`.** Décision de Sabine du
+  2026-10-19 (18:45Z–19:00Z). Pourquoi, celui de Sabine : un pipeline d'étapes logiques qui
+  s'enchaînent (collecte → import en base → création des fiches) ; en ligne, une automatisation
+  les enchaînera, `kb import` ne sera pas lancé à la main ; la ligne du README reproduit en dev le
+  fonctionnement de la prod, sans commande d'orchestration à coder. `;` plutôt que `&&` (choix de
+  Sabine sur proposition de la session) : `kb collect` sort en 4 dès qu'une source échoue (arXiv
+  au-delà de 2 000 papiers, « Problèmes connus » de `MEMORY.md`), et `kb write-tops` ne lit que
+  le brut. **Révise** l'arbitrage C du même jour (la fiche à la fin de `kb import`, critère
+  initial de #265, jamais écrit dans ce journal). Options écartées : la fiche en fin de
+  `kb import` (deux rôles dans une commande) ; `&&` (une source en panne arrête les fiches). Une
+  commande `kb write-notes` qui les regrouperait n'est pas à créer maintenant. Sans
+  `KB_VAULT_DIR`, ou s'il n'est pas un dossier existant : code 2, rien n'est lu ni supprimé, aucun
+  dossier créé (`write_file_atomically` créerait un faux coffre sur une faute de frappe) ; aucun
+  relevé : code 0 (tranché par time-knight, délégation de Sabine du 2026-10-15). Point ouvert :
+  où tourne `kb write-tops` en ligne, avec le coffre, d'ici le 08/11. — PR de #265
+- **Une fiche par top et par jour de collecte encore présent dans le brut,
+  `veille/tops/<most_starred|most_forked>/AAAA-MM-JJ.md`, nommée par le jour UTC du relevé ; une
+  fiche qui existe n'est jamais réécrite. Une fois les fiches d'un top écrites, ses relevés
+  lisibles antérieurs au dernier relevé lisible sont supprimés du brut.** Décision de Sabine
+  (proposition (a) de la session, 2026-10-19). Pourquoi : « une fiche datée par top et par
+  collecte » (décision 2 du 2026-10-19), alors que `kb collect` et `kb write-tops` ne tournent pas
+  au même rythme ; « je valide le dernier json importé avec succès » (décision 4) : importé avec
+  succès = sa fiche est écrite. Option écartée : la fiche du dernier relevé seul (la lettre du
+  premier critère), qui supprimerait sans fiche les relevés des jours sans `kb write-tops`.
+  **Tranche** la limite « durée de conservation des fichiers non décidée » de « Tops GitHub (P7,
+  P8) » (2026-10-07) pour le brut : seul le dernier relevé lisible reste, avec ceux qui le
+  suivent ; et **révise** son « sans historique » : les fiches gardent un top par jour. Chaque
+  relevé listé est relu, sa fiche écrite ou non : un relevé illisible n'est jamais pris pour le
+  dernier lisible (constat de la relecture du plan). Le dossier est lu une fois : un relevé écrit
+  pendant la commande (brut partagé, #200) n'est ni lu ni supprimé. Limites assumées : deux
+  collectes le même jour ne donnent qu'une fiche, celle du premier relevé de ce jour encore dans le
+  brut, alors que le brut ne garde que le second (et `kb top`, #266, l'affichera) ; au premier
+  lancement sur les vraies données, tout l'historique des relevés devient des fiches, puis ces
+  relevés sont supprimés ; deux `kb write-tops` simultanés peuvent réécrire une fiche créée entre
+  le contrôle et l'écriture (même contenu pour un même relevé). — PR de #265
+- **Un relevé illisible (nom qui n'est pas une heure de collecte, JSON invalide, classement
+  refusé) est gardé, jamais supprimé, journalisé sans le nom de son fichier, et `kb write-tops`
+  sort en 1 tant qu'il est là.** Décision de Sabine (proposition (a), 2026-10-19). Pourquoi :
+  échouer fermé, la fiche de son jour manque. Option écartée : le journaliser et sortir en 0.
+  Limite assumée : un relevé illisible fait échouer chaque `kb write-tops` jusqu'à son retrait à
+  la main, comme arXiv au-delà de 2 000 papiers ; c'est le cas si #269 change le lecteur sans
+  reprendre les relevés REST. — PR de #265
+- **La fiche est du Markdown déterministe, en français : un frontmatter (`classement`, `releve`,
+  `depots`), puis un tableau par rang (dépôt en lien, étoiles ou forks, description). L'URL est
+  construite depuis le nom, jamais lue dans `html_url` ; la description est neutralisée :
+  contrôles, surrogates isolés et contrôles bidirectionnels remplacés par une espace, blancs
+  réduits à une espace, `\`, `[`, `]`, `<`, `>`, `|`, l'accent grave, `#`, `%` et `$` échappés
+  par une barre oblique inverse.** Décision
+  de Sabine pour la description échappée (P4, 2026-10-19) ; la liste est celle du critère,
+  complétée par la session (tranché par time-knight) : `#` (un tag Obsidian dans le coffre, alors
+  que les tags d'une fiche sont réservés au LLM), `%` (un commentaire `%%` masque la suite), `$`
+  (une formule), les surrogates (qui feraient échouer l'encodage UTF-8 de toute la commande) et
+  les contrôles bidirectionnels (qui réordonnent l'affichage ; U+200D, qui joint les émojis, est
+  gardé). Pourquoi : une description est un texte libre venu de GitHub, une donnée et jamais une
+  syntaxe. Limites assumées : une URL nue reste cliquable dans Obsidian (lien vers une page
+  publique ; la casser abîmerait le texte) ; `==`, `*`, `_` et `~` restent de la mise en forme ;
+  un processus tué laisse un temporaire caché `.AAAA-MM-JJ.md.*.tmp` dans le coffre. — PR de #265
+- **`kb write-tops` ne suit jamais un lien symbolique dans le coffre : si `veille/`, `veille/tops/`,
+  `veille/tops/<top>/` ou la fiche d'un des relevés est un lien symbolique
+  (`vault_link_refused`), si une fiche n'est pas un fichier régulier (`sheet_not_a_file` : un
+  dossier, par exemple), ou si la fiche d'un relevé lu manque avant sa suppression
+  (`sheet_missing`), il refuse ce top avant d'en écrire aucune fiche, journalise le refus avec
+  son chemin dans le coffre, ne supprime aucun de ses relevés et sort en 1 ; l'autre top est
+  traité.** Décision de Sabine du 2026-10-19, 22:04Z (relayée par time-knight). Pourquoi, celui de
+  Sabine : c'est le dossier où `kb write-tops` écrit qui est en jeu ; une règle d'écriture, à part
+  de celle de la lecture et de l'import. `sheet_not_a_file`, `sheet_missing` et les recontrôles sont tranchés par
+  time-knight (délégation de Sabine du 2026-10-15), après les revues : une entrée prise pour une
+  fiche écrite laisserait supprimer son relevé sans fiche. Le contrôle lit l'entrée elle-même
+  (`lstat`, jamais sa cible) : les dossiers et la fiche de chaque relevé listé (son jour vient de
+  son nom) avant de lire un relevé et d'écrire une fiche ; les dossiers et la fiche de nouveau
+  avant chaque écriture ; les dossiers et les fiches des relevés lisibles une dernière fois avant
+  la suppression, où chaque fiche doit être là (`sheet_missing` sinon : une fiche retirée depuis
+  son écriture laisserait supprimer son relevé sans fiche). Options écartées : suivre le lien et l'écrire comme une limite (premier plan) ;
+  écrire par descripteurs (`O_NOFOLLOW | O_DIRECTORY`), écarté par time-knight :
+  `write_file_atomically` est partagée par tout le projet, et aucune limite de droits n'est à
+  défendre. Limite assumée : une entrée remplacée par un lien entre un contrôle et l'écriture qui
+  le suit serait encore suivie ; seul un processus qui a déjà le compte de l'utilisatrice peut
+  exploiter cette course, et le contenu des fiches est public. — PR de #265
+
 ## Décisions encore ouvertes
+
+- **Où tourne `kb write-tops` en ligne** (2026-10-19) : elle écrit le coffre, qu'aucun conteneur
+  ne monte au POC (règle 4 de `.claude/rules/poc.md`) ; à trancher avant la mise en ligne du
+  08/11 (« Tops : les fiches par `kb write-tops` »).
+
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
   l'étalonnage du juge (#224), si les fiches sont trop maigres (« Fiches de veille : le LLM

@@ -163,6 +163,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   comparant deux instantanés. Une réponse marquée `incomplete_results`, ou de moins de 100 dépôts, est
   refusée. Dépôts les plus forkés collectés (#264) : de même, un instantané du top 100 à chaque
   collecte, sous `raw/automated_watch/github_most_forked/`.
+  Après l'import, `kb write-tops` (#265) écrit une fiche Markdown par top et par jour de collecte
+  encore dans le brut, dans le coffre (`veille/tops/<most_starred|most_forked>/AAAA-MM-JJ.md`),
+  puis supprime les relevés lisibles antérieurs au dernier relevé lisible : le brut d'un top ne
+  garde que son dernier relevé lisible (registre des traitements, étape 7).
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-02) : les
   alertes sont demandées pour les seuls paquets suivis (`affects=`). Tout l'écosystème `npm`
   dépasse 100 alertes par semaine et obligerait à paginer.
@@ -832,7 +836,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
        un nouveau clip, l'ancien reste en base ; un même article gardé sous deux URL donne deux
        clips ; un clip supprimé du coffre reste en base.
    - **Source sans import** (classements des plus étoilés et des plus forkés) : ils n'entrent pas
-     dans la base (journal ADR, 2026-10-07).
+     dans la base (journal ADR, 2026-10-07) ; `kb write-tops` les lit pour écrire leurs fiches
+     dans le coffre (#265).
    - Une même CVE dans deux sources (une entrée CISA et une alerte GitHub), ou citée par deux
      alertes, n'est **pas** un doublon : chaque alerte est gardée, et toutes pointent vers la
      même vulnérabilité (`vulnerability.cve_id` unique).

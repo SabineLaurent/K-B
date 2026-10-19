@@ -72,7 +72,9 @@ modèle et le contrôle des sujets (contrôle 3) sont construits à partir de ce
 consigne du modèle ne change pas, puisque la liste voyage dans le message utilisateur. Les tests
 utilisent leur propre liste de sujets, jamais les noms réels : un renommage ne casse aucun test.
 
-**Limite.** Les fiches sont rangées par sujet (`wiki/veille/<sujet>/AAAA-MM-JJ.md`) : renommer un
+**Limite.** Les fiches sont rangées par sujet (`veille/<sujet>/AAAA-MM-JJ.md`, à la racine du
+coffre ; journal ADR, 2026-10-19, « Coffre : organisation ») ; `tops` est réservé aux fiches des
+tops (`veille/tops/`), aucun sujet ne peut le prendre (`TOPS_DIR_NAME`, `core/config.py`) : renommer un
 sujet ouvre un nouveau dossier, et les anciennes fiches restent dans l'ancien. Option écartée :
 lire la liste dans un fichier du dossier de données ou dans une variable d'environnement ; ce
 serait un réglage de plus à valider au démarrage, pour une liste qui change rarement. À reprendre

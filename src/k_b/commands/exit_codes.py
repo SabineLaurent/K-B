@@ -33,5 +33,5 @@ class ExitCode(IntEnum):
     # 128 + 15, the code of a process stopped by SIGTERM.
     STOPPED_BY_SIGTERM = (
         143,
-        "kb collect, kb import: stopped by SIGTERM; what was done before it is kept",
+        "kb collect, kb import, kb write-tops: stopped by SIGTERM; what was done before it is kept",
     )

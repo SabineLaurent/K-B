@@ -54,7 +54,8 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 - Le 25/10 : POC en conteneurs en localhost, retour console ; ni interface CLI dédiée ni front.
   `kb search` vient après le 08/11 ; un front écoconçu, plus tard (journal ADR, 2026-10-15,
-  « POC du 25/10 »).
+  « POC du 25/10 »). Une commande de plus, `kb write-tops` (#265), écrit les fiches des tops dans
+  le coffre, après `kb import` (journal ADR, 2026-10-19, « Tops : les fiches par `kb write-tops` »).
 
 ## Consignes de travail
 
@@ -76,6 +77,11 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   les mutations suivantes semblent tuées ou survivantes à tort. Une copie qui garde le `.venv` du
   dépôt lit le `src` du dépôt d'origine (`k_b.pth` y pointe ; constat du 2026-10-18, #242) :
   vérifier d'abord que `import k_b; print(k_b.__file__)` donne le chemin de la copie.
+- **`ruff` sans son cache** (constat du 2026-10-19, revue de #265) : `uv run ruff check` a passé,
+  puis `uv run ruff check --no-cache` a trouvé trois imports non triés. Cause non établie : le cache
+  est supposé (le `pyproject.toml` ne fixe ni `src` ni `known-first-party`, la détection des imports
+  internes est une autre piste). Avant de déclarer les contrôles verts :
+  `uv run ruff check --no-cache`.
 - **Liste des tests collectés** (constat du 2026-10-18, #247) : elle n'est pas stable d'une
   exécution à l'autre. `test_a_key_refused_is_never_quoted` (`tests/ai_api/test_data_api_settings.py`)
   est paramétré par une clé tirée par `secrets.token_urlsafe(32)` au chargement du module. Pour

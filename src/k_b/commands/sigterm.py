@@ -1,4 +1,4 @@
-"""The stop of kb collect and kb import on SIGTERM."""
+"""The stop of kb collect, kb import and kb write-tops on SIGTERM."""
 
 import signal
 from collections.abc import Iterator
@@ -9,20 +9,22 @@ from k_b.commands.exit_codes import ExitCode
 
 
 class StoppedBySigtermError(SystemExit):
-    """SIGTERM received by kb collect or kb import: docker stop sends it before SIGKILL."""
+    """SIGTERM received by kb collect, kb import or kb write-tops: docker stop sends it before
+    SIGKILL."""
 
     def __init__(self) -> None:
         super().__init__(ExitCode.STOPPED_BY_SIGTERM)
 
 
 # The commands that stop on SIGTERM; kb serve keeps the handler of uvicorn.
-COMMANDS_STOPPED_BY_SIGTERM = frozenset({"collect", "import"})
+COMMANDS_STOPPED_BY_SIGTERM = frozenset({"collect", "import", "write-tops"})
 
 
 @contextmanager
 def stopping_on_sigterm(command: str) -> Iterator[None]:
-    """For kb collect and kb import, turn SIGTERM into StoppedBySigtermError, a SystemExit: the
-    import is undone and its log removed, the temporary files are removed, as on any exception.
+    """For kb collect, kb import and kb write-tops, turn SIGTERM into StoppedBySigtermError, a
+    SystemExit: the import is undone and its log removed, the temporary files are removed, no
+    ranking is deleted before its sheets are written, as on any exception.
     A SIGTERM received during the commit of the import is raised once the commit has returned:
     the import and its log are kept (etl/load.py, commit_with_log). The handler found is set
     back on exit.

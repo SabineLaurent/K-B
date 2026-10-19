@@ -302,7 +302,13 @@ def test_a_key_is_deleted_under_the_data_directory_once(tmp_path):
 def test_a_key_that_is_not_relative_to_the_data_directory_is_refused(tmp_path, key):
     store = RawStore(tmp_path / "data")
 
-    for method in (store.delete, store.has_file, store.read_latest):
+    for method in (
+        store.delete,
+        store.has_file,
+        store.read_latest,
+        store.list_file_keys,
+        store.read,
+    ):
         with pytest.raises(
             ValueError, match="not a key relative to the data directory"
         ):
@@ -326,6 +332,29 @@ def test_a_folder_without_raw_file_has_no_latest(tmp_path):
 
     assert store.read_latest("raw/selected_library/zotero") is None
     assert store.read_latest("raw/selected_library/absent") is None
+
+
+def test_the_keys_of_a_folder_are_listed_in_name_order_hidden_files_left_out(tmp_path):
+    folder = tmp_path / "raw" / "automated_watch" / "github_most_starred"
+    folder.mkdir(parents=True)
+    (folder / "2026-10-06T093000Z.json").write_bytes(b"latest")
+    (folder / "2026-10-05T093000Z.json").write_bytes(b"older")
+    # A rest of an interrupted write, and the pages of a collection, in a subfolder.
+    (folder / ".2026-10-07T093000Z.json.abc.tmp").write_bytes(b"half")
+    (folder / "2026-10-07T093000Z").mkdir()
+    store = RawStore(tmp_path)
+
+    keys = store.list_file_keys("raw/automated_watch/github_most_starred")
+
+    assert keys == [
+        "raw/automated_watch/github_most_starred/2026-10-05T093000Z.json",
+        "raw/automated_watch/github_most_starred/2026-10-06T093000Z.json",
+    ]
+    assert [store.read(key) for key in keys] == [b"older", b"latest"]
+
+
+def test_a_folder_that_does_not_exist_has_no_key(tmp_path):
+    assert RawStore(tmp_path).list_file_keys("raw/automated_watch/absent") == []
 
 
 def test_the_folder_key_of_a_source_is_under_raw_and_its_acquisition_folder():

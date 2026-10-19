@@ -28,6 +28,7 @@ ETL_PIPELINE_MODULES = {
     "etl.normalize",
     "etl.raw_store",
     "etl.raw_purge",
+    "etl.top_sheets",
     "etl.source_contract",
     "etl.http_download",
     "etl.user_agent",

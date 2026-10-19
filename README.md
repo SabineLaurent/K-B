@@ -184,7 +184,7 @@ uv sync
 |---|---|---|
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
 | `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
-| `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais le coffre. |
+| `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, et ne tourne pas sans elle (code 2). |
 | `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
 | `KB_COLLECT_ONLY` | non | les dossiers des sources que `kb collect` lance, séparés par des virgules (`zotero,clipping`) ; la casse ne compte pas. Sans elle, pas de filtre : chaque source tourne comme avant (Zotero, clips et GH Archive selon leur variable). Une source écartée affiche `<dossier>: skipped (not in KB_COLLECT_ONLY)` ; un nom qui n'est pas un dossier de source, une valeur ou une entrée vide, ou une source choisie sans sa variable (`zotero` sans `KB_ZOTERO_DIR`) : code 2, rien n'est collecté ([docs/specs-collecte.md](docs/specs-collecte.md), « Choisir les sources »). |
 | `KB_GITHUB_TOKEN` | non | jeton GitHub en lecture seule ([docs/jeton-github.md](docs/jeton-github.md)). Sans lui, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000. |
@@ -250,6 +250,45 @@ sortie :
 - 143 : `kb import` a reçu SIGTERM (`docker stop`). Reçu avant la validation de la base, il
   n'écrit rien, comme pour 1, ni dans la base ni au journal ; reçu pendant ou après, l'import est
   gardé, avec son journal.
+
+**Écrire les fiches des tops dans le coffre** (après un import) :
+
+```sh
+KB_DATA_DIR=~/.knowledge_base KB_VAULT_DIR=<coffre> uv run kb write-tops
+```
+
+`kb write-tops` écrit, pour le top 100 des dépôts les plus étoilés et celui des plus forkés, une
+fiche Markdown par jour de collecte encore présent dans le brut :
+`<KB_VAULT_DIR>/veille/tops/most_starred/AAAA-MM-JJ.md` et `.../most_forked/AAAA-MM-JJ.md`,
+nommée par le jour UTC du relevé. Une fiche qui existe n'est jamais réécrite : deux collectes le
+même jour ne donnent qu'une fiche, celle du premier relevé de ce jour encore dans le brut. Une fois
+les fiches d'un top écrites, ses relevés lisibles plus anciens que le dernier relevé lisible sont
+supprimés du brut ; au premier lancement, tout l'historique des relevés devient des fiches, puis
+ces relevés sont supprimés. Il affiche une ligne par top (fiches écrites, relevés sautés parce que la fiche de leur jour
+existe, relevés supprimés, relevés illisibles gardés). Code de sortie :
+
+- 0 : chaque top a réussi, ou n'a aucun relevé ;
+- 1 : un relevé est illisible (gardé, jamais supprimé, tant qu'il est là), ou une erreur de
+  lecture, d'écriture ou de suppression (`OSError`) arrête un top. Aucun relevé n'est supprimé
+  avant que les fiches de son top soient écrites ; une suppression qui échoue laisse celles déjà
+  faites. Un top arrêté n'a pas de ligne : son erreur est au journal. L'autre top est traité quand
+  même ;
+- 2 : `KB_DATA_DIR` manque, ou `KB_VAULT_DIR` manque ou n'est pas un dossier existant : rien n'est
+  lu dans le brut, rien n'est écrit dans le coffre ni supprimé, aucun dossier du coffre n'est créé ;
+  l'erreur va au journal ;
+- 143 : `kb write-tops` a reçu SIGTERM (`docker stop`) : les fiches déjà écrites sont gardées,
+  aucun relevé n'est supprimé avant que ses fiches soient écrites.
+
+**Toute la chaîne en dev**, comme en ligne, où une automatisation enchaînera les étapes :
+
+```sh
+export KB_DATA_DIR=~/.knowledge_base KB_VAULT_DIR=<coffre>
+uv run --env-file .env kb collect; uv run --env-file .env kb import; uv run --env-file .env kb write-tops
+```
+
+Chaque étape tourne même si la précédente a échoué en partie (un code 4 de `kb collect`, une
+source en panne), et garde son propre code de sortie : `kb write-tops` ne lit que le brut, pas la
+base.
 
 Les codes de toutes les commandes et leur sens sont listés par `uv run kb --help`.
 

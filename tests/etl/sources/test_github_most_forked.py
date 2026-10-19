@@ -12,6 +12,7 @@ from k_b.etl.sources.github_most_forked import (
     GithubMostForkedSource,
     read_most_forked,
 )
+from k_b.etl.top_sheets import TopEntry
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 # Ranks 4 to 6 of the collection of 2026-10-19: the first three are owned by persons (minimisation).
@@ -187,3 +188,25 @@ def test_a_name_that_is_not_a_string_is_refused_by_its_type():
         read_most_forked(response_with(full_name=["jdoe/escape"]), expected_size=3)
 
     assert str(refusal.value) == "repository 1: full_name is not a string"
+
+
+def test_its_entries_of_a_sheet_carry_the_forks_and_a_url_built_from_the_name():
+    changed = json.loads(RECORDED_RESPONSE)
+    changed["items"][0]["html_url"] = "https://github.com/someone/else"
+
+    entries = github_most_forked.read_top_entries(
+        json.dumps(changed).encode(), expected_size=3
+    )
+
+    assert entries[0] == TopEntry(
+        rank=1,
+        full_name="firstcontributions/first-contributions",
+        url="https://github.com/firstcontributions/first-contributions",
+        description="🚀✨ Help beginners to contribute to open source projects",
+        count=111263,
+    )
+    assert [entry.count for entry in entries] == [111263, 107886, 94375]
+
+
+def test_its_entries_of_a_sheet_are_the_100_of_the_ranking_by_default():
+    assert len(github_most_forked.read_top_entries(FULL_RANKING)) == 100

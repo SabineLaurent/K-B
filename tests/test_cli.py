@@ -12,13 +12,14 @@ from datetime import UTC, datetime, time, timedelta
 import pytest
 import uvicorn.config
 from etl.test_extract import BrokenSource, WorkingSource
+from etl.test_top_sheets import TEST_TOPS, write_ranking
 from etl.test_transform import FIXTURES_DIR, copy_fixture
 
 from k_b import cli
-from k_b.commands import collect_command, import_command
+from k_b.commands import collect_command, import_command, write_tops_command
 from k_b.core import quoting
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
-from k_b.etl import collected_sources, load
+from k_b.etl import collected_sources, load, top_sheets
 from k_b.etl.source_contract import SourceKind
 from k_b.etl.sources import clipping
 
@@ -1310,3 +1311,252 @@ def test_kb_collect_sent_sigterm_in_its_own_process_exits_with_143(tmp_path):
     assert process.returncode == cli.ExitCode.STOPPED_BY_SIGTERM
     assert "ERROR k_b.cli: kb stopped by SIGTERM" in error_output
     assert not (tmp_path / "collection_state.json").exists()
+
+
+@pytest.fixture
+def test_tops(monkeypatch):
+    """The tops of kb write-tops, read with the size of the recorded responses: 3 each."""
+    monkeypatch.setattr(write_tops_command, "TOPS", TEST_TOPS)
+
+
+@pytest.fixture
+def data_and_vault_dirs(monkeypatch, tmp_path):
+    data_dir, vault_dir = tmp_path / "data", tmp_path / "vault"
+    data_dir.mkdir()
+    vault_dir.mkdir()
+    monkeypatch.setenv("KB_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("KB_VAULT_DIR", str(vault_dir))
+    return data_dir, vault_dir
+
+
+def write_rankings_of_each_top(data_dir, *collection_names):
+    return {
+        top.name: [write_ranking(data_dir, top, name) for name in collection_names]
+        for top in TEST_TOPS
+    }
+
+
+def list_sheets(vault_dir):
+    return sorted(
+        path.relative_to(vault_dir).as_posix() for path in vault_dir.rglob("*.md")
+    )
+
+
+def test_write_tops_writes_the_sheets_of_each_top_then_deletes_the_older_rankings(
+    data_and_vault_dirs, test_tops, capsys
+):
+    data_dir, vault_dir = data_and_vault_dirs
+    rankings = write_rankings_of_each_top(
+        data_dir, "2026-10-05T093000Z", "2026-10-12T093000Z"
+    )
+
+    exit_code = cli.main(["write-tops"])
+
+    assert exit_code == 0
+    assert list_sheets(vault_dir) == [
+        "veille/tops/most_forked/2026-10-05.md",
+        "veille/tops/most_forked/2026-10-12.md",
+        "veille/tops/most_starred/2026-10-05.md",
+        "veille/tops/most_starred/2026-10-12.md",
+    ]
+    for older, last in rankings.values():
+        assert (older.exists(), last.exists()) == (False, True)
+    output = capsys.readouterr().out
+    for top_name in ("most_starred", "most_forked"):
+        assert (
+            f"{top_name} sheets: written 2,"
+            " rankings skipped (sheet of their day exists) 0,"
+            " superseded rankings deleted 1, unreadable rankings kept 0\n"
+        ) in output
+
+
+def test_write_tops_again_writes_nothing_new(data_and_vault_dirs, test_tops, capsys):
+    data_dir, _ = data_and_vault_dirs
+    write_rankings_of_each_top(data_dir, "2026-10-05T093000Z")
+    cli.main(["write-tops"])
+    capsys.readouterr()
+
+    assert cli.main(["write-tops"]) == 0
+    assert (
+        "most_starred sheets: written 0,"
+        " rankings skipped (sheet of their day exists) 1,"
+        " superseded rankings deleted 0, unreadable rankings kept 0\n"
+    ) in capsys.readouterr().out
+
+
+def test_write_tops_without_ranking_says_so_and_succeeds(
+    data_and_vault_dirs, test_tops, capsys
+):
+    _, vault_dir = data_and_vault_dirs
+
+    assert cli.main(["write-tops"]) == 0
+    assert capsys.readouterr().out == (
+        "most_starred sheets: no ranking\nmost_forked sheets: no ranking\n"
+    )
+    assert list_sheets(vault_dir) == []
+
+
+@pytest.mark.parametrize("vault_dir_variable", [None, ""])
+def test_write_tops_without_kb_vault_dir_runs_nothing_and_exits_2(
+    monkeypatch, data_and_vault_dirs, test_tops, capsys, vault_dir_variable
+):
+    data_dir, _ = data_and_vault_dirs
+    if vault_dir_variable is None:
+        monkeypatch.delenv("KB_VAULT_DIR")
+    else:
+        monkeypatch.setenv("KB_VAULT_DIR", vault_dir_variable)
+    rankings = write_rankings_of_each_top(
+        data_dir, "2026-10-05T093000Z", "2026-10-12T093000Z"
+    )
+
+    assert cli.main(["write-tops"]) == cli.ExitCode.NOT_STARTED
+    assert all(path.exists() for paths in rankings.values() for path in paths)
+    assert re.search(
+        rf"^{LOG_LINE_DATE} ERROR k_b\.cli: KB_VAULT_DIR not set; the sheets of the tops"
+        " are written in the vault$",
+        (data_dir / "logs" / "kb.log").read_text("utf-8"),
+        re.MULTILINE,
+    )
+    assert capsys.readouterr().out == ""
+
+
+def test_write_tops_with_a_vault_that_does_not_exist_creates_no_folder_and_exits_2(
+    monkeypatch, data_and_vault_dirs, test_tops, tmp_path, capsys
+):
+    data_dir, _ = data_and_vault_dirs
+    absent_vault = tmp_path / "typo"
+    monkeypatch.setenv("KB_VAULT_DIR", str(absent_vault))
+    write_rankings_of_each_top(data_dir, "2026-10-05T093000Z")
+
+    assert cli.main(["write-tops"]) == cli.ExitCode.NOT_STARTED
+    assert not absent_vault.exists()
+    error_output = capsys.readouterr().err
+    assert "KB_VAULT_DIR is not an existing directory; no folder is created" in (
+        error_output
+    )
+    assert str(absent_vault) not in error_output
+
+
+def test_a_sheet_not_written_keeps_its_rankings_exits_1_and_the_other_top_is_written(
+    monkeypatch, data_and_vault_dirs, test_tops, capsys
+):
+    data_dir, vault_dir = data_and_vault_dirs
+    rankings = write_rankings_of_each_top(
+        data_dir, "2026-10-05T093000Z", "2026-10-12T093000Z"
+    )
+    write_file_atomically = top_sheets.write_file_atomically
+
+    def refuse_the_most_starred(path, content):
+        if "most_starred" in path.parts:
+            raise PermissionError(13, "Permission denied", str(path))
+        write_file_atomically(path, content)
+
+    monkeypatch.setattr(top_sheets, "write_file_atomically", refuse_the_most_starred)
+
+    assert cli.main(["write-tops"]) == cli.ExitCode.FAILED
+    assert all(path.exists() for path in rankings["most_starred"])
+    assert [path.exists() for path in rankings["most_forked"]] == [False, True]
+    assert list_sheets(vault_dir) == [
+        "veille/tops/most_forked/2026-10-05.md",
+        "veille/tops/most_forked/2026-10-12.md",
+    ]
+    error_output = capsys.readouterr().err
+    assert (
+        "top sheets failed: most_starred: PermissionError (Permission denied);"
+        " run kb write-tops again"
+    ) in error_output
+    assert str(vault_dir) not in error_output
+
+
+def test_an_unreadable_ranking_is_kept_and_write_tops_exits_1(
+    data_and_vault_dirs, test_tops, capsys
+):
+    data_dir, vault_dir = data_and_vault_dirs
+    rankings = write_rankings_of_each_top(data_dir, "2026-10-05T093000Z")
+    unreadable = write_ranking(data_dir, TEST_TOPS[0], "2026-10-12T093000Z", b"[]")
+
+    assert cli.main(["write-tops"]) == cli.ExitCode.FAILED
+    assert unreadable.exists()
+    assert rankings["most_starred"][0].exists()
+    assert len(list_sheets(vault_dir)) == 2
+    assert (
+        "most_starred sheets: written 1,"
+        " rankings skipped (sheet of their day exists) 0,"
+        " superseded rankings deleted 0, unreadable rankings kept 1\n"
+    ) in capsys.readouterr().out
+
+
+def test_a_sigterm_while_a_sheet_is_written_stops_write_tops_and_deletes_no_ranking(
+    monkeypatch, data_and_vault_dirs, test_tops, sigterm_handler_of_the_test
+):
+    data_dir, vault_dir = data_and_vault_dirs
+    rankings = write_rankings_of_each_top(
+        data_dir, "2026-10-05T093000Z", "2026-10-12T093000Z"
+    )
+    write_file_atomically = top_sheets.write_file_atomically
+
+    def write_then_receive_sigterm(path, content):
+        write_file_atomically(path, content)
+        signal.raise_signal(signal.SIGTERM)
+
+    monkeypatch.setattr(top_sheets, "write_file_atomically", write_then_receive_sigterm)
+
+    exit_code = cli.main(["write-tops"])
+
+    assert exit_code == cli.ExitCode.STOPPED_BY_SIGTERM
+    assert all(path.exists() for paths in rankings.values() for path in paths)
+    assert list_sheets(vault_dir) == ["veille/tops/most_starred/2026-10-05.md"]
+    assert list_hidden_files(vault_dir) == []
+    assert signal.getsignal(signal.SIGTERM) is sigterm_handler_of_the_test
+
+
+def test_kb_import_writes_nothing_in_the_vault(data_and_vault_dirs, test_tops):
+    data_dir, vault_dir = data_and_vault_dirs
+    cli.main(["create-db"])
+    rankings = write_rankings_of_each_top(
+        data_dir, "2026-10-05T093000Z", "2026-10-12T093000Z"
+    )
+
+    assert cli.main(["import"]) == 0
+    assert list(vault_dir.iterdir()) == []
+    assert all(path.exists() for paths in rankings.values() for path in paths)
+
+
+def test_kb_help_lists_write_tops(capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["--help"])
+
+    assert re.search(
+        r"^    write-tops +write the sheet of each top ranking",
+        capsys.readouterr().out,
+        re.MULTILINE,
+    )
+
+
+def test_a_folder_of_a_top_linked_elsewhere_is_refused_exits_1_and_the_other_top_is_written(
+    data_and_vault_dirs, test_tops, tmp_path, capsys
+):
+    data_dir, vault_dir = data_and_vault_dirs
+    rankings = write_rankings_of_each_top(
+        data_dir, "2026-10-05T093000Z", "2026-10-12T093000Z"
+    )
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (vault_dir / "veille" / "tops").mkdir(parents=True)
+    (vault_dir / "veille" / "tops" / "most_starred").symlink_to(
+        elsewhere, target_is_directory=True
+    )
+
+    assert cli.main(["write-tops"]) == cli.ExitCode.FAILED
+    assert all(path.exists() for path in rankings["most_starred"])
+    assert list(elsewhere.iterdir()) == []
+    assert list_sheets(vault_dir / "veille" / "tops" / "most_forked") == [
+        "2026-10-05.md",
+        "2026-10-12.md",
+    ]
+    error_output = capsys.readouterr().err
+    assert (
+        "top sheets failed: most_starred: vault_link_refused: veille/tops/most_starred is a"
+        " symbolic link\n"
+    ) in error_output
+    assert str(vault_dir) not in error_output

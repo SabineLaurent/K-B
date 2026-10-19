@@ -1,11 +1,13 @@
 """SOURCE_KINDS: the only declaration of the sources, one kind per entry, in collection order.
 
-In the package, only commands/collect_command.py and commands/import_command.py import it: they
-give it to the collection (E) and to the import (T then L). The Zotero, clipping and GH Archive
+In the package, only the commands import this module: commands/collect_command.py and
+commands/import_command.py give SOURCE_KINDS to the collection (E) and to the import (T then L);
+commands/write_tops_command.py reads TOPS, the top rankings whose sheets kb write-tops writes. The Zotero, clipping and GH Archive
 kinds have no instance here: etl/collected_sources.py creates them, on a machine that says where
 the Zotero data directory, the Obsidian vault, or the BigQuery key, is.
 """
 
+from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME, make_source_folder_key
 from k_b.etl.source_contract import SourceKind
 from k_b.etl.sources import (
     arxiv,
@@ -30,6 +32,7 @@ from k_b.etl.sources.tracked_repositories import (
     TRACKED_REPOSITORIES,
     list_packages_by_ecosystem,
 )
+from k_b.etl.top_sheets import Top
 
 SOURCE_KINDS = (
     SourceKind(cisa_kev.FOLDER_PREFIX, (CisaKevSource(),), cisa_kev.READER),
@@ -79,4 +82,27 @@ SOURCE_KINDS = (
     # items: its rankings are not items, commands/import_command.py reads them with
     # read_trend_files.
     SourceKind(gh_archive.FOLDER_PREFIX, (), None),
+)
+
+# The sheets of the top rankings, in the order of SOURCE_KINDS: kb write-tops writes them, and
+# kb top (#266) reads the same rankings. Each name is the folder of its sheets under veille/tops/.
+TOPS = (
+    Top(
+        "most_starred",
+        make_source_folder_key(
+            AUTOMATED_WATCH_DIR_NAME, github_most_starred.FOLDER_PREFIX
+        ),
+        github_most_starred.read_top_entries,
+        "Étoiles",
+        "dépôts GitHub les plus étoilés",
+    ),
+    Top(
+        "most_forked",
+        make_source_folder_key(
+            AUTOMATED_WATCH_DIR_NAME, github_most_forked.FOLDER_PREFIX
+        ),
+        github_most_forked.read_top_entries,
+        "Forks",
+        "dépôts GitHub les plus forkés",
+    ),
 )
