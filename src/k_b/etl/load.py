@@ -18,8 +18,9 @@ same base.
 
 A ranking of GH Archive is not made of items: its rows go to the trend table, in the same
 transaction, and its rule is a news feed applied to the whole window. A Zotero entry is a state
-catalog, as CISA KEV, and so is each of its highlights (decision of 2026-10-13). A clip is a
-news feed, by URL: the clips are not changed once kept (decision of 2026-10-17).
+catalog, as CISA KEV, and so is each of its highlights (decision of 2026-10-13). A clip is
+known by its URL, and keeps its latest version: a clip whose content changed is written again
+(decision of 2026-10-19).
 
 Only exact duplicates are found: the same identifier within its source (a replay, collections
 that overlap). The same content under another identifier is not found, a written limit without

@@ -300,8 +300,8 @@ def listed_one_nanosecond_before(vault_dir, name):
 def test_a_clip_rewritten_between_the_list_and_the_reading_is_left_to_the_next_collection(
     vault_dir, monkeypatch, caplog
 ):
-    """Obsidian Sync, iCloud or an edit may be writing it: copied now, it could stay cut for
-    good, the first version of a URL being kept."""
+    """Obsidian Sync, iCloud or an edit may be writing it: copied now, it could go cut into the
+    base, until a collection copies it again."""
     listed = listed_one_nanosecond_before(vault_dir, ARTICLE)
     monkeypatch.setattr(clipping, "list_clip_files", lambda clippings_dir: listed)
 
@@ -337,8 +337,8 @@ def make_changed_now(vault_dir, monkeypatch):
 def test_a_clip_changed_less_than_the_margin_ago_is_left_to_the_next_collection(
     vault_dir, monkeypatch, caplog
 ):
-    """It may still be written (Obsidian, Web Clipper, a sync): copied now, it would stay cut
-    for good, the first version of a URL being kept."""
+    """It may still be written (Obsidian, Web Clipper, a sync): copied now, it would go cut into
+    the base, until a collection copies it again."""
     make_changed_now(vault_dir, monkeypatch)
 
     with caplog.at_level(logging.INFO, logger="k_b.etl.sources.clipping"):

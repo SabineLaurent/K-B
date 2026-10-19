@@ -17,7 +17,8 @@ COMPARED_FIELD_BY_RULE: dict[DiscardRule, str] = {
     "already_seen": "compared_with_collected_at",
     # The collection of the version kept, the only one compared with the content.
     "unchanged": "compared_with_collected_at",
-    # The collection of the latest catalog of the source already imported.
+    # The collection of the latest catalog of the source already imported; for a clip, the
+    # collection of the version kept.
     "no_newer_version": "compared_with_collected_at",
     # The arXiv revision of the version kept.
     "revision_not_newer": "compared_with_revised_at",

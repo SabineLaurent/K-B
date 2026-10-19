@@ -62,7 +62,8 @@ avec son équivalent PostgreSQL.
   (documentation SQLite, WAL, § 5 ; constat sur SQLite 3.50.4).
 - **Dates** : du texte `AAAA-MM-JJTHH:MM:SSZ`, en UTC. Un `CHECK` refuse toute autre forme, et
   un jour qui n'existe pas. Exception, `clip` (#14), écrite en SQL portable (règle 1 de
-  `.claude/rules/poc.md`, sans `strftime`) : son `CHECK` ne tient que la longueur et la place du
+  `.claude/rules/poc.md`, sans `strftime`) : le `CHECK` de chacune de ses dates (`saved_at`,
+  `published_at`, `revised_at`) ne tient que la longueur et la place du
   `T` et du `Z` ; la forme complète est tenue par l'item. Une source qui ne donne qu'un jour
   (`dateAdded` de CISA KEV, `created` et `published` de Web Clipper) est stockée à minuit UTC :
   convention d'écriture, pas de donnée ajoutée.
@@ -206,8 +207,9 @@ GH Archive, dont chaque ligne de classement (`TrendRow`, `src/k_b/items.py`) dev
   autres items ; son URL sans `utm_*` est sa clé naturelle. Ne vont pas en base : `author`,
   `description`, `tags` ; ils restent dans la copie brute. Le texte gardé (`clip.body`) peut
   contenir la signature de l'article et les notes de l'utilisatrice
-  ([registre des traitements](registre-traitements.md)). Un clip déjà en base n'est jamais
-  remplacé : la première version vue d'une URL est gardée.
+  ([registre des traitements](registre-traitements.md)). La dernière version d'une URL est
+  gardée : un clip dont le contenu a changé est réécrit, et `clip.revised_at` prend la date de la
+  collecte qui a vu le changement (journal ADR, 2026-10-19, #259).
 - Le classement des dépôts les plus étoilés n'entre pas dans la base (journal ADR, 2026-10-07).
 
 ## MCD et MLD
