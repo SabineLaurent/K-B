@@ -1,8 +1,11 @@
+import importlib
 from itertools import permutations
+from pathlib import Path
 
+from k_b.commands import collect_command
 from k_b.etl.source_contract import find_source_kind, list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources import clipping
+from k_b.etl.sources import clipping, github_api
 from k_b.etl.sources.zotero import READER
 
 
@@ -55,4 +58,18 @@ def test_the_clips_are_declared_with_their_reader_and_without_an_instance():
         "clipping",
         (),
         clipping.READER,
+    )
+
+
+def test_the_github_api_kinds_are_those_whose_module_calls_the_github_api():
+    sources_dir = Path(github_api.__file__).parent
+    calling_modules = [
+        importlib.import_module(f"k_b.etl.sources.{path.stem}")
+        for path in sources_dir.glob("*.py")
+        if path.stem != "github_api"
+        and "get_from_github_api" in path.read_text("utf-8")
+    ]
+
+    assert {module.FOLDER_PREFIX for module in calling_modules} == (
+        collect_command.GITHUB_API_FOLDER_PREFIXES
     )
