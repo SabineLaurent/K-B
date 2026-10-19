@@ -13,6 +13,7 @@ from k_b.etl.sources import github_most_forked, github_most_starred
 from k_b.etl.top_sheets import (
     Top,
     TopSheetsOutcome,
+    VaultLinkRefusedError,
     neutralize_description,
     write_top_sheets,
 )
@@ -388,3 +389,49 @@ def test_tops_is_a_reserved_name_no_subject_of_the_digests_may_take():
     them in the folder of the sheets of the tops."""
     assert (WATCH_DIR_NAME, TOPS_DIR_NAME) == ("veille", "tops")
     assert TOPS_DIR_NAME not in {subject.name for subject in DIGEST_SUBJECTS}
+
+
+@pytest.mark.parametrize(
+    "linked", ["veille", "veille/tops", "veille/tops/most_starred"]
+)
+def test_a_folder_of_the_sheets_that_is_a_symbolic_link_is_refused_before_anything(
+    data_dir, vault_dir, tmp_path, linked
+):
+    """K-B never follows a symbolic link in the vault (decision of Sabine, 2026-10-19)."""
+    rankings = [
+        write_ranking(data_dir, STARRED_TOP, "2026-10-05T093000Z"),
+        write_ranking(data_dir, STARRED_TOP, "2026-10-06T093000Z"),
+    ]
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    link = vault_dir / linked
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(elsewhere, target_is_directory=True)
+
+    with pytest.raises(VaultLinkRefusedError) as refusal:
+        write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
+
+    assert str(refusal.value) == (
+        f"vault_link_refused: {linked} is a symbolic link;"
+        " K-B never follows a link in the vault"
+    )
+    assert all(ranking.exists() for ranking in rankings)
+    assert list_files(elsewhere) == []
+
+
+def test_a_sheet_that_is_a_symbolic_link_is_refused_and_no_ranking_deleted(
+    data_dir, vault_dir, tmp_path
+):
+    older = write_ranking(data_dir, STARRED_TOP, "2026-10-05T093000Z")
+    last = write_ranking(data_dir, STARRED_TOP, "2026-10-06T093000Z")
+    outside = tmp_path / "outside.md"
+    sheet = find_sheet(vault_dir, STARRED_TOP, "2026-10-06")
+    sheet.parent.mkdir(parents=True)
+    sheet.symlink_to(outside)
+
+    with pytest.raises(VaultLinkRefusedError, match="2026-10-06.md is a symbolic link"):
+        write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
+
+    assert (older.exists(), last.exists()) == (True, True)
+    assert not outside.exists()
+    assert sheet.is_symlink()

@@ -11,7 +11,11 @@ from k_b.commands.run_log import LOGGER_NAME
 from k_b.etl.collected_sources import VAULT_DIR_VARIABLE, read_vault_dir
 from k_b.etl.raw_store import RawStore
 from k_b.etl.source_kinds import TOPS
-from k_b.etl.top_sheets import TopSheetsOutcome, write_top_sheets
+from k_b.etl.top_sheets import (
+    TopSheetsOutcome,
+    VaultLinkRefusedError,
+    write_top_sheets,
+)
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -46,6 +50,10 @@ def run_write_tops(data_dir: Path) -> int:
                 type(error).__name__,
                 reason,
             )
+            has_failed = True
+            continue
+        except VaultLinkRefusedError as error:
+            logger.error("top sheets failed: %s: %s", top.name, error)
             has_failed = True
             continue
         print(f"{top.name} sheets: {describe_outcome(outcome)}")

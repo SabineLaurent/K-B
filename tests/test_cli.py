@@ -1531,3 +1531,32 @@ def test_kb_help_lists_write_tops(capsys):
         capsys.readouterr().out,
         re.MULTILINE,
     )
+
+
+def test_a_folder_of_a_top_linked_elsewhere_is_refused_exits_1_and_the_other_top_is_written(
+    data_and_vault_dirs, test_tops, tmp_path, capsys
+):
+    data_dir, vault_dir = data_and_vault_dirs
+    rankings = write_rankings_of_each_top(
+        data_dir, "2026-10-05T093000Z", "2026-10-12T093000Z"
+    )
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (vault_dir / "veille" / "tops").mkdir(parents=True)
+    (vault_dir / "veille" / "tops" / "most_starred").symlink_to(
+        elsewhere, target_is_directory=True
+    )
+
+    assert cli.main(["write-tops"]) == cli.ExitCode.FAILED
+    assert all(path.exists() for path in rankings["most_starred"])
+    assert list(elsewhere.iterdir()) == []
+    assert list_sheets(vault_dir / "veille" / "tops" / "most_forked") == [
+        "2026-10-05.md",
+        "2026-10-12.md",
+    ]
+    error_output = capsys.readouterr().err
+    assert (
+        "top sheets failed: most_starred: vault_link_refused: veille/tops/most_starred is a"
+        " symbolic link; K-B never follows a link in the vault"
+    ) in error_output
+    assert str(vault_dir) not in error_output
