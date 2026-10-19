@@ -78,8 +78,8 @@ TREND_REPOSITORY_NAME_MAX_LENGTH = 255
 # bound, not measured: the vault is not read.
 TAG_MAX_LENGTH = 100
 # The most tags of an item: a bound on the statements one item writes (code.md, defense in
-# depth), not held by the base.
-TAG_MAX_COUNT = 100
+# depth), not a rule of filing (decision of Sabine of 2026-10-19), not held by the base.
+TAG_MAX_COUNT = 30
 
 
 def check_url_can_be_normalized(url: str) -> str:

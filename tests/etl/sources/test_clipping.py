@@ -659,13 +659,13 @@ def listed_tags(count):
 
 
 def test_a_clip_of_the_maximum_count_of_tags_is_kept():
-    item = convert(with_tags(fixture_bytes(ARTICLE), listed_tags(100)))
+    item = convert(with_tags(fixture_bytes(ARTICLE), listed_tags(30)))
 
-    assert len(item.tags) == 100
+    assert len(item.tags) == 30
 
 
 def test_a_clip_with_too_many_tags_is_refused_with_its_count_and_the_maximum():
     with pytest.raises(ValidationError) as refusal:
-        convert(with_tags(fixture_bytes(ARTICLE), listed_tags(101)))
+        convert(with_tags(fixture_bytes(ARTICLE), listed_tags(31)))
 
-    assert "tags too long: 101 elements, maximum 100" in str(refusal.value)
+    assert "tags too long: 31 elements, maximum 30" in str(refusal.value)
