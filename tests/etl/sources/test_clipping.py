@@ -645,3 +645,10 @@ def test_a_tag_of_the_maximum_length_is_kept():
     item = convert(with_tags(fixture_bytes(ARTICLE), 'tags:\n  - "' + "x" * 100 + '"'))
 
     assert item.tags == ("x" * 100,)
+
+
+def test_a_tag_too_long_is_refused_with_its_length_and_the_maximum():
+    with pytest.raises(ValidationError) as refusal:
+        convert(with_tags(fixture_bytes(ARTICLE), 'tags:\n  - "' + "x" * 101 + '"'))
+
+    assert "tag too long: 101 characters, maximum 100" in str(refusal.value)

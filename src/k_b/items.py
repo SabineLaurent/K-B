@@ -115,6 +115,16 @@ def normalize_tag(tag: str) -> str:
     return tag.strip().removeprefix("#").strip().lower()
 
 
+def check_tag_length(tag: str) -> str:
+    """Refuse a tag longer than the base keeps, saying its length and the maximum
+    (conventions.md, rule 3)."""
+    if len(tag) > TAG_MAX_LENGTH:
+        raise ValueError(
+            f"tag too long: {len(tag)} characters, maximum {TAG_MAX_LENGTH}"
+        )
+    return tag
+
+
 def check_tag_is_normalized(tag: str) -> str:
     """Refuse a tag normalize_tag would change: two forms of one tag would be two rows of tag. A
     tag with two # at its start keeps one once normalized, and is refused."""
@@ -183,7 +193,8 @@ ZoteroKey = Annotated[str, StringConstraints(pattern=f"^{ZOTERO_KEY}$")]
 # A tag of an imported .md, in its normalized form.
 Tag = Annotated[
     str,
-    StringConstraints(min_length=1, max_length=TAG_MAX_LENGTH),
+    StringConstraints(min_length=1),
+    AfterValidator(check_tag_length),
     AfterValidator(check_tag_is_normalized),
     CAN_BE_STORED,
 ]

@@ -36,28 +36,26 @@ WHERE clip.url = :url
 # A tag shared by every item that carries it: created by the first.
 INSERT_TAG = "INSERT INTO tag (name) VALUES (:name) ON CONFLICT (name) DO NOTHING"
 
-INSERT_ITEM_TAG = """
-INSERT INTO item_tag (item_id, tag_id) SELECT :item_id, id FROM tag WHERE name = :name
-"""
+SELECT_TAG_ID = "SELECT id FROM tag WHERE name = ?"
+
+INSERT_ITEM_TAG = "INSERT INTO item_tag (item_id, tag_id) VALUES (:item_id, :tag_id)"
 
 SELECT_ITEM_TAGS = """
-SELECT tag.name FROM item_tag JOIN tag ON tag.id = item_tag.tag_id WHERE item_tag.item_id = ?
+SELECT tag.name, tag.id FROM item_tag JOIN tag ON tag.id = item_tag.tag_id
+WHERE item_tag.item_id = ?
 """
 
 # A link of the version before to a tag the new version no longer carries: a link is a value of
-# a version, as a column, not an item. The one exception to removing by the purge only
+# a version, as a column, not an item. One of the two exceptions to removing by the purge only
 # (conventions.md, rule 5; decision of Sabine of 2026-10-19).
-DELETE_ITEM_TAG = """
-DELETE FROM item_tag
-WHERE item_id = :item_id AND tag_id = (SELECT id FROM tag WHERE name = :name)
-"""
+DELETE_ITEM_TAG = "DELETE FROM item_tag WHERE item_id = :item_id AND tag_id = :tag_id"
 
 # A tag no item carries any more, once its last link removed: a tag removed no longer exists in
-# the base. The second exception to removing by the purge only (conventions.md, rule 5;
-# decision of Sabine of 2026-10-19).
+# the base. The other exception to removing by the purge only (conventions.md, rule 5; decision
+# of Sabine of 2026-10-19).
 DELETE_TAG_WITHOUT_LINK = """
 DELETE FROM tag
-WHERE name = :name AND NOT EXISTS (SELECT 1 FROM item_tag WHERE item_tag.tag_id = tag.id)
+WHERE id = :tag_id AND NOT EXISTS (SELECT 1 FROM item_tag WHERE item_tag.tag_id = tag.id)
 """
 
 # A patch, not a put (decision of Sabine of 2026-10-19): the SET names only the columns that
@@ -132,12 +130,13 @@ def write_known_clip(
     ) = connection.execute(
         SELECT_KNOWN_CLIP, {"url": item.url, "collected_at": collected_at}
     ).fetchone()
+    known_tag_ids = read_tag_ids(connection, known_item_id)
     known_content = ClipContent(
         title=known_title,
         body=known_body,
         saved_at=known_saved_at,
         published_at=known_published_at,
-        tags=read_tags(connection, known_item_id),
+        tags=frozenset(known_tag_ids),
     )
     if known_content == content:
         if not is_file_before:
@@ -148,7 +147,7 @@ def write_known_clip(
     write_changed_columns(
         connection, known_item_id, known_content, content, collected_at
     )
-    write_changed_tags(connection, known_item_id, known_content.tags, content.tags)
+    write_changed_tags(connection, known_item_id, known_tag_ids, content.tags)
     shared_rows.point_item_at_raw_data(connection, known_item_id, raw_data_id)
     return None
 
@@ -179,27 +178,30 @@ def write_changed_columns(
 def write_changed_tags(
     connection: sqlite3.Connection,
     item_id: int,
-    known: frozenset[str],
+    known_tag_ids: dict[str, int],
     tags: frozenset[str],
 ) -> None:
     """Remove the links to the tags removed, and a tag removed that no item carries any more;
-    write the links to the tags added, in order."""
-    for removed in sorted(known - tags):
-        connection.execute(DELETE_ITEM_TAG, {"item_id": item_id, "name": removed})
-        connection.execute(DELETE_TAG_WITHOUT_LINK, {"name": removed})
-    write_tags(connection, item_id, tuple(sorted(tags - known)))
+    write the links to the tags added, sorted by name."""
+    for removed in sorted(known_tag_ids.keys() - tags):
+        link = {"item_id": item_id, "tag_id": known_tag_ids[removed]}
+        connection.execute(DELETE_ITEM_TAG, link)
+        connection.execute(DELETE_TAG_WITHOUT_LINK, link)
+    write_tags(connection, item_id, tuple(sorted(tags - known_tag_ids.keys())))
 
 
-def read_tags(connection: sqlite3.Connection, item_id: int) -> frozenset[str]:
-    return frozenset(
-        name for (name,) in connection.execute(SELECT_ITEM_TAGS, (item_id,))
-    )
+def read_tag_ids(connection: sqlite3.Connection, item_id: int) -> dict[str, int]:
+    """The id of each tag of the item, by name."""
+    return dict(connection.execute(SELECT_ITEM_TAGS, (item_id,)).fetchall())
 
 
 def write_tags(
     connection: sqlite3.Connection, item_id: int, tags: tuple[str, ...]
 ) -> None:
-    """Link the item to each of its tags, created if new, in the order of the item."""
+    """Link the item to each of its tags, created if new, in the order given (sorted by name).
+    The id is read, not looked up by the link: a tag absent stops the import, never drops its
+    link without a trace."""
     for tag in tags:
         connection.execute(INSERT_TAG, {"name": tag})
-        connection.execute(INSERT_ITEM_TAG, {"item_id": item_id, "name": tag})
+        (tag_id,) = connection.execute(SELECT_TAG_ID, (tag,)).fetchone()
+        connection.execute(INSERT_ITEM_TAG, {"item_id": item_id, "tag_id": tag_id})

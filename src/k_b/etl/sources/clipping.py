@@ -344,8 +344,9 @@ def read_tags(value: object) -> object:
 
 
 def normalize_tags(tags: tuple[str, ...]) -> tuple[str, ...]:
-    """Each tag normalized (items.py), once, in order; the empty ones and the tag of the template
-    left out. Item checks what is kept: its length, its characters, its form."""
+    """Each tag normalized (items.py), once, sorted by name: the import is the same whatever the
+    order of the vault. The empty ones and the tag of the template are left out; Item checks
+    what is kept: its length, its characters, its form."""
     return tuple(sorted({normalize_tag(tag) for tag in tags} - {"", TEMPLATE_TAG}))
 
 
