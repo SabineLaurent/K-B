@@ -762,6 +762,7 @@ REFUSED_VALUES = [
     # A year on 3 digits, as strftime writes it under Linux (database/dates.py).
     ("clip", "length(saved_at) = 20", {"saved_at": "999-09-17T00:00:00Z"}),
     ("clip", "length(published_at) = 20", {"published_at": "2026-06-08 00:00:00Z"}),
+    ("clip", "length(revised_at) = 20", {"revised_at": "2026-10-18 09:30:00Z"}),
 ]
 
 

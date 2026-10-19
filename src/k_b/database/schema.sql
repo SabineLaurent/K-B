@@ -285,10 +285,10 @@ CREATE TABLE zotero_entry (
 
 CREATE INDEX zotero_entry_publication_id ON zotero_entry (publication_id);
 
--- A subtype of item: a page the user kept with Web Clipper in the Obsidian vault (#14). News
--- feed: the first version seen of a URL is kept; the clips are not changed once kept (decision
--- of Sabine of 2026-10-17). Written in portable SQL (.claude/rules/poc.md, rule 1). kind NOT
--- NULL: a NULL kind would pass its CHECK and skip the foreign key.
+-- A subtype of item: a page the user kept with Web Clipper in the Obsidian vault (#14). The
+-- latest version of a URL is kept: a clip whose content changed is written again, revised_at
+-- dated (decision of Sabine of 2026-10-19). Written in portable SQL (.claude/rules/poc.md, rule
+-- 1). kind NOT NULL: a NULL kind would pass its CHECK and skip the foreign key.
 CREATE TABLE clip (
     id           INTEGER PRIMARY KEY,
     item_id      INTEGER NOT NULL UNIQUE,
@@ -311,5 +311,9 @@ CREATE TABLE clip (
     published_at TEXT
         CHECK (length(published_at) = 20 AND substr(published_at, 11, 1) = 'T'
             AND substr(published_at, 20, 1) = 'Z'),
+    -- A date of K-B: the collection that saw the change; empty until the clip changes.
+    revised_at   TEXT
+        CHECK (length(revised_at) = 20 AND substr(revised_at, 11, 1) = 'T'
+            AND substr(revised_at, 20, 1) = 'Z'),
     FOREIGN KEY (item_id, kind) REFERENCES item (id, kind)
 ) STRICT;
