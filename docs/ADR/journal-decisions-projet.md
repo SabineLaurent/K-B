@@ -2928,13 +2928,21 @@ time-knight (délégation de Sabine du 2026-10-15).
   commit ; la comparaison d'un extrait Zotero au dernier porte sur son contenu, plus sur la date
   des fichiers de Zotero ; un extrait Zotero dont tous les documents sont invalides fait échouer
   la source à la collecte (règle 1 de `conventions.md`), sinon il deviendrait le dernier et ferait
-  supprimer le dernier bon. Options écartées : une durée en années, ou les N derniers (un
+  supprimer le dernier bon ; pour la même raison, un catalogue sans entrée, Zotero ou CISA, fait
+  échouer la source (`empty_catalog`), règle que l'import tenait déjà en ne retirant rien pour
+  lui (constat de `/code-review`, tri de time-knight, délégation de Sabine du 2026-10-15). Options écartées : une durée en années, ou les N derniers (un
   catalogue complet rend chaque fichier plus ancien inutile à la base) ; purger à la collecte
   (elle n'ouvre pas la base, donc ne sait pas ce qui est importé) ; « importé et sans rejet ».
   Limites assumées : une base reconstruite depuis le brut n'a que l'état du dernier catalogue,
   ni les lignes retirées avant lui ni les dates de révision passées ; une entrée valide autrefois
   et refusée dans le dernier extrait reste en base mais sort du brut ; un extrait illisible n'est
-  jamais importé, donc jamais supprimé. **Révise** l'entrée CISA du 2026-10-07 (« l'historique
+  jamais importé, donc jamais supprimé ; une bibliothèque vraiment vidée n'est plus collectée ;
+  un extrait dont tous les documents passent la collecte mais sont refusés à l'import (par `Item`
+  ou par un `CHECK`) fait quand même supprimer le précédent, la collecte ne pouvant valider ni
+  l'un ni l'autre sans valeurs factices ; un item inchangé reste rattaché au fichier qui l'a écrit
+  (`item.raw_data_id`), et `raw_data` garde le chemin d'un fichier supprimé : il dit ce qui a été
+  importé et quand, plus que le fichier existe ; un dossier renommé à la main
+  (`cisa_kev_<suffixe>`) n'est pas purgé. **Révise** l'entrée CISA du 2026-10-07 (« l'historique
   des versions n'est pas en base, le brut le garde ») et la phrase du 2026-10-09 « c'est le brut
   qu'on sauvegarde » pour ces deux sources. Tranche la question ouverte du 2026-10-11, « Durée de
   conservation et purge des extraits Zotero ». — PR de #139
