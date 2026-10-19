@@ -213,7 +213,8 @@ GH Archive, dont chaque ligne de classement (`TrendRow`, `src/k_b/items.py`) dev
   ([registre des traitements](registre-traitements.md)). La dernière version d'une URL est
   gardée : un clip dont le contenu a changé est réécrit, et `clip.revised_at` prend la date de la
   collecte qui a vu le changement (journal ADR, 2026-10-19, #259).
-- Le classement des dépôts les plus étoilés n'entre pas dans la base (journal ADR, 2026-10-07).
+- Les classements des dépôts les plus étoilés et les plus forkés n'entrent pas dans la base
+  (journal ADR, 2026-10-07).
 
 ## MCD et MLD
 
