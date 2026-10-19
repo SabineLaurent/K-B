@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from k_b.etl.raw_store import write_file_atomically
+from k_b.etl.raw_store import RawStore, write_file_atomically
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.zotero import ZoteroSource
@@ -566,7 +566,7 @@ def test_the_extracts_of_the_selected_library_are_read(tmp_path, zotero_dir):
     extract_dir = tmp_path / "selected_library" / "zotero"
     extract_dir.mkdir(parents=True)
     (extract_dir / f"{COLLECTION_NAME}.json").write_bytes(
-        ZoteroSource(zotero_dir).fetch(None)
+        ZoteroSource(zotero_dir, RawStore(zotero_dir.parent / "data")).fetch(None)
     )
 
     reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())

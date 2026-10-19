@@ -27,6 +27,7 @@ ETL_PIPELINE_MODULES = {
     "etl.import_log",
     "etl.normalize",
     "etl.raw_store",
+    "etl.raw_purge",
     "etl.source_contract",
     "etl.http_download",
     "etl.user_agent",

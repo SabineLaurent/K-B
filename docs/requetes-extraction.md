@@ -31,10 +31,9 @@ Fichier : `src/k_b/etl/sources/zotero.py`. Spécifications de la source :
 ### Où elle tourne
 
 `ZoteroSource.fetch` retire d'abord les copies qu'un processus tué aurait laissées
-(`remove_left_copies`). Il s'arrête là, sans copie ni requête, si ni la base ni son journal
-d'écriture n'ont été modifiés depuis la dernière collecte (`was_modified_since`). Sinon, il copie
-la base (`copy_library`) dans un dossier temporaire, puis `extract_documents` ouvre la copie en
-lecture seule (`mode=ro`), la vérifie (`check_integrity`), et lance `EXTRACTION_QUERY`. La base de
+(`remove_left_copies`), puis copie la base (`copy_library`) dans un dossier temporaire ;
+`extract_documents` ouvre la copie en lecture seule (`mode=ro`), la vérifie
+(`check_integrity`), et lance `EXTRACTION_QUERY`. La base de
 Zotero elle-même n'est jamais ouverte par SQLite.
 
 ### Tables et colonnes lues
@@ -116,9 +115,10 @@ sur les colonnes de `JSON_COLUMNS`), et `ZoteroSource.fetch` rend l'extrait enti
 - **Seuls les champs utiles sont nommés**, et tous les filtres sont dans le SQL : rien n'est lu
   pour être jeté ensuite en Python.
 - **Une copie, lue seule** : la requête ne prend aucun verrou sur la base de Zotero.
-- **Rien quand rien n'a changé** : sans modification des fichiers de la bibliothèque depuis la
-  dernière collecte, il n'y a ni copie ni requête (`was_modified_since`, dans
-  `ZoteroSource.fetch`).
+- **Rien d'écrit quand rien n'a changé** : la copie et la requête ont lieu à chaque collecte,
+  mais un extrait identique au dernier du brut n'est pas écrit (`ZoteroSource.fetch`, #139). La
+  date des fichiers de Zotero n'est plus comparée : elle ne disait pas si la bibliothèque avait
+  changé.
 
 Cette économie n'est **pas mesurée** : ni plan d'exécution, ni temps.
 

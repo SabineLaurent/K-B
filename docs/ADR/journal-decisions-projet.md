@@ -444,6 +444,8 @@ encore l'ancien modèle.
   nature de source : flux de nouveautés (TLDR, alertes, releases) premier vu ; catalogue d'état
   dernière version ; flux avec révisions (arXiv) remplacé si `updated` est plus récent. Limite
   assumée : l'historique des versions n'est pas en base, le brut le garde (RGESN 1.6).
+  **Révisée le 2026-10-19** : l'historique des versions est abandonné, le brut de CISA ne garde
+  que le dernier catalogue importé (« Brut : catalogues d'état et conservation »).
 - **Un référentiel est une chose de référence, à identifiant officiel et stable, vers laquelle
   les items pointent : VULNÉRABILITÉ (numéro CVE) dès le 07/10, PUBLICATION (référence arXiv)
   le 08/10. Il porte le contenu donné par la source qui fait foi (CISA KEV, arXiv) et pointe vers
@@ -2647,7 +2649,8 @@ Décisions de Sabine du 2026-10-17 sur le plan de #14, relayées par time-knight
   clip modifié quand même n'est pas repris ; un clip supprimé du coffre reste en base ; deux
   fichiers de même URL dans une même collecte, le premier dans l'ordre des noms de pages
   l'emporte. La collecte reste incrémentale et copie tout clip changé : le brut garde chaque
-  version. — PR de #14
+  version. **Précisée le 2026-10-19** : jusqu'à la sauvegarde de la base, au 08/11 (« Brut :
+  catalogues d'état et conservation »). — PR de #14
 - **Le texte complet d'un clip va dans la colonne `clip.body` de son sous-type ; ni `author`, ni
   `description`, ni `tags` n'entrent en base.** Décision de Sabine, sur recommandation. Pourquoi,
   celui de la recommandation : la spec (« titre, URL source, date, et le texte gardé ») et la
@@ -2896,6 +2899,60 @@ time-knight (délégation de Sabine du 2026-10-15).
   la règle générale. Limite assumée : le test ne voit pas un dossier de modules sans
   `__init__.py`. — PR de #251
 
+## 2026-10-19
+
+### Brut : catalogues d'état et conservation
+
+- **Trois couches : *raw*, la réponse des sources ; *cleansed*, l'immuable (la base, et les `.md`
+  normalisés selon les sources) ; *curated*, les fiches de lecture, les fiches de veille, le
+  wiki, les classements et les tendances. Le *curated* n'est jamais purgé automatiquement ; le
+  *cleansed* est immuable.** Décision de Sabine, qui reprend son vocabulaire du 2026-10-12
+  (*cleansed* et *curated*, « Wiki ») et le donne à toutes les données de K-B. Pourquoi : chaque
+  couche a sa règle de conservation, et la purge ne touche que le *raw*. Réserve de Sabine :
+  « petit bémol pour les vieilles veilles, à voir » (ci-dessous, « Décisions encore ouvertes »).
+  — PR de #139
+- **Zotero et CISA KEV sont des catalogues d'état : leur brut ne garde que le dernier fichier
+  importé, le nouveau remplace le précédent.** Décision de Sabine. Pourquoi, celui de Sabine :
+  « L'historique de versions n'a pas d'intérêt pour un catalogue d'état qui est indexé en bdd. On
+  suit déjà les dates entre deux imports directement dans la bdd » (`revised_at`, `withdrawn_at`
+  de `zotero_entry`, `highlight` et `vulnerability`). Pour Zotero, c'est la purge que demandait
+  `conformite.md` pour une donnée personnelle (auteurs, surlignages, commentaires) ; pour CISA,
+  sans donnée personnelle, la sobriété (RGESN 1.6). Garde-fous, recommandés par time-knight et
+  validés par Sabine : le précédent n'est supprimé qu'une fois le nouveau importé ; un brut pas
+  encore importé n'est jamais supprimé ; un extrait Zotero identique au dernier n'est pas écrit.
+  Tranché dans le plan de #139 et validé par Sabine : « importé » veut dire enregistré dans
+  `raw_data`, même avec un rejet, sinon une entrée invalide pour toujours bloquerait la purge
+  pour toujours (cohérent avec « seule la collecte la plus récente compte », 2026-10-12) ; la
+  liste des fichiers à supprimer vient de ce registre, jamais du dossier, et rien n'est supprimé
+  si le dernier fichier importé manque ; la purge tourne à la fin de `kb import`, après le
+  commit ; la comparaison d'un extrait Zotero au dernier porte sur son contenu, plus sur la date
+  des fichiers de Zotero ; un extrait Zotero dont tous les documents sont invalides fait échouer
+  la source à la collecte (règle 1 de `conventions.md`), sinon il deviendrait le dernier et ferait
+  supprimer le dernier bon ; pour la même raison, un catalogue sans entrée, Zotero ou CISA, fait
+  échouer la source (`empty_catalog`), règle que l'import tenait déjà en ne retirant rien pour
+  lui (constat de `/code-review`, tri de time-knight, délégation de Sabine du 2026-10-15). Options écartées : une durée en années, ou les N derniers (un
+  catalogue complet rend chaque fichier plus ancien inutile à la base) ; purger à la collecte
+  (elle n'ouvre pas la base, donc ne sait pas ce qui est importé) ; « importé et sans rejet ».
+  Limites assumées : une base reconstruite depuis le brut n'a que l'état du dernier catalogue,
+  ni les lignes retirées avant lui ni les dates de révision passées ; une entrée valide autrefois
+  et refusée dans le dernier extrait reste en base mais sort du brut ; un extrait illisible n'est
+  jamais importé, donc jamais supprimé ; une bibliothèque vraiment vidée n'est plus collectée ;
+  un extrait dont tous les documents passent la collecte mais sont refusés à l'import (par `Item`
+  ou par un `CHECK`) fait quand même supprimer le précédent, la collecte ne pouvant valider ni
+  l'un ni l'autre sans valeurs factices ; un item inchangé reste rattaché au fichier qui l'a écrit
+  (`item.raw_data_id`), et `raw_data` garde le chemin d'un fichier supprimé : il dit ce qui a été
+  importé et quand, plus que le fichier existe ; un dossier renommé à la main
+  (`cisa_kev_<suffixe>`) n'est pas purgé. **Révise** l'entrée CISA du 2026-10-07 (« l'historique
+  des versions n'est pas en base, le brut le garde ») et la phrase du 2026-10-09 « c'est le brut
+  qu'on sauvegarde » pour ces deux sources. Tranche la question ouverte du 2026-10-11, « Durée de
+  conservation et purge des extraits Zotero ». — PR de #139
+- **Le brut des clips (copies et recopies) n'est supprimé qu'une fois la base sauvegardée, au
+  08/11, avec PostgreSQL et Alembic. Règle écrite au registre seulement, sans code au 25/10.**
+  Décision de Sabine. Pourquoi, celui de Sabine : une sauvegarde native se migre par
+  `alembic_version`, un export CSV non. K-B ne touche jamais au coffre (`clipping.py`). Sort la
+  purge des copies de clips de #139, où l'avait mise la décision du 2026-10-17. Limite assumée :
+  jusque-là, chaque version d'un clip reste dans le brut, sans durée. — PR de #139
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
@@ -2914,14 +2971,9 @@ time-knight (délégation de Sabine du 2026-10-15).
   (2026-10-13) nomme ses dates nouvelles par leur événement Zotero, sans renommer les colonnes
   existantes.
 
-- **Durée de conservation et purge des extraits Zotero** (2026-10-11) : ils sont tous gardés,
-  sans durée au registre ni purge codée, ce que `.claude/rules/conformite.md` demande pour une
-  donnée personnelle (noms d'auteurs, textes surlignés). Remplace la règle provisoire du
-  registre (« seule la dernière copie est gardée »), sans objet depuis que la copie est
-  temporaire. Une issue à part, à valider par Sabine ; la comparaison d'un extrait au précédent
-  (ne pas réécrire un extrait identique, et extraire un autre dossier Zotero même plus ancien)
-  relève de la même décision. La durée des copies de clips (`raw/selected_library/clipping/`,
-  #14) se décide avec elle (décision de Sabine du 2026-10-17, #139).
+- **Conservation des vieilles veilles** (2026-10-19) : le *cleansed* est immuable, avec le
+  « petit bémol pour les vieilles veilles, à voir » de Sabine (« Brut : catalogues d'état et
+  conservation »).
 - **Licence du schéma de Zotero** (2026-10-11) : le code de Zotero est sous AGPL v3 « sauf
   fichier qui dit autrement » (page « Licensing » de zotero.org), K-B sous CC BY-NC 4.0.
   La base d'essai réécrit 15 tables aux noms et types de Zotero ; si cela pose une question de

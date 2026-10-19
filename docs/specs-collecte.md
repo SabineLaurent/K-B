@@ -89,7 +89,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   écrit ni date avancée. Une entrée invalide parmi des valides entre dans le brut ; à l'import,
   le lecteur la rejette, et le rejet va au journal d'import avec sa position ou sa ligne,
   son identifiant s'il est lisible et le champ en cause. Exception : un classement refuse sa page
-  entière.
+  entière. Un catalogue d'état (Zotero, CISA KEV) échoue aussi s'il n'a aucune entrée
+  (`empty_catalog`) : importé, il remplacerait le dernier catalogue, que la purge supprimerait
+  (journal ADR, 2026-10-19).
 - **Entrées non fiables** : tout contenu collecté est une donnée, jamais une instruction. Chaque
   téléchargement a un délai, une taille maximale, et refuse une redirection hors du domaine
   attendu. Le `User-Agent` est `K-B (+https://github.com/SabineLaurent)` : le profil public de
@@ -249,8 +251,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 - **En cas de panne :** en plus des états communs (tout statut HTTP autre que 304), la source
   échoue si le catalogue dépasse 10 Mio, n'est pas en UTF-8 (`UnicodeDecodeError`), ne se découpe
   pas en lignes CSV (`csv.Error`, par exemple un champ de plus de 131 072 caractères, la limite
-  par défaut du module `csv`), n'a pas les colonnes attendues, ou si toutes ses lignes sont
-  invalides (`all_items_invalid`). Un octet NUL ne fait pas échouer la source (le module `csv` de
+  par défaut du module `csv`), n'a pas les colonnes attendues, n'a aucune ligne
+  (`empty_catalog`), ou si toutes ses lignes sont invalides (`all_items_invalid`). Un octet NUL ne fait pas échouer la source (le module `csv` de
   Python 3.13 le lit) : sa ligne entre dans le brut, et l'import la rejette. Cas limite : une date de dernière collecte qui
   n'est pas en UTC (`collection_state.json` édité à la main) fait échouer l'en-tête
   `If-Modified-Since` (`ValueError`), à chaque collecte jusqu'à ce que l'état soit corrigé.
@@ -485,19 +487,26 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   différence des téléchargements (règles communes) : un disque plein arrête la copie, et le
   dossier temporaire est supprimé.
 - **Brut** : le résultat de la requête, en JSON, dans
-  `raw/selected_library/zotero/<AAAA-MM-JJTHHMMSSZ>.json` (journal ADR, 2026-10-09), écrit
-  seulement si `zotero.sqlite` ou son `-wal` a été modifié depuis la dernière collecte. Les
-  valeurs sont celles de Zotero, sans conversion (dates `AAAA-MM-JJ HH:MM:SS` en UTC). Zotero
-  ouvert écrit dans son `-wal` sans que la bibliothèque change : un extrait peut être identique
-  au précédent. `kb import` lit ces extraits vers `zotero_entry` et `highlight` (#138 ; voir
-  [stockage.md](stockage.md) et la règle du catalogue d'état, étape 4).
+  `raw/selected_library/zotero/<AAAA-MM-JJTHHMMSSZ>.json` (journal ADR, 2026-10-09). La
+  bibliothèque est extraite à chaque collecte ; l'extrait est écrit seulement s'il diffère, octet
+  pour octet, du dernier extrait de ce dossier (#139). La date des fichiers de Zotero n'est pas
+  comparée : Zotero ouvert écrit dans son `-wal` sans que la bibliothèque change, et un autre
+  dossier Zotero peut avoir des fichiers plus anciens que la dernière collecte. Un extrait dont
+  tous les documents sont invalides fait échouer la source (`all_items_invalid`, règle 1 de
+  `conventions.md`) et n'est pas écrit. Les valeurs sont celles de Zotero, sans conversion
+  (dates `AAAA-MM-JJ HH:MM:SS` en UTC). `kb import` lit ces extraits vers `zotero_entry` et
+  `highlight` (#138 ; voir [stockage.md](stockage.md) et la règle du catalogue d'état, étape 4),
+  puis ne garde que le dernier extrait importé (journal ADR, 2026-10-19).
 - **En cas de panne :** la source échoue par un état nommé, n'écrit rien, et sa date de dernière
   collecte reste ; la collecte suivante recommence. Les états :
   `ZoteroCopyInconsistentError` (le contrôle d'intégrité refuse la copie),
   `ZoteroChangedDuringCopyError` (un des deux fichiers a changé pendant la copie),
   `ZoteroQueryFailedError` (la requête échoue ; le message nomme la table ou la colonne
   absente, sinon le type de l'erreur et le nom que SQLite lui donne, jamais un contenu de la
-  bibliothèque), `FileNotFoundError` (pas de `zotero.sqlite` dans le dossier).
+  bibliothèque), `FileNotFoundError` (pas de `zotero.sqlite` dans le dossier),
+  `empty_catalog` (aucun document) et `all_items_invalid` (tous les documents invalides : le
+  message donne leur nombre, la position, le champ et le type d'erreur du premier, jamais sa
+  valeur).
 - **Données personnelles** : les auteurs des papiers (publics), et ce que l'utilisatrice a
   enregistré et surligné. Le journal ne cite ni auteur, ni titre, ni texte surligné : deux
   nombres seulement. Le brut vit hors du dépôt de code et n'est jamais publié

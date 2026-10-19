@@ -11,8 +11,10 @@ from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import (
     COLLECTION_STATE_FILENAME,
     InvalidCollectionStateError,
+    RawStore,
     find_stream,
     load_last_collection_dates,
+    make_source_folder_key,
     save_last_collection_dates,
     write_file_atomically,
     write_new_raw_file,
@@ -277,3 +279,56 @@ def test_a_long_source_name_and_date_of_the_state_are_quoted_cut_in_the_refusal(
     )
     assert "\n" not in message
     assert len(message) < 1_000
+
+
+def test_a_key_is_deleted_under_the_data_directory_once(tmp_path):
+    raw_file = (
+        tmp_path / "raw" / "automated_watch" / "cisa_kev" / "2026-10-05T093000Z.csv"
+    )
+    raw_file.parent.mkdir(parents=True)
+    raw_file.write_bytes(b"catalog")
+    store = RawStore(tmp_path)
+
+    assert store.has_file("raw/automated_watch/cisa_kev/2026-10-05T093000Z.csv")
+    assert store.delete("raw/automated_watch/cisa_kev/2026-10-05T093000Z.csv")
+    assert not raw_file.exists()
+    assert not store.has_file("raw/automated_watch/cisa_kev/2026-10-05T093000Z.csv")
+    assert not store.delete("raw/automated_watch/cisa_kev/2026-10-05T093000Z.csv")
+
+
+@pytest.mark.parametrize(
+    "key", ["", "/etc/passwd", "raw/../k-b.sqlite", "../outside", "raw\\..\\k-b.sqlite"]
+)
+def test_a_key_that_is_not_relative_to_the_data_directory_is_refused(tmp_path, key):
+    store = RawStore(tmp_path / "data")
+
+    for method in (store.delete, store.has_file, store.read_latest):
+        with pytest.raises(
+            ValueError, match="not a key relative to the data directory"
+        ):
+            method(key)
+
+
+def test_the_latest_raw_file_of_a_folder_is_read_hidden_files_left_out(tmp_path):
+    folder = tmp_path / "raw" / "selected_library" / "zotero"
+    folder.mkdir(parents=True)
+    (folder / "2026-10-05T093000Z.json").write_bytes(b"older")
+    (folder / "2026-10-06T093000Z.json").write_bytes(b"latest")
+    # A rest of an interrupted write, as write_file_atomically names it.
+    (folder / ".2026-10-07T093000Z.json.abc.tmp").write_bytes(b"half")
+
+    assert RawStore(tmp_path).read_latest("raw/selected_library/zotero") == b"latest"
+
+
+def test_a_folder_without_raw_file_has_no_latest(tmp_path):
+    (tmp_path / "raw" / "selected_library" / "zotero").mkdir(parents=True)
+    store = RawStore(tmp_path)
+
+    assert store.read_latest("raw/selected_library/zotero") is None
+    assert store.read_latest("raw/selected_library/absent") is None
+
+
+def test_the_folder_key_of_a_source_is_under_raw_and_its_acquisition_folder():
+    assert make_source_folder_key("selected_library", "zotero") == (
+        "raw/selected_library/zotero"
+    )

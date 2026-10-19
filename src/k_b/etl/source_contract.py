@@ -69,6 +69,14 @@ def check_not_all_invalid(reading: EntryReading[Any]) -> None:
         )
 
 
+def check_not_empty(reading: EntryReading[Any]) -> None:
+    """Refuse, at the collection, a state catalog without any entry (empty_catalog): its source
+    fails, so nothing is written to raw/. Imported, it would supersede the last catalog, which the
+    purge would then delete (ADR of 2026-10-19); the import already withdraws nothing for it."""
+    if not reading.entries and not reading.rejection_reasons:
+        raise ValueError("empty_catalog: 0 entries")
+
+
 class SourceReader[EntryT](NamedTuple):
     """How to read a raw file of a source: its entries, then each entry as an item.
 

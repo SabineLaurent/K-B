@@ -3,7 +3,9 @@ then read an extract into Zotero entries (T).
 
 Zotero keeps its library in an SQLite database, zotero.sqlite, that it locks while it runs. The
 source never opens it: it copies the file and its write-ahead log to a temporary folder, checks
-the copy, queries it read-only, and deletes it. What the query returns is the raw extract.
+the copy, queries it read-only, and deletes it. What the query returns is the raw extract, written
+only when it differs from the last one (ADR of 2026-10-19: of a state catalog, only the last raw
+file imported is kept).
 """
 
 import contextlib
@@ -15,7 +17,7 @@ import shutil
 import sqlite3
 import stat
 import tempfile
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any, NamedTuple
 
@@ -30,8 +32,18 @@ from pydantic import (
 )
 
 from k_b.core.quoting import without_values
-from k_b.etl.raw_store import SELECTED_LIBRARY_DIR_NAME
-from k_b.etl.source_contract import EntryReading, SourceReader
+from k_b.etl.raw_store import (
+    SELECTED_LIBRARY_DIR_NAME,
+    RawStore,
+    make_source_folder_key,
+)
+from k_b.etl.source_contract import (
+    EntryReading,
+    SourceReader,
+    check_not_all_invalid,
+    check_not_empty,
+    read_each_entry,
+)
 from k_b.items import ARXIV_ID, Highlight, Item, SourceCode
 
 logger = logging.getLogger(__name__)
@@ -39,10 +51,10 @@ logger = logging.getLogger(__name__)
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "zotero"
 
+# The folder of raw/ its extracts go to.
+RAW_FOLDER_KEY = make_source_folder_key(SELECTED_LIBRARY_DIR_NAME, FOLDER_PREFIX)
+
 DATABASE_FILE_NAME = "zotero.sqlite"
-# A file date is in nanoseconds since EPOCH; a datetime, in microseconds.
-EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
-ONE_MICROSECOND = timedelta(microseconds=1)
 # Zotero's last writes are here while it runs: the main file alone would be an older library.
 WRITE_AHEAD_LOG_FILE_NAME = "zotero.sqlite-wal"
 # The temporary folder is recognisable: one left behind by a killed process is found and
@@ -184,33 +196,45 @@ class ZoteroSource:
     extension = "json"
     acquisition_dir_name = SELECTED_LIBRARY_DIR_NAME
 
-    def __init__(self, zotero_dir: Path) -> None:
+    def __init__(self, zotero_dir: Path, store: RawStore) -> None:
         self.zotero_dir = zotero_dir
+        self.store = store
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
-        """Return the documents of the library and their highlights as JSON, or None if
-        neither file of the library was modified since last_collected_at.
+        """Return the documents of the library and their highlights as JSON, or None when the
+        extract is the same, byte for byte, as the last one in raw/.
 
-        Zotero running writes to its log even when the library does not change: an extract
-        equal to the previous one is then returned.
+        The library is extracted at each collection, whatever last_collected_at: Zotero
+        running writes to its log without changing the library, and another Zotero folder may
+        hold files older than the last collection. Only the content is compared.
+
+        Raises:
+            ValueError: the library has no document (empty_catalog), or every document is
+                invalid (all_items_invalid, conventions.md, rule 1); written, the extract would
+                supersede the last valid one.
         """
         remove_left_copies()
-        if last_collected_at is not None and not was_modified_since(
-            read_file_states(self.zotero_dir), last_collected_at
-        ):
-            return None
         # Deleted on a success, an error or Ctrl-C; a killed process leaves it, and the next
         # extraction removes it. In the system's temporary folder, not in the data directory:
         # a whole library has no place in what gets backed up.
         with tempfile.TemporaryDirectory(prefix=TEMPORARY_DIR_PREFIX) as copy_dir:
             copy_path = copy_library(self.zotero_dir, Path(copy_dir))
             documents = extract_documents(copy_path)
+        checked_documents = read_each_entry(enumerate(documents, 1), check_document)
+        check_not_empty(checked_documents)
+        check_not_all_invalid(checked_documents)
         logger.info(
             "zotero: %d documents, %d highlights extracted",
             len(documents),
             sum(len(document["highlights"]) for document in documents),
         )
-        return (json.dumps(documents, ensure_ascii=False, indent=2) + "\n").encode()
+        raw_extract = (
+            json.dumps(documents, ensure_ascii=False, indent=2) + "\n"
+        ).encode()
+        if raw_extract == self.store.read_latest(RAW_FOLDER_KEY):
+            logger.info("zotero: extract identical to the latest raw file, not written")
+            return None
+        return raw_extract
 
 
 def remove_left_copies() -> None:
@@ -248,18 +272,6 @@ def read_file_states(zotero_dir: Path) -> tuple[FileState, FileState | None]:
 def read_file_state(path: Path) -> FileState:
     status = path.stat()
     return FileState(status.st_size, status.st_mtime_ns, status.st_ino)
-
-
-def was_modified_since(
-    states: tuple[FileState, FileState | None], last_collected_at: datetime
-) -> bool:
-    last_modified_at_ns = max(
-        state.modified_at_ns for state in states if state is not None
-    )
-    # In whole nanoseconds: a float would round a write made in the same microsecond as the
-    # last collection onto it, and the write would be taken as not newer.
-    last_collected_at_ns = (last_collected_at - EPOCH) // ONE_MICROSECOND * 1000
-    return last_modified_at_ns > last_collected_at_ns
 
 
 def copy_library(zotero_dir: Path, copy_dir: Path) -> Path:
@@ -397,6 +409,15 @@ def read_documents(raw_extract: bytes) -> EntryReading[object]:
     if not isinstance(documents, list):
         raise ValueError("extract not a JSON list")
     return EntryReading(documents, [])
+
+
+def check_document(entry: object, number: int) -> ZoteroDocument:
+    """A document of the extract, validated at the collection; refused, the error gives its
+    position, the field and the type of error, never its value."""
+    try:
+        return ZoteroDocument.model_validate(entry)
+    except ValidationError as error:
+        raise ValueError(f"document {number}: {without_values(error)}") from None
 
 
 def convert_document(entry: object, collected_at: datetime, raw_file_path: str) -> Item:

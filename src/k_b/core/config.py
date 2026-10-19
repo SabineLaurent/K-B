@@ -21,7 +21,8 @@ class TrackedRepository:
 # (#83) reads it. None: K-B sets no duration, the library being kept by the user in Zotero and
 # Obsidian (docs/registre-traitements.md, record 2). For now, to be reviewed (ADR of 2026-10-10).
 # One entry per value of the CHECK on source.acquisition_mode in schema.sql: a test keeps both
-# lists equal.
+# lists equal. Of a state catalog (Zotero, CISA KEV), the raw keeps only the last file imported,
+# whatever the duration: kb import deletes the others (etl/raw_purge.py, ADR of 2026-10-19).
 RETENTION_YEARS_BY_ACQUISITION_MODE: dict[str, int | None] = {
     "watch": 2,
     "library": None,

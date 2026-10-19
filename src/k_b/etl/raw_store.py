@@ -7,12 +7,15 @@ import itertools
 import json
 import os
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from k_b.core.quoting import quote_value
 from k_b.items import parse_aware_datetime
 
+# The folder of the data directory that holds the raw output of each collection.
+RAW_DIR_NAME = "raw"
 # The folder of raw/ that holds what the watch collects, one folder per source.
 AUTOMATED_WATCH_DIR_NAME = "automated_watch"
 # The folder of raw/ that holds what the user selected (ADR of 2026-10-09).
@@ -35,6 +38,63 @@ def find_stream(raw_file_path: str) -> str:
     if len(parts) < 3:
         raise ValueError(f"raw file path without a source folder: {raw_file_path}")
     return parts[1]
+
+
+def make_source_folder_key(acquisition_dir_name: str, source_name: str) -> str:
+    """The key of the folder of raw/ a source writes to (etl/extract.py)."""
+    return f"{RAW_DIR_NAME}/{acquisition_dir_name}/{source_name}"
+
+
+@dataclass(frozen=True)
+class RawStore:
+    """The raw files of a data directory, each named by a POSIX key relative to it
+    (raw/automated_watch/cisa_kev/2026-10-05T093000Z.csv), never by a Path
+    (.claude/rules/poc.md, rule 3): the callers name what they read and delete, the store
+    knows where it is."""
+
+    data_dir: Path
+
+    def delete(self, key: str) -> bool:
+        """Delete the file of key; False when it is already gone."""
+        try:
+            self.find_path(key).unlink()
+        except FileNotFoundError:
+            return False
+        return True
+
+    def has_file(self, key: str) -> bool:
+        return self.find_path(key).is_file()
+
+    def read_latest(self, folder_key: str) -> bytes | None:
+        """The last raw file of a folder, in name order, that is collection order; None when
+        it has none. Hidden files are left out, as by list_visible_entries of etl/transform.py,
+        which imports this module: a rest of an interrupted write is not a raw file."""
+        folder = self.find_path(folder_key)
+        if not folder.is_dir():
+            return None
+        raw_files = sorted(
+            path
+            for path in folder.iterdir()
+            if path.is_file() and not path.name.startswith(".")
+        )
+        if not raw_files:
+            return None
+        return raw_files[-1].read_bytes()
+
+    def find_path(self, key: str) -> Path:
+        """The path of key in the data directory. A key that is empty, absolute, that goes up
+        (..) or holds a backslash is refused: the keys of the purge come from the base."""
+        key_path = PurePosixPath(key)
+        if (
+            not key_path.parts
+            or key_path.is_absolute()
+            or ".." in key_path.parts
+            or "\\" in key
+        ):
+            raise ValueError(
+                f"not a key relative to the data directory: {quote_value(key)}"
+            )
+        return self.data_dir.joinpath(*key_path.parts)
 
 
 class InvalidCollectionStateError(ValueError):
