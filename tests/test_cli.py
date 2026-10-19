@@ -932,6 +932,26 @@ def test_a_failed_import_deletes_no_raw_file(monkeypatch, tmp_path):
     assert all(path.exists() for path in paths)
 
 
+def test_a_failed_purge_without_a_reason_names_its_type_only(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    write_state_catalogs(tmp_path)
+
+    def fail_to_delete(store, key):
+        raise OSError("raised by code, without an errno")
+
+    monkeypatch.setattr(import_command.RawStore, "delete", fail_to_delete)
+
+    assert cli.main(["import"]) == 1
+    error_output = capsys.readouterr().err
+    assert "import committed, raw purge failed: OSError; run kb import again" in (
+        error_output
+    )
+    assert "None" not in error_output
+
+
 def test_a_failed_purge_keeps_the_import_exits_1_and_the_next_import_purges(
     monkeypatch, tmp_path, capsys
 ):

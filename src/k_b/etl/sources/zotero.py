@@ -41,6 +41,7 @@ from k_b.etl.source_contract import (
     EntryReading,
     SourceReader,
     check_not_all_invalid,
+    check_not_empty,
     read_each_entry,
 )
 from k_b.items import ARXIV_ID, Highlight, Item, SourceCode
@@ -208,8 +209,9 @@ class ZoteroSource:
         hold files older than the last collection. Only the content is compared.
 
         Raises:
-            ValueError: every document of the library is invalid (all_items_invalid,
-                conventions.md, rule 1); written, the extract would supersede the last valid one.
+            ValueError: the library has no document (empty_catalog), or every document is
+                invalid (all_items_invalid, conventions.md, rule 1); written, the extract would
+                supersede the last valid one.
         """
         remove_left_copies()
         # Deleted on a success, an error or Ctrl-C; a killed process leaves it, and the next
@@ -218,7 +220,9 @@ class ZoteroSource:
         with tempfile.TemporaryDirectory(prefix=TEMPORARY_DIR_PREFIX) as copy_dir:
             copy_path = copy_library(self.zotero_dir, Path(copy_dir))
             documents = extract_documents(copy_path)
-        check_not_all_invalid(read_each_entry(enumerate(documents, 1), check_document))
+        checked_documents = read_each_entry(enumerate(documents, 1), check_document)
+        check_not_empty(checked_documents)
+        check_not_all_invalid(checked_documents)
         logger.info(
             "zotero: %d documents, %d highlights extracted",
             len(documents),

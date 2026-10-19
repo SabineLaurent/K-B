@@ -6,6 +6,7 @@ from k_b.etl.source_contract import (
     EntryReading,
     SourceKind,
     check_not_all_invalid,
+    check_not_empty,
     find_source_kind,
     list_sources,
     read_each_entry,
@@ -76,3 +77,16 @@ def test_a_page_whose_entries_are_all_invalid_is_refused_as_all_items_invalid():
 )
 def test_an_empty_page_or_a_page_with_a_valid_entry_is_accepted(reading):
     check_not_all_invalid(reading)
+
+
+def test_a_state_catalog_without_any_entry_is_refused_as_empty_catalog():
+    with pytest.raises(ValueError, match="^empty_catalog: 0 entries$"):
+        check_not_empty(EntryReading([], []))
+
+
+@pytest.mark.parametrize(
+    "reading",
+    [EntryReading([2], []), EntryReading([], ["entry 1: value is odd"])],
+)
+def test_a_state_catalog_with_an_entry_valid_or_not_is_not_empty(reading):
+    check_not_empty(reading)

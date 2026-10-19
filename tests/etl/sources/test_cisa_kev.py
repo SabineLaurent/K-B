@@ -225,6 +225,15 @@ def test_a_catalog_whose_rows_are_all_invalid_fails_the_collection(monkeypatch):
         CisaKevSource().fetch(last_collected_at=None)
 
 
+def test_a_catalog_without_any_row_fails_the_collection(monkeypatch):
+    """Imported, an empty catalog would supersede the last one, and the purge delete it."""
+    header = EXTRACT.splitlines(keepends=True)[0]
+    monkeypatch.setattr(http_download, "urlopen", FakeUrlopen(body=header))
+
+    with pytest.raises(ValueError, match="^empty_catalog: 0 entries$"):
+        CisaKevSource().fetch(last_collected_at=None)
+
+
 def test_a_vulnerability_dated_the_day_before_a_collection_run_after_midnight_utc_is_kept():
     # 02:00 UTC on the 30th is still the 29th in the Americas: rows dated the 29th may follow.
     last_collected_at = datetime(2026, 9, 30, 2, 0, tzinfo=UTC)

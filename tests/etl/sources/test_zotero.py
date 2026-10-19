@@ -537,6 +537,31 @@ def test_an_extract_identical_to_the_last_one_is_logged_as_not_written(
     )
 
 
+def test_a_library_without_any_document_writes_no_extract_and_fails(
+    zotero_dir, tmp_path, run_on_zotero_library
+):
+    """Imported, an empty extract would supersede the last one, and the purge delete it."""
+    data_dir = tmp_path / "data"
+    # Both documents of the user library in the trash (tests/fixtures/zotero_extract.sql).
+    run_on_zotero_library(
+        zotero_dir,
+        "INSERT INTO deletedItems (itemID, dateDeleted)"
+        " VALUES (1, '2026-10-05 20:00:00'), (10, '2026-10-05 20:00:00');",
+    )
+
+    outcome = collect_all_sources(
+        [ZoteroSource(zotero_dir, RawStore(data_dir))],
+        data_dir / "raw",
+        data_dir,
+        FIRST_COLLECTION_AT,
+    )
+
+    error = outcome.errors_by_source["zotero"]
+    assert isinstance(error, ValueError)
+    assert str(error) == "empty_catalog: 0 entries"
+    assert not (data_dir / "raw").exists()
+
+
 def test_a_library_whose_documents_are_all_invalid_writes_no_extract_and_fails(
     zotero_dir, tmp_path, run_on_zotero_library
 ):

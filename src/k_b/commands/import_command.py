@@ -95,7 +95,12 @@ def run_import(data_dir: Path) -> int:
         )
     except (sqlite3.Error, OSError, ValueError) as error:
         # The type and the reason, never the name of a raw file.
-        reason = f" ({error.strerror})" if isinstance(error, OSError) else ""
+        # An OSError raised by code, not by the system, has no strerror.
+        reason = (
+            f" ({error.strerror})"
+            if isinstance(error, OSError) and error.strerror
+            else ""
+        )
         logger.error(
             "import committed, raw purge failed: %s%s; run kb import again",
             type(error).__name__,

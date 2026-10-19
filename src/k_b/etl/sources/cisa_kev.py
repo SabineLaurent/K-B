@@ -22,6 +22,7 @@ from k_b.etl.source_contract import (
     EntryReading,
     SourceReader,
     check_not_all_invalid,
+    check_not_empty,
     read_each_entry,
 )
 from k_b.items import (
@@ -77,7 +78,8 @@ class CisaKevSource:
             URLError, TimeoutError: the network (urlopen).
             RedirectedOutsideError: a redirection outside TRUSTED_URL_PREFIX.
             ValueError: a catalog larger than MAX_CATALOG_BYTES, without the REQUIRED_COLUMNS,
-                or whose rows are all invalid (all_items_invalid).
+                without any row (empty_catalog), or whose rows are all invalid
+                (all_items_invalid).
             UnicodeDecodeError: a catalog that is not UTF-8.
             csv.Error: a catalog that the csv module cannot split into rows (a NUL byte).
         """
@@ -95,7 +97,9 @@ class CisaKevSource:
                 error.close()
                 return None
             raise
-        check_not_all_invalid(read_catalog(raw_catalog))
+        catalog = read_catalog(raw_catalog)
+        check_not_empty(catalog)
+        check_not_all_invalid(catalog)
         return raw_catalog
 
 
