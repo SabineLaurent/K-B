@@ -271,7 +271,8 @@ source ne touche pas aux tables.
   contraintes `UNIQUE` créent
   leur propre index.
 - **Suppressions en cascade** : seulement de `item` vers `highlight` et vers `item_tag` (#260 ;
-  un tag que plus aucun item ne porte reste dans `tag`). Il n'y en a pas vers `publication`, `vulnerability`, `release`,
+  un tag ainsi laissé sans liaison reste dans `tag` jusqu'à la purge, #83 ; celui dont une
+  réécriture retire la dernière liaison est supprimé avec elle, journal ADR, 2026-10-19). Il n'y en a pas vers `publication`, `vulnerability`, `release`,
   `advisory`, `newsletter_article`, `zotero_entry` ni `clip` : supprimer un item qu'une de ces tables référence est refusé par la clé
   étrangère. La purge n'est pas codée.
 - **Formats contrôlés** par un `CHECK` : les dates (ci-dessus) ; `cve_id` (`CVE-AAAA-NNNN…`) ;

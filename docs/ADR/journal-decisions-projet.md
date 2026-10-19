@@ -3034,11 +3034,8 @@ time-knight (délégation de Sabine du 2026-10-15).
   provenance d'un `.md` se lit déjà par `item.kind` (« Collecte : mise à jour des `.md`
   importés »). Aucune ligne de code ne traite une autre sorte que le clip. Les liaisons d'un
   item partent avec lui (`ON DELETE CASCADE`), comme ses surlignages Zotero (décidé par
-  time-knight, délégation de la pause de Sabine). Un tag que plus aucun item ne porte reste dans
-  `tag` jusqu'à la purge (#83) ; aucune suppression des tags sans liaison n'est codée : ce serait
-  une suppression hors de la purge (règle 5 de `conventions.md`), et elle effacerait un tag que
-  le LLM aura créé sans liaison (suite prévue, ci-dessous). Le registre des traitements dit la
-  durée et l'effacement par nom (étapes 2 et 5). Options écartées : `clip_tag` (une table de
+  time-knight, délégation de la pause de Sabine). Le registre des traitements dit la durée et
+  l'effacement par nom (étapes 2 et 5). Options écartées : `clip_tag` (une table de
   liaison par sorte, à dupliquer pour `manual_notes`). — PR de #260
 - **Les tags sont normalisés à l'import : sans espaces autour, sans le `#` d'Obsidian au début,
   en minuscules ; un tag vide une fois normalisé est ignoré ; le tag `clippings` du gabarit de
@@ -3075,6 +3072,19 @@ time-knight (délégation de Sabine du 2026-10-15).
   colonne et un filtre à chaque lecture, pour un historique des tags que rien ne demande).
   Limite : `.claude/rules/conventions.md`, que la session ne modifie pas, ne nomme pas encore
   cette exception. — PR de #260
+- **Un tag dont la dernière liaison est retirée est supprimé, dans la même transaction que le
+  `DELETE` de cette liaison (`DELETE FROM tag … WHERE NOT EXISTS (… item_tag …)`, SQL
+  portable).** Décision de Sabine (« on le supprime »). Pourquoi, celui de Sabine : « Un tag
+  supprimé n'existe plus en base. » **Seconde exception nommée à la règle 5 de
+  `conventions.md`** (« ne supprime que par la purge ») : le tag n'est pas un item, et un tag que
+  plus rien ne porte n'a ni usage ni durée (un tag peut nommer une personne : registre des
+  traitements). Un tag laissé sans liaison par la suppression d'un item (`ON DELETE CASCADE`)
+  reste, lui, jusqu'à la purge (#83), qui supprime les tags sans liaison. Option écartée :
+  garder le tag sans durée jusqu'à la purge (proposé par time-knight, pour ne pas faire une
+  seconde exception et ne pas effacer un tag que le LLM aura créé sans liaison). Limite connue :
+  un tag créé un jour sans liaison, par le LLM (suite prévue), sera supprimé quand sa dernière
+  liaison l'est, ou restera s'il n'en a jamais eu ; la règle est à revoir à la migration de la
+  provenance des tags. — PR de #260
 - **Un `.md` changé est écrit en *patch*, pas en *put* : seules les colonnes qui ont changé
   (titre, texte, dates) sont écrites, avec `revised_at` ; seules les liaisons des tags retirés
   sont supprimées et celles des tags ajoutés écrites ; les liaisons inchangées ne bougent
@@ -3096,8 +3106,6 @@ time-knight (délégation de Sabine du 2026-10-15).
 
 ## Décisions encore ouvertes
 
-- **Tag que plus aucun item ne porte** (2026-10-19, #260) : il reste dans `tag`, sans durée,
-  jusqu'à la purge (#83) ; question posée à Sabine, accepter cette limite ou non.
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
   l'étalonnage du juge (#224), si les fiches sont trop maigres (« Fiches de veille : le LLM
   juge »).
