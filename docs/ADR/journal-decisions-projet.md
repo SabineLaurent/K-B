@@ -2659,7 +2659,8 @@ Décisions de Sabine du 2026-10-17 sur le plan de #14, relayées par time-knight
   complet » **reste ouverte** (Sabine, à questionner plus tard) : une future table CONTENU
   déplacerait cette colonne. Option écartée : créer CONTENU ici, hors du périmètre de #14.
   Limite assumée : le texte peut contenir la signature de l'article et les notes de
-  l'utilisatrice (registre des traitements). — PR de #14
+  l'utilisatrice (registre des traitements). **Révisée le 2026-10-19** pour les tags seulement :
+  ils entrent en base (« Collecte : tags des `.md` importés »). — PR de #14
 
 ## 2026-10-18
 
@@ -3017,6 +3018,97 @@ time-knight (délégation de Sabine du 2026-10-15).
   `withdrawn_at`, les `revised_at` passés et les lignes retirées avant lui (limite de « Brut :
   catalogues d'état et conservation »). Option écartée : l'`ALTER TABLE` à la main, sans perte
   (la recommandation de la session). — PR de #259
+
+### Collecte : tags des `.md` importés
+
+- **Les tags d'un `.md` importé entrent en base : une table `tag` partagée, une ligne par tag, et
+  une table de liaison `item_tag` (plusieurs-à-plusieurs : un `.md` a plusieurs tags, un tag sert
+  à plusieurs `.md`).** Décision de Sabine, option (a). Pourquoi, celui de Sabine : les tags
+  serviront au wiki pour regrouper les fiches par tag (#148), et la table partagée prépare leur
+  partage entre les sources de `.md`. **Révise** pour les tags seulement « Collecte : clips
+  (suite) » du 2026-10-17 (« ni `author`, ni `description`, ni `tags` n'entrent en base ») ;
+  `author` et `description` restent hors de la base. Zotero garde ses étiquettes dans l'extrait
+  (ADR du 2026-10-13) : rien ne change pour lui. Tranché dans le plan de #260 (validé par
+  time-knight, délégation de la pause de Sabine) : la liaison pointe sur `item`, pas sur `clip`,
+  pour que `manual_notes`, qui aura sa propre sorte d'item, la réutilise sans migration ; la
+  provenance d'un `.md` se lit déjà par `item.kind` (« Collecte : mise à jour des `.md`
+  importés »). Aucune ligne de code ne traite une autre sorte que le clip. Les liaisons d'un
+  item partent avec lui (`ON DELETE CASCADE`), comme ses surlignages Zotero (décidé par
+  time-knight, délégation de la pause de Sabine). Le registre des traitements dit la durée et
+  l'effacement par nom (étapes 2 et 5). Options écartées : `clip_tag` (une table de
+  liaison par sorte, à dupliquer pour `manual_notes`). — PR de #260
+- **Les tags sont normalisés à l'import : sans espaces autour, sans le `#` d'Obsidian au début,
+  en minuscules ; un tag vide une fois normalisé est ignoré ; le tag `clippings` du gabarit de
+  Web Clipper est écarté.** Décision de Sabine. Pourquoi, celui de Sabine pour `clippings` : la
+  sorte et la source distinguent déjà un clip (le gabarit le met sur chaque clip : 5 sur 5 dans
+  le relevé de la spec de collecte). La normalisation est une seule fonction, `normalize_tag`
+  (`items.py`), et le type `Tag` refuse un tag qu'elle changerait encore : la forme est tenue à
+  un seul endroit (règle 4 de `conventions.md`), prête pour `manual_notes`. Un tag invalide (pas
+  du texte, plus de 100 caractères, avec un NUL, ou `##llm`, qui garde un `#`) fait refuser le
+  clip entier, par la voie de rejet des autres propriétés (décision de time-knight, délégation
+  de Sabine ; règles 1 et 4 de `conventions.md`). Tranché dans le plan de #260 : `lower()` et
+  non `casefold()` (la décision dit « en minuscules » ; `casefold` change aussi `ß` en `ss`) ;
+  un seul `#` retiré (`removeprefix`), pas tous (`lstrip`), pour ne pas lire `##llm` comme
+  `llm` sans décision ; la base ne tient que la longueur de `tag.name` (`CHECK`), car le
+  `lower` de SQLite ne connaît que l'ASCII et celui de PostgreSQL tout Unicode ; 100 caractères
+  au plus, borne large non mesurée (le coffre n'est pas lu) ; 30 tags au plus par item
+  (`TAG_MAX_COUNT`, tenu par l'item seul) : la borne vient d'un constat du second `/code-review`
+  (sans borne, un clip de 1 Mo fait de tags d'une lettre écrirait environ 750 000 requêtes dans
+  un seul savepoint), que time-knight a fait corriger (délégation de Sabine du 2026-10-15), ce
+  qui revient sur « le clip est déjà borné à 1 Mo » du plan ; sa valeur est de Sabine, 30 et non
+  les 100 proposés : « un garde-fou de ressources, pas une règle de rangement » ; un tag en
+  double est refusé par l'item, sinon la clé de
+  `item_tag` le refuserait et arrêterait tout l'import. Options écartées : normaliser dans
+  `normalize_item` (`etl/normalize.py`), car `clippings` est propre à Web Clipper et la
+  normalisation doit précéder la validation par `Item` ; normaliser dans l'écrivain (la couche
+  d'accès aux données ne transforme pas, règle 5). Limites assumées, hypothèses non vérifiées
+  sur le coffre : `tags: llm, ai` donne un seul tag `llm, ai`, et `tags: "#ai #llm"` le seul tag
+  `ai #llm` (une espace intérieure n'est pas lue comme un séparateur) ; un mot sous deux formes
+  Unicode (NFC et NFD) donne deux tags. — PR de #260
+- **Les tags d'un clip font partie de son contenu : un tag ajouté ou retiré date `revised_at` ;
+  la liaison d'un tag retiré (`item_tag`) est supprimée, celle d'un tag ajouté écrite.**
+  Décision de Sabine. Pourquoi, celui de Sabine : « Un tag supprimé
+  n'existe plus en base. Je ne vois pas l'utilité qu'aurait le fait de le garder en revised
+  at. » **Exception nommée à la règle 5 de `conventions.md`** (« ne supprime que par la purge »),
+  le premier `DELETE` de `src/k_b` : une liaison est une valeur d'une version du clip, comme une
+  colonne que l'`UPDATE` écrase, pas un item ; elle ne touche pas au « retiré, jamais supprimé »
+  des entrées Zotero (2026-10-13), qui vaut pour des items. Les tags se comparent comme un
+  ensemble, sans leur ordre : l'ordre d'un `ORDER BY` dépend de la collation, qui n'est pas la
+  même en SQLite et en PostgreSQL. Option écartée : un `withdrawn_at` sur `item_tag` (une
+  colonne et un filtre à chaque lecture, pour un historique des tags que rien ne demande).
+  Limite : `.claude/rules/conventions.md`, que la session ne modifie pas, ne nomme pas encore
+  cette exception. — PR de #260
+- **Un tag dont la dernière liaison est retirée est supprimé, dans la même transaction que le
+  `DELETE` de cette liaison (`DELETE FROM tag … WHERE NOT EXISTS (… item_tag …)`, SQL
+  portable).** Décision de Sabine (« on le supprime »). Pourquoi, celui de Sabine : « Un tag
+  supprimé n'existe plus en base. » **Seconde exception nommée à la règle 5 de
+  `conventions.md`** (« ne supprime que par la purge ») : le tag n'est pas un item, et un tag que
+  plus rien ne porte n'a ni usage ni durée (un tag peut nommer une personne : registre des
+  traitements). Un tag laissé sans liaison par la suppression d'un item (`ON DELETE CASCADE`)
+  reste, lui, jusqu'à la purge (#83), qui supprime les tags sans liaison. Option écartée :
+  garder le tag sans durée jusqu'à la purge (proposé par time-knight, pour ne pas faire une
+  seconde exception et ne pas effacer un tag que le LLM aura créé sans liaison). Limite connue :
+  un tag créé un jour sans liaison, par le LLM (suite prévue), sera supprimé quand sa dernière
+  liaison l'est, ou restera s'il n'en a jamais eu ; la règle est à revoir à la migration de la
+  provenance des tags. — PR de #260
+- **Un `.md` changé est écrit en *patch*, pas en *put* : seules les colonnes qui ont changé
+  (titre, texte, dates) sont écrites, avec `revised_at` ; seules les liaisons des tags retirés
+  sont supprimées et celles des tags ajoutés écrites ; les liaisons inchangées ne bougent
+  pas.** Décision de Sabine. Pourquoi, celui de Sabine : « je veux le patch. C'est plus sobre et
+  propre ». Révise l'écriture livrée par #259 (« Collecte : mise à jour des `.md` importés »),
+  qui écrivait toutes les colonnes. Le `SET` de l'`UPDATE` ne nomme que les colonnes changées,
+  prises dans les champs de `ClipContent`, jamais dans une valeur lue. Option écartée : le *put*
+  (toutes les colonnes, et toutes les liaisons supprimées puis écrites de nouveau) : plus simple,
+  mais il écrit le texte entier, jusqu'à 1 Mo, pour un tag changé. Ce que le *patch* épargne sur
+  le disque, à vérifier sur la base : en PostgreSQL (08/11), un `UPDATE` laisse en place la
+  valeur hors ligne d'une colonne qui ne change pas (documentation TOAST) ; en SQLite, ce n'est
+  pas établi : SQLite n'écrit que les pages qui changent quand la cellule garde sa taille
+  (journal des sources de SQLite, 2018), mais des essais du forum montrent la ligne entière
+  réécrite dans d'autres cas, non mesuré ici. — PR de #260
+- **Suite prévue, sans code ici.** Le wiki regroupe les fiches par tag (#148) ; le LLM aura la
+  main sur les tags, « de façon frugale », pour en créer et les revoir, par l'API de données,
+  après le 25/10 ; la provenance d'un tag (Sabine ou LLM) n'est pas modélisée : Sabine préfère
+  « une migration quand on en sera au llm ». Décisions de Sabine du 2026-10-19. — PR de #260
 
 ## Décisions encore ouvertes
 

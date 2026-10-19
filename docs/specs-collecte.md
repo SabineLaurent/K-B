@@ -294,7 +294,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   2024-12-04, lue par l'API GitHub le 2026-10-17.
 - **Ce qu'on en tire** : un item par fichier : titre (`title`), URL source (`source`), date
   d'ajout (`created`), date de publication (`published`, si la page en donne une), et le texte
-  gardé, après le frontmatter. Ne sont pas lus : `author`, `description`, `tags`. Comment un clip
+  gardé, après le frontmatter, et ses tags (`tags`, depuis #260). Ne sont pas lus : `author`,
+  `description`. Comment un clip
   entre en base (champs, clé, dates, rejets, doublons) : « Du brut au jeu d'items », étape 4,
   « Clips ».
 - **Accès** : lecture du dossier local du coffre (`src/k_b/etl/sources/clipping.py`) ; aucun
@@ -667,7 +668,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
    | flux de nouveautés, **par fenêtre** (variante propre aux classements, #142) | classements GH Archive (table `trend`, pas un item) | inchangée : le premier classement vu d'une fenêtre est gardé entier ; une fenêtre qu'un autre fichier brut a déjà apportée est écartée entière | `INSERT INTO trend … SELECT … WHERE NOT EXISTS (ligne de la même fenêtre venue d'un autre fichier brut) ON CONFLICT (window_end, repository_id) DO NOTHING RETURNING id` | `already_seen`, une ligne par fenêtre |
    | catalogue d'état | CISA KEV | remplacé si son fichier est collecté après le dernier catalogue de la source déjà importé et que son contenu diffère ; `revised_at` prend la date de cette collecte | `ON CONFLICT (cve_id) DO UPDATE … WHERE` (collecte plus récente et contenu différent) `RETURNING id` | `unchanged`, `no_newer_version` |
    | flux avec révisions | arXiv | remplacé si sa révision (`updated`) est plus récente | `ON CONFLICT (arxiv_id) DO UPDATE … WHERE excluded.revised_at > publication.revised_at RETURNING id` | `revision_not_newer` |
-   | `.md` importé, **par URL** (#14, #259) | clips du Web Clipper | réécrit si son contenu (titre, texte, dates) diffère et que son fichier n'est pas collecté avant le brut le plus récent du contenu gardé ; `revised_at` prend la date de cette collecte | `INSERT INTO item … SELECT … WHERE NOT EXISTS (clip de même URL) RETURNING id`, sinon lecture de la ligne gardée, comparaison en Python et `UPDATE clip` | `already_seen`, `no_newer_version` |
+   | `.md` importé, **par URL** (#14, #259, #260) | clips du Web Clipper | écrit en *patch* si son contenu (titre, texte, dates, tags) diffère et que son fichier n'est pas collecté avant le brut le plus récent du contenu gardé : seules les colonnes changées, la liaison de chaque tag retiré supprimée (et le tag s'il n'a plus de liaison), celle de chaque tag ajouté écrite ; `revised_at` prend la date de cette collecte | `INSERT INTO item … SELECT … WHERE NOT EXISTS (clip de même URL) RETURNING id` ; sinon lecture de la ligne gardée et de ses tags, comparaison en Python, `UPDATE clip SET` (colonnes changées), `DELETE FROM item_tag` et `DELETE FROM tag … WHERE NOT EXISTS` (les deux exceptions à la règle 5 de `conventions.md`), `INSERT INTO tag … ON CONFLICT (name) DO NOTHING` et `INSERT INTO item_tag` | `already_seen`, `no_newer_version` |
    | catalogue d'état, **à deux niveaux** (#138) | Zotero : l'entrée et chacun de ses surlignages | comme CISA KEV : remplacé si son extrait est collecté après le dernier extrait importé et que son contenu diffère ; `revised_at` prend la date de cette collecte | `ON CONFLICT (zotero_key) DO UPDATE … WHERE` (extrait plus récent, et retiré ou contenu différent) `RETURNING`, pour `zotero_entry` et pour `highlight` | `unchanged`, `no_newer_version` |
 
    - Le flux de nouveautés n'a pas d'`ON CONFLICT` : le sous-type exige un item déjà créé, et
@@ -762,7 +763,29 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
      - **champs lus** : `title` (texte non vide, au plus 1 000 caractères), `source` (URL `http`
        ou `https`), `created` (obligatoire), `published` (facultative) et le texte après le
        frontmatter (au plus 1 000 000 caractères), gardé tel quel, une ligne `---` plus bas
-       comprise (un filet du texte). Les autres propriétés sont ignorées ;
+       comprise (un filet du texte), et `tags` (#260, ci-dessous). Les autres propriétés sont
+       ignorées ;
+     - **tags** (#260, décisions de Sabine du 2026-10-19) : lus en liste, ou en texte simple
+       (`tags: llm`, un tag) ; une valeur absente (vide, `null`, `~`, ou pas de propriété) ne
+       donne aucun tag, et un élément absent est ignoré. Chaque tag est normalisé
+       (`normalize_tag`, `items.py`) : sans espaces autour, sans le `#` d'Obsidian au début, en
+       minuscules ; `LLM`, ` llm ` et `#llm` donnent `llm`, une fois. Un tag vide une fois
+       normalisé est ignoré ; `clippings`, que le gabarit par défaut met sur chaque clip (5 clips
+       sur 5 relevés), est écarté. Un tag qui n'est pas du texte (une liste, un dictionnaire),
+       trop long (plus de 100 caractères) ou avec un NUL, ou plus de 30 tags, fait **refuser le
+       clip entier**, par la
+       voie de rejet des autres propriétés ; de même un tag que la normalisation laisse sous une
+       forme qu'elle changerait encore (`##llm` donne `#llm`). Un tag est une ligne de `tag`,
+       partagée par les clips qui le portent, liée à chacun par `item_tag`. **Limites**
+       (hypothèses, non vérifiées sur le coffre) : `tags: llm, ai` donne un seul tag `llm, ai`,
+       et `tags: "#ai #llm"` le seul tag `ai #llm` : ni une virgule ni une espace intérieure ne
+       sont lues comme un séparateur ; un même mot écrit sous deux formes
+       Unicode (NFC et NFD) donne deux tags. Un `#tag` sans guillemets (`- #llm`, `tags: #llm`)
+       est un commentaire YAML : lu absent, il est perdu sans trace (vérifié avec `BaseLoader` le
+       2026-10-19 ; Web Clipper écrit ses tags entre guillemets). Les tags sont rangés par nom :
+       l'ordre du coffre n'est pas gardé. La clé stable d'un tag est son nom (`tag.name`,
+       unique) ; `tag.id` est interne, et SQLite peut redonner l'id d'un tag supprimé au tag
+       créé ensuite (rien ne l'expose). Les `#tags` écrits dans le texte ne sont pas lus ;
      - **clé** : l'URL sans ses paramètres `utm_*` (`remove_tracking_parameters`), les autres
        paramètres gardés tels quels et dans leur ordre ; pas d'empreinte de contenu (journal ADR,
        « Collecte : clips ») ;
@@ -783,8 +806,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
        valeur ;
      - **nature** : `.md` importé, par URL ; la dernière version est gardée (décision de Sabine
        du 2026-10-19, #259). Un clip copié de nouveau, ou une autre copie de la même URL, au même
-       contenu (titre, texte, `created`, `published`) est écarté `already_seen` ; un contenu
-       changé réécrit le clip, `revised_at` prend la date de la collecte qui voit le changement.
+       contenu (titre, texte, `created`, `published`, tags normalisés, sans leur ordre) est
+       écarté `already_seen` ; un contenu changé est écrit en *patch* (décision de Sabine du
+       2026-10-19, #260) : seules les colonnes qui ont changé, la liaison de chaque tag retiré
+       supprimée (exception à la règle 5 de `.claude/rules/conventions.md`, journal ADR,
+       2026-10-19), et le tag lui-même s'il n'a plus de liaison, celle de chaque tag ajouté
+       écrite, les autres laissées telles quelles ;
+       `revised_at` prend la date de la collecte qui voit le changement.
        L'item pointe sur le brut le plus récent de son contenu, une copie au même contenu
        comprise. Une propriété que la base ne garde pas (`author`, `description`) ne réécrit
        rien. Un fichier collecté avant ce brut, au contenu différent, est écarté

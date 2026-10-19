@@ -568,3 +568,104 @@ def test_a_readable_clip_is_one_entry_without_rejection():
     assert len(reading.entries) == 1
     assert reading.rejection_reasons == []
     check_not_all_invalid(reading)
+
+
+# Tags (#260).
+
+FIXTURE_TAGS = 'tags:\n  - "clippings"\n'
+
+
+def with_tags(raw_clip, tags):
+    """The clip with its tags property, as the fixture writes it, replaced by tags."""
+    text = raw_clip.decode()
+    assert FIXTURE_TAGS in text
+    return text.replace(FIXTURE_TAGS, f"{tags}\n").encode()
+
+
+@pytest.mark.parametrize(
+    ("tags", "read"),
+    [
+        ('tags:\n  - "LLM"\n  - " llm "\n  - "#llm"', ("llm",)),
+        ('tags:\n  - "# llm"', ("llm",)),
+        ('tags:\n  - "Security"\n  - "agents"', ("agents", "security")),
+        ("tags: llm", ("llm",)),
+        ("tags:", ()),
+        ("tags: []", ()),
+        ("tags: null", ()),
+        ('tags:\n  - ""\n  - null\n  - "~"\n  - "llm"', ("llm",)),
+        ('tags:\n  - "#"\n  - "  "\n  - "llm"', ("llm",)),
+        ('tags:\n  - "clippings"\n  - "Clippings"\n  - "#clippings"', ()),
+    ],
+    ids=[
+        "case_spaces_and_hash",
+        "hash_then_space",
+        "sorted",
+        "text",
+        "empty",
+        "empty_list",
+        "null",
+        "absent_elements",
+        "empty_once_normalized",
+        "template_tag",
+    ],
+)
+def test_the_tags_of_a_clip_are_read_normalized(tags, read):
+    item = convert(with_tags(fixture_bytes(ARTICLE), tags))
+
+    assert item.tags == read
+
+
+def test_a_clip_without_tags_property_has_none():
+    item = convert(with_tags(fixture_bytes(ARTICLE), ""))
+
+    assert item.tags == ()
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [
+        "tags:\n  - [llm, ai]",
+        "tags:\n  - {llm: ai}",
+        "tags: {llm: ai}",
+        'tags:\n  - "' + "x" * 101 + '"',
+        'tags:\n  - "SECRET\\0"',
+        'tags:\n  - "##llm"',
+    ],
+    ids=["list", "mapping_element", "mapping", "too_long", "nul", "two_hashes"],
+)
+def test_a_clip_with_an_invalid_tag_is_refused_by_its_field(tags):
+    with pytest.raises(ValidationError) as refusal:
+        convert(with_tags(fixture_bytes(ARTICLE), tags))
+
+    assert "tags" in str(refusal.value)
+    assert "SECRET" not in str(refusal.value)
+
+
+def test_a_tag_of_the_maximum_length_is_kept():
+    item = convert(with_tags(fixture_bytes(ARTICLE), 'tags:\n  - "' + "x" * 100 + '"'))
+
+    assert item.tags == ("x" * 100,)
+
+
+def test_a_tag_too_long_is_refused_with_its_length_and_the_maximum():
+    with pytest.raises(ValidationError) as refusal:
+        convert(with_tags(fixture_bytes(ARTICLE), 'tags:\n  - "' + "x" * 101 + '"'))
+
+    assert "tag too long: 101 characters, maximum 100" in str(refusal.value)
+
+
+def listed_tags(count):
+    return "tags:\n" + "\n".join(f'  - "tag{number}"' for number in range(count))
+
+
+def test_a_clip_of_the_maximum_count_of_tags_is_kept():
+    item = convert(with_tags(fixture_bytes(ARTICLE), listed_tags(30)))
+
+    assert len(item.tags) == 30
+
+
+def test_a_clip_with_too_many_tags_is_refused_with_its_count_and_the_maximum():
+    with pytest.raises(ValidationError) as refusal:
+        convert(with_tags(fixture_bytes(ARTICLE), listed_tags(31)))
+
+    assert "tags too long: 31 elements, maximum 30" in str(refusal.value)

@@ -3,6 +3,7 @@ written again, revised_at dated (decision of Sabine of 2026-10-19). Each clip is
 collection writes it, a page of a collection folder of raw/selected_library/clipping/, from the
 fixtures of tests/fixtures/clipping/."""
 
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,15 @@ CLIP_QUERY = (
     "SELECT url, title, body, saved_at, published_at, raw_file_path"
     " FROM clip JOIN item ON item.id = clip.item_id"
     " JOIN raw_data ON raw_data.id = item.raw_data_id ORDER BY url"
+)
+TAGS_QUERY = (
+    "SELECT clip.url, tag.name FROM clip"
+    " JOIN item_tag ON item_tag.item_id = clip.item_id"
+    " JOIN tag ON tag.id = item_tag.tag_id ORDER BY clip.url, tag.name"
+)
+FIXTURE_TAGS = 'tags:\n  - "clippings"\n'
+OTHER_URL = (
+    "https://owasp.github.io/www-project-agentic-skills-top-10/videos/?video=ast01"
 )
 
 
@@ -185,8 +195,9 @@ def test_a_clip_whose_content_changed_is_written_again(
     [
         ('"[[Jane Doe]]"', '"[[John Roe]]"'),
         ('simply by learning more syntax."', 'by learning syntax."'),
+        ('- "clippings"', '- "Clippings"'),
     ],
-    ids=["author", "description"],
+    ids=["author", "description", "template_tag"],
 )
 def test_a_change_of_a_property_the_base_does_not_keep_is_left_out(
     data_dir, kept, changed
@@ -325,8 +336,221 @@ def test_an_unreadable_clip_is_rejected_at_each_import_and_not_registered(data_d
     assert fetch_rows(data_dir, "SELECT count(*) FROM raw_data") == [(0,)]
 
 
-def test_a_rebuilt_base_is_the_same(data_dir, tmp_path):
+def with_tags(text, *tags):
+    """The clip with tags in place of the tag of the fixture."""
+    assert FIXTURE_TAGS in text
+    listed = "".join(f'  - "{tag}"\n' for tag in tags)
+    return text.replace(FIXTURE_TAGS, f"tags:\n{listed}")
+
+
+def test_the_tags_of_a_clip_are_in_the_base_normalized(data_dir):
+    write_clip(
+        data_dir,
+        FIRST,
+        "a1",
+        with_tags(fixture_text(ARTICLE), "LLM", " llm ", "#llm", "Agents", "clippings"),
+    )
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, TAGS_QUERY) == [
+        (ARTICLE_URL, "agents"),
+        (ARTICLE_URL, "llm"),
+    ]
+    assert fetch_rows(data_dir, "SELECT name FROM tag ORDER BY name") == [
+        ("agents",),
+        ("llm",),
+    ]
+
+
+def test_a_tag_carried_by_two_clips_is_one_row(data_dir):
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
+    write_clip(
+        data_dir, FIRST, "b2", with_tags(fixture_text(PAGE_WITHOUT_AUTHOR), "LLM")
+    )
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, "SELECT count(*) FROM tag") == [(1,)]
+    assert fetch_rows(data_dir, TAGS_QUERY) == [
+        (ARTICLE_URL, "llm"),
+        (OTHER_URL, "llm"),
+    ]
+
+
+def test_a_clip_without_other_tag_than_the_template_has_none(data_dir):
     write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, "SELECT count(*) FROM tag") == [(0,)]
+    assert fetch_rows(data_dir, "SELECT count(*) FROM item_tag") == [(0,)]
+
+
+def test_a_clip_copied_again_with_its_tags_in_another_form_is_left_out(data_dir):
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm", "agents"))
+    run_import(data_dir)
+    write_clip(
+        data_dir, SECOND, "a1", with_tags(fixture_text(ARTICLE), "#Agents", "LLM")
+    )
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(None,)]
+    assert [discard["rule"] for discard in read_discards(data_dir)] == ["already_seen"]
+
+
+def test_a_tag_added_or_removed_writes_the_clip_again(data_dir):
+    """Decision of Sabine of 2026-10-19: the links of the version before are removed."""
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
+    run_import(data_dir)
+    write_clip(
+        data_dir, SECOND, "a1", with_tags(fixture_text(ARTICLE), "llm", "agents")
+    )
+    run_import(data_dir)
+    added = (
+        fetch_rows(data_dir, TAGS_QUERY),
+        fetch_rows(data_dir, "SELECT revised_at FROM clip"),
+    )
+    third_path = write_clip(
+        data_dir, "2026-10-19T093000Z", "a1", with_tags(fixture_text(ARTICLE), "agents")
+    )
+
+    run_import(data_dir)
+
+    assert added == ([(ARTICLE_URL, "agents"), (ARTICLE_URL, "llm")], [(SECOND_AT,)])
+    assert fetch_rows(data_dir, TAGS_QUERY) == [(ARTICLE_URL, "agents")]
+    assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [
+        ("2026-10-19T09:30:00Z",)
+    ]
+    assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [third_path]
+    assert read_log(data_dir) == []
+
+
+# The columns of clip a rewrite may write.
+CLIP_COLUMNS = ("title", "body", "saved_at", "published_at", "revised_at")
+LINKS_QUERY = (
+    "SELECT tag.name, item_tag.rowid FROM item_tag"
+    " JOIN tag ON tag.id = item_tag.tag_id ORDER BY tag.name"
+)
+
+
+def watch_written_columns(data_dir):
+    """A trigger per column of clip, in the base of the test only: an UPDATE OF a column fires
+    when the column is in the SET of the UPDATE, whether its value changes or not."""
+    connection = sqlite3.connect(data_dir / "k-b.sqlite")
+    try:
+        connection.execute("CREATE TABLE written_column (name TEXT)")
+        for column in CLIP_COLUMNS:
+            connection.execute(
+                f"CREATE TRIGGER clip_{column}_written AFTER UPDATE OF {column} ON clip"  # noqa: S608 — constants
+                f" BEGIN INSERT INTO written_column VALUES ('{column}'); END"
+            )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def read_written_columns(data_dir):
+    return sorted(
+        name for (name,) in fetch_rows(data_dir, "SELECT name FROM written_column")
+    )
+
+
+def test_a_title_changed_alone_writes_only_the_title(data_dir):
+    """Decision of Sabine of 2026-10-19: a patch, not a put."""
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
+    run_import(data_dir)
+    links = fetch_rows(data_dir, LINKS_QUERY)
+    watch_written_columns(data_dir)
+    changed = with_tags(fixture_text(ARTICLE), "llm").replace(
+        'title: "7 Coding', 'title: "Seven Coding'
+    )
+    write_clip(data_dir, SECOND, "a1", changed)
+
+    run_import(data_dir)
+
+    assert read_written_columns(data_dir) == ["revised_at", "title"]
+    assert fetch_rows(data_dir, LINKS_QUERY) == links
+
+
+def test_a_tag_added_writes_only_its_link(data_dir):
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
+    run_import(data_dir)
+    [(_, llm_rowid)] = fetch_rows(data_dir, LINKS_QUERY)
+    watch_written_columns(data_dir)
+    write_clip(
+        data_dir, SECOND, "a1", with_tags(fixture_text(ARTICLE), "llm", "agents")
+    )
+
+    run_import(data_dir)
+
+    assert read_written_columns(data_dir) == ["revised_at"]
+    links = dict(fetch_rows(data_dir, LINKS_QUERY))
+    assert sorted(links) == ["agents", "llm"]
+    assert links["llm"] == llm_rowid
+
+
+def test_a_tag_removed_removes_only_its_link(data_dir):
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm", "agents"))
+    run_import(data_dir)
+    agents_rowid = dict(fetch_rows(data_dir, LINKS_QUERY))["agents"]
+    watch_written_columns(data_dir)
+    write_clip(data_dir, SECOND, "a1", with_tags(fixture_text(ARTICLE), "agents"))
+
+    run_import(data_dir)
+
+    assert read_written_columns(data_dir) == ["revised_at"]
+    assert fetch_rows(data_dir, LINKS_QUERY) == [("agents", agents_rowid)]
+
+
+def test_the_last_link_of_a_tag_removed_removes_the_tag(data_dir):
+    """Decision of Sabine of 2026-10-19: a tag removed no longer exists in the base."""
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm", "agents"))
+    run_import(data_dir)
+    write_clip(data_dir, SECOND, "a1", with_tags(fixture_text(ARTICLE), "agents"))
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, "SELECT name FROM tag") == [("agents",)]
+
+
+def test_a_tag_another_clip_still_carries_stays(data_dir):
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
+    write_clip(
+        data_dir, FIRST, "b2", with_tags(fixture_text(PAGE_WITHOUT_AUTHOR), "llm")
+    )
+    run_import(data_dir)
+    write_clip(data_dir, SECOND, "a1", with_tags(fixture_text(ARTICLE), "agents"))
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, "SELECT name FROM tag ORDER BY name") == [
+        ("agents",),
+        ("llm",),
+    ]
+    assert fetch_rows(data_dir, TAGS_QUERY) == [
+        (ARTICLE_URL, "agents"),
+        (OTHER_URL, "llm"),
+    ]
+
+
+def test_an_identical_clip_changes_nothing(data_dir):
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
+    run_import(data_dir)
+    links = fetch_rows(data_dir, LINKS_QUERY)
+    watch_written_columns(data_dir)
+    write_clip(data_dir, SECOND, "a1", with_tags(fixture_text(ARTICLE), "LLM"))
+
+    run_import(data_dir)
+
+    assert read_written_columns(data_dir) == []
+    assert fetch_rows(data_dir, LINKS_QUERY) == links
+    assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(None,)]
+
+
+def test_a_rebuilt_base_is_the_same(data_dir, tmp_path):
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
     write_clip(data_dir, SECOND, "a1", fixture_text(ARTICLE).replace("do not", "never"))
     write_clip(data_dir, SECOND, "b2", fixture_text(PAGE_WITHOUT_AUTHOR))
     run_import(data_dir)
