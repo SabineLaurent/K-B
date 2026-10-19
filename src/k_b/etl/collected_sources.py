@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from k_b.core.quoting import quote_value
+from k_b.etl.raw_store import RawStore
 from k_b.etl.source_contract import Source, SourceKind, list_sources
 from k_b.etl.sources.clipping import FOLDER_PREFIX as CLIPPING_SOURCE_NAME
 from k_b.etl.sources.clipping import ClippingSource
@@ -89,16 +90,20 @@ def find_collect_only_refusal(
 
 
 def list_collected_sources(
-    collect_only: CollectOnly, environ: Mapping[str, str], kinds: Sequence[SourceKind]
+    collect_only: CollectOnly,
+    environ: Mapping[str, str],
+    kinds: Sequence[SourceKind],
+    store: RawStore,
 ) -> list[Source]:
     """The sources of the kinds given that are chosen, then Zotero, the clips and GH Archive,
-    each when it is chosen and its variable set."""
+    each when it is chosen and its variable set. Zotero compares its extract with the last one
+    of store."""
     sources = list_sources(
         [kind for kind in kinds if collect_only.is_collected(kind.folder_prefix)]
     )
     zotero_dir = environ.get(ZOTERO_DIR_VARIABLE)
     if zotero_dir and collect_only.is_collected(ZOTERO_SOURCE_NAME):
-        sources.append(ZoteroSource(Path(zotero_dir)))
+        sources.append(ZoteroSource(Path(zotero_dir), store))
     vault_dir = environ.get(VAULT_DIR_VARIABLE)
     if vault_dir and collect_only.is_collected(CLIPPING_SOURCE_NAME):
         sources.append(ClippingSource(Path(vault_dir)))

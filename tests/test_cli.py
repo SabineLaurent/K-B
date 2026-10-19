@@ -880,6 +880,88 @@ def test_import_writes_the_raw_rankings_of_gh_archive_into_the_trend_table(
     connection.close()
 
 
+def write_state_catalogs(data_dir):
+    """Two extracts of Zotero and two catalogs of CISA KEV, not imported yet."""
+    paths = []
+    for collection in ("2026-10-05T093000Z", "2026-10-06T093000Z"):
+        extract_path = (
+            data_dir / "raw" / "selected_library" / "zotero" / f"{collection}.json"
+        )
+        extract_path.parent.mkdir(parents=True, exist_ok=True)
+        extract_path.write_bytes(b"[]\n")
+        catalog_dir = data_dir / "raw" / "automated_watch" / "cisa_kev"
+        catalog_dir.mkdir(parents=True, exist_ok=True)
+        catalog_path = catalog_dir / f"{collection}.csv"
+        shutil.copyfile(FIXTURES_DIR / "cisa_kev_extract.csv", catalog_path)
+        paths += [extract_path, catalog_path]
+    return paths
+
+
+def test_import_keeps_only_the_last_extract_and_catalog_imported(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    older_extract, older_catalog, last_extract, last_catalog = write_state_catalogs(
+        tmp_path
+    )
+
+    exit_code = cli.main(["import"])
+
+    assert exit_code == 0
+    assert "superseded raw files deleted: 2" in capsys.readouterr().out
+    assert (older_extract.exists(), older_catalog.exists()) == (False, False)
+    assert (last_extract.exists(), last_catalog.exists()) == (True, True)
+
+
+def test_a_failed_import_deletes_no_raw_file(monkeypatch, tmp_path):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    paths = write_state_catalogs(tmp_path)
+
+    def fail_to_import(*arguments):
+        raise sqlite3.OperationalError("database is locked")
+
+    def refuse_to_purge(*arguments):
+        raise AssertionError("purged after a failed import")
+
+    monkeypatch.setattr(import_command, "import_items", fail_to_import)
+    monkeypatch.setattr(import_command, "delete_superseded_raw_files", refuse_to_purge)
+
+    assert cli.main(["import"]) == 1
+    assert all(path.exists() for path in paths)
+
+
+def test_a_failed_purge_keeps_the_import_exits_1_and_the_next_import_purges(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    older_extract, older_catalog, _, _ = write_state_catalogs(tmp_path)
+
+    def fail_to_delete(store, key):
+        raise PermissionError(13, "Permission denied", str(tmp_path / key))
+
+    with monkeypatch.context() as patch:
+        patch.setattr(import_command.RawStore, "delete", fail_to_delete)
+        patch.setattr(import_command, "datetime", FrozenDatetime)
+        assert cli.main(["import"]) == 1
+
+    error_output = capsys.readouterr().err
+    assert (
+        "import committed, raw purge failed: PermissionError (Permission denied)"
+        in (error_output)
+    )
+    assert "2026-10-05T093000Z" not in error_output
+    assert older_extract.exists()
+    connection = sqlite3.connect(tmp_path / "k-b.sqlite")
+    assert connection.execute("SELECT count(*) FROM raw_data").fetchone() == (4,)
+    connection.close()
+
+    assert cli.main(["import"]) == 0
+    assert (older_extract.exists(), older_catalog.exists()) == (False, False)
+
+
 class FrozenDatetime(datetime):
     @classmethod
     def now(cls, tz=None):

@@ -4,12 +4,14 @@ import os
 import shutil
 import sqlite3
 import tempfile
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
+from k_b.etl.extract import collect_all_sources
+from k_b.etl.raw_store import RawStore
 from k_b.etl.sources import zotero
 from k_b.etl.sources.zotero import (
     READER,
@@ -89,9 +91,26 @@ def temporary_root(tmp_path, monkeypatch):
     return root
 
 
+def create_source(zotero_dir):
+    """The source of a data directory without any raw file yet: each extract is returned."""
+    return ZoteroSource(zotero_dir, RawStore(zotero_dir.parent / "data"))
+
+
 def extract(zotero_dir, last_collected_at=None):
-    raw_extract = ZoteroSource(zotero_dir).fetch(last_collected_at)
+    raw_extract = create_source(zotero_dir).fetch(last_collected_at)
     return json.loads(raw_extract)
+
+
+def collect(zotero_dir, data_dir, collected_at):
+    """kb collect with Zotero alone; return the extracts written, by name."""
+    outcome = collect_all_sources(
+        [ZoteroSource(zotero_dir, RawStore(data_dir))],
+        data_dir / "raw",
+        data_dir,
+        collected_at,
+    )
+    assert outcome.errors_by_source["zotero"] is None
+    return read_files(data_dir / "raw" / "selected_library" / "zotero")
 
 
 def read_files(folder):
@@ -126,7 +145,7 @@ def test_the_extract_is_utf8_json_and_the_same_bytes_for_the_same_library(
     run_on_zotero_library(
         zotero_dir, "UPDATE itemDataValues SET value = 'Résumé' WHERE valueID = 6"
     )
-    source = ZoteroSource(zotero_dir)
+    source = create_source(zotero_dir)
 
     first_extract = source.fetch(None)
 
@@ -235,12 +254,13 @@ def test_a_left_copy_that_another_run_removes_first_is_passed_over(
 
 
 def test_the_copies_a_killed_process_left_are_removed_even_with_nothing_new(
-    zotero_dir, temporary_root
+    zotero_dir, temporary_root, tmp_path
 ):
+    data_dir = tmp_path / "data"
+    collect(zotero_dir, data_dir, FIRST_COLLECTION_AT)
     (temporary_root / "kb-zotero-left").mkdir()
-    last_collected_at = datetime.now(UTC) + timedelta(minutes=1)
 
-    assert ZoteroSource(zotero_dir).fetch(last_collected_at) is None
+    assert ZoteroSource(zotero_dir, RawStore(data_dir)).fetch(None) is None
     assert list(temporary_root.iterdir()) == []
 
 
@@ -431,52 +451,112 @@ def test_a_folder_without_the_zotero_database_fails(tmp_path):
         extract(tmp_path)
 
 
-def test_a_library_not_modified_since_the_last_collection_is_not_copied(
-    zotero_dir, monkeypatch
+FIRST_COLLECTION_AT = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
+SECOND_COLLECTION_AT = datetime(2026, 10, 6, 9, 30, tzinfo=UTC)
+THIRD_COLLECTION_AT = datetime(2026, 10, 7, 9, 30, tzinfo=UTC)
+CHANGE_A_TITLE = "UPDATE itemDataValues SET value = 'Résumé' WHERE valueID = 6"
+# The title of the paper saved without its PDF (tests/fixtures/zotero_extract.sql).
+CHANGE_IT_BACK = "UPDATE itemDataValues SET value = 'A paper saved without its PDF' WHERE valueID = 6"
+
+
+def test_two_collections_of_an_unchanged_library_write_one_extract(
+    zotero_dir, tmp_path
 ):
-    def refuse_to_copy(source, destination):
-        raise AssertionError(f"copied {source}")
+    data_dir = tmp_path / "data"
+    collect(zotero_dir, data_dir, FIRST_COLLECTION_AT)
+    # Zotero running writes to its log even when the library does not change.
+    wal_path = zotero_dir / "zotero.sqlite-wal"
+    wal_path.write_bytes(b"")
 
-    monkeypatch.setattr(zotero.shutil, "copyfile", refuse_to_copy)
-    last_collected_at = datetime.now(UTC) + timedelta(minutes=1)
+    extracts = collect(zotero_dir, data_dir, SECOND_COLLECTION_AT)
 
-    assert ZoteroSource(zotero_dir).fetch(last_collected_at) is None
-
-
-def test_a_library_modified_since_the_last_collection_is_extracted(zotero_dir):
-    last_collected_at = datetime.now(UTC) - timedelta(minutes=1)
-
-    assert len(extract(zotero_dir, last_collected_at)) == 2
+    assert list(extracts) == ["2026-10-05T093000Z.json"]
 
 
-def test_a_write_less_than_a_microsecond_after_the_last_collection_is_extracted(
-    zotero_dir,
+def test_a_library_changed_since_the_last_extract_is_written_again(
+    zotero_dir, tmp_path, run_on_zotero_library
 ):
-    # The last collection is a datetime, to the microsecond; a file date is in nanoseconds.
-    last_collected_at = datetime(2026, 10, 11, 12, 0, 0, 123456, tzinfo=UTC)
-    last_collected_at_ns = (
-        (last_collected_at - datetime(1970, 1, 1, tzinfo=UTC))
-        // timedelta(microseconds=1)
-        * 1000
+    data_dir = tmp_path / "data"
+    collect(zotero_dir, data_dir, FIRST_COLLECTION_AT)
+    run_on_zotero_library(zotero_dir, CHANGE_A_TITLE)
+
+    extracts = collect(zotero_dir, data_dir, SECOND_COLLECTION_AT)
+
+    assert list(extracts) == ["2026-10-05T093000Z.json", "2026-10-06T093000Z.json"]
+    assert "Résumé".encode() in extracts["2026-10-06T093000Z.json"]
+
+
+def test_another_zotero_folder_with_files_older_than_the_last_collection_is_extracted(
+    zotero_dir, tmp_path, run_on_zotero_library
+):
+    data_dir = tmp_path / "data"
+    collect(zotero_dir, data_dir, FIRST_COLLECTION_AT)
+    other_zotero_dir = tmp_path / "Other Zotero"
+    shutil.copytree(zotero_dir, other_zotero_dir)
+    run_on_zotero_library(other_zotero_dir, CHANGE_A_TITLE)
+    for path in other_zotero_dir.iterdir():
+        os.utime(path, ns=(1, 1))
+
+    extracts = collect(other_zotero_dir, data_dir, SECOND_COLLECTION_AT)
+
+    assert len(extracts) == 2
+
+
+def test_a_library_changed_back_is_compared_with_the_last_extract_only(
+    zotero_dir, tmp_path, run_on_zotero_library
+):
+    """The first extract imported, the second only written: the library back as in the
+    first is a third extract, compared with the second."""
+    data_dir = tmp_path / "data"
+    collect(zotero_dir, data_dir, FIRST_COLLECTION_AT)
+    run_on_zotero_library(zotero_dir, CHANGE_A_TITLE)
+    collect(zotero_dir, data_dir, SECOND_COLLECTION_AT)
+    run_on_zotero_library(zotero_dir, CHANGE_IT_BACK)
+
+    extracts = collect(zotero_dir, data_dir, THIRD_COLLECTION_AT)
+
+    assert list(extracts) == [
+        "2026-10-05T093000Z.json",
+        "2026-10-06T093000Z.json",
+        "2026-10-07T093000Z.json",
+    ]
+    assert extracts["2026-10-07T093000Z.json"] == extracts["2026-10-05T093000Z.json"]
+
+
+def test_an_extract_identical_to_the_last_one_is_logged_as_not_written(
+    zotero_dir, tmp_path, caplog
+):
+    data_dir = tmp_path / "data"
+    collect(zotero_dir, data_dir, FIRST_COLLECTION_AT)
+
+    with caplog.at_level(logging.INFO, logger="k_b.etl.sources.zotero"):
+        collect(zotero_dir, data_dir, SECOND_COLLECTION_AT)
+
+    assert caplog.messages[-1] == (
+        "zotero: extract identical to the latest raw file, not written"
     )
-    os.utime(zotero_dir / "zotero.sqlite", ns=(1, 1))
-    wal_path = zotero_dir / "zotero.sqlite-wal"
-    wal_path.write_bytes(b"")
-    os.utime(wal_path, ns=(last_collected_at_ns + 500, last_collected_at_ns + 500))
-
-    assert len(extract(zotero_dir, last_collected_at)) == 2
 
 
-def test_a_library_whose_only_recent_change_is_in_its_write_ahead_log_is_extracted(
-    zotero_dir,
+def test_a_library_whose_documents_are_all_invalid_writes_no_extract_and_fails(
+    zotero_dir, tmp_path, run_on_zotero_library
 ):
-    last_collected_at = datetime.now(UTC) + timedelta(minutes=1)
-    after_it = int((last_collected_at + timedelta(minutes=1)).timestamp() * 1e9)
-    wal_path = zotero_dir / "zotero.sqlite-wal"
-    wal_path.write_bytes(b"")
-    os.utime(wal_path, ns=(after_it, after_it))
+    """conventions.md, rule 1: all_items_invalid. Written, the extract would become the last
+    one imported, and the purge would delete the last valid one."""
+    data_dir = tmp_path / "data"
+    run_on_zotero_library(zotero_dir, "UPDATE items SET dateAdded = 'yesterday';")
 
-    assert len(extract(zotero_dir, last_collected_at)) == 2
+    outcome = collect_all_sources(
+        [ZoteroSource(zotero_dir, RawStore(data_dir))],
+        data_dir / "raw",
+        data_dir,
+        FIRST_COLLECTION_AT,
+    )
+
+    error = outcome.errors_by_source["zotero"]
+    assert isinstance(error, ValueError)
+    assert str(error).startswith("all_items_invalid: 2 entries, all rejected; first: ")
+    assert "yesterday" not in str(error)
+    assert not (data_dir / "raw").exists()
 
 
 def test_the_log_gives_two_counts_and_no_author_title_or_highlight(zotero_dir, caplog):
@@ -487,7 +567,7 @@ def test_the_log_gives_two_counts_and_no_author_title_or_highlight(zotero_dir, c
 
 
 def test_zotero_is_stored_in_the_library_the_user_selected():
-    source = ZoteroSource(Path("anywhere"))
+    source = ZoteroSource(Path("anywhere"), RawStore(Path("anywhere else")))
 
     assert (source.acquisition_dir_name, source.name, source.extension) == (
         "selected_library",
@@ -514,7 +594,7 @@ def with_first_highlight_changed(document, **changes):
 
 
 def test_the_reader_reads_every_document_of_an_extract(zotero_dir):
-    raw_extract = ZoteroSource(zotero_dir).fetch(None)
+    raw_extract = create_source(zotero_dir).fetch(None)
 
     documents = read_documents(raw_extract).entries
 

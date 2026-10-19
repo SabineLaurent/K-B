@@ -20,6 +20,7 @@ from test_transform import copy_fixture
 from k_b.database.creation import create_database
 from k_b.etl import load as import_items_module
 from k_b.etl.normalize import normalize_item
+from k_b.etl.raw_store import RawStore
 from k_b.etl.sources.zotero import ZoteroSource
 
 FIRST = "2026-10-05T093000Z"
@@ -66,7 +67,8 @@ def data_dir(tmp_path):
 
 
 def extract_of(zotero_dir):
-    return ZoteroSource(zotero_dir).fetch(None)
+    # A data directory without any raw file: each extract is returned, even a replay.
+    return ZoteroSource(zotero_dir, RawStore(zotero_dir.parent / "data")).fetch(None)
 
 
 def write_extract(data_dir, collection, raw_extract):
