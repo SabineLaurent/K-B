@@ -3,7 +3,7 @@
 Download the ranking of the most starred GitHub repositories, as published.
 
 Read a raw ranking of the most starred GitHub repositories: the download checks its response with
-it. The ranking gives no item: it does not enter the base (decision "Tops", 2026-10-08).
+it. The ranking gives no item: it does not enter the base (decision "Tops", 2026-10-07).
 """
 
 import json

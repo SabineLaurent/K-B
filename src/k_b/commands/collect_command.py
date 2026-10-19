@@ -25,8 +25,8 @@ from k_b.etl.sources.github_api import TOKEN_VARIABLE
 logger = logging.getLogger(LOGGER_NAME)
 
 # The kinds whose sources call the GitHub REST API on its primary quota, the one KB_GITHUB_TOKEN
-# raises from 60 to 5,000 requests per hour. Not github_most_starred: it calls the search, which
-# has its own quota, apart. Not gh_archive, which reads BigQuery.
+# raises from 60 to 5,000 requests per hour. Not github_most_starred nor github_most_forked: they
+# call the search, which has its own quota, apart. Not gh_archive, which reads BigQuery.
 GITHUB_CORE_QUOTA_FOLDER_PREFIXES = frozenset(
     {github_releases.FOLDER_PREFIX, github_advisories.FOLDER_PREFIX}
 )

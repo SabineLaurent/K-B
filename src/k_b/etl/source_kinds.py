@@ -13,6 +13,7 @@ from k_b.etl.sources import (
     clipping,
     gh_archive,
     github_advisories,
+    github_most_forked,
     github_most_starred,
     github_releases,
     tldr,
@@ -21,6 +22,7 @@ from k_b.etl.sources import (
 from k_b.etl.sources.arxiv import ArxivSource
 from k_b.etl.sources.cisa_kev import CisaKevSource
 from k_b.etl.sources.github_advisories import GithubAdvisoriesSource
+from k_b.etl.sources.github_most_forked import GithubMostForkedSource
 from k_b.etl.sources.github_most_starred import GithubMostStarredSource
 from k_b.etl.sources.github_releases import GithubReleasesSource
 from k_b.etl.sources.tldr import TRACKED_EDITIONS, TldrSource
@@ -51,7 +53,13 @@ SOURCE_KINDS = (
     SourceKind(
         github_most_starred.FOLDER_PREFIX,
         (GithubMostStarredSource(),),
-        # No reader: the ranking does not enter the base (decision "Tops", 2026-10-08).
+        # No reader: the ranking does not enter the base (decision "Tops", 2026-10-07).
+        None,
+    ),
+    SourceKind(
+        github_most_forked.FOLDER_PREFIX,
+        (GithubMostForkedSource(),),
+        # No reader: the ranking does not enter the base (decision "Tops", 2026-10-07).
         None,
     ),
     SourceKind(arxiv.FOLDER_PREFIX, (ArxivSource(),), arxiv.READER),

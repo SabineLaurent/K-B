@@ -157,10 +157,9 @@ def test_the_raw_files_of_a_folder_no_longer_tracked_are_read(tmp_path):
     assert reading.rejections == []
 
 
-def test_the_github_ranking_is_skipped_and_logged(tmp_path, caplog):
-    copy_fixture(
-        tmp_path, "github_most_starred_extract.json", "github_most_starred", "json"
-    )
+@pytest.mark.parametrize("folder_name", ["github_most_starred", "github_most_forked"])
+def test_a_github_ranking_is_skipped_and_logged(tmp_path, caplog, folder_name):
+    copy_fixture(tmp_path, f"{folder_name}_extract.json", folder_name, "json")
 
     with caplog.at_level(logging.INFO):
         reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
@@ -168,8 +167,7 @@ def test_the_github_ranking_is_skipped_and_logged(tmp_path, caplog):
     assert items_of(reading) == []
     assert reading.rejections == []
     assert (
-        "source without a reader of items, skipped by the item reader:"
-        " 'github_most_starred'"
+        f"source without a reader of items, skipped by the item reader: '{folder_name}'"
     ) in caplog.text
 
 
