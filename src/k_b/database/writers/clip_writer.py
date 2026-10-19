@@ -22,9 +22,8 @@ INSERT INTO clip (item_id, kind, url, title, body, saved_at, published_at)
 VALUES (:item_id, 'clip', :url, :title, :body, :saved_at, :published_at)
 """
 
-# The clip of the URL, its content in the order of ClipContent, and whether the file being
-# imported was collected before the version kept. The dates are compared as text
-# (database/dates.py).
+# The clip of the URL, its content, and whether the file being imported was collected before
+# the raw file its item points to. The dates are compared as text (database/dates.py).
 SELECT_KNOWN_CLIP = """
 SELECT clip.item_id, clip.title, clip.body, clip.saved_at, clip.published_at,
     raw_data.collected_at, :collected_at < raw_data.collected_at
@@ -78,15 +77,33 @@ def write_known_clip(
     connection: sqlite3.Connection, item: Item, raw_data_id: int, content: ClipContent
 ) -> Discard | None:
     """The known clip of the URL takes content, unless it is the same or the file was collected
-    before the version kept. Two files of a URL in one collection: the second in page name order
-    writes over the first."""
+    before the raw file of the clip. Two files of a URL in one collection: the second in page
+    name order writes over the first.
+
+    The item points to the newest raw file of its content, a copy of the same content
+    included: a file collected before it is older than the content kept.
+    """
     collected_at = format_date(item.collected_at)
-    known_item_id, *known_content, known_collected_at, is_file_before = (
-        connection.execute(
-            SELECT_KNOWN_CLIP, {"url": item.url, "collected_at": collected_at}
-        ).fetchone()
+    (
+        known_item_id,
+        known_title,
+        known_body,
+        known_saved_at,
+        known_published_at,
+        known_collected_at,
+        is_file_before,
+    ) = connection.execute(
+        SELECT_KNOWN_CLIP, {"url": item.url, "collected_at": collected_at}
+    ).fetchone()
+    known_content = ClipContent(
+        title=known_title,
+        body=known_body,
+        saved_at=known_saved_at,
+        published_at=known_published_at,
     )
-    if ClipContent._make(known_content) == content:
+    if known_content == content:
+        if not is_file_before:
+            shared_rows.point_item_at_raw_data(connection, known_item_id, raw_data_id)
         return Discard("already_seen", item, known_collected_at)
     if is_file_before:
         return Discard("no_newer_version", item, known_collected_at)

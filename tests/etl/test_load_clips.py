@@ -84,13 +84,15 @@ def test_a_clip_without_publication_date_has_none(data_dir):
 
 
 def test_a_clip_copied_again_with_the_same_content_is_left_out(data_dir):
-    first_path = write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
+    """Its item points to the newest raw file of that content: the order guard compares with
+    it."""
+    write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
     run_import(data_dir)
     second_path = write_clip(data_dir, SECOND, "a1", fixture_text(ARTICLE))
 
     run_import(data_dir)
 
-    assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [first_path]
+    assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [second_path]
     assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(None,)]
     assert read_discards(data_dir) == [
         {
@@ -189,15 +191,15 @@ def test_a_clip_whose_content_changed_is_written_again(
 def test_a_change_of_a_property_the_base_does_not_keep_is_left_out(
     data_dir, kept, changed
 ):
-    first_path = write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
+    write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
     run_import(data_dir)
     changed_text = fixture_text(ARTICLE).replace(kept, changed)
     assert changed_text != fixture_text(ARTICLE)
-    write_clip(data_dir, SECOND, "a1", changed_text)
+    second_path = write_clip(data_dir, SECOND, "a1", changed_text)
 
     run_import(data_dir)
 
-    assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [first_path]
+    assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [second_path]
     assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(None,)]
     assert [discard["rule"] for discard in read_discards(data_dir)] == ["already_seen"]
 
@@ -254,6 +256,27 @@ def test_two_urls_are_two_clips_even_for_the_same_article(data_dir):
         (2, 1)
     ]
     assert read_discards(data_dir) == []
+
+
+def test_an_older_version_imported_after_a_newer_copy_of_the_same_content_is_left_out(
+    data_dir,
+):
+    """A version of 2026-10-18 imported after a copy of 2026-10-19 that kept the version of
+    2026-10-17: the base keeps the content of the newest copy."""
+    write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
+    run_import(data_dir)
+    write_clip(data_dir, "2026-10-19T093000Z", "a1", fixture_text(ARTICLE))
+    run_import(data_dir)
+    write_clip(data_dir, SECOND, "a1", fixture_text(ARTICLE).replace("do not", "never"))
+
+    run_import(data_dir)
+
+    assert "They usually do not." in fetch_rows(data_dir, "SELECT body FROM clip")[0][0]
+    assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(None,)]
+    assert [
+        (discard["rule"], discard["compared_with_collected_at"])
+        for discard in read_discards(data_dir)
+    ] == [("no_newer_version", "2026-10-19T09:30:00Z")]
 
 
 def test_of_two_files_of_one_url_in_a_collection_the_second_is_written_again(data_dir):
