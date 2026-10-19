@@ -98,7 +98,7 @@ Le type `Tag` (`items.py:197`) refuse ensuite ce que la base refuserait, et plus
 - un tag que `normalize_tag` changerait encore (`check_tag_is_normalized`) : `#llm` est refusé ;
 - un NUL ou un surrogate isolé (`CAN_BE_STORED`).
 
-L'item refuse aussi plus de 100 tags (`check_tag_count`) et un tag en double (`check_tags_once`).
+L'item refuse aussi plus de 30 tags (`check_tag_count`) et un tag en double (`check_tags_once`).
 Sans ce dernier contrôle, la clé primaire de `item_tag` refuserait le doublon, ce que
 `savepoint.py` ne rattrape pas : tout l'import s'arrêterait.
 
@@ -209,7 +209,7 @@ lu : s'il manque, le dépaquetage lève une erreur et l'import s'arrête (échou
 | `lower()` | La décision dit « en minuscules ». | `casefold()` change aussi `ß` en `ss`. |
 | `removeprefix("#")` | La forme d'Obsidian a un seul `#`. | `lstrip("#")` lirait `##llm` comme `llm` sans décision. |
 | `CHECK` de longueur seulement | Portable. | Un `CHECK` de casse : le `lower` de SQLite n'est pas celui de PostgreSQL. |
-| 100 caractères, 100 tags au plus | Bornes larges ; la seconde décidée sur le second `/code-review` (un clip de 1 Mo de tags d'une lettre écrirait environ 750 000 requêtes). | Pas de nombre maximum (le plan s'appuyait sur la borne de 1 Mo du clip). |
+| 100 caractères, 30 tags au plus | Bornes de ressources. Le nombre est né du second `/code-review` (un clip de 1 Mo de tags d'une lettre écrirait environ 750 000 requêtes) ; sa valeur est de Sabine : « un garde-fou de ressources, pas une règle de rangement ». | Pas de nombre maximum (le plan s'appuyait sur la borne de 1 Mo du clip) ; 100, la valeur proposée. |
 | `ON DELETE CASCADE` sur `item_tag.item_id` | Comme `highlight` (décidé par time-knight). | Pas de cascade : la purge devrait supprimer les liaisons elle-même. |
 | *Patch* | Décision de Sabine : « plus sobre et propre ». | *Put* : plus simple, mais il écrit tout le texte, jusqu'à 1 Mo, pour un tag. |
 | Supprimer les liaisons retirées | Décision de Sabine. | Un `withdrawn_at` sur `item_tag` : une colonne et un filtre pour un historique que rien ne demande. |

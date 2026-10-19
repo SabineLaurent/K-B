@@ -3051,11 +3051,13 @@ time-knight (délégation de Sabine du 2026-10-15).
   un seul `#` retiré (`removeprefix`), pas tous (`lstrip`), pour ne pas lire `##llm` comme
   `llm` sans décision ; la base ne tient que la longueur de `tag.name` (`CHECK`), car le
   `lower` de SQLite ne connaît que l'ASCII et celui de PostgreSQL tout Unicode ; 100 caractères
-  au plus, borne large non mesurée (le coffre n'est pas lu) ; 100 tags au plus par item
-  (`TAG_MAX_COUNT`, tenu par l'item seul), décision de time-knight sur un constat du second
-  `/code-review` (délégation de Sabine du 2026-10-15) : sans borne, un clip de 1 Mo fait de tags
-  d'une lettre écrirait environ 750 000 requêtes dans un seul savepoint (défense en profondeur,
-  `code.md`), ce qui revient sur « le clip est déjà borné à 1 Mo » du plan ; un tag en double est refusé par l'item, sinon la clé de
+  au plus, borne large non mesurée (le coffre n'est pas lu) ; 30 tags au plus par item
+  (`TAG_MAX_COUNT`, tenu par l'item seul) : la borne vient d'un constat du second `/code-review`
+  (sans borne, un clip de 1 Mo fait de tags d'une lettre écrirait environ 750 000 requêtes dans
+  un seul savepoint), que time-knight a fait corriger (délégation de Sabine du 2026-10-15), ce
+  qui revient sur « le clip est déjà borné à 1 Mo » du plan ; sa valeur est de Sabine, 30 et non
+  les 100 proposés : « un garde-fou de ressources, pas une règle de rangement » ; un tag en
+  double est refusé par l'item, sinon la clé de
   `item_tag` le refuserait et arrêterait tout l'import. Options écartées : normaliser dans
   `normalize_item` (`etl/normalize.py`), car `clippings` est propre à Web Clipper et la
   normalisation doit précéder la validation par `Item` ; normaliser dans l'écrivain (la couche
