@@ -3062,6 +3062,19 @@ time-knight (délégation de Sabine du 2026-10-15).
   d'accès aux données ne transforme pas, règle 5). Limites assumées, hypothèses non vérifiées
   sur le coffre : `tags: llm, ai` donne un seul tag `llm, ai` ; un mot sous deux formes Unicode
   (NFC et NFD) donne deux tags. — PR de #260
+- **Les tags d'un clip font partie de son contenu : un tag ajouté ou retiré réécrit le clip,
+  `revised_at` daté, et les liaisons de la version d'avant (`item_tag`) sont supprimées puis
+  écrites de nouveau.** Décision de Sabine. Pourquoi, celui de Sabine : « Un tag supprimé
+  n'existe plus en base. Je ne vois pas l'utilité qu'aurait le fait de le garder en revised
+  at. » **Exception nommée à la règle 5 de `conventions.md`** (« ne supprime que par la purge »),
+  le premier `DELETE` de `src/k_b` : une liaison est une valeur d'une version du clip, comme une
+  colonne que l'`UPDATE` écrase, pas un item ; elle ne touche pas au « retiré, jamais supprimé »
+  des entrées Zotero (2026-10-13), qui vaut pour des items. Les tags se comparent comme un
+  ensemble, sans leur ordre : l'ordre d'un `ORDER BY` dépend de la collation, qui n'est pas la
+  même en SQLite et en PostgreSQL. Option écartée : un `withdrawn_at` sur `item_tag` (une
+  colonne et un filtre à chaque lecture, pour un historique des tags que rien ne demande).
+  Limite : `.claude/rules/conventions.md`, que la session ne modifie pas, ne nomme pas encore
+  cette exception. — PR de #260
 - **Suite prévue, sans code ici.** Le wiki regroupe les fiches par tag (#148) ; le LLM aura la
   main sur les tags, « de façon frugale », pour en créer et les revoir, par l'API de données,
   après le 25/10 ; la provenance d'un tag (Sabine ou LLM) n'est pas modélisée : Sabine préfère
@@ -3069,13 +3082,8 @@ time-knight (délégation de Sabine du 2026-10-15).
 
 ## Décisions encore ouvertes
 
-- **Tags d'un clip modifié** (2026-10-19, #260) : réécrire les liaisons d'un clip dont les tags
-  ont changé demande le premier `DELETE` de `src/k_b` (supprimer les liaisons retirées), contre
-  la règle 5 de `conventions.md` (« ne supprime que par la purge ») et le « retiré, jamais
-  supprimé » de Sabine pour Zotero. Question à Sabine : (a) supprimer les liaisons, exception
-  nommée (une liaison est une valeur de la version du clip, pas un item) ; (b) un `withdrawn_at`
-  sur `item_tag`. Avec elle : accepter qu'un tag que plus aucun item ne porte reste sans durée
-  jusqu'à la purge (#83).
+- **Tag que plus aucun item ne porte** (2026-10-19, #260) : il reste dans `tag`, sans durée,
+  jusqu'à la purge (#83) ; question posée à Sabine, accepter cette limite ou non.
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
   l'étalonnage du juge (#224), si les fiches sont trop maigres (« Fiches de veille : le LLM
   juge »).
