@@ -75,9 +75,8 @@ class TopSheetsOutcome:
 
 
 class VaultLinkRefusedError(Exception):
-    """A folder of the sheets, or a sheet, is a symbolic link: K-B never follows a link in the
-    vault, when it reads the clips as when it writes the sheets (decision of Sabine,
-    2026-10-19)."""
+    """A folder of the sheets, or a sheet, is a symbolic link: kb write-tops refuses its top
+    (decision of Sabine, 2026-10-19: K-B never follows a symbolic link in the vault)."""
 
 
 class Ranking(NamedTuple):
@@ -92,21 +91,23 @@ def write_top_sheets(store: RawStore, vault_dir: Path, top: Top) -> TopSheetsOut
     Every ranking listed is read, its sheet written or not: only a ranking read is readable, and
     only the readable ones before the last readable are deleted. An unreadable one is kept and
     counted. The folder is listed once: a ranking collected meanwhile is neither read nor
-    deleted. An exception raised by a read or a write (OSError, SIGTERM, a symbolic link
-    refused) deletes nothing; the folders of the sheets are checked before anything is read.
+    deleted. An exception raised by a read or a write (OSError, SIGTERM) deletes nothing. A
+    symbolic link is refused before any ranking is read and any sheet written: all or nothing.
+    The folders are checked again before each sheet and before the deletion: a folder replaced
+    by a link meanwhile stops the top, nothing deleted.
     """
     sheets_dir = find_sheets_dir(vault_dir, top)
-    for folder in (sheets_dir.parent.parent, sheets_dir.parent, sheets_dir):
-        refuse_symbolic_link(folder, vault_dir)
+    keys = store.list_file_keys(top.folder_key)
+    refuse_symbolic_links(vault_dir, sheets_dir, keys)
     readable_keys = []
     written_count = 0
-    keys = store.list_file_keys(top.folder_key)
     for key in keys:
         ranking = read_ranking(store, top, key)
         if ranking is None:
             continue
         readable_keys.append(key)
-        written_count += write_sheet(vault_dir, top, ranking)
+        written_count += write_sheet(vault_dir, sheets_dir, top, ranking)
+    refuse_linked_folders(vault_dir, sheets_dir)
     deleted_count = sum(store.delete(key) for key in readable_keys[:-1])
     logger.info("%s: %d superseded rankings deleted", top.name, deleted_count)
     return TopSheetsOutcome(
@@ -159,22 +160,50 @@ def find_sheets_dir(vault_dir: Path, top: Top) -> Path:
     return vault_dir / WATCH_DIR_NAME / TOPS_DIR_NAME / top.name
 
 
+def find_sheet_path(sheets_dir: Path, collected_at: datetime) -> Path:
+    return sheets_dir / f"{collected_at.date().isoformat()}.md"
+
+
+def refuse_symbolic_links(vault_dir: Path, sheets_dir: Path, keys: list[str]) -> None:
+    """Refuse a symbolic link among the folders from the vault down to sheets_dir, then among
+    the sheets of the rankings of keys named by a collection time: their days come from their
+    names, without reading them."""
+    refuse_linked_folders(vault_dir, sheets_dir)
+    for key in keys:
+        collected_at = find_collection_time(key)
+        if collected_at is not None:
+            refuse_symbolic_link(find_sheet_path(sheets_dir, collected_at), vault_dir)
+
+
+def refuse_linked_folders(vault_dir: Path, sheets_dir: Path) -> None:
+    for folder in list_folders_down_to(vault_dir, sheets_dir):
+        refuse_symbolic_link(folder, vault_dir)
+
+
+def list_folders_down_to(vault_dir: Path, folder: Path) -> list[Path]:
+    """The folders under vault_dir down to folder, the highest first: veille, veille/tops,
+    veille/tops/<top>."""
+    parts = folder.relative_to(vault_dir).parts
+    return [vault_dir.joinpath(*parts[:depth]) for depth in range(1, len(parts) + 1)]
+
+
 def refuse_symbolic_link(path: Path, vault_dir: Path) -> None:
     """Raise VaultLinkRefusedError when path is a symbolic link: is_symlink reads the link
-    itself (lstat), never its target, as the clips do. The path is named in the vault: made of
-    constants and a date, it never says where the vault is."""
+    itself (lstat), never its target. The path is named in the vault: made of constants and a
+    date, it never says where the vault is."""
     if path.is_symlink():
         raise VaultLinkRefusedError(
             f"vault_link_refused: {path.relative_to(vault_dir).as_posix()} is a symbolic"
-            " link; K-B never follows a link in the vault"
+            " link"
         )
 
 
-def write_sheet(vault_dir: Path, top: Top, ranking: Ranking) -> bool:
-    """Write the sheet of the day of ranking, unless it exists; whether it was written."""
+def write_sheet(vault_dir: Path, sheets_dir: Path, top: Top, ranking: Ranking) -> bool:
+    """Write the sheet of the day of ranking, unless it exists; whether it was written. Its
+    folders are checked again first: write_file_atomically follows a link."""
     day = ranking.collected_at.date()
-    sheet_path = find_sheets_dir(vault_dir, top) / f"{day.isoformat()}.md"
-    refuse_symbolic_link(sheet_path, vault_dir)
+    sheet_path = find_sheet_path(sheets_dir, ranking.collected_at)
+    refuse_linked_folders(vault_dir, sheets_dir)
     if sheet_path.exists():
         logger.info("%s sheet of %s: sheet_exists, not rewritten", top.name, day)
         return False

@@ -411,27 +411,73 @@ def test_a_folder_of_the_sheets_that_is_a_symbolic_link_is_refused_before_anythi
     with pytest.raises(VaultLinkRefusedError) as refusal:
         write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
 
-    assert str(refusal.value) == (
-        f"vault_link_refused: {linked} is a symbolic link;"
-        " K-B never follows a link in the vault"
-    )
+    assert str(refusal.value) == f"vault_link_refused: {linked} is a symbolic link"
     assert all(ranking.exists() for ranking in rankings)
     assert list_files(elsewhere) == []
 
 
-def test_a_sheet_that_is_a_symbolic_link_is_refused_and_no_ranking_deleted(
-    data_dir, vault_dir, tmp_path
+@pytest.mark.parametrize("target_exists", [False, True])
+def test_a_sheet_that_is_a_symbolic_link_refuses_its_top_before_any_sheet_is_written(
+    data_dir, vault_dir, tmp_path, target_exists
 ):
+    """All or nothing: the sheet of 2026-10-05 is not written either. A link to an existing
+    file is refused too, never read as a sheet that exists."""
     older = write_ranking(data_dir, STARRED_TOP, "2026-10-05T093000Z")
     last = write_ranking(data_dir, STARRED_TOP, "2026-10-06T093000Z")
     outside = tmp_path / "outside.md"
+    if target_exists:
+        outside.write_bytes(b"not a sheet\n")
     sheet = find_sheet(vault_dir, STARRED_TOP, "2026-10-06")
     sheet.parent.mkdir(parents=True)
     sheet.symlink_to(outside)
 
-    with pytest.raises(VaultLinkRefusedError, match="2026-10-06.md is a symbolic link"):
+    with pytest.raises(
+        VaultLinkRefusedError,
+        match="^vault_link_refused: veille/tops/most_starred/2026-10-06.md is a symbolic link$",
+    ):
         write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
 
     assert (older.exists(), last.exists()) == (True, True)
-    assert not outside.exists()
+    assert not find_sheet(vault_dir, STARRED_TOP, "2026-10-05").exists()
     assert sheet.is_symlink()
+    assert outside.exists() is target_exists
+    if target_exists:
+        assert outside.read_bytes() == b"not a sheet\n"
+
+
+@pytest.mark.parametrize(
+    ("replaced_after_day", "written_days"),
+    [
+        # Before the second sheet: write_sheet checks its folders again.
+        ("2026-10-05", ["2026-10-05.md"]),
+        # After the last sheet: the folders are checked again before the deletion.
+        ("2026-10-06", ["2026-10-05.md", "2026-10-06.md"]),
+    ],
+)
+def test_a_folder_replaced_by_a_link_while_the_sheets_are_written_deletes_no_ranking(
+    data_dir, vault_dir, tmp_path, monkeypatch, replaced_after_day, written_days
+):
+    older = write_ranking(data_dir, STARRED_TOP, "2026-10-05T093000Z")
+    last = write_ranking(data_dir, STARRED_TOP, "2026-10-06T093000Z")
+    sheets_dir = find_sheet(vault_dir, STARRED_TOP, "2026-10-05").parent
+    moved = tmp_path / "moved"
+    write_file_atomically = top_sheets.write_file_atomically
+
+    def write_then_replace_the_folder(path, content):
+        write_file_atomically(path, content)
+        if path.name == f"{replaced_after_day}.md":
+            sheets_dir.rename(moved)
+            sheets_dir.symlink_to(moved, target_is_directory=True)
+
+    monkeypatch.setattr(
+        top_sheets, "write_file_atomically", write_then_replace_the_folder
+    )
+
+    with pytest.raises(
+        VaultLinkRefusedError,
+        match="^vault_link_refused: veille/tops/most_starred is a symbolic link$",
+    ):
+        write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
+
+    assert (older.exists(), last.exists()) == (True, True)
+    assert list_files(moved) == written_days

@@ -1557,6 +1557,6 @@ def test_a_folder_of_a_top_linked_elsewhere_is_refused_exits_1_and_the_other_top
     error_output = capsys.readouterr().err
     assert (
         "top sheets failed: most_starred: vault_link_refused: veille/tops/most_starred is a"
-        " symbolic link; K-B never follows a link in the vault"
+        " symbolic link\n"
     ) in error_output
     assert str(vault_dir) not in error_output

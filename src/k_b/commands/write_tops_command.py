@@ -41,24 +41,22 @@ def run_write_tops(data_dir: Path) -> int:
     for top in TOPS:
         try:
             outcome = write_top_sheets(store, vault_dir, top)
-        except OSError as error:
-            # The type and the reason, never a path: it names the vault or a raw file.
-            reason = f" ({error.strerror})" if error.strerror else ""
-            logger.error(
-                "top sheets failed: %s: %s%s; run kb write-tops again",
-                top.name,
-                type(error).__name__,
-                reason,
-            )
-            has_failed = True
-            continue
-        except VaultLinkRefusedError as error:
-            logger.error("top sheets failed: %s: %s", top.name, error)
+        except (OSError, VaultLinkRefusedError) as error:
+            logger.error("top sheets failed: %s: %s", top.name, describe_error(error))
             has_failed = True
             continue
         print(f"{top.name} sheets: {describe_outcome(outcome)}")
         has_failed = has_failed or outcome.unreadable_count > 0
     return ExitCode.FAILED if has_failed else ExitCode.SUCCEEDED
+
+
+def describe_error(error: OSError | VaultLinkRefusedError) -> str:
+    """A refused link by its named state and its path in the vault; an OSError by its type and
+    its reason, never a path: it names the vault or a raw file."""
+    if isinstance(error, VaultLinkRefusedError):
+        return str(error)
+    reason = f" ({error.strerror})" if error.strerror else ""
+    return f"{type(error).__name__}{reason}; run kb write-tops again"
 
 
 def describe_outcome(outcome: TopSheetsOutcome) -> str:
