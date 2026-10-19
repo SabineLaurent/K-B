@@ -62,7 +62,8 @@ avec son équivalent PostgreSQL.
   (documentation SQLite, WAL, § 5 ; constat sur SQLite 3.50.4).
 - **Dates** : du texte `AAAA-MM-JJTHH:MM:SSZ`, en UTC. Un `CHECK` refuse toute autre forme, et
   un jour qui n'existe pas. Exception, `clip` (#14), écrite en SQL portable (règle 1 de
-  `.claude/rules/poc.md`, sans `strftime`) : son `CHECK` ne tient que la longueur et la place du
+  `.claude/rules/poc.md`, sans `strftime`) : le `CHECK` de chacune de ses dates (`saved_at`,
+  `published_at`, `revised_at`) ne tient que la longueur et la place du
   `T` et du `Z` ; la forme complète est tenue par l'item. Une source qui ne donne qu'un jour
   (`dateAdded` de CISA KEV, `created` et `published` de Web Clipper) est stockée à minuit UTC :
   convention d'écriture, pas de donnée ajoutée.
@@ -206,8 +207,9 @@ GH Archive, dont chaque ligne de classement (`TrendRow`, `src/k_b/items.py`) dev
   autres items ; son URL sans `utm_*` est sa clé naturelle. Ne vont pas en base : `author`,
   `description`, `tags` ; ils restent dans la copie brute. Le texte gardé (`clip.body`) peut
   contenir la signature de l'article et les notes de l'utilisatrice
-  ([registre des traitements](registre-traitements.md)). Un clip déjà en base n'est jamais
-  remplacé : la première version vue d'une URL est gardée.
+  ([registre des traitements](registre-traitements.md)). La dernière version d'une URL est
+  gardée : un clip dont le contenu a changé est réécrit, et `clip.revised_at` prend la date de la
+  collecte qui a vu le changement (journal ADR, 2026-10-19, #259).
 - Le classement des dépôts les plus étoilés n'entre pas dans la base (journal ADR, 2026-10-07).
 
 ## MCD et MLD
@@ -242,7 +244,7 @@ source ne touche pas aux tables.
 | `advisory` | sous-type d'item : une alerte de sécurité GitHub | `id`, `item_id`, `kind`, `ghsa_id`, `vulnerability_id`, `summary`, `published_at`, `url`, `packages` |
 | `newsletter_article` | sous-type d'item : un article résumé par une édition TLDR ; clé (édition, date, rang) | `id`, `item_id`, `kind`, `edition`, `edition_date`, `rank`, `title`, `summary`, `url`, `publication_id` |
 | `zotero_entry` | sous-type d'item : un document de la bibliothèque Zotero ; catalogue d'état ; clé `zotero_key` | `id`, `item_id`, `kind`, `zotero_key`, `item_type`, `title`, `url`, `saved_at`, `publication_id`, `revised_at`, `withdrawn_at` |
-| `clip` | sous-type d'item : une page gardée avec Web Clipper ; flux de nouveautés ; clé `url` | `id`, `item_id`, `kind`, `url`, `title`, `body`, `saved_at`, `published_at` |
+| `clip` | sous-type d'item : une page gardée avec Web Clipper ; la dernière version d'une URL est gardée ; clé `url` | `id`, `item_id`, `kind`, `url`, `title`, `body`, `saved_at`, `published_at`, `revised_at` |
 | `highlight` | un surlignage d'un PDF d'une entrée Zotero ; catalogue d'état ; clé `zotero_key` | `highlight_id`, `zotero_key`, `text`, `comment`, `highlighted_at`, `revised_at`, `withdrawn_at`, `item_id` |
 | `trend` | TENDANCE : les dépôts qui montent d'un classement GH Archive, une ligne par fenêtre de 3 jours et par dépôt ; pas un item ; clé (`window_end`, `repository_id`) | `id`, `raw_data_id`, `window_end`, `repository_id`, `repository_name`, `stars_gained`, `forks_gained` |
 

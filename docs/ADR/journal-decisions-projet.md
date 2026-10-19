@@ -2650,7 +2650,8 @@ Décisions de Sabine du 2026-10-17 sur le plan de #14, relayées par time-knight
   fichiers de même URL dans une même collecte, le premier dans l'ordre des noms de pages
   l'emporte. La collecte reste incrémentale et copie tout clip changé : le brut garde chaque
   version. **Précisée le 2026-10-19** : jusqu'à la sauvegarde de la base, au 08/11 (« Brut :
-  catalogues d'état et conservation »). — PR de #14
+  catalogues d'état et conservation »). **Révisée le 2026-10-19** : un clip dont le contenu a
+  changé est réécrit (« Collecte : mise à jour des `.md` importés »). — PR de #14
 - **Le texte complet d'un clip va dans la colonne `clip.body` de son sous-type ; ni `author`, ni
   `description`, ni `tags` n'entrent en base.** Décision de Sabine, sur recommandation. Pourquoi,
   celui de la recommandation : la spec (« titre, URL source, date, et le texte gardé ») et la
@@ -2953,6 +2954,70 @@ time-knight (délégation de Sabine du 2026-10-15).
   purge des copies de clips de #139, où l'avait mise la décision du 2026-10-17. Limite assumée :
   jusque-là, chaque version d'un clip reste dans le brut, sans durée. — PR de #139
 
+### Collecte : mise à jour des `.md` importés
+
+- **Une seule règle pour tous les `.md` importés : si ce que la base garde du `.md` change
+  (titre, texte, dates, tags), il est réécrit en base et `revised_at` prend la date K-B de la
+  collecte qui voit le changement ; au même contenu (vrai doublon, ou fichier touché sans
+  changement), il est écarté `already_seen`, comme avant.** Décision de Sabine. Pourquoi, celui
+  de Sabine : « Ma décision du 17/10 concernait la création d'un vrai doublon. Là si le contenu
+  du fichier a changé il faudrait un update. » Elle vaut pour `clipping`, la seule source de
+  `.md` collectée, et plus tard pour `manual_notes` (le dossier de dépôt manuel du coffre, `.md`
+  et PDF, nom proposé par Sabine), nommé ici sans code : pas d'abstraction pour une source qui
+  n'existe pas encore. Les tags entrent dans la comparaison avec leur code (#260). Un champ que
+  la base ne garde pas (`author`, `description`) ne déclenche rien. La provenance d'un `.md` en
+  base se lit par `item.kind = 'clip'` et par `item.raw_data_id` → `raw_data.source_id` →
+  `source.source_code = 'clipper'` ; `manual_notes` aura sa propre source et sa propre sorte.
+  **S'accorde avec « le *cleansed* est immuable »** (« Brut : catalogues d'état et
+  conservation », ci-dessus), selon la précision de Sabine : « les clips sont immuables en
+  contenu mais le tag peut changer. Mes .md manuels sont potentiellement modifiables aussi en
+  contenu. Ce que je ne fais que rarement. » Le *cleansed* n'est jamais purgé ; le texte d'un
+  clip est immuable par usage, Sabine ne le modifie pas ; ses tags peuvent changer ; un `.md`
+  manuel peut changer, rarement. Un texte de clip changé quand même est pris par la même règle,
+  sans seconde règle. **Révise** « Collecte : clips (suite) » du 2026-10-17 (la première version
+  vue d'une URL était gardée, et la réécriture écartée « sans objet si les clips ne changent
+  pas »). Suite prévue, sans code ici : la tâche du LLM après la mise à jour d'un `.md` reste à
+  définir dans la partie wiki (#148). Limites assumées : deux fichiers du coffre de même URL et
+  de contenu différent, dans une même collecte : le second dans l'ordre des noms de pages
+  réécrit le premier (révise la limite du 2026-10-17, « le premier l'emporte ») ; un clip dont
+  l'URL source change devient un nouveau clip, l'ancien reste en base (la clé reste l'URL) ; un
+  nom effacé d'un clip en base revient si le clip du coffre est recopié (une édition, une
+  étiquette du Finder), l'effacement touche donc aussi le coffre (registre des traitements,
+  étape 5) ; un clip réécrit ne revient pas dans la liste filtrée par `since` (« quoi de neuf »),
+  qui date un clip par `saved_at` (`created`), que la réécriture ne change pas, et l'API de
+  données n'expose pas encore `clip.revised_at` (constats de `/code-review`, signalés sans
+  correction ; la suite après la mise à jour d'un `.md` relève de #148). — PR de #259
+- **La comparaison se fait en Python (lecture de la ligne gardée, puis `UPDATE clip`), et un
+  fichier collecté avant la version gardée est écarté `no_newer_version`.** Tranché dans le plan
+  de #259, validé par Sabine. Pourquoi : le SQL reste portable (règle 1 de `poc.md`) ; le
+  `WHERE (…) IS NOT (…)` d'un upsert, comme Zotero, compare des lignes d'une façon propre à
+  SQLite, PostgreSQL écrivant `IS DISTINCT FROM` ; l'item reste créé seulement si le clip est
+  absent ; et #260 comparera un ensemble de tags lu dans une table de liaison, qu'un `WHERE`
+  sur une ligne ne compare pas. La garde d'ordre empêche la base de revenir à une version plus
+  ancienne (deux imports en même temps, un brut plus ancien importé après), comme pour les
+  catalogues d'état et arXiv ; elle compare par « avant », pas par « avant ou en même temps »,
+  pour que le second fichier d'une même collecte réécrive le premier. Elle se compare au brut
+  le plus récent du contenu gardé : une copie au même contenu, écartée `already_seen`, déplace
+  l'item sur son brut, sans quoi un fichier intermédiaire importé en retard réécrirait la base
+  avec une version plus ancienne que cette copie (constat de `/code-review`, tri de time-knight,
+  délégation de Sabine du 2026-10-15 ; option écartée : comparer à la collecte la plus récente
+  de tous les bruts de l'URL, que `raw_data` ne relie pas à l'URL). `revised_at` est posé même
+  quand le changement est vu dans la collecte qui a créé le clip : il dit la collecte qui a vu
+  le changement. Une réécriture ne va pas au journal d'import : ce n'est pas un rejet, comme une
+  révision Zotero. Options écartées : l'upsert `ON CONFLICT (url) DO UPDATE … WHERE` (forme à
+  porter, tags hors de sa portée) ; aucune garde d'ordre (plus court, mais une régression
+  silencieuse possible) ; un cas à part pour ne pas dater une réécriture dans la collecte de
+  création (une branche de plus pour un cas limite). — PR de #259
+- **Le schéma change (`clip.revised_at`) : la base du POC est recréée, sans migration.**
+  Décision de Sabine, sur la question posée par la relecture du plan (recréer, ou ajouter la
+  colonne à la main par un `ALTER TABLE` écrit dans la PR). Pourquoi, celui de Sabine : « je
+  n'ai rien changé dans zotero. Et pour cisa on ne perdrait que des dates de retraits et encore
+  c'est même pas sûr qu'il y en ait eu. Donc pas grave ». Coût accepté : depuis #139, le brut
+  de Zotero et de CISA KEV ne garde que le dernier fichier ; la base recréée perd les
+  `withdrawn_at`, les `revised_at` passés et les lignes retirées avant lui (limite de « Brut :
+  catalogues d'état et conservation »). Option écartée : l'`ALTER TABLE` à la main, sans perte
+  (la recommandation de la session). — PR de #259
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
@@ -2995,7 +3060,8 @@ time-knight (délégation de Sabine du 2026-10-15).
   DOCUMENT ou CONTENU pour le texte complet (une publication décrite par plusieurs items et un
   document Zotero hors arXiv sont tranchés le 2026-10-13, « Modèle de la base : bibliothèque
   Zotero » ; le texte d'un clip est rangé dans `clip.body` le 2026-10-17, en attendant) ; les
-  versions d'un clip annoté sont tranchées le 2026-10-17 (« Collecte : clips (suite) »).
+  versions d'un clip annoté sont tranchées le 2026-10-17 (« Collecte : clips (suite) »), puis
+  révisées le 2026-10-19 (« Collecte : mise à jour des `.md` importés »).
 - **Transfert hors UE par les agents** : un agent qui lit les items par l'API envoie leur contenu
   au fournisseur du modèle (États-Unis). Cadre juridique non vérifié. **Révisée le
   2026-10-15**, puis **le 2026-10-16** : l'API IA appelle gpt-6-luna sur Azure AI Foundry, en

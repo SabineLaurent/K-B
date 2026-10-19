@@ -1,6 +1,7 @@
-"""The import of the clips: a news feed, the first version of a URL is kept (decision of Sabine
-of 2026-10-17). Each clip is written as the collection writes it, a page of a collection folder
-of raw/selected_library/clipping/, from the fixtures of tests/fixtures/clipping/."""
+"""The import of the clips: the latest version of a URL is kept, a clip whose content changed is
+written again, revised_at dated (decision of Sabine of 2026-10-19). Each clip is written as the
+collection writes it, a page of a collection folder of raw/selected_library/clipping/, from the
+fixtures of tests/fixtures/clipping/."""
 
 from pathlib import Path
 
@@ -19,6 +20,7 @@ ARTICLE_URL = (
 FIRST = "2026-10-17T093000Z"
 SECOND = "2026-10-18T093000Z"
 FIRST_AT = "2026-10-17T09:30:00Z"
+SECOND_AT = "2026-10-18T09:30:00Z"
 CLIPPING_DIR = "selected_library/clipping"
 CLIP_QUERY = (
     "SELECT url, title, body, saved_at, published_at, raw_file_path"
@@ -81,16 +83,17 @@ def test_a_clip_without_publication_date_has_none(data_dir):
     assert fetch_rows(data_dir, "SELECT published_at FROM clip") == [(None,)]
 
 
-def test_a_clip_of_a_url_already_seen_keeps_its_first_version(data_dir):
-    first_path = write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
+def test_a_clip_copied_again_with_the_same_content_is_left_out(data_dir):
+    """Its item points to the newest raw file of that content: the order guard compares with
+    it."""
+    write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
     run_import(data_dir)
-    changed = fixture_text(ARTICLE).replace("They usually do not.", "Changed.")
-    second_path = write_clip(data_dir, SECOND, "a1", changed)
+    second_path = write_clip(data_dir, SECOND, "a1", fixture_text(ARTICLE))
 
     run_import(data_dir)
 
-    assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [first_path]
-    assert "They usually do not." in fetch_rows(data_dir, "SELECT body FROM clip")[0][0]
+    assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [second_path]
+    assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(None,)]
     assert read_discards(data_dir) == [
         {
             "kind": "discard",
@@ -99,6 +102,129 @@ def test_a_clip_of_a_url_already_seen_keeps_its_first_version(data_dir):
             "source_item_id": ARTICLE_URL,
             "raw_file_path": second_path,
             "compared_with_collected_at": FIRST_AT,
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    ("fixture", "kept", "changed", "column", "written"),
+    [
+        (
+            ARTICLE,
+            "They usually do not.",
+            "Changed.",
+            "body",
+            (
+                "## Most developers do not become better simply by learning more syntax.\n\n"
+                "Most junior developers think senior engineers know more tricks.\n\n"
+                "Changed.\n"
+            ),
+        ),
+        (
+            ARTICLE,
+            'title: "7 Coding',
+            'title: "Seven Coding',
+            "title",
+            "Seven Coding Patterns I Stole From Senior Engineers",
+        ),
+        (
+            ARTICLE,
+            "created: 2026-09-17",
+            "created: 2026-09-18",
+            "saved_at",
+            "2026-09-18T00:00:00Z",
+        ),
+        (
+            ARTICLE,
+            "published: 2026-06-08",
+            "published: 2026-06-09",
+            "published_at",
+            "2026-06-09T00:00:00Z",
+        ),
+        (ARTICLE, "published: 2026-06-08", "published:", "published_at", None),
+        (
+            PAGE_WITHOUT_AUTHOR,
+            "published:\n",
+            "published: 2026-10-01\n",
+            "published_at",
+            "2026-10-01T00:00:00Z",
+        ),
+    ],
+    ids=[
+        "text",
+        "title",
+        "created",
+        "published",
+        "published_removed",
+        "published_added",
+    ],
+)
+def test_a_clip_whose_content_changed_is_written_again(
+    data_dir, fixture, kept, changed, column, written
+):
+    write_clip(data_dir, FIRST, "a1", fixture_text(fixture))
+    run_import(data_dir)
+    changed_text = fixture_text(fixture).replace(kept, changed)
+    second_path = write_clip(data_dir, SECOND, "a1", changed_text)
+
+    run_import(data_dir)
+
+    (value, revised_at, raw_file_path) = fetch_rows(
+        data_dir,
+        f"SELECT clip.{column}, clip.revised_at, raw_data.raw_file_path FROM clip"  # noqa: S608 — constants
+        " JOIN item ON item.id = clip.item_id"
+        " JOIN raw_data ON raw_data.id = item.raw_data_id",
+    )[0]
+    assert (value, revised_at, raw_file_path) == (written, SECOND_AT, second_path)
+    assert fetch_rows(data_dir, "SELECT count(*) FROM item") == [(1,)]
+    assert read_log(data_dir) == []
+
+
+@pytest.mark.parametrize(
+    ("kept", "changed"),
+    [
+        ('"[[Jane Doe]]"', '"[[John Roe]]"'),
+        ('simply by learning more syntax."', 'by learning syntax."'),
+    ],
+    ids=["author", "description"],
+)
+def test_a_change_of_a_property_the_base_does_not_keep_is_left_out(
+    data_dir, kept, changed
+):
+    write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
+    run_import(data_dir)
+    changed_text = fixture_text(ARTICLE).replace(kept, changed)
+    assert changed_text != fixture_text(ARTICLE)
+    second_path = write_clip(data_dir, SECOND, "a1", changed_text)
+
+    run_import(data_dir)
+
+    assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [second_path]
+    assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(None,)]
+    assert [discard["rule"] for discard in read_discards(data_dir)] == ["already_seen"]
+
+
+def test_an_older_version_imported_after_a_newer_one_is_left_out(data_dir):
+    """A raw file collected before the version kept, imported after it (two imports at once)."""
+    second_path = write_clip(
+        data_dir, SECOND, "a1", fixture_text(ARTICLE).replace("do not", "never")
+    )
+    run_import(data_dir)
+    first_path = write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
+
+    run_import(data_dir)
+
+    assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [second_path]
+    assert "They usually never." in fetch_rows(data_dir, "SELECT body FROM clip")[0][0]
+    assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(None,)]
+    assert read_discards(data_dir) == [
+        {
+            "kind": "discard",
+            "rule": "no_newer_version",
+            "source_code": "clipper",
+            "source_item_id": ARTICLE_URL,
+            "raw_file_path": first_path,
+            "compared_with_collected_at": SECOND_AT,
         }
     ]
 
@@ -132,13 +258,40 @@ def test_two_urls_are_two_clips_even_for_the_same_article(data_dir):
     assert read_discards(data_dir) == []
 
 
-def test_of_two_files_of_one_url_in_a_collection_the_first_page_name_is_kept(data_dir):
-    first_path = write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
-    write_clip(data_dir, FIRST, "b2", fixture_text(ARTICLE).replace("do not", "never"))
+def test_an_older_version_imported_after_a_newer_copy_of_the_same_content_is_left_out(
+    data_dir,
+):
+    """A version of 2026-10-18 imported after a copy of 2026-10-19 that kept the version of
+    2026-10-17: the base keeps the content of the newest copy."""
+    write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
+    run_import(data_dir)
+    write_clip(data_dir, "2026-10-19T093000Z", "a1", fixture_text(ARTICLE))
+    run_import(data_dir)
+    write_clip(data_dir, SECOND, "a1", fixture_text(ARTICLE).replace("do not", "never"))
 
     run_import(data_dir)
 
-    assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [first_path]
+    assert "They usually do not." in fetch_rows(data_dir, "SELECT body FROM clip")[0][0]
+    assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(None,)]
+    assert [
+        (discard["rule"], discard["compared_with_collected_at"])
+        for discard in read_discards(data_dir)
+    ] == [("no_newer_version", "2026-10-19T09:30:00Z")]
+
+
+def test_of_two_files_of_one_url_in_a_collection_the_second_is_written_again(data_dir):
+    """The limit of the ADR of 2026-10-19: in page name order, the second writes over the first."""
+    write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
+    second_path = write_clip(
+        data_dir, FIRST, "b2", fixture_text(ARTICLE).replace("do not", "never")
+    )
+
+    run_import(data_dir)
+
+    assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [second_path]
+    assert "They usually never." in fetch_rows(data_dir, "SELECT body FROM clip")[0][0]
+    assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(FIRST_AT,)]
+    assert read_discards(data_dir) == []
 
 
 def test_a_refused_clip_is_logged_by_its_field_without_its_title(data_dir):
