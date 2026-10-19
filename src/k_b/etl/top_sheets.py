@@ -76,9 +76,11 @@ class TopSheetsOutcome:
 
 
 class VaultEntryRefusedError(Exception):
-    """A folder of the sheets, or a sheet, is a symbolic link (vault_link_refused), or a sheet is
-    not a regular file (sheet_not_a_file): kb write-tops refuses its top (decision of Sabine,
-    2026-10-19: kb write-tops never follows a symbolic link in the vault)."""
+    """kb write-tops refuses a top: a folder of the sheets, or a sheet, is a symbolic link
+    (vault_link_refused, decision of Sabine, 2026-10-19: kb write-tops never follows a symbolic
+    link in the vault); a sheet is not a regular file (sheet_not_a_file), or is not there before
+    the deletion of its ranking (sheet_missing), decided by time-knight, delegation of Sabine of
+    2026-10-15."""
 
 
 class Ranking(NamedTuple):
@@ -95,25 +97,26 @@ def write_top_sheets(store: RawStore, vault_dir: Path, top: Top) -> TopSheetsOut
     counted. The folder is listed once: a ranking collected meanwhile is neither read nor
     deleted. An exception raised by a read or a write (OSError, SIGTERM) deletes nothing. A
     symbolic link is refused before any ranking is read and any sheet written: all or nothing.
-    The folders are checked again before each sheet and before the deletion: a folder replaced
-    by a link meanwhile stops the top, nothing deleted.
+    The folders are checked again before each sheet, and before the deletion with the sheet of
+    every ranking read, which must be there: an entry replaced or removed meanwhile stops the
+    top, nothing deleted.
     """
     sheets_dir = find_sheets_dir(vault_dir, top)
     keys = store.list_file_keys(top.folder_key)
     refuse_linked_folders(vault_dir, sheets_dir)
     refuse_linked_sheets(vault_dir, sheets_dir, keys)
     readable_keys = []
+    read_times = []
     written_count = 0
     for key in keys:
         ranking = read_ranking(store, top, key)
         if ranking is None:
             continue
         readable_keys.append(key)
+        read_times.append(ranking.collected_at)
         written_count += write_sheet(vault_dir, sheets_dir, top, ranking)
-    # The sheets that justify the deletion, checked again: a sheet replaced meanwhile by a link
-    # or by a folder would leave its ranking deleted without a sheet.
     refuse_linked_folders(vault_dir, sheets_dir)
-    refuse_linked_sheets(vault_dir, sheets_dir, readable_keys)
+    refuse_missing_sheets(vault_dir, sheets_dir, read_times)
     deleted_count = sum(store.delete(key) for key in readable_keys[:-1])
     logger.info("%s: %d superseded rankings deleted", top.name, deleted_count)
     return TopSheetsOutcome(
@@ -182,8 +185,23 @@ def refuse_linked_sheets(vault_dir: Path, sheets_dir: Path, keys: list[str]) -> 
     collection time has no sheet."""
     for key in keys:
         collected_at = find_collection_time(key)
+        # Only its refusals count here: a sheet not written yet is expected.
         if collected_at is not None:
             has_sheet(find_sheet_path(sheets_dir, collected_at), vault_dir)
+
+
+def refuse_missing_sheets(
+    vault_dir: Path, sheets_dir: Path, read_times: list[datetime]
+) -> None:
+    """Before the deletion, the sheet of each ranking read must be there, a regular file: a
+    sheet removed or replaced since it was written would leave its ranking deleted without a
+    sheet (sheet_missing, or the refusals of has_sheet)."""
+    for collected_at in read_times:
+        sheet_path = find_sheet_path(sheets_dir, collected_at)
+        if not has_sheet(sheet_path, vault_dir):
+            raise VaultEntryRefusedError(
+                f"sheet_missing: {sheet_path.relative_to(vault_dir).as_posix()} is not there"
+            )
 
 
 def list_folders_down_to(vault_dir: Path, folder: Path) -> list[Path]:

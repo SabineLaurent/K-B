@@ -51,8 +51,8 @@ def run_write_tops(data_dir: Path) -> int:
 
 
 def describe_error(error: OSError | VaultEntryRefusedError) -> str:
-    """A refused link by its named state and its path in the vault; an OSError by its type and
-    its reason, never a path: it names the vault or a raw file."""
+    """A refused entry of the vault by its named state and its path in the vault; an OSError by
+    its type and its reason, never a path: it names the vault or a raw file."""
     if isinstance(error, VaultEntryRefusedError):
         return str(error)
     reason = f" ({error.strerror})" if error.strerror else ""

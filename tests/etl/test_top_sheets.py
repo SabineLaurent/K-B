@@ -568,3 +568,30 @@ def test_a_linked_sheet_of_an_unreadable_ranking_refuses_the_top_too(
 
     assert (readable.exists(), unreadable.exists()) == (True, True)
     assert not find_sheet(vault_dir, STARRED_TOP, "2026-10-05").exists()
+
+
+def test_a_sheet_removed_before_the_deletion_refuses_its_top_and_deletes_no_ranking(
+    data_dir, vault_dir, monkeypatch
+):
+    rankings = [
+        write_ranking(data_dir, STARRED_TOP, f"2026-10-0{day}T093000Z")
+        for day in (5, 6)
+    ]
+    write_file_atomically = top_sheets.write_file_atomically
+
+    def write_then_remove_the_first_sheet(path, content):
+        write_file_atomically(path, content)
+        if path.name == "2026-10-06.md":
+            (path.parent / "2026-10-05.md").unlink()
+
+    monkeypatch.setattr(
+        top_sheets, "write_file_atomically", write_then_remove_the_first_sheet
+    )
+
+    with pytest.raises(
+        VaultEntryRefusedError,
+        match="^sheet_missing: veille/tops/most_starred/2026-10-05.md is not there$",
+    ):
+        write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
+
+    assert all(ranking.exists() for ranking in rankings)
