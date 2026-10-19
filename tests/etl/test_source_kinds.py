@@ -1,11 +1,12 @@
 import importlib
+import pkgutil
 from itertools import permutations
-from pathlib import Path
 
 from k_b.commands import collect_command
+from k_b.etl import sources
 from k_b.etl.source_contract import find_source_kind, list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources import clipping, github_api
+from k_b.etl.sources import clipping, github_api, github_most_starred
 from k_b.etl.sources.zotero import READER
 
 
@@ -61,15 +62,22 @@ def test_the_clips_are_declared_with_their_reader_and_without_an_instance():
     )
 
 
-def test_the_github_api_kinds_are_those_whose_module_calls_the_github_api():
-    sources_dir = Path(github_api.__file__).parent
+def test_the_github_core_quota_kinds_are_those_that_call_the_github_api_but_the_search():
+    modules = [
+        importlib.import_module(f"k_b.etl.sources.{module_info.name}")
+        for module_info in pkgutil.iter_modules(sources.__path__)
+    ]
+    # Imported, not named: a module that only names the function in a comment is not counted.
     calling_modules = [
-        importlib.import_module(f"k_b.etl.sources.{path.stem}")
-        for path in sources_dir.glob("*.py")
-        if path.stem != "github_api"
-        and "get_from_github_api" in path.read_text("utf-8")
+        module
+        for module in modules
+        if module is not github_api
+        and getattr(module, "get_from_github_api", None)
+        is github_api.get_from_github_api
     ]
 
+    # The ranking calls the search, which has its own quota, apart.
     assert {module.FOLDER_PREFIX for module in calling_modules} == (
-        collect_command.GITHUB_API_FOLDER_PREFIXES
+        collect_command.GITHUB_CORE_QUOTA_FOLDER_PREFIXES
+        | {github_most_starred.FOLDER_PREFIX}
     )

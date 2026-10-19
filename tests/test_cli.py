@@ -648,6 +648,27 @@ def test_collect_says_once_without_the_github_token_that_github_allows_60_reques
     )
 
 
+def test_collect_says_nothing_of_the_github_token_for_the_search_alone(
+    monkeypatch, tmp_path, capsys
+):
+    # The ranking calls the search, which has its own quota, apart from the 60 per hour.
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        collect_command,
+        "SOURCE_KINDS",
+        (
+            SourceKind(
+                "github_most_starred", (WorkingSource("github_most_starred"),), None
+            ),
+        ),
+    )
+
+    assert cli.main(["collect"]) == 0
+    error_output = capsys.readouterr().err
+    assert "INFO k_b.cli: sources to collect: github_most_starred\n" in error_output
+    assert "KB_GITHUB_TOKEN" not in error_output
+
+
 def test_collect_says_nothing_of_the_github_token_when_it_is_set(
     monkeypatch, tmp_path, capsys
 ):

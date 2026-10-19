@@ -160,12 +160,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   alertes sont demandées pour les seuls paquets suivis (`affects=`). Tout l'écosystème `npm`
   dépasse 100 alertes par semaine et obligerait à paginer.
 - **Jeton** : sans `KB_GITHUB_TOKEN` (ou vide), les requêtes partent sans jeton, avec la limite
-  de 60 requêtes par heure. Quand une source GitHub (releases, alertes, dépôts les plus étoilés)
-  est collectée, `kb collect` le journalise une fois, au lancement :
+  de 60 requêtes par heure. Quand les releases ou les alertes sont collectées, `kb collect` le
+  journalise une fois, au lancement :
   `WARNING k_b.cli: KB_GITHUB_TOKEN not set: the GitHub API allows 60 requests per hour instead
   of 5,000`. Avec le jeton, rien n'est journalisé sur lui, et sa valeur n'entre dans aucun
-  message. Un jeton que GitHub refuse donne un statut HTTP d'erreur à chaque source GitHub
-  (états communs du téléchargement).
+  message. Les dépôts les plus étoilés seuls ne le déclenchent pas : ils appellent la recherche,
+  qui a son propre quota, à part. Un jeton que GitHub refuse donne un statut HTTP d'erreur à
+  chaque source GitHub (états communs du téléchargement).
 - **En cas de panne :** releases (`github_releases_<dépôt>`), en plus des états communs : la page
   n'est pas du JSON, ou pas une liste ; toutes ses releases sont invalides (`all_items_invalid`) ;
   une release est d'un autre dépôt que celui demandé (casse ignorée). Une release invalide parmi

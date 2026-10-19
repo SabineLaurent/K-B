@@ -19,19 +19,16 @@ from k_b.etl.extract import CollectionOutcome, collect_all_sources
 from k_b.etl.raw_store import InvalidCollectionStateError
 from k_b.etl.source_contract import Source, find_source_kind
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources import github_advisories, github_most_starred, github_releases
+from k_b.etl.sources import github_advisories, github_releases
 from k_b.etl.sources.github_api import TOKEN_VARIABLE
 
 logger = logging.getLogger(LOGGER_NAME)
 
-# The kinds whose sources call the GitHub REST API, the only ones that read KB_GITHUB_TOKEN; not
-# gh_archive, which reads BigQuery.
-GITHUB_API_FOLDER_PREFIXES = frozenset(
-    {
-        github_releases.FOLDER_PREFIX,
-        github_advisories.FOLDER_PREFIX,
-        github_most_starred.FOLDER_PREFIX,
-    }
+# The kinds whose sources call the GitHub REST API on its primary quota, the one KB_GITHUB_TOKEN
+# raises from 60 to 5,000 requests per hour. Not github_most_starred: it calls the search, which
+# has its own quota, apart. Not gh_archive, which reads BigQuery.
+GITHUB_CORE_QUOTA_FOLDER_PREFIXES = frozenset(
+    {github_releases.FOLDER_PREFIX, github_advisories.FOLDER_PREFIX}
 )
 
 
@@ -66,11 +63,12 @@ def run_collect(data_dir: Path) -> int:
 
 def log_collection_start(sources: Sequence[Source], environ: Mapping[str, str]) -> None:
     """Once, before the first source: the sources run, by the name of their line at the end,
-    then, when one of them calls the GitHub API without KB_GITHUB_TOKEN, the quota it gets. Of
+    then, when one of them uses the primary quota of the GitHub API without KB_GITHUB_TOKEN,
+    that quota. Of
     the token, only whether it is set is read, never its value."""
     logger.info("sources to collect: %s", ", ".join(source.name for source in sources))
     if not environ.get(TOKEN_VARIABLE) and any(
-        is_github_api_source(source) for source in sources
+        is_github_core_quota_source(source) for source in sources
     ):
         # GitHub Docs, "Rate limits for the REST API", read on 2026-10-19.
         logger.warning(
@@ -79,9 +77,9 @@ def log_collection_start(sources: Sequence[Source], environ: Mapping[str, str]) 
         )
 
 
-def is_github_api_source(source: Source) -> bool:
+def is_github_core_quota_source(source: Source) -> bool:
     kind = find_source_kind(source.name, SOURCE_KINDS)
-    return kind is not None and kind.folder_prefix in GITHUB_API_FOLDER_PREFIXES
+    return kind is not None and kind.folder_prefix in GITHUB_CORE_QUOTA_FOLDER_PREFIXES
 
 
 def print_skipped_sources(
