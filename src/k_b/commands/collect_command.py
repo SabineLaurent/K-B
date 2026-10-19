@@ -2,7 +2,7 @@
 
 import logging
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -17,9 +17,19 @@ from k_b.etl.collected_sources import (
 )
 from k_b.etl.extract import CollectionOutcome, collect_all_sources
 from k_b.etl.raw_store import InvalidCollectionStateError
+from k_b.etl.source_contract import Source, find_source_kind
 from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.etl.sources import github_advisories, github_releases
+from k_b.etl.sources.github_api import TOKEN_VARIABLE
 
 logger = logging.getLogger(LOGGER_NAME)
+
+# The kinds whose sources call the GitHub REST API on its primary quota, the one KB_GITHUB_TOKEN
+# raises from 60 to 5,000 requests per hour. Not github_most_starred: it calls the search, which
+# has its own quota, apart. Not gh_archive, which reads BigQuery.
+GITHUB_CORE_QUOTA_FOLDER_PREFIXES = frozenset(
+    {github_releases.FOLDER_PREFIX, github_advisories.FOLDER_PREFIX}
+)
 
 
 def run_collect(data_dir: Path) -> int:
@@ -31,9 +41,11 @@ def run_collect(data_dir: Path) -> int:
     )
     if collect_only is None:
         return ExitCode.NOT_STARTED
+    sources = list_collected_sources(collect_only, environ, SOURCE_KINDS)
+    log_collection_start(sources, environ)
     try:
         outcome = collect_all_sources(
-            list_collected_sources(collect_only, environ, SOURCE_KINDS),
+            sources,
             data_dir / "raw",
             data_dir,
             datetime.now(UTC),
@@ -47,6 +59,26 @@ def run_collect(data_dir: Path) -> int:
     if outcome.state_error is not None:
         print(f"collection_state: {describe_outcome(outcome.state_error)}")
     return find_collection_exit_code(outcome)
+
+
+def log_collection_start(sources: Sequence[Source], environ: Mapping[str, str]) -> None:
+    """Once, before the first source: the sources run, by the name of their line at the end,
+    then, when one of them uses the primary quota of the GitHub API without KB_GITHUB_TOKEN,
+    that quota. Of the token, only whether it is set is read, never its value."""
+    logger.info("sources to collect: %s", ", ".join(source.name for source in sources))
+    if not environ.get(TOKEN_VARIABLE) and any(
+        is_github_core_quota_source(source) for source in sources
+    ):
+        # GitHub Docs, "Rate limits for the REST API", read on 2026-10-19.
+        logger.warning(
+            "%s not set: the GitHub API allows 60 requests per hour instead of 5,000",
+            TOKEN_VARIABLE,
+        )
+
+
+def is_github_core_quota_source(source: Source) -> bool:
+    kind = find_source_kind(source.name, SOURCE_KINDS)
+    return kind is not None and kind.folder_prefix in GITHUB_CORE_QUOTA_FOLDER_PREFIXES
 
 
 def print_skipped_sources(

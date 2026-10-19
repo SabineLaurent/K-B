@@ -47,6 +47,12 @@ def no_collect_only(monkeypatch):
     monkeypatch.delenv("KB_COLLECT_ONLY", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def no_github_token(monkeypatch):
+    """A terminal that exports KB_GITHUB_TOKEN must not hide the line said without it."""
+    monkeypatch.delenv("KB_GITHUB_TOKEN", raising=False)
+
+
 def collected_kinds(*sources):
     """One kind without a reader: the collection tests only need its sources."""
     return (SourceKind("test", sources, None),)
@@ -578,6 +584,128 @@ def test_an_error_log_line_is_written_to_the_log_file_in_the_same_format(
         if error_line.fullmatch(line)
     ]
     assert file_line in capsys.readouterr().err.splitlines()
+
+
+QUOTA_LINE = "KB_GITHUB_TOKEN not set: the GitHub API allows 60 requests per hour instead of 5,000"
+
+
+def github_kinds():
+    """Two kinds of the sources that call the GitHub API, a source each."""
+    return tuple(
+        SourceKind(name, (WorkingSource(f"{name}_owner_repository"),), None)
+        for name in ("github_releases", "github_advisories")
+    )
+
+
+def test_collect_announces_once_the_sources_it_runs_before_the_first_one(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        collect_command,
+        "SOURCE_KINDS",
+        declared_kinds(BrokenSource(), WorkingSource()),
+    )
+
+    assert cli.main(["collect"]) == cli.ExitCode.PARTIAL_FAILURE
+    output = capsys.readouterr()
+    error_lines = output.err.splitlines()
+    # Not zotero, clipping nor gh_archive: declared, their variable not set.
+    [announcement_position] = [
+        position
+        for position, line in enumerate(error_lines)
+        if re.fullmatch(
+            rf"{LOG_LINE_DATE} INFO k_b\.cli: sources to collect: broken, working", line
+        )
+    ]
+    [failure_position] = [
+        position
+        for position, line in enumerate(error_lines)
+        if "collection failed for source 'broken'" in line
+    ]
+    assert announcement_position < failure_position
+    assert output.err.count("sources to collect:") == 1
+    assert "sources to collect:" not in output.out
+
+
+@pytest.mark.parametrize("token", [None, ""])
+def test_collect_says_once_without_the_github_token_that_github_allows_60_requests(
+    monkeypatch, tmp_path, capsys, token
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    if token is not None:
+        monkeypatch.setenv("KB_GITHUB_TOKEN", token)
+    monkeypatch.setattr(collect_command, "SOURCE_KINDS", github_kinds())
+
+    assert cli.main(["collect"]) == 0
+    [quota_line] = [
+        line
+        for line in capsys.readouterr().err.splitlines()
+        if "60 requests per hour" in line
+    ]
+    assert re.fullmatch(
+        rf"{LOG_LINE_DATE} WARNING k_b\.cli: {re.escape(QUOTA_LINE)}", quota_line
+    )
+
+
+def test_collect_says_nothing_of_the_github_token_for_the_search_alone(
+    monkeypatch, tmp_path, capsys
+):
+    # The ranking calls the search, which has its own quota, apart from the 60 per hour.
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        collect_command,
+        "SOURCE_KINDS",
+        (
+            SourceKind(
+                "github_most_starred", (WorkingSource("github_most_starred"),), None
+            ),
+        ),
+    )
+
+    assert cli.main(["collect"]) == 0
+    error_output = capsys.readouterr().err
+    assert "INFO k_b.cli: sources to collect: github_most_starred\n" in error_output
+    assert "KB_GITHUB_TOKEN" not in error_output
+
+
+def test_collect_says_nothing_of_the_github_token_when_it_is_set(
+    monkeypatch, tmp_path, capsys
+):
+    token_value = "github_pat_" + "x" * 30
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("KB_GITHUB_TOKEN", token_value)
+    monkeypatch.setattr(collect_command, "SOURCE_KINDS", github_kinds())
+
+    assert cli.main(["collect"]) == 0
+    output = capsys.readouterr()
+    log_file_text = (tmp_path / "logs" / "kb.log").read_text("utf-8")
+    assert "sources to collect:" in log_file_text
+    for text in (output.out, output.err, log_file_text):
+        assert "KB_GITHUB_TOKEN" not in text
+        assert token_value not in text
+
+
+def test_collect_only_without_a_github_source_says_nothing_of_the_github_token(
+    monkeypatch, tmp_path, capsys, zotero_dir
+):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (tmp_path / "vault" / "Clippings").mkdir(parents=True)
+    monkeypatch.setenv("KB_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("KB_ZOTERO_DIR", str(zotero_dir))
+    monkeypatch.setenv("KB_VAULT_DIR", str(tmp_path / "vault"))
+    monkeypatch.setenv("KB_COLLECT_ONLY", "zotero,clipping")
+    # The GitHub kinds are declared: only KB_COLLECT_ONLY leaves them out.
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", github_kinds() + declared_kinds()
+    )
+
+    assert cli.main(["collect"]) == 0
+    error_output = capsys.readouterr().err
+    assert "INFO k_b.cli: sources to collect: zotero, clipping\n" in error_output
+    assert "KB_GITHUB_TOKEN" not in error_output
+    assert "60 requests per hour" not in error_output
 
 
 @pytest.mark.skipif(
