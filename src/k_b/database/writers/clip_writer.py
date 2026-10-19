@@ -40,6 +40,15 @@ INSERT_ITEM_TAG = """
 INSERT INTO item_tag (item_id, tag_id) SELECT :item_id, id FROM tag WHERE name = :name
 """
 
+SELECT_ITEM_TAGS = """
+SELECT tag.name FROM item_tag JOIN tag ON tag.id = item_tag.tag_id WHERE item_tag.item_id = ?
+"""
+
+# The links of the version before, removed when a clip is written again: a link is a value of a
+# version, as a column, not an item. The one exception to removing by the purge only
+# (conventions.md, rule 5; decision of Sabine of 2026-10-19).
+DELETE_ITEM_TAGS = "DELETE FROM item_tag WHERE item_id = ?"
+
 UPDATE_CLIP = """
 UPDATE clip
 SET title = :title, body = :body, saved_at = :saved_at, published_at = :published_at,
@@ -57,6 +66,17 @@ class ClipContent(NamedTuple):
     body: str | None
     saved_at: str | None
     published_at: str | None
+    # A set: the tags compare without their order.
+    tags: frozenset[str]
+
+    def to_columns(self) -> dict[str, str | None]:
+        """The columns of clip; the tags are rows of item_tag."""
+        return {
+            "title": self.title,
+            "body": self.body,
+            "saved_at": self.saved_at,
+            "published_at": self.published_at,
+        }
 
 
 def write(
@@ -68,6 +88,7 @@ def write(
         item.summary,
         format_date(item.saved_at),
         format_date(item.published_at),
+        frozenset(item.tags),
     )
     row = connection.execute(
         INSERT_ITEM_OF_NEW_CLIP, {"raw_data_id": raw_data_id, "url": item.url}
@@ -75,7 +96,7 @@ def write(
     if row is None:
         return write_known_clip(connection, item, raw_data_id, content)
     connection.execute(
-        INSERT_CLIP, {"item_id": row[0], "url": item.url} | content._asdict()
+        INSERT_CLIP, {"item_id": row[0], "url": item.url} | content.to_columns()
     )
     write_tags(connection, row[0], item.tags)
     return None
@@ -108,6 +129,7 @@ def write_known_clip(
         body=known_body,
         saved_at=known_saved_at,
         published_at=known_published_at,
+        tags=read_tags(connection, known_item_id),
     )
     if known_content == content:
         if not is_file_before:
@@ -117,10 +139,18 @@ def write_known_clip(
         return Discard("no_newer_version", item, known_collected_at)
     connection.execute(
         UPDATE_CLIP,
-        content._asdict() | {"item_id": known_item_id, "revised_at": collected_at},
+        content.to_columns() | {"item_id": known_item_id, "revised_at": collected_at},
     )
+    connection.execute(DELETE_ITEM_TAGS, (known_item_id,))
+    write_tags(connection, known_item_id, item.tags)
     shared_rows.point_item_at_raw_data(connection, known_item_id, raw_data_id)
     return None
+
+
+def read_tags(connection: sqlite3.Connection, item_id: int) -> frozenset[str]:
+    return frozenset(
+        name for (name,) in connection.execute(SELECT_ITEM_TAGS, (item_id,))
+    )
 
 
 def write_tags(

@@ -194,8 +194,9 @@ def test_a_clip_whose_content_changed_is_written_again(
     [
         ('"[[Jane Doe]]"', '"[[John Roe]]"'),
         ('simply by learning more syntax."', 'by learning syntax."'),
+        ('- "clippings"', '- "Clippings"'),
     ],
-    ids=["author", "description"],
+    ids=["author", "description", "template_tag"],
 )
 def test_a_change_of_a_property_the_base_does_not_keep_is_left_out(
     data_dir, kept, changed
@@ -396,6 +397,33 @@ def test_a_clip_copied_again_with_its_tags_in_another_form_is_left_out(data_dir)
 
     assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(None,)]
     assert [discard["rule"] for discard in read_discards(data_dir)] == ["already_seen"]
+
+
+def test_a_tag_added_or_removed_writes_the_clip_again(data_dir):
+    """Decision of Sabine of 2026-10-19: the links of the version before are removed."""
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
+    run_import(data_dir)
+    write_clip(
+        data_dir, SECOND, "a1", with_tags(fixture_text(ARTICLE), "llm", "agents")
+    )
+    run_import(data_dir)
+    added = (
+        fetch_rows(data_dir, TAGS_QUERY),
+        fetch_rows(data_dir, "SELECT revised_at FROM clip"),
+    )
+    third_path = write_clip(
+        data_dir, "2026-10-19T093000Z", "a1", with_tags(fixture_text(ARTICLE), "agents")
+    )
+
+    run_import(data_dir)
+
+    assert added == ([(ARTICLE_URL, "agents"), (ARTICLE_URL, "llm")], [(SECOND_AT,)])
+    assert fetch_rows(data_dir, TAGS_QUERY) == [(ARTICLE_URL, "agents")]
+    assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [
+        ("2026-10-19T09:30:00Z",)
+    ]
+    assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [third_path]
+    assert read_log(data_dir) == []
 
 
 def test_a_rebuilt_base_is_the_same(data_dir, tmp_path):
