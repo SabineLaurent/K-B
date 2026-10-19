@@ -667,7 +667,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
    | flux de nouveautés, **par fenêtre** (variante propre aux classements, #142) | classements GH Archive (table `trend`, pas un item) | inchangée : le premier classement vu d'une fenêtre est gardé entier ; une fenêtre qu'un autre fichier brut a déjà apportée est écartée entière | `INSERT INTO trend … SELECT … WHERE NOT EXISTS (ligne de la même fenêtre venue d'un autre fichier brut) ON CONFLICT (window_end, repository_id) DO NOTHING RETURNING id` | `already_seen`, une ligne par fenêtre |
    | catalogue d'état | CISA KEV | remplacé si son fichier est collecté après le dernier catalogue de la source déjà importé et que son contenu diffère ; `revised_at` prend la date de cette collecte | `ON CONFLICT (cve_id) DO UPDATE … WHERE` (collecte plus récente et contenu différent) `RETURNING id` | `unchanged`, `no_newer_version` |
    | flux avec révisions | arXiv | remplacé si sa révision (`updated`) est plus récente | `ON CONFLICT (arxiv_id) DO UPDATE … WHERE excluded.revised_at > publication.revised_at RETURNING id` | `revision_not_newer` |
-   | `.md` importé, **par URL** (#14, #259) | clips du Web Clipper | réécrit si son contenu (titre, texte, dates) diffère et que son fichier n'est pas collecté avant la version gardée ; `revised_at` prend la date de cette collecte | `INSERT INTO item … SELECT … WHERE NOT EXISTS (clip de même URL) RETURNING id`, sinon lecture de la ligne gardée, comparaison en Python et `UPDATE clip` | `already_seen`, `no_newer_version` |
+   | `.md` importé, **par URL** (#14, #259) | clips du Web Clipper | réécrit si son contenu (titre, texte, dates) diffère et que son fichier n'est pas collecté avant le brut le plus récent du contenu gardé ; `revised_at` prend la date de cette collecte | `INSERT INTO item … SELECT … WHERE NOT EXISTS (clip de même URL) RETURNING id`, sinon lecture de la ligne gardée, comparaison en Python et `UPDATE clip` | `already_seen`, `no_newer_version` |
    | catalogue d'état, **à deux niveaux** (#138) | Zotero : l'entrée et chacun de ses surlignages | comme CISA KEV : remplacé si son extrait est collecté après le dernier extrait importé et que son contenu diffère ; `revised_at` prend la date de cette collecte | `ON CONFLICT (zotero_key) DO UPDATE … WHERE` (extrait plus récent, et retiré ou contenu différent) `RETURNING`, pour `zotero_entry` et pour `highlight` | `unchanged`, `no_newer_version` |
 
    - Le flux de nouveautés n'a pas d'`ON CONFLICT` : le sous-type exige un item déjà créé, et
@@ -784,11 +784,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
      - **nature** : `.md` importé, par URL ; la dernière version est gardée (décision de Sabine
        du 2026-10-19, #259). Un clip copié de nouveau, ou une autre copie de la même URL, au même
        contenu (titre, texte, `created`, `published`) est écarté `already_seen` ; un contenu
-       changé réécrit le clip, `revised_at` prend la date de la collecte qui voit le changement,
-       et l'item pointe sur le brut de cette version. Une propriété que la base ne garde pas
-       (`author`, `description`) ne réécrit rien. Un fichier collecté avant la version gardée est
-       écarté `no_newer_version`. `compared_with_collected_at` est la collecte de la version
-       gardée. **Limites** : deux fichiers de même URL et de contenu différent dans une même
+       changé réécrit le clip, `revised_at` prend la date de la collecte qui voit le changement.
+       L'item pointe sur le brut le plus récent de son contenu, une copie au même contenu
+       comprise. Une propriété que la base ne garde pas (`author`, `description`) ne réécrit
+       rien. Un fichier collecté avant ce brut, au contenu différent, est écarté
+       `no_newer_version`. `compared_with_collected_at` est la collecte de ce brut. **Limites** : deux fichiers de même URL et de contenu différent dans une même
        collecte : le second dans l'ordre des noms de pages réécrit le premier, un ordre fait par
        le hachage, donc arbitraire pour l'utilisatrice ; un clip dont l'URL source change devient
        un nouveau clip, l'ancien reste en base ; un même article gardé sous deux URL donne deux
@@ -836,7 +836,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
      |---|---|---|---|
      | `already_seen` | le sous-type est déjà en base, ou la fenêtre d'un classement vient déjà d'un autre fichier brut | `compared_with_collected_at` | collecte de la version gardée |
      | `unchanged` | fichier plus récent que le dernier catalogue importé, contenu identique | `compared_with_collected_at` | collecte de la version gardée, la seule comparée au contenu |
-     | `no_newer_version` | catalogue : fichier collecté avant le dernier catalogue importé, ou au même instant ; clip : fichier collecté avant la version gardée, contenu différent | `compared_with_collected_at` | catalogue : collecte de ce dernier catalogue ; clip : collecte de la version gardée |
+     | `no_newer_version` | catalogue : fichier collecté avant le dernier catalogue importé, ou au même instant ; clip : fichier collecté avant le brut le plus récent du contenu gardé, contenu différent | `compared_with_collected_at` | catalogue : collecte de ce dernier catalogue ; clip : collecte de ce brut |
      | `revision_not_newer` | révision arXiv plus ancienne ou égale | `compared_with_revised_at` | révision arXiv de la version gardée |
 
    - **Rejouable** : un second import sans nouveau brut ne lit aucun fichier (sauf un fichier

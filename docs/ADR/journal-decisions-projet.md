@@ -2983,7 +2983,10 @@ time-knight (délégation de Sabine du 2026-10-15).
   l'URL source change devient un nouveau clip, l'ancien reste en base (la clé reste l'URL) ; un
   nom effacé d'un clip en base revient si le clip du coffre est recopié (une édition, une
   étiquette du Finder), l'effacement touche donc aussi le coffre (registre des traitements,
-  étape 5). — PR de #259
+  étape 5) ; un clip réécrit ne revient pas dans la liste filtrée par `since` (« quoi de neuf »),
+  qui date un clip par `saved_at` (`created`), que la réécriture ne change pas, et l'API de
+  données n'expose pas encore `clip.revised_at` (constats de `/code-review`, signalés sans
+  correction ; la suite après la mise à jour d'un `.md` relève de #148). — PR de #259
 - **La comparaison se fait en Python (lecture de la ligne gardée, puis `UPDATE clip`), et un
   fichier collecté avant la version gardée est écarté `no_newer_version`.** Tranché dans le plan
   de #259, validé par Sabine. Pourquoi : le SQL reste portable (règle 1 de `poc.md`) ; le
@@ -2993,7 +2996,12 @@ time-knight (délégation de Sabine du 2026-10-15).
   sur une ligne ne compare pas. La garde d'ordre empêche la base de revenir à une version plus
   ancienne (deux imports en même temps, un brut plus ancien importé après), comme pour les
   catalogues d'état et arXiv ; elle compare par « avant », pas par « avant ou en même temps »,
-  pour que le second fichier d'une même collecte réécrive le premier. `revised_at` est posé même
+  pour que le second fichier d'une même collecte réécrive le premier. Elle se compare au brut
+  le plus récent du contenu gardé : une copie au même contenu, écartée `already_seen`, déplace
+  l'item sur son brut, sans quoi un fichier intermédiaire importé en retard réécrirait la base
+  avec une version plus ancienne que cette copie (constat de `/code-review`, tri de time-knight,
+  délégation de Sabine du 2026-10-15 ; option écartée : comparer à la collecte la plus récente
+  de tous les bruts de l'URL, que `raw_data` ne relie pas à l'URL). `revised_at` est posé même
   quand le changement est vu dans la collecte qui a créé le clip : il dit la collecte qui a vu
   le changement. Une réécriture ne va pas au journal d'import : ce n'est pas un rejet, comme une
   révision Zotero. Options écartées : l'upsert `ON CONFLICT (url) DO UPDATE … WHERE` (forme à
