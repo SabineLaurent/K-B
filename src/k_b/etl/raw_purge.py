@@ -32,7 +32,7 @@ def delete_superseded_raw_files(
             if PurePosixPath(key).parent == PurePosixPath(folder_key)
         )
         # Collection names are times: the last in name order is the last collected.
-        if not imported_keys or not store.exists(imported_keys[-1]):
+        if not imported_keys or not store.has_file(imported_keys[-1]):
             continue
         deleted_count += sum(store.delete(key) for key in imported_keys[:-1])
     logger.info("raw purge: %d superseded files deleted", deleted_count)

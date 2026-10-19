@@ -62,7 +62,7 @@ class RawStore:
             return False
         return True
 
-    def exists(self, key: str) -> bool:
+    def has_file(self, key: str) -> bool:
         return self.find_path(key).is_file()
 
     def read_latest(self, folder_key: str) -> bytes | None:

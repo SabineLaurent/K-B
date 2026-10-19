@@ -289,10 +289,10 @@ def test_a_key_is_deleted_under_the_data_directory_once(tmp_path):
     raw_file.write_bytes(b"catalog")
     store = RawStore(tmp_path)
 
-    assert store.exists("raw/automated_watch/cisa_kev/2026-10-05T093000Z.csv")
+    assert store.has_file("raw/automated_watch/cisa_kev/2026-10-05T093000Z.csv")
     assert store.delete("raw/automated_watch/cisa_kev/2026-10-05T093000Z.csv")
     assert not raw_file.exists()
-    assert not store.exists("raw/automated_watch/cisa_kev/2026-10-05T093000Z.csv")
+    assert not store.has_file("raw/automated_watch/cisa_kev/2026-10-05T093000Z.csv")
     assert not store.delete("raw/automated_watch/cisa_kev/2026-10-05T093000Z.csv")
 
 
@@ -302,7 +302,7 @@ def test_a_key_is_deleted_under_the_data_directory_once(tmp_path):
 def test_a_key_that_is_not_relative_to_the_data_directory_is_refused(tmp_path, key):
     store = RawStore(tmp_path / "data")
 
-    for method in (store.delete, store.exists, store.read_latest):
+    for method in (store.delete, store.has_file, store.read_latest):
         with pytest.raises(
             ValueError, match="not a key relative to the data directory"
         ):
