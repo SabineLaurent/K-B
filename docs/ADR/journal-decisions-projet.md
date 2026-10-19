@@ -3233,18 +3233,20 @@ time-knight (délégation de Sabine du 2026-10-15).
   un processus tué laisse un temporaire caché `.AAAA-MM-JJ.md.*.tmp` dans le coffre. — PR de #265
 - **`kb write-tops` ne suit jamais un lien symbolique dans le coffre : si `veille/`, `veille/tops/`,
   `veille/tops/<top>/` ou la fiche d'un des relevés est un lien symbolique
-  (`vault_link_refused`), ou si une fiche n'est pas un fichier régulier (`sheet_not_a_file` : un
-  dossier, par exemple), il refuse ce top avant d'en écrire aucune fiche, journalise le refus avec
+  (`vault_link_refused`), si une fiche n'est pas un fichier régulier (`sheet_not_a_file` : un
+  dossier, par exemple), ou si la fiche d'un relevé lu manque avant sa suppression
+  (`sheet_missing`), il refuse ce top avant d'en écrire aucune fiche, journalise le refus avec
   son chemin dans le coffre, ne supprime aucun de ses relevés et sort en 1 ; l'autre top est
   traité.** Décision de Sabine du 2026-10-19, 22:04Z (relayée par time-knight). Pourquoi, celui de
   Sabine : c'est le dossier où `kb write-tops` écrit qui est en jeu ; une règle d'écriture, à part
-  de celle de la lecture et de l'import. `sheet_not_a_file` et les recontrôles sont tranchés par
+  de celle de la lecture et de l'import. `sheet_not_a_file`, `sheet_missing` et les recontrôles sont tranchés par
   time-knight (délégation de Sabine du 2026-10-15), après les revues : une entrée prise pour une
   fiche écrite laisserait supprimer son relevé sans fiche. Le contrôle lit l'entrée elle-même
   (`lstat`, jamais sa cible) : les dossiers et la fiche de chaque relevé listé (son jour vient de
   son nom) avant de lire un relevé et d'écrire une fiche ; les dossiers et la fiche de nouveau
   avant chaque écriture ; les dossiers et les fiches des relevés lisibles une dernière fois avant
-  la suppression. Options écartées : suivre le lien et l'écrire comme une limite (premier plan) ;
+  la suppression, où chaque fiche doit être là (`sheet_missing` sinon : une fiche retirée depuis
+  son écriture laisserait supprimer son relevé sans fiche). Options écartées : suivre le lien et l'écrire comme une limite (premier plan) ;
   écrire par descripteurs (`O_NOFOLLOW | O_DIRECTORY`), écarté par time-knight :
   `write_file_atomically` est partagée par tout le projet, et aucune limite de droits n'est à
   défendre. Limite assumée : une entrée remplacée par un lien entre un contrôle et l'écriture qui
