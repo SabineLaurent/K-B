@@ -205,7 +205,10 @@ GH Archive, dont chaque ligne de classement (`TrendRow`, `src/k_b/items.py`) dev
     (« Limite de SQLite » ci-dessus).
 - **Web Clipper** (#14, journal ADR, 2026-10-17) : un clip a un `item.id` technique, comme les
   autres items ; son URL sans `utm_*` est sa clé naturelle. Ne vont pas en base : `author`,
-  `description`, `tags` ; ils restent dans la copie brute. Le texte gardé (`clip.body`) peut
+  `description` ; ils restent dans la copie brute. Les `tags` y vont depuis #260 (journal ADR,
+  2026-10-19) : normalisés (`normalize_tag`, `items.py` : en minuscules, sans espaces autour,
+  sans `#` au début), une ligne par tag dans `tag`, partagée par tous les items qui le portent,
+  et une liaison plusieurs-à-plusieurs `item_tag` ; le tag `clippings` du gabarit est écarté. Le texte gardé (`clip.body`) peut
   contenir la signature de l'article et les notes de l'utilisatrice
   ([registre des traitements](registre-traitements.md)). La dernière version d'une URL est
   gardée : un clip dont le contenu a changé est réécrit, et `clip.revised_at` prend la date de la
@@ -245,6 +248,8 @@ source ne touche pas aux tables.
 | `newsletter_article` | sous-type d'item : un article résumé par une édition TLDR ; clé (édition, date, rang) | `id`, `item_id`, `kind`, `edition`, `edition_date`, `rank`, `title`, `summary`, `url`, `publication_id` |
 | `zotero_entry` | sous-type d'item : un document de la bibliothèque Zotero ; catalogue d'état ; clé `zotero_key` | `id`, `item_id`, `kind`, `zotero_key`, `item_type`, `title`, `url`, `saved_at`, `publication_id`, `revised_at`, `withdrawn_at` |
 | `clip` | sous-type d'item : une page gardée avec Web Clipper ; la dernière version d'une URL est gardée ; clé `url` | `id`, `item_id`, `kind`, `url`, `title`, `body`, `saved_at`, `published_at`, `revised_at` |
+| `tag` | un tag d'un `.md` importé, normalisé, partagé par les items qui le portent ; clé `name` (#260) | `id`, `name` |
+| `item_tag` | la liaison plusieurs-à-plusieurs d'un item à ses tags ; clé (`item_id`, `tag_id`) | `item_id`, `tag_id` |
 | `highlight` | un surlignage d'un PDF d'une entrée Zotero ; catalogue d'état ; clé `zotero_key` | `highlight_id`, `zotero_key`, `text`, `comment`, `highlighted_at`, `revised_at`, `withdrawn_at`, `item_id` |
 | `trend` | TENDANCE : les dépôts qui montent d'un classement GH Archive, une ligne par fenêtre de 3 jours et par dépôt ; pas un item ; clé (`window_end`, `repository_id`) | `id`, `raw_data_id`, `window_end`, `repository_id`, `repository_name`, `stars_gained`, `forks_gained` |
 
@@ -261,17 +266,19 @@ source ne touche pas aux tables.
 - **Index** : sur les clés étrangères, que SQLite n'indexe pas d'office (`raw_data.source_id`,
   `item.raw_data_id`, `highlight.item_id`, `release.tracked_repository_id`,
   `advisory.vulnerability_id`, `newsletter_article.publication_id`, `trend.raw_data_id`,
-  `zotero_entry.publication_id`). Les
+  `zotero_entry.publication_id`, `item_tag.tag_id` ; `item_tag.item_id` est en tête de sa clé
+  primaire). Les
   contraintes `UNIQUE` créent
   leur propre index.
-- **Suppressions en cascade** : seulement de `item` vers `highlight`. Il n'y en a pas vers `publication`, `vulnerability`, `release`,
+- **Suppressions en cascade** : seulement de `item` vers `highlight` et vers `item_tag` (#260 ;
+  un tag que plus aucun item ne porte reste dans `tag`). Il n'y en a pas vers `publication`, `vulnerability`, `release`,
   `advisory`, `newsletter_article`, `zotero_entry` ni `clip` : supprimer un item qu'une de ces tables référence est refusé par la clé
   étrangère. La purge n'est pas codée.
 - **Formats contrôlés** par un `CHECK` : les dates (ci-dessus) ; `cve_id` (`CVE-AAAA-NNNN…`) ;
   `repository_name` (`owner/repo`) ; `ghsa_id` (`GHSA-…`) ; `url` (`https://…`, ou `http://…`
   pour `zotero_entry` et `clip`) ; `zotero_key` (8 caractères `0-9A-Z`) ; `edition` (lettres minuscules sans accent) ; les listes
   fermées (`source_type`, `acquisition_mode`, `kind`, `ransomware_use`, `ecosystem`) ; les listes
-  JSON non vides ; `tag_name` non vide ; dans `trend`, `window_end` à minuit UTC, `repository_id` > 0,
+  JSON non vides ; `tag_name` et `tag.name` non vides ; dans `trend`, `window_end` à minuit UTC, `repository_id` > 0,
   `stars_gained` et `forks_gained` ≥ 0 ; les longueurs maximales.
 
 ### Ce qui est propre à SQLite

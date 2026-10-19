@@ -294,7 +294,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   2024-12-04, lue par l'API GitHub le 2026-10-17.
 - **Ce qu'on en tire** : un item par fichier : titre (`title`), URL source (`source`), date
   d'ajout (`created`), date de publication (`published`, si la page en donne une), et le texte
-  gardé, après le frontmatter. Ne sont pas lus : `author`, `description`, `tags`. Comment un clip
+  gardé, après le frontmatter, et ses tags (`tags`, depuis #260). Ne sont pas lus : `author`,
+  `description`. Comment un clip
   entre en base (champs, clé, dates, rejets, doublons) : « Du brut au jeu d'items », étape 4,
   « Clips ».
 - **Accès** : lecture du dossier local du coffre (`src/k_b/etl/sources/clipping.py`) ; aucun
@@ -762,7 +763,22 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
      - **champs lus** : `title` (texte non vide, au plus 1 000 caractères), `source` (URL `http`
        ou `https`), `created` (obligatoire), `published` (facultative) et le texte après le
        frontmatter (au plus 1 000 000 caractères), gardé tel quel, une ligne `---` plus bas
-       comprise (un filet du texte). Les autres propriétés sont ignorées ;
+       comprise (un filet du texte), et `tags` (#260, ci-dessous). Les autres propriétés sont
+       ignorées ;
+     - **tags** (#260, décisions de Sabine du 2026-10-19) : lus en liste, ou en texte simple
+       (`tags: llm`, un tag) ; une valeur absente (vide, `null`, `~`, ou pas de propriété) ne
+       donne aucun tag, et un élément absent est ignoré. Chaque tag est normalisé
+       (`normalize_tag`, `items.py`) : sans espaces autour, sans le `#` d'Obsidian au début, en
+       minuscules ; `LLM`, ` llm ` et `#llm` donnent `llm`, une fois. Un tag vide une fois
+       normalisé est ignoré ; `clippings`, que le gabarit par défaut met sur chaque clip (5 clips
+       sur 5 relevés), est écarté. Un tag qui n'est pas du texte (une liste, un dictionnaire),
+       trop long (plus de 100 caractères) ou avec un NUL fait **refuser le clip entier**, par la
+       voie de rejet des autres propriétés ; de même un tag que la normalisation laisse sous une
+       forme qu'elle changerait encore (`##llm` donne `#llm`). Un tag est une ligne de `tag`,
+       partagée par les clips qui le portent, liée à chacun par `item_tag`. **Limites**
+       (hypothèses, non vérifiées sur le coffre) : `tags: llm, ai` donne un seul tag `llm, ai`,
+       une virgule n'est pas lue comme un séparateur ; un même mot écrit sous deux formes
+       Unicode (NFC et NFD) donne deux tags. Les `#tags` écrits dans le texte ne sont pas lus ;
      - **clé** : l'URL sans ses paramètres `utm_*` (`remove_tracking_parameters`), les autres
        paramètres gardés tels quels et dans leur ordre ; pas d'empreinte de contenu (journal ADR,
        « Collecte : clips ») ;
