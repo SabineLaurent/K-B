@@ -45,7 +45,7 @@ EXPECTED_TABLES = {
     "zotero_entry",
     "clip",
     "tag",
-    "item_tag",
+    "item_has_tag",
 }
 
 PAPER_COLUMNS = (
@@ -1206,7 +1206,7 @@ def test_a_highlight_without_text_is_accepted(filled_database):
 
 def insert_tag_link(database, item_id=CLIP_ITEM_ID, tag_id=1):
     database.execute(
-        "INSERT INTO item_tag (item_id, tag_id) VALUES (?, ?)", (item_id, tag_id)
+        "INSERT INTO item_has_tag (item_id, tag_id) VALUES (?, ?)", (item_id, tag_id)
     )
 
 
@@ -1219,7 +1219,7 @@ def test_a_tag_is_one_row_and_an_item_carries_it_once(filled_database):
     ):
         insert_row(filled_database, "tag", id=2)
     with pytest.raises(
-        sqlite3.IntegrityError, match="UNIQUE constraint failed: item_tag"
+        sqlite3.IntegrityError, match="UNIQUE constraint failed: item_has_tag"
     ):
         insert_tag_link(filled_database)
 
@@ -1241,7 +1241,8 @@ def test_the_links_of_an_item_removed_go_with_it_and_its_tags_stay(filled_databa
 
     filled_database.execute("DELETE FROM item WHERE id = ?", (PAPER_ITEM_ID,))
 
-    assert filled_database.execute("SELECT count(*) FROM item_tag").fetchone() == (0,)
+    links = filled_database.execute("SELECT count(*) FROM item_has_tag").fetchone()
+    assert links == (0,)
     assert filled_database.execute("SELECT name FROM tag").fetchall() == [("llm",)]
 
 

@@ -30,8 +30,8 @@ CLIP_QUERY = (
 )
 TAGS_QUERY = (
     "SELECT clip.url, tag.name FROM clip"
-    " JOIN item_tag ON item_tag.item_id = clip.item_id"
-    " JOIN tag ON tag.id = item_tag.tag_id ORDER BY clip.url, tag.name"
+    " JOIN item_has_tag ON item_has_tag.item_id = clip.item_id"
+    " JOIN tag ON tag.id = item_has_tag.tag_id ORDER BY clip.url, tag.name"
 )
 FIXTURE_TAGS = 'tags:\n  - "clippings"\n'
 OTHER_URL = (
@@ -384,7 +384,7 @@ def test_a_clip_without_other_tag_than_the_template_has_none(data_dir):
     run_import(data_dir)
 
     assert fetch_rows(data_dir, "SELECT count(*) FROM tag") == [(0,)]
-    assert fetch_rows(data_dir, "SELECT count(*) FROM item_tag") == [(0,)]
+    assert fetch_rows(data_dir, "SELECT count(*) FROM item_has_tag") == [(0,)]
 
 
 def test_a_clip_copied_again_with_its_tags_in_another_form_is_left_out(data_dir):
@@ -430,8 +430,8 @@ def test_a_tag_added_or_removed_writes_the_clip_again(data_dir):
 # The columns of clip a rewrite may write.
 CLIP_COLUMNS = ("title", "body", "saved_at", "published_at", "revised_at")
 LINKS_QUERY = (
-    "SELECT tag.name, item_tag.rowid FROM item_tag"
-    " JOIN tag ON tag.id = item_tag.tag_id ORDER BY tag.name"
+    "SELECT tag.name, item_has_tag.rowid FROM item_has_tag"
+    " JOIN tag ON tag.id = item_has_tag.tag_id ORDER BY tag.name"
 )
 
 

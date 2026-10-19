@@ -331,10 +331,10 @@ CREATE TABLE tag (
 -- The tags of an item: many to many, an item carries each tag once. The links of an item go
 -- with it, as its highlights. A tag whose last link a rewrite removes is removed with it
 -- (clip_writer.py); a tag left without link by the removal of an item, by the purge (#83).
-CREATE TABLE item_tag (
+CREATE TABLE item_has_tag (
     item_id INTEGER NOT NULL REFERENCES item (id) ON DELETE CASCADE,
     tag_id  INTEGER NOT NULL REFERENCES tag (id),
     PRIMARY KEY (item_id, tag_id)
 ) STRICT;
 
-CREATE INDEX item_tag_tag_id ON item_tag (tag_id);
+CREATE INDEX item_has_tag_tag_id ON item_has_tag (tag_id);
