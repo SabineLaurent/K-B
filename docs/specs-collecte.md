@@ -485,12 +485,16 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   différence des téléchargements (règles communes) : un disque plein arrête la copie, et le
   dossier temporaire est supprimé.
 - **Brut** : le résultat de la requête, en JSON, dans
-  `raw/selected_library/zotero/<AAAA-MM-JJTHHMMSSZ>.json` (journal ADR, 2026-10-09), écrit
-  seulement si `zotero.sqlite` ou son `-wal` a été modifié depuis la dernière collecte. Les
-  valeurs sont celles de Zotero, sans conversion (dates `AAAA-MM-JJ HH:MM:SS` en UTC). Zotero
-  ouvert écrit dans son `-wal` sans que la bibliothèque change : un extrait peut être identique
-  au précédent. `kb import` lit ces extraits vers `zotero_entry` et `highlight` (#138 ; voir
-  [stockage.md](stockage.md) et la règle du catalogue d'état, étape 4).
+  `raw/selected_library/zotero/<AAAA-MM-JJTHHMMSSZ>.json` (journal ADR, 2026-10-09). La
+  bibliothèque est extraite à chaque collecte ; l'extrait est écrit seulement s'il diffère, octet
+  pour octet, du dernier extrait de ce dossier (#139). La date des fichiers de Zotero n'est pas
+  comparée : Zotero ouvert écrit dans son `-wal` sans que la bibliothèque change, et un autre
+  dossier Zotero peut avoir des fichiers plus anciens que la dernière collecte. Un extrait dont
+  tous les documents sont invalides fait échouer la source (`all_items_invalid`, règle 1 de
+  `conventions.md`) et n'est pas écrit. Les valeurs sont celles de Zotero, sans conversion
+  (dates `AAAA-MM-JJ HH:MM:SS` en UTC). `kb import` lit ces extraits vers `zotero_entry` et
+  `highlight` (#138 ; voir [stockage.md](stockage.md) et la règle du catalogue d'état, étape 4),
+  puis ne garde que le dernier extrait importé (journal ADR, 2026-10-19).
 - **En cas de panne :** la source échoue par un état nommé, n'écrit rien, et sa date de dernière
   collecte reste ; la collecte suivante recommence. Les états :
   `ZoteroCopyInconsistentError` (le contrôle d'intégrité refuse la copie),
