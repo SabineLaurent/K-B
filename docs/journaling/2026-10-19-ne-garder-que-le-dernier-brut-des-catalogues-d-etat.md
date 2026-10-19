@@ -246,8 +246,8 @@ Sabine du 2026-10-15.
 - La conservation des « vieilles veilles » dans le *cleansed* : question ouverte (journal ADR).
 
 Hors de cette note : les commits et fichiers listés au lancement de la note avant 432cfea
-appartiennent à des PR déjà fusionnées sur `main` (#250 à #257) ; cette branche a sept commits
-(432cfea à 2b9fc3d, ce dernier étant cette note), tous couverts ci-dessus. `core/config.py` (une ligne de commentaire) et
+appartiennent à des PR déjà fusionnées sur `main` (#250 à #257) ; les commits de cette branche
+commencent à 432cfea (`git log origin/main..HEAD`), et tous sont couverts ci-dessus. `core/config.py` (une ligne de commentaire) et
 `tests/architecture/module_imports.py` (le module de purge déclaré dans le pipeline) sont couverts
 par les sections 2 et 3.
 
