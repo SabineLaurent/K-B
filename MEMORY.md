@@ -105,3 +105,6 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 - Tout texte publié sur GitHub (description et commentaire de PR, commentaire d'issue) finit par
   une ligne vide, `--`, puis `*Written by Claude Code*`. Un message de commit ne porte ni
   `Co-Authored-By` ni `Claude-Session:` ; une PR ne porte pas de lien de session.
+- **Labels d'une issue** (consigne de Sabine, 2026-10-19) : une session K-B pose `size:*` et le
+  label de périmètre, jamais un label de livrable (`E1`, `hors E1`…) : « si kb n'a pas
+  connaissance du livrable, qu'elle ne mette pas de label livrable ».

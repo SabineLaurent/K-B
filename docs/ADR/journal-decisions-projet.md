@@ -3110,6 +3110,19 @@ time-knight (délégation de Sabine du 2026-10-15).
   après le 25/10 ; la provenance d'un tag (Sabine ou LLM) n'est pas modélisée : Sabine préfère
   « une migration quand on en sera au llm ». Décisions de Sabine du 2026-10-19. — PR de #260
 
+### Base : nom de la liaison des tags
+
+- **La table de liaison d'un item à ses tags s'appelle `item_has_tag`, son index
+  `item_has_tag_tag_id` ; la base du POC est recréée, sans migration.** Décision de Sabine.
+  Pourquoi, celui de Sabine : « je préfère garder item_has_tag en mld et mpd ». **Révise** le
+  nom seul de « Collecte : tags des `.md` importés » (même jour, `item_tag`) ; l'entrée et la
+  note pédagogique du jour gardent l'ancien nom, la note reçoit un addendum. Option écartée :
+  garder `item_tag`, le nom livré par #260. Sans migration, comme pour `clip.revised_at`
+  (#259) : aucune n'existe dans le dépôt avant Alembic (08/11). Coût accepté par Sabine : la
+  base recréée perd ce que le brut ne garde plus (les `withdrawn_at`, les `revised_at` passés
+  et les lignes retirées, limite de « Brut : catalogues d'état et conservation »). Limite : le
+  MLD du dépôt n'a pas encore les tables de tags (#211). — PR de #263
+
 ## Décisions encore ouvertes
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de

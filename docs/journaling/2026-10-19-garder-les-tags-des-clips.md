@@ -287,3 +287,5 @@ lu : s'il manque, le dépaquetage lève une erreur et l'import s'arrête (échou
 | PostgreSQL, « TOAST » (une valeur hors ligne d'une colonne non modifiée est gardée) | https://www.postgresql.org/docs/8.1/storage-toast.html | 2026-10-19, par recherche web |
 | SQLite, check-in « overwrite an existing btree cell … if the old and new cell are the same size » | https://www.sqlite.org/src/info/5887d8beb502ad62 | 2026-10-19, par recherche web |
 | SQLite Forum, « Slow update table with large BLOB » (ligne réécrite dans d'autres cas) | https://sqlite.org/forum/forumpost/8019aa22f6?t=h | 2026-10-19, par recherche web |
+
+**Addendum du 2026-10-19** : la table `item_tag` s'appelle désormais `item_has_tag`, et son index `item_has_tag_tag_id`, comme au MLD et au MPD de Sabine (#263) ; le texte ci-dessus garde l'ancien nom.
