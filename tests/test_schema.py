@@ -16,6 +16,7 @@ from k_b.items import (
     MAX_COUNT_BY_KIND,
     MAX_INT64,
     MAX_LENGTH_BY_KIND,
+    TAG_MAX_LENGTH,
     TREND_REPOSITORY_NAME_MAX_LENGTH,
     CveId,
     Highlight,
@@ -23,6 +24,7 @@ from k_b.items import (
     ItemKind,
     NonEmptyText,
     RepositoryName,
+    Tag,
     Text,
     TrendRow,
     UtcDatetime,
@@ -42,6 +44,8 @@ EXPECTED_TABLES = {
     "newsletter_article",
     "zotero_entry",
     "clip",
+    "tag",
+    "item_tag",
 }
 
 PAPER_COLUMNS = (
@@ -517,7 +521,7 @@ def test_each_maximum_length_of_the_items_is_the_check_of_its_column():
     } | {
         ("highlight", field): maximum
         for field, maximum in HIGHLIGHT_MAX_LENGTH_BY_FIELD.items()
-    }
+    } | {("tag", "name"): TAG_MAX_LENGTH}
 
 
 def test_each_maximum_count_of_the_items_is_the_check_of_its_column():
@@ -652,6 +656,7 @@ VALID_ROW_BY_TABLE = {
         "saved_at": "2026-09-17T00:00:00Z",
         "published_at": "2026-06-08T00:00:00Z",
     },
+    "tag": {"name": "llm"},
 }
 
 
@@ -763,6 +768,8 @@ REFUSED_VALUES = [
     ("clip", "length(saved_at) = 20", {"saved_at": "999-09-17T00:00:00Z"}),
     ("clip", "length(published_at) = 20", {"published_at": "2026-06-08 00:00:00Z"}),
     ("clip", "length(revised_at) = 20", {"revised_at": "2026-10-18 09:30:00Z"}),
+    ("tag", "length(name) > 0", {"name": ""}),
+    ("tag", "length(name) <= 100", {"name": "x" * 101}),
 ]
 
 
@@ -1195,3 +1202,52 @@ def test_a_zotero_key_the_item_refuses_is_refused_by_the_base(
 
 def test_a_highlight_without_text_is_accepted(filled_database):
     insert_row(filled_database, "highlight", text=None)
+
+
+def insert_tag_link(database, item_id=CLIP_ITEM_ID, tag_id=1):
+    database.execute(
+        "INSERT INTO item_tag (item_id, tag_id) VALUES (?, ?)", (item_id, tag_id)
+    )
+
+
+def test_a_tag_is_one_row_and_an_item_carries_it_once(filled_database):
+    insert_row(filled_database, "tag", id=1)
+    insert_tag_link(filled_database)
+
+    with pytest.raises(
+        sqlite3.IntegrityError, match="UNIQUE constraint failed: tag.name"
+    ):
+        insert_row(filled_database, "tag", id=2)
+    with pytest.raises(
+        sqlite3.IntegrityError, match="UNIQUE constraint failed: item_tag"
+    ):
+        insert_tag_link(filled_database)
+
+
+@pytest.mark.parametrize(
+    ("item_id", "tag_id"), [(99, 1), (CLIP_ITEM_ID, 99)], ids=["item", "tag"]
+)
+def test_a_link_to_an_unknown_item_or_tag_is_refused(filled_database, item_id, tag_id):
+    insert_row(filled_database, "tag", id=1)
+
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY constraint failed"):
+        insert_tag_link(filled_database, item_id, tag_id)
+
+
+def test_the_links_of_an_item_removed_go_with_it_and_its_tags_stay(filled_database):
+    """ON DELETE CASCADE, as highlight: the purge of an item removes its links (#83)."""
+    insert_row(filled_database, "tag", id=1)
+    insert_tag_link(filled_database, item_id=PAPER_ITEM_ID)
+
+    filled_database.execute("DELETE FROM item WHERE id = ?", (PAPER_ITEM_ID,))
+
+    assert filled_database.execute("SELECT count(*) FROM item_tag").fetchone() == (0,)
+    assert filled_database.execute("SELECT name FROM tag").fetchall() == [("llm",)]
+
+
+@pytest.mark.parametrize("name", ["", "\0llm"], ids=["empty", "nul"])
+def test_a_tag_the_base_refuses_is_refused_by_its_type(filled_database, name):
+    with pytest.raises(ValidationError):
+        validate(Tag, name)
+    with pytest.raises(sqlite3.IntegrityError, match="length\\(name\\) > 0"):
+        insert_row(filled_database, "tag", name=name)

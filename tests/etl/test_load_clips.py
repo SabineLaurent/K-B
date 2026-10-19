@@ -27,6 +27,15 @@ CLIP_QUERY = (
     " FROM clip JOIN item ON item.id = clip.item_id"
     " JOIN raw_data ON raw_data.id = item.raw_data_id ORDER BY url"
 )
+TAGS_QUERY = (
+    "SELECT clip.url, tag.name FROM clip"
+    " JOIN item_tag ON item_tag.item_id = clip.item_id"
+    " JOIN tag ON tag.id = item_tag.tag_id ORDER BY clip.url, tag.name"
+)
+FIXTURE_TAGS = 'tags:\n  - "clippings"\n'
+OTHER_URL = (
+    "https://owasp.github.io/www-project-agentic-skills-top-10/videos/?video=ast01"
+)
 
 
 @pytest.fixture
@@ -325,8 +334,72 @@ def test_an_unreadable_clip_is_rejected_at_each_import_and_not_registered(data_d
     assert fetch_rows(data_dir, "SELECT count(*) FROM raw_data") == [(0,)]
 
 
-def test_a_rebuilt_base_is_the_same(data_dir, tmp_path):
+def with_tags(text, *tags):
+    """The clip with tags in place of the tag of the fixture."""
+    assert FIXTURE_TAGS in text
+    listed = "".join(f'  - "{tag}"\n' for tag in tags)
+    return text.replace(FIXTURE_TAGS, f"tags:\n{listed}")
+
+
+def test_the_tags_of_a_clip_are_in_the_base_normalized(data_dir):
+    write_clip(
+        data_dir,
+        FIRST,
+        "a1",
+        with_tags(fixture_text(ARTICLE), "LLM", " llm ", "#llm", "Agents", "clippings"),
+    )
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, TAGS_QUERY) == [
+        (ARTICLE_URL, "agents"),
+        (ARTICLE_URL, "llm"),
+    ]
+    assert fetch_rows(data_dir, "SELECT name FROM tag ORDER BY name") == [
+        ("agents",),
+        ("llm",),
+    ]
+
+
+def test_a_tag_carried_by_two_clips_is_one_row(data_dir):
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
+    write_clip(
+        data_dir, FIRST, "b2", with_tags(fixture_text(PAGE_WITHOUT_AUTHOR), "LLM")
+    )
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, "SELECT count(*) FROM tag") == [(1,)]
+    assert fetch_rows(data_dir, TAGS_QUERY) == [
+        (ARTICLE_URL, "llm"),
+        (OTHER_URL, "llm"),
+    ]
+
+
+def test_a_clip_without_other_tag_than_the_template_has_none(data_dir):
     write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, "SELECT count(*) FROM tag") == [(0,)]
+    assert fetch_rows(data_dir, "SELECT count(*) FROM item_tag") == [(0,)]
+
+
+def test_a_clip_copied_again_with_its_tags_in_another_form_is_left_out(data_dir):
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm", "agents"))
+    run_import(data_dir)
+    write_clip(
+        data_dir, SECOND, "a1", with_tags(fixture_text(ARTICLE), "#Agents", "LLM")
+    )
+
+    run_import(data_dir)
+
+    assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(None,)]
+    assert [discard["rule"] for discard in read_discards(data_dir)] == ["already_seen"]
+
+
+def test_a_rebuilt_base_is_the_same(data_dir, tmp_path):
+    write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
     write_clip(data_dir, SECOND, "a1", fixture_text(ARTICLE).replace("do not", "never"))
     write_clip(data_dir, SECOND, "b2", fixture_text(PAGE_WITHOUT_AUTHOR))
     run_import(data_dir)

@@ -33,6 +33,13 @@ JOIN raw_data ON raw_data.id = item.raw_data_id
 WHERE clip.url = :url
 """
 
+# A tag shared by every item that carries it: created by the first.
+INSERT_TAG = "INSERT INTO tag (name) VALUES (:name) ON CONFLICT (name) DO NOTHING"
+
+INSERT_ITEM_TAG = """
+INSERT INTO item_tag (item_id, tag_id) SELECT :item_id, id FROM tag WHERE name = :name
+"""
+
 UPDATE_CLIP = """
 UPDATE clip
 SET title = :title, body = :body, saved_at = :saved_at, published_at = :published_at,
@@ -70,6 +77,7 @@ def write(
     connection.execute(
         INSERT_CLIP, {"item_id": row[0], "url": item.url} | content._asdict()
     )
+    write_tags(connection, row[0], item.tags)
     return None
 
 
@@ -113,3 +121,12 @@ def write_known_clip(
     )
     shared_rows.point_item_at_raw_data(connection, known_item_id, raw_data_id)
     return None
+
+
+def write_tags(
+    connection: sqlite3.Connection, item_id: int, tags: tuple[str, ...]
+) -> None:
+    """Link the item to each of its tags, created if new, in the order of the item."""
+    for tag in tags:
+        connection.execute(INSERT_TAG, {"name": tag})
+        connection.execute(INSERT_ITEM_TAG, {"item_id": item_id, "name": tag})

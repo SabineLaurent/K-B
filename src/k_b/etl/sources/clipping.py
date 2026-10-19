@@ -19,7 +19,13 @@ from pathlib import Path
 from typing import Annotated, Any, NamedTuple
 
 import yaml
-from pydantic import BaseModel, BeforeValidator, ConfigDict, ValidationError
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    ValidationError,
+)
 
 from k_b.core.config import CLIP_CHANGE_MARGIN
 from k_b.core.quoting import quote_value, without_values
@@ -33,6 +39,7 @@ from k_b.items import (
     SourceCode,
     WebUrl,
     at_midnight_utc,
+    normalize_tag,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,6 +64,9 @@ FRONTMATTER_FENCE = "---"
 DAY = re.compile(r"[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}")
 # What YAML writes for an absent value; BaseLoader reads all three as text.
 ABSENT_VALUES = ("", "null", "~")
+# The tag the default template of Web Clipper puts on every clip: the kind and the source of an
+# item say it is a clip already (decision of Sabine of 2026-10-19).
+TEMPLATE_TAG = "clippings"
 
 
 class ClipTooLargeError(Exception):
@@ -321,9 +331,27 @@ def check_day_form(value: object) -> object:
 ClipDay = Annotated[date, BeforeValidator(check_day_form)]
 
 
+def read_tags(value: object) -> object:
+    """The tags as a list: a text alone is one tag, an absent value none, an absent element is
+    left out. Any other value is left to pydantic, which refuses it."""
+    if read_absent(value) is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [element for element in value if read_absent(element) is not None]
+    return value
+
+
+def normalize_tags(tags: tuple[str, ...]) -> tuple[str, ...]:
+    """Each tag normalized (items.py), once, in order; the empty ones and the tag of the template
+    left out. Item checks what is kept: its length, its characters, its form."""
+    return tuple(sorted({normalize_tag(tag) for tag in tags} - {"", TEMPLATE_TAG}))
+
+
 class ClipFrontmatter(BaseModel):
     """The properties of a clip read. Not read, to keep out of the base: author (a personal
-    data, without use in the base), description and tags (docs/registre-traitements.md)."""
+    data, without use in the base) and description (docs/registre-traitements.md)."""
 
     model_config = ConfigDict(frozen=True, extra="ignore", hide_input_in_errors=True)
 
@@ -331,6 +359,9 @@ class ClipFrontmatter(BaseModel):
     source: WebUrl
     created: ClipDay
     published: Annotated[ClipDay | None, BeforeValidator(read_absent)] = None
+    tags: Annotated[
+        tuple[str, ...], BeforeValidator(read_tags), AfterValidator(normalize_tags)
+    ] = ()
 
 
 def convert_clip(entry: ClipEntry, collected_at: datetime, raw_file_path: str) -> Item:
@@ -353,6 +384,7 @@ def convert_clip(entry: ClipEntry, collected_at: datetime, raw_file_path: str) -
             else None,
             saved_at=at_midnight_utc(frontmatter.created),
             summary=entry.text,
+            tags=frontmatter.tags,
             collected_at=collected_at,
             raw_file_path=raw_file_path,
         )

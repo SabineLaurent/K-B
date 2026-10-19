@@ -317,3 +317,23 @@ CREATE TABLE clip (
             AND substr(revised_at, 20, 1) = 'Z'),
     FOREIGN KEY (item_id, kind) REFERENCES item (id, kind)
 ) STRICT;
+
+-- A tag of an imported .md (#260): a keyword the user chose in the vault, normalized (items.py,
+-- normalize_tag); one row per tag, shared by every item that carries it (decision of Sabine of
+-- 2026-10-19). Written in portable SQL (.claude/rules/poc.md, rule 1).
+CREATE TABLE tag (
+    id   INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE
+        CHECK (length(name) > 0)
+        CHECK (length(name) <= 100)
+) STRICT;
+
+-- The tags of an item: many to many, an item carries each tag once. The links of an item go
+-- with it, as its highlights; a tag no item carries stays.
+CREATE TABLE item_tag (
+    item_id INTEGER NOT NULL REFERENCES item (id) ON DELETE CASCADE,
+    tag_id  INTEGER NOT NULL REFERENCES tag (id),
+    PRIMARY KEY (item_id, tag_id)
+) STRICT;
+
+CREATE INDEX item_tag_tag_id ON item_tag (tag_id);

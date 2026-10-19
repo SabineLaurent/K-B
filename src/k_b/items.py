@@ -74,6 +74,9 @@ MAX_INT64 = 2**63 - 1
 # The longest name a ranking may write in trend.repository_name, held by a CHECK too. A wide
 # bound, not the one of GitHub: the longest of the collection of 2026-10-11 has 38 characters.
 TREND_REPOSITORY_NAME_MAX_LENGTH = 255
+# The longest tag, normalized, held by the CHECK of tag.name too; a test keeps both equal. A wide
+# bound, not measured: the vault is not read.
+TAG_MAX_LENGTH = 100
 
 
 def check_url_can_be_normalized(url: str) -> str:
@@ -104,6 +107,20 @@ def check_text_can_be_stored(text: str) -> str:
     if UNSTORABLE_CHARACTER.search(text):
         raise ValueError(f"text with a NUL or a lone surrogate: {len(text)} characters")
     return text
+
+
+def normalize_tag(tag: str) -> str:
+    """A tag as the base keeps it (decision of Sabine of 2026-10-19): without the spaces around
+    it, without the # Obsidian writes at its start, in lower case."""
+    return tag.strip().removeprefix("#").strip().lower()
+
+
+def check_tag_is_normalized(tag: str) -> str:
+    """Refuse a tag normalize_tag would change: two forms of one tag would be two rows of tag. A
+    tag with two # at its start keeps one once normalized, and is refused."""
+    if normalize_tag(tag) != tag:
+        raise ValueError(f"tag not normalized: {len(tag)} characters")
+    return tag
 
 
 def convert_to_utc(moment: datetime) -> datetime:
@@ -163,6 +180,13 @@ NewsletterEdition = Annotated[
 ]
 ArxivId = Annotated[str, StringConstraints(pattern=f"^{ARXIV_ID}$")]
 ZoteroKey = Annotated[str, StringConstraints(pattern=f"^{ZOTERO_KEY}$")]
+# A tag of an imported .md, in its normalized form.
+Tag = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=TAG_MAX_LENGTH),
+    AfterValidator(check_tag_is_normalized),
+    CAN_BE_STORED,
+]
 # A date with its time zone, held in UTC.
 UtcDatetime = Annotated[AwareDatetime, AfterValidator(convert_to_utc)]
 # An integer SQLite holds: a larger one fails to be written.
@@ -209,6 +233,7 @@ FIELDS_OF_ONE_KIND = {
     "advisory": ("package_names",),
     "newsletter_article": ("edition", "rank"),
     "zotero_entry": ("item_type", "arxiv_id", "highlights"),
+    "clip": ("tags",),
 }
 KINDS_WITH_CVE = ("vulnerability", "advisory")
 # Zotero and Web Clipper keep the URL a page was saved from.
@@ -361,6 +386,8 @@ class Item(BaseModel):
     item_type: NonEmptyText | None = None
     arxiv_id: ArxivId | None = None
     highlights: tuple[Highlight, ...] = ()
+    # Clip only: its tags, normalized, each once.
+    tags: tuple[Tag, ...] = ()
 
     @model_validator(mode="after")
     def check_the_fields_of_its_kind(self) -> "Item":
@@ -371,6 +398,7 @@ class Item(BaseModel):
         check_lengths(self)
         check_url_scheme(self)
         check_source_item_id(self)
+        check_tags_once(self)
         return self
 
 
@@ -432,6 +460,14 @@ def check_source_item_id(item: Item) -> None:
     if item.kind == "release" and int(item.source_item_id) > MAX_INT64:
         raise ValueError(
             f"source_item_id of a release over 64 bits: {len(item.source_item_id)} digits"
+        )
+
+
+def check_tags_once(item: Item) -> None:
+    """Refuse a tag given twice: the base holds one link of an item to a tag."""
+    if len(set(item.tags)) != len(item.tags):
+        raise ValueError(
+            f"tags not each once: {len(item.tags)} tags, {len(set(item.tags))} distinct"
         )
 
 
