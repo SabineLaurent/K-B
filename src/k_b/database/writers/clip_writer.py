@@ -38,9 +38,9 @@ INSERT_TAG = "INSERT INTO tag (name) VALUES (:name) ON CONFLICT (name) DO NOTHIN
 
 SELECT_TAG_ID = "SELECT id FROM tag WHERE name = ?"
 
-INSERT_ITEM_HAS_TAG = (
-    "INSERT INTO item_has_tag (item_id, tag_id) VALUES (:item_id, :tag_id)"
-)
+INSERT_ITEM_HAS_TAG = """
+INSERT INTO item_has_tag (item_id, tag_id) VALUES (:item_id, :tag_id)
+"""
 
 SELECT_ITEM_TAGS = """
 SELECT tag.name, tag.id FROM item_has_tag JOIN tag ON tag.id = item_has_tag.tag_id
@@ -50,9 +50,9 @@ WHERE item_has_tag.item_id = ?
 # A link of the version before to a tag the new version no longer carries: a link is a value of
 # a version, as a column, not an item. One of the two exceptions to removing by the purge only
 # (conventions.md, rule 5; decision of Sabine of 2026-10-19).
-DELETE_ITEM_HAS_TAG = (
-    "DELETE FROM item_has_tag WHERE item_id = :item_id AND tag_id = :tag_id"
-)
+DELETE_ITEM_HAS_TAG = """
+DELETE FROM item_has_tag WHERE item_id = :item_id AND tag_id = :tag_id
+"""
 
 # A tag no item carries any more, once its last link removed: a tag removed no longer exists in
 # the base. The other exception to removing by the purge only (conventions.md, rule 5; decision

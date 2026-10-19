@@ -40,17 +40,19 @@ relevé et renommé à part.
 ### 2. Les constantes SQL de l'écrivain des clips
 
 ```python
-INSERT_ITEM_HAS_TAG = (
-    "INSERT INTO item_has_tag (item_id, tag_id) VALUES (:item_id, :tag_id)"
-)
+INSERT_ITEM_HAS_TAG = """
+INSERT INTO item_has_tag (item_id, tag_id) VALUES (:item_id, :tag_id)
+"""
 ```
 (`src/k_b/database/writers/clip_writer.py:41-43`)
 
 Les deux constantes qui nomment la table (`INSERT_ITEM_TAG`, `DELETE_ITEM_TAG`) prennent son
 nouveau nom ; `SELECT_ITEM_TAGS` garde le sien, parce qu'il dit ce qu'il rend (les tags d'un
-item), pas la table qu'il lit. Le passage à la ligne entre parenthèses vient de `ruff format` :
-la ligne dépassait la longueur permise. Dans `DELETE_TAG_WITHOUT_LINK`, la condition
-`NOT EXISTS` passe à la ligne pour la même raison (`clip_writer.py:61-63`).
+item), pas la table qu'il lit. Avec le nom plus long, la constante sur une ligne dépassait la
+longueur permise par `ruff format` : elle passe en triple guillemets, comme les autres requêtes
+du module sur plusieurs lignes (`SELECT_ITEM_TAGS`), sans changer son SQL (constat 4 de la
+revue, décidé par time-knight). Dans `DELETE_TAG_WITHOUT_LINK`, la condition `NOT EXISTS` passe
+à la ligne pour la même raison (`clip_writer.py:61-63`).
 
 ### 3. Les tests d'abord
 
