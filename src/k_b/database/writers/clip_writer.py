@@ -44,17 +44,17 @@ SELECT_ITEM_TAGS = """
 SELECT tag.name FROM item_tag JOIN tag ON tag.id = item_tag.tag_id WHERE item_tag.item_id = ?
 """
 
-# The links of the version before, removed when a clip is written again: a link is a value of a
-# version, as a column, not an item. The one exception to removing by the purge only
+# A link of the version before to a tag the new version no longer carries: a link is a value of
+# a version, as a column, not an item. The one exception to removing by the purge only
 # (conventions.md, rule 5; decision of Sabine of 2026-10-19).
-DELETE_ITEM_TAGS = "DELETE FROM item_tag WHERE item_id = ?"
-
-UPDATE_CLIP = """
-UPDATE clip
-SET title = :title, body = :body, saved_at = :saved_at, published_at = :published_at,
-    revised_at = :revised_at
-WHERE item_id = :item_id
+DELETE_ITEM_TAG = """
+DELETE FROM item_tag
+WHERE item_id = :item_id AND tag_id = (SELECT id FROM tag WHERE name = :name)
 """
+
+# A patch, not a put (decision of Sabine of 2026-10-19): the SET names only the columns that
+# changed, taken from the fields of ClipContent, never from a value read.
+UPDATE_CLIP = "UPDATE clip SET {assignments} WHERE item_id = :item_id"
 
 
 class ClipContent(NamedTuple):
@@ -137,14 +137,47 @@ def write_known_clip(
         return Discard("already_seen", item, known_collected_at)
     if is_file_before:
         return Discard("no_newer_version", item, known_collected_at)
-    connection.execute(
-        UPDATE_CLIP,
-        content.to_columns() | {"item_id": known_item_id, "revised_at": collected_at},
+    write_changed_columns(
+        connection, known_item_id, known_content, content, collected_at
     )
-    connection.execute(DELETE_ITEM_TAGS, (known_item_id,))
-    write_tags(connection, known_item_id, item.tags)
+    write_changed_tags(connection, known_item_id, known_content.tags, content.tags)
     shared_rows.point_item_at_raw_data(connection, known_item_id, raw_data_id)
     return None
+
+
+def write_changed_columns(
+    connection: sqlite3.Connection,
+    item_id: int,
+    known: ClipContent,
+    content: ClipContent,
+    revised_at: str | None,
+) -> None:
+    """Write the columns of clip that changed, and revised_at: it is dated if a tag alone
+    changed too."""
+    known_columns = known.to_columns()
+    changed = {
+        column: value
+        for column, value in content.to_columns().items()
+        if value != known_columns[column]
+    }
+    assignments = [f"{column} = :{column}" for column in [*changed, "revised_at"]]
+    connection.execute(
+        # The names are the keys of ClipContent.to_columns, written in this module.
+        UPDATE_CLIP.format(assignments=", ".join(assignments)),
+        changed | {"item_id": item_id, "revised_at": revised_at},
+    )
+
+
+def write_changed_tags(
+    connection: sqlite3.Connection,
+    item_id: int,
+    known: frozenset[str],
+    tags: frozenset[str],
+) -> None:
+    """Remove the links to the tags removed, and write those to the tags added, in order."""
+    for removed in sorted(known - tags):
+        connection.execute(DELETE_ITEM_TAG, {"item_id": item_id, "name": removed})
+    write_tags(connection, item_id, tuple(sorted(tags - known)))
 
 
 def read_tags(connection: sqlite3.Connection, item_id: int) -> frozenset[str]:
