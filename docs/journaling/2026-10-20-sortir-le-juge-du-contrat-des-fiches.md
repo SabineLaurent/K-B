@@ -181,8 +181,8 @@ le critère : il décrit une mesure faite avec le juge.
 ## Ce qui reste
 
 - Le juge codé (#223) et son étalonnage (#224) : hors du squelette, « on voit plus tard ». Leurs
-  corps d'issue renvoient encore à la section « Juge » de `main`, retirée ici : signalé dans la
-  PR.
+  corps d'issue renvoient encore à la section « Juge » de `main`, retirée ici : un commentaire
+  daté sur chacune (avec ton accord du 20/10) dit où lire le contrat.
 - La spec décrit encore des étapes non codées (fidélité #207, contrôle 6 #206, route et métriques
   #156) : c'est le contrat qui reste, hors de #277.
 - `.claude/rules/poc.md` parle encore du « POC en conteneurs » : à modifier par toi (`.claude/`).
