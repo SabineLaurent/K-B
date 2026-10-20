@@ -71,8 +71,21 @@ Un item n'a qu'une valeur de `kind`, et une ligne `release` exige `kind = 'relea
 (exclusion). Il n'y a pas de **T** (totalité) : un item `paper` ou `vulnerability` n'a pas de sous-entité,
 il passe par les tables de référence (sous-section 3).
 
-Au MCD, `kind` n'est pas dessiné, parce que le type se déduit de la structure : la sous-entité, ou bien
-DÉCRIRE ou RECENSER. `kind` est la façon dont le MPD matérialise la spécialisation.
+Au MCD, `kind` n'est pas une propriété d'Item, parce que le type se déduit de la structure : la
+sous-entité, ou bien DÉCRIRE ou RECENSER. Il est noté sur la spécialisation : « discriminant : type
+d'item ». `kind` est la façon dont le MPD matérialise ce discriminant.
+
+**Identifiant ou discriminant** (décision de Sabine du 20/10). Dans sa formation DWWM, Sabine a appris
+à appeler « discriminant » la propriété soulignée qui identifie chaque occurrence d'une entité (« code
+question »). Le MCD de K-B l'appelle **identifiant**, le mot de Merise : « Identifiants : le mécanisme
+d'héritage s'applique aussi à l'identifiant du sur-type qui est aussi l'identifiant du sous-type »
+(Espinasse, voir les sources). Le MCD de K-B a une spécialisation, et dans ce contexte « discriminant »
+désigne autre chose : l'attribut qui dit à quelle sous-entité appartient une occurrence. Un cours de
+Merise 2 le décrit comme « un attribut permettant de différencier les occurrences » quand la
+spécialisation tient dans une seule relation (Nomad Education). Le nom « discriminator column » vient
+du monde objet-relationnel (JPA, Oracle). Garder « discriminant » pour l'identifiant aurait donné deux
+sens au même mot sur un seul schéma. À l'oral : « l'identifiant, ce que ma formation appelait
+discriminant ».
 
 Ce que la base ne tient pas : qu'un item de type `release` ait vraiment sa ligne `release`. C'est le code
 qui le tient : un seul écrivain par type écrit les deux ensemble (`src/k_b/database/writing.py:58-66`,
@@ -170,7 +183,8 @@ liste) ; la **2FN** porte sur la dépendance d'une colonne envers la clé.
 | Une entité par liste, jamais partagée | un nom n'identifie pas une personne ; relier deux publications par un auteur croiserait des données par un identifiant personnel (`.claude/rules/conformite.md`, RGPD) | **Auteur partagé** entre publications ; **Paquet partagé** : l'écosystème d'une alerte n'est pas une colonne d'`advisory` (`schema.sql:198-219`), et un nom de paquet seul n'identifie pas un paquet |
 | Classement au MCD | 2FN (sous-section 5) ; décision de Sabine | une simple ligne de légende (l'expert peut relever la 2FN) |
 | « code <entité> » souligné pour toutes les entités, avec un `UNIQUE (publication_id, rank)` au MLD | convention de Sabine (son dossier DWWM), une seule règle ; décision de time-knight | l'identification relative (clé composée `(publication_id, rank)`), que la convention n'utilise pas ; constat 6 de la revue, gardé tel quel |
-| `kind` absent du MCD | il se déduit de la spécialisation et de DÉCRIRE ou RECENSER | le garder (redondant) ; une spécialisation XT à 7 sous-entités, dont deux sans propriété |
+| `kind` n'est pas une propriété d'Item ; il est noté « discriminant : type d'item » sur la spécialisation | il se déduit de la spécialisation et de DÉCRIRE ou RECENSER ; décision de Sabine pour la mention | le garder comme propriété (redondant) ; une spécialisation XT à 7 sous-entités, dont deux sans propriété |
+| « Identifiant » pour la propriété soulignée | le mot de Merise ; « discriminant » est réservé aux sous-types (décision de Sabine du 20/10, constat 9) | « Discriminant », le mot de la formation DWWM : un même mot aurait eu deux sens sur le schéma |
 | Surlignage sur Entrée Zotero, Étiquette sur Item | une règle : le commentaire de `schema.sql` fait foi (l. 78, 331), la clé étrangère à défaut | Surlignage sur Item (fidèle à la clé étrangère, mais dirait qu'une version publiée peut avoir un surlignage) |
 | Noms français au MCD (Étiquette, Clip de page web, Version publiée), noms de `schema.sql` au MLD | conventions de Sabine ; la correspondance se lit d'un modèle à l'autre | un mot anglais entre parenthèses au MCD |
 | `tag_name` devient « nom de version », `name` devient « titre » | évite un conflit avec l'entité Étiquette et deux « nom » dans une même entité | « balise Git » (une balise est HTML en français) |
@@ -185,7 +199,7 @@ liste) ; la **2FN** porte sur la dépendance d'une colonne envers la clé.
 | Boucle `grep -c` sur chaque table et chaque nom de colonne de `schema.sql` dans le MLD : `missing=0` | la vérification par commande que demande la mission |
 | Contrôle géométrique (scratchpad) : 0 chevauchement, 0 trait à travers une forme, 0 croisement, 0 segment superposé, sur les deux modèles | aucune flèche ambiguë ; ce contrôle a été renforcé après la revue, qui avait trouvé 4 superpositions qu'il ne voyait pas |
 | Calcul des 15 positions sujet / complément sur les coordonnées du `.drawio` | la table de `positions-mcd.md` dit vrai |
-| `/code-review high` : 10 constats, triés par time-knight ; 1 à 8 corrigés (sauf 6, gardé, et 9, posé à Sabine) | la revue a eu lieu et ses suites sont tracées dans la PR |
+| `/code-review high` : 10 constats, triés par time-knight ; 1 à 9 corrigés, sauf le 6 (gardé) ; le 9 tranché par Sabine | la revue a eu lieu et ses suites sont tracées dans la PR |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -216,9 +230,10 @@ liste) ; la **2FN** porte sur la dépendance d'une colonne envers la clé.
   « l. » restent à voir dans draw.io. Sabine exporte l'image, et c'est à ce moment que cela se vérifie.
 - **Les scripts de génération et de vérification ne sont pas dans le dépôt** (scratchpad de la session) :
   un tiers ne peut pas relancer le contrôle géométrique. Le contrôle `grep -c` est, lui, rejouable.
-- **Le mot « discriminant »** : la convention de Sabine l'emploie pour l'identifiant souligné, alors qu'en
-  Merise il désigne plutôt ce qui distingue les sous-entités. La question est posée à Sabine (constat 9) ;
-  le MCD garde « Discriminant » d'ici là.
+- **Le sens de « discriminant » pour les sous-types** : aucune des sources lues n'est un cours Merise en
+  français qui emploie le mot lui-même. Nomad Education décrit l'attribut sans le nommer, et le mot vient
+  des sources objet-relationnel (JPA). L'usage est donc établi par recoupement, pas par une source de
+  référence Merise.
 - La phrase « servies en liste par l'API » est vérifiée dans `reading.py:406, 432`, mais pas jusqu'aux
   routes de l'API.
 
@@ -238,3 +253,17 @@ liste) ; la **2FN** porte sur la dépendance d'une colonne envers la clé.
   - la mission compte 14 tables, et `schema.sql` en a 15.
 - Aucune issue pour aligner la base sur le MLD : la dénormalisation est voulue (décision de Sabine du
   20/10).
+
+## Sources (consultées le 2026-10-20)
+
+- Bernard Espinasse, « Modélisation conceptuelle des données : compléments » (MCD2 - Merise), Université
+  d'Aix-Marseille :
+  <https://pageperso.lis-lab.fr/bernard.espinasse/wp-content/uploads/2021/12/6-MCD2-Merise-4p.pdf>
+  (héritage de l'identifiant du sur-type par le sous-type).
+- Nomad Education, « Merise 2 : la spécialisation d'entités » :
+  <https://www.nomadeducation.fr/revisions/licence-informatique-1re-annee-lb2efe85/merise-2-la-specialisation-dentites-cy595931>
+  (« un attribut permettant de différencier les occurrences » ; les relations spécialisées héritent de la
+  clé primaire de la relation générique).
+- Oracle, The Java EE 6 Tutorial, « Entity Inheritance Mapping Strategies » :
+  <https://docs.oracle.com/cd/E19226-01/820-7627/bnbqr/index.html> (la colonne discriminante d'une
+  hiérarchie tenue dans une seule table).
