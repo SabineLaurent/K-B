@@ -1013,7 +1013,8 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   score de la veille par un modèle.** Décision de Sabine ; pourquoi non transmis. **Levée le
   2026-10-15** pour le classement de la veille par sujet, dans une liste fermée (« POC du 25/10 »,
   décision 5), puis **le 2026-10-16** pour la vérification des fiches par un LLM juge
-  (« Fiches de veille : le LLM juge »).
+  (« Fiches de veille : le LLM juge »). **Révisée le 2026-10-20** : le juge sort du contrat des
+  fiches (« Squelette E1 E3 : cadrage du 20/10 », décision 2).
 - **Inférence sur Azure, en API compatible OpenAI ; le modèle est choisi par rôle en
   configuration.** Décision de Sabine. Pourquoi (transmis) : le modèle reste interchangeable.
   **Révisée le 2026-10-15** : Mistral pour le POC ; Azure (Foundry) pour l'inférence reste
@@ -1125,7 +1126,8 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   seulement) ; Langfuse auto-hébergé (6 services, environ 11 CPU et 25 Gio). **Revient** sur
   « tableau de bord : plus tard » (2026-09-29) et sur le README (hors v0) : un outil de
   restitution entre en v0, étape 2. **Révisée le 2026-10-15** : la copie locale devient une
-  ligne JSON par appel, sur stdout (« POC du 25/10 », décision 8 ; règle 4 de `.claude/rules/poc.md`).
+  ligne JSON par appel, sur stdout (« POC du 25/10 », décision 8 ; règle 4 de `.claude/rules/poc.md`). **Close le 2026-10-20** : l'outil est Grafana
+  Cloud, en OpenTelemetry (« Squelette E1 E3 : cadrage du 20/10 », décision 4).
 
 ### Périmètre
 
@@ -1728,7 +1730,8 @@ qui en découlent sont dans `.claude/rules/poc.md`.
   **Révise** « Installation et interface » (2026-10-08), « Interface » (2026-10-09 et
   2026-10-14 : `kb search` vient après le 08/11), la
   décision qui garde la base et les données sur la machine (2026-10-09), et l'API IA « en local
-  […] pas d'hébergement en v0 » (2026-10-12). — PR de #198
+  […] pas d'hébergement en v0 » (2026-10-12). — PR de #198 **Révisée le 2026-10-20** : trois temps, le Mac sans conteneur
+  d'abord, puis les conteneurs en local, puis ACA (« Squelette E1 E3 : cadrage du 20/10 », décision 1).
 - **2. SQLite au 25/10, PostgreSQL au 08/11.** Décision de Sabine (15/10, 11 h 17). Pourquoi :
   PostgreSQL ne sert que la mise en ligne, car sur ACA un fichier SQLite n'a pas de disque
   fiable ; en localhost, SQLite fonctionne. La règle « aucun nouveau SQL propre à SQLite » (règle
@@ -1743,7 +1746,8 @@ qui en découlent sont dans `.claude/rules/poc.md`.
 
   **Révise** le choix du SGBD (2026-10-02, où PostgreSQL était écarté), W7 et la recherche par
   FTS5 (2026-10-09), les migrations Alembic (2026-10-10) et la recherche `LIKE` puis FTS5
-  (2026-10-14). — PR de #198
+  (2026-10-14). — PR de #198 **En attente depuis le 2026-10-20** : « La base au temps 3 »,
+  question ouverte (plus bas).
 - **3. Pas de planificateur sur le Mac : la collecte et l'import sont lancés à la main, et
   conçus comme des jobs. En ligne, un job ACA déclenché par cron, avec un lancement manuel
   possible.** Décision de Sabine (15/10, 10 h 48). Pourquoi : la collecte, lancée à la main
@@ -1799,7 +1803,8 @@ qui en découlent sont dans `.claude/rules/poc.md`.
   les coder avant le 29/10, par Entra ID ou par #160. Pourquoi : 6 à 8 h, hors de la marge du
   POC ; Entra ID dépend aussi de la souscription de l'école, où le droit d'enregistrer une
   application n'est pas vérifié. **Révise** le jeton de courte durée et le *refresh token*
-  (2026-10-12, « Wiki : API et client »). — PR de #198
+  (2026-10-12, « Wiki : API et client »). — PR de #198 **Précisée le 2026-10-20** : la clé reste
+  fixe, sa rotation est documentée ; #160 reste hors du squelette (« Squelette E1 E3 : cadrage du 20/10 », décision 3).
 - **8. Les recommandations des relectures plateforme et IA du 15/10 sont suivies ; elles
   deviennent les huit règles de `.claude/rules/poc.md`.** Décision de Sabine (15/10, 11 h 54).
   Options écartées : dans chaque issue qui porte une recommandation. **Révise** la copie locale
@@ -1912,7 +1917,8 @@ chaîne des fiches (#204 à #207, #156). Le détail est dans `docs/fiches-veille
   sont dans la fenêtre. #206 est accordé (commentaire du 15/10) : ce piège est retiré et compté,
   pas un état nommé. — PR de #203 **Complétée le 2026-10-16** : la recherche reste sans second
   modèle, et un LLM juge vérifie ensuite le sens de chaque affirmation gardée (« Fiches de veille :
-  le LLM juge », plus bas).
+  le LLM juge », plus bas). **Révisée le 2026-10-20** : le juge sort du contrat des fiches
+  (« Squelette E1 E3 : cadrage du 20/10 », décision 2).
 - **Le modèle ne reçoit pas le champ `url` d'un item, et les URL des champs de texte envoyés sont
   masquées en `[url]` avant le prompt ; les sources d'une fiche (titre, URL) sont rendues par le
   code, lues dans l'API de données.** Pourquoi : rien à recopier, donc tout `://` en sortie est
@@ -2160,7 +2166,8 @@ Recommandation de time-knight, retenue par Sabine le 16/10 (vers 11 h 45, heure 
 
 Décisions de Sabine des 15 et 16/10, relayées par time-knight. Celles du 16/10 (14 h 53, heure de
 Paris) valident le découpage de la session K-B, relu par un agent ingénieur IA indépendant. Le
-contrat vient avec #222, le code avec #223, l'étalonnage avec #224.
+contrat vient avec #222, le code avec #223, l'étalonnage avec #224. **Révisée le 2026-10-20** : le juge sort du contrat des
+fiches ; #223 et #224 restent ouvertes, hors du squelette (« Squelette E1 E3 : cadrage du 20/10 », décision 2).
 
 - **Un LLM juge vérifie chaque affirmation d'une fiche : c'est le contrôle 8, après la fidélité
   (contrôle 7). Il rend
@@ -2369,7 +2376,8 @@ Contrat écrit par #222 dans `docs/fiches-veille.md`, section « Juge ». Plan d
 relu par un agent ingénieur IA indépendant, validé par Sabine le 17/10 (relayé par time-knight) ;
 spec relue par un second agent ingénieur IA ; constats tranchés par time-knight, délégation de
 Sabine du 15/10, sauf les seuils et les altérées, tranchés par Sabine. Complète « Fiches de
-veille : le LLM juge » (2026-10-16), sans la contredire.
+veille : le LLM juge » (2026-10-16), sans la contredire. **Révisée le 2026-10-20** : le juge sort
+du contrat des fiches (« Squelette E1 E3 : cadrage du 20/10 », décision 2).
 
 - **Les seuils de l'étalonnage sont écrits en comptes sur l'échantillon fixé, comme des critères
   de passage : au plus 2 des 20 altérées gardées, aucune pour la négation ni pour le nombre changé
@@ -2486,7 +2494,8 @@ portail) ; plan de #158 relu par un agent architecte plateforme Azure, validé p
   sorties structurées strictes, sur des données fabriquées. Option écartée : déployer
   `gpt-5.6-luna` comme juge, que recommandait la session : un modèle de la même famille que le
   rédacteur. Limite assumée en phases 1 et 2 : le biais d'un juge envers ses propres textes, que
-  la spec voulait éviter, n'est pas écarté.
+  la spec voulait éviter, n'est pas écarté. **Révisée le 2026-10-20** pour le juge : il sort du
+  contrat des fiches (« Squelette E1 E3 : cadrage du 20/10 », décision 2).
 
 - **Fin des replis de fournisseur de #227 (Mistral Small 4, puis Gemini 2.5 Flash-Lite) à la
   fusion de la PR de #158.** « Modèle des fiches : Mistral Small 4 en repli temporaire » et
@@ -2655,7 +2664,8 @@ Décisions de Sabine du 2026-10-17 sur le plan de #14, relayées par time-knight
   l'emporte. La collecte reste incrémentale et copie tout clip changé : le brut garde chaque
   version. **Précisée le 2026-10-19** : jusqu'à la sauvegarde de la base, au 08/11 (« Brut :
   catalogues d'état et conservation »). **Révisée le 2026-10-19** : un clip dont le contenu a
-  changé est réécrit (« Collecte : mise à jour des `.md` importés »). — PR de #14
+  changé est réécrit (« Collecte : mise à jour des `.md` importés »). **Précisée le 2026-10-20** :
+  la sauvegarde de la base attend « La base au temps 3 » (« Squelette E1 E3 : cadrage du 20/10 », décision 6). — PR de #14
 - **Le texte complet d'un clip va dans la colonne `clip.body` de son sous-type ; ni `author`, ni
   `description`, ni `tags` n'entrent en base.** Décision de Sabine, sur recommandation. Pourquoi,
   celui de la recommandation : la spec (« titre, URL source, date, et le texte gardé ») et la
@@ -2916,7 +2926,9 @@ time-knight (délégation de Sabine du 2026-10-15).
   (*cleansed* et *curated*, « Wiki ») et le donne à toutes les données de K-B. Pourquoi : chaque
   couche a sa règle de conservation, et la purge ne touche que le *raw*. Réserve de Sabine :
   « petit bémol pour les vieilles veilles, à voir » (ci-dessous, « Décisions encore ouvertes »).
-  — PR de #139
+  — PR de #139 **Précisée le 2026-10-20** : la veille du *cleansed* est purgée au terme de sa
+  durée, 3 ans ; « immuable » veut dire jamais réécrit ; `trend` sort du *curated* « jamais purgé »
+  (« Squelette E1 E3 : cadrage du 20/10 », décision 5).
 - **Zotero et CISA KEV sont des catalogues d'état : leur brut ne garde que le dernier fichier
   importé, le nouveau remplace le précédent.** Décision de Sabine. Pourquoi, celui de Sabine :
   « L'historique de versions n'a pas d'intérêt pour un catalogue d'état qui est indexé en bdd. On
@@ -2959,7 +2971,9 @@ time-knight (délégation de Sabine du 2026-10-15).
   **révisé le même jour** : K-B ne touche jamais aux clips, `kb write-tops` écrit `veille/tops/`
   du coffre (« Coffre : organisation »). Sort la
   purge des copies de clips de #139, où l'avait mise la décision du 2026-10-17. Limite assumée :
-  jusque-là, chaque version d'un clip reste dans le brut, sans durée. — PR de #139
+  jusque-là, chaque version d'un clip reste dans le brut, sans durée. — PR de #139 **Précisée le
+  2026-10-20** : la règle reste ; « au 08/11, avec PostgreSQL et Alembic » attend « La base au
+  temps 3 » ; fréquence : à chaque sauvegarde de la base (« Squelette E1 E3 : cadrage du 20/10 », décision 6).
 
 ### Collecte : mise à jour des `.md` importés
 
@@ -2978,7 +2992,9 @@ time-knight (délégation de Sabine du 2026-10-15).
   **S'accorde avec « le *cleansed* est immuable »** (« Brut : catalogues d'état et
   conservation », ci-dessus), selon la précision de Sabine : « les clips sont immuables en
   contenu mais le tag peut changer. Mes .md manuels sont potentiellement modifiables aussi en
-  contenu. Ce que je ne fais que rarement. » Le *cleansed* n'est jamais purgé ; le texte d'un
+  contenu. Ce que je ne fais que rarement. » Le *cleansed* n'est jamais purgé (**précisée le
+  2026-10-20** : sauf la veille, purgée à 3 ans ; « Squelette E1 E3 : cadrage du 20/10 »,
+  décision 5) ; le texte d'un
   clip est immuable par usage, Sabine ne le modifie pas ; ses tags peuvent changer ; un `.md`
   manuel peut changer, rarement. Un texte de clip changé quand même est pris par la même règle,
   sans seconde règle. **Révise** « Collecte : clips (suite) » du 2026-10-17 (la première version
@@ -3253,7 +3269,111 @@ time-knight (délégation de Sabine du 2026-10-15).
   le suit serait encore suivie ; seul un processus qui a déjà le compte de l'utilisatrice peut
   exploiter cette course, et le contenu des fiches est public. — PR de #265
 
+## 2026-10-20
+
+### Squelette E1 E3 : cadrage du 20/10
+
+Décisions de Sabine du 2026-10-20, relayées par time-knight. Elles portent sur sa proposition du
+« squelette E1 E3 » : les tâches qui couvrent les livrables E1 et E3 par les usages de K-B. Cette
+proposition est tirée de deux rapports en lecture seule sur K-B, l'un d'un *product owner*,
+l'autre d'un architecte (deux sous-agents de time-knight). Les décisions 6 et 7 ont été prises le
+même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne donnent pas est
+écrit « non consigné ». Ces décisions s'appliquent par #276 (procédure de tri, durées), #277
+(contrat des fiches), #156 (clé), #162 et #163 (métriques) et #210 (essais).
+
+- **1. K-B tourne en trois temps. D'abord sur le Mac, en environnement de développement, sans
+  conteneur : retour en CLI, fiches en `.md`. Puis en conteneurs en local, pour répéter le
+  déploiement (préproduction), « avant le 29/10 si le temps le permet ». Enfin sur Azure
+  Container Apps (ACA), au 08/11. Ce qui est construit au premier temps passe aux suivants sans
+  refonte.** Décision de Sabine. Pourquoi de Sabine : non consigné ; elle dit que « le premier
+  temps passe d'abord ». Argument de la proposition : les conteneurs (#200, #202) ne remplissent
+  aucun critère encore vide d'E1 ou d'E3 ; selon le rapport du *product owner*, ils viennent de la
+  contrainte de déploiement, pas des critères. Option écartée : un POC en conteneurs dès le 25/10
+  (« POC du 25/10 », décision 1). **Révise**, pour le premier temps, l'option que cette décision
+  écartait : « tout faire tourner sur le Mac, sans conteneurs (on ne répète pas la cible) ». La
+  répétition de la cible passe au deuxième temps. — PR de #275
+- **2. Le LLM juge sort du contrat des fiches de veille.** Décision de Sabine : « on voit plus
+  tard ». Pourquoi, selon la proposition : une spécification qui dit ce que fait le produit.
+  Option écartée : garder le juge dans le contrat sans le coder. Le rapport du *product owner* y
+  relève une contradiction : la spécification décrit un parcours, une réponse et des métriques que
+  le produit n'a pas. #223 (le juge codé) et #224 (son étalonnage) restent ouvertes, hors du
+  squelette. Conséquence : le manque que le juge devait combler revient, puisque la fidélité ne
+  vérifie pas le sens d'une phrase (« Fiches de veille : le LLM juge »). **Révise** « Fiches de
+  veille : le LLM juge » (2026-10-16) et « Fiches de veille : le contrat du LLM juge »
+  (2026-10-17). #277 aligne `docs/fiches-veille.md`. — PR de #275
+- **3. La clé de l'API IA reste fixe. Sa rotation est documentée, avec ce que fait `kb digest` sur
+  un 401 (dans #156). Le renouvellement de l'accès (#160) reste hors de ce travail.** Décision de
+  Sabine, sur la recommandation de la proposition. Pourquoi, selon la proposition : pour une seule
+  utilisatrice, des jetons qui expirent seraient une greffe ; le critère de la certification dit
+  « éventuelles » ; la décision 7 du 15/10 garde déjà les clés fixes au 29/10. Option écartée :
+  #160 (jetons qui expirent, taille M) dans le squelette. Remarque de Sabine : une interface web
+  en ligne demandera probablement un login, avec des jetons qui expirent, où le renouvellement
+  deviendrait naturel ; à voir plus tard. **Précise** « POC du 25/10 », décision 7. — PR de #275
+- **4. Les métriques du modèle partent en OpenTelemetry vers Grafana Cloud, en région UE, dès le
+  premier temps. Le bac à sable est une pile dédiée, ou un label d'environnement. Au troisième
+  temps, seuls l'URL et le jeton changent. La ligne JSON par appel sur la sortie standard reste.**
+  Décision de Sabine : l'option M3 du rapport de l'architecte, et non Azure Monitor. Pourquoi
+  Grafana Cloud plutôt qu'Azure Monitor : non consigné ; la comparaison qui fonde ce choix est
+  consignée par #163, selon les critères de « Wiki : métriques » (temps réel, alerte sur seuil,
+  accessibilité, région UE, coût). Selon le même rapport, l'option rend la surveillance du modèle
+  démontrable dès le premier temps, sans attendre la mise en ligne. Options écartées, avec les
+  propriétés relevées par l'architecte :
+  - Azure Monitor (Application Insights) par OpenTelemetry (M4), recommandé par l'architecte :
+    démontrable dès le premier temps, sans outil de plus au troisième ; raison du rejet non
+    consignée ;
+  - la sortie standard envoyée par ACA vers Log Analytics, avec un classeur et une alerte (M1,
+    recommandé par le *product owner*) : rien de visible avant le troisième temps ;
+  - Grafana et Loki en local, par compose (M2) : démontrable au deuxième temps seulement, puis un
+    second outil au troisième, ou des tableaux réécrits de LogQL en KQL.
+
+  Limites assumées : un tiers de plus (rapport de l'architecte) ; Grafana Labs devient un
+  sous-traitant, dont le DPA est lu, et qui est inscrit au registre, avant le premier envoi
+  (critère de #162). **Clôt** l'outil « à choisir » de « Wiki : métriques » (2026-10-12), où
+  Grafana Cloud était candidat. Ne révise pas la ligne JSON sur stdout (« POC du 25/10 »,
+  décision 8). — PR de #275
+- **5. La veille collectée en base est purgée au terme de sa durée. « Immuable » veut dire jamais
+  réécrit, pas gardé pour toujours. Les fiches déjà écrites dans le coffre ne sont pas touchées.
+  La durée passe de 2 à 3 ans pour les items de veille, le brut de veille (`raw/automated_watch/`)
+  et les tendances (`trend`).** Décision de Sabine. Pourquoi, selon la proposition : rendre
+  cohérentes les étapes 2 (purge des items de veille) et 9 (« le *cleansed* est immuable ») de la
+  procédure de tri du registre. Pourquoi purger plutôt que garder la veille sans limite, et 3 ans
+  plutôt que 2 : non consignés. Options écartées : garder la veille sans limite, en lisant
+  « immuable » comme « gardé pour toujours » ; 2 ans, la durée provisoire du 2026-10-10.
+  L'application (`RETENTION_YEARS_BY_ACQUISITION_MODE` de `core/config.py`, le registre, les
+  étapes 2, 3 et 9) est portée par #276 ; la purge n'est pas codée (#83). **Clôt** « Conservation
+  des vieilles veilles » (2026-10-19) et, pour la veille, « Durées de conservation et fréquence de
+  la purge ». **Précise** « Brut : catalogues d'état et conservation » (2026-10-19) : la veille du
+  *cleansed* est purgée, et `trend` sort du *curated* « jamais purgé ». — PR de #275
+- **6. L'étape 8 de la procédure de tri (suppression du brut des clips) reste rattachée à la base
+  : elle attend « La base au temps 3 » (question ouverte, plus bas). Sa règle du 2026-10-19 ne
+  change pas : le brut des clips n'est supprimé qu'une fois la base sauvegardée. Sa fréquence : à
+  chaque sauvegarde de la base.** Décision de Sabine, prise au découpage. Pourquoi : non consigné.
+  Options écartées :
+  - des migrations Alembic sur SQLite : elles réviseraient le 2026-10-15, où les migrations sont à
+    reprendre pour PostgreSQL seulement ;
+  - une copie native de la base, sans migration : elle réviserait la raison du 2026-10-19 (« une
+    sauvegarde native se migre par `alembic_version`, un export CSV non »).
+
+  **Précise** « Brut : catalogues d'état et conservation » (2026-10-19) : « au 08/11, avec
+  PostgreSQL et Alembic » attend la décision sur la base. Le registre est mis à jour par #276.
+  — PR de #275
+- **7. #210 garde trois essais sur gpt-6-luna, avec `reasoning_effort: "none"`, sur la veille
+  réelle. La comparaison de configurations validée le 2026-10-15 en sort : `none` contre `low`,
+  stabilité sur 5 passages, 50 items étiquetés par Sabine, règle de décision. Ses seuils restent
+  une grille de lecture : 100 % de schémas valides après une nouvelle tentative, au moins 95 % de
+  fidélité, aucun item oublié.** Décision de Sabine, prise au découpage. Option écartée : garder
+  la comparaison (l'issue passait à la taille M, plus l'étiquetage des 50 items par Sabine).
+  **Révise** la comparaison validée par Sabine le 2026-10-15, consignée dans un commentaire de
+  #210 et non dans ce journal. — PR de #275
+
 ## Décisions encore ouvertes
+
+- **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,
+  recommandée par le rapport de l'architecte, la base est un fichier produit par le job de
+  collecte et d'import, puis rangé dans Azure Blob Storage ; rien ne change aux temps 1 et 2.
+  Non tranchée le 2026-10-20. Met en attente « PostgreSQL au 08/11 » (« POC du 25/10 »,
+  décision 2) et l'étape 8 de la procédure de tri (« Squelette E1 E3 : cadrage du 20/10 »,
+  décision 6). `README.md` et `docs/stockage.md` (« Le SGBD ») y renvoient.
 
 - **Où tourne `kb write-tops` en ligne** (2026-10-19) : elle écrit le coffre, qu'aucun conteneur
   ne monte au POC (règle 4 de `.claude/rules/poc.md`) ; à trancher avant la mise en ligne du
@@ -3262,7 +3382,8 @@ time-knight (délégation de Sabine du 2026-10-15).
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
   l'étalonnage du juge (#224), si les fiches sont trop maigres (« Fiches de veille : le LLM
-  juge »).
+  juge »). **En attente depuis le 2026-10-20** : le juge sort du contrat des fiches (« Squelette E1 E3 : cadrage du 20/10 »,
+  décision 2).
 
 - **Remplir `newsletter_article.publication_id`** (2026-10-12) : quand le lien d'un article TLDR
   est `https://arxiv.org/abs/<id>`, le rattacher à sa PUBLICATION, créée sans ses colonnes arXiv
@@ -3276,9 +3397,6 @@ time-knight (délégation de Sabine du 2026-10-15).
   (2026-10-13) nomme ses dates nouvelles par leur événement Zotero, sans renommer les colonnes
   existantes.
 
-- **Conservation des vieilles veilles** (2026-10-19) : le *cleansed* est immuable, avec le
-  « petit bémol pour les vieilles veilles, à voir » de Sabine (« Brut : catalogues d'état et
-  conservation »).
 - **Licence du schéma de Zotero** (2026-10-11) : le code de Zotero est sous AGPL v3 « sauf
   fichier qui dit autrement » (page « Licensing » de zotero.org), K-B sous CC BY-NC 4.0.
   La base d'essai réécrit 15 tables aux noms et types de Zotero ; si cela pose une question de
@@ -3292,7 +3410,9 @@ time-knight (délégation de Sabine du 2026-10-15).
   (base et brut), purge à chaque collecte (une par jour) ; la durée, par mode d'acquisition,
   sera dans `config.py` (2026-10-10), à revoir. Sabine n'a pas tranché le 2026-10-02 ; à confirmer
   quand #20 code la purge. La purge des tables nouvelles (référentiels, TENDANCE, bibliothèque)
-  n'est pas définie (relecture du 2026-10-09).
+  n'est pas définie (relecture du 2026-10-09). **Close le 2026-10-20 pour la veille** : 3 ans pour
+  les items, le brut de veille et les tendances (`trend`), dont la purge est ainsi définie (« Squelette E1 E3 : cadrage du 20/10 »,
+  décision 5) ; le reste, et les fréquences : #276.
 - **Liste d'exclusion** des personnes qui demandent l'effacement, pour qu'une collecte ou une
   reconstruction ne les réintroduise pas : proposée dans le registre, à concevoir dans #20.
   Indispensable avec une base reconstruite, en développement (2026-10-10).
@@ -3325,7 +3445,8 @@ time-knight (délégation de Sabine du 2026-10-15).
 - **Wiki : le texte envoyé au modèle et reçu de lui, dans l'outil de suivi** (2026-10-12) : jamais
   (mesures seules), seulement en environnement d'essai, ou toujours (et inscrit au registre).
   Sabine tranchera à la comparaison des outils de restitution. La trace d'un outil comme Langfuse
-  tire son intérêt de ce texte, qui contient les noms des auteurs.
+  tire son intérêt de ce texte, qui contient les noms des auteurs. **Précisée le 2026-10-20** :
+  l'outil est Grafana Cloud (« Squelette E1 E3 : cadrage du 20/10 », décision 4) ; la question reste ouverte jusqu'à #163.
 - **Wiki : forme du contrat `.md` *cleansed*** (2026-10-12) : l'ETL écrit en SQLite ; ce que la
   partie LLM reçoit d'un papier Zotero (texte du PDF, métadonnées, surlignages) est à fixer avant
   le code.
@@ -3338,4 +3459,5 @@ time-knight (délégation de Sabine du 2026-10-15).
   (« POC du 25/10 », décisions 1 et 4).
 - **Wiki : suivre OAuth 2 en entier, ou le schéma de jetons seul** (2026-10-12) : à voir au début
   de #160. **Révisée le 2026-10-15** : #160 vient en ligne au 08/11 ; la question reste ouverte
-  jusque-là (« POC du 25/10 », décision 7).
+  jusque-là (« POC du 25/10 », décision 7). **Précisée le 2026-10-20** : #160 reste hors du
+  squelette ; à revoir avec une interface web en ligne (« Squelette E1 E3 : cadrage du 20/10 », décision 3).
