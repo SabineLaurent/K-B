@@ -125,14 +125,15 @@ ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 6
   dès l'arrivée de la demande ; elle borne la lecture et chaque appel au modèle. Les
   appels se font **en série**, un sujet après l'autre (décision de Sabine du 2026-10-17, plan de
   #205) : la chaîne mesurée par #158 dure environ 98 s (113 s avec les appels les plus lents),
-  une mesure qui comptait un appel de plus par sujet, sorti du contrat le 2026-10-20,
   sous les 240 s que l'ingress HTTP d'Azure Container Apps laisse à une requête
   ([Ingress in Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/ingress-overview),
-  section « HTTP ») ; 200 s gardent 40 s pour le dernier appel en cours et la réponse. Options
+  section « HTTP ») ; 200 s gardent 40 s pour le dernier appel en cours et la réponse. Cette
+  mesure comptait un appel de plus par sujet, la vérification du sens, sortie du contrat le
+  2026-10-20 (section « Ce que la spec ne couvre pas » ; `core/config.py`). Options
   écartées : rédiger les sujets en parallèle (environ 30 s, mais un `replay` à refaire et des 429
   possibles sous le quota, pour un gain sans besoin mesuré) ; une tâche de fond (un état gardé
   entre deux requêtes, contraire à la règle 7 de `poc.md`, utile seulement au-delà de 240 s).
-  Le pire cas, 14 appels ou plus de 210 s, dépasse 240 s en série comme en parallèle : seule l'échéance
+  Le pire cas, 14 appels de 210 s, dépasse 240 s en série comme en parallèle : seule l'échéance
   borne la demande.
   - **Mécanisme** (`ai_api/deadline.py`) : aucune requête au modèle s'il reste moins de
     `MIN_SECONDS_FOR_LLM_REQUEST` = 10 s, au-dessus de la rédaction la plus lente mesurée par #158
@@ -161,7 +162,8 @@ ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 6
   caractères de message au plus, `MAX_ITEMS_PER_CLASSIFICATION_CALL` et
   `MAX_CLASSIFICATION_INPUT_CHARS` ; jusqu'à environ 10 quand les titres sont longs), 8
   rédactions (une par sujet) : environ 14 appels, et le double de tentatives au plus avec les
-  nouvelles tentatives, soit environ 28. Ce nombre découle du plafond et des sujets : pas de constante de plus.
+  nouvelles tentatives, soit environ 28. Ce nombre découle du plafond et des sujets : pas de
+  constante de plus.
 
 **Limites** : une seule demande à la fois est supposée (une seule utilisatrice, en local) ; le
 quota du déploiement Foundry est de 140 000 jetons et 140 requêtes par minute (en-têtes
@@ -559,9 +561,10 @@ pas »).
 Ce qu'un produit fini demanderait de plus ; rien n'est décidé ici.
 
 - La **vérification du sens** de chaque affirmation, que la fidélité ne fait pas (« Ce qu'elle ne
-  vérifie pas »). Le LLM juge qui devait la faire est hors du contrat depuis le 2026-10-20 (`git show 4bb57c7:docs/fiches-veille.md`, section « Juge »)
-  (journal ADR, « Squelette E1 E3 : cadrage du 20/10 », décision 2) ; son code (#223) et son
-  étalonnage (#224) restent ouverts.
+  vérifie pas »), est hors du contrat depuis le 2026-10-20 (journal ADR, « Squelette E1 E3 :
+  cadrage du 20/10 », décision 2). Le contrat retiré du LLM juge : section « Juge » de
+  `git show 4bb57c7:docs/fiches-veille.md` ; son code (#223) et son étalonnage (#224) restent
+  ouverts.
 - La **complétude vérifiée par un modèle** : un point important d'un item cité que la fiche
   oublierait.
 - La **correction du français et du style**.
