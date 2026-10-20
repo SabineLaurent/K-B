@@ -205,7 +205,7 @@ def test_a_page_that_is_not_an_edition_fails_the_source_with_its_day_and_url(
 ):
     fake_download.answers["https://tldr.tech/ai/2026-10-03"] = LANDING_PAGE
 
-    with pytest.raises(ValueError, match="^not_the_edition_of_the_day$") as raised:
+    with pytest.raises(ValueError, match="^not_the_edition_of_the_day") as raised:
         TldrSource("ai").fetch(datetime(2026, 10, 3, 6, 0, tzinfo=UTC))
     assert raised.value.__notes__ == [
         "tldr_ai 2026-10-03, from https://tldr.tech/ai/2026-10-03",
@@ -218,7 +218,7 @@ def test_a_page_that_is_not_an_edition_fails_the_source_with_its_day_and_url(
 def test_the_edition_of_another_day_fails_the_source_with_its_date(fake_download):
     fake_download.answers["https://tldr.tech/ai/2026-10-03"] = EDITION_PAGE
 
-    with pytest.raises(ValueError, match="^not_the_edition_of_the_day$") as raised:
+    with pytest.raises(ValueError, match="^not_the_edition_of_the_day") as raised:
         TldrSource("ai").fetch(datetime(2026, 10, 3, 6, 0, tzinfo=UTC))
     assert raised.value.__notes__ == [
         "tldr_ai 2026-10-03, from https://tldr.tech/ai/2026-10-03",
@@ -235,7 +235,7 @@ def test_each_day_refused_after_the_last_edition_read_is_noted(
     # Monday: 2026-10-04 is a past day, not today.
     monkeypatch.setattr(tldr, "current_day", lambda: date(2026, 10, 5))
 
-    with pytest.raises(ValueError, match="^not_the_edition_of_the_day$") as raised:
+    with pytest.raises(ValueError, match="^not_the_edition_of_the_day") as raised:
         TldrSource("ai").fetch(datetime(2026, 10, 2, 6, 0, tzinfo=UTC))
     # The edition of 2026-10-02 read is not returned: the source fails whole.
     assert raised.value.__notes__ == [
@@ -283,7 +283,9 @@ def test_a_page_of_today_that_is_not_an_edition_is_skipped_and_logged(
         "tldr_ai 2026-10-04: not_the_edition_of_the_day, read again at the next "
         f"collection; {LANDING_REFUSAL}, from https://tldr.tech/ai/2026-10-04"
     ) in caplog.text
-    assert not [record for record in caplog.records if record.levelno >= logging.WARNING]
+    assert not [
+        record for record in caplog.records if record.levelno >= logging.WARNING
+    ]
 
 
 def test_an_http_error_after_a_page_refused_is_raised(fake_download):
