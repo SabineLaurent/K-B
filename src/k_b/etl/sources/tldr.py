@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from time import sleep
+from typing import NamedTuple
 
 from bs4 import BeautifulSoup, Tag
 from bs4.exceptions import ParserRejectedMarkup
@@ -30,12 +31,20 @@ MAX_PAGE_BYTES = 1024 * 1024
 PAUSE_BETWEEN_PAGES_SECONDS = 2
 # For testing the collection; to widen when K-B is put into service.
 FIRST_COLLECTION_DAYS = 7
+# The failure of a page received that is not the edition of its day (conventions.md, rule 1).
+NOT_THE_EDITION_OF_THE_DAY = "not_the_edition_of_the_day"
 
 logger = logging.getLogger(__name__)
 
 
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "tldr"
+
+
+class PageRefusal(NamedTuple):
+    page_url: str
+    # What the page is instead: the refusal of the reader, or the date of its edition.
+    observed: str
 
 
 class TldrSource:
@@ -51,12 +60,62 @@ class TldrSource:
     def fetch(self, last_collected_at: datetime | None) -> dict[str, bytes] | None:
         """Return the edition page of each day to collect, by day; None if there is none.
 
+        Each page is read before it is returned (conventions.md, rule 1): a page that is not
+        the edition of its day is refused (not_the_edition_of_the_day) and never returned.
+        - A day refused after the last edition read, or with none read, fails the source: its
+          last collection date stays, and the day is asked again at the next collection.
+        - A day refused before an edition read is given up, logged as a warning: the site
+          serves editions, and that day is over.
+        - Today refused is logged and skipped: the day of the last collection is read again
+          (list_days_to_collect). Decision of Sabine of 2026-10-20 (#274).
         A day redirected to the landing page of the edition (observed for 2026-10-03 and
-        2026-10-04) has no edition page: it is logged and skipped. Any other redirection or
-        HTTP error is raised.
+        2026-10-04) has no edition page: it is logged and skipped. Any other redirection, HTTP
+        error or error of the reader is raised.
         """
-        days = list_days_to_collect(last_collected_at, current_day())
-        pages = {}
+        today = current_day()
+        days = list_days_to_collect(last_collected_at, today)
+        read_pages = self.read_pages(days)
+        pages = {
+            day: page for day, page in read_pages.items() if isinstance(page, bytes)
+        }
+        refusals = {
+            day: page
+            for day, page in read_pages.items()
+            if isinstance(page, PageRefusal)
+        }
+        today_refusal = refusals.pop(today, None)
+        if today_refusal is not None:
+            logger.info(
+                "%s %s: %s, read again at the next collection; %s, from %s",
+                self.name,
+                today,
+                NOT_THE_EDITION_OF_THE_DAY,
+                today_refusal.observed,
+                today_refusal.page_url,
+            )
+        last_edition_day = max(pages, default=None)
+        if any(last_edition_day is None or day > last_edition_day for day in refusals):
+            raise self.refuse(refusals)
+        for day, refusal in refusals.items():
+            logger.warning(
+                "%s %s: %s, given up: edition of %s read; %s, from %s",
+                self.name,
+                day,
+                NOT_THE_EDITION_OF_THE_DAY,
+                last_edition_day,
+                refusal.observed,
+                refusal.page_url,
+            )
+        if not pages:
+            logger.info(
+                "%s: no edition page from %s to %s", self.name, days[0], days[-1]
+            )
+        return {day.isoformat(): page for day, page in pages.items()} or None
+
+    def read_pages(self, days: list[date]) -> dict[date, bytes | PageRefusal]:
+        """The page of each day, or why it is not the edition of the day; a day redirected to
+        the landing page of the edition is left out."""
+        read_pages: dict[date, bytes | PageRefusal] = {}
         for position, day in enumerate(days):
             if position > 0:
                 sleep(PAUSE_BETWEEN_PAGES_SECONDS)
@@ -64,6 +123,7 @@ class TldrSource:
             try:
                 # The page url itself is the trusted prefix: any redirection is noticed.
                 page = download(page_url, page_url, MAX_PAGE_BYTES)
+                observed = find_refusal(page, day)
             except Exception as error:
                 if (
                     isinstance(error, RedirectedOutsideError)
@@ -80,13 +140,38 @@ class TldrSource:
                 # where the collection handles it (etl/extract.py), with this note.
                 error.add_note(f"{self.name} {day}, from {page_url}")
                 raise
-            logger.info("%s %s: edition page, %d bytes", self.name, day, len(page))
-            pages[day.isoformat()] = page
-        if not pages:
-            logger.info(
-                "%s: no edition page from %s to %s", self.name, days[0], days[-1]
-            )
-        return pages or None
+            if observed is None:
+                logger.info("%s %s: edition page, %d bytes", self.name, day, len(page))
+                read_pages[day] = page
+            else:
+                read_pages[day] = PageRefusal(page_url, observed)
+        return read_pages
+
+    def refuse(self, refusals: dict[date, PageRefusal]) -> ValueError:
+        """The failure of the source, with the day, url and observation of each day refused in
+        the window, one note each: the collection quotes and cuts each note apart
+        (etl/extract.py)."""
+        error = ValueError(NOT_THE_EDITION_OF_THE_DAY)
+        for day, refusal in refusals.items():
+            error.add_note(f"{self.name} {day}, from {refusal.page_url}")
+            error.add_note(refusal.observed)
+        return error
+
+
+def find_refusal(page: bytes, day: date) -> str | None:
+    """Why the page is not the edition of the day, as observed; None if it is.
+
+    The page is read as at the import: a page the import would refuse is refused here.
+    """
+    try:
+        reading = read_articles(page)
+    except ValueError as error:
+        return str(error)
+    # read_articles raises for a page without any article: the first one is there.
+    edition_date = reading.entries[0].edition_date
+    if edition_date != day:
+        return f"edition of {edition_date.isoformat()}"
+    return None
 
 
 def current_day() -> date:
