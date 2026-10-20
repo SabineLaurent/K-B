@@ -221,7 +221,9 @@ GH Archive, dont chaque ligne de classement (`TrendRow`, `src/k_b/items.py`) dev
 Le MCD et le MLD sont dessinés avec draw.io, dans [`docs/merise/`](merise/) (journal ADR,
 2026-10-08) : [`mcd-k-b_20261020.drawio`](merise/mcd-k-b_20261020.drawio) et
 [`mld-k-b_20261020.drawio`](merise/mld-k-b_20261020.drawio), tirés de
-[`schema.sql`](../src/k_b/database/schema.sql) le 2026-10-20 (#211). Chaque élément du MCD renvoie
+[`schema.sql`](../src/k_b/database/schema.sql) le 2026-10-20 (#211). Leurs images, exportées en
+SVG : [`mcd-k-b_20261020.svg`](merise/mcd-k-b_20261020.svg) et
+[`mld-k-b_20261020.svg`](merise/mld-k-b_20261020.svg). Chaque élément du MCD renvoie
 à ses lignes de `schema.sql` ; le MLD se déduit du MCD par les règles de passage, et chacune de ses
 tables et colonnes renvoie à sa ligne de `schema.sql` quand elle y est. Le MPD est `schema.sql`.
 Les modèles ne sont pas recopiés ici ; la disposition du MCD suit
