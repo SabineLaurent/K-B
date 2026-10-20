@@ -3319,11 +3319,12 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
   premier temps. Le bac à sable est une pile dédiée, ou un label d'environnement. Au troisième
   temps, seuls l'URL et le jeton changent. La ligne JSON par appel sur la sortie standard reste.**
   Décision de Sabine : l'option M3 du rapport de l'architecte, et non Azure Monitor. Pourquoi
-  Grafana Cloud plutôt qu'Azure Monitor : non consigné ; la comparaison qui fonde ce choix est
-  consignée par #163, selon les critères de « Wiki : métriques » (temps réel, alerte sur seuil,
-  accessibilité, région UE, coût). Selon le même rapport, l'option rend la surveillance du modèle
-  démontrable dès le premier temps, sans attendre la mise en ligne. Options écartées, avec les
-  propriétés relevées par l'architecte :
+  Grafana Cloud plutôt qu'Azure Monitor (décision de Sabine du 2026-10-20) : « Pourquoi : à
+  établir par la comparaison de #163, qui fonde ce choix (critères 26 et 28 de la revue
+  certif). » Cette comparaison suit les critères de « Wiki : métriques » (temps réel, alerte sur
+  seuil, accessibilité, région UE, coût). Selon le rapport de l'architecte, l'option rend la
+  surveillance du modèle démontrable dès le premier temps, sans attendre la mise en ligne. Options
+  écartées, avec les propriétés relevées par l'architecte :
   - Azure Monitor (Application Insights) par OpenTelemetry (M4), recommandé par l'architecte :
     démontrable dès le premier temps, sans outil de plus au troisième ; raison du rejet non
     consignée ;
@@ -3342,8 +3343,13 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
   La durée passe de 2 à 3 ans pour les items de veille, le brut de veille (`raw/automated_watch/`)
   et les tendances (`trend`).** Décision de Sabine. Pourquoi, selon la proposition : rendre
   cohérentes les étapes 2 (purge des items de veille) et 9 (« le *cleansed* est immuable ») de la
-  procédure de tri du registre. Pourquoi purger plutôt que garder la veille sans limite, et 3 ans
-  plutôt que 2 : non consignés. Options écartées : garder la veille sans limite, en lisant
+  procédure de tri du registre. Pourquoi 3 ans plutôt que 2 (décision de Sabine du 2026-10-20) :
+  « Je ne prévois pas d'interroger la base sur des sujets de plus de 3 ans. Une durée plus courte
+  n'a pas été écartée par un fait : elle sera revue quand l'usage réel de la base sera mesuré. »
+  Pourquoi purger plutôt que garder la veille sans limite (décision de Sabine du 2026-10-20) :
+  « La veille est reprise dans des fiches de veille, que je garde : elle n'est donc pas perdue
+  quand la base est purgée. La veille vaut par sa fraîcheur : la base n'a pas à garder ses
+  entrées les plus anciennes. » Options écartées : garder la veille sans limite, en lisant
   « immuable » comme « gardé pour toujours » ; 2 ans, la durée provisoire du 2026-10-10.
   L'application (`RETENTION_YEARS_BY_ACQUISITION_MODE` de `core/config.py`, le registre, les
   étapes 2, 3 et 9) est portée par #276 ; la purge n'est pas codée (#83). **Clôt** « Conservation

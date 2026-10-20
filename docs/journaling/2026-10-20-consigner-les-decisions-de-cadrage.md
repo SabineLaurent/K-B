@@ -48,9 +48,10 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
 ```
 (`docs/ADR/journal-decisions-projet.md:3285-3287`)
 
-Trois pourquoi sont absents des sources : Grafana Cloud plutôt qu'Azure Monitor, 3 ans plutôt que
-2, purger la veille plutôt que la garder. Ils sont écrits « non consigné », et tu peux les donner
-avant la PR. Un premier plan écrivait un pourquoi déduit pour l'étape 8 ; le relecteur l'a montré
+Trois pourquoi manquaient aux sources : Grafana Cloud plutôt qu'Azure Monitor, 3 ans plutôt que
+2, purger la veille plutôt que la garder. Tu les as donnés avant la PR : ils sont cités tels
+quels, entre guillemets, avec « décision de Sabine du 2026-10-20 » (décisions 4 et 5). Celui de
+Grafana Cloud renvoie à la comparaison de #163, encore à faire. Un premier plan écrivait un pourquoi déduit pour l'étape 8 ; le relecteur l'a montré
 inexact (le 08/11 reste la date d'ACA ; seule la question sur la base met PostgreSQL en attente).
 Il est devenu « non consigné ».
 
@@ -156,7 +157,8 @@ l'autre piste de travail ouverte en même temps.
 
 ## Ce qui reste
 
-- Les pourquoi « non consignés », si tu les donnes : inscrits dans cette PR, à ta formulation.
+- Les pourquoi encore « non consignés » (décisions 1 et 6, rejet d'Azure Monitor) ; celui de
+  Grafana Cloud, que la comparaison de #163 établira.
 - L'application des décisions : #276 (durées, procédure de tri), #277 (spec des fiches sans juge),
   #156 (rotation de la clé, 401), #162 et #163 (métriques), #210 (essais).
 - `.claude/rules/poc.md`, lignes 32 (« PostgreSQL au 08/11 ») et 144 (« POC en conteneurs ») : à
