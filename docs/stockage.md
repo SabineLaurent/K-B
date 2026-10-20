@@ -223,7 +223,9 @@ Le MCD et le MLD sont dessinés avec draw.io, dans [`docs/merise/`](merise/) (jo
 [`mld-k-b_20261020.drawio`](merise/mld-k-b_20261020.drawio), tirés de
 [`schema.sql`](../src/k_b/database/schema.sql) le 2026-10-20 (#211). Leurs images, exportées en
 SVG : [`mcd-k-b_20261020.svg`](merise/mcd-k-b_20261020.svg) et
-[`mld-k-b_20261020.svg`](merise/mld-k-b_20261020.svg). Chaque élément du MCD renvoie
+[`mld-k-b_20261020.svg`](merise/mld-k-b_20261020.svg). Une vue d'ensemble du MCD, avec les mêmes
+entités, associations, cardinalités et disposition, mais sans propriétés :
+[`mcd-k-b_20261020_vue-ensemble.drawio`](merise/mcd-k-b_20261020_vue-ensemble.drawio). Chaque élément du MCD renvoie
 à ses lignes de `schema.sql` ; le MLD se déduit du MCD par les règles de passage, et chacune de ses
 tables et colonnes renvoie à sa ligne de `schema.sql` quand elle y est. Le MPD est `schema.sql`.
 Les modèles ne sont pas recopiés ici ; la disposition du MCD suit
