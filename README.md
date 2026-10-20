@@ -121,7 +121,7 @@ Les utilisateurs du produit sont décrits plus haut, dans « Utilisateurs ».
 |---|---|
 | API GitHub | un jeton en lecture seule, sans frais ([docs/jeton-github.md](docs/jeton-github.md)) |
 | BigQuery (GH Archive) | bac à sable sans compte de facturation : au-delà du quota gratuit (1 Tio lu par mois), une requête est refusée, jamais facturée ([docs/bigquery.md](docs/bigquery.md)) |
-| Modèle des fiches | gpt-6-luna sur Azure AI Foundry, sur l'abonnement Azure de mon organisme de formation, fourni pour ce projet : région France Central, zone de données UE, 140 000 jetons par minute (journal ADR, 2026-10-17). Je n'en vois pas la facturation. Ordre de grandeur : au pire environ 420 000 jetons par demande de fiches, à 0,12 $ en entrée et 0,60 $ en sortie par million de jetons, prix UE, soit quelques centimes (journal ADR, 2026-10-16) ; les appels et les jetons d'une demande sont détaillés dans [docs/fiches-veille.md](docs/fiches-veille.md), « Coût » |
+| Modèle des fiches | gpt-6-luna sur Azure AI Foundry, sur l'abonnement Azure de mon organisme de formation, fourni pour ce projet : région France Central, zone de données UE, 140 000 jetons par minute (journal ADR, 2026-10-17). Je n'en vois pas la facturation. Ordre de grandeur : au pire environ 420 000 jetons par demande de fiches, à 0,12 $ en entrée et 0,60 $ en sortie par million de jetons, prix UE, soit quelques centimes (journal ADR, 2026-10-16) ; les appels d'une demande sont détaillés dans [docs/fiches-veille.md](docs/fiches-veille.md), « Lecture plafonnée » |
 | Mise en ligne du 08/11 (Azure Container Apps, Blob Storage ; la base, à trancher) | non chiffrée à ce jour |
 | Temps | chaque issue porte son estimation en heures ; les jalons les regroupent |
 
