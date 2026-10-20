@@ -38,10 +38,6 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   et le réécrit en entier à la fin (`src/k_b/etl/extract.py`) : la dernière collecte qui écrit
   l'emporte. Avec `KB_COLLECT_ONLY`, le Mac (`zotero,clipping`) et les conteneurs (le reste)
   collectent à part ; s'ils partagent l'état (#200), leurs collectes ne doivent pas se chevaucher.
-- **tldr ne lit pas sa page à la collecte** (constat du 2026-10-18, PR de #64, sans issue) : une
-  page reçue qui n'est pas une édition est écrite telle quelle, puis refusée à chaque import ;
-  écart à la règle 1 de `conventions.md` (`src/k_b/etl/sources/tldr.py`, `fetch`). Écrit dans
-  `docs/specs-collecte.md`, non tranché.
 - **Le README annonce des métriques « en OpenTelemetry, gardées sur ma machine »** (« Étape 2 »,
   constat de la revue de #5, le 2026-10-18, sans issue) : contredit l'ADR du 15/10 (décision 8),
   la règle 4 de `poc.md` (une ligne JSON par appel sur stdout) et l'observabilité dans le cloud

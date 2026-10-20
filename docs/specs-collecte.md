@@ -392,8 +392,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 ### tldr.tech — scraping
 
 - **Technologie** : pages HTML `https://tldr.tech/<édition>/<AAAA-MM-JJ>` (vérifié :
-  `https://tldr.tech/ai/2026-09-30` répond 200). La collecte garde chaque page brute ; la lecture des articles se fait à la
-  transformation.
+  `https://tldr.tech/ai/2026-09-30` répond 200). La collecte lit chaque page avant de la garder
+  brute, par le lecteur de l'import (« Page qui n'est pas l'édition du jour », ci-dessous) ; les
+  articles en sont tirés à la transformation.
 - **Ce qu'on en tire** : un item par article de chaque édition suivie : titre, lien, résumé.
 - **Lecture d'une page** (#57, `read_articles`, `k_b/etl/sources/tldr.py`, avec BeautifulSoup et
   l'analyseur `html.parser` de la bibliothèque standard) : une entrée par `<article>` de la
@@ -406,8 +407,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     « (Sponsor) », et les offres d'emploi de TLDR, reconnues par leur lien
     (`https://jobs.ashbyhq.com/tldr.tech/`, décision de Sabine du 2026-10-12). Elles comptent
     dans le rang : changer ce qui est écarté ne renumérote aucun article.
-  - **Page refusée entière** (rejet au journal d'import, page non inscrite au registre, relue à
-    chaque import) : elle n'est pas en UTF-8 ; elle n'a pas de `h1` ; son premier `h1` n'est
+  - **Page refusée entière** (refusée dès la collecte depuis #274 ; une page gardée avant est
+    rejetée au journal d'import, non inscrite au registre, relue à chaque import) : elle n'est
+    pas en UTF-8 ; elle n'a pas de `h1` ; son premier `h1` n'est
     pas « TLDR <titre> <date> » (le `h1` trouvé est cité, échappé et coupé à 100 caractères) ;
     un `<article>` en contient un autre (refusée avant la lecture des entrées : une page
     d'articles imbriqués coûterait un temps quadratique, 18 s mesurées pour 50 Ko) ;
@@ -424,11 +426,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     normalisation, comme pour tout item.
   - **Limites** (mesures sur les 18 pages collectées du 2026-09-30 au 2026-10-09, 315
     entrées) : le titre d'édition du `h1` n'est pas comparé au dossier : une page d'une autre
-    édition rangée sous `tldr_ai` entrerait comme édition `ai`. Si la date du `h1` diffère de
-    celle du nom du fichier, celle du `h1` l'emporte (18 pages sur 18 ont la même) : une page
-    de la veille servie à l'adresse du jour voit ses articles écartés `already_seen` ; une
-    page qui se dirait d'un jour à venir prendrait la clé de ce jour, et l'édition de ce jour
-    serait écartée à son tour. Le `h1` doit porter un nom d'édition entre « TLDR » et la
+    édition rangée sous `tldr_ai` entrerait comme édition `ai`. Une page dont la date du `h1`
+    n'est pas le jour demandé est refusée à la collecte depuis #274 (« Page qui n'est pas
+    l'édition du jour », ci-dessous) ; pour une page gardée avant, la date du `h1` l'emporte
+    sur celle du nom du fichier (18 pages sur 18 ont la même). Le `h1` doit porter un nom d'édition entre « TLDR » et la
     date : une édition titrée « TLDR <date> » serait refusée à chaque import (forme non
     observée ; à vérifier quand une édition est ajoutée à `TRACKED_EDITIONS`). Une offre
     d'emploi publiée ailleurs que sur le site d'offres de TLDR entre comme article. Un lien
@@ -442,20 +443,64 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   `https://tldr.tech/<édition>`, n'a pas de page d'édition (observé pour le 2026-10-03 et le
   2026-10-04) : il est journalisé avec l'adresse de redirection et sauté. Toute autre
   redirection ou erreur HTTP fait échouer la source.
+- **Page qui n'est pas l'édition du jour** (#274, `fetch`, `download_edition_pages` et
+  `find_refusal`, `src/k_b/etl/sources/tldr.py:60-172`) : chaque page reçue est lue par
+  `read_articles`, le lecteur de l'import, avant d'être gardée. Elle est refusée, état nommé
+  `not_the_edition_of_the_day` (`tldr.py:35`), si le lecteur la refuse (« Page refusée
+  entière », ci-dessus) ou si la date de son `h1` n'est pas le jour demandé (`edition of
+  <date>`). Une page refusée n'est jamais écrite. Selon son jour :
+  - **un jour passé, après le dernier jour qui a donné une édition dans la collecte, ou sans
+    édition lue** : la source échoue (`ValueError` `not_the_edition_of_the_day`, `refuse`,
+    `tldr.py:149-156`), avec deux notes par jour refusé, le jour et l'URL demandée, puis ce qui
+    a été observé (refus du lecteur, `h1` cité par `quote_value`, ou `edition of <date>`) ;
+    `src/k_b/etl/extract.py:48-50` cite chaque note à part, échappée et coupée à 100
+    caractères. Rien n'est écrit, pas même les éditions lues dans la même collecte, et la date
+    de dernière collecte reste (règle 1 de `.claude/rules/conventions.md`) : le jour est
+    redemandé à la collecte suivante ;
+  - **un jour passé, avant un jour qui a donné une édition dans la collecte** : le jour est
+    abandonné, une ligne `WARNING` le dit (« `<source> <jour>: not_the_edition_of_the_day,
+    given up: edition of <jour> read; <observé>, from <URL>` », `tldr.py:87-95`), et la source
+    réussit. L'édition lue après lui montre que le site sert des éditions et que ce jour est
+    passé : un jour qui n'est jamais une édition fait échouer la source au plus jusqu'à la
+    prochaine édition publiée, puis n'est plus demandé. Écartés : une borne de N jours (constante
+    arbitraire ; la source reste en échec N jours, éditions suivantes comprises) et un compte
+    d'essais dans `collection_state.json` (change le format de l'état ; décision du plan de
+    #274, validé par Sabine le 2026-10-20) ;
+  - **aujourd'hui (UTC)** : la page est sautée, une ligne `INFO` le dit (« `<source> <jour>:
+    not_the_edition_of_the_day, read again at the next collection; <observé>, from <URL>` »,
+    `tldr.py:136-144`), et la source réussit. Rien n'est perdu : le jour de la dernière collecte
+    est relu (`list_days_to_collect`, `tldr.py:179`). Écart à la lettre du critère de #274
+    (« la source échoue »), pour ce seul jour : si tldr.tech servait avant la parution une page
+    qui n'est pas une édition (non observé), une collecte faite chaque matin échouerait chaque
+    jour, et sa fenêtre grandirait sans fin, comme arXiv au-delà de 2 000 papiers (#71)
+    (décision de Sabine du 2026-10-20).
+
+  Toute autre exception du lecteur (hors `ValueError`) fait échouer la source tout de suite,
+  avec le jour et l'URL en note, comme une erreur HTTP (échouer fermé).
+  **Limites** : une page refusée isolée entre deux éditions (passagère) est abandonnée dès la
+  première collecte qui la voit, journalisée ; si c'est le premier jour de la fenêtre, relu et
+  déjà gardé par une collecte précédente, la ligne `WARNING` s'écrit sans que rien ne soit
+  perdu. La ligne `WARNING` s'écrit quand `fetch` rend ses pages : si l'écriture du brut ou de
+  l'état échoue ensuite, le jour est redemandé et la ligne répétée. Une exception du lecteur
+  autre que `ValueError` sur un jour passé ferait échouer la source à chaque collecte (aucune
+  observée). Le service en 200, à l'adresse d'un jour, d'une page qui n'est pas une édition
+  n'est pas observé : la fixture du test est la page d'accueil de l'édition reçue le
+  2026-10-20, réduite à sa structure et à son `h1`.
 - **Journal** : chaque jour donne une ligne, avec l'édition, le jour et ce qui a été observé :
-  page gardée (taille en octets), redirection vers la page d'accueil (adresse d'arrivée), ou
-  erreur (message reçu et URL demandée) ; une collecte sans aucune page le dit aussi.
-  `kb collect` affiche les lignes de niveau INFO et au-dessus.
+  page gardée (taille en octets), redirection vers la page d'accueil (adresse d'arrivée), page
+  qui n'est pas l'édition du jour (ci-dessus), ou erreur (message reçu et URL demandée) ; une
+  collecte sans aucune page le dit aussi. `kb collect` affiche les lignes de niveau INFO et
+  au-dessus.
 - **En cas de panne :** une erreur sur un jour (redirection autre que vers la page d'accueil de
-  l'édition, statut HTTP d'erreur, réseau, page de plus de 1 Mio) fait échouer l'édition (sa
-  source, `tldr_<édition>`) ; le journal donne l'erreur avec le jour et l'URL demandée. Les pages
-  déjà téléchargées pendant cette collecte ne sont pas écrites, et les jours suivants ne sont pas
-  demandés ; la collecte suivante reprend au jour de la dernière collecte réussie. Une date de
-  dernière collecte postérieure à aujourd'hui (UTC) fait échouer l'édition avant tout
-  téléchargement. **Écart à la règle 1** de `.claude/rules/conventions.md` (constaté le
-  2026-10-18, non tranché ici) : une page reçue n'est pas lue à la collecte ; une page qui n'est
-  pas une édition est écrite telle quelle, et refusée à chaque import (« Page refusée entière »,
-  ci-dessus).
+  l'édition, statut HTTP d'erreur, réseau, page de plus de 1 Mio, exception du lecteur autre que
+  `ValueError`) fait échouer l'édition (sa source, `tldr_<édition>`) ; le journal donne l'erreur
+  avec le jour et l'URL demandée. Les pages déjà téléchargées pendant cette collecte ne sont pas
+  écrites, et les jours suivants ne sont pas demandés ; la collecte suivante reprend au jour de
+  la dernière collecte réussie. Une date de dernière collecte postérieure à aujourd'hui (UTC)
+  fait échouer l'édition avant tout téléchargement. Tant qu'aucune édition n'est lue (sélecteurs
+  changés par le site, édition arrêtée qui sert une page en 200, erreur HTTP durable), la source
+  échoue à chaque collecte et sa fenêtre grandit d'un jour par jour, une page toutes les 2 s :
+  rien n'est perdu tant que tldr.tech garde ses anciennes pages en ligne.
 - **Fréquence** : voir les règles communes.
   Chaque collecte lit chaque jour depuis le jour de la dernière collecte, relu car son édition a
   pu paraître après elle, jusqu'à aujourd'hui (UTC) ; la première lit les 7 jours précédents et
