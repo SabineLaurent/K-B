@@ -4,26 +4,31 @@ Merise ne fixe pas de sens de lecture à une association. Convention retenue pou
 (Sabine, 2026-10-09) : **le sujet du verbe est placé à gauche du complément, ou au-dessus s'ils
 sont dans la même colonne**. Les cardinalités se lisent depuis l'entité voisine.
 
-| Association | Sujet (à gauche ou au-dessus) | Complément | Lecture depuis le sujet | Lecture depuis le complément | Respecté dans `mcd-k-b.drawio` (2026-10-09) |
+| Association | Sujet (à gauche ou au-dessus) | Complément | Lecture depuis le sujet | Lecture depuis le complément | Dans `mcd-k-b_20261020.drawio` |
 |---|---|---|---|---|---|
-| REGROUPER | MODE D'ACQUISITION (0,n) | SOURCE (1,1) | un mode d'acquisition regroupe 0 à n sources | une source est regroupée dans un seul mode d'acquisition | oui |
-| FOURNIR | SOURCE (0,n) | DONNÉE BRUTE (1,1) | une source fournit 0 à n données brutes | une donnée brute est fournie par une seule source | oui |
-| CONTENIR | DONNÉE BRUTE (0,n) | ITEM (1,1) | une donnée brute contient 0 à n items | un item est contenu dans une seule donnée brute | oui |
-| PRODUIRE | DONNÉE BRUTE (0,n) | TENDANCE (1,1) | une donnée brute produit 0 à n tendances | une tendance est produite par une seule donnée brute | oui |
-| DÉCRIRE | ITEM (0,1) | PUBLICATION (0,1) | un item décrit 0 ou 1 publication | une publication est décrite par 0 ou 1 item | non : PUBLICATION est à gauche de ITEM |
-| CITER | ALERTE GITHUB (0,1) | VULNÉRABILITÉ (0,n) | une alerte GitHub cite 0 ou 1 vulnérabilité | une vulnérabilité est citée par 0 à n alertes GitHub | oui |
-| RECENSER | ITEM (0,1) | VULNÉRABILITÉ (0,1) | un item recense 0 ou 1 vulnérabilité | une vulnérabilité est recensée par 0 ou 1 item | oui |
-| RÉSUMER | ARTICLE DE NEWSLETTER (0,1) | PUBLICATION (0,n) | un article de newsletter résume 0 ou 1 publication | une publication est résumée par 0 à n articles de newsletter | non : ARTICLE DE NEWSLETTER est à droite de PUBLICATION |
-| PUBLIER | DÉPÔT SUIVI (0,n) | RELEASE (1,1) | un dépôt suivi publie 0 à n releases | une release est publiée par un seul dépôt suivi | non : DÉPÔT SUIVI est sous RELEASE, dans la même colonne |
+| FOURNIR | Source (0,N) | Donnée brute (1,1) | une source fournit 0 à N données brutes | une donnée brute est fournie par une seule source | à gauche |
+| CONTENIR | Donnée brute (0,N) | Item (1,1) | une donnée brute contient 0 à N items | un item est contenu dans une seule donnée brute | à gauche |
+| PRODUIRE | Donnée brute (0,N) | Classement (1,1) | une donnée brute produit 0 à N classements | un classement est produit par une seule donnée brute | au-dessus |
+| COMPTER | Classement (1,N) | Tendance (1,1) | un classement compte 1 à N tendances | une tendance est comptée dans un seul classement | au-dessus |
+| DÉCRIRE | Item (0,1) | Publication (0,1) | un item décrit 0 ou 1 publication | une publication est décrite par 0 ou 1 item | à gauche |
+| RECENSER | Item (0,1) | Vulnérabilité (0,1) | un item recense 0 ou 1 vulnérabilité | une vulnérabilité est recensée par 0 ou 1 item | à gauche |
+| CITER | Alerte GitHub (0,1) | Vulnérabilité (0,N) | une alerte GitHub cite 0 ou 1 vulnérabilité | une vulnérabilité est citée par 0 à N alertes GitHub | à gauche |
+| RÉSUMER | Article de newsletter (0,1) | Publication (0,N) | un article de newsletter résume 0 ou 1 publication | une publication est résumée par 0 à N articles de newsletter | à gauche |
+| DÉSIGNER | Entrée Zotero (0,1) | Publication (0,N) | une entrée Zotero désigne 0 ou 1 publication | une publication est désignée par 0 à N entrées Zotero | au-dessus |
+| PUBLIER | Dépôt suivi (0,N) | Version publiée (1,1) | un dépôt suivi publie 0 à N versions | une version est publiée par un seul dépôt suivi | à gauche |
+| ANNOTER | Surlignage (1,1) | Entrée Zotero (0,N) | un surlignage annote une seule entrée Zotero | une entrée Zotero est annotée par 0 à N surlignages | au-dessus |
+| PORTER | Item (0,N) | Étiquette (1,N) | un item porte 0 à N étiquettes | une étiquette est portée par 1 à N items | à gauche, plus bas (question ci-dessous) |
+| ÉCRIRE | Auteur (1,1) | Publication (0,N) | un auteur écrit une seule publication | une publication est écrite par 0 à N auteurs | à gauche |
+| COMPRENDRE | Dépôt suivi (1,N) | Paquet suivi (1,1) | un dépôt suivi comprend 1 à N paquets suivis | un paquet suivi est compris dans un seul dépôt suivi | au-dessus |
+| TOUCHER | Alerte GitHub (1,N) | Paquet touché (1,1) | une alerte GitHub touche 1 à N paquets | un paquet touché l'est par une seule alerte GitHub | au-dessus |
 
-**Spécialisation (XT)** : ITEM, l'entité générique, est placée au-dessus de ses sous-entités
-(ARTICLE DE NEWSLETTER, RELEASE, ALERTE GITHUB). Respecté.
+**Spécialisation (X, exclusion sans totalité)** : Item, l'entité générique, est placée au-dessus de
+ses sous-entités (Version publiée, Clip de page web, Alerte GitHub, Article de newsletter, Entrée
+Zotero). Respecté.
 
-Cardinalités relevées dans `mcd-k-b.drawio` le 2026-10-09. Le sujet de chaque association est le
-premier terme de la liste validée le 2026-10-08 (« DÉCRIRE (ITEM, PUBLICATION) », « RECENSER (ITEM,
-VULNÉRABILITÉ) »)  ; la légende de `mcd-k-b.drawio` est corrigée dans ce sens.
+Un auteur est une place dans la liste des auteurs d'une publication, pas une personne (légende du
+MCD) : d'où « un auteur écrit une seule publication ».
 
-Une disposition conforme est à refaire (un premier essai, construit avec le mauvais sujet pour
-DÉCRIRE et RECENSER, a été supprimé). Question ouverte (Sabine) : la règle « à gauche » admet un sujet plus bas que son complément (ex.
-ARTICLE DE NEWSLETTER à gauche mais en dessous de PUBLICATION) ; une règle plus stricte serait
-« le sujet en haut à gauche du complément ».
+Question ouverte (Sabine) : la règle « à gauche » admet un sujet plus bas que son complément (ici
+Item, à gauche mais en dessous d'Étiquette) ; une règle plus stricte serait « le sujet en haut à
+gauche du complément ».
