@@ -22,7 +22,21 @@ from k_b.etl.transform import read_raw_items
 
 # Sunday: the window of a collection on this day holds a weekend.
 TODAY = date(2026, 10, 4)
-EDITION_PAGE = b"<html><h1>TLDR AI 2026-10-02</h1></html>"
+# The reader. Both pages are reduced extracts of collected pages: some entries, as written,
+# their summaries cut to their first sentence.
+FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
+AI_PAGE = (FIXTURES_DIR / "tldr_ai_extract.html").read_bytes()
+DEV_PAGE = (FIXTURES_DIR / "tldr_dev_extract.html").read_bytes()
+AI_HEADING = b"TLDR AI 2026-10-07</h1>"
+# The edition of 2026-10-02, as the collection reads it: a collected page under another date.
+EDITION_PAGE = AI_PAGE.replace(AI_HEADING, b"TLDR AI 2026-10-02</h1>")
+# The landing page of the edition, https://tldr.tech/ai, received on 2026-10-20 and reduced to
+# its structure and its h1, without any text of its own. It is the page a day without edition
+# is redirected to; served with a 200 at the url of a day, as here, is not observed.
+LANDING_PAGE = (FIXTURES_DIR / "tldr_ai_landing_extract.html").read_bytes()
+LANDING_REFUSAL = (
+    "first h1 is not an edition title with its date: 'Keep up with AI in 5 minutes'"
+)
 
 
 class FakeDownload:
@@ -186,15 +200,124 @@ def test_a_last_collection_after_today_is_refused_with_both_days(fake_download):
     assert fake_download.urls == []
 
 
-# The reader. Both pages are reduced extracts of collected pages: some entries, as written,
-# their summaries cut to their first sentence.
-FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
-AI_PAGE = (FIXTURES_DIR / "tldr_ai_extract.html").read_bytes()
-DEV_PAGE = (FIXTURES_DIR / "tldr_dev_extract.html").read_bytes()
+def test_a_page_that_is_not_an_edition_fails_the_source_with_its_day_and_url(
+    fake_download, caplog
+):
+    fake_download.answers["https://tldr.tech/ai/2026-10-03"] = LANDING_PAGE
+
+    with pytest.raises(ValueError, match="^not_the_edition_of_the_day$") as raised:
+        TldrSource("ai").fetch(datetime(2026, 10, 3, 6, 0, tzinfo=UTC))
+    assert raised.value.__notes__ == [
+        "tldr_ai 2026-10-03, from https://tldr.tech/ai/2026-10-03",
+        LANDING_REFUSAL,
+    ]
+    # Logged once, where the collection handles the failure (etl/extract.py).
+    assert not [record for record in caplog.records if record.levelno >= logging.ERROR]
+
+
+def test_the_edition_of_another_day_fails_the_source_with_its_date(fake_download):
+    fake_download.answers["https://tldr.tech/ai/2026-10-03"] = EDITION_PAGE
+
+    with pytest.raises(ValueError, match="^not_the_edition_of_the_day$") as raised:
+        TldrSource("ai").fetch(datetime(2026, 10, 3, 6, 0, tzinfo=UTC))
+    assert raised.value.__notes__ == [
+        "tldr_ai 2026-10-03, from https://tldr.tech/ai/2026-10-03",
+        "edition of 2026-10-02",
+    ]
+
+
+def test_each_day_refused_after_the_last_edition_read_is_noted(
+    fake_download, monkeypatch
+):
+    fake_download.answers["https://tldr.tech/ai/2026-10-02"] = EDITION_PAGE
+    fake_download.answers["https://tldr.tech/ai/2026-10-03"] = LANDING_PAGE
+    fake_download.answers["https://tldr.tech/ai/2026-10-04"] = EDITION_PAGE
+    # Monday: 2026-10-04 is a past day, not today.
+    monkeypatch.setattr(tldr, "current_day", lambda: date(2026, 10, 5))
+
+    with pytest.raises(ValueError, match="^not_the_edition_of_the_day$") as raised:
+        TldrSource("ai").fetch(datetime(2026, 10, 2, 6, 0, tzinfo=UTC))
+    # The edition of 2026-10-02 read is not returned: the source fails whole.
+    assert raised.value.__notes__ == [
+        "tldr_ai 2026-10-03, from https://tldr.tech/ai/2026-10-03",
+        LANDING_REFUSAL,
+        "tldr_ai 2026-10-04, from https://tldr.tech/ai/2026-10-04",
+        "edition of 2026-10-02",
+    ]
+
+
+def test_a_past_day_refused_before_an_edition_read_is_given_up_and_logged(
+    fake_download, caplog
+):
+    fake_download.answers["https://tldr.tech/ai/2026-10-02"] = LANDING_PAGE
+    fake_download.answers["https://tldr.tech/ai/2026-10-04"] = EDITION_PAGE.replace(
+        b"2026-10-02</h1>", b"2026-10-04</h1>"
+    )
+    caplog.set_level(logging.INFO, logger="k_b.etl.sources.tldr")
+
+    pages = TldrSource("ai").fetch(datetime(2026, 10, 2, 6, 0, tzinfo=UTC))
+
+    assert list(pages) == ["2026-10-04"]
+    [warning] = [
+        record for record in caplog.records if record.levelno == logging.WARNING
+    ]
+    assert warning.getMessage() == (
+        "tldr_ai 2026-10-02: not_the_edition_of_the_day, given up: edition of "
+        f"2026-10-04 read; {LANDING_REFUSAL}, from https://tldr.tech/ai/2026-10-02"
+    )
+
+
+def test_a_page_of_today_that_is_not_an_edition_is_skipped_and_logged(
+    fake_download, caplog
+):
+    fake_download.answers["https://tldr.tech/ai/2026-10-03"] = EDITION_PAGE.replace(
+        b"2026-10-02</h1>", b"2026-10-03</h1>"
+    )
+    fake_download.answers["https://tldr.tech/ai/2026-10-04"] = LANDING_PAGE
+    caplog.set_level(logging.INFO, logger="k_b.etl.sources.tldr")
+
+    pages = TldrSource("ai").fetch(datetime(2026, 10, 3, 6, 0, tzinfo=UTC))
+
+    assert list(pages) == ["2026-10-03"]
+    assert (
+        "tldr_ai 2026-10-04: not_the_edition_of_the_day, read again at the next "
+        f"collection; {LANDING_REFUSAL}, from https://tldr.tech/ai/2026-10-04"
+    ) in caplog.text
+    assert not [record for record in caplog.records if record.levelno >= logging.WARNING]
+
+
+def test_an_http_error_after_a_page_refused_is_raised(fake_download):
+    fake_download.answers["https://tldr.tech/ai/2026-10-03"] = LANDING_PAGE
+    fake_download.answers["https://tldr.tech/ai/2026-10-04"] = HTTPError(
+        "https://tldr.tech/ai/2026-10-04", 500, "Internal Server Error", {}, None
+    )
+
+    with pytest.raises(HTTPError) as raised:
+        TldrSource("ai").fetch(datetime(2026, 10, 3, 6, 0, tzinfo=UTC))
+    assert raised.value.__notes__ == [
+        "tldr_ai 2026-10-04, from https://tldr.tech/ai/2026-10-04"
+    ]
+
+
+def test_an_unexpected_error_of_the_reader_is_raised_with_its_day_and_url(
+    fake_download, monkeypatch
+):
+    def fail_reading(page):
+        raise RecursionError("maximum recursion depth exceeded")
+
+    fake_download.answers["https://tldr.tech/ai/2026-10-04"] = EDITION_PAGE
+    monkeypatch.setattr(tldr, "read_articles", fail_reading)
+
+    with pytest.raises(RecursionError) as raised:
+        TldrSource("ai").fetch(datetime(2026, 10, 4, 6, 0, tzinfo=UTC))
+    assert raised.value.__notes__ == [
+        "tldr_ai 2026-10-04, from https://tldr.tech/ai/2026-10-04"
+    ]
+
+
 AI_PAGE_PATH = "automated_watch/tldr_ai/2026-10-11T153130Z/2026-10-07.html"
 DEV_PAGE_PATH = "automated_watch/tldr_dev/2026-10-11T153130Z/2026-10-05.html"
 COLLECTED_AT = datetime(2026, 10, 11, 15, 31, 30, tzinfo=UTC)
-AI_HEADING = b"TLDR AI 2026-10-07</h1>"
 MISTRAL_ARTICLE = TldrArticle(
     edition_date=date(2026, 10, 7),
     rank=2,

@@ -7,6 +7,7 @@ from urllib.error import HTTPError
 import pytest
 
 from k_b.etl.extract import collect_all_sources
+from k_b.etl.http_download import RedirectedOutsideError
 from k_b.etl.raw_store import load_last_collection_dates, save_last_collection_dates
 from k_b.etl.sources import cisa_kev, tldr
 
@@ -265,6 +266,117 @@ def test_a_failed_tldr_page_is_logged_once_with_its_day_and_url(
         "'HTTP Error 500: Internal Server Error'; "
         "'tldr_ai 2026-10-04, from https://tldr.tech/ai/2026-10-04'"
     )
+
+
+# Collected pages (tests/etl/sources/test_tldr.py): the landing page of the edition, and the
+# edition of 2026-10-07 under the date of each test.
+TLDR_LANDING_PAGE = (FIXTURES_DIR / "tldr_ai_landing_extract.html").read_bytes()
+TLDR_AI_PAGE = (FIXTURES_DIR / "tldr_ai_extract.html").read_bytes()
+
+
+def tldr_edition_page(day):
+    return TLDR_AI_PAGE.replace(
+        b"TLDR AI 2026-10-07</h1>", f"TLDR AI {day}</h1>".encode()
+    )
+
+
+def serve_tldr_pages(monkeypatch, today, pages_by_url):
+    """Stand for tldr.tech on today: each url its page, any other day redirected to the landing
+    page of the edition; return the urls asked."""
+    urls_asked = []
+
+    def fake_download(url, trusted_url_prefix, max_bytes):
+        urls_asked.append(url)
+        if url in pages_by_url:
+            return pages_by_url[url]
+        raise RedirectedOutsideError(url, "https://tldr.tech/ai")
+
+    monkeypatch.setattr(tldr, "download", fake_download)
+    monkeypatch.setattr(tldr, "current_day", lambda: today)
+    monkeypatch.setattr(tldr, "sleep", lambda seconds: None)
+    return urls_asked
+
+
+def test_a_tldr_page_that_is_not_an_edition_writes_nothing_and_keeps_the_date(
+    tmp_path, monkeypatch, caplog
+):
+    serve_tldr_pages(
+        monkeypatch,
+        date(2026, 10, 4),
+        {
+            "https://tldr.tech/ai/2026-10-02": tldr_edition_page("2026-10-02"),
+            "https://tldr.tech/ai/2026-10-03": TLDR_LANDING_PAGE,
+        },
+    )
+    last_collected_at = datetime(2026, 10, 2, 6, 0, tzinfo=UTC)
+    save_last_collection_dates(tmp_path, {"tldr_ai": last_collected_at})
+
+    outcome = collect_all_sources(
+        [tldr.TldrSource("ai")],
+        tmp_path / "raw",
+        tmp_path,
+        datetime(2026, 10, 4, 8, 0, tzinfo=UTC),
+    )
+
+    assert isinstance(outcome.errors_by_source["tldr_ai"], ValueError)
+    assert load_last_collection_dates(tmp_path) == {"tldr_ai": last_collected_at}
+    # The edition of 2026-10-02, read before the page refused, is not written either.
+    assert not (tmp_path / "raw").exists()
+    [error_record] = [
+        record for record in caplog.records if record.levelno >= logging.ERROR
+    ]
+    assert error_record.getMessage() == (
+        "collection failed for source 'tldr_ai': ValueError "
+        "'not_the_edition_of_the_day'; "
+        "'tldr_ai 2026-10-03, from https://tldr.tech/ai/2026-10-03'; "
+        '"first h1 is not an edition title with its date: '
+        "'Keep up with AI in 5 minutes'\""
+    )
+
+
+def test_a_past_tldr_day_never_an_edition_stops_failing_once_a_later_edition_is_read(
+    tmp_path, monkeypatch, caplog
+):
+    refused_url = "https://tldr.tech/ai/2026-10-02"
+    save_last_collection_dates(
+        tmp_path, {"tldr_ai": datetime(2026, 10, 2, 6, 0, tzinfo=UTC)}
+    )
+
+    def collect_on(today, pages_by_url):
+        urls_asked = serve_tldr_pages(monkeypatch, today, pages_by_url)
+        outcome = collect_all_sources(
+            [tldr.TldrSource("ai")],
+            tmp_path / "raw",
+            tmp_path,
+            datetime.combine(today, datetime.min.time(), UTC) + timedelta(hours=8),
+        )
+        return outcome.errors_by_source["tldr_ai"], urls_asked
+
+    # Saturday: no edition after the page refused, the source fails.
+    error, _ = collect_on(date(2026, 10, 3), {refused_url: TLDR_LANDING_PAGE})
+    assert isinstance(error, ValueError)
+    assert load_last_collection_dates(tmp_path)["tldr_ai"].date() == date(2026, 10, 2)
+
+    # Monday: the edition of the day is read, the day refused is given up.
+    monday_url = "https://tldr.tech/ai/2026-10-05"
+    with caplog.at_level(logging.WARNING, logger="k_b"):
+        error, _ = collect_on(
+            date(2026, 10, 5),
+            {
+                refused_url: TLDR_LANDING_PAGE,
+                monday_url: tldr_edition_page("2026-10-05"),
+            },
+        )
+    assert error is None
+    assert load_last_collection_dates(tmp_path)["tldr_ai"].date() == date(2026, 10, 5)
+    [page] = (tmp_path / "raw" / "automated_watch" / "tldr_ai").glob("*/*.html")
+    assert page.name == "2026-10-05.html"
+    assert "2026-10-02: not_the_edition_of_the_day, given up" in caplog.text
+
+    # Tuesday: the day given up is not asked again.
+    error, urls_asked = collect_on(date(2026, 10, 6), {refused_url: TLDR_LANDING_PAGE})
+    assert error is None
+    assert refused_url not in urls_asked
 
 
 def test_the_error_and_the_notes_of_a_failed_source_are_quoted_escaped(
