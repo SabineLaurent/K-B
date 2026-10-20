@@ -7,10 +7,11 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 ## Contexte
 
 - K-B est le projet support de la certification Développeur IA (RNCP37827) : E1 (pipeline de
-  données) et E3 (API IA) d'abord, hors machine learning. Le 25/10 est un POC en conteneurs en
-  localhost ; mise en ligne sur Azure Container Apps au 08/11 (journal ADR, 2026-10-15, « POC du
-  25/10 »). Le suivi de la certif vit dans un dépôt séparé, pas ici. Les dates sont tenues par
-  time-knight.
+  données) et E3 (API IA) d'abord, hors machine learning. K-B tourne en trois temps : d'abord sur le
+  Mac, sans conteneur (retour en CLI, fiches `.md`) ; puis en conteneurs en local, avant le 29/10 si
+  le temps le permet ; puis sur Azure Container Apps au 08/11 (journal ADR, 2026-10-20,
+  « Squelette E1 E3 : cadrage du 20/10 », décision 1). Le suivi de la certif vit dans un dépôt
+  séparé, pas ici. Les dates sont tenues par time-knight.
 - Les critères de la certif deviennent des exigences de K-B seulement là où ils servent le produit.
 - **Binôme** : Sabine travaille avec Claude Code. Claude écrit l'essentiel du code et de la doc ;
   Sabine pilote, relit, teste et décide. Les estimations en tiennent compte : les comptes, la prise
@@ -20,7 +21,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 - Chaque issue porte une ligne « Estimation : X h » ; le label `size:*` n'est qu'un ordre de
   grandeur. Le jalon « POC 25/10 » porte ses estimations.
-- La surveillance des exécutions est portée par #163 (rédaction), puis #162 et #164 (08/11).
+- La surveillance du modèle est portée par #163 (comparaison des outils), puis #162 et #164, au
+  jalon « POC 25/10 » : métriques en OpenTelemetry vers Grafana Cloud dès le premier temps
+  (journal ADR, 2026-10-20, décision 4).
 - Coupes du 15/10 (journal ADR, « POC du 25/10 ») : la compilation des clips en wiki passe après
   le 29/10, `kb search` après le 08/11. arXiv et Zotero vont ensemble ; l'ingester arXiv est
   repris de brief09.
@@ -38,17 +41,24 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   et le réécrit en entier à la fin (`src/k_b/etl/extract.py`) : la dernière collecte qui écrit
   l'emporte. Avec `KB_COLLECT_ONLY`, le Mac (`zotero,clipping`) et les conteneurs (le reste)
   collectent à part ; s'ils partagent l'état (#200), leurs collectes ne doivent pas se chevaucher.
-- **Le README annonce des métriques « en OpenTelemetry, gardées sur ma machine »** (« Étape 2 »,
-  constat de la revue de #5, le 2026-10-18, sans issue) : contredit l'ADR du 15/10 (décision 8),
-  la règle 4 de `poc.md` (une ligne JSON par appel sur stdout) et l'observabilité dans le cloud
-  seulement (Sabine, 15/10). Périmètre de la v0, non corrigé.
+- **Le README annonce des métriques « gardées sur ma machine » et restituées « par un outil à
+  choisir »** (« Étape 2 », constat de la revue de #5, le 2026-10-18, porté par #165) : contredit
+  l'ADR du 15/10 (décision 8), la règle 4 de `poc.md` (une ligne JSON par appel sur stdout) et
+  l'ADR du 20/10 (décision 4 : OpenTelemetry vers Grafana Cloud, l'outil est choisi). Périmètre de
+  la v0, non corrigé.
 - **La ligne « Sécurité » du registre** (fiche 1 : fichiers lisibles par la seule utilisatrice)
   devient fausse quand la base passe dans un volume Docker (#200), puis sur Azure au 08/11 : la PR
   qui change l'hébergement la met à jour (revue de #5, le 2026-10-18).
+- **Deux pourquoi de `.claude/rules/poc.md` contredisent le cadrage du 20/10** (revue de #275, le
+  2026-10-20 ; signalé à Sabine, qui modifie `.claude/`) : la règle 1 dit « La base passe à
+  PostgreSQL au 08/11 (décision 2) », décision en attente de « La base au temps 3 » ; la règle 6
+  dit « Le POC en conteneurs », alors que le premier temps se fait sans conteneur (journal ADR,
+  2026-10-20, décision 1).
 
 ## Interface
 
-- Le 25/10 : POC en conteneurs en localhost, retour console ; ni interface CLI dédiée ni front.
+- Au premier temps : sur le Mac, sans conteneur, retour dans la console, par les commandes
+  `kb`, et fiches `.md` ; ni interface CLI dédiée ni front (journal ADR, 2026-10-20, décision 1).
   `kb search` vient après le 08/11 ; un front écoconçu, plus tard (journal ADR, 2026-10-15,
   « POC du 25/10 »). Une commande de plus, `kb write-tops` (#265), écrit les fiches des tops dans
   le coffre, après `kb import` (journal ADR, 2026-10-19, « Tops : les fiches par `kb write-tops` »).

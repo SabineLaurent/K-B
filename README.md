@@ -100,11 +100,14 @@ Les utilisateurs du produit sont décrits plus haut, dans « Utilisateurs ».
 - **Python 3.13** (`.python-version`), langage du code ; dépendances et environnement par
   [uv](https://docs.astral.sh/uv/). **SQL** pour le schéma et les requêtes
   (`src/k_b/database/schema.sql`, module `sqlite3`, sans ORM).
-- **Base** : SQLite au POC du 25/10, PostgreSQL à la mise en ligne du 08/11. D'ici là, aucun
-  SQL propre à SQLite n'est ajouté (règle 1 de `.claude/rules/poc.md`).
+- **Base** : SQLite aux deux premiers temps, le Mac puis des conteneurs en local (voir « Le POC
+  du 25/10 et la suite ») ; au troisième (Azure Container Apps, 08/11), SQLite et Blob ou
+  PostgreSQL, non tranché (journal ADR, « Décisions encore ouvertes », « La base au
+  temps 3 »). D'ici là, aucun SQL propre à SQLite n'est ajouté (règle 1 de `.claude/rules/poc.md`).
 - **Données hors du dépôt**, dans le dossier `KB_DATA_DIR` (`~/.knowledge_base` sur ma machine,
-  journal ADR du 2026-10-09). Au POC, la base ira dans un volume nommé et le brut dans un dossier
-  partagé avec les conteneurs (journal ADR, 2026-10-15, « POC du 25/10 », décision 2 ; #200).
+  journal ADR du 2026-10-09). Au deuxième temps, en conteneurs, la base ira dans un volume nommé et
+  le brut dans un dossier partagé avec les conteneurs (journal ADR, 2026-10-15, « POC du 25/10 »,
+  décision 2 ; #200).
 - **Réglages par variables d'environnement** : hôtes, ports, chemins et secrets ; un secret n'a
   pas de valeur par défaut (règle 2 de `.claude/rules/poc.md`).
 - **Données personnelles** : le modèle traite en zone de données UE ; ce que K-B garde, et
@@ -119,7 +122,7 @@ Les utilisateurs du produit sont décrits plus haut, dans « Utilisateurs ».
 | API GitHub | un jeton en lecture seule, sans frais ([docs/jeton-github.md](docs/jeton-github.md)) |
 | BigQuery (GH Archive) | bac à sable sans compte de facturation : au-delà du quota gratuit (1 Tio lu par mois), une requête est refusée, jamais facturée ([docs/bigquery.md](docs/bigquery.md)) |
 | Modèle des fiches | gpt-6-luna sur Azure AI Foundry, sur l'abonnement Azure de mon organisme de formation, fourni pour ce projet : région France Central, zone de données UE, 140 000 jetons par minute (journal ADR, 2026-10-17). Je n'en vois pas la facturation. Ordre de grandeur : au pire environ 420 000 jetons par demande de fiches, à 0,12 $ en entrée et 0,60 $ en sortie par million de jetons, prix UE, soit quelques centimes (journal ADR, 2026-10-16) ; les appels et les jetons d'une demande sont détaillés dans [docs/fiches-veille.md](docs/fiches-veille.md), « Coût » |
-| Mise en ligne du 08/11 (Azure Container Apps, PostgreSQL, Blob Storage) | non chiffrée à ce jour |
+| Mise en ligne du 08/11 (Azure Container Apps, Blob Storage ; la base, à trancher) | non chiffrée à ce jour |
 | Temps | chaque issue porte son estimation en heures ; les jalons les regroupent |
 
 ### Organisation du travail
@@ -146,22 +149,25 @@ le 18/10/2026 :
 
 ### Le POC du 25/10 et la suite
 
-**Le 25/10** (journal ADR, 2026-10-15, « POC du 25/10 ») : un POC en conteneurs Docker en
-localhost, qui fait tourner la collecte, l'API de données et l'API IA. L'API IA rédige des fiches
-de veille par sujet, sur une fenêtre réglable (`KB_DIGEST_WINDOW_DAYS`, 3 jours par défaut), avec
-gpt-6-luna ; le modèle ne choisit le sujet que dans une liste fermée que je tiens. Le retour se
-lit dans la console : ni interface CLI dédiée ni front. Zotero et les clips restent collectés sur ma
-machine (`KB_COLLECT_ONLY`), sans que ma bibliothèque soit montée dans un conteneur. La collecte et
-l'import sont lancés à la main, et conçus comme des jobs.
+**Le 25/10** (journal ADR, 2026-10-20, « Squelette E1 E3 : cadrage du 20/10 », décision 1) : K-B
+tourne sur ma machine, sans conteneur ; c'est le premier de trois temps. La collecte, l'import,
+l'API de données et l'API IA s'y lancent par `kb`. L'API IA rédige des fiches de veille par sujet,
+sur une fenêtre réglable (`KB_DIGEST_WINDOW_DAYS`, 3 jours par défaut), avec gpt-6-luna ; le modèle
+ne choisit le sujet que dans une liste fermée que je tiens. Le retour se lit dans la console, et les
+fiches en `.md` dans mon coffre : ni interface CLI dédiée ni front. La collecte et l'import sont
+lancés à la main, et conçus comme des jobs. Au deuxième temps, avant le 29/10 si le temps le permet,
+des conteneurs en local répètent le déploiement : Zotero et les clips y restent collectés sur ma
+machine (`KB_COLLECT_ONLY`), sans que ma bibliothèque soit montée dans un conteneur.
 
 **Où on en est** : la collecte, l'import et l'API de données sont codés (voir « Installer et
-lancer »). Restent l'image et les conteneurs (#200), le service des fiches par l'API IA (#156) et
-l'installation par compose (#202).
+lancer »). Restent le service des fiches par l'API IA (#156), leur écriture en `.md` par
+`kb digest` (#209) et les métriques du modèle vers Grafana Cloud (#162, #164) ; puis, au deuxième
+temps, l'image et les conteneurs (#200) et l'installation par compose (#202).
 
 **La suite** :
 
-- au 08/11, mise en ligne sur Azure Container Apps : PostgreSQL, brut dans Azure Blob Storage,
-  collecte en job déclenché par cron ;
+- au 08/11, mise en ligne sur Azure Container Apps : brut dans Azure Blob Storage, collecte en
+  job déclenché par cron ; la base, SQLite et Blob ou PostgreSQL, reste à trancher ;
 - après le 29/10, la compilation des clips en wiki ;
 - après le 08/11, la recherche `kb search`.
 

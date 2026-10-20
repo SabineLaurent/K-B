@@ -285,9 +285,10 @@ de `TrustedHostMiddleware`, qui répond avant l'app, en texte.
 
 - Tri par date, comme sans `q`.
 - **Écart temporaire** à la recherche plein texte triée par pertinence (journal ADR,
-  2026-10-09) : elle se fera avec PostgreSQL (`tsvector`) après le 08/11 (journal ADR,
-  2026-10-15, « POC du 25/10 », décision 2), changera l'ordre des résultats avec `q`, et passera
-  la spec et l'OpenAPI à une nouvelle version.
+  2026-10-09) : elle changera l'ordre des résultats avec `q`, et passera la spec et l'OpenAPI à
+  une nouvelle version. Elle était prévue avec PostgreSQL (`tsvector`) après le 08/11 (journal
+  ADR, 2026-10-15, « POC du 25/10 », décision 2) ; son moteur attend « La base au temps 3 »
+  (journal ADR, « Décisions encore ouvertes »).
 
 ## Données personnelles
 

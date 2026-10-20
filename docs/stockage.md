@@ -25,15 +25,16 @@ base : il lit la veille par l'API de données (`src/k_b/ai_api/connectors/data_a
 pas encore servi (#156). `kb search` vient après le 08/11 (journal ADR, 2026-10-15, « POC du
 25/10 », décision 1).
 
-## Le SGBD : SQLite au POC du 25/10, PostgreSQL au 08/11
+## Le SGBD : SQLite, puis la base au temps 3, non tranchée
 
-Retenu au POC du 25/10 : **SQLite**, un fichier hors du dépôt, lu avec le module `sqlite3` de
-la bibliothèque standard. En local, il est dans le dossier de données, donné par la variable
-`KB_DATA_DIR`, que le journal ADR du 2026-10-09 fixe à `~/.knowledge_base`. Dans les conteneurs
-du POC, il sera dans un volume nommé (journal ADR, 2026-10-15, « POC du 25/10 », décision 2 ;
-#200).
+Retenu aux deux premiers temps, le Mac puis les conteneurs en local (journal ADR, 2026-10-20,
+« Squelette E1 E3 : cadrage du 20/10 », décision 1) : **SQLite**, un fichier hors du dépôt, lu
+avec le module `sqlite3` de la bibliothèque standard. En local, il est dans le dossier de données,
+donné par la variable `KB_DATA_DIR`, que le journal ADR du 2026-10-09 fixe à `~/.knowledge_base`.
+Dans les conteneurs du deuxième temps, il sera dans un volume nommé (journal ADR, 2026-10-15,
+« POC du 25/10 », décision 2 ; #200).
 
-| | SQLite (au POC du 25/10) | PostgreSQL (prévu au 08/11) |
+| | SQLite (temps 1 et 2) | PostgreSQL (une option au temps 3) |
 |---|---|---|
 | Installation | aucune : un fichier, rejouable par un tiers | un serveur à installer, lancer et sécuriser |
 | Écritures | une à la fois ; ici un seul écrivain, le pipeline | plusieurs en parallèle (MVCC) |
@@ -42,10 +43,13 @@ du POC, il sera dans un volume nommé (journal ADR, 2026-10-15, « POC du 25/10 
 | Typage | souple par défaut ; strict avec les tables `STRICT` | strict |
 | Dépendance | aucune | un pilote (`psycopg`) |
 
-Pourquoi SQLite au POC du 25/10 : un utilisateur, un écrivain par jour, quelques milliers
+Pourquoi SQLite aux deux premiers temps : un utilisateur, un écrivain par jour, quelques milliers
 d'items par an ; en localhost, un fichier suffit. Limite assumée : pas de rôles dans la base.
-Pourquoi PostgreSQL au 08/11 : sur Azure Container Apps, un fichier SQLite n'a pas de disque
-fiable (journal ADR, 2026-10-15, « POC du 25/10 », décision 2). D'ici là, aucun SQL propre à
+Pourquoi PostgreSQL au 08/11, selon la décision du 2026-10-15 : sur Azure Container Apps, un
+fichier SQLite n'a pas de disque fiable (journal ADR, « POC du 25/10 », décision 2). Cette
+décision est en attente depuis le 2026-10-20 : l'autre option est SQLite et Blob, la base
+devenant un fichier produit par le job et rangé dans Azure Blob Storage (journal ADR, « Décisions
+encore ouvertes », « La base au temps 3 »). D'ici là, aucun SQL propre à
 SQLite n'est ajouté (règle 1 de `.claude/rules/poc.md`) ; ce qui l'est déjà est listé plus bas,
 avec son équivalent PostgreSQL.
 
@@ -315,11 +319,12 @@ règle ci-dessus (`tests/test_database.py`).
 
 - **En développement, la base est jetable** : un changement de schéma = supprimer la base,
   `kb create-db`, puis `kb import`, qui la reconstruit depuis le brut. Pas de migration.
-- **En usage réel, la base est gardée** et l'`id` technique des items reste stable. SQLite au
-  25/10, PostgreSQL au 08/11 (journal ADR, 2026-10-15, « POC du 25/10 », décision 2) : les
-  migrations Alembic écrites en SQL (journal ADR, 2026-10-10), pas encore codées, sont à reprendre
-  pour PostgreSQL seulement, avec #186. `schema.sql` reste le MPD et fait foi.
-- **Au passage à PostgreSQL, l'`id` est copié tel quel.** Les lignes de chaque table sont
+- **En usage réel, la base est gardée** et l'`id` technique des items reste stable. SQLite aux
+  temps 1 et 2 ; PostgreSQL au 08/11 selon la décision 2 du 2026-10-15 (journal ADR, « POC du
+  25/10 »), en attente de « La base au temps 3 » : les migrations Alembic écrites en SQL (journal
+  ADR, 2026-10-10), pas encore codées, sont à reprendre pour PostgreSQL seulement, avec #186.
+  `schema.sql` reste le MPD et fait foi.
+- **Si la base passe à PostgreSQL, l'`id` est copié tel quel.** Les lignes de chaque table sont
   copiées avec leur `id` ; un `INSERT` dans une colonne `GENERATED ALWAYS AS IDENTITY` (tableau
   ci-dessus) ne l'accepte qu'avec `OVERRIDING SYSTEM VALUE`. Puis la séquence de chaque table est
   recalée sur le plus grand `id` copié, sans quoi le prochain `INSERT` sans `id` reprendrait à 1
