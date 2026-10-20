@@ -1126,8 +1126,9 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   seulement) ; Langfuse auto-hébergé (6 services, environ 11 CPU et 25 Gio). **Revient** sur
   « tableau de bord : plus tard » (2026-09-29) et sur le README (hors v0) : un outil de
   restitution entre en v0, étape 2. **Révisée le 2026-10-15** : la copie locale devient une
-  ligne JSON par appel, sur stdout (« POC du 25/10 », décision 8 ; règle 4 de `.claude/rules/poc.md`). **Close le 2026-10-20** : l'outil est Grafana
-  Cloud, en OpenTelemetry (« Squelette E1 E3 : cadrage du 20/10 », décision 4).
+  ligne JSON par appel, sur stdout (« POC du 25/10 », décision 8 ; règle 4 de
+  `.claude/rules/poc.md`). **Close le 2026-10-20** : l'outil est Grafana Cloud, en
+  OpenTelemetry (« Squelette E1 E3 : cadrage du 20/10 », décision 4).
 
 ### Périmètre
 
@@ -1730,8 +1731,9 @@ qui en découlent sont dans `.claude/rules/poc.md`.
   **Révise** « Installation et interface » (2026-10-08), « Interface » (2026-10-09 et
   2026-10-14 : `kb search` vient après le 08/11), la
   décision qui garde la base et les données sur la machine (2026-10-09), et l'API IA « en local
-  […] pas d'hébergement en v0 » (2026-10-12). — PR de #198 **Révisée le 2026-10-20** : trois temps, le Mac sans conteneur
-  d'abord, puis les conteneurs en local, puis ACA (« Squelette E1 E3 : cadrage du 20/10 », décision 1).
+  […] pas d'hébergement en v0 » (2026-10-12). — PR de #198 **Révisée le 2026-10-20** : trois temps,
+  le Mac sans conteneur d'abord, puis les conteneurs en local, puis ACA (« Squelette E1 E3 : cadrage
+  du 20/10 », décision 1).
 - **2. SQLite au 25/10, PostgreSQL au 08/11.** Décision de Sabine (15/10, 11 h 17). Pourquoi :
   PostgreSQL ne sert que la mise en ligne, car sur ACA un fichier SQLite n'a pas de disque
   fiable ; en localhost, SQLite fonctionne. La règle « aucun nouveau SQL propre à SQLite » (règle
@@ -1804,7 +1806,8 @@ qui en découlent sont dans `.claude/rules/poc.md`.
   POC ; Entra ID dépend aussi de la souscription de l'école, où le droit d'enregistrer une
   application n'est pas vérifié. **Révise** le jeton de courte durée et le *refresh token*
   (2026-10-12, « Wiki : API et client »). — PR de #198 **Précisée le 2026-10-20** : la clé reste
-  fixe, sa rotation est documentée ; #160 reste hors du squelette (« Squelette E1 E3 : cadrage du 20/10 », décision 3).
+  fixe, sa rotation est documentée ; #160 reste hors du squelette (« Squelette E1 E3 : cadrage du
+  20/10 », décision 3).
 - **8. Les recommandations des relectures plateforme et IA du 15/10 sont suivies ; elles
   deviennent les huit règles de `.claude/rules/poc.md`.** Décision de Sabine (15/10, 11 h 54).
   Options écartées : dans chaque issue qui porte une recommandation. **Révise** la copie locale
@@ -2166,8 +2169,9 @@ Recommandation de time-knight, retenue par Sabine le 16/10 (vers 11 h 45, heure 
 
 Décisions de Sabine des 15 et 16/10, relayées par time-knight. Celles du 16/10 (14 h 53, heure de
 Paris) valident le découpage de la session K-B, relu par un agent ingénieur IA indépendant. Le
-contrat vient avec #222, le code avec #223, l'étalonnage avec #224. **Révisée le 2026-10-20** : le juge sort du contrat des
-fiches ; #223 et #224 restent ouvertes, hors du squelette (« Squelette E1 E3 : cadrage du 20/10 », décision 2).
+contrat vient avec #222, le code avec #223, l'étalonnage avec #224. **Révisée le 2026-10-20** : le
+juge sort du contrat des fiches ; #223 et #224 restent ouvertes, hors du squelette (« Squelette E1
+E3 : cadrage du 20/10 », décision 2).
 
 - **Un LLM juge vérifie chaque affirmation d'une fiche : c'est le contrôle 8, après la fidélité
   (contrôle 7). Il rend
@@ -2665,7 +2669,8 @@ Décisions de Sabine du 2026-10-17 sur le plan de #14, relayées par time-knight
   version. **Précisée le 2026-10-19** : jusqu'à la sauvegarde de la base, au 08/11 (« Brut :
   catalogues d'état et conservation »). **Révisée le 2026-10-19** : un clip dont le contenu a
   changé est réécrit (« Collecte : mise à jour des `.md` importés »). **Précisée le 2026-10-20** :
-  la sauvegarde de la base attend « La base au temps 3 » (« Squelette E1 E3 : cadrage du 20/10 », décision 6). — PR de #14
+  la sauvegarde de la base attend « La base au temps 3 » (« Squelette E1 E3 : cadrage du 20/10 »,
+  décision 6). — PR de #14
 - **Le texte complet d'un clip va dans la colonne `clip.body` de son sous-type ; ni `author`, ni
   `description`, ni `tags` n'entrent en base.** Décision de Sabine, sur recommandation. Pourquoi,
   celui de la recommandation : la spec (« titre, URL source, date, et le texte gardé ») et la
@@ -2926,9 +2931,9 @@ time-knight (délégation de Sabine du 2026-10-15).
   (*cleansed* et *curated*, « Wiki ») et le donne à toutes les données de K-B. Pourquoi : chaque
   couche a sa règle de conservation, et la purge ne touche que le *raw*. Réserve de Sabine :
   « petit bémol pour les vieilles veilles, à voir » (ci-dessous, « Décisions encore ouvertes »).
-  — PR de #139 **Précisée le 2026-10-20** : la veille du *cleansed* est purgée au terme de sa
-  durée, 3 ans ; « immuable » veut dire jamais réécrit ; `trend` sort du *curated* « jamais purgé »
-  (« Squelette E1 E3 : cadrage du 20/10 », décision 5).
+  — PR de #139 **Révisée le 2026-10-20**, règle et pourquoi : la purge touche aussi la veille du
+  *cleansed*, au terme de sa durée, 3 ans ; « immuable » veut dire jamais réécrit ; `trend` sort du
+  *curated* « jamais purgé » (« Squelette E1 E3 : cadrage du 20/10 », décision 5).
 - **Zotero et CISA KEV sont des catalogues d'état : leur brut ne garde que le dernier fichier
   importé, le nouveau remplace le précédent.** Décision de Sabine. Pourquoi, celui de Sabine :
   « L'historique de versions n'a pas d'intérêt pour un catalogue d'état qui est indexé en bdd. On
@@ -2973,7 +2978,8 @@ time-knight (délégation de Sabine du 2026-10-15).
   purge des copies de clips de #139, où l'avait mise la décision du 2026-10-17. Limite assumée :
   jusque-là, chaque version d'un clip reste dans le brut, sans durée. — PR de #139 **Précisée le
   2026-10-20** : la règle reste ; « au 08/11, avec PostgreSQL et Alembic » attend « La base au
-  temps 3 » ; fréquence : à chaque sauvegarde de la base (« Squelette E1 E3 : cadrage du 20/10 », décision 6).
+  temps 3 » ; fréquence : à chaque sauvegarde de la base (« Squelette E1 E3 : cadrage du 20/10 »,
+  décision 6).
 
 ### Collecte : mise à jour des `.md` importés
 
@@ -2992,7 +2998,7 @@ time-knight (délégation de Sabine du 2026-10-15).
   **S'accorde avec « le *cleansed* est immuable »** (« Brut : catalogues d'état et
   conservation », ci-dessus), selon la précision de Sabine : « les clips sont immuables en
   contenu mais le tag peut changer. Mes .md manuels sont potentiellement modifiables aussi en
-  contenu. Ce que je ne fais que rarement. » Le *cleansed* n'est jamais purgé (**précisée le
+  contenu. Ce que je ne fais que rarement. » Le *cleansed* n'est jamais purgé (**révisée le
   2026-10-20** : sauf la veille, purgée à 3 ans ; « Squelette E1 E3 : cadrage du 20/10 »,
   décision 5) ; le texte d'un
   clip est immuable par usage, Sabine ne le modifie pas ; ses tags peuvent changer ; un `.md`
@@ -3342,10 +3348,11 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
   L'application (`RETENTION_YEARS_BY_ACQUISITION_MODE` de `core/config.py`, le registre, les
   étapes 2, 3 et 9) est portée par #276 ; la purge n'est pas codée (#83). **Clôt** « Conservation
   des vieilles veilles » (2026-10-19) et, pour la veille, « Durées de conservation et fréquence de
-  la purge ». **Précise** « Brut : catalogues d'état et conservation » (2026-10-19) : la veille du
-  *cleansed* est purgée, et `trend` sort du *curated* « jamais purgé ». — PR de #275
-- **6. L'étape 8 de la procédure de tri (suppression du brut des clips) reste rattachée à la base
-  : elle attend « La base au temps 3 » (question ouverte, plus bas). Sa règle du 2026-10-19 ne
+  la purge ». **Révise** « Brut : catalogues d'état et conservation » (2026-10-19), sa règle et son
+  pourquoi (« la purge ne touche que le *raw* ») : la veille du *cleansed* est purgée, et `trend`
+  sort du *curated* « jamais purgé ». — PR de #275
+- **6. L'étape 8 de la procédure de tri (suppression du brut des clips) reste rattachée à la
+  base : elle attend « La base au temps 3 » (question ouverte, plus bas). Sa règle du 2026-10-19 ne
   change pas : le brut des clips n'est supprimé qu'une fois la base sauvegardée. Sa fréquence : à
   chaque sauvegarde de la base.** Décision de Sabine, prise au découpage. Pourquoi : non consigné.
   Options écartées :
@@ -3382,8 +3389,8 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de
   l'étalonnage du juge (#224), si les fiches sont trop maigres (« Fiches de veille : le LLM
-  juge »). **En attente depuis le 2026-10-20** : le juge sort du contrat des fiches (« Squelette E1 E3 : cadrage du 20/10 »,
-  décision 2).
+  juge »). **En attente depuis le 2026-10-20** : le juge sort du contrat des fiches (« Squelette E1
+  E3 : cadrage du 20/10 », décision 2).
 
 - **Remplir `newsletter_article.publication_id`** (2026-10-12) : quand le lien d'un article TLDR
   est `https://arxiv.org/abs/<id>`, le rattacher à sa PUBLICATION, créée sans ses colonnes arXiv
@@ -3397,6 +3404,10 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
   (2026-10-13) nomme ses dates nouvelles par leur événement Zotero, sans renommer les colonnes
   existantes.
 
+- **Conservation des vieilles veilles** (2026-10-19) : le *cleansed* est immuable, avec le
+  « petit bémol pour les vieilles veilles, à voir » de Sabine (« Brut : catalogues d'état et
+  conservation »). **Close le 2026-10-20** : la veille est purgée au terme de sa durée, 3 ans
+  (« Squelette E1 E3 : cadrage du 20/10 », décision 5).
 - **Licence du schéma de Zotero** (2026-10-11) : le code de Zotero est sous AGPL v3 « sauf
   fichier qui dit autrement » (page « Licensing » de zotero.org), K-B sous CC BY-NC 4.0.
   La base d'essai réécrit 15 tables aux noms et types de Zotero ; si cela pose une question de
@@ -3411,8 +3422,8 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
   sera dans `config.py` (2026-10-10), à revoir. Sabine n'a pas tranché le 2026-10-02 ; à confirmer
   quand #20 code la purge. La purge des tables nouvelles (référentiels, TENDANCE, bibliothèque)
   n'est pas définie (relecture du 2026-10-09). **Close le 2026-10-20 pour la veille** : 3 ans pour
-  les items, le brut de veille et les tendances (`trend`), dont la purge est ainsi définie (« Squelette E1 E3 : cadrage du 20/10 »,
-  décision 5) ; le reste, et les fréquences : #276.
+  les items, le brut de veille et les tendances (`trend`), dont la purge est ainsi définie
+  (« Squelette E1 E3 : cadrage du 20/10 », décision 5) ; le reste, et les fréquences : #276.
 - **Liste d'exclusion** des personnes qui demandent l'effacement, pour qu'une collecte ou une
   reconstruction ne les réintroduise pas : proposée dans le registre, à concevoir dans #20.
   Indispensable avec une base reconstruite, en développement (2026-10-10).
@@ -3446,7 +3457,8 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
   (mesures seules), seulement en environnement d'essai, ou toujours (et inscrit au registre).
   Sabine tranchera à la comparaison des outils de restitution. La trace d'un outil comme Langfuse
   tire son intérêt de ce texte, qui contient les noms des auteurs. **Précisée le 2026-10-20** :
-  l'outil est Grafana Cloud (« Squelette E1 E3 : cadrage du 20/10 », décision 4) ; la question reste ouverte jusqu'à #163.
+  l'outil est Grafana Cloud (« Squelette E1 E3 : cadrage du 20/10 », décision 4) ; la question reste
+  ouverte jusqu'à #163.
 - **Wiki : forme du contrat `.md` *cleansed*** (2026-10-12) : l'ETL écrit en SQLite ; ce que la
   partie LLM reçoit d'un papier Zotero (texte du PDF, métadonnées, surlignages) est à fixer avant
   le code.
@@ -3460,4 +3472,5 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
 - **Wiki : suivre OAuth 2 en entier, ou le schéma de jetons seul** (2026-10-12) : à voir au début
   de #160. **Révisée le 2026-10-15** : #160 vient en ligne au 08/11 ; la question reste ouverte
   jusque-là (« POC du 25/10 », décision 7). **Précisée le 2026-10-20** : #160 reste hors du
-  squelette ; à revoir avec une interface web en ligne (« Squelette E1 E3 : cadrage du 20/10 », décision 3).
+  squelette ; à revoir avec une interface web en ligne (« Squelette E1 E3 : cadrage du 20/10 »,
+  décision 3).

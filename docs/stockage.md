@@ -319,12 +319,12 @@ règle ci-dessus (`tests/test_database.py`).
 
 - **En développement, la base est jetable** : un changement de schéma = supprimer la base,
   `kb create-db`, puis `kb import`, qui la reconstruit depuis le brut. Pas de migration.
-- **En usage réel, la base est gardée** et l'`id` technique des items reste stable. SQLite au
-  25/10, PostgreSQL au 08/11 (journal ADR, 2026-10-15, « POC du 25/10 », décision 2, en attente
-  de « La base au temps 3 ») : les
-  migrations Alembic écrites en SQL (journal ADR, 2026-10-10), pas encore codées, sont à reprendre
-  pour PostgreSQL seulement, avec #186. `schema.sql` reste le MPD et fait foi.
-- **Au passage à PostgreSQL, l'`id` est copié tel quel.** Les lignes de chaque table sont
+- **En usage réel, la base est gardée** et l'`id` technique des items reste stable. SQLite aux
+  temps 1 et 2 ; PostgreSQL au 08/11 selon la décision 2 du 2026-10-15 (journal ADR, « POC du
+  25/10 »), en attente de « La base au temps 3 » : les migrations Alembic écrites en SQL (journal
+  ADR, 2026-10-10), pas encore codées, sont à reprendre pour PostgreSQL seulement, avec #186.
+  `schema.sql` reste le MPD et fait foi.
+- **Si la base passe à PostgreSQL, l'`id` est copié tel quel.** Les lignes de chaque table sont
   copiées avec leur `id` ; un `INSERT` dans une colonne `GENERATED ALWAYS AS IDENTITY` (tableau
   ci-dessus) ne l'accepte qu'avec `OVERRIDING SYSTEM VALUE`. Puis la séquence de chaque table est
   recalée sur le plus grand `id` copié, sans quoi le prochain `INSERT` sans `id` reprendrait à 1

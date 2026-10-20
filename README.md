@@ -100,8 +100,9 @@ Les utilisateurs du produit sont décrits plus haut, dans « Utilisateurs ».
 - **Python 3.13** (`.python-version`), langage du code ; dépendances et environnement par
   [uv](https://docs.astral.sh/uv/). **SQL** pour le schéma et les requêtes
   (`src/k_b/database/schema.sql`, module `sqlite3`, sans ORM).
-- **Base** : SQLite aux deux premiers temps ; au troisième (Azure Container Apps, 08/11), SQLite
-  et Blob ou PostgreSQL, non tranché (journal ADR, « Décisions encore ouvertes », « La base au
+- **Base** : SQLite aux deux premiers temps, le Mac puis des conteneurs en local (voir « Le POC
+  du 25/10 et la suite ») ; au troisième (Azure Container Apps, 08/11), SQLite et Blob ou
+  PostgreSQL, non tranché (journal ADR, « Décisions encore ouvertes », « La base au
   temps 3 »). D'ici là, aucun SQL propre à SQLite n'est ajouté (règle 1 de `.claude/rules/poc.md`).
 - **Données hors du dépôt**, dans le dossier `KB_DATA_DIR` (`~/.knowledge_base` sur ma machine,
   journal ADR du 2026-10-09). Au deuxième temps, en conteneurs, la base ira dans un volume nommé et
@@ -149,19 +150,19 @@ le 18/10/2026 :
 ### Le POC du 25/10 et la suite
 
 **Le 25/10** (journal ADR, 2026-10-20, « Squelette E1 E3 : cadrage du 20/10 », décision 1) : K-B
-tourne sur ma machine, sans conteneur ; c'est le premier de trois temps. La collecte, l'import, l'API de données
-et l'API IA s'y lancent par `kb`. L'API IA rédige des fiches de veille par sujet, sur une fenêtre
-réglable (`KB_DIGEST_WINDOW_DAYS`, 3 jours par défaut), avec gpt-6-luna ; le modèle ne choisit le
-sujet que dans une liste fermée que je tiens. Le retour se lit dans la console, et les fiches en
-`.md` dans mon coffre : ni interface CLI dédiée ni front. La collecte et l'import sont lancés à la
-main, et conçus comme des jobs. Au deuxième temps, avant le 29/10 si le temps le permet, des
-conteneurs en local répètent le déploiement : Zotero et les clips y restent collectés sur ma
+tourne sur ma machine, sans conteneur ; c'est le premier de trois temps. La collecte, l'import,
+l'API de données et l'API IA s'y lancent par `kb`. L'API IA rédige des fiches de veille par sujet,
+sur une fenêtre réglable (`KB_DIGEST_WINDOW_DAYS`, 3 jours par défaut), avec gpt-6-luna ; le modèle
+ne choisit le sujet que dans une liste fermée que je tiens. Le retour se lit dans la console, et les
+fiches en `.md` dans mon coffre : ni interface CLI dédiée ni front. La collecte et l'import sont
+lancés à la main, et conçus comme des jobs. Au deuxième temps, avant le 29/10 si le temps le permet,
+des conteneurs en local répètent le déploiement : Zotero et les clips y restent collectés sur ma
 machine (`KB_COLLECT_ONLY`), sans que ma bibliothèque soit montée dans un conteneur.
 
 **Où on en est** : la collecte, l'import et l'API de données sont codés (voir « Installer et
-lancer »). Restent le service des fiches par l'API IA (#156) et leur écriture en `.md` par
-`kb digest` (#209) ; puis, au deuxième temps, l'image et les conteneurs (#200) et l'installation
-par compose (#202).
+lancer »). Restent le service des fiches par l'API IA (#156), leur écriture en `.md` par
+`kb digest` (#209) et les métriques du modèle vers Grafana Cloud (#162, #164) ; puis, au deuxième
+temps, l'image et les conteneurs (#200) et l'installation par compose (#202).
 
 **La suite** :
 
