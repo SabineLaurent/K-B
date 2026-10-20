@@ -10,7 +10,6 @@ After a writing that failed with a 429 (rate limited, or its retry timed out, re
 the deadline), nothing more is sent: the provider said to wait, and the items of the next
 subjects would leave for an answer refused (minimisation, GDPR art. 5.1.c). A retry answered
 after its Retry-After got past the 429: the provider accepts again, and the next subjects go.
-The judge (#223) comes after the writing of each subject, in the same order of calls.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -78,7 +77,7 @@ class DigestFact:
 class DigestClaim:
     text: str
     item_ids: tuple[int, ...]
-    # Kept for the checks of #207 and the judge; never in the answer.
+    # Kept for the checks of #207; never in the answer.
     facts: tuple[DigestFact, ...]
 
 
