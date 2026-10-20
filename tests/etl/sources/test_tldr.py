@@ -246,6 +246,28 @@ def test_each_day_refused_after_the_last_edition_read_is_noted(
     ]
 
 
+def test_a_day_refused_before_an_edition_read_is_noted_too_when_the_source_fails(
+    fake_download, monkeypatch
+):
+    fake_download.answers["https://tldr.tech/ai/2026-10-02"] = LANDING_PAGE
+    fake_download.answers["https://tldr.tech/ai/2026-10-03"] = EDITION_PAGE.replace(
+        b"2026-10-02</h1>", b"2026-10-03</h1>"
+    )
+    fake_download.answers["https://tldr.tech/ai/2026-10-04"] = LANDING_PAGE
+    monkeypatch.setattr(tldr, "current_day", lambda: date(2026, 10, 5))
+
+    with pytest.raises(ValueError, match="^not_the_edition_of_the_day") as raised:
+        TldrSource("ai").fetch(datetime(2026, 10, 2, 6, 0, tzinfo=UTC))
+    # Every day refused in the window, in its order: 2026-10-02 is given up only by a
+    # collection that succeeds.
+    assert raised.value.__notes__ == [
+        "tldr_ai 2026-10-02, from https://tldr.tech/ai/2026-10-02",
+        LANDING_REFUSAL,
+        "tldr_ai 2026-10-04, from https://tldr.tech/ai/2026-10-04",
+        LANDING_REFUSAL,
+    ]
+
+
 def test_a_past_day_refused_before_an_edition_read_is_given_up_and_logged(
     fake_download, caplog
 ):

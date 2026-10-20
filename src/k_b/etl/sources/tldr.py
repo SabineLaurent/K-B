@@ -74,15 +74,28 @@ class TldrSource:
         """
         today = current_day()
         days = list_days_to_collect(last_collected_at, today)
-        pages, refusals = self.download_edition_pages(days, today)
-        last_edition_day = max(map(date.fromisoformat, pages), default=None)
-        pending_days = [
-            day
-            for day in refusals
-            if last_edition_day is None or day > last_edition_day
-        ]
-        if pending_days:
-            raise self.refuse(pending_days, refusals)
+        read_pages = self.read_pages(days)
+        pages = {
+            day: page for day, page in read_pages.items() if isinstance(page, bytes)
+        }
+        refusals = {
+            day: page
+            for day, page in read_pages.items()
+            if isinstance(page, PageRefusal)
+        }
+        today_refusal = refusals.pop(today, None)
+        if today_refusal is not None:
+            logger.info(
+                "%s %s: %s, read again at the next collection; %s, from %s",
+                self.name,
+                today,
+                NOT_THE_EDITION_OF_THE_DAY,
+                today_refusal.observed,
+                today_refusal.page_url,
+            )
+        last_edition_day = max(pages, default=None)
+        if any(last_edition_day is None or day > last_edition_day for day in refusals):
+            raise self.refuse(refusals)
         for day, refusal in refusals.items():
             logger.warning(
                 "%s %s: %s, given up: edition of %s read; %s, from %s",
@@ -97,15 +110,12 @@ class TldrSource:
             logger.info(
                 "%s: no edition page from %s to %s", self.name, days[0], days[-1]
             )
-        return pages or None
+        return {day.isoformat(): page for day, page in pages.items()} or None
 
-    def download_edition_pages(
-        self, days: list[date], today: date
-    ) -> tuple[dict[str, bytes], dict[date, PageRefusal]]:
-        """The edition page of each day, by day, and the refusal of each past day whose page
-        is not the edition of the day."""
-        pages = {}
-        refusals = {}
+    def read_pages(self, days: list[date]) -> dict[date, bytes | PageRefusal]:
+        """The page of each day, or why it is not the edition of the day; a day redirected to
+        the landing page of the edition is left out."""
+        read_pages: dict[date, bytes | PageRefusal] = {}
         for position, day in enumerate(days):
             if position > 0:
                 sleep(PAUSE_BETWEEN_PAGES_SECONDS)
@@ -132,27 +142,19 @@ class TldrSource:
                 raise
             if observed is None:
                 logger.info("%s %s: edition page, %d bytes", self.name, day, len(page))
-                pages[day.isoformat()] = page
-            elif day == today:
-                logger.info(
-                    "%s %s: %s, read again at the next collection; %s, from %s",
-                    self.name,
-                    day,
-                    NOT_THE_EDITION_OF_THE_DAY,
-                    observed,
-                    page_url,
-                )
+                read_pages[day] = page
             else:
-                refusals[day] = PageRefusal(page_url, observed)
-        return pages, refusals
+                read_pages[day] = PageRefusal(page_url, observed)
+        return read_pages
 
-    def refuse(self, days: list[date], refusals: dict[date, PageRefusal]) -> ValueError:
-        """The failure of the source, with the day, url and observation of each day refused,
-        one note each: the collection quotes and cuts each note apart (etl/extract.py)."""
+    def refuse(self, refusals: dict[date, PageRefusal]) -> ValueError:
+        """The failure of the source, with the day, url and observation of each day refused in
+        the window, one note each: the collection quotes and cuts each note apart
+        (etl/extract.py)."""
         error = ValueError(NOT_THE_EDITION_OF_THE_DAY)
-        for day in days:
-            error.add_note(f"{self.name} {day}, from {refusals[day].page_url}")
-            error.add_note(refusals[day].observed)
+        for day, refusal in refusals.items():
+            error.add_note(f"{self.name} {day}, from {refusal.page_url}")
+            error.add_note(refusal.observed)
         return error
 
 

@@ -443,23 +443,24 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   `https://tldr.tech/<édition>`, n'a pas de page d'édition (observé pour le 2026-10-03 et le
   2026-10-04) : il est journalisé avec l'adresse de redirection et sauté. Toute autre
   redirection ou erreur HTTP fait échouer la source.
-- **Page qui n'est pas l'édition du jour** (#274, `fetch`, `download_edition_pages` et
-  `find_refusal`, `src/k_b/etl/sources/tldr.py:60-172`) : chaque page reçue est lue par
+- **Page qui n'est pas l'édition du jour** (#274, `fetch`, `read_pages` et `find_refusal`,
+  `src/k_b/etl/sources/tldr.py:60-174`) : chaque page reçue est lue par
   `read_articles`, le lecteur de l'import, avant d'être gardée. Elle est refusée, état nommé
   `not_the_edition_of_the_day` (`tldr.py:35`), si le lecteur la refuse (« Page refusée
   entière », ci-dessus) ou si la date de son `h1` n'est pas le jour demandé (`edition of
   <date>`). Une page refusée n'est jamais écrite. Selon son jour :
   - **un jour passé, après le dernier jour qui a donné une édition dans la collecte, ou sans
     édition lue** : la source échoue (`ValueError` `not_the_edition_of_the_day`, `refuse`,
-    `tldr.py:149-156`), avec deux notes par jour refusé, le jour et l'URL demandée, puis ce qui
-    a été observé (refus du lecteur, `h1` cité par `quote_value`, ou `edition of <date>`) ;
+    `tldr.py:150-158`), avec deux notes par jour refusé de la fenêtre, dans l'ordre, y compris
+    ceux qui précèdent une édition lue : le jour et l'URL demandée, puis ce qui a été observé
+    (refus du lecteur, `h1` cité par `quote_value`, ou `edition of <date>`) ;
     `src/k_b/etl/extract.py:48-50` cite chaque note à part, échappée et coupée à 100
     caractères. Rien n'est écrit, pas même les éditions lues dans la même collecte, et la date
     de dernière collecte reste (règle 1 de `.claude/rules/conventions.md`) : le jour est
     redemandé à la collecte suivante ;
   - **un jour passé, avant un jour qui a donné une édition dans la collecte** : le jour est
     abandonné, une ligne `WARNING` le dit (« `<source> <jour>: not_the_edition_of_the_day,
-    given up: edition of <jour> read; <observé>, from <URL>` », `tldr.py:87-95`), et la source
+    given up: edition of <jour> read; <observé>, from <URL>` », `tldr.py:100-108`), et la source
     réussit. L'édition lue après lui montre que le site sert des éditions et que ce jour est
     passé : un jour qui n'est jamais une édition fait échouer la source au plus jusqu'à la
     prochaine édition publiée, puis n'est plus demandé. Écartés : une borne de N jours (constante
@@ -468,8 +469,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     #274, validé par Sabine le 2026-10-20) ;
   - **aujourd'hui (UTC)** : la page est sautée, une ligne `INFO` le dit (« `<source> <jour>:
     not_the_edition_of_the_day, read again at the next collection; <observé>, from <URL>` »,
-    `tldr.py:136-144`), et la source réussit. Rien n'est perdu : le jour de la dernière collecte
-    est relu (`list_days_to_collect`, `tldr.py:179`). Écart à la lettre du critère de #274
+    `tldr.py:87-95`), et la source réussit. Rien n'est perdu : le jour de la dernière collecte
+    est relu (`list_days_to_collect`, `tldr.py:181`). Écart à la lettre du critère de #274
     (« la source échoue »), pour ce seul jour : si tldr.tech servait avant la parution une page
     qui n'est pas une édition (non observé), une collecte faite chaque matin échouerait chaque
     jour, et sa fenêtre grandirait sans fin, comme arXiv au-delà de 2 000 papiers (#71)
@@ -480,8 +481,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   **Limites** : une page refusée isolée entre deux éditions (passagère) est abandonnée dès la
   première collecte qui la voit, journalisée ; si c'est le premier jour de la fenêtre, relu et
   déjà gardé par une collecte précédente, la ligne `WARNING` s'écrit sans que rien ne soit
-  perdu. La ligne `WARNING` s'écrit quand `fetch` rend ses pages : si l'écriture du brut ou de
-  l'état échoue ensuite, le jour est redemandé et la ligne répétée. Une exception du lecteur
+  perdu. Le premier jour de la fenêtre est relu à chaque collecte : si sa page, déjà gardée,
+  est refusée cette fois et qu'aucune édition ne suit, la source échoue jusqu'à la prochaine
+  édition, puis l'abandonne, sans rien perdre (le distinguer d'un jour encore à collecter
+  demanderait de lire le brut). La ligne `WARNING` s'écrit quand `fetch` rend ses pages : si
+  l'écriture du brut ou de l'état échoue ensuite, le jour est redemandé et la ligne répétée. Une exception du lecteur
   autre que `ValueError` sur un jour passé ferait échouer la source à chaque collecte (aucune
   observée). Le service en 200, à l'adresse d'un jour, d'une page qui n'est pas une édition
   n'est pas observé : la fixture du test est la page d'accueil de l'édition reçue le
