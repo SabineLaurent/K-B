@@ -240,9 +240,11 @@ aucune issue ne les aligne :
 - **Les listes JSON (1FN).** Au MLD, `author`, `tracked_package` et `affected_package` ont une
   ligne par élément. Au MPD, ce sont trois listes JSON : `publication.authors`,
   `tracked_repository.packages` et `advisory.packages`, ce que la 1FN refuse (une valeur non
-  atomique). Raison : une liste n'est jamais cherchée ni filtrée en base, elle est servie en liste
-  par les API ; elle se lit et s'écrit entière, avec sa ligne (`src/k_b/database/reading.py:406,
-  432`). Un `CHECK` tient sa forme
+  atomique). Raison : une liste n'est jamais cherchée ni filtrée en base ; elle s'écrit entière,
+  avec sa ligne. Les auteurs et les paquets touchés se lisent entiers et sont servis en liste par
+  l'API (`src/k_b/database/reading.py:406, 432`). Les paquets suivis sont une copie de la liste du
+  code (`src/k_b/etl/sources/tracked_repositories.py`), réécrite entière à chaque import
+  (`src/k_b/database/writers/release_writer.py:24-29`) et jamais relue en base. Un `CHECK` tient sa forme
   (tableau JSON non vide) et, pour les auteurs et les paquets touchés, son nombre maximum
   (1 000 et 100) ; la longueur de ses éléments est tenue par les items (`schema.sql:10-14`).
 
