@@ -219,9 +219,37 @@ GH Archive, dont chaque ligne de classement (`TrendRow`, `src/k_b/items.py`) dev
 ## MCD et MLD
 
 Le MCD et le MLD sont dessinés avec draw.io, dans [`docs/merise/`](merise/) (journal ADR,
-2026-10-08) : `mcd-k-b.drawio` et `mld-k-b.drawio`. Ils ne sont pas recopiés ici. Leur mise au
-niveau des décisions du 2026-10-10 (le mode d'acquisition devient une colonne de SOURCE) est une
-tâche à part, qui suit la réécriture du schéma.
+2026-10-08) : [`mcd-k-b_20261020.drawio`](merise/mcd-k-b_20261020.drawio) et
+[`mld-k-b_20261020.drawio`](merise/mld-k-b_20261020.drawio), tirés de
+[`schema.sql`](../src/k_b/database/schema.sql) le 2026-10-20 (#211). Chaque élément du MCD renvoie
+à ses lignes de `schema.sql` ; le MLD se déduit du MCD par les règles de passage, et chacune de ses
+tables et colonnes renvoie à sa ligne de `schema.sql` quand elle y est. Le MPD est `schema.sql`.
+Les modèles ne sont pas recopiés ici ; la disposition du MCD suit
+[`positions-mcd.md`](merise/positions-mcd.md).
+
+Le MPD s'écarte du MLD par deux dénormalisations voulues (décision de Sabine du 2026-10-20) ;
+aucune issue ne les aligne :
+
+- **Le classement dans `trend` (2FN).** Au MLD, `ranking` garde une fenêtre et la donnée brute
+  qui l'a apportée, et `trend` une ligne par dépôt de la fenêtre. Au MPD, `trend` seule porte
+  `window_end` et `raw_data_id` : `raw_data_id` ne dépend que de `window_end`, une partie de la
+  clé naturelle `(window_end, repository_id)`, ce que la 2FN refuse. Un classement n'a pas
+  d'autre attribut que sa donnée brute. La règle « une fenêtre, une donnée brute »
+  (`schema.sql:105-106`) est tenue par l'écriture : une ligne n'est écrite que si aucune autre
+  donnée brute n'a apporté sa fenêtre (`src/k_b/database/writers/trend_writer.py:18-26`).
+- **Les listes JSON (1FN).** Au MLD, `author`, `tracked_package` et `affected_package` ont une
+  ligne par élément. Au MPD, ce sont trois listes JSON : `publication.authors`,
+  `tracked_repository.packages` et `advisory.packages`, ce que la 1FN refuse (une valeur non
+  atomique). Raison : une liste n'est jamais cherchée ni filtrée en base, elle est servie en liste
+  par les API ; elle se lit et s'écrit entière, avec sa ligne (`src/k_b/database/reading.py:406,
+  432`). Un `CHECK` tient sa forme
+  (tableau JSON non vide) et, pour les auteurs et les paquets touchés, son nombre maximum
+  (1 000 et 100) ; la longueur de ses éléments est tenue par les items (`schema.sql:10-14`).
+
+Les autres écarts sont propres au MPD et annotés dans le MLD : chaque sous-type d'item y a sa
+colonne `id`, la colonne `kind` et la clé étrangère `(item_id, kind)`, qui tiennent l'exclusion
+des sous-types ; la clé étrangère de `highlight` vise `item`, l'entrée Zotero étant tenue par le
+code (`src/k_b/database/writers/zotero_entry_writer.py:92-103, 139`).
 
 ## MPD
 
