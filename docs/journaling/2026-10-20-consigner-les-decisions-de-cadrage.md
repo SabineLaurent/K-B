@@ -5,9 +5,9 @@
 - **Issue** : #275
 - **Fichiers principaux** : `docs/ADR/journal-decisions-projet.md`, `MEMORY.md`, `README.md`,
   `docs/stockage.md`, `docs/specs-api.md`
-- **Commits** : `a27574e` (journal ADR) et `904843f` (mémoire, README, docs de stockage et d'API).
-  La liste de commits fournie au début de la note contenait aussi l'historique de `main` : seuls ces
-  deux commits sont ceux de la branche.
+- **Commits** : ceux de la branche sur `main` (`git log origin/main..HEAD`) : le journal ADR, la
+  mémoire et les docs, les corrections de la revue avec cette note, puis les pourquoi que tu as
+  donnés. La liste de commits fournie au début de la note contenait aussi l'historique de `main`.
 
 ## Le pourquoi
 
@@ -107,8 +107,10 @@ se reporte partout. Le critère de #275 nommait certaines lignes ; une recherche
 ```
 (`README.md:103`)
 
-Les lignes tldr de `MEMORY.md` (« Problèmes connus ») ne sont pas touchées : #274 les retire, sur
-l'autre piste de travail ouverte en même temps.
+Les lignes tldr de `MEMORY.md` (« Problèmes connus ») n'ont pas été touchées par cette branche :
+#274, sur l'autre piste de travail, les a retirées (PR #283, fusionnée pendant ce travail). Au
+rebase, le conflit sur `MEMORY.md` a gardé les deux changements : ce retrait, et la ligne des
+métriques réécrite ici.
 
 ## Choix faits et options écartées
 
@@ -127,11 +129,11 @@ l'autre piste de travail ouverte en même temps.
 |---|---|
 | `git grep -n "^## 2026-10-20" HEAD -- docs/ADR/journal-decisions-projet.md` → ligne 3278 | l'entrée du jour existe |
 | `git grep -n "La base au temps 3\*\*" HEAD -- docs/ADR/…` → ligne 3378 | la question ouverte est ajoutée |
-| `git grep -n -i "POC en conteneurs" HEAD -- MEMORY.md README.md` → rien | le premier temps n'est plus dit « en conteneurs » |
+| `git grep -n -i "POC en conteneurs" HEAD -- MEMORY.md README.md` → une ligne, `MEMORY.md:55`, qui cite la règle 6 de `poc.md` comme problème connu | le premier temps n'est plus dit « en conteneurs » |
 | `git grep -n "porté par #165" HEAD -- MEMORY.md` → ligne 49 | la ligne des métriques renvoie à son issue |
-| `git diff origin/main -- MEMORY.md \| grep tldr` → une ligne de contexte, inchangée | les lignes tldr ne sont pas touchées |
+| `git grep -n tldr HEAD -- MEMORY.md` → rien, après le rebase sur #283 | le retrait des lignes tldr par #274 est gardé |
 | `git diff origin/main...HEAD \| grep -c "$HOME"` → 0 | aucun chemin personnel |
-| `uv run pytest -q` → 1946 passed | aucun test ne dépend de ces textes |
+| `uv run pytest -q` → 1956 passed, après le rebase sur `main` | aucun test ne dépend de ces textes |
 
 ## Ce que tu dois pouvoir défendre
 
