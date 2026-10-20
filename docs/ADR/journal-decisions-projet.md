@@ -3360,8 +3360,11 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
 - **6. L'étape 8 de la procédure de tri (suppression du brut des clips) reste rattachée à la
   base : elle attend « La base au temps 3 » (question ouverte, plus bas). Sa règle du 2026-10-19 ne
   change pas : le brut des clips n'est supprimé qu'une fois la base sauvegardée. Sa fréquence : à
-  chaque sauvegarde de la base.** Décision de Sabine, prise au découpage. Pourquoi : non consigné.
-  Options écartées :
+  chaque sauvegarde de la base.** Décision de Sabine, prise au découpage. Pourquoi (décision de
+  Sabine du 2026-10-20) : « la base sera certainement PostgreSQL, avec Alembic pour les
+  migrations. On est en développement : le plan reste de supprimer le brut des clips quand une
+  sauvegarde de la base sera fonctionnelle. » « La base au temps 3 » reste pourtant ouverte :
+  Sabine la tranchera le moment venu. Options écartées :
   - des migrations Alembic sur SQLite : elles réviseraient le 2026-10-15, où les migrations sont à
     reprendre pour PostgreSQL seulement ;
   - une copie native de la base, sans migration : elle réviserait la raison du 2026-10-19 (« une
