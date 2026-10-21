@@ -31,6 +31,7 @@ ETL_PIPELINE_MODULES = {
     "etl.top_sheets",
     "etl.vault_files",
     "etl.ai_api_client",
+    "etl.digest_sheets",
     "etl.source_contract",
     "etl.http_download",
     "etl.user_agent",
