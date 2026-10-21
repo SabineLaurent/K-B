@@ -43,8 +43,8 @@ class ExitCode(IntEnum):
     STOPPED_BY_SIGTERM = (
         143,
         (
-            "kb collect, kb import, kb write-tops: stopped by SIGTERM; what was done before it"
-            " is kept; kb serve, kb serve-ai: stopped by SIGTERM, outside PID 1"
+            "kb collect, kb import, kb write-tops, kb digest: stopped by SIGTERM; what was done"
+            " before it is kept; kb serve, kb serve-ai: stopped by SIGTERM, outside PID 1"
         ),
     )
 

@@ -1,5 +1,5 @@
 """Command line: `kb collect`, `kb create-db`, `kb import`, `kb write-tops`, `kb serve`,
-`kb serve-ai`, `kb openapi`.
+`kb serve-ai`, `kb digest`, `kb openapi`.
 
 The entry point of kb: it reads the command, opens the log and hands the run to its module in
 commands/.
@@ -13,6 +13,7 @@ from pathlib import Path
 
 from k_b.commands.collect_command import run_collect
 from k_b.commands.create_db_command import run_create_db
+from k_b.commands.digest_command import run_digest
 from k_b.commands.environment import read_data_dir, read_log_to_file
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.import_command import run_import
@@ -34,7 +35,7 @@ from k_b.commands.sigterm import StoppedBySigtermError, stopping_on_sigterm
 from k_b.commands.write_tops_command import run_write_tops
 from k_b.core.config import AI_API_HOST, AI_API_PORT, DATA_API_HOST, DATA_API_PORT
 from k_b.database.connection import DATABASE_FILE_NAME
-from k_b.etl.collected_sources import COLLECT_ONLY_VARIABLE
+from k_b.etl.collected_sources import COLLECT_ONLY_VARIABLE, VAULT_DIR_VARIABLE
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -80,6 +81,11 @@ def main(argv: list[str] | None = None) -> int:
         "serve-ai",
         help="serve the digests of the watch by the AI API, on"
         f" http://{AI_API_HOST}:{AI_API_PORT} by default",
+    )
+    command_parsers.add_parser(
+        "digest",
+        help="ask the AI API for the digests of the watch, then write the sheet of each"
+        f" subject in the vault of {VAULT_DIR_VARIABLE}",
     )
     command_parsers.add_parser(
         "openapi",
@@ -138,4 +144,6 @@ def run_command(command: str, data_dir: Path) -> int:
         return run_serve(data_dir)
     if command == "serve-ai":
         return run_serve_ai()
+    if command == "digest":
+        return run_digest()
     return run_collect(data_dir)
