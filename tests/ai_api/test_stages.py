@@ -305,9 +305,17 @@ def writing_of(text):
     "text",
     [
         "v2.1.287 : HTTPS://evil.example",
-        "v2.1.287 : javascript+x://evil",
+        # Each character of the scheme after its first letter, alone before ://.
+        "v2.1.287 : x+://evil",
+        "v2.1.287 : x.://evil",
+        "v2.1.287 : x-://evil",
+        "v2.1.287 : x9://evil",
+        # Inside the group, [a-z] takes the four non-ASCII letters of IGNORECASE too.
+        "v2.1.287 : ſ://evil",
         "v2.1.287 sur www.evil.example",
-        "v2.1.287 ![x](y)",
+        "v2.1.287 sur WWW.evil.example",
+        # An image by reference: ![ without ](.
+        "v2.1.287 ![x][ref]",
         "v2.1.287 [[note]]",
         "v2.1.287 [notes](evil)",
         "v2.1.287\n[a]: //evil.example",

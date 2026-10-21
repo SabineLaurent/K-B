@@ -70,8 +70,9 @@ WRITING_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
     "only.",
 }
 # Check 6: a link with a scheme or from www., an image, a wikilink, a Markdown link or link
-# definition, a tag (docs/fiches-veille.md, "Contrôles"). The flag is scoped to the group: a global
-# IGNORECASE would widen <[a-zA-Z] to four non-ASCII letters (İ, ı, ſ, K), beyond the spec.
+# definition, a tag (docs/fiches-veille.md, "Contrôles"). The flag is scoped to the group, as the
+# (?i) of the spec: inside it, [a-z] takes four non-ASCII letters too (İ, ı, ſ, K), which only
+# refuses more; a global IGNORECASE would also widen <[a-zA-Z] to them, beyond the spec.
 MARKUP = re.compile(r"(?i:[a-z][a-z0-9+.-]*://|www\.)|!\[|\[\[|\]\(|\]:|<[a-zA-Z/!?]")
 # The longest output the bounds allow, an estimate: 12 claims of a text of 400 characters, 5
 # items and 10 facts of 120 characters, about 24,500 characters in compact JSON, so 8,192 tokens
