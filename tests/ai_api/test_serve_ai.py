@@ -15,7 +15,9 @@ import httpx2
 import pytest
 
 from k_b import cli
+from k_b.ai_api.connectors.data_api_settings import DATA_API_KEY_VARIABLE
 from k_b.commands import serve_ai_command
+from k_b.core.api_keys import AI_API_KEY_VARIABLE_PREFIX
 from k_b.core.config import DIGEST_SUBJECTS
 
 # The variables kb serve-ai reads, which a terminal may export (a .env loaded).
@@ -320,3 +322,30 @@ def test_the_log_keeps_no_request_line_of_the_http_client(
     error_output = capsys.readouterr().err
     assert "resource.example" not in error_output
     assert "warning of the http client" in error_output
+
+
+def test_serve_ai_exits_2_when_a_client_has_the_key_it_sends_to_the_data_api(
+    monkeypatch, capsys, data_dir, uvicorn_calls, environment
+):
+    """The data API gives each client every item: a key shared would let the client of the AI
+    API read the data API too (least privilege, code.md)."""
+    shared_key = make_key()
+    set_environment(
+        monkeypatch,
+        environment
+        | {
+            f"{AI_API_KEY_VARIABLE_PREFIX}KB_DIGEST": shared_key,
+            DATA_API_KEY_VARIABLE: shared_key,
+        },
+    )
+
+    exit_code = cli.main(["serve-ai"])
+
+    error_output = capsys.readouterr().err
+    assert exit_code == 2
+    assert (
+        f"'{AI_API_KEY_VARIABLE_PREFIX}KB_DIGEST' and '{DATA_API_KEY_VARIABLE}': same key"
+        in error_output
+    )
+    assert shared_key not in error_output
+    assert uvicorn_calls == []

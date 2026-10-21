@@ -120,3 +120,16 @@ def test_no_route_answers_cors(client, authorization, path):
     assert response.status_code == 200
     assert "access-control-allow-origin" not in response.headers
     assert "access-control-allow-origin" not in preflight.headers
+
+
+def test_a_body_the_data_api_never_reads_gives_no_400_nor_422(client, authorization):
+    """A data route reads no body: the 400 of a body FastAPI cannot read, which
+    core/api_errors.py answers 422, does not reach the data API."""
+    response = client.request(
+        "GET",
+        "/items",
+        content=b"\xff",
+        headers={**authorization, "Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 200

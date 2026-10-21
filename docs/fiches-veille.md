@@ -89,6 +89,9 @@ si Sabine la modifie souvent.
 - `since` = l'instant de la demande, en UTC à la seconde, moins `window_days` × 24 h ; il est
   passé à `GET /items?since=…`, et la règle de « quoi de neuf » de l'API de données s'applique :
   la date est celle de la source, pas celle de la collecte.
+- `until` = l'instant de la demande, rendu dans `window.until`. **Limite** : `GET /items` n'a pas
+  de borne haute ; un item daté après `until` (une date future dans la source, un décalage
+  d'horloge entre `kb serve` et `kb serve-ai`) est lu et peut être cité.
 - **Limite** : les articles TLDR et les entrées KEV sont datés à minuit UTC
   ([specs-api.md](specs-api.md), « Règle de quoi de neuf ») ; selon l'heure de la demande, une
   fenêtre de 3 jours prend 2 ou 3 éditions. Option écartée : arrondir `since` à minuit (une règle
@@ -617,6 +620,14 @@ Les lignes d'une demande sont écrites quand ses appels sont finis, classement e
 dans l'ordre des appels, chacune vidée aussitôt (`ai_api/metrics.py`) : sur SIGTERM, uvicorn
 renvoie le signal, et une ligne restée dans le tampon d'un tube serait perdue. `ts` est donc
 l'heure d'écriture, pas celle de l'appel. Un champ « nul » vaut `null` en JSON.
+
+**Limites** (revue de code de #156, tranchées par time-knight, délégation de Sabine du
+2026-10-15) : une demande sans appel au modèle (fenêtre vide, ou échéance passée pendant la
+lecture, 504 `llm_timeout`) n'écrit aucune ligne, si bien que ses `data_fetch_ms`,
+`items_dropped` et `items_capped` ne sont nulle part : une ligne de mesures de la demande se
+conçoit avec les métriques de #162. Une exception imprévue pendant la rédaction (500
+`internal_error`, journalisé avec son `request_id`) perd les lignes des appels déjà faits : elles
+ne sont écrites qu'au retour du parcours.
 
 | Champ | Contenu |
 |---|---|

@@ -57,3 +57,17 @@ def find_api_key_refusal(
             f"{quote_value(variable_by_key[key])} and {quote_value(variable)}: same key"
         )
     return None
+
+
+def find_shared_key_refusal(
+    prefix: str,
+    api_keys: Mapping[str, SecretStr],
+    variable: str,
+    key: SecretStr,
+) -> str | None:
+    """Why a key of the clients is refused, or None: the same key as the one of variable, which
+    another API reads. Both variables are named, never the key."""
+    for client_name, client_key in api_keys.items():
+        if client_key.get_secret_value() == key.get_secret_value():
+            return f"{quote_value(prefix + client_name)} and {quote_value(variable)}: same key"
+    return None

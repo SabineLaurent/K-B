@@ -19,7 +19,10 @@ logger = logging.getLogger(__name__)
 # The states of the errors Starlette raises when it routes a request.
 STATE_BY_ROUTING_STATUS = {404: "route_not_found", 405: "method_not_allowed"}
 # FastAPI raises a 400 for a body it cannot read as JSON, one not in UTF-8 among them
-# (fastapi/routing.py, 0.143): a malformed request, refused as any other.
+# (fastapi/routing.py:485, 0.143): a malformed request, refused as any other. The only other
+# HTTPException(400) of FastAPI 0.143 and Starlette 1.8 is a form that cannot be read
+# (starlette/requests.py:297 and :311), and no route of K-B reads a form; the 400 of
+# TrustedHostMiddleware answers before the app, without exception.
 BODY_NOT_READ_STATUS = 400
 # The name of a body refused as a whole: absent, not an object, not JSON, or holding a field that
 # is not declared.

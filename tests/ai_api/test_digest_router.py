@@ -8,6 +8,7 @@ import secrets
 import sys
 from dataclasses import replace
 from datetime import UTC, datetime
+from typing import get_args
 
 import httpx2
 import pytest
@@ -16,8 +17,9 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from k_b.ai_api.app import create_app
+from k_b.ai_api.connectors.data_api_client import DataApiState
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
-from k_b.ai_api.connectors.llm_client import build_http_client
+from k_b.ai_api.connectors.llm_client import LlmOutcome, build_http_client
 from k_b.ai_api.connectors.llm_replay import REPLAY_STEPS, ReplayTransport
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.dependencies import (
@@ -25,6 +27,7 @@ from k_b.ai_api.dependencies import (
     open_llm_client,
     read_request_time,
 )
+from k_b.ai_api.errors import STATUS_BY_STATE
 from k_b.core.config import (
     LLM_INPUT_USD_PER_MILLION_TOKENS,
     LLM_OUTPUT_USD_PER_MILLION_TOKENS,
@@ -631,3 +634,12 @@ def test_a_final_slash_is_an_unknown_route(make_ai_api):
 
     assert response.status_code == 404
     assert response.json() == {"error": "route_not_found"}
+
+
+def test_each_state_that_fails_a_request_has_its_status():
+    """A state without status would answer 500 in place of a named 502, 503 or 504."""
+    failure_states = {
+        state for state in get_args(LlmOutcome.__value__) if state != "ok"
+    } | set(get_args(DataApiState.__value__))
+
+    assert set(STATUS_BY_STATE) == failure_states
