@@ -7,6 +7,7 @@ outbound and llm_replay → deadline, watch_items and the settings of kb serve-a
 imports only the layers below its own.
 """
 
+import importlib
 from pathlib import Path
 
 import pytest
@@ -76,6 +77,24 @@ def test_the_app_of_an_api_imports_no_router(api):
     imported = list_imported_modules(path, find_package(path), depth=3)
 
     assert {name for name in imported if is_within(name, {f"{api}.routers"})} == set()
+
+
+# Each router declares its prefix and its tags on its APIRouter, in both APIs: the tags group the
+# routes in /docs and the OpenAPI (decision of Sabine of 2026-10-21, #156; skill fastapi,
+# references/path-operations.md).
+@pytest.mark.parametrize("api", ["data_api", "ai_api"])
+def test_each_router_of_an_api_declares_its_prefix_and_its_tags(api):
+    paths = [
+        path
+        for path in list_python_files(f"{api}.routers")
+        if path.name != "__init__.py"
+    ]
+
+    assert paths
+    for path in paths:
+        router = importlib.import_module(f"k_b.{name_module(path)}").router
+        assert router.prefix, path
+        assert router.tags, path
 
 
 # The AI API reads the watch through the data API, never the base (docs/fiches-veille.md, "Le

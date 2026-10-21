@@ -30,7 +30,7 @@ def check_window_end_form(window_end: object) -> object:
 # Still a date to pydantic: the OpenAPI declares it so.
 WindowEnd = Annotated[date, BeforeValidator(check_window_end_form)]
 
-router = APIRouter()
+router = APIRouter(prefix="/trends", tags=["trends"])
 
 TRENDS_RESPONSES = {
     **ERROR_RESPONSES,
@@ -38,7 +38,7 @@ TRENDS_RESPONSES = {
 }
 
 
-@router.get("/trends", responses=TRENDS_RESPONSES)
+@router.get("", responses=TRENDS_RESPONSES)
 def list_trends(
     connection: Database,
     window_end: Annotated[WindowEnd | None, Query()] = None,

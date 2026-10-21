@@ -67,7 +67,8 @@ l'ordre des résultats, change la version.
   `KB_LOG_TO_FILE=false`, le journal va sur la sortie d'erreur seule, sans fichier : en conteneur,
   la sortie d'erreur est le journal du conteneur.
 - **Organisation du code** : paquet `src/k_b/data_api/`, un dossier par rôle (`routers/`,
-  `schemas/`) ; `api_router.py` rassemble les routeurs ; ce qui est commun à l'API IA est dans
+  `schemas/`) ; `api_router.py` rassemble les routeurs, et chacun déclare son préfixe et ses tags
+  (`items`, `trends`), qui regroupent les routes dans `/docs` et l'OpenAPI ; ce qui est commun à l'API IA est dans
   `core/` : la clé (`api_keys.py`, `api_access.py`), les erreurs (`api_errors.py`), le journal
   (`api_request_log.py`), la santé (`api_health.py`), la règle de l'hôte et du port
   (`api_settings.py`) ; le détail et les options écartées sont

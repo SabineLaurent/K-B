@@ -68,7 +68,7 @@ ItemId = Annotated[Int64, BeforeValidator(check_item_id_form)]
 
 DETAIL_ADAPTER: TypeAdapter[ItemDetailSchema] = TypeAdapter(ItemDetailSchema)
 
-router = APIRouter()
+router = APIRouter(prefix="/items", tags=["items"])
 
 DETAIL_RESPONSES = {
     **ERROR_RESPONSES,
@@ -76,7 +76,7 @@ DETAIL_RESPONSES = {
 }
 
 
-@router.get("/items", responses=ERROR_RESPONSES)
+@router.get("", responses=ERROR_RESPONSES)
 def list_items(
     connection: Database,
     kind: Annotated[list[ItemKind] | None, Query()] = None,
@@ -107,7 +107,7 @@ def bound_next_offset(next_offset: int | None) -> int | None:
     return next_offset
 
 
-@router.get("/items/{item_id}", responses=DETAIL_RESPONSES)
+@router.get("/{item_id}", responses=DETAIL_RESPONSES)
 def read_item(
     connection: Database, item_id: Annotated[ItemId, Path()]
 ) -> ItemDetailSchema:

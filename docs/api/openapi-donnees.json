@@ -7,6 +7,9 @@
   "paths": {
     "/items": {
       "get": {
+        "tags": [
+          "items"
+        ],
         "summary": "List Items",
         "description": "A page of the items, the newest first by the date the source gives.",
         "operationId": "list_items_items_get",
@@ -160,6 +163,9 @@
     },
     "/items/{item_id}": {
       "get": {
+        "tags": [
+          "items"
+        ],
         "summary": "Read Item",
         "description": "An item, with what its kind serves beyond the list.",
         "operationId": "read_item_items__item_id__get",
@@ -282,6 +288,9 @@
     },
     "/trends": {
       "get": {
+        "tags": [
+          "trends"
+        ],
         "summary": "List Trends",
         "description": "The trends of a window, the latest in the base when none is given.",
         "operationId": "list_trends_trends_get",
