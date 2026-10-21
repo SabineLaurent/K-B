@@ -2,6 +2,7 @@
 the AI API, and its stop on SIGTERM. Each test builds its own environment: never from .env."""
 
 import json
+import logging
 import os
 import secrets
 import signal
@@ -298,3 +299,24 @@ def wait_for_health(port, timeout_seconds=20):
             pass
         time.sleep(0.1)
     raise AssertionError(f"kb serve-ai did not answer on port {port}")
+
+
+def test_the_log_keeps_no_request_line_of_the_http_client(
+    monkeypatch, capsys, data_dir, environment
+):
+    """httpx2 logs each request at INFO: its URL (the resource of the provider) and no request
+    id. Its warnings stay."""
+    set_environment(monkeypatch, environment)
+
+    def log_as_the_http_client(app, **options):
+        http_client_logger = logging.getLogger("httpx2")
+        http_client_logger.info("HTTP Request: POST https://resource.example/v1")
+        http_client_logger.warning("warning of the http client")
+
+    monkeypatch.setattr(serve_ai_command.uvicorn, "run", log_as_the_http_client)
+
+    cli.main(["serve-ai"])
+
+    error_output = capsys.readouterr().err
+    assert "resource.example" not in error_output
+    assert "warning of the http client" in error_output
