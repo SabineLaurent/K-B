@@ -55,7 +55,10 @@ l'ordre des résultats, change la version.
 - **Journal** : une ligne par requête, horodatée en ISO 8601 UTC, à la seconde. Elle donne la
   méthode, le gabarit de route (`/items/{item_id}`, pas l'identifiant), le statut, la durée en ms
   et le nom du client (`-` pour un statut sans réponse envoyée, une route inconnue ou un client
-  sans clé valide) ; jamais la clé, une valeur de paramètre ni un chemin brut. Elle va dans
+  sans clé valide), puis l'identifiant de la requête (`request_id`, un UUID), rendu aussi dans
+  l'en-tête `X-Request-ID` de chaque réponse et repris par chaque autre ligne de la requête
+  (`database_error`, `internal_error`) ; jamais la clé, une valeur de paramètre ni un chemin brut.
+  Le journal est commun aux deux API (`core/api_request_log.py`). Elle va dans
   `<KB_DATA_DIR>/logs/kb-serve.log`, à part de `kb.log` : `kb serve` tourne longtemps, et la rotation
   de minuit faite par `kb collect` ou `kb import` dans un fichier partagé le laisserait écrire dans
   le fichier de la veille (constat sur `TimedRotatingFileHandler`, Python 3.13). Limite : un seul
@@ -64,7 +67,10 @@ l'ordre des résultats, change la version.
   `KB_LOG_TO_FILE=false`, le journal va sur la sortie d'erreur seule, sans fichier : en conteneur,
   la sortie d'erreur est le journal du conteneur.
 - **Organisation du code** : paquet `src/k_b/data_api/`, un dossier par rôle (`routers/`,
-  `schemas/`) ; `api_router.py` rassemble les routeurs ; le détail et les options écartées sont
+  `schemas/`) ; `api_router.py` rassemble les routeurs ; ce qui est commun à l'API IA est dans
+  `core/` : la clé (`api_keys.py`, `api_access.py`), les erreurs (`api_errors.py`), le journal
+  (`api_request_log.py`), la santé (`api_health.py`), la règle de l'hôte et du port
+  (`api_settings.py`) ; le détail et les options écartées sont
   au journal ADR (2026-10-14, « Paquet `src/k_b/data_api/` »).
 
 ## Accès par clé

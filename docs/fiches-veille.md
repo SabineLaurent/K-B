@@ -14,8 +14,9 @@ contrôles, les états nommés et la ligne de métrique sont posés ici ; la sp�
 
 ## Le parcours d'une demande
 
-1. `POST /digests` sur l'API IA, avec une clé (#156) : la demande est validée (section
-   « Fenêtre »), avant toute lecture et tout appel au modèle.
+1. `POST /digests` sur l'API IA, servie par `kb serve-ai` sur `127.0.0.1:8001` par défaut, avec la
+   clé d'un client (#156, section « Accès ») : la demande est validée (section « Fenêtre »), avant
+   toute lecture et tout appel au modèle.
 2. L'API IA lit la veille de la fenêtre par l'API de données, avec la clé du client `AI_DIGEST`
    (#204) : `GET /items` filtré par `kind=` et plafonné (section « Fenêtre »), puis
    `GET /items/{item_id}` pour chaque item gardé. Elle ne lit pas la base.
@@ -82,7 +83,7 @@ si Sabine la modifie souvent.
 
 | Paramètre | Forme | Bornes | Défaut | Hors bornes |
 |---|---|---|---|---|
-| `window_days` (corps de `POST /digests`) | entier JSON | de 1 à 14 | `KB_DIGEST_WINDOW_DAYS` | 422 `invalid_parameter`, avant toute lecture et tout appel au modèle ; `true`, `3.0` et `"3"` sont refusés (pas des entiers) |
+| `window_days` (corps de `POST /digests`) | entier JSON | de 1 à 14 | `KB_DIGEST_WINDOW_DAYS`, absent ou `null` | 422 `invalid_parameter`, avant toute lecture et tout appel au modèle ; `true`, `3.0` et `"3"` sont refusés (pas des entiers) |
 | `KB_DIGEST_WINDOW_DAYS` (variable d'environnement) | chiffres seuls | de 1 à 14 | 3, défaut nommé dans `core/config.py` (règle 2 de `poc.md`) | l'API IA ne démarre pas (code de sortie 2, échouer fermé, comme `kb serve`) |
 
 - `since` = l'instant de la demande, en UTC à la seconde, moins `window_days` × 24 h ; il est
@@ -233,7 +234,16 @@ démarre pas (journal ADR, « Appel du modèle »).
 {"window_days": 3}
 ```
 
-`window_days` est optionnel ; tout autre champ est refusé (422 `invalid_parameter`).
+`window_days` est optionnel : absent ou `null`, c'est la fenêtre de `KB_DIGEST_WINDOW_DAYS`.
+Tout autre champ est refusé (422 `invalid_parameter`), comme un corps absent, qui n'est pas un
+objet ou pas du JSON (UTF-8 invalide compris) : le corps renvoie alors `"parameters": ["body"]`,
+jamais le nom d'un champ en trop, qui vient du client.
+
+**Limite** (FastAPI 0.143, `fastapi/routing.py`) : le corps est lu en entier, et son JSON décodé,
+avant la vérification de la clé. Un corps qui n'est pas du JSON reçoit donc 422 même sans clé ;
+tout autre appel sans clé reçoit 401, et aucun ne lit la veille ni n'appelle le modèle. La taille
+du corps n'est pas bornée (OWASP API4:2023) : signalé à #161, dont le critère borne la taille
+d'entrée en configuration.
 
 ### Entrée du modèle
 
@@ -447,7 +457,25 @@ tard).
 « Entrée du modèle » : une adresse mail n'est pas masquée) ; elle revient dans la
 réponse, car le contrôle 6 ne la refuse pas.
 
-Une erreur rend `{"error": "<état>"}`, comme l'API de données (section « États nommés »).
+Une erreur rend `{"error": "<état>"}`, comme l'API de données (section « États nommés »). Chaque
+réponse, une erreur comprise, porte l'identifiant de sa requête dans l'en-tête `X-Request-ID` :
+celui du `request_id` d'une réponse 200, de ses lignes de métrique et de chaque ligne de journal
+de la requête.
+
+### Accès
+
+- **Une clé par client** : `KB_AI_API_KEY_<CLIENT>`, avec les règles de `KB_API_KEY_<CLIENT>` de
+  l'API de données ([specs-api.md](specs-api.md), « Accès par clé ») et le même module
+  (`core/api_keys.py`, `core/api_access.py`) ; `kb digest` (#209) est le client `KB_DIGEST`. Sans
+  clé valide, 401 `invalid_api_key`. La clé est fixe ; sa rotation est dans le `README.md`
+  (« Changer une clé »).
+- **Pas de `TrustedHostMiddleware`**, écart voulu à la ligne API8 de [specs-api.md](specs-api.md) :
+  sans clé, une requête n'atteint que `/health`, `/docs` et `/openapi.json`, qui ne contiennent
+  aucune donnée, si bien qu'un rebinding DNS n'obtient rien et ne coûte aucun appel. Signalé à
+  #161 (OWASP API Top 10 de l'API IA) et à revoir en conteneurs (#200), où l'hôte appelant change.
+- **`GET /health`** répond 200 `{"status": "ok"}` sans clé, comme celle de l'API de données.
+- **Version** : `0.1.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
+  un changement visible par un client change les deux.
 
 ## Contrôles
 
@@ -585,6 +613,10 @@ Ce qu'un produit fini demanderait de plus ; rien n'est décidé ici.
 Une ligne JSON par appel au modèle, sur la sortie standard, sans fichier (règle 4 de `poc.md`).
 Un **appel** est un classement ou la rédaction d'un sujet, nouvelle tentative
 comprise : jetons et durées sont cumulés sur la ligne.
+Les lignes d'une demande sont écrites quand ses appels sont finis, classement en échec compris,
+dans l'ordre des appels, chacune vidée aussitôt (`ai_api/metrics.py`) : sur SIGTERM, uvicorn
+renvoie le signal, et une ligne restée dans le tampon d'un tube serait perdue. `ts` est donc
+l'heure d'écriture, pas celle de l'appel. Un champ « nul » vaut `null` en JSON.
 
 | Champ | Contenu |
 |---|---|
@@ -611,7 +643,7 @@ comprise : jetons et durées sont cumulés sur la ligne.
 | `failed_check` | le contrôle qui a refusé la dernière tentative (`content_filter`, `finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`) ; nul si `ok` |
 | `first_failed_check` | le contrôle qui a refusé la première tentative, quand une seconde a suivi ; nul sinon (#205, `LlmCall`, constat de #158 : le motif de la première tentative était perdu) |
 | `facts_checked`, `facts_found`, `claims_removed`, `items_uncited` | compteurs de la fidélité (rédaction) ; nuls au classement |
-| `cost_estimated` | jetons × prix au million lus dans `core/config.py` ; 0 en offre gratuite |
+| `cost_estimated` | en USD, arrondi à 6 décimales : `tokens_in` et `tokens_out` × prix au million de `core/config.py` (gpt-6-luna, Data Zone Standard, France Central, contexte court : 0,12 et 0,60) ; 0 en offre gratuite. **Limite** : tout appel est compté à ces prix, le replay compris (ses jetons sont ceux de ses pas, `provider` le dit) et un autre `KB_LLM_MODEL` aussi |
 
 `ts`, `stage`, `failed_check`, `items_dropped`, `items_capped`, `reasoning_tokens` et `http_status`
 s'ajoutent à la liste de #156, puis `first_failed_check` (#205).
@@ -628,7 +660,7 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 | `llm_invalid_output` | contrôles 2 à 6, ou `finish_reason` hors liste, deux fois | 502 | le sujet va dans `failed_subjects`, avec son étape (`stage`) |
 | `llm_truncated` | `finish_reason` `length` ; pas de nouvelle tentative (même entrée, même modèle figé : même sortie attendue) | 502 | `failed_subjects` |
 | `llm_content_filtered` | `finish_reason` `content_filter` : le filtre de contenu du fournisseur a retenu la sortie (celui d'Azure peut réagir aux textes sur le jailbreak et l'injection, sujets de la veille) ; ou un 400 dont `error.code` vaut `content_filter` : il a retenu l'entrée ; pas de nouvelle tentative (même entrée) | 502 | `failed_subjects` |
-| `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec `Retry-After` | `failed_subjects`, et chaque sujet suivant, sans envoi (#205) |
+| `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec le `Retry-After` du fournisseur ; sans en-tête s'il n'en a pas donné (aucune attente inventée) | `failed_subjects`, et chaque sujet suivant, sans envoi (#205) |
 | `llm_unavailable` | 5xx, connexion refusée ou coupée, après la nouvelle tentative ; autre 4xx, réponse qui ne se décode pas, ou réponse 200 qui n'est pas une complétion lisible (pas du JSON, aucun `choices`, un type faux), sans nouvelle tentative | 502 | `failed_subjects` |
 | `llm_timeout` | pas de connexion ou pas de réponse dans le délai du client (#150), sans nouvelle tentative ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé | 504 | `failed_subjects` |
 | `data_api_unavailable` | API de données injoignable, ou 5xx | 502 | — |
@@ -689,7 +721,16 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 
 ## Sources
 
-Consultées le 2026-10-15.
+Consultées le 2026-10-15, sauf mention.
+
+- [Azure Retail Prices overview](https://learn.microsoft.com/ar-sa/rest/api/cost-management/retail-prices/azure-retail-prices)
+  — Microsoft Learn, rendue par une recherche du 2026-10-21 : l'API des prix de détail,
+  `https://prices.azure.com/api/retail/prices`, sans authentification. Requête du 2026-10-21,
+  `api-version=2023-01-01-preview`, filtre `armRegionName eq 'francecentral' and
+  contains(meterName, 'luna')` : compteurs `6-luna ShortCo Inp Std DZ 1M Tokens` (0,12 USD) et
+  `6-luna ShortCo Opt Std DZ 1M Tokens` (0,60 USD), `effectiveStartDate` 2026-09-01
+  (`cost_estimated`). Recoupé par une recherche du même jour : [GPT-6 Luna Azure Pricing](https://www.azurespeed.com/AzureAiModelPricing/Models/openai-gpt-6-luna),
+  agrégateur tiers, 0,11 à 0,12 et 0,55 à 0,60 USD en Data Zone Standard.
 
 - [Data, privacy, and security for Foundry Models sold by Azure](https://learn.microsoft.com/en-us/azure/foundry/responsible-ai/openai/data-privacy)
   — Microsoft, relevé par recherche web : les demandes et réponses ne servent pas à entraîner les
