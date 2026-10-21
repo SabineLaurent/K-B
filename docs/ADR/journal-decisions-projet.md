@@ -3415,6 +3415,44 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
   - ce qu'un test garde (sa console et `logs/`) est à l'étape 10 de la procédure de tri du
     registre. — PR de #25
 
+### Tests : les tests de bout en bout ne reçoivent que leurs variables, et rendent un rapport HTML
+
+- **Les tests de bout en bout se lancent par
+  `uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html --self-contained-html` :
+  `.env.e2e_test` ne porte que leurs variables (jeton GitHub, dossier Zotero, coffre, clé
+  BigQuery ; modèle suivi par git, `.env.e2e_test.example`), et `pytest-html`, en dépendance de
+  développement, écrit un rapport où chaque test inscrit ses chiffres par `record_property`.**
+  Met à jour une limite assumée de l'entrée précédente (« chaque `kb` reçoit tout
+  l'environnement du terminal, clés Azure comprises ») : moindre privilège, demandé par
+  l'utilisatrice le 2026-10-21 juste après #25. Le rapport, parce que le compte rendu de #25 a été
+  recopié à la main depuis la console ; il donne les résultats, l'interprétation reste écrite à la
+  main. Décisions de l'utilisatrice du 2026-10-21 (outil, fixture, nom du fichier), puis au plan de
+  #290, relayé par time-knight :
+  - un garde-fou arrête les tests avant tout `kb` si une variable de `.env.example`, absente de
+    `.env.e2e_test.example`, est dans l'environnement : uv ajoute `--env-file` à l'environnement
+    du terminal, qui prime, et un `.env` exporté donnerait encore toutes les clés à chaque `kb`.
+    Il compare des noms, jamais des valeurs ;
+  - il laisse passer les noms que le test pose lui-même (`KB_DATA_DIR`, `KB_COLLECT_ONLY`) ou que
+    `tests/conftest.py` retire avant lui (`KB_LOG_TO_FILE`, `KB_DATA_API_*`) : leur valeur
+    n'atteint jamais `kb`, et en conteneur ou en job ACA, où `KB_DATA_DIR` et `KB_LOG_TO_FILE`
+    sont posés, le critère à la lettre aurait tout arrêté. Écart au critère de #290, décidé par
+    l'utilisatrice (option écartée : le critère à la lettre, qui aurait cassé le rejeu à
+    l'identique en conteneur) ;
+  - le rapport va dans `reports/`, ignoré par git, en `0600` (dossier créé en `0700`), un seul
+    fichier écrasé à chaque production : il garde la sortie capturée des tests. Écartés : `temp/`,
+    le dossier de données des essais de l'utilisatrice ; un dossier hors du dépôt (`$TMPDIR`),
+    dont la durée de conservation n'est pas vérifiable ;
+  - `pytest-html` n'affiche pas `user_properties` : une colonne s'ajoute par ses hooks, dans
+    `tests/conftest.py`, chaque valeur échappée.
+
+  Limites assumées :
+  - lancer depuis un terminal sans `.env` exporté reste une consigne : le garde-fou ne connaît que
+    les noms de `.env.example` (une variable `KB_API_KEY_<CLIENT>` qui n'y est pas le passe) ;
+  - si `.env.example` ou `.env.e2e_test.example` manque (une image qui ne les copie pas, #200),
+    les tests échouent ;
+  - `uv.lock` gagne trois dépendances de `pytest-html` (`pytest-metadata`, `jinja2`,
+    `markupsafe`), en développement seulement, acceptées par l'utilisatrice. — PR de #290
+
 ## Décisions encore ouvertes
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,

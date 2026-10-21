@@ -186,19 +186,37 @@ conformes au code et déjà couverts par ses tests :
 ## Rejouer les tests de bout en bout
 
 `uv run pytest` (la commande de la CI) ne les lance pas : ils sont comptés « deselected »
-(`tests/conftest.py`). Pour les lancer, sur le Mac, avec les variables des sources :
+(`tests/conftest.py`). Pour les lancer, sur le Mac, avec les variables des sources et le rapport
+HTML :
 
 ```
-uv run --env-file .env pytest -m e2e -rs
+uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html --self-contained-html
 ```
+
+*2026-10-21, #290 : la commande a changé.* Elle était `uv run --env-file .env pytest -m e2e -rs` ;
+chaque `kb` recevait alors tout le `.env`, clés Azure comprises. `.env.e2e_test`, rempli par
+l'utilisatrice et ignoré par git, ne porte que les variables des tests (son modèle :
+`.env.e2e_test.example`). **Limite** : uv ajoute ce fichier à l'environnement du terminal, qui
+prime ; il faut donc lancer la commande depuis un terminal sans `.env` exporté. Un garde-fou arrête
+les tests avant tout `kb` si une variable de `.env.example` absente de `.env.e2e_test.example` est
+dans l'environnement ; le message nomme les variables, jamais leur valeur. Ne l'arrêtent pas celles
+que le test pose lui-même (`KB_DATA_DIR`, `KB_COLLECT_ONLY`) ou que `tests/conftest.py` retire
+(`KB_LOG_TO_FILE`, `KB_DATA_API_*`) : leur valeur n'atteint jamais `kb`.
+
+Le rapport, `reports/e2e-report.html`, donne pour chaque test les codes de sortie de
+`kb create-db`, `kb collect` et `kb import`, les items par sorte, les rejets, les lignes
+d'avertissement ou d'erreur et, pour `gh_archive`, les octets lus par BigQuery (colonne
+« Properties », inscrite par `record_property`). Il donne les résultats, pas leur interprétation :
+ce compte rendu-ci reste écrit à la main.
 
 Une source seule : `-k <source>`, par exemple `-k cisa_kev`. Le test de `gh_archive` lance une
 requête BigQuery réelle. Une source dont la variable manque (`KB_ZOTERO_DIR`, `KB_VAULT_DIR`,
 `GOOGLE_APPLICATION_CREDENTIALS`) est sautée, et la raison nomme la variable. Chaque test
 vérifie aussi qu'aucun rejet n'est au journal d'import, et qu'aucune commande n'a journalisé
 d'avertissement ou d'erreur, sauf celui du quota GitHub sans jeton. À sa fin, réussi ou non, il
-efface son dossier de données sauf `logs/` ; ce qu'il garde, et combien de temps, est à l'étape 10
-de la procédure de tri du [registre](registre-traitements.md). Au deuxième temps,
+efface son dossier de données sauf `logs/` ; ce qu'il garde (sa console, le journal de `kb` et le
+rapport HTML), et combien de temps, est à l'étape 10 de la procédure de tri du
+[registre](registre-traitements.md). Au deuxième temps,
 la même commande tournera dans le conteneur, sans `--env-file`, les variables venant de
 l'environnement du conteneur (#200).
 
@@ -209,5 +227,8 @@ l'environnement du conteneur (#200).
 | pytest, « Control skipping of tests according to command line option » (marqueur déclaré dans `conftest.py`, tests écartés par `pytest_collection_modifyitems`), par Context7 | https://github.com/pytest-dev/pytest/blob/main/doc/en/example/simple.rst | 2026-10-21 |
 | pytest, « Registering custom markers », par Context7 | https://github.com/pytest-dev/pytest/blob/main/doc/en/how-to/writing_plugins.rst | 2026-10-21 |
 | uv, « Environment variable files » (l'environnement prime sur `--env-file`), par Context7 | https://docs.astral.sh/uv/concepts/configuration-files | 2026-10-21 |
+| pytest, `record_property` (les propriétés passent dans le rapport du test, `user_properties`), par Context7 | https://github.com/pytest-dev/pytest/blob/main/doc/en/how-to/output.rst | 2026-10-21 |
+| pytest-html, hooks `pytest_html_results_table_header` et `pytest_html_results_table_row` (la colonne des propriétés ; `user_properties` n'est lu nulle part par pytest-html), par Context7 puis lecture de `pytest_html/basereport.py` 4.2.0 | https://github.com/pytest-dev/pytest-html/blob/master/docs/user_guide.rst | 2026-10-21 |
+| pytest-html 4.2.0, publiée le 19/01/2026 (piwheels, DepScope), par WebSearch | https://www.piwheels.org/project/pytest-html/ | 2026-10-21 |
 | Volumes et quota BigQuery de K-B | [`docs/bigquery.md`](bigquery.md) | 2026-10-21 |
 | arXiv, « Terms of Use for arXiv APIs » (une requête toutes les 3 s, une seule connexion ; rien sur le 429), par WebSearch puis WebFetch | https://info.arxiv.org/help/api/tou.html | 2026-10-21 |
