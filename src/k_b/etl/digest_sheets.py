@@ -21,6 +21,7 @@ from k_b.core.config import WATCH_DIR_NAME
 from k_b.database.dates import format_date
 from k_b.etl.ai_api_client import Digest, DigestsResponse, Source
 from k_b.etl.vault_files import (
+    CHARACTER_REFERENCE,
     MARKDOWN_SYNTAX_CHARACTERS,
     VaultEntryRefusedError,
     has_sheet,
@@ -30,10 +31,11 @@ from k_b.etl.vault_files import (
 )
 
 # Beyond the characters of the sheets of the tops: a fence of code (~~~), an autolink of GFM or a
-# field of Dataview (:: , http:, mailto:, xmpp:), an e-mail address (@). A bare URL stays text
+# field of Dataview (:: , http:, mailto:, xmpp:), an e-mail address (@), and every &, a character
+# reference or not: a digest sheet escapes all its syntax. A bare URL stays text
 # here: a claim of the model never makes a link (ADR of 2026-10-21, #209). In Obsidian, as the
 # recipe of 2026-10-21 shows; cmark-gfm (GitHub) still links an e-mail address and its mailto:.
-DIGEST_ESCAPED_CHARACTERS = MARKDOWN_SYNTAX_CHARACTERS | frozenset("~:@")
+DIGEST_ESCAPED_CHARACTERS = MARKDOWN_SYNTAX_CHARACTERS | frozenset("~:@&")
 # The autolink of GFM that needs none of them, www. in any case (GitHub Flavored Markdown, 6.9):
 # its dot is escaped, after the backslashes of the text.
 WWW_DOT = re.compile(r"(www)\.", re.IGNORECASE)
@@ -51,9 +53,6 @@ URL_SCHEMES = ("http://", "https://")
 # delimiters, a percent and two hexadecimal digits), less [ ] and $, a wikilink and a formula of
 # Obsidian: it cannot leave its <…>, where a backslash escapes nothing (CommonMark 0.31.2, 6.5).
 URL_CHARACTERS = re.compile(r"(?:[A-Za-z0-9._~:/?#@!&'()*+,;=-]|%[0-9A-Fa-f]{2})+")
-# A character reference, which a renderer decodes even in an autolink (cmark-gfm shows &#x202E; as
-# U+202E in the link text): any numeric one, any &name;. ?a=1&b=2 is none.
-CHARACTER_REFERENCE = re.compile(r"&(?:#|[A-Za-z0-9]+;)")
 # What a URL may not hold once its percents are decoded (markdown-it shows them decoded): a control,
 # a format character (the bidirectional ones, U+200B to U+200F, U+FEFF, U+00AD), a surrogate, a line
 # or paragraph separator. A link would read otherwise than it leads (CWE-451).
@@ -169,7 +168,9 @@ def render_source(source: Source) -> str:
 
 def is_writable_url(url: str) -> bool:
     """Whether the URL is written as an autolink: refused, never rewritten, which would change
-    where it leads. :: would make a field of Dataview in the rendered line."""
+    where it leads. :: would make a field of Dataview in the rendered line; a character
+    reference is decoded even in an autolink (cmark-gfm shows &#x202E; as U+202E in the link
+    text); ?a=1&b=2 holds none."""
     return (
         url.startswith(URL_SCHEMES)
         and URL_CHARACTERS.fullmatch(url) is not None

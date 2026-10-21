@@ -9,6 +9,7 @@ follows a symbolic link it sees in the vault (decision of Sabine, 2026-10-19). A
 the vault, never whole: made of constants and a date, it never says where the vault is.
 """
 
+import re
 import stat
 import unicodedata
 from pathlib import Path
@@ -25,12 +26,15 @@ BIDI_CONTROLS = frozenset(
 REMOVED_CATEGORIES = frozenset({"Cc", "Cs"})
 # The ASCII punctuation that would make syntax of a text in Markdown or Obsidian: a link, an
 # embed or a wikilink ([ ]), HTML (< >), a cell of a table (|), code (`), a tag (#), a comment
-# (%%), a formula ($), a character reference (&rlm;, which CommonMark decodes into the
-# bidirectional control neutralize_text removes; a numeric one is already stopped by its #;
-# decision of Sabine of 2026-10-21). Each is escaped by a backslash, as CommonMark allows for any
-# ASCII punctuation; the backslash too, so that a text ending with one does not escape the
-# character that follows it.
-MARKDOWN_SYNTAX_CHARACTERS = frozenset("\\[]<>|`#%$&")
+# (%%), a formula ($). Each is escaped by a backslash, as CommonMark allows for any ASCII
+# punctuation; the backslash too, so that a text ending with one does not escape the character
+# that follows it.
+MARKDOWN_SYNTAX_CHARACTERS = frozenset("\\[]<>|`#%$")
+# The & of a character reference (&rlm;, &copy;, &#x202E;), which CommonMark decodes: &rlm; would
+# give back the bidirectional control neutralize_text removes. Escaped wherever its text is
+# written; another & stays, so that R&D and a bare URL with a query stay as they are (decision of
+# Sabine of 2026-10-21). ASCII classes, not \w.
+CHARACTER_REFERENCE = re.compile(r"&(?=#|[A-Za-z0-9]+;)")
 
 
 class VaultEntryRefusedError(Exception):
@@ -93,7 +97,8 @@ def has_sheet(sheet_path: Path, vault_dir: Path) -> bool:
 
 def neutralize_text(text: str, escaped_characters: frozenset[str]) -> str:
     """The text on one line, as text: its controls, lone surrogates and bidirectional controls
-    become spaces, its whitespace one space, each of escaped_characters escaped."""
+    become spaces, its whitespace one space, each of escaped_characters and the & of a character
+    reference escaped. Both in one pass, on the line before any backslash is inserted."""
     visible = "".join(
         " "
         if character in BIDI_CONTROLS
@@ -101,7 +106,11 @@ def neutralize_text(text: str, escaped_characters: frozenset[str]) -> str:
         else character
         for character in text
     )
+    line = " ".join(visible.split())
+    references = {match.start() for match in CHARACTER_REFERENCE.finditer(line)}
     return "".join(
-        f"\\{character}" if character in escaped_characters else character
-        for character in " ".join(visible.split())
+        f"\\{character}"
+        if character in escaped_characters or position in references
+        else character
+        for position, character in enumerate(line)
     )
