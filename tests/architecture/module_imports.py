@@ -30,6 +30,7 @@ ETL_PIPELINE_MODULES = {
     "etl.raw_purge",
     "etl.top_sheets",
     "etl.vault_files",
+    "etl.ai_api_client",
     "etl.source_contract",
     "etl.http_download",
     "etl.user_agent",
