@@ -1,5 +1,6 @@
-"""The rules of a connection the AI API opens to another service, the model or the data API: the
-URL it accepts, and its HTTP client. One place, since both are rules of security."""
+"""The rules of a connection K-B opens to a service by HTTP: the AI API to the model and to the data
+API, kb digest to the AI API. The URL it accepts, and its HTTP client: one place, since both are
+rules of security (ADR of 2026-10-21, #209: in core, which etl and the APIs may import)."""
 
 import re
 from collections.abc import Mapping

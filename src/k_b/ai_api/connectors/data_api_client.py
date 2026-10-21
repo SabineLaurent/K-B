@@ -17,7 +17,6 @@ import httpx2
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
-from k_b.ai_api.connectors.outbound import open_http_client
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.watch_items import (
     WATCH_KINDS,
@@ -34,6 +33,7 @@ from k_b.core.config import (
     MAX_DATA_API_BODY_BYTES,
     MAX_ITEMS_PER_DIGEST_REQUEST,
 )
+from k_b.core.outbound import open_http_client
 from k_b.items import Int64, RansomwareUse, UtcDatetime
 
 ITEMS_PATH = "items"

@@ -3,8 +3,8 @@
 
 Under k_b.ai_api: app → api_router → the routers → the pieces of a route (errors, dependencies,
 schemas, metrics) → digests → the stages → the clients → the settings of the connectors →
-outbound and llm_replay → deadline, watch_items and the settings of kb serve-ai; a module
-imports only the layers below its own.
+llm_replay → deadline, watch_items and the settings of kb serve-ai; a module imports only the
+layers below its own. The rules of an outbound connection are in core (core/outbound.py, #209).
 """
 
 import importlib
@@ -140,7 +140,7 @@ def test_the_ai_api_rule_refuses_the_base_the_pipeline_and_the_other_apis(
 # imports only the layers below its own: two modules of one layer do not import each other.
 AI_API_LAYERS = (
     {"ai_api.deadline", "ai_api.watch_items", "ai_api.settings"},
-    {"ai_api.connectors.outbound", "ai_api.connectors.llm_replay"},
+    {"ai_api.connectors.llm_replay"},
     {"ai_api.connectors.llm_settings", "ai_api.connectors.data_api_settings"},
     {"ai_api.connectors.llm_client", "ai_api.connectors.data_api_client"},
     {"ai_api.stages.classification", "ai_api.stages.writing"},
@@ -211,7 +211,7 @@ def test_a_module_of_ai_api_imports_only_the_layers_below_its_own():
         ("ai_api.connectors.llm_client", "from ..stages import writing", True),
         ("ai_api.connectors.llm_settings", "from . import llm_replay", False),
         ("ai_api.connectors.llm_settings", "from .llm_client import call_model", True),
-        ("ai_api.connectors.outbound", "from .llm_replay import ReplayTransport", True),
+        ("ai_api.connectors.llm_replay", "from .llm_settings import LlmSettings", True),
         ("ai_api.deadline", "from k_b.core.config import LLM_REPLAY_BASE_URL", False),
         ("ai_api.deadline", "from k_b.ai_api.watch_items import WatchItem", True),
     ],

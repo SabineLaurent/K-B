@@ -25,7 +25,6 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
 from k_b.ai_api.connectors.llm_settings import LlmSettings
-from k_b.ai_api.connectors.outbound import open_http_client
 from k_b.ai_api.deadline import Deadline
 from k_b.core.config import (
     LLM_CALL_TIMEOUT_SECONDS,
@@ -36,6 +35,7 @@ from k_b.core.config import (
     LLM_WRITE_TIMEOUT_SECONDS,
     MAX_TOKENS_READ_PER_ANSWER,
 )
+from k_b.core.outbound import open_http_client
 
 # Relative to the base URL, which keeps its path (/openai/v1, /v1).
 CHAT_COMPLETIONS_PATH = "chat/completions"

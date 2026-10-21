@@ -1,9 +1,9 @@
-"""The rules of a connection the AI API opens: the URL it accepts, and its HTTP client."""
+"""The rules of a connection K-B opens by HTTP: the URL it accepts, and its HTTP client."""
 
 import httpx2
 import pytest
 
-from k_b.ai_api.connectors.outbound import find_url_refusal, open_http_client
+from k_b.core.outbound import find_url_refusal, open_http_client
 
 VARIABLE = "KB_TEST_URL"
 

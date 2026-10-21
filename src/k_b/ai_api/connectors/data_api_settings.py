@@ -11,9 +11,9 @@ from dataclasses import dataclass
 
 from pydantic import SecretStr
 
-from k_b.ai_api.connectors.outbound import find_url_refusal
 from k_b.core.api_keys import API_KEY_VARIABLE_PREFIX
 from k_b.core.config import API_KEY_CHARACTERS, DATA_API_URL, MIN_API_KEY_LENGTH
+from k_b.core.outbound import find_url_refusal
 
 DATA_API_URL_VARIABLE = "KB_DATA_API_URL"
 # The variable kb serve reads for its client AI_DIGEST: formed from its prefix, one value for both.
