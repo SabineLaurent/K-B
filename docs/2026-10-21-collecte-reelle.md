@@ -5,8 +5,8 @@ vraies sources, au premier temps (le Mac, sans conteneur). Code de la branche
 `test/collect-real-sources`, partie de `main` au commit 431637a. Chaque nombre vient de la sortie
 console ou du journal d'une exécution, ou d'un `SELECT COUNT(*)` sur la base d'essai.
 
-Zotero est la bibliothèque réelle de Sabine, encore réduite (5 documents), lue par une copie en
-lecture seule. Les clips viennent du coffre de développement : un dossier du dépôt ignoré par
+Zotero est la bibliothèque Zotero réelle de Sabine, réduite pour le test (5 documents), lue par
+une copie en lecture seule. Les clips viennent du coffre de développement : un dossier du dépôt ignoré par
 git, tenu comme un vrai coffre. Rien n'a été écrit dans le vrai dossier de données. Chaque essai tourne dans un dossier neuf,
 hors du dépôt, en `0700`. La sortie console, les codes de sortie et une copie de `logs/kb.log`
 sont gardés sous ce dossier, hors de la rotation. Le compte rendu ne cite ni titre, ni auteur, ni
@@ -42,7 +42,7 @@ le code de sortie de chacune et ce qui est arrivé en base. Lancés le 2026-10-2
 | `github_most_starred` | 0, 0, 0 | 0 | 0 (relevé dans le brut) | 0 | n'entre pas en base |
 | `github_most_forked` | 0, 0, 0 | 0 | 0 (relevé dans le brut) | 0 | n'entre pas en base |
 | `clipping` | 0, 0, 0 | 5 | 5 `clip` | 0 | 5 clips lus, coffre de développement |
-| `zotero` | 0, 0, 0 | 1 | 5 `zotero_entry` | 0 | bibliothèque réelle de Sabine, réduite (5 documents, 6 highlights) |
+| `zotero` | 0, 0, 0 | 1 | 5 `zotero_entry` | 0 | bibliothèque Zotero réelle de Sabine, réduite pour le test (5 documents), 6 highlights |
 | `gh_archive` | 0, 0, 0 | 1 | 49 lignes de `trend` | 0 | 1 fenêtre, 49 lignes |
 
 ## Les trois exécutions complètes

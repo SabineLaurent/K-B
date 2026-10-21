@@ -1,13 +1,15 @@
 """The end-to-end test of each source: kb create-db, KB_COLLECT_ONLY=<source> kb collect, then
 kb import, on the real source, in a new data directory; each command exits 0 and the items of
-the source are in the base.
+the source are in the base, with no rejection.
 
-Left out of uv run pytest (tests/conftest.py). Run on the Mac, in a container and as a job by
-uv run pytest -m e2e, with the settings of the sources in the environment (KB_GITHUB_TOKEN,
-KB_ZOTERO_DIR, KB_VAULT_DIR, GOOGLE_APPLICATION_CREDENTIALS). gh_archive runs a real BigQuery
-query (docs/bigquery.md).
+Left out of uv run pytest (tests/conftest.py). Run on the Mac by uv run pytest -m e2e, with the
+settings of the sources in the environment; to be run the same way in a container (#200) and as a
+job. Without KB_ZOTERO_DIR, KB_VAULT_DIR or GOOGLE_APPLICATION_CREDENTIALS, the test of its source
+is skipped. KB_GITHUB_TOKEN is optional: without it, the GitHub sources run on 60 requests per
+hour instead of 5,000. gh_archive runs a real BigQuery query (docs/bigquery.md).
 """
 
+import json
 import os
 import sqlite3
 import subprocess
@@ -57,21 +59,33 @@ TOP_FOLDER_KEY_BY_SOURCE_NAME = {
 
 def run_kb(command, environ, console_dir):
     """Run kb <command> and keep what it printed in console_dir; return its exit code alone, so
-    that a failed assert never shows the environment, which holds the GitHub token."""
-    result = subprocess.run(  # noqa: S603 — runs the kb of this interpreter, fixed arguments
-        [str(KB_PATH), command],
-        capture_output=True,
-        text=True,
-        env=environ,
-        timeout=COMMAND_TIMEOUT_SECONDS,
-    )
-    (console_dir / f"{command}.out").write_text(result.stdout)
-    (console_dir / f"{command}.err").write_text(result.stderr)
+    that a failed assert never shows the environment, which holds the GitHub token. A command
+    past its timeout keeps what it printed until then."""
+    try:
+        result = subprocess.run(  # noqa: S603 — runs the kb of this interpreter, fixed arguments
+            [str(KB_PATH), command],
+            capture_output=True,
+            text=True,
+            env=environ,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as error:
+        write_console(console_dir, command, error.stdout, error.stderr)
+        raise
+    write_console(console_dir, command, result.stdout, result.stderr)
     return result.returncode
 
 
+def write_console(console_dir, command, stdout, stderr):
+    """Its output as text, or as bytes: subprocess gives a timeout the bytes read, or None."""
+    for extension, output in (("out", stdout), ("err", stderr)):
+        if isinstance(output, bytes):
+            output = output.decode(errors="replace")
+        (console_dir / f"{command}.{extension}").write_text(output or "")
+
+
 def count_rows(database_path, query, *parameters):
-    connection = sqlite3.connect(f"file:{database_path}?mode=ro", uri=True)
+    connection = sqlite3.connect(f"{database_path.as_uri()}?mode=ro", uri=True)
     try:
         return connection.execute(query, parameters).fetchone()[0]
     finally:
@@ -83,6 +97,16 @@ def count_raw_files(folder):
         1
         for path in folder.rglob("*")
         if path.is_file() and not path.name.startswith(".")
+    )
+
+
+def count_rejections(data_dir):
+    """The rejections of the import logs of data_dir: kb import exits 0 with them."""
+    return sum(
+        1
+        for log_path in data_dir.glob("import-log-*.jsonl")
+        for line in log_path.read_text().splitlines()
+        if json.loads(line)["kind"] == "rejection"
     )
 
 
@@ -105,15 +129,18 @@ def test_kb_collects_and_imports_the_real_source(source_name, tmp_path):
     }
     environ["KB_DATA_DIR"] = str(data_dir)
 
+    # Each exit code is checked as soon as its command ends: nothing is collected, BigQuery
+    # least of all, after a command has failed.
     create_db_exit_code = run_kb("create-db", environ, console_dir)
+    assert create_db_exit_code == ExitCode.SUCCEEDED
     collect_exit_code = run_kb(
         "collect", {**environ, COLLECT_ONLY_VARIABLE: source_name}, console_dir
     )
-    import_exit_code = run_kb("import", environ, console_dir)
-
-    assert create_db_exit_code == ExitCode.SUCCEEDED
     assert collect_exit_code == ExitCode.SUCCEEDED
+    import_exit_code = run_kb("import", environ, console_dir)
     assert import_exit_code == ExitCode.SUCCEEDED
+
+    assert count_rejections(data_dir) == 0
     database_path = data_dir / DATABASE_FILE_NAME
     item_count = count_rows(database_path, "SELECT COUNT(*) FROM item")
     if source_name in TOP_FOLDER_KEY_BY_SOURCE_NAME:

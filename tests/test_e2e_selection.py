@@ -1,6 +1,7 @@
 """uv run pytest, the command of the CI, leaves out the end-to-end tests; -m e2e runs them, one
 per source."""
 
+import os
 import re
 import subprocess
 import sys
@@ -29,6 +30,12 @@ def collect_e2e_dir(*options):
         capture_output=True,
         text=True,
         cwd=TESTS_DIR.parent,
+        # The options of the terminal would change what is collected, not the code.
+        env={
+            name: value
+            for name, value in os.environ.items()
+            if name != "PYTEST_ADDOPTS"
+        },
     )
     ids = re.findall(r"::\w+\[(\w+)\]$", result.stdout, re.MULTILINE)
     return ids, result.stdout
@@ -39,6 +46,12 @@ def test_pytest_without_m_leaves_out_every_end_to_end_test():
 
     assert ids == []
     assert f"{len(SOURCE_KINDS)} deselected" in output
+
+
+def test_pytest_m_of_a_marker_that_holds_e2e_leaves_out_every_end_to_end_test():
+    ids, _ = collect_e2e_dir("-m", "not nightly_e2e")
+
+    assert ids == []
 
 
 def test_pytest_m_e2e_collects_one_end_to_end_test_per_source():

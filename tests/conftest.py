@@ -2,6 +2,7 @@
 test base of the readers of the items; the settings of kb read from the terminal, removed; the
 end-to-end tests, left out unless -m names them."""
 
+import re
 import sqlite3
 from pathlib import Path
 
@@ -34,7 +35,8 @@ def pytest_configure(config):
 def pytest_collection_modifyitems(config, items):
     """Leave out the end-to-end tests unless -m names them: uv run pytest, the command of the
     CI, never calls a real source; uv run pytest -m e2e runs them."""
-    if E2E_MARKER in config.option.markexpr:
+    # The word e2e, not a marker name that holds it (nightly_e2e).
+    if E2E_MARKER in re.findall(r"\w+", config.option.markexpr):
         return
     deselected = [item for item in items if item.get_closest_marker(E2E_MARKER)]
     if not deselected:
