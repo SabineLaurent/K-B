@@ -84,6 +84,27 @@ LLM_REASONING_EFFORT: Literal["none"] | None = None
 # The base URL of the replay provider: a reserved domain (RFC 6761), never resolved, since the
 # replay answers in the client itself.
 LLM_REPLAY_BASE_URL = "https://replay.invalid/v1"
+# The prices of gpt-6-luna (ADR of 2026-10-17, "Modèle des fiches : gpt-6-luna sur l'abonnement
+# de l'organisme de formation"), in USD per million tokens, for cost_estimated of each metric
+# line: Data Zone Standard, France Central, short context, effective from 2026-09-01. Read on
+# 2026-10-21 in the Azure Retail Prices API (https://prices.azure.com/api/retail/prices,
+# armRegionName francecentral, meters "6-luna ShortCo Inp Std DZ 1M Tokens" and "6-luna ShortCo
+# Opt Std DZ 1M Tokens"), described by the page "Azure Retail Prices overview" of Microsoft Learn
+# (https://learn.microsoft.com/ar-sa/rest/api/cost-management/retail-prices/azure-retail-prices,
+# the address a web search of the same day gave).
+# Every call is counted at these prices, the replay and another KB_LLM_MODEL included.
+LLM_INPUT_USD_PER_MILLION_TOKENS = 0.12
+LLM_OUTPUT_USD_PER_MILLION_TOKENS = 0.60
+
+# The local defaults of kb serve-ai, each changed by its variable (ai_api/settings.py;
+# .claude/rules/poc.md, rule 2): the AI API listens on the machine only, beside kb serve.
+AI_API_HOST = "127.0.0.1"
+AI_API_PORT = 8001
+# The window of a digest request, in days (docs/fiches-veille.md, "Fenêtre"): the default, changed
+# by KB_DIGEST_WINDOW_DAYS, and the bounds of both the variable and window_days of a request.
+DIGEST_WINDOW_DAYS = 3
+MIN_DIGEST_WINDOW_DAYS = 1
+MAX_DIGEST_WINDOW_DAYS = 14
 
 # The reading of the watch by the AI API through the data API (ai_api/connectors/data_api_client.py;
 # docs/fiches-veille.md, "Lecture plafonnée"). The URL of kb serve with its defaults, changed by

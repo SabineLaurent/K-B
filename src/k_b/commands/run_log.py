@@ -20,6 +20,8 @@ LOG_FILE_PATH = Path("logs") / "kb.log"
 # day before once a rotation done by kb collect or kb import has renamed it (docs/specs-api.md,
 # "Journal").
 SERVE_LOG_FILE_PATH = Path("logs") / "kb-serve.log"
+# The log of kb serve-ai, apart for the same reason: a long run, beside kb serve.
+SERVE_AI_LOG_FILE_PATH = Path("logs") / "kb-serve-ai.log"
 LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 
 logger = logging.getLogger(LOGGER_NAME)
@@ -30,7 +32,8 @@ def logging_to(
     data_dir: Path, log_file_path: Path | None = LOG_FILE_PATH
 ) -> Iterator[None]:
     """Log every line of level INFO and above on stderr and, unless log_file_path is None, in
-    the log file of the data directory (logs/kb.log, or logs/kb-serve.log for kb serve), dated
+    the log file of the data directory (logs/kb.log, logs/kb-serve.log for kb serve,
+    logs/kb-serve-ai.log for kb serve-ai), dated
     in UTC in the format of the base (2026-10-14T11:30:00Z); the file turns at midnight UTC into
     <file>.<day>.
 

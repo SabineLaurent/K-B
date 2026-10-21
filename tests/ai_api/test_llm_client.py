@@ -11,7 +11,10 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from k_b.ai_api.connectors.llm_client import FailedCheck, build_http_client, call_model
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
-from k_b.ai_api.connectors.llm_settings import LlmSettings, read_llm_settings
+from k_b.ai_api.connectors.llm_settings import (
+    LlmSettings,
+    read_llm_settings_or_refusal,
+)
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.stages.classification import CLASSIFICATION_MAX_COMPLETION_TOKENS
 from k_b.ai_api.stages.writing import WRITING_MAX_COMPLETION_TOKENS
@@ -593,10 +596,10 @@ def test_the_replay_client_sends_no_key():
 def test_the_replay_chosen_by_the_settings_answers_from_its_file(tmp_path):
     replay_file = tmp_path / "replay.json"
     replay_file.write_text(json.dumps([completion(), response(503)]))
-    settings = read_llm_settings(
+    settings = read_llm_settings_or_refusal(
         {"KB_LLM_PROVIDER": "replay", "KB_LLM_REPLAY_FILE": str(replay_file)}
     )
-    assert settings is not None
+    assert isinstance(settings, LlmSettings)
 
     with build_http_client(settings) as http_client:
         answers = [
