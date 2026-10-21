@@ -62,6 +62,10 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   `kb search` vient après le 08/11 ; un front écoconçu, plus tard (journal ADR, 2026-10-15,
   « POC du 25/10 »). Une commande de plus, `kb write-tops` (#265), écrit les fiches des tops dans
   le coffre, après `kb import` (journal ADR, 2026-10-19, « Tops : les fiches par `kb write-tops` »).
+- L'API IA est servie par `kb serve-ai` (#156), à côté de `kb serve`, sur `127.0.0.1:8001` ; ses
+  clients ont leur clé dans `KB_AI_API_KEY_<CLIENT>`, ceux de l'API de données dans
+  `KB_DATA_API_KEY_<CLIENT>` (journal ADR, 2026-10-21, « API IA : servir les fiches par
+  `POST /digests` »).
 
 ## Consignes de travail
 
@@ -83,6 +87,11 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   les mutations suivantes semblent tuées ou survivantes à tort. Une copie qui garde le `.venv` du
   dépôt lit le `src` du dépôt d'origine (`k_b.pth` y pointe ; constat du 2026-10-18, #242) :
   vérifier d'abord que `import k_b; print(k_b.__file__)` donne le chemin de la copie.
+- **Fichiers d'environnement et Bash** (constat du 2026-10-21, #156) : l'outil refuse toute
+  commande Bash qui nomme un fichier `.env*`, `.env.example` compris : `cat`, `grep`, `git add`, et
+  même un message de commit qui en cite le nom. `.env.example` et `.env.e2e_test.example` se lisent
+  et se modifient par Read et Edit ; Sabine tape `! git add <fichier>`. Ne pas contourner (pas de
+  `git add -u`).
 - **`ruff` sans son cache** (constat du 2026-10-19, revue de #265) : `uv run ruff check` a passé,
   puis `uv run ruff check --no-cache` a trouvé trois imports non triés. Cause non établie : le cache
   est supposé (le `pyproject.toml` ne fixe ni `src` ni `known-first-party`, la détection des imports
