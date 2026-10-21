@@ -1,7 +1,10 @@
 """The fabricated Zotero library, shared by the tests of the source and of the command line; the
 test base of the readers of the items; the settings of kb read from the terminal, removed; the
-end-to-end tests, left out unless -m names them."""
+end-to-end tests, left out unless -m names them; the HTML report of pytest-html, readable by the
+user alone, with the properties each test records."""
 
+import html
+import os
 import re
 import sqlite3
 from pathlib import Path
@@ -26,6 +29,15 @@ E2E_MARKER = "e2e"
 # A marker name of a -m expression, by the rule ident of pytest's grammar
 # (_pytest/mark/expression.py:10, pytest 9.1.1): nightly-e2e and e2e.slow are one name each.
 MARKER_NAME = re.compile(r"(?:\w|:|\+|-|\.|\[|\]|\\|/)+")
+# The HTML report keeps the captured output of every test: the user alone reads it
+# (docs/registre-traitements.md, step 10 of the sorting). In the repository, only its folder
+# is ignored by git (.gitignore).
+REPORT_DIR_NAME = "reports"
+REPORT_DIR_MODE = 0o700
+REPORT_FILE_MODE = 0o600
+# The column of the recorded properties, before the links (the last default column of
+# pytest-html 4.2.0: result, test, duration, links).
+PROPERTIES_COLUMN = 3
 
 
 def pytest_configure(config):
@@ -33,6 +45,46 @@ def pytest_configure(config):
         "markers",
         f"{E2E_MARKER}: runs kb on a real source; left out unless -m names {E2E_MARKER}",
     )
+    restrict_report_to_user(config)
+
+
+def restrict_report_to_user(config):
+    """Create the report of --html before pytest-html writes it, in 0600, and its folder, when
+    new, in 0700: pytest-html rewrites the file in place, which keeps its mode. A folder that
+    exists keeps its mode. A report in the repository (the rootdir) outside reports/ stops the
+    run before any file: git would not ignore it. Outside the repository, it is written."""
+    report_option = config.getoption("htmlpath", default=None)
+    if not report_option:
+        return
+    # Resolved as pytest-html resolves it (BaseReport.__init__, pytest-html 4.2.0).
+    report_path = Path.cwd() / Path(os.path.expandvars(report_option)).expanduser()
+    resolved_path = report_path.resolve()
+    repository_dir = config.rootpath.resolve()
+    if resolved_path.is_relative_to(
+        repository_dir
+    ) and not resolved_path.is_relative_to(repository_dir / REPORT_DIR_NAME):
+        pytest.exit(
+            f"--html: {resolved_path} is in the repository outside {REPORT_DIR_NAME}/,"
+            " which git does not ignore",
+            returncode=pytest.ExitCode.USAGE_ERROR,
+        )
+    report_path.parent.mkdir(mode=REPORT_DIR_MODE, parents=True, exist_ok=True)
+    os.close(os.open(report_path, os.O_WRONLY | os.O_CREAT, REPORT_FILE_MODE))
+    report_path.chmod(REPORT_FILE_MODE)
+
+
+@pytest.hookimpl(optionalhook=True)
+def pytest_html_results_table_header(cells):
+    cells.insert(PROPERTIES_COLUMN, "<th>Properties</th>")
+
+
+@pytest.hookimpl(optionalhook=True)
+def pytest_html_results_table_row(report, cells):
+    """The properties the test recorded (record_property), one name=value a line, escaped. A
+    report of the collection has none."""
+    properties = getattr(report, "user_properties", ())
+    lines = "<br>".join(html.escape(f"{name}={value}") for name, value in properties)
+    cells.insert(PROPERTIES_COLUMN, f'<td class="col-properties">{lines}</td>')
 
 
 def pytest_collection_modifyitems(config, items):

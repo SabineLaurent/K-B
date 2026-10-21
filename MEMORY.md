@@ -19,8 +19,8 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 ## Estimations
 
-- Chaque issue porte une ligne « Estimation : X h » ; le label `size:*` n'est qu'un ordre de
-  grandeur. Le jalon « POC 25/10 » porte ses estimations.
+- Une issue porte sa taille seule (label `size:*` et champ `Size` du board), sans heures (règle
+  de l'utilisatrice du 2026-10-20).
 - La surveillance du modèle est portée par #163 (comparaison des outils), puis #162 et #164, au
   jalon « POC 25/10 » : métriques en OpenTelemetry vers Grafana Cloud dès le premier temps
   (journal ADR, 2026-10-20, décision 4).
@@ -89,8 +89,13 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   internes est une autre piste). Avant de déclarer les contrôles verts :
   `uv run ruff check --no-cache`.
 - **Tests de bout en bout** (#25, 2026-10-21) : un par source, dans `tests/e2e/`, marqués
-  `e2e` ; `uv run pytest` (la CI) les écarte (`tests/conftest.py`). Les rejouer sur le Mac :
-  `uv run --env-file .env pytest -m e2e -rs` (une source : `-k <source>`). Celui de `gh_archive`
+  `e2e` ; `uv run pytest` (la CI) les écarte (`tests/conftest.py`). Les rejouer sur le Mac, avec
+  leur rapport HTML (#290), depuis un terminal sans `.env` exporté :
+  `uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html --self-contained-html`
+  (une source : `-k <source>`). `.env.e2e_test` ne porte que leurs variables
+  (`.env.e2e_test.example`) ; une autre variable de `.env.example` dans l'environnement les arrête
+  avant tout `kb`. Le rapport (`reports/`, ignoré par git, en `0600`) donne les résultats, pas leur
+  interprétation : le compte rendu reste écrit à la main. Celui de `gh_archive`
   lance une requête BigQuery réelle : ne pas le relancer à la légère. Sans `--basetemp` : pytest
   garde ses 3 dernières sessions (registre, étape 10 de la procédure de tri) ; un `--basetemp`
   n'a plus de rotation et est effacé par pytest s'il existe déjà.
