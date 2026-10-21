@@ -671,8 +671,10 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
   `llm_content_filtered`, sans nouvelle tentative). Un seul item piégé peut aussi provoquer deux
   sorties fautives de suite (un doublon, `completeness` ; une sortie sans fin, `llm_truncated`).
   Non observé par #158 (aucun filtre sur 20 appels réels) ; renvoyé à #206 (décision de Sabine du
-  2026-10-17). Option écartée : couper le lot en deux et recommencer pour isoler l'item (jusqu'à
-  environ 12 appels de plus, et un contrat changé).
+  2026-10-17), qui teste le doublon sur le replay (`completeness`). Le filtre et la sortie sans
+  fin, sur le vrai modèle, passent à #210, où Sabine décide de l'essai (décision du 2026-10-21 :
+  provoquer le filtre exprès est l'essai écarté par #158). Option écartée : couper le lot en deux
+  et recommencer pour isoler l'item (jusqu'à environ 12 appels de plus, et un contrat changé).
 - Une fenêtre sans item rend 200 avec `digests` vide, sans appel au modèle.
 
 ## Sources
