@@ -7,7 +7,7 @@ erreurs et les exigences de sécurité. Les décisions et leur pourquoi sont dan
 [journal ADR](ADR/journal-decisions-projet.md) (entrées du 2026-10-14) ; la collecte, dans
 [specs-collecte.md](specs-collecte.md) ; la base, dans [stockage.md](stockage.md).
 
-**Version de la spec : 0.4.0**, la même que `info.version` de l'OpenAPI
+**Version de la spec : 0.5.0**, la même que `info.version` de l'OpenAPI
 (`docs/api/openapi-donnees.json`, que #184 écrit). Un changement de comportement visible par un client, comme
 l'ordre des résultats, change la version.
 
@@ -17,6 +17,7 @@ l'ordre des résultats, change la version.
 | 0.2.0 | `GET /items/{item_id}` et `GET /trends` servis (#185) ; un `item_id` au-delà de 64 bits répond 422 |
 | 0.3.0 | `GET /health` servi sans clé ; hôte, port et hôtes permis réglables (#199) |
 | 0.4.0 | la sorte `clip` (pages gardées avec Web Clipper) servie par `GET /items` et `GET /items/{item_id}` (#14) |
+| 0.5.0 | l'en-tête `X-Request-ID` sur chaque réponse ; les tags `items` et `trends` dans l'OpenAPI ; les clés des clients lues dans `KB_DATA_API_KEY_<CLIENT>`, et non plus `KB_API_KEY_<CLIENT>` (#156) |
 
 ## Règles communes
 
