@@ -106,7 +106,7 @@ antérieurs au dernier.
 ### arXiv : délais de lecture, puis un 429
 
 Après les corrections des revues, les tests e2e ont été relancés sur les 9 sources sans coût
-(`gh_archive` exclu, aucune correction ne le touchant). arXiv a alors échoué. Les sept requêtes
+(`gh_archive` exclu, aucune correction ne le touchant). arXiv a alors échoué. Les huit requêtes
 envoyées à arXiv ce matin-là :
 
 | Heure (UTC) | Requête | Résultat |
@@ -151,7 +151,7 @@ conformes au code et déjà couverts par ses tests :
    jour même à 08:43 UTC. Le journal le dit (`no edition page, redirected to …`), et la source
    reste `ok`.
 2. **Versions GitHub, première collecte** : 100 versions par dépôt, soit la première page
-   seulement (`RELEASES_PER_PAGE`, `src/k_b/etl/sources/github_releases.py:29`).
+   seulement (`RELEASES_PER_PAGE`, `src/k_b/etl/sources/github_releases.py:30`).
 3. **arXiv, collecte suivante** : la fenêtre recule de 7 jours avant la dernière collecte
    (`ANNOUNCEMENT_DELAY_MARGIN`). Les 21 papiers relus sont écartés à l'import
    (`revision_not_newer`) : aucun doublon n'entre en base.
