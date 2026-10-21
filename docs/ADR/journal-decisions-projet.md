@@ -3616,16 +3616,22 @@ Sabine du 2026-10-15).
   `etl/raw_store.py`, et `core` n'importe rien de K-B). Les fiches des tops gardent leur jeu de
   caractères et leur URL nue cliquable (2026-10-19). — PR de #209
 - **Dans une fiche de veille, chaque affirmation et chaque titre de source est écrit en texte : le
-  jeu des fiches des tops, plus `~`, `:` et `@`, puis le point de `www.`, sans casse ; une
-  affirmation renvoie à ses sources par leur numéro. Une URL de source n'est écrite, en lien
+  jeu des fiches des tops, plus `~`, `:`, `@` et `&`, puis le point de `www.`, sans casse, et la
+  ponctuation d'un marqueur de liste en tête du texte ; une affirmation renvoie à ses sources par
+  leur numéro. Une URL de source n'est écrite, en lien
   automatique `<…>`, que si elle commence par `http://` ou `https://` et n'est faite que des
   caractères de la RFC 3986, moins `[`, `]` et `$` ; sinon « (sans URL) ».** Choix de la session
-  (plan validé ; la règle de l'URL resserrée en codant, acceptée par time-knight le 2026-10-21).
+  (plan validé ; la règle de l'URL resserrée en codant, acceptée par time-knight le 2026-10-21 ;
+  `&` et le marqueur de liste ajoutés après la revue de code et un relecteur de sécurité, tranchés
+  par time-knight, délégation de Sabine du 2026-10-15).
   Pourquoi : la réponse est une entrée non fiable (OWASP LLM10:2026) ; une affirmation ou un titre
   piégés deviendraient actifs dans Obsidian, jusqu'au JavaScript d'un bloc `dataviewjs` ou d'une
   requête `$=` si l'utilisatrice les a activés. `~` ouvre un bloc `~~~` ; `:` et `@` font les liens
   automatiques de GFM (`http://`, `mailto:`, `xmpp:`, adresse mail) et les champs Dataview `::` ;
-  une affirmation du modèle ne fait jamais un lien, à la différence d'une description de top.
+  `&` ouvre une référence de caractère, que CommonMark décode (`&rlm;` rend le contrôle
+  bidirectionnel que la neutralisation retire) ; un marqueur de liste en tête imbrique une liste
+  (CWE-116 : une structure, sans injection ; un titre « 2026. Bilan » suffit). Une affirmation du
+  modèle ne fait jamais un lien, à la différence d'une description de top.
   Dans `<…>`, une barre oblique n'échappe rien (CommonMark 0.31.2, § 6.5) : l'URL ne doit contenir
   aucun caractère qui la ferait sortir, et `[`, `]`, `$` sont de la syntaxe d'Obsidian. Options
   écartées : le seul contrôle 6 de l'API IA, qui reste en amont (il laisse passer `$=`, `#`, `%%`,

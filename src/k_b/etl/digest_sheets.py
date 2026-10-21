@@ -27,12 +27,19 @@ from k_b.etl.vault_files import (
 )
 
 # Beyond the characters of the sheets of the tops: a fence of code (~~~), an autolink of GFM or a
-# field of Dataview (:: , http:, mailto:, xmpp:), an e-mail address (@). A bare URL stays text
-# here: a claim of the model never makes a link (ADR of 2026-10-21, #209).
-DIGEST_ESCAPED_CHARACTERS = MARKDOWN_SYNTAX_CHARACTERS | frozenset("~:@")
+# field of Dataview (:: , http:, mailto:, xmpp:), an e-mail address (@), a character reference
+# (&#x202E; or &rlm;, which CommonMark decodes into the bidirectional control neutralize_text
+# removes). A bare URL stays text here: a claim of the model never makes a link (ADR of
+# 2026-10-21, #209).
+DIGEST_ESCAPED_CHARACTERS = MARKDOWN_SYNTAX_CHARACTERS | frozenset("~:@&")
 # The autolink of GFM that needs none of them, www. in any case (GitHub Flavored Markdown, 6.9):
 # its dot is escaped, after the backslashes of the text.
 WWW_DOT = re.compile(r"(www)\.", re.IGNORECASE)
+# A list marker at the start of a text (CommonMark 0.31.2, 5.2 and 5.3): a claim starts a list
+# item and a title a numbered line, where it would nest a list. [0-9], not \d, which takes the
+# digits of other scripts too. A rule or an underline (---, ***, ===) never stands alone on its line:
+# the claim ends with its sources, the title with its URL.
+LEADING_LIST_MARKER = re.compile(r"^([-+*]|[0-9]{1,9}[.)])(?= |$)")
 URL_SCHEMES = ("http://", "https://")
 # A URL is written, as an autolink, only when it is made of the characters of RFC 3986 (unreserved,
 # delimiters, a percent and two hexadecimal digits), less [ ] and $, a wikilink and a formula of
@@ -144,6 +151,15 @@ def is_writable_url(url: str) -> bool:
 
 
 def neutralize_digest_text(text: str) -> str:
-    """The text on one line, as text, without an autolink: the characters of the sheets of the
-    tops, ~ : @, and the dot of www. escaped."""
-    return WWW_DOT.sub(r"\1\\.", neutralize_text(text, DIGEST_ESCAPED_CHARACTERS))
+    """The text on one line, as text, without an autolink nor a list: the characters of the
+    sheets of the tops, ~ : @ &, the dot of www., and the punctuation of a list marker at its
+    start escaped. Both after neutralize_text, which would escape their backslash again."""
+    neutralized = neutralize_text(text, DIGEST_ESCAPED_CHARACTERS)
+    return LEADING_LIST_MARKER.sub(
+        escape_list_marker, WWW_DOT.sub(r"\1\\.", neutralized)
+    )
+
+
+def escape_list_marker(marker: re.Match[str]) -> str:
+    """- becomes \\-, 2026. becomes 2026\\. : CommonMark lets any ASCII punctuation be escaped."""
+    return f"{marker[1][:-1]}\\{marker[1][-1]}"

@@ -809,15 +809,19 @@ sources.
 
 **Écrit en texte.** Le texte de chaque affirmation et le titre de chaque source : sur une ligne
 (retours à la ligne et blancs réduits à une espace ; contrôles, surrogates isolés et contrôles
-bidirectionnels remplacés par une espace), les caractères ``\ [ ] < > | ` # % $ ~ : @`` précédés
+bidirectionnels remplacés par une espace), les caractères ``\ [ ] < > | ` # % $ ~ : @ &`` précédés
 d'une barre oblique inverse (CommonMark 0.31.2, § 2.4 : toute ponctuation ASCII s'échappe), puis le
-point de `www.`, sans casse. Ne s'activent donc ni lien, image, lien wiki, incorporation, note en
-ligne, balise, lien automatique `<…>`, ni ceux de GFM (`http://`, `https://`, `www.`, `mailto:`,
-`xmpp:`, adresse mail), ni code en ligne, bloc ```` ``` ```` ou `~~~`, requête Dataview en ligne
-(`=`, `$=`), bloc `dataviewjs`, champ Dataview (`::`), tag, commentaire `%%` ni formule `$`. Les
-caractères des fiches des tops sont repris (`etl/vault_files.py`) ; `~ : @` et `www.` s'y ajoutent,
-car une URL nue reste du texte dans une fiche de veille : une affirmation du modèle ne fait jamais un
-lien. Le contrôle 6 de l'API IA reste en amont (défense en profondeur). Non échappée, voulu :
+point de `www.`, sans casse, et la ponctuation d'un marqueur de liste en tête du texte (`-`, `+`,
+`*`, ou `.` et `)` après un à neuf chiffres : `\- urgent`, `2026\. Bilan`). Ne s'activent donc ni
+lien, image, lien wiki, incorporation, note en ligne, balise, lien automatique `<…>`, ni ceux de GFM
+(`http://`, `https://`, `www.`, `mailto:`, `xmpp:`, adresse mail), ni code en ligne, bloc
+```` ``` ```` ou `~~~`, requête Dataview en ligne (`=`, `$=`), bloc `dataviewjs`, champ Dataview
+(`::`), tag, commentaire `%%`, formule `$`, référence de caractère (`&rlm;`, que CommonMark décode
+en contrôle bidirectionnel) ni liste imbriquée. Une ligne horizontale ou un soulignement (`---`,
+`***`, `===`) n'est jamais seul sur sa ligne : l'affirmation finit par ses sources, le titre par
+son URL. Les caractères des fiches des tops sont repris (`etl/vault_files.py`) ; `~ : @ &`, `www.`
+et le marqueur de liste s'y ajoutent, car une URL nue reste du texte dans une fiche de veille : une
+affirmation du modèle ne fait jamais un lien. Le contrôle 6 de l'API IA reste en amont (défense en profondeur). Non échappée, voulu :
 l'emphase (`*x*`, `_x_`, `==x==`), de la mise en forme, ni lien ni code.
 
 **Une URL** n'est écrite, en lien automatique `<…>`, que si elle commence par `http://` ou

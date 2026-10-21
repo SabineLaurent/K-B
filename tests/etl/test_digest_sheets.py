@@ -217,6 +217,84 @@ def test_a_text_of_a_digest_escapes_the_autolinks_too(text, neutralized):
 
 
 @pytest.mark.parametrize(
+    ("text", "neutralized"),
+    [
+        ("- urgent", "\\- urgent"),
+        ("+ plus", "\\+ plus"),
+        ("* étoile", "\\* étoile"),
+        ("-", "\\-"),
+        ("3.", "3\\."),
+        ("2026. Year in review", "2026\\. Year in review"),
+        ("1) premier", "1\\) premier"),
+        ("\n  - après un retour à la ligne", "\\- après un retour à la ligne"),
+        ("1234567890. dix chiffres", "1234567890. dix chiffres"),
+        ("-tiret collé", "-tiret collé"),
+        ("2026 Year", "2026 Year"),
+        ("a - b", "a - b"),
+        ("---", "---"),
+        ("***", "***"),
+        ("___", "___"),
+        ("===", "==="),
+    ],
+)
+def test_a_list_marker_at_the_start_of_a_text_is_escaped(text, neutralized):
+    """A claim starts a list item, a title a numbered line: its own marker would nest a list
+    (CommonMark 0.31.2, 5.2 and 5.3; finding 7 of the code review, decided by time-knight,
+    delegation of Sabine of 2026-10-15)."""
+    assert neutralize_digest_text(text) == neutralized
+
+
+@pytest.mark.parametrize("text", ["---", "***", "___", "==="])
+def test_a_rule_or_an_underline_alone_stays_text_on_the_line_of_its_claim_or_source(
+    text,
+):
+    """Never alone on its line: the claim ends with its sources, the title with its URL."""
+    response, digest = read_one_digest(
+        claims=[ClaimSchema(text=text, item_ids=[6])],
+        sources=[RELEASE_SOURCE.model_copy(update={"title": text})],
+    )
+
+    lines = render_digest_sheet(response, digest).splitlines()
+
+    assert f"- {text} (source 1)" in lines
+    assert lines[-1] == f"1. {text} — <{RELEASE_SOURCE.url}>"
+
+
+@pytest.mark.parametrize(
+    ("text", "neutralized"),
+    [
+        # The # of a numeric reference was escaped already; a named one needs the &.
+        ("droite&#x202E;gauche", "droite\\&\\#x202E;gauche"),
+        ("droite&#8238;gauche", "droite\\&\\#8238;gauche"),
+        ("marque&rlm;et&lrm;fin", "marque\\&rlm;et\\&lrm;fin"),
+        ("R&D", "R\\&D"),
+    ],
+)
+def test_a_character_reference_is_written_as_text(text, neutralized):
+    """CommonMark decodes &#x202E; or &rlm; into the bidirectional control neutralize_text
+    removes: & is escaped (security review of time-knight, delegation of Sabine of 2026-10-15)."""
+    assert neutralize_digest_text(text) == neutralized
+
+
+def test_a_character_reference_in_a_title_and_a_claim_is_written_as_text():
+    response, digest = read_one_digest(
+        claims=[
+            ClaimSchema(text="Une affirmation &#x202E;inversée&rlm;.", item_ids=[6])
+        ],
+        sources=[
+            RELEASE_SOURCE.model_copy(update={"title": "Titre &#x202E;inversé&rlm;"})
+        ],
+    )
+
+    lines = render_digest_sheet(response, digest).splitlines()
+
+    assert "- Une affirmation \\&\\#x202E;inversée\\&rlm;. (source 1)" in lines
+    assert lines[-1] == (
+        f"1. Titre \\&\\#x202E;inversé\\&rlm; — <{RELEASE_SOURCE.url}>"
+    )
+
+
+@pytest.mark.parametrize(
     "url",
     [
         None,
