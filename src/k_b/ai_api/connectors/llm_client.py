@@ -18,7 +18,7 @@ import re
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
-from typing import Literal, get_args
+from typing import Annotated, Literal, get_args
 
 import httpx2
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -34,6 +34,7 @@ from k_b.core.config import (
     LLM_RETRY_AFTER_MAX_SECONDS,
     LLM_RETRY_WAIT_SECONDS,
     LLM_WRITE_TIMEOUT_SECONDS,
+    MAX_TOKENS_READ_PER_ANSWER,
 )
 
 # Relative to the base URL, which keeps its path (/openai/v1, /v1).
@@ -61,9 +62,12 @@ type FailedCheck = Literal[
     "markup",
 ]
 FAILED_CHECKS: tuple[FailedCheck, ...] = get_args(FailedCheck.__value__)
-# The delay-seconds form of Retry-After (RFC 9110, § 10.2.3), of any length: compared to the
-# maximum. Its HTTP-date form, rare, is read as no header.
-RETRY_AFTER_SECONDS = re.compile(r"[0-9]+")
+# The delay-seconds form of Retry-After (RFC 9110, § 10.2.3), compared to the maximum. Its
+# HTTP-date form, rare, is read as no header. Read up to 9 digits, about 31 years: int() refuses
+# 4,301 digits or more, and a longer value is a wait beyond any maximum (review of #156).
+MAX_RETRY_AFTER_DIGITS = 9
+RETRY_AFTER_SECONDS = re.compile(rf"[0-9]{{1,{MAX_RETRY_AFTER_DIGITS}}}")
+RETRY_AFTER_TOO_LONG = re.compile(rf"[0-9]{{{MAX_RETRY_AFTER_DIGITS + 1},}}")
 # A finish_reason is read whatever its length, and cut to this length in the call: it goes to a
 # metric line.
 MAX_FINISH_REASON_LENGTH = 64
@@ -87,13 +91,17 @@ class Choice(EnvelopeModel):
     finish_reason: str | None = None
 
 
+# A token count of the provider, bounded: beyond, the answer is not read.
+type TokenCount = Annotated[int, Field(ge=0, le=MAX_TOKENS_READ_PER_ANSWER)]
+
+
 class CompletionTokensDetails(EnvelopeModel):
-    reasoning_tokens: int | None = Field(default=None, ge=0)
+    reasoning_tokens: TokenCount | None = None
 
 
 class Usage(EnvelopeModel):
-    prompt_tokens: int = Field(ge=0)
-    completion_tokens: int = Field(ge=0)
+    prompt_tokens: TokenCount
+    completion_tokens: TokenCount
     completion_tokens_details: CompletionTokensDetails | None = None
 
 
@@ -350,6 +358,10 @@ def wait_or_end[OutputT: BaseModel](
 ) -> Attempt[OutputT]:
     """A retry after Retry-After, or after the default wait without it; none when Retry-After
     is above the maximum, since a shorter wait would give the same answer."""
+    value = response.headers.get("Retry-After")
+    if value is not None and RETRY_AFTER_TOO_LONG.fullmatch(value):
+        # Too long to read: a wait beyond the maximum, whose value is not given back.
+        return Attempt(outcome=outcome)
     retry_after = read_retry_after(response)
     if retry_after is not None and retry_after > LLM_RETRY_AFTER_MAX_SECONDS:
         return Attempt(outcome=outcome, retry_after_seconds=retry_after)

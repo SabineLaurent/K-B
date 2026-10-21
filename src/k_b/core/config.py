@@ -84,6 +84,12 @@ LLM_REASONING_EFFORT: Literal["none"] | None = None
 # The base URL of the replay provider: a reserved domain (RFC 6761), never resolved, since the
 # replay answers in the client itself.
 LLM_REPLAY_BASE_URL = "https://replay.invalid/v1"
+# The largest token count read in an answer of the provider (prompt, completion, reasoning): an
+# answer beyond it is not read (llm_unavailable), since the answer of a provider is an input not
+# trusted (OWASP API10:2023). Far above a call of K-B (about 9,000 input tokens and 8,192 output
+# tokens at most, #205) and the context of any current model, and far below 2**53, the largest
+# integer a float holds exactly: the cost of a metric line stays a finite number (review of #156).
+MAX_TOKENS_READ_PER_ANSWER = 10_000_000
 # The prices of gpt-6-luna (ADR of 2026-10-17, "Modèle des fiches : gpt-6-luna sur l'abonnement
 # de l'organisme de formation"), in USD per million tokens, for cost_estimated of each metric
 # line: Data Zone Standard, France Central, short context, effective from 2026-09-01. Read on
