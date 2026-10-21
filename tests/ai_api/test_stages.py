@@ -26,8 +26,11 @@ from k_b.ai_api.stages.writing import (
     TEXT_CHARS,
     WRITING_RETRY_REMINDERS,
     WRITING_SYSTEM_PROMPT,
+    Claim,
+    Fact,
     WritingOutput,
     build_writing_schema,
+    check_writing,
     project_for_writing,
 )
 from k_b.ai_api.watch_items import WatchItem, build_fields
@@ -286,3 +289,50 @@ def test_the_subjects_have_safe_and_distinct_names():
         assert SUBJECT_NAME.fullmatch(subject.name)
         assert len(subject.name) <= 40
         assert subject.definition
+
+
+def writing_of(text):
+    return WritingOutput(
+        claims=[
+            Claim(
+                text=text, item_ids=["i6"], facts=[Fact(value="v2.1.287", item_id="i6")]
+            )
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "v2.1.287 : HTTPS://evil.example",
+        "v2.1.287 : javascript+x://evil",
+        "v2.1.287 sur www.evil.example",
+        "v2.1.287 ![x](y)",
+        "v2.1.287 [[note]]",
+        "v2.1.287 [notes](evil)",
+        "v2.1.287\n[a]: //evil.example",
+        "v2.1.287 <b>gras</b>",
+        "v2.1.287 fin</p>",
+        "v2.1.287 <!-- x -->",
+        "v2.1.287 <?php",
+    ],
+)
+def test_a_text_with_a_link_an_image_or_a_tag_is_refused(text):
+    """Check 6 (docs/fiches-veille.md, "Contrôles"): one case per pattern."""
+    assert check_writing(writing_of(text), frozenset({"i6"})) == "markup"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "HTTP request smuggling dans v2.1.287",
+        "Les versions < 2.3.1 sont touchées, pas v2.1.287.",
+        "3 < 4 dans v2.1.287",
+        # The mask of a URL of the input, copied by the model.
+        "Lien [url] de v2.1.287",
+        # The pattern of the spec, not wider: <[a-zA-Z] takes no non-ASCII letter.
+        "v2.1.287 <İ",
+    ],
+)
+def test_a_plain_text_passes_the_check_of_markup(text):
+    assert check_writing(writing_of(text), frozenset({"i6"})) is None

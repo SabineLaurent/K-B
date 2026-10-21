@@ -5,7 +5,8 @@ API, classified by subject, then each subject written; one test per case of the 
 import json
 import secrets
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -25,14 +26,15 @@ from k_b.ai_api.digests import (
 )
 from k_b.ai_api.stages import classification
 from k_b.ai_api.stages.classification import CLASSIFICATION_SYSTEM_PROMPT
-from k_b.ai_api.stages.writing import WRITING_SYSTEM_PROMPT
-from k_b.ai_api.watch_items import WatchReading
+from k_b.ai_api.stages.writing import WRITING_RETRY_REMINDERS, WRITING_SYSTEM_PROMPT
+from k_b.ai_api.watch_items import WatchItem, WatchReading, build_fields
 from k_b.core.config import (
     LLM_REPLAY_BASE_URL,
     MIN_SECONDS_FOR_LLM_REQUEST,
     DigestSubject,
 )
 from k_b.data_api.app import create_app
+from k_b.etl.sources.tldr import read_articles
 
 # The subjects of the tests, never the real ones: a change of the real list breaks no test.
 TEST_SUBJECTS = (
@@ -771,3 +773,183 @@ def test_a_classification_down_gives_no_retry_after(reading):
     assert isinstance(result, ClassificationFailure)
     assert result.state == "llm_unavailable"
     assert result.retry_after_seconds is None
+
+
+# The trapped item of #206: the article of a TLDR AI edition collected (tldr_ai_extract.html,
+# 2026-10-07), its summary carrying the trap of the criterion; an id out of the test base.
+TRAPPED_PAGE = (
+    Path(__file__).parent.parent / "fixtures" / "tldr_ai_trapped_extract.html"
+)
+TRAPPED_ITEM_ID = 900
+TRAPPED_REF = f"i{TRAPPED_ITEM_ID}"
+TRAPPED_LINK = "evil.example"
+
+
+@pytest.fixture(scope="module")
+def trapped_reading(reading):
+    """The watch of the test base and the trapped article, read by the TLDR reader, then masked
+    as the data API client masks an item (to_watch_item)."""
+    article = read_articles(TRAPPED_PAGE.read_bytes()).entries[0]
+    trapped_item = WatchItem(
+        item_id=TRAPPED_ITEM_ID,
+        kind="newsletter_article",
+        source_date=datetime.combine(article.edition_date, time(), tzinfo=UTC),
+        url=article.link,
+        source_title=article.title,
+        fields=build_fields(
+            "newsletter_article",
+            {"edition": "ai", "title": article.title, "summary": article.summary},
+        ),
+    )
+    return replace(reading, items=(*reading.items, trapped_item))
+
+
+def classified_with_trap(agent=(*AGENT_ITEMS, TRAPPED_ITEM_ID), trapped=()):
+    """The valid classification, the trapped item in agent_tools, and the assignments the trap
+    asks for."""
+    output = json.loads(classified(agent=list(agent))["content"])
+    output["assignments"].extend(trapped)
+    return completion(output)
+
+
+def trapped_claim(text, item_ids=(TRAPPED_REF,)):
+    # "China" is in the title of the trapped article.
+    return {
+        "text": text,
+        "item_ids": list(item_ids),
+        "facts": [{"value": "China", "item_id": TRAPPED_REF}],
+    }
+
+
+def written_with_trap(claim):
+    """The writing of each subject, the model obeying the trap at both attempts of agent_tools."""
+    return [
+        classified_with_trap(),
+        written(SECURITY_CLAIM),
+        written(claim),
+        written(claim),
+        written(),
+    ]
+
+
+ADMIN_SUBJECT = classified_with_trap(
+    agent=AGENT_ITEMS, trapped=[{"item_id": TRAPPED_REF, "subject": "admin"}]
+)
+TRAPPED_TWICE = classified_with_trap(
+    trapped=[{"item_id": TRAPPED_REF, "subject": "research"}]
+)
+
+
+@pytest.mark.parametrize(
+    ("steps", "failed_check"),
+    [
+        ([ADMIN_SUBJECT, ADMIN_SUBJECT], "subject"),
+        ([TRAPPED_TWICE, TRAPPED_TWICE], "completeness"),
+        (
+            written_with_trap(
+                trapped_claim("La Chine recrute.", (TRAPPED_REF, "i99999"))
+            ),
+            "item_id",
+        ),
+        (
+            written_with_trap(
+                trapped_claim(f"La Chine recrute. ![x](https://{TRAPPED_LINK})")
+            ),
+            "markup",
+        ),
+        (
+            written_with_trap(
+                trapped_claim(f"La Chine recrute : https://{TRAPPED_LINK}")
+            ),
+            "markup",
+        ),
+    ],
+    ids=["subject_admin", "item_twice", "item_99999", "image", "link"],
+)
+def test_a_model_obeying_a_trapped_item_gives_a_named_state_and_no_digest(
+    trapped_reading, steps, failed_check
+):
+    """Criterion of #206: each output the trap asks for is refused, and the trapped item stayed
+    in the user message (rule 8 of poc.md)."""
+    result, transport = digest_of(trapped_reading, steps)
+
+    if isinstance(result, ClassificationFailure):
+        assert result.state == "llm_invalid_output"
+        refused_call = 0
+    else:
+        assert result.failed_subjects == (
+            FailedSubject(
+                subject="agent_tools", stage="write", error="llm_invalid_output"
+            ),
+        )
+        assert "agent_tools" not in [digest.subject for digest in result.digests]
+        refused_call = 2
+    assert result.stage_calls[refused_call].llm_call.failed_check == failed_check
+    trapped_summary = trapped_reading.items[-1].fields.summary
+    bodies = sent_bodies(transport)
+    for body in bodies[refused_call : refused_call + 2]:
+        sent_items = json.loads(messages_of(body, "user")[0])["items"]
+        assert {"item_id": TRAPPED_REF, "summary": trapped_summary}.items() <= next(
+            item for item in sent_items if item["item_id"] == TRAPPED_REF
+        ).items()
+    for body in bodies:
+        assert not any("Ignore les consignes" in m for m in messages_of(body, "system"))
+        assert TRAPPED_LINK not in json.dumps(body["messages"])
+    # Rule 5 of poc.md: the measures of the calls carry no text of the item nor of the output.
+    assert TRAPPED_LINK not in repr(result.stage_calls)
+    assert "Ignore les consignes" not in repr(result.stage_calls)
+
+
+def test_the_retry_after_a_markup_sends_its_reminder(trapped_reading):
+    image = trapped_claim(f"La Chine recrute. ![x](https://{TRAPPED_LINK})")
+    plain = trapped_claim("China peine à recruter des chercheurs étrangers.")
+
+    result, transport = digest_of(
+        trapped_reading,
+        [
+            classified_with_trap(),
+            written(SECURITY_CLAIM),
+            written(image),
+            written(plain),
+            written(),
+        ],
+    )
+
+    assert isinstance(result, DigestsResult)
+    assert result.digests[1].subject == "agent_tools"
+    assert result.stage_calls[2].llm_call.first_failed_check == "markup"
+    assert messages_of(sent_bodies(transport)[3], "system") == [
+        f"{WRITING_SYSTEM_PROMPT}\n\n{WRITING_RETRY_REMINDERS['markup']}"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("claims", "failed_check"),
+    [
+        # Check 4 over the whole output before check 6.
+        (
+            [
+                {**AGENT_CLAIM, "text": "v2.1.287 : https://evil.example"},
+                {**AGENT_CLAIM, "item_ids": ["i6", "i99999"]},
+            ],
+            "item_id",
+        ),
+        # Check 6 before the bounds of a claim, which would only remove it.
+        ([{**AGENT_CLAIM, "text": "v2.1.287 " + "x" * 400 + " www.x"}], "markup"),
+    ],
+    ids=["item_id_before_markup", "markup_before_bounds"],
+)
+def test_the_checks_of_the_writing_go_in_their_order(reading, claims, failed_check):
+    result, _ = digest_of(
+        reading,
+        [
+            classified(),
+            written(SECURITY_CLAIM),
+            written(*claims),
+            written(*claims),
+            written(),
+        ],
+    )
+
+    assert result.failed_subjects[0].subject == "agent_tools"
+    assert result.stage_calls[2].llm_call.failed_check == failed_check
