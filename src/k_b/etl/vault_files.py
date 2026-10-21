@@ -25,10 +25,12 @@ BIDI_CONTROLS = frozenset(
 REMOVED_CATEGORIES = frozenset({"Cc", "Cs"})
 # The ASCII punctuation that would make syntax of a text in Markdown or Obsidian: a link, an
 # embed or a wikilink ([ ]), HTML (< >), a cell of a table (|), code (`), a tag (#), a comment
-# (%%), a formula ($). Each is escaped by a backslash, as CommonMark allows for any ASCII
-# punctuation; the backslash too, so that a text ending with one does not escape the character
-# that follows it.
-MARKDOWN_SYNTAX_CHARACTERS = frozenset("\\[]<>|`#%$")
+# (%%), a formula ($), a character reference (&rlm;, which CommonMark decodes into the
+# bidirectional control neutralize_text removes; a numeric one is already stopped by its #;
+# decision of Sabine of 2026-10-21). Each is escaped by a backslash, as CommonMark allows for any
+# ASCII punctuation; the backslash too, so that a text ending with one does not escape the
+# character that follows it.
+MARKDOWN_SYNTAX_CHARACTERS = frozenset("\\[]<>|`#%$&")
 
 
 class VaultEntryRefusedError(Exception):

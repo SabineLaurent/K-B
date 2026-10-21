@@ -127,6 +127,7 @@ def test_a_sheet_not_written_leaves_no_temporary_file(
         ("ends with a backslash \\", "ends with a backslash \\\\"),
         ("`code` and #tag", "\\`code\\` and \\#tag"),
         ("%%hidden and save $5 or $10", "\\%\\%hidden and save \\$5 or \\$10"),
+        ("R&D &rlm;", "R\\&D \\&rlm;"),
         ("escape \x1b[31m red", "escape \\[31m red"),
         ("lone \ud800 surrogate", "lone surrogate"),
         ("right\u202eleft\u2066mark\u200f", "right left mark"),

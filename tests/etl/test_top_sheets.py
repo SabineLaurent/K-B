@@ -355,6 +355,29 @@ def test_a_trapped_description_stays_in_its_cell(data_dir, vault_dir):
     assert [line for line in lines if line == "---"] == ["---", "---"]
 
 
+def test_a_character_reference_in_a_description_is_written_as_text(data_dir, vault_dir):
+    """CommonMark decodes a named reference: &rlm; or &lrm; would give back the bidirectional
+    control neutralize_text removes (decision of Sabine of 2026-10-21, relayed by time-knight)."""
+    write_ranking(
+        data_dir,
+        STARRED_TOP,
+        "2026-10-05T093000Z",
+        response_with(
+            STARRED_RESPONSE,
+            description="droite&rlm;gauche&lrm; sans&zwnj;liaison c&shy;oupure R&D",
+        ),
+    )
+
+    write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
+
+    lines = (
+        find_sheet(vault_dir, STARRED_TOP, "2026-10-05").read_text("utf-8").splitlines()
+    )
+    assert lines[10].endswith(
+        " | droite\\&rlm;gauche\\&lrm; sans\\&zwnj;liaison c\\&shy;oupure R\\&D |"
+    )
+
+
 def test_tops_is_a_reserved_name_no_subject_of_the_digests_may_take():
     """The digests of a subject are written in veille/<subject>/: a subject tops would write
     them in the folder of the sheets of the tops."""

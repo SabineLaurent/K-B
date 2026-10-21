@@ -826,8 +826,9 @@ Dataview le cherche aussi dans le texte rendu, où les barres obliques ont dispa
 (`replaceInlineFields` lit le HTML rendu, Dataview 0.5.68) : seule une espace entre les deux
 deux-points l'y empêche (recette de Sabine du 2026-10-21). Une ligne horizontale ou un soulignement (`---`,
 `***`, `===`) n'est jamais seul sur sa ligne : l'affirmation finit par ses sources, le titre par
-son URL. Les caractères des fiches des tops sont repris (`etl/vault_files.py`) ; `~ : @ &`, `www.`
-et le marqueur de liste s'y ajoutent, car une URL nue reste du texte dans une fiche de veille : une
+son URL. Les caractères des fiches des tops sont repris (`etl/vault_files.py`, `&` compris depuis
+le 2026-10-21) ; `~ : @`, `www.`, le marqueur de liste et l'espace entre deux deux-points s'y
+ajoutent, car une URL nue reste du texte dans une fiche de veille : une
 affirmation du modèle ne fait jamais un lien. Le contrôle 6 de l'API IA reste en amont (défense en profondeur). Non échappée, voulu :
 l'emphase (`*x*`, `_x_`, `==x==`), de la mise en forme, ni lien ni code.
 

@@ -28,11 +28,9 @@ from k_b.etl.vault_files import (
 )
 
 # Beyond the characters of the sheets of the tops: a fence of code (~~~), an autolink of GFM or a
-# field of Dataview (:: , http:, mailto:, xmpp:), an e-mail address (@), a character reference
-# (&#x202E; or &rlm;, which CommonMark decodes into the bidirectional control neutralize_text
-# removes). A bare URL stays text here: a claim of the model never makes a link (ADR of
-# 2026-10-21, #209).
-DIGEST_ESCAPED_CHARACTERS = MARKDOWN_SYNTAX_CHARACTERS | frozenset("~:@&")
+# field of Dataview (:: , http:, mailto:, xmpp:), an e-mail address (@). A bare URL stays text
+# here: a claim of the model never makes a link (ADR of 2026-10-21, #209).
+DIGEST_ESCAPED_CHARACTERS = MARKDOWN_SYNTAX_CHARACTERS | frozenset("~:@")
 # The autolink of GFM that needs none of them, www. in any case (GitHub Flavored Markdown, 6.9):
 # its dot is escaped, after the backslashes of the text.
 WWW_DOT = re.compile(r"(www)\.", re.IGNORECASE)

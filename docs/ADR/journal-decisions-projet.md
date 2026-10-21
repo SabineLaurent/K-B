@@ -3624,7 +3624,7 @@ Sabine du 2026-10-15).
   `write_file_atomically` et la règle 2 de `conventions.md` dans cette PR. Les fiches des tops gardent leur jeu de
   caractères et leur URL nue cliquable (2026-10-19). — PR de #209
 - **Dans une fiche de veille, chaque affirmation et chaque titre de source est écrit en texte : le
-  jeu des fiches des tops, plus `~`, `:`, `@` et `&`, puis le point de `www.`, sans casse, la
+  jeu des fiches des tops, `&` compris, plus `~`, `:` et `@`, puis le point de `www.`, sans casse, la
   ponctuation d'un marqueur de liste en tête du texte, et une espace entre deux deux-points ; une
   affirmation renvoie à ses sources par leur numéro. Une URL de source n'est écrite, en lien
   automatique `<…>`, que si elle commence par `http://` ou `https://` et n'est faite que des
@@ -3654,6 +3654,14 @@ Sabine du 2026-10-15).
   imprimable sans espace, `<`, `>` ni `\` (plan v2, moins strict). Limites assumées : l'emphase
   (`*x*`, `_x_`, `==x==`) n'est pas échappée, c'est de la mise en forme ; le rendu dans Obsidian,
   logiciel fermé, n'est prouvé que par la recette de la PR. — PR de #209
+- **`&` est échappé aussi dans les fiches des tops : il rejoint `MARKDOWN_SYNTAX_CHARACTERS`
+  (`etl/vault_files.py`), le jeu commun aux deux écrivains du coffre.** Décision de Sabine du
+  2026-10-21, relayée par time-knight, sur un constat du relecteur de sécurité. Pourquoi : une
+  référence nommée (`&rlm;`, `&lrm;`) rend à l'affichage le contrôle bidirectionnel que
+  `neutralize_text` retire ; les références numériques étaient déjà inactives, puisque `#` est
+  échappé ; une seule règle pour les deux écrivains du coffre. Option écartée : `&` dans les seules
+  fiches de veille. **Révise** 2026-10-19, « Tops : les fiches par `kb write-tops` » : la liste des
+  caractères échappés d'une description (P4) compte `&`. — PR de #209
 - **Avant sa demande, `kb digest` vérifie, pour chaque sujet de la liste, que ni `veille/` ni
   `veille/<sujet>/` n'est un lien symbolique et que la fiche du jour UTC n'existe pas ; sinon il
   sort en 2 sans rien demander.** Choix de la session dans le plan validé. Pourquoi : aucun item ne
