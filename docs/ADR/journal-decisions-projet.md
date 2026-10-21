@@ -3382,6 +3382,39 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
   **Révise** la comparaison validée par Sabine le 2026-10-15, consignée dans un commentaire de
   #210 et non dans ce journal. — PR de #275
 
+## 2026-10-21
+
+### Tests : un test de bout en bout par source, hors de la CI
+
+- **Un test de bout en bout par source, marqué `e2e`, lance `kb create-db`,
+  `KB_COLLECT_ONLY=<source> kb collect` puis `kb import` sur la vraie source dans un
+  `KB_DATA_DIR` neuf, et vérifie les codes de sortie et ce qui arrive en base. `uv run pytest`,
+  la commande de la CI, les écarte ; `uv run pytest -m e2e` les lance.** Décision de Sabine du
+  2026-10-21, relayée par time-knight : un ajout au critère de #25. Pourquoi : les rejouer à
+  l'identique au deuxième temps (`docker compose run kb uv run pytest -m e2e`) et au troisième
+  (un job ACA). Hors de la CI parce qu'ils appellent les vraies sources : réseau, clés, et une
+  requête BigQuery réelle pour `gh_archive`. La forme a été tranchée au plan de #25, validé par
+  Sabine, puis aux revues, par time-knight (délégation de Sabine du 15/10) :
+  - un seul test, paramétré par les dossiers de `SOURCE_KINDS`, plutôt qu'un test écrit à la
+    main par source, qui ferait dix copies du même déroulé ;
+  - l'exclusion se fait dans `tests/conftest.py` (`pytest_collection_modifyitems`), et non par
+    `addopts = "-m 'not e2e'"` dans `pyproject.toml`, modification que Sabine aurait dû taper
+    elle-même sans rien y gagner ;
+  - l'interface `-m e2e` est gardée, plutôt qu'une option `--run-e2e`, qui aurait changé la
+    commande décidée ;
+  - le nom `e2e` est cherché dans l'expression `-m` par la règle `ident` de la grammaire de
+    pytest, et non par l'API `Expression` de pytest, privée et changée en 8.x ;
+  - une source dont la variable manque (Zotero, coffre, clé BigQuery) est sautée, plutôt qu'en
+    échec : en conteneur, Zotero et les clips restent sur le Mac.
+
+  Limites assumées :
+  - le test dépend de la disponibilité de la source réelle : un rouge se lit d'abord dans le
+    journal, avant d'être pris pour un défaut de K-B ;
+  - chaque `kb` reçoit tout l'environnement du terminal (`uv run --env-file .env`), clés Azure
+    comprises, comme dans un usage ordinaire de `kb` ;
+  - ce qu'un test garde (sa console et `logs/`) est à l'étape 10 de la procédure de tri du
+    registre. — PR de #25
+
 ## Décisions encore ouvertes
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,
