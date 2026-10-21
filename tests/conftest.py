@@ -23,6 +23,9 @@ KB_SETTINGS_VARIABLES = (
 )
 # The marker of the tests that run kb on the real sources (tests/e2e/).
 E2E_MARKER = "e2e"
+# A marker name of a -m expression, by the rule ident of pytest's grammar
+# (_pytest/mark/expression.py:10, pytest 9.1.1): nightly-e2e and e2e.slow are one name each.
+MARKER_NAME = re.compile(r"(?:\w|:|\+|-|\.|\[|\]|\\|/)+")
 
 
 def pytest_configure(config):
@@ -35,8 +38,8 @@ def pytest_configure(config):
 def pytest_collection_modifyitems(config, items):
     """Leave out the end-to-end tests unless -m names them: uv run pytest, the command of the
     CI, never calls a real source; uv run pytest -m e2e runs them."""
-    # The word e2e, not a marker name that holds it (nightly_e2e).
-    if E2E_MARKER in re.findall(r"\w+", config.option.markexpr):
+    # The name e2e, not a marker name that holds it (nightly_e2e, nightly-e2e, e2e.slow).
+    if E2E_MARKER in MARKER_NAME.findall(config.option.markexpr):
         return
     deselected = [item for item in items if item.get_closest_marker(E2E_MARKER)]
     if not deselected:
