@@ -6,10 +6,13 @@ Left out of uv run pytest (tests/conftest.py). Run on the Mac, with the HTML rep
 uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html --self-contained-html
 .env.e2e_test holds the settings of the sources alone (.env.e2e_test.example), and each kb gets
 the environment of the terminal too: run it from a terminal without .env exported. A variable of
-.env.example that is not in .env.e2e_test.example stops the tests before any kb, but the ones the
-test sets itself (KB_DATA_DIR, KB_COLLECT_ONLY) or tests/conftest.py removes (KB_LOG_TO_FILE,
-KB_DATA_API_HOST, KB_DATA_API_PORT, KB_DATA_API_ALLOWED_HOSTS): KB_DATA_API_URL, of the AI API, stops them. To be run the same way in a container (#200) and as a job. Without KB_ZOTERO_DIR,
-KB_VAULT_DIR or GOOGLE_APPLICATION_CREDENTIALS, the test of its source is skipped. KB_GITHUB_TOKEN
+.env.example that is not in .env.e2e_test.example, or any KB_API_KEY_<CLIENT>, stops the tests
+before any kb, but the ones the test sets itself (KB_DATA_DIR, KB_COLLECT_ONLY) or
+tests/conftest.py removes (KB_LOG_TO_FILE, KB_DATA_API_HOST, KB_DATA_API_PORT,
+KB_DATA_API_ALLOWED_HOSTS): KB_DATA_API_URL, of the AI API, stops them. To be run the same way in
+a container (#200) and as a job, whose environment holds the variables of these tests alone.
+Without KB_ZOTERO_DIR, KB_VAULT_DIR or GOOGLE_APPLICATION_CREDENTIALS, the test of its source is
+skipped. KB_GITHUB_TOKEN
 is optional: without it, the GitHub sources run on 60 requests per hour instead of 5,000.
 gh_archive runs a real BigQuery query (docs/bigquery.md).
 
@@ -35,6 +38,7 @@ import pytest
 from k_b.commands.environment import DATA_DIR_VARIABLE
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOG_FILE_PATH, LOGGER_NAME
+from k_b.core.api_keys import API_KEY_VARIABLE_PREFIX
 from k_b.database.connection import DATABASE_FILE_NAME
 from k_b.etl.collected_sources import COLLECT_ONLY_VARIABLE, VARIABLE_BY_SOURCE_NAME
 from k_b.etl.raw_store import (
@@ -121,11 +125,16 @@ def find_names_beyond_the_end_to_end_tests(env_example_path, e2e_env_example_pat
 def no_variable_beyond_the_end_to_end_tests():
     """Stop every test before any kb if the environment holds a variable of kb that the
     end-to-end tests do not need: a .env exported in the terminal would give each kb its keys.
-    Names only: no value is read."""
+    The key of any client of the data API too, named in .env.example or not: kb serve reads
+    them by their prefix. Names only: no value is read."""
     names_beyond = find_names_beyond_the_end_to_end_tests(
         ENV_EXAMPLE_PATH, E2E_ENV_EXAMPLE_PATH
     )
-    present = sorted(name for name in names_beyond if name in os.environ)
+    present = sorted(
+        name
+        for name in os.environ
+        if name in names_beyond or name.startswith(API_KEY_VARIABLE_PREFIX)
+    )
     if present:
         pytest.exit(
             f"variables beyond the end-to-end tests in the environment: {', '.join(present)};"

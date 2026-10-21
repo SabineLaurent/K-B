@@ -3454,7 +3454,9 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
 
   Limites assumées :
   - lancer depuis un terminal sans `.env` exporté reste une consigne : le garde-fou ne connaît que
-    les noms de `.env.example` (une variable `KB_API_KEY_<CLIENT>` qui n'y est pas le passe) ;
+    les noms de `.env.example`, et la famille `KB_API_KEY_<CLIENT>` par son préfixe (la seule que
+    `kb` lit par préfixe) ; une variable d'un autre outil (une clé exportée par un autre projet)
+    passe ;
   - si `.env.example` ou `.env.e2e_test.example` manque (une image qui ne les copie pas, #200),
     les tests échouent ;
   - `KB_DATA_API_URL`, réglage de l'API IA, n'est ni posé ni retiré par le test : présent dans

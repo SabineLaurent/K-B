@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from k_b.commands.environment import DATA_DIR_VARIABLE, LOG_TO_FILE_VARIABLE
+from k_b.core.api_keys import API_KEY_VARIABLE_PREFIX
 from k_b.etl.collected_sources import ZOTERO_DIR_VARIABLE
 from k_b.etl.source_kinds import SOURCE_KINDS
 
@@ -84,20 +85,16 @@ def test_pytest_m_e2e_collects_one_end_to_end_test_per_source():
 VALUE_BEYOND = "value-beyond-the-end-to-end-tests"
 
 
-def test_the_end_to_end_tests_stop_on_a_variable_beyond_theirs_without_its_value():
-    """-k zotero without KB_ZOTERO_DIR: even with the guard broken, the test is skipped and no
-    real source is called."""
+def run_the_zotero_end_to_end_test(variables):
+    """pytest -m e2e -k zotero with the variables given, without KB_ZOTERO_DIR: even with the
+    guard broken, the test is skipped and no real source is called."""
     environment = {
         name: value
         for name, value in os.environ.items()
         if name not in ("PYTEST_ADDOPTS", ZOTERO_DIR_VARIABLE)
     }
-    environment["KB_LLM_API_KEY"] = VALUE_BEYOND
-    # Set or removed by the test before any kb: never a reason to stop.
-    environment[DATA_DIR_VARIABLE] = VALUE_BEYOND
-    environment[LOG_TO_FILE_VARIABLE] = VALUE_BEYOND
-
-    result = subprocess.run(  # noqa: S603 — runs this interpreter on pytest, fixed arguments
+    environment.update(variables)
+    return subprocess.run(  # noqa: S603 — runs this interpreter on pytest, fixed arguments
         [
             sys.executable,
             "-m",
@@ -116,6 +113,17 @@ def test_the_end_to_end_tests_stop_on_a_variable_beyond_theirs_without_its_value
         env=environment,
     )
 
+
+def test_the_end_to_end_tests_stop_on_a_variable_beyond_theirs_without_its_value():
+    result = run_the_zotero_end_to_end_test(
+        {
+            "KB_LLM_API_KEY": VALUE_BEYOND,
+            # Set or removed by the test before any kb: never a reason to stop.
+            DATA_DIR_VARIABLE: VALUE_BEYOND,
+            LOG_TO_FILE_VARIABLE: VALUE_BEYOND,
+        }
+    )
+
     assert result.returncode == pytest.ExitCode.USAGE_ERROR
     assert "1 selected" in result.stdout
     assert "KB_LLM_API_KEY" in result.stdout
@@ -123,6 +131,19 @@ def test_the_end_to_end_tests_stop_on_a_variable_beyond_theirs_without_its_value
     assert LOG_TO_FILE_VARIABLE not in result.stdout
     assert " skipped" not in result.stdout
     assert " passed" not in result.stdout
+    assert VALUE_BEYOND not in result.stdout + result.stderr
+
+
+def test_the_end_to_end_tests_stop_on_the_key_of_any_client_without_its_value():
+    """kb serve reads every KB_API_KEY_<CLIENT>: a client that .env.example does not name stops
+    the tests too."""
+    key_variable = f"{API_KEY_VARIABLE_PREFIX}CLIENT_NOT_IN_THE_EXAMPLE"
+
+    result = run_the_zotero_end_to_end_test({key_variable: VALUE_BEYOND})
+
+    assert result.returncode == pytest.ExitCode.USAGE_ERROR
+    assert key_variable in result.stdout
+    assert " skipped" not in result.stdout
     assert VALUE_BEYOND not in result.stdout + result.stderr
 
 
