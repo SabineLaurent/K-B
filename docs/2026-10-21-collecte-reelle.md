@@ -14,12 +14,15 @@ chemin.
 
 ## En bref
 
-- **Tout est vert, sans aucun cas nouveau.** 10 tests de bout en bout, un par source, puis 3
-  exécutions complètes et un `kb write-tops` : chaque commande sort en `0` (`SUCCEEDED`), avec 0
-  rejet, 0 erreur non gérée et aucune correction de code.
-- **Le critère « chaque cas rencontré est couvert par un test » est donc tenu sans test
-  nouveau.** Les seuls tests ajoutés sont les tests de bout en bout et ceux de leur exclusion par
-  défaut.
+- **Tout est vert.** 10 tests de bout en bout, un par source, puis 3 exécutions complètes et un
+  `kb write-tops` : chaque commande sort en `0` (`SUCCEEDED`), avec 0 rejet, 0 erreur non gérée
+  et aucune correction de code.
+- **Un cas rencontré, côté source** : plus tard dans la matinée, arXiv a dépassé deux fois le
+  délai de lecture de 30 s, puis refusé une requête de mesure par un HTTP 429. kb l'a traité comme
+  prévu, et une relance 27 min plus tard était verte (voir « Cas rencontrés »).
+- **Le critère « chaque cas rencontré est couvert par un test » est tenu sans test nouveau** :
+  ce cas est déjà couvert par les tests de la collecte. Les seuls tests ajoutés sont les tests de
+  bout en bout et ceux de leur exclusion par défaut.
 - **La collecte incrémentale tient.** Les 2e et 3e exécutions, le même jour, n'écrivent aucun
   item. Elles relisent 21 papiers arXiv, que l'import écarte comme doublons.
 - **BigQuery** : 2 requêtes réelles, 147 Mo lues chacune, sur le quota gratuit de 1 Tio par
@@ -100,9 +103,48 @@ antérieurs au dernier.
 
 ## Cas rencontrés
 
-**Aucun.** Aucune exécution n'a révélé de cas que les tests ne couvraient pas, et aucun code de
-`src/` n'a été modifié. Quatre comportements sont observés ici sur vraies données pour la première
-fois ; ils sont conformes au code et déjà couverts par ses tests :
+### arXiv : délais de lecture, puis un 429
+
+Après les corrections des revues, les tests e2e ont été relancés sur les 9 sources sans coût
+(`gh_archive` exclu, aucune correction ne le touchant). arXiv a alors échoué. Les sept requêtes
+envoyées à arXiv ce matin-là :
+
+| Heure (UTC) | Requête | Résultat |
+|---|---|---|
+| 08:43 | test e2e, première collecte (depuis le 01/05) | 551 papiers, environ 3 s |
+| 08:47 | exécution complète 1, première collecte | ok |
+| 08:48 | exécution complète 2, fenêtre de 7 jours | ok |
+| 08:48 | exécution complète 3, fenêtre de 7 jours | ok |
+| 09:10 | test e2e, première collecte | `TimeoutError 'The read operation timed out'` après 30 s |
+| 09:12 | test e2e, première collecte, relancé une fois | même délai, après 30 s |
+| 09:13 | mesure par `curl`, 1 résultat (`max_results=1`) | HTTP 429 (Too Many Requests), en 0,33 s |
+| 09:40 | test e2e, première collecte, relancé après 27 min sans requête | vert : 551 papiers, 0 rejet, en 3,9 s |
+
+- **Ce que fait kb** : le cas est géré, sans erreur non gérée. La source échoue sous son nom
+  (`collection failed for source 'arxiv_cscr_x_csai': TimeoutError …`, avec sa trace), sa date de
+  dernière collecte reste, et `kb collect` sort en `1` (`FAILED`), puisque c'était la seule
+  source. Le délai de 30 s est `TIMEOUT_SECONDS` (`src/k_b/etl/http_download.py:8`).
+- **Les tests qui couvrent ce comportement** :
+  - `tests/etl/test_http_download.py:50`, une requête de kb a un délai ;
+  - `tests/etl/test_extract.py:43` et `:57` : une source en échec ne bloque pas les autres, et sa
+    date reste.
+
+  Le test e2e est passé rouge, comme il le doit. Aucun code n'a été corrigé : une observation ne
+  prouve pas un défaut de K-B.
+- **Ce que disent les conditions d'usage d'arXiv** : au plus une requête toutes les 3 s, une seule
+  connexion à la fois. Elles ne disent rien du 429. Ce matin, les requêtes étaient espacées de
+  plusieurs minutes : le rythme demandé a été tenu.
+- **Hypothèse, non établie** : dans un dossier neuf, kb demande en une seule requête tout ce qui
+  est paru depuis le 01/05 (`PAPERS_PER_PAGE = 2000`, `src/k_b/etl/sources/arxiv.py:37`). Cette
+  requête lourde est partie quatre fois en 30 min (08:43, 08:47, 09:10, 09:12). C'est peut-être
+  sa répétition, et non le rythme, qui a déclenché une limitation de débit. Une autre façon de
+  faire, des pages plus petites avec une pause de 3 s, est signalée dans la PR, pour une décision
+  après #25.
+
+### Comportements conformes au code
+
+Quatre comportements sont observés ici sur vraies données pour la première fois ; ils sont
+conformes au code et déjà couverts par ses tests :
 
 1. **TLDR, jour sans édition** : la page demandée renvoie vers l'accueil de l'édition. C'est
    arrivé 9 fois, aux 17, 18 et 21/10 pour chacune des 3 éditions : le samedi, le dimanche et le
@@ -127,6 +169,10 @@ fois ; ils sont conformes au code et déjà couverts par ses tests :
 - **L'incrémental est juste le même jour** : les exécutions 2 et 3 n'ajoutent rien et ne
   rejettent rien. Les sources à état (Zotero, CISA KEV) n'écrivent aucun brut nouveau quand rien
   n'a changé, et `gh_archive` ne lance aucune requête quand aucune fenêtre n'est due.
+- **Un test de bout en bout dépend de la disponibilité de la source réelle.** Un test e2e rouge
+  se lit donc d'abord dans son journal (`console/collect.err`) avant d'être pris pour un défaut
+  de K-B : le cas d'arXiv en est l'exemple. Le test e2e d'arXiv refait à chaque lancement la
+  première collecte, la plus lourde.
 - **Ce qui n'est pas mesuré ici** :
   - une collecte le lendemain, avec une fenêtre GH Archive due et de nouvelles éditions TLDR ;
   - une collecte après plusieurs jours manqués ;
@@ -164,3 +210,4 @@ l'environnement du conteneur (#200).
 | pytest, « Registering custom markers », par Context7 | https://github.com/pytest-dev/pytest/blob/main/doc/en/how-to/writing_plugins.rst | 2026-10-21 |
 | uv, « Environment variable files » (l'environnement prime sur `--env-file`), par Context7 | https://docs.astral.sh/uv/concepts/configuration-files | 2026-10-21 |
 | Volumes et quota BigQuery de K-B | [`docs/bigquery.md`](bigquery.md) | 2026-10-21 |
+| arXiv, « Terms of Use for arXiv APIs » (une requête toutes les 3 s, une seule connexion ; rien sur le 429), par WebSearch puis WebFetch | https://info.arxiv.org/help/api/tou.html | 2026-10-21 |
