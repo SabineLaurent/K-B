@@ -462,7 +462,8 @@ coffre »).
 **Limite** : le `text` d'une affirmation peut recopier une adresse mail d'un item (section
 « Entrée du modèle » : une adresse mail n'est pas masquée) ; elle revient dans la
 réponse, car le contrôle 6 ne la refuse pas. `kb digest` l'écrit dans la fiche en texte (`@` échappé),
-jamais en lien : elle reste dans le coffre.
+jamais en lien dans Obsidian (recette du 2026-10-21) ; dans un moteur GFM comme celui de GitHub, elle
+reste un lien `mailto:` (section « Fiches dans le coffre », « Limites »). Elle reste dans le coffre.
 
 Une erreur rend `{"error": "<état>"}`, comme l'API de données (section « États nommés »). Chaque
 réponse, une erreur comprise, porte l'identifiant de sa requête dans l'en-tête `X-Request-ID` :
@@ -818,7 +819,8 @@ point de `www.`, sans casse, et la ponctuation d'un marqueur de liste en tête d
 `*`, ou `.` et `)` après un à neuf chiffres : `\- urgent`, `2026\. Bilan`) ; deux deux-points de
 suite sont séparés par une espace (`std::string` s'affiche `std: :string`). Ne s'activent donc ni
 lien, image, lien wiki, incorporation, note en ligne, balise, lien automatique `<…>`, ni ceux de GFM
-(`http://`, `https://`, `www.`, `mailto:`, `xmpp:`, adresse mail), ni code en ligne, bloc
+(`http://`, `https://`, `www.`, et, dans Obsidian, `mailto:`, `xmpp:` et une adresse mail : recette
+du 2026-10-21), ni code en ligne, bloc
 ```` ``` ```` ou `~~~`, requête Dataview en ligne (`=`, `$=`), bloc `dataviewjs`, champ Dataview
 (`[clé:: valeur]`, `(clé:: valeur)`, `clé:: valeur`), tag, commentaire `%%`, formule `$`, référence
 de caractère (`&rlm;`, que CommonMark décode en contrôle bidirectionnel) ni liste imbriquée. Un
@@ -826,7 +828,9 @@ champ Dataview demande `::` à deux endroits : l'indexeur de Dataview le cherche
 la note, où il est écrit `\:\:`, et n'en tire donc aucune métadonnée de la page ; en mode lecture,
 Dataview le cherche aussi dans le texte rendu, où les barres obliques ont disparu
 (`replaceInlineFields` lit le HTML rendu, Dataview 0.5.68) : seule une espace entre les deux
-deux-points l'y empêche (recette de Sabine du 2026-10-21). Une ligne horizontale ou un soulignement (`---`,
+deux-points l'y empêche (recette de Sabine du 2026-10-21). Une URL de source qui contient `::` est
+refusée (ci-dessous) : aucun champ ne se forme donc, ni dans les textes ni dans les URL, ni dans la
+source ni dans le texte rendu. Une ligne horizontale ou un soulignement (`---`,
 `***`, `===`) n'est jamais seul sur sa ligne : l'affirmation finit par ses sources, le titre par
 son URL. Les caractères des fiches des tops sont repris (`etl/vault_files.py`, `&` compris depuis
 le 2026-10-21) ; `~ : @`, `www.`, le marqueur de liste et l'espace entre deux deux-points s'y
@@ -838,7 +842,15 @@ l'emphase (`*x*`, `_x_`, `==x==`), de la mise en forme, ni lien ni code.
 `https://` et n'est faite que des caractères de la RFC 3986 (non réservés, délimiteurs, `%` suivi de
 deux chiffres hexadécimaux), moins `[`, `]` et `$`, syntaxe d'Obsidian (lien wiki, formule) : elle
 ne peut pas sortir de ses chevrons, où une barre oblique n'échappe rien (CommonMark 0.31.2, § 6.5).
-Sinon la source est écrite « (sans URL) ».
+Elle est refusée aussi si elle contient une référence de caractère (`&#…`, `&nom;` : cmark-gfm
+affiche `&#x202E;` en U+202E dans le texte du lien), `::` (un champ Dataview dans la ligne rendue),
+ou, une fois ses pourcents décodés, de l'UTF-8 invalide, un caractère de contrôle, de format (dont
+les bidirectionnels), un surrogate ou un séparateur de ligne (`%E2%80%AE`, `%00` : markdown-it les
+montre décodés) ; sinon un lien se lirait autrement qu'il ne mène (CWE-451), comme
+`https://docs.python.org&#x202E;@evil.example/`. L'URL est refusée, jamais réécrite : la réécrire
+changerait sa cible. Sinon la source est écrite « (sans URL) ». `?a=1&b=2`, `%20` et `%C3%A9`
+passent. Un hôte en `xn--` (un nom de domaine internationalisé) n'est pas refusé : des domaines
+légitimes l'utilisent.
 
 **Codes de sortie** (l'unité est le sujet ; codes nommés par `ExitCode`, listés par `kb --help`) :
 
@@ -880,6 +892,11 @@ tronqué et échappé (règle 3 de `conventions.md`).
   accepté pour les tops, registre, fiche 1, « Sécurité »). Seuls deux lancements de l'utilisatrice
   qui se chevauchent peuvent le déclencher ; un texte de source ou du modèle ne le peut pas. À
   corriger au plus tard dès que `kb digest` tourne sans elle (tâche planifiée, conteneur).
+- **Une adresse mail dans un moteur GFM** : dans cmark-gfm (GitHub), `\@` n'empêche pas le lien
+  d'une adresse mail, ni `\:` celui de `mailto:` ou `xmpp:`, car les nœuds de texte y sont recollés
+  avant l'extension des liens automatiques (`blocks.c`, `extensions/autolink.c`). Aucune correction
+  de code propre ; enjeu très faible (CWE-116) : un lien `mailto:` vers l'adresse, sans sujet ni
+  corps, et l'adresse est déjà dans le texte. Le coffre se lit dans Obsidian, où elle reste du texte.
 - **Le rendu dans Obsidian**, un logiciel fermé, n'est prouvé que par la recette de #209 (PR) : un
   autre lecteur de Markdown, ou un autre module d'Obsidian (Templater…), n'est pas couvert.
 

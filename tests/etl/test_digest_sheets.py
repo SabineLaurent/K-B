@@ -352,6 +352,20 @@ def test_a_character_reference_in_a_title_and_a_claim_is_written_as_text():
         "https://example.invalid/%%comment",
         "https://example.invalid/[[note]]",
         "https://example.invalid/$x$",
+        # A character reference, or a percent-encoding of a control or format character,
+        # would show U+202E in the link text (second code review, finding 2): CWE-451.
+        "https://docs.python.org&#x202E;@evil.example/",
+        "https://example.invalid/&#8238;a",
+        "https://example.invalid/&rlm;a",
+        "https://example.invalid/%E2%80%AEgpj.exe",
+        "https://example.invalid/%E2%80%8Fa",
+        "https://example.invalid/%00a",
+        "https://example.invalid/%0Aa",
+        "https://example.invalid/%ED%A0%80a",
+        "https://example.invalid/%FFa",
+        # Dataview would take (a::b) in the rendered line for a field (security review).
+        "https://example.invalid/(a::b)",
+        "https://evil.example.invalid/a(status::done)",
         "https://exämple.invalid/",
         f"https://example.invalid/{RIGHT_TO_LEFT_OVERRIDE}a",
         "HTTPS://example.invalid/",
@@ -374,6 +388,9 @@ def test_a_url_out_of_the_rule_is_not_written(url):
         "https://github.com/advisories/GHSA-2c8m-cx5r-f9x8",
         "http://example.invalid/a?b=c&d=%20e;f=(g)#h",
         "https://example.invalid/~user/@y/!'*+,=",
+        "https://example.invalid/search?a=1&b=2",
+        "https://example.invalid/a%20b/%C3%A9t%C3%A9",
+        "https://fr.wikipedia.org/wiki/Python_(langage)",
     ],
 )
 def test_a_url_of_the_rule_is_written_as_an_autolink(url):

@@ -3628,14 +3628,17 @@ Sabine du 2026-10-15).
   ponctuation d'un marqueur de liste en tête du texte, et une espace entre deux deux-points ; une
   affirmation renvoie à ses sources par leur numéro. Une URL de source n'est écrite, en lien
   automatique `<…>`, que si elle commence par `http://` ou `https://` et n'est faite que des
-  caractères de la RFC 3986, moins `[`, `]` et `$` ; sinon « (sans URL) ».** Choix de la session
+  caractères de la RFC 3986, moins `[`, `]` et `$`, sans `::`, sans référence de caractère, et
+  sans caractère caché une fois ses pourcents décodés ; sinon « (sans URL) ».** Choix de la session
   (plan validé ; la règle de l'URL resserrée en codant, acceptée par time-knight le 2026-10-21 ;
   `&` et le marqueur de liste ajoutés après la revue de code et un relecteur de sécurité, tranchés
   par time-knight, délégation de Sabine du 2026-10-15).
   Pourquoi : la réponse est une entrée non fiable (OWASP LLM10:2026) ; une affirmation ou un titre
   piégés deviendraient actifs dans Obsidian, jusqu'au JavaScript d'un bloc `dataviewjs` ou d'une
   requête `$=` si l'utilisatrice les a activés. `~` ouvre un bloc `~~~` ; `:` et `@` font les liens
-  automatiques de GFM (`http://`, `mailto:`, `xmpp:`, adresse mail) et les champs Dataview `::` ;
+  automatiques de GFM (`http://`, et, dans Obsidian, `mailto:`, `xmpp:` et une adresse mail, d'après
+  la recette du 2026-10-21 ; cmark-gfm, le moteur de GitHub, en fait encore un lien `mailto:`) et
+  les champs Dataview `::` ;
   `&` ouvre une référence de caractère, que CommonMark décode (`&rlm;` rend le contrôle
   bidirectionnel que la neutralisation retire) ; un marqueur de liste en tête imbrique une liste
   (CWE-116 : une structure, sans injection ; un titre « 2026. Bilan » suffit). L'espace entre deux
@@ -3648,7 +3651,13 @@ Sabine du 2026-10-15).
   `std: :string`. Une affirmation du modèle ne fait jamais un lien, à la différence d'une
   description de top.
   Dans `<…>`, une barre oblique n'échappe rien (CommonMark 0.31.2, § 6.5) : l'URL ne doit contenir
-  aucun caractère qui la ferait sortir, et `[`, `]`, `$` sont de la syntaxe d'Obsidian. Options
+  aucun caractère qui la ferait sortir, et `[`, `]`, `$` sont de la syntaxe d'Obsidian. Après la
+  seconde revue de code et un relecteur de sécurité (tranchés par time-knight, délégation de
+  Sabine du 2026-10-15) : une référence de caractère (`&#x202E;`, que cmark-gfm décode dans le
+  texte du lien) ou un caractère caché encodé en pourcents (`%E2%80%AE`, que markdown-it montre)
+  ferait lire un lien autrement qu'il ne mène (CWE-451) ; `::` ferait un champ Dataview dans la
+  ligne rendue, et même dans les métadonnées de la page (l'indexeur lit les champs d'un élément de
+  liste). L'URL est refusée, jamais réécrite, ce qui changerait sa cible. Options
   écartées : le seul contrôle 6 de l'API IA, qui reste en amont (il laisse passer `$=`, `#`, `%%`,
   `::` et une adresse mail, et ne lit pas les titres, donnée de source) ; l'URL lue en ASCII
   imprimable sans espace, `<`, `>` ni `\` (plan v2, moins strict). Limites assumées : l'emphase

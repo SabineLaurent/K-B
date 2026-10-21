@@ -63,3 +63,19 @@ def test_an_error_on_the_whole_input_is_located_as_the_input():
         Summary.model_validate_json(b"not json 1234567")
 
     assert locate_first_error(refusal.value) == "input (json_invalid)"
+
+
+class Counts(BaseModel):
+    by_name: dict[str, int]
+
+
+def test_a_place_that_comes_from_the_input_is_quoted_cut_and_escaped():
+    """A key of a dict comes from the input: never written as it is (second code review,
+    finding 7)."""
+    with pytest.raises(ValidationError) as refusal:
+        Counts.model_validate({"by_name": {"a\nERROR forged": "x"}})
+
+    assert (
+        locate_first_error(refusal.value) == "by_name.'a\\nERROR forged' (int_parsing)"
+    )
+    assert "\n" not in locate_first_error(refusal.value)
