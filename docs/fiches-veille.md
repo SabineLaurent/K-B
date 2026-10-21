@@ -763,7 +763,9 @@ des tops).
    de l'environnement (`core/outbound.py`).
 4. **La réponse est relue** par un schéma fermé (types stricts, champs inconnus ignorés, les
    `facts` jamais lus) : `request_id` en UUID, `model` au motif `MODEL_NAME` (`core/config.py`),
-   `stage`, `error` et `capped_kind` au motif `[a-z_]{1,64}`, dates avec fuseau, au moins une
+   `stage` et `error` au motif `[a-z_]{1,64}`, `capped_kind` dans la liste fermée des sortes
+   d'items (`ItemKind`, `items.py` : un mot que YAML lit comme nul ou booléen ferait passer une
+   fenêtre coupée pour entière), dates avec fuseau, au moins une
    source par affirmation. Puis : chaque sujet est de la liste fermée, une fois dans la réponse ; chaque source
    est une fois dans sa fiche ; chaque affirmation cite des sources de sa fiche, chacune une fois.
    Hors de là : `ai_api_invalid_response`, aucune fiche écrite. L'erreur nomme la place et le

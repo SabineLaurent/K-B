@@ -17,6 +17,7 @@ from etl.test_ai_api_client import (
 )
 
 from k_b.ai_api.schemas.digest_schema import ClaimSchema, WindowSchema
+from k_b.etl import digest_sheets
 from k_b.etl.ai_api_client import DigestsResponse
 from k_b.etl.digest_sheets import (
     neutralize_digest_text,
@@ -461,6 +462,20 @@ def test_a_sheet_written_meanwhile_is_never_rewritten(vault_dir):
         write_digest_sheet(vault_dir, response, response.digests[0])
 
     assert sheet.read_bytes() == b"written meanwhile\n"
+
+
+def test_a_sheet_seen_by_the_writing_is_refused_without_a_second_look(
+    vault_dir, monkeypatch
+):
+    """write_new_sheet saw the sheet: kb never says it wrote it, even if it is gone since (second
+    code review, finding 5)."""
+    response = read(make_response())
+    monkeypatch.setattr(digest_sheets, "write_new_sheet", lambda *arguments: False)
+
+    with pytest.raises(VaultEntryRefusedError, match="^sheet_exists: "):
+        write_digest_sheet(vault_dir, response, response.digests[0])
+
+    assert list_files(vault_dir) == []
 
 
 def test_a_folder_linked_after_the_check_is_refused_before_the_sheet(

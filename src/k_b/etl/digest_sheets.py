@@ -74,10 +74,16 @@ def refuse_written_sheets(
 
 def refuse_existing_sheet(sheet_path: Path, vault_dir: Path) -> None:
     if has_sheet(sheet_path, vault_dir):
-        raise VaultEntryRefusedError(
-            f"sheet_exists: {sheet_path.relative_to(vault_dir).as_posix()} is there;"
-            " kb digest never rewrites a sheet"
-        )
+        raise find_sheet_exists_error(sheet_path, vault_dir)
+
+
+def find_sheet_exists_error(
+    sheet_path: Path, vault_dir: Path
+) -> VaultEntryRefusedError:
+    return VaultEntryRefusedError(
+        f"sheet_exists: {sheet_path.relative_to(vault_dir).as_posix()} is there;"
+        " kb digest never rewrites a sheet"
+    )
 
 
 def write_digest_sheet(
@@ -93,7 +99,8 @@ def write_digest_sheet(
     if not write_new_sheet(
         vault_dir, find_sheets_dir(vault_dir, digest.subject), sheet_path, content
     ):
-        refuse_existing_sheet(sheet_path, vault_dir)
+        # Seen by write_new_sheet: refused on that one look, never looked at again.
+        raise find_sheet_exists_error(sheet_path, vault_dir)
     return sheet_path.relative_to(vault_dir).as_posix()
 
 
@@ -111,7 +118,7 @@ def render_digest_sheet(response: DigestsResponse, digest: Digest) -> str:
         f"since: {format_date(window.since)}",
         f"until: {format_date(window.until)}",
         f"items_capped: {json.dumps(response.items_capped)}",
-        # Checked by LOWERCASE_NAME and as a date: null when nothing is cut.
+        # A kind of the closed list (ItemKind) and a date: null when nothing is cut.
         f"capped_kind: {window.capped_kind or 'null'}",
         f"covered_after: {format_date(window.covered_after) or 'null'}",
         f"request_id: {response.request_id}",

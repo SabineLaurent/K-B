@@ -36,7 +36,7 @@ from k_b.core.config import (
 )
 from k_b.core.outbound import find_url_refusal, open_http_client
 from k_b.core.quoting import locate_first_error, quote_value
-from k_b.items import UtcDatetime
+from k_b.items import ItemKind, UtcDatetime
 
 AI_API_URL_VARIABLE = "KB_AI_API_URL"
 # The client KB_DIGEST of kb serve-ai: one value for both sides (README, "Changer une clé").
@@ -48,8 +48,8 @@ DIGESTS_PATH = "digests"
 RETRY_AFTER_HEADER = "Retry-After"
 # The id log_request gives a request (core/api_request_log.py): uuid4, in lowercase.
 REQUEST_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-# A named state of K-B (docs/fiches-veille.md, "États nommés"), a stage of a digest, a kind of
-# item: lowercase letters and _, nothing YAML or Markdown would read.
+# A named state of K-B (docs/fiches-veille.md, "États nommés") or a stage of a digest: lowercase
+# letters and _, nothing Markdown would read. Written in a log, never in a sheet.
 LOWERCASE_NAME = re.compile(r"[a-z_]{1,64}")
 # A Retry-After in seconds; a date is quoted.
 SECONDS = re.compile(r"[0-9]{1,6}")
@@ -109,8 +109,10 @@ class Window(AiApiModel):
     since: UtcDatetime
     until: UtcDatetime
     # The kind cut by the cap of the reading, and the date of its first item left out; null when
-    # nothing is cut (docs/fiches-veille.md, "Lecture plafonnée").
-    capped_kind: Annotated[str, AfterValidator(match_fully(LOWERCASE_NAME))] | None
+    # nothing is cut (docs/fiches-veille.md, "Lecture plafonnée"). A kind of the closed list:
+    # written in the front matter, a word YAML reads as null or a boolean would make a window
+    # cut look uncut.
+    capped_kind: ItemKind | None
     covered_after: UtcDatetime | None
 
 

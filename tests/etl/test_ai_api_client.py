@@ -363,7 +363,24 @@ def make_body_with(**changes):
                     "covered_after": "2026-10-19T08:00:00Z",
                 }
             ),
-            "window.capped_kind (value_error)",
+            "window.capped_kind (literal_error)",
+        ),
+        *(
+            (
+                make_body_with(
+                    window={
+                        "days": 3,
+                        "since": "2026-10-18T16:30:00Z",
+                        "until": "2026-10-21T16:30:00Z",
+                        "capped_kind": word,
+                        "covered_after": "2026-10-19T08:00:00Z",
+                    }
+                ),
+                "window.capped_kind (literal_error)",
+            )
+            # Words YAML reads as null or a boolean: a sheet cut would look uncut (second code
+            # review, finding 6).
+            for word in ("null", "true", "yes", "on")
         ),
         (
             make_body_with(
