@@ -148,7 +148,11 @@ uv run --env-file .env pytest -m e2e -rs
 
 Une source seule : `-k <source>`, par exemple `-k cisa_kev`. Le test de `gh_archive` lance une
 requête BigQuery réelle. Une source dont la variable manque (`KB_ZOTERO_DIR`, `KB_VAULT_DIR`,
-`GOOGLE_APPLICATION_CREDENTIALS`) est sautée, et la raison nomme la variable. Au deuxième temps,
+`GOOGLE_APPLICATION_CREDENTIALS`) est sautée, et la raison nomme la variable. Chaque test
+vérifie aussi qu'aucun rejet n'est au journal d'import, et qu'aucune commande n'a journalisé
+d'avertissement ou d'erreur, sauf celui du quota GitHub sans jeton. À sa fin, réussi ou non, il
+efface son dossier de données sauf `logs/` ; ce qu'il garde, et combien de temps, est à l'étape 10
+de la procédure de tri du [registre](registre-traitements.md). Au deuxième temps,
 la même commande tournera dans le conteneur, sans `--env-file`, les variables venant de
 l'environnement du conteneur (#200).
 
