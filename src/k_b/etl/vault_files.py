@@ -31,9 +31,9 @@ REMOVED_CATEGORIES = frozenset({"Cc", "Cs"})
 # that follows it.
 MARKDOWN_SYNTAX_CHARACTERS = frozenset("\\[]<>|`#%$")
 # The & of a character reference (&rlm;, &copy;, &#x202E;), which CommonMark decodes: &rlm; would
-# give back the bidirectional control neutralize_text removes. Escaped wherever its text is
-# written; another & stays, so that R&D and a bare URL with a query stay as they are (decision of
-# Sabine of 2026-10-21). ASCII classes, not \w.
+# give back the bidirectional control neutralize_text removes. Escaped in both kinds of sheets;
+# another & stays, so that R&D and a bare URL with a query stay as they are (one rule for both
+# writers of the vault, decision of Sabine of 2026-10-21). ASCII classes, not \w.
 CHARACTER_REFERENCE = re.compile(r"&(?=#|[A-Za-z0-9]+;)")
 
 

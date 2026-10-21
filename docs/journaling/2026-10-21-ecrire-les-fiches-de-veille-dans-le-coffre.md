@@ -104,10 +104,10 @@ Chaque affirmation et chaque titre passent par `neutralize_digest_text`
 inverse devant chaque caractère de syntaxe : CommonMark permet d'échapper toute ponctuation
 ASCII (§ 2.4), et le caractère s'affiche sans la barre. Dans la même passe, elle échappe le `&`
 qui ouvre une référence de caractère (`&rlm;` rendrait un contrôle bidirectionnel), mais pas celui
-de `R&D` ni d'une URL avec requête, qui restent justes dans une fiche de top. Le jeu des fiches de
-veille ajoute à celui des tops tout `&`, `~` (bloc `~~~`), `:` et `@` (liens automatiques
-`http://`, `mailto:`, adresse mail ; ces deux derniers restent du texte dans Obsidian, mais
-cmark-gfm, le moteur de GitHub, en fait encore un lien).
+de `R&D` ni d'une URL avec requête, qui restent justes : une seule règle pour les deux écrivains
+du coffre. Le jeu des fiches de veille ajoute à celui des tops `~` (bloc `~~~`), `:` et `@` (liens
+automatiques `http://`, `mailto:`, adresse mail ; ces deux derniers restent du texte dans Obsidian,
+mais cmark-gfm, le moteur de GitHub, en fait encore un lien).
 Trois étapes viennent ensuite, toutes après `neutralize_text`, qui sinon doublerait leurs barres
 obliques :
 
@@ -203,7 +203,7 @@ tient désormais qu'`etl` n'importe ni `data_api` ni `ai_api`
 | Une URL en RFC 3986, moins `[ ] $` | dans `<…>` rien ne s'échappe : refuser plutôt qu'échapper | l'ASCII imprimable sans espace, `<`, `>`, `\` (plan v2, moins strict) |
 | Contrôler les fiches du jour avant la demande | aucun item envoyé pour une fiche qui ne serait pas écrite | demander puis sauter les fiches existantes |
 | `capped_kind` et `covered_after` dans le frontmatter, `null` sinon | une fenêtre coupée doit dire quelle sorte et après quelle date (constat 6 de la revue) | `items_capped` seul |
-| Le `&` d'une référence de caractère échappé dans les tops, tout `&` dans les fiches de veille | une référence nommée (`&rlm;`) rend un contrôle bidirectionnel ; décisions de Sabine : un `&` toujours échappé cassait les URL nues des tops avec requête | `&` dans les seules fiches de veille ; tout `&` échappé dans les tops |
+| Le seul `&` d'une référence de caractère échappé, dans les deux sortes de fiches | une référence nommée (`&rlm;`) rend un contrôle bidirectionnel ; décisions de Sabine : un `&` toujours échappé cassait les URL nues des tops avec requête, et une seule règle vaut pour les deux écrivains | `&` dans les seules fiches de veille ; tout `&` échappé ; deux règles |
 | Une URL refusée si elle contient `::`, une référence de caractère ou un caractère caché en pourcents | un champ Dataview, ou un lien qui se lit autrement qu'il ne mène (CWE-451) | réécrire l'URL, ce qui change sa cible ; refuser un hôte en `xn--`, que des domaines légitimes utilisent |
 | Une espace entre deux deux-points | Dataview lit le HTML rendu en mode lecture (recette de Sabine) ; son indexeur lit la source, où `\:\:` n'est pas un champ | un caractère invisible (U+2060), qui tromperait un copier-coller |
 | Le marqueur de liste en tête échappé | une affirmation ou un titre « 2026. Bilan » imbriquait une liste (constat 7) | le laisser, comme l'emphase |
@@ -218,7 +218,7 @@ tient désormais qu'`etl` n'importe ni `data_api` ni `ai_api`
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
 | `tests/etl/test_ai_api_client.py` (44 tests) | réglages refusés par leur nom, jamais leur valeur ; la clé dans `Authorization`, le corps `{}`, les délais ; chaque panne nommée, sans URL ; une valeur reçue hors règle citée tronquée et échappée ; une réponse hors schéma ou hors listes refusée par sa place |
-| `tests/etl/test_digest_sheets.py` (90 tests) | la fiche attendue octet par octet ; un titre et une affirmation piégés écrits en texte, sur leur ligne ; les `facts` jamais écrits ; 26 URL refusées, 6 acceptées ; `::` absent du texte rendu ; `&` et le marqueur de liste échappés ; les refus avant la demande |
+| `tests/etl/test_digest_sheets.py` (92 tests) | la fiche attendue octet par octet ; un titre et une affirmation piégés écrits en texte, sur leur ligne ; les `facts` jamais écrits ; 26 URL refusées, 6 acceptées ; `::` absent du texte rendu ; `&` et le marqueur de liste échappés ; les refus avant la demande |
 | `tests/etl/test_vault_files.py` (24 tests), `test_a_character_reference_in_a_description_is_written_as_text` | écrite une fois, une fiche vue jamais réécrite ; liens et dossier sous le nom refusés ; aucun temporaire laissé ; `&` échappé dans une description de top |
 | `tests/test_cli.py`, tests `digest` (18) | les codes 0, 1, 2, 4, 143 ; aucune demande quand une fiche du jour existe ; la clé absente des sorties et du journal sur un 401 |
 | `tests/test_cli.py`, tests `write_tops` et `test_a_part_that_failed_gives_4_beside_a_part_done_and_1_alone` | la règle « même résultat, même code » |
@@ -226,7 +226,7 @@ tient désormais qu'`etl` n'importe ni `data_api` ni `ai_api`
 | Démonstration sur le Mac (base de test, replay, coffre neuf) | trois fiches écrites (0) ; relance le même jour : `sheet_exists`, aucune demande (2) ; clé refusée : aucune fiche, la variable nommée (1) ; les trois clés absentes de toutes les sorties et de tous les journaux |
 | Recette de Sabine dans Obsidian (Dataview 0.5.68, JavaScript activé), trois fiches | témoin positif : 22 pièges actifs ; témoin négatif : propre ; fiche testée : 21 pièges sur 22 en texte, aucun JavaScript exécuté ; le champ Dataview, actif en mode lecture, a donné l'espace entre deux deux-points |
 | `/security-review` (deux étapes : recherche, puis filtre) | aucune vulnérabilité HIGH ni MEDIUM ; un constat LOW filtré, `::` dans une URL de source, corrigé quand même |
-| `uv run pytest` (2 261 tests), `ruff check --no-cache`, `ruff format --check`, `mypy --strict` | les contrôles de la CI, sur chaque commit |
+| `uv run pytest` (2 263 tests), `ruff check --no-cache`, `ruff format --check`, `mypy --strict` | les contrôles de la CI, sur chaque commit |
 
 ## Ce que tu dois pouvoir défendre
 

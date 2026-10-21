@@ -310,12 +310,19 @@ def test_no_field_of_dataview_is_rendered_from_a_title_or_a_claim(field):
         ("droite&#x202E;gauche", "droite\\&\\#x202E;gauche"),
         ("droite&#8238;gauche", "droite\\&\\#8238;gauche"),
         ("marque&rlm;et&lrm;fin", "marque\\&rlm;et\\&lrm;fin"),
-        ("R&D", "R\\&D"),
+        ("&copy; &amp; &frac12;", "\\&copy; \\&amp; \\&frac12;"),
+        # Only the & of a reference: one rule for both writers of the vault (decision of
+        # Sabine of 2026-10-21, relayed by time-knight).
+        ("R&D", "R&D"),
+        (
+            "https://example.invalid/?q=a&page=2",
+            "https\\://example.invalid/?q=a&page=2",
+        ),
     ],
 )
 def test_a_character_reference_is_written_as_text(text, neutralized):
     """CommonMark decodes &#x202E; or &rlm; into the bidirectional control neutralize_text
-    removes: & is escaped (security review of time-knight, delegation of Sabine of 2026-10-15)."""
+    removes: the & that opens a reference is escaped, another & stays."""
     assert neutralize_digest_text(text) == neutralized
 
 

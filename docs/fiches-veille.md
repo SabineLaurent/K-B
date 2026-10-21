@@ -813,8 +813,10 @@ sources.
 
 **Écrit en texte.** Le texte de chaque affirmation et le titre de chaque source : sur une ligne
 (retours à la ligne et blancs réduits à une espace ; contrôles, surrogates isolés et contrôles
-bidirectionnels remplacés par une espace), les caractères ``\ [ ] < > | ` # % $ ~ : @ &`` précédés
-d'une barre oblique inverse (CommonMark 0.31.2, § 2.4 : toute ponctuation ASCII s'échappe), puis le
+bidirectionnels remplacés par une espace), les caractères ``\ [ ] < > | ` # % $ ~ : @`` et le `&`
+qui ouvre une référence de caractère (`&` suivi de `#`, ou d'un nom puis `;` : `R&D` reste tel quel)
+précédés d'une barre oblique inverse (CommonMark 0.31.2, § 2.4 : toute ponctuation ASCII
+s'échappe), puis le
 point de `www.`, sans casse, et la ponctuation d'un marqueur de liste en tête du texte (`-`, `+`,
 `*`, ou `.` et `)` après un à neuf chiffres : `\- urgent`, `2026\. Bilan`) ; deux deux-points de
 suite sont séparés par une espace (`std::string` s'affiche `std: :string`). Ne s'activent donc ni
@@ -832,9 +834,9 @@ deux-points l'y empêche (recette de Sabine du 2026-10-21). Une URL de source qu
 refusée (ci-dessous) : aucun champ ne se forme donc, ni dans les textes ni dans les URL, ni dans la
 source ni dans le texte rendu. Une ligne horizontale ou un soulignement (`---`,
 `***`, `===`) n'est jamais seul sur sa ligne : l'affirmation finit par ses sources, le titre par
-son URL. Les caractères des fiches des tops sont repris (`etl/vault_files.py`, où seul le `&`
-d'une référence de caractère est échappé, pour garder justes les URL nues des tops) ; tout `&`,
-`~ : @`, `www.`, le marqueur de liste et l'espace entre deux deux-points s'y ajoutent, car une URL nue reste du texte dans une fiche de veille : une
+son URL. Les caractères des fiches des tops sont repris (`etl/vault_files.py`), avec la même règle
+du `&`, une seule pour les deux écrivains du coffre (décision de Sabine du 2026-10-21) ; `~ : @`,
+`www.`, le marqueur de liste et l'espace entre deux deux-points s'y ajoutent, car une URL nue reste du texte dans une fiche de veille : une
 affirmation du modèle ne fait jamais un lien. Le contrôle 6 de l'API IA reste en amont (défense en profondeur). Non échappée, voulu :
 l'emphase (`*x*`, `_x_`, `==x==`), de la mise en forme, ni lien ni code.
 

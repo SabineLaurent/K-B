@@ -31,11 +31,11 @@ from k_b.etl.vault_files import (
 )
 
 # Beyond the characters of the sheets of the tops: a fence of code (~~~), an autolink of GFM or a
-# field of Dataview (:: , http:, mailto:, xmpp:), an e-mail address (@), and every &, a character
-# reference or not: a digest sheet escapes all its syntax. A bare URL stays text
+# field of Dataview (:: , http:, mailto:, xmpp:), an e-mail address (@). The & of a character
+# reference is escaped by neutralize_text, as in the sheets of the tops. A bare URL stays text
 # here: a claim of the model never makes a link (ADR of 2026-10-21, #209). In Obsidian, as the
 # recipe of 2026-10-21 shows; cmark-gfm (GitHub) still links an e-mail address and its mailto:.
-DIGEST_ESCAPED_CHARACTERS = MARKDOWN_SYNTAX_CHARACTERS | frozenset("~:@&")
+DIGEST_ESCAPED_CHARACTERS = MARKDOWN_SYNTAX_CHARACTERS | frozenset("~:@")
 # The autolink of GFM that needs none of them, www. in any case (GitHub Flavored Markdown, 6.9):
 # its dot is escaped, after the backslashes of the text.
 WWW_DOT = re.compile(r"(www)\.", re.IGNORECASE)
@@ -194,7 +194,7 @@ def has_hidden_character(url: str) -> bool:
 
 def neutralize_digest_text(text: str) -> str:
     """The text on one line, as text, without an autolink, a field of Dataview nor a list: the
-    characters of the sheets of the tops, ~ : @ &, the dot of www., and the punctuation of a list
+    characters of the sheets of the tops, ~ : @, the dot of www., and the punctuation of a list
     marker at its start escaped, two colons kept apart. All after neutralize_text, which would
     escape their backslash again."""
     neutralized = neutralize_text(text, DIGEST_ESCAPED_CHARACTERS)
