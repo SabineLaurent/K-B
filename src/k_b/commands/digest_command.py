@@ -8,7 +8,11 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from k_b.commands.exit_codes import ExitCode, find_exit_code
-from k_b.commands.run_log import LOGGER_NAME, value_or_log_refusal
+from k_b.commands.run_log import (
+    LOGGER_NAME,
+    describe_os_error,
+    value_or_log_refusal,
+)
 from k_b.core.config import AI_API_READ_TIMEOUT_SECONDS, DIGEST_SUBJECTS
 from k_b.etl.ai_api_client import (
     AI_API_KEY_VARIABLE,
@@ -125,8 +129,3 @@ def describe_error(error: OSError | VaultEntryRefusedError) -> str:
     if isinstance(error, VaultEntryRefusedError):
         return str(error)
     return describe_os_error(error)
-
-
-def describe_os_error(error: OSError) -> str:
-    reason = f" ({error.strerror})" if error.strerror else ""
-    return f"{type(error).__name__}{reason}"

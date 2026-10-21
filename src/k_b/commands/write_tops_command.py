@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 from k_b.commands.exit_codes import ExitCode, find_exit_code
-from k_b.commands.run_log import LOGGER_NAME
+from k_b.commands.run_log import LOGGER_NAME, describe_os_error
 from k_b.etl.collected_sources import VAULT_DIR_VARIABLE, read_vault_dir
 from k_b.etl.raw_store import RawStore
 from k_b.etl.source_kinds import TOPS
@@ -57,8 +57,7 @@ def describe_error(error: OSError | VaultEntryRefusedError) -> str:
     its type and its reason, never a path: it names the vault or a raw file."""
     if isinstance(error, VaultEntryRefusedError):
         return str(error)
-    reason = f" ({error.strerror})" if error.strerror else ""
-    return f"{type(error).__name__}{reason}; run kb write-tops again"
+    return f"{describe_os_error(error)}; run kb write-tops again"
 
 
 def describe_outcome(outcome: TopSheetsOutcome) -> str:

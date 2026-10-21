@@ -85,3 +85,10 @@ def value_or_log_refusal[ValueT](value_or_refusal: ValueT | str) -> ValueT | Non
         logger.error("%s", value_or_refusal)
         return None
     return value_or_refusal
+
+
+def describe_os_error(error: OSError) -> str:
+    """An OSError by its type and its reason, never by its text, which names a file: the vault, a
+    raw file. An OSError raised by code, not by the system, has no reason."""
+    reason = f" ({error.strerror})" if error.strerror else ""
+    return f"{type(error).__name__}{reason}"
