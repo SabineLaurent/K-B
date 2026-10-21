@@ -316,6 +316,7 @@ def writing_of(text):
         "v2.1.287 : mailto:x@evil.example",
         "v2.1.287 : MAILTO:x@evil.example",
         "v2.1.287 : xmpp:admin@evil.example",
+        "v2.1.287 : XMPP:admin@evil.example",
         "v2.1.287 sur WWW.evil.example",
         # An image by reference: ![ without ](.
         "v2.1.287 ![x][ref]",
