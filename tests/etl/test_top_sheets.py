@@ -7,16 +7,11 @@ import pytest
 
 from k_b.commands.sigterm import StoppedBySigtermError
 from k_b.core.config import DIGEST_SUBJECTS, TOPS_DIR_NAME, WATCH_DIR_NAME
-from k_b.etl import top_sheets
+from k_b.etl import top_sheets, vault_files
 from k_b.etl.raw_store import RawStore
 from k_b.etl.sources import github_most_forked, github_most_starred
-from k_b.etl.top_sheets import (
-    Top,
-    TopSheetsOutcome,
-    VaultEntryRefusedError,
-    neutralize_description,
-    write_top_sheets,
-)
+from k_b.etl.top_sheets import Top, TopSheetsOutcome, write_top_sheets
+from k_b.etl.vault_files import VaultEntryRefusedError
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 STARRED_RESPONSE = (FIXTURES_DIR / "github_most_starred_extract.json").read_bytes()
@@ -317,7 +312,7 @@ def test_a_sheet_not_written_deletes_no_ranking(
             raise error
         written_paths.append(path)
 
-    monkeypatch.setattr(top_sheets, "write_file_atomically", write_then_fail)
+    monkeypatch.setattr(vault_files, "write_file_atomically", write_then_fail)
 
     with pytest.raises(type(error)):
         write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
@@ -339,30 +334,6 @@ def test_no_value_of_github_enters_the_path_of_a_sheet(data_dir, vault_dir):
         "data/raw/automated_watch/github_most_starred/2026-10-05T093000Z.json",
         "vault/veille/tops/most_starred/2026-10-05.md",
     ]
-
-
-@pytest.mark.parametrize(
-    ("description", "neutralized"),
-    [
-        (None, ""),
-        ("", ""),
-        ("first line\nsecond\r\nthird fourth", "first line second third fourth"),
-        ("line\n---\nline", "line --- line"),
-        ("[a link](https://example.com)", "\\[a link\\](https://example.com)"),
-        ("![embed](x.png) [[wikilink]]", "!\\[embed\\](x.png) \\[\\[wikilink\\]\\]"),
-        ("<script>alert(1)</script>", "\\<script\\>alert(1)\\</script\\>"),
-        ("a | b", "a \\| b"),
-        ("ends with a backslash \\", "ends with a backslash \\\\"),
-        ("`code` and #tag", "\\`code\\` and \\#tag"),
-        ("%%hidden and save $5 or $10", "\\%\\%hidden and save \\$5 or \\$10"),
-        ("escape \x1b[31m red", "escape \\[31m red"),
-        ("lone \ud800 surrogate", "lone surrogate"),
-        ("right\u202eleft\u2066mark\u200f", "right left mark"),
-        ("🚀✨ family 👨\u200d👩\u200d👧", "🚀✨ family 👨\u200d👩\u200d👧"),
-    ],
-)
-def test_a_description_is_neutralized_on_one_line(description, neutralized):
-    assert neutralize_description(description) == neutralized
 
 
 def test_a_trapped_description_stays_in_its_cell(data_dir, vault_dir):
@@ -461,7 +432,7 @@ def test_a_folder_replaced_by_a_link_while_the_sheets_are_written_deletes_no_ran
     last = write_ranking(data_dir, STARRED_TOP, "2026-10-06T093000Z")
     sheets_dir = find_sheet(vault_dir, STARRED_TOP, "2026-10-05").parent
     moved = tmp_path / "moved"
-    write_file_atomically = top_sheets.write_file_atomically
+    write_file_atomically = vault_files.write_file_atomically
 
     def write_then_replace_the_folder(path, content):
         write_file_atomically(path, content)
@@ -470,7 +441,7 @@ def test_a_folder_replaced_by_a_link_while_the_sheets_are_written_deletes_no_ran
             sheets_dir.symlink_to(moved, target_is_directory=True)
 
     monkeypatch.setattr(
-        top_sheets, "write_file_atomically", write_then_replace_the_folder
+        vault_files, "write_file_atomically", write_then_replace_the_folder
     )
 
     with pytest.raises(
@@ -508,7 +479,7 @@ def test_a_sheet_replaced_by_a_link_while_the_sheets_are_written_deletes_no_rank
     ]
     outside = tmp_path / "outside.md"
     outside.write_bytes(b"not a sheet\n")
-    write_file_atomically = top_sheets.write_file_atomically
+    write_file_atomically = vault_files.write_file_atomically
 
     def write_then_replace_a_sheet(path, content):
         write_file_atomically(path, content)
@@ -517,7 +488,9 @@ def test_a_sheet_replaced_by_a_link_while_the_sheets_are_written_deletes_no_rank
             replaced.unlink(missing_ok=True)
             replaced.symlink_to(outside)
 
-    monkeypatch.setattr(top_sheets, "write_file_atomically", write_then_replace_a_sheet)
+    monkeypatch.setattr(
+        vault_files, "write_file_atomically", write_then_replace_a_sheet
+    )
 
     with pytest.raises(
         VaultEntryRefusedError,
@@ -577,7 +550,7 @@ def test_a_sheet_removed_before_the_deletion_refuses_its_top_and_deletes_no_rank
         write_ranking(data_dir, STARRED_TOP, f"2026-10-0{day}T093000Z")
         for day in (5, 6)
     ]
-    write_file_atomically = top_sheets.write_file_atomically
+    write_file_atomically = vault_files.write_file_atomically
 
     def write_then_remove_the_first_sheet(path, content):
         write_file_atomically(path, content)
@@ -585,7 +558,7 @@ def test_a_sheet_removed_before_the_deletion_refuses_its_top_and_deletes_no_rank
             (path.parent / "2026-10-05.md").unlink()
 
     monkeypatch.setattr(
-        top_sheets, "write_file_atomically", write_then_remove_the_first_sheet
+        vault_files, "write_file_atomically", write_then_remove_the_first_sheet
     )
 
     with pytest.raises(

@@ -19,7 +19,7 @@ from k_b import cli
 from k_b.commands import collect_command, import_command, write_tops_command
 from k_b.core import quoting
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
-from k_b.etl import collected_sources, load, top_sheets
+from k_b.etl import collected_sources, load, vault_files
 from k_b.etl.source_contract import SourceKind
 from k_b.etl.sources import clipping
 
@@ -1444,14 +1444,14 @@ def test_a_sheet_not_written_keeps_its_rankings_exits_1_and_the_other_top_is_wri
     rankings = write_rankings_of_each_top(
         data_dir, "2026-10-05T093000Z", "2026-10-12T093000Z"
     )
-    write_file_atomically = top_sheets.write_file_atomically
+    write_file_atomically = vault_files.write_file_atomically
 
     def refuse_the_most_starred(path, content):
         if "most_starred" in path.parts:
             raise PermissionError(13, "Permission denied", str(path))
         write_file_atomically(path, content)
 
-    monkeypatch.setattr(top_sheets, "write_file_atomically", refuse_the_most_starred)
+    monkeypatch.setattr(vault_files, "write_file_atomically", refuse_the_most_starred)
 
     assert cli.main(["write-tops"]) == cli.ExitCode.FAILED
     assert all(path.exists() for path in rankings["most_starred"])
@@ -1493,13 +1493,15 @@ def test_a_sigterm_while_a_sheet_is_written_stops_write_tops_and_deletes_no_rank
     rankings = write_rankings_of_each_top(
         data_dir, "2026-10-05T093000Z", "2026-10-12T093000Z"
     )
-    write_file_atomically = top_sheets.write_file_atomically
+    write_file_atomically = vault_files.write_file_atomically
 
     def write_then_receive_sigterm(path, content):
         write_file_atomically(path, content)
         signal.raise_signal(signal.SIGTERM)
 
-    monkeypatch.setattr(top_sheets, "write_file_atomically", write_then_receive_sigterm)
+    monkeypatch.setattr(
+        vault_files, "write_file_atomically", write_then_receive_sigterm
+    )
 
     exit_code = cli.main(["write-tops"])
 

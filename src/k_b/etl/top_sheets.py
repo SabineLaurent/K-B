@@ -6,8 +6,6 @@ constants and of the day of its ranking, never of a value read from GitHub.
 """
 
 import logging
-import stat
-import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -17,25 +15,18 @@ from typing import NamedTuple
 from k_b.core.config import TOPS_DIR_NAME, WATCH_DIR_NAME
 from k_b.core.quoting import quote_value
 from k_b.database.dates import format_date
-from k_b.etl.raw_store import RawStore, write_file_atomically
+from k_b.etl.raw_store import RawStore
 from k_b.etl.transform import COLLECTION_NAME_FORMAT, parse_collection_name
+from k_b.etl.vault_files import (
+    MARKDOWN_SYNTAX_CHARACTERS,
+    VaultEntryRefusedError,
+    has_sheet,
+    neutralize_text,
+    refuse_linked_folders,
+    write_new_sheet,
+)
 
 logger = logging.getLogger(__name__)
-
-# The format characters that reorder a line as it is displayed (Unicode bidirectional controls
-# and marks, UAX #9). U+200D, which joins the emojis, is kept.
-BIDI_CONTROLS = frozenset(
-    "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
-)
-# The characters a description loses: the controls (Cc) and the lone surrogates (Cs), which
-# UTF-8 cannot encode.
-REMOVED_CATEGORIES = frozenset({"Cc", "Cs"})
-# The ASCII punctuation that would make syntax of a description in Markdown or Obsidian: a link,
-# an embed or a wikilink ([ ]), HTML (< >), a cell of the table (|), code (`), a tag (#), a
-# comment (%%), a formula ($). Each is escaped by a backslash, as CommonMark allows for any
-# ASCII punctuation; the backslash too, so that a description ending with one does not escape
-# the | that closes its cell.
-ESCAPED_CHARACTERS = frozenset("\\[]<>|`#%$")
 
 
 @dataclass(frozen=True)
@@ -73,14 +64,6 @@ class TopSheetsOutcome:
     skipped_count: int
     deleted_count: int
     unreadable_count: int
-
-
-class VaultEntryRefusedError(Exception):
-    """kb write-tops refuses a top: a folder of the sheets, or a sheet, is a symbolic link
-    (vault_link_refused, decision of Sabine, 2026-10-19: kb write-tops never follows a symbolic
-    link in the vault); a sheet is not a regular file (sheet_not_a_file), or is not there before
-    the deletion of its ranking (sheet_missing), decided by time-knight, delegation of Sabine of
-    2026-10-15."""
 
 
 class Ranking(NamedTuple):
@@ -173,12 +156,6 @@ def find_sheet_path(sheets_dir: Path, collected_at: datetime) -> Path:
     return sheets_dir / f"{collected_at.date().isoformat()}.md"
 
 
-def refuse_linked_folders(vault_dir: Path, sheets_dir: Path) -> None:
-    """Refuse a symbolic link among the folders from the vault down to sheets_dir."""
-    for folder in list_folders_down_to(vault_dir, sheets_dir):
-        refuse_symbolic_link(folder, vault_dir)
-
-
 def refuse_linked_sheets(vault_dir: Path, sheets_dir: Path, keys: list[str]) -> None:
     """Refuse the sheet of a ranking of keys that is a link or not a regular file: its day
     comes from the name of its ranking, without reading it. A ranking whose name is not a
@@ -204,50 +181,15 @@ def refuse_missing_sheets(
             )
 
 
-def list_folders_down_to(vault_dir: Path, folder: Path) -> list[Path]:
-    """The folders under vault_dir down to folder, the highest first: veille, veille/tops,
-    veille/tops/<top>."""
-    parts = folder.relative_to(vault_dir).parts
-    return [vault_dir.joinpath(*parts[:depth]) for depth in range(1, len(parts) + 1)]
-
-
-def refuse_symbolic_link(path: Path, vault_dir: Path) -> None:
-    """Raise VaultEntryRefusedError when path is a symbolic link: is_symlink reads the link
-    itself (lstat), never its target. The path is named in the vault: made of constants and a
-    date, it never says where the vault is."""
-    if path.is_symlink():
-        raise VaultEntryRefusedError(
-            f"vault_link_refused: {path.relative_to(vault_dir).as_posix()} is a symbolic"
-            " link"
-        )
-
-
-def has_sheet(sheet_path: Path, vault_dir: Path) -> bool:
-    """Whether the sheet is written: a regular file, read by lstat, never through a link. A
-    link, or another entry (a folder, a FIFO) under its name, is refused: taken for a sheet, it
-    would let its ranking be deleted without one."""
-    try:
-        status = sheet_path.lstat()
-    except FileNotFoundError:
-        return False
-    named = sheet_path.relative_to(vault_dir).as_posix()
-    if stat.S_ISLNK(status.st_mode):
-        raise VaultEntryRefusedError(f"vault_link_refused: {named} is a symbolic link")
-    if not stat.S_ISREG(status.st_mode):
-        raise VaultEntryRefusedError(f"sheet_not_a_file: {named} is not a regular file")
-    return True
-
-
 def write_sheet(vault_dir: Path, sheets_dir: Path, top: Top, ranking: Ranking) -> bool:
-    """Write the sheet of the day of ranking, unless it exists; whether it was written. Its
-    folders are checked again first: write_file_atomically follows a link."""
+    """Write the sheet of the day of ranking, unless it exists; whether it was written."""
     day = ranking.collected_at.date()
     sheet_path = find_sheet_path(sheets_dir, ranking.collected_at)
-    refuse_linked_folders(vault_dir, sheets_dir)
-    if has_sheet(sheet_path, vault_dir):
+    if not write_new_sheet(
+        vault_dir, sheets_dir, sheet_path, render_sheet(top, ranking)
+    ):
         logger.info("%s sheet of %s: sheet_exists, not rewritten", top.name, day)
         return False
-    write_file_atomically(sheet_path, render_sheet(top, ranking).encode("utf-8"))
     logger.info("%s sheet of %s: sheet_written", top.name, day)
     return True
 
@@ -276,19 +218,8 @@ def render_sheet(top: Top, ranking: Ranking) -> str:
 
 
 def neutralize_description(description: str | None) -> str:
-    """The description on one line, as text: its controls, lone surrogates and bidirectional
-    controls become spaces, its whitespace one space, its syntax characters escaped. A bare URL
-    is left as it is: Obsidian shows it as a link."""
+    """The description on one line, as text, in its cell: the escaped | cannot close it. A bare
+    URL is left as it is: Obsidian shows it as a link (ADR of 2026-10-19)."""
     if description is None:
         return ""
-    visible = "".join(
-        " "
-        if character in BIDI_CONTROLS
-        or unicodedata.category(character) in REMOVED_CATEGORIES
-        else character
-        for character in description
-    )
-    return "".join(
-        f"\\{character}" if character in ESCAPED_CHARACTERS else character
-        for character in " ".join(visible.split())
-    )
+    return neutralize_text(description, MARKDOWN_SYNTAX_CHARACTERS)
