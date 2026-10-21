@@ -208,7 +208,8 @@ Le rapport, `reports/e2e-report.html`, donne pour chaque test les codes de sorti
 `kb create-db`, `kb collect` et `kb import`, les items par sorte, les rejets, les lignes
 d'avertissement ou d'erreur et, pour `gh_archive`, les octets lus par BigQuery (colonne
 « Properties », inscrite par `record_property`). Il donne les résultats, pas leur interprétation :
-ce compte rendu-ci reste écrit à la main.
+ce compte rendu-ci reste écrit à la main. Seul `reports/` est ignoré par git : un rapport demandé
+ailleurs dans le dépôt arrête pytest avant tout fichier.
 
 Une source seule : `-k <source>`, par exemple `-k cisa_kev`. Le test de `gh_archive` lance une
 requête BigQuery réelle. Une source dont la variable manque (`KB_ZOTERO_DIR`, `KB_VAULT_DIR`,

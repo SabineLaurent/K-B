@@ -3,6 +3,7 @@ per source, and stops them on a variable they must not get. A test recorded prop
 report, which the user alone can read."""
 
 import html
+import importlib.util
 import os
 import re
 import shutil
@@ -139,7 +140,9 @@ MARKER = "<b>marker</b>"
 
 
 def produce_report(directory, report_path):
-    subprocess.run(  # noqa: S603 — runs this interpreter on pytest, fixed arguments
+    """Run the marker test of directory with a report at report_path; directory is the rootdir
+    of the run, the repository of the copied conftest."""
+    return subprocess.run(  # noqa: S603 — runs this interpreter on pytest, fixed arguments
         [
             sys.executable,
             "-m",
@@ -153,7 +156,6 @@ def produce_report(directory, report_path):
         capture_output=True,
         text=True,
         cwd=directory,
-        check=True,
         env={
             name: value
             for name, value in os.environ.items()
@@ -173,7 +175,9 @@ def test_a_recorded_property_is_in_the_report_escaped(tmp_path):
     write_marker_test(tmp_path)
     report_path = tmp_path / "reports" / "report.html"
 
-    produce_report(tmp_path, report_path)
+    result = produce_report(tmp_path, report_path)
+
+    assert result.returncode == pytest.ExitCode.OK
 
     report_data = read_report_data(report_path)
     assert f"marker={html.escape(MARKER)}" in report_data
@@ -184,18 +188,80 @@ def test_the_report_and_its_new_folder_are_readable_by_the_user_alone(tmp_path):
     write_marker_test(tmp_path)
     report_path = tmp_path / "reports" / "report.html"
 
-    produce_report(tmp_path, report_path)
+    result = produce_report(tmp_path, report_path)
 
+    assert result.returncode == pytest.ExitCode.OK
     assert stat.S_IMODE(report_path.parent.stat().st_mode) == 0o700
     assert stat.S_IMODE(report_path.stat().st_mode) == 0o600
 
 
 def test_a_report_written_before_is_made_readable_by_the_user_alone(tmp_path):
     write_marker_test(tmp_path)
-    report_path = tmp_path / "report.html"
+    report_path = tmp_path / "reports" / "report.html"
+    report_path.parent.mkdir()
     report_path.write_text("")
     report_path.chmod(0o644)
 
-    produce_report(tmp_path, report_path)
+    result = produce_report(tmp_path, report_path)
 
+    assert result.returncode == pytest.ExitCode.OK
     assert stat.S_IMODE(report_path.stat().st_mode) == 0o600
+
+
+def test_a_report_in_the_repository_outside_reports_is_refused_before_any_file(
+    tmp_path,
+):
+    """Only reports/ is ignored by git: a report elsewhere in the repository could be
+    committed."""
+    write_marker_test(tmp_path)
+    report_path = tmp_path / "docs" / "report.html"
+
+    result = produce_report(tmp_path, report_path)
+
+    assert result.returncode == pytest.ExitCode.USAGE_ERROR
+    # Stopped while pytest configures: the message goes to stderr.
+    assert str(report_path) in result.stderr
+    assert not report_path.parent.exists()
+
+
+def test_a_report_outside_the_repository_is_written(tmp_path, tmp_path_factory):
+    repository_dir = tmp_path / "repository"
+    repository_dir.mkdir()
+    write_marker_test(repository_dir)
+    report_path = tmp_path_factory.mktemp("outside") / "report.html"
+
+    result = produce_report(repository_dir, report_path)
+
+    assert result.returncode == pytest.ExitCode.OK
+    assert stat.S_IMODE(report_path.stat().st_mode) == 0o600
+
+
+def load_end_to_end_module():
+    """The module of the end-to-end tests, loaded by its path: tests/e2e/ is not a package. Its
+    fixtures are not used here."""
+    spec = importlib.util.spec_from_file_location(
+        "end_to_end_tests", E2E_DIR / "test_real_sources.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_a_name_commented_out_in_the_end_to_end_example_is_not_theirs(tmp_path):
+    """.env.example comments out some keys (KB_API_KEY_AI_DIGEST): its commented names count.
+    In .env.e2e_test.example, a commented name is not a variable of the tests."""
+    env_example_path = tmp_path / ".env.example"
+    env_example_path.write_text(
+        "KB_LLM_API_KEY=\n# KB_API_KEY_AI_DIGEST=\nKB_GITHUB_TOKEN=\n"
+    )
+    e2e_env_example_path = tmp_path / ".env.e2e_test.example"
+    e2e_env_example_path.write_text("# KB_LLM_API_KEY=\nKB_GITHUB_TOKEN=\n")
+    end_to_end_tests = load_end_to_end_module()
+
+    names_beyond = end_to_end_tests.find_names_beyond_the_end_to_end_tests(
+        env_example_path, e2e_env_example_path
+    )
+
+    assert names_beyond == {"KB_LLM_API_KEY", "KB_API_KEY_AI_DIGEST"}

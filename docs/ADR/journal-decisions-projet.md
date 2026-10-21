@@ -3431,7 +3431,9 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
   - un garde-fou arrête les tests avant tout `kb` si une variable de `.env.example`, absente de
     `.env.e2e_test.example`, est dans l'environnement : uv ajoute `--env-file` à l'environnement
     du terminal, qui prime, et un `.env` exporté donnerait encore toutes les clés à chaque `kb`.
-    Il compare des noms, jamais des valeurs ;
+    Il compare des noms, jamais des valeurs : ceux de `.env.example`, lignes commentées comprises
+    (une clé y est commentée), moins ceux que `.env.e2e_test.example` pose (un nom qu'il commente
+    n'est pas aux tests) ;
   - il laisse passer les noms que le test pose lui-même (`KB_DATA_DIR`, `KB_COLLECT_ONLY`) ou que
     `tests/conftest.py` retire avant lui (`KB_LOG_TO_FILE`, `KB_DATA_API_HOST`, `KB_DATA_API_PORT`,
     `KB_DATA_API_ALLOWED_HOSTS`) : leur valeur
@@ -3439,10 +3441,14 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
     sont posés, le critère à la lettre aurait tout arrêté. Écart au critère de #290, décidé par
     l'utilisatrice (option écartée : le critère à la lettre, qui aurait cassé le rejeu à
     l'identique en conteneur) ;
-  - le rapport va dans `reports/`, ignoré par git, en `0600` (dossier créé en `0700`), un seul
-    fichier écrasé à chaque production : il garde la sortie capturée des tests. Écartés : `temp/`,
-    le dossier de données des essais de l'utilisatrice ; un dossier hors du dépôt (`$TMPDIR`),
-    dont la durée de conservation n'est pas vérifiable ;
+  - le rapport va dans `reports/`, ignoré par git, en `0600` (dossier créé en `0700` s'il est
+    neuf), un seul fichier écrasé à chaque production : il garde la sortie capturée des tests.
+    Un rapport demandé ailleurs dans le dépôt arrête pytest avant tout fichier (le dépôt devient
+    public le 25/10). Écartés : ignorer `reports/` à toute profondeur, qui ne couvre ni un
+    rapport hors d'un dossier `reports/` ni un fichier suivi écrasé, et ignorerait sans bruit un
+    futur dossier de code nommé ainsi ; `temp/`, le dossier de données des essais de
+    l'utilisatrice ; un dossier hors du dépôt (`$TMPDIR`), dont la durée de conservation n'est
+    pas vérifiable ;
   - `pytest-html` n'affiche pas `user_properties` : une colonne s'ajoute par ses hooks, dans
     `tests/conftest.py`, chaque valeur échappée.
 

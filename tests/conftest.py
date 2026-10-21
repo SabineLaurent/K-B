@@ -30,7 +30,9 @@ E2E_MARKER = "e2e"
 # (_pytest/mark/expression.py:10, pytest 9.1.1): nightly-e2e and e2e.slow are one name each.
 MARKER_NAME = re.compile(r"(?:\w|:|\+|-|\.|\[|\]|\\|/)+")
 # The HTML report keeps the captured output of every test: the user alone reads it
-# (docs/registre-traitements.md, step 10 of the sorting).
+# (docs/registre-traitements.md, step 10 of the sorting). In the repository, only its folder
+# is ignored by git (.gitignore).
+REPORT_DIR_NAME = "reports"
 REPORT_DIR_MODE = 0o700
 REPORT_FILE_MODE = 0o600
 # The column of the recorded properties, before the links (the last default column of
@@ -49,12 +51,23 @@ def pytest_configure(config):
 def restrict_report_to_user(config):
     """Create the report of --html before pytest-html writes it, in 0600, and its folder, when
     new, in 0700: pytest-html rewrites the file in place, which keeps its mode. A folder that
-    exists keeps its mode."""
+    exists keeps its mode. A report in the repository (the rootdir) outside reports/ stops the
+    run before any file: git would not ignore it. Outside the repository, it is written."""
     report_option = config.getoption("htmlpath", default=None)
     if not report_option:
         return
     # Resolved as pytest-html resolves it (BaseReport.__init__, pytest-html 4.2.0).
     report_path = Path.cwd() / Path(os.path.expandvars(report_option)).expanduser()
+    resolved_path = report_path.resolve()
+    repository_dir = config.rootpath.resolve()
+    if resolved_path.is_relative_to(
+        repository_dir
+    ) and not resolved_path.is_relative_to(repository_dir / REPORT_DIR_NAME):
+        pytest.exit(
+            f"--html: {resolved_path} is in the repository outside {REPORT_DIR_NAME}/,"
+            " which git does not ignore",
+            returncode=pytest.ExitCode.USAGE_ERROR,
+        )
     report_path.parent.mkdir(mode=REPORT_DIR_MODE, parents=True, exist_ok=True)
     os.close(os.open(report_path, os.O_WRONLY | os.O_CREAT, REPORT_FILE_MODE))
     report_path.chmod(REPORT_FILE_MODE)
