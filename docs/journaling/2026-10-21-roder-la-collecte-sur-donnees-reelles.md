@@ -243,3 +243,14 @@ Sabine of 2026-10-15 ».
   changerait un comportement documenté sur une seule observation.
 - Une collecte le lendemain (fenêtre GH Archive due, nouvelles éditions TLDR) et une collecte
   après plusieurs jours manqués : non mesurées ici.
+
+## Sources
+
+| Source | URL | Consultée le |
+|---|---|---|
+| pytest, « Control skipping of tests according to command line option » (hook `pytest_collection_modifyitems`), par Context7 | https://github.com/pytest-dev/pytest/blob/main/doc/en/example/simple.rst | 2026-10-21 |
+| pytest, « Registering custom markers » (`pytest_configure`, `addinivalue_line`), par Context7 | https://github.com/pytest-dev/pytest/blob/main/doc/en/how-to/writing_plugins.rst | 2026-10-21 |
+| pytest 9.1.1, grammaire des expressions `-m` (règle `ident`), lue dans le paquet installé | `_pytest/mark/expression.py:10` | 2026-10-21 |
+| uv, « Environment variable files » (l'environnement prime sur `--env-file`), par Context7 | https://docs.astral.sh/uv/concepts/configuration-files | 2026-10-21 |
+| arXiv, « Terms of Use for arXiv APIs » (une requête toutes les 3 s, une seule connexion), par WebSearch puis WebFetch | https://info.arxiv.org/help/api/tou.html | 2026-10-21 |
+| Volumes et quota BigQuery de K-B | [`docs/bigquery.md`](../bigquery.md) | 2026-10-21 |
