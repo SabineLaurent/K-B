@@ -1,8 +1,11 @@
 """The files kb writes in the vault, under veille/: the sheets of the tops (etl/top_sheets.py) and
 the digests of the watch (etl/digest_sheets.py), one place for both (#209).
 
-A sheet is written once, never rewritten. kb never follows a symbolic link in the vault (decision
-of Sabine, 2026-10-19). A text of a source is written as text, never as syntax. A path is named in
+A sheet is written once: kb never rewrites one it sees. Limit accepted by Sabine for the POC
+(2026-10-21, #295): a sheet that appears between has_sheet and the rename of write_file_atomically
+is replaced without a message (CWE-367), and a folder replaced by a link in that window is followed
+(CWE-59); only two runs of the user that overlap can cause it, never a text of a source. kb never
+follows a symbolic link it sees in the vault (decision of Sabine, 2026-10-19). A text of a source is written as text, never as syntax. A path is named in
 the vault, never whole: made of constants and a date, it never says where the vault is.
 """
 

@@ -1,7 +1,8 @@
 """The digests of the watch in the vault: one Markdown sheet per subject and per day, written by
 kb digest from the response of the AI API (docs/fiches-veille.md, "Fiches dans le coffre"; #209).
 
-A sheet is written once, never rewritten, never through a symbolic link (etl/vault_files.py). Its
+A sheet is written once, never rewritten nor written through a symbolic link that kb sees, with
+the limit of etl/vault_files.py (#295). Its
 path is made of constants, of a subject of the closed list and of a day, never of another value
 of the response. Each text of the response, a claim written by the model or a title read from a
 source, is written as text: the response is an input not trusted (OWASP LLM10). Its front matter
@@ -85,7 +86,8 @@ def write_digest_sheet(
     vault_dir: Path, response: DigestsResponse, digest: Digest
 ) -> str:
     """Write the sheet of digest, of the UTC day of the end of the window; its path in the vault.
-    A sheet written meanwhile is refused, never rewritten (sheet_exists)."""
+    A sheet written meanwhile and seen is refused (sheet_exists); one that appears after the last
+    check is replaced (etl/vault_files.py, #295)."""
     sheet_path = find_sheet_path(
         vault_dir, digest.subject, response.window.until.date()
     )

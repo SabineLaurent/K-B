@@ -769,9 +769,10 @@ des tops).
    Hors de là : `ai_api_invalid_response`, aucune fiche écrite. L'erreur nomme la place et le
    contrôle, jamais la valeur reçue.
 5. **Une fiche par sujet rendu**, `veille/<sujet>/AAAA-MM-JJ.md`, au jour UTC de `window.until` :
-   le chemin est fait de constantes, d'un sujet de la liste et d'un jour. Elle est écrite une fois,
-   jamais réécrite, jamais à travers un lien : les dossiers et la fiche sont recontrôlés juste avant
-   l'écriture, par un temporaire caché renommé (règle 2 de `conventions.md`).
+   le chemin est fait de constantes, d'un sujet de la liste et d'un jour. Elle est écrite une fois :
+   `kb` ne réécrit jamais une fiche qu'il voit, et ne suit jamais un lien qu'il voit ; les dossiers
+   et la fiche sont recontrôlés juste avant l'écriture, par un temporaire caché renommé (règle 2 de
+   `conventions.md`). Une limite : voir « Limites », ci-dessous.
 
 **La fiche** : du Markdown déterministe (la même réponse donne les mêmes octets), ses clés en
 anglais, son texte en français (règle de Sabine du 2026-10-21) :
@@ -870,8 +871,12 @@ tronqué et échappé (règle 3 de `conventions.md`).
   sujet dont la fiche du lendemain existe déjà compte en échec (`sheet_exists`).
 - **Un SIGKILL** pendant une écriture laisse un temporaire caché `.AAAA-MM-JJ.md.*.tmp` dans
   `veille/<sujet>/`, comme pour les tops ; Obsidian n'affiche pas un fichier caché.
-- **Une entrée remplacée par un lien** entre le dernier contrôle et l'écriture serait suivie,
-  comme pour les tops (registre, fiche 1, « Sécurité »).
+- **Entre le dernier contrôle et le renommage** (limite acceptée par Sabine pour le POC, le
+  2026-10-21, à corriger par #295) : une fiche apparue dans cette fenêtre est remplacée sans
+  message (CWE-367) ; un dossier remplacé par un lien y fait écrire hors du coffre (CWE-59, déjà
+  accepté pour les tops, registre, fiche 1, « Sécurité »). Seuls deux lancements de l'utilisatrice
+  qui se chevauchent peuvent le déclencher ; un texte de source ou du modèle ne le peut pas. À
+  corriger au plus tard dès que `kb digest` tourne sans elle (tâche planifiée, conteneur).
 - **Le rendu dans Obsidian**, un logiciel fermé, n'est prouvé que par la recette de #209 (PR) : un
   autre lecteur de Markdown, ou un autre module d'Obsidian (Templater…), n'est pas couvert.
 

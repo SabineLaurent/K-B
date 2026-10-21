@@ -3608,12 +3608,20 @@ Sabine du 2026-10-15).
   suivra le dossier) ; deux modules de connexions sortantes, `etl/http_download.py` (urllib, la
   collecte) et `core/outbound.py` (httpx2), à harmoniser après le POC. — PR de #209
 - **L'écriture sûre d'une fiche dans le coffre vit une fois, dans `etl/vault_files.py`, pour les
-  fiches des tops et les fiches de veille : `write_new_sheet` (dossiers recontrôlés, aucun lien
-  suivi, jamais de réécriture, temporaire caché renommé) et `neutralize_text`, qui reçoit les
+  fiches des tops et les fiches de veille : `write_new_sheet` (dossiers recontrôlés, aucun lien vu
+  suivi, aucune fiche vue réécrite, temporaire caché renommé) et `neutralize_text`, qui reçoit les
   caractères à échapper.** Choix de la session dans le plan validé. Pourquoi : la mission demande
   l'écriture sûre « réemployée, pas recopiée ». Options écartées : la recopier dans
   `etl/digest_sheets.py` ; la mettre dans `core/` (elle écrit par `write_file_atomically` de
-  `etl/raw_store.py`, et `core` n'importe rien de K-B). Les fiches des tops gardent leur jeu de
+  `etl/raw_store.py`, et `core` n'importe rien de K-B). Limite assumée, décision de Sabine du
+  2026-10-21 (constat 1 de la revue de code, confirmé par un relecteur de sécurité) : une fiche
+  apparue entre `has_sheet` et le `os.replace` de `write_file_atomically` est remplacée sans
+  message (CWE-367), et un dossier remplacé par un lien dans cette fenêtre fait écrire hors du
+  coffre (CWE-59, déjà acceptée le 2026-10-19 pour `kb write-tops`) ; seuls deux lancements de
+  l'utilisatrice qui se chevauchent le peuvent, jamais un contenu non fiable. Correction (publier
+  par `os.link`, écrire par descripteurs) : #295, après les squelettes d'E1 et d'E3, au plus tard
+  dès que `kb digest` ou `kb write-tops` tourne sans l'utilisatrice. Option écartée ici : modifier
+  `write_file_atomically` et la règle 2 de `conventions.md` dans cette PR. Les fiches des tops gardent leur jeu de
   caractères et leur URL nue cliquable (2026-10-19). — PR de #209
 - **Dans une fiche de veille, chaque affirmation et chaque titre de source est écrit en texte : le
   jeu des fiches des tops, plus `~`, `:`, `@` et `&`, puis le point de `www.`, sans casse, la
