@@ -44,7 +44,10 @@ def run_serve_ai() -> int:
     ):
         return ExitCode.NOT_STARTED
     # The data API gives each client every item: a client of the AI API that held the key of
-    # AI_DIGEST would read it too (least privilege, code.md).
+    # AI_DIGEST would read it too (least privilege, code.md). Compared with KB_DATA_API_KEY_AI_DIGEST
+    # only, not with the other keys of the data API: on the Mac, kb digest reads the whole .env
+    # anyway, and every key of the data API has the same rights; in containers, each service
+    # gets its own keys (decision of Sabine of 2026-10-21, second review of #156).
     shared_key_refusal = find_shared_key_refusal(
         AI_API_KEY_VARIABLE_PREFIX,
         api_keys,
