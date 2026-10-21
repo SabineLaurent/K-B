@@ -7,6 +7,7 @@ prompt says them, and the code checks them. A bound of structure fails the outpu
 the Pydantic model); a bound of a claim removes the claim, counted (claims_removed).
 """
 
+import re
 from collections.abc import Mapping, Sequence
 from typing import Annotated
 
@@ -51,7 +52,7 @@ means an advisory without CVE.
 - Answer with the JSON object of the schema, and nothing else."""
 # One reminder per check, added to the system prompt of a retry (llm_client.call_model). Those of
 # content_filter, subject and completeness are never sent: the first ends the call without
-# retry, the others are checks of the classification; markup is checked by #206.
+# retry, the others are checks of the classification.
 WRITING_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
     "content_filter": "Your previous answer was filtered. Write about the items only.",
     "finish_reason": "Your previous answer did not end normally. Answer with the JSON "
@@ -68,6 +69,14 @@ WRITING_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
     "markup": "Your previous answer had a link, an image or a tag in a text. Write plain text "
     "only.",
 }
+# Check 6: a link with a scheme, from www., or a mailto: or xmpp: link (GFM makes a link of
+# them without //), an image, a wikilink, a Markdown link or link definition, a tag
+# (docs/fiches-veille.md, "Contrôles"). The flag is scoped to the group, as the (?i) of the spec:
+# inside it, [a-z] takes four non-ASCII letters too (İ, ı, ſ, K), which only refuses more; a
+# global IGNORECASE would also widen <[a-zA-Z] to them, beyond the spec.
+MARKUP = re.compile(
+    r"(?i:[a-z][a-z0-9+.-]*://|www\.|mailto:|xmpp:)|!\[|\[\[|\]\(|\]:|<[a-zA-Z/!?]"
+)
 # The longest output the bounds allow, an estimate: 12 claims of a text of 400 characters, 5
 # items and 10 facts of 120 characters, about 24,500 characters in compact JSON, so 8,192 tokens
 # at 3 characters per token (assumed; the note of #158 estimates 6,000 to 7,000). Read within
@@ -153,8 +162,10 @@ def build_writing_schema(item_refs: Sequence[str]) -> dict[str, object]:
 def check_writing(
     output: WritingOutput, item_refs: frozenset[str]
 ) -> FailedCheck | None:
-    """Check 4: each item cited was sent in this call, once in its claim, and each fact cites
-    an item of its claim."""
+    """Checks 4 and 6, in order, each over the whole output: each item cited was sent in this
+    call, once in its claim, and each fact cites an item of its claim; then no text holds a
+    link, an image nor a tag. Before the bounds of a claim: a text too long with a link fails
+    the output, it is not only removed."""
     for claim in output.claims:
         if any(ref not in item_refs for ref in claim.item_ids):
             return "item_id"
@@ -162,6 +173,8 @@ def check_writing(
             return "item_id"
         if any(fact.item_id not in claim.item_ids for fact in claim.facts):
             return "item_id"
+    if any(MARKUP.search(claim.text) for claim in output.claims):
+        return "markup"
     return None
 
 
