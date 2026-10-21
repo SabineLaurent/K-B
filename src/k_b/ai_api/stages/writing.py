@@ -69,11 +69,14 @@ WRITING_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
     "markup": "Your previous answer had a link, an image or a tag in a text. Write plain text "
     "only.",
 }
-# Check 6: a link with a scheme or from www., an image, a wikilink, a Markdown link or link
-# definition, a tag (docs/fiches-veille.md, "Contrôles"). The flag is scoped to the group, as the
-# (?i) of the spec: inside it, [a-z] takes four non-ASCII letters too (İ, ı, ſ, K), which only
-# refuses more; a global IGNORECASE would also widen <[a-zA-Z] to them, beyond the spec.
-MARKUP = re.compile(r"(?i:[a-z][a-z0-9+.-]*://|www\.)|!\[|\[\[|\]\(|\]:|<[a-zA-Z/!?]")
+# Check 6: a link with a scheme, from www., or a mailto: or xmpp: link (GFM makes a link of
+# them without //), an image, a wikilink, a Markdown link or link definition, a tag
+# (docs/fiches-veille.md, "Contrôles"). The flag is scoped to the group, as the (?i) of the spec:
+# inside it, [a-z] takes four non-ASCII letters too (İ, ı, ſ, K), which only refuses more; a
+# global IGNORECASE would also widen <[a-zA-Z] to them, beyond the spec.
+MARKUP = re.compile(
+    r"(?i:[a-z][a-z0-9+.-]*://|www\.|mailto:|xmpp:)|!\[|\[\[|\]\(|\]:|<[a-zA-Z/!?]"
+)
 # The longest output the bounds allow, an estimate: 12 claims of a text of 400 characters, 5
 # items and 10 facts of 120 characters, about 24,500 characters in compact JSON, so 8,192 tokens
 # at 3 characters per token (assumed; the note of #158 estimates 6,000 to 7,000). Read within

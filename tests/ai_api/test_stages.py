@@ -313,6 +313,9 @@ def writing_of(text):
         # Inside the group, [a-z] takes the four non-ASCII letters of IGNORECASE too.
         "v2.1.287 : ſ://evil",
         "v2.1.287 sur www.evil.example",
+        "v2.1.287 : mailto:x@evil.example",
+        "v2.1.287 : MAILTO:x@evil.example",
+        "v2.1.287 : xmpp:admin@evil.example",
         "v2.1.287 sur WWW.evil.example",
         # An image by reference: ![ without ](.
         "v2.1.287 ![x][ref]",

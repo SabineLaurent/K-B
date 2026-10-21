@@ -283,7 +283,9 @@ champs où la fidélité cherche un fait (section « Fidélité ») :
   par `@user` ; le masquage est codé par #204. Ordre : masquer, puis couper (500 ou 2 000
   caractères). La fidélité cherche dans le texte masqué, donc dans les champs envoyés. **Limite** :
   un domaine sans schéma (`example.com/x`) n'est ni masqué ni refusé ; il est rendu en texte non
-  cliquable, car CommonMark et GFM ne font un lien que d'un schéma ou de `www.`.
+  cliquable, car CommonMark ne fait un lien que d'un schéma, et GFM, en plus, de `www.`, de
+  `mailto:`, de `xmpp:` et d'une adresse mail nue ([doc de pymarkdown, « Extended Autolinks »](https://pymarkdown.readthedocs.io/en/latest/extensions/extended-autolinks/),
+  qui suit la spec GFM, lue le 2026-10-21 ; la section de la spec GFM elle-même n'a pas été lue).
 - **`@login` masqués** (#204, `ai_api/watch_items.py`), dans `release.body` seul, après les URL
   (une URL peut porter un `@`) : `(?<![A-Za-z0-9_.@/-])@[A-Za-z0-9][A-Za-z0-9-]{0,38}` devient
   `@user`. **Limites** : une adresse mail (`jane.doe@example.com`) n'est pas masquée, la règle ne
@@ -461,7 +463,7 @@ par du code déterministe).
 | 3 | **Sujets** | un sujet hors de la liste de `core/config.py` | `subject` |
 | 4 | **`item_id`** | un identifiant qui n'a pas été envoyé dans **cet** appel (un item inventé, ou d'un autre sujet) ; un `facts[].item_id` hors des `item_ids` de son affirmation | `item_id` |
 | 5 | **Complétude** (classement) | un item présent deux fois dans la sortie du classement ; un item absent n'est pas un échec : il est compté « non retenu » | `completeness` |
-| 6 | **Markdown** (rédaction) | un `text` qui contient `(?i)[a-z][a-z0-9+.-]*://`, `(?i)www\.`, `![`, `[[`, `](`, `]:` ou `<[a-zA-Z/!?]` | `markup` |
+| 6 | **Markdown** (rédaction) | un `text` qui contient `(?i)[a-z][a-z0-9+.-]*://`, `(?i)www\.`, `(?i)mailto:`, `(?i)xmpp:`, `![`, `[[`, `](`, `]:` ou `<[a-zA-Z/!?]` | `markup` |
 | 7 | **Fidélité** (rédaction) | voir ci-dessous : retire l'affirmation, n'est pas un échec | — |
 
 - **Contrôles 2 à 6, et une valeur de `finish_reason` hors liste** : `llm_invalid_output`,
@@ -477,6 +479,14 @@ par du code déterministe).
     recopiée comme fait ;
   - `](` et `]:` s'ajoutent : un lien Markdown sans schéma, et une définition de lien par référence
     (`[a]: javascript:…`, `[a]: //evil.example`), qui n'ont ni `://` ni `<`.
+- **`mailto:` et `xmpp:`** s'ajoutent (revue de #206, tranchée par time-knight le 2026-10-21) :
+  GFM en fait un lien sans `//`, et un `mailto:` peut porter un sujet et un corps préremplis.
+  L'adresse mail nue reste une limite (section « Réponse »).
+- **Limite** : le contrôle 6 refuse aussi un texte technique qui n'est pas une balise
+  (`Map<K, V>`, un `]:` en milieu de phrase) ; après la nouvelle tentative, le sujet échoue
+  (`llm_invalid_output`). `Promise<void>` ou `Vec<u8>` sont des balises en ligne pour CommonMark :
+  les refuser est voulu. Le nombre de `failed_check` = `markup` est relevé par les essais sur la
+  veille réelle (#210).
 
 ### Fidélité
 
