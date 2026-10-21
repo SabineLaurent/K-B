@@ -1,5 +1,6 @@
 """The fabricated Zotero library, shared by the tests of the source and of the command line; the
-test base of the readers of the items; the settings of kb read from the terminal, removed."""
+test base of the readers of the items; the settings of kb read from the terminal, removed; the
+end-to-end tests, left out unless -m names them."""
 
 import sqlite3
 from pathlib import Path
@@ -19,6 +20,27 @@ KB_SETTINGS_VARIABLES = (
     "KB_DATA_API_ALLOWED_HOSTS",
     "KB_LOG_TO_FILE",
 )
+# The marker of the tests that run kb on the real sources (tests/e2e/).
+E2E_MARKER = "e2e"
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        f"{E2E_MARKER}: runs kb on a real source; left out unless -m names {E2E_MARKER}",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Leave out the end-to-end tests unless -m names them: uv run pytest, the command of the
+    CI, never calls a real source; uv run pytest -m e2e runs them."""
+    if E2E_MARKER in config.option.markexpr:
+        return
+    deselected = [item for item in items if item.get_closest_marker(E2E_MARKER)]
+    if not deselected:
+        return
+    config.hook.pytest_deselected(items=deselected)
+    items[:] = [item for item in items if not item.get_closest_marker(E2E_MARKER)]
 
 
 @pytest.fixture
