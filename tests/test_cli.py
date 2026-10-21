@@ -17,6 +17,7 @@ from etl.test_transform import FIXTURES_DIR, copy_fixture
 
 from k_b import cli
 from k_b.commands import collect_command, import_command, write_tops_command
+from k_b.commands.exit_codes import find_exit_code
 from k_b.core import quoting
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl import collected_sources, load, vault_files
@@ -1107,6 +1108,23 @@ def test_each_exit_code_keeps_its_value():
     }
 
 
+@pytest.mark.parametrize(
+    ("has_failed", "has_done", "exit_code"),
+    [
+        (False, True, cli.ExitCode.SUCCEEDED),
+        (False, False, cli.ExitCode.SUCCEEDED),
+        (True, True, cli.ExitCode.PARTIAL_FAILURE),
+        (True, False, cli.ExitCode.FAILED),
+    ],
+)
+def test_a_part_that_failed_gives_4_beside_a_part_done_and_1_alone(
+    has_failed, has_done, exit_code
+):
+    """The same result, the same code, for kb collect, kb write-tops and kb digest (rule of
+    Sabine of 2026-10-21)."""
+    assert find_exit_code(has_failed=has_failed, has_done=has_done) == exit_code
+
+
 def test_the_server_not_started_code_is_the_one_uvicorn_exits_with():
     assert cli.ExitCode.SERVER_NOT_STARTED == uvicorn.config.STARTUP_FAILURE
 
@@ -1437,7 +1455,7 @@ def test_write_tops_with_a_vault_that_does_not_exist_creates_no_folder_and_exits
     assert str(absent_vault) not in error_output
 
 
-def test_a_sheet_not_written_keeps_its_rankings_exits_1_and_the_other_top_is_written(
+def test_a_sheet_not_written_keeps_its_rankings_exits_4_and_the_other_top_is_written(
     monkeypatch, data_and_vault_dirs, test_tops, capsys
 ):
     data_dir, vault_dir = data_and_vault_dirs
@@ -1453,7 +1471,7 @@ def test_a_sheet_not_written_keeps_its_rankings_exits_1_and_the_other_top_is_wri
 
     monkeypatch.setattr(vault_files, "write_file_atomically", refuse_the_most_starred)
 
-    assert cli.main(["write-tops"]) == cli.ExitCode.FAILED
+    assert cli.main(["write-tops"]) == cli.ExitCode.PARTIAL_FAILURE
     assert all(path.exists() for path in rankings["most_starred"])
     assert [path.exists() for path in rankings["most_forked"]] == [False, True]
     assert list_sheets(vault_dir) == [
@@ -1468,14 +1486,17 @@ def test_a_sheet_not_written_keeps_its_rankings_exits_1_and_the_other_top_is_wri
     assert str(vault_dir) not in error_output
 
 
-def test_an_unreadable_ranking_is_kept_and_write_tops_exits_1(
+def test_an_unreadable_ranking_is_kept_and_write_tops_exits_4_with_the_sheets_written(
     data_and_vault_dirs, test_tops, capsys
 ):
+    """Fail closed: a ranking kept unread is never a success (ADR of 2026-10-19); the sheets
+    written are kept, so the code is the one of a partial failure (rule of Sabine of
+    2026-10-21: the same result, the same code)."""
     data_dir, vault_dir = data_and_vault_dirs
     rankings = write_rankings_of_each_top(data_dir, "2026-10-05T093000Z")
     unreadable = write_ranking(data_dir, TEST_TOPS[0], "2026-10-12T093000Z", b"[]")
 
-    assert cli.main(["write-tops"]) == cli.ExitCode.FAILED
+    assert cli.main(["write-tops"]) == cli.ExitCode.PARTIAL_FAILURE
     assert unreadable.exists()
     assert rankings["most_starred"][0].exists()
     assert len(list_sheets(vault_dir)) == 2
@@ -1535,7 +1556,7 @@ def test_kb_help_lists_write_tops(capsys):
     )
 
 
-def test_a_folder_of_a_top_linked_elsewhere_is_refused_exits_1_and_the_other_top_is_written(
+def test_a_folder_of_a_top_linked_elsewhere_is_refused_exits_4_and_the_other_top_is_written(
     data_and_vault_dirs, test_tops, tmp_path, capsys
 ):
     data_dir, vault_dir = data_and_vault_dirs
@@ -1549,7 +1570,7 @@ def test_a_folder_of_a_top_linked_elsewhere_is_refused_exits_1_and_the_other_top
         elsewhere, target_is_directory=True
     )
 
-    assert cli.main(["write-tops"]) == cli.ExitCode.FAILED
+    assert cli.main(["write-tops"]) == cli.ExitCode.PARTIAL_FAILURE
     assert all(path.exists() for path in rankings["most_starred"])
     assert list(elsewhere.iterdir()) == []
     assert list_sheets(vault_dir / "veille" / "tops" / "most_forked") == [
@@ -1562,3 +1583,44 @@ def test_a_folder_of_a_top_linked_elsewhere_is_refused_exits_1_and_the_other_top
         " symbolic link\n"
     ) in error_output
     assert str(vault_dir) not in error_output
+
+
+def test_write_tops_exits_1_when_both_tops_are_refused(
+    data_and_vault_dirs, test_tops, tmp_path
+):
+    data_dir, vault_dir = data_and_vault_dirs
+    rankings = write_rankings_of_each_top(data_dir, "2026-10-05T093000Z")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (vault_dir / "veille").symlink_to(elsewhere, target_is_directory=True)
+
+    assert cli.main(["write-tops"]) == cli.ExitCode.FAILED
+    assert all(path.exists() for paths in rankings.values() for path in paths)
+    assert list(elsewhere.iterdir()) == []
+
+
+def test_write_tops_exits_1_when_its_only_rankings_are_unreadable(
+    data_and_vault_dirs, test_tops
+):
+    data_dir, vault_dir = data_and_vault_dirs
+    for top in TEST_TOPS:
+        write_ranking(data_dir, top, "2026-10-05T093000Z", b"[]")
+
+    assert cli.main(["write-tops"]) == cli.ExitCode.FAILED
+    assert list_sheets(vault_dir) == []
+
+
+def test_a_top_without_ranking_succeeds_beside_a_top_refused_so_write_tops_exits_4(
+    data_and_vault_dirs, test_tops, tmp_path
+):
+    """A top without ranking ran to its end: as a source with nothing new for kb collect."""
+    data_dir, vault_dir = data_and_vault_dirs
+    write_ranking(data_dir, TEST_TOPS[0], "2026-10-05T093000Z")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (vault_dir / "veille" / "tops").mkdir(parents=True)
+    (vault_dir / "veille" / "tops" / TEST_TOPS[0].name).symlink_to(
+        elsewhere, target_is_directory=True
+    )
+
+    assert cli.main(["write-tops"]) == cli.ExitCode.PARTIAL_FAILURE

@@ -275,11 +275,15 @@ ces relevés sont supprimés. Il affiche une ligne par top (fiches écrites, rel
 existe, relevés supprimés, relevés illisibles gardés). Code de sortie :
 
 - 0 : chaque top a réussi, ou n'a aucun relevé ;
-- 1 : un relevé est illisible (gardé, jamais supprimé, tant qu'il est là), ou une erreur de
-  lecture, d'écriture ou de suppression (`OSError`) arrête un top. Aucun relevé n'est supprimé
-  avant que les fiches de son top soient écrites ; une suppression qui échoue laisse celles déjà
-  faites. Un top arrêté n'a pas de ligne : son erreur est au journal. L'autre top est traité quand
-  même ;
+- 4 : un top a échoué, et un autre a abouti. L'unité est le top : il échoue quand une erreur de
+  lecture, d'écriture ou de suppression (`OSError`) ou une entrée refusée du coffre (lien
+  symbolique) l'arrête, ou quand il garde un relevé illisible (gardé, jamais supprimé, tant qu'il
+  est là) ; il aboutit quand il va au bout et écrit une fiche, ou va au bout sans échec (un top
+  sans relevé compris). Un top qui écrit ses fiches et garde un relevé illisible a donc échoué et
+  abouti : seul, il sort en 4, jamais en 0 (échouer fermé). Aucun relevé n'est supprimé avant que
+  les fiches de son top soient écrites ; une suppression qui échoue laisse celles déjà faites. Un
+  top arrêté n'a pas de ligne : son erreur est au journal. L'autre top est traité quand même ;
+- 1 : un top a échoué et aucun n'a abouti (les deux arrêtés, ou rien que des relevés illisibles) ;
 - 2 : `KB_DATA_DIR` manque, ou `KB_VAULT_DIR` manque ou n'est pas un dossier existant : rien n'est
   lu dans le brut, rien n'est écrit dans le coffre ni supprimé, aucun dossier du coffre n'est créé ;
   l'erreur va au journal ;
