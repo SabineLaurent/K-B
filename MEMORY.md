@@ -88,6 +88,11 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   est supposé (le `pyproject.toml` ne fixe ni `src` ni `known-first-party`, la détection des imports
   internes est une autre piste). Avant de déclarer les contrôles verts :
   `uv run ruff check --no-cache`.
+- **Tests de bout en bout** (#25, 2026-10-21) : un par source, dans `tests/e2e/`, marqués
+  `e2e` ; `uv run pytest` (la CI) les écarte (`tests/conftest.py`). Les rejouer sur le Mac :
+  `uv run --env-file .env pytest -m e2e -rs` (une source : `-k <source>`). Celui de `gh_archive`
+  lance une requête BigQuery réelle : ne pas le relancer à la légère. Avec `--basetemp`, toujours
+  un dossier qui n'existe pas encore : pytest efface celui qu'on lui donne.
 - **Liste des tests collectés** (constat du 2026-10-18, #247) : elle n'est pas stable d'une
   exécution à l'autre. `test_a_key_refused_is_never_quoted` (`tests/ai_api/test_data_api_settings.py`)
   est paramétré par une clé tirée par `secrets.token_urlsafe(32)` au chargement du module. Pour
