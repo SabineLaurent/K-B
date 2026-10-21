@@ -409,6 +409,7 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
 ```json
 {
   "request_id": "1b4e28ba-2fa1-4d2e-9b5c-6c8e1f0a7d3e",
+  "model": "gpt-6-luna",
   "window": {
     "days": 3,
     "since": "2026-10-12T09:00:00Z",
@@ -441,6 +442,7 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
 | Champ | Contenu |
 |---|---|
 | `request_id` | identifiant de la demande (UUID), repris par chaque ligne de métrique |
+| `model` | le modèle de `KB_LLM_MODEL` qui a rédigé les fiches (`replay` pour le replay), écrit par `kb digest` dans chaque fiche (#209) |
 | `window` | `days`, et `since` et `until` en UTC, au format des dates de la base ; quand `items_capped` est vrai, `capped_kind`, la sorte coupée, et `covered_after`, la date de son premier item laissé de côté (borne exclue) ; nuls sinon (section « Lecture plafonnée ») |
 | `digests` | une fiche par sujet rédigé ; un sujet sans item n'a pas de fiche |
 | `digests[].claims` | les affirmations gardées après la fidélité, sans leurs `facts` (contrôle interne) |
@@ -477,8 +479,9 @@ de la requête.
   aucune donnée, si bien qu'un rebinding DNS n'obtient rien et ne coûte aucun appel. Signalé à
   #161 (OWASP API Top 10 de l'API IA) et à revoir en conteneurs (#200), où l'hôte appelant change.
 - **`GET /health`** répond 200 `{"status": "ok"}` sans clé, comme celle de l'API de données.
-- **Version** : `0.1.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
-  un changement visible par un client change les deux.
+- **Version** : `0.2.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
+  un changement visible par un client change les deux. `0.1.0` : `POST /digests` (#156) ; `0.2.0` :
+  `model` dans la réponse (#209).
 
 ## Contrôles
 

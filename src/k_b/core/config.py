@@ -84,6 +84,10 @@ LLM_REASONING_EFFORT: Literal["none"] | None = None
 # The base URL of the replay provider: a reserved domain (RFC 6761), never resolved, since the
 # replay answers in the client itself.
 LLM_REPLAY_BASE_URL = "https://replay.invalid/v1"
+# The name of a model: a deployment name of Azure, a model of OpenAI or of Mistral. Checked by the
+# AI API in KB_LLM_MODEL, then by kb digest in the response, before it enters a sheet (#209);
+# quoted in a log as it is.
+MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,99}")
 # The largest token count read in an answer of the provider (prompt, completion, reasoning): an
 # answer beyond it is not read (llm_unavailable), since the answer of a provider is an input not
 # trusted (OWASP API10:2023). Far above a call of K-B (about 9,000 input tokens and 8,192 output

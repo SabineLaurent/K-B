@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "K-B AI API",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "paths": {
     "/digests": {
@@ -203,6 +203,11 @@
             "type": "string",
             "title": "Request Id"
           },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "The model of KB_LLM_MODEL that wrote the digests; replay for the replay."
+          },
           "window": {
             "$ref": "#/components/schemas/WindowSchema"
           },
@@ -247,6 +252,7 @@
         "type": "object",
         "required": [
           "request_id",
+          "model",
           "window",
           "digests",
           "failed_subjects",

@@ -18,7 +18,7 @@ from k_b.ai_api.connectors.llm_replay import (
     ReplayStep,
     read_replay_steps,
 )
-from k_b.core.config import LLM_REASONING_EFFORT, LLM_REPLAY_BASE_URL
+from k_b.core.config import LLM_REASONING_EFFORT, LLM_REPLAY_BASE_URL, MODEL_NAME
 from k_b.core.outbound import find_url_refusal
 from k_b.core.quoting import quote_value
 
@@ -33,8 +33,6 @@ type LlmProvider = Literal["openai_compatible", "replay"]
 PROVIDERS: tuple[LlmProvider, ...] = ("openai_compatible", "replay")
 # The model of the replay, in the metrics: no deployment answers.
 REPLAY_MODEL = "replay"
-# A deployment name of Azure, a model of OpenAI or of Mistral; quoted in a log as it is.
-MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,99}")
 # Printable ASCII without space: the key goes into an HTTP header as it is.
 API_KEY_CHARACTERS = re.compile(r"[!-~]+")
 

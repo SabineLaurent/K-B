@@ -199,6 +199,8 @@ def test_a_request_gives_a_digest_per_subject_with_its_window_and_its_id(make_ai
     assert response.status_code == 200
     body = response.json()
     assert body["request_id"] == response.headers["X-Request-ID"]
+    # The model of the settings of kb serve-ai, written by kb digest in each sheet (#209).
+    assert body["model"] == "replay"
     assert body["window"] == {
         "days": 14,
         "since": "2026-09-24T12:00:30Z",
