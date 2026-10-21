@@ -141,7 +141,8 @@ MARKER = "<b>marker</b>"
 
 def produce_report(directory, report_path):
     """Run the marker test of directory with a report at report_path; directory is the rootdir
-    of the run, the repository of the copied conftest."""
+    of the run, the repository of the copied conftest. --rootdir: under a --basetemp in K-B,
+    pytest would take K-B for the rootdir, by its pyproject.toml."""
     return subprocess.run(  # noqa: S603 — runs this interpreter on pytest, fixed arguments
         [
             sys.executable,
@@ -149,6 +150,7 @@ def produce_report(directory, report_path):
             "pytest",
             "-p",
             "no:cacheprovider",
+            f"--rootdir={directory}",
             f"--html={report_path}",
             "--self-contained-html",
             str(directory / "test_marker.py"),

@@ -301,7 +301,7 @@ def collect_and_import(
     record_property("items_by_kind", item_count_by_kind)
     assert rejection_count == 0
     assert log_line_count == 0
-    item_count = count_rows(database_path, "SELECT COUNT(*) FROM item")
+    item_count = sum(item_count_by_kind.values())
     if source_name in TOP_FOLDER_KEY_BY_SOURCE_NAME:
         # The rankings as kb write-tops lists them.
         folder_key = TOP_FOLDER_KEY_BY_SOURCE_NAME[source_name]
@@ -315,9 +315,6 @@ def collect_and_import(
         assert trend_count >= 1
         assert item_count == 0
     else:
-        kind = ITEM_KIND_BY_SOURCE_NAME[source_name]
-        kind_count = count_rows(
-            database_path, "SELECT COUNT(*) FROM item WHERE kind = ?", kind
-        )
+        kind_count = item_count_by_kind.get(ITEM_KIND_BY_SOURCE_NAME[source_name], 0)
         assert kind_count >= 1
         assert kind_count == item_count
