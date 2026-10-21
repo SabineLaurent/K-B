@@ -159,9 +159,9 @@ lancés à la main, et conçus comme des jobs. Au deuxième temps, avant le 29/1
 des conteneurs en local répètent le déploiement : Zotero et les clips y restent collectés sur ma
 machine (`KB_COLLECT_ONLY`), sans que ma bibliothèque soit montée dans un conteneur.
 
-**Où on en est** : la collecte, l'import, l'API de données et le service des fiches par l'API IA
-(`kb serve-ai`, #156) sont codés (voir « Installer et lancer »). Restent l'écriture des fiches en
-`.md` par `kb digest` (#209) et les métriques du modèle vers Grafana Cloud (#162, #164) ; puis, au deuxième
+**Où on en est** : la collecte, l'import, l'API de données, le service des fiches par l'API IA
+(`kb serve-ai`, #156) et leur écriture en `.md` dans le coffre (`kb digest`, #209) sont codés (voir
+« Installer et lancer »). Restent les métriques du modèle vers Grafana Cloud (#162, #164) ; puis, au deuxième
 temps, l'image et les conteneurs (#200) et l'installation par compose (#202).
 
 **La suite** :
@@ -190,12 +190,13 @@ uv sync
 |---|---|---|
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
 | `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
-| `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, et ne tourne pas sans elle (code 2). |
+| `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les fiches de veille dans `veille/<sujet>/` ; ni l'un ni l'autre ne tourne sans elle (code 2). |
 | `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
 | `KB_COLLECT_ONLY` | non | les dossiers des sources que `kb collect` lance, séparés par des virgules (`zotero,clipping`) ; la casse ne compte pas. Sans elle, pas de filtre : chaque source tourne comme avant (Zotero, clips et GH Archive selon leur variable). Une source écartée affiche `<dossier>: skipped (not in KB_COLLECT_ONLY)` ; un nom qui n'est pas un dossier de source, une valeur ou une entrée vide, ou une source choisie sans sa variable (`zotero` sans `KB_ZOTERO_DIR`) : code 2, rien n'est collecté ([docs/specs-collecte.md](docs/specs-collecte.md), « Choisir les sources »). |
 | `KB_GITHUB_TOKEN` | non | jeton GitHub en lecture seule ([docs/jeton-github.md](docs/jeton-github.md)). Sans lui, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000. |
 | `KB_DATA_API_KEY_<CLIENT>` | pour `kb serve` | la clé d'un client de l'API de données (`<CLIENT>` en `A-Z`, `0-9` et `_`, par exemple `KB_DATA_API_KEY_TERMINAL`), une variable par client ([docs/specs-api.md](docs/specs-api.md)). |
-| `KB_AI_API_KEY_<CLIENT>` | pour `kb serve-ai` | la clé d'un client de l'API IA, une variable par client, mêmes règles que `KB_DATA_API_KEY_<CLIENT>` ; `kb digest` est le client `KB_DIGEST` (`KB_AI_API_KEY_KB_DIGEST`). Les autres réglages de `kb serve-ai` (modèle, API de données, hôte, port, fenêtre) sont décrits dans `.env.example`. |
+| `KB_AI_API_KEY_<CLIENT>` | pour `kb serve-ai` et `kb digest` | la clé d'un client de l'API IA, une variable par client, mêmes règles que `KB_DATA_API_KEY_<CLIENT>` ; `kb digest` est le client `KB_DIGEST` et lit la même variable, `KB_AI_API_KEY_KB_DIGEST`. Les autres réglages de `kb serve-ai` (modèle, API de données, hôte, port, fenêtre) sont décrits dans `.env.example`. |
+| `KB_AI_API_URL` | non | l'adresse de l'API IA pour `kb digest`, `http` ou `https`, sans utilisateur, requête ni fragment. Sans elle, `http://127.0.0.1:8001` (`core/config.py`) ; elle ne suit pas `KB_AI_API_PORT` : la changer aussi quand le port change. |
 
 **Créer la base** (une fois) :
 
@@ -396,13 +397,49 @@ message nomme la variable, jamais une clé ni l'URL du modèle. Port déjà pris
 - clé `KB_DATA_API_KEY_AI_DIGEST` : la changer dans le `.env`, puis redémarrer `kb serve` et
   `kb serve-ai`, qui la lisent tous deux ; tant que l'un des deux garde l'ancienne, chaque demande
   de fiches rend 502 `data_api_unauthorized` ;
-- **à venir avec `kb digest` (#209)** : sur un 401 de l'API IA (`invalid_api_key`, clé absente,
-  changée d'un seul côté ou retirée), `kb digest` n'écrit aucune fiche, ne cite jamais la clé,
-  nomme la variable `KB_AI_API_KEY_KB_DIGEST` et sort avec un code nommé, que #209 fixe.
+- sur un 401 de l'API IA (`invalid_api_key`, clé absente, changée d'un seul côté ou retirée),
+  `kb digest` n'écrit aucune fiche, ne cite jamais la clé, nomme la variable
+  `KB_AI_API_KEY_KB_DIGEST` et sort en code 1 : la requête est partie (une clé absente de
+  `kb digest` donne 2, rien n'est demandé).
 
 Limites : une variable `KB_AI_API_KEY_*` exportée dans le profil du shell reste valide même retirée
 du `.env` ; `uv run --env-file .env kb serve-ai` charge tout le `.env`, donc aussi des secrets dont
 l'API IA n'a pas besoin (moindre privilège).
+
+**Écrire les fiches de veille dans le coffre** (`kb serve` et `kb serve-ai` lancés ; voir
+[docs/fiches-veille.md](docs/fiches-veille.md), « Fiches dans le coffre ») :
+
+```sh
+KB_DATA_DIR=~/.knowledge_base KB_VAULT_DIR=<coffre> uv run --env-file .env kb digest
+```
+
+`kb digest` demande à l'API IA les fiches de sa fenêtre par défaut (`KB_DIGEST_WINDOW_DAYS`, lue
+par `kb serve-ai`), avec la clé `KB_AI_API_KEY_KB_DIGEST`, à l'adresse `KB_AI_API_URL`
+(`http://127.0.0.1:8001` par défaut ; elle ne suit pas `KB_AI_API_PORT` : la changer aussi). Il
+écrit une fiche par sujet rendu, `<KB_VAULT_DIR>/veille/<sujet>/AAAA-MM-JJ.md`, au jour UTC de la
+demande : un frontmatter (`subject`, `generated`, `model`, la fenêtre, `items_capped`,
+`request_id`), les affirmations, chacune avec le numéro de ses sources, puis les sources, leur
+titre et leur URL. Chaque affirmation et chaque titre est écrit en texte : ni lien, ni image, ni
+balise, ni code, ni requête Dataview ne peut s'y activer. Une fiche n'est jamais réécrite : s'il en
+existe une du jour, aucune demande n'est faite. Une demande dure jusqu'à environ 220 s ; `kb digest`
+attend 240 s au plus, sans nouvelle tentative. Il affiche une ligne par fiche écrite, puis un
+résumé (fiches écrites, en échec, modèle, `request_id`, que `logs/kb-serve-ai.log` reprend). Code
+de sortie, l'unité étant le sujet :
+
+- 0 : chaque fiche rendue est écrite, ou la fenêtre n'en a aucune ;
+- 4 : un sujet a échoué (nommé par l'API IA, ou sa fiche non écrite) et au moins une fiche est
+  écrite ;
+- 1 : rien n'est écrit : l'API IA est injoignable, dépasse le délai, refuse la clé (le message
+  nomme `KB_AI_API_KEY_KB_DIGEST`, jamais la clé), répond en échec (502, 503, 504 : son état, son
+  `X-Request-ID` et son `Retry-After` sont affichés) ou hors du schéma attendu ; ou chaque sujet a
+  échoué ;
+- 2 : rien n'est demandé : `KB_DATA_DIR`, `KB_VAULT_DIR` (absente, ou pas un dossier existant) ou
+  `KB_AI_API_KEY_KB_DIGEST` manque ou est refusée, une fiche du jour est déjà là, ou un dossier
+  `veille/…` est un lien symbolique ;
+- 143 : `kb digest` a reçu SIGTERM : les fiches déjà écrites sont gardées.
+
+Le code 4 dit la même chose pour `kb collect` (l'unité est la source), `kb write-tops` (le top) et
+`kb digest` (le sujet) : une partie a échoué, une autre est faite et gardée.
 
 **Lire la base sans l'API** : la base s'ouvre en lecture seule avec `sqlite3`, sans clé ni
 serveur :
