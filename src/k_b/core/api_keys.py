@@ -1,5 +1,5 @@
 """The key of each client of an API of K-B, one variable <prefix><CLIENT> per client
-(docs/specs-api.md, "Accès par clé"): KB_API_KEY_<CLIENT> for the data API, read by kb serve,
+(docs/specs-api.md, "Accès par clé"): KB_DATA_API_KEY_<CLIENT> for the data API, read by kb serve,
 KB_AI_API_KEY_<CLIENT> for the AI API, read by kb serve-ai. Each request is checked by
 core/api_access.py.
 """
@@ -12,7 +12,7 @@ from pydantic import SecretStr
 from k_b.core.config import API_KEY_CHARACTERS, MIN_API_KEY_LENGTH
 from k_b.core.quoting import quote_value
 
-API_KEY_VARIABLE_PREFIX = "KB_API_KEY_"
+API_KEY_VARIABLE_PREFIX = "KB_DATA_API_KEY_"
 AI_API_KEY_VARIABLE_PREFIX = "KB_AI_API_KEY_"
 CLIENT_NAME = re.compile(r"[A-Z0-9_]+")
 

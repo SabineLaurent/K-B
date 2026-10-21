@@ -135,7 +135,7 @@ def test_the_end_to_end_tests_stop_on_a_variable_beyond_theirs_without_its_value
 
 
 def test_the_end_to_end_tests_stop_on_the_key_of_any_client_without_its_value():
-    """kb serve reads every KB_API_KEY_<CLIENT>: a client that .env.example does not name stops
+    """kb serve reads every KB_DATA_API_KEY_<CLIENT>: a client that .env.example does not name stops
     the tests too."""
     key_variable = f"{API_KEY_VARIABLE_PREFIX}CLIENT_NOT_IN_THE_EXAMPLE"
 
@@ -273,11 +273,11 @@ def load_end_to_end_module():
 
 
 def test_a_name_commented_out_in_the_end_to_end_example_is_not_theirs(tmp_path):
-    """.env.example comments out some keys (KB_API_KEY_AI_DIGEST): its commented names count.
+    """.env.example comments out some keys (KB_DATA_API_KEY_AI_DIGEST): its commented names count.
     In .env.e2e_test.example, a commented name is not a variable of the tests."""
     env_example_path = tmp_path / ".env.example"
     env_example_path.write_text(
-        "KB_LLM_API_KEY=\n# KB_API_KEY_AI_DIGEST=\nKB_GITHUB_TOKEN=\n"
+        "KB_LLM_API_KEY=\n# KB_DATA_API_KEY_AI_DIGEST=\nKB_GITHUB_TOKEN=\n"
     )
     e2e_env_example_path = tmp_path / ".env.e2e_test.example"
     e2e_env_example_path.write_text("# KB_LLM_API_KEY=\nKB_GITHUB_TOKEN=\n")
@@ -287,4 +287,4 @@ def test_a_name_commented_out_in_the_end_to_end_example_is_not_theirs(tmp_path):
         env_example_path, e2e_env_example_path
     )
 
-    assert names_beyond == {"KB_LLM_API_KEY", "KB_API_KEY_AI_DIGEST"}
+    assert names_beyond == {"KB_LLM_API_KEY", "KB_DATA_API_KEY_AI_DIGEST"}

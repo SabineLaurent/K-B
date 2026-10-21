@@ -194,8 +194,8 @@ uv sync
 | `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
 | `KB_COLLECT_ONLY` | non | les dossiers des sources que `kb collect` lance, séparés par des virgules (`zotero,clipping`) ; la casse ne compte pas. Sans elle, pas de filtre : chaque source tourne comme avant (Zotero, clips et GH Archive selon leur variable). Une source écartée affiche `<dossier>: skipped (not in KB_COLLECT_ONLY)` ; un nom qui n'est pas un dossier de source, une valeur ou une entrée vide, ou une source choisie sans sa variable (`zotero` sans `KB_ZOTERO_DIR`) : code 2, rien n'est collecté ([docs/specs-collecte.md](docs/specs-collecte.md), « Choisir les sources »). |
 | `KB_GITHUB_TOKEN` | non | jeton GitHub en lecture seule ([docs/jeton-github.md](docs/jeton-github.md)). Sans lui, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000. |
-| `KB_API_KEY_<CLIENT>` | pour `kb serve` | la clé d'un client de l'API de données (`<CLIENT>` en `A-Z`, `0-9` et `_`, par exemple `KB_API_KEY_TERMINAL`), une variable par client ([docs/specs-api.md](docs/specs-api.md)). |
-| `KB_AI_API_KEY_<CLIENT>` | pour `kb serve-ai` | la clé d'un client de l'API IA, une variable par client, mêmes règles que `KB_API_KEY_<CLIENT>` ; `kb digest` est le client `KB_DIGEST` (`KB_AI_API_KEY_KB_DIGEST`). Les autres réglages de `kb serve-ai` (modèle, API de données, hôte, port, fenêtre) sont décrits dans `.env.example`. |
+| `KB_DATA_API_KEY_<CLIENT>` | pour `kb serve` | la clé d'un client de l'API de données (`<CLIENT>` en `A-Z`, `0-9` et `_`, par exemple `KB_DATA_API_KEY_TERMINAL`), une variable par client ([docs/specs-api.md](docs/specs-api.md)). |
+| `KB_AI_API_KEY_<CLIENT>` | pour `kb serve-ai` | la clé d'un client de l'API IA, une variable par client, mêmes règles que `KB_DATA_API_KEY_<CLIENT>` ; `kb digest` est le client `KB_DIGEST` (`KB_AI_API_KEY_KB_DIGEST`). Les autres réglages de `kb serve-ai` (modèle, API de données, hôte, port, fenêtre) sont décrits dans `.env.example`. |
 
 **Créer la base** (une fois) :
 
@@ -309,7 +309,7 @@ Les codes de toutes les commandes et leur sens sont listés par `uv run kb --hel
    uv run python -c "import secrets; print(secrets.token_urlsafe(32))"
    ```
 
-   et la ranger dans le `.env` : `KB_API_KEY_TERMINAL=<la clé>`.
+   et la ranger dans le `.env` : `KB_DATA_API_KEY_TERMINAL=<la clé>`.
 2. Lancer l'API, qui écoute par défaut sur `http://127.0.0.1:8000`, et seulement sur la machine
    (`KB_DATA_API_HOST`, `KB_DATA_API_PORT` et `KB_DATA_API_ALLOWED_HOSTS` changent l'hôte, le port
    et les hôtes permis : `docs/specs-api.md`, « Règles communes ») :
@@ -342,7 +342,7 @@ Limites :
 
 - un client se retire en retirant sa variable, puis en redémarrant `kb serve` : un retrait ne
   prend effet qu'au redémarrage ;
-- une variable `KB_API_KEY_*` exportée dans le profil du shell (`~/.zshrc`) reste valide même
+- une variable `KB_DATA_API_KEY_*` exportée dans le profil du shell (`~/.zshrc`) reste valide même
   retirée du `.env` : la retirer aussi de là ;
 - `uv run --env-file .env kb serve` charge tout le `.env`, donc aussi le jeton GitHub et les
   identifiants Google, dont l'API n'a pas besoin : `kb serve` tourne avec plus de droits que sa
@@ -354,7 +354,7 @@ donc tourner, et appelle le modèle ; elle ne garde rien entre deux demandes.
 
 1. Ranger dans le `.env` une clé par client de l'API IA, faite comme celles de l'API de données
    (`KB_AI_API_KEY_KB_DIGEST=<la clé>`), la clé que l'API IA envoie à l'API de données
-   (`KB_API_KEY_AI_DIGEST=<une autre clé>`, que `kb serve` lit aussi : redémarrer `kb serve`), et
+   (`KB_DATA_API_KEY_AI_DIGEST=<une autre clé>`, que `kb serve` lit aussi : redémarrer `kb serve`), et
    le modèle (`KB_LLM_PROVIDER` et ses variables, `.env.example`). `replay` répond par les
    réponses d'un fichier, sans réseau ni clé ni coût.
 2. Lancer l'API IA, à côté de `kb serve` ; elle écoute par défaut sur `http://127.0.0.1:8001`, et
@@ -379,7 +379,7 @@ l'API de données. `kb serve-ai` journalise une ligne par requête dans
 `KB_DATA_DIR`), avec le nom du client et l'identifiant de la requête, rendu aussi dans l'en-tête
 `X-Request-ID` de chaque réponse ; chaque appel au modèle écrit une ligne JSON de métrique sur la
 sortie standard, sans texte. Code de sortie 2, sans lancer l'API, si `KB_DATA_DIR` manque, si une
-clé, l'hôte, le port, la fenêtre, le modèle ou la clé `KB_API_KEY_AI_DIGEST` est refusé : le
+clé, l'hôte, le port, la fenêtre, le modèle ou la clé `KB_DATA_API_KEY_AI_DIGEST` est refusé : le
 message nomme la variable, jamais une clé ni l'URL du modèle. Port déjà pris : code 3, comme
 `kb serve`.
 
@@ -389,7 +389,7 @@ message nomme la variable, jamais une clé ni l'URL du modèle. Port déjà pris
 - clé d'un client de l'API IA : faire une nouvelle clé, la ranger dans sa variable
   (`KB_AI_API_KEY_KB_DIGEST`), puis redémarrer `kb serve-ai` ; l'ancienne clé est refusée dès le
   redémarrage, pas avant. Retirer un client : retirer sa variable et redémarrer ;
-- clé `KB_API_KEY_AI_DIGEST` : la changer dans le `.env`, puis redémarrer `kb serve` et
+- clé `KB_DATA_API_KEY_AI_DIGEST` : la changer dans le `.env`, puis redémarrer `kb serve` et
   `kb serve-ai`, qui la lisent tous deux ; tant que l'un des deux garde l'ancienne, chaque demande
   de fiches rend 502 `data_api_unauthorized` ;
 - **à venir avec `kb digest` (#209)** : sur un 401 de l'API IA (`invalid_api_key`, clé absente,

@@ -21,7 +21,7 @@ from k_b.core.api_keys import AI_API_KEY_VARIABLE_PREFIX
 from k_b.core.config import DIGEST_SUBJECTS
 
 # The variables kb serve-ai reads, which a terminal may export (a .env loaded).
-READ_PREFIXES = ("KB_AI_API_", "KB_API_KEY_", "KB_LLM_", "KB_DATA_API_", "KB_DIGEST_")
+READ_PREFIXES = ("KB_AI_API_", "KB_LLM_", "KB_DATA_API_", "KB_DIGEST_")
 
 
 def make_key():
@@ -50,7 +50,7 @@ def environment(replay_file):
         "KB_AI_API_KEY_KB_DIGEST": make_key(),
         "KB_LLM_PROVIDER": "replay",
         "KB_LLM_REPLAY_FILE": str(replay_file),
-        "KB_API_KEY_AI_DIGEST": make_key(),
+        "KB_DATA_API_KEY_AI_DIGEST": make_key(),
     }
 
 
@@ -159,10 +159,10 @@ def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
             {"KB_LLM_PROVIDER": None},
             "KB_LLM_PROVIDER: not set, openai_compatible or replay",
         ),
-        ({"KB_API_KEY_AI_DIGEST": None}, "KB_API_KEY_AI_DIGEST: not set"),
+        ({"KB_DATA_API_KEY_AI_DIGEST": None}, "KB_DATA_API_KEY_AI_DIGEST: not set"),
         (
-            {"KB_API_KEY_AI_DIGEST": "short-key-of-the-test"},
-            "KB_API_KEY_AI_DIGEST: key of 21 characters, minimum 32",
+            {"KB_DATA_API_KEY_AI_DIGEST": "short-key-of-the-test"},
+            "KB_DATA_API_KEY_AI_DIGEST: key of 21 characters, minimum 32",
         ),
     ],
     ids=[
@@ -198,7 +198,7 @@ def test_serve_ai_exits_2_and_names_the_variable_refused(
     assert exit_code == 2
     assert message in error_output
     assert uvicorn_calls == []
-    for name in ("KB_AI_API_KEY_KB_DIGEST", "KB_API_KEY_AI_DIGEST"):
+    for name in ("KB_AI_API_KEY_KB_DIGEST", "KB_DATA_API_KEY_AI_DIGEST"):
         if environment.get(name):
             assert environment[name] not in error_output
 
@@ -215,7 +215,7 @@ def test_serve_ai_logs_its_clients_its_provider_and_its_model_never_a_key(
     # An AI API set on the replay by mistake says it.
     assert "LLM provider replay, model replay" in error_output
     assert "digest window by default: 3 days" in error_output
-    for name in ("KB_AI_API_KEY_KB_DIGEST", "KB_API_KEY_AI_DIGEST"):
+    for name in ("KB_AI_API_KEY_KB_DIGEST", "KB_DATA_API_KEY_AI_DIGEST"):
         assert environment[name] not in error_output
 
 

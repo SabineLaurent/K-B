@@ -199,7 +199,7 @@ l'utilisatrice et ignoré par git, ne porte que les variables des tests (son mod
 `.env.e2e_test.example`). **Limite** : uv ajoute ce fichier à l'environnement du terminal, qui
 prime ; il faut donc lancer la commande depuis un terminal sans `.env` exporté. Un garde-fou arrête
 les tests avant tout `kb` si une variable de `.env.example` absente de `.env.e2e_test.example`, ou
-une clé `KB_API_KEY_<CLIENT>` de n'importe quel client, est dans l'environnement ; le message nomme les variables, jamais leur valeur. Ne l'arrêtent pas celles
+une clé `KB_DATA_API_KEY_<CLIENT>` de n'importe quel client, est dans l'environnement ; le message nomme les variables, jamais leur valeur. Ne l'arrêtent pas celles
 que le test pose lui-même (`KB_DATA_DIR`, `KB_COLLECT_ONLY`) ou que `tests/conftest.py` retire
 (`KB_LOG_TO_FILE`, `KB_DATA_API_HOST`, `KB_DATA_API_PORT`, `KB_DATA_API_ALLOWED_HOSTS`) : leur
 valeur n'atteint jamais `kb`. `KB_DATA_API_URL`, réglage de l'API IA, les arrête.

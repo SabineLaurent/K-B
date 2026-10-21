@@ -467,7 +467,7 @@ de la requête.
 
 ### Accès
 
-- **Une clé par client** : `KB_AI_API_KEY_<CLIENT>`, avec les règles de `KB_API_KEY_<CLIENT>` de
+- **Une clé par client** : `KB_AI_API_KEY_<CLIENT>`, avec les règles de `KB_DATA_API_KEY_<CLIENT>` de
   l'API de données ([specs-api.md](specs-api.md), « Accès par clé ») et le même module
   (`core/api_keys.py`, `core/api_access.py`) ; `kb digest` (#209) est le client `KB_DIGEST`. Sans
   clé valide, 401 `invalid_api_key`. La clé est fixe ; sa rotation est dans le `README.md`

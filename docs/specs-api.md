@@ -76,8 +76,8 @@ l'ordre des résultats, change la version.
 
 ## Accès par clé
 
-- **Un client nommé, une clé** : la variable d'environnement `KB_API_KEY_<CLIENT>` porte la clé du
-  client `<CLIENT>` (`[A-Z0-9_]+`, par exemple `KB_API_KEY_TERMINAL`, `KB_API_KEY_AGENT`).
+- **Un client nommé, une clé** : la variable d'environnement `KB_DATA_API_KEY_<CLIENT>` porte la clé du
+  client `<CLIENT>` (`[A-Z0-9_]+`, par exemple `KB_DATA_API_KEY_TERMINAL`, `KB_DATA_API_KEY_AGENT`).
   La clé identifie le programme qui appelle (le terminal ou un script de Sabine, un agent, l'API
   IA) ; aucune personne ne se connecte.
 - **Clé générée en 256 bits** par `secrets.token_urlsafe(32)` ; le minimum contrôlé est de
