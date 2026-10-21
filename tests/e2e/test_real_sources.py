@@ -2,14 +2,23 @@
 kb import, on the real source, in a new data directory; each command exits 0 and the items of
 the source are in the base, with no rejection.
 
-Left out of uv run pytest (tests/conftest.py). Run on the Mac by uv run pytest -m e2e, with the
-settings of the sources in the environment; to be run the same way in a container (#200) and as a
-job. Without KB_ZOTERO_DIR, KB_VAULT_DIR or GOOGLE_APPLICATION_CREDENTIALS, the test of its source
-is skipped. KB_GITHUB_TOKEN is optional: without it, the GitHub sources run on 60 requests per
-hour instead of 5,000. gh_archive runs a real BigQuery query (docs/bigquery.md).
+Left out of uv run pytest (tests/conftest.py). Run on the Mac, with the HTML report, by
+uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html --self-contained-html
+.env.e2e_test holds the settings of the sources alone (.env.e2e_test.example), and each kb gets
+the environment of the terminal too: run it from a terminal without .env exported. A variable of
+.env.example that is not in .env.e2e_test.example stops the tests before any kb, but the ones the
+test sets itself (KB_DATA_DIR, KB_COLLECT_ONLY) or tests/conftest.py removes (KB_LOG_TO_FILE,
+KB_DATA_API_*). To be run the same way in a container (#200) and as a job. Without KB_ZOTERO_DIR,
+KB_VAULT_DIR or GOOGLE_APPLICATION_CREDENTIALS, the test of its source is skipped. KB_GITHUB_TOKEN
+is optional: without it, the GitHub sources run on 60 requests per hour instead of 5,000.
+gh_archive runs a real BigQuery query (docs/bigquery.md).
+
+Each test records its figures in the report (record_property): the exit codes of the commands,
+the items by kind, the rejections, and for gh_archive the bytes BigQuery processed.
 
 Once a test ends, however it ends, its data directory is deleted but its logs/: what a test keeps
-is its console and the log of kb (docs/registre-traitements.md, step 10 of the sorting).
+is its console, the log of kb and the HTML report (docs/registre-traitements.md, step 10 of the
+sorting).
 """
 
 import json
@@ -76,6 +85,42 @@ LOG_LINE_ABOVE_INFO = re.compile(r"\S+ (WARNING|ERROR|CRITICAL) ")
 TOKEN_NOT_SET_WARNING = f"WARNING {LOGGER_NAME}: {TOKEN_VARIABLE} not set:"
 # The folder of the log of kb in the data directory, the only one a test keeps.
 LOG_DIR_NAME = LOG_FILE_PATH.parts[0]
+# The variables of kb, and the ones of the end-to-end tests alone, by their names.
+REPOSITORY_DIR = Path(__file__).parents[2]
+ENV_EXAMPLE_PATH = REPOSITORY_DIR / ".env.example"
+E2E_ENV_EXAMPLE_PATH = REPOSITORY_DIR / ".env.e2e_test.example"
+# A line NAME=value of an environment file, set or commented out.
+VARIABLE_LINE = re.compile(r"^#?[ \t]*([A-Z][A-Z0-9_]*)=", re.MULTILINE)
+# Set by the test before any kb: the value of the terminal never reaches kb. The settings
+# tests/conftest.py removes are gone before the guard reads the environment.
+VARIABLES_SET_BY_THE_TEST = frozenset({DATA_DIR_VARIABLE, COLLECT_ONLY_VARIABLE})
+# The line of gh_archive with the bytes BigQuery processed (etl/sources/gh_archive.py).
+BIGQUERY_BYTES_LINE = re.compile(r"gh_archive: .*, (\d+|None) bytes processed,")
+
+
+def read_variable_names(path):
+    """The names of the lines NAME= of path; a missing file fails the test."""
+    return set(VARIABLE_LINE.findall(path.read_text()))
+
+
+@pytest.fixture(autouse=True)
+def no_variable_beyond_the_end_to_end_tests():
+    """Stop every test before any kb if the environment holds a variable of kb that the
+    end-to-end tests do not need: a .env exported in the terminal would give each kb its keys.
+    Names only: no value is read."""
+    names_beyond = (
+        read_variable_names(ENV_EXAMPLE_PATH)
+        - read_variable_names(E2E_ENV_EXAMPLE_PATH)
+        - VARIABLES_SET_BY_THE_TEST
+    )
+    present = sorted(name for name in names_beyond if name in os.environ)
+    if present:
+        pytest.exit(
+            f"variables beyond the end-to-end tests in the environment: {', '.join(present)};"
+            f" run from a terminal without .env exported ({E2E_ENV_EXAMPLE_PATH.name} lists"
+            " theirs)",
+            returncode=pytest.ExitCode.USAGE_ERROR,
+        )
 
 
 def run_kb(command, console_dir):
@@ -128,12 +173,31 @@ def delete_all_but_logs(data_dir):
             entry.unlink()
 
 
-def count_rows(database_path, query, *parameters):
+def read_rows(database_path, query, *parameters):
     connection = sqlite3.connect(f"{database_path.as_uri()}?mode=ro", uri=True)
     try:
-        return connection.execute(query, parameters).fetchone()[0]
+        return connection.execute(query, parameters).fetchall()
     finally:
         connection.close()
+
+
+def count_rows(database_path, query, *parameters):
+    return read_rows(database_path, query, *parameters)[0][0]
+
+
+def count_items_by_kind(database_path):
+    return dict(
+        read_rows(database_path, "SELECT kind, COUNT(*) FROM item GROUP BY kind")
+    )
+
+
+def read_bigquery_bytes(console_dir):
+    """The bytes BigQuery processed, as gh_archive logs them (a number or None); None also when
+    the line is not in the log."""
+    bytes_line = BIGQUERY_BYTES_LINE.search((console_dir / "collect.err").read_text())
+    if bytes_line is None:
+        return None
+    return bytes_line.group(1)
 
 
 def count_log_lines_above_info(console_dir):
@@ -159,7 +223,9 @@ def count_rejections(data_dir):
 
 @pytest.mark.e2e
 @pytest.mark.parametrize("source_name", [kind.folder_prefix for kind in SOURCE_KINDS])
-def test_kb_collects_and_imports_the_real_source(source_name, tmp_path, monkeypatch):
+def test_kb_collects_and_imports_the_real_source(
+    source_name, tmp_path, monkeypatch, record_property
+):
     # Read before any command: a source without what it brings fails before the real calls.
     is_expected = (
         source_name in ITEM_KIND_BY_SOURCE_NAME
@@ -181,35 +247,55 @@ def test_kb_collects_and_imports_the_real_source(source_name, tmp_path, monkeypa
     # so that no other source runs, gh_archive and its BigQuery query above all.
     monkeypatch.delenv(COLLECT_ONLY_VARIABLE, raising=False)
     try:
-        collect_and_import(source_name, data_dir, console_dir, monkeypatch)
+        collect_and_import(
+            source_name, data_dir, console_dir, monkeypatch, record_property
+        )
     finally:
         # A failed assert, a timeout or a Ctrl-C deletes as well.
         delete_all_but_logs(data_dir)
 
 
-def collect_and_import(source_name, data_dir, console_dir, monkeypatch):
+def collect_and_import(
+    source_name, data_dir, console_dir, monkeypatch, record_property
+):
     # Each exit code is checked as soon as its command ends: nothing is collected, BigQuery
-    # least of all, after a command has failed.
+    # least of all, after a command has failed. Each figure is recorded before its check: a
+    # failed test keeps its figures in the report.
     create_db_exit_code = run_kb("create-db", console_dir)
+    record_property("create_db_exit_code", create_db_exit_code)
     assert create_db_exit_code == ExitCode.SUCCEEDED
     with monkeypatch.context() as collect_patch:
         collect_patch.setenv(COLLECT_ONLY_VARIABLE, source_name)
         collect_exit_code = run_kb("collect", console_dir)
+    record_property("collect_exit_code", collect_exit_code)
+    if source_name == gh_archive.FOLDER_PREFIX:
+        record_property("bigquery_bytes_processed", read_bigquery_bytes(console_dir))
     assert collect_exit_code == ExitCode.SUCCEEDED
     import_exit_code = run_kb("import", console_dir)
+    record_property("import_exit_code", import_exit_code)
     assert import_exit_code == ExitCode.SUCCEEDED
 
-    assert count_rejections(data_dir) == 0
-    assert count_log_lines_above_info(console_dir) == 0
+    rejection_count = count_rejections(data_dir)
+    record_property("rejections", rejection_count)
+    log_line_count = count_log_lines_above_info(console_dir)
+    record_property("log_lines_above_info", log_line_count)
     database_path = data_dir / DATABASE_FILE_NAME
+    item_count_by_kind = count_items_by_kind(database_path)
+    record_property("items_by_kind", item_count_by_kind)
+    assert rejection_count == 0
+    assert log_line_count == 0
     item_count = count_rows(database_path, "SELECT COUNT(*) FROM item")
     if source_name in TOP_FOLDER_KEY_BY_SOURCE_NAME:
         # The rankings as kb write-tops lists them.
         folder_key = TOP_FOLDER_KEY_BY_SOURCE_NAME[source_name]
-        assert len(RawStore(data_dir).list_file_keys(folder_key)) >= 1
+        top_file_count = len(RawStore(data_dir).list_file_keys(folder_key))
+        record_property("top_files", top_file_count)
+        assert top_file_count >= 1
         assert item_count == 0
     elif source_name == gh_archive.FOLDER_PREFIX:
-        assert count_rows(database_path, "SELECT COUNT(*) FROM trend") >= 1
+        trend_count = count_rows(database_path, "SELECT COUNT(*) FROM trend")
+        record_property("trends", trend_count)
+        assert trend_count >= 1
         assert item_count == 0
     else:
         kind = ITEM_KIND_BY_SOURCE_NAME[source_name]
