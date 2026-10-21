@@ -3,6 +3,7 @@ text (docs/fiches-veille.md, "Fiches dans le coffre"; #209). The responses are m
 of the AI API, then read as kb digest reads them."""
 
 import json
+import re
 from datetime import UTC, date, datetime
 
 import pytest
@@ -171,7 +172,7 @@ def test_a_trapped_title_is_written_as_text():
     assert lines[-1] == (
         "1. \\[x\\](javascript\\:alert(1)) \\<img src=x onerror=alert(1)\\> !\\[a\\](b)"
         ' \\[\\[note\\]\\] \\#tag \\%\\%hidden\\%\\% \\$x\\$ \\`\\$= "TÉMOIN POSITIF"\\`'
-        " key\\:\\: value \\~\\~\\~ www\\.evil.example.invalid WWW\\.evil.example.invalid"
+        " key\\: \\: value \\~\\~\\~ www\\.evil.example.invalid WWW\\.evil.example.invalid"
         " https\\://evil.example.invalid/p mail\\@example.invalid --- \\# heading end"
         " — <https://github.com/anthropics/claude-code/releases/tag/v2.1.287>"
     )
@@ -193,7 +194,7 @@ def test_a_trapped_claim_is_written_as_text_on_its_own_line():
     assert lines[15] == (
         '- \\`\\`\\`dataviewjs dv.paragraph("TÉMOIN POSITIF") \\`\\`\\` \\~\\~\\~ ---'
         " \\> \\[!note\\] callout \\[\\[note\\]\\] !\\[a\\](b) \\<b\\>bold\\</b\\>"
-        ' \\`\\$= "TÉMOIN POSITIF"\\` key\\:\\: value http\\://evil.example.invalid'
+        ' \\`\\$= "TÉMOIN POSITIF"\\` key\\: \\: value http\\://evil.example.invalid'
         " www\\.evil.example.invalid (source 1)"
     )
     assert lines[14:17] == ["", lines[15], ""]
@@ -258,6 +259,47 @@ def test_a_rule_or_an_underline_alone_stays_text_on_the_line_of_its_claim_or_sou
 
     assert f"- {text} (source 1)" in lines
     assert lines[-1] == f"1. {text} — <{RELEASE_SOURCE.url}>"
+
+
+def render_escapes(markdown):
+    """The text CommonMark renders from a line of escaped text: a backslash before an ASCII
+    punctuation character is dropped (0.31.2, 2.4). Dataview reads its inline fields in this text,
+    in reading mode (replaceInlineFields reads innerHTML, Dataview 0.5.68)."""
+    return re.sub(r"\\([!-/:-@\[-`{-~])", r"\1", markdown)
+
+
+@pytest.mark.parametrize(
+    ("text", "neutralized"),
+    [
+        ("[champ:: valeur]", "\\[champ\\: \\: valeur\\]"),
+        ("(clé:: valeur)", "(clé\\: \\: valeur)"),
+        ("clé:: valeur", "clé\\: \\: valeur"),
+        ("std::string", "std\\: \\:string"),
+        ("a:::b", "a\\: \\: \\:b"),
+        ("note: une seule", "note\\: une seule"),
+    ],
+)
+def test_a_double_colon_is_never_rendered(text, neutralized):
+    """Dataview takes [key:: value], (key:: value) and key:: value for a field; in reading mode it
+    looks for :: in the rendered text, where the escapes are gone (recipe of Sabine of
+    2026-10-21, decided by time-knight, delegation of Sabine of 2026-10-15)."""
+    assert neutralize_digest_text(text) == neutralized
+    assert "::" not in render_escapes(neutralize_digest_text(text))
+
+
+@pytest.mark.parametrize(
+    "field", ["[champ:: valeur]", "(clé:: valeur)", "clé:: valeur"]
+)
+def test_no_field_of_dataview_is_rendered_from_a_title_or_a_claim(field):
+    response, digest = read_one_digest(
+        claims=[ClaimSchema(text=field, item_ids=[6])],
+        sources=[RELEASE_SOURCE.model_copy(update={"title": field})],
+    )
+
+    sheet = render_digest_sheet(response, digest)
+
+    assert "::" not in sheet
+    assert "::" not in render_escapes(sheet)
 
 
 @pytest.mark.parametrize(

@@ -812,12 +812,18 @@ sources.
 bidirectionnels remplacés par une espace), les caractères ``\ [ ] < > | ` # % $ ~ : @ &`` précédés
 d'une barre oblique inverse (CommonMark 0.31.2, § 2.4 : toute ponctuation ASCII s'échappe), puis le
 point de `www.`, sans casse, et la ponctuation d'un marqueur de liste en tête du texte (`-`, `+`,
-`*`, ou `.` et `)` après un à neuf chiffres : `\- urgent`, `2026\. Bilan`). Ne s'activent donc ni
+`*`, ou `.` et `)` après un à neuf chiffres : `\- urgent`, `2026\. Bilan`) ; deux deux-points de
+suite sont séparés par une espace (`std::string` s'affiche `std: :string`). Ne s'activent donc ni
 lien, image, lien wiki, incorporation, note en ligne, balise, lien automatique `<…>`, ni ceux de GFM
 (`http://`, `https://`, `www.`, `mailto:`, `xmpp:`, adresse mail), ni code en ligne, bloc
 ```` ``` ```` ou `~~~`, requête Dataview en ligne (`=`, `$=`), bloc `dataviewjs`, champ Dataview
-(`::`), tag, commentaire `%%`, formule `$`, référence de caractère (`&rlm;`, que CommonMark décode
-en contrôle bidirectionnel) ni liste imbriquée. Une ligne horizontale ou un soulignement (`---`,
+(`[clé:: valeur]`, `(clé:: valeur)`, `clé:: valeur`), tag, commentaire `%%`, formule `$`, référence
+de caractère (`&rlm;`, que CommonMark décode en contrôle bidirectionnel) ni liste imbriquée. Un
+champ Dataview demande `::` à deux endroits : l'indexeur de Dataview le cherche dans la source de
+la note, où il est écrit `\:\:`, et n'en tire donc aucune métadonnée de la page ; en mode lecture,
+Dataview le cherche aussi dans le texte rendu, où les barres obliques ont disparu
+(`replaceInlineFields` lit le HTML rendu, Dataview 0.5.68) : seule une espace entre les deux
+deux-points l'y empêche (recette de Sabine du 2026-10-21). Une ligne horizontale ou un soulignement (`---`,
 `***`, `===`) n'est jamais seul sur sa ligne : l'affirmation finit par ses sources, le titre par
 son URL. Les caractères des fiches des tops sont repris (`etl/vault_files.py`) ; `~ : @ &`, `www.`
 et le marqueur de liste s'y ajoutent, car une URL nue reste du texte dans une fiche de veille : une

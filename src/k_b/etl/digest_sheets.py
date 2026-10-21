@@ -40,6 +40,10 @@ WWW_DOT = re.compile(r"(www)\.", re.IGNORECASE)
 # digits of other scripts too. A rule or an underline (---, ***, ===) never stands alone on its line:
 # the claim ends with its sources, the title with its URL.
 LEADING_LIST_MARKER = re.compile(r"^([-+*]|[0-9]{1,9}[.)])(?= |$)")
+# Two colons in a row, once escaped: Dataview takes [key:: value], (key:: value) and key:: value for
+# a field, and in reading mode looks for :: in the rendered text, where the escapes are gone
+# (replaceInlineFields reads innerHTML, Dataview 0.5.68). A space keeps them apart: : : is shown.
+ESCAPED_DOUBLE_COLON = re.compile(r"\\:(?=\\:)")
 URL_SCHEMES = ("http://", "https://")
 # A URL is written, as an autolink, only when it is made of the characters of RFC 3986 (unreserved,
 # delimiters, a percent and two hexadecimal digits), less [ ] and $, a wikilink and a formula of
@@ -151,13 +155,13 @@ def is_writable_url(url: str) -> bool:
 
 
 def neutralize_digest_text(text: str) -> str:
-    """The text on one line, as text, without an autolink nor a list: the characters of the
-    sheets of the tops, ~ : @ &, the dot of www., and the punctuation of a list marker at its
-    start escaped. Both after neutralize_text, which would escape their backslash again."""
+    """The text on one line, as text, without an autolink, a field of Dataview nor a list: the
+    characters of the sheets of the tops, ~ : @ &, the dot of www., and the punctuation of a list
+    marker at its start escaped, two colons kept apart. All after neutralize_text, which would
+    escape their backslash again."""
     neutralized = neutralize_text(text, DIGEST_ESCAPED_CHARACTERS)
-    return LEADING_LIST_MARKER.sub(
-        escape_list_marker, WWW_DOT.sub(r"\1\\.", neutralized)
-    )
+    neutralized = ESCAPED_DOUBLE_COLON.sub(r"\\: ", WWW_DOT.sub(r"\1\\.", neutralized))
+    return LEADING_LIST_MARKER.sub(escape_list_marker, neutralized)
 
 
 def escape_list_marker(marker: re.Match[str]) -> str:

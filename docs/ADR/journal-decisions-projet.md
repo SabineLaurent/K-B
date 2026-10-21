@@ -3616,9 +3616,9 @@ Sabine du 2026-10-15).
   `etl/raw_store.py`, et `core` n'importe rien de K-B). Les fiches des tops gardent leur jeu de
   caractères et leur URL nue cliquable (2026-10-19). — PR de #209
 - **Dans une fiche de veille, chaque affirmation et chaque titre de source est écrit en texte : le
-  jeu des fiches des tops, plus `~`, `:`, `@` et `&`, puis le point de `www.`, sans casse, et la
-  ponctuation d'un marqueur de liste en tête du texte ; une affirmation renvoie à ses sources par
-  leur numéro. Une URL de source n'est écrite, en lien
+  jeu des fiches des tops, plus `~`, `:`, `@` et `&`, puis le point de `www.`, sans casse, la
+  ponctuation d'un marqueur de liste en tête du texte, et une espace entre deux deux-points ; une
+  affirmation renvoie à ses sources par leur numéro. Une URL de source n'est écrite, en lien
   automatique `<…>`, que si elle commence par `http://` ou `https://` et n'est faite que des
   caractères de la RFC 3986, moins `[`, `]` et `$` ; sinon « (sans URL) ».** Choix de la session
   (plan validé ; la règle de l'URL resserrée en codant, acceptée par time-knight le 2026-10-21 ;
@@ -3630,8 +3630,15 @@ Sabine du 2026-10-15).
   automatiques de GFM (`http://`, `mailto:`, `xmpp:`, adresse mail) et les champs Dataview `::` ;
   `&` ouvre une référence de caractère, que CommonMark décode (`&rlm;` rend le contrôle
   bidirectionnel que la neutralisation retire) ; un marqueur de liste en tête imbrique une liste
-  (CWE-116 : une structure, sans injection ; un titre « 2026. Bilan » suffit). Une affirmation du
-  modèle ne fait jamais un lien, à la différence d'une description de top.
+  (CWE-116 : une structure, sans injection ; un titre « 2026. Bilan » suffit). L'espace entre deux
+  deux-points vient de la recette de Sabine du 2026-10-21 dans Obsidian : `\[champ\:\: valeur\]`
+  s'affichait encore en champ Dataview en mode lecture, car Dataview y cherche `::` dans le HTML
+  rendu (`replaceInlineFields`, 0.5.68), où les échappements ont disparu ; son indexeur lit la
+  source, où `\:\:` n'est pas un champ : aucune métadonnée n'entrait dans la page (code de
+  Dataview 0.5.68 lu le 2026-10-21). Option écartée : un caractère invisible entre les deux-points
+  (U+2060), qui tromperait un copier-coller. Limite assumée : `std::string` s'affiche
+  `std: :string`. Une affirmation du modèle ne fait jamais un lien, à la différence d'une
+  description de top.
   Dans `<…>`, une barre oblique n'échappe rien (CommonMark 0.31.2, § 6.5) : l'URL ne doit contenir
   aucun caractère qui la ferait sortir, et `[`, `]`, `$` sont de la syntaxe d'Obsidian. Options
   écartées : le seul contrôle 6 de l'API IA, qui reste en amont (il laisse passer `$=`, `#`, `%%`,
