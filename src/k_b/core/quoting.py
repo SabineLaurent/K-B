@@ -35,3 +35,15 @@ def without_values(error: ValidationError) -> ValidationError:
     return ValidationError.from_exception_data(
         error.title, line_errors, hide_input=True
     )
+
+
+def locate_first_error(error: ValidationError) -> str:
+    """The place and the type of the first error, on one line, never its value; the count when
+    there are more (poc.md, rule 5). An error on the whole input has no place: it is the input."""
+    first = error.errors(include_url=False, include_context=False, include_input=False)[
+        0
+    ]
+    place = ".".join(str(part) for part in first["loc"]) or "input"
+    count = error.error_count()
+    more = f", {count} errors" if count > 1 else ""
+    return f"{place} ({first['type']}){more}"

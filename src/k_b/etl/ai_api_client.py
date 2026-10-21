@@ -35,7 +35,7 @@ from k_b.core.config import (
     MODEL_NAME,
 )
 from k_b.core.outbound import find_url_refusal, open_http_client
-from k_b.core.quoting import quote_value
+from k_b.core.quoting import locate_first_error, quote_value
 from k_b.items import UtcDatetime
 
 AI_API_URL_VARIABLE = "KB_AI_API_URL"
@@ -48,8 +48,9 @@ DIGESTS_PATH = "digests"
 RETRY_AFTER_HEADER = "Retry-After"
 # The id log_request gives a request (core/api_request_log.py): uuid4, in lowercase.
 REQUEST_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-# A named state of K-B (docs/fiches-veille.md, "États nommés"), and a stage of a digest.
-STATE_NAME = re.compile(r"[a-z_]{1,64}")
+# A named state of K-B (docs/fiches-veille.md, "États nommés"), a stage of a digest, a kind of
+# item: lowercase letters and _, nothing YAML or Markdown would read.
+LOWERCASE_NAME = re.compile(r"[a-z_]{1,64}")
 # A Retry-After in seconds; a date is quoted.
 SECONDS = re.compile(r"[0-9]{1,6}")
 
@@ -107,6 +108,10 @@ class Window(AiApiModel):
     days: int
     since: UtcDatetime
     until: UtcDatetime
+    # The kind cut by the cap of the reading, and the date of its first item left out; null when
+    # nothing is cut (docs/fiches-veille.md, "Lecture plafonnée").
+    capped_kind: Annotated[str, AfterValidator(match_fully(LOWERCASE_NAME))] | None
+    covered_after: UtcDatetime | None
 
 
 class Claim(AiApiModel):
@@ -129,8 +134,8 @@ class Digest(AiApiModel):
 
 class FailedSubject(AiApiModel):
     subject: str
-    stage: Annotated[str, AfterValidator(match_fully(STATE_NAME))]
-    error: Annotated[str, AfterValidator(match_fully(STATE_NAME))]
+    stage: Annotated[str, AfterValidator(match_fully(LOWERCASE_NAME))]
+    error: Annotated[str, AfterValidator(match_fully(LOWERCASE_NAME))]
 
 
 class DigestsResponse(AiApiModel):
@@ -227,7 +232,7 @@ def describe_answer(answer: httpx2.Response) -> list[str]:
     details = []
     error = read_error_state(answer.content)
     if error is not None:
-        details.append(f"error {describe_value(error, STATE_NAME)}")
+        details.append(f"error {describe_value(error, LOWERCASE_NAME)}")
     for header, pattern in (
         (REQUEST_ID_HEADER, REQUEST_ID),
         (RETRY_AFTER_HEADER, SECONDS),
@@ -248,18 +253,6 @@ def read_error_state(content: bytes) -> str | None:
 def describe_value(value: str, pattern: re.Pattern[str]) -> str:
     """The value as it is when it follows its rule, else quoted, cut and escaped."""
     return value if pattern.fullmatch(value) else quote_value(value)
-
-
-def locate_first_error(error: ValidationError) -> str:
-    """The place and the type of the first error, never its value; the count when there are
-    more."""
-    first = error.errors(include_url=False, include_context=False, include_input=False)[
-        0
-    ]
-    place = ".".join(str(part) for part in first["loc"]) or "body"
-    count = error.error_count()
-    more = f", {count} errors" if count > 1 else ""
-    return f"{place} ({first['type']}){more}"
 
 
 def refuse_out_of_lists(

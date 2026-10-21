@@ -335,7 +335,7 @@ def make_body_with(**changes):
 @pytest.mark.parametrize(
     ("body", "detail"),
     [
-        (b"not json", "body (json_invalid)"),
+        (b"not json", "input (json_invalid)"),
         (make_body_with(model="gpt 6\n---"), "model (value_error)"),
         (make_body_with(request_id="1"), "request_id (value_error)"),
         (make_body_with(items_capped="false"), "items_capped (bool_type)"),
@@ -351,7 +351,19 @@ def make_body_with(**changes):
             make_body_with(
                 window={"days": 3, "since": "2026-10-18T16:30:00", "until": "x"}
             ),
-            "window.since (timezone_aware), 2 errors",
+            "window.since (timezone_aware), 4 errors",
+        ),
+        (
+            make_body_with(
+                window={
+                    "days": 3,
+                    "since": "2026-10-18T16:30:00Z",
+                    "until": "2026-10-21T16:30:00Z",
+                    "capped_kind": "Vulnerability\n---",
+                    "covered_after": "2026-10-19T08:00:00Z",
+                }
+            ),
+            "window.capped_kind (value_error)",
         ),
         (
             make_body_with(

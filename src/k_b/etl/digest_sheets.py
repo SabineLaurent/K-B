@@ -100,6 +100,9 @@ def render_digest_sheet(response: DigestsResponse, digest: Digest) -> str:
         f"since: {format_date(window.since)}",
         f"until: {format_date(window.until)}",
         f"items_capped: {json.dumps(response.items_capped)}",
+        # Checked by LOWERCASE_NAME and as a date: null when nothing is cut.
+        f"capped_kind: {window.capped_kind or 'null'}",
+        f"covered_after: {format_date(window.covered_after) or 'null'}",
         f"request_id: {response.request_id}",
         "---",
         "",

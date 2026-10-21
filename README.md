@@ -417,7 +417,8 @@ KB_DATA_DIR=~/.knowledge_base KB_VAULT_DIR=<coffre> uv run --env-file .env kb di
 par `kb serve-ai`), avec la clé `KB_AI_API_KEY_KB_DIGEST`, à l'adresse `KB_AI_API_URL`
 (`http://127.0.0.1:8001` par défaut ; elle ne suit pas `KB_AI_API_PORT` : la changer aussi). Il
 écrit une fiche par sujet rendu, `<KB_VAULT_DIR>/veille/<sujet>/AAAA-MM-JJ.md`, au jour UTC de la
-demande : un frontmatter (`subject`, `generated`, `model`, la fenêtre, `items_capped`,
+demande : un frontmatter (`subject`, `generated`, `model`, la fenêtre, `items_capped`, la sorte
+coupée par le plafond et la date de son premier item laissé (`capped_kind`, `covered_after`),
 `request_id`), les affirmations, chacune avec le numéro de ses sources, puis les sources, leur
 titre et leur URL. Chaque affirmation et chaque titre est écrit en texte : ni lien, ni image, ni
 balise, ni code, ni requête Dataview ne peut s'y activer. Une fiche n'est jamais réécrite : s'il en
@@ -432,7 +433,8 @@ de sortie, l'unité étant le sujet :
 - 1 : rien n'est écrit : l'API IA est injoignable, dépasse le délai, refuse la clé (le message
   nomme `KB_AI_API_KEY_KB_DIGEST`, jamais la clé), répond en échec (502, 503, 504 : son état, son
   `X-Request-ID` et son `Retry-After` sont affichés) ou hors du schéma attendu ; ou chaque sujet a
-  échoué ;
+  échoué ; ou une erreur du système (`OSError`, un dossier illisible) arrête le contrôle d'avant la
+  demande, sans rien demander ;
 - 2 : rien n'est demandé : `KB_DATA_DIR`, `KB_VAULT_DIR` (absente, ou pas un dossier existant) ou
   `KB_AI_API_KEY_KB_DIGEST` manque ou est refusée, une fiche du jour est déjà là, ou un dossier
   `veille/…` est un lien symbolique ;

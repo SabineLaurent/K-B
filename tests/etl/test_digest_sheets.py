@@ -3,18 +3,19 @@ text (docs/fiches-veille.md, "Fiches dans le coffre"; #209). The responses are m
 of the AI API, then read as kb digest reads them."""
 
 import json
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 from etl.test_ai_api_client import (
     AGENT_DIGEST,
     PAPER_SOURCE,
     RELEASE_SOURCE,
+    UNTIL,
     make_response,
     to_body,
 )
 
-from k_b.ai_api.schemas.digest_schema import ClaimSchema
+from k_b.ai_api.schemas.digest_schema import ClaimSchema, WindowSchema
 from k_b.etl.ai_api_client import DigestsResponse
 from k_b.etl.digest_sheets import (
     neutralize_digest_text,
@@ -73,6 +74,8 @@ def test_a_digest_gives_the_sheet_of_its_subject_and_of_the_day_of_its_window(
         "since: 2026-10-18T16:30:00Z\n"
         "until: 2026-10-21T16:30:00Z\n"
         "items_capped: false\n"
+        "capped_kind: null\n"
+        "covered_after: null\n"
         "request_id: 1b4e28ba-2fa1-4d2e-9b5c-6c8e1f0a7d3e\n"
         "---\n"
         "\n"
@@ -99,12 +102,25 @@ def test_the_same_response_gives_the_same_bytes():
     )
 
 
-def test_a_capped_window_says_so_in_the_front_matter():
-    response = read(make_response(items_capped=True))
-
-    assert "\nitems_capped: true\n" in render_digest_sheet(
-        response, response.digests[0]
+def test_a_capped_window_names_the_kind_cut_and_the_date_after_which_it_is_read():
+    response = read(
+        make_response(
+            window=WindowSchema(
+                days=3,
+                since=datetime(2026, 10, 18, 16, 30, tzinfo=UTC),
+                until=UNTIL,
+                capped_kind="vulnerability",
+                covered_after=datetime(2026, 10, 19, 8, 0, tzinfo=UTC),
+            ),
+            items_capped=True,
+        )
     )
+
+    assert (
+        "\nitems_capped: true\n"
+        "capped_kind: vulnerability\n"
+        "covered_after: 2026-10-19T08:00:00Z\n"
+    ) in render_digest_sheet(response, response.digests[0])
 
 
 def test_the_day_of_the_sheet_is_the_utc_day_of_the_end_of_the_window(vault_dir):
@@ -174,13 +190,13 @@ def test_a_trapped_claim_is_written_as_text_on_its_own_line():
 
     lines = render_digest_sheet(response, digest).splitlines()
 
-    assert lines[13] == (
+    assert lines[15] == (
         '- \\`\\`\\`dataviewjs dv.paragraph("TÉMOIN POSITIF") \\`\\`\\` \\~\\~\\~ ---'
         " \\> \\[!note\\] callout \\[\\[note\\]\\] !\\[a\\](b) \\<b\\>bold\\</b\\>"
         ' \\`\\$= "TÉMOIN POSITIF"\\` key\\:\\: value http\\://evil.example.invalid'
         " www\\.evil.example.invalid (source 1)"
     )
-    assert lines[12:15] == ["", lines[13], ""]
+    assert lines[14:17] == ["", lines[15], ""]
 
 
 @pytest.mark.parametrize(

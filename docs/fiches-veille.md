@@ -763,8 +763,8 @@ des tops).
    de l'environnement (`core/outbound.py`).
 4. **La réponse est relue** par un schéma fermé (types stricts, champs inconnus ignorés, les
    `facts` jamais lus) : `request_id` en UUID, `model` au motif `MODEL_NAME` (`core/config.py`),
-   `stage` et `error` au motif `[a-z_]{1,64}`, dates avec fuseau, au moins une source par
-   affirmation. Puis : chaque sujet est de la liste fermée, une fois dans la réponse ; chaque source
+   `stage`, `error` et `capped_kind` au motif `[a-z_]{1,64}`, dates avec fuseau, au moins une
+   source par affirmation. Puis : chaque sujet est de la liste fermée, une fois dans la réponse ; chaque source
    est une fois dans sa fiche ; chaque affirmation cite des sources de sa fiche, chacune une fois.
    Hors de là : `ai_api_invalid_response`, aucune fiche écrite. L'erreur nomme la place et le
    contrôle, jamais la valeur reçue.
@@ -785,6 +785,8 @@ window_days: 3
 since: 2026-10-18T18:28:37Z
 until: 2026-10-21T18:28:37Z
 items_capped: false
+capped_kind: null
+covered_after: null
 request_id: 6ac62295-48be-4dec-9c43-7a71e00e4282
 ---
 
@@ -798,8 +800,10 @@ request_id: 6ac62295-48be-4dec-9c43-7a71e00e4282
 ```
 
 `generated` est `window.until`, l'instant de la demande côté API IA ; `model` est écrit en chaîne
-JSON, que YAML lit telle quelle ; `items_capped` dit une fenêtre coupée par le plafond (section
-« Lecture plafonnée »). Une affirmation cite ses sources par leur numéro, en texte ; seule la liste
+JSON, que YAML lit telle quelle ; `items_capped` dit une fenêtre coupée par le plafond, et
+`capped_kind` et `covered_after` la sorte coupée et la date de son premier item laissé de côté :
+cette sorte n'est lue qu'après cette date (section « Lecture plafonnée ») ; `null` quand rien
+n'est coupé. Une affirmation cite ses sources par leur numéro, en texte ; seule la liste
 des sources porte des URL. Une fiche sans affirmation dit « Aucune affirmation retenue. », sans
 sources.
 
