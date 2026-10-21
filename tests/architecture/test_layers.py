@@ -109,6 +109,32 @@ def test_no_module_of_the_pipeline_imports_the_sources_or_the_composition():
             )
 
 
+# etl runs below the APIs: kb digest reaches the AI API by HTTP, never by its code (#209).
+def list_imports_of_the_apis(imported: set[str]) -> set[str]:
+    return {name for name in imported if reaches(name, {"data_api", "ai_api"})}
+
+
+def test_etl_imports_neither_the_data_api_nor_the_ai_api():
+    for path in list_python_files("etl"):
+        imported = list_imported_modules(path, find_package(path))
+        assert list_imports_of_the_apis(imported) == set(), path
+
+
+@pytest.mark.parametrize(
+    ("code", "is_refused"),
+    [
+        ("from k_b.ai_api.schemas.digest_schema import DigestsSchema", True),
+        ("from k_b import data_api", True),
+        ("from ..ai_api.connectors import llm_client", True),
+        ("from k_b.core.outbound import open_http_client", False),
+    ],
+)
+def test_the_rule_of_etl_refuses_every_way_to_the_apis(code, is_refused):
+    imported = parse_imported_modules(code, package="k_b.etl")
+
+    assert bool(list_imports_of_the_apis(imported)) is is_refused
+
+
 def test_no_module_of_the_sources_imports_the_composition():
     for path in list_python_files(ETL_SOURCES_PACKAGE):
         imported = list_imported_modules(path, find_package(path))

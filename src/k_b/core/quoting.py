@@ -1,10 +1,15 @@
 """How a value observed in an input is quoted in a log line or an error (conventions.md, rule 3)."""
 
+import re
+
 from pydantic import ValidationError
 from pydantic_core import InitErrorDetails
 
 # The longest value quoted, quotes and escapes included.
 MAX_QUOTED_VALUE_LENGTH = 100
+# A part of the place of an error written as it is: the name of a field of a model. Any other, a
+# key of a dict, comes from the input.
+FIELD_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 def quote_value(value: object) -> str:
@@ -35,3 +40,22 @@ def without_values(error: ValidationError) -> ValidationError:
     return ValidationError.from_exception_data(
         error.title, line_errors, hide_input=True
     )
+
+
+def locate_first_error(error: ValidationError) -> str:
+    """The place and the type of the first error, on one line, never its value; the count when
+    there are more (poc.md, rule 5). An error on the whole input has no place: it is the input."""
+    first = error.errors(include_url=False, include_context=False, include_input=False)[
+        0
+    ]
+    place = ".".join(describe_place_part(part) for part in first["loc"]) or "input"
+    count = error.error_count()
+    more = f", {count} errors" if count > 1 else ""
+    return f"{place} ({first['type']}){more}"
+
+
+def describe_place_part(part: int | str) -> str:
+    """A position or a field name as it is; another part, a key the input gave, quoted."""
+    if isinstance(part, int) or FIELD_NAME.fullmatch(part):
+        return str(part)
+    return quote_value(part)

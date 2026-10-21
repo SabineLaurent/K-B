@@ -26,6 +26,7 @@ contrôles, les états nommés et la ligne de métrique sont posés ici ; la sp�
 5. **Contrôles** (#206, #207, section « Contrôles ») : le code revalide chaque sortie avant de
    s'en servir.
 6. Réponse JSON ; une ligne de métrique par appel au modèle, sur la sortie standard (#156).
+7. `kb digest` écrit une fiche par sujet dans le coffre (#209, section « Fiches dans le coffre »).
 
 L'appel au modèle, sa nouvelle tentative et le modèle de remplacement des tests sont à #150 ; le
 vrai modèle (gpt-6-luna sur Azure AI Foundry, décision de Sabine du 2026-10-16 ; déployé le
@@ -33,7 +34,7 @@ vrai modèle (gpt-6-luna sur Azure AI Foundry, décision de Sabine du 2026-10-16
 journal ADR, « Modèle des fiches : gpt-6-luna sur l'abonnement de l'organisme de formation ») à
 #158. La spec ne dépend d'aucun fournisseur :
 elle s'en tient à l'interface compatible OpenAI. L'API IA n'écrit rien qui doive survivre à son redémarrage
-(règle 7 de `poc.md`) : les fiches sont rendues, pas gardées.
+(règle 7 de `poc.md`) : les fiches sont rendues, pas gardées ; `kb digest` les écrit dans le coffre.
 
 **Pas de tendances au 25/10** (décision de Sabine du 2026-10-15) : une tendance n'est pas un item
 (table `trend`, servie par `GET /trends` avec un `repository_id`) et n'a pas d'`item_id` à citer ;
@@ -409,6 +410,7 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
 ```json
 {
   "request_id": "1b4e28ba-2fa1-4d2e-9b5c-6c8e1f0a7d3e",
+  "model": "gpt-6-luna",
   "window": {
     "days": 3,
     "since": "2026-10-12T09:00:00Z",
@@ -441,6 +443,7 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
 | Champ | Contenu |
 |---|---|
 | `request_id` | identifiant de la demande (UUID), repris par chaque ligne de métrique |
+| `model` | le modèle de `KB_LLM_MODEL` qui a rédigé les fiches (`replay` pour le replay), écrit par `kb digest` dans chaque fiche (#209) |
 | `window` | `days`, et `since` et `until` en UTC, au format des dates de la base ; quand `items_capped` est vrai, `capped_kind`, la sorte coupée, et `covered_after`, la date de son premier item laissé de côté (borne exclue) ; nuls sinon (section « Lecture plafonnée ») |
 | `digests` | une fiche par sujet rédigé ; un sujet sans item n'a pas de fiche |
 | `digests[].claims` | les affirmations gardées après la fidélité, sans leurs `facts` (contrôle interne) |
@@ -453,12 +456,14 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
 | `items_in`, `items_truncated`, `items_dropped`, `items_capped` | compteurs de la section « Entrée du modèle » |
 
 **Limite** : `sources[].title` est une donnée de source, pas une sortie du modèle ; le filtre du
-Markdown ne s'y applique pas. L'échapper revient à qui écrira la fiche dans le coffre (`kb`, plus
-tard).
+Markdown ne s'y applique pas. `kb digest` l'écrit en texte dans la fiche (section « Fiches dans le
+coffre »).
 
 **Limite** : le `text` d'une affirmation peut recopier une adresse mail d'un item (section
 « Entrée du modèle » : une adresse mail n'est pas masquée) ; elle revient dans la
-réponse, car le contrôle 6 ne la refuse pas.
+réponse, car le contrôle 6 ne la refuse pas. `kb digest` l'écrit dans la fiche en texte (`@` échappé),
+jamais en lien dans Obsidian (recette du 2026-10-21) ; dans un moteur GFM comme celui de GitHub, elle
+reste un lien `mailto:` (section « Fiches dans le coffre », « Limites »). Elle reste dans le coffre.
 
 Une erreur rend `{"error": "<état>"}`, comme l'API de données (section « États nommés »). Chaque
 réponse, une erreur comprise, porte l'identifiant de sa requête dans l'en-tête `X-Request-ID` :
@@ -477,8 +482,9 @@ de la requête.
   aucune donnée, si bien qu'un rebinding DNS n'obtient rien et ne coûte aucun appel. Signalé à
   #161 (OWASP API Top 10 de l'API IA) et à revoir en conteneurs (#200), où l'hôte appelant change.
 - **`GET /health`** répond 200 `{"status": "ok"}` sans clé, comme celle de l'API de données.
-- **Version** : `0.1.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
-  un changement visible par un client change les deux.
+- **Version** : `0.2.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
+  un changement visible par un client change les deux. `0.1.0` : `POST /digests` (#156) ; `0.2.0` :
+  `model` dans la réponse (#209).
 
 ## Contrôles
 
@@ -730,9 +736,188 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
   et recommencer pour isoler l'item (jusqu'à environ 12 appels de plus, et un contrat changé).
 - Une fenêtre sans item rend 200 avec `digests` vide, sans appel au modèle.
 
+## Fiches dans le coffre
+
+`kb digest` (#209) demande les fiches à l'API IA, puis écrit celle de chaque sujet dans le coffre
+d'Obsidian : l'API IA n'écrit rien (règle 7 de `poc.md`). Il joint l'API IA par HTTP, jamais par
+son code (`etl` n'importe pas `ai_api`, `tests/architecture/test_layers.py`). Code :
+`commands/digest_command.py` (la porte), `etl/ai_api_client.py` (la demande et la réponse),
+`etl/digest_sheets.py` (la fiche), `etl/vault_files.py` (l'écriture sûre, partagée avec les fiches
+des tops).
+
+**Parcours**
+
+1. **Réglages** : `KB_VAULT_DIR`, un dossier existant (sinon code 2, aucun dossier créé) ;
+   `KB_AI_API_URL`, `http` ou `https`, sans utilisateur, requête ni fragment, par défaut
+   `http://127.0.0.1:8001` (`AI_API_URL`, `core/config.py`), qui ne suit pas `KB_AI_API_PORT` ;
+   `KB_AI_API_KEY_KB_DIGEST`, sans défaut, aux règles des clés (section « Accès »). Un refus nomme
+   la variable, jamais la clé ni l'URL.
+2. **Avant la demande**, pour chaque sujet de la liste : ni `veille/` ni `veille/<sujet>/` n'est un
+   lien symbolique, et la fiche du jour UTC n'existe pas. Sinon : code 2 (`vault_link_refused`,
+   `sheet_not_a_file`, `sheet_exists`), aucune demande : aucun item ne part au modèle pour une
+   fiche qui ne serait pas écrite. Rien n'est créé par ce contrôle.
+3. **`POST /digests`** avec `{}` : la fenêtre par défaut de l'API IA (`KB_DIGEST_WINDOW_DAYS`).
+   Délais nommés (`core/config.py`) : connexion 5 s, pool 5 s, écriture 10 s, lecture 240 s
+   (`AI_API_READ_TIMEOUT_SECONDS`) : au-dessus de `DIGEST_REQUEST_TIMEOUT_SECONDS` et du dernier
+   appel au modèle en cours (environ 20 s de plus, `ai_api/deadline.py`). Aucune nouvelle
+   tentative : un `Retry-After` est affiché, jamais attendu. Aucune redirection suivie, aucun proxy
+   de l'environnement (`core/outbound.py`).
+4. **La réponse est relue** par un schéma fermé (types stricts, champs inconnus ignorés, les
+   `facts` jamais lus) : `request_id` en UUID, `model` au motif `MODEL_NAME` (`core/config.py`),
+   `stage` et `error` au motif `[a-z_]{1,64}`, `capped_kind` dans la liste fermée des sortes
+   d'items (`ItemKind`, `items.py` : un mot que YAML lit comme nul ou booléen ferait passer une
+   fenêtre coupée pour entière), dates avec fuseau, au moins une
+   source par affirmation. Puis : chaque sujet est de la liste fermée, une fois dans la réponse ; chaque source
+   est une fois dans sa fiche ; chaque affirmation cite des sources de sa fiche, chacune une fois.
+   Hors de là : `ai_api_invalid_response`, aucune fiche écrite. L'erreur nomme la place et le
+   contrôle, jamais la valeur reçue.
+5. **Une fiche par sujet rendu**, `veille/<sujet>/AAAA-MM-JJ.md`, au jour UTC de `window.until` :
+   le chemin est fait de constantes, d'un sujet de la liste et d'un jour. Elle est écrite une fois :
+   `kb` ne réécrit jamais une fiche qu'il voit, et ne suit jamais un lien qu'il voit ; les dossiers
+   et la fiche sont recontrôlés juste avant l'écriture, par un temporaire caché renommé (règle 2 de
+   `conventions.md`). Une limite : voir « Limites », ci-dessous.
+
+**La fiche** : du Markdown déterministe (la même réponse donne les mêmes octets), ses clés en
+anglais, son texte en français (règle de Sabine du 2026-10-21) :
+
+```markdown
+---
+subject: coding_assistants
+generated: 2026-10-21T18:28:37Z
+model: "gpt-6-luna"
+window_days: 3
+since: 2026-10-18T18:28:37Z
+until: 2026-10-21T18:28:37Z
+items_capped: false
+capped_kind: null
+covered_after: null
+request_id: 6ac62295-48be-4dec-9c43-7a71e00e4282
+---
+
+# Veille coding_assistants du 2026-10-21
+
+- Claude Code publie la version v2.1.287. (source 1)
+
+## Sources
+
+1. anthropics/claude-code Claude Code 2.1.287 — <https://github.com/anthropics/claude-code/releases/tag/v2.1.287>
+```
+
+`generated` est `window.until`, l'instant de la demande côté API IA ; `model` est écrit en chaîne
+JSON, que YAML lit telle quelle ; `items_capped` dit une fenêtre coupée par le plafond, et
+`capped_kind` et `covered_after` la sorte coupée et la date de son premier item laissé de côté :
+cette sorte n'est lue qu'après cette date (section « Lecture plafonnée ») ; `null` quand rien
+n'est coupé. Une affirmation cite ses sources par leur numéro, en texte ; seule la liste
+des sources porte des URL. Une fiche sans affirmation dit « Aucune affirmation retenue. », sans
+sources.
+
+**Écrit en texte.** Le texte de chaque affirmation et le titre de chaque source : sur une ligne
+(retours à la ligne et blancs réduits à une espace ; contrôles, surrogates isolés et contrôles
+bidirectionnels remplacés par une espace), les caractères ``\ [ ] < > | ` # % $ ~ : @`` et le `&`
+qui ouvre une référence de caractère (`&` suivi de `#`, ou d'un nom puis `;` : `R&D` reste tel quel)
+précédés d'une barre oblique inverse (CommonMark 0.31.2, § 2.4 : toute ponctuation ASCII
+s'échappe), puis le
+point de `www.`, sans casse, et la ponctuation d'un marqueur de liste en tête du texte (`-`, `+`,
+`*`, ou `.` et `)` après un à neuf chiffres : `\- urgent`, `2026\. Bilan`) ; deux deux-points de
+suite sont séparés par une espace (`std::string` s'affiche `std: :string`). Ne s'activent donc ni
+lien, image, lien wiki, incorporation, note en ligne, balise, lien automatique `<…>`, ni ceux de GFM
+(`http://`, `https://`, `www.`, et, dans Obsidian, `mailto:`, `xmpp:` et une adresse mail : recette
+du 2026-10-21), ni code en ligne, bloc
+```` ``` ```` ou `~~~`, requête Dataview en ligne (`=`, `$=`), bloc `dataviewjs`, champ Dataview
+(`[clé:: valeur]`, `(clé:: valeur)`, `clé:: valeur`), tag, commentaire `%%`, formule `$`, référence
+de caractère (`&rlm;`, que CommonMark décode en contrôle bidirectionnel) ni liste imbriquée. Un
+champ Dataview demande `::` à deux endroits : l'indexeur de Dataview le cherche dans la source de
+la note, où il est écrit `\:\:`, et n'en tire donc aucune métadonnée de la page ; en mode lecture,
+Dataview le cherche aussi dans le texte rendu, où les barres obliques ont disparu
+(`replaceInlineFields` lit le HTML rendu, Dataview 0.5.68) : seule une espace entre les deux
+deux-points l'y empêche (recette de Sabine du 2026-10-21). Une URL de source qui contient `::` est
+refusée (ci-dessous) : aucun champ ne se forme donc, ni dans les textes ni dans les URL, ni dans la
+source ni dans le texte rendu. Une ligne horizontale ou un soulignement (`---`,
+`***`, `===`) n'est jamais seul sur sa ligne : l'affirmation finit par ses sources, le titre par
+son URL. Les caractères des fiches des tops sont repris (`etl/vault_files.py`), avec la même règle
+du `&`, une seule pour les deux écrivains du coffre (décision de Sabine du 2026-10-21) ; `~ : @`,
+`www.`, le marqueur de liste et l'espace entre deux deux-points s'y ajoutent, car une URL nue reste du texte dans une fiche de veille : une
+affirmation du modèle ne fait jamais un lien. Le contrôle 6 de l'API IA reste en amont (défense en profondeur). Non échappée, voulu :
+l'emphase (`*x*`, `_x_`, `==x==`), de la mise en forme, ni lien ni code.
+
+**Une URL** n'est écrite, en lien automatique `<…>`, que si elle commence par `http://` ou
+`https://` et n'est faite que des caractères de la RFC 3986 (non réservés, délimiteurs, `%` suivi de
+deux chiffres hexadécimaux), moins `[`, `]` et `$`, syntaxe d'Obsidian (lien wiki, formule) : elle
+ne peut pas sortir de ses chevrons, où une barre oblique n'échappe rien (CommonMark 0.31.2, § 6.5).
+Elle est refusée aussi si elle contient une référence de caractère (`&#…`, `&nom;` : cmark-gfm
+affiche `&#x202E;` en U+202E dans le texte du lien), `::` (un champ Dataview dans la ligne rendue),
+ou, une fois ses pourcents décodés, de l'UTF-8 invalide, un caractère de contrôle, de format (dont
+les bidirectionnels), un surrogate ou un séparateur de ligne (`%E2%80%AE`, `%00` : markdown-it les
+montre décodés) ; sinon un lien se lirait autrement qu'il ne mène (CWE-451), comme
+`https://docs.python.org&#x202E;@evil.example/`. L'URL est refusée, jamais réécrite : la réécrire
+changerait sa cible. Sinon la source est écrite « (sans URL) ». `?a=1&b=2`, `%20` et `%C3%A9`
+passent. Un hôte en `xn--` (un nom de domaine internationalisé) n'est pas refusé : des domaines
+légitimes l'utilisent.
+
+**Codes de sortie** (l'unité est le sujet ; codes nommés par `ExitCode`, listés par `kb --help`) :
+
+| Code | Quand |
+|---|---|
+| 0 | chaque fiche rendue est écrite ; ou aucune fiche dans la fenêtre (`digests: none in the window`) |
+| 1 | l'API IA injoignable (`ai_api_unavailable`), délai dépassé (`ai_api_timeout`), clé refusée (`ai_api_unauthorized`, 401), panne (`ai_api_failed`, 5xx), autre réponse ou réponse hors schéma (`ai_api_invalid_response`) : aucune fiche écrite ; ou un sujet en échec et aucune fiche écrite ; ou une `OSError` au contrôle d'avant la demande |
+| 2 | réglage refusé, `KB_VAULT_DIR` absente ou pas un dossier, fiche du jour déjà là ou lien, vus avant la demande : rien n'est demandé |
+| 4 | un sujet en échec (nommé dans `failed_subjects`, ou sa fiche non écrite) et au moins une fiche écrite |
+| 143 | SIGTERM : les fiches déjà écrites restent |
+
+Une clé refusée par l'API IA sort en 1, et une clé absente en 2 : avec une clé refusée, la requête
+est partie ; c'est la règle de `kb collect`, où une source qui rend 401 échoue (décision de Sabine du
+2026-10-21). Le message nomme `KB_AI_API_KEY_KB_DIGEST`, jamais la clé. 4 suit la règle « même
+résultat, même code » de `kb collect` et `kb write-tops` (décision de Sabine du 2026-10-21).
+
+**Console** (libellés en anglais) : une ligne par fiche écrite, puis un résumé (fiches écrites et
+en échec, `model`, `request_id`). Chaque échec va une fois au journal, sur la sortie d'erreur et
+dans `<KB_DATA_DIR>/logs/kb.log` : sujet en échec (étape et état), fiche non écrite, ou réponse
+refusée, avec son état, son statut HTTP, l'état de son corps, son `X-Request-ID` (pour la retrouver
+dans `logs/kb-serve-ai.log`) et son `Retry-After`, chacun écrit tel quel s'il suit sa règle, sinon
+tronqué et échappé (règle 3 de `conventions.md`).
+
+**Limites**
+
+- **Pas de borne de taille** sur la réponse lue : risque accepté par Sabine pour le POC
+  (2026-10-21 : le service de K-B, à une adresse qu'elle règle). À poser avant la mise en ligne du
+  08/11, dans `core/outbound.py`, commune aux deux clients (`read_bounded_body` et son échéance).
+- **Relancer le même jour** après un échec partiel sort en 2 : une fiche du jour existe. Les
+  sujets en échec s'écrivent le lendemain, si leurs items restent dans la fenêtre.
+- **Le jour contrôlé** avant la demande est celui de l'horloge de `kb` ; celui de la fiche,
+  `window.until` de l'API IA. Une demande à cheval sur minuit UTC écrit la fiche du lendemain, et un
+  sujet dont la fiche du lendemain existe déjà compte en échec (`sheet_exists`).
+- **Un SIGKILL** pendant une écriture laisse un temporaire caché `.AAAA-MM-JJ.md.*.tmp` dans
+  `veille/<sujet>/`, comme pour les tops ; Obsidian n'affiche pas un fichier caché.
+- **Entre le dernier contrôle et le renommage** (limite acceptée par Sabine pour le POC, le
+  2026-10-21, à corriger par #295) : une fiche apparue dans cette fenêtre est remplacée sans
+  message (CWE-367) ; un dossier remplacé par un lien y fait écrire hors du coffre (CWE-59, déjà
+  accepté pour les tops, registre, fiche 1, « Sécurité »). Seuls deux lancements de l'utilisatrice
+  qui se chevauchent peuvent le déclencher ; un texte de source ou du modèle ne le peut pas. À
+  corriger au plus tard dès que `kb digest` tourne sans elle (tâche planifiée, conteneur).
+- **Une adresse mail dans un moteur GFM** : dans cmark-gfm (GitHub), `\@` n'empêche pas le lien
+  d'une adresse mail, ni `\:` celui de `mailto:` ou `xmpp:`, car les nœuds de texte y sont recollés
+  avant l'extension des liens automatiques (`blocks.c`, `extensions/autolink.c`). Aucune correction
+  de code propre ; enjeu très faible (CWE-116) : un lien `mailto:` vers l'adresse, sans sujet ni
+  corps, et l'adresse est déjà dans le texte. Le coffre se lit dans Obsidian, où elle reste du texte.
+- **Le rendu dans Obsidian**, un logiciel fermé, n'est prouvé que par la recette de #209 (PR) : un
+  autre lecteur de Markdown, ou un autre module d'Obsidian (Templater…), n'est pas couvert.
+
 ## Sources
 
 Consultées le 2026-10-15, sauf mention.
+
+- [CommonMark Spec 0.31.2](https://spec.commonmark.org/0.31.2/) — lue le 2026-10-21 (#209) :
+  § 2.4, toute ponctuation ASCII s'échappe par une barre oblique inverse ; § 6.5, aucun
+  échappement dans un lien automatique `<…>`.
+- [GitHub Flavored Markdown Spec](https://github.github.com/gfm/) — lue le 2026-10-21 (#209) :
+  § 6.9, liens automatiques étendus (`www.`, `http://`, `https://`, adresse mail, `mailto:`,
+  `xmpp:`).
+- [Dataview, requêtes en ligne DQL et JavaScript](https://blacksmithgu.github.io/obsidian-dataview/queries/dql-js-inline/)
+  — lue le 2026-10-21 (#209) : `` `= …` `` et `` `$= …` ``, blocs `dataviewjs` ; les requêtes
+  JavaScript ne tournent que si l'utilisatrice les active.
+- [RFC 3986, Uniform Resource Identifier: Generic Syntax](https://www.rfc-editor.org/rfc/rfc3986),
+  § 2 — grammaire (`unreserved`, `gen-delims`, `sub-delims`, `pct-encoded`) recoupée le 2026-10-21
+  par une recherche web, sur des pages qui la reproduisent, pas sur le texte de l'IETF (#209).
 
 - [Azure Retail Prices overview](https://learn.microsoft.com/ar-sa/rest/api/cost-management/retail-prices/azure-retail-prices)
   — Microsoft Learn, rendue par une recherche du 2026-10-21 : l'API des prix de détail,

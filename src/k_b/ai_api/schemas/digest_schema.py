@@ -68,6 +68,9 @@ class FailedSubjectSchema(BaseModel):
 
 class DigestsSchema(BaseModel):
     request_id: str
+    model: str = Field(
+        description="The model of KB_LLM_MODEL that wrote the digests; replay for the replay."
+    )
     window: WindowSchema
     digests: list[DigestSchema]
     failed_subjects: list[FailedSubjectSchema]

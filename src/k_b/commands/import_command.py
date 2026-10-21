@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from k_b.commands.exit_codes import ExitCode
-from k_b.commands.run_log import LOGGER_NAME
+from k_b.commands.run_log import LOGGER_NAME, describe_os_error
 from k_b.database.connection import DATABASE_FILE_NAME, MissingDatabaseError
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl.load import (
@@ -94,17 +94,12 @@ def run_import(data_dir: Path) -> int:
             LATEST_ONLY_FOLDER_KEYS,
         )
     except (sqlite3.Error, OSError, ValueError) as error:
-        # The type and the reason, never the name of a raw file.
-        # An OSError raised by code, not by the system, has no strerror.
-        reason = (
-            f" ({error.strerror})"
-            if isinstance(error, OSError) and error.strerror
-            else ""
-        )
+        # The type, and the reason of an OSError, never the name of a raw file.
         logger.error(
-            "import committed, raw purge failed: %s%s; run kb import again",
-            type(error).__name__,
-            reason,
+            "import committed, raw purge failed: %s; run kb import again",
+            describe_os_error(error)
+            if isinstance(error, OSError)
+            else type(error).__name__,
         )
         return ExitCode.FAILED
     print(f"superseded raw files deleted: {deleted_count}")

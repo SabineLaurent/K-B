@@ -84,6 +84,10 @@ LLM_REASONING_EFFORT: Literal["none"] | None = None
 # The base URL of the replay provider: a reserved domain (RFC 6761), never resolved, since the
 # replay answers in the client itself.
 LLM_REPLAY_BASE_URL = "https://replay.invalid/v1"
+# The name of a model: a deployment name of Azure, a model of OpenAI or of Mistral. Checked by the
+# AI API in KB_LLM_MODEL, then by kb digest in the response, before it enters a sheet (#209);
+# quoted in a log as it is.
+MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,99}")
 # The largest token count read in an answer of the provider (prompt, completion, reasoning): an
 # answer beyond it is not read (llm_unavailable), since the answer of a provider is an input not
 # trusted (OWASP API10:2023). Far above a call of K-B (about 9,000 input tokens and 8,192 output
@@ -208,6 +212,18 @@ TOPS_DIR_NAME = "tops"
 # #158 on gpt-6-luna: about 98 seconds for 8 subjects, the judge included (113 with the slowest
 # calls). Beyond it, a subject not yet written is llm_timeout, the others are returned.
 DIGEST_REQUEST_TIMEOUT_SECONDS = 200
+# The request of kb digest to the AI API (etl/ai_api_client.py, #209). The URL of kb serve-ai with
+# its defaults, changed by KB_AI_API_URL; it does not follow KB_AI_API_PORT: set KB_AI_API_URL too
+# when the port of kb serve-ai changes. Connection, pool and write: assumed values for a service on
+# the same machine or in the same compose network, as for the data API. Read: the AI API answers
+# in one block once its request is done, within DIGEST_REQUEST_TIMEOUT_SECONDS and the last call to
+# the model under way (about 20 seconds more, ai_api/deadline.py); 240 is also the bound the HTTP
+# ingress of Azure Container Apps gives a request. No retry: a Retry-After is shown, never waited.
+AI_API_URL = f"http://{AI_API_HOST}:{AI_API_PORT}"
+AI_API_CONNECT_TIMEOUT_SECONDS = 5
+AI_API_POOL_TIMEOUT_SECONDS = 5
+AI_API_WRITE_TIMEOUT_SECONDS = 10
+AI_API_READ_TIMEOUT_SECONDS = 240
 # The time a request to the model needs at least: none is sent with less left, so that the items
 # are not sent for an answer the deadline would throw away. Above the slowest writing measured by
 # #158 (9.3 s), not above the longest one the output cap allows (about 60 s): a longer writing

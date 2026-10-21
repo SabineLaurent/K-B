@@ -66,6 +66,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   clients ont leur clé dans `KB_AI_API_KEY_<CLIENT>`, ceux de l'API de données dans
   `KB_DATA_API_KEY_<CLIENT>` (journal ADR, 2026-10-21, « API IA : servir les fiches par
   `POST /digests` »).
+- `kb digest` (#209) demande les fiches à l'API IA, puis les écrit dans le coffre,
+  `veille/<sujet>/AAAA-MM-JJ.md` ; `kb serve` et `kb serve-ai` doivent tourner (journal ADR,
+  2026-10-21, « Fiches de veille : `kb digest` les écrit dans le coffre »).
 
 ## Consignes de travail
 
@@ -92,6 +95,13 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   même un message de commit qui en cite le nom. `.env.example` et `.env.e2e_test.example` se lisent
   et se modifient par Read et Edit ; Sabine tape `! git add <fichier>`. Ne pas contourner (pas de
   `git add -u`).
+- **Échappements `\u` et `\x` dans un fichier écrit par Write ou Edit** (constat du 2026-10-21,
+  #209) : un `"\u202e"` écrit dans le contenu est arrivé dans le fichier comme le caractère
+  lui-même, un contrôle bidirectionnel invisible (Write dans le code, Edit dans ce fichier même ;
+  Write a fait de même d'un `\x1b`), alors que `\\` et `\n` restaient tels quels. Écrire ces
+  caractères par `chr(0x202E)`, ou par un script Python ou un heredoc `<<'EOF'`, et vérifier
+  qu'aucun fichier modifié ne contient de caractère des catégories Unicode `Cc` ou `Cf` hors
+  tabulation, retour à la ligne et U+200D.
 - **`ruff` sans son cache** (constat du 2026-10-19, revue de #265) : `uv run ruff check` a passé,
   puis `uv run ruff check --no-cache` a trouvé trois imports non triés. Cause non établie : le cache
   est supposé (le `pyproject.toml` ne fixe ni `src` ni `known-first-party`, la détection des imports

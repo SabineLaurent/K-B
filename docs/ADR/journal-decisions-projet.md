@@ -3542,6 +3542,176 @@ time-knight (délégation de Sabine du 2026-10-15).
   données ont les mêmes droits. Limite assumée : en conteneurs et sur ACA, une clé distincte par
   service, chacun ne recevant que les siennes (signalé). — PR de #156
 
+### Fiches de veille : `kb digest` les écrit dans le coffre
+
+Décisions de Sabine du 2026-10-21 sur #209, relayées par time-knight (plan v2, relu par un
+sous-agent, validé à 18:03Z), et choix de la session acceptés par time-knight (délégation de
+Sabine du 2026-10-15).
+
+- **`kb digest` demande les fiches à `POST /digests` par HTTP, avec la clé
+  `KB_AI_API_KEY_KB_DIGEST` et l'adresse `KB_AI_API_URL` (défaut `http://127.0.0.1:8001`, nommé
+  dans `core/config.py`), puis écrit une fiche par sujet rendu, `veille/<sujet>/AAAA-MM-JJ.md`, au
+  jour UTC de `window.until`. Le client est `etl/ai_api_client.py`, la fiche
+  `etl/digest_sheets.py`, la porte `commands/digest_command.py`.** Choix de la session dans le
+  plan validé. Pourquoi : seul `kb` écrit le coffre (règle 7 de `poc.md`) ; `etl` est la couche du
+  métier, sous les commandes, et n'importe pas `ai_api` (règle 5 de `conventions.md`) : l'API IA
+  est jointe par son contrat, comme un service extérieur. Options écartées : un paquet nouveau pour
+  le client, au-dessus d'`ai_api` ; une demande avec `window_days` (la fenêtre reste un réglage de
+  `kb serve-ai`, `KB_DIGEST_WINDOW_DAYS`). Partie commune avec `kb ingest` (#159) : `core/outbound.py`,
+  la lecture « URL et clé d'un client » et les états `ai_api_*` ; aucun client générique n'est
+  écrit d'avance. — PR de #209
+- **La réponse 200 de `POST /digests` donne `model`, le modèle des réglages de `kb serve-ai`
+  (`replay` pour le replay) ; l'API IA passe en 0.2.0. `MODEL_NAME` passe de
+  `ai_api/connectors/llm_settings.py` à `core/config.py`.** Décision de Sabine (décision 1).
+  Pourquoi : le critère de #209 met le modèle dans le frontmatter de la fiche, et la réponse ne le
+  donnait pas ; `kb digest` relit le modèle reçu par le même motif avant de l'écrire. Options
+  écartées : `kb digest` lit `KB_LLM_MODEL` (le réglage d'un autre processus, qui peut différer) ;
+  une fiche sans modèle (contre le critère). — PR de #209
+- **Une clé refusée par l'API IA (401) fait sortir `kb digest` en 1 ; une clé absente ou hors
+  règle, en 2. Le sens de 2 ne change pas. Le message nomme `KB_AI_API_KEY_KB_DIGEST`, jamais la
+  clé.** Décision de Sabine (décision 2). Pourquoi, celui de Sabine : une clé absente, `kb` refuse
+  avant de lancer ; une clé refusée par le service appelé, la requête est partie. C'est la règle de
+  `kb collect`, où une source qui rend 401 échoue (`etl/extract.py:45`), et celle d'autres outils :
+  l'AWS CLI sort en 253 sur une configuration ou des identifiants absents, en 254 quand le service
+  a répondu par une erreur ([return codes](https://github.com/aws/aws-cli/blob/v2/awscli/topics/return-codes.rst)) ;
+  `gh auth status` sort en 1 sur un jeton refusé ([manuel](https://cli.github.com/manual/gh_auth_status)),
+  consultés le 2026-10-21 par time-knight. Options écartées : 2 avec un sens élargi (proposition de
+  la session : le remède est celui d'une clé absente) ; un code dédié à l'authentification (le 4
+  de `gh`, [exit codes](https://cli.github.com/manual/gh_help_exit-codes)), à reconsidérer pour
+  toutes les commandes avec #160 (jetons qui expirent). — PR de #209
+- **Même résultat, même code : une commande faite de parties sort en 4 quand une partie a échoué
+  et qu'une autre est faite et gardée, en 1 quand aucune ne l'est. La partie est la source pour
+  `kb collect`, le top pour `kb write-tops`, le sujet pour `kb digest` ; `find_exit_code`
+  (`commands/exit_codes.py`) tient la règle pour les trois.** Règle de Sabine (décision 2 bis).
+  Pour `kb digest` : un sujet en échec (dans `failed_subjects`, ou sa fiche non écrite) et une
+  fiche écrite, 4 ; aucune fiche écrite, 1. Pour `kb write-tops` : un top échoue s'il est arrêté
+  (`OSError`, entrée refusée du coffre) ou garde un relevé illisible ; il aboutit s'il va au bout
+  et écrit une fiche, ou va au bout sans échec, un top sans relevé compris (choix de la session,
+  accepté par time-knight : comme une source sans rien de neuf pour `kb collect`). Un relevé
+  illisible quand des fiches sont écrites sort en 4 : « échouer fermé » (2026-10-19) tient, car 4
+  n'est pas 0. Options écartées : `kb write-tops` dans une issue à part ; 1 pour l'échec partiel de
+  `kb digest` (proposition de la session). **Révise** 2026-10-18, « Codes de sortie de kb » :
+  « Le code d'échec partiel (4) vaut pour `kb collect` seul ». **Révise** 2026-10-19, « Tops : les
+  fiches par `kb write-tops` » : un relevé illisible, ou un top refusé quand l'autre aboutit, sort
+  en 4 et non plus en 1. — PR de #209
+- **Les règles d'une connexion sortante (`find_url_refusal`, `open_http_client` : URL jamais
+  citée, ni proxy ni certificat de l'environnement, aucune redirection suivie) passent
+  d'`ai_api/connectors/outbound.py` à `core/outbound.py`, que l'API IA et `kb digest` importent ;
+  un test tient qu'`etl` n'importe ni `data_api` ni `ai_api`.** Décision de Sabine (décision 3).
+  Pourquoi : `etl` n'importe pas `ai_api`, et une règle de sécurité ne se recopie pas (même motif
+  qu'en #204). Options écartées : un paquet `outbound/` à côté de `core/` ; une copie dans `etl`,
+  même temporaire (contraire à #204). **Révise** 2026-10-15, « Fiches de veille : la lecture par
+  l'API de données » : ces règles ne vivent plus « dans `ai_api/outbound.py` ». **Révise**
+  2026-10-18, « API IA : organisation par rôle » : `connectors/` ne contient plus `outbound.py`,
+  et la deuxième couche d'`ai_api` n'a plus que `llm_replay`. Signalé, pas fait ici : renommer
+  `core/` en `common/` après le POC, dans une issue seule (décision de Sabine ; `core/outbound.py`
+  suivra le dossier) ; deux modules de connexions sortantes, `etl/http_download.py` (urllib, la
+  collecte) et `core/outbound.py` (httpx2), à harmoniser après le POC. — PR de #209
+- **L'écriture sûre d'une fiche dans le coffre vit une fois, dans `etl/vault_files.py`, pour les
+  fiches des tops et les fiches de veille : `write_new_sheet` (dossiers recontrôlés, aucun lien vu
+  suivi, aucune fiche vue réécrite, temporaire caché renommé) et `neutralize_text`, qui reçoit les
+  caractères à échapper.** Choix de la session dans le plan validé. Pourquoi : la mission demande
+  l'écriture sûre « réemployée, pas recopiée ». Options écartées : la recopier dans
+  `etl/digest_sheets.py` ; la mettre dans `core/` (elle écrit par `write_file_atomically` de
+  `etl/raw_store.py`, et `core` n'importe rien de K-B). Limite assumée, décision de Sabine du
+  2026-10-21 (constat 1 de la revue de code, confirmé par un relecteur de sécurité) : une fiche
+  apparue entre `has_sheet` et le `os.replace` de `write_file_atomically` est remplacée sans
+  message (CWE-367), et un dossier remplacé par un lien dans cette fenêtre fait écrire hors du
+  coffre (CWE-59, déjà acceptée le 2026-10-19 pour `kb write-tops`) ; seuls deux lancements de
+  l'utilisatrice qui se chevauchent le peuvent, jamais un contenu non fiable. Correction (publier
+  par `os.link`, écrire par descripteurs) : #295, après les squelettes d'E1 et d'E3, au plus tard
+  dès que `kb digest` ou `kb write-tops` tourne sans l'utilisatrice. Option écartée ici : modifier
+  `write_file_atomically` et la règle 2 de `conventions.md` dans cette PR. Les fiches des tops gardent leur jeu de
+  caractères et leur URL nue cliquable (2026-10-19). — PR de #209
+- **Dans une fiche de veille, chaque affirmation et chaque titre de source est écrit en texte : le
+  jeu des fiches des tops (le `&` d'une référence de caractère compris), plus `~`, `:` et `@`,
+  puis le point de `www.`, sans casse, la
+  ponctuation d'un marqueur de liste en tête du texte, et une espace entre deux deux-points ; une
+  affirmation renvoie à ses sources par leur numéro. Une URL de source n'est écrite, en lien
+  automatique `<…>`, que si elle commence par `http://` ou `https://` et n'est faite que des
+  caractères de la RFC 3986, moins `[`, `]` et `$`, sans `::`, sans référence de caractère, et
+  sans caractère caché une fois ses pourcents décodés ; sinon « (sans URL) ».** Choix de la session
+  (plan validé ; la règle de l'URL resserrée en codant, acceptée par time-knight le 2026-10-21 ;
+  `&` et le marqueur de liste ajoutés après la revue de code et un relecteur de sécurité, tranchés
+  par time-knight, délégation de Sabine du 2026-10-15).
+  Pourquoi : la réponse est une entrée non fiable (OWASP LLM10:2026) ; une affirmation ou un titre
+  piégés deviendraient actifs dans Obsidian, jusqu'au JavaScript d'un bloc `dataviewjs` ou d'une
+  requête `$=` si l'utilisatrice les a activés. `~` ouvre un bloc `~~~` ; `:` et `@` font les liens
+  automatiques de GFM (`http://`, et, dans Obsidian, `mailto:`, `xmpp:` et une adresse mail, d'après
+  la recette du 2026-10-21 ; cmark-gfm, le moteur de GitHub, en fait encore un lien `mailto:`) et
+  les champs Dataview `::` ;
+  `&` ouvre une référence de caractère, que CommonMark décode (`&rlm;` rend le contrôle
+  bidirectionnel que la neutralisation retire) ; un marqueur de liste en tête imbrique une liste
+  (CWE-116 : une structure, sans injection ; un titre « 2026. Bilan » suffit). L'espace entre deux
+  deux-points vient de la recette de Sabine du 2026-10-21 dans Obsidian : `\[champ\:\: valeur\]`
+  s'affichait encore en champ Dataview en mode lecture, car Dataview y cherche `::` dans le HTML
+  rendu (`replaceInlineFields`, 0.5.68), où les échappements ont disparu ; son indexeur lit la
+  source, où `\:\:` n'est pas un champ : aucune métadonnée n'entrait dans la page (code de
+  Dataview 0.5.68 lu le 2026-10-21). Option écartée : un caractère invisible entre les deux-points
+  (U+2060), qui tromperait un copier-coller. Limite assumée : `std::string` s'affiche
+  `std: :string`. Une affirmation du modèle ne fait jamais un lien, à la différence d'une
+  description de top.
+  Dans `<…>`, une barre oblique n'échappe rien (CommonMark 0.31.2, § 6.5) : l'URL ne doit contenir
+  aucun caractère qui la ferait sortir, et `[`, `]`, `$` sont de la syntaxe d'Obsidian. Après la
+  seconde revue de code et un relecteur de sécurité (tranchés par time-knight, délégation de
+  Sabine du 2026-10-15) : une référence de caractère (`&#x202E;`, que cmark-gfm décode dans le
+  texte du lien) ou un caractère caché encodé en pourcents (`%E2%80%AE`, que markdown-it montre)
+  ferait lire un lien autrement qu'il ne mène (CWE-451) ; `::` ferait un champ Dataview dans la
+  ligne rendue, et même dans les métadonnées de la page (l'indexeur lit les champs d'un élément de
+  liste). L'URL est refusée, jamais réécrite, ce qui changerait sa cible. Options
+  écartées : le seul contrôle 6 de l'API IA, qui reste en amont (il laisse passer `$=`, `#`, `%%`,
+  `::` et une adresse mail, et ne lit pas les titres, donnée de source) ; l'URL lue en ASCII
+  imprimable sans espace, `<`, `>` ni `\` (plan v2, moins strict). Limites assumées : l'emphase
+  (`*x*`, `_x_`, `==x==`) n'est pas échappée, c'est de la mise en forme ; le rendu dans Obsidian,
+  logiciel fermé, n'est prouvé que par la recette de la PR. — PR de #209
+- **Une seule règle pour les deux écrivains du coffre : le `&` qui ouvre une référence de caractère
+  (`&` suivi de `#`, ou d'un nom ASCII puis `;`) est échappé, dans une description de top comme
+  dans une fiche de veille ; un autre `&` reste.** Décisions de Sabine du 2026-10-21, relayées par
+  time-knight, sur un constat du relecteur de sécurité : d'abord `&` échappé partout, puis, le même
+  soir, ce seul `&`, d'abord pour les tops, enfin pour les deux, ce qui affine les premières sans en
+  changer le but : aucune référence décodée, un fichier `.md` plus lisible, les URL nues des tops
+  justes. Pourquoi : une
+  référence nommée (`&rlm;`, `&lrm;`) rend à l'affichage le contrôle bidirectionnel que
+  `neutralize_text` retire ; les références numériques étaient déjà inactives, puisque `#` est
+  échappé. Un `&` toujours échappé cassait les URL nues des tops qui ont une requête :
+  `?q=a\&page=2` devient, dans cmark-gfm, un lien vers `?q=a%5C&page=2` (seconde revue de code,
+  constat 3) ; les URL nues des tops restent justes. Le motif est appliqué dans la même passe que
+  l'échappement, sur la ligne, avant toute barre insérée, jamais après un passage qui échappe déjà
+  `&`. Options écartées : `&` dans les seules fiches de veille ; tout `&` échappé (la première
+  décision) ; tout `&` dans les fiches de veille et le seul `&` d'une référence dans les tops (deux
+  règles). Limite assumée : `#` et `%` cassaient déjà, depuis le 2026-10-19, dans
+  cmark-gfm, une URL nue de top qui a une ancre ou un pourcent ; non vérifié dans Obsidian.
+  **Révise** 2026-10-19, « Tops : les fiches par `kb write-tops` » : la liste des caractères
+  échappés d'une description (P4) compte le `&` d'une référence. — PR de #209
+- **Avant sa demande, `kb digest` vérifie, pour chaque sujet de la liste, que ni `veille/` ni
+  `veille/<sujet>/` n'est un lien symbolique et que la fiche du jour UTC n'existe pas ; sinon il
+  sort en 2 sans rien demander.** Choix de la session dans le plan validé. Pourquoi : aucun item ne
+  part au modèle pour une fiche qui ne serait pas écrite (minimisation, coût). Option écartée :
+  demander, puis sauter les fiches qui existent. Limites assumées : relancer le même jour après un
+  échec partiel sort en 2, et les sujets en échec s'écrivent le lendemain si leurs items restent
+  dans la fenêtre ; le jour contrôlé est celui de l'horloge de `kb`, celui de la fiche est
+  `window.until` : une demande à cheval sur minuit UTC compte en échec un sujet dont la fiche du
+  lendemain existe déjà. — PR de #209
+- **`kb digest` attend la réponse 240 s au plus (`AI_API_READ_TIMEOUT_SECONDS`), sans nouvelle
+  tentative ; un `Retry-After` est affiché, jamais attendu. Le corps de la réponse est lu sans
+  borne de taille.** Décision de Sabine pour la borne (décision 6) : risque accepté pour le POC,
+  faible, car c'est son propre service, à une adresse qu'elle règle. Pourquoi 240 : au-dessus de
+  `DIGEST_REQUEST_TIMEOUT_SECONDS` (200 s) et du dernier appel au modèle en cours (environ 20 s de
+  plus, `ai_api/deadline.py`), égal à la borne de l'ingress d'Azure Container Apps. Option écartée :
+  relancer après un 503 (une attente sans borne, seconde revue de #156). Signalé, avec son
+  déclencheur : avant la mise en ligne du 08/11, une borne de lecture dans `core/outbound.py`,
+  commune aux deux clients (`read_bounded_body` et son échéance). — PR de #209
+- **Les clés du frontmatter sont en anglais partout ; le texte rédigé d'une fiche (affirmations,
+  titres de section, phrases fixes) est en français ; une citation garde sa langue (titre d'une
+  source, nom d'un dépôt).** Règle de Sabine (décision 5). Les identifiants sont en anglais : le
+  code, les champs de l'API et les clés du frontmatter, dont Obsidian impose lui-même certaines en
+  anglais (`tags`, `aliases`, `cssclasses`). Les fiches des tops passent de `classement`, `releve`
+  et `depots` à `ranking`, `collected_at` et `repositories`. **Révise** 2026-10-19, « Tops : les
+  fiches par `kb write-tops` » : « en français : un frontmatter (`classement`, `releve`,
+  `depots`) ». Limite assumée : une fiche n'est jamais réécrite, donc les fiches des tops du coffre
+  de dev (`temp/` du dépôt) gardent leurs anciennes clés ; le vrai coffre de Sabine n'en a aucune
+  (dit par Sabine). — PR de #209
+
 ## Décisions encore ouvertes
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,
@@ -3553,7 +3723,15 @@ time-knight (délégation de Sabine du 2026-10-15).
 
 - **Où tourne `kb write-tops` en ligne** (2026-10-19) : elle écrit le coffre, qu'aucun conteneur
   ne monte au POC (règle 4 de `.claude/rules/poc.md`) ; à trancher avant la mise en ligne du
-  08/11 (« Tops : les fiches par `kb write-tops` »).
+  08/11 (« Tops : les fiches par `kb write-tops` »). La même question vaut pour `kb digest`
+  (2026-10-21, « Fiches de veille : `kb digest` les écrit dans le coffre »).
+
+- **Une borne de lecture des réponses de l'API IA et de l'API de données** (2026-10-21) : avant la
+  mise en ligne du 08/11, dans `core/outbound.py`, commune aux deux clients ; `kb digest` lit
+  aujourd'hui sans borne (risque accepté par Sabine pour le POC).
+
+- **Un code de sortie dédié à l'authentification**, pour toutes les commandes (2026-10-21) : à
+  reconsidérer avec #160 (jetons qui expirent) ; une clé refusée sort aujourd'hui en 1.
 
 
 - **Révision après le juge, en un seul tour** (2026-10-16) : la coder ou non, au vu des taux de

@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from k_b.commands.exit_codes import ExitCode
+from k_b.commands.exit_codes import ExitCode, find_exit_code
 from k_b.commands.run_log import LOGGER_NAME, value_or_log_refusal
 from k_b.etl.collected_sources import (
     COLLECT_ONLY_VARIABLE,
@@ -103,11 +103,10 @@ def find_collection_exit_code(outcome: CollectionOutcome) -> ExitCode:
     errors = outcome.errors_by_source.values()
     if outcome.state_error is not None:
         return ExitCode.FAILED
-    if all(error is None for error in errors):
-        return ExitCode.SUCCEEDED
-    if any(error is None for error in errors):
-        return ExitCode.PARTIAL_FAILURE
-    return ExitCode.FAILED
+    return find_exit_code(
+        has_failed=any(error is not None for error in errors),
+        has_done=any(error is None for error in errors),
+    )
 
 
 def describe_outcome(error: Exception | None) -> str:

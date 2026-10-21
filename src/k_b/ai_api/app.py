@@ -17,7 +17,7 @@ from k_b.core.api_request_log import log_request
 from k_b.core.config import DigestSubject
 
 # The version of the contract of docs/fiches-veille.md: a change a client can see changes both.
-API_VERSION = "0.1.0"
+API_VERSION = "0.2.0"
 
 
 def create_app(

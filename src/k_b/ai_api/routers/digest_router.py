@@ -82,6 +82,7 @@ def post_digests(
         raise to_api_error(result.state, result.retry_after_seconds)
     return DigestsSchema(
         request_id=request_id,
+        model=state.llm_settings.model,
         window=WindowSchema(
             days=window_days,
             since=since,
