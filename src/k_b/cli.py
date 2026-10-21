@@ -16,7 +16,11 @@ from k_b.commands.create_db_command import run_create_db
 from k_b.commands.environment import read_data_dir, read_log_to_file
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.import_command import run_import
-from k_b.commands.openapi_command import OPENAPI_PATH, run_openapi
+from k_b.commands.openapi_command import (
+    AI_API_OPENAPI_PATH,
+    DATA_API_OPENAPI_PATH,
+    run_openapi,
+)
 from k_b.commands.run_log import (
     LOG_FILE_PATH,
     LOGGER_NAME,
@@ -78,7 +82,9 @@ def main(argv: list[str] | None = None) -> int:
         f" http://{AI_API_HOST}:{AI_API_PORT} by default",
     )
     command_parsers.add_parser(
-        "openapi", help=f"write the OpenAPI of the data API in {OPENAPI_PATH}"
+        "openapi",
+        help=f"write the OpenAPI of the data API in {DATA_API_OPENAPI_PATH} and the one of"
+        f" the AI API in {AI_API_OPENAPI_PATH}",
     )
     arguments = parser.parse_args(argv)
 
