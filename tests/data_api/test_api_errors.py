@@ -51,7 +51,8 @@ def test_a_database_error_gives_500_without_detail_and_logs_its_type(
 
     assert response.status_code == 500
     assert response.json() == {"error": "database_error"}
-    assert "database_error: DatabaseError" in caplog.text
+    request_id = response.headers["X-Request-ID"]
+    assert f"database_error: DatabaseError request_id={request_id}" in caplog.text
 
 
 @pytest.fixture
@@ -94,12 +95,13 @@ def test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only(
 
     monkeypatch.setattr(item_router, "read_items", fail)
 
-    with caplog.at_level(logging.INFO, logger="k_b.data_api"):
+    with caplog.at_level(logging.INFO, logger="k_b"):
         response = client.get("/items", headers=authorization)
 
     assert response.status_code == 500
     assert response.json() == {"error": "internal_error"}
-    assert "internal_error: RuntimeError" in caplog.text
+    request_id = response.headers["X-Request-ID"]
+    assert f"internal_error: RuntimeError request_id={request_id}" in caplog.text
     assert "status=500" in caplog.text
     assert "value received by the test" not in caplog.text
     assert "Traceback" not in caplog.text

@@ -9,12 +9,13 @@ from fastapi import Depends, FastAPI
 from pydantic import SecretStr
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from k_b.core.api_access import check_api_key
+from k_b.core.api_errors import respond_to_unexpected_error
+from k_b.core.api_health import HEALTH_PATH, answer_health
+from k_b.core.api_request_log import log_request
 from k_b.core.config import DATA_API_ALLOWED_HOSTS
 from k_b.data_api.api_router import api_router
-from k_b.data_api.dependencies import check_api_key
-from k_b.data_api.errors import ERROR_HANDLERS, respond_to_unexpected_error
-from k_b.data_api.health import HEALTH_PATH, answer_health
-from k_b.data_api.request_log import log_request
+from k_b.data_api.errors import ERROR_HANDLERS
 
 # The version of docs/specs-api.md: a change a client can see changes both.
 API_VERSION = "0.4.0"

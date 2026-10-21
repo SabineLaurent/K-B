@@ -8,8 +8,9 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Path, Query
 from pydantic import AfterValidator, BeforeValidator, TypeAdapter
 
+from k_b.core.api_errors import ApiError, ErrorSchema
 from k_b.data_api.dependencies import Database
-from k_b.data_api.errors import ERROR_RESPONSES, ApiError, ErrorSchema
+from k_b.data_api.errors import ERROR_RESPONSES
 from k_b.data_api.schemas.item_schema import (
     ItemDetailSchema,
     ItemPageSchema,
