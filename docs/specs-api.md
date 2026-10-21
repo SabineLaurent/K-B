@@ -7,7 +7,7 @@ erreurs et les exigences de sécurité. Les décisions et leur pourquoi sont dan
 [journal ADR](ADR/journal-decisions-projet.md) (entrées du 2026-10-14) ; la collecte, dans
 [specs-collecte.md](specs-collecte.md) ; la base, dans [stockage.md](stockage.md).
 
-**Version de la spec : 0.4.0**, la même que `info.version` de l'OpenAPI
+**Version de la spec : 0.5.0**, la même que `info.version` de l'OpenAPI
 (`docs/api/openapi-donnees.json`, que #184 écrit). Un changement de comportement visible par un client, comme
 l'ordre des résultats, change la version.
 
@@ -17,6 +17,7 @@ l'ordre des résultats, change la version.
 | 0.2.0 | `GET /items/{item_id}` et `GET /trends` servis (#185) ; un `item_id` au-delà de 64 bits répond 422 |
 | 0.3.0 | `GET /health` servi sans clé ; hôte, port et hôtes permis réglables (#199) |
 | 0.4.0 | la sorte `clip` (pages gardées avec Web Clipper) servie par `GET /items` et `GET /items/{item_id}` (#14) |
+| 0.5.0 | l'en-tête `X-Request-ID` sur chaque réponse ; les tags `items` et `trends` dans l'OpenAPI ; les clés des clients lues dans `KB_DATA_API_KEY_<CLIENT>`, et non plus `KB_API_KEY_<CLIENT>` (#156) |
 
 ## Règles communes
 
@@ -55,7 +56,10 @@ l'ordre des résultats, change la version.
 - **Journal** : une ligne par requête, horodatée en ISO 8601 UTC, à la seconde. Elle donne la
   méthode, le gabarit de route (`/items/{item_id}`, pas l'identifiant), le statut, la durée en ms
   et le nom du client (`-` pour un statut sans réponse envoyée, une route inconnue ou un client
-  sans clé valide) ; jamais la clé, une valeur de paramètre ni un chemin brut. Elle va dans
+  sans clé valide), puis l'identifiant de la requête (`request_id`, un UUID), rendu aussi dans
+  l'en-tête `X-Request-ID` de chaque réponse et repris par chaque autre ligne de la requête
+  (`database_error`, `internal_error`) ; jamais la clé, une valeur de paramètre ni un chemin brut.
+  Le journal est commun aux deux API (`core/api_request_log.py`). Elle va dans
   `<KB_DATA_DIR>/logs/kb-serve.log`, à part de `kb.log` : `kb serve` tourne longtemps, et la rotation
   de minuit faite par `kb collect` ou `kb import` dans un fichier partagé le laisserait écrire dans
   le fichier de la veille (constat sur `TimedRotatingFileHandler`, Python 3.13). Limite : un seul
@@ -64,13 +68,17 @@ l'ordre des résultats, change la version.
   `KB_LOG_TO_FILE=false`, le journal va sur la sortie d'erreur seule, sans fichier : en conteneur,
   la sortie d'erreur est le journal du conteneur.
 - **Organisation du code** : paquet `src/k_b/data_api/`, un dossier par rôle (`routers/`,
-  `schemas/`) ; `api_router.py` rassemble les routeurs ; le détail et les options écartées sont
+  `schemas/`) ; `api_router.py` rassemble les routeurs, et chacun déclare son préfixe et ses tags
+  (`items`, `trends`), qui regroupent les routes dans `/docs` et l'OpenAPI ; ce qui est commun à l'API IA est dans
+  `core/` : la clé (`api_keys.py`, `api_access.py`), les erreurs (`api_errors.py`), le journal
+  (`api_request_log.py`), la santé (`api_health.py`), la règle de l'hôte et du port
+  (`api_settings.py`) ; le détail et les options écartées sont
   au journal ADR (2026-10-14, « Paquet `src/k_b/data_api/` »).
 
 ## Accès par clé
 
-- **Un client nommé, une clé** : la variable d'environnement `KB_API_KEY_<CLIENT>` porte la clé du
-  client `<CLIENT>` (`[A-Z0-9_]+`, par exemple `KB_API_KEY_TERMINAL`, `KB_API_KEY_AGENT`).
+- **Un client nommé, une clé** : la variable d'environnement `KB_DATA_API_KEY_<CLIENT>` porte la clé du
+  client `<CLIENT>` (`[A-Z0-9_]+`, par exemple `KB_DATA_API_KEY_TERMINAL`, `KB_DATA_API_KEY_AGENT`).
   La clé identifie le programme qui appelle (le terminal ou un script de Sabine, un agent, l'API
   IA) ; aucune personne ne se connecte.
 - **Clé générée en 256 bits** par `secrets.token_urlsafe(32)` ; le minimum contrôlé est de

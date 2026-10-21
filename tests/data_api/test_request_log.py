@@ -1,23 +1,26 @@
 """One log line per request (docs/specs-api.md, "Journal"): the client named, never its key, a
-value of a parameter or a raw path."""
+value of a parameter or a raw path; the id of the request, given back in X-Request-ID."""
 
 import logging
+import uuid
 
 import pytest
 
-from k_b.data_api.request_log import format_request_line
+from k_b.core.api_request_log import format_request_line
+
+REQUEST_LOGGER = "k_b.core.api_request_log"
 
 
 @pytest.fixture
 def request_lines(caplog):
     """The request lines logged while the test runs."""
-    caplog.set_level(logging.INFO, logger="k_b.data_api.request_log")
+    caplog.set_level(logging.INFO, logger=REQUEST_LOGGER)
 
     def read():
         return [
             record.getMessage()
             for record in caplog.records
-            if record.name == "k_b.data_api.request_log"
+            if record.name == REQUEST_LOGGER
         ]
 
     return read
@@ -26,11 +29,13 @@ def request_lines(caplog):
 def test_a_request_line_names_the_client_never_the_key_a_value_or_the_path(
     client, api_keys, authorization, request_lines
 ):
-    client.get("/items?q=langchain&limit=3", headers=authorization)
+    response = client.get("/items?q=langchain&limit=3", headers=authorization)
 
     [line] = request_lines()
     assert line.startswith("request method='GET' route=/items status=200 duration_ms=")
-    assert line.endswith(" client=TERMINAL")
+    assert line.endswith(
+        f" client=TERMINAL request_id={response.headers['X-Request-ID']}"
+    )
     for absent in (api_keys["TERMINAL"].get_secret_value(), "langchain", "limit", "?"):
         assert absent not in line
 
@@ -40,7 +45,7 @@ def test_a_401_is_logged_without_name_nor_received_value(client, request_lines):
 
     [line] = request_lines()
     assert "status=401" in line
-    assert line.endswith(" client=-")
+    assert " client=- request_id=" in line
     assert "key-received-by-the-api" not in line
 
 
@@ -92,19 +97,44 @@ def test_a_health_check_that_fails_is_logged_by_its_path(
 
 
 def test_a_request_without_response_is_logged_without_status():
-    line = format_request_line("GET", "/items", None, 3, "-")
+    line = format_request_line("GET", "/items", None, 3, "-", "id-of-the-test")
 
-    assert line == "request method='GET' route=/items status=- duration_ms=3 client=-"
+    assert line == (
+        "request method='GET' route=/items status=- duration_ms=3 client=-"
+        " request_id=id-of-the-test"
+    )
 
 
 def test_the_method_is_quoted():
-    line = format_request_line("GET\nfake line", "-", 400, 0, "-")
+    line = format_request_line("GET\nfake line", "-", 400, 0, "-", "id-of-the-test")
 
     assert "\n" not in line
-    assert (
-        line
-        == r"request method='GET\nfake line' route=- status=400 duration_ms=0 client=-"
+    assert line == (
+        r"request method='GET\nfake line' route=- status=400 duration_ms=0 client=-"
+        " request_id=id-of-the-test"
     )
+
+
+@pytest.mark.parametrize(
+    ("path", "with_key"),
+    [("/items", True), ("/items", False), ("/health", False), ("/unknown", True)],
+)
+def test_each_response_gives_the_id_of_its_request_in_its_log_line(
+    client, authorization, request_lines, path, with_key
+):
+    """The id ties a response, an error included, to the lines of its request."""
+    response = client.get(path, headers=authorization if with_key else {})
+
+    request_id = response.headers["X-Request-ID"]
+    assert str(uuid.UUID(request_id)) == request_id
+    assert all(line.endswith(f" request_id={request_id}") for line in request_lines())
+
+
+def test_each_request_has_its_own_id(client, authorization):
+    first = client.get("/items", headers=authorization)
+    second = client.get("/items", headers=authorization)
+
+    assert first.headers["X-Request-ID"] != second.headers["X-Request-ID"]
 
 
 def test_a_detail_is_logged_by_its_route_template_never_its_id(

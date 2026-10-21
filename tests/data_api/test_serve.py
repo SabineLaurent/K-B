@@ -21,7 +21,7 @@ VERSIONED_OPENAPI = Path(__file__).parents[2] / "docs" / "api" / "openapi-donnee
 def no_api_key_of_the_terminal(monkeypatch):
     """A terminal that exports a key must not give it to the tests."""
     for name in os.environ:
-        if name.startswith("KB_API_KEY_"):
+        if name.startswith("KB_DATA_API_KEY_"):
             monkeypatch.delenv(name)
 
 
@@ -51,27 +51,27 @@ def make_key(length=43):
 @pytest.mark.parametrize(
     ("variables", "message"),
     [
-        ({}, "no API key: set KB_API_KEY_<CLIENT>"),
+        ({}, "no API key: set KB_DATA_API_KEY_<CLIENT>"),
         (
-            {"KB_API_KEY_": make_key()},
-            "'KB_API_KEY_': client name empty or not [A-Z0-9_]+",
+            {"KB_DATA_API_KEY_": make_key()},
+            "'KB_DATA_API_KEY_': client name empty or not [A-Z0-9_]+",
         ),
         (
-            {"KB_API_KEY_terminal": make_key()},
-            "'KB_API_KEY_terminal': client name empty or not [A-Z0-9_]+",
+            {"KB_DATA_API_KEY_terminal": make_key()},
+            "'KB_DATA_API_KEY_terminal': client name empty or not [A-Z0-9_]+",
         ),
         (
-            {"KB_API_KEY_TERMINAL": make_key(31)},
-            "'KB_API_KEY_TERMINAL': key of 31 characters, minimum 32",
+            {"KB_DATA_API_KEY_TERMINAL": make_key(31)},
+            "'KB_DATA_API_KEY_TERMINAL': key of 31 characters, minimum 32",
         ),
         (
-            {"KB_API_KEY_TERMINAL": ""},
-            "'KB_API_KEY_TERMINAL': key of 0 characters, minimum 32",
+            {"KB_DATA_API_KEY_TERMINAL": ""},
+            "'KB_DATA_API_KEY_TERMINAL': key of 0 characters, minimum 32",
         ),
         # HTTPBearer strips the spaces around the key received: this key would never match.
         (
-            {"KB_API_KEY_TERMINAL": make_key() + " "},
-            "'KB_API_KEY_TERMINAL': key with a character outside [A-Za-z0-9_-]",
+            {"KB_DATA_API_KEY_TERMINAL": make_key() + " "},
+            "'KB_DATA_API_KEY_TERMINAL': key with a character outside [A-Za-z0-9_-]",
         ),
     ],
 )
@@ -96,14 +96,17 @@ def test_serve_exits_2_when_two_clients_have_the_same_key(
     monkeypatch, capsys, data_dir, uvicorn_calls
 ):
     key = make_key()
-    monkeypatch.setenv("KB_API_KEY_TERMINAL", key)
-    monkeypatch.setenv("KB_API_KEY_AGENT", key)
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", key)
+    monkeypatch.setenv("KB_DATA_API_KEY_AGENT", key)
 
     exit_code = cli.main(["serve"])
 
     error_output = capsys.readouterr().err
     assert exit_code == 2
-    assert "'KB_API_KEY_AGENT' and 'KB_API_KEY_TERMINAL': same key" in error_output
+    assert (
+        "'KB_DATA_API_KEY_AGENT' and 'KB_DATA_API_KEY_TERMINAL': same key"
+        in error_output
+    )
     assert key not in error_output
     assert uvicorn_calls == []
 
@@ -111,7 +114,7 @@ def test_serve_exits_2_when_two_clients_have_the_same_key(
 def test_serve_logs_the_names_of_the_clients_never_their_keys(
     monkeypatch, capsys, data_dir, uvicorn_calls
 ):
-    keys = {"KB_API_KEY_TERMINAL": make_key(), "KB_API_KEY_AGENT": make_key()}
+    keys = {"KB_DATA_API_KEY_TERMINAL": make_key(), "KB_DATA_API_KEY_AGENT": make_key()}
     for name, value in keys.items():
         monkeypatch.setenv(name, value)
 
@@ -127,7 +130,7 @@ def test_serve_logs_the_names_of_the_clients_never_their_keys(
 def test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_config(
     monkeypatch, data_dir, uvicorn_calls
 ):
-    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
 
     cli.main(["serve"])
 
@@ -143,7 +146,7 @@ def test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_conf
 def test_serve_listens_on_the_host_and_port_of_the_environment(
     monkeypatch, data_dir, uvicorn_calls
 ):
-    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv("KB_DATA_API_HOST", "192.0.2.10")
     monkeypatch.setenv("KB_DATA_API_PORT", "8080")
 
@@ -202,7 +205,7 @@ def test_serve_listens_on_the_host_and_port_of_the_environment(
 def test_serve_exits_2_on_a_host_or_port_refused(
     monkeypatch, capsys, data_dir, uvicorn_calls, variable, value, message
 ):
-    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv(variable, value)
 
     exit_code = cli.main(["serve"])
@@ -242,7 +245,7 @@ def test_serve_exits_2_on_a_host_or_port_refused(
 def test_serve_exits_2_and_names_the_allowed_hosts_refused(
     monkeypatch, capsys, data_dir, uvicorn_calls, value, message
 ):
-    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv("KB_DATA_API_ALLOWED_HOSTS", value)
 
     exit_code = cli.main(["serve"])
@@ -255,7 +258,7 @@ def test_serve_exits_2_and_names_the_allowed_hosts_refused(
 def test_serve_allows_the_hosts_of_the_environment_and_no_other(
     monkeypatch, capsys, data_dir, uvicorn_calls
 ):
-    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv("KB_DATA_API_ALLOWED_HOSTS", " api-donnees ,localhost")
 
     cli.main(["serve"])
@@ -272,7 +275,7 @@ def test_serve_reads_the_base_and_writes_its_own_log_file_under_kb_data_dir(
 ):
     """kb serve runs for long: a rotation done by kb collect in kb.log would leave it writing in
     the file of the day before (docs/specs-api.md, "Journal")."""
-    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
 
     cli.main(["serve"])
 
@@ -288,7 +291,7 @@ def test_without_log_file_kb_logs_on_stderr_only(
     monkeypatch, capsys, data_dir, uvicorn_calls
 ):
     """In a container, stderr goes to the logs of the container: a file would be a copy."""
-    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv("KB_LOG_TO_FILE", "false")
 
     exit_code = cli.main(["serve"])
@@ -302,7 +305,7 @@ def test_without_log_file_kb_logs_on_stderr_only(
 def test_a_log_to_file_value_refused_exits_2(
     monkeypatch, capsys, data_dir, uvicorn_calls, value
 ):
-    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv("KB_LOG_TO_FILE", value)
 
     exit_code = cli.main(["serve"])
@@ -350,7 +353,7 @@ def test_openapi_writes_nothing_outside_the_root_of_the_repository(
 def test_serve_exits_with_the_code_of_uvicorn_when_it_does_not_start_and_sets_no_sigterm_handler(
     monkeypatch, data_dir
 ):
-    monkeypatch.setenv("KB_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     sigterm_handlers = []
 
     def fail_to_start(app, **options):

@@ -8,8 +8,9 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 from pydantic import BeforeValidator
 
+from k_b.core.api_errors import ApiError, ErrorSchema
 from k_b.data_api.dependencies import Database
-from k_b.data_api.errors import ERROR_RESPONSES, ApiError, ErrorSchema
+from k_b.data_api.errors import ERROR_RESPONSES
 from k_b.data_api.schemas.trend_schema import TrendSchema, TrendWindowSchema
 from k_b.database.reading import read_trends
 
@@ -29,7 +30,7 @@ def check_window_end_form(window_end: object) -> object:
 # Still a date to pydantic: the OpenAPI declares it so.
 WindowEnd = Annotated[date, BeforeValidator(check_window_end_form)]
 
-router = APIRouter()
+router = APIRouter(prefix="/trends", tags=["trends"])
 
 TRENDS_RESPONSES = {
     **ERROR_RESPONSES,
@@ -37,7 +38,7 @@ TRENDS_RESPONSES = {
 }
 
 
-@router.get("/trends", responses=TRENDS_RESPONSES)
+@router.get("", responses=TRENDS_RESPONSES)
 def list_trends(
     connection: Database,
     window_end: Annotated[WindowEnd | None, Query()] = None,

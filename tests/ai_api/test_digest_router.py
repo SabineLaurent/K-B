@@ -1,0 +1,646 @@
+"""POST /digests on the replay provider and the data API of the test base: one test per case of
+the criterion of #156 (docs/fiches-veille.md, "Fenêtre", "Réponse", "Métriques", "États
+nommés"). No network, no key of a provider."""
+
+import json
+import logging
+import secrets
+import sys
+from dataclasses import replace
+from datetime import UTC, datetime
+from typing import get_args
+
+import httpx2
+import pytest
+from fastapi.routing import iter_route_contexts
+from fastapi.testclient import TestClient
+from pydantic import SecretStr
+
+from k_b.ai_api.app import create_app
+from k_b.ai_api.connectors.data_api_client import DataApiState
+from k_b.ai_api.connectors.data_api_settings import DataApiSettings
+from k_b.ai_api.connectors.llm_client import LlmFailure, build_http_client
+from k_b.ai_api.connectors.llm_replay import REPLAY_STEPS, ReplayTransport
+from k_b.ai_api.connectors.llm_settings import LlmSettings
+from k_b.ai_api.dependencies import (
+    open_data_api_client,
+    open_llm_client,
+    read_request_time,
+)
+from k_b.ai_api.errors import STATUS_BY_STATE
+from k_b.core.config import (
+    LLM_INPUT_USD_PER_MILLION_TOKENS,
+    LLM_OUTPUT_USD_PER_MILLION_TOKENS,
+    LLM_REPLAY_BASE_URL,
+    DigestSubject,
+)
+from k_b.data_api.app import create_app as create_data_app
+
+# The subjects of the tests, never the real ones: a change of the real list breaks no test.
+TEST_SUBJECTS = (
+    DigestSubject("security_alerts", "failles et alertes de sécurité"),
+    DigestSubject("agent_tools", "outils et cadres d'agents"),
+    DigestSubject("research", "articles de recherche"),
+)
+REPLAY_SETTINGS = LlmSettings(
+    provider="replay",
+    base_url=LLM_REPLAY_BASE_URL,
+    model="replay",
+    api_key=None,
+    reasoning_effort=None,
+    replay_steps=None,
+)
+# Made for the test: never a real key.
+CLIENT_KEY = secrets.token_urlsafe(32)
+AUTHORIZATION = {"Authorization": f"Bearer {CLIENT_KEY}"}
+# The time of the requests, set by the test. Over 14 days, the window reads the vulnerabilities 3
+# and 4, the papers 2 and 1, the releases 6, 7 and 8 and the newsletter articles 12, 11 and 13 of
+# the test base; the advisories, of June, are older.
+REQUEST_TIME = datetime(2026, 10, 8, 12, 0, 30, 500_000, tzinfo=UTC)
+WINDOW_DAYS = 14
+SECURITY_ITEMS = [3, 4]
+AGENT_ITEMS = [6, 7, 8]
+RESEARCH_ITEMS = [2, 1]
+NOT_RETAINED = [12, 11, 13]
+# Facts copied from the items of the test base: the CVE of vulnerability 3, the tag of release 6.
+SECURITY_CLAIM = {
+    "text": "La faille CVE-2026-86950 touche des produits Apple.",
+    "item_ids": ["i3"],
+    "facts": [{"value": "CVE-2026-86950", "item_id": "i3"}],
+}
+AGENT_CLAIM = {
+    "text": "Claude Code publie la version v2.1.287.",
+    "item_ids": ["i6"],
+    "facts": [{"value": "v2.1.287", "item_id": "i6"}],
+}
+TOKENS_IN = 1_000
+TOKENS_OUT = 200
+
+
+def completion(output):
+    content = output if isinstance(output, str) else json.dumps(output)
+    return {
+        "kind": "completion",
+        "content": content,
+        "prompt_tokens": TOKENS_IN,
+        "completion_tokens": TOKENS_OUT,
+    }
+
+
+def classified(
+    security=SECURITY_ITEMS,
+    agent=AGENT_ITEMS,
+    research=RESEARCH_ITEMS,
+    not_retained=NOT_RETAINED,
+):
+    assignments = [
+        {"item_id": f"i{item_id}", "subject": subject}
+        for subject, item_ids in (
+            ("security_alerts", security),
+            ("agent_tools", agent),
+            ("research", research),
+        )
+        for item_id in item_ids
+    ]
+    return completion(
+        {
+            "assignments": assignments,
+            "not_retained": [f"i{item_id}" for item_id in not_retained],
+        }
+    )
+
+
+def written(*claims):
+    return completion({"claims": list(claims)})
+
+
+# A valid request: the classification, then the writing of each subject, in the order of the list.
+VALID_STEPS = [
+    classified(),
+    written(SECURITY_CLAIM),
+    written(AGENT_CLAIM),
+    written(),
+]
+# An output the schema refuses, twice: the classification fails the request.
+INVALID_OUTPUT = completion("not JSON")
+
+
+@pytest.fixture
+def data_api(items_database):
+    """The data API of the test base, as the AI API reads it, with the key of AI_DIGEST."""
+    key = secrets.token_urlsafe(32)
+    with TestClient(
+        create_data_app(items_database, {"AI_DIGEST": SecretStr(key)}),
+        base_url="http://localhost",
+        headers={"Authorization": f"Bearer {key}"},
+    ) as client:
+        yield client
+
+
+@pytest.fixture
+def make_ai_api(data_api):
+    """A client of the AI API on the replay of these steps, and the transport of the replay, which
+    keeps each request to the model. replay_from_settings: the replay the settings give, as kb
+    serve-ai makes it, in place of the transport of the test."""
+
+    def make(
+        steps,
+        default_window_days=WINDOW_DAYS,
+        data_api_client=None,
+        replay_from_settings=False,
+    ):
+        settings = replace(
+            REPLAY_SETTINGS, replay_steps=tuple(REPLAY_STEPS.validate_python(steps))
+        )
+        app = create_app(
+            {"TERMINAL": SecretStr(CLIENT_KEY)},
+            settings,
+            DataApiSettings(
+                base_url="http://localhost",
+                api_key=SecretStr(secrets.token_urlsafe(32)),
+            ),
+            TEST_SUBJECTS,
+            default_window_days,
+        )
+        transport = ReplayTransport(steps)
+
+        def open_replay():
+            with build_http_client(settings, transport=transport) as http_client:
+                yield http_client
+
+        if not replay_from_settings:
+            app.dependency_overrides[open_llm_client] = open_replay
+        app.dependency_overrides[open_data_api_client] = lambda: (
+            data_api if data_api_client is None else data_api_client
+        )
+        app.dependency_overrides[read_request_time] = lambda: REQUEST_TIME
+        return TestClient(app, raise_server_exceptions=False), transport
+
+    return make
+
+
+def post_digests(client, body=None, headers=AUTHORIZATION):
+    return client.post(
+        "/digests",
+        json={"window_days": WINDOW_DAYS} if body is None else body,
+        headers=headers,
+    )
+
+
+def read_metric_lines(capsys):
+    return [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+
+
+def test_a_request_gives_a_digest_per_subject_with_its_window_and_its_id(make_ai_api):
+    client, _ = make_ai_api(VALID_STEPS, replay_from_settings=True)
+
+    response = post_digests(client)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["request_id"] == response.headers["X-Request-ID"]
+    assert body["window"] == {
+        "days": 14,
+        "since": "2026-09-24T12:00:30Z",
+        "until": "2026-10-08T12:00:30Z",
+        "capped_kind": None,
+        "covered_after": None,
+    }
+    assert [digest["subject"] for digest in body["digests"]] == [
+        "security_alerts",
+        "agent_tools",
+        "research",
+    ]
+    security = body["digests"][0]
+    assert security["claims"] == [{"text": SECURITY_CLAIM["text"], "item_ids": [3]}]
+    [source] = security["sources"]
+    assert (source["item_id"], source["kind"]) == (3, "vulnerability")
+    assert source["url"].startswith("https://")
+    assert security["not_retained"] == [4]
+    assert body["digests"][2]["claims"] == []
+    assert body["failed_subjects"] == []
+    assert body["not_retained"] == NOT_RETAINED
+    assert (body["items_in"], body["items_dropped"], body["items_capped"]) == (
+        10,
+        0,
+        False,
+    )
+
+
+@pytest.mark.parametrize("body", [{}, {"window_days": None}])
+def test_a_request_without_window_takes_the_window_of_the_settings(make_ai_api, body):
+    # Over 3 days, the newsletter articles 12 and 11 only.
+    client, _ = make_ai_api(
+        [classified([], [], [], not_retained=[12, 11])], default_window_days=3
+    )
+
+    response = post_digests(client, body)
+
+    assert response.status_code == 200
+    assert response.json()["window"]["days"] == 3
+    assert response.json()["window"]["since"] == "2026-10-05T12:00:30Z"
+    assert response.json()["items_in"] == 2
+
+
+def test_an_empty_window_answers_without_calling_the_model(make_ai_api, capsys):
+    client, transport = make_ai_api([])
+    client.app.dependency_overrides[read_request_time] = lambda: datetime(
+        2030, 1, 1, tzinfo=UTC
+    )
+
+    response = post_digests(client)
+
+    assert response.status_code == 200
+    assert response.json()["digests"] == []
+    assert response.json()["items_in"] == 0
+    assert transport.requests == []
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {},
+        {"Authorization": "Bearer wrong-key-of-the-test"},
+        {"Authorization": "Bearer"},
+    ],
+)
+def test_a_request_without_a_valid_key_is_refused_before_any_reading(
+    make_ai_api, headers
+):
+    client, transport = make_ai_api(VALID_STEPS)
+    failing_reading = httpx2.Client(
+        base_url="http://localhost", transport=httpx2.MockTransport(fail_the_test)
+    )
+    client.app.dependency_overrides[open_data_api_client] = lambda: failing_reading
+
+    response = post_digests(client, headers=headers)
+
+    assert response.status_code == 401
+    assert response.json() == {"error": "invalid_api_key"}
+    assert response.headers["WWW-Authenticate"] == "Bearer"
+    assert transport.requests == []
+
+
+def fail_the_test(request):
+    raise AssertionError("the data API was read")
+
+
+@pytest.mark.parametrize(
+    ("content", "parameter"),
+    [
+        ({"window_days": 0}, "window_days"),
+        ({"window_days": 15}, "window_days"),
+        ({"window_days": True}, "window_days"),
+        ({"window_days": 3.0}, "window_days"),
+        ({"window_days": "3"}, "window_days"),
+        ({"window_days": 3, "field\nof the client": 1}, "body"),
+        ([3], "body"),
+        (None, "body"),
+        (b"not JSON", "body"),
+        (b"\xff", "body"),
+    ],
+    ids=[
+        "zero",
+        "fifteen",
+        "true",
+        "float",
+        "string",
+        "extra-field",
+        "not-an-object",
+        "absent",
+        "not-json",
+        "not-utf-8",
+    ],
+)
+def test_a_malformed_request_is_refused_422_before_any_call(
+    make_ai_api, content, parameter
+):
+    client, transport = make_ai_api(VALID_STEPS)
+
+    response = send(client, content, AUTHORIZATION)
+
+    assert response.status_code == 422
+    assert response.json() == {"error": "invalid_parameter", "parameters": [parameter]}
+    assert transport.requests == []
+
+
+def send(client, content, headers):
+    """A body as given: JSON, raw bytes, or none."""
+    if content is None:
+        return client.post("/digests", headers=headers)
+    if isinstance(content, bytes):
+        return client.post(
+            "/digests",
+            content=content,
+            headers={**headers, "Content-Type": "application/json"},
+        )
+    return client.post("/digests", json=content, headers=headers)
+
+
+@pytest.mark.parametrize(
+    ("content", "status"),
+    [({"window_days": 0}, 401), (None, 401), (b"not JSON", 422), (b"\xff", 422)],
+)
+def test_without_key_only_a_body_that_cannot_be_read_gets_422(
+    make_ai_api, content, status
+):
+    """FastAPI reads the JSON of the body before the dependencies (fastapi/routing.py, 0.143):
+    a limit written in docs/fiches-veille.md; nothing is read nor sent."""
+    client, transport = make_ai_api(VALID_STEPS)
+
+    response = send(client, content, {})
+
+    assert response.status_code == status
+    assert transport.requests == []
+
+
+@pytest.mark.parametrize(
+    ("steps", "status", "state", "retry_after"),
+    [
+        ([INVALID_OUTPUT, INVALID_OUTPUT], 502, "llm_invalid_output", None),
+        (
+            [{"kind": "response", "status": 429, "retry_after": "30"}],
+            503,
+            "llm_rate_limited",
+            "30",
+        ),
+        (
+            [
+                {"kind": "response", "status": 429, "retry_after": "0"},
+                {"kind": "response", "status": 429},
+            ],
+            503,
+            "llm_rate_limited",
+            None,
+        ),
+        ([{"kind": "timeout"}], 504, "llm_timeout", None),
+    ],
+    ids=[
+        "invalid-output",
+        "rate-limited",
+        "rate-limited-without-retry-after",
+        "timeout",
+    ],
+)
+def test_a_classification_that_fails_fails_the_request_with_its_lines(
+    make_ai_api, capsys, steps, status, state, retry_after
+):
+    client, _ = make_ai_api(steps)
+
+    response = post_digests(client)
+
+    assert response.status_code == status
+    assert response.json() == {"error": state}
+    assert response.headers.get("Retry-After") == retry_after
+    [line] = read_metric_lines(capsys)
+    assert (line["stage"], line["outcome"]) == ("classify", state)
+    assert line["request_id"] == response.headers["X-Request-ID"]
+    assert isinstance(line["data_fetch_ms"], int)
+    assert (line["items_dropped"], line["items_capped"]) == (0, False)
+
+
+def test_a_writing_that_fails_names_its_subject_and_the_others_are_returned(
+    make_ai_api,
+):
+    client, _ = make_ai_api(
+        [classified(), {"kind": "timeout"}, written(AGENT_CLAIM), written()]
+    )
+
+    response = post_digests(client)
+
+    assert response.status_code == 200
+    assert response.json()["failed_subjects"] == [
+        {"subject": "security_alerts", "stage": "write", "error": "llm_timeout"}
+    ]
+    assert [digest["subject"] for digest in response.json()["digests"]] == [
+        "agent_tools",
+        "research",
+    ]
+
+
+def raise_timeout(request):
+    raise httpx2.ReadTimeout("timeout of the test", request=request)
+
+
+@pytest.mark.parametrize(
+    ("data_api_client", "status", "state"),
+    [
+        (
+            httpx2.Client(
+                base_url="http://localhost",
+                transport=httpx2.MockTransport(raise_timeout),
+            ),
+            504,
+            "data_api_timeout",
+        ),
+        (
+            httpx2.Client(
+                base_url="http://localhost",
+                transport=httpx2.MockTransport(lambda request: httpx2.Response(401)),
+            ),
+            502,
+            "data_api_unauthorized",
+        ),
+    ],
+    ids=["timeout", "key-refused"],
+)
+def test_a_reading_that_fails_fails_the_request_without_a_call_to_the_model(
+    make_ai_api, capsys, caplog, data_api_client, status, state
+):
+    client, transport = make_ai_api(VALID_STEPS, data_api_client=data_api_client)
+
+    with caplog.at_level(logging.ERROR, logger="k_b.ai_api"):
+        response = post_digests(client)
+
+    assert response.status_code == status
+    assert response.json() == {"error": state}
+    assert transport.requests == []
+    assert capsys.readouterr().out == ""
+    request_id = response.headers["X-Request-ID"]
+    [failure] = [
+        r.getMessage() for r in caplog.records if r.name.startswith("k_b.ai_api")
+    ]
+    assert failure.startswith(f"reading of the watch failed: {state}")
+    assert failure.endswith(f", request_id={request_id}")
+
+
+# The fields of a metric line, in the order of the spec (docs/fiches-veille.md, "Métriques").
+METRIC_FIELDS = [
+    "ts",
+    "event",
+    "request_id",
+    "stage",
+    "subject",
+    "provider",
+    "model",
+    "prompt_version",
+    "items_in",
+    "items_truncated",
+    "items_dropped",
+    "items_capped",
+    "input_chars",
+    "tokens_in",
+    "tokens_out",
+    "reasoning_tokens",
+    "data_fetch_ms",
+    "llm_ms",
+    "check_ms",
+    "attempts",
+    "outcome",
+    "finish_reason",
+    "http_status",
+    "schema_valid",
+    "failed_check",
+    "first_failed_check",
+    "facts_checked",
+    "facts_found",
+    "claims_removed",
+    "items_uncited",
+    "cost_estimated",
+]
+
+
+def test_each_call_writes_one_json_line_on_stdout_without_a_text(make_ai_api, capsys):
+    client, _ = make_ai_api(VALID_STEPS)
+
+    response = post_digests(client)
+
+    output = capsys.readouterr().out
+    lines = [json.loads(line) for line in output.splitlines()]
+    assert [(line["stage"], line["subject"]) for line in lines] == [
+        ("classify", None),
+        ("write", "security_alerts"),
+        ("write", "agent_tools"),
+        ("write", "research"),
+    ]
+    first, *others = lines
+    assert list(first) == METRIC_FIELDS
+    assert first["event"] == "llm_call"
+    assert first["request_id"] == response.json()["request_id"]
+    assert (first["provider"], first["model"]) == ("replay", "replay")
+    assert isinstance(first["data_fetch_ms"], int)
+    assert (first["items_in"], first["items_dropped"], first["items_capped"]) == (
+        10,
+        0,
+        False,
+    )
+    assert (first["claims_removed"], first["items_uncited"]) == (None, None)
+    for line in others:
+        assert (line["data_fetch_ms"], line["items_dropped"], line["items_capped"]) == (
+            None,
+            None,
+            None,
+        )
+    assert (others[0]["claims_removed"], others[0]["items_uncited"]) == (0, 0)
+    for line in lines:
+        assert (line["outcome"], line["http_status"], line["attempts"]) == (
+            "ok",
+            200,
+            1,
+        )
+        # Filled by #207.
+        assert (line["facts_checked"], line["facts_found"]) == (None, None)
+        assert line["ts"].endswith("Z")
+        assert line["ts"] == datetime.fromisoformat(line["ts"]).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+    # Neither the text of a claim nor a title.
+    assert "CVE-2026-86950" not in output
+    assert "Apple" not in output
+
+
+def test_the_cost_is_the_tokens_at_the_prices_of_the_config(make_ai_api, capsys):
+    client, _ = make_ai_api(VALID_STEPS)
+
+    post_digests(client)
+
+    expected = round(
+        (
+            TOKENS_IN * LLM_INPUT_USD_PER_MILLION_TOKENS
+            + TOKENS_OUT * LLM_OUTPUT_USD_PER_MILLION_TOKENS
+        )
+        / 1_000_000,
+        6,
+    )
+    assert {line["cost_estimated"] for line in read_metric_lines(capsys)} == {expected}
+    assert expected == 0.00024
+
+
+class RecordingOutput:
+    """A stdout that keeps what is written and when it is flushed."""
+
+    def __init__(self):
+        self.events = []
+
+    def write(self, text):
+        self.events.append(("write", text))
+        return len(text)
+
+    def flush(self):
+        self.events.append(("flush", None))
+
+
+def test_each_metric_line_is_flushed_at_once(make_ai_api, monkeypatch):
+    """On SIGTERM, uvicorn sends the signal again: a line left in the buffer of a pipe is lost."""
+    client, _ = make_ai_api(VALID_STEPS)
+    output = RecordingOutput()
+    monkeypatch.setattr(sys, "stdout", output)
+
+    post_digests(client)
+
+    kinds = [kind for kind, _ in output.events]
+    assert kinds == ["write", "flush"] * 4
+    assert all(text.endswith("\n") for kind, text in output.events if kind == "write")
+
+
+def test_health_answers_without_key(make_ai_api):
+    client, _ = make_ai_api([])
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_only_the_public_routes_answer_without_a_key(make_ai_api):
+    client, _ = make_ai_api([])
+    routes = {
+        (route.path, method)
+        for route in iter_route_contexts(client.app.routes)
+        for method in route.methods or ()
+        if method != "HEAD"
+    }
+
+    answered_without_key = {
+        path
+        for path, method in routes
+        if client.request(method, path).status_code != 401
+    }
+
+    assert routes == {
+        ("/docs", "GET"),
+        ("/openapi.json", "GET"),
+        ("/health", "GET"),
+        ("/digests", "POST"),
+    }
+    assert answered_without_key == {"/docs", "/openapi.json", "/health"}
+
+
+def test_a_final_slash_is_an_unknown_route(make_ai_api):
+    client, _ = make_ai_api([])
+
+    response = client.post("/digests/", json={}, headers=AUTHORIZATION)
+
+    assert response.status_code == 404
+    assert response.json() == {"error": "route_not_found"}
+
+
+def test_each_state_that_fails_a_request_has_its_status():
+    """A state without status would answer 500 in place of a named 502, 503 or 504."""
+    failure_states = {
+        *get_args(LlmFailure.__value__),
+        *get_args(DataApiState.__value__),
+    }
+
+    assert set(STATUS_BY_STATE) == failure_states

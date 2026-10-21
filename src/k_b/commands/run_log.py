@@ -20,7 +20,12 @@ LOG_FILE_PATH = Path("logs") / "kb.log"
 # day before once a rotation done by kb collect or kb import has renamed it (docs/specs-api.md,
 # "Journal").
 SERVE_LOG_FILE_PATH = Path("logs") / "kb-serve.log"
+# The log of kb serve-ai, apart for the same reason: a long run, beside kb serve.
+SERVE_AI_LOG_FILE_PATH = Path("logs") / "kb-serve-ai.log"
 LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+# The HTTP client of the AI API logs each request at INFO, with its URL (the resource of the
+# provider) and without the id of the request of kb serve-ai: from WARNING only.
+HTTP_CLIENT_LOGGER_NAME = "httpx2"
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -30,7 +35,8 @@ def logging_to(
     data_dir: Path, log_file_path: Path | None = LOG_FILE_PATH
 ) -> Iterator[None]:
     """Log every line of level INFO and above on stderr and, unless log_file_path is None, in
-    the log file of the data directory (logs/kb.log, or logs/kb-serve.log for kb serve), dated
+    the log file of the data directory (logs/kb.log, logs/kb-serve.log for kb serve,
+    logs/kb-serve-ai.log for kb serve-ai), dated
     in UTC in the format of the base (2026-10-14T11:30:00Z); the file turns at midnight UTC into
     <file>.<day>.
 
@@ -55,14 +61,18 @@ def logging_to(
     formatter.converter = time.gmtime
     root_logger = logging.getLogger()
     previous_level = root_logger.level
+    http_client_logger = logging.getLogger(HTTP_CLIENT_LOGGER_NAME)
+    previous_http_client_level = http_client_logger.level
     for handler in handlers:
         handler.setFormatter(formatter)
         root_logger.addHandler(handler)
     root_logger.setLevel(logging.INFO)
+    http_client_logger.setLevel(logging.WARNING)
     try:
         yield
     finally:
         root_logger.setLevel(previous_level)
+        http_client_logger.setLevel(previous_http_client_level)
         for handler in handlers:
             root_logger.removeHandler(handler)
             handler.close()

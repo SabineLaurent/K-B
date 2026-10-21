@@ -1,10 +1,13 @@
 """What the data API and the AI API may import, read at two levels, three under k_b.ai_api
 (conventions.md, rule 5).
 
-Under k_b.ai_api: digests → the stages → the clients → the settings → outbound and llm_replay →
-deadline and watch_items; a module imports only the layers below its own.
+Under k_b.ai_api: app → api_router → the routers → the pieces of a route (errors, dependencies,
+schemas, metrics) → digests → the stages → the clients → the settings of the connectors →
+outbound and llm_replay → deadline, watch_items and the settings of kb serve-ai; a module
+imports only the layers below its own.
 """
 
+import importlib
 from pathlib import Path
 
 import pytest
@@ -67,12 +70,31 @@ def test_the_data_api_rule_refuses_etl_and_the_writers(code, is_refused):
 
 
 # api_router.py gathers the routers; the app plugs in it alone (code.md, "Séparation des
-# responsabilités"; #246).
-def test_the_app_of_the_data_api_imports_no_router():
-    path = PACKAGE_DIR / "data_api" / "app.py"
+# responsabilités"; #246), in both APIs.
+@pytest.mark.parametrize("api", ["data_api", "ai_api"])
+def test_the_app_of_an_api_imports_no_router(api):
+    path = PACKAGE_DIR / api / "app.py"
     imported = list_imported_modules(path, find_package(path), depth=3)
 
-    assert {name for name in imported if is_within(name, {"data_api.routers"})} == set()
+    assert {name for name in imported if is_within(name, {f"{api}.routers"})} == set()
+
+
+# Each router declares its prefix and its tags on its APIRouter, in both APIs: the tags group the
+# routes in /docs and the OpenAPI (decision of Sabine of 2026-10-21, #156; skill fastapi,
+# references/path-operations.md).
+@pytest.mark.parametrize("api", ["data_api", "ai_api"])
+def test_each_router_of_an_api_declares_its_prefix_and_its_tags(api):
+    paths = [
+        path
+        for path in list_python_files(f"{api}.routers")
+        if path.name != "__init__.py"
+    ]
+
+    assert paths
+    for path in paths:
+        router = importlib.import_module(f"k_b.{name_module(path)}").router
+        assert router.prefix, path
+        assert router.tags, path
 
 
 # The AI API reads the watch through the data API, never the base (docs/fiches-veille.md, "Le
@@ -117,12 +139,21 @@ def test_the_ai_api_rule_refuses_the_base_the_pipeline_and_the_other_apis(
 # Under k_b.ai_api, each module is in exactly one layer, from the bottom up (#242). A module
 # imports only the layers below its own: two modules of one layer do not import each other.
 AI_API_LAYERS = (
-    {"ai_api.deadline", "ai_api.watch_items"},
+    {"ai_api.deadline", "ai_api.watch_items", "ai_api.settings"},
     {"ai_api.connectors.outbound", "ai_api.connectors.llm_replay"},
     {"ai_api.connectors.llm_settings", "ai_api.connectors.data_api_settings"},
     {"ai_api.connectors.llm_client", "ai_api.connectors.data_api_client"},
     {"ai_api.stages.classification", "ai_api.stages.writing"},
     {"ai_api.digests"},
+    {
+        "ai_api.errors",
+        "ai_api.dependencies",
+        "ai_api.schemas.digest_schema",
+        "ai_api.metrics",
+    },
+    {"ai_api.routers.digest_router"},
+    {"ai_api.api_router"},
+    {"ai_api.app"},
 )
 
 

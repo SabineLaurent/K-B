@@ -9,9 +9,18 @@ import httpx2
 import pytest
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
-from k_b.ai_api.connectors.llm_client import FailedCheck, build_http_client, call_model
+from k_b.ai_api.connectors.llm_client import (
+    MAX_RETRY_AFTER_DIGITS,
+    FailedCheck,
+    build_http_client,
+    call_model,
+    to_failure,
+)
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
-from k_b.ai_api.connectors.llm_settings import LlmSettings, read_llm_settings
+from k_b.ai_api.connectors.llm_settings import (
+    LlmSettings,
+    read_llm_settings_or_refusal,
+)
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.stages.classification import CLASSIFICATION_MAX_COMPLETION_TOKENS
 from k_b.ai_api.stages.writing import WRITING_MAX_COMPLETION_TOKENS
@@ -23,6 +32,7 @@ from k_b.core.config import (
     LLM_RETRY_AFTER_MAX_SECONDS,
     LLM_RETRY_WAIT_SECONDS,
     LLM_WRITE_TIMEOUT_SECONDS,
+    MAX_TOKENS_READ_PER_ANSWER,
     MIN_SECONDS_FOR_LLM_REQUEST,
 )
 
@@ -593,10 +603,10 @@ def test_the_replay_client_sends_no_key():
 def test_the_replay_chosen_by_the_settings_answers_from_its_file(tmp_path):
     replay_file = tmp_path / "replay.json"
     replay_file.write_text(json.dumps([completion(), response(503)]))
-    settings = read_llm_settings(
+    settings = read_llm_settings_or_refusal(
         {"KB_LLM_PROVIDER": "replay", "KB_LLM_REPLAY_FILE": str(replay_file)}
     )
-    assert settings is not None
+    assert isinstance(settings, LlmSettings)
 
     with build_http_client(settings) as http_client:
         answers = [
@@ -667,7 +677,7 @@ def test_an_answer_that_cannot_be_decoded_is_llm_unavailable_without_retry():
     assert len(requests) == 1
 
 
-def test_a_retry_after_of_any_number_of_digits_is_compared_to_the_maximum():
+def test_a_retry_after_of_seven_digits_is_compared_to_the_maximum():
     llm_call, transport, sleeps = call(
         [response(429, retry_after="3600000"), completion()]
     )
@@ -802,3 +812,68 @@ def test_a_429_of_any_attempt_is_kept(steps, saw_rate_limit):
     llm_call, _, _ = call(steps)
 
     assert llm_call.saw_rate_limit is saw_rate_limit
+
+
+@pytest.mark.parametrize(
+    "usage",
+    [
+        {"prompt_tokens": MAX_TOKENS_READ_PER_ANSWER + 1},
+        {"completion_tokens": MAX_TOKENS_READ_PER_ANSWER + 1},
+        {"reasoning_tokens": MAX_TOKENS_READ_PER_ANSWER + 1},
+        # 309 digits: int * float overflows (review of #156).
+        {"prompt_tokens": int("9" * 309)},
+    ],
+    ids=["prompt", "completion", "reasoning", "309-digits"],
+)
+def test_a_token_count_beyond_the_bound_is_an_answer_not_read(usage):
+    """The answer of the provider is an input not trusted (OWASP API10:2023): a count beyond
+    the bound would make the cost of the metric line overflow."""
+    llm_call, transport, sleeps = call([completion(**usage)])
+
+    assert llm_call.outcome == "llm_unavailable"
+    assert llm_call.output is None
+    assert (llm_call.tokens_in, llm_call.tokens_out) == (0, 0)
+    assert sleeps == []
+    assert len(transport.requests) == 1
+
+
+def test_a_token_count_at_the_bound_is_read():
+    llm_call, _, _ = call(
+        [completion(prompt_tokens=MAX_TOKENS_READ_PER_ANSWER, completion_tokens=1)]
+    )
+
+    assert llm_call.outcome == "ok"
+    assert llm_call.tokens_in == MAX_TOKENS_READ_PER_ANSWER
+
+
+@pytest.mark.parametrize(
+    "retry_after", ["1" * (MAX_RETRY_AFTER_DIGITS + 1), "9" * 4301]
+)
+def test_a_retry_after_too_long_to_read_ends_the_call_without_retry(retry_after):
+    """int() refuses 4,301 digits or more; a provider that said to wait is not asked again, and
+    no value is given back."""
+    llm_call, transport, sleeps = call(
+        [response(429, retry_after=retry_after), completion()]
+    )
+
+    assert llm_call.outcome == "llm_rate_limited"
+    assert llm_call.retry_after_seconds is None
+    assert sleeps == []
+    assert len(transport.requests) == 1
+
+
+def test_a_retry_after_of_the_most_digits_read_is_compared_to_the_maximum():
+    llm_call, _, sleeps = call(
+        [response(429, retry_after="9" * MAX_RETRY_AFTER_DIGITS), completion()]
+    )
+
+    assert llm_call.retry_after_seconds == int("9" * MAX_RETRY_AFTER_DIGITS)
+    assert sleeps == []
+
+
+def test_a_call_without_output_is_never_read_as_ok():
+    """Its state names a failed subject or a failed request: ok there would answer 500."""
+    with pytest.raises(ValueError, match="not ok"):
+        to_failure("ok")
+
+    assert to_failure("llm_timeout") == "llm_timeout"

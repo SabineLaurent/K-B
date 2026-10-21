@@ -3464,6 +3464,84 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
   - `uv.lock` gagne trois dépendances de `pytest-html` (`pytest-metadata`, `jinja2`,
     `markupsafe`), en développement seulement, acceptées par l'utilisatrice. — PR de #290
 
+### API IA : servir les fiches par `POST /digests`
+
+Décisions de Sabine du 2026-10-21 sur #156, relayées par time-knight : le plan relu par un
+sous-agent et validé (14:33Z), puis les décisions prises pendant le travail. Tri des revues par
+time-knight (délégation de Sabine du 2026-10-15).
+
+- **Ce qui est commun aux deux API vit une fois dans `core/` : la clé lue au démarrage
+  (`api_keys.py`, le préfixe en paramètre) et vérifiée à chaque requête (`api_access.py`), les
+  erreurs et leurs gestionnaires (`api_errors.py`), le journal des requêtes (`api_request_log.py`),
+  la santé (`api_health.py`), la règle de l'hôte et du port (`api_settings.py`). `data_api/` ne
+  garde que ce que sa base donne (`database_missing`, `database_error`) et ses hôtes permis.**
+  Pourquoi : critère de #156 (« sans être recopiés ») ; l'API IA ne peut importer que `ai_api`,
+  `items` et `core`. La vérification est à part de la lecture, pour que la lecture de
+  l'environnement n'importe pas FastAPI (relecture du plan). Options écartées : un module
+  `core/api_app.py` qui câblerait l'app commune (deuxième occurrence ; l'ordre des middlewares
+  diffère, `TrustedHostMiddleware` de l'API de données passant sous le journal) ; recopier dans
+  `ai_api/`. Limite assumée : le nom de journal des lignes de requête devient
+  `k_b.core.api_request_log`, au lieu de `k_b.data_api.request_log`. **Révise** 2026-10-14,
+  « API de données », entrée « Paquet `src/k_b/data_api/` » : `request_log.py` et `health.py`
+  quittent le paquet, et `dependencies.py` n'y porte plus la clé. **Révise** 2026-10-18, « API IA :
+  organisation par rôle » : la racine d'`ai_api` ne reçoit ni `health.py` ni `request_log.py`,
+  qui sont dans `core/`, mais `settings.py` et `metrics.py` (les lignes `llm_call`). — PR de #156
+- **Chaque requête des deux API reçoit un identifiant (UUID) du journal commun, écrit dans chacune
+  de ses lignes de journal et renvoyé dans l'en-tête `X-Request-ID` ; l'API IA le rend aussi dans
+  sa réponse 200 et dans ses lignes de métrique.** Pourquoi, celui du plan validé : un outil commun
+  ne connaît pas de cas particulier (`code.md`), et l'en-tête relie un 502 à ses lignes `llm_call`
+  sans changer le corps `{"error": …}` (réserve du relecteur du plan). Options écartées : un
+  identifiant de l'API IA seule ; un identifiant dans le corps d'une erreur. L'API de données passe
+  en 0.5.0 (seconde revue de code). — PR de #156
+- **L'API IA est servie par `kb serve-ai`, réglée par `KB_AI_API_HOST` (`127.0.0.1`),
+  `KB_AI_API_PORT` (`8001`) et `KB_DIGEST_WINDOW_DAYS` (3, de 1 à 14), avec son propre fichier de
+  journal, `logs/kb-serve-ai.log` ; ses clients ont leur clé dans `KB_AI_API_KEY_<CLIENT>`
+  (`kb digest` est le client `KB_DIGEST`).** Pourquoi, celui du plan validé : un processus long a
+  son fichier, pour la même raison que `kb serve` (2026-10-14, « Journaux »).
+  Options écartées : `kb serve-ia`, `kb serve --ai`. Limite assumée : un seul `kb serve-ai` par
+  `KB_DATA_DIR`. **Révise** 2026-10-14, « Journaux » : `kb serve` n'est plus le seul processus long.
+  — PR de #156
+- **Pas de `TrustedHostMiddleware` sur l'API IA.** Pourquoi (relecteur du plan, accepté par
+  Sabine) : sans clé, une requête n'atteint que `/health`, `/docs` et `/openapi.json`, qui ne
+  contiennent aucune donnée ; un rebinding DNS n'obtient rien et ne coûte aucun appel. Écart voulu
+  à la ligne API8 de `docs/specs-api.md`. Option écartée : `KB_AI_API_ALLOWED_HOSTS`. Limite
+  assumée : à revoir par #161 (OWASP API Top 10 de l'API IA) et en conteneurs (#200), où l'hôte
+  appelant change. — PR de #156
+- **Chaque `APIRouter` de `routers/`, dans les deux API, déclare son `prefix` et ses `tags`
+  (`/digests`, `/items`, `/trends`), la route n'écrivant que la fin de son chemin ; un test
+  d'architecture tient la règle.** Pourquoi, celui de Sabine : suivre la doc FastAPI (skill
+  `fastapi`, `references/path-operations.md`) et le critère du 17/10 sur #156 ; les tags regroupent
+  les routes dans `/docs` et l'OpenAPI. Option écartée : le chemin entier dans le décorateur, sans
+  `prefix`, la forme de l'API de données jusque-là, recommandée un temps par time-knight pour
+  n'avoir qu'une règle. Les adresses ne changent pas. — PR de #156
+- **Les clés de l'API de données s'appellent `KB_DATA_API_KEY_<CLIENT>`, en face de
+  `KB_AI_API_KEY_<CLIENT>` ; la constante `API_KEY_VARIABLE_PREFIX` garde son nom ; la clé que
+  l'API IA envoie devient `KB_DATA_API_KEY_AI_DIGEST`.** Pourquoi, celui de Sabine : tous les
+  réglages de l'API de données s'écrivent déjà `KB_DATA_API_*`, et `KB_API_KEY_AI_DIGEST` se
+  lisait comme une clé de l'API IA. Option écartée : garder `KB_API_KEY_`. Limite assumée : après
+  la fusion, `kb serve` ne trouve plus une clé sous l'ancien nom (il refuse de démarrer, « no API
+  key ») : l'utilisatrice renomme ses variables. **Révise** 2026-10-21, « Tests : les tests de bout
+  en bout ne reçoivent que leurs variables… », limite « la famille `KB_API_KEY_<CLIENT>` … la
+  seule que `kb` lit par préfixe » : la famille s'appelle `KB_DATA_API_KEY_<CLIENT>`, et
+  `KB_AI_API_KEY_<CLIENT>` est une seconde famille lue par préfixe, que le garde-fou ne connaît
+  pas encore (signalé à la piste A). — PR de #156
+- **`kb serve-ai` lit les réglages du modèle et de l'API de données par
+  `read_llm_settings_or_refusal` et `read_data_api_settings_or_refusal`, et journalise un refus par
+  `value_or_log_refusal`, sous `k_b.cli`, comme `kb serve` ; les enveloppes `read_llm_settings` et
+  `read_data_api_settings` sont retirées.** Pourquoi : la porte journalise le refus (2026-10-18,
+  « Ligne de commande : une porte mince ») ; plus de copie du motif (commentaire du 18/10 sur #156).
+  Option écartée : faire rejoindre `core/` à `value_or_log_refusal`, qui n'a plus qu'un appelant,
+  `commands/`. **Révise** 2026-10-18, « Ligne de commande : une porte mince », limite « la fonction
+  rejoindra `core/` avec elles » : les copies sont retirées et la fonction reste dans `commands/`.
+  — PR de #156
+- **`kb serve-ai` refuse de démarrer (code 2) si une clé de ses clients est celle qu'il envoie à
+  l'API de données ; il ne la compare qu'à `KB_DATA_API_KEY_AI_DIGEST`.** Pourquoi : l'API de
+  données donne tout à chaque client, et partager cette clé ouvrirait la base au client de l'IA
+  (première revue de code). Comparer aussi aux autres clés de l'API de données est écarté par
+  Sabine : sur le Mac, `kb digest` lit déjà tout l'environnement, et toutes les clés de l'API de
+  données ont les mêmes droits. Limite assumée : en conteneurs et sur ACA, une clé distincte par
+  service, chacun ne recevant que les siennes (signalé). — PR de #156
+
 ## Décisions encore ouvertes
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,

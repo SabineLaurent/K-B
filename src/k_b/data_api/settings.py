@@ -4,11 +4,11 @@ client of the data API has its own, ai_api/connectors/data_api_settings.py.
 Not set: the local defaults of core/config.py (.claude/rules/poc.md, rule 2).
 """
 
-import ipaddress
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from k_b.core.api_settings import find_host_refusal, find_port_refusal
 from k_b.core.config import DATA_API_ALLOWED_HOSTS, DATA_API_HOST, DATA_API_PORT
 from k_b.core.quoting import quote_value
 
@@ -16,9 +16,6 @@ from k_b.core.quoting import quote_value
 DATA_API_HOST_VARIABLE = "KB_DATA_API_HOST"
 DATA_API_PORT_VARIABLE = "KB_DATA_API_PORT"
 DATA_API_ALLOWED_HOSTS_VARIABLE = "KB_DATA_API_ALLOWED_HOSTS"
-# Digits only: int() would also read " 8000", "+8000" and "8_000".
-PORT_DIGITS = re.compile(r"[0-9]{1,5}")
-PORT_NUMBERS = range(1, 65536)
 # A host name in lowercase, without * nor port: TrustedHostMiddleware compares the Host received
 # as it is (starlette/middleware/trustedhost.py), and an entry of this form has nothing to escape
 # in the log.
@@ -45,33 +42,13 @@ def read_serve_settings_or_refusal(environ: Mapping[str, str]) -> ServeSettings 
         else split_allowed_hosts(allowed_hosts_value)
     )
     refusal = (
-        find_host_refusal(host)
-        or find_port_refusal(port)
+        find_host_refusal(DATA_API_HOST_VARIABLE, host)
+        or find_port_refusal(DATA_API_PORT_VARIABLE, port)
         or find_allowed_hosts_refusal(allowed_hosts)
     )
     if refusal is not None:
         return refusal
     return ServeSettings(host=host, port=int(port), allowed_hosts=allowed_hosts)
-
-
-def find_host_refusal(host: str) -> str | None:
-    """Why the host is refused, or None. An IPv4 address only: uvicorn would bind an empty host
-    to every interface, and the Host of a client in IPv6 keeps its brackets ([::1]), which no
-    allowed host can name."""
-    try:
-        ipaddress.IPv4Address(host)
-    except ValueError:
-        return f"{DATA_API_HOST_VARIABLE}: {quote_value(host)} not an IPv4 address"
-    return None
-
-
-def find_port_refusal(port: str) -> str | None:
-    if PORT_DIGITS.fullmatch(port) and int(port) in PORT_NUMBERS:
-        return None
-    return (
-        f"{DATA_API_PORT_VARIABLE}: {quote_value(port)} not an integer"
-        f" from {PORT_NUMBERS.start} to {PORT_NUMBERS.stop - 1}"
-    )
 
 
 def split_allowed_hosts(allowed_hosts: str) -> tuple[str, ...]:

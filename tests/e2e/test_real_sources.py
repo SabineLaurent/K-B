@@ -6,7 +6,7 @@ Left out of uv run pytest (tests/conftest.py). Run on the Mac, with the HTML rep
 uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html --self-contained-html
 .env.e2e_test holds the settings of the sources alone (.env.e2e_test.example), and each kb gets
 the environment of the terminal too: run it from a terminal without .env exported. A variable of
-.env.example that is not in .env.e2e_test.example, or any KB_API_KEY_<CLIENT>, stops the tests
+.env.example that is not in .env.e2e_test.example, or any KB_DATA_API_KEY_<CLIENT>, stops the tests
 before any kb, but the ones the test sets itself (KB_DATA_DIR, KB_COLLECT_ONLY) or
 tests/conftest.py removes (KB_LOG_TO_FILE, KB_DATA_API_HOST, KB_DATA_API_PORT,
 KB_DATA_API_ALLOWED_HOSTS): KB_DATA_API_URL, of the AI API, stops them. To be run the same way in
@@ -94,7 +94,7 @@ REPOSITORY_DIR = Path(__file__).parents[2]
 ENV_EXAMPLE_PATH = REPOSITORY_DIR / ".env.example"
 E2E_ENV_EXAMPLE_PATH = REPOSITORY_DIR / ".env.e2e_test.example"
 # A line NAME=value of an environment file, set or commented out: .env.example comments out
-# some keys (KB_API_KEY_AI_DIGEST).
+# some keys (KB_DATA_API_KEY_AI_DIGEST).
 VARIABLE_LINE = re.compile(r"^#?[ \t]*([A-Z][A-Z0-9_]*)=", re.MULTILINE)
 # A line NAME=value that is set: a name commented out in .env.e2e_test.example is not theirs.
 SET_VARIABLE_LINE = re.compile(r"^([A-Z][A-Z0-9_]*)=", re.MULTILINE)

@@ -1,5 +1,5 @@
 """Command line: `kb collect`, `kb create-db`, `kb import`, `kb write-tops`, `kb serve`,
-`kb openapi`.
+`kb serve-ai`, `kb openapi`.
 
 The entry point of kb: it reads the command, opens the log and hands the run to its module in
 commands/.
@@ -16,21 +16,34 @@ from k_b.commands.create_db_command import run_create_db
 from k_b.commands.environment import read_data_dir, read_log_to_file
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.import_command import run_import
-from k_b.commands.openapi_command import OPENAPI_PATH, run_openapi
+from k_b.commands.openapi_command import (
+    AI_API_OPENAPI_PATH,
+    DATA_API_OPENAPI_PATH,
+    run_openapi,
+)
 from k_b.commands.run_log import (
     LOG_FILE_PATH,
     LOGGER_NAME,
+    SERVE_AI_LOG_FILE_PATH,
     SERVE_LOG_FILE_PATH,
     logging_to,
 )
+from k_b.commands.serve_ai_command import run_serve_ai
 from k_b.commands.serve_command import run_serve
 from k_b.commands.sigterm import StoppedBySigtermError, stopping_on_sigterm
 from k_b.commands.write_tops_command import run_write_tops
-from k_b.core.config import DATA_API_HOST, DATA_API_PORT
+from k_b.core.config import AI_API_HOST, AI_API_PORT, DATA_API_HOST, DATA_API_PORT
 from k_b.database.connection import DATABASE_FILE_NAME
 from k_b.etl.collected_sources import COLLECT_ONLY_VARIABLE
 
 logger = logging.getLogger(LOGGER_NAME)
+
+# The long runs, each with its own log file: a rotation done by another command would leave it
+# writing in the file of the day before (docs/specs-api.md, "Journal").
+LOG_FILE_PATH_BY_COMMAND = {
+    "serve": SERVE_LOG_FILE_PATH,
+    "serve-ai": SERVE_AI_LOG_FILE_PATH,
+}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -64,7 +77,14 @@ def main(argv: list[str] | None = None) -> int:
         f" http://{DATA_API_HOST}:{DATA_API_PORT} by default",
     )
     command_parsers.add_parser(
-        "openapi", help=f"write the OpenAPI of the data API in {OPENAPI_PATH}"
+        "serve-ai",
+        help="serve the digests of the watch by the AI API, on"
+        f" http://{AI_API_HOST}:{AI_API_PORT} by default",
+    )
+    command_parsers.add_parser(
+        "openapi",
+        help=f"write the OpenAPI of the data API in {DATA_API_OPENAPI_PATH} and the one of"
+        f" the AI API in {AI_API_OPENAPI_PATH}",
     )
     arguments = parser.parse_args(argv)
 
@@ -77,9 +97,7 @@ def main(argv: list[str] | None = None) -> int:
         return ExitCode.NOT_STARTED
     log_file_path = None
     if log_to_file:
-        log_file_path = (
-            SERVE_LOG_FILE_PATH if arguments.command == "serve" else LOG_FILE_PATH
-        )
+        log_file_path = LOG_FILE_PATH_BY_COMMAND.get(arguments.command, LOG_FILE_PATH)
     with ExitStack() as log_stack:
         try:
             log_stack.enter_context(logging_to(data_dir, log_file_path))
@@ -118,4 +136,6 @@ def run_command(command: str, data_dir: Path) -> int:
         return run_write_tops(data_dir)
     if command == "serve":
         return run_serve(data_dir)
+    if command == "serve-ai":
+        return run_serve_ai()
     return run_collect(data_dir)

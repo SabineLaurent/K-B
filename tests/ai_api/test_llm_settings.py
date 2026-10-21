@@ -1,11 +1,13 @@
 """The settings of the model, read from a dict given as the environment: never from .env."""
 
 import json
-import logging
 
 import pytest
 
-from k_b.ai_api.connectors.llm_settings import read_llm_settings
+from k_b.ai_api.connectors.llm_settings import (
+    LlmSettings,
+    read_llm_settings_or_refusal,
+)
 from k_b.core.config import LLM_REPLAY_BASE_URL
 
 # Made for the test: never a real key.
@@ -26,36 +28,27 @@ def replay_environment(tmp_path):
     return {"KB_LLM_PROVIDER": "replay", "KB_LLM_REPLAY_FILE": str(replay_file)}
 
 
-def test_the_settings_of_a_provider_are_read(caplog):
-    caplog.set_level(logging.INFO)
+def test_the_settings_of_a_provider_are_read():
+    settings = read_llm_settings_or_refusal(PROVIDER_ENVIRONMENT)
 
-    settings = read_llm_settings(PROVIDER_ENVIRONMENT)
-
-    assert settings is not None
+    assert isinstance(settings, LlmSettings)
     assert settings.provider == "openai_compatible"
     assert settings.base_url == "https://models.example/openai/v1"
     assert settings.model == "gpt-5.6-luna"
     assert settings.api_key is not None
     assert settings.api_key.get_secret_value() == TEST_API_KEY
     assert settings.reasoning_effort is None
-    assert caplog.messages == ["LLM provider openai_compatible, model gpt-5.6-luna"]
 
 
-def test_the_settings_of_the_replay_need_neither_url_nor_key(
-    replay_environment, caplog
-):
-    caplog.set_level(logging.INFO)
+def test_the_settings_of_the_replay_need_neither_url_nor_key(replay_environment):
+    settings = read_llm_settings_or_refusal(replay_environment)
 
-    settings = read_llm_settings(replay_environment)
-
-    assert settings is not None
+    assert isinstance(settings, LlmSettings)
     assert settings.provider == "replay"
     assert settings.base_url == LLM_REPLAY_BASE_URL
     assert settings.api_key is None
     assert settings.replay_steps is not None
     assert [step.kind for step in settings.replay_steps] == ["completion", "timeout"]
-    # A container set on the replay by mistake says it.
-    assert caplog.messages == ["LLM provider replay, model replay"]
 
 
 @pytest.mark.parametrize(
@@ -67,32 +60,35 @@ def test_the_settings_of_the_replay_need_neither_url_nor_key(
     ids=["missing", "out-of-the-model"],
 )
 def test_a_replay_file_missing_or_out_of_the_model_stops_the_start(
-    tmp_path, content, message, caplog
+    tmp_path, content, message
 ):
     replay_file = tmp_path / "replay.json"
     if content is not None:
         replay_file.write_text(content)
     environment = {"KB_LLM_PROVIDER": "replay", "KB_LLM_REPLAY_FILE": str(replay_file)}
 
-    assert read_llm_settings(environment) is None
-    (logged,) = caplog.messages
-    assert logged.startswith("KB_LLM_REPLAY_FILE: ")
-    assert logged.endswith(message)
+    refusal = read_llm_settings_or_refusal(environment)
+
+    assert isinstance(refusal, str)
+    assert refusal.startswith("KB_LLM_REPLAY_FILE: ")
+    assert refusal.endswith(message)
 
 
 def test_an_empty_reasoning_effort_is_not_set():
-    settings = read_llm_settings(PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": ""})
+    settings = read_llm_settings_or_refusal(
+        PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": ""}
+    )
 
-    assert settings is not None
+    assert isinstance(settings, LlmSettings)
     assert settings.reasoning_effort is None
 
 
 def test_reasoning_effort_none_is_read():
-    settings = read_llm_settings(
+    settings = read_llm_settings_or_refusal(
         PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": "none"}
     )
 
-    assert settings is not None
+    assert isinstance(settings, LlmSettings)
     assert settings.reasoning_effort == "none"
 
 
@@ -171,9 +167,8 @@ def test_reasoning_effort_none_is_read():
         "reasoning-effort-other-than-none",
     ],
 )
-def test_a_setting_refused_is_logged_and_gives_none(environment, message, caplog):
-    assert read_llm_settings(environment) is None
-    assert caplog.messages == [message]
+def test_a_setting_refused_gives_its_reason(environment, message):
+    assert read_llm_settings_or_refusal(environment) == message
 
 
 @pytest.mark.parametrize(
@@ -194,14 +189,13 @@ def test_a_setting_refused_is_logged_and_gives_none(environment, message, caplog
     ],
     ids=["user-information", "query", "fragment"],
 )
-def test_a_url_refused_is_never_quoted_since_it_may_carry_a_key(
-    base_url, message, caplog
-):
+def test_a_url_refused_is_never_quoted_since_it_may_carry_a_key(base_url, message):
     environment = PROVIDER_ENVIRONMENT | {"KB_LLM_BASE_URL": base_url}
 
-    assert read_llm_settings(environment) is None
-    assert caplog.messages == [message]
-    assert TEST_API_KEY not in caplog.text
+    refusal = read_llm_settings_or_refusal(environment)
+
+    assert refusal == message
+    assert TEST_API_KEY not in refusal
 
 
 @pytest.mark.parametrize(
@@ -209,17 +203,16 @@ def test_a_url_refused_is_never_quoted_since_it_may_carry_a_key(
     [" key", "key with space", "clé", "key\n"],
     ids=["space-before", "space", "non-ascii", "line-break"],
 )
-def test_a_key_refused_is_never_quoted(api_key, caplog):
+def test_a_key_refused_is_never_quoted(api_key):
     environment = PROVIDER_ENVIRONMENT | {"KB_LLM_API_KEY": api_key}
 
-    assert read_llm_settings(environment) is None
-    assert caplog.messages == [
-        "KB_LLM_API_KEY: a character outside printable ASCII, or a space"
-    ]
-    assert api_key.strip() not in caplog.text
+    refusal = read_llm_settings_or_refusal(environment)
+
+    assert refusal == "KB_LLM_API_KEY: a character outside printable ASCII, or a space"
+    assert api_key.strip() not in refusal
 
 
 def test_the_key_is_not_in_the_representation_of_the_settings():
-    settings = read_llm_settings(PROVIDER_ENVIRONMENT)
+    settings = read_llm_settings_or_refusal(PROVIDER_ENVIRONMENT)
 
     assert TEST_API_KEY not in repr(settings)

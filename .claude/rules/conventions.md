@@ -51,7 +51,8 @@ lu le 2026-10-16). La base SQLite, que SQLite écrit lui-même, est hors de cett
 La copie temporaire d'une base source (Zotero) est hors de cette règle elle aussi : elle vit dans
 un `tempfile.TemporaryDirectory` du système, hors du dossier de données, supprimé sur un succès,
 une erreur ou un Ctrl-C ; chaque extraction retire d'abord les copies qu'un processus tué aurait
-laissées. Le journal de fonctionnement (`logs/kb.log`, et `logs/kb-serve.log` pour `kb serve`),
+laissées. Le journal de fonctionnement (`logs/kb.log`, `logs/kb-serve.log` pour `kb serve` et
+`logs/kb-serve-ai.log` pour `kb serve-ai`),
 ajouté ligne à ligne par `logging`, est hors de cette règle : il n'est jamais lu comme une page.
 
 **Vérifier.**
@@ -87,7 +88,7 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
 - `print` donne le résultat d'une commande ; `logger` donne le déroulé. Un échec est journalisé
   une fois, là où il est traité.
 - Le journal de fonctionnement (le déroulé, réussites et échecs) va sur la sortie d'erreur et
-  dans `<KB_DATA_DIR>/logs/kb.log` (`logs/kb-serve.log` pour `kb serve`), tourné chaque jour à minuit UTC, `LOG_FILES_KEPT` fichiers
+  dans `<KB_DATA_DIR>/logs/kb.log` (`logs/kb-serve.log` pour `kb serve`, `logs/kb-serve-ai.log` pour `kb serve-ai`), tourné chaque jour à minuit UTC, `LOG_FILES_KEPT` fichiers
   gardés (`core/config.py`), sauf `KB_LOG_TO_FILE=false` : sortie d'erreur seule, sans fichier (en
   conteneur, la sortie d'erreur est le journal ; décision du 2026-10-15, #199) ; le résultat d'une commande reste un `print`. Le journal d'import garde sa règle : écrit seulement si l'import va au
   bout de l'écriture en base.

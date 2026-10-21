@@ -5,7 +5,6 @@ default replay would give digests made up without saying it, and a default provi
 watch to a service nobody chose. Without them, the AI API does not start (fail closed).
 """
 
-import logging
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -22,8 +21,6 @@ from k_b.ai_api.connectors.llm_replay import (
 from k_b.ai_api.connectors.outbound import find_url_refusal
 from k_b.core.config import LLM_REASONING_EFFORT, LLM_REPLAY_BASE_URL
 from k_b.core.quoting import quote_value
-
-logger = logging.getLogger(__name__)
 
 PROVIDER_VARIABLE = "KB_LLM_PROVIDER"
 BASE_URL_VARIABLE = "KB_LLM_BASE_URL"
@@ -55,22 +52,8 @@ class LlmSettings:
     replay_steps: tuple[ReplayStep, ...] | None
 
 
-def read_llm_settings(environ: Mapping[str, str]) -> LlmSettings | None:
-    """The settings of the model, or None after logging the variable refused; logs the provider
-    and the model chosen, never the URL nor the key."""
-    settings_or_refusal = read_settings_or_refusal(environ)
-    if isinstance(settings_or_refusal, str):
-        logger.error("%s", settings_or_refusal)
-        return None
-    logger.info(
-        "LLM provider %s, model %s",
-        settings_or_refusal.provider,
-        settings_or_refusal.model,
-    )
-    return settings_or_refusal
-
-
-def read_settings_or_refusal(environ: Mapping[str, str]) -> LlmSettings | str:
+def read_llm_settings_or_refusal(environ: Mapping[str, str]) -> LlmSettings | str:
+    """The settings of the model, or why a variable is refused: never the URL nor the key."""
     provider = environ.get(PROVIDER_VARIABLE)
     if not provider:
         return f"{PROVIDER_VARIABLE}: not set, {' or '.join(PROVIDERS)}"
