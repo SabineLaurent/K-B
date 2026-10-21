@@ -3433,7 +3433,8 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
     du terminal, qui prime, et un `.env` exporté donnerait encore toutes les clés à chaque `kb`.
     Il compare des noms, jamais des valeurs ;
   - il laisse passer les noms que le test pose lui-même (`KB_DATA_DIR`, `KB_COLLECT_ONLY`) ou que
-    `tests/conftest.py` retire avant lui (`KB_LOG_TO_FILE`, `KB_DATA_API_*`) : leur valeur
+    `tests/conftest.py` retire avant lui (`KB_LOG_TO_FILE`, `KB_DATA_API_HOST`, `KB_DATA_API_PORT`,
+    `KB_DATA_API_ALLOWED_HOSTS`) : leur valeur
     n'atteint jamais `kb`, et en conteneur ou en job ACA, où `KB_DATA_DIR` et `KB_LOG_TO_FILE`
     sont posés, le critère à la lettre aurait tout arrêté. Écart au critère de #290, décidé par
     l'utilisatrice (option écartée : le critère à la lettre, qui aurait cassé le rejeu à
@@ -3450,6 +3451,8 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
     les noms de `.env.example` (une variable `KB_API_KEY_<CLIENT>` qui n'y est pas le passe) ;
   - si `.env.example` ou `.env.e2e_test.example` manque (une image qui ne les copie pas, #200),
     les tests échouent ;
+  - `KB_DATA_API_URL`, réglage de l'API IA, n'est ni posé ni retiré par le test : présent dans
+    l'environnement (un conteneur qui le pose, #200), il arrête les tests ;
   - `uv.lock` gagne trois dépendances de `pytest-html` (`pytest-metadata`, `jinja2`,
     `markupsafe`), en développement seulement, acceptées par l'utilisatrice. — PR de #290
 

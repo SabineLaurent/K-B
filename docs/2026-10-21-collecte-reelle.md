@@ -201,7 +201,8 @@ prime ; il faut donc lancer la commande depuis un terminal sans `.env` exporté.
 les tests avant tout `kb` si une variable de `.env.example` absente de `.env.e2e_test.example` est
 dans l'environnement ; le message nomme les variables, jamais leur valeur. Ne l'arrêtent pas celles
 que le test pose lui-même (`KB_DATA_DIR`, `KB_COLLECT_ONLY`) ou que `tests/conftest.py` retire
-(`KB_LOG_TO_FILE`, `KB_DATA_API_*`) : leur valeur n'atteint jamais `kb`.
+(`KB_LOG_TO_FILE`, `KB_DATA_API_HOST`, `KB_DATA_API_PORT`, `KB_DATA_API_ALLOWED_HOSTS`) : leur
+valeur n'atteint jamais `kb`. `KB_DATA_API_URL`, réglage de l'API IA, les arrête.
 
 Le rapport, `reports/e2e-report.html`, donne pour chaque test les codes de sortie de
 `kb create-db`, `kb collect` et `kb import`, les items par sorte, les rejets, les lignes

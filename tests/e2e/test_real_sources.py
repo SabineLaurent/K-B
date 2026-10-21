@@ -8,7 +8,7 @@ uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html
 the environment of the terminal too: run it from a terminal without .env exported. A variable of
 .env.example that is not in .env.e2e_test.example stops the tests before any kb, but the ones the
 test sets itself (KB_DATA_DIR, KB_COLLECT_ONLY) or tests/conftest.py removes (KB_LOG_TO_FILE,
-KB_DATA_API_*). To be run the same way in a container (#200) and as a job. Without KB_ZOTERO_DIR,
+KB_DATA_API_HOST, KB_DATA_API_PORT, KB_DATA_API_ALLOWED_HOSTS): KB_DATA_API_URL, of the AI API, stops them. To be run the same way in a container (#200) and as a job. Without KB_ZOTERO_DIR,
 KB_VAULT_DIR or GOOGLE_APPLICATION_CREDENTIALS, the test of its source is skipped. KB_GITHUB_TOKEN
 is optional: without it, the GitHub sources run on 60 requests per hour instead of 5,000.
 gh_archive runs a real BigQuery query (docs/bigquery.md).
@@ -192,8 +192,8 @@ def count_items_by_kind(database_path):
 
 
 def read_bigquery_bytes(console_dir):
-    """The bytes BigQuery processed, as gh_archive logs them (a number or None); None also when
-    the line is not in the log."""
+    """The bytes BigQuery processed, as gh_archive logs them: a number, or "None" when BigQuery
+    gave no count. None when the line is not in the log: nothing is recorded."""
     bytes_line = BIGQUERY_BYTES_LINE.search((console_dir / "collect.err").read_text())
     if bytes_line is None:
         return None
@@ -268,8 +268,13 @@ def collect_and_import(
         collect_patch.setenv(COLLECT_ONLY_VARIABLE, source_name)
         collect_exit_code = run_kb("collect", console_dir)
     record_property("collect_exit_code", collect_exit_code)
-    if source_name == gh_archive.FOLDER_PREFIX:
-        record_property("bigquery_bytes_processed", read_bigquery_bytes(console_dir))
+    bigquery_bytes = (
+        read_bigquery_bytes(console_dir)
+        if source_name == gh_archive.FOLDER_PREFIX
+        else None
+    )
+    if bigquery_bytes is not None:
+        record_property("bigquery_bytes_processed", bigquery_bytes)
     assert collect_exit_code == ExitCode.SUCCEEDED
     import_exit_code = run_kb("import", console_dir)
     record_property("import_exit_code", import_exit_code)
