@@ -87,9 +87,9 @@ def test_a_ranking_gives_the_sheet_of_its_day_by_rank(data_dir, vault_dir):
     )
     assert find_sheet(vault_dir, FORKED_TOP, "2026-10-05").read_text("utf-8") == (
         "---\n"
-        "classement: most_forked\n"
-        "releve: 2026-10-05T09:30:00Z\n"
-        "depots: 3\n"
+        "ranking: most_forked\n"
+        "collected_at: 2026-10-05T09:30:00Z\n"
+        "repositories: 3\n"
         "---\n"
         "\n"
         "# Top 3 des dépôts GitHub les plus forkés, relevé du 2026-10-05\n"
@@ -189,7 +189,7 @@ def test_two_rankings_of_a_day_give_one_sheet_the_one_of_the_first(data_dir, vau
         written_count=1, skipped_count=1, deleted_count=1, unreadable_count=0
     )
     sheet = find_sheet(vault_dir, STARRED_TOP, "2026-10-05").read_text("utf-8")
-    assert "releve: 2026-10-05T09:30:00Z" in sheet
+    assert "collected_at: 2026-10-05T09:30:00Z" in sheet
     assert "| 551156 |" in sheet
     assert (first.exists(), second.exists()) == (False, True)
 

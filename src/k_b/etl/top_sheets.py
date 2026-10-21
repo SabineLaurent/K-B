@@ -195,13 +195,14 @@ def write_sheet(vault_dir: Path, sheets_dir: Path, top: Top, ranking: Ranking) -
 
 
 def render_sheet(top: Top, ranking: Ranking) -> str:
-    """The Markdown of a sheet, in French: a frontmatter, then the repositories by rank."""
+    """The Markdown of a sheet: a front matter, then the repositories by rank. Its keys are in
+    English, its text in French (rule of Sabine of 2026-10-21)."""
     day = ranking.collected_at.date().isoformat()
     lines = [
         "---",
-        f"classement: {top.name}",
-        f"releve: {format_date(ranking.collected_at)}",
-        f"depots: {len(ranking.entries)}",
+        f"ranking: {top.name}",
+        f"collected_at: {format_date(ranking.collected_at)}",
+        f"repositories: {len(ranking.entries)}",
         "---",
         "",
         f"# Top {len(ranking.entries)} des {top.subject}, relevé du {day}",
