@@ -19,7 +19,7 @@ from typing import Literal
 import httpx2
 from pydantic import BaseModel
 
-from k_b.ai_api.connectors.llm_client import LlmCall, LlmOutcome
+from k_b.ai_api.connectors.llm_client import LlmCall, LlmFailure, to_failure
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.stages.classification import (
@@ -107,7 +107,7 @@ class Digest:
 class FailedSubject:
     subject: str
     stage: Stage
-    error: LlmOutcome
+    error: LlmFailure
 
 
 @dataclass(frozen=True)
@@ -131,7 +131,7 @@ class ClassificationFailure:
     """The request failed at the classification: its state, the Retry-After of a rate limit, and
     the calls made."""
 
-    state: LlmOutcome
+    state: LlmFailure
     retry_after_seconds: int | None
     stage_calls: tuple[StageCall, ...]
 
@@ -201,7 +201,7 @@ def build_digests(
         )
         if digest is None:
             failed_subjects.append(
-                FailedSubject(subject.name, "write", llm_call.outcome)
+                FailedSubject(subject.name, "write", to_failure(llm_call.outcome))
             )
             is_rate_limited = llm_call.saw_rate_limit
         else:
@@ -253,7 +253,7 @@ def classify(
                 else None
             )
             return ClassificationFailure(
-                llm_call.outcome, retry_after, tuple(stage_calls)
+                to_failure(llm_call.outcome), retry_after, tuple(stage_calls)
             )
         subject_by_ref.update(
             {a.item_id: a.subject for a in llm_call.output.assignments}

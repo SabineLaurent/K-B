@@ -41,8 +41,9 @@ from k_b.core.config import (
 CHAT_COMPLETIONS_PATH = "chat/completions"
 PROMPT_CACHE_OFF: Mapping[str, str] = {"mode": "explicit"}
 
-type LlmOutcome = Literal[
-    "ok",
+# The states of a call that failed (docs/fiches-veille.md, "États nommés"); a call is ok or one
+# of them.
+type LlmFailure = Literal[
     "llm_invalid_output",
     "llm_truncated",
     "llm_content_filtered",
@@ -50,6 +51,7 @@ type LlmOutcome = Literal[
     "llm_unavailable",
     "llm_timeout",
 ]
+type LlmOutcome = Literal["ok"] | LlmFailure
 # The check that refused the output (docs/fiches-veille.md, "Contrôles"); 1 and 2 here, 3 to 6
 # by the stage.
 type FailedCheck = Literal[
@@ -166,6 +168,13 @@ class Attempt[OutputT: BaseModel]:
     http_status: int | None = None
     # None: no retry. 0: a retry at once, after an output refused; else the wait before it.
     retry_wait_seconds: float | None = None
+
+
+def to_failure(outcome: LlmOutcome) -> LlmFailure:
+    """The failure of a call without output: ok there is a fault of the caller, raised."""
+    if outcome == "ok":
+        raise ValueError("a call without output is not ok")
+    return outcome
 
 
 def build_http_client(

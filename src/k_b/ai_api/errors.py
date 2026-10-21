@@ -6,12 +6,12 @@ from itertools import groupby
 from typing import Any
 
 from k_b.ai_api.connectors.data_api_client import DataApiState
-from k_b.ai_api.connectors.llm_client import LlmOutcome
+from k_b.ai_api.connectors.llm_client import LlmFailure
 from k_b.core.api_errors import API_ERROR_RESPONSES, ApiError, ErrorSchema
 
 # The states of a reading or of a classification that fails the request; a writing that fails
 # names its subject in the response instead.
-STATUS_BY_STATE: dict[LlmOutcome | DataApiState, int] = {
+STATUS_BY_STATE: dict[LlmFailure | DataApiState, int] = {
     "data_api_invalid_response": 502,
     "data_api_timeout": 504,
     "data_api_unauthorized": 502,
@@ -26,7 +26,7 @@ STATUS_BY_STATE: dict[LlmOutcome | DataApiState, int] = {
 
 
 def to_api_error(
-    state: LlmOutcome | DataApiState, retry_after_seconds: int | None = None
+    state: LlmFailure | DataApiState, retry_after_seconds: int | None = None
 ) -> ApiError:
     """The error of the state; a Retry-After only when the provider gave one: none is made up."""
     headers = (

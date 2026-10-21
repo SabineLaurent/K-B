@@ -281,7 +281,7 @@
             "$ref": "#/components/schemas/Stage"
           },
           "error": {
-            "$ref": "#/components/schemas/LlmOutcome"
+            "$ref": "#/components/schemas/LlmFailure"
           }
         },
         "type": "object",
@@ -313,10 +313,9 @@
         ],
         "title": "InvalidParameterSchema"
       },
-      "LlmOutcome": {
+      "LlmFailure": {
         "type": "string",
         "enum": [
-          "ok",
           "llm_invalid_output",
           "llm_truncated",
           "llm_content_filtered",

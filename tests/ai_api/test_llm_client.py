@@ -14,6 +14,7 @@ from k_b.ai_api.connectors.llm_client import (
     FailedCheck,
     build_http_client,
     call_model,
+    to_failure,
 )
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
 from k_b.ai_api.connectors.llm_settings import (
@@ -868,3 +869,11 @@ def test_a_retry_after_of_the_most_digits_read_is_compared_to_the_maximum():
 
     assert llm_call.retry_after_seconds == int("9" * MAX_RETRY_AFTER_DIGITS)
     assert sleeps == []
+
+
+def test_a_call_without_output_is_never_read_as_ok():
+    """Its state names a failed subject or a failed request: ok there would answer 500."""
+    with pytest.raises(ValueError, match="not ok"):
+        to_failure("ok")
+
+    assert to_failure("llm_timeout") == "llm_timeout"

@@ -102,3 +102,12 @@ def test_kb_openapi_writes_each_api_in_its_own_file(monkeypatch, tmp_path):
         assert (tmp_path / "docs" / "api" / name).read_text(encoding="utf-8") == (
             DOCS_API_DIR / name
         ).read_text(encoding="utf-8")
+
+
+def test_a_failed_subject_never_announces_ok_as_its_error():
+    schemas = read_versioned_openapi()["components"]["schemas"]
+    reference = schemas["FailedSubjectSchema"]["properties"]["error"]["$ref"]
+    error = schemas[reference.removeprefix("#/components/schemas/")]
+
+    assert "ok" not in error["enum"]
+    assert "llm_timeout" in error["enum"]

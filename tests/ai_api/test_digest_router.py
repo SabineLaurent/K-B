@@ -19,7 +19,7 @@ from pydantic import SecretStr
 from k_b.ai_api.app import create_app
 from k_b.ai_api.connectors.data_api_client import DataApiState
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
-from k_b.ai_api.connectors.llm_client import LlmOutcome, build_http_client
+from k_b.ai_api.connectors.llm_client import LlmFailure, build_http_client
 from k_b.ai_api.connectors.llm_replay import REPLAY_STEPS, ReplayTransport
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.dependencies import (
@@ -639,7 +639,8 @@ def test_a_final_slash_is_an_unknown_route(make_ai_api):
 def test_each_state_that_fails_a_request_has_its_status():
     """A state without status would answer 500 in place of a named 502, 503 or 504."""
     failure_states = {
-        state for state in get_args(LlmOutcome.__value__) if state != "ok"
-    } | set(get_args(DataApiState.__value__))
+        *get_args(LlmFailure.__value__),
+        *get_args(DataApiState.__value__),
+    }
 
     assert set(STATUS_BY_STATE) == failure_states
