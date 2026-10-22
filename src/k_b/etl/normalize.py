@@ -1,7 +1,8 @@
 """Normalize the items read (docs/specs-collecte.md, step 3).
 
-No input or output here: the items come from etl/transform.py; the base removes the duplicates at
-the import (etl/load.py).
+No input or output here: the items come from etl/transform.py, which calls normalize_item on each
+item its reading keeps (read_raw_items); the base removes the duplicates at the import
+(etl/load.py).
 """
 
 from urllib.parse import urlsplit, urlunsplit

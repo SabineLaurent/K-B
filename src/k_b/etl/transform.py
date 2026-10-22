@@ -1,6 +1,6 @@
 """Read the raw files of raw/automated_watch/ and raw/selected_library/ not imported yet into
 common items (docs/specs-collecte.md, step 2), then reject the releases of a repository out of
-the tracked list (docs/stockage.md)."""
+the tracked list (docs/stockage.md) and normalize the items kept (step 3)."""
 
 import csv
 import logging
@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 from k_b.core.config import TrackedRepository
 from k_b.core.quoting import quote_value, without_values
+from k_b.etl.normalize import normalize_item
 from k_b.etl.raw_files import RawFile, RawReading, Rejection, parse_collection_name
 from k_b.etl.raw_store import RAW_DIR_NAMES
 from k_b.etl.source_contract import SourceKind, SourceReader, find_source_kind
@@ -28,7 +29,8 @@ def read_raw_items(
     tracked_repositories: Sequence[TrackedRepository],
 ) -> RawReading:
     """Every raw file whose source kind has a reader and that is not in imported_paths, in
-    collection order, without the releases of a repository out of tracked_repositories.
+    collection order, without the releases of a repository out of tracked_repositories, each
+    item kept normalized.
 
     A collection is a raw file, or a folder of pages; a raw file is read as a single page. A
     collection not named by its time or that cannot be listed, a page that cannot be read, or
@@ -44,7 +46,9 @@ def read_raw_items(
     )
     # Stable sort: within a collection, the files keep their page order.
     reading.files.sort(key=lambda raw_file: raw_file.collected_at)
-    return reject_untracked_releases(reading, tracked_repositories)
+    # The filter first: it reads each item as its source gave it.
+    kept = reject_untracked_releases(reading, tracked_repositories)
+    return normalize_items(kept)
 
 
 def join_readings(readings: list[RawReading]) -> RawReading:
@@ -93,6 +97,22 @@ def is_untracked_release(item: Item, tracked_names: set[str]) -> bool:
     return (
         item.kind == "release"
         and str(item.repository_name).lower() not in tracked_names
+    )
+
+
+def normalize_items(reading: RawReading) -> RawReading:
+    """The same reading, each item of each file normalized (etl/normalize.py).
+
+    Outside the reading of a page, which turns a ValidationError into a rejection: the second
+    validation of normalize_item must stop the whole import, not reject one item. An item
+    refuses beforehand what the normalization would break (check_url_can_be_normalized,
+    items.py).
+    """
+    return reading._replace(
+        files=[
+            raw_file._replace(items=[normalize_item(item) for item in raw_file.items])
+            for raw_file in reading.files
+        ]
     )
 
 

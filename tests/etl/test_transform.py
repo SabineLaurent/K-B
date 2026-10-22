@@ -588,6 +588,24 @@ def test_a_release_of_a_repository_out_of_the_list_is_rejected_and_the_others_ar
     assert reading.read_count == 1
 
 
+# A collected TLDR page: its links carry the utm_* parameters of the newsletter.
+TLDR_PAGE_PATH = "automated_watch/tldr_ai/2026-10-11T153130Z/2026-10-07.html"
+
+
+def test_the_url_of_an_item_read_loses_its_tracking_parameters(tmp_path):
+    page = (FIXTURES_DIR / "tldr_ai_extract.html").read_bytes()
+    assert b"utm_source=tldrai" in page
+    page_path = tmp_path / TLDR_PAGE_PATH
+    page_path.parent.mkdir(parents=True)
+    page_path.write_bytes(page)
+
+    reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
+
+    urls = [item.url for item in items_of(reading)]
+    assert "https://mistral.ai/news/mistral-large-4/" in urls
+    assert [url for url in urls if url is not None and "utm_" in url] == []
+
+
 @pytest.mark.parametrize(
     "fixture_name, folder_name, extension",
     [

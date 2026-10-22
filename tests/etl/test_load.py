@@ -25,6 +25,7 @@ from k_b.database.connection import MissingDatabaseError, connect_database
 from k_b.database.creation import create_database
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl import load as import_items_module
+from k_b.etl import transform as read_raw_items_module
 from k_b.etl.load import (
     ImportLogExistsError,
     import_items,
@@ -737,7 +738,7 @@ def refuse_in_the_base(monkeypatch, source_item_id, changes):
             return normalized_item
         return normalized_item.model_copy(update=changes)
 
-    monkeypatch.setattr(import_items_module, "normalize_item", normalize_then_change)
+    monkeypatch.setattr(read_raw_items_module, "normalize_item", normalize_then_change)
 
 
 RELEASES_PATH = f"{AUTOMATED_WATCH}/{RELEASES_DIR}/{FIRST_COLLECTION}.json"

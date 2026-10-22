@@ -52,7 +52,6 @@ from k_b.database.writing import (
     write_trend_rows,
 )
 from k_b.etl.import_log import TrendDiscard, write_import_log
-from k_b.etl.normalize import normalize_item
 from k_b.etl.raw_files import (
     RawFile,
     RawReading,
@@ -243,14 +242,15 @@ def write_items_file(connection: sqlite3.Connection, raw_file: RawFile) -> FileW
     """Register the file read, write each of its items, then mark as withdrawn what its
     catalog no longer lists.
 
-    Its items are those the reading kept: the releases of a repository out of the tracked list
-    are rejected before (etl/transform.py). The file is registered even with an item the base
-    refuses, as with an entry rejected when read: only a rebuild of the base reads it again.
+    Its items are those the reading kept, normalized: the releases of a repository out of the
+    tracked list are rejected, and each item kept is normalized, before (etl/transform.py). The
+    file is registered even with an item the base refuses, as with an entry rejected when read:
+    only a rebuild of the base reads it again.
     """
     raw_data_id = register_raw_file(connection, raw_file)
     outcomes = [
         write_item_in_savepoint(connection, item, raw_data_id)
-        for item in map(normalize_item, raw_file.items)
+        for item in raw_file.items
     ]
     discards = [outcome for outcome in outcomes if isinstance(outcome, Discard)]
     refusals = [outcome for outcome in outcomes if isinstance(outcome, Rejection)]

@@ -100,7 +100,7 @@ Points défendables :
 |---|---|---|
 | 0 | Sortir le post-traitement de etl vers post/, règle etl -> post | fait, tag etl-post-separated |
 | 1 | Créer etl/raw_files.py (types partagés, déplacement mécanique) ; ajouter le module à ETL_PIPELINE_MODULES (tests/architecture/module_imports.py) | fait (à commiter) |
-| 2 | Filtre des releases non suivies et normalize_item dans le transform, avant le load | à faire |
+| 2 | Filtre des releases non suivies et normalize_item dans le transform, avant le load | fait (à commiter) |
 | 3 | Décision de conception d'abord : comment le lecteur des tendances parvient à transform.py par la composition (second champ de SourceKind, ou contrat de lecteur de classement). Relevé en lecture seule, puis choix de Sabine. Lecture des tendances de gh_archive appelée par transform.py, via RawStore, sans accès direct au brut ; gh_archive.py sort de la liste de la règle 3 de poc.md | à faire |
 | 4 | Créer pipeline.py ; les commandes passent par lui ; ajouter le module à ETL_PIPELINE_MODULES (tests/architecture/module_imports.py) | à faire |
 | 5 | Règle d'architecture : extract, transform, load ne s'importent pas entre eux | à faire |
