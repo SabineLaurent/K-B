@@ -1,13 +1,18 @@
-"""The vocabulary the stages of the ETL share: a raw file read, a ranking read, and a rejection
-(docs/refactoring/plan.md, target 1)."""
+"""The vocabulary the stages of the ETL share: a raw file read, a ranking read, and a rejection."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import NamedTuple
 
 from k_b.items import Item, SourceCode, TrendRow
 
 # The name etl/extract.py gives every raw file of a collection.
 COLLECTION_NAME_FORMAT = "%Y-%m-%dT%H%M%SZ"
+
+
+def parse_collection_name(collection_name: str) -> datetime:
+    return datetime.strptime(collection_name, COLLECTION_NAME_FORMAT).replace(
+        tzinfo=UTC
+    )
 
 
 class Rejection(NamedTuple):

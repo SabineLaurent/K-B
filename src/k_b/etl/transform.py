@@ -4,14 +4,14 @@ common items (docs/specs-collecte.md, step 2)."""
 import csv
 import logging
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
 
 from k_b.core.quoting import quote_value, without_values
-from k_b.etl.raw_files import COLLECTION_NAME_FORMAT, RawFile, RawReading, Rejection
+from k_b.etl.raw_files import RawFile, RawReading, Rejection, parse_collection_name
 from k_b.etl.raw_store import RAW_DIR_NAMES
 from k_b.etl.source_contract import SourceKind, SourceReader, find_source_kind
 
@@ -76,12 +76,6 @@ def read_collection(
             for page_path in pages
             if page_path.relative_to(raw_dir).as_posix() not in imported_paths
         ]
-    )
-
-
-def parse_collection_name(collection_name: str) -> datetime:
-    return datetime.strptime(collection_name, COLLECTION_NAME_FORMAT).replace(
-        tzinfo=UTC
     )
 
 

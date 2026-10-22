@@ -25,13 +25,15 @@ from google.cloud import bigquery
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from k_b.core.quoting import quote_value
-from k_b.etl.raw_files import RawFile, Rejection, TrendFile, TrendReading
-from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
-from k_b.etl.transform import (
-    list_visible_entries,
+from k_b.etl.raw_files import (
+    RawFile,
+    Rejection,
+    TrendFile,
+    TrendReading,
     parse_collection_name,
-    reject,
 )
+from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
+from k_b.etl.transform import list_visible_entries, reject
 from k_b.items import SourceCode, TrendRow
 
 logger = logging.getLogger(__name__)
