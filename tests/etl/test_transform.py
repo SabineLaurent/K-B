@@ -7,11 +7,12 @@ from pathlib import Path
 
 import pytest
 
+from k_b.etl.raw_files import RawFile, RawReading, Rejection
 from k_b.etl.raw_store import RawStore, write_file_atomically
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.zotero import ZoteroSource
-from k_b.etl.transform import RawFile, RawReading, Rejection, read_raw_items
+from k_b.etl.transform import read_raw_items
 from k_b.items import Item
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"

@@ -31,11 +31,12 @@ from k_b.etl.load import (
     read_imported_paths,
 )
 from k_b.etl.normalize import normalize_item
+from k_b.etl.raw_files import RawReading, TrendReading
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.gh_archive import read_trend_files
 from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
-from k_b.etl.transform import RawReading, TrendReading, read_raw_items
+from k_b.etl.transform import read_raw_items
 from k_b.items import (
     MAX_COUNT_BY_KIND,
     MAX_ELEMENT_LENGTH_BY_KIND,

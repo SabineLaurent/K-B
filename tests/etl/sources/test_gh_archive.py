@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from k_b.etl.raw_files import RawFile
 from k_b.etl.sources import gh_archive
 from k_b.etl.sources.gh_archive import (
     MAX_BYTES_BILLED,
@@ -21,7 +22,6 @@ from k_b.etl.sources.gh_archive import (
     read_trend_files,
     read_trends,
 )
-from k_b.etl.transform import RawFile
 
 FIXTURE_PATH = (
     Path(__file__).parent.parent.parent / "fixtures" / "gh_archive_extract.json"

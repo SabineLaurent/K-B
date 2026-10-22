@@ -14,6 +14,7 @@ from k_b.etl.load import (
     import_items,
     read_imported_paths,
 )
+from k_b.etl.raw_files import COLLECTION_NAME_FORMAT
 from k_b.etl.raw_purge import delete_superseded_raw_files
 from k_b.etl.raw_store import (
     AUTOMATED_WATCH_DIR_NAME,
@@ -26,7 +27,7 @@ from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources import cisa_kev, zotero
 from k_b.etl.sources.gh_archive import read_trend_files
 from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
-from k_b.etl.transform import COLLECTION_NAME_FORMAT, read_raw_items
+from k_b.etl.transform import read_raw_items
 
 logger = logging.getLogger(LOGGER_NAME)
 
