@@ -79,9 +79,8 @@ SOURCE_KINDS = (
     SourceKind(clipping.FOLDER_PREFIX, (), clipping.READER),
     # No instance: etl/collected_sources.py adds GhArchiveSource when
     # GOOGLE_APPLICATION_CREDENTIALS is set, unless KB_COLLECT_ONLY leaves it out. No reader of
-    # items: its rankings are not items, commands/import_command.py reads them with
-    # read_trend_files.
-    SourceKind(gh_archive.FOLDER_PREFIX, (), None),
+    # items: its rankings are not items, etl/transform.py reads them with its trend reader.
+    SourceKind(gh_archive.FOLDER_PREFIX, (), None, gh_archive.TREND_READER),
 )
 
 # The sheets of the top rankings, in the order of SOURCE_KINDS: kb write-tops writes them, and

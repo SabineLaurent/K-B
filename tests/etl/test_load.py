@@ -35,9 +35,8 @@ from k_b.etl.normalize import normalize_item
 from k_b.etl.raw_files import RawReading, TrendReading
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources.gh_archive import read_trend_files
 from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
-from k_b.etl.transform import read_raw_items
+from k_b.etl.transform import read_raw_files
 from k_b.items import (
     MAX_COUNT_BY_KIND,
     MAX_ELEMENT_LENGTH_BY_KIND,
@@ -107,9 +106,12 @@ def run_import(
     imported_at = FIRST_IMPORT_AT + timedelta(seconds=len(list_logs(data_dir)))
     database_path = data_dir / "k-b.sqlite"
     imported_paths = frozenset() if read_again else read_imported_paths(database_path)
+    readings = read_raw_files(
+        data_dir / "raw", kinds, imported_paths, tracked_repositories
+    )
     return import_items(
-        read_raw_items(data_dir / "raw", kinds, imported_paths, tracked_repositories),
-        read_trend_files(data_dir / "raw", imported_paths),
+        readings.items,
+        readings.trends,
         database_path,
         log_path_at(data_dir, imported_at),
         imported_at,
@@ -1288,12 +1290,12 @@ def test_a_log_of_the_same_second_stops_the_import_before_the_database(data_dir)
     log_path.write_text("earlier import\n")
     tables_before = dump_database(data_dir)
     database_path = data_dir / "k-b.sqlite"
-    reading = read_raw_items(
+    reading = read_raw_files(
         data_dir / "raw",
         SOURCE_KINDS,
         read_imported_paths(database_path),
         TRACKED_REPOSITORIES,
-    )
+    ).items
 
     with pytest.raises(ImportLogExistsError):
         import_items(
@@ -1947,20 +1949,20 @@ def run_import_with_a_ranking_row_changed(data_dir, raw_file_path, **changes):
     imported_at = FIRST_IMPORT_AT + timedelta(seconds=len(list_logs(data_dir)))
     database_path = data_dir / "k-b.sqlite"
     imported_paths = read_imported_paths(database_path)
-    trend_reading = read_trend_files(data_dir / "raw", imported_paths)
+    readings = read_raw_files(
+        data_dir / "raw", SOURCE_KINDS, imported_paths, TRACKED_REPOSITORIES
+    )
     changed_files = [
         trend_file._replace(
             rows=[*trend_file.rows[:-1], trend_file.rows[-1].model_copy(update=changes)]
         )
         if trend_file.raw_file.raw_file_path == raw_file_path
         else trend_file
-        for trend_file in trend_reading.files
+        for trend_file in readings.trends.files
     ]
     return import_items(
-        read_raw_items(
-            data_dir / "raw", SOURCE_KINDS, imported_paths, TRACKED_REPOSITORIES
-        ),
-        trend_reading._replace(files=changed_files),
+        readings.items,
+        readings.trends._replace(files=changed_files),
         database_path,
         log_path_at(data_dir, imported_at),
         imported_at,

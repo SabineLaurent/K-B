@@ -8,7 +8,7 @@ from collections.abc import Callable, Iterable, Sequence
 from datetime import datetime
 from typing import Any, NamedTuple, Protocol
 
-from k_b.items import Item, SourceCode
+from k_b.items import Item, SourceCode, TrendRow
 
 
 class Source(Protocol):
@@ -92,8 +92,20 @@ class SourceReader[EntryT](NamedTuple):
     convert: Callable[[EntryT, datetime, str], Item]
 
 
+class TrendReader(NamedTuple):
+    """How to read a raw file of a source whose raw files are a ranking, not items: its rows.
+
+    A ranking is refused whole (conventions.md, rule 1): read_rows raises for a file it cannot
+    read, and never rejects a row alone.
+    """
+
+    # The source_code of its raw files in the base.
+    source_code: SourceCode
+    read_rows: Callable[[bytes], list[TrendRow]]
+
+
 class SourceKind(NamedTuple):
-    """A kind of source, declared once: its raw folders, its instances, its reader.
+    """A kind of source, declared once: its raw folders, its instances, its readers.
 
     Pass the READER constant of the reader module, never a SourceReader built here: only an
     annotated constant lets mypy refuse a converter of another source.
@@ -103,8 +115,13 @@ class SourceKind(NamedTuple):
     folder_prefix: str
     sources: tuple[Source, ...]
     # None: its raw files are not read into items (no reader yet, none planned, or raw files
-    # that are not items: the rankings of GH Archive).
+    # that are not items: the rankings of the two GitHub tops, read by no one, and those of GH
+    # Archive, read by trend_reader).
     reader: SourceReader[Any] | None
+    # How to read its raw files when they are a ranking written to the trend table, not items
+    # (GH Archive). A kind has one reader or the other, never both
+    # (test_no_kind_has_both_a_reader_of_items_and_a_trend_reader).
+    trend_reader: TrendReader | None = None
 
 
 def list_sources(kinds: Sequence[SourceKind]) -> list[Source]:

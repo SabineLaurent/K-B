@@ -8,6 +8,7 @@ from k_b.etl.source_contract import find_source_kind, list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources import (
     clipping,
+    gh_archive,
     github_api,
     github_most_forked,
     github_most_starred,
@@ -66,6 +67,29 @@ def test_the_clips_are_declared_with_their_reader_and_without_an_instance():
         (),
         clipping.READER,
     )
+
+
+def test_gh_archive_is_declared_with_its_trend_reader_and_without_an_instance():
+    # Its instance needs the BigQuery key: etl/collected_sources.py creates it from
+    # GOOGLE_APPLICATION_CREDENTIALS. Its raw files are rankings, not items (ADR of 2026-10-08).
+    kind = find_source_kind("gh_archive", SOURCE_KINDS)
+
+    assert kind is not None
+    assert (kind.folder_prefix, kind.sources, kind.reader, kind.trend_reader) == (
+        "gh_archive",
+        (),
+        None,
+        gh_archive.TREND_READER,
+    )
+
+
+def test_no_kind_has_both_a_reader_of_items_and_a_trend_reader():
+    """A raw folder is read one way or the other (etl/source_contract.py)."""
+    assert [
+        kind.folder_prefix
+        for kind in SOURCE_KINDS
+        if kind.reader is not None and kind.trend_reader is not None
+    ] == []
 
 
 def test_the_github_core_quota_kinds_are_those_that_call_the_github_api_but_the_search():

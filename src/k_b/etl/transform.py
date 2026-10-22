@@ -1,36 +1,84 @@
 """Read the raw files of raw/automated_watch/ and raw/selected_library/ not imported yet into
 common items (docs/specs-collecte.md, step 2), then reject the releases of a repository out of
-the tracked list (docs/stockage.md) and normalize the items kept (step 3)."""
+the tracked list (docs/stockage.md) and normalize the items kept (step 3).
+
+The raw files of a source whose kind carries a trend reader (GH Archive) are read beside them,
+by the same walk of raw/: their rows are not items (ADR of 2026-10-08).
+"""
 
 import csv
 import logging
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from pydantic import ValidationError
 
 from k_b.core.config import TrackedRepository
 from k_b.core.quoting import quote_value, without_values
 from k_b.etl.normalize import normalize_item
-from k_b.etl.raw_files import RawFile, RawReading, Rejection, parse_collection_name
+from k_b.etl.raw_files import (
+    RawFile,
+    RawReading,
+    Rejection,
+    TrendFile,
+    TrendReading,
+    parse_collection_name,
+)
 from k_b.etl.raw_store import RAW_DIR_NAMES
-from k_b.etl.source_contract import SourceKind, SourceReader, find_source_kind
+from k_b.etl.source_contract import (
+    SourceKind,
+    SourceReader,
+    TrendReader,
+    find_source_kind,
+)
 from k_b.items import Item
 
 logger = logging.getLogger(__name__)
 
 
-def read_raw_items(
+class RawReadings(NamedTuple):
+    """What one walk of raw/ gives the import: the files read as items, and those read as
+    trends."""
+
+    items: RawReading
+    trends: TrendReading
+
+
+class Collections(NamedTuple):
+    """The collections of raw/ with the reader each one is read by: as items (a raw file, or a
+    folder of pages), or as trends."""
+
+    of_items: list[tuple[Path, SourceReader[Any]]]
+    of_trends: list[tuple[Path, TrendReader]]
+
+
+def read_raw_files(
     raw_dir: Path,
     kinds: Sequence[SourceKind],
     imported_paths: frozenset[str],
     tracked_repositories: Sequence[TrackedRepository],
+) -> RawReadings:
+    """Every raw file not in imported_paths read as its kind says, from one walk of raw/: each
+    source folder is listed once, and the reader of its kind says what its files hold."""
+    collections = list_collections(raw_dir, kinds)
+    return RawReadings(
+        read_raw_items(
+            collections.of_items, raw_dir, imported_paths, tracked_repositories
+        ),
+        read_raw_trends(collections.of_trends, raw_dir, imported_paths),
+    )
+
+
+def read_raw_items(
+    collections: list[tuple[Path, SourceReader[Any]]],
+    raw_dir: Path,
+    imported_paths: frozenset[str],
+    tracked_repositories: Sequence[TrackedRepository],
 ) -> RawReading:
-    """Every raw file whose source kind has a reader and that is not in imported_paths, in
-    collection order, without the releases of a repository out of tracked_repositories, each
-    item kept normalized.
+    """Every collection of items that is not in imported_paths, in collection order, without
+    the releases of a repository out of tracked_repositories, each item kept normalized.
 
     A collection is a raw file, or a folder of pages; a raw file is read as a single page. A
     collection not named by its time or that cannot be listed, a page that cannot be read, or
@@ -41,7 +89,7 @@ def read_raw_items(
     reading = join_readings(
         [
             read_collection(collection_path, raw_dir, reader, imported_paths)
-            for collection_path, reader in list_collections(raw_dir, kinds)
+            for collection_path, reader in collections
         ]
     )
     # Stable sort: within a collection, the files keep their page order.
@@ -180,12 +228,53 @@ def read_page(
     return RawReading([raw_file], rejections, 1)
 
 
-def list_collections(
-    raw_dir: Path, kinds: Sequence[SourceKind]
-) -> list[tuple[Path, SourceReader[Any]]]:
-    """Each collection (raw file or folder of pages) with the reader of its kind, found by the
-    name of its source folder, whether its source is still tracked or not."""
-    collections: list[tuple[Path, SourceReader[Any]]] = []
+def read_raw_trends(
+    collections: list[tuple[Path, TrendReader]],
+    raw_dir: Path,
+    imported_paths: frozenset[str],
+) -> TrendReading:
+    """Every raw file of trends that is not in imported_paths, in collection order, each read as
+    a whole ranking.
+
+    As for the items: a file not named by its collection time is rejected without being opened;
+    a file that cannot be read, or that its reader refuses, is rejected and counted as opened. A
+    rejected file is not registered: the next import reads it again. A file already imported is
+    not opened. Unlike a collection of items, a folder is not a collection of pages: the source
+    writes one file per collection, and a folder is rejected without being opened, its path left
+    out of the reason.
+    """
+    files: list[TrendFile] = []
+    rejections: list[Rejection] = []
+    read_count = 0
+    # A raw file is named by its collection time: the order of the names is the order of time.
+    for path, reader in collections:
+        raw_file_path = path.relative_to(raw_dir).as_posix()
+        if raw_file_path in imported_paths:
+            continue
+        if path.is_dir():
+            rejections.append(reject(raw_file_path, "a folder, not a raw file"))
+            continue
+        try:
+            collected_at = parse_collection_name(path.stem)
+        except ValueError as error:
+            rejections.append(reject(raw_file_path, f"{type(error).__name__}: {error}"))
+            continue
+        read_count += 1
+        try:
+            rows = reader.read_rows(path.read_bytes())
+        except (ValueError, OSError) as error:
+            rejections.append(reject(raw_file_path, f"{type(error).__name__}: {error}"))
+            continue
+        raw_file = RawFile(raw_file_path, reader.source_code, collected_at, [], 0)
+        files.append(TrendFile(raw_file, rows))
+    return TrendReading(files, rejections, read_count)
+
+
+def list_collections(raw_dir: Path, kinds: Sequence[SourceKind]) -> Collections:
+    """Each collection with the reader it is read by, that of its kind, found by the name of its
+    source folder, whether its source is still tracked or not."""
+    of_items: list[tuple[Path, SourceReader[Any]]] = []
+    of_trends: list[tuple[Path, TrendReader]] = []
     source_dirs = [
         source_dir
         for raw_dir_name in RAW_DIR_NAMES
@@ -200,17 +289,24 @@ def list_collections(
                 quote_value(source_dir.name),
             )
             continue
-        reader = kind.reader
-        if reader is None:
-            # Not always left unread: the rankings of GH Archive, which are not items, have
-            # their own reader (etl/sources/gh_archive.py).
-            logger.info(
-                "source without a reader of items, skipped by the item reader: %s",
-                quote_value(source_dir.name),
+        item_reader = kind.reader
+        trend_reader = kind.trend_reader
+        # Listed only for a kind that has a reader: a folder left unread is never opened.
+        if item_reader is not None:
+            of_items.extend(
+                (path, item_reader) for path in list_visible_entries(source_dir)
             )
-            continue
-        collections.extend((path, reader) for path in list_visible_entries(source_dir))
-    return collections
+        elif trend_reader is not None:
+            of_trends.extend(
+                (path, trend_reader) for path in list_visible_entries(source_dir)
+            )
+        else:
+            # The rankings of the two GitHub tops: they do not enter the base (ADR of
+            # 2026-10-07), and kb write-tops reads them from raw/.
+            logger.info(
+                "source without a reader, skipped: %s", quote_value(source_dir.name)
+            )
+    return Collections(of_items, of_trends)
 
 
 def list_pages(collection_dir: Path, raw_dir: Path) -> list[Path]:

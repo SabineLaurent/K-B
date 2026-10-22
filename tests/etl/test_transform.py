@@ -8,13 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from k_b.etl.raw_files import RawFile, RawReading, Rejection
+from k_b.etl.raw_files import RawFile, RawReading, Rejection, TrendReading
 from k_b.etl.raw_store import RawStore, write_file_atomically
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
 from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.etl.sources.gh_archive import read_trend_rows
 from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 from k_b.etl.sources.zotero import ZoteroSource
-from k_b.etl.transform import read_raw_items
+from k_b.etl.transform import RawReadings, read_raw_files
 from k_b.items import Item
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -48,12 +49,18 @@ FAKE_PAGE_KINDS = [
 ]
 
 
+def read_raw(
+    raw_dir: Path, kinds: Sequence[SourceKind], imported_paths: frozenset[str]
+) -> RawReadings:
+    """read_raw_files with the tracked repositories of the code: a release of a repository out
+    of that list is rejected by the reading (etl/transform.py)."""
+    return read_raw_files(raw_dir, kinds, imported_paths, TRACKED_REPOSITORIES)
+
+
 def read_items(
     raw_dir: Path, kinds: Sequence[SourceKind], imported_paths: frozenset[str]
 ) -> RawReading:
-    """read_raw_items with the tracked repositories of the code: a release of a repository out
-    of that list is rejected by the reading (etl/transform.py)."""
-    return read_raw_items(raw_dir, kinds, imported_paths, TRACKED_REPOSITORIES)
+    return read_raw(raw_dir, kinds, imported_paths).items
 
 
 def items_of(reading: RawReading) -> list[Item]:
@@ -170,16 +177,15 @@ def test_the_raw_files_of_a_folder_no_longer_tracked_are_read(tmp_path):
 
 @pytest.mark.parametrize("folder_name", ["github_most_starred", "github_most_forked"])
 def test_a_github_ranking_is_skipped_and_logged(tmp_path, caplog, folder_name):
+    # Its kind has neither reader: its ranking does not enter the base (ADR of 2026-10-07).
     copy_fixture(tmp_path, f"{folder_name}_extract.json", folder_name, "json")
 
     with caplog.at_level(logging.INFO):
-        reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
+        readings = read_raw(tmp_path, SOURCE_KINDS, frozenset())
 
-    assert items_of(reading) == []
-    assert reading.rejections == []
-    assert (
-        f"source without a reader of items, skipped by the item reader: '{folder_name}'"
-    ) in caplog.text
+    assert items_of(readings.items) == []
+    assert (readings.items.rejections, readings.trends) == ([], ([], [], 0))
+    assert f"source without a reader, skipped: '{folder_name}'" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -727,3 +733,168 @@ def test_an_unreadable_page_is_rejected_without_its_text(
     (rejection,) = reading.rejections
     assert "RECEIVED_TEXT" not in rejection.reason
     assert "RECEIVED_TEXT" not in caplog.text
+
+
+# The trends of GH Archive: the same walk reads them, by the trend reader of their kind
+# (etl/source_contract.py). Their rows are not items (ADR of 2026-10-08).
+TRENDS_FIXTURE_PATH = FIXTURES_DIR / "gh_archive_extract.json"
+TRENDS_COLLECTION_NAME = "2026-10-11T153130Z"
+TRENDS_RAW_FILE_PATH = f"automated_watch/gh_archive/{TRENDS_COLLECTION_NAME}.json"
+
+
+def write_raw_trends(raw_dir: Path, name: str, content: bytes) -> Path:
+    """A raw file of GH Archive, as the collection writes it under raw/."""
+    source_dir = raw_dir / "automated_watch" / "gh_archive"
+    source_dir.mkdir(parents=True, exist_ok=True)
+    path = source_dir / name
+    path.write_bytes(content)
+    return path
+
+
+def read_trends(
+    raw_dir: Path, imported_paths: frozenset[str] = frozenset()
+) -> TrendReading:
+    """The trends the reading gives, with the kinds of the code: the gh_archive kind carries its
+    trend reader (etl/source_kinds.py)."""
+    return read_raw(raw_dir, SOURCE_KINDS, imported_paths).trends
+
+
+def make_raw_trends_with_an_invalid_row() -> bytes:
+    """The fixture with a negative count on its first row: a ranking its reader refuses whole."""
+    ranking = json.loads(TRENDS_FIXTURE_PATH.read_bytes())
+    ranking["rows"][0] = {**ranking["rows"][0], "stars_gained": -1}
+    return json.dumps(ranking).encode()
+
+
+def test_a_raw_trend_file_is_read_with_its_file_its_collection_and_its_rows(tmp_path):
+    write_raw_trends(
+        tmp_path, f"{TRENDS_COLLECTION_NAME}.json", TRENDS_FIXTURE_PATH.read_bytes()
+    )
+
+    reading = read_trends(tmp_path)
+
+    [trend_file] = reading.files
+    assert trend_file.raw_file == RawFile(
+        TRENDS_RAW_FILE_PATH,
+        "gh_archive",
+        datetime(2026, 10, 11, 15, 31, 30, tzinfo=UTC),
+        [],
+        0,
+    )
+    assert trend_file.rows == read_trend_rows(TRENDS_FIXTURE_PATH.read_bytes())
+    assert (reading.rejections, reading.read_count) == ([], 1)
+
+
+def test_the_raw_trend_files_are_read_in_collection_order(tmp_path):
+    write_raw_trends(
+        tmp_path, "2026-10-12T021500Z.json", TRENDS_FIXTURE_PATH.read_bytes()
+    )
+    write_raw_trends(
+        tmp_path, f"{TRENDS_COLLECTION_NAME}.json", TRENDS_FIXTURE_PATH.read_bytes()
+    )
+
+    reading = read_trends(tmp_path)
+
+    assert [trend_file.raw_file.raw_file_path for trend_file in reading.files] == [
+        TRENDS_RAW_FILE_PATH,
+        "automated_watch/gh_archive/2026-10-12T021500Z.json",
+    ]
+
+
+def test_a_raw_trend_file_already_imported_is_not_opened(tmp_path):
+    # Not a ranking: opened, it would be rejected.
+    write_raw_trends(tmp_path, f"{TRENDS_COLLECTION_NAME}.json", b"not json")
+
+    reading = read_trends(tmp_path, frozenset({TRENDS_RAW_FILE_PATH}))
+
+    assert reading == ([], [], 0)
+
+
+@pytest.mark.parametrize(
+    "content", [b"not json", make_raw_trends_with_an_invalid_row()]
+)
+def test_a_raw_trend_file_refused_is_rejected_and_counted_as_opened(tmp_path, content):
+    write_raw_trends(tmp_path, f"{TRENDS_COLLECTION_NAME}.json", content)
+
+    reading = read_trends(tmp_path)
+
+    assert reading.files == []
+    [rejection] = reading.rejections
+    assert rejection.raw_file_path == TRENDS_RAW_FILE_PATH
+    assert rejection.reason.startswith("TrendsExtractInvalidError: ")
+    assert reading.read_count == 1
+
+
+def test_a_raw_trend_file_not_named_by_its_collection_time_is_rejected_unopened(
+    tmp_path,
+):
+    write_raw_trends(tmp_path, "latest.json", TRENDS_FIXTURE_PATH.read_bytes())
+
+    reading = read_trends(tmp_path)
+
+    assert reading.files == []
+    [rejection] = reading.rejections
+    assert rejection.raw_file_path == "automated_watch/gh_archive/latest.json"
+    assert rejection.reason.startswith("ValueError: ")
+    assert reading.read_count == 0
+
+
+def test_a_folder_among_the_raw_trend_files_is_rejected_unopened_without_its_path(
+    tmp_path,
+):
+    # The source writes one file per collection, never a folder of pages.
+    (tmp_path / "automated_watch" / "gh_archive" / TRENDS_COLLECTION_NAME).mkdir(
+        parents=True
+    )
+
+    reading = read_trends(tmp_path)
+
+    assert reading.files == []
+    [rejection] = reading.rejections
+    assert rejection.raw_file_path == (
+        f"automated_watch/gh_archive/{TRENDS_COLLECTION_NAME}"
+    )
+    assert rejection.reason == "a folder, not a raw file"
+    assert reading.read_count == 0
+
+
+def test_a_hidden_file_among_the_raw_trend_files_is_skipped(tmp_path):
+    write_raw_trends(tmp_path, ".DS_Store", b"not json")
+
+    assert read_trends(tmp_path) == ([], [], 0)
+
+
+def test_no_raw_folder_of_gh_archive_gives_no_trend(tmp_path):
+    assert read_trends(tmp_path) == ([], [], 0)
+
+
+def test_gh_archive_is_not_a_source_without_a_reader(tmp_path, caplog):
+    # Its kind has no reader of items, but a trend reader: the reading does not skip it.
+    write_raw_trends(
+        tmp_path, f"{TRENDS_COLLECTION_NAME}.json", TRENDS_FIXTURE_PATH.read_bytes()
+    )
+
+    with caplog.at_level(logging.INFO):
+        reading = read_trends(tmp_path)
+
+    assert [trend_file.raw_file.raw_file_path for trend_file in reading.files] == [
+        TRENDS_RAW_FILE_PATH
+    ]
+    assert "source without a reader" not in caplog.text
+
+
+def test_the_items_and_the_trends_are_read_apart_by_one_walk(tmp_path):
+    copy_fixture(tmp_path, "cisa_kev_extract.csv", "cisa_kev", "csv")
+    write_raw_trends(
+        tmp_path, f"{TRENDS_COLLECTION_NAME}.json", TRENDS_FIXTURE_PATH.read_bytes()
+    )
+
+    readings = read_raw(tmp_path, SOURCE_KINDS, frozenset())
+
+    assert [raw_file.raw_file_path for raw_file in readings.items.files] == [
+        f"automated_watch/cisa_kev/{COLLECTION_NAME}.csv"
+    ]
+    assert [
+        trend_file.raw_file.raw_file_path for trend_file in readings.trends.files
+    ] == [TRENDS_RAW_FILE_PATH]
+    assert (readings.items.read_count, readings.trends.read_count) == (1, 1)

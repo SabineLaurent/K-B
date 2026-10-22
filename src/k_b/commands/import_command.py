@@ -25,9 +25,8 @@ from k_b.etl.raw_store import (
 )
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources import cisa_kev, zotero
-from k_b.etl.sources.gh_archive import read_trend_files
 from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
-from k_b.etl.transform import read_raw_items
+from k_b.etl.transform import read_raw_files
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -41,9 +40,9 @@ LATEST_ONLY_FOLDER_KEYS = (
 
 
 def run_import(data_dir: Path) -> int:
-    """Read the registry of the base, then the raw files not in it (the items, then the
-    rankings of GH Archive), then write the base; once it is committed, delete the raw files
-    of the state catalogs that the last one imported superseded."""
+    """Read the registry of the base, then the raw files not in it (the items and the rankings
+    of GH Archive, in one walk of raw/), then write the base; once it is committed, delete the
+    raw files of the state catalogs that the last one imported superseded."""
     database_path = data_dir / DATABASE_FILE_NAME
     imported_at = datetime.now(UTC).replace(microsecond=0)
     log_path = data_dir / IMPORT_LOG_FILE_NAME.format(
@@ -51,16 +50,15 @@ def run_import(data_dir: Path) -> int:
     )
     try:
         imported_paths = read_imported_paths(database_path)
-        reading = read_raw_items(
+        readings = read_raw_files(
             data_dir / RAW_DIR_NAME,
             SOURCE_KINDS,
             imported_paths,
             TRACKED_REPOSITORIES,
         )
-        trend_reading = read_trend_files(data_dir / RAW_DIR_NAME, imported_paths)
         summary = import_items(
-            reading,
-            trend_reading,
+            readings.items,
+            readings.trends,
             database_path,
             log_path,
             imported_at,
