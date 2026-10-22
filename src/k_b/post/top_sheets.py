@@ -18,7 +18,7 @@ from k_b.database.dates import format_date
 from k_b.etl.raw_store import RawStore
 from k_b.etl.tops import Top, TopEntry
 from k_b.etl.transform import COLLECTION_NAME_FORMAT, parse_collection_name
-from k_b.etl.vault_files import (
+from k_b.post.vault_files import (
     MARKDOWN_SYNTAX_CHARACTERS,
     VaultEntryRefusedError,
     has_sheet,

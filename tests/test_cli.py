@@ -14,7 +14,6 @@ import httpx2
 import pytest
 import uvicorn.config
 from etl.test_extract import BrokenSource, WorkingSource
-from etl.test_top_sheets import TEST_TOPS, write_ranking
 from etl.test_transform import FIXTURES_DIR, copy_fixture
 from post.test_ai_api_client import (
     AGENT_DIGEST,
@@ -23,6 +22,7 @@ from post.test_ai_api_client import (
     make_response,
     to_body,
 )
+from post.test_top_sheets import TEST_TOPS, write_ranking
 
 from k_b import cli
 from k_b.ai_api.schemas.digest_schema import FailedSubjectSchema
@@ -36,9 +36,10 @@ from k_b.commands.exit_codes import find_exit_code
 from k_b.core import quoting
 from k_b.core.config import DigestSubject
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
-from k_b.etl import collected_sources, load, vault_files
+from k_b.etl import collected_sources, load
 from k_b.etl.source_contract import SourceKind
 from k_b.etl.sources import clipping
+from k_b.post import vault_files
 from k_b.post.ai_api_client import build_ai_api_client
 
 

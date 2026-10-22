@@ -17,7 +17,6 @@ from post.test_ai_api_client import (
 )
 
 from k_b.ai_api.schemas.digest_schema import ClaimSchema, WindowSchema
-from k_b.etl.vault_files import VaultEntryRefusedError
 from k_b.post import digest_sheets
 from k_b.post.ai_api_client import DigestsResponse
 from k_b.post.digest_sheets import (
@@ -26,6 +25,7 @@ from k_b.post.digest_sheets import (
     render_digest_sheet,
     write_digest_sheet,
 )
+from k_b.post.vault_files import VaultEntryRefusedError
 
 DAY = date(2026, 10, 21)
 SUBJECT_NAMES = ("security_alerts", "agent_tools", "research")

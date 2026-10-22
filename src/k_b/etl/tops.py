@@ -1,4 +1,4 @@
-"""The two kinds of a top ranking, shared by its source, which reads its entries, and by
+"""The two types of a top ranking, shared by its source, which reads its entries, and by
 post/top_sheets.py, which writes its sheet.
 """
 

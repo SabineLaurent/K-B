@@ -7,12 +7,12 @@ import pytest
 
 from k_b.commands.sigterm import StoppedBySigtermError
 from k_b.core.config import DIGEST_SUBJECTS, TOPS_DIR_NAME, WATCH_DIR_NAME
-from k_b.etl import top_sheets, vault_files
 from k_b.etl.raw_store import RawStore
 from k_b.etl.sources import github_most_forked, github_most_starred
-from k_b.etl.top_sheets import TopSheetsOutcome, write_top_sheets
 from k_b.etl.tops import Top
-from k_b.etl.vault_files import VaultEntryRefusedError
+from k_b.post import top_sheets, vault_files
+from k_b.post.top_sheets import TopSheetsOutcome, write_top_sheets
+from k_b.post.vault_files import VaultEntryRefusedError
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 STARRED_RESPONSE = (FIXTURES_DIR / "github_most_starred_extract.json").read_bytes()

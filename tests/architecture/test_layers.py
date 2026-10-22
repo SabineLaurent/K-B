@@ -154,7 +154,7 @@ def test_etl_imports_nothing_of_the_post_processing():
         ("from k_b import post", True),
         ("from k_b.post import digest_sheets", True),
         ("from ..post.digest_sheets import write_digest_sheet", True),
-        ("from k_b.etl.vault_files import write_new_sheet", False),
+        ("from k_b.etl.tops import Top", False),
     ],
 )
 def test_the_rule_of_etl_refuses_every_way_to_the_post_processing(code, is_refused):

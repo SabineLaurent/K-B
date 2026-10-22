@@ -3,8 +3,8 @@ text of a source written as text. Shared by the sheets of the tops and the diges
 
 import pytest
 
-from k_b.etl import vault_files
-from k_b.etl.vault_files import (
+from k_b.post import vault_files
+from k_b.post.vault_files import (
     MARKDOWN_SYNTAX_CHARACTERS,
     VaultEntryRefusedError,
     neutralize_text,
