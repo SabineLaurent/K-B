@@ -19,7 +19,7 @@ from k_b.ai_api.schemas.digest_schema import (
     WindowSchema,
 )
 from k_b.core.config import AI_API_READ_TIMEOUT_SECONDS, DIGEST_REQUEST_TIMEOUT_SECONDS
-from k_b.etl.ai_api_client import (
+from k_b.post.ai_api_client import (
     AiApiClientSettings,
     AiApiError,
     build_ai_api_client,

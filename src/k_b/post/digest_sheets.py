@@ -19,7 +19,6 @@ from urllib.parse import unquote
 
 from k_b.core.config import WATCH_DIR_NAME
 from k_b.database.dates import format_date
-from k_b.etl.ai_api_client import Digest, DigestsResponse, Source
 from k_b.etl.vault_files import (
     CHARACTER_REFERENCE,
     MARKDOWN_SYNTAX_CHARACTERS,
@@ -29,6 +28,7 @@ from k_b.etl.vault_files import (
     refuse_linked_folders,
     write_new_sheet,
 )
+from k_b.post.ai_api_client import Digest, DigestsResponse, Source
 
 # Beyond the characters of the sheets of the tops: a fence of code (~~~), an autolink of GFM or a
 # field of Dataview (:: , http:, mailto:, xmpp:), an e-mail address (@). The & of a character

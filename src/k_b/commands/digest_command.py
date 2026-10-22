@@ -14,7 +14,9 @@ from k_b.commands.run_log import (
     value_or_log_refusal,
 )
 from k_b.core.config import AI_API_READ_TIMEOUT_SECONDS, DIGEST_SUBJECTS
-from k_b.etl.ai_api_client import (
+from k_b.etl.collected_sources import VAULT_DIR_VARIABLE, read_vault_dir
+from k_b.etl.vault_files import VaultEntryRefusedError
+from k_b.post.ai_api_client import (
     AI_API_KEY_VARIABLE,
     AiApiError,
     DigestsResponse,
@@ -22,9 +24,7 @@ from k_b.etl.ai_api_client import (
     read_ai_api_client_settings_or_refusal,
     request_digests,
 )
-from k_b.etl.collected_sources import VAULT_DIR_VARIABLE, read_vault_dir
-from k_b.etl.digest_sheets import refuse_written_sheets, write_digest_sheet
-from k_b.etl.vault_files import VaultEntryRefusedError
+from k_b.post.digest_sheets import refuse_written_sheets, write_digest_sheet
 
 logger = logging.getLogger(LOGGER_NAME)
 

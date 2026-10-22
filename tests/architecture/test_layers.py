@@ -1,9 +1,10 @@
 """The dependencies go one way, read at two levels (conventions.md, rule 5).
 
 Under k_b: core and items are the common vocabulary, database reads and writes the base (its
-writers under database/writers, behind database/writing), etl runs the pipeline, data_api serves
-the base, ai_api calls the model, cli and commands compose. Under k_b.etl: the composition
-(source_kinds, collected_sources) → the sources → the modules of the pipeline.
+writers under database/writers, behind database/writing), etl runs the pipeline, post writes
+the digests and the sheets above it, data_api serves the base, ai_api calls the model, cli and
+commands compose. Under k_b.etl: the composition (source_kinds, collected_sources) → the
+sources → the modules of the pipeline.
 """
 
 import pytest
@@ -133,6 +134,33 @@ def test_the_rule_of_etl_refuses_every_way_to_the_apis(code, is_refused):
     imported = parse_imported_modules(code, package="k_b.etl")
 
     assert bool(list_imports_of_the_apis(imported)) is is_refused
+
+
+# etl runs below the post-processing: post reads the pipeline, the pipeline never reads post.
+def list_imports_of_the_post_processing(imported: set[str]) -> set[str]:
+    return {name for name in imported if reaches(name, {"post"})}
+
+
+def test_etl_imports_nothing_of_the_post_processing():
+    for path in list_python_files("etl"):
+        imported = list_imported_modules(path, find_package(path))
+        assert list_imports_of_the_post_processing(imported) == set(), path
+
+
+@pytest.mark.parametrize(
+    ("code", "is_refused"),
+    [
+        ("from k_b.post.ai_api_client import build_ai_api_client", True),
+        ("from k_b import post", True),
+        ("from k_b.post import digest_sheets", True),
+        ("from ..post.digest_sheets import write_digest_sheet", True),
+        ("from k_b.etl.vault_files import write_new_sheet", False),
+    ],
+)
+def test_the_rule_of_etl_refuses_every_way_to_the_post_processing(code, is_refused):
+    imported = parse_imported_modules(code, package="k_b.etl")
+
+    assert bool(list_imports_of_the_post_processing(imported)) is is_refused
 
 
 def test_no_module_of_the_sources_imports_the_composition():
