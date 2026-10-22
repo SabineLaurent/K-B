@@ -168,6 +168,11 @@ plan ni les étapes d'avant.
   SourceKind.reader vaut None pour GH Archive, et son commentaire dit
   pourquoi (source_contract.py:105-107). La composition n'a donc
   aujourd'hui aucun emplacement pour le lecteur des tendances.
+- Étape 5 : reject journalise : il ne rejoint pas raw_files.py
+  (vocabulaire pur) mais un module etl/rejections.py, avec le type
+  Rejection. Vérifier le nom du logger dans les lignes de journal et
+  les tests qui le lisent. L'amendement de la règle 1 de
+  conventions.md citera alors etl/rejections.py.
 - Étape 6 : le contrôle à la collecte passe de la source à
   etl/extract.py, mais une sorte sans lecteur (reader None : les deux
   classements GitHub, GH Archive) n'a rien à contrôler, et l'exception
