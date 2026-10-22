@@ -651,10 +651,12 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
    Pydantic. Le lecteur est retrouvé par le nom du dossier brut (`github_releases_<dépôt>/` est
    lu par celui des releases), que la source soit encore suivie ou non. Les sortes sont déclarées
    une seule fois, dans `source_kinds.py`. Un dossier qui n'appartient à aucune sorte est
-   journalisé et sauté. Exception : un classement GH Archive n'est pas fait d'items (ADR du
-   2026-10-08) ; ses lignes sont lues par un lecteur à part (`read_trend_files`,
-   `src/k_b/etl/sources/gh_archive.py`), et la sorte `gh_archive` reste déclarée sans lecteur
-   d'items. Les items ont les mêmes champs : source, identifiant dans la source,
+   journalisé et sauté, comme un dossier dont la sorte n'a aucun lecteur (les deux classements
+   GitHub). Exception : un classement GH Archive n'est pas fait d'items (ADR du
+   2026-10-08) ; ses lignes sont lues par le lecteur de tendances que porte sa sorte
+   (`TREND_READER`, `src/k_b/etl/sources/gh_archive.py`, donné par `SourceKind.trend_reader`),
+   dans le même parcours de `raw/` que les items, et la sorte `gh_archive` reste déclarée sans
+   lecteur d'items. Les items ont les mêmes champs : source, identifiant dans la source,
    titre, URL, auteurs (arXiv), date de publication et date de révision (arXiv), date d'ajout (Clipper, Zotero),
    contenu ou résumé, date de collecte, chemin du brut d'origine. Une date absente reste vide. Toutes les dates sont en UTC, avec fuseau. Une ligne
    illisible est rejetée et journalisée, pas devinée.
@@ -673,8 +675,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
    `src/k_b/commands/import_command.py`) n'importe que les fichiers bruts pas encore importés
    (#106) : il lit le registre de la base
    (`read_imported_paths`, `src/k_b/etl/load.py`), puis les fichiers qui n'y sont pas
-   (`read_raw_items`, `src/k_b/etl/transform.py`, pour les items ; `read_trend_files`,
-   `src/k_b/etl/sources/gh_archive.py`, pour les classements GH Archive), puis écrit la base
+   (`read_raw_files`, `src/k_b/etl/transform.py`, qui rend les items et les classements GH
+   Archive d'un seul parcours de `raw/`), puis écrit la base
    (`import_items`) : fichiers d'items et classements en une seule suite, dans l'ordre des
    collectes. Il affiche
    le nombre de fichiers bruts lus (`raw files read`).

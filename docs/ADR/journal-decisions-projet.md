@@ -3770,6 +3770,76 @@ Sabine du 2026-10-15).
   sur les tests d'architecture. Limite assumée : le classement est un jugement, pas un critère
   automatique ; un document nouveau se classe à la main. — branche `refactoring/etl`
 
+### Tendances : un lecteur porté par la sorte, et un seul parcours de `raw/`
+
+- **La sorte d'une source porte un second lecteur, `trend_reader` (`TrendReader` :
+  `source_code`, `read_rows`), à côté de `reader`, et c'est par lui que le lecteur des tendances
+  de GH Archive parvient à `etl/transform.py`. `read_trend_files` quitte
+  `etl/sources/gh_archive.py` ; la source ne garde que ce qui lui est propre (la requête
+  BigQuery, `read_trends`, `TrendsExtract`, `describe_validation_error`) et expose
+  `read_trend_rows` par la constante `TREND_READER`, que `source_kinds.py` lui donne, comme les
+  sept `READER` des autres sources.** Décision de Sabine du 2026-10-22, étape 3 du plan de
+  refactorisation, après un relevé en lecture seule des options. Pourquoi : `transform.py` est un
+  module du pipeline, et un test d'architecture lui interdit d'importer une source ou la
+  composition
+  (`test_no_module_of_the_pipeline_imports_the_sources_or_the_composition`) ; le lecteur doit
+  donc arriver par paramètre, et la sorte est déjà l'endroit où une source dit comment lire son
+  dossier brut (`find_source_kind` route un dossier vers exactement une sorte). Le champ a `None`
+  pour défaut : les vingt constructions de `SourceKind` de `src/` et de `tests/` restent
+  intactes, et seule la ligne de GH Archive change. Le vocabulaire est celui de la base
+  (`trend`, `TrendRow`, `TrendFile`, `TrendReading`) et non « ranking », qui désigne déjà les
+  tops GitHub. Un invariant tenu par un test, faute d'un type qui l'exprime : une sorte porte un
+  lecteur ou l'autre, jamais les deux
+  (`test_no_kind_has_both_a_reader_of_items_and_a_trend_reader`). Aucun test d'architecture n'a
+  été modifié : les 102 passent tels quels, ce qui prouve que c'est la composition, et non le
+  transform, qui nomme la source. Options écartées : étendre `SourceReader` (déjà écartée le
+  2026-10-13 ; raison de fond ajoutée : `EntryReading` porte des rejets par entrée, alors qu'un
+  classement se refuse en entier, exception de la règle 1 de `conventions.md`) ; une constante
+  `RANKING_KINDS` déclarée à côté de `SOURCE_KINDS`, sur le modèle de `TOPS` (deux listes à tenir
+  en phase, `gh_archive` nommé dans les deux, et deux listes à porter dans le `pipeline.py` de
+  l'étape 4). — branche `refactoring/etl`
+- **Un seul parcours de `raw/` rend les deux lectures : `read_raw_files` appelle
+  `list_collections`, qui classe chaque collecte selon le lecteur de sa sorte, puis rend
+  `RawReadings(items, trends)`. `kb import` l'appelle une fois au lieu de deux ; `import_items`
+  garde ses deux lectures et n'est pas touché.** Décision de Sabine du 2026-10-22. Pourquoi :
+  `list_collections` parcourait déjà tous les dossiers de `raw/` et trouvait la sorte de chacun,
+  y compris celle de GH Archive, qu'il journalisait et sautait ; il classe désormais au lieu de
+  sauter. **Close** « Un seul chemin de lecture pour les items et les classements » (2026-10-13,
+  décisions ouvertes) et **lève la limite assumée** de « Import dans la base : TENDANCE » : il
+  n'y a plus deux chemins de lecture, et plus personne ne refait « en une vingtaine de lignes le
+  parcours d'un dossier, le saut d'un fichier déjà importé et les rejets ». Les deux `read_count`
+  restent séparés dans `RawReadings` : leur somme est le `raw files read` que `kb import`
+  affiche. — branche `refactoring/etl`
+- **Deux changements de comportement, acceptés.** Décisions de Sabine du 2026-10-22, sur le
+  compte rendu de la session. (1) La ligne de journal « source without a reader of items,
+  skipped by the item reader: 'x' » devient « source without a reader, skipped: 'x' » : avec une
+  entrée de lecture unique, « sauté par le lecteur d'items » n'a plus de sens, et le message ne
+  concerne plus que les deux classements GitHub, seules sortes sans aucun lecteur. (2) Le dossier
+  brut des tendances est trouvé **par préfixe**, comme pour toute autre source : un dossier
+  `gh_archive_<suffixe>`, ou un `gh_archive` sous `selected_library/`, serait désormais lu, là où
+  l'ancien lecteur ne lisait que `automated_watch/gh_archive`. Même règle que pour les autres
+  sources, dont un dossier plus suivi reste lu (`cisa_kev_old`,
+  `test_the_raw_files_of_a_folder_no_longer_tracked_are_read`) ; aucune source ne peut écrire un
+  tel dossier aujourd'hui. Un chemin d'erreur a été préservé exprès : `list_collections` ne liste
+  un dossier de source que s'il a un lecteur, sinon un dossier de top illisible ferait échouer
+  tout l'import là où il était sauté. — branche `refactoring/etl`
+- **La lecture du brut par `RawStore` ne se fait pas à l'étape 3 : elle devient l'étape 3 bis,
+  pour tout `transform.py` d'un coup.** Décision de Sabine du 2026-10-22, sur la recommandation
+  de la session, qui **amende le texte de l'étape 3 du plan** (« via RawStore »). Pourquoi : les
+  tendances par clé et les items par `Path` donneraient à un seul module deux adresses pour le
+  même arbre (une clé de `RawStore` commence par `raw/`, un `raw_file_path` en est relatif), ce
+  qui condamnerait le parcours unique ; et le contrôle de la règle 3 de `poc.md` est un `grep -rl`,
+  une liste de **fichiers** : `transform.py` y reste tant que le lecteur d'items ouvre le brut,
+  donc la moitié du chemin ne gagne rien de mesurable. Ce que l'étape 3 gagne sur la règle 3 est
+  la sortie de `gh_archive.py` de cette liste, qui vient du déplacement et non de la poignée (la
+  liste passe de onze à dix fichiers, et `etl/transform.py` est le seul qui touche encore le
+  brut). L'étape 3 bis demandera deux ou trois méthodes nouvelles de `RawStore` (lister les
+  dossiers de source, lister les entrées d'un dossier dossiers compris, la conversion clé ↔
+  `raw_file_path` nommée une fois) et touchera cinq signatures et les tests qui passent un
+  `raw_dir`. Option écartée : tout faire dans l'étape 3, en acceptant un diff large dans la même
+  étape qu'une décision de conception (`plan.md`, §6 : les déplacements mécaniques sont séparés
+  des changements de comportement). — branche `refactoring/etl`
+
 ## Décisions encore ouvertes
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,
@@ -3858,6 +3928,9 @@ Sabine du 2026-10-15).
 - **Un seul chemin de lecture pour les items et les classements** (2026-10-13) : `trend` est lu
   par `read_trend_files`, à côté du lecteur générique, dont le contrat rend un `Item`. Signalé
   par #142, sans issue ; aucune issue du rangement (#107, #85, #135, #136) ne le porte.
+  **Close le 2026-10-22** : `etl/transform.py` lit les deux par un seul parcours de `raw/`, le
+  lecteur des tendances lui arrivant par `SourceKind.trend_reader` (« Tendances : un lecteur
+  porté par la sorte, et un seul parcours de `raw/` », étape 3 du plan de refactorisation).
 - **Wiki : le texte envoyé au modèle et reçu de lui, dans l'outil de suivi** (2026-10-12) : jamais
   (mesures seules), seulement en environnement d'essai, ou toujours (et inscrit au registre).
   Sabine tranchera à la comparaison des outils de restitution. La trace d'un outil comme Langfuse

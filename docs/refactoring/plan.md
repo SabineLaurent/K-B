@@ -99,9 +99,10 @@ Points défendables :
 | # | Étape | Statut |
 |---|---|---|
 | 0 | Sortir le post-traitement de etl vers post/, règle etl -> post | fait, tag etl-post-separated |
-| 1 | Créer etl/raw_files.py (types partagés, déplacement mécanique) ; ajouter le module à ETL_PIPELINE_MODULES (tests/architecture/module_imports.py) | fait (à commiter) |
-| 2 | Filtre des releases non suivies et normalize_item dans le transform, avant le load | fait (à commiter) |
-| 3 | Décision de conception d'abord : comment le lecteur des tendances parvient à transform.py par la composition (second champ de SourceKind, ou contrat de lecteur de classement). Relevé en lecture seule, puis choix de Sabine. Lecture des tendances de gh_archive appelée par transform.py, via RawStore, sans accès direct au brut ; gh_archive.py sort de la liste de la règle 3 de poc.md | à faire |
+| 1 | Créer etl/raw_files.py (types partagés, déplacement mécanique) ; ajouter le module à ETL_PIPELINE_MODULES (tests/architecture/module_imports.py) | fait |
+| 2 | Filtre des releases non suivies et normalize_item dans le transform, avant le load | fait |
+| 3 | Décision de conception d'abord : comment le lecteur des tendances parvient à transform.py par la composition (second champ de SourceKind, ou contrat de lecteur de classement). Relevé en lecture seule, puis choix de Sabine. Lecture des tendances de gh_archive appelée par transform.py, par le lecteur que porte sa sorte, sans accès direct au brut ; gh_archive.py sort de la liste de la règle 3 de poc.md | fait (à commiter) |
+| 3 bis | Tout transform.py lit le brut via RawStore, prérequis du passage du brut à Azure Blob Storage (règle 3 de poc.md) ; transform.py sort alors de la liste de la règle 3 | à faire |
 | 4 | Créer pipeline.py ; les commandes passent par lui ; ajouter le module à ETL_PIPELINE_MODULES (tests/architecture/module_imports.py) | à faire |
 | 5 | Règle d'architecture : extract, transform, load ne s'importent pas entre eux | à faire |
 | 6 | Pilote : la source Zotero en paquet extract.py / transform.py | à faire |
@@ -154,20 +155,21 @@ conventions.md :
 
 poc.md :
 
-- Règles 3 et 4 : les chemins de zotero.py et de gh_archive.py dans
-  les références de départ (étape 6).
-- Règle 5 : le chemin de describe_validation_error (étape 6).
+- Règle 3 : gh_archive.py hors de la liste des fichiers qui touchent le
+  brut (étape 3) ; transform.py hors de cette liste (étape 3 bis) ; les
+  chemins de zotero.py dans les références de départ (étape 6).
+- Règle 4 : son contrôle ne cite que etl/raw_store.py et
+  etl/sources/zotero.py ; seul le chemin de zotero.py change (étape 6).
+- Règle 5 : le numéro de ligne de describe_validation_error, et la
+  citation des lignes de read_collection, qui se périment à chaque
+  changement de leur fichier : remplacés par le nom des fonctions
+  (étape 3) ; le chemin de describe_validation_error (étape 6).
 
 ## 8. Points ouverts
 
 Chacun relève d'une étape future, qui le tranche : aucun ne bloque le
 plan ni les étapes d'avant.
 
-- Étape 3 : SourceReader est typé pour des items (read_entries rend des
-  entrées, convert rend un Item) et ne peut pas porter read_trends ;
-  SourceKind.reader vaut None pour GH Archive, et son commentaire dit
-  pourquoi (source_contract.py:105-107). La composition n'a donc
-  aujourd'hui aucun emplacement pour le lecteur des tendances.
 - Étape 4 : la liste des dépôts suivis est passée deux fois, au filtre
   du transform (read_raw_items) et à la table des dépôts suivis
   (import_items) ; pipeline.py doit la prendre une seule fois et la
@@ -178,11 +180,12 @@ plan ni les étapes d'avant.
   les tests qui le lisent. L'amendement de la règle 1 de
   conventions.md citera alors etl/rejections.py.
 - Étape 6 : le contrôle à la collecte passe de la source à
-  etl/extract.py, mais une sorte sans lecteur (reader None : les deux
-  classements GitHub, GH Archive) n'a rien à contrôler, et l'exception
-  des classements de la règle 1 de conventions.md est aujourd'hui portée
-  par la source elle-même (check_not_empty, dans cisa_kev.py et
-  zotero.py). Le contrôle générique doit traiter les deux cas.
+  etl/extract.py, mais une sorte sans aucun lecteur (reader et
+  trend_reader None : les deux classements GitHub) n'a rien à contrôler,
+  et l'exception des classements de la règle 1 de conventions.md est
+  aujourd'hui portée par la source elle-même (check_not_empty, dans
+  cisa_kev.py et zotero.py). Le contrôle générique doit traiter les deux
+  cas.
 - Étape 8 : Top porte les mots de sa fiche (count_heading, subject) et
   son lecteur (read_entries), et c'est la composition qui les fournit
   (TOPS, source_kinds.py) ; TopEntry est lui-même décrit « as its sheet
@@ -191,3 +194,13 @@ plan ni les étapes d'avant.
 - Hors étapes : release_writer.py:71-75 dépaquette fetchone() sans
   garde ; une liste incohérente entre le filtre et la table lèverait
   une TypeError au lieu d'une erreur nommée. À traiter à part.
+- Hors étapes : six fichiers sont entrés dans la sortie du grep de la
+  règle 3 de poc.md depuis le commit 9e6e2e8, sans la justification que
+  la règle demande (« un fichier nouveau dans la liste se justifie dans
+  la PR ») : etl/sources/clipping.py, commands/environment.py,
+  commands/write_tops_command.py, commands/digest_command.py,
+  commands/openapi_command.py et ai_api/connectors/llm_replay.py ;
+  cli.py en est sorti. Aucun ne touche raw/ (relevé du 2026-10-22,
+  fichier par fichier : coffre, dossier de données, base, journal
+  d'import, fichiers du paquet, rejeu). À justifier ou à écarter de la
+  liste, hors de cette refactorisation.
