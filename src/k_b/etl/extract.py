@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from k_b.core.quoting import quote_value
+from k_b.etl.raw_files import COLLECTION_NAME_FORMAT
 from k_b.etl.raw_store import (
     COLLECTION_STATE_FILENAME,
     RAW_DIR_NAMES,
@@ -82,7 +83,7 @@ def collect_one_source(
     if raw_content is None:
         return
     source_dir = raw_dir / source.acquisition_dir_name / source.name
-    collection_name = f"{now:%Y-%m-%dT%H%M%SZ}"
+    collection_name = now.strftime(COLLECTION_NAME_FORMAT)
     if isinstance(raw_content, bytes):
         write_new_raw_file(
             source_dir / f"{collection_name}.{source.extension}", raw_content
