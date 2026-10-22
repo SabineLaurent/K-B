@@ -32,7 +32,7 @@ from k_b.etl.sources.tracked_repositories import (
     TRACKED_REPOSITORIES,
     list_packages_by_ecosystem,
 )
-from k_b.etl.top_sheets import Top
+from k_b.etl.tops import Top
 
 SOURCE_KINDS = (
     SourceKind(cisa_kev.FOLDER_PREFIX, (CisaKevSource(),), cisa_kev.READER),

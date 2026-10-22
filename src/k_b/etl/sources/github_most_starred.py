@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.sources.github_api import get_from_github_api
 from k_b.etl.sources.tracked_repositories import is_repository_name
-from k_b.etl.top_sheets import TopEntry
+from k_b.etl.tops import TopEntry
 from k_b.items import parse_aware_datetime
 
 # The search needs a criterion: this one keeps the whole top 100 (the 100th had 116,161 stars on

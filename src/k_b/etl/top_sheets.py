@@ -7,7 +7,6 @@ constants and of the day of its ranking, never of a value read from GitHub.
 """
 
 import logging
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -17,6 +16,7 @@ from k_b.core.config import TOPS_DIR_NAME, WATCH_DIR_NAME
 from k_b.core.quoting import quote_value
 from k_b.database.dates import format_date
 from k_b.etl.raw_store import RawStore
+from k_b.etl.tops import Top, TopEntry
 from k_b.etl.transform import COLLECTION_NAME_FORMAT, parse_collection_name
 from k_b.etl.vault_files import (
     MARKDOWN_SYNTAX_CHARACTERS,
@@ -28,33 +28,6 @@ from k_b.etl.vault_files import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class TopEntry:
-    """A repository of a ranking, as its sheet shows it."""
-
-    rank: int
-    # owner/name, checked by the reader of its source.
-    full_name: str
-    # Built from the name by the source, never read in the response.
-    url: str
-    description: str | None
-    # Its stars or its forks.
-    count: int
-
-
-@dataclass(frozen=True)
-class Top:
-    """A top ranking: the folder of its sheets under veille/tops/, the raw folder of its
-    rankings and their reader, and the words of its sheet."""
-
-    name: str
-    folder_key: str
-    read_entries: Callable[[bytes], list[TopEntry]]
-    count_heading: str
-    # What it ranks, after "Top <n> des".
-    subject: str
 
 
 @dataclass(frozen=True)
