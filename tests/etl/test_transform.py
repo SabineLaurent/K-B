@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import shutil
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from k_b.etl.raw_files import RawFile, RawReading, Rejection
 from k_b.etl.raw_store import RawStore, write_file_atomically
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
 from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 from k_b.etl.sources.zotero import ZoteroSource
 from k_b.etl.transform import read_raw_items
 from k_b.items import Item
@@ -46,6 +48,14 @@ FAKE_PAGE_KINDS = [
 ]
 
 
+def read_items(
+    raw_dir: Path, kinds: Sequence[SourceKind], imported_paths: frozenset[str]
+) -> RawReading:
+    """read_raw_items with the tracked repositories of the code: a release of a repository out
+    of that list is rejected by the reading (etl/transform.py)."""
+    return read_raw_items(raw_dir, kinds, imported_paths, TRACKED_REPOSITORIES)
+
+
 def items_of(reading: RawReading) -> list[Item]:
     """The items of every file read, in reading order."""
     return [item for raw_file in reading.files for item in raw_file.items]
@@ -71,7 +81,7 @@ def test_every_source_with_a_reader_gives_its_items(tmp_path):
     copy_fixture(tmp_path, "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml")
     copy_fixture(tmp_path, "cisa_kev_extract.csv", "cisa_kev", "csv")
 
-    reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+    reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     count_by_raw_file = {}
     for item in items_of(reading):
@@ -93,7 +103,7 @@ def test_an_unreadable_file_is_rejected_and_the_others_are_read(tmp_path, caplog
     broken.write_bytes(b"<html>not a catalog</html>")
 
     with caplog.at_level(logging.WARNING):
-        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+        reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert len(items_of(reading)) == 3
     assert len(reading.rejections) == 1
@@ -108,7 +118,7 @@ def test_a_file_name_that_is_not_a_collection_time_is_rejected(tmp_path):
     source_dir.mkdir(parents=True)
     shutil.copyfile(FIXTURES_DIR / "arxiv_extract.xml", source_dir / "latest.xml")
 
-    reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+    reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert items_of(reading) == []
     assert [rejection.raw_file_path for rejection in reading.rejections] == [
@@ -120,7 +130,7 @@ def test_a_folder_of_no_source_kind_is_skipped_and_logged(tmp_path, caplog):
     copy_fixture(tmp_path, "arxiv_extract.xml", "unknown", "xml")
 
     with caplog.at_level(logging.INFO):
-        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+        reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert items_of(reading) == []
     assert reading.rejections == []
@@ -134,7 +144,7 @@ def test_the_name_of_a_folder_of_no_source_kind_is_logged_escaped_and_truncated(
     (tmp_path / "automated_watch" / folder_name).mkdir(parents=True)
 
     with caplog.at_level(logging.INFO):
-        read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+        read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     [message] = [
         record.getMessage()
@@ -150,7 +160,7 @@ def test_the_name_of_a_folder_of_no_source_kind_is_logged_escaped_and_truncated(
 def test_the_raw_files_of_a_folder_no_longer_tracked_are_read(tmp_path):
     copy_fixture(tmp_path, "cisa_kev_extract.csv", "cisa_kev_old", "csv")
 
-    reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+    reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert {item.raw_file_path.split("/")[1] for item in items_of(reading)} == {
         "cisa_kev_old"
@@ -163,7 +173,7 @@ def test_a_github_ranking_is_skipped_and_logged(tmp_path, caplog, folder_name):
     copy_fixture(tmp_path, f"{folder_name}_extract.json", folder_name, "json")
 
     with caplog.at_level(logging.INFO):
-        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+        reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert items_of(reading) == []
     assert reading.rejections == []
@@ -188,7 +198,7 @@ def test_the_github_releases_and_advisories_are_read(
 ):
     copy_fixture(tmp_path, fixture_name, folder_name, "json")
 
-    reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+    reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert [item.kind for item in items_of(reading)] == [kind] * 3
     assert reading.rejections == []
@@ -204,14 +214,14 @@ def test_files_are_read_in_collection_order(tmp_path):
 
     collection_times = [
         item.collected_at
-        for item in items_of(read_raw_items(tmp_path, SOURCE_KINDS, frozenset()))
+        for item in items_of(read_items(tmp_path, SOURCE_KINDS, frozenset()))
     ]
 
     assert collection_times == sorted(collection_times)
 
 
 def test_an_empty_raw_folder_gives_nothing(tmp_path):
-    reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+    reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert items_of(reading) == []
     assert reading.rejections == []
@@ -229,7 +239,7 @@ def test_an_entry_refused_as_an_item_is_rejected_and_the_others_of_its_file_are_
     (source_dir / f"{COLLECTION_NAME}.csv").write_text(catalog)
 
     with caplog.at_level(logging.WARNING):
-        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+        reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert [item.source_item_id for item in items_of(reading)] == [
         "CVE-2026-86950",
@@ -259,7 +269,7 @@ def test_a_title_too_long_is_rejected_and_logged_and_the_other_papers_are_read(
     (source_dir / f"{COLLECTION_NAME}.xml").write_text(feed)
 
     with caplog.at_level(logging.WARNING):
-        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+        reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert len(items_of(reading)) == 2
     assert "2609.31282" not in [item.source_item_id for item in items_of(reading)]
@@ -282,7 +292,7 @@ def test_hidden_files_are_ignored(tmp_path):
         b"\x00\x00\x00\x01Bud1"
     )
 
-    reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+    reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert len(items_of(reading)) == 3
     assert reading.rejections == []
@@ -296,7 +306,7 @@ def test_a_folder_of_pages_is_read_page_by_page(tmp_path):
         {"2026-10-05.html": b"c\nd", "2026-10-04.html": b"a\nb"},
     )
 
-    reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
+    reading = read_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
 
     assert [
         (item.source_item_id, item.raw_file_path, item.collected_at)
@@ -315,7 +325,7 @@ def test_a_hidden_file_in_a_folder_of_pages_is_skipped(tmp_path):
         tmp_path, COLLECTION_NAME, {"2026-10-05.html": b"a", ".DS_Store": b"hidden"}
     )
 
-    reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
+    reading = read_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
 
     assert [item.source_item_id for item in items_of(reading)] == ["a"]
     assert reading.rejections == []
@@ -333,7 +343,7 @@ def test_the_rest_of_an_interrupted_write_in_a_folder_of_pages_is_skipped(
     assert rest.name.startswith(".2026-10-06.html.")
     assert rest.name.endswith(".tmp")
 
-    reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
+    reading = read_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
 
     assert [item.source_item_id for item in items_of(reading)] == ["a"]
     assert reading.rejections == []
@@ -345,7 +355,7 @@ def test_a_folder_inside_a_folder_of_pages_is_skipped_and_logged(tmp_path, caplo
     (pages_dir / "archive" / "2026-10-04.html").write_bytes(b"inside")
 
     with caplog.at_level(logging.INFO):
-        reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
+        reading = read_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
 
     assert [item.source_item_id for item in items_of(reading)] == ["a"]
     assert reading.rejections == []
@@ -360,7 +370,7 @@ def test_a_folder_of_pages_not_named_by_a_collection_time_is_rejected_whole(
 ):
     write_pages(tmp_path, "latest", {"2026-10-04.html": b"a", "2026-10-05.html": b"b"})
 
-    reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
+    reading = read_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
 
     assert items_of(reading) == []
     assert [rejection.raw_file_path for rejection in reading.rejections] == [
@@ -378,7 +388,7 @@ def test_an_unreadable_page_is_rejected_and_the_others_of_its_folder_are_read(
         {"2026-10-04.html": b"\xff", "2026-10-05.html": b"a"},
     )
 
-    reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
+    reading = read_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
 
     assert [item.source_item_id for item in items_of(reading)] == ["a"]
     assert len(reading.rejections) == 1
@@ -397,7 +407,7 @@ def test_an_unreadable_folder_of_pages_is_rejected_and_the_others_are_read(tmp_p
     write_pages(tmp_path, COLLECTION_NAME, {"2026-10-05.html": b"b"})
     unreadable_dir.chmod(0)
     try:
-        reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
+        reading = read_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
     finally:
         unreadable_dir.chmod(0o755)
 
@@ -423,7 +433,7 @@ def test_a_raw_file_already_imported_is_not_opened_and_a_new_one_is(tmp_path):
     write_pages(tmp_path, COLLECTION_NAME, {"2026-10-05.html": b"b"})
     opened_pages: list[bytes] = []
 
-    reading = read_raw_items(
+    reading = read_items(
         tmp_path,
         recording_kinds(opened_pages),
         frozenset({"automated_watch/fake/2026-10-04T093000Z/2026-10-04.html"}),
@@ -444,7 +454,7 @@ def test_a_page_already_imported_is_skipped_and_the_others_of_its_folder_are_rea
     )
     opened_pages: list[bytes] = []
 
-    reading = read_raw_items(
+    reading = read_items(
         tmp_path,
         recording_kinds(opened_pages),
         frozenset({f"automated_watch/fake/{COLLECTION_NAME}/2026-10-04.html"}),
@@ -457,7 +467,7 @@ def test_a_page_already_imported_is_skipped_and_the_others_of_its_folder_are_rea
 def test_a_file_without_item_is_read_with_its_source_and_collection(tmp_path):
     write_pages(tmp_path, COLLECTION_NAME, {"2026-10-05.html": b""})
 
-    reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
+    reading = read_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
 
     assert reading.files == [
         RawFile(
@@ -474,7 +484,7 @@ def test_a_file_without_item_is_read_with_its_source_and_collection(tmp_path):
 def test_an_unreadable_page_gives_no_file_read_but_is_counted_as_opened(tmp_path):
     write_pages(tmp_path, COLLECTION_NAME, {"2026-10-05.html": b"\xff"})
 
-    reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
+    reading = read_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
 
     assert reading.files == []
     assert reading.read_count == 1
@@ -484,7 +494,7 @@ def test_an_unreadable_page_gives_no_file_read_but_is_counted_as_opened(tmp_path
 def test_a_collection_not_named_by_its_time_opens_no_page(tmp_path):
     write_pages(tmp_path, "latest", {"2026-10-05.html": b"a"})
 
-    reading = read_raw_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
+    reading = read_items(tmp_path, FAKE_PAGE_KINDS, frozenset())
 
     assert reading.files == []
     assert reading.read_count == 0
@@ -502,7 +512,7 @@ def test_a_file_read_counts_its_rejected_entries(tmp_path):
     source_dir.mkdir(parents=True)
     (source_dir / f"{COLLECTION_NAME}.csv").write_text(catalog)
 
-    (raw_file,) = read_raw_items(tmp_path, SOURCE_KINDS, frozenset()).files
+    (raw_file,) = read_items(tmp_path, SOURCE_KINDS, frozenset()).files
 
     assert (len(raw_file.items), raw_file.rejection_count) == (3, 1)
 
@@ -519,7 +529,7 @@ def test_an_entry_rejected_by_its_reader_is_rejected_and_counted_with_its_file(
     (source_dir / f"{COLLECTION_NAME}.csv").write_text(catalog)
 
     with caplog.at_level(logging.WARNING):
-        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+        reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert [item.source_item_id for item in items_of(reading)] == [
         "CVE-2026-86950",
@@ -535,6 +545,47 @@ def test_an_entry_rejected_by_its_reader_is_rejected_and_counted_with_its_file(
     assert item_rejection.reason.startswith("read entry 1: ValidationError")
     (raw_file,) = reading.files
     assert raw_file.rejection_count == 2
+
+
+# The repository of a release is read in its URL (github_releases.py): a page can hold a release
+# of a repository the list no longer names.
+UNTRACKED_REPOSITORY = "octocat/hello-world"
+
+
+def test_a_release_of_a_repository_out_of_the_list_is_rejected_and_the_others_are_read(
+    tmp_path, caplog
+):
+    releases = json.loads((FIXTURES_DIR / "github_releases_extract.json").read_text())
+    releases[1]["html_url"] = releases[1]["html_url"].replace(
+        "anthropics/claude-code", UNTRACKED_REPOSITORY
+    )
+    source_dir = tmp_path / "automated_watch" / "github_releases_anthropics_claude_code"
+    source_dir.mkdir(parents=True)
+    (source_dir / f"{COLLECTION_NAME}.json").write_text(json.dumps(releases))
+
+    with caplog.at_level(logging.WARNING):
+        reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
+
+    (raw_file,) = reading.files
+    assert [item.source_item_id for item in raw_file.items] == [
+        str(releases[0]["id"]),
+        str(releases[2]["id"]),
+    ]
+    raw_file_path = (
+        f"automated_watch/github_releases_anthropics_claude_code/{COLLECTION_NAME}.json"
+    )
+    assert reading.rejections == [
+        Rejection(
+            raw_file_path,
+            f"repository not in the tracked list: {UNTRACKED_REPOSITORY}",
+        )
+    ]
+    assert UNTRACKED_REPOSITORY in caplog.text
+    # A release left out is not an entry its reader rejected nor an item refused: the count of
+    # the file stays at 0, and the catalogs keep withdrawing (decision of Sabine of 2026-10-22).
+    assert raw_file.rejection_count == 0
+    # The file is read: the import registers it, even with no item left.
+    assert reading.read_count == 1
 
 
 @pytest.mark.parametrize(
@@ -555,7 +606,7 @@ def test_the_source_of_a_file_read_is_the_source_of_its_items(
 ):
     copy_fixture(tmp_path, fixture_name, folder_name, extension)
 
-    (raw_file,) = read_raw_items(tmp_path, SOURCE_KINDS, frozenset()).files
+    (raw_file,) = read_items(tmp_path, SOURCE_KINDS, frozenset()).files
 
     assert raw_file.items
     assert {item.source_code for item in raw_file.items} == {raw_file.source_code}
@@ -568,7 +619,7 @@ def test_the_extracts_of_the_selected_library_are_read(tmp_path, zotero_dir):
         ZoteroSource(zotero_dir, RawStore(zotero_dir.parent / "data")).fetch(None)
     )
 
-    reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+    reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert [
         (raw_file.raw_file_path, raw_file.source_code, raw_file.collected_at)
@@ -587,7 +638,7 @@ def test_a_folder_of_the_selected_library_without_a_source_kind_is_skipped(
     (tmp_path / "selected_library" / "notes").mkdir(parents=True)
 
     with caplog.at_level(logging.INFO):
-        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+        reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert reading.files == []
     assert "folder without a source kind, skipped: 'notes'" in caplog.text
@@ -601,7 +652,7 @@ def test_a_raw_file_nested_too_deep_is_rejected_and_the_others_are_read(tmp_path
     nested_path.parent.mkdir(parents=True)
     nested_path.write_bytes(b"[" * 100_000)
 
-    reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+    reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert [raw_file.source_code for raw_file in reading.files] == ["cisa_kev"]
     [rejection] = reading.rejections
@@ -620,7 +671,7 @@ def test_a_summary_with_a_nul_is_rejected_without_its_text(tmp_path, caplog):
     (source_dir / f"{COLLECTION_NAME}.json").write_text(json.dumps(releases))
 
     with caplog.at_level(logging.WARNING):
-        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+        reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     assert len(items_of(reading)) == len(releases) - 1
     (rejection,) = reading.rejections
@@ -653,7 +704,7 @@ def test_an_unreadable_page_is_rejected_without_its_text(
     (source_dir / f"{COLLECTION_NAME}.{extension}").write_bytes(page)
 
     with caplog.at_level(logging.WARNING):
-        reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+        reading = read_items(tmp_path, SOURCE_KINDS, frozenset())
 
     (rejection,) = reading.rejections
     assert "RECEIVED_TEXT" not in rejection.reason

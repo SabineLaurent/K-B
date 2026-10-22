@@ -107,7 +107,7 @@ def run_import(
     database_path = data_dir / "k-b.sqlite"
     imported_paths = frozenset() if read_again else read_imported_paths(database_path)
     return import_items(
-        read_raw_items(data_dir / "raw", kinds, imported_paths),
+        read_raw_items(data_dir / "raw", kinds, imported_paths, tracked_repositories),
         read_trend_files(data_dir / "raw", imported_paths),
         database_path,
         log_path_at(data_dir, imported_at),
@@ -1205,6 +1205,29 @@ def test_a_file_read_without_item_is_registered_and_not_read_again(data_dir):
     assert first.withdrawn_count == 0
 
 
+def test_a_file_whose_releases_are_all_out_of_the_list_is_registered_and_not_read_again(
+    data_dir,
+):
+    """The reading rejects every release of the file (etl/transform.py) and still returns it:
+    the import registers it, as it does a file read without item."""
+    still_tracked = tuple(
+        repository
+        for repository in TRACKED_REPOSITORIES
+        if repository.name != "anthropics/claude-code"
+    )
+
+    first = run_import(data_dir, still_tracked)
+    second = run_import(data_dir, still_tracked)
+
+    assert RELEASES_PATH in registered_paths(data_dir)
+    assert (first.rejection_count, second.read_count, second.rejection_count) == (
+        3,
+        0,
+        0,
+    )
+    assert count_rows(data_dir, "SELECT count(*) FROM release") == 0
+
+
 def test_a_file_read_with_a_rejected_entry_is_registered_and_not_read_again(data_dir):
     catalog = kev_catalog()
     assert (
@@ -1265,7 +1288,10 @@ def test_a_log_of_the_same_second_stops_the_import_before_the_database(data_dir)
     tables_before = dump_database(data_dir)
     database_path = data_dir / "k-b.sqlite"
     reading = read_raw_items(
-        data_dir / "raw", SOURCE_KINDS, read_imported_paths(database_path)
+        data_dir / "raw",
+        SOURCE_KINDS,
+        read_imported_paths(database_path),
+        TRACKED_REPOSITORIES,
     )
 
     with pytest.raises(ImportLogExistsError):
@@ -1296,6 +1322,38 @@ def test_each_line_of_the_log_carries_the_time_of_its_import(data_dir):
         re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", line["imported_at"])
         for line in lines
     )
+
+
+def test_the_log_lists_what_the_reading_rejected_before_what_the_writing_refused(
+    data_dir, monkeypatch
+):
+    """write_files writes what the reading rejected first, then each file in collection order:
+    an unreadable page and a release out of the list come before an item the base refuses."""
+    unreadable = write_collection(data_dir, ARXIV_DIR, "2026-10-06T093000Z", "not xml")
+    still_tracked = tuple(
+        repository
+        for repository in TRACKED_REPOSITORIES
+        if repository.name != "anthropics/claude-code"
+    )
+    refuse_in_the_base(
+        monkeypatch, FIRST_CVE_ID, {"cve": CVE_ID_IN_ARABIC_INDIC_DIGITS}
+    )
+
+    run_import(data_dir, still_tracked)
+
+    rejections = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
+    assert [line["raw_file_path"] for line in rejections] == [
+        unreadable,
+        RELEASES_PATH,
+        RELEASES_PATH,
+        RELEASES_PATH,
+        CISA_KEV_PATH,
+    ]
+    assert "not an XML document" in rejections[0]["reason"]
+    assert {line["reason"] for line in rejections[1:4]} == {
+        "repository not in the tracked list: anthropics/claude-code"
+    }
+    assert "refused by the base" in rejections[4]["reason"]
 
 
 WITHDRAWAL_QUERY = (
@@ -1898,7 +1956,9 @@ def run_import_with_a_ranking_row_changed(data_dir, raw_file_path, **changes):
         for trend_file in trend_reading.files
     ]
     return import_items(
-        read_raw_items(data_dir / "raw", SOURCE_KINDS, imported_paths),
+        read_raw_items(
+            data_dir / "raw", SOURCE_KINDS, imported_paths, TRACKED_REPOSITORIES
+        ),
         trend_reading._replace(files=changed_files),
         database_path,
         log_path_at(data_dir, imported_at),

@@ -18,6 +18,7 @@ from k_b.etl.sources.tldr import (
     convert_article,
     read_articles,
 )
+from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 from k_b.etl.transform import read_raw_items
 
 # Sunday: the window of a collection on this day holds a weekend.
@@ -585,7 +586,7 @@ def test_an_entry_refused_is_rejected_and_the_others_of_its_page_are_read(tmp_pa
     page_path.parent.mkdir(parents=True)
     page_path.write_bytes(before + mistral + openai_without_summary)
 
-    reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset())
+    reading = read_raw_items(tmp_path, SOURCE_KINDS, frozenset(), TRACKED_REPOSITORIES)
 
     (raw_file,) = reading.files
     assert [item.rank for item in raw_file.items] == [2, 4]

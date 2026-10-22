@@ -1,5 +1,6 @@
 """Read the raw files of raw/automated_watch/ and raw/selected_library/ not imported yet into
-common items (docs/specs-collecte.md, step 2)."""
+common items (docs/specs-collecte.md, step 2), then reject the releases of a repository out of
+the tracked list (docs/stockage.md)."""
 
 import csv
 import logging
@@ -10,19 +11,24 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from k_b.core.config import TrackedRepository
 from k_b.core.quoting import quote_value, without_values
 from k_b.etl.raw_files import RawFile, RawReading, Rejection, parse_collection_name
 from k_b.etl.raw_store import RAW_DIR_NAMES
 from k_b.etl.source_contract import SourceKind, SourceReader, find_source_kind
+from k_b.items import Item
 
 logger = logging.getLogger(__name__)
 
 
 def read_raw_items(
-    raw_dir: Path, kinds: Sequence[SourceKind], imported_paths: frozenset[str]
+    raw_dir: Path,
+    kinds: Sequence[SourceKind],
+    imported_paths: frozenset[str],
+    tracked_repositories: Sequence[TrackedRepository],
 ) -> RawReading:
     """Every raw file whose source kind has a reader and that is not in imported_paths, in
-    collection order.
+    collection order, without the releases of a repository out of tracked_repositories.
 
     A collection is a raw file, or a folder of pages; a raw file is read as a single page. A
     collection not named by its time or that cannot be listed, a page that cannot be read, or
@@ -38,7 +44,7 @@ def read_raw_items(
     )
     # Stable sort: within a collection, the files keep their page order.
     reading.files.sort(key=lambda raw_file: raw_file.collected_at)
-    return reading
+    return reject_untracked_releases(reading, tracked_repositories)
 
 
 def join_readings(readings: list[RawReading]) -> RawReading:
@@ -46,6 +52,47 @@ def join_readings(readings: list[RawReading]) -> RawReading:
         [raw_file for reading in readings for raw_file in reading.files],
         [rejection for reading in readings for rejection in reading.rejections],
         sum(reading.read_count for reading in readings),
+    )
+
+
+def reject_untracked_releases(
+    reading: RawReading, tracked_repositories: Sequence[TrackedRepository]
+) -> RawReading:
+    """The same reading, without the releases of a repository out of the list, each one
+    rejected.
+
+    The import goes on, as for an entry refused when read. A file keeps its place even with no
+    item left: the import registers it, and only a rebuild of the base reads it again (#106).
+    """
+    tracked_names = {repository.name.lower() for repository in tracked_repositories}
+    files: list[RawFile] = []
+    rejections = list(reading.rejections)
+    for raw_file in reading.files:
+        kept: list[Item] = []
+        for item in raw_file.items:
+            if is_untracked_release(item, tracked_names):
+                rejections.append(
+                    reject(
+                        item.raw_file_path,
+                        f"repository not in the tracked list: {item.repository_name}",
+                    )
+                )
+                continue
+            kept.append(item)
+        # A release left out does not count in rejection_count, which stays the entries its
+        # reader rejected or the item refused (raw_files.py): it was read whole, and no state
+        # catalog holds a release, so no withdrawal depends on it (decision of Sabine of
+        # 2026-10-22).
+        files.append(raw_file._replace(items=kept))
+    return RawReading(files, rejections, reading.read_count)
+
+
+def is_untracked_release(item: Item, tracked_names: set[str]) -> bool:
+    """Whether the item is a release of a repository out of the tracked list."""
+    # A release always has its repository (items.py): str() only satisfies the typing.
+    return (
+        item.kind == "release"
+        and str(item.repository_name).lower() not in tracked_names
     )
 
 

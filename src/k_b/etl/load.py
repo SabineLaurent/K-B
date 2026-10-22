@@ -123,9 +123,7 @@ def import_items(
     try:
         try:
             write_tracked_repositories(connection, tracked_repositories)
-            writing = write_files(
-                connection, reading, trend_reading, tracked_repositories
-            )
+            writing = write_files(connection, reading, trend_reading)
             commit_with_log(connection, log_path, imported_at, writing)
         except BaseException:
             # BaseException: Ctrl-C must not leave half an import either.
@@ -144,10 +142,7 @@ def import_items(
 
 
 def write_files(
-    connection: sqlite3.Connection,
-    reading: RawReading,
-    trend_reading: TrendReading,
-    tracked_repositories: Sequence[TrackedRepository],
+    connection: sqlite3.Connection, reading: RawReading, trend_reading: TrendReading
 ) -> FileWriting:
     """Write each file in collection order; what the reading rejected comes first."""
     rejected_when_read = FileWriting(
@@ -162,7 +157,7 @@ def write_files(
         [
             rejected_when_read,
             *(
-                write_file(connection, file_read, tracked_repositories)
+                write_file(connection, file_read)
                 for file_read in list_files_in_collection_order(reading, trend_reading)
             ),
         ]
@@ -185,13 +180,11 @@ def join_writings(writings: list[FileWriting]) -> FileWriting:
 
 
 def write_file(
-    connection: sqlite3.Connection,
-    file_read: RawFile | TrendFile,
-    tracked_repositories: Sequence[TrackedRepository],
+    connection: sqlite3.Connection, file_read: RawFile | TrendFile
 ) -> FileWriting:
     if isinstance(file_read, TrendFile):
         return write_trend_file(connection, file_read)
-    return write_items_file(connection, file_read, tracked_repositories)
+    return write_items_file(connection, file_read)
 
 
 def commit_with_log(
@@ -246,50 +239,18 @@ def list_files_in_collection_order(
     return sorted([*reading.files, *trend_reading.files], key=read_collected_at)
 
 
-def reject_untracked_releases(
-    items: list[Item], tracked_repositories: Sequence[TrackedRepository]
-) -> tuple[list[Item], list[Rejection]]:
-    """The items without the releases of a repository out of the list, each one rejected.
-
-    The import goes on, as for an entry refused when read. Their file is registered: only a
-    rebuild of the base reads them again.
-    """
-    tracked_names = {repository.name.lower() for repository in tracked_repositories}
-    kept = []
-    rejections = []
-    for item in items:
-        if (
-            # A release always has its repository (items.py): str() only satisfies the typing.
-            item.kind == "release"
-            and str(item.repository_name).lower() not in tracked_names
-        ):
-            rejections.append(
-                reject(
-                    item.raw_file_path,
-                    f"repository not in the tracked list: {item.repository_name}",
-                )
-            )
-        else:
-            kept.append(item)
-    return kept, rejections
-
-
-def write_items_file(
-    connection: sqlite3.Connection,
-    raw_file: RawFile,
-    tracked_repositories: Sequence[TrackedRepository],
-) -> FileWriting:
+def write_items_file(connection: sqlite3.Connection, raw_file: RawFile) -> FileWriting:
     """Register the file read, write each of its items, then mark as withdrawn what its
     catalog no longer lists.
 
-    The file is registered even with an item the base refuses, as with an entry rejected when
-    read: only a rebuild of the base reads it again.
+    Its items are those the reading kept: the releases of a repository out of the tracked list
+    are rejected before (etl/transform.py). The file is registered even with an item the base
+    refuses, as with an entry rejected when read: only a rebuild of the base reads it again.
     """
-    items, untracked = reject_untracked_releases(raw_file.items, tracked_repositories)
     raw_data_id = register_raw_file(connection, raw_file)
     outcomes = [
         write_item_in_savepoint(connection, item, raw_data_id)
-        for item in map(normalize_item, items)
+        for item in map(normalize_item, raw_file.items)
     ]
     discards = [outcome for outcome in outcomes if isinstance(outcome, Discard)]
     refusals = [outcome for outcome in outcomes if isinstance(outcome, Rejection)]
@@ -304,7 +265,7 @@ def write_items_file(
         item_count=outcomes.count(None),
         discards=discards,
         trend_discards=[],
-        rejections=[*untracked, *refusals],
+        rejections=refusals,
         withdrawn_count=withdrawn_count,
         trend_count=0,
     )

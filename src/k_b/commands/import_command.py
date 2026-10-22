@@ -51,7 +51,12 @@ def run_import(data_dir: Path) -> int:
     )
     try:
         imported_paths = read_imported_paths(database_path)
-        reading = read_raw_items(data_dir / RAW_DIR_NAME, SOURCE_KINDS, imported_paths)
+        reading = read_raw_items(
+            data_dir / RAW_DIR_NAME,
+            SOURCE_KINDS,
+            imported_paths,
+            TRACKED_REPOSITORIES,
+        )
         trend_reading = read_trend_files(data_dir / RAW_DIR_NAME, imported_paths)
         summary = import_items(
             reading,

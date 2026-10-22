@@ -168,6 +168,10 @@ plan ni les étapes d'avant.
   SourceKind.reader vaut None pour GH Archive, et son commentaire dit
   pourquoi (source_contract.py:105-107). La composition n'a donc
   aujourd'hui aucun emplacement pour le lecteur des tendances.
+- Étape 4 : la liste des dépôts suivis est passée deux fois, au filtre
+  du transform (read_raw_items) et à la table des dépôts suivis
+  (import_items) ; pipeline.py doit la prendre une seule fois et la
+  passer aux deux.
 - Étape 5 : reject journalise : il ne rejoint pas raw_files.py
   (vocabulaire pur) mais un module etl/rejections.py, avec le type
   Rejection. Vérifier le nom du logger dans les lignes de journal et
@@ -184,3 +188,6 @@ plan ni les étapes d'avant.
   (TOPS, source_kinds.py) ; TopEntry est lui-même décrit « as its sheet
   shows it ». Séparer collecte et rendu touche donc etl/tops.py, la
   composition et post/top_sheets.py.
+- Hors étapes : release_writer.py:71-75 dépaquette fetchone() sans
+  garde ; une liste incohérente entre le filtre et la table lèverait
+  une TypeError au lieu d'une erreur nommée. À traiter à part.
