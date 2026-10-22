@@ -1,5 +1,5 @@
-"""The files kb writes in the vault, under veille/: the sheets of the tops (etl/top_sheets.py) and
-the digests of the watch (etl/digest_sheets.py), one place for both (#209).
+"""The files kb writes in the vault, under veille/: the sheets of the tops (post/top_sheets.py) and
+the digests of the watch (post/digest_sheets.py), one place for both (#209).
 
 A sheet is written once: kb never rewrites one it sees. Limit accepted by Sabine for the POC
 (2026-10-21, #295): a sheet that appears between has_sheet and the rename of write_file_atomically

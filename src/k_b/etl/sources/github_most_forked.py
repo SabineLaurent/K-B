@@ -113,7 +113,7 @@ def read_ranking(raw_response: bytes) -> list[ForkedRepository]:
 def read_top_entries(
     raw_response: bytes, expected_size: int = RANKING_SIZE
 ) -> list[TopEntry]:
-    """The ranking as its sheet shows it (etl/top_sheets.py), its URL built from the name."""
+    """The ranking as its sheet shows it (TopEntry, etl/tops.py), its URL built from the name."""
     return [
         TopEntry(
             rank=repository.rank,

@@ -133,8 +133,8 @@ def read_ranking(raw_response: bytes) -> list[StarredRepository]:
 def read_top_entries(
     raw_response: bytes, expected_size: int = RANKING_SIZE
 ) -> list[TopEntry]:
-    """The ranking as its sheet shows it (etl/top_sheets.py), its URL built from the name, never
-    read in html_url (ADR of 2026-10-08)."""
+    """The ranking as its sheet shows it (TopEntry, etl/tops.py), its URL built from the name,
+    never read in html_url (ADR of 2026-10-08)."""
     return [
         TopEntry(
             rank=repository.rank,

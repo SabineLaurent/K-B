@@ -3712,6 +3712,64 @@ Sabine du 2026-10-15).
   de dev (`temp/` du dépôt) gardent leurs anciennes clés ; le vrai coffre de Sabine n'en a aucune
   (dit par Sabine). — PR de #209
 
+## 2026-10-22
+
+### Post-traitement : un paquet `k_b.post` hors de l'ETL
+
+- **Les quatre modules de post-traitement sortent de `src/k_b/etl/` vers un paquet nouveau,
+  `src/k_b/post/`, à plat : `ai_api_client.py` (la demande de `kb digest` à l'API IA),
+  `digest_sheets.py` (la fiche de veille rendue), `top_sheets.py` (les fiches des tops) et
+  `vault_files.py` (l'écriture sûre dans le coffre). Déplacement mécanique : `git mv`, aucun corps
+  de fonction, nom de fonction ni nom de module changé ; seules des lignes d'`import` sont
+  modifiées.** Décision de Sabine du 2026-10-22, sur la cible annoncée dans
+  `docs/refactoring/inventaire.md`. Pourquoi : `etl` nomme un parcours précis — extraire d'une
+  source, transformer en items communs, charger en base — et demander des fiches à un modèle, les
+  rendre en Markdown et les écrire dans un coffre Obsidian n'en fait pas partie ; un paquet dont le
+  nom ne prédit plus le contenu ne sert plus de table des matières (`code.md`, « Lisibilité »).
+  Les sous-dossiers `post/digest/` et `post/render/` de la cible ne sont pas créés : avec quatre
+  modules, deux dossiers de deux fichiers ne font rien gagner, et `digest_sheets.py` relèverait des
+  deux. Options écartées : garder les quatre dans `etl/` avec une convention écrite (la règle
+  ci-dessous serait intenable) ; les ranger tout de suite en `digest/` et `render/`.
+  — branche `refactoring/etl`
+- **`Top` et `TopEntry` sont définies dans `src/k_b/etl/tops.py`, pas dans le module des fiches :
+  `etl` garde le vocabulaire que ses sources produisent, et `post/top_sheets.py` le consomme.**
+  Décision de Sabine du 2026-10-22, prise sur un blocage signalé par la session : trois modules qui
+  restent dans `etl/` importaient `etl/top_sheets.py` (`source_kinds.py` pour `Top`,
+  `sources/github_most_starred.py` et `sources/github_most_forked.py` pour `TopEntry`), de sorte
+  que le déplacement tel quel aurait créé trois imports `etl` → `post`. Les deux classes sont
+  déplacées à l'identique, sans changement de champ, de nom ni de signature. Le nom au pluriel dit
+  une famille de types, à côté de `top_sheets.py` qui dit un traitement. Conséquence pour la doc :
+  un module de `etl` se décrit par ce qu'il produit, pas par son consommateur dans `post` — les
+  docstrings de `read_top_entries` renvoient à `(TopEntry, etl/tops.py)`. Options écartées :
+  `items.py` (un top n'entre jamais en base) ; laisser `top_sheets.py` dans `etl/` ; déplacer
+  `top_sheets.py` sans extraire les types, en renonçant à la règle ou en lui faisant une exception.
+  — branche `refactoring/etl`
+- **`k_b.etl` n'importe jamais `k_b.post`. La règle est tenue par
+  `tests/architecture/test_layers.py` : `test_etl_imports_nothing_of_the_post_processing` lit les
+  imports de chaque fichier de `etl/` par `ast`, et `reaches` refuse aussi le paquet qui y donne
+  accès (`from k_b import post`) ; un second test, paramétré, vérifie que le détecteur refuse
+  chaque forme d'import et laisse passer un module de `etl`.** Décision de Sabine du 2026-10-22,
+  première des règles de la cible. Pourquoi : le post-traitement part de ce que le pipeline a
+  produit, donc il lit `etl` ; l'inverse ferait dépendre la collecte de la façon de présenter ses
+  résultats, et formerait un cycle d'imports. Même motif que la porte des écrivains (#251) et que
+  la règle qui tient `etl` sous les API (#209) : une règle d'architecture qu'aucun test ne tient
+  n'est qu'un texte. Les deux listes de `tests/architecture/module_imports.py` suivent (`"post"`
+  dans `TOP_LEVEL_MODULES`, les quatre modules hors d'`ETL_PIPELINE_MODULES`, `"etl.tops"` dedans) :
+  elles font échouer `test_every_module_of_k_b_is_listed` et
+  `test_every_module_of_etl_is_in_exactly_one_list` si un module arrive sans qu'on décide où il va.
+  Vérifiée par contre-épreuve : un import ajouté dans `etl/user_agent.py` fait échouer le test.
+  Option écartée : un `grep` du critère de fin seul. — branche `refactoring/etl`
+- **Une mention de chemin dans le dépôt est corrigée si elle décrit l'état actuel, laissée
+  intacte si elle raconte un état passé.** Décision de Sabine du 2026-10-22, sur le classement
+  proposé par la session. Sont vivants : les commentaires et docstrings du code,
+  `docs/fiches-veille.md` (le contrat des fiches) et `docs/registre-traitements.md` (le registre en
+  vigueur). Sont historiques, donc non réécrits : `docs/journaling/`, les entrées déjà écrites de
+  ce journal, `docs/refactoring/inventaire.md` et `docs/2026-10-21-collecte-reelle.md`, tous deux
+  épinglés à un commit. Pourquoi : une note datée dit ce qui a été observé ce jour-là, numéros de
+  ligne compris ; la réécrire la ferait mentir. Confirme ce que posait déjà la note du 2026-10-18
+  sur les tests d'architecture. Limite assumée : le classement est un jugement, pas un critère
+  automatique ; un document nouveau se classe à la main. — branche `refactoring/etl`
+
 ## Décisions encore ouvertes
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,

@@ -2,7 +2,7 @@
 collection, then the rankings they supersede deleted from raw/ (ADR of 2026-10-19).
 
 A sheet is curated: written once, never purged by K-B, never rewritten, with the limit of
-etl/vault_files.py (#295). Its path is made of
+post/vault_files.py (#295). Its path is made of
 constants and of the day of its ranking, never of a value read from GitHub.
 """
 

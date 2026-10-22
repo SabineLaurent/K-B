@@ -24,7 +24,7 @@ class TrackedRepository:
 # lists equal. Of a state catalog (Zotero, CISA KEV), the raw keeps only the last file imported,
 # whatever the duration: kb import deletes the others (etl/raw_purge.py, ADR of 2026-10-19). Of a
 # top ranking, the raw keeps only the last one readable: kb write-tops deletes the older ones once
-# their sheets are written (etl/top_sheets.py).
+# their sheets are written (post/top_sheets.py).
 RETENTION_YEARS_BY_ACQUISITION_MODE: dict[str, int | None] = {
     "watch": 2,
     "library": None,
@@ -212,7 +212,7 @@ TOPS_DIR_NAME = "tops"
 # #158 on gpt-6-luna: about 98 seconds for 8 subjects, the judge included (113 with the slowest
 # calls). Beyond it, a subject not yet written is llm_timeout, the others are returned.
 DIGEST_REQUEST_TIMEOUT_SECONDS = 200
-# The request of kb digest to the AI API (etl/ai_api_client.py, #209). The URL of kb serve-ai with
+# The request of kb digest to the AI API (post/ai_api_client.py, #209). The URL of kb serve-ai with
 # its defaults, changed by KB_AI_API_URL; it does not follow KB_AI_API_PORT: set KB_AI_API_URL too
 # when the port of kb serve-ai changes. Connection, pool and write: assumed values for a service on
 # the same machine or in the same compose network, as for the data API. Read: the AI API answers
