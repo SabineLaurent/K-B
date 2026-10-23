@@ -7,31 +7,25 @@ from pathlib import Path
 
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME, describe_os_error
-from k_b.database.connection import DATABASE_FILE_NAME, MissingDatabaseError
+from k_b.database.connection import MissingDatabaseError
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
-from k_b.etl.load import (
+from k_b.etl.pipeline import (
     ImportLogExistsError,
-    import_items,
-    read_imported_paths,
+    ImportOutcome,
+    import_raw_files,
+    purge_superseded_raw,
 )
-from k_b.etl.raw_files import COLLECTION_NAME_FORMAT
-from k_b.etl.raw_purge import delete_superseded_raw_files
 from k_b.etl.raw_store import (
     AUTOMATED_WATCH_DIR_NAME,
-    RAW_DIR_NAME,
     SELECTED_LIBRARY_DIR_NAME,
-    RawStore,
     make_source_folder_key,
 )
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources import cisa_kev, zotero
 from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
-from k_b.etl.transform import read_raw_files
 
 logger = logging.getLogger(LOGGER_NAME)
 
-# One log per import, named by its second as a raw file by its collection: never rewritten.
-IMPORT_LOG_FILE_NAME = "import-log-{imported_at}.jsonl"
 # The state catalogs: of each, only the last raw file imported is kept (ADR of 2026-10-19).
 LATEST_ONLY_FOLDER_KEYS = (
     make_source_folder_key(SELECTED_LIBRARY_DIR_NAME, zotero.FOLDER_PREFIX),
@@ -40,29 +34,16 @@ LATEST_ONLY_FOLDER_KEYS = (
 
 
 def run_import(data_dir: Path) -> int:
-    """Read the registry of the base, then the raw files not in it (the items and the rankings
-    of GH Archive, in one walk of raw/), then write the base; once it is committed, delete the
-    raw files of the state catalogs that the last one imported superseded."""
-    database_path = data_dir / DATABASE_FILE_NAME
+    """Run the import (etl/pipeline.py), print what it wrote, then delete the raw files of the
+    state catalogs that the last one imported superseded.
+
+    The purge comes after the summary is printed: a purge that fails leaves the summary of the
+    import it committed.
+    """
     imported_at = datetime.now(UTC).replace(microsecond=0)
-    log_path = data_dir / IMPORT_LOG_FILE_NAME.format(
-        imported_at=imported_at.strftime(COLLECTION_NAME_FORMAT)
-    )
     try:
-        imported_paths = read_imported_paths(database_path)
-        readings = read_raw_files(
-            data_dir / RAW_DIR_NAME,
-            SOURCE_KINDS,
-            imported_paths,
-            TRACKED_REPOSITORIES,
-        )
-        summary = import_items(
-            readings.items,
-            readings.trends,
-            database_path,
-            log_path,
-            imported_at,
-            TRACKED_REPOSITORIES,
+        outcome = import_raw_files(
+            data_dir, SOURCE_KINDS, TRACKED_REPOSITORIES, imported_at
         )
     except MissingDatabaseError as error:
         logger.error("%s; create it with kb create-db", error)
@@ -78,6 +59,25 @@ def run_import(data_dir: Path) -> int:
     ) as error:
         logger.error("%s: %s", type(error).__name__, error)
         return ExitCode.FAILED
+    print_import_summary(outcome)
+    try:
+        deleted_count = purge_superseded_raw(data_dir, LATEST_ONLY_FOLDER_KEYS)
+    except (sqlite3.Error, OSError, ValueError) as error:
+        # The type, and the reason of an OSError, never the name of a raw file.
+        logger.error(
+            "import committed, raw purge failed: %s; run kb import again",
+            describe_os_error(error)
+            if isinstance(error, OSError)
+            else type(error).__name__,
+        )
+        return ExitCode.FAILED
+    print(f"superseded raw files deleted: {deleted_count}")
+    return ExitCode.SUCCEEDED
+
+
+def print_import_summary(outcome: ImportOutcome) -> None:
+    """What the import wrote, left out and rejected, then where its log details it."""
+    summary = outcome.summary
     print(f"raw files read: {summary.read_count}")
     print(f"items written (new or updated): {summary.item_count}")
     print(f"trend rows written: {summary.trend_count}")
@@ -90,21 +90,4 @@ def run_import(data_dir: Path) -> int:
         f" {summary.withdrawn_count}"
     )
     print(f"rejections: {summary.rejection_count}")
-    print(f"log: {log_path}")
-    try:
-        deleted_count = delete_superseded_raw_files(
-            RawStore(data_dir),
-            read_imported_paths(database_path),
-            LATEST_ONLY_FOLDER_KEYS,
-        )
-    except (sqlite3.Error, OSError, ValueError) as error:
-        # The type, and the reason of an OSError, never the name of a raw file.
-        logger.error(
-            "import committed, raw purge failed: %s; run kb import again",
-            describe_os_error(error)
-            if isinstance(error, OSError)
-            else type(error).__name__,
-        )
-        return ExitCode.FAILED
-    print(f"superseded raw files deleted: {deleted_count}")
-    return ExitCode.SUCCEEDED
+    print(f"log: {outcome.log_path}")

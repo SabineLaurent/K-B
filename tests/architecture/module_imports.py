@@ -22,6 +22,7 @@ TOP_LEVEL_MODULES = {
 ETL_COMPOSITION_MODULES = {"etl.source_kinds", "etl.collected_sources"}
 ETL_SOURCES_PACKAGE = "etl.sources"
 ETL_PIPELINE_MODULES = {
+    "etl.pipeline",
     "etl.extract",
     "etl.transform",
     "etl.load",
