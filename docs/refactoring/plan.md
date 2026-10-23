@@ -21,7 +21,10 @@ etl/
   source_kinds.py       # composition : la liste unique des sources
   collected_sources.py  # composition : sources selon l'environnement
   source_contract.py    # le contrat d'une source
-  raw_files.py          # vocabulaire partagé entre les stages
+  raw_files.py          # vocabulaire partagé entre les stages, et les
+                        # jointures de leurs lectures
+  rejections.py         # reject : le chemin unique d'un rejet, de l'étape qui
+                        # le trouve au journal d'import
   tops.py               # types partagés des classements, partie collecte ;
                         # la partie rendu va dans post/top_sheets.py (étape 8)
   raw_store.py          # zone d'atterrissage : seul accès au brut et à l'état
@@ -29,12 +32,15 @@ etl/
   extract.py            # stage 1 : parcourt la liste, contrôle, écrit raw/
   http_download.py      # aide à l'extract : téléchargement commun
   user_agent.py         # aide à l'extract : en-tête HTTP
-  transform.py          # stage 2 : relit raw/, appelle chaque transform,
+  transform.py          # stage 2 : parcours des items et des tendances,
                         #           puis filtre, normalise, rejette
+  raw_reading.py        # aide au transform : seul à lister raw/ et à lire ses
+                        # octets (une collecte, une page, un fichier de tendances)
   normalize.py          # étape du transform
   load.py               # stage 3 : une transaction, via database/writers
   import_log.py         # aide au load : journal d'import (audit)
-  pipeline.py           # parcours collecte (1) et import (2 + 3)
+  pipeline.py           # parcours collecte (1) et import (2 + 3) ; porte
+                        # unique des deux parcours pour commands/
 post/                   # post-traitement, hors de l'ETL
 ```
 
@@ -59,7 +65,10 @@ post/                   # post-traitement, hors de l'ETL
    pipeline.py les enchaîne. Ce qu'ils partagent est dans raw_files.py.
 5. Le pipeline garde deux parcours, qui communiquent par raw/ :
    kb collect (stage 1) et kb import (stages 2 et 3) tournent séparément.
-   pipeline.py fournit aussi leur enchaînement, que le job appelle.
+   pipeline.py nomme les deux parcours et en est la porte unique pour
+   commands/ ; leur enchaînement reste la suite de commandes
+   (kb collect ; kb import, README) tant qu'aucun job en conteneur ne
+   l'appelle.
 6. etl n'importe jamais post (déjà en vigueur, tests/architecture/).
 
 Chaque règle n'existe vraiment que lorsqu'un test de tests/architecture/
@@ -101,10 +110,10 @@ Points défendables :
 | 0 | Sortir le post-traitement de etl vers post/, règle etl -> post | fait, tag etl-post-separated |
 | 1 | Créer etl/raw_files.py (types partagés, déplacement mécanique) ; ajouter le module à ETL_PIPELINE_MODULES (tests/architecture/module_imports.py) | fait |
 | 2 | Filtre des releases non suivies et normalize_item dans le transform, avant le load | fait |
-| 3 | Décision de conception d'abord : comment le lecteur des tendances parvient à transform.py par la composition (second champ de SourceKind, ou contrat de lecteur de classement). Relevé en lecture seule, puis choix de Sabine. Lecture des tendances de gh_archive appelée par transform.py, par le lecteur que porte sa sorte, sans accès direct au brut ; gh_archive.py sort de la liste de la règle 3 de poc.md | fait (à commiter) |
-| 3 bis | Tout transform.py lit le brut via RawStore, prérequis du passage du brut à Azure Blob Storage (règle 3 de poc.md) ; transform.py sort alors de la liste de la règle 3 | à faire |
-| 4 | Créer pipeline.py ; les commandes passent par lui ; ajouter le module à ETL_PIPELINE_MODULES (tests/architecture/module_imports.py) | à faire |
-| 5 | Règle d'architecture : extract, transform, load ne s'importent pas entre eux | à faire |
+| 3 | Décision de conception d'abord : comment le lecteur des tendances parvient à transform.py par la composition (second champ de SourceKind, ou contrat de lecteur de classement). Relevé en lecture seule, puis choix de Sabine. Lecture des tendances de gh_archive appelée par transform.py, par le lecteur que porte sa sorte, sans accès direct au brut ; gh_archive.py sort de la liste de la règle 3 de poc.md | fait |
+| 3 bis | Tout raw_reading.py lit le brut via RawStore, prérequis du passage du brut à Azure Blob Storage (règle 3 de poc.md) ; raw_reading.py sort alors de la liste de la règle 3 | à faire, après le jalon des étapes 4 et 5, avant la mise en ligne du 08/11 |
+| 4 | Créer pipeline.py ; les commandes passent par lui ; ajouter le module à ETL_PIPELINE_MODULES (tests/architecture/module_imports.py) | fait (purge en étape à part ; raw_reading.py sort la relecture du brut de transform.py) |
+| 5 | Règle d'architecture : extract, transform, load ne s'importent pas entre eux | fait (reject dans rejections.py, puis test_no_stage_of_the_etl_imports_another_stage) |
 | 6 | Pilote : la source Zotero en paquet extract.py / transform.py | à faire |
 | 7 | Si le pilote est validé : généraliser aux autres sources, une par commit | à décider |
 | 8 | Séparer dans Top ce qui relève de la collecte et du rendu | à faire |
@@ -144,41 +153,44 @@ conventions.md prime sur poc.md.
 
 conventions.md :
 
-- Règle 1 : le chemin de reject, s'il quitte transform.py (étape 1) ;
-  l'exception des classements, à préserver dans le contrôle à la
-  collecte (étape 6).
+- Règle 1 : le chemin de reject, qui a quitté transform.py pour
+  etl/rejections.py (étape 5, texte rédigé) ; l'exception des
+  classements, à préserver dans le contrôle à la collecte (étape 6).
 - Règle 4 : le modèle Pydantic d'une source dans
   etl/sources/<source>/transform.py (étape 6).
-- Règle 5 : la liste des modules d'etl (étape 4) ; le chemin des
-  requêtes Zotero et GH Archive, et les --exclude de sa commande de
-  vérification (étape 6).
+- Règle 5 : la liste des modules d'etl, et pipeline.py comme porte des
+  deux parcours (étape 4, texte rédigé) ; le chemin des requêtes Zotero
+  et GH Archive, et les --exclude de sa commande de vérification
+  (étape 6).
 
 poc.md :
 
 - Règle 3 : gh_archive.py hors de la liste des fichiers qui touchent le
-  brut (étape 3) ; transform.py hors de cette liste (étape 3 bis) ; les
-  chemins de zotero.py dans les références de départ (étape 6).
+  brut (étape 3) ; transform.py hors de cette liste, remplacé par
+  raw_reading.py (étape 4, texte rédigé ; la lecture par RawStore reste
+  l'étape 3 bis) ; les chemins de zotero.py dans les références de
+  départ (étape 6).
 - Règle 4 : son contrôle ne cite que etl/raw_store.py et
   etl/sources/zotero.py ; seul le chemin de zotero.py change (étape 6).
 - Règle 5 : le numéro de ligne de describe_validation_error, et la
   citation des lignes de read_collection, qui se périment à chaque
   changement de leur fichier : remplacés par le nom des fonctions
-  (étape 3) ; le chemin de describe_validation_error (étape 6).
+  (étape 3) ; le chemin de read_collection, passé dans raw_reading.py
+  (étape 4, texte rédigé) ; le chemin de describe_validation_error
+  (étape 6).
 
 ## 8. Points ouverts
 
 Chacun relève d'une étape future, qui le tranche : aucun ne bloque le
 plan ni les étapes d'avant.
 
-- Étape 4 : la liste des dépôts suivis est passée deux fois, au filtre
-  du transform (read_raw_items) et à la table des dépôts suivis
-  (import_items) ; pipeline.py doit la prendre une seule fois et la
-  passer aux deux.
-- Étape 5 : reject journalise : il ne rejoint pas raw_files.py
-  (vocabulaire pur) mais un module etl/rejections.py, avec le type
-  Rejection. Vérifier le nom du logger dans les lignes de journal et
-  les tests qui le lisent. L'amendement de la règle 1 de
-  conventions.md citera alors etl/rejections.py.
+Réglés par les étapes 4 et 5 : la liste des dépôts suivis, que
+pipeline.import_raw_files prend une seule fois et passe au filtre du
+transform comme à la table de la base ; reject, sorti dans
+etl/rejections.py, le type Rejection restant dans raw_files.py
+(vocabulaire pur, décision du 2026-10-23) ; le nom du logger, vérifié,
+qu'aucun test ne lit.
+
 - Étape 6 : le contrôle à la collecte passe de la source à
   etl/extract.py, mais une sorte sans aucun lecteur (reader et
   trend_reader None : les deux classements GitHub) n'a rien à contrôler,
@@ -191,6 +203,12 @@ plan ni les étapes d'avant.
   (TOPS, source_kinds.py) ; TopEntry est lui-même décrit « as its sheet
   shows it ». Séparer collecte et rendu touche donc etl/tops.py, la
   composition et post/top_sheets.py.
+- Hors étapes : le motif d'un fichier de tendances que la base refuse
+  dit encore « ranking refused by the base » (load.py:324), alors que le
+  code dit « trend » pour GH Archive et réserve « ranking » aux tops
+  GitHub. C'est un message, lu par un test (tests/etl/test_load.py) et
+  écrit au journal d'import : le changer touche le code, le test et le
+  journal. À traiter à part.
 - Hors étapes : release_writer.py:71-75 dépaquette fetchone() sans
   garde ; une liste incohérente entre le filtre et la table lèverait
   une TypeError au lieu d'une erreur nommée. À traiter à part.

@@ -3840,6 +3840,118 @@ Sabine du 2026-10-15).
   étape qu'une décision de conception (`plan.md`, §6 : les déplacements mécaniques sont séparés
   des changements de comportement). — branche `refactoring/etl`
 
+## 2026-10-23
+
+### ETL : `pipeline.py` enchaîne les stages, la relecture du brut et les rejets à part
+
+- **`etl/pipeline.py` porte les deux parcours de l'ETL et devient la porte unique de `commands/`
+  vers eux : `collect(sources, data_dir, now)` pour la collecte (stage 1) et
+  `import_raw_files(data_dir, kinds, tracked_repositories, imported_at)` pour l'import (stages 2
+  puis 3). Il ne lit aucun réglage, n'affiche rien et ne rend aucun code de sortie ; ce qui nomme
+  les sources arrive en paramètre, et chaque parcours rend un résultat nommé que la commande
+  affiche. `__all__` dit ce qui passe la porte, comme `database/writing.py` pour les écrivains, de
+  sorte que `commands/` n'importe plus `etl/extract.py`, `etl/transform.py`, `etl/load.py` ni
+  `etl/raw_purge.py`.** Décision de Sabine du 2026-10-23, étape 4 du plan de refactorisation,
+  après le relevé en lecture seule de `docs/refactoring/orchestration.md` (2026-10-22). Pourquoi :
+  l'orchestration de `kb import` vivait à deux endroits, la commande et `load.import_items`, avec
+  la frontière au milieu d'un parcours — le registre lu dans `load.py`, le brut dans
+  `transform.py`, et la commande qui les mettait dans l'ordre. Un parcours s'écrit comme une suite
+  d'étapes nommées (`code.md`) ; la commande garde ce qui lui revient : l'environnement, l'horloge,
+  le résumé affiché, les codes de sortie et SIGTERM (posé par `cli.py`, `poc.md`, règle 6). Le
+  module est ajouté à `ETL_PIPELINE_MODULES`, ce qui le soumet à
+  `test_no_module_of_the_pipeline_imports_the_sources_or_the_composition` : `SOURCE_KINDS`,
+  `TRACKED_REPOSITORIES` et `LATEST_ONLY_FOLDER_KEYS` restent donc dans la commande, puisqu'ils
+  nomment des sources. La boucle des sources ne bouge pas : la cible (§1 du plan) donne le parcours
+  de la liste à `extract.py`, et `pipeline.collect` ne fait que nommer le parcours. Effet mesuré :
+  la liste des dépôts suivis n'entre plus qu'une fois dans l'import et va au filtre du transform
+  comme à la table de la base — l'incohérence entre les deux, signalée au §8 du plan, devient
+  inatteignable depuis les commandes. Options écartées : l'orchestration dans `commands/`
+  (option C du relevé : elle contredit la règle 5 de `conventions.md` sur deux points, et aucun
+  test d'architecture ne la tiendrait) ; trois paquets `etl/extract/`, `etl/transform/`,
+  `etl/load/` (option B : le plus large diff, pour des paquets de un ou deux modules).
+  — branche `refactoring/etl`
+- **La purge du brut reste une étape à part, appelée par la commande après l'affichage du résumé :
+  `pipeline.purge_superseded_raw(data_dir, latest_only_folder_keys)`, et non une étape de
+  `import_raw_files`.** Décision de Sabine du 2026-10-23, sur les deux options du compte rendu de
+  la session. Pourquoi : aucun changement de comportement — le résumé de l'import sort avant la
+  purge, donc un import qui a commité dit ce qu'il a écrit même quand la purge échoue — et le plan
+  classe la rétention hors des trois stages (§1). Conséquence : `ImportOutcome` ne porte que le
+  résumé et le chemin du journal, la commande garde ses deux `try` et son unique ligne de journal
+  de purge (qui a besoin de `describe_os_error`, dans `commands/`, donc hors de portée d'`etl`).
+  Un test fige l'ordre : `test_a_failed_purge_leaves_the_summary_of_the_import_it_committed`.
+  Option écartée : la purge dans `import_raw_files`, avec son erreur portée par `ImportOutcome`
+  sur le modèle de `CollectionOutcome.state_error` — l'invariant « la purge ne tourne qu'après le
+  commit » serait devenu structurel, mais un SIGTERM reçu pendant la purge aurait fait perdre le
+  résumé affiché aujourd'hui. — branche `refactoring/etl`
+- **L'enchaînement des deux parcours reste hors périmètre : `pipeline.py` nomme les deux parcours,
+  et c'est la suite de commandes (`kb collect ; kb import`) qui les enchaîne, tant qu'aucun job en
+  conteneur ne l'appelle. Le §2, règle 5 du plan est amendé en ce sens.** Décision de Sabine du
+  2026-10-23, sur la recommandation de la session. Pourquoi : la fonction d'enchaînement n'aurait
+  aucun appelant (`code.md` : aucune abstraction sans second usage, pas de couche pour plus tard) ;
+  l'enchaînement en ligne est un job ACA qui enchaîne des exécutions de conteneur, pas deux
+  fonctions dans un processus ; et un seul code de sortie pour deux parcours contredirait le
+  README, qui garantit aujourd'hui qu'« chaque étape tourne même si la précédente a échoué en
+  partie […] et garde son propre code de sortie ». À rouvrir au temps 2 (conteneurs), avec la
+  question du code de sortie posée. Option écartée : écrire `collect_then_import` et une commande
+  `kb run` maintenant. — branche `refactoring/etl`
+- **`reject` quitte `etl/transform.py` pour un module à lui, `etl/rejections.py` ; le type
+  `Rejection` reste définitivement dans `etl/raw_files.py`, le vocabulaire pur partagé par les
+  stages.** Décision de Sabine du 2026-10-23, prise sur un blocage signalé par la session : sortir
+  la relecture du brut de `transform.py` (ci-dessous) demandait que les fonctions déplacées
+  atteignent `reject`, alors que `transform.py` importe désormais le module qui les porte — garder
+  `reject` dans `transform.py` aurait formé un cycle. Pourquoi ce module plutôt que `raw_reading.py`
+  ou `raw_files.py` : `reject` journalise, donc il n'a pas sa place dans un vocabulaire pur (§8 du
+  plan) ; et `load.py` l'appelle aussi, de sorte que le mettre dans le module de relecture du brut
+  aurait fait importer celui-ci par le load. La destination du §8 est donc atteinte d'un coup,
+  plutôt qu'en deux déplacements d'une fonction qui journalise. Effet de bord mesuré : `load.py:63`
+  était le seul import de `transform` par `load` — après ce déplacement, `extract`, `transform` et
+  `load` ne s'importent plus entre eux. Option écartée : `reject` dans `raw_reading.py`, suivi d'un
+  second déplacement à l'étape 5. — branche `refactoring/etl`
+- **Ce qui lit `raw/` sort de `etl/transform.py` dans `etl/raw_reading.py` : `list_collections`,
+  `read_collection`, `read_page`, `list_pages`, `list_visible_entries` et le type `Collections`,
+  déplacés tels quels ; `read_raw_trends` est séparé entre son parcours, qui reste dans
+  `transform.py` à côté de celui des items, et la lecture d'un fichier, `read_trend_file`, qui part
+  avec les autres. `join_readings` va dans `etl/raw_files.py`, à côté de `RawReading`, avec
+  `join_trend_readings` écrit sur son modèle.** Décision de Sabine du 2026-10-23, sur le constat de
+  la session que `transform.py` ne se lisait plus comme une table des matières : 334 lignes et
+  quatre niveaux de détail dans le même module (le parcours, les étapes pures, la relecture du brut,
+  et un `read_raw_trends` qui mélangeait parcours et détail). Pourquoi maintenant, et non à l'étape 3 bis comme la session le proposait d'abord : l'étape 3 bis,
+  liée au passage du brut à Azure Blob Storage, vient après le jalon, alors que le but du jalon est
+  un ETL lisible ; et elle ne réécrira plus qu'un seul module, celui-ci. `transform.py` tombe à 159 lignes et sept définitions, sans accès au système de
+  fichiers et sans ligne de journal propre ; il sort de la liste des fichiers qui touchent le brut
+  (`poc.md`, règle 3), où `raw_reading.py` le remplace. Les cinq déplacements ont été vérifiés
+  identiques au caractère, bloc par bloc, contre `HEAD`. Le nom `read_trend_file` a remplacé
+  `read_ranking` après coup : « ranking » désigne les tops GitHub, et `read_ranking` existait déjà
+  trois fois pour eux. Options écartées : garder la relecture du brut dans `transform.py` jusqu'à
+  l'étape 3 bis ; ne déplacer que les fonctions de listage, qui n'appellent pas `reject` (le but,
+  sortir `transform.py` de la liste de la règle 3, n'était pas atteint : `read_page` ouvre le brut).
+  — branche `refactoring/etl`
+- **Deux changements de nom de logger, acceptés.** Décisions de Sabine du 2026-10-23, sur les
+  comptes rendus de la session. (1) Une ligne de rejet (`rejected from <chemin> : <raison>`) passe
+  de `k_b.etl.transform` à `k_b.etl.rejections`, y compris les deux rejets émis pendant l'écriture
+  en base (une entrée que la base refuse, un fichier de tendances refusé) : ils disaient
+  `k_b.etl.transform` alors qu'aucun transform ne tournait, et la nouvelle valeur est plus juste au
+  sens de la règle 3 de `conventions.md` (« quand, où, qui, quoi »). (2) Les trois lignes `INFO` du
+  listage de `raw/` (« folder without a source kind, skipped », « source without a reader,
+  skipped », « folder inside a collection folder, skipped ») passent de `k_b.etl.transform` à
+  `k_b.etl.raw_reading`. Vérifié avant de décider : aucun test ne filtre sur le nom de ce logger
+  (les tests du transform capturent la racine), et le texte des lignes ne change pas. Limite
+  assumée : un `grep` du journal de fonctionnement sur `k_b.etl.transform` ne trouvera plus ces
+  lignes. — branche `refactoring/etl`
+- **La règle « extract, transform et load ne s'importent pas entre eux » est tenue par un test :
+  `test_no_stage_of_the_etl_imports_another_stage` (`tests/architecture/test_layers.py`), sur le
+  modèle des trois règles voisines — un détecteur (`list_imports_of_another_stage`), un test sur
+  les fichiers réels, et un test paramétré des formes d'import.** Décision de Sabine du
+  2026-10-23, étape 5 du plan. Pourquoi : une règle d'architecture qu'aucun test ne tient n'est
+  qu'un texte (même motif que la porte des écrivains, #251, et que la règle `etl` → `post`). Le
+  détecteur retire du jeu l'étape qui interroge, parce que la liste interdite dépend de qui
+  demande, et `reaches` refuse aussi le paquet qui donne accès (`from k_b import etl`) ;
+  `pipeline.py`, qui n'est pas un stage, garde le droit d'importer les trois. Contre-épreuve :
+  l'import que le déplacement de `reject` a retiré (`from k_b.etl.transform import reject` dans
+  `etl/load.py`) remis en place fait échouer le test, qui nomme le fichier et l'étape atteinte ;
+  l'import a ensuite été retiré, et le fichier vérifié identique. Option écartée : un `grep` du
+  critère de fin seul. — branche `refactoring/etl`
+
 ## Décisions encore ouvertes
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,

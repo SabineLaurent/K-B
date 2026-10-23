@@ -673,12 +673,12 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 4. **Stockage** des items dans la base : SGBD, modèles et ce que chaque source met dans l'item,
    dans [stockage.md](stockage.md). `kb import` (`run_import`,
    `src/k_b/commands/import_command.py`) n'importe que les fichiers bruts pas encore importés
-   (#106) : il lit le registre de la base
+   (#106) : son parcours (`import_raw_files`, `src/k_b/etl/pipeline.py`) lit le registre de la base
    (`read_imported_paths`, `src/k_b/etl/load.py`), puis les fichiers qui n'y sont pas
    (`read_raw_files`, `src/k_b/etl/transform.py`, qui rend les items et les classements GH
    Archive d'un seul parcours de `raw/`), puis écrit la base
    (`import_items`) : fichiers d'items et classements en une seule suite, dans l'ordre des
-   collectes. Il affiche
+   collectes. La commande affiche
    le nombre de fichiers bruts lus (`raw files read`).
 
    - **Registre** : la table `raw_data`, une ligne par fichier lu, ou par page d'un dossier de

@@ -74,8 +74,10 @@ contraint que la signature des fonctions nouvelles de `raw_store.py`.
   brut) ou enfreint la règle. Depuis l'étape 3 de la refactorisation de l'ETL,
   `etl/sources/gh_archive.py` n'est plus de ceux qui touchent le brut : la lecture de ses
   tendances est passée dans `etl/transform.py`, par le lecteur de tendances que porte sa sorte
-  (`SourceKind.trend_reader`). `etl/transform.py` est le seul fichier de la liste qui touche
-  encore le brut, jusqu'à l'étape 3 bis.
+  (`SourceKind.trend_reader`). La lecture du brut est sortie de `etl/transform.py` dans
+  `etl/raw_reading.py` (lister les collections, lire une page, lire un fichier de tendances) :
+  `etl/raw_reading.py` est le seul fichier de la liste qui touche encore le brut, jusqu'à
+  l'étape 3 bis, qui le fera lire par `RawStore` ; `etl/transform.py` n'est plus dans la liste.
 - `grep -nA3 "^def " src/k_b/etl/raw_store.py | grep -E "def |Path"` : au départ,
   `write_file_atomically`, `write_new_raw_file`, `load_last_collection_dates` et
   `save_last_collection_dates` prennent un `Path` ; une fonction nouvelle n'en prend pas.
@@ -118,7 +120,7 @@ qui gardent le champ et le type d'erreur, jamais par `str(error)` ni par `{error
 **Vérifier.** Les commandes sont des repères ; la preuve est le test.
 - `grep -rn -A5 "except ValidationError" src/k_b | grep -E "\{error\}|str\(error\)"` → rien
   depuis #212 (au départ, `etl/transform.py:149`, une `ValidationError` citée par `{error}`). Ce
-  grep ne voit pas le rejet d'une page illisible par `read_collection` (`etl/transform.py`, une
+  grep ne voit pas le rejet d'une page illisible par `read_collection` (`etl/raw_reading.py`, une
   page illisible citée par `{error}`) : vérifié par
   `test_an_unreadable_page_is_rejected_without_its_text` (`tests/etl/test_transform.py`, #212).
 - Repère secondaire : `grep -rnE -A3 "logger\.[a-z]+\(" src/k_b | grep -iE "\.(summary|abstract|authors?|body|content|text)\b|clip_text"`
