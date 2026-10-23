@@ -33,6 +33,7 @@ docs/specs-collecte.md).
 import logging
 import sqlite3
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -92,15 +93,22 @@ def read_imported_paths(database_path: Path) -> frozenset[str]:
         connection.close()
 
 
-class FileWriting(NamedTuple):
-    """What the writing of files gave: one file, or the sum of several."""
+@dataclass(frozen=True)
+class FileWriting:
+    """What the writing of files gave: one file, or the sum of several.
 
-    item_count: int
-    discards: list[Discard]
-    trend_discards: list[TrendDiscard]
-    rejections: list[Rejection]
-    withdrawn_count: int
-    trend_count: int
+    Every field has its empty value by default, so that a site names only what it produced.
+    default_factory, not [], and so a dataclass and not a NamedTuple: the default of a
+    NamedTuple is built once, at the creation of the class, and every instance that omits the
+    field shares that one list.
+    """
+
+    item_count: int = 0
+    discards: list[Discard] = field(default_factory=list)
+    trend_discards: list[TrendDiscard] = field(default_factory=list)
+    rejections: list[Rejection] = field(default_factory=list)
+    withdrawn_count: int = 0
+    trend_count: int = 0
 
 
 def import_items(
@@ -145,12 +153,7 @@ def write_files(
 ) -> FileWriting:
     """Write each file in collection order; what the reading rejected comes first."""
     rejected_when_read = FileWriting(
-        item_count=0,
-        discards=[],
-        trend_discards=[],
-        rejections=[*reading.rejections, *trend_reading.rejections],
-        withdrawn_count=0,
-        trend_count=0,
+        rejections=[*reading.rejections, *trend_reading.rejections]
     )
     return join_writings(
         [
@@ -270,10 +273,8 @@ def write_items_file(connection: sqlite3.Connection, raw_file: RawFile) -> FileW
     return FileWriting(
         item_count=outcomes.count(None),
         discards=discards,
-        trend_discards=[],
         rejections=refusals,
         withdrawn_count=withdrawn_count,
-        trend_count=0,
     )
 
 
@@ -327,26 +328,12 @@ def write_trend_file(
             )
     except EntryRefusedError as refusal:
         rejection = reject(raw_file_path, f"ranking refused by the base: {refusal}")
-        return FileWriting(
-            item_count=0,
-            discards=[],
-            trend_discards=[],
-            rejections=[rejection],
-            withdrawn_count=0,
-            trend_count=0,
-        )
+        return FileWriting(rejections=[rejection])
     discards = [
         TrendDiscard(trend_file.raw_file, window_end, collected_at)
         for window_end, collected_at in collected_at_by_window_left_out.items()
     ]
-    return FileWriting(
-        item_count=0,
-        discards=[],
-        trend_discards=discards,
-        rejections=[],
-        withdrawn_count=0,
-        trend_count=written_count,
-    )
+    return FileWriting(trend_discards=discards, trend_count=written_count)
 
 
 def mark_withdrawn_vulnerabilities(
