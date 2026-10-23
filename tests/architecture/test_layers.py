@@ -4,7 +4,8 @@ Under k_b: core and items are the common vocabulary, database reads and writes t
 writers under database/writers, behind database/writing), etl runs the pipeline, post writes
 the digests and the sheets above it, data_api serves the base, ai_api calls the model, cli and
 commands compose. Under k_b.etl: the composition (source_kinds, collected_sources) → the
-sources → the modules of the pipeline.
+sources → the modules of the pipeline. Among those, the three stages never import each other:
+they talk to each other through raw/, and only etl/pipeline.py chains them.
 """
 
 import pytest
@@ -108,6 +109,51 @@ def test_no_module_of_the_pipeline_imports_the_sources_or_the_composition():
             assert {name for name in imported if reaches(name, forbidden)} == set(), (
                 path
             )
+
+
+# The three stages of the ETL talk to each other through raw/, never by their code: the
+# collection writes it, the import reads it, and only etl/pipeline.py chains them
+# (docs/refactoring/plan.md, part 2, rule 4). What they share is the vocabulary of
+# etl/raw_files.py; a rejection goes through etl/rejections.py. A subset of
+# ETL_PIPELINE_MODULES: the other modules of the pipeline run below the stages.
+ETL_STAGE_MODULES = {"etl.extract", "etl.transform", "etl.load"}
+
+
+def list_imports_of_another_stage(imported: set[str], stage: str) -> set[str]:
+    """The names, in the module of a stage, that give access to another stage: `from k_b.etl
+    import load` reaches the load, `from k_b.etl.raw_files import RawReading` reaches no
+    stage, and the stage's own name is its own business."""
+    return {name for name in imported if reaches(name, ETL_STAGE_MODULES - {stage})}
+
+
+def test_no_stage_of_the_etl_imports_another_stage():
+    for stage in sorted(ETL_STAGE_MODULES):
+        for path in list_python_files(stage):
+            imported = list_imported_modules(path, find_package(path))
+            assert list_imports_of_another_stage(imported, stage) == set(), path
+
+
+@pytest.mark.parametrize(
+    ("stage", "code", "is_refused"),
+    [
+        ("etl.load", "from k_b.etl.transform import reject", True),
+        ("etl.load", "from k_b.etl import transform", True),
+        ("etl.load", "from .transform import reject", True),
+        ("etl.transform", "import k_b.etl.load", True),
+        ("etl.transform", "from k_b.etl.extract import collect_one_source", True),
+        ("etl.extract", "from k_b import etl", True),
+        ("etl.load", "from k_b.etl.raw_files import RawReading", False),
+        ("etl.load", "from k_b.etl.rejections import reject", False),
+        # Its own module: the rule is about the other stages.
+        ("etl.transform", "from k_b.etl.transform import read_raw_files", False),
+    ],
+)
+def test_the_rule_of_the_stages_refuses_every_way_to_another_stage(
+    stage, code, is_refused
+):
+    imported = parse_imported_modules(code, package="k_b.etl")
+
+    assert bool(list_imports_of_another_stage(imported, stage)) is is_refused
 
 
 # etl runs below the APIs: kb digest reaches the AI API by HTTP, never by its code (#209).
