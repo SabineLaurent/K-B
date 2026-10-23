@@ -32,7 +32,7 @@ from k_b.etl.source_contract import SourceKind, SourceReader, TrendReader
 from k_b.items import Item
 
 
-class RawReadings(NamedTuple):
+class ImportReadings(NamedTuple):
     """What one walk of raw/ gives the import: the files read as items, and those read as
     trends."""
 
@@ -45,11 +45,11 @@ def read_raw_files(
     kinds: Sequence[SourceKind],
     imported_paths: frozenset[str],
     tracked_repositories: Sequence[TrackedRepository],
-) -> RawReadings:
+) -> ImportReadings:
     """Every raw file not in imported_paths read as its kind says, from one walk of raw/: each
     source folder is listed once, and the reader of its kind says what its files hold."""
     collections = list_collections(raw_dir, kinds)
-    return RawReadings(
+    return ImportReadings(
         read_raw_items(
             collections.of_items, raw_dir, imported_paths, tracked_repositories
         ),

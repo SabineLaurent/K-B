@@ -181,7 +181,7 @@ def parse_feed(raw_response: bytes) -> ElementTree.Element:
 
 def parse_paper(entry: ElementTree.Element, position: int) -> Paper:
     label = f"entry {position}"
-    entry_id = read_text(entry, "id", label)
+    entry_id = read_required_text(entry, "id", label)
     paper_id = PAPER_ID.fullmatch(entry_id)
     if paper_id is None:
         raise ValueError(f"{label}: id is not an arXiv paper: {quote_value(entry_id)}")
@@ -198,20 +198,20 @@ def parse_paper(entry: ElementTree.Element, position: int) -> Paper:
     return Paper(
         arxiv_id=arxiv_id,
         version=int(version),
-        title=read_text(entry, "title", label),
-        summary=read_text(entry, "summary", label),
+        title=read_required_text(entry, "title", label),
+        summary=read_required_text(entry, "summary", label),
         authors=authors,
         published_at=parse_aware_datetime(
-            read_text(entry, "published", label), f"{label}: published"
+            read_required_text(entry, "published", label), f"{label}: published"
         ),
         updated_at=parse_aware_datetime(
-            read_text(entry, "updated", label), f"{label}: updated"
+            read_required_text(entry, "updated", label), f"{label}: updated"
         ),
         url=ARXIV_ABSTRACT_PAGE_URL + arxiv_id,
     )
 
 
-def read_text(entry: ElementTree.Element, field: str, label: str) -> str:
+def read_required_text(entry: ElementTree.Element, field: str, label: str) -> str:
     text = (entry.findtext(f"{ATOM}{field}") or "").strip()
     if not text:
         raise ValueError(f"{label}: {field} is missing")

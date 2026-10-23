@@ -234,12 +234,14 @@ def list_files_in_collection_order(
     """The files of items and those of trends, oldest collection first; at the same collection,
     the files of items first, in their reading order (the sort is stable)."""
 
-    def read_collected_at(file_read: RawFile | TrendFile) -> datetime:
+    def find_collected_at(file_read: RawFile | TrendFile) -> datetime:
+        """The collection time of either kind of file: a file of trends holds it on the raw
+        file it registers, not on itself."""
         if isinstance(file_read, TrendFile):
             return file_read.raw_file.collected_at
         return file_read.collected_at
 
-    return sorted([*reading.files, *trend_reading.files], key=read_collected_at)
+    return sorted([*reading.files, *trend_reading.files], key=find_collected_at)
 
 
 def write_items_file(connection: sqlite3.Connection, raw_file: RawFile) -> FileWriting:

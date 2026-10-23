@@ -15,7 +15,7 @@ from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.gh_archive import read_trend_rows
 from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 from k_b.etl.sources.zotero import ZoteroSource
-from k_b.etl.transform import RawReadings, read_raw_files
+from k_b.etl.transform import ImportReadings, read_raw_files
 from k_b.items import Item
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -51,7 +51,7 @@ FAKE_PAGE_KINDS = [
 
 def read_raw(
     raw_dir: Path, kinds: Sequence[SourceKind], imported_paths: frozenset[str]
-) -> RawReadings:
+) -> ImportReadings:
     """read_raw_files with the tracked repositories of the code: a release of a repository out
     of that list is rejected by the reading (etl/transform.py)."""
     return read_raw_files(raw_dir, kinds, imported_paths, TRACKED_REPOSITORIES)
