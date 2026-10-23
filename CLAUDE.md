@@ -48,5 +48,7 @@ Pour cette branche, le cycle de methode.md est allégé :
   notes s'écrivent à la main, au format des entrées existantes ;
 - restent obligatoires : contrôles du dépôt au vert, arrêt et signalement
   au moindre conflit, Sabine relit et commite.
+- la revue /code-review tourne une fois par chantier ou par jalon, sur
+  l'ensemble de ses commits, pas après chaque commit ;
 
 Ce paragraphe est retiré avant la fusion dans main.
