@@ -27,6 +27,7 @@ from k_b.etl.raw_files import (
     parse_collection_name,
 )
 from k_b.etl.raw_store import RAW_DIR_NAMES
+from k_b.etl.rejections import reject
 from k_b.etl.source_contract import (
     SourceKind,
     SourceReader,
@@ -327,8 +328,3 @@ def list_visible_entries(folder: Path) -> list[Path]:
     """The entries of a folder in name order, hidden ones left out: they are not raw data
     (.DS_Store written by macOS, for instance)."""
     return sorted(path for path in folder.iterdir() if not path.name.startswith("."))
-
-
-def reject(raw_file_path: str, reason: str) -> Rejection:
-    logger.warning("rejected from %s: %s", raw_file_path, reason)
-    return Rejection(raw_file_path, reason)

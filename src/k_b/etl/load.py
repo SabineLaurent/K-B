@@ -60,7 +60,7 @@ from k_b.etl.raw_files import (
     TrendReading,
 )
 from k_b.etl.raw_store import find_stream
-from k_b.etl.transform import reject
+from k_b.etl.rejections import reject
 from k_b.items import Item
 
 logger = logging.getLogger(__name__)

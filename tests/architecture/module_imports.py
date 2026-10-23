@@ -31,6 +31,7 @@ ETL_PIPELINE_MODULES = {
     "etl.raw_files",
     "etl.raw_store",
     "etl.raw_purge",
+    "etl.rejections",
     "etl.tops",
     "etl.source_contract",
     "etl.http_download",
