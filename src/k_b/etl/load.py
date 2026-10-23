@@ -45,8 +45,6 @@ from k_b.database.reading import read_raw_file_paths
 from k_b.database.savepoint import EntryRefusedError, write_in_savepoint
 from k_b.database.writing import (
     Discard,
-    mark_withdrawn_vulnerabilities_not_in,
-    mark_withdrawn_zotero_rows_not_in,
     write_item,
     write_raw_data,
     write_tracked_repositories,
@@ -62,6 +60,10 @@ from k_b.etl.raw_files import (
 )
 from k_b.etl.raw_store import find_stream
 from k_b.etl.rejections import reject
+from k_b.etl.withdrawals import (
+    mark_withdrawn_vulnerabilities,
+    mark_withdrawn_zotero_rows,
+)
 from k_b.items import Item
 
 logger = logging.getLogger(__name__)
@@ -83,16 +85,6 @@ class ImportSummary(NamedTuple):
     trend_count: int
 
 
-def read_imported_paths(database_path: Path) -> frozenset[str]:
-    """The raw files already imported, from the registry of the base."""
-    check_database_exists(database_path)
-    connection = connect_database(database_path)
-    try:
-        return read_raw_file_paths(connection)
-    finally:
-        connection.close()
-
-
 @dataclass(frozen=True)
 class FileWriting:
     """What the writing of files gave: one file, or the sum of several.
@@ -109,6 +101,16 @@ class FileWriting:
     rejections: list[Rejection] = field(default_factory=list)
     withdrawn_count: int = 0
     trend_count: int = 0
+
+
+def read_imported_paths(database_path: Path) -> frozenset[str]:
+    """The raw files already imported, from the registry of the base."""
+    check_database_exists(database_path)
+    connection = connect_database(database_path)
+    try:
+        return read_raw_file_paths(connection)
+    finally:
+        connection.close()
 
 
 def import_items(
@@ -166,33 +168,6 @@ def write_files(
     )
 
 
-def join_writings(writings: list[FileWriting]) -> FileWriting:
-    """The sum of several writings: the counts added, the discards and the rejections kept in
-    the order given."""
-    return FileWriting(
-        item_count=sum(writing.item_count for writing in writings),
-        discards=[discard for writing in writings for discard in writing.discards],
-        trend_discards=[
-            discard for writing in writings for discard in writing.trend_discards
-        ],
-        rejections=[
-            rejection for writing in writings for rejection in writing.rejections
-        ],
-        withdrawn_count=sum(writing.withdrawn_count for writing in writings),
-        trend_count=sum(writing.trend_count for writing in writings),
-    )
-
-
-def write_file(
-    connection: sqlite3.Connection, file_read: RawFile | TrendFile
-) -> FileWriting:
-    """Write one file read, as what it holds says: a file of trends whole, a file of items item
-    by item."""
-    if isinstance(file_read, TrendFile):
-        return write_trend_file(connection, file_read)
-    return write_items_file(connection, file_read)
-
-
 def commit_with_log(
     connection: sqlite3.Connection,
     log_path: Path,
@@ -231,6 +206,12 @@ def commit_with_log(
         raise
 
 
+def check_log_absent(log_path: Path) -> None:
+    """The log of an import is never rewritten: one already at log_path stops the import."""
+    if log_path.exists():
+        raise ImportLogExistsError(f"{log_path} already exists")
+
+
 def list_files_in_collection_order(
     reading: RawReading, trend_reading: TrendReading
 ) -> list[RawFile | TrendFile]:
@@ -245,6 +226,33 @@ def list_files_in_collection_order(
         return file_read.collected_at
 
     return sorted([*reading.files, *trend_reading.files], key=find_collected_at)
+
+
+def join_writings(writings: list[FileWriting]) -> FileWriting:
+    """The sum of several writings: the counts added, the discards and the rejections kept in
+    the order given."""
+    return FileWriting(
+        item_count=sum(writing.item_count for writing in writings),
+        discards=[discard for writing in writings for discard in writing.discards],
+        trend_discards=[
+            discard for writing in writings for discard in writing.trend_discards
+        ],
+        rejections=[
+            rejection for writing in writings for rejection in writing.rejections
+        ],
+        withdrawn_count=sum(writing.withdrawn_count for writing in writings),
+        trend_count=sum(writing.trend_count for writing in writings),
+    )
+
+
+def write_file(
+    connection: sqlite3.Connection, file_read: RawFile | TrendFile
+) -> FileWriting:
+    """Write one file read, as what it holds says: a file of trends whole, a file of items item
+    by item."""
+    if isinstance(file_read, TrendFile):
+        return write_trend_file(connection, file_read)
+    return write_items_file(connection, file_read)
 
 
 def write_items_file(connection: sqlite3.Connection, raw_file: RawFile) -> FileWriting:
@@ -278,37 +286,6 @@ def write_items_file(connection: sqlite3.Connection, raw_file: RawFile) -> FileW
     )
 
 
-def write_item_in_savepoint(
-    connection: sqlite3.Connection, item: Item, raw_data_id: int
-) -> Discard | Rejection | None:
-    """Write the item in its savepoint; an item the base refuses is undone alone and returned
-    as a rejection, an item it left out as a discard.
-
-    A Zotero entry, its highlights and the publication it cites are written by one writer:
-    they share the savepoint.
-    """
-    try:
-        with write_in_savepoint(connection):
-            return write_item(connection, item, raw_data_id)
-    except EntryRefusedError as refusal:
-        return reject(
-            item.raw_file_path,
-            f"{item.kind} {quote_value(item.source_item_id)} refused by the base: "
-            f"{refusal}",
-        )
-
-
-def register_raw_file(connection: sqlite3.Connection, raw_file: RawFile) -> int:
-    """Register the file read under its stream, the name of its source folder."""
-    return write_raw_data(
-        connection,
-        raw_file.source_code,
-        raw_file.raw_file_path,
-        find_stream(raw_file.raw_file_path),
-        raw_file.collected_at,
-    )
-
-
 def write_trend_file(
     connection: sqlite3.Connection, trend_file: TrendFile
 ) -> FileWriting:
@@ -336,49 +313,32 @@ def write_trend_file(
     return FileWriting(trend_discards=discards, trend_count=written_count)
 
 
-def mark_withdrawn_vulnerabilities(
-    connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
-) -> int:
-    """Mark as withdrawn the CVE a catalog no longer lists (vulnerability_writer.py);
-    return how many.
-
-    Only a file of vulnerabilities, all of its entries read: a rejected row is in the catalog,
-    not absent from it.
-    """
-    present_cve_ids = [
-        item.cve
-        for item in raw_file.items
-        if item.kind == "vulnerability" and item.cve is not None
-    ]
-    if not present_cve_ids or raw_file.rejection_count:
-        return 0
-    return mark_withdrawn_vulnerabilities_not_in(
+def register_raw_file(connection: sqlite3.Connection, raw_file: RawFile) -> int:
+    """Register the file read under its stream, the name of its source folder."""
+    return write_raw_data(
         connection,
         raw_file.source_code,
+        raw_file.raw_file_path,
+        find_stream(raw_file.raw_file_path),
         raw_file.collected_at,
-        raw_data_id,
-        present_cve_ids,
     )
 
 
-def mark_withdrawn_zotero_rows(
-    connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
-) -> int:
-    """Mark as withdrawn the entries and the highlights an extract no longer lists
-    (zotero_entry_writer.py); return how many.
+def write_item_in_savepoint(
+    connection: sqlite3.Connection, item: Item, raw_data_id: int
+) -> Discard | Rejection | None:
+    """Write the item in its savepoint; an item the base refuses is undone alone and returned
+    as a rejection, an item it left out as a discard.
 
-    The same conditions as for a catalog of CISA KEV: an extract with a rejected entry, or
-    without entry, withdraws nothing.
+    A Zotero entry, its highlights and the publication it cites are written by one writer:
+    they share the savepoint.
     """
-    entries = [item for item in raw_file.items if item.kind == "zotero_entry"]
-    if not entries or raw_file.rejection_count:
-        return 0
-    return mark_withdrawn_zotero_rows_not_in(
-        connection, raw_file.source_code, raw_file.collected_at, raw_data_id, entries
-    )
-
-
-def check_log_absent(log_path: Path) -> None:
-    """The log of an import is never rewritten: one already at log_path stops the import."""
-    if log_path.exists():
-        raise ImportLogExistsError(f"{log_path} already exists")
+    try:
+        with write_in_savepoint(connection):
+            return write_item(connection, item, raw_data_id)
+    except EntryRefusedError as refusal:
+        return reject(
+            item.raw_file_path,
+            f"{item.kind} {quote_value(item.source_item_id)} refused by the base: "
+            f"{refusal}",
+        )

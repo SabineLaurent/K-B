@@ -51,7 +51,8 @@ post/                   # post-traitement, hors de l'ETL
    produisent le même type ; les classements (most_starred, most_forked)
    ne vont pas en base ; les tendances de GH Archive, si (table trend,
    trend_writer). Les règles propres à une source (retrait CISA, retrait
-   Zotero) restent dans etl/load.py.
+   Zotero) restent dans le stage de chargement, jamais dans la source :
+   elles sont dans etl/withdrawals.py (chantier 11).
 2. Les modules du pipeline (les stages et leurs aides) n'importent ni
    les sources ni la composition : ils reçoivent la liste des sources en
    paramètre. Seule la composition (cli.py, commands/, source_kinds.py,

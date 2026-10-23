@@ -37,6 +37,7 @@ ETL_PIPELINE_MODULES = {
     "etl.source_contract",
     "etl.http_download",
     "etl.user_agent",
+    "etl.withdrawals",
 }
 COMPOSITION_MODULES = {"cli", "commands"} | ETL_COMPOSITION_MODULES
 
