@@ -1,4 +1,5 @@
-"""The vocabulary the stages of the ETL share: a raw file read, a ranking read, and a rejection."""
+"""The vocabulary the stages of the ETL share: a raw file read, a ranking read, a rejection,
+and the join of several readings into one."""
 
 from datetime import UTC, datetime
 from typing import NamedTuple
@@ -39,6 +40,14 @@ class RawReading(NamedTuple):
     read_count: int
 
 
+def join_readings(readings: list[RawReading]) -> RawReading:
+    return RawReading(
+        [raw_file for reading in readings for raw_file in reading.files],
+        [rejection for reading in readings for rejection in reading.rejections],
+        sum(reading.read_count for reading in readings),
+    )
+
+
 class TrendFile(NamedTuple):
     """A raw ranking of GH Archive read: the file to register, and its rows, which are not
     items."""
@@ -52,3 +61,11 @@ class TrendReading(NamedTuple):
     rejections: list[Rejection]
     # The rankings opened, readable or not.
     read_count: int
+
+
+def join_trend_readings(readings: list[TrendReading]) -> TrendReading:
+    return TrendReading(
+        [trend_file for reading in readings for trend_file in reading.files],
+        [rejection for reading in readings for rejection in reading.rejections],
+        sum(reading.read_count for reading in readings),
+    )

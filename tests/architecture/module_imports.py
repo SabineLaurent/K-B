@@ -29,6 +29,7 @@ ETL_PIPELINE_MODULES = {
     "etl.import_log",
     "etl.normalize",
     "etl.raw_files",
+    "etl.raw_reading",
     "etl.raw_store",
     "etl.raw_purge",
     "etl.rejections",
