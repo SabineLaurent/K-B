@@ -11,6 +11,8 @@ COLLECTION_NAME_FORMAT = "%Y-%m-%dT%H%M%SZ"
 
 
 def parse_collection_name(collection_name: str) -> datetime:
+    """The collection time a raw file or a folder of pages is named by, in UTC; a name that is
+    not of COLLECTION_NAME_FORMAT raises ValueError."""
     return datetime.strptime(collection_name, COLLECTION_NAME_FORMAT).replace(
         tzinfo=UTC
     )

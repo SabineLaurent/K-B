@@ -4,9 +4,8 @@ each clip into an item (T).
 A clip is a Markdown file the Web Clipper extension writes into the vault: a YAML frontmatter
 between two --- lines, then the text kept. The clips stay the user's: K-B reads them, never
 changes them (it writes only veille/ of the vault: kb write-tops), and copies each clip new or
-modified since the last collection under
-raw/selected_library/clipping/ (ADR of 2026-10-09). A clip is part of the library, never of the
-watch: no digest reads it (ai_api/watch_items.py).
+modified since the last collection under raw/selected_library/clipping/ (ADR of 2026-10-09). A
+clip is part of the library, never of the watch: no digest reads it (ai_api/watch_items.py).
 """
 
 import codecs
@@ -73,9 +72,9 @@ TEMPLATE_TAG = "clippings"
 class ClipTooLargeError(Exception):
     """clip_too_large: a clip of the vault is larger than CLIP_MAX_BYTES. Nothing is copied, and
     the last collection date stays: each collection fails again until the clip is shrunk or
-    removed from the vault. An exception to rule 1 of
-    conventions.md, which fails a source for an unreadable page only: a clip is a page, and the
-    bound passed is shown, not silent (decision of 2026-10-17)."""
+    removed from the vault. An exception to rule 1 of conventions.md, which fails a source for
+    an unreadable page only: a clip is a page, and the bound passed is shown, not silent
+    (decision of 2026-10-17)."""
 
 
 class ClippingsFolderMissingError(Exception):

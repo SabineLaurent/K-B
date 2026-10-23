@@ -164,6 +164,8 @@ def write_files(
 
 
 def join_writings(writings: list[FileWriting]) -> FileWriting:
+    """The sum of several writings: the counts added, the discards and the rejections kept in
+    the order given."""
     return FileWriting(
         item_count=sum(writing.item_count for writing in writings),
         discards=[discard for writing in writings for discard in writing.discards],
@@ -181,6 +183,8 @@ def join_writings(writings: list[FileWriting]) -> FileWriting:
 def write_file(
     connection: sqlite3.Connection, file_read: RawFile | TrendFile
 ) -> FileWriting:
+    """Write one file read, as what it holds says: a file of trends whole, a file of items item
+    by item."""
     if isinstance(file_read, TrendFile):
         return write_trend_file(connection, file_read)
     return write_items_file(connection, file_read)
@@ -309,9 +313,8 @@ def write_trend_file(
     written, and each window the base left out.
 
     A file of trends with a row the base refuses is refused whole (decision of Sabine of
-    2026-10-13):
-    none of its rows is written, it is not registered, and the next import reads it again, as
-    an unreadable file.
+    2026-10-13): none of its rows is written, it is not registered, and the next import reads it
+    again, as an unreadable file.
     """
     raw_file_path = trend_file.raw_file.raw_file_path
     try:

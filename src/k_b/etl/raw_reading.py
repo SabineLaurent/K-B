@@ -91,6 +91,13 @@ def read_collection(
     reader: SourceReader[Any],
     imported_paths: frozenset[str],
 ) -> RawReading:
+    """One collection, read page by page: the raw files read, their rejections, and how many
+    pages were opened.
+
+    A collection is a raw file, read as a single page, or a folder of pages. One not named by
+    its collection time, or whose folder cannot be listed, is rejected whole without being
+    opened, and counts no page; a page of imported_paths is not opened either.
+    """
     try:
         if collection_path.is_dir():
             # A folder name is taken whole: a file name without its extension.
@@ -118,6 +125,14 @@ def read_collection(
 def read_page(
     page_path: Path, raw_dir: Path, reader: SourceReader[Any], collected_at: datetime
 ) -> RawReading:
+    """One page, read whole: the raw file with the items its entries gave, the entries
+    rejected, and the one page it opened.
+
+    A page its reader cannot read is rejected alone and counted as opened; it is not a file
+    read, so it is not registered and the next import reads it again. An entry its reader
+    rejects, or that the item refuses (ValidationError), is rejected with its position and
+    without its values, and the other entries are still read.
+    """
     raw_file_path = page_path.relative_to(raw_dir).as_posix()
     try:
         entry_reading = reader.read_entries(page_path.read_bytes())

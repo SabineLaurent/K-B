@@ -2,9 +2,10 @@
 
 In the package, only the commands import this module: commands/collect_command.py and
 commands/import_command.py give SOURCE_KINDS to the collection (E) and to the import (T then L);
-commands/write_tops_command.py reads TOPS, the top rankings whose sheets kb write-tops writes. The Zotero, clipping and GH Archive
-kinds have no instance here: etl/collected_sources.py creates them, on a machine that says where
-the Zotero data directory, the Obsidian vault, or the BigQuery key, is.
+commands/write_tops_command.py reads TOPS, the top rankings whose sheets kb write-tops writes.
+The Zotero, clipping and GH Archive kinds have no instance here: etl/collected_sources.py creates
+them, on a machine that says where the Zotero data directory, the Obsidian vault, or the BigQuery
+key, is.
 """
 
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME, make_source_folder_key

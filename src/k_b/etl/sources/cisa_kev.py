@@ -2,8 +2,8 @@
 
 Download the CISA catalog of known exploited vulnerabilities (KEV), as published.
 
-Read the vulnerabilities of a raw CISA KEV catalog that were added since the last collection,
-and convert each one into an item.
+Read the vulnerabilities of a raw CISA KEV catalog, the whole catalog, and convert each one into
+an item: the duplicates between two collections are removed by the base, at the import.
 """
 
 import csv
@@ -121,8 +121,9 @@ def read_new_vulnerabilities(
     all); every invalid row is rejected with its line.
 
     dateAdded is a day without a time zone, not an instant: it is not converted, it is compared
-    with a day of margin, so no row is lost whatever its zone. Duplicates are removed by the base, at the import.
-    Its rejection reasons are those of every row: the date of a rejected row is not read.
+    with a day of margin, so no row is lost whatever its zone. Duplicates are removed by the
+    base, at the import. Its rejection reasons are those of every row: the date of a rejected
+    row is not read.
     """
     # utf-8-sig: a byte order mark would otherwise stick to the first column name.
     rows = csv.DictReader(io.StringIO(raw_catalog.decode("utf-8-sig"), newline=""))

@@ -223,9 +223,9 @@ def read_articles(page: bytes) -> EntryReading[TldrArticle]:
     out.
 
     An entry is returned as read, even without a title, a link or a summary: the item refuses
-    it, and the others are still read; the reader itself rejects none. A page that is not UTF-8, whose first h1 is not the
-    title of an edition, with an article inside another, or without any complete article (a
-    selector no longer matches) is refused whole.
+    it, and the others are still read; the reader itself rejects none. A page that is not UTF-8,
+    whose first h1 is not the title of an edition, with an article inside another, or without
+    any complete article (a selector no longer matches) is refused whole.
     """
     try:
         # Decoded here: BeautifulSoup would guess the encoding of bytes.

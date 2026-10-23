@@ -69,8 +69,7 @@ def read_raw_items(
     A collection is a raw file, or a folder of pages; a raw file is read as a single page. A
     collection not named by its time or that cannot be listed, a page that cannot be read, or
     an entry rejected by its reader or refused as an item, is rejected and logged; the others
-    are still read. A page
-    already imported is not opened.
+    are still read. A page already imported is not opened.
     """
     reading = join_readings(
         [
