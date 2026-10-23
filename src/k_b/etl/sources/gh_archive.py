@@ -3,7 +3,8 @@
 GH Archive records every public GitHub event, one table a day, as a public BigQuery dataset. The
 source counts, for each window of 3 complete UTC days, the stars (WatchEvent) and forks
 (ForkEvent) each repository gains, in one query that reads each day once. What the query returns,
-with the windows it covers, is the raw result: a ranking, refused whole when one row is invalid.
+with the windows it covers, is the raw result: the trends it counted, refused whole when one
+row is invalid.
 
 The query runs in a BigQuery sandbox without billing (docs/bigquery.md): a dry run first, then
 the query capped by maximum_bytes_billed. The service account key is found by the client through
@@ -114,7 +115,7 @@ class DryRunVolumeUnknownError(Exception):
 
 
 class TrendsExtractInvalidError(ValueError):
-    """The raw result is not a readable ranking: it is refused whole."""
+    """The raw result does not read as trends: it is refused whole."""
 
 
 class TrendsExtract(BaseModel):

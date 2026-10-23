@@ -93,10 +93,10 @@ class SourceReader[EntryT](NamedTuple):
 
 
 class TrendReader(NamedTuple):
-    """How to read a raw file of a source whose raw files are a ranking, not items: its rows.
+    """How to read a raw file of a source whose raw files hold trends, not items: its rows.
 
-    A ranking is refused whole (conventions.md, rule 1): read_rows raises for a file it cannot
-    read, and never rejects a row alone.
+    A file of trends is refused whole (conventions.md, rule 1): read_rows raises for a file it
+    cannot read, and never rejects a row alone.
     """
 
     # The source_code of its raw files in the base.
@@ -115,10 +115,10 @@ class SourceKind(NamedTuple):
     folder_prefix: str
     sources: tuple[Source, ...]
     # None: its raw files are not read into items (no reader yet, none planned, or raw files
-    # that are not items: the rankings of the two GitHub tops, read by no one, and those of GH
-    # Archive, read by trend_reader).
+    # that are not items: the rankings of the two GitHub tops, read by no one, and the trends
+    # of GH Archive, read by trend_reader).
     reader: SourceReader[Any] | None
-    # How to read its raw files when they are a ranking written to the trend table, not items
+    # How to read its raw files when they hold trends written to the trend table, not items
     # (GH Archive). A kind has one reader or the other, never both
     # (test_no_kind_has_both_a_reader_of_items_and_a_trend_reader).
     trend_reader: TrendReader | None = None

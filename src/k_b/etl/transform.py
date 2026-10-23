@@ -147,8 +147,8 @@ def read_raw_trends(
     raw_dir: Path,
     imported_paths: frozenset[str],
 ) -> TrendReading:
-    """Every raw file of trends that is not in imported_paths, in collection order, each read as
-    a whole ranking (etl/raw_reading.py). A file already imported is not opened."""
+    """Every raw file of trends that is not in imported_paths, in collection order, each read
+    whole (etl/raw_reading.py). A file already imported is not opened."""
     # A raw file is named by its collection time: the order of the names is the order of time.
     return join_trend_readings(
         [

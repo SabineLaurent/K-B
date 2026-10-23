@@ -70,7 +70,7 @@ def import_raw_files(
     imported_at: datetime,
 ) -> ImportOutcome:
     """Run the import: the registry of the base, then the raw files not in it read as items and
-    as rankings, in one walk of raw/ (stage 2), then the base and the log of this import, in one
+    as trends, in one walk of raw/ (stage 2), then the base and the log of this import, in one
     transaction (stage 3).
 
     The tracked repositories are given once: the filter of the reading and the table of the base

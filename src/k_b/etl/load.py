@@ -3,7 +3,7 @@ step 4).
 
 The registry of the files already imported is raw_data, read before the raw. The files read,
 their items and the log of the import are then written in one transaction. Each item, and each
-ranking, is written in its savepoint (database/savepoint.py): an entry the base refuses is
+file of trends, is written in its savepoint (database/savepoint.py): an entry the base refuses is
 undone alone and becomes a rejection of the log, and the import goes on. Any other error writes
 nothing in the base, and leaves no log; an interruption (Ctrl-C, SIGTERM) received once the base
 has committed keeps the import and its log. A file registered is not read again, except by a
@@ -16,7 +16,7 @@ revisions keeps the newest revision. An item left out is returned with its rule 
 it was compared with, then written to the log. Run again on the same raw, the import gives the
 same base.
 
-A ranking of GH Archive is not made of items: its rows go to the trend table, in the same
+A file of trends of GH Archive is not made of items: its rows go to the trend table, in the same
 transaction, and its rule is a news feed applied to the whole window. A Zotero entry is a state
 catalog, as CISA KEV, and so is each of its highlights (decision of 2026-10-13). A clip is
 known by its URL, and keeps its latest version: a clip whose content changed is written again
@@ -72,10 +72,10 @@ class ImportLogExistsError(FileExistsError):
 
 class ImportSummary(NamedTuple):
     item_count: int
-    # The items and the windows of a ranking left out.
+    # The items and the windows of trends left out.
     discard_count: int
     rejection_count: int
-    # The raw files opened, rankings included.
+    # The raw files opened, files of trends included.
     read_count: int
     withdrawn_count: int
     # The rows written to the trend table.
@@ -111,10 +111,10 @@ def import_items(
     imported_at: datetime,
     tracked_repositories: Sequence[TrackedRepository],
 ) -> ImportSummary:
-    """Write the tracked repositories, each file read with its items or its ranking into the
+    """Write the tracked repositories, each file read with its items or its trends into the
     base, then the log of what was left out, all in one transaction.
 
-    The files of items and the rankings are written in one sequence, in collection order: a
+    The files of items and those of trends are written in one sequence, in collection order: a
     base rebuilt registers them in the order the imports did.
     """
     check_database_exists(database_path)
@@ -227,7 +227,7 @@ def commit_with_log(
 def list_files_in_collection_order(
     reading: RawReading, trend_reading: TrendReading
 ) -> list[RawFile | TrendFile]:
-    """The files of items and the rankings, oldest collection first; at the same collection,
+    """The files of items and those of trends, oldest collection first; at the same collection,
     the files of items first, in their reading order (the sort is stable)."""
 
     def read_collected_at(file_read: RawFile | TrendFile) -> datetime:
@@ -305,10 +305,11 @@ def register_raw_file(connection: sqlite3.Connection, raw_file: RawFile) -> int:
 def write_trend_file(
     connection: sqlite3.Connection, trend_file: TrendFile
 ) -> FileWriting:
-    """Register the ranking and write its rows in one savepoint; return how many were written,
-    and each window the base left out.
+    """Register the file of trends and write its rows in one savepoint; return how many were
+    written, and each window the base left out.
 
-    A ranking with a row the base refuses is refused whole (decision of Sabine of 2026-10-13):
+    A file of trends with a row the base refuses is refused whole (decision of Sabine of
+    2026-10-13):
     none of its rows is written, it is not registered, and the next import reads it again, as
     an unreadable file.
     """
