@@ -222,3 +222,74 @@ qu'aucun test ne lit.
   fichier par fichier : coffre, dossier de données, base, journal
   d'import, fichiers du paquet, rejeu). À justifier ou à écarter de la
   liste, hors de cette refactorisation.
+
+## 9. Chantiers de lisibilité
+
+Le relevé du 2026-10-23, docs/refactoring/lisibilite.md, mesure les 29
+modules de etl/ et etl/sources/ et classe 17 chantiers par rapport gain
+de clarté / coût. Cette section tient l'état de chaque ligne de son
+tableau (sa partie 5) ; le relevé lui-même n'est pas réécrit.
+
+Un chantier sans étape est indépendant de la cible : il se fait avant ou
+après n'importe laquelle. Le chantier 6 portait quatre renommages, dont
+l'un est écarté et l'autre reporté : il tient trois lignes.
+
+| # | Chantier | État | Étape |
+|---|---|---|---|
+| 1 | Docstring de list_file_keys : elle nommait etl/transform.py, qui ne porte plus list_visible_entries ni d'import de raw_store | fait, commit A (73421c1) | — |
+| 2 | Docstring de module de cisa_kev : elle annonçait une collecte incrémentale, alors que son lecteur lit le catalogue entier | fait, commit A (73421c1) | — |
+| 3 | Trois lignes de plus de 100 caractères, quatre docstrings coupées en plein milieu | fait, commit A (73421c1) | — |
+| 4 | Docstrings des huit portes qui n'en avaient pas | fait, commit A (73421c1) | — |
+| 5 | Valeurs par défaut de FileWriting : 44 lignes de littéraux ramenées à 23 | fait, commit C (618d9d8) | — |
+| 6 | RawReadings -> ImportReadings ; read_collected_at -> find_collected_at, avec sa docstring | fait, commit B (b501e5a) | — |
+| 6 | read_absent, qui ne dit pas ce qu'il fait | reporté, voir ci-dessous | — |
+| 6 | to_ns -> to_nanoseconds | écarté le 2026-10-23, voir ci-dessous | — |
+| 7 | Les deux read_text, de règle inverse sur une absence, devenus read_required_text et read_text_or_empty | fait, commit B (b501e5a) | portait l'étape 7, fait avant |
+| 8 | L'horloge nommée qui manque à arxiv, seul à lire datetime.now(UTC) dans son fetch | à faire | hors étapes ; avec l'étape 7, qui déplace ce fetch |
+| 9 | Les trois noms de lecture d'un top (read_most_starred, read_ranking, read_top_entries) et les trois read_ranking du dépôt, de signatures différentes | à faire | étape 8 |
+| 10 | Sortir de collect_one_source le contrôle des noms de chemin | à faire | hors étapes ; avant l'étape 6, qui ajoutera le contrôle générique des entrées au même module |
+| 11 | Couper les cinq niveaux de load.py : transaction, ordre des fichiers, aiguillage par type, écriture d'un fichier, règle d'une source | à faire | hors étapes ; la partie 5 décide de ce qui reste dans le load, jamais de la façon dont le module se lit |
+| 12 | read_trends de gh_archive : séparer la validation Pydantic des quatre contrôles de cohérence | à faire | étape 7 |
+| 13 | raw_store.py : une seule façon de nommer un fichier, les quatre fonctions à Path comprises | à faire | étape 3 bis |
+| 14 | Le paramètre last_collected_at de read_new_vulnerabilities, mort en production | reporté, voir ci-dessous | — |
+| 15 | Rompre le lien E -> T dans les dix fetch | à faire | étapes 6 et 7 |
+| 16 | Découper zotero.py, puis les autres sources, en extract.py / transform.py | à faire | étapes 6 et 7 |
+| 17 | Séparer dans Top ce qui relève de la collecte et du rendu | à faire | étape 8 |
+
+Trois états demandent leur raison :
+
+- Écarté, to_ns (chantier 6), le 2026-10-23 : le relevé invoquait
+  l'interdiction d'abréviation de code.md, et le relevé des occurrences
+  la contredit. Le suffixe des nanosecondes est de maison, emprunté à
+  os.stat_result : changed_at_ns, read_changed_at_ns, modified_at_ns,
+  settled_before_ns, newest_ns, à côté de st_mtime_ns et st_ctime_ns,
+  que Python fournit. Renommer la seule fonction en ferait l'exception
+  dans une famille cohérente ; renommer la famille entière est hors de
+  proportion avec le gain.
+- Reporté, read_absent (chantier 6) : un découpage à part, après le
+  commit C. Le nom est trompeur (la fonction rend None pour un marqueur
+  d'absence, la valeur sinon), mais deux de ses trois appels la comparent
+  à None, « is None » puis « is not None » : elle fait deux choses, un
+  prédicat et un validateur. C'est un découpage (is_absent, qui rend un
+  booléen comme code.md le demande d'un prédicat, plus le validateur),
+  pas un renommage ; le renommer d'abord obligerait à toucher les trois
+  mêmes sites deux fois.
+- Reporté, le paramètre last_collected_at de read_new_vulnerabilities
+  (chantier 14) : décision de Sabine, hors étapes. Son unique appelant
+  de production, read_catalog, passe toujours None : la branche de
+  filtre n'est atteinte que par les tests (11 appels dans
+  tests/etl/sources/test_cisa_kev.py). Le retirer change les tests ; le
+  garder garde une branche que la production n'exécute jamais. Le
+  commit A n'a corrigé que la docstring de module qui le décrivait comme
+  le comportement de la source.
+
+Les chantiers 13, 15, 16 et 17 sont les étapes de ce plan : 13 est
+l'étape 3 bis, 15 et 16 les étapes 6 et 7, 17 l'étape 8. Leur avancement
+est tenu par la partie 4, et ce que le relevé a précisé de ces étapes
+est dans sa partie 6, pas ici.
+
+Les anciens noms (RawReadings, read_collected_at) restent cités par
+lisibilite.md, par le journal d'ADR et par des notes de journaling.
+Décision de Sabine du 2026-10-23 : ces documents sont datés, ils ne sont
+pas réécrits (partie 6). Le message du commit B nomme les quatre anciens
+noms, pour qu'on les retrouve dans l'historique.
