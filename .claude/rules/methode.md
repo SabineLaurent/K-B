@@ -1,4 +1,4 @@
-<!-- consignes/methode.md v2026-10-24 — source : time-knight. Ne pas modifier ici sans la reporter. -->
+<!-- consignes/methode.md v2026-10-24b — source : time-knight. Ne pas modifier ici sans la reporter. -->
 # Méthode de travail
 
 Le cycle de toute PR de code. Ce qui est propre au dépôt (board, taille des PR, briques en cycle
@@ -44,7 +44,7 @@ Chaque issue porte `size:`, une étiquette de livrable et au moins une de partie
 - **Livrable** : `E1`…`E5` si le livrable l'exige ; `hors E1`… s'il le touche sans l'exiger. Posé par
   time-knight seul, qui lit la certif : la session n'en pose pas.
 - **Partie**, une ou plusieurs, posée par la session ou par time-knight : `etl`, `base`, `api-données`,
-  `api-ia`, `coffre`, `wiki`, `cli` ; transverses : `observabilité`, `données-perso`, `outillage`,
+  `api-ia`, `coffre`, `wiki`, `cli`, `interface` ; transverses : `observabilité`, `données-perso`, `outillage`,
   `déploiement`.
 - Une étiquette nouvelle passe par time-knight.
 
