@@ -12,6 +12,10 @@ from k_b.ai_api.connectors.data_api_settings import (
     read_data_api_settings_or_refusal,
 )
 from k_b.ai_api.connectors.llm_settings import read_llm_settings_or_refusal
+from k_b.ai_api.connectors.metrics_export import (
+    read_metrics_export_settings_or_refusal,
+)
+from k_b.ai_api.metric_instruments import ModelMetrics
 from k_b.ai_api.settings import read_ai_api_settings_or_refusal
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME, value_or_log_refusal
@@ -36,11 +40,16 @@ def run_serve_ai() -> int:
     data_api_settings = value_or_log_refusal(
         read_data_api_settings_or_refusal(os.environ)
     )
+    # None is a setting here: the export is off.
+    export_settings = read_metrics_export_settings_or_refusal(os.environ)
+    if isinstance(export_settings, str):
+        logger.error("%s", export_settings)
     if (
         api_keys is None
         or settings is None
         or llm_settings is None
         or data_api_settings is None
+        or isinstance(export_settings, str)
     ):
         return ExitCode.NOT_STARTED
     # The data API gives each client every item: a client of the AI API that held the key of
@@ -62,6 +71,13 @@ def run_serve_ai() -> int:
     # mistake says it.
     logger.info("LLM provider %s, model %s", llm_settings.provider, llm_settings.model)
     logger.info("digest window by default: %s days", settings.window_days)
+    # The environment, never the endpoint nor the headers.
+    logger.info(
+        "metrics export: %s",
+        "off"
+        if export_settings is None
+        else f"OTLP, environment {export_settings.environment}",
+    )
     uvicorn.run(
         create_app(
             api_keys,
@@ -69,6 +85,8 @@ def run_serve_ai() -> int:
             data_api_settings,
             DIGEST_SUBJECTS,
             settings.window_days,
+            # Stopped by the lifespan of the app (ai_api/app.py).
+            ModelMetrics.from_settings(export_settings),
         ),
         host=settings.host,
         port=settings.port,

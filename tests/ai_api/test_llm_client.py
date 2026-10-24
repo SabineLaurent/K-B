@@ -11,9 +11,11 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from k_b.ai_api.connectors.llm_client import (
     MAX_RETRY_AFTER_DIGITS,
+    Attempt,
     FailedCheck,
     build_http_client,
     call_model,
+    summarize,
     to_failure,
 )
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
@@ -877,3 +879,23 @@ def test_a_call_without_output_is_never_read_as_ok():
         to_failure("ok")
 
     assert to_failure("llm_timeout") == "llm_timeout"
+
+
+def test_a_call_whose_answer_was_unreadable_is_not_checked():
+    # A 200 whose body is not a completion: read_answer gives llm_unavailable, no check ran.
+    call = summarize([Attempt(outcome="llm_unavailable", http_status=200)], 0, 0.1)
+
+    assert (call.is_checked, call.check_ms) == (False, 0)
+
+
+def test_a_call_is_checked_when_one_of_its_attempts_was():
+    call = summarize(
+        [
+            Attempt(outcome="llm_invalid_output", is_checked=True, check_seconds=0.004),
+            Attempt(outcome="llm_timeout"),
+        ],
+        0,
+        0.5,
+    )
+
+    assert (call.is_checked, call.check_ms) == (True, 4)

@@ -14,6 +14,8 @@ import httpx2
 import pytest
 from fastapi.routing import iter_route_contexts
 from fastapi.testclient import TestClient
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from pydantic import SecretStr
 
 from k_b.ai_api.app import create_app
@@ -28,6 +30,7 @@ from k_b.ai_api.dependencies import (
     read_request_time,
 )
 from k_b.ai_api.errors import STATUS_BY_STATE
+from k_b.ai_api.metric_instruments import ModelMetrics
 from k_b.core.config import (
     LLM_INPUT_USD_PER_MILLION_TOKENS,
     LLM_OUTPUT_USD_PER_MILLION_TOKENS,
@@ -138,10 +141,16 @@ def data_api(items_database):
 
 
 @pytest.fixture
-def make_ai_api(data_api):
+def metric_reader():
+    """The reader of the OpenTelemetry measures of the AI API of the test, in memory."""
+    return InMemoryMetricReader()
+
+
+@pytest.fixture
+def make_ai_api(data_api, metric_reader):
     """A client of the AI API on the replay of these steps, and the transport of the replay, which
     keeps each request to the model. replay_from_settings: the replay the settings give, as kb
-    serve-ai makes it, in place of the transport of the test."""
+    serve-ai makes it, in place of the transport of the test. Its measures go to metric_reader."""
 
     def make(
         steps,
@@ -161,6 +170,9 @@ def make_ai_api(data_api):
             ),
             TEST_SUBJECTS,
             default_window_days,
+            ModelMetrics(
+                MeterProvider(metric_readers=[metric_reader], shutdown_on_exit=False)
+            ),
         )
         transport = ReplayTransport(steps)
 
@@ -567,6 +579,229 @@ def test_the_cost_is_the_tokens_at_the_prices_of_the_config(make_ai_api, capsys)
     )
     assert {line["cost_estimated"] for line in read_metric_lines(capsys)} == {expected}
     assert expected == 0.00024
+
+
+# The attributes a measure may carry: closed values, never a text, a subject nor an id of request
+# (.claude/rules/poc.md, rule 5).
+METRIC_ATTRIBUTES = {
+    "gen_ai.operation.name",
+    "gen_ai.provider.name",
+    "gen_ai.request.model",
+    "gen_ai.token.modality",
+    "error.type",
+    "k_b.stage",
+    "k_b.outcome",
+    "k_b.schema_valid",
+}
+
+
+def read_metric_points(metric_reader):
+    """The points of each instrument, by name: (attributes, value), the value being the sum of a
+    counter or the (count, sum) of a histogram."""
+    metrics_data = metric_reader.get_metrics_data()
+    points = {}
+    for resource_metrics in metrics_data.resource_metrics:
+        for scope_metrics in resource_metrics.scope_metrics:
+            for metric in scope_metrics.metrics:
+                points[metric.name] = [
+                    (
+                        dict(point.attributes),
+                        (point.count, point.sum)
+                        if hasattr(point, "count")
+                        else point.value,
+                    )
+                    for point in metric.data.data_points
+                ]
+    return points
+
+
+def find_point(points, name, **attributes):
+    """The value of the point of the instrument whose attributes hold these ones."""
+    [value] = [
+        value
+        for point_attributes, value in points[name]
+        if attributes.items() <= point_attributes.items()
+    ]
+    return value
+
+
+def test_each_call_is_measured_in_opentelemetry_as_on_its_line(
+    make_ai_api, capsys, metric_reader
+):
+    client, _ = make_ai_api(VALID_STEPS)
+
+    post_digests(client)
+
+    lines = read_metric_lines(capsys)
+    points = read_metric_points(metric_reader)
+    classify, *writes = lines
+    common = {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.provider.name": "replay",
+        "gen_ai.request.model": "replay",
+    }
+    assert find_point(
+        points,
+        "gen_ai.client.inference.duration",
+        **common,
+        **{"k_b.stage": "classify"},
+    ) == (1, classify["llm_ms"] / 1000)
+    assert find_point(
+        points, "gen_ai.client.inference.duration", **{"k_b.stage": "write"}
+    ) == (3, sum(line["llm_ms"] for line in writes) / 1000)
+    assert find_point(points, "k_b.llm.check.duration", **{"k_b.stage": "write"}) == (
+        3,
+        sum(line["check_ms"] for line in writes) / 1000,
+    )
+    assert find_point(
+        points,
+        "gen_ai.client.inference.usage.input_tokens",
+        **{"k_b.stage": "write", "gen_ai.token.modality": "text"},
+    ) == sum(line["tokens_in"] for line in writes)
+    assert find_point(
+        points, "gen_ai.client.inference.usage.output_tokens", **{"k_b.stage": "write"}
+    ) == sum(line["tokens_out"] for line in writes)
+    assert (
+        find_point(
+            points,
+            "k_b.llm.calls",
+            **{"k_b.stage": "write", "k_b.outcome": "ok", "k_b.schema_valid": True},
+        )
+        == 3
+    )
+    assert find_point(points, "k_b.llm.cost", **{"k_b.stage": "write"}) == (
+        pytest.approx(sum(line["cost_estimated"] for line in writes))
+    )
+    assert find_point(points, "k_b.digest.claims_removed") == sum(
+        line["claims_removed"] for line in writes
+    )
+    assert find_point(points, "k_b.digest.items_uncited") == sum(
+        line["items_uncited"] for line in writes
+    )
+    assert find_point(points, "k_b.digest.data_fetch.duration") == (
+        1,
+        classify["data_fetch_ms"] / 1000,
+    )
+
+
+def test_a_measure_carries_closed_attributes_never_a_text(make_ai_api, metric_reader):
+    client, _ = make_ai_api(VALID_STEPS)
+
+    response = post_digests(client)
+
+    points = read_metric_points(metric_reader)
+    values = {
+        str(value)
+        for name in points
+        for attributes, _ in points[name]
+        for value in attributes.values()
+    }
+    keys = {
+        key for name in points for attributes, _ in points[name] for key in attributes
+    }
+    assert keys <= METRIC_ATTRIBUTES
+    assert values <= {"chat", "replay", "classify", "write", "ok", "True", "text"}
+    assert response.json()["request_id"] not in values
+
+
+def test_a_call_checked_then_retried_without_answer_measures_its_check(
+    make_ai_api, metric_reader
+):
+    client, _ = make_ai_api(
+        [
+            classified(),
+            completion("not JSON"),
+            {"kind": "timeout"},
+            written(AGENT_CLAIM),
+            written(),
+        ]
+    )
+
+    post_digests(client)
+
+    points = read_metric_points(metric_reader)
+    assert (
+        find_point(points, "k_b.llm.check.duration", **{"k_b.stage": "write"})[0] == 3
+    )
+
+
+def test_a_call_without_answer_measures_no_check(make_ai_api, metric_reader):
+    client, _ = make_ai_api(
+        [classified(), {"kind": "timeout"}, written(AGENT_CLAIM), written()]
+    )
+
+    post_digests(client)
+
+    points = read_metric_points(metric_reader)
+    assert (
+        find_point(points, "k_b.llm.check.duration", **{"k_b.stage": "write"})[0] == 2
+    )
+    assert (
+        find_point(
+            points, "gen_ai.client.inference.duration", **{"error.type": "llm_timeout"}
+        )[0]
+        == 1
+    )
+
+
+def test_a_call_that_fails_carries_its_outcome_as_error_type(
+    make_ai_api, metric_reader
+):
+    client, _ = make_ai_api([INVALID_OUTPUT, INVALID_OUTPUT])
+
+    post_digests(client)
+
+    points = read_metric_points(metric_reader)
+    [(attributes, _)] = points["gen_ai.client.inference.duration"]
+    assert attributes["error.type"] == "llm_invalid_output"
+    assert (
+        find_point(
+            points,
+            "k_b.llm.calls",
+            **{"k_b.outcome": "llm_invalid_output", "k_b.schema_valid": False},
+        )
+        == 1
+    )
+
+
+def test_an_empty_window_measures_its_reading_without_a_call(
+    make_ai_api, metric_reader
+):
+    client, _ = make_ai_api([])
+    client.app.dependency_overrides[read_request_time] = lambda: datetime(
+        2030, 1, 1, tzinfo=UTC
+    )
+
+    post_digests(client)
+
+    points = read_metric_points(metric_reader)
+    assert set(points) == {"k_b.digest.data_fetch.duration"}
+    [(attributes, (count, _))] = points["k_b.digest.data_fetch.duration"]
+    assert (attributes, count) == ({}, 1)
+
+
+def test_the_measures_are_sent_when_the_app_stops(data_api):
+    reader = InMemoryMetricReader()
+    stopped = []
+    model_metrics = ModelMetrics(
+        MeterProvider(metric_readers=[reader], shutdown_on_exit=False)
+    )
+    model_metrics.stop = lambda: stopped.append(True)
+    app = create_app(
+        {"TERMINAL": SecretStr(CLIENT_KEY)},
+        REPLAY_SETTINGS,
+        DataApiSettings(
+            base_url="http://localhost", api_key=SecretStr(secrets.token_urlsafe(32))
+        ),
+        TEST_SUBJECTS,
+        WINDOW_DAYS,
+        model_metrics,
+    )
+
+    with TestClient(app):
+        assert stopped == []
+
+    assert stopped == [True]
 
 
 class RecordingOutput:

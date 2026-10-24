@@ -1,10 +1,10 @@
 """What the data API and the AI API may import, read at two levels, three under k_b.ai_api
 (conventions.md, rule 5).
 
-Under k_b.ai_api: app → api_router → the routers → the pieces of a route (errors, dependencies,
-schemas, metrics) → digests → the stages → the clients → the settings of the connectors →
-llm_replay → deadline, watch_items and the settings of kb serve-ai; a module imports only the
-layers below its own. The rules of an outbound connection are in core (core/outbound.py, #209).
+Under k_b.ai_api: app → api_router → the routers → metric_instruments → the pieces of a route
+(errors, dependencies, schemas, metrics) → digests → the stages → the clients → the settings of
+the connectors → llm_replay → deadline, watch_items, the settings of kb serve-ai and the export of
+the metrics; a module imports only the layers below its own. The rules of an outbound connection are in core (core/outbound.py, #209).
 """
 
 import importlib
@@ -139,7 +139,12 @@ def test_the_ai_api_rule_refuses_the_base_the_pipeline_and_the_other_apis(
 # Under k_b.ai_api, each module is in exactly one layer, from the bottom up (#242). A module
 # imports only the layers below its own: two modules of one layer do not import each other.
 AI_API_LAYERS = (
-    {"ai_api.deadline", "ai_api.watch_items", "ai_api.settings"},
+    {
+        "ai_api.deadline",
+        "ai_api.watch_items",
+        "ai_api.settings",
+        "ai_api.connectors.metrics_export",
+    },
     {"ai_api.connectors.llm_replay"},
     {"ai_api.connectors.llm_settings", "ai_api.connectors.data_api_settings"},
     {"ai_api.connectors.llm_client", "ai_api.connectors.data_api_client"},
@@ -151,6 +156,7 @@ AI_API_LAYERS = (
         "ai_api.schemas.digest_schema",
         "ai_api.metrics",
     },
+    {"ai_api.metric_instruments"},
     {"ai_api.routers.digest_router"},
     {"ai_api.api_router"},
     {"ai_api.app"},

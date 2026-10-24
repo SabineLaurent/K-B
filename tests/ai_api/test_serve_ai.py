@@ -13,20 +13,35 @@ import time
 
 import httpx2
 import pytest
+from test_metrics_export import FakeExporter
 
 from k_b import cli
+from k_b.ai_api.connectors import metrics_export
 from k_b.ai_api.connectors.data_api_settings import DATA_API_KEY_VARIABLE
+from k_b.ai_api.metric_instruments import ModelMetrics
 from k_b.commands import serve_ai_command
 from k_b.core.api_keys import AI_API_KEY_VARIABLE_PREFIX
 from k_b.core.config import DIGEST_SUBJECTS
 
 # The variables kb serve-ai reads, which a terminal may export (a .env loaded).
-READ_PREFIXES = ("KB_AI_API_", "KB_LLM_", "KB_DATA_API_", "KB_DIGEST_")
+READ_PREFIXES = (
+    "KB_AI_API_",
+    "KB_LLM_",
+    "KB_DATA_API_",
+    "KB_DIGEST_",
+    "KB_OTLP_",
+    "KB_DEPLOYMENT_",
+    "OTEL_",
+)
 
 
 def make_key():
     """A key of the test; token_urlsafe(32) gives 43 characters."""
     return secrets.token_urlsafe(32)
+
+
+# Made for the test: never a real token.
+OTLP_TOKEN = make_key()
 
 
 @pytest.fixture(autouse=True)
@@ -164,6 +179,21 @@ def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
             {"KB_DATA_API_KEY_AI_DIGEST": "short-key-of-the-test"},
             "KB_DATA_API_KEY_AI_DIGEST: key of 21 characters, minimum 32",
         ),
+        (
+            {"KB_OTLP_ENDPOINT": "https://otlp.example.net/otlp"},
+            "KB_OTLP_HEADERS: not set, while KB_OTLP_ENDPOINT is",
+        ),
+        (
+            {
+                "KB_OTLP_ENDPOINT": "https://otlp.example.net/otlp",
+                "KB_OTLP_HEADERS": f"Authorization=Basic%20{OTLP_TOKEN}",
+            },
+            "KB_DEPLOYMENT_ENVIRONMENT: not set, sandbox or production",
+        ),
+        (
+            {"OTEL_SERVICE_NAME": "k-b"},
+            "OTEL_SERVICE_NAME: read by the OpenTelemetry SDK behind the back of K-B",
+        ),
     ],
     ids=[
         "no-key",
@@ -178,6 +208,9 @@ def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
         "no-provider",
         "no-data-api-key",
         "short-data-api-key",
+        "otlp-without-headers",
+        "otlp-without-environment",
+        "otel-variable",
     ],
 )
 def test_serve_ai_exits_2_and_names_the_variable_refused(
@@ -201,6 +234,53 @@ def test_serve_ai_exits_2_and_names_the_variable_refused(
     for name in ("KB_AI_API_KEY_KB_DIGEST", "KB_DATA_API_KEY_AI_DIGEST"):
         if environment.get(name):
             assert environment[name] not in error_output
+    assert OTLP_TOKEN not in error_output
+
+
+def test_serve_ai_without_export_says_it_and_gives_the_app_its_measures(
+    monkeypatch, capsys, data_dir, uvicorn_calls, environment
+):
+    set_environment(monkeypatch, environment)
+
+    cli.main(["serve-ai"])
+
+    [(app, _)] = uvicorn_calls
+    assert isinstance(app.state.model_metrics, ModelMetrics)
+    assert "metrics export: off" in capsys.readouterr().err
+
+
+def test_serve_ai_with_export_names_its_environment_never_its_endpoint_nor_its_headers(
+    monkeypatch, capsys, data_dir, uvicorn_calls, environment
+):
+    # No network: the exporter built is a fake one.
+    exporters = []
+    monkeypatch.setattr(
+        metrics_export,
+        "OTLPMetricExporter",
+        lambda **options: exporters.append(options) or FakeExporter(**options),
+    )
+    set_environment(
+        monkeypatch,
+        environment
+        | {
+            "KB_OTLP_ENDPOINT": "https://otlp.example.net/otlp",
+            "KB_OTLP_HEADERS": f"Authorization=Basic%20{OTLP_TOKEN}",
+            "KB_DEPLOYMENT_ENVIRONMENT": "sandbox",
+        },
+    )
+
+    exit_code = cli.main(["serve-ai"])
+
+    [(app, _)] = uvicorn_calls
+    app.state.model_metrics.stop()
+    error_output = capsys.readouterr().err
+    assert exit_code == 0
+    assert [options["endpoint"] for options in exporters] == [
+        "https://otlp.example.net/otlp/v1/metrics"
+    ]
+    assert "metrics export: OTLP, environment sandbox" in error_output
+    assert "otlp.example.net" not in error_output
+    assert OTLP_TOKEN not in error_output
 
 
 def test_serve_ai_logs_its_clients_its_provider_and_its_model_never_a_key(

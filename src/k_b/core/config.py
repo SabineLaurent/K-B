@@ -229,3 +229,15 @@ AI_API_READ_TIMEOUT_SECONDS = 240
 # #158 (9.3 s), not above the longest one the output cap allows (about 60 s): a longer writing
 # started with less time left can still end in llm_timeout.
 MIN_SECONDS_FOR_LLM_REQUEST = 10
+
+# The export of the metrics of the AI API in OpenTelemetry (ai_api/connectors/metrics_export.py,
+# #162). Every 60 s, the default of the OpenTelemetry SDK; a request to the OTLP endpoint waits 5 s
+# at most, and the last export on stop as long. The last export runs once uvicorn has ended the
+# requests under way, which may take up to DIGEST_REQUEST_TIMEOUT_SECONDS: within the 10 s docker
+# stop gives before SIGKILL only if no digest request is under way (.claude/rules/poc.md, rule 6);
+# the stop delay of the container is #200's. Constants, not variables: no need to change them by
+# deployment.
+MILLISECONDS_PER_SECOND = 1000
+METRICS_EXPORT_INTERVAL_SECONDS = 60
+METRICS_EXPORT_TIMEOUT_SECONDS = 5
+METRICS_STOP_TIMEOUT_SECONDS = 5

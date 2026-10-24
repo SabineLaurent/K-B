@@ -3952,6 +3952,79 @@ Sabine du 2026-10-15).
   l'import a ensuite été retiré, et le fichier vérifié identique. Option écartée : un `grep` du
   critère de fin seul. — branche `refactoring/etl`
 
+## 2026-10-24
+
+### Métriques : l'export OpenTelemetry de l'API IA (#162)
+
+Décisions prises au plan de #162, validé par Sabine le 2026-10-24 et relayé par time-knight, puis
+aux deux revues de code, tranchées par time-knight (délégation de Sabine du 2026-10-15). Elles
+appliquent « Squelette E1 E3 : cadrage du 20/10 », décision 4.
+
+- **K-B lit ses propres variables d'export, `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS`, et `kb
+  serve-ai` refuse de démarrer si une variable `OTEL_*` est présente.** Pourquoi, constaté dans le
+  code du SDK 1.45.1 à la relecture du plan : l'exporteur relit l'environnement même quand on lui
+  passe l'en-tête (`_resolve_headers`), et son lecteur d'en-têtes journalise tel quel un segment
+  mal formé, donc le jeton ; d'autres variables changent son comportement en silence
+  (`OTEL_SDK_DISABLED`, intervalle, attributs de ressource). Refuser tout le préfixe est une règle
+  fermée, qui ne prend pas de retard sur la version suivante du SDK. Options écartées : les noms
+  standard `OTEL_EXPORTER_OTLP_*`, que Grafana Cloud et Honeycomb donnent tout prêts (premier
+  plan) ; une liste des variables à refuser. Changer d'outil reste un changement d'URL et
+  d'en-tête : les valeurs se collent sous un autre nom. Contredit le skill `fastapi` du dépôt
+  (0.143.1, section OpenTelemetry), qui conseille la télémétrie native réglée par les `OTEL_*` :
+  non appliqué ici, signalé pour #281. — PR de #162
+- **`KB_DEPLOYMENT_ENVIRONMENT` (`sandbox` ou `production`) n'a pas de défaut ; elle est exigée
+  dès que l'export est réglé, ignorée sans lui.** Décision de Sabine du 2026-10-24. Pourquoi, selon
+  la question posée par la relecture du plan : avec un défaut `sandbox`, une production où l'on
+  oublie la variable serait étiquetée `sandbox` sans message. Option écartée : un défaut `sandbox`
+  dans `core/config.py`. **Précise** la décision 4 du 20/10 (« seuls l'URL et le jeton changent ») :
+  d'un environnement à l'autre, trois réglages changent, aucun code. Écart à la règle 2 de
+  `.claude/rules/poc.md` (un réglage de déploiement a un défaut local), au même titre qu'un service
+  distant. — PR de #162
+- **La ressource est construite par son constructeur : `service.name`, `deployment.environment.name`
+  et un `service.instance.id` tiré au hasard par processus, rien d'autre.** Pourquoi : le critère de
+  #162 interdit `host.name`, `process.owner`, `process.command_args` et tout chemin ;
+  `Resource.create` lit `OTEL_RESOURCE_ATTRIBUTES` et les détecteurs de
+  `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS`. L'identifiant d'instance (première revue de code) : sans
+  lui, deux processus qui exportent en même temps écrivent les mêmes séries cumulées. Limite
+  assumée : chaque redémarrage ouvre de nouvelles séries (89 pour une demande ordinaire, face aux
+  10 000 séries actives de l'offre gratuite). Option écartée : `Resource.create`, la voie que la doc
+  du SDK présente d'abord. — PR de #162
+- **OpenTelemetry ne s'importe que dans `ai_api/connectors/metrics_export.py` et
+  `ai_api/metric_instruments.py` ; l'app, le routeur et les commandes ne voient que `ModelMetrics`
+  (enregistrer, arrêter). Un test d'architecture le tient.** Décision de Sabine du 2026-10-24,
+  ajoutée au plan, sur la recommandation de time-knight (« je suis tes recommandations »).
+  Pourquoi de Sabine, le 24/10 vers 10:00 UTC : « On avait parlé d'une façon de faire qui
+  limitait la "pollution" du code par opentelemetry ». La règle est tenue par un test, selon sa
+  règle d'harmonisation : une règle par sujet, tenue par un test. Conséquence : les règles de
+  l'export (refus des `OTEL_*`, ressource fermée, session HTTP sans l'environnement) restent en un
+  seul endroit. `requests`, client de l'exporteur, est tenu de même dans `metrics_export.py`. —
+  PR de #162
+- **L'arrêt envoie les dernières mesures dans le `lifespan` de l'app, et non après `uvicorn.run`.**
+  Pourquoi, constaté à la relecture du plan dans `uvicorn/server.py` : uvicorn finit les demandes
+  en cours, termine le `lifespan`, puis relance le SIGTERM qui tue le processus ; un code placé
+  après `uvicorn.run` ne s'exécute jamais. Option écartée : un `finally` après `uvicorn.run` (premier
+  plan). Limite assumée (première revue) : une demande en cours retarde le dernier envoi jusqu'à
+  `DIGEST_REQUEST_TIMEOUT_SECONDS`, au-delà des 10 s de `docker stop` ; le délai d'arrêt du conteneur
+  est renvoyé à #200. — PR de #162
+- **La télémétrie native de FastAPI 0.143 est coupée dans les deux API (`core/api_telemetry.py`).**
+  Pourquoi (première revue, vérifiée par time-knight) : les paquets ajoutés par #162 arment sa
+  configuration automatique ; avec `FASTAPI_OTEL_AUTO_CONFIGURE=true`, FastAPI pose ses propres
+  fournisseurs globaux, et une trace de l'API de données porterait la requête brute d'un client vers
+  un destinataire absent du registre. Option écartée : la couper dans l'API IA seule (premier état
+  du code). Les traces restent l'objet de #281. — PR de #162
+- **La durée de lecture de la veille est mesurée à chaque demande lue, même sans appel au modèle ;
+  les compteurs de la fidélité qui existent (`claims_removed`, `items_uncited`) partent dès #162.**
+  Décisions de Sabine du 2026-10-24, sur les recommandations du plan. Pourquoi : la ligne JSON ne
+  porte pas la lecture d'une demande sans appel (`docs/fiches-veille.md`, « Métriques »,
+  « Limites ») ; les deux compteurs sont déjà sur la ligne, #207 n'ajoute que `facts_checked` et
+  `facts_found`. Options écartées : la lecture seulement quand la ligne JSON la porte ; tous les
+  compteurs de la fidélité à #207. — PR de #162
+- **Le DPA de Grafana Labs est lu, non signé ; il est à signer avant tout envoi d'une donnée
+  personnelle.** Décision de Sabine du 2026-10-24. Pourquoi : le DPA (ver. 2026.04.02) ne prend effet
+  que signé par la cliente et reçu par Grafana Labs, et les mesures ne portent aucune donnée
+  personnelle (test). Option écartée : le signer avant le premier envoi. Inscrit au registre
+  (« Envoi des mesures à Grafana Cloud »). — PR de #162
+
 ## Décisions encore ouvertes
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,
