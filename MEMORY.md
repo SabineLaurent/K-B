@@ -16,6 +16,11 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 - **Binôme** : Sabine travaille avec Claude Code. Claude écrit l'essentiel du code et de la doc ;
   Sabine pilote, relit, teste et décide. Les estimations en tiennent compte : les comptes, la prise
   en main d'outils nouveaux, les décisions et la relecture ne s'accélèrent pas.
+- **Refactorisation de l'ETL** (branche `refactoring/etl`, PR du 2026-10-24) :
+  `docs/refactoring/plan.md` fait foi pour la cible et les étapes restantes (3 bis avant la mise
+  en ligne du 08/11, puis 6 à 9), une branche et une PR par étape (sa partie 6). Ce qui en est
+  acté est au journal ADR (2026-10-22 : `post/` hors de l'ETL ; 2026-10-23 : `etl/pipeline.py`,
+  porte des deux parcours pour `commands/`) et à la règle 5 de `conventions.md`.
 
 ## Estimations
 
