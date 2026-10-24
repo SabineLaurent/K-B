@@ -3,6 +3,7 @@ environment and refused without quoting the headers, the meter provider and its 
 to anything else, and the last export on stop. No network: the exporter is a fake one."""
 
 import secrets
+import uuid
 
 import pytest
 from opentelemetry.exporter.otlp.proto.http import Compression
@@ -136,6 +137,10 @@ def test_several_headers_are_read():
             {"KB_OTLP_ENDPOINT": f"https://otlp.example.net/otlp?key={TOKEN}"},
             "KB_OTLP_ENDPOINT: with a query or a fragment",
         ),
+        (
+            {"KB_OTLP_ENDPOINT": f"{ENDPOINT}/v1/metrics/"},
+            "KB_OTLP_ENDPOINT: ends with /v1/metrics, give the base URL",
+        ),
         ({"KB_OTLP_HEADERS": f"Authorization{TOKEN}"}, "KB_OTLP_HEADERS: not"),
         ({"KB_OTLP_HEADERS": f"={TOKEN}"}, "KB_OTLP_HEADERS: not"),
         ({"KB_OTLP_HEADERS": "Authorization="}, "KB_OTLP_HEADERS: not"),
@@ -166,6 +171,7 @@ def test_several_headers_are_read():
         "http",
         "user",
         "query",
+        "metrics-path",
         "no-equal",
         "no-name",
         "no-value",
@@ -250,14 +256,29 @@ def test_the_resource_names_the_service_and_the_environment_only(
     [exporter] = fake_exporters
     [metrics_data] = exporter.exported
     [resource_metrics] = metrics_data.resource_metrics
-    assert dict(resource_metrics.resource.attributes) == {
+    attributes = dict(resource_metrics.resource.attributes)
+    instance_id = attributes.pop("service.instance.id")
+    assert attributes == {
         "service.name": "k-b-ai-api",
         "deployment.environment.name": "sandbox",
     }
+    assert uuid.UUID(instance_id).version == 4
 
 
-def test_without_export_the_resource_names_the_service_only():
-    assert dict(build_resource(None).attributes) == {"service.name": "k-b-ai-api"}
+def test_each_process_gets_its_own_instance_so_its_own_series():
+    first, second = build_resource("sandbox"), build_resource("sandbox")
+
+    assert (
+        first.attributes["service.instance.id"]
+        != second.attributes["service.instance.id"]
+    )
+
+
+def test_without_export_the_resource_names_the_service_and_its_instance_only():
+    assert set(build_resource(None).attributes) == {
+        "service.name",
+        "service.instance.id",
+    }
 
 
 def test_stop_sends_the_measures_not_sent_yet(fake_exporters):

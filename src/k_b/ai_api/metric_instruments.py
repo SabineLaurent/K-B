@@ -20,16 +20,17 @@ from k_b.ai_api.connectors.metrics_export import (
 )
 from k_b.ai_api.digests import StageCall
 from k_b.ai_api.metrics import estimate_cost
-from k_b.core.config import METRICS_STOP_TIMEOUT_SECONDS
+from k_b.core.config import METRICS_STOP_TIMEOUT_SECONDS, MILLISECONDS_PER_SECOND
 
 logger = logging.getLogger(__name__)
 
 METER_NAME = "k_b.ai_api"
-MILLISECONDS_PER_SECOND = 1000
 # The operation of the conventions: K-B calls chat/completions only.
 OPERATION_NAME = "chat"
 TEXT_MODALITY = "text"
 OK_OUTCOME = "ok"
+# The last answer of the provider came: its output went through the checks.
+HTTP_OK = 200
 # The buckets of gen_ai.client.inference.duration in the conventions, in seconds; the reading of the
 # data API, an HTTP call too, takes them.
 CALL_SECONDS_BUCKETS = (
@@ -129,9 +130,12 @@ class ModelMetrics:
                 attributes
                 | {"k_b.outcome": call.outcome, "k_b.schema_valid": call.schema_valid},
             )
-            self._check_duration.record(
-                call.check_ms / MILLISECONDS_PER_SECOND, attributes
-            )
+            # A call without an answer (a timeout, a failed connection, a 5xx) ran no check: a 0
+            # would pull the duration of the checks down.
+            if call.http_status == HTTP_OK:
+                self._check_duration.record(
+                    call.check_ms / MILLISECONDS_PER_SECOND, attributes
+                )
             self._cost.add(estimate_cost(call.tokens_in, call.tokens_out), attributes)
             if stage_call.claims_removed is not None:
                 self._claims_removed.add(stage_call.claims_removed, attributes)

@@ -685,7 +685,7 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
 | `gen_ai.client.inference.usage.input_tokens` | Counter, `{token}` | `tokens_in` | `gen_ai.token.modality = text` |
 | `gen_ai.client.inference.usage.output_tokens` | Counter, `{token}` | `tokens_out`, raisonnement compris | `gen_ai.token.modality = text` |
 | `k_b.llm.calls` | Counter, `{call}` | 1 par appel | `k_b.outcome`, `k_b.schema_valid` |
-| `k_b.llm.check.duration` | Histogram, `s` | `check_ms` / 1000 | — |
+| `k_b.llm.check.duration` | Histogram, `s` | `check_ms` / 1000, pour un appel dont la dernière réponse est arrivée (HTTP 200) ; un appel sans réponse n'a passé aucun contrôle | — |
 | `k_b.llm.cost` | Counter, `{USD}` | `cost_estimated` | — |
 | `k_b.digest.claims_removed`, `k_b.digest.items_uncited` | Counter | les compteurs de la rédaction | — |
 | `k_b.digest.data_fetch.duration` | Histogram, `s` | `data_fetch_ms` / 1000 | aucun |
@@ -696,15 +696,26 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
   texte (règle 5 de `poc.md`) : des valeurs fermées, que lit un test.
 - **Noms** : ceux des conventions OpenTelemetry pour l'IA générative quand elles en ont un (statut
   *Development*, dépôt `semantic-conventions-genai`, lu le 2026-10-24), l'espace `k_b.` sinon.
+  Le paquet Python `opentelemetry-semantic-conventions` 0.66b1 (installé avec le SDK 1.45.1) a
+  encore les anciens noms (`gen_ai.client.operation.duration`, `gen_ai.client.token.usage`) : K-B
+  suit le texte des conventions, pas ce paquet ([client-inference.md](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/client-inference.md),
+  [gen-ai-token-metrics.md](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-token-metrics.md),
+  lus le 2026-10-24).
   Écart : `llm_ms` compte les deux tentatives et l'attente entre elles, là où la convention mesure
   une opération.
 - **`data_fetch`** est mesuré à chaque demande dont la lecture réussit, même sans appel au modèle
   (décision de Sabine du 2026-10-24) : la limite ci-dessus ne vaut plus que pour la ligne JSON.
-- **Ressource** : `service.name = k-b-ai-api` et `deployment.environment.name`, rien d'autre (ni
-  `host.name`, ni `process.*`, ni chemin) : construite sans `Resource.create`, qui lirait
-  l'environnement et des détecteurs.
+- **Ressource** : `service.name = k-b-ai-api`, `deployment.environment.name` et
+  `service.instance.id`, un UUID tiré au hasard par processus ; rien d'autre (ni `host.name`, ni
+  `process.*`, ni chemin) : construite sans `Resource.create`, qui lirait l'environnement et des
+  détecteurs. L'identifiant d'instance sépare deux processus qui exportent en même temps (`kb
+  serve-ai` et le test de bout en bout, deux réplicas), qui sinon écriraient les mêmes séries
+  cumulées. Chaque redémarrage ouvre donc de nouvelles séries : 89 pour une demande dont les
+  quatre appels réussissent (compte du 2026-10-24, buckets compris), davantage avec des échecs ;
+  l'offre gratuite de Grafana Cloud en compte 10 000 actives par mois.
 - **Réglages** de `kb serve-ai` : `KB_OTLP_ENDPOINT` (URL de base, `https`) et `KB_OTLP_HEADERS`
-  (paires `nom=valeur` du format OTLP), les deux ou aucun ; sans eux, rien n'est exporté.
+  (paires `nom=valeur` du format OTLP), les deux ou aucun ; sans eux, rien n'est exporté. Une URL
+  qui finit déjà par `/v1/metrics` est refusée : K-B ajoute ce chemin à l'URL de base.
   `KB_DEPLOYMENT_ENVIRONMENT` (`sandbox` ou `production`), sans défaut, est exigée avec l'export
   (décision de Sabine du 2026-10-24). D'un environnement à l'autre, ces trois réglages changent,
   aucun code. Une variable `OTEL_*` présente arrête le démarrage : le SDK la lirait sans que K-B le
@@ -717,7 +728,11 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
 envoi qui échoue y cite l'hôte et le chemin de l'URL, jamais l'en-tête, et se répète à chaque envoi
 tant que l'outil est injoignable (règle 3 de `conventions.md`). Le transport du SDK ne suit pas les
 redirections, mais compte une réponse 3xx comme un succès : les mesures seraient perdues sans
-message. La télémétrie native de FastAPI (traces, métriques HTTP) est coupée : les traces sont
+message ; le test de bout en bout ne voit donc pas ce cas, la preuve finale est la série lue dans
+Grafana. Le dernier envoi part quand uvicorn a fini les demandes en cours, jusqu'à
+`DIGEST_REQUEST_TIMEOUT_SECONDS` : `docker stop` tue le processus 10 s après SIGTERM, et les
+mesures non envoyées d'un arrêt pendant une demande seraient perdues ; le délai d'arrêt du
+conteneur relève de #200. La télémétrie native de FastAPI (traces, métriques HTTP) est coupée : les traces sont
 l'objet de #281.
 
 ## États nommés

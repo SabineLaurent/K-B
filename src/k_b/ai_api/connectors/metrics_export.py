@@ -10,6 +10,7 @@ malformed one as it is. So no OTEL_* variable is accepted at all.
 """
 
 import re
+import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
@@ -29,6 +30,7 @@ from pydantic import SecretStr
 from k_b.core.config import (
     METRICS_EXPORT_INTERVAL_SECONDS,
     METRICS_EXPORT_TIMEOUT_SECONDS,
+    MILLISECONDS_PER_SECOND,
 )
 from k_b.core.outbound import find_url_refusal
 from k_b.core.quoting import quote_value
@@ -53,7 +55,6 @@ CUMULATIVE_TEMPORALITY: dict[type, AggregationTemporality] = {
     Counter: AggregationTemporality.CUMULATIVE,
     Histogram: AggregationTemporality.CUMULATIVE,
 }
-MILLISECONDS_PER_SECOND = 1000
 
 
 @dataclass(frozen=True)
@@ -90,6 +91,9 @@ def read_metrics_export_settings_or_refusal(
     refusal = find_url_refusal(ENDPOINT_VARIABLE, endpoint, ("https",))
     if refusal is not None:
         return refusal
+    # The URL of the metrics given in place of the base: K-B would add the path a second time.
+    if endpoint.removesuffix("/").endswith(METRICS_PATH):
+        return f"{ENDPOINT_VARIABLE}: ends with {METRICS_PATH}, give the base URL"
     headers = parse_headers(headers_text)
     if headers is None:
         return (
@@ -133,10 +137,15 @@ def parse_headers(text: str) -> dict[str, SecretStr] | None:
 
 def build_resource(environment: DeploymentEnvironment | None) -> Resource:
     """The service and its environment, nothing else: built by its constructor, not by
-    Resource.create, which adds OTEL_RESOURCE_ATTRIBUTES, OTEL_SERVICE_NAME, a random
-    service.instance.id and the detectors of OTEL_EXPERIMENTAL_RESOURCE_DETECTORS (process gives
-    process.command_args and process.owner)."""
-    attributes: dict[str, str] = {"service.name": SERVICE_NAME}
+    Resource.create, which adds OTEL_RESOURCE_ATTRIBUTES, OTEL_SERVICE_NAME
+    and the detectors of OTEL_EXPERIMENTAL_RESOURCE_DETECTORS (process gives process.command_args
+    and process.owner). service.instance.id is drawn at random for each process, as
+    Resource.create does: two processes that export at once (kb serve-ai and the end-to-end test,
+    two replicas) do not write the same cumulative series. A new process opens new series."""
+    attributes: dict[str, str] = {
+        "service.name": SERVICE_NAME,
+        "service.instance.id": str(uuid.uuid4()),
+    }
     if environment is not None:
         attributes["deployment.environment.name"] = environment
     return Resource(attributes)
