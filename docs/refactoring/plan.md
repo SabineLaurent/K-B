@@ -38,6 +38,9 @@ etl/
                         # octets (une collecte, une page, un fichier de tendances)
   normalize.py          # étape du transform
   load.py               # stage 3 : une transaction, via database/writers
+  file_writing.py       # aide au load : écrire en base ce qu'un fichier lu
+                        # porte, par l'écrivain de chaque sorte
+  withdrawals.py        # aide au load : règles de retrait CISA et Zotero
   import_log.py         # aide au load : journal d'import (audit)
   pipeline.py           # parcours collecte (1) et import (2 + 3) ; porte
                         # unique des deux parcours pour commands/
@@ -118,6 +121,7 @@ Points défendables :
 | 6 | Pilote : la source Zotero en paquet extract.py / transform.py | à faire |
 | 7 | Si le pilote est validé : généraliser aux autres sources, une par commit | à décider |
 | 8 | Séparer dans Top ce qui relève de la collecte et du rendu | à faire |
+| 9 | Réduire les docstrings longues et les commentaires qui décrivent d'autres modules (décision de l'utilisatrice du 2026-10-24) | à faire, ordre non fixé |
 
 À vérifier à part : la double normalisation des clips (clipping.py),
 peut-être voulue ; les tests qui s'importent entre eux (vers conftest.py).
@@ -136,13 +140,15 @@ peut-être voulue ; les tests qui s'importent entre eux (vers conftest.py).
 
 ## 6. Méthode
 
-- Une étape par session, sur la branche refactoring/etl, avec le cycle
-  allégé décrit dans CLAUDE.md.
+- Une étape par branche et par PR vers main, selon le cycle de
+  .claude/rules/methode.md (issue, tests d'abord, revue, note par
+  /note-pedago-ls, ADR par /adr-ls) ; les étapes restantes de la partie 4
+  y restent tenues.
 - Un relevé en lecture seule avant toute décision de conception.
 - Les déplacements mécaniques sont séparés des changements de
   comportement, dans des commits distincts.
 - L'agent s'arrête au moindre conflit et le signale au lieu de le
-  contourner. Sabine relit les diffs et commite.
+  contourner. L'utilisatrice relit chaque PR et la fusionne.
 - Les documents historiques (journaling, entrées d'ADR déjà écrites,
   inventaire, orchestration) ne sont jamais réécrits.
 
@@ -205,9 +211,9 @@ qu'aucun test ne lit.
   shows it ». Séparer collecte et rendu touche donc etl/tops.py, la
   composition et post/top_sheets.py.
 - Hors étapes : le motif d'un fichier de tendances que la base refuse
-  dit encore « ranking refused by the base » (load.py:324), alors que le
-  code dit « trend » pour GH Archive et réserve « ranking » aux tops
-  GitHub. C'est un message, lu par un test (tests/etl/test_load.py) et
+  dit encore « ranking refused by the base » (write_trend_file, dans
+  etl/file_writing.py), alors que le code dit « trend » pour GH Archive
+  et réserve « ranking » aux tops GitHub. C'est un message, lu par un test (tests/etl/test_load.py) et
   écrit au journal d'import : le changer touche le code, le test et le
   journal. À traiter à part.
 - Hors étapes : release_writer.py:71-75 dépaquette fetchone() sans
@@ -249,7 +255,7 @@ l'un est écarté et l'autre reporté : il tient trois lignes.
 | 8 | L'horloge nommée qui manque à arxiv, seul à lire datetime.now(UTC) dans son fetch | à faire | hors étapes ; avec l'étape 7, qui déplace ce fetch |
 | 9 | Les trois noms de lecture d'un top (read_most_starred, read_ranking, read_top_entries) et les trois read_ranking du dépôt, de signatures différentes | à faire | étape 8 |
 | 10 | Sortir de collect_one_source le contrôle des noms de chemin | à faire | hors étapes ; avant l'étape 6, qui ajoutera le contrôle générique des entrées au même module |
-| 11 | Couper les cinq niveaux de load.py : transaction, ordre des fichiers, aiguillage par type, écriture d'un fichier, règle d'une source | à faire | hors étapes ; la partie 5 décide de ce qui reste dans le load, jamais de la façon dont le module se lit |
+| 11 | Couper les cinq niveaux de load.py : transaction, ordre des fichiers, aiguillage par type, écriture d'un fichier, règle d'une source | fait, 090ae1e (withdrawals.py) et f8b6d33 (file_writing.py) : trois modules, aucun de plus de trois niveaux | hors étapes ; la partie 5 décide de ce qui reste dans le load, jamais de la façon dont le module se lit |
 | 12 | read_trends de gh_archive : séparer la validation Pydantic des quatre contrôles de cohérence | à faire | étape 7 |
 | 13 | raw_store.py : une seule façon de nommer un fichier, les quatre fonctions à Path comprises | à faire | étape 3 bis |
 | 14 | Le paramètre last_collected_at de read_new_vulnerabilities, mort en production | reporté, voir ci-dessous | — |
