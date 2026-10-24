@@ -116,7 +116,7 @@ def read_window(
 
 
 def to_digest_schema(digest: Digest) -> DigestSchema:
-    """The digest of the response: the claims without their facts, kept for the checks."""
+    """The digest of the response: the claims the checks kept, without their facts."""
     return DigestSchema(
         subject=digest.subject,
         claims=[

@@ -387,6 +387,10 @@ DISGUISED_CVES = {
     "letters_o_for_zeros": "CVE-2026-OOO1",
     "letter_l_for_one": "CVE-2026-000l",
     "ghsa_cyrillic": "GHS" + chr(0x0410) + "-fjqc-hq36-qh5p",
+    "plural": "les CVEs 2026-0001",
+    "identifiant": "la CVE identifiant 2026-0001",
+    "ref": "la CVE réf. 2026-0001",
+    "reference": "la CVE référence 2026-0001",
 }
 
 
@@ -422,3 +426,30 @@ def test_greek_letters_next_to_latin_ones_keep_the_claim(text, value):
     fidelity = check_claim(claim(text, (value, "i2")), {"i2": GREEK_PAPER})
 
     assert fidelity.is_faithful is True
+
+
+def test_a_modifier_letter_apostrophe_keeps_the_claim():
+    """U+02BC is an apostrophe a model may write, not a lookalike of a Latin letter."""
+    fidelity = check_claim(
+        claim("China : l" + chr(0x02BC) + "équipe recrute.", ("China", TRAPPED_REF)),
+        {TRAPPED_REF: TRAPPED_ITEM},
+    )
+
+    assert fidelity.is_faithful is True
+
+
+@pytest.mark.parametrize("value", ["@user", "[url]"])
+def test_a_fact_equal_to_a_mark_put_by_k_b_is_not_found(value):
+    """The masks of a login and of a URL say nothing of the item."""
+    release = watch_item(
+        6,
+        "release",
+        repository_name="anthropics/claude-code",
+        tag_name="v2.1.287",
+        title="Claude Code 2.1.287",
+        body="Thanks @octocat, see https://github.com/anthropics/claude-code/pull/1",
+    )
+
+    fidelity = check_claim(claim(f"Voir {value} ici.", (value, "i6")), {"i6": release})
+
+    assert fidelity.facts_found == 0

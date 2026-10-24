@@ -82,7 +82,7 @@ class ModelMetrics:
         self._items_uncited = meter.create_counter(
             "k_b.digest.items_uncited",
             unit="{item}",
-            description="Items no longer cited once the claims are removed by the fidelity.",
+            description="Items no longer cited once claims are removed, by bounds or fidelity.",
         )
         self._facts_checked = meter.create_counter(
             "k_b.digest.facts_checked",

@@ -7,7 +7,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 
 from k_b.ai_api.stages.writing import Claim, Fact
-from k_b.ai_api.watch_items import WatchItem, WatchKind
+from k_b.ai_api.watch_items import MASKED_LOGIN, MASKED_URL, WatchItem, WatchKind
 from k_b.core.config import MAX_FIELD_CHARS_FOR_WRITING
 
 # Dashes U+2010 to U+2015 and the minus sign U+2212 become "-", the typographic quotes "'" and '"'.
@@ -23,21 +23,24 @@ PUNCTUATION = str.maketrans(
 BLANKS = re.compile(r"\s+")
 INVISIBLE_CATEGORY = "Cf"
 # Applied to the text of detection (to_detection_text). A separator is any run without letter nor
-# digit, between the letters of the prefix too (C.V.E.); a number word may follow the prefix
-# (CVE n°, CVE ID); o, l and i stand for digits, so that CVE-2026-OOO1 is read and never equals a
+# digit, between the letters of the prefix too (C.V.E.); a plural s and a number word may follow
+# the prefix (CVEs, CVE n°, CVE ID, CVE réf.); o, l and i stand for digits, so that CVE-2026-OOO1 is read and never equals a
 # real one. An identifier ends at a limit, as any fact: neither a letter nor a digit after it, nor
 # a . or a - followed by one. Decisions of Sabine of 2026-10-24 and of time-knight on the review of
 # #207 (docs/fiches-veille.md, "Fidélité").
 SEPARATOR = r"[\W_]*"
-NUMBER_WORD = rf"(?:(?:n|no|nr|num|numero|numéro|number|id)(?![^\W\d_]){SEPARATOR})?"
+NUMBER_WORD = (
+    r"(?:(?:n|no|nr|num|numero|numéro|number|id|identifiant|ref|réf|reference|référence)"
+    rf"(?![^\W\d_]){SEPARATOR})?"
+)
 DIGIT = r"[\doli]"
 END_LIMIT = r"(?![^\W_]|[.-][^\W_])"
 CVE = re.compile(
-    rf"c{SEPARATOR}v{SEPARATOR}e{SEPARATOR}{NUMBER_WORD}"
+    rf"c{SEPARATOR}v{SEPARATOR}e(?:s(?![^\W\d_]))?{SEPARATOR}{NUMBER_WORD}"
     rf"({DIGIT}{{4}}){SEPARATOR}({DIGIT}{{4,}}){END_LIMIT}"
 )
 GHSA = re.compile(
-    rf"g{SEPARATOR}h{SEPARATOR}s{SEPARATOR}a{SEPARATOR}{NUMBER_WORD}"
+    rf"g{SEPARATOR}h{SEPARATOR}s{SEPARATOR}a(?:s(?![^\W\d_]))?{SEPARATOR}{NUMBER_WORD}"
     rf"([0-9a-z]{{4}}){SEPARATOR}([0-9a-z]{{4}}){SEPARATOR}([0-9a-z]{{4}}){END_LIMIT}"
 )
 # The emphasis of Markdown (**, ==), removed for the detection only: CVE-2026-00**01** displays as
@@ -71,6 +74,7 @@ GREEK_LOOKALIKES = frozenset(
     )
 )
 LETTER_RUNS = re.compile(r"[^\W\d_]+")
+MODIFIER_LETTER = "Lm"
 # Added after a field cut for the writing: a letter, so that its end is not a limit (…1.2 may be
 # the start of 1.2.9).
 CUT_END = "a"
@@ -145,7 +149,12 @@ def is_disguised(text: str) -> bool:
 
 def mixes_lookalikes(word: str) -> bool:
     latin = [char for char in word if is_latin(char)]
-    others = [char for char in word if not is_latin(char)]
+    # A modifier letter (U+02BC, an apostrophe) looks like no Latin letter.
+    others = [
+        char
+        for char in word
+        if not is_latin(char) and unicodedata.category(char) != MODIFIER_LETTER
+    ]
     return bool(latin) and any(not is_free_greek(char) for char in others)
 
 
@@ -184,9 +193,11 @@ def is_fact_found(
 
 
 def to_searched_text(field: str) -> str:
-    """The field normalized; at the length of the cut, its end is not a limit."""
+    """The field normalized, without the masks K-B put in it; at the length of the cut, its end is
+    not a limit."""
     is_cut = len(field) >= MAX_FIELD_CHARS_FOR_WRITING
-    return normalize(field) + (CUT_END if is_cut else "")
+    unmasked = field.replace(MASKED_URL, " ").replace(MASKED_LOGIN, " ")
+    return normalize(unmasked) + (CUT_END if is_cut else "")
 
 
 def find_identifiers(text: str) -> Iterator[str]:

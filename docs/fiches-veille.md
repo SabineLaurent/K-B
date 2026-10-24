@@ -540,12 +540,13 @@ identifiant), et les lettres cyrilliques, grecques et petites capitales latines 
 une lettre d'un préfixe lues comme elle (`СVЕ` cyrillique se lit `cve`). Écrits sur ce texte, en
 minuscules (`ai_api/fidelity.py`, `CVE` et `GHSA`), avec `S` = `[\W_]*` :
 
-- CVE : `c S v S e S [mot de numéro S] [\doli]{4} S [\doli]{4,}` ;
-- GHSA : `g S h S s S a S [mot de numéro S] [0-9a-z]{4} S [0-9a-z]{4} S [0-9a-z]{4}`.
+- CVE : `c S v S e [s] S [mot de numéro S] [\doli]{4} S [\doli]{4,}` ;
+- GHSA : `g S h S s S a [s] S [mot de numéro S] [0-9a-z]{4} S [0-9a-z]{4} S [0-9a-z]{4}`.
 
-Un séparateur peut couper le préfixe (`C.V.E.`, `C*V*E`). Le **mot de numéro**, facultatif, est
-`n`, `no`, `nr`, `num`, `numero`, `numéro`, `number` ou `id` (`№` devient `no` par NFKC) : « la CVE
-n°2026-0001 » est une tournure française que le modèle écrit sans attaque. `o`, `l` et `i` comptent
+Un séparateur peut couper le préfixe (`C.V.E.`, `C*V*E`), et un `s` de pluriel le suivre (« les
+CVEs 2026-0001 »). Le **mot de numéro**, facultatif, est `n`, `no`, `nr`, `num`, `numero`, `numéro`,
+`number`, `id`, `identifiant`, `ref`, `réf`, `reference` ou `référence` (`№` devient `no` par
+NFKC) : « la CVE n°2026-0001 » est une tournure française que le modèle écrit sans attaque. `o`, `l` et `i` comptent
 pour des chiffres : `CVE-2026-OOO1` est lu, et n'est jamais égal à un vrai identifiant. Ces règles
 de détection sont des décisions de time-knight sur la revue de sécurité de #207 (délégation de
 Sabine du 2026-10-15) ; `AAAA-NNNN` seul n'est pas lu comme un identifiant, car `2025-2026` le
@@ -581,7 +582,9 @@ d'un chiffre). Ainsi `1.2` n'est pas trouvé dans `1.2.9`, ni `CVE-2026-1234` da
 `CVE-2026-12345`. « Lettre ou chiffre » s'entend au sens Unicode, après la normalisation : `caf`
 n'est pas trouvé dans `café`. Un champ nul (`body`, `cve_id` d'une alerte sans CVE) est sauté ;
 chaque nom de `packages` est un champ ; `cve_id` et `ghsa_id` ne servent qu'à l'égalité d'un fait
-CVE ou GHSA, jamais à la recherche d'un fait ordinaire. La fin d'un champ coupé pour la rédaction
+CVE ou GHSA, jamais à la recherche d'un fait ordinaire. Les repères que K-B pose lui-même dans les
+champs (`[url]`, `@user`, section « Entrée du modèle ») sont retirés avant la recherche : un fait
+`@user` ne dit rien de l'item (revue de #207, décision de time-knight). La fin d'un champ coupé pour la rédaction
 (2 000 caractères, `MAX_FIELD_CHARS_FOR_WRITING`) n'est pas une limite : `…1.2` coupé peut être le
 début de `1.2.9`, et `1.2` n'y est pas trouvé (revue de #207, même décision). Un champ d'exactement
 2 000 caractères est traité comme coupé, ce qui va dans le sens sûr.
@@ -594,7 +597,8 @@ et comptée (décision de time-knight sur la revue de sécurité de #207, délé
 2026-10-15). Le mot se lit avant le `casefold` : la capitale grecque `Ε` ressemble à `E`, sa
 minuscule `ε` non. Une lettre grecque qui ne ressemble pas à une lettre latine reste permise à côté
 de lettres latines, car les titres d'articles en portent (`5 µs`, que NFKC écrit avec un μ grec) ;
-`β-VAE` et `α-Fold` ne mêlent rien, le tiret séparant les mots. Cette règle porte sur l'affirmation,
+`β-VAE` et `α-Fold` ne mêlent rien, le tiret séparant les mots. Une lettre modificative (`Lm`,
+comme l'apostrophe U+02BC de `lʼéquipe`) ne ressemble à aucune lettre latine : elle est permise. Cette règle porte sur l'affirmation,
 pas sur un fait : elle n'entre pas dans le taux.
 
 **Fait sans lettre ni chiffre.** Un fait qui n'a ni lettre ni chiffre une fois normalisé (`"   "`,
@@ -649,6 +653,9 @@ n'a pas.
   faible. **Limite** : le sens de la phrase, le nombre non déclaré et la traduction ne sont
   vérifiés par aucune étape (section « Ce que la spec ne couvre pas ») ; la fidélité reste sans
   modèle.
+- **Limite assumée** : un idéogramme ou une autre lettre non latine collée à des lettres latines
+  dans un même mot (un nom de produit suivi d'un caractère chinois) retire l'affirmation, comme un
+  sosie (revue de #207, décision de time-knight) ; rare dans une fiche en français.
 - **Limite assumée** : la détection lit large, dans le sens sûr. « Le CV en 2026, 0001 candidats »
   est lu `CVE-2026-0001`, non déclaré, et retire l'affirmation ; un emoji suivi du sélecteur de
   variante U+FE0F (`Mn`) aussi.
