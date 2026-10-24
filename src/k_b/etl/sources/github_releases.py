@@ -1,9 +1,5 @@
-"""The GitHub releases source: its download (E), then its reader (T).
-
-Download the latest releases of a tracked GitHub repository, as published.
-
-Read the releases of a raw GitHub API response, and convert each one into an item.
-"""
+"""The GitHub releases source: download the latest releases of a tracked repository (E), then
+read each one into an item (T)."""
 
 import json
 import logging

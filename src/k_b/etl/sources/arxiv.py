@@ -1,9 +1,5 @@
-"""The arXiv source: its download (E), then its reader (T).
-
-Download the AI security papers submitted to arXiv, as the API returns them.
-
-Read the papers of a raw arXiv API response (an Atom feed), and convert each one into an item.
-"""
+"""The arXiv source: download the AI security papers submitted to arXiv (E), then read each paper
+of a raw Atom feed into an item (T)."""
 
 import re
 import xml.etree.ElementTree as ElementTree
@@ -76,10 +72,8 @@ class ArxivSource:
     acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
-        """Return the papers submitted since 7 days before last_collected_at; None if none.
-
-        A first collection (last_collected_at is None) reaches back to FIRST_COLLECTION_START.
-        """
+        """Return the papers submitted since 7 days before last_collected_at, or since
+        FIRST_COLLECTION_START at the first collection; None if none."""
         now = datetime.now(UTC)
         if last_collected_at is None:
             window_start = FIRST_COLLECTION_START
@@ -138,10 +132,8 @@ class Paper:
 
 
 def read_papers(raw_response: bytes) -> EntryReading[Paper]:
-    """One paper per valid entry of the feed, in the order of the response.
-
-    An invalid entry is rejected with its position, not guessed: the others are still read.
-    """
+    """One paper per valid entry of the feed, in the order of the response; an invalid entry is
+    rejected with its position."""
     entries = parse_feed(raw_response).findall(f"{ATOM}entry")
     return read_each_entry(enumerate(entries), parse_paper)
 
@@ -149,10 +141,8 @@ def read_papers(raw_response: bytes) -> EntryReading[Paper]:
 def count_papers(raw_response: bytes) -> int:
     """Count every entry, valid or not; refuse a feed that reports an API error.
 
-    Entries are validated by read_papers, not here: one malformed paper among valid ones must
-    not block the collection, whose window would keep it forever; only a page whose papers are
-    all invalid does.
-    """
+    Entries are validated by read_papers, not here: one malformed paper must not block the
+    collection, whose window would keep it forever."""
     entries = parse_feed(raw_response).findall(f"{ATOM}entry")
     for entry in entries:
         entry_id = (entry.findtext(f"{ATOM}id") or "").strip()

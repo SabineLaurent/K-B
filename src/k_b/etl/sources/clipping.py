@@ -1,12 +1,7 @@
 """The Web Clipper source: copy the clips of the user's Obsidian vault as they are (E), then read
-each clip into an item (T).
+each clip into an item of the library (T).
 
-A clip is a Markdown file the Web Clipper extension writes into the vault: a YAML frontmatter
-between two --- lines, then the text kept. The clips stay the user's: K-B reads them, never
-changes them (it writes only veille/ of the vault: kb write-tops), and copies each clip new or
-modified since the last collection under raw/selected_library/clipping/ (ADR of 2026-10-09). A
-clip is part of the library, never of the watch: no digest reads it (ai_api/watch_items.py).
-"""
+K-B never changes a clip: it writes only veille/ of the vault."""
 
 import codecs
 import hashlib
@@ -70,18 +65,14 @@ TEMPLATE_TAG = "clippings"
 
 
 class ClipTooLargeError(Exception):
-    """clip_too_large: a clip of the vault is larger than CLIP_MAX_BYTES. Nothing is copied, and
-    the last collection date stays: each collection fails again until the clip is shrunk or
-    removed from the vault. An exception to rule 1 of conventions.md, which fails a source for
-    an unreadable page only: a clip is a page, and the bound passed is shown, not silent
-    (decision of 2026-10-17)."""
+    """A clip of the vault is larger than CLIP_MAX_BYTES: nothing is copied and each collection
+    fails until it is shrunk or removed, so that the bound is never passed silently."""
 
 
 class ClippingsFolderMissingError(Exception):
-    """clippings_folder_missing: the vault has no Clippings folder, or does not exist. Not taken
-    for a vault without clips: the last collection date would move on, and the clips a mount or
-    a sync brings later, with their old dates, would never be copied (decision of 2026-10-17).
-    The message gives no path: it is a folder of the user's machine."""
+    """The vault, or its Clippings folder, is missing: not taken for a vault without clips, or
+    the clips a mount brings later with their old dates would never be copied. No path in the
+    message."""
 
 
 class ClipFile(NamedTuple):
@@ -99,13 +90,11 @@ class ClippingSource:
         self.vault_dir = vault_dir
 
     def fetch(self, last_collected_at: datetime | None) -> dict[str, bytes] | None:
-        """Return each clip changed since last_collected_at (all, at the first collection), as
-        it is, by page name; None when none was.
+        """Return each clip changed since last_collected_at (all, at the first collection), by
+        page name; None when none was.
 
-        The margin goes both ways (CLIP_CHANGE_MARGIN): a clip changed shortly before the last
-        collection is copied again; a clip changed shortly before this one, which may still be
-        written, is left to the next collection.
-        """
+        The margin goes both ways (CLIP_CHANGE_MARGIN): a clip changed just before this
+        collection, maybe still written, is left to the next one."""
         try:
             clip_files = list_clip_files(self.vault_dir / CLIPPINGS_DIR_NAME)
         except FileNotFoundError:
@@ -156,17 +145,14 @@ def current_time() -> datetime:
 
 
 def to_ns(moment: datetime) -> int:
-    """A moment in whole nanoseconds since EPOCH, as a file date: a float would round a write
-    made in the same microsecond onto it."""
+    """A moment in whole nanoseconds since EPOCH: a float would round a write of the same
+    microsecond onto it."""
     return (moment - EPOCH) // ONE_MICROSECOND * 1000
 
 
 def list_clip_files(clippings_dir: Path) -> list[ClipFile]:
-    """The clips of the folder, in name order: its Markdown files that are regular files, not
-    hidden. Its subfolders are not read, and a symbolic link is left: it could point out of the
-    vault. The change date counts with the modification date: a copy that keeps the
-    modification date (cp -p, the Finder, a sync) is a new clip; so is a change of its metadata
-    alone (chmod, a Finder tag), copied again for nothing."""
+    """The clips of the folder in name order: its regular, visible Markdown files, not its
+    subfolders nor a symbolic link, which could point out of the vault."""
     clip_files = []
     for path in sorted(clippings_dir.iterdir()):
         if path.name.startswith(".") or not path.name.endswith(CLIP_EXTENSION):
@@ -182,15 +168,14 @@ def list_clip_files(clippings_dir: Path) -> list[ClipFile]:
 
 
 def read_changed_at_ns(status: os.stat_result) -> int:
-    """The change date of a clip, at its listing and at its reading alike: the newest of its
-    modification and change dates."""
+    """The change date of a clip: the newest of its modification and change dates, as a copy (cp
+    -p, a sync) keeps the modification date."""
     return max(status.st_mtime_ns, status.st_ctime_ns)
 
 
 def read_clip_files(clip_files: list[ClipFile]) -> dict[str, bytes]:
-    """The bytes of each clip by page name. Left out and counted: a clip gone since it was
-    listed (renamed in Obsidian, a sync), whose new name is listed next time; a clip changed
-    since it was listed (a sync, an edit), which can be cut, read by the next collection."""
+    """The bytes of each clip by page name; a clip gone or changed since it was listed is left
+    out, counted, and read by the next collection."""
     clips = {}
     gone_count = changed_count = 0
     for clip_file in clip_files:
@@ -230,9 +215,8 @@ class ClipRead(NamedTuple):
 
 
 def read_clip_file(path: Path) -> ClipRead:
-    """The bytes of the clip, read once, at most one more than the maximum, with its size and
-    its change date once read. O_NOFOLLOW: a file replaced by a link since it was listed is not
-    followed."""
+    """The bytes of the clip, at most one more than the maximum, with its size and change date
+    once read; O_NOFOLLOW, so that a file replaced by a link is not followed."""
     descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
     with os.fdopen(descriptor, "rb") as clip_file:
         content = clip_file.read(CLIP_MAX_BYTES + 1)
@@ -258,9 +242,8 @@ class ClipEntry(NamedTuple):
 
 
 def read_clip(raw_clip: bytes) -> EntryReading[ClipEntry]:
-    """A clip as its only entry. A clip that is not UTF-8, without frontmatter, whose frontmatter
-    is not YAML or not a mapping cannot be read (conventions.md, rule 1). The error says where,
-    never what: the YAML error of PyYAML quotes the text around it."""
+    """A clip as its only entry, refused if not UTF-8 or without a YAML mapping as frontmatter;
+    the error says where, never what, as PyYAML quotes the text around."""
     # A byte order mark an editor adds is not part of the text, as for Obsidian; the position
     # of a byte not UTF-8 is counted from the start of the file, the mark included.
     without_mark = raw_clip.removeprefix(codecs.BOM_UTF8)
@@ -283,8 +266,8 @@ def read_clip(raw_clip: bytes) -> EntryReading[ClipEntry]:
 
 
 def split_frontmatter(text: str) -> tuple[str, str]:
-    """The frontmatter, between the first line and the next line that is ---, and the text
-    after it, as written: a --- further down is a rule of the text."""
+    """The frontmatter, between the first line and the next ---, and the text after it; a ---
+    further down is a rule of the text."""
     lines = text.splitlines(keepends=True)
     if not lines or lines[0].rstrip("\r\n") != FRONTMATTER_FENCE:
         raise ValueError("clip without frontmatter")
@@ -303,8 +286,7 @@ def describe_yaml_error(error: yaml.YAMLError) -> str:
 
 
 def find_rejection_reason(page_name: str, raw_clip: bytes) -> str | None:
-    """Why the import would reject the clip, or None: converted as the import will, the dates
-    and the path aside, since only whether it is an item counts."""
+    """Why the import would reject the clip, or None, converted as the import will."""
     try:
         for entry in read_clip(raw_clip).entries:
             convert_clip(entry, EPOCH, page_name)
@@ -332,8 +314,8 @@ ClipDay = Annotated[date, BeforeValidator(check_day_form)]
 
 
 def read_tags(value: object) -> object:
-    """The tags as a list: a text alone is one tag, an absent value none, an absent element is
-    left out. Any other value is left to pydantic, which refuses it."""
+    """The tags as a list: a text alone is one tag, an absent value none; any other value is left
+    to pydantic, which refuses it."""
     if read_absent(value) is None:
         return []
     if isinstance(value, str):
@@ -344,15 +326,14 @@ def read_tags(value: object) -> object:
 
 
 def normalize_tags(tags: tuple[str, ...]) -> tuple[str, ...]:
-    """Each tag normalized (items.py), once, sorted by name: the import is the same whatever the
-    order of the vault. The empty ones and the tag of the template are left out; Item checks
-    what is kept: its length, its characters, its form."""
+    """Each tag normalized, once, sorted by name, the empty ones and the tag of the template left
+    out."""
     return tuple(sorted({normalize_tag(tag) for tag in tags} - {"", TEMPLATE_TAG}))
 
 
 class ClipFrontmatter(BaseModel):
-    """The properties of a clip read. Not read, to keep out of the base: author (a personal
-    data, without use in the base) and description (docs/registre-traitements.md)."""
+    """The properties of a clip read; author (a personal data) and description are not read
+    (docs/registre-traitements.md)."""
 
     model_config = ConfigDict(frozen=True, extra="ignore", hide_input_in_errors=True)
 
@@ -366,11 +347,8 @@ class ClipFrontmatter(BaseModel):
 
 
 def convert_clip(entry: ClipEntry, collected_at: datetime, raw_file_path: str) -> Item:
-    """A clip as an item of the library, its text kept as written.
-
-    Refused, the error names each field and its error, never its value: a title or a text is
-    chosen by the user, and goes into the import log.
-    """
+    """A clip as an item of the library, its text as written; refused, the error never quotes a
+    value, as a title or a text goes into the import log."""
     try:
         frontmatter = ClipFrontmatter.model_validate(entry.properties)
         return Item(
