@@ -1,7 +1,7 @@
 """POST /digests: the digests of the watch of a window (docs/fiches-veille.md, "Le parcours d'une
 demande"). The window is read by the data API, classified and written by the model under the
-deadline of the request; one metric line per call; nothing is kept (.claude/rules/poc.md, rule
-7)."""
+deadline of the request; one metric line per call, and the same measures in OpenTelemetry, with
+the reading of each window; nothing is kept (.claude/rules/poc.md, rule 7)."""
 
 import logging
 import time
@@ -61,6 +61,8 @@ def post_digests(
     started = time.perf_counter()
     reading = read_window(data_api_client, since, deadline, request_id)
     data_fetch_ms = round((time.perf_counter() - started) * 1000)
+    # Each request read, a model called or not (docs/fiches-veille.md, "Métriques").
+    state.model_metrics.record_data_fetch(data_fetch_ms)
     result = build_digests(
         llm_client, state.llm_settings, reading, state.subjects, deadline
     )
@@ -78,6 +80,7 @@ def post_digests(
             items_capped=reading.items_capped,
         ),
     )
+    state.model_metrics.record_calls(state.llm_settings, result.stage_calls)
     if isinstance(result, ClassificationFailure):
         raise to_api_error(result.state, result.retry_after_seconds)
     return DigestsSchema(

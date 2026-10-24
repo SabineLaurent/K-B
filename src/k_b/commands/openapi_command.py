@@ -11,6 +11,7 @@ from pydantic import SecretStr
 from k_b.ai_api.app import create_app as create_ai_app
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.connectors.llm_settings import REPLAY_MODEL, LlmSettings
+from k_b.ai_api.metric_instruments import ModelMetrics
 from k_b.commands.exit_codes import ExitCode
 from k_b.core.config import (
     DATA_API_URL,
@@ -75,4 +76,6 @@ def describe_ai_api() -> dict[str, Any]:
         DataApiSettings(base_url=DATA_API_URL, api_key=SecretStr("")),
         DIGEST_SUBJECTS,
         DIGEST_WINDOW_DAYS,
+        # Without export: no measure leaves while the OpenAPI is written.
+        ModelMetrics.from_settings(None),
     ).openapi()
