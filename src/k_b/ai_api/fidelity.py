@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from k_b.ai_api.stages.writing import Claim, Fact
 from k_b.ai_api.watch_items import WatchItem, WatchKind
+from k_b.core.config import MAX_FIELD_CHARS_FOR_WRITING
 
 # Dashes U+2010 to U+2015 and the minus sign U+2212 become "-", the typographic quotes "'" and '"'.
 PUNCTUATION = str.maketrans(
@@ -22,9 +23,16 @@ PUNCTUATION = str.maketrans(
 BLANKS = re.compile(r"\s+")
 INVISIBLE_CATEGORY = "Cf"
 # Applied to a normalized text. A separator is any run without letter nor digit: CVE_2026_0001 is
-# a CVE too (decision of Sabine of 2026-10-24).
-CVE = re.compile(r"cve[\W_]*(\d{4})[\W_]*(\d{4,})")
-GHSA = re.compile(r"ghsa[\W_]*([0-9a-z]{4})[\W_]*([0-9a-z]{4})[\W_]*([0-9a-z]{4})")
+# a CVE too (decision of Sabine of 2026-10-24). An identifier ends at a limit, as any fact: neither
+# a letter nor a digit after it, nor a . or a - followed by one.
+END_LIMIT = r"(?![^\W_]|[.-][^\W_])"
+CVE = re.compile(rf"cve[\W_]*(\d{{4}})[\W_]*(\d{{4,}}){END_LIMIT}")
+GHSA = re.compile(
+    rf"ghsa[\W_]*([0-9a-z]{{4}})[\W_]*([0-9a-z]{{4}})[\W_]*([0-9a-z]{{4}}){END_LIMIT}"
+)
+# Added after a field cut for the writing: a letter, so that its end is not a limit (…1.2 may be
+# the start of 1.2.9).
+CUT_END = "a"
 # The fields where an ordinary fact is searched; a CVE or a GHSA only equals cve_id or ghsa_id.
 SEARCHED_FIELDS_BY_KIND: dict[WatchKind, tuple[str, ...]] = {
     "paper": ("title", "summary"),
@@ -89,8 +97,14 @@ def is_fact_found(
     if not any(char.isalnum() for char in value):
         return False
     return is_found(value, text) and any(
-        is_found(value, normalize(field)) for field in list_searched_fields(item)
+        is_found(value, to_searched_text(field)) for field in list_searched_fields(item)
     )
+
+
+def to_searched_text(field: str) -> str:
+    """The field normalized; at the length of the cut, its end is not a limit."""
+    is_cut = len(field) >= MAX_FIELD_CHARS_FOR_WRITING
+    return normalize(field) + (CUT_END if is_cut else "")
 
 
 def find_identifiers(text: str) -> Iterator[str]:

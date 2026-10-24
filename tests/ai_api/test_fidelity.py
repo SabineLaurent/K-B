@@ -9,6 +9,7 @@ import pytest
 from k_b.ai_api.fidelity import check_claim, is_found, normalize
 from k_b.ai_api.stages.writing import Claim
 from k_b.ai_api.watch_items import WatchItem, build_fields
+from k_b.core.config import MAX_FIELD_CHARS_FOR_WRITING
 from k_b.etl.sources.tldr import read_articles
 
 # Characters written by their code point, never as an escape in the source (MEMORY.md).
@@ -279,3 +280,65 @@ def test_every_fact_is_counted_even_after_one_is_not_found():
         2,
         False,
     )
+
+
+def test_a_list_of_years_after_cve_is_read_as_an_identifier_not_declared():
+    """A known false positive, on the safe side: CVE-2025-2026 is not declared, the claim is
+    removed (docs/fiches-veille.md, "Fidélité", limits)."""
+    fidelity = check_claim(
+        claim("Les CVE 2025, 2026 et 2027 touchent Apple.", ("Apple", "i3")),
+        ITEM_BY_REF,
+    )
+
+    assert (fidelity.facts_found, fidelity.is_faithful) == (1, False)
+
+
+@pytest.mark.parametrize(
+    ("text", "fact"),
+    [
+        ("Apple publie GHSA-fjqc-hq36-qh5pxx.", "GHSA-fjqc-hq36-qh5p"),
+        ("Apple publie CVE-2026-86950abc.", "CVE-2026-86950"),
+        ("Apple publie CVE-2026-86950.7.", "CVE-2026-86950"),
+    ],
+    ids=["ghsa_longer", "cve_with_letters", "cve_with_a_dot_and_digit"],
+)
+def test_an_identifier_of_the_text_ends_at_a_limit(text, fact):
+    """The text shows another string than the identifier declared: the fact is not in it."""
+    item_by_ref = {"i3": VULNERABILITY, "i9": ADVISORY}
+    ref = "i9" if fact.startswith("GHSA") else "i3"
+
+    fidelity = check_claim(claim(text, (fact, ref)), item_by_ref)
+
+    assert fidelity.facts_found == 0
+
+
+def test_the_end_of_a_field_cut_for_the_writing_is_not_a_limit():
+    """Cut at MAX_FIELD_CHARS_FOR_WRITING, '…1.2' may be the start of 1.2.9: 1.2 is not found."""
+    body = "x" * (MAX_FIELD_CHARS_FOR_WRITING - len(" 1.2")) + " 1.2"
+    release = watch_item(
+        6,
+        "release",
+        repository_name="anthropics/claude-code",
+        tag_name="v2.1.287",
+        title="Claude Code 2.1.287",
+        body=body,
+    )
+
+    fidelity = check_claim(claim("Version 1.2.", ("1.2", "i6")), {"i6": release})
+
+    assert fidelity.facts_found == 0
+
+
+def test_the_end_of_a_field_shorter_than_the_cut_is_a_limit():
+    release = watch_item(
+        6,
+        "release",
+        repository_name="anthropics/claude-code",
+        tag_name="v2.1.287",
+        title="Claude Code 2.1.287",
+        body="upgrade to 1.2",
+    )
+
+    fidelity = check_claim(claim("Version 1.2.", ("1.2", "i6")), {"i6": release})
+
+    assert fidelity.facts_found == 1

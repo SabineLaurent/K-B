@@ -542,7 +542,10 @@ apostrophes et guillemets typographiques (U+2018, U+2019, U+201C, U+201D) ramen�
 Un séparateur est toute suite sans lettre ni chiffre (décision de Sabine du 2026-10-24, plan de
 #207) : avec `[\s-]*`, `CVE_2026_0001` ou `CVE.2026.0001` n'était pas un motif ; déclaré en fait,
 il devenait un fait ordinaire, trouvé si un item piégé l'écrivait ainsi, et le piège de #206
-passait sous cette écriture.
+passait sous cette écriture. Un identifiant de la phrase finit à une limite, comme tout fait (ni
+lettre ni chiffre après lui, ni `.` ou `-` suivi d'une lettre ou d'un chiffre) : `GHSA-fjqc-hq36-qh5pxx`
+ou `CVE-2026-86950abc` ne sont pas lus comme `GHSA-fjqc-hq36-qh5p` et `CVE-2026-86950` (revue de
+#207, tranchée par time-knight, délégation de Sabine du 2026-10-15).
 
 Un fait qui **contient** l'un de ces motifs est un fait CVE ou GHSA, quelle que soit son écriture
 (`cve 2026-1234` compris). Il doit être **égal**, une fois ramené à sa forme canonique
@@ -566,7 +569,10 @@ d'un chiffre). Ainsi `1.2` n'est pas trouvé dans `1.2.9`, ni `CVE-2026-1234` da
 `CVE-2026-12345`. « Lettre ou chiffre » s'entend au sens Unicode, après la normalisation : `caf`
 n'est pas trouvé dans `café`. Un champ nul (`body`, `cve_id` d'une alerte sans CVE) est sauté ;
 chaque nom de `packages` est un champ ; `cve_id` et `ghsa_id` ne servent qu'à l'égalité d'un fait
-CVE ou GHSA, jamais à la recherche d'un fait ordinaire.
+CVE ou GHSA, jamais à la recherche d'un fait ordinaire. La fin d'un champ coupé pour la rédaction
+(2 000 caractères, `MAX_FIELD_CHARS_FOR_WRITING`) n'est pas une limite : `…1.2` coupé peut être le
+début de `1.2.9`, et `1.2` n'y est pas trouvé (revue de #207, même décision). Un champ d'exactement
+2 000 caractères est traité comme coupé, ce qui va dans le sens sûr.
 
 **Fait sans lettre ni chiffre.** Un fait qui n'a ni lettre ni chiffre une fois normalisé (`"   "`,
 trois U+200B) n'est pas trouvé (décision de Sabine du 2026-10-24, plan de #207) : sa chaîne vide ou
@@ -620,6 +626,9 @@ n'a pas.
   faible. **Limite** : le sens de la phrase, le nombre non déclaré et la traduction ne sont
   vérifiés par aucune étape (section « Ce que la spec ne couvre pas ») ; la fidélité reste sans
   modèle.
+- **Limite assumée** : un motif CVE peut joindre deux nombres d'une liste (« les CVE 2025, 2026 et
+  2027 » se lit `CVE-2025-2026`) ; non déclaré, il retire l'affirmation, ce qui va dans le sens sûr
+  (revue de #207, même décision ; un test le fige).
 - **Limite assumée** : un motif GHSA peut être un faux positif dans une phrase française (« les
   GHSA dont deux sont critiques » : quatre lettres, trois fois) ; non déclaré, il retire
   l'affirmation, ce qui va dans le sens sûr.

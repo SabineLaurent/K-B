@@ -281,10 +281,9 @@ def to_digest(
     cited_by_model = cited_refs(output.claims)
     cited_kept = cited_refs(kept)
     uncited = cited_by_model - cited_kept
-    item_id_by_ref = {ref: item.item_id for ref, item in item_by_ref.items()}
     return Digest(
         subject=subject,
-        claims=tuple(to_digest_claim(claim, item_id_by_ref) for claim in kept),
+        claims=tuple(to_digest_claim(claim, item_by_ref) for claim in kept),
         sources=tuple(
             to_source(item)
             for item in items_sent
@@ -308,10 +307,10 @@ def cited_refs(claims: Iterable[Claim]) -> set[str]:
     return {ref for claim in claims for ref in claim.item_ids}
 
 
-def to_digest_claim(claim: Claim, item_id_by_ref: Mapping[str, int]) -> DigestClaim:
+def to_digest_claim(claim: Claim, item_by_ref: Mapping[str, WatchItem]) -> DigestClaim:
     return DigestClaim(
         text=claim.text,
-        item_ids=tuple(item_id_by_ref[ref] for ref in claim.item_ids),
+        item_ids=tuple(item_by_ref[ref].item_id for ref in claim.item_ids),
     )
 
 
