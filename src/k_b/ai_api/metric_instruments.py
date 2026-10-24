@@ -29,8 +29,6 @@ METER_NAME = "k_b.ai_api"
 OPERATION_NAME = "chat"
 TEXT_MODALITY = "text"
 OK_OUTCOME = "ok"
-# The last answer of the provider came: its output went through the checks.
-HTTP_OK = 200
 # The buckets of gen_ai.client.inference.duration in the conventions, in seconds; the reading of the
 # data API, an HTTP call too, takes them.
 CALL_SECONDS_BUCKETS = (
@@ -130,9 +128,9 @@ class ModelMetrics:
                 attributes
                 | {"k_b.outcome": call.outcome, "k_b.schema_valid": call.schema_valid},
             )
-            # A call without an answer (a timeout, a failed connection, a 5xx) ran no check: a 0
-            # would pull the duration of the checks down.
-            if call.http_status == HTTP_OK:
+            # A call none of whose outputs was checked (a timeout, a 5xx, an unreadable answer)
+            # has a check_ms of 0 that measures nothing: it would pull the durations down.
+            if call.is_checked:
                 self._check_duration.record(
                     call.check_ms / MILLISECONDS_PER_SECOND, attributes
                 )

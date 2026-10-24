@@ -144,6 +144,9 @@ class LlmCall[OutputT: BaseModel]:
     # The attempts and the wait between them: the time of the call, seen by the request.
     llm_ms: int
     check_ms: int
+    # Whether an attempt reached the checks of its output: check_ms of a call without it is a 0
+    # that measures nothing (the metrics of #162 leave it out).
+    is_checked: bool
     retry_after_seconds: int | None
     # None when no answer came: a timeout, a failed connection.
     http_status: int | None
@@ -164,6 +167,8 @@ class Attempt[OutputT: BaseModel]:
     failed_check: FailedCheck | None = None
     usage: Usage | None = None
     check_seconds: float = 0.0
+    # Set by check_completion alone: the output of this attempt went through the checks.
+    is_checked: bool = False
     retry_after_seconds: int | None = None
     http_status: int | None = None
     # None: no retry. 0: a retry at once, after an output refused; else the wait before it.
@@ -422,6 +427,7 @@ def check_completion[OutputT: BaseModel](
             failed_check=failed_check,
             usage=completion.usage,
             check_seconds=time.perf_counter() - started,
+            is_checked=True,
             retry_wait_seconds=0 if is_retried else None,
         )
 
@@ -451,6 +457,7 @@ def check_completion[OutputT: BaseModel](
         schema_valid=True,
         usage=completion.usage,
         check_seconds=time.perf_counter() - started,
+        is_checked=True,
     )
 
 
@@ -481,6 +488,7 @@ def summarize[OutputT: BaseModel](
         input_chars=input_chars,
         llm_ms=round((elapsed_seconds - check_seconds) * 1000),
         check_ms=round(check_seconds * 1000),
+        is_checked=any(attempt.is_checked for attempt in attempts),
         retry_after_seconds=last.retry_after_seconds,
         http_status=last.http_status,
         saw_rate_limit=any(

@@ -3992,7 +3992,10 @@ appliquent « Squelette E1 E3 : cadrage du 20/10 », décision 4.
 - **OpenTelemetry ne s'importe que dans `ai_api/connectors/metrics_export.py` et
   `ai_api/metric_instruments.py` ; l'app, le routeur et les commandes ne voient que `ModelMetrics`
   (enregistrer, arrêter). Un test d'architecture le tient.** Décision de Sabine du 2026-10-24,
-  ajoutée au plan. Pourquoi de Sabine : non consigné ; déduction, à confirmer : les règles de
+  ajoutée au plan, sur la recommandation de time-knight (« je suis tes recommandations »).
+  Pourquoi de Sabine, le 24/10 vers 10:00 UTC : « On avait parlé d'une façon de faire qui
+  limitait la "pollution" du code par opentelemetry ». La règle est tenue par un test, selon sa
+  règle d'harmonisation : une règle par sujet, tenue par un test. Conséquence : les règles de
   l'export (refus des `OTEL_*`, ressource fermée, session HTTP sans l'environnement) restent en un
   seul endroit. `requests`, client de l'exporteur, est tenu de même dans `metrics_export.py`. —
   PR de #162

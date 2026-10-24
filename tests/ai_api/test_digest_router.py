@@ -704,6 +704,27 @@ def test_a_measure_carries_closed_attributes_never_a_text(make_ai_api, metric_re
     assert response.json()["request_id"] not in values
 
 
+def test_a_call_checked_then_retried_without_answer_measures_its_check(
+    make_ai_api, metric_reader
+):
+    client, _ = make_ai_api(
+        [
+            classified(),
+            completion("not JSON"),
+            {"kind": "timeout"},
+            written(AGENT_CLAIM),
+            written(),
+        ]
+    )
+
+    post_digests(client)
+
+    points = read_metric_points(metric_reader)
+    assert (
+        find_point(points, "k_b.llm.check.duration", **{"k_b.stage": "write"})[0] == 3
+    )
+
+
 def test_a_call_without_answer_measures_no_check(make_ai_api, metric_reader):
     client, _ = make_ai_api(
         [classified(), {"kind": "timeout"}, written(AGENT_CLAIM), written()]

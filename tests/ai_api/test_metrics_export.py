@@ -4,6 +4,7 @@ to anything else, and the last export on stop. No network: the exporter is a fak
 
 import io
 import logging
+import math
 import secrets
 import uuid
 
@@ -17,12 +18,13 @@ from opentelemetry.sdk.metrics.export import (
     MetricExporter,
     MetricExportResult,
     MetricsData,
+    PeriodicExportingMetricReader,
 )
 from pydantic import SecretStr
 
 from k_b.ai_api.connectors import metrics_export
 from k_b.ai_api.connectors.metrics_export import (
-    EXPORTER_LOGGER,
+    EXPORTER_LOGGERS,
     MetricsExportSettings,
     build_meter_provider,
     build_resource,
@@ -146,6 +148,14 @@ def test_several_headers_are_read():
             {"KB_OTLP_ENDPOINT": f"{ENDPOINT}/v1/metrics/"},
             "KB_OTLP_ENDPOINT: ends with /v1/metrics, give the base URL",
         ),
+        (
+            {"KB_OTLP_ENDPOINT": f"{ENDPOINT}/v1/metrics//"},
+            "KB_OTLP_ENDPOINT: ends with /v1/metrics, give the base URL",
+        ),
+        (
+            {"KB_OTLP_ENDPOINT": f"{ENDPOINT}/V1/Metrics"},
+            "KB_OTLP_ENDPOINT: ends with /v1/metrics, give the base URL",
+        ),
         ({"KB_OTLP_HEADERS": f"Authorization{TOKEN}"}, "KB_OTLP_HEADERS: not"),
         ({"KB_OTLP_HEADERS": f"={TOKEN}"}, "KB_OTLP_HEADERS: not"),
         ({"KB_OTLP_HEADERS": "Authorization="}, "KB_OTLP_HEADERS: not"),
@@ -177,6 +187,8 @@ def test_several_headers_are_read():
         "user",
         "query",
         "metrics-path",
+        "metrics-path-two-slashes",
+        "metrics-path-case",
         "no-equal",
         "no-name",
         "no-value",
@@ -270,7 +282,7 @@ def test_the_resource_names_the_service_and_the_environment_only(
     assert uuid.UUID(instance_id).version == 4
 
 
-def test_each_process_gets_its_own_instance_so_its_own_series():
+def test_each_build_draws_its_own_instance():
     first, second = build_resource("sandbox"), build_resource("sandbox")
 
     assert (
@@ -336,10 +348,54 @@ def test_a_failed_export_is_logged_with_its_reason_quoted(monkeypatch, caplog):
 
     assert result is MetricExportResult.FAILURE
     [record] = [
-        record for record in caplog.records if record.name == EXPORTER_LOGGER.name
+        record for record in caplog.records if record.name == EXPORTER_LOGGERS[0].name
     ]
     message = record.getMessage()
     assert "'Bad\\rRequest\\x1b[31m'" in message
     assert "\r" not in message
     assert "\x1b" not in message
     assert TOKEN not in message
+
+
+class RaisingExporter(FakeExporter):
+    """An exporter whose export raises, with a CR in the message of its error."""
+
+    def export(self, metrics_data, timeout_millis=10_000, **kwargs):
+        raise RuntimeError(f"refused\r{TOKEN}")
+
+
+def test_an_error_of_the_reader_is_logged_by_its_type_without_its_traceback(caplog):
+    metrics_export.build_exporter(SETTINGS)  # sets the filters, sends nothing
+    reader = PeriodicExportingMetricReader(
+        RaisingExporter(), export_interval_millis=math.inf
+    )
+    model_metrics = ModelMetrics(MeterProvider(metric_readers=[reader]))
+    model_metrics.record_data_fetch(120)
+
+    # Without a thread (an infinite interval), force_flush collects and exports at once.
+    with caplog.at_level(logging.ERROR):
+        reader.force_flush()
+
+    [record] = [
+        record for record in caplog.records if record.name == EXPORTER_LOGGERS[1].name
+    ]
+    assert record.getMessage() == "Exception while exporting metrics (RuntimeError)"
+    assert record.exc_info is None
+    assert TOKEN not in caplog.text
+    assert "\r" not in caplog.text
+
+
+def test_a_mapping_of_arguments_is_quoted():
+    record = logging.LogRecord(
+        "name",
+        logging.ERROR,
+        "path",
+        1,
+        "reason %(reason)s",
+        ({"reason": "a\rb"},),
+        None,
+    )
+
+    metrics_export.QUOTING_FILTER.filter(record)
+
+    assert record.getMessage() == "reason 'a\\rb'"

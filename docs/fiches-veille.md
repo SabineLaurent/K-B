@@ -685,7 +685,7 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
 | `gen_ai.client.inference.usage.input_tokens` | Counter, `{token}` | `tokens_in` | `gen_ai.token.modality = text` |
 | `gen_ai.client.inference.usage.output_tokens` | Counter, `{token}` | `tokens_out`, raisonnement compris | `gen_ai.token.modality = text` |
 | `k_b.llm.calls` | Counter, `{call}` | 1 par appel | `k_b.outcome`, `k_b.schema_valid` |
-| `k_b.llm.check.duration` | Histogram, `s` | `check_ms` / 1000, pour un appel dont la dernière réponse est arrivée (HTTP 200) ; un appel sans réponse n'a passé aucun contrôle | — |
+| `k_b.llm.check.duration` | Histogram, `s` | `check_ms` / 1000, pour un appel dont une tentative au moins a passé les contrôles (`LlmCall.is_checked`) ; un délai, un 5xx ou une réponse illisible n'en passent aucun | — |
 | `k_b.llm.cost` | Counter, `{USD}` | `cost_estimated` | — |
 | `k_b.digest.claims_removed`, `k_b.digest.items_uncited` | Counter | les compteurs de la rédaction | — |
 | `k_b.digest.data_fetch.duration` | Histogram, `s` | `data_fetch_ms` / 1000 | aucun |
@@ -724,10 +724,13 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
   uvicorn relance le SIGTERM ; chaque envoi attend 5 s au plus. La session HTTP de l'exporteur ne
   lit ni proxy, ni certificat, ni `.netrc` de l'environnement (`core/outbound.py`).
 
-**Journaux de l'exporteur** : ses lignes passent par le journal de `kb serve-ai`. Un filtre posé
-sur le journal de l'exporteur (`QuotingFilter`, `ai_api/connectors/metrics_export.py`) cite chaque
-texte par `quote_value` (la phrase d'état du serveur, qui peut porter un CR ou un caractère de
-contrôle) et chaque exception par son type (règle 3 de `conventions.md`) ; la ligne reste.
+**Journaux de l'exporteur** : ses lignes et celles du lecteur périodique passent par le journal
+de `kb serve-ai`. Un filtre posé sur ces deux journaux (`QuotingFilter`,
+`ai_api/connectors/metrics_export.py`) cite chaque texte par `quote_value` (la phrase d'état du
+serveur, qui peut porter un CR ou un caractère de contrôle), chaque exception par son type, et
+remplace une trace d'exception par le type de l'exception (règle 3 de `conventions.md`) ; la ligne
+reste. Il cite aussi les mots fixes du SDK (`'metrics'`) : une règle simple plutôt qu'une liste de
+positions d'arguments propre à une version du SDK.
 
 **Limites** : un envoi qui échoue cite le code HTTP et la phrase d'état, jamais l'en-tête, et se
 répète à chaque envoi tant que l'outil est injoignable ; le message de la ligne reste celui du

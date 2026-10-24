@@ -36,9 +36,13 @@ from k_b.core.config import (
 from k_b.core.outbound import find_url_refusal
 from k_b.core.quoting import quote_value
 
-# The log of the exporter: its failures quote the reason phrase of the endpoint and the text of an
-# exception, which may hold a CR or a control character.
-EXPORTER_LOGGER = logging.getLogger(OTLPMetricExporter.__module__)
+# The logs of the exporter and of the reader that calls it: their failures quote the reason phrase
+# of the endpoint, the text of an exception or its traceback, which may hold a CR or a control
+# character. By the module of each class: the reader lives in a private module of the SDK.
+EXPORTER_LOGGERS = (
+    logging.getLogger(OTLPMetricExporter.__module__),
+    logging.getLogger(PeriodicExportingMetricReader.__module__),
+)
 
 ENDPOINT_VARIABLE = "KB_OTLP_ENDPOINT"
 HEADERS_VARIABLE = "KB_OTLP_HEADERS"
@@ -97,7 +101,7 @@ def read_metrics_export_settings_or_refusal(
     if refusal is not None:
         return refusal
     # The URL of the metrics given in place of the base: K-B would add the path a second time.
-    if endpoint.removesuffix("/").endswith(METRICS_PATH):
+    if endpoint.rstrip("/").casefold().endswith(METRICS_PATH):
         return f"{ENDPOINT_VARIABLE}: ends with {METRICS_PATH}, give the base URL"
     headers = parse_headers(headers_text)
     if headers is None:
@@ -116,7 +120,7 @@ def read_metrics_export_settings_or_refusal(
             f" {' nor '.join(DEPLOYMENT_ENVIRONMENTS)}"
         )
     return MetricsExportSettings(
-        endpoint=endpoint.removesuffix("/") + METRICS_PATH,
+        endpoint=endpoint.rstrip("/") + METRICS_PATH,
         headers=headers,
         environment=environment,
     )
@@ -177,11 +181,22 @@ def build_meter_provider(settings: MetricsExportSettings | None) -> MeterProvide
 
 class QuotingFilter(logging.Filter):
     """The values of a line of the exporter quoted as K-B quotes them (conventions.md, rule 3): a
-    text by quote_value, an exception by its type. The line is kept: a failure stays visible."""
+    text by quote_value, an exception by its type, its traceback by the type of the exception.
+    The line is kept: a failure stays visible."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.args, tuple):
             record.args = tuple(quote_argument(argument) for argument in record.args)
+        elif isinstance(record.args, Mapping):
+            record.args = {
+                name: quote_argument(argument) for name, argument in record.args.items()
+            }
+        if record.exc_info:
+            _, error, _ = record.exc_info
+            if error is not None:
+                record.msg = f"{record.msg} ({type(error).__name__})"
+            record.exc_info = None
+            record.exc_text = None
         return True
 
 
@@ -200,10 +215,11 @@ def build_exporter(settings: MetricsExportSettings) -> OTLPMetricExporter:
     """The OTLP exporter over HTTP: every option given, and an HTTP session that reads neither a
     proxy, a certificate nor a .netrc of the environment (core/outbound.py). The transport of the
     SDK follows no redirection, but counts a 3xx as a success."""
-    # On the logger of the exporter itself: a filter on the logger "opentelemetry" does not see
-    # the lines of its children.
-    if QUOTING_FILTER not in EXPORTER_LOGGER.filters:
-        EXPORTER_LOGGER.addFilter(QUOTING_FILTER)
+    # On the loggers themselves: a filter on the logger "opentelemetry" does not see the lines of
+    # its children.
+    for logger in EXPORTER_LOGGERS:
+        if QUOTING_FILTER not in logger.filters:
+            logger.addFilter(QUOTING_FILTER)
     session = requests.Session()
     session.trust_env = False
     return OTLPMetricExporter(
