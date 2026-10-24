@@ -54,12 +54,18 @@ def collect_e2e_dir(*options):
     return ids, result.stdout, result.returncode
 
 
+# The end-to-end tests that are not of a source: the export of the metrics (tests/e2e/
+# test_real_export.py, #162).
+END_TO_END_TESTS_BEYOND_THE_SOURCES = 1
+
+
 def check_every_end_to_end_test_left_out(*options):
     ids, output, exit_code = collect_e2e_dir(*options)
 
     assert ids == []
     assert exit_code == NO_TESTS_COLLECTED
-    assert f"{len(SOURCE_KINDS)} deselected" in output
+    deselected = len(SOURCE_KINDS) + END_TO_END_TESTS_BEYOND_THE_SOURCES
+    assert f"{deselected} deselected" in output
 
 
 def test_pytest_without_m_leaves_out_every_end_to_end_test():
@@ -260,10 +266,10 @@ def test_a_report_outside_the_repository_is_written(tmp_path, tmp_path_factory):
 
 
 def load_end_to_end_module():
-    """The module of the end-to-end tests, loaded by its path: tests/e2e/ is not a package. Its
-    fixtures are not used here."""
+    """The conftest of the end-to-end tests, which holds their guard, loaded by its path:
+    tests/e2e/ is not a package. Its fixture is not used here."""
     spec = importlib.util.spec_from_file_location(
-        "end_to_end_tests", E2E_DIR / "test_real_sources.py"
+        "end_to_end_tests", E2E_DIR / "conftest.py"
     )
     assert spec is not None
     assert spec.loader is not None

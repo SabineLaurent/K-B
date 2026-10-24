@@ -670,6 +670,56 @@ modèle, un titre, un auteur, une clé (règle 5 de `poc.md`). Un échec `data_a
 aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), avec le
 `request_id`.
 
+### Les mêmes mesures en OpenTelemetry (#162)
+
+Les mesures de chaque appel partent aussi en métriques OpenTelemetry, exportées en OTLP (HTTP,
+protobuf, gzip) vers Grafana Cloud, en région UE (journal ADR, 2026-10-20, « Squelette E1 E3 »,
+décision 4). La ligne JSON reste : l'export s'y ajoute. Le code est dans
+`ai_api/metric_instruments.py` (les instruments, `ModelMetrics`) et
+`ai_api/connectors/metrics_export.py` (les réglages, le fournisseur de mesures) ; OpenTelemetry
+n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
+
+| Instrument | Type, unité | Valeur | Attributs propres |
+|---|---|---|---|
+| `gen_ai.client.inference.duration` | Histogram, `s` | `llm_ms` / 1000 | `error.type` = `outcome` hors `ok` |
+| `gen_ai.client.inference.usage.input_tokens` | Counter, `{token}` | `tokens_in` | `gen_ai.token.modality = text` |
+| `gen_ai.client.inference.usage.output_tokens` | Counter, `{token}` | `tokens_out`, raisonnement compris | `gen_ai.token.modality = text` |
+| `k_b.llm.calls` | Counter, `{call}` | 1 par appel | `k_b.outcome`, `k_b.schema_valid` |
+| `k_b.llm.check.duration` | Histogram, `s` | `check_ms` / 1000 | — |
+| `k_b.llm.cost` | Counter, `{USD}` | `cost_estimated` | — |
+| `k_b.digest.claims_removed`, `k_b.digest.items_uncited` | Counter | les compteurs de la rédaction | — |
+| `k_b.digest.data_fetch.duration` | Histogram, `s` | `data_fetch_ms` / 1000 | aucun |
+
+- **Attributs communs** aux mesures d'un appel : `gen_ai.operation.name = chat`,
+  `gen_ai.provider.name` (`openai_compatible` ou `replay`, ce que K-B sait),
+  `gen_ai.request.model`, `k_b.stage`. Jamais le sujet, le `request_id`, un titre, un auteur ni un
+  texte (règle 5 de `poc.md`) : des valeurs fermées, que lit un test.
+- **Noms** : ceux des conventions OpenTelemetry pour l'IA générative quand elles en ont un (statut
+  *Development*, dépôt `semantic-conventions-genai`, lu le 2026-10-24), l'espace `k_b.` sinon.
+  Écart : `llm_ms` compte les deux tentatives et l'attente entre elles, là où la convention mesure
+  une opération.
+- **`data_fetch`** est mesuré à chaque demande dont la lecture réussit, même sans appel au modèle
+  (décision de Sabine du 2026-10-24) : la limite ci-dessus ne vaut plus que pour la ligne JSON.
+- **Ressource** : `service.name = k-b-ai-api` et `deployment.environment.name`, rien d'autre (ni
+  `host.name`, ni `process.*`, ni chemin) : construite sans `Resource.create`, qui lirait
+  l'environnement et des détecteurs.
+- **Réglages** de `kb serve-ai` : `KB_OTLP_ENDPOINT` (URL de base, `https`) et `KB_OTLP_HEADERS`
+  (paires `nom=valeur` du format OTLP), les deux ou aucun ; sans eux, rien n'est exporté.
+  `KB_DEPLOYMENT_ENVIRONMENT` (`sandbox` ou `production`), sans défaut, est exigée avec l'export
+  (décision de Sabine du 2026-10-24). D'un environnement à l'autre, ces trois réglages changent,
+  aucun code. Une variable `OTEL_*` présente arrête le démarrage : le SDK la lirait sans que K-B le
+  sache, et relit l'en-tête même quand K-B le lui passe.
+- **Envoi** : toutes les 60 s, et un dernier à l'arrêt, dans le `lifespan` de l'app, avant que
+  uvicorn relance le SIGTERM ; chaque envoi attend 5 s au plus. La session HTTP de l'exporteur ne
+  lit ni proxy, ni certificat, ni `.netrc` de l'environnement (`core/outbound.py`).
+
+**Limites** : les journaux du SDK passent par le journal de `kb serve-ai`, en texte libre ; un
+envoi qui échoue y cite l'hôte et le chemin de l'URL, jamais l'en-tête, et se répète à chaque envoi
+tant que l'outil est injoignable (règle 3 de `conventions.md`). Le transport du SDK ne suit pas les
+redirections, mais compte une réponse 3xx comme un succès : les mesures seraient perdues sans
+message. La télémétrie native de FastAPI (traces, métriques HTTP) est coupée : les traces sont
+l'objet de #281.
+
 ## États nommés
 
 | État | Quand | Le classement échoue (toute la demande) | La rédaction d'un sujet échoue |
