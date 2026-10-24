@@ -1,5 +1,4 @@
-"""The reading of the watch by the data API (docs/fiches-veille.md, "Lecture plafonnée" and
-"États nommés"): against the real data API on the test base of the readers, and against a
+"""The reading of the watch by the data API: against the real data API on the test base, and a
 simulated transport for the answers the base cannot give."""
 
 import json
@@ -46,9 +45,8 @@ def far_deadline():
 
 @pytest.fixture
 def data_api(items_database):
-    """The data API on the test base, its client AI_DIGEST holding the key of the test. Its
-    TestClient is an httpx2.Client: read_watch takes it as it takes the client of the settings.
-    localhost, since TrustedHostMiddleware refuses the testserver host of TestClient."""
+    """The data API on the test base, its client AI_DIGEST holding the test key; on localhost, as
+    TrustedHostMiddleware refuses the testserver host of TestClient."""
     client = TestClient(
         create_app(items_database, {"AI_DIGEST": SecretStr(TEST_API_KEY)}),
         base_url="http://localhost",
@@ -84,8 +82,8 @@ def test_the_reading_gives_the_items_of_the_whitelist_in_the_order_of_the_spec(
 
 
 def test_a_clip_is_of_the_library_and_never_read_for_the_watch(data_api):
-    """A clip is in the test base (item 18): the reading asks neither its kind nor its detail
-    (decision of Sabine of 2026-10-15, recalled on 2026-10-17)."""
+    """A clip is of the library (item 18 of the test base): the reading asks neither its kind nor
+    its detail."""
     queries = []
     data_api.event_hooks["request"].append(
         lambda request: queries.append(dict(request.url.params))
@@ -283,8 +281,8 @@ def answer(status=200, body=None, headers=None):
 
 
 def simulate(answer_detail=None, answer_list=None):
-    """A data API that lists paper 2 alone, and answers its detail with answer_detail; every
-    request is kept."""
+    """A data API that lists paper 2 alone and answers its detail with answer_detail, keeping
+    every request."""
     requests = []
 
     def handle(request):

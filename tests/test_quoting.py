@@ -70,8 +70,7 @@ class Counts(BaseModel):
 
 
 def test_a_place_that_comes_from_the_input_is_quoted_cut_and_escaped():
-    """A key of a dict comes from the input: never written as it is (second code review,
-    finding 7)."""
+    """A key of a dict comes from the input: never written as it is."""
     with pytest.raises(ValidationError) as refusal:
         Counts.model_validate({"by_name": {"a\nERROR forged": "x"}})
 

@@ -89,7 +89,7 @@ def test_a_key_refused_is_never_quoted(key, refusal):
 
 
 def test_the_key_sent_is_the_one_kb_serve_reads_for_its_client_ai_digest():
-    """One variable for both sides, formed from the prefix kb serve reads (review of #247)."""
+    """One variable for both sides, formed from the prefix kb serve reads."""
     api_keys = read_api_keys_or_refusal(
         {DATA_API_KEY_VARIABLE: TEST_API_KEY}, API_KEY_VARIABLE_PREFIX
     )

@@ -1,4 +1,4 @@
-"""The read-only connection the readers of the base use (#183)."""
+"""The read-only connection the readers of the base use."""
 
 import sqlite3
 

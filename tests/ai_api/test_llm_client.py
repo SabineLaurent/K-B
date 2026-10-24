@@ -1,5 +1,4 @@
-"""A call to the model on the replay provider: no network, no key, answers known in advance; one
-test per named state (docs/fiches-veille.md, "Contrôles" and "États nommés")."""
+"""A call to the model on the replay provider, one test per named state: no network, no key."""
 
 import json
 from dataclasses import replace
@@ -67,7 +66,7 @@ PROVIDER_SETTINGS = LlmSettings(
 
 
 class Classification(BaseModel):
-    """The output of the tests: closed, as the outputs of #205, with a bounded field."""
+    """The output of the tests: closed, with a bounded field."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -90,7 +89,7 @@ def accept_every_output(output: Classification) -> FailedCheck | None:
 
 
 def refuse_the_subject_once():
-    """A check of a stage (#205) that refuses the first output it sees, then accepts."""
+    """A check of a stage that refuses the first output it sees, then accepts."""
     seen: list[Classification] = []
 
     def check(output: Classification) -> FailedCheck | None:
@@ -114,8 +113,8 @@ def call(
     check_output=accept_every_output,
     deadline=None,
 ):
-    """Call the model on the replay provider with these steps: the call, the transport, which
-    kept every request, and the waits asked."""
+    """Call the model on the replay with these steps: the call, the transport, which kept every
+    request, and the waits asked."""
     transport = ReplayTransport(steps)
     sleeps = Sleeps()
     with build_http_client(settings, transport=transport) as http_client:
@@ -583,7 +582,7 @@ def test_the_read_timeout_covers_the_longest_output_at_the_measured_rate_with_a_
     output_cap,
 ):
     """An answer not streamed comes in one block: a valid output near the cap must not end in
-    llm_timeout, which is not retried, and loses the digest."""
+    llm_timeout, which is not retried."""
     seconds_at_cap = MEASURED_MS_PER_OUTPUT_TOKEN * output_cap / 1000
 
     assert seconds_at_cap * 1.4 <= LLM_CALL_TIMEOUT_SECONDS
@@ -828,8 +827,8 @@ def test_a_429_of_any_attempt_is_kept(steps, saw_rate_limit):
     ids=["prompt", "completion", "reasoning", "309-digits"],
 )
 def test_a_token_count_beyond_the_bound_is_an_answer_not_read(usage):
-    """The answer of the provider is an input not trusted (OWASP API10:2023): a count beyond
-    the bound would make the cost of the metric line overflow."""
+    """The answer of the provider is untrusted (OWASP API10:2023): a count beyond the bound would
+    make the cost of the metric line overflow."""
     llm_call, transport, sleeps = call([completion(**usage)])
 
     assert llm_call.outcome == "llm_unavailable"
@@ -852,8 +851,7 @@ def test_a_token_count_at_the_bound_is_read():
     "retry_after", ["1" * (MAX_RETRY_AFTER_DIGITS + 1), "9" * 4301]
 )
 def test_a_retry_after_too_long_to_read_ends_the_call_without_retry(retry_after):
-    """int() refuses 4,301 digits or more; a provider that said to wait is not asked again, and
-    no value is given back."""
+    """int() refuses 4,301 digits or more; a provider that said to wait is not asked again."""
     llm_call, transport, sleeps = call(
         [response(429, retry_after=retry_after), completion()]
     )

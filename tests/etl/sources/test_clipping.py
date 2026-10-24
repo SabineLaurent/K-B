@@ -1,7 +1,5 @@
-"""The clipping source: the clips of the Obsidian vault copied as they are (E), then each clip
-read into an item (T). The fixtures are clips of the vault of 2026-10-17, cut down
-(tests/fixtures/clipping/): the author replaced, the share token of a URL removed, the text cut
-to a few public lines."""
+"""The clipping source: the clips of the Obsidian vault copied as they are (E), then each read
+into an item (T); the fixtures are real clips cut down, their author replaced."""
 
 import hashlib
 import logging
@@ -50,8 +48,8 @@ def page_name_of(file_name):
 
 @pytest.fixture(autouse=True)
 def collection_after_the_margin(monkeypatch):
-    """A collection that runs later than the margin after the clips the tests write: none is
-    left to the next collection, unless a test says otherwise."""
+    """A collection later than the margin after the clips the tests write, unless a test says
+    otherwise."""
     monkeypatch.setattr(
         clipping, "current_time", lambda: datetime.now(UTC) + CLIP_CHANGE_MARGIN * 2
     )
@@ -119,8 +117,8 @@ def test_nothing_modified_since_the_last_collection_gives_nothing(vault_dir):
 
 
 def last_change_of(paths):
-    """The collection right after the last change of the files: in whole microseconds, as a
-    datetime, rounded up."""
+    """The collection right after the last change of the files, in whole microseconds, rounded
+    up."""
     newest_ns = max(
         max(path.stat().st_mtime_ns, path.stat().st_ctime_ns) for path in paths
     )
@@ -148,8 +146,8 @@ def test_only_the_clips_modified_since_the_last_collection_are_copied(vault_dir)
 def test_a_clip_changed_within_the_margin_before_the_last_collection_is_copied_again(
     vault_dir,
 ):
-    """The clock of the file system may lag behind the one of the collection: a clip written
-    right after a collection began would be dated before it, and never copied."""
+    """The clock of the file system may lag behind the collection's: a clip written just after a
+    collection began would be dated before it, and never copied."""
     clips = [clippings_of(vault_dir) / name for name in (ARTICLE,)]
     within_the_margin = last_change_of(clips) + CLIP_CHANGE_MARGIN / 2
     beyond_the_margin = last_change_of(clips) + CLIP_CHANGE_MARGIN * 2
@@ -275,8 +273,8 @@ def test_an_unreadable_clip_among_valid_ones_is_copied(vault_dir):
 
 @pytest.mark.parametrize("vault", ["vault without Clippings", "missing vault"])
 def test_a_vault_without_its_clippings_folder_fails_without_its_path(tmp_path, vault):
-    """Not taken for a vault without clips: the date would move on, and the clips that a mount
-    or a sync brings later, with their old dates, would never be copied."""
+    """Not taken for a vault without clips: the clips a mount brings later, with their old dates,
+    would never be copied."""
     (tmp_path / "vault without Clippings").mkdir()
 
     with pytest.raises(ClippingsFolderMissingError) as failure:
@@ -300,8 +298,7 @@ def listed_one_nanosecond_before(vault_dir, name):
 def test_a_clip_rewritten_between_the_list_and_the_reading_is_left_to_the_next_collection(
     vault_dir, monkeypatch, caplog
 ):
-    """Obsidian Sync, iCloud or an edit may be writing it: copied now, it could go cut into the
-    base, until a collection copies it again."""
+    """A sync or an edit may be writing it: copied now, it could go cut into the base."""
     listed = listed_one_nanosecond_before(vault_dir, ARTICLE)
     monkeypatch.setattr(clipping, "list_clip_files", lambda clippings_dir: listed)
 
@@ -337,8 +334,7 @@ def make_changed_now(vault_dir, monkeypatch):
 def test_a_clip_changed_less_than_the_margin_ago_is_left_to_the_next_collection(
     vault_dir, monkeypatch, caplog
 ):
-    """It may still be written (Obsidian, Web Clipper, a sync): copied now, it would go cut into
-    the base, until a collection copies it again."""
+    """It may still be written: copied now, it would go cut into the base."""
     make_changed_now(vault_dir, monkeypatch)
 
     with caplog.at_level(logging.INFO, logger="k_b.etl.sources.clipping"):
@@ -436,7 +432,7 @@ def test_a_rule_in_the_text_is_kept_in_the_text():
 
 
 def test_the_tracking_parameters_are_removed_from_the_key():
-    """A variant: no clip of the vault of 2026-10-17 has a utm_* parameter."""
+    """A variant: no clip of the fixtures has a utm_* parameter."""
     raw_clip = with_property(
         fixture_bytes(ARTICLE),
         "source",

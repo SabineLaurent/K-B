@@ -1,5 +1,4 @@
-"""GET /items on the test base (tests/fixtures/items_database.sql): its ids are the ones the
-tests name."""
+"""GET /items on the test base (tests/fixtures/items_database.sql), whose ids the tests name."""
 
 import pytest
 
@@ -111,8 +110,8 @@ def test_next_offset_stops_at_the_offset_bound(
 
 
 def test_the_list_serves_only_the_six_fields(client, authorization):
-    """API3: a whitelist of six fields. The Zotero entry 14 has highlights, the paper 1 an author
-    and a summary, every item a raw file path and a date of collection: none is served."""
+    """API3: a whitelist of six fields; highlights, an author, a summary, a raw file path or a
+    collection date are never served."""
     response = client.get("/items", params={"limit": 100}, headers=authorization)
 
     items = response.json()["items"]

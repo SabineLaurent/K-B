@@ -1,11 +1,5 @@
-"""What the data API and the AI API may import, read at two levels, three under k_b.ai_api
-(conventions.md, rule 5).
-
-Under k_b.ai_api: app → api_router → the routers → metric_instruments → the pieces of a route
-(errors, dependencies, schemas, metrics) → digests → the stages → the clients → the settings of
-the connectors → llm_replay → deadline, watch_items, the settings of kb serve-ai and the export of
-the metrics; a module imports only the layers below its own. The rules of an outbound connection are in core (core/outbound.py, #209).
-"""
+"""What the data API and the AI API may import (conventions.md, rule 5); under k_b.ai_api, read
+at three levels, a module imports only the layers below its own."""
 
 import importlib
 from pathlib import Path
@@ -28,10 +22,8 @@ DATA_API_FORBIDDEN_MODULES = {"database.writers", "database.writing"}
 
 
 def list_forbidden_imports_of_the_data_api(imported: set[str]) -> set[str]:
-    """The names a module of data_api may not import. A name is cut at two levels, and read as
-    the rule of the writers reads it (reaches): `from k_b.database import reading` gives
-    `database.reading`, allowed; `from k_b.database import writers` gives `database.writers`,
-    refused, and so does `from k_b import database`, the package that holds them."""
+    """The names a module of data_api may not import, read by reaches: `database.reading` is
+    allowed, `database.writers` and the package `database` refused."""
     return {
         name
         for name in imported
@@ -169,8 +161,7 @@ def name_module(path: Path) -> str:
 
 
 def list_upward_imports_of_the_ai_api(module: str, imported: set[str]) -> set[str]:
-    """The names a module of ai_api may not import: those that reach a module of its layer or
-    of a layer above (`from k_b import ai_api` reaches them all)."""
+    """The names a module of ai_api may not import: those that reach its layer or a layer above."""
     layer = next(
         (i for i, modules in enumerate(AI_API_LAYERS) if module in modules), None
     )

@@ -87,8 +87,7 @@ def collected_kinds(*sources):
 
 
 def declared_kinds(*sources):
-    """The kind of collected_kinds, and the three kinds whose source etl/collected_sources.py
-    creates: names that KB_COLLECT_ONLY can choose."""
+    """The kind of collected_kinds, and the three kinds etl/collected_sources.py creates."""
     return collected_kinds(*sources) + tuple(
         SourceKind(name, (), None) for name in ("zotero", "clipping", "gh_archive")
     )
@@ -1013,9 +1012,8 @@ def test_a_failed_purge_keeps_the_import_exits_1_and_the_next_import_purges(
 def test_a_failed_purge_leaves_the_summary_of_the_import_it_committed(
     monkeypatch, tmp_path, capsys
 ):
-    """The summary is printed before the purge (commands/import_command.py): an import that
-    committed says what it wrote, even when the purge that follows fails. The line of the files
-    deleted is the only one left out: none was."""
+    """The summary is printed before the purge, so that an import that committed says what it
+    wrote even when the purge fails."""
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
     write_state_catalogs(tmp_path)
@@ -1169,8 +1167,7 @@ def test_each_exit_code_keeps_its_value():
 def test_a_part_that_failed_gives_4_beside_a_part_done_and_1_alone(
     has_failed, has_done, exit_code
 ):
-    """The same result, the same code, for kb collect, kb write-tops and kb digest (rule of
-    Sabine of 2026-10-21)."""
+    """The same result, the same code, for kb collect, kb write-tops and kb digest."""
     assert find_exit_code(has_failed=has_failed, has_done=has_done) == exit_code
 
 
@@ -1196,8 +1193,8 @@ class SigtermNotHandledByKbError(Exception):
 
 @pytest.fixture
 def sigterm_handler_of_the_test():
-    """A SIGTERM handler set before kb runs. Without it, a kb that sets no handler would leave
-    the default one, which kills pytest; kb must set it back when it ends."""
+    """A SIGTERM handler set before kb runs, which kb must set back; without it, a kb that sets
+    none would leave the default one, which kills pytest."""
 
     def raise_in_the_test(signal_number, frame):
         raise SigtermNotHandledByKbError
@@ -1220,8 +1217,8 @@ def list_hidden_files(directory):
 
 
 def dump_database(data_dir):
-    """Every table, row by row, as SQL text, as in etl/test_load.py: its module cannot be
-    imported from here (it imports its neighbours by their bare name)."""
+    """Every table, row by row, as SQL text, as in etl/test_load.py, which cannot be imported
+    from here."""
     connection = sqlite3.connect(data_dir / "k-b.sqlite")
     try:
         return list(connection.iterdump())
@@ -1538,9 +1535,8 @@ def test_a_sheet_not_written_keeps_its_rankings_exits_4_and_the_other_top_is_wri
 def test_an_unreadable_ranking_is_kept_and_write_tops_exits_4_with_the_sheets_written(
     data_and_vault_dirs, test_tops, capsys
 ):
-    """Fail closed: a ranking kept unread is never a success (ADR of 2026-10-19); the sheets
-    written are kept, so the code is the one of a partial failure (rule of Sabine of
-    2026-10-21: the same result, the same code)."""
+    """Fail closed: a ranking kept unread is never a success, and the sheets written are kept, so
+    the code is the one of a partial failure."""
     data_dir, vault_dir = data_and_vault_dirs
     rankings = write_rankings_of_each_top(data_dir, "2026-10-05T093000Z")
     unreadable = write_ranking(data_dir, TEST_TOPS[0], "2026-10-12T093000Z", b"[]")
@@ -1886,8 +1882,7 @@ def test_digest_without_the_ai_api_writes_nothing_and_exits_1(
 def test_digest_with_a_refused_key_writes_nothing_names_its_variable_never_the_key(
     monkeypatch, digest_environment, capsys
 ):
-    """The request went out: 1, as a source that answers 401 to kb collect (decision of Sabine
-    of 2026-10-21)."""
+    """The request went out: 1, as a source that answers 401 to kb collect."""
     data_dir, vault_dir = digest_environment
     answer_digests(
         monkeypatch,

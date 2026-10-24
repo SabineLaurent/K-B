@@ -130,9 +130,8 @@ def test_a_paper_with_nothing_attached_is_extracted_with_empty_lists(zotero_dir)
 def test_only_the_documents_of_the_user_library_out_of_the_trash_are_extracted(
     zotero_dir,
 ):
-    """Left out: the web page in the trash and the paper of a group library; and with them
-    the underline, the note, the editor, the abstract, the highlight and the PDF in the trash,
-    the linked PDF and its absolute path, the highlight of a web page snapshot."""
+    """Left out: the trash, a group library, and with them every annotation, PDF and snapshot
+    that is not a highlight of a document kept."""
     assert extract(zotero_dir) == [
         PAPER_WITH_HIGHLIGHTS,
         PAPER_WITHOUT_ANYTHING_ATTACHED,
@@ -505,8 +504,8 @@ def test_another_zotero_folder_with_files_older_than_the_last_collection_is_extr
 def test_a_library_changed_back_is_compared_with_the_last_extract_only(
     zotero_dir, tmp_path, run_on_zotero_library
 ):
-    """The first extract imported, the second only written: the library back as in the
-    first is a third extract, compared with the second."""
+    """The library back as in the first extract is a third extract, compared with the second
+    only."""
     data_dir = tmp_path / "data"
     collect(zotero_dir, data_dir, FIRST_COLLECTION_AT)
     run_on_zotero_library(zotero_dir, CHANGE_A_TITLE)
@@ -565,8 +564,8 @@ def test_a_library_without_any_document_writes_no_extract_and_fails(
 def test_a_library_whose_documents_are_all_invalid_writes_no_extract_and_fails(
     zotero_dir, tmp_path, run_on_zotero_library
 ):
-    """conventions.md, rule 1: all_items_invalid. Written, the extract would become the last
-    one imported, and the purge would delete the last valid one."""
+    """Written, an extract all invalid would become the last one imported, and the purge would
+    delete the last valid one."""
     data_dir = tmp_path / "data"
     run_on_zotero_library(zotero_dir, "UPDATE items SET dateAdded = 'yesterday';")
 

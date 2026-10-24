@@ -1,5 +1,4 @@
-"""The reader of the imports of k_b and the lists of modules that the architecture tests
-share."""
+"""The reader of the imports of k_b and the lists of modules the architecture tests share."""
 
 import ast
 from pathlib import Path
@@ -44,23 +43,16 @@ COMPOSITION_MODULES = {"cli", "commands"} | ETL_COMPOSITION_MODULES
 
 
 def list_imported_modules(path: Path, package: str, depth: int = 2) -> set[str]:
-    """The k_b modules imported by the module at path, of the given package, cut at depth
-    levels (see parse_imported_modules)."""
+    """The k_b modules imported by the module at path, of the given package, cut at depth levels."""
     return parse_imported_modules(path.read_text(), package, depth)
 
 
 def parse_imported_modules(code: str, package: str = "k_b", depth: int = 2) -> set[str]:
-    """The k_b modules imported by `import k_b.x`, `from k_b import x`, `from k_b.x import y`,
-    and their relative forms (`from . import x`, `from .x import y`, `from .. import x`),
-    resolved against the package of the module.
+    """The k_b modules imported, absolute and relative forms, each named below k_b and cut at
+    depth levels (`etl.sources`, `core.config`); a name imported from a module counts as its
+    second level.
 
-    Each name is given below k_b, cut at two levels: `etl.sources` for any module of
-    k_b.etl.sources, `core.config` for k_b.core.config. A name imported from a module counts as
-    its second level (`items.Item`): a rule compares by prefix (see is_within). A depth of three
-    tells the modules of a sub-folder apart (`ai_api.connectors.llm_client`).
-
-    A dynamic import (importlib.import_module) is not seen: there is none in k_b.
-    """
+    A dynamic import (importlib.import_module) is not seen: there is none in k_b."""
     imported: set[str] = set()
     for node in ast.walk(ast.parse(code)):
         if isinstance(node, ast.Import):
@@ -95,16 +87,15 @@ def is_within(name: str, modules: set[str]) -> bool:
 
 
 def reaches(name: str, modules: set[str]) -> bool:
-    """Whether importing name gives access to one of the modules: name is within one of them, or
-    is a package that holds one (`etl` holds `etl.sources`)."""
+    """Whether importing name reaches one of the modules: name is within one, or a package that
+    holds one (`etl` holds `etl.sources`)."""
     return is_within(name, modules) or any(
         module.startswith(f"{name}.") for module in modules
     )
 
 
 def list_python_files(module: str) -> list[Path]:
-    """The Python files of a k_b module (`items`) or package (`etl.sources`), those of its
-    sub-folders included (`database/writers`)."""
+    """The Python files of a k_b module or package, those of its sub-folders included."""
     path = PACKAGE_DIR.joinpath(*module.split("."))
     if path.with_suffix(".py").exists():
         return [path.with_suffix(".py")]

@@ -1,5 +1,5 @@
 """The deadline of a digest request: the time left, and the timeouts of a request shortened to
-it (docs/fiches-veille.md, "Lecture plafonnée")."""
+it."""
 
 import httpx2
 

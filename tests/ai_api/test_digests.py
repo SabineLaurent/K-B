@@ -1,6 +1,5 @@
-"""The digests of a request on the replay provider: the items of the test base read by the data
-API, classified by subject, then each subject written; one test per case of the criterion of #205
-(docs/fiches-veille.md, "Contrôles", "Réponse" and "États nommés")."""
+"""The digests of a request on the replay provider: the items of the test base classified by
+subject, then each subject written."""
 
 import json
 import secrets
@@ -151,7 +150,6 @@ VALID_STEPS = [
 
 
 def digest_of(reading, steps, deadline=None, transport=None, subjects=TEST_SUBJECTS):
-    """The result of build_digests on the replay with these steps, and its transport."""
     transport = transport or ReplayTransport(steps)
     with build_http_client(REPLAY_SETTINGS, transport=transport) as http_client:
         result = build_digests(
@@ -788,7 +786,7 @@ TRAPPED_LINK = "evil.example"
 @pytest.fixture(scope="module")
 def trapped_reading(reading):
     """The watch of the test base and the trapped article, read by the TLDR reader, then masked
-    as the data API client masks an item (to_watch_item)."""
+    as the data API client masks an item."""
     article = read_articles(TRAPPED_PAGE.read_bytes()).entries[0]
     trapped_item = WatchItem(
         item_id=TRAPPED_ITEM_ID,
@@ -869,8 +867,8 @@ TRAPPED_TWICE = classified_with_trap(
 def test_a_model_obeying_a_trapped_item_gives_a_named_state_and_no_digest(
     trapped_reading, steps, failed_check
 ):
-    """Criterion of #206: each output the trap asks for is refused, and the trapped item stayed
-    in the user message (rule 8 of poc.md)."""
+    """Each output the trap asks for is refused, and the trapped item stayed in the user message
+    (rule 8 of poc.md)."""
     result, transport = digest_of(trapped_reading, steps)
 
     if isinstance(result, ClassificationFailure):

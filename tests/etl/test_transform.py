@@ -52,8 +52,7 @@ FAKE_PAGE_KINDS = [
 def read_raw(
     raw_dir: Path, kinds: Sequence[SourceKind], imported_paths: frozenset[str]
 ) -> ImportReadings:
-    """read_raw_files with the tracked repositories of the code: a release of a repository out
-    of that list is rejected by the reading (etl/transform.py)."""
+    """read_raw_files with the tracked repositories of the code."""
     return read_raw_files(raw_dir, kinds, imported_paths, TRACKED_REPOSITORIES)
 
 
@@ -754,8 +753,7 @@ def write_raw_trends(raw_dir: Path, name: str, content: bytes) -> Path:
 def read_trends(
     raw_dir: Path, imported_paths: frozenset[str] = frozenset()
 ) -> TrendReading:
-    """The trends the reading gives, with the kinds of the code: the gh_archive kind carries its
-    trend reader (etl/source_kinds.py)."""
+    """The trends the reading gives, with the kinds of the code."""
     return read_raw(raw_dir, SOURCE_KINDS, imported_paths).trends
 
 

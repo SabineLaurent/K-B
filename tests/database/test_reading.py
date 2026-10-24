@@ -1,5 +1,5 @@
-"""The reading of the items and of the highlights (#183), on the test base of
-tests/fixtures/items_database.sql: its ids are the ones the tests name."""
+"""The reading of the items and the highlights on the test base
+(tests/fixtures/items_database.sql), whose ids the tests name."""
 
 import typing
 from datetime import UTC, date, datetime, timedelta, timezone, tzinfo
@@ -510,9 +510,8 @@ def test_no_field_of_a_kind_takes_the_name_of_a_field_of_the_list(kind_detail):
 
 @pytest.fixture
 def base_with_vulnerabilities_on_papers(tmp_path):
-    """Papers designated by a vulnerability row too: publication and vulnerability have no
-    (item_id, kind) foreign key, so the schema does not refuse it. Paper 1 has its publication;
-    paper 2 has none."""
+    """Papers designated by a vulnerability row too, which the schema does not refuse; paper 1
+    has its publication, paper 2 none."""
     database_path = tmp_path / "k-b.sqlite"
     create_database(database_path)
     connection = connect_database(database_path)

@@ -1,5 +1,5 @@
-"""kb serve and kb openapi: the keys and the settings checked at the start, the host and the port,
-the hosts allowed, the log of the API, the OpenAPI written without data directory."""
+"""kb serve and kb openapi: the keys and the settings checked at the start, the hosts allowed,
+the log, the OpenAPI written without data directory."""
 
 import os
 import secrets
@@ -27,7 +27,6 @@ def no_api_key_of_the_terminal(monkeypatch):
 
 @pytest.fixture
 def uvicorn_calls(monkeypatch):
-    """The calls kb serve makes to uvicorn.run, which is not run."""
     calls = []
     monkeypatch.setattr(
         serve_command.uvicorn,
@@ -274,7 +273,7 @@ def test_serve_reads_the_base_and_writes_its_own_log_file_under_kb_data_dir(
     monkeypatch, data_dir, uvicorn_calls
 ):
     """kb serve runs for long: a rotation done by kb collect in kb.log would leave it writing in
-    the file of the day before (docs/specs-api.md, "Journal")."""
+    the file of the day before."""
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
 
     cli.main(["serve"])

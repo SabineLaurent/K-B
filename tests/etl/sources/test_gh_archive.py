@@ -605,8 +605,8 @@ def test_the_message_gives_the_length_and_the_maximum_of_a_name_too_long():
 
 
 def test_the_trend_reader_of_the_source_gives_the_rows_of_a_raw_result():
-    """What the kind of the source carries (etl/source_kinds.py): etl/transform.py reads the raw
-    files with it."""
+    """The trend reader the kind of the source carries, which etl/transform.py reads the raw
+    files with."""
     assert gh_archive.TREND_READER.source_code == "gh_archive"
     assert (
         gh_archive.TREND_READER.read_rows(FIXTURE_PATH.read_bytes())

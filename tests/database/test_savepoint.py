@@ -1,6 +1,5 @@
-"""The savepoint each item is written in (conventions.md, rule 1): what it keeps, what it
-undoes, which errors of the base are those of an entry, and how a refusal is described without
-the value refused."""
+"""The savepoint each item is written in: what it keeps, what it undoes, which errors are those
+of an entry, and a refusal described without the value."""
 
 import sqlite3
 

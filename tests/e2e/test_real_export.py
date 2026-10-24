@@ -1,14 +1,9 @@
-"""The end-to-end test of the export of the metrics (#162): one request to the AI API, on the replay
-and the data API of the test base, whose measures are sent to the real OTLP endpoint when the app
-stops. No model is called, no source is read: the endpoint is the only network.
+"""The end-to-end test of the export of the metrics: one request to the AI API on the replay,
+whose measures are sent to the real OTLP endpoint when the app stops; skipped without the
+endpoint.
 
-Left out of uv run pytest (tests/conftest.py). Run on the Mac, from a terminal without .env
-exported, with KB_OTLP_ENDPOINT, KB_OTLP_HEADERS and KB_DEPLOYMENT_ENVIRONMENT in .env.e2e_test:
-uv run --env-file .env.e2e_test pytest -m e2e -rs -k real_export
-Without the endpoint and the headers, it is skipped. Proof: each export the SDK made answered
-SUCCESS; the series is then read in Grafana Explore, the final proof: the transport of the SDK
-counts a 3xx as a success, which this test cannot tell from a delivery.
-"""
+Run as written in MEMORY.md (-k real_export); its proof ends in Grafana Explore, as the SDK
+counts a 3xx as a success."""
 
 import os
 import secrets

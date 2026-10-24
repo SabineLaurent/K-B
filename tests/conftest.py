@@ -1,7 +1,5 @@
-"""The fabricated Zotero library, shared by the tests of the source and of the command line; the
-test base of the readers of the items; the settings of kb read from the terminal, removed; the
-end-to-end tests, left out unless -m names them; the HTML report of pytest-html, readable by the
-user alone, with the properties each test records."""
+"""What the tests share: the fabricated Zotero library, the test base of the readers, the
+settings of the terminal removed, the end-to-end tests left out, and the HTML report."""
 
 import html
 import os
@@ -49,10 +47,9 @@ def pytest_configure(config):
 
 
 def restrict_report_to_user(config):
-    """Create the report of --html before pytest-html writes it, in 0600, and its folder, when
-    new, in 0700: pytest-html rewrites the file in place, which keeps its mode. A folder that
-    exists keeps its mode. A report in the repository (the rootdir) outside reports/ stops the
-    run before any file: git would not ignore it. Outside the repository, it is written."""
+    """Create the report of --html in 0600, and its new folder in 0700, before pytest-html writes
+    it in place; a report in the repository outside reports/, which git would not ignore, stops
+    the run."""
     report_option = config.getoption("htmlpath", default=None)
     if not report_option:
         return
@@ -80,16 +77,15 @@ def pytest_html_results_table_header(cells):
 
 @pytest.hookimpl(optionalhook=True)
 def pytest_html_results_table_row(report, cells):
-    """The properties the test recorded (record_property), one name=value a line, escaped. A
-    report of the collection has none."""
+    """The properties the test recorded, one name=value a line, escaped."""
     properties = getattr(report, "user_properties", ())
     lines = "<br>".join(html.escape(f"{name}={value}") for name, value in properties)
     cells.insert(PROPERTIES_COLUMN, f'<td class="col-properties">{lines}</td>')
 
 
 def pytest_collection_modifyitems(config, items):
-    """Leave out the end-to-end tests unless -m names them: uv run pytest, the command of the
-    CI, never calls a real source; uv run pytest -m e2e runs them."""
+    """Leave out the end-to-end tests unless -m names them, so that the CI never calls a real
+    source."""
     # The name e2e, not a marker name that holds it (nightly_e2e, nightly-e2e, e2e.slow).
     if E2E_MARKER in MARKER_NAME.findall(config.option.markexpr):
         return
@@ -149,8 +145,8 @@ def run_on_zotero_library():
 
 @pytest.fixture(scope="session")
 def items_database(tmp_path_factory):
-    """The path of the test base of the readers, built once for the session; its folder name
-    holds a space, #, ? and %, which its URI must escape. Read only: no test writes in it."""
+    """The path of the test base of the readers, built once, read only; its folder name holds a
+    space, #, ? and %, which its URI must escape."""
     database_dir = tmp_path_factory.mktemp("data dir #1 ?%", numbered=False)
     database_path = database_dir / "k-b.sqlite"
     create_database(database_path)

@@ -1,6 +1,5 @@
-"""uv run pytest, the command of the CI, leaves out the end-to-end tests; -m e2e runs them, one
-per source, and stops them on a variable they must not get. A test recorded property is in the HTML
-report, which the user alone can read."""
+"""The CI leaves out the end-to-end tests; -m e2e runs them, and stops them on a variable they
+must not get; a recorded property is in the HTML report, readable by the user alone."""
 
 import html
 import importlib.util
@@ -92,8 +91,8 @@ VALUE_BEYOND = "value-beyond-the-end-to-end-tests"
 
 
 def run_the_zotero_end_to_end_test(variables):
-    """pytest -m e2e -k zotero with the variables given, without KB_ZOTERO_DIR: even with the
-    guard broken, the test is skipped and no real source is called."""
+    """pytest -m e2e -k zotero with the variables given, without KB_ZOTERO_DIR, so that even with
+    the guard broken no real source is called."""
     environment = {
         name: value
         for name, value in os.environ.items()
@@ -167,9 +166,8 @@ MARKER = "<b>marker</b>"
 
 
 def produce_report(directory, report_path):
-    """Run the marker test of directory with a report at report_path; directory is the rootdir
-    of the run, the repository of the copied conftest. --rootdir: under a --basetemp in K-B,
-    pytest would take K-B for the rootdir, by its pyproject.toml."""
+    """Run the marker test of directory with a report at report_path, directory as --rootdir:
+    under a --basetemp in K-B, pytest would take K-B by its pyproject.toml."""
     return subprocess.run(  # noqa: S603 — runs this interpreter on pytest, fixed arguments
         [
             sys.executable,
@@ -266,8 +264,7 @@ def test_a_report_outside_the_repository_is_written(tmp_path, tmp_path_factory):
 
 
 def load_end_to_end_module():
-    """The conftest of the end-to-end tests, which holds their guard, loaded by its path:
-    tests/e2e/ is not a package. Its fixture is not used here."""
+    """The conftest of the end-to-end tests, loaded by its path, as tests/e2e/ is not a package."""
     spec = importlib.util.spec_from_file_location(
         "end_to_end_tests", E2E_DIR / "conftest.py"
     )

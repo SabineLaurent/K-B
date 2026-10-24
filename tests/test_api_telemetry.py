@@ -1,6 +1,5 @@
-"""The native OpenTelemetry of FastAPI is off in both APIs (core/api_telemetry.py, #162): with
-FASTAPI_OTEL_AUTO_CONFIGURE=true, neither sets a global provider of traces, metrics or logs. In
-one subprocess for both APIs: a global provider is set once per process."""
+"""The native OpenTelemetry of FastAPI is off in both APIs, even with
+FASTAPI_OTEL_AUTO_CONFIGURE=true; in a subprocess, as a global provider is set once per process."""
 
 import os
 import subprocess

@@ -1,6 +1,5 @@
-"""The sheets of the digests in the vault: one per subject and per day, a Markdown that only says
-text (docs/fiches-veille.md, "Fiches dans le coffre"; #209). The responses are made by the schema
-of the AI API, then read as kb digest reads them."""
+"""The sheets of the digests in the vault, one per subject and per day, a Markdown that only says
+text; the responses are made by the schema of the AI API."""
 
 import json
 import re
@@ -34,7 +33,6 @@ RIGHT_TO_LEFT_OVERRIDE = chr(0x202E)
 
 
 def read(response):
-    """The response as kb digest reads it."""
     return DigestsResponse.model_validate_json(to_body(response))
 
 
@@ -241,8 +239,7 @@ def test_a_text_of_a_digest_escapes_the_autolinks_too(text, neutralized):
 )
 def test_a_list_marker_at_the_start_of_a_text_is_escaped(text, neutralized):
     """A claim starts a list item, a title a numbered line: its own marker would nest a list
-    (CommonMark 0.31.2, 5.2 and 5.3; finding 7 of the code review, decided by time-knight,
-    delegation of Sabine of 2026-10-15)."""
+    (CommonMark 0.31.2, 5.2 and 5.3)."""
     assert neutralize_digest_text(text) == neutralized
 
 
@@ -263,9 +260,8 @@ def test_a_rule_or_an_underline_alone_stays_text_on_the_line_of_its_claim_or_sou
 
 
 def render_escapes(markdown):
-    """The text CommonMark renders from a line of escaped text: a backslash before an ASCII
-    punctuation character is dropped (0.31.2, 2.4). Dataview reads its inline fields in this text,
-    in reading mode (replaceInlineFields reads innerHTML, Dataview 0.5.68)."""
+    """The text CommonMark renders from a line of escaped text, where Dataview reads its inline
+    fields in reading mode."""
     return re.sub(r"\\([!-/:-@\[-`{-~])", r"\1", markdown)
 
 
@@ -281,9 +277,8 @@ def render_escapes(markdown):
     ],
 )
 def test_a_double_colon_is_never_rendered(text, neutralized):
-    """Dataview takes [key:: value], (key:: value) and key:: value for a field; in reading mode it
-    looks for :: in the rendered text, where the escapes are gone (recipe of Sabine of
-    2026-10-21, decided by time-knight, delegation of Sabine of 2026-10-15)."""
+    """Dataview takes [key:: value], (key:: value) and key:: value for a field, looking for :: in
+    the rendered text, where the escapes are gone."""
     assert neutralize_digest_text(text) == neutralized
     assert "::" not in render_escapes(neutralize_digest_text(text))
 
@@ -321,8 +316,8 @@ def test_no_field_of_dataview_is_rendered_from_a_title_or_a_claim(field):
     ],
 )
 def test_a_character_reference_is_written_as_text(text, neutralized):
-    """CommonMark decodes &#x202E; or &rlm; into the bidirectional control neutralize_text
-    removes: the & that opens a reference is escaped, another & stays."""
+    """CommonMark decodes &#x202E; or &rlm; into a bidirectional control: the & that opens a
+    reference is escaped, another & stays."""
     assert neutralize_digest_text(text) == neutralized
 
 
@@ -491,8 +486,7 @@ def test_a_sheet_written_meanwhile_is_never_rewritten(vault_dir):
 def test_a_sheet_seen_by_the_writing_is_refused_without_a_second_look(
     vault_dir, monkeypatch
 ):
-    """write_new_sheet saw the sheet: kb never says it wrote it, even if it is gone since (second
-    code review, finding 5)."""
+    """write_new_sheet saw the sheet: kb never says it wrote it, even if it is gone since."""
     response = read(make_response())
     monkeypatch.setattr(digest_sheets, "write_new_sheet", lambda *arguments: False)
 

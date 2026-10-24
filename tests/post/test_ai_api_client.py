@@ -1,6 +1,5 @@
-"""The client of the AI API of kb digest: its settings, its request, and the response it accepts
-(docs/fiches-veille.md, "Réponse", "États nommés"). No network: each answer is made by a
-MockTransport, a 200 by the schema of the AI API, which ties the client to the contract."""
+"""The client of the AI API of kb digest: its settings, its request, and the response it accepts,
+each 200 made by the schema of the AI API, which ties the client to the contract."""
 
 import json
 import secrets
@@ -201,8 +200,8 @@ def test_the_request_asks_the_default_window_with_the_key_and_its_timeouts():
 
 
 def test_the_read_timeout_waits_beyond_the_bound_of_a_request_of_the_ai_api():
-    """A request lasts up to DIGEST_REQUEST_TIMEOUT_SECONDS, and its last call a little more
-    (ai_api/deadline.py): the answer comes in one block at the end."""
+    """A request lasts up to DIGEST_REQUEST_TIMEOUT_SECONDS, its last call a little more, and the
+    answer comes in one block at the end."""
     assert AI_API_READ_TIMEOUT_SECONDS > DIGEST_REQUEST_TIMEOUT_SECONDS + 20
 
 

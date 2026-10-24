@@ -1,28 +1,8 @@
-"""The end-to-end test of each source: kb create-db, KB_COLLECT_ONLY=<source> kb collect, then
-kb import, on the real source, in a new data directory; each command exits 0 and the items of
-the source are in the base, with no rejection.
+"""The end-to-end test of each source: kb create-db, KB_COLLECT_ONLY=<source> kb collect, then kb
+import on the real source, in a new data directory; each command exits 0, with no rejection.
 
-Left out of uv run pytest (tests/conftest.py). Run on the Mac, with the HTML report, by
-uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html --self-contained-html
-.env.e2e_test holds the settings of the sources alone (.env.e2e_test.example), and each kb gets
-the environment of the terminal too: run it from a terminal without .env exported. A variable of
-.env.example that is not in .env.e2e_test.example, or any KB_DATA_API_KEY_<CLIENT>, stops the tests
-before any kb, but the ones the test sets itself (KB_DATA_DIR, KB_COLLECT_ONLY) or
-tests/conftest.py removes (KB_LOG_TO_FILE, KB_DATA_API_HOST, KB_DATA_API_PORT,
-KB_DATA_API_ALLOWED_HOSTS): KB_DATA_API_URL, of the AI API, stops them. To be run the same way in
-a container (#200) and as a job, whose environment holds the variables of these tests alone.
-Without KB_ZOTERO_DIR, KB_VAULT_DIR or GOOGLE_APPLICATION_CREDENTIALS, the test of its source is
-skipped. KB_GITHUB_TOKEN
-is optional: without it, the GitHub sources run on 60 requests per hour instead of 5,000.
-gh_archive runs a real BigQuery query (docs/bigquery.md).
-
-Each test records its figures in the report (record_property): the exit codes of the commands,
-the items by kind, the rejections, and for gh_archive the bytes BigQuery processed.
-
-Once a test ends, however it ends, its data directory is deleted but its logs/: what a test keeps
-is its console, the log of kb and the HTML report (docs/registre-traitements.md, step 10 of the
-sorting).
-"""
+Run as written in MEMORY.md, from a terminal without .env exported; gh_archive runs a real
+BigQuery query. A data directory is deleted but its logs/ once its test ends."""
 
 import json
 import os
@@ -93,12 +73,10 @@ BIGQUERY_BYTES_LINE = re.compile(r"gh_archive: .*, (\d+|None) bytes processed,")
 
 
 def run_kb(command, console_dir):
-    """Run kb <command> in the environment of this process and keep what it printed in
-    console_dir; return its exit code. No variable here nor in subprocess holds the environment,
-    and with it the GitHub token: a traceback that shows the locals cannot show it.
+    """Run kb <command> and keep what it printed in console_dir; return its exit code. No
+    variable holds the environment, so that a traceback with locals cannot show the GitHub token.
 
-    A command past its timeout is sent SIGTERM, so that kb cleans up as on docker stop, then
-    SIGKILL if it does not stop; what it printed until then is kept."""
+    Past its timeout, the command gets SIGTERM, then SIGKILL."""
     with subprocess.Popen(  # noqa: S603 — runs the kb of this interpreter, fixed arguments
         [str(KB_PATH), command],
         stdout=subprocess.PIPE,
@@ -131,8 +109,8 @@ def write_console(console_dir, command, stdout, stderr):
 
 
 def delete_all_but_logs(data_dir):
-    """Delete the raw files, the base (and its -wal and -shm) and the import logs, which hold
-    the authors of Zotero and of arXiv, the clips and their URLs: logs/ alone is kept."""
+    """Delete all but logs/: the raw files, the base and the import logs hold authors, clips and
+    URLs."""
     for entry in data_dir.iterdir():
         if entry.name == LOG_DIR_NAME:
             continue
@@ -161,8 +139,8 @@ def count_items_by_kind(database_path):
 
 
 def read_bigquery_bytes(console_dir):
-    """The bytes BigQuery processed, as gh_archive logs them: a number, or "None" when BigQuery
-    gave no count. None when the line is not in the log: nothing is recorded."""
+    """The bytes BigQuery processed, as gh_archive logs them; None when the line is not in the
+    log."""
     bytes_line = BIGQUERY_BYTES_LINE.search((console_dir / "collect.err").read_text())
     if bytes_line is None:
         return None
@@ -171,7 +149,7 @@ def read_bigquery_bytes(console_dir):
 
 def count_log_lines_above_info(console_dir):
     """The WARNING, ERROR and CRITICAL lines of the commands run: a case a source logs and gives
-    up without failing (tldr given up, a page not read) is a case met."""
+    up without failing is a case met."""
     return sum(
         1
         for console_path in console_dir.glob("*.err")

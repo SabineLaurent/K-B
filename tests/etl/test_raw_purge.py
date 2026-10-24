@@ -1,5 +1,5 @@
 """The purge of the state catalogs: of Zotero and CISA KEV, only the last raw file imported is
-kept (ADR of 2026-10-19). The registry each test reads is written by a real import."""
+kept."""
 
 import logging
 import shutil
