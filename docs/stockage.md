@@ -252,7 +252,7 @@ aucune issue ne les aligne :
   `tracked_repository.packages` et `advisory.packages`, ce que la 1FN refuse (une valeur non
   atomique). Raison : une liste n'est jamais cherchée ni filtrée en base ; elle s'écrit entière,
   avec sa ligne. Les auteurs et les paquets touchés se lisent entiers et sont servis en liste par
-  l'API (`src/k_b/database/reading.py:406, 432`). Les paquets suivis sont une copie de la liste du
+  l'API (`src/k_b/database/reading.py:394, 420`). Les paquets suivis sont une copie de la liste du
   code (`src/k_b/etl/sources/tracked_repositories.py`), réécrite entière à chaque import
   (`src/k_b/database/writers/release_writer.py:24-29`) et jamais relue en base. Un `CHECK` tient sa forme
   (tableau JSON non vide) et, pour les auteurs et les paquets touchés, son nombre maximum
@@ -261,7 +261,7 @@ aucune issue ne les aligne :
 Les autres écarts sont propres au MPD et annotés dans le MLD : chaque sous-type d'item y a sa
 colonne `id`, la colonne `kind` et la clé étrangère `(item_id, kind)`, qui tiennent l'exclusion
 des sous-types ; la clé étrangère de `highlight` vise `item`, l'entrée Zotero étant tenue par le
-code (`src/k_b/database/writers/zotero_entry_writer.py:92-103, 139`).
+code (`src/k_b/database/writers/zotero_entry_writer.py:89-100, 136`).
 
 ## MPD
 
