@@ -534,10 +534,33 @@ NFKC, `casefold`, retrait des caractères invisibles (catégorie Unicode `Cf` : 
 U+2060…), espaces réduites à une seule, tirets Unicode (U+2010 à U+2015, U+2212) ramenés à `-`,
 apostrophes et guillemets typographiques (U+2018, U+2019, U+201C, U+201D) ramenés à `'` et `"`.
 
-**Faits CVE et GHSA.** Les motifs s'appliquent après la normalisation :
+**Faits CVE et GHSA.** Les motifs s'appliquent après la normalisation, sur un **texte de
+détection** : les marques d'emphase `*` et `=` retirées (`CVE-2026-00**01**` s'affiche comme un
+identifiant), et les lettres cyrilliques, grecques et petites capitales latines qui ressemblent à
+une lettre d'un préfixe lues comme elle (`СVЕ` cyrillique se lit `cve`), puis toute autre lettre,
+chiffre ou symbole hors ASCII qui n'est pas une lettre ASCII accentuée lu comme `o` (`é` reste `é`,
+pour que `numéro` se lise ; `CVE-2026-ЗЗЗЗ` se lit `CVE-2026-oooo`). Écrits sur ce texte, en
+minuscules (`ai_api/fidelity.py`, `CVE` et `GHSA`), avec `S` = `[\W_]*` :
 
-- CVE : `(?i)CVE[\s-]*\d{4}[\s-]*\d{4,}` ;
-- GHSA : `(?i)GHSA[\s-]*[0-9a-z]{4}[\s-]*[0-9a-z]{4}[\s-]*[0-9a-z]{4}`.
+- CVE : `c S v S e [s] S [mot de numéro S] [\doli]{4} S [\doli]{4,}` ;
+- GHSA : `g S h S s S a [s] S [mot de numéro S] [0-9a-z]{4} S [0-9a-z]{4} S [0-9a-z]{4}`.
+
+Un séparateur peut couper le préfixe (`C.V.E.`, `C*V*E`), et un `s` de pluriel le suivre (« les
+CVEs 2026-0001 »). Le **mot de numéro**, facultatif, est `n`, `no`, `nr`, `num`, `numero`, `numéro`,
+`number`, `id`, `identifiant`, `ref`, `réf`, `reference` ou `référence` (`№` devient `no` par
+NFKC) : « la CVE n°2026-0001 » est une tournure française que le modèle écrit sans attaque. `o`, `l` et `i` comptent
+pour des chiffres : `CVE-2026-OOO1` est lu, et n'est jamais égal à un vrai identifiant. Ces règles
+de détection sont des décisions de time-knight sur la revue de sécurité de #207 (délégation de
+Sabine du 2026-10-15) ; `AAAA-NNNN` seul n'est pas lu comme un identifiant, car `2025-2026` le
+deviendrait.
+
+Un séparateur est toute suite sans lettre ni chiffre (décision de Sabine du 2026-10-24, plan de
+#207) : avec `[\s-]*`, `CVE_2026_0001` ou `CVE.2026.0001` n'était pas un motif ; déclaré en fait,
+il devenait un fait ordinaire, trouvé si un item piégé l'écrivait ainsi, et le piège de #206
+passait sous cette écriture. Un identifiant de la phrase finit à une limite, comme tout fait (ni
+lettre ni chiffre après lui, ni `.` ou `-` suivi d'une lettre ou d'un chiffre) : `GHSA-fjqc-hq36-qh5pxx`
+ou `CVE-2026-86950abc` ne sont pas lus comme `GHSA-fjqc-hq36-qh5p` et `CVE-2026-86950` (revue de
+#207, tranchée par time-knight, délégation de Sabine du 2026-10-15).
 
 Un fait qui **contient** l'un de ces motifs est un fait CVE ou GHSA, quelle que soit son écriture
 (`cve 2026-1234` compris). Il doit être **égal**, une fois ramené à sa forme canonique
@@ -546,6 +569,10 @@ trouvé dans un texte libre. Un article TLDR n'a pas de tel champ : il ne porte 
 fiche cite la CVE par l'entrée KEV ou par l'alerte, si elles sont dans la fenêtre (décision de
 Sabine du 2026-10-15). Comme tout fait, un fait CVE ou GHSA doit aussi figurer dans le `text` de
 son affirmation ; et tout motif CVE ou GHSA écrit dans un `text` doit être déclaré comme fait.
+Dans le `text`, la comparaison se fait par forme canonique : `cve 2026 86950` dans la phrase est le
+fait `CVE-2026-86950`. Un fait qui contient plus que le motif (`CVE-2026-86950 (Apple)`) n'a pas
+de forme canonique : il n'est pas trouvé. Le fait est comparé à l'item **qu'il cite**
+(`facts[].item_id`), plus strict que « un item cité » du journal ADR (2026-10-15).
 
 **Autres faits.** Chaque `facts[].value` doit figurer dans le `text` de son affirmation **et** dans
 la valeur de l'un des champs où la fidélité cherche, pour l'item qu'elle cite (tableau de la
@@ -554,7 +581,36 @@ dans `kind`, `item_id` ni `cve_listed_in_cisa_kev`. Une valeur est trouvée seul
 **limites** : juste après elle, ni lettre ni chiffre, ni `.` ou `-` suivi d'une lettre ou d'un
 chiffre ; juste avant, la même règle (ni lettre ni chiffre, ni `.` ou `-` précédé d'une lettre ou
 d'un chiffre). Ainsi `1.2` n'est pas trouvé dans `1.2.9`, ni `CVE-2026-1234` dans
-`CVE-2026-12345`.
+`CVE-2026-12345`. « Lettre ou chiffre » s'entend au sens Unicode, après la normalisation : `caf`
+n'est pas trouvé dans `café`. Un champ nul (`body`, `cve_id` d'une alerte sans CVE) est sauté ;
+chaque nom de `packages` est un champ ; `cve_id` et `ghsa_id` ne servent qu'à l'égalité d'un fait
+CVE ou GHSA, jamais à la recherche d'un fait ordinaire. Les repères que K-B pose lui-même dans les
+champs (`[url]`, `@user`, section « Entrée du modèle ») sont retirés avant la recherche : un fait
+`@user` ne dit rien de l'item (revue de #207, décision de time-knight). La fin d'un champ coupé pour la rédaction
+(2 000 caractères, `MAX_FIELD_CHARS_FOR_WRITING`) n'est pas une limite : `…1.2` coupé peut être le
+début de `1.2.9`, et `1.2` n'y est pas trouvé (revue de #207, même décision). Un champ d'exactement
+2 000 caractères est traité comme coupé, ce qui va dans le sens sûr.
+
+**Texte déguisé.** Une affirmation dont le `text` brut contient un caractère invisible `Cf`, sauf
+U+200D (le liant des emoji composés), est retirée : un contrôle de direction U+202E affiche
+`1000-6202-EVC` comme `CVE-2026-0001`, et les tags U+E0000 à U+E007F font entrer au coffre un texte
+que la lectrice ne voit pas. Faux positifs rares, dans le sens sûr : U+00AD, U+200B, U+2060, le
+drapeau écossais (fait de tags). De même, une affirmation dont le `text` contient, une fois
+normalisé, un caractère qui cache ou déguise (une marque `Mn` ou `Me`, un point de code privé `Co` ou non attribué `Cn`, un
+remplissage hangul ou braille U+115F, U+1160, U+3164, U+FFA0, U+2800, qui s'affiche en blanc), ou
+un mot qui mêle des lettres latines à une lettre non latine qui peut leur ressembler, est retirée
+et comptée (décision de time-knight sur la revue de sécurité de #207, délégation de Sabine du
+2026-10-15). Le mot se lit avant le `casefold` : la capitale grecque `Ε` ressemble à `E`, sa
+minuscule `ε` non. Une lettre grecque qui ne ressemble pas à une lettre latine reste permise à côté
+de lettres latines, car les titres d'articles en portent (`5 µs`, que NFKC écrit avec un μ grec) ;
+`β-VAE` et `α-Fold` ne mêlent rien, le tiret séparant les mots. Une lettre modificative (`Lm`,
+comme l'apostrophe U+02BC de `lʼéquipe`) ne ressemble à aucune lettre latine : elle est permise. Cette règle porte sur l'affirmation,
+pas sur un fait : elle n'entre pas dans le taux.
+
+**Fait sans lettre ni chiffre.** Un fait qui n'a ni lettre ni chiffre une fois normalisé (`"   "`,
+trois U+200B) n'est pas trouvé (décision de Sabine du 2026-10-24, plan de #207) : sa chaîne vide ou
+son espace serait trouvé entre ses limites presque partout, et un item se ferait citer pour un fait
+qui ne dit rien de lui. Un fait n'est pas rogné : ` v2.1.287 ` n'est pas trouvé (sens sûr).
 
 **Chaque item cité porte un fait.** Chaque item de `item_ids` porte au moins un fait trouvé : un
 item ne peut pas se faire citer à côté d'une affirmation qui ne dit rien de lui.
@@ -572,6 +628,27 @@ ce n'est pas un échec. Un item qui n'est plus cité après ces retraits passe d
 Si toutes les affirmations d'un sujet sont retirées, la fiche est rendue sans affirmation : c'est
 ce qui a été observé. `fidelity_rate` = `facts_found` / `facts_checked`.
 
+**Ce qui est compté** (décision de Sabine du 2026-10-24, plan de #207). `facts_checked` compte
+chaque fait de chaque affirmation d'une sortie contrôlée, y compris d'une affirmation retirée pour
+une borne ; `facts_found`, ceux qui sont trouvés. Le taux mesure ce que le modèle recopie, comme
+Faithfulness de Ragas, qui met toutes les affirmations au dénominateur
+([doc de Ragas, « Faithfulness »](https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness),
+lue par time-knight le 2026-10-24), et comme `check_evidence.py`, qui vérifie chaque candidat
+(`docs/veille/2026-09-23-fiches-existant/Astro-Han_karpathy-llm-wiki.md`, l. 37). Les règles
+propres à l'affirmation (motif CVE ou GHSA non déclaré, item cité sans fait trouvé) n'entrent pas
+dans le taux : il peut valoir 1 avec des retraits, et se lit avec `claims_removed`. Un `text` vide
+rend ses faits non trouvés. `fidelity_rate` est sur la ligne de chaque appel de rédaction
+(section « Métriques »), arrondi à 4 décimales, nul quand aucun fait n'est vérifié ; le taux d'un
+essai est la somme des `facts_found` sur la somme des `facts_checked` de ses lignes `write`, pas la
+moyenne des taux. Option écartée : ne compter que les affirmations dans leurs bornes (un fait exact
+d'une affirmation trop longue ne compterait pas).
+
+**Partie commune avec le wiki (#153).** Le contrôle de fidélité du wiki reprend d'ici la
+normalisation, la recherche mot pour mot entre deux limites et le taux calculé à chaque appel
+(critère de #153) ; le code est `ai_api/fidelity.py`. Il n'en reprend pas ce qui tient aux items :
+les champs où chercher par sorte et l'égalité des CVE et GHSA à un champ identifiant, qu'un clip
+n'a pas.
+
 - **Ce qu'elle vérifie** : chaque valeur déclarée est écrite dans la phrase et existe, entre ses
   limites, dans un champ de l'item qu'elle cite ; chaque identifiant CVE ou GHSA de la phrase est
   celui de l'item cité ; chaque item cité porte un fait.
@@ -582,6 +659,34 @@ ce qui a été observé. `fidelity_rate` = `facts_found` / `facts_checked`.
   faible. **Limite** : le sens de la phrase, le nombre non déclaré et la traduction ne sont
   vérifiés par aucune étape (section « Ce que la spec ne couvre pas ») ; la fidélité reste sans
   modèle.
+- **Limite assumée** : un idéogramme ou une autre lettre non latine collée à des lettres latines
+  dans un même mot (un nom de produit suivi d'un caractère chinois) retire l'affirmation, comme un
+  sosie (revue de #207, décision de time-knight) ; rare dans une fiche en français.
+- **Limite assumée** : la détection lit large, dans le sens sûr. « Le CV en 2026, 0001 candidats »
+  est lu `CVE-2026-0001`, non déclaré, et retire l'affirmation ; un emoji suivi du sélecteur de
+  variante U+FE0F (`Mn`) aussi.
+- **Limite** : ne sont pas lus comme un identifiant `CVE-2026-0001a` (une lettre après le numéro :
+  il s'affiche autrement que l'identifiant visé), une phrase sans identifiant (« la faille
+  2026-0001 » : le sens n'est pas vérifié, et aucune expression régulière ne l'attrape), ni un sosie
+  hors de la liste (`PREFIX_LOOKALIKES`, `GREEK_LOOKALIKES`) ; une table complète des sosies
+  (UTS #39) demanderait une dépendance. L'écrivain du coffre retire les caractères `Cc` et `Cs` et
+  les douze contrôles bidirectionnels, pas les autres `Cf` (un tag U+E0041) (`post/vault_files.py`) :
+  la fidélité retire toute affirmation qui porte un `Cf` autre que U+200D, si bien qu'aucun
+  caractère invisible d'une affirmation n'arrive au coffre.
+- **Limite** : un chiffre accentué (`CVE-2026-0ö01`) n'est pas lu comme un identifiant, la lettre
+  ASCII accentuée restant elle-même ; le tréma se voit. Un symbole collé après un vrai identifiant
+  (`CVE-2026-0001🔥`) se lit `o` et rend l'identifiant différent : l'affirmation est retirée, ce qui
+  va dans le sens sûr. Décisions de time-knight sur la seconde revue de #207 (délégation de Sabine
+  du 2026-10-15).
+- **Limite assumée** : un motif CVE peut joindre deux nombres d'une liste (« les CVE 2025, 2026 et
+  2027 » se lit `CVE-2025-2026`) ; non déclaré, il retire l'affirmation, ce qui va dans le sens sûr
+  (revue de #207, même décision ; un test le fige).
+- **Limite assumée** : un motif GHSA peut être un faux positif dans une phrase française (« les
+  GHSA dont deux sont critiques » : quatre lettres, trois fois) ; non déclaré, il retire
+  l'affirmation, ce qui va dans le sens sûr.
+- **Limite** : la borne de 3 à 120 caractères d'un fait se mesure sur la valeur reçue, avant la
+  normalisation : `v2` suivi d'un U+200B la passe et devient `v2`, 2 caractères. Signalé par le plan
+  de #207, non tranché ; le fait doit encore figurer dans la phrase et dans l'item.
 - **Limite assumée** : `1.2.0` n'est pas trouvé dans `v1.2.0` ; l'affirmation est retirée,
   l'erreur va donc dans le sens sûr.
 
@@ -651,7 +756,7 @@ ne sont écrites qu'au retour du parcours.
 | `tokens_in`, `tokens_out` | `usage` rendu par le fournisseur |
 | `reasoning_tokens` | jetons de raisonnement rendus par le fournisseur, attendus à 0 avec `reasoning_effort: "none"` ; nul s'il ne les rend pas |
 | `data_fetch_ms` | durée de la lecture par l'API de données ; sur la première ligne de classement de la demande, nul ailleurs |
-| `llm_ms`, `check_ms` | durée des appels au modèle, nouvelle tentative et attente avant elle comprises ; durée des contrôles |
+| `llm_ms`, `check_ms` | durée des appels au modèle, nouvelle tentative et attente avant elle comprises ; durée des contrôles 1 à 6 (la fidélité tourne après l'appel, hors de cette durée) |
 | `attempts` | 1 ou 2 |
 | `outcome` | `ok`, ou l'état `llm_*` de l'appel |
 | `finish_reason` | celui de la dernière tentative, coupé à 64 caractères ; nul s'il manque |
@@ -659,11 +764,13 @@ ne sont écrites qu'au retour du parcours.
 | `schema_valid` | la dernière tentative a passé le contrôle 2 |
 | `failed_check` | le contrôle qui a refusé la dernière tentative (`content_filter`, `finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`) ; nul si `ok` |
 | `first_failed_check` | le contrôle qui a refusé la première tentative, quand une seconde a suivi ; nul sinon (#205, `LlmCall`, constat de #158 : le motif de la première tentative était perdu) |
-| `facts_checked`, `facts_found`, `claims_removed`, `items_uncited` | compteurs de la fidélité (rédaction) ; nuls au classement |
+| `facts_checked`, `facts_found` | compteurs de la fidélité (rédaction, section « Fidélité », « Ce qui est compté ») ; nuls au classement et pour une rédaction en échec |
+| `fidelity_rate` | `facts_found` / `facts_checked`, arrondi à 4 décimales ; nul au classement, pour une rédaction en échec, et quand `facts_checked` vaut 0 |
+| `claims_removed`, `items_uncited` | compteurs de la fidélité (rédaction) ; nuls au classement |
 | `cost_estimated` | en USD, arrondi à 6 décimales : `tokens_in` et `tokens_out` × prix au million de `core/config.py` (gpt-6-luna, Data Zone Standard, France Central, contexte court : 0,12 et 0,60) ; 0 en offre gratuite. **Limite** : tout appel est compté à ces prix, le replay compris (ses jetons sont ceux de ses pas, `provider` le dit) et un autre `KB_LLM_MODEL` aussi |
 
 `ts`, `stage`, `failed_check`, `items_dropped`, `items_capped`, `reasoning_tokens` et `http_status`
-s'ajoutent à la liste de #156, puis `first_failed_check` (#205).
+s'ajoutent à la liste de #156, puis `first_failed_check` (#205), puis `fidelity_rate` (#207).
 
 **Jamais** dans une ligne : le texte d'un item ou d'une affirmation, la consigne, la sortie du
 modèle, un titre, un auteur, une clé (règle 5 de `poc.md`). Un échec `data_api_*` ne fait aucun appel au modèle, donc
@@ -688,6 +795,7 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
 | `k_b.llm.check.duration` | Histogram, `s` | `check_ms` / 1000, pour un appel dont une tentative au moins a passé les contrôles (`LlmCall.is_checked`) ; un délai, un 5xx ou une réponse illisible n'en passent aucun | — |
 | `k_b.llm.cost` | Counter, `{USD}` | `cost_estimated` | — |
 | `k_b.digest.claims_removed`, `k_b.digest.items_uncited` | Counter | les compteurs de la rédaction | — |
+| `k_b.digest.facts_checked`, `k_b.digest.facts_found` | Counter, `{fact}` | les compteurs de la fidélité (#207) ; le taux se calcule dans Grafana par leur rapport, un taux ne s'additionnant pas | — |
 | `k_b.digest.data_fetch.duration` | Histogram, `s` | `data_fetch_ms` / 1000 | aucun |
 
 - **Attributs communs** aux mesures d'un appel : `gen_ai.operation.name = chat`,
@@ -711,7 +819,9 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
   détecteurs. L'identifiant d'instance sépare deux processus qui exportent en même temps (`kb
   serve-ai` et le test de bout en bout, deux réplicas), qui sinon écriraient les mêmes séries
   cumulées. Chaque redémarrage ouvre donc de nouvelles séries : 89 pour une demande dont les
-  quatre appels réussissent (compte du 2026-10-24, buckets compris), davantage avec des échecs ;
+  quatre appels réussissent (compte du 2026-10-24, buckets compris), 91 depuis les deux compteurs
+  de faits de #207 (une série chacun, aux attributs de la rédaction ; calcul, non recompté dans
+  Grafana), davantage avec des échecs ;
   l'offre gratuite de Grafana Cloud en compte 10 000 actives par mois.
 - **Réglages** de `kb serve-ai` : `KB_OTLP_ENDPOINT` (URL de base, `https`) et `KB_OTLP_HEADERS`
   (paires `nom=valeur` du format OTLP), les deux ou aucun ; sans eux, rien n'est exporté. Une URL

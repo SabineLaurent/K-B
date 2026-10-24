@@ -82,7 +82,17 @@ class ModelMetrics:
         self._items_uncited = meter.create_counter(
             "k_b.digest.items_uncited",
             unit="{item}",
-            description="Items no longer cited once the claims out of bounds are removed.",
+            description="Items no longer cited once claims are removed, by bounds or fidelity.",
+        )
+        self._facts_checked = meter.create_counter(
+            "k_b.digest.facts_checked",
+            unit="{fact}",
+            description="Facts of the claims checked by the fidelity, a claim removed included.",
+        )
+        self._facts_found = meter.create_counter(
+            "k_b.digest.facts_found",
+            unit="{fact}",
+            description="Facts found in their claim and in the item they cite.",
         )
         self._data_fetch_duration = meter.create_histogram(
             "k_b.digest.data_fetch.duration",
@@ -134,6 +144,10 @@ class ModelMetrics:
                 self._claims_removed.add(stage_call.claims_removed, attributes)
             if stage_call.items_uncited is not None:
                 self._items_uncited.add(stage_call.items_uncited, attributes)
+            if stage_call.facts_checked is not None:
+                self._facts_checked.add(stage_call.facts_checked, attributes)
+            if stage_call.facts_found is not None:
+                self._facts_found.add(stage_call.facts_found, attributes)
 
     def record_data_fetch(self, data_fetch_ms: int) -> None:
         """The reading of the window of a request, a model called or not."""

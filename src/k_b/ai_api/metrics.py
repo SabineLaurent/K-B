@@ -18,6 +18,8 @@ LLM_CALL_EVENT = "llm_call"
 TOKENS_PER_MILLION = 1_000_000
 # A millionth of a dollar: below, a call of a few tokens.
 COST_DECIMALS = 6
+# A percentage to two decimals: enough to read the threshold of 95 % (#210).
+FIDELITY_RATE_DECIMALS = 4
 
 
 @dataclass(frozen=True)
@@ -54,7 +56,7 @@ def build_llm_call_line(
     stage_call: StageCall,
     request_measures: RequestMeasures | None,
 ) -> dict[str, object]:
-    """The fields of the spec, in its order; the counters of the fidelity are null until #207."""
+    """The fields of the spec, in its order."""
     call = stage_call.llm_call
     return {
         "ts": format_timestamp(datetime.now(UTC)),
@@ -89,8 +91,11 @@ def build_llm_call_line(
         "schema_valid": call.schema_valid,
         "failed_check": call.failed_check,
         "first_failed_check": call.first_failed_check,
-        "facts_checked": None,
-        "facts_found": None,
+        "facts_checked": stage_call.facts_checked,
+        "facts_found": stage_call.facts_found,
+        "fidelity_rate": compute_fidelity_rate(
+            stage_call.facts_found, stage_call.facts_checked
+        ),
         "claims_removed": stage_call.claims_removed,
         "items_uncited": stage_call.items_uncited,
         "cost_estimated": estimate_cost(call.tokens_in, call.tokens_out),
@@ -104,6 +109,15 @@ def estimate_cost(tokens_in: int, tokens_out: int) -> float:
         + tokens_out * LLM_OUTPUT_USD_PER_MILLION_TOKENS
     ) / TOKENS_PER_MILLION
     return round(cost, COST_DECIMALS)
+
+
+def compute_fidelity_rate(
+    facts_found: int | None, facts_checked: int | None
+) -> float | None:
+    """The facts found over the facts checked; None without a fact checked."""
+    if facts_found is None or not facts_checked:
+        return None
+    return round(facts_found / facts_checked, FIDELITY_RATE_DECIMALS)
 
 
 def format_timestamp(moment: datetime) -> str:
