@@ -740,7 +740,7 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 
 `kb digest` (#209) demande les fiches à l'API IA, puis écrit celle de chaque sujet dans le coffre
 d'Obsidian : l'API IA n'écrit rien (règle 7 de `poc.md`). Il joint l'API IA par HTTP, jamais par
-son code (`etl` n'importe pas `ai_api`, `tests/architecture/test_layers.py`). Code :
+son code (ni `etl` ni `post` n'importent `ai_api`, `tests/architecture/test_layers.py`). Code :
 `commands/digest_command.py` (la porte), `post/ai_api_client.py` (la demande et la réponse),
 `post/digest_sheets.py` (la fiche), `post/vault_files.py` (l'écriture sûre, partagée avec les fiches
 des tops).

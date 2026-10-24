@@ -111,6 +111,15 @@ def test_no_module_of_the_pipeline_imports_the_sources_or_the_composition():
             )
 
 
+# post held four modules of the pipeline until they left etl (step 0 of
+# docs/refactoring/plan.md): the rule they had there follows them.
+def test_post_imports_neither_the_sources_nor_the_composition():
+    forbidden = {ETL_SOURCES_PACKAGE} | COMPOSITION_MODULES
+    for path in list_python_files("post"):
+        imported = list_imported_modules(path, find_package(path))
+        assert {name for name in imported if reaches(name, forbidden)} == set(), path
+
+
 # The three stages of the ETL talk to each other through raw/, never by their code: the
 # collection writes it, the import reads it, and only etl/pipeline.py chains them
 # (docs/refactoring/plan.md, part 2, rule 4). What they share is the vocabulary of
@@ -156,13 +165,20 @@ def test_the_rule_of_the_stages_refuses_every_way_to_another_stage(
     assert bool(list_imports_of_another_stage(imported, stage)) is is_refused
 
 
-# etl runs below the APIs: kb digest reaches the AI API by HTTP, never by its code (#209).
+# etl and post run below the APIs: kb digest reaches the AI API by HTTP, never by its code
+# (#209); its client is post/ai_api_client.py.
 def list_imports_of_the_apis(imported: set[str]) -> set[str]:
     return {name for name in imported if reaches(name, {"data_api", "ai_api"})}
 
 
 def test_etl_imports_neither_the_data_api_nor_the_ai_api():
     for path in list_python_files("etl"):
+        imported = list_imported_modules(path, find_package(path))
+        assert list_imports_of_the_apis(imported) == set(), path
+
+
+def test_post_imports_neither_the_data_api_nor_the_ai_api():
+    for path in list_python_files("post"):
         imported = list_imported_modules(path, find_package(path))
         assert list_imports_of_the_apis(imported) == set(), path
 
