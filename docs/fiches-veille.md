@@ -669,9 +669,10 @@ n'a pas.
   il s'affiche autrement que l'identifiant visé), une phrase sans identifiant (« la faille
   2026-0001 » : le sens n'est pas vérifié, et aucune expression régulière ne l'attrape), ni un sosie
   hors de la liste (`PREFIX_LOOKALIKES`, `GREEK_LOOKALIKES`) ; une table complète des sosies
-  (UTS #39) demanderait une dépendance. L'écrivain du coffre ne retire que les caractères `Cc` et
-  `Cs` (`post/vault_files.py`) : la fidélité retire toute affirmation qui porte un `Cf` autre
-  que U+200D, si bien qu'aucun caractère invisible d'une affirmation n'arrive au coffre.
+  (UTS #39) demanderait une dépendance. L'écrivain du coffre retire les caractères `Cc` et `Cs` et
+  les douze contrôles bidirectionnels, pas les autres `Cf` (un tag U+E0041) (`post/vault_files.py`) :
+  la fidélité retire toute affirmation qui porte un `Cf` autre que U+200D, si bien qu'aucun
+  caractère invisible d'une affirmation n'arrive au coffre.
 - **Limite** : un chiffre accentué (`CVE-2026-0ö01`) n'est pas lu comme un identifiant, la lettre
   ASCII accentuée restant elle-même ; le tréma se voit. Un symbole collé après un vrai identifiant
   (`CVE-2026-0001🔥`) se lit `o` et rend l'identifiant différent : l'affirmation est retirée, ce qui
