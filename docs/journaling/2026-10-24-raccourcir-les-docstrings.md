@@ -143,7 +143,14 @@ Résultat après chaque commit : `compared=194 ast_differences=0 comment_differe
 ## Zones non vérifiées
 
 - **Le texte des docstrings.** La preuve garantit que le code n'a pas bougé, pas que chaque nouvelle phrase
-  dit juste. Cette justesse repose sur la relecture : la mienne, puis `/code-review high`.
+  dit juste. Cette justesse repose sur la relecture.
+  - Le premier `/code-review high` a trouvé 17 pertes d'information, dont quatre règles de sécurité ou de
+    perte de données (`without_values`, la garde de `raw_purge`, l'ordre de `check_writing`,
+    l'interruption après le commit). 16 ont été rétablies (`f784919`).
+  - Le second passage (`medium`, sur les seules corrections) a trouvé des phrases rétablies encore
+    inexactes, corrigées dans `b51e887`. Parmi elles, deux mots que le contrôle de la règle 3 de
+    `conventions.md` refuse : « maybe » et « may be ».
+  - Leçon : raccourcir, c'est d'abord risquer de retirer le pourquoi qui protège le code.
 - **L'appréciation de ce qui est « évident ».** Elle est une affaire de jugement, et elle a été tranchée
   docstring par docstring sans seconde lecture humaine.
 - **Les tests de bout en bout** (`tests/e2e/`) n'ont pas été relancés. Leurs fichiers ne changent que par
@@ -153,6 +160,8 @@ Résultat après chaque commit : `compared=194 ast_differences=0 comment_differe
 
 - **Les commentaires**, l'autre moitié de l'étape 9 de `docs/refactoring/plan.md`, qui reste à faire.
 - **Les renvois `fichier:ligne` des notes datées et des notes de refactorisation**, laissés tels quels.
+- **#301** : la clause « copied again » de `ClippingSource.fetch`, fausse déjà sur `main`.
+- **#302** : le cas d'une interruption sans transaction dans `commit_with_log`, présent déjà sur `main`.
 
 ## Sources
 
