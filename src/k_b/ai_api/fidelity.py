@@ -22,14 +22,55 @@ PUNCTUATION = str.maketrans(
 )
 BLANKS = re.compile(r"\s+")
 INVISIBLE_CATEGORY = "Cf"
-# Applied to a normalized text. A separator is any run without letter nor digit: CVE_2026_0001 is
-# a CVE too (decision of Sabine of 2026-10-24). An identifier ends at a limit, as any fact: neither
-# a letter nor a digit after it, nor a . or a - followed by one.
+# Applied to the text of detection (to_detection_text). A separator is any run without letter nor
+# digit, between the letters of the prefix too (C.V.E.); a number word may follow the prefix
+# (CVE n°, CVE ID); o, l and i stand for digits, so that CVE-2026-OOO1 is read and never equals a
+# real one. An identifier ends at a limit, as any fact: neither a letter nor a digit after it, nor
+# a . or a - followed by one. Decisions of Sabine of 2026-10-24 and of time-knight on the review of
+# #207 (docs/fiches-veille.md, "Fidélité").
+SEPARATOR = r"[\W_]*"
+NUMBER_WORD = rf"(?:(?:n|no|nr|num|numero|numéro|number|id)(?![^\W\d_]){SEPARATOR})?"
+DIGIT = r"[\doli]"
 END_LIMIT = r"(?![^\W_]|[.-][^\W_])"
-CVE = re.compile(rf"cve[\W_]*(\d{{4}})[\W_]*(\d{{4,}}){END_LIMIT}")
-GHSA = re.compile(
-    rf"ghsa[\W_]*([0-9a-z]{{4}})[\W_]*([0-9a-z]{{4}})[\W_]*([0-9a-z]{{4}}){END_LIMIT}"
+CVE = re.compile(
+    rf"c{SEPARATOR}v{SEPARATOR}e{SEPARATOR}{NUMBER_WORD}"
+    rf"({DIGIT}{{4}}){SEPARATOR}({DIGIT}{{4,}}){END_LIMIT}"
 )
+GHSA = re.compile(
+    rf"g{SEPARATOR}h{SEPARATOR}s{SEPARATOR}a{SEPARATOR}{NUMBER_WORD}"
+    rf"([0-9a-z]{{4}}){SEPARATOR}([0-9a-z]{{4}}){SEPARATOR}([0-9a-z]{{4}}){END_LIMIT}"
+)
+# The emphasis of Markdown (**, ==), removed for the detection only: CVE-2026-00**01** displays as
+# an identifier.
+EMPHASIS = str.maketrans("", "", "*=")
+# Letters read as the Latin letters of a prefix, for the detection only: Cyrillic, Greek and Latin
+# small capitals, lowercase as normalize leaves them.
+PREFIX_LOOKALIKES = str.maketrans(
+    {
+        **{chr(code): "a" for code in (0x0430, 0x03B1, 0x1D00)},
+        **{chr(code): "c" for code in (0x0441, 0x03F2, 0x1D04)},
+        **{chr(code): "e" for code in (0x0435, 0x03B5, 0x1D07)},
+        **{chr(code): "g" for code in (0x050D, 0x0262)},
+        **{chr(code): "h" for code in (0x04BB, 0x029C)},
+        **{chr(code): "s" for code in (0x0455, 0xA731)},
+        **{chr(code): "v" for code in (0x0475, 0x03BD, 0x1D20)},
+    }
+)
+# What hides or disguises a text once normalized: marks, enclosing marks, private-use and
+# unassigned code points, and the Hangul and Braille fillers, displayed as blanks.
+HIDING_CATEGORIES = frozenset({"Mn", "Me", "Co", "Cn"})
+FILLERS = frozenset(chr(code) for code in (0x115F, 0x1160, 0x3164, 0xFFA0, 0x2800))
+# The Greek letters that look like Latin ones: any other may stand next to Latin letters in a word
+# (5 μs, as NFKC writes 5 µs), as arXiv titles carry them.
+GREEK_LOOKALIKES = frozenset(
+    chr(code)
+    for code in (
+        *(0x0391, 0x0392, 0x0395, 0x0396, 0x0397, 0x0399, 0x039A, 0x039C, 0x039D),
+        *(0x039F, 0x03A1, 0x03A4, 0x03A5, 0x03A7, 0x03B9, 0x03BD, 0x03BF, 0x03C1),
+        *(0x03C5, 0x03F2),
+    )
+)
+LETTER_RUNS = re.compile(r"[^\W\d_]+")
 # Added after a field cut for the writing: a letter, so that its end is not a limit (…1.2 may be
 # the start of 1.2.9).
 CUT_END = "a"
@@ -47,26 +88,31 @@ SEARCHED_FIELDS_BY_KIND: dict[WatchKind, tuple[str, ...]] = {
 class ClaimFidelity:
     facts_checked: int
     facts_found: int
-    # Every fact found, every identifier of the text declared, every item cited carrying a fact.
+    # Every fact found, every identifier of the text declared, every item cited carrying a fact,
+    # and nothing that hides or disguises the text.
     is_faithful: bool
 
 
 def check_claim(claim: Claim, item_by_ref: Mapping[str, WatchItem]) -> ClaimFidelity:
     """The facts of the claim checked, each against the item it cites."""
     text = normalize(claim.text)
-    text_identifiers = set(find_identifiers(text))
+    text_identifiers = set(find_identifiers(to_detection_text(text)))
     found_facts = [
         fact
         for fact in claim.facts
         if is_fact_found(fact, text, text_identifiers, item_by_ref[fact.item_id])
     ]
-    declared = {to_canonical_identifier(normalize(fact.value)) for fact in claim.facts}
+    declared = {
+        to_canonical_identifier(to_detection_text(normalize(fact.value)))
+        for fact in claim.facts
+    }
     return ClaimFidelity(
         facts_checked=len(claim.facts),
         facts_found=len(found_facts),
         is_faithful=len(found_facts) == len(claim.facts)
         and text_identifiers <= declared
-        and set(claim.item_ids) <= {fact.item_id for fact in found_facts},
+        and set(claim.item_ids) <= {fact.item_id for fact in found_facts}
+        and not is_disguised(claim.text),
     )
 
 
@@ -79,17 +125,53 @@ def normalize(text: str) -> str:
     return BLANKS.sub(" ", visible.translate(PUNCTUATION))
 
 
+def to_detection_text(normalized: str) -> str:
+    """The normalized text without emphasis, its lookalikes of a prefix read as Latin letters."""
+    return normalized.translate(EMPHASIS).translate(PREFIX_LOOKALIKES)
+
+
+def is_disguised(text: str) -> bool:
+    """Whether the text holds, once normalized, a character that hides, or a word mixing Latin
+    letters with a letter that may look like one."""
+    if any(
+        unicodedata.category(char) in HIDING_CATEGORIES or char in FILLERS
+        for char in normalize(text)
+    ):
+        return True
+    # Before casefold: a Greek capital Ε looks like E, its lowercase ε does not.
+    words = LETTER_RUNS.findall(unicodedata.normalize("NFKC", text))
+    return any(mixes_lookalikes(word) for word in words)
+
+
+def mixes_lookalikes(word: str) -> bool:
+    latin = [char for char in word if is_latin(char)]
+    others = [char for char in word if not is_latin(char)]
+    return bool(latin) and any(not is_free_greek(char) for char in others)
+
+
+def is_latin(char: str) -> bool:
+    return unicodedata.name(char, "").startswith("LATIN")
+
+
+def is_free_greek(char: str) -> bool:
+    return (
+        unicodedata.name(char, "").startswith("GREEK") and char not in GREEK_LOOKALIKES
+    )
+
+
 def is_fact_found(
     fact: Fact, text: str, text_identifiers: set[str], item: WatchItem
 ) -> bool:
     value = normalize(fact.value)
-    if CVE.search(value) or GHSA.search(value):
-        identifier = to_canonical_identifier(value)
+    detection_value = to_detection_text(value)
+    if CVE.search(detection_value) or GHSA.search(detection_value):
+        identifier = to_canonical_identifier(detection_value)
         return (
             identifier is not None
             and identifier in text_identifiers
             and any(
-                to_canonical_identifier(normalize(field)) == identifier
+                to_canonical_identifier(to_detection_text(normalize(field)))
+                == identifier
                 for field in list_identifier_fields(item)
             )
         )
@@ -108,7 +190,7 @@ def to_searched_text(field: str) -> str:
 
 
 def find_identifiers(text: str) -> Iterator[str]:
-    """The CVE and GHSA of a normalized text, in their canonical form."""
+    """The CVE and GHSA of a text of detection, in their canonical form."""
     for cve in CVE.finditer(text):
         yield to_canonical_cve(cve)
     for ghsa in GHSA.finditer(text):
@@ -116,7 +198,7 @@ def find_identifiers(text: str) -> Iterator[str]:
 
 
 def to_canonical_identifier(value: str) -> str | None:
-    """CVE-YYYY-NNNN or GHSA-xxxx-xxxx-xxxx if the normalized value is one, and nothing more."""
+    """CVE-YYYY-NNNN or GHSA-xxxx-xxxx-xxxx if the value of detection is one, and nothing more."""
     if cve := CVE.fullmatch(value):
         return to_canonical_cve(cve)
     if ghsa := GHSA.fullmatch(value):

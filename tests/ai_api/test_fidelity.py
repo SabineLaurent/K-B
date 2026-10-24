@@ -342,3 +342,83 @@ def test_the_end_of_a_field_shorter_than_the_cut_is_a_limit():
     fidelity = check_claim(claim("Version 1.2.", ("1.2", "i6")), {"i6": release})
 
     assert fidelity.facts_found == 1
+
+
+def trapped_claim_kept(text):
+    """Whether the claim of the trap, citing the trapped article for the fact China, is kept."""
+    fidelity = check_claim(
+        claim(f"China : {text} n'est pas exploitée.", ("China", TRAPPED_REF)),
+        {TRAPPED_REF: TRAPPED_ITEM},
+    )
+    return fidelity.is_faithful
+
+
+def test_the_trap_written_plainly_is_removed():
+    assert trapped_claim_kept("CVE-2026-0001") is False
+
+
+# The writings of the trap found by the security reviewer of #207 (decisions of time-knight,
+# delegation of Sabine of 2026-10-15), each character written by its code point.
+DISGUISED_CVES = {
+    "variation_selector": "C" + chr(0xFE0F) + "VE-2026-0001",
+    "combining_grapheme_joiner": "C" + chr(0x034F) + "VE-2026-0001",
+    "combining_grave": "CV" + chr(0x0300) + "E-2026-0001",
+    "khmer_inherent_vowel": "C" + chr(0x17B4) + "VE-2026-0001",
+    "variation_selector_supplement": "C" + chr(0xE0100) + "VE-2026-0001",
+    "private_use": "C" + chr(0xE000) + "VE-2026-0001",
+    "hangul_filler": "C" + chr(0x3164) + "VE-2026-0001",
+    "hangul_choseong_filler": "C" + chr(0x115F) + "VE-2026-0001",
+    "hangul_jungseong_filler": "C" + chr(0x1160) + "VE-2026-0001",
+    "halfwidth_hangul_filler": "C" + chr(0xFFA0) + "VE-2026-0001",
+    "braille_blank": "C" + chr(0x2800) + "VE-2026-0001",
+    "cyrillic_mixed": chr(0x0421) + "V" + chr(0x0415) + "-2026-0001",
+    "cyrillic_and_izhitsa": chr(0x0421) + chr(0x0474) + chr(0x0415) + "-2026-0001",
+    "greek_capitals_mixed": "CV" + chr(0x0395) + "-2026-0001",
+    "small_capitals": chr(0x1D04) + chr(0x1D20) + chr(0x1D07) + "-2026-0001",
+    "number_sign": "la CVE n°2026-0001",
+    "numero_sign": "la CVE " + chr(0x2116) + "2026-0001",
+    "id": "la CVE ID 2026-0001",
+    "numero": "la CVE numéro 2026-0001",
+    "number": "la CVE number 2026-0001",
+    "emphasis_in_prefix": "C*V*E-2026-0001",
+    "bold_in_number": "CVE-2026-00**01**",
+    "highlight_in_number": "CVE-2026-00==01==",
+    "dotted_prefix": "C.V.E. 2026-0001",
+    "letters_o_for_zeros": "CVE-2026-OOO1",
+    "letter_l_for_one": "CVE-2026-000l",
+    "ghsa_cyrillic": "GHS" + chr(0x0410) + "-fjqc-hq36-qh5p",
+}
+
+
+@pytest.mark.parametrize("text", DISGUISED_CVES.values(), ids=DISGUISED_CVES.keys())
+def test_the_trap_disguised_is_removed(text):
+    assert trapped_claim_kept(text) is False
+
+
+def test_a_cv_in_a_sentence_can_read_as_a_cve_and_remove_the_claim():
+    """A known false positive, on the safe side (docs/fiches-veille.md, "Fidélité", limits)."""
+    assert trapped_claim_kept("Le CV en 2026, 0001 candidats, et") is False
+
+
+# Paper 2 of the test base, its title with Greek letters as arXiv titles carry them.
+GREEK_PAPER = watch_item(
+    2,
+    "paper",
+    title="Evaluating β-VAE and α-Fold judges in 5 µs",
+    summary="Model-based judges support agent security by detecting prompt injections.",
+)
+
+
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        ("Le β-VAE juge les injections.", "β-VAE"),
+        ("α-Fold juge les injections.", "α-Fold"),
+        ("Un juge en 5 µs.", "5 µs"),
+    ],
+    ids=["beta_vae", "alpha_fold", "micro_second"],
+)
+def test_greek_letters_next_to_latin_ones_keep_the_claim(text, value):
+    fidelity = check_claim(claim(text, (value, "i2")), {"i2": GREEK_PAPER})
+
+    assert fidelity.is_faithful is True

@@ -534,10 +534,22 @@ NFKC, `casefold`, retrait des caractères invisibles (catégorie Unicode `Cf` : 
 U+2060…), espaces réduites à une seule, tirets Unicode (U+2010 à U+2015, U+2212) ramenés à `-`,
 apostrophes et guillemets typographiques (U+2018, U+2019, U+201C, U+201D) ramenés à `'` et `"`.
 
-**Faits CVE et GHSA.** Les motifs s'appliquent après la normalisation :
+**Faits CVE et GHSA.** Les motifs s'appliquent après la normalisation, sur un **texte de
+détection** : les marques d'emphase `*` et `=` retirées (`CVE-2026-00**01**` s'affiche comme un
+identifiant), et les lettres cyrilliques, grecques et petites capitales latines qui ressemblent à
+une lettre d'un préfixe lues comme elle (`СVЕ` cyrillique se lit `cve`). Écrits sur ce texte, en
+minuscules (`ai_api/fidelity.py`, `CVE` et `GHSA`), avec `S` = `[\W_]*` :
 
-- CVE : `(?i)CVE[\W_]*\d{4}[\W_]*\d{4,}` ;
-- GHSA : `(?i)GHSA[\W_]*[0-9a-z]{4}[\W_]*[0-9a-z]{4}[\W_]*[0-9a-z]{4}`.
+- CVE : `c S v S e S [mot de numéro S] [\doli]{4} S [\doli]{4,}` ;
+- GHSA : `g S h S s S a S [mot de numéro S] [0-9a-z]{4} S [0-9a-z]{4} S [0-9a-z]{4}`.
+
+Un séparateur peut couper le préfixe (`C.V.E.`, `C*V*E`). Le **mot de numéro**, facultatif, est
+`n`, `no`, `nr`, `num`, `numero`, `numéro`, `number` ou `id` (`№` devient `no` par NFKC) : « la CVE
+n°2026-0001 » est une tournure française que le modèle écrit sans attaque. `o`, `l` et `i` comptent
+pour des chiffres : `CVE-2026-OOO1` est lu, et n'est jamais égal à un vrai identifiant. Ces règles
+de détection sont des décisions de time-knight sur la revue de sécurité de #207 (délégation de
+Sabine du 2026-10-15) ; `AAAA-NNNN` seul n'est pas lu comme un identifiant, car `2025-2026` le
+deviendrait.
 
 Un séparateur est toute suite sans lettre ni chiffre (décision de Sabine du 2026-10-24, plan de
 #207) : avec `[\s-]*`, `CVE_2026_0001` ou `CVE.2026.0001` n'était pas un motif ; déclaré en fait,
@@ -573,6 +585,17 @@ CVE ou GHSA, jamais à la recherche d'un fait ordinaire. La fin d'un champ coup�
 (2 000 caractères, `MAX_FIELD_CHARS_FOR_WRITING`) n'est pas une limite : `…1.2` coupé peut être le
 début de `1.2.9`, et `1.2` n'y est pas trouvé (revue de #207, même décision). Un champ d'exactement
 2 000 caractères est traité comme coupé, ce qui va dans le sens sûr.
+
+**Texte déguisé.** Une affirmation dont le `text` contient, une fois normalisé, un caractère qui
+cache ou déguise (une marque `Mn` ou `Me`, un point de code privé `Co` ou non attribué `Cn`, un
+remplissage hangul ou braille U+115F, U+1160, U+3164, U+FFA0, U+2800, qui s'affiche en blanc), ou
+un mot qui mêle des lettres latines à une lettre non latine qui peut leur ressembler, est retirée
+et comptée (décision de time-knight sur la revue de sécurité de #207, délégation de Sabine du
+2026-10-15). Le mot se lit avant le `casefold` : la capitale grecque `Ε` ressemble à `E`, sa
+minuscule `ε` non. Une lettre grecque qui ne ressemble pas à une lettre latine reste permise à côté
+de lettres latines, car les titres d'articles en portent (`5 µs`, que NFKC écrit avec un μ grec) ;
+`β-VAE` et `α-Fold` ne mêlent rien, le tiret séparant les mots. Cette règle porte sur l'affirmation,
+pas sur un fait : elle n'entre pas dans le taux.
 
 **Fait sans lettre ni chiffre.** Un fait qui n'a ni lettre ni chiffre une fois normalisé (`"   "`,
 trois U+200B) n'est pas trouvé (décision de Sabine du 2026-10-24, plan de #207) : sa chaîne vide ou
@@ -626,6 +649,16 @@ n'a pas.
   faible. **Limite** : le sens de la phrase, le nombre non déclaré et la traduction ne sont
   vérifiés par aucune étape (section « Ce que la spec ne couvre pas ») ; la fidélité reste sans
   modèle.
+- **Limite assumée** : la détection lit large, dans le sens sûr. « Le CV en 2026, 0001 candidats »
+  est lu `CVE-2026-0001`, non déclaré, et retire l'affirmation ; un emoji suivi du sélecteur de
+  variante U+FE0F (`Mn`) aussi.
+- **Limite** : ne sont pas lus comme un identifiant `CVE-2026-0001a` (une lettre après le numéro :
+  il s'affiche autrement que l'identifiant visé), une phrase sans identifiant (« la faille
+  2026-0001 » : le sens n'est pas vérifié, et aucune expression régulière ne l'attrape), ni un sosie
+  hors de la liste (`PREFIX_LOOKALIKES`, `GREEK_LOOKALIKES`) ; une table complète des sosies
+  (UTS #39) demanderait une dépendance. L'écrivain du coffre ne retire que les caractères `Cc` et
+  `Cs` (`post/vault_files.py`) : un caractère `Cf` d'une affirmation gardée (U+200B) arrive au
+  coffre ; la fidélité le retire avant de chercher, si bien qu'il ne cache pas un identifiant.
 - **Limite assumée** : un motif CVE peut joindre deux nombres d'une liste (« les CVE 2025, 2026 et
   2027 » se lit `CVE-2025-2026`) ; non déclaré, il retire l'affirmation, ce qui va dans le sens sûr
   (revue de #207, même décision ; un test le fige).
