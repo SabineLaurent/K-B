@@ -1,9 +1,4 @@
-"""Normalize the items read (docs/specs-collecte.md, step 3).
-
-No input or output here: the items come from etl/transform.py, which calls normalize_item on each
-item its reading keeps (read_raw_items); the base removes the duplicates at the import
-(etl/load.py).
-"""
+"""Normalize the items read, without input or output (docs/specs-collecte.md, step 3)."""
 
 from urllib.parse import urlsplit, urlunsplit
 
@@ -13,8 +8,7 @@ TRACKING_PARAMETER_PREFIX = "utm_"
 
 
 def normalize_item(item: Item) -> Item:
-    """The same item, with its URL without tracking parameters. Its dates, those of its
-    highlights too, are in UTC already (UtcDatetime, items.py)."""
+    """The same item, with its URL without tracking parameters; its dates are in UTC already."""
     fields = item.model_dump()
     if item.url is not None:
         fields["url"] = remove_tracking_parameters(item.url)

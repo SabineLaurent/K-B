@@ -75,17 +75,7 @@ def collect_one_source(
     source: Source, raw_dir: Path, now: datetime, last_collected_at: datetime | None
 ) -> None:
     """Collect one source and write what it gives under raw/: one raw file named by now, or a
-    folder of that name holding one file per page. A source that says nothing changed since
-    last_collected_at writes nothing.
-
-    Raises:
-        ValueError: a raw folder that is not one of RAW_DIR_NAMES, or a source name, extension
-            or page name that is not safe in a path.
-        FileExistsError: a raw file of that name is already there; raw/ is immutable
-            (etl/raw_store.py).
-        Exception: whatever the fetch of the source raises; the collection logs it and goes on
-            to the next source (collect_all_sources).
-    """
+    folder of that name holding one file per page; nothing if the source says nothing changed."""
     if source.acquisition_dir_name not in RAW_DIR_NAMES:
         raise ValueError(f"not a folder of raw/: {source.acquisition_dir_name!r}")
     for path_segment in (source.name, source.extension):

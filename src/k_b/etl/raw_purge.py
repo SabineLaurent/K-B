@@ -1,7 +1,5 @@
-"""Delete the raw files of a state catalog that a newer one, imported, has superseded: of each
-folder given, only the last raw file imported is kept (ADR of 2026-10-19). The base keeps the
-dates between two imports (revised_at, withdrawn_at), not the raw.
-"""
+"""Delete the raw files of a state catalog superseded by a newer one imported: of each folder,
+only the last raw file imported is kept."""
 
 import logging
 from collections.abc import Collection
@@ -16,13 +14,10 @@ def delete_superseded_raw_files(
     store: RawStore, imported_paths: frozenset[str], folder_keys: Collection[str]
 ) -> int:
     """Of each folder, delete the raw files imported before the last one imported; return how
-    many were deleted.
+    many.
 
-    The files come from the registry of the base (raw_data, paths relative to raw/), never
-    from the folder: a raw file not imported yet, or that cannot be read, is not registered,
-    so never deleted. A folder whose last imported file is gone keeps the others: they are the
-    only raw of its state. The first error stops the purge; the next import deletes the rest.
-    """
+    The files come from the registry of the base, never from the folder: a raw file not imported
+    is never deleted. The first error stops the purge."""
     deleted_count = 0
     for folder_key in folder_keys:
         imported_keys = sorted(

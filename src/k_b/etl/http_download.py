@@ -9,12 +9,8 @@ TIMEOUT_SECONDS = 30
 
 
 class RedirectedOutsideError(ValueError):
-    """The answer came from outside the trusted prefix; redirect_url says where it led.
-
-    A source may read it (tldr.tech redirects a day without an edition to its landing page).
-    Refusing a redirection before following it (#54) must keep raising this error, with the
-    redirection target resolved against the requested url.
-    """
+    """The answer came from outside the trusted prefix; redirect_url says where it led, resolved
+    against the requested url (tldr.tech redirects a day without an edition)."""
 
     def __init__(self, trusted_url_prefix: str, redirect_url: str):
         super().__init__(
@@ -30,11 +26,11 @@ def download(
     headers: dict[str, str] | None = None,
     unredirected_headers: dict[str, str] | None = None,
 ) -> bytes:
-    """Return the body of GET url, refused if served from outside trusted_url_prefix or too large.
+    """Return the body of GET url, refused if served from outside trusted_url_prefix or too
+    large.
 
-    An unredirected header (a token) is never forwarded to a redirection. An HTTPError is raised
-    to the caller, who alone knows what a status such as 304 means.
-    """
+    An unredirected header (a token) is never forwarded to a redirection; an HTTPError is left to
+    the caller, who alone knows what a status such as 304 means."""
     check_trusted_url_prefix(url, trusted_url_prefix)
     # https only: check_trusted_url_prefix refuses any other scheme.
     request = Request(url, headers={**(headers or {}), "User-Agent": USER_AGENT})  # noqa: S310
@@ -53,10 +49,9 @@ def download(
 def check_trusted_url_prefix(url: str, trusted_url_prefix: str) -> None:
     """Refuse a prefix that would trust too much, or a url the prefix does not cover.
 
-    The prefix must name an https host and end it with a path, so that "https://" or
-    "https://example.org" (which "https://example.org.evil.com" starts with) cannot be passed.
-    No user info either: urlsplit reads "https://evil.com\\@good.com/" as good.com, urllib does not.
-    """
+    The prefix names an https host and a path, so that "https://example.org.evil.com" cannot
+    pass; no user info either: urlsplit reads "https://evil.com\\@good.com/" as good.com, urllib
+    does not."""
     prefix_parts = urlsplit(trusted_url_prefix)
     is_prefix_strict = (
         prefix_parts.scheme == "https"
