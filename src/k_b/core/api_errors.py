@@ -1,5 +1,5 @@
-"""The errors of the APIs of K-B, written once for both: a named state, no stack, no path, no
-value received (docs/specs-api.md, "Erreurs"; docs/fiches-veille.md, "États nommés")."""
+"""The errors of both APIs: a named state, never a stack, a path nor a value received
+(docs/specs-api.md, "Erreurs")."""
 
 import logging
 from collections.abc import Awaitable, Callable, Coroutine, Mapping
@@ -87,10 +87,8 @@ async def handle_invalid_parameter(
 
 
 def name_parameter(detail: Mapping[str, Any]) -> str:
-    """The name of the parameter refused, never a value received. loc is ("query", <name>, ...)
-    for a declared parameter, ("body", <field>, ...) for a field of the body; a body refused as a
-    whole has a loc of one item, or a position in place of a name (not JSON), and a field that
-    is not declared is named by the client: each of them is the body."""
+    """The name of the parameter refused, never a value received; a refusal of the whole body or
+    of an undeclared field (named by the client) is the body."""
     location = detail["loc"]
     if (
         len(location) < 2
@@ -104,8 +102,8 @@ def name_parameter(detail: Mapping[str, Any]) -> str:
 async def handle_http_error(
     request: Request, error: StarletteHTTPException
 ) -> Response:
-    """The errors Starlette raises when it routes a request, and the 400 of a body FastAPI
-    cannot read: each by its named state; any other by FastAPI."""
+    """The errors Starlette raises when it routes a request, and the 400 of an unreadable body,
+    each by its named state."""
     if error.status_code == BODY_NOT_READ_STATUS:
         return respond_with_invalid_parameters([BODY])
     state = STATE_BY_ROUTING_STATUS.get(error.status_code)
@@ -117,12 +115,11 @@ async def handle_http_error(
 async def respond_to_unexpected_error(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
-    """An exception no handler takes: a 500 with a named state, its type logged once with the id
-    of the request, never its message nor its stack, which may quote a value received.
+    """An exception no handler takes: a 500 with a named state, its type logged once, never its
+    message nor its stack, which may quote a value received.
 
-    A middleware, not a handler of Exception: Starlette raises the exception again after such a
-    handler (starlette/middleware/errors.py), and uvicorn would log its stack.
-    """
+    A middleware, not a handler of Exception: Starlette raises again after such a handler, and
+    uvicorn would log the stack."""
     try:
         return await call_next(request)
     except Exception as error:  # noqa: BLE001 — every exception no handler takes

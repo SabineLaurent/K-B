@@ -1,6 +1,6 @@
-"""The rules of a connection K-B opens to a service by HTTP: the AI API to the model and to the data
-API, kb digest to the AI API. The URL it accepts, and its HTTP client: one place, since both are
-rules of security (ADR of 2026-10-21, #209: in core, which etl and the APIs may import)."""
+"""The rules of a connection K-B opens by HTTP (AI API to the model and to the data API, kb
+digest to the AI API): the URL it accepts and its HTTP client, in one place since both are
+security rules."""
 
 import re
 from collections.abc import Mapping
@@ -14,8 +14,8 @@ HOST_NAME = re.compile(r"[a-z0-9]([a-z0-9.-]*[a-z0-9])?")
 
 
 def find_url_refusal(variable: str, url: str, schemes: tuple[str, ...]) -> str | None:
-    """Why the URL of the variable is refused, or None. The URL is never quoted: a URL refused
-    may carry a key (`https://user:key@host`, `?api-key=…`)."""
+    """Why the URL of the variable is refused, or None. The URL is never quoted: it may carry a
+    key (`https://user:key@host`, `?api-key=…`)."""
     try:
         parts = urlsplit(url)
         has_user_information = parts.username is not None or parts.password is not None
@@ -43,7 +43,7 @@ def open_http_client(
     transport: httpx2.BaseTransport | None,
 ) -> httpx2.Client:
     """A client that reads neither a proxy nor a certificate of the environment, and follows no
-    redirection: the caller reads a redirection as an answer it does not expect."""
+    redirection."""
     return httpx2.Client(
         base_url=base_url,
         headers=headers,

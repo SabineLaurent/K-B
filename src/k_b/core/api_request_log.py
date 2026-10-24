@@ -1,7 +1,5 @@
-"""One log line per request of an API: method, route template, status, duration, client and the id
-of the request; never the key, a value of a parameter nor a raw path (docs/specs-api.md,
-"Journal"). The id is given back in X-Request-ID: a response, an error included, is tied to the
-lines of its request."""
+"""One log line per request of an API, never with the key, a parameter value nor a raw path
+(docs/specs-api.md, "Journal"); its id is given back in X-Request-ID."""
 
 import logging
 import time
@@ -24,8 +22,7 @@ async def log_request(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
     """Give the request its id, then log it once its response is known; in a finally, so that a
-    request stopped before its response (the client gone, the server stopped) leaves its line,
-    without status."""
+    request stopped before its response leaves its line, without status."""
     request.state.request_id = str(uuid.uuid4())
     started = time.perf_counter()
     status_code: int | None = None
@@ -52,17 +49,14 @@ async def log_request(
 
 
 def read_request_id(request: Request) -> str:
-    """The id log_request gave the request, for the other lines of the request."""
     return str(getattr(request.state, "request_id", NONE_SEEN))
 
 
 def find_route_template(request: Request) -> str:
     """The template of the route matched (/items/{item_id}), never the path received.
 
-    FastAPI puts in the scope its own routes only (fastapi/routing.py, 0.143): /docs,
-    /openapi.json and /health, without parameter, are named by their path, the one the app gives
-    them.
-    """
+    FastAPI puts only its own routes in the scope: /docs, /openapi.json and /health, without
+    parameter, are named by their path."""
     route = request.scope.get("route")
     if route is not None:
         return str(route.path)

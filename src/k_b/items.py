@@ -1,10 +1,5 @@
-"""The common item every source is read into, before the import (docs/specs-collecte.md, step 2).
-
-Which source field goes into which item field: docs/stockage.md.
-
-And the row of a GH Archive ranking, which is not an item: the base constrains it, and the
-import, which cannot import a source, writes it.
-"""
+"""The common item every source is read into, before the import, and the row of a GH Archive
+ranking; which source field goes where: docs/stockage.md."""
 
 import re
 from datetime import UTC, date, datetime, time
@@ -83,10 +78,8 @@ TAG_MAX_COUNT = 30
 
 
 def check_url_can_be_normalized(url: str) -> str:
-    """Refuse the URL urlsplit refuses (an unclosed bracket, a host NFKC rewrites), and the URL
-    without a host, as "https://?utm_source=x" is once its utm_* parameters are removed:
-    etl/normalize.py splits every URL at the import, then validates the item again, where one
-    refused would stop it all."""
+    """Refuse a URL urlsplit refuses, and one without a host once its utm_* parameters are
+    removed ("https://?utm_source=x"): the import would refuse it and stop."""
     try:
         host = urlsplit(url).hostname
     except ValueError:
@@ -102,25 +95,22 @@ UNSTORABLE_CHARACTER = re.compile("[\0\ud800-\udfff]")
 
 
 def check_text_can_be_stored(text: str) -> str:
-    """Refuse a NUL and a lone surrogate, nothing more: a line break and a tab are kept. SQLite
-    stops a GLOB and a length() at the first NUL: the base would refuse, or measure short, a
-    text the item accepts; sqlite3 fails to write a lone surrogate. A ValueError: the import
-    rebuilds the errors by their type, without their value (core/quoting.py), which must be
-    one pydantic knows."""
+    """Refuse a NUL and a lone surrogate: SQLite stops a GLOB and a length() at a NUL, and
+    sqlite3 fails to write a lone surrogate. A ValueError, as core/quoting.py rebuilds errors by
+    their type."""
     if UNSTORABLE_CHARACTER.search(text):
         raise ValueError(f"text with a NUL or a lone surrogate: {len(text)} characters")
     return text
 
 
 def normalize_tag(tag: str) -> str:
-    """A tag as the base keeps it (decision of Sabine of 2026-10-19): without the spaces around
-    it, without the # Obsidian writes at its start, in lower case."""
+    """A tag as the base keeps it: stripped, without the leading # Obsidian writes, in lower
+    case."""
     return tag.strip().removeprefix("#").strip().lower()
 
 
 def check_tag_length(tag: str) -> str:
-    """Refuse a tag longer than the base keeps, saying its length and the maximum
-    (conventions.md, rule 3)."""
+    """Refuse a tag longer than the base keeps, saying its length and the maximum."""
     if len(tag) > TAG_MAX_LENGTH:
         raise ValueError(
             f"tag too long: {len(tag)} characters, maximum {TAG_MAX_LENGTH}"
@@ -129,16 +119,15 @@ def check_tag_length(tag: str) -> str:
 
 
 def check_tag_is_normalized(tag: str) -> str:
-    """Refuse a tag normalize_tag would change: two forms of one tag would be two rows of tag. A
-    tag with two # at its start keeps one once normalized, and is refused."""
+    """Refuse a tag normalize_tag would change: two forms of one tag would be two rows of tag."""
     if normalize_tag(tag) != tag:
         raise ValueError(f"tag not normalized: {len(tag)} characters")
     return tag
 
 
 def convert_to_utc(moment: datetime) -> datetime:
-    """The same moment in UTC, as the base writes it. A moment out of the range of datetime
-    once in UTC (the first day, east of UTC) is refused, not raised as an OverflowError."""
+    """The same moment in UTC; a moment out of the range of datetime once in UTC is refused, not
+    raised as an OverflowError."""
     try:
         return moment.astimezone(UTC)
     except OverflowError:
@@ -146,16 +135,14 @@ def convert_to_utc(moment: datetime) -> datetime:
 
 
 def at_midnight_utc(day: date) -> datetime:
-    """A source that gives a day only is stored at midnight UTC, a writing convention
-    (docs/stockage.md): dateAdded of CISA KEV, the edition of TLDR, the days of a clip."""
+    """A day stored at midnight UTC, the convention for a source that gives a day only
+    (docs/stockage.md)."""
     return datetime.combine(day, time(), UTC)
 
 
 def parse_aware_datetime(stored_date: object, label: str) -> datetime:
-    """Read an ISO 8601 date, refusing one without a time zone: naive dates compare wrongly.
-
-    label names the date in error messages, such as "release 0: published_at".
-    """
+    """Read an ISO 8601 date, refusing one without a time zone (naive dates compare wrongly);
+    label names the date in error messages."""
     if not isinstance(stored_date, str):
         raise ValueError(f"{label} is not a date")
     try:
@@ -320,8 +307,7 @@ HIGHLIGHT_MAX_LENGTH_BY_FIELD = {"text": 10_000, "comment": 10_000}
 
 
 class Highlight(BaseModel):
-    """A highlight of a PDF of a Zotero entry: a row of the highlight table, written with its
-    entry."""
+    """A highlight of a PDF of a Zotero entry, written with its entry."""
 
     model_config = ConfigDict(
         frozen=True, extra="forbid", strict=True, hide_input_in_errors=True
@@ -486,7 +472,6 @@ def check_tag_count(item: Item) -> None:
 
 
 def check_tags_once(item: Item) -> None:
-    """Refuse a tag given twice: the base holds one link of an item to a tag."""
     if len(set(item.tags)) != len(item.tags):
         raise ValueError(
             f"tags not each once: {len(item.tags)} tags, {len(set(item.tags))} distinct"
@@ -494,8 +479,8 @@ def check_tags_once(item: Item) -> None:
 
 
 def check_lengths(item: Item) -> None:
-    """Refuse a text or a list longer than its maximum: the message says which field, its
-    length and the maximum."""
+    """Refuse a text or a list longer than its maximum, saying which field, its length and the
+    maximum."""
     too_long = list_texts_too_long(item) + list_lists_too_long(item)
     if too_long:
         raise ValueError("; ".join(too_long))
@@ -529,9 +514,8 @@ def list_lists_too_long(item: Item) -> list[str]:
 
 
 class TrendRow(BaseModel):
-    """A repository of a GH Archive ranking, in a window of 3 days: a row of the trend table,
-    not an item (ADR of 2026-10-08). Each CHECK of trend refuses nothing this row accepts; a
-    test keeps both in step."""
+    """A repository of a GH Archive ranking in a window of 3 days, not an item; a test keeps it
+    in step with each CHECK of trend."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
