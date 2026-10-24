@@ -18,7 +18,7 @@ from test_load import (
 from test_transform import copy_fixture
 
 from k_b.database.creation import create_database
-from k_b.etl import load as import_items_module
+from k_b.etl import transform as read_raw_items_module
 from k_b.etl.normalize import normalize_item
 from k_b.etl.raw_store import RawStore
 from k_b.etl.sources.zotero import ZoteroSource
@@ -427,7 +427,7 @@ def test_a_document_with_a_highlight_the_base_refuses_is_written_in_none_of_its_
         return normalized_item.model_copy(update={"highlights": [*kept, refused]})
 
     monkeypatch.setattr(
-        import_items_module, "normalize_item", normalize_then_refuse_last_highlight
+        read_raw_items_module, "normalize_item", normalize_then_refuse_last_highlight
     )
 
     summary = run_import(data_dir)

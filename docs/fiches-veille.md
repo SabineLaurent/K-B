@@ -740,9 +740,9 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 
 `kb digest` (#209) demande les fiches à l'API IA, puis écrit celle de chaque sujet dans le coffre
 d'Obsidian : l'API IA n'écrit rien (règle 7 de `poc.md`). Il joint l'API IA par HTTP, jamais par
-son code (`etl` n'importe pas `ai_api`, `tests/architecture/test_layers.py`). Code :
-`commands/digest_command.py` (la porte), `etl/ai_api_client.py` (la demande et la réponse),
-`etl/digest_sheets.py` (la fiche), `etl/vault_files.py` (l'écriture sûre, partagée avec les fiches
+son code (ni `etl` ni `post` n'importent `ai_api`, `tests/architecture/test_layers.py`). Code :
+`commands/digest_command.py` (la porte), `post/ai_api_client.py` (la demande et la réponse),
+`post/digest_sheets.py` (la fiche), `post/vault_files.py` (l'écriture sûre, partagée avec les fiches
 des tops).
 
 **Parcours**
@@ -834,7 +834,7 @@ deux-points l'y empêche (recette de Sabine du 2026-10-21). Une URL de source qu
 refusée (ci-dessous) : aucun champ ne se forme donc, ni dans les textes ni dans les URL, ni dans la
 source ni dans le texte rendu. Une ligne horizontale ou un soulignement (`---`,
 `***`, `===`) n'est jamais seul sur sa ligne : l'affirmation finit par ses sources, le titre par
-son URL. Les caractères des fiches des tops sont repris (`etl/vault_files.py`), avec la même règle
+son URL. Les caractères des fiches des tops sont repris (`post/vault_files.py`), avec la même règle
 du `&`, une seule pour les deux écrivains du coffre (décision de Sabine du 2026-10-21) ; `~ : @`,
 `www.`, le marqueur de liste et l'espace entre deux deux-points s'y ajoutent, car une URL nue reste du texte dans une fiche de veille : une
 affirmation du modèle ne fait jamais un lien. Le contrôle 6 de l'API IA reste en amont (défense en profondeur). Non échappée, voulu :

@@ -76,8 +76,8 @@ class RawStore:
     def list_file_keys(self, folder_key: str) -> list[str]:
         """The keys of the files of a folder, in name order, that is collection order; none when
         it does not exist. Hidden files are left out, as by list_visible_entries of
-        etl/transform.py, which imports this module: a rest of an interrupted write is not a raw
-        file. The subfolders are left out too."""
+        etl/raw_reading.py, which imports this module: a rest of an interrupted write is not a
+        raw file. The subfolders are left out too."""
         folder = self.find_path(folder_key)
         if not folder.is_dir():
             return []
@@ -163,6 +163,13 @@ def write_new_raw_file(path: Path, content: bytes) -> None:
 
 
 def load_last_collection_dates(data_dir: Path) -> dict[str, datetime]:
+    """The date of the last collection of each source, read from the collection state file;
+    empty when the file is absent, as before the first collection.
+
+    A file that cannot be read, that is not a JSON object, or that holds a date that is not
+    ISO 8601 or has no time zone, raises InvalidCollectionStateError: a state half read would
+    make the next collection start from a date nobody wrote.
+    """
     state_path = data_dir / COLLECTION_STATE_FILENAME
     if not state_path.exists():
         return {}
@@ -192,6 +199,9 @@ def load_last_collection_dates(data_dir: Path) -> dict[str, datetime]:
 def save_last_collection_dates(
     data_dir: Path, last_collection_dates: dict[str, datetime]
 ) -> None:
+    """Write the date of the last collection of each source to the collection state file, in
+    ISO 8601, sorted by source name: the file is written whole, and atomically (rule 2 of
+    conventions.md)."""
     stored_dates = {
         source_name: collected_at.isoformat()
         for source_name, collected_at in last_collection_dates.items()

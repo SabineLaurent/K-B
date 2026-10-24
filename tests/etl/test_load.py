@@ -25,17 +25,18 @@ from k_b.database.connection import MissingDatabaseError, connect_database
 from k_b.database.creation import create_database
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl import load as import_items_module
+from k_b.etl import transform as read_raw_items_module
 from k_b.etl.load import (
     ImportLogExistsError,
     import_items,
     read_imported_paths,
 )
 from k_b.etl.normalize import normalize_item
+from k_b.etl.raw_files import RawReading, TrendReading
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources.gh_archive import read_trend_files
 from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
-from k_b.etl.transform import RawReading, TrendReading, read_raw_items
+from k_b.etl.transform import read_raw_files
 from k_b.items import (
     MAX_COUNT_BY_KIND,
     MAX_ELEMENT_LENGTH_BY_KIND,
@@ -105,9 +106,12 @@ def run_import(
     imported_at = FIRST_IMPORT_AT + timedelta(seconds=len(list_logs(data_dir)))
     database_path = data_dir / "k-b.sqlite"
     imported_paths = frozenset() if read_again else read_imported_paths(database_path)
+    readings = read_raw_files(
+        data_dir / "raw", kinds, imported_paths, tracked_repositories
+    )
     return import_items(
-        read_raw_items(data_dir / "raw", kinds, imported_paths),
-        read_trend_files(data_dir / "raw", imported_paths),
+        readings.items,
+        readings.trends,
         database_path,
         log_path_at(data_dir, imported_at),
         imported_at,
@@ -736,7 +740,7 @@ def refuse_in_the_base(monkeypatch, source_item_id, changes):
             return normalized_item
         return normalized_item.model_copy(update=changes)
 
-    monkeypatch.setattr(import_items_module, "normalize_item", normalize_then_change)
+    monkeypatch.setattr(read_raw_items_module, "normalize_item", normalize_then_change)
 
 
 RELEASES_PATH = f"{AUTOMATED_WATCH}/{RELEASES_DIR}/{FIRST_COLLECTION}.json"
@@ -1204,6 +1208,29 @@ def test_a_file_read_without_item_is_registered_and_not_read_again(data_dir):
     assert first.withdrawn_count == 0
 
 
+def test_a_file_whose_releases_are_all_out_of_the_list_is_registered_and_not_read_again(
+    data_dir,
+):
+    """The reading rejects every release of the file (etl/transform.py) and still returns it:
+    the import registers it, as it does a file read without item."""
+    still_tracked = tuple(
+        repository
+        for repository in TRACKED_REPOSITORIES
+        if repository.name != "anthropics/claude-code"
+    )
+
+    first = run_import(data_dir, still_tracked)
+    second = run_import(data_dir, still_tracked)
+
+    assert RELEASES_PATH in registered_paths(data_dir)
+    assert (first.rejection_count, second.read_count, second.rejection_count) == (
+        3,
+        0,
+        0,
+    )
+    assert count_rows(data_dir, "SELECT count(*) FROM release") == 0
+
+
 def test_a_file_read_with_a_rejected_entry_is_registered_and_not_read_again(data_dir):
     catalog = kev_catalog()
     assert (
@@ -1263,9 +1290,12 @@ def test_a_log_of_the_same_second_stops_the_import_before_the_database(data_dir)
     log_path.write_text("earlier import\n")
     tables_before = dump_database(data_dir)
     database_path = data_dir / "k-b.sqlite"
-    reading = read_raw_items(
-        data_dir / "raw", SOURCE_KINDS, read_imported_paths(database_path)
-    )
+    reading = read_raw_files(
+        data_dir / "raw",
+        SOURCE_KINDS,
+        read_imported_paths(database_path),
+        TRACKED_REPOSITORIES,
+    ).items
 
     with pytest.raises(ImportLogExistsError):
         import_items(
@@ -1295,6 +1325,38 @@ def test_each_line_of_the_log_carries_the_time_of_its_import(data_dir):
         re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", line["imported_at"])
         for line in lines
     )
+
+
+def test_the_log_lists_what_the_reading_rejected_before_what_the_writing_refused(
+    data_dir, monkeypatch
+):
+    """write_files writes what the reading rejected first, then each file in collection order:
+    an unreadable page and a release out of the list come before an item the base refuses."""
+    unreadable = write_collection(data_dir, ARXIV_DIR, "2026-10-06T093000Z", "not xml")
+    still_tracked = tuple(
+        repository
+        for repository in TRACKED_REPOSITORIES
+        if repository.name != "anthropics/claude-code"
+    )
+    refuse_in_the_base(
+        monkeypatch, FIRST_CVE_ID, {"cve": CVE_ID_IN_ARABIC_INDIC_DIGITS}
+    )
+
+    run_import(data_dir, still_tracked)
+
+    rejections = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
+    assert [line["raw_file_path"] for line in rejections] == [
+        unreadable,
+        RELEASES_PATH,
+        RELEASES_PATH,
+        RELEASES_PATH,
+        CISA_KEV_PATH,
+    ]
+    assert "not an XML document" in rejections[0]["reason"]
+    assert {line["reason"] for line in rejections[1:4]} == {
+        "repository not in the tracked list: anthropics/claude-code"
+    }
+    assert "refused by the base" in rejections[4]["reason"]
 
 
 WITHDRAWAL_QUERY = (
@@ -1887,18 +1949,20 @@ def run_import_with_a_ranking_row_changed(data_dir, raw_file_path, **changes):
     imported_at = FIRST_IMPORT_AT + timedelta(seconds=len(list_logs(data_dir)))
     database_path = data_dir / "k-b.sqlite"
     imported_paths = read_imported_paths(database_path)
-    trend_reading = read_trend_files(data_dir / "raw", imported_paths)
+    readings = read_raw_files(
+        data_dir / "raw", SOURCE_KINDS, imported_paths, TRACKED_REPOSITORIES
+    )
     changed_files = [
         trend_file._replace(
             rows=[*trend_file.rows[:-1], trend_file.rows[-1].model_copy(update=changes)]
         )
         if trend_file.raw_file.raw_file_path == raw_file_path
         else trend_file
-        for trend_file in trend_reading.files
+        for trend_file in readings.trends.files
     ]
     return import_items(
-        read_raw_items(data_dir / "raw", SOURCE_KINDS, imported_paths),
-        trend_reading._replace(files=changed_files),
+        readings.items,
+        readings.trends._replace(files=changed_files),
         database_path,
         log_path_at(data_dir, imported_at),
         imported_at,

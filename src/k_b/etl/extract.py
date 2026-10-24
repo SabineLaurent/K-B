@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from k_b.core.quoting import quote_value
+from k_b.etl.raw_files import COLLECTION_NAME_FORMAT
 from k_b.etl.raw_store import (
     COLLECTION_STATE_FILENAME,
     RAW_DIR_NAMES,
@@ -73,6 +74,18 @@ def collect_all_sources(
 def collect_one_source(
     source: Source, raw_dir: Path, now: datetime, last_collected_at: datetime | None
 ) -> None:
+    """Collect one source and write what it gives under raw/: one raw file named by now, or a
+    folder of that name holding one file per page. A source that says nothing changed since
+    last_collected_at writes nothing.
+
+    Raises:
+        ValueError: a raw folder that is not one of RAW_DIR_NAMES, or a source name, extension
+            or page name that is not safe in a path.
+        FileExistsError: a raw file of that name is already there; raw/ is immutable
+            (etl/raw_store.py).
+        Exception: whatever the fetch of the source raises; the collection logs it and goes on
+            to the next source (collect_all_sources).
+    """
     if source.acquisition_dir_name not in RAW_DIR_NAMES:
         raise ValueError(f"not a folder of raw/: {source.acquisition_dir_name!r}")
     for path_segment in (source.name, source.extension):
@@ -82,7 +95,7 @@ def collect_one_source(
     if raw_content is None:
         return
     source_dir = raw_dir / source.acquisition_dir_name / source.name
-    collection_name = f"{now:%Y-%m-%dT%H%M%SZ}"
+    collection_name = now.strftime(COLLECTION_NAME_FORMAT)
     if isinstance(raw_content, bytes):
         write_new_raw_file(
             source_dir / f"{collection_name}.{source.extension}", raw_content

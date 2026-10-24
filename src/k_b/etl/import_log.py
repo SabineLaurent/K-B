@@ -1,5 +1,5 @@
 """The log of an import: one JSON line per entry rejected, per item left out and per window of
-a ranking left out."""
+trends left out."""
 
 import json
 from datetime import date, datetime
@@ -8,8 +8,8 @@ from typing import NamedTuple
 
 from k_b.database.dates import format_date
 from k_b.database.writing import TREND_DISCARD_RULE, Discard, DiscardRule
+from k_b.etl.raw_files import RawFile, Rejection
 from k_b.etl.raw_store import write_file_atomically
-from k_b.etl.transform import RawFile, Rejection
 
 # The date each rule compared the item with, named by where that date comes from.
 COMPARED_FIELD_BY_RULE: dict[DiscardRule, str] = {
@@ -26,11 +26,11 @@ COMPARED_FIELD_BY_RULE: dict[DiscardRule, str] = {
 
 
 class TrendDiscard(NamedTuple):
-    """A window of a ranking left out: another raw file brought it first."""
+    """A window of trends left out: another raw file brought it first."""
 
     raw_file: RawFile
     window_end: date
-    # The collection of the ranking kept, in the format of the base.
+    # The collection of the file of trends kept, in the format of the base.
     compared_with: str
 
 
@@ -41,7 +41,7 @@ def write_import_log(
     discards: list[Discard],
     trend_discards: list[TrendDiscard],
 ) -> None:
-    """One JSON line per rejection, then per item left out, then per window of a ranking left
+    """One JSON line per rejection, then per item left out, then per window of trends left
     out, each dated by its import.
 
     A window is named by its last day, in the field that names an item: one form of line. No

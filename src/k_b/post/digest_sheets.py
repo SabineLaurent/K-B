@@ -2,7 +2,7 @@
 kb digest from the response of the AI API (docs/fiches-veille.md, "Fiches dans le coffre"; #209).
 
 A sheet is written once, never rewritten nor written through a symbolic link that kb sees, with
-the limit of etl/vault_files.py (#295). Its
+the limit of post/vault_files.py (#295). Its
 path is made of constants, of a subject of the closed list and of a day, never of another value
 of the response. Each text of the response, a claim written by the model or a title read from a
 source, is written as text: the response is an input not trusted (OWASP LLM10). Its front matter
@@ -19,8 +19,8 @@ from urllib.parse import unquote
 
 from k_b.core.config import WATCH_DIR_NAME
 from k_b.database.dates import format_date
-from k_b.etl.ai_api_client import Digest, DigestsResponse, Source
-from k_b.etl.vault_files import (
+from k_b.post.ai_api_client import Digest, DigestsResponse, Source
+from k_b.post.vault_files import (
     CHARACTER_REFERENCE,
     MARKDOWN_SYNTAX_CHARACTERS,
     VaultEntryRefusedError,
@@ -100,7 +100,7 @@ def write_digest_sheet(
 ) -> str:
     """Write the sheet of digest, of the UTC day of the end of the window; its path in the vault.
     A sheet written meanwhile and seen is refused (sheet_exists); one that appears after the last
-    check is replaced (etl/vault_files.py, #295)."""
+    check is replaced (post/vault_files.py, #295)."""
     sheet_path = find_sheet_path(
         vault_dir, digest.subject, response.window.until.date()
     )

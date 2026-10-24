@@ -18,10 +18,8 @@ from k_b.etl.sources.gh_archive import (
     TrendsExtractInvalidError,
     compute_bytes_cap,
     list_window_ends,
-    read_trend_files,
     read_trends,
 )
-from k_b.etl.transform import RawFile
 
 FIXTURE_PATH = (
     Path(__file__).parent.parent.parent / "fixtures" / "gh_archive_extract.json"
@@ -606,107 +604,11 @@ def test_the_message_gives_the_length_and_the_maximum_of_a_name_too_long():
     )
 
 
-COLLECTION = "2026-10-11T153130Z"
-RAW_FILE_PATH = f"automated_watch/gh_archive/{COLLECTION}.json"
-
-
-def write_raw(raw_dir, name, content):
-    """A raw file of the source, as the collection writes it under raw/."""
-    source_dir = raw_dir / "automated_watch" / "gh_archive"
-    source_dir.mkdir(parents=True, exist_ok=True)
-    path = source_dir / name
-    path.write_bytes(content)
-    return path
-
-
-def test_a_raw_ranking_is_read_with_its_file_its_collection_and_its_rows(tmp_path):
-    write_raw(tmp_path, f"{COLLECTION}.json", FIXTURE_PATH.read_bytes())
-
-    reading = read_trend_files(tmp_path, frozenset())
-
-    [trend_file] = reading.files
-    assert trend_file.raw_file == RawFile(
-        RAW_FILE_PATH,
-        "gh_archive",
-        datetime(2026, 10, 11, 15, 31, 30, tzinfo=UTC),
-        [],
-        0,
+def test_the_trend_reader_of_the_source_gives_the_rows_of_a_raw_result():
+    """What the kind of the source carries (etl/source_kinds.py): etl/transform.py reads the raw
+    files with it."""
+    assert gh_archive.TREND_READER.source_code == "gh_archive"
+    assert (
+        gh_archive.TREND_READER.read_rows(FIXTURE_PATH.read_bytes())
+        == read_trends(FIXTURE_PATH.read_bytes()).rows
     )
-    assert trend_file.rows == read_trends(FIXTURE_PATH.read_bytes()).rows
-    assert (reading.rejections, reading.read_count) == ([], 1)
-
-
-def test_the_raw_rankings_are_read_in_collection_order(tmp_path):
-    write_raw(tmp_path, "2026-10-12T021500Z.json", FIXTURE_PATH.read_bytes())
-    write_raw(tmp_path, f"{COLLECTION}.json", FIXTURE_PATH.read_bytes())
-
-    reading = read_trend_files(tmp_path, frozenset())
-
-    assert [trend_file.raw_file.raw_file_path for trend_file in reading.files] == [
-        RAW_FILE_PATH,
-        "automated_watch/gh_archive/2026-10-12T021500Z.json",
-    ]
-
-
-def test_a_raw_ranking_already_imported_is_not_opened(tmp_path):
-    # Not a ranking: opened, it would be rejected.
-    write_raw(tmp_path, f"{COLLECTION}.json", b"not json")
-
-    reading = read_trend_files(tmp_path, frozenset({RAW_FILE_PATH}))
-
-    assert reading == ([], [], 0)
-
-
-@pytest.mark.parametrize(
-    "content",
-    [b"not json", make_raw([{**first_row(), "stars_gained": -1}])],
-)
-def test_a_raw_ranking_refused_is_rejected_and_counted_as_opened(tmp_path, content):
-    write_raw(tmp_path, f"{COLLECTION}.json", content)
-
-    reading = read_trend_files(tmp_path, frozenset())
-
-    assert reading.files == []
-    [rejection] = reading.rejections
-    assert rejection.raw_file_path == RAW_FILE_PATH
-    assert rejection.reason.startswith("TrendsExtractInvalidError: ")
-    assert reading.read_count == 1
-
-
-def test_a_raw_ranking_not_named_by_its_collection_time_is_rejected_unopened(
-    tmp_path,
-):
-    write_raw(tmp_path, "latest.json", FIXTURE_PATH.read_bytes())
-
-    reading = read_trend_files(tmp_path, frozenset())
-
-    assert reading.files == []
-    [rejection] = reading.rejections
-    assert rejection.raw_file_path == "automated_watch/gh_archive/latest.json"
-    assert rejection.reason.startswith("ValueError: ")
-    assert reading.read_count == 0
-
-
-def test_a_folder_among_the_raw_rankings_is_rejected_unopened_without_its_path(
-    tmp_path,
-):
-    # The source writes one file per collection, never a folder of pages.
-    (tmp_path / "automated_watch" / "gh_archive" / COLLECTION).mkdir(parents=True)
-
-    reading = read_trend_files(tmp_path, frozenset())
-
-    assert reading.files == []
-    [rejection] = reading.rejections
-    assert rejection.raw_file_path == f"automated_watch/gh_archive/{COLLECTION}"
-    assert rejection.reason == "a folder, not a raw file"
-    assert reading.read_count == 0
-
-
-def test_a_hidden_file_among_the_raw_rankings_is_skipped(tmp_path):
-    write_raw(tmp_path, ".DS_Store", b"not json")
-
-    assert read_trend_files(tmp_path, frozenset()) == ([], [], 0)
-
-
-def test_no_raw_folder_of_the_source_gives_no_ranking(tmp_path):
-    assert read_trend_files(tmp_path, frozenset()) == ([], [], 0)

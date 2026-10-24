@@ -10,8 +10,12 @@ la commande. Complète `code.md` (comment coder) et `conformite.md` (selon quell
 **Règle.**
 - Un lecteur (`read_entries`) ne lève que pour une **page illisible** (pas du JSON, pas du CSV,
   colonnes manquantes, pas un flux Atom). Une **entrée** invalide devient un rejet nommé, rendu
-  avec les entrées lues, et suit un seul chemin (`reject`, `etl/transform.py`) jusqu'au journal
-  d'import.
+  avec les entrées lues, et suit un seul chemin (`reject`, `etl/rejections.py`) jusqu'au journal
+  d'import. Ce chemin est le même pour les trois sortes de rejet, quelle que soit l'étape qui
+  les trouve : l'entrée qu'un lecteur refuse ou que l'item refuse, la release hors de la liste
+  suivie, et l'entrée que la base refuse ; la ligne de journal d'un rejet porte donc toujours
+  `k_b.etl.rejections`. Le type `Rejection` reste dans `etl/raw_files.py`, le vocabulaire
+  partagé par les étapes.
 - À la collecte, une source n'échoue que si sa page est illisible ou si toutes ses entrées sont
   invalides (`all_items_invalid`) ; sa date de dernière collecte reste alors inchangée.
   Exception : un classement (instantané dont la complétude compte) refuse sa page entière.
@@ -27,6 +31,8 @@ la commande. Complète `code.md` (comment coder) et `conformite.md` (selon quell
 - `grep -rn "SAVEPOINT" src/k_b` renvoie l'écriture d'un item, sous `src/k_b/database/`.
 - `uv run pytest` : un test par erreur rattrapée, et un test où une erreur du système arrête
   l'import.
+- `grep -rn "Rejection(" src/k_b --include='*.py'` ne renvoie que la classe, dans
+  `etl/raw_files.py`, et sa seule construction, dans `etl/rejections.py`.
 
 **Pourquoi.** Une seule entrée mal formée ne doit bloquer ni une source à chaque collecte, ni
 tout l'import à chaque import ; tout rejet doit laisser une trace lisible au journal d'import.
@@ -141,8 +147,9 @@ statu quo).
 
 **Règle.**
 - **Architecture en couches** : présentation (`cli.py` et `commands/`, routes de l'API), métier et
-  ETL (`etl/` : `extract.py`, `transform.py`, `normalize.py`, `load.py`, les sources dans
-  `etl/sources/`), accès aux données (`database/`). Une couche n'appelle que celle du dessous.
+  ETL (`etl/` : `pipeline.py`, `extract.py`, `transform.py`, `raw_reading.py`, `normalize.py`,
+  `load.py`, les sources dans `etl/sources/`), accès aux données (`database/`). Une couche
+  n'appelle que celle du dessous.
 - `items.py` et `core/` sont le vocabulaire commun à toutes les couches : chacune peut les
   importer.
 - Une API importe `database`, `items` et `core`, jamais `etl`, `database/writers` ni
@@ -159,7 +166,14 @@ statu quo).
 - La requête d'extraction d'une source qui est elle-même une base (Zotero, GH Archive sur
   BigQuery) vit dans le module de cette source, `src/k_b/etl/sources/<source>.py`, comme la
   requête d'une API : elle lit une source externe, en lecture seule, pas la base K-B.
-- Le module de chargement orchestre la transaction et le journal, sans SQL.
+- `etl/pipeline.py` enchaîne les étapes des deux parcours, qui communiquent par `raw/` : la
+  collecte (`extract.py`) et l'import (`transform.py`, qui lit le brut par `raw_reading.py`, puis
+  `load.py`). C'est le seul module d'`etl` qui les enchaîne, et la seule porte des deux parcours
+  pour `commands/` : `__all__` liste ce qui passe, comme `database/writing.py` pour les écrivains.
+  Il reçoit en paramètre ce qui nomme les sources (sortes, dépôts suivis, dossiers à ne garder
+  qu'au dernier import), ne lit pas l'environnement, n'affiche rien et ne rend aucun code de
+  sortie : il rend un résultat nommé que la commande affiche. Le module de chargement garde la
+  transaction et le journal d'import, sans SQL.
 
 **Vérifier.**
 - `grep -rlE "INSERT INTO|SELECT |UPDATE |DELETE FROM" src/k_b --include='*.py' --exclude=zotero.py --exclude=gh_archive.py`
@@ -171,6 +185,10 @@ statu quo).
   compris, n'importe de K-B autre chose que `database`, `items` et `core` ; hors de `database/`,
   aucun module n'atteint `database/writers` (`test_only_database_imports_its_writers`).
 - `grep -c "execute" src/k_b/etl/load.py` renvoie 0.
+- `grep -nE "etl\.(extract|transform|load|normalize|import_log|raw_purge)" src/k_b/commands` ne
+  renvoie rien : les commandes passent par `etl/pipeline.py`.
+- `uv run pytest tests/architecture/test_layers.py -k "pipeline or stage"` : `etl/pipeline.py`
+  n'importe ni les sources ni la composition, et les trois stages ne s'importent pas entre eux.
 
 **Pourquoi.** Un module par écrivain : les modules de `writers/` font 851 lignes à eux tous
 (relevé du 2026-10-14), et chaque sorte a assez de code pour son module (`code.md`). Une seule

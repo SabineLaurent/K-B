@@ -3,14 +3,16 @@
 GH Archive records every public GitHub event, one table a day, as a public BigQuery dataset. The
 source counts, for each window of 3 complete UTC days, the stars (WatchEvent) and forks
 (ForkEvent) each repository gains, in one query that reads each day once. What the query returns,
-with the windows it covers, is the raw result: a ranking, refused whole when one row is invalid.
+with the windows it covers, is the raw result: the trends it counted, refused whole when one
+row is invalid.
 
 The query runs in a BigQuery sandbox without billing (docs/bigquery.md): a dry run first, then
 the query capped by maximum_bytes_billed. The service account key is found by the client through
 GOOGLE_APPLICATION_CREDENTIALS; the source never opens it.
 
-Then its reader (T): the raw results not imported yet, each read as a ranking. Its rows are not
-items: commands/import_command.py gives them to the import beside the items.
+Then how to read a raw result (T): TREND_READER, the trend reader its kind carries
+(etl/source_kinds.py). Its rows are not items: etl/transform.py reads the raw files with it,
+beside the items, and the import writes them to the trend table.
 """
 
 import json
@@ -18,7 +20,6 @@ import logging
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping
 from datetime import UTC, date, datetime, time, timedelta
-from pathlib import Path
 from typing import Annotated, Any
 
 from google.cloud import bigquery
@@ -26,15 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
-from k_b.etl.transform import (
-    RawFile,
-    Rejection,
-    TrendFile,
-    TrendReading,
-    list_visible_entries,
-    parse_collection_name,
-    reject,
-)
+from k_b.etl.source_contract import TrendReader
 from k_b.items import SourceCode, TrendRow
 
 logger = logging.getLogger(__name__)
@@ -122,7 +115,7 @@ class DryRunVolumeUnknownError(Exception):
 
 
 class TrendsExtractInvalidError(ValueError):
-    """The raw result is not a readable ranking: it is refused whole."""
+    """The raw result does not read as trends: it is refused whole."""
 
 
 class TrendsExtract(BaseModel):
@@ -386,41 +379,9 @@ def describe_value(value: object, field: object) -> str:
     return type(value).__name__
 
 
-def read_trend_files(raw_dir: Path, imported_paths: frozenset[str]) -> TrendReading:
-    """Every raw result of the source that is not in imported_paths, in collection order.
+def read_trend_rows(raw_result: bytes) -> list[TrendRow]:
+    """The rows of a raw result, for the trend reader of its kind."""
+    return read_trends(raw_result).rows
 
-    As the reader of the items does (etl/transform.py): a file not named by its collection time is
-    rejected without being opened; a file that cannot be read, or that read_trends refuses, is
-    rejected and counted as opened. A rejected file is not registered: the next import reads
-    it again. A file already imported is not opened. Unlike that reader, a folder is not a
-    collection of pages: the source writes one file per collection, and a folder is rejected
-    without being opened, its path left out of the reason.
-    """
-    source_dir = raw_dir / AUTOMATED_WATCH_DIR_NAME / FOLDER_PREFIX
-    files: list[TrendFile] = []
-    rejections: list[Rejection] = []
-    read_count = 0
-    if not source_dir.is_dir():
-        return TrendReading(files, rejections, read_count)
-    # A raw file is named by its collection time: the order of the names is the order of time.
-    for path in list_visible_entries(source_dir):
-        raw_file_path = path.relative_to(raw_dir).as_posix()
-        if raw_file_path in imported_paths:
-            continue
-        if path.is_dir():
-            rejections.append(reject(raw_file_path, "a folder, not a raw file"))
-            continue
-        try:
-            collected_at = parse_collection_name(path.stem)
-        except ValueError as error:
-            rejections.append(reject(raw_file_path, f"{type(error).__name__}: {error}"))
-            continue
-        read_count += 1
-        try:
-            extract = read_trends(path.read_bytes())
-        except (ValueError, OSError) as error:
-            rejections.append(reject(raw_file_path, f"{type(error).__name__}: {error}"))
-            continue
-        raw_file = RawFile(raw_file_path, SOURCE_CODE, collected_at, [], 0)
-        files.append(TrendFile(raw_file, extract.rows))
-    return TrendReading(files, rejections, read_count)
+
+TREND_READER = TrendReader(SOURCE_CODE, read_trend_rows)

@@ -223,9 +223,9 @@ def read_articles(page: bytes) -> EntryReading[TldrArticle]:
     out.
 
     An entry is returned as read, even without a title, a link or a summary: the item refuses
-    it, and the others are still read; the reader itself rejects none. A page that is not UTF-8, whose first h1 is not the
-    title of an edition, with an article inside another, or without any complete article (a
-    selector no longer matches) is refused whole.
+    it, and the others are still read; the reader itself rejects none. A page that is not UTF-8,
+    whose first h1 is not the title of an edition, with an article inside another, or without
+    any complete article (a selector no longer matches) is refused whole.
     """
     try:
         # Decoded here: BeautifulSoup would guess the encoding of bytes.
@@ -258,7 +258,7 @@ def read_edition_date(soup: BeautifulSoup) -> date:
     heading = soup.select_one("h1")
     if heading is None:
         raise ValueError("no h1 in the page")
-    title = read_text(heading)
+    title = read_text_or_empty(heading)
     refusal = ValueError(
         "first h1 is not an edition title with its date: " + quote_value(title)
     )
@@ -278,14 +278,14 @@ def read_article(entry: Tag, edition_date: date, rank: int) -> TldrArticle:
     return TldrArticle(
         edition_date=edition_date,
         rank=rank,
-        title=read_text(link),
+        title=read_text_or_empty(link),
         # A str for one href; BeautifulSoup types every attribute as a str or a list.
         link=href if isinstance(href, str) else "",
-        summary=read_text(entry.select_one("div.newsletter-html")),
+        summary=read_text_or_empty(entry.select_one("div.newsletter-html")),
     )
 
 
-def read_text(element: Tag | None) -> str:
+def read_text_or_empty(element: Tag | None) -> str:
     """The text of an element, its pieces (paragraphs, links) a space apart and each run of
     white space as one space; "" without the element."""
     return " ".join(element.get_text(" ").split()) if element else ""

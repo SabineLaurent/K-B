@@ -16,25 +16,29 @@ TOP_LEVEL_MODULES = {
     "etl",
     "data_api",
     "ai_api",
+    "post",
 }
 # Under k_b.etl, each module is in exactly one of the three.
 ETL_COMPOSITION_MODULES = {"etl.source_kinds", "etl.collected_sources"}
 ETL_SOURCES_PACKAGE = "etl.sources"
 ETL_PIPELINE_MODULES = {
+    "etl.pipeline",
     "etl.extract",
     "etl.transform",
     "etl.load",
     "etl.import_log",
     "etl.normalize",
+    "etl.raw_files",
+    "etl.raw_reading",
     "etl.raw_store",
     "etl.raw_purge",
-    "etl.top_sheets",
-    "etl.vault_files",
-    "etl.ai_api_client",
-    "etl.digest_sheets",
+    "etl.rejections",
+    "etl.tops",
     "etl.source_contract",
     "etl.http_download",
     "etl.user_agent",
+    "etl.file_writing",
+    "etl.withdrawals",
 }
 COMPOSITION_MODULES = {"cli", "commands"} | ETL_COMPOSITION_MODULES
 

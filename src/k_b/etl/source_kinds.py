@@ -2,9 +2,10 @@
 
 In the package, only the commands import this module: commands/collect_command.py and
 commands/import_command.py give SOURCE_KINDS to the collection (E) and to the import (T then L);
-commands/write_tops_command.py reads TOPS, the top rankings whose sheets kb write-tops writes. The Zotero, clipping and GH Archive
-kinds have no instance here: etl/collected_sources.py creates them, on a machine that says where
-the Zotero data directory, the Obsidian vault, or the BigQuery key, is.
+commands/write_tops_command.py reads TOPS, the top rankings whose sheets kb write-tops writes.
+The Zotero, clipping and GH Archive kinds have no instance here: etl/collected_sources.py creates
+them, on a machine that says where the Zotero data directory, the Obsidian vault, or the BigQuery
+key, is.
 """
 
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME, make_source_folder_key
@@ -32,7 +33,7 @@ from k_b.etl.sources.tracked_repositories import (
     TRACKED_REPOSITORIES,
     list_packages_by_ecosystem,
 )
-from k_b.etl.top_sheets import Top
+from k_b.etl.tops import Top
 
 SOURCE_KINDS = (
     SourceKind(cisa_kev.FOLDER_PREFIX, (CisaKevSource(),), cisa_kev.READER),
@@ -79,9 +80,9 @@ SOURCE_KINDS = (
     SourceKind(clipping.FOLDER_PREFIX, (), clipping.READER),
     # No instance: etl/collected_sources.py adds GhArchiveSource when
     # GOOGLE_APPLICATION_CREDENTIALS is set, unless KB_COLLECT_ONLY leaves it out. No reader of
-    # items: its rankings are not items, commands/import_command.py reads them with
-    # read_trend_files.
-    SourceKind(gh_archive.FOLDER_PREFIX, (), None),
+    # items: its raw files hold trends, not items; etl/transform.py reads them with its
+    # trend reader.
+    SourceKind(gh_archive.FOLDER_PREFIX, (), None, gh_archive.TREND_READER),
 )
 
 # The sheets of the top rankings, in the order of SOURCE_KINDS: kb write-tops writes them, and

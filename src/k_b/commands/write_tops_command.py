@@ -11,8 +11,8 @@ from k_b.commands.run_log import LOGGER_NAME, describe_os_error
 from k_b.etl.collected_sources import VAULT_DIR_VARIABLE, read_vault_dir
 from k_b.etl.raw_store import RawStore
 from k_b.etl.source_kinds import TOPS
-from k_b.etl.top_sheets import TopSheetsOutcome, write_top_sheets
-from k_b.etl.vault_files import VaultEntryRefusedError
+from k_b.post.top_sheets import TopSheetsOutcome, write_top_sheets
+from k_b.post.vault_files import VaultEntryRefusedError
 
 logger = logging.getLogger(LOGGER_NAME)
 

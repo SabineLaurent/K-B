@@ -15,8 +15,8 @@ from k_b.etl.collected_sources import (
     list_collected_sources,
     read_collect_only_or_refusal,
 )
-from k_b.etl.extract import CollectionOutcome, collect_all_sources
-from k_b.etl.raw_store import RAW_DIR_NAME, InvalidCollectionStateError, RawStore
+from k_b.etl.pipeline import CollectionOutcome, collect
+from k_b.etl.raw_store import InvalidCollectionStateError, RawStore
 from k_b.etl.source_contract import Source, find_source_kind
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources import github_advisories, github_releases
@@ -46,12 +46,7 @@ def run_collect(data_dir: Path) -> int:
     )
     log_collection_start(sources, environ)
     try:
-        outcome = collect_all_sources(
-            sources,
-            data_dir / RAW_DIR_NAME,
-            data_dir,
-            datetime.now(UTC),
-        )
+        outcome = collect(sources, data_dir, datetime.now(UTC))
     except InvalidCollectionStateError as error:
         logger.error("%s", error)
         return ExitCode.NOT_STARTED

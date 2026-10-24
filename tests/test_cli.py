@@ -13,16 +13,16 @@ from functools import partial
 import httpx2
 import pytest
 import uvicorn.config
-from etl.test_ai_api_client import (
+from etl.test_extract import BrokenSource, WorkingSource
+from etl.test_transform import FIXTURES_DIR, copy_fixture
+from post.test_ai_api_client import (
     AGENT_DIGEST,
     REQUEST_ID,
     TEST_API_KEY,
     make_response,
     to_body,
 )
-from etl.test_extract import BrokenSource, WorkingSource
-from etl.test_top_sheets import TEST_TOPS, write_ranking
-from etl.test_transform import FIXTURES_DIR, copy_fixture
+from post.test_top_sheets import TEST_TOPS, write_ranking
 
 from k_b import cli
 from k_b.ai_api.schemas.digest_schema import FailedSubjectSchema
@@ -36,10 +36,11 @@ from k_b.commands.exit_codes import find_exit_code
 from k_b.core import quoting
 from k_b.core.config import DigestSubject
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
-from k_b.etl import collected_sources, load, vault_files
-from k_b.etl.ai_api_client import build_ai_api_client
+from k_b.etl import collected_sources, load, pipeline
 from k_b.etl.source_contract import SourceKind
 from k_b.etl.sources import clipping
+from k_b.post import vault_files
+from k_b.post.ai_api_client import build_ai_api_client
 
 
 @pytest.fixture(autouse=True)
@@ -952,8 +953,8 @@ def test_a_failed_import_deletes_no_raw_file(monkeypatch, tmp_path):
     def refuse_to_purge(*arguments):
         raise AssertionError("purged after a failed import")
 
-    monkeypatch.setattr(import_command, "import_items", fail_to_import)
-    monkeypatch.setattr(import_command, "delete_superseded_raw_files", refuse_to_purge)
+    monkeypatch.setattr(pipeline, "import_items", fail_to_import)
+    monkeypatch.setattr(pipeline, "delete_superseded_raw_files", refuse_to_purge)
 
     assert cli.main(["import"]) == 1
     assert all(path.exists() for path in paths)
@@ -969,7 +970,7 @@ def test_a_failed_purge_without_a_reason_names_its_type_only(
     def fail_to_delete(store, key):
         raise OSError("raised by code, without an errno")
 
-    monkeypatch.setattr(import_command.RawStore, "delete", fail_to_delete)
+    monkeypatch.setattr(pipeline.RawStore, "delete", fail_to_delete)
 
     assert cli.main(["import"]) == 1
     error_output = capsys.readouterr().err
@@ -990,7 +991,7 @@ def test_a_failed_purge_keeps_the_import_exits_1_and_the_next_import_purges(
         raise PermissionError(13, "Permission denied", str(tmp_path / key))
 
     with monkeypatch.context() as patch:
-        patch.setattr(import_command.RawStore, "delete", fail_to_delete)
+        patch.setattr(pipeline.RawStore, "delete", fail_to_delete)
         patch.setattr(import_command, "datetime", FrozenDatetime)
         assert cli.main(["import"]) == 1
 
@@ -1007,6 +1008,29 @@ def test_a_failed_purge_keeps_the_import_exits_1_and_the_next_import_purges(
 
     assert cli.main(["import"]) == 0
     assert (older_extract.exists(), older_catalog.exists()) == (False, False)
+
+
+def test_a_failed_purge_leaves_the_summary_of_the_import_it_committed(
+    monkeypatch, tmp_path, capsys
+):
+    """The summary is printed before the purge (commands/import_command.py): an import that
+    committed says what it wrote, even when the purge that follows fails. The line of the files
+    deleted is the only one left out: none was."""
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    write_state_catalogs(tmp_path)
+    capsys.readouterr()
+
+    def fail_to_delete(store, key):
+        raise PermissionError(13, "Permission denied", str(tmp_path / key))
+
+    monkeypatch.setattr(pipeline.RawStore, "delete", fail_to_delete)
+
+    assert cli.main(["import"]) == 1
+    output = capsys.readouterr()
+    assert "raw files read: 4" in output.out
+    assert "superseded raw files deleted" not in output.out
+    assert "import committed, raw purge failed: PermissionError" in output.err
 
 
 class FrozenDatetime(datetime):
@@ -1057,7 +1081,7 @@ def test_import_reports_a_failed_import_and_exits_1(monkeypatch, tmp_path, capsy
     ):
         raise sqlite3.IntegrityError("CHECK constraint failed: publication")
 
-    monkeypatch.setattr(import_command, "import_items", fail_to_import)
+    monkeypatch.setattr(pipeline, "import_items", fail_to_import)
 
     exit_code = cli.main(["import"])
 
@@ -1084,7 +1108,7 @@ def test_import_reports_a_source_missing_from_the_database_and_exits_1(
     ):
         raise UnknownSourceError("source_code not in the source table: cisa_kev")
 
-    monkeypatch.setattr(import_command, "import_items", fail_to_import)
+    monkeypatch.setattr(pipeline, "import_items", fail_to_import)
 
     exit_code = cli.main(["import"])
 
@@ -1111,7 +1135,7 @@ def test_import_reports_a_kind_without_table_and_exits_1(monkeypatch, tmp_path, 
             "kind without a table in the base: newsletter_article"
         )
 
-    monkeypatch.setattr(import_command, "import_items", fail_to_import)
+    monkeypatch.setattr(pipeline, "import_items", fail_to_import)
 
     exit_code = cli.main(["import"])
 
