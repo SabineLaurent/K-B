@@ -336,8 +336,8 @@ def read_answer[OutputT: BaseModel](
 
 
 def read_failure[OutputT: BaseModel](response: httpx2.Response) -> Attempt[OutputT]:
-    """The state of an answer other than 200: a 429 or a 5xx may be retried (wait_or_end), a 400
-    of a prompt filtered is not."""
+    """The state of an answer other than 200: a 429 or a 5xx gets a retry unless wait_or_end
+    refuses it, a 400 of a prompt filtered none."""
     status = response.status_code
     if status == httpx2.codes.TOO_MANY_REQUESTS:
         return wait_or_end(response, "llm_rate_limited")

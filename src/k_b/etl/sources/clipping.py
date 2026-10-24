@@ -94,8 +94,8 @@ class ClippingSource:
         page name; None when none was.
 
         The margin goes both ways (CLIP_CHANGE_MARGIN): a clip changed shortly before the last
-        collection is copied again; one changed shortly before this one, maybe still written, is
-        left to the next."""
+        collection is copied again; one changed less than the margin before this one is left to
+        the next, as it can still be written."""
         try:
             clip_files = list_clip_files(self.vault_dir / CLIPPINGS_DIR_NAME)
         except FileNotFoundError:

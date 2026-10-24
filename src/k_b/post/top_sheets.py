@@ -48,8 +48,9 @@ def write_top_sheets(store: RawStore, vault_dir: Path, top: Top) -> TopSheetsOut
     read before the last one read.
 
     The folder is listed once: a ranking collected meanwhile is neither read nor deleted. An
-    unreadable ranking is kept; an exception (OSError, SIGTERM), a symbolic link, or an entry
-    replaced meanwhile, stops the top with nothing deleted."""
+    unreadable ranking is kept; an exception (OSError, SIGTERM) raised by a read or a write, a
+    symbolic link, or an entry replaced meanwhile, stops the top before any deletion; the
+    deletions already made when one fails stay."""
     sheets_dir = find_sheets_dir(vault_dir, top)
     keys = store.list_file_keys(top.folder_key)
     refuse_linked_folders(vault_dir, sheets_dir)

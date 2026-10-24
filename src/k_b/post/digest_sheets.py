@@ -92,7 +92,9 @@ def write_digest_sheet(
     vault_dir: Path, response: DigestsResponse, digest: Digest
 ) -> str:
     """Write the sheet of digest, of the UTC day of the end of the window; return its path in the
-    vault. One that appears after the last check is replaced (the limit of post/vault_files.py)."""
+    vault. A sheet written meanwhile and seen is refused (sheet_exists); a sheet or a link that
+    appears after the last check is replaced or followed (the limit of post/vault_files.py,
+    CWE-367, CWE-59)."""
     sheet_path = find_sheet_path(
         vault_dir, digest.subject, response.window.until.date()
     )
