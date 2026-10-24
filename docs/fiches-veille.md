@@ -724,16 +724,23 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
   uvicorn relance le SIGTERM ; chaque envoi attend 5 s au plus. La session HTTP de l'exporteur ne
   lit ni proxy, ni certificat, ni `.netrc` de l'environnement (`core/outbound.py`).
 
-**Limites** : les journaux du SDK passent par le journal de `kb serve-ai`, en texte libre ; un
-envoi qui échoue y cite l'hôte et le chemin de l'URL, jamais l'en-tête, et se répète à chaque envoi
-tant que l'outil est injoignable (règle 3 de `conventions.md`). Le transport du SDK ne suit pas les
+**Journaux de l'exporteur** : ses lignes passent par le journal de `kb serve-ai`. Un filtre posé
+sur le journal de l'exporteur (`QuotingFilter`, `ai_api/connectors/metrics_export.py`) cite chaque
+texte par `quote_value` (la phrase d'état du serveur, qui peut porter un CR ou un caractère de
+contrôle) et chaque exception par son type (règle 3 de `conventions.md`) ; la ligne reste.
+
+**Limites** : un envoi qui échoue cite le code HTTP et la phrase d'état, jamais l'en-tête, et se
+répète à chaque envoi tant que l'outil est injoignable ; le message de la ligne reste celui du
+SDK, en anglais. Le transport du SDK ne suit pas les
 redirections, mais compte une réponse 3xx comme un succès : les mesures seraient perdues sans
 message ; le test de bout en bout ne voit donc pas ce cas, la preuve finale est la série lue dans
 Grafana. Le dernier envoi part quand uvicorn a fini les demandes en cours, jusqu'à
 `DIGEST_REQUEST_TIMEOUT_SECONDS` : `docker stop` tue le processus 10 s après SIGTERM, et les
 mesures non envoyées d'un arrêt pendant une demande seraient perdues ; le délai d'arrêt du
-conteneur relève de #200. La télémétrie native de FastAPI (traces, métriques HTTP) est coupée : les traces sont
-l'objet de #281.
+conteneur relève de #200. La télémétrie native de FastAPI (traces, métriques HTTP, journaux) est
+coupée dans les deux API (`core/api_telemetry.py`) : avec `FASTAPI_OTEL_AUTO_CONFIGURE=true`, elle
+poserait ses propres fournisseurs, et une trace de l'API de données porterait la requête brute d'un
+client. Les traces sont l'objet de #281.
 
 ## États nommés
 

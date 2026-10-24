@@ -176,8 +176,37 @@ journaux de `kb`.
 `record_data_fetch`, `stop`. OpenTelemetry ne s'importe que dans `metrics_export.py` et
 `metric_instruments.py`, et `requests` que dans le premier. Un test d'architecture le tient
 (`tests/architecture/test_opentelemetry.py`). C'est une décision de Sabine du 24/10 : les règles de
-l'export restent en un seul endroit. La télémétrie native de FastAPI 0.143, qui enverrait traces et
-métriques HTTP aux fournisseurs globaux, est coupée dans l'app de l'API IA (`app.py:55-61`).
+l'export restent en un seul endroit.
+
+La télémétrie native de FastAPI 0.143 est coupée dans les **deux** API, par une valeur partagée
+(`src/k_b/core/api_telemetry.py`). Allumée, elle enverrait traces, métriques HTTP et messages
+d'erreur aux fournisseurs globaux. Avec `FASTAPI_OTEL_AUTO_CONFIGURE=true`, elle les poserait
+elle-même, d'après les variables `OTEL_*`. Une trace de l'API de données porterait alors la requête
+brute d'un client vers un destinataire absent du registre. Le risque est né de cette PR : avant
+elle, l'exporteur OTLP n'était pas installé et la configuration automatique échouait. Le test
+`tests/test_api_telemetry.py` lance chaque app dans un sous-processus avec la variable, et vérifie
+qu'aucun fournisseur global n'est posé (constat de la revue de code, vérifié par time-knight).
+
+### 7. Les journaux de l'exporteur, cités comme ceux de K-B
+
+Quand un envoi échoue, le client OTLP journalise le code HTTP et la phrase d'état du serveur. Cette
+phrase peut porter un retour chariot ou un caractère de contrôle. Un filtre est posé sur le journal
+de l'exporteur lui-même (`EXPORTER_LOGGER`, `metrics_export.py`) :
+
+```python
+def quote_argument(argument: object) -> object:
+    if isinstance(argument, BaseException):
+        return type(argument).__name__
+    if isinstance(argument, str):
+        return quote_value(argument)
+    return argument
+```
+(`src/k_b/ai_api/connectors/metrics_export.py:188-193`)
+
+Chaque texte passe par `quote_value` (règle 3 de `conventions.md`), chaque exception est réduite à
+son type, et la ligne reste : l'échec demeure visible. Le filtre est sur le journal de l'exporteur
+et non sur `opentelemetry` : un filtre de journal ne voit pas les lignes que ses enfants lui
+remontent.
 
 ## Choix faits et options écartées
 
@@ -209,9 +238,11 @@ métriques HTTP aux fournisseurs globaux, est coupée dans l'app de l'API IA (`a
 | `test_a_measure_carries_closed_attributes_never_a_text` | Clés et valeurs d'attributs dans une liste fermée, sans `request_id` |
 | `test_an_empty_window_measures_its_reading_without_a_call` | `data_fetch` mesuré sans appel au modèle |
 | `test_the_measures_are_sent_when_the_app_stops` | La fin du `lifespan` appelle `stop` |
+| `test_auto_configure_sets_no_global_provider` (les deux API, en sous-processus) | Avec `FASTAPI_OTEL_AUTO_CONFIGURE=true`, aucun fournisseur global n'est posé ; une app FastAPI sans la coupure en pose un (vérifié le 24/10) |
+| `test_a_failed_export_is_logged_with_its_reason_quoted` | Un 400 dont la phrase d'état porte un CR et un échappement est journalisé cité ; rouge sans le filtre |
 | `test_a_library_of_the_export_is_imported_by_its_modules_only` | OpenTelemetry et `requests` restent dans leurs deux modules |
 | Test `e2e` vers `https://otlp.invalid` (le 24/10) | Demande 200, export en échec ; le journal du SDK cite l'hôte et le chemin, jamais l'en-tête |
-| `uv run pytest` : 2344 réussis ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` | Contrôles du dépôt verts |
+| `uv run pytest` : 2347 réussis ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` | Contrôles du dépôt verts |
 | Nouveaux tests lancés sur `736c46c` (dépendances seules) | Rouges : `ImportError` à la collecte des trois modules de test |
 
 ## Ce que tu dois pouvoir défendre
@@ -250,9 +281,8 @@ métriques HTTP aux fournisseurs globaux, est coupée dans l'app de l'API IA (`a
   commerciales de Grafana, lues le 24/10, pas d'un contrat.
 - **Le texte du DPA** a été lu sur les pages 1 à 14 du PDF ; la fin du Schedule 3 (juridictions
   hors UE) n'a pas été lue.
-- **Deux constats de la revue de code** sont en vérification par time-knight à l'écriture de la
-  note : la télémétrie native de FastAPI dans l'API de données (`kb serve`), et les journaux du SDK
-  non échappés.
+- **Le filtre des journaux** ne couvre que le journal de l'exporteur OTLP. Une ligne d'un autre
+  module du SDK (le lecteur périodique, par exemple) n'est pas citée par `quote_value`.
 
 ## Ce qui reste
 

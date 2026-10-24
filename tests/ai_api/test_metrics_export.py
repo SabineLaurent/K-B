@@ -2,14 +2,18 @@
 environment and refused without quoting the headers, the meter provider and its resource, closed
 to anything else, and the last export on stop. No network: the exporter is a fake one."""
 
+import io
+import logging
 import secrets
 import uuid
 
 import pytest
+import requests
 from opentelemetry.exporter.otlp.proto.http import Compression
-from opentelemetry.sdk.metrics import Counter, Histogram
+from opentelemetry.sdk.metrics import Counter, Histogram, MeterProvider
 from opentelemetry.sdk.metrics.export import (
     AggregationTemporality,
+    InMemoryMetricReader,
     MetricExporter,
     MetricExportResult,
     MetricsData,
@@ -18,6 +22,7 @@ from pydantic import SecretStr
 
 from k_b.ai_api.connectors import metrics_export
 from k_b.ai_api.connectors.metrics_export import (
+    EXPORTER_LOGGER,
     MetricsExportSettings,
     build_meter_provider,
     build_resource,
@@ -295,3 +300,46 @@ def test_stop_sends_the_measures_not_sent_yet(fake_exporters):
     assert metric.name == "k_b.digest.data_fetch.duration"
     [point] = metric.data.data_points
     assert (point.count, point.sum) == (1, 1.5)
+
+
+class RefusingAdapter(requests.adapters.BaseAdapter):
+    """An HTTP adapter that answers every request 400, with a reason phrase that holds a CR and an
+    escape character, as an endpoint could send: nothing leaves the test."""
+
+    def send(self, request, **kwargs):
+        response = requests.Response()
+        response.status_code = 400
+        response.reason = "Bad\rRequest\x1b[31m"
+        response.url = request.url
+        response.request = request
+        response.raw = io.BytesIO(b"")
+        return response
+
+    def close(self):
+        pass
+
+
+def test_a_failed_export_is_logged_with_its_reason_quoted(monkeypatch, caplog):
+    class LocalSession(requests.Session):
+        def __init__(self):
+            super().__init__()
+            self.mount("https://", RefusingAdapter())
+
+    monkeypatch.setattr(metrics_export.requests, "Session", LocalSession)
+    reader = InMemoryMetricReader()
+    model_metrics = ModelMetrics(MeterProvider(metric_readers=[reader]))
+    model_metrics.record_data_fetch(120)
+    exporter = metrics_export.build_exporter(SETTINGS)
+
+    with caplog.at_level(logging.ERROR):
+        result = exporter.export(reader.get_metrics_data())
+
+    assert result is MetricExportResult.FAILURE
+    [record] = [
+        record for record in caplog.records if record.name == EXPORTER_LOGGER.name
+    ]
+    message = record.getMessage()
+    assert "'Bad\\rRequest\\x1b[31m'" in message
+    assert "\r" not in message
+    assert "\x1b" not in message
+    assert TOKEN not in message

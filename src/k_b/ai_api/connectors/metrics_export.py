@@ -9,6 +9,7 @@ behind the back of its caller, the headers too even when they are given
 malformed one as it is. So no OTEL_* variable is accepted at all.
 """
 
+import logging
 import re
 import uuid
 from collections.abc import Mapping
@@ -34,6 +35,10 @@ from k_b.core.config import (
 )
 from k_b.core.outbound import find_url_refusal
 from k_b.core.quoting import quote_value
+
+# The log of the exporter: its failures quote the reason phrase of the endpoint and the text of an
+# exception, which may hold a CR or a control character.
+EXPORTER_LOGGER = logging.getLogger(OTLPMetricExporter.__module__)
 
 ENDPOINT_VARIABLE = "KB_OTLP_ENDPOINT"
 HEADERS_VARIABLE = "KB_OTLP_HEADERS"
@@ -170,10 +175,35 @@ def build_meter_provider(settings: MetricsExportSettings | None) -> MeterProvide
     )
 
 
+class QuotingFilter(logging.Filter):
+    """The values of a line of the exporter quoted as K-B quotes them (conventions.md, rule 3): a
+    text by quote_value, an exception by its type. The line is kept: a failure stays visible."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple):
+            record.args = tuple(quote_argument(argument) for argument in record.args)
+        return True
+
+
+def quote_argument(argument: object) -> object:
+    if isinstance(argument, BaseException):
+        return type(argument).__name__
+    if isinstance(argument, str):
+        return quote_value(argument)
+    return argument
+
+
+QUOTING_FILTER = QuotingFilter()
+
+
 def build_exporter(settings: MetricsExportSettings) -> OTLPMetricExporter:
     """The OTLP exporter over HTTP: every option given, and an HTTP session that reads neither a
     proxy, a certificate nor a .netrc of the environment (core/outbound.py). The transport of the
     SDK follows no redirection, but counts a 3xx as a success."""
+    # On the logger of the exporter itself: a filter on the logger "opentelemetry" does not see
+    # the lines of its children.
+    if QUOTING_FILTER not in EXPORTER_LOGGER.filters:
+        EXPORTER_LOGGER.addFilter(QUOTING_FILTER)
     session = requests.Session()
     session.trust_env = False
     return OTLPMetricExporter(

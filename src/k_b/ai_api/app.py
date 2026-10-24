@@ -18,6 +18,7 @@ from k_b.core.api_access import check_api_key
 from k_b.core.api_errors import API_ERROR_HANDLERS, respond_to_unexpected_error
 from k_b.core.api_health import HEALTH_PATH, answer_health
 from k_b.core.api_request_log import log_request
+from k_b.core.api_telemetry import NATIVE_TELEMETRY_OFF
 from k_b.core.config import DigestSubject
 
 # The version of the contract of docs/fiches-veille.md: a change a client can see changes both.
@@ -48,17 +49,7 @@ def create_app(
         redirect_slashes=False,
         exception_handlers=API_ERROR_HANDLERS,
         lifespan=stop_metrics_on_shutdown,
-        # The native OpenTelemetry of FastAPI (0.143) would send the traces, the HTTP metrics and
-        # the error messages to the global providers, or, with FASTAPI_OTEL_AUTO_CONFIGURE, to the
-        # OTEL_* variables K-B refuses: off, the measures of K-B go by ModelMetrics alone (#162;
-        # the traces are #281).
-        telemetry={
-            "tracing": False,
-            "metrics": False,
-            "logs": False,
-            "operation_spans": False,
-            "auto_configure": False,
-        },
+        telemetry=NATIVE_TELEMETRY_OFF,
     )
     app.state.api_keys = dict(api_keys)
     app.state.llm_settings = llm_settings

@@ -13,6 +13,7 @@ from k_b.core.api_access import check_api_key
 from k_b.core.api_errors import respond_to_unexpected_error
 from k_b.core.api_health import HEALTH_PATH, answer_health
 from k_b.core.api_request_log import log_request
+from k_b.core.api_telemetry import NATIVE_TELEMETRY_OFF
 from k_b.core.config import DATA_API_ALLOWED_HOSTS
 from k_b.data_api.api_router import api_router
 from k_b.data_api.errors import ERROR_HANDLERS
@@ -40,6 +41,8 @@ def create_app(
         # /items/ is an unknown route (404), not a redirection to /items.
         redirect_slashes=False,
         exception_handlers=ERROR_HANDLERS,
+        # Its traces would carry the raw query of a request (core/api_telemetry.py).
+        telemetry=NATIVE_TELEMETRY_OFF,
     )
     app.state.database_path = database_path
     app.state.api_keys = dict(api_keys)
