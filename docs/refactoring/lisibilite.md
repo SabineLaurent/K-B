@@ -484,7 +484,7 @@ et Zotero) — jamais de la façon dont le module se lit. À inscrire au plan co
 
 - **Lint, format et typage** : `uv run ruff check --no-cache`, `uv run ruff format --check` et
   `uv run mypy --strict` n'ont pas pu être lancés. `uv` échoue dans le bac à sable de la session
-  (`Failed to initialize cache at /Users/sabine/.cache/uv: Operation not permitted`). Les tests
+  (`Failed to initialize cache at ~/.cache/uv: Operation not permitted`). Les tests
   ont été lancés par `.venv/bin/python3 -m pytest` : 2 288 passés, 1 échec, celui-ci dû au bac à
   sable (voir en tête). Les trois lignes de plus de 100 caractères et les docstrings coupées sont
   relevées par mes propres scripts, pas par `ruff`.

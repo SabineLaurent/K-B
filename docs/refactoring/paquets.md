@@ -371,7 +371,7 @@ d'entrée, et il faut alors une entrée de journal pour le nom du logger.
 ## 7. Ce que je n'ai pas vérifié
 
 - **Lint, format et typage** : `uv` échoue dans le bac à sable de la session
-  (`Failed to initialize cache at /Users/sabine/.cache/uv: Operation not permitted`). Les tests
+  (`Failed to initialize cache at ~/.cache/uv: Operation not permitted`). Les tests
   ont été lancés par `.venv/bin/python3 -m pytest` : `tests/etl/test_load*.py`,
   `tests/architecture/` et `tests/etl/test_import_log.py`, 236 passés.
 - **Aucun déplacement n'a été essayé** : les coûts d'imports sont des comptes de `grep`
