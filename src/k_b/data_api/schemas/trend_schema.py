@@ -1,5 +1,4 @@
-"""The response of GET /trends: the repositories that gained the most stars and forks over a
-window of 3 days (docs/specs-api.md, "GET /trends")."""
+"""The response of GET /trends."""
 
 from datetime import date
 

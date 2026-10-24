@@ -1,6 +1,5 @@
-"""The responses of GET /items and GET /items/{item_id}: the fields of the spec, and only them
-(docs/specs-api.md, "Réponse" and "GET /items/{item_id}"). The API's own models, never Item: a
-field added to the reading is not served."""
+"""The responses of GET /items and GET /items/{item_id}: the API's own models, never Item, so
+that a field added to the reading is not served."""
 
 from typing import Annotated, Literal
 

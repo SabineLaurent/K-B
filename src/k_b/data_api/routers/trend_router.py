@@ -1,5 +1,5 @@
 """GET /trends: the repositories that gained the most stars and forks over a window of 3 days
-(docs/specs-api.md, "GET /trends")."""
+(docs/specs-api.md)."""
 
 import re
 from datetime import date
@@ -19,9 +19,8 @@ WINDOW_END_FORM = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 
 def check_window_end_form(window_end: object) -> object:
-    """window_end as written in the URL: left to pydantic, 1760227200 would be read as a Unix
-    time and 2026-10-12T00:00:00Z as a day. A ValueError, which pydantic turns into a 422; the
-    day is then read by pydantic, which refuses 2026-02-30."""
+    """window_end as written in the URL: left to pydantic, 1760227200 would be a Unix time and
+    2026-10-12T00:00:00Z a day."""
     if not isinstance(window_end, str) or not WINDOW_END_FORM.fullmatch(window_end):
         raise ValueError("window_end is not a day written YYYY-MM-DD")
     return window_end
