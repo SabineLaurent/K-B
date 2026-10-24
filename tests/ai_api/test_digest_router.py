@@ -507,6 +507,7 @@ METRIC_FIELDS = [
     "first_failed_check",
     "facts_checked",
     "facts_found",
+    "fidelity_rate",
     "claims_removed",
     "items_uncited",
     "cost_estimated",
@@ -545,14 +546,17 @@ def test_each_call_writes_one_json_line_on_stdout_without_a_text(make_ai_api, ca
             None,
         )
     assert (others[0]["claims_removed"], others[0]["items_uncited"]) == (0, 0)
+    # The counters of the fidelity: null at the classification, null rate without fact.
+    assert [
+        (line["facts_checked"], line["facts_found"], line["fidelity_rate"])
+        for line in lines
+    ] == [(None, None, None), (1, 1, 1.0), (1, 1, 1.0), (0, 0, None)]
     for line in lines:
         assert (line["outcome"], line["http_status"], line["attempts"]) == (
             "ok",
             200,
             1,
         )
-        # Filled by #207.
-        assert (line["facts_checked"], line["facts_found"]) == (None, None)
         assert line["ts"].endswith("Z")
         assert line["ts"] == datetime.fromisoformat(line["ts"]).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
@@ -577,6 +581,39 @@ def test_the_cost_is_the_tokens_at_the_prices_of_the_config(make_ai_api, capsys)
     )
     assert {line["cost_estimated"] for line in read_metric_lines(capsys)} == {expected}
     assert expected == 0.00024
+
+
+def test_the_fidelity_rate_is_the_facts_found_over_the_facts_checked(
+    make_ai_api, capsys
+):
+    # v2.1.287 is the tag of release 6; v2.1.299 is in no item.
+    two_versions = {
+        "text": "Claude Code publie v2.1.287 puis v2.1.299.",
+        "item_ids": ["i6"],
+        "facts": [
+            {"value": "v2.1.287", "item_id": "i6"},
+            {"value": "v2.1.299", "item_id": "i6"},
+        ],
+    }
+    client, _ = make_ai_api(
+        [
+            classified(),
+            written(SECURITY_CLAIM),
+            written(AGENT_CLAIM, two_versions),
+            written(),
+        ]
+    )
+
+    post_digests(client)
+
+    agent = read_metric_lines(capsys)[2]
+    assert (agent["subject"], agent["facts_checked"], agent["facts_found"]) == (
+        "agent_tools",
+        3,
+        2,
+    )
+    assert agent["fidelity_rate"] == 0.6667
+    assert agent["claims_removed"] == 1
 
 
 # The attributes a measure may carry: closed values, never a text, a subject nor an id of request
@@ -675,6 +712,12 @@ def test_each_call_is_measured_in_opentelemetry_as_on_its_line(
     )
     assert find_point(points, "k_b.digest.items_uncited") == sum(
         line["items_uncited"] for line in writes
+    )
+    assert find_point(points, "k_b.digest.facts_checked") == sum(
+        line["facts_checked"] for line in writes
+    )
+    assert find_point(points, "k_b.digest.facts_found") == sum(
+        line["facts_found"] for line in writes
     )
     assert find_point(points, "k_b.digest.data_fetch.duration") == (
         1,

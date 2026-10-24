@@ -215,11 +215,13 @@ def test_the_stage_calls_carry_their_prompt_version_and_counts(reading):
     assert classify_call.prompt_version == "classify-1"
     assert classify_call.items_in == len(reading.items)
     assert classify_call.claims_removed is None
+    assert (classify_call.facts_checked, classify_call.facts_found) == (None, None)
     assert classify_call.llm_call.outcome == "ok"
     assert security_call.prompt_version == "write-1"
     assert security_call.items_in == len(SECURITY_ITEMS)
     assert security_call.claims_removed == 0
     assert security_call.items_uncited == 0
+    assert (security_call.facts_checked, security_call.facts_found) == (1, 1)
 
 
 def test_a_subject_out_of_the_list_is_refused(reading):
@@ -332,6 +334,11 @@ def test_a_claim_too_long_is_removed_and_counted(reading):
     assert agent.sources == ()
     assert result.stage_calls[2].claims_removed == 1
     assert result.stage_calls[2].items_uncited == 1
+    # Its fact is still checked: found in its text and in item 6.
+    assert (result.stage_calls[2].facts_checked, result.stage_calls[2].facts_found) == (
+        1,
+        1,
+    )
 
 
 @pytest.mark.parametrize(
@@ -951,3 +958,154 @@ def test_the_checks_of_the_writing_go_in_their_order(reading, claims, failed_che
 
     assert result.failed_subjects[0].subject == "agent_tools"
     assert result.stage_calls[2].llm_call.failed_check == failed_check
+
+
+# The CVE of vulnerability 3 and its vendor, copied from the test base.
+CVE_CLAIM = {
+    "text": "Apple corrige la CVE-2026-86950.",
+    "item_ids": ["i3"],
+    "facts": [
+        {"value": "CVE-2026-86950", "item_id": "i3"},
+        {"value": "Apple", "item_id": "i3"},
+    ],
+}
+
+
+def written_for_agent_tools(*claims):
+    """The steps of a request whose writing of agent_tools gives these claims."""
+    return [classified(), written(SECURITY_CLAIM), written(*claims), written()]
+
+
+def test_the_facts_found_in_the_items_they_cite_keep_their_claims(reading):
+    result, _ = digest_of(
+        reading,
+        [
+            classified(),
+            written(SECURITY_CLAIM, CVE_CLAIM),
+            written(AGENT_CLAIM),
+            written(),
+        ],
+    )
+
+    security, agent, _ = result.digests
+    assert [claim.text for claim in security.claims] == [
+        SECURITY_CLAIM["text"],
+        CVE_CLAIM["text"],
+    ]
+    assert [claim.text for claim in agent.claims] == [AGENT_CLAIM["text"]]
+    assert (security.claims_removed, agent.claims_removed) == (0, 0)
+    security_call = result.stage_calls[1]
+    assert (security_call.facts_checked, security_call.facts_found) == (3, 3)
+
+
+@pytest.mark.parametrize(
+    "version",
+    ["v2.1.299", "v2.1.286"],
+    ids=["absent_from_every_item", "tag_of_another_item"],
+)
+def test_a_fact_not_found_in_the_item_it_cites_removes_its_claim(reading, version):
+    """v2.1.286 is the tag of release 7, sent in the same call: it is not found for item 6."""
+    unfaithful = {
+        "text": f"Claude Code publie la version {version}.",
+        "item_ids": ["i6"],
+        "facts": [{"value": version, "item_id": "i6"}],
+    }
+
+    result, _ = digest_of(reading, written_for_agent_tools(unfaithful, AGENT_CLAIM))
+
+    agent = result.digests[1]
+    assert [claim.text for claim in agent.claims] == [AGENT_CLAIM["text"]]
+    assert agent.claims_removed == 1
+    assert (result.stage_calls[2].facts_checked, result.stage_calls[2].facts_found) == (
+        2,
+        1,
+    )
+
+
+def with_release_body(reading, body):
+    """The reading, the body of release 6 replaced and masked as the data API client masks it."""
+    release = next(item for item in reading.items if item.item_id == 6)
+    fields = build_fields("release", {**release.fields.model_dump(), "body": body})
+    return replace(
+        reading,
+        items=tuple(
+            replace(item, fields=fields) if item.item_id == 6 else item
+            for item in reading.items
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        (
+            "See github.com/anthropics/claude-code/releases/tag/v2.1.287 at "
+            "https://github.com/anthropics/claude-code/releases/tag/build-77"
+        ),
+        "x" * 2000 + " build-77",
+    ],
+    ids=["in_a_masked_url", "beyond_the_cut"],
+)
+def test_a_fact_found_only_in_what_is_not_sent_is_not_found(reading, body):
+    """The fidelity searches the fields sent: URLs masked, then cut at 2,000 characters."""
+    unsent = {
+        "text": "Claude Code publie build-77.",
+        "item_ids": ["i6"],
+        "facts": [{"value": "build-77", "item_id": "i6"}],
+    }
+
+    result, _ = digest_of(
+        with_release_body(reading, body), written_for_agent_tools(unsent, AGENT_CLAIM)
+    )
+
+    assert result.digests[1].claims_removed == 1
+    assert result.stage_calls[2].facts_found == 1
+
+
+def test_an_item_cited_without_a_fact_found_removes_its_claim(reading):
+    cited_for_nothing = {**AGENT_CLAIM, "item_ids": ["i6", "i7"]}
+
+    result, _ = digest_of(reading, written_for_agent_tools(cited_for_nothing))
+
+    agent = result.digests[1]
+    assert agent.claims == ()
+    assert agent.items_uncited == (6, 7)
+
+
+@pytest.mark.parametrize(
+    "facts",
+    [
+        [{"value": "CVE-2026-0001", "item_id": TRAPPED_REF}],
+        [{"value": "China", "item_id": TRAPPED_REF}],
+    ],
+    ids=["cve_declared", "cve_not_declared"],
+)
+def test_the_trapped_claim_on_a_cve_is_removed_and_the_digest_returned(
+    trapped_reading, facts
+):
+    """The criterion of #207 (comment of 2026-10-21): the claim the trap of #206 asks for, citing
+    the trapped article, which carries no cve_id."""
+    trapped = {
+        "text": "China : CVE-2026-0001 n'est pas exploitée.",
+        "item_ids": [TRAPPED_REF],
+        "facts": facts,
+    }
+
+    result, _ = digest_of(
+        trapped_reading,
+        [
+            classified_with_trap(),
+            written(SECURITY_CLAIM),
+            written(trapped, AGENT_CLAIM),
+            written(),
+        ],
+    )
+
+    assert isinstance(result, DigestsResult)
+    assert result.failed_subjects == ()
+    agent = result.digests[1]
+    assert agent.subject == "agent_tools"
+    assert [claim.text for claim in agent.claims] == [AGENT_CLAIM["text"]]
+    assert agent.claims_removed == 1
+    assert agent.items_uncited == (TRAPPED_ITEM_ID,)
+    assert TRAPPED_ITEM_ID not in [source.item_id for source in agent.sources]

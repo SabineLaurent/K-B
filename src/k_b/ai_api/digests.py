@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from k_b.ai_api.connectors.llm_client import LlmCall, LlmFailure, to_failure
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
+from k_b.ai_api.fidelity import check_claim
 from k_b.ai_api.stages.classification import (
     CLASSIFICATION_PROMPT_VERSION,
     build_batches,
@@ -53,24 +54,18 @@ class StageCall:
     # for the writing.
     items_truncated: int
     # Of a writing whose output is checked; None otherwise. items_uncited counts the items no
-    # longer cited once the claims out of their bounds are removed.
+    # longer cited once the claims out of their bounds or unfaithful are removed.
+    facts_checked: int | None
+    facts_found: int | None
     claims_removed: int | None
     items_uncited: int | None
     llm_call: LlmCall[BaseModel]
 
 
 @dataclass(frozen=True)
-class DigestFact:
-    value: str
-    item_id: int
-
-
-@dataclass(frozen=True)
 class DigestClaim:
     text: str
     item_ids: tuple[int, ...]
-    # Kept for the checks of #207; never in the answer.
-    facts: tuple[DigestFact, ...]
 
 
 @dataclass(frozen=True)
@@ -90,6 +85,9 @@ class Digest:
     sources: tuple[DigestSource, ...]
     # Sent for this subject and cited by no claim of the model.
     not_retained: tuple[int, ...]
+    # Every fact of every claim of the output, a claim removed included.
+    facts_checked: int
+    facts_found: int
     claims_removed: int
     # Cited by the model, no longer cited once its claims are removed.
     items_uncited: tuple[int, ...]
@@ -186,6 +184,8 @@ def build_digests(
                 prompt_version=WRITING_PROMPT_VERSION,
                 items_in=len(selection.items),
                 items_truncated=selection.items_truncated,
+                facts_checked=None if digest is None else digest.facts_checked,
+                facts_found=None if digest is None else digest.facts_found,
                 claims_removed=None if digest is None else digest.claims_removed,
                 items_uncited=None if digest is None else len(digest.items_uncited),
                 llm_call=llm_call,
@@ -231,6 +231,8 @@ def classify(
                 prompt_version=CLASSIFICATION_PROMPT_VERSION,
                 items_in=len(batch.items),
                 items_truncated=batch.items_truncated,
+                facts_checked=None,
+                facts_found=None,
                 claims_removed=None,
                 items_uncited=None,
                 llm_call=llm_call,
@@ -267,13 +269,19 @@ def classify(
 def to_digest(
     subject: str, items_sent: Sequence[WatchItem], output: WritingOutput
 ) -> Digest:
-    """The digest of a writing checked: the claims within their bounds, and what the code
-    computes from them."""
-    kept = [claim for claim in output.claims if is_within_claim_bounds(claim)]
+    """The digest of a writing checked: the claims within their bounds and faithful, and what the
+    code computes from them."""
+    item_by_ref = {to_item_ref(item.item_id): item for item in items_sent}
+    fidelities = [check_claim(claim, item_by_ref) for claim in output.claims]
+    kept = [
+        claim
+        for claim, fidelity in zip(output.claims, fidelities, strict=True)
+        if is_within_claim_bounds(claim) and fidelity.is_faithful
+    ]
     cited_by_model = cited_refs(output.claims)
     cited_kept = cited_refs(kept)
     uncited = cited_by_model - cited_kept
-    item_id_by_ref = {to_item_ref(item.item_id): item.item_id for item in items_sent}
+    item_id_by_ref = {ref: item.item_id for ref, item in item_by_ref.items()}
     return Digest(
         subject=subject,
         claims=tuple(to_digest_claim(claim, item_id_by_ref) for claim in kept),
@@ -287,6 +295,8 @@ def to_digest(
             for item in items_sent
             if to_item_ref(item.item_id) not in cited_by_model
         ),
+        facts_checked=sum(fidelity.facts_checked for fidelity in fidelities),
+        facts_found=sum(fidelity.facts_found for fidelity in fidelities),
         claims_removed=len(output.claims) - len(kept),
         items_uncited=tuple(
             item.item_id for item in items_sent if to_item_ref(item.item_id) in uncited
@@ -302,10 +312,6 @@ def to_digest_claim(claim: Claim, item_id_by_ref: Mapping[str, int]) -> DigestCl
     return DigestClaim(
         text=claim.text,
         item_ids=tuple(item_id_by_ref[ref] for ref in claim.item_ids),
-        facts=tuple(
-            DigestFact(value=fact.value, item_id=item_id_by_ref[fact.item_id])
-            for fact in claim.facts
-        ),
     )
 
 
