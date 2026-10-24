@@ -248,7 +248,9 @@ du SDK (seconde revue, constat non corrigé).
 | `test_a_call_checked_then_retried_without_answer_measures_its_check`, `test_a_call_whose_answer_was_unreadable_is_not_checked` | La durée des contrôles suit `is_checked`, dans les deux cas trouvés par la seconde revue |
 | `test_a_library_of_the_export_is_imported_by_its_modules_only` | OpenTelemetry et `requests` restent dans leurs deux modules |
 | Test `e2e` vers `https://otlp.invalid` (le 24/10) | Demande 200, export en échec ; le journal du SDK cite l'hôte et le chemin, jamais l'en-tête |
-| `uv run pytest` : 2347 réussis ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` | Contrôles du dépôt verts |
+| Essai réel, le 2026-10-24 à 11:09 UTC : `uv run --env-file .env.e2e_test pytest -m e2e -rs -k real_export` → 1 réussi | Chaque envoi vers la pile `prod-eu-west-2` a rendu SUCCESS. Deux essais d'avant avaient rendu 401 : des chevrons du gabarit restés dans l'en-tête ; Grafana répondait « authentication error: no credentials provided », et le journal citait la phrase d'état sans le jeton |
+| Grafana Explore, le 2026-10-24 à 11:14 UTC, requête `{job="k-b-ai-api"}` (lue par Sabine, capture gardée par elle pour E3) | 53 séries arrivées (`gen_ai_client_inference_duration_seconds_bucket`…), avec `deployment_environment=sandbox`, `service_instance_id`, `gen_ai_provider_name=replay`, `k_b_stage=classify` ; aucun texte ni nom dans les étiquettes |
+| `uv run pytest` : 2353 réussis ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` | Contrôles du dépôt verts |
 | Nouveaux tests lancés sur `736c46c` (dépendances seules) | Rouges : `ImportError` à la collecte des trois modules de test |
 
 ## Ce que tu dois pouvoir défendre
@@ -275,12 +277,10 @@ du SDK (seconde revue, constat non corrigé).
 
 ## Zones non vérifiées
 
-- **L'essai réel vers Grafana Cloud n'est pas fait à l'écriture de cette note.** Il attend le
-  jeton de Sabine (`tests/e2e/test_real_export.py`, lancé par elle), puis la série lue dans Grafana
-  Explore par `{job="k-b-ai-api"}`.
 - **Le nom des séries dans Grafana** : la règle de traduction (points en soulignés, `_total` sur
-  un compteur, suffixe d'unité) vient de la doc de Grafana Cloud. Le sort d'une unité entre
-  accolades (`{token}`, `{USD}`) n'y est pas écrit.
+  un compteur, suffixe d'unité) vient de la doc de Grafana Cloud, et l'essai l'a confirmée pour un
+  histogramme en secondes (`gen_ai_client_inference_duration_seconds_bucket`). Le nom exact d'un
+  compteur à l'unité entre accolades (`{token}`, `{USD}`) n'a pas été relevé.
 - **Un 3xx compte comme un succès** pour le transport du SDK : le test de bout en bout ne le
   distingue pas d'un envoi reçu. La série vue dans Grafana est la preuve finale.
 - **La rétention de 14 jours et les 10 000 séries** de l'offre gratuite viennent des pages
