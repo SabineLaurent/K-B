@@ -537,7 +537,9 @@ apostrophes et guillemets typographiques (U+2018, U+2019, U+201C, U+201D) ramen�
 **Faits CVE et GHSA.** Les motifs s'appliquent après la normalisation, sur un **texte de
 détection** : les marques d'emphase `*` et `=` retirées (`CVE-2026-00**01**` s'affiche comme un
 identifiant), et les lettres cyrilliques, grecques et petites capitales latines qui ressemblent à
-une lettre d'un préfixe lues comme elle (`СVЕ` cyrillique se lit `cve`). Écrits sur ce texte, en
+une lettre d'un préfixe lues comme elle (`СVЕ` cyrillique se lit `cve`), puis toute autre lettre,
+chiffre ou symbole hors ASCII qui n'est pas une lettre ASCII accentuée lu comme `o` (`é` reste `é`,
+pour que `numéro` se lise ; `CVE-2026-ЗЗЗЗ` se lit `CVE-2026-oooo`). Écrits sur ce texte, en
 minuscules (`ai_api/fidelity.py`, `CVE` et `GHSA`), avec `S` = `[\W_]*` :
 
 - CVE : `c S v S e [s] S [mot de numéro S] [\doli]{4} S [\doli]{4,}` ;
@@ -589,8 +591,12 @@ champs (`[url]`, `@user`, section « Entrée du modèle ») sont retirés avant 
 début de `1.2.9`, et `1.2` n'y est pas trouvé (revue de #207, même décision). Un champ d'exactement
 2 000 caractères est traité comme coupé, ce qui va dans le sens sûr.
 
-**Texte déguisé.** Une affirmation dont le `text` contient, une fois normalisé, un caractère qui
-cache ou déguise (une marque `Mn` ou `Me`, un point de code privé `Co` ou non attribué `Cn`, un
+**Texte déguisé.** Une affirmation dont le `text` brut contient un caractère invisible `Cf`, sauf
+U+200D (le liant des emoji composés), est retirée : un contrôle de direction U+202E affiche
+`1000-6202-EVC` comme `CVE-2026-0001`, et les tags U+E0000 à U+E007F font entrer au coffre un texte
+que la lectrice ne voit pas. Faux positifs rares, dans le sens sûr : U+00AD, U+200B, U+2060, le
+drapeau écossais (fait de tags). De même, une affirmation dont le `text` contient, une fois
+normalisé, un caractère qui cache ou déguise (une marque `Mn` ou `Me`, un point de code privé `Co` ou non attribué `Cn`, un
 remplissage hangul ou braille U+115F, U+1160, U+3164, U+FFA0, U+2800, qui s'affiche en blanc), ou
 un mot qui mêle des lettres latines à une lettre non latine qui peut leur ressembler, est retirée
 et comptée (décision de time-knight sur la revue de sécurité de #207, délégation de Sabine du
@@ -664,8 +670,13 @@ n'a pas.
   2026-0001 » : le sens n'est pas vérifié, et aucune expression régulière ne l'attrape), ni un sosie
   hors de la liste (`PREFIX_LOOKALIKES`, `GREEK_LOOKALIKES`) ; une table complète des sosies
   (UTS #39) demanderait une dépendance. L'écrivain du coffre ne retire que les caractères `Cc` et
-  `Cs` (`post/vault_files.py`) : un caractère `Cf` d'une affirmation gardée (U+200B) arrive au
-  coffre ; la fidélité le retire avant de chercher, si bien qu'il ne cache pas un identifiant.
+  `Cs` (`post/vault_files.py`) : la fidélité retire toute affirmation qui porte un `Cf` autre
+  que U+200D, si bien qu'aucun caractère invisible d'une affirmation n'arrive au coffre.
+- **Limite** : un chiffre accentué (`CVE-2026-0ö01`) n'est pas lu comme un identifiant, la lettre
+  ASCII accentuée restant elle-même ; le tréma se voit. Un symbole collé après un vrai identifiant
+  (`CVE-2026-0001🔥`) se lit `o` et rend l'identifiant différent : l'affirmation est retirée, ce qui
+  va dans le sens sûr. Décisions de time-knight sur la seconde revue de #207 (délégation de Sabine
+  du 2026-10-15).
 - **Limite assumée** : un motif CVE peut joindre deux nombres d'une liste (« les CVE 2025, 2026 et
   2027 » se lit `CVE-2025-2026`) ; non déclaré, il retire l'affirmation, ce qui va dans le sens sûr
   (revue de #207, même décision ; un test le fige).

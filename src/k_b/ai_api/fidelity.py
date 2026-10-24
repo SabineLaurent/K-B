@@ -74,6 +74,13 @@ GREEK_LOOKALIKES = frozenset(
     )
 )
 LETTER_RUNS = re.compile(r"[^\W\d_]+")
+# The joiner of composed emoji, the one invisible character a claim may hold; any other (a control
+# of direction, a tag U+E0041) hides text from the reader.
+ZERO_WIDTH_JOINER = chr(0x200D)
+# Read in place of a letter, digit or symbol that is no ASCII letter decomposed, for the detection
+# only: CVE-2026-ЗЗЗЗ is read, as o counts for a digit, and never equals a real one.
+UNKNOWN_SIGN = "o"
+SIGN_CATEGORIES = ("L", "N", "S")
 MODIFIER_LETTER = "Lm"
 # Added after a field cut for the writing: a letter, so that its end is not a limit (…1.2 may be
 # the start of 1.2.9).
@@ -130,13 +137,29 @@ def normalize(text: str) -> str:
 
 
 def to_detection_text(normalized: str) -> str:
-    """The normalized text without emphasis, its lookalikes of a prefix read as Latin letters."""
-    return normalized.translate(EMPHASIS).translate(PREFIX_LOOKALIKES)
+    """The normalized text without emphasis, its lookalikes of a prefix read as Latin letters,
+    any other sign out of ASCII read as o."""
+    read = normalized.translate(EMPHASIS).translate(PREFIX_LOOKALIKES)
+    return "".join(UNKNOWN_SIGN if is_unknown_sign(char) else char for char in read)
+
+
+def is_unknown_sign(char: str) -> bool:
+    """Whether the character is a letter, digit or symbol out of ASCII that is not an ASCII letter
+    with an accent (é stays é, so that numéro is read)."""
+    if char.isascii() or not unicodedata.category(char).startswith(SIGN_CATEGORIES):
+        return False
+    base = unicodedata.normalize("NFD", char)[0]
+    return not (base.isascii() and base.isalpha())
 
 
 def is_disguised(text: str) -> bool:
     """Whether the text holds, once normalized, a character that hides, or a word mixing Latin
     letters with a letter that may look like one."""
+    if any(
+        unicodedata.category(char) == INVISIBLE_CATEGORY and char != ZERO_WIDTH_JOINER
+        for char in text
+    ):
+        return True
     if any(
         unicodedata.category(char) in HIDING_CATEGORIES or char in FILLERS
         for char in normalize(text)

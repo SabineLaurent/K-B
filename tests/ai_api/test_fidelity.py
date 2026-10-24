@@ -391,6 +391,19 @@ DISGUISED_CVES = {
     "identifiant": "la CVE identifiant 2026-0001",
     "ref": "la CVE réf. 2026-0001",
     "reference": "la CVE référence 2026-0001",
+    "right_to_left_override": chr(0x202E) + "1000-6202-EVC" + chr(0x202C),
+    "right_to_left_isolate": chr(0x2067) + "1000-6202-EVC" + chr(0x2069),
+    "cyrillic_o_in_the_number": "CVE-2026-0" + chr(0x043E) + "01",
+    "greek_omicron_in_the_year": "CVE-2" + chr(0x03BF) + "26-0001",
+    "cyrillic_er_in_a_ghsa_group": "GHSA-fjqc-hq36-qh5" + chr(0x0440),
+    "cyrillic_ha_in_a_ghsa_group": "GHSA-" + chr(0x0445) + "2fg-hq36-qh5p",
+    "cyrillic_ze_for_digits": "CVE-2026-" + chr(0x0417) * 4,
+    "cyrillic_er_group": "GHSA-fjqc-hq36-" + chr(0x0440) * 4,
+    "small_capital_o": "CVE-2026-0" + chr(0x1D0F) + "01",
+    "dotless_i": "CVE-2026-000" + chr(0x0131),
+    "white_circle": "CVE-2026-0" + chr(0x25CB) + "01",
+    # Invisible text, carried to the vault: tags U+E0043 U+E0056 U+E0045 spell "CVE".
+    "hidden_tags": "rien" + chr(0xE0043) + chr(0xE0056) + chr(0xE0045),
 }
 
 
@@ -453,3 +466,38 @@ def test_a_fact_equal_to_a_mark_put_by_k_b_is_not_found(value):
     fidelity = check_claim(claim(f"Voir {value} ici.", (value, "i6")), {"i6": release})
 
     assert fidelity.facts_found == 0
+
+
+def test_a_control_of_direction_at_the_start_of_the_text_removes_the_claim():
+    fidelity = check_claim(
+        claim(chr(0x202E) + "1000-6202-EVC China.", ("China", TRAPPED_REF)),
+        {TRAPPED_REF: TRAPPED_ITEM},
+    )
+
+    assert fidelity.is_faithful is False
+
+
+NOT_DISGUISED = {
+    "greek_nu_and_digit": "ν2",
+    "ideogram_after_digits": "2026年",
+    "cyrillic_word_and_digits": "Москва2026",
+    "beta_vae": "β-VAE",
+    "alpha_fold": "α-Fold",
+    "micro_second": "5 µs",
+    "beta_and_digit": "β2",
+    "emoji_with_joiner": chr(0x1F469) + chr(0x200D) + chr(0x1F4BB),
+    "subscript": "H₂O",
+    "superscript": "m²",
+    "ordinal": "3ᵉ",
+    "number_sign": "n°3",
+    "accented_word": "été 2026",
+}
+
+
+@pytest.mark.parametrize("phrase", NOT_DISGUISED.values(), ids=NOT_DISGUISED.keys())
+def test_a_sign_out_of_ascii_in_an_ordinary_phrase_keeps_the_claim(phrase):
+    fidelity = check_claim(
+        claim(f"China : {phrase}.", ("China", TRAPPED_REF)), {TRAPPED_REF: TRAPPED_ITEM}
+    )
+
+    assert fidelity.is_faithful is True
