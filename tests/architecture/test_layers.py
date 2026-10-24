@@ -166,6 +166,41 @@ def test_the_rule_of_the_stages_refuses_every_way_to_another_stage(
     assert bool(list_imports_of_another_stage(imported, stage)) is is_refused
 
 
+# etl/pipeline.py is the only door of the two runs for commands/: they import neither a stage
+# nor the steps the pipeline chains around them (conventions.md, rule 5).
+ETL_RUN_MODULES = ETL_STAGE_MODULES | {
+    "etl.normalize",
+    "etl.import_log",
+    "etl.raw_purge",
+}
+
+
+def list_imports_behind_the_pipeline(imported: set[str]) -> set[str]:
+    return {name for name in imported if reaches(name, ETL_RUN_MODULES)}
+
+
+def test_commands_reach_the_runs_only_through_the_pipeline():
+    for path in list_python_files("commands"):
+        imported = list_imported_modules(path, find_package(path))
+        assert list_imports_behind_the_pipeline(imported) == set(), path
+
+
+@pytest.mark.parametrize(
+    ("code", "is_refused"),
+    [
+        ("from k_b.etl.load import import_items", True),
+        ("from k_b.etl import transform", True),
+        ("from ..etl.raw_purge import purge_raw_files", True),
+        ("from k_b.etl.pipeline import collect", False),
+        ("from k_b.etl.raw_store import RawStore", False),
+    ],
+)
+def test_the_rule_of_the_pipeline_door_refuses_every_way_behind_it(code, is_refused):
+    imported = parse_imported_modules(code, package="k_b.commands")
+
+    assert bool(list_imports_behind_the_pipeline(imported)) is is_refused
+
+
 # etl and post run below the APIs: kb digest reaches the AI API by HTTP, never by its code
 # (#209); its client is post/ai_api_client.py.
 def list_imports_of_the_apis(imported: set[str]) -> set[str]:
