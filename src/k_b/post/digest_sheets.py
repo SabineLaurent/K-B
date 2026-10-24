@@ -1,5 +1,5 @@
 """The digests of the watch in the vault: one Markdown sheet per subject and per day, written
-once by kb digest from the response of the AI API.
+once by kb digest from the response of the AI API, with the limit of post/vault_files.py.
 
 Its path is made of constants, a subject of the closed list and a day; each text of the response
 is written as text, as the response is untrusted (OWASP LLM10)."""
@@ -92,7 +92,7 @@ def write_digest_sheet(
     vault_dir: Path, response: DigestsResponse, digest: Digest
 ) -> str:
     """Write the sheet of digest, of the UTC day of the end of the window; return its path in the
-    vault."""
+    vault. One that appears after the last check is replaced (the limit of post/vault_files.py)."""
     sheet_path = find_sheet_path(
         vault_dir, digest.subject, response.window.until.date()
     )

@@ -1,8 +1,8 @@
 """The export of the metrics of the AI API in OpenTelemetry to an OTLP endpoint: its settings and
 the meter provider; without endpoint and headers, nothing leaves.
 
-No OTEL_* variable is accepted: the SDK reads the environment behind its caller, the headers too,
-and logs a malformed one as it is."""
+No OTEL_* variable is accepted: the SDK reads the environment behind its caller, the headers too
+even when given (_resolve_headers, 1.45.1), and logs a malformed one as it is."""
 
 import logging
 import re
@@ -141,8 +141,8 @@ def parse_headers(text: str) -> dict[str, SecretStr] | None:
 
 def build_resource(environment: DeploymentEnvironment | None) -> Resource:
     """The service and its environment, nothing else: not Resource.create, which reads OTEL_* and
-    its detectors (process.command_args). service.instance.id is drawn for each process, so that
-    two processes never write the same cumulative series."""
+    its detectors (process.command_args, process.owner, a personal datum). service.instance.id is
+    drawn for each process, so that two processes never write the same cumulative series."""
     attributes: dict[str, str] = {
         "service.name": SERVICE_NAME,
         "service.instance.id": str(uuid.uuid4()),
@@ -203,7 +203,8 @@ QUOTING_FILTER = QuotingFilter()
 
 def build_exporter(settings: MetricsExportSettings) -> OTLPMetricExporter:
     """The OTLP exporter over HTTP, with a session that reads neither a proxy, a certificate nor
-    a .netrc of the environment."""
+    a .netrc of the environment. The transport of the SDK follows no redirection, but counts a
+    3xx as a success."""
     # On the loggers themselves: a filter on the logger "opentelemetry" does not see the lines of
     # its children.
     for logger in EXPORTER_LOGGERS:

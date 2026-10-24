@@ -1,5 +1,6 @@
 """The replay provider: answers known in advance, given in order by the transport of the HTTP
-client, so that a real call runs whole, without network, key nor cost."""
+client, so that a real call runs whole, without network, key nor cost; the steps assume calls one
+after the other."""
 
 from pathlib import Path
 from typing import Annotated, Literal

@@ -20,7 +20,7 @@ def quote_value(value: object) -> str:
 
 def without_values(error: ValidationError) -> ValidationError:
     """The same errors without the value each one received: field, type and message kept (poc.md,
-    rule 5).
+    rule 5), so a validator's message must never quote the value.
 
     Each error is rebuilt by its type, which must be one pydantic knows: a validator raises a
     ValueError, never a PydanticCustomError, which this would refuse with a KeyError."""

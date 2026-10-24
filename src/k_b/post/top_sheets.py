@@ -1,8 +1,8 @@
 """The sheets of the top rankings in the vault, one per top and per day of collection, then the
 rankings they supersede deleted from raw/.
 
-A sheet is written once, never purged nor rewritten; its path is made of constants and the day of
-its ranking, never of a value read from GitHub."""
+A sheet is written once, never purged nor rewritten, with the limit of post/vault_files.py; its
+path is made of constants and the day of its ranking, never of a value read from GitHub."""
 
 import logging
 from dataclasses import dataclass
@@ -47,8 +47,9 @@ def write_top_sheets(store: RawStore, vault_dir: Path, top: Top) -> TopSheetsOut
     """Write the sheet of each day of collection of top that has none, then delete the rankings
     read before the last one read.
 
-    An unreadable ranking is kept; a symbolic link, or an entry replaced meanwhile, stops the top
-    with nothing deleted."""
+    The folder is listed once: a ranking collected meanwhile is neither read nor deleted. An
+    unreadable ranking is kept; an exception (OSError, SIGTERM), a symbolic link, or an entry
+    replaced meanwhile, stops the top with nothing deleted."""
     sheets_dir = find_sheets_dir(vault_dir, top)
     keys = store.list_file_keys(top.folder_key)
     refuse_linked_folders(vault_dir, sheets_dir)

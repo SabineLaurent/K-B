@@ -93,8 +93,9 @@ class ClippingSource:
         """Return each clip changed since last_collected_at (all, at the first collection), by
         page name; None when none was.
 
-        The margin goes both ways (CLIP_CHANGE_MARGIN): a clip changed just before this
-        collection, maybe still written, is left to the next one."""
+        The margin goes both ways (CLIP_CHANGE_MARGIN): a clip changed shortly before the last
+        collection is copied again; one changed shortly before this one, maybe still written, is
+        left to the next."""
         try:
             clip_files = list_clip_files(self.vault_dir / CLIPPINGS_DIR_NAME)
         except FileNotFoundError:

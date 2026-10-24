@@ -1,8 +1,9 @@
 """The end-to-end test of each source: kb create-db, KB_COLLECT_ONLY=<source> kb collect, then kb
 import on the real source, in a new data directory; each command exits 0, with no rejection.
 
-Run as written in MEMORY.md, from a terminal without .env exported; gh_archive runs a real
-BigQuery query. A data directory is deleted but its logs/ once its test ends."""
+Run as written in MEMORY.md, from a terminal without .env exported; without KB_ZOTERO_DIR,
+KB_VAULT_DIR or GOOGLE_APPLICATION_CREDENTIALS, the test of its source is skipped. gh_archive
+runs a real BigQuery query. A data directory is deleted but its logs/ once its test ends."""
 
 import json
 import os

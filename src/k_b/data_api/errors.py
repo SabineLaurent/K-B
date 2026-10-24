@@ -1,4 +1,4 @@
-"""The errors of the data API that the base gives, those of both APIs being in
+"""The errors of the data API that the base gives, without SQL, those of both APIs being in
 core/api_errors.py."""
 
 import logging

@@ -212,8 +212,8 @@ def drop_windows_over_the_cap(
 ) -> list[date]:
     """Drop the oldest windows while the bound caps them, until the dry run fits; else refuse.
 
-    Under the bound, a window dropped lowers the cap more than the volume; above it, a long
-    catch-up would fail every collection."""
+    Under the bound, a window dropped lowers the cap more than the volume, so dropping cannot
+    fit; refusing at the bound without dropping would fail every collection of a long catch-up."""
     while True:
         dry_run = client.query(
             TRENDS_QUERY,

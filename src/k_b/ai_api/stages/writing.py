@@ -157,7 +157,10 @@ def check_writing(
     output: WritingOutput, item_refs: frozenset[str]
 ) -> FailedCheck | None:
     """Checks 4 and 6, over the whole output: each item cited was sent, once in its claim, each
-    fact cites an item of its claim, and no text holds a link, an image nor a tag."""
+    fact cites an item of its claim, and no text holds a link, an image nor a tag.
+
+    Run before the bounds of a claim: a claim too long with a link fails the output, it is not
+    only removed."""
     for claim in output.claims:
         if any(ref not in item_refs for ref in claim.item_ids):
             return "item_id"

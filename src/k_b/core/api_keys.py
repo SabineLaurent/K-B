@@ -37,8 +37,8 @@ def read_api_keys_or_refusal(
 def find_api_key_refusal(
     prefix: str, variable: str, key: str, variable_by_key: Mapping[str, str]
 ) -> str | None:
-    """Why the variable of a client is refused, or None; variable_by_key holds the keys already
-    read."""
+    """Why the variable of a client is refused, or None, naming the variable, never the key;
+    variable_by_key holds the keys already read."""
     client_name = variable.removeprefix(prefix)
     if not CLIENT_NAME.fullmatch(client_name):
         return f"{quote_value(variable)}: client name empty or not [A-Z0-9_]+"
@@ -63,7 +63,7 @@ def find_shared_key_refusal(
     key: SecretStr,
 ) -> str | None:
     """Why a key is refused, or None: the same key as the one of variable, which another API
-    reads."""
+    reads. Both variables are named, never the key."""
     for client_name, client_key in api_keys.items():
         if client_key.get_secret_value() == key.get_secret_value():
             return f"{quote_value(prefix + client_name)} and {quote_value(variable)}: same key"

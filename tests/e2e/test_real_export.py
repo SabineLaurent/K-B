@@ -2,8 +2,9 @@
 whose measures are sent to the real OTLP endpoint when the app stops; skipped without the
 endpoint.
 
-Run as written in MEMORY.md (-k real_export); its proof ends in Grafana Explore, as the SDK
-counts a 3xx as a success."""
+Run as written in MEMORY.md (-k real_export), with KB_OTLP_ENDPOINT, KB_OTLP_HEADERS and
+KB_DEPLOYMENT_ENVIRONMENT in .env.e2e_test; its proof ends in Grafana Explore, as the SDK counts
+a 3xx as a success."""
 
 import os
 import secrets

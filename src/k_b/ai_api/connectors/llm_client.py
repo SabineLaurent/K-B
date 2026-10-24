@@ -68,7 +68,8 @@ MAX_FINISH_REASON_LENGTH = 64
 
 class EnvelopeModel(BaseModel):
     """The envelope a provider gives around the output: the fields read are typed, the others
-    ignored, as a provider adds its own."""
+    ignored, as a provider adds its own; the output inside is the one that refuses a field in
+    excess."""
 
     model_config = ConfigDict(extra="ignore", strict=True, frozen=True)
 
@@ -215,7 +216,7 @@ def call_model[OutputT: BaseModel](
     paid.
 
     With a deadline, each timeout is shortened to the time left, and a retry without the time it
-    needs ends in llm_timeout."""
+    needs ends in llm_timeout. The caller checks the deadline before the call."""
     missing_reminders = [c for c in FAILED_CHECKS if c not in retry_reminders]
     if missing_reminders:
         raise ValueError(f"retry_reminders without: {', '.join(missing_reminders)}")

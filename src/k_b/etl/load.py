@@ -107,7 +107,8 @@ def commit_with_log(
     writing: FileWriting,
 ) -> None:
     """Write the log, then commit: a file registered is not read again, so its log must not be
-    lost. A failed commit, or an interruption before it, removes the log."""
+    lost. A failed commit, or an interruption before it, removes the log; an interruption
+    (Ctrl-C, SIGTERM) once the base has committed keeps the import and its log."""
     # Checked once the base holds the write lock: two imports of the same second cannot both
     # find no log.
     check_log_absent(log_path)

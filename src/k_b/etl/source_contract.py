@@ -34,7 +34,8 @@ def read_each_entry[RawEntryT, EntryT](
     parse: Callable[[RawEntryT, int], EntryT],
 ) -> EntryReading[EntryT]:
     """Parse each entry with its number; one that parse refuses (ValueError) is rejected with its
-    reason, the others still read (conventions.md, rule 1)."""
+    reason, the others still read (conventions.md, rule 1). Only parse is guarded: an error while
+    listing the entries (csv.Error) leaves the whole page unreadable."""
     entries = []
     rejection_reasons = []
     for number, raw_entry in numbered_entries:

@@ -18,7 +18,8 @@ logger = logging.getLogger(LOGGER_NAME)
 
 def run_write_tops(data_dir: Path) -> int:
     """Each top in turn, a top that fails not stopping the other; without a vault, nothing is
-    read nor created, as write_file_atomically would create a vault misspelt."""
+    read nor deleted, and nothing created, as write_file_atomically would create a vault
+    misspelt."""
     vault_dir = read_vault_dir(os.environ)
     if vault_dir is None:
         logger.error(

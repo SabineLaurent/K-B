@@ -17,7 +17,8 @@ def delete_superseded_raw_files(
     many.
 
     The files come from the registry of the base, never from the folder: a raw file not imported
-    is never deleted. The first error stops the purge."""
+    is never deleted, and a folder whose last imported file is gone keeps the others, the only
+    raw of its state. The first error stops the purge."""
     deleted_count = 0
     for folder_key in folder_keys:
         imported_keys = sorted(
