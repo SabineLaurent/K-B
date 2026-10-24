@@ -59,9 +59,8 @@ def run_collect(data_dir: Path) -> int:
 
 
 def log_collection_start(sources: Sequence[Source], environ: Mapping[str, str]) -> None:
-    """Once, before the first source: the sources run, by the name of their line at the end,
-    then, when one of them uses the primary quota of the GitHub API without KB_GITHUB_TOKEN,
-    that quota. Of the token, only whether it is set is read, never its value."""
+    """Log, before the first source, the sources run and, when one uses the GitHub API without
+    KB_GITHUB_TOKEN, its quota; of the token, only whether it is set is read."""
     logger.info("sources to collect: %s", ", ".join(source.name for source in sources))
     if not environ.get(TOKEN_VARIABLE) and any(
         is_github_core_quota_source(source) for source in sources
@@ -81,9 +80,7 @@ def is_github_core_quota_source(source: Source) -> bool:
 def print_skipped_sources(
     collect_only: CollectOnly, environ: Mapping[str, str]
 ) -> None:
-    """One line per source not run: not chosen, or, without KB_COLLECT_ONLY, its variable not
-    set. A source chosen without its variable never gets here: read_collect_only_or_refusal
-    refuses it."""
+    """One line per source not run: not chosen, or its variable not set."""
     for kind in SOURCE_KINDS:
         if not collect_only.is_collected(kind.folder_prefix):
             print(f"{kind.folder_prefix}: skipped (not in {COLLECT_ONLY_VARIABLE})")
@@ -93,8 +90,8 @@ def print_skipped_sources(
 
 
 def find_collection_exit_code(outcome: CollectionOutcome) -> ExitCode:
-    """Partial when some sources failed and the others are kept for good; a state not written
-    is a failure, as when every source fails: the next collection starts from the same dates."""
+    """Partial when some sources failed and the others are kept; a state not written is a
+    failure, as the next collection starts from the same dates."""
     errors = outcome.errors_by_source.values()
     if outcome.state_error is not None:
         return ExitCode.FAILED

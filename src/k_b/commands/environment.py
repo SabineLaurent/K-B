@@ -32,7 +32,7 @@ def read_data_dir() -> Path | None:
 
 def read_log_to_file() -> bool | None:
     """Whether kb logs in a file as well as on stderr, or None after printing why the value is
-    refused: the log is not open yet."""
+    refused."""
     value = os.environ.get(LOG_TO_FILE_VARIABLE)
     if value is None:
         return LOG_TO_FILE

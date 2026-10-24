@@ -34,15 +34,11 @@ logger = logging.getLogger(LOGGER_NAME)
 def logging_to(
     data_dir: Path, log_file_path: Path | None = LOG_FILE_PATH
 ) -> Iterator[None]:
-    """Log every line of level INFO and above on stderr and, unless log_file_path is None, in
-    the log file of the data directory (logs/kb.log, logs/kb-serve.log for kb serve,
-    logs/kb-serve-ai.log for kb serve-ai), dated
-    in UTC in the format of the base (2026-10-14T11:30:00Z); the file turns at midnight UTC into
-    <file>.<day>.
+    """Log every line of level INFO and above on stderr and, unless log_file_path is None, in a
+    file of the data directory, dated in UTC and turned at midnight UTC.
 
-    Raises OSError when the log file cannot be opened. On exit the handlers are closed and
-    removed: the tests run kb many times in the interpreter of pytest.
-    """
+    On exit the handlers are closed and removed, as the tests run kb many times in one
+    interpreter."""
     handlers: list[logging.Handler] = [logging.StreamHandler()]
     if log_file_path is not None:
         log_path = data_dir / log_file_path
@@ -79,8 +75,8 @@ def logging_to(
 
 
 def value_or_log_refusal[ValueT](value_or_refusal: ValueT | str) -> ValueT | None:
-    """The value read by a layer, or None after logging why the layer refused it; the caller
-    decides to stop. The value read is never a str: a str is the refusal."""
+    """The value read by a layer, or None after logging why the layer refused it; a str is the
+    refusal."""
     if isinstance(value_or_refusal, str):
         logger.error("%s", value_or_refusal)
         return None
@@ -88,7 +84,7 @@ def value_or_log_refusal[ValueT](value_or_refusal: ValueT | str) -> ValueT | Non
 
 
 def describe_os_error(error: OSError) -> str:
-    """An OSError by its type and its reason, never by its text, which names a file: the vault, a
-    raw file. An OSError raised by code, not by the system, has no reason."""
+    """An OSError by its type and its reason, never its text, which names a file (the vault, a
+    raw file)."""
     reason = f" ({error.strerror})" if error.strerror else ""
     return f"{type(error).__name__}{reason}"

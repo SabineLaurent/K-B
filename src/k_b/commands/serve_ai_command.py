@@ -1,5 +1,4 @@
-"""kb serve-ai: serve the digests of the watch by the AI API, with the keys and the settings of the
-environment, beside kb serve."""
+"""kb serve-ai: serve the digests of the watch by the AI API, beside kb serve."""
 
 import logging
 import os
@@ -30,8 +29,8 @@ logger = logging.getLogger(LOGGER_NAME)
 
 
 def run_serve_ai() -> int:
-    """Serve the AI API with the keys and the settings of the environment, each read at the
-    start: any refused, nothing is served. The log of uvicorn is the one of kb."""
+    """Serve the AI API with the keys and the settings of the environment: any refused, nothing
+    is served."""
     api_keys = value_or_log_refusal(
         read_api_keys_or_refusal(os.environ, AI_API_KEY_VARIABLE_PREFIX)
     )

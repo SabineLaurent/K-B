@@ -5,8 +5,8 @@ from typing import Self
 
 
 class ExitCode(IntEnum):
-    """The code kb exits with, for who runs it: by hand, or as a job in a container, where the
-    code is the only way to know what kb did without reading its log. Listed by kb --help."""
+    """The code kb exits with, the only way for a job in a container to know what kb did; listed
+    by kb --help."""
 
     meaning: str
 
@@ -50,9 +50,8 @@ class ExitCode(IntEnum):
 
 
 def find_exit_code(*, has_failed: bool, has_done: bool) -> ExitCode:
-    """The code of a command made of parts (the sources of kb collect, the tops of kb write-tops,
-    the subjects of kb digest): the same result, the same code (rule of Sabine of 2026-10-21).
-    A part failed: 4 when another is done and kept, 1 when none is."""
+    """The code of a command made of parts: 4 when a part failed and another is done, 1 when none
+    is."""
     if not has_failed:
         return ExitCode.SUCCEEDED
     return ExitCode.PARTIAL_FAILURE if has_done else ExitCode.FAILED

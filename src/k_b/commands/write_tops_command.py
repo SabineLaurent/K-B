@@ -1,6 +1,5 @@
-"""kb write-tops: write the sheets of the top rankings in the vault, then delete the rankings they
-supersede from raw/ (ADR of 2026-10-19). It runs after kb import: kb collect; kb import;
-kb write-tops."""
+"""kb write-tops: write the sheets of the top rankings in the vault, then delete the rankings
+they supersede from raw/; it runs after kb import."""
 
 import logging
 import os
@@ -18,10 +17,8 @@ logger = logging.getLogger(LOGGER_NAME)
 
 
 def run_write_tops(data_dir: Path) -> int:
-    """Each top in turn: a top that fails does not stop the other. Without a vault, nothing is
-    read nor deleted, and no folder is created: write_file_atomically would create a vault
-    misspelt. A top fails when it is stopped or keeps an unreadable ranking (fail closed, ADR of
-    2026-10-19); it is done when it ran to its end and wrote a sheet or failed in nothing."""
+    """Each top in turn, a top that fails not stopping the other; without a vault, nothing is
+    read nor created, as write_file_atomically would create a vault misspelt."""
     vault_dir = read_vault_dir(os.environ)
     if vault_dir is None:
         logger.error(
@@ -53,8 +50,8 @@ def run_write_tops(data_dir: Path) -> int:
 
 
 def describe_error(error: OSError | VaultEntryRefusedError) -> str:
-    """A refused entry of the vault by its named state and its path in the vault; an OSError by
-    its type and its reason, never a path: it names the vault or a raw file."""
+    """A refused entry of the vault by its state and its path in the vault; an OSError by its
+    type and reason, never a path, which names the vault or a raw file."""
     if isinstance(error, VaultEntryRefusedError):
         return str(error)
     return f"{describe_os_error(error)}; run kb write-tops again"

@@ -1,5 +1,5 @@
-"""kb openapi: write the OpenAPI of the data API and the one of the AI API, each in its file,
-versioned with the code."""
+"""kb openapi: write the OpenAPI of the data API and of the AI API, each in its file, versioned
+with the code."""
 
 import json
 import sys
@@ -30,8 +30,6 @@ AI_API_OPENAPI_PATH = OPENAPI_DIR / "openapi-ia.json"
 
 
 def run_openapi() -> int:
-    """Write the OpenAPI of each API, versioned with the code (docs/specs-api.md,
-    docs/fiches-veille.md)."""
     # Run from another folder, it would write documents the repository never sees.
     if not OPENAPI_DIR.is_dir():
         print(
@@ -60,9 +58,8 @@ def describe_data_api() -> dict[str, Any]:
 
 
 def describe_ai_api() -> dict[str, Any]:
-    """The app is made without key, on the replay without steps and the local data API without
-    key: its document reads none of them, nor the window by default (window_days is null by
-    default in the request)."""
+    """The OpenAPI of the AI API, made without key nor setting of the environment, as its
+    document reads none of them."""
     return create_ai_app(
         {},
         LlmSettings(

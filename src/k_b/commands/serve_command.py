@@ -17,8 +17,7 @@ logger = logging.getLogger(LOGGER_NAME)
 
 
 def run_serve(data_dir: Path) -> int:
-    """Serve the base with the keys and the settings of the environment; the log of uvicorn is
-    the one of kb."""
+    """Serve the base with the keys and the settings of the environment, uvicorn logging as kb."""
     api_keys = value_or_log_refusal(
         read_api_keys_or_refusal(os.environ, API_KEY_VARIABLE_PREFIX)
     )

@@ -9,8 +9,7 @@ from k_b.commands.exit_codes import ExitCode
 
 
 class StoppedBySigtermError(SystemExit):
-    """SIGTERM received by kb collect, kb import, kb write-tops or kb digest: docker stop sends
-    it before SIGKILL."""
+    """SIGTERM received, as docker stop sends before SIGKILL."""
 
     def __init__(self) -> None:
         super().__init__(ExitCode.STOPPED_BY_SIGTERM)
@@ -22,14 +21,11 @@ COMMANDS_STOPPED_BY_SIGTERM = frozenset({"collect", "import", "write-tops", "dig
 
 @contextmanager
 def stopping_on_sigterm(command: str) -> Iterator[None]:
-    """For kb collect, kb import, kb write-tops and kb digest, turn SIGTERM into
-    StoppedBySigtermError, a SystemExit: the import is undone and its log removed, the temporary
-    files are removed, no ranking is deleted before its sheets are written, the request of the
-    digests is closed, as on any exception.
-    A SIGTERM received during the commit of the import is raised once the commit has returned:
-    the import and its log are kept (etl/load.py, commit_with_log). The handler found is set
-    back on exit.
-    Called from the main thread only: Python sets a signal handler nowhere else."""
+    """Turn SIGTERM into StoppedBySigtermError, a SystemExit, so that the command undoes its work
+    as on any exception; the handler found is set back on exit.
+
+    A SIGTERM received during the commit of the import is raised once the commit has returned.
+    Main thread only: Python sets a signal handler nowhere else."""
     if command not in COMMANDS_STOPPED_BY_SIGTERM:
         yield
         return
