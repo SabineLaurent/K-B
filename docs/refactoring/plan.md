@@ -180,9 +180,9 @@ poc.md :
 - Règle 4 : son contrôle ne cite que etl/raw_store.py et
   etl/sources/zotero.py ; seul le chemin de zotero.py change (étape 6).
 - Règle 5 : le numéro de ligne de describe_validation_error, et la
-  citation des lignes de read_collection, qui se périment à chaque
+  citation des lignes de read_page, qui se périment à chaque
   changement de leur fichier : remplacés par le nom des fonctions
-  (étape 3) ; le chemin de read_collection, passé dans raw_reading.py
+  (étape 3) ; le chemin de read_page, passé dans raw_reading.py
   (étape 4, texte rédigé) ; le chemin de describe_validation_error
   (étape 6).
 

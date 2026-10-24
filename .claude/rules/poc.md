@@ -120,7 +120,7 @@ qui gardent le champ et le type d'erreur, jamais par `str(error)` ni par `{error
 **Vérifier.** Les commandes sont des repères ; la preuve est le test.
 - `grep -rn -A5 "except ValidationError" src/k_b | grep -E "\{error\}|str\(error\)"` → rien
   depuis #212 (au départ, `etl/transform.py:149`, une `ValidationError` citée par `{error}`). Ce
-  grep ne voit pas le rejet d'une page illisible par `read_collection` (`etl/raw_reading.py`, une
+  grep ne voit pas le rejet d'une page illisible par `read_page` (`etl/raw_reading.py`, une
   page illisible citée par `{error}`) : vérifié par
   `test_an_unreadable_page_is_rejected_without_its_text` (`tests/etl/test_transform.py`, #212).
 - Repère secondaire : `grep -rnE -A3 "logger\.[a-z]+\(" src/k_b | grep -iE "\.(summary|abstract|authors?|body|content|text)\b|clip_text"`
