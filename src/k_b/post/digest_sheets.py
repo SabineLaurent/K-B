@@ -1,13 +1,8 @@
-"""The digests of the watch in the vault: one Markdown sheet per subject and per day, written by
-kb digest from the response of the AI API (docs/fiches-veille.md, "Fiches dans le coffre"; #209).
+"""The digests of the watch in the vault: one Markdown sheet per subject and per day, written
+once by kb digest from the response of the AI API.
 
-A sheet is written once, never rewritten nor written through a symbolic link that kb sees, with
-the limit of post/vault_files.py (#295). Its
-path is made of constants, of a subject of the closed list and of a day, never of another value
-of the response. Each text of the response, a claim written by the model or a title read from a
-source, is written as text: the response is an input not trusted (OWASP LLM10). Its front matter
-keys are in English, its text in French (rule of Sabine of 2026-10-21).
-"""
+Its path is made of constants, a subject of the closed list and a day; each text of the response
+is written as text, as the response is untrusted (OWASP LLM10)."""
 
 import json
 import re
@@ -71,10 +66,8 @@ def find_sheet_path(vault_dir: Path, subject: str, day: date) -> Path:
 def refuse_written_sheets(
     vault_dir: Path, subject_names: Sequence[str], day: date
 ) -> None:
-    """Before the request: no sheet of a subject is written for day, and no folder down to it is
-    a symbolic link. Raises VaultEntryRefusedError (sheet_exists, vault_link_refused,
-    sheet_not_a_file): no item is sent to the model for a sheet that would not be written.
-    Creates nothing."""
+    """Before the request, refuse a sheet of a subject already written for day, or a folder down
+    to it that is a symbolic link; creates nothing."""
     for subject in subject_names:
         sheets_dir = find_sheets_dir(vault_dir, subject)
         refuse_linked_folders(vault_dir, sheets_dir)
@@ -98,9 +91,8 @@ def find_sheet_exists_error(
 def write_digest_sheet(
     vault_dir: Path, response: DigestsResponse, digest: Digest
 ) -> str:
-    """Write the sheet of digest, of the UTC day of the end of the window; its path in the vault.
-    A sheet written meanwhile and seen is refused (sheet_exists); one that appears after the last
-    check is replaced (post/vault_files.py, #295)."""
+    """Write the sheet of digest, of the UTC day of the end of the window; return its path in the
+    vault."""
     sheet_path = find_sheet_path(
         vault_dir, digest.subject, response.window.until.date()
     )
@@ -114,8 +106,8 @@ def write_digest_sheet(
 
 
 def render_digest_sheet(response: DigestsResponse, digest: Digest) -> str:
-    """The Markdown of a sheet: a front matter, the claims, each citing its sources by their
-    number, then the sources. The same response gives the same bytes."""
+    """The Markdown of a sheet: a front matter, the claims citing their sources by number, then
+    the sources; the same response gives the same bytes."""
     window = response.window
     lines = [
         "---",
@@ -167,10 +159,8 @@ def render_source(source: Source) -> str:
 
 
 def is_writable_url(url: str) -> bool:
-    """Whether the URL is written as an autolink: refused, never rewritten, which would change
-    where it leads. :: would make a field of Dataview in the rendered line; a character
-    reference is decoded even in an autolink (cmark-gfm shows &#x202E; as U+202E in the link
-    text); ?a=1&b=2 holds none."""
+    """Whether the URL can be written as an autolink, never rewritten: :: would make a field of
+    Dataview, and a character reference is decoded even in an autolink."""
     return (
         url.startswith(URL_SCHEMES)
         and URL_CHARACTERS.fullmatch(url) is not None
@@ -181,8 +171,8 @@ def is_writable_url(url: str) -> bool:
 
 
 def has_hidden_character(url: str) -> bool:
-    """Whether the URL, its percents decoded, holds a character that is not shown as itself; a
-    percent-encoding that is not UTF-8 (a surrogate, %FF) counts as one."""
+    """Whether the URL, its percents decoded, holds a character not shown as itself; a
+    percent-encoding that is not UTF-8 counts as one."""
     try:
         decoded = unquote(url, errors="strict")
     except UnicodeDecodeError:
@@ -193,10 +183,8 @@ def has_hidden_character(url: str) -> bool:
 
 
 def neutralize_digest_text(text: str) -> str:
-    """The text on one line, as text, without an autolink, a field of Dataview nor a list: the
-    characters of the sheets of the tops, ~ : @, the dot of www., and the punctuation of a list
-    marker at its start escaped, two colons kept apart. All after neutralize_text, which would
-    escape their backslash again."""
+    """The text on one line, as text, without an autolink, a field of Dataview nor a list; after
+    neutralize_text, which would escape their backslash again."""
     neutralized = neutralize_text(text, DIGEST_ESCAPED_CHARACTERS)
     neutralized = ESCAPED_DOUBLE_COLON.sub(r"\\: ", WWW_DOT.sub(r"\1\\.", neutralized))
     return LEADING_LIST_MARKER.sub(escape_list_marker, neutralized)

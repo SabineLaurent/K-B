@@ -1,10 +1,8 @@
-"""The sheets of the top rankings in the vault: one Markdown file per top and per day of
-collection, then the rankings they supersede deleted from raw/ (ADR of 2026-10-19).
+"""The sheets of the top rankings in the vault, one per top and per day of collection, then the
+rankings they supersede deleted from raw/.
 
-A sheet is curated: written once, never purged by K-B, never rewritten, with the limit of
-post/vault_files.py (#295). Its path is made of
-constants and of the day of its ranking, never of a value read from GitHub.
-"""
+A sheet is written once, never purged nor rewritten; its path is made of constants and the day of
+its ranking, never of a value read from GitHub."""
 
 import logging
 from dataclasses import dataclass
@@ -47,17 +45,10 @@ class Ranking(NamedTuple):
 
 def write_top_sheets(store: RawStore, vault_dir: Path, top: Top) -> TopSheetsOutcome:
     """Write the sheet of each day of collection of top that has none, then delete the rankings
-    read before the last one read: of each day, the first ranking still in raw/ gives its sheet.
+    read before the last one read.
 
-    Every ranking listed is read, its sheet written or not: only a ranking read is readable, and
-    only the readable ones before the last readable are deleted. An unreadable one is kept and
-    counted. The folder is listed once: a ranking collected meanwhile is neither read nor
-    deleted. An exception raised by a read or a write (OSError, SIGTERM) deletes nothing. A
-    symbolic link is refused before any ranking is read and any sheet written: all or nothing.
-    The folders are checked again before each sheet, and before the deletion with the sheet of
-    every ranking read, which must be there: an entry replaced or removed meanwhile stops the
-    top, nothing deleted.
-    """
+    An unreadable ranking is kept; a symbolic link, or an entry replaced meanwhile, stops the top
+    with nothing deleted."""
     sheets_dir = find_sheets_dir(vault_dir, top)
     keys = store.list_file_keys(top.folder_key)
     refuse_linked_folders(vault_dir, sheets_dir)
@@ -85,8 +76,7 @@ def write_top_sheets(store: RawStore, vault_dir: Path, top: Top) -> TopSheetsOut
 
 
 def read_ranking(store: RawStore, top: Top, key: str) -> Ranking | None:
-    """The ranking of key, or None after logging why it is kept unread. Its file is never
-    named in the log: a name that is not a collection time is not quoted."""
+    """The ranking of key, or None after logging why it is kept unread, without naming its file."""
     collected_at = find_collection_time(key)
     if collected_at is None:
         logger.error(
@@ -109,9 +99,8 @@ def read_ranking(store: RawStore, top: Top, key: str) -> Ranking | None:
 
 
 def find_collection_time(key: str) -> datetime | None:
-    """The time of the collection that named the file of key, None for another name. The name
-    must be the one kb collect writes: strptime also takes 2026-10-5, which would break the
-    order of the names."""
+    """The time of the collection that named the file of key, None for another name; strptime
+    alone would take 2026-10-5, which breaks the order of the names."""
     collection_name = PurePosixPath(key).stem
     try:
         collected_at = parse_collection_name(collection_name)
@@ -131,9 +120,8 @@ def find_sheet_path(sheets_dir: Path, collected_at: datetime) -> Path:
 
 
 def refuse_linked_sheets(vault_dir: Path, sheets_dir: Path, keys: list[str]) -> None:
-    """Refuse the sheet of a ranking of keys that is a link or not a regular file: its day
-    comes from the name of its ranking, without reading it. A ranking whose name is not a
-    collection time has no sheet."""
+    """Refuse the sheet of a ranking of keys that is a link or not a regular file, its day read
+    from the name of its ranking."""
     for key in keys:
         collected_at = find_collection_time(key)
         # Only its refusals count here: a sheet not written yet is expected.
@@ -144,9 +132,8 @@ def refuse_linked_sheets(vault_dir: Path, sheets_dir: Path, keys: list[str]) -> 
 def refuse_missing_sheets(
     vault_dir: Path, sheets_dir: Path, read_times: list[datetime]
 ) -> None:
-    """Before the deletion, the sheet of each ranking read must be there, a regular file: a
-    sheet removed or replaced since it was written would leave its ranking deleted without a
-    sheet (sheet_missing, or the refusals of has_sheet)."""
+    """Refuse, before the deletion, a sheet of a ranking read that is missing or not a regular
+    file: its ranking would be deleted without a sheet."""
     for collected_at in read_times:
         sheet_path = find_sheet_path(sheets_dir, collected_at)
         if not has_sheet(sheet_path, vault_dir):
@@ -156,7 +143,7 @@ def refuse_missing_sheets(
 
 
 def write_sheet(vault_dir: Path, sheets_dir: Path, top: Top, ranking: Ranking) -> bool:
-    """Write the sheet of the day of ranking, unless it exists; whether it was written."""
+    """Write the sheet of the day of ranking, unless it exists; return whether it was written."""
     day = ranking.collected_at.date()
     sheet_path = find_sheet_path(sheets_dir, ranking.collected_at)
     if not write_new_sheet(
@@ -169,8 +156,7 @@ def write_sheet(vault_dir: Path, sheets_dir: Path, top: Top, ranking: Ranking) -
 
 
 def render_sheet(top: Top, ranking: Ranking) -> str:
-    """The Markdown of a sheet: a front matter, then the repositories by rank. Its keys are in
-    English, its text in French (rule of Sabine of 2026-10-21)."""
+    """The Markdown of a sheet: a front matter, then the repositories by rank."""
     day = ranking.collected_at.date().isoformat()
     lines = [
         "---",
@@ -193,8 +179,7 @@ def render_sheet(top: Top, ranking: Ranking) -> str:
 
 
 def neutralize_description(description: str | None) -> str:
-    """The description on one line, as text, in its cell: the escaped | cannot close it. A bare
-    URL is left as it is: Obsidian shows it as a link (ADR of 2026-10-19)."""
+    """The description on one line, as text, in its cell, | escaped; a bare URL is left as it is."""
     if description is None:
         return ""
     return neutralize_text(description, MARKDOWN_SYNTAX_CHARACTERS)
