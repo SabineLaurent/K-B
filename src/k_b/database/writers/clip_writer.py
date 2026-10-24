@@ -1,5 +1,5 @@
 """Write a clip: the latest version of a URL is kept, a clip whose content changed is written
-again, revised_at dated (decision of Sabine of 2026-10-19)."""
+again, revised_at dated."""
 
 import sqlite3
 from typing import NamedTuple
@@ -69,8 +69,7 @@ UPDATE_CLIP = "UPDATE clip SET {assignments} WHERE item_id = :item_id"
 
 
 class ClipContent(NamedTuple):
-    """What the base keeps of a clip, in the format of the base: a change of it is a new
-    version. A property the base does not keep (author, description) is not compared."""
+    """What the base keeps of a clip, in its format: a change of it is a new version."""
 
     title: str
     # Required of a clip by the item (REQUIRED_FIELDS_BY_KIND, items.py), typed as the item.
@@ -81,7 +80,7 @@ class ClipContent(NamedTuple):
     tags: frozenset[str]
 
     def to_columns(self) -> dict[str, str | None]:
-        """The columns of clip, every field but the tags, which are rows of item_has_tag."""
+        """The columns of clip, every field but the tags."""
         columns = self._asdict()
         del columns["tags"]
         return columns
@@ -114,12 +113,8 @@ def write_known_clip(
     connection: sqlite3.Connection, item: Item, raw_data_id: int, content: ClipContent
 ) -> Discard | None:
     """The known clip of the URL takes content, unless it is the same or the file was collected
-    before the raw file of the clip. Two files of a URL in one collection: the second in page
-    name order writes over the first.
-
-    The item points to the newest raw file of its content, a copy of the same content
-    included: a file collected before it is older than the content kept.
-    """
+    before the raw file of the clip; of two files of a URL in one collection, the second in page
+    name order wins."""
     collected_at = format_date(item.collected_at)
     (
         known_item_id,
@@ -161,8 +156,7 @@ def write_changed_columns(
     content: ClipContent,
     revised_at: str | None,
 ) -> None:
-    """Write the columns of clip that changed, and revised_at: it is dated if a tag alone
-    changed too."""
+    """Write the columns of clip that changed, and revised_at, dated also if a tag alone changed."""
     known_columns = known.to_columns()
     changed = {
         column: value
@@ -183,8 +177,7 @@ def write_changed_tags(
     known_tag_ids: dict[str, int],
     tags: frozenset[str],
 ) -> None:
-    """Remove the links to the tags removed, and a tag removed that no item carries any more;
-    write the links to the tags added, sorted by name."""
+    """Unlink the tags removed, deleting one no item carries any more, then link the tags added."""
     for removed in sorted(known_tag_ids.keys() - tags):
         link = {"item_id": item_id, "tag_id": known_tag_ids[removed]}
         connection.execute(DELETE_ITEM_HAS_TAG, link)
@@ -193,16 +186,14 @@ def write_changed_tags(
 
 
 def read_tag_ids(connection: sqlite3.Connection, item_id: int) -> dict[str, int]:
-    """The id of each tag of the item, by name."""
     return dict(connection.execute(SELECT_ITEM_TAGS, (item_id,)).fetchall())
 
 
 def write_tags(
     connection: sqlite3.Connection, item_id: int, tags: tuple[str, ...]
 ) -> None:
-    """Link the item to each of its tags, created if new, in the order given (sorted by name).
-    The id is read, not looked up by the link: a tag absent stops the import, never drops its
-    link without a trace."""
+    """Link the item to each of its tags, created if new, in the order given; the id is read, so
+    that a missing tag stops the import instead of dropping its link silently."""
     for tag in tags:
         connection.execute(INSERT_TAG, {"name": tag})
         (tag_id,) = connection.execute(SELECT_TAG_ID, (tag,)).fetchone()

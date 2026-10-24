@@ -84,11 +84,8 @@ WHERE withdrawn_at IS NULL
 def write(
     connection: sqlite3.Connection, item: Item, raw_data_id: int
 ) -> Discard | None:
-    """The Zotero item, its entry and its highlights, found by their Zotero keys.
-
-    The entry counts as written if its row or one of its highlights was: a highlight changed
-    is a new version of the entry, whose item then points to this raw data.
-    """
+    """The Zotero item, its entry and its highlights, found by their Zotero keys; a highlight
+    changed is a new version of the entry."""
     row = connection.execute(
         "SELECT item_id FROM zotero_entry WHERE zotero_key = ?", (item.source_item_id,)
     ).fetchone()
@@ -170,13 +167,11 @@ def mark_withdrawn(
     raw_data_id: int,
     entries: Sequence[Item],
 ) -> int:
-    """Mark as withdrawn the entries and the highlights an extract collected after the
-    latest one imported no longer lists; return how many.
+    """Mark as withdrawn the entries and highlights an extract collected after the latest one
+    imported no longer lists; return how many.
 
-    The highlights are compared with every highlight of the extract: the last one of the
-    library deleted in Zotero is withdrawn too. Without an entry, nothing is withdrawn: an
-    empty list would withdraw every entry and every highlight of the base.
-    """
+    Without an entry, nothing is withdrawn: an empty list would withdraw every entry and
+    highlight of the base."""
     if not entries:
         return 0
     # No item: only the other files of the source are compared.

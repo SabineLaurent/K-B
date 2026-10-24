@@ -24,7 +24,7 @@ def write_raw_data(
     stream: str,
     collected_at: datetime,
 ) -> int:
-    """Register the file read, even without item: the next import does not read it again."""
+    """Register the file read, even without item, so that the next import does not read it again."""
     source_row = connection.execute(
         "SELECT id FROM source WHERE source_code = ?", (source_code,)
     ).fetchone()

@@ -9,11 +9,8 @@ DATABASE_SCRIPTS = files("k_b.database")
 
 
 def create_database(database_path: Path) -> None:
-    """Create the tables and the sources; refuse an existing file, which is left untouched.
-
-    A creation that fails leaves no file behind: a half-built database would look valid and
-    block the next attempt.
-    """
+    """Create the tables and the sources; refuse an existing file, and leave no file behind on
+    failure: a half-built database would look valid and block the next attempt."""
     if database_path.exists():
         raise FileExistsError(f"{database_path} already exists")
     try:

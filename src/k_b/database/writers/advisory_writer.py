@@ -25,10 +25,8 @@ INSERT INTO advisory (
 def write(
     connection: sqlite3.Connection, item: Item, raw_data_id: int
 ) -> Discard | None:
-    """The GitHub item and its advisory, unless the advisory is known: the first seen is kept.
-
-    The CVE it cites is created without its KEV columns if no source has cited it yet.
-    """
+    """The GitHub item and its advisory, unless the advisory is known; the CVE it cites is
+    created without its KEV columns if new."""
     row = connection.execute(
         INSERT_ITEM_OF_NEW_ADVISORY, (raw_data_id, item.source_item_id)
     ).fetchone()
