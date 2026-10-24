@@ -4025,6 +4025,50 @@ appliquent « Squelette E1 E3 : cadrage du 20/10 », décision 4.
   personnelle (test). Option écartée : le signer avant le premier envoi. Inscrit au registre
   (« Envoi des mesures à Grafana Cloud »). — PR de #162
 
+### Fiches de veille : la fidélité (#207)
+
+Décisions de Sabine du 2026-10-24 sur les recommandations du plan de #207, relayées par time-knight,
+puis décisions de time-knight sur les revues de #207 (délégation de Sabine du 2026-10-15).
+
+- **`fidelity_rate` est un champ de la ligne `llm_call`, arrondi à 4 décimales, nul au classement,
+  pour une rédaction en échec et sans fait vérifié ; seuls `facts_checked` et `facts_found` partent
+  en OpenTelemetry.** Pourquoi : la spec définissait le taux sans lui donner de place ; la règle 4
+  de `poc.md` met les métriques de l'API IA sur une ligne JSON par appel, et le critère de #153 veut
+  un taux « calculé à chaque appel » ; un taux ne s'additionne pas, Grafana le tire des deux
+  compteurs ; 4 décimales donnent un pourcentage à 2 décimales, assez pour lire le seuil de 95 %.
+  Options écartées : aucun champ (#210 le calculerait à la main, et aucun code ne tiendrait « est
+  calculé ») ; le taux dans la réponse de `POST /digests` (OpenAPI changée, sans lecteur). Le taux
+  d'un essai de #210 est la somme des `facts_found` sur la somme des `facts_checked`, pas la moyenne
+  des taux. — PR de #207
+- **`facts_checked` compte chaque fait de chaque affirmation d'une sortie contrôlée, y compris
+  d'une affirmation retirée pour une borne.** Pourquoi : le taux mesure ce que le modèle recopie,
+  `claims_removed` ce qui est retiré ; appui donné par time-knight : Faithfulness de Ragas met toutes
+  les affirmations au dénominateur, et `check_evidence.py` vérifie chaque candidat. Option écartée :
+  les seules affirmations dans leurs bornes (un fait exact d'une affirmation trop longue ne
+  compterait pas). Limite assumée : les règles propres à l'affirmation (identifiant non déclaré,
+  item cité sans fait, texte déguisé) n'entrent pas dans le taux, qui peut valoir 1 avec des
+  retraits et se lit avec `claims_removed`. — PR de #207
+- **Les séparateurs des motifs CVE et GHSA passent de `[\s-]*` à `[\W_]*`, et un fait sans lettre
+  ni chiffre une fois normalisé n'est jamais trouvé.** Pourquoi : `CVE_2026_0001` échappait au
+  motif, et le piège de #206 passait sous cette écriture ; une espace ou une chaîne vide serait
+  trouvée presque partout, et un item se ferait citer pour un fait qui ne dit rien de lui. Option
+  écartée : garder les motifs et la recherche de la spec telles quelles. Complète l'entrée du
+  2026-10-15 (« Un fait est un extrait recopié… »), sans l'inverser ; le fait est comparé à l'item
+  **qu'il cite**, comme la spec le dit, plus strict que « un item cité » de cette entrée. — PR de
+  #207
+- **La détection des identifiants lit large (préfixe éclaté, mot de numéro, emphase retirée, sosies
+  du préfixe, `o`, `l`, `i` pour des chiffres), et une affirmation dont le texte cache ou déguise
+  (marque, point de code privé ou non attribué, remplissage hangul ou braille, mot qui mêle des
+  lettres latines à une lettre sosie) est retirée.** Décisions de time-knight sur les revues de #207,
+  après un relecteur de sécurité neuf. Pourquoi : chaque écriture que la détection manque laisse
+  passer le piège (« la CVE n°2026-0001 n'est pas exploitée », `C`+U+FE0F+`VE`, `СVЕ` cyrillique,
+  `CVE-2026-00**01**`) ; « CVE n° » est une tournure française que le modèle écrit sans attaque.
+  Options écartées : refuser toute lettre non latine (les titres d'articles portent du grec,
+  `β-VAE`, `5 µs`) ; une table complète des sosies UTS #39 (dépendance nouvelle) ; lire `AAAA-NNNN`
+  seul comme un identifiant (`2025-2026` le deviendrait). Limites assumées : des faux positifs dans
+  le sens sûr (« Le CV en 2026, 0001 candidats ») ; ne sont pas lus `CVE-2026-0001a`, « la faille
+  2026-0001 » ni un sosie hors des listes. — PR de #207
+
 ## Décisions encore ouvertes
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,
