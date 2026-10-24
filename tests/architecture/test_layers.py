@@ -5,7 +5,8 @@ writers under database/writers, behind database/writing), etl runs the pipeline,
 the digests and the sheets above it, data_api serves the base, ai_api calls the model, cli and
 commands compose. Under k_b.etl: the composition (source_kinds, collected_sources) → the
 sources → the modules of the pipeline. Among those, the three stages never import each other:
-they talk to each other through raw/, and only etl/pipeline.py chains them.
+the collection and the import talk through raw/, the transform hands its reading to the load in
+memory, and only etl/pipeline.py chains them.
 """
 
 import pytest
@@ -120,9 +121,9 @@ def test_post_imports_neither_the_sources_nor_the_composition():
         assert {name for name in imported if reaches(name, forbidden)} == set(), path
 
 
-# The three stages of the ETL talk to each other through raw/, never by their code: the
-# collection writes it, the import reads it, and only etl/pipeline.py chains them
-# (docs/refactoring/plan.md, part 2, rule 4). What they share is the vocabulary of
+# The three stages of the ETL never import each other: the collection writes raw/, the
+# transform reads it and hands its reading to the load in memory, and only etl/pipeline.py
+# chains them (docs/refactoring/plan.md, part 2, rule 4). What they share is the vocabulary of
 # etl/raw_files.py; a rejection goes through etl/rejections.py. A subset of
 # ETL_PIPELINE_MODULES: the other modules of the pipeline run below the stages.
 ETL_STAGE_MODULES = {"etl.extract", "etl.transform", "etl.load"}
