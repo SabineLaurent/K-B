@@ -9,8 +9,9 @@
 - **Série** : suite de [2026-10-21, refuser un lien ou une balise dans une fiche](2026-10-21-refuser-un-lien-ou-une-balise-dans-une-fiche.md)
   (#206, contrôle 6). Cette note traite du contrôle 7, la fidélité.
 
-Commits de la PR : `212ee8a` (le contrôle et ses compteurs), `f9886b9` (la spec), `2e87936` et
-`8ec3f41` (corrections tranchées après les revues). Les autres commits de la liste fournie au skill
+Commits de la PR : `212ee8a` (le contrôle et ses compteurs), `f9886b9` (la spec), `2e87936`,
+`8ec3f41`, `7c54ddb` et `2e466e1` (corrections tranchées après les revues), `0f9a17b` (cette note),
+`4272737` (le journal ADR). Les autres commits de la liste fournie au skill
 sont déjà sur `main` : ils ne relèvent pas de cette note.
 
 ## Le pourquoi
@@ -61,7 +62,7 @@ def normalize(text: str) -> str:
     )
     return BLANKS.sub(" ", visible.translate(PUNCTUATION))
 ```
-`src/k_b/ai_api/fidelity.py:119-125`
+`src/k_b/ai_api/fidelity.py:130-136`
 
 Sur `Lang`+U+200B+`Graph`+deux U+00A0+`v2`+U+2011+`1 l`+U+2019+`API `+U+FF36+`2`, sortie observée
 à chaque étape :
@@ -94,9 +95,9 @@ def joins_a_word(text: str, position: int, step: int) -> bool:
     beyond = position + step
     return char in ".-" and 0 <= beyond < len(text) and text[beyond].isalnum()
 ```
-`src/k_b/ai_api/fidelity.py:245-253`
+`src/k_b/ai_api/fidelity.py:279-287`
 
-`is_found` (l. 234) essaie chaque occurrence et appelle cette fonction juste avant (`step` = −1) et
+`is_found` (l. 268) essaie chaque occurrence et appelle cette fonction juste avant (`step` = −1) et
 juste après (`step` = +1). Ainsi `1.2` n'est pas trouvé dans `1.2.9` (un `.` suivi d'un chiffre),
 mais l'est dans `version 1.2.` (le `.` final n'est suivi de rien). `isalnum` est Unicode : `caf`
 n'est pas trouvé dans `café`.
@@ -104,10 +105,11 @@ n'est pas trouvé dans `café`.
 La recherche se fait **champ par champ**, dans les champs envoyés au modèle (masqués, coupés) et
 listés par sorte dans `SEARCHED_FIELDS_BY_KIND` : jamais dans une concaténation, jamais dans
 `cve_id` ni `ghsa_id`. La fin d'un champ coupé à 2 000 caractères n'est pas une limite :
-`to_searched_text` (l. 186) lui ajoute une lettre (`CUT_END`), car `…1.2` coupé peut être le début de
-`1.2.9`.
+`to_searched_text` (l. 218) lui ajoute une lettre (`CUT_END`), car `…1.2` coupé peut être le début de
+`1.2.9`. Il retire aussi les repères que K-B a posés (`[url]`, `@user`) : un fait `@user` ne dit
+rien de l'item.
 
-Un fait sans lettre ni chiffre une fois normalisé n'est jamais trouvé (`is_fact_found`, l. 162) :
+Un fait sans lettre ni chiffre une fois normalisé n'est jamais trouvé (`is_fact_found`, l. 194) :
 une espace serait trouvée presque partout, et un item se ferait citer pour un fait qui ne dit rien
 de lui.
 
@@ -118,8 +120,11 @@ canonique (`CVE-AAAA-NNNN`, `GHSA-xxxx-xxxx-xxxx`), au `cve_id` ou au `ghsa_id` 
 cite. Un article TLDR n'a pas de tel champ : la CVE que son résumé recopie n'y est jamais trouvée.
 Dans l'autre sens, tout identifiant écrit dans la phrase doit être déclaré en fait.
 
-La détection lit large, sur un **texte de détection** (`to_detection_text`, l. 128) : emphase `*`
-et `=` retirée, sosies d'une lettre du préfixe lus comme elle. Puis :
+La détection lit large, sur un **texte de détection** (`to_detection_text`, l. 139) : emphase `*`
+et `=` retirée, sosies d'une lettre du préfixe lus comme elle, puis tout autre signe hors ASCII qui
+n'est pas une lettre ASCII accentuée lu comme `o` (`is_unknown_sign`, l. 146) : `CVE-2026-ЗЗЗЗ` se
+lit `CVE-2026-oooo`, détecté et jamais égal à un vrai identifiant ; `é` reste `é`, sinon `numéro`
+ne se lirait plus. Puis :
 
 ```python
 CVE = re.compile(
@@ -127,10 +132,11 @@ CVE = re.compile(
     rf"({DIGIT}{{4}}){SEPARATOR}({DIGIT}{{4,}}){END_LIMIT}"
 )
 ```
-`src/k_b/ai_api/fidelity.py:35-38`
+`src/k_b/ai_api/fidelity.py:38-41`
 
 `SEPARATOR` (`[\W_]*`) accepte toute suite sans lettre ni chiffre, même entre les lettres du préfixe
-(`C.V.E.`). `NUMBER_WORD` accepte « n° », « numéro », « ID ». `DIGIT` (`[\doli]`) lit `o`, `l`, `i`
+(`C.V.E.`) ; un `s` de pluriel peut suivre (`CVEs`). `NUMBER_WORD` accepte « n° », « numéro »,
+« ID », « identifiant », « réf. ». `DIGIT` (`[\doli]`) lit `o`, `l`, `i`
 comme des chiffres : `CVE-2026-OOO1` est détecté, et jamais égal à un vrai identifiant. `END_LIMIT`
 impose la même limite que pour tout fait : `GHSA-fjqc-hq36-qh5pxx` n'est pas lu comme
 `GHSA-fjqc-hq36-qh5p`.
@@ -141,9 +147,12 @@ serait gardée si « CVE n°2026-0001 » n'était pas reconnu.
 
 ### 5. Le texte déguisé
 
-Un identifiant peut aussi se cacher : un caractère invisible que NFKC garde (U+034F, U+FE0F), un
-remplissage hangul qui s'affiche en blanc (U+3164), une lettre cyrillique qui ressemble à une lettre
-latine (`С`). `is_disguised` (l. 133) retire l'affirmation qui en contient. Une lettre grecque qui
+Un identifiant peut aussi se cacher. `is_disguised` (l. 155) retire l'affirmation dont le texte
+**brut** porte un caractère invisible `Cf` autre que U+200D (le liant des emoji) : un contrôle de
+direction U+202E affiche `1000-6202-EVC` comme `CVE-2026-0001`, et des tags U+E0000 à U+E007F
+feraient entrer au coffre un texte invisible. Il retire aussi celle dont le texte normalisé porte un
+caractère que NFKC garde et qui cache (U+034F, U+FE0F), un remplissage hangul qui s'affiche en blanc
+(U+3164), ou un mot qui mêle des lettres latines à une lettre sosie (`С` cyrillique). Une lettre modificative (`ʼ` de `lʼéquipe`) reste permise. Une lettre grecque qui
 ne ressemble pas à une lettre latine reste permise, car les titres d'articles en portent : `5 µs`,
 que NFKC écrit avec un μ grec. Le mot se lit **avant** le `casefold` : la capitale `Ε` ressemble à
 `E`, sa minuscule `ε` non.
@@ -171,6 +180,9 @@ rapport des deux compteurs.
 | séparateurs `[\W_]*` (Sabine, 2026-10-24) | `CVE_2026_0001` échappait au motif `[\s-]*` | garder le motif de la spec |
 | fait sans lettre ni chiffre non trouvé (Sabine, 2026-10-24) | une espace serait trouvée partout | chercher la valeur telle quelle |
 | détection large, texte déguisé retiré (time-knight, revues de #207) | chaque écriture manquée laisse passer le piège | refuser toute lettre non latine (le grec des articles tomberait) ; une table complète des sosies UTS #39 (dépendance nouvelle) |
+| tout `Cf` du texte brut retire l'affirmation, sauf U+200D (time-knight, seconde revue) | ferme la famille : contrôles de direction et tags | une liste des contrôles de direction (les tags passaient encore) |
+| signe hors ASCII lu `o` à la détection (time-knight, seconde revue) | un sosie dans le corps d'un identifiant est lu, jamais égal | des mots de lettres et de chiffres (laissait passer `CVE-2026-ЗЗЗЗ`, retirait « ν2 », « 2026年 ») |
+| repères `[url]` et `@user` retirés des champs avant la recherche (time-knight) | ils ne disent rien de l'item | les chercher comme du texte d'item |
 | `fidelity.py` à la racine d'`ai_api`, une couche du test entre les étapes et `digests` | `stages/` regroupe les étapes qui appellent le modèle (ADR du 2026-10-18) | dans `stages/writing.py` (la fidélité ne relance rien ; un module par entité qui a assez de code, `code.md`) |
 | la fidélité lit `Claim` ; `DigestFact` et `DigestClaim.facts` retirés | ils n'étaient lus par aucun code (« Kept for the checks of #207 ») | lire `DigestClaim` (`fidelity` aurait importé `digests`, la couche du dessus) |
 | CVE de la phrase comparée par forme canonique | `cve 2026 86950` est le fait `CVE-2026-86950` | chercher la valeur brute du fait dans la phrase |
@@ -180,18 +192,20 @@ rapport des deux compteurs.
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| 13 tests en échec et le module absent avant `212ee8a` ; 4 avant `2e87936` ; 28 avant `8ec3f41` | chaque test a été vu rouge avant le code |
+| 13 tests en échec et le module absent avant `212ee8a` ; 4 avant `2e87936` ; 28 avant `8ec3f41` ; 7 avant `7c54ddb` ; 13 avant `2e466e1` (sur une copie du code committé) | chaque test a été vu rouge avant le code |
 | `test_a_text_is_normalized_before_any_search` (`tests/ai_api/test_fidelity.py`) | NFKC, casse, invisibles, tirets, apostrophes, blancs |
 | `test_a_value_is_found_only_between_its_limits` | `1.2` / `1.2.9`, `CVE-2026-1234` / `CVE-2026-12345`, `v1.2.0`, `café` |
 | `test_a_fact_not_found_in_the_item_it_cites_removes_its_claim` (`tests/ai_api/test_digests.py`) | fait absent, et fait présent dans un autre item que celui cité (`v2.1.286` de la release 7) |
 | `test_the_facts_found_in_the_items_they_cite_keep_their_claims` | GHSA, CVE et nom propre trouvés : rien n'est retiré, 3 faits sur 3 |
 | `test_the_trapped_claim_on_a_cve_is_removed_and_the_digest_returned` | le piège de #206, CVE déclarée ou non : retiré, `claims_removed` = 1, l'autre affirmation rendue |
-| `test_the_trap_disguised_is_removed` (27 écritures) | invisibles, remplissages, sosies, « n° », emphase, préfixe éclaté, `OOO1` |
+| `test_the_trap_disguised_is_removed` (43 écritures) | invisibles, remplissages, sosies, contrôles de direction, tags, « n° », « CVEs », emphase, préfixe éclaté, `OOO1`, `ЗЗЗЗ` |
+| `test_a_sign_out_of_ascii_in_an_ordinary_phrase_keeps_the_claim` | ν2, 2026年, Москва2026, H₂O, m², 3ᵉ, n°3, été 2026, un emoji composé ne retirent rien |
+| `test_a_fact_equal_to_a_mark_put_by_k_b_is_not_found` | `@user` et `[url]` ne sont jamais trouvés |
 | `test_greek_letters_next_to_latin_ones_keep_the_claim` | `β-VAE`, `α-Fold`, `5 µs` ne tombent pas |
 | `test_a_claim_out_of_its_bounds_is_removed`, `test_a_claim_too_long_is_removed_and_counted` | les bornes d'affirmation (#205), et les faits d'une affirmation retirée comptés |
 | `test_the_fidelity_rate_is_the_facts_found_over_the_facts_checked` (`tests/ai_api/test_digest_router.py`) | 2 faits sur 3 : `fidelity_rate` = 0.6667 sur la ligne |
 | `test_each_call_is_measured_in_opentelemetry_as_on_its_line` | les deux compteurs OTel égalent la somme des lignes |
-| `uv run pytest` → 2433 passés ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | les contrôles du dépôt |
+| `uv run pytest` → 2466 passés ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | les contrôles du dépôt |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -202,7 +216,7 @@ rapport des deux compteurs.
 2. **Que se passe-t-il si le modèle obéit au piège de #206 ?** L'affirmation « CVE-2026-0001 n'est
    pas exploitée » cite l'article : si la CVE est déclarée en fait, elle n'est égale à aucun
    `cve_id` (un article n'en a pas) ; sinon, elle est dans la phrase sans être déclarée. Dans les
-   deux cas, retirée et comptée (`fidelity.py:96`, `check_claim`).
+   deux cas, retirée et comptée (`fidelity.py:107`, `check_claim`).
 3. **Le taux peut-il valoir 100 % avec des affirmations retirées ?** Oui : les règles qui portent sur
    l'affirmation (identifiant non déclaré, item cité sans fait, texte déguisé) n'entrent pas dans le
    taux. Il se lit avec `claims_removed`.
