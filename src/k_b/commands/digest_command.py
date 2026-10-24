@@ -1,6 +1,5 @@
-"""kb digest: ask the AI API for the digests of the watch, then write the sheet of each subject in
-the vault (docs/fiches-veille.md, "Fiches dans le coffre"; #209). It runs once kb serve and
-kb serve-ai are started: the AI API reads the watch through the data API."""
+"""kb digest: ask the AI API for the digests of the watch, then write the sheet of each subject
+in the vault; kb serve and kb serve-ai must run."""
 
 import logging
 import os
@@ -30,9 +29,8 @@ logger = logging.getLogger(LOGGER_NAME)
 
 
 def run_digest() -> int:
-    """Read the settings, check the vault, ask the digests, write their sheets. Nothing is asked
-    while a setting is refused or a sheet of the day is there: no item is sent to the model for a
-    sheet that would not be written."""
+    """Read the settings, check the vault, ask the digests, write their sheets; nothing is asked
+    while a setting is refused or a sheet of the day is there, so no item is sent for nothing."""
     vault_dir = read_vault_dir(os.environ)
     if vault_dir is None:
         logger.error(
@@ -70,13 +68,13 @@ def run_digest() -> int:
 
 
 def read_today() -> date:
-    """The UTC day of the run, the day of the sheets kb digest checks before its request."""
+    """The UTC day of the run, the day of the sheets."""
     return datetime.now(UTC).date()
 
 
 def write_digest_sheets(vault_dir: Path, response: DigestsResponse) -> ExitCode:
-    """Each sheet in turn: a sheet not written does not stop the others. A subject is failed when
-    the AI API names it, or when its sheet is not written."""
+    """Each sheet in turn, a sheet not written not stopping the others; a subject fails when the
+    AI API names it or its sheet is not written."""
     written_count = 0
     failed_count = 0
     for digest in response.digests:
@@ -111,8 +109,7 @@ def describe_counts(written_count: int, failed_count: int) -> str:
 
 
 def describe_request(response: DigestsResponse) -> str:
-    """The model and the id of the request, to find it in the log of kb serve-ai; both checked
-    by their rule."""
+    """The model and the id of the request, to find it in the log of kb serve-ai."""
     return f"model {response.model}, request_id {response.request_id}"
 
 
@@ -124,8 +121,8 @@ def describe_remedy(error: AiApiError) -> str:
 
 
 def describe_error(error: OSError | VaultEntryRefusedError) -> str:
-    """A refused entry of the vault by its named state and its path in the vault; an OSError by
-    its type and its reason, never a path: it names the vault."""
+    """A refused entry of the vault by its state and its path in the vault; an OSError by its
+    type and reason, never a path, which names the vault."""
     if isinstance(error, VaultEntryRefusedError):
         return str(error)
     return describe_os_error(error)

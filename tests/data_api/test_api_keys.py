@@ -13,10 +13,8 @@ PUBLIC_ROUTES = {"/docs", "/openapi.json", "/health"}
 
 
 def list_routes(items_database, api_keys):
-    """Every route of the app, read from it: a route added later, documented or not, is tested as
-    well. app.routes holds an included router as one entry without path: the routes are read by
-    the walk FastAPI makes for its OpenAPI (fastapi/routing.py, 0.143), which the test of the
-    list below keeps from going empty."""
+    """Every route of the app, read by the walk FastAPI makes for its OpenAPI, so that a route
+    added later is tested as well."""
     app = create_app(items_database, api_keys)
     return [route.path for route in iter_route_contexts(app.routes)]
 

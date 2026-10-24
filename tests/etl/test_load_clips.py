@@ -1,7 +1,5 @@
 """The import of the clips: the latest version of a URL is kept, a clip whose content changed is
-written again, revised_at dated (decision of Sabine of 2026-10-19). Each clip is written as the
-collection writes it, a page of a collection folder of raw/selected_library/clipping/, from the
-fixtures of tests/fixtures/clipping/."""
+written again, each clip written as the collection writes it."""
 
 import sqlite3
 from pathlib import Path
@@ -94,8 +92,8 @@ def test_a_clip_without_publication_date_has_none(data_dir):
 
 
 def test_a_clip_copied_again_with_the_same_content_is_left_out(data_dir):
-    """Its item points to the newest raw file of that content: the order guard compares with
-    it."""
+    """Its item points to the newest raw file of that content, which the order guard compares
+    with."""
     write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
     run_import(data_dir)
     second_path = write_clip(data_dir, SECOND, "a1", fixture_text(ARTICLE))
@@ -254,7 +252,7 @@ def test_two_urls_that_differ_by_their_utm_parameters_are_one_clip(data_dir):
 
 
 def test_two_urls_are_two_clips_even_for_the_same_article(data_dir):
-    """The limit of the key (ADR, "Collecte : clips"): no content fingerprint."""
+    """The limit of the key: no content fingerprint."""
     write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
     other_url = fixture_text(ARTICLE).replace(
         f'source: "{ARTICLE_URL}"', 'source: "https://example.com/the-same-article"'
@@ -272,8 +270,8 @@ def test_two_urls_are_two_clips_even_for_the_same_article(data_dir):
 def test_an_older_version_imported_after_a_newer_copy_of_the_same_content_is_left_out(
     data_dir,
 ):
-    """A version of 2026-10-18 imported after a copy of 2026-10-19 that kept the version of
-    2026-10-17: the base keeps the content of the newest copy."""
+    """A version of 2026-10-18 imported after a copy of 2026-10-19 of the version of 2026-10-17:
+    the base keeps the content of the newest copy."""
     write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
     run_import(data_dir)
     write_clip(data_dir, "2026-10-19T093000Z", "a1", fixture_text(ARTICLE))
@@ -291,7 +289,7 @@ def test_an_older_version_imported_after_a_newer_copy_of_the_same_content_is_lef
 
 
 def test_of_two_files_of_one_url_in_a_collection_the_second_is_written_again(data_dir):
-    """The limit of the ADR of 2026-10-19: in page name order, the second writes over the first."""
+    """The limit of the key: in page name order, the second writes over the first."""
     write_clip(data_dir, FIRST, "a1", fixture_text(ARTICLE))
     second_path = write_clip(
         data_dir, FIRST, "b2", fixture_text(ARTICLE).replace("do not", "never")
@@ -401,7 +399,7 @@ def test_a_clip_copied_again_with_its_tags_in_another_form_is_left_out(data_dir)
 
 
 def test_a_tag_added_or_removed_writes_the_clip_again(data_dir):
-    """Decision of Sabine of 2026-10-19: the links of the version before are removed."""
+    """The links of the version before are removed."""
     write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
     run_import(data_dir)
     write_clip(
@@ -436,8 +434,8 @@ LINKS_QUERY = (
 
 
 def watch_written_columns(data_dir):
-    """A trigger per column of clip, in the base of the test only: an UPDATE OF a column fires
-    when the column is in the SET of the UPDATE, whether its value changes or not."""
+    """A trigger per column of clip, in the test base only: it fires when the column is in the
+    SET of an UPDATE, changed or not."""
     connection = sqlite3.connect(data_dir / "k-b.sqlite")
     try:
         connection.execute("CREATE TABLE written_column (name TEXT)")
@@ -458,7 +456,7 @@ def read_written_columns(data_dir):
 
 
 def test_a_title_changed_alone_writes_only_the_title(data_dir):
-    """Decision of Sabine of 2026-10-19: a patch, not a put."""
+    """A patch, not a put."""
     write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm"))
     run_import(data_dir)
     links = fetch_rows(data_dir, LINKS_QUERY)
@@ -505,7 +503,7 @@ def test_a_tag_removed_removes_only_its_link(data_dir):
 
 
 def test_the_last_link_of_a_tag_removed_removes_the_tag(data_dir):
-    """Decision of Sabine of 2026-10-19: a tag removed no longer exists in the base."""
+    """A tag removed no longer exists in the base."""
     write_clip(data_dir, FIRST, "a1", with_tags(fixture_text(ARTICLE), "llm", "agents"))
     run_import(data_dir)
     write_clip(data_dir, SECOND, "a1", with_tags(fixture_text(ARTICLE), "agents"))

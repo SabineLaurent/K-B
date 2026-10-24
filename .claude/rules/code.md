@@ -1,4 +1,4 @@
-<!-- consignes/code.md v2026-10-13 — source : time-knight. Ne pas modifier ici sans la reporter. -->
+<!-- consignes/code.md v2026-10-24 — source : time-knight. Ne pas modifier ici sans la reporter. -->
 # Principes de code
 
 Chaque règle dit quoi faire et où elle s'arrête. En cas de conflit :
@@ -19,6 +19,10 @@ Chaque règle dit quoi faire et où elle s'arrête. En cas de conflit :
 - **Le nom d'une variable dit son contenu et son état** (`raw_entry`, `validated_item`). **Une
   même action porte le même verbe pour chaque entité**, sans répéter ce que le module dit déjà
   (`paper.write`, pas `paper.write_paper`).
+- **Une docstring tient en une phrase** : ce que fait la fonction, la classe ou le module, quand le
+  nom ne suffit pas. Le pourquoi seulement s'il n'est pas évident, en une ou deux lignes de plus. Ni
+  rappel d'issue, ni historique, ni paraphrase du code : le détail va dans `docs/` ou dans la note
+  pédagogique. (Sabine, 2026-10-24 : une docstring longue coûte à chaque lecture et personne ne la lit.)
 
 ### Journalisation
 - **Un log dit ce qui a été observé, jamais ce qui est supposé.** Pas de cause devinée

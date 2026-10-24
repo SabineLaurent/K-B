@@ -1,12 +1,5 @@
-"""SOURCE_KINDS: the only declaration of the sources, one kind per entry, in collection order.
-
-In the package, only the commands import this module: commands/collect_command.py and
-commands/import_command.py give SOURCE_KINDS to the collection (E) and to the import (T then L);
-commands/write_tops_command.py reads TOPS, the top rankings whose sheets kb write-tops writes.
-The Zotero, clipping and GH Archive kinds have no instance here: etl/collected_sources.py creates
-them, on a machine that says where the Zotero data directory, the Obsidian vault, or the BigQuery
-key, is.
-"""
+"""SOURCE_KINDS: the only declaration of the sources, in collection order, imported by the
+commands only; Zotero, clipping and GH Archive get their instance in etl/collected_sources.py."""
 
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME, make_source_folder_key
 from k_b.etl.source_contract import SourceKind

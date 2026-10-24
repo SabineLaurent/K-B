@@ -1,11 +1,6 @@
 """The replay provider: answers known in advance, given in order by the transport of the HTTP
-client, so that the code of a real call runs whole, without network, key nor cost.
-
-A step is an answer of the provider (a completion, or any HTTP response), or a failure of its
-transport (a timeout, a refused or broken connection). The steps assume calls one after the
-other; a file of steps cites only the item_id of a watch known in advance, since the enum of
-the item_id changes with each call.
-"""
+client, so that a real call runs whole, without network, key nor cost; the steps assume calls one
+after the other."""
 
 from pathlib import Path
 from typing import Annotated, Literal
@@ -62,8 +57,8 @@ REPLAY_STEPS = TypeAdapter(list[ReplayStep])
 
 
 class InvalidReplayFileError(Exception):
-    """A file of steps out of the model: the position, the type of error and the field, never
-    the value read (.claude/rules/poc.md, rule 5)."""
+    """A file of steps out of the model: the position, the type of error and the field, never the
+    value."""
 
 
 class ReplayExhaustedError(Exception):
@@ -71,7 +66,6 @@ class ReplayExhaustedError(Exception):
 
 
 def read_replay_steps(path: Path) -> list[ReplayStep]:
-    """The steps of a JSON file, a list of steps."""
     try:
         return REPLAY_STEPS.validate_json(path.read_bytes())
     except ValidationError as error:

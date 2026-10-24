@@ -1,7 +1,5 @@
 """OpenTelemetry and the HTTP client of its exporter are imported by two modules of the AI API
-only (decision of Sabine of 2026-10-24, plan of #162): the app, the router and the commands see
-ModelMetrics alone, so that the rules of the export (no OTEL_* variable, a closed resource, a
-session blind to the environment) are in one place."""
+only, so that the rules of the export are in one place."""
 
 import ast
 
@@ -18,8 +16,7 @@ ALLOWED_MODULES_BY_LIBRARY = {
 
 
 def list_imported_top_level_names(code: str) -> set[str]:
-    """The top-level names of the absolute imports of code (`opentelemetry` for
-    `from opentelemetry.sdk.metrics import MeterProvider`)."""
+    """The top-level names of the absolute imports of code (`opentelemetry`)."""
     names: set[str] = set()
     for node in ast.walk(ast.parse(code)):
         if isinstance(node, ast.Import):

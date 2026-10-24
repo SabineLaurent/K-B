@@ -1,13 +1,5 @@
-"""Mark as withdrawn what a state catalog no longer lists, while its raw file is written into
-the base (stage 3).
-
-Two kinds of raw file are a state catalog: a catalog of CISA KEV, and a Zotero extract, whose
-entries and highlights are a state catalog too (decision of 2026-10-13). The rule is the load's,
-not the source's: a source collects, it never decides what the base keeps.
-
-Each function takes the file read and the row that registers it, and returns how many rows it
-marked; the SQL of a withdrawal is in the writer of the kind (database/writers/).
-"""
+"""Mark as withdrawn what a state catalog (CISA KEV, a Zotero extract) no longer lists, while its
+raw file is written into the base; the SQL is in the writer of the kind."""
 
 import sqlite3
 
@@ -21,12 +13,10 @@ from k_b.etl.raw_files import RawFile
 def mark_withdrawn_vulnerabilities(
     connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
 ) -> int:
-    """Mark as withdrawn the CVE a catalog no longer lists (vulnerability_writer.py);
-    return how many.
+    """Mark as withdrawn the CVE a catalog no longer lists; return how many.
 
-    Only a file of vulnerabilities, all of its entries read: a rejected row is in the catalog,
-    not absent from it.
-    """
+    Only for a file whose entries were all read: a rejected row is in the catalog, not absent
+    from it."""
     present_cve_ids = [
         item.cve
         for item in raw_file.items
@@ -46,12 +36,8 @@ def mark_withdrawn_vulnerabilities(
 def mark_withdrawn_zotero_rows(
     connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
 ) -> int:
-    """Mark as withdrawn the entries and the highlights an extract no longer lists
-    (zotero_entry_writer.py); return how many.
-
-    The same conditions as for a catalog of CISA KEV: an extract with a rejected entry, or
-    without entry, withdraws nothing.
-    """
+    """Mark as withdrawn the entries and highlights an extract no longer lists; return how many.
+    An extract with a rejected entry, or without entry, withdraws nothing."""
     entries = [item for item in raw_file.items if item.kind == "zotero_entry"]
     if not entries or raw_file.rejection_count:
         return 0

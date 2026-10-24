@@ -1,5 +1,5 @@
-"""kb serve-ai: the keys and the settings checked at the start, the host and the port, the log of
-the AI API, and its stop on SIGTERM. Each test builds its own environment: never from .env."""
+"""kb serve-ai: the keys and the settings checked at the start, the host and the port, its log,
+and its stop on SIGTERM; never from .env."""
 
 import json
 import logging
@@ -302,7 +302,7 @@ def test_serve_ai_logs_its_clients_its_provider_and_its_model_never_a_key(
 def test_serve_ai_writes_its_own_log_file_under_kb_data_dir(
     monkeypatch, data_dir, uvicorn_calls, environment
 ):
-    """A long run beside kb serve: each keeps its own file (docs/specs-api.md, "Journal")."""
+    """A long run beside kb serve: each keeps its own file."""
     set_environment(monkeypatch, environment)
 
     cli.main(["serve-ai"])
@@ -337,9 +337,8 @@ def find_free_port():
 def test_serve_ai_stops_on_sigterm_with_the_code_of_a_process_stopped_by_it(
     tmp_path, environment
 ):
-    """uvicorn stops, then sends SIGTERM again (uvicorn/server.py): a parent process reads -15,
-    a shell 143 (ExitCode.STOPPED_BY_SIGTERM). The environment is built, never the one of the
-    terminal."""
+    """uvicorn stops, then sends SIGTERM again: a parent process reads -15, a shell 143; the
+    environment is built, never the terminal's."""
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     port = find_free_port()
@@ -386,8 +385,7 @@ def wait_for_health(port, timeout_seconds=20):
 def test_the_log_keeps_no_request_line_of_the_http_client(
     monkeypatch, capsys, data_dir, environment
 ):
-    """httpx2 logs each request at INFO: its URL (the resource of the provider) and no request
-    id. Its warnings stay."""
+    """httpx2 logs each request at INFO with its URL and no request id; its warnings stay."""
     set_environment(monkeypatch, environment)
 
     def log_as_the_http_client(app, **options):
@@ -407,8 +405,7 @@ def test_the_log_keeps_no_request_line_of_the_http_client(
 def test_serve_ai_exits_2_when_a_client_has_the_key_it_sends_to_the_data_api(
     monkeypatch, capsys, data_dir, uvicorn_calls, environment
 ):
-    """The data API gives each client every item: a key shared would let the client of the AI
-    API read the data API too (least privilege, code.md)."""
+    """A shared key would let the client of the AI API read the data API too (least privilege)."""
     shared_key = make_key()
     set_environment(
         monkeypatch,

@@ -1,13 +1,5 @@
-"""Read the raw files of raw/automated_watch/ and raw/selected_library/ not imported yet into
-common items (docs/specs-collecte.md, step 2), then reject the releases of a repository out of
-the tracked list (docs/stockage.md) and normalize the items kept (step 3).
-
-The run of the stage, step by step: what raw/ holds is listed and read by etl/raw_reading.py,
-once per collection; the steps that follow read only the items it returned.
-
-The raw files of a source whose kind carries a trend reader (GH Archive) are read beside them,
-by the same walk of raw/: their rows are not items (ADR of 2026-10-08).
-"""
+"""Read the raw files not imported yet into common items, reject the releases of a repository out
+of the tracked list and normalize the items kept (docs/specs-collecte.md, steps 2 and 3)."""
 
 from collections.abc import Sequence
 from pathlib import Path
@@ -33,8 +25,7 @@ from k_b.items import Item
 
 
 class ImportReadings(NamedTuple):
-    """What one walk of raw/ gives the import: the files read as items, and those read as
-    trends."""
+    """What one walk of raw/ gives the import: the files read as items, and those read as trends."""
 
     items: RawReading
     trends: TrendReading
@@ -46,8 +37,7 @@ def read_raw_files(
     imported_paths: frozenset[str],
     tracked_repositories: Sequence[TrackedRepository],
 ) -> ImportReadings:
-    """Every raw file not in imported_paths read as its kind says, from one walk of raw/: each
-    source folder is listed once, and the reader of its kind says what its files hold."""
+    """Every raw file not in imported_paths read as its kind says, in one walk of raw/."""
     collections = list_collections(raw_dir, kinds)
     return ImportReadings(
         read_raw_items(
@@ -63,14 +53,8 @@ def read_raw_items(
     imported_paths: frozenset[str],
     tracked_repositories: Sequence[TrackedRepository],
 ) -> RawReading:
-    """Every collection of items that is not in imported_paths, in collection order, without
-    the releases of a repository out of tracked_repositories, each item kept normalized.
-
-    A collection is a raw file, or a folder of pages; a raw file is read as a single page. A
-    collection not named by its time or that cannot be listed, a page that cannot be read, or
-    an entry rejected by its reader or refused as an item, is rejected and logged; the others
-    are still read. A page already imported is not opened.
-    """
+    """Every collection of items not in imported_paths, in collection order, without the
+    untracked releases, each item normalized."""
     reading = join_readings(
         [
             read_collection(collection_path, raw_dir, reader, imported_paths)
@@ -87,12 +71,8 @@ def read_raw_items(
 def reject_untracked_releases(
     reading: RawReading, tracked_repositories: Sequence[TrackedRepository]
 ) -> RawReading:
-    """The same reading, without the releases of a repository out of the list, each one
-    rejected.
-
-    The import goes on, as for an entry refused when read. A file keeps its place even with no
-    item left: the import registers it, and only a rebuild of the base reads it again (#106).
-    """
+    """The same reading, without the releases of a repository out of the list, each one rejected;
+    a file keeps its place even with no item left, so that the import registers it."""
     tracked_names = {repository.name.lower() for repository in tracked_repositories}
     files: list[RawFile] = []
     rejections = list(reading.rejections)
@@ -117,7 +97,6 @@ def reject_untracked_releases(
 
 
 def is_untracked_release(item: Item, tracked_names: set[str]) -> bool:
-    """Whether the item is a release of a repository out of the tracked list."""
     # A release always has its repository (items.py): str() only satisfies the typing.
     return (
         item.kind == "release"
@@ -126,13 +105,10 @@ def is_untracked_release(item: Item, tracked_names: set[str]) -> bool:
 
 
 def normalize_items(reading: RawReading) -> RawReading:
-    """The same reading, each item of each file normalized (etl/normalize.py).
+    """The same reading, each item normalized.
 
     Outside the reading of a page, which turns a ValidationError into a rejection: the second
-    validation of normalize_item must stop the whole import, not reject one item. An item
-    refuses beforehand what the normalization would break (check_url_can_be_normalized,
-    items.py).
-    """
+    validation of normalize_item must stop the whole import."""
     return reading._replace(
         files=[
             raw_file._replace(items=[normalize_item(item) for item in raw_file.items])
@@ -146,8 +122,7 @@ def read_raw_trends(
     raw_dir: Path,
     imported_paths: frozenset[str],
 ) -> TrendReading:
-    """Every raw file of trends that is not in imported_paths, in collection order, each read
-    whole (etl/raw_reading.py). A file already imported is not opened."""
+    """Every raw file of trends not in imported_paths, in collection order, each read whole."""
     # A raw file is named by its collection time: the order of the names is the order of time.
     return join_trend_readings(
         [

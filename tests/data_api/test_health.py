@@ -1,5 +1,4 @@
-"""GET /health: the probe of the container, served without key, which says ok and nothing else
-(docs/specs-api.md, "Santé")."""
+"""GET /health: the probe of the container, served without key, which says ok and nothing else."""
 
 
 def test_health_answers_ok_without_key(client):

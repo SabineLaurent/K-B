@@ -99,10 +99,8 @@ def run_import(
     kinds=SOURCE_KINDS,
     read_again=False,
 ):
-    """kb import, one second after the import before it: each import writes its own log.
-
-    read_again: every raw file is read, as by a base of before #106 that has no registry.
-    """
+    """kb import, one second after the one before, so that each writes its own log; read_again
+    reads every raw file, as a base without registry."""
     imported_at = FIRST_IMPORT_AT + timedelta(seconds=len(list_logs(data_dir)))
     database_path = data_dir / "k-b.sqlite"
     imported_paths = frozenset() if read_again else read_imported_paths(database_path)
@@ -148,8 +146,7 @@ def read_log_lines(data_dir):
 
 
 def read_log(data_dir):
-    """The lines of the latest log, without the time each one carries: a test of its own
-    checks it."""
+    """The lines of the latest log, without their time, which a test of its own checks."""
     lines = read_log_lines(data_dir)
     for line in lines:
         del line["imported_at"]
@@ -180,8 +177,8 @@ def write_collection(data_dir, folder, collection, content):
 
 
 def kev_catalog(ransomware_use_of_first_cve="Unknown", without=(), renamed=None):
-    """The recorded catalog, with knownRansomwareCampaignUse of its first CVE as given, each
-    CVE of renamed under its new identifier, then the CVE of without left out."""
+    """The recorded catalog, knownRansomwareCampaignUse of its first CVE as given, the CVE of
+    renamed renamed, those of without left out."""
     rows = list(
         csv.DictReader(io.StringIO((FIXTURES_DIR / "cisa_kev_extract.csv").read_text()))
     )
@@ -730,9 +727,8 @@ def test_a_foreign_key_the_base_refuses_stops_the_import_and_writes_nothing(
 
 
 def refuse_in_the_base(monkeypatch, source_item_id, changes):
-    """The item of source_item_id reaches its writer with changes the item would refuse: they
-    are made after its validation, as by an item that let them through (conventions.md, rule
-    4); the base is the safety net behind it."""
+    """The item of source_item_id reaches its writer with changes made after its validation: the
+    base is the safety net behind the item (conventions.md, rule 4)."""
 
     def normalize_then_change(item):
         normalized_item = normalize_item(item)
@@ -1006,8 +1002,7 @@ def test_a_commit_that_fails_leaves_neither_the_import_nor_its_log(
 
 
 class CommitUndoneBySqliteConnection(sqlite3.Connection):
-    """A commit refused that SQLite undoes itself (disk full, I/O error): the base has no
-    transaction left, as after a commit done."""
+    """A commit refused that SQLite undoes itself (disk full, I/O error): no transaction is left."""
 
     def commit(self):
         self.rollback()
@@ -1032,8 +1027,8 @@ def test_a_commit_undone_by_sqlite_leaves_neither_the_import_nor_its_log(
 
 
 class InterruptedAfterCommitConnection(sqlite3.Connection):
-    """A Ctrl-C handled once the commit has returned: Python runs a signal handler between two
-    bytecodes, after the C call of the commit."""
+    """A Ctrl-C handled once the commit has returned, as Python runs a signal handler after the C
+    call."""
 
     def commit(self):
         super().commit()
@@ -1086,8 +1081,8 @@ def test_a_ctrl_c_after_the_log_is_written_leaves_neither_the_import_nor_its_log
 
 
 def text_at_its_maximum(kind, field, maximum):
-    """A text of the maximum length that names its kind and its field: no two columns hold
-    the same, so a writer that takes one field for another is seen."""
+    """A text of the maximum length that names its kind and its field, so that a writer taking
+    one field for another is seen."""
     if field in ("cve", "edition") or (kind, field) == ("advisory", "source_item_id"):
         return text_of_length(field, maximum, kind)
     prefix = {"url": "https://"}.get(field, "")
@@ -1211,8 +1206,8 @@ def test_a_file_read_without_item_is_registered_and_not_read_again(data_dir):
 def test_a_file_whose_releases_are_all_out_of_the_list_is_registered_and_not_read_again(
     data_dir,
 ):
-    """The reading rejects every release of the file (etl/transform.py) and still returns it:
-    the import registers it, as it does a file read without item."""
+    """The reading rejects every release of the file and still returns it, so that the import
+    registers it."""
     still_tracked = tuple(
         repository
         for repository in TRACKED_REPOSITORIES
@@ -1330,8 +1325,8 @@ def test_each_line_of_the_log_carries_the_time_of_its_import(data_dir):
 def test_the_log_lists_what_the_reading_rejected_before_what_the_writing_refused(
     data_dir, monkeypatch
 ):
-    """write_files writes what the reading rejected first, then each file in collection order:
-    an unreadable page and a release out of the list come before an item the base refuses."""
+    """What the reading rejected comes first: an unreadable page and a release out of the list
+    before an item the base refuses."""
     unreadable = write_collection(data_dir, ARXIV_DIR, "2026-10-06T093000Z", "not xml")
     still_tracked = tuple(
         repository
@@ -1944,8 +1939,8 @@ def test_a_ranking_refused_is_rejected_logged_and_read_again_at_the_next_import(
 
 
 def run_import_with_a_ranking_row_changed(data_dir, raw_file_path, **changes):
-    """kb import, with the last row of the ranking at raw_file_path changed after its
-    reading: as by a reader that let the change through (conventions.md, rule 4)."""
+    """kb import, the last row of the ranking changed after its reading, as by a reader that let
+    it through."""
     imported_at = FIRST_IMPORT_AT + timedelta(seconds=len(list_logs(data_dir)))
     database_path = data_dir / "k-b.sqlite"
     imported_paths = read_imported_paths(database_path)

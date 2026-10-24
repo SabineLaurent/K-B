@@ -1,10 +1,8 @@
-"""The items of the watch as the AI API reads them, and as the model will receive them
-(docs/fiches-veille.md, "Entrée du modèle"): the fields of a whitelist per kind, masked when
-read, then cut for the writing. Masked before cut: a URL cut in two would no longer be found.
+"""The items of the watch as the model will receive them: the fields of a whitelist per kind,
+masked, then cut for the writing (masked first: a URL cut in two would no longer be found).
 
 A field sent never carries an author nor the url of the item (.claude/rules/poc.md, rules 5 and
-8): the authors are never read, and the url stays with the item, for the sources of the answer.
-"""
+8)."""
 
 import re
 from collections.abc import Iterable, Mapping
@@ -110,9 +108,8 @@ class WatchItem:
 
 @dataclass(frozen=True)
 class WatchReading:
-    """The items read for a request. When the cap is reached, capped_kind is the kind cut and
-    covered_after the date of its first item left out: each item of that kind strictly more
-    recent was read; the kinds after it in WATCH_KINDS were not."""
+    """The items read for a request; at the cap, capped_kind is the kind cut and covered_after
+    the date of its first item left out."""
 
     items: tuple[WatchItem, ...]
     # Withdrawn from a catalog, or gone between the list and the detail.
@@ -137,14 +134,13 @@ class WritingSelection:
 
 
 def to_item_ref(item_id: int) -> str:
-    """The identifier of an item for the model, "i17" for item 17: a string, an enum of integers
-    being confirmed by no provider (docs/fiches-veille.md, "Schémas")."""
+    """The identifier of an item for the model, "i17" for item 17: no provider confirms an enum
+    of integers."""
     return f"i{item_id}"
 
 
 def build_fields(kind: WatchKind, values: Mapping[str, object]) -> WatchFields:
-    """The fields of the whitelist of the kind, taken from values, each text masked; the other
-    values are not kept."""
+    """The fields of the whitelist of the kind, taken from values, each text masked."""
     fields_model = FIELDS_BY_KIND[kind]
     login_fields = LOGIN_FIELDS_BY_KIND.get(kind, ())
     return fields_model.model_validate(
@@ -166,7 +162,7 @@ def mask_value(value: object, has_logins: bool) -> object:
 
 def select_for_writing(items: Iterable[WatchItem]) -> WritingSelection:
     """The most recent items of a digest, MAX_ITEMS_PER_DIGEST at most, each text field cut to
-    MAX_FIELD_CHARS_FOR_WRITING characters; called by the writing (#205) for each subject."""
+    MAX_FIELD_CHARS_FOR_WRITING characters."""
     ordered = sorted(
         items, key=lambda item: (item.source_date, item.item_id), reverse=True
     )

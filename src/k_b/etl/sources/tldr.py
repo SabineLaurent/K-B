@@ -1,9 +1,5 @@
-"""The TLDR source: its download (E), then its reader (T).
-
-Download the raw TLDR edition pages, one per day, as tldr.tech serves them.
-
-Read the articles of a raw edition page, and convert each one into an item.
-"""
+"""The TLDR source: download the edition page of each day (E), then read its articles into items
+(T)."""
 
 import logging
 import re
@@ -60,18 +56,9 @@ class TldrSource:
     def fetch(self, last_collected_at: datetime | None) -> dict[str, bytes] | None:
         """Return the edition page of each day to collect, by day; None if there is none.
 
-        Each page is read before it is returned (conventions.md, rule 1): a page that is not
-        the edition of its day is refused (not_the_edition_of_the_day) and never returned.
-        - A day refused after the last edition read, or with none read, fails the source: its
-          last collection date stays, and the day is asked again at the next collection.
-        - A day refused before an edition read is given up, logged as a warning: the site
-          serves editions, and that day is over.
-        - Today refused is logged and skipped: the day of the last collection is read again
-          (list_days_to_collect). Decision of Sabine of 2026-10-20 (#274).
-        A day redirected to the landing page of the edition (observed for 2026-10-03 and
-        2026-10-04) has no edition page: it is logged and skipped. Any other redirection, HTTP
-        error or error of the reader is raised.
-        """
+        A page that is not the edition of its day is never returned: refused after the last
+        edition read, it fails the source; before, it is given up; today, skipped
+        (docs/specs-collecte.md)."""
         today = current_day()
         days = list_days_to_collect(last_collected_at, today)
         read_pages = self.read_pages(days)
@@ -113,8 +100,8 @@ class TldrSource:
         return {day.isoformat(): page for day, page in pages.items()} or None
 
     def read_pages(self, days: list[date]) -> dict[date, bytes | PageRefusal]:
-        """The page of each day, or why it is not the edition of the day; a day redirected to
-        the landing page of the edition is left out."""
+        """The page of each day, or why it is not the edition of the day; a day redirected to the
+        landing page is left out."""
         read_pages: dict[date, bytes | PageRefusal] = {}
         for position, day in enumerate(days):
             if position > 0:
@@ -148,9 +135,8 @@ class TldrSource:
         return read_pages
 
     def refuse(self, refusals: dict[date, PageRefusal]) -> ValueError:
-        """The failure of the source, with the day, url and observation of each day refused in
-        the window, one note each: the collection quotes and cuts each note apart
-        (etl/extract.py)."""
+        """The failure of the source, one note per day refused, with its day, url and
+        observation."""
         error = ValueError(NOT_THE_EDITION_OF_THE_DAY)
         for day, refusal in refusals.items():
             error.add_note(f"{self.name} {day}, from {refusal.page_url}")
@@ -159,10 +145,8 @@ class TldrSource:
 
 
 def find_refusal(page: bytes, day: date) -> str | None:
-    """Why the page is not the edition of the day, as observed; None if it is.
-
-    The page is read as at the import: a page the import would refuse is refused here.
-    """
+    """Why the page is not the edition of the day, as observed, read as at the import; None if it
+    is."""
     try:
         reading = read_articles(page)
     except ValueError as error:
@@ -179,11 +163,8 @@ def current_day() -> date:
 
 
 def list_days_to_collect(last_collected_at: datetime | None, today: date) -> list[date]:
-    """Every day from the day of the last collection, or 7 days ago, to today.
-
-    The day of the last collection is read again: its edition may have come out after it. The
-    articles of a page collected twice are left out at the import, as already seen.
-    """
+    """Every day from the day of the last collection, or 7 days ago, to today; the day of the
+    last collection is read again, as its edition may have come out after it."""
     if last_collected_at is None:
         first_day = today - timedelta(days=FIRST_COLLECTION_DAYS)
     else:
@@ -219,14 +200,10 @@ class TldrArticle:
 
 
 def read_articles(page: bytes) -> EntryReading[TldrArticle]:
-    """One article per entry of an edition page, sponsored entries and job offers of TLDR left
-    out.
+    """One article per entry of an edition page, sponsored entries and job offers left out.
 
-    An entry is returned as read, even without a title, a link or a summary: the item refuses
-    it, and the others are still read; the reader itself rejects none. A page that is not UTF-8,
-    whose first h1 is not the title of an edition, with an article inside another, or without
-    any complete article (a selector no longer matches) is refused whole.
-    """
+    An entry is returned as read, for the item to refuse; a page that is not UTF-8, not an
+    edition, or without any complete article (a selector no longer matches) is refused whole."""
     try:
         # Decoded here: BeautifulSoup would guess the encoding of bytes.
         soup = BeautifulSoup(page.decode("utf-8"), "html.parser")
@@ -286,8 +263,8 @@ def read_article(entry: Tag, edition_date: date, rank: int) -> TldrArticle:
 
 
 def read_text_or_empty(element: Tag | None) -> str:
-    """The text of an element, its pieces (paragraphs, links) a space apart and each run of
-    white space as one space; "" without the element."""
+    """The text of an element, its pieces a space apart and white space collapsed; "" without the
+    element."""
     return " ".join(element.get_text(" ").split()) if element else ""
 
 

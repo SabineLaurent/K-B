@@ -1,5 +1,5 @@
-"""GET /items: the list of the items and "what's new"; GET /items/{item_id}: the detail of an
-item (docs/specs-api.md, "GET /items" and "GET /items/{item_id}")."""
+"""GET /items, the list of the items, and GET /items/{item_id}, the detail of an item
+(docs/specs-api.md)."""
 
 import re
 from datetime import datetime
@@ -33,14 +33,14 @@ MAX_SEARCH_LENGTH = 200
 
 
 def read_since_text(since: object) -> datetime:
-    """since read as an ISO 8601 date with its zone, by the date reader of K-B: left to pydantic,
-    a number would be read as a Unix time (since=20261007, the 23rd of August 1970)."""
+    """since read as an ISO 8601 date with its zone: left to pydantic, a number would be a Unix
+    time (since=20261007, the 23rd of August 1970)."""
     return parse_aware_datetime(since, "since")
 
 
 def check_since_can_be_read(since: datetime) -> datetime:
-    """since as the reading compares it: rounded up to its second, it must remain a date
-    (9999-12-31T23:59:59.5Z does not). A ValueError, which pydantic turns into a 422."""
+    """since as the reading compares it, rounded up to its second, must remain a date
+    (9999-12-31T23:59:59.5Z does not); a ValueError becomes a 422."""
     format_since(since)
     return since
 
@@ -58,7 +58,7 @@ ITEM_ID_FORM = re.compile(r"0|-?[1-9][0-9]*")
 
 def check_item_id_form(item_id: object) -> object:
     """item_id as written in the path: left to pydantic, 1.0, " 1" and 01 would each be a URL of
-    item 1. A ValueError, which pydantic turns into a 422; the integer is then read by Int64."""
+    item 1."""
     if not isinstance(item_id, str) or not ITEM_ID_FORM.fullmatch(item_id):
         raise ValueError("item_id is not an integer written in digits")
     return item_id
@@ -101,7 +101,7 @@ def list_items(
 
 
 def bound_next_offset(next_offset: int | None) -> int | None:
-    """None beyond the bound of offset: the client could not ask for that page (a 422)."""
+    """None beyond the bound of offset, as the client could not ask for that page."""
     if next_offset is None or next_offset > MAX_OFFSET:
         return None
     return next_offset

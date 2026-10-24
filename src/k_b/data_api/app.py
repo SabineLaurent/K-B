@@ -1,6 +1,4 @@
-"""The data API: the items of the base, read only, for the clients of Sabine, on her machine by
-default, or in containers (docs/specs-api.md, "Règles communes"). create_app plugs in the
-routers (gathered by api_router.py), the key and the errors."""
+"""The data API: the items of the base, read only, for the clients of Sabine (docs/specs-api.md)."""
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -27,8 +25,8 @@ def create_app(
     api_keys: Mapping[str, SecretStr],
     allowed_hosts: Sequence[str] = DATA_API_ALLOWED_HOSTS,
 ) -> FastAPI:
-    """The app, its keys, its base and the hosts it answers given: a test makes its own, kb
-    serve gives those of the environment. Without any key, every data route answers 401."""
+    """The app, its keys, its base and the hosts it answers given; without any key, every data
+    route answers 401."""
     app = FastAPI(
         title="K-B data API",
         version=API_VERSION,

@@ -121,7 +121,7 @@ Points défendables :
 | 6 | Pilote : la source Zotero en paquet extract.py / transform.py | à faire |
 | 7 | Si le pilote est validé : généraliser aux autres sources, une par commit | à décider |
 | 8 | Séparer dans Top ce qui relève de la collecte et du rendu | à faire |
-| 9 | Réduire les docstrings longues et les commentaires qui décrivent d'autres modules (décision de l'utilisatrice du 2026-10-24) | à faire, ordre non fixé |
+| 9 | Réduire les docstrings longues et les commentaires qui décrivent d'autres modules (décision de l'utilisatrice du 2026-10-24) | docstrings faites (#300) ; commentaires à faire |
 
 À vérifier à part : la double normalisation des clips (clipping.py),
 peut-être voulue ; les tests qui s'importent entre eux (vers conftest.py).

@@ -11,7 +11,7 @@ from k_b.data_api.app import create_app
 
 @pytest.fixture
 def api_keys():
-    """The key of each client, made for the test as kb serve would read them: never from .env."""
+    """The key of each client, made for the test as kb serve would read them, never from .env."""
     return {
         "TERMINAL": SecretStr(secrets.token_urlsafe(32)),
         "AGENT": SecretStr(secrets.token_urlsafe(32)),
@@ -20,7 +20,7 @@ def api_keys():
 
 @pytest.fixture
 def make_client():
-    """A client of a new app; localhost, since TrustedHostMiddleware refuses the testserver host
+    """A client of a new app, on localhost, as TrustedHostMiddleware refuses the testserver host
     of TestClient."""
 
     def make(database_path, api_keys):
@@ -40,5 +40,4 @@ def client(make_client, items_database, api_keys):
 
 @pytest.fixture
 def authorization(api_keys):
-    """The header of the terminal client."""
     return {"Authorization": f"Bearer {api_keys['TERMINAL'].get_secret_value()}"}

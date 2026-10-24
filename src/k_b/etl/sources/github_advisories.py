@@ -1,9 +1,5 @@
-"""The GitHub security advisories source: its download (E), then its reader (T).
-
-Download the security advisories of the tracked packages of one ecosystem, as published.
-
-Read the security advisories of a raw GitHub API response, and convert each one into an item.
-"""
+"""The GitHub security advisories source: download the advisories of the tracked packages of one
+ecosystem (E), then read each one into an item (T)."""
 
 import json
 import logging
@@ -50,14 +46,12 @@ class GithubAdvisoriesSource:
         self.name = f"{FOLDER_PREFIX}_{ecosystem}"
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
-        """Return the advisories of the packages; None if none was reviewed since last_collected_at.
+        """Return the advisories of the packages; None if none was reviewed since
+        last_collected_at.
 
-        Only reviewed advisories are asked for, and GitHub may review one days after publishing
-        it: the publication date would miss it, so collections follow the review date.
-
-        The packages are filtered in the request, not at the reading: the whole ecosystem would
-        exceed a page (npm publishes more than 100 advisories a week).
-        """
+        Collections follow the review date, as GitHub may review an advisory days after
+        publishing it; the packages are filtered in the request, as the whole ecosystem would
+        exceed a page."""
         query = {
             "type": "reviewed",
             "ecosystem": self.ecosystem,
@@ -115,8 +109,8 @@ class Advisory:
 
 
 def read_advisories(raw_response: bytes) -> EntryReading[Advisory]:
-    """One advisory per valid entry of a `GET /advisories` response, newest first; an invalid
-    one is rejected with its position."""
+    """One advisory per valid entry of a `GET /advisories` response, newest first; an invalid one
+    is rejected with its position."""
     entries = json.loads(raw_response)
     if not isinstance(entries, list):
         raise ValueError("expected a list of advisories")

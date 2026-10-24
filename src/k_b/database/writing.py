@@ -1,13 +1,8 @@
-"""Write the items database: the door of the import to the writers of database/writers/.
-
-Each kind of item has its writer, in WRITER_BY_KIND; write_item chooses it. The import
-(etl/load.py) also writes through this module the raw data it registers, the tracked
-repositories, the rows of a ranking and what a catalog or an extract no longer lists, and reads
-from it what a writer returns for an item left out.
+"""Write the items database: the door of the import to database/writers/, which chooses the
+writer of each kind (WRITER_BY_KIND).
 
 Only objects pass the door, never a module of writers/: __all__ lists them, and mypy --strict
-refuses any other name imported from here.
-"""
+refuses any other name."""
 
 import sqlite3
 from collections.abc import Callable

@@ -1,6 +1,5 @@
-"""POST /digests on the replay provider and the data API of the test base: one test per case of
-the criterion of #156 (docs/fiches-veille.md, "Fenêtre", "Réponse", "Métriques", "États
-nommés"). No network, no key of a provider."""
+"""POST /digests on the replay provider and the data API of the test base, without network nor
+key of a provider."""
 
 import json
 import logging
@@ -148,9 +147,8 @@ def metric_reader():
 
 @pytest.fixture
 def make_ai_api(data_api, metric_reader):
-    """A client of the AI API on the replay of these steps, and the transport of the replay, which
-    keeps each request to the model. replay_from_settings: the replay the settings give, as kb
-    serve-ai makes it, in place of the transport of the test. Its measures go to metric_reader."""
+    """A client of the AI API on the replay of these steps, and the replay transport, which keeps
+    each request; replay_from_settings uses the replay of the settings, as kb serve-ai does."""
 
     def make(
         steps,
@@ -359,8 +357,8 @@ def send(client, content, headers):
 def test_without_key_only_a_body_that_cannot_be_read_gets_422(
     make_ai_api, content, status
 ):
-    """FastAPI reads the JSON of the body before the dependencies (fastapi/routing.py, 0.143):
-    a limit written in docs/fiches-veille.md; nothing is read nor sent."""
+    """FastAPI reads the JSON of the body before the dependencies, a limit written in
+    docs/fiches-veille.md; nothing is read nor sent."""
     client, transport = make_ai_api(VALID_STEPS)
 
     response = send(client, content, {})
@@ -596,8 +594,8 @@ METRIC_ATTRIBUTES = {
 
 
 def read_metric_points(metric_reader):
-    """The points of each instrument, by name: (attributes, value), the value being the sum of a
-    counter or the (count, sum) of a histogram."""
+    """The points of each instrument by name: (attributes, value), the sum of a counter or the
+    (count, sum) of a histogram."""
     metrics_data = metric_reader.get_metrics_data()
     points = {}
     for resource_metrics in metrics_data.resource_metrics:

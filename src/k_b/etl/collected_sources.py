@@ -1,8 +1,5 @@
 """The sources kb collect runs: the kinds chosen by KB_COLLECT_ONLY, then Zotero, the clips and
-GH Archive, created here on a machine that says where each one reads.
-
-The kinds are given by the caller, which reads SOURCE_KINDS (etl/source_kinds.py).
-"""
+GH Archive, created here on a machine that says where each one reads."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -66,9 +63,8 @@ def read_collect_only_or_refusal(
 def find_collect_only_refusal(
     entries: tuple[str, ...], environ: Mapping[str, str], kinds: Sequence[SourceKind]
 ) -> str | None:
-    """Why the sources chosen are refused, or None. Each entry is compared lowercased, and
-    quoted as it was written, without the spaces around. A source chosen without its variable
-    is refused: it would not run, and kb collect could exit 0 without having run anything."""
+    """Why the sources chosen are refused, or None; a source chosen without its variable is
+    refused, or kb collect could exit 0 without having run anything."""
     # A value empty or made of spaces gives one empty entry: it would choose no source.
     if entries == ("",):
         return f"{COLLECT_ONLY_VARIABLE}: empty, set the source folders separated by commas"
@@ -90,8 +86,7 @@ def find_collect_only_refusal(
 
 
 def read_vault_dir(environ: Mapping[str, str]) -> Path | None:
-    """The vault of KB_VAULT_DIR, the only reading of its value: the clips are copied from it,
-    and kb write-tops writes the sheets of the tops in it. None: not set, or empty."""
+    """The vault of KB_VAULT_DIR, the only reading of its value; None when not set or empty."""
     vault_dir = environ.get(VAULT_DIR_VARIABLE)
     return Path(vault_dir) if vault_dir else None
 
@@ -103,8 +98,7 @@ def list_collected_sources(
     store: RawStore,
 ) -> list[Source]:
     """The sources of the kinds given that are chosen, then Zotero, the clips and GH Archive,
-    each when it is chosen and its variable set. Zotero compares its extract with the last one
-    of store."""
+    each when chosen and its variable set."""
     sources = list_sources(
         [kind for kind in kinds if collect_only.is_collected(kind.folder_prefix)]
     )

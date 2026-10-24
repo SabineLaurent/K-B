@@ -222,8 +222,8 @@ def test_a_last_ranking_unreadable_keeps_the_last_readable_one(data_dir, vault_d
 
 
 def test_a_second_ranking_of_a_day_unreadable_is_read_and_kept(data_dir, vault_dir):
-    """The sheet of its day exists: the ranking is read all the same, so that an unreadable one
-    is never taken for the last readable."""
+    """The sheet of its day exists, but the ranking is read, so that an unreadable one is never
+    taken for the last readable."""
     readable = write_ranking(data_dir, STARRED_TOP, "2026-10-05T093000Z")
     write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
     unreadable = write_ranking(data_dir, STARRED_TOP, "2026-10-05T153000Z", b"{}")
@@ -357,9 +357,8 @@ def test_a_trapped_description_stays_in_its_cell(data_dir, vault_dir):
 
 
 def test_a_character_reference_in_a_description_is_written_as_text(data_dir, vault_dir):
-    """CommonMark decodes a named reference: &rlm; or &lrm; would give back the bidirectional
-    control neutralize_text removes. Only the & that opens a reference is escaped: R&D and a bare
-    URL with a query stay as they are (decision of Sabine of 2026-10-21, relayed by time-knight)."""
+    """CommonMark decodes a named reference (&rlm;) into a bidirectional control: only the & that
+    opens a reference is escaped, R&D and a URL with a query stay."""
     write_ranking(
         data_dir,
         STARRED_TOP,
@@ -395,7 +394,7 @@ def test_tops_is_a_reserved_name_no_subject_of_the_digests_may_take():
 def test_a_folder_of_the_sheets_that_is_a_symbolic_link_is_refused_before_any_ranking_is_read(
     data_dir, vault_dir, tmp_path, linked
 ):
-    """K-B never follows a symbolic link in the vault (decision of Sabine, 2026-10-19)."""
+    """K-B never follows a symbolic link in the vault."""
     rankings = [
         write_ranking(data_dir, STARRED_TOP, "2026-10-05T093000Z"),
         write_ranking(data_dir, STARRED_TOP, "2026-10-06T093000Z"),
@@ -418,8 +417,8 @@ def test_a_folder_of_the_sheets_that_is_a_symbolic_link_is_refused_before_any_ra
 def test_a_sheet_that_is_a_symbolic_link_refuses_its_top_before_any_sheet_is_written(
     data_dir, vault_dir, tmp_path, target_exists
 ):
-    """All or nothing: the sheet of 2026-10-05 is not written either. A link to an existing
-    file is refused too, never read as a sheet that exists."""
+    """All or nothing: the sheet of 2026-10-05 is not written either, and a link to an existing
+    file is refused too."""
     older = write_ranking(data_dir, STARRED_TOP, "2026-10-05T093000Z")
     last = write_ranking(data_dir, STARRED_TOP, "2026-10-06T093000Z")
     outside = tmp_path / "outside.md"

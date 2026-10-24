@@ -282,7 +282,7 @@ def tldr_edition_page(day):
 
 def serve_tldr_pages(monkeypatch, today, pages_by_url):
     """Stand for tldr.tech on today: each url its page, any other day redirected to the landing
-    page of the edition; return the urls asked."""
+    page; return the urls asked."""
     urls_asked = []
 
     def fake_download(url, trusted_url_prefix, max_bytes):

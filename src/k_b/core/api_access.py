@@ -1,5 +1,5 @@
-"""Who may call an API of K-B: the key of a request, checked against the keys of the clients
-(docs/specs-api.md, "Accès par clé"). Each API sets it on the whole app."""
+"""Who may call an API of K-B: the key of a request, checked against the keys of its clients
+(docs/specs-api.md, "Accès par clé")."""
 
 import hmac
 from collections.abc import Mapping
@@ -36,10 +36,8 @@ def check_api_key(
 def find_client(received_key: str, api_keys: Mapping[str, SecretStr]) -> str | None:
     """The client whose key is the one received, or None.
 
-    Compared in constant time with every key, without stopping at the one that matches: the
-    time of the answer tells neither the key nor which client holds it. As bytes: compare_digest
-    refuses a str that is not ASCII.
-    """
+    Compared in constant time with every key, as bytes (compare_digest refuses a non-ASCII str):
+    the time of the answer reveals neither the key nor its client."""
     received = received_key.encode()
     client_name = None
     for name, key in api_keys.items():

@@ -1,19 +1,8 @@
-"""The GH Archive source: the GitHub repositories that gain the most stars and forks (E).
+"""The GH Archive source: the stars and forks each GitHub repository gains in each window of 3
+complete UTC days, counted in one BigQuery query (E), and their reader (T).
 
-GH Archive records every public GitHub event, one table a day, as a public BigQuery dataset. The
-source counts, for each window of 3 complete UTC days, the stars (WatchEvent) and forks
-(ForkEvent) each repository gains, in one query that reads each day once. What the query returns,
-with the windows it covers, is the raw result: the trends it counted, refused whole when one
-row is invalid.
-
-The query runs in a BigQuery sandbox without billing (docs/bigquery.md): a dry run first, then
-the query capped by maximum_bytes_billed. The service account key is found by the client through
-GOOGLE_APPLICATION_CREDENTIALS; the source never opens it.
-
-Then how to read a raw result (T): TREND_READER, the trend reader its kind carries
-(etl/source_kinds.py). Its rows are not items: etl/transform.py reads the raw files with it,
-beside the items, and the import writes them to the trend table.
-"""
+The query runs in a sandbox without billing (docs/bigquery.md): a dry run first, then the query
+capped by maximum_bytes_billed."""
 
 import json
 import logging
@@ -141,10 +130,8 @@ class GhArchiveSource:
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
         """Return the trends of every window due since last_collected_at; None if none is due.
 
-        The day is read from the clock when the source runs, not when the collection started: a
-        collection that runs past midnight UTC collects the next window, and the next collection
-        takes it again (a raw file twice, nothing lost).
-        """
+        The day is read when the source runs, not when the collection started: a run past
+        midnight UTC collects the next window twice, never loses one."""
         window_ends = list_window_ends(last_collected_at, current_day())
         if not window_ends:
             return None
@@ -183,11 +170,7 @@ def current_day() -> date:
 
 
 def list_window_ends(last_collected_at: datetime | None, today: date) -> list[date]:
-    """The last day of each window due, oldest first, the most recent ending yesterday.
-
-    A collection made on day L covered the window ending on L - 1: the windows due end from L to
-    yesterday. A first collection takes the window ending yesterday.
-    """
+    """The last day of each window due, oldest first, the most recent ending yesterday."""
     yesterday = today - timedelta(days=1)
     if last_collected_at is None:
         return [yesterday]
@@ -207,13 +190,8 @@ def list_window_ends(last_collected_at: datetime | None, today: date) -> list[da
 
 
 def check_day_table_closed(client: bigquery.Client, day: date) -> None:
-    """Refuse a day whose table was last modified before the day ended.
-
-    An hour added to the table after its last modification is not in it yet.
-
-    GH Archive adds each hour to the table of its day; the last one arrived around 00:08 UTC the
-    next day (seen on 2026-10-11).
-    """
+    """Refuse a day whose table was last modified before the day ended: an hour may still be
+    missing (the last one arrived around 00:08 UTC the next day, seen on 2026-10-11)."""
     table = client.get_table(
         f"{TABLE_PREFIX}{day:%Y%m%d}", timeout=QUERY_TIMEOUT_SECONDS
     )
@@ -235,9 +213,8 @@ def drop_windows_over_the_cap(
     """Drop the oldest windows while the bound caps them, until the dry run fits; else refuse.
 
     Under the bound, the cap grows by a whole window and the volume by one day of events: a
-    window dropped lowers the cap more than the volume, so dropping cannot fit. Under the bound
-    alone, a long catch-up whose windows are over it would fail every collection.
-    """
+    window dropped lowers the cap more than the volume, so dropping cannot fit; refusing at the
+    bound without dropping would fail every collection of a long catch-up."""
     while True:
         dry_run = client.query(
             TRENDS_QUERY,
@@ -361,8 +338,8 @@ def describe_validation_error(error: ValidationError) -> str:
 
 
 def describe_location_part(part: int | str) -> str:
-    """A position or a known field as it is; an unknown key, which the raw gives, escaped and
-    cut like a value."""
+    """A position or a known field as it is; an unknown key, which the raw gives, quoted like a
+    value."""
     if isinstance(part, str) and part not in KNOWN_FIELDS:
         return quote_value(part)
     return str(part)
@@ -380,7 +357,6 @@ def describe_value(value: object, field: object) -> str:
 
 
 def read_trend_rows(raw_result: bytes) -> list[TrendRow]:
-    """The rows of a raw result, for the trend reader of its kind."""
     return read_trends(raw_result).rows
 
 

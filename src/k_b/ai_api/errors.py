@@ -1,6 +1,5 @@
-"""The errors of the AI API that a request to the model or to the data API gives
-(docs/fiches-veille.md, "États nommés"); those of both APIs are in core/api_errors.py. 502, 503
-and 504 say the failure upstream, as a gateway (RFC 9110, § 15.6)."""
+"""The errors of the AI API that the model or the data API gives; 502, 503 and 504 say the
+failure upstream, as a gateway (RFC 9110, § 15.6)."""
 
 from itertools import groupby
 from typing import Any
@@ -28,7 +27,7 @@ STATUS_BY_STATE: dict[LlmFailure | DataApiState, int] = {
 def to_api_error(
     state: LlmFailure | DataApiState, retry_after_seconds: int | None = None
 ) -> ApiError:
-    """The error of the state; a Retry-After only when the provider gave one: none is made up."""
+    """The error of the state; a Retry-After only when the provider gave one."""
     headers = (
         None
         if retry_after_seconds is None

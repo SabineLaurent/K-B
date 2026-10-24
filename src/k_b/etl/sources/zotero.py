@@ -1,12 +1,8 @@
-"""The Zotero source: extract the documents of the user's library and their highlights (E),
-then read an extract into Zotero entries (T).
+"""The Zotero source: extract the documents of the user's library and their highlights (E), then
+read an extract into Zotero entries (T).
 
-Zotero keeps its library in an SQLite database, zotero.sqlite, that it locks while it runs. The
-source never opens it: it copies the file and its write-ahead log to a temporary folder, checks
-the copy, queries it read-only, and deletes it. What the query returns is the raw extract, written
-only when it differs from the last one (ADR of 2026-10-19: of a state catalog, only the last raw
-file imported is kept).
-"""
+zotero.sqlite is never opened: it is copied with its write-ahead log to a temporary folder,
+checked, queried read-only, and deleted."""
 
 import contextlib
 import json
@@ -175,14 +171,13 @@ class ZoteroCopyInconsistentError(Exception):
 
 
 class ZoteroChangedDuringCopyError(Exception):
-    """The main file or its write-ahead log changed while they were copied: the two copies
-    may not go together."""
+    """The main file or its write-ahead log changed while they were copied: the two copies may
+    not go together."""
 
 
 class ZoteroQueryFailedError(Exception):
-    """SQLite refused the extraction query. The message names the missing table or column,
-    or the syntax SQLite does not know (ORDER BY in an aggregate needs SQLite 3.44); for any
-    other failure, it gives the type of the error and SQLite's name for it."""
+    """SQLite refused the extraction query: the message names the missing table or column, or the
+    syntax SQLite does not know (ORDER BY in an aggregate needs SQLite 3.44)."""
 
 
 class FileState(NamedTuple):
@@ -204,15 +199,8 @@ class ZoteroSource:
         """Return the documents of the library and their highlights as JSON, or None when the
         extract is the same, byte for byte, as the last one in raw/.
 
-        The library is extracted at each collection, whatever last_collected_at: Zotero
-        running writes to its log without changing the library, and another Zotero folder may
-        hold files older than the last collection. Only the content is compared.
-
-        Raises:
-            ValueError: the library has no document (empty_catalog), or every document is
-                invalid (all_items_invalid, conventions.md, rule 1); written, the extract would
-                supersede the last valid one.
-        """
+        The library is extracted at each collection, whatever last_collected_at: only the content
+        is compared, as file dates do not tell a change."""
         remove_left_copies()
         # Deleted on a success, an error or Ctrl-C; a killed process leaves it, and the next
         # extraction removes it. In the system's temporary folder, not in the data directory:
@@ -238,12 +226,11 @@ class ZoteroSource:
 
 
 def remove_left_copies() -> None:
-    """Remove the copies of the library that a killed process left in the temporary folder.
+    """Remove the copies of the library a killed process left in the temporary folder, this
+    user's only.
 
-    Only the folders of this user: in a temporary folder shared by several users, another
-    user's folder is neither removed nor a reason to fail. Two runs of kb collect at the same
-    time can remove each other's copy: K-B has no lock against it.
-    """
+    Two runs of kb collect at the same time can remove each other's copy: K-B has no lock against
+    it."""
     removed_count = 0
     for path in Path(tempfile.gettempdir()).glob(TEMPORARY_DIR_PREFIX + "*"):
         # Another run may remove it first: a copy already gone is passed over.
@@ -259,8 +246,8 @@ def remove_left_copies() -> None:
 
 
 def read_file_states(zotero_dir: Path) -> tuple[FileState, FileState | None]:
-    """The state of the main file, which must exist, and of its write-ahead log, None when
-    there is none (Zotero closed cleanly may leave none)."""
+    """The state of the main file, which must exist, and of its write-ahead log, None when there
+    is none."""
     database_state = read_file_state(zotero_dir / DATABASE_FILE_NAME)
     try:
         log_state = read_file_state(zotero_dir / WRITE_AHEAD_LOG_FILE_NAME)
@@ -275,12 +262,10 @@ def read_file_state(path: Path) -> FileState:
 
 
 def copy_library(zotero_dir: Path, copy_dir: Path) -> Path:
-    """Copy the main file, then its write-ahead log if there is one; return the copy of the
-    main file. The originals are read as files, never opened by SQLite.
+    """Copy the main file, then its write-ahead log; return the copy of the main file.
 
-    The two files are not copied at the same instant, and a pair that does not go together
-    passes integrity_check: their states are compared before and after the copy.
-    """
+    A pair that does not go together passes integrity_check: their states are compared before and
+    after the copy."""
     states_before = read_file_states(zotero_dir)
     copy_path = copy_dir / DATABASE_FILE_NAME
     shutil.copyfile(zotero_dir / DATABASE_FILE_NAME, copy_path)
@@ -335,8 +320,8 @@ def check_integrity(connection: sqlite3.Connection) -> None:
 
 
 def describe_query_error(error: sqlite3.DatabaseError) -> str:
-    """SQLite's message when it only quotes the query; else the type of the error, with the
-    name SQLite gives it (SQLITE_CORRUPT, SQLITE_IOERR...), which quotes nothing."""
+    """SQLite's message when it only quotes the query; else the type of the error and SQLite's
+    name for it (SQLITE_CORRUPT...), which quote nothing."""
     message = str(error)
     if MESSAGE_ABOUT_THE_QUERY.fullmatch(message):
         return message
@@ -348,8 +333,7 @@ def describe_query_error(error: sqlite3.DatabaseError) -> str:
 
 
 def mark_as_utc(zotero_date: object) -> object:
-    """Give a date of Zotero its time zone, UTC; pydantic then reads it, and refuses a day that
-    does not exist."""
+    """Give a date of Zotero its time zone, UTC, for pydantic to read."""
     if not isinstance(zotero_date, str) or not ZOTERO_DATE.fullmatch(zotero_date):
         raise ValueError("not a date of Zotero (YYYY-MM-DD HH:MM:SS)")
     return f"{zotero_date}Z"
@@ -371,7 +355,7 @@ ZoteroDate = Annotated[AwareDatetime, BeforeValidator(mark_as_utc)]
 
 
 class ZoteroHighlight(BaseModel):
-    """A highlight of the extract. Not read: its PDF and its page (ADR of 2026-10-13)."""
+    """A highlight of the extract, without its PDF and its page."""
 
     model_config = ConfigDict(frozen=True, extra="ignore", hide_input_in_errors=True)
 
@@ -382,9 +366,8 @@ class ZoteroHighlight(BaseModel):
 
 
 class ZoteroDocument(BaseModel):
-    """A document of the extract. Not read, to keep out of the base (ADR of 2026-10-13): its
-    date, its authors, its tags, its PDF; validating them would refuse a document for a field
-    the base does not keep."""
+    """A document of the extract, without its date, authors, tags and PDF: validating them would
+    refuse a document for a field the base does not keep."""
 
     model_config = ConfigDict(frozen=True, extra="ignore", hide_input_in_errors=True)
 
@@ -400,8 +383,8 @@ class ZoteroDocument(BaseModel):
 
 
 def read_documents(raw_extract: bytes) -> EntryReading[object]:
-    """The entries of an extract; an extract that is not a JSON list cannot be read. Each entry
-    is validated when converted: one invalid entry is rejected alone, the reader rejects none."""
+    """The entries of an extract, refused if not a JSON list; each entry is validated when
+    converted."""
     try:
         documents = json.loads(raw_extract)
     except ValueError:
@@ -412,8 +395,8 @@ def read_documents(raw_extract: bytes) -> EntryReading[object]:
 
 
 def check_document(entry: object, number: int) -> ZoteroDocument:
-    """A document of the extract, validated at the collection; refused, the error gives its
-    position, the field and the type of error, never its value."""
+    """A document of the extract, validated at the collection; refused, the error never quotes
+    its value."""
     try:
         return ZoteroDocument.model_validate(entry)
     except ValidationError as error:
@@ -421,11 +404,8 @@ def check_document(entry: object, number: int) -> ZoteroDocument:
 
 
 def convert_document(entry: object, collected_at: datetime, raw_file_path: str) -> Item:
-    """A document of the extract as a Zotero entry, with its highlights.
-
-    Refused, the error names each field, its error and its measure, never its value: a title or
-    a highlight is a personal data of the user, and goes into the import log.
-    """
+    """A document of the extract as a Zotero entry, with its highlights; refused, the error never
+    quotes a value, as a title or a highlight is a personal data."""
     try:
         document = ZoteroDocument.model_validate(entry)
         return Item(

@@ -1,5 +1,4 @@
-"""The writers of database/writers called without the import: what each one refuses by
-itself, whatever its caller checked."""
+"""The writers called without the import: what each one refuses by itself."""
 
 from datetime import timedelta
 

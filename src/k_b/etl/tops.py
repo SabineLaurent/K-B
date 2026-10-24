@@ -1,6 +1,4 @@
-"""The two types of a top ranking, shared by its source, which reads its entries, and by
-post/top_sheets.py, which writes its sheet.
-"""
+"""The two types of a top ranking, shared by its source and by post/top_sheets.py."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -23,7 +21,7 @@ class TopEntry:
 @dataclass(frozen=True)
 class Top:
     """A top ranking: the folder of its sheets under veille/tops/, the raw folder of its
-    rankings and their reader, and the words of its sheet."""
+    rankings, their reader, and the words of its sheet."""
 
     name: str
     folder_key: str

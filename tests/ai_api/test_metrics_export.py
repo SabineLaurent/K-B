@@ -1,6 +1,5 @@
-"""The export of the metrics of the AI API in OpenTelemetry (#162): its settings, read from the
-environment and refused without quoting the headers, the meter provider and its resource, closed
-to anything else, and the last export on stop. No network: the exporter is a fake one."""
+"""The export of the metrics in OpenTelemetry: its settings, refused without quoting the headers,
+the meter provider, its closed resource, and the last export on stop; no network."""
 
 import io
 import logging
@@ -71,7 +70,6 @@ class FakeExporter(MetricExporter):
 
 @pytest.fixture
 def fake_exporters(monkeypatch):
-    """The exporters built by metrics_export, fake ones."""
     exporters = []
 
     def build(**options):
@@ -315,8 +313,8 @@ def test_stop_sends_the_measures_not_sent_yet(fake_exporters):
 
 
 class RefusingAdapter(requests.adapters.BaseAdapter):
-    """An HTTP adapter that answers every request 400, with a reason phrase that holds a CR and an
-    escape character, as an endpoint could send: nothing leaves the test."""
+    """An HTTP adapter that answers every request 400 with a reason phrase holding a CR and an
+    escape character; nothing leaves the test."""
 
     def send(self, request, **kwargs):
         response = requests.Response()

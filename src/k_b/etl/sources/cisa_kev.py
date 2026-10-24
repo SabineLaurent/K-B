@@ -1,10 +1,5 @@
-"""The CISA KEV source: its download (E), then its reader (T).
-
-Download the CISA catalog of known exploited vulnerabilities (KEV), as published.
-
-Read the vulnerabilities of a raw CISA KEV catalog, the whole catalog, and convert each one into
-an item: the duplicates between two collections are removed by the base, at the import.
-"""
+"""The CISA KEV source: download the catalog of known exploited vulnerabilities (E), then read
+each vulnerability of a raw catalog into an item (T)."""
 
 import csv
 import io
@@ -69,20 +64,8 @@ class CisaKevSource:
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
         """Return the whole catalog, or None if it has not changed since last_collected_at.
 
-        The catalog is read before it is returned: a page that is not a catalog (maintenance,
-        captcha) raises instead of being stored as one. A catalog with an invalid row is
-        returned: the row is rejected at the import.
-
-        Raises:
-            HTTPError: any status but 304 (Not Modified).
-            URLError, TimeoutError: the network (urlopen).
-            RedirectedOutsideError: a redirection outside TRUSTED_URL_PREFIX.
-            ValueError: a catalog larger than MAX_CATALOG_BYTES, without the REQUIRED_COLUMNS,
-                without any row (empty_catalog), or whose rows are all invalid
-                (all_items_invalid).
-            UnicodeDecodeError: a catalog that is not UTF-8.
-            csv.Error: a catalog that the csv module cannot split into rows (a NUL byte).
-        """
+        The catalog is read first, so that a page that is not a catalog (maintenance, captcha)
+        raises instead of being stored; a row invalid is rejected at the import."""
         headers = {}
         if last_collected_at is not None:
             headers["If-Modified-Since"] = format_datetime(
@@ -120,11 +103,8 @@ def read_new_vulnerabilities(
     """One vulnerability per valid row added since the day before the last collection (None:
     all); every invalid row is rejected with its line.
 
-    dateAdded is a day without a time zone, not an instant: it is not converted, it is compared
-    with a day of margin, so no row is lost whatever its zone. Duplicates are removed by the
-    base, at the import. Its rejection reasons are those of every row: the date of a rejected
-    row is not read.
-    """
+    dateAdded is a day without a time zone: compared with a day of margin, not converted, so that
+    no row is lost whatever its zone."""
     # utf-8-sig: a byte order mark would otherwise stick to the first column name.
     rows = csv.DictReader(io.StringIO(raw_catalog.decode("utf-8-sig"), newline=""))
     columns = rows.fieldnames or []
@@ -209,7 +189,7 @@ def convert_vulnerability(
 
 
 def read_catalog(raw_catalog: bytes) -> EntryReading[Vulnerability]:
-    """The whole catalog: duplicates between collections are removed by the base, at the import."""
+    """The whole catalog; the base removes the duplicates between collections."""
     return read_new_vulnerabilities(raw_catalog, last_collected_at=None)
 
 

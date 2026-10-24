@@ -40,9 +40,8 @@ LIMIT 1
 def write(
     connection: sqlite3.Connection, rows: Sequence[TrendRow], raw_data_id: int
 ) -> tuple[int, dict[date, str]]:
-    """Write the rows of the ranking of the raw data raw_data_id; return how many were
-    written, and each window the base left out with the collection of the ranking kept, in the
-    format of the base."""
+    """Write the rows of a ranking; return how many were written, and each window left out with
+    the collection of the ranking kept."""
     written_count = 0
     # A dict keeps the windows left out once each, in the order of the rows.
     windows_left_out: dict[date, None] = {}
@@ -58,8 +57,8 @@ def write(
 
 
 def write_row(connection: sqlite3.Connection, row: TrendRow, raw_data_id: int) -> bool:
-    """Write the row of the raw data raw_data_id, unless another raw file brought its window:
-    the first ranking seen is kept. Return whether the base wrote it."""
+    """Write the row unless another raw file brought its window; return whether the base wrote
+    it."""
     written = connection.execute(
         INSERT_TREND_OF_NEW_WINDOW,
         {

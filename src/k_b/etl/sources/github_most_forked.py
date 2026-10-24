@@ -1,15 +1,7 @@
-"""The most forked GitHub repositories source: its download (E), and the reading of its ranking.
+"""The most forked GitHub repositories source: download the ranking (E), and read it; a ranking
+gives no item, it does not enter the base.
 
-Download the ranking of the most forked GitHub repositories, as published.
-
-Read a raw ranking of the most forked GitHub repositories: the download checks its response with
-it. The ranking gives no item: it does not enter the base (decision "Tops", 2026-10-07). It is
-collected by the REST search, like the most starred, and not by GraphQL (decision of 2026-10-19,
-until #269).
-
-The checks of the response are those of the most starred, copied and not shared: #269 rewrites
-both rankings. Its size and URL prefix are imported from them, until #269.
-"""
+Its checks are copied from the most starred, not shared, until #269 rewrites both."""
 
 import json
 from dataclasses import dataclass
@@ -59,11 +51,8 @@ class ForkedRepository:
 
 
 def read_most_forked(raw_response: bytes, expected_size: int) -> list[ForkedRepository]:
-    """One repository per item of a `GET /search/repositories` response, by rank.
-
-    A ranking with fewer repositories than asked for, or marked incomplete, is refused: it would
-    show a top that is not the top.
-    """
+    """One repository per item of a `GET /search/repositories` response, by rank; a ranking
+    shorter than asked for, or marked incomplete, is refused."""
     response = json.loads(raw_response)
     items = response.get("items") if isinstance(response, dict) else None
     if not isinstance(items, list):
@@ -113,7 +102,7 @@ def read_ranking(raw_response: bytes) -> list[ForkedRepository]:
 def read_top_entries(
     raw_response: bytes, expected_size: int = RANKING_SIZE
 ) -> list[TopEntry]:
-    """The ranking as its sheet shows it (TopEntry, etl/tops.py), its URL built from the name."""
+    """The ranking as its sheet shows it, its URL built from the name."""
     return [
         TopEntry(
             rank=repository.rank,

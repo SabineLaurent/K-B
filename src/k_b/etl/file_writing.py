@@ -1,31 +1,8 @@
-"""Write into the base what one raw file read holds: a file of items item by item, a file of
-trends whole (stage 3). No function here writes a file; writing a file to disk is the business of
-etl/raw_store.py (conventions.md, rule 2).
+"""Write into the base what one raw file read holds: a file of items item by item, each in its
+own savepoint, a file of trends whole.
 
-Each item, and each file of trends, is written in its own savepoint (database/savepoint.py): an
-entry the base refuses is undone alone and becomes a rejection of the log of the import, and the
-import goes on.
-
-The base removes the duplicates. The writer of each kind (database/writers/, chosen by
-database/writing.py) holds, in its SQL, the rule of the nature of its source: a news feed keeps
-the first version seen; a state catalog keeps the version of its latest collection; a feed with
-revisions keeps the newest revision. An item left out is returned with its rule and the date
-it was compared with, then written to the log. Run again on the same raw, the import gives the
-same base.
-
-A file of trends of GH Archive is not made of items: its rows go to the trend table, in the same
-transaction, and its rule is a news feed applied to the whole window. A Zotero entry is a state
-catalog, as CISA KEV, and so is each of its highlights (decision of 2026-10-13). A clip is
-known by its URL, and keeps its latest version: a clip whose content changed is written again
-(decision of 2026-10-19).
-
-Only exact duplicates are found: the same identifier within its source (a replay, collections
-that overlap). The same content under another identifier is not found, a written limit without
-a content fingerprint: for TLDR, another URL or another edition (decision of 2026-10-12); for
-Zotero, another key, though two entries of the same arXiv paper point to the same publication
-(decision of 2026-10-13); for a clip, another URL (ADR, "Collecte : clips";
-docs/specs-collecte.md).
-"""
+The base removes the duplicates, by the rule of each source's writer (database/writers/); only
+exact duplicates are found, the same identifier within its source (docs/specs-collecte.md)."""
 
 import sqlite3
 from dataclasses import dataclass, field
@@ -48,11 +25,8 @@ from k_b.items import Item
 class FileWriting:
     """What the writing of files gave: one file, or the sum of several.
 
-    Every field has its empty value by default, so that a site names only what it produced.
-    default_factory, not [], and so a dataclass and not a NamedTuple: the default of a
-    NamedTuple is built once, at the creation of the class, and every instance that omits the
-    field shares that one list.
-    """
+    A dataclass with default_factory, not a NamedTuple: a NamedTuple's default list is built once
+    and shared by every instance."""
 
     item_count: int = 0
     discards: list[Discard] = field(default_factory=list)
@@ -65,22 +39,14 @@ class FileWriting:
 def write_file(
     connection: sqlite3.Connection, file_read: RawFile | TrendFile
 ) -> FileWriting:
-    """Write one file read, as what it holds says: a file of trends whole, a file of items item
-    by item."""
     if isinstance(file_read, TrendFile):
         return write_trend_file(connection, file_read)
     return write_items_file(connection, file_read)
 
 
 def write_items_file(connection: sqlite3.Connection, raw_file: RawFile) -> FileWriting:
-    """Register the file read, write each of its items, then mark as withdrawn what its
-    catalog no longer lists.
-
-    Its items are those the reading kept, normalized: the releases of a repository out of the
-    tracked list are rejected, and each item kept is normalized, before (etl/transform.py). The
-    file is registered even with an item the base refuses, as with an entry rejected when read:
-    only a rebuild of the base reads it again.
-    """
+    """Register the file read, write each of its items, then mark as withdrawn what its catalog
+    no longer lists; the file is registered even with an item the base refuses."""
     raw_data_id = register_raw_file(connection, raw_file)
     outcomes = [
         write_item_in_savepoint(connection, item, raw_data_id)
@@ -107,12 +73,10 @@ def write_trend_file(
     connection: sqlite3.Connection, trend_file: TrendFile
 ) -> FileWriting:
     """Register the file of trends and write its rows in one savepoint; return how many were
-    written, and each window the base left out.
+    written, and each window left out.
 
-    A file of trends with a row the base refuses is refused whole (decision of Sabine of
-    2026-10-13): none of its rows is written, it is not registered, and the next import reads it
-    again, as an unreadable file.
-    """
+    A file with a row the base refuses is refused whole: not registered, it is read again by the
+    next import."""
     raw_file_path = trend_file.raw_file.raw_file_path
     try:
         with write_in_savepoint(connection):
@@ -144,12 +108,8 @@ def register_raw_file(connection: sqlite3.Connection, raw_file: RawFile) -> int:
 def write_item_in_savepoint(
     connection: sqlite3.Connection, item: Item, raw_data_id: int
 ) -> Discard | Rejection | None:
-    """Write the item in its savepoint; an item the base refuses is undone alone and returned
-    as a rejection, an item it left out as a discard.
-
-    A Zotero entry, its highlights and the publication it cites are written by one writer:
-    they share the savepoint.
-    """
+    """Write the item in its savepoint: an item the base refuses is returned as a rejection, one
+    it left out as a discard."""
     try:
         with write_in_savepoint(connection):
             return write_item(connection, item, raw_data_id)

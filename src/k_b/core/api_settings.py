@@ -1,5 +1,4 @@
-"""Where an API of K-B listens, kb serve and kb serve-ai: the host and the port, checked by one
-rule, each read by its variable (.claude/rules/poc.md, rule 2)."""
+"""Where kb serve and kb serve-ai listen: the host and the port, each read by its variable."""
 
 import ipaddress
 import re
@@ -12,9 +11,8 @@ PORT_NUMBERS = range(1, 65536)
 
 
 def find_host_refusal(variable: str, host: str) -> str | None:
-    """Why the host is refused, or None. An IPv4 address only: uvicorn would bind an empty host
-    to every interface, and the Host of a client in IPv6 keeps its brackets ([::1]), which no
-    allowed host can name."""
+    """Why the host is refused, or None. An IPv4 address only: uvicorn binds an empty host to
+    every interface, and a client's IPv6 Host keeps brackets ([::1]) no allowed host can name."""
     try:
         ipaddress.IPv4Address(host)
     except ValueError:

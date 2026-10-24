@@ -1,12 +1,8 @@
 """Read raw/ for the import: list the collections of each source folder with the reader of its
 kind, then read a page as items, or a raw file of trends whole.
 
-The one place of the import that lists raw/ and reads its bytes outside etl/raw_store.py
-(.claude/rules/poc.md, rule 3). The run that calls it reads only what it returns
-(etl/transform.py), and so do the steps that follow. A collection, a page or a file of trends
-that cannot be read is rejected alone (conventions.md, rule 1); a page already imported is never
-opened.
-"""
+The one place of the import that reads raw/ outside etl/raw_store.py (.claude/rules/poc.md, rule
+3)."""
 
 import csv
 import logging
@@ -39,16 +35,16 @@ logger = logging.getLogger(__name__)
 
 
 class Collections(NamedTuple):
-    """The collections of raw/ with the reader each one is read by: as items (a raw file, or a
-    folder of pages), or as trends."""
+    """The collections of raw/ with their reader: as items (a raw file, or a folder of pages), or
+    as trends."""
 
     of_items: list[tuple[Path, SourceReader[Any]]]
     of_trends: list[tuple[Path, TrendReader]]
 
 
 def list_collections(raw_dir: Path, kinds: Sequence[SourceKind]) -> Collections:
-    """Each collection with the reader it is read by, that of its kind, found by the name of its
-    source folder, whether its source is still tracked or not."""
+    """Each collection with the reader of its kind, found by the name of its source folder,
+    tracked or not."""
     of_items: list[tuple[Path, SourceReader[Any]]] = []
     of_trends: list[tuple[Path, TrendReader]] = []
     source_dirs = [
@@ -92,12 +88,7 @@ def read_collection(
     imported_paths: frozenset[str],
 ) -> RawReading:
     """One collection, read page by page: the raw files read, their rejections, and how many
-    pages were opened.
-
-    A collection is a raw file, read as a single page, or a folder of pages. One not named by
-    its collection time, or whose folder cannot be listed, is rejected whole without being
-    opened, and counts no page; a page of imported_paths is not opened either.
-    """
+    pages were opened; a page of imported_paths is not opened."""
     try:
         if collection_path.is_dir():
             # A folder name is taken whole: a file name without its extension.
@@ -125,14 +116,11 @@ def read_collection(
 def read_page(
     page_path: Path, raw_dir: Path, reader: SourceReader[Any], collected_at: datetime
 ) -> RawReading:
-    """One page, read whole: the raw file with the items its entries gave, the entries
-    rejected, and the one page it opened.
+    """One page, read whole: the raw file with its items, the entries rejected, and the one page
+    opened.
 
-    A page its reader cannot read is rejected alone and counted as opened; it is not a file
-    read, so it is not registered and the next import reads it again. An entry its reader
-    rejects, or that the item refuses (ValidationError), is rejected with its position and
-    without its values, and the other entries are still read.
-    """
+    A page its reader cannot read is rejected and not registered, so the next import reads it
+    again; an entry is rejected without its values."""
     raw_file_path = page_path.relative_to(raw_dir).as_posix()
     try:
         entry_reading = reader.read_entries(page_path.read_bytes())
@@ -165,14 +153,8 @@ def read_page(
 
 
 def read_trend_file(path: Path, raw_dir: Path, reader: TrendReader) -> TrendReading:
-    """One raw file of trends, read whole: its rows, or one rejection.
-
-    As for the items: a file not named by its collection time is rejected without being opened;
-    a file that cannot be read, or that its reader refuses, is rejected and counted as opened. A
-    rejected file is not registered: the next import reads it again. Unlike a collection of
-    items, a folder is not a collection of pages: the source writes one file per collection, and
-    a folder is rejected without being opened, its path left out of the reason.
-    """
+    """One raw file of trends, read whole: its rows, or one rejection; a rejected file is not
+    registered, so the next import reads it again."""
     raw_file_path = path.relative_to(raw_dir).as_posix()
     if path.is_dir():
         return TrendReading([], [reject(raw_file_path, "a folder, not a raw file")], 0)
@@ -192,7 +174,6 @@ def read_trend_file(path: Path, raw_dir: Path, reader: TrendReader) -> TrendRead
 
 
 def list_pages(collection_dir: Path, raw_dir: Path) -> list[Path]:
-    """The files of a collection folder."""
     pages = []
     for path in list_visible_entries(collection_dir):
         if path.is_dir():
@@ -206,6 +187,6 @@ def list_pages(collection_dir: Path, raw_dir: Path) -> list[Path]:
 
 
 def list_visible_entries(folder: Path) -> list[Path]:
-    """The entries of a folder in name order, hidden ones left out: they are not raw data
-    (.DS_Store written by macOS, for instance)."""
+    """The entries of a folder in name order, hidden ones (.DS_Store, a rest of an interrupted
+    write) left out."""
     return sorted(path for path in folder.iterdir() if not path.name.startswith("."))

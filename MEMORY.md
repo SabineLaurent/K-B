@@ -37,7 +37,7 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 - **arXiv bloqué au-delà de 2 000 papiers** (constat du 2026-10-05, porté par #71, hors E1 et
   non planifié). Si la fenêtre de collecte contient plus de
-  2 000 papiers, la source échoue et sa date reste (`src/k_b/etl/sources/arxiv.py:91-95`). La fenêtre
+  2 000 papiers, la source échoue et sa date reste (`src/k_b/etl/sources/arxiv.py:85-89`). La fenêtre
   suivante part du même point et finit plus tard : elle dépasse encore le plafond, la source
   échoue à chaque collecte. Cela contredit la consigne du 05/10 : lancée tous les jours, K-B
   rattrape les jours manqués (#65).
@@ -142,6 +142,12 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   code HTTP, titre trouvé et titre attendu), jamais une supposition ni une interprétation
   (« probablement », « structure changée ? »). Le pourquoi d'un choix va dans les commentaires
   et la doc, pas dans les journaux.
+- **Docstrings** (#300, 2026-10-24) : une PR qui ne touche que des docstrings se prouve par
+  `ast.dump` sans docstrings et par les jetons `COMMENT` de `tokenize`, comparés sur tous les `.py`
+  entre `origin/main` et `HEAD` (0 différence attendue). La preuve ne voit pas le texte : raccourcir a
+  retiré 17 pourquoi que le code suppose, retrouvés seulement par la revue. Les docstrings des routes
+  et des schémas des API sont l'OpenAPI versionnée (`docs/api/*.json`). Les renvois `fichier:ligne` de
+  `.claude/rules/poc.md` visent le commit de départ `9e6e2e8`, pas `main` : ne pas les « corriger ».
 
 ## Revue, PR et GitHub
 

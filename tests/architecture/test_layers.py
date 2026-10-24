@@ -1,13 +1,5 @@
-"""The dependencies go one way, read at two levels (conventions.md, rule 5).
-
-Under k_b: core and items are the common vocabulary, database reads and writes the base (its
-writers under database/writers, behind database/writing), etl runs the pipeline, post writes
-the digests and the sheets above it, data_api serves the base, ai_api calls the model, cli and
-commands compose. Under k_b.etl: the composition (source_kinds, collected_sources) → the
-sources → the modules of the pipeline. Among those, the three stages never import each other:
-the collection and the import talk through raw/, the transform hands its reading to the load in
-memory, and only etl/pipeline.py chains them.
-"""
+"""The dependencies go one way, read at two levels (conventions.md, rule 5); the three stages of
+the ETL never import each other."""
 
 import pytest
 from module_imports import (
@@ -45,8 +37,8 @@ def test_database_imports_only_items_and_core():
 # database/writing.py is the only door to the writers: outside database, no module imports
 # database/writers (#251).
 def list_imports_of_the_writers(imported: set[str]) -> set[str]:
-    """The names, outside database, that give access to the writers: `from k_b import
-    database` reaches them, `from k_b.database import writing` does not."""
+    """The names, outside database, that reach the writers: `from k_b import database` does,
+    `from k_b.database import writing` does not."""
     return {name for name in imported if reaches(name, {"database.writers"})}
 
 
@@ -130,9 +122,8 @@ ETL_STAGE_MODULES = {"etl.extract", "etl.transform", "etl.load"}
 
 
 def list_imports_of_another_stage(imported: set[str], stage: str) -> set[str]:
-    """The names, in the module of a stage, that give access to another stage: `from k_b.etl
-    import load` reaches the load, `from k_b.etl.raw_files import RawReading` reaches no
-    stage, and the stage's own name is its own business."""
+    """The names, in the module of a stage, that reach another stage: `from k_b.etl import load`
+    does, `from k_b.etl.raw_files import RawReading` does not."""
     return {name for name in imported if reaches(name, ETL_STAGE_MODULES - {stage})}
 
 

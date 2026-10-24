@@ -54,8 +54,8 @@ def read_latest(
 
 
 def find_withdrawn_at_of_new_row(latest: LatestCatalog) -> str | None:
-    """A row only a file older than the latest catalog brings is absent from the latest one:
-    it is written withdrawn at it. Without a latest catalog, nothing to compare."""
+    """A row brought only by a file older than the latest catalog is written withdrawn at the
+    latest one."""
     if latest.is_file_after or latest.collected_at is None:
         return None
     return latest.collected_at
@@ -64,7 +64,7 @@ def find_withdrawn_at_of_new_row(latest: LatestCatalog) -> str | None:
 def build_discard(
     connection: sqlite3.Connection, item: Item, item_id: int, latest: LatestCatalog
 ) -> Discard:
-    """The base wrote nothing; the rule names which of its two conditions failed."""
+    """The discard of an item the base did not write, naming which of the two conditions failed."""
     if latest.is_file_after:
         return Discard(
             "unchanged", item, shared_rows.read_item_collected_at(connection, item_id)

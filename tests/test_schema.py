@@ -501,8 +501,8 @@ def read_maximums_of_the_schema(check_pattern):
 
 
 def list_maximums_of_the_items(maximum_by_kind):
-    """The maximum of each column, as the items hold it; two kinds that fill the same column
-    must hold the same."""
+    """The maximum of each column, as the items hold it; two kinds that fill one column must hold
+    the same."""
     maximums = {}
     for kind, maximum_by_field in maximum_by_kind.items():
         for field, maximum in maximum_by_field.items():
@@ -1235,7 +1235,7 @@ def test_a_link_to_an_unknown_item_or_tag_is_refused(filled_database, item_id, t
 
 
 def test_the_links_of_an_item_removed_go_with_it_and_its_tags_stay(filled_database):
-    """ON DELETE CASCADE, as highlight: the purge of an item removes its links (#83)."""
+    """ON DELETE CASCADE, as highlight: the purge of an item removes its links."""
     insert_row(filled_database, "tag", id=1)
     insert_tag_link(filled_database, item_id=PAPER_ITEM_ID)
 

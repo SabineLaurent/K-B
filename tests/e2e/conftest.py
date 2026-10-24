@@ -1,7 +1,5 @@
-"""The guard of every end-to-end test (tests/e2e/): stop before any kb, or any export, if the
-environment holds a variable of kb that the end-to-end tests do not need. Here, not in a test
-module, so that it covers the test of the real sources and the test of the export of the metrics
-(#162)."""
+"""The guard of every end-to-end test: stop before any kb, or any export, if the environment
+holds a variable of kb the end-to-end tests do not need."""
 
 import os
 import re
@@ -28,14 +26,13 @@ VARIABLES_SET_BY_THE_TEST = frozenset({DATA_DIR_VARIABLE, COLLECT_ONLY_VARIABLE}
 
 
 def read_variable_names(path, variable_line):
-    """The names of the lines of path that variable_line matches; a missing file fails the
-    test."""
+    """The names of the lines of path that variable_line matches; a missing file fails the test."""
     return set(variable_line.findall(path.read_text()))
 
 
 def find_names_beyond_the_end_to_end_tests(env_example_path, e2e_env_example_path):
-    """The variables of kb, set or commented out, but the ones set in the example of the
-    end-to-end tests and the ones the test sets."""
+    """The variables of kb, set or commented out, but those of the example of the end-to-end
+    tests and those the test sets."""
     return (
         read_variable_names(env_example_path, VARIABLE_LINE)
         - read_variable_names(e2e_env_example_path, SET_VARIABLE_LINE)
@@ -45,10 +42,9 @@ def find_names_beyond_the_end_to_end_tests(env_example_path, e2e_env_example_pat
 
 @pytest.fixture(autouse=True)
 def no_variable_beyond_the_end_to_end_tests():
-    """Stop every test before any kb if the environment holds a variable of kb that the
-    end-to-end tests do not need: a .env exported in the terminal would give each kb its keys.
-    The key of any client of the data API too, named in .env.example or not: kb serve reads
-    them by their prefix. Names only: no value is read."""
+    """Stop every test before any kb if the environment holds a variable of kb the tests do not
+    need, the key of any client of the data API included: an exported .env would give each kb its
+    keys. Names only, no value read."""
     names_beyond = find_names_beyond_the_end_to_end_tests(
         ENV_EXAMPLE_PATH, E2E_ENV_EXAMPLE_PATH
     )

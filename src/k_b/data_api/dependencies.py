@@ -1,5 +1,4 @@
-"""The dependencies of the data routes: the connection of the request. The key of the client is
-checked by core/api_access.py, on the whole app."""
+"""The dependencies of the data routes: the connection of the request."""
 
 import sqlite3
 from collections.abc import Iterator

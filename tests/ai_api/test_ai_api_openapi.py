@@ -1,5 +1,5 @@
-"""The versioned OpenAPI of the AI API (docs/api/openapi-ia.json): the one the app produces, valid,
-apart from the one of the data API, and the same whatever the settings."""
+"""The versioned OpenAPI of the AI API (docs/api/openapi-ia.json): the one the app produces,
+valid, and the same whatever the settings."""
 
 import json
 import secrets

@@ -1,9 +1,5 @@
 """The GitHub repositories K-B watches, the packages each one publishes, and what a repository
-name is.
-
-The list and the reasons for each repository are in docs/sources.md. A repository gives its
-releases; its packages give its security advisories.
-"""
+name is; the reasons are in docs/sources.md."""
 
 import re
 

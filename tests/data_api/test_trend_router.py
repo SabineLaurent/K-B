@@ -1,5 +1,5 @@
-"""GET /trends on the test base (tests/fixtures/items_database.sql): the window of 2026-10-10,
-the latest, and the older window of 2026-10-09."""
+"""GET /trends on the test base: the window of 2026-10-10, the latest, and the older one of
+2026-10-09."""
 
 import pytest
 

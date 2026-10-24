@@ -1,16 +1,8 @@
-"""Import the raw files not imported yet into the items database (docs/specs-collecte.md,
-step 4).
+"""Import the raw files not imported yet into the items database, in one transaction with the log
+of the import.
 
-The registry of the files already imported is raw_data, read before the raw. The files read,
-their items and the log of the import are then written in one transaction. An entry the base
-refuses is undone alone and becomes a rejection of the log, and the import goes on; any other
-error writes nothing in the base, and leaves no log. An interruption (Ctrl-C, SIGTERM) received
-once the base has committed keeps the import and its log. A file registered is not read again,
-except by a rebuild of the base.
-
-How each entry is written, what the base gets from a file read, and the rule of the nature of
-each source are in etl/file_writing.py.
-"""
+An entry the base refuses becomes a rejection and the import goes on; any other error writes
+nothing in the base and leaves no log."""
 
 import logging
 import sqlite3
@@ -48,7 +40,6 @@ class ImportSummary(NamedTuple):
 
 
 def read_imported_paths(database_path: Path) -> frozenset[str]:
-    """The raw files already imported, from the registry of the base."""
     check_database_exists(database_path)
     connection = connect_database(database_path)
     try:
@@ -65,12 +56,9 @@ def import_items(
     imported_at: datetime,
     tracked_repositories: Sequence[TrackedRepository],
 ) -> ImportSummary:
-    """Write the tracked repositories, each file read with its items or its trends into the
-    base, then the log of what was left out, all in one transaction.
-
-    The files of items and those of trends are written in one sequence, in collection order: a
-    base rebuilt registers them in the order the imports did.
-    """
+    """Write the tracked repositories, each file read and the log, in one transaction; files of
+    items and of trends in collection order, so that a rebuilt base registers them in the same
+    order."""
     check_database_exists(database_path)
     connection = connect_database(database_path)
     try:
@@ -118,12 +106,9 @@ def commit_with_log(
     imported_at: datetime,
     writing: FileWriting,
 ) -> None:
-    """Write the log, then commit.
-
-    The log is written before the commit: a file registered is not read again, its log must
-    not be lost. A commit that fails, or an interruption before the commit, removes the log
-    written; an interruption once the base has committed keeps it.
-    """
+    """Write the log, then commit: a file registered is not read again, so its log must not be
+    lost. A failed commit, or an interruption before it, removes the log; an interruption
+    (Ctrl-C, SIGTERM) once the base has committed keeps the import and its log."""
     # Checked once the base holds the write lock: two imports of the same second cannot both
     # find no log.
     check_log_absent(log_path)
@@ -151,7 +136,6 @@ def commit_with_log(
 
 
 def check_log_absent(log_path: Path) -> None:
-    """The log of an import is never rewritten: one already at log_path stops the import."""
     if log_path.exists():
         raise ImportLogExistsError(f"{log_path} already exists")
 
@@ -160,11 +144,10 @@ def list_files_in_collection_order(
     reading: RawReading, trend_reading: TrendReading
 ) -> list[RawFile | TrendFile]:
     """The files of items and those of trends, oldest collection first; at the same collection,
-    the files of items first, in their reading order (the sort is stable)."""
+    the files of items first (the sort is stable)."""
 
     def find_collected_at(file_read: RawFile | TrendFile) -> datetime:
-        """The collection time of either kind of file: a file of trends holds it on the raw
-        file it registers, not on itself."""
+        """A file of trends holds its collection time on the raw file it registers."""
         if isinstance(file_read, TrendFile):
             return file_read.raw_file.collected_at
         return file_read.collected_at
@@ -173,8 +156,7 @@ def list_files_in_collection_order(
 
 
 def join_writings(writings: list[FileWriting]) -> FileWriting:
-    """The sum of several writings: the counts added, the discards and the rejections kept in
-    the order given."""
+    """The sum of several writings, the discards and the rejections in the order given."""
     return FileWriting(
         item_count=sum(writing.item_count for writing in writings),
         discards=[discard for writing in writings for discard in writing.discards],

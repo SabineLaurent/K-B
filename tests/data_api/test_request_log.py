@@ -1,5 +1,5 @@
-"""One log line per request (docs/specs-api.md, "Journal"): the client named, never its key, a
-value of a parameter or a raw path; the id of the request, given back in X-Request-ID."""
+"""One log line per request: the client named, never its key, a parameter value or a raw path;
+its id given back in X-Request-ID."""
 
 import logging
 import uuid
@@ -13,7 +13,6 @@ REQUEST_LOGGER = "k_b.core.api_request_log"
 
 @pytest.fixture
 def request_lines(caplog):
-    """The request lines logged while the test runs."""
     caplog.set_level(logging.INFO, logger=REQUEST_LOGGER)
 
     def read():

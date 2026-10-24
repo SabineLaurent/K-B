@@ -1,5 +1,5 @@
-"""The reader of the imports: every form of import is seen, cut at the level asked, and the
-files of a module are listed."""
+"""The reader of the imports: every form of import seen, cut at the level asked, and the files of
+a module listed."""
 
 import pytest
 from module_imports import (

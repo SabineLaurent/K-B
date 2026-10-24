@@ -34,12 +34,8 @@ LATEST_ONLY_FOLDER_KEYS = (
 
 
 def run_import(data_dir: Path) -> int:
-    """Run the import (etl/pipeline.py), print what it wrote, then delete the raw files of the
-    state catalogs that the last one imported superseded.
-
-    The purge comes after the summary is printed: a purge that fails leaves the summary of the
-    import it committed.
-    """
+    """Run the import, print what it wrote, then purge the raw files superseded; after the
+    summary, so that a purge that fails leaves the summary of the import committed."""
     imported_at = datetime.now(UTC).replace(microsecond=0)
     try:
         outcome = import_raw_files(

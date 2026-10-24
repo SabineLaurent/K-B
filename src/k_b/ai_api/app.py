@@ -1,7 +1,6 @@
-"""The AI API: the digests of the watch, the one door of K-B to the model (docs/fiches-veille.md),
-on the machine by default. create_app plugs in the routers (gathered by api_router.py), the key,
-the errors and the measures; it keeps nothing between two requests (.claude/rules/poc.md, rule 7)
-but the measures in OpenTelemetry, summed up in memory until they are sent (#162)."""
+"""The AI API: the digests of the watch, the one door of K-B to the model
+(docs/fiches-veille.md); it keeps nothing between two requests but the measures not sent yet
+(.claude/rules/poc.md, rule 7)."""
 
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
@@ -33,9 +32,8 @@ def create_app(
     default_window_days: int,
     model_metrics: ModelMetrics,
 ) -> FastAPI:
-    """The app, its keys, the model and the data API it calls, the subjects it writes, the
-    window of a request that gives none and its measures: a test makes its own, kb serve-ai gives
-    those of the environment. Without any key, POST /digests answers 401."""
+    """The app, its keys, the model and the data API it calls, its subjects, its default window
+    and its measures given; without any key, POST /digests answers 401."""
     app = FastAPI(
         title="K-B AI API",
         version=API_VERSION,
@@ -71,8 +69,7 @@ def create_app(
 
 @asynccontextmanager
 async def stop_metrics_on_shutdown(app: FastAPI) -> AsyncIterator[None]:
-    """Send the measures not sent yet when the app stops: uvicorn ends the lifespan before it
-    sends SIGTERM again to its process (uvicorn/server.py), when no code after uvicorn.run runs.
-    In the threadpool: the last export waits for the network."""
+    """Send the measures not sent yet when the app stops, in the threadpool as the export waits
+    for the network: no code after uvicorn.run runs on SIGTERM."""
     yield
     await run_in_threadpool(app.state.model_metrics.stop)

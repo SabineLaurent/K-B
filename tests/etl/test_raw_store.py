@@ -32,8 +32,8 @@ def test_write_new_raw_file_refuses_to_overwrite(tmp_path):
 
 
 class FailingTemporaryFile:
-    """A real temporary file whose write, flush or close fails as on a full disk. As in
-    io.BufferedWriter, a failed flush leaves the data in the buffer: the close fails again."""
+    """A real temporary file whose write, flush or close fails as on a full disk; a failed flush
+    leaves the data in the buffer, so the close fails again."""
 
     def __init__(self, temporary_file, failing_step, error):
         self.temporary_file = temporary_file

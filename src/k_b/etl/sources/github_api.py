@@ -15,10 +15,8 @@ MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 
 
 def get_from_github_api(path_and_query: str) -> bytes:
-    """Return the body of GET API_URL + path_and_query, with the token if there is one.
-
-    Without a token, GitHub allows 60 requests per hour instead of 5,000.
-    """
+    """Return the body of GET API_URL + path_and_query, with the token if there is one (60
+    requests per hour without, 5,000 with)."""
     token = os.environ.get(TOKEN_VARIABLE)
     return download(
         API_URL + path_and_query,

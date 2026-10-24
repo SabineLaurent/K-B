@@ -1,5 +1,5 @@
-"""The errors of the data API that the base gives; those of both APIs are in core/api_errors.py
-(docs/specs-api.md, "Erreurs"): a named state, no stack, no SQL, no path, no value received."""
+"""The errors of the data API that the base gives, without SQL, those of both APIs being in
+core/api_errors.py."""
 
 import logging
 import sqlite3

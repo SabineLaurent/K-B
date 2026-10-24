@@ -1,8 +1,4 @@
-"""The settings kb serve reads: the host and the port it listens on, the hosts it answers. The
-client of the data API has its own, ai_api/connectors/data_api_settings.py.
-
-Not set: the local defaults of core/config.py (.claude/rules/poc.md, rule 2).
-"""
+"""The settings kb serve reads: the host and the port it listens on, the hosts it answers."""
 
 import re
 from collections.abc import Mapping
@@ -30,8 +26,8 @@ class ServeSettings:
 
 
 def read_serve_settings_or_refusal(environ: Mapping[str, str]) -> ServeSettings | str:
-    """The host, the port and the hosts allowed of kb serve, or why the variable is refused, with
-    its value quoted. Not set: the default of core/config.py."""
+    """The host, the port and the hosts allowed of kb serve, or why the variable is refused, its
+    value quoted."""
     host = environ.get(DATA_API_HOST_VARIABLE, DATA_API_HOST)
     port = environ.get(DATA_API_PORT_VARIABLE, str(DATA_API_PORT))
     allowed_hosts_value = environ.get(DATA_API_ALLOWED_HOSTS_VARIABLE)
@@ -52,13 +48,12 @@ def read_serve_settings_or_refusal(environ: Mapping[str, str]) -> ServeSettings 
 
 
 def split_allowed_hosts(allowed_hosts: str) -> tuple[str, ...]:
-    """The entries of the list, separated by commas, without the spaces around each."""
     return tuple(entry.strip() for entry in allowed_hosts.split(","))
 
 
 def find_allowed_hosts_refusal(allowed_hosts: tuple[str, ...]) -> str | None:
     """Why the hosts allowed are refused, or None: TrustedHostMiddleware would serve any host for
-    a * (docs/specs-api.md, API8)."""
+    a *."""
     # A value empty or made of spaces gives one empty entry.
     if allowed_hosts == ("",):
         return f"{DATA_API_ALLOWED_HOSTS_VARIABLE}: empty, set the hosts separated by commas"

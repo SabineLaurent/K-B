@@ -1,9 +1,5 @@
-"""Read the items database.
-
-The list of the items is one query for the data API, kb search and "what's new"
-(docs/specs-api.md, "GET /items"): one branch per kind gives its title, summary, date and URL,
-and every filter is a bound parameter.
-"""
+"""Read the items database: the list of the items is one query for the data API, kb search and
+"what's new", one branch per kind, every filter a bound parameter."""
 
 import json
 import sqlite3
@@ -271,7 +267,7 @@ class TrendWindow(NamedTuple):
 
 
 def read_raw_file_paths(connection: sqlite3.Connection) -> frozenset[str]:
-    """The raw files already imported: raw_data is their registry, one row per file (#106)."""
+    """The raw files already imported, one row of raw_data per file."""
     return frozenset(
         str(raw_file_path)
         for (raw_file_path,) in connection.execute(SELECT_RAW_FILE_PATHS)
@@ -290,9 +286,8 @@ def read_items(
 ) -> ItemPage:
     """A page of the items, the newest first; no kind given reads every kind.
 
-    The bounds of the data API (docs/specs-api.md) are its own; this refuses only what SQLite
-    would misread or cannot bind: a negative LIMIT reads every row.
-    """
+    Refuses only what SQLite would misread or cannot bind (a negative LIMIT reads every row); the
+    bounds of the data API are its own."""
     # limit + 1 is bound as a 64-bit integer: one more would raise an OverflowError.
     check_within_bounds("limit", limit, 1, MAX_INT64 - 1)
     check_within_bounds("offset", offset, 0, MAX_INT64)
@@ -317,8 +312,8 @@ def read_items(
 
 
 def check_within_bounds(name: str, value: int, minimum: int, maximum: int) -> None:
-    """Refuse a value out of its bounds, naming the bound crossed, never the value: an integer
-    of thousands of digits cannot even be written (conventions.md, rule 3)."""
+    """Refuse a value out of its bounds, naming the bound crossed, never the value: an integer of
+    thousands of digits cannot even be written."""
     if value < minimum:
         raise ValueError(f"{name} below minimum {minimum}")
     if value > maximum:
@@ -326,12 +321,9 @@ def check_within_bounds(name: str, value: int, minimum: int, maximum: int) -> No
 
 
 def format_since(since: datetime) -> str:
-    """since in UTC, in the format of the base, rounded up to its second: the dates of the base
-    are compared as text, to the second (database/dates.py).
-
-    isoformat, not strftime: strftime leaves the width of the year to the C library, and since
-    is given by the caller, the year 1 included.
-    """
+    """since in UTC, in the format of the base, rounded up to its second, as the dates of the
+    base are compared as text; isoformat, as strftime leaves the width of the year 1 to the C
+    library."""
     # utcoffset, not tzinfo: a tzinfo without offset leaves the date naive, read as local.
     if since.utcoffset() is None:
         raise ValueError("since has no time zone")
@@ -358,10 +350,8 @@ def to_like_pattern(search_text: str) -> str:
 def read_highlights(
     connection: sqlite3.Connection, item_id: int
 ) -> list[StoredHighlight]:
-    """The highlights of a Zotero entry, the withdrawn ones included, by date of creation.
-
-    item_id is bound as a 64-bit integer: beyond, sqlite3 would raise an OverflowError.
-    """
+    """The highlights of a Zotero entry, the withdrawn ones included, by date of creation;
+    item_id must hold in 64 bits, or sqlite3 raises an OverflowError."""
     check_within_bounds("item_id", item_id, MIN_INT64, MAX_INT64)
     return [
         StoredHighlight._make(row)
@@ -372,10 +362,8 @@ def read_highlights(
 def read_item_detail(connection: sqlite3.Connection, item_id: int) -> ItemDetail | None:
     """An item with what its kind serves beyond the list, or None if no item has this id.
 
-    Its queries share one read transaction: a write between them cannot mix two states of a
-    catalog row. The connection must hold no transaction: the data API opens one per request.
-    item_id is bound as a 64-bit integer.
-    """
+    Its queries share one read transaction, so that a write between them cannot mix two states of
+    a catalog row: the connection must hold no transaction."""
     check_within_bounds("item_id", item_id, MIN_INT64, MAX_INT64)
     connection.execute("BEGIN")
     try:
@@ -461,8 +449,8 @@ def read_clip_detail(connection: sqlite3.Connection, item_id: int) -> ClipDetail
 
 
 def fetch_row(connection: sqlite3.Connection, query: str, item_id: int) -> Any:
-    """The row of the subtype of an item the list has read: the branch of its kind in
-    LISTED_ITEMS reads the same table by the same item_id, so it exists."""
+    """The row of the subtype of an item the list has read, which exists since its branch in
+    LISTED_ITEMS reads the same table by the same item_id."""
     return connection.execute(query, (item_id,)).fetchone()
 
 

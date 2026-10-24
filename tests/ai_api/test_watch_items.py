@@ -1,5 +1,5 @@
 """The items of the watch as the model will receive them: the fields of the whitelist, masked,
-then cut for the writing (docs/fiches-veille.md, "Entrée du modèle")."""
+then cut for the writing."""
 
 from datetime import UTC, datetime, timedelta
 

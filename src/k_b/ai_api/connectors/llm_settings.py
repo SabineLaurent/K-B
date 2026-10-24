@@ -1,9 +1,8 @@
-"""The settings of the model, read from the environment: the provider, its URL, its model, its key.
+"""The settings of the model, read from the environment: the provider, its URL, its model, its
+key.
 
-No default for the provider, its URL nor its model (ADR of 2026-10-15, "Appel du modèle"): a
-default replay would give digests made up without saying it, and a default provider would send the
-watch to a service nobody chose. Without them, the AI API does not start (fail closed).
-"""
+No default for the provider, its URL nor its model: a default would send the watch to a service
+nobody chose, or make up digests (fail closed)."""
 
 import re
 from collections.abc import Mapping

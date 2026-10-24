@@ -1,12 +1,5 @@
 """The one path of every rejection, from the stage that finds it to the log of the import
-(conventions.md, rule 1): an entry its reader refused, a page that cannot be read, a release of a
-repository out of the tracked list, an item the base refuses.
-
-A rejection is a named state, not an error: it is logged once, here, and returned to the stage,
-which goes on reading or writing. The caller gives the reason, with the field, the measure and,
-when there is one, the value already quoted (core/quoting.py); the type of a rejection stays in
-the vocabulary the stages share (etl/raw_files.py).
-"""
+(conventions.md, rule 1): logged once, here, and returned to the stage, which goes on."""
 
 import logging
 

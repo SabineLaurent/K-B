@@ -18,8 +18,6 @@ def format_date(moment: datetime | None) -> str | None:
 
 
 def format_day(day: date) -> str:
-    """A day is written at midnight UTC (docs/stockage.md), in the format of the base.
-
-    isoformat always writes the year on 4 digits; strftime leaves it to the C library.
-    """
+    """A day at midnight UTC, in the format of the base; isoformat, as strftime leaves the width
+    of the year to the C library."""
     return f"{day.isoformat()}T00:00:00Z"

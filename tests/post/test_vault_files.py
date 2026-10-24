@@ -1,5 +1,5 @@
-"""The files kb writes in the vault: a sheet written once, never through a symbolic link, and a
-text of a source written as text. Shared by the sheets of the tops and the digests (#209)."""
+"""The files kb writes in the vault: a sheet written once, never through a symbolic link, a text
+of a source written as text."""
 
 import pytest
 

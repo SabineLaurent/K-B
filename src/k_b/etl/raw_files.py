@@ -1,5 +1,5 @@
 """The vocabulary the stages of the ETL share: a raw file read, a file of trends read, a
-rejection, and the join of several readings into one."""
+rejection."""
 
 from datetime import UTC, datetime
 from typing import NamedTuple
@@ -11,8 +11,8 @@ COLLECTION_NAME_FORMAT = "%Y-%m-%dT%H%M%SZ"
 
 
 def parse_collection_name(collection_name: str) -> datetime:
-    """The collection time a raw file or a folder of pages is named by, in UTC; a name that is
-    not of COLLECTION_NAME_FORMAT raises ValueError."""
+    """The collection time a raw file or a folder of pages is named by, in UTC; ValueError for
+    another name."""
     return datetime.strptime(collection_name, COLLECTION_NAME_FORMAT).replace(
         tzinfo=UTC
     )
@@ -51,8 +51,8 @@ def join_readings(readings: list[RawReading]) -> RawReading:
 
 
 class TrendFile(NamedTuple):
-    """A raw file of trends of GH Archive read: the file to register, and its rows, which are
-    not items."""
+    """A raw file of trends of GH Archive read: the file to register, and its rows, which are not
+    items."""
 
     raw_file: RawFile
     rows: list[TrendRow]

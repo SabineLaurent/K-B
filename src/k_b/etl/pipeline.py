@@ -1,17 +1,8 @@
-"""The two runs of the ETL, which talk to each other through raw/: the collection (stage 1,
-etl/extract.py) and the import (stages 2 and 3, etl/transform.py then etl/load.py). They run
-apart: kb collect writes raw/, kb import reads it.
+"""The two runs of the ETL, which talk through raw/: the collection (etl/extract.py) and the
+import (etl/transform.py, then etl/load.py).
 
-The only module of etl that chains the stages, and the only door of the two runs for commands/:
-__all__ lists what passes, as database/writing.py does for the writers. It reads no setting,
-prints nothing and returns no exit code: what names the sources (the kinds, the tracked
-repositories, the folders of a state catalog) comes in as a parameter, and each run returns a
-named outcome its command prints. Each stage keeps its own log lines.
-
-The retention of the raw is a step of its own, outside the three stages (etl/raw_purge.py):
-its command runs it once it has printed the summary of the import, so that a purge that fails
-leaves the summary of the import it committed.
-"""
+The only door of the two runs for commands/ (__all__): it reads no setting, prints nothing and
+returns a named outcome its command prints."""
 
 from collections.abc import Collection, Sequence
 from datetime import datetime
@@ -54,12 +45,8 @@ class ImportOutcome(NamedTuple):
 
 
 def collect(sources: list[Source], data_dir: Path, now: datetime) -> CollectionOutcome:
-    """Run the collection: each source given writes its raw files under raw/, then the
-    collection state is written (stage 1).
-
-    The sources are created by the composition, which the caller holds: a source failing or
-    skipped is its business, this run only gives them the data directory and the time.
-    """
+    """Run the collection: each source given writes its raw files under raw/, then the collection
+    state is written."""
     return collect_all_sources(sources, data_dir / RAW_DIR_NAME, data_dir, now)
 
 
@@ -69,13 +56,11 @@ def import_raw_files(
     tracked_repositories: Sequence[TrackedRepository],
     imported_at: datetime,
 ) -> ImportOutcome:
-    """Run the import: the registry of the base, then the raw files not in it read as items and
-    as trends, in one walk of raw/ (stage 2), then the base and the log of this import, in one
-    transaction (stage 3).
+    """Run the import: the raw files not in the registry of the base read in one walk of raw/,
+    then written with the log in one transaction.
 
-    The tracked repositories are given once: the filter of the reading and the table of the base
-    cannot read two different lists.
-    """
+    The tracked repositories are given once, so that the reading and the base cannot read two
+    lists."""
     database_path = data_dir / DATABASE_FILE_NAME
     log_path = data_dir / IMPORT_LOG_FILE_NAME.format(
         imported_at=imported_at.strftime(COLLECTION_NAME_FORMAT)
@@ -101,9 +86,8 @@ def purge_superseded_raw(
     """Delete the raw files of the folders given that the last one imported superseded; return
     how many.
 
-    Run after the import: the registry is read again, so a file the base registers for the first
-    time can be the one kept.
-    """
+    Run after the import, so that a file the base registers for the first time can be the one
+    kept."""
     return delete_superseded_raw_files(
         RawStore(data_dir),
         read_imported_paths(data_dir / DATABASE_FILE_NAME),

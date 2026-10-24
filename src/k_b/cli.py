@@ -1,9 +1,5 @@
-"""Command line: `kb collect`, `kb create-db`, `kb import`, `kb write-tops`, `kb serve`,
-`kb serve-ai`, `kb digest`, `kb openapi`.
-
-The entry point of kb: it reads the command, opens the log and hands the run to its module in
-commands/.
-"""
+"""The entry point of kb: it reads the command, opens the log and hands the run to its module in
+commands/."""
 
 import argparse
 import logging

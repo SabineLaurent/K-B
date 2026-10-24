@@ -1,13 +1,7 @@
-"""The request of kb digest to the AI API: its settings, POST /digests, and the response it accepts
-(docs/fiches-veille.md, "Réponse", "États nommés"; #209).
+"""The request of kb digest to the AI API, by HTTP: its settings, POST /digests, and the response
+it accepts, an untrusted input read by a closed schema and checked against the closed lists.
 
-The AI API is reached by HTTP, never by its code: etl does not import ai_api. The response is an
-input not trusted (OWASP API10:2023, LLM10): it is read by a closed schema, then its subjects and
-its sources are checked against the closed lists, before any sheet is written. A failure is a named
-state, raised as an AiApiError; nothing is logged here: kb digest logs it once. No retry, no wait
-on a Retry-After. The body is read without a bound on its size (risk accepted by Sabine for the
-POC, 2026-10-21: the service of K-B, at an address she sets).
-"""
+The body is read without a bound on its size: risk accepted by Sabine for the POC (2026-10-21)."""
 
 import re
 from collections.abc import Callable, Mapping, Sequence
@@ -64,9 +58,8 @@ type AiApiState = Literal[
 
 
 class AiApiError(Exception):
-    """A request of the digests stopped: its state, the HTTP status of the answer when one came,
-    and what the answer says, each value checked by its rule or quoted (conventions.md, rule 3).
-    Never the URL nor the key."""
+    """A request of the digests stopped: its state, the HTTP status, and what the answer says,
+    checked or quoted; never the URL nor the key."""
 
     def __init__(
         self,
@@ -98,8 +91,7 @@ def match_fully(pattern: re.Pattern[str]) -> Callable[[str], str]:
 
 
 class AiApiModel(BaseModel):
-    """A part of the response of POST /digests: the fields read are typed, the others ignored
-    (the facts, the counters kb digest does not write)."""
+    """A part of the response of POST /digests: the fields read are typed, the others ignored."""
 
     model_config = ConfigDict(extra="ignore", strict=True, frozen=True)
 
@@ -191,9 +183,8 @@ def build_ai_api_client(
 def request_digests(
     http_client: httpx2.Client, subject_names: Sequence[str]
 ) -> DigestsResponse:
-    """The digests of the default window of the AI API (KB_DIGEST_WINDOW_DAYS), checked against
-    subject_names. Raises AiApiError. Raised from None: the error of httpx2 names the URL, a
-    ValidationError quotes the value received."""
+    """The digests of the default window of the AI API, checked against subject_names; raised
+    from None, as the error of httpx2 names the URL and a ValidationError quotes the value."""
     try:
         answer = http_client.post(DIGESTS_PATH, json={})
     except httpx2.TimeoutException:
@@ -229,8 +220,8 @@ def read_response(answer: httpx2.Response) -> DigestsResponse:
 
 
 def describe_answer(answer: httpx2.Response) -> list[str]:
-    """What a failed answer says: the state of its body, the id of its request, to find it in the
-    log of kb serve-ai, and its Retry-After."""
+    """What a failed answer says: the state of its body, the id of its request and its
+    Retry-After."""
     details = []
     error = read_error_state(answer.content)
     if error is not None:
@@ -260,9 +251,8 @@ def describe_value(value: str, pattern: re.Pattern[str]) -> str:
 def refuse_out_of_lists(
     response: DigestsResponse, subject_names: Sequence[str]
 ) -> None:
-    """Each subject is of the closed list, once in the response: its name makes the path of its
-    sheet. Each source of a digest is there once, and each claim cites its sources once each,
-    all of them sources of its digest: a sheet never cites what it does not list."""
+    """Refuse a subject out of the closed list or given twice, as its name makes the path of its
+    sheet; and a claim citing a source not listed once in its digest."""
     seen_subjects: set[str] = set()
     subjects = [
         (f"digests.{number}.subject", digest.subject)
@@ -290,8 +280,7 @@ def refuse_out_of_lists(
 
 
 def raise_invalid(response: DigestsResponse, place: str, check: str) -> NoReturn:
-    """A response refused by a closed list, named by its place, and by its request_id, to find it
-    in the log of kb serve-ai."""
+    """A response refused by a closed list, named by its place and its request_id."""
     raise AiApiError(
         "ai_api_invalid_response",
         httpx2.codes.OK,

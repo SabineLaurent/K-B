@@ -41,12 +41,8 @@ def write_import_log(
     discards: list[Discard],
     trend_discards: list[TrendDiscard],
 ) -> None:
-    """One JSON line per rejection, then per item left out, then per window of trends left
-    out, each dated by its import.
-
-    A window is named by its last day, in the field that names an item: one form of line. No
-    repository is named: its name holds the login of its owner.
-    """
+    """One JSON line per rejection, then per item left out, then per window of trends left out,
+    each dated by its import; no repository is named, its name holds its owner's login."""
     logged_at = format_date(imported_at)
     lines = (
         [

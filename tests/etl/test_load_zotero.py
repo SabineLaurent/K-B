@@ -1,6 +1,5 @@
-"""The import of the Zotero extracts: a state catalog, at the level of the entry and of the
-highlight (journal ADR, 2026-10-13). Each extract is written by the collection itself, from the
-fabricated library of tests/conftest.py, changed by SQL as Zotero would change it."""
+"""The import of the Zotero extracts, a state catalog at the level of the entry and of the
+highlight, each extract written by the collection from the fabricated library."""
 
 import json
 import tempfile

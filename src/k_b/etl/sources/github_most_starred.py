@@ -1,10 +1,5 @@
-"""The most starred GitHub repositories source: its download (E), and the reading of its ranking.
-
-Download the ranking of the most starred GitHub repositories, as published.
-
-Read a raw ranking of the most starred GitHub repositories: the download checks its response with
-it. The ranking gives no item: it does not enter the base (decision "Tops", 2026-10-07).
-"""
+"""The most starred GitHub repositories source: download the ranking (E), and read it; a ranking
+gives no item, it does not enter the base."""
 
 import json
 from dataclasses import dataclass
@@ -37,10 +32,7 @@ class GithubMostStarredSource:
     acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
-        """Return a snapshot of the ranking at every collection: star counts always change.
-
-        Entries, exits and climbs are found at the reading, by comparing two snapshots.
-        """
+        """Return a snapshot of the ranking at every collection: star counts always change."""
         query = {
             "q": SEARCH_QUERY,
             "sort": "stars",
@@ -69,9 +61,8 @@ def read_most_starred(
 ) -> list[StarredRepository]:
     """One repository per item of a `GET /search/repositories` response, by rank.
 
-    A ranking with fewer repositories than asked for, or marked incomplete, is refused: compared
-    with the previous one, it would show repositories leaving the top that never left it.
-    """
+    A ranking shorter than asked for, or marked incomplete, is refused: it would show
+    repositories leaving the top that never left it."""
     response = json.loads(raw_response)
     items = response.get("items") if isinstance(response, dict) else None
     if not isinstance(items, list):
@@ -133,8 +124,7 @@ def read_ranking(raw_response: bytes) -> list[StarredRepository]:
 def read_top_entries(
     raw_response: bytes, expected_size: int = RANKING_SIZE
 ) -> list[TopEntry]:
-    """The ranking as its sheet shows it (TopEntry, etl/tops.py), its URL built from the name,
-    never read in html_url (ADR of 2026-10-08)."""
+    """The ranking as its sheet shows it, its URL built from the name, never read in html_url."""
     return [
         TopEntry(
             rank=repository.rank,

@@ -1,13 +1,8 @@
-"""The files kb writes in the vault, under veille/: the sheets of the tops (post/top_sheets.py) and
-the digests of the watch (post/digest_sheets.py), one place for both (#209).
+"""The files kb writes in the vault, under veille/: written once, never through a symbolic link
+kb sees, each text of a source as text, each path named in the vault, never whole.
 
-A sheet is written once: kb never rewrites one it sees. Limit accepted by Sabine for the POC
-(2026-10-21, #295): a sheet that appears between has_sheet and the rename of write_file_atomically
-is replaced without a message (CWE-367), and a folder replaced by a link in that window is followed
-(CWE-59); only two runs of the user that overlap can cause it, never a text of a source. kb never
-follows a symbolic link it sees in the vault (decision of Sabine, 2026-10-19). A text of a source is written as text, never as syntax. A path is named in
-the vault, never whole: made of constants and a date, it never says where the vault is.
-"""
+Limit accepted by Sabine for the POC (#295): a sheet or link appearing between has_sheet and the
+rename is replaced or followed (CWE-367, CWE-59); only two overlapping runs can cause it."""
 
 import re
 import stat
@@ -38,17 +33,16 @@ CHARACTER_REFERENCE = re.compile(r"&(?=#|[A-Za-z0-9]+;)")
 
 
 class VaultEntryRefusedError(Exception):
-    """kb refuses an entry of the vault: a folder of the sheets, or a sheet, is a symbolic link
-    (vault_link_refused, decision of Sabine, 2026-10-19); a sheet is not a regular file
-    (sheet_not_a_file); kb write-tops: a sheet is not there before the deletion of its ranking
-    (sheet_missing), decided by time-knight, delegation of Sabine of 2026-10-15."""
+    """kb refuses an entry of the vault: a symbolic link (vault_link_refused), a sheet that is
+    not a regular file (sheet_not_a_file), or missing before the deletion of its ranking
+    (sheet_missing)."""
 
 
 def write_new_sheet(
     vault_dir: Path, sheets_dir: Path, sheet_path: Path, content: str
 ) -> bool:
-    """Write the sheet unless it exists; whether it was written. Its folders are checked again
-    first: write_file_atomically follows a link."""
+    """Write the sheet unless it exists; return whether it was written. Its folders are checked
+    again first, as write_file_atomically follows a link."""
     refuse_linked_folders(vault_dir, sheets_dir)
     if has_sheet(sheet_path, vault_dir):
         return False
@@ -63,15 +57,14 @@ def refuse_linked_folders(vault_dir: Path, sheets_dir: Path) -> None:
 
 
 def list_folders_down_to(vault_dir: Path, folder: Path) -> list[Path]:
-    """The folders under vault_dir down to folder, the highest first: veille, veille/tops,
-    veille/tops/<top>."""
+    """The folders under vault_dir down to folder, the highest first."""
     parts = folder.relative_to(vault_dir).parts
     return [vault_dir.joinpath(*parts[:depth]) for depth in range(1, len(parts) + 1)]
 
 
 def refuse_symbolic_link(path: Path, vault_dir: Path) -> None:
-    """Raise VaultEntryRefusedError when path is a symbolic link: is_symlink reads the link
-    itself (lstat), never its target."""
+    """Raise VaultEntryRefusedError when path is a symbolic link, read by lstat, never its
+    target."""
     if path.is_symlink():
         raise VaultEntryRefusedError(
             f"vault_link_refused: {path.relative_to(vault_dir).as_posix()} is a symbolic"
@@ -80,9 +73,8 @@ def refuse_symbolic_link(path: Path, vault_dir: Path) -> None:
 
 
 def has_sheet(sheet_path: Path, vault_dir: Path) -> bool:
-    """Whether the sheet is written: a regular file, read by lstat, never through a link. A
-    link, or another entry (a folder, a FIFO) under its name, is refused: taken for a sheet, it
-    would stand for one that is not there."""
+    """Whether the sheet is written: a regular file, read by lstat; a link or another entry under
+    its name is refused, as it would stand for a sheet that is not there."""
     try:
         status = sheet_path.lstat()
     except FileNotFoundError:
@@ -96,9 +88,8 @@ def has_sheet(sheet_path: Path, vault_dir: Path) -> bool:
 
 
 def neutralize_text(text: str, escaped_characters: frozenset[str]) -> str:
-    """The text on one line, as text: its controls, lone surrogates and bidirectional controls
-    become spaces, its whitespace one space, each of escaped_characters and the & of a character
-    reference escaped. Both in one pass, on the line before any backslash is inserted."""
+    """The text on one line, as text: controls, lone surrogates and bidirectional controls become
+    spaces, each of escaped_characters and the & of a character reference escaped, in one pass."""
     visible = "".join(
         " "
         if character in BIDI_CONTROLS

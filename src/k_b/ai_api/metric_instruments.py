@@ -1,12 +1,8 @@
-"""The measures of the AI API in OpenTelemetry (#162), beside the JSON line of each call
-(metrics.py): the same measures, as instruments a tool sums up and charts. The app, the router and
-the commands see ModelMetrics only; OpenTelemetry is imported here and in
-connectors/metrics_export.py, nowhere else.
+"""The measures of the AI API as OpenTelemetry instruments, the same as the JSON line of each
+call; OpenTelemetry is imported here and in connectors/metrics_export.py only.
 
-The names follow the semantic conventions of OpenTelemetry for generative AI where they have one
-(status Development, repository semantic-conventions-genai, read on 2026-10-24), under k_b.
-otherwise. A measure carries closed attributes only: never a text, a title, a subject nor the id
-of a request (.claude/rules/poc.md, rule 5; conventions.md, rule 3)."""
+Names after the semantic conventions for generative AI, k_b. otherwise; closed attributes only,
+never a text, a title, a subject nor a request id."""
 
 import logging
 from collections.abc import Sequence
@@ -41,8 +37,7 @@ CHECK_SECONDS_BUCKETS = (
 
 
 class ModelMetrics:
-    """The instruments of the AI API, made once with the app: record the calls of a request and
-    the reading of its window; stop sends what is not sent yet."""
+    """The instruments of the AI API, made once with the app."""
 
     def __init__(self, meter_provider: MeterProvider) -> None:
         self._meter_provider = meter_provider
@@ -104,7 +99,7 @@ class ModelMetrics:
     def record_calls(
         self, llm_settings: LlmSettings, stage_calls: Sequence[StageCall]
     ) -> None:
-        """The measures of each call of a request, the ones of its JSON line."""
+        """The measures of each call of a request, those of its JSON line."""
         for stage_call in stage_calls:
             call = stage_call.llm_call
             attributes: dict[str, str | bool] = {
@@ -145,8 +140,8 @@ class ModelMetrics:
         self._data_fetch_duration.record(data_fetch_ms / MILLISECONDS_PER_SECOND)
 
     def stop(self) -> None:
-        """Send what is not sent yet, within METRICS_STOP_TIMEOUT_SECONDS. A failure is logged by
-        its type only: the SDK builds its message from the errors of its readers."""
+        """Send what is not sent yet, within METRICS_STOP_TIMEOUT_SECONDS; a failure is logged by
+        its type only, as the SDK builds its message from the errors of its readers."""
         try:
             self._meter_provider.shutdown(
                 timeout_millis=METRICS_STOP_TIMEOUT_SECONDS * MILLISECONDS_PER_SECOND

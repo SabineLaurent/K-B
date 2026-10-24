@@ -1,12 +1,5 @@
 """The reading of the watch by the data API, with the key of the client AI_DIGEST
-(docs/fiches-veille.md, "Le parcours d'une demande", "Lecture plafonnée", "États nommés").
-
-The AI API does not read the base: it lists the items of a window, kind after kind, then reads
-the detail of each item kept, one after the other. A failure of the data API stops the reading
-with a named state, raised as a DataApiError; nothing is logged here: the caller logs the state
-once, with its request (#156). No retry: the data API runs beside the AI API, and the spec gives
-none. The reading is bounded by the deadline of the request: beyond, data_api_timeout.
-"""
+(docs/fiches-veille.md): a failure is a named state, raised as a DataApiError, without retry."""
 
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -49,8 +42,8 @@ type DataApiState = Literal[
 
 
 class DataApiError(Exception):
-    """A reading stopped by the data API: its state, and the HTTP status of the answer when one
-    came. Never the body received nor a header: a body or a Location may quote what was sent."""
+    """A reading stopped by the data API: its state and the HTTP status; never the body nor a
+    header, which may quote what was sent."""
 
     def __init__(self, state: DataApiState, http_status: int | None = None) -> None:
         super().__init__(
@@ -61,8 +54,8 @@ class DataApiError(Exception):
 
 
 class DataApiModel(BaseModel):
-    """An answer of the data API: the fields read are typed, the others ignored, the authors of
-    a paper among them, which are never kept."""
+    """An answer of the data API: the fields read are typed, the others ignored, the authors
+    among them."""
 
     model_config = ConfigDict(extra="ignore", strict=True, frozen=True)
 
@@ -178,8 +171,8 @@ def read_watch(
     http_client: httpx2.Client, since: datetime, *, deadline: Deadline
 ) -> WatchReading:
     """The items of the whitelist dated since `since` or later, MAX_ITEMS_PER_DIGEST_REQUEST at
-    most, each read in its detail and masked. Raises DataApiError. The deadline is required: the
-    timeouts of the client bound each wait, never the reading (docs/fiches-veille.md)."""
+    most, each read in its detail and masked; the deadline bounds the reading, as the timeouts
+    bound each wait only."""
     item_list = list_items(http_client, format_since(since), deadline)
     items = []
     for listed_item in item_list.items:
@@ -197,9 +190,8 @@ def read_watch(
 
 
 def format_since(since: datetime) -> str:
-    """since in UTC, to the second, rounded up: the rule of the data API, which reads since this
-    way (format_since of database/reading.py, which the AI API may not import). isoformat, not
-    strftime: strftime leaves the width of the year to the C library."""
+    """since in UTC, rounded up to the second, as the data API reads it (database/reading.py may
+    not be imported); isoformat, as strftime leaves the width of the year to the C library."""
     # utcoffset, not tzinfo: a tzinfo without offset leaves the date naive, read as local.
     if since.utcoffset() is None:
         raise ValueError("since without time zone")
@@ -213,9 +205,8 @@ def format_since(since: datetime) -> str:
 
 
 def list_items(http_client: httpx2.Client, since: str, deadline: Deadline) -> ItemList:
-    """The items of each kind in the order of WATCH_KINDS, until the cap. A withdrawn entry is
-    not kept, and takes no place under the cap; an item listed again, by a page shifted by an
-    import, is read once."""
+    """The items of each kind in the order of WATCH_KINDS, until the cap; a withdrawn entry takes
+    no place, and an item listed again by a shifted page is read once."""
     kept: list[ListedItem] = []
     seen_ids: set[int] = set()
     withdrawn = 0
@@ -236,8 +227,7 @@ def list_items(http_client: httpx2.Client, since: str, deadline: Deadline) -> It
 def list_kind(
     http_client: httpx2.Client, since: str, kind: WatchKind, deadline: Deadline
 ) -> Iterator[ListedItem]:
-    """The items of a kind, the most recent first, page after page: a page is asked only when
-    the one before is read to its end."""
+    """The items of a kind, the most recent first, a page asked only when the one before is read."""
     offset = 0
     while True:
         response = send(
@@ -278,8 +268,8 @@ def send(
     params: dict[str, str | int] | None,
     deadline: Deadline,
 ) -> Answer:
-    """One GET, its body read within its bounds, its failure as a named state. Raised from None:
-    the error of httpx2 names the URL asked."""
+    """One GET, its body read within its bounds, its failure as a named state; raised from None,
+    as the error of httpx2 names the URL."""
     if deadline.is_passed():
         raise DataApiError("data_api_timeout")
     try:
@@ -297,9 +287,8 @@ def send(
 
 
 def read_bounded_body(response: httpx2.Response, deadline: Deadline) -> bytes:
-    """The body, refused beyond MAX_DATA_API_BODY_BYTES, without quoting it: before reading when
-    Content-Length announces more, else as soon as the bytes read pass it. Stopped as soon as the
-    deadline passes between two pieces."""
+    """The body, refused beyond MAX_DATA_API_BODY_BYTES without quoting it, and stopped as soon
+    as the deadline passes between two pieces."""
     status = response.status_code
     length = response.headers.get("Content-Length")
     if (

@@ -1,7 +1,5 @@
-"""POST /digests: the digests of the watch of a window (docs/fiches-veille.md, "Le parcours d'une
-demande"). The window is read by the data API, classified and written by the model under the
-deadline of the request; one metric line per call, and the same measures in OpenTelemetry, with
-the reading of each window; nothing is kept (.claude/rules/poc.md, rule 7)."""
+"""POST /digests: the digests of the watch of a window, read by the data API, classified and
+written by the model under the deadline; nothing is kept."""
 
 import logging
 import time
@@ -106,8 +104,8 @@ def post_digests(
 def read_window(
     http_client: httpx2.Client, since: datetime, deadline: Deadline, request_id: str
 ) -> WatchReading:
-    """The watch of the window; a failure of the data API is logged here, with the id of the
-    request, and fails it: no call to the model, so no metric line."""
+    """The watch of the window; a failure of the data API is logged here and fails the request,
+    without call to the model."""
     try:
         return read_watch(http_client, since, deadline=deadline)
     except DataApiError as error:

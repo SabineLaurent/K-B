@@ -1,5 +1,4 @@
-"""The raw output of each collection, under raw/, and the date of the last one per source, in
-the collection state file at the root of the data directory."""
+"""The raw output of each collection, under raw/, and the date of the last collection per source."""
 
 import contextlib
 import errno
@@ -32,8 +31,7 @@ REFUSED_FOLDER_SYNC_ERRORS = (errno.EBADF, errno.EINVAL)
 
 
 def find_stream(raw_file_path: str) -> str:
-    """The stream of a raw file: the name of its source folder, second part of its path
-    relative to raw/ (automated_watch/<stream>/...)."""
+    """The stream of a raw file: the name of its source folder (automated_watch/<stream>/...)."""
     parts = PurePosixPath(raw_file_path).parts
     if len(parts) < 3:
         raise ValueError(f"raw file path without a source folder: {raw_file_path}")
@@ -41,16 +39,13 @@ def find_stream(raw_file_path: str) -> str:
 
 
 def make_source_folder_key(acquisition_dir_name: str, source_name: str) -> str:
-    """The key of the folder of raw/ a source writes to (etl/extract.py)."""
     return f"{RAW_DIR_NAME}/{acquisition_dir_name}/{source_name}"
 
 
 @dataclass(frozen=True)
 class RawStore:
-    """The raw files of a data directory, each named by a POSIX key relative to it
-    (raw/automated_watch/cisa_kev/2026-10-05T093000Z.csv), never by a Path
-    (.claude/rules/poc.md, rule 3): the callers name what they read and delete, the store
-    knows where it is."""
+    """The raw files of a data directory, each named by a POSIX key relative to it, never by a
+    Path (.claude/rules/poc.md, rule 3)."""
 
     data_dir: Path
 
@@ -66,18 +61,15 @@ class RawStore:
         return self.find_path(key).is_file()
 
     def read_latest(self, folder_key: str) -> bytes | None:
-        """The last raw file of a folder, in name order, that is collection order; None when
-        it has none."""
+        """The last raw file of a folder in collection order; None when it has none."""
         keys = self.list_file_keys(folder_key)
         if not keys:
             return None
         return self.read(keys[-1])
 
     def list_file_keys(self, folder_key: str) -> list[str]:
-        """The keys of the files of a folder, in name order, that is collection order; none when
-        it does not exist. Hidden files are left out, as by list_visible_entries of
-        etl/raw_reading.py, which imports this module: a rest of an interrupted write is not a
-        raw file. The subfolders are left out too."""
+        """The keys of the files of a folder, in collection order, hidden files and subfolders
+        left out."""
         folder = self.find_path(folder_key)
         if not folder.is_dir():
             return []
@@ -91,8 +83,8 @@ class RawStore:
         return self.find_path(key).read_bytes()
 
     def find_path(self, key: str) -> Path:
-        """The path of key in the data directory. A key that is empty, absolute, that goes up
-        (..) or holds a backslash is refused: the keys of the purge come from the base."""
+        """The path of key in the data directory; a key empty, absolute, going up (..) or holding
+        a backslash is refused, as the keys of the purge come from the base."""
         key_path = PurePosixPath(key)
         if (
             not key_path.parts
@@ -111,11 +103,9 @@ class InvalidCollectionStateError(ValueError):
 
 
 def write_file_atomically(path: Path, content: bytes) -> None:
-    """Write to a hidden temporary file of the target folder, sync it to disk, rename it, then
-    sync the folder and each folder created for it: a reader never sees a half-written file,
-    and a power cut cannot keep a later file while losing this one. On any exception, Ctrl-C
-    included, the temporary file is removed and the exception raised; a rest left by a killed
-    process is hidden, so the import skips it (list_visible_entries)."""
+    """Write to a hidden temporary file of the target folder, sync it, rename it, then sync the
+    folders: a reader never sees a half-written file, and a power cut cannot keep a later file
+    while losing this one (conventions.md, rule 2)."""
     # The folder of the target, then each new parent up to the first that exists: each holds
     # the entry of a new file or folder.
     folders_to_sync = [path.parent]
@@ -156,20 +146,17 @@ def write_file_atomically(path: Path, content: bytes) -> None:
 
 
 def write_new_raw_file(path: Path, content: bytes) -> None:
-    """raw/ is immutable: a raw file is written once and never overwritten."""
+    """Write a raw file once: raw/ is immutable, a raw file is never overwritten."""
     if path.exists():
         raise FileExistsError(f"raw file already exists: {path}")
     write_file_atomically(path, content)
 
 
 def load_last_collection_dates(data_dir: Path) -> dict[str, datetime]:
-    """The date of the last collection of each source, read from the collection state file;
-    empty when the file is absent, as before the first collection.
+    """The date of the last collection of each source; empty when the state file is absent.
 
-    A file that cannot be read, that is not a JSON object, or that holds a date that is not
-    ISO 8601 or has no time zone, raises InvalidCollectionStateError: a state half read would
-    make the next collection start from a date nobody wrote.
-    """
+    A state half read would make the next collection start from a date nobody wrote:
+    InvalidCollectionStateError instead."""
     state_path = data_dir / COLLECTION_STATE_FILENAME
     if not state_path.exists():
         return {}
@@ -199,9 +186,7 @@ def load_last_collection_dates(data_dir: Path) -> dict[str, datetime]:
 def save_last_collection_dates(
     data_dir: Path, last_collection_dates: dict[str, datetime]
 ) -> None:
-    """Write the date of the last collection of each source to the collection state file, in
-    ISO 8601, sorted by source name: the file is written whole, and atomically (rule 2 of
-    conventions.md)."""
+    """Write the date of the last collection of each source, whole and atomically."""
     stored_dates = {
         source_name: collected_at.isoformat()
         for source_name, collected_at in last_collection_dates.items()

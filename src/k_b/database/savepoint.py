@@ -1,9 +1,5 @@
 """Write an item in a savepoint of the import's transaction: an entry the base refuses is undone
-alone, and the import goes on (conventions.md, rule 1).
-
-SAVEPOINT, ROLLBACK TO SAVEPOINT and RELEASE SAVEPOINT are written the same in SQLite and in
-PostgreSQL (poc.md, rule 1).
-"""
+alone, and the import goes on (conventions.md, rule 1)."""
 
 import sqlite3
 from collections.abc import Iterator
@@ -21,8 +17,7 @@ ENTRY_CONSTRAINT_ERROR_NAMES = frozenset(
 
 
 class EntryRefusedError(Exception):
-    """The base refused an entry: what it refused, without the value refused. Raised from the
-    error of the base."""
+    """The base refused an entry: what it refused, without the value refused."""
 
 
 class NoTransactionError(RuntimeError):
@@ -31,12 +26,11 @@ class NoTransactionError(RuntimeError):
 
 @contextmanager
 def write_in_savepoint(connection: sqlite3.Connection) -> Iterator[None]:
-    """Keep what the block writes, or undo it alone on any exception: an error due to the entry
-    is raised again as an EntryRefusedError, any other unchanged.
+    """Keep what the block writes, or undo it alone on any exception; an error due to the entry
+    is raised again as an EntryRefusedError.
 
-    SQLite undoes the whole transaction on some errors (a full disk, an I/O error): no savepoint
-    is then left to roll back to, and the error of the base is raised unchanged.
-    """
+    On some errors (a full disk, an I/O error) SQLite undoes the whole transaction: the error is
+    then raised unchanged."""
     if not connection.in_transaction:
         raise NoTransactionError(
             "a savepoint is written inside the import's transaction"
@@ -61,13 +55,9 @@ def is_entry_refusal(error: BaseException) -> bool:
 
 
 def describe_refusal(error: BaseException) -> str:
-    """What the base refused, without the value refused (conventions.md, rule 3).
-
-    A constraint is named by its state and by the message of SQLite, which names the constraint
-    and not the value, on one line. The text of a UnicodeEncodeError quotes the character
-    refused: only its reason and position are kept. Neither it nor an OverflowError names the
-    field.
-    """
+    """What the base refused, without the value refused: a constraint by its state and the
+    message of SQLite, which names the constraint, never the value; a UnicodeEncodeError by its
+    reason and position, as its text quotes the character."""
     if isinstance(error, sqlite3.IntegrityError):
         return f"{error.sqlite_errorname}: {' '.join(str(error).split())}"
     if isinstance(error, UnicodeEncodeError):
