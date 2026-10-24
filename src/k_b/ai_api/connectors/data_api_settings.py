@@ -1,10 +1,5 @@
-"""The settings of the data API the AI API reads the watch from: its URL and the key of the client
-AI_DIGEST (docs/fiches-veille.md, "Le parcours d'une demande").
-
-The key is read from KB_DATA_API_KEY_AI_DIGEST, the variable kb serve reads for this client: one value
-for both sides. It has no default (a secret: fail closed); the URL has the local one of kb serve
-(.claude/rules/poc.md, rule 2).
-"""
+"""The settings of the data API the AI API reads: its URL and the key of AI_DIGEST, read from
+KB_DATA_API_KEY_AI_DIGEST, without default (a secret: fail closed)."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass

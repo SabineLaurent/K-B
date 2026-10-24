@@ -1,11 +1,7 @@
-"""The writing of the digest of one subject: claims in French, each citing its items and declaring
-its facts (docs/fiches-veille.md, "Sortie de la rédaction", "Contrôles" and "Fidélité").
+"""The writing of the digest of one subject: claims in French, each citing its items and
+declaring its facts (docs/fiches-veille.md).
 
-The items of the subject are sent in the user message, encoded in JSON (.claude/rules/poc.md,
-rule 8). The schema sent cannot hold the bounds (no min* nor max* in strict mode): the system
-prompt says them, and the code checks them. A bound of structure fails the output (check 2, in
-the Pydantic model); a bound of a claim removes the claim, counted (claims_removed).
-"""
+Strict mode holds no bounds: the system prompt says them, the code checks them."""
 
 import re
 from collections.abc import Mapping, Sequence
@@ -103,9 +99,8 @@ class Claim(BaseModel):
 
 
 class WritingOutput(BaseModel):
-    """The output of the model, static: the enums are in the schema sent, and checked again by
-    check_writing. Its bounds of structure write maxItems in a schema Pydantic derives: the
-    schema sent is written by hand."""
+    """The output of the model; the enums are in the schema sent, written by hand, and checked
+    again by check_writing."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -113,8 +108,8 @@ class WritingOutput(BaseModel):
 
 
 def project_for_writing(item: WatchItem) -> dict[str, object]:
-    """The fields the writing sends: the identifier, the kind, and the whitelist of the kind,
-    masked and cut by select_for_writing."""
+    """The fields the writing sends: the identifier, the kind and the whitelist of the kind,
+    masked and cut."""
     return {
         "item_id": to_item_ref(item.item_id),
         "kind": item.kind,
@@ -123,8 +118,7 @@ def project_for_writing(item: WatchItem) -> dict[str, object]:
 
 
 def build_writing_schema(item_refs: Sequence[str]) -> dict[str, object]:
-    """The schema sent, written by hand: portable in strict mode (docs/fiches-veille.md, "Schéma
-    portable")."""
+    """The schema sent, written by hand to be portable in strict mode."""
     item_ref = {"type": "string", "enum": list(item_refs)}
     return {
         "type": "object",
@@ -162,10 +156,8 @@ def build_writing_schema(item_refs: Sequence[str]) -> dict[str, object]:
 def check_writing(
     output: WritingOutput, item_refs: frozenset[str]
 ) -> FailedCheck | None:
-    """Checks 4 and 6, in order, each over the whole output: each item cited was sent in this
-    call, once in its claim, and each fact cites an item of its claim; then no text holds a
-    link, an image nor a tag. Before the bounds of a claim: a text too long with a link fails
-    the output, it is not only removed."""
+    """Checks 4 and 6, over the whole output: each item cited was sent, once in its claim, each
+    fact cites an item of its claim, and no text holds a link, an image nor a tag."""
     for claim in output.claims:
         if any(ref not in item_refs for ref in claim.item_ids):
             return "item_id"
@@ -179,8 +171,7 @@ def check_writing(
 
 
 def is_within_claim_bounds(claim: Claim) -> bool:
-    """The bounds of a claim (docs/fiches-veille.md, "Fidélité"): its text, the number of its
-    facts and the length of each."""
+    """The bounds of a claim: its text, the number of its facts and the length of each."""
     return (
         TEXT_CHARS[0] <= len(claim.text) <= TEXT_CHARS[1]
         and FACTS_PER_CLAIM[0] <= len(claim.facts) <= FACTS_PER_CLAIM[1]

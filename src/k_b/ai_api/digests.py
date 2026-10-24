@@ -1,16 +1,8 @@
-"""The digests of a request (docs/fiches-veille.md, "Le parcours d'une demande"): the items read are
-classified in batches, then each subject of the list is written, one call after the other, under
-the deadline of the request. Nothing is written nor logged here (.claude/rules/poc.md, rule 7):
-the result is returned, with one StageCall per call for the metrics, and the caller logs it once
-(#156).
+"""The digests of a request: the items classified in batches, then each subject written, one call
+after the other, under the deadline; nothing is written nor logged here.
 
-A classification that fails fails the request; a writing that fails, or that the deadline does
-not leave the time for, names its subject in failed_subjects, and the other digests are returned.
-After a writing that failed with a 429 (rate limited, or its retry timed out, refused or cut by
-the deadline), nothing more is sent: the provider said to wait, and the items of the next
-subjects would leave for an answer refused (minimisation, GDPR art. 5.1.c). A retry answered
-after its Retry-After got past the 429: the provider accepts again, and the next subjects go.
-"""
+After a writing failed with a 429, nothing more is sent: the items of the next subjects would
+leave for an answer refused (minimisation, GDPR art. 5.1.c)."""
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -50,7 +42,7 @@ SOURCE_URL_SCHEMES = ("http://", "https://")
 
 @dataclass(frozen=True)
 class StageCall:
-    """A call to the model and what the metric line of #156 needs of it."""
+    """A call to the model and what its metric line needs of it."""
 
     stage: Stage
     # None for the classification.
@@ -128,8 +120,8 @@ class DigestsResult:
 
 @dataclass(frozen=True)
 class ClassificationFailure:
-    """The request failed at the classification: its state, the Retry-After of a rate limit, and
-    the calls made."""
+    """The request failed at the classification: its state, the Retry-After of a rate limit, the
+    calls made."""
 
     state: LlmFailure
     retry_after_seconds: int | None
@@ -150,7 +142,7 @@ def build_digests(
     subjects: Sequence[DigestSubject],
     deadline: Deadline,
 ) -> DigestsResult | ClassificationFailure:
-    """The digests of the items read, a subject after the other in the order of the list."""
+    """The digests of the items read, one subject after the other in the order of the list."""
     classification = classify(http_client, settings, reading.items, subjects, deadline)
     if isinstance(classification, ClassificationFailure):
         return classification
@@ -276,7 +268,7 @@ def to_digest(
     subject: str, items_sent: Sequence[WatchItem], output: WritingOutput
 ) -> Digest:
     """The digest of a writing checked: the claims within their bounds, and what the code
-    computes from them (docs/fiches-veille.md, "Réponse")."""
+    computes from them."""
     kept = [claim for claim in output.claims if is_within_claim_bounds(claim)]
     cited_by_model = cited_refs(output.claims)
     cited_kept = cited_refs(kept)

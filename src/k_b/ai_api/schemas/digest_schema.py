@@ -1,5 +1,4 @@
-"""The request and the response of POST /digests (docs/fiches-veille.md, "Demande" and
-"Réponse")."""
+"""The request and the response of POST /digests (docs/fiches-veille.md)."""
 
 from datetime import datetime
 from typing import Annotated

@@ -1,8 +1,4 @@
-"""The settings kb serve-ai reads: the host and the port the AI API listens on, and the window of a
-digest request when it gives none. The model and the data API have their own, in connectors/.
-
-Not set: the local defaults of core/config.py (.claude/rules/poc.md, rule 2).
-"""
+"""The settings kb serve-ai reads: the host, the port and the default window of a digest request."""
 
 import re
 from collections.abc import Mapping
@@ -33,8 +29,8 @@ class AiApiSettings:
 
 
 def read_ai_api_settings_or_refusal(environ: Mapping[str, str]) -> AiApiSettings | str:
-    """The host, the port and the window of kb serve-ai, or why the variable is refused, with its
-    value quoted. Not set: the default of core/config.py."""
+    """The host, the port and the window of kb serve-ai, or why the variable is refused, its
+    value quoted."""
     host = environ.get(AI_API_HOST_VARIABLE, AI_API_HOST)
     port = environ.get(AI_API_PORT_VARIABLE, str(AI_API_PORT))
     window_days = environ.get(DIGEST_WINDOW_DAYS_VARIABLE, str(DIGEST_WINDOW_DAYS))

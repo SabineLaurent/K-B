@@ -1,17 +1,8 @@
 """One call to the model by an OpenAI-compatible API, its first two checks and its retry
-(docs/fiches-veille.md, "Contrôles" and "États nommés").
+(docs/fiches-veille.md, "Contrôles").
 
-A call sends the system prompt of a stage, a module constant, and its data, encoded in JSON in
-the user message, the only place where a text of a source goes (.claude/rules/poc.md, rule 8).
-The output is checked before any use: its finish_reason (check 1), its schema (check 2), then the
-checks of the stage (3 to 6, #205 and #206). At most one retry per call: after an output
-refused, with the constant reminder of the check that refused it; after a 429, a 5xx or a failed
-connection, after waiting Retry-After. Nothing is logged here: the caller handles the state, and
-logs it once, with the measures of the call.
-
-The HTTP client is httpx2 alone, not the SDK of a provider (ADR of 2026-10-15, "Appel du
-modèle"): changing it later changes this module, behind call_model and LlmCall.
-"""
+A text of a source goes only in the user message, encoded in JSON, never in the system prompt
+(.claude/rules/poc.md, rule 8); at most one retry per call."""
 
 import json
 import re
@@ -77,8 +68,7 @@ MAX_FINISH_REASON_LENGTH = 64
 
 class EnvelopeModel(BaseModel):
     """The envelope a provider gives around the output: the fields read are typed, the others
-    ignored, since a provider adds its own (Azure: the results of its content filter). The
-    output of the model, inside, is the one that refuses a field in excess."""
+    ignored, as a provider adds its own."""
 
     model_config = ConfigDict(extra="ignore", strict=True, frozen=True)
 
@@ -117,17 +107,15 @@ class ErrorDetail(EnvelopeModel):
 
 
 class ErrorBody(EnvelopeModel):
-    """The error of a 4xx: its code only, the rest neither kept nor logged, since its message
-    may quote the input."""
+    """The error of a 4xx: its code only, as its message may quote the input."""
 
     error: ErrorDetail
 
 
 @dataclass(frozen=True)
 class LlmCall[OutputT: BaseModel]:
-    """A call, its outcome and its measures, never a text: the output, checked, only when the
-    outcome is ok. The tokens are those of both attempts; the other measures are those of the
-    last one: a Retry-After waited before a retry is not kept, llm_ms counts its wait."""
+    """A call, its outcome and its measures, never a text: the output only when the outcome is
+    ok; the tokens of both attempts, the other measures of the last one."""
 
     outcome: LlmOutcome
     output: OutputT | None
@@ -158,8 +146,6 @@ class LlmCall[OutputT: BaseModel]:
 
 @dataclass(frozen=True)
 class Attempt[OutputT: BaseModel]:
-    """One request and the checks of its answer."""
-
     outcome: LlmOutcome
     output: OutputT | None = None
     finish_reason: str | None = None
@@ -176,7 +162,7 @@ class Attempt[OutputT: BaseModel]:
 
 
 def to_failure(outcome: LlmOutcome) -> LlmFailure:
-    """The failure of a call without output: ok there is a fault of the caller, raised."""
+    """The failure of a call without output; ok there is a fault of the caller, raised."""
     if outcome == "ok":
         raise ValueError("a call without output is not ok")
     return outcome
@@ -185,9 +171,8 @@ def to_failure(outcome: LlmOutcome) -> LlmFailure:
 def build_http_client(
     settings: LlmSettings, transport: httpx2.BaseTransport | None = None
 ) -> httpx2.Client:
-    """The client of the provider of the settings, or of its replay, on the steps read with the
-    settings, when no transport is given. The rules of open_http_client apply, and the transport
-    makes no retry of its own."""
+    """The client of the provider, or of its replay when no transport is given; no retry of its
+    own."""
     if transport is None and settings.provider == "replay":
         if settings.replay_steps is None:
             raise ValueError("replay settings without replay steps")
@@ -225,13 +210,12 @@ def call_model[OutputT: BaseModel](
     deadline: Deadline | None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> LlmCall[OutputT]:
-    """Ask the model for an output of output_model, check it, and ask once more if the first
-    answer may change on a retry. retry_reminders holds one reminder per check: one missing is a
-    fault of the caller, raised before any request is paid.
+    """Ask the model for an output of output_model, check it, and ask once more if a retry may
+    change the answer; a reminder missing in retry_reminders is raised before any request is
+    paid.
 
-    With a deadline, the timeouts of each request are shortened to the time left, and a retry
-    that would not have the time it needs is not made: the call ends in llm_timeout, what the
-    first attempt observed kept. The caller checks the deadline before the call."""
+    With a deadline, each timeout is shortened to the time left, and a retry without the time it
+    needs ends in llm_timeout."""
     missing_reminders = [c for c in FAILED_CHECKS if c not in retry_reminders]
     if missing_reminders:
         raise ValueError(f"retry_reminders without: {', '.join(missing_reminders)}")
@@ -276,8 +260,8 @@ def call_model[OutputT: BaseModel](
 
 
 def encode_user_message(user_data: Mapping[str, object]) -> str:
-    """The user message: the data of the stage in JSON, its text unescaped. Its length is the
-    input_chars of the call, which the batches of the classification bound."""
+    """The user message: the data of the stage in JSON; its length is the input_chars of the
+    call."""
     return json.dumps(user_data, ensure_ascii=False, allow_nan=False)
 
 
@@ -351,9 +335,8 @@ def read_answer[OutputT: BaseModel](
 
 
 def read_failure[OutputT: BaseModel](response: httpx2.Response) -> Attempt[OutputT]:
-    """The state of an answer other than 200: a 429 or a 5xx gets a wait before a retry, none
-    when Retry-After is above the maximum (wait_or_end); a 400 of a prompt filtered is not
-    retried; any other is a provider that cannot answer this request."""
+    """The state of an answer other than 200: a 429 or a 5xx may be retried (wait_or_end), a 400
+    of a prompt filtered is not."""
     status = response.status_code
     if status == httpx2.codes.TOO_MANY_REQUESTS:
         return wait_or_end(response, "llm_rate_limited")
@@ -370,8 +353,8 @@ def read_failure[OutputT: BaseModel](response: httpx2.Response) -> Attempt[Outpu
 def wait_or_end[OutputT: BaseModel](
     response: httpx2.Response, outcome: LlmOutcome
 ) -> Attempt[OutputT]:
-    """A retry after Retry-After, or after the default wait without it; none when Retry-After
-    is above the maximum, since a shorter wait would give the same answer."""
+    """A retry after Retry-After, or after the default wait; none when Retry-After is above the
+    maximum, as a shorter wait would give the same answer."""
     value = response.headers.get("Retry-After")
     if value is not None and RETRY_AFTER_TOO_LONG.fullmatch(value):
         # Too long to read: a wait beyond the maximum, whose value is not given back.
@@ -404,8 +387,8 @@ def check_completion[OutputT: BaseModel](
     output_model: type[OutputT],
     check_output: Callable[[OutputT], FailedCheck | None],
 ) -> Attempt[OutputT]:
-    """Checks 1 and 2, then those of the stage, in this order; the first refusal names the
-    failure. Neither the output refused nor its ValidationError is kept (poc.md, rule 5)."""
+    """Checks 1 and 2, then those of the stage, the first refusal naming the failure; neither the
+    output refused nor its ValidationError is kept (poc.md, rule 5)."""
     started = time.perf_counter()
     choice = completion.choices[0]
     finish_reason = (

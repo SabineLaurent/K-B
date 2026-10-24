@@ -1,6 +1,5 @@
-"""The metric lines of the AI API: one JSON line per call to the model, on stdout, without a file
-(docs/fiches-veille.md, "Métriques"; .claude/rules/poc.md, rules 4 and 5). A line holds measures
-and states, never a text: neither an item, a title, an author, a prompt, an output nor a key."""
+"""The metric lines of the AI API: one JSON line per call to the model, on stdout, with measures
+and states, never a text nor a key (.claude/rules/poc.md, rules 4 and 5)."""
 
 import json
 import sys
@@ -36,9 +35,8 @@ def write_llm_call_lines(
     stage_calls: Sequence[StageCall],
     request_measures: RequestMeasures,
 ) -> None:
-    """One line per call, in the order of the calls, each written and flushed at once: on
-    SIGTERM, uvicorn sends the signal again, and a line kept in the buffer of a pipe would be
-    lost."""
+    """One line per call, each written and flushed at once, as a line kept in a pipe buffer would
+    be lost on SIGTERM."""
     for position, stage_call in enumerate(stage_calls):
         line = build_llm_call_line(
             request_id,
@@ -56,7 +54,7 @@ def build_llm_call_line(
     stage_call: StageCall,
     request_measures: RequestMeasures | None,
 ) -> dict[str, object]:
-    """The fields of the spec, in its order. The counters of the fidelity are null until #207."""
+    """The fields of the spec, in its order; the counters of the fidelity are null until #207."""
     call = stage_call.llm_call
     return {
         "ts": format_timestamp(datetime.now(UTC)),
@@ -109,6 +107,5 @@ def estimate_cost(tokens_in: int, tokens_out: int) -> float:
 
 
 def format_timestamp(moment: datetime) -> str:
-    """ISO 8601 in UTC, to the second, with its zone: the format of the dates of K-B
-    (conventions.md, rule 3)."""
+    """ISO 8601 in UTC, to the second, with its zone (conventions.md, rule 3)."""
     return moment.astimezone(UTC).replace(microsecond=0, tzinfo=None).isoformat() + "Z"

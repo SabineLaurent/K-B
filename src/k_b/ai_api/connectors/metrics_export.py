@@ -1,13 +1,8 @@
-"""The export of the metrics of the AI API in OpenTelemetry, to an OTLP endpoint (Grafana Cloud,
-ADR of 2026-10-20, decision 4; #162): its settings, read from the environment, and the meter
-provider. Without the endpoint and the headers, the provider has no reader: the measures are
-dropped, nothing leaves.
+"""The export of the metrics of the AI API in OpenTelemetry to an OTLP endpoint: its settings and
+the meter provider; without endpoint and headers, nothing leaves.
 
-K-B reads its own variables and gives each value to the SDK: the SDK reads the environment
-behind the back of its caller, the headers too even when they are given
-(opentelemetry/exporter/otlp/proto/http/_common/__init__.py, _resolve_headers, 1.45.1), and logs a
-malformed one as it is. So no OTEL_* variable is accepted at all.
-"""
+No OTEL_* variable is accepted: the SDK reads the environment behind its caller, the headers too,
+and logs a malformed one as it is."""
 
 import logging
 import re
@@ -78,8 +73,8 @@ class MetricsExportSettings:
 def read_metrics_export_settings_or_refusal(
     environ: Mapping[str, str],
 ) -> MetricsExportSettings | str | None:
-    """The settings of the export, None without its endpoint and its headers, or why a variable is
-    refused: never the headers, nor the endpoint, which a refused URL may carry a key in."""
+    """The settings of the export, None without its endpoint and its headers, or why a variable
+    is refused, never quoting the headers nor the endpoint."""
     opentelemetry_names = sorted(
         name for name in environ if name.startswith(OPENTELEMETRY_VARIABLE_PREFIX)
     )
@@ -127,8 +122,8 @@ def read_metrics_export_settings_or_refusal(
 
 
 def parse_headers(text: str) -> dict[str, SecretStr] | None:
-    """The headers of the OTLP format, `name=value,name=value`, each value percent-decoded (as
-    Grafana Cloud gives `Authorization=Basic%20…`); None if a pair is not read."""
+    """The headers of the OTLP format, `name=value,name=value`, each value percent-decoded; None
+    if a pair is not read."""
     headers: dict[str, SecretStr] = {}
     for pair in text.split(","):
         name, separator, encoded_value = pair.partition("=")
@@ -145,12 +140,9 @@ def parse_headers(text: str) -> dict[str, SecretStr] | None:
 
 
 def build_resource(environment: DeploymentEnvironment | None) -> Resource:
-    """The service and its environment, nothing else: built by its constructor, not by
-    Resource.create, which adds OTEL_RESOURCE_ATTRIBUTES, OTEL_SERVICE_NAME
-    and the detectors of OTEL_EXPERIMENTAL_RESOURCE_DETECTORS (process gives process.command_args
-    and process.owner). service.instance.id is drawn at random for each process, as
-    Resource.create does: two processes that export at once (kb serve-ai and the end-to-end test,
-    two replicas) do not write the same cumulative series. A new process opens new series."""
+    """The service and its environment, nothing else: not Resource.create, which reads OTEL_* and
+    its detectors (process.command_args). service.instance.id is drawn for each process, so that
+    two processes never write the same cumulative series."""
     attributes: dict[str, str] = {
         "service.name": SERVICE_NAME,
         "service.instance.id": str(uuid.uuid4()),
@@ -161,9 +153,8 @@ def build_resource(environment: DeploymentEnvironment | None) -> Resource:
 
 
 def build_meter_provider(settings: MetricsExportSettings | None) -> MeterProvider:
-    """The provider of the meters of the AI API: with a reader that exports every
-    METRICS_EXPORT_INTERVAL_SECONDS, or without reader if the export is off. The caller shuts it
-    down: no atexit handler, which would log once the handlers of kb are removed."""
+    """The provider of the meters, with a reader if the export is on; the caller shuts it down
+    (no atexit, which would log once the handlers of kb are removed)."""
     if settings is None:
         return MeterProvider(resource=build_resource(None), shutdown_on_exit=False)
     reader = PeriodicExportingMetricReader(
@@ -180,9 +171,8 @@ def build_meter_provider(settings: MetricsExportSettings | None) -> MeterProvide
 
 
 class QuotingFilter(logging.Filter):
-    """The values of a line of the exporter quoted as K-B quotes them (conventions.md, rule 3): a
-    text by quote_value, an exception by its type, its traceback by the type of the exception.
-    The line is kept: a failure stays visible."""
+    """The values of a line of the exporter quoted as K-B quotes them (conventions.md, rule 3),
+    the line kept."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.args, tuple):
@@ -212,9 +202,8 @@ QUOTING_FILTER = QuotingFilter()
 
 
 def build_exporter(settings: MetricsExportSettings) -> OTLPMetricExporter:
-    """The OTLP exporter over HTTP: every option given, and an HTTP session that reads neither a
-    proxy, a certificate nor a .netrc of the environment (core/outbound.py). The transport of the
-    SDK follows no redirection, but counts a 3xx as a success."""
+    """The OTLP exporter over HTTP, with a session that reads neither a proxy, a certificate nor
+    a .netrc of the environment."""
     # On the loggers themselves: a filter on the logger "opentelemetry" does not see the lines of
     # its children.
     for logger in EXPORTER_LOGGERS:

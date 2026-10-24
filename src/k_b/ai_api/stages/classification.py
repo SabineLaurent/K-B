@@ -1,11 +1,5 @@
 """The classification of the items of a request: each item to one subject of the closed list, or
-not retained (docs/fiches-veille.md, "Sortie du classement" and "Contrôles").
-
-The items are sent in batches, in the order of the reading, each in the user message, encoded in
-JSON (.claude/rules/poc.md, rule 8). The model answers in a schema whose enums are the subjects of
-the list and the items of the batch; the code checks them again (checks 3 to 5), and counts an
-item absent from the output as not retained.
-"""
+not retained; the code checks the output again (checks 3 to 5)."""
 
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
@@ -84,7 +78,7 @@ class Assignment(BaseModel):
 
 
 class ClassificationOutput(BaseModel):
-    """The output of the model, static: the enums are in the schema sent, and checked again by
+    """The output of the model; the enums are in the schema sent, and checked again by
     check_classification."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -104,9 +98,8 @@ class ClassificationBatch:
 def build_batches(
     items: Iterable[WatchItem], subjects: Sequence[DigestSubject]
 ) -> list[ClassificationBatch]:
-    """The items in batches, in their order: each of MAX_ITEMS_PER_CLASSIFICATION_CALL items and
-    MAX_CLASSIFICATION_INPUT_CHARS characters of user message at most; an item longer alone is a
-    batch alone."""
+    """The items in batches, in their order, each within MAX_ITEMS_PER_CLASSIFICATION_CALL and
+    MAX_CLASSIFICATION_INPUT_CHARS; an item longer alone is a batch alone."""
     subjects_sent = [
         {"name": subject.name, "definition": subject.definition} for subject in subjects
     ]
@@ -149,8 +142,7 @@ def to_user_data(
 
 
 def project_for_classification(item: WatchItem) -> tuple[dict[str, object], bool]:
-    """The fields the classification sends, and whether the long text is cut: the identifier,
-    the kind, the title and the long text, masked, the long text cut."""
+    """The fields the classification sends, masked, the long text cut, and whether it was."""
     fields = item.fields.model_dump()
     projected: dict[str, object] = {
         "item_id": to_item_ref(item.item_id),
@@ -170,8 +162,8 @@ def project_for_classification(item: WatchItem) -> tuple[dict[str, object], bool
 def build_classification_schema(
     item_refs: Sequence[str], subject_names: Sequence[str]
 ) -> dict[str, object]:
-    """The schema sent, written by hand: portable in strict mode, without min* nor max*, which a
-    schema derived from Pydantic would hold (docs/fiches-veille.md, "Schéma portable")."""
+    """The schema sent, written by hand to be portable in strict mode, without the min* and max*
+    a Pydantic schema would hold."""
     item_ref = {"type": "string", "enum": list(item_refs)}
     return {
         "type": "object",
