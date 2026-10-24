@@ -231,7 +231,7 @@ reconnaître un item déjà vu, quelle que soit la source.
   étrangères facultatives vers chaque référentiel (doublon de rôle) ; C, pas de table ITEM et une
   vue `UNION` (il faudrait une table de liaison par type pour les notes du point 4). Raison : ITEM
   reste le point d'entrée unique pour les notes, la recherche et P1.
-- **Valeurs de `kind`** (la seule liste, tenue à jour ici et dans `docs/merise/mld-k-b.drawio`) :
+- **Valeurs de `kind`** (la seule liste, tenue à jour ici et dans `docs/merise/mld-k-b.drawio` (retiré le 2026-10-24 ; voir `docs/merise/mld-k-b_20261020.drawio`)) :
   `paper` (item arXiv), `vulnerability` (item CISA KEV), `newsletter_article`, `release`,
   `advisory` (alerte GitHub). Les trois premières viennent de l'option D (07/10), les deux
   dernières du lot GitHub (08/10). Les valeurs de la bibliothèque (clip, Zotero, note) attendent
@@ -404,7 +404,7 @@ reconstruire le chemin, qui demanderait de recoder les règles de rangement de c
 **Validés par Sabine (2026-10-08)** : FOURNIR (SOURCE, DONNÉE BRUTE), CONTENIR (DONNÉE BRUTE, ITEM),
 PRODUIRE (DONNÉE BRUTE, TENDANCE), RECENSER (ITEM, VULNÉRABILITÉ), DÉCRIRE (ITEM, PUBLICATION),
 CITER (ALERTE GITHUB, VULNÉRABILITÉ), RÉSUMER (ARTICLE DE NEWSLETTER, PUBLICATION), PUBLIER (DÉPÔT
-SUIVI, RELEASE). MCD et MLD du jour : `docs/merise/mcd-k-b.drawio`, `docs/merise/mld-k-b.drawio`.
+SUIVI, RELEASE). MCD et MLD du jour : `docs/merise/mcd-k-b.drawio` (retiré le 2026-10-24 ; voir `docs/merise/mcd-k-b_20261020.drawio`), `docs/merise/mld-k-b.drawio` (retiré le 2026-10-24 ; voir `docs/merise/mld-k-b_20261020.drawio`).
 
 ### Longueurs maximales (séance 3)
 
@@ -452,7 +452,7 @@ de la veille que Sabine creuse et met dans Zotero relève ensuite de la biblioth
 - **Décidé par Sabine (2026-10-09) : une table de référence ACQUISITION_MODE** (mode
   d'acquisition), dès la v0, trois lignes. Association **REGROUPER** : un mode d'acquisition
   regroupe 0 à n sources ; une source est regroupée dans un seul mode (1,1). Le sujet est le mode
-  d'acquisition, placé à gauche de SOURCE au MCD (`docs/merise/mcd-k-b.drawio`). Écartés pour l'entité :
+  d'acquisition, placé à gauche de SOURCE au MCD (`docs/merise/mcd-k-b.drawio` (retiré le 2026-10-24 ; voir `docs/merise/mcd-k-b_20261020.drawio`)). Écartés pour l'entité :
   ORIGIN et PROVENANCE (synonymes de « source » dans la langue courante), CANAL (se confond avec
   le flux d'une source), MODE D'ENTRÉE (`intake`, peu connu). Écartés pour l'association : ÊTRE
   OBTENU PAR et ÊTRE COLLECTÉE (passifs, seules exceptions aux huit associations validées ; un

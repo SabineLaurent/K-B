@@ -125,7 +125,7 @@ Zotero : elle n'a rien à voir et ne change pas.
 
 - La recréation de la base du POC n'a pas été faite ici : elle se fait chez Sabine, après la
   fusion (la session n'ouvre pas sa base).
-- Le MLD du dépôt (`docs/merise/mld-k-b.drawio`) n'a pas encore les tables de tags : le nom
+- Le MLD du dépôt (`docs/merise/mld-k-b.drawio` (retiré le 2026-10-24 ; voir `docs/merise/mld-k-b_20261020.drawio`)) n'a pas encore les tables de tags : le nom
   `item_has_tag` n'y est pas vérifiable (#211).
 
 ## Ce qui reste
