@@ -185,6 +185,19 @@ def test_a_retry_after_too_long_to_wait_pauses_until_it_ends():
     assert pause_end(error) == NOW + seconds
 
 
+def test_with_both_an_exhausted_rate_limit_and_a_longer_retry_after_the_longer_wins():
+    # GitHub checks retry-after first ("Rate limits for the REST API", 2026-10-25).
+    error = http_error(
+        URL,
+        403,
+        x_ratelimit_remaining="0",
+        x_ratelimit_reset=RESET_EPOCH_SECONDS,
+        Retry_After="7200",
+    )
+
+    assert pause_end(error) == NOW + 7200
+
+
 def test_a_retry_after_too_long_to_read_pauses_for_good():
     assert pause_end(http_error(URL, 429, Retry_After="9" * 10)) == math.inf
 

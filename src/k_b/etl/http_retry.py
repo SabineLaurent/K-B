@@ -69,17 +69,19 @@ def find_pause_end(
     of an exhausted rate limit, or the end of a Retry-After beyond RETRY_AFTER_MAX_SECONDS."""
     if not is_served_from(error, trusted_url_prefix):
         return None
+    # Both may come together (a secondary rate limit of GitHub): the longer wins.
+    pause_ends: list[float] = []
     if is_rate_limit_exhausted(error):
         # Without a readable reset, or a reset already past (a clock off): the minute GitHub asks.
-        return max(read_rate_limit_reset(error) or 0, now + MIN_PAUSE_SECONDS)
+        pause_ends.append(
+            max(read_rate_limit_reset(error) or 0, now + MIN_PAUSE_SECONDS)
+        )
     retry_after = error.headers.get("Retry-After")
-    if not is_retried_status(error, retry_after) or not is_retry_after_beyond_max(
-        retry_after
-    ):
-        return None
-    seconds = read_retry_after(retry_after)
-    # Too long to read: no request for the rest of the process.
-    return math.inf if seconds is None else now + seconds
+    if is_retried_status(error, retry_after) and is_retry_after_beyond_max(retry_after):
+        seconds = read_retry_after(retry_after)
+        # Too long to read: no request for the rest of the process.
+        pause_ends.append(math.inf if seconds is None else now + seconds)
+    return max(pause_ends, default=None)
 
 
 def is_retried_status(error: HTTPError, retry_after: str | None) -> bool:
