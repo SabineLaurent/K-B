@@ -482,3 +482,12 @@ La CI (GitHub Actions, `.github/workflows/ci.yml`) lance quatre jobs, `audit` (p
 - **Toute utilisation commerciale est interdite** sans mon accord écrit préalable.
 
 Texte complet : voir [LICENSE](LICENSE).
+
+## Crédits
+
+Les papiers viennent de l'API arXiv, qui demande cette mention à chacun de ses utilisateurs
+([arXiv API Access](https://info.arxiv.org/help/api/index.html), consulté le 2026-10-25) :
+
+> Thank you to arXiv for use of its open access interoperability.
+
+L'API de données la donne aussi, dans la description de son OpenAPI (`/docs`).

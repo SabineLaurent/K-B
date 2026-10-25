@@ -7,7 +7,10 @@ import pytest
 from bs4.exceptions import ParserRejectedMarkup
 from pydantic import ValidationError
 
-from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
+from k_b.core.config import (
+    GITHUB_TRACKED_REPOSITORIES,
+    TLDR_PAUSE_BETWEEN_PAGES_SECONDS,
+)
 from k_b.etl.http_download import RedirectedOutsideError
 from k_b.etl.normalize import normalize_item
 from k_b.etl.source_contract import find_source_kind, list_sources
@@ -62,7 +65,6 @@ def fake_download(monkeypatch):
     fake = FakeDownload({})
     monkeypatch.setattr(tldr, "download", fake)
     monkeypatch.setattr(tldr, "current_day", lambda: TODAY)
-    monkeypatch.setattr(tldr, "sleep", lambda seconds: None)
     return fake
 
 
@@ -597,3 +599,16 @@ def test_an_entry_refused_is_rejected_and_the_others_of_its_page_are_read(tmp_pa
     # The position among the entries read, sponsored ones left out, from 0: not the rank.
     assert rejection.reason.startswith("read entry 1: ValidationError")
     assert "a newsletter_article item without summary" in rejection.reason
+
+
+def test_a_pause_comes_before_every_page_the_first_too(fake_download, monkeypatch):
+    # The editions are collected one after the other: a pause before the first page of each
+    # keeps one between the last page of an edition and the first of the next.
+    pauses = []
+    monkeypatch.setattr(tldr, "sleep", pauses.append)
+
+    TldrSource("ai").fetch(None)
+
+    # The first collection reads the 7 days before today and today.
+    assert len(fake_download.urls) == 8
+    assert pauses == [TLDR_PAUSE_BETWEEN_PAGES_SECONDS] * 8

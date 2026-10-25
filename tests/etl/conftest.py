@@ -6,6 +6,8 @@ from test_transform import copy_fixture
 
 from k_b.database.creation import create_database
 from k_b.etl import http_download
+from k_b.etl.sources import tldr
+from k_b.etl.sources.github import api as github_api
 
 
 @pytest.fixture(autouse=True)
@@ -15,6 +17,18 @@ def no_wait_before_a_retry(monkeypatch):
     waits = []
     monkeypatch.setattr(http_download, "sleep", waits.append)
     return waits
+
+
+@pytest.fixture(autouse=True)
+def no_github_pause(monkeypatch):
+    """A pause GitHub asked in one test never reaches the next."""
+    monkeypatch.setattr(github_api, "paused_until", 0.0)
+
+
+@pytest.fixture(autouse=True)
+def no_pause_before_a_tldr_page(monkeypatch):
+    """A tldr.tech page waits for nothing in a test."""
+    monkeypatch.setattr(tldr, "sleep", lambda seconds: None)
 
 
 @pytest.fixture

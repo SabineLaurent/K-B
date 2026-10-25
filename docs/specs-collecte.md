@@ -120,8 +120,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     (il doublerait l'attente), un autre statut, une réponse d'erreur servie hors de l'adresse
     attendue après une redirection (ses en-têtes ne sont pas lus), et un quota épuisé
     (`x-ratelimit-remaining: 0`, GitHub) : sa remise à zéro peut être dans une heure, et le journal
-    de la source en échec donne son heure (UTC). Chaque nouvel essai est journalisé, l'URL sans sa
-    requête ;
+    de la source en échec donne son heure (UTC). Après un quota épuisé ou un `Retry-After` au-delà de
+    60 s de l'API GitHub, les sources GitHub suivantes n'envoient aucune requête avant la remise à
+    zéro, ou la fin du `Retry-After`, et échouent (`GithubPausedError`, depuis le 2026-10-25 ; une
+    minute au moins, ce que GitHub demande sans heure de remise à zéro lisible ; jusqu'à la fin du
+    processus pour un `Retry-After` trop long pour être lu). La pause vit dans le processus : un
+    `kb collect` suivant repart sans elle. Chaque nouvel essai
+    est journalisé, l'URL sans sa requête ;
   - **écriture du brut** (`src/k_b/etl/raw_store.py`) : un fichier brut déjà présent (deux
     collectes dans la même seconde) est refusé (`FileExistsError`) ; un dossier ou un fichier qui
     ne s'écrit pas (droits, disque plein) lève une `OSError`.
@@ -529,8 +534,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   articles gardés).
 - **Accès** : sans authentification. Le `robots.txt` autorise tout, sauf les pages d'abonnement
   et de compte (`/subscribed`, `/manage`, `/info`…), qu'on ne lit pas.
-- **Limites** : pas de quota publié ; on s'impose une page à la fois, avec une pause entre deux
-  pages. Les liens portent des paramètres de suivi `utm_*` et certaines entrées sont
+- **Limites** : pas de quota publié ; on s'impose une page à la fois, avec une pause de 2 s avant
+  chaque page, d'une édition à la suivante aussi (depuis le 2026-10-25). Les liens portent des paramètres de suivi `utm_*` et certaines entrées sont
   sponsorisées : traité à la lecture (ci-dessus).
 - **Données personnelles** : aucune (voir le registre des traitements).
 - **Suivi** : éditions **ai**, **infosec** et **dev** (ai le 2026-10-01, les deux autres le

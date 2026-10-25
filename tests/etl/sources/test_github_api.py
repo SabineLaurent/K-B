@@ -5,7 +5,7 @@ from http_helpers import http_error
 
 from k_b.etl import http_download
 from k_b.etl.sources.github import api as github_api
-from k_b.etl.sources.github.api import get_from_github_api
+from k_b.etl.sources.github.api import GithubPausedError, get_from_github_api
 from k_b.etl.user_agent import USER_AGENT
 
 BODY = b'[{"tag_name": "v1.0.0"}]'
@@ -93,3 +93,38 @@ def test_only_a_rate_limited_request_waits_the_minute_github_asks(
     assert get_from_github_api(PATH) == BODY
     assert no_wait_before_a_retry == [wait]
     assert github_api.RATE_LIMITED_WAIT_SECONDS == 60
+
+
+# 2026-10-25T16:00:00Z, in epoch seconds.
+RESET = 1792944000
+
+
+def test_after_a_rate_limit_with_no_request_left_no_request_is_sent_until_its_reset(
+    fake_urlopen, monkeypatch
+):
+    exhausted = http_error(
+        github_api.API_URL + PATH,
+        403,
+        x_ratelimit_remaining="0",
+        x_ratelimit_reset=str(RESET),
+    )
+
+    def exhausted_once(request, timeout):
+        fake_urlopen.requests.append(request)
+        raise exhausted
+
+    monkeypatch.setattr(http_download, "urlopen", exhausted_once)
+    monkeypatch.setattr(github_api, "time", lambda: RESET - 3600)
+    with pytest.raises(type(exhausted)):
+        get_from_github_api(PATH)
+
+    monkeypatch.setattr(http_download, "urlopen", fake_urlopen)
+    with pytest.raises(
+        GithubPausedError, match="until 2026-10-25T16:00:00\\+00:00; none sent"
+    ):
+        get_from_github_api(PATH)
+    assert len(fake_urlopen.requests) == 1
+
+    monkeypatch.setattr(github_api, "time", lambda: RESET)
+    assert get_from_github_api(PATH) == BODY
+    assert len(fake_urlopen.requests) == 2

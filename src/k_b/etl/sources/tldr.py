@@ -105,9 +105,10 @@ class TldrSource:
         """The page of each day, or why it is not the edition of the day; a day redirected to the
         landing page is left out."""
         read_pages: dict[date, bytes | PageRefusal] = {}
-        for position, day in enumerate(days):
-            if position > 0:
-                sleep(TLDR_PAUSE_BETWEEN_PAGES_SECONDS)
+        for day in days:
+            # Before every page, the first too: the editions are sources collected one after
+            # the other, and the last page of one would else follow the first of the next.
+            sleep(TLDR_PAUSE_BETWEEN_PAGES_SECONDS)
             page_url = f"{SITE_URL}{self.edition}/{day.isoformat()}"
             try:
                 # The page url itself is the trusted prefix: any redirection is noticed.
