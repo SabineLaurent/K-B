@@ -14,6 +14,7 @@ from typing import Annotated, Any
 from google.cloud import bigquery
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from k_b.core.config import MILLISECONDS_PER_SECOND
 from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import TrendReader
@@ -264,7 +265,7 @@ def configure_query(window_ends: list[date], dry_run: bool) -> bigquery.QueryJob
     return bigquery.QueryJobConfig(
         maximum_bytes_billed=compute_bytes_cap(len(window_ends)),
         # BigQuery stops the job itself: a client timeout alone leaves it running, and billed.
-        job_timeout_ms=QUERY_TIMEOUT_SECONDS * 1000,
+        job_timeout_ms=QUERY_TIMEOUT_SECONDS * MILLISECONDS_PER_SECOND,
         query_parameters=parameters,
     )
 

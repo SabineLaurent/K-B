@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable
 from fastapi import Request, Response
 
 from k_b.core.api_health import HEALTH_PATH
+from k_b.core.config import MILLISECONDS_PER_SECOND
 from k_b.core.quoting import quote_value
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ async def log_request(
                     request.method,
                     find_route_template(request),
                     status_code,
-                    round((time.perf_counter() - started) * 1000),
+                    round((time.perf_counter() - started) * MILLISECONDS_PER_SECOND),
                     getattr(request.state, "client_name", NONE_SEEN),
                     request.state.request_id,
                 ),

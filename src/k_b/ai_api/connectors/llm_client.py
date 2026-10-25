@@ -25,6 +25,7 @@ from k_b.core.config import (
     LLM_RETRY_WAIT_SECONDS,
     LLM_WRITE_TIMEOUT_SECONDS,
     MAX_TOKENS_READ_PER_ANSWER,
+    MILLISECONDS_PER_SECOND,
 )
 from k_b.core.outbound import open_http_client
 
@@ -470,8 +471,8 @@ def summarize[OutputT: BaseModel](
         tokens_out=sum(usage.completion_tokens for usage in usages),
         reasoning_tokens=sum(reasoning) if reasoning else None,
         input_chars=input_chars,
-        llm_ms=round((elapsed_seconds - check_seconds) * 1000),
-        check_ms=round(check_seconds * 1000),
+        llm_ms=round((elapsed_seconds - check_seconds) * MILLISECONDS_PER_SECOND),
+        check_ms=round(check_seconds * MILLISECONDS_PER_SECOND),
         is_checked=any(attempt.is_checked for attempt in attempts),
         retry_after_seconds=last.retry_after_seconds,
         http_status=last.http_status,
