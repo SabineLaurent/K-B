@@ -302,7 +302,7 @@ def test_serve_ai_logs_its_clients_its_provider_and_its_model_never_a_key(
 def test_serve_ai_writes_its_own_log_file_under_kb_data_dir(
     monkeypatch, data_dir, uvicorn_calls, environment
 ):
-    """A long run beside kb serve: each keeps its own file."""
+    """A long run beside kb serve-data: each keeps its own file."""
     set_environment(monkeypatch, environment)
 
     cli.main(["serve-ai"])
@@ -311,7 +311,7 @@ def test_serve_ai_writes_its_own_log_file_under_kb_data_dir(
         data_dir / "logs" / "kb-serve-ai.log"
     ).read_text(encoding="utf-8")
     assert not (data_dir / "logs" / "kb.log").exists()
-    assert not (data_dir / "logs" / "kb-serve.log").exists()
+    assert not (data_dir / "logs" / "kb-serve-data.log").exists()
 
 
 def test_serve_ai_needs_kb_data_dir_for_its_log(

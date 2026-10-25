@@ -1,4 +1,4 @@
-"""The settings kb serve reads: the host and the port it listens on, the hosts it answers."""
+"""The settings kb serve-data reads: the host and the port it listens on, the hosts it answers."""
 
 import re
 from collections.abc import Mapping
@@ -8,7 +8,7 @@ from k_b.core.api_settings import find_host_refusal, find_port_refusal
 from k_b.core.config import DATA_API_ALLOWED_HOSTS, DATA_API_HOST, DATA_API_PORT
 from k_b.core.quoting import quote_value
 
-# Where kb serve listens and the hosts it answers; not set: the defaults of core/config.py.
+# Where kb serve-data listens and the hosts it answers; not set: the defaults of core/config.py.
 DATA_API_HOST_VARIABLE = "KB_DATA_API_HOST"
 DATA_API_PORT_VARIABLE = "KB_DATA_API_PORT"
 DATA_API_ALLOWED_HOSTS_VARIABLE = "KB_DATA_API_ALLOWED_HOSTS"
@@ -26,7 +26,7 @@ class ServeSettings:
 
 
 def read_serve_settings_or_refusal(environ: Mapping[str, str]) -> ServeSettings | str:
-    """The host, the port and the hosts allowed of kb serve, or why the variable is refused, its
+    """The host, the port and the hosts allowed of kb serve-data, or why the variable is refused, its
     value quoted."""
     host = environ.get(DATA_API_HOST_VARIABLE, DATA_API_HOST)
     port = environ.get(DATA_API_PORT_VARIABLE, str(DATA_API_PORT))

@@ -1,4 +1,4 @@
-"""kb serve-ai: serve the digests of the watch by the AI API, beside kb serve."""
+"""kb serve-ai: serve the digests of the watch by the AI API, beside kb serve-data."""
 
 import logging
 import os

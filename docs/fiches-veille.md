@@ -85,14 +85,14 @@ si Sabine la modifie souvent.
 | Paramètre | Forme | Bornes | Défaut | Hors bornes |
 |---|---|---|---|---|
 | `window_days` (corps de `POST /digests`) | entier JSON | de 1 à 14 | `KB_DIGEST_WINDOW_DAYS`, absent ou `null` | 422 `invalid_parameter`, avant toute lecture et tout appel au modèle ; `true`, `3.0` et `"3"` sont refusés (pas des entiers) |
-| `KB_DIGEST_WINDOW_DAYS` (variable d'environnement) | chiffres seuls | de 1 à 14 | 3, défaut nommé dans `core/config.py` (règle 2 de `poc.md`) | l'API IA ne démarre pas (code de sortie 2, échouer fermé, comme `kb serve`) |
+| `KB_DIGEST_WINDOW_DAYS` (variable d'environnement) | chiffres seuls | de 1 à 14 | 3, défaut nommé dans `core/config.py` (règle 2 de `poc.md`) | l'API IA ne démarre pas (code de sortie 2, échouer fermé, comme `kb serve-data`) |
 
 - `since` = l'instant de la demande, en UTC à la seconde, moins `window_days` × 24 h ; il est
   passé à `GET /items?since=…`, et la règle de « quoi de neuf » de l'API de données s'applique :
   la date est celle de la source, pas celle de la collecte.
 - `until` = l'instant de la demande, rendu dans `window.until`. **Limite** : `GET /items` n'a pas
   de borne haute ; un item daté après `until` (une date future dans la source, un décalage
-  d'horloge entre `kb serve` et `kb serve-ai`) est lu et peut être cité.
+  d'horloge entre `kb serve-data` et `kb serve-ai`) est lu et peut être cité.
 - **Limite** : les articles TLDR et les entrées KEV sont datés à minuit UTC
   ([specs-api.md](specs-api.md), « Règle de quoi de neuf ») ; selon l'heure de la demande, une
   fenêtre de 3 jours prend 2 ou 3 éditions. Option écartée : arrondir `since` à minuit (une règle

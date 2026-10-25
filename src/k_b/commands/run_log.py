@@ -16,11 +16,11 @@ LOGGER_NAME = "k_b.cli"
 # The log of every run, successes and failures, apart from the import logs: those are written
 # only when an import reaches the end of its writing in the base.
 LOG_FILE_PATH = Path("logs") / "kb.log"
-# The log of kb serve, apart: a long run that shared kb.log would keep writing in the file of the
+# The log of kb serve-data, apart: a long run that shared kb.log would keep writing in the file of the
 # day before once a rotation done by kb collect or kb import has renamed it (docs/specs-api.md,
 # "Journal").
-SERVE_LOG_FILE_PATH = Path("logs") / "kb-serve.log"
-# The log of kb serve-ai, apart for the same reason: a long run, beside kb serve.
+SERVE_DATA_LOG_FILE_PATH = Path("logs") / "kb-serve-data.log"
+# The log of kb serve-ai, apart for the same reason: a long run, beside kb serve-data.
 SERVE_AI_LOG_FILE_PATH = Path("logs") / "kb-serve-ai.log"
 LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 # The HTTP client of the AI API logs each request at INFO, with its URL (the resource of the

@@ -22,11 +22,11 @@ from k_b.commands.run_log import (
     LOG_FILE_PATH,
     LOGGER_NAME,
     SERVE_AI_LOG_FILE_PATH,
-    SERVE_LOG_FILE_PATH,
+    SERVE_DATA_LOG_FILE_PATH,
     logging_to,
 )
 from k_b.commands.serve_ai_command import run_serve_ai
-from k_b.commands.serve_command import run_serve
+from k_b.commands.serve_data_command import run_serve_data
 from k_b.commands.sigterm import StoppedBySigtermError, stopping_on_sigterm
 from k_b.commands.write_tops_command import run_write_tops
 from k_b.core.config import AI_API_HOST, AI_API_PORT, DATA_API_HOST, DATA_API_PORT
@@ -38,7 +38,7 @@ logger = logging.getLogger(LOGGER_NAME)
 # The long runs, each with its own log file: a rotation done by another command would leave it
 # writing in the file of the day before (docs/specs-api.md, "Journal").
 LOG_FILE_PATH_BY_COMMAND = {
-    "serve": SERVE_LOG_FILE_PATH,
+    "serve-data": SERVE_DATA_LOG_FILE_PATH,
     "serve-ai": SERVE_AI_LOG_FILE_PATH,
 }
 
@@ -69,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
         " the rankings it supersedes",
     )
     command_parsers.add_parser(
-        "serve",
+        "serve-data",
         help="serve the database, read only, on"
         f" http://{DATA_API_HOST}:{DATA_API_PORT} by default",
     )
@@ -136,8 +136,8 @@ def run_command(command: str, data_dir: Path) -> int:
         return run_import(data_dir)
     if command == "write-tops":
         return run_write_tops(data_dir)
-    if command == "serve":
-        return run_serve(data_dir)
+    if command == "serve-data":
+        return run_serve_data(data_dir)
     if command == "serve-ai":
         return run_serve_ai()
     if command == "digest":
