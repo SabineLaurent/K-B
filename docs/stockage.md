@@ -21,8 +21,8 @@ Elle est lue par l'API de données, lancée par `kb serve-data` ([specs-api.md](
 `/items`, `/items/{item_id}` et `/trends` (`src/k_b/data_api/routers/item_router.py`,
 `trend_router.py`), qui ouvrent la base en lecture seule (`src/k_b/data_api/dependencies.py`,
 `connect_database_read_only`). Le code des comptes rendus de veille (`src/k_b/ai_api/`) n'ouvre pas la
-base : il lit la veille par l'API de données (`src/k_b/ai_api/connectors/data_api_client.py`), et n'est
-pas encore servi (#156). `kb search` vient après le 08/11 (journal ADR, 2026-10-15, « POC du
+base : il lit la veille par l'API de données (`src/k_b/ai_api/connectors/data_api_client.py`), et
+est servi par `kb serve-ai` (#156). `kb search` vient après le 08/11 (journal ADR, 2026-10-15, « POC du
 25/10 », décision 1).
 
 ## Le SGBD : SQLite, puis la base au temps 3, non tranchée
