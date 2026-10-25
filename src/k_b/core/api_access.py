@@ -11,8 +11,14 @@ from pydantic import SecretStr
 
 from k_b.core.api_errors import ApiError
 
+# The access rules a client reads in the OpenAPI of both APIs (docs/specs-api.md, "Accès par clé").
+BEARER_SCHEME_DESCRIPTION = (
+    "One key per client, sent as `Authorization: Bearer <key>`. A missing or unknown key gets"
+    " the same 401 `invalid_api_key`. No login route and no token lifetime: a key is revoked by"
+    " removing it and restarting the API."
+)
 # auto_error=False: without a header, the 401 is the one of an unknown key, with the same body.
-BEARER_SCHEME = HTTPBearer(auto_error=False)
+BEARER_SCHEME = HTTPBearer(auto_error=False, description=BEARER_SCHEME_DESCRIPTION)
 # RFC 6750: a 401 says the scheme it expects.
 INVALID_API_KEY_HEADERS = {"WWW-Authenticate": "Bearer"}
 

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from openapi_spec_validator import OpenAPIV31SpecValidator
 
+from k_b.core.api_access import BEARER_SCHEME_DESCRIPTION
 from k_b.data_api.app import create_app
 
 OPENAPI_PATH = Path(__file__).parents[2] / "docs" / "api" / "openapi-donnees.json"
@@ -29,7 +30,11 @@ def test_the_versioned_openapi_is_valid_and_declares_its_security_scheme():
     OpenAPIV31SpecValidator(openapi).validate()
     assert openapi["info"]["version"] == "0.5.0"
     assert openapi["components"]["securitySchemes"] == {
-        "HTTPBearer": {"type": "http", "scheme": "bearer"}
+        "HTTPBearer": {
+            "type": "http",
+            "scheme": "bearer",
+            "description": BEARER_SCHEME_DESCRIPTION,
+        }
     }
     for path in openapi["paths"].values():
         assert path["get"]["security"] == [{"HTTPBearer": []}]

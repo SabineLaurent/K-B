@@ -437,6 +437,7 @@
     "securitySchemes": {
       "HTTPBearer": {
         "type": "http",
+        "description": "One key per client, sent as `Authorization: Bearer <key>`. A missing or unknown key gets the same 401 `invalid_api_key`. No login route and no token lifetime: a key is revoked by removing it and restarting the API.",
         "scheme": "bearer"
       }
     }
