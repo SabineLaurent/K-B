@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 from k_b.core.config import WATCH_DIR_NAME
-from k_b.database.dates import format_date
+from k_b.core.dates import format_date
 from k_b.post.ai_api_client import Digest, DigestsResponse, Source
 from k_b.post.vault_files import (
     CHARACTER_REFERENCE,

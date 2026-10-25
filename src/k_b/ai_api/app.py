@@ -12,7 +12,7 @@ from pydantic import SecretStr
 from k_b.ai_api.api_router import api_router
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.connectors.llm_settings import LlmSettings
-from k_b.ai_api.metric_instruments import ModelMetrics
+from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.core.api_access import check_api_key
 from k_b.core.api_errors import API_ERROR_HANDLERS, respond_to_unexpected_error
 from k_b.core.api_health import HEALTH_PATH, answer_health

@@ -12,7 +12,7 @@ from k_b import cli
 from k_b.ai_api.app import create_app
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.connectors.llm_settings import LlmSettings
-from k_b.ai_api.metric_instruments import ModelMetrics
+from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.commands.openapi_command import describe_ai_api
 from k_b.core.config import DigestSubject
 

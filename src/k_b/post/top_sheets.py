@@ -11,8 +11,8 @@ from pathlib import Path, PurePosixPath
 from typing import NamedTuple
 
 from k_b.core.config import TOPS_DIR_NAME, WATCH_DIR_NAME
+from k_b.core.dates import format_date
 from k_b.core.quoting import quote_value
-from k_b.database.dates import format_date
 from k_b.etl.raw_files import COLLECTION_NAME_FORMAT, parse_collection_name
 from k_b.etl.raw_store import RawStore
 from k_b.etl.tops import Top, TopEntry

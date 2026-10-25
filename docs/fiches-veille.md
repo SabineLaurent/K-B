@@ -1,6 +1,6 @@
-# Spécification des fiches de veille
+# Spécification des comptes rendus de veille
 
-Une fiche de veille regroupe, pour un sujet d'une liste fermée, ce que la veille de K-B a vu sur
+Un compte rendu de veille regroupe, pour un sujet d'une liste fermée, ce que la veille de K-B a vu sur
 une fenêtre de quelques jours. C'est la première sortie d'un modèle dans K-B : ce document est son
 contrat, écrit avant le code. Il dit ce qui entre, ce qui sort, ce que le code refuse et ce qu'il
 mesure. Les décisions et leur pourquoi sont dans le [journal ADR](ADR/journal-decisions-projet.md)
@@ -85,14 +85,14 @@ si Sabine la modifie souvent.
 | Paramètre | Forme | Bornes | Défaut | Hors bornes |
 |---|---|---|---|---|
 | `window_days` (corps de `POST /digests`) | entier JSON | de 1 à 14 | `KB_DIGEST_WINDOW_DAYS`, absent ou `null` | 422 `invalid_parameter`, avant toute lecture et tout appel au modèle ; `true`, `3.0` et `"3"` sont refusés (pas des entiers) |
-| `KB_DIGEST_WINDOW_DAYS` (variable d'environnement) | chiffres seuls | de 1 à 14 | 3, défaut nommé dans `core/config.py` (règle 2 de `poc.md`) | l'API IA ne démarre pas (code de sortie 2, échouer fermé, comme `kb serve`) |
+| `KB_DIGEST_WINDOW_DAYS` (variable d'environnement) | chiffres seuls | de 1 à 14 | 3, défaut nommé dans `core/config.py` (règle 2 de `poc.md`) | l'API IA ne démarre pas (code de sortie 2, échouer fermé, comme `kb serve-data`) |
 
 - `since` = l'instant de la demande, en UTC à la seconde, moins `window_days` × 24 h ; il est
   passé à `GET /items?since=…`, et la règle de « quoi de neuf » de l'API de données s'applique :
   la date est celle de la source, pas celle de la collecte.
 - `until` = l'instant de la demande, rendu dans `window.until`. **Limite** : `GET /items` n'a pas
   de borne haute ; un item daté après `until` (une date future dans la source, un décalage
-  d'horloge entre `kb serve` et `kb serve-ai`) est lu et peut être cité.
+  d'horloge entre `kb serve-data` et `kb serve-ai`) est lu et peut être cité.
 - **Limite** : les articles TLDR et les entrées KEV sont datés à minuit UTC
   ([specs-api.md](specs-api.md), « Règle de quoi de neuf ») ; selon l'heure de la demande, une
   fenêtre de 3 jours prend 2 ou 3 éditions. Option écartée : arrondir `since` à minuit (une règle
@@ -540,7 +540,7 @@ identifiant), et les lettres cyrilliques, grecques et petites capitales latines 
 une lettre d'un préfixe lues comme elle (`СVЕ` cyrillique se lit `cve`), puis toute autre lettre,
 chiffre ou symbole hors ASCII qui n'est pas une lettre ASCII accentuée lu comme `o` (`é` reste `é`,
 pour que `numéro` se lise ; `CVE-2026-ЗЗЗЗ` se lit `CVE-2026-oooo`). Écrits sur ce texte, en
-minuscules (`ai_api/fidelity.py`, `CVE` et `GHSA`), avec `S` = `[\W_]*` :
+minuscules (`ai_api/stages/fidelity.py`, `CVE` et `GHSA`), avec `S` = `[\W_]*` :
 
 - CVE : `c S v S e [s] S [mot de numéro S] [\doli]{4} S [\doli]{4,}` ;
 - GHSA : `g S h S s S a [s] S [mot de numéro S] [0-9a-z]{4} S [0-9a-z]{4} S [0-9a-z]{4}`.
@@ -645,7 +645,7 @@ d'une affirmation trop longue ne compterait pas).
 
 **Partie commune avec le wiki (#153).** Le contrôle de fidélité du wiki reprend d'ici la
 normalisation, la recherche mot pour mot entre deux limites et le taux calculé à chaque appel
-(critère de #153) ; le code est `ai_api/fidelity.py`. Il n'en reprend pas ce qui tient aux items :
+(critère de #153) ; le code est `ai_api/stages/fidelity.py`. Il n'en reprend pas ce qui tient aux items :
 les champs où chercher par sorte et l'égalité des CVE et GHSA à un champ identifiant, qu'un clip
 n'a pas.
 
@@ -728,7 +728,7 @@ Une ligne JSON par appel au modèle, sur la sortie standard, sans fichier (règl
 Un **appel** est un classement ou la rédaction d'un sujet, nouvelle tentative
 comprise : jetons et durées sont cumulés sur la ligne.
 Les lignes d'une demande sont écrites quand ses appels sont finis, classement en échec compris,
-dans l'ordre des appels, chacune vidée aussitôt (`ai_api/metrics.py`) : sur SIGTERM, uvicorn
+dans l'ordre des appels, chacune vidée aussitôt (`ai_api/observability/metrics.py`) : sur SIGTERM, uvicorn
 renvoie le signal, et une ligne restée dans le tampon d'un tube serait perdue. `ts` est donc
 l'heure d'écriture, pas celle de l'appel. Un champ « nul » vaut `null` en JSON.
 
@@ -782,7 +782,7 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 Les mesures de chaque appel partent aussi en métriques OpenTelemetry, exportées en OTLP (HTTP,
 protobuf, gzip) vers Grafana Cloud, en région UE (journal ADR, 2026-10-20, « Squelette E1 E3 »,
 décision 4). La ligne JSON reste : l'export s'y ajoute. Le code est dans
-`ai_api/metric_instruments.py` (les instruments, `ModelMetrics`) et
+`ai_api/observability/metric_instruments.py` (les instruments, `ModelMetrics`) et
 `ai_api/connectors/metrics_export.py` (les réglages, le fournisseur de mesures) ; OpenTelemetry
 n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
 
@@ -1021,7 +1021,7 @@ source ni dans le texte rendu. Une ligne horizontale ou un soulignement (`---`,
 `***`, `===`) n'est jamais seul sur sa ligne : l'affirmation finit par ses sources, le titre par
 son URL. Les caractères des fiches des tops sont repris (`post/vault_files.py`), avec la même règle
 du `&`, une seule pour les deux écrivains du coffre (décision de Sabine du 2026-10-21) ; `~ : @`,
-`www.`, le marqueur de liste et l'espace entre deux deux-points s'y ajoutent, car une URL nue reste du texte dans une fiche de veille : une
+`www.`, le marqueur de liste et l'espace entre deux deux-points s'y ajoutent, car une URL nue reste du texte dans un compte rendu de veille : une
 affirmation du modèle ne fait jamais un lien. Le contrôle 6 de l'API IA reste en amont (défense en profondeur). Non échappée, voulu :
 l'emphase (`*x*`, `_x_`, `==x==`), de la mise en forme, ni lien ni code.
 

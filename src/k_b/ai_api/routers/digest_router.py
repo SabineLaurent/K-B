@@ -18,7 +18,7 @@ from k_b.ai_api.digests import (
     build_digests,
 )
 from k_b.ai_api.errors import ERROR_RESPONSES, to_api_error
-from k_b.ai_api.metrics import RequestMeasures, write_llm_call_lines
+from k_b.ai_api.observability.metrics import RequestMeasures, write_llm_call_lines
 from k_b.ai_api.schemas.digest_schema import (
     ClaimSchema,
     DigestRequestSchema,
@@ -30,7 +30,7 @@ from k_b.ai_api.schemas.digest_schema import (
 )
 from k_b.ai_api.watch_items import WatchReading
 from k_b.core.api_request_log import read_request_id
-from k_b.core.config import DIGEST_REQUEST_TIMEOUT_SECONDS
+from k_b.core.config import DIGEST_REQUEST_TIMEOUT_SECONDS, MILLISECONDS_PER_SECOND
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ def post_digests(
     since = until - timedelta(days=window_days)
     started = time.perf_counter()
     reading = read_window(data_api_client, since, deadline, request_id)
-    data_fetch_ms = round((time.perf_counter() - started) * 1000)
+    data_fetch_ms = round((time.perf_counter() - started) * MILLISECONDS_PER_SECOND)
     # Each request read, a model called or not (docs/fiches-veille.md, "Métriques").
     state.model_metrics.record_data_fetch(data_fetch_ms)
     result = build_digests(

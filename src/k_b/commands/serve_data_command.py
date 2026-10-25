@@ -1,4 +1,4 @@
-"""kb serve: serve the database, read only, with the keys and the settings of the environment."""
+"""kb serve-data: serve the database, read only, with the keys and the settings of the environment."""
 
 import logging
 import os
@@ -16,7 +16,7 @@ from k_b.database.connection import DATABASE_FILE_NAME
 logger = logging.getLogger(LOGGER_NAME)
 
 
-def run_serve(data_dir: Path) -> int:
+def run_serve_data(data_dir: Path) -> int:
     """Serve the base with the keys and the settings of the environment, uvicorn logging as kb."""
     api_keys = value_or_log_refusal(
         read_api_keys_or_refusal(os.environ, API_KEY_VARIABLE_PREFIX)

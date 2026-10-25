@@ -15,7 +15,7 @@ from k_b.database.creation import create_database
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 ZOTERO_LIBRARY_SCRIPT = FIXTURES_DIR / "zotero_extract.sql"
 ITEMS_DATABASE_SCRIPT = FIXTURES_DIR / "items_database.sql"
-# The settings of kb serve and of the log, which a terminal may export (a .env loaded).
+# The settings of kb serve-data and of the log, which a terminal may export (a .env loaded).
 KB_SETTINGS_VARIABLES = (
     "KB_DATA_API_HOST",
     "KB_DATA_API_PORT",

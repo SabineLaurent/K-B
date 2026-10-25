@@ -1,4 +1,4 @@
-"""kb serve and kb openapi: the keys and the settings checked at the start, the hosts allowed,
+"""kb serve-data and kb openapi: the keys and the settings checked at the start, the hosts allowed,
 the log, the OpenAPI written without data directory."""
 
 import os
@@ -12,7 +12,7 @@ import uvicorn.config
 from fastapi.testclient import TestClient
 
 from k_b import cli
-from k_b.commands import serve_command
+from k_b.commands import serve_data_command
 
 VERSIONED_OPENAPI = Path(__file__).parents[2] / "docs" / "api" / "openapi-donnees.json"
 
@@ -29,7 +29,7 @@ def no_api_key_of_the_terminal(monkeypatch):
 def uvicorn_calls(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        serve_command.uvicorn,
+        serve_data_command.uvicorn,
         "run",
         lambda app, **options: calls.append((app, options)),
     )
@@ -80,7 +80,7 @@ def test_serve_exits_2_and_names_the_variable_without_its_value(
     for name, value in variables.items():
         monkeypatch.setenv(name, value)
 
-    exit_code = cli.main(["serve"])
+    exit_code = cli.main(["serve-data"])
 
     error_output = capsys.readouterr().err
     assert exit_code == 2
@@ -98,7 +98,7 @@ def test_serve_exits_2_when_two_clients_have_the_same_key(
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", key)
     monkeypatch.setenv("KB_DATA_API_KEY_AGENT", key)
 
-    exit_code = cli.main(["serve"])
+    exit_code = cli.main(["serve-data"])
 
     error_output = capsys.readouterr().err
     assert exit_code == 2
@@ -117,7 +117,7 @@ def test_serve_logs_the_names_of_the_clients_never_their_keys(
     for name, value in keys.items():
         monkeypatch.setenv(name, value)
 
-    exit_code = cli.main(["serve"])
+    exit_code = cli.main(["serve-data"])
 
     error_output = capsys.readouterr().err
     assert exit_code == 0
@@ -131,7 +131,7 @@ def test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_conf
 ):
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
 
-    cli.main(["serve"])
+    cli.main(["serve-data"])
 
     [(_, options)] = uvicorn_calls
     assert options == {
@@ -149,7 +149,7 @@ def test_serve_listens_on_the_host_and_port_of_the_environment(
     monkeypatch.setenv("KB_DATA_API_HOST", "192.0.2.10")
     monkeypatch.setenv("KB_DATA_API_PORT", "8080")
 
-    cli.main(["serve"])
+    cli.main(["serve-data"])
 
     [(_, options)] = uvicorn_calls
     assert (options["host"], options["port"]) == ("192.0.2.10", 8080)
@@ -207,7 +207,7 @@ def test_serve_exits_2_on_a_host_or_port_refused(
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv(variable, value)
 
-    exit_code = cli.main(["serve"])
+    exit_code = cli.main(["serve-data"])
 
     assert exit_code == 2
     assert message in capsys.readouterr().err
@@ -247,7 +247,7 @@ def test_serve_exits_2_and_names_the_allowed_hosts_refused(
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv("KB_DATA_API_ALLOWED_HOSTS", value)
 
-    exit_code = cli.main(["serve"])
+    exit_code = cli.main(["serve-data"])
 
     assert exit_code == 2
     assert message in capsys.readouterr().err
@@ -260,7 +260,7 @@ def test_serve_allows_the_hosts_of_the_environment_and_no_other(
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv("KB_DATA_API_ALLOWED_HOSTS", " api-donnees ,localhost")
 
-    cli.main(["serve"])
+    cli.main(["serve-data"])
 
     [(app, _)] = uvicorn_calls
     client = TestClient(app, base_url="http://api-donnees")
@@ -272,16 +272,16 @@ def test_serve_allows_the_hosts_of_the_environment_and_no_other(
 def test_serve_reads_the_base_and_writes_its_own_log_file_under_kb_data_dir(
     monkeypatch, data_dir, uvicorn_calls
 ):
-    """kb serve runs for long: a rotation done by kb collect in kb.log would leave it writing in
+    """kb serve-data runs for long: a rotation done by kb collect in kb.log would leave it writing in
     the file of the day before."""
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
 
-    cli.main(["serve"])
+    cli.main(["serve-data"])
 
     [(app, _)] = uvicorn_calls
     assert app.state.database_path == data_dir / "k-b.sqlite"
     assert "API clients loaded: TERMINAL" in (
-        data_dir / "logs" / "kb-serve.log"
+        data_dir / "logs" / "kb-serve-data.log"
     ).read_text(encoding="utf-8")
     assert not (data_dir / "logs" / "kb.log").exists()
 
@@ -293,7 +293,7 @@ def test_without_log_file_kb_logs_on_stderr_only(
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv("KB_LOG_TO_FILE", "false")
 
-    exit_code = cli.main(["serve"])
+    exit_code = cli.main(["serve-data"])
 
     assert exit_code == 0
     assert "API clients loaded: TERMINAL" in capsys.readouterr().err
@@ -307,7 +307,7 @@ def test_a_log_to_file_value_refused_exits_2(
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv("KB_LOG_TO_FILE", value)
 
-    exit_code = cli.main(["serve"])
+    exit_code = cli.main(["serve-data"])
 
     assert exit_code == 2
     assert (
@@ -356,15 +356,15 @@ def test_serve_exits_with_the_code_of_uvicorn_when_it_does_not_start_and_sets_no
     sigterm_handlers = []
 
     def fail_to_start(app, **options):
-        # uvicorn sets its own SIGTERM handler: kb serve leaves it the one it found.
+        # uvicorn sets its own SIGTERM handler: kb serve-data leaves it the one it found.
         sigterm_handlers.append(signal.getsignal(signal.SIGTERM))
         sys.exit(uvicorn.config.STARTUP_FAILURE)
 
-    monkeypatch.setattr(serve_command.uvicorn, "run", fail_to_start)
+    monkeypatch.setattr(serve_data_command.uvicorn, "run", fail_to_start)
     handler_before = signal.getsignal(signal.SIGTERM)
 
     with pytest.raises(SystemExit) as stop:
-        cli.main(["serve"])
+        cli.main(["serve-data"])
 
     assert stop.value.code == cli.ExitCode.SERVER_NOT_STARTED
     assert sigterm_handlers == [handler_before]

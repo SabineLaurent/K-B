@@ -26,7 +26,7 @@ from k_b.ai_api.connectors.metrics_export import (
     read_metrics_export_settings_or_refusal,
 )
 from k_b.ai_api.dependencies import open_data_api_client, read_request_time
-from k_b.ai_api.metric_instruments import ModelMetrics
+from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.core.config import DIGEST_SUBJECTS, LLM_REPLAY_BASE_URL
 from k_b.data_api.app import create_app as create_data_app
 

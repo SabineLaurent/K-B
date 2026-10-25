@@ -38,7 +38,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   | **4** | `PARTIAL_FAILURE` | au moins une source a réussi, au moins une a échoué, et l'état est écrit : les sources réussies sont acquises, les autres repartent de leur date à la collecte suivante |
   | **143** | `STOPPED_BY_SIGTERM` | arrêt par SIGTERM (`docker stop`) : le brut déjà écrit reste ; si l'arrêt vient avant l'écriture de l'état, l'état n'est pas écrit et la collecte suivante relit les mêmes fenêtres ; s'il vient après (pendant l'affichage des lignes), l'état est écrit et le code reste 143 |
 
-  Le code 3 (`SERVER_NOT_STARTED`) est propre à `kb serve`. Ctrl-C (SIGINT) n'est pas traité par
+  Le code 3 (`SERVER_NOT_STARTED`) est propre à `kb serve-data`. Ctrl-C (SIGINT) n'est pas traité par
   `kb` : Python affiche sa trace hors du journal daté, l'état n'est pas écrit si l'arrêt vient
   avant lui, et le code de sortie, donné par le shell, est 130 ; aucun code nommé ne le décrit.
 - **Choisir les sources** (#201) : `KB_COLLECT_ONLY`, posée, ne lance que les sources nommées,

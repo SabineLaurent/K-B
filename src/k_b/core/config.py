@@ -39,17 +39,17 @@ RETENTION_YEARS_BY_ACQUISITION_MODE: dict[str, int | None] = {
 CLIP_CHANGE_MARGIN = timedelta(seconds=60)
 
 # How many log files of past days kb keeps, of each log (logs/kb.log.<day> and
-# logs/kb-serve.log.<day> of the data directory), the oldest removed at the rotation: about a
+# logs/kb-serve-data.log.<day> of the data directory), the oldest removed at the rotation: about a
 # month of daily collections (Sabine, 2026-10-14).
 LOG_FILES_KEPT = 30
 
-# The local defaults of kb serve, each changed by its variable (data_api/settings.py;
+# The local defaults of kb serve-data, each changed by its variable (data_api/settings.py;
 # .claude/rules/poc.md, rule 2): the data API listens on the machine only and answers these hosts
 # only.
 DATA_API_HOST = "127.0.0.1"
 DATA_API_PORT = 8000
 DATA_API_ALLOWED_HOSTS = ("127.0.0.1", "localhost")
-# The key of a client of the data API (docs/specs-api.md, "Accès par clé"), checked by kb serve
+# The key of a client of the data API (docs/specs-api.md, "Accès par clé"), checked by kb serve-data
 # for each client and by the AI API for the key it sends. secrets.token_urlsafe(32) gives 43
 # characters: 32 is the minimum checked. The alphabet of token_urlsafe, the way of making a key
 # the README gives. HTTPBearer strips the spaces around the key received
@@ -107,7 +107,7 @@ LLM_INPUT_USD_PER_MILLION_TOKENS = 0.12
 LLM_OUTPUT_USD_PER_MILLION_TOKENS = 0.60
 
 # The local defaults of kb serve-ai, each changed by its variable (ai_api/settings.py;
-# .claude/rules/poc.md, rule 2): the AI API listens on the machine only, beside kb serve.
+# .claude/rules/poc.md, rule 2): the AI API listens on the machine only, beside kb serve-data.
 AI_API_HOST = "127.0.0.1"
 AI_API_PORT = 8001
 # The window of a digest request, in days (docs/fiches-veille.md, "Fenêtre"): the default, changed
@@ -117,9 +117,9 @@ MIN_DIGEST_WINDOW_DAYS = 1
 MAX_DIGEST_WINDOW_DAYS = 14
 
 # The reading of the watch by the AI API through the data API (ai_api/connectors/data_api_client.py;
-# docs/fiches-veille.md, "Lecture plafonnée"). The URL of kb serve with its defaults, changed by
+# docs/fiches-veille.md, "Lecture plafonnée"). The URL of kb serve-data with its defaults, changed by
 # KB_DATA_API_URL; it does not follow KB_DATA_API_PORT: set KB_DATA_API_URL too when the port of
-# kb serve changes.
+# kb serve-data changes.
 DATA_API_URL = f"http://{DATA_API_HOST}:{DATA_API_PORT}"
 # Assumed values for a service on the same machine or in the same compose network. They bound
 # each wait (a connection, each piece of an answer read), neither a request nor the reading: the
