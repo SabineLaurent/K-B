@@ -154,7 +154,8 @@ de la revue).
 - Une pause par quota GitHub (core ou search), si les tops devaient un jour ne pas attendre.
 - Une pause qui survit au processus (écrite à côté des dates de dernière collecte) : un
   `kb collect` relancé avant la remise à zéro renverrait au plus une requête refusée par source
-  GitHub. Écarté à la revue : `kb collect` est lancé à la main, rarement deux fois par heure.
+  GitHub. Écarté à la revue : la collecte prévue est quotidienne (launchd,
+  `docs/2026-10-07-clarification-modele.md:568`), bien au-delà d'une remise à zéro (une heure au plus).
 - Un intervalle minimal par hôte dans `download()`, qui espacerait toutes les sources sans cas
   particulier : une refonte de la couche réseau, à proposer à part.
 
