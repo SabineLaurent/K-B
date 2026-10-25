@@ -183,10 +183,10 @@ Posés par `configure_query`, jamais collés dans le texte :
 - `@first_suffix`, `@last_suffix` : premier et dernier jour lus, au format `TABLE_SUFFIX_FORMAT` ;
 - `@window_ends` : les fins de fenêtre ;
 - `@window_days` : `WINDOW_DAYS` ;
-- `@top_size` : `TOP_SIZE`.
+- `@top_size` : `GH_ARCHIVE_TOP_SIZE`.
 
 Les jours et les fenêtres changent d'une collecte à l'autre. `@window_days` et `@top_size` ne
-changent pas : ils sont des paramètres pour que `WINDOW_DAYS` et `TOP_SIZE` ne soient écrits qu'à un
+changent pas : ils sont des paramètres pour que `WINDOW_DAYS` et `GH_ARCHIVE_TOP_SIZE` ne soient écrits qu'à un
 endroit (un test de `tests/etl/sources/test_gh_archive.py` vérifie que la taille du classement
 n'est pas dans le texte de la requête). Restent écrits dans le texte : la table, les types d'événement,
 et ce qui reconstruit le jour à partir du nom de la table (le préfixe du siècle, le format de
@@ -207,7 +207,7 @@ date).
 - **Puis l'exécution plafonnée** : `maximum_bytes_billed` vaut `compute_bytes_cap`
   (`MAX_BYTES_PER_WINDOW` par fenêtre, `MAX_BYTES_BILLED` au plus), et `job_timeout_ms` arrête le
   job chez BigQuery (`QUERY_TIMEOUT_SECONDS`).
-- **Un rattrapage borné** : `MAX_CATCH_UP_WINDOWS` fenêtres au plus.
+- **Un rattrapage borné** : `GH_ARCHIVE_MAX_CATCH_UP_WINDOWS` fenêtres au plus.
 - **Le bac à sable** : sans facturation, un dépassement du quota est refusé, jamais facturé.
 
 Les chiffres (volume par fenêtre et par rattrapage, calcul des bornes) sont dans
@@ -285,24 +285,26 @@ sélection de toutes les colonnes.
 
 ## 3. Paramètres des requêtes aux API
 
-Chaque source construit ses requêtes dans son module ; les valeurs des constantes (tailles de page,
-plafonds, délais) sont dans le code, et leur justification dans la section de la source de
-[specs-collecte.md](specs-collecte.md). Chaque téléchargement passe par `download`
-(`src/k_b/etl/http_download.py`) : délai (`TIMEOUT_SECONDS`), taille maximale, préfixe d'URL de
+Chaque source construit ses requêtes dans son module. Les réglages de la veille (mots-clés d'arXiv,
+éditions TLDR, dépôts suivis, seuils et taille des tops, délai réseau…) sont dans
+`src/k_b/core/config.py`, chacun préfixé par sa source (#123) ; les faits des API (URL, tailles de
+page) et les plafonds restent dans le module de la source. Leur justification est dans la section de
+la source de [specs-collecte.md](specs-collecte.md). Chaque téléchargement passe par `download`
+(`src/k_b/etl/http_download.py`) : délai (`HTTP_TIMEOUT_SECONDS`), taille maximale, préfixe d'URL de
 confiance, un seul nouvel essai après un 429, un 5xx ou un échec de connexion
 (`src/k_b/etl/http_retry.py` ; l'API GitHub attend 60 s après un 429 sans `Retry-After`)
 ([règles communes](specs-collecte.md#règles-communes)).
 
 | Source | Fichier | Construite par | Paramètres | Filtre à la requête | Spécifications |
 |---|---|---|---|---|---|
-| arXiv | `src/k_b/etl/sources/arxiv.py` | `ArxivSource.fetch`, `build_search_query`, `download_papers` | URL `API_URL` ; `search_query` ; `start` ; `max_results` (`PAPERS_PER_PAGE`) ; `sortBy` et `sortOrder` (date de soumission, croissante) ; réponse plafonnée par `MAX_RESPONSE_BYTES` | `cat:cs.CR AND cat:cs.AI`, un mot-clé de `KEYWORDS` dans le résumé (`abs:`), `submittedDate` depuis la dernière collecte moins `ANNOUNCEMENT_DELAY_MARGIN` (première collecte : `FIRST_COLLECTION_START`) | [API arXiv](specs-collecte.md#api-arxiv--service-web) |
-| GitHub, releases | `src/k_b/etl/sources/github/releases.py` | `GithubReleasesSource.fetch` | chemin `repos/<dépôt>/releases`, dépôt pris dans `TRACKED_REPOSITORIES` (`core/config.py`) ; `per_page` (`RELEASES_PER_PAGE`) | aucun : `fetch` compare les dates de la page à la dernière collecte | [API GitHub](specs-collecte.md#api-github--service-web) |
-| GitHub, alertes | `src/k_b/etl/sources/github/advisories.py` | `GithubAdvisoriesSource.fetch` | chemin `advisories` ; `type=reviewed` ; `ecosystem` (un de `ECOSYSTEMS`) ; `affects` ; `sort=updated` ; `per_page` (`ADVISORIES_PER_PAGE`) ; `updated`, seulement s'il y a une dernière collecte | `affects` : les paquets suivis, donnés par `list_packages_by_ecosystem` (`etl/source_kinds.py`) ; `updated` : mises à jour depuis la veille de la dernière collecte (l'API n'a pas de filtre sur la date de revue, et la mise à jour n'est jamais antérieure à la revue), puis `fetch` compare les dates de revue à la dernière collecte | [API GitHub](specs-collecte.md#api-github--service-web) |
-| GitHub, dépôts les plus étoilés | `src/k_b/etl/sources/github/most_starred.py` | `GithubMostStarredSource.fetch` | chemin `search/repositories` ; `q` (`SEARCH_QUERY`) ; `sort=stars` ; `order=desc` ; `per_page` (`RANKING_SIZE`) | aucun : la recherche exige un critère, et `SEARCH_QUERY` garde tout le classement (commentaire de la constante) | [API GitHub](specs-collecte.md#api-github--service-web) |
-| GitHub, dépôts les plus forkés | `src/k_b/etl/sources/github/most_forked.py` | `GithubMostForkedSource.fetch` | chemin `search/repositories` ; `q` (`SEARCH_QUERY`) ; `sort=forks` ; `order=desc` ; `per_page` (`RANKING_SIZE`) | aucun : la recherche exige un critère, et `SEARCH_QUERY` garde tout le classement (commentaire de la constante) | [API GitHub](specs-collecte.md#api-github--service-web) |
+| arXiv | `src/k_b/etl/sources/arxiv.py` | `ArxivSource.fetch`, `build_search_query`, `download_papers` | URL `API_URL` ; `search_query` ; `start` ; `max_results` (`PAPERS_PER_PAGE`) ; `sortBy` et `sortOrder` (date de soumission, croissante) ; réponse plafonnée par `MAX_RESPONSE_BYTES` | `cat:cs.CR AND cat:cs.AI`, un mot-clé de `ARXIV_KEYWORDS` dans le résumé (`abs:`), `submittedDate` depuis la dernière collecte moins `ARXIV_ANNOUNCEMENT_DELAY_MARGIN` (première collecte : `ARXIV_FIRST_COLLECTION_START`) | [API arXiv](specs-collecte.md#api-arxiv--service-web) |
+| GitHub, releases | `src/k_b/etl/sources/github/releases.py` | `GithubReleasesSource.fetch` | chemin `repos/<dépôt>/releases`, dépôt pris dans `GITHUB_TRACKED_REPOSITORIES` (`core/config.py`) ; `per_page` (`RELEASES_PER_PAGE`) | aucun : `fetch` compare les dates de la page à la dernière collecte | [API GitHub](specs-collecte.md#api-github--service-web) |
+| GitHub, alertes | `src/k_b/etl/sources/github/advisories.py` | `GithubAdvisoriesSource.fetch` | chemin `advisories` ; `type=reviewed` ; `ecosystem` (un de `GITHUB_ECOSYSTEMS`) ; `affects` ; `sort=updated` ; `per_page` (`ADVISORIES_PER_PAGE`) ; `updated`, seulement s'il y a une dernière collecte | `affects` : les paquets suivis, donnés par `list_packages_by_ecosystem` (`etl/source_kinds.py`) ; `updated` : mises à jour depuis la veille de la dernière collecte (l'API n'a pas de filtre sur la date de revue, et la mise à jour n'est jamais antérieure à la revue), puis `fetch` compare les dates de revue à la dernière collecte | [API GitHub](specs-collecte.md#api-github--service-web) |
+| GitHub, dépôts les plus étoilés | `src/k_b/etl/sources/github/most_starred.py` | `GithubMostStarredSource.fetch` | chemin `search/repositories` ; `q` (`GITHUB_MOST_STARRED_SEARCH_QUERY`) ; `sort=stars` ; `order=desc` ; `per_page` (`GITHUB_RANKING_SIZE`) | aucun : la recherche exige un critère, et `GITHUB_MOST_STARRED_SEARCH_QUERY` garde tout le classement (commentaire de la constante) | [API GitHub](specs-collecte.md#api-github--service-web) |
+| GitHub, dépôts les plus forkés | `src/k_b/etl/sources/github/most_forked.py` | `GithubMostForkedSource.fetch` | chemin `search/repositories` ; `q` (`GITHUB_MOST_FORKED_SEARCH_QUERY`) ; `sort=forks` ; `order=desc` ; `per_page` (`GITHUB_RANKING_SIZE`) | aucun : la recherche exige un critère, et `GITHUB_MOST_FORKED_SEARCH_QUERY` garde tout le classement (commentaire de la constante) | [API GitHub](specs-collecte.md#api-github--service-web) |
 | GitHub, commun aux quatre | `src/k_b/etl/sources/github/api.py` | `get_from_github_api` | URL `API_URL` ; en-têtes `Accept` et `X-GitHub-Api-Version` (`API_VERSION`) ; jeton (`TOKEN_VARIABLE`) en `Authorization`, jamais transmis à une redirection ; réponse plafonnée par `MAX_RESPONSE_BYTES` | — | [jeton-github.md](jeton-github.md) |
 | CISA KEV | `src/k_b/etl/sources/cisa_kev.py` | `CisaKevSource.fetch` | URL `CATALOG_URL` ; en-tête `If-Modified-Since` (date de la dernière collecte), seulement s'il y en a une ; réponse plafonnée par `MAX_CATALOG_BYTES`, servie sous `TRUSTED_URL_PREFIX` | aucun : le catalogue entier, ou rien s'il n'a pas changé (`HTTP_NOT_MODIFIED`) | [Catalogue CISA KEV](specs-collecte.md#catalogue-cisa-kev--fichier) |
-| tldr.tech | `src/k_b/etl/sources/tldr.py` | `TldrSource.fetch` | URL `SITE_URL` + édition (une de `TRACKED_EDITIONS`) + jour ; jours donnés par `list_days_to_collect` (première collecte : `FIRST_COLLECTION_DAYS`) ; `PAUSE_BETWEEN_PAGES_SECONDS` entre deux pages ; page plafonnée par `MAX_PAGE_BYTES` | le jour, dans l'URL | [tldr.tech](specs-collecte.md#tldrtech--scraping) |
+| tldr.tech | `src/k_b/etl/sources/tldr.py` | `TldrSource.fetch` | URL `SITE_URL` + édition (une de `TLDR_TRACKED_EDITIONS`) + jour ; jours donnés par `list_days_to_collect` (première collecte : `TLDR_FIRST_COLLECTION_DAYS`) ; `TLDR_PAUSE_BETWEEN_PAGES_SECONDS` entre deux pages ; page plafonnée par `MAX_PAGE_BYTES` | le jour, dans l'URL | [tldr.tech](specs-collecte.md#tldrtech--scraping) |
 
 Par défaut, K-B filtre à la lecture, pas à la requête
 ([règles communes](specs-collecte.md#règles-communes)). Deux exceptions décidées posent le filtre

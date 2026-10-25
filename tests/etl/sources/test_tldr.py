@@ -7,7 +7,7 @@ import pytest
 from bs4.exceptions import ParserRejectedMarkup
 from pydantic import ValidationError
 
-from k_b.core.config import TRACKED_REPOSITORIES
+from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.etl.http_download import RedirectedOutsideError
 from k_b.etl.normalize import normalize_item
 from k_b.etl.source_contract import find_source_kind, list_sources
@@ -587,7 +587,7 @@ def test_an_entry_refused_is_rejected_and_the_others_of_its_page_are_read(tmp_pa
     page_path.write_bytes(before + mistral + openai_without_summary)
 
     reading = read_raw_files(
-        tmp_path, SOURCE_KINDS, frozenset(), TRACKED_REPOSITORIES
+        tmp_path, SOURCE_KINDS, frozenset(), GITHUB_TRACKED_REPOSITORIES
     ).items
 
     (raw_file,) = reading.files

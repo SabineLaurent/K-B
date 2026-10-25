@@ -7,7 +7,7 @@ from pathlib import Path
 
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME, describe_os_error
-from k_b.core.config import TRACKED_REPOSITORIES
+from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.database.connection import MissingDatabaseError
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl.pipeline import (
@@ -39,7 +39,7 @@ def run_import(data_dir: Path) -> int:
     imported_at = datetime.now(UTC).replace(microsecond=0)
     try:
         outcome = import_raw_files(
-            data_dir, SOURCE_KINDS, TRACKED_REPOSITORIES, imported_at
+            data_dir, SOURCE_KINDS, GITHUB_TRACKED_REPOSITORIES, imported_at
         )
     except MissingDatabaseError as error:
         logger.error("%s; create it with kb create-db", error)

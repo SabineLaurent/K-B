@@ -154,13 +154,13 @@ CREATE TABLE vulnerability (
         AND (item_id IS NOT NULL OR (revised_at IS NULL AND withdrawn_at IS NULL)))
 ) STRICT;
 
--- A reference table, like source: the list TRACKED_REPOSITORIES of src/k_b/core/config.py is the
+-- A reference table, like source: the list GITHUB_TRACKED_REPOSITORIES of src/k_b/core/config.py is the
 -- source of truth; each import adds its repositories or updates them, and a repository removed
 -- from the list keeps its row (#87). GitHub ignores the case of a repository name.
 CREATE TABLE tracked_repository (
     id              INTEGER PRIMARY KEY,
     repository_name TEXT NOT NULL UNIQUE COLLATE NOCASE CHECK (repository_name GLOB '?*/?*'),
-    -- The ecosystems of src/k_b/etl/sources/github/advisories.py: a test keeps both lists equal.
+    -- The ecosystems of GITHUB_ECOSYSTEMS (src/k_b/core/config.py): a test keeps both lists equal.
     ecosystem       TEXT NOT NULL CHECK (ecosystem IN ('pip', 'npm')),
     -- The tracked packages, in the order of the list.
     packages        TEXT NOT NULL

@@ -30,7 +30,7 @@ paquets principaux sont suivis ; une intégration (`langchain-anthropic`…) s'a
 Écartés le 2026-10-02 : `langchain-community` et `langchain-experimental` (dépôts archivés, plus
 maintenus), `langchain-classic` (compatibilité avec la v0, non utilisée).
 La sécurité des projets de Sabine relève de Dependabot, pas de cette liste (décidé le 2026-10-02).
-La liste vit dans `TRACKED_REPOSITORIES` de `src/k_b/core/config.py`.
+La liste vit dans `GITHUB_TRACKED_REPOSITORIES` de `src/k_b/core/config.py`.
 
 | Dépôt | Pourquoi | Paquets (alertes) |
 |---|---|---|

@@ -2,8 +2,43 @@
 
 import re
 from dataclasses import dataclass
-from datetime import timedelta
-from typing import Literal
+from datetime import UTC, datetime, timedelta
+from typing import Literal, get_args
+
+# The settings of the watch, by source (#123), each name with the prefix of its source (decision of
+# 2026-10-13). The facts of the APIs and formats, and the size caps, stay in the code.
+
+# arXiv. Papers both in cs.CR and cs.AI whose abstract has one of these keywords (decided in #6).
+ARXIV_KEYWORDS = [
+    "prompt injection",
+    "jailbreak",
+    "red teaming",
+    "adversarial attack",
+    "backdoor",
+    "poisoning",
+    "membership inference",
+    "agent security",
+]
+# A paper is searchable only once announced, up to 3.5 days after its submission (Thursday
+# 14:00 to Sunday 20:00, New York time), later on holidays. The window reaches back this far
+# before the last collection so that late announcements are not lost; the overlap with the
+# previous raw file is removed when merging, by arXiv identifier.
+ARXIV_ANNOUNCEMENT_DELAY_MARGIN = timedelta(days=7)
+# The first collection reaches back to the start of Sabine's training: 488 papers, 1.2 MB,
+# measured on 2026-10-02.
+ARXIV_FIRST_COLLECTION_START = datetime(2026, 5, 1, tzinfo=UTC)
+
+# TLDR. Adding an edition is adding its slug, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
+TLDR_TRACKED_EDITIONS = ("ai", "infosec", "dev")
+# One page at a time, with a pause: tldr.tech publishes no rate limit (decided in #6).
+TLDR_PAUSE_BETWEEN_PAGES_SECONDS = 2
+# For testing the collection; to widen when K-B is put into service.
+TLDR_FIRST_COLLECTION_DAYS = 7
+
+# GitHub. The ecosystems whose advisories are collected, written once: the type of a tracked
+# repository and the list are the same values (#123).
+type Ecosystem = Literal["pip", "npm"]
+GITHUB_ECOSYSTEMS: tuple[Ecosystem, ...] = get_args(Ecosystem.__value__)
 
 
 # A GitHub repository K-B watches, and the packages it publishes; the reasons are in
@@ -12,12 +47,12 @@ from typing import Literal
 @dataclass(frozen=True)
 class TrackedRepository:
     name: str
-    ecosystem: Literal["pip", "npm"]
+    ecosystem: Ecosystem
     # Only the main packages: integrations are added when they are used.
     packages: tuple[str, ...]
 
 
-TRACKED_REPOSITORIES = (
+GITHUB_TRACKED_REPOSITORIES = (
     TrackedRepository(
         "langchain-ai/langchain",
         "pip",
@@ -31,6 +66,25 @@ TRACKED_REPOSITORIES = (
     ),
     TrackedRepository("anthropics/claude-code", "npm", ("@anthropic-ai/claude-code",)),
 )
+# The size of both tops, the API maximum: one request, deep enough to see a repository enter the
+# top.
+GITHUB_RANKING_SIZE = 100
+# The search needs a criterion: this one keeps the whole top 100 (the 100th had 116,161 stars on
+# 2026-10-02).
+GITHUB_MOST_STARRED_SEARCH_QUERY = "stars:>10000"
+# The same for the forks: the whole top 100 (533 repositories, the 100th had 27,552 forks on
+# 2026-10-19).
+GITHUB_MOST_FORKED_SEARCH_QUERY = "forks:>10000"
+
+# GH Archive. The 30 first by stars and the 30 first by forks, together (decision of 2026-10-08).
+GH_ARCHIVE_TOP_SIZE = 30
+# Two weeks of missed collections: a repository that rose earlier adds little to the watch
+# (decision of 2026-10-11). Beyond, the most recent windows are kept.
+GH_ARCHIVE_MAX_CATCH_UP_WINDOWS = 15
+
+# HTTP. A source download waits this long for each network operation: the connection, or each
+# read (docs/specs-collecte.md).
+HTTP_TIMEOUT_SECONDS = 30
 
 
 # How long the data of each acquisition mode is kept, in years after its collection; the purge

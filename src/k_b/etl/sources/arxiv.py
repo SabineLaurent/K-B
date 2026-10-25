@@ -4,9 +4,14 @@ of a raw Atom feed into an item (T)."""
 import re
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from urllib.parse import urlencode
 
+from k_b.core.config import (
+    ARXIV_ANNOUNCEMENT_DELAY_MARGIN,
+    ARXIV_FIRST_COLLECTION_START,
+    ARXIV_KEYWORDS,
+)
 from k_b.core.quoting import quote_value
 from k_b.etl.http_download import download
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
@@ -44,25 +49,6 @@ API_URL = "https://export.arxiv.org/api/query"
 MAX_RESPONSE_BYTES = 6 * 1024 * 1024
 # The API maximum. About 40 papers per window: one page holds them all.
 PAPERS_PER_PAGE = 2000
-# Papers both in cs.CR and cs.AI whose abstract has one of these keywords (decided in #6).
-KEYWORDS = [
-    "prompt injection",
-    "jailbreak",
-    "red teaming",
-    "adversarial attack",
-    "backdoor",
-    "poisoning",
-    "membership inference",
-    "agent security",
-]
-# A paper is searchable only once announced, up to 3.5 days after its submission (Thursday
-# 14:00 to Sunday 20:00, New York time), later on holidays. The window reaches back this far
-# before the last collection so that late announcements are not lost; the overlap with the
-# previous raw file is removed when merging, by arXiv identifier.
-ANNOUNCEMENT_DELAY_MARGIN = timedelta(days=7)
-# The first collection reaches back to the start of Sabine's training: 488 papers, 1.2 MB,
-# measured on 2026-10-02.
-FIRST_COLLECTION_START = datetime(2026, 5, 1, tzinfo=UTC)
 OPENSEARCH = "{http://a9.com/-/spec/opensearch/1.1/}"
 # arXiv reports an error as a feed whose single entry carries this id.
 API_ERROR_ID = re.compile(r"https?://arxiv\.org/api/errors")
@@ -75,12 +61,12 @@ class ArxivSource:
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
         """Return the papers submitted since 7 days before last_collected_at, or since
-        FIRST_COLLECTION_START at the first collection; None if none."""
+        ARXIV_FIRST_COLLECTION_START at the first collection; None if none."""
         now = datetime.now(UTC)
         if last_collected_at is None:
-            window_start = FIRST_COLLECTION_START
+            window_start = ARXIV_FIRST_COLLECTION_START
         else:
-            window_start = last_collected_at - ANNOUNCEMENT_DELAY_MARGIN
+            window_start = last_collected_at - ARXIV_ANNOUNCEMENT_DELAY_MARGIN
         raw_response = download_papers(build_search_query(window_start, now))
         paper_count = count_papers(raw_response)
         total_results = read_total_results(raw_response)
@@ -100,7 +86,7 @@ class ArxivSource:
 def build_search_query(window_start: datetime, window_end: datetime) -> str:
     keywords = " OR ".join(
         f'abs:"{keyword}"' if " " in keyword else f"abs:{keyword}"
-        for keyword in KEYWORDS
+        for keyword in ARXIV_KEYWORDS
     )
     # The API reads these dates in GMT.
     window_start, window_end = window_start.astimezone(UTC), window_end.astimezone(UTC)

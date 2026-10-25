@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from k_b.core.atomic_write import write_file_atomically
-from k_b.core.config import TRACKED_REPOSITORIES
+from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.etl.raw_files import RawFile, RawReading, Rejection, TrendReading
 from k_b.etl.raw_store import RawStore
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
@@ -54,7 +54,7 @@ def read_raw(
     raw_dir: Path, kinds: Sequence[SourceKind], imported_paths: frozenset[str]
 ) -> ImportReadings:
     """read_raw_files with the tracked repositories of the code."""
-    return read_raw_files(raw_dir, kinds, imported_paths, TRACKED_REPOSITORIES)
+    return read_raw_files(raw_dir, kinds, imported_paths, GITHUB_TRACKED_REPOSITORIES)
 
 
 def read_items(

@@ -6,6 +6,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
+from k_b.core.config import HTTP_TIMEOUT_SECONDS
 from k_b.core.quoting import quote_value
 from k_b.etl.http_retry import (
     RETRY_WAIT_SECONDS,
@@ -15,8 +16,6 @@ from k_b.etl.http_retry import (
 from k_b.etl.user_agent import USER_AGENT
 
 logger = logging.getLogger(__name__)
-
-TIMEOUT_SECONDS = 30
 
 
 class RedirectedOutsideError(ValueError):
@@ -80,7 +79,7 @@ def download_once(
     for name, value in (unredirected_headers or {}).items():
         request.add_unredirected_header(name, value)
     try:
-        with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310
+        with urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:  # noqa: S310
             # urlopen follows redirections, even to plain HTTP: only an answer from here is
             # trusted.
             if not response.url.startswith(trusted_url_prefix):
