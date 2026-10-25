@@ -30,6 +30,7 @@ from k_b.core.config import (
 )
 from k_b.core.outbound import find_url_refusal, open_http_client
 from k_b.core.quoting import locate_first_error, quote_value
+from k_b.core.retry_after import RETRY_AFTER_SECONDS
 from k_b.items import ItemKind, UtcDatetime
 
 AI_API_URL_VARIABLE = "KB_AI_API_URL"
@@ -45,8 +46,6 @@ REQUEST_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 # A named state of K-B (docs/fiches-veille.md, "États nommés") or a stage of a digest: lowercase
 # letters and _, nothing Markdown would read. Written in a log, never in a sheet.
 LOWERCASE_NAME = re.compile(r"[a-z_]{1,64}")
-# A Retry-After in seconds; a date is quoted.
-SECONDS = re.compile(r"[0-9]{1,6}")
 
 type AiApiState = Literal[
     "ai_api_unavailable",
@@ -228,7 +227,8 @@ def describe_answer(answer: httpx2.Response) -> list[str]:
         details.append(f"error {describe_value(error, LOWERCASE_NAME)}")
     for header, pattern in (
         (REQUEST_ID_HEADER, REQUEST_ID),
-        (RETRY_AFTER_HEADER, SECONDS),
+        # A Retry-After in seconds as it is; a date is quoted.
+        (RETRY_AFTER_HEADER, RETRY_AFTER_SECONDS),
     ):
         value = answer.headers.get(header)
         if value is not None:

@@ -5,7 +5,6 @@ A text of a source goes only in the user message, encoded in JSON, never in the 
 (.claude/rules/poc.md, rule 8); at most one retry per call."""
 
 import json
-import re
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
@@ -28,6 +27,7 @@ from k_b.core.config import (
     MILLISECONDS_PER_SECOND,
 )
 from k_b.core.outbound import open_http_client
+from k_b.core.retry_after import is_retry_after_too_long, read_retry_after
 
 # Relative to the base URL, which keeps its path (/openai/v1, /v1).
 CHAT_COMPLETIONS_PATH = "chat/completions"
@@ -56,12 +56,6 @@ type FailedCheck = Literal[
     "markup",
 ]
 FAILED_CHECKS: tuple[FailedCheck, ...] = get_args(FailedCheck.__value__)
-# The delay-seconds form of Retry-After (RFC 9110, § 10.2.3), compared to the maximum. Its
-# HTTP-date form, rare, is read as no header. Read up to 9 digits, about 31 years: int() refuses
-# 4,301 digits or more, and a longer value is a wait beyond any maximum (review of #156).
-MAX_RETRY_AFTER_DIGITS = 9
-RETRY_AFTER_SECONDS = re.compile(rf"[0-9]{{1,{MAX_RETRY_AFTER_DIGITS}}}")
-RETRY_AFTER_TOO_LONG = re.compile(rf"[0-9]{{{MAX_RETRY_AFTER_DIGITS + 1},}}")
 # A finish_reason is read whatever its length, and cut to this length in the call: it goes to a
 # metric line.
 MAX_FINISH_REASON_LENGTH = 64
@@ -358,23 +352,16 @@ def wait_or_end[OutputT: BaseModel](
     """A retry after Retry-After, or after the default wait; none when Retry-After is above the
     maximum, as a shorter wait would give the same answer."""
     value = response.headers.get("Retry-After")
-    if value is not None and RETRY_AFTER_TOO_LONG.fullmatch(value):
-        # Too long to read: a wait beyond the maximum, whose value is not given back.
+    if is_retry_after_too_long(value):
+        # A wait beyond the maximum, whose value is not given back.
         return Attempt(outcome=outcome)
-    retry_after = read_retry_after(response)
+    retry_after = read_retry_after(value)
     if retry_after is not None and retry_after > LLM_RETRY_AFTER_MAX_SECONDS:
         return Attempt(outcome=outcome, retry_after_seconds=retry_after)
     wait = LLM_RETRY_WAIT_SECONDS if retry_after is None else retry_after
     return Attempt(
         outcome=outcome, retry_after_seconds=retry_after, retry_wait_seconds=wait
     )
-
-
-def read_retry_after(response: httpx2.Response) -> int | None:
-    value = response.headers.get("Retry-After")
-    if value is None or not RETRY_AFTER_SECONDS.fullmatch(value):
-        return None
-    return int(value)
 
 
 def read_error_code(response: httpx2.Response) -> str | None:

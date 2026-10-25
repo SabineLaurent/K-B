@@ -4120,6 +4120,17 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   `Retry-After` n'est pas retenté (c'est d'abord un refus, même quand GitHub y met sa limite
   secondaire) ; la lecture du `Retry-After` existe en double, ici et dans `llm_client.py` (la mettre
   dans `core` toucherait l'API IA, hors de cette PR). — branche `fix/source-download-retry`
+- **La lecture du `Retry-After` passe dans `core/retry_after.py` (`read_retry_after`,
+  `is_retry_after_too_long`) ; la collecte (`etl/http_retry.py`), l'appel au modèle
+  (`ai_api/connectors/llm_client.py`) et `kb digest` (`post/ai_api_client.py`) l'appellent.** Lève
+  la limite de l'entrée précédente, sur l'accord de Sabine du 2026-10-25 (« ok après la fusion »).
+  Pourquoi : trois lectures du même en-tête, chacune à sa façon (`[0-9]+` et une longueur, `[0-9]{1,9}`
+  et un motif « trop long », `[0-9]{1,6}`) : une seule règle par sujet, et `core` est le
+  vocabulaire commun à plusieurs couches. La règle d'attente reste à chaque client (statuts,
+  plafonds, attente par défaut) : elle n'est pas la même pour une source, le modèle et `kb digest`.
+  Seul changement visible : `kb digest` affiche tel quel un `Retry-After` de 7 à 9 chiffres, qu'il
+  citait entre guillemets. Option écartée : mettre toute la règle du nouvel essai dans `core` (elle
+  ne sert qu'à l'ETL, sur les erreurs d'`urllib`). — branche `refactor/retry-after-in-core`
 
 ## Décisions encore ouvertes
 
