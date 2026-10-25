@@ -18,7 +18,7 @@ from test_metrics_export import FakeExporter
 from k_b import cli
 from k_b.ai_api.connectors import metrics_export
 from k_b.ai_api.connectors.data_api_settings import DATA_API_KEY_VARIABLE
-from k_b.ai_api.metric_instruments import ModelMetrics
+from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.commands import serve_ai_command
 from k_b.core.api_keys import AI_API_KEY_VARIABLE_PREFIX
 from k_b.core.config import DIGEST_SUBJECTS

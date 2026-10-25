@@ -78,7 +78,7 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   `prod-eu-west-2` (Allemagne), quand `KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS` et
   `KB_DEPLOYMENT_ENVIRONMENT` sont réglées ; il refuse de démarrer avec une variable `OTEL_*`
   (le SDK la lirait en silence). OpenTelemetry ne s'importe que dans
-  `ai_api/connectors/metrics_export.py` et `ai_api/metric_instruments.py` (décision de Sabine du
+  `ai_api/connectors/metrics_export.py` et `ai_api/observability/metric_instruments.py` (décision de Sabine du
   2026-10-24). Dans Grafana, les séries de K-B se lisent par `{job="k-b-ai-api"}`. L'essai gratuit
   de 14 jours de la pile finit vers le 07/11 : l'offre gratuite garde 14 jours et 10 000 séries.
 

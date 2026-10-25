@@ -540,7 +540,7 @@ identifiant), et les lettres cyrilliques, grecques et petites capitales latines 
 une lettre d'un préfixe lues comme elle (`СVЕ` cyrillique se lit `cve`), puis toute autre lettre,
 chiffre ou symbole hors ASCII qui n'est pas une lettre ASCII accentuée lu comme `o` (`é` reste `é`,
 pour que `numéro` se lise ; `CVE-2026-ЗЗЗЗ` se lit `CVE-2026-oooo`). Écrits sur ce texte, en
-minuscules (`ai_api/fidelity.py`, `CVE` et `GHSA`), avec `S` = `[\W_]*` :
+minuscules (`ai_api/stages/fidelity.py`, `CVE` et `GHSA`), avec `S` = `[\W_]*` :
 
 - CVE : `c S v S e [s] S [mot de numéro S] [\doli]{4} S [\doli]{4,}` ;
 - GHSA : `g S h S s S a [s] S [mot de numéro S] [0-9a-z]{4} S [0-9a-z]{4} S [0-9a-z]{4}`.
@@ -645,7 +645,7 @@ d'une affirmation trop longue ne compterait pas).
 
 **Partie commune avec le wiki (#153).** Le contrôle de fidélité du wiki reprend d'ici la
 normalisation, la recherche mot pour mot entre deux limites et le taux calculé à chaque appel
-(critère de #153) ; le code est `ai_api/fidelity.py`. Il n'en reprend pas ce qui tient aux items :
+(critère de #153) ; le code est `ai_api/stages/fidelity.py`. Il n'en reprend pas ce qui tient aux items :
 les champs où chercher par sorte et l'égalité des CVE et GHSA à un champ identifiant, qu'un clip
 n'a pas.
 
@@ -728,7 +728,7 @@ Une ligne JSON par appel au modèle, sur la sortie standard, sans fichier (règl
 Un **appel** est un classement ou la rédaction d'un sujet, nouvelle tentative
 comprise : jetons et durées sont cumulés sur la ligne.
 Les lignes d'une demande sont écrites quand ses appels sont finis, classement en échec compris,
-dans l'ordre des appels, chacune vidée aussitôt (`ai_api/metrics.py`) : sur SIGTERM, uvicorn
+dans l'ordre des appels, chacune vidée aussitôt (`ai_api/observability/metrics.py`) : sur SIGTERM, uvicorn
 renvoie le signal, et une ligne restée dans le tampon d'un tube serait perdue. `ts` est donc
 l'heure d'écriture, pas celle de l'appel. Un champ « nul » vaut `null` en JSON.
 
@@ -782,7 +782,7 @@ aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), 
 Les mesures de chaque appel partent aussi en métriques OpenTelemetry, exportées en OTLP (HTTP,
 protobuf, gzip) vers Grafana Cloud, en région UE (journal ADR, 2026-10-20, « Squelette E1 E3 »,
 décision 4). La ligne JSON reste : l'export s'y ajoute. Le code est dans
-`ai_api/metric_instruments.py` (les instruments, `ModelMetrics`) et
+`ai_api/observability/metric_instruments.py` (les instruments, `ModelMetrics`) et
 `ai_api/connectors/metrics_export.py` (les réglages, le fournisseur de mesures) ; OpenTelemetry
 n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
 

@@ -18,7 +18,7 @@ from k_b.ai_api.digests import (
     build_digests,
 )
 from k_b.ai_api.errors import ERROR_RESPONSES, to_api_error
-from k_b.ai_api.metrics import RequestMeasures, write_llm_call_lines
+from k_b.ai_api.observability.metrics import RequestMeasures, write_llm_call_lines
 from k_b.ai_api.schemas.digest_schema import (
     ClaimSchema,
     DigestRequestSchema,
