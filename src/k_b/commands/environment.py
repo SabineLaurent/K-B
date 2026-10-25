@@ -19,7 +19,10 @@ LOG_TO_FILE_VALUES = {"true": True, "false": False}
 
 def read_environment() -> Mapping[str, str]:
     """The environment of the run, read once by cli.py; kb never loads a .env file itself: uv run
-    --env-file does."""
+    --env-file does.
+
+    os.environ itself, not a copy: libraries read it too (the BigQuery client, the OpenTelemetry
+    SDK, and the GitHub token for now), so the checks of K-B must see the same variables."""
     return os.environ
 
 
