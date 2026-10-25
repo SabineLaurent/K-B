@@ -14,7 +14,11 @@ from typing import Annotated, Any
 from google.cloud import bigquery
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from k_b.core.config import MILLISECONDS_PER_SECOND
+from k_b.core.config import (
+    GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
+    GH_ARCHIVE_TOP_SIZE,
+    MILLISECONDS_PER_SECOND,
+)
 from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import TrendReader
@@ -25,16 +29,11 @@ logger = logging.getLogger(__name__)
 SOURCE_CODE: SourceCode = "gh_archive"
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "gh_archive"
-# The 30 first by stars and the 30 first by forks, together (decision of 2026-10-08).
-TOP_SIZE = 30
 
 
 # === EXTRACT ===
 
 WINDOW_DAYS = 3
-# Two weeks of missed collections: a repository that rose earlier adds little to the watch
-# (decision of 2026-10-11). Beyond, the most recent windows are kept.
-MAX_CATCH_UP_WINDOWS = 15
 # The cap grows with the windows, up to a bound (decision of 2026-10-11): the heaviest window
 # alone read 433.5 MB, x 1.5; 15 windows read 1.58 GB (dry runs of 2026-10-11, measures and
 # reckoning in docs/bigquery.md).
@@ -160,14 +159,14 @@ def list_window_ends(last_collected_at: datetime | None, today: date) -> list[da
     if first_end > today:
         raise ValueError(f"last collection day {first_end} is after today {today}")
     due_count = (yesterday - first_end).days + 1
-    if due_count > MAX_CATCH_UP_WINDOWS:
+    if due_count > GH_ARCHIVE_MAX_CATCH_UP_WINDOWS:
         logger.info(
             "gh_archive: %d windows due since %s, the %d most recent are collected",
             due_count,
             first_end,
-            MAX_CATCH_UP_WINDOWS,
+            GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
         )
-        due_count = MAX_CATCH_UP_WINDOWS
+        due_count = GH_ARCHIVE_MAX_CATCH_UP_WINDOWS
     return [yesterday - timedelta(days=offset) for offset in reversed(range(due_count))]
 
 
@@ -237,7 +236,7 @@ def configure_query(window_ends: list[date], dry_run: bool) -> bigquery.QueryJob
         ),
         bigquery.ArrayQueryParameter("window_ends", "DATE", window_ends),
         bigquery.ScalarQueryParameter("window_days", "INT64", WINDOW_DAYS),
-        bigquery.ScalarQueryParameter("top_size", "INT64", TOP_SIZE),
+        bigquery.ScalarQueryParameter("top_size", "INT64", GH_ARCHIVE_TOP_SIZE),
     ]
     if dry_run:
         return bigquery.QueryJobConfig(
@@ -267,7 +266,7 @@ def encode_result(window_ends: list[date], rows: Iterable[Mapping[str, Any]]) ->
 
 # === TRANSFORM ===
 
-MAX_ROWS_PER_WINDOW = 2 * TOP_SIZE
+MAX_ROWS_PER_WINDOW = 2 * GH_ARCHIVE_TOP_SIZE
 # The only fields whose value is quoted: a date or a number. Any other value (a repository name,
 # that holds the owner's login when the owner is a person, a whole row, the raw document) is
 # described by its type and its length.

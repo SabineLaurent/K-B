@@ -8,9 +8,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import urlencode
 
+from k_b.core.config import GITHUB_MOST_FORKED_SEARCH_QUERY, GITHUB_RANKING_SIZE
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.sources.github.api import get_from_github_api
-from k_b.etl.sources.github.most_starred import RANKING_SIZE, REPOSITORY_URL_PREFIX
+from k_b.etl.sources.github.most_starred import REPOSITORY_URL_PREFIX
 from k_b.etl.tops import TopEntry
 from k_b.items import is_repository_name
 
@@ -19,10 +20,6 @@ FOLDER_PREFIX = "github_most_forked"
 
 
 # === EXTRACT ===
-
-# The search needs a criterion: this one keeps the whole top 100 (533 repositories, the 100th had
-# 27,552 forks on 2026-10-19).
-SEARCH_QUERY = "forks:>10000"
 
 
 class GithubMostForkedSource:
@@ -33,10 +30,10 @@ class GithubMostForkedSource:
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
         """Return a snapshot of the ranking at every collection: fork counts always change."""
         query = {
-            "q": SEARCH_QUERY,
+            "q": GITHUB_MOST_FORKED_SEARCH_QUERY,
             "sort": "forks",
             "order": "desc",
-            "per_page": RANKING_SIZE,
+            "per_page": GITHUB_RANKING_SIZE,
         }
         raw_response = get_from_github_api(f"search/repositories?{urlencode(query)}")
         read_ranking(raw_response)
@@ -101,11 +98,11 @@ def parse_repository(item: object, rank: int) -> ForkedRepository:
 
 
 def read_ranking(raw_response: bytes) -> list[ForkedRepository]:
-    return read_most_forked(raw_response, expected_size=RANKING_SIZE)
+    return read_most_forked(raw_response, expected_size=GITHUB_RANKING_SIZE)
 
 
 def read_top_entries(
-    raw_response: bytes, expected_size: int = RANKING_SIZE
+    raw_response: bytes, expected_size: int = GITHUB_RANKING_SIZE
 ) -> list[TopEntry]:
     """The ranking as its sheet shows it, its URL built from the name."""
     return [

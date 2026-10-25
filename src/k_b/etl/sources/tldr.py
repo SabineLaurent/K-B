@@ -11,6 +11,10 @@ from typing import NamedTuple
 from bs4 import BeautifulSoup, Tag
 from bs4.exceptions import ParserRejectedMarkup
 
+from k_b.core.config import (
+    TLDR_FIRST_COLLECTION_DAYS,
+    TLDR_PAUSE_BETWEEN_PAGES_SECONDS,
+)
 from k_b.core.quoting import quote_value
 from k_b.etl.http_download import RedirectedOutsideError, download
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME, find_stream
@@ -28,15 +32,9 @@ FOLDER_PREFIX = "tldr"
 
 # === EXTRACT ===
 
-# Adding an edition is adding its slug, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
-TRACKED_EDITIONS = ("ai", "infosec", "dev")
 SITE_URL = "https://tldr.tech/"
 # An edition page weighs about 80 KB in 2026.
 MAX_PAGE_BYTES = 1024 * 1024
-# One page at a time, with a pause: tldr.tech publishes no rate limit (decided in #6).
-PAUSE_BETWEEN_PAGES_SECONDS = 2
-# For testing the collection; to widen when K-B is put into service.
-FIRST_COLLECTION_DAYS = 7
 # The failure of a page received that is not the edition of its day (conventions.md, rule 1).
 NOT_THE_EDITION_OF_THE_DAY = "not_the_edition_of_the_day"
 
@@ -109,7 +107,7 @@ class TldrSource:
         read_pages: dict[date, bytes | PageRefusal] = {}
         for position, day in enumerate(days):
             if position > 0:
-                sleep(PAUSE_BETWEEN_PAGES_SECONDS)
+                sleep(TLDR_PAUSE_BETWEEN_PAGES_SECONDS)
             page_url = f"{SITE_URL}{self.edition}/{day.isoformat()}"
             try:
                 # The page url itself is the trusted prefix: any redirection is noticed.
@@ -170,7 +168,7 @@ def list_days_to_collect(last_collected_at: datetime | None, today: date) -> lis
     """Every day from the day of the last collection, or 7 days ago, to today; the day of the
     last collection is read again, as its edition may have come out after it."""
     if last_collected_at is None:
-        first_day = today - timedelta(days=FIRST_COLLECTION_DAYS)
+        first_day = today - timedelta(days=TLDR_FIRST_COLLECTION_DAYS)
     else:
         first_day = last_collected_at.astimezone(UTC).date()
     if first_day > today:

@@ -85,7 +85,7 @@ INSERT INTO vulnerability (
     -- The CVE of advisory 17, cited by GitHub, not in the KEV catalog: no KEV column.
     ('CVE-2026-45134', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
--- TRACKED_REPOSITORIES (src/k_b/core/config.py).
+-- GITHUB_TRACKED_REPOSITORIES (src/k_b/core/config.py).
 INSERT INTO tracked_repository (id, repository_name, ecosystem, packages) VALUES
     (1, 'anthropics/claude-code', 'npm', '["@anthropic-ai/claude-code"]');
 

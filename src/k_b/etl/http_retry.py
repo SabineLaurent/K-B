@@ -10,7 +10,7 @@ from k_b.core.retry_after import is_retry_after_too_long, read_retry_after
 
 # The wait before the one retry after a 429, a 5xx or a failed connection, when the answer gives
 # no Retry-After. A timeout gets no retry, as for the model (ai_api/connectors/llm_client.py): it
-# would double a wait of http_download.TIMEOUT_SECONDS.
+# would double a wait of HTTP_TIMEOUT_SECONDS (core/config.py).
 RETRY_WAIT_SECONDS = 5
 # Never less, whatever a Retry-After says: the 3 seconds arXiv asks between two requests (Terms of
 # Use for arXiv APIs).

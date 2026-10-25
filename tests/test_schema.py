@@ -7,9 +7,8 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ConfigDict, TypeAdapter, ValidationError
 
-from k_b.core.config import RETENTION_YEARS_BY_ACQUISITION_MODE
+from k_b.core.config import GITHUB_ECOSYSTEMS, RETENTION_YEARS_BY_ACQUISITION_MODE
 from k_b.database.creation import DATABASE_SCRIPTS
-from k_b.etl.sources.github.advisories import ECOSYSTEMS
 from k_b.items import (
     GHSA_ID,
     HIGHLIGHT_MAX_LENGTH_BY_FIELD,
@@ -273,7 +272,7 @@ def test_the_ecosystems_of_the_schema_are_those_of_the_advisories():
     schema = DATABASE_SCRIPTS.joinpath("schema.sql").read_text()
     (allowed_values,) = re.findall(r"ecosystem IN \(([^)]*)\)", schema)
 
-    assert set(re.findall(r"'(\w+)'", allowed_values)) == set(ECOSYSTEMS)
+    assert set(re.findall(r"'(\w+)'", allowed_values)) == set(GITHUB_ECOSYSTEMS)
 
 
 INSERT_TRACKED_REPOSITORY = (

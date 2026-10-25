@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from k_b.core.config import GH_ARCHIVE_MAX_CATCH_UP_WINDOWS
 from k_b.etl.sources import gh_archive
 from k_b.etl.sources.gh_archive import (
     MAX_BYTES_BILLED,
     MAX_BYTES_PER_WINDOW,
-    MAX_CATCH_UP_WINDOWS,
     QUERY_TIMEOUT_SECONDS,
     TRENDS_QUERY,
     DayTableNotClosedError,
@@ -154,7 +154,7 @@ def test_the_catch_up_keeps_the_most_recent_windows_up_to_its_maximum():
 
     window_ends = list_window_ends(last_collected_at, TODAY)
 
-    assert len(window_ends) == MAX_CATCH_UP_WINDOWS == 15
+    assert len(window_ends) == GH_ARCHIVE_MAX_CATCH_UP_WINDOWS == 15
     assert window_ends[-1] == YESTERDAY
     assert window_ends[0] == YESTERDAY - timedelta(days=14)
 

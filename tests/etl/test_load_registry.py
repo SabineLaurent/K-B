@@ -27,7 +27,7 @@ from load_helpers import (
 )
 from test_transform import FIXTURES_DIR, copy_fixture
 
-from k_b.core.config import TRACKED_REPOSITORIES
+from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.etl.load import (
     ImportLogExistsError,
     import_items,
@@ -59,7 +59,7 @@ def test_a_file_whose_releases_are_all_out_of_the_list_is_registered_and_not_rea
     registers it."""
     still_tracked = tuple(
         repository
-        for repository in TRACKED_REPOSITORIES
+        for repository in GITHUB_TRACKED_REPOSITORIES
         if repository.name != "anthropics/claude-code"
     )
 
@@ -138,7 +138,7 @@ def test_a_log_of_the_same_second_stops_the_import_before_the_database(data_dir)
         data_dir / "raw",
         SOURCE_KINDS,
         read_imported_paths(database_path),
-        TRACKED_REPOSITORIES,
+        GITHUB_TRACKED_REPOSITORIES,
     ).items
 
     with pytest.raises(ImportLogExistsError):
@@ -148,7 +148,7 @@ def test_a_log_of_the_same_second_stops_the_import_before_the_database(data_dir)
             database_path,
             log_path,
             FIRST_IMPORT_AT,
-            TRACKED_REPOSITORIES,
+            GITHUB_TRACKED_REPOSITORIES,
         )
 
     assert dump_database(data_dir) == tables_before
@@ -179,7 +179,7 @@ def test_the_log_lists_what_the_reading_rejected_before_what_the_writing_refused
     unreadable = write_collection(data_dir, ARXIV_DIR, "2026-10-06T093000Z", "not xml")
     still_tracked = tuple(
         repository
-        for repository in TRACKED_REPOSITORIES
+        for repository in GITHUB_TRACKED_REPOSITORIES
         if repository.name != "anthropics/claude-code"
     )
     refuse_in_the_base(

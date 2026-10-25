@@ -23,7 +23,7 @@ from load_helpers import (
 )
 from test_transform import FIXTURES_DIR
 
-from k_b.core.config import TRACKED_REPOSITORIES
+from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.database.creation import create_database
 from k_b.etl.load import (
     import_items,
@@ -264,7 +264,7 @@ def run_import_with_a_ranking_row_changed(data_dir, raw_file_path, **changes):
     database_path = data_dir / "k-b.sqlite"
     imported_paths = read_imported_paths(database_path)
     readings = read_raw_files(
-        data_dir / "raw", SOURCE_KINDS, imported_paths, TRACKED_REPOSITORIES
+        data_dir / "raw", SOURCE_KINDS, imported_paths, GITHUB_TRACKED_REPOSITORIES
     )
     changed_files = [
         trend_file._replace(
@@ -280,7 +280,7 @@ def run_import_with_a_ranking_row_changed(data_dir, raw_file_path, **changes):
         database_path,
         log_path_at(data_dir, imported_at),
         imported_at,
-        TRACKED_REPOSITORIES,
+        GITHUB_TRACKED_REPOSITORIES,
     )
 
 

@@ -447,7 +447,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     l'édition du jour », ci-dessous) ; pour une page gardée avant, la date du `h1` l'emporte
     sur celle du nom du fichier (18 pages sur 18 ont la même). Le `h1` doit porter un nom d'édition entre « TLDR » et la
     date : une édition titrée « TLDR <date> » serait refusée à chaque import (forme non
-    observée ; à vérifier quand une édition est ajoutée à `TRACKED_EDITIONS`). Une offre
+    observée ; à vérifier quand une édition est ajoutée à `TLDR_TRACKED_EDITIONS`). Une offre
     d'emploi publiée ailleurs que sur le site d'offres de TLDR entre comme article. Un lien
     qui passe par `links.tldrnewsletter.com` est gardé tel quel (3 liens) : l'adresse de
     l'article demanderait un appel réseau.
@@ -534,8 +534,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   sponsorisées : traité à la lecture (ci-dessus).
 - **Données personnelles** : aucune (voir le registre des traitements).
 - **Suivi** : éditions **ai**, **infosec** et **dev** (ai le 2026-10-01, les deux autres le
-  2026-10-04), une source par édition (`tldr_ai`…), dans `TRACKED_EDITIONS` de
-  `k_b/etl/sources/tldr.py` (neuf candidates dans [sources-detaillees.md](sources-detaillees.md)).
+  2026-10-04), une source par édition (`tldr_ai`…), dans `TLDR_TRACKED_EDITIONS` de
+  `k_b/core/config.py` (neuf candidates dans [sources-detaillees.md](sources-detaillees.md)).
 
 ### Zotero — base de données
 

@@ -26,7 +26,7 @@ from test_items import (
 )
 from test_transform import FIXTURES_DIR
 
-from k_b.core.config import TRACKED_REPOSITORIES
+from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.database.creation import create_database
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
 from k_b.items import (
@@ -123,7 +123,7 @@ def test_the_tracked_repositories_of_the_code_fill_their_table(data_dir):
         for name, ecosystem, packages in rows
     ] == [
         (repository.name, repository.ecosystem, repository.packages)
-        for repository in TRACKED_REPOSITORIES
+        for repository in GITHUB_TRACKED_REPOSITORIES
     ]
 
 
@@ -231,7 +231,7 @@ def test_an_advisory_and_a_kev_row_of_the_same_cve_share_one_vulnerability(
 def test_a_release_of_a_repository_no_longer_tracked_is_rejected_and_logged(data_dir):
     still_tracked = tuple(
         repository
-        for repository in TRACKED_REPOSITORIES
+        for repository in GITHUB_TRACKED_REPOSITORIES
         if repository.name != "anthropics/claude-code"
     )
 

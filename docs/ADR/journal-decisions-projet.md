@@ -4170,6 +4170,22 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   modules, `tracked_repositories.py` laissé en attendant #123. — branche
   `refactor/github-sources-package`
 
+### Configuration : les réglages de la veille rassemblés dans `core/config.py` (#123)
+
+- **Les 14 réglages de la veille sont dans `core/config.py`, chacun préfixé par sa source :
+  `ARXIV_` (mots-clés, marge d'annonce, première collecte), `TLDR_` (éditions, pause, première
+  collecte), `GITHUB_` (dépôts suivis, écosystèmes, requêtes et taille des tops), `GH_ARCHIVE_`
+  (taille du top, fenêtres rattrapées) et `HTTP_` (délai réseau) ; les écosystèmes ne sont écrits
+  qu'une fois (`type Ecosystem`, d'où `GITHUB_ECOSYSTEMS`).** Applique la décision de Sabine du
+  2026-10-10 (« Configuration ») et la règle de nommage du 2026-10-13 ; demandé le 2026-10-25, plan
+  validé. Les faits des API, les formats et les plafonds restent dans le module de la source.
+  Valeurs inchangées (relevées avant et après). Deux écarts à l'issue : la requête des plus forkés
+  (`GITHUB_MOST_FORKED_SEARCH_QUERY`), venue après #123 avec #264, en plus, d'où 14 réglages et non
+  13 ; `GITHUB_RANKING_SIZE` plutôt que `GITHUB_MOST_STARRED_RANKING_SIZE`, la taille étant
+  partagée par les deux tops. Limite : c'est toujours un fichier Python ; une configuration hors du
+  code (fichier lu au démarrage) serait une autre décision. — branche
+  `refactor/watch-settings-in-config`
+
 ## Décisions encore ouvertes
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,

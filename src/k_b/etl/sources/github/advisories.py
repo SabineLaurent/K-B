@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
+from k_b.core.config import GITHUB_ECOSYSTEMS
 from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import (
@@ -28,7 +29,6 @@ FOLDER_PREFIX = "github_advisories"
 
 # === EXTRACT ===
 
-ECOSYSTEMS = ("pip", "npm")
 # The API maximum. Only the first page is read: see the warning in fetch.
 ADVISORIES_PER_PAGE = 100
 
@@ -38,7 +38,7 @@ class GithubAdvisoriesSource:
     acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
 
     def __init__(self, ecosystem: str, packages: tuple[str, ...]):
-        if ecosystem not in ECOSYSTEMS:
+        if ecosystem not in GITHUB_ECOSYSTEMS:
             raise ValueError(f"not a tracked ecosystem: {ecosystem!r}")
         self.ecosystem = ecosystem
         self.packages = packages

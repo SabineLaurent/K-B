@@ -28,7 +28,7 @@ from load_helpers import (
 )
 from test_transform import FIXTURES_DIR, convert_line
 
-from k_b.core.config import TRACKED_REPOSITORIES
+from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.database import writing
 from k_b.database.connection import MissingDatabaseError, connect_database
 from k_b.database.creation import create_database
@@ -264,7 +264,7 @@ def test_a_missing_database_is_refused_and_not_created(tmp_path):
             tmp_path / "k-b.sqlite",
             log_path_at(tmp_path, FIRST_IMPORT_AT),
             FIRST_IMPORT_AT,
-            TRACKED_REPOSITORIES,
+            GITHUB_TRACKED_REPOSITORIES,
         )
 
     assert not (tmp_path / "k-b.sqlite").exists()

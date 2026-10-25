@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from k_b.core.config import TRACKED_REPOSITORIES
+from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.core.quoting import quote_value
 from k_b.etl.source_contract import list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
@@ -44,12 +44,12 @@ def requested_paths(monkeypatch):
 def test_each_tracked_repository_is_a_source_of_kb_collect():
     source_names = {source.name for source in list_sources(SOURCE_KINDS)}
 
-    assert len(TRACKED_REPOSITORIES) == 4
+    assert len(GITHUB_TRACKED_REPOSITORIES) == 4
     assert "github_releases_langchain_ai_langchain" in source_names
     assert "github_releases_run_llama_llama_index" in source_names
     assert all(
         GithubReleasesSource(repository.name).name in source_names
-        for repository in TRACKED_REPOSITORIES
+        for repository in GITHUB_TRACKED_REPOSITORIES
     )
 
 
