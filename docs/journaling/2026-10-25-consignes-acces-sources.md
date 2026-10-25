@@ -104,7 +104,7 @@ l'autre.
 | Où afficher le crédit arXiv | README et description de l'OpenAPI : c'est là que K-B montre ses données | Un pied de page dans chaque fiche de veille : plus de code, et arXiv ne le demande pas |
 | Version de l'API de données | Inchangée (0.5.0) : la description ne touche ni une route ni un schéma | Monter la version : rien ne change dans le contrat avec un client |
 | Portée de la pause GitHub | Toutes les requêtes GitHub : simple, et au pire les tops attendent la collecte suivante | Une pause par quota (core ou search, d'après l'en-tête `x-ratelimit-resource`) : plus de code pour un gain minime |
-| Durée de la pause | Jusqu'à l'heure de remise à zéro, ce que dit la consigne de GitHub, sans état périmé même dans un processus long | « Jusqu'à la fin de la collecte » : moins fidèle à la consigne |
+| Durée de la pause | Jusqu'à l'heure de remise à zéro, ce que dit la consigne de GitHub : une pause finie s'éteint d'elle-même, même dans un processus long (seul un `Retry-After` illisible dure jusqu'à la fin du processus) | « Jusqu'à la fin de la collecte » : moins fidèle à la consigne |
 | Où garder l'état | Variable de module dans `api.py`, le seul point d'entrée vers GitHub | Un objet « quota » passé aux constructeurs des 4 sources (`source_kinds.py`) : plus de code pour le même effet |
 | tldr.tech | Pause avant chaque page, un changement d'une ligne, qui coûte 6 s par collecte | Une horloge « dernière page lue » : plus de code pour gagner 6 s. Corriger la spécification à la place : affaiblirait une règle posée par Sabine |
 

@@ -65,7 +65,6 @@ def fake_download(monkeypatch):
     fake = FakeDownload({})
     monkeypatch.setattr(tldr, "download", fake)
     monkeypatch.setattr(tldr, "current_day", lambda: TODAY)
-    monkeypatch.setattr(tldr, "sleep", lambda seconds: None)
     return fake
 
 
