@@ -4,8 +4,8 @@ import pytest
 from http_helpers import http_error
 
 from k_b.etl import http_download
-from k_b.etl.sources import github_api
-from k_b.etl.sources.github_api import get_from_github_api
+from k_b.etl.sources.github import api as github_api
+from k_b.etl.sources.github.api import get_from_github_api
 from k_b.etl.user_agent import USER_AGENT
 
 BODY = b'[{"tag_name": "v1.0.0"}]'

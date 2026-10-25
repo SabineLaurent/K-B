@@ -1,8 +1,5 @@
-from k_b.core.config import TrackedRepository
-from k_b.etl.sources.tracked_repositories import (
-    TRACKED_REPOSITORIES,
-    list_packages_by_ecosystem,
-)
+from k_b.core.config import TRACKED_REPOSITORIES, TrackedRepository
+from k_b.etl.source_kinds import list_packages_by_ecosystem
 
 
 def test_packages_are_grouped_by_ecosystem_in_the_order_of_the_repositories():

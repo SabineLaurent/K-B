@@ -171,8 +171,8 @@ statu quo).
   `# === EXTRACT ===` (constantes de la requête, erreurs de l'extraction, la classe `…Source` et
   `fetch`, ses aides), puis `# === TRANSFORM ===` (constantes de la lecture, ce qui est gardé,
   `read_…` et `parse_…`, `convert_…`, `READER`). Le LOAD n'y est pas : il est commun à toutes les
-  sources (`etl/load.py`, `database/writers/`). `github_api.py` et `tracked_repositories.py` ne
-  sont pas des sources.
+  sources (`etl/load.py`, `database/writers/`). Les sources GitHub sont dans `etl/sources/github/`, avec
+  leur client commun, `github/api.py`, qui n'est pas une source.
 - `etl/pipeline.py` enchaîne les étapes des deux parcours, qui communiquent par `raw/` : la
   collecte (`extract.py`) et l'import (`transform.py`, qui lit le brut par `raw_reading.py`, puis
   `load.py`). C'est le seul module d'`etl` qui les enchaîne, et la seule porte des deux parcours

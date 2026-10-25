@@ -19,8 +19,9 @@ from k_b.etl.pipeline import CollectionOutcome, collect
 from k_b.etl.raw_store import InvalidCollectionStateError, RawStore
 from k_b.etl.source_contract import Source, find_source_kind
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources import github_advisories, github_releases
-from k_b.etl.sources.github_api import TOKEN_VARIABLE
+from k_b.etl.sources.github import advisories as github_advisories
+from k_b.etl.sources.github import releases as github_releases
+from k_b.etl.sources.github.api import TOKEN_VARIABLE
 
 logger = logging.getLogger(LOGGER_NAME)
 

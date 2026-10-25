@@ -32,14 +32,14 @@ from k_b.etl.sources import (
     cisa_kev,
     clipping,
     gh_archive,
-    github_advisories,
-    github_most_forked,
-    github_most_starred,
-    github_releases,
     tldr,
     zotero,
 )
-from k_b.etl.sources.github_api import TOKEN_VARIABLE
+from k_b.etl.sources.github import advisories as github_advisories
+from k_b.etl.sources.github import most_forked as github_most_forked
+from k_b.etl.sources.github import most_starred as github_most_starred
+from k_b.etl.sources.github import releases as github_releases
+from k_b.etl.sources.github.api import TOKEN_VARIABLE
 
 # The kb of this interpreter, by its full path: the one of the environment under test.
 KB_PATH = Path(sys.executable).with_name("kb")

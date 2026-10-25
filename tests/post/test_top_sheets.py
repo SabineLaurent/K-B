@@ -8,7 +8,8 @@ import pytest
 from k_b.commands.sigterm import StoppedBySigtermError
 from k_b.core.config import DIGEST_SUBJECTS, TOPS_DIR_NAME, WATCH_DIR_NAME
 from k_b.etl.raw_store import RawStore
-from k_b.etl.sources import github_most_forked, github_most_starred
+from k_b.etl.sources.github import most_forked as github_most_forked
+from k_b.etl.sources.github import most_starred as github_most_starred
 from k_b.etl.tops import Top
 from k_b.post import top_sheets, vault_files
 from k_b.post.top_sheets import TopSheetsOutcome, write_top_sheets

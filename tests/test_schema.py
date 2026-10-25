@@ -9,7 +9,7 @@ from pydantic import ConfigDict, TypeAdapter, ValidationError
 
 from k_b.core.config import RETENTION_YEARS_BY_ACQUISITION_MODE
 from k_b.database.creation import DATABASE_SCRIPTS
-from k_b.etl.sources.github_advisories import ECOSYSTEMS
+from k_b.etl.sources.github.advisories import ECOSYSTEMS
 from k_b.items import (
     GHSA_ID,
     HIGHLIGHT_MAX_LENGTH_BY_FIELD,

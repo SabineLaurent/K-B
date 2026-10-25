@@ -9,10 +9,10 @@ from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources import (
     clipping,
     gh_archive,
-    github_api,
-    github_most_forked,
-    github_most_starred,
 )
+from k_b.etl.sources.github import api as github_api
+from k_b.etl.sources.github import most_forked as github_most_forked
+from k_b.etl.sources.github import most_starred as github_most_starred
 from k_b.etl.sources.zotero import READER
 
 
@@ -93,9 +93,11 @@ def test_no_kind_has_both_a_reader_of_items_and_a_trend_reader():
 
 
 def test_the_github_core_quota_kinds_are_those_that_call_the_github_api_but_the_search():
+    # Sub-packages included: the GitHub sources are in sources/github/.
     modules = [
-        importlib.import_module(f"k_b.etl.sources.{module_info.name}")
-        for module_info in pkgutil.iter_modules(sources.__path__)
+        importlib.import_module(module_info.name)
+        for module_info in pkgutil.walk_packages(sources.__path__, "k_b.etl.sources.")
+        if not module_info.ispkg
     ]
     # Imported, not named: a module that only names the function in a comment is not counted.
     calling_modules = [

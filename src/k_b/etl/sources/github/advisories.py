@@ -16,7 +16,7 @@ from k_b.etl.source_contract import (
     check_not_all_invalid,
     read_each_entry,
 )
-from k_b.etl.sources.github_api import SOURCE_CODE, get_from_github_api
+from k_b.etl.sources.github.api import SOURCE_CODE, get_from_github_api
 from k_b.items import CVE_ID, GHSA_ID, Item, parse_aware_datetime
 
 logger = logging.getLogger(__name__)

@@ -4153,6 +4153,22 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   100 à 450 lignes ; une classe de base commune, quand le `Protocol` du contrat suffit et que les
   formats (Atom, CSV, JSON, HTML, SQLite, BigQuery) n'ont rien d'autre en commun. — branche
   `refactor/source-modules-extract-transform`
+- **Les sources GitHub passent dans un paquet `etl/sources/github/` (`api`, `releases`,
+  `advisories`, `most_starred`, `most_forked`) ; `tracked_repositories.py` disparaît : la liste
+  `TRACKED_REPOSITORIES` va dans `core/config.py`, à côté de son type, `list_packages_by_ecosystem`
+  dans `etl/source_kinds.py`, son seul appelant, et `is_repository_name` dans `items.py`, à côté du
+  motif `REPOSITORY_NAME` qu'elle complète.** Demandé par Sabine le 2026-10-25 (« un dossier
+  `sources/github_…` ») ; la répartition de `tracked_repositories.py` est la recommandation de
+  time-knight, acceptée (« version complète »). Pourquoi : un dossier par fournisseur, et le client
+  GitHub avec les quatre sources qui l'appellent ; la liste des dépôts suivis n'est pas une aide des
+  sources GitHub (les commandes, le pipeline, le load, le transform et la base s'en servent), et
+  `core/config.py` annonçait déjà qu'elle y viendrait avec #123. Avance une partie de #123, qui
+  reste ouverte pour les autres paramètres. Les noms des dossiers de `raw/` (`github_releases_…`,
+  `github_advisories_…`) ne changent pas. Pur déplacement : chaque définition identique, imports
+  mis à part. Options écartées : la liste dans la composition de l'ETL (une source ne peut pas
+  l'importer, or trois sources GitHub lisent `is_repository_name`) ; le seul regroupement des cinq
+  modules, `tracked_repositories.py` laissé en attendant #123. — branche
+  `refactor/github-sources-package`
 
 ## Décisions encore ouvertes
 

@@ -1,7 +1,5 @@
-"""The most forked GitHub repositories source: download the ranking (E), and read it; a ranking
-gives no item, it does not enter the base.
-
-Its checks are copied from the most starred, not shared, until #269 rewrites both."""
+"""The most starred GitHub repositories source: download the ranking (E), and read it; a ranking
+gives no item, it does not enter the base."""
 
 import json
 from dataclasses import dataclass
@@ -9,32 +7,35 @@ from datetime import datetime
 from urllib.parse import urlencode
 
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
-from k_b.etl.sources.github_api import get_from_github_api
-from k_b.etl.sources.github_most_starred import RANKING_SIZE, REPOSITORY_URL_PREFIX
-from k_b.etl.sources.tracked_repositories import is_repository_name
+from k_b.etl.sources.github.api import get_from_github_api
 from k_b.etl.tops import TopEntry
+from k_b.items import is_repository_name, parse_aware_datetime
 
-# The name of its raw folders, written once: its instance and its kind use it.
-FOLDER_PREFIX = "github_most_forked"
+# The API maximum: one request, deep enough to see a repository enter the top.
+RANKING_SIZE = 100
+
+
+# The name of its raw folders, written once: its instances and its kind use it.
+FOLDER_PREFIX = "github_most_starred"
 
 
 # === EXTRACT ===
 
-# The search needs a criterion: this one keeps the whole top 100 (533 repositories, the 100th had
-# 27,552 forks on 2026-10-19).
-SEARCH_QUERY = "forks:>10000"
+# The search needs a criterion: this one keeps the whole top 100 (the 100th had 116,161 stars on
+# 2026-10-02).
+SEARCH_QUERY = "stars:>10000"
 
 
-class GithubMostForkedSource:
+class GithubMostStarredSource:
     name = FOLDER_PREFIX
     extension = "json"
     acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
 
     def fetch(self, last_collected_at: datetime | None) -> bytes | None:
-        """Return a snapshot of the ranking at every collection: fork counts always change."""
+        """Return a snapshot of the ranking at every collection: star counts always change."""
         query = {
             "q": SEARCH_QUERY,
-            "sort": "forks",
+            "sort": "stars",
             "order": "desc",
             "per_page": RANKING_SIZE,
         }
@@ -45,19 +46,28 @@ class GithubMostForkedSource:
 
 # === TRANSFORM ===
 
+REPOSITORY_URL_PREFIX = "https://github.com/"
+
 
 @dataclass(frozen=True)
-class ForkedRepository:
+class StarredRepository:
     rank: int
     # owner/name: the owner's login is kept, as it identifies the repository (see the register).
     full_name: str
+    url: str
     description: str | None
-    forks: int
+    stars: int
+    topics: tuple[str, ...]
+    created_at: datetime
 
 
-def read_most_forked(raw_response: bytes, expected_size: int) -> list[ForkedRepository]:
-    """One repository per item of a `GET /search/repositories` response, by rank; a ranking
-    shorter than asked for, or marked incomplete, is refused."""
+def read_most_starred(
+    raw_response: bytes, expected_size: int
+) -> list[StarredRepository]:
+    """One repository per item of a `GET /search/repositories` response, by rank.
+
+    A ranking shorter than asked for, or marked incomplete, is refused: it would show
+    repositories leaving the top that never left it."""
     response = json.loads(raw_response)
     items = response.get("items") if isinstance(response, dict) else None
     if not isinstance(items, list):
@@ -71,7 +81,7 @@ def read_most_forked(raw_response: bytes, expected_size: int) -> list[ForkedRepo
     return [parse_repository(item, rank) for rank, item in enumerate(items, start=1)]
 
 
-def parse_repository(item: object, rank: int) -> ForkedRepository:
+def parse_repository(item: object, rank: int) -> StarredRepository:
     if not isinstance(item, dict):
         raise ValueError(f"repository {rank}: not an object")
     full_name = item.get("full_name")
@@ -82,7 +92,6 @@ def parse_repository(item: object, rank: int) -> ForkedRepository:
         raise ValueError(
             f"repository {rank}: not an owner/name, length {len(full_name)}"
         )
-    # Checked, not kept: the URL of a repository is built from its name.
     url = item.get("html_url")
     if not isinstance(url, str) or not url.startswith(REPOSITORY_URL_PREFIX):
         raise ValueError(
@@ -91,30 +100,43 @@ def parse_repository(item: object, rank: int) -> ForkedRepository:
     description = item.get("description")
     if not isinstance(description, str | None):
         raise ValueError(f"repository {rank}: description is not a string")
-    forks = item.get("forks_count")
+    stars = item.get("stargazers_count")
     # bool is a subclass of int in Python: refuse it explicitly.
-    if not isinstance(forks, int) or isinstance(forks, bool):
-        raise ValueError(f"repository {rank}: forks_count is not an integer")
-    return ForkedRepository(
-        rank=rank, full_name=full_name, description=description, forks=forks
+    if not isinstance(stars, int) or isinstance(stars, bool):
+        raise ValueError(f"repository {rank}: stargazers_count is not an integer")
+    topics = item.get("topics")
+    if not isinstance(topics, list) or not all(
+        isinstance(topic, str) for topic in topics
+    ):
+        raise ValueError(f"repository {rank}: topics is not a list of strings")
+    return StarredRepository(
+        rank=rank,
+        full_name=full_name,
+        url=url,
+        description=description,
+        stars=stars,
+        topics=tuple(topics),
+        created_at=parse_aware_datetime(
+            item.get("created_at"), f"repository {rank}: created_at"
+        ),
     )
 
 
-def read_ranking(raw_response: bytes) -> list[ForkedRepository]:
-    return read_most_forked(raw_response, expected_size=RANKING_SIZE)
+def read_ranking(raw_response: bytes) -> list[StarredRepository]:
+    return read_most_starred(raw_response, expected_size=RANKING_SIZE)
 
 
 def read_top_entries(
     raw_response: bytes, expected_size: int = RANKING_SIZE
 ) -> list[TopEntry]:
-    """The ranking as its sheet shows it, its URL built from the name."""
+    """The ranking as its sheet shows it, its URL built from the name, never read in html_url."""
     return [
         TopEntry(
             rank=repository.rank,
             full_name=repository.full_name,
             url=f"{REPOSITORY_URL_PREFIX}{repository.full_name}",
             description=repository.description,
-            count=repository.forks,
+            count=repository.stars,
         )
-        for repository in read_most_forked(raw_response, expected_size)
+        for repository in read_most_starred(raw_response, expected_size)
     ]

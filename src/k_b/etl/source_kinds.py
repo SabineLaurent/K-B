@@ -1,6 +1,7 @@
 """SOURCE_KINDS: the only declaration of the sources, in collection order, imported by the
 commands only; Zotero, clipping and GH Archive get their instance in etl/collected_sources.py."""
 
+from k_b.core.config import TRACKED_REPOSITORIES, TrackedRepository
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME, make_source_folder_key
 from k_b.etl.source_contract import SourceKind
 from k_b.etl.sources import (
@@ -8,25 +9,34 @@ from k_b.etl.sources import (
     cisa_kev,
     clipping,
     gh_archive,
-    github_advisories,
-    github_most_forked,
-    github_most_starred,
-    github_releases,
     tldr,
     zotero,
 )
 from k_b.etl.sources.arxiv import ArxivSource
 from k_b.etl.sources.cisa_kev import CisaKevSource
-from k_b.etl.sources.github_advisories import GithubAdvisoriesSource
-from k_b.etl.sources.github_most_forked import GithubMostForkedSource
-from k_b.etl.sources.github_most_starred import GithubMostStarredSource
-from k_b.etl.sources.github_releases import GithubReleasesSource
+from k_b.etl.sources.github import advisories as github_advisories
+from k_b.etl.sources.github import most_forked as github_most_forked
+from k_b.etl.sources.github import most_starred as github_most_starred
+from k_b.etl.sources.github import releases as github_releases
+from k_b.etl.sources.github.advisories import GithubAdvisoriesSource
+from k_b.etl.sources.github.most_forked import GithubMostForkedSource
+from k_b.etl.sources.github.most_starred import GithubMostStarredSource
+from k_b.etl.sources.github.releases import GithubReleasesSource
 from k_b.etl.sources.tldr import TRACKED_EDITIONS, TldrSource
-from k_b.etl.sources.tracked_repositories import (
-    TRACKED_REPOSITORIES,
-    list_packages_by_ecosystem,
-)
 from k_b.etl.tops import Top
+
+
+def list_packages_by_ecosystem(
+    repositories: tuple[TrackedRepository, ...],
+) -> dict[str, tuple[str, ...]]:
+    packages_by_ecosystem: dict[str, tuple[str, ...]] = {}
+    for repository in repositories:
+        known_packages = packages_by_ecosystem.get(repository.ecosystem, ())
+        packages_by_ecosystem[repository.ecosystem] = (
+            known_packages + repository.packages
+        )
+    return packages_by_ecosystem
+
 
 SOURCE_KINDS = (
     SourceKind(cisa_kev.FOLDER_PREFIX, (CisaKevSource(),), cisa_kev.READER),

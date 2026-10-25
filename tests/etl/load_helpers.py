@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 from test_transform import FIXTURES_DIR
 
+from k_b.core.config import TRACKED_REPOSITORIES
 from k_b.database.connection import connect_database
 from k_b.database.creation import create_database
 from k_b.etl import transform as read_raw_items_module
@@ -16,7 +17,6 @@ from k_b.etl.load import (
 )
 from k_b.etl.normalize import normalize_item
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 from k_b.etl.transform import read_raw_files
 
 FIRST_PAPER_ID = "2609.31282"

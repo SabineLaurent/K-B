@@ -9,12 +9,12 @@ from pathlib import Path
 import pytest
 
 from k_b.core.atomic_write import write_file_atomically
+from k_b.core.config import TRACKED_REPOSITORIES
 from k_b.etl.raw_files import RawFile, RawReading, Rejection, TrendReading
 from k_b.etl.raw_store import RawStore
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.gh_archive import read_trend_rows
-from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 from k_b.etl.sources.zotero import ZoteroSource
 from k_b.etl.transform import ImportReadings, read_raw_files
 from k_b.items import Item
@@ -553,7 +553,7 @@ def test_an_entry_rejected_by_its_reader_is_rejected_and_counted_with_its_file(
     assert raw_file.rejection_count == 2
 
 
-# The repository of a release is read in its URL (github_releases.py): a page can hold a release
+# The repository of a release is read in its URL (github/releases.py): a page can hold a release
 # of a repository the list no longer names.
 UNTRACKED_REPOSITORY = "octocat/hello-world"
 

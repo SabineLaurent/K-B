@@ -28,6 +28,7 @@ from load_helpers import (
 )
 from test_transform import FIXTURES_DIR, convert_line
 
+from k_b.core.config import TRACKED_REPOSITORIES
 from k_b.database import writing
 from k_b.database.connection import MissingDatabaseError, connect_database
 from k_b.database.creation import create_database
@@ -38,7 +39,6 @@ from k_b.etl.load import (
 )
 from k_b.etl.raw_files import RawReading, TrendReading
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
-from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 
 
 def test_each_rejected_file_is_written_to_the_log(data_dir):
