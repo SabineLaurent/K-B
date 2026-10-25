@@ -4,6 +4,7 @@ import signal
 
 import pytest
 from commands.cli_helpers import (
+    SigintNotHandledByKbError,
     SigtermNotHandledByKbError,
 )
 
@@ -57,6 +58,19 @@ def sigterm_handler_of_the_test():
     previous_handler = signal.signal(signal.SIGTERM, raise_in_the_test)
     yield raise_in_the_test
     signal.signal(signal.SIGTERM, previous_handler)
+
+
+@pytest.fixture
+def sigint_handler_of_the_test():
+    """A SIGINT handler set before kb runs, set back after the test: kb ignores SIGINT once
+    stopped by it, which would leave pytest deaf to Ctrl-C."""
+
+    def raise_in_the_test(signal_number, frame):
+        raise SigintNotHandledByKbError
+
+    previous_handler = signal.signal(signal.SIGINT, raise_in_the_test)
+    yield raise_in_the_test
+    signal.signal(signal.SIGINT, previous_handler)
 
 
 @pytest.fixture

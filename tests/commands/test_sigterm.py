@@ -10,8 +10,10 @@ import sys
 from datetime import datetime
 
 from commands.cli_helpers import (
+    COLLECT_WAITING_FOR_A_SIGNAL,
     LOG_LINE_DATE,
     collected_kinds,
+    dump_database,
     list_hidden_files,
 )
 from etl.test_extract import WorkingSource
@@ -30,16 +32,6 @@ class SigtermSource(WorkingSource):
     def fetch(self, last_collected_at):
         signal.raise_signal(signal.SIGTERM)
         return super().fetch(last_collected_at)
-
-
-def dump_database(data_dir):
-    """Every table, row by row, as SQL text, as in etl/test_load.py, which cannot be imported
-    from here."""
-    connection = sqlite3.connect(data_dir / "k-b.sqlite")
-    try:
-        return list(connection.iterdump())
-    finally:
-        connection.close()
 
 
 def test_a_sigterm_after_the_import_log_is_written_leaves_neither_the_import_nor_its_log(
@@ -138,36 +130,9 @@ def test_a_sigterm_during_a_source_stops_kb_collect_and_keeps_the_collection_sta
     assert signal.getsignal(signal.SIGTERM) is sigterm_handler_of_the_test
 
 
-# kb collect run as the kb script runs it, sys.exit(main()), with a source that says it has
-# started, then waits for the signal.
-COLLECT_WAITING_FOR_SIGTERM = """
-import sys
-import time
-
-from k_b import cli
-from k_b.commands import collect_command
-from k_b.etl.source_contract import SourceKind
-
-
-class WaitingSource:
-    name = "waiting"
-    extension = "json"
-    acquisition_dir_name = "automated_watch"
-
-    def fetch(self, last_collected_at):
-        print("ready", flush=True)
-        time.sleep(60)
-        return b"{}"
-
-
-collect_command.SOURCE_KINDS = (SourceKind("test", (WaitingSource(),), None),)
-sys.exit(cli.main(["collect"]))
-"""
-
-
 def test_kb_collect_sent_sigterm_in_its_own_process_exits_with_143(tmp_path):
     process = subprocess.Popen(  # noqa: S603 — runs this interpreter on a fixed script
-        [sys.executable, "-c", COLLECT_WAITING_FOR_SIGTERM],
+        [sys.executable, "-c", COLLECT_WAITING_FOR_A_SIGNAL],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,

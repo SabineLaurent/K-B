@@ -37,6 +37,16 @@ class ExitCode(IntEnum):
             " kb collect: state written"
         ),
     )
+    # 128 + 2: kb dies by SIGINT after Ctrl-C (commands/sigint.py), so that a shell stops its loop;
+    # a shell reads 130, a parent process -2. Named here so that no other code takes its value;
+    # returned only if the signal does not stop kb.
+    STOPPED_BY_SIGINT = (
+        130,
+        (
+            "kb collect, kb import, kb write-tops, kb digest: stopped by Ctrl-C (SIGINT); what"
+            " was done before it is kept"
+        ),
+    )
     # 128 + 15, the code of a process stopped by SIGTERM. kb serve-data and kb serve-ai exit with it
     # through uvicorn, which sends the signal again once stopped (uvicorn/server.py): a shell
     # reads 143, a parent process -15.

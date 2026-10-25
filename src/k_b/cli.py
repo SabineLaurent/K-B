@@ -3,6 +3,7 @@ opens the log and hands the run to its module in commands/, the environment give
 
 import argparse
 import logging
+import signal
 import sys
 from collections.abc import Mapping
 from contextlib import ExitStack
@@ -32,6 +33,11 @@ from k_b.commands.run_log import (
 )
 from k_b.commands.serve_ai_command import run_serve_ai
 from k_b.commands.serve_data_command import run_serve_data
+from k_b.commands.sigint import (
+    COMMANDS_STOPPED_BY_SIGINT,
+    die_by_sigint,
+    stopping_on_sigint,
+)
 from k_b.commands.sigterm import StoppedBySigtermError, stopping_on_sigterm
 from k_b.commands.write_tops_command import run_write_tops
 from k_b.core.config import AI_API_HOST, AI_API_PORT, DATA_API_HOST, DATA_API_PORT
@@ -118,12 +124,26 @@ def main(argv: list[str] | None = None) -> int:
             )
             return ExitCode.NOT_STARTED
         try:
-            with stopping_on_sigterm(arguments.command):
+            with (
+                stopping_on_sigterm(arguments.command),
+                stopping_on_sigint(arguments.command),
+            ):
                 return run_command(arguments.command, data_dir, environ)
         except StoppedBySigtermError:
             # Caught once the import or the collection has cleaned up on its way out.
             logger.error("kb stopped by SIGTERM")
             return ExitCode.STOPPED_BY_SIGTERM
+        except KeyboardInterrupt:
+            if arguments.command not in COMMANDS_STOPPED_BY_SIGINT:
+                raise
+            # Caught, as SIGTERM, once the command has cleaned up; a second Ctrl-C would cut
+            # the line.
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
+            logger.error("kb stopped by Ctrl-C (SIGINT)")
+            log_stack.close()
+            die_by_sigint()
+            # Only if the signal did not stop kb.
+            return ExitCode.STOPPED_BY_SIGINT
         except Exception:
             # Logged here, while the log file is open, and not raised again: Python would print
             # its traceback a second time. 1, as Python exits on an exception: kb was run.
