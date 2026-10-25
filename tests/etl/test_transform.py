@@ -8,8 +8,9 @@ from pathlib import Path
 
 import pytest
 
+from k_b.core.atomic_write import write_file_atomically
 from k_b.etl.raw_files import RawFile, RawReading, Rejection, TrendReading
-from k_b.etl.raw_store import RawStore, write_file_atomically
+from k_b.etl.raw_store import RawStore
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.gh_archive import read_trend_rows

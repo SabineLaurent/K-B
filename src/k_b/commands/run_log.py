@@ -8,7 +8,7 @@ from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 from k_b.core.config import LOG_FILES_KEPT
-from k_b.database.dates import DATABASE_DATE_FORMAT
+from k_b.core.dates import DATABASE_DATE_FORMAT
 
 # The name of the logger of cli.py and of every module of commands/, written in each line: one
 # name for the command line, whichever of its modules logs.

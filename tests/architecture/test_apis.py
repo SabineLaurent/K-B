@@ -16,9 +16,13 @@ from module_imports import (
 )
 
 # The data API reads the base: never the pipeline, the writers nor their door (conventions.md,
-# rule 5).
+# rule 5), nor the writing of a file.
 DATA_API_ALLOWED_MODULES = {"data_api", "database", "items", "core"}
-DATA_API_FORBIDDEN_MODULES = {"database.writers", "database.writing"}
+DATA_API_FORBIDDEN_MODULES = {
+    "database.writers",
+    "database.writing",
+    "core.atomic_write",
+}
 
 
 def list_forbidden_imports_of_the_data_api(imported: set[str]) -> set[str]:
@@ -50,6 +54,7 @@ def test_data_api_imports_only_data_api_database_items_and_core():
         ("from k_b.database.writing import write_item", True),
         ("from k_b.database import writing", True),
         ("from k_b import database", True),
+        ("from k_b.core.atomic_write import write_file_atomically", True),
         ("from k_b.database import reading", False),
         ("from k_b.database.reading import read_items", False),
         ("from k_b.data_api.errors import ApiError", False),
@@ -91,12 +96,18 @@ def test_each_router_of_an_api_declares_its_prefix_and_its_tags(api):
 
 # The AI API reads the watch through the data API, never the base (docs/fiches-veille.md, "Le
 # parcours d'une demande"), and writes nothing that must outlive it (.claude/rules/poc.md, rule
-# 7): neither database, its writers included, nor etl and its raw store.
+# 7): neither database, its writers included, nor etl and its raw store, nor the writing of a file.
 AI_API_ALLOWED_MODULES = {"ai_api", "items", "core"}
+AI_API_FORBIDDEN_MODULES = {"core.atomic_write"}
 
 
 def list_forbidden_imports_of_the_ai_api(imported: set[str]) -> set[str]:
-    return {name for name in imported if not is_within(name, AI_API_ALLOWED_MODULES)}
+    return {
+        name
+        for name in imported
+        if not is_within(name, AI_API_ALLOWED_MODULES)
+        or reaches(name, AI_API_FORBIDDEN_MODULES)
+    }
 
 
 def test_ai_api_imports_only_ai_api_items_and_core():
@@ -113,6 +124,8 @@ def test_ai_api_imports_only_ai_api_items_and_core():
         ("from k_b.database.writers import paper_writer", True),
         ("from k_b.etl import raw_store", True),
         ("from k_b.etl.raw_store import write_file_atomically", True),
+        ("from k_b.core.atomic_write import write_file_atomically", True),
+        ("from k_b.core import atomic_write", True),
         ("from k_b import data_api", True),
         ("from k_b import cli", True),
         ("from k_b.core.config import LLM_CALL_TIMEOUT_SECONDS", False),

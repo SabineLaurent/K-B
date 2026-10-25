@@ -65,7 +65,7 @@ ajouté ligne à ligne par `logging`, est hors de cette règle : il n'est jamais
 - `grep -rn "NamedTemporaryFile\|\.tmp\|os\.replace" src/k_b` ne renvoie que
   `write_file_atomically`.
 - `grep -rn "TemporaryDirectory" src/k_b` ne renvoie que la copie d'une base source.
-- `uv run pytest tests/etl/test_raw_store.py` : `os.fsync` est appelé sur le temporaire avant le
+- `uv run pytest tests/test_atomic_write.py` : `os.fsync` est appelé sur le temporaire avant le
   renommage, puis sur le dossier, puis sur le parent de chaque dossier créé.
 
 **Pourquoi.** Un nom caché est déjà sauté par l'import (`list_visible_entries`) : un reste

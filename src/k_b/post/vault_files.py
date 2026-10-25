@@ -9,7 +9,7 @@ import stat
 import unicodedata
 from pathlib import Path
 
-from k_b.etl.raw_store import write_file_atomically
+from k_b.core.atomic_write import write_file_atomically
 
 # The format characters that reorder a line as it is displayed (Unicode bidirectional controls
 # and marks, UAX #9). U+200D, which joins the emojis, is kept.

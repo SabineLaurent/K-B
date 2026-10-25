@@ -23,7 +23,7 @@ dans `docs/stockage.md`.
   → 36 lignes au départ.
 - `grep -rhoE "GLOB|strftime|json_each|json_valid|json_type|json_array_length|PRAGMA" src/k_b/database --include='*.py' | wc -l`
   → 11 occurrences au départ, dont 4 du mot `strftime` dans du Python : un appel
-  (`database/dates.py:16`) et trois dans des docstrings (`dates.py:23`, `reading.py:314`).
+  (`database/dates.py:16`) et trois dans des docstrings (`dates.py:23`, `reading.py:314`). `dates.py` est passé dans `core/` le 2026-10-25.
 - `grep -rhoiE "\b(glob|strftime|json_each|json_valid|json_type|json_array_length|pragma|fts5|iif|insert or)\b" src/k_b/database | wc -l`
   → 52 occurrences au départ. Il dépasse 36 + 11 : il compte chaque occurrence et non chaque
   ligne (il voit un second motif sur une ligne déjà comptée), il ignore la casse, et il cherche
@@ -81,6 +81,7 @@ contraint que la signature des fonctions nouvelles de `raw_store.py`.
 - `grep -nA3 "^def " src/k_b/etl/raw_store.py | grep -E "def |Path"` : au départ,
   `write_file_atomically`, `write_new_raw_file`, `load_last_collection_dates` et
   `save_last_collection_dates` prennent un `Path` ; une fonction nouvelle n'en prend pas.
+  `write_file_atomically` est passée dans `core/atomic_write.py` le 2026-10-25.
 
 **Pourquoi.** Au 08/11, le brut passe dans Azure Blob Storage, qui adresse un objet par une clé et
 pas par un chemin. Si chaque accès passe par `raw_store` avec une clé relative, le stockage
