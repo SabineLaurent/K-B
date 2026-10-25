@@ -35,6 +35,7 @@ ETL_PIPELINE_MODULES = {
     "etl.tops",
     "etl.source_contract",
     "etl.http_download",
+    "etl.http_retry",
     "etl.user_agent",
     "etl.file_writing",
     "etl.withdrawals",

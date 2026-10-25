@@ -1,6 +1,7 @@
 import io
 
 import pytest
+from http_helpers import http_error
 
 from k_b.etl import http_download
 from k_b.etl.sources import github_api
@@ -72,3 +73,23 @@ def test_the_token_is_sent_but_never_forwarded_to_a_redirection(
     assert request.get_header("Authorization") == "Bearer test-token"
     # urllib copies request.headers to a redirection, never the unredirected ones.
     assert "Authorization" not in request.headers
+
+
+@pytest.mark.parametrize(
+    ("status", "wait"), [(429, github_api.RATE_LIMITED_WAIT_SECONDS), (502, 5)]
+)
+def test_only_a_rate_limited_request_waits_the_minute_github_asks(
+    fake_urlopen, monkeypatch, no_wait_before_a_retry, status, wait
+):
+    answers = [http_error(github_api.API_URL + PATH, status)]
+
+    def failing_once(request, timeout):
+        if answers:
+            raise answers.pop()
+        return fake_urlopen(request, timeout)
+
+    monkeypatch.setattr(http_download, "urlopen", failing_once)
+
+    assert get_from_github_api(PATH) == BODY
+    assert no_wait_before_a_retry == [wait]
+    assert github_api.RATE_LIMITED_WAIT_SECONDS == 60

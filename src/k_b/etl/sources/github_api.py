@@ -12,6 +12,9 @@ API_VERSION = "2026-03-10"
 TOKEN_VARIABLE = "KB_GITHUB_TOKEN"  # noqa: S105 — the variable's name, not a token
 # A page of 100 releases of anthropics/claude-code weighs 2.2 MB in 2026.
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024
+# GitHub asks to wait at least a minute before retrying a rate limited request that gives no
+# Retry-After (docs: "Rate limits for the REST API", 2026-10-25).
+RATE_LIMITED_WAIT_SECONDS = 60
 
 
 def get_from_github_api(path_and_query: str) -> bytes:
@@ -28,4 +31,5 @@ def get_from_github_api(path_and_query: str) -> bytes:
         },
         # Never forwarded to a redirection: the token stays with api.github.com.
         unredirected_headers={"Authorization": f"Bearer {token}"} if token else None,
+        rate_limited_wait_seconds=RATE_LIMITED_WAIT_SECONDS,
     )
