@@ -243,7 +243,8 @@ tout a réussi ; 4 si au moins une source a réussi et au moins une a échoué, 
 `KB_DATA_DIR` manque, n'est pas un dossier existant, si l'état de collecte est illisible, ou si
 `KB_COLLECT_ONLY` est refusée ; 143 si `kb collect` reçoit SIGTERM (`docker stop`) : ce qui a été
 fait avant le signal est gardé ; reçu avant l'écriture de l'état de collecte, il laisse l'état
-inchangé, et la collecte suivante repart des mêmes dates.
+inchangé, et la collecte suivante repart des mêmes dates ; 130 pour Ctrl-C, avec les mêmes effets (`kb`
+meurt par SIGINT, et une boucle shell qui le lance s'arrête).
 
 **Importer le brut dans la base** (après une collecte) :
 
@@ -269,7 +270,8 @@ sortie :
   seconde existe déjà (relancer `kb import`) ;
 - 143 : `kb import` a reçu SIGTERM (`docker stop`). Reçu avant la validation de la base, il
   n'écrit rien, comme pour 1, ni dans la base ni au journal ; reçu pendant ou après, l'import est
-  gardé, avec son journal.
+  gardé, avec son journal ;
+- 130 : `kb import` a reçu Ctrl-C, avec les mêmes effets que SIGTERM (143).
 
 **Écrire les fiches des tops dans le coffre** (après un import) :
 
@@ -302,7 +304,8 @@ existe, relevés supprimés, relevés illisibles gardés). Code de sortie :
   lu dans le brut, rien n'est écrit dans le coffre ni supprimé, aucun dossier du coffre n'est créé ;
   l'erreur va au journal ;
 - 143 : `kb write-tops` a reçu SIGTERM (`docker stop`) : les fiches déjà écrites sont gardées,
-  aucun relevé n'est supprimé avant que ses fiches soient écrites.
+  aucun relevé n'est supprimé avant que ses fiches soient écrites ;
+- 130 : `kb write-tops` a reçu Ctrl-C, avec les mêmes effets que SIGTERM (143).
 
 **Toute la chaîne en dev**, comme en ligne, où une automatisation enchaînera les étapes :
 
@@ -452,7 +455,8 @@ de sortie, l'unité étant le sujet :
 - 2 : rien n'est demandé : `KB_DATA_DIR`, `KB_VAULT_DIR` (absente, ou pas un dossier existant) ou
   `KB_AI_API_KEY_KB_DIGEST` manque ou est refusée, une fiche du jour est déjà là, ou un dossier
   `veille/…` est un lien symbolique ;
-- 143 : `kb digest` a reçu SIGTERM : les fiches déjà écrites sont gardées.
+- 143 : `kb digest` a reçu SIGTERM : les fiches déjà écrites sont gardées ;
+- 130 : `kb digest` a reçu Ctrl-C, avec les mêmes effets.
 
 Le code 4 dit la même chose pour `kb collect` (l'unité est la source), `kb write-tops` (le top) et
 `kb digest` (le sujet) : une partie a échoué, une autre est faite et gardée.
