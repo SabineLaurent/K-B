@@ -120,8 +120,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     (il doublerait l'attente), un autre statut, une réponse d'erreur servie hors de l'adresse
     attendue après une redirection (ses en-têtes ne sont pas lus), et un quota épuisé
     (`x-ratelimit-remaining: 0`, GitHub) : sa remise à zéro peut être dans une heure, et le journal
-    de la source en échec donne son heure (UTC). Chaque nouvel essai est journalisé, l'URL sans sa
-    requête ;
+    de la source en échec donne son heure (UTC). Après un quota épuisé ou un `Retry-After` au-delà de
+    60 s de l'API GitHub, les sources GitHub suivantes n'envoient aucune requête avant la remise à
+    zéro, ou la fin du `Retry-After`, et échouent (`GithubPausedError`, depuis le 2026-10-25 ; une
+    minute au moins, ce que GitHub demande sans heure de remise à zéro lisible). Chaque nouvel essai
+    est journalisé, l'URL sans sa requête ;
   - **écriture du brut** (`src/k_b/etl/raw_store.py`) : un fichier brut déjà présent (deux
     collectes dans la même seconde) est refusé (`FileExistsError`) ; un dossier ou un fichier qui
     ne s'écrit pas (droits, disque plein) lève une `OSError`.

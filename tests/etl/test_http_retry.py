@@ -1,12 +1,15 @@
+import math
 from urllib.error import URLError
 
 import pytest
 from http_helpers import http_error
 
 from k_b.etl.http_retry import (
+    MIN_PAUSE_SECONDS,
     MIN_RETRY_WAIT_SECONDS,
     RETRY_AFTER_MAX_SECONDS,
     RETRY_WAIT_SECONDS,
+    find_pause_end,
     find_retry_wait,
     note_rate_limit_reset,
 )
@@ -149,3 +152,57 @@ def test_no_note_without_an_exhausted_rate_limit_from_the_trusted_prefix(
     note_rate_limit_reset(error, TRUSTED_URL_PREFIX)
 
     assert not hasattr(error, "__notes__")
+
+
+NOW = 1792940000.0  # about an hour before RESET_EPOCH_SECONDS
+
+
+def pause_end(error):
+    return find_pause_end(error, TRUSTED_URL_PREFIX, NOW)
+
+
+def test_a_rate_limit_with_no_request_left_pauses_until_its_reset():
+    error = http_error(
+        URL, 403, x_ratelimit_remaining="0", x_ratelimit_reset=RESET_EPOCH_SECONDS
+    )
+
+    assert pause_end(error) == float(RESET_EPOCH_SECONDS)
+
+
+@pytest.mark.parametrize("reset", [None, "soon", "9" * 11, "1000"])
+def test_a_reset_missing_unreadable_or_past_pauses_a_minute(reset):
+    headers = {"x_ratelimit_remaining": "0"}
+    if reset is not None:
+        headers["x_ratelimit_reset"] = reset
+
+    assert pause_end(http_error(URL, 403, **headers)) == NOW + MIN_PAUSE_SECONDS
+
+
+def test_a_retry_after_too_long_to_wait_pauses_until_it_ends():
+    seconds = RETRY_AFTER_MAX_SECONDS + 1
+    error = http_error(URL, 429, Retry_After=str(seconds))
+
+    assert pause_end(error) == NOW + seconds
+
+
+def test_a_retry_after_too_long_to_read_pauses_for_good():
+    assert pause_end(http_error(URL, 429, Retry_After="9" * 10)) == math.inf
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        http_error(URL, 404),
+        http_error(URL, 429, Retry_After=str(RETRY_AFTER_MAX_SECONDS)),
+        http_error(URL, 403, x_ratelimit_remaining="3"),
+        http_error(
+            "https://example.com/landing",
+            403,
+            x_ratelimit_remaining="0",
+            Retry_After="3600",
+        ),
+    ],
+    ids=["refusal", "retry-after-waited", "requests-left", "served-from-outside"],
+)
+def test_no_pause_otherwise(error):
+    assert pause_end(error) is None

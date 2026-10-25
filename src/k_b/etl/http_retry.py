@@ -1,6 +1,7 @@
 """When a source download gets a retry, and after which wait: the politeness of K-B towards the
 services it collects (RFC 9110 Retry-After, rate limits)."""
 
+import math
 import re
 from datetime import UTC, datetime
 from http import HTTPStatus
@@ -23,6 +24,9 @@ RETRY_AFTER_MAX_SECONDS = 60
 RATE_LIMIT_REMAINING_HEADER = "x-ratelimit-remaining"
 RATE_LIMIT_RESET_HEADER = "x-ratelimit-reset"
 EPOCH_SECONDS = re.compile(r"[0-9]{1,10}")
+# A pause asked by a service lasts at least a minute: GitHub asks it when it gives no reset
+# (docs: "Rate limits for the REST API", 2026-10-25).
+MIN_PAUSE_SECONDS = 60
 
 
 def find_retry_wait(
@@ -63,6 +67,32 @@ def find_retry_wait(
             return rate_limited_wait
         return RETRY_WAIT_SECONDS
     return max(seconds, MIN_RETRY_WAIT_SECONDS)
+
+
+def find_pause_end(
+    error: HTTPError, trusted_url_prefix: str, now: float
+) -> float | None:
+    """Until when, in epoch seconds, the service asks for no request at all, or None.
+
+    After a rate limit with no request left, until its reset; after a Retry-After above
+    RETRY_AFTER_MAX_SECONDS, until it ends: the other sources on the same service wait too
+    (GitHub: "Best practices for using the REST API", 2026-10-25). An answer served from outside
+    trusted_url_prefix is not read."""
+    if not is_served_from(error, trusted_url_prefix):
+        return None
+    if is_rate_limit_exhausted(error):
+        reset = error.headers.get(RATE_LIMIT_RESET_HEADER)
+        if reset is None or not EPOCH_SECONDS.fullmatch(reset):
+            return now + MIN_PAUSE_SECONDS
+        # A reset already past (a clock off) still gets the minute.
+        return max(float(reset), now + MIN_PAUSE_SECONDS)
+    retry_after = error.headers.get("Retry-After")
+    if is_retry_after_too_long(retry_after):
+        return math.inf
+    seconds = read_retry_after(retry_after)
+    if seconds is not None and seconds > RETRY_AFTER_MAX_SECONDS:
+        return now + seconds
+    return None
 
 
 def is_served_from(error: HTTPError, trusted_url_prefix: str) -> bool:
