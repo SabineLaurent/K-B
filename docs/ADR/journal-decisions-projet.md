@@ -4186,7 +4186,38 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   code (fichier lu au démarrage) serait une autre décision. — branche
   `refactor/watch-settings-in-config`
 
+### Configuration : l'environnement lu à un seul endroit
+
+- **`os.environ` n'est lu qu'à un endroit, `read_environment` de `commands/environment.py`, appelé
+  une fois par `cli.py` ; les commandes et les lecteurs reçoivent l'environnement en paramètre
+  (`environ: Mapping[str, str]`), chaque lecteur près de son domaine ; un test d'architecture le
+  tient (`tests/architecture/test_environment.py`).** Point noté le 2026-10-21 (« un seul endroit lit
+  et valide ») ; plan validé par Sabine le 2026-10-25, lecture dans `environment.py` à sa demande.
+  Les lecteurs maison (`read_…_or_refusal(environ)`, déjà neuf) sont gardés **pour le moment**,
+  sans pydantic-settings (voir les décisions encore ouvertes). `kb` ne charge jamais un `.env`
+  lui-même, sans `dotenv` : `uv run --env-file` le fait (un `load_dotenv` chercherait un `.env` en
+  remontant les dossiers). **Exception provisoire** : le jeton GitHub reste lu par
+  `etl/sources/github/api.py`. Le passer aux sources GitHub, essayé dans la même PR, ajoutait une
+  troisième façon de créer une source (instances déclarées, création par la sorte pour GitHub,
+  création au cas par cas dans `etl/collected_sources.py` pour Zotero, les clips et GH Archive) ;
+  Sabine : « je ne suis pas certaine que ce soit très clean ». Il attend une seule façon de créer toutes les sources qui ont besoin
+  de l'environnement, à concevoir à part. Options écartées : tout regrouper dans `core/` (les
+  réglages du modèle, des API et des sources mêlés, sans gain) ; la lecture dans `cli.py` (moins
+  facile à trouver que dans le module qui porte le nom). — branche `refactor/read-environment-once`
+
 ## Décisions encore ouvertes
+
+- **Lecteurs maison ou pydantic-settings** (2026-10-21, gardés le 2026-10-25 « pour le moment ») :
+  les lecteurs `read_…_or_refusal(environ)` de K-B, sans dépendance, contre pydantic-settings, la
+  solution standard. Ce que coûte pydantic-settings : une dépendance directe nouvelle, la réécriture
+  des neuf lecteurs, des familles de variables à préfixe variable (`KB_DATA_API_KEY_<CLIENT>`) mal
+  servies, et une erreur de validation qui recopie la valeur refusée, jeton compris, sauf
+  `hide_input_in_errors`. Ce qui pourrait faire changer d'avis, selon time-knight (non dit par
+  Sabine) : beaucoup plus de variables, ou des lecteurs maison qui divergent.
+
+- **Une seule façon de créer les sources qui ont besoin de l'environnement** (2026-10-25) : les
+  sources GitHub (leur jeton, aujourd'hui lu par `etl/sources/github/api.py`), Zotero, les clips et
+  GH Archive ; lève l'exception provisoire de « l'environnement lu à un seul endroit ».
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,
   recommandée par le rapport de l'architecte, la base est un fichier produit par le job de

@@ -44,9 +44,15 @@ défaut : sans eux, la commande échoue (échouer fermé, `code.md` ; ADR du 202
 « Configuration »). Le fournisseur du modèle, son URL et le nom du modèle (`KB_LLM_PROVIDER`,
 `KB_LLM_BASE_URL`, `KB_LLM_MODEL`) n'en ont pas non plus : un fournisseur distant n'a pas de valeur
 locale, et un défaut enverrait la veille à un service que personne n'a choisi (ADR du 2026-10-15,
-« Appel du modèle »).
+« Appel du modèle »). L'environnement se lit à un seul endroit, `read_environment` de
+`commands/environment.py`, une fois au démarrage (`cli.py`) ; les commandes et les lecteurs le
+reçoivent en paramètre (`environ: Mapping[str, str]`), chaque lecteur près de son domaine. `kb` ne
+charge jamais un `.env` lui-même : `uv run --env-file` le fait. Exception provisoire : le jeton
+GitHub, lu par `etl/sources/github/api.py` (ADR du 2026-10-25).
 
 **Vérifier.**
+- `uv run pytest tests/architecture/test_environment.py` : seul `commands/environment.py` lit
+  `os.environ` (et, pour l'instant, `etl/sources/github/api.py`).
 - `grep -rnE '127\.0\.0\.1|localhost|0\.0\.0\.0|port *= *[0-9]|_PORT *= *[0-9]' src/k_b` ne renvoie
   que des défauts nommés de `core/config.py`. Au départ : `cli.py:80`, `cli.py:81`,
   `data_api/app.py:18`, que #199 corrige.

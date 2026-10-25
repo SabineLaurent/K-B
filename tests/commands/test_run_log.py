@@ -107,7 +107,7 @@ def test_an_error_handled_by_kb_is_a_dated_log_line_of_the_log_file(
 def test_an_exception_kb_does_not_handle_is_logged_once_and_exits_1(
     monkeypatch, tmp_path, capsys
 ):
-    def failing_collect(data_dir):
+    def failing_collect(data_dir, environ):
         raise RuntimeError("not handled")
 
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))

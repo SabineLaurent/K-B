@@ -2,7 +2,7 @@
 they supersede from raw/; it runs after kb import."""
 
 import logging
-import os
+from collections.abc import Mapping
 from pathlib import Path
 
 from k_b.commands.exit_codes import ExitCode, find_exit_code
@@ -16,11 +16,11 @@ from k_b.post.vault_files import VaultEntryRefusedError
 logger = logging.getLogger(LOGGER_NAME)
 
 
-def run_write_tops(data_dir: Path) -> int:
+def run_write_tops(data_dir: Path, environ: Mapping[str, str]) -> int:
     """Each top in turn, a top that fails not stopping the other; without a vault, nothing is
     read nor deleted, and nothing created, as write_file_atomically would create a vault
     misspelt."""
-    vault_dir = read_vault_dir(os.environ)
+    vault_dir = read_vault_dir(environ)
     if vault_dir is None:
         logger.error(
             "%s not set; the sheets of the tops are written in the vault",

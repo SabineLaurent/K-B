@@ -2,7 +2,7 @@
 in the vault; kb serve-data and kb serve-ai must run."""
 
 import logging
-import os
+from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -28,10 +28,10 @@ from k_b.post.vault_files import VaultEntryRefusedError
 logger = logging.getLogger(LOGGER_NAME)
 
 
-def run_digest() -> int:
+def run_digest(environ: Mapping[str, str]) -> int:
     """Read the settings, check the vault, ask the digests, write their sheets; nothing is asked
     while a setting is refused or a sheet of the day is there, so no item is sent for nothing."""
-    vault_dir = read_vault_dir(os.environ)
+    vault_dir = read_vault_dir(environ)
     if vault_dir is None:
         logger.error(
             "%s not set; the digests are written in the vault", VAULT_DIR_VARIABLE
@@ -42,7 +42,7 @@ def run_digest() -> int:
             "%s is not an existing directory; no folder is created", VAULT_DIR_VARIABLE
         )
         return ExitCode.NOT_STARTED
-    settings = value_or_log_refusal(read_ai_api_client_settings_or_refusal(os.environ))
+    settings = value_or_log_refusal(read_ai_api_client_settings_or_refusal(environ))
     if settings is None:
         return ExitCode.NOT_STARTED
     subject_names = [subject.name for subject in DIGEST_SUBJECTS]

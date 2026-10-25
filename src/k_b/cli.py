@@ -1,16 +1,21 @@
-"""The entry point of kb: it reads the command, opens the log and hands the run to its module in
-commands/."""
+"""The entry point of kb: it reads the command and the environment (commands/environment.py),
+opens the log and hands the run to its module in commands/, the environment given as a parameter."""
 
 import argparse
 import logging
 import sys
+from collections.abc import Mapping
 from contextlib import ExitStack
 from pathlib import Path
 
 from k_b.commands.collect_command import run_collect
 from k_b.commands.create_db_command import run_create_db
 from k_b.commands.digest_command import run_digest
-from k_b.commands.environment import read_data_dir, read_log_to_file
+from k_b.commands.environment import (
+    read_data_dir,
+    read_environment,
+    read_log_to_file,
+)
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.import_command import run_import
 from k_b.commands.openapi_command import (
@@ -93,8 +98,10 @@ def main(argv: list[str] | None = None) -> int:
     # Neither data nor key: the document is the same on every machine.
     if arguments.command == "openapi":
         return run_openapi()
-    data_dir = read_data_dir()
-    log_to_file = read_log_to_file()
+    # Read once, here: every command gets the same mapping.
+    environ = read_environment()
+    data_dir = read_data_dir(environ)
+    log_to_file = read_log_to_file(environ)
     if data_dir is None or log_to_file is None:
         return ExitCode.NOT_STARTED
     log_file_path = None
@@ -112,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
             return ExitCode.NOT_STARTED
         try:
             with stopping_on_sigterm(arguments.command):
-                return run_command(arguments.command, data_dir)
+                return run_command(arguments.command, data_dir, environ)
         except StoppedBySigtermError:
             # Caught once the import or the collection has cleaned up on its way out.
             logger.error("kb stopped by SIGTERM")
@@ -129,17 +136,17 @@ def describe_exit_codes() -> str:
     return "exit codes:\n" + "\n".join(lines)
 
 
-def run_command(command: str, data_dir: Path) -> int:
+def run_command(command: str, data_dir: Path, environ: Mapping[str, str]) -> int:
     if command == "create-db":
         return run_create_db(data_dir)
     if command == "import":
         return run_import(data_dir)
     if command == "write-tops":
-        return run_write_tops(data_dir)
+        return run_write_tops(data_dir, environ)
     if command == "serve-data":
-        return run_serve_data(data_dir)
+        return run_serve_data(data_dir, environ)
     if command == "serve-ai":
-        return run_serve_ai()
+        return run_serve_ai(environ)
     if command == "digest":
-        return run_digest()
-    return run_collect(data_dir)
+        return run_digest(environ)
+    return run_collect(data_dir, environ)

@@ -1,7 +1,7 @@
 """kb serve-ai: serve the digests of the watch by the AI API, beside kb serve-data."""
 
 import logging
-import os
+from collections.abc import Mapping
 
 import uvicorn
 
@@ -28,19 +28,17 @@ from k_b.core.config import DIGEST_SUBJECTS
 logger = logging.getLogger(LOGGER_NAME)
 
 
-def run_serve_ai() -> int:
+def run_serve_ai(environ: Mapping[str, str]) -> int:
     """Serve the AI API with the keys and the settings of the environment: any refused, nothing
     is served."""
     api_keys = value_or_log_refusal(
-        read_api_keys_or_refusal(os.environ, AI_API_KEY_VARIABLE_PREFIX)
+        read_api_keys_or_refusal(environ, AI_API_KEY_VARIABLE_PREFIX)
     )
-    settings = value_or_log_refusal(read_ai_api_settings_or_refusal(os.environ))
-    llm_settings = value_or_log_refusal(read_llm_settings_or_refusal(os.environ))
-    data_api_settings = value_or_log_refusal(
-        read_data_api_settings_or_refusal(os.environ)
-    )
+    settings = value_or_log_refusal(read_ai_api_settings_or_refusal(environ))
+    llm_settings = value_or_log_refusal(read_llm_settings_or_refusal(environ))
+    data_api_settings = value_or_log_refusal(read_data_api_settings_or_refusal(environ))
     # None is a setting here: the export is off.
-    export_settings = read_metrics_export_settings_or_refusal(os.environ)
+    export_settings = read_metrics_export_settings_or_refusal(environ)
     if isinstance(export_settings, str):
         logger.error("%s", export_settings)
     if (
