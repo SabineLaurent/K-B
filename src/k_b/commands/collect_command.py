@@ -1,7 +1,6 @@
 """kb collect: run the sources chosen and store their raw output in raw/."""
 
 import logging
-import os
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,10 +32,10 @@ GITHUB_CORE_QUOTA_FOLDER_PREFIXES = frozenset(
 )
 
 
-def run_collect(data_dir: Path) -> int:
-    # The mapping the check reads is the one the sources are created from; the BigQuery client
-    # reads os.environ itself.
-    environ = os.environ
+def run_collect(data_dir: Path, environ: Mapping[str, str]) -> int:
+    # The check and the sources read the same mapping, given by cli.py; the BigQuery client reads
+    # GOOGLE_APPLICATION_CREDENTIALS from the environment itself, as the GitHub API client reads its
+    # token (sources/github/api.py, for now).
     collect_only = value_or_log_refusal(
         read_collect_only_or_refusal(environ, SOURCE_KINDS)
     )
