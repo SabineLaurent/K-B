@@ -9,7 +9,6 @@ import pytest
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from k_b.ai_api.connectors.llm_client import (
-    MAX_RETRY_AFTER_DIGITS,
     Attempt,
     FailedCheck,
     build_http_client,
@@ -36,6 +35,7 @@ from k_b.core.config import (
     MAX_TOKENS_READ_PER_ANSWER,
     MIN_SECONDS_FOR_LLM_REQUEST,
 )
+from k_b.core.retry_after import MAX_RETRY_AFTER_DIGITS
 
 # A system prompt of a stage, a module constant as the real ones will be (#205;
 # .claude/rules/poc.md, rule 8).
