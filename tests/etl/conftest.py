@@ -5,6 +5,16 @@ import pytest
 from test_transform import copy_fixture
 
 from k_b.database.creation import create_database
+from k_b.etl import http_download
+
+
+@pytest.fixture(autouse=True)
+def no_wait_before_a_retry(monkeypatch):
+    """A download retried after a 429, a 5xx or a failed connection waits for nothing in a test;
+    the waits asked are recorded."""
+    waits = []
+    monkeypatch.setattr(http_download, "sleep", waits.append)
+    return waits
 
 
 @pytest.fixture

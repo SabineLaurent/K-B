@@ -289,7 +289,8 @@ Chaque source construit ses requêtes dans son module ; les valeurs des constant
 plafonds, délais) sont dans le code, et leur justification dans la section de la source de
 [specs-collecte.md](specs-collecte.md). Chaque téléchargement passe par `download`
 (`src/k_b/etl/http_download.py`) : délai (`TIMEOUT_SECONDS`), taille maximale, préfixe d'URL de
-confiance
+confiance, un seul nouvel essai après un 429, un 5xx ou un échec de connexion
+(`src/k_b/etl/http_retry.py` ; l'API GitHub attend 60 s sans `Retry-After`)
 ([règles communes](specs-collecte.md#règles-communes)).
 
 | Source | Fichier | Construite par | Paramètres | Filtre à la requête | Spécifications |

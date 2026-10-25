@@ -4098,6 +4098,27 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   Limite : la racine garde huit fichiers, dont trois qui ne sont pas du squelette. — branche
   `refactor/cosmetic-a`
 
+### Collecte : un seul nouvel essai, poli envers les sources
+
+- **Tout téléchargement d'une source (`download`) a un seul nouvel essai après un 429, un 5xx ou
+  un échec de connexion ; il attend le `Retry-After` en secondes, plafonné à 60 s, sinon 5 s, et
+  60 s pour l'API GitHub ; un délai dépassé, un autre statut et un quota épuisé
+  (`x-ratelimit-remaining: 0`) n'en ont pas, et le quota épuisé note sur l'erreur l'heure de sa
+  remise à zéro. La règle vit dans un module à elle, `etl/http_retry.py`.** Demandé par Sabine le
+  2026-10-25 (429 et quotas, puis 5xx et connexion sur la recommandation de time-knight, qui l'a
+  codé sur sa délégation). Pourquoi : la collecte n'avait aucun nouvel essai (constat du 24/10) ;
+  la même règle que l'appel au modèle (`ai_api/connectors/llm_client.py` : un essai de plus,
+  `Retry-After` plafonné, pas de nouvel essai sur un délai dépassé), une seule règle par sujet.
+  5 s dépassent les 3 s qu'arXiv demande entre deux requêtes ; GitHub demande au moins une minute
+  sans `Retry-After` et interdit de retenter avant la remise à zéro d'un quota épuisé
+  ([Rate limits for the REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api),
+  lu le 2026-10-25). Options écartées : attendre la remise à zéro d'un quota GitHub (jusqu'à une
+  heure dans une collecte ; la source échoue, sa date reste, la collecte suivante redemande) ;
+  plusieurs nouveaux essais avec attente croissante (une collecte planifiée repasse de toute
+  façon) ; la règle dans `http_download.py` (deux rôles dans un fichier). Limite : une limite
+  secondaire de GitHub servie en 403 n'est pas retentée (un 403 est d'abord un refus). — branche
+  `fix/source-download-retry`
+
 ## Décisions encore ouvertes
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,

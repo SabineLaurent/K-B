@@ -1,0 +1,65 @@
+"""When a source download gets a retry, and after which wait: the politeness of K-B towards the
+services it collects (RFC 9110 Retry-After, rate limits)."""
+
+import re
+from datetime import UTC, datetime
+from http import HTTPStatus
+from urllib.error import HTTPError, URLError
+
+# The wait before the one retry after a 429, a 5xx or a failed connection, when the answer gives
+# no Retry-After: more than the 3 seconds arXiv asks between two requests (Terms of Use for arXiv
+# APIs). A timeout gets no retry, as for the model (ai_api/connectors/llm_client.py): it would
+# double a wait of http_download.TIMEOUT_SECONDS.
+RETRY_WAIT_SECONDS = 5
+# A Retry-After above it is not waited: the source fails, its last collection date stays, and the
+# next collection asks again.
+RETRY_AFTER_MAX_SECONDS = 60
+# The delay-seconds form of Retry-After (RFC 9110, § 10.2.3); its HTTP-date form, rare, is read as
+# no header. Over 9 digits, about 31 years, it is a wait beyond the maximum: int() is not asked.
+RETRY_AFTER_SECONDS = re.compile(r"[0-9]+")
+MAX_RETRY_AFTER_DIGITS = 9
+# A rate limit with no request left (GitHub): its reset may be an hour away, so the answer gets no
+# retry; the reset time, in epoch seconds, is noted on the error.
+RATE_LIMIT_REMAINING_HEADER = "x-ratelimit-remaining"
+RATE_LIMIT_RESET_HEADER = "x-ratelimit-reset"
+EPOCH_SECONDS = re.compile(r"[0-9]{1,10}")
+
+
+def find_retry_wait(error: URLError, default_wait: float) -> float | None:
+    """The wait before the retry, or None: no retry."""
+    if not isinstance(error, HTTPError):
+        # A failed connection; a timeout is not retried (see RETRY_WAIT_SECONDS).
+        return None if isinstance(error.reason, TimeoutError) else default_wait
+    is_retried_status = (
+        error.code == HTTPStatus.TOO_MANY_REQUESTS
+        or error.code >= HTTPStatus.INTERNAL_SERVER_ERROR
+    )
+    if not is_retried_status or is_rate_limit_exhausted(error):
+        return None
+    retry_after = error.headers.get("Retry-After")
+    if retry_after is None or not RETRY_AFTER_SECONDS.fullmatch(retry_after):
+        return default_wait
+    if (
+        len(retry_after) > MAX_RETRY_AFTER_DIGITS
+        or int(retry_after) > RETRY_AFTER_MAX_SECONDS
+    ):
+        # A shorter wait would get the same answer.
+        return None
+    return int(retry_after)
+
+
+def is_rate_limit_exhausted(error: HTTPError) -> bool:
+    return error.headers.get(RATE_LIMIT_REMAINING_HEADER) == "0"
+
+
+def note_rate_limit_reset(error: HTTPError) -> None:
+    """Note on the error when a rate limit with no request left resets: the log of the failed
+    source gives it."""
+    if not is_rate_limit_exhausted(error):
+        return
+    reset = error.headers.get(RATE_LIMIT_RESET_HEADER)
+    if reset is None or not EPOCH_SECONDS.fullmatch(reset):
+        error.add_note("rate limit reached, no request left")
+        return
+    reset_at = datetime.fromtimestamp(int(reset), UTC)
+    error.add_note(f"rate limit reached, no request left until {reset_at.isoformat()}")

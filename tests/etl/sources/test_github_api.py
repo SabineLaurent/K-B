@@ -1,4 +1,6 @@
 import io
+from email.message import Message
+from urllib.error import HTTPError
 
 import pytest
 
@@ -72,3 +74,20 @@ def test_the_token_is_sent_but_never_forwarded_to_a_redirection(
     assert request.get_header("Authorization") == "Bearer test-token"
     # urllib copies request.headers to a redirection, never the unredirected ones.
     assert "Authorization" not in request.headers
+
+
+def test_a_rate_limited_request_without_retry_after_waits_the_minute_github_asks(
+    fake_urlopen, monkeypatch, no_wait_before_a_retry
+):
+    rate_limited = HTTPError(PATH, 429, "Too Many Requests", Message(), None)
+    answers = [rate_limited]
+
+    def rate_limited_once(request, timeout):
+        if answers:
+            raise answers.pop()
+        return fake_urlopen(request, timeout)
+
+    monkeypatch.setattr(http_download, "urlopen", rate_limited_once)
+
+    assert get_from_github_api(PATH) == BODY
+    assert no_wait_before_a_retry == [github_api.RETRY_WAIT_SECONDS] == [60]
