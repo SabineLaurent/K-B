@@ -112,13 +112,16 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     réponse servie, après une redirection, hors de l'adresse attendue (`RedirectedOutsideError`,
     sauf la page d'accueil d'une édition tldr) ; réponse plus grande que le maximum de la source.
     **Un seul nouvel essai** (`src/k_b/etl/http_retry.py`, depuis le 2026-10-25) après un 429, un
-    5xx ou un échec de connexion : il attend le `Retry-After` de la réponse (en secondes), sinon
-    5 s (plus que les 3 s qu'arXiv demande entre deux requêtes) ; pour l'API GitHub, 60 s (GitHub
-    demande au moins une minute sans `Retry-After`). Pas de nouvel essai : un `Retry-After` au-delà
-    de 60 s (la source échoue, la collecte suivante redemande), un délai dépassé (il doublerait
-    l'attente), un autre statut, et un quota épuisé (`x-ratelimit-remaining: 0`, GitHub) : sa
-    remise à zéro peut être dans une heure, et le journal de la source en échec donne son heure
-    (UTC). Chaque nouvel essai est journalisé, l'URL sans sa requête ;
+    5xx, un 403 qui porte un `Retry-After` (la limite secondaire de GitHub) ou un échec de
+    connexion (refusée, ou coupée avant la réponse) : il attend le `Retry-After` de la réponse (en
+    secondes), jamais moins de 3 s (ce qu'arXiv demande entre deux requêtes) ; sans lui, 5 s, et 60 s
+    pour un 429 de l'API GitHub (GitHub demande au moins une minute). Pas de nouvel essai : un
+    `Retry-After` au-delà de 60 s (la source échoue, la collecte suivante redemande), un délai dépassé
+    (il doublerait l'attente), un autre statut, une réponse d'erreur servie hors de l'adresse
+    attendue après une redirection (ses en-têtes ne sont pas lus), et un quota épuisé
+    (`x-ratelimit-remaining: 0`, GitHub) : sa remise à zéro peut être dans une heure, et le journal
+    de la source en échec donne son heure (UTC). Chaque nouvel essai est journalisé, l'URL sans sa
+    requête ;
   - **écriture du brut** (`src/k_b/etl/raw_store.py`) : un fichier brut déjà présent (deux
     collectes dans la même seconde) est refusé (`FileExistsError`) ; un dossier ou un fichier qui
     ne s'écrit pas (droits, disque plein) lève une `OSError`.

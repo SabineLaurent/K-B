@@ -14,7 +14,7 @@ TOKEN_VARIABLE = "KB_GITHUB_TOKEN"  # noqa: S105 — the variable's name, not a 
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 # GitHub asks to wait at least a minute before retrying a rate limited request that gives no
 # Retry-After (docs: "Rate limits for the REST API", 2026-10-25).
-RETRY_WAIT_SECONDS = 60
+RATE_LIMITED_WAIT_SECONDS = 60
 
 
 def get_from_github_api(path_and_query: str) -> bytes:
@@ -31,5 +31,5 @@ def get_from_github_api(path_and_query: str) -> bytes:
         },
         # Never forwarded to a redirection: the token stays with api.github.com.
         unredirected_headers={"Authorization": f"Bearer {token}"} if token else None,
-        retry_wait_seconds=RETRY_WAIT_SECONDS,
+        rate_limited_wait_seconds=RATE_LIMITED_WAIT_SECONDS,
     )

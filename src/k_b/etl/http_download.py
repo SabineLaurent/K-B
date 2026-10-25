@@ -36,10 +36,11 @@ def download(
     max_bytes: int,
     headers: dict[str, str] | None = None,
     unredirected_headers: dict[str, str] | None = None,
-    retry_wait_seconds: float = RETRY_WAIT_SECONDS,
+    rate_limited_wait_seconds: float = RETRY_WAIT_SECONDS,
 ) -> bytes:
     """Return the body of GET url, refused if served from outside trusted_url_prefix or too
-    large; one retry after a 429, a 5xx or a failed connection.
+    large; one retry after a 429, a 5xx or a failed connection (etl/http_retry.py), after
+    rate_limited_wait_seconds for a 429 without Retry-After.
 
     An unredirected header (a token) is never forwarded to a redirection; an HTTPError not
     retried is left to the caller, who alone knows what a status such as 304 means."""
@@ -48,14 +49,14 @@ def download(
         return download_once(
             url, trusted_url_prefix, max_bytes, headers, unredirected_headers
         )
-    except URLError as error:
-        wait = find_retry_wait(error, retry_wait_seconds)
+    except (URLError, ConnectionError) as error:
+        wait = find_retry_wait(error, trusted_url_prefix, rate_limited_wait_seconds)
         if wait is None:
             raise
         # Without the query: the url of a source may carry anything there.
         logger.warning(
             "GET %s failed: %s; one retry in %s s",
-            urlsplit(url)._replace(query="", fragment="").geturl(),
+            quote_value(urlsplit(url)._replace(query="", fragment="").geturl()),
             quote_value(str(error)),
             wait,
         )
@@ -86,7 +87,7 @@ def download_once(
                 raise RedirectedOutsideError(trusted_url_prefix, response.url)
             body: bytes = response.read(max_bytes + 1)
     except HTTPError as error:
-        note_rate_limit_reset(error)
+        note_rate_limit_reset(error, trusted_url_prefix)
         raise
     if len(body) > max_bytes:
         raise ValueError(f"response larger than {max_bytes} bytes, refused")

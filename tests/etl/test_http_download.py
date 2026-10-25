@@ -1,9 +1,9 @@
 import io
 import logging
-from email.message import Message
 from urllib.error import HTTPError, URLError
 
 import pytest
+from http_helpers import http_error
 
 from k_b.etl import http_download
 from k_b.etl.http_download import RedirectedOutsideError, download
@@ -152,37 +152,45 @@ def test_an_http_error_is_raised_to_the_caller(fake_urlopen):
         download(URL, TRUSTED_URL_PREFIX, max_bytes=1000)
 
 
-def http_error(status, **headers):
-    message = Message()
-    for name, value in headers.items():
-        message[name.replace("_", "-")] = value
-    return HTTPError(URL, status, "error", message, None)
-
-
 def test_a_429_is_retried_once_after_its_retry_after(
     fake_urlopen, no_wait_before_a_retry
 ):
-    fake_urlopen.errors = [http_error(429, Retry_After="12")]
+    fake_urlopen.errors = [http_error(URL, 429, Retry_After="12")]
 
     assert download(URL, TRUSTED_URL_PREFIX, max_bytes=1000) == BODY
     assert len(fake_urlopen.requests) == 2
     assert no_wait_before_a_retry == [12]
 
 
-def test_a_failed_connection_is_retried_after_the_given_wait(
+def test_a_429_without_retry_after_waits_the_given_rate_limited_wait(
     fake_urlopen, no_wait_before_a_retry
 ):
-    fake_urlopen.errors = [URLError(ConnectionResetError(54, "reset by peer"))]
+    fake_urlopen.errors = [http_error(URL, 429)]
 
-    download(URL, TRUSTED_URL_PREFIX, max_bytes=1000, retry_wait_seconds=60)
+    download(URL, TRUSTED_URL_PREFIX, max_bytes=1000, rate_limited_wait_seconds=60)
 
     assert no_wait_before_a_retry == [60]
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        URLError(ConnectionRefusedError(61, "Connection refused")),
+        ConnectionResetError(54, "Connection reset by peer"),
+    ],
+    ids=["refused", "dropped"],
+)
+def test_a_failed_connection_is_retried(fake_urlopen, no_wait_before_a_retry, error):
+    fake_urlopen.errors = [error]
+
+    assert download(URL, TRUSTED_URL_PREFIX, max_bytes=1000) == BODY
+    assert no_wait_before_a_retry == [http_download.RETRY_WAIT_SECONDS]
 
 
 def test_a_second_failure_is_raised_without_a_third_request(
     fake_urlopen, no_wait_before_a_retry
 ):
-    fake_urlopen.error = http_error(503)
+    fake_urlopen.error = http_error(URL, 503)
 
     with pytest.raises(HTTPError):
         download(URL, TRUSTED_URL_PREFIX, max_bytes=1000)
@@ -192,7 +200,7 @@ def test_a_second_failure_is_raised_without_a_third_request(
 
 
 def test_an_answer_not_retried_is_raised_at_once(fake_urlopen, no_wait_before_a_retry):
-    fake_urlopen.error = http_error(429, Retry_After="3600")
+    fake_urlopen.error = http_error(URL, 429, Retry_After="3600")
 
     with pytest.raises(HTTPError):
         download(URL, TRUSTED_URL_PREFIX, max_bytes=1000)
@@ -203,7 +211,7 @@ def test_an_answer_not_retried_is_raised_at_once(fake_urlopen, no_wait_before_a_
 
 def test_a_rate_limit_with_no_request_left_is_raised_with_its_reset(fake_urlopen):
     fake_urlopen.error = http_error(
-        403, x_ratelimit_remaining="0", x_ratelimit_reset="1792944000"
+        URL, 403, x_ratelimit_remaining="0", x_ratelimit_reset="1792944000"
     )
 
     with pytest.raises(HTTPError) as failure:
@@ -215,12 +223,12 @@ def test_a_rate_limit_with_no_request_left_is_raised_with_its_reset(fake_urlopen
 
 
 def test_the_retry_is_logged_without_the_query_of_the_url(fake_urlopen, caplog):
-    fake_urlopen.errors = [http_error(502)]
+    fake_urlopen.errors = [http_error(URL, 502)]
 
     with caplog.at_level(logging.WARNING):
         download(URL, TRUSTED_URL_PREFIX, max_bytes=1000)
 
     [record] = caplog.records
     assert record.getMessage() == (
-        "GET https://example.org/feed failed: 'HTTP Error 502: error'; one retry in 5 s"
+        "GET 'https://example.org/feed' failed: 'HTTP Error 502: error'; one retry in 5 s"
     )

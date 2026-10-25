@@ -4100,9 +4100,10 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
 
 ### Collecte : un seul nouvel essai, poli envers les sources
 
-- **Tout téléchargement d'une source (`download`) a un seul nouvel essai après un 429, un 5xx ou
-  un échec de connexion ; il attend le `Retry-After` en secondes, plafonné à 60 s, sinon 5 s, et
-  60 s pour l'API GitHub ; un délai dépassé, un autre statut et un quota épuisé
+- **Tout téléchargement d'une source (`download`) a un seul nouvel essai après un 429, un 5xx, un
+  403 qui porte un `Retry-After` ou un échec de connexion ; il attend le `Retry-After` en secondes,
+  plafonné à 60 s et jamais moins de 3 s, sinon 5 s, et 60 s pour un 429 de l'API GitHub ; un délai
+  dépassé, un autre statut, une erreur servie hors du préfixe de confiance et un quota épuisé
   (`x-ratelimit-remaining: 0`) n'en ont pas, et le quota épuisé note sur l'erreur l'heure de sa
   remise à zéro. La règle vit dans un module à elle, `etl/http_retry.py`.** Demandé par Sabine le
   2026-10-25 (429 et quotas, puis 5xx et connexion sur la recommandation de time-knight, qui l'a
@@ -4115,9 +4116,10 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   lu le 2026-10-25). Options écartées : attendre la remise à zéro d'un quota GitHub (jusqu'à une
   heure dans une collecte ; la source échoue, sa date reste, la collecte suivante redemande) ;
   plusieurs nouveaux essais avec attente croissante (une collecte planifiée repasse de toute
-  façon) ; la règle dans `http_download.py` (deux rôles dans un fichier). Limite : une limite
-  secondaire de GitHub servie en 403 n'est pas retentée (un 403 est d'abord un refus). — branche
-  `fix/source-download-retry`
+  façon) ; la règle dans `http_download.py` (deux rôles dans un fichier). Limites : un 403 sans
+  `Retry-After` n'est pas retenté (c'est d'abord un refus, même quand GitHub y met sa limite
+  secondaire) ; la lecture du `Retry-After` existe en double, ici et dans `llm_client.py` (la mettre
+  dans `core` toucherait l'API IA, hors de cette PR). — branche `fix/source-download-retry`
 
 ## Décisions encore ouvertes
 
