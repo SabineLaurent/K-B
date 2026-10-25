@@ -102,7 +102,7 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
 **Vérifier.**
 - `grep -nE "asctime|gmtime|DATABASE_DATE_FORMAT" src/k_b/commands/run_log.py` renvoie le format
   des journaux, l'horloge UTC et le format de date de la base.
-- `uv run pytest tests/test_cli.py -k log_line` : une ligne émise est datée en UTC avec sa zone,
+- `uv run pytest tests/commands/test_run_log.py -k log_line` : une ligne émise est datée en UTC avec sa zone,
   sur la sortie d'erreur et, pour une erreur, dans le fichier, au même format.
 - `grep -rniE "may be|maybe|probably|perhaps" src/k_b` ne renvoie rien.
 - `uv run pytest` : un test donne une entrée refusée qui contient une valeur repérable sur
