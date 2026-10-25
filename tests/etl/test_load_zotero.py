@@ -5,7 +5,7 @@ import json
 import tempfile
 
 import pytest
-from test_load import (
+from load_helpers import (
     count_rows,
     dump_database,
     fetch_rows,
