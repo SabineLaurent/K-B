@@ -532,8 +532,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   articles gardés).
 - **Accès** : sans authentification. Le `robots.txt` autorise tout, sauf les pages d'abonnement
   et de compte (`/subscribed`, `/manage`, `/info`…), qu'on ne lit pas.
-- **Limites** : pas de quota publié ; on s'impose une page à la fois, avec une pause entre deux
-  pages. Les liens portent des paramètres de suivi `utm_*` et certaines entrées sont
+- **Limites** : pas de quota publié ; on s'impose une page à la fois, avec une pause de 2 s avant
+  chaque page, d'une édition à la suivante aussi (depuis le 2026-10-25). Les liens portent des paramètres de suivi `utm_*` et certaines entrées sont
   sponsorisées : traité à la lecture (ci-dessus).
 - **Données personnelles** : aucune (voir le registre des traitements).
 - **Suivi** : éditions **ai**, **infosec** et **dev** (ai le 2026-10-01, les deux autres le

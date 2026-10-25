@@ -30,7 +30,8 @@ ARXIV_FIRST_COLLECTION_START = datetime(2026, 5, 1, tzinfo=UTC)
 
 # TLDR. Adding an edition is adding its slug, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
 TLDR_TRACKED_EDITIONS = ("ai", "infosec", "dev")
-# One page at a time, with a pause: tldr.tech publishes no rate limit (decided in #6).
+# One page at a time, with a pause before each, from one edition to the next too: tldr.tech
+# publishes no rate limit (decided in #6).
 TLDR_PAUSE_BETWEEN_PAGES_SECONDS = 2
 # For testing the collection; to widen when K-B is put into service.
 TLDR_FIRST_COLLECTION_DAYS = 7
