@@ -195,6 +195,7 @@ def test_a_retry_after_too_long_to_read_pauses_for_good():
         http_error(URL, 404),
         http_error(URL, 429, Retry_After=str(RETRY_AFTER_MAX_SECONDS)),
         http_error(URL, 403, x_ratelimit_remaining="3"),
+        http_error(URL, 404, Retry_After="3600"),
         http_error(
             "https://example.com/landing",
             403,
@@ -202,7 +203,13 @@ def test_a_retry_after_too_long_to_read_pauses_for_good():
             Retry_After="3600",
         ),
     ],
-    ids=["refusal", "retry-after-waited", "requests-left", "served-from-outside"],
+    ids=[
+        "refusal",
+        "retry-after-waited",
+        "requests-left",
+        "not-a-rate-limit",
+        "served-from-outside",
+    ],
 )
 def test_no_pause_otherwise(error):
     assert pause_end(error) is None

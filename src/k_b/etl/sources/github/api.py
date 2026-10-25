@@ -26,8 +26,7 @@ paused_until = 0.0
 
 
 class GithubPausedError(RuntimeError):
-    """GitHub asked for no request until paused_until: none is sent, the source fails and its
-    last collection date stays."""
+    """GitHub asked for no request until paused_until: none is sent."""
 
     def __init__(self, until: float):
         when = (

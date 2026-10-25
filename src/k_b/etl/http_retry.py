@@ -49,19 +49,12 @@ def find_retry_wait(
     if not is_served_from(error, trusted_url_prefix) or is_rate_limit_exhausted(error):
         return None
     retry_after = error.headers.get("Retry-After")
-    is_retried_status = (
-        error.code == HTTPStatus.TOO_MANY_REQUESTS
-        or error.code >= HTTPStatus.INTERNAL_SERVER_ERROR
-        or (error.code == HTTPStatus.FORBIDDEN and retry_after is not None)
-    )
-    if not is_retried_status:
+    if not is_retried_status(error, retry_after) or is_retry_after_beyond_max(
+        retry_after
+    ):
+        # Beyond the maximum, a shorter wait would get the same answer.
         return None
     seconds = read_retry_after(retry_after)
-    if is_retry_after_too_long(retry_after) or (
-        seconds is not None and seconds > RETRY_AFTER_MAX_SECONDS
-    ):
-        # A shorter wait would get the same answer.
-        return None
     if seconds is None:
         if error.code == HTTPStatus.TOO_MANY_REQUESTS:
             return rate_limited_wait
@@ -72,27 +65,46 @@ def find_retry_wait(
 def find_pause_end(
     error: HTTPError, trusted_url_prefix: str, now: float
 ) -> float | None:
-    """Until when, in epoch seconds, the service asks for no request at all, or None.
-
-    After a rate limit with no request left, until its reset; after a Retry-After above
-    RETRY_AFTER_MAX_SECONDS, until it ends: the other sources on the same service wait too
-    (GitHub: "Best practices for using the REST API", 2026-10-25). An answer served from outside
-    trusted_url_prefix is not read."""
+    """Until when, in epoch seconds, the service asks for no request at all, or None: the reset
+    of an exhausted rate limit, or the end of a Retry-After beyond RETRY_AFTER_MAX_SECONDS."""
     if not is_served_from(error, trusted_url_prefix):
         return None
     if is_rate_limit_exhausted(error):
-        reset = error.headers.get(RATE_LIMIT_RESET_HEADER)
-        if reset is None or not EPOCH_SECONDS.fullmatch(reset):
-            return now + MIN_PAUSE_SECONDS
-        # A reset already past (a clock off) still gets the minute.
-        return max(float(reset), now + MIN_PAUSE_SECONDS)
+        # Without a readable reset, or a reset already past (a clock off): the minute GitHub asks.
+        return max(read_rate_limit_reset(error) or 0, now + MIN_PAUSE_SECONDS)
     retry_after = error.headers.get("Retry-After")
-    if is_retry_after_too_long(retry_after):
-        return math.inf
+    if not is_retried_status(error, retry_after) or not is_retry_after_beyond_max(
+        retry_after
+    ):
+        return None
     seconds = read_retry_after(retry_after)
-    if seconds is not None and seconds > RETRY_AFTER_MAX_SECONDS:
-        return now + seconds
-    return None
+    # Too long to read: no request for the rest of the process.
+    return math.inf if seconds is None else now + seconds
+
+
+def is_retried_status(error: HTTPError, retry_after: str | None) -> bool:
+    """A 429, a 5xx, or a 403 with a Retry-After (the secondary rate limit of GitHub): a 403
+    without it is first a refusal."""
+    return (
+        error.code == HTTPStatus.TOO_MANY_REQUESTS
+        or error.code >= HTTPStatus.INTERNAL_SERVER_ERROR
+        or (error.code == HTTPStatus.FORBIDDEN and retry_after is not None)
+    )
+
+
+def is_retry_after_beyond_max(retry_after: str | None) -> bool:
+    seconds = read_retry_after(retry_after)
+    return is_retry_after_too_long(retry_after) or (
+        seconds is not None and seconds > RETRY_AFTER_MAX_SECONDS
+    )
+
+
+def read_rate_limit_reset(error: HTTPError) -> int | None:
+    """Its reset in epoch seconds; None when missing or unreadable."""
+    reset = error.headers.get(RATE_LIMIT_RESET_HEADER)
+    if reset is None or not EPOCH_SECONDS.fullmatch(reset):
+        return None
+    return int(reset)
 
 
 def is_served_from(error: HTTPError, trusted_url_prefix: str) -> bool:
@@ -111,9 +123,9 @@ def note_rate_limit_reset(error: HTTPError, trusted_url_prefix: str) -> None:
         error
     ):
         return
-    reset = error.headers.get(RATE_LIMIT_RESET_HEADER)
-    if reset is None or not EPOCH_SECONDS.fullmatch(reset):
+    reset = read_rate_limit_reset(error)
+    if reset is None:
         error.add_note("rate limit reached, no request left")
         return
-    reset_at = datetime.fromtimestamp(int(reset), UTC)
+    reset_at = datetime.fromtimestamp(reset, UTC)
     error.add_note(f"rate limit reached, no request left until {reset_at.isoformat()}")
