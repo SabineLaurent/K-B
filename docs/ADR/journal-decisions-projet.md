@@ -4276,6 +4276,10 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   n'est pas définie (relecture du 2026-10-09). **Close le 2026-10-20 pour la veille** : 3 ans pour
   les items, le brut de veille et les tendances (`trend`), dont la purge est ainsi définie
   (« Squelette E1 E3 : cadrage du 20/10 », décision 5) ; le reste, et les fréquences : #276.
+  **Fréquences écrites le 2026-10-25** (PR de #276) : chaque étape de tri du registre a la sienne ;
+  les purges de la veille (étapes 2 et 3) tournent à chaque import. Restent ouverts, décision de
+  Sabine en attente : le point de départ des 3 ans pour `trend`, la garde de `tracked_repository`
+  et de `raw_data`, et l'effacement d'un login de propriétaire de dépôt suivi (#268).
 - **Liste d'exclusion** des personnes qui demandent l'effacement, pour qu'une collecte ou une
   reconstruction ne les réintroduise pas : proposée dans le registre, à concevoir dans #20.
   Indispensable avec une base reconstruite, en développement (2026-10-10).
