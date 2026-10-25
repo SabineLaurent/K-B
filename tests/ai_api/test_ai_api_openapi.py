@@ -14,6 +14,7 @@ from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.commands.openapi_command import describe_ai_api
+from k_b.core.api_access import BEARER_SCHEME_DESCRIPTION
 from k_b.core.config import DigestSubject
 
 DOCS_API_DIR = Path(__file__).parents[2] / "docs" / "api"
@@ -62,7 +63,11 @@ def test_the_versioned_openapi_is_valid_and_closes_its_route_by_a_key():
     assert "model" in openapi["components"]["schemas"]["DigestsSchema"]["required"]
     assert list(openapi["paths"]) == ["/digests"]
     assert openapi["components"]["securitySchemes"] == {
-        "HTTPBearer": {"type": "http", "scheme": "bearer"}
+        "HTTPBearer": {
+            "type": "http",
+            "scheme": "bearer",
+            "description": BEARER_SCHEME_DESCRIPTION,
+        }
     }
     assert openapi["paths"]["/digests"]["post"]["security"] == [{"HTTPBearer": []}]
 
