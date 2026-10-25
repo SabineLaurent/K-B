@@ -22,21 +22,15 @@ from k_b.items import REPOSITORY_NAME, Item, parse_aware_datetime
 
 logger = logging.getLogger(__name__)
 
-# The API maximum. Only the first page is read: see the warning in fetch.
-RELEASES_PER_PAGE = 100
-
-
-# The repository is read in the release URL: the raw file can be read without its source.
-# The whole URL is checked, so that the link opens the repository of the title: the tag part
-# takes only the path characters of RFC 3986 and /, so no query, fragment, space or non-ASCII.
-RELEASE_URL = re.compile(
-    rf"https://github\.com/({REPOSITORY_NAME})/releases/tag/"
-    r"(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9A-Fa-f]{2})+"
-)
-
 
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "github_releases"
+
+
+# === EXTRACT ===
+
+# The API maximum. Only the first page is read: see the warning in fetch.
+RELEASES_PER_PAGE = 100
 
 
 class GithubReleasesSource:
@@ -89,6 +83,17 @@ class GithubReleasesSource:
                 last_collected_at.isoformat(),
             )
         return raw_response
+
+
+# === TRANSFORM ===
+
+# The repository is read in the release URL: the raw file can be read without its source.
+# The whole URL is checked, so that the link opens the repository of the title: the tag part
+# takes only the path characters of RFC 3986 and /, so no query, fragment, space or non-ASCII.
+RELEASE_URL = re.compile(
+    rf"https://github\.com/({REPOSITORY_NAME})/releases/tag/"
+    r"(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9A-Fa-f]{2})+"
+)
 
 
 @dataclass(frozen=True)

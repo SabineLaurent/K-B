@@ -47,6 +47,11 @@ logger = logging.getLogger(__name__)
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "zotero"
 
+SOURCE_CODE: SourceCode = "zotero"
+
+
+# === EXTRACT ===
+
 # The folder of raw/ its extracts go to.
 RAW_FOLDER_KEY = make_source_folder_key(SELECTED_LIBRARY_DIR_NAME, FOLDER_PREFIX)
 
@@ -157,13 +162,6 @@ ORDER BY document.dateAdded, document.itemID
 """
 # The columns the query returns as a JSON list.
 JSON_COLUMNS = ("authors", "tags", "pdfs", "highlights")
-
-SOURCE_CODE: SourceCode = "zotero"
-# A date of Zotero: UTC, written without its time zone (2026-10-01 08:15:00).
-ZOTERO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}")
-ARXIV_REFERENCE_PREFIX = "arXiv:"
-# archiveID of an arXiv paper, its version left out: the publication is known without it.
-ARXIV_REFERENCE = re.compile(rf"{ARXIV_REFERENCE_PREFIX}({ARXIV_ID})(?:v[0-9]+)?")
 
 
 class ZoteroCopyInconsistentError(Exception):
@@ -330,6 +328,15 @@ def describe_query_error(error: sqlite3.DatabaseError) -> str:
     if sqlite_error_name is None:
         return type(error).__name__
     return f"{type(error).__name__} ({sqlite_error_name})"
+
+
+# === TRANSFORM ===
+
+# A date of Zotero: UTC, written without its time zone (2026-10-01 08:15:00).
+ZOTERO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}")
+ARXIV_REFERENCE_PREFIX = "arXiv:"
+# archiveID of an arXiv paper, its version left out: the publication is known without it.
+ARXIV_REFERENCE = re.compile(rf"{ARXIV_REFERENCE_PREFIX}({ARXIV_ID})(?:v[0-9]+)?")
 
 
 def mark_as_utc(zotero_date: object) -> object:

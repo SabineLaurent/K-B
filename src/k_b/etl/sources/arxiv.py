@@ -26,6 +26,19 @@ from k_b.items import (
 
 # The source of its items, in the source table of the base.
 SOURCE_CODE: SourceCode = "arxiv"
+
+
+# Python's expat (2.4.1 and later) refuses entity expansion attacks and never fetches
+# external entities: the standard library parser is safe on this untrusted feed.
+ATOM = "{http://www.w3.org/2005/Atom}"
+
+
+# The name of its raw folders, written once: its instances and its kind use it.
+FOLDER_PREFIX = "arxiv_cscr_x_csai"
+
+
+# === EXTRACT ===
+
 API_URL = "https://export.arxiv.org/api/query"
 # A page of 35 papers weighs 93 KB in 2026, about 2.7 KB a paper: 2,000 papers weigh 5.3 MB.
 MAX_RESPONSE_BYTES = 6 * 1024 * 1024
@@ -50,20 +63,9 @@ ANNOUNCEMENT_DELAY_MARGIN = timedelta(days=7)
 # The first collection reaches back to the start of Sabine's training: 488 papers, 1.2 MB,
 # measured on 2026-10-02.
 FIRST_COLLECTION_START = datetime(2026, 5, 1, tzinfo=UTC)
-
-
-# Python's expat (2.4.1 and later) refuses entity expansion attacks and never fetches
-# external entities: the standard library parser is safe on this untrusted feed.
-ATOM = "{http://www.w3.org/2005/Atom}"
 OPENSEARCH = "{http://a9.com/-/spec/opensearch/1.1/}"
-# The identifier of an arXiv paper, of either form (items.ARXIV_ID), and its version.
-PAPER_ID = re.compile(rf"https?://arxiv\.org/abs/({ARXIV_ID})v([0-9]+)")
 # arXiv reports an error as a feed whose single entry carries this id.
 API_ERROR_ID = re.compile(r"https?://arxiv\.org/api/errors")
-
-
-# The name of its raw folders, written once: its instances and its kind use it.
-FOLDER_PREFIX = "arxiv_cscr_x_csai"
 
 
 class ArxivSource:
@@ -117,27 +119,6 @@ def download_papers(search_query: str) -> bytes:
     return download(f"{API_URL}?{urlencode(parameters)}", API_URL, MAX_RESPONSE_BYTES)
 
 
-@dataclass(frozen=True)
-class Paper:
-    """An arXiv paper, at the version the API returned (the latest one)."""
-
-    arxiv_id: str
-    version: int
-    title: str
-    summary: str
-    authors: tuple[str, ...]
-    published_at: datetime
-    updated_at: datetime
-    url: str
-
-
-def read_papers(raw_response: bytes) -> EntryReading[Paper]:
-    """One paper per valid entry of the feed, in the order of the response; an invalid entry is
-    rejected with its position."""
-    entries = parse_feed(raw_response).findall(f"{ATOM}entry")
-    return read_each_entry(enumerate(entries), parse_paper)
-
-
 def count_papers(raw_response: bytes) -> int:
     """Count every entry, valid or not; refuse a feed that reports an API error.
 
@@ -157,6 +138,33 @@ def read_total_results(raw_response: bytes) -> int:
     if total_results is None or not total_results.strip().isdigit():
         raise ValueError("totalResults is missing or not a number")
     return int(total_results)
+
+
+# === TRANSFORM ===
+
+# The identifier of an arXiv paper, of either form (items.ARXIV_ID), and its version.
+PAPER_ID = re.compile(rf"https?://arxiv\.org/abs/({ARXIV_ID})v([0-9]+)")
+
+
+@dataclass(frozen=True)
+class Paper:
+    """An arXiv paper, at the version the API returned (the latest one)."""
+
+    arxiv_id: str
+    version: int
+    title: str
+    summary: str
+    authors: tuple[str, ...]
+    published_at: datetime
+    updated_at: datetime
+    url: str
+
+
+def read_papers(raw_response: bytes) -> EntryReading[Paper]:
+    """One paper per valid entry of the feed, in the order of the response; an invalid entry is
+    rejected with its position."""
+    entries = parse_feed(raw_response).findall(f"{ATOM}entry")
+    return read_each_entry(enumerate(entries), parse_paper)
 
 
 def parse_feed(raw_response: bytes) -> ElementTree.Element:

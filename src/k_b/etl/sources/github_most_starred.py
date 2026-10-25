@@ -12,18 +12,19 @@ from k_b.etl.sources.tracked_repositories import is_repository_name
 from k_b.etl.tops import TopEntry
 from k_b.items import parse_aware_datetime
 
-# The search needs a criterion: this one keeps the whole top 100 (the 100th had 116,161 stars on
-# 2026-10-02).
-SEARCH_QUERY = "stars:>10000"
-
-
-REPOSITORY_URL_PREFIX = "https://github.com/"
 # The API maximum: one request, deep enough to see a repository enter the top.
 RANKING_SIZE = 100
 
 
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "github_most_starred"
+
+
+# === EXTRACT ===
+
+# The search needs a criterion: this one keeps the whole top 100 (the 100th had 116,161 stars on
+# 2026-10-02).
+SEARCH_QUERY = "stars:>10000"
 
 
 class GithubMostStarredSource:
@@ -42,6 +43,11 @@ class GithubMostStarredSource:
         raw_response = get_from_github_api(f"search/repositories?{urlencode(query)}")
         read_ranking(raw_response)
         return raw_response
+
+
+# === TRANSFORM ===
+
+REPOSITORY_URL_PREFIX = "https://github.com/"
 
 
 @dataclass(frozen=True)

@@ -25,11 +25,13 @@ logger = logging.getLogger(__name__)
 SOURCE_CODE: SourceCode = "gh_archive"
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "gh_archive"
-
-WINDOW_DAYS = 3
 # The 30 first by stars and the 30 first by forks, together (decision of 2026-10-08).
 TOP_SIZE = 30
-MAX_ROWS_PER_WINDOW = 2 * TOP_SIZE
+
+
+# === EXTRACT ===
+
+WINDOW_DAYS = 3
 # Two weeks of missed collections: a repository that rose earlier adds little to the watch
 # (decision of 2026-10-11). Beyond, the most recent windows are kept.
 MAX_CATCH_UP_WINDOWS = 15
@@ -39,12 +41,6 @@ MAX_CATCH_UP_WINDOWS = 15
 MAX_BYTES_PER_WINDOW = 650_000_000
 MAX_BYTES_BILLED = 2_000_000_000
 QUERY_TIMEOUT_SECONDS = 300
-# The only fields whose value is quoted: a date or a number. Any other value (a repository name,
-# that holds the owner's login when the owner is a person, a whole row, the raw document) is
-# described by its type and its length.
-FIELDS_QUOTED = frozenset(
-    {"window_ends", "window_end", "repository_id", "stars_gained", "forks_gained"}
-)
 
 TABLE_PREFIX = "githubarchive.day."
 # With the wildcard day.20*, _TABLE_SUFFIX is what follows "20": YYMMDD (261008 for 2026-10-08).
@@ -102,21 +98,6 @@ class DryRunOverLimitError(Exception):
 
 class DryRunVolumeUnknownError(Exception):
     """The dry run gives no volume: the query is not run (fail closed)."""
-
-
-class TrendsExtractInvalidError(ValueError):
-    """The raw result does not read as trends: it is refused whole."""
-
-
-class TrendsExtract(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid")
-
-    window_ends: Annotated[list[date], Field(min_length=1)]
-    rows: list[TrendRow]
-
-
-# The names of the fields a raw result may hold: any other key is a value of the raw.
-KNOWN_FIELDS = frozenset(TrendsExtract.model_fields) | frozenset(TrendRow.model_fields)
 
 
 class GhArchiveSource:
@@ -282,6 +263,32 @@ def encode_result(window_ends: list[date], rows: Iterable[Mapping[str, Any]]) ->
         ],
     }
     return (json.dumps(result, ensure_ascii=False, indent=2) + "\n").encode()
+
+
+# === TRANSFORM ===
+
+MAX_ROWS_PER_WINDOW = 2 * TOP_SIZE
+# The only fields whose value is quoted: a date or a number. Any other value (a repository name,
+# that holds the owner's login when the owner is a person, a whole row, the raw document) is
+# described by its type and its length.
+FIELDS_QUOTED = frozenset(
+    {"window_ends", "window_end", "repository_id", "stars_gained", "forks_gained"}
+)
+
+
+class TrendsExtractInvalidError(ValueError):
+    """The raw result does not read as trends: it is refused whole."""
+
+
+class TrendsExtract(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    window_ends: Annotated[list[date], Field(min_length=1)]
+    rows: list[TrendRow]
+
+
+# The names of the fields a raw result may hold: any other key is a value of the raw.
+KNOWN_FIELDS = frozenset(TrendsExtract.model_fields) | frozenset(TrendRow.model_fields)
 
 
 def read_trends(raw_result: bytes) -> TrendsExtract:
