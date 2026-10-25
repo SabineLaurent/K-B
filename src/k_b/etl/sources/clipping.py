@@ -42,6 +42,10 @@ logger = logging.getLogger(__name__)
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "clipping"
 SOURCE_CODE: SourceCode = "clipper"
+
+
+# === EXTRACT ===
+
 # The folder of the vault the default template of Web Clipper writes to (docs/specs-collecte.md).
 CLIPPINGS_DIR_NAME = "Clippings"
 CLIP_EXTENSION = ".md"
@@ -52,16 +56,6 @@ PAGE_NAME_LENGTH = 16
 # A file date is in nanoseconds since EPOCH; a datetime, in microseconds.
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 ONE_MICROSECOND = timedelta(microseconds=1)
-FRONTMATTER_FENCE = "---"
-# A day as Web Clipper writes a property of type date: YYYY-MM-DD, the year on four digits from
-# 1000, so that the base writes it as it reads it. Another form (a time, a time zone, a number)
-# is refused, not guessed: pydantic alone would read a number as a Unix time.
-DAY = re.compile(r"[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}")
-# What YAML writes for an absent value; BaseLoader reads all three as text.
-ABSENT_VALUES = ("", "null", "~")
-# The tag the default template of Web Clipper puts on every clip: the kind and the source of an
-# item say it is a clip already (decision of Sabine of 2026-10-19).
-TEMPLATE_TAG = "clippings"
 
 
 class ClipTooLargeError(Exception):
@@ -235,6 +229,34 @@ def check_clip_size(path: Path, size: int) -> None:
         )
 
 
+def find_rejection_reason(page_name: str, raw_clip: bytes) -> str | None:
+    """Why the import would reject the clip, or None, converted as the import will."""
+    try:
+        for entry in read_clip(raw_clip).entries:
+            convert_clip(entry, EPOCH, page_name)
+    except ValidationError as refusal:
+        # convert_clip gives it without its values already.
+        return f"ValidationError: {refusal}"
+    # RecursionError: a frontmatter nested too deep, rejected at the import as well (#103).
+    except (ValueError, RecursionError) as unreadable:
+        return f"{type(unreadable).__name__}: {unreadable}"
+    return None
+
+
+# === TRANSFORM ===
+
+FRONTMATTER_FENCE = "---"
+# A day as Web Clipper writes a property of type date: YYYY-MM-DD, the year on four digits from
+# 1000, so that the base writes it as it reads it. Another form (a time, a time zone, a number)
+# is refused, not guessed: pydantic alone would read a number as a Unix time.
+DAY = re.compile(r"[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}")
+# What YAML writes for an absent value; BaseLoader reads all three as text.
+ABSENT_VALUES = ("", "null", "~")
+# The tag the default template of Web Clipper puts on every clip: the kind and the source of an
+# item say it is a clip already (decision of Sabine of 2026-10-19).
+TEMPLATE_TAG = "clippings"
+
+
 class ClipEntry(NamedTuple):
     """A clip read: the properties of its frontmatter, and its text."""
 
@@ -284,20 +306,6 @@ def describe_yaml_error(error: yaml.YAMLError) -> str:
         return "frontmatter not YAML"
     # The line in the clip: the frontmatter starts on its second line.
     return f"frontmatter not YAML: line {mark.line + 2}, column {mark.column + 1}"
-
-
-def find_rejection_reason(page_name: str, raw_clip: bytes) -> str | None:
-    """Why the import would reject the clip, or None, converted as the import will."""
-    try:
-        for entry in read_clip(raw_clip).entries:
-            convert_clip(entry, EPOCH, page_name)
-    except ValidationError as refusal:
-        # convert_clip gives it without its values already.
-        return f"ValidationError: {refusal}"
-    # RecursionError: a frontmatter nested too deep, rejected at the import as well (#103).
-    except (ValueError, RecursionError) as unreadable:
-        return f"{type(unreadable).__name__}: {unreadable}"
-    return None
 
 
 def read_absent(value: object) -> object:

@@ -18,6 +18,16 @@ from k_b.etl.source_contract import EntryReading, SourceReader
 from k_b.items import EDITION_SLUG, Item, SourceCode, at_midnight_utc
 
 SOURCE_CODE: SourceCode = "tldr"
+
+logger = logging.getLogger(__name__)
+
+
+# The name of its raw folders, written once: its instances and its kind use it.
+FOLDER_PREFIX = "tldr"
+
+
+# === EXTRACT ===
+
 # Adding an edition is adding its slug, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
 TRACKED_EDITIONS = ("ai", "infosec", "dev")
 SITE_URL = "https://tldr.tech/"
@@ -29,12 +39,6 @@ PAUSE_BETWEEN_PAGES_SECONDS = 2
 FIRST_COLLECTION_DAYS = 7
 # The failure of a page received that is not the edition of its day (conventions.md, rule 1).
 NOT_THE_EDITION_OF_THE_DAY = "not_the_edition_of_the_day"
-
-logger = logging.getLogger(__name__)
-
-
-# The name of its raw folders, written once: its instances and its kind use it.
-FOLDER_PREFIX = "tldr"
 
 
 class PageRefusal(NamedTuple):
@@ -176,6 +180,8 @@ def list_days_to_collect(last_collected_at: datetime | None, today: date) -> lis
         for offset in range((today - first_day).days + 1)
     ]
 
+
+# === TRANSFORM ===
 
 # The first h1 of an edition page: "TLDR AI 2026-10-08"; the landing page has no date.
 EDITION_PAGE_TITLE = re.compile(r"TLDR .+ (\d{4}-\d{2}-\d{2})")

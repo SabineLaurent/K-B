@@ -14,13 +14,15 @@ from k_b.etl.sources.github_most_starred import RANKING_SIZE, REPOSITORY_URL_PRE
 from k_b.etl.sources.tracked_repositories import is_repository_name
 from k_b.etl.tops import TopEntry
 
+# The name of its raw folders, written once: its instance and its kind use it.
+FOLDER_PREFIX = "github_most_forked"
+
+
+# === EXTRACT ===
+
 # The search needs a criterion: this one keeps the whole top 100 (533 repositories, the 100th had
 # 27,552 forks on 2026-10-19).
 SEARCH_QUERY = "forks:>10000"
-
-
-# The name of its raw folders, written once: its instance and its kind use it.
-FOLDER_PREFIX = "github_most_forked"
 
 
 class GithubMostForkedSource:
@@ -39,6 +41,9 @@ class GithubMostForkedSource:
         raw_response = get_from_github_api(f"search/repositories?{urlencode(query)}")
         read_ranking(raw_response)
         return raw_response
+
+
+# === TRANSFORM ===
 
 
 @dataclass(frozen=True)

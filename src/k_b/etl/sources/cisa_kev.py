@@ -29,6 +29,14 @@ from k_b.items import (
     at_midnight_utc,
 )
 
+# The name of its raw folders, written once: its instances and its kind use it.
+FOLDER_PREFIX = "cisa_kev"
+# The source of its items, in the source table of the base.
+SOURCE_CODE: SourceCode = "cisa_kev"
+
+
+# === EXTRACT ===
+
 CATALOG_URL = (
     "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv"
 )
@@ -37,23 +45,6 @@ MAX_CATALOG_BYTES = 10 * 1024 * 1024
 # Redirections are followed, even to plain HTTP: only a catalog served from here is trusted.
 TRUSTED_URL_PREFIX = "https://www.cisa.gov/"
 HTTP_NOT_MODIFIED = 304
-
-
-REQUIRED_COLUMNS = (
-    "cveID",
-    "vendorProject",
-    "product",
-    "vulnerabilityName",
-    "dateAdded",
-    "shortDescription",
-    "knownRansomwareCampaignUse",
-)
-
-
-# The name of its raw folders, written once: its instances and its kind use it.
-FOLDER_PREFIX = "cisa_kev"
-# The source of its items, in the source table of the base.
-SOURCE_CODE: SourceCode = "cisa_kev"
 
 
 class CisaKevSource:
@@ -86,6 +77,19 @@ class CisaKevSource:
         return raw_catalog
 
 
+# === TRANSFORM ===
+
+REQUIRED_COLUMNS = (
+    "cveID",
+    "vendorProject",
+    "product",
+    "vulnerabilityName",
+    "dateAdded",
+    "shortDescription",
+    "knownRansomwareCampaignUse",
+)
+
+
 @dataclass(frozen=True)
 class Vulnerability:
     cve_id: str
@@ -95,6 +99,11 @@ class Vulnerability:
     date_added: date
     short_description: str
     known_ransomware_campaign_use: RansomwareUse
+
+
+def read_catalog(raw_catalog: bytes) -> EntryReading[Vulnerability]:
+    """The whole catalog; the base removes the duplicates between collections."""
+    return read_new_vulnerabilities(raw_catalog, last_collected_at=None)
 
 
 def read_new_vulnerabilities(
@@ -186,11 +195,6 @@ def convert_vulnerability(
         product=vulnerability.product,
         ransomware_use=vulnerability.known_ransomware_campaign_use,
     )
-
-
-def read_catalog(raw_catalog: bytes) -> EntryReading[Vulnerability]:
-    """The whole catalog; the base removes the duplicates between collections."""
-    return read_new_vulnerabilities(raw_catalog, last_collected_at=None)
 
 
 READER: SourceReader[Vulnerability] = SourceReader(

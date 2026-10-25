@@ -166,6 +166,13 @@ statu quo).
 - La requête d'extraction d'une source qui est elle-même une base (Zotero, GH Archive sur
   BigQuery) vit dans le module de cette source, `src/k_b/etl/sources/<source>.py`, comme la
   requête d'une API : elle lit une source externe, en lecture seule, pas la base K-B.
+- **Un module de source est construit d'une seule façon** (Sabine, 2026-10-25) : son identité
+  (`logger`, `SOURCE_CODE`, `FOLDER_PREFIX`, et les constantes que les deux blocs partagent), puis
+  `# === EXTRACT ===` (constantes de la requête, erreurs de l'extraction, la classe `…Source` et
+  `fetch`, ses aides), puis `# === TRANSFORM ===` (constantes de la lecture, ce qui est gardé,
+  `read_…` et `parse_…`, `convert_…`, `READER`). Le LOAD n'y est pas : il est commun à toutes les
+  sources (`etl/load.py`, `database/writers/`). `github_api.py` et `tracked_repositories.py` ne
+  sont pas des sources.
 - `etl/pipeline.py` enchaîne les étapes des deux parcours, qui communiquent par `raw/` : la
   collecte (`extract.py`) et l'import (`transform.py`, qui lit le brut par `raw_reading.py`, puis
   `load.py`). C'est le seul module d'`etl` qui les enchaîne, et la seule porte des deux parcours
@@ -189,6 +196,9 @@ statu quo).
   renvoie rien : les commandes passent par `etl/pipeline.py`.
 - `uv run pytest tests/architecture/test_layers.py -k "pipeline or stage"` : `etl/pipeline.py`
   n'importe ni les sources ni la composition, et les trois stages ne s'importent pas entre eux.
+- `uv run pytest tests/architecture/test_source_modules.py` : chaque module de source a ses deux
+  bandeaux, dans l'ordre, la classe `…Source` sous EXTRACT, sa lecture, sa conversion et son
+  `READER` sous TRANSFORM.
 
 **Pourquoi.** Un module par écrivain : les modules de `writers/` font 851 lignes à eux tous
 (relevé du 2026-10-14), et chaque sorte a assez de code pour son module (`code.md`). Une seule

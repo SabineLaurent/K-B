@@ -21,17 +21,16 @@ from k_b.items import CVE_ID, GHSA_ID, Item, parse_aware_datetime
 
 logger = logging.getLogger(__name__)
 
-ECOSYSTEMS = ("pip", "npm")
-# The API maximum. Only the first page is read: see the warning in fetch.
-ADVISORIES_PER_PAGE = 100
-
-
-ADVISORY_URL_PREFIX = "https://github.com/advisories/"
-SEVERITIES = ("low", "medium", "high", "critical", "unknown")
-
 
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "github_advisories"
+
+
+# === EXTRACT ===
+
+ECOSYSTEMS = ("pip", "npm")
+# The API maximum. Only the first page is read: see the warning in fetch.
+ADVISORIES_PER_PAGE = 100
 
 
 class GithubAdvisoriesSource:
@@ -94,6 +93,12 @@ class GithubAdvisoriesSource:
                 last_collected_at.isoformat(),
             )
         return raw_response
+
+
+# === TRANSFORM ===
+
+ADVISORY_URL_PREFIX = "https://github.com/advisories/"
+SEVERITIES = ("low", "medium", "high", "critical", "unknown")
 
 
 @dataclass(frozen=True)

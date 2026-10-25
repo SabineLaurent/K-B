@@ -4132,6 +4132,28 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   citait entre guillemets. Option écartée : mettre toute la règle du nouvel essai dans `core` (elle
   ne sert qu'à l'ETL, sur les erreurs d'`urllib`). — branche `refactor/retry-after-in-core`
 
+### ETL : chaque module de source construit de la même façon, EXTRACT puis TRANSFORM
+
+- **Chaque module de `etl/sources/` suit une seule forme : son identité (`logger`, `SOURCE_CODE`,
+  `FOLDER_PREFIX`, les constantes partagées), puis un bandeau `# === EXTRACT ===` (la requête, la
+  classe `…Source` et `fetch`, ses aides), puis `# === TRANSFORM ===` (ce qui est gardé, la
+  lecture, la conversion, `READER`) ; `tests/architecture/test_source_modules.py` la tient.**
+  Demandé par Sabine le 2026-10-25 (« de l'harmonisation et de l'uniformité ») : savoir expliquer
+  le pipeline de n'importe quelle source en s'appuyant sur le code, avec la même carte pour toutes.
+  Les bandeaux en toutes lettres, pas en initiales (demande de Sabine). Relevé avant : le squelette
+  existait dans la plupart des modules, mais les constantes de la lecture étaient mêlées à celles
+  de la requête (arXiv, Zotero, GH Archive), les erreurs toutes en tête, et `read_catalog` de CISA
+  après sa conversion. Pur déplacement : chaque définition identique à l'original (arbre
+  syntaxique comparé, 367 instructions), aucun commentaire perdu. Pas de bandeau LOAD : le
+  chargement est commun à toutes les sources (`etl/load.py`, `database/writers/`). Limites : une
+  fonction d'aide que le modèle de la lecture utilise dès sa définition reste avant lui (Zotero,
+  clips) ; une fonction que seul `fetch` appelle mais annotée par un modèle de la lecture
+  (`check_document` de Zotero) est sous TRANSFORM. Options écartées : un module par bloc
+  (`<source>/extract.py`, `<source>/transform.py`), deux fois plus de fichiers pour des modules de
+  100 à 450 lignes ; une classe de base commune, quand le `Protocol` du contrat suffit et que les
+  formats (Atom, CSV, JSON, HTML, SQLite, BigQuery) n'ont rien d'autre en commun. — branche
+  `refactor/source-modules-extract-transform`
+
 ## Décisions encore ouvertes
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,
