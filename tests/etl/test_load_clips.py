@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
-from test_load import dump_database, fetch_rows, read_discards, read_log, run_import
+from load_helpers import dump_database, fetch_rows, read_discards, read_log, run_import
 
 from k_b.database.creation import create_database
 

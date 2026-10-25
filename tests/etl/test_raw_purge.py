@@ -5,7 +5,7 @@ import logging
 import shutil
 
 import pytest
-from test_load import run_import
+from load_helpers import run_import
 from test_transform import FIXTURES_DIR
 
 from k_b.database.creation import create_database
