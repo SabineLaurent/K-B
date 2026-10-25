@@ -3,7 +3,7 @@
 import sqlite3
 from datetime import datetime
 
-from k_b.database.dates import format_date
+from k_b.core.dates import format_date
 from k_b.items import ItemKind
 
 SELECT_ITEM_COLLECTED_AT = """

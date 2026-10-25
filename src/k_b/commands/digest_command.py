@@ -1,5 +1,5 @@
 """kb digest: ask the AI API for the digests of the watch, then write the sheet of each subject
-in the vault; kb serve and kb serve-ai must run."""
+in the vault; kb serve-data and kb serve-ai must run."""
 
 import logging
 import os

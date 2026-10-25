@@ -11,7 +11,7 @@ from k_b.core.config import API_KEY_CHARACTERS, DATA_API_URL, MIN_API_KEY_LENGTH
 from k_b.core.outbound import find_url_refusal
 
 DATA_API_URL_VARIABLE = "KB_DATA_API_URL"
-# The variable kb serve reads for its client AI_DIGEST: formed from its prefix, one value for both.
+# The variable kb serve-data reads for its client AI_DIGEST: formed from its prefix, one value for both.
 DATA_API_KEY_VARIABLE = f"{API_KEY_VARIABLE_PREFIX}AI_DIGEST"
 # No TLS before Azure Container Apps (docs/specs-api.md, OWASP API8): http on the machine and in
 # the compose network.
@@ -42,7 +42,7 @@ def read_data_api_settings_or_refusal(
 
 
 def find_api_key_refusal(api_key: str) -> str | None:
-    """Why the key is refused, by the rule kb serve applies, or None; the key is never quoted."""
+    """Why the key is refused, by the rule kb serve-data applies, or None; the key is never quoted."""
     if len(api_key) < MIN_API_KEY_LENGTH:
         return (
             f"{DATA_API_KEY_VARIABLE}: key of {len(api_key)} characters,"

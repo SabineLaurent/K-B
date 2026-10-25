@@ -9,7 +9,7 @@ from module_imports import PACKAGE_DIR
 ALLOWED_MODULES_BY_LIBRARY = {
     "opentelemetry": {
         "ai_api/connectors/metrics_export.py",
-        "ai_api/metric_instruments.py",
+        "ai_api/observability/metric_instruments.py",
     },
     "requests": {"ai_api/connectors/metrics_export.py"},
 }
@@ -44,7 +44,10 @@ def test_a_library_of_the_export_is_imported_by_its_modules_only(library):
         ("from opentelemetry.sdk.metrics import MeterProvider", {"opentelemetry"}),
         ("import requests as http", {"requests"}),
         ("from . import metrics", set()),
-        ("from k_b.ai_api.metric_instruments import ModelMetrics", {"k_b"}),
+        (
+            "from k_b.ai_api.observability.metric_instruments import ModelMetrics",
+            {"k_b"},
+        ),
     ],
 )
 def test_the_reader_of_imports_gives_the_top_level_names(code, names):

@@ -5,7 +5,7 @@ import sqlite3
 from collections.abc import Sequence
 from datetime import date
 
-from k_b.database.dates import format_day
+from k_b.core.dates import format_day
 from k_b.database.writers.discard import DiscardRule
 from k_b.items import TrendRow
 

@@ -29,7 +29,7 @@ from k_b.ai_api.connectors.metrics_export import (
     build_resource,
     read_metrics_export_settings_or_refusal,
 )
-from k_b.ai_api.metric_instruments import ModelMetrics
+from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.core.config import METRICS_EXPORT_TIMEOUT_SECONDS
 
 ENDPOINT = "https://otlp-gateway-prod-eu-west-2.grafana.net/otlp"

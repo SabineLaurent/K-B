@@ -34,7 +34,7 @@ l'ordre des résultats, change la version.
     laisserait passer tout hôte.
 
   Une valeur refusée (hôte hors adresse IPv4, port hors bornes, liste ou entrée vide, entrée avec
-  `*`, entrée hors motif) fait sortir `kb serve` en code 2 avant d'écouter, avec un message qui
+  `*`, entrée hors motif) fait sortir `kb serve-data` en code 2 avant d'écouter, avec un message qui
   nomme la variable et la position de l'entrée. En conteneur, le port est publié sur `127.0.0.1`
   de la machine (#200). Pas de CORS.
 - **Lecture seule** : GET seulement. La base est ouverte en lecture seule (`mode=ro`), une
@@ -60,10 +60,10 @@ l'ordre des résultats, change la version.
   l'en-tête `X-Request-ID` de chaque réponse et repris par chaque autre ligne de la requête
   (`database_error`, `internal_error`) ; jamais la clé, une valeur de paramètre ni un chemin brut.
   Le journal est commun aux deux API (`core/api_request_log.py`). Elle va dans
-  `<KB_DATA_DIR>/logs/kb-serve.log`, à part de `kb.log` : `kb serve` tourne longtemps, et la rotation
+  `<KB_DATA_DIR>/logs/kb-serve-data.log`, à part de `kb.log` : `kb serve-data` tourne longtemps, et la rotation
   de minuit faite par `kb collect` ou `kb import` dans un fichier partagé le laisserait écrire dans
   le fichier de la veille (constat sur `TimedRotatingFileHandler`, Python 3.13). Limite : un seul
-  `kb serve` par `KB_DATA_DIR`. Le port étant réglable, un second `kb serve` sur un autre port ne
+  `kb serve-data` par `KB_DATA_DIR`. Le port étant réglable, un second `kb serve-data` sur un autre port ne
   bute plus sur le `bind` et écrirait le même fichier (journal ADR, 2026-10-15). Avec
   `KB_LOG_TO_FILE=false`, le journal va sur la sortie d'erreur seule, sans fichier : en conteneur,
   la sortie d'erreur est le journal du conteneur.
@@ -82,7 +82,7 @@ l'ordre des résultats, change la version.
   La clé identifie le programme qui appelle (le terminal ou un script de Sabine, un agent, l'API
   IA) ; aucune personne ne se connecte.
 - **Clé générée en 256 bits** par `secrets.token_urlsafe(32)` ; le minimum contrôlé est de
-  32 caractères. Au démarrage, `kb serve` refuse un
+  32 caractères. Au démarrage, `kb serve-data` refuse un
   nom de client vide ou hors `[A-Z0-9_]+`, une clé de moins de 32 caractères, une clé hors de
   l'alphabet de `token_urlsafe` (`[A-Za-z0-9_-]` : les espaces autour de la clé reçue sont retirées,
   une clé qui en porte ne serait jamais reconnue), deux clients de

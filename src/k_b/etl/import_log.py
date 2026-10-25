@@ -6,10 +6,10 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import NamedTuple
 
-from k_b.database.dates import format_date
+from k_b.core.atomic_write import write_file_atomically
+from k_b.core.dates import format_date
 from k_b.database.writing import TREND_DISCARD_RULE, Discard, DiscardRule
 from k_b.etl.raw_files import RawFile, Rejection
-from k_b.etl.raw_store import write_file_atomically
 
 # The date each rule compared the item with, named by where that date comes from.
 COMPARED_FIELD_BY_RULE: dict[DiscardRule, str] = {

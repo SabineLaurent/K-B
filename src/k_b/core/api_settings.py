@@ -1,4 +1,4 @@
-"""Where kb serve and kb serve-ai listen: the host and the port, each read by its variable."""
+"""Where kb serve-data and kb serve-ai listen: the host and the port, each read by its variable."""
 
 import ipaddress
 import re

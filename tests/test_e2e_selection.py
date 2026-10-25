@@ -140,7 +140,7 @@ def test_the_end_to_end_tests_stop_on_a_variable_beyond_theirs_without_its_value
 
 
 def test_the_end_to_end_tests_stop_on_the_key_of_any_client_without_its_value():
-    """kb serve reads every KB_DATA_API_KEY_<CLIENT>: a client that .env.example does not name stops
+    """kb serve-data reads every KB_DATA_API_KEY_<CLIENT>: a client that .env.example does not name stops
     the tests too."""
     key_variable = f"{API_KEY_VARIABLE_PREFIX}CLIENT_NOT_IN_THE_EXAMPLE"
 

@@ -67,18 +67,18 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   `kb search` vient après le 08/11 ; un front écoconçu, plus tard (journal ADR, 2026-10-15,
   « POC du 25/10 »). Une commande de plus, `kb write-tops` (#265), écrit les fiches des tops dans
   le coffre, après `kb import` (journal ADR, 2026-10-19, « Tops : les fiches par `kb write-tops` »).
-- L'API IA est servie par `kb serve-ai` (#156), à côté de `kb serve`, sur `127.0.0.1:8001` ; ses
+- L'API IA est servie par `kb serve-ai` (#156), à côté de `kb serve-data`, sur `127.0.0.1:8001` ; ses
   clients ont leur clé dans `KB_AI_API_KEY_<CLIENT>`, ceux de l'API de données dans
   `KB_DATA_API_KEY_<CLIENT>` (journal ADR, 2026-10-21, « API IA : servir les fiches par
   `POST /digests` »).
 - `kb digest` (#209) demande les fiches à l'API IA, puis les écrit dans le coffre,
-  `veille/<sujet>/AAAA-MM-JJ.md` ; `kb serve` et `kb serve-ai` doivent tourner (journal ADR,
+  `veille/<sujet>/AAAA-MM-JJ.md` ; `kb serve-data` et `kb serve-ai` doivent tourner (journal ADR,
   2026-10-21, « Fiches de veille : `kb digest` les écrit dans le coffre »).
 - `kb serve-ai` exporte les mesures du modèle en OpenTelemetry vers Grafana Cloud (#162), pile
   `prod-eu-west-2` (Allemagne), quand `KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS` et
   `KB_DEPLOYMENT_ENVIRONMENT` sont réglées ; il refuse de démarrer avec une variable `OTEL_*`
   (le SDK la lirait en silence). OpenTelemetry ne s'importe que dans
-  `ai_api/connectors/metrics_export.py` et `ai_api/metric_instruments.py` (décision de Sabine du
+  `ai_api/connectors/metrics_export.py` et `ai_api/observability/metric_instruments.py` (décision de Sabine du
   2026-10-24). Dans Grafana, les séries de K-B se lisent par `{job="k-b-ai-api"}`. L'essai gratuit
   de 14 jours de la pile finit vers le 07/11 : l'offre gratuite garde 14 jours et 10 000 séries.
 

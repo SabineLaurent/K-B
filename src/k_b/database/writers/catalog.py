@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime
 from typing import NamedTuple
 
-from k_b.database.dates import format_date
+from k_b.core.dates import format_date
 from k_b.database.writers import shared_rows
 from k_b.database.writers.discard import Discard
 from k_b.items import Item

@@ -29,7 +29,7 @@ from k_b.ai_api.dependencies import (
     read_request_time,
 )
 from k_b.ai_api.errors import STATUS_BY_STATE
-from k_b.ai_api.metric_instruments import ModelMetrics
+from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.core.config import (
     LLM_INPUT_USD_PER_MILLION_TOKENS,
     LLM_OUTPUT_USD_PER_MILLION_TOKENS,

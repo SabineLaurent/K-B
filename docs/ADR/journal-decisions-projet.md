@@ -4069,6 +4069,35 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   le sens sûr (« Le CV en 2026, 0001 candidats ») ; ne sont pas lus `CVE-2026-0001a`, « la faille
   2026-0001 » ni un sosie hors des listes. — PR de #207
 
+## 2026-10-25
+
+### Rangement : les utilitaires partagés dans `core`, l'API IA rangée par rôle
+
+- **`write_file_atomically` (et `REFUSED_FOLDER_SYNC_ERRORS`) passe de `etl/raw_store.py` à
+  `core/atomic_write.py`, et `database/dates.py` devient `core/dates.py` ; `core.atomic_write` est
+  refusé aux deux API par `tests/architecture/test_apis.py` (`DATA_API_FORBIDDEN_MODULES`,
+  `AI_API_FORBIDDEN_MODULES`).** Mission cosmétique décidée par Sabine le 2026-10-25, codée par
+  time-knight sur sa délégation. Pourquoi : les deux servent à plusieurs modules (`etl`, `post`,
+  `commands`, `database`), et `core` est le vocabulaire commun à toutes les couches (règle 5 de
+  `conventions.md` ; déjà recommandé par `docs/refactoring/paquets.md`, point 3 des gains rapides).
+  `post` n'importe plus `etl` ni `database` pour écrire un fichier ou une date. Le refus aux API
+  garde la règle « une API n'écrit aucun fichier » (règle 7 de `poc.md`) au même niveau
+  qu'avant : tant que la fonction vivait dans `etl`, le refus d'`etl` suffisait. Options écartées :
+  le nom `core/file_writing.py` (collision avec `etl/file_writing.py`, qui écrit en base) ; laisser
+  les API importer `core.atomic_write` (la règle ne tiendrait plus que par un `grep`). — branche
+  `refactor/cosmetic-a`
+- **Sous `k_b.ai_api`, `fidelity` passe dans `stages/`, `metrics` et `metric_instruments` dans un
+  paquet nouveau, `observability/` ; la racine garde le squelette de l'API (`app`, `api_router`,
+  `dependencies`, `errors`, `settings`, comme `data_api`), le parcours d'une demande (`digests`,
+  comme `etl/pipeline.py`) et le vocabulaire que partagent toutes les couches d'`ai_api`
+  (`watch_items`, `deadline`).** Même mission, choix de time-knight. Pourquoi : « un dossier par
+  rôle » (`code.md`) et le plan par rôle attendu pour l'API IA (2026-10-17, paquet `data_api`) ;
+  la fidélité contrôle une affirmation rédigée, c'est une étape comme `classification` et
+  `writing`. Les couches de `AI_API_LAYERS` ne changent pas, seuls les noms des modules. Option
+  écartée : `watch_items` et `deadline` dans `stages/` (les connecteurs, plus bas, les importent).
+  Limite : la racine garde huit fichiers, dont trois qui ne sont pas du squelette. — branche
+  `refactor/cosmetic-a`
+
 ## Décisions encore ouvertes
 
 - **La base au temps 3** (2026-10-20) : SQLite et Blob, ou PostgreSQL. Avec la première option,

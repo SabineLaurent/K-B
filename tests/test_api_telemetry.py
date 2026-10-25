@@ -16,7 +16,7 @@ from pydantic import SecretStr
 from k_b.ai_api.app import create_app as create_ai_app
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.connectors.llm_settings import REPLAY_MODEL, LlmSettings
-from k_b.ai_api.metric_instruments import ModelMetrics
+from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.core.config import DIGEST_SUBJECTS, LLM_REPLAY_BASE_URL
 from k_b.data_api.app import create_app as create_data_app
 data_app = create_data_app(

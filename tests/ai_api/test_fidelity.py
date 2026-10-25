@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from k_b.ai_api.fidelity import check_claim, is_found, normalize
+from k_b.ai_api.stages.fidelity import check_claim, is_found, normalize
 from k_b.ai_api.stages.writing import Claim
 from k_b.ai_api.watch_items import WatchItem, build_fields
 from k_b.core.config import MAX_FIELD_CHARS_FOR_WRITING

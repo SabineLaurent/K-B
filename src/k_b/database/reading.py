@@ -7,7 +7,7 @@ from collections.abc import Callable, Collection
 from datetime import date, datetime, timedelta
 from typing import Any, NamedTuple
 
-from k_b.database.dates import format_day
+from k_b.core.dates import format_day
 from k_b.items import (
     ARXIV_ABSTRACT_PAGE_URL,
     MAX_INT64,

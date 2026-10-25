@@ -1,4 +1,4 @@
-"""kb serve-ai: serve the digests of the watch by the AI API, beside kb serve."""
+"""kb serve-ai: serve the digests of the watch by the AI API, beside kb serve-data."""
 
 import logging
 import os
@@ -14,7 +14,7 @@ from k_b.ai_api.connectors.llm_settings import read_llm_settings_or_refusal
 from k_b.ai_api.connectors.metrics_export import (
     read_metrics_export_settings_or_refusal,
 )
-from k_b.ai_api.metric_instruments import ModelMetrics
+from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.ai_api.settings import read_ai_api_settings_or_refusal
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME, value_or_log_refusal
