@@ -1,6 +1,6 @@
-# Spécification des fiches de veille
+# Spécification des comptes rendus de veille
 
-Une fiche de veille regroupe, pour un sujet d'une liste fermée, ce que la veille de K-B a vu sur
+Un compte rendu de veille regroupe, pour un sujet d'une liste fermée, ce que la veille de K-B a vu sur
 une fenêtre de quelques jours. C'est la première sortie d'un modèle dans K-B : ce document est son
 contrat, écrit avant le code. Il dit ce qui entre, ce qui sort, ce que le code refuse et ce qu'il
 mesure. Les décisions et leur pourquoi sont dans le [journal ADR](ADR/journal-decisions-projet.md)
@@ -1021,7 +1021,7 @@ source ni dans le texte rendu. Une ligne horizontale ou un soulignement (`---`,
 `***`, `===`) n'est jamais seul sur sa ligne : l'affirmation finit par ses sources, le titre par
 son URL. Les caractères des fiches des tops sont repris (`post/vault_files.py`), avec la même règle
 du `&`, une seule pour les deux écrivains du coffre (décision de Sabine du 2026-10-21) ; `~ : @`,
-`www.`, le marqueur de liste et l'espace entre deux deux-points s'y ajoutent, car une URL nue reste du texte dans une fiche de veille : une
+`www.`, le marqueur de liste et l'espace entre deux deux-points s'y ajoutent, car une URL nue reste du texte dans un compte rendu de veille : une
 affirmation du modèle ne fait jamais un lien. Le contrôle 6 de l'API IA reste en amont (défense en profondeur). Non échappée, voulu :
 l'emphase (`*x*`, `_x_`, `==x==`), de la mise en forme, ni lien ni code.
 

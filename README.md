@@ -143,7 +143,7 @@ le 18/10/2026 :
 | Jalon | Échéance |
 |---|---|
 | POC 25/10 | 25/10/2026 |
-| Fiches de veille tous les 3 jours | 01/11/2026 |
+| Comptes rendus de veille tous les 3 jours | 01/11/2026 |
 | Mise en ligne 08/11 | 08/11/2026 |
 | Wiki : ingest des clips | sans date, après le 29/10 |
 
@@ -151,7 +151,7 @@ le 18/10/2026 :
 
 **Le 25/10** (journal ADR, 2026-10-20, « Squelette E1 E3 : cadrage du 20/10 », décision 1) : K-B
 tourne sur ma machine, sans conteneur ; c'est le premier de trois temps. La collecte, l'import,
-l'API de données et l'API IA s'y lancent par `kb`. L'API IA rédige des fiches de veille par sujet,
+l'API de données et l'API IA s'y lancent par `kb`. L'API IA rédige des comptes rendus de veille par sujet,
 sur une fenêtre réglable (`KB_DIGEST_WINDOW_DAYS`, 3 jours par défaut), avec gpt-6-luna ; le modèle
 ne choisit le sujet que dans une liste fermée que je tiens. Le retour se lit dans la console, et les
 fiches en `.md` dans mon coffre : ni interface CLI dédiée ni front. La collecte et l'import sont
@@ -190,7 +190,7 @@ uv sync
 |---|---|---|
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
 | `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
-| `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les fiches de veille dans `veille/<sujet>/` ; ni l'un ni l'autre ne tourne sans elle (code 2). |
+| `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les comptes rendus de veille dans `veille/<sujet>/` ; ni l'un ni l'autre ne tourne sans elle (code 2). |
 | `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
 | `KB_COLLECT_ONLY` | non | les dossiers des sources que `kb collect` lance, séparés par des virgules (`zotero,clipping`) ; la casse ne compte pas. Sans elle, pas de filtre : chaque source tourne comme avant (Zotero, clips et GH Archive selon leur variable). Une source écartée affiche `<dossier>: skipped (not in KB_COLLECT_ONLY)` ; un nom qui n'est pas un dossier de source, une valeur ou une entrée vide, ou une source choisie sans sa variable (`zotero` sans `KB_ZOTERO_DIR`) : code 2, rien n'est collecté ([docs/specs-collecte.md](docs/specs-collecte.md), « Choisir les sources »). |
 | `KB_GITHUB_TOKEN` | non | jeton GitHub en lecture seule ([docs/jeton-github.md](docs/jeton-github.md)). Sans lui, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000. |
@@ -354,7 +354,7 @@ Limites :
   identifiants Google, dont l'API n'a pas besoin : `kb serve-data` tourne avec plus de droits que sa
   tâche n'en demande (moindre privilège).
 
-**Lancer l'API IA** (les fiches de veille d'une fenêtre, par sujet ; voir
+**Lancer l'API IA** (les comptes rendus de veille d'une fenêtre, par sujet ; voir
 [docs/fiches-veille.md](docs/fiches-veille.md)) : elle lit la veille par l'API de données, qui doit
 donc tourner, et appelle le modèle ; elle ne garde rien entre deux demandes.
 
@@ -407,7 +407,7 @@ Limites : une variable `KB_AI_API_KEY_*` exportée dans le profil du shell reste
 du `.env` ; `uv run --env-file .env kb serve-ai` charge tout le `.env`, donc aussi des secrets dont
 l'API IA n'a pas besoin (moindre privilège).
 
-**Écrire les fiches de veille dans le coffre** (`kb serve-data` et `kb serve-ai` lancés ; voir
+**Écrire les comptes rendus de veille dans le coffre** (`kb serve-data` et `kb serve-ai` lancés ; voir
 [docs/fiches-veille.md](docs/fiches-veille.md), « Fiches dans le coffre ») :
 
 ```sh
