@@ -37,14 +37,6 @@ class CtrlCSource(WorkingSource):
         return super().fetch(last_collected_at)
 
 
-@pytest.fixture
-def deaths_by_sigint(monkeypatch):
-    """kb would die by SIGINT, and pytest with it: the deaths asked are recorded instead."""
-    deaths = []
-    monkeypatch.setattr(cli, "die_by_sigint", lambda: deaths.append(True))
-    return deaths
-
-
 def test_a_ctrl_c_during_a_source_stops_kb_collect_and_keeps_the_collection_state(
     monkeypatch, tmp_path, sigint_handler_of_the_test, deaths_by_sigint
 ):
@@ -118,6 +110,26 @@ def test_kb_stops_on_the_first_ctrl_c_ignores_the_next_and_sets_the_handler_back
         signal.raise_signal(signal.SIGINT)
 
     assert signal.getsignal(signal.SIGINT) is sigint_handler_of_the_test
+
+
+def test_once_stopped_by_ctrl_c_kb_keeps_ignoring_sigint_until_it_dies(
+    sigint_handler_of_the_test,
+):
+    with pytest.raises(KeyboardInterrupt), stopping_on_sigint("collect"):
+        signal.raise_signal(signal.SIGINT)
+
+    # Not set back: a second Ctrl-C would cut the line of the log.
+    assert signal.getsignal(signal.SIGINT) is signal.SIG_IGN
+
+
+def test_a_sigint_ignored_from_the_start_stays_ignored(sigint_handler_of_the_test):
+    # As for kb run in the background of a script: Ctrl-C is not meant for it.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+    with stopping_on_sigint("collect"):
+        assert signal.getsignal(signal.SIGINT) is signal.SIG_IGN
+
+    assert signal.getsignal(signal.SIGINT) is signal.SIG_IGN
 
 
 @pytest.mark.parametrize("command", ["serve-data", "serve-ai", "create-db", "openapi"])

@@ -8,6 +8,8 @@ from commands.cli_helpers import (
     SigtermNotHandledByKbError,
 )
 
+from k_b import cli
+
 
 @pytest.fixture(autouse=True)
 def no_zotero_directory(monkeypatch):
@@ -71,6 +73,14 @@ def sigint_handler_of_the_test():
     previous_handler = signal.signal(signal.SIGINT, raise_in_the_test)
     yield raise_in_the_test
     signal.signal(signal.SIGINT, previous_handler)
+
+
+@pytest.fixture
+def deaths_by_sigint(monkeypatch):
+    """kb would die by SIGINT, and pytest with it: the deaths asked are recorded instead."""
+    deaths = []
+    monkeypatch.setattr(cli, "die_by_sigint", lambda: deaths.append(True))
+    return deaths
 
 
 @pytest.fixture

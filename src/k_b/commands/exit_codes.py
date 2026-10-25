@@ -44,7 +44,8 @@ class ExitCode(IntEnum):
         130,
         (
             "kb collect, kb import, kb write-tops, kb digest: stopped by Ctrl-C (SIGINT); what"
-            " was done before it is kept"
+            " was done before it is kept; kb dies by the signal: a shell reads 130, a parent"
+            " process -2"
         ),
     )
     # 128 + 15, the code of a process stopped by SIGTERM. kb serve-data and kb serve-ai exit with it

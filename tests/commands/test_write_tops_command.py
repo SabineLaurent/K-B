@@ -203,6 +203,34 @@ def test_a_sigterm_while_a_sheet_is_written_stops_write_tops_and_deletes_no_rank
     assert signal.getsignal(signal.SIGTERM) is sigterm_handler_of_the_test
 
 
+def test_a_ctrl_c_while_a_sheet_is_written_stops_write_tops_and_deletes_no_ranking(
+    monkeypatch,
+    data_and_vault_dirs,
+    test_tops,
+    sigint_handler_of_the_test,
+    deaths_by_sigint,
+):
+    data_dir, vault_dir = data_and_vault_dirs
+    rankings = write_rankings_of_each_top(
+        data_dir, "2026-10-05T093000Z", "2026-10-12T093000Z"
+    )
+    write_file_atomically = vault_files.write_file_atomically
+
+    def write_then_receive_ctrl_c(path, content):
+        write_file_atomically(path, content)
+        signal.raise_signal(signal.SIGINT)
+
+    monkeypatch.setattr(vault_files, "write_file_atomically", write_then_receive_ctrl_c)
+
+    exit_code = cli.main(["write-tops"])
+
+    assert deaths_by_sigint == [True]
+    assert exit_code == cli.ExitCode.STOPPED_BY_SIGINT
+    assert all(path.exists() for paths in rankings.values() for path in paths)
+    assert list_sheets(vault_dir) == ["veille/tops/most_starred/2026-10-05.md"]
+    assert list_hidden_files(vault_dir) == []
+
+
 def test_kb_import_writes_nothing_in_the_vault(data_and_vault_dirs, test_tops):
     data_dir, vault_dir = data_and_vault_dirs
     cli.main(["create-db"])

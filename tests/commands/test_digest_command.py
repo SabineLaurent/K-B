@@ -383,6 +383,29 @@ def test_a_sigterm_while_a_sheet_is_written_stops_digest_and_keeps_the_sheet(
     assert signal.getsignal(signal.SIGTERM) is sigterm_handler_of_the_test
 
 
+def test_a_ctrl_c_while_a_sheet_is_written_stops_digest_and_keeps_the_sheet(
+    monkeypatch, digest_environment, sigint_handler_of_the_test, deaths_by_sigint
+):
+    _, vault_dir = digest_environment
+    answer_digests(
+        monkeypatch, answer_with(make_response([AGENT_DIGEST, RESEARCH_DIGEST]))
+    )
+    write_file_atomically = vault_files.write_file_atomically
+
+    def write_then_receive_ctrl_c(path, content):
+        write_file_atomically(path, content)
+        signal.raise_signal(signal.SIGINT)
+
+    monkeypatch.setattr(vault_files, "write_file_atomically", write_then_receive_ctrl_c)
+
+    exit_code = cli.main(["digest"])
+
+    assert deaths_by_sigint == [True]
+    assert exit_code == cli.ExitCode.STOPPED_BY_SIGINT
+    assert list_sheets(vault_dir) == ["veille/agent_tools/2026-10-21.md"]
+    assert list_hidden_files(vault_dir) == []
+
+
 def test_kb_help_lists_digest(capsys):
     with pytest.raises(SystemExit):
         cli.main(["--help"])
