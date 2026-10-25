@@ -9,10 +9,13 @@ import pytest
 from module_imports import PACKAGE_DIR
 
 SOURCES_DIR = PACKAGE_DIR / "etl" / "sources"
-# Not sources: the client of the GitHub API and the list of the tracked repositories.
-HELPER_MODULES = {"__init__", "github_api", "tracked_repositories"}
+# Not a source: the client of the GitHub API, shared by the GitHub sources.
+HELPER_MODULES = {"github/api"}
 SOURCE_MODULES = sorted(
-    path.stem for path in SOURCES_DIR.glob("*.py") if path.stem not in HELPER_MODULES
+    path.relative_to(SOURCES_DIR).with_suffix("").as_posix()
+    for path in SOURCES_DIR.rglob("*.py")
+    if path.stem != "__init__"
+    and path.relative_to(SOURCES_DIR).with_suffix("").as_posix() not in HELPER_MODULES
 )
 EXTRACT_BANNER = "# === EXTRACT ==="
 TRANSFORM_BANNER = "# === TRANSFORM ==="

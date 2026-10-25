@@ -26,9 +26,9 @@ from test_items import (
 )
 from test_transform import FIXTURES_DIR
 
+from k_b.core.config import TRACKED_REPOSITORIES
 from k_b.database.creation import create_database
 from k_b.etl.source_contract import EntryReading, SourceKind, SourceReader
-from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 from k_b.items import (
     MAX_COUNT_BY_KIND,
     MAX_ELEMENT_LENGTH_BY_KIND,

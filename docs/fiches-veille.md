@@ -62,7 +62,7 @@ plusieurs sujets va au **premier** de la liste, dans cet ordre.
 | 8 | `software_engineering` | outils, langages et pratiques de développement hors IA |
 
 Liste de départ proposée par la session K-B à partir des sources collectées (dépôts suivis,
-`etl/sources/tracked_repositories.py` ; éditions TLDR `ai`, `infosec` et `dev`,
+`TRACKED_REPOSITORIES` de `core/config.py` ; éditions TLDR `ai`, `infosec` et `dev`,
 `etl/sources/tldr.py` ; arXiv sur la sécurité de l'IA, [specs-collecte.md](specs-collecte.md) ;
 catalogue KEV ; alertes GitHub), validée par Sabine le 2026-10-15. Un item qui n'entre dans aucun
 sujet est « non retenu » : il n'y a pas de sujet « autre ».

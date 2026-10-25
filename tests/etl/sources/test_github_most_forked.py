@@ -7,8 +7,8 @@ import pytest
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources import github_most_forked
-from k_b.etl.sources.github_most_forked import (
+from k_b.etl.sources.github import most_forked as github_most_forked
+from k_b.etl.sources.github.most_forked import (
     GithubMostForkedSource,
     read_most_forked,
 )

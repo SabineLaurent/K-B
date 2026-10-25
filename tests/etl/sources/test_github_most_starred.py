@@ -7,8 +7,8 @@ import pytest
 
 from k_b.etl.source_contract import list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources import github_most_starred
-from k_b.etl.sources.github_most_starred import (
+from k_b.etl.sources.github import most_starred as github_most_starred
+from k_b.etl.sources.github.most_starred import (
     GithubMostStarredSource,
     read_most_starred,
 )

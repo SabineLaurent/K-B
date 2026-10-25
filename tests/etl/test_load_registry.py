@@ -27,6 +27,7 @@ from load_helpers import (
 )
 from test_transform import FIXTURES_DIR, copy_fixture
 
+from k_b.core.config import TRACKED_REPOSITORIES
 from k_b.etl.load import (
     ImportLogExistsError,
     import_items,
@@ -34,7 +35,6 @@ from k_b.etl.load import (
 )
 from k_b.etl.raw_files import TrendReading
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 from k_b.etl.transform import read_raw_files
 
 

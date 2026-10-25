@@ -7,17 +7,17 @@ from pathlib import Path
 
 import pytest
 
+from k_b.core.config import TRACKED_REPOSITORIES
 from k_b.core.quoting import quote_value
 from k_b.etl.source_contract import list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources import github_releases
-from k_b.etl.sources.github_releases import (
+from k_b.etl.sources.github import releases as github_releases
+from k_b.etl.sources.github.releases import (
     GithubReleasesSource,
     Release,
     convert_release,
     read_releases,
 )
-from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_releases_extract.json").read_bytes()

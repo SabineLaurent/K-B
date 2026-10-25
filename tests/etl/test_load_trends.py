@@ -23,13 +23,13 @@ from load_helpers import (
 )
 from test_transform import FIXTURES_DIR
 
+from k_b.core.config import TRACKED_REPOSITORIES
 from k_b.database.creation import create_database
 from k_b.etl.load import (
     import_items,
     read_imported_paths,
 )
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 from k_b.etl.transform import read_raw_files
 
 # A reduced extract of the GH Archive ranking collected on 2026-10-11: 5 of the 48 rows of the

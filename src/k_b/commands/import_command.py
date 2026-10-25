@@ -7,6 +7,7 @@ from pathlib import Path
 
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME, describe_os_error
+from k_b.core.config import TRACKED_REPOSITORIES
 from k_b.database.connection import MissingDatabaseError
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl.pipeline import (
@@ -22,7 +23,6 @@ from k_b.etl.raw_store import (
 )
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources import cisa_kev, zotero
-from k_b.etl.sources.tracked_repositories import TRACKED_REPOSITORIES
 
 logger = logging.getLogger(LOGGER_NAME)
 

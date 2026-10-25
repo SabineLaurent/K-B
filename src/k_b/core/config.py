@@ -6,15 +6,31 @@ from datetime import timedelta
 from typing import Literal
 
 
-# A GitHub repository K-B watches; the list is in etl/sources/tracked_repositories.py until #123
-# moves it here. Defined here, not with the list: the import writes it to the base, and a
-# generic module does not import the sources.
+# A GitHub repository K-B watches, and the packages it publishes; the reasons are in
+# docs/sources.md. Here, not in a source: the import writes the list to the base, and the
+# collection derives its sources from it.
 @dataclass(frozen=True)
 class TrackedRepository:
     name: str
     ecosystem: Literal["pip", "npm"]
     # Only the main packages: integrations are added when they are used.
     packages: tuple[str, ...]
+
+
+TRACKED_REPOSITORIES = (
+    TrackedRepository(
+        "langchain-ai/langchain",
+        "pip",
+        ("langchain", "langchain-core", "langchain-text-splitters"),
+    ),
+    TrackedRepository(
+        "langchain-ai/langgraph", "pip", ("langgraph", "langgraph-checkpoint")
+    ),
+    TrackedRepository(
+        "run-llama/llama_index", "pip", ("llama-index", "llama-index-core")
+    ),
+    TrackedRepository("anthropics/claude-code", "npm", ("@anthropic-ai/claude-code",)),
+)
 
 
 # How long the data of each acquisition mode is kept, in years after its collection; the purge

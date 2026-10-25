@@ -77,6 +77,15 @@ TAG_MAX_LENGTH = 100
 TAG_MAX_COUNT = 30
 
 
+def is_repository_name(text: str) -> bool:
+    """owner/name, where neither part is `.` nor contains `..`: the name goes into paths."""
+    return (
+        re.fullmatch(REPOSITORY_NAME, text) is not None
+        and ".." not in text
+        and "." not in text.split("/")
+    )
+
+
 def check_url_can_be_normalized(url: str) -> str:
     """Refuse a URL urlsplit refuses, and one without a host once its utm_* parameters are
     removed ("https://?utm_source=x"): the import would refuse it and stop."""

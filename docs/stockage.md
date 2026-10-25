@@ -253,7 +253,7 @@ aucune issue ne les aligne :
   atomique). Raison : une liste n'est jamais cherchée ni filtrée en base ; elle s'écrit entière,
   avec sa ligne. Les auteurs et les paquets touchés se lisent entiers et sont servis en liste par
   l'API (`src/k_b/database/reading.py:394, 420`). Les paquets suivis sont une copie de la liste du
-  code (`src/k_b/etl/sources/tracked_repositories.py`), réécrite entière à chaque import
+  code (`TRACKED_REPOSITORIES` de `src/k_b/core/config.py`), réécrite entière à chaque import
   (`src/k_b/database/writers/release_writer.py:24-29`) et jamais relue en base. Un `CHECK` tient sa forme
   (tableau JSON non vide) et, pour les auteurs et les paquets touchés, son nombre maximum
   (1 000 et 100) ; la longueur de ses éléments est tenue par les items (`schema.sql:10-14`).
