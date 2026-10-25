@@ -44,18 +44,24 @@ reprend dans une section « Crédits ».
 ```python
     if is_rate_limit_exhausted(error):
         # Without a readable reset, or a reset already past (a clock off): the minute GitHub asks.
-        return max(read_rate_limit_reset(error) or 0, now + MIN_PAUSE_SECONDS)
+        pause_ends.append(
+            max(read_rate_limit_reset(error) or 0, now + MIN_PAUSE_SECONDS)
+        )
 ```
-(`src/k_b/etl/http_retry.py:72-74`). La fonction répond à une seule question : jusqu'à quand,
+(`src/k_b/etl/http_retry.py:74-78`). La fonction répond à une seule question : jusqu'à quand,
 en secondes epoch, ne faut-il plus rien envoyer ?
 
 - **Quota épuisé** (`x-ratelimit-remaining: 0`) : jusqu'à `x-ratelimit-reset`, l'heure de remise
-  à zéro donnée par GitHub. `read_rate_limit_reset` (`:102`) vérifie d'abord, avec
+  à zéro donnée par GitHub. `read_rate_limit_reset` (`:104`) vérifie d'abord, avec
   `EPOCH_SECONDS`, que l'en-tête ne contient que 1 à 10 chiffres. Sans heure lisible, ou avec une
   heure déjà passée (horloge décalée), la pause dure une minute, le minimum que GitHub demande.
 - **`Retry-After` de plus de 60 s, sur un statut de limite** (429, 5xx, ou 403 avec
-  `Retry-After`, `is_retried_status`, `:85`) : jusqu'à `now + Retry-After`. S'il est trop long
-  pour être lu, la pause dure jusqu'à la fin du processus (`math.inf`, `:82`).
+  `Retry-After`, `is_retried_status`, `:87`) : jusqu'à `now + Retry-After`. S'il est trop long
+  pour être lu, la pause dure jusqu'à la fin du processus (`math.inf`, `:83`).
+- **Les deux à la fois** : GitHub peut envoyer un quota épuisé avec un `Retry-After` (limite
+  secondaire), et dit de lire `retry-after` en premier. La plus longue des deux attentes l'emporte
+  (`max(pause_ends, default=None)`, `:84`). Ce cas avait d'abord été écarté à tort, de mémoire, puis
+  corrigé après vérification dans la doc de GitHub.
 - **Tout autre cas** : `None`, pas de pause.
 
 La fonction ne lit pas une réponse servie hors de l'adresse attendue : elle s'appuie sur
@@ -65,7 +71,7 @@ paramètres), à côté des autres règles de politesse du fichier.
 Après la revue de code, les trois règles que `find_retry_wait`, `note_rate_limit_reset` et
 `find_pause_end` répétaient sont extraites, chacune à un seul endroit (règle « une connaissance
 vit à un seul endroit » de `.claude/rules/code.md`) : `is_retried_status` (quels statuts sont des
-limites), `is_retry_after_beyond_max` (`:95`), `read_rate_limit_reset`. Le comportement du nouvel
+limites), `is_retry_after_beyond_max` (`:97`), `read_rate_limit_reset`. Le comportement du nouvel
 essai et de la note est inchangé : leurs tests passent sans modification.
 
 ### 3. Tenir la pause : `paused_until`, partagé par les sources GitHub
@@ -113,10 +119,10 @@ l'autre.
 | Test ou sortie | Ce que ça démontre |
 |---|---|
 | `test_after_a_rate_limit_with_no_request_left_no_request_is_sent_until_its_reset` (`tests/etl/sources/test_github_api.py:102`) | Après un 403 avec quota épuisé, l'appel suivant lève `GithubPausedError` sans requête. Une fois l'heure de remise à zéro passée, il redemande. Ce test échoue si la ligne `paused_until = max(...)` est retirée (vérifié) |
-| `test_a_rate_limit_with_no_request_left_pauses_until_its_reset`, `test_a_reset_missing_unreadable_or_past_pauses_a_minute`, `test_no_pause_otherwise` (`tests/etl/test_http_retry.py:164-214`) | Chaque cas de `find_pause_end`, dont la réponse servie ailleurs, un 404 avec `Retry-After` (pas une limite, donc sans pause) et le `Retry-After` de 60 s (attendu, donc sans pause) |
+| `test_a_rate_limit_with_no_request_left_pauses_until_its_reset`, `test_a_reset_missing_unreadable_or_past_pauses_a_minute`, `test_no_pause_otherwise` (`tests/etl/test_http_retry.py:164-227`), `test_with_both_an_exhausted_rate_limit_and_a_longer_retry_after_the_longer_wins` | Chaque cas de `find_pause_end`, dont le quota épuisé avec un `Retry-After` plus long, la réponse servie ailleurs, un 404 avec `Retry-After` (pas une limite, donc sans pause) et le `Retry-After` de 60 s (attendu, donc sans pause) |
 | `test_a_pause_comes_before_every_page_the_first_too` (`tests/etl/sources/test_tldr.py:605`) | 8 pages lues donnent 8 pauses. L'ancien code en aurait fait 7 |
 | `test_the_versioned_openapi_is_valid_and_declares_its_security_scheme` | L'OpenAPI versionnée porte la mention arXiv |
-| `uv run pytest` : 2 610 réussis ; `mypy`, `ruff check`, `ruff format --check` verts | Rien d'autre n'a cassé |
+| `uv run pytest` : 2 611 réussis ; `mypy`, `ruff check`, `ruff format --check` verts | Rien d'autre n'a cassé |
 
 Deux fixtures autouse (`tests/etl/conftest.py`) : `no_github_pause` remet `paused_until` à 0
 avant chaque test, pour qu'une pause ne déborde pas sur le test suivant ; `no_pause_before_a_tldr_page`
@@ -130,7 +136,7 @@ de la revue).
    seul passage vers GitHub, donc l'état y vit et nulle part ailleurs. Les tests la remettent à
    zéro (`tests/etl/conftest.py`).
 2. **Et si l'horloge du Mac est décalée ?** Une heure de remise à zéro déjà passée donne quand
-   même une minute de pause (`http_retry.py:74`). On n'enchaîne pas les requêtes refusées.
+   même une minute de pause (`http_retry.py:77`). On n'enchaîne pas les requêtes refusées.
 3. **Pourquoi ne pas simplement attendre la remise à zéro ?** Elle peut être dans une heure.
    Bloquer `kb collect` aussi longtemps priverait toutes les autres sources. La source échoue,
    et la collecte suivante redemande.
