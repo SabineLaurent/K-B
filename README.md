@@ -244,7 +244,9 @@ tout a réussi ; 4 si au moins une source a réussi et au moins une a échoué, 
 `KB_COLLECT_ONLY` est refusée ; 143 si `kb collect` reçoit SIGTERM (`docker stop`) : ce qui a été
 fait avant le signal est gardé ; reçu avant l'écriture de l'état de collecte, il laisse l'état
 inchangé, et la collecte suivante repart des mêmes dates ; 130 pour Ctrl-C, avec les mêmes effets (`kb`
-meurt par SIGINT, et une boucle shell qui le lance s'arrête).
+meurt par SIGINT, et une boucle shell qui le lance s'arrête ; un processus parent lit -2). Pour chaque
+commande, un `kb` lancé en arrière-plan d'un script, qui ignore Ctrl-C dès son lancement, continue de
+l'ignorer.
 
 **Importer le brut dans la base** (après une collecte) :
 

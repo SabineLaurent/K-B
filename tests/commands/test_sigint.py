@@ -128,8 +128,28 @@ def test_a_sigint_ignored_from_the_start_stays_ignored(sigint_handler_of_the_tes
 
     with stopping_on_sigint("collect"):
         assert signal.getsignal(signal.SIGINT) is signal.SIG_IGN
+        signal.raise_signal(signal.SIGINT)
 
     assert signal.getsignal(signal.SIGINT) is signal.SIG_IGN
+
+
+def test_kb_collect_run_with_sigint_ignored_goes_on_through_a_ctrl_c(
+    monkeypatch, tmp_path, sigint_handler_of_the_test, deaths_by_sigint
+):
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        collect_command,
+        "SOURCE_KINDS",
+        collected_kinds(CtrlCSource("pressed"), WorkingSource("after")),
+    )
+
+    exit_code = cli.main(["collect"])
+
+    assert exit_code == cli.ExitCode.SUCCEEDED
+    assert deaths_by_sigint == []
+    assert list((tmp_path / "raw" / "automated_watch" / "after").iterdir())
+    assert "Ctrl-C" not in (tmp_path / "logs" / "kb.log").read_text("utf-8")
 
 
 @pytest.mark.parametrize("command", ["serve-data", "serve-ai", "create-db", "openapi"])

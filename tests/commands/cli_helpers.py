@@ -45,6 +45,7 @@ def list_sheets(vault_dir):
 # kb collect run as the kb script runs it, sys.exit(main()), with a source that says it has
 # started, then waits for a signal (SIGTERM or SIGINT).
 COLLECT_WAITING_FOR_A_SIGNAL = """
+import signal
 import sys
 import time
 
@@ -64,6 +65,8 @@ class WaitingSource:
         return b"{}"
 
 
+# SIGINT as a terminal gives it: a pytest run with SIGINT ignored would pass it on to kb.
+signal.signal(signal.SIGINT, signal.default_int_handler)
 collect_command.SOURCE_KINDS = (SourceKind("test", (WaitingSource(),), None),)
 sys.exit(cli.main(["collect"]))
 """

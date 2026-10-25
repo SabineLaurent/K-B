@@ -3,6 +3,7 @@ opens the log and hands the run to its module in commands/, the environment give
 
 import argparse
 import logging
+import signal
 import sys
 from collections.abc import Mapping
 from contextlib import ExitStack
@@ -135,8 +136,10 @@ def main(argv: list[str] | None = None) -> int:
         except KeyboardInterrupt:
             if arguments.command not in COMMANDS_STOPPED_BY_SIGINT:
                 raise
-            # Caught, as SIGTERM, once the command has cleaned up; SIGINT is left ignored
-            # (commands/sigint.py).
+            # Caught, as SIGTERM, once the command has cleaned up. SIGINT is already ignored
+            # (commands/sigint.py), unless Ctrl-C came just outside its block: a second one
+            # would cut the line.
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
             logger.error("kb stopped by Ctrl-C (SIGINT)")
             log_stack.close()
             die_by_sigint()

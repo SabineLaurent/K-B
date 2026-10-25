@@ -51,12 +51,14 @@ relèvent l'erreur (`etl/load.py`, `database/creation.py`, `core/atomic_write.py
             if arguments.command not in COMMANDS_STOPPED_BY_SIGINT:
                 raise
             ...
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
             logger.error("kb stopped by Ctrl-C (SIGINT)")
             log_stack.close()
             die_by_sigint()
 ```
-(`src/k_b/cli.py:135-144`). Le cas des serveurs est relevé tel quel : leur comportement ne change pas. Pour
-les quatre commandes, SIGINT est déjà ignoré, et l'ordre compte : écrire la ligne au journal daté, fermer le
+(`src/k_b/cli.py:136-147`). Le cas des serveurs est relevé tel quel : leur comportement ne change pas. Pour
+les quatre commandes, SIGINT est en principe déjà ignoré. La ligne `SIG_IGN` couvre le cas d'un Ctrl-C arrivé
+juste hors du bloc de `stopping_on_sigint`. L'ordre compte : écrire la ligne au journal daté, fermer le
 journal, puis mourir.
 
 ### 3. Mourir par le signal, comme Python
@@ -89,12 +91,13 @@ code ne la prenne. `main` ne la rend que si le signal n'a pas arrêté le proces
 | `test_a_ctrl_c_during_kb_import_leaves_neither_the_import_nor_its_log` (`:70`) | La base est identique, ligne à ligne, et aucun journal d'import n'est laissé |
 | `test_kb_stops_on_the_first_ctrl_c_ignores_the_next_and_sets_the_handler_back` (`:100`) | Pour chacune des quatre commandes : le premier SIGINT lève, le second est ignoré, et le gestionnaire d'avant est remis quand l'exception est attrapée dans le bloc |
 | `test_once_stopped_by_ctrl_c_kb_keeps_ignoring_sigint_until_it_dies` (`:115`) | Arrêté par Ctrl-C, SIGINT reste ignoré en sortie |
-| `test_a_sigint_ignored_from_the_start_stays_ignored` (`:125`) | Un SIGINT ignoré au lancement le reste |
-| `test_the_other_commands_keep_the_sigint_handler_found`, `test_a_ctrl_c_out_of_kb_serve_data_is_left_to_python_as_before` (`:136`, `:143`) | Les serveurs, `create-db` et `openapi` ne changent pas |
+| `test_a_sigint_ignored_from_the_start_stays_ignored` (`:125`) | Un SIGINT ignoré au lancement le reste, même reçu dans le bloc |
+| `test_kb_collect_run_with_sigint_ignored_goes_on_through_a_ctrl_c` (`:136`) | De bout en bout : un `kb collect` qui ignore SIGINT passe le Ctrl-C, collecte la source suivante, sort en 0, sans ligne ni mort |
+| `test_the_other_commands_keep_the_sigint_handler_found`, `test_a_ctrl_c_out_of_kb_serve_data_is_left_to_python_as_before` (`:156`, `:163`) | Les serveurs, `create-db` et `openapi` ne changent pas |
 | `test_a_ctrl_c_while_a_sheet_is_written_stops_write_tops_and_deletes_no_ranking`, `test_a_ctrl_c_while_a_sheet_is_written_stops_digest_and_keeps_the_sheet` | Les fiches déjà écrites restent, et aucun relevé n'est supprimé, comme le README le promet |
-| `test_kb_collect_sent_sigint_in_its_own_process_dies_by_sigint` (`:161`) | Un vrai processus `kb collect` reçoit un vrai SIGINT : il meurt par le signal (`returncode == -2`), avec la ligne et sans trace |
-| Contre-épreuve : `die_by_sigint()` retiré de la CLI | 3 tests échouent, dont celui du vrai processus : il attrape le défaut de la première version |
-| `uv run pytest` : 2 627 réussis ; mypy, ruff verts | Rien d'autre n'a cassé |
+| `test_kb_collect_sent_sigint_in_its_own_process_dies_by_sigint` (`:181`) | Un vrai processus `kb collect` reçoit un vrai SIGINT : il meurt par le signal (`returncode == -2`), avec la ligne et sans trace. Le script du processus remet SIGINT comme un terminal le donne : un pytest lancé avec SIGINT ignoré ne fausse pas le test |
+| Contre-épreuve : `die_by_sigint()` retiré de la CLI | 5 tests échouent (collect, import, write-tops, digest, vrai processus) : celui du vrai processus attrape le défaut de la première version |
+| `uv run pytest` : 2 628 réussis ; mypy, ruff verts | Rien d'autre n'a cassé |
 
 ## Ce que tu dois pouvoir défendre
 
