@@ -18,6 +18,11 @@ from k_b.data_api.errors import ERROR_HANDLERS
 
 # The version of docs/specs-api.md: a change a client can see changes both.
 API_VERSION = "0.5.0"
+# Asked of every user of the arXiv API, "on your product" (arXiv API Access, 2026-10-25): the
+# data API serves its papers.
+ARXIV_ACKNOWLEDGEMENT = (
+    "Thank you to arXiv for use of its open access interoperability."
+)
 
 
 def create_app(
@@ -30,6 +35,7 @@ def create_app(
     app = FastAPI(
         title="K-B data API",
         version=API_VERSION,
+        description=ARXIV_ACKNOWLEDGEMENT,
         # On the app, not on a router: no data route can leave it out. /docs, /openapi.json and
         # /health are routes of Starlette, outside: they hold no data. ReDoc and the OAuth2
         # redirect of Swagger UI, which K-B does not use, are not served.
