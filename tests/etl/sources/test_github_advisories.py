@@ -19,7 +19,8 @@ from k_b.etl.sources.github_advisories import (
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_advisories_extract.json").read_bytes()
-# The recorded advisories were published and reviewed on 2026-05-13, 06-16 and 06-25.
+# The recorded advisories were published and reviewed on 2026-05-13, 06-16 and 06-25, and last
+# updated on 06-08, 07-08 and 06-25.
 BEFORE_ALL_ADVISORIES = datetime(2026, 5, 1, 0, 0, tzinfo=UTC)
 BETWEEN_ADVISORIES = datetime(2026, 6, 20, 0, 0, tzinfo=UTC)
 AFTER_ALL_ADVISORIES = datetime(2026, 6, 26, 0, 0, tzinfo=UTC)
@@ -68,17 +69,21 @@ def test_a_first_collection_asks_for_the_reviewed_advisories_of_the_packages(
         "type": "reviewed",
         "ecosystem": "pip",
         "affects": "langchain,langchain-core",
+        "sort": "updated",
         "per_page": "100",
     }
 
 
-def test_a_later_collection_asks_for_advisories_reviewed_from_the_day_before_the_last_one(
+def test_a_later_collection_asks_for_advisories_updated_from_the_day_before_the_last_one(
     fake_github_api,
 ):
     GithubAdvisoriesSource("pip", PACKAGES).fetch(last_collected_at=BETWEEN_ADVISORIES)
 
     query = query_of(fake_github_api.paths[0])
-    assert query["reviewed"] == ">=2026-06-19"
+    assert query["updated"] == ">=2026-06-19"
+    assert query["sort"] == "updated"
+    # The API ignores a filter it does not know, as reviewed: the whole page would come back.
+    assert "reviewed" not in query
     assert "published" not in query
 
 
@@ -126,8 +131,8 @@ def test_a_full_page_of_new_advisories_logs_the_count_read_and_the_oldest_date(
 
     [record] = caplog.records
     assert record.getMessage() == (
-        "github_advisories_pip: 3 advisories read, page size 3; oldest reviewed at "
-        "2026-05-13T15:29:30+00:00, after the last collection at "
+        "github_advisories_pip: 3 advisories read, page size 3; oldest updated at "
+        "2026-06-08T23:54:04+00:00, after the last collection at "
         "2026-05-01T00:00:00+00:00; next pages not read"
     )
 
@@ -170,6 +175,7 @@ def test_a_recorded_response_gives_one_advisory_per_entry_newest_first():
     assert newest.url == "https://github.com/advisories/GHSA-fjqc-hq36-qh5p"
     assert newest.published_at == datetime(2026, 6, 25, 18, 25, 42, tzinfo=UTC)
     assert newest.reviewed_at == datetime(2026, 6, 25, 18, 25, 42, tzinfo=UTC)
+    assert newest.updated_at == datetime(2026, 6, 25, 18, 25, 43, tzinfo=UTC)
     assert newest.summary
 
 
@@ -205,6 +211,7 @@ def test_a_response_that_is_not_a_list_is_refused():
         {"html_url": "https://evil.example.com/advisories/GHSA-fjqc-hq36-qh5p"},
         {"published_at": "2026-06-25T18:25:42"},
         {"github_reviewed_at": None},
+        {"updated_at": None},
         {"vulnerabilities": [{"package": {"name": 42}}]},
     ],
 )

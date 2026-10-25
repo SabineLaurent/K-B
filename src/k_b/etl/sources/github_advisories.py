@@ -51,17 +51,19 @@ class GithubAdvisoriesSource:
 
         Collections follow the review date, as GitHub may review an advisory days after
         publishing it; the packages are filtered in the request, as the whole ecosystem would
-        exceed a page."""
+        exceed a page. The API has no filter on the review date: the request filters and sorts on
+        the update date, never before the review date, then the review dates are compared."""
         query = {
             "type": "reviewed",
             "ecosystem": self.ecosystem,
             "affects": ",".join(self.packages),
+            "sort": "updated",
             "per_page": ADVISORIES_PER_PAGE,
         }
         if last_collected_at is not None:
             # The filter is checked to the day only: a day of margin, then the exact comparison.
             since = last_collected_at.astimezone(UTC).date() - timedelta(days=1)
-            query["reviewed"] = f">={since.isoformat()}"
+            query["updated"] = f">={since.isoformat()}"
         raw_response = get_from_github_api(f"advisories?{urlencode(query)}")
         # A page whose advisories are all invalid raises.
         reading = read_advisories(raw_response)
@@ -79,10 +81,11 @@ class GithubAdvisoriesSource:
             return None
         advisory_count = len(reading.entries) + len(reading.rejection_reasons)
         is_page_full = advisory_count >= ADVISORIES_PER_PAGE
-        oldest = min(review_dates)
+        # The page is sorted on the update date: older updates are on the next pages.
+        oldest = min(advisory.updated_at for advisory in reading.entries)
         if is_page_full and oldest > last_collected_at:
             logger.warning(
-                "%s: %d advisories read, page size %d; oldest reviewed at %s, after the last "
+                "%s: %d advisories read, page size %d; oldest updated at %s, after the last "
                 "collection at %s; next pages not read",
                 self.name,
                 advisory_count,
@@ -105,11 +108,13 @@ class Advisory:
     published_at: datetime
     # GitHub may review an advisory days after publishing it: collections follow this date.
     reviewed_at: datetime
+    # Never before the review date: collections filter and sort on it.
+    updated_at: datetime
     packages: tuple[str, ...]
 
 
 def read_advisories(raw_response: bytes) -> EntryReading[Advisory]:
-    """One advisory per valid entry of a `GET /advisories` response, newest first; an invalid one
+    """One advisory per valid entry of a `GET /advisories` response, in its order; an invalid one
     is rejected with its position."""
     entries = json.loads(raw_response)
     if not isinstance(entries, list):
@@ -152,6 +157,9 @@ def parse_advisory(entry: object, position: int) -> Advisory:
         ),
         reviewed_at=parse_aware_datetime(
             entry.get("github_reviewed_at"), f"{label}: github_reviewed_at"
+        ),
+        updated_at=parse_aware_datetime(
+            entry.get("updated_at"), f"{label}: updated_at"
         ),
         packages=parse_package_names(entry.get("vulnerabilities"), label),
     )

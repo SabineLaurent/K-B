@@ -151,9 +151,14 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   release nouvelle est invalide n'est pas écrite ; son rejet n'atteint le journal d'import
   qu'avec la page suivante écrite, tant qu'elle reste parmi les 100 dernières releases.
   Alertes collectées (PR de #11) : un brut par écosystème (`pip`, `npm`), relues par GitHub
-  depuis la veille de la dernière collecte (date de revue, pas de publication : GitHub relit
-  parfois une alerte des jours après l'avoir publiée), même avertissement si la page de 100 est
-  pleine. Une page qui porte une alerte invalide est écrite, même sans alerte valide nouvelle :
+  depuis la dernière collecte (date de revue, pas de publication : GitHub relit parfois une
+  alerte des jours après l'avoir publiée). L'API n'a pas de filtre sur la date de revue : la
+  requête filtre et trie sur la date de mise à jour (`updated`, depuis la veille de la dernière
+  collecte, `sort=updated`), jamais antérieure à la date de revue (vérifié sur 200 alertes le
+  2026-10-25), puis K-B compare les dates de revue à la dernière collecte. Avant le 2026-10-25,
+  K-B envoyait un filtre `reviewed` que l'API ignore : il recevait les 100 alertes les plus
+  récemment publiées. Avertissement si la page de 100 est pleine et que sa plus ancienne mise à
+  jour suit la dernière collecte. Une page qui porte une alerte invalide est écrite, même sans alerte valide nouvelle :
   l'alerte sort de la page à mesure que la fenêtre avance, et son rejet doit atteindre le journal
   d'import.
   Un écosystème dont la seule alerte de la fenêtre est invalide échoue à chaque collecte
