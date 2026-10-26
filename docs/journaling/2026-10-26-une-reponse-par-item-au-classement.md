@@ -214,6 +214,7 @@ nom, `not_retained`, qui est le contrat existant.
 | `test_a_subject_out_of_the_list_is_refused` (`test_digests.py`) | Une réponse hors liste donne `subject` ; chaque propriété du schéma porte les sujets plus `no_suitable_subject` |
 | le paramètre `TRAPPED_TWICE` du test de l'item piégé (`test_digests.py`) | Le doublon que demande le piège de #206 est refusé en `schema` |
 | `test_an_output_out_of_its_model_fails_the_schema_check[key-twice]`, `test_only_json_without_a_key_twice_is_read`, `test_an_output_nested_too_deep_fails_the_schema_check` (`tests/ai_api/test_llm_client.py`) | Une clé en double est refusée même quand la dernière valeur serait valide, à toute profondeur ; un JSON trop imbriqué donne `schema`, pas un 500 |
+| `test_the_classification_model_reads_every_answer_the_schema_allows` (`tests/ai_api/test_stages.py`) | Le schéma envoyé et le modèle qui lit la sortie restent liés : chaque valeur de chaque `enum`, sous chaque propriété obligatoire, passe la validation stricte |
 | `test_the_schema_of_a_full_batch_is_within_the_bounds_of_strict_mode` (`tests/ai_api/test_stages.py:246`) | Un lot plein (50 items, les 8 vrais sujets) tient sous 100 propriétés, 500 valeurs d'`enum` et 15 000 caractères |
 | `test_the_versioned_openapi_is_the_one_the_app_produces` (`tests/ai_api/test_ai_api_openapi.py`) | `docs/api/openapi-ia.json`, régénéré par `uv run kb openapi`, porte `unanswered` et la version 0.3.0 |
 | `uv run pytest` : 2 622 tests ; `ruff check`, `ruff format --check`, `mypy --strict` | Rien d'autre n'est cassé |
