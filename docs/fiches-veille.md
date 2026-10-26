@@ -323,7 +323,7 @@ champs où la fidélité cherche un fait (section « Fidélité ») :
   consigne dit les trois valeurs.
 - Une entrée retirée (`withdrawn_at` non nul : une vulnérabilité retirée du catalogue KEV) n'est
   pas envoyée : `GET /items` la sert sans filtre ([specs-api.md](specs-api.md), « Réponse »), et le
-  modèle la présenterait comme une entrée du catalogue. Elle est comptée dans `items_dropped_before_model`.
+  modèle la présenterait comme une entrée du catalogue. Elle est comptée dans `items_dropped_before_writing_stage`.
 - **Au classement**, chaque item n'envoie que `item_id`, `kind`, `title` et son texte long
   (`summary`, `description` ou `body`) coupé à 500 caractères : classer demande moins de texte que
   rédiger (jetons, délai).
@@ -337,7 +337,7 @@ champs où la fidélité cherche un fait (section « Fidélité ») :
   (#158 : 46 items, environ 5 500 jetons). Une `advisory`, sans texte long, est classée par son
   titre ; un `body` nul de release est envoyé nul.
 - `items_truncated` compte les items dont un champ est coupé à 2 000 caractères pour la
-  rédaction ; `items_dropped_before_model`, ceux laissés hors d'une fiche (au-delà de 60, retirés, ou disparus
+  rédaction ; `items_dropped_before_writing_stage`, ceux laissés hors d'une fiche (au-delà de 60, retirés, ou disparus
   entre la liste et le détail : 404 `item_not_found`). La coupe à 500 du classement n'y est pas
   comptée (presque tous les items y passent) : elle est comptée par appel, dans la ligne de
   métrique. **Limite** : la coupe et le plafond de 60 ne sont comptés que pour un sujet envoyé à
@@ -485,7 +485,7 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
   "unanswered": [],
   "items_in": 41,
   "items_truncated": 2,
-  "items_dropped_before_model": 0,
+  "items_dropped_before_writing_stage": 0,
   "items_capped": false
 }
 ```
@@ -499,12 +499,12 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
 | `digests[].claims` | les affirmations gardées après la fidélité, sans leurs `facts` (contrôle interne) |
 | `digests[].sources` | `item_id`, `kind`, `title`, `url` de chaque item des affirmations gardées, lus dans l'API de données, **jamais dans la sortie du modèle** ; une `url` qui ne commence ni par `http://` ni par `https://` est rendue nulle |
 | `digests[].items_not_retained_in_output` | les items envoyés pour ce sujet qu'aucune affirmation du modèle ne cite, calculés par le code |
-| `digests[].claims_removed` | affirmations retirées par la fidélité |
-| `digests[].items_removed_by_checks` | items du sujet qui ne sont plus cités après les retraits de la fidélité |
+| `digests[].claims_removed` | affirmations retirées par les contrôles (bornes ou fidélité) |
+| `digests[].items_removed_by_checks` | items du sujet qui ne sont plus cités après les retraits des contrôles (bornes ou fidélité) |
 | `failed_subjects` | chaque sujet en échec, son étape (`stage` : `write`, la rédaction) et son état nommé |
 | `no_suitable_subject` | items du classement auxquels aucun sujet ne convient : le modèle a répondu `no_suitable_subject` (champ nommé `not_retained` jusqu'à la version 0.2.0, qui y mêlait les items absents de la sortie) |
 | `unanswered` | items que le classement a laissés sans réponse, absents des fiches eux aussi (depuis la version 0.3.0 de l'API IA, `classify-2`) |
-| `items_in`, `items_truncated`, `items_dropped_before_model`, `items_capped` | compteurs de la section « Entrée du modèle » |
+| `items_in`, `items_truncated`, `items_dropped_before_writing_stage`, `items_capped` | compteurs de la section « Entrée du modèle » |
 
 **Limite** : `sources[].title` est une donnée de source, pas une sortie du modèle ; le filtre du
 Markdown ne s'y applique pas. `kb digest` l'écrit en texte dans la fiche (section « Fiches dans le
@@ -537,7 +537,7 @@ de la requête.
   un changement visible par un client change les deux. `0.1.0` : `POST /digests` (#156) ; `0.2.0` :
   `model` dans la réponse (#209) ; `0.3.0` : `unanswered`, et `not_retained` renommé
   `no_suitable_subject` (#210, `classify-2`) ; `0.4.0` : `items_dropped` renommé
-  `items_dropped_before_model`, `digests[].not_retained` renommé
+  `items_dropped_before_writing_stage`, `digests[].not_retained` renommé
   `digests[].items_not_retained_in_output`, `digests[].items_uncited` renommé
   `digests[].items_removed_by_checks` (décision de Sabine du 2026-10-26).
 
@@ -790,7 +790,7 @@ l'heure d'écriture, pas celle de l'appel. Un champ « nul » vaut `null` en JSO
 **Limites** (revue de code de #156, tranchées par time-knight, délégation de Sabine du
 2026-10-15) : une demande sans appel au modèle (fenêtre vide, ou échéance passée pendant la
 lecture, 504 `llm_timeout`) n'écrit aucune ligne, si bien que ses `data_fetch_ms`,
-`items_dropped_before_model` et `items_capped` ne sont nulle part : une ligne de mesures de la demande se
+`items_dropped_before_writing_stage` et `items_capped` ne sont nulle part : une ligne de mesures de la demande se
 conçoit avec les métriques de #162. Une exception imprévue pendant la rédaction (500
 `internal_error`, journalisé avec son `request_id`) perd les lignes des appels déjà faits : elles
 ne sont écrites qu'au retour du parcours.
@@ -806,7 +806,7 @@ ne sont écrites qu'au retour du parcours.
 | `prompt_version` | constante de la consigne utilisée (`classify-2`, `write-1`), changée à la main avec elle |
 | `items_in` | items envoyés dans l'appel |
 | `items_truncated` | items de cet appel dont un champ est coupé |
-| `items_dropped_before_model`, `items_capped` | compteurs de la demande (section « Entrée du modèle ») ; sur la première ligne de classement de la demande, nuls ailleurs |
+| `items_dropped_before_writing_stage`, `items_capped` | compteurs de la demande (section « Entrée du modèle ») ; sur la première ligne de classement de la demande, nuls ailleurs |
 | `input_chars` | longueur du message utilisateur |
 | `tokens_in`, `tokens_out` | `usage` rendu par le fournisseur |
 | `reasoning_tokens` | jetons de raisonnement rendus par le fournisseur, attendus à 0 avec `reasoning_effort: "none"` ; nul s'il ne les rend pas |
@@ -821,11 +821,12 @@ ne sont écrites qu'au retour du parcours.
 | `first_failed_check` | le contrôle qui a refusé la première tentative, quand une seconde a suivi ; nul sinon (#205, `LlmCall`, constat de #158 : le motif de la première tentative était perdu) |
 | `facts_checked`, `facts_found` | compteurs de la fidélité (rédaction, section « Fidélité », « Ce qui est compté ») ; nuls au classement et pour une rédaction en échec |
 | `fidelity_rate` | `facts_found` / `facts_checked`, arrondi à 4 décimales ; nul au classement, pour une rédaction en échec, et quand `facts_checked` vaut 0 |
-| `claims_removed`, `items_removed_by_checks` | compteurs de la fidélité (rédaction) ; nuls au classement |
+| `claims_removed`, `items_removed_by_checks` | compteurs des contrôles, bornes ou fidélité (rédaction) ; nuls au classement |
 | `items_with_subject`, `items_no_suitable_subject`, `items_unanswered` | compteurs du classement (section « Sortie du classement », « Trois cas ») : les items du lot qui ont reçu un sujet, ceux auxquels aucun sujet ne convient, et ceux que le modèle a laissés sans réponse, `items_in` à eux trois ; nuls à la rédaction, et pour un classement en échec |
 | `cost_estimated` | en USD, arrondi à 6 décimales : `tokens_in` et `tokens_out` × prix au million de `core/config.py` (gpt-6-luna, Data Zone Standard, France Central, contexte court : 0,12 et 0,60) ; 0 en offre gratuite. **Limite** : tout appel est compté à ces prix, le replay compris (ses jetons sont ceux de ses pas, `provider` le dit) et un autre `KB_LLM_MODEL` aussi |
 
-`ts`, `stage`, `failed_check`, `items_dropped_before_model`, `items_capped`, `reasoning_tokens` et `http_status`
+`ts`, `stage`, `failed_check`, `items_dropped_before_writing_stage` (nommé `items_dropped` avant 0.4.0), `items_capped`,
+`reasoning_tokens` et `http_status`
 s'ajoutent à la liste de #156, puis `first_failed_check` (#205), puis `fidelity_rate` (#207), puis
 `items_with_subject`, `items_no_suitable_subject` et `items_unanswered` (`classify-2`, #210).
 
@@ -933,7 +934,7 @@ client. Les traces sont l'objet de #281.
 
 - Les états `data_api_*` sont ceux de la lecture par l'API de données (#204). Un item disparu entre
   la liste et le détail (404 `item_not_found`) n'est pas un échec : il est sauté et compté
-  (`items_dropped_before_model`).
+  (`items_dropped_before_writing_stage`).
 - **Nouvelle tentative** (#150, `core/config.py`) : une au plus par appel. Après un 429, un 5xx
   ou une connexion refusée, elle attend `Retry-After` (en secondes ; une date HTTP compte comme un
   en-tête absent), ou `LLM_RETRY_WAIT_SECONDS` sans lui ; un `Retry-After` au-delà de

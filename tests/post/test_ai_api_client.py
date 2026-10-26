@@ -85,7 +85,7 @@ def make_response(digests=(AGENT_DIGEST,), failed_subjects=(), **changes):
         "unanswered": [],
         "items_in": 4,
         "items_truncated": 0,
-        "items_dropped_before_model": 0,
+        "items_dropped_before_writing_stage": 0,
         "items_capped": False,
     } | changes
     return DigestsSchema(**fields)

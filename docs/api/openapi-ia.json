@@ -249,9 +249,9 @@
             "type": "integer",
             "title": "Items Truncated"
           },
-          "items_dropped_before_model": {
+          "items_dropped_before_writing_stage": {
             "type": "integer",
-            "title": "Items Dropped Before Model"
+            "title": "Items Dropped Before Writing Stage"
           },
           "items_capped": {
             "type": "boolean",
@@ -269,7 +269,7 @@
           "unanswered",
           "items_in",
           "items_truncated",
-          "items_dropped_before_model",
+          "items_dropped_before_writing_stage",
           "items_capped"
         ],
         "title": "DigestsSchema"

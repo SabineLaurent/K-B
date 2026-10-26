@@ -81,5 +81,5 @@ class DigestsSchema(BaseModel):
     )
     items_in: int
     items_truncated: int
-    items_dropped_before_model: int
+    items_dropped_before_writing_stage: int
     items_capped: bool

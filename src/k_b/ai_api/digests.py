@@ -118,7 +118,7 @@ class DigestsResult:
     # Items with a field cut for the writing.
     items_truncated: int
     # Dropped by the reading, then beyond MAX_ITEMS_PER_DIGEST of a digest.
-    items_dropped_before_model: int
+    items_dropped_before_writing_stage: int
     items_capped: bool
     stage_calls: tuple[StageCall, ...]
 
@@ -156,7 +156,7 @@ def build_digests(
     failed_subjects: list[FailedSubject] = []
     stage_calls = list(classification.stage_calls)
     items_truncated = 0
-    items_dropped_before_model = reading.items_dropped_before_model
+    items_dropped_before_writing_stage = reading.items_dropped
     is_rate_limited = False
     for subject in subjects:
         subject_items = [
@@ -176,7 +176,7 @@ def build_digests(
             continue
         selection = select_for_writing(subject_items)
         items_truncated += selection.items_truncated
-        items_dropped_before_model += selection.items_dropped_before_model
+        items_dropped_before_writing_stage += selection.items_dropped
         llm_call = write_subject(
             http_client, settings, subject, selection.items, deadline
         )
@@ -218,7 +218,7 @@ def build_digests(
         unanswered=classification.unanswered,
         items_in=len(reading.items),
         items_truncated=items_truncated,
-        items_dropped_before_model=items_dropped_before_model,
+        items_dropped_before_writing_stage=items_dropped_before_writing_stage,
         items_capped=reading.items_capped,
         stage_calls=tuple(stage_calls),
     )

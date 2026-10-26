@@ -70,10 +70,10 @@ def post_digests(
         result.stage_calls,
         RequestMeasures(
             data_fetch_ms=data_fetch_ms,
-            items_dropped_before_model=(
-                reading.items_dropped_before_model
+            items_dropped_before_writing_stage=(
+                reading.items_dropped
                 if isinstance(result, ClassificationFailure)
-                else result.items_dropped_before_model
+                else result.items_dropped_before_writing_stage
             ),
             items_capped=reading.items_capped,
         ),
@@ -97,7 +97,7 @@ def post_digests(
         unanswered=list(result.unanswered),
         items_in=result.items_in,
         items_truncated=result.items_truncated,
-        items_dropped_before_model=result.items_dropped_before_model,
+        items_dropped_before_writing_stage=result.items_dropped_before_writing_stage,
         items_capped=result.items_capped,
     )
 

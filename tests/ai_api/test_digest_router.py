@@ -232,7 +232,7 @@ def test_a_request_gives_a_digest_per_subject_with_its_window_and_its_id(make_ai
     assert body["no_suitable_subject"] == NO_SUITABLE_SUBJECT_ITEMS
     assert (
         body["items_in"],
-        body["items_dropped_before_model"],
+        body["items_dropped_before_writing_stage"],
         body["items_capped"],
     ) == (
         10,
@@ -411,7 +411,10 @@ def test_a_classification_that_fails_fails_the_request_with_its_lines(
     assert (line["stage"], line["outcome"]) == ("classify", state)
     assert line["request_id"] == response.headers["X-Request-ID"]
     assert isinstance(line["data_fetch_ms"], int)
-    assert (line["items_dropped_before_model"], line["items_capped"]) == (0, False)
+    assert (line["items_dropped_before_writing_stage"], line["items_capped"]) == (
+        0,
+        False,
+    )
 
 
 def test_a_writing_that_fails_names_its_subject_and_the_others_are_returned(
@@ -491,7 +494,7 @@ METRIC_FIELDS = [
     "prompt_version",
     "items_in",
     "items_truncated",
-    "items_dropped_before_model",
+    "items_dropped_before_writing_stage",
     "items_capped",
     "input_chars",
     "tokens_in",
@@ -540,7 +543,7 @@ def test_each_call_writes_one_json_line_on_stdout_without_a_text(make_ai_api, ca
     assert isinstance(first["data_fetch_ms"], int)
     assert (
         first["items_in"],
-        first["items_dropped_before_model"],
+        first["items_dropped_before_writing_stage"],
         first["items_capped"],
     ) == (
         10,
@@ -564,7 +567,7 @@ def test_each_call_writes_one_json_line_on_stdout_without_a_text(make_ai_api, ca
     for line in others:
         assert (
             line["data_fetch_ms"],
-            line["items_dropped_before_model"],
+            line["items_dropped_before_writing_stage"],
             line["items_capped"],
         ) == (
             None,

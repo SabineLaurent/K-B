@@ -113,7 +113,7 @@ class WatchReading:
 
     items: tuple[WatchItem, ...]
     # Withdrawn from a catalog, or gone between the list and the detail.
-    items_dropped_before_model: int
+    items_dropped: int
     capped_kind: WatchKind | None
     covered_after: datetime | None
 
@@ -130,7 +130,7 @@ class WritingSelection:
     # Items with at least one field cut.
     items_truncated: int
     # Items beyond MAX_ITEMS_PER_DIGEST.
-    items_dropped_before_model: int
+    items_dropped: int
 
 
 def to_item_ref(item_id: int) -> str:
@@ -173,7 +173,7 @@ def select_for_writing(items: Iterable[WatchItem]) -> WritingSelection:
         items_truncated=sum(
             cut != item for cut, item in zip(cut_items, kept, strict=True)
         ),
-        items_dropped_before_model=len(ordered) - len(kept),
+        items_dropped=len(ordered) - len(kept),
     )
 
 
