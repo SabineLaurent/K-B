@@ -4205,7 +4205,71 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   réglages du modèle, des API et des sources mêlés, sans gain) ; la lecture dans `cli.py` (moins
   facile à trouver que dans le module qui porte le nom). — branche `refactor/read-environment-once`
 
+## 2026-10-26
+
+### Fiches de veille : une réponse par item au classement
+
+- **La sortie du classement est un objet avec une propriété obligatoire par item du lot, dans
+  son ordre : sa valeur est un sujet de la liste ou `no_suitable_subject` (consigne `classify-2`).
+  `no_suitable_subject` est un nom réservé (`NO_SUITABLE_SUBJECT_ANSWER`, `core/config.py`),
+  qu'aucun sujet ne peut prendre. Une clé JSON présente deux fois dans une sortie du modèle est
+  refusée (contrôle 2, `schema`, `is_json_without_key_twice` dans `llm_client.py`), aux deux étapes.** Plan
+  validé par Sabine le 2026-10-26, proposé par time-knight ; Sabine : « pour le moment on met une
+  case pour avancer ». Pourquoi : à l'essai 1 de #210 sur la veille réelle (2026-10-26, 268 items,
+  gpt-6-luna), le modèle a donné à deux items d'un lot de 50 articles TLDR à la fois un sujet et
+  « non retenu », aux deux tentatives ; le contrôle 5 a refusé le lot, et toute la demande a
+  échoué (502). Le rejeu du lot l'a montré, par les seuls identifiants. Le mode strict ne pouvait
+  pas l'interdire dans des listes : `uniqueItems` n'y est pas pris en charge (OpenAI et Azure).
+  Avec une propriété par item, cet état ne peut plus s'écrire. Pydantic garde sans le dire la
+  dernière valeur d'une clé répétée, d'où le refus explicite. La valeur dit au modèle pourquoi il
+  la choisit (« not suitable category », Sabine), au lieu de `not_retained`. Options écartées :
+  dédoublonner par le code (il réparerait en silence ce que le modèle écrit) ; laisser un lot en
+  échec sans faire échouer la demande (utile en plus, il ne corrige pas la cause, et les items du
+  lot seraient perdus) ; des lots plus petits (la probabilité baisse, le cas reste) ; une phrase
+  de plus dans la consigne (une règle en prose ne tient pas) ; un sujet secondaire par item (voir
+  les décisions encore ouvertes). Limites tenues par un test, les plus strictes connues : 100
+  propriétés d'objet par schéma (Azure), 500 valeurs d'`enum` et 15 000 caractères de chaînes
+  (erreurs d'OpenAI rapportées sur son forum) ; au plafond de 50 items et 8 sujets, 50 propriétés,
+  450 valeurs et environ 6 400 caractères. Limite assumée : un 10e sujet dépasserait 500 valeurs
+  et demanderait des lots plus petits. — PR de #210 (`classify-2`)
+- **Le classement distingue trois cas : catégorisé (un sujet), sans sujet adapté
+  (`no_suitable_subject`, un jugement du modèle, rendu dans `no_suitable_subject`) et non traité (aucune
+  réponse, un raté du modèle, rendu dans le champ nouveau `unanswered` de la réponse). Un item non
+  traité ne fait pas échouer le lot ; chaque ligne de métrique du classement compte
+  `items_with_subject`, `items_no_suitable_subject` et `items_unanswered`, en JSON et en
+  OpenTelemetry ; x + y + z = `items_in`. Le cas y porte partout le nom choisi par Sabine,
+  `no_suitable_subject` (« not suitable category », adapté au vocabulaire « sujet »), à la place de
+  `not_retained` dans la réponse.** Décision de Sabine du
+  2026-10-26 : « Quand il oublie l'item, rien. Du coup à la fin on a x items catégorisés, y items
+  avec aucune catégorie adaptée et z items non traités » ; « un item non traité est une forme de
+  raté quand même ». Pourquoi : un jugement et un raté sont deux choses ; les confondre ferait
+  passer une panne pour une décision, et rendrait impossible à mesurer le seuil « aucun item
+  oublié » des essais de #210. Un `items_no_suitable_subject` élevé dira aussi qu'il manque un sujet à la
+  liste fermée (Sabine). **Précise** la décision du 2026-10-15 (« La complétude est calculée par
+  le code », PR de #203) : un item absent n'est toujours pas un échec, mais il n'est plus confondu
+  avec un item non retenu. Options écartées : faire échouer le lot pour un item sans réponse (un
+  item perdu ferait tomber toutes les fiches ; proposé un temps dans la même PR) ; le compter
+  « non retenu » sans compteur (une panne passerait pour un jugement). La réponse de l'API IA passe
+  en version 0.3.0 (`unanswered` ajouté, `not_retained` renommé `no_suitable_subject` ; aucun client
+  ne lit ce champ, et `kb digest` ignore ceux qu'il ne connaît pas). Limite :
+  un item non traité n'est pas redemandé ; une seconde chance ciblée viendra si les essais en
+  montrent. **Une sortie qui ne répond à aucun item du lot (`{}`) est refusée** (`completeness`,
+  avec une nouvelle tentative) : elle ne trie rien, et vient d'un fournisseur qui ignore le mode
+  strict ; sans ce refus, tout le lot passerait en « non traité » et la demande rendrait un 200
+  vide (revue de code `high` de la PR, proposé par time-knight, confirmé par Sabine le 2026-10-26 :
+  « Je suis d'accord sur le principe »). Sabine, même jour : la seconde chance ciblée reste une
+  option, décidée sur ce que montrent les essais (« en fonction de ce qu'il se passe en vrai »).
+  — PR de #210 (`classify-2`)
+
 ## Décisions encore ouvertes
+
+- **Un sujet secondaire par item au classement** (2026-10-26, idée de Sabine) : une case de sujet
+  principal et une case de sujet secondaire, pour ne pas perdre qu'un item touche deux sujets.
+  Questions : à quoi servirait-il (une ligne « Voir aussi » dans la fiche, le wiki, l'annotation
+  des items en base) ; le modèle remplit-il à bon escient une case facultative ; tient-il sous les
+  limites du mode strict (deux propriétés par item, soit 100 pour un lot de 50, la limite d'Azure).
+  Rouvre « Un sujet par item » (2026-10-15, PR de #203), qui écartait plusieurs sujets par item
+  pour les doublons entre fiches. À décider après les essais de #210.
 
 - **Lecteurs maison ou pydantic-settings** (2026-10-21, gardés le 2026-10-25 « pour le moment ») :
   les lecteurs `read_…_or_refusal(environ)` de K-B, sans dépendance, contre pydantic-settings, la

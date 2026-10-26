@@ -217,7 +217,8 @@ MAX_FIELD_CHARS_FOR_WRITING = 2000
 # of the reading, each of 50 items and 36,000 characters of user message at most, about 9,000
 # input tokens (#158: 46 items took about 5,500). 300 items make 6 batches, up to about 10 when
 # the titles are long. The long text of an item is cut to 500 characters: sorting needs less text
-# than writing.
+# than writing. The schema of a batch has one property per item, within the bounds of strict mode
+# that tests/ai_api/test_stages.py keeps.
 MAX_ITEMS_PER_CLASSIFICATION_CALL = 50
 MAX_CLASSIFICATION_INPUT_CHARS = 36_000
 MAX_FIELD_CHARS_FOR_CLASSIFICATION = 500
@@ -270,6 +271,9 @@ DIGEST_SUBJECTS = (
         "outils, langages et pratiques de développement hors IA",
     ),
 )
+# The answer of the classification for an item that no subject suits, then not retained: a
+# reserved name, no subject of DIGEST_SUBJECTS may take it (a test keeps it).
+NO_SUITABLE_SUBJECT_ANSWER = "no_suitable_subject"
 
 # The folder of the vault that kb writes (ADR of 2026-10-19, "Coffre : organisation"): the digests
 # of each subject in veille/<subject>/ (#209), the sheets of the top rankings in veille/tops/.

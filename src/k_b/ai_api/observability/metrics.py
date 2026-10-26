@@ -98,6 +98,9 @@ def build_llm_call_line(
         ),
         "claims_removed": stage_call.claims_removed,
         "items_uncited": stage_call.items_uncited,
+        "items_with_subject": stage_call.items_with_subject,
+        "items_no_suitable_subject": stage_call.items_no_suitable_subject,
+        "items_unanswered": stage_call.items_unanswered,
         "cost_estimated": estimate_cost(call.tokens_in, call.tokens_out),
     }
 

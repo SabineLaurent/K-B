@@ -34,6 +34,7 @@ from k_b.core.config import (
     LLM_INPUT_USD_PER_MILLION_TOKENS,
     LLM_OUTPUT_USD_PER_MILLION_TOKENS,
     LLM_REPLAY_BASE_URL,
+    NO_SUITABLE_SUBJECT_ANSWER,
     DigestSubject,
 )
 from k_b.data_api.app import create_app as create_data_app
@@ -63,7 +64,7 @@ WINDOW_DAYS = 14
 SECURITY_ITEMS = [3, 4]
 AGENT_ITEMS = [6, 7, 8]
 RESEARCH_ITEMS = [2, 1]
-NOT_RETAINED = [12, 11, 13]
+NO_SUITABLE_SUBJECT_ITEMS = [12, 11, 13]
 # Facts copied from the items of the test base: the CVE of vulnerability 3, the tag of release 6.
 SECURITY_CLAIM = {
     "text": "La faille CVE-2026-86950 touche des produits Apple.",
@@ -93,21 +94,18 @@ def classified(
     security=SECURITY_ITEMS,
     agent=AGENT_ITEMS,
     research=RESEARCH_ITEMS,
-    not_retained=NOT_RETAINED,
+    no_suitable_subject=NO_SUITABLE_SUBJECT_ITEMS,
 ):
-    assignments = [
-        {"item_id": f"i{item_id}", "subject": subject}
-        for subject, item_ids in (
-            ("security_alerts", security),
-            ("agent_tools", agent),
-            ("research", research),
-        )
-        for item_id in item_ids
-    ]
     return completion(
         {
-            "assignments": assignments,
-            "not_retained": [f"i{item_id}" for item_id in not_retained],
+            f"i{item_id}": answer
+            for answer, item_ids in (
+                ("security_alerts", security),
+                ("agent_tools", agent),
+                ("research", research),
+                (NO_SUITABLE_SUBJECT_ANSWER, no_suitable_subject),
+            )
+            for item_id in item_ids
         }
     )
 
@@ -231,7 +229,7 @@ def test_a_request_gives_a_digest_per_subject_with_its_window_and_its_id(make_ai
     assert security["not_retained"] == [4]
     assert body["digests"][2]["claims"] == []
     assert body["failed_subjects"] == []
-    assert body["not_retained"] == NOT_RETAINED
+    assert body["no_suitable_subject"] == NO_SUITABLE_SUBJECT_ITEMS
     assert (body["items_in"], body["items_dropped"], body["items_capped"]) == (
         10,
         0,
@@ -243,7 +241,7 @@ def test_a_request_gives_a_digest_per_subject_with_its_window_and_its_id(make_ai
 def test_a_request_without_window_takes_the_window_of_the_settings(make_ai_api, body):
     # Over 3 days, the newsletter articles 12 and 11 only.
     client, _ = make_ai_api(
-        [classified([], [], [], not_retained=[12, 11])], default_window_days=3
+        [classified([], [], [], no_suitable_subject=[12, 11])], default_window_days=3
     )
 
     response = post_digests(client, body)
@@ -510,6 +508,9 @@ METRIC_FIELDS = [
     "fidelity_rate",
     "claims_removed",
     "items_uncited",
+    "items_with_subject",
+    "items_no_suitable_subject",
+    "items_unanswered",
     "cost_estimated",
 ]
 
@@ -539,6 +540,19 @@ def test_each_call_writes_one_json_line_on_stdout_without_a_text(make_ai_api, ca
         False,
     )
     assert (first["claims_removed"], first["items_uncited"]) == (None, None)
+    # The three cases of the classification: 5 items given a subject, 3 that no subject
+    # suits, none left without answer.
+    assert (
+        first["items_with_subject"],
+        first["items_no_suitable_subject"],
+        first["items_unanswered"],
+    ) == (7, 3, 0)
+    # Each item of the call is in one case, and in one only.
+    assert (
+        first["items_with_subject"]
+        + first["items_no_suitable_subject"]
+        + first["items_unanswered"]
+    ) == first["items_in"]
     for line in others:
         assert (line["data_fetch_ms"], line["items_dropped"], line["items_capped"]) == (
             None,
@@ -546,6 +560,12 @@ def test_each_call_writes_one_json_line_on_stdout_without_a_text(make_ai_api, ca
             None,
         )
     assert (others[0]["claims_removed"], others[0]["items_uncited"]) == (0, 0)
+    for line in others:
+        assert (
+            line["items_with_subject"],
+            line["items_no_suitable_subject"],
+            line["items_unanswered"],
+        ) == (None, None, None)
     # The counters of the fidelity: null at the classification, null rate without fact.
     assert [
         (line["facts_checked"], line["facts_found"], line["fidelity_rate"])
@@ -712,6 +732,18 @@ def test_each_call_is_measured_in_opentelemetry_as_on_its_line(
     )
     assert find_point(points, "k_b.digest.items_uncited") == sum(
         line["items_uncited"] for line in writes
+    )
+    assert (
+        find_point(points, "k_b.digest.items_with_subject")
+        == classify["items_with_subject"]
+    )
+    assert (
+        find_point(points, "k_b.digest.items_no_suitable_subject")
+        == classify["items_no_suitable_subject"]
+    )
+    assert (
+        find_point(points, "k_b.digest.items_unanswered")
+        == classify["items_unanswered"]
     )
     assert find_point(points, "k_b.digest.facts_checked") == sum(
         line["facts_checked"] for line in writes
