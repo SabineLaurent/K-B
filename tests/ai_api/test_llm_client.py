@@ -13,7 +13,7 @@ from k_b.ai_api.connectors.llm_client import (
     FailedCheck,
     build_http_client,
     call_model,
-    has_key_twice,
+    is_json_without_key_twice,
     summarize,
     to_failure,
 )
@@ -309,19 +309,28 @@ def test_an_output_out_of_its_model_fails_the_schema_check(content):
 
 
 @pytest.mark.parametrize(
-    ("content", "is_found"),
+    ("content", "is_read"),
     [
-        ('{"i1": "a", "i1": "b"}', True),
-        ('{"claims": [{"text": "a", "text": "b"}]}', True),
-        ('{"i1": "a", "i2": "a"}', False),
+        ('{"i1": "a", "i1": "b"}', False),
+        ('{"claims": [{"text": "a", "text": "b"}]}', False),
+        ('{"i1": "a", "i2": "a"}', True),
+        # A text json cannot read is refused too: fail closed, never left to Pydantic alone.
         ("not JSON", False),
-        # json raises RecursionError, not ValueError: left to the schema check, never a 500.
+        ("\ufeff{}", False),
+        # json raises RecursionError, not ValueError: refused, never a 500.
         ("[" * 100_000, False),
     ],
-    ids=["at-the-top", "nested", "same-value-twice", "not-json", "nested-too-deep"],
+    ids=[
+        "key-twice-at-the-top",
+        "key-twice-nested",
+        "same-value-twice",
+        "not-json",
+        "leading-bom",
+        "nested-too-deep",
+    ],
 )
-def test_a_key_twice_is_found_at_any_depth(content, is_found):
-    assert has_key_twice(content) is is_found
+def test_only_json_without_a_key_twice_is_read(content, is_read):
+    assert is_json_without_key_twice(content) is is_read
 
 
 def test_an_output_nested_too_deep_fails_the_schema_check():

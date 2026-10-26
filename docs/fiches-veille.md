@@ -360,7 +360,7 @@ identifiant (consigne `classify-2`) :
 |---|---|
 | propriétés | une par item envoyé dans cet appel, dans l'ordre du lot, **toutes dans `required`** ; `additionalProperties: false` |
 | valeur | `enum` des sujets de `core/config.py`, plus `no_suitable_subject` (`NO_SUITABLE_SUBJECT_ANSWER`, nom réservé : aucun sujet ne peut le prendre, un test le tient) |
-| ensemble | en mode strict, chaque item envoyé reçoit **exactement une** réponse ; le code revérifie (contrôles 2 à 4) et compte un item sans réponse |
+| ensemble | en mode strict, chaque item envoyé reçoit **exactement une** réponse ; le code revérifie (contrôles 2 à 5) et compte un item sans réponse parmi d'autres |
 
 **Trois cas à la sortie** (décision de Sabine du 2026-10-26) :
 
@@ -371,12 +371,14 @@ identifiant (consigne `classify-2`) :
 | non traité | ne répond rien pour l'item : un **raté** du modèle | `unanswered` | `items_unanswered` |
 
 Un item non traité ne fait pas échouer le lot : les autres réponses du lot sont bonnes, et la
-demande continue. Une sortie qui ne répond à aucun item, en revanche, ne trie rien : elle est
-refusée (contrôle 5), avec une nouvelle tentative (revue de code de la PR de `classify-2`). Il est compté à part, pour ne pas passer pour un jugement. En mode strict, il ne
+demande continue. Il est compté à part, pour ne pas passer pour un jugement. En mode strict, il ne
 devrait pas exister : un `items_unanswered` au-dessus de 0 se voit dans les métriques, et manque le
 seuil « aucun item oublié » des essais de #210. Un `items_not_retained` élevé peut dire qu'il manque
-un sujet à la liste fermée. **Limite** : un item non traité n'est pas redemandé ; une seconde
-chance ciblée (redemander les seuls items oubliés, une fois) viendra si des essais en montrent.
+un sujet à la liste fermée. Une sortie qui ne répond à **aucun** item, en revanche, ne trie rien :
+elle n'est pas comptée, elle est refusée (contrôle 5), avec une nouvelle tentative (revue de code
+de la PR de `classify-2`). **Limite** : un item non traité parmi d'autres n'est pas redemandé ; une
+seconde chance ciblée (redemander les seuls items oubliés, une fois) viendra si des essais en
+montrent.
 
 **Pourquoi une propriété par item** (essai 1 de #210, 2026-10-26, sur la veille réelle). Avec
 `classify-1`, la sortie était deux listes, `assignments` (`item_id`, `subject`) et `not_retained`.
@@ -539,7 +541,7 @@ par du code déterministe).
 | N° | Contrôle | Refuse | `failed_check` |
 |---|---|---|---|
 | 1 | `finish_reason` (liste blanche) | `stop` passe ; `length` → `llm_truncated` ; `content_filter` → `llm_content_filtered` ; toute autre valeur → `llm_invalid_output` (échouer fermé sur une valeur inconnue, `tool_calls` compris) | `content_filter` pour un filtrage ; `finish_reason` pour une valeur hors liste |
-| 2 | **Schéma** | un texte qui n'est pas du JSON, une clé deux fois dans un même objet (Pydantic garderait la dernière valeur sans le dire : un item répondu deux fois passerait pour un item répondu une fois ; `has_key_twice`, `llm_client.py`), un champ en trop (`extra="forbid"`), un type faux, une borne de structure dépassée (plus de 12 affirmations, `item_ids` hors de 1 à 5) | `schema` |
+| 2 | **Schéma** | un texte qui n'est pas du JSON, une clé deux fois dans un même objet (Pydantic garderait la dernière valeur sans le dire : un item répondu deux fois passerait pour un item répondu une fois ; `is_json_without_key_twice`, `llm_client.py`), un champ en trop (`extra="forbid"`), un type faux, une borne de structure dépassée (plus de 12 affirmations, `item_ids` hors de 1 à 5) | `schema` |
 | 3 | **Sujets** | un sujet hors de la liste de `core/config.py` (au classement : une réponse qui n'est ni un sujet de la liste ni `no_suitable_subject`) | `subject` |
 | 4 | **`item_id`** | un identifiant qui n'a pas été envoyé dans **cet** appel (un item inventé, ou d'un autre sujet) ; un `facts[].item_id` hors des `item_ids` de son affirmation | `item_id` |
 | 5 | **Complétude** (classement) | une sortie qui ne répond à **aucun** item du lot (`{}`, un fournisseur qui ignore le mode strict) ; un item sans réponse parmi d'autres n'est pas refusé, il est compté à part (`unanswered`, `items_unanswered`) ; un item répondu deux fois est refusé par le contrôle 2 (avant `classify-2`, le contrôle 5 refusait un item présent deux fois) | `completeness` |

@@ -4213,7 +4213,7 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   son ordre : sa valeur est un sujet de la liste ou `no_suitable_subject` (consigne `classify-2`).
   `no_suitable_subject` est un nom réservé (`NO_SUITABLE_SUBJECT_ANSWER`, `core/config.py`),
   qu'aucun sujet ne peut prendre. Une clé JSON présente deux fois dans une sortie du modèle est
-  refusée (contrôle 2, `schema`, `has_key_twice` dans `llm_client.py`), aux deux étapes.** Plan
+  refusée (contrôle 2, `schema`, `is_json_without_key_twice` dans `llm_client.py`), aux deux étapes.** Plan
   validé par Sabine le 2026-10-26, proposé par time-knight ; Sabine : « pour le moment on met une
   case pour avancer ». Pourquoi : à l'essai 1 de #210 sur la veille réelle (2026-10-26, 268 items,
   gpt-6-luna), le modèle a donné à deux items d'un lot de 50 articles TLDR à la fois un sujet et

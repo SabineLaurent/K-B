@@ -151,28 +151,30 @@ jugement. Chaque ligne de métrique du classement porte les deux compteurs
 
 ### 5. Une clé présente deux fois est refusée
 
-`src/k_b/ai_api/connectors/llm_client.py:440-456`
+`src/k_b/ai_api/connectors/llm_client.py:442-456`
 
 ```python
     try:
         json.loads(content, object_pairs_hook=refuse_key_twice)
-    except KeyTwiceError:
-        return True
     except (ValueError, RecursionError):
         return False
+    return True
 ```
 
 En JSON, rien n'interdit d'écrire deux fois la même clé dans un objet (`{"i1": "a", "i1": "b"}`).
 Pydantic garde alors la dernière valeur **sans rien signaler** : c'est vérifié en séance avec
 Pydantic 2.13.5. Le doublon de l'essai 1 serait réparé en silence.
 
-`has_key_twice` relit le texte avec la bibliothèque standard : `object_pairs_hook` reçoit les
-paires (clé, valeur) de chaque objet, à toutes les profondeurs, avant qu'elles ne deviennent un
-dictionnaire, et `refuse_key_twice` lève une exception dès qu'une clé revient. Un texte que `json`
-ne lit pas (`ValueError`), ou trop imbriqué pour lui (`RecursionError`), est laissé au contrôle 2,
-que fait ensuite Pydantic. Sans le `RecursionError`, une sortie `[[[[…` aurait remonté jusqu'à la
-route et donné un 500 au lieu d'un refus. L'appel se fait avant la validation, aux deux étapes
-(`llm_client.py:414`) : le refus devient `schema`, avec une nouvelle tentative.
+`is_json_without_key_twice` relit le texte avec la bibliothèque standard : `object_pairs_hook`
+reçoit les paires (clé, valeur) de chaque objet, à toutes les profondeurs, avant qu'elles ne
+deviennent un dictionnaire, et `refuse_key_twice` lève `KeyTwiceError` (une `ValueError`) dès
+qu'une clé revient. La fonction **échoue fermé** : un texte que `json` ne lit pas (`ValueError`)
+ou trop imbriqué pour lui (`RecursionError`) est refusé lui aussi, puisqu'une sortie valide du
+modèle est toujours du JSON. Une première version le laissait à Pydantic : la revue de code
+(niveau `high`) l'a relevé, et la règle « Échouer fermé » de `code.md` l'impose. Sans le
+`RecursionError`, une sortie `[[[[…` aurait remonté jusqu'à la route et donné un 500 au lieu d'un
+refus. L'appel se fait avant la validation, aux deux étapes (`llm_client.py:414`) : le refus
+devient `schema`, avec une nouvelle tentative.
 
 ### 6. `no_suitable_subject`, un nom réservé
 
@@ -211,7 +213,7 @@ nom, `not_retained`, qui est le contrat existant.
 | le test des compteurs OpenTelemetry (`test_digest_router.py`) | `k_b.digest.items_not_retained` et `k_b.digest.items_unanswered` reprennent la ligne JSON |
 | `test_a_subject_out_of_the_list_is_refused` (`test_digests.py`) | Une réponse hors liste donne `subject` ; chaque propriété du schéma porte les sujets plus `no_suitable_subject` |
 | le paramètre `TRAPPED_TWICE` du test de l'item piégé (`test_digests.py`) | Le doublon que demande le piège de #206 est refusé en `schema` |
-| `test_an_output_out_of_its_model_fails_the_schema_check[key-twice]`, `test_a_key_twice_is_found_at_any_depth`, `test_an_output_nested_too_deep_fails_the_schema_check` (`tests/ai_api/test_llm_client.py`) | Une clé en double est refusée même quand la dernière valeur serait valide, à toute profondeur ; un JSON trop imbriqué donne `schema`, pas un 500 |
+| `test_an_output_out_of_its_model_fails_the_schema_check[key-twice]`, `test_only_json_without_a_key_twice_is_read`, `test_an_output_nested_too_deep_fails_the_schema_check` (`tests/ai_api/test_llm_client.py`) | Une clé en double est refusée même quand la dernière valeur serait valide, à toute profondeur ; un JSON trop imbriqué donne `schema`, pas un 500 |
 | `test_the_schema_of_a_full_batch_is_within_the_bounds_of_strict_mode` (`tests/ai_api/test_stages.py:246`) | Un lot plein (50 items, les 8 vrais sujets) tient sous 100 propriétés, 500 valeurs d'`enum` et 15 000 caractères |
 | `test_the_versioned_openapi_is_the_one_the_app_produces` (`tests/ai_api/test_ai_api_openapi.py`) | `docs/api/openapi-ia.json`, régénéré par `uv run kb openapi`, porte `unanswered` et la version 0.3.0 |
 | `uv run pytest` : 2 622 tests ; `ruff check`, `ruff format --check`, `mypy --strict` | Rien d'autre n'est cassé |
@@ -224,7 +226,7 @@ nom, `not_retained`, qui est le contrat existant.
 2. **Si le mode strict garantit déjà tout, pourquoi les contrôles ?** Parce que le code ne s'y fie
    pas : un autre fournisseur, ou le replay, rend ce qu'il veut. Les contrôles refusent un
    doublon, une réponse hors liste, un item inventé, une sortie vide (`classification.py:176-185`,
-   `llm_client.py:440`), et l'item oublié est compté (`digests.py:270-286`).
+   `llm_client.py:442`), et l'item oublié est compté (`digests.py:270-286`).
 3. **Pourquoi refuser une clé en double, puisque le JSON l'accepte ?** Parce que Pydantic garderait
    la dernière valeur sans rien dire : on ne saurait pas que le modèle a hésité, et le code
    choisirait à sa place.
@@ -248,10 +250,9 @@ nom, `not_retained`, qui est le contrat existant.
   sur le forum d'OpenAI (sources secondaires) ; la page Azure ne donne aucune limite d'`enum`, et
   la doc OpenAI relevée le 16/10 disait 1 000 valeurs. Le test applique les chiffres les plus
   stricts, et compte chaque sous-schéma répété une fois par propriété : c'est le pire cas.
-- **`json.loads` et Pydantic ne lisent pas exactement les mêmes textes** : un texte lisible par
-  Pydantic mais pas par `json` (un BOM en tête, par exemple) saute la recherche de clés en double,
-  et Pydantic garderait alors la dernière valeur. La revue de sécurité (effort `high`) juge cet
-  écart sans effet sur la sécurité : la valeur reste dans la liste fermée. Non corrigé.
+- **`json.loads` et Pydantic ne lisent pas exactement les mêmes textes** (`NaN`, lu par `json`
+  et refusé par Pydantic, vérifié en séance). L'écart ne laisse plus rien passer : un texte que
+  `json` refuse est refusé, et un texte qu'il lit passe ensuite Pydantic.
 - **Le coût en jetons de la nouvelle sortie** (environ 10 jetons par item, estimé) n'est pas
   mesuré ; `CLASSIFICATION_MAX_COMPLETION_TOKENS` reste à 2 048, une large marge.
 

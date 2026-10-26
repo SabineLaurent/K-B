@@ -235,6 +235,13 @@ def classify(
             return ClassificationFailure("llm_timeout", None, tuple(stage_calls))
         llm_call = classify_batch(http_client, settings, batch, subjects, deadline)
         answers = None if llm_call.output is None else llm_call.output.root
+        # The answer of each item of the batch, None for an item left without: counted by the
+        # same rule as the three cases of the request below.
+        batch_answers = (
+            None
+            if answers is None
+            else [answers.get(to_item_ref(item.item_id)) for item in batch.items]
+        )
         stage_calls.append(
             StageCall(
                 stage="classify",
@@ -247,11 +254,11 @@ def classify(
                 claims_removed=None,
                 items_uncited=None,
                 items_not_retained=None
-                if answers is None
-                else sum(a == NO_SUITABLE_SUBJECT_ANSWER for a in answers.values()),
+                if batch_answers is None
+                else batch_answers.count(NO_SUITABLE_SUBJECT_ANSWER),
                 items_unanswered=None
-                if answers is None
-                else sum(to_item_ref(i.item_id) not in answers for i in batch.items),
+                if batch_answers is None
+                else batch_answers.count(None),
                 llm_call=llm_call,
             )
         )
