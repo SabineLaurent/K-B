@@ -438,9 +438,8 @@ class KeyTwiceError(ValueError):
 
 
 def has_key_twice(content: str) -> bool:
-    """Whether an object of the JSON content holds a key twice: Pydantic keeps the last value
-    without a word, and an item answered twice would pass for an item answered once. A text that
-    is not JSON, or nested too deep for json, is left to the schema check."""
+    """Whether an object of the JSON content holds a key twice, which Pydantic would take without
+    a word; a text json cannot read is left to the schema check."""
     try:
         json.loads(content, object_pairs_hook=refuse_key_twice)
     except KeyTwiceError:

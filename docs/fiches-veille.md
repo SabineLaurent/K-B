@@ -211,12 +211,18 @@ rend les `item_id` entiers de l'API de données.
 **Schéma portable.** Le `json_schema` envoyé au modèle n'utilise que ce que les fournisseurs
 acceptent en mode strict : `additionalProperties: false`, **tous** les champs dans `required`, et
 ni `minLength`, ni `maxLength`, ni `minItems`, ni `maxItems` (Azure les refuse en mode strict).
-Les bornes de ce document sont vérifiées par le code. Limites : 1 000 valeurs d'`enum` au plus par
-schéma (OpenAI, structured outputs) et 100 propriétés d'objet (Azure, [structured
+Les bornes de ce document sont vérifiées par le code. Limites, les plus strictes connues : 100
+propriétés d'objet par schéma (Azure, [structured
 outputs](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs), page du
-2026-08-24, lue le 2026-10-26). Le schéma du classement porte une propriété par item du lot
-(`classify-2`) : au plafond de 50 items et 8 sujets, 50 propriétés et 50 × 9 = 450 valeurs
-d'`enum`, sous les deux limites ; un test les tient (`tests/ai_api/test_stages.py`).
+2026-08-24, lue le 2026-10-26, qui ne donne pas de limite d'`enum`) ; 500 valeurs d'`enum` et
+15 000 caractères de noms de propriétés et de valeurs d'`enum`, d'après des erreurs d'OpenAI
+rapportées sur son forum ([500 valeurs](https://community.openai.com/t/500-enums-limitation-in-structured-output/974416),
+[15 000 caractères](https://community.openai.com/t/possible-structured-output-schema-length-error-bug-in-api/984509),
+lus le 2026-10-26 ; la doc relevée le 2026-10-16 disait 1 000 valeurs, voir « Sources »). Le
+schéma du classement porte une propriété par item du lot (`classify-2`) : au plafond de 50 items
+et 8 sujets, 50 propriétés, 50 × 9 = 450 valeurs d'`enum` et environ 6 400 caractères, sous les
+trois limites ; un test les tient (`tests/ai_api/test_stages.py`). Un 10e sujet (550 valeurs)
+ferait échouer ce test avant tout appel réel : il faudrait alors des lots plus petits.
 
 **Réglages d'appel**, lus dans la configuration (#150) : `reasoning_effort: "none"`
 (`KB_LLM_REASONING_EFFORT=none`) pour un modèle à raisonnement, sinon `temperature=0`. Mesure de

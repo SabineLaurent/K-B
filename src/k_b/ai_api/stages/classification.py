@@ -71,9 +71,8 @@ LONG_TEXT_FIELD_BY_KIND: Mapping[WatchKind, str | None] = {
 
 
 class ClassificationOutput(RootModel[dict[str, str]]):
-    """The output of the model, the answer for each item of the batch by its item_id: the name of
-    a subject or NOT_RETAINED_ANSWER; the enums are in the schema sent, and checked again by
-    check_classification."""
+    """The answer of the model for each item of the batch, by its item_id: a subject or
+    NOT_RETAINED_ANSWER."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -154,12 +153,14 @@ def build_classification_schema(
     item_refs: Sequence[str], subject_names: Sequence[str]
 ) -> dict[str, object]:
     """The schema sent, written by hand to be portable in strict mode: one required property per
-    item of the batch, in its order, so that the model answers each item once, neither twice nor
-    never (strict mode has no uniqueItems)."""
-    answer = {"type": "string", "enum": [*subject_names, NOT_RETAINED_ANSWER]}
+    item, so that each item is answered once (strict mode has no uniqueItems)."""
+    answers = [*subject_names, NOT_RETAINED_ANSWER]
     return {
         "type": "object",
-        "properties": {item_ref: answer for item_ref in item_refs},
+        "properties": {
+            item_ref: {"type": "string", "enum": list(answers)}
+            for item_ref in item_refs
+        },
         "required": list(item_refs),
         "additionalProperties": False,
     }
@@ -171,7 +172,7 @@ def check_classification(
     subject_names: frozenset[str],
 ) -> FailedCheck | None:
     """Checks 3 (subjects), 4 (items of this batch) and 5 (each item answered), in order; an item
-    answered twice is refused before, as a key twice (llm_client.check_completion)."""
+    answered twice fails check 2 before."""
     answers = output.root
     if any(
         answer not in subject_names and answer != NOT_RETAINED_ANSWER

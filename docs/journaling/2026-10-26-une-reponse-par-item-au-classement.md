@@ -33,17 +33,24 @@ sortie pour que le doublon ne puisse plus s'écrire.
 
 ### 1. Une propriété obligatoire par item
 
-`src/k_b/ai_api/stages/classification.py:159-165`
+`src/k_b/ai_api/stages/classification.py:157-167`
 
 ```python
-    answer = {"type": "string", "enum": [*subject_names, NOT_RETAINED_ANSWER]}
+    answers = [*subject_names, NOT_RETAINED_ANSWER]
     return {
         "type": "object",
-        "properties": {item_ref: answer for item_ref in item_refs},
+        "properties": {
+            item_ref: {"type": "string", "enum": list(answers)}
+            for item_ref in item_refs
+        },
         "required": list(item_refs),
         "additionalProperties": False,
     }
 ```
+
+Chaque propriété reçoit son propre sous-schéma, et sa propre copie de la liste
+(`list(answers)`). Une première version partageait un seul dictionnaire entre les 50 propriétés :
+la revue de code l'a relevé, car une modification de l'une les aurait toutes changées.
 
 Le schéma envoyé au modèle n'a plus de liste. Il a une propriété par item du lot (`"i2838"`),
 toutes dans `required`, et aucune autre (`additionalProperties: false`). Chaque valeur est prise
@@ -72,7 +79,7 @@ revérifient.
 
 ### 3. Les contrôles 3 à 5 revérifient tout
 
-`src/k_b/ai_api/stages/classification.py:175-185`
+`src/k_b/ai_api/stages/classification.py:176-185`
 
 ```python
     answers = output.root
@@ -99,7 +106,7 @@ Le dernier est nouveau : avec `classify-1`, un item absent était compté « non
 
 ### 4. Une clé présente deux fois est refusée
 
-`src/k_b/ai_api/connectors/llm_client.py:440-457`
+`src/k_b/ai_api/connectors/llm_client.py:440-456`
 
 ```python
     try:
@@ -159,7 +166,7 @@ avant.
 | le paramètre `TRAPPED_TWICE` du test de l'item piégé (`test_digests.py`) | Le doublon que demande le piège de #206 est refusé en `schema` |
 | `test_an_output_out_of_its_model_fails_the_schema_check[key-twice]` (`tests/ai_api/test_llm_client.py`) | Une clé en double est refusée même quand la dernière valeur serait valide |
 | `test_a_key_twice_is_found_at_any_depth` et `test_an_output_nested_too_deep_fails_the_schema_check` (`test_llm_client.py`) | La clé en double est trouvée à toute profondeur ; un JSON trop imbriqué donne `schema`, pas un 500 |
-| `test_the_schema_of_a_full_batch_is_within_the_bounds_of_strict_mode` (`tests/ai_api/test_stages.py:244`) | Un lot plein (50 items, les 8 vrais sujets) tient sous 100 propriétés et 1 000 valeurs d'`enum` |
+| `test_the_schema_of_a_full_batch_is_within_the_bounds_of_strict_mode` (`tests/ai_api/test_stages.py:246`) | Un lot plein (50 items, les 8 vrais sujets) tient sous 100 propriétés, 500 valeurs d'`enum` et 15 000 caractères |
 | `test_the_schemas_carry_the_enums_of_the_call` (`test_stages.py`) | Les propriétés sont les items du lot, dans leur ordre |
 | `uv run pytest` : 2 622 tests ; `ruff check`, `ruff format --check`, `mypy --strict` | Rien d'autre n'est cassé |
 
@@ -170,7 +177,7 @@ avant.
    OpenAI. Il fallait une forme où le doublon est impossible, d'où l'objet.
 2. **Si le mode strict garantit déjà tout, pourquoi les contrôles ?** Parce que le code ne s'y fie
    pas : un autre fournisseur, ou le replay, rend ce qu'il veut. Les contrôles 2 à 5 refusent un
-   doublon, une réponse hors liste, un item inventé, un item oublié (`classification.py:175-185`,
+   doublon, une réponse hors liste, un item inventé, un item oublié (`classification.py:176-185`,
    `llm_client.py:440`).
 3. **Pourquoi refuser une clé en double, puisque le JSON l'accepte ?** Parce que Pydantic garderait
    la dernière valeur sans rien dire. Le doublon serait réparé en silence, et on ne saurait pas que
@@ -180,8 +187,9 @@ avant.
    Avec une propriété obligatoire par item, l'oubli n'est plus possible en mode strict. L'accepter
    en silence ne protégerait plus que les cas anormaux, où il vaut mieux échouer fermé.
 5. **Et si la liste des sujets grandit ?** Chaque item porte toute la liste fermée : 50 items et
-   8 sujets font 450 valeurs d'`enum`. À 20 sujets, on dépasserait 1 000, et le test de bornes
-   échouerait avant tout appel réel. Il faudrait alors des lots plus petits ou une définition
+   8 sujets font 450 valeurs d'`enum`. Un 10e sujet en ferait 550, au-delà de 500, la limite la
+   plus stricte connue, et le test de bornes échouerait avant tout appel réel
+   (`tests/ai_api/test_stages.py:246`). Il faudrait alors des lots plus petits, ou une définition
    partagée (`$defs`), dont le décompte n'est pas vérifié.
 
 ## Zones non vérifiées
@@ -189,10 +197,14 @@ avant.
 - **`classify-2` n'a pas encore tourné sur gpt-6-luna.** L'essai 1 de #210 sera rejoué après la
   fusion. La garantie « une propriété obligatoire ne manque jamais » vient de la doc du mode
   strict, pas d'une mesure.
-- **La limite de 1 000 valeurs d'`enum`** vient de la spec (lecture d'OpenAI du 15/10), non relue
-  aujourd'hui ; la page Azure lue aujourd'hui ne donne aucune limite d'`enum`. Le test de bornes
-  compte 50 × 9 valeurs, en supposant qu'un même sous-schéma répété est compté à chaque fois :
-  c'est le pire cas.
+- **Les limites de 500 valeurs d'`enum` et de 15 000 caractères** viennent d'erreurs rapportées
+  sur le forum d'OpenAI (sources secondaires) ; la page Azure ne donne aucune limite d'`enum`, et
+  la doc OpenAI relevée le 16/10 disait 1 000 valeurs. Le test applique les chiffres les plus
+  stricts, et compte chaque sous-schéma répété une fois par propriété : c'est le pire cas.
+- **`json.loads` et Pydantic ne lisent pas exactement les mêmes textes** : un texte lisible par
+  Pydantic mais pas par `json` (un BOM en tête, par exemple) saute la recherche de clés en double,
+  et Pydantic garderait alors la dernière valeur. La revue de sécurité (effort `high`) juge cet
+  écart sans effet sur la sécurité : la valeur reste dans la liste fermée. Non corrigé.
 - **Le coût en jetons de la nouvelle sortie** (environ 10 jetons par item, estimé) n'est pas
   mesuré ; `CLASSIFICATION_MAX_COMPLETION_TOKENS` reste à 2 048, une large marge.
 
@@ -209,3 +221,5 @@ avant.
 |---|---|---|
 | [Azure, structured outputs](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs) (page du 2026-08-24) | 2026-10-26 | 100 propriétés d'objet par schéma, 5 niveaux ; `uniqueItems` refusé ; la sortie suit l'ordre du schéma |
 | [OpenAI, prompt generation (méta-schéma des sorties structurées)](https://developers.openai.com/api/docs/guides/prompt-generation), via Context7 | 2026-10-26 | `uniqueItems` n'est pas pris en charge en mode strict |
+| [Forum OpenAI, « 500 Enums Limitation in Structured Output »](https://community.openai.com/t/500-enums-limitation-in-structured-output/974416) | 2026-10-26 | une erreur réelle plafonne un schéma à 500 valeurs d'`enum` (source secondaire) |
+| [Forum OpenAI, « Possible Structured Output Schema Length Error »](https://community.openai.com/t/possible-structured-output-schema-length-error-bug-in-api/984509) | 2026-10-26 | une erreur réelle plafonne les chaînes d'un schéma à environ 15 000 caractères (source secondaire) |

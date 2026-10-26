@@ -235,23 +235,29 @@ def test_the_classification_model_reads_an_answer_the_schema_allows():
     assert output.root == {"i1": "research", "i2": NOT_RETAINED_ANSWER}
 
 
-# The bounds of a schema in strict mode: 100 object properties (Azure, docs of 2026-08-24) and
-# 1,000 values of enum (OpenAI).
+# The strictest bounds known of a schema in strict mode (docs/fiches-veille.md, "Schémas"): 100
+# object properties (Azure), 500 values of enum and 15,000 characters of property names and enum
+# values (errors of OpenAI reported in its forum).
 MAX_SCHEMA_PROPERTIES = 100
-MAX_SCHEMA_ENUM_VALUES = 1000
+MAX_SCHEMA_ENUM_VALUES = 500
+MAX_SCHEMA_STRING_CHARS = 15_000
 
 
 def test_the_schema_of_a_full_batch_is_within_the_bounds_of_strict_mode():
-    item_refs = [f"i{number}" for number in range(MAX_ITEMS_PER_CLASSIFICATION_CALL)]
+    # Identifiers longer than those of the base today: the length is bounded with a margin.
+    item_refs = [
+        f"i{1_000_000 + number}" for number in range(MAX_ITEMS_PER_CLASSIFICATION_CALL)
+    ]
     schema = build_classification_schema(
         item_refs, [subject.name for subject in DIGEST_SUBJECTS]
     )
 
     nodes = list(walk_objects(schema))
-    assert (
-        sum(len(node.get("properties", {})) for node in nodes) <= MAX_SCHEMA_PROPERTIES
-    )
-    assert sum(len(node.get("enum", [])) for node in nodes) <= MAX_SCHEMA_ENUM_VALUES
+    property_names = [name for node in nodes for name in node.get("properties", {})]
+    enum_values = [value for node in nodes for value in node.get("enum", [])]
+    assert len(property_names) <= MAX_SCHEMA_PROPERTIES
+    assert len(enum_values) <= MAX_SCHEMA_ENUM_VALUES
+    assert sum(map(len, property_names + enum_values)) <= MAX_SCHEMA_STRING_CHARS
 
 
 def test_no_subject_takes_the_answer_of_no_subject():

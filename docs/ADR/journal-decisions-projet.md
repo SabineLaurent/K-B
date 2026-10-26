@@ -4226,9 +4226,11 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   la demande (utile en plus, il ne corrige pas la cause, et les items du lot seraient perdus) ;
   des lots plus petits (la probabilité baisse, le cas reste) ; une phrase de plus dans la consigne
   (une règle en prose ne tient pas) ; un sujet secondaire par item (voir les décisions encore
-  ouvertes). Limites tenues par un test : 100 propriétés d'objet par schéma (Azure) et 1 000
-  valeurs d'`enum` (OpenAI) ; au plafond de 50 items et 8 sujets, 50 propriétés et 450 valeurs.
-  — PR de #210 (`classify-2`)
+  ouvertes). Limites tenues par un test, les plus strictes connues : 100 propriétés d'objet par
+  schéma (Azure), 500 valeurs d'`enum` et 15 000 caractères de chaînes (erreurs d'OpenAI rapportées
+  sur son forum) ; au plafond de 50 items et 8 sujets, 50 propriétés, 450 valeurs et environ
+  6 400 caractères. Limite assumée : un 10e sujet dépasserait 500 valeurs et demanderait des lots
+  plus petits. — PR de #210 (`classify-2`)
 - **Un item du lot sans réponse est un échec (`completeness`, avec une nouvelle tentative), et
   non plus un item « non retenu ».** **Inverse** la décision du 2026-10-15 (« La complétude est
   calculée par le code », PR de #203), qui comptait un item absent « non retenu », parce qu'un
