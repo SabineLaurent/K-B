@@ -4252,8 +4252,10 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   montrent. **Une sortie qui ne répond à aucun item du lot (`{}`) est refusée** (`completeness`,
   avec une nouvelle tentative) : elle ne trie rien, et vient d'un fournisseur qui ignore le mode
   strict ; sans ce refus, tout le lot passerait en « non traité » et la demande rendrait un 200
-  vide (revue de code `high` de la PR, tranchée par time-knight, soumise à Sabine). — PR de #210
-  (`classify-2`)
+  vide (revue de code `high` de la PR, proposé par time-knight, confirmé par Sabine le 2026-10-26 :
+  « Je suis d'accord sur le principe »). Sabine, même jour : la seconde chance ciblée reste une
+  option, décidée sur ce que montrent les essais (« en fonction de ce qu'il se passe en vrai »).
+  — PR de #210 (`classify-2`)
 
 ## Décisions encore ouvertes
 
