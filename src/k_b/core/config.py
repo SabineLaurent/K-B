@@ -271,9 +271,9 @@ DIGEST_SUBJECTS = (
         "outils, langages et pratiques de développement hors IA",
     ),
 )
-# The answer of the classification for an item of no subject: a reserved name, no subject of
-# DIGEST_SUBJECTS may take it, or its items would be read as not retained (a test keeps it).
-NOT_RETAINED_ANSWER = "not_retained"
+# The answer of the classification for an item that no subject suits, then not retained: a
+# reserved name, no subject of DIGEST_SUBJECTS may take it (a test keeps it).
+NO_SUITABLE_SUBJECT_ANSWER = "no_suitable_subject"
 
 # The folder of the vault that kb writes (ADR of 2026-10-19, "Coffre : organisation"): the digests
 # of each subject in veille/<subject>/ (#209), the sheets of the top rankings in veille/tops/.

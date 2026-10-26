@@ -34,7 +34,7 @@ from k_b.ai_api.watch_items import (
     select_for_writing,
     to_item_ref,
 )
-from k_b.core.config import NOT_RETAINED_ANSWER, DigestSubject
+from k_b.core.config import NO_SUITABLE_SUBJECT_ANSWER, DigestSubject
 
 type Stage = Literal["classify", "write"]
 # A source URL is returned only with one of these schemes (docs/fiches-veille.md, "Réponse").
@@ -59,6 +59,10 @@ class StageCall:
     facts_found: int | None
     claims_removed: int | None
     items_uncited: int | None
+    # Of a classification whose output is checked; None otherwise: the items no subject suits,
+    # and the items the model left without answer.
+    items_not_retained: int | None
+    items_unanswered: int | None
     llm_call: LlmCall[BaseModel]
 
 
@@ -104,8 +108,10 @@ class FailedSubject:
 class DigestsResult:
     digests: tuple[Digest, ...]
     failed_subjects: tuple[FailedSubject, ...]
-    # Not retained by the classification, or absent from its output, in the order of the reading.
+    # Of the classification, in the order of the reading: the items no subject suits, and the
+    # items the model left without answer.
     not_retained: tuple[int, ...]
+    unanswered: tuple[int, ...]
     # Items read.
     items_in: int
     # Items with a field cut for the writing.
@@ -130,6 +136,7 @@ class ClassificationFailure:
 class Classification:
     subject_by_item_id: Mapping[int, str]
     not_retained: tuple[int, ...]
+    unanswered: tuple[int, ...]
     stage_calls: tuple[StageCall, ...]
 
 
@@ -188,6 +195,8 @@ def build_digests(
                 facts_found=None if digest is None else digest.facts_found,
                 claims_removed=None if digest is None else digest.claims_removed,
                 items_uncited=None if digest is None else len(digest.items_uncited),
+                items_not_retained=None,
+                items_unanswered=None,
                 llm_call=llm_call,
             )
         )
@@ -202,6 +211,7 @@ def build_digests(
         digests=tuple(digests),
         failed_subjects=tuple(failed_subjects),
         not_retained=classification.not_retained,
+        unanswered=classification.unanswered,
         items_in=len(reading.items),
         items_truncated=items_truncated,
         items_dropped=items_dropped,
@@ -217,13 +227,14 @@ def classify(
     subjects: Sequence[DigestSubject],
     deadline: Deadline,
 ) -> Classification | ClassificationFailure:
-    """The subject of each item, batch after batch; an item no batch assigns is not retained."""
-    subject_by_ref: dict[str, str] = {}
+    """The answer for each item, batch after batch: a subject, no suitable subject, or none."""
+    answer_by_ref: dict[str, str] = {}
     stage_calls: list[StageCall] = []
     for batch in build_batches(items, subjects):
         if not deadline.allows_llm_request():
             return ClassificationFailure("llm_timeout", None, tuple(stage_calls))
         llm_call = classify_batch(http_client, settings, batch, subjects, deadline)
+        answers = None if llm_call.output is None else llm_call.output.root
         stage_calls.append(
             StageCall(
                 stage="classify",
@@ -235,10 +246,16 @@ def classify(
                 facts_found=None,
                 claims_removed=None,
                 items_uncited=None,
+                items_not_retained=None
+                if answers is None
+                else sum(a == NO_SUITABLE_SUBJECT_ANSWER for a in answers.values()),
+                items_unanswered=None
+                if answers is None
+                else sum(to_item_ref(i.item_id) not in answers for i in batch.items),
                 llm_call=llm_call,
             )
         )
-        if llm_call.output is None:
+        if answers is None:
             # A Retry-After only with llm_rate_limited, the one state of the spec that gives
             # it (503): neither with a retry cut by the deadline (504) nor with a 5xx (502).
             retry_after = (
@@ -249,22 +266,23 @@ def classify(
             return ClassificationFailure(
                 to_failure(llm_call.outcome), retry_after, tuple(stage_calls)
             )
-        subject_by_ref.update(
-            {
-                ref: answer
-                for ref, answer in llm_call.output.root.items()
-                if answer != NOT_RETAINED_ANSWER
-            }
-        )
-    subject_by_item_id = {
-        item.item_id: subject_by_ref[to_item_ref(item.item_id)]
-        for item in items
-        if to_item_ref(item.item_id) in subject_by_ref
+        answer_by_ref.update(answers)
+    answer_by_item_id = {
+        item.item_id: answer_by_ref.get(to_item_ref(item.item_id)) for item in items
     }
     return Classification(
-        subject_by_item_id=subject_by_item_id,
+        subject_by_item_id={
+            item_id: answer
+            for item_id, answer in answer_by_item_id.items()
+            if answer is not None and answer != NO_SUITABLE_SUBJECT_ANSWER
+        },
         not_retained=tuple(
-            item.item_id for item in items if item.item_id not in subject_by_item_id
+            item_id
+            for item_id, answer in answer_by_item_id.items()
+            if answer == NO_SUITABLE_SUBJECT_ANSWER
+        ),
+        unanswered=tuple(
+            item_id for item_id, answer in answer_by_item_id.items() if answer is None
         ),
         stage_calls=tuple(stage_calls),
     )

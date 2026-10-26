@@ -28,7 +28,11 @@ from k_b.ai_api.connectors.metrics_export import (
 )
 from k_b.ai_api.dependencies import open_data_api_client, read_request_time
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
-from k_b.core.config import DIGEST_SUBJECTS, LLM_REPLAY_BASE_URL, NOT_RETAINED_ANSWER
+from k_b.core.config import (
+    DIGEST_SUBJECTS,
+    LLM_REPLAY_BASE_URL,
+    NO_SUITABLE_SUBJECT_ANSWER,
+)
 from k_b.data_api.app import create_app as create_data_app
 
 # The window of the test base read by tests/ai_api/test_digest_router.py: ten items.
@@ -40,7 +44,7 @@ REPLAY = [
     {
         "kind": "completion",
         "content": json.dumps(
-            {f"i{item_id}": NOT_RETAINED_ANSWER for item_id in WINDOW_ITEM_IDS}
+            {f"i{item_id}": NO_SUITABLE_SUBJECT_ANSWER for item_id in WINDOW_ITEM_IDS}
         ),
         "prompt_tokens": 1_000,
         "completion_tokens": 200,

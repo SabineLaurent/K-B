@@ -82,6 +82,7 @@ def make_response(digests=(AGENT_DIGEST,), failed_subjects=(), **changes):
         "digests": list(digests),
         "failed_subjects": list(failed_subjects),
         "not_retained": [12],
+        "unanswered": [],
         "items_in": 4,
         "items_truncated": 0,
         "items_dropped": 0,

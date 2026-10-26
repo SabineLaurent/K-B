@@ -30,7 +30,7 @@ from k_b.ai_api.watch_items import WatchItem, WatchReading, build_fields
 from k_b.core.config import (
     LLM_REPLAY_BASE_URL,
     MIN_SECONDS_FOR_LLM_REQUEST,
-    NOT_RETAINED_ANSWER,
+    NO_SUITABLE_SUBJECT_ANSWER,
     DigestSubject,
 )
 from k_b.data_api.app import create_app
@@ -136,7 +136,7 @@ def classified(
             ("security_alerts", security),
             ("agent_tools", agent),
             ("research", research),
-            (NOT_RETAINED_ANSWER, not_retained),
+            (NO_SUITABLE_SUBJECT_ANSWER, not_retained),
         )
         for item_id in item_ids
     ]
@@ -243,7 +243,7 @@ def test_a_subject_out_of_the_list_is_refused(reading):
     schema = sent_bodies(transport)[0]["response_format"]["json_schema"]["schema"]
     assert schema["properties"]["i3"]["enum"] == [
         *(subject.name for subject in TEST_SUBJECTS),
-        NOT_RETAINED_ANSWER,
+        NO_SUITABLE_SUBJECT_ANSWER,
     ]
 
 
@@ -301,20 +301,24 @@ def test_a_fact_of_an_item_its_claim_does_not_cite_is_refused(reading):
     assert result.stage_calls[2].llm_call.failed_check == "item_id"
 
 
-def test_an_item_without_answer_is_llm_invalid_output(reading):
+def test_an_item_without_answer_is_counted_apart_without_failure(reading):
+    # A miss of the model, not its judgement: kept apart from the items no subject suits.
     forgotten = classified(not_retained=[12, 11])
 
-    result, _ = digest_of(reading, [forgotten, forgotten])
+    result, _ = digest_of(reading, [forgotten, *VALID_STEPS[1:]])
 
-    assert isinstance(result, ClassificationFailure)
-    assert result.state == "llm_invalid_output"
-    assert result.stage_calls[0].llm_call.failed_check == "completeness"
+    assert isinstance(result, DigestsResult)
+    assert result.not_retained == (12, 11)
+    assert result.unanswered == (13,)
+    classify_call = result.stage_calls[0]
+    assert (classify_call.items_not_retained, classify_call.items_unanswered) == (2, 1)
+    assert classify_call.llm_call.attempts == 1
 
 
 def test_an_item_answered_twice_at_the_classification_is_llm_invalid_output(reading):
     # The case of the first trial of #210 on gpt-6-luna: an item given a subject, then not
     # retained.
-    twice = classified(extra=[("i9", NOT_RETAINED_ANSWER)])
+    twice = classified(extra=[("i9", NO_SUITABLE_SUBJECT_ANSWER)])
 
     result, _ = digest_of(reading, [twice, twice])
 
@@ -507,6 +511,7 @@ def test_an_empty_window_calls_no_model():
         digests=(),
         failed_subjects=(),
         not_retained=(),
+        unanswered=(),
         items_in=0,
         items_truncated=0,
         items_dropped=2,

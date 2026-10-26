@@ -38,7 +38,7 @@ from k_b.core.config import (
     MAX_CLASSIFICATION_INPUT_CHARS,
     MAX_FIELD_CHARS_FOR_CLASSIFICATION,
     MAX_ITEMS_PER_CLASSIFICATION_CALL,
-    NOT_RETAINED_ANSWER,
+    NO_SUITABLE_SUBJECT_ANSWER,
     DigestSubject,
 )
 
@@ -229,10 +229,10 @@ def test_the_writing_schema_matches_its_model():
 
 def test_the_classification_model_reads_an_answer_the_schema_allows():
     output = ClassificationOutput.model_validate_json(
-        '{"i1": "research", "i2": "not_retained"}', strict=True
+        '{"i1": "research", "i2": "no_suitable_subject"}', strict=True
     )
 
-    assert output.root == {"i1": "research", "i2": NOT_RETAINED_ANSWER}
+    assert output.root == {"i1": "research", "i2": NO_SUITABLE_SUBJECT_ANSWER}
 
 
 # The strictest bounds known of a schema in strict mode (docs/fiches-veille.md, "Schémas"): 100
@@ -261,7 +261,9 @@ def test_the_schema_of_a_full_batch_is_within_the_bounds_of_strict_mode():
 
 
 def test_no_subject_takes_the_answer_of_no_subject():
-    assert NOT_RETAINED_ANSWER not in {subject.name for subject in DIGEST_SUBJECTS}
+    assert NO_SUITABLE_SUBJECT_ANSWER not in {
+        subject.name for subject in DIGEST_SUBJECTS
+    }
 
 
 def test_a_schema_derived_from_the_writing_model_would_not_be_portable():
@@ -279,7 +281,7 @@ def test_the_schemas_carry_the_enums_of_the_call():
     assert list(classification["properties"]) == ["i1", "i2"]
     assert classification["properties"]["i2"]["enum"] == [
         "research",
-        NOT_RETAINED_ANSWER,
+        NO_SUITABLE_SUBJECT_ANSWER,
     ]
     claim = writing["properties"]["claims"]["items"]["properties"]
     assert claim["item_ids"]["items"]["enum"] == ["i1", "i2"]

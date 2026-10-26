@@ -34,7 +34,7 @@ from k_b.core.config import (
     LLM_INPUT_USD_PER_MILLION_TOKENS,
     LLM_OUTPUT_USD_PER_MILLION_TOKENS,
     LLM_REPLAY_BASE_URL,
-    NOT_RETAINED_ANSWER,
+    NO_SUITABLE_SUBJECT_ANSWER,
     DigestSubject,
 )
 from k_b.data_api.app import create_app as create_data_app
@@ -103,7 +103,7 @@ def classified(
                 ("security_alerts", security),
                 ("agent_tools", agent),
                 ("research", research),
-                (NOT_RETAINED_ANSWER, not_retained),
+                (NO_SUITABLE_SUBJECT_ANSWER, not_retained),
             )
             for item_id in item_ids
         }
@@ -508,6 +508,8 @@ METRIC_FIELDS = [
     "fidelity_rate",
     "claims_removed",
     "items_uncited",
+    "items_not_retained",
+    "items_unanswered",
     "cost_estimated",
 ]
 
@@ -537,6 +539,9 @@ def test_each_call_writes_one_json_line_on_stdout_without_a_text(make_ai_api, ca
         False,
     )
     assert (first["claims_removed"], first["items_uncited"]) == (None, None)
+    # The three cases of the classification: 5 items given a subject, 3 that no subject
+    # suits, none left without answer.
+    assert (first["items_not_retained"], first["items_unanswered"]) == (3, 0)
     for line in others:
         assert (line["data_fetch_ms"], line["items_dropped"], line["items_capped"]) == (
             None,
@@ -544,6 +549,8 @@ def test_each_call_writes_one_json_line_on_stdout_without_a_text(make_ai_api, ca
             None,
         )
     assert (others[0]["claims_removed"], others[0]["items_uncited"]) == (0, 0)
+    for line in others:
+        assert (line["items_not_retained"], line["items_unanswered"]) == (None, None)
     # The counters of the fidelity: null at the classification, null rate without fact.
     assert [
         (line["facts_checked"], line["facts_found"], line["fidelity_rate"])
@@ -710,6 +717,14 @@ def test_each_call_is_measured_in_opentelemetry_as_on_its_line(
     )
     assert find_point(points, "k_b.digest.items_uncited") == sum(
         line["items_uncited"] for line in writes
+    )
+    assert (
+        find_point(points, "k_b.digest.items_not_retained")
+        == classify["items_not_retained"]
+    )
+    assert (
+        find_point(points, "k_b.digest.items_unanswered")
+        == classify["items_unanswered"]
     )
     assert find_point(points, "k_b.digest.facts_checked") == sum(
         line["facts_checked"] for line in writes

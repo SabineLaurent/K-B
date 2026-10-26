@@ -94,6 +94,7 @@ def post_digests(
         digests=[to_digest_schema(digest) for digest in result.digests],
         failed_subjects=to_failed_subject_schemas(result),
         not_retained=list(result.not_retained),
+        unanswered=list(result.unanswered),
         items_in=result.items_in,
         items_truncated=result.items_truncated,
         items_dropped=result.items_dropped,

@@ -352,15 +352,30 @@ identifiant (consigne `classify-2`) :
 ```json
 {
   "i12": "llm_security",
-  "i7": "not_retained"
+  "i7": "no_suitable_subject"
 }
 ```
 
 | Champ | Contrainte |
 |---|---|
 | propriétés | une par item envoyé dans cet appel, dans l'ordre du lot, **toutes dans `required`** ; `additionalProperties: false` |
-| valeur | `enum` des sujets de `core/config.py`, plus `not_retained` (`NOT_RETAINED_ANSWER`, nom réservé : aucun sujet ne peut le prendre, un test le tient) |
-| ensemble | chaque item envoyé reçoit **exactement une** réponse : le mode strict ne peut ni en omettre un, ni lui en donner deux |
+| valeur | `enum` des sujets de `core/config.py`, plus `no_suitable_subject` (`NO_SUITABLE_SUBJECT_ANSWER`, nom réservé : aucun sujet ne peut le prendre, un test le tient) |
+| ensemble | en mode strict, chaque item envoyé reçoit **exactement une** réponse ; le code revérifie (contrôles 2 à 4) et compte un item sans réponse |
+
+**Trois cas à la sortie** (décision de Sabine du 2026-10-26) :
+
+| Cas | Le modèle | Dans la réponse | Sur la ligne de métrique |
+|---|---|---|---|
+| catégorisé | répond un sujet de la liste | l'item entre dans la fiche de ce sujet | — |
+| sans sujet adapté | répond `no_suitable_subject` : un **jugement** du modèle | `not_retained` | `items_not_retained` |
+| non traité | ne répond rien pour l'item : un **raté** du modèle | `unanswered` | `items_unanswered` |
+
+Un item non traité ne fait pas échouer le lot : les autres réponses du lot sont bonnes, et la
+demande continue. Il est compté à part, pour ne pas passer pour un jugement. En mode strict, il ne
+devrait pas exister : un `items_unanswered` au-dessus de 0 se voit dans les métriques, et manque le
+seuil « aucun item oublié » des essais de #210. Un `items_not_retained` élevé peut dire qu'il manque
+un sujet à la liste fermée. **Limite** : un item non traité n'est pas redemandé ; une seconde
+chance ciblée (redemander les seuls items oubliés, une fois) viendra si des essais en montrent.
 
 **Pourquoi une propriété par item** (essai 1 de #210, 2026-10-26, sur la veille réelle). Avec
 `classify-1`, la sortie était deux listes, `assignments` (`item_id`, `subject`) et `not_retained`.
@@ -368,8 +383,9 @@ Le mode strict ne pouvait pas y interdire un doublon : `uniqueItems` n'est pas p
 ([guide OpenAI](https://developers.openai.com/api/docs/guides/prompt-generation), lu le
 2026-10-26 ; table des mots-clés refusés de la page Azure citée plus haut). gpt-6-luna a donné à
 deux items d'un lot de 50 articles TLDR à la fois un sujet et « non retenu », aux deux tentatives :
-le contrôle 5 a refusé le lot, et toute la demande a échoué (502 `llm_invalid_output`). Avec une
-propriété par item, cet état ne peut plus s'écrire ; le code le revérifie (contrôles 2 et 5).
+le contrôle 5 (doublon) a refusé le lot, et toute la demande a échoué (502 `llm_invalid_output`).
+Avec une propriété par item, cet état ne peut plus s'écrire ; le code le revérifie (contrôle 2,
+une clé deux fois).
 Options écartées : dédoublonner par le code (il réparerait en silence ce que le modèle écrit) ;
 laisser un lot en échec sans faire échouer la demande (utile en plus, il ne corrige pas la
 cause, et les items du lot seraient perdus) ; des lots plus petits (la probabilité baisse, le cas
@@ -457,6 +473,7 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
   ],
   "failed_subjects": [{"subject": "models", "stage": "write", "error": "llm_timeout"}],
   "not_retained": [3, 9],
+  "unanswered": [],
   "items_in": 41,
   "items_truncated": 2,
   "items_dropped": 0,
@@ -476,7 +493,8 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
 | `digests[].claims_removed` | affirmations retirées par la fidélité |
 | `digests[].items_uncited` | items du sujet qui ne sont plus cités après les retraits de la fidélité |
 | `failed_subjects` | chaque sujet en échec, son étape (`stage` : `write`, la rédaction) et son état nommé |
-| `not_retained` | items non retenus au classement, ou absents de sa sortie |
+| `not_retained` | items du classement qu'aucun sujet ne convient : le modèle a répondu `no_suitable_subject` |
+| `unanswered` | items que le classement a laissés sans réponse, non retenus eux aussi (depuis la version 0.3.0 de l'API IA, `classify-2`) |
 | `items_in`, `items_truncated`, `items_dropped`, `items_capped` | compteurs de la section « Entrée du modèle » |
 
 **Limite** : `sources[].title` est une donnée de source, pas une sortie du modèle ; le filtre du
@@ -521,9 +539,9 @@ par du code déterministe).
 |---|---|---|---|
 | 1 | `finish_reason` (liste blanche) | `stop` passe ; `length` → `llm_truncated` ; `content_filter` → `llm_content_filtered` ; toute autre valeur → `llm_invalid_output` (échouer fermé sur une valeur inconnue, `tool_calls` compris) | `content_filter` pour un filtrage ; `finish_reason` pour une valeur hors liste |
 | 2 | **Schéma** | un texte qui n'est pas du JSON, une clé deux fois dans un même objet (Pydantic garderait la dernière valeur sans le dire : un item répondu deux fois passerait pour un item répondu une fois ; `has_key_twice`, `llm_client.py`), un champ en trop (`extra="forbid"`), un type faux, une borne de structure dépassée (plus de 12 affirmations, `item_ids` hors de 1 à 5) | `schema` |
-| 3 | **Sujets** | un sujet hors de la liste de `core/config.py` (au classement : une réponse qui n'est ni un sujet de la liste ni `not_retained`) | `subject` |
+| 3 | **Sujets** | un sujet hors de la liste de `core/config.py` (au classement : une réponse qui n'est ni un sujet de la liste ni `no_suitable_subject`) | `subject` |
 | 4 | **`item_id`** | un identifiant qui n'a pas été envoyé dans **cet** appel (un item inventé, ou d'un autre sujet) ; un `facts[].item_id` hors des `item_ids` de son affirmation | `item_id` |
-| 5 | **Complétude** (classement) | un item du lot sans réponse (depuis `classify-2` ; avant, il était compté « non retenu ») ; un item répondu deux fois est refusé avant, par le contrôle 2 | `completeness` |
+| 5 | **Complétude** (classement) | ne refuse plus rien depuis `classify-2` : un item répondu deux fois est refusé par le contrôle 2, un item sans réponse est compté à part (`unanswered`, `items_unanswered`) ; avant `classify-2`, un item présent deux fois | `completeness` (plus produit) |
 | 6 | **Markdown** (rédaction) | un `text` qui contient `(?i)[a-z][a-z0-9+.-]*://`, `(?i)www\.`, `(?i)mailto:`, `(?i)xmpp:`, `![`, `[[`, `](`, `]:` ou `<[a-zA-Z/!?]` | `markup` |
 | 7 | **Fidélité** (rédaction) | voir ci-dessous : retire l'affirmation, n'est pas un échec | — |
 
@@ -791,10 +809,12 @@ ne sont écrites qu'au retour du parcours.
 | `facts_checked`, `facts_found` | compteurs de la fidélité (rédaction, section « Fidélité », « Ce qui est compté ») ; nuls au classement et pour une rédaction en échec |
 | `fidelity_rate` | `facts_found` / `facts_checked`, arrondi à 4 décimales ; nul au classement, pour une rédaction en échec, et quand `facts_checked` vaut 0 |
 | `claims_removed`, `items_uncited` | compteurs de la fidélité (rédaction) ; nuls au classement |
+| `items_not_retained`, `items_unanswered` | compteurs du classement (section « Sortie du classement », « Trois cas ») : les items du lot auxquels aucun sujet ne convient, et ceux que le modèle a laissés sans réponse ; nuls à la rédaction, et pour un classement en échec |
 | `cost_estimated` | en USD, arrondi à 6 décimales : `tokens_in` et `tokens_out` × prix au million de `core/config.py` (gpt-6-luna, Data Zone Standard, France Central, contexte court : 0,12 et 0,60) ; 0 en offre gratuite. **Limite** : tout appel est compté à ces prix, le replay compris (ses jetons sont ceux de ses pas, `provider` le dit) et un autre `KB_LLM_MODEL` aussi |
 
 `ts`, `stage`, `failed_check`, `items_dropped`, `items_capped`, `reasoning_tokens` et `http_status`
-s'ajoutent à la liste de #156, puis `first_failed_check` (#205), puis `fidelity_rate` (#207).
+s'ajoutent à la liste de #156, puis `first_failed_check` (#205), puis `fidelity_rate` (#207), puis
+`items_not_retained` et `items_unanswered` (`classify-2`, #210).
 
 **Jamais** dans une ligne : le texte d'un item ou d'une affirmation, la consigne, la sortie du
 modèle, un titre, un auteur, une clé (règle 5 de `poc.md`). Un échec `data_api_*` ne fait aucun appel au modèle, donc
@@ -819,6 +839,7 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
 | `k_b.llm.check.duration` | Histogram, `s` | `check_ms` / 1000, pour un appel dont une tentative au moins a passé les contrôles (`LlmCall.is_checked`) ; un délai, un 5xx ou une réponse illisible n'en passent aucun | — |
 | `k_b.llm.cost` | Counter, `{USD}` | `cost_estimated` | — |
 | `k_b.digest.claims_removed`, `k_b.digest.items_uncited` | Counter | les compteurs de la rédaction | — |
+| `k_b.digest.items_not_retained`, `k_b.digest.items_unanswered` | Counter | les compteurs du classement | — |
 | `k_b.digest.facts_checked`, `k_b.digest.facts_found` | Counter, `{fact}` | les compteurs de la fidélité (#207) ; le taux se calcule dans Grafana par leur rapport, un taux ne s'additionnant pas | — |
 | `k_b.digest.data_fetch.duration` | Histogram, `s` | `data_fetch_ms` / 1000 | aucun |
 

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "K-B AI API",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "paths": {
     "/digests": {
@@ -230,7 +230,16 @@
               "type": "integer"
             },
             "type": "array",
-            "title": "Not Retained"
+            "title": "Not Retained",
+            "description": "Items of the classification that no subject suits."
+          },
+          "unanswered": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Unanswered",
+            "description": "Items the classification left without answer, not retained either."
           },
           "items_in": {
             "type": "integer",
@@ -257,6 +266,7 @@
           "digests",
           "failed_subjects",
           "not_retained",
+          "unanswered",
           "items_in",
           "items_truncated",
           "items_dropped",

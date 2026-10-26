@@ -84,6 +84,16 @@ class ModelMetrics:
             unit="{item}",
             description="Items no longer cited once claims are removed, by bounds or fidelity.",
         )
+        self._items_not_retained = meter.create_counter(
+            "k_b.digest.items_not_retained",
+            unit="{item}",
+            description="Items of the classification that no subject suits.",
+        )
+        self._items_unanswered = meter.create_counter(
+            "k_b.digest.items_unanswered",
+            unit="{item}",
+            description="Items the classification left without answer.",
+        )
         self._facts_checked = meter.create_counter(
             "k_b.digest.facts_checked",
             unit="{fact}",
@@ -144,6 +154,10 @@ class ModelMetrics:
                 self._claims_removed.add(stage_call.claims_removed, attributes)
             if stage_call.items_uncited is not None:
                 self._items_uncited.add(stage_call.items_uncited, attributes)
+            if stage_call.items_not_retained is not None:
+                self._items_not_retained.add(stage_call.items_not_retained, attributes)
+            if stage_call.items_unanswered is not None:
+                self._items_unanswered.add(stage_call.items_unanswered, attributes)
             if stage_call.facts_checked is not None:
                 self._facts_checked.add(stage_call.facts_checked, attributes)
             if stage_call.facts_found is not None:
