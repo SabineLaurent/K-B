@@ -225,12 +225,12 @@
             "type": "array",
             "title": "Failed Subjects"
           },
-          "not_retained": {
+          "no_suitable_subject": {
             "items": {
               "type": "integer"
             },
             "type": "array",
-            "title": "Not Retained",
+            "title": "No Suitable Subject",
             "description": "Items of the classification that no subject suits."
           },
           "unanswered": {
@@ -265,7 +265,7 @@
           "window",
           "digests",
           "failed_subjects",
-          "not_retained",
+          "no_suitable_subject",
           "unanswered",
           "items_in",
           "items_truncated",

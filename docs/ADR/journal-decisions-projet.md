@@ -4233,21 +4233,25 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   450 valeurs et environ 6 400 caractères. Limite assumée : un 10e sujet dépasserait 500 valeurs
   et demanderait des lots plus petits. — PR de #210 (`classify-2`)
 - **Le classement distingue trois cas : catégorisé (un sujet), sans sujet adapté
-  (`no_suitable_subject`, un jugement du modèle, rendu dans `not_retained`) et non traité (aucune
+  (`no_suitable_subject`, un jugement du modèle, rendu dans `no_suitable_subject`) et non traité (aucune
   réponse, un raté du modèle, rendu dans le champ nouveau `unanswered` de la réponse). Un item non
   traité ne fait pas échouer le lot ; chaque ligne de métrique du classement compte
-  `items_not_retained` et `items_unanswered`, en JSON et en OpenTelemetry.** Décision de Sabine du
+  `items_with_subject`, `items_no_suitable_subject` et `items_unanswered`, en JSON et en
+  OpenTelemetry ; x + y + z = `items_in`. Le cas y porte partout le nom choisi par Sabine,
+  `no_suitable_subject` (« not suitable category », adapté au vocabulaire « sujet »), à la place de
+  `not_retained` dans la réponse.** Décision de Sabine du
   2026-10-26 : « Quand il oublie l'item, rien. Du coup à la fin on a x items catégorisés, y items
   avec aucune catégorie adaptée et z items non traités » ; « un item non traité est une forme de
   raté quand même ». Pourquoi : un jugement et un raté sont deux choses ; les confondre ferait
   passer une panne pour une décision, et rendrait impossible à mesurer le seuil « aucun item
-  oublié » des essais de #210. Un `items_not_retained` élevé dira aussi qu'il manque un sujet à la
+  oublié » des essais de #210. Un `items_no_suitable_subject` élevé dira aussi qu'il manque un sujet à la
   liste fermée (Sabine). **Précise** la décision du 2026-10-15 (« La complétude est calculée par
   le code », PR de #203) : un item absent n'est toujours pas un échec, mais il n'est plus confondu
   avec un item non retenu. Options écartées : faire échouer le lot pour un item sans réponse (un
   item perdu ferait tomber toutes les fiches ; proposé un temps dans la même PR) ; le compter
   « non retenu » sans compteur (une panne passerait pour un jugement). La réponse de l'API IA passe
-  en version 0.3.0 (un champ ajouté ; `kb digest` ignore les champs qu'il ne connaît pas). Limite :
+  en version 0.3.0 (`unanswered` ajouté, `not_retained` renommé `no_suitable_subject` ; aucun client
+  ne lit ce champ, et `kb digest` ignore ceux qu'il ne connaît pas). Limite :
   un item non traité n'est pas redemandé ; une seconde chance ciblée viendra si les essais en
   montrent. **Une sortie qui ne répond à aucun item du lot (`{}`) est refusée** (`completeness`,
   avec une nouvelle tentative) : elle ne trie rien, et vient d'un fournisseur qui ignore le mode

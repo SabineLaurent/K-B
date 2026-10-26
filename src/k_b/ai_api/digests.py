@@ -59,9 +59,10 @@ class StageCall:
     facts_found: int | None
     claims_removed: int | None
     items_uncited: int | None
-    # Of a classification whose output is checked; None otherwise: the items no subject suits,
-    # and the items the model left without answer.
-    items_not_retained: int | None
+    # Of a classification whose output is checked; None otherwise: the items given a subject,
+    # those no subject suits, and those the model left without answer, items_in in all.
+    items_with_subject: int | None
+    items_no_suitable_subject: int | None
     items_unanswered: int | None
     llm_call: LlmCall[BaseModel]
 
@@ -110,7 +111,7 @@ class DigestsResult:
     failed_subjects: tuple[FailedSubject, ...]
     # Of the classification, in the order of the reading: the items no subject suits, and the
     # items the model left without answer.
-    not_retained: tuple[int, ...]
+    no_suitable_subject: tuple[int, ...]
     unanswered: tuple[int, ...]
     # Items read.
     items_in: int
@@ -135,7 +136,7 @@ class ClassificationFailure:
 @dataclass(frozen=True)
 class Classification:
     subject_by_item_id: Mapping[int, str]
-    not_retained: tuple[int, ...]
+    no_suitable_subject: tuple[int, ...]
     unanswered: tuple[int, ...]
     stage_calls: tuple[StageCall, ...]
 
@@ -195,7 +196,8 @@ def build_digests(
                 facts_found=None if digest is None else digest.facts_found,
                 claims_removed=None if digest is None else digest.claims_removed,
                 items_uncited=None if digest is None else len(digest.items_uncited),
-                items_not_retained=None,
+                items_with_subject=None,
+                items_no_suitable_subject=None,
                 items_unanswered=None,
                 llm_call=llm_call,
             )
@@ -210,7 +212,7 @@ def build_digests(
     return DigestsResult(
         digests=tuple(digests),
         failed_subjects=tuple(failed_subjects),
-        not_retained=classification.not_retained,
+        no_suitable_subject=classification.no_suitable_subject,
         unanswered=classification.unanswered,
         items_in=len(reading.items),
         items_truncated=items_truncated,
@@ -253,7 +255,12 @@ def classify(
                 facts_found=None,
                 claims_removed=None,
                 items_uncited=None,
-                items_not_retained=None
+                items_with_subject=None
+                if batch_answers is None
+                else len(batch_answers)
+                - batch_answers.count(NO_SUITABLE_SUBJECT_ANSWER)
+                - batch_answers.count(None),
+                items_no_suitable_subject=None
                 if batch_answers is None
                 else batch_answers.count(NO_SUITABLE_SUBJECT_ANSWER),
                 items_unanswered=None
@@ -283,7 +290,7 @@ def classify(
             for item_id, answer in answer_by_item_id.items()
             if answer is not None and answer != NO_SUITABLE_SUBJECT_ANSWER
         },
-        not_retained=tuple(
+        no_suitable_subject=tuple(
             item_id
             for item_id, answer in answer_by_item_id.items()
             if answer == NO_SUITABLE_SUBJECT_ANSWER

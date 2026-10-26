@@ -56,7 +56,7 @@ REPLAY_SETTINGS = LlmSettings(
 SECURITY_ITEMS = [3, 4, 9, 10, 17]
 AGENT_ITEMS = [6, 7, 8]
 RESEARCH_ITEMS = [2, 1]
-NOT_RETAINED = [12, 11, 13]
+NO_SUITABLE_SUBJECT_ITEMS = [12, 11, 13]
 # Facts copied from the items of the test base: the GHSA of advisory 9, the tag of release 6.
 SECURITY_CLAIM = {
     "text": "L'alerte GHSA-fjqc-hq36-qh5p touche langgraph-checkpoint.",
@@ -126,7 +126,7 @@ def classified(
     security=SECURITY_ITEMS,
     agent=AGENT_ITEMS,
     research=RESEARCH_ITEMS,
-    not_retained=NOT_RETAINED,
+    no_suitable_subject=NO_SUITABLE_SUBJECT_ITEMS,
     extra=(),
 ):
     """The answer for each item given, then the extra pairs."""
@@ -136,7 +136,7 @@ def classified(
             ("security_alerts", security),
             ("agent_tools", agent),
             ("research", research),
-            (NO_SUITABLE_SUBJECT_ANSWER, not_retained),
+            (NO_SUITABLE_SUBJECT_ANSWER, no_suitable_subject),
         )
         for item_id in item_ids
     ]
@@ -202,7 +202,7 @@ def test_a_valid_output_gives_a_digest_per_subject_with_its_sources(reading):
     assert result.digests[2].claims == ()
     assert sorted(result.digests[2].not_retained) == [1, 2]
     assert result.failed_subjects == ()
-    assert result.not_retained == tuple(NOT_RETAINED)
+    assert result.no_suitable_subject == tuple(NO_SUITABLE_SUBJECT_ITEMS)
     assert result.items_in == len(reading.items)
     assert result.items_dropped == reading.items_dropped
     assert result.items_capped is False
@@ -303,15 +303,19 @@ def test_a_fact_of_an_item_its_claim_does_not_cite_is_refused(reading):
 
 def test_an_item_without_answer_is_counted_apart_without_failure(reading):
     # A miss of the model, not its judgement: kept apart from the items no subject suits.
-    forgotten = classified(not_retained=[12, 11])
+    forgotten = classified(no_suitable_subject=[12, 11])
 
     result, _ = digest_of(reading, [forgotten, *VALID_STEPS[1:]])
 
     assert isinstance(result, DigestsResult)
-    assert result.not_retained == (12, 11)
+    assert result.no_suitable_subject == (12, 11)
     assert result.unanswered == (13,)
     classify_call = result.stage_calls[0]
-    assert (classify_call.items_not_retained, classify_call.items_unanswered) == (2, 1)
+    assert (
+        classify_call.items_with_subject,
+        classify_call.items_no_suitable_subject,
+        classify_call.items_unanswered,
+    ) == (10, 2, 1)
     assert classify_call.llm_call.attempts == 1
 
 
@@ -472,7 +476,7 @@ def test_a_classification_not_finished_by_the_deadline_is_llm_timeout(
             security=[3, 4, 9, 10, 17],
             agent=[6, 7, 8],
             research=[2, 1],
-            not_retained=[],
+            no_suitable_subject=[],
         )
     ]
     transport = SlowTransport(steps, clock, seconds_per_answer=30)
@@ -492,10 +496,13 @@ def test_the_classification_is_split_in_batches_each_checked_against_its_items(
         security=SECURITY_ITEMS,
         agent=AGENT_ITEMS,
         research=RESEARCH_ITEMS,
-        not_retained=[],
+        no_suitable_subject=[],
     )
     second_batch = classified(
-        security=[], agent=[], research=[], not_retained=NOT_RETAINED
+        security=[],
+        agent=[],
+        research=[],
+        no_suitable_subject=NO_SUITABLE_SUBJECT_ITEMS,
     )
 
     result, transport = digest_of(
@@ -506,13 +513,13 @@ def test_the_classification_is_split_in_batches_each_checked_against_its_items(
     first, second = sent_bodies(transport)[:2]
     assert len(json.loads(messages_of(first, "user")[0])["items"]) == 10
     assert len(json.loads(messages_of(second, "user")[0])["items"]) == 3
-    assert result.not_retained == tuple(NOT_RETAINED)
+    assert result.no_suitable_subject == tuple(NO_SUITABLE_SUBJECT_ITEMS)
 
 
 def test_an_item_of_another_batch_is_refused(reading, monkeypatch):
     monkeypatch.setattr(classification, "MAX_ITEMS_PER_CLASSIFICATION_CALL", 10)
     # Item 13 is in the second batch, not in the first.
-    wrong_batch = classified(not_retained=[13])
+    wrong_batch = classified(no_suitable_subject=[13])
 
     result, _ = digest_of(reading, [wrong_batch, wrong_batch])
 
@@ -530,7 +537,7 @@ def test_an_empty_window_calls_no_model():
     assert result == DigestsResult(
         digests=(),
         failed_subjects=(),
-        not_retained=(),
+        no_suitable_subject=(),
         unanswered=(),
         items_in=0,
         items_truncated=0,
@@ -545,7 +552,9 @@ def test_a_subject_without_item_is_not_written(reading):
     result, transport = digest_of(
         reading,
         [
-            classified(research=[], not_retained=[*NOT_RETAINED, 2, 1]),
+            classified(
+                research=[], no_suitable_subject=[*NO_SUITABLE_SUBJECT_ITEMS, 2, 1]
+            ),
             *VALID_STEPS[1:3],
         ],
     )

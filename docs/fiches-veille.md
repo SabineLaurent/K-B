@@ -366,14 +366,19 @@ identifiant (consigne `classify-2`) :
 
 | Cas | Le modèle | Dans la réponse | Sur la ligne de métrique |
 |---|---|---|---|
-| catégorisé | répond un sujet de la liste | l'item entre dans la fiche de ce sujet | — |
-| sans sujet adapté | répond `no_suitable_subject` : un **jugement** du modèle | `not_retained` | `items_not_retained` |
-| non traité | ne répond rien pour l'item : un **raté** du modèle | `unanswered` | `items_unanswered` |
+| catégorisé (x) | répond un sujet de la liste | l'item entre dans la fiche de ce sujet | `items_with_subject` |
+| sans sujet adapté (y) | répond `no_suitable_subject` : un **jugement** du modèle | `no_suitable_subject` | `items_no_suitable_subject` |
+| non traité (z) | ne répond rien pour l'item : un **raté** du modèle | `unanswered` | `items_unanswered` |
+
+Sur chaque ligne de classement, x + y + z = `items_in` (un test le tient). Le nom de y est celui
+qu'a choisi Sabine (« not suitable category », 2026-10-26), le même pour la valeur du modèle, le
+champ de la réponse et les compteurs ; il remplace `not_retained`, qui disait le résultat sans dire
+pourquoi.
 
 Un item non traité ne fait pas échouer le lot : les autres réponses du lot sont bonnes, et la
 demande continue. Il est compté à part, pour ne pas passer pour un jugement. En mode strict, il ne
 devrait pas exister : un `items_unanswered` au-dessus de 0 se voit dans les métriques, et manque le
-seuil « aucun item oublié » des essais de #210. Un `items_not_retained` élevé peut dire qu'il manque
+seuil « aucun item oublié » des essais de #210. Un `items_no_suitable_subject` élevé peut dire qu'il manque
 un sujet à la liste fermée. Une sortie qui ne répond à **aucun** item, en revanche, ne trie rien :
 elle n'est pas comptée, elle est refusée (contrôle 5), avec une nouvelle tentative (revue de code
 de la PR de `classify-2`). **Limite** : un item non traité parmi d'autres n'est pas redemandé ; une
@@ -475,7 +480,7 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
     }
   ],
   "failed_subjects": [{"subject": "models", "stage": "write", "error": "llm_timeout"}],
-  "not_retained": [3, 9],
+  "no_suitable_subject": [3, 9],
   "unanswered": [],
   "items_in": 41,
   "items_truncated": 2,
@@ -496,7 +501,7 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
 | `digests[].claims_removed` | affirmations retirées par la fidélité |
 | `digests[].items_uncited` | items du sujet qui ne sont plus cités après les retraits de la fidélité |
 | `failed_subjects` | chaque sujet en échec, son étape (`stage` : `write`, la rédaction) et son état nommé |
-| `not_retained` | items du classement qu'aucun sujet ne convient : le modèle a répondu `no_suitable_subject` |
+| `no_suitable_subject` | items du classement auxquels aucun sujet ne convient : le modèle a répondu `no_suitable_subject` (champ nommé `not_retained` jusqu'à la version 0.2.0, qui y mêlait les items absents de la sortie) |
 | `unanswered` | items que le classement a laissés sans réponse, non retenus eux aussi (depuis la version 0.3.0 de l'API IA, `classify-2`) |
 | `items_in`, `items_truncated`, `items_dropped`, `items_capped` | compteurs de la section « Entrée du modèle » |
 
@@ -812,12 +817,12 @@ ne sont écrites qu'au retour du parcours.
 | `facts_checked`, `facts_found` | compteurs de la fidélité (rédaction, section « Fidélité », « Ce qui est compté ») ; nuls au classement et pour une rédaction en échec |
 | `fidelity_rate` | `facts_found` / `facts_checked`, arrondi à 4 décimales ; nul au classement, pour une rédaction en échec, et quand `facts_checked` vaut 0 |
 | `claims_removed`, `items_uncited` | compteurs de la fidélité (rédaction) ; nuls au classement |
-| `items_not_retained`, `items_unanswered` | compteurs du classement (section « Sortie du classement », « Trois cas ») : les items du lot auxquels aucun sujet ne convient, et ceux que le modèle a laissés sans réponse ; nuls à la rédaction, et pour un classement en échec |
+| `items_with_subject`, `items_no_suitable_subject`, `items_unanswered` | compteurs du classement (section « Sortie du classement », « Trois cas ») : les items du lot qui ont reçu un sujet, ceux auxquels aucun sujet ne convient, et ceux que le modèle a laissés sans réponse, `items_in` à eux trois ; nuls à la rédaction, et pour un classement en échec |
 | `cost_estimated` | en USD, arrondi à 6 décimales : `tokens_in` et `tokens_out` × prix au million de `core/config.py` (gpt-6-luna, Data Zone Standard, France Central, contexte court : 0,12 et 0,60) ; 0 en offre gratuite. **Limite** : tout appel est compté à ces prix, le replay compris (ses jetons sont ceux de ses pas, `provider` le dit) et un autre `KB_LLM_MODEL` aussi |
 
 `ts`, `stage`, `failed_check`, `items_dropped`, `items_capped`, `reasoning_tokens` et `http_status`
 s'ajoutent à la liste de #156, puis `first_failed_check` (#205), puis `fidelity_rate` (#207), puis
-`items_not_retained` et `items_unanswered` (`classify-2`, #210).
+`items_with_subject`, `items_no_suitable_subject` et `items_unanswered` (`classify-2`, #210).
 
 **Jamais** dans une ligne : le texte d'un item ou d'une affirmation, la consigne, la sortie du
 modèle, un titre, un auteur, une clé (règle 5 de `poc.md`). Un échec `data_api_*` ne fait aucun appel au modèle, donc
@@ -842,7 +847,7 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
 | `k_b.llm.check.duration` | Histogram, `s` | `check_ms` / 1000, pour un appel dont une tentative au moins a passé les contrôles (`LlmCall.is_checked`) ; un délai, un 5xx ou une réponse illisible n'en passent aucun | — |
 | `k_b.llm.cost` | Counter, `{USD}` | `cost_estimated` | — |
 | `k_b.digest.claims_removed`, `k_b.digest.items_uncited` | Counter | les compteurs de la rédaction | — |
-| `k_b.digest.items_not_retained`, `k_b.digest.items_unanswered` | Counter | les compteurs du classement | — |
+| `k_b.digest.items_with_subject`, `k_b.digest.items_no_suitable_subject`, `k_b.digest.items_unanswered` | Counter | les compteurs du classement | — |
 | `k_b.digest.facts_checked`, `k_b.digest.facts_found` | Counter, `{fact}` | les compteurs de la fidélité (#207) ; le taux se calcule dans Grafana par leur rapport, un taux ne s'additionnant pas | — |
 | `k_b.digest.data_fetch.duration` | Histogram, `s` | `data_fetch_ms` / 1000 | aucun |
 

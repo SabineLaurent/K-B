@@ -73,7 +73,7 @@ class DigestsSchema(BaseModel):
     window: WindowSchema
     digests: list[DigestSchema]
     failed_subjects: list[FailedSubjectSchema]
-    not_retained: list[int] = Field(
+    no_suitable_subject: list[int] = Field(
         description="Items of the classification that no subject suits."
     )
     unanswered: list[int] = Field(

@@ -124,7 +124,7 @@ item, alors qu'une sortie vide ne trie rien.
             for item_id, answer in answer_by_item_id.items()
             if answer is not None and answer != NO_SUITABLE_SUBJECT_ANSWER
         },
-        not_retained=tuple(
+        no_suitable_subject=tuple(
             item_id
             for item_id, answer in answer_by_item_id.items()
             if answer == NO_SUITABLE_SUBJECT_ANSWER
@@ -137,17 +137,18 @@ item, alors qu'une sortie vide ne trie rien.
 Après tous les lots, chaque item lu a une réponse, ou aucune (`None`). Trois groupes en sortent,
 dans l'ordre de la lecture :
 
-- **catégorisé** : un sujet de la liste ; l'item part à la rédaction de ce sujet ;
-- **sans sujet adapté** : `no_suitable_subject`, un **jugement** du modèle ; l'item va dans
-  `not_retained` ;
-- **non traité** : aucune réponse, un **raté** du modèle ; l'item va dans `unanswered`, champ
+- **x, catégorisé** : un sujet de la liste ; l'item part à la rédaction de ce sujet ;
+- **y, sans sujet adapté** : `no_suitable_subject`, un **jugement** du modèle ; l'item va dans le
+  champ `no_suitable_subject` de la réponse (nommé `not_retained` jusqu'à la version 0.2.0) ;
+- **z, non traité** : aucune réponse, un **raté** du modèle ; l'item va dans `unanswered`, champ
   nouveau de la réponse (version 0.3.0 de l'API IA).
 
 Un item non traité ne fait pas échouer le lot : les autres réponses sont bonnes, et une seule
 perte ne doit pas faire tomber toutes les fiches. Il est compté à part pour ne pas passer pour un
-jugement. Chaque ligne de métrique du classement porte les deux compteurs
-(`digests.py:249-254`), et OpenTelemetry les reprend (`k_b.digest.items_not_retained`,
-`k_b.digest.items_unanswered`).
+jugement. Chaque ligne de métrique du classement porte les trois compteurs, `items_with_subject`,
+`items_no_suitable_subject` et `items_unanswered`, tirés de la réponse de chaque item du lot
+(`digests.py:242-269`), et OpenTelemetry les reprend (`k_b.digest.items_with_subject`, etc.).
+À eux trois, ils font `items_in`.
 
 ### 5. Une clé présente deux fois est refusée
 
@@ -187,8 +188,10 @@ NO_SUITABLE_SUBJECT_ANSWER = "no_suitable_subject"
 La valeur dit au modèle pourquoi il la choisit (« not suitable category », Sabine), mieux que
 `not_retained`. Si un sujet s'appelait ainsi, ses items seraient lus comme sans sujet adapté : le
 nom est réservé, comme `tops` l'est pour les dossiers du coffre, et un test le tient
-(`test_no_subject_takes_the_answer_of_no_subject`). Dans la réponse de l'API, le champ garde son
-nom, `not_retained`, qui est le contrat existant.
+(`test_no_subject_takes_the_answer_of_no_subject`). Sabine a voulu ce nom partout : la valeur du
+modèle, le champ de la réponse et le compteur portent le même. Le `not_retained` *de chaque fiche*
+(`digests[].not_retained`) est une autre notion, les items envoyés à la rédaction d'un sujet
+qu'aucune affirmation ne cite : il garde son nom.
 
 ## Choix faits et options écartées
 
@@ -196,7 +199,8 @@ nom, `not_retained`, qui est le contrat existant.
 |---|---|---|
 | Une propriété obligatoire par item | L'état fautif ne peut plus s'écrire en mode strict | Dédoublonner par le code : il réparerait en silence ce que le modèle écrit. Laisser un lot échouer sans faire tomber la demande : utile en plus, mais ne corrige pas la cause. Des lots plus petits : la probabilité baisse, le cas reste. Une phrase de plus dans la consigne : une règle en prose ne tient pas (veille de l'existant, 2026-09-23, « Ce qui converge », point 3) |
 | Trois cas distincts, l'item non traité compté à part sans échec | Décision de Sabine : un jugement et un raté sont deux choses ; le seuil « aucun item oublié » de #210 devient mesurable | Faire échouer le lot pour un item sans réponse : proposé un temps dans la même PR, il ferait tomber toutes les fiches pour un item perdu. Le compter « non retenu » sans compteur : une panne passerait pour un jugement |
-| La valeur `no_suitable_subject`, le champ de réponse `not_retained` gardé | La valeur s'adresse au modèle, le champ est un contrat existant | Renommer aussi le champ de réponse : un changement de contrat sans gain |
+| Le nom `no_suitable_subject` partout pour y (valeur, champ de réponse, compteurs) | Décision de Sabine : `not_retained` disait le résultat sans dire pourquoi ; un seul nom se suit d'un bout à l'autre | Garder `not_retained` dans la réponse pour ne pas changer son contrat : la version 0.3.0 n'est pas publiée, et aucun client ne lit ce champ |
+| Un compteur pour x aussi (`items_with_subject`) | Décision de Sabine : x se lit directement, et x + y + z = `items_in` se vérifie | Le déduire par soustraction : asymétrique sur un tableau de bord |
 | Un champ `unanswered` dans la réponse, version 0.3.0 | Un champ ajouté ne casse aucun client ; `kb digest` ignore les champs qu'il ne connaît pas | Seulement un compteur : l'item raté ne serait pas nommé |
 | `RootModel[dict[str, str]]` | Les noms de propriétés changent à chaque lot ; le schéma envoyé est déjà écrit à la main | Un modèle Pydantic créé à chaque lot (`create_model`) : plus lourd, pour la même vérification |
 | Le refus d'une clé en double dans `llm_client.py`, aux deux étapes | Pydantic garde la dernière valeur sans le dire | Le seul classement : une clé en double dans la sortie de la rédaction serait aussi une sortie fautive |
@@ -207,10 +211,10 @@ nom, `not_retained`, qui est le contrat existant.
 | Test | Ce que ça démontre |
 |---|---|
 | `test_an_item_answered_twice_at_the_classification_is_llm_invalid_output` (`tests/ai_api/test_digests.py:338`) | Le cas de l'essai 1 (un item avec un sujet, puis sans sujet adapté) est refusé en `schema` |
-| `test_an_item_without_answer_is_counted_apart_without_failure` (`test_digests.py:304`) | Un item oublié n'arrête rien : il va dans `unanswered`, séparé de `not_retained`, et les compteurs du lot valent (2, 1) |
+| `test_an_item_without_answer_is_counted_apart_without_failure` (`test_digests.py:304`) | Un item oublié n'arrête rien : il va dans `unanswered`, séparé de `no_suitable_subject`, et les compteurs du lot valent (10, 2, 1) |
 | `test_an_answer_to_no_item_is_asked_again_then_fails_the_request` et `test_an_answer_to_no_item_then_a_valid_one_passes` (`test_digests.py:318`) | Une sortie vide est refusée en `completeness`, redemandée une fois, et fait échouer la demande si elle revient |
-| `test_each_call_writes_one_json_line_on_stdout_without_a_text` (`tests/ai_api/test_digest_router.py:517`) | La ligne de classement porte `items_not_retained` et `items_unanswered`, dans l'ordre de la spec ; nuls à la rédaction |
-| le test des compteurs OpenTelemetry (`test_digest_router.py`) | `k_b.digest.items_not_retained` et `k_b.digest.items_unanswered` reprennent la ligne JSON |
+| `test_each_call_writes_one_json_line_on_stdout_without_a_text` (`tests/ai_api/test_digest_router.py:517`) | La ligne de classement porte `items_with_subject`, `items_no_suitable_subject` et `items_unanswered`, dans l'ordre de la spec, et leur somme vaut `items_in` ; nuls à la rédaction |
+| le test des compteurs OpenTelemetry (`test_digest_router.py`) | les trois compteurs OpenTelemetry reprennent la ligne JSON |
 | `test_a_subject_out_of_the_list_is_refused` (`test_digests.py`) | Une réponse hors liste donne `subject` ; chaque propriété du schéma porte les sujets plus `no_suitable_subject` |
 | le paramètre `TRAPPED_TWICE` du test de l'item piégé (`test_digests.py`) | Le doublon que demande le piège de #206 est refusé en `schema` |
 | `test_an_output_out_of_its_model_fails_the_schema_check[key-twice]`, `test_only_json_without_a_key_twice_is_read`, `test_an_output_nested_too_deep_fails_the_schema_check` (`tests/ai_api/test_llm_client.py`) | Une clé en double est refusée même quand la dernière valeur serait valide, à toute profondeur ; un JSON trop imbriqué donne `schema`, pas un 500 |
