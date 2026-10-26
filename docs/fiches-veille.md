@@ -371,7 +371,8 @@ identifiant (consigne `classify-2`) :
 | non traité | ne répond rien pour l'item : un **raté** du modèle | `unanswered` | `items_unanswered` |
 
 Un item non traité ne fait pas échouer le lot : les autres réponses du lot sont bonnes, et la
-demande continue. Il est compté à part, pour ne pas passer pour un jugement. En mode strict, il ne
+demande continue. Une sortie qui ne répond à aucun item, en revanche, ne trie rien : elle est
+refusée (contrôle 5), avec une nouvelle tentative (revue de code de la PR de `classify-2`). Il est compté à part, pour ne pas passer pour un jugement. En mode strict, il ne
 devrait pas exister : un `items_unanswered` au-dessus de 0 se voit dans les métriques, et manque le
 seuil « aucun item oublié » des essais de #210. Un `items_not_retained` élevé peut dire qu'il manque
 un sujet à la liste fermée. **Limite** : un item non traité n'est pas redemandé ; une seconde
@@ -541,7 +542,7 @@ par du code déterministe).
 | 2 | **Schéma** | un texte qui n'est pas du JSON, une clé deux fois dans un même objet (Pydantic garderait la dernière valeur sans le dire : un item répondu deux fois passerait pour un item répondu une fois ; `has_key_twice`, `llm_client.py`), un champ en trop (`extra="forbid"`), un type faux, une borne de structure dépassée (plus de 12 affirmations, `item_ids` hors de 1 à 5) | `schema` |
 | 3 | **Sujets** | un sujet hors de la liste de `core/config.py` (au classement : une réponse qui n'est ni un sujet de la liste ni `no_suitable_subject`) | `subject` |
 | 4 | **`item_id`** | un identifiant qui n'a pas été envoyé dans **cet** appel (un item inventé, ou d'un autre sujet) ; un `facts[].item_id` hors des `item_ids` de son affirmation | `item_id` |
-| 5 | **Complétude** (classement) | ne refuse plus rien depuis `classify-2` : un item répondu deux fois est refusé par le contrôle 2, un item sans réponse est compté à part (`unanswered`, `items_unanswered`) ; avant `classify-2`, un item présent deux fois | `completeness` (plus produit) |
+| 5 | **Complétude** (classement) | une sortie qui ne répond à **aucun** item du lot (`{}`, un fournisseur qui ignore le mode strict) ; un item sans réponse parmi d'autres n'est pas refusé, il est compté à part (`unanswered`, `items_unanswered`) ; un item répondu deux fois est refusé par le contrôle 2 (avant `classify-2`, le contrôle 5 refusait un item présent deux fois) | `completeness` |
 | 6 | **Markdown** (rédaction) | un `text` qui contient `(?i)[a-z][a-z0-9+.-]*://`, `(?i)www\.`, `(?i)mailto:`, `(?i)xmpp:`, `![`, `[[`, `](`, `]:` ou `<[a-zA-Z/!?]` | `markup` |
 | 7 | **Fidélité** (rédaction) | voir ci-dessous : retire l'affirmation, n'est pas un échec | — |
 

@@ -4249,7 +4249,11 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   « non retenu » sans compteur (une panne passerait pour un jugement). La réponse de l'API IA passe
   en version 0.3.0 (un champ ajouté ; `kb digest` ignore les champs qu'il ne connaît pas). Limite :
   un item non traité n'est pas redemandé ; une seconde chance ciblée viendra si les essais en
-  montrent. — PR de #210 (`classify-2`)
+  montrent. **Une sortie qui ne répond à aucun item du lot (`{}`) est refusée** (`completeness`,
+  avec une nouvelle tentative) : elle ne trie rien, et vient d'un fournisseur qui ignore le mode
+  strict ; sans ce refus, tout le lot passerait en « non traité » et la demande rendrait un 200
+  vide (revue de code `high` de la PR, tranchée par time-knight, soumise à Sabine). — PR de #210
+  (`classify-2`)
 
 ## Décisions encore ouvertes
 

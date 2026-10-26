@@ -1,5 +1,5 @@
 """The classification of the items of a request: each item to one subject of the closed list, or
-to no suitable subject; the code checks the output again (checks 3 and 4)."""
+to no suitable subject; the code checks the output again (checks 3 to 5)."""
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -39,8 +39,8 @@ subject, taken from "subjects" only, or "no_suitable_subject".
 - An item that fits no subject is "no_suitable_subject".
 - Answer with the JSON object of the schema, and nothing else."""
 # One reminder per check, added to the system prompt of a retry (llm_client.call_model). Those of
-# content_filter, completeness and markup are never sent: the first ends the call without retry,
-# an item without answer is counted, not refused, and markup is a check of the writing.
+# content_filter and markup are never sent: the first ends the call without retry, the second is
+# a check of the writing.
 CLASSIFICATION_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
     "content_filter": "Your previous answer was filtered. Sort the items only.",
     "finish_reason": "Your previous answer did not end normally. Answer with the JSON "
@@ -51,7 +51,7 @@ CLASSIFICATION_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
     '"name", or "no_suitable_subject".',
     "item_id": 'Your previous answer had an "item_id" that is not in "items". Answer only '
     "under the item_id given.",
-    "completeness": "Your previous answer was refused. Answer once for each item.",
+    "completeness": "Your previous answer answered no item. Answer once for each item.",
     "markup": "Your previous answer was refused. Answer with the JSON object of the schema "
     "only.",
 }
@@ -170,8 +170,9 @@ def check_classification(
     item_refs: frozenset[str],
     subject_names: frozenset[str],
 ) -> FailedCheck | None:
-    """Checks 3 (subjects) and 4 (items of this batch), in order; an item answered twice fails
-    check 2 before, an item without answer is counted by the caller."""
+    """Checks 3 (subjects), 4 (items of this batch) and 5 (an answer for one item at least), in
+    order; an item answered twice fails check 2 before, an item left without answer among others
+    is counted by the caller."""
     answers = output.root
     if any(
         answer not in subject_names and answer != NO_SUITABLE_SUBJECT_ANSWER
@@ -180,6 +181,8 @@ def check_classification(
         return "subject"
     if any(ref not in item_refs for ref in answers):
         return "item_id"
+    if not answers:
+        return "completeness"
     return None
 
 

@@ -315,6 +315,26 @@ def test_an_item_without_answer_is_counted_apart_without_failure(reading):
     assert classify_call.llm_call.attempts == 1
 
 
+def test_an_answer_to_no_item_is_asked_again_then_fails_the_request(reading):
+    # A provider that ignores strict mode: {} is not a miss on an item, it does not sort.
+    empty = answered([])
+
+    result, _ = digest_of(reading, [empty, empty])
+
+    assert isinstance(result, ClassificationFailure)
+    assert result.state == "llm_invalid_output"
+    assert result.stage_calls[0].llm_call.failed_check == "completeness"
+    assert result.stage_calls[0].llm_call.attempts == 2
+
+
+def test_an_answer_to_no_item_then_a_valid_one_passes(reading):
+    result, _ = digest_of(reading, [answered([]), *VALID_STEPS])
+
+    assert isinstance(result, DigestsResult)
+    assert result.stage_calls[0].llm_call.first_failed_check == "completeness"
+    assert result.unanswered == ()
+
+
 def test_an_item_answered_twice_at_the_classification_is_llm_invalid_output(reading):
     # The case of the first trial of #210 on gpt-6-luna: an item given a subject, then not
     # retained.

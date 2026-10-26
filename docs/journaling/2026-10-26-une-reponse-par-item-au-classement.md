@@ -81,9 +81,9 @@ peut donc pas les déclarer : un `RootModel` lit l'objet entier comme un diction
 identifiant → réponse. Les listes fermées sont dans le schéma envoyé, et les contrôles 3 et 4 les
 revérifient.
 
-### 3. Les contrôles 3 et 4 revérifient
+### 3. Les contrôles 3 à 5 revérifient
 
-`src/k_b/ai_api/stages/classification.py:175-182`
+`src/k_b/ai_api/stages/classification.py:176-185`
 
 ```python
     answers = output.root
@@ -94,6 +94,8 @@ revérifient.
         return "subject"
     if any(ref not in item_refs for ref in answers):
         return "item_id"
+    if not answers:
+        return "completeness"
 ```
 
 Le code ne se fie pas au mode strict (défense en profondeur, OWASP LLM01) : un fournisseur sans
@@ -101,6 +103,12 @@ mode strict, ou le modèle de remplacement des tests, peut rendre n'importe quoi
 n'est ni un sujet de la liste ni `no_suitable_subject` donne `subject` ; un identifiant qui n'est
 pas du lot donne `item_id`. Ces deux cas peuvent venir d'une injection : la sortie est refusée,
 avec une nouvelle tentative.
+
+Le contrôle 5 refuse une sortie qui ne répond à **aucun** item (`{}`). Un objet vide passe la
+validation du `RootModel` : sans ce contrôle, tout le lot deviendrait « non traité » et la demande
+rendrait un 200 sans fiche, sans nouvelle tentative. La revue de code de niveau `high` l'a montré.
+Un item oublié parmi d'autres, lui, n'est pas refusé (section suivante) : c'est un raté sur un
+item, alors qu'une sortie vide ne trie rien.
 
 ### 4. Les trois cas : catégorisé, sans sujet adapté, non traité
 
@@ -196,8 +204,9 @@ nom, `not_retained`, qui est le contrat existant.
 
 | Test | Ce que ça démontre |
 |---|---|
-| `test_an_item_answered_twice_at_the_classification_is_llm_invalid_output` (`tests/ai_api/test_digests.py:318`) | Le cas de l'essai 1 (un item avec un sujet, puis sans sujet adapté) est refusé en `schema` |
+| `test_an_item_answered_twice_at_the_classification_is_llm_invalid_output` (`tests/ai_api/test_digests.py:338`) | Le cas de l'essai 1 (un item avec un sujet, puis sans sujet adapté) est refusé en `schema` |
 | `test_an_item_without_answer_is_counted_apart_without_failure` (`test_digests.py:304`) | Un item oublié n'arrête rien : il va dans `unanswered`, séparé de `not_retained`, et les compteurs du lot valent (2, 1) |
+| `test_an_answer_to_no_item_is_asked_again_then_fails_the_request` et `test_an_answer_to_no_item_then_a_valid_one_passes` (`test_digests.py:318`) | Une sortie vide est refusée en `completeness`, redemandée une fois, et fait échouer la demande si elle revient |
 | `test_each_call_writes_one_json_line_on_stdout_without_a_text` (`tests/ai_api/test_digest_router.py:517`) | La ligne de classement porte `items_not_retained` et `items_unanswered`, dans l'ordre de la spec ; nuls à la rédaction |
 | le test des compteurs OpenTelemetry (`test_digest_router.py`) | `k_b.digest.items_not_retained` et `k_b.digest.items_unanswered` reprennent la ligne JSON |
 | `test_a_subject_out_of_the_list_is_refused` (`test_digests.py`) | Une réponse hors liste donne `subject` ; chaque propriété du schéma porte les sujets plus `no_suitable_subject` |
@@ -214,7 +223,7 @@ nom, `not_retained`, qui est le contrat existant.
    OpenAI. Il fallait une forme où le doublon est impossible, d'où l'objet.
 2. **Si le mode strict garantit déjà tout, pourquoi les contrôles ?** Parce que le code ne s'y fie
    pas : un autre fournisseur, ou le replay, rend ce qu'il veut. Les contrôles refusent un
-   doublon, une réponse hors liste, un item inventé (`classification.py:175-182`,
+   doublon, une réponse hors liste, un item inventé, une sortie vide (`classification.py:176-185`,
    `llm_client.py:440`), et l'item oublié est compté (`digests.py:270-286`).
 3. **Pourquoi refuser une clé en double, puisque le JSON l'accepte ?** Parce que Pydantic garderait
    la dernière valeur sans rien dire : on ne saurait pas que le modèle a hésité, et le code
