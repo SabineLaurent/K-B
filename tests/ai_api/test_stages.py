@@ -227,12 +227,20 @@ def test_the_writing_schema_matches_its_model():
     )
 
 
-def test_the_classification_model_reads_an_answer_the_schema_allows():
-    output = ClassificationOutput.model_validate_json(
-        '{"i1": "research", "i2": "no_suitable_subject"}', strict=True
-    )
+def test_the_classification_model_reads_every_answer_the_schema_allows():
+    """Ties the schema sent to the model that reads the output: each value of each enum, under
+    each property required, passes the strict validation."""
+    schema = build_classification_schema(["i1", "i2"], ["research", "models"])
 
-    assert output.root == {"i1": "research", "i2": NO_SUITABLE_SUBJECT_ANSWER}
+    for ref, answer_schema in schema["properties"].items():
+        assert answer_schema["type"] == "string"
+        for answer in answer_schema["enum"]:
+            answers = {required: answer for required in schema["required"]}
+            output = ClassificationOutput.model_validate_json(
+                json.dumps(answers), strict=True
+            )
+            assert output.root == answers, ref
+    assert schema["properties"]["i1"]["enum"][-1] == NO_SUITABLE_SUBJECT_ANSWER
 
 
 # The strictest bounds known of a schema in strict mode (docs/fiches-veille.md, "Schémas"): 100
