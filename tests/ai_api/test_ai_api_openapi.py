@@ -58,8 +58,8 @@ def test_the_versioned_openapi_is_valid_and_closes_its_route_by_a_key():
     openapi = read_versioned_openapi()
 
     OpenAPIV31SpecValidator(openapi).validate()
-    # 0.2.0: model in the response (#209).
-    assert openapi["info"] == {"title": "K-B AI API", "version": "0.3.0"}
+    # 0.2.0: model in the response (#209); 0.3.0: unanswered (#210); 0.4.0: three fields renamed.
+    assert openapi["info"] == {"title": "K-B AI API", "version": "0.4.0"}
     assert "model" in openapi["components"]["schemas"]["DigestsSchema"]["required"]
     assert list(openapi["paths"]) == ["/digests"]
     assert openapi["components"]["securitySchemes"] == {

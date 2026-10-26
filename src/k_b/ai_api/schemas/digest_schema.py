@@ -54,9 +54,9 @@ class DigestSchema(BaseModel):
     subject: str
     claims: list[ClaimSchema]
     sources: list[SourceSchema]
-    not_retained: list[int]
+    items_not_retained_in_output: list[int]
     claims_removed: int
-    items_uncited: list[int]
+    items_removed_by_checks: list[int]
 
 
 class FailedSubjectSchema(BaseModel):
@@ -77,9 +77,9 @@ class DigestsSchema(BaseModel):
         description="Items of the classification that no subject suits."
     )
     unanswered: list[int] = Field(
-        description="Items the classification left without answer, not retained either."
+        description="Items the classification left without answer, in no digest either."
     )
     items_in: int
     items_truncated: int
-    items_dropped: int
+    items_dropped_before_writing_stage: int
     items_capped: bool

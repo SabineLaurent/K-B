@@ -226,11 +226,15 @@ def test_a_request_gives_a_digest_per_subject_with_its_window_and_its_id(make_ai
     [source] = security["sources"]
     assert (source["item_id"], source["kind"]) == (3, "vulnerability")
     assert source["url"].startswith("https://")
-    assert security["not_retained"] == [4]
+    assert security["items_not_retained_in_output"] == [4]
     assert body["digests"][2]["claims"] == []
     assert body["failed_subjects"] == []
     assert body["no_suitable_subject"] == NO_SUITABLE_SUBJECT_ITEMS
-    assert (body["items_in"], body["items_dropped"], body["items_capped"]) == (
+    assert (
+        body["items_in"],
+        body["items_dropped_before_writing_stage"],
+        body["items_capped"],
+    ) == (
         10,
         0,
         False,
@@ -407,7 +411,10 @@ def test_a_classification_that_fails_fails_the_request_with_its_lines(
     assert (line["stage"], line["outcome"]) == ("classify", state)
     assert line["request_id"] == response.headers["X-Request-ID"]
     assert isinstance(line["data_fetch_ms"], int)
-    assert (line["items_dropped"], line["items_capped"]) == (0, False)
+    assert (line["items_dropped_before_writing_stage"], line["items_capped"]) == (
+        0,
+        False,
+    )
 
 
 def test_a_writing_that_fails_names_its_subject_and_the_others_are_returned(
@@ -487,7 +494,7 @@ METRIC_FIELDS = [
     "prompt_version",
     "items_in",
     "items_truncated",
-    "items_dropped",
+    "items_dropped_before_writing_stage",
     "items_capped",
     "input_chars",
     "tokens_in",
@@ -507,7 +514,7 @@ METRIC_FIELDS = [
     "facts_found",
     "fidelity_rate",
     "claims_removed",
-    "items_uncited",
+    "items_removed_by_checks",
     "items_with_subject",
     "items_no_suitable_subject",
     "items_unanswered",
@@ -534,12 +541,16 @@ def test_each_call_writes_one_json_line_on_stdout_without_a_text(make_ai_api, ca
     assert first["request_id"] == response.json()["request_id"]
     assert (first["provider"], first["model"]) == ("replay", "replay")
     assert isinstance(first["data_fetch_ms"], int)
-    assert (first["items_in"], first["items_dropped"], first["items_capped"]) == (
+    assert (
+        first["items_in"],
+        first["items_dropped_before_writing_stage"],
+        first["items_capped"],
+    ) == (
         10,
         0,
         False,
     )
-    assert (first["claims_removed"], first["items_uncited"]) == (None, None)
+    assert (first["claims_removed"], first["items_removed_by_checks"]) == (None, None)
     # The three cases of the classification: 5 items given a subject, 3 that no subject
     # suits, none left without answer.
     assert (
@@ -554,12 +565,16 @@ def test_each_call_writes_one_json_line_on_stdout_without_a_text(make_ai_api, ca
         + first["items_unanswered"]
     ) == first["items_in"]
     for line in others:
-        assert (line["data_fetch_ms"], line["items_dropped"], line["items_capped"]) == (
+        assert (
+            line["data_fetch_ms"],
+            line["items_dropped_before_writing_stage"],
+            line["items_capped"],
+        ) == (
             None,
             None,
             None,
         )
-    assert (others[0]["claims_removed"], others[0]["items_uncited"]) == (0, 0)
+    assert (others[0]["claims_removed"], others[0]["items_removed_by_checks"]) == (0, 0)
     for line in others:
         assert (
             line["items_with_subject"],
@@ -730,8 +745,8 @@ def test_each_call_is_measured_in_opentelemetry_as_on_its_line(
     assert find_point(points, "k_b.digest.claims_removed") == sum(
         line["claims_removed"] for line in writes
     )
-    assert find_point(points, "k_b.digest.items_uncited") == sum(
-        line["items_uncited"] for line in writes
+    assert find_point(points, "k_b.digest.items_removed_by_checks") == sum(
+        line["items_removed_by_checks"] for line in writes
     )
     assert (
         find_point(points, "k_b.digest.items_with_subject")

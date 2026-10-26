@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "K-B AI API",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "paths": {
     "/digests": {
@@ -167,23 +167,23 @@
             "type": "array",
             "title": "Sources"
           },
-          "not_retained": {
+          "items_not_retained_in_output": {
             "items": {
               "type": "integer"
             },
             "type": "array",
-            "title": "Not Retained"
+            "title": "Items Not Retained In Output"
           },
           "claims_removed": {
             "type": "integer",
             "title": "Claims Removed"
           },
-          "items_uncited": {
+          "items_removed_by_checks": {
             "items": {
               "type": "integer"
             },
             "type": "array",
-            "title": "Items Uncited"
+            "title": "Items Removed By Checks"
           }
         },
         "type": "object",
@@ -191,9 +191,9 @@
           "subject",
           "claims",
           "sources",
-          "not_retained",
+          "items_not_retained_in_output",
           "claims_removed",
-          "items_uncited"
+          "items_removed_by_checks"
         ],
         "title": "DigestSchema"
       },
@@ -239,7 +239,7 @@
             },
             "type": "array",
             "title": "Unanswered",
-            "description": "Items the classification left without answer, not retained either."
+            "description": "Items the classification left without answer, in no digest either."
           },
           "items_in": {
             "type": "integer",
@@ -249,9 +249,9 @@
             "type": "integer",
             "title": "Items Truncated"
           },
-          "items_dropped": {
+          "items_dropped_before_writing_stage": {
             "type": "integer",
-            "title": "Items Dropped"
+            "title": "Items Dropped Before Writing Stage"
           },
           "items_capped": {
             "type": "boolean",
@@ -269,7 +269,7 @@
           "unanswered",
           "items_in",
           "items_truncated",
-          "items_dropped",
+          "items_dropped_before_writing_stage",
           "items_capped"
         ],
         "title": "DigestsSchema"

@@ -4261,6 +4261,37 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   option, décidée sur ce que montrent les essais (« en fonction de ce qu'il se passe en vrai »).
   — PR de #210 (`classify-2`)
 
+### Fiches de veille : le nom dit quand un item quitte la fiche
+
+- **Trois champs de l'API IA sont renommés (réponse, ligne de métrique, OpenTelemetry, et les
+  structures qui portent le même compte), pour que chacun dise le moment où l'item quitte la
+  fiche : `items_dropped` → `items_dropped_before_writing_stage` (écartés par le code avant la
+  rédaction : retirés ou disparus à la lecture, avant tout modèle ; au-delà des 60 plus récents
+  d'un sujet, après la classification, qui les a vus) ; `digests[].not_retained` →
+  `digests[].items_not_retained_in_output` (envoyés au modèle,
+  cités par aucune affirmation de sa sortie) ; `digests[].items_uncited` →
+  `digests[].items_removed_by_checks` (cités par le modèle, plus cités une fois retirées les
+  affirmations hors bornes ou infidèles ; métrique `k_b.digest.items_removed_by_checks`).**
+  Décision de Sabine du 2026-10-26, noms choisis par elle en séance avec time-knight. Pourquoi :
+  les trois listes ont toutes des items absents des sources de la fiche ; seul le moment les
+  distingue. Options écartées : `not_used`, `not_used_for_digest`, `not_retained_for_digest` (ils
+  décrivent aussi les items retirés par les contrôles) ; `never_cited`, `not_cited_in_output` et
+  `not_cited_by_model` (« not cited » se lit comme une faute de citation, un fait écrit sans sa
+  source, Sabine) ; `not_used_by_llm_choice` (le modèle est borné à 12 affirmations, ce n'est pas
+  un libre choix) ; `not_selected` (la sélection est celle des 60 items les plus récents, par le
+  code) ; `dropped_by_checks` (confondu avec `items_dropped`) ; `rejected_by_controls` et
+  `removed_by_checks` sans préfixe (ce sont les affirmations qui sont retirées, et
+  `claims_removed` est à côté) ; `items_dropped_by_code` (les contrôles sont du code aussi) ;
+  `items_dropped_before_model` (faux pour les items au-delà de 60, que la classification a vus ;
+  relevé par la revue `high` de la PR) ; `items_dropped` gardé (ne dit pas le moment) ;
+  `before_redaction` (faux ami : *redaction* veut dire caviardage en anglais). Les comptes
+  internes de la lecture (`WatchReading`) et de la sélection (`WritingSelection`) gardent
+  `items_dropped`, ce que leur étape écarte ; seule leur somme prend le nom public (Sabine, même
+  jour, sur la même revue : la lecture ne connaît pas la rédaction).
+  L'API IA passe en version 0.4.0 ; aucun client ne lit ces champs (`kb digest` les ignore). La
+  spec dit aussi « aucun sujet ne convient » (`no_suitable_subject`) là où elle disait « non
+  retenu ». — branche `refactor/name-when-an-item-leaves-the-digest`
+
 ## Décisions encore ouvertes
 
 - **Un sujet secondaire par item au classement** (2026-10-26, idée de Sabine) : une case de sujet

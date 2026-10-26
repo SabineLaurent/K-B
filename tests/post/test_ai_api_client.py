@@ -61,9 +61,9 @@ AGENT_DIGEST = DigestSchema(
         ),
     ],
     sources=[RELEASE_SOURCE, PAPER_SOURCE],
-    not_retained=[7],
+    items_not_retained_in_output=[7],
     claims_removed=0,
-    items_uncited=[],
+    items_removed_by_checks=[],
 )
 
 
@@ -85,7 +85,7 @@ def make_response(digests=(AGENT_DIGEST,), failed_subjects=(), **changes):
         "unanswered": [],
         "items_in": 4,
         "items_truncated": 0,
-        "items_dropped": 0,
+        "items_dropped_before_writing_stage": 0,
         "items_capped": False,
     } | changes
     return DigestsSchema(**fields)
