@@ -7,6 +7,7 @@ KB_DEPLOYMENT_ENVIRONMENT in .env.e2e_test: one of the three missing while the e
 headers is set, or an OTEL_* variable, fails it. Its proof ends in Grafana Explore, as the SDK
 counts a 3xx as a success."""
 
+import json
 import os
 import secrets
 from datetime import UTC, datetime
@@ -27,7 +28,7 @@ from k_b.ai_api.connectors.metrics_export import (
 )
 from k_b.ai_api.dependencies import open_data_api_client, read_request_time
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
-from k_b.core.config import DIGEST_SUBJECTS, LLM_REPLAY_BASE_URL
+from k_b.core.config import DIGEST_SUBJECTS, LLM_REPLAY_BASE_URL, NOT_RETAINED_ANSWER
 from k_b.data_api.app import create_app as create_data_app
 
 # The window of the test base read by tests/ai_api/test_digest_router.py: ten items.
@@ -38,10 +39,8 @@ WINDOW_ITEM_IDS = [3, 4, 6, 7, 8, 2, 1, 12, 11, 13]
 REPLAY = [
     {
         "kind": "completion",
-        "content": (
-            '{"assignments": [], "not_retained": ['
-            + ", ".join(f'"i{item_id}"' for item_id in WINDOW_ITEM_IDS)
-            + "]}"
+        "content": json.dumps(
+            {f"i{item_id}": NOT_RETAINED_ANSWER for item_id in WINDOW_ITEM_IDS}
         ),
         "prompt_tokens": 1_000,
         "completion_tokens": 200,

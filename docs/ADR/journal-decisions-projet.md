@@ -4205,7 +4205,49 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   réglages du modèle, des API et des sources mêlés, sans gain) ; la lecture dans `cli.py` (moins
   facile à trouver que dans le module qui porte le nom). — branche `refactor/read-environment-once`
 
+## 2026-10-26
+
+### Fiches de veille : une réponse par item au classement
+
+- **La sortie du classement est un objet avec une propriété obligatoire par item du lot, dans
+  son ordre : sa valeur est un sujet de la liste ou `not_retained` (consigne `classify-2`).
+  `not_retained` est un nom réservé (`NOT_RETAINED_ANSWER`, `core/config.py`), qu'aucun sujet ne
+  peut prendre. Une clé JSON présente deux fois dans une sortie du modèle est refusée (contrôle 2,
+  `schema`, `has_key_twice` dans `llm_client.py`), aux deux étapes.** Plan validé par Sabine le
+  2026-10-26, proposé par time-knight ; Sabine : « pour le moment on met une case pour avancer ».
+  Pourquoi : à l'essai 1 de #210 sur la veille réelle (2026-10-26, 268 items, gpt-6-luna),
+  le modèle a donné à deux items d'un lot de 50 articles TLDR à la fois un sujet et « non
+  retenu », aux deux tentatives ; le contrôle 5 a refusé le lot, et toute la demande a échoué
+  (502). Le rejeu du lot l'a montré, par les seuls identifiants. Le mode strict ne pouvait pas
+  l'interdire dans des listes : `uniqueItems` n'y est pas pris en charge (OpenAI et Azure). Avec
+  une propriété par item, cet état ne peut plus s'écrire. Pydantic garde sans le dire la dernière
+  valeur d'une clé répétée, d'où le refus explicite. Options écartées : dédoublonner par le code
+  (il réparerait en silence ce que le modèle écrit) ; laisser un lot en échec sans faire échouer
+  la demande (utile en plus, il ne corrige pas la cause, et les items du lot seraient perdus) ;
+  des lots plus petits (la probabilité baisse, le cas reste) ; une phrase de plus dans la consigne
+  (une règle en prose ne tient pas) ; un sujet secondaire par item (voir les décisions encore
+  ouvertes). Limites tenues par un test : 100 propriétés d'objet par schéma (Azure) et 1 000
+  valeurs d'`enum` (OpenAI) ; au plafond de 50 items et 8 sujets, 50 propriétés et 450 valeurs.
+  — PR de #210 (`classify-2`)
+- **Un item du lot sans réponse est un échec (`completeness`, avec une nouvelle tentative), et
+  non plus un item « non retenu ».** **Inverse** la décision du 2026-10-15 (« La complétude est
+  calculée par le code », PR de #203), qui comptait un item absent « non retenu », parce qu'un
+  petit modèle en oublie un sur 60 dans une liste. Ce qui a changé : chaque item est désormais une
+  propriété obligatoire, et le mode strict ne laisse plus en omettre une ; un oubli ne vient plus
+  que d'un fournisseur sans mode strict ou du modèle de remplacement, où échouer fermé vaut mieux
+  que de taire un item (règle « Échouer fermé » de `code.md`). Option écartée : garder « absent =
+  non retenu ». Limite : avec un fournisseur sans mode strict, un oubli fait échouer le lot après
+  la nouvelle tentative, donc toute la demande. — PR de #210 (`classify-2`)
+
 ## Décisions encore ouvertes
+
+- **Un sujet secondaire par item au classement** (2026-10-26, idée de Sabine) : une case de sujet
+  principal et une case de sujet secondaire, pour ne pas perdre qu'un item touche deux sujets.
+  Questions : à quoi servirait-il (une ligne « Voir aussi » dans la fiche, le wiki, l'annotation
+  des items en base) ; le modèle remplit-il à bon escient une case facultative ; tient-il sous les
+  limites du mode strict (deux propriétés par item, soit 100 pour un lot de 50, la limite d'Azure).
+  Rouvre « Un sujet par item » (2026-10-15, PR de #203), qui écartait plusieurs sujets par item
+  pour les doublons entre fiches. À décider après les essais de #210.
 
 - **Lecteurs maison ou pydantic-settings** (2026-10-21, gardés le 2026-10-25 « pour le moment ») :
   les lecteurs `read_…_or_refusal(environ)` de K-B, sans dépendance, contre pydantic-settings, la

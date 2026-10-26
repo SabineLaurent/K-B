@@ -13,6 +13,7 @@ from k_b.ai_api.connectors.llm_client import (
     FailedCheck,
     build_http_client,
     call_model,
+    has_key_twice,
     summarize,
     to_failure,
 )
@@ -287,6 +288,8 @@ def test_an_output_refused_by_the_check_of_the_stage_twice_is_llm_invalid_output
         '{"subject": "models", "count": "2"}',
         '{"subject": "models", "count": 9}',
         '{"subject": "", "count": 2}',
+        # Pydantic would keep the last value, valid, without a word.
+        '{"subject": "models", "count": 9, "count": 2}',
         None,
     ],
     ids=[
@@ -294,11 +297,37 @@ def test_an_output_refused_by_the_check_of_the_stage_twice_is_llm_invalid_output
         "wrong-type",
         "count-above-bound",
         "empty-subject",
+        "key-twice",
         "no-content",
     ],
 )
 def test_an_output_out_of_its_model_fails_the_schema_check(content):
     llm_call, _, _ = call([completion(content), completion(content)])
+
+    assert llm_call.outcome == "llm_invalid_output"
+    assert llm_call.failed_check == "schema"
+
+
+@pytest.mark.parametrize(
+    ("content", "is_found"),
+    [
+        ('{"i1": "a", "i1": "b"}', True),
+        ('{"claims": [{"text": "a", "text": "b"}]}', True),
+        ('{"i1": "a", "i2": "a"}', False),
+        ("not JSON", False),
+        # json raises RecursionError, not ValueError: left to the schema check, never a 500.
+        ("[" * 100_000, False),
+    ],
+    ids=["at-the-top", "nested", "same-value-twice", "not-json", "nested-too-deep"],
+)
+def test_a_key_twice_is_found_at_any_depth(content, is_found):
+    assert has_key_twice(content) is is_found
+
+
+def test_an_output_nested_too_deep_fails_the_schema_check():
+    deep = "[" * 100_000
+
+    llm_call, _, _ = call([completion(deep), completion(deep)])
 
     assert llm_call.outcome == "llm_invalid_output"
     assert llm_call.failed_check == "schema"

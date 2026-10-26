@@ -211,9 +211,12 @@ rend les `item_id` entiers de l'API de données.
 **Schéma portable.** Le `json_schema` envoyé au modèle n'utilise que ce que les fournisseurs
 acceptent en mode strict : `additionalProperties: false`, **tous** les champs dans `required`, et
 ni `minLength`, ni `maxLength`, ni `minItems`, ni `maxItems` (Azure les refuse en mode strict).
-Les bornes de ce document sont vérifiées par le code. Limite : 1 000 valeurs d'`enum` au plus par
-schéma (OpenAI, structured outputs) ; au plafond, environ 300 identifiants et 8 sujets, donc
-sous la limite.
+Les bornes de ce document sont vérifiées par le code. Limites : 1 000 valeurs d'`enum` au plus par
+schéma (OpenAI, structured outputs) et 100 propriétés d'objet (Azure, [structured
+outputs](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs), page du
+2026-08-24, lue le 2026-10-26). Le schéma du classement porte une propriété par item du lot
+(`classify-2`) : au plafond de 50 items et 8 sujets, 50 propriétés et 50 × 9 = 450 valeurs
+d'`enum`, sous les deux limites ; un test les tient (`tests/ai_api/test_stages.py`).
 
 **Réglages d'appel**, lus dans la configuration (#150) : `reasoning_effort: "none"`
 (`KB_LLM_REASONING_EFFORT=none`) pour un modèle à raisonnement, sinon `temperature=0`. Mesure de
@@ -337,20 +340,35 @@ champs où la fidélité cherche un fait (section « Fidélité ») :
 
 ### Sortie du classement
 
-`response_format` `json_schema`, `strict: true`.
+`response_format` `json_schema`, `strict: true`. Une réponse par item du lot, sous son
+identifiant (consigne `classify-2`) :
 
 ```json
 {
-  "assignments": [{"item_id": "i12", "subject": "llm_security"}],
-  "not_retained": ["i7"]
+  "i12": "llm_security",
+  "i7": "not_retained"
 }
 ```
 
 | Champ | Contrainte |
 |---|---|
-| `assignments[].item_id`, `not_retained[]` | `enum` des `item_id` envoyés dans cet appel |
-| `assignments[].subject` | `enum` des sujets de `core/config.py` |
-| ensemble | chaque item envoyé apparaît **au plus une fois**, dans `assignments` ou dans `not_retained` ; un item absent est compté « non retenu » par le code |
+| propriétés | une par item envoyé dans cet appel, dans l'ordre du lot, **toutes dans `required`** ; `additionalProperties: false` |
+| valeur | `enum` des sujets de `core/config.py`, plus `not_retained` (`NOT_RETAINED_ANSWER`, nom réservé : aucun sujet ne peut le prendre, un test le tient) |
+| ensemble | chaque item envoyé reçoit **exactement une** réponse : le mode strict ne peut ni en omettre un, ni lui en donner deux |
+
+**Pourquoi une propriété par item** (essai 1 de #210, 2026-10-26, sur la veille réelle). Avec
+`classify-1`, la sortie était deux listes, `assignments` (`item_id`, `subject`) et `not_retained`.
+Le mode strict ne pouvait pas y interdire un doublon : `uniqueItems` n'est pas pris en charge
+([guide OpenAI](https://developers.openai.com/api/docs/guides/prompt-generation), lu le
+2026-10-26 ; table des mots-clés refusés de la page Azure citée plus haut). gpt-6-luna a donné à
+deux items d'un lot de 50 articles TLDR à la fois un sujet et « non retenu », aux deux tentatives :
+le contrôle 5 a refusé le lot, et toute la demande a échoué (502 `llm_invalid_output`). Avec une
+propriété par item, cet état ne peut plus s'écrire ; le code le revérifie (contrôles 2 et 5).
+Options écartées : dédoublonner par le code (il réparerait en silence ce que le modèle écrit) ;
+laisser un lot en échec sans faire échouer la demande (utile en plus, il ne corrige pas la
+cause, et les items du lot seraient perdus) ; des lots plus petits (la probabilité baisse, le cas
+reste) ; une phrase de plus dans la consigne (une règle en prose ne tient pas). **Limite** : un
+item reçoit un seul sujet ; un sujet secondaire est une piste à décider après les essais de #210.
 
 ### Sortie de la rédaction
 
@@ -496,10 +514,10 @@ par du code déterministe).
 | N° | Contrôle | Refuse | `failed_check` |
 |---|---|---|---|
 | 1 | `finish_reason` (liste blanche) | `stop` passe ; `length` → `llm_truncated` ; `content_filter` → `llm_content_filtered` ; toute autre valeur → `llm_invalid_output` (échouer fermé sur une valeur inconnue, `tool_calls` compris) | `content_filter` pour un filtrage ; `finish_reason` pour une valeur hors liste |
-| 2 | **Schéma** | un texte qui n'est pas du JSON, un champ en trop (`extra="forbid"`), un type faux, une borne de structure dépassée (plus de 12 affirmations, `item_ids` hors de 1 à 5) | `schema` |
-| 3 | **Sujets** | un sujet hors de la liste de `core/config.py` | `subject` |
+| 2 | **Schéma** | un texte qui n'est pas du JSON, une clé deux fois dans un même objet (Pydantic garderait la dernière valeur sans le dire : un item répondu deux fois passerait pour un item répondu une fois ; `has_key_twice`, `llm_client.py`), un champ en trop (`extra="forbid"`), un type faux, une borne de structure dépassée (plus de 12 affirmations, `item_ids` hors de 1 à 5) | `schema` |
+| 3 | **Sujets** | un sujet hors de la liste de `core/config.py` (au classement : une réponse qui n'est ni un sujet de la liste ni `not_retained`) | `subject` |
 | 4 | **`item_id`** | un identifiant qui n'a pas été envoyé dans **cet** appel (un item inventé, ou d'un autre sujet) ; un `facts[].item_id` hors des `item_ids` de son affirmation | `item_id` |
-| 5 | **Complétude** (classement) | un item présent deux fois dans la sortie du classement ; un item absent n'est pas un échec : il est compté « non retenu » | `completeness` |
+| 5 | **Complétude** (classement) | un item du lot sans réponse (depuis `classify-2` ; avant, il était compté « non retenu ») ; un item répondu deux fois est refusé avant, par le contrôle 2 | `completeness` |
 | 6 | **Markdown** (rédaction) | un `text` qui contient `(?i)[a-z][a-z0-9+.-]*://`, `(?i)www\.`, `(?i)mailto:`, `(?i)xmpp:`, `![`, `[[`, `](`, `]:` ou `<[a-zA-Z/!?]` | `markup` |
 | 7 | **Fidélité** (rédaction) | voir ci-dessous : retire l'affirmation, n'est pas un échec | — |
 
@@ -748,7 +766,7 @@ ne sont écrites qu'au retour du parcours.
 | `stage` | `classify` ou `write` |
 | `subject` | le sujet rédigé ; nul au classement |
 | `provider`, `model` | lus dans la configuration (#150) |
-| `prompt_version` | constante de la consigne utilisée (`classify-1`, `write-1`), changée à la main avec elle |
+| `prompt_version` | constante de la consigne utilisée (`classify-2`, `write-1`), changée à la main avec elle |
 | `items_in` | items envoyés dans l'appel |
 | `items_truncated` | items de cet appel dont un champ est coupé |
 | `items_dropped`, `items_capped` | compteurs de la demande (section « Entrée du modèle ») ; sur la première ligne de classement de la demande, nuls ailleurs |
@@ -913,9 +931,11 @@ client. Les traces sont l'objet de #281.
   dans `DefaultV2`, lit le message utilisateur, où sont les items : un item réel qui parle
   d'injection d'instructions peut faire rendre un 400 `content_filter` à tout un lot (502
   `llm_content_filtered`, sans nouvelle tentative). Un seul item piégé peut aussi provoquer deux
-  sorties fautives de suite (un doublon, `completeness` ; une sortie sans fin, `llm_truncated`).
-  Non observé par #158 (aucun filtre sur 20 appels réels) ; renvoyé à #206 (décision de Sabine du
-  2026-10-17), qui teste le doublon sur le replay (`completeness`). Le filtre et la sortie sans
+  sorties fautives de suite (un doublon, refusé par le contrôle 2 depuis `classify-2` ; une
+  sortie sans fin, `llm_truncated`). Non observé par #158 (aucun filtre sur 20 appels réels) ;
+  renvoyé à #206 (décision de Sabine du 2026-10-17), qui teste le doublon sur le replay (une clé
+  deux fois, `schema`). Un doublon sans aucun piège a fait échouer l'essai 1 de #210 sur
+  `classify-1` (section « Sortie du classement »). Le filtre et la sortie sans
   fin, sur le vrai modèle, passent à #210, où Sabine décide de l'essai (décision du 2026-10-21 :
   provoquer le filtre exprès est l'essai écarté par #158). Option écartée : couper le lot en deux
   et recommencer pour isoler l'item (jusqu'à environ 12 appels de plus, et un contrat changé).

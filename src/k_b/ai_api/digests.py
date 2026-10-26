@@ -34,7 +34,7 @@ from k_b.ai_api.watch_items import (
     select_for_writing,
     to_item_ref,
 )
-from k_b.core.config import DigestSubject
+from k_b.core.config import NOT_RETAINED_ANSWER, DigestSubject
 
 type Stage = Literal["classify", "write"]
 # A source URL is returned only with one of these schemes (docs/fiches-veille.md, "Réponse").
@@ -250,7 +250,11 @@ def classify(
                 to_failure(llm_call.outcome), retry_after, tuple(stage_calls)
             )
         subject_by_ref.update(
-            {a.item_id: a.subject for a in llm_call.output.assignments}
+            {
+                ref: answer
+                for ref, answer in llm_call.output.root.items()
+                if answer != NOT_RETAINED_ANSWER
+            }
         )
     subject_by_item_id = {
         item.item_id: subject_by_ref[to_item_ref(item.item_id)]

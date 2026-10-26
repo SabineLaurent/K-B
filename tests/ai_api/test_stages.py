@@ -38,6 +38,7 @@ from k_b.core.config import (
     MAX_CLASSIFICATION_INPUT_CHARS,
     MAX_FIELD_CHARS_FOR_CLASSIFICATION,
     MAX_ITEMS_PER_CLASSIFICATION_CALL,
+    NOT_RETAINED_ANSWER,
     DigestSubject,
 )
 
@@ -204,13 +205,13 @@ def walk_objects(schema):
 
 
 @pytest.mark.parametrize(
-    ("schema", "output_model"),
+    "schema",
     [
-        (build_classification_schema(["i1", "i2"], ["research"]), ClassificationOutput),
-        (build_writing_schema(["i1", "i2"]), WritingOutput),
+        build_classification_schema(["i1", "i2"], ["research"]),
+        build_writing_schema(["i1", "i2"]),
     ],
 )
-def test_the_schema_sent_is_portable_and_matches_its_model(schema, output_model):
+def test_the_schema_sent_is_portable(schema):
     """Azure refuses min* and max* in strict mode: the bounds stay in the Pydantic model, and the
     schema is written by hand."""
     for node in walk_objects(schema):
@@ -218,7 +219,43 @@ def test_the_schema_sent_is_portable_and_matches_its_model(schema, output_model)
         if node.get("type") == "object":
             assert node["additionalProperties"] is False
             assert node["required"] == list(node["properties"])
-    assert set(schema["properties"]) == set(output_model.model_fields)
+
+
+def test_the_writing_schema_matches_its_model():
+    assert set(build_writing_schema(["i1"])["properties"]) == set(
+        WritingOutput.model_fields
+    )
+
+
+def test_the_classification_model_reads_an_answer_the_schema_allows():
+    output = ClassificationOutput.model_validate_json(
+        '{"i1": "research", "i2": "not_retained"}', strict=True
+    )
+
+    assert output.root == {"i1": "research", "i2": NOT_RETAINED_ANSWER}
+
+
+# The bounds of a schema in strict mode: 100 object properties (Azure, docs of 2026-08-24) and
+# 1,000 values of enum (OpenAI).
+MAX_SCHEMA_PROPERTIES = 100
+MAX_SCHEMA_ENUM_VALUES = 1000
+
+
+def test_the_schema_of_a_full_batch_is_within_the_bounds_of_strict_mode():
+    item_refs = [f"i{number}" for number in range(MAX_ITEMS_PER_CLASSIFICATION_CALL)]
+    schema = build_classification_schema(
+        item_refs, [subject.name for subject in DIGEST_SUBJECTS]
+    )
+
+    nodes = list(walk_objects(schema))
+    assert (
+        sum(len(node.get("properties", {})) for node in nodes) <= MAX_SCHEMA_PROPERTIES
+    )
+    assert sum(len(node.get("enum", [])) for node in nodes) <= MAX_SCHEMA_ENUM_VALUES
+
+
+def test_no_subject_takes_the_answer_of_no_subject():
+    assert NOT_RETAINED_ANSWER not in {subject.name for subject in DIGEST_SUBJECTS}
 
 
 def test_a_schema_derived_from_the_writing_model_would_not_be_portable():
@@ -233,10 +270,11 @@ def test_the_schemas_carry_the_enums_of_the_call():
     classification = build_classification_schema(["i1", "i2"], ["research"])
     writing = build_writing_schema(["i1", "i2"])
 
-    assignment = classification["properties"]["assignments"]["items"]["properties"]
-    assert assignment["item_id"]["enum"] == ["i1", "i2"]
-    assert assignment["subject"]["enum"] == ["research"]
-    assert classification["properties"]["not_retained"]["items"]["enum"] == ["i1", "i2"]
+    assert list(classification["properties"]) == ["i1", "i2"]
+    assert classification["properties"]["i2"]["enum"] == [
+        "research",
+        NOT_RETAINED_ANSWER,
+    ]
     claim = writing["properties"]["claims"]["items"]["properties"]
     assert claim["item_ids"]["items"]["enum"] == ["i1", "i2"]
     assert claim["facts"]["items"]["properties"]["item_id"]["enum"] == ["i1", "i2"]

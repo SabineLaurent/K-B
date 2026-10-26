@@ -30,6 +30,7 @@ from k_b.ai_api.watch_items import WatchItem, WatchReading, build_fields
 from k_b.core.config import (
     LLM_REPLAY_BASE_URL,
     MIN_SECONDS_FOR_LLM_REQUEST,
+    NOT_RETAINED_ANSWER,
     DigestSubject,
 )
 from k_b.data_api.app import create_app
@@ -113,27 +114,33 @@ def completion(output):
     return {"kind": "completion", "content": content}
 
 
+def answered(pairs):
+    """The output of the classification written by hand, pair by pair: a key may come twice, as
+    a model could write it, and json.dumps would merge them."""
+    return completion(
+        "{" + ", ".join(f"{json.dumps(ref)}: {json.dumps(a)}" for ref, a in pairs) + "}"
+    )
+
+
 def classified(
     security=SECURITY_ITEMS,
     agent=AGENT_ITEMS,
     research=RESEARCH_ITEMS,
     not_retained=NOT_RETAINED,
+    extra=(),
 ):
-    assignments = [
-        {"item_id": f"i{item_id}", "subject": subject}
-        for subject, item_ids in (
+    """The answer for each item given, then the extra pairs."""
+    pairs = [
+        (f"i{item_id}", answer)
+        for answer, item_ids in (
             ("security_alerts", security),
             ("agent_tools", agent),
             ("research", research),
+            (NOT_RETAINED_ANSWER, not_retained),
         )
         for item_id in item_ids
     ]
-    return completion(
-        {
-            "assignments": assignments,
-            "not_retained": [f"i{item_id}" for item_id in not_retained],
-        }
-    )
+    return answered([*pairs, *extra])
 
 
 def written(*claims):
@@ -212,7 +219,7 @@ def test_the_stage_calls_carry_their_prompt_version_and_counts(reading):
     result, _ = digest_of(reading, VALID_STEPS)
 
     classify_call, security_call = result.stage_calls[:2]
-    assert classify_call.prompt_version == "classify-1"
+    assert classify_call.prompt_version == "classify-2"
     assert classify_call.items_in == len(reading.items)
     assert classify_call.claims_removed is None
     assert (classify_call.facts_checked, classify_call.facts_found) == (None, None)
@@ -225,21 +232,19 @@ def test_the_stage_calls_carry_their_prompt_version_and_counts(reading):
 
 
 def test_a_subject_out_of_the_list_is_refused(reading):
-    out_of_list = completion(
-        {"assignments": [{"item_id": "i3", "subject": "admin"}], "not_retained": []}
-    )
+    out_of_list = classified(security=[4, 9, 10, 17], extra=[("i3", "admin")])
 
     result, transport = digest_of(reading, [out_of_list, out_of_list])
 
     assert isinstance(result, ClassificationFailure)
     assert result.state == "llm_invalid_output"
     assert result.stage_calls[0].llm_call.failed_check == "subject"
-    # The schema sent holds the subjects of the list only.
+    # The schema sent holds the subjects of the list only, and the answer of no subject.
     schema = sent_bodies(transport)[0]["response_format"]["json_schema"]["schema"]
-    subject_schema = schema["properties"]["assignments"]["items"]["properties"][
-        "subject"
+    assert schema["properties"]["i3"]["enum"] == [
+        *(subject.name for subject in TEST_SUBJECTS),
+        NOT_RETAINED_ANSWER,
     ]
-    assert subject_schema["enum"] == [subject.name for subject in TEST_SUBJECTS]
 
 
 def test_an_unknown_item_id_is_refused_at_the_classification(reading):
@@ -296,24 +301,26 @@ def test_a_fact_of_an_item_its_claim_does_not_cite_is_refused(reading):
     assert result.stage_calls[2].llm_call.failed_check == "item_id"
 
 
-def test_an_item_forgotten_by_the_model_is_not_retained_without_failure(reading):
-    result, _ = digest_of(
-        reading,
-        [classified(not_retained=[12, 11]), *VALID_STEPS[1:]],
-    )
+def test_an_item_without_answer_is_llm_invalid_output(reading):
+    forgotten = classified(not_retained=[12, 11])
 
-    assert isinstance(result, DigestsResult)
-    assert result.not_retained == (12, 11, 13)
+    result, _ = digest_of(reading, [forgotten, forgotten])
+
+    assert isinstance(result, ClassificationFailure)
+    assert result.state == "llm_invalid_output"
+    assert result.stage_calls[0].llm_call.failed_check == "completeness"
 
 
-def test_an_item_twice_at_the_classification_is_llm_invalid_output(reading):
-    twice = classified(not_retained=[*NOT_RETAINED, 9])
+def test_an_item_answered_twice_at_the_classification_is_llm_invalid_output(reading):
+    # The case of the first trial of #210 on gpt-6-luna: an item given a subject, then not
+    # retained.
+    twice = classified(extra=[("i9", NOT_RETAINED_ANSWER)])
 
     result, _ = digest_of(reading, [twice, twice])
 
     assert isinstance(result, ClassificationFailure)
     assert result.state == "llm_invalid_output"
-    assert result.stage_calls[0].llm_call.failed_check == "completeness"
+    assert result.stage_calls[0].llm_call.failed_check == "schema"
 
 
 def test_a_claim_too_long_is_removed_and_counted(reading):
@@ -607,8 +614,7 @@ def test_the_schema_of_each_call_holds_the_items_of_this_call_only(reading):
     _, transport = digest_of(reading, VALID_STEPS)
 
     classification_body, security_body = sent_bodies(transport)[:2]
-    assignment = schema_sent(classification_body)["properties"]["assignments"]
-    assert assignment["items"]["properties"]["item_id"]["enum"] == [
+    assert list(schema_sent(classification_body)["properties"]) == [
         f"i{item.item_id}" for item in reading.items
     ]
     claim = schema_sent(security_body)["properties"]["claims"]["items"]
@@ -810,11 +816,9 @@ def trapped_reading(reading):
 
 
 def classified_with_trap(agent=(*AGENT_ITEMS, TRAPPED_ITEM_ID), trapped=()):
-    """The valid classification, the trapped item in agent_tools, and the assignments the trap
-    asks for."""
-    output = json.loads(classified(agent=list(agent))["content"])
-    output["assignments"].extend(trapped)
-    return completion(output)
+    """The valid classification, the trapped item in agent_tools, and the answers the trap asks
+    for."""
+    return classified(agent=list(agent), extra=trapped)
 
 
 def trapped_claim(text, item_ids=(TRAPPED_REF,)):
@@ -838,18 +842,17 @@ def written_with_trap(claim):
 
 
 ADMIN_SUBJECT = classified_with_trap(
-    agent=AGENT_ITEMS, trapped=[{"item_id": TRAPPED_REF, "subject": "admin"}]
+    agent=AGENT_ITEMS, trapped=[(TRAPPED_REF, "admin")]
 )
-TRAPPED_TWICE = classified_with_trap(
-    trapped=[{"item_id": TRAPPED_REF, "subject": "research"}]
-)
+# Answered twice: a key twice in the output, refused by the schema check.
+TRAPPED_TWICE = classified_with_trap(trapped=[(TRAPPED_REF, "research")])
 
 
 @pytest.mark.parametrize(
     ("steps", "failed_check"),
     [
         ([ADMIN_SUBJECT, ADMIN_SUBJECT], "subject"),
-        ([TRAPPED_TWICE, TRAPPED_TWICE], "completeness"),
+        ([TRAPPED_TWICE, TRAPPED_TWICE], "schema"),
         (
             written_with_trap(
                 trapped_claim("La Chine recrute.", (TRAPPED_REF, "i99999"))

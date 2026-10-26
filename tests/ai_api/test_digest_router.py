@@ -34,6 +34,7 @@ from k_b.core.config import (
     LLM_INPUT_USD_PER_MILLION_TOKENS,
     LLM_OUTPUT_USD_PER_MILLION_TOKENS,
     LLM_REPLAY_BASE_URL,
+    NOT_RETAINED_ANSWER,
     DigestSubject,
 )
 from k_b.data_api.app import create_app as create_data_app
@@ -95,19 +96,16 @@ def classified(
     research=RESEARCH_ITEMS,
     not_retained=NOT_RETAINED,
 ):
-    assignments = [
-        {"item_id": f"i{item_id}", "subject": subject}
-        for subject, item_ids in (
-            ("security_alerts", security),
-            ("agent_tools", agent),
-            ("research", research),
-        )
-        for item_id in item_ids
-    ]
     return completion(
         {
-            "assignments": assignments,
-            "not_retained": [f"i{item_id}" for item_id in not_retained],
+            f"i{item_id}": answer
+            for answer, item_ids in (
+                ("security_alerts", security),
+                ("agent_tools", agent),
+                ("research", research),
+                (NOT_RETAINED_ANSWER, not_retained),
+            )
+            for item_id in item_ids
         }
     )
 

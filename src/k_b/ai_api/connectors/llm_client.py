@@ -411,7 +411,7 @@ def check_completion[OutputT: BaseModel](
         return refuse("llm_content_filtered", "content_filter", is_retried=False)
     if finish_reason != "stop":
         return refuse("llm_invalid_output", "finish_reason", is_retried=True)
-    if choice.message.content is None:
+    if choice.message.content is None or has_key_twice(choice.message.content):
         return refuse("llm_invalid_output", "schema", is_retried=True)
     try:
         output = output_model.model_validate_json(choice.message.content, strict=True)
@@ -431,6 +431,30 @@ def check_completion[OutputT: BaseModel](
         check_seconds=time.perf_counter() - started,
         is_checked=True,
     )
+
+
+class KeyTwiceError(ValueError):
+    """A JSON object holds a key twice."""
+
+
+def has_key_twice(content: str) -> bool:
+    """Whether an object of the JSON content holds a key twice: Pydantic keeps the last value
+    without a word, and an item answered twice would pass for an item answered once. A text that
+    is not JSON, or nested too deep for json, is left to the schema check."""
+    try:
+        json.loads(content, object_pairs_hook=refuse_key_twice)
+    except KeyTwiceError:
+        return True
+    except (ValueError, RecursionError):
+        return False
+    return False
+
+
+def refuse_key_twice(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    keys = [key for key, _ in pairs]
+    if len(set(keys)) < len(keys):
+        raise KeyTwiceError
+    return dict(pairs)
 
 
 def summarize[OutputT: BaseModel](
