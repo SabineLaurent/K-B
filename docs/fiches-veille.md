@@ -337,11 +337,14 @@ champs où la fidélité cherche un fait (section « Fidélité ») :
   (#158 : 46 items, environ 5 500 jetons). Une `advisory`, sans texte long, est classée par son
   titre ; un `body` nul de release est envoyé nul.
 - `items_truncated` compte les items dont un champ est coupé à 2 000 caractères pour la
-  rédaction ; `items_dropped_before_writing_stage`, ceux laissés hors d'une fiche (au-delà de 60, retirés, ou disparus
-  entre la liste et le détail : 404 `item_not_found`). La coupe à 500 du classement n'y est pas
-  comptée (presque tous les items y passent) : elle est comptée par appel, dans la ligne de
-  métrique. **Limite** : la coupe et le plafond de 60 ne sont comptés que pour un sujet envoyé à
-  la rédaction ; un sujet laissé en `llm_timeout` avant l'envoi n'y ajoute rien.
+  rédaction ; `items_dropped_before_writing_stage`, ceux que les règles du code laissent hors
+  d'une fiche avant la rédaction (au-delà de 60, retirés, ou disparus entre la liste et le
+  détail : 404 `item_not_found`). Les items sans sujet adapté, sans réponse, ou d'un sujet en
+  échec n'y sont pas : ils ont leurs propres champs (`no_suitable_subject`, `unanswered`,
+  `failed_subjects`). La coupe à 500 du classement n'y est pas comptée (presque tous les items y
+  passent) : elle est comptée par appel, dans la ligne de métrique. **Limite** : la coupe et le
+  plafond de 60 ne sont comptés que pour un sujet envoyé à la rédaction ; un sujet laissé en
+  `llm_timeout` ou `llm_rate_limited` avant l'envoi n'y ajoute rien.
 - `items_capped` est vrai s'il reste au moins un item au-delà de `MAX_ITEMS_PER_DIGEST_REQUEST`
   (section « Lecture plafonnée ») ; ces items ne sont pas lus, donc pas comptés.
 
@@ -535,8 +538,8 @@ de la requête.
 - **`GET /health`** répond 200 `{"status": "ok"}` sans clé, comme celle de l'API de données.
 - **Version** : `0.4.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
   un changement visible par un client change les deux. `0.1.0` : `POST /digests` (#156) ; `0.2.0` :
-  `model` dans la réponse (#209) ; `0.3.0` : `unanswered`, et `not_retained` renommé
-  `no_suitable_subject` (#210, `classify-2`) ; `0.4.0` : `items_dropped` renommé
+  `model` dans la réponse (#209) ; `0.3.0` : `unanswered`, et `not_retained` du premier niveau
+  renommé `no_suitable_subject` (#210, `classify-2`) ; `0.4.0` : `items_dropped` renommé
   `items_dropped_before_writing_stage`, `digests[].not_retained` renommé
   `digests[].items_not_retained_in_output`, `digests[].items_uncited` renommé
   `digests[].items_removed_by_checks` (décision de Sabine du 2026-10-26).
@@ -825,10 +828,11 @@ ne sont écrites qu'au retour du parcours.
 | `items_with_subject`, `items_no_suitable_subject`, `items_unanswered` | compteurs du classement (section « Sortie du classement », « Trois cas ») : les items du lot qui ont reçu un sujet, ceux auxquels aucun sujet ne convient, et ceux que le modèle a laissés sans réponse, `items_in` à eux trois ; nuls à la rédaction, et pour un classement en échec |
 | `cost_estimated` | en USD, arrondi à 6 décimales : `tokens_in` et `tokens_out` × prix au million de `core/config.py` (gpt-6-luna, Data Zone Standard, France Central, contexte court : 0,12 et 0,60) ; 0 en offre gratuite. **Limite** : tout appel est compté à ces prix, le replay compris (ses jetons sont ceux de ses pas, `provider` le dit) et un autre `KB_LLM_MODEL` aussi |
 
-`ts`, `stage`, `failed_check`, `items_dropped_before_writing_stage` (nommé `items_dropped` avant 0.4.0), `items_capped`,
-`reasoning_tokens` et `http_status`
+`ts`, `stage`, `failed_check`, `items_dropped`, `items_capped`, `reasoning_tokens` et `http_status`
 s'ajoutent à la liste de #156, puis `first_failed_check` (#205), puis `fidelity_rate` (#207), puis
-`items_with_subject`, `items_no_suitable_subject` et `items_unanswered` (`classify-2`, #210).
+`items_with_subject`, `items_no_suitable_subject` et `items_unanswered` (`classify-2`, #210). En
+0.4.0, `items_dropped` devient `items_dropped_before_writing_stage` et `items_uncited`,
+`items_removed_by_checks`.
 
 **Jamais** dans une ligne : le texte d'un item ou d'une affirmation, la consigne, la sortie du
 modèle, un titre, un auteur, une clé (règle 5 de `poc.md`). Un échec `data_api_*` ne fait aucun appel au modèle, donc

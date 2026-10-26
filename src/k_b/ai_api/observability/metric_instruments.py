@@ -77,7 +77,7 @@ class ModelMetrics:
         self._claims_removed = meter.create_counter(
             "k_b.digest.claims_removed",
             unit="{claim}",
-            description="Claims removed from the digests by the checks of fidelity.",
+            description="Claims removed from the digests by the checks, bounds or fidelity.",
         )
         self._items_removed_by_checks = meter.create_counter(
             "k_b.digest.items_removed_by_checks",

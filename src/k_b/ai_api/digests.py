@@ -53,8 +53,8 @@ class StageCall:
     # Items of this call with a field cut: at 500 characters for the classification, at 2,000
     # for the writing.
     items_truncated: int
-    # Of a writing whose output is checked; None otherwise. items_removed_by_checks counts the items no
-    # longer cited once the claims out of their bounds or unfaithful are removed.
+    # Of a writing whose output is checked; None otherwise. items_removed_by_checks counts the
+    # items no longer cited once the claims out of their bounds or unfaithful are removed.
     facts_checked: int | None
     facts_found: int | None
     claims_removed: int | None
