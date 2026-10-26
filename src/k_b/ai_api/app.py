@@ -21,7 +21,7 @@ from k_b.core.api_telemetry import NATIVE_TELEMETRY_OFF
 from k_b.core.config import DigestSubject
 
 # The version of the contract of docs/fiches-veille.md: a change a client can see changes both.
-API_VERSION = "0.3.0"
+API_VERSION = "0.4.0"
 
 
 def create_app(

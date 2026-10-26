@@ -79,8 +79,8 @@ class ModelMetrics:
             unit="{claim}",
             description="Claims removed from the digests by the checks of fidelity.",
         )
-        self._items_uncited = meter.create_counter(
-            "k_b.digest.items_uncited",
+        self._items_removed_by_checks = meter.create_counter(
+            "k_b.digest.items_removed_by_checks",
             unit="{item}",
             description="Items no longer cited once claims are removed, by bounds or fidelity.",
         )
@@ -157,8 +157,10 @@ class ModelMetrics:
             self._cost.add(estimate_cost(call.tokens_in, call.tokens_out), attributes)
             if stage_call.claims_removed is not None:
                 self._claims_removed.add(stage_call.claims_removed, attributes)
-            if stage_call.items_uncited is not None:
-                self._items_uncited.add(stage_call.items_uncited, attributes)
+            if stage_call.items_removed_by_checks is not None:
+                self._items_removed_by_checks.add(
+                    stage_call.items_removed_by_checks, attributes
+                )
             if stage_call.items_with_subject is not None:
                 self._items_with_subject.add(stage_call.items_with_subject, attributes)
             if stage_call.items_no_suitable_subject is not None:

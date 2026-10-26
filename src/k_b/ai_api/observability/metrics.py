@@ -27,7 +27,7 @@ class RequestMeasures:
     """The measures of the request, on the first line of classification only."""
 
     data_fetch_ms: int
-    items_dropped: int
+    items_dropped_before_model: int
     items_capped: bool
 
 
@@ -69,9 +69,9 @@ def build_llm_call_line(
         "prompt_version": stage_call.prompt_version,
         "items_in": stage_call.items_in,
         "items_truncated": stage_call.items_truncated,
-        "items_dropped": None
+        "items_dropped_before_model": None
         if request_measures is None
-        else request_measures.items_dropped,
+        else request_measures.items_dropped_before_model,
         "items_capped": None
         if request_measures is None
         else request_measures.items_capped,
@@ -97,7 +97,7 @@ def build_llm_call_line(
             stage_call.facts_found, stage_call.facts_checked
         ),
         "claims_removed": stage_call.claims_removed,
-        "items_uncited": stage_call.items_uncited,
+        "items_removed_by_checks": stage_call.items_removed_by_checks,
         "items_with_subject": stage_call.items_with_subject,
         "items_no_suitable_subject": stage_call.items_no_suitable_subject,
         "items_unanswered": stage_call.items_unanswered,

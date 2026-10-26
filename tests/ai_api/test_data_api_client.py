@@ -74,7 +74,7 @@ def test_the_reading_gives_the_items_of_the_whitelist_in_the_order_of_the_spec(
         "newsletter_article",
     }
     # Withdrawn vulnerability 5: dropped, counted, its detail never asked.
-    assert reading.items_dropped == 1
+    assert reading.items_dropped_before_model == 1
     assert "/items/5" not in data_api.paths
     assert reading.items_capped is False
     assert reading.capped_kind is None
@@ -184,7 +184,7 @@ def test_a_withdrawn_entry_takes_no_place_under_the_cap(data_api, monkeypatch):
     reading = read_watch(data_api, SINCE_ALL, deadline=far_deadline())
 
     assert [item.item_id for item in reading.items] == [3, 4, 9, 10, 17]
-    assert reading.items_dropped == 1
+    assert reading.items_dropped_before_model == 1
     assert reading.capped_kind == "paper"
 
 
@@ -194,7 +194,7 @@ def test_an_empty_window_asks_no_detail(data_api):
     )
 
     assert reading.items == ()
-    assert reading.items_dropped == 0
+    assert reading.items_dropped_before_model == 0
     assert data_api.paths == ["/items"] * 5
 
 
@@ -338,7 +338,7 @@ def test_an_item_gone_between_the_list_and_the_detail_is_skipped_and_counted():
     reading = read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert reading.items == ()
-    assert reading.items_dropped == 1
+    assert reading.items_dropped_before_model == 1
 
 
 def test_an_item_withdrawn_between_the_list_and_the_detail_is_skipped_and_counted():
@@ -348,7 +348,7 @@ def test_an_item_withdrawn_between_the_list_and_the_detail_is_skipped_and_counte
     reading = read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
     assert reading.items == ()
-    assert reading.items_dropped == 1
+    assert reading.items_dropped_before_model == 1
 
 
 def test_an_item_listed_twice_is_read_once():
@@ -606,7 +606,7 @@ def test_an_item_not_found_is_still_read_under_the_bound(monkeypatch):
 
     reading = read_watch(http_client, SINCE_ALL, deadline=far_deadline())
 
-    assert reading.items_dropped == 1
+    assert reading.items_dropped_before_model == 1
 
 
 class UnreadStream(httpx2.SyncByteStream):

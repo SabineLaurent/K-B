@@ -53,12 +53,12 @@ class StageCall:
     # Items of this call with a field cut: at 500 characters for the classification, at 2,000
     # for the writing.
     items_truncated: int
-    # Of a writing whose output is checked; None otherwise. items_uncited counts the items no
+    # Of a writing whose output is checked; None otherwise. items_removed_by_checks counts the items no
     # longer cited once the claims out of their bounds or unfaithful are removed.
     facts_checked: int | None
     facts_found: int | None
     claims_removed: int | None
-    items_uncited: int | None
+    items_removed_by_checks: int | None
     # Of a classification whose output is checked; None otherwise: the items given a subject,
     # those no subject suits, and those the model left without answer, items_in in all.
     items_with_subject: int | None
@@ -89,13 +89,13 @@ class Digest:
     claims: tuple[DigestClaim, ...]
     sources: tuple[DigestSource, ...]
     # Sent for this subject and cited by no claim of the model.
-    not_retained: tuple[int, ...]
+    items_not_retained_in_output: tuple[int, ...]
     # Every fact of every claim of the output, a claim removed included.
     facts_checked: int
     facts_found: int
     claims_removed: int
     # Cited by the model, no longer cited once its claims are removed.
-    items_uncited: tuple[int, ...]
+    items_removed_by_checks: tuple[int, ...]
 
 
 @dataclass(frozen=True)
@@ -118,7 +118,7 @@ class DigestsResult:
     # Items with a field cut for the writing.
     items_truncated: int
     # Dropped by the reading, then beyond MAX_ITEMS_PER_DIGEST of a digest.
-    items_dropped: int
+    items_dropped_before_model: int
     items_capped: bool
     stage_calls: tuple[StageCall, ...]
 
@@ -156,7 +156,7 @@ def build_digests(
     failed_subjects: list[FailedSubject] = []
     stage_calls = list(classification.stage_calls)
     items_truncated = 0
-    items_dropped = reading.items_dropped
+    items_dropped_before_model = reading.items_dropped_before_model
     is_rate_limited = False
     for subject in subjects:
         subject_items = [
@@ -176,7 +176,7 @@ def build_digests(
             continue
         selection = select_for_writing(subject_items)
         items_truncated += selection.items_truncated
-        items_dropped += selection.items_dropped
+        items_dropped_before_model += selection.items_dropped_before_model
         llm_call = write_subject(
             http_client, settings, subject, selection.items, deadline
         )
@@ -195,7 +195,9 @@ def build_digests(
                 facts_checked=None if digest is None else digest.facts_checked,
                 facts_found=None if digest is None else digest.facts_found,
                 claims_removed=None if digest is None else digest.claims_removed,
-                items_uncited=None if digest is None else len(digest.items_uncited),
+                items_removed_by_checks=None
+                if digest is None
+                else len(digest.items_removed_by_checks),
                 items_with_subject=None,
                 items_no_suitable_subject=None,
                 items_unanswered=None,
@@ -216,7 +218,7 @@ def build_digests(
         unanswered=classification.unanswered,
         items_in=len(reading.items),
         items_truncated=items_truncated,
-        items_dropped=items_dropped,
+        items_dropped_before_model=items_dropped_before_model,
         items_capped=reading.items_capped,
         stage_calls=tuple(stage_calls),
     )
@@ -254,7 +256,7 @@ def classify(
                 facts_checked=None,
                 facts_found=None,
                 claims_removed=None,
-                items_uncited=None,
+                items_removed_by_checks=None,
                 items_with_subject=None
                 if batch_answers is None
                 else len(batch_answers)
@@ -316,7 +318,7 @@ def to_digest(
     ]
     cited_by_model = cited_refs(output.claims)
     cited_kept = cited_refs(kept)
-    uncited = cited_by_model - cited_kept
+    removed_by_checks = cited_by_model - cited_kept
     return Digest(
         subject=subject,
         claims=tuple(to_digest_claim(claim, item_by_ref) for claim in kept),
@@ -325,7 +327,7 @@ def to_digest(
             for item in items_sent
             if to_item_ref(item.item_id) in cited_kept
         ),
-        not_retained=tuple(
+        items_not_retained_in_output=tuple(
             item.item_id
             for item in items_sent
             if to_item_ref(item.item_id) not in cited_by_model
@@ -333,8 +335,10 @@ def to_digest(
         facts_checked=sum(fidelity.facts_checked for fidelity in fidelities),
         facts_found=sum(fidelity.facts_found for fidelity in fidelities),
         claims_removed=len(output.claims) - len(kept),
-        items_uncited=tuple(
-            item.item_id for item in items_sent if to_item_ref(item.item_id) in uncited
+        items_removed_by_checks=tuple(
+            item.item_id
+            for item in items_sent
+            if to_item_ref(item.item_id) in removed_by_checks
         ),
     )
 

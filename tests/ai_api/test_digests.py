@@ -195,16 +195,16 @@ def test_a_valid_output_gives_a_digest_per_subject_with_its_sources(reading):
         for source in security.sources
     ] == [(9, "advisory", advisory.source_title, advisory.url)]
     # Sent and not cited.
-    assert sorted(security.not_retained) == [3, 4, 10, 17]
+    assert sorted(security.items_not_retained_in_output) == [3, 4, 10, 17]
     assert security.claims_removed == 0
-    assert security.items_uncited == ()
+    assert security.items_removed_by_checks == ()
     # A subject written without claim: a digest without claim, its items not retained.
     assert result.digests[2].claims == ()
-    assert sorted(result.digests[2].not_retained) == [1, 2]
+    assert sorted(result.digests[2].items_not_retained_in_output) == [1, 2]
     assert result.failed_subjects == ()
     assert result.no_suitable_subject == tuple(NO_SUITABLE_SUBJECT_ITEMS)
     assert result.items_in == len(reading.items)
-    assert result.items_dropped == reading.items_dropped
+    assert result.items_dropped_before_model == reading.items_dropped_before_model
     assert result.items_capped is False
     assert [(call.stage, call.subject) for call in result.stage_calls] == [
         ("classify", None),
@@ -227,7 +227,7 @@ def test_the_stage_calls_carry_their_prompt_version_and_counts(reading):
     assert security_call.prompt_version == "write-1"
     assert security_call.items_in == len(SECURITY_ITEMS)
     assert security_call.claims_removed == 0
-    assert security_call.items_uncited == 0
+    assert security_call.items_removed_by_checks == 0
     assert (security_call.facts_checked, security_call.facts_found) == (1, 1)
 
 
@@ -364,11 +364,11 @@ def test_a_claim_too_long_is_removed_and_counted(reading):
     assert agent.claims == ()
     assert agent.claims_removed == 1
     # Cited by the model, no longer cited once the claim is removed.
-    assert agent.items_uncited == (6,)
-    assert 6 not in agent.not_retained
+    assert agent.items_removed_by_checks == (6,)
+    assert 6 not in agent.items_not_retained_in_output
     assert agent.sources == ()
     assert result.stage_calls[2].claims_removed == 1
-    assert result.stage_calls[2].items_uncited == 1
+    assert result.stage_calls[2].items_removed_by_checks == 1
     # Its fact is still checked: found in its text and in item 6.
     assert (result.stage_calls[2].facts_checked, result.stage_calls[2].facts_found) == (
         1,
@@ -529,7 +529,7 @@ def test_an_item_of_another_batch_is_refused(reading, monkeypatch):
 
 def test_an_empty_window_calls_no_model():
     empty = WatchReading(
-        items=(), items_dropped=2, capped_kind=None, covered_after=None
+        items=(), items_dropped_before_model=2, capped_kind=None, covered_after=None
     )
 
     result, transport = digest_of(empty, [])
@@ -541,7 +541,7 @@ def test_an_empty_window_calls_no_model():
         unanswered=(),
         items_in=0,
         items_truncated=0,
-        items_dropped=2,
+        items_dropped_before_model=2,
         items_capped=False,
         stage_calls=(),
     )
@@ -576,7 +576,9 @@ def test_the_items_beyond_the_digest_cap_are_dropped_and_counted(reading, monkey
     security_body = sent_bodies(transport)[1]
     assert len(json.loads(messages_of(security_body, "user")[0])["items"]) == 2
     # 3 security items and 1 agent item beyond 2, added to those of the reading.
-    assert result.items_dropped == reading.items_dropped + 3 + 1
+    assert (
+        result.items_dropped_before_model == reading.items_dropped_before_model + 3 + 1
+    )
 
 
 def test_a_source_url_without_http_scheme_is_returned_null(reading):
@@ -585,7 +587,7 @@ def test_a_source_url_without_http_scheme_is_returned_null(reading):
             replace(item, url="javascript:alert(1)") if item.item_id == 9 else item
             for item in reading.items
         ),
-        items_dropped=reading.items_dropped,
+        items_dropped_before_model=reading.items_dropped_before_model,
         capped_kind=None,
         covered_after=None,
     )
@@ -777,7 +779,7 @@ def test_an_item_cut_for_the_writing_is_counted(reading):
             else item
             for item in reading.items
         ),
-        items_dropped=reading.items_dropped,
+        items_dropped_before_model=reading.items_dropped_before_model,
         capped_kind=None,
         covered_after=None,
     )
@@ -1106,7 +1108,7 @@ def test_an_item_cited_without_a_fact_found_removes_its_claim(reading):
 
     agent = result.digests[1]
     assert agent.claims == ()
-    assert agent.items_uncited == (6, 7)
+    assert agent.items_removed_by_checks == (6, 7)
 
 
 @pytest.mark.parametrize(
@@ -1144,5 +1146,5 @@ def test_the_trapped_claim_on_a_cve_is_removed_and_the_digest_returned(
     assert agent.subject == "agent_tools"
     assert [claim.text for claim in agent.claims] == [AGENT_CLAIM["text"]]
     assert agent.claims_removed == 1
-    assert agent.items_uncited == (TRAPPED_ITEM_ID,)
+    assert agent.items_removed_by_checks == (TRAPPED_ITEM_ID,)
     assert TRAPPED_ITEM_ID not in [source.item_id for source in agent.sources]

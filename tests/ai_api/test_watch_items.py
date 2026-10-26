@@ -151,7 +151,7 @@ def test_the_writing_keeps_the_most_recent_items_and_counts_the_others():
 
     assert MAX_ITEMS_PER_DIGEST == 60
     assert [item.item_id for item in selection.items] == list(range(1, 61))
-    assert selection.items_dropped == 5
+    assert selection.items_dropped_before_model == 5
     assert selection.items_truncated == 0
 
 
@@ -174,7 +174,7 @@ def test_the_writing_cuts_each_field_and_counts_the_items_cut():
     assert isinstance(second.fields, NewsletterArticleFields)
     assert second.fields.summary == "a" * 2000
     assert selection.items_truncated == 1
-    assert selection.items_dropped == 0
+    assert selection.items_dropped_before_model == 0
 
 
 def test_the_writing_cuts_each_name_of_packages():

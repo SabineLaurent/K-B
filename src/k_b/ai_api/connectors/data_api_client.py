@@ -183,7 +183,9 @@ def read_watch(
         items.append(to_watch_item(detail))
     return WatchReading(
         items=tuple(items),
-        items_dropped=item_list.withdrawn + len(item_list.items) - len(items),
+        items_dropped_before_model=item_list.withdrawn
+        + len(item_list.items)
+        - len(items),
         capped_kind=item_list.capped_kind,
         covered_after=item_list.covered_after,
     )
