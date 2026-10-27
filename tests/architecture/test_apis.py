@@ -153,8 +153,10 @@ AI_API_LAYERS = (
     {"ai_api.connectors.llm_replay"},
     {"ai_api.connectors.llm_settings", "ai_api.connectors.data_api_settings"},
     {"ai_api.connectors.llm_client", "ai_api.connectors.data_api_client"},
+    {"ai_api.stage_calls"},
     {"ai_api.stages.classification", "ai_api.stages.writing"},
     {"ai_api.stages.fidelity"},
+    {"ai_api.stages.checking"},
     {"ai_api.digests"},
     {
         "ai_api.errors",
