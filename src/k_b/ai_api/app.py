@@ -1,7 +1,8 @@
 """The AI API: the digests of the watch, the one door of K-B to the model
-(docs/fiches-veille.md); it keeps nothing between two requests but the measures not sent yet
-(.claude/rules/poc.md, rule 7)."""
+(docs/fiches-veille.md); it keeps nothing between two requests but the measures, the spans and the
+log records not sent yet (.claude/rules/poc.md, rule 7)."""
 
+import asyncio
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 
@@ -12,6 +13,7 @@ from pydantic import SecretStr
 from k_b.ai_api.api_router import api_router
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.connectors.llm_settings import LlmSettings
+from k_b.ai_api.connectors.trace_export import TraceExport
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.core.api_access import check_api_key
 from k_b.core.api_errors import API_ERROR_HANDLERS, respond_to_unexpected_error
@@ -31,9 +33,10 @@ def create_app(
     subjects: Sequence[DigestSubject],
     default_window_days: int,
     model_metrics: ModelMetrics,
+    trace_export: TraceExport,
 ) -> FastAPI:
-    """The app, its keys, the model and the data API it calls, its subjects, its default window
-    and its measures given; without any key, POST /digests answers 401."""
+    """The app, its keys, the model and the data API it calls, its subjects, its default window,
+    its measures and its traces given; without any key, POST /digests answers 401."""
     app = FastAPI(
         title="K-B AI API",
         version=API_VERSION,
@@ -46,7 +49,7 @@ def create_app(
         # /digests/ is an unknown route (404), not a redirection to /digests.
         redirect_slashes=False,
         exception_handlers=API_ERROR_HANDLERS,
-        lifespan=stop_metrics_on_shutdown,
+        lifespan=stop_telemetry_on_shutdown,
         telemetry=NATIVE_TELEMETRY_OFF,
     )
     app.state.api_keys = dict(api_keys)
@@ -55,6 +58,8 @@ def create_app(
     app.state.subjects = tuple(subjects)
     app.state.default_window_days = default_window_days
     app.state.model_metrics = model_metrics
+    app.state.trace_export = trace_export
+    app.state.tracing = trace_export.build_tracing()
     # The last added is the outermost: the 500 of an unexpected error has its line too. No
     # TrustedHostMiddleware: without the key, a request reaches only /health, /docs and
     # /openapi.json, which hold no data (docs/fiches-veille.md, "Sécurité").
@@ -68,8 +73,13 @@ def create_app(
 
 
 @asynccontextmanager
-async def stop_metrics_on_shutdown(app: FastAPI) -> AsyncIterator[None]:
-    """Send the measures not sent yet when the app stops, in the threadpool as the export waits
-    for the network: no code after uvicorn.run runs on SIGTERM."""
+async def stop_telemetry_on_shutdown(app: FastAPI) -> AsyncIterator[None]:
+    """Send the measures, the spans and the log records not sent yet when the app stops, the
+    three at once in the threadpool, as each export waits for the network: no code after
+    uvicorn.run runs on SIGTERM."""
     yield
-    await run_in_threadpool(app.state.model_metrics.stop)
+    await asyncio.gather(
+        run_in_threadpool(app.state.model_metrics.stop),
+        run_in_threadpool(app.state.trace_export.stop_traces),
+        run_in_threadpool(app.state.trace_export.stop_logs),
+    )

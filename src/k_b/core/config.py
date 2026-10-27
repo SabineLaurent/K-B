@@ -317,3 +317,12 @@ MILLISECONDS_PER_SECOND = 1000
 METRICS_EXPORT_INTERVAL_SECONDS = 60
 METRICS_EXPORT_TIMEOUT_SECONDS = 5
 METRICS_STOP_TIMEOUT_SECONDS = 5
+
+# The traces of the AI API and their log records (ai_api/connectors/trace_export.py), sent to the
+# endpoint of the metrics. A request waits 3 s at most: a stop may send twice (the export under way,
+# then the rest), so the traces and the logs stop within 2 × 3 s, beside the 5 s of the metrics, all
+# three at once (ai_api/app.py), under the 10 s docker stop gives.
+TRACE_EXPORT_TIMEOUT_SECONDS = 3
+# Grafana Cloud Traces cuts each attribute at 2 KB: K-B cuts before, in bytes of UTF-8, as the SDK
+# counts characters.
+MAX_TRACE_ATTRIBUTE_BYTES = 2048

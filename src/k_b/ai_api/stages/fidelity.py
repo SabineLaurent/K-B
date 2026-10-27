@@ -85,6 +85,12 @@ MODIFIER_LETTER = "Lm"
 # Added after a field cut for the writing: a letter, so that its end is not a limit (…1.2 may be
 # the start of 1.2.9).
 CUT_END = "a"
+# Why a claim is not faithful, a closed code each: a fact not found is written with its position
+# in the claim and the item it cites (fact_not_found:0:17).
+FACT_NOT_FOUND = "fact_not_found"
+UNDECLARED_IDENTIFIER = "undeclared_identifier"
+CITED_ITEM_WITHOUT_FACT = "cited_item_without_fact"
+DISGUISED_TEXT = "disguised_text"
 # The fields where an ordinary fact is searched; a CVE or a GHSA only equals cve_id or ghsa_id.
 SEARCHED_FIELDS_BY_KIND: dict[WatchKind, tuple[str, ...]] = {
     "paper": ("title", "summary"),
@@ -99,31 +105,48 @@ SEARCHED_FIELDS_BY_KIND: dict[WatchKind, tuple[str, ...]] = {
 class ClaimFidelity:
     facts_checked: int
     facts_found: int
-    # Every fact found, every identifier of the text declared, every item cited carrying a fact,
-    # and nothing that hides or disguises the text.
-    is_faithful: bool
+    # The codes of what the claim fails, in the order of the checks; none for a faithful claim.
+    refusals: tuple[str, ...]
+
+    @property
+    def is_faithful(self) -> bool:
+        """Every fact found, every identifier of the text declared, every item cited carrying a
+        fact, and nothing that hides or disguises the text."""
+        return not self.refusals
 
 
 def check_claim(claim: Claim, item_by_ref: Mapping[str, WatchItem]) -> ClaimFidelity:
     """The facts of the claim checked, each against the item it cites."""
     text = normalize(claim.text)
     text_identifiers = set(find_identifiers(to_detection_text(text)))
-    found_facts = [
-        fact
+    found = [
+        is_fact_found(fact, text, text_identifiers, item_by_ref[fact.item_id])
         for fact in claim.facts
-        if is_fact_found(fact, text, text_identifiers, item_by_ref[fact.item_id])
     ]
     declared = {
         to_canonical_identifier(to_detection_text(normalize(fact.value)))
         for fact in claim.facts
     }
+    refusals = [
+        f"{FACT_NOT_FOUND}:{index}:{item_by_ref[fact.item_id].item_id}"
+        for index, (fact, is_found) in enumerate(zip(claim.facts, found, strict=True))
+        if not is_found
+    ]
+    if not text_identifiers <= declared:
+        refusals.append(UNDECLARED_IDENTIFIER)
+    items_with_fact = {
+        fact.item_id
+        for fact, is_found in zip(claim.facts, found, strict=True)
+        if is_found
+    }
+    if not set(claim.item_ids) <= items_with_fact:
+        refusals.append(CITED_ITEM_WITHOUT_FACT)
+    if is_disguised(claim.text):
+        refusals.append(DISGUISED_TEXT)
     return ClaimFidelity(
         facts_checked=len(claim.facts),
-        facts_found=len(found_facts),
-        is_faithful=len(found_facts) == len(claim.facts)
-        and text_identifiers <= declared
-        and set(claim.item_ids) <= {fact.item_id for fact in found_facts}
-        and not is_disguised(claim.text),
+        facts_found=sum(found),
+        refusals=tuple(refusals),
     )
 
 

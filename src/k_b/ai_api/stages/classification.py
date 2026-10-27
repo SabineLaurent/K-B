@@ -18,6 +18,7 @@ from k_b.ai_api.connectors.llm_client import (
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.stage_calls import StageCall
+from k_b.ai_api.tracing import TRACING_OFF, Step, Tracing
 from k_b.ai_api.watch_items import WatchItem, WatchKind, cut_value, to_item_ref
 from k_b.core.config import (
     MAX_CLASSIFICATION_INPUT_CHARS,
@@ -27,6 +28,7 @@ from k_b.core.config import (
     DigestSubject,
 )
 
+CLASSIFICATION_PROMPT_NAME = "classify"
 CLASSIFICATION_PROMPT_VERSION = "classify-2"
 # A module constant, never an expression: no text of an item can be in it (poc.md, rule 8).
 CLASSIFICATION_SYSTEM_PROMPT = """You sort the items of a technology watch into subjects.
@@ -111,22 +113,35 @@ def classify(
     items: Sequence[WatchItem],
     subjects: Sequence[DigestSubject],
     deadline: Deadline,
+    *,
+    tracing: Tracing = TRACING_OFF,
 ) -> Classification | ClassificationFailure:
     """The answer for each item, batch after batch: a subject, no suitable subject, or none."""
     answer_by_ref: dict[str, str] = {}
     stage_calls: list[StageCall] = []
-    for batch in build_batches(items, subjects):
+    for index, batch in enumerate(build_batches(items, subjects)):
         if not deadline.allows_llm_request():
             return ClassificationFailure("llm_timeout", None, tuple(stage_calls))
-        llm_call = classify_batch(http_client, settings, batch, subjects, deadline)
-        answers = None if llm_call.output is None else llm_call.output.root
-        # The answer of each item of the batch, None for an item left without: counted by the
-        # same rule as the three cases of the request below.
-        batch_answers = (
-            None
-            if answers is None
-            else [answers.get(to_item_ref(item.item_id)) for item in batch.items]
-        )
+        with tracing.step(
+            "classify_batch",
+            attributes={
+                "k_b.batch.index": index,
+                "k_b.items.in": len(batch.items),
+                "k_b.items.truncated": batch.items_truncated,
+            },
+        ) as step:
+            llm_call = classify_batch(
+                http_client, settings, batch, subjects, deadline, tracing=tracing
+            )
+            answers = None if llm_call.output is None else llm_call.output.root
+            # The answer of each item of the batch, None for an item left without: counted by
+            # the same rule as the three cases of the request below.
+            batch_answers = (
+                None
+                if answers is None
+                else [answers.get(to_item_ref(item.item_id)) for item in batch.items]
+            )
+            trace_batch(step, batch, llm_call, batch_answers)
         stage_calls.append(
             StageCall(
                 stage="classify",
@@ -182,6 +197,33 @@ def classify(
             item_id for item_id, answer in answer_by_item_id.items() if answer is None
         ),
         stage_calls=tuple(stage_calls),
+    )
+
+
+def trace_batch(
+    step: Step,
+    batch: ClassificationBatch,
+    llm_call: LlmCall[ClassificationOutput],
+    batch_answers: Sequence[str | None] | None,
+) -> None:
+    """The result of a batch on its span: the state of its call, and the items no subject suits
+    or left without answer, by their identifiers."""
+    step.set({"k_b.outcome": llm_call.outcome})
+    if batch_answers is None:
+        step.fail(to_failure(llm_call.outcome))
+        return
+    answer_by_item = list(zip(batch.items, batch_answers, strict=True))
+    step.set_ids(
+        "k_b.items.no_suitable_subject.ids",
+        [
+            item.item_id
+            for item, answer in answer_by_item
+            if answer == NO_SUITABLE_SUBJECT_ANSWER
+        ],
+    )
+    step.set_ids(
+        "k_b.items.unanswered.ids",
+        [item.item_id for item, answer in answer_by_item if answer is None],
     )
 
 
@@ -293,6 +335,8 @@ def classify_batch(
     batch: ClassificationBatch,
     subjects: Sequence[DigestSubject],
     deadline: Deadline,
+    *,
+    tracing: Tracing = TRACING_OFF,
 ) -> LlmCall[ClassificationOutput]:
     item_refs = [to_item_ref(item.item_id) for item in batch.items]
     subject_names = [subject.name for subject in subjects]
@@ -310,4 +354,7 @@ def classify_batch(
         ),
         retry_reminders=CLASSIFICATION_RETRY_REMINDERS,
         deadline=deadline,
+        prompt_name=CLASSIFICATION_PROMPT_NAME,
+        prompt_version=CLASSIFICATION_PROMPT_VERSION,
+        tracing=tracing,
     )

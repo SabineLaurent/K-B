@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
+from k_b.ai_api.tracing import TRACING_OFF, SpanRef, Step, Tracing
 from k_b.core.config import (
     LLM_CALL_TIMEOUT_SECONDS,
     LLM_CONNECT_TIMEOUT_SECONDS,
@@ -59,6 +60,10 @@ FAILED_CHECKS: tuple[FailedCheck, ...] = get_args(FailedCheck.__value__)
 # A finish_reason is read whatever its length, and cut to this length in the call: it goes to a
 # metric line.
 MAX_FINISH_REASON_LENGTH = 64
+# The operation and the output of the semantic conventions for generative AI: K-B calls
+# chat/completions only, for a JSON object.
+CHAT_OPERATION = "chat"
+JSON_OUTPUT = "json"
 
 
 class EnvelopeModel(BaseModel):
@@ -138,6 +143,8 @@ class LlmCall[OutputT: BaseModel]:
     # does not erase it. After a call that failed with one, the request sends nothing more; a
     # retry answered after its Retry-After got past it, and the next calls go.
     saw_rate_limit: bool
+    # The span of the last attempt, the one whose output the checks read.
+    span_ref: SpanRef
 
 
 @dataclass(frozen=True)
@@ -204,11 +211,14 @@ def call_model[OutputT: BaseModel](
     check_output: Callable[[OutputT], FailedCheck | None],
     retry_reminders: Mapping[FailedCheck, str],
     deadline: Deadline | None,
+    prompt_name: str,
+    prompt_version: str,
     sleep: Callable[[float], None] = time.sleep,
+    tracing: Tracing = TRACING_OFF,
 ) -> LlmCall[OutputT]:
     """Ask the model for an output of output_model, check it, and ask once more if a retry may
     change the answer; a reminder missing in retry_reminders is raised before any request is
-    paid.
+    paid. Each request is a span chat <model>.
 
     With a deadline, each timeout is shortened to the time left, and a retry without the time it
     needs ends in llm_timeout. The caller checks the deadline before the call."""
@@ -217,6 +227,7 @@ def call_model[OutputT: BaseModel](
         raise ValueError(f"retry_reminders without: {', '.join(missing_reminders)}")
     user_message = encode_user_message(user_data)
     started = time.perf_counter()
+    span_refs: list[SpanRef] = []
 
     def ask(prompt: str) -> Attempt[OutputT]:
         body = build_request_body(
@@ -232,7 +243,28 @@ def call_model[OutputT: BaseModel](
             if deadline is None
             else deadline.cap(http_client.timeout)
         )
-        return send_and_check(http_client, body, output_model, check_output, timeout)
+        with tracing.step(
+            f"{CHAT_OPERATION} {settings.model}",
+            "client",
+            {
+                "gen_ai.operation.name": CHAT_OPERATION,
+                # What K-B knows: openai_compatible or replay, not the company behind the URL.
+                "gen_ai.provider.name": settings.provider,
+                "gen_ai.request.model": settings.model,
+                "gen_ai.request.max_tokens": max_completion_tokens,
+                "gen_ai.prompt.name": prompt_name,
+                "gen_ai.prompt.version": prompt_version,
+                "gen_ai.output.type": JSON_OUTPUT,
+                "k_b.attempt": len(span_refs) + 1,
+                "k_b.input_chars": len(user_message),
+            },
+        ) as step:
+            attempt = send_and_check(
+                http_client, body, output_model, check_output, timeout
+            )
+            trace_attempt(step, attempt)
+        span_refs.append(step.ref)
+        return attempt
 
     attempts = [ask(system_prompt)]
     first = attempts[0]
@@ -241,7 +273,9 @@ def call_model[OutputT: BaseModel](
         and deadline is not None
         and not deadline.allows_llm_request(first.retry_wait_seconds)
     ):
-        call = summarize(attempts, len(user_message), time.perf_counter() - started)
+        call = summarize(
+            attempts, len(user_message), time.perf_counter() - started, span_refs[-1]
+        )
         return replace(call, outcome="llm_timeout", output=None)
     if first.retry_wait_seconds is not None:
         if first.failed_check is None:
@@ -252,7 +286,33 @@ def call_model[OutputT: BaseModel](
                 ask(f"{system_prompt}\n\n{retry_reminders[first.failed_check]}")
             )
     elapsed_seconds = time.perf_counter() - started
-    return summarize(attempts, len(user_message), elapsed_seconds)
+    return summarize(attempts, len(user_message), elapsed_seconds, span_refs[-1])
+
+
+def trace_attempt[OutputT: BaseModel](step: Step, attempt: Attempt[OutputT]) -> None:
+    """The result of a request on its span: its state, its tokens, how it ended and the check
+    that refused it, never a text."""
+    usage = attempt.usage
+    details = None if usage is None else usage.completion_tokens_details
+    step.set(
+        {
+            "k_b.outcome": attempt.outcome,
+            "gen_ai.usage.input_tokens": None if usage is None else usage.prompt_tokens,
+            "gen_ai.usage.output_tokens": None
+            if usage is None
+            else usage.completion_tokens,
+            "gen_ai.usage.reasoning.output_tokens": None
+            if details is None
+            else details.reasoning_tokens,
+            "gen_ai.response.finish_reasons": None
+            if attempt.finish_reason is None
+            else [attempt.finish_reason],
+            "http.response.status_code": attempt.http_status,
+            "k_b.failed_check": attempt.failed_check,
+        }
+    )
+    if attempt.outcome != "ok":
+        step.fail(attempt.outcome)
 
 
 def encode_user_message(user_data: Mapping[str, object]) -> str:
@@ -457,7 +517,10 @@ def refuse_key_twice(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 
 def summarize[OutputT: BaseModel](
-    attempts: list[Attempt[OutputT]], input_chars: int, elapsed_seconds: float
+    attempts: list[Attempt[OutputT]],
+    input_chars: int,
+    elapsed_seconds: float,
+    span_ref: SpanRef,
 ) -> LlmCall[OutputT]:
     """The call: the state of its last attempt, the tokens of both."""
     last = attempts[-1]
@@ -489,4 +552,5 @@ def summarize[OutputT: BaseModel](
         saw_rate_limit=any(
             attempt.outcome == "llm_rate_limited" for attempt in attempts
         ),
+        span_ref=span_ref,
     )

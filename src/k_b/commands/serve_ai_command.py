@@ -12,8 +12,10 @@ from k_b.ai_api.connectors.data_api_settings import (
 )
 from k_b.ai_api.connectors.llm_settings import read_llm_settings_or_refusal
 from k_b.ai_api.connectors.metrics_export import (
+    build_resource,
     read_metrics_export_settings_or_refusal,
 )
+from k_b.ai_api.connectors.trace_export import TraceExport
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.ai_api.settings import read_ai_api_settings_or_refusal
 from k_b.commands.exit_codes import ExitCode
@@ -70,10 +72,14 @@ def run_serve_ai(environ: Mapping[str, str]) -> int:
     logger.info("digest window by default: %s days", settings.window_days)
     # The environment, never the endpoint nor the headers.
     logger.info(
-        "metrics export: %s",
+        "metrics and traces export: %s",
         "off"
         if export_settings is None
         else f"OTLP, environment {export_settings.environment}",
+    )
+    # One resource for the three providers.
+    resource = build_resource(
+        None if export_settings is None else export_settings.environment
     )
     uvicorn.run(
         create_app(
@@ -82,8 +88,9 @@ def run_serve_ai(environ: Mapping[str, str]) -> int:
             data_api_settings,
             DIGEST_SUBJECTS,
             settings.window_days,
-            # Stopped by the lifespan of the app (ai_api/app.py).
-            ModelMetrics.from_settings(export_settings),
+            # Both stopped by the lifespan of the app (ai_api/app.py).
+            ModelMetrics.from_settings(export_settings, resource),
+            TraceExport.from_settings(export_settings, resource),
         ),
         host=settings.host,
         port=settings.port,
