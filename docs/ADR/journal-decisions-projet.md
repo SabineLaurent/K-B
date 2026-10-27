@@ -4325,6 +4325,85 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   `StageCall` de la rédaction (une vingtaine de lignes), laissé à une autre PR. — branche
   `refactor/one-module-per-digest-stage`
 
+### Traces : `POST /digests` vers Grafana Cloud, sans texte (#345)
+
+Décisions du plan des traces (time-knight, version 3 du 27/10, relue deux fois), sur lequel Sabine
+a donné son « go » le 2026-10-27 ; celles de Sabine sont dites comme telles.
+
+- **Les traces de `POST /digests` partent vers Grafana Cloud seul, en bac à sable comme en
+  production, par l'exportation des métriques ; la PR de #345 envoie les spans et les raisons, sans
+  aucun texte, et le contenu (consigne, items, réponse) viendra par une PR à part.** Décision de
+  Sabine du 2026-10-27 à 11:23 UTC (« commençons par cela »), sur la recommandation de time-knight
+  (recherche du 27/10). Pourquoi, selon la recommandation : l'essai 1 de #210 (26/10) n'a pu être
+  compris que par un script de rejeu ; Grafana Cloud reçoit déjà les mesures, et relie un span à ses
+  journaux (« Logs for this span »). Options écartées : Jaeger en local et Honeycomb en production
+  (deux outils, un sous-traitant de plus) ; Grafana pour le système et Langfuse pour la couche IA
+  (un sous-traitant de plus ; Langfuse va dans la suite du projet) ; l'image `otel-lgtm` en local.
+  Limite assumée : une trace part chez un tiers dès le bac à sable. — branche
+  `feat/trace-digest-steps`
+- **Les spans sont ouverts en ligne par une façade, `ai_api/tracing.py`, que chaque étape reçoit
+  par `tracing=`, comme `Deadline` ; le défaut, `TRACING_OFF`, n'enregistre rien, et un test lit le
+  code : dans `ai_api`, tout appel à une fonction qui prend `tracing` le lui passe.** Pourquoi : un
+  span ouvert en ligne voit un 500 et se lit en direct ; la façade garde OpenTelemetry hors des
+  étapes (aucune n'importe `SpanKind` ni `StatusCode`). Un span n'enregistre jamais d'exception :
+  un échec pose l'état nommé, ou le nom du type, dans `error.type`, le statut sans description.
+  Options écartées : des spans construits après coup depuis les résultats (première version du
+  plan : un 500 y perd toute sa trace, rien ne se voit en direct, et il faudrait des instants dans
+  six types métier) ; l'API d'OpenTelemetry appelée dans les étapes, avec un fournisseur global ; la
+  racine dans un middleware (elle perdrait l'état nommé, et `log_request` vit dans `core`, que
+  partage l'API de données) ; le span `SERVER` natif de FastAPI (il porte `url.path`, `url.query` et
+  `server.address`, et reprend un `traceparent` reçu), contre le skill `fastapi` du dépôt, comme
+  pour #162. **Révise en partie** 2026-10-24, « Métriques : l'export OpenTelemetry de l'API IA »
+  (#162) : OpenTelemetry s'importe désormais dans quatre modules (`tracing.py` et
+  `connectors/trace_export.py` en plus) ; l'intention de Sabine (« limiter la "pollution" du code
+  par opentelemetry ») reste tenue : l'app, le routeur et les étapes ne voient que `Tracing` et
+  `TraceExport`, et le test d'architecture garde la liste. Limites assumées : un 401 et un 422 n'ont
+  pas de trace ; une erreur après le `return` de la route laisse une racine à 200. — branche
+  `feat/trace-digest-steps`
+- **Un span `chat <model>` par requête HTTP envoyée au modèle, et non un par appel.** Écart assumé
+  à la convention GenAI, qui regroupe les relances d'une erreur passagère : K-B relance après une
+  attente, avec la même consigne, ou après un contrôle raté, avec un rappel, et chaque tentative a
+  son état, ses jetons et son contrôle refusé. Le span porte `gen_ai.prompt.name` et
+  `gen_ai.prompt.version` (l'étape et la version de sa consigne), pas `server.address`. Option
+  écartée : un span par appel, les tentatives en attributs. — branche `feat/trace-digest-steps`
+- **Le pourquoi d'une affirmation retirée : des codes fermés (`out_of_bounds`,
+  `fact_not_found:<fait>:<item>`, `undeclared_identifier`, `cited_item_without_fact`,
+  `disguised_text`), un enregistrement de journal OTLP `gen_ai.evaluation.result` par affirmation,
+  rattaché au dernier `chat` de sa rédaction et daté de sa fin.** Pourquoi : un journal, parce
+  qu'OpenTelemetry déprécie l'API des événements de span ; sans texte, la règle 5 de `poc.md`
+  suffit telle quelle ; rattaché par le contexte du span fermé (`SpanRef`), parce que les contrôles
+  tournent après la fin de l'appel. Options écartées : des événements de span ; deux évaluations,
+  `k_b.claim_bounds` et `k_b.fidelity` (plan v3). **Ce dernier point est un choix de time-knight au
+  code, à valider par Sabine** : une affirmation hors bornes et infidèle aurait donné deux
+  enregistrements, alors que le critère de #345 en demande un par affirmation ; une seule
+  évaluation, `k_b.claim_checks`, dont les codes disent laquelle a refusé. — branche
+  `feat/trace-digest-steps`
+- **L'export des traces reprend l'URL de base et l'en-tête des métriques (`/v1/traces`,
+  `/v1/logs`), avec un jeton à trois droits ; 3 s par envoi ; tous les spans gardés ; 2 048 octets
+  par attribut ; une seule ressource pour les trois fournisseurs ; les journaux du SDK filtrés sur
+  quatre noms ; et à l'arrêt, les trois fournisseurs en même temps.** Pourquoi : le point d'entrée
+  OTLP de Grafana Cloud reçoit les trois signaux, distingués par leur chemin, sans réglage nouveau ;
+  un arrêt envoie au plus deux fois (l'envoi
+  en cours, puis le reste), d'où max(2 × 3, 2 × 3, 5) = 6 s, sous les 10 s de `docker stop` ; une
+  demande fait quelques dizaines de spans, et celle qui échoue est celle qu'on veut lire ; Grafana
+  Cloud Traces coupe chaque attribut à 2 Ko, et le SDK compte des caractères, pas des octets. Seul
+  `trace_export.py` importe les modules privés du SDK et de l'exporteur (un test le tient).
+  Options écartées : 5 s comme les métriques (2 × 5 atteint les 10 s) ; un échantillonnage ; un
+  arrêt l'un après l'autre (les délais s'additionnent). Limite assumée : si Grafana répond en plus
+  de 3 s, des lots sont perdus en marche normale, avec une ligne de l'exporteur. — branche
+  `feat/trace-digest-steps`
+- **Grafana reçoit désormais, dans les traces, le sujet, le `request_id`, les identifiants des items
+  et les codes des contrôles.** Décision de Sabine du 2026-10-27 (« je valide »). **Inverse**, pour
+  les traces, la ligne du registre qui l'interdisait (« Envoi des mesures à Grafana Cloud »,
+  données envoyées) ; les mesures gardent leur règle. Pourquoi : sans eux, une trace ne dit ni quel
+  sujet, ni quelle demande, ni quel item ; aucun n'est une donnée personnelle (liste fermée, UUID
+  tiré par le serveur, entiers internes). Inscrit au registre. — branche `feat/trace-digest-steps`
+- **OpenTelemetry est borné sous 1.46 (`>=1.45.1,<1.46`) sur ses trois paquets.** Décision de Sabine
+  du 2026-10-27 (« je valide »). Pourquoi : les journaux et leur exporteur sont des modules privés
+  qui bougent d'une version à l'autre (dépréciations depuis la 1.35), et rien ne figeait leur
+  version. Limite assumée : la montée de version se fait à la main, en relisant ces modules. —
+  branche `feat/trace-digest-steps`
+
 ## Décisions encore ouvertes
 
 - **Un sujet secondaire par item au classement** (2026-10-26, idée de Sabine) : une case de sujet
@@ -4445,7 +4524,15 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   Sabine tranchera à la comparaison des outils de restitution. La trace d'un outil comme Langfuse
   tire son intérêt de ce texte, qui contient les noms des auteurs. **Précisée le 2026-10-20** :
   l'outil est Grafana Cloud (« Squelette E1 E3 : cadrage du 20/10 », décision 4) ; la question reste
-  ouverte jusqu'à #163.
+  ouverte jusqu'à #163. **Précisée le 2026-10-27** : les traces partent sans texte (#345) ; le
+  contenu des appels au modèle viendra par une PR à part (voir la décision ouverte suivante).
+- **Traces : le contenu des appels au modèle** (2026-10-27, plan des traces, PR 2) : un
+  enregistrement `gen_ai.client.inference.operation.details` (consigne, message utilisateur,
+  réponse), réglé par `KB_TRACE_CONTENT` (`none`, `anomalies`, `all`). Attend trois choses : le DPA
+  de Grafana Labs signé, le contenu portant des données personnelles ; la décision de Sabine sur ce
+  qu'est une anomalie (D1 : 50 affirmations retirées sur 92 dans l'essai 1 de #210, donc pas
+  `claims_removed > 0`) ; le texte de l'amendement de la règle 5 de `poc.md` (D2). Le critère de
+  #163 (« texte des prompts jamais émis ») est à réécrire à ce moment, avec l'accord de Sabine.
 - **Wiki : forme du contrat `.md` *cleansed*** (2026-10-12) : l'ETL écrit en SQLite ; ce que la
   partie LLM reçoit d'un papier Zotero (texte du PDF, métadonnées, surlignages) est à fixer avant
   le code.
