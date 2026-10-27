@@ -17,14 +17,12 @@ from k_b.ai_api.connectors.llm_client import build_http_client
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
-from k_b.ai_api.digests import (
-    ClassificationFailure,
-    DigestsResult,
-    FailedSubject,
-    build_digests,
-)
+from k_b.ai_api.digests import DigestsResult, FailedSubject, build_digests
 from k_b.ai_api.stages import classification
-from k_b.ai_api.stages.classification import CLASSIFICATION_SYSTEM_PROMPT
+from k_b.ai_api.stages.classification import (
+    CLASSIFICATION_SYSTEM_PROMPT,
+    ClassificationFailure,
+)
 from k_b.ai_api.stages.writing import WRITING_RETRY_REMINDERS, WRITING_SYSTEM_PROMPT
 from k_b.ai_api.watch_items import WatchItem, WatchReading, build_fields
 from k_b.core.config import (

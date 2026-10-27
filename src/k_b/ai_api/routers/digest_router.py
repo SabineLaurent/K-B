@@ -11,12 +11,7 @@ from fastapi import APIRouter, Request
 from k_b.ai_api.connectors.data_api_client import DataApiError, read_watch
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.dependencies import DataApiClient, LlmClient, RequestTime
-from k_b.ai_api.digests import (
-    ClassificationFailure,
-    Digest,
-    DigestsResult,
-    build_digests,
-)
+from k_b.ai_api.digests import DigestsResult, build_digests
 from k_b.ai_api.errors import ERROR_RESPONSES, to_api_error
 from k_b.ai_api.observability.metrics import RequestMeasures, write_llm_call_lines
 from k_b.ai_api.schemas.digest_schema import (
@@ -28,6 +23,8 @@ from k_b.ai_api.schemas.digest_schema import (
     SourceSchema,
     WindowSchema,
 )
+from k_b.ai_api.stages.checking import Digest
+from k_b.ai_api.stages.classification import ClassificationFailure
 from k_b.ai_api.watch_items import WatchReading
 from k_b.core.api_request_log import read_request_id
 from k_b.core.config import DIGEST_REQUEST_TIMEOUT_SECONDS, MILLISECONDS_PER_SECOND

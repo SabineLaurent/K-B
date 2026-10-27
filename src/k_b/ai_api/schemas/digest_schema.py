@@ -6,7 +6,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field
 
 from k_b.ai_api.connectors.llm_client import LlmFailure
-from k_b.ai_api.digests import Stage
+from k_b.ai_api.stage_calls import Stage
 from k_b.ai_api.watch_items import WatchKind
 from k_b.core.config import MAX_DIGEST_WINDOW_DAYS, MIN_DIGEST_WINDOW_DAYS
 
