@@ -955,7 +955,9 @@ POST /digests            SERVER   http.request.method, http.route, http.response
 - **`chat <model>`** : `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`,
   `gen_ai.request.max_tokens`, `gen_ai.prompt.name` et `gen_ai.prompt.version` (l'étape et la
   version de sa consigne), `gen_ai.output.type = json`, les jetons de la tentative
-  (`gen_ai.usage.*`), `gen_ai.response.finish_reasons`, `http.response.status_code`, et
+  (`gen_ai.usage.*`), `gen_ai.response.finish_reasons` (fermé : `stop`, `length`,
+  `content_filter`, sinon `other`, le fournisseur pouvant y mettre un texte libre),
+  `http.response.status_code`, et
   `k_b.attempt`, `k_b.outcome`, `k_b.failed_check`, `k_b.input_chars`. Pas de `server.address`.
 - **Pourquoi une affirmation est retirée** : un enregistrement de journal OTLP
   `gen_ai.evaluation.result` par affirmation, rattaché au dernier `chat` de sa rédaction, à
@@ -980,7 +982,10 @@ POST /digests            SERVER   http.request.method, http.route, http.response
   (l'envoi en cours, puis le reste) : au plus max(2 × 3, 2 × 3, 5) = 6 s, sous les 10 s de `docker
   stop`, sans demande en cours. Pour que le reste tienne en un envoi, la file d'attente est d'un
   lot, 512 spans ou enregistrements (`TRACE_QUEUE_SIZE`) ; une demande en fait quelques dizaines.
-  Au-delà, le SDK abandonne ce qui arrive, avec une ligne de journal.
+  Au-delà, le SDK abandonne le plus ancien en attente, avec une ligne de journal. Le SDK ne borne
+  pas le total d'un envoi (son délai vaut pour chaque attente de la connexion) : chaque arrêt tourne
+  dans un fil à part, attendu 6 s au plus (`TRACE_STOP_TIMEOUT_SECONDS`), puis laissé, avec une
+  ligne de journal.
 - **Lire** dans Grafana : Explore, Tempo, `{resource.service.name="k-b-ai-api"}`, ou
   `{status = error}` pour les demandes en échec ; « Logs for this span » sur un `chat` montre les
   raisons.

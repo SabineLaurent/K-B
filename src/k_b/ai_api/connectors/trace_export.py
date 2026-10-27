@@ -5,14 +5,17 @@ The one module of K-B that imports the private modules of the SDK and of its exp
 records), which move from one version to the next: pyproject.toml bounds them."""
 
 import logging
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from opentelemetry.exporter.otlp.proto.common._internal import _encode_attributes
 from opentelemetry.exporter.otlp.proto.http import Compression
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk._logs import LoggerProvider, LogRecordLimits
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.sdk._shared_internal import BatchProcessor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import SpanLimits, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -28,19 +31,21 @@ from k_b.core.config import (
     MAX_TRACE_ATTRIBUTE_BYTES,
     TRACE_EXPORT_TIMEOUT_SECONDS,
     TRACE_QUEUE_SIZE,
+    TRACE_STOP_TIMEOUT_SECONDS,
 )
 
 logger = logging.getLogger(__name__)
 
 # The loggers whose lines may quote what the endpoint or an exception says: the batch processor
-# of the spans and of the log records, the two exporters (the second gets the lines of the retry
-# loop too) and the encoder of the attributes. By their exact names: a filter on a parent logger
-# does not see the lines of its children.
+# of the spans and of the log records, the two exporters (each gets the lines of its retry loop
+# too) and the encoder of the attributes. Each by the module of what logs, as each logs under the
+# name of its module: a filter on a parent logger does not see the lines of its children, and a
+# module moved by a version of the SDK moves its name here.
 EXPORTER_LOGGER_NAMES = (
-    "opentelemetry.sdk._shared_internal",
-    "opentelemetry.exporter.otlp.proto.http.trace_exporter",
-    "opentelemetry.exporter.otlp.proto.http._log_exporter",
-    "opentelemetry.exporter.otlp.proto.common._internal",
+    BatchProcessor.__module__,
+    OTLPSpanExporter.__module__,
+    OTLPLogExporter.__module__,
+    _encode_attributes.__module__,
 )
 SPAN_LIMITS = SpanLimits(max_attribute_length=MAX_TRACE_ATTRIBUTE_BYTES)
 LOG_RECORD_LIMITS = LogRecordLimits(max_attribute_length=MAX_TRACE_ATTRIBUTE_BYTES)
@@ -98,8 +103,8 @@ class TraceExport:
         )
 
     def stop_traces(self) -> None:
-        """Send the spans not sent yet: the export under way, then the rest, one batch, each
-        within TRACE_EXPORT_TIMEOUT_SECONDS."""
+        """Send the spans not sent yet: the export under way, then the rest, one batch, within
+        TRACE_STOP_TIMEOUT_SECONDS."""
         stop("traces", self.tracer_provider.shutdown)
 
     def stop_logs(self) -> None:
@@ -128,8 +133,23 @@ def build_log_exporter(settings: MetricsExportSettings) -> OTLPLogExporter:
 
 
 def stop(signal: str, shutdown: Callable[[], None]) -> None:
-    """A failure is logged by its type only, as the SDK builds its message from its exporters."""
-    try:
-        shutdown()
-    except Exception as error:  # noqa: BLE001 — the SDK may raise a bare Exception
-        logger.error("%s: stop failed, %s", signal, type(error).__name__)
+    """Run shutdown in a thread of its own, waited TRACE_STOP_TIMEOUT_SECONDS at most, then left
+    behind: a daemon, it ends with the process. A failure is logged by its type only, as the SDK
+    builds its message from its exporters."""
+    errors: list[Exception] = []
+
+    def run() -> None:
+        try:
+            shutdown()
+        except Exception as error:  # noqa: BLE001 — the SDK may raise a bare Exception
+            errors.append(error)
+
+    thread = threading.Thread(target=run, name=f"stop-{signal}", daemon=True)
+    thread.start()
+    thread.join(TRACE_STOP_TIMEOUT_SECONDS)
+    if thread.is_alive():
+        logger.error(
+            "%s: stop not finished within %s s", signal, TRACE_STOP_TIMEOUT_SECONDS
+        )
+    elif errors:
+        logger.error("%s: stop failed, %s", signal, type(errors[0]).__name__)

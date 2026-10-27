@@ -64,6 +64,10 @@ MAX_FINISH_REASON_LENGTH = 64
 # chat/completions only, for a JSON object.
 CHAT_OPERATION = "chat"
 JSON_OUTPUT = "json"
+# The finish_reasons a span may carry, those check 1 reads; any other, a free text of the provider,
+# is sent as OTHER_FINISH_REASON (the register allows closed values only).
+TRACED_FINISH_REASONS = frozenset({"stop", "length", "content_filter"})
+OTHER_FINISH_REASON = "other"
 
 
 class EnvelopeModel(BaseModel):
@@ -306,7 +310,7 @@ def trace_attempt[OutputT: BaseModel](step: Step, attempt: Attempt[OutputT]) -> 
             else details.reasoning_tokens,
             "gen_ai.response.finish_reasons": None
             if attempt.finish_reason is None
-            else [attempt.finish_reason],
+            else [to_traced_finish_reason(attempt.finish_reason)],
             "http.response.status_code": attempt.http_status,
             "k_b.failed_check": attempt.failed_check,
         }
@@ -514,6 +518,12 @@ def refuse_key_twice(pairs: list[tuple[str, object]]) -> dict[str, object]:
     if len(set(keys)) < len(keys):
         raise KeyTwiceError
     return dict(pairs)
+
+
+def to_traced_finish_reason(finish_reason: str) -> str:
+    return (
+        finish_reason if finish_reason in TRACED_FINISH_REASONS else OTHER_FINISH_REASON
+    )
 
 
 def summarize[OutputT: BaseModel](

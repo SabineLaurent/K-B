@@ -361,6 +361,20 @@ def test_an_unknown_finish_reason_is_asked_again():
     assert llm_call.finish_reason == "tool_calls"
 
 
+def test_a_finish_reason_out_of_the_closed_list_is_traced_as_other(recorded_traces):
+    # A provider may put any text there; check 1 refuses it, the span must not carry it.
+    free_text = "Mistral Large 4 (9 minute read)"
+
+    call(
+        [completion(finish_reason=free_text), completion(finish_reason="length")],
+        tracing=recorded_traces.trace_export.build_tracing(),
+    )
+
+    first, second = recorded_traces.find_spans("chat replay")
+    assert first.attributes["gen_ai.response.finish_reasons"] == ("other",)
+    assert second.attributes["gen_ai.response.finish_reasons"] == ("length",)
+
+
 def test_a_truncated_output_is_llm_truncated_without_retry():
     llm_call, transport, _ = call(
         [completion('{"subject": "mo', finish_reason="length"), completion()]

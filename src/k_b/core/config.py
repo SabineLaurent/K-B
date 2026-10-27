@@ -327,7 +327,10 @@ TRACE_EXPORT_TIMEOUT_SECONDS = 3
 # counts characters.
 MAX_TRACE_ATTRIBUTE_BYTES = 2048
 # The spans, or the log records, waiting to be sent: one batch at most, so that a stop sends one
-# batch after the one under way, and the 2 × 3 s above hold. A request makes a few dozen spans;
-# beyond, the SDK drops what comes and logs it (the default, 2,048 in batches of 512, could send
-# four batches on a stop).
+# batch after the one under way (the default, 2,048 in batches of 512, could send four). A request
+# makes a few dozen spans; beyond 512 waiting, the SDK drops the oldest one and logs it.
 TRACE_QUEUE_SIZE = 512
+# The longest a stop of the traces, or of the log records, waits: the two sendings above. The SDK
+# bounds no total, as the timeout of an export bounds each wait of the socket only: the stop runs
+# in a thread of its own, left behind when the time is up.
+TRACE_STOP_TIMEOUT_SECONDS = 2 * TRACE_EXPORT_TIMEOUT_SECONDS

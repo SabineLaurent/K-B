@@ -4374,9 +4374,11 @@ a donné son « go » le 2026-10-27 ; celles de Sabine sont dites comme telles.
   suffit telle quelle ; rattaché par le contexte du span fermé (`SpanRef`), parce que les contrôles
   tournent après la fin de l'appel. Options écartées : des événements de span ; deux évaluations,
   `k_b.claim_bounds` et `k_b.fidelity` (plan v3). **Ce dernier point est un choix de time-knight au
-  code, à valider par Sabine** : une affirmation hors bornes et infidèle aurait donné deux
-  enregistrements, alors que le critère de #345 en demande un par affirmation ; une seule
-  évaluation, `k_b.claim_checks`, dont les codes disent laquelle a refusé. — branche
+  code, validé par Sabine le 2026-10-27 (« je valide pour le moment. On verra à l'usage »)** : une
+  affirmation hors bornes et infidèle aurait donné deux enregistrements, alors que le critère de
+  #345 en demande un par affirmation ; une seule évaluation, `k_b.claim_checks`, dont les codes
+  disent quel contrôle a refusé. Limite assumée : Grafana ne filtre plus par le nom de
+  l'évaluation, mais par le contenu de l'explication. — branche
   `feat/trace-digest-steps`
 - **L'export des traces reprend l'URL de base et l'en-tête des métriques (`/v1/traces`,
   `/v1/logs`), avec un jeton à trois droits ; 3 s par envoi ; tous les spans gardés ; 2 048 octets
@@ -4390,10 +4392,13 @@ a donné son « go » le 2026-10-27 ; celles de Sabine sont dites comme telles.
   `trace_export.py` importe les modules privés du SDK et de l'exporteur (un test le tient).
   La file d'attente est d'un seul lot (512) : avec la file par défaut du SDK (2 048, par lots de
   512), un arrêt pouvait envoyer quatre lots après celui en cours (revue de code, tranchée par
-  time-knight). Options écartées : 5 s comme les métriques (2 × 5 atteint les 10 s) ; un
+  time-knight). Et chaque arrêt tourne dans un fil à part, attendu 6 s au plus puis laissé : le SDK
+  ne borne pas le total d'un envoi, son délai valant pour chaque attente de la connexion, et son
+  arrêt n'en prend aucun (seconde revue de code). Options écartées : 5 s comme les métriques (2 × 5 atteint les 10 s) ; un
   échantillonnage ; un arrêt l'un après l'autre (les délais s'additionnent) ; la file par défaut.
   Limites assumées : si Grafana répond en plus de 3 s, des lots sont perdus en marche normale, avec
-  une ligne de l'exporteur ; au-delà de 512 en attente, le SDK abandonne ce qui arrive. — branche
+  une ligne de l'exporteur ; au-delà de 512 en attente, le SDK abandonne le plus ancien ; un arrêt
+  laissé au bout de 6 s perd ce qu'il n'a pas envoyé. — branche
   `feat/trace-digest-steps`
 - **Grafana reçoit désormais, dans les traces, le sujet, le `request_id`, les identifiants des items
   et les codes des contrôles.** Décision de Sabine du 2026-10-27 (« je valide »). **Inverse**, pour

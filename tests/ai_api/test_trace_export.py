@@ -236,6 +236,27 @@ def test_an_exporter_that_raises_is_logged_by_the_type_of_its_error_never_its_te
     export.stop_logs()
 
 
+def test_a_stop_that_hangs_is_left_behind_after_its_bound_and_says_it(
+    monkeypatch, caplog
+):
+    monkeypatch.setattr(trace_export, "TRACE_STOP_TIMEOUT_SECONDS", 0.2)
+    export = TraceExport.from_settings(None, build_resource(None))
+    # A shutdown slower than the bound, as an export whose socket trickles its answer.
+    released = threading.Event()
+    export.tracer_provider.shutdown = lambda: released.wait(5)
+
+    started = time.monotonic()
+    with caplog.at_level(logging.ERROR, logger=trace_export.logger.name):
+        export.stop_traces()
+    elapsed = time.monotonic() - started
+    released.set()
+
+    assert elapsed < 0.2 + STOP_MARGIN_SECONDS
+    assert [record.getMessage() for record in caplog.records] == [
+        "traces: stop not finished within 0.2 s"
+    ]
+
+
 def test_a_stop_that_fails_is_logged_by_its_type_only(caplog):
     export = TraceExport.from_settings(None, build_resource(None))
 

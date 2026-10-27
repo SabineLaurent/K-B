@@ -157,6 +157,12 @@ SDK, 2 048 par lots de 512, pouvait en envoyer quatre (constat de la revue de co
 faudrait 2 × 3 + 2 × 3 + 5 = 17 s, au-delà des 10 s que `docker stop` laisse avant de tuer le
 processus. En parallèle, on attend seulement le plus lent : 6 s.
 
+Ce calcul suppose qu'un envoi dure 3 s au plus. Or le délai de l'exporteur vaut pour chaque attente
+de la connexion (se connecter, puis chaque lecture), pas pour l'envoi entier, et l'arrêt du SDK ne
+prend aucun délai (seconde revue de code). `stop` lance donc l'arrêt dans un fil à part, l'attend
+6 s au plus (`TRACE_STOP_TIMEOUT_SECONDS`), puis le laisse : c'est un fil *daemon*, qui finit avec
+le processus (`trace_export.py`, `stop`).
+
 ## Choix faits et options écartées
 
 | Choix | Pourquoi | Écarté, et pourquoi |
@@ -165,7 +171,7 @@ processus. En parallèle, on attend seulement le plus lent : 6 s.
 | Spans ouverts en ligne par une façade passée en paramètre | un 500 garde sa trace, tout se voit en direct, OpenTelemetry reste hors des étapes | spans construits après coup (un 500 perd tout) ; API OpenTelemetry dans les étapes ; racine dans un middleware (perd l'état nommé) ; span natif de FastAPI (porte `url.path`, `url.query`, `server.address`) |
 | Un span `chat` par requête HTTP | les deux relances de K-B diffèrent (attente, ou rappel après un contrôle raté) | un span par appel, comme la convention GenAI |
 | Les raisons en journal OTLP | OpenTelemetry déprécie les événements de span | événements de span |
-| Une seule évaluation par affirmation, `k_b.claim_checks` (choix de time-knight au code, à valider) | le critère de #345 en demande une par affirmation ; les codes disent laquelle des deux a refusé | deux évaluations, `k_b.claim_bounds` et `k_b.fidelity` (plan v3) |
+| Une seule évaluation par affirmation, `k_b.claim_checks` (choix de time-knight au code, validé par Sabine le 27/10 « pour le moment, on verra à l'usage ») | le critère de #345 en demande une par affirmation ; les codes disent laquelle des deux a refusé | deux évaluations, `k_b.claim_bounds` et `k_b.fidelity` (plan v3) |
 | 3 s par envoi, arrêt en parallèle | 6 s au plus, sous les 10 s de `docker stop` | 5 s comme les métriques (2 × 5 = 10 s) ; arrêt en série |
 | Le sujet, le `request_id`, les identifiants d'items et les codes envoyés à Grafana (Sabine, 27/10, « je valide ») | sans eux, une trace ne dit pas quelle demande ni quel item ; aucun n'est une donnée personnelle | rien de tout cela (le registre l'interdisait : la décision l'inverse pour les traces) |
 | OpenTelemetry borné sous 1.46 (Sabine, 27/10, « je valide ») | les journaux et leur exporteur sont des modules privés qui changent d'une version à l'autre | aucune borne |
@@ -186,10 +192,12 @@ processus. En parallèle, on attend seulement le plus lent : 6 s.
 | `test_a_private_module_of_opentelemetry_is_imported_by_the_export_of_the_traces_only` | seul `trace_export.py` importe les modules privés du SDK |
 | `test_the_measures_the_spans_and_the_logs_are_sent_at_once_when_the_app_stops` | les trois arrêts tournent en même temps (une barrière à trois : en série, elle casserait) |
 | `test_a_stop_against_an_endpoint_that_never_answers_is_bounded_and_quotes_nothing` (`test_trace_export.py`) | contre un point d'entrée local muet, l'arrêt dure 0,30 s pour un délai de 0,3 s |
+| `test_a_stop_that_hangs_is_left_behind_after_its_bound_and_says_it` | un arrêt qui ne finit pas est laissé au bout du délai, avec la ligne `traces: stop not finished within 0.2 s` |
+| `test_a_finish_reason_out_of_the_closed_list_is_traced_as_other` (`test_llm_client.py`) | un `finish_reason` libre du fournisseur part comme `other` (constat de la revue de sécurité) |
 | `test_each_processor_waits_one_batch_at_most` | la file d'attente est d'un lot de 512 : un arrêt n'envoie qu'un lot après celui en cours |
 | `test_an_evaluation_keeps_its_first_codes_whole_and_says_when_it_cut` | 200 faits introuvables : des codes entiers sous 2 048 octets, et `k_b.claim.reasons_truncated` |
 | `test_an_exporter_that_raises_is_logged_by_the_type_of_its_error_never_its_text` | la ligne du SDK devient `Exception while exporting 'Span'. (ValueError)`, sans le texte |
-| `uv run pytest` : 2 672 tests ; `mypy --strict src`, `ruff check`, `ruff format --check` | rien d'autre n'a cassé |
+| `uv run pytest` : 2 674 tests ; `mypy --strict src`, `ruff check`, `ruff format --check` | rien d'autre n'a cassé |
 
 ## Ce que tu dois pouvoir défendre
 
