@@ -988,7 +988,8 @@ POST /digests            SERVER   http.request.method, http.route, http.response
   ligne de journal.
 - **Lire** dans Grafana : Explore, Tempo, `{resource.service.name="k-b-ai-api"}`, ou
   `{status = error}` pour les demandes en échec ; « Logs for this span » sur un `chat` montre les
-  raisons.
+  raisons. Dans Loki, elles se lisent aussi par `{service_name="k-b-ai-api"}`, leurs attributs avec
+  un tiret bas à la place du point (`k_b_claim_index`) : vu à l'essai réel du 2026-10-27.
 
 **Angles morts** : un 401 et un 422 n'ont pas de trace, la route n'étant pas atteinte. Une erreur
 après le `return` de la route (la validation de la réponse, la fermeture des dépendances) laisse

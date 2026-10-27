@@ -198,6 +198,7 @@ le processus (`trace_export.py`, `stop`).
 | `test_an_evaluation_keeps_its_first_codes_whole_and_says_when_it_cut` | 200 faits introuvables : des codes entiers sous 2 048 octets, et `k_b.claim.reasons_truncated` |
 | `test_an_exporter_that_raises_is_logged_by_the_type_of_its_error_never_its_text` | la ligne du SDK devient `Exception while exporting 'Span'. (ValueError)`, sans le texte |
 | `uv run pytest` : 2 674 tests ; `mypy --strict src`, `ruff check`, `ruff format --check` | rien d'autre n'a cassé |
+| Essai réel du 2026-10-27, lancé par Sabine : `gpt-6-luna`, fenêtre de 3 jours, demande `5a1f8e0a-3df7-452d-98f3-7b1e1d3c6584` (200, 54,7 s, 10 appels au modèle) | Tempo montre l'arbre attendu, 22 spans : la racine, `read_watch`, 2 `classify_batch` et 8 `write_subject`, chacun avec un `chat gpt-6-luna` ; `k_b.subject = agent_frameworks` et `k_b.claims.removed = 8` se lisent sur le span. Sous « Logs for this span » de son `chat` : les 8 enregistrements `gen_ai.evaluation.result`, le corps réduit à un code (`out_of_bounds`), datés de la fin du span, avec un lien vers la trace. Aucune ligne « Failed to export » dans le terminal de `serve-ai` |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -223,11 +224,11 @@ le processus (`trace_export.py`, `stop`).
 
 ## Zones non vérifiées
 
-- **Rien n'est encore parti vers Grafana.** Tous les tests tournent en mémoire. Restent à voir à
-  l'essai réel, lancé par Sabine : que Tempo montre l'arbre, que Loki accepte l'enregistrement
-  `gen_ai.evaluation.result`, et que « Logs for this span » l'affiche. Sa fenêtre de temps n'a pas
-  été lue.
-- **Le délai de 3 s** n'a pas été mesuré contre Grafana Cloud.
+- **Le délai de 3 s** a suffi à l'essai réel (aucun « Failed to export »), une fois ; sa marge n'a
+  pas été mesurée.
+- **Une étape d'analyse que Grafana ajoute** à sa requête « Logs for this span » échoue sur le
+  corps, qui n'est pas un objet JSON (`__error_details__` à l'essai réel) ; elle ne masque aucune
+  ligne. Cette étape n'a pas été lue.
 - **La coupe d'une liste d'identifiants** suppose que Grafana compte 2 Ko sur la liste écrite avec
   des virgules ; sa doc parle de la longueur d'un attribut, sans dire comment il compte un tableau.
 - **Le champ `realm` de la politique d'accès** couvrait, le 27/10, toute l'organisation, et non la
