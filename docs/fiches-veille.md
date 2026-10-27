@@ -950,7 +950,8 @@ POST /digests            SERVER   http.request.method, http.route, http.response
 - **Échec** : un état nommé (`llm_timeout`, `data_api_unavailable`…) met le span en `ERROR`, sans
   description, et le pose dans `error.type`. Une exception imprévue y met le nom de son type,
   jamais son texte : aucun span n'enregistre d'exception, dont le message peut citer un item. Un
-  sujet sauté (après un 429, ou faute de temps) est un `write_subject` en erreur, sans enfant.
+  sujet sauté (après un 429, ou faute de temps) est un `write_subject` en erreur, sans enfant ; un
+  lot de classement sauté faute de temps, un `classify_batch` en erreur, sans enfant.
 - **`chat <model>`** : `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`,
   `gen_ai.request.max_tokens`, `gen_ai.prompt.name` et `gen_ai.prompt.version` (l'étape et la
   version de sa consigne), `gen_ai.output.type = json`, les jetons de la tentative
@@ -962,7 +963,8 @@ POST /digests            SERVER   http.request.method, http.route, http.response
   évaluation), `gen_ai.evaluation.score.label = fail`, `k_b.claim.index` (sa position dans la
   sortie), et dans `gen_ai.evaluation.explanation` comme dans le corps, les codes séparés par des
   virgules : `out_of_bounds`, `fact_not_found:<index du fait>:<item>`, `undeclared_identifier`,
-  `cited_item_without_fact`, `disguised_text`. Un journal, pas un événement de span : OpenTelemetry
+  `cited_item_without_fact`, `disguised_text`. Les premiers codes qui tiennent en 2 048 octets sont
+  gardés entiers ; `k_b.claim.reasons_truncated` dit qu'il en manque. Un journal, pas un événement de span : OpenTelemetry
   déprécie l'API des événements de span.
 - **Identifiants** : des entiers internes, sans donnée personnelle (décision de Sabine du
   2026-10-27, registre). Chaque attribut tient en 2 048 octets d'UTF-8, la limite de Grafana Cloud
@@ -976,7 +978,9 @@ POST /digests            SERVER   http.request.method, http.route, http.response
   Un échec d'envoi ne fait jamais échouer une demande.
 - **Arrêt** : les trois fournisseurs s'arrêtent en même temps. Un arrêt peut envoyer deux fois
   (l'envoi en cours, puis le reste) : au plus max(2 × 3, 2 × 3, 5) = 6 s, sous les 10 s de `docker
-  stop`, sans demande en cours.
+  stop`, sans demande en cours. Pour que le reste tienne en un envoi, la file d'attente est d'un
+  lot, 512 spans ou enregistrements (`TRACE_QUEUE_SIZE`) ; une demande en fait quelques dizaines.
+  Au-delà, le SDK abandonne ce qui arrive, avec une ligne de journal.
 - **Lire** dans Grafana : Explore, Tempo, `{resource.service.name="k-b-ai-api"}`, ou
   `{status = error}` pour les demandes en échec ; « Logs for this span » sur un `chat` montre les
   raisons.

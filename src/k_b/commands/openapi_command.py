@@ -62,6 +62,7 @@ def describe_data_api() -> dict[str, Any]:
 def describe_ai_api() -> dict[str, Any]:
     """The OpenAPI of the AI API, made without key nor setting of the environment, as its
     document reads none of them."""
+    resource = build_resource(None)
     return create_ai_app(
         {},
         LlmSettings(
@@ -76,6 +77,6 @@ def describe_ai_api() -> dict[str, Any]:
         DIGEST_SUBJECTS,
         DIGEST_WINDOW_DAYS,
         # Without export: no measure nor span leaves while the OpenAPI is written.
-        ModelMetrics.from_settings(None, build_resource(None)),
-        TraceExport.from_settings(None, build_resource(None)),
+        ModelMetrics.from_settings(None, resource),
+        TraceExport.from_settings(None, resource),
     ).openapi()

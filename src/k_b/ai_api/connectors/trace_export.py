@@ -24,7 +24,11 @@ from k_b.ai_api.connectors.metrics_export import (
     build_session,
 )
 from k_b.ai_api.tracing import SCOPE_NAME, Tracing
-from k_b.core.config import MAX_TRACE_ATTRIBUTE_BYTES, TRACE_EXPORT_TIMEOUT_SECONDS
+from k_b.core.config import (
+    MAX_TRACE_ATTRIBUTE_BYTES,
+    TRACE_EXPORT_TIMEOUT_SECONDS,
+    TRACE_QUEUE_SIZE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,10 +76,18 @@ class TraceExport:
                 logging.getLogger(name) for name in EXPORTER_LOGGER_NAMES
             )
             tracer_provider.add_span_processor(
-                BatchSpanProcessor(build_span_exporter(settings))
+                BatchSpanProcessor(
+                    build_span_exporter(settings),
+                    max_queue_size=TRACE_QUEUE_SIZE,
+                    max_export_batch_size=TRACE_QUEUE_SIZE,
+                )
             )
             logger_provider.add_log_record_processor(
-                BatchLogRecordProcessor(build_log_exporter(settings))
+                BatchLogRecordProcessor(
+                    build_log_exporter(settings),
+                    max_queue_size=TRACE_QUEUE_SIZE,
+                    max_export_batch_size=TRACE_QUEUE_SIZE,
+                )
             )
         return cls(tracer_provider, logger_provider)
 
@@ -86,8 +98,8 @@ class TraceExport:
         )
 
     def stop_traces(self) -> None:
-        """Send the spans not sent yet; the export under way, then the rest, each within
-        TRACE_EXPORT_TIMEOUT_SECONDS."""
+        """Send the spans not sent yet: the export under way, then the rest, one batch, each
+        within TRACE_EXPORT_TIMEOUT_SECONDS."""
         stop("traces", self.tracer_provider.shutdown)
 
     def stop_logs(self) -> None:

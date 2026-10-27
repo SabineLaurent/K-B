@@ -151,9 +151,11 @@ par le `QuotingFilter` de #162, posé sur quatre journaux nommés (`trace_export
 ```
 (`src/k_b/ai_api/app.py:81-85`)
 
-Un arrêt peut envoyer deux fois : le lot en cours, puis le reste. En série, il faudrait 2 × 3 +
-2 × 3 + 5 = 17 s, au-delà des 10 s que `docker stop` laisse avant de tuer le processus. En
-parallèle, on attend seulement le plus lent : 6 s.
+Un arrêt peut envoyer deux fois : le lot en cours, puis le reste. Pour que « le reste » soit un
+seul lot, la file d'attente est limitée à un lot de 512 (`TRACE_QUEUE_SIZE`) : la file par défaut du
+SDK, 2 048 par lots de 512, pouvait en envoyer quatre (constat de la revue de code). En série, il
+faudrait 2 × 3 + 2 × 3 + 5 = 17 s, au-delà des 10 s que `docker stop` laisse avant de tuer le
+processus. En parallèle, on attend seulement le plus lent : 6 s.
 
 ## Choix faits et options écartées
 
@@ -184,8 +186,10 @@ parallèle, on attend seulement le plus lent : 6 s.
 | `test_a_private_module_of_opentelemetry_is_imported_by_the_export_of_the_traces_only` | seul `trace_export.py` importe les modules privés du SDK |
 | `test_the_measures_the_spans_and_the_logs_are_sent_at_once_when_the_app_stops` | les trois arrêts tournent en même temps (une barrière à trois : en série, elle casserait) |
 | `test_a_stop_against_an_endpoint_that_never_answers_is_bounded_and_quotes_nothing` (`test_trace_export.py`) | contre un point d'entrée local muet, l'arrêt dure 0,30 s pour un délai de 0,3 s |
+| `test_each_processor_waits_one_batch_at_most` | la file d'attente est d'un lot de 512 : un arrêt n'envoie qu'un lot après celui en cours |
+| `test_an_evaluation_keeps_its_first_codes_whole_and_says_when_it_cut` | 200 faits introuvables : des codes entiers sous 2 048 octets, et `k_b.claim.reasons_truncated` |
 | `test_an_exporter_that_raises_is_logged_by_the_type_of_its_error_never_its_text` | la ligne du SDK devient `Exception while exporting 'Span'. (ValueError)`, sans le texte |
-| `uv run pytest` : 2 669 tests ; `mypy --strict src`, `ruff check`, `ruff format --check` | rien d'autre n'a cassé |
+| `uv run pytest` : 2 672 tests ; `mypy --strict src`, `ruff check`, `ruff format --check` | rien d'autre n'a cassé |
 
 ## Ce que tu dois pouvoir défendre
 

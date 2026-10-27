@@ -169,8 +169,7 @@ def parse_headers(text: str) -> dict[str, SecretStr] | None:
 
 def build_resource(environment: DeploymentEnvironment | None) -> Resource:
     """The service and its environment, nothing else, built once for the three providers: not
-    Resource.create, which adds
-    OTEL_RESOURCE_ATTRIBUTES, OTEL_SERVICE_NAME and the detectors
+    Resource.create, which adds OTEL_RESOURCE_ATTRIBUTES, OTEL_SERVICE_NAME and the detectors
     OTEL_EXPERIMENTAL_RESOURCE_DETECTORS names (process gives process.owner, a personal datum).
     service.instance.id is drawn for each process, so that two processes never write the same
     cumulative series."""

@@ -24,6 +24,7 @@ from k_b.ai_api.stages.classification import (
     ClassificationFailure,
 )
 from k_b.ai_api.stages.writing import WRITING_RETRY_REMINDERS, WRITING_SYSTEM_PROMPT
+from k_b.ai_api.tracing import TRACING_OFF
 from k_b.ai_api.watch_items import WatchItem, WatchReading, build_fields
 from k_b.core.config import (
     LLM_REPLAY_BASE_URL,
@@ -154,7 +155,14 @@ VALID_STEPS = [
 ]
 
 
-def digest_of(reading, steps, deadline=None, transport=None, subjects=TEST_SUBJECTS):
+def digest_of(
+    reading,
+    steps,
+    deadline=None,
+    transport=None,
+    subjects=TEST_SUBJECTS,
+    tracing=TRACING_OFF,
+):
     transport = transport or ReplayTransport(steps)
     with build_http_client(REPLAY_SETTINGS, transport=transport) as http_client:
         result = build_digests(
@@ -163,6 +171,7 @@ def digest_of(reading, steps, deadline=None, transport=None, subjects=TEST_SUBJE
             reading,
             subjects,
             deadline or Deadline.after(3600),
+            tracing=tracing,
         )
     return result, transport
 
@@ -444,13 +453,21 @@ def test_a_failed_classification_carries_its_retry_after(reading):
     assert result.retry_after_seconds == 3
 
 
-def test_the_subjects_not_written_by_the_deadline_are_llm_timeout(reading):
+def test_the_subjects_not_written_by_the_deadline_are_llm_timeout(
+    reading, recorded_traces
+):
     clock = Clock()
     # The classification and one writing fit; the second writing would start with too little time.
     deadline = Deadline.after(2 * 30 + MIN_SECONDS_FOR_LLM_REQUEST - 1, clock)
     transport = SlowTransport(VALID_STEPS, clock, seconds_per_answer=30)
 
-    result, _ = digest_of(reading, VALID_STEPS, deadline=deadline, transport=transport)
+    result, _ = digest_of(
+        reading,
+        VALID_STEPS,
+        deadline=deadline,
+        transport=transport,
+        tracing=recorded_traces.trace_export.build_tracing(),
+    )
 
     assert [digest.subject for digest in result.digests] == ["security_alerts"]
     assert result.failed_subjects == (
@@ -460,10 +477,18 @@ def test_the_subjects_not_written_by_the_deadline_are_llm_timeout(reading):
     # Nothing is sent for a subject past the deadline: its items stay home.
     assert len(transport.requests) == 2
     assert len(result.stage_calls) == 2
+    # Each subject skipped is a span in error, without request under it.
+    writings = recorded_traces.find_spans("write_subject")
+    assert [span.attributes.get("error.type") for span in writings] == [
+        None,
+        "llm_timeout",
+        "llm_timeout",
+    ]
+    assert len(recorded_traces.find_spans("chat replay")) == 2
 
 
 def test_a_classification_not_finished_by_the_deadline_is_llm_timeout(
-    reading, monkeypatch
+    reading, monkeypatch, recorded_traces
 ):
     monkeypatch.setattr(classification, "MAX_ITEMS_PER_CLASSIFICATION_CALL", 10)
     clock = Clock()
@@ -479,11 +504,24 @@ def test_a_classification_not_finished_by_the_deadline_is_llm_timeout(
     ]
     transport = SlowTransport(steps, clock, seconds_per_answer=30)
 
-    result, _ = digest_of(reading, steps, deadline=deadline, transport=transport)
+    result, _ = digest_of(
+        reading,
+        steps,
+        deadline=deadline,
+        transport=transport,
+        tracing=recorded_traces.trace_export.build_tracing(),
+    )
 
     assert isinstance(result, ClassificationFailure)
     assert result.state == "llm_timeout"
     assert len(transport.requests) == 1
+    # The batch not sent is a span in error, without request under it.
+    first, second = recorded_traces.find_spans("classify_batch")
+    assert (first.attributes.get("error.type"), second.attributes["error.type"]) == (
+        None,
+        "llm_timeout",
+    )
+    assert len(recorded_traces.find_spans("chat replay")) == 1
 
 
 def test_the_classification_is_split_in_batches_each_checked_against_its_items(

@@ -326,3 +326,8 @@ TRACE_EXPORT_TIMEOUT_SECONDS = 3
 # Grafana Cloud Traces cuts each attribute at 2 KB: K-B cuts before, in bytes of UTF-8, as the SDK
 # counts characters.
 MAX_TRACE_ATTRIBUTE_BYTES = 2048
+# The spans, or the log records, waiting to be sent: one batch at most, so that a stop sends one
+# batch after the one under way, and the 2 × 3 s above hold. A request makes a few dozen spans;
+# beyond, the SDK drops what comes and logs it (the default, 2,048 in batches of 512, could send
+# four batches on a stop).
+TRACE_QUEUE_SIZE = 512

@@ -65,6 +65,7 @@ def post_digests(
         try:
             digests = answer_digests(
                 request,
+                request_id,
                 demand,
                 llm_client,
                 data_api_client,
@@ -85,6 +86,7 @@ def post_digests(
 
 def answer_digests(
     request: Request,
+    request_id: str,
     demand: DigestRequestSchema,
     llm_client: httpx2.Client,
     data_api_client: httpx2.Client,
@@ -96,7 +98,6 @@ def answer_digests(
     raises its ApiError."""
     deadline = Deadline.after(DIGEST_REQUEST_TIMEOUT_SECONDS)
     state = request.app.state
-    request_id = read_request_id(request)
     window_days = (
         state.default_window_days if demand.window_days is None else demand.window_days
     )

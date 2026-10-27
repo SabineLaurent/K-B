@@ -79,20 +79,20 @@ def build_digests(
         ]
         if not subject_items:
             continue
-        skipped_state = find_skipped_state(is_rate_limited, deadline)
-        if skipped_state is not None:
-            with tracing.step(
-                "write_subject", attributes={"k_b.subject": subject.name}
-            ) as step:
-                step.fail(skipped_state)
-            failed_subjects.append(FailedSubject(subject.name, "write", skipped_state))
-            continue
-        selection = select_for_writing(subject_items)
-        items_truncated += selection.items_truncated
-        items_dropped_before_writing_stage += selection.items_dropped
         with tracing.step(
             "write_subject", attributes={"k_b.subject": subject.name}
         ) as step:
+            skipped_state = find_skipped_state(is_rate_limited, deadline)
+            if skipped_state is not None:
+                # A span in error, without request: nothing is sent for this subject.
+                step.fail(skipped_state)
+                failed_subjects.append(
+                    FailedSubject(subject.name, "write", skipped_state)
+                )
+                continue
+            selection = select_for_writing(subject_items)
+            items_truncated += selection.items_truncated
+            items_dropped_before_writing_stage += selection.items_dropped
             llm_call = write_subject(
                 http_client,
                 settings,

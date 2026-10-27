@@ -4388,9 +4388,12 @@ a donné son « go » le 2026-10-27 ; celles de Sabine sont dites comme telles.
   demande fait quelques dizaines de spans, et celle qui échoue est celle qu'on veut lire ; Grafana
   Cloud Traces coupe chaque attribut à 2 Ko, et le SDK compte des caractères, pas des octets. Seul
   `trace_export.py` importe les modules privés du SDK et de l'exporteur (un test le tient).
-  Options écartées : 5 s comme les métriques (2 × 5 atteint les 10 s) ; un échantillonnage ; un
-  arrêt l'un après l'autre (les délais s'additionnent). Limite assumée : si Grafana répond en plus
-  de 3 s, des lots sont perdus en marche normale, avec une ligne de l'exporteur. — branche
+  La file d'attente est d'un seul lot (512) : avec la file par défaut du SDK (2 048, par lots de
+  512), un arrêt pouvait envoyer quatre lots après celui en cours (revue de code, tranchée par
+  time-knight). Options écartées : 5 s comme les métriques (2 × 5 atteint les 10 s) ; un
+  échantillonnage ; un arrêt l'un après l'autre (les délais s'additionnent) ; la file par défaut.
+  Limites assumées : si Grafana répond en plus de 3 s, des lots sont perdus en marche normale, avec
+  une ligne de l'exporteur ; au-delà de 512 en attente, le SDK abandonne ce qui arrive. — branche
   `feat/trace-digest-steps`
 - **Grafana reçoit désormais, dans les traces, le sujet, le `request_id`, les identifiants des items
   et les codes des contrôles.** Décision de Sabine du 2026-10-27 (« je valide »). **Inverse**, pour

@@ -22,7 +22,11 @@ from k_b.ai_api.connectors.metrics_export import (
     build_resource,
 )
 from k_b.ai_api.connectors.trace_export import EXPORTER_LOGGER_NAMES, TraceExport
-from k_b.core.config import MAX_TRACE_ATTRIBUTE_BYTES, TRACE_EXPORT_TIMEOUT_SECONDS
+from k_b.core.config import (
+    MAX_TRACE_ATTRIBUTE_BYTES,
+    TRACE_EXPORT_TIMEOUT_SECONDS,
+    TRACE_QUEUE_SIZE,
+)
 
 # Short, so that the test of the stop lasts less than a second; the bound is the same multiple.
 TEST_TIMEOUT_SECONDS = 0.3
@@ -119,6 +123,42 @@ def test_both_providers_share_the_resource_keep_every_span_and_cut_each_attribut
         trace_export.SPAN_LIMITS.max_attribute_length
         == trace_export.LOG_RECORD_LIMITS.max_attribute_length
         == MAX_TRACE_ATTRIBUTE_BYTES
+    )
+
+
+def test_each_processor_waits_one_batch_at_most(built_exporters, monkeypatch):
+    processors = []
+
+    def record(processor):
+        def build(exporter, **options):
+            processors.append(options)
+            return processor(exporter, **options)
+
+        return build
+
+    monkeypatch.setattr(
+        trace_export, "BatchSpanProcessor", record(trace_export.BatchSpanProcessor)
+    )
+    monkeypatch.setattr(
+        trace_export,
+        "BatchLogRecordProcessor",
+        record(trace_export.BatchLogRecordProcessor),
+    )
+
+    export = TraceExport.from_settings(SETTINGS, build_resource("sandbox"))
+    export.stop_traces()
+    export.stop_logs()
+
+    # A stop sends the batch under way, then one more: within 2 × TRACE_EXPORT_TIMEOUT_SECONDS.
+    assert (
+        processors
+        == [
+            {
+                "max_queue_size": TRACE_QUEUE_SIZE,
+                "max_export_batch_size": TRACE_QUEUE_SIZE,
+            }
+        ]
+        * 2
     )
 
 

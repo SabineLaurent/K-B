@@ -4,7 +4,7 @@ evaluation of a claim removed tied to the request to the model."""
 import pytest
 from opentelemetry.trace import SpanKind, StatusCode
 
-from k_b.ai_api.tracing import TRACING_OFF, cut_ids, cut_text
+from k_b.ai_api.tracing import TRACING_OFF, count_fitting, cut_ids, cut_text
 from k_b.core.config import MAX_TRACE_ATTRIBUTE_BYTES
 
 
@@ -152,3 +152,31 @@ def test_tracing_off_records_nothing_and_still_gives_a_reference():
     TRACING_OFF.evaluate(step.ref, 0, ["disguised_text"])
 
     assert not step.ref.span_context.is_valid
+
+
+def test_an_evaluation_keeps_its_first_codes_whole_and_says_when_it_cut(
+    recorded_traces,
+):
+    tracing = recorded_traces.trace_export.build_tracing()
+    with tracing.step("chat replay", "client") as step:
+        pass
+    # A claim of 200 facts not found: the schema sent bounds no list (writing.py).
+    reasons = [f"fact_not_found:{index}:17" for index in range(200)]
+
+    tracing.evaluate(step.ref, 0, reasons)
+
+    [record] = recorded_traces.log_records.get_finished_logs()
+    attributes = record.log_record.attributes
+    codes = attributes["gen_ai.evaluation.explanation"].split(",")
+    assert codes == reasons[: len(codes)]
+    assert len(attributes["gen_ai.evaluation.explanation"].encode()) <= (
+        MAX_TRACE_ATTRIBUTE_BYTES
+    )
+    assert attributes["k_b.claim.reasons_truncated"] is True
+
+
+def test_count_fitting_counts_the_parts_that_fit_whole():
+    assert count_fitting([]) == 0
+    assert count_fitting(["a" * MAX_TRACE_ATTRIBUTE_BYTES]) == 1
+    assert count_fitting(["a" * MAX_TRACE_ATTRIBUTE_BYTES, "b"]) == 1
+    assert count_fitting(["é" * 1024, "b"]) == 1

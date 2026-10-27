@@ -120,8 +120,6 @@ def classify(
     answer_by_ref: dict[str, str] = {}
     stage_calls: list[StageCall] = []
     for index, batch in enumerate(build_batches(items, subjects)):
-        if not deadline.allows_llm_request():
-            return ClassificationFailure("llm_timeout", None, tuple(stage_calls))
         with tracing.step(
             "classify_batch",
             attributes={
@@ -130,6 +128,10 @@ def classify(
                 "k_b.items.truncated": batch.items_truncated,
             },
         ) as step:
+            if not deadline.allows_llm_request():
+                # A batch not sent: a span in error, without request, as a subject skipped.
+                step.fail("llm_timeout")
+                return ClassificationFailure("llm_timeout", None, tuple(stage_calls))
             llm_call = classify_batch(
                 http_client, settings, batch, subjects, deadline, tracing=tracing
             )

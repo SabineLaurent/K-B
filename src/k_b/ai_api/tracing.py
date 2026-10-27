@@ -40,6 +40,8 @@ EVALUATION_EVENT = "gen_ai.evaluation.result"
 # One evaluation per claim: its bounds and its fidelity (stages/checking.py).
 CLAIM_CHECKS_EVALUATION = "k_b.claim_checks"
 FAILED_LABEL = "fail"
+# Beside the explanation of an evaluation, when its codes did not all fit.
+REASONS_TRUNCATED = "k_b.claim.reasons_truncated"
 
 
 @dataclass(frozen=True)
@@ -136,20 +138,25 @@ class Tracing:
 
     def evaluate(self, ref: SpanRef, claim_index: int, reasons: Sequence[str]) -> None:
         """The evaluation of a claim the checks removed, a log record tied to the request to the
-        model that wrote it, at the instant it ended; its reasons are codes, never a text."""
-        explanation = cut_text(IDENTIFIER_SEPARATOR.join(reasons))
+        model that wrote it, at the instant it ended; its reasons are codes, never a text, the
+        first that fit kept whole."""
+        kept = reasons[: count_fitting(reasons)]
+        explanation = IDENTIFIER_SEPARATOR.join(kept)
+        attributes: dict[str, str | int | bool] = {
+            "gen_ai.evaluation.name": CLAIM_CHECKS_EVALUATION,
+            "gen_ai.evaluation.score.label": FAILED_LABEL,
+            "gen_ai.evaluation.explanation": explanation,
+            "k_b.claim.index": claim_index,
+        }
+        if len(kept) < len(reasons):
+            attributes[REASONS_TRUNCATED] = True
         self.logger.emit(
             timestamp=ref.ended_ns,
             context=trace.set_span_in_context(NonRecordingSpan(ref.span_context)),
             severity_number=SeverityNumber.INFO,
             # The codes in the body too: a log record without body is not shown by every reader.
             body=explanation,
-            attributes={
-                "gen_ai.evaluation.name": CLAIM_CHECKS_EVALUATION,
-                "gen_ai.evaluation.score.label": FAILED_LABEL,
-                "gen_ai.evaluation.explanation": explanation,
-                "k_b.claim.index": claim_index,
-            },
+            attributes=attributes,
             event_name=EVALUATION_EVENT,
         )
 
@@ -165,11 +172,15 @@ def cut_text(text: str) -> str:
 
 def cut_ids(ids: Sequence[int]) -> list[int]:
     """The first identifiers that fit MAX_TRACE_ATTRIBUTE_BYTES once written with commas."""
-    kept: list[int] = []
-    length = 0
-    for item_id in ids:
-        length += len(str(item_id)) + (len(IDENTIFIER_SEPARATOR) if kept else 0)
+    return list(ids[: count_fitting([str(item_id) for item_id in ids])])
+
+
+def count_fitting(parts: Sequence[str]) -> int:
+    """How many of the first parts fit MAX_TRACE_ATTRIBUTE_BYTES of UTF-8 once joined with
+    commas, none cut."""
+    length = -len(IDENTIFIER_SEPARATOR)
+    for count, part in enumerate(parts):
+        length += len(IDENTIFIER_SEPARATOR) + len(part.encode())
         if length > MAX_TRACE_ATTRIBUTE_BYTES:
-            break
-        kept.append(item_id)
-    return kept
+            return count
+    return len(parts)
