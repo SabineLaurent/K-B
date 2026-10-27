@@ -10,11 +10,14 @@ from pydantic import ConfigDict, RootModel
 from k_b.ai_api.connectors.llm_client import (
     FailedCheck,
     LlmCall,
+    LlmFailure,
     call_model,
     encode_user_message,
+    to_failure,
 )
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
+from k_b.ai_api.stage_calls import StageCall
 from k_b.ai_api.watch_items import WatchItem, WatchKind, cut_value, to_item_ref
 from k_b.core.config import (
     MAX_CLASSIFICATION_INPUT_CHARS,
@@ -82,6 +85,104 @@ class ClassificationBatch:
     user_data: Mapping[str, object]
     # Items whose long text is cut.
     items_truncated: int
+
+
+@dataclass(frozen=True)
+class ClassificationFailure:
+    """The request failed at the classification: its state, the Retry-After of a rate limit, the
+    calls made."""
+
+    state: LlmFailure
+    retry_after_seconds: int | None
+    stage_calls: tuple[StageCall, ...]
+
+
+@dataclass(frozen=True)
+class Classification:
+    subject_by_item_id: Mapping[int, str]
+    no_suitable_subject: tuple[int, ...]
+    unanswered: tuple[int, ...]
+    stage_calls: tuple[StageCall, ...]
+
+
+def classify(
+    http_client: httpx2.Client,
+    settings: LlmSettings,
+    items: Sequence[WatchItem],
+    subjects: Sequence[DigestSubject],
+    deadline: Deadline,
+) -> Classification | ClassificationFailure:
+    """The answer for each item, batch after batch: a subject, no suitable subject, or none."""
+    answer_by_ref: dict[str, str] = {}
+    stage_calls: list[StageCall] = []
+    for batch in build_batches(items, subjects):
+        if not deadline.allows_llm_request():
+            return ClassificationFailure("llm_timeout", None, tuple(stage_calls))
+        llm_call = classify_batch(http_client, settings, batch, subjects, deadline)
+        answers = None if llm_call.output is None else llm_call.output.root
+        # The answer of each item of the batch, None for an item left without: counted by the
+        # same rule as the three cases of the request below.
+        batch_answers = (
+            None
+            if answers is None
+            else [answers.get(to_item_ref(item.item_id)) for item in batch.items]
+        )
+        stage_calls.append(
+            StageCall(
+                stage="classify",
+                subject=None,
+                prompt_version=CLASSIFICATION_PROMPT_VERSION,
+                items_in=len(batch.items),
+                items_truncated=batch.items_truncated,
+                facts_checked=None,
+                facts_found=None,
+                claims_removed=None,
+                items_removed_by_checks=None,
+                items_with_subject=None
+                if batch_answers is None
+                else len(batch_answers)
+                - batch_answers.count(NO_SUITABLE_SUBJECT_ANSWER)
+                - batch_answers.count(None),
+                items_no_suitable_subject=None
+                if batch_answers is None
+                else batch_answers.count(NO_SUITABLE_SUBJECT_ANSWER),
+                items_unanswered=None
+                if batch_answers is None
+                else batch_answers.count(None),
+                llm_call=llm_call,
+            )
+        )
+        if answers is None:
+            # A Retry-After only with llm_rate_limited, the one state of the spec that gives
+            # it (503): neither with a retry cut by the deadline (504) nor with a 5xx (502).
+            retry_after = (
+                llm_call.retry_after_seconds
+                if llm_call.outcome == "llm_rate_limited"
+                else None
+            )
+            return ClassificationFailure(
+                to_failure(llm_call.outcome), retry_after, tuple(stage_calls)
+            )
+        answer_by_ref.update(answers)
+    answer_by_item_id = {
+        item.item_id: answer_by_ref.get(to_item_ref(item.item_id)) for item in items
+    }
+    return Classification(
+        subject_by_item_id={
+            item_id: answer
+            for item_id, answer in answer_by_item_id.items()
+            if answer is not None and answer != NO_SUITABLE_SUBJECT_ANSWER
+        },
+        no_suitable_subject=tuple(
+            item_id
+            for item_id, answer in answer_by_item_id.items()
+            if answer == NO_SUITABLE_SUBJECT_ANSWER
+        ),
+        unanswered=tuple(
+            item_id for item_id, answer in answer_by_item_id.items() if answer is None
+        ),
+        stage_calls=tuple(stage_calls),
+    )
 
 
 def build_batches(

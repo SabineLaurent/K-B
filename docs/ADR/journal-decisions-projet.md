@@ -4292,6 +4292,39 @@ puis décisions de time-knight sur les revues de #207 (délégation de Sabine du
   spec dit aussi « aucun sujet ne convient » (`no_suitable_subject`) là où elle disait « non
   retenu ». — branche `refactor/name-when-an-item-leaves-the-digest`
 
+## 2026-10-27
+
+### API IA : le parcours dans `digests.py`, chaque étape dans son module
+
+- **`ai_api/digests.py` ne garde que le parcours d'une demande (`build_digests`, `FailedSubject`,
+  `DigestsResult`) ; le détail de chaque étape va dans son module. `classify`, `Classification` et
+  `ClassificationFailure` passent dans `stages/classification.py` ; `to_digest`, ses trois
+  fonctions d'aide, `SOURCE_URL_SCHEMES`, `Digest`, `DigestClaim` et `DigestSource` dans un module
+  nouveau, `stages/checking.py` ; `Stage` et `StageCall` dans un module nouveau à la racine,
+  `ai_api/stage_calls.py`. Déplacement à l'identique (arbre syntaxique comparé, définition par
+  définition) : seuls les imports changent.** Décision de Sabine du 2026-10-27 : « chaque étape de
+  traitement des watch donne accès au détail du code de l'étape dans le module python dédié ».
+  Pourquoi : `digests.py` gardait le détail de deux étapes (la boucle des lots et le décompte des
+  trois cas du classement ; les bornes, la fidélité et l'assemblage du compte rendu), contre deux
+  règles de `code.md` (« Un module se lit comme une table des matières », « Un parcours s'écrit
+  comme une suite d'étapes nommées, chacune dans son module ») ; et c'est le préalable des traces
+  (un span par étape, chaque étape dans son module). `stages/` se lit désormais classification,
+  writing, checking (classer, rédiger, contrôler), `fidelity.py` restant le détail du contrôle.
+  `stage_calls.py` est à la racine parce que plusieurs couches le lisent (étapes, parcours,
+  observabilité, schémas), comme `watch_items` et `deadline` (2026-10-25). `AI_API_LAYERS` reçoit
+  deux couches : `stage_calls` entre les connecteurs et les étapes, `stages.checking` entre
+  `stages.fidelity` et `digests`. **Révise en partie** 2026-10-18, « API IA : organisation par
+  rôle » (#242), qui décrivait `stages/` comme « les étapes qui appellent le modèle » : `fidelity`
+  (2026-10-25) et `checking` n'en appellent aucun. Options écartées : `to_digest` dans
+  `fidelity.py` (proposé d'abord, écarté avec Sabine : deux niveaux de détail dans un module) ;
+  `StageCall` dans `llm_client.py` (il décrit une étape, pas une connexion) ou dans
+  `watch_items.py` (plus bas que `llm_client`, alors que `StageCall` contient un `LlmCall`) ;
+  laisser `StageCall` dans `digests.py` (une étape importerait le parcours qui l'appelle, refusé
+  par `tests/architecture/test_apis.py`) ; réexporter les types depuis `digests.py`. Limites : la
+  racine d'`ai_api` passe à neuf fichiers ; `build_digests` construit toujours en ligne le
+  `StageCall` de la rédaction (une vingtaine de lignes), laissé à une autre PR. — branche
+  `refactor/one-module-per-digest-stage`
+
 ## Décisions encore ouvertes
 
 - **Un sujet secondaire par item au classement** (2026-10-26, idée de Sabine) : une case de sujet

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from k_b.ai_api.connectors.llm_settings import LlmSettings
-from k_b.ai_api.digests import StageCall
+from k_b.ai_api.stage_calls import StageCall
 from k_b.core.config import (
     LLM_INPUT_USD_PER_MILLION_TOKENS,
     LLM_OUTPUT_USD_PER_MILLION_TOKENS,

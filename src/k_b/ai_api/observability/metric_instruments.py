@@ -14,8 +14,8 @@ from k_b.ai_api.connectors.metrics_export import (
     MetricsExportSettings,
     build_meter_provider,
 )
-from k_b.ai_api.digests import StageCall
 from k_b.ai_api.observability.metrics import estimate_cost
+from k_b.ai_api.stage_calls import StageCall
 from k_b.core.config import METRICS_STOP_TIMEOUT_SECONDS, MILLISECONDS_PER_SECOND
 
 logger = logging.getLogger(__name__)
