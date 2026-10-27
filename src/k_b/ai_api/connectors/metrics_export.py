@@ -1,5 +1,6 @@
-"""The export of the metrics of the AI API in OpenTelemetry to an OTLP endpoint: its settings and
-the meter provider; without endpoint and headers, nothing leaves.
+"""The export of the metrics of the AI API in OpenTelemetry to an OTLP endpoint: its settings, shared
+with the traces (connectors/trace_export.py), and the meter provider; without endpoint and headers,
+nothing leaves.
 
 No OTEL_* variable is accepted: the SDK reads the environment behind its caller, the headers too
 even when given (_resolve_headers, 1.45.1), and logs a malformed one as it is."""
@@ -7,7 +8,7 @@ even when given (_resolve_headers, 1.45.1), and logs a malformed one as it is.""
 import logging
 import re
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import unquote
@@ -43,8 +44,11 @@ ENDPOINT_VARIABLE = "KB_OTLP_ENDPOINT"
 HEADERS_VARIABLE = "KB_OTLP_HEADERS"
 ENVIRONMENT_VARIABLE = "KB_DEPLOYMENT_ENVIRONMENT"
 OPENTELEMETRY_VARIABLE_PREFIX = "OTEL_"
-# The path the SDK adds to a base endpoint for the metrics.
+# The paths K-B adds to the base endpoint, one per signal.
 METRICS_PATH = "/v1/metrics"
+TRACES_PATH = "/v1/traces"
+LOGS_PATH = "/v1/logs"
+SIGNAL_PATHS = (METRICS_PATH, TRACES_PATH, LOGS_PATH)
 SERVICE_NAME = "k-b-ai-api"
 type DeploymentEnvironment = Literal["sandbox", "production"]
 DEPLOYMENT_ENVIRONMENTS: tuple[DeploymentEnvironment, ...] = ("sandbox", "production")
@@ -63,11 +67,27 @@ CUMULATIVE_TEMPORALITY: dict[type, AggregationTemporality] = {
 
 @dataclass(frozen=True)
 class MetricsExportSettings:
-    # The URL of the metrics: the base endpoint and METRICS_PATH.
-    endpoint: str
+    # The base endpoint, without a / at its end.
+    base_url: str
     # The values hold the token: never logged, never quoted.
     headers: Mapping[str, SecretStr]
     environment: DeploymentEnvironment
+
+    @property
+    def metrics_url(self) -> str:
+        return self.base_url + METRICS_PATH
+
+    @property
+    def traces_url(self) -> str:
+        return self.base_url + TRACES_PATH
+
+    @property
+    def logs_url(self) -> str:
+        return self.base_url + LOGS_PATH
+
+    def reveal_headers(self) -> dict[str, str]:
+        """The headers as an exporter sends them, the token in clear: never logged."""
+        return {name: value.get_secret_value() for name, value in self.headers.items()}
 
 
 def read_metrics_export_settings_or_refusal(
@@ -95,9 +115,17 @@ def read_metrics_export_settings_or_refusal(
     refusal = find_url_refusal(ENDPOINT_VARIABLE, endpoint, ("https",))
     if refusal is not None:
         return refusal
-    # The URL of the metrics given in place of the base: K-B would add the path a second time.
-    if endpoint.rstrip("/").casefold().endswith(METRICS_PATH):
-        return f"{ENDPOINT_VARIABLE}: ends with {METRICS_PATH}, give the base URL"
+    # The URL of a signal given in place of the base: K-B would add a path after it.
+    signal_path = next(
+        (
+            path
+            for path in SIGNAL_PATHS
+            if endpoint.rstrip("/").casefold().endswith(path)
+        ),
+        None,
+    )
+    if signal_path is not None:
+        return f"{ENDPOINT_VARIABLE}: ends with {signal_path}, give the base URL"
     headers = parse_headers(headers_text)
     if headers is None:
         return (
@@ -115,7 +143,7 @@ def read_metrics_export_settings_or_refusal(
             f" {' nor '.join(DEPLOYMENT_ENVIRONMENTS)}"
         )
     return MetricsExportSettings(
-        endpoint=endpoint.rstrip("/") + METRICS_PATH,
+        base_url=endpoint.rstrip("/"),
         headers=headers,
         environment=environment,
     )
@@ -140,8 +168,8 @@ def parse_headers(text: str) -> dict[str, SecretStr] | None:
 
 
 def build_resource(environment: DeploymentEnvironment | None) -> Resource:
-    """The service and its environment, nothing else: not Resource.create, which adds
-    OTEL_RESOURCE_ATTRIBUTES, OTEL_SERVICE_NAME and the detectors
+    """The service and its environment, nothing else, built once for the three providers: not
+    Resource.create, which adds OTEL_RESOURCE_ATTRIBUTES, OTEL_SERVICE_NAME and the detectors
     OTEL_EXPERIMENTAL_RESOURCE_DETECTORS names (process gives process.owner, a personal datum).
     service.instance.id is drawn for each process, so that two processes never write the same
     cumulative series."""
@@ -154,11 +182,13 @@ def build_resource(environment: DeploymentEnvironment | None) -> Resource:
     return Resource(attributes)
 
 
-def build_meter_provider(settings: MetricsExportSettings | None) -> MeterProvider:
+def build_meter_provider(
+    settings: MetricsExportSettings | None, resource: Resource
+) -> MeterProvider:
     """The provider of the meters, with a reader if the export is on; the caller shuts it down
     (no atexit, which would log once the handlers of kb are removed)."""
     if settings is None:
-        return MeterProvider(resource=build_resource(None), shutdown_on_exit=False)
+        return MeterProvider(resource=resource, shutdown_on_exit=False)
     reader = PeriodicExportingMetricReader(
         build_exporter(settings),
         export_interval_millis=METRICS_EXPORT_INTERVAL_SECONDS
@@ -167,7 +197,7 @@ def build_meter_provider(settings: MetricsExportSettings | None) -> MeterProvide
     )
     return MeterProvider(
         metric_readers=[reader],
-        resource=build_resource(settings.environment),
+        resource=resource,
         shutdown_on_exit=False,
     )
 
@@ -203,24 +233,30 @@ def quote_argument(argument: object) -> object:
 QUOTING_FILTER = QuotingFilter()
 
 
-def build_exporter(settings: MetricsExportSettings) -> OTLPMetricExporter:
-    """The OTLP exporter over HTTP, with a session that reads neither a proxy, a certificate nor
-    a .netrc of the environment. The transport of the SDK follows no redirection, but counts a
-    3xx as a success."""
-    # On the loggers themselves: a filter on the logger "opentelemetry" does not see the lines of
-    # its children.
-    for logger in EXPORTER_LOGGERS:
+def add_quoting_filter(loggers: Iterable[logging.Logger]) -> None:
+    """On the loggers themselves: a filter on the logger "opentelemetry" does not see the lines of
+    its children."""
+    for logger in loggers:
         if QUOTING_FILTER not in logger.filters:
             logger.addFilter(QUOTING_FILTER)
+
+
+def build_session() -> requests.Session:
+    """A session of an exporter, which reads neither a proxy, a certificate nor a .netrc of the
+    environment. The transport of the SDK follows no redirection, but counts a 3xx as a success."""
     session = requests.Session()
     session.trust_env = False
+    return session
+
+
+def build_exporter(settings: MetricsExportSettings) -> OTLPMetricExporter:
+    """The OTLP exporter of the metrics over HTTP."""
+    add_quoting_filter(EXPORTER_LOGGERS)
     return OTLPMetricExporter(
-        endpoint=settings.endpoint,
-        headers={
-            name: value.get_secret_value() for name, value in settings.headers.items()
-        },
+        endpoint=settings.metrics_url,
+        headers=settings.reveal_headers(),
         timeout=METRICS_EXPORT_TIMEOUT_SECONDS,
         compression=Compression.Gzip,
-        session=session,
+        session=build_session(),
         preferred_temporality=CUMULATIVE_TEMPORALITY,
     )

@@ -24,8 +24,10 @@ from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.connectors.llm_replay import REPLAY_STEPS
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.connectors.metrics_export import (
+    build_resource,
     read_metrics_export_settings_or_refusal,
 )
+from k_b.ai_api.connectors.trace_export import TraceExport
 from k_b.ai_api.dependencies import open_data_api_client, read_request_time
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.core.config import (
@@ -71,6 +73,7 @@ def test_the_measures_of_a_request_reach_the_otlp_endpoint(
             return result
 
     monkeypatch.setattr(metrics_export, "OTLPMetricExporter", RecordingExporter)
+    resource = build_resource(settings.environment)
     data_api_key = secrets.token_urlsafe(32)
     client_key = secrets.token_urlsafe(32)
     app = create_app(
@@ -86,7 +89,9 @@ def test_the_measures_of_a_request_reach_the_otlp_endpoint(
         DataApiSettings(base_url="http://localhost", api_key=SecretStr(data_api_key)),
         DIGEST_SUBJECTS,
         WINDOW_DAYS,
-        ModelMetrics.from_settings(settings),
+        ModelMetrics.from_settings(settings, resource),
+        # The traces are tried by Sabine on kb serve-ai (docs/fiches-veille.md, "Traces").
+        TraceExport.from_settings(None, resource),
     )
     with TestClient(
         create_data_app(items_database, {"AI_DIGEST": SecretStr(data_api_key)}),

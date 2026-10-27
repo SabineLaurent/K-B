@@ -13,11 +13,14 @@ import time
 
 import httpx2
 import pytest
+from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from test_metrics_export import FakeExporter
 
 from k_b import cli
-from k_b.ai_api.connectors import metrics_export
+from k_b.ai_api.connectors import metrics_export, trace_export
 from k_b.ai_api.connectors.data_api_settings import DATA_API_KEY_VARIABLE
+from k_b.ai_api.connectors.trace_export import TraceExport
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.commands import serve_ai_command
 from k_b.core.api_keys import AI_API_KEY_VARIABLE_PREFIX
@@ -246,18 +249,49 @@ def test_serve_ai_without_export_says_it_and_gives_the_app_its_measures(
 
     [(app, _)] = uvicorn_calls
     assert isinstance(app.state.model_metrics, ModelMetrics)
-    assert "metrics export: off" in capsys.readouterr().err
+    assert isinstance(app.state.trace_export, TraceExport)
+    assert "metrics and traces export: off" in capsys.readouterr().err
+
+
+def test_serve_ai_builds_one_resource_for_its_providers(
+    monkeypatch, data_dir, uvicorn_calls, environment
+):
+    resources = []
+
+    def build_resource(environment):
+        resources.append(metrics_export.build_resource(environment))
+        return resources[-1]
+
+    monkeypatch.setattr(serve_ai_command, "build_resource", build_resource)
+    set_environment(monkeypatch, environment)
+
+    cli.main(["serve-ai"])
+
+    [(app, _)] = uvicorn_calls
+    [resource] = resources
+    assert app.state.trace_export.tracer_provider.resource is resource
+    assert app.state.trace_export.logger_provider.resource is resource
 
 
 def test_serve_ai_with_export_names_its_environment_never_its_endpoint_nor_its_headers(
     monkeypatch, capsys, data_dir, uvicorn_calls, environment
 ):
-    # No network: the exporter built is a fake one.
+    # No network: the exporters built are fake ones.
     exporters = []
     monkeypatch.setattr(
         metrics_export,
         "OTLPMetricExporter",
         lambda **options: exporters.append(options) or FakeExporter(**options),
+    )
+    monkeypatch.setattr(
+        trace_export,
+        "OTLPSpanExporter",
+        lambda **options: exporters.append(options) or InMemorySpanExporter(),
+    )
+    monkeypatch.setattr(
+        trace_export,
+        "OTLPLogExporter",
+        lambda **options: exporters.append(options) or InMemoryLogRecordExporter(),
     )
     set_environment(
         monkeypatch,
@@ -273,12 +307,16 @@ def test_serve_ai_with_export_names_its_environment_never_its_endpoint_nor_its_h
 
     [(app, _)] = uvicorn_calls
     app.state.model_metrics.stop()
+    app.state.trace_export.stop_traces()
+    app.state.trace_export.stop_logs()
     error_output = capsys.readouterr().err
     assert exit_code == 0
     assert [options["endpoint"] for options in exporters] == [
-        "https://otlp.example.net/otlp/v1/metrics"
+        "https://otlp.example.net/otlp/v1/metrics",
+        "https://otlp.example.net/otlp/v1/traces",
+        "https://otlp.example.net/otlp/v1/logs",
     ]
-    assert "metrics export: OTLP, environment sandbox" in error_output
+    assert "metrics and traces export: OTLP, environment sandbox" in error_output
     assert "otlp.example.net" not in error_output
     assert OTLP_TOKEN not in error_output
 

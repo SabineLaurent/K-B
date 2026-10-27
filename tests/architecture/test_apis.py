@@ -1,6 +1,8 @@
 """What the data API and the AI API may import (conventions.md, rule 5); under k_b.ai_api, read
-at three levels, a module imports only the layers below its own."""
+at three levels, a module imports only the layers below its own, and a function that takes
+tracing always gets it by name."""
 
+import ast
 import importlib
 from pathlib import Path
 
@@ -148,8 +150,10 @@ AI_API_LAYERS = (
         "ai_api.deadline",
         "ai_api.watch_items",
         "ai_api.settings",
+        "ai_api.tracing",
         "ai_api.connectors.metrics_export",
     },
+    {"ai_api.connectors.trace_export"},
     {"ai_api.connectors.llm_replay"},
     {"ai_api.connectors.llm_settings", "ai_api.connectors.data_api_settings"},
     {"ai_api.connectors.llm_client", "ai_api.connectors.data_api_client"},
@@ -236,3 +240,91 @@ def test_the_rule_of_ai_api_refuses_its_layer_and_the_layers_above(
     imported = parse_imported_modules(code, package=package, depth=3)
 
     assert bool(list_upward_imports_of_the_ai_api(module, imported)) is is_refused
+
+
+# The functions of ai_api that pass the traces down the steps (ai_api/tracing.py).
+TRACED_FUNCTIONS = {
+    "build_digests",
+    "classify",
+    "classify_batch",
+    "write_subject",
+    "call_model",
+    "read_window",
+}
+TRACING_PARAMETER = "tracing"
+
+
+def list_functions_taking_tracing(trees: list[ast.Module]) -> set[str]:
+    """The names of the functions with a parameter tracing."""
+    names: set[str] = set()
+    for tree in trees:
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                arguments = node.args
+                parameters = [
+                    *arguments.posonlyargs,
+                    *arguments.args,
+                    *arguments.kwonlyargs,
+                ]
+                if any(parameter.arg == TRACING_PARAMETER for parameter in parameters):
+                    names.add(node.name)
+    return names
+
+
+def list_calls_without_tracing(tree: ast.Module, names: set[str]) -> list[int]:
+    """The lines of the calls to one of names that do not give tracing= : its default,
+    TRACING_OFF, would silence the steps below."""
+    lines = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        called = (
+            func.id
+            if isinstance(func, ast.Name)
+            else func.attr
+            if isinstance(func, ast.Attribute)
+            else None
+        )
+        if called in names and all(
+            keyword.arg != TRACING_PARAMETER for keyword in node.keywords
+        ):
+            lines.append(node.lineno)
+    return lines
+
+
+def test_a_function_of_ai_api_that_takes_tracing_gets_it_by_name():
+    trees = {path: ast.parse(path.read_text()) for path in list_python_files("ai_api")}
+    names = list_functions_taking_tracing(list(trees.values()))
+    calls_without_tracing = {
+        path.relative_to(PACKAGE_DIR).as_posix(): lines
+        for path, tree in trees.items()
+        if (lines := list_calls_without_tracing(tree, names))
+    }
+
+    assert names >= TRACED_FUNCTIONS
+    assert calls_without_tracing == {}
+
+
+@pytest.mark.parametrize(
+    ("code", "lines"),
+    [
+        ("classify(client, settings, items, tracing=tracing)", []),
+        ("classify(client, settings, items)", [1]),
+        ("stages.classify(client, tracing=TRACING_OFF)", []),
+        ("x = 1\nstages.classify(client)", [2]),
+        ("select_for_writing(items)", []),
+    ],
+)
+def test_the_reader_finds_a_call_that_does_not_give_tracing(code, lines):
+    assert list_calls_without_tracing(ast.parse(code), {"classify"}) == lines
+
+
+def test_the_reader_finds_the_functions_taking_tracing():
+    code = (
+        "def classify(items, *, tracing=TRACING_OFF): ...\n"
+        "def read(items, tracing): ...\n"
+        "def select(items): ..."
+    )
+
+    assert list_functions_taking_tracing([ast.parse(code)]) == {"classify", "read"}

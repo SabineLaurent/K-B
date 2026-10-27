@@ -13,9 +13,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from k_b.ai_api.connectors.llm_client import FailedCheck, LlmCall, call_model
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
+from k_b.ai_api.tracing import TRACING_OFF, Tracing
 from k_b.ai_api.watch_items import WatchItem, to_item_ref
 from k_b.core.config import DigestSubject
 
+WRITING_PROMPT_NAME = "write"
 WRITING_PROMPT_VERSION = "write-1"
 # The bounds of a digest: of structure (MAX_CLAIMS, ITEMS_PER_CLAIM), which fail the output, and
 # of a claim (TEXT_CHARS, FACTS_PER_CLAIM, FACT_VALUE_CHARS), which remove the claim.
@@ -191,6 +193,8 @@ def write_subject(
     subject: DigestSubject,
     items: Sequence[WatchItem],
     deadline: Deadline,
+    *,
+    tracing: Tracing = TRACING_OFF,
 ) -> LlmCall[WritingOutput]:
     item_refs = [to_item_ref(item.item_id) for item in items]
     return call_model(
@@ -208,4 +212,7 @@ def write_subject(
         check_output=lambda output: check_writing(output, frozenset(item_refs)),
         retry_reminders=WRITING_RETRY_REMINDERS,
         deadline=deadline,
+        prompt_name=WRITING_PROMPT_NAME,
+        prompt_version=WRITING_PROMPT_VERSION,
+        tracing=tracing,
     )

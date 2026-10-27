@@ -43,7 +43,7 @@ EXPORT_ENVIRONMENT = {
     "KB_DEPLOYMENT_ENVIRONMENT": "sandbox",
 }
 SETTINGS = MetricsExportSettings(
-    endpoint=f"{ENDPOINT}/v1/metrics",
+    base_url=ENDPOINT,
     headers={"Authorization": SecretStr(f"Basic {TOKEN}==")},
     environment="sandbox",
 )
@@ -95,8 +95,16 @@ def test_without_export_the_environment_is_not_read():
     )
 
 
-def test_the_settings_give_the_path_of_the_metrics_and_the_headers_decoded():
+def test_the_settings_give_the_base_and_the_headers_decoded():
     assert read_metrics_export_settings_or_refusal(EXPORT_ENVIRONMENT) == SETTINGS
+
+
+def test_the_settings_give_the_path_of_each_signal():
+    assert (SETTINGS.metrics_url, SETTINGS.traces_url, SETTINGS.logs_url) == (
+        f"{ENDPOINT}/v1/metrics",
+        f"{ENDPOINT}/v1/traces",
+        f"{ENDPOINT}/v1/logs",
+    )
 
 
 def test_an_endpoint_ending_with_a_slash_gets_one_slash_before_the_path():
@@ -105,7 +113,7 @@ def test_an_endpoint_ending_with_a_slash_gets_one_slash_before_the_path():
     )
 
     assert isinstance(settings, MetricsExportSettings)
-    assert settings.endpoint == f"{ENDPOINT}/v1/metrics"
+    assert settings.metrics_url == f"{ENDPOINT}/v1/metrics"
 
 
 def test_several_headers_are_read():
@@ -154,6 +162,14 @@ def test_several_headers_are_read():
             {"KB_OTLP_ENDPOINT": f"{ENDPOINT}/V1/Metrics"},
             "KB_OTLP_ENDPOINT: ends with /v1/metrics, give the base URL",
         ),
+        (
+            {"KB_OTLP_ENDPOINT": f"{ENDPOINT}/v1/traces"},
+            "KB_OTLP_ENDPOINT: ends with /v1/traces, give the base URL",
+        ),
+        (
+            {"KB_OTLP_ENDPOINT": f"{ENDPOINT}/v1/logs/"},
+            "KB_OTLP_ENDPOINT: ends with /v1/logs, give the base URL",
+        ),
         ({"KB_OTLP_HEADERS": f"Authorization{TOKEN}"}, "KB_OTLP_HEADERS: not"),
         ({"KB_OTLP_HEADERS": f"={TOKEN}"}, "KB_OTLP_HEADERS: not"),
         ({"KB_OTLP_HEADERS": "Authorization="}, "KB_OTLP_HEADERS: not"),
@@ -187,6 +203,8 @@ def test_several_headers_are_read():
         "metrics-path",
         "metrics-path-two-slashes",
         "metrics-path-case",
+        "traces-path",
+        "logs-path",
         "no-equal",
         "no-name",
         "no-value",
@@ -229,7 +247,7 @@ def test_any_variable_of_opentelemetry_is_refused_by_its_name_only():
 
 
 def test_without_settings_no_exporter_is_built(fake_exporters):
-    model_metrics = ModelMetrics(build_meter_provider(None))
+    model_metrics = ModelMetrics(build_meter_provider(None, build_resource(None)))
 
     model_metrics.record_data_fetch(120)
     model_metrics.stop()
@@ -240,7 +258,7 @@ def test_without_settings_no_exporter_is_built(fake_exporters):
 def test_the_exporter_gets_the_settings_and_a_session_blind_to_the_environment(
     fake_exporters,
 ):
-    build_meter_provider(SETTINGS).shutdown()
+    build_meter_provider(SETTINGS, build_resource("sandbox")).shutdown()
 
     [exporter] = fake_exporters
     options = exporter.options
@@ -263,7 +281,9 @@ def test_the_resource_names_the_service_and_the_environment_only(
     monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "host.name=mac-of-the-user")
     monkeypatch.setenv("OTEL_SERVICE_NAME", "other")
     monkeypatch.setenv("OTEL_EXPERIMENTAL_RESOURCE_DETECTORS", "process,os")
-    model_metrics = ModelMetrics(build_meter_provider(SETTINGS))
+    model_metrics = ModelMetrics(
+        build_meter_provider(SETTINGS, build_resource("sandbox"))
+    )
 
     model_metrics.record_data_fetch(120)
     model_metrics.stop()
@@ -297,7 +317,9 @@ def test_without_export_the_resource_names_the_service_and_its_instance_only():
 
 
 def test_stop_sends_the_measures_not_sent_yet(fake_exporters):
-    model_metrics = ModelMetrics(build_meter_provider(SETTINGS))
+    model_metrics = ModelMetrics(
+        build_meter_provider(SETTINGS, build_resource("sandbox"))
+    )
     model_metrics.record_data_fetch(1_500)
 
     model_metrics.stop()

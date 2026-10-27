@@ -864,7 +864,8 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
 - **Attributs communs** aux mesures d'un appel : `gen_ai.operation.name = chat`,
   `gen_ai.provider.name` (`openai_compatible` ou `replay`, ce que K-B sait),
   `gen_ai.request.model`, `k_b.stage`. Jamais le sujet, le `request_id`, un titre, un auteur ni un
-  texte (règle 5 de `poc.md`) : des valeurs fermées, que lit un test.
+  texte (règle 5 de `poc.md`) : des valeurs fermées, que lit un test. Les traces, elles, portent
+  le sujet et le `request_id` (section « Traces de `POST /digests` »).
 - **Noms** : ceux des conventions OpenTelemetry pour l'IA générative quand elles en ont un (statut
   *Development*, dépôt `semantic-conventions-genai`, lu le 2026-10-24), l'espace `k_b.` sinon.
   Le paquet Python `opentelemetry-semantic-conventions` 0.66b1 (installé avec le SDK 1.45.1) a
@@ -888,13 +889,15 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
   l'offre gratuite de Grafana Cloud en compte 10 000 actives par mois.
 - **Réglages** de `kb serve-ai` : `KB_OTLP_ENDPOINT` (URL de base, `https`) et `KB_OTLP_HEADERS`
   (paires `nom=valeur` du format OTLP), les deux ou aucun ; sans eux, rien n'est exporté. Une URL
-  qui finit déjà par `/v1/metrics` est refusée : K-B ajoute ce chemin à l'URL de base.
+  qui finit déjà par `/v1/metrics`, `/v1/traces` ou `/v1/logs` est refusée : K-B ajoute ces
+  chemins à l'URL de base, un par signal. Le jeton porte `metrics:write`, `traces:write` et
+  `logs:write`.
   `KB_DEPLOYMENT_ENVIRONMENT` (`sandbox` ou `production`), sans défaut, est exigée avec l'export
   (décision de Sabine du 2026-10-24). D'un environnement à l'autre, ces trois réglages changent,
   aucun code. Une variable `OTEL_*` présente arrête le démarrage : le SDK la lirait sans que K-B le
   sache, et relit l'en-tête même quand K-B le lui passe.
 - **Envoi** : toutes les 60 s, et un dernier à l'arrêt, dans le `lifespan` de l'app, avant que
-  uvicorn relance le SIGTERM ; chaque envoi attend 5 s au plus. La session HTTP de l'exporteur ne
+  uvicorn relance le SIGTERM, en même temps que celui des traces ; chaque envoi attend 5 s au plus. La session HTTP de l'exporteur ne
   lit ni proxy, ni certificat, ni `.netrc` de l'environnement (`core/outbound.py`).
 
 **Journaux de l'exporteur** : ses lignes et celles du lecteur périodique passent par le journal
@@ -916,7 +919,95 @@ mesures non envoyées d'un arrêt pendant une demande seraient perdues ; le dél
 conteneur relève de #200. La télémétrie native de FastAPI (traces, métriques HTTP, journaux) est
 coupée dans les deux API (`core/api_telemetry.py`) : avec `FASTAPI_OTEL_AUTO_CONFIGURE=true`, elle
 poserait ses propres fournisseurs, et une trace de l'API de données porterait la requête brute d'un
-client. Les traces sont l'objet de #281.
+client. Les traces de `POST /digests` sont décrites ci-dessous ; le `traceparent` envoyé à l'API de
+données, et le `trace_id` dans les lignes de journal, restent l'objet de #281.
+
+### Traces de `POST /digests` (#345)
+
+Chaque demande est une trace : le résultat de chaque étape, en identifiants et en comptes, et la
+raison de chaque affirmation retirée. Elles servent à suivre une demande étape par étape en bac à
+sable, et à comprendre une anomalie en production. Elles ne portent aucun texte : ni consigne, ni
+item, ni réponse du modèle (règle 5 de `poc.md`, inchangée). Le contenu viendra par une issue à
+part, quand le DPA de Grafana sera signé.
+
+```
+POST /digests            SERVER   http.request.method, http.route, http.response.status_code, error.type, k_b.request_id
+├─ read_watch            INTERNAL k_b.items.read, k_b.items.dropped, k_b.items.capped, k_b.capped_kind, error.type
+├─ classify_batch        INTERNAL k_b.batch.index, k_b.items.in, k_b.items.truncated, k_b.outcome,
+│  │                              k_b.items.no_suitable_subject.ids, k_b.items.unanswered.ids
+│  └─ chat <model>       CLIENT   une par requête HTTP au modèle
+└─ write_subject         INTERNAL k_b.subject, k_b.outcome, k_b.items.sent.ids, k_b.items.dropped,
+   │                              k_b.items.truncated, k_b.items.not_retained.ids, k_b.items.removed_by_checks.ids,
+   │                              k_b.facts.checked, k_b.facts.found, k_b.claims.removed   (englobe les contrôles)
+   └─ chat <model>       CLIENT   une par requête ; les évaluations sur la dernière
+```
+
+- **Façade** : `ai_api/tracing.py`, seule à appeler l'API d'OpenTelemetry. Les étapes ouvrent leur
+  span en ligne (`tracing.step`), et reçoivent la façade par `tracing=`, comme `Deadline`, jamais
+  par un fournisseur global. Le défaut, `TRACING_OFF`, n'enregistre rien. Pour qu'il ne cache pas
+  un oubli, un test lit le code : dans `ai_api`, tout appel à une fonction qui prend `tracing` le
+  lui passe (`tests/architecture/test_apis.py`).
+- **Échec** : un état nommé (`llm_timeout`, `data_api_unavailable`…) met le span en `ERROR`, sans
+  description, et le pose dans `error.type`. Une exception imprévue y met le nom de son type,
+  jamais son texte : aucun span n'enregistre d'exception, dont le message peut citer un item. Un
+  sujet sauté (après un 429, ou faute de temps) est un `write_subject` en erreur, sans enfant ; un
+  lot de classement sauté faute de temps, un `classify_batch` en erreur, sans enfant.
+- **`chat <model>`** : `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`,
+  `gen_ai.request.max_tokens`, `gen_ai.prompt.name` et `gen_ai.prompt.version` (l'étape et la
+  version de sa consigne), `gen_ai.output.type = json`, les jetons de la tentative
+  (`gen_ai.usage.*`), `gen_ai.response.finish_reasons` (fermé : `stop`, `length`,
+  `content_filter`, sinon `other`, le fournisseur pouvant y mettre un texte libre),
+  `http.response.status_code`, et
+  `k_b.attempt`, `k_b.outcome`, `k_b.failed_check`, `k_b.input_chars`. Pas de `server.address`.
+- **Pourquoi une affirmation est retirée** : un enregistrement de journal OTLP
+  `gen_ai.evaluation.result` par affirmation, rattaché au dernier `chat` de sa rédaction, à
+  l'instant où il a fini. `gen_ai.evaluation.name = k_b.claim_checks` (bornes et fidélité, une
+  évaluation), `gen_ai.evaluation.score.label = fail`, `k_b.claim.index` (sa position dans la
+  sortie), et dans `gen_ai.evaluation.explanation` comme dans le corps, les codes séparés par des
+  virgules : `out_of_bounds`, `fact_not_found:<index du fait>:<item>`, `undeclared_identifier`,
+  `cited_item_without_fact`, `disguised_text`. Les premiers codes qui tiennent en 2 048 octets sont
+  gardés entiers ; `k_b.claim.reasons_truncated` dit qu'il en manque. Un journal, pas un événement de span : OpenTelemetry
+  déprécie l'API des événements de span.
+- **Identifiants** : des entiers internes, sans donnée personnelle (décision de Sabine du
+  2026-10-27, registre). Chaque attribut tient en 2 048 octets d'UTF-8, la limite de Grafana Cloud
+  Traces : un texte est coupé, une liste garde ses premiers identifiants, et `<nom>_truncated`
+  s'ajoute. Le SDK coupe aussi à 2 048 caractères, en défense.
+- **Export** : la même URL de base et le même en-tête que les métriques, `/v1/traces` et
+  `/v1/logs` ; gzip ; 3 s par envoi ; tous les spans gardés (`ALWAYS_ON`) ; une seule ressource
+  pour les trois fournisseurs. Les journaux du SDK et de l'exporteur passent par le même
+  `QuotingFilter`, posé sur quatre journaux nommés (`ai_api/connectors/trace_export.py`), le seul
+  module qui importe les modules privés du SDK : `pyproject.toml` borne OpenTelemetry sous 1.46.
+  Un échec d'envoi ne fait jamais échouer une demande.
+- **Arrêt** : les trois fournisseurs s'arrêtent en même temps. Un arrêt peut envoyer deux fois
+  (l'envoi en cours, puis le reste) : au plus max(2 × 3, 2 × 3, 5) = 6 s, sous les 10 s de `docker
+  stop`, sans demande en cours. Pour que le reste tienne en un envoi, la file d'attente est d'un
+  lot, 512 spans ou enregistrements (`TRACE_QUEUE_SIZE`) ; une demande en fait quelques dizaines.
+  Au-delà, le SDK abandonne le plus ancien en attente, avec une ligne de journal. Le SDK ne borne
+  pas le total d'un envoi (son délai vaut pour chaque attente de la connexion) : chaque arrêt tourne
+  dans un fil à part, attendu 6 s au plus (`TRACE_STOP_TIMEOUT_SECONDS`), puis laissé, avec une
+  ligne de journal.
+- **Lire** dans Grafana : Explore, Tempo, `{resource.service.name="k-b-ai-api"}`, ou
+  `{status = error}` pour les demandes en échec ; « Logs for this span » sur un `chat` montre les
+  raisons. Dans Loki, elles se lisent aussi par `{service_name="k-b-ai-api"}`, leurs attributs avec
+  un tiret bas à la place du point (`k_b_claim_index`) : vu à l'essai réel du 2026-10-27.
+
+**Angles morts** : un 401 et un 422 n'ont pas de trace, la route n'étant pas atteinte. Une erreur
+après le `return` de la route (la validation de la réponse, la fermeture des dépendances) laisse
+une racine à 200 alors que le client reçoit 500 ; la ligne de `log_request` dit le vrai code.
+
+**Écarts à la convention** :
+- un span `chat` par requête HTTP, là où la convention regroupe les relances : K-B relance après
+  une attente, avec la même consigne, ou après un contrôle raté, avec un rappel, et chaque
+  tentative a son résultat ;
+- la racine est ouverte par la route, pas par la télémétrie native de FastAPI, qui porterait
+  `url.path`, `url.query` et `server.address`, et reprendrait un `traceparent` reçu ;
+- `gen_ai.prompt.version` vaut la version de K-B (`classify-2`, `write-1`).
+
+Sources, lues le 2026-10-27 :
+[client-inference.md](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/client-inference.md),
+[gen-ai-events.md](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-events.md),
+[dépréciation des événements de span](https://opentelemetry.io/blog/2026/deprecating-span-events/),
+[limite de 2 Ko de Grafana Cloud Traces](https://grafana.com/docs/grafana-cloud/whats-new/2025-01-17-higher-reliability-for-grafana-cloud-traces-with-new-limits-on-attribute-size).
 
 ## États nommés
 

@@ -11,6 +11,8 @@ from pydantic import SecretStr
 from k_b.ai_api.app import create_app as create_ai_app
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.connectors.llm_settings import REPLAY_MODEL, LlmSettings
+from k_b.ai_api.connectors.metrics_export import build_resource
+from k_b.ai_api.connectors.trace_export import TraceExport
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.commands.exit_codes import ExitCode
 from k_b.core.atomic_write import write_file_atomically
@@ -60,6 +62,7 @@ def describe_data_api() -> dict[str, Any]:
 def describe_ai_api() -> dict[str, Any]:
     """The OpenAPI of the AI API, made without key nor setting of the environment, as its
     document reads none of them."""
+    resource = build_resource(None)
     return create_ai_app(
         {},
         LlmSettings(
@@ -73,6 +76,7 @@ def describe_ai_api() -> dict[str, Any]:
         DataApiSettings(base_url=DATA_API_URL, api_key=SecretStr("")),
         DIGEST_SUBJECTS,
         DIGEST_WINDOW_DAYS,
-        # Without export: no measure leaves while the OpenAPI is written.
-        ModelMetrics.from_settings(None),
+        # Without export: no measure nor span leaves while the OpenAPI is written.
+        ModelMetrics.from_settings(None, resource),
+        TraceExport.from_settings(None, resource),
     ).openapi()

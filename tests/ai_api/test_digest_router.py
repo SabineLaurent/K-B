@@ -5,6 +5,7 @@ import json
 import logging
 import secrets
 import sys
+import threading
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import get_args
@@ -15,6 +16,7 @@ from fastapi.routing import iter_route_contexts
 from fastapi.testclient import TestClient
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+from opentelemetry.trace import SpanKind, StatusCode
 from pydantic import SecretStr
 
 from k_b.ai_api.app import create_app
@@ -30,6 +32,8 @@ from k_b.ai_api.dependencies import (
 )
 from k_b.ai_api.errors import STATUS_BY_STATE
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
+from k_b.ai_api.routers import digest_router
+from k_b.ai_api.tracing import TRACING_OFF
 from k_b.core.config import (
     LLM_INPUT_USD_PER_MILLION_TOKENS,
     LLM_OUTPUT_USD_PER_MILLION_TOKENS,
@@ -144,9 +148,10 @@ def metric_reader():
 
 
 @pytest.fixture
-def make_ai_api(data_api, metric_reader):
+def make_ai_api(data_api, metric_reader, recorded_traces):
     """A client of the AI API on the replay of these steps, and the replay transport, which keeps
-    each request; replay_from_settings uses the replay of the settings, as kb serve-ai does."""
+    each request; replay_from_settings uses the replay of the settings, as kb serve-ai does. Its
+    spans and log records are kept by recorded_traces."""
 
     def make(
         steps,
@@ -169,6 +174,7 @@ def make_ai_api(data_api, metric_reader):
             ModelMetrics(
                 MeterProvider(metric_readers=[metric_reader], shutdown_on_exit=False)
             ),
+            recorded_traces.trace_export,
         )
         transport = ReplayTransport(steps)
 
@@ -868,13 +874,36 @@ def test_an_empty_window_measures_its_reading_without_a_call(
     assert (attributes, count) == ({}, 1)
 
 
-def test_the_measures_are_sent_when_the_app_stops(data_api):
-    reader = InMemoryMetricReader()
+class StoppedTraceExport:
+    """An export of the traces that sends nothing, and says when each signal is stopped."""
+
+    def __init__(self, stop):
+        self.stop = stop
+
+    def build_tracing(self):
+        return TRACING_OFF
+
+    def stop_traces(self):
+        self.stop("traces")
+
+    def stop_logs(self):
+        self.stop("logs")
+
+
+def test_the_measures_the_spans_and_the_logs_are_sent_at_once_when_the_app_stops():
+    # Each stop waits for the two others: run one after the other, the first would wait alone
+    # and break the barrier.
+    barrier = threading.Barrier(3, timeout=5)
     stopped = []
+
+    def stop(signal):
+        barrier.wait()
+        stopped.append(signal)
+
     model_metrics = ModelMetrics(
-        MeterProvider(metric_readers=[reader], shutdown_on_exit=False)
+        MeterProvider(metric_readers=[InMemoryMetricReader()], shutdown_on_exit=False)
     )
-    model_metrics.stop = lambda: stopped.append(True)
+    model_metrics.stop = lambda: stop("metrics")
     app = create_app(
         {"TERMINAL": SecretStr(CLIENT_KEY)},
         REPLAY_SETTINGS,
@@ -884,12 +913,13 @@ def test_the_measures_are_sent_when_the_app_stops(data_api):
         TEST_SUBJECTS,
         WINDOW_DAYS,
         model_metrics,
+        StoppedTraceExport(stop),
     )
 
     with TestClient(app):
         assert stopped == []
 
-    assert stopped == [True]
+    assert sorted(stopped) == ["logs", "metrics", "traces"]
 
 
 class RecordingOutput:
@@ -969,3 +999,199 @@ def test_each_state_that_fails_a_request_has_its_status():
     }
 
     assert set(STATUS_BY_STATE) == failure_states
+
+
+def describe_tree(recorded_traces):
+    """Each span by its name, kind, parent name and state: the shape of the trace."""
+    spans = recorded_traces.spans.get_finished_spans()
+    name_by_id = {span.context.span_id: span.name for span in spans}
+    return [
+        (
+            span.name,
+            span.kind,
+            None if span.parent is None else name_by_id[span.parent.span_id],
+            span.attributes.get("error.type"),
+        )
+        for span in sorted(spans, key=lambda span: span.start_time)
+    ]
+
+
+def test_a_request_is_a_trace_of_its_steps(make_ai_api, recorded_traces):
+    client, _ = make_ai_api(VALID_STEPS)
+
+    response = post_digests(client)
+
+    assert describe_tree(recorded_traces) == [
+        ("POST /digests", SpanKind.SERVER, None, None),
+        ("read_watch", SpanKind.INTERNAL, "POST /digests", None),
+        ("classify_batch", SpanKind.INTERNAL, "POST /digests", None),
+        ("chat replay", SpanKind.CLIENT, "classify_batch", None),
+        ("write_subject", SpanKind.INTERNAL, "POST /digests", None),
+        ("chat replay", SpanKind.CLIENT, "write_subject", None),
+        ("write_subject", SpanKind.INTERNAL, "POST /digests", None),
+        ("chat replay", SpanKind.CLIENT, "write_subject", None),
+        ("write_subject", SpanKind.INTERNAL, "POST /digests", None),
+        ("chat replay", SpanKind.CLIENT, "write_subject", None),
+    ]
+    [root] = recorded_traces.find_spans("POST /digests")
+    assert dict(root.attributes) == {
+        "http.request.method": "POST",
+        "http.route": "/digests",
+        "k_b.request_id": response.headers["X-Request-ID"],
+        "http.response.status_code": 200,
+    }
+    [reading] = recorded_traces.find_spans("read_watch")
+    assert dict(reading.attributes) == {
+        "k_b.items.read": 10,
+        "k_b.items.dropped": 0,
+        "k_b.items.capped": False,
+    }
+    [batch] = recorded_traces.find_spans("classify_batch")
+    assert batch.attributes["k_b.batch.index"] == 0
+    assert batch.attributes["k_b.outcome"] == "ok"
+    assert list(batch.attributes["k_b.items.no_suitable_subject.ids"]) == [12, 11, 13]
+    assert list(batch.attributes["k_b.items.unanswered.ids"]) == []
+    security = recorded_traces.find_spans("write_subject")[0]
+    assert security.attributes["k_b.subject"] == "security_alerts"
+    assert list(security.attributes["k_b.items.sent.ids"]) == SECURITY_ITEMS
+    assert list(security.attributes["k_b.items.not_retained.ids"]) == [4]
+    assert security.attributes["k_b.claims.removed"] == 0
+
+
+def test_a_subject_that_fails_or_is_skipped_is_a_span_in_error(
+    make_ai_api, recorded_traces
+):
+    # A Retry-After beyond the maximum: no retry, and nothing more is sent.
+    client, _ = make_ai_api(
+        [classified(), {"kind": "response", "status": 429, "retry_after": "30"}]
+    )
+
+    post_digests(client)
+
+    writings = recorded_traces.find_spans("write_subject")
+    assert [span.attributes["error.type"] for span in writings] == [
+        "llm_rate_limited",
+        "llm_rate_limited",
+        "llm_rate_limited",
+    ]
+    assert all(span.status.status_code is StatusCode.ERROR for span in writings)
+    # The first sent its request; the next two, skipped, sent none.
+    tree = describe_tree(recorded_traces)
+    assert [parent for name, _, parent, _ in tree if name == "chat replay"] == [
+        "classify_batch",
+        "write_subject",
+    ]
+
+
+def test_a_request_that_fails_names_its_state_and_its_status_on_the_root(
+    make_ai_api, recorded_traces
+):
+    client, _ = make_ai_api([INVALID_OUTPUT, INVALID_OUTPUT])
+
+    response = post_digests(client)
+
+    [root] = recorded_traces.find_spans("POST /digests")
+    assert root.status.status_code is StatusCode.ERROR
+    assert root.status.description is None
+    assert root.attributes["error.type"] == "llm_invalid_output"
+    assert root.attributes["http.response.status_code"] == response.status_code == 502
+    [batch] = recorded_traces.find_spans("classify_batch")
+    assert batch.attributes["error.type"] == "llm_invalid_output"
+
+
+class TrappedError(Exception):
+    """An unexpected error whose text quotes an item."""
+
+
+def test_an_unexpected_error_names_its_type_never_its_text_on_the_root(
+    make_ai_api, recorded_traces, monkeypatch
+):
+    def fail(*args, **kwargs):
+        raise TrappedError("Mistral Large 4 (9 minute read)")
+
+    monkeypatch.setattr(digest_router, "build_digests", fail)
+    client, _ = make_ai_api(VALID_STEPS)
+
+    response = post_digests(client)
+
+    assert response.status_code == 500
+    [root] = recorded_traces.find_spans("POST /digests")
+    assert root.attributes["error.type"] == "TrappedError"
+    assert root.attributes["http.response.status_code"] == 500
+    assert root.status.description is None
+    assert all(span.events == () for span in recorded_traces.spans.get_finished_spans())
+    assert not any("Mistral" in str(value) for value in list_values(recorded_traces))
+
+
+def list_values(recorded_traces):
+    """Every value of every attribute of the spans and log records, and every body."""
+    values = []
+    for span in recorded_traces.spans.get_finished_spans():
+        values.extend(span.attributes.values())
+    for record in recorded_traces.log_records.get_finished_logs():
+        values.extend(record.log_record.attributes.values())
+        values.append(record.log_record.body)
+    return values
+
+
+def test_no_value_holds_a_text_of_the_items_or_of_the_output(
+    make_ai_api, recorded_traces
+):
+    client, _ = make_ai_api(VALID_STEPS)
+
+    body = post_digests(client).json()
+
+    texts = [
+        text
+        for digest in body["digests"]
+        for text in [
+            *(claim["text"] for claim in digest["claims"]),
+            *(source["title"] for source in digest["sources"]),
+        ]
+    ]
+    assert texts
+    words = {word for text in texts for word in text.split() if len(word) > 6}
+    for value in list_values(recorded_traces):
+        written = " ".join(map(str, value)) if isinstance(value, tuple) else str(value)
+        assert not any(word in written for word in words), written
+        assert len(written.encode()) <= 2048
+
+
+def test_each_claim_removed_is_an_evaluation_tied_to_its_last_request(
+    make_ai_api, recorded_traces
+):
+    two_versions = {
+        "text": "Claude Code publie v2.1.287 puis v2.1.299.",
+        "item_ids": ["i6"],
+        "facts": [
+            {"value": "v2.1.287", "item_id": "i6"},
+            {"value": "v2.1.299", "item_id": "i6"},
+        ],
+    }
+    client, _ = make_ai_api(
+        [
+            classified(),
+            written(SECURITY_CLAIM),
+            written(AGENT_CLAIM, two_versions),
+            written(),
+        ]
+    )
+
+    post_digests(client)
+
+    [record] = recorded_traces.log_records.get_finished_logs()
+    log_record = record.log_record
+    agent_chat = [
+        span
+        for span in recorded_traces.find_spans("chat replay")
+        if span.attributes["gen_ai.prompt.name"] == "write"
+    ][1]
+    assert log_record.span_id == agent_chat.context.span_id
+    assert log_record.event_name == "gen_ai.evaluation.result"
+    assert log_record.attributes["gen_ai.evaluation.explanation"] == (
+        "fact_not_found:1:6"
+    )
+    assert log_record.attributes["k_b.claim.index"] == 1
+    assert not any(name.startswith("exception.") for name in log_record.attributes)
+    agent = recorded_traces.find_spans("write_subject")[1]
+    assert agent.attributes["k_b.claims.removed"] == 1

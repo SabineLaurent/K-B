@@ -1,5 +1,5 @@
 """The measures of the AI API as OpenTelemetry instruments, the same as the JSON line of each
-call; OpenTelemetry is imported here and in connectors/metrics_export.py only.
+call.
 
 Names after the semantic conventions for generative AI, k_b. otherwise; closed attributes only,
 never a text, a title, a subject nor a request id."""
@@ -8,6 +8,7 @@ import logging
 from collections.abc import Sequence
 
 from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.resources import Resource
 
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.connectors.metrics_export import (
@@ -117,9 +118,11 @@ class ModelMetrics:
         )
 
     @classmethod
-    def from_settings(cls, settings: MetricsExportSettings | None) -> "ModelMetrics":
+    def from_settings(
+        cls, settings: MetricsExportSettings | None, resource: Resource
+    ) -> "ModelMetrics":
         """The instruments of kb serve-ai: exported if the settings are given, dropped if not."""
-        return cls(build_meter_provider(settings))
+        return cls(build_meter_provider(settings, resource))
 
     def record_calls(
         self, llm_settings: LlmSettings, stage_calls: Sequence[StageCall]

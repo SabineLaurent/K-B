@@ -1,5 +1,5 @@
 """The digests of a request: the items classified in batches, then each subject written, one call
-after the other, under the deadline; nothing is written nor logged here.
+after the other, under the deadline; nothing is written nor logged here, each step is a span.
 
 After a writing failed with a 429, nothing more is sent: the items of the next subjects would
 leave for an answer refused (minimisation, GDPR art. 5.1.c)."""
@@ -9,14 +9,19 @@ from dataclasses import dataclass
 
 import httpx2
 
-from k_b.ai_api.connectors.llm_client import LlmFailure, to_failure
+from k_b.ai_api.connectors.llm_client import LlmCall, LlmFailure, to_failure
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.stage_calls import Stage, StageCall
 from k_b.ai_api.stages.checking import Digest, to_digest
 from k_b.ai_api.stages.classification import ClassificationFailure, classify
-from k_b.ai_api.stages.writing import WRITING_PROMPT_VERSION, write_subject
-from k_b.ai_api.watch_items import WatchReading, select_for_writing
+from k_b.ai_api.stages.writing import (
+    WRITING_PROMPT_VERSION,
+    WritingOutput,
+    write_subject,
+)
+from k_b.ai_api.tracing import TRACING_OFF, Step, Tracing
+from k_b.ai_api.watch_items import WatchReading, WritingSelection, select_for_writing
 from k_b.core.config import DigestSubject
 
 
@@ -51,9 +56,13 @@ def build_digests(
     reading: WatchReading,
     subjects: Sequence[DigestSubject],
     deadline: Deadline,
+    *,
+    tracing: Tracing = TRACING_OFF,
 ) -> DigestsResult | ClassificationFailure:
     """The digests of the items read, one subject after the other in the order of the list."""
-    classification = classify(http_client, settings, reading.items, subjects, deadline)
+    classification = classify(
+        http_client, settings, reading.items, subjects, deadline, tracing=tracing
+    )
     if isinstance(classification, ClassificationFailure):
         return classification
     digests: list[Digest] = []
@@ -70,25 +79,34 @@ def build_digests(
         ]
         if not subject_items:
             continue
-        if is_rate_limited:
-            failed_subjects.append(
-                FailedSubject(subject.name, "write", "llm_rate_limited")
+        with tracing.step(
+            "write_subject", attributes={"k_b.subject": subject.name}
+        ) as step:
+            skipped_state = find_skipped_state(is_rate_limited, deadline)
+            if skipped_state is not None:
+                # A span in error, without request: nothing is sent for this subject.
+                step.fail(skipped_state)
+                failed_subjects.append(
+                    FailedSubject(subject.name, "write", skipped_state)
+                )
+                continue
+            selection = select_for_writing(subject_items)
+            items_truncated += selection.items_truncated
+            items_dropped_before_writing_stage += selection.items_dropped
+            llm_call = write_subject(
+                http_client,
+                settings,
+                subject,
+                selection.items,
+                deadline,
+                tracing=tracing,
             )
-            continue
-        if not deadline.allows_llm_request():
-            failed_subjects.append(FailedSubject(subject.name, "write", "llm_timeout"))
-            continue
-        selection = select_for_writing(subject_items)
-        items_truncated += selection.items_truncated
-        items_dropped_before_writing_stage += selection.items_dropped
-        llm_call = write_subject(
-            http_client, settings, subject, selection.items, deadline
-        )
-        digest = (
-            None
-            if llm_call.output is None
-            else to_digest(subject.name, selection.items, llm_call.output)
-        )
+            digest = (
+                None
+                if llm_call.output is None
+                else to_digest(subject.name, selection.items, llm_call.output)
+            )
+            trace_writing(step, selection, llm_call, digest, tracing=tracing)
         stage_calls.append(
             StageCall(
                 stage="write",
@@ -126,3 +144,46 @@ def build_digests(
         items_capped=reading.items_capped,
         stage_calls=tuple(stage_calls),
     )
+
+
+def find_skipped_state(is_rate_limited: bool, deadline: Deadline) -> LlmFailure | None:
+    """Why a subject is not written: a 429 before it, or too little time left; None if it is."""
+    if is_rate_limited:
+        return "llm_rate_limited"
+    if not deadline.allows_llm_request():
+        return "llm_timeout"
+    return None
+
+
+def trace_writing(
+    step: Step,
+    selection: WritingSelection,
+    llm_call: LlmCall[WritingOutput],
+    digest: Digest | None,
+    *,
+    tracing: Tracing,
+) -> None:
+    """The result of a writing on its span, by identifiers and counts, and the evaluation of each
+    claim removed, tied to the request whose output was checked."""
+    step.set(
+        {
+            "k_b.outcome": llm_call.outcome,
+            "k_b.items.dropped": selection.items_dropped,
+            "k_b.items.truncated": selection.items_truncated,
+        }
+    )
+    step.set_ids("k_b.items.sent.ids", [item.item_id for item in selection.items])
+    if digest is None:
+        step.fail(to_failure(llm_call.outcome))
+        return
+    step.set(
+        {
+            "k_b.facts.checked": digest.facts_checked,
+            "k_b.facts.found": digest.facts_found,
+            "k_b.claims.removed": digest.claims_removed,
+        }
+    )
+    step.set_ids("k_b.items.not_retained.ids", digest.items_not_retained_in_output)
+    step.set_ids("k_b.items.removed_by_checks.ids", digest.items_removed_by_checks)
+    for removed in digest.removed_claims:
+        tracing.evaluate(llm_call.span_ref, removed.index, removed.reasons)

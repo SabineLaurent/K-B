@@ -6,6 +6,7 @@ from typing import get_args
 
 import httpx2
 import pytest
+from opentelemetry.trace import INVALID_SPAN_CONTEXT, SpanKind, StatusCode
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from k_b.ai_api.connectors.llm_client import (
@@ -25,6 +26,7 @@ from k_b.ai_api.connectors.llm_settings import (
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.stages.classification import CLASSIFICATION_MAX_COMPLETION_TOKENS
 from k_b.ai_api.stages.writing import WRITING_MAX_COMPLETION_TOKENS
+from k_b.ai_api.tracing import TRACING_OFF, SpanRef
 from k_b.core.config import (
     LLM_CALL_TIMEOUT_SECONDS,
     LLM_CONNECT_TIMEOUT_SECONDS,
@@ -83,6 +85,8 @@ CLASSIFICATION_SCHEMA = {
 }
 VALID_OUTPUT = json.dumps({"subject": "models", "count": 2})
 USER_DATA = {"items": [{"item_id": "i1", "kind": "paper", "title": "A model"}]}
+# The span of a call made without tracing.
+NO_SPAN = SpanRef(INVALID_SPAN_CONTEXT, 0)
 
 
 def accept_every_output(output: Classification) -> FailedCheck | None:
@@ -113,6 +117,7 @@ def call(
     user_data=USER_DATA,
     check_output=accept_every_output,
     deadline=None,
+    tracing=TRACING_OFF,
 ):
     """Call the model on the replay with these steps: the call, the transport, which kept every
     request, and the waits asked."""
@@ -131,7 +136,10 @@ def call(
             check_output=check_output,
             retry_reminders=RETRY_REMINDERS,
             deadline=deadline,
+            prompt_name="classify",
+            prompt_version="classify-test",
             sleep=sleeps,
+            tracing=tracing,
         )
     return llm_call, transport, sleeps
 
@@ -351,6 +359,20 @@ def test_an_unknown_finish_reason_is_asked_again():
     assert llm_call.attempts == 2
     assert llm_call.failed_check == "finish_reason"
     assert llm_call.finish_reason == "tool_calls"
+
+
+def test_a_finish_reason_out_of_the_closed_list_is_traced_as_other(recorded_traces):
+    # A provider may put any text there; check 1 refuses it, the span must not carry it.
+    free_text = "Mistral Large 4 (9 minute read)"
+
+    call(
+        [completion(finish_reason=free_text), completion(finish_reason="length")],
+        tracing=recorded_traces.trace_export.build_tracing(),
+    )
+
+    first, second = recorded_traces.find_spans("chat replay")
+    assert first.attributes["gen_ai.response.finish_reasons"] == ("other",)
+    assert second.attributes["gen_ai.response.finish_reasons"] == ("length",)
 
 
 def test_a_truncated_output_is_llm_truncated_without_retry():
@@ -590,6 +612,8 @@ def test_the_client_of_the_provider_sends_the_key_and_follows_no_redirection():
             check_output=accept_every_output,
             retry_reminders=RETRY_REMINDERS,
             deadline=None,
+            prompt_name="classify",
+            prompt_version="classify-test",
             sleep=Sleeps(),
         )
     (request,) = transport.requests
@@ -677,6 +701,8 @@ def test_reminders_missing_for_a_check_are_refused_before_any_request():
             check_output=accept_every_output,
             retry_reminders=reminders,
             deadline=None,
+            prompt_name="classify",
+            prompt_version="classify-test",
             sleep=Sleeps(),
         )
 
@@ -707,6 +733,8 @@ def test_an_answer_that_cannot_be_decoded_is_llm_unavailable_without_retry():
             check_output=accept_every_output,
             retry_reminders=RETRY_REMINDERS,
             deadline=None,
+            prompt_name="classify",
+            prompt_version="classify-test",
             sleep=Sleeps(),
         )
 
@@ -919,7 +947,9 @@ def test_a_call_without_output_is_never_read_as_ok():
 
 def test_a_call_whose_answer_was_unreadable_is_not_checked():
     # A 200 whose body is not a completion: read_answer gives llm_unavailable, no check ran.
-    call = summarize([Attempt(outcome="llm_unavailable", http_status=200)], 0, 0.1)
+    call = summarize(
+        [Attempt(outcome="llm_unavailable", http_status=200)], 0, 0.1, NO_SPAN
+    )
 
     assert (call.is_checked, call.check_ms) == (False, 0)
 
@@ -932,6 +962,56 @@ def test_a_call_is_checked_when_one_of_its_attempts_was():
         ],
         0,
         0.5,
+        NO_SPAN,
     )
 
     assert (call.is_checked, call.check_ms) == (True, 4)
+
+
+def test_each_request_is_a_chat_span_and_the_call_keeps_the_last(recorded_traces):
+    tracing = recorded_traces.trace_export.build_tracing()
+
+    llm_call, _, _ = call(
+        [
+            completion("not json", prompt_tokens=100, completion_tokens=10),
+            completion(prompt_tokens=110, completion_tokens=20),
+        ],
+        tracing=tracing,
+    )
+
+    first, second = recorded_traces.find_spans("chat replay")
+    assert (first.kind, second.kind) == (SpanKind.CLIENT, SpanKind.CLIENT)
+    assert dict(first.attributes) == {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.provider.name": "replay",
+        "gen_ai.request.model": "replay",
+        "gen_ai.request.max_tokens": 500,
+        "gen_ai.prompt.name": "classify",
+        "gen_ai.prompt.version": "classify-test",
+        "gen_ai.output.type": "json",
+        "k_b.attempt": 1,
+        "k_b.input_chars": len(json.dumps(USER_DATA, ensure_ascii=False)),
+        "k_b.outcome": "llm_invalid_output",
+        "gen_ai.usage.input_tokens": 100,
+        "gen_ai.usage.output_tokens": 10,
+        "gen_ai.response.finish_reasons": ("stop",),
+        "http.response.status_code": 200,
+        "k_b.failed_check": "schema",
+        "error.type": "llm_invalid_output",
+    }
+    assert first.status.status_code is StatusCode.ERROR
+    assert second.attributes["k_b.attempt"] == 2
+    assert second.attributes["k_b.outcome"] == "ok"
+    assert "error.type" not in second.attributes
+    assert llm_call.span_ref.span_context == second.context
+
+
+def test_a_request_without_answer_is_a_chat_span_without_tokens(recorded_traces):
+    tracing = recorded_traces.trace_export.build_tracing()
+
+    call([{"kind": "timeout"}], tracing=tracing)
+
+    [span] = recorded_traces.find_spans("chat replay")
+    assert span.attributes["error.type"] == "llm_timeout"
+    assert "gen_ai.usage.input_tokens" not in span.attributes
+    assert "http.response.status_code" not in span.attributes

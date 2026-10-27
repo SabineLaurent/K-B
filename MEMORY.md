@@ -79,8 +79,17 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   `KB_DEPLOYMENT_ENVIRONMENT` sont réglées ; il refuse de démarrer avec une variable `OTEL_*`
   (le SDK la lirait en silence). OpenTelemetry ne s'importe que dans
   `ai_api/connectors/metrics_export.py` et `ai_api/observability/metric_instruments.py` (décision de Sabine du
-  2026-10-24). Dans Grafana, les séries de K-B se lisent par `{job="k-b-ai-api"}`. L'essai gratuit
+  2026-10-24), et depuis #345 dans `ai_api/tracing.py` (la façade des traces) et
+  `ai_api/connectors/trace_export.py` (seul à importer les modules privés du SDK). Dans Grafana,
+  les séries de K-B se lisent par `{job="k-b-ai-api"}`. L'essai gratuit
   de 14 jours de la pile finit vers le 07/11 : l'offre gratuite garde 14 jours et 10 000 séries.
+- Depuis #345, chaque `POST /digests` est une trace sans texte (`docs/fiches-veille.md`, « Traces de
+  `POST /digests` ») : Tempo, `{resource.service.name="k-b-ai-api"}` ; les raisons d'une affirmation
+  retirée sous « Logs for this span » d'un `chat`. Une fonction d'`ai_api` qui prend `tracing` le
+  reçoit toujours par `tracing=` (test AST) : une étape nouvelle ouvre son span par `tracing.step`
+  et passe `tracing=` plus bas. Le jeton porte `metrics:write`, `traces:write` et `logs:write`.
+  OpenTelemetry est borné sous 1.46 : une montée relit `trace_export.py`. Le contenu des appels au
+  modèle attend une seconde PR (DPA signé, décisions D1 et D2 de Sabine).
 
 ## Consignes de travail
 
