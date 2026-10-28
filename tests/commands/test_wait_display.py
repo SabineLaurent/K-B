@@ -3,6 +3,7 @@
 import io
 import logging
 import os
+import signal
 import sys
 import threading
 
@@ -90,6 +91,37 @@ def test_on_a_narrow_terminal_each_frame_is_cut_to_its_width(monkeypatch, quick_
     frames = terminal.getvalue().removesuffix(cleared_row(20)).split("\r")[1:]
     assert frames[0] == FIRST_FRAME[1:20]
     assert all(len(frame) <= 19 for frame in frames)
+
+
+def test_a_terminal_that_says_0_columns_is_taken_as_80_wide(monkeypatch, quick_wait):
+    terminal = use_stderr(monkeypatch, is_terminal=True, columns=0)
+
+    with wait_display.showing_the_wait("the digests", READ_TIMEOUT_SECONDS):
+        shown_in_time = terminal.written.wait(5)
+
+    assert shown_in_time
+    assert terminal.getvalue().startswith(FIRST_FRAME)
+    assert terminal.getvalue().endswith(cleared_row(80))
+
+
+def test_the_thread_is_born_with_sigint_and_sigterm_blocked_and_the_main_thread_keeps_its_mask(
+    monkeypatch,
+):
+    use_stderr(monkeypatch, is_terminal=False)
+    masks_of_the_thread = []
+
+    def keep_the_mask_then_wait(display, started, stopped):
+        masks_of_the_thread.append(signal.pthread_sigmask(signal.SIG_BLOCK, []))
+        stopped.wait()
+
+    monkeypatch.setattr(wait_display, "show_until_stopped", keep_the_mask_then_wait)
+    mask_before = signal.pthread_sigmask(signal.SIG_BLOCK, [])
+
+    with wait_display.showing_the_wait("the digests", READ_TIMEOUT_SECONDS):
+        mask_in_the_block = signal.pthread_sigmask(signal.SIG_BLOCK, [])
+
+    assert {signal.SIGINT, signal.SIGTERM} <= masks_of_the_thread[0]
+    assert mask_in_the_block == mask_before
 
 
 def test_out_of_a_terminal_the_wait_is_a_log_line_and_no_frame(

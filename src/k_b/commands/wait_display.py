@@ -20,7 +20,13 @@ logger = logging.getLogger(LOGGER_NAME)
 # The frames of the "dots" spinner, the most common in command-line tools.
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 SPINNER_FRAME_SECONDS = 0.1
+# The width of a terminal that says 0 columns (some pseudo-terminals): the fallback of
+# shutil.get_terminal_size.
+FALLBACK_COLUMNS = 80
 WAIT_THREAD_NAME = "wait-display"
+# Blocked in the thread of the wait, so that the system gives them to the main thread: only there do
+# they stop the read of the answer, which would else last up to its timeout.
+STOP_SIGNALS = {signal.SIGINT, signal.SIGTERM}
 
 
 class SpinnerRow:
@@ -53,7 +59,7 @@ class SpinnerRow:
 
     def read_columns(self) -> int:
         # Of the stream itself: shutil.get_terminal_size would read COLUMNS first.
-        return get_terminal_size(self.stream.fileno()).columns
+        return get_terminal_size(self.stream.fileno()).columns or FALLBACK_COLUMNS
 
 
 class WaitLogLine:
@@ -94,23 +100,32 @@ def showing_the_wait(waited_for: str, read_timeout_seconds: int) -> Iterator[Non
         name=WAIT_THREAD_NAME,
         daemon=True,
     )
-    thread.start()
     try:
+        # In the try: a stop signal held during the start is raised once the mask is set back.
+        start_without_stop_signals(thread)
         yield
     finally:
         stopped.set()
         # Not bounded, unlike the stop of ai_api/connectors/trace_export.py: Event.wait returns at
         # once and nothing goes through the network. Waited so that the row is cleared before what
         # follows, and no line is logged once run_log.py has removed its handlers.
-        thread.join()
+        if thread.is_alive():
+            thread.join()
         display.clear()
+
+
+def start_without_stop_signals(thread: threading.Thread) -> None:
+    """Start the thread with STOP_SIGNALS blocked, the mask it inherits from its first instruction;
+    the mask of the main thread is set back at once."""
+    previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, STOP_SIGNALS)
+    try:
+        thread.start()
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
 
 
 def show_until_stopped(
     display: SpinnerRow | WaitLogLine, started: float, stopped: threading.Event
 ) -> None:
-    # SIGINT and SIGTERM blocked in this thread, so that the system gives them to the main thread:
-    # only there do they stop the read of the answer, which would else last up to its timeout.
-    signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT, signal.SIGTERM})
     while not stopped.wait(display.period_seconds):
         display.show(round(monotonic() - started))
