@@ -224,7 +224,8 @@ sortie :
 - 1 : la création a échoué (dossier en lecture seule, disque plein…). Le message dit l'erreur, et
   aucun fichier de base ne reste ;
 - 2 : `KB_DATA_DIR` manque ou n'est pas un dossier existant, ou la base existe déjà. Une base
-  existante n'est pas touchée : pour repartir de zéro, supprimer le fichier.
+  existante n'est pas touchée : pour repartir de zéro, supprimer le fichier ;
+- 130 : `kb create-db` a reçu SIGINT (Ctrl-C) : comme pour 1, aucun fichier de base ne reste.
 
 **Lancer une collecte** (une par jour, voir [docs/specs-collecte.md](docs/specs-collecte.md)) :
 
@@ -241,9 +242,9 @@ pour Zotero sans `KB_ZOTERO_DIR`, les clips sans `KB_VAULT_DIR`, GH Archive sans
 tout a réussi ; 4 si au moins une source a réussi et au moins une a échoué, l'état de collecte
 écrit ; 1 si aucune source lancée n'a réussi ou si l'état de collecte n'a pas pu être écrit ; 2 si
 `KB_DATA_DIR` manque, n'est pas un dossier existant, si l'état de collecte est illisible, ou si
-`KB_COLLECT_ONLY` est refusée ; 143 si `kb collect` reçoit SIGTERM (`docker stop`) : ce qui a été
-fait avant le signal est gardé ; reçu avant l'écriture de l'état de collecte, il laisse l'état
-inchangé, et la collecte suivante repart des mêmes dates.
+`KB_COLLECT_ONLY` est refusée ; 143 si `kb collect` reçoit SIGTERM (`docker stop`), 130 s'il reçoit
+SIGINT (Ctrl-C) : ce qui a été fait avant le signal est gardé ; reçu avant l'écriture de l'état de
+collecte, il laisse l'état inchangé, et la collecte suivante repart des mêmes dates.
 
 **Importer le brut dans la base** (après une collecte) :
 
@@ -269,7 +270,8 @@ sortie :
   seconde existe déjà (relancer `kb import`) ;
 - 143 : `kb import` a reçu SIGTERM (`docker stop`). Reçu avant la validation de la base, il
   n'écrit rien, comme pour 1, ni dans la base ni au journal ; reçu pendant ou après, l'import est
-  gardé, avec son journal.
+  gardé, avec son journal ;
+- 130 : `kb import` a reçu SIGINT (Ctrl-C), avec le même effet que SIGTERM.
 
 **Écrire les fiches des tops dans le coffre** (après un import) :
 
@@ -301,8 +303,8 @@ existe, relevés supprimés, relevés illisibles gardés). Code de sortie :
 - 2 : `KB_DATA_DIR` manque, ou `KB_VAULT_DIR` manque ou n'est pas un dossier existant : rien n'est
   lu dans le brut, rien n'est écrit dans le coffre ni supprimé, aucun dossier du coffre n'est créé ;
   l'erreur va au journal ;
-- 143 : `kb write-tops` a reçu SIGTERM (`docker stop`) : les fiches déjà écrites sont gardées,
-  aucun relevé n'est supprimé avant que ses fiches soient écrites.
+- 143 : `kb write-tops` a reçu SIGTERM (`docker stop`), 130 : SIGINT (Ctrl-C). Les fiches déjà
+  écrites sont gardées, aucun relevé n'est supprimé avant que ses fiches soient écrites.
 
 **Toute la chaîne en dev**, comme en ligne, où une automatisation enchaînera les étapes :
 
@@ -355,6 +357,8 @@ entrée vide, une entrée avec `*` ou une entrée hors nom en minuscules, ou si 
 ni `true` ni `false` (`false` : journal sur la sortie d'erreur seule) ; le message nomme la
 variable et cite la valeur refusée. Si le port est déjà pris (par exemple par un autre
 `kb serve-data`), uvicorn écrit `address already in use` au journal et `kb serve-data` sort en code 3.
+Un Ctrl-C arrête uvicorn proprement : `kb serve-data` sort en code 0, sans la ligne
+`kb stopped by SIGINT` des autres commandes.
 
 Limites :
 
@@ -398,8 +402,8 @@ l'API de données. `kb serve-ai` journalise une ligne par requête dans
 `X-Request-ID` de chaque réponse ; chaque appel au modèle écrit une ligne JSON de métrique sur la
 sortie standard, sans texte. Code de sortie 2, sans lancer l'API, si `KB_DATA_DIR` manque, si une
 clé, l'hôte, le port, la fenêtre, le modèle ou la clé `KB_DATA_API_KEY_AI_DIGEST` est refusé : le
-message nomme la variable, jamais une clé ni l'URL du modèle. Port déjà pris : code 3, comme
-`kb serve-data`.
+message nomme la variable, jamais une clé ni l'URL du modèle. Port déjà pris : code 3, et Ctrl-C :
+code 0, comme `kb serve-data`.
 
 **Changer une clé** (la clé reste fixe, sans date d'expiration : journal ADR, 2026-10-20,
 « Squelette E1 E3 », décision 3) :
@@ -453,7 +457,7 @@ de sortie, l'unité étant le sujet :
 - 2 : rien n'est demandé : `KB_DATA_DIR`, `KB_VAULT_DIR` (absente, ou pas un dossier existant) ou
   `KB_AI_API_KEY_KB_DIGEST` manque ou est refusée, une fiche du jour est déjà là, ou un dossier
   `veille/…` est un lien symbolique ;
-- 143 : `kb digest` a reçu SIGTERM : les fiches déjà écrites sont gardées.
+- 143 : `kb digest` a reçu SIGTERM, 130 : SIGINT (Ctrl-C). Les fiches déjà écrites sont gardées.
 
 Le code 4 dit la même chose pour `kb collect` (l'unité est la source), `kb write-tops` (le top) et
 `kb digest` (le sujet) : une partie a échoué, une autre est faite et gardée.
