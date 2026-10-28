@@ -319,6 +319,11 @@ Chaque étape tourne même si la précédente a échoué en partie (un code 4 de
 source en panne), et garde son propre code de sortie : `kb write-tops` ne lit que le brut, pas la
 base.
 
+Raccourcis, à la racine du dépôt : `make chain` lance ces trois étapes avec le `.env`, `make <commande>`
+une seule (`make collect`, `make serve-data`, `make digest`…). Avec `ESSAI=1` (`make chain ESSAI=1`),
+`.env.essai` est lu après `.env` et l'emporte : y mettre `KB_DATA_DIR` et `KB_VAULT_DIR` d'une base
+et d'un coffre d'essai, en chemins complets, pour essayer sans toucher au `.env`.
+
 Les codes de toutes les commandes et leur sens sont listés par `uv run kb --help`.
 
 **Lancer l'API** (la liste des items, en lecture seule, sur la machine ; voir
