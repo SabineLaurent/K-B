@@ -1254,6 +1254,7 @@ légitimes l'utilisent.
 | 1 | l'API IA injoignable (`ai_api_unavailable`), délai dépassé (`ai_api_timeout`), clé refusée (`ai_api_unauthorized`, 401), panne (`ai_api_failed`, 5xx), autre réponse ou réponse hors schéma (`ai_api_invalid_response`) : aucune fiche écrite ; ou un sujet en échec et aucune fiche écrite ; ou une `OSError` au contrôle d'avant la demande |
 | 2 | réglage refusé, `KB_VAULT_DIR` absente ou pas un dossier, fiche du jour déjà là ou lien, vus avant la demande : rien n'est demandé |
 | 4 | un sujet en échec (nommé dans `failed_subjects`, ou sa fiche non écrite) et au moins une fiche écrite |
+| 130 | SIGINT (Ctrl-C) : les fiches déjà écrites restent |
 | 143 | SIGTERM : les fiches déjà écrites restent |
 
 Une clé refusée par l'API IA sort en 1, et une clé absente en 2 : avec une clé refusée, la requête

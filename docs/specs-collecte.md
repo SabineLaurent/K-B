@@ -36,11 +36,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   | **1** | `FAILED` | aucune source lancée n'a réussi ; ou `collection_state.json` n'a pas pu être écrit (disque plein, droits), quel que soit le sort des sources ; ou une exception que `kb` ne traite pas, journalisée avec sa trace |
   | **2** | `NOT_STARTED` | rien n'a été collecté, ni brut ni état écrit : `KB_DATA_DIR` absente ou vide ; `KB_DATA_DIR` qui n'est pas un dossier existant ; `KB_LOG_TO_FILE` qui n'est ni `true` ni `false` ; fichier de journal qui ne s'ouvre pas ; `collection_state.json` illisible ou invalide (pas du JSON, pas un objet, une date sans fuseau) ; `KB_COLLECT_ONLY` refusée (ci-dessous) ; commande absente ou inconnue, refusée par `argparse` (son message d'usage, sur la sortie d'erreur seulement : le journal n'est pas encore ouvert) |
   | **4** | `PARTIAL_FAILURE` | au moins une source a réussi, au moins une a échoué, et l'état est écrit : les sources réussies sont acquises, les autres repartent de leur date à la collecte suivante |
+  | **130** | `STOPPED_BY_SIGINT` | arrêt par SIGINT (Ctrl-C), avec le même effet que SIGTERM ci-dessous, sauf un second Ctrl-C, que SIGTERM ignorerait : il peut couper la suppression d'un temporaire caché, que l'import saute ; une ligne datée au journal (`kb stopped by SIGINT`), sans la trace de Python |
   | **143** | `STOPPED_BY_SIGTERM` | arrêt par SIGTERM (`docker stop`) : le brut déjà écrit reste ; si l'arrêt vient avant l'écriture de l'état, l'état n'est pas écrit et la collecte suivante relit les mêmes fenêtres ; s'il vient après (pendant l'affichage des lignes), l'état est écrit et le code reste 143 |
 
-  Le code 3 (`SERVER_NOT_STARTED`) est propre à `kb serve-data`. Ctrl-C (SIGINT) n'est pas traité par
-  `kb` : Python affiche sa trace hors du journal daté, l'état n'est pas écrit si l'arrêt vient
-  avant lui, et le code de sortie, donné par le shell, est 130 ; aucun code nommé ne le décrit.
+  Le code 3 (`SERVER_NOT_STARTED`) est propre à `kb serve-data`. Un Ctrl-C reçu avant que `kb`
+  n'ouvre son journal (l'import de Python, la lecture de l'environnement) garde la trace de Python.
 - **Choisir les sources** (#201) : `KB_COLLECT_ONLY`, posée, ne lance que les sources nommées,
   séparées par des virgules (`KB_COLLECT_ONLY=zotero,clipping`, la collecte du Mac au POC ; les
   conteneurs collectent le reste). Un nom est le dossier d'une source sous `raw/` (`FOLDER_PREFIX`) :
