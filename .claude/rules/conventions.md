@@ -93,6 +93,9 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
   lui appartient (décision du 2026-10-14).
 - `print` donne le résultat d'une commande ; `logger` donne le déroulé. Un échec est journalisé
   une fois, là où il est traité.
+- Une animation d'attente, sur la sortie d'erreur d'un terminal seulement, effacée avant la suite,
+  n'est ni un résultat ni une ligne de journal ; hors terminal, une ligne datée la remplace
+  (`commands/wait_display.py` ; accord de Sabine du 2026-10-28, #349).
 - Le journal de fonctionnement (le déroulé, réussites et échecs) va sur la sortie d'erreur et
   dans `<KB_DATA_DIR>/logs/kb.log` (`logs/kb-serve-data.log` pour `kb serve-data`, `logs/kb-serve-ai.log` pour `kb serve-ai`), tourné chaque jour à minuit UTC, `LOG_FILES_KEPT` fichiers
   gardés (`core/config.py`), sauf `KB_LOG_TO_FILE=false` : sortie d'erreur seule, sans fichier (en

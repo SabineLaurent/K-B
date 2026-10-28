@@ -1152,7 +1152,8 @@ des tops).
    (`AI_API_READ_TIMEOUT_SECONDS`) : au-dessus de `DIGEST_REQUEST_TIMEOUT_SECONDS` et du dernier
    appel au modèle en cours (environ 20 s de plus, `ai_api/deadline.py`). Aucune nouvelle
    tentative : un `Retry-After` est affiché, jamais attendu. Aucune redirection suivie, aucun proxy
-   de l'environnement (`core/outbound.py`).
+   de l'environnement (`core/outbound.py`). Pendant l'attente, `kb digest` montre qu'il attend
+   (`commands/wait_display.py`, paragraphe « Console » ci-dessous).
 4. **La réponse est relue** par un schéma fermé (types stricts, champs inconnus ignorés, les
    `facts` jamais lus) : `request_id` en UUID, `model` au motif `MODEL_NAME` (`core/config.py`),
    `stage` et `error` au motif `[a-z_]{1,64}`, `capped_kind` dans la liste fermée des sortes
@@ -1260,8 +1261,16 @@ est partie ; c'est la règle de `kb collect`, où une source qui rend 401 échou
 2026-10-21). Le message nomme `KB_AI_API_KEY_KB_DIGEST`, jamais la clé. 4 suit la règle « même
 résultat, même code » de `kb collect` et `kb write-tops` (décision de Sabine du 2026-10-21).
 
-**Console** (libellés en anglais) : une ligne par fiche écrite, puis un résumé (fiches écrites et
-en échec, `model`, `request_id`). Chaque échec va une fois au journal, sur la sortie d'erreur et
+**Console** (libellés en anglais) : pendant la demande, sur la sortie d'erreur, l'attente (#349).
+Dans un terminal, une ligne qui tourne et compte, coupée à la largeur du terminal, effacée à la
+réponse, jamais écrite dans `kb.log` : `⠹ waiting for the digests: 23 s, read timeout 240 s`. Hors
+terminal (sortie redirigée, conteneur sans TTY), une ligne datée toutes les
+`WAIT_LOG_INTERVAL_SECONDS` (10 s, `core/config.py`), aussi dans `kb.log` :
+`still waiting for the digests: 10 seconds, read timeout 240 seconds`. Le mode se choisit sur la
+sortie d'erreur, là où l'attente s'écrit ; un conteneur lancé avec un TTY (`docker run -t`,
+`tty: true`) recevrait donc l'animation dans son journal. La ligne dit que `kb` attend, pas que l'API
+IA avance (l'avancement par sujet : #350). Puis une ligne par fiche écrite, et un résumé (fiches
+écrites et en échec, `model`, `request_id`). Chaque échec va une fois au journal, sur la sortie d'erreur et
 dans `<KB_DATA_DIR>/logs/kb.log` : sujet en échec (étape et état), fiche non écrite, ou réponse
 refusée, avec son état, son statut HTTP, l'état de son corps, son `X-Request-ID` (pour la retrouver
 dans `logs/kb-serve-ai.log`) et son `Retry-After`, chacun écrit tel quel s'il suit sa règle, sinon

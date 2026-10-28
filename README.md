@@ -437,7 +437,8 @@ titre et leur URL. Chaque affirmation et chaque titre est écrit en texte : ni l
 balise, ni code, ni requête Dataview ne peut s'y activer. Une fiche n'est jamais réécrite (sauf deux
 lancements qui se chevauchent, qui peuvent en remplacer une sans message : #295) : s'il en existe
 une du jour, aucune demande n'est faite. Une demande dure jusqu'à environ 220 s ; `kb digest`
-attend 240 s au plus, sans nouvelle tentative. Il affiche une ligne par fiche écrite, puis un
+attend 240 s au plus, sans nouvelle tentative, et montre qu'il attend : une ligne qui tourne dans un
+terminal, une ligne datée toutes les 10 s ailleurs. Il affiche ensuite une ligne par fiche écrite, puis un
 résumé (fiches écrites, en échec, modèle, `request_id`, que `logs/kb-serve-ai.log` reprend). Code
 de sortie, l'unité étant le sujet :
 
