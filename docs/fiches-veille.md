@@ -997,9 +997,13 @@ POST /digests            SERVER   http.request.method, http.route, http.response
   `{status = error}` pour les demandes en échec ; « Logs for this span » sur un `chat` montre les
   raisons, et le contenu quand il est envoyé. Dans Loki, elles se lisent aussi par
   `{service_name="k-b-ai-api"}`, leurs attributs avec un tiret bas à la place du point
-  (`k_b_claim_index`) : vu à l'essai réel du 2026-10-27. Le contenu seul :
-  `{service_name="k-b-ai-api"} | event_name="gen_ai.client.inference.operation.details" | json`
-  (le nom de l'attribut dans Loki est à vérifier à l'essai réel de #347).
+  (`k_b_claim_index`) : vu à l'essai réel du 2026-10-27. Le contenu seul, et la sortie du modèle :
+  `{service_name="k-b-ai-api"} | event_name="gen_ai.client.inference.operation.details" | json
+  output="output_messages[0].parts[0].content"`. Filtrer sur `event_name` avant `| json` : le corps
+  d'une évaluation (des codes) n'est pas du JSON et porterait `__error__`. Le corps est une ligne
+  longue, sa sortie à la fin : les icônes `{}` (JSON indenté) et ↵ (retour à la ligne), à droite de
+  la liste des journaux, le rendent lisible. Vu à l'essai réel de #347 (2026-10-28, demande
+  `506e690d-9b4f-4ce5-9d9a-8b2384711aad`).
 
 **Contenu d'un appel au modèle (#347)** : un enregistrement de journal OTLP
 `gen_ai.client.inference.operation.details` par requête au modèle, de niveau DEBUG, rattaché à
