@@ -199,26 +199,37 @@ coffre et la réponse de l'API, à cause de l'injection. Ici, la sortie refusée
    garde l'état de cette première tentative (`llm_client.py:328-338`). Un délai dépassé dès la
    première tentative (le modèle trop lent) en reste une.
 
+## Essai réel (2026-10-28, `gpt-6-luna`, bac à sable, fenêtre de 3 jours)
+
+| Vérification | Résultat |
+|---|---|
+| `KB_TRACE_CONTENT=all`, ligne de démarrage | `model content all` |
+| Demande `506e690d-9b4f-4ce5-9d9a-8b2384711aad` | 200 en 56,8 s, 8 fiches, 22 spans, aucune relance, donc 10 requêtes au modèle |
+| Dans Loki, « Logs for this trace » | 10 enregistrements DEBUG (le contenu) et 37 INFO (les évaluations) : aucun perdu |
+| Un corps lu dans Loki | JSON complet, trois clés, la sortie du modèle comprise (8 Ko pour une rédaction, 25 Ko pour un lot de classement) ; l'attribut s'appelle `event_name` ; lisible avec les icônes `{}` et ↵ |
+| Erreurs d'envoi dans le terminal | aucune (`WARNING`, `ERROR`, `Failed to export`) |
+| `none`, demande `cabf2a92-dc9f-43d6-b0d2-534401519c1a` (`POST /digests` direct, sans écrire de fiche) | 200 en 56,6 s ; dans Loki, 41 INFO, aucun DEBUG |
+
+Ce que l'essai montre déjà : un fait déclaré en anglais (« 8.2 million ») dans une affirmation
+écrite en français (« 8,2 millions »), le genre de cas que #210 doit trancher.
+
 ## Zones non vérifiées
 
-- **Ce que Loki fait d'un corps en chaîne**, et le nom de `event_name` dans Loki (pour la requête
-  `| event_name=…` de la spec) : à voir à l'essai réel. Que « Logs for this span » montre un
-  enregistrement de niveau DEBUG est supposé, comme pour les évaluations (INFO) vues le 27/10.
-- **La taille des envois** : plusieurs corps de 200 Ko dans un lot. Selon la relecture du plan, un
-  envoi part toutes les secondes, et l'exporteur jette en local un lot de plus de 64 Mio. Ni la
-  limite d'une requête chez Grafana ni un 413 n'ont été essayés.
+- **Une demande plus chargée** : à cette charge (une demande, 10 corps de 8 à 25 Ko), aucun lot
+  n'approche les limites. Un corps proche de 200 000 octets, et la limite d'une requête chez
+  Grafana, n'ont pas été essayés en réel.
 - **La procédure de suppression de journaux dans Grafana Cloud** (droit à l'effacement) : citée au
   registre, pas lue.
 - **La rétention pendant l'essai de 14 jours** de la pile : non relevée. 14 jours dans l'offre
   gratuite (page « Pricing », lue le 2026-10-28).
-- **Le DPA n'est pas signé** au moment de cette note : aucun contenu n'a été envoyé.
+- **L'accusé de réception du DPA** : signé et envoyé le 2026-10-28 ; l'accusé n'est pas arrivé au
+  moment de l'essai.
 
 ## Ce qui reste
 
-- **L'essai réel**, lancé par toi après la signature du DPA : `KB_TRACE_CONTENT=all`, en bac à
-  sable, sur `gpt-6-luna` ; « Logs for this span » sur le `chat` d'un `write_subject` ; puis `none`,
-  qui ne doit rien montrer.
-- **La date de signature du DPA** au registre, avant la fusion.
+- **L'accusé de réception du DPA**, à inscrire au registre s'il arrive.
+- **`KB_DEPLOYMENT_ENVIRONMENT=production`** à figer dans la configuration du conteneur à la mise en
+  ligne sur ACA (08/11) : le refus de `all` en production ne repose que sur elle.
 - **Une file propre aux journaux**, si un envoi est refusé pour sa taille.
 - **La variante écartée de D1** (le texte des seules affirmations retirées en production) : à
   rejuger après #210.
