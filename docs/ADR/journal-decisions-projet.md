@@ -4486,6 +4486,32 @@ dites comme telles.
   la réponse, la sortie restant de toute façon en mémoire dans `call_model`. —
   branche `feat/trace-model-content`
 
+### Codes de sortie de kb : SIGINT (#352)
+
+Décision de Sabine du 2026-10-28 (issue et PR à part, après #351), sur le plan de time-knight relu
+par un sous-agent et validé par elle (« go »).
+
+- **Sur SIGINT (Ctrl-C), `kb` journalise une ligne datée, `kb stopped by SIGINT`, et sort
+  normalement avec le code nommé 130, `STOPPED_BY_SIGINT`, après le même nettoyage que pour
+  SIGTERM ; `kb serve-data` et `kb serve-ai` gardent l'arrêt d'uvicorn, en 0.** Pourquoi : un
+  Ctrl-C imprimait toute la trace de Python, hors du journal daté (essai de Sabine du 2026-10-28) ;
+  `cli.py` attrapait SIGTERM et `Exception`, mais `KeyboardInterrupt` n'est ni l'un ni l'autre. 130
+  est 128 + 2, comme 143 est 128 + 15 (entrée « Codes de sortie de kb » du 2026-10-18). La ligne
+  dit le signal observé, qui vient aussi de `kill -INT` (`code.md`, « Journalisation »). Le
+  nettoyage était déjà là : l'import, l'écriture atomique, la création de la base et la copie de
+  Zotero défont leur travail sur toute `BaseException`. Option écartée : finir le processus par
+  SIGINT (`os.kill` sur soi-même, comme Python le fait depuis la 3.8 pour un Ctrl-C non attrapé,
+  [bpo-1054041](https://bugs.python.org/issue1054041)), pour qu'un script bash qui lance `kb`
+  s'arrête aussi ; sous `uv run kb …`, la façon de lancer `kb` du README, uv sort lui-même
+  normalement en 130 (vérifié le 2026-10-28), et le gain ne vaudrait que pour `.venv/bin/kb` lancé
+  directement, au prix d'une sortie standard à vider avant le signal et d'un remplacement dans les
+  tests. Limites assumées : un Ctrl-C reçu avant que `kb` n'ouvre son journal (l'import des
+  modules, la lecture de l'environnement) et `kb openapi`, qui sort avant, gardent la trace de
+  Python ; un script bash qui lance `.venv/bin/kb` continue après un Ctrl-C (vérifié le 2026-10-28
+  avec un programme qui sort en 130 sur `KeyboardInterrupt`). `kb create-db` sort en
+  130 sur SIGINT mais n'a toujours pas de gestionnaire de SIGTERM (limite de l'entrée du
+  2026-10-18). — branche `fix/stop-on-sigint`
+
 ## Décisions encore ouvertes
 
 - **Un sujet secondaire par item au classement** (2026-10-26, idée de Sabine) : une case de sujet
