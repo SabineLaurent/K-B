@@ -1120,6 +1120,14 @@ def refuse_once_with_a_clock(clock, seconds):
         ([response(500), response(500)], None, False),
         ([response(429, retry_after="1"), completion()], None, False),
         ([response(500), completion()], None, False),
+        ([response(429, retry_after="1"), {"kind": "timeout"}], None, False),
+        ([response(500), {"kind": "timeout"}], None, False),
+        (
+            [{"kind": "transport_error", "error": "connect"}, {"kind": "timeout"}],
+            None,
+            False,
+        ),
+        ([completion(), {"kind": "timeout"}], refuse_the_subject_once, True),
     ],
     ids=[
         "invalid-output",
@@ -1136,6 +1144,10 @@ def refuse_once_with_a_clock(clock, seconds):
         "unavailable-twice",
         "429-then-ok",
         "5xx-then-ok",
+        "429-then-timeout",
+        "5xx-then-timeout",
+        "transport-error-then-timeout",
+        "refusal-then-timeout",
     ],
 )
 def test_with_content_anomalies_only_a_call_in_anomaly_is_sent(
@@ -1167,8 +1179,9 @@ def test_with_content_anomalies_only_a_call_in_anomaly_is_sent(
 def test_a_retry_cut_by_the_deadline_is_an_anomaly_only_after_a_refusal(
     recorded_traces, step, is_sent
 ):
-    # Precision of D1 by Sabine, 2026-10-28: a timeout set by the deadline before the retry of a
-    # failure of the provider is no anomaly; one before the retry of an output refused is.
+    # Precision of D1 by Sabine, 2026-10-28: a timeout after a failure of the provider is no
+    # anomaly, its retry cut before it left as here, or after; one before the retry of an output
+    # refused is.
     clock = Clock()
     deadline = Deadline.after(MIN_SECONDS_FOR_LLM_REQUEST + 1, clock)
     tracing = recorded_traces.build_tracing("anomalies")
@@ -1182,11 +1195,6 @@ def test_a_retry_cut_by_the_deadline_is_an_anomaly_only_after_a_refusal(
     trace_contents(llm_call, tracing=tracing)
 
     assert (llm_call.outcome, len(transport.requests)) == ("llm_timeout", 1)
-    assert llm_call.cut_outcome in {
-        "llm_rate_limited",
-        "llm_unavailable",
-        "llm_invalid_output",
-    }
     assert len(recorded_traces.find_log_records(CONTENT_EVENT)) == (1 if is_sent else 0)
 
 
@@ -1201,7 +1209,15 @@ def test_a_call_whose_batch_left_items_unanswered_is_sent_with_anomalies(
     assert len(recorded_traces.find_log_records(CONTENT_EVENT)) == 1
 
 
-def test_a_call_not_cut_by_the_deadline_has_no_cut_outcome():
-    llm_call, _, _ = call([completion()])
+@pytest.mark.parametrize(
+    ("steps", "first_outcome"),
+    [
+        ([completion()], "ok"),
+        ([response(429, retry_after="1"), completion()], "llm_rate_limited"),
+        ([response(500), {"kind": "timeout"}], "llm_unavailable"),
+    ],
+)
+def test_the_call_keeps_the_outcome_of_its_first_attempt(steps, first_outcome):
+    llm_call, _, _ = call(steps)
 
-    assert llm_call.cut_outcome is None
+    assert llm_call.first_outcome == first_outcome

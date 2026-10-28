@@ -152,9 +152,13 @@ def read_metrics_export_settings_or_refusal(
 
 def find_content_without_export_refusal(environ: Mapping[str, str]) -> str | None:
     """KB_TRACE_CONTENT set while the export is off, refused: texts would be kept in memory for
-    nothing, and the setting would say otherwise; None if it is not set."""
-    if (environ.get(TRACE_CONTENT_VARIABLE) or "none") == "none":
+    nothing, and the setting would say otherwise; a value out of the list, refused as such; None
+    if it is not set."""
+    trace_content = environ.get(TRACE_CONTENT_VARIABLE) or "none"
+    if trace_content == "none":
         return None
+    if trace_content not in TRACE_CONTENTS:
+        return find_unknown_content_refusal(trace_content)
     return (
         f"{TRACE_CONTENT_VARIABLE}: set, while the export is off"
         f" ({ENDPOINT_VARIABLE} and {HEADERS_VARIABLE})"
@@ -179,13 +183,17 @@ def read_environment_and_content_or_refusal(
         )
     trace_content = environ.get(TRACE_CONTENT_VARIABLE) or "none"
     if trace_content not in TRACE_CONTENTS:
-        return (
-            f"{TRACE_CONTENT_VARIABLE}: {quote_value(trace_content)} not"
-            f" {' nor '.join(TRACE_CONTENTS)}"
-        )
+        return find_unknown_content_refusal(trace_content)
     if trace_content == "all" and environment == "production":
         return f"{TRACE_CONTENT_VARIABLE}: all refused in production, anomalies or none"
     return environment, trace_content
+
+
+def find_unknown_content_refusal(trace_content: str) -> str:
+    return (
+        f"{TRACE_CONTENT_VARIABLE}: {quote_value(trace_content)} not"
+        f" {' nor '.join(TRACE_CONTENTS)}"
+    )
 
 
 def parse_headers(text: str) -> dict[str, SecretStr] | None:

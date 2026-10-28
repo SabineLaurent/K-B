@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from k_b.ai_api import watch_items
+from k_b.ai_api import digests, watch_items
 from k_b.ai_api.connectors.data_api_client import read_watch
 from k_b.ai_api.connectors.llm_client import build_http_client
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
@@ -1276,3 +1276,18 @@ def test_with_content_anomalies_a_subject_down_at_the_provider_sends_nothing(
 
     assert result.failed_subjects[0].error == "llm_unavailable"
     assert contents_sent(recorded_traces) == []
+
+
+def test_with_content_all_a_fault_in_the_checks_keeps_the_content_sent(
+    reading, recorded_traces, monkeypatch
+):
+    def fail(*arguments):
+        raise RuntimeError("a fault of the checks")
+
+    monkeypatch.setattr(digests, "to_digest", fail)
+
+    with pytest.raises(RuntimeError):
+        digest_of(reading, VALID_STEPS, tracing=recorded_traces.build_tracing("all"))
+
+    # The classification, then the writing whose checks failed.
+    assert len(contents_sent(recorded_traces)) == 2

@@ -4435,8 +4435,12 @@ dites comme telles.
   droits d'accès séparés (un second service à tenir pour une utilisatrice) ; Langfuse (un
   sous-traitant de plus, suite du projet) ; `OTEL_INSTRUMENTATION_GENAI_CAPTURE_CONTENT` (K-B refuse
   toute variable `OTEL_*`). La règle 8 de `poc.md` (« une sortie hors schéma n'est jamais écrite »)
-  reste inchangée : elle vise le coffre et la réponse de l'API, à cause de l'injection ; la sortie
-  refusée part ici comme une chaîne échappée dans un corps de journal, jamais interprétée. Limites
+  vise le coffre et la réponse de l'API, à cause de l'injection ; elle reçoit une phrase qui le dit
+  (accord de Sabine du 2026-10-28, sur la revue de sécurité) : le contenu envoyé, sortie refusée
+  comprise, reste une donnée, jamais une consigne, en chaîne échappée dans un corps de journal. Le
+  texte de D2 est corrigé le même jour avec son accord : le masquage retire les adresses web
+  partout, mais les logins `@…` des seules notes d'une release, et jamais une adresse mail (erreur de
+  la proposition de time-knight du 27/10, trouvée par la revue de sécurité). Limites
   assumées : des données personnelles (un login dans un nom de dépôt, un nom en texte libre) partent
   chez un sous-traitant, dont le DPA doit être signé avant le premier envoi ; leur purge n'est pas
   codée par K-B, c'est la rétention de Grafana Cloud (14 jours dans l'offre gratuite) ; le contenu
@@ -4451,7 +4455,11 @@ dites comme telles.
   `all`), dont le pourquoi s'enquête en bac à sable avec `all`. **Précisée par Sabine le
   2026-10-28** (« Pas une anomalie ») : un `llm_timeout` posé par le délai de la demande avant la
   relance d'un 429, d'un 5xx ou d'une erreur de transport n'en est pas une, pour la même raison ;
-  dans un projet courant, ce cas se lit sur le span en erreur et les métriques. Option écartée pour
+  dans un projet courant, ce cas se lit sur le span en erreur et les métriques. **Étendue par
+  Sabine le même jour** (« Pas une anomalie », sur les deux revues de la PR) à la relance qui part,
+  son délai réduit au temps restant, puis expire : un `llm_timeout` dont la première tentative a eu
+  un 429, un 5xx ou une erreur de transport n'est pas une anomalie (`LlmCall.first_outcome`). Un
+  délai dépassé dès la première tentative (le modèle trop lent) en reste une. Option écartée pour
   ce cas : D1 à la lettre (aucun code, mais les items partent quand le fournisseur limite près du
   délai). Un refus de contrôle prime : relancé puis en 429 ou en 5xx, l'appel est en anomalie. D1
   vit dans `connectors/llm_client.py` (`is_anomaly`, `trace_contents`), non dans `tracing.py` comme

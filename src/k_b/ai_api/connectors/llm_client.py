@@ -47,8 +47,8 @@ type LlmFailure = Literal[
 type LlmOutcome = Literal["ok"] | LlmFailure
 # The states of a call in anomaly, whose content KB_TRACE_CONTENT=anomalies sends (decision D1 of
 # Sabine, 2026-10-27): the content may explain them. Not llm_rate_limited nor llm_unavailable, whose
-# cause is the provider (minimisation); nor a timeout set by the deadline before the retry of one of
-# them (precision of D1, 2026-10-28).
+# cause is the provider (minimisation); nor a timeout of a call whose first attempt was one of them,
+# its retry cut by the deadline before or after it left (precision of D1, 2026-10-28).
 ANOMALY_OUTCOMES: frozenset[LlmOutcome] = frozenset(
     {"llm_invalid_output", "llm_truncated", "llm_content_filtered", "llm_timeout"}
 )
@@ -141,6 +141,8 @@ class LlmCall[OutputT: BaseModel]:
     failed_check: FailedCheck | None
     # The check that refused the first attempt, when a second one followed; None otherwise.
     first_failed_check: FailedCheck | None
+    # The outcome of the first attempt, before a retry or a cut by the deadline.
+    first_outcome: LlmOutcome
     tokens_in: int
     tokens_out: int
     reasoning_tokens: int | None
@@ -160,8 +162,6 @@ class LlmCall[OutputT: BaseModel]:
     saw_rate_limit: bool
     # The span of the last attempt, the one whose output the checks read.
     span_ref: SpanRef
-    # The outcome before the deadline cut the retry into llm_timeout; None if it did not.
-    cut_outcome: LlmOutcome | None = None
     # The texts of each attempt, empty with KB_TRACE_CONTENT=none (connectors/metrics_export.py).
     contents: tuple[AttemptContent, ...] = field(default=(), repr=False)
 
@@ -306,9 +306,7 @@ def call_model[OutputT: BaseModel](
             span_refs[-1],
             contents=tuple(contents),
         )
-        return replace(
-            call, outcome="llm_timeout", output=None, cut_outcome=call.outcome
-        )
+        return replace(call, outcome="llm_timeout", output=None)
     if first.retry_wait_seconds is not None:
         if first.failed_check is None:
             sleep(first.retry_wait_seconds)
@@ -328,13 +326,16 @@ def call_model[OutputT: BaseModel](
 
 
 def is_anomaly[OutputT: BaseModel](call: LlmCall[OutputT]) -> bool:
-    """Whether the call is in anomaly (decision D1 of Sabine, 2026-10-27): it ended in a state of
-    ANOMALY_OUTCOMES, unless the deadline cut the retry of a failure of the provider, or it was
-    retried after a check refused its first output. A batch of the classification that left items
-    without answer is one too, told by its caller."""
-    return (
-        call.outcome in ANOMALY_OUTCOMES and call.cut_outcome not in PROVIDER_FAILURES
-    ) or call.first_failed_check is not None
+    """Whether the call is in anomaly (decision D1 of Sabine, 2026-10-27): it was retried after a
+    check refused its first output, or it ended in a state of ANOMALY_OUTCOMES, but for a timeout
+    after a failure of the provider (precision of D1, 2026-10-28). A batch of the classification
+    that left items without answer is one too, told by its caller."""
+    is_provider_timeout = (
+        call.outcome == "llm_timeout" and call.first_outcome in PROVIDER_FAILURES
+    )
+    return call.first_failed_check is not None or (
+        call.outcome in ANOMALY_OUTCOMES and not is_provider_timeout
+    )
 
 
 def trace_contents[OutputT: BaseModel](
@@ -611,6 +612,7 @@ def summarize[OutputT: BaseModel](
         schema_valid=last.schema_valid,
         failed_check=last.failed_check,
         first_failed_check=attempts[0].failed_check if len(attempts) == 2 else None,
+        first_outcome=attempts[0].outcome,
         tokens_in=sum(usage.prompt_tokens for usage in usages),
         tokens_out=sum(usage.completion_tokens for usage in usages),
         reasoning_tokens=sum(reasoning) if reasoning else None,

@@ -106,6 +106,9 @@ def build_digests(
                 deadline,
                 tracing=tracing,
             )
+            # Sent before the checks of the stage: a fault in them would lose it. A claim removed
+            # is no anomaly (decision D1 of Sabine, 2026-10-27).
+            trace_contents(llm_call, tracing=tracing)
             digest = (
                 None
                 if llm_call.output is None
@@ -168,11 +171,8 @@ def trace_writing(
     *,
     tracing: Tracing,
 ) -> None:
-    """The result of a writing on its span, by identifiers and counts, the content of its
-    requests as KB_TRACE_CONTENT lets it, and the evaluation of each claim removed, tied to the
-    request whose output was checked."""
-    # A claim removed is no anomaly (decision D1 of Sabine, 2026-10-27).
-    trace_contents(llm_call, tracing=tracing)
+    """The result of a writing on its span, by identifiers and counts, and the evaluation of each
+    claim removed, tied to the request whose output was checked."""
     step.set(
         {
             "k_b.outcome": llm_call.outcome,

@@ -37,12 +37,12 @@ contient pas de texte »), dans les mots que tu as validés (D2).
 
 `KB_TRACE_CONTENT` vaut `none` (le défaut), `anomalies` ou `all`. Il est lu par la fonction qui lit
 déjà `KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS` et `KB_DEPLOYMENT_ENVIRONMENT`
-(`src/k_b/ai_api/connectors/metrics_export.py:181-188`) :
+(`src/k_b/ai_api/connectors/metrics_export.py:184-188`) :
 
 ```python
     trace_content = environ.get(TRACE_CONTENT_VARIABLE) or "none"
     if trace_content not in TRACE_CONTENTS:
-        return (...)
+        return find_unknown_content_refusal(trace_content)
     if trace_content == "all" and environment == "production":
         return f"{TRACE_CONTENT_VARIABLE}: all refused in production, anomalies or none"
 ```
@@ -77,31 +77,37 @@ si le réglage n'est pas `none` (`src/k_b/ai_api/connectors/llm_client.py:289-29
 
 ### 3. Ce qu'est une anomalie (D1, et sa précision du 28/10)
 
-Une seule fonction décide (`llm_client.py:330-337`) :
+Une seule fonction décide (`llm_client.py:328-338`) :
 
 ```python
-    return (
-        call.outcome in ANOMALY_OUTCOMES and call.cut_outcome not in PROVIDER_FAILURES
-    ) or call.first_failed_check is not None
+    is_provider_timeout = (
+        call.outcome == "llm_timeout" and call.first_outcome in PROVIDER_FAILURES
+    )
+    return call.first_failed_check is not None or (
+        call.outcome in ANOMALY_OUTCOMES and not is_provider_timeout
+    )
 ```
 
 - `ANOMALY_OUTCOMES` vaut `llm_invalid_output`, `llm_truncated`, `llm_content_filtered` et
   `llm_timeout`. Ce sont les cas que le contenu peut expliquer.
 - `first_failed_check` n'est posé que si l'appel a été relancé après le refus d'un contrôle. Ce cas
   l'emporte : un refus, une relance, puis un 5xx, c'est une anomalie.
-- `cut_outcome` est neuf. Quand le délai de la demande empêche la relance, `call_model` transforme
-  l'appel en `llm_timeout`, et garde l'état d'avant (`llm_client.py:309-311`). Si c'était un 429 ou un
-  5xx, la cause est le fournisseur, comme pour `llm_rate_limited`, et ce n'est pas une anomalie. C'est
-  ta précision du 28/10.
+- `first_outcome` est neuf : l'état de la première tentative (`llm_client.py:615`). Si elle a eu un
+  429, un 5xx ou une erreur réseau, et que l'appel finit en `llm_timeout`, la cause est le
+  fournisseur, puis le délai de la demande : ce n'est pas une anomalie. Peu importe que la relance
+  n'ait pas eu le temps de partir, ou qu'elle soit partie avec un délai réduit puis ait expiré. Ce sont
+  tes deux précisions du 28/10, la seconde sur les deux revues de la PR.
 - Le troisième cas de D1, un lot de classement qui a laissé des items sans réponse, ne se voit pas
   dans l'appel : seule l'étape le sait. Elle le passe en paramètre (`classification.py:151`) :
   `has_unanswered=batch_answers is not None and None in batch_answers`. Le garde `is not None` évite
   `None in None`, qui lèverait une exception sur chaque classement en échec.
 
 `trace_contents` (`llm_client.py:340-349`) applique le réglage : avec `all`, tout part ; avec
-`anomalies`, seulement si `is_anomaly(call) or has_unanswered`. Elle est appelée après chaque lot de
-classement et après chaque rédaction (`digests.py:175`). Une affirmation retirée n'est pas une
-anomalie (D1) : la rédaction n'envoie que selon l'état de son appel.
+`anomalies`, seulement si `is_anomaly(call) or has_unanswered`. Elle est appelée juste après chaque
+appel, avant les contrôles de l'étape (`classification.py:148-152`, `digests.py:111`) : une faute
+dans ces contrôles (un 500) ne fait pas perdre le contenu de l'appel qui l'a provoquée (première
+revue de code). Une affirmation retirée n'est pas une anomalie (D1) : la rédaction n'envoie que
+selon l'état de son appel.
 
 ### 4. L'enregistrement et son corps
 
@@ -163,8 +169,8 @@ coffre et la réponse de l'API, à cause de l'injection. Ici, la sortie refusée
 | `test_with_content_none_the_call_keeps_no_text_and_sends_none` (`tests/ai_api/test_llm_client.py`) | Avec `none`, aucun texte gardé, rien envoyé |
 | `test_with_content_all_each_request_is_a_content_tied_to_its_chat_span` | Un enregistrement par tentative, rattaché au `span_id` de son `chat` ; le rappel de la relance ; la sortie refusée présente ; aucun texte dans le `repr` |
 | `test_a_request_without_output_text_keeps_no_output` (429, 5xx, 400 filtré, délai, 200 illisible) | Pas de sortie sans réponse 200 lisible |
-| `test_with_content_anomalies_only_a_call_in_anomaly_is_sent` (14 cas) | D1 : les quatre états, la relance après un refus (même finie en 429 ou 5xx) envoient ; `ok`, 429 et 5xx seuls ou relancés avec succès n'envoient pas |
-| `test_a_retry_cut_by_the_deadline_is_an_anomaly_only_after_a_refusal` | La précision du 28/10 : 429, 5xx ou erreur réseau coupés par le délai n'envoient pas ; un refus coupé, si |
+| `test_with_content_anomalies_only_a_call_in_anomaly_is_sent` (18 cas) | D1 : les quatre états, la relance après un refus (même finie en 429 ou 5xx) envoient ; `ok`, 429 et 5xx seuls ou relancés avec succès n'envoient pas |
+| `test_a_retry_cut_by_the_deadline_is_an_anomaly_only_after_a_refusal`, et les cas `*-then-timeout` du test précédent | Les précisions du 28/10 : après un 429, un 5xx ou une erreur réseau, un délai dépassé n'envoie pas, que la relance soit partie ou non ; après un refus de contrôle, si |
 | `test_with_content_anomalies_*` (`tests/ai_api/test_digests.py`) | Un lot avec un item sans réponse envoie ; un classement en échec envoie, sans 500 ; une affirmation retirée et un sujet en 503 n'envoient rien |
 | `test_a_content_beyond_the_maximum_is_cut_keeping_its_structure` (`tests/ai_api/test_tracing.py`) | Au plus 200 000 octets, avec des caractères sur plusieurs octets et à échapper ; mêmes clés ; un caractère de plus dépasserait ; drapeau posé |
 | `test_with_content_all_only_the_body_of_a_content_record_holds_a_text` (`tests/ai_api/test_digest_router.py`) | Règle 5 : avec `all`, le texte d'un item n'apparaît que dans le corps des enregistrements de contenu, ni dans un attribut, ni dans une évaluation, ni dans une ligne de journal ou de métrique |
@@ -176,7 +182,7 @@ coffre et la réponse de l'API, à cause de l'injection. Ici, la sortie refusée
    part déjà au modèle, masqué de la même façon. Le DPA est signé avant le premier envoi. `all` est
    refusé en production, où seuls les appels en anomalie partent. Tout est inscrit au registre, avec
    ses limites : une purge par la rétention de Grafana (14 jours), et pas de droits séparés
-   (`metrics_export.py:187`, `docs/registre-traitements.md`).
+   (`metrics_export.py:188`, `docs/registre-traitements.md`).
 2. **« Pourquoi pas tout envoyer en production, c'est plus simple ? »** C'est la minimisation (RGPD
    art. 5.1.c) : n'envoyer que ce qui explique un problème. Une affirmation retirée ne compte pas,
    parce que les 8 sujets en avaient à l'essai, et son pourquoi se rejoue en bac à sable. Un 429 non
@@ -188,9 +194,10 @@ coffre et la réponse de l'API, à cause de l'injection. Ici, la sortie refusée
    avec `all`, puis cherche les mots des items partout : spans, évaluations, journaux, sortie
    standard. Il ne les trouve que dans le corps du contenu. Le `repr` d'un appel n'affiche pas
    `contents`.
-5. **« Un `llm_timeout` est-il toujours une anomalie ? »** Non : s'il vient du délai qui empêche de
-   relancer après un 429, un 5xx ou une erreur réseau, la cause est le fournisseur. `cut_outcome`
-   garde l'état d'avant la coupe (`llm_client.py:309-311`).
+5. **« Un `llm_timeout` est-il toujours une anomalie ? »** Non : si la première tentative a eu un
+   429, un 5xx ou une erreur réseau, la cause est le fournisseur, puis le délai. `first_outcome`
+   garde l'état de cette première tentative (`llm_client.py:328-338`). Un délai dépassé dès la
+   première tentative (le modèle trop lent) en reste une.
 
 ## Zones non vérifiées
 

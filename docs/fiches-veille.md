@@ -1012,12 +1012,12 @@ son `chat` à l'instant où il a fini, comme une évaluation.
   `llm_invalid_output`, `llm_truncated`, `llm_content_filtered` ou `llm_timeout`, un appel relancé
   après le refus d'un contrôle (même si la relance finit en 429 ou en 5xx), ou un lot de
   classement qui a laissé des items sans réponse. Pas `llm_rate_limited` ni `llm_unavailable`, dont
-  la cause est le fournisseur (minimisation) ; ni un `llm_timeout` posé par le délai de la demande
-  avant la relance d'un 429, d'un 5xx ou d'une erreur de transport (précision de Sabine du
-  2026-10-28 : même cause) ; ni une affirmation retirée, qui a déjà ses raisons et dont le pourquoi
+  la cause est le fournisseur (minimisation) ; ni un `llm_timeout` dont la première tentative a eu
+  un 429, un 5xx ou une erreur de transport, la relance étant coupée par le délai de la demande avant
+  ou après son départ (précisions de Sabine du 2026-10-28 : même cause ; `LlmCall.first_outcome`) ; ni une affirmation retirée, qui a déjà ses raisons et dont le pourquoi
   s'enquête en bac à sable avec `all`. À rejuger après #210. Le choix est fait par
-  `trace_contents` (`connectors/llm_client.py`), après le classement de chaque lot et après chaque
-  rédaction.
+  `trace_contents` (`connectors/llm_client.py`), juste après chaque appel, avant les contrôles de
+  l'étape : une faute dans ces contrôles ne fait pas perdre le contenu de l'appel qui l'a provoquée.
 - **Corps** : une chaîne JSON aux trois clés de la convention, `system_instructions` (la consigne
   envoyée, rappel compris pour une relance), `input_messages` (le message utilisateur, les champs
   des items masqués comme pour le modèle) et `output_messages` (la sortie d'un 200, refusée ou non ;

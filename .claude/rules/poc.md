@@ -128,9 +128,10 @@ qui gardent le champ et le type d'erreur, jamais par `str(error)` ni par `{error
 `gen_ai.client.inference.operation.details` peut porter la consigne, les champs des items envoyés au
 modèle et sa réponse, quand `KB_TRACE_CONTENT` l'active : `all` en bac à sable seulement, refusé au
 démarrage en production ; `anomalies` pour les seuls appels en anomalie (décision D1 du 2026-10-27).
-Ces champs sont masqués comme pour le modèle (adresses web, logins `@…`), mais peuvent encore contenir
-un login dans un nom de dépôt ou un nom en texte libre : ce sont des données personnelles (voir le
-registre). L'enregistrement part en OTLP vers l'outil de suivi inscrit au registre, dont le DPA est
+Ces champs sont masqués comme pour le modèle (les adresses web partout, les logins `@…` dans les
+seules notes d'une release), mais peuvent encore contenir un login dans un nom de dépôt ou hors des
+notes d'une release, une adresse mail ou un nom en texte libre : ce sont des données personnelles
+(voir le registre). L'enregistrement part en OTLP vers l'outil de suivi inscrit au registre, dont le DPA est
 signé, jamais sur la sortie standard ni dans un fichier. Il ne contient jamais le texte d'une entrée
 Zotero ni d'un clip, que l'API IA ne reçoit pas (`connectors/data_api_client.py:125`). Hors de cet
 enregistrement, la règle est inchangée.
@@ -199,6 +200,9 @@ coffre. Elle n'importe ni `etl`, ni `database/writers`, ni `database/writing`.
 **Règle.** Tout texte venu d'une source (item, clip) entre dans le message utilisateur, encodé,
 jamais dans la consigne du modèle. Toute sortie du modèle passe par un schéma fermé (modèle
 Pydantic, `enum` des sujets) avant d'être écrite ; une sortie hors schéma n'est jamais écrite.
+Le contenu d'un appel au modèle envoyé à l'outil de suivi (exception de la règle 5), sortie
+refusée comprise, y reste une donnée, jamais une consigne : il part comme une chaîne échappée dans
+le corps d'un journal, et n'est jamais écrit dans le coffre ni dans la réponse de l'API.
 
 **Vérifier.**
 - `grep -rnE -C3 'role.*system|SystemMessage|system=|instructions=' src/k_b` → rien au départ.

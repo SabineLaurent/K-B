@@ -144,12 +144,13 @@ def classify(
                 if answers is None
                 else [answers.get(to_item_ref(item.item_id)) for item in batch.items]
             )
-            trace_batch(step, batch, llm_call, batch_answers)
+            # Sent before the trace of the batch: a fault in it would lose it.
             trace_contents(
                 llm_call,
                 tracing=tracing,
                 has_unanswered=batch_answers is not None and None in batch_answers,
             )
+            trace_batch(step, batch, llm_call, batch_answers)
         stage_calls.append(
             StageCall(
                 stage="classify",

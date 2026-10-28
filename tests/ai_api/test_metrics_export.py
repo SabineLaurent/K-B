@@ -118,7 +118,13 @@ def test_the_content_of_the_requests_is_read_with_the_export(environment, conten
     assert settings == replace(SETTINGS, environment=environment, trace_content=content)
 
 
-@pytest.mark.parametrize("content", ["all", "anomalies", "everything"])
+def test_an_unknown_content_of_the_requests_without_export_is_refused_as_unknown():
+    assert read_metrics_export_settings_or_refusal(
+        {"KB_TRACE_CONTENT": "anomalie"}
+    ) == ("KB_TRACE_CONTENT: 'anomalie' not none nor anomalies nor all")
+
+
+@pytest.mark.parametrize("content", ["all", "anomalies"])
 def test_the_content_of_the_requests_without_export_is_refused(content):
     assert read_metrics_export_settings_or_refusal({"KB_TRACE_CONTENT": content}) == (
         "KB_TRACE_CONTENT: set, while the export is off (KB_OTLP_ENDPOINT and"
