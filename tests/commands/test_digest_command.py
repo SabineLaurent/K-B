@@ -1,7 +1,11 @@
 """kb digest: the digests asked of the AI API, the sheet of each subject written."""
 
+import logging
+import os
 import re
 import signal
+import subprocess
+import sys
 from datetime import date
 from functools import partial
 
@@ -9,6 +13,7 @@ import httpx2
 import pytest
 from commands.cli_helpers import (
     LOG_LINE_DATE,
+    WaitLineSeen,
     list_hidden_files,
     list_sheets,
 )
@@ -24,7 +29,9 @@ from k_b import cli
 from k_b.ai_api.schemas.digest_schema import FailedSubjectSchema
 from k_b.commands import (
     digest_command,
+    wait_display,
 )
+from k_b.commands.run_log import LOGGER_NAME
 from k_b.core.config import DigestSubject
 from k_b.post import vault_files
 from k_b.post.ai_api_client import build_ai_api_client
@@ -381,6 +388,83 @@ def test_a_sigterm_while_a_sheet_is_written_stops_digest_and_keeps_the_sheet(
     assert list_sheets(vault_dir) == ["veille/agent_tools/2026-10-21.md"]
     assert list_hidden_files(vault_dir) == []
     assert signal.getsignal(signal.SIGTERM) is sigterm_handler_of_the_test
+
+
+def test_a_slow_request_logs_that_the_digests_are_still_awaited(
+    monkeypatch, digest_environment, capsys
+):
+    data_dir, _ = digest_environment
+    monkeypatch.setattr(wait_display, "WAIT_LOG_INTERVAL_SECONDS", 0.001)
+    wait_line = WaitLineSeen()
+    seen_in_time = []
+
+    def answer_once_the_wait_is_logged(request):
+        seen_in_time.append(wait_line.seen.wait(5))
+        return answer_with(make_response([AGENT_DIGEST]))(request)
+
+    answer_digests(monkeypatch, answer_once_the_wait_is_logged)
+    logger = logging.getLogger(LOGGER_NAME)
+    logger.addHandler(wait_line)
+    try:
+        exit_code = cli.main(["digest"])
+    finally:
+        logger.removeHandler(wait_line)
+
+    assert exit_code == cli.ExitCode.SUCCEEDED
+    assert seen_in_time == [True]
+    wait_line_logged = (
+        rf"^{LOG_LINE_DATE} INFO k_b\.cli: still waiting for the digests:"
+        r" \d+ seconds, read timeout 240 seconds$"
+    )
+    assert re.search(wait_line_logged, capsys.readouterr().err, re.MULTILINE)
+    assert re.search(wait_line_logged, read_kb_log(data_dir), re.MULTILINE)
+
+
+# kb digest run as the kb script runs it, sys.exit(main()), with an AI API that says the request
+# has arrived, then never answers: the wait is shown by its thread while SIGTERM comes.
+DIGEST_WAITING_FOR_SIGTERM = """
+import sys
+import time
+from functools import partial
+
+import httpx2
+
+from k_b import cli
+from k_b.commands import digest_command
+from k_b.post.ai_api_client import build_ai_api_client
+
+
+def wait_for_sigterm(request):
+    print("ready", flush=True)
+    time.sleep(60)
+    return httpx2.Response(500)
+
+
+digest_command.build_ai_api_client = partial(
+    build_ai_api_client, transport=httpx2.MockTransport(wait_for_sigterm)
+)
+sys.exit(cli.main(["digest"]))
+"""
+
+
+def test_kb_digest_sent_sigterm_while_it_waits_exits_with_143(digest_environment):
+    process = subprocess.Popen(  # noqa: S603 — runs this interpreter on a fixed script
+        [sys.executable, "-c", DIGEST_WAITING_FOR_SIGTERM],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=dict(os.environ),
+    )
+    try:
+        assert process.stdout.readline() == "ready\n"
+        process.send_signal(signal.SIGTERM)
+        _, error_output = process.communicate(timeout=30)
+    finally:
+        process.kill()
+        process.wait()
+
+    assert process.returncode == cli.ExitCode.STOPPED_BY_SIGTERM
+    assert "ERROR k_b.cli: kb stopped by SIGTERM" in error_output
 
 
 def test_kb_help_lists_digest(capsys):
