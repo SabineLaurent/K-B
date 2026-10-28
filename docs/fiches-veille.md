@@ -894,7 +894,9 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
   `logs:write`.
   `KB_DEPLOYMENT_ENVIRONMENT` (`sandbox` ou `production`), sans défaut, est exigée avec l'export
   (décision de Sabine du 2026-10-24). D'un environnement à l'autre, ces trois réglages changent,
-  aucun code. Une variable `OTEL_*` présente arrête le démarrage : le SDK la lirait sans que K-B le
+  aucun code. `KB_TRACE_CONTENT` (`none` par défaut, `anomalies`, `all`) dit quel contenu des appels
+  au modèle part avec les traces (« Traces de `POST /digests` », ci-dessous) ; posé sans l'export,
+  il arrête le démarrage. Une variable `OTEL_*` présente arrête le démarrage : le SDK la lirait sans que K-B le
   sache, et relit l'en-tête même quand K-B le lui passe.
 - **Envoi** : toutes les 60 s, et un dernier à l'arrêt, dans le `lifespan` de l'app, avant que
   uvicorn relance le SIGTERM, en même temps que celui des traces ; chaque envoi attend 5 s au plus. La session HTTP de l'exporteur ne
@@ -926,9 +928,10 @@ données, et le `trace_id` dans les lignes de journal, restent l'objet de #281.
 
 Chaque demande est une trace : le résultat de chaque étape, en identifiants et en comptes, et la
 raison de chaque affirmation retirée. Elles servent à suivre une demande étape par étape en bac à
-sable, et à comprendre une anomalie en production. Elles ne portent aucun texte : ni consigne, ni
-item, ni réponse du modèle (règle 5 de `poc.md`, inchangée). Le contenu viendra par une issue à
-part, quand le DPA de Grafana sera signé.
+sable, et à comprendre une anomalie en production. Les spans et les évaluations ne portent aucun
+texte : ni consigne, ni item, ni réponse du modèle. Le contenu d'un appel au modèle part à côté,
+sous réglage, dans un enregistrement à part (#347, « Contenu d'un appel au modèle » ci-dessous ;
+exception de la règle 5 de `poc.md`).
 
 ```
 POST /digests            SERVER   http.request.method, http.route, http.response.status_code, error.type, k_b.request_id
@@ -981,15 +984,54 @@ POST /digests            SERVER   http.request.method, http.route, http.response
 - **Arrêt** : les trois fournisseurs s'arrêtent en même temps. Un arrêt peut envoyer deux fois
   (l'envoi en cours, puis le reste) : au plus max(2 × 3, 2 × 3, 5) = 6 s, sous les 10 s de `docker
   stop`, sans demande en cours. Pour que le reste tienne en un envoi, la file d'attente est d'un
-  lot, 512 spans ou enregistrements (`TRACE_QUEUE_SIZE`) ; une demande en fait quelques dizaines.
+  lot, 512 spans ou enregistrements (`TRACE_QUEUE_SIZE`) ; une demande en fait quelques dizaines,
+  plus un enregistrement de contenu par requête au modèle avec `all`, jusqu'à 200 000 octets
+  chacun. Un envoi part toutes les secondes : un lot porte la seconde écoulée, loin des 64 Mio
+  au-delà desquels l'exporteur le jette. À vérifier à l'essai réel ; si un envoi est refusé, une
+  file propre aux journaux, plus courte, toujours d'un lot.
   Au-delà, le SDK abandonne le plus ancien en attente, avec une ligne de journal. Le SDK ne borne
   pas le total d'un envoi (son délai vaut pour chaque attente de la connexion) : chaque arrêt tourne
   dans un fil à part, attendu 6 s au plus (`TRACE_STOP_TIMEOUT_SECONDS`), puis laissé, avec une
   ligne de journal.
 - **Lire** dans Grafana : Explore, Tempo, `{resource.service.name="k-b-ai-api"}`, ou
   `{status = error}` pour les demandes en échec ; « Logs for this span » sur un `chat` montre les
-  raisons. Dans Loki, elles se lisent aussi par `{service_name="k-b-ai-api"}`, leurs attributs avec
-  un tiret bas à la place du point (`k_b_claim_index`) : vu à l'essai réel du 2026-10-27.
+  raisons, et le contenu quand il est envoyé. Dans Loki, elles se lisent aussi par
+  `{service_name="k-b-ai-api"}`, leurs attributs avec un tiret bas à la place du point
+  (`k_b_claim_index`) : vu à l'essai réel du 2026-10-27. Le contenu seul :
+  `{service_name="k-b-ai-api"} | event_name="gen_ai.client.inference.operation.details" | json`
+  (le nom de l'attribut dans Loki est à vérifier à l'essai réel de #347).
+
+**Contenu d'un appel au modèle (#347)** : un enregistrement de journal OTLP
+`gen_ai.client.inference.operation.details` par requête au modèle, de niveau DEBUG, rattaché à
+son `chat` à l'instant où il a fini, comme une évaluation.
+- **Réglage** `KB_TRACE_CONTENT` : `none` (défaut), rien ; `anomalies`, chaque requête d'un appel
+  en anomalie ; `all`, chaque requête, refusé au démarrage en production. Avec `none`, l'appel ne
+  garde aucun texte (`LlmCall.contents` vide) ; avec un autre réglage, les textes restent hors du
+  `repr` de l'appel et de ses mesures.
+- **Anomalie** (décision D1 de Sabine du 2026-10-27) : un appel qui finit en
+  `llm_invalid_output`, `llm_truncated`, `llm_content_filtered` ou `llm_timeout`, un appel relancé
+  après le refus d'un contrôle (même si la relance finit en 429 ou en 5xx), ou un lot de
+  classement qui a laissé des items sans réponse. Pas `llm_rate_limited` ni `llm_unavailable`, dont
+  la cause est le fournisseur (minimisation) ; ni un `llm_timeout` posé par le délai de la demande
+  avant la relance d'un 429, d'un 5xx ou d'une erreur de transport (précision de Sabine du
+  2026-10-28 : même cause) ; ni une affirmation retirée, qui a déjà ses raisons et dont le pourquoi
+  s'enquête en bac à sable avec `all`. À rejuger après #210. Le choix est fait par
+  `trace_contents` (`connectors/llm_client.py`), après le classement de chaque lot et après chaque
+  rédaction.
+- **Corps** : une chaîne JSON aux trois clés de la convention, `system_instructions` (la consigne
+  envoyée, rappel compris pour une relance), `input_messages` (le message utilisateur, les champs
+  des items masqués comme pour le modèle) et `output_messages` (la sortie d'un 200, refusée ou non ;
+  vide sans sortie : un délai, un 429, un 5xx, un 400, une enveloppe illisible, le corps d'une
+  erreur pouvant citer l'entrée). La raison de fin reste sur le span. Le contenu va dans le corps,
+  pas en attributs : Grafana Cloud Traces coupe un attribut à 2 Ko, et Loki range les attributs en
+  métadonnées plafonnées à 64 Ko, quand une ligne accepte 256 Ko. Une chaîne plutôt qu'un
+  dictionnaire : K-B mesure les octets de la ligne que Loki reçoit.
+- **Coupe** : au-delà de `MAX_CONTENT_EVENT_BYTES` (200 000 octets d'UTF-8), chaque texte est coupé
+  à la même longueur, la plus grande qui tient ; toutes les clés et parties restent, et
+  `k_b.content_truncated = true` le dit. Seuls attributs : `gen_ai.operation.name = chat` et ce
+  drapeau.
+- **Sortie refusée** : elle part comme une chaîne échappée dans un corps de journal, jamais
+  interprétée ni écrite dans le coffre ou la réponse de l'API (règle 8 de `poc.md`, inchangée).
 
 **Angles morts** : un 401 et un 422 n'ont pas de trace, la route n'étant pas atteinte. Une erreur
 après le `return` de la route (la validation de la réponse, la fermeture des dépendances) laisse
@@ -1001,7 +1043,11 @@ une racine à 200 alors que le client reçoit 500 ; la ligne de `log_request` di
   tentative a son résultat ;
 - la racine est ouverte par la route, pas par la télémétrie native de FastAPI, qui porterait
   `url.path`, `url.query` et `server.address`, et reprendrait un `traceparent` reçu ;
-- `gen_ai.prompt.version` vaut la version de K-B (`classify-2`, `write-1`).
+- `gen_ai.prompt.version` vaut la version de K-B (`classify-2`, `write-1`) ;
+- le contenu va dans le corps d'un enregistrement, en une chaîne JSON, pas dans les attributs
+  `gen_ai.system_instructions`, `gen_ai.input.messages` et `gen_ai.output.messages` ; il se règle par
+  `KB_TRACE_CONTENT`, K-B refusant toute variable `OTEL_*`
+  (`OTEL_INSTRUMENTATION_GENAI_CAPTURE_CONTENT`).
 
 Sources, lues le 2026-10-27 :
 [client-inference.md](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/client-inference.md),

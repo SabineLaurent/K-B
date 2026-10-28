@@ -88,8 +88,14 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   retirée sous « Logs for this span » d'un `chat`. Une fonction d'`ai_api` qui prend `tracing` le
   reçoit toujours par `tracing=` (test AST) : une étape nouvelle ouvre son span par `tracing.step`
   et passe `tracing=` plus bas. Le jeton porte `metrics:write`, `traces:write` et `logs:write`.
-  OpenTelemetry est borné sous 1.46 : une montée relit `trace_export.py`. Le contenu des appels au
-  modèle attend une seconde PR (DPA signé, décisions D1 et D2 de Sabine).
+  OpenTelemetry est borné sous 1.46 : une montée relit `trace_export.py`.
+- Depuis #347, le contenu d'un appel au modèle (consigne, items, sortie) peut partir avec les traces,
+  sous `KB_TRACE_CONTENT` (`none` par défaut, `anomalies`, `all` refusé en production) : une exception
+  à la règle 5 de `poc.md`, des données personnelles chez Grafana. Ne jamais poser `anomalies` ni
+  `all` avant la signature du DPA de Grafana Labs (registre, « Envoi des mesures à Grafana Cloud »).
+  Ce qu'est une anomalie (D1, précisée le 2026-10-28) ne se change que par Sabine, dans
+  `is_anomaly` (`ai_api/connectors/llm_client.py`) ; une étape nouvelle qui appelle le modèle appelle
+  `trace_contents(llm_call, tracing=tracing)` après avoir jugé l'appel.
 
 ## Consignes de travail
 

@@ -124,6 +124,17 @@ quelle : son texte cite la valeur reçue (`input_value=`). Elle passe par `witho
 (`core/quoting.py`) ou `describe_validation_error` (`etl/sources/gh_archive.py`),
 qui gardent le champ et le type d'erreur, jamais par `str(error)` ni par `{error}`.
 
+**Exception : le contenu d'un appel au modèle.** Un enregistrement
+`gen_ai.client.inference.operation.details` peut porter la consigne, les champs des items envoyés au
+modèle et sa réponse, quand `KB_TRACE_CONTENT` l'active : `all` en bac à sable seulement, refusé au
+démarrage en production ; `anomalies` pour les seuls appels en anomalie (décision D1 du 2026-10-27).
+Ces champs sont masqués comme pour le modèle (adresses web, logins `@…`), mais peuvent encore contenir
+un login dans un nom de dépôt ou un nom en texte libre : ce sont des données personnelles (voir le
+registre). L'enregistrement part en OTLP vers l'outil de suivi inscrit au registre, dont le DPA est
+signé, jamais sur la sortie standard ni dans un fichier. Il ne contient jamais le texte d'une entrée
+Zotero ni d'un clip, que l'API IA ne reçoit pas (`connectors/data_api_client.py:125`). Hors de cet
+enregistrement, la règle est inchangée.
+
 **Vérifier.** Les commandes sont des repères ; la preuve est le test.
 - `grep -rn -A5 "except ValidationError" src/k_b | grep -E "\{error\}|str\(error\)"` → rien
   depuis #212 (au départ, `etl/transform.py:149`, une `ValidationError` citée par `{error}`). Ce
@@ -134,6 +145,9 @@ qui gardent le champ et le type d'erreur, jamais par `str(error)` ni par `{error
   → rien au départ. `-A3` lit les appels écrits sur plusieurs lignes (14 sur 30 au départ).
 - `uv run pytest` : le test de la règle 3 de `conventions.md` (une entrée refusée avec un auteur ;
   l'auteur est absent du message).
+- L'exception : `test_with_content_all_only_the_body_of_a_content_record_holds_a_text`
+  (`tests/ai_api/test_digest_router.py`, #347) ; le refus en production et sans export :
+  `tests/ai_api/test_metrics_export.py`.
 
 **Pourquoi.** Règle 3 de `conventions.md` (minimisation, RGPD). Au 08/11, les journaux partent
 vers un service en ligne : un auteur est une donnée personnelle, et le texte d'un item ou d'un
