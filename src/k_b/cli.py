@@ -124,6 +124,11 @@ def main(argv: list[str] | None = None) -> int:
             # Caught once the import or the collection has cleaned up on its way out.
             logger.error("kb stopped by SIGTERM")
             return ExitCode.STOPPED_BY_SIGTERM
+        except KeyboardInterrupt:
+            # The same for SIGINT (Ctrl-C), which Python raises as KeyboardInterrupt, not an
+            # Exception: uncaught, Python would print its whole traceback.
+            logger.error("kb stopped by SIGINT")
+            return ExitCode.STOPPED_BY_SIGINT
         except Exception:
             # Logged here, while the log file is open, and not raised again: Python would print
             # its traceback a second time. 1, as Python exits on an exception: kb was run.

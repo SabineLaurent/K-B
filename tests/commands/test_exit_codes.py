@@ -14,6 +14,7 @@ def test_each_exit_code_keeps_its_value():
         "NOT_STARTED": 2,
         "SERVER_NOT_STARTED": 3,
         "PARTIAL_FAILURE": 4,
+        "STOPPED_BY_SIGINT": 130,
         "STOPPED_BY_SIGTERM": 143,
     }
 
