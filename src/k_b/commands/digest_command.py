@@ -12,6 +12,7 @@ from k_b.commands.run_log import (
     describe_os_error,
     value_or_log_refusal,
 )
+from k_b.commands.wait_display import showing_the_wait
 from k_b.core.config import AI_API_READ_TIMEOUT_SECONDS, DIGEST_SUBJECTS
 from k_b.etl.collected_sources import VAULT_DIR_VARIABLE, read_vault_dir
 from k_b.post.ai_api_client import (
@@ -59,7 +60,10 @@ def run_digest(environ: Mapping[str, str]) -> int:
         AI_API_READ_TIMEOUT_SECONDS,
     )
     try:
-        with build_ai_api_client(settings) as http_client:
+        with (
+            build_ai_api_client(settings) as http_client,
+            showing_the_wait("the digests", AI_API_READ_TIMEOUT_SECONDS),
+        ):
             response = request_digests(http_client, subject_names)
     except AiApiError as error:
         logger.error("digests not received: %s%s", error, describe_remedy(error))

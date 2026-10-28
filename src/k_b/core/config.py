@@ -300,6 +300,11 @@ AI_API_CONNECT_TIMEOUT_SECONDS = 5
 AI_API_POOL_TIMEOUT_SECONDS = 5
 AI_API_WRITE_TIMEOUT_SECONDS = 10
 AI_API_READ_TIMEOUT_SECONDS = 240
+# The wait for an answer shown out of a terminal (commands/wait_display.py): a log line every 10
+# seconds, the step of the "Still creating... [10s elapsed]" of Terraform and the limit of attention
+# of NN/g (docs/fiches-veille.md, "Console"). A constant, not a variable: no need to change it by
+# deployment.
+WAIT_LOG_INTERVAL_SECONDS = 10
 # The time a request to the model needs at least: none is sent with less left, so that the items
 # are not sent for an answer the deadline would throw away. Above the slowest writing measured by
 # #158 (9.3 s), not above the longest one the output cap allows (about 60 s): a longer writing
