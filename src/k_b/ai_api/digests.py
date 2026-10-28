@@ -9,7 +9,12 @@ from dataclasses import dataclass
 
 import httpx2
 
-from k_b.ai_api.connectors.llm_client import LlmCall, LlmFailure, to_failure
+from k_b.ai_api.connectors.llm_client import (
+    LlmCall,
+    LlmFailure,
+    to_failure,
+    trace_contents,
+)
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.stage_calls import Stage, StageCall
@@ -101,6 +106,9 @@ def build_digests(
                 deadline,
                 tracing=tracing,
             )
+            # Sent before the checks of the stage: a fault in them would lose it. A claim removed
+            # is no anomaly (decision D1 of Sabine, 2026-10-27).
+            trace_contents(llm_call, tracing=tracing)
             digest = (
                 None
                 if llm_call.output is None

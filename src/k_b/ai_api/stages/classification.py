@@ -14,6 +14,7 @@ from k_b.ai_api.connectors.llm_client import (
     call_model,
     encode_user_message,
     to_failure,
+    trace_contents,
 )
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
@@ -142,6 +143,12 @@ def classify(
                 None
                 if answers is None
                 else [answers.get(to_item_ref(item.item_id)) for item in batch.items]
+            )
+            # Sent before the trace of the batch: a fault in it would lose it.
+            trace_contents(
+                llm_call,
+                tracing=tracing,
+                has_unanswered=batch_answers is not None and None in batch_answers,
             )
             trace_batch(step, batch, llm_call, batch_answers)
         stage_calls.append(

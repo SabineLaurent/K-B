@@ -32,6 +32,7 @@ from k_b.core.config import (
     TRACE_EXPORT_TIMEOUT_SECONDS,
     TRACE_QUEUE_SIZE,
     TRACE_STOP_TIMEOUT_SECONDS,
+    TraceContent,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,8 @@ class TraceExport:
 
     tracer_provider: TracerProvider
     logger_provider: LoggerProvider
+    # KB_TRACE_CONTENT, none without the export (connectors/metrics_export.py).
+    content: TraceContent = "none"
 
     @classmethod
     def from_settings(
@@ -94,12 +97,17 @@ class TraceExport:
                     max_export_batch_size=TRACE_QUEUE_SIZE,
                 )
             )
-        return cls(tracer_provider, logger_provider)
+        return cls(
+            tracer_provider,
+            logger_provider,
+            "none" if settings is None else settings.trace_content,
+        )
 
     def build_tracing(self) -> Tracing:
         return Tracing(
             self.tracer_provider.get_tracer(SCOPE_NAME),
             self.logger_provider.get_logger(SCOPE_NAME),
+            self.content,
         )
 
     def stop_traces(self) -> None:

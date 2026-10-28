@@ -158,6 +158,7 @@ def make_ai_api(data_api, metric_reader, recorded_traces):
         default_window_days=WINDOW_DAYS,
         data_api_client=None,
         replay_from_settings=False,
+        trace_content="none",
     ):
         settings = replace(
             REPLAY_SETTINGS, replay_steps=tuple(REPLAY_STEPS.validate_python(steps))
@@ -174,7 +175,7 @@ def make_ai_api(data_api, metric_reader, recorded_traces):
             ModelMetrics(
                 MeterProvider(metric_readers=[metric_reader], shutdown_on_exit=False)
             ),
-            recorded_traces.trace_export,
+            replace(recorded_traces.trace_export, content=trace_content),
         )
         transport = ReplayTransport(steps)
 
@@ -1123,6 +1124,9 @@ def test_an_unexpected_error_names_its_type_never_its_text_on_the_root(
     assert not any("Mistral" in str(value) for value in list_values(recorded_traces))
 
 
+CONTENT_EVENT = "gen_ai.client.inference.operation.details"
+
+
 def list_values(recorded_traces):
     """Every value of every attribute of the spans and log records, and every body."""
     values = []
@@ -1155,6 +1159,57 @@ def test_no_value_holds_a_text_of_the_items_or_of_the_output(
         written = " ".join(map(str, value)) if isinstance(value, tuple) else str(value)
         assert not any(word in written for word in words), written
         assert len(written.encode()) <= 2048
+
+
+def test_with_content_all_only_the_body_of_a_content_record_holds_a_text(
+    make_ai_api, recorded_traces, capsys, caplog
+):
+    # Rule 5 of poc.md and its exception: the texts go in the body of the content records, never
+    # in an attribute, another record, a log line nor a metric line.
+    client, _ = make_ai_api(VALID_STEPS, trace_content="all")
+
+    with caplog.at_level(logging.DEBUG):
+        body = post_digests(client).json()
+
+    words = {
+        word
+        for digest in body["digests"]
+        for text in [
+            *(claim["text"] for claim in digest["claims"]),
+            *(source["title"] for source in digest["sources"]),
+        ]
+        for word in text.split()
+        if len(word) > 6
+    }
+    assert words
+    content_records = recorded_traces.find_log_records(CONTENT_EVENT)
+    assert len(content_records) == 4
+    assert all(any(word in record.body for word in words) for record in content_records)
+    out, err = capsys.readouterr()
+    values = [
+        *(
+            v
+            for s in recorded_traces.spans.get_finished_spans()
+            for v in s.attributes.values()
+        ),
+        *(
+            v
+            for r in recorded_traces.log_records.get_finished_logs()
+            for v in r.log_record.attributes.values()
+        ),
+        *(
+            r.log_record.body
+            for r in recorded_traces.log_records.get_finished_logs()
+            if r.log_record.event_name != CONTENT_EVENT
+        ),
+        *(record.getMessage() for record in caplog.records),
+        # The values of the metric lines: a key, as prompt_version, is a name of K-B.
+        *(v for line in out.splitlines() for v in json.loads(line).values()),
+        err,
+    ]
+    for value in values:
+        written = " ".join(map(str, value)) if isinstance(value, tuple) else str(value)
+        assert not any(word in written for word in words), written
 
 
 def test_each_claim_removed_is_an_evaluation_tied_to_its_last_request(

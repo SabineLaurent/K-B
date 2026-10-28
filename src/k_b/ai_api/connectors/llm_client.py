@@ -7,7 +7,7 @@ A text of a source goes only in the user message, encoded in JSON, never in the 
 import json
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Annotated, Literal, get_args
 
 import httpx2
@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
-from k_b.ai_api.tracing import TRACING_OFF, SpanRef, Step, Tracing
+from k_b.ai_api.tracing import TRACING_OFF, AttemptContent, SpanRef, Step, Tracing
 from k_b.core.config import (
     LLM_CALL_TIMEOUT_SECONDS,
     LLM_CONNECT_TIMEOUT_SECONDS,
@@ -45,6 +45,16 @@ type LlmFailure = Literal[
     "llm_timeout",
 ]
 type LlmOutcome = Literal["ok"] | LlmFailure
+# The states of a call in anomaly, whose content KB_TRACE_CONTENT=anomalies sends (decision D1 of
+# Sabine, 2026-10-27): the content may explain them. Not llm_rate_limited nor llm_unavailable, whose
+# cause is the provider (minimisation); nor a timeout of a call whose first attempt was one of them,
+# its retry cut by the deadline before or after it left (precision of D1, 2026-10-28).
+ANOMALY_OUTCOMES: frozenset[LlmOutcome] = frozenset(
+    {"llm_invalid_output", "llm_truncated", "llm_content_filtered", "llm_timeout"}
+)
+PROVIDER_FAILURES: frozenset[LlmOutcome] = frozenset(
+    {"llm_rate_limited", "llm_unavailable"}
+)
 # The check that refused the output (docs/fiches-veille.md, "Contrôles"); 1 and 2 here, 3 to 6
 # by the stage.
 type FailedCheck = Literal[
@@ -120,7 +130,8 @@ class ErrorBody(EnvelopeModel):
 @dataclass(frozen=True)
 class LlmCall[OutputT: BaseModel]:
     """A call, its outcome and its measures, never a text: the output only when the outcome is
-    ok; the tokens of both attempts, the other measures of the last one."""
+    ok; the tokens of both attempts, the other measures of the last one. The texts of its attempts
+    only in contents, when KB_TRACE_CONTENT keeps them, never in its repr."""
 
     outcome: LlmOutcome
     output: OutputT | None
@@ -130,6 +141,8 @@ class LlmCall[OutputT: BaseModel]:
     failed_check: FailedCheck | None
     # The check that refused the first attempt, when a second one followed; None otherwise.
     first_failed_check: FailedCheck | None
+    # The outcome of the first attempt, before a retry or a cut by the deadline.
+    first_outcome: LlmOutcome
     tokens_in: int
     tokens_out: int
     reasoning_tokens: int | None
@@ -149,6 +162,8 @@ class LlmCall[OutputT: BaseModel]:
     saw_rate_limit: bool
     # The span of the last attempt, the one whose output the checks read.
     span_ref: SpanRef
+    # The texts of each attempt, empty with KB_TRACE_CONTENT=none (connectors/metrics_export.py).
+    contents: tuple[AttemptContent, ...] = field(default=(), repr=False)
 
 
 @dataclass(frozen=True)
@@ -166,6 +181,8 @@ class Attempt[OutputT: BaseModel]:
     http_status: int | None = None
     # None: no retry. 0: a retry at once, after an output refused; else the wait before it.
     retry_wait_seconds: float | None = None
+    # The output of a 200, refused or not; it never leaves call_model but in an AttemptContent.
+    output_text: str | None = field(default=None, repr=False)
 
 
 def to_failure(outcome: LlmOutcome) -> LlmFailure:
@@ -232,6 +249,7 @@ def call_model[OutputT: BaseModel](
     user_message = encode_user_message(user_data)
     started = time.perf_counter()
     span_refs: list[SpanRef] = []
+    contents: list[AttemptContent] = []
 
     def ask(prompt: str) -> Attempt[OutputT]:
         body = build_request_body(
@@ -268,6 +286,10 @@ def call_model[OutputT: BaseModel](
             )
             trace_attempt(step, attempt)
         span_refs.append(step.ref)
+        if tracing.content != "none":
+            contents.append(
+                AttemptContent(step.ref, prompt, user_message, attempt.output_text)
+            )
         return attempt
 
     attempts = [ask(system_prompt)]
@@ -278,7 +300,11 @@ def call_model[OutputT: BaseModel](
         and not deadline.allows_llm_request(first.retry_wait_seconds)
     ):
         call = summarize(
-            attempts, len(user_message), time.perf_counter() - started, span_refs[-1]
+            attempts,
+            len(user_message),
+            time.perf_counter() - started,
+            span_refs[-1],
+            contents=tuple(contents),
         )
         return replace(call, outcome="llm_timeout", output=None)
     if first.retry_wait_seconds is not None:
@@ -290,7 +316,38 @@ def call_model[OutputT: BaseModel](
                 ask(f"{system_prompt}\n\n{retry_reminders[first.failed_check]}")
             )
     elapsed_seconds = time.perf_counter() - started
-    return summarize(attempts, len(user_message), elapsed_seconds, span_refs[-1])
+    return summarize(
+        attempts,
+        len(user_message),
+        elapsed_seconds,
+        span_refs[-1],
+        contents=tuple(contents),
+    )
+
+
+def is_anomaly[OutputT: BaseModel](call: LlmCall[OutputT]) -> bool:
+    """Whether the call is in anomaly (decision D1 of Sabine, 2026-10-27): it was retried after a
+    check refused its first output, or it ended in a state of ANOMALY_OUTCOMES, but for a timeout
+    after a failure of the provider (precision of D1, 2026-10-28). A batch of the classification
+    that left items without answer is one too, told by its caller."""
+    is_provider_timeout = (
+        call.outcome == "llm_timeout" and call.first_outcome in PROVIDER_FAILURES
+    )
+    return call.first_failed_check is not None or (
+        call.outcome in ANOMALY_OUTCOMES and not is_provider_timeout
+    )
+
+
+def trace_contents[OutputT: BaseModel](
+    call: LlmCall[OutputT], *, tracing: Tracing, has_unanswered: bool = False
+) -> None:
+    """Send the content of each attempt of the call: all of them with KB_TRACE_CONTENT=all, those
+    of a call in anomaly with anomalies, none with none."""
+    if tracing.content == "all" or (
+        tracing.content == "anomalies" and (is_anomaly(call) or has_unanswered)
+    ):
+        for content in call.contents:
+            tracing.record_content(content)
 
 
 def trace_attempt[OutputT: BaseModel](step: Step, attempt: Attempt[OutputT]) -> None:
@@ -440,8 +497,9 @@ def check_completion[OutputT: BaseModel](
     output_model: type[OutputT],
     check_output: Callable[[OutputT], FailedCheck | None],
 ) -> Attempt[OutputT]:
-    """Checks 1 and 2, then those of the stage, the first refusal naming the failure; neither the
-    output refused nor its ValidationError is kept (poc.md, rule 5)."""
+    """Checks 1 and 2, then those of the stage, the first refusal naming the failure. The output
+    refused is kept only as output_text, which call_model sends with the traces when
+    KB_TRACE_CONTENT lets it (poc.md, rule 5, exception); its ValidationError never."""
     started = time.perf_counter()
     choice = completion.choices[0]
     finish_reason = (
@@ -465,6 +523,7 @@ def check_completion[OutputT: BaseModel](
             check_seconds=time.perf_counter() - started,
             is_checked=True,
             retry_wait_seconds=0 if is_retried else None,
+            output_text=choice.message.content,
         )
 
     # The same input to the same model most often gives the same output (determinism is not
@@ -496,6 +555,7 @@ def check_completion[OutputT: BaseModel](
         usage=completion.usage,
         check_seconds=time.perf_counter() - started,
         is_checked=True,
+        output_text=choice.message.content,
     )
 
 
@@ -531,6 +591,8 @@ def summarize[OutputT: BaseModel](
     input_chars: int,
     elapsed_seconds: float,
     span_ref: SpanRef,
+    *,
+    contents: tuple[AttemptContent, ...] = (),
 ) -> LlmCall[OutputT]:
     """The call: the state of its last attempt, the tokens of both."""
     last = attempts[-1]
@@ -550,6 +612,7 @@ def summarize[OutputT: BaseModel](
         schema_valid=last.schema_valid,
         failed_check=last.failed_check,
         first_failed_check=attempts[0].failed_check if len(attempts) == 2 else None,
+        first_outcome=attempts[0].outcome,
         tokens_in=sum(usage.prompt_tokens for usage in usages),
         tokens_out=sum(usage.completion_tokens for usage in usages),
         reasoning_tokens=sum(reasoning) if reasoning else None,
@@ -563,4 +626,5 @@ def summarize[OutputT: BaseModel](
             attempt.outcome == "llm_rate_limited" for attempt in attempts
         ),
         span_ref=span_ref,
+        contents=contents,
     )

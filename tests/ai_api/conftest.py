@@ -1,6 +1,6 @@
 """The traces of the AI API kept in memory, for the tests that read them."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import pytest
 from opentelemetry.sdk._logs import LoggerProvider
@@ -23,6 +23,18 @@ class RecordedTraces:
 
     def find_spans(self, name):
         return [span for span in self.spans.get_finished_spans() if span.name == name]
+
+    def build_tracing(self, content):
+        """The tracing of these providers, the content of the requests kept as KB_TRACE_CONTENT
+        would."""
+        return replace(self.trace_export, content=content).build_tracing()
+
+    def find_log_records(self, event_name):
+        return [
+            record.log_record
+            for record in self.log_records.get_finished_logs()
+            if record.log_record.event_name == event_name
+        ]
 
 
 @pytest.fixture

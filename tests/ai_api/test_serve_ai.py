@@ -197,6 +197,19 @@ def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
             {"OTEL_SERVICE_NAME": "k-b"},
             "OTEL_SERVICE_NAME: read by the OpenTelemetry SDK behind the back of K-B",
         ),
+        (
+            {"KB_TRACE_CONTENT": "all"},
+            "KB_TRACE_CONTENT: set, while the export is off",
+        ),
+        (
+            {
+                "KB_OTLP_ENDPOINT": "https://otlp.example.net/otlp",
+                "KB_OTLP_HEADERS": f"Authorization=Basic%20{OTLP_TOKEN}",
+                "KB_DEPLOYMENT_ENVIRONMENT": "production",
+                "KB_TRACE_CONTENT": "all",
+            },
+            "KB_TRACE_CONTENT: all refused in production, anomalies or none",
+        ),
     ],
     ids=[
         "no-key",
@@ -214,6 +227,8 @@ def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
         "otlp-without-headers",
         "otlp-without-environment",
         "otel-variable",
+        "content-without-export",
+        "content-all-in-production",
     ],
 )
 def test_serve_ai_exits_2_and_names_the_variable_refused(
@@ -300,6 +315,7 @@ def test_serve_ai_with_export_names_its_environment_never_its_endpoint_nor_its_h
             "KB_OTLP_ENDPOINT": "https://otlp.example.net/otlp",
             "KB_OTLP_HEADERS": f"Authorization=Basic%20{OTLP_TOKEN}",
             "KB_DEPLOYMENT_ENVIRONMENT": "sandbox",
+            "KB_TRACE_CONTENT": "all",
         },
     )
 
@@ -316,7 +332,11 @@ def test_serve_ai_with_export_names_its_environment_never_its_endpoint_nor_its_h
         "https://otlp.example.net/otlp/v1/traces",
         "https://otlp.example.net/otlp/v1/logs",
     ]
-    assert "metrics and traces export: OTLP, environment sandbox" in error_output
+    assert (
+        "metrics and traces export: OTLP, environment sandbox, model content all"
+        in error_output
+    )
+    assert app.state.tracing.content == "all"
     assert "otlp.example.net" not in error_output
     assert OTLP_TOKEN not in error_output
 

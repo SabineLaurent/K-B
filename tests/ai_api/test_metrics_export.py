@@ -6,6 +6,7 @@ import logging
 import math
 import secrets
 import uuid
+from dataclasses import replace
 
 import pytest
 import requests
@@ -93,6 +94,61 @@ def test_without_export_the_environment_is_not_read():
         )
         is None
     )
+
+
+@pytest.mark.parametrize("value", [None, "", "none"])
+def test_the_content_of_the_requests_is_none_by_default(value):
+    environ = EXPORT_ENVIRONMENT | (
+        {} if value is None else {"KB_TRACE_CONTENT": value}
+    )
+
+    assert read_metrics_export_settings_or_refusal(environ) == SETTINGS
+
+
+@pytest.mark.parametrize(
+    ("environment", "content"),
+    [("sandbox", "all"), ("sandbox", "anomalies"), ("production", "anomalies")],
+)
+def test_the_content_of_the_requests_is_read_with_the_export(environment, content):
+    settings = read_metrics_export_settings_or_refusal(
+        EXPORT_ENVIRONMENT
+        | {"KB_DEPLOYMENT_ENVIRONMENT": environment, "KB_TRACE_CONTENT": content}
+    )
+
+    assert settings == replace(SETTINGS, environment=environment, trace_content=content)
+
+
+def test_an_unknown_content_of_the_requests_without_export_is_refused_as_unknown():
+    assert read_metrics_export_settings_or_refusal(
+        {"KB_TRACE_CONTENT": "anomalie"}
+    ) == ("KB_TRACE_CONTENT: 'anomalie' not none nor anomalies nor all")
+
+
+@pytest.mark.parametrize("content", ["all", "anomalies"])
+def test_the_content_of_the_requests_without_export_is_refused(content):
+    assert read_metrics_export_settings_or_refusal({"KB_TRACE_CONTENT": content}) == (
+        "KB_TRACE_CONTENT: set, while the export is off (KB_OTLP_ENDPOINT and"
+        " KB_OTLP_HEADERS)"
+    )
+
+
+def test_the_content_of_the_requests_all_in_production_quotes_no_value():
+    refusal = read_metrics_export_settings_or_refusal(
+        EXPORT_ENVIRONMENT
+        | {"KB_DEPLOYMENT_ENVIRONMENT": "production", "KB_TRACE_CONTENT": "all"}
+    )
+
+    assert "'" not in refusal
+    assert ENDPOINT not in refusal
+    assert TOKEN not in refusal
+
+
+def test_a_variable_of_opentelemetry_is_refused_before_the_content_of_the_requests():
+    refusal = read_metrics_export_settings_or_refusal(
+        {"OTEL_SDK_DISABLED": "true", "KB_TRACE_CONTENT": "all"}
+    )
+
+    assert refusal.startswith("OTEL_SDK_DISABLED: read by the OpenTelemetry SDK")
 
 
 def test_the_settings_give_the_base_and_the_headers_decoded():
@@ -193,6 +249,14 @@ def test_several_headers_are_read():
             {"KB_DEPLOYMENT_ENVIRONMENT": "staging"},
             "KB_DEPLOYMENT_ENVIRONMENT: 'staging' not sandbox nor production",
         ),
+        (
+            {"KB_TRACE_CONTENT": "everything"},
+            "KB_TRACE_CONTENT: 'everything' not none nor anomalies nor all",
+        ),
+        (
+            {"KB_TRACE_CONTENT": "all", "KB_DEPLOYMENT_ENVIRONMENT": "production"},
+            "KB_TRACE_CONTENT: all refused in production, anomalies or none",
+        ),
     ],
     ids=[
         "no-headers",
@@ -216,6 +280,8 @@ def test_several_headers_are_read():
         "not-utf-8",
         "no-environment",
         "staging",
+        "content-unknown",
+        "content-all-in-production",
     ],
 )
 def test_a_setting_of_the_export_refused_is_named_without_its_headers(

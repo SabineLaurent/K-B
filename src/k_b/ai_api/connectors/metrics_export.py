@@ -28,6 +28,8 @@ from k_b.core.config import (
     METRICS_EXPORT_INTERVAL_SECONDS,
     METRICS_EXPORT_TIMEOUT_SECONDS,
     MILLISECONDS_PER_SECOND,
+    TRACE_CONTENTS,
+    TraceContent,
 )
 from k_b.core.outbound import find_url_refusal
 from k_b.core.quoting import quote_value
@@ -43,6 +45,7 @@ EXPORTER_LOGGERS = (
 ENDPOINT_VARIABLE = "KB_OTLP_ENDPOINT"
 HEADERS_VARIABLE = "KB_OTLP_HEADERS"
 ENVIRONMENT_VARIABLE = "KB_DEPLOYMENT_ENVIRONMENT"
+TRACE_CONTENT_VARIABLE = "KB_TRACE_CONTENT"
 OPENTELEMETRY_VARIABLE_PREFIX = "OTEL_"
 # The paths K-B adds to the base endpoint, one per signal.
 METRICS_PATH = "/v1/metrics"
@@ -72,6 +75,8 @@ class MetricsExportSettings:
     # The values hold the token: never logged, never quoted.
     headers: Mapping[str, SecretStr]
     environment: DeploymentEnvironment
+    # The content of the requests to the model sent with the traces (core/config.py).
+    trace_content: TraceContent = "none"
 
     @property
     def metrics_url(self) -> str:
@@ -94,7 +99,8 @@ def read_metrics_export_settings_or_refusal(
     environ: Mapping[str, str],
 ) -> MetricsExportSettings | str | None:
     """The settings of the export, None without its endpoint and its headers, or why a variable
-    is refused, never quoting the headers nor the endpoint."""
+    is refused, never quoting the headers nor the endpoint; the content of the requests to the model
+    is refused without the export, and all in production."""
     opentelemetry_names = sorted(
         name for name in environ if name.startswith(OPENTELEMETRY_VARIABLE_PREFIX)
     )
@@ -107,7 +113,7 @@ def read_metrics_export_settings_or_refusal(
     endpoint = environ.get(ENDPOINT_VARIABLE) or None
     headers_text = environ.get(HEADERS_VARIABLE) or None
     if endpoint is None and headers_text is None:
-        return None
+        return find_content_without_export_refusal(environ)
     if headers_text is None:
         return f"{HEADERS_VARIABLE}: not set, while {ENDPOINT_VARIABLE} is"
     if endpoint is None:
@@ -132,6 +138,39 @@ def read_metrics_export_settings_or_refusal(
             f"{HEADERS_VARIABLE}: not name=value pairs separated by commas, each name a"
             " token, each value printable ASCII once percent-decoded"
         )
+    environment_and_content = read_environment_and_content_or_refusal(environ)
+    if isinstance(environment_and_content, str):
+        return environment_and_content
+    environment, trace_content = environment_and_content
+    return MetricsExportSettings(
+        base_url=endpoint.rstrip("/"),
+        headers=headers,
+        environment=environment,
+        trace_content=trace_content,
+    )
+
+
+def find_content_without_export_refusal(environ: Mapping[str, str]) -> str | None:
+    """KB_TRACE_CONTENT set while the export is off, refused: texts would be kept in memory for
+    nothing, and the setting would say otherwise; a value out of the list, refused as such; None
+    if it is not set."""
+    trace_content = environ.get(TRACE_CONTENT_VARIABLE) or "none"
+    if trace_content == "none":
+        return None
+    if trace_content not in TRACE_CONTENTS:
+        return find_unknown_content_refusal(trace_content)
+    return (
+        f"{TRACE_CONTENT_VARIABLE}: set, while the export is off"
+        f" ({ENDPOINT_VARIABLE} and {HEADERS_VARIABLE})"
+    )
+
+
+def read_environment_and_content_or_refusal(
+    environ: Mapping[str, str],
+) -> tuple[DeploymentEnvironment, TraceContent] | str:
+    """The environment of the export, required, and the content sent with the traces, none by
+    default; or why one is refused: all in production, as each request to the model would send its
+    items (poc.md, rule 5, exception)."""
     environment = environ.get(ENVIRONMENT_VARIABLE) or None
     if environment is None:
         return (
@@ -142,10 +181,18 @@ def read_metrics_export_settings_or_refusal(
             f"{ENVIRONMENT_VARIABLE}: {quote_value(environment)} not"
             f" {' nor '.join(DEPLOYMENT_ENVIRONMENTS)}"
         )
-    return MetricsExportSettings(
-        base_url=endpoint.rstrip("/"),
-        headers=headers,
-        environment=environment,
+    trace_content = environ.get(TRACE_CONTENT_VARIABLE) or "none"
+    if trace_content not in TRACE_CONTENTS:
+        return find_unknown_content_refusal(trace_content)
+    if trace_content == "all" and environment == "production":
+        return f"{TRACE_CONTENT_VARIABLE}: all refused in production, anomalies or none"
+    return environment, trace_content
+
+
+def find_unknown_content_refusal(trace_content: str) -> str:
+    return (
+        f"{TRACE_CONTENT_VARIABLE}: {quote_value(trace_content)} not"
+        f" {' nor '.join(TRACE_CONTENTS)}"
     )
 
 

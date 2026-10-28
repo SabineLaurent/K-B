@@ -4412,6 +4412,80 @@ a donné son « go » le 2026-10-27 ; celles de Sabine sont dites comme telles.
   version. Limite assumée : la montée de version se fait à la main, en relisant ces modules. —
   branche `feat/trace-digest-steps`
 
+## 2026-10-28
+
+### Traces : le contenu des appels au modèle, sous réglage (#347)
+
+Décisions D1 et D2 de Sabine (27/10), sa précision de D1 (28/10), et les choix du plan court de la
+PR 2 (time-knight, relu par un sous-agent, validé par Sabine le 2026-10-28) ; celles de Sabine sont
+dites comme telles.
+
+- **Le contenu d'un appel au modèle (la consigne, les champs des items envoyés, la sortie) part vers
+  Grafana Cloud, dans un enregistrement de journal OTLP `gen_ai.client.inference.operation.details`
+  par requête, rattaché à son `chat`, sous le réglage `KB_TRACE_CONTENT` : `none` par défaut,
+  `anomalies`, ou `all`, refusé au démarrage en production.** Piste de Sabine du 2026-10-26 (« c'est
+  important de connaître ce qui a fait le choix du llm surtout en phase de dev. Mais aussi en prod
+  quand quelque chose sort des clous ») ; texte de l'exception à la règle 5 de `poc.md` validé par
+  Sabine le 2026-10-27 (D2, « je valide D2 »). **Inverse** le critère de #163, « texte des prompts
+  jamais émis » (réécrit le 2026-10-27 avec l'accord de Sabine), et la phrase de l'entrée du
+  2026-10-27 « sans aucun texte » pour ce seul enregistrement ; ce qui a changé : l'essai du 27/10
+  a retiré 37 affirmations, dont les codes ne disent pas si le refus était juste. Options écartées :
+  le contenu en attributs de span (Grafana Cloud Traces les coupe à 2 Ko) ; un stockage externe
+  avec une référence sur le span, l'usage que la convention recommande en production pour ses
+  droits d'accès séparés (un second service à tenir pour une utilisatrice) ; Langfuse (un
+  sous-traitant de plus, suite du projet) ; `OTEL_INSTRUMENTATION_GENAI_CAPTURE_CONTENT` (K-B refuse
+  toute variable `OTEL_*`). La règle 8 de `poc.md` (« une sortie hors schéma n'est jamais écrite »)
+  vise le coffre et la réponse de l'API, à cause de l'injection ; elle reçoit une phrase qui le dit
+  (accord de Sabine du 2026-10-28, sur la revue de sécurité) : le contenu envoyé, sortie refusée
+  comprise, reste une donnée, jamais une consigne, en chaîne échappée dans un corps de journal. Le
+  texte de D2 est corrigé le même jour avec son accord : le masquage retire les adresses web
+  partout, mais les logins `@…` des seules notes d'une release, et jamais une adresse mail (erreur de
+  la proposition de time-knight du 27/10, trouvée par la revue de sécurité). Limites
+  assumées : des données personnelles (un login dans un nom de dépôt, un nom en texte libre) partent
+  chez un sous-traitant, dont le DPA doit être signé avant le premier envoi ; leur purge n'est pas
+  codée par K-B, c'est la rétention de Grafana Cloud (14 jours dans l'offre gratuite) ; le contenu
+  se lit avec les traces, sans droits séparés. — branche `feat/trace-model-content`
+- **Un appel est en anomalie s'il finit en `llm_invalid_output`, `llm_truncated`,
+  `llm_content_filtered` ou `llm_timeout`, s'il a été relancé après le refus d'un contrôle, ou si
+  son lot de classement a laissé des items sans réponse ; `anomalies` envoie chacune de ses
+  requêtes.** Décision de Sabine du 2026-10-27 (D1, « je valide D1 »), sur la proposition de
+  time-knight modifiée par lui. Pourquoi : le contenu explique ces cas. Ne sont pas des anomalies :
+  `llm_rate_limited` et `llm_unavailable`, dont la cause est le fournisseur (minimisation) ; une
+  affirmation retirée (les 8 sujets en avaient à l'essai du 27/10 : `anomalies` vaudrait presque
+  `all`), dont le pourquoi s'enquête en bac à sable avec `all`. **Précisée par Sabine le
+  2026-10-28** (« Pas une anomalie ») : un `llm_timeout` posé par le délai de la demande avant la
+  relance d'un 429, d'un 5xx ou d'une erreur de transport n'en est pas une, pour la même raison ;
+  dans un projet courant, ce cas se lit sur le span en erreur et les métriques. **Étendue par
+  Sabine le même jour** (« Pas une anomalie », sur les deux revues de la PR) à la relance qui part,
+  son délai réduit au temps restant, puis expire : un `llm_timeout` dont la première tentative a eu
+  un 429, un 5xx ou une erreur de transport n'est pas une anomalie (`LlmCall.first_outcome`). Un
+  délai dépassé dès la première tentative (le modèle trop lent) en reste une. Option écartée pour
+  ce cas : D1 à la lettre (aucun code, mais les items partent quand le fournisseur limite près du
+  délai). Un refus de contrôle prime : relancé puis en 429 ou en 5xx, l'appel est en anomalie. D1
+  vit dans `connectors/llm_client.py` (`is_anomaly`, `trace_contents`), non dans `tracing.py` comme
+  l'issue le prévoyait : les couches interdisent à `tracing.py` d'importer `LlmCall`. Variante
+  écartée pour l'instant : envoyer en production le texte des seules affirmations retirées. À
+  rejuger après #210. — branche `feat/trace-model-content`
+- **Le corps de l'enregistrement est une chaîne JSON aux trois clés de la convention
+  (`system_instructions`, `input_messages`, `output_messages`), coupée au-delà de 200 000 octets en
+  donnant à chaque texte la même longueur, la plus grande qui tient.** Choix de time-knight (plan
+  validé par Sabine le 2026-10-28). Pourquoi : Loki refuse une ligne de plus de 256 Ko, et la ligne
+  qu'il reçoit est ce corps même, dont K-B mesure les octets ; la structure garde le sens d'un
+  contenu coupé. Options écartées : un dictionnaire, que le récepteur convertit en JSON avec son
+  propre échappement (taille non garantie) ; ne couper que le message utilisateur (le plus long en
+  pratique, pas en garantie). `output_messages` est vide sans sortie, le corps d'une erreur pouvant
+  citer l'entrée. — branche `feat/trace-model-content`
+- **`KB_TRACE_CONTENT` se lit avec les autres variables de l'export, et se refuse posé sans
+  l'export ; les textes ne sont gardés dans un appel (`LlmCall.contents`) que si le réglage n'est
+  pas `none`, et jamais dans son `repr`.** Choix de time-knight (plan validé par Sabine le
+  2026-10-28). Pourquoi : `KB_DEPLOYMENT_ENVIRONMENT`, dont dépend le refus en production, n'est lu
+  que là ; posé sans export, le réglage garderait des textes en mémoire pour rien et dirait le
+  contraire de ce qui part, comme `KB_OTLP_HEADERS` sans `KB_OTLP_ENDPOINT`, déjà refusé. Options
+  écartées : une lecture à part dans `trace_export.py` (une branche de refus et un paramètre de
+  plus) ; accepter le réglage sans export ; descendre un drapeau dans les trois fonctions qui lisent
+  la réponse, la sortie restant de toute façon en mémoire dans `call_model`. —
+  branche `feat/trace-model-content`
+
 ## Décisions encore ouvertes
 
 - **Un sujet secondaire par item au classement** (2026-10-26, idée de Sabine) : une case de sujet
@@ -4533,14 +4607,9 @@ a donné son « go » le 2026-10-27 ; celles de Sabine sont dites comme telles.
   tire son intérêt de ce texte, qui contient les noms des auteurs. **Précisée le 2026-10-20** :
   l'outil est Grafana Cloud (« Squelette E1 E3 : cadrage du 20/10 », décision 4) ; la question reste
   ouverte jusqu'à #163. **Précisée le 2026-10-27** : les traces partent sans texte (#345) ; le
-  contenu des appels au modèle viendra par une PR à part (voir la décision ouverte suivante).
-- **Traces : le contenu des appels au modèle** (2026-10-27, plan des traces, PR 2) : un
-  enregistrement `gen_ai.client.inference.operation.details` (consigne, message utilisateur,
-  réponse), réglé par `KB_TRACE_CONTENT` (`none`, `anomalies`, `all`). Attend trois choses : le DPA
-  de Grafana Labs signé, le contenu portant des données personnelles ; la décision de Sabine sur ce
-  qu'est une anomalie (D1 : 50 affirmations retirées sur 92 dans l'essai 1 de #210, donc pas
-  `claims_removed > 0`) ; le texte de l'amendement de la règle 5 de `poc.md` (D2). Le critère de
-  #163 (« texte des prompts jamais émis ») est à réécrire à ce moment, avec l'accord de Sabine.
+  contenu des appels au modèle viendra par une PR à part. **Tranchée pour l'API IA des fiches le
+  2026-10-28** (« Traces : le contenu des appels au modèle, sous réglage (#347) ») ; reste ouverte
+  pour le wiki.
 - **Wiki : forme du contrat `.md` *cleansed*** (2026-10-12) : l'ETL écrit en SQLite ; ce que la
   partie LLM reçoit d'un papier Zotero (texte du PDF, métadonnées, surlignages) est à fixer avant
   le code.

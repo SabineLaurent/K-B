@@ -334,3 +334,11 @@ TRACE_QUEUE_SIZE = 512
 # bounds no total, as the timeout of an export bounds each wait of the socket only: the stop runs
 # in a thread of its own, left behind when the time is up.
 TRACE_STOP_TIMEOUT_SECONDS = 2 * TRACE_EXPORT_TIMEOUT_SECONDS
+# The content of a request to the model (prompt, items sent, output), a log record of its own sent
+# with the traces when KB_TRACE_CONTENT lets it (.claude/rules/poc.md, rule 5, exception): none, the
+# default; the calls in anomaly only (decision D1 of Sabine, 2026-10-27); all, in the sandbox only.
+type TraceContent = Literal["none", "anomalies", "all"]
+TRACE_CONTENTS: tuple[TraceContent, ...] = get_args(TraceContent.__value__)
+# The longest body of such a record, in bytes of UTF-8: Loki refuses a line beyond 256 KB, the
+# margin is left to its own counting. Beyond, each text is cut, the structure kept.
+MAX_CONTENT_EVENT_BYTES = 200_000
