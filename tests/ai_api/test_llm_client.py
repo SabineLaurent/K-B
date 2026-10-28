@@ -17,6 +17,7 @@ from k_b.ai_api.connectors.llm_client import (
     is_json_without_key_twice,
     summarize,
     to_failure,
+    trace_contents,
 )
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
 from k_b.ai_api.connectors.llm_settings import (
@@ -1015,3 +1016,192 @@ def test_a_request_without_answer_is_a_chat_span_without_tokens(recorded_traces)
     assert span.attributes["error.type"] == "llm_timeout"
     assert "gen_ai.usage.input_tokens" not in span.attributes
     assert "http.response.status_code" not in span.attributes
+
+
+CONTENT_EVENT = "gen_ai.client.inference.operation.details"
+REFUSED_OUTPUT = json.dumps({"subject": "refused", "count": 1})
+
+
+@pytest.mark.parametrize(
+    "steps",
+    [[completion()], [response(500), completion()]],
+    ids=["ok", "retried"],
+)
+def test_with_content_none_the_call_keeps_no_text_and_sends_none(
+    recorded_traces, steps
+):
+    tracing = recorded_traces.build_tracing("none")
+
+    llm_call, _, _ = call(steps, tracing=tracing)
+    trace_contents(llm_call, tracing=tracing)
+
+    assert llm_call.contents == ()
+    assert recorded_traces.find_log_records(CONTENT_EVENT) == []
+
+
+def test_with_content_all_each_request_is_a_content_tied_to_its_chat_span(
+    recorded_traces,
+):
+    tracing = recorded_traces.build_tracing("all")
+
+    llm_call, _, _ = call(
+        [completion(REFUSED_OUTPUT), completion()],
+        check_output=refuse_the_subject_once(),
+        tracing=tracing,
+    )
+    trace_contents(llm_call, tracing=tracing)
+
+    chat_spans = recorded_traces.find_spans("chat replay")
+    records = recorded_traces.find_log_records(CONTENT_EVENT)
+    assert [record.span_id for record in records] == [
+        span.context.span_id for span in chat_spans
+    ]
+    first, second = (json.loads(record.body) for record in records)
+    user_message = json.dumps(USER_DATA, ensure_ascii=False)
+    assert first["input_messages"][0]["parts"][0]["content"] == user_message
+    assert first["system_instructions"][0]["content"] == SYSTEM_PROMPT
+    # The output refused is the one to read, and the retry carries its reminder.
+    assert first["output_messages"][0]["parts"][0]["content"] == REFUSED_OUTPUT
+    assert second["system_instructions"][0]["content"] == (
+        f"{SYSTEM_PROMPT}\n\n{RETRY_REMINDERS['subject']}"
+    )
+    assert second["output_messages"][0]["parts"][0]["content"] == VALID_OUTPUT
+    # Never in the repr of the call, which a test or a log may show.
+    assert "refused" not in repr(llm_call)
+    assert "A model" not in repr(llm_call)
+
+
+@pytest.mark.parametrize(
+    "steps",
+    [
+        [response(429, retry_after="1"), response(429, retry_after="1")],
+        [response(500), response(503)],
+        [response(400, json.dumps({"error": {"code": "content_filter"}}))],
+        [{"kind": "timeout"}],
+        [response(200, "not a completion")],
+    ],
+    ids=["429", "5xx", "400-filtered", "timeout", "200-not-a-completion"],
+)
+def test_a_request_without_output_text_keeps_no_output(recorded_traces, steps):
+    llm_call, _, _ = call(steps, tracing=recorded_traces.build_tracing("all"))
+
+    assert llm_call.contents
+    assert all(content.output_text is None for content in llm_call.contents)
+
+
+def refuse_once_with_a_clock(clock, seconds):
+    """A check that refuses the first output once seconds have passed."""
+
+    def check(output):
+        clock.now += seconds
+        return "subject"
+
+    return check
+
+
+@pytest.mark.parametrize(
+    ("steps", "check_output", "is_sent"),
+    [
+        ([completion("not json"), completion("not json")], None, True),
+        ([completion(finish_reason="length")], None, True),
+        ([completion(finish_reason="content_filter")], None, True),
+        ([{"kind": "timeout"}], None, True),
+        ([completion(), completion()], refuse_the_subject_once, True),
+        ([completion(), response(500)], refuse_the_subject_once, True),
+        ([completion(), response(429, retry_after="1")], refuse_the_subject_once, True),
+        ([completion()], None, False),
+        (
+            [response(429, retry_after=str(LLM_RETRY_AFTER_MAX_SECONDS + 1))],
+            None,
+            False,
+        ),
+        ([response(400)], None, False),
+        ([response(429, retry_after="1"), response(429, retry_after="1")], None, False),
+        ([response(500), response(500)], None, False),
+        ([response(429, retry_after="1"), completion()], None, False),
+        ([response(500), completion()], None, False),
+    ],
+    ids=[
+        "invalid-output",
+        "truncated",
+        "content-filtered",
+        "timeout-of-the-model",
+        "ok-after-a-refusal",
+        "refusal-then-5xx",
+        "refusal-then-429",
+        "ok",
+        "rate-limited",
+        "unavailable",
+        "rate-limited-twice",
+        "unavailable-twice",
+        "429-then-ok",
+        "5xx-then-ok",
+    ],
+)
+def test_with_content_anomalies_only_a_call_in_anomaly_is_sent(
+    recorded_traces, steps, check_output, is_sent
+):
+    tracing = recorded_traces.build_tracing("anomalies")
+
+    llm_call, _, _ = call(
+        steps,
+        check_output=accept_every_output if check_output is None else check_output(),
+        tracing=tracing,
+    )
+    trace_contents(llm_call, tracing=tracing)
+
+    records = recorded_traces.find_log_records(CONTENT_EVENT)
+    assert len(records) == (llm_call.attempts if is_sent else 0)
+
+
+@pytest.mark.parametrize(
+    ("step", "is_sent"),
+    [
+        (response(429, retry_after="2"), False),
+        (response(500), False),
+        ({"kind": "transport_error", "error": "connect"}, False),
+        (completion(), True),
+    ],
+    ids=["429", "5xx", "transport-error", "refused-by-a-check"],
+)
+def test_a_retry_cut_by_the_deadline_is_an_anomaly_only_after_a_refusal(
+    recorded_traces, step, is_sent
+):
+    # Precision of D1 by Sabine, 2026-10-28: a timeout set by the deadline before the retry of a
+    # failure of the provider is no anomaly; one before the retry of an output refused is.
+    clock = Clock()
+    deadline = Deadline.after(MIN_SECONDS_FOR_LLM_REQUEST + 1, clock)
+    tracing = recorded_traces.build_tracing("anomalies")
+
+    llm_call, transport, _ = call(
+        [step, completion()],
+        check_output=refuse_once_with_a_clock(clock, 2),
+        deadline=deadline,
+        tracing=tracing,
+    )
+    trace_contents(llm_call, tracing=tracing)
+
+    assert (llm_call.outcome, len(transport.requests)) == ("llm_timeout", 1)
+    assert llm_call.cut_outcome in {
+        "llm_rate_limited",
+        "llm_unavailable",
+        "llm_invalid_output",
+    }
+    assert len(recorded_traces.find_log_records(CONTENT_EVENT)) == (1 if is_sent else 0)
+
+
+def test_a_call_whose_batch_left_items_unanswered_is_sent_with_anomalies(
+    recorded_traces,
+):
+    tracing = recorded_traces.build_tracing("anomalies")
+
+    llm_call, _, _ = call([completion()], tracing=tracing)
+    trace_contents(llm_call, tracing=tracing, has_unanswered=True)
+
+    assert len(recorded_traces.find_log_records(CONTENT_EVENT)) == 1
+
+
+def test_a_call_not_cut_by_the_deadline_has_no_cut_outcome():
+    llm_call, _, _ = call([completion()])
+
+    assert llm_call.cut_outcome is None

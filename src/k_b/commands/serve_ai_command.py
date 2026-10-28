@@ -70,12 +70,13 @@ def run_serve_ai(environ: Mapping[str, str]) -> int:
     # mistake says it.
     logger.info("LLM provider %s, model %s", llm_settings.provider, llm_settings.model)
     logger.info("digest window by default: %s days", settings.window_days)
-    # The environment, never the endpoint nor the headers.
+    # The environment and the content sent with the traces, never the endpoint nor the headers.
     logger.info(
         "metrics and traces export: %s",
         "off"
         if export_settings is None
-        else f"OTLP, environment {export_settings.environment}",
+        else f"OTLP, environment {export_settings.environment},"
+        f" model content {export_settings.trace_content}",
     )
     # One resource for the three providers.
     resource = build_resource(

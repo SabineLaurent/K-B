@@ -1,11 +1,13 @@
-"""The traces of a digest request: a span per step and per request to the model, and the
-evaluation of each claim removed, a log record tied to its span (docs/fiches-veille.md, "Traces").
-The API of OpenTelemetry only; its SDK is in connectors/trace_export.py."""
+"""The traces of a digest request: a span per step and per request to the model, the evaluation of
+each claim removed, and, when KB_TRACE_CONTENT lets it, the content of a request to the model, each a
+log record tied to its span (docs/fiches-veille.md, "Traces"). The API of OpenTelemetry only; its
+SDK is in connectors/trace_export.py."""
 
+import json
 import time
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from opentelemetry import trace
@@ -21,7 +23,11 @@ from opentelemetry.trace import (
     Tracer,
 )
 
-from k_b.core.config import MAX_TRACE_ATTRIBUTE_BYTES
+from k_b.core.config import (
+    MAX_CONTENT_EVENT_BYTES,
+    MAX_TRACE_ATTRIBUTE_BYTES,
+    TraceContent,
+)
 
 # The instrumentation scope of the spans and of the log records.
 SCOPE_NAME = "k_b.ai_api"
@@ -42,6 +48,11 @@ CLAIM_CHECKS_EVALUATION = "k_b.claim_checks"
 FAILED_LABEL = "fail"
 # Beside the explanation of an evaluation, when its codes did not all fit.
 REASONS_TRUNCATED = "k_b.claim.reasons_truncated"
+# The content of a request to the model: the event of the semantic conventions for generative AI,
+# its texts in the body, which Loki keeps up to 256 KB, not in attributes (.claude/rules/poc.md,
+# rule 5, exception).
+CONTENT_EVENT = "gen_ai.client.inference.operation.details"
+CONTENT_TRUNCATED = "k_b.content_truncated"
 
 
 @dataclass(frozen=True)
@@ -50,6 +61,18 @@ class SpanRef:
 
     span_context: SpanContext
     ended_ns: int
+
+
+@dataclass(frozen=True)
+class AttemptContent:
+    """The texts of a request to the model, kept when KB_TRACE_CONTENT lets it: the system prompt
+    sent, its reminder too on a retry, the user message, and the output of a 200, None otherwise
+    (the body of an error may quote the input). Never in a repr."""
+
+    span_ref: SpanRef
+    system_prompt: str = field(repr=False)
+    user_message: str = field(repr=False)
+    output_text: str | None = field(repr=False)
 
 
 class Step:
@@ -105,6 +128,9 @@ class Tracing:
 
     tracer: Tracer
     logger: Logger
+    # Whose content the requests to the model keep; the caller of record_content decides which
+    # are sent (connectors/llm_client.py, trace_contents).
+    content: TraceContent = "none"
 
     @contextmanager
     def step(
@@ -160,6 +186,25 @@ class Tracing:
             event_name=EVALUATION_EVENT,
         )
 
+    def record_content(self, content: AttemptContent) -> None:
+        """The content of a request to the model, a log record tied to its span at the instant it
+        ended: its texts in a JSON body shaped as the messages of the conventions, cut to
+        MAX_CONTENT_EVENT_BYTES; its attributes say only that it was."""
+        body, is_cut = build_content_body(content)
+        attributes: dict[str, str | bool] = {"gen_ai.operation.name": "chat"}
+        if is_cut:
+            attributes[CONTENT_TRUNCATED] = True
+        self.logger.emit(
+            timestamp=content.span_ref.ended_ns,
+            context=trace.set_span_in_context(
+                NonRecordingSpan(content.span_ref.span_context)
+            ),
+            severity_number=SeverityNumber.DEBUG,
+            body=body,
+            attributes=attributes,
+            event_name=CONTENT_EVENT,
+        )
+
 
 # Nothing recorded: the default of the functions that take tracing, for their tests.
 TRACING_OFF = Tracing(NoOpTracer(), NoOpLogger(SCOPE_NAME))
@@ -184,3 +229,52 @@ def count_fitting(parts: Sequence[str]) -> int:
         if length > MAX_TRACE_ATTRIBUTE_BYTES:
             return count
     return len(parts)
+
+
+def build_content_body(content: AttemptContent) -> tuple[str, bool]:
+    """The body of a content record, in JSON, and whether its texts were cut: each to the longest
+    length that fits MAX_CONTENT_EVENT_BYTES, the same for all, every key and part kept."""
+    body = encode_content_body(content, None)
+    if len(body.encode()) <= MAX_CONTENT_EVENT_BYTES:
+        return body, False
+    # The size grows with the length kept, and a length of 0 fits: the structure is small.
+    low, high = (
+        0,
+        max(
+            len(content.system_prompt),
+            len(content.user_message),
+            len(content.output_text or ""),
+        ),
+    )
+    while low < high:
+        middle = (low + high + 1) // 2
+        if (
+            len(encode_content_body(content, middle).encode())
+            <= MAX_CONTENT_EVENT_BYTES
+        ):
+            low = middle
+        else:
+            high = middle - 1
+    return encode_content_body(content, low), True
+
+
+def encode_content_body(content: AttemptContent, max_chars: int | None) -> str:
+    """The texts as the conventions shape gen_ai.system_instructions, gen_ai.input.messages and
+    gen_ai.output.messages, each cut to max_chars characters if given; no output without a text."""
+
+    def part(text: str) -> dict[str, str]:
+        return {"type": "text", "content": text[:max_chars]}
+
+    output_messages = (
+        []
+        if content.output_text is None
+        else [{"role": "assistant", "parts": [part(content.output_text)]}]
+    )
+    return json.dumps(
+        {
+            "system_instructions": [part(content.system_prompt)],
+            "input_messages": [{"role": "user", "parts": [part(content.user_message)]}],
+            "output_messages": output_messages,
+        },
+        ensure_ascii=False,
+    )

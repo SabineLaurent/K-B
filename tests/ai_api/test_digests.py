@@ -1182,3 +1182,97 @@ def test_the_trapped_claim_on_a_cve_is_removed_and_the_digest_returned(
     assert agent.claims_removed == 1
     assert agent.items_removed_by_checks == (TRAPPED_ITEM_ID,)
     assert TRAPPED_ITEM_ID not in [source.item_id for source in agent.sources]
+
+
+CONTENT_EVENT = "gen_ai.client.inference.operation.details"
+
+
+def contents_sent(recorded_traces):
+    return recorded_traces.find_log_records(CONTENT_EVENT)
+
+
+def test_with_content_all_each_request_sends_its_content_tied_to_its_span(
+    reading, recorded_traces
+):
+    result, transport = digest_of(
+        reading, VALID_STEPS, tracing=recorded_traces.build_tracing("all")
+    )
+
+    records = contents_sent(recorded_traces)
+    chat_spans = recorded_traces.find_spans("chat replay")
+    assert len(records) == len(transport.requests) == len(chat_spans) == 4
+    assert [record.span_id for record in records] == [
+        span.context.span_id for span in chat_spans
+    ]
+    # The measures of the calls still carry no text (poc.md, rule 5).
+    title = reading.items[0].fields.title
+    assert title in records[0].body
+    assert title not in repr(result.stage_calls)
+
+
+def test_with_content_anomalies_a_batch_with_an_item_unanswered_is_sent(
+    reading, recorded_traces
+):
+    forgotten = classified(no_suitable_subject=[12, 11])
+
+    result, _ = digest_of(
+        reading,
+        [forgotten, *VALID_STEPS[1:]],
+        tracing=recorded_traces.build_tracing("anomalies"),
+    )
+
+    assert result.unanswered == (13,)
+    [record] = contents_sent(recorded_traces)
+    [classify_chat] = [
+        span
+        for span in recorded_traces.find_spans("chat replay")
+        if span.parent.span_id
+        == recorded_traces.find_spans("classify_batch")[0].context.span_id
+    ]
+    assert record.span_id == classify_chat.context.span_id
+
+
+def test_with_content_anomalies_a_failed_classification_is_sent(
+    reading, recorded_traces
+):
+    result, _ = digest_of(
+        reading,
+        [completion("not json"), completion("not json")],
+        tracing=recorded_traces.build_tracing("anomalies"),
+    )
+
+    assert isinstance(result, ClassificationFailure)
+    assert result.state == "llm_invalid_output"
+    assert len(contents_sent(recorded_traces)) == 2
+
+
+def test_with_content_anomalies_a_claim_removed_sends_nothing(reading, recorded_traces):
+    too_long = {**AGENT_CLAIM, "text": "v2.1.287 " + "x" * 400}
+
+    result, _ = digest_of(
+        reading,
+        [classified(), written(SECURITY_CLAIM), written(too_long), written()],
+        tracing=recorded_traces.build_tracing("anomalies"),
+    )
+
+    assert result.digests[1].claims_removed == 1
+    assert contents_sent(recorded_traces) == []
+
+
+def test_with_content_anomalies_a_subject_down_at_the_provider_sends_nothing(
+    reading, recorded_traces
+):
+    result, _ = digest_of(
+        reading,
+        [
+            classified(),
+            written(SECURITY_CLAIM),
+            {"kind": "response", "status": 503},
+            {"kind": "response", "status": 503},
+            written(),
+        ],
+        tracing=recorded_traces.build_tracing("anomalies"),
+    )
+
+    assert result.failed_subjects[0].error == "llm_unavailable"
+    assert contents_sent(recorded_traces) == []

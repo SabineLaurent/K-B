@@ -9,7 +9,12 @@ from dataclasses import dataclass
 
 import httpx2
 
-from k_b.ai_api.connectors.llm_client import LlmCall, LlmFailure, to_failure
+from k_b.ai_api.connectors.llm_client import (
+    LlmCall,
+    LlmFailure,
+    to_failure,
+    trace_contents,
+)
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.stage_calls import Stage, StageCall
@@ -163,8 +168,11 @@ def trace_writing(
     *,
     tracing: Tracing,
 ) -> None:
-    """The result of a writing on its span, by identifiers and counts, and the evaluation of each
-    claim removed, tied to the request whose output was checked."""
+    """The result of a writing on its span, by identifiers and counts, the content of its
+    requests as KB_TRACE_CONTENT lets it, and the evaluation of each claim removed, tied to the
+    request whose output was checked."""
+    # A claim removed is no anomaly (decision D1 of Sabine, 2026-10-27).
+    trace_contents(llm_call, tracing=tracing)
     step.set(
         {
             "k_b.outcome": llm_call.outcome,

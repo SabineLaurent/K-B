@@ -7,6 +7,7 @@ import logging
 import socket
 import threading
 import time
+from dataclasses import replace
 
 import pytest
 from opentelemetry.exporter.otlp.proto.http import Compression
@@ -89,6 +90,24 @@ def test_without_settings_no_exporter_is_built(built_exporters):
     export.stop_logs()
 
     assert built_exporters == []
+
+
+@pytest.mark.parametrize(
+    ("settings", "content"),
+    [
+        (None, "none"),
+        (SETTINGS, "none"),
+        (replace(SETTINGS, trace_content="anomalies"), "anomalies"),
+        (replace(SETTINGS, trace_content="all"), "all"),
+    ],
+    ids=["no-export", "default", "anomalies", "all"],
+)
+def test_the_tracing_keeps_the_content_the_settings_give(
+    built_exporters, settings, content
+):
+    export = TraceExport.from_settings(settings, build_resource(None))
+
+    assert export.build_tracing().content == content
 
 
 def test_each_exporter_gets_its_url_the_headers_and_a_session_blind_to_the_environment(

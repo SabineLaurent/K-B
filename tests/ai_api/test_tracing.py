@@ -1,11 +1,24 @@
 """The façade of the traces: a span per step, its failure named, its attributes cut, and the
 evaluation of a claim removed tied to the request to the model."""
 
+import json
+
 import pytest
+from opentelemetry._logs import SeverityNumber
 from opentelemetry.trace import SpanKind, StatusCode
 
-from k_b.ai_api.tracing import TRACING_OFF, count_fitting, cut_ids, cut_text
-from k_b.core.config import MAX_TRACE_ATTRIBUTE_BYTES
+from k_b.ai_api.tracing import (
+    TRACING_OFF,
+    AttemptContent,
+    build_content_body,
+    count_fitting,
+    cut_ids,
+    cut_text,
+    encode_content_body,
+)
+from k_b.core.config import MAX_CONTENT_EVENT_BYTES, MAX_TRACE_ATTRIBUTE_BYTES
+
+CONTENT_EVENT = "gen_ai.client.inference.operation.details"
 
 
 class ItemTextError(Exception):
@@ -180,3 +193,96 @@ def test_count_fitting_counts_the_parts_that_fit_whole():
     assert count_fitting(["a" * MAX_TRACE_ATTRIBUTE_BYTES]) == 1
     assert count_fitting(["a" * MAX_TRACE_ATTRIBUTE_BYTES, "b"]) == 1
     assert count_fitting(["é" * 1024, "b"]) == 1
+
+
+def ended_step_ref(tracing):
+    with tracing.step("chat replay", "client") as step:
+        pass
+    return step.ref
+
+
+def test_a_content_is_a_debug_log_record_tied_to_the_end_of_its_span(recorded_traces):
+    tracing = recorded_traces.build_tracing("all")
+    ref = ended_step_ref(tracing)
+
+    tracing.record_content(
+        AttemptContent(ref, "Sort the items.", '{"items": []}', '{"i1": "models"}')
+    )
+
+    [span] = recorded_traces.spans.get_finished_spans()
+    [log_record] = recorded_traces.find_log_records(CONTENT_EVENT)
+    assert (log_record.trace_id, log_record.span_id) == (
+        span.context.trace_id,
+        span.context.span_id,
+    )
+    assert log_record.timestamp == span.end_time
+    assert log_record.severity_number is SeverityNumber.DEBUG
+    assert dict(log_record.attributes) == {"gen_ai.operation.name": "chat"}
+    assert json.loads(log_record.body) == {
+        "system_instructions": [{"type": "text", "content": "Sort the items."}],
+        "input_messages": [
+            {"role": "user", "parts": [{"type": "text", "content": '{"items": []}'}]}
+        ],
+        "output_messages": [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": '{"i1": "models"}'}],
+            }
+        ],
+    }
+
+
+def test_a_content_without_output_text_has_no_output_message():
+    body, is_cut = build_content_body(
+        AttemptContent(ended_step_ref(TRACING_OFF), "Sort.", "{}", None)
+    )
+
+    assert json.loads(body)["output_messages"] == []
+    assert is_cut is False
+
+
+def test_a_content_beyond_the_maximum_is_cut_keeping_its_structure(recorded_traces):
+    tracing = recorded_traces.build_tracing("all")
+    # Each character takes two bytes once in JSON: é in UTF-8, the quote and the line feed
+    # escaped, as in the user message, itself JSON.
+    long_text = 'é"\n' * 100_000
+    content = AttemptContent(
+        ended_step_ref(tracing), "Sort the items.", long_text, long_text
+    )
+
+    tracing.record_content(content)
+
+    [log_record] = recorded_traces.find_log_records(CONTENT_EVENT)
+    assert len(log_record.body.encode()) <= MAX_CONTENT_EVENT_BYTES
+    body = json.loads(log_record.body)
+    assert list(body) == ["system_instructions", "input_messages", "output_messages"]
+    [system_part] = body["system_instructions"]
+    [user_part] = body["input_messages"][0]["parts"]
+    [output_part] = body["output_messages"][0]["parts"]
+    assert system_part["content"] == "Sort the items."
+    assert long_text.startswith(user_part["content"])
+    assert user_part["content"] == output_part["content"]
+    # The longest cut that fits: one character more would not.
+    kept = len(user_part["content"])
+    assert (
+        len(encode_content_body(content, kept + 1).encode()) > MAX_CONTENT_EVENT_BYTES
+    )
+    assert log_record.attributes["k_b.content_truncated"] is True
+
+
+def test_a_content_within_the_maximum_is_whole():
+    text = "é" * 1000
+    body, is_cut = build_content_body(
+        AttemptContent(ended_step_ref(TRACING_OFF), text, text, text)
+    )
+
+    assert is_cut is False
+    assert json.loads(body)["input_messages"][0]["parts"][0]["content"] == text
+
+
+def test_the_repr_of_a_content_holds_no_text():
+    content = AttemptContent(
+        ended_step_ref(TRACING_OFF), "consigne", "item piégé", "sortie"
+    )
+
+    assert not any(text in repr(content) for text in ("consigne", "piégé", "sortie"))
