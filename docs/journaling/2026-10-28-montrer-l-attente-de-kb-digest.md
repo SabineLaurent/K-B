@@ -48,12 +48,12 @@ pourra servir à `kb collect` et `kb import` si tu le décides.
 ```python
 stream = sys.stderr
 display = (
-    SpinnerRow(stream, waited_for, read_timeout_seconds)
+    SpinnerRow(stream, waited_for)
     if stream.isatty()
     else WaitLogLine(waited_for, read_timeout_seconds)
 )
 ```
-(`src/k_b/commands/wait_display.py:90-95`)
+(`src/k_b/commands/wait_display.py:87-92`)
 
 `isatty()` dit si le flux est relié à un terminal. On teste la sortie d'erreur, là où l'attente
 s'écrit, et on la lit une seule fois : c'est le même objet que le `StreamHandler` du journal
@@ -73,7 +73,7 @@ self.write("\r" + " " * (self.read_columns() - 1) + "\r")
 ...
 return get_terminal_size(self.stream.fileno()).columns or FALLBACK_COLUMNS
 ```
-(`src/k_b/commands/wait_display.py:50`, `:54`, `:62`)
+(`src/k_b/commands/wait_display.py:47`, `:51`, `:59`)
 
 Une ligne plus large que le terminal passerait à la ligne : `\r` ne remonterait qu'au début de la
 dernière rangée, et chaque image en ajouterait une. Le texte est donc coupé à la largeur moins une
@@ -81,6 +81,13 @@ colonne, lue sur le descripteur du flux lui-même (`shutil.get_terminal_size` li
 `COLUMNS`). Un terminal qui annonce 0 colonne est pris pour 80, le repli de `shutil`. L'effacement
 couvre toute la rangée, pour emporter aussi le `^C` que le terminal affiche lui-même au Ctrl-C ; il
 n'utilise que `\r` et des espaces, sans séquence d'échappement.
+
+La ligne est courte, `⠹ waiting for the digests: 25 s` (31 caractères) : à ton essai du 28/10, une
+première version avec `, read timeout 240 s` (51 caractères) laissait des débris quand tu rétrécissais
+la fenêtre. Le terminal replie alors la ligne **déjà écrite** sur plusieurs rangées, et `\r` ne revient
+qu'au début de la dernière : la coupe ne peut rien pour une ligne écrite avant le redimensionnement. Le
+délai reste dans la ligne écrite juste avant la demande. Sous 32 colonnes, la limite demeure (section
+« Zones non vérifiées »).
 
 ### Un fil d'exécution, un `Event`, un `join`
 
@@ -94,10 +101,10 @@ finally:
         thread.join()
     display.clear()
 ```
-(`src/k_b/commands/wait_display.py:103-114`)
+(`src/k_b/commands/wait_display.py:100-111`)
 
 La demande bloque le fil principal dans la lecture de la réponse : l'affichage tourne donc dans un
-second fil, `wait-display`. Sa boucle est `while not stopped.wait(display.period_seconds)` (`:130`) :
+second fil, `wait-display`. Sa boucle est `while not stopped.wait(display.period_seconds)` (`:127`) :
 `Event.wait(t)` dort au plus `t` secondes et rend `True` dès que l'événement est levé. Le `finally`
 lève l'événement, attend la fin du fil, puis efface la ligne. Le `join` compte : sans lui, une image
 pourrait s'écrire après l'effacement, ou une ligne de journal après que `run_log.py` a retiré ses
@@ -114,7 +121,7 @@ try:
 finally:
     signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
 ```
-(`src/k_b/commands/wait_display.py:120-124`)
+(`src/k_b/commands/wait_display.py:117-121`)
 
 C'est le point le plus subtil. Un signal envoyé au processus (Ctrl-C, `docker stop`) est remis par le
 système à **un** fil qui ne le bloque pas. Python exécute toujours son gestionnaire dans le fil
@@ -171,13 +178,13 @@ puis affirmé dans le test.
 
 1. **Pourquoi un fil, et pas `asyncio` ?** La demande est synchrone (`httpx2.Client`) et bloque le fil
    principal ; un second fil qui ne fait qu'écrire est le plus petit changement. `asyncio` obligerait à
-   réécrire le client et la commande (`wait_display.py:97-102`).
+   réécrire le client et la commande (`wait_display.py:94-99`).
 2. **Que se passe-t-il sur un Ctrl-C pendant l'attente ?** Le signal ne peut arriver qu'au fil principal
-   (masque hérité, `:120-124`) ; il interrompt la lecture ; le `finally` arrête le fil et efface la
-   ligne (`:107-114`) ; Python affiche sa trace habituelle, comme avant.
+   (masque hérité, `:117-121`) ; il interrompt la lecture ; le `finally` arrête le fil et efface la
+   ligne (`:104-111`) ; Python affiche sa trace habituelle, comme avant.
 3. **Pourquoi l'animation n'est-elle pas dans `kb.log` ?** Elle n'est ni un résultat ni un déroulé à
    relire : elle ne vit que le temps de l'attente (règle 3 de `conventions.md`). Hors terminal, la ligne
-   datée la remplace, et va, elle, dans `kb.log` (`:73-79`).
+   datée la remplace, et va, elle, dans `kb.log` (`:70-76`).
 4. **La ligne prouve-t-elle que l'API IA avance ?** Non : elle prouve que `kb` attend toujours, et le
    délai de 240 s garantit que l'attente finit. Seule l'API IA pourrait dire « sujet 3 sur 8 » : c'est
    #350.
@@ -187,8 +194,12 @@ puis affirmé dans le test.
 
 ## Zones non vérifiées
 
-- **Le rendu réel dans ton terminal** n'est pas encore vu : c'est l'essai sans modèle (`nc -l 8099`,
-  `KB_AI_API_URL=http://127.0.0.1:8099`) prévu avec la PR.
+- **Le rendu réel** : vu par toi le 28/10, sans modèle (`nc -l 8099`, `KB_AI_API_URL=http://127.0.0.1:8099`) :
+  l'animation tourne et le compteur avance. La ligne raccourcie qui a suivi n'a pas été revue en vrai.
+- **Limite connue, acceptée (ta décision du 28/10)** : une fenêtre rétrécie sous la longueur de la ligne
+  pendant l'attente laisse des morceaux de lignes à l'écran, que ni les images suivantes ni l'effacement
+  n'atteignent. L'éviter demanderait des séquences de contrôle du terminal et le suivi des
+  redimensionnements ; c'est écarté. Décrit dans `docs/fiches-veille.md`, « Console ».
 - **Le test SIGTERM ne prouve pas le masque** : le système remet en général le signal au fil principal
   de lui-même ; ce test passerait donc aussi sans masque. Le masque est prouvé par le test qui lit le
   masque du fil, pas par un signal réel remis au mauvais fil (impossible à provoquer à coup sûr).

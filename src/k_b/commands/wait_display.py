@@ -32,20 +32,17 @@ STOP_SIGNALS = {signal.SIGINT, signal.SIGTERM}
 class SpinnerRow:
     """The wait on a terminal: one row rewritten in place, then cleared."""
 
-    def __init__(
-        self, stream: TextIO, waited_for: str, read_timeout_seconds: int
-    ) -> None:
+    def __init__(self, stream: TextIO, waited_for: str) -> None:
         self.stream = stream
         self.waited_for = waited_for
-        self.read_timeout_seconds = read_timeout_seconds
         self.frames = cycle(SPINNER_FRAMES)
         self.period_seconds = SPINNER_FRAME_SECONDS
 
     def show(self, elapsed_seconds: int) -> None:
-        line = (
-            f"{next(self.frames)} waiting for {self.waited_for}: {elapsed_seconds} s,"
-            f" read timeout {self.read_timeout_seconds} s"
-        )
+        # Short, so that it fits most windows: the read timeout is in the line logged before the
+        # wait. A row the terminal has already folded on a resize stays behind: \r goes back to the
+        # start of the last row only (docs/fiches-veille.md, "Console").
+        line = f"{next(self.frames)} waiting for {self.waited_for}: {elapsed_seconds} s"
         # Cut to the width of the terminal: a longer line would wrap at each frame.
         self.write("\r" + line[: self.read_columns() - 1])
 
@@ -89,7 +86,7 @@ def showing_the_wait(waited_for: str, read_timeout_seconds: int) -> Iterator[Non
     # Read once: the stream of the log handler of run_log.py, whose mode is chosen on it.
     stream = sys.stderr
     display = (
-        SpinnerRow(stream, waited_for, read_timeout_seconds)
+        SpinnerRow(stream, waited_for)
         if stream.isatty()
         else WaitLogLine(waited_for, read_timeout_seconds)
     )

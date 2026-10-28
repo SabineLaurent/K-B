@@ -14,7 +14,8 @@ from k_b.commands import wait_display
 from k_b.commands.run_log import LOGGER_NAME
 
 READ_TIMEOUT_SECONDS = 240
-FIRST_FRAME = "\r⠋ waiting for the digests: 0 s, read timeout 240 s"
+# Short, so that it fits most windows: the read timeout is in the line logged before the request.
+FIRST_FRAME = "\r⠋ waiting for the digests: 0 s"
 
 
 class FakeStream(io.StringIO):
@@ -76,7 +77,7 @@ def test_on_a_terminal_a_spinner_turns_then_its_row_is_cleared(
         shown_in_time = terminal.written.wait(5)
 
     assert shown_in_time
-    assert terminal.getvalue().startswith(FIRST_FRAME)
+    assert terminal.getvalue().split("\r")[1] == FIRST_FRAME[1:]
     assert terminal.getvalue().endswith(cleared_row(80))
     assert caplog.messages == []
 

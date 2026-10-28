@@ -1263,7 +1263,15 @@ résultat, même code » de `kb collect` et `kb write-tops` (décision de Sabine
 
 **Console** (libellés en anglais) : pendant la demande, sur la sortie d'erreur, l'attente (#349).
 Dans un terminal, une ligne qui tourne et compte, coupée à la largeur du terminal, effacée à la
-réponse, jamais écrite dans `kb.log` : `⠹ waiting for the digests: 23 s, read timeout 240 s`. Hors
+réponse, jamais écrite dans `kb.log` : `⠹ waiting for the digests: 23 s` (courte, 31 caractères, pour
+tenir dans la plupart des fenêtres ; le délai de lecture est dans la ligne écrite juste avant la
+demande). **Limite** (observée par Sabine le 2026-10-28) : si la fenêtre est rétrécie sous la longueur
+de la ligne pendant l'attente, le terminal replie la ligne déjà écrite sur plusieurs rangées ; `\r` ne
+revient qu'au début de la dernière, et ni les images suivantes ni l'effacement final n'atteignent les
+rangées du dessus : des morceaux de lignes restent à l'écran. Rien de plus qu'un défaut d'affichage :
+le compteur avance, la commande n'en est pas affectée. L'effacer demanderait des séquences de contrôle
+du terminal (remonter le curseur, effacer les rangées) et le suivi des redimensionnements : écarté le
+2026-10-28 (décision de Sabine). Hors
 terminal (sortie redirigée, conteneur sans TTY), une ligne datée toutes les
 `WAIT_LOG_INTERVAL_SECONDS` (10 s, `core/config.py`), aussi dans `kb.log` :
 `still waiting for the digests: 10 seconds, read timeout 240 seconds`. Le mode se choisit sur la
