@@ -225,7 +225,8 @@ sortie :
   aucun fichier de base ne reste ;
 - 2 : `KB_DATA_DIR` manque ou n'est pas un dossier existant, ou la base existe déjà. Une base
   existante n'est pas touchée : pour repartir de zéro, supprimer le fichier ;
-- 130 : `kb create-db` a reçu SIGINT (Ctrl-C) : comme pour 1, aucun fichier de base ne reste.
+- 130 : `kb create-db` a reçu SIGINT (Ctrl-C) : comme pour 1, aucun fichier de base ne reste, sauf
+  si un second Ctrl-C coupe sa suppression (le supprimer à la main).
 
 **Lancer une collecte** (une par jour, voir [docs/specs-collecte.md](docs/specs-collecte.md)) :
 
@@ -271,7 +272,8 @@ sortie :
 - 143 : `kb import` a reçu SIGTERM (`docker stop`). Reçu avant la validation de la base, il
   n'écrit rien, comme pour 1, ni dans la base ni au journal ; reçu pendant ou après, l'import est
   gardé, avec son journal ;
-- 130 : `kb import` a reçu SIGINT (Ctrl-C), avec le même effet que SIGTERM.
+- 130 : `kb import` a reçu SIGINT (Ctrl-C), avec le même effet que SIGTERM, sauf un second Ctrl-C,
+  qui peut couper l'annulation : SIGTERM ignore un second signal, SIGINT non.
 
 **Écrire les fiches des tops dans le coffre** (après un import) :
 
@@ -357,8 +359,9 @@ entrée vide, une entrée avec `*` ou une entrée hors nom en minuscules, ou si 
 ni `true` ni `false` (`false` : journal sur la sortie d'erreur seule) ; le message nomme la
 variable et cite la valeur refusée. Si le port est déjà pris (par exemple par un autre
 `kb serve-data`), uvicorn écrit `address already in use` au journal et `kb serve-data` sort en code 3.
-Un Ctrl-C arrête uvicorn proprement : `kb serve-data` sort en code 0, sans la ligne
-`kb stopped by SIGINT` des autres commandes.
+Une fois le serveur démarré, un Ctrl-C arrête uvicorn proprement : `kb serve-data` sort en code 0,
+sans la ligne `kb stopped by SIGINT` des autres commandes ; pendant le démarrage, le code dépend du
+moment : 130 avec cette ligne, 3 ou 0.
 
 Limites :
 
@@ -402,8 +405,8 @@ l'API de données. `kb serve-ai` journalise une ligne par requête dans
 `X-Request-ID` de chaque réponse ; chaque appel au modèle écrit une ligne JSON de métrique sur la
 sortie standard, sans texte. Code de sortie 2, sans lancer l'API, si `KB_DATA_DIR` manque, si une
 clé, l'hôte, le port, la fenêtre, le modèle ou la clé `KB_DATA_API_KEY_AI_DIGEST` est refusé : le
-message nomme la variable, jamais une clé ni l'URL du modèle. Port déjà pris : code 3, et Ctrl-C :
-code 0, comme `kb serve-data`.
+message nomme la variable, jamais une clé ni l'URL du modèle. Port déjà pris : code 3, et Ctrl-C une
+fois démarré : code 0, comme `kb serve-data`.
 
 **Changer une clé** (la clé reste fixe, sans date d'expiration : journal ADR, 2026-10-20,
 « Squelette E1 E3 », décision 3) :

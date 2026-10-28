@@ -4510,7 +4510,16 @@ par un sous-agent et validé par elle (« go »).
   Python ; un script bash qui lance `.venv/bin/kb` continue après un Ctrl-C (vérifié le 2026-10-28
   avec un programme qui sort en 130 sur `KeyboardInterrupt`). `kb create-db` sort en
   130 sur SIGINT mais n'a toujours pas de gestionnaire de SIGTERM (limite de l'entrée du
-  2026-10-18). — branche `fix/stop-on-sigint`
+  2026-10-18). **Un second Ctrl-C pendant l'annulation peut la couper** (un fichier de base à
+  moitié créé, un temporaire caché) : SIGTERM ignore un second signal, SIGINT non, comme sur `main`
+  avant cette PR. Laissé ainsi par Sabine le 2026-10-28 (« ok », sur la revue de code) : un Ctrl-C
+  suppose quelqu'un devant l'écran, qui voit l'erreur. Sur Azure, sans personne, l'arrêt vient par
+  SIGTERM, puis SIGKILL 30 s plus tard
+  ([Application lifecycle management in Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/application-lifecycle-management),
+  lue le 2026-10-28) ; le signal que reçoit un job arrêté n'y est pas écrit : à vérifier à la mise
+  en ligne du 08/11, par la ligne `kb stopped by …` du journal après un `az containerapp job stop`.
+  Option écartée : un gestionnaire de SIGINT qui ignore le second, comme pour SIGTERM. —
+  branche `fix/stop-on-sigint`
 
 ## Décisions encore ouvertes
 

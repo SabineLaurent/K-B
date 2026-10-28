@@ -69,8 +69,8 @@ ligne en sortant.
     STOPPED_BY_SIGINT = (
         130,
         (
-            "kb collect, kb import, kb write-tops, kb digest, kb create-db: stopped by SIGINT"
-            " (Ctrl-C); what was done before it is kept"
+            "kb collect, kb import, kb write-tops, kb digest: stopped by SIGINT (Ctrl-C); what was"
+            " done before it is kept; kb create-db: stopped by SIGINT, no database left"
         ),
     )
 ```
@@ -82,8 +82,13 @@ de `poc.md` : un code de sortie est une constante nommée).
 ### 4. Les serveurs ne changent pas
 
 `kb serve-data` et `kb serve-ai` lancent `uvicorn.run`, qui attrape lui-même `KeyboardInterrupt` et
-rend la main normalement : la commande sort en 0, sans trace (observé par Sabine, lu dans
-`uvicorn/main.py`, 0.54.0). Le nouveau bloc ne les touche qu'avant qu'uvicorn ne tourne.
+rend la main normalement : une fois le serveur démarré, la commande sort en 0, sans trace (observé
+par Sabine, lu dans `uvicorn/main.py`, 0.54.0). Pendant le démarrage, le code dépend du moment
+(lecture du code d'uvicorn, non essayé) : avant `uvicorn.run`, ou pendant le chargement de
+l'application, le nouveau bloc rend 130 avec la ligne ; dans `uvicorn.run`, avant qu'uvicorn ne pose
+ses gestionnaires de signaux, il avale l'interruption puis sort en 3 (`STARTUP_FAILURE`,
+`main.py:633-640`) ; une fois ses gestionnaires posés (`server.py:89`), il finit de démarrer, puis
+s'arrête en 0.
 
 ## Choix faits et options écartées
 
@@ -122,9 +127,11 @@ rend la main normalement : la commande sort en 0, sans trace (observé par Sabin
    de toute façon ; mourir du signal ne servirait qu'à un script bash lancé hors de uv, au prix de
    code de plus. Limite mesurée : un tel script continue après le Ctrl-C.
 5. **Et un second Ctrl-C pendant le nettoyage ?** Il lève un second `KeyboardInterrupt` dans le
-   nettoyage : s'il tombe dans le `try`, il finit au même bloc ; s'il tombe pendant le
-   `logger.error` du bloc, la trace de Python revient. Contrairement à SIGTERM, rien n'ignore un
-   second SIGINT : appuyer deux fois reste un moyen de forcer l'arrêt.
+   nettoyage, qu'il coupe (un fichier de base à moitié créé, un temporaire caché) : s'il tombe dans
+   le `try`, il finit au même bloc ; s'il tombe pendant le `logger.error` du bloc, la trace de
+   Python revient. Contrairement à SIGTERM, rien n'ignore un second SIGINT, comme sur `main`. Choix
+   de Sabine sur la revue : laissé, car un Ctrl-C suppose quelqu'un devant l'écran ; sur Azure,
+   l'arrêt vient par SIGTERM, dont le second est ignoré.
 
 ## Zones non vérifiées
 
@@ -136,7 +143,8 @@ rend la main normalement : la commande sort en 0, sans trace (observé par Sabin
   `tests/test_atomic_write.py`), la création de la base avec une autre exception, par le même
   `except BaseException` (`tests/test_database.py:43`).
 - Le code 0 des serveurs sur Ctrl-C vient de l'observation de Sabine et de la lecture
-  d'uvicorn 0.54.0, pas d'un test.
+  d'uvicorn 0.54.0, pas d'un test ; les codes 130, 3 ou 0 pendant leur démarrage, de la lecture
+  seule.
 
 ## Ce qui reste
 
@@ -144,3 +152,5 @@ rend la main normalement : la commande sort en 0, sans trace (observé par Sabin
   l'environnement) et `kb openapi` gardent la trace de Python : hors périmètre de #352.
 - `kb create-db` sort en 130 sur SIGINT mais n'a toujours pas de gestionnaire de SIGTERM (limite
   de #193).
+- Le signal que reçoit un job Azure Container Apps arrêté n'est pas écrit dans la doc de Microsoft :
+  à vérifier à la mise en ligne du 08/11, par la ligne `kb stopped by …` du journal.
