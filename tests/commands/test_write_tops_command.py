@@ -55,7 +55,7 @@ def test_write_tops_writes_the_sheets_of_each_top_then_deletes_the_older_ranking
         "\nmost_starred: ok, 2 sheets written\n"
         "most_forked: ok, 2 sheets written\n"
         "Older raw files deleted: 2\n"
-        "Sheets vault path: veille/tops/\n"
+        "Sheets vault path: veille/tops/\n\n"
     )
     for line in (
         "write-tops started: 2 tops expected",
@@ -88,7 +88,7 @@ def test_write_tops_without_ranking_says_so_and_succeeds(
         "\nmost_starred: no ranking\n"
         "most_forked: no ranking\n"
         "Older raw files deleted: 0\n"
-        "Sheets vault path: veille/tops/\n"
+        "Sheets vault path: veille/tops/\n\n"
     )
     assert list_sheets(vault_dir) == []
 
@@ -170,7 +170,7 @@ def test_a_sheet_not_written_keeps_its_rankings_exits_4_and_the_other_top_is_wri
     assert output.out == (
         "\nmost_starred: failed (PermissionError)\n"
         "most_forked: ok, 2 sheets written\n"
-        "Sheets vault path: veille/tops/\n"
+        "Sheets vault path: veille/tops/\n\n"
     )
 
 

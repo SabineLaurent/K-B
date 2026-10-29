@@ -102,7 +102,7 @@ def test_collect_still_prints_the_summary_and_exits_1_when_the_state_cannot_be_w
         == "\nworking: ok\nzotero: skipped (KB_ZOTERO_DIR not set)\n"
         "clipping: skipped (KB_VAULT_DIR not set)\n"
         "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
-        "collection_state: failed (PermissionError)\n"
+        "collection_state: failed (PermissionError)\n\n"
     )
 
 
@@ -126,7 +126,7 @@ def test_collect_skips_zotero_and_says_so_without_its_directory(
         capsys.readouterr().out
         == "\nworking: ok\nzotero: skipped (KB_ZOTERO_DIR not set)\n"
         "clipping: skipped (KB_VAULT_DIR not set)\n"
-        "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
+        "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n\n"
     )
     assert not (data_dir / "raw" / "selected_library").exists()
 
@@ -145,7 +145,7 @@ def test_collect_extracts_zotero_into_the_selected_library_with_its_directory(
     assert exit_code == 0
     assert capsys.readouterr().out == (
         "\nzotero: ok\nclipping: skipped (KB_VAULT_DIR not set)\n"
-        "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
+        "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n\n"
     )
     [extract_path] = (data_dir / "raw" / "selected_library" / "zotero").iterdir()
     assert extract_path.suffix == ".json"
@@ -172,7 +172,7 @@ def test_collect_reports_a_zotero_failure_and_keeps_its_last_collection_date(
     assert exit_code == 1
     assert capsys.readouterr().out == (
         "\nzotero: failed (FileNotFoundError)\nclipping: skipped (KB_VAULT_DIR not set)\n"
-        "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
+        "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n\n"
     )
     assert json.loads((data_dir / "collection_state.json").read_text()) == {}
     assert not (data_dir / "raw").exists()
@@ -290,7 +290,7 @@ def test_collect_only_runs_the_sources_chosen_and_keeps_the_date_of_the_others(
     assert exit_code == 0
     assert capsys.readouterr().out == (
         "\nzotero: ok\nclipping: ok\ntest: skipped (not in KB_COLLECT_ONLY)\n"
-        "gh_archive: skipped (not in KB_COLLECT_ONLY)\n"
+        "gh_archive: skipped (not in KB_COLLECT_ONLY)\n\n"
     )
     assert sorted(path.name for path in (data_dir / "raw").iterdir()) == [
         "selected_library"
@@ -329,7 +329,7 @@ def test_collect_only_prints_one_line_for_a_source_not_chosen(
     assert capsys.readouterr().out == (
         "\nworking: ok\nzotero: skipped (not in KB_COLLECT_ONLY)\n"
         "clipping: skipped (not in KB_COLLECT_ONLY)\n"
-        "gh_archive: skipped (not in KB_COLLECT_ONLY)\n"
+        "gh_archive: skipped (not in KB_COLLECT_ONLY)\n\n"
     )
 
 

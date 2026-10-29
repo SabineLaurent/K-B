@@ -62,13 +62,15 @@ def run_write_tops(data_dir: Path, environ: Mapping[str, str]) -> int:
         if deleted_count is not None:
             deleted_count += outcome.deleted_count
     logger.info("write-tops finished in %s", describe_duration(monotonic() - started))
-    # A blank line between the log and the result (decision of Sabine of 2026-10-29).
+    # A blank line before and after the result, apart from the log and from what follows (make's
+    # line of an error): decisions of Sabine of 2026-10-29.
     print()
     for line in lines:
         print(line)
     if deleted_count is not None:
         print(f"Older raw files deleted: {deleted_count}")
     print(f"Sheets vault path: {SHEETS_VAULT_PATH.as_posix()}/")
+    print()
     return find_exit_code(has_failed=has_failed, has_done=has_done)
 
 

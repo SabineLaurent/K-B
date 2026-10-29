@@ -4554,8 +4554,12 @@ time-knight relu par un sous-agent et validé par elle.
     n'écrit pas », « ça foire une erreur ». Suivent `Older raw files deleted: N` et
     `Sheets vault path: veille/tops/`. Le type d'une erreur est affiché seul, jamais son message,
     qui nomme le coffre. Le code de sortie ne change pas.
-  - **Une ligne vide sépare le journal du résultat** dans les trois commandes, comme pour digest.
-    C'est la proposition de Sabine, « une séparation entre le retour log et le print en console ».
+  - **Une ligne vide avant et après le résultat** dans les trois commandes. Celle d'avant le
+    sépare du journal, comme pour digest : c'est la proposition de Sabine, « une séparation entre
+    le retour log et le print en console ». Celle d'après le sépare de la ligne de make après un
+    échec (`make: *** [collect] Error 4`), autre idée de Sabine. Une ligne vide écrite par le
+    `Makefile` en cas d'échec a été écartée au profit de la sienne, plus simple.
+    Limite : un arrêt avant tout résultat (code 2) n'imprime rien.
     Écartés : un titre au-dessus du résultat, plus long que la ligne de l'import ; une règle
     `-----`, qui sépare le total d'un tableau dans digest.
 

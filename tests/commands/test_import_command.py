@@ -28,7 +28,7 @@ def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, ca
     (log_path,) = tmp_path.glob("import-log-*.jsonl")
     assert re.fullmatch(r"import-log-\d{4}-\d{2}-\d{2}T\d{6}Z\.jsonl", log_path.name)
     assert output.out == (
-        "\nimport: 0 raw read, 0 written, 0 trend rows, 0 left out, 0 rejected, 0 withdrawn\n"
+        "\nimport: 0 raw read, 0 written, 0 trend rows, 0 left out, 0 rejected, 0 withdrawn\n\n"
     )
     for line in (
         "import started",
@@ -55,7 +55,7 @@ def test_import_writes_the_raw_rankings_of_gh_archive_into_the_trend_table(
 
     assert exit_code == 0
     assert capsys.readouterr().out.endswith(
-        "\nimport: 1 raw read, 0 written, 5 trend rows, 0 left out, 0 rejected, 0 withdrawn\n"
+        "\nimport: 1 raw read, 0 written, 5 trend rows, 0 left out, 0 rejected, 0 withdrawn\n\n"
     )
     connection = sqlite3.connect(tmp_path / "k-b.sqlite")
     assert connection.execute("SELECT count(*) FROM trend").fetchone() == (5,)
@@ -181,8 +181,8 @@ def test_a_failed_purge_leaves_the_summary_of_the_import_it_committed(
 
     assert cli.main(["import"]) == 1
     output = capsys.readouterr()
-    blank_line, summary_line = output.out.splitlines()
-    assert blank_line == ""
+    blank_line, summary_line, last_line = output.out.splitlines()
+    assert blank_line == last_line == ""
     assert summary_line.startswith("import: 4 raw read, ")
     assert "import committed, raw purge failed: PermissionError" in output.err
 
@@ -201,7 +201,7 @@ def test_a_purge_stopped_by_ctrl_c_still_prints_the_summary(
 
     assert cli.main(["import"]) == cli.ExitCode.STOPPED_BY_SIGINT
     assert capsys.readouterr().out == (
-        "\nimport: 0 raw read, 0 written, 0 trend rows, 0 left out, 0 rejected, 0 withdrawn\n"
+        "\nimport: 0 raw read, 0 written, 0 trend rows, 0 left out, 0 rejected, 0 withdrawn\n\n"
     )
 
 

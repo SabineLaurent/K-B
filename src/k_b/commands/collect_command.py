@@ -54,13 +54,15 @@ def run_collect(data_dir: Path, environ: Mapping[str, str]) -> int:
         logger.error("%s", error)
         return ExitCode.NOT_STARTED
     logger.info("collection finished in %s", describe_duration(monotonic() - started))
-    # A blank line between the log and the result (decision of Sabine of 2026-10-29).
+    # A blank line before and after the result, apart from the log and from what follows (make's
+    # line of an error): decisions of Sabine of 2026-10-29.
     print()
     for source_name, source_error in outcome.errors_by_source.items():
         print(f"{source_name}: {describe_outcome(source_error)}")
     print_skipped_sources(collect_only, environ)
     if outcome.state_error is not None:
         print(f"collection_state: {describe_outcome(outcome.state_error)}")
+    print()
     return find_collection_exit_code(outcome)
 
 
