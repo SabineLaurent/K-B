@@ -5,6 +5,8 @@ import logging
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from pathlib import Path
+from time import monotonic
+from typing import NamedTuple
 
 from k_b.commands.exit_codes import ExitCode, find_exit_code
 from k_b.commands.run_log import (
@@ -27,6 +29,19 @@ from k_b.post.digest_sheets import refuse_written_sheets, write_digest_sheet
 from k_b.post.vault_files import VaultEntryRefusedError
 
 logger = logging.getLogger(LOGGER_NAME)
+
+SHEET_WRITTEN = "sheet written"
+
+
+class SummaryRow(NamedTuple):
+    """A row of the summary of kb digest; sheet is empty when the sheet is not written."""
+
+    subject: str
+    status: str
+    sheet: str
+
+
+SUMMARY_HEADER = SummaryRow("subject", "status", "sheet")
 
 
 def run_digest(environ: Mapping[str, str]) -> int:
@@ -55,10 +70,12 @@ def run_digest(environ: Mapping[str, str]) -> int:
     except OSError as error:
         logger.error("no digest asked: %s", describe_os_error(error))
         return ExitCode.FAILED
+    logger.info("digest started: %d subjects asked", len(subject_names))
     logger.info(
         "digests asked of the AI API, read timeout %d seconds",
         AI_API_READ_TIMEOUT_SECONDS,
     )
+    started = monotonic()
     try:
         with (
             build_ai_api_client(settings) as http_client,
@@ -68,7 +85,12 @@ def run_digest(environ: Mapping[str, str]) -> int:
     except AiApiError as error:
         logger.error("digests not received: %s%s", error, describe_remedy(error))
         return ExitCode.FAILED
-    return write_digest_sheets(vault_dir, response)
+    rows = write_digest_sheets(vault_dir, response)
+    logger.info("digest finished in %s", describe_duration(monotonic() - started))
+    written_count = sum(1 for row in rows if row.status == SHEET_WRITTEN)
+    failed_count = len(rows) - written_count
+    print(render_digest_summary(response, rows, written_count, failed_count))
+    return find_exit_code(has_failed=failed_count > 0, has_done=written_count > 0)
 
 
 def read_today() -> date:
@@ -76,11 +98,10 @@ def read_today() -> date:
     return datetime.now(UTC).date()
 
 
-def write_digest_sheets(vault_dir: Path, response: DigestsResponse) -> ExitCode:
+def write_digest_sheets(vault_dir: Path, response: DigestsResponse) -> list[SummaryRow]:
     """Each sheet in turn, a sheet not written not stopping the others; a subject fails when the
-    AI API names it or its sheet is not written."""
-    written_count = 0
-    failed_count = 0
+    AI API names it or its sheet is not written. One row of the summary per subject."""
+    rows: list[SummaryRow] = []
     for digest in response.digests:
         try:
             sheet = write_digest_sheet(vault_dir, response, digest)
@@ -88,10 +109,9 @@ def write_digest_sheets(vault_dir: Path, response: DigestsResponse) -> ExitCode:
             logger.error(
                 "%s: sheet not written: %s", digest.subject, describe_error(error)
             )
-            failed_count += 1
+            rows.append(SummaryRow(digest.subject, "sheet not written", ""))
             continue
-        print(f"{digest.subject}: sheet written, {sheet}")
-        written_count += 1
+        rows.append(SummaryRow(digest.subject, SHEET_WRITTEN, sheet))
     for failed in response.failed_subjects:
         logger.error(
             "%s: digest failed: %s at the stage %s",
@@ -99,11 +119,40 @@ def write_digest_sheets(vault_dir: Path, response: DigestsResponse) -> ExitCode:
             failed.error,
             failed.stage,
         )
-        failed_count += 1
-    print(
-        f"digests: {describe_counts(written_count, failed_count)}; {describe_request(response)}"
+        rows.append(SummaryRow(failed.subject, "digest failed", ""))
+    return rows
+
+
+def render_digest_summary(
+    response: DigestsResponse,
+    rows: list[SummaryRow],
+    written_count: int,
+    failed_count: int,
+) -> str:
+    """The summary after the end line: the window, a row per subject and the total, then the
+    model and the id of the request, last, the reference to give when something goes wrong."""
+    window = response.window
+    subject_width = max(len(row.subject) for row in [SUMMARY_HEADER, *rows])
+    status_width = max(len(row.status) for row in [SUMMARY_HEADER, *rows])
+    table = [
+        f"{row.subject:<{subject_width}}  {row.status:<{status_width}}  {row.sheet}".rstrip()
+        for row in [SUMMARY_HEADER, *rows]
+    ]
+    since, until = window.since.date().isoformat(), window.until.date().isoformat()
+    return "\n".join(
+        [
+            "",
+            "Digest summary",
+            f"Window: {since} → {until}, {response.items_in} items read",
+            "",
+            *table,
+            "-" * max(len(line) for line in table),
+            f"{'total':<{subject_width}}  {describe_counts(written_count, failed_count)}",
+            "",
+            f"Model: {response.model}",
+            f"Request id: {response.request_id}",
+        ]
     )
-    return find_exit_code(has_failed=failed_count > 0, has_done=written_count > 0)
 
 
 def describe_counts(written_count: int, failed_count: int) -> str:
@@ -112,9 +161,10 @@ def describe_counts(written_count: int, failed_count: int) -> str:
     return f"written {written_count}, failed {failed_count}"
 
 
-def describe_request(response: DigestsResponse) -> str:
-    """The model and the id of the request, to find it in the log of kb serve-ai."""
-    return f"model {response.model}, request_id {response.request_id}"
+def describe_duration(seconds: float) -> str:
+    """57 s, or 4 min 6 s."""
+    minutes, seconds_left = divmod(round(seconds), 60)
+    return f"{minutes} min {seconds_left} s" if minutes else f"{seconds_left} s"
 
 
 def describe_remedy(error: AiApiError) -> str:
