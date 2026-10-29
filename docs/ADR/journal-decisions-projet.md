@@ -4521,6 +4521,67 @@ par un sous-agent et validé par elle (« go »).
   Option écartée : un gestionnaire de SIGINT qui ignore le second, comme pour SIGTERM. —
   branche `fix/stop-on-sigint`
 
+## 2026-10-29
+
+### Commandes : le retour console sans tableau (#359)
+
+Décisions de Sabine du 2026-10-29, après avoir vu en vrai les tableaux de #291 (PR #358) ; plan de
+time-knight relu par un sous-agent et validé par elle.
+
+- **`kb collect`, `kb import` et `kb write-tops` finissent sans tableau ; `kb digest` garde le
+  sien (#357).** **Inverse** les tableaux de #291 (décisions de Sabine du 2026-10-28 et du
+  2026-10-29 au matin, PR #358) : pour collect, « la version initiale avec source et ok me convient
+  mieux » ; pour write-tops, « pas besoin de tableau » ; pour digest, vu en vrai le même matin,
+  « Il me convenait. Je veux la garder comme ça ». Ce qui reste de #358 : les lignes de journal
+  (`collection started: N sources selected`, le départ et la fin de chaque source, les durées,
+  `import started` et `import finished`). Ce qui est retiré, parce qu'il ne servait qu'aux
+  tableaux : les comptes par source de l'import (`SourceImport`, `count_by_source`), le nombre de
+  bruts écrits par source dans le résultat de la collecte (`raw_file_counts`), et l'alignement à
+  droite de `render_table`.
+  - **collect** reprend le rendu d'avant #291 : `<source>: ok` ou `failed (<type>)`, puis
+    `<source>: skipped (<réglage>)`, puis `collection_state: failed (<type>)` si l'état n'est pas
+    écrit. Le nombre de bruts écrits par une source collectée est au journal seulement ; celui
+    d'une source en échec au milieu de ses pages n'est plus donné, comme avant #291.
+  - **import** affiche une ligne :
+    `import: N raw read, N written, N trend rows, N left out, N rejected, N withdrawn`. Une ligne de
+    journal nouvelle, `import log kept: '<nom>'`, dit où lire les rejets, choix de Sabine : sur un
+    import normal, aucune ligne ne nommait le journal d'import, que seul `Log:` donnait. Elle
+    n'en cite que le nom, comme `etl/load.py` : le chemin nomme le dossier des données.
+  - **write-tops** journalise son départ et sa fin, puis affiche une ligne par top, dans cet ordre
+    de priorité : `failed (<type>)`, ou `failed (ranking_unreadable)` pour un relevé illisible ou
+    mal nommé ; `ok, N sheet(s) written` ; `ok, 0 sheets written, the sheet of the day already
+    exists` ; `no ranking`. Les trois cas de Sabine : « ça marche ça écrit », « ça existe déjà, ça
+    n'écrit pas », « ça foire une erreur ». Suivent `Older raw files deleted: N` et
+    `Sheets vault path: veille/tops/`. Le type d'une erreur est affiché seul, jamais son message,
+    qui nomme le coffre. Le code de sortie ne change pas.
+  - **Une ligne vide avant et après le résultat** dans les trois commandes. Celle d'avant le
+    sépare du journal, comme pour digest : c'est la proposition de Sabine, « une séparation entre
+    le retour log et le print en console ». Celle d'après le sépare de la ligne de make après un
+    échec (`make: *** [collect] Error 4`), autre idée de Sabine. Une ligne vide écrite par le
+    `Makefile` en cas d'échec a été écartée au profit de la sienne, plus simple.
+    Limite : un arrêt avant tout résultat (code 2) n'imprime rien.
+    `kb digest` finit lui aussi son bilan par une ligne vide, et son titre `Digest summary` est
+    souligné de `-`, pour qu'il se lise comme le titre du bloc (demandes de Sabine) ; son tableau ne
+    change pas. Écartés : un soulignement de `=`, qui l'aurait distingué de la règle du total ; les
+    capitales ; le gras ANSI, qu'il faudrait réserver au terminal.
+    Écartés : un titre au-dessus du résultat, plus long que la ligne de l'import ; une règle
+    `-----`, qui sépare le total d'un tableau dans digest.
+
+  Options écartées :
+  - le bilan de l'import en ligne de journal, pour qu'il entre dans `kb.log` : la règle 3 de
+    `conventions.md` donne le résultat d'une commande à `print`, le déroulé à `logger` ;
+  - le tableau de write-tops, validé le matin du 2026-10-29, avant que Sabine renonce aux autres ;
+  - un revert de #358 : il retirait aussi les lignes de journal gardées, à recoder ensuite.
+
+  Limites assumées :
+  - **write-tops imprime ses lignes une fois tous les tops finis**, comme collect : un SIGINT ou
+    un SIGTERM pendant le second top fait perdre la ligne du premier.
+  - **`Older raw files deleted` manque quand un top a été arrêté par une erreur** : la commande
+    ne sait pas si l'erreur est venue pendant ses suppressions, la dernière étape d'un top. C'était
+    la règle de l'ancien bilan de l'import. L'erreur est au journal.
+
+  — PR de #359
+
 ## Décisions encore ouvertes
 
 - **Un sujet secondaire par item au classement** (2026-10-26, idée de Sabine) : une case de sujet

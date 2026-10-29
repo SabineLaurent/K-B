@@ -14,7 +14,6 @@ from k_b.commands import (
 )
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl import pipeline
-from k_b.etl.pipeline import SourceImport
 
 
 def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, capsys):
@@ -29,18 +28,13 @@ def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, ca
     (log_path,) = tmp_path.glob("import-log-*.jsonl")
     assert re.fullmatch(r"import-log-\d{4}-\d{2}-\d{2}T\d{6}Z\.jsonl", log_path.name)
     assert output.out == (
-        "\n"
-        "Import summary\n"
-        "\n"
-        "source  raw read  written  left out  rejected\n"
-        f"{'-' * 45}\n"
-        "total          0        0         0         0\n"
-        "\n"
-        "Withdrawn (vulnerabilities, Zotero entries, highlights): 0\n"
-        "Older raw files deleted (a newer one replaces them): 0\n"
-        f"Log: {log_path}\n"
+        "\nimport: 0 raw read, 0 written, 0 trend rows, 0 left out, 0 rejected, 0 withdrawn\n\n"
     )
-    for line in ("import started", r"import finished in \d+ s"):
+    for line in (
+        "import started",
+        r"import finished in \d+ s",
+        re.escape(f"import log kept: '{log_path.name}'"),
+    ):
         assert re.search(
             rf"^{LOG_LINE_DATE} INFO k_b\.cli: {line}$", output.err, re.MULTILINE
         )
@@ -60,9 +54,9 @@ def test_import_writes_the_raw_rankings_of_gh_archive_into_the_trend_table(
     exit_code = cli.main(["import"])
 
     assert exit_code == 0
-    output = capsys.readouterr().out
-    assert re.search(r"^gh_archive +1 +5 trend rows +0 +0$", output, re.MULTILINE)
-    assert re.search(r"^total +1 +0 +0 +0\n +\+ 5 trend rows$", output, re.MULTILINE)
+    assert capsys.readouterr().out.endswith(
+        "\nimport: 1 raw read, 0 written, 5 trend rows, 0 left out, 0 rejected, 0 withdrawn\n\n"
+    )
     connection = sqlite3.connect(tmp_path / "k-b.sqlite")
     assert connection.execute("SELECT count(*) FROM trend").fetchone() == (5,)
     connection.close()
@@ -97,10 +91,7 @@ def test_import_keeps_only_the_last_extract_and_catalog_imported(
     exit_code = cli.main(["import"])
 
     assert exit_code == 0
-    assert (
-        "Older raw files deleted (a newer one replaces them): 2\n"
-        in capsys.readouterr().out
-    )
+    assert "raw purge: 2 superseded files deleted" in capsys.readouterr().err
     assert (older_extract.exists(), older_catalog.exists()) == (False, False)
     assert (last_extract.exists(), last_catalog.exists()) == (True, True)
 
@@ -190,39 +181,13 @@ def test_a_failed_purge_leaves_the_summary_of_the_import_it_committed(
 
     assert cli.main(["import"]) == 1
     output = capsys.readouterr()
-    assert re.search(r"^total +4 ", output.out, re.MULTILINE)
-    assert "Older raw files deleted" not in output.out
-    assert output.out.endswith(f"Log: {next(tmp_path.glob('import-log-*.jsonl'))}\n")
+    blank_line, summary_line, last_line = output.out.splitlines()
+    assert blank_line == last_line == ""
+    assert summary_line.startswith("import: 4 raw read, ")
     assert "import committed, raw purge failed: PermissionError" in output.err
 
 
-def test_import_names_the_sources_without_a_reader_left_in_raw(
-    monkeypatch, tmp_path, capsys
-):
-    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    cli.main(["create-db"])
-    for source_name in ("github_most_starred", "github_most_forked"):
-        source_dir = tmp_path / "raw" / "automated_watch" / source_name
-        source_dir.mkdir(parents=True)
-        (source_dir / "2026-10-11T153130Z.json").write_bytes(b"[]")
-
-    assert cli.main(["import"]) == 0
-    assert (
-        "Not imported (no reader, read by kb write-tops):\n"
-        "  github_most_forked\n"
-        "  github_most_starred\n"
-    ) in capsys.readouterr().out
-
-
-def test_a_source_of_trends_without_a_row_written_says_0_trend_rows():
-    row = import_command.describe_source_import(
-        "gh_archive", SourceImport(1, 0, 1, 0, 0, writes_trends=True)
-    )
-
-    assert row == ("gh_archive", "1", "0 trend rows", "1", "0")
-
-
-def test_a_purge_stopped_by_ctrl_c_still_prints_the_summary_and_the_log(
+def test_a_purge_stopped_by_ctrl_c_still_prints_the_summary(
     monkeypatch, tmp_path, capsys
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
@@ -235,10 +200,9 @@ def test_a_purge_stopped_by_ctrl_c_still_prints_the_summary_and_the_log(
     monkeypatch.setattr(import_command, "purge_superseded_raw", interrupt)
 
     assert cli.main(["import"]) == cli.ExitCode.STOPPED_BY_SIGINT
-    output = capsys.readouterr().out
-    assert "Import summary\n" in output
-    assert "Older raw files deleted" not in output
-    assert output.endswith(f"Log: {next(tmp_path.glob('import-log-*.jsonl'))}\n")
+    assert capsys.readouterr().out == (
+        "\nimport: 0 raw read, 0 written, 0 trend rows, 0 left out, 0 rejected, 0 withdrawn\n\n"
+    )
 
 
 class FrozenDatetime(datetime):

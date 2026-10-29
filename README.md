@@ -201,10 +201,10 @@ uv sync
 | Variable | Obligatoire | Rôle |
 |---|---|---|
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
-| `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero (KB_ZOTERO_DIR not set)`, sous la remarque du bilan). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
-| `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les comptes rendus de veille dans `veille/<sujet>/` ; ni l'un ni l'autre ne tourne sans elle (code 2). |
-| `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
-| `KB_COLLECT_ONLY` | non | les dossiers des sources que `kb collect` lance, séparés par des virgules (`zotero,clipping`) ; la casse ne compte pas. Sans elle, pas de filtre : chaque source tourne comme avant (Zotero, clips et GH Archive selon leur variable). Une source écartée est nommée sous la remarque du bilan, `<dossier> (not in KB_COLLECT_ONLY)` ; un nom qui n'est pas un dossier de source, une valeur ou une entrée vide, ou une source choisie sans sa variable (`zotero` sans `KB_ZOTERO_DIR`) : code 2, rien n'est collecté ([docs/specs-collecte.md](docs/specs-collecte.md), « Choisir les sources »). |
+| `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
+| `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les comptes rendus de veille dans `veille/<sujet>/` ; ni l'un ni l'autre ne tourne sans elle (code 2). |
+| `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
+| `KB_COLLECT_ONLY` | non | les dossiers des sources que `kb collect` lance, séparés par des virgules (`zotero,clipping`) ; la casse ne compte pas. Sans elle, pas de filtre : chaque source tourne comme avant (Zotero, clips et GH Archive selon leur variable). Une source écartée affiche `<dossier>: skipped (not in KB_COLLECT_ONLY)` ; un nom qui n'est pas un dossier de source, une valeur ou une entrée vide, ou une source choisie sans sa variable (`zotero` sans `KB_ZOTERO_DIR`) : code 2, rien n'est collecté ([docs/specs-collecte.md](docs/specs-collecte.md), « Choisir les sources »). |
 | `KB_GITHUB_TOKEN` | non | jeton GitHub en lecture seule ([docs/jeton-github.md](docs/jeton-github.md)). Sans lui, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000. |
 | `KB_DATA_API_KEY_<CLIENT>` | pour `kb serve-data` | la clé d'un client de l'API de données (`<CLIENT>` en `A-Z`, `0-9` et `_`, par exemple `KB_DATA_API_KEY_TERMINAL`), une variable par client ([docs/specs-api.md](docs/specs-api.md)). |
 | `KB_AI_API_KEY_<CLIENT>` | pour `kb serve-ai` et `kb digest` | la clé d'un client de l'API IA, une variable par client, mêmes règles que `KB_DATA_API_KEY_<CLIENT>` ; `kb digest` est le client `KB_DIGEST` et lit la même variable, `KB_AI_API_KEY_KB_DIGEST`. Les autres réglages de `kb serve-ai` (modèle, API de données, hôte, port, fenêtre) sont décrits dans `.env.example`. |
@@ -238,12 +238,10 @@ Avec le jeton rangé dans le `.env` à la racine du dépôt, ignoré par git :
 `KB_DATA_DIR=~/.knowledge_base uv run --env-file .env kb collect`.
 
 `kb collect` journalise son début (`collection started: 17 sources selected`), le départ de
-chaque source puis ce qu'elle a écrit, et sa fin avec la durée, puis affiche un bilan : un tableau
-par source lancée (`ok` ou `failed`, avec le type de l'erreur ; le nombre de bruts écrits,
-`0 (nothing new)` pour une source sans rien de neuf), puis les sources non lancées, une par ligne
-avec le réglage qui les écarte : Zotero sans `KB_ZOTERO_DIR`, les clips sans `KB_VAULT_DIR`, GH
-Archive sans `GOOGLE_APPLICATION_CREDENTIALS`, une source que `KB_COLLECT_ONLY` écarte
-([docs/specs-collecte.md](docs/specs-collecte.md), « Règles communes »). Code de sortie : 0 si
+chaque source puis ce qu'elle a écrit, et sa fin avec la durée, puis affiche une ligne par source
+(`ok` ou `failed`, avec le type de l'erreur ; `skipped` pour Zotero sans `KB_ZOTERO_DIR`, les clips
+sans `KB_VAULT_DIR`, GH Archive sans `GOOGLE_APPLICATION_CREDENTIALS`, une source que
+`KB_COLLECT_ONLY` écarte). Code de sortie : 0 si
 tout a réussi ; 4 si au moins une source a réussi et au moins une a échoué, l'état de collecte
 écrit ; 1 si aucune source lancée n'a réussi ou si l'état de collecte n'a pas pu être écrit ; 2 si
 `KB_DATA_DIR` manque, n'est pas un dossier existant, si l'état de collecte est illisible, ou si
@@ -261,13 +259,12 @@ KB_DATA_DIR=~/.knowledge_base uv run kb import
 `<KB_DATA_DIR>/raw/selected_library/` (les extraits Zotero) pas encore importés et
 écrit leurs items dans la base, qui écarte les doublons, et les lignes des classements GH Archive
 dans sa table `trend` ; sans nouveau brut, il ne lit rien,
-sauf un fichier illisible, relu et rejeté à chaque import. Il journalise son début et sa fin
-avec la durée, puis affiche un bilan : un tableau par source (fichiers bruts lus, items écrits,
-nouveaux ou mis à jour, items et fenêtres de classement écartés, doublons ou versions qui ne sont
-pas plus récentes que celle de la base, rejets) et son total, les lignes de tendance de GH Archive
-à part des items, les sources sans lecteur (les tops, lus par `kb write-tops`), puis les lignes
-retirées (CISA, entrées et surlignages Zotero), les bruts remplacés supprimés et le journal, où
-les rejets sont détaillés :
+sauf un fichier illisible, relu et rejeté à chaque import. Il journalise son début, sa fin avec
+la durée et le nom de son journal, puis affiche son bilan sur une ligne
+(`import: 35 raw read, 120 written, 40 trend rows, 3 left out, 2 rejected, 4 withdrawn`) : fichiers
+bruts lus, items écrits (nouveaux ou mis à jour), lignes de tendance écrites, items et fenêtres de
+classement écartés (doublons, ou versions qui ne sont pas plus récentes que celle de la base),
+rejets et lignes retirées (CISA, entrées et surlignages Zotero). Les rejets sont détaillés dans
 `<KB_DATA_DIR>/import-log-<AAAA-MM-JJTHHMMSSZ>.jsonl`, un journal par import. Pour reconstruire
 la base depuis tout le brut : supprimer `k-b.sqlite`, puis `kb create-db` et `kb import`. Code de
 sortie :
@@ -297,8 +294,13 @@ qui se chevauchent : #295) : deux collectes le
 même jour ne donnent qu'une fiche, celle du premier relevé de ce jour encore dans le brut. Une fois
 les fiches d'un top écrites, ses relevés lisibles plus anciens que le dernier relevé lisible sont
 supprimés du brut ; au premier lancement, tout l'historique des relevés devient des fiches, puis
-ces relevés sont supprimés. Il affiche une ligne par top (fiches écrites, relevés sautés parce que la fiche de leur jour
-existe, relevés supprimés, relevés illisibles gardés). Code de sortie :
+ces relevés sont supprimés. Il journalise son début et sa fin avec la durée, puis affiche une ligne
+par top : `ok, 1 sheet written` ; `ok, 0 sheets written, the sheet of the day already exists` ;
+`failed (<type>)` pour un top arrêté, avec le type de l'erreur seul, ou `failed (ranking_unreadable)`
+pour un relevé illisible ou mal nommé, gardé ; `no ranking` sans relevé. Suivent les relevés
+remplacés supprimés (`Older raw files deleted: N`, absent si un top a été arrêté : l'erreur a pu
+venir pendant ses suppressions) et le dossier des fiches dans le coffre
+(`Sheets vault path: veille/tops/`). Code de sortie :
 
 - 0 : chaque top a réussi, ou n'a aucun relevé ;
 - 4 : un top a échoué, et un autre a abouti. L'unité est le top : il échoue quand une erreur de
@@ -308,13 +310,15 @@ existe, relevés supprimés, relevés illisibles gardés). Code de sortie :
   sans relevé compris). Un top qui écrit ses fiches et garde un relevé illisible a donc échoué et
   abouti : seul, il sort en 4, jamais en 0 (échouer fermé). Aucun relevé n'est supprimé avant que
   les fiches de son top soient écrites ; une suppression qui échoue laisse celles déjà faites. Un
-  top arrêté n'a pas de ligne : son erreur est au journal. L'autre top est traité quand même ;
+  top arrêté a sa ligne `failed (<type>)` ; son erreur est au journal. L'autre top est traité quand
+  même ;
 - 1 : un top a échoué et aucun n'a abouti (les deux arrêtés, ou rien que des relevés illisibles) ;
 - 2 : `KB_DATA_DIR` manque, ou `KB_VAULT_DIR` manque ou n'est pas un dossier existant : rien n'est
   lu dans le brut, rien n'est écrit dans le coffre ni supprimé, aucun dossier du coffre n'est créé ;
   l'erreur va au journal ;
 - 143 : `kb write-tops` a reçu SIGTERM (`docker stop`), 130 : SIGINT (Ctrl-C). Les fiches déjà
-  écrites sont gardées, aucun relevé n'est supprimé avant que ses fiches soient écrites.
+  écrites sont gardées, aucun relevé n'est supprimé avant que ses fiches soient écrites. Aucune
+  ligne de top n'est affichée, pas même celle d'un top déjà fini : elles le sont à la fin.
 
 **Toute la chaîne en dev**, comme en ligne, où une automatisation enchaînera les étapes :
 

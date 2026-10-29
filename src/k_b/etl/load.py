@@ -6,7 +6,6 @@ nothing in the base and leaves no log."""
 
 import logging
 import sqlite3
-from collections import Counter, defaultdict
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
@@ -19,31 +18,13 @@ from k_b.database.reading import read_raw_file_paths
 from k_b.database.writing import write_tracked_repositories
 from k_b.etl.file_writing import FileWriting, write_file
 from k_b.etl.import_log import write_import_log
-from k_b.etl.raw_files import (
-    RawFile,
-    RawReading,
-    TrendFile,
-    TrendReading,
-)
-from k_b.etl.raw_store import find_stream
+from k_b.etl.raw_files import RawFile, RawReading, TrendFile, TrendReading
 
 logger = logging.getLogger(__name__)
 
 
 class ImportLogExistsError(FileExistsError):
     """The log of this second is already written: the log of an import is never rewritten."""
-
-
-class SourceImport(NamedTuple):
-    """What the import read and wrote of one source, a row of the summary of kb import."""
-
-    read_count: int
-    item_count: int
-    discard_count: int
-    rejection_count: int
-    trend_count: int
-    # A source of trends (gh_archive): it writes trend rows, never items.
-    writes_trends: bool
 
 
 class ImportSummary(NamedTuple):
@@ -56,8 +37,6 @@ class ImportSummary(NamedTuple):
     withdrawn_count: int
     # The rows written to the trend table.
     trend_count: int
-    # The same counts by source, in the order of the names (withdrawals apart: totals only).
-    by_source: dict[str, SourceImport]
 
 
 def read_imported_paths(database_path: Path) -> frozenset[str]:
@@ -85,8 +64,7 @@ def import_items(
     try:
         try:
             write_tracked_repositories(connection, tracked_repositories)
-            writings = write_files(connection, reading, trend_reading)
-            writing = join_writings([file_writing for _, file_writing in writings])
+            writing = write_files(connection, reading, trend_reading)
             commit_with_log(connection, log_path, imported_at, writing)
         except BaseException:
             # BaseException: Ctrl-C must not leave half an import either.
@@ -101,66 +79,25 @@ def import_items(
         reading.read_count + trend_reading.read_count,
         writing.withdrawn_count,
         writing.trend_count,
-        count_by_source(
-            # A source of trends whose files were all rejected before being opened is one too.
-            [
-                *trend_reading.opened_paths,
-                *(rejection.raw_file_path for rejection in trend_reading.rejections),
-            ],
-            [*reading.opened_paths, *trend_reading.opened_paths],
-            writings,
-        ),
     )
 
 
 def write_files(
     connection: sqlite3.Connection, reading: RawReading, trend_reading: TrendReading
-) -> list[tuple[str, FileWriting]]:
-    """Write each file in collection order, each writing with its source; what the reading
-    rejected comes first."""
-    rejected_when_read = [
-        (find_stream(rejection.raw_file_path), FileWriting(rejections=[rejection]))
-        for rejection in [*reading.rejections, *trend_reading.rejections]
-    ]
-    return [
-        *rejected_when_read,
-        *(
-            (
-                find_stream(find_raw_file(file_read).raw_file_path),
-                write_file(connection, file_read),
-            )
-            for file_read in list_files_in_collection_order(reading, trend_reading)
-        ),
-    ]
-
-
-def find_raw_file(file_read: RawFile | TrendFile) -> RawFile:
-    return file_read.raw_file if isinstance(file_read, TrendFile) else file_read
-
-
-def count_by_source(
-    trend_paths: list[str],
-    opened_paths: list[str],
-    writings: list[tuple[str, FileWriting]],
-) -> dict[str, SourceImport]:
-    """The counts of the summary, by source: the files opened, and the sum of its writings."""
-    opened_counts = Counter(find_stream(path) for path in opened_paths)
-    trend_sources = {find_stream(path) for path in trend_paths}
-    writings_by_source: defaultdict[str, list[FileWriting]] = defaultdict(list)
-    for source_name, file_writing in writings:
-        writings_by_source[source_name].append(file_writing)
-    by_source = {}
-    for source_name in sorted(opened_counts.keys() | writings_by_source.keys()):
-        writing = join_writings(writings_by_source[source_name])
-        by_source[source_name] = SourceImport(
-            opened_counts[source_name],
-            writing.item_count,
-            len(writing.discards) + len(writing.trend_discards),
-            len(writing.rejections),
-            writing.trend_count,
-            source_name in trend_sources,
-        )
-    return by_source
+) -> FileWriting:
+    """Write each file in collection order; what the reading rejected comes first."""
+    rejected_when_read = FileWriting(
+        rejections=[*reading.rejections, *trend_reading.rejections]
+    )
+    return join_writings(
+        [
+            rejected_when_read,
+            *(
+                write_file(connection, file_read)
+                for file_read in list_files_in_collection_order(reading, trend_reading)
+            ),
+        ]
+    )
 
 
 def commit_with_log(

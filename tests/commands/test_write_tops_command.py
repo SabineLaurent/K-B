@@ -50,13 +50,20 @@ def test_write_tops_writes_the_sheets_of_each_top_then_deletes_the_older_ranking
     ]
     for older, last in rankings.values():
         assert (older.exists(), last.exists()) == (False, True)
-    output = capsys.readouterr().out
-    for top_name in ("most_starred", "most_forked"):
-        assert (
-            f"{top_name} sheets: written 2,"
-            " rankings skipped (sheet of their day exists) 0,"
-            " superseded rankings deleted 1, unreadable rankings kept 0\n"
-        ) in output
+    output = capsys.readouterr()
+    assert output.out == (
+        "\nmost_starred: ok, 2 sheets written\n"
+        "most_forked: ok, 2 sheets written\n"
+        "Older raw files deleted: 2\n"
+        "Sheets vault path: veille/tops/\n\n"
+    )
+    for line in (
+        "write-tops started: 2 tops expected",
+        r"write-tops finished in \d+ s",
+    ):
+        assert re.search(
+            rf"^{LOG_LINE_DATE} INFO k_b\.cli: {line}$", output.err, re.MULTILINE
+        )
 
 
 def test_write_tops_again_writes_nothing_new(data_and_vault_dirs, test_tops, capsys):
@@ -66,11 +73,9 @@ def test_write_tops_again_writes_nothing_new(data_and_vault_dirs, test_tops, cap
     capsys.readouterr()
 
     assert cli.main(["write-tops"]) == 0
-    assert (
-        "most_starred sheets: written 0,"
-        " rankings skipped (sheet of their day exists) 1,"
-        " superseded rankings deleted 0, unreadable rankings kept 0\n"
-    ) in capsys.readouterr().out
+    assert capsys.readouterr().out.startswith(
+        "\nmost_starred: ok, 0 sheets written, the sheet of the day already exists\n"
+    )
 
 
 def test_write_tops_without_ranking_says_so_and_succeeds(
@@ -80,7 +85,10 @@ def test_write_tops_without_ranking_says_so_and_succeeds(
 
     assert cli.main(["write-tops"]) == 0
     assert capsys.readouterr().out == (
-        "most_starred sheets: no ranking\nmost_forked sheets: no ranking\n"
+        "\nmost_starred: no ranking\n"
+        "most_forked: no ranking\n"
+        "Older raw files deleted: 0\n"
+        "Sheets vault path: veille/tops/\n\n"
     )
     assert list_sheets(vault_dir) == []
 
@@ -100,12 +108,14 @@ def test_write_tops_without_kb_vault_dir_runs_nothing_and_exits_2(
 
     assert cli.main(["write-tops"]) == cli.ExitCode.NOT_STARTED
     assert all(path.exists() for paths in rankings.values() for path in paths)
+    log_file_text = (data_dir / "logs" / "kb.log").read_text("utf-8")
     assert re.search(
         rf"^{LOG_LINE_DATE} ERROR k_b\.cli: KB_VAULT_DIR not set; the sheets of the tops"
         " are written in the vault$",
-        (data_dir / "logs" / "kb.log").read_text("utf-8"),
+        log_file_text,
         re.MULTILINE,
     )
+    assert "write-tops started" not in log_file_text
     assert capsys.readouterr().out == ""
 
 
@@ -149,12 +159,19 @@ def test_a_sheet_not_written_keeps_its_rankings_exits_4_and_the_other_top_is_wri
         "veille/tops/most_forked/2026-10-05.md",
         "veille/tops/most_forked/2026-10-12.md",
     ]
-    error_output = capsys.readouterr().err
+    output = capsys.readouterr()
     assert (
         "top sheets failed: most_starred: PermissionError (Permission denied);"
         " run kb write-tops again"
-    ) in error_output
-    assert str(vault_dir) not in error_output
+    ) in output.err
+    assert str(vault_dir) not in output.err
+    # The type alone, never the message, which names the vault; no count of the raw files
+    # deleted, as the top stopped may have deleted some.
+    assert output.out == (
+        "\nmost_starred: failed (PermissionError)\n"
+        "most_forked: ok, 2 sheets written\n"
+        "Sheets vault path: veille/tops/\n\n"
+    )
 
 
 def test_an_unreadable_ranking_is_kept_and_write_tops_exits_4_with_the_sheets_written(
@@ -170,11 +187,10 @@ def test_an_unreadable_ranking_is_kept_and_write_tops_exits_4_with_the_sheets_wr
     assert unreadable.exists()
     assert rankings["most_starred"][0].exists()
     assert len(list_sheets(vault_dir)) == 2
-    assert (
-        "most_starred sheets: written 1,"
-        " rankings skipped (sheet of their day exists) 0,"
-        " superseded rankings deleted 0, unreadable rankings kept 1\n"
-    ) in capsys.readouterr().out
+    # The sheet written does not hide the ranking kept unread: the top failed.
+    assert capsys.readouterr().out.startswith(
+        "\nmost_starred: failed (ranking_unreadable)\nmost_forked: ok, 1 sheet written\n"
+    )
 
 
 def test_a_sigterm_while_a_sheet_is_written_stops_write_tops_and_deletes_no_ranking(

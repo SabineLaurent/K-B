@@ -259,8 +259,8 @@ def test_a_missing_database_is_refused_and_not_created(tmp_path):
         read_imported_paths(tmp_path / "k-b.sqlite")
     with pytest.raises(MissingDatabaseError):
         import_items(
-            RawReading([], [], []),
-            TrendReading([], [], []),
+            RawReading([], [], 0),
+            TrendReading([], [], 0),
             tmp_path / "k-b.sqlite",
             log_path_at(tmp_path, FIRST_IMPORT_AT),
             FIRST_IMPORT_AT,

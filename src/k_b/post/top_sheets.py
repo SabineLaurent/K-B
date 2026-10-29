@@ -27,6 +27,9 @@ from k_b.post.vault_files import (
 
 logger = logging.getLogger(__name__)
 
+# The folder of the sheets of the tops, in the vault: one folder per top under it.
+SHEETS_VAULT_PATH = PurePosixPath(WATCH_DIR_NAME, TOPS_DIR_NAME)
+
 
 @dataclass(frozen=True)
 class TopSheetsOutcome:
@@ -114,7 +117,7 @@ def find_collection_time(key: str) -> datetime | None:
 
 
 def find_sheets_dir(vault_dir: Path, top: Top) -> Path:
-    return vault_dir / WATCH_DIR_NAME / TOPS_DIR_NAME / top.name
+    return vault_dir / SHEETS_VAULT_PATH / top.name
 
 
 def find_sheet_path(sheets_dir: Path, collected_at: datetime) -> Path:

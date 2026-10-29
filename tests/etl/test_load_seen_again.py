@@ -23,7 +23,6 @@ from load_helpers import (
     read_discards,
     read_log,
     run_import,
-    totals,
     write_collection,
 )
 from test_transform import FIXTURES_DIR
@@ -36,7 +35,7 @@ def test_a_second_import_without_new_raw_reads_nothing_and_changes_nothing(data_
     second = run_import(data_dir)
 
     assert first.read_count == 4
-    assert totals(second) == (0, 0, 0, 0, 0, 0)
+    assert second == (0, 0, 0, 0, 0, 0)
     assert dump_database(data_dir) == tables
     assert read_log(data_dir) == []
 

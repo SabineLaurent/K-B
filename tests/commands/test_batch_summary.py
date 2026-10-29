@@ -5,20 +5,19 @@ import pytest
 from k_b.commands.batch_summary import describe_duration, render_rule, render_table
 
 
-def test_a_table_pads_each_column_to_its_widest_cell_and_the_counts_on_the_left():
+def test_a_table_pads_each_column_to_its_widest_cell():
     lines = render_table(
         [
             ("source", "raw files", "note"),
             ("tldr_ai", "6", ""),
             ("cisa_kev", "12", "x"),
-        ],
-        right_aligned=frozenset({1}),
+        ]
     )
 
     assert lines == [
         "source    raw files  note",
-        "tldr_ai           6",
-        "cisa_kev         12  x",
+        "tldr_ai   6",
+        "cisa_kev  12         x",
     ]
     assert render_rule(lines) == "-" * len("source    raw files  note")
 

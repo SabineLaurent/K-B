@@ -75,11 +75,6 @@ def list_logs(data_dir):
     return sorted(data_dir.glob("import-log-*.jsonl"))
 
 
-def totals(summary):
-    """The totals of an import summary, without its counts by source."""
-    return tuple(summary)[:6]
-
-
 def run_import(
     data_dir,
     tracked_repositories=GITHUB_TRACKED_REPOSITORIES,

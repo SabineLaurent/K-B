@@ -15,7 +15,6 @@ from k_b.etl.extract import CollectionOutcome, collect_all_sources
 from k_b.etl.load import (
     ImportLogExistsError,
     ImportSummary,
-    SourceImport,
     import_items,
     read_imported_paths,
 )
@@ -29,7 +28,6 @@ __all__ = [
     "CollectionOutcome",
     "ImportLogExistsError",
     "ImportOutcome",
-    "SourceImport",
     "collect",
     "import_raw_files",
     "purge_superseded_raw",
@@ -44,8 +42,6 @@ class ImportOutcome(NamedTuple):
 
     summary: ImportSummary
     log_path: Path
-    # The sources of raw/ whose kind has no reader: the rankings kb write-tops reads.
-    unread_sources: list[str]
 
 
 def collect(sources: list[Source], data_dir: Path, now: datetime) -> CollectionOutcome:
@@ -81,18 +77,18 @@ def import_raw_files(
         imported_at,
         tracked_repositories,
     )
-    return ImportOutcome(summary, log_path, readings.unread_sources)
+    return ImportOutcome(summary, log_path)
 
 
 def purge_superseded_raw(
     data_dir: Path, latest_only_folder_keys: Collection[str]
-) -> int:
-    """Delete the raw files of the folders given that the last one imported superseded; return
-    how many.
+) -> None:
+    """Delete the raw files of the folders given that the last one imported superseded; the
+    purge logs how many.
 
     Run after the import, so that a file the base registers for the first time can be the one
     kept."""
-    return delete_superseded_raw_files(
+    delete_superseded_raw_files(
         RawStore(data_dir),
         read_imported_paths(data_dir / DATABASE_FILE_NAME),
         latest_only_folder_keys,

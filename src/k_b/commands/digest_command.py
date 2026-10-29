@@ -48,6 +48,7 @@ class SummaryRow(NamedTuple):
 
 
 SUMMARY_HEADER = SummaryRow("subject", "status", "sheet")
+SUMMARY_TITLE = "Digest summary"
 
 
 def run_digest(environ: Mapping[str, str]) -> int:
@@ -96,6 +97,9 @@ def run_digest(environ: Mapping[str, str]) -> int:
     written_count = sum(1 for row in rows if row.status == SHEET_WRITTEN)
     failed_count = len(rows) - written_count
     print(render_digest_summary(response, rows, written_count, failed_count))
+    # A blank line after the result, apart from what follows (make's line of an error):
+    # decision of Sabine of 2026-10-29, as for kb collect.
+    print()
     return find_exit_code(has_failed=failed_count > 0, has_done=written_count > 0)
 
 
@@ -146,7 +150,9 @@ def render_digest_summary(
     return "\n".join(
         [
             "",
-            "Digest summary",
+            # Underlined, the title of the block (decision of Sabine of 2026-10-29).
+            SUMMARY_TITLE,
+            "-" * len(SUMMARY_TITLE),
             f"Window: {since} → {until}, {response.items_in} items read",
             "",
             *table,
