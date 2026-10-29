@@ -42,8 +42,8 @@ IMPORT_SUMMARY_HEADER = ("source", "raw read", "written", "left out", "rejected"
 
 
 def run_import(data_dir: Path) -> int:
-    """Run the import, purge the raw files superseded, then print the summary; the purge comes
-    after the import is committed, and the summary is printed even when the purge fails."""
+    """Run the import, print its summary, then purge the raw files superseded; before the purge,
+    so that whatever stops it (an error, Ctrl-C) leaves the summary of the import committed."""
     imported_at = datetime.now(UTC).replace(microsecond=0)
     logger.info("import started")
     started = monotonic()
@@ -65,16 +65,17 @@ def run_import(data_dir: Path) -> int:
     ) as error:
         logger.error("%s: %s", type(error).__name__, error)
         return ExitCode.FAILED
-    try:
-        deleted_count: int | None = purge_superseded_raw(
-            data_dir, LATEST_ONLY_FOLDER_KEYS
-        )
-        purge_error = None
-    except (sqlite3.Error, OSError, ValueError) as error:
-        deleted_count = None
-        purge_error = error
     logger.info("import finished in %s", describe_duration(monotonic() - started))
-    print(render_import_summary(outcome, deleted_count))
+    print(render_import_summary(outcome))
+    deleted_count: int | None = None
+    purge_error: Exception | None = None
+    try:
+        deleted_count = purge_superseded_raw(data_dir, LATEST_ONLY_FOLDER_KEYS)
+    except (sqlite3.Error, OSError, ValueError) as error:
+        purge_error = error
+    finally:
+        # The log last, even when the purge is stopped.
+        print(render_import_end(outcome.log_path, deleted_count))
     if purge_error is not None:
         # The type, and the reason of an OSError, never the name of a raw file.
         logger.error(
@@ -87,10 +88,9 @@ def run_import(data_dir: Path) -> int:
     return ExitCode.SUCCEEDED
 
 
-def render_import_summary(outcome: ImportOutcome, deleted_count: int | None) -> str:
+def render_import_summary(outcome: ImportOutcome) -> str:
     """The summary after the end line: a row per source and the total, the trend rows of
-    gh_archive apart from the items, the sources left unread, then the withdrawals, the raw
-    files deleted (none when the purge failed) and, last, the log."""
+    gh_archive apart from the items, the sources left unread, then the withdrawals."""
     summary = outcome.summary
     total = (
         "total",
@@ -132,11 +132,16 @@ def render_import_summary(outcome: ImportOutcome, deleted_count: int | None) -> 
             f" {summary.withdrawn_count}"
         ),
     ]
+    return "\n".join(lines)
+
+
+def render_import_end(log_path: Path, deleted_count: int | None) -> str:
+    """After the purge: the raw files it deleted (no line when it did not end), then the log."""
+    lines = [f"Log: {log_path}"]
     if deleted_count is not None:
-        lines.append(
-            f"Older raw files deleted (a newer one replaces them): {deleted_count}"
+        lines.insert(
+            0, f"Older raw files deleted (a newer one replaces them): {deleted_count}"
         )
-    lines.append(f"Log: {outcome.log_path}")
     return "\n".join(lines)
 
 
@@ -146,7 +151,7 @@ def describe_source_import(
     """A source of trends (gh_archive) writes trend rows, not items: its written cell says so."""
     written = (
         f"{source_import.trend_count} trend rows"
-        if source_import.trend_count
+        if source_import.writes_trends
         else str(source_import.item_count)
     )
     return (

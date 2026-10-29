@@ -14,6 +14,7 @@ from k_b.commands import (
 )
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl import pipeline
+from k_b.etl.pipeline import SourceImport
 
 
 def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, capsys):
@@ -211,6 +212,33 @@ def test_import_names_the_sources_without_a_reader_left_in_raw(
         "  github_most_forked\n"
         "  github_most_starred\n"
     ) in capsys.readouterr().out
+
+
+def test_a_source_of_trends_without_a_row_written_says_0_trend_rows():
+    row = import_command.describe_source_import(
+        "gh_archive", SourceImport(1, 0, 1, 0, 0, writes_trends=True)
+    )
+
+    assert row == ("gh_archive", "1", "0 trend rows", "1", "0")
+
+
+def test_a_purge_stopped_by_ctrl_c_still_prints_the_summary_and_the_log(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    capsys.readouterr()
+
+    def interrupt(data_dir, folder_keys):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(import_command, "purge_superseded_raw", interrupt)
+
+    assert cli.main(["import"]) == cli.ExitCode.STOPPED_BY_SIGINT
+    output = capsys.readouterr().out
+    assert "Import summary\n" in output
+    assert "Older raw files deleted" not in output
+    assert output.endswith(f"Log: {next(tmp_path.glob('import-log-*.jsonl'))}\n")
 
 
 class FrozenDatetime(datetime):

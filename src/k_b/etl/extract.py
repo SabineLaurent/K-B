@@ -44,7 +44,6 @@ def collect_all_sources(
     raw_file_counts: dict[str, int] = {}
     for source in sources:
         written_paths: list[Path] = []
-        raw_file_counts[source.name] = 0
         try:
             collect_one_source(
                 source,
@@ -54,7 +53,6 @@ def collect_all_sources(
                 written_paths,
             )
         except Exception as error:
-            raw_file_counts[source.name] = len(written_paths)
             # The error and the notes of a source (the day and url of a page) go on the dated
             # line, quoted: any source may raise any text. The traceback follows it.
             notes = "".join(
@@ -70,7 +68,6 @@ def collect_all_sources(
             )
             errors_by_source[source.name] = error
         else:
-            raw_file_counts[source.name] = len(written_paths)
             # One line per source collected, whatever it brought (decision of Sabine of
             # 2026-10-28): a source that writes no line of its own is not silent.
             logger.info(
@@ -80,6 +77,9 @@ def collect_all_sources(
             )
             last_collection_dates[source.name] = now
             errors_by_source[source.name] = None
+        finally:
+            # Those written before a failure included: they stay in raw/ and are imported.
+            raw_file_counts[source.name] = len(written_paths)
     try:
         save_last_collection_dates(data_dir, last_collection_dates)
     except OSError as error:

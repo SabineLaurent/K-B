@@ -146,8 +146,8 @@ def test_the_same_article_summarized_by_two_editions_is_kept_twice(tldr_data_dir
     assert totals(summary) == (6, 0, 0, 2, 0, 0)
     # Each edition its own row in the summary of kb import, by the folder of its source.
     assert summary.by_source == {
-        "tldr_ai": SourceImport(1, 3, 0, 0, 0),
-        "tldr_dev": SourceImport(1, 3, 0, 0, 0),
+        "tldr_ai": SourceImport(1, 3, 0, 0, 0, False),
+        "tldr_dev": SourceImport(1, 3, 0, 0, 0, False),
     }
     assert fetch_rows(
         tldr_data_dir,

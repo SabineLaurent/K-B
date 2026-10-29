@@ -6,6 +6,7 @@ nothing in the base and leaves no log."""
 
 import logging
 import sqlite3
+from collections import Counter, defaultdict
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
@@ -41,6 +42,8 @@ class SourceImport(NamedTuple):
     discard_count: int
     rejection_count: int
     trend_count: int
+    # A source of trends (gh_archive): it writes trend rows, never items.
+    writes_trends: bool
 
 
 class ImportSummary(NamedTuple):
@@ -98,7 +101,11 @@ def import_items(
         reading.read_count + trend_reading.read_count,
         writing.withdrawn_count,
         writing.trend_count,
-        count_by_source([*reading.opened_paths, *trend_reading.opened_paths], writings),
+        count_by_source(
+            trend_reading.opened_paths,
+            [*reading.opened_paths, *trend_reading.opened_paths],
+            writings,
+        ),
     )
 
 
@@ -128,24 +135,26 @@ def find_raw_file(file_read: RawFile | TrendFile) -> RawFile:
 
 
 def count_by_source(
-    opened_paths: list[str], writings: list[tuple[str, FileWriting]]
+    trend_paths: list[str],
+    opened_paths: list[str],
+    writings: list[tuple[str, FileWriting]],
 ) -> dict[str, SourceImport]:
     """The counts of the summary, by source: the files opened, and the sum of its writings."""
-    source_names = sorted(
-        {find_source_name(path) for path in opened_paths}
-        | {source_name for source_name, _ in writings}
-    )
+    opened_counts = Counter(find_source_name(path) for path in opened_paths)
+    trend_sources = {find_source_name(path) for path in trend_paths}
+    writings_by_source: defaultdict[str, list[FileWriting]] = defaultdict(list)
+    for source_name, file_writing in writings:
+        writings_by_source[source_name].append(file_writing)
     by_source = {}
-    for source_name in source_names:
-        writing = join_writings(
-            [file_writing for name, file_writing in writings if name == source_name]
-        )
+    for source_name in sorted(opened_counts.keys() | writings_by_source.keys()):
+        writing = join_writings(writings_by_source[source_name])
         by_source[source_name] = SourceImport(
-            sum(1 for path in opened_paths if find_source_name(path) == source_name),
+            opened_counts[source_name],
             writing.item_count,
             len(writing.discards) + len(writing.trend_discards),
             len(writing.rejections),
             writing.trend_count,
+            source_name in trend_sources,
         )
     return by_source
 

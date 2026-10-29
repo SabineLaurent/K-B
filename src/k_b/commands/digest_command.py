@@ -8,7 +8,11 @@ from pathlib import Path
 from time import monotonic
 from typing import NamedTuple
 
-from k_b.commands.batch_summary import describe_duration, render_rule
+from k_b.commands.batch_summary import (
+    describe_duration,
+    render_rule,
+    render_table,
+)
 from k_b.commands.exit_codes import ExitCode, find_exit_code
 from k_b.commands.run_log import (
     LOGGER_NAME,
@@ -133,12 +137,9 @@ def render_digest_summary(
     """The summary after the end line: the window, a row per subject and the total, then the
     model and the id of the request, last, the reference to give when something goes wrong."""
     window = response.window
+    table = render_table([SUMMARY_HEADER, *rows])
+    # The total spans the status and the sheet: out of the table, under the status.
     subject_width = max(len(row.subject) for row in [SUMMARY_HEADER, *rows])
-    status_width = max(len(row.status) for row in [SUMMARY_HEADER, *rows])
-    table = [
-        f"{row.subject:<{subject_width}}  {row.status:<{status_width}}  {row.sheet}".rstrip()
-        for row in [SUMMARY_HEADER, *rows]
-    ]
     since, until = window.since.date().isoformat(), window.until.date().isoformat()
     return "\n".join(
         [

@@ -100,7 +100,7 @@ def test_a_ranking_gives_a_trend_row_per_repository_of_its_window_and_no_item(
 
     # The 5 rows share one window: the file being written leaves none of its own rows out.
     assert totals(summary) == (0, 0, 0, 1, 0, 5)
-    assert summary.by_source == {GH_ARCHIVE_DIR: SourceImport(1, 0, 0, 0, 5)}
+    assert summary.by_source == {GH_ARCHIVE_DIR: SourceImport(1, 0, 0, 0, 5, True)}
     assert fetch_rows(trend_data_dir, TREND_QUERY) == [
         (
             "2026-10-10T00:00:00Z",
@@ -140,6 +140,8 @@ def test_a_ranking_read_again_changes_nothing_and_its_window_is_logged_already_s
     second = run_import(trend_data_dir, read_again=True)
 
     assert totals(second) == (0, 1, 0, 1, 0, 0)
+    # No row written: still a source of trends, its written cell says 0 trend rows.
+    assert second.by_source == {GH_ARCHIVE_DIR: SourceImport(1, 0, 1, 0, 0, True)}
     assert dump_database(trend_data_dir) == tables
     assert read_log(trend_data_dir) == [
         {
