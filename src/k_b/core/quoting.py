@@ -5,7 +5,7 @@ import re
 from pydantic import ValidationError
 from pydantic_core import InitErrorDetails
 
-# The longest value quoted, quotes and escapes included.
+# The length a value is cut to by default, quotes and escapes included.
 MAX_QUOTED_VALUE_LENGTH = 100
 # A part of the place of an error written as it is: the name of a field of a model. Any other, a
 # key of a dict, comes from the input.

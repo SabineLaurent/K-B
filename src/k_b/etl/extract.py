@@ -27,7 +27,8 @@ SAFE_PAGE_NAME = re.compile(r"[a-z0-9_-]+")
 # 2026-10-29). Any other error keeps its traceback: a fault to find in the code.
 EXPECTED_SOURCE_ERRORS = (ExpectedSourceError, URLError, ConnectionError, TimeoutError)
 # The longest message, or note, of a failure quoted on its line: without a traceback, the line is
-# its only copy. Enough for the longest of K-B, Zotero's (200 characters and its start).
+# its only copy. Enough for the longest of K-B, Zotero's: 252 characters quoted for a printable
+# problem cut to 200; control characters, escaped twice, can pass it.
 MAX_QUOTED_FAILURE_LENGTH = 300
 
 

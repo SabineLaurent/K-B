@@ -113,15 +113,15 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   Sabine, le dépôt étant privé jusqu'au 25/10, puis public.
 - **Panne d'une source** (`src/k_b/etl/extract.py`) : toute erreur levée par une source est
   rattrapée. La source affiche `failed (<type d'erreur>)`, l'erreur va au journal de
-  fonctionnement, sa date de dernière collecte reste, et les sources suivantes sont
-  lancées ; la collecte suivante redemande la même fenêtre. Une erreur prévue (`ExpectedSourceError`
-  et ses filles, dont `PageRefusedError` pour une page refusée sur ce qu'elle contient, ou une
-  erreur réseau : `URLError`, dont `HTTPError` pour un statut HTTP refusé, `ConnectionError`,
-  `TimeoutError` ; pas les erreurs de BigQuery) tient sur sa ligne, sans trace ;
-  toute autre garde sa trace Python, la faute étant à chercher dans le code (décision de Sabine du
-  2026-10-29, #361). Le message et les notes y sont coupés à 300 caractères : sans trace, la
-  ligne en est la seule copie. Le brut n'est écrit qu'une fois la
-  source allée au bout de sa lecture : une source en échec n'écrit rien. Exception : une source à
+  fonctionnement, sa date de dernière collecte reste, et les sources suivantes sont lancées ; la
+  collecte suivante redemande la même fenêtre. Une erreur prévue (`ExpectedSourceError` et ses
+  filles, dont `PageRefusedError` pour une page refusée sur ce qu'elle contient, ou une erreur
+  réseau : `URLError`, dont `HTTPError` pour un statut HTTP refusé, `ConnectionError`,
+  `TimeoutError` ; pas les erreurs de BigQuery) tient sur sa ligne, sans trace ; toute autre garde
+  sa trace Python, la faute étant à chercher dans le code (décision de Sabine du 2026-10-29, #361).
+  Le message et les notes y sont coupés à 300 caractères : sans trace, la ligne en est la seule
+  copie. Le brut n'est écrit qu'une fois la source allée au bout de sa lecture : une source en
+  échec n'écrit rien. Exception : une source à
   plusieurs pages (tldr, clips) vérifie le nom de chaque page avant d'écrire la première, mais
   une écriture qui échoue au milieu (disque plein) laisse les pages déjà écrites. Chaque source dit
   ses états propres (« En cas de panne », dans sa section) ; deux familles valent pour plusieurs :
@@ -405,10 +405,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     clip valide suivant ; elle est alors copiée, et rejetée à chaque import ;
   - `ClippingsFolderMissingError` (`clippings_folder_missing`, sans chemin dans le message) : le
     coffre n'a pas de dossier `Clippings/`, ou n'existe pas. Créer `Clippings/`, attendre le
-    premier clip (Web Clipper le crée), ou vérifier `KB_VAULT_DIR` : le message le dit. Pas pris pour un coffre sans clip : la date de collecte
-    avancerait, et les clips qu'un montage ou une synchronisation apporteraient ensuite, avec
-    leurs dates anciennes, ne seraient jamais copiés (décision du 2026-10-17, tranchée par
-    time-knight sur délégation de Sabine, qui inverse une correction du même jour) ;
+    premier clip (Web Clipper le crée), ou vérifier `KB_VAULT_DIR` : le message le dit. Pas pris
+    pour un coffre sans clip : la date de collecte avancerait, et les clips qu'un montage ou une
+    synchronisation apporteraient ensuite, avec leurs dates anciennes, ne seraient jamais copiés
+    (décision du 2026-10-17, tranchée par time-knight sur délégation de Sabine, qui inverse une
+    correction du même jour) ;
   - `PermissionError` : un clip ou le dossier ne se lit pas (droits) ;
   - `OSError` : un clip qui ne se lit pas pour une autre raison, dont `ELOOP` (un fichier
     remplacé par un lien symbolique entre sa liste et sa lecture). Hypothèse, non vérifiée : un

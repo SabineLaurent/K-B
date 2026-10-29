@@ -6,7 +6,7 @@ from urllib.error import HTTPError, URLError
 
 import pytest
 
-from k_b.etl.extract import collect_all_sources
+from k_b.etl.extract import MAX_QUOTED_FAILURE_LENGTH, collect_all_sources
 from k_b.etl.http_download import RedirectedOutsideError
 from k_b.etl.raw_store import load_last_collection_dates, save_last_collection_dates
 from k_b.etl.source_contract import ExpectedSourceError, PageRefusedError
@@ -91,6 +91,21 @@ def test_an_expected_failure_is_logged_with_its_long_message_and_notes_whole(
 
     [record] = caplog.records
     assert record.getMessage().endswith(f"'{'m' * 250}'; '{'n' * 250}'")
+
+
+def test_a_failure_message_longer_than_the_cut_is_cut_on_its_line(tmp_path, caplog):
+    error = ExpectedSourceError("m" * 500)
+
+    with caplog.at_level(logging.ERROR, logger="k_b.etl.extract"):
+        collect_all_sources(
+            [FailingSource(error)], tmp_path / "raw", tmp_path, FIRST_RUN_AT
+        )
+
+    [record] = caplog.records
+    quoted = record.getMessage().removeprefix(
+        "collection failed for source 'failing': ExpectedSourceError "
+    )
+    assert quoted == ("'" + "m" * 500)[:MAX_QUOTED_FAILURE_LENGTH]
 
 
 @pytest.mark.parametrize(
