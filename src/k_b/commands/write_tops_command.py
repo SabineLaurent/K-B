@@ -40,7 +40,7 @@ def run_write_tops(data_dir: Path, environ: Mapping[str, str]) -> int:
     has_failed = False
     has_done = False
     # The line of each top, printed once all are done; no count of the rankings deleted once a
-    # top stopped, as it may have deleted some before its error.
+    # top stopped, as its error may have come amid its deletions, its last step.
     lines: list[str] = []
     deleted_count: int | None = 0
     for top in TOPS:

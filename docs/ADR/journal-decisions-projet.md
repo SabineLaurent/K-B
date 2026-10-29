@@ -4540,7 +4540,8 @@ time-knight relu par un sous-agent et validé par elle.
   droite de `render_table`.
   - **collect** reprend le rendu d'avant #291 : `<source>: ok` ou `failed (<type>)`, puis
     `<source>: skipped (<réglage>)`, puis `collection_state: failed (<type>)` si l'état n'est pas
-    écrit. Le nombre de bruts écrits est au journal seulement.
+    écrit. Le nombre de bruts écrits par une source collectée est au journal seulement ; celui
+    d'une source en échec au milieu de ses pages n'est plus donné, comme avant #291.
   - **import** affiche une ligne :
     `import: N raw read, N written, N trend rows, N left out, N rejected, N withdrawn`. Une ligne de
     journal nouvelle, `import log kept: '<nom>'`, dit où lire les rejets, choix de Sabine : sur un
@@ -4563,9 +4564,9 @@ time-knight relu par un sous-agent et validé par elle.
   Limites assumées :
   - **write-tops imprime ses lignes une fois tous les tops finis**, comme collect : un SIGINT ou
     un SIGTERM pendant le second top fait perdre la ligne du premier.
-  - **`Older raw files deleted` manque quand un top a été arrêté par une erreur**, car les
-    suppressions déjà faites ne sont pas connues. C'était la règle de l'ancien bilan de l'import.
-    L'erreur est au journal.
+  - **`Older raw files deleted` manque quand un top a été arrêté par une erreur** : la commande
+    ne sait pas si l'erreur est venue pendant ses suppressions, la dernière étape d'un top. C'était
+    la règle de l'ancien bilan de l'import. L'erreur est au journal.
 
   — PR de #359
 

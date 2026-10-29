@@ -34,7 +34,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   gh_archive: skipped (not in KB_COLLECT_ONLY)
   ```
 
-  Le nombre de bruts écrits par source est au journal seulement. Quand
+  Le nombre de bruts écrits par une source collectée est au journal seulement. Une source en
+  échec au milieu de ses pages (une écriture qui échoue) garde dans `raw/` les pages déjà écrites,
+  entières, que l'import suivant lit ; leur nombre n'est donné nulle part. Quand
   l'état ne s'écrit pas, le brut est déjà écrit : `kb collect` journalise l'erreur avec le chemin
   du fichier et ajoute la ligne `collection_state: failed (<type d'erreur>)`. Les dates de
   dernière collecte n'avancent pas : la collecte suivante relit les mêmes fenêtres, et l'import

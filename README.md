@@ -298,8 +298,8 @@ ces relevés sont supprimés. Il journalise son début et sa fin avec la durée,
 par top : `ok, 1 sheet written` ; `ok, 0 sheets written, the sheet of the day already exists` ;
 `failed (<type>)` pour un top arrêté, avec le type de l'erreur seul, ou `failed (ranking_unreadable)`
 pour un relevé illisible ou mal nommé, gardé ; `no ranking` sans relevé. Suivent les relevés
-remplacés supprimés (`Older raw files deleted: N`, absent si un top a été arrêté : ses suppressions
-déjà faites ne sont pas connues) et le dossier des fiches dans le coffre
+remplacés supprimés (`Older raw files deleted: N`, absent si un top a été arrêté : l'erreur a pu
+venir pendant ses suppressions) et le dossier des fiches dans le coffre
 (`Sheets vault path: veille/tops/`). Code de sortie :
 
 - 0 : chaque top a réussi, ou n'a aucun relevé ;
