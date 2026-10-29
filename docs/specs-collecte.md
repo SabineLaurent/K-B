@@ -113,8 +113,12 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   Sabine, le dépôt étant privé jusqu'au 25/10, puis public.
 - **Panne d'une source** (`src/k_b/etl/extract.py`) : toute erreur levée par une source est
   rattrapée. La source affiche `failed (<type d'erreur>)`, l'erreur va au journal de
-  fonctionnement avec sa trace, sa date de dernière collecte reste, et les sources suivantes sont
-  lancées ; la collecte suivante redemande la même fenêtre. Le brut n'est écrit qu'une fois la
+  fonctionnement, sa date de dernière collecte reste, et les sources suivantes sont
+  lancées ; la collecte suivante redemande la même fenêtre. Une erreur prévue (`ExpectedSourceError`
+  et ses filles, dont `PageRefusedError` pour une page refusée sur ce qu'elle contient, ou une
+  erreur réseau : `URLError`, `ConnectionError`, `TimeoutError`) tient sur sa ligne, sans trace ;
+  toute autre garde sa trace Python, la faute étant à chercher dans le code (décision de Sabine du
+  2026-10-29, #361). Le brut n'est écrit qu'une fois la
   source allée au bout de sa lecture : une source en échec n'écrit rien. Exception : une source à
   plusieurs pages (tldr, clips) vérifie le nom de chaque page avant d'écrire la première, mais
   une écriture qui échoue au milieu (disque plein) laisse les pages déjà écrites. Chaque source dit
@@ -398,8 +402,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     frontmatter posée seule dans `Clippings/` fait échouer la source à chaque collecte, jusqu'au
     clip valide suivant ; elle est alors copiée, et rejetée à chaque import ;
   - `ClippingsFolderMissingError` (`clippings_folder_missing`, sans chemin dans le message) : le
-    coffre n'a pas de dossier `Clippings/`, ou n'existe pas. Créer `Clippings/`, ou attendre le
-    premier clip (Web Clipper le crée). Pas pris pour un coffre sans clip : la date de collecte
+    coffre n'a pas de dossier `Clippings/`, ou n'existe pas. Créer `Clippings/`, attendre le
+    premier clip (Web Clipper le crée), ou vérifier `KB_VAULT_DIR` : le message le dit. Pas pris pour un coffre sans clip : la date de collecte
     avancerait, et les clips qu'un montage ou une synchronisation apporteraient ensuite, avec
     leurs dates anciennes, ne seraient jamais copiés (décision du 2026-10-17, tranchée par
     time-knight sur délégation de Sabine, qui inverse une correction du même jour) ;
@@ -485,8 +489,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   entière », ci-dessus) ou si la date de son `h1` n'est pas le jour demandé (`edition of
   <date>`). Une page refusée n'est jamais écrite. Selon son jour :
   - **un jour passé, après le dernier jour qui a donné une édition dans la collecte, ou sans
-    édition lue** : la source échoue (`ValueError` `not_the_edition_of_the_day`, `refuse`,
-    `tldr.py:137-144`), avec deux notes par jour refusé de la fenêtre, dans l'ordre, y compris
+    édition lue** : la source échoue (`PageRefusedError` `not_the_edition_of_the_day`, `refuse`,
+    `tldr.py:140-147`), avec deux notes par jour refusé de la fenêtre, dans l'ordre, y compris
     ceux qui précèdent une édition lue : le jour et l'URL demandée, puis ce qui a été observé
     (refus du lecteur, `h1` cité par `quote_value`, ou `edition of <date>`) ;
     `src/k_b/etl/extract.py:48-50` cite chaque note à part, échappée et coupée à 100

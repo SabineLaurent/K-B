@@ -91,6 +91,10 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
   seconde, avec la zone (`2026-10-14T11:30:00Z`, le format des dates de la base ; décision du
   2026-10-12). La règle vaut par enregistrement : la trace d'une erreur suit sa ligne datée et
   lui appartient (décision du 2026-10-14).
+- L'échec d'une source à la collecte : une erreur prévue (`ExpectedSourceError`, dont
+  `PageRefusedError`, ou une erreur réseau) est journalisée sur sa ligne seule, sans trace ; toute
+  autre garde sa trace (`EXPECTED_SOURCE_ERRORS`, `etl/extract.py` ; décision de Sabine du
+  2026-10-29, #361).
 - `print` donne le résultat d'une commande ; `logger` donne le déroulé. Un échec est journalisé
   une fois, là où il est traité.
 - Une animation d'attente, sur la sortie d'erreur d'un terminal seulement, effacée avant la suite,
@@ -107,6 +111,8 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
   des journaux, l'horloge UTC et le format de date de la base.
 - `uv run pytest tests/commands/test_run_log.py -k log_line` : une ligne émise est datée en UTC avec sa zone,
   sur la sortie d'erreur et, pour une erreur, dans le fichier, au même format.
+- `uv run pytest tests/etl/test_extract.py -k failure_is_logged` : l'échec prévu d'une source n'a
+  pas de trace, un échec imprévu a la sienne.
 - `grep -rniE "may be|maybe|probably|perhaps" src/k_b` ne renvoie rien.
 - `uv run pytest` : un test donne une entrée refusée qui contient une valeur repérable sur
   plusieurs lignes et un auteur, et vérifie le message (valeur tronquée et échappée, auteur
