@@ -112,6 +112,7 @@ def test_digest_writes_the_sheet_of_each_subject_and_says_so(
     assert capsys.readouterr().out == (
         "\n"
         "Digest summary\n"
+        "--------------\n"
         "Window: 2026-10-18 → 2026-10-21, 4 items read\n"
         "\n"
         "subject      status         sheet\n"

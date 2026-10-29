@@ -4560,8 +4560,10 @@ time-knight relu par un sous-agent et validé par elle.
     échec (`make: *** [collect] Error 4`), autre idée de Sabine. Une ligne vide écrite par le
     `Makefile` en cas d'échec a été écartée au profit de la sienne, plus simple.
     Limite : un arrêt avant tout résultat (code 2) n'imprime rien.
-    `kb digest` finit lui aussi son bilan par une ligne vide, à la demande de Sabine ; son tableau
-    ne change pas.
+    `kb digest` finit lui aussi son bilan par une ligne vide, et son titre `Digest summary` est
+    souligné de `-`, pour qu'il se lise comme le titre du bloc (demandes de Sabine) ; son tableau ne
+    change pas. Écartés : un soulignement de `=`, qui l'aurait distingué de la règle du total ; les
+    capitales ; le gras ANSI, qu'il faudrait réserver au terminal.
     Écartés : un titre au-dessus du résultat, plus long que la ligne de l'import ; une règle
     `-----`, qui sépare le total d'un tableau dans digest.
 

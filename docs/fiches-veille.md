@@ -1285,6 +1285,7 @@ la sortie standard (exemple de l'essai du 2026-10-28, la fenêtre et le nombre d
 
 ```
 Digest summary
+--------------
 Window: 2026-10-25 → 2026-10-28, 412 items read
 
 subject               status         sheet

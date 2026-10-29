@@ -48,6 +48,7 @@ class SummaryRow(NamedTuple):
 
 
 SUMMARY_HEADER = SummaryRow("subject", "status", "sheet")
+SUMMARY_TITLE = "Digest summary"
 
 
 def run_digest(environ: Mapping[str, str]) -> int:
@@ -149,7 +150,9 @@ def render_digest_summary(
     return "\n".join(
         [
             "",
-            "Digest summary",
+            # Underlined, the title of the block (decision of Sabine of 2026-10-29).
+            SUMMARY_TITLE,
+            "-" * len(SUMMARY_TITLE),
             f"Window: {since} → {until}, {response.items_in} items read",
             "",
             *table,
