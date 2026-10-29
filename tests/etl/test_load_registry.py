@@ -144,7 +144,7 @@ def test_a_log_of_the_same_second_stops_the_import_before_the_database(data_dir)
     with pytest.raises(ImportLogExistsError):
         import_items(
             reading,
-            TrendReading([], [], []),
+            TrendReading([], [], 0),
             database_path,
             log_path,
             FIRST_IMPORT_AT,

@@ -108,7 +108,7 @@ def test_a_sigterm_once_the_base_has_committed_keeps_the_import_and_its_log(
     imported_at = datetime.fromisoformat(log_lines[0]["imported_at"])
     assert log_path.name == f"import-log-{imported_at:%Y-%m-%dT%H%M%SZ}.jsonl"
     output = capsys.readouterr()
-    assert "raw files read" not in output.out
+    assert output.out == ""
     assert f"INFO k_b.etl.load: import committed, log kept: '{log_path.name}'" in (
         output.err
     )

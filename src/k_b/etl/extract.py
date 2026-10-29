@@ -26,9 +26,6 @@ SAFE_PAGE_NAME = re.compile(r"[a-z0-9_-]+")
 
 class CollectionOutcome(NamedTuple):
     errors_by_source: dict[str, Exception | None]
-    # The raw files each source wrote: 0 when it said nothing changed; those written before a
-    # failure included.
-    raw_file_counts: dict[str, int]
     # The raw files are written even when the state is not: the next run collects again.
     state_error: OSError | None
 
@@ -41,7 +38,6 @@ def collect_all_sources(
         raise ValueError(f"collection time must be in UTC, got {now!r}")
     last_collection_dates = load_last_collection_dates(data_dir)
     errors_by_source: dict[str, Exception | None] = {}
-    raw_file_counts: dict[str, int] = {}
     for source in sources:
         written_paths: list[Path] = []
         # Its start apart from its end: a source that hangs is named (decision of Sabine of
@@ -80,17 +76,14 @@ def collect_all_sources(
             )
             last_collection_dates[source.name] = now
             errors_by_source[source.name] = None
-        finally:
-            # Those written before a failure included: they stay in raw/ and are imported.
-            raw_file_counts[source.name] = len(written_paths)
     try:
         save_last_collection_dates(data_dir, last_collection_dates)
     except OSError as error:
         logger.exception(
             "collection state not written to %s", data_dir / COLLECTION_STATE_FILENAME
         )
-        return CollectionOutcome(errors_by_source, raw_file_counts, error)
-    return CollectionOutcome(errors_by_source, raw_file_counts, None)
+        return CollectionOutcome(errors_by_source, error)
+    return CollectionOutcome(errors_by_source, None)
 
 
 def collect_one_source(
@@ -102,7 +95,7 @@ def collect_one_source(
 ) -> None:
     """Collect one source and write what it gives under raw/: one raw file named by now, or a
     folder of that name holding one file per page; nothing if the source says nothing changed.
-    Each raw file written is added to written_paths, also when a later write fails."""
+    Each raw file written is added to written_paths."""
     if source.acquisition_dir_name not in RAW_DIR_NAMES:
         raise ValueError(f"not a folder of raw/: {source.acquisition_dir_name!r}")
     for path_segment in (source.name, source.extension):

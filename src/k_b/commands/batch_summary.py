@@ -1,20 +1,17 @@
-"""The plain-text tables and the durations of the summaries of kb collect, kb import and kb digest."""
+"""The plain-text table of the summary of kb digest, and the counts and durations of the batch
+commands."""
 
 from collections.abc import Sequence
 
 COLUMN_GAP = "  "
 
 
-def render_table(
-    rows: Sequence[Sequence[str]], right_aligned: frozenset[int] = frozenset()
-) -> list[str]:
-    """One line per row, the first one the header; the columns of right_aligned (counts) padded
-    on the left."""
+def render_table(rows: Sequence[Sequence[str]]) -> list[str]:
+    """One line per row, the first one the header, each column padded to its widest cell."""
     widths = [max(len(row[column]) for row in rows) for column in range(len(rows[0]))]
     return [
         COLUMN_GAP.join(
-            cell.rjust(width) if column in right_aligned else cell.ljust(width)
-            for column, (cell, width) in enumerate(zip(row, widths, strict=True))
+            cell.ljust(width) for cell, width in zip(row, widths, strict=True)
         ).rstrip()
         for row in rows
     ]

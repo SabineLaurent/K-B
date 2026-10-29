@@ -9,12 +9,10 @@ from load_helpers import (
     read_log,
     registered_paths,
     run_import,
-    totals,
 )
 from test_transform import FIXTURES_DIR
 
 from k_b.database.creation import create_database
-from k_b.etl.load import SourceImport
 
 # A reduced extract of the TLDR AI page of 2026-10-07, as collected on 2026-10-11: a sponsored
 # entry, three articles, a job offer of TLDR.
@@ -70,7 +68,7 @@ def test_a_tldr_page_gives_an_item_and_its_newsletter_article_per_article(
 
     summary = run_import(tldr_data_dir)
 
-    assert totals(summary) == (3, 0, 0, 1, 0, 0)
+    assert summary == (3, 0, 0, 1, 0, 0)
     rows = fetch_rows(tldr_data_dir, NEWSLETTER_ARTICLE_QUERY)
     assert rows[0] == (
         "ai",
@@ -119,7 +117,7 @@ def test_an_article_seen_again_keeps_its_first_collection_and_is_logged_already_
 
     second = run_import(tldr_data_dir)
 
-    assert totals(second) == (0, 3, 0, 1, 0, 0)
+    assert second == (0, 3, 0, 1, 0, 0)
     assert fetch_rows(tldr_data_dir, NEWSLETTER_ARTICLE_QUERY) == (
         rows_of_the_first_import
     )
@@ -143,12 +141,7 @@ def test_the_same_article_summarized_by_two_editions_is_kept_twice(tldr_data_dir
 
     summary = run_import(tldr_data_dir)
 
-    assert totals(summary) == (6, 0, 0, 2, 0, 0)
-    # Each edition its own row in the summary of kb import, by the folder of its source.
-    assert summary.by_source == {
-        "tldr_ai": SourceImport(1, 3, 0, 0, 0, False),
-        "tldr_dev": SourceImport(1, 3, 0, 0, 0, False),
-    }
+    assert summary == (6, 0, 0, 2, 0, 0)
     assert fetch_rows(
         tldr_data_dir,
         "SELECT edition, count(*), count(DISTINCT url) FROM newsletter_article"
