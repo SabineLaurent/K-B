@@ -58,7 +58,7 @@ def test_write_tops_writes_the_sheets_of_each_top_then_deletes_the_older_ranking
         "Sheets vault path: veille/tops/\n"
     )
     for line in (
-        "write-tops started: 2 rankings selected",
+        "write-tops started: 2 tops expected",
         r"write-tops finished in \d+ s",
     ):
         assert re.search(

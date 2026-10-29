@@ -34,7 +34,8 @@ def run_write_tops(data_dir: Path, environ: Mapping[str, str]) -> int:
             "%s is not an existing directory; no folder is created", VAULT_DIR_VARIABLE
         )
         return ExitCode.NOT_STARTED
-    logger.info("write-tops started: %s selected", describe_count(len(TOPS), "ranking"))
+    # Every top is written: none is selected (wording of Sabine of 2026-10-29).
+    logger.info("write-tops started: %s expected", describe_count(len(TOPS), "top"))
     started = monotonic()
     store = RawStore(data_dir)
     has_failed = False
