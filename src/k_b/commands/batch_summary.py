@@ -1,6 +1,4 @@
-"""The summaries of the batch commands (collect, import, digest): a table in plain text, each
-column as wide as its widest cell, and the duration of the run (#291). No dependency: rich was
-left out on 2026-10-21."""
+"""The plain-text tables and the durations of the summaries of kb collect, kb import and kb digest."""
 
 from collections.abc import Sequence
 

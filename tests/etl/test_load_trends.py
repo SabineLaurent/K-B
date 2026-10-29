@@ -131,6 +131,18 @@ def test_a_second_import_reads_no_ranking_again_and_changes_nothing(trend_data_d
     assert dump_database(trend_data_dir) == tables
 
 
+def test_a_source_of_trends_with_only_a_rejected_file_is_still_one(tmp_path):
+    create_database(tmp_path / "k-b.sqlite")
+    # A folder where a raw file of trends is expected: rejected before being opened.
+    (tmp_path / "raw" / AUTOMATED_WATCH / GH_ARCHIVE_DIR / "not-a-file").mkdir(
+        parents=True
+    )
+
+    summary = run_import(tmp_path)
+
+    assert summary.by_source == {GH_ARCHIVE_DIR: SourceImport(0, 0, 0, 1, 0, True)}
+
+
 def test_a_ranking_read_again_changes_nothing_and_its_window_is_logged_already_seen(
     trend_data_dir,
 ):

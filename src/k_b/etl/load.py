@@ -24,8 +24,8 @@ from k_b.etl.raw_files import (
     RawReading,
     TrendFile,
     TrendReading,
-    find_source_name,
 )
+from k_b.etl.raw_store import find_stream
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,11 @@ def import_items(
         writing.withdrawn_count,
         writing.trend_count,
         count_by_source(
-            trend_reading.opened_paths,
+            # A source of trends whose files were all rejected before being opened is one too.
+            [
+                *trend_reading.opened_paths,
+                *(rejection.raw_file_path for rejection in trend_reading.rejections),
+            ],
             [*reading.opened_paths, *trend_reading.opened_paths],
             writings,
         ),
@@ -115,14 +119,14 @@ def write_files(
     """Write each file in collection order, each writing with its source; what the reading
     rejected comes first."""
     rejected_when_read = [
-        (find_source_name(rejection.raw_file_path), FileWriting(rejections=[rejection]))
+        (find_stream(rejection.raw_file_path), FileWriting(rejections=[rejection]))
         for rejection in [*reading.rejections, *trend_reading.rejections]
     ]
     return [
         *rejected_when_read,
         *(
             (
-                find_source_name(find_raw_file(file_read).raw_file_path),
+                find_stream(find_raw_file(file_read).raw_file_path),
                 write_file(connection, file_read),
             )
             for file_read in list_files_in_collection_order(reading, trend_reading)
@@ -140,8 +144,8 @@ def count_by_source(
     writings: list[tuple[str, FileWriting]],
 ) -> dict[str, SourceImport]:
     """The counts of the summary, by source: the files opened, and the sum of its writings."""
-    opened_counts = Counter(find_source_name(path) for path in opened_paths)
-    trend_sources = {find_source_name(path) for path in trend_paths}
+    opened_counts = Counter(find_stream(path) for path in opened_paths)
+    trend_sources = {find_stream(path) for path in trend_paths}
     writings_by_source: defaultdict[str, list[FileWriting]] = defaultdict(list)
     for source_name, file_writing in writings:
         writings_by_source[source_name].append(file_writing)

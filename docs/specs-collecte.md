@@ -18,9 +18,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   `KB_COLLECT_ONLY` (ci-dessous) ; une source en panne n'arrête pas les autres. Au lancement,
   avant la première source et avant de lire l'état de collecte, il journalise une fois le nombre
   de sources lancées (`INFO k_b.cli: collection started: 17 sources selected`). Chaque source
-  collectée journalise ce qu'elle a écrit (`source 'cisa_kev' collected, raw files written: 1`,
-  `src/k_b/etl/extract.py`), qu'elle écrive ou non ses propres lignes (décision de Sabine du
-  2026-10-28). À la fin, `collection finished in 1 min 26 s`, puis le bilan (#291) :
+  journalise son départ (`source 'cisa_kev' started` : une source bloquée est nommée, décision de
+  Sabine du 2026-10-29) puis, collectée, ce qu'elle a écrit (`source 'cisa_kev' collected, raw
+  files written: 1`, `src/k_b/etl/extract.py`), qu'elle écrive ou non ses propres lignes
+  (décision de Sabine du 2026-10-28). À la fin, `collection finished in 1 min 26 s`, puis le bilan (#291) :
 
   ```
   Collection summary
@@ -744,8 +745,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
    Log: <KB_DATA_DIR>/import-log-2026-10-28T194943Z.jsonl
    ```
 
-   Une ligne par source, au nom de son dossier de `raw/` (`find_source_name`,
-   `src/k_b/etl/raw_files.py`), cité s'il sort de `[a-z0-9_]` : `raw read`, les fichiers bruts
+   Une ligne par source, au nom de son dossier de `raw/` (`find_stream`,
+   `src/k_b/etl/raw_store.py`), cité s'il sort de `[a-z0-9_]` : `raw read`, les fichiers bruts
    ouverts ; `written`, les items écrits (nouveaux ou mis à jour) ; `left out`, les items et les
    fenêtres de classement écartés (doublons, ou versions qui ne sont pas plus récentes que celle
    de la base) ; `rejected`, les rejets, détaillés au journal d'import. **gh_archive** écrit des

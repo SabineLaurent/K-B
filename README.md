@@ -237,8 +237,8 @@ KB_DATA_DIR=~/.knowledge_base uv run kb collect
 Avec le jeton rangé dans le `.env` à la racine du dépôt, ignoré par git :
 `KB_DATA_DIR=~/.knowledge_base uv run --env-file .env kb collect`.
 
-`kb collect` journalise son début (`collection started: 17 sources selected`), une ligne par
-source collectée (les bruts écrits) et sa fin avec la durée, puis affiche un bilan : un tableau
+`kb collect` journalise son début (`collection started: 17 sources selected`), le départ de
+chaque source puis ce qu'elle a écrit, et sa fin avec la durée, puis affiche un bilan : un tableau
 par source lancée (`ok` ou `failed`, avec le type de l'erreur ; le nombre de bruts écrits,
 `0 (nothing new)` pour une source sans rien de neuf), puis les sources non lancées, une par ligne
 avec le réglage qui les écarte : Zotero sans `KB_ZOTERO_DIR`, les clips sans `KB_VAULT_DIR`, GH

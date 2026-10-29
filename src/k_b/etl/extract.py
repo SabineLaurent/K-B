@@ -44,6 +44,9 @@ def collect_all_sources(
     raw_file_counts: dict[str, int] = {}
     for source in sources:
         written_paths: list[Path] = []
+        # Its start apart from its end: a source that hangs is named (decision of Sabine of
+        # 2026-10-29).
+        logger.info("source %r started", source.name)
         try:
             collect_one_source(
                 source,

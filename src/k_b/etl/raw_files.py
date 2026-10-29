@@ -18,11 +18,6 @@ def parse_collection_name(collection_name: str) -> datetime:
     )
 
 
-def find_source_name(raw_file_path: str) -> str:
-    """The source of a raw file, by its path relative to raw/: <folder of raw/>/<source>/…."""
-    return raw_file_path.split("/")[1]
-
-
 class Rejection(NamedTuple):
     raw_file_path: str
     reason: str

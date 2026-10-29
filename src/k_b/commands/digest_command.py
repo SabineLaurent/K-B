@@ -9,6 +9,7 @@ from time import monotonic
 from typing import NamedTuple
 
 from k_b.commands.batch_summary import (
+    COLUMN_GAP,
     describe_duration,
     render_rule,
     render_table,
@@ -140,6 +141,7 @@ def render_digest_summary(
     table = render_table([SUMMARY_HEADER, *rows])
     # The total spans the status and the sheet: out of the table, under the status.
     subject_width = max(len(row.subject) for row in [SUMMARY_HEADER, *rows])
+    total = describe_counts(written_count, failed_count)
     since, until = window.since.date().isoformat(), window.until.date().isoformat()
     return "\n".join(
         [
@@ -149,7 +151,7 @@ def render_digest_summary(
             "",
             *table,
             render_rule(table),
-            f"{'total':<{subject_width}}  {describe_counts(written_count, failed_count)}",
+            f"{'total':<{subject_width}}{COLUMN_GAP}{total}",
             "",
             f"Model: {response.model}",
             f"Request id: {response.request_id}",

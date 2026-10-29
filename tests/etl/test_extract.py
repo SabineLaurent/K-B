@@ -214,6 +214,18 @@ def test_each_source_counts_the_raw_files_it_wrote_and_logs_them(tmp_path, caplo
         "source 'unchanged' collected, raw files written: 0",
         "source 'scraped' collected, raw files written: 2",
     ]
+    started_lines = [
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().endswith(" started")
+    ]
+    # The broken source too: its start is logged before its failure.
+    assert started_lines == [
+        "source 'working' started",
+        "source 'unchanged' started",
+        "source 'scraped' started",
+        "source 'broken' started",
+    ]
 
 
 def test_a_source_failing_at_its_second_page_counts_the_first_one_written(tmp_path):
