@@ -12,7 +12,6 @@ import pytest
 from pydantic import ValidationError
 
 from k_b.core.config import CLIP_CHANGE_MARGIN
-from k_b.core.quoting import quote_value
 from k_b.etl.source_contract import PageRefusedError, check_not_all_invalid
 from k_b.etl.sources import clipping
 from k_b.etl.sources.clipping import (
@@ -282,11 +281,9 @@ def test_a_vault_without_its_clippings_folder_fails_without_its_path(tmp_path, v
         ClippingSource(tmp_path / vault).fetch(None)
 
     assert str(failure.value) == (
-        "clippings_folder_missing: no Clippings folder in KB_VAULT_DIR;"
+        "clippings_folder_missing: no Clippings folder in the vault of KB_VAULT_DIR;"
         " create it, or check KB_VAULT_DIR"
     )
-    # Not cut on the log line: its remedy is at its end.
-    assert quote_value(str(failure.value)) == repr(str(failure.value))
 
 
 def listed_one_nanosecond_before(vault_dir, name):

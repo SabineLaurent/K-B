@@ -77,6 +77,22 @@ def test_an_expected_failure_is_logged_on_its_line_without_its_traceback(
     assert not record.exc_info
 
 
+def test_an_expected_failure_is_logged_with_its_long_message_and_notes_whole(
+    tmp_path, caplog
+):
+    # Its line is the only copy of its message: no traceback repeats it.
+    error = ExpectedSourceError("m" * 250)
+    error.add_note("n" * 250)
+
+    with caplog.at_level(logging.ERROR, logger="k_b.etl.extract"):
+        collect_all_sources(
+            [FailingSource(error)], tmp_path / "raw", tmp_path, FIRST_RUN_AT
+        )
+
+    [record] = caplog.records
+    assert record.getMessage().endswith(f"'{'m' * 250}'; '{'n' * 250}'")
+
+
 @pytest.mark.parametrize(
     "error", [ValueError("invalid literal for int()"), KeyError("id")]
 )

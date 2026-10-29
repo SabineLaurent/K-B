@@ -116,9 +116,11 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   fonctionnement, sa date de dernière collecte reste, et les sources suivantes sont
   lancées ; la collecte suivante redemande la même fenêtre. Une erreur prévue (`ExpectedSourceError`
   et ses filles, dont `PageRefusedError` pour une page refusée sur ce qu'elle contient, ou une
-  erreur réseau : `URLError`, `ConnectionError`, `TimeoutError`) tient sur sa ligne, sans trace ;
+  erreur réseau : `URLError`, dont `HTTPError` pour un statut HTTP refusé, `ConnectionError`,
+  `TimeoutError` ; pas les erreurs de BigQuery) tient sur sa ligne, sans trace ;
   toute autre garde sa trace Python, la faute étant à chercher dans le code (décision de Sabine du
-  2026-10-29, #361). Le brut n'est écrit qu'une fois la
+  2026-10-29, #361). Le message et les notes y sont coupés à 300 caractères : sans trace, la
+  ligne en est la seule copie. Le brut n'est écrit qu'une fois la
   source allée au bout de sa lecture : une source en échec n'écrit rien. Exception : une source à
   plusieurs pages (tldr, clips) vérifie le nom de chaque page avant d'écrire la première, mais
   une écriture qui échoue au milieu (disque plein) laisse les pages déjà écrites. Chaque source dit
@@ -493,7 +495,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     `tldr.py:140-147`), avec deux notes par jour refusé de la fenêtre, dans l'ordre, y compris
     ceux qui précèdent une édition lue : le jour et l'URL demandée, puis ce qui a été observé
     (refus du lecteur, `h1` cité par `quote_value`, ou `edition of <date>`) ;
-    `src/k_b/etl/extract.py:48-50` cite chaque note à part, échappée et coupée à 100
+    `src/k_b/etl/extract.py:60-62` cite chaque note à part, échappée et coupée à 300
     caractères. Rien n'est écrit, pas même les éditions lues dans la même collecte, et la date
     de dernière collecte reste (règle 1 de `.claude/rules/conventions.md`) : le jour est
     redemandé à la collecte suivante ;

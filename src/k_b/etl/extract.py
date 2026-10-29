@@ -26,6 +26,9 @@ SAFE_PAGE_NAME = re.compile(r"[a-z0-9_-]+")
 # Failures a source meets in normal operation: their line says all (decision of Sabine of
 # 2026-10-29). Any other error keeps its traceback: a fault to find in the code.
 EXPECTED_SOURCE_ERRORS = (ExpectedSourceError, URLError, ConnectionError, TimeoutError)
+# The longest message, or note, of a failure quoted on its line: without a traceback, the line is
+# its only copy. Enough for the longest of K-B, Zotero's (200 characters and its start).
+MAX_QUOTED_FAILURE_LENGTH = 300
 
 
 class CollectionOutcome(NamedTuple):
@@ -55,13 +58,14 @@ def collect_all_sources(
             # line, quoted: any source may raise any text. The traceback of an unexpected error
             # follows it.
             notes = "".join(
-                f"; {quote_value(note)}" for note in getattr(error, "__notes__", [])
+                f"; {quote_value(note, MAX_QUOTED_FAILURE_LENGTH)}"
+                for note in getattr(error, "__notes__", [])
             )
             logger.error(
                 "collection failed for source %r: %s %s%s",
                 source.name,
                 type(error).__name__,
-                quote_value(str(error)),
+                quote_value(str(error), MAX_QUOTED_FAILURE_LENGTH),
                 notes,
                 exc_info=not isinstance(error, EXPECTED_SOURCE_ERRORS),
             )

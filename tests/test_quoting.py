@@ -20,6 +20,10 @@ def test_a_long_value_is_cut_to_the_fixed_length():
     assert quoted.startswith("'xxx")
 
 
+def test_a_long_value_is_cut_to_the_length_given():
+    assert len(quote_value("x" * 500, max_length=300)) == 300
+
+
 class Summary(BaseModel):
     text: str
 
