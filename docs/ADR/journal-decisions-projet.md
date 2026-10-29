@@ -4582,6 +4582,56 @@ time-knight relu par un sous-agent et validé par elle.
 
   — PR de #359
 
+### Collecte : l'échec prévu d'une source, sans sa trace Python (#361)
+
+Décisions de Sabine du 2026-10-29, après un essai réel sur main d490346 (un coffre sans
+`Clippings` : une ligne claire, puis 11 lignes de trace) ; plan de time-knight relu par un
+sous-agent et validé par elle.
+
+- **Une erreur prévue d'une source est journalisée sur sa ligne seule, sans trace ; toute autre
+  garde sa trace.** Prévue : `ExpectedSourceError` (`etl/source_contract.py`), à laquelle les 11
+  erreurs nommées des sources sont rattachées, et les erreurs réseau (`URLError`, dont `HTTPError`
+  pour un statut HTTP refusé ; `ConnectionError` ; `TimeoutError`), tuple `EXPECTED_SOURCE_ERRORS`
+  (`etl/extract.py`). Pourquoi (raison présentée à Sabine avec l'avant/après) : la trace n'apprend
+  rien d'un échec attendu, dont le message dit tout ; elle reste là où une faute est à chercher
+  dans le code. Écarté : la trace dans `kb.log` seulement (choix (2), non retenu par Sabine, sans
+  raison dite). Le bilan, le code de sortie et la date de dernière collecte ne changent pas. Garde
+  la décision du 2026-10-14 (la trace suit sa ligne datée) ; change ce que `specs-collecte.md`
+  disait de toute panne d'une source (« avec sa trace »).
+- **Une page refusée sur ce qu'elle contient lève `PageRefusedError`, fille de `ValueError` ; tout
+  autre `ValueError` garde sa trace** (choix (a) de Sabine). Convertis : les refus de page qui
+  remontent de `fetch` à la collecte (`all_items_invalid`, `empty_catalog`, réponse trop grande, les
+  deux classements en entier, arXiv, CISA, releases, advisories, `not_the_edition_of_the_day` de
+  tldr). Restent `ValueError` les bugs, réglages et états faux (préfixe de confiance, segment de
+  chemin, dernier jour de collecte après aujourd'hui). Fille de `ValueError` : l'import rejette
+  toujours la page qu'il ne lit pas (`raw_reading.py`). Écartés, parce qu'un bug dans un lecteur
+  (`int('x')`) perdrait sa trace : (b) compter tout `ValueError` comme prévu ; convertir tout
+  `ValueError` levé pendant `fetch` (proposé par la revue de code). Effet voulu : le type affiché
+  devient `PageRefusedError` dans la ligne de journal, le bilan (`failed (PageRefusedError)`),
+  `import-log.jsonl` et le journal de `kb write-tops`.
+- **Sur la ligne d'échec d'une source, le message et les notes sont cités jusqu'à 300 caractères,
+  pas 100** (`MAX_QUOTED_FAILURE_LENGTH` ; `quote_value` prend la longueur en paramètre et reste la
+  seule fonction de la règle 3). Pourquoi : sans trace, la ligne est la seule copie du message ; à
+  100, la fin d'un message long se perdait (celui de Zotero va jusqu'à 200 caractères : constat de
+  la revue de code, correction acceptée par Sabine). Écarté : garder 100 partout.
+- **Le message d'un dossier `Clippings` absent donne son remède** : `…; create it, or check
+  KB_VAULT_DIR` (avec le choix (1) de Sabine). Un contrôle avant la collecte a été déconseillé par
+  time-knight : clipping est une source locale, et la collecte ne s'arrête pas sur l'échec d'une
+  source.
+
+  Limites assumées :
+  - **Gardent leur trace** : `JSONDecodeError` des lecteurs GitHub, `UnicodeDecodeError` et
+    `csv.Error` de CISA, les erreurs de BigQuery et de google-auth, les `OSError` hors réseau
+    (coffre, `zotero.sqlite` absent, `raw/`), `ssl.SSLError` et `IncompleteRead` pendant une
+    lecture, l'état non écrit (`extract.py`) et l'exception non traitée (`cli.py`). À rouvrir si
+    l'un apparaît en vrai.
+  - **Un délai de BigQuery** lève un `TimeoutError` souvent sans message : sa ligne dit la source
+    et le type, pas l'étape qui a attendu.
+  - **Un 4xx dû à un bug de requête perd sa trace** : la ligne nomme la source, et chaque source n'a
+    qu'une sorte de requête.
+
+  — branche `fix/collect-expected-errors-without-traceback`
+
 ## Décisions encore ouvertes
 
 - **Un sujet secondaire par item au classement** (2026-10-26, idée de Sabine) : une case de sujet
