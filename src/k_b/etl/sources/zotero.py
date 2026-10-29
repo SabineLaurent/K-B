@@ -35,6 +35,7 @@ from k_b.etl.raw_store import (
 )
 from k_b.etl.source_contract import (
     EntryReading,
+    ExpectedSourceError,
     SourceReader,
     check_not_all_invalid,
     check_not_empty,
@@ -164,16 +165,16 @@ ORDER BY document.dateAdded, document.itemID
 JSON_COLUMNS = ("authors", "tags", "pdfs", "highlights")
 
 
-class ZoteroCopyInconsistentError(Exception):
+class ZoteroCopyInconsistentError(ExpectedSourceError):
     """PRAGMA integrity_check did not answer ok on the copy, or could not read it."""
 
 
-class ZoteroChangedDuringCopyError(Exception):
+class ZoteroChangedDuringCopyError(ExpectedSourceError):
     """The main file or its write-ahead log changed while they were copied: the two copies may
     not go together."""
 
 
-class ZoteroQueryFailedError(Exception):
+class ZoteroQueryFailedError(ExpectedSourceError):
     """SQLite refused the extraction query: the message names the missing table or column, or the
     syntax SQLite does not know (ORDER BY in an aggregate needs SQLite 3.44)."""
 

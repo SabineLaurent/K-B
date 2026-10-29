@@ -21,7 +21,7 @@ from k_b.core.config import (
 )
 from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
-from k_b.etl.source_contract import TrendReader
+from k_b.etl.source_contract import ExpectedSourceError, PageRefusedError, TrendReader
 from k_b.items import SourceCode, TrendRow
 
 logger = logging.getLogger(__name__)
@@ -87,15 +87,15 @@ ORDER BY window_end, stars_gained DESC, repository_id
 """
 
 
-class DayTableNotClosedError(Exception):
+class DayTableNotClosedError(ExpectedSourceError):
     """The table of the last day of a window was last modified before that day ended."""
 
 
-class DryRunOverLimitError(Exception):
+class DryRunOverLimitError(ExpectedSourceError):
     """The dry run of a single window announces more bytes than its cap."""
 
 
-class DryRunVolumeUnknownError(Exception):
+class DryRunVolumeUnknownError(ExpectedSourceError):
     """The dry run gives no volume: the query is not run (fail closed)."""
 
 
@@ -275,7 +275,7 @@ FIELDS_QUOTED = frozenset(
 )
 
 
-class TrendsExtractInvalidError(ValueError):
+class TrendsExtractInvalidError(PageRefusedError):
     """The raw result does not read as trends: it is refused whole."""
 
 

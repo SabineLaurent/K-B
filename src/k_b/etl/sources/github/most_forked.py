@@ -10,6 +10,7 @@ from urllib.parse import urlencode
 
 from k_b.core.config import GITHUB_MOST_FORKED_SEARCH_QUERY, GITHUB_RANKING_SIZE
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
+from k_b.etl.source_contract import PageRefusedError
 from k_b.etl.sources.github.api import get_from_github_api
 from k_b.etl.sources.github.most_starred import REPOSITORY_URL_PREFIX
 from k_b.etl.tops import TopEntry
@@ -58,11 +59,11 @@ def read_most_forked(raw_response: bytes, expected_size: int) -> list[ForkedRepo
     response = json.loads(raw_response)
     items = response.get("items") if isinstance(response, dict) else None
     if not isinstance(items, list):
-        raise ValueError("expected a search response with a list of items")
+        raise PageRefusedError("expected a search response with a list of items")
     if response.get("incomplete_results") is not False:
-        raise ValueError("incomplete search results, refused")
+        raise PageRefusedError("incomplete search results, refused")
     if len(items) != expected_size:
-        raise ValueError(
+        raise PageRefusedError(
             f"{len(items)} repositories, expected {expected_size}, refused"
         )
     return [parse_repository(item, rank) for rank, item in enumerate(items, start=1)]
@@ -70,28 +71,28 @@ def read_most_forked(raw_response: bytes, expected_size: int) -> list[ForkedRepo
 
 def parse_repository(item: object, rank: int) -> ForkedRepository:
     if not isinstance(item, dict):
-        raise ValueError(f"repository {rank}: not an object")
+        raise PageRefusedError(f"repository {rank}: not an object")
     full_name = item.get("full_name")
     if not isinstance(full_name, str):
-        raise ValueError(f"repository {rank}: full_name is not a string")
+        raise PageRefusedError(f"repository {rank}: full_name is not a string")
     # Its length only: the name carries the owner's login.
     if not is_repository_name(full_name):
-        raise ValueError(
+        raise PageRefusedError(
             f"repository {rank}: not an owner/name, length {len(full_name)}"
         )
     # Checked, not kept: the URL of a repository is built from its name.
     url = item.get("html_url")
     if not isinstance(url, str) or not url.startswith(REPOSITORY_URL_PREFIX):
-        raise ValueError(
+        raise PageRefusedError(
             f"repository {rank}: html_url is not a {REPOSITORY_URL_PREFIX} URL"
         )
     description = item.get("description")
     if not isinstance(description, str | None):
-        raise ValueError(f"repository {rank}: description is not a string")
+        raise PageRefusedError(f"repository {rank}: description is not a string")
     forks = item.get("forks_count")
     # bool is a subclass of int in Python: refuse it explicitly.
     if not isinstance(forks, int) or isinstance(forks, bool):
-        raise ValueError(f"repository {rank}: forks_count is not an integer")
+        raise PageRefusedError(f"repository {rank}: forks_count is not an integer")
     return ForkedRepository(
         rank=rank, full_name=full_name, description=description, forks=forks
     )

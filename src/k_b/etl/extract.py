@@ -5,6 +5,7 @@ import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import NamedTuple
+from urllib.error import URLError
 
 from k_b.core.quoting import quote_value
 from k_b.etl.raw_files import COLLECTION_NAME_FORMAT
@@ -15,13 +16,20 @@ from k_b.etl.raw_store import (
     save_last_collection_dates,
     write_new_raw_file,
 )
-from k_b.etl.source_contract import Source
+from k_b.etl.source_contract import ExpectedSourceError, Source
 
 logger = logging.getLogger(__name__)
 
 SAFE_PATH_SEGMENT = re.compile(r"[a-z0-9_]+")
 # A page name is a file name under the collection folder: a date such as 2026-09-30.
 SAFE_PAGE_NAME = re.compile(r"[a-z0-9_-]+")
+# Failures a source meets in normal operation: their line says all (decision of Sabine of
+# 2026-10-29). Any other error keeps its traceback: a fault to find in the code.
+EXPECTED_SOURCE_ERRORS = (ExpectedSourceError, URLError, ConnectionError, TimeoutError)
+# The longest message, or note, of a failure quoted on its line: without a traceback, the line is
+# its only copy. Enough for the longest of K-B, Zotero's: 252 characters quoted for a printable
+# problem cut to 200; control characters, escaped twice, can pass it.
+MAX_QUOTED_FAILURE_LENGTH = 300
 
 
 class CollectionOutcome(NamedTuple):
@@ -48,17 +56,19 @@ def collect_all_sources(
             )
         except Exception as error:
             # The error and the notes of a source (the day and url of a page) go on the dated
-            # line, quoted: any source may raise any text. The traceback follows it.
+            # line, quoted: any source may raise any text. The traceback of an unexpected error
+            # follows it.
             notes = "".join(
-                f"; {quote_value(note)}" for note in getattr(error, "__notes__", [])
+                f"; {quote_value(note, MAX_QUOTED_FAILURE_LENGTH)}"
+                for note in getattr(error, "__notes__", [])
             )
-            logger.exception(
+            logger.error(
                 "collection failed for source %r: %s %s%s",
                 source.name,
                 type(error).__name__,
-                # On the dated line, quoted; the traceback gives it again with its stack.
-                quote_value(str(error)),  # noqa: TRY401
+                quote_value(str(error), MAX_QUOTED_FAILURE_LENGTH),
                 notes,
+                exc_info=not isinstance(error, EXPECTED_SOURCE_ERRORS),
             )
             errors_by_source[source.name] = error
         else:

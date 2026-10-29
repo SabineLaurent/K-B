@@ -5,17 +5,17 @@ import re
 from pydantic import ValidationError
 from pydantic_core import InitErrorDetails
 
-# The longest value quoted, quotes and escapes included.
+# The length a value is cut to by default, quotes and escapes included.
 MAX_QUOTED_VALUE_LENGTH = 100
 # A part of the place of an error written as it is: the name of a field of a model. Any other, a
 # key of a dict, comes from the input.
 FIELD_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
-def quote_value(value: object) -> str:
-    """The value with its line breaks and control characters escaped by repr, cut to a fixed
-    length: it cannot write a line of its own in a log."""
-    return repr(value)[:MAX_QUOTED_VALUE_LENGTH]
+def quote_value(value: object, max_length: int = MAX_QUOTED_VALUE_LENGTH) -> str:
+    """The value with its line breaks and control characters escaped by repr, cut to max_length:
+    it cannot write a line of its own in a log."""
+    return repr(value)[:max_length]
 
 
 def without_values(error: ValidationError) -> ValidationError:

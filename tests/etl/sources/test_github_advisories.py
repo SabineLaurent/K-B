@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from k_b.etl.source_contract import list_sources
+from k_b.etl.source_contract import PageRefusedError, list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.github import advisories as github_advisories
 from k_b.etl.sources.github.advisories import (
@@ -196,7 +196,7 @@ def test_an_advisory_without_cve_keeps_an_empty_cve():
 
 
 def test_a_response_that_is_not_a_list_is_refused():
-    with pytest.raises(ValueError, match="list"):
+    with pytest.raises(PageRefusedError, match="list"):
         read_advisories(b'{"message": "Validation Failed"}')
 
 
@@ -283,7 +283,9 @@ def test_a_page_with_an_invalid_advisory_is_collected_even_without_a_new_valid_o
 def test_a_page_whose_advisories_are_all_invalid_fails_the_collection(fake_github_api):
     fake_github_api.response = page_with_invalid_advisories(0, 1, 2)
 
-    with pytest.raises(ValueError, match="^all_items_invalid: 3 entries, all rejected"):
+    with pytest.raises(
+        PageRefusedError, match="^all_items_invalid: 3 entries, all rejected"
+    ):
         GithubAdvisoriesSource("pip", PACKAGES).fetch(last_collected_at=None)
 
 

@@ -116,7 +116,7 @@ def test_an_unreadable_file_is_rejected_and_the_others_are_read(tmp_path, caplog
     assert len(reading.rejections) == 1
     rejection = reading.rejections[0]
     assert rejection.raw_file_path == f"automated_watch/cisa_kev/{COLLECTION_NAME}.csv"
-    assert rejection.reason.startswith("ValueError: catalog without the columns")
+    assert rejection.reason.startswith("PageRefusedError: catalog without the columns")
     assert f"automated_watch/cisa_kev/{COLLECTION_NAME}.csv" in caplog.text
 
 

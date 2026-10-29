@@ -5,7 +5,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from k_b.etl.source_contract import list_sources
+from k_b.etl.source_contract import PageRefusedError, list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.github import most_starred as github_most_starred
 from k_b.etl.sources.github.most_starred import (
@@ -75,7 +75,7 @@ def test_every_collection_writes_a_snapshot_of_the_ranking(fake_github_api):
 def test_a_ranking_shorter_than_100_is_not_written(fake_github_api):
     fake_github_api.response = ranking_of(99)
 
-    with pytest.raises(ValueError, match="99 repositories, expected 100"):
+    with pytest.raises(PageRefusedError, match="99 repositories, expected 100"):
         GithubMostStarredSource().fetch(last_collected_at=None)
 
 
@@ -84,7 +84,7 @@ def test_an_incomplete_ranking_is_not_written(fake_github_api):
     response["incomplete_results"] = True
     fake_github_api.response = json.dumps(response).encode()
 
-    with pytest.raises(ValueError, match="incomplete"):
+    with pytest.raises(PageRefusedError, match="incomplete"):
         GithubMostStarredSource().fetch(last_collected_at=None)
 
 
@@ -125,17 +125,17 @@ def test_an_incomplete_ranking_is_refused():
     response = json.loads(RECORDED_RESPONSE)
     response["incomplete_results"] = True
 
-    with pytest.raises(ValueError, match="incomplete"):
+    with pytest.raises(PageRefusedError, match="incomplete"):
         read_most_starred(json.dumps(response).encode(), expected_size=3)
 
 
 def test_a_ranking_shorter_than_expected_is_refused():
-    with pytest.raises(ValueError, match="3 repositories, expected 4"):
+    with pytest.raises(PageRefusedError, match="3 repositories, expected 4"):
         read_most_starred(RECORDED_RESPONSE, expected_size=4)
 
 
 def test_a_response_without_a_list_of_items_is_refused():
-    with pytest.raises(ValueError, match="items"):
+    with pytest.raises(PageRefusedError, match="items"):
         read_most_starred(b'{"message": "Validation Failed"}', expected_size=3)
 
 
@@ -152,20 +152,20 @@ def test_a_response_without_a_list_of_items_is_refused():
     ],
 )
 def test_an_invalid_repository_is_refused_with_its_rank(changes):
-    with pytest.raises(ValueError, match="repository 1"):
+    with pytest.raises(PageRefusedError, match="repository 1"):
         read_most_starred(response_with(**changes), expected_size=3)
 
 
 def test_a_refused_name_is_quoted_by_its_length_only():
     # The name carries the owner's login (register of processing activities).
-    with pytest.raises(ValueError) as refusal:
+    with pytest.raises(PageRefusedError) as refusal:
         read_most_starred(response_with(full_name="jdoe/../escape"), expected_size=3)
 
     assert str(refusal.value) == "repository 1: not an owner/name, length 14"
 
 
 def test_a_name_that_is_not_a_string_is_refused_by_its_type():
-    with pytest.raises(ValueError) as refusal:
+    with pytest.raises(PageRefusedError) as refusal:
         read_most_starred(response_with(full_name=["jdoe/escape"]), expected_size=3)
 
     assert str(refusal.value) == "repository 1: full_name is not a string"

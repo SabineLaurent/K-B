@@ -15,6 +15,7 @@ from k_b.etl.http_download import download
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import (
     EntryReading,
+    PageRefusedError,
     SourceReader,
     check_not_all_invalid,
     check_not_empty,
@@ -119,7 +120,9 @@ def read_new_vulnerabilities(
     columns = rows.fieldnames or []
     missing_columns = [column for column in REQUIRED_COLUMNS if column not in columns]
     if missing_columns:
-        raise ValueError(f"catalog without the columns {', '.join(missing_columns)}")
+        raise PageRefusedError(
+            f"catalog without the columns {', '.join(missing_columns)}"
+        )
     # line_num is read once its row is: the line the row ends on.
     reading = read_each_entry(
         ((rows.line_num, row) for row in rows), parse_vulnerability

@@ -21,6 +21,16 @@ class Source(Protocol):
         ...
 
 
+class ExpectedSourceError(Exception):
+    """A failure a source meets in normal operation, whose message says all: logged without its
+    traceback (etl/extract.py)."""
+
+
+class PageRefusedError(ExpectedSourceError, ValueError):
+    """A page refused on what it holds (conventions.md, rule 1); a ValueError still, which the
+    import rejects as a page it cannot read."""
+
+
 class EntryReading[EntryT](NamedTuple):
     """The entries of a raw file read, and the reason each invalid one was rejected."""
 
@@ -52,7 +62,7 @@ def check_not_all_invalid(reading: EntryReading[Any]) -> None:
     """Refuse, at the collection, a page whose entries are all invalid (all_items_invalid), so
     that its last collection date stays; a page without entry is not refused."""
     if reading.rejection_reasons and not reading.entries:
-        raise ValueError(
+        raise PageRefusedError(
             f"all_items_invalid: {len(reading.rejection_reasons)} entries, all rejected; "
             f"first: {reading.rejection_reasons[0]}"
         )
@@ -62,7 +72,7 @@ def check_not_empty(reading: EntryReading[Any]) -> None:
     """Refuse, at the collection, a state catalog without entry (empty_catalog): imported, it
     would supersede the last catalog, which the purge would then delete."""
     if not reading.entries and not reading.rejection_reasons:
-        raise ValueError("empty_catalog: 0 entries")
+        raise PageRefusedError("empty_catalog: 0 entries")
 
 
 class SourceReader[EntryT](NamedTuple):

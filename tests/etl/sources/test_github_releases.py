@@ -9,7 +9,7 @@ import pytest
 
 from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.core.quoting import quote_value
-from k_b.etl.source_contract import list_sources
+from k_b.etl.source_contract import PageRefusedError, list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.github import releases as github_releases
 from k_b.etl.sources.github.releases import (
@@ -74,7 +74,7 @@ def test_a_page_of_another_repository_is_refused(requested_paths, last_collected
     source = GithubReleasesSource("anthropics/another-repository")
 
     with pytest.raises(
-        ValueError,
+        PageRefusedError,
         match="release 401174143 is of the repository 'anthropics/claude-code'",
     ):
         source.fetch(last_collected_at)
@@ -87,7 +87,7 @@ def test_the_repository_of_a_page_of_another_one_is_quoted_cut(monkeypatch):
     )
     monkeypatch.setattr(github_releases, "get_from_github_api", lambda path: page)
 
-    with pytest.raises(ValueError) as refusal:
+    with pytest.raises(PageRefusedError) as refusal:
         GithubReleasesSource(REPOSITORY).fetch(last_collected_at=None)
 
     assert str(refusal.value).endswith(quote_value(long_repository))
@@ -151,7 +151,7 @@ def test_a_page_that_is_not_a_list_of_releases_fails_the_first_collection(monkey
         lambda path: b'{"message": "Not Found"}',
     )
 
-    with pytest.raises(ValueError, match="expected a list of releases"):
+    with pytest.raises(PageRefusedError, match="expected a list of releases"):
         GithubReleasesSource("anthropics/claude-code").fetch(last_collected_at=None)
 
 
@@ -201,7 +201,7 @@ def test_a_missing_name_or_body_stays_empty():
 
 
 def test_a_response_that_is_not_a_list_is_refused():
-    with pytest.raises(ValueError, match="list"):
+    with pytest.raises(PageRefusedError, match="list"):
         read_releases(b'{"message": "Not Found"}')
 
 
@@ -332,7 +332,9 @@ def test_a_page_whose_releases_are_all_invalid_fails_the_collection(monkeypatch)
     page = page_with_invalid_releases(0, 1, 2)
     monkeypatch.setattr(github_releases, "get_from_github_api", lambda path: page)
 
-    with pytest.raises(ValueError, match="^all_items_invalid: 3 entries, all rejected"):
+    with pytest.raises(
+        PageRefusedError, match="^all_items_invalid: 3 entries, all rejected"
+    ):
         GithubReleasesSource(REPOSITORY).fetch(last_collected_at=None)
 
 

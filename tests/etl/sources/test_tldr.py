@@ -13,7 +13,7 @@ from k_b.core.config import (
 )
 from k_b.etl.http_download import RedirectedOutsideError
 from k_b.etl.normalize import normalize_item
-from k_b.etl.source_contract import find_source_kind, list_sources
+from k_b.etl.source_contract import PageRefusedError, find_source_kind, list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources import tldr
 from k_b.etl.sources.tldr import (
@@ -171,7 +171,7 @@ def test_no_edition_page_in_the_window_returns_none_and_is_logged(
         ),
         (URLError("timed out"), "<urlopen error timed out>"),
         (
-            ValueError("response larger than 1048576 bytes, refused"),
+            PageRefusedError("response larger than 1048576 bytes, refused"),
             "response larger than",
         ),
     ],
@@ -208,7 +208,7 @@ def test_a_page_that_is_not_an_edition_fails_the_source_with_its_day_and_url(
 ):
     fake_download.answers["https://tldr.tech/ai/2026-10-03"] = LANDING_PAGE
 
-    with pytest.raises(ValueError, match="^not_the_edition_of_the_day") as raised:
+    with pytest.raises(PageRefusedError, match="^not_the_edition_of_the_day") as raised:
         TldrSource("ai").fetch(datetime(2026, 10, 3, 6, 0, tzinfo=UTC))
     assert raised.value.__notes__ == [
         "tldr_ai 2026-10-03, from https://tldr.tech/ai/2026-10-03",
@@ -221,7 +221,7 @@ def test_a_page_that_is_not_an_edition_fails_the_source_with_its_day_and_url(
 def test_the_edition_of_another_day_fails_the_source_with_its_date(fake_download):
     fake_download.answers["https://tldr.tech/ai/2026-10-03"] = EDITION_PAGE
 
-    with pytest.raises(ValueError, match="^not_the_edition_of_the_day") as raised:
+    with pytest.raises(PageRefusedError, match="^not_the_edition_of_the_day") as raised:
         TldrSource("ai").fetch(datetime(2026, 10, 3, 6, 0, tzinfo=UTC))
     assert raised.value.__notes__ == [
         "tldr_ai 2026-10-03, from https://tldr.tech/ai/2026-10-03",
@@ -238,7 +238,7 @@ def test_each_day_refused_after_the_last_edition_read_is_noted(
     # Monday: 2026-10-04 is a past day, not today.
     monkeypatch.setattr(tldr, "current_day", lambda: date(2026, 10, 5))
 
-    with pytest.raises(ValueError, match="^not_the_edition_of_the_day") as raised:
+    with pytest.raises(PageRefusedError, match="^not_the_edition_of_the_day") as raised:
         TldrSource("ai").fetch(datetime(2026, 10, 2, 6, 0, tzinfo=UTC))
     # The edition of 2026-10-02 read is not returned: the source fails whole.
     assert raised.value.__notes__ == [
@@ -259,7 +259,7 @@ def test_a_day_refused_before_an_edition_read_is_noted_too_when_the_source_fails
     fake_download.answers["https://tldr.tech/ai/2026-10-04"] = LANDING_PAGE
     monkeypatch.setattr(tldr, "current_day", lambda: date(2026, 10, 5))
 
-    with pytest.raises(ValueError, match="^not_the_edition_of_the_day") as raised:
+    with pytest.raises(PageRefusedError, match="^not_the_edition_of_the_day") as raised:
         TldrSource("ai").fetch(datetime(2026, 10, 2, 6, 0, tzinfo=UTC))
     # Every day refused in the window, in its order: 2026-10-02 is given up only by a
     # collection that succeeds.
