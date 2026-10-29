@@ -8,6 +8,12 @@ from pathlib import Path
 from time import monotonic
 from typing import NamedTuple
 
+from k_b.commands.batch_summary import (
+    COLUMN_GAP,
+    describe_duration,
+    render_rule,
+    render_table,
+)
 from k_b.commands.exit_codes import ExitCode, find_exit_code
 from k_b.commands.run_log import (
     LOGGER_NAME,
@@ -132,12 +138,10 @@ def render_digest_summary(
     """The summary after the end line: the window, a row per subject and the total, then the
     model and the id of the request, last, the reference to give when something goes wrong."""
     window = response.window
+    table = render_table([SUMMARY_HEADER, *rows])
+    # The total spans the status and the sheet: out of the table, under the status.
     subject_width = max(len(row.subject) for row in [SUMMARY_HEADER, *rows])
-    status_width = max(len(row.status) for row in [SUMMARY_HEADER, *rows])
-    table = [
-        f"{row.subject:<{subject_width}}  {row.status:<{status_width}}  {row.sheet}".rstrip()
-        for row in [SUMMARY_HEADER, *rows]
-    ]
+    total = describe_counts(written_count, failed_count)
     since, until = window.since.date().isoformat(), window.until.date().isoformat()
     return "\n".join(
         [
@@ -146,8 +150,8 @@ def render_digest_summary(
             f"Window: {since} → {until}, {response.items_in} items read",
             "",
             *table,
-            "-" * max(len(line) for line in table),
-            f"{'total':<{subject_width}}  {describe_counts(written_count, failed_count)}",
+            render_rule(table),
+            f"{'total':<{subject_width}}{COLUMN_GAP}{total}",
             "",
             f"Model: {response.model}",
             f"Request id: {response.request_id}",
@@ -159,12 +163,6 @@ def describe_counts(written_count: int, failed_count: int) -> str:
     if written_count == failed_count == 0:
         return "none in the window"
     return f"written {written_count}, failed {failed_count}"
-
-
-def describe_duration(seconds: float) -> str:
-    """57 s, or 4 min 6 s."""
-    minutes, seconds_left = divmod(round(seconds), 60)
-    return f"{minutes} min {seconds_left} s" if minutes else f"{seconds_left} s"
 
 
 def describe_remedy(error: AiApiError) -> str:

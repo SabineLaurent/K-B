@@ -19,6 +19,7 @@ from load_helpers import (
     rebuild_database,
     registered_paths,
     run_import,
+    totals,
     write_collection,
 )
 from test_transform import FIXTURES_DIR
@@ -26,6 +27,7 @@ from test_transform import FIXTURES_DIR
 from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.database.creation import create_database
 from k_b.etl.load import (
+    SourceImport,
     import_items,
     read_imported_paths,
 )
@@ -97,7 +99,8 @@ def test_a_ranking_gives_a_trend_row_per_repository_of_its_window_and_no_item(
     summary = run_import(trend_data_dir)
 
     # The 5 rows share one window: the file being written leaves none of its own rows out.
-    assert summary == (0, 0, 0, 1, 0, 5)
+    assert totals(summary) == (0, 0, 0, 1, 0, 5)
+    assert summary.by_source == {GH_ARCHIVE_DIR: SourceImport(1, 0, 0, 0, 5, True)}
     assert fetch_rows(trend_data_dir, TREND_QUERY) == [
         (
             "2026-10-10T00:00:00Z",
@@ -124,8 +127,20 @@ def test_a_second_import_reads_no_ranking_again_and_changes_nothing(trend_data_d
 
     second = run_import(trend_data_dir)
 
-    assert second == (0, 0, 0, 0, 0, 0)
+    assert totals(second) == (0, 0, 0, 0, 0, 0)
     assert dump_database(trend_data_dir) == tables
+
+
+def test_a_source_of_trends_with_only_a_rejected_file_is_still_one(tmp_path):
+    create_database(tmp_path / "k-b.sqlite")
+    # A folder where a raw file of trends is expected: rejected before being opened.
+    (tmp_path / "raw" / AUTOMATED_WATCH / GH_ARCHIVE_DIR / "not-a-file").mkdir(
+        parents=True
+    )
+
+    summary = run_import(tmp_path)
+
+    assert summary.by_source == {GH_ARCHIVE_DIR: SourceImport(0, 0, 0, 1, 0, True)}
 
 
 def test_a_ranking_read_again_changes_nothing_and_its_window_is_logged_already_seen(
@@ -136,7 +151,9 @@ def test_a_ranking_read_again_changes_nothing_and_its_window_is_logged_already_s
 
     second = run_import(trend_data_dir, read_again=True)
 
-    assert second == (0, 1, 0, 1, 0, 0)
+    assert totals(second) == (0, 1, 0, 1, 0, 0)
+    # No row written: still a source of trends, its written cell says 0 trend rows.
+    assert second.by_source == {GH_ARCHIVE_DIR: SourceImport(1, 0, 1, 0, 0, True)}
     assert dump_database(trend_data_dir) == tables
     assert read_log(trend_data_dir) == [
         {
@@ -170,7 +187,7 @@ def test_a_window_collected_again_keeps_its_first_ranking_whole_and_is_logged(
 
     second = run_import(trend_data_dir)
 
-    assert second == (0, 1, 0, 1, 0, 0)
+    assert totals(second) == (0, 1, 0, 1, 0, 0)
     assert fetch_rows(trend_data_dir, TREND_QUERY) == first_ranking
     assert again in registered_paths(trend_data_dir)
     log = list_logs(trend_data_dir)[-1].read_text()
@@ -204,7 +221,7 @@ def test_a_ranking_with_a_known_window_and_a_new_one_writes_the_new_one_only(
 
     second = run_import(trend_data_dir)
 
-    assert second == (0, 1, 0, 1, 0, 5)
+    assert totals(second) == (0, 1, 0, 1, 0, 5)
     assert fetch_rows(
         trend_data_dir,
         "SELECT window_end, count(*), max(stars_gained), count(DISTINCT raw_data_id)"
@@ -225,7 +242,7 @@ def test_two_rankings_of_a_window_in_one_import_keep_the_one_collected_first(
 
     summary = run_import(trend_data_dir)
 
-    assert summary == (0, 1, 0, 2, 0, 5)
+    assert totals(summary) == (0, 1, 0, 2, 0, 5)
     assert {row[3] for row in fetch_rows(trend_data_dir, TREND_QUERY)} == {
         row["stars_gained"] for row in RANKING["rows"]
     }
@@ -246,8 +263,8 @@ def test_a_ranking_refused_is_rejected_logged_and_read_again_at_the_next_import(
     second = run_import(trend_data_dir)
 
     # The ranking of the fixture is written; the refused one is opened by both imports.
-    assert first == (0, 0, 1, 2, 0, 5)
-    assert second == (0, 0, 1, 1, 0, 0)
+    assert totals(first) == (0, 0, 1, 2, 0, 5)
+    assert totals(second) == (0, 0, 1, 1, 0, 0)
     assert refused not in registered_paths(trend_data_dir)
     [rejection] = read_log(trend_data_dir)
     assert (rejection["kind"], rejection["raw_file_path"]) == ("rejection", refused)
@@ -299,7 +316,7 @@ def test_a_ranking_with_a_row_the_base_refuses_is_refused_whole_and_read_again(
     )
 
     # The ranking of the fixture is written; none of the rows of the refused one is.
-    assert first == (0, 0, 1, 2, 0, 5)
+    assert totals(first) == (0, 0, 1, 2, 0, 5)
     assert refused not in registered_paths(trend_data_dir)
     assert read_log(trend_data_dir) == [
         {
@@ -316,7 +333,7 @@ def test_a_ranking_with_a_row_the_base_refuses_is_refused_whole_and_read_again(
     # Read again by the next import, as an unreadable file: written once it is accepted.
     second = run_import(trend_data_dir)
 
-    assert second == (0, 0, 0, 1, 0, 5)
+    assert totals(second) == (0, 0, 0, 1, 0, 5)
     assert refused in registered_paths(trend_data_dir)
 
 

@@ -97,7 +97,8 @@ def test_an_error_handled_by_kb_is_a_dated_log_line_of_the_log_file(
 
     assert cli.main(["import"]) == 2
 
-    [file_line] = (tmp_path / "logs" / "kb.log").read_text("utf-8").splitlines()
+    # The line of the start of kb import, then the error.
+    [_, file_line] = (tmp_path / "logs" / "kb.log").read_text("utf-8").splitlines()
     assert re.fullmatch(
         rf"{LOG_LINE_DATE} ERROR k_b\.cli: .*; create it with kb create-db", file_line
     )

@@ -184,7 +184,7 @@ def test_a_github_ranking_is_skipped_and_logged(tmp_path, caplog, folder_name):
         readings = read_raw(tmp_path, SOURCE_KINDS, frozenset())
 
     assert items_of(readings.items) == []
-    assert (readings.items.rejections, readings.trends) == ([], ([], [], 0))
+    assert (readings.items.rejections, readings.trends) == ([], ([], [], []))
     assert f"source without a reader, skipped: '{folder_name}'" in caplog.text
 
 
@@ -806,7 +806,7 @@ def test_a_raw_trend_file_already_imported_is_not_opened(tmp_path):
 
     reading = read_trends(tmp_path, frozenset({TRENDS_RAW_FILE_PATH}))
 
-    assert reading == ([], [], 0)
+    assert reading == ([], [], [])
 
 
 @pytest.mark.parametrize(
@@ -860,11 +860,11 @@ def test_a_folder_among_the_raw_trend_files_is_rejected_unopened_without_its_pat
 def test_a_hidden_file_among_the_raw_trend_files_is_skipped(tmp_path):
     write_raw_trends(tmp_path, ".DS_Store", b"not json")
 
-    assert read_trends(tmp_path) == ([], [], 0)
+    assert read_trends(tmp_path) == ([], [], [])
 
 
 def test_no_raw_folder_of_gh_archive_gives_no_trend(tmp_path):
-    assert read_trends(tmp_path) == ([], [], 0)
+    assert read_trends(tmp_path) == ([], [], [])
 
 
 def test_gh_archive_is_not_a_source_without_a_reader(tmp_path, caplog):

@@ -29,6 +29,8 @@ class ImportReadings(NamedTuple):
 
     items: RawReading
     trends: TrendReading
+    # The sources of raw/ left unread: their kind has no reader.
+    unread_sources: list[str]
 
 
 def read_raw_files(
@@ -44,6 +46,7 @@ def read_raw_files(
             collections.of_items, raw_dir, imported_paths, tracked_repositories
         ),
         read_raw_trends(collections.of_trends, raw_dir, imported_paths),
+        collections.without_reader,
     )
 
 
@@ -93,7 +96,7 @@ def reject_untracked_releases(
         # catalog holds a release, so no withdrawal depends on it (decision of Sabine of
         # 2026-10-22).
         files.append(raw_file._replace(items=kept))
-    return RawReading(files, rejections, reading.read_count)
+    return RawReading(files, rejections, reading.opened_paths)
 
 
 def is_untracked_release(item: Item, tracked_names: set[str]) -> bool:

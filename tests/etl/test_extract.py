@@ -189,6 +189,66 @@ def test_each_page_of_a_source_is_written_as_received_in_a_folder_per_collection
     assert (collection_dir / "2026-09-30.html").read_bytes() == b"<html>tuesday</html>"
 
 
+def test_each_source_counts_the_raw_files_it_wrote_and_logs_them(tmp_path, caplog):
+    pages = {
+        "2026-09-29": b"<html>monday</html>",
+        "2026-09-30": b"<html>tuesday</html>",
+    }
+    caplog.set_level(logging.INFO, logger="k_b.etl.extract")
+
+    raw_file_counts = collect_all_sources(
+        [WorkingSource(), UnchangedSource(), ScrapedSource(pages), BrokenSource()],
+        tmp_path / "raw",
+        tmp_path,
+        FIRST_RUN_AT,
+    ).raw_file_counts
+
+    assert raw_file_counts == {"working": 1, "unchanged": 0, "scraped": 2, "broken": 0}
+    collected_lines = [
+        record.getMessage()
+        for record in caplog.records
+        if "collected, raw files written" in record.getMessage()
+    ]
+    assert collected_lines == [
+        "source 'working' collected, raw files written: 1",
+        "source 'unchanged' collected, raw files written: 0",
+        "source 'scraped' collected, raw files written: 2",
+    ]
+    started_lines = [
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().endswith(" started")
+    ]
+    # The broken source too: its start is logged before its failure.
+    assert started_lines == [
+        "source 'working' started",
+        "source 'unchanged' started",
+        "source 'scraped' started",
+        "source 'broken' started",
+    ]
+
+
+def test_a_source_failing_at_its_second_page_counts_the_first_one_written(tmp_path):
+    pages = {
+        "2026-09-29": b"<html>monday</html>",
+        "2026-09-30": b"<html>tuesday</html>",
+    }
+    collection_dir = (
+        tmp_path / "raw" / "automated_watch" / "scraped" / "2026-09-30T100000Z"
+    )
+    collection_dir.mkdir(parents=True)
+    # The second page is there already: its write fails, after the first one.
+    (collection_dir / "2026-09-30.html").write_bytes(b"there before")
+
+    outcome = collect_all_sources(
+        [ScrapedSource(pages)], tmp_path / "raw", tmp_path, FIRST_RUN_AT
+    )
+
+    assert isinstance(outcome.errors_by_source["scraped"], FileExistsError)
+    assert outcome.raw_file_counts == {"scraped": 1}
+    assert (collection_dir / "2026-09-29.html").read_bytes() == b"<html>monday</html>"
+
+
 def test_a_page_name_that_is_not_a_safe_path_segment_is_refused_before_any_write(
     tmp_path,
 ):

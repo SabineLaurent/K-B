@@ -38,15 +38,20 @@ class RawFile(NamedTuple):
 class RawReading(NamedTuple):
     files: list[RawFile]
     rejections: list[Rejection]
-    # The pages opened, readable or not.
-    read_count: int
+    # The pages opened, readable or not, by their path relative to raw/: counted by source in the
+    # summary of kb import.
+    opened_paths: list[str]
+
+    @property
+    def read_count(self) -> int:
+        return len(self.opened_paths)
 
 
 def join_readings(readings: list[RawReading]) -> RawReading:
     return RawReading(
         [raw_file for reading in readings for raw_file in reading.files],
         [rejection for reading in readings for rejection in reading.rejections],
-        sum(reading.read_count for reading in readings),
+        [path for reading in readings for path in reading.opened_paths],
     )
 
 
@@ -61,13 +66,17 @@ class TrendFile(NamedTuple):
 class TrendReading(NamedTuple):
     files: list[TrendFile]
     rejections: list[Rejection]
-    # The files of trends opened, readable or not.
-    read_count: int
+    # The files of trends opened, readable or not, as for RawReading.
+    opened_paths: list[str]
+
+    @property
+    def read_count(self) -> int:
+        return len(self.opened_paths)
 
 
 def join_trend_readings(readings: list[TrendReading]) -> TrendReading:
     return TrendReading(
         [trend_file for reading in readings for trend_file in reading.files],
         [rejection for reading in readings for rejection in reading.rejections],
-        sum(reading.read_count for reading in readings),
+        [path for reading in readings for path in reading.opened_paths],
     )

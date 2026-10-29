@@ -16,15 +16,37 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 
 - **Un point de lancement** : `kb collect` lance toutes les sources, ou celles de
   `KB_COLLECT_ONLY` (ci-dessous) ; une source en panne n'arrête pas les autres. Au lancement,
-  avant la première source et avant de lire l'état de collecte, il journalise une fois les
-  sources qu'il va collecter (`INFO k_b.cli: sources to collect: cisa_kev, …`), chacune sous le
-  nom de sa ligne de fin. À la fin, il affiche une ligne par source (`ok` ou
-  `failed (<type d'erreur>)`),
-  `zotero: skipped (KB_ZOTERO_DIR not set)` quand le dossier de Zotero n'est pas donné,
-  `clipping: skipped (KB_VAULT_DIR not set)` quand le coffre Obsidian ne l'est pas, et
-  `gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)` sans la clé BigQuery. Quand
+  avant la première source et avant de lire l'état de collecte, il journalise une fois le nombre
+  de sources lancées (`INFO k_b.cli: collection started: 17 sources selected`). Chaque source
+  journalise son départ (`source 'cisa_kev' started` : une source bloquée est nommée, décision de
+  Sabine du 2026-10-29) puis, collectée, ce qu'elle a écrit (`source 'cisa_kev' collected, raw
+  files written: 1`, `src/k_b/etl/extract.py`), qu'elle écrive ou non ses propres lignes
+  (décision de Sabine du 2026-10-28). À la fin, `collection finished in 1 min 26 s`, puis le bilan (#291) :
+
+  ```
+  Collection summary
+
+  source              status                    raw files
+  tldr_ai             ok                        6
+  cisa_kev            ok                        0 (nothing new)
+  github_most_forked  failed (HTTPStatusError)  0
+
+  Not part of this collection (excluded by your settings):
+    zotero (KB_ZOTERO_DIR not set)
+    gh_archive (not in KB_COLLECT_ONLY)
+  ```
+
+  `raw files` compte les fichiers bruts écrits, pas les items : `0 (nothing new)` est une source
+  qui a dit n'avoir rien de neuf (son `fetch` rend `None`, rien n'est écrit) ; une source qui
+  rend une page vide écrit son brut et compte 1 ; combien d'items il contient, c'est le bilan de
+  `kb import` qui le dit. Une source en échec compte les bruts écrits avant l'erreur : 0 pour une
+  erreur de la source, qui vient pendant `fetch`, avant toute écriture ; plus que 0 seulement si
+  une écriture échoue au milieu de ses pages (les pages déjà écrites sont entières). Une source
+  non lancée est nommée sous la remarque avec le réglage qui l'écarte : sans `KB_ZOTERO_DIR`
+  (Zotero), sans `KB_VAULT_DIR` (les clips), sans `GOOGLE_APPLICATION_CREDENTIALS` (GH
+  Archive), ou hors de `KB_COLLECT_ONLY`. Quand
   l'état ne s'écrit pas, le brut est déjà écrit : `kb collect` journalise l'erreur avec le chemin
-  du fichier et ajoute la ligne `collection_state: failed (<type d'erreur>)`. Les dates de
+  du fichier et ajoute, sous le tableau, la ligne `collection_state: failed (<type d'erreur>)`. Les dates de
   dernière collecte n'avancent pas : la collecte suivante relit les mêmes fenêtres, et l'import
   écarte les items déjà en base (étape 4 de « Du brut au jeu d'items »).
 - **Codes de sortie** de `kb collect`, nommés par `ExitCode` (`src/k_b/commands/exit_codes.py`)
@@ -48,10 +70,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   `arxiv_cscr_x_csai`, `tldr`, `zotero`, `clipping`, `gh_archive` ; `tldr` lance toutes ses
   éditions, `github_releases` tous ses dépôts. Les espaces autour d'un nom sont retirés, puis le
   nom est mis en minuscules (`Zotero` est `zotero`, décision de Sabine du 2026-10-18) ; un nom
-  refusé est cité tel qu'il est écrit, sans les espaces autour. Une source écartée affiche une
-  seule ligne,
-  `<dossier>: skipped (not in KB_COLLECT_ONLY)`, au nom de son dossier (une source lancée affiche
-  le nom de la source, `tldr_ai`), et sa date de dernière collecte reste. Code de sortie **2**,
+  refusé est cité tel qu'il est écrit, sans les espaces autour. Une source écartée a une seule
+  ligne sous la remarque du bilan,
+  `<dossier> (not in KB_COLLECT_ONLY)`, au nom de son dossier (une source lancée a sa ligne du
+  tableau au nom de la source, `tldr_ai`), et sa date de dernière collecte reste. Code de sortie **2**,
   sans rien collecter (ni brut ni état écrit ; le refus va au journal), quand la valeur est vide,
   qu'une entrée est vide, qu'un nom n'est pas un dossier de source (le nom est cité, tronqué et
   échappé), ou qu'une source choisie n'a pas sa variable (`zotero` sans `KB_ZOTERO_DIR`, `clipping`
@@ -699,8 +721,40 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
    (`read_raw_files`, `src/k_b/etl/transform.py`, qui rend les items et les classements GH
    Archive d'un seul parcours de `raw/`), puis écrit la base
    (`import_items`) : fichiers d'items et classements en une seule suite, dans l'ordre des
-   collectes. La commande affiche
-   le nombre de fichiers bruts lus (`raw files read`).
+   collectes. La commande journalise `import started`, puis `import finished in 0 s`, et
+   affiche le bilan (#291), ici celui de l'essai du 2026-10-28 (lignes coupées) :
+
+   ```
+   Import summary
+
+   source             raw read          written  left out  rejected
+   arxiv_cscr_x_csai         1              567         0         0
+   gh_archive                1    51 trend rows         0         0
+   tldr_ai                   6               89         0         0
+   …
+   ----------------------------------------------------------------
+   total                    33             3089         0         0
+                                + 51 trend rows
+
+   Not imported (no reader, read by kb write-tops):
+     github_most_forked
+     github_most_starred
+
+   Withdrawn (vulnerabilities, Zotero entries, highlights): 0
+   Older raw files deleted (a newer one replaces them): 0
+   Log: <KB_DATA_DIR>/import-log-2026-10-28T194943Z.jsonl
+   ```
+
+   Une ligne par source, au nom de son dossier de `raw/` (`find_stream`,
+   `src/k_b/etl/raw_store.py`), cité s'il sort de `[a-z0-9_]` : `raw read`, les fichiers bruts
+   ouverts ; `written`, les items écrits (nouveaux ou mis à jour) ; `left out`, les items et les
+   fenêtres de classement écartés (doublons, ou versions qui ne sont pas plus récentes que celle
+   de la base) ; `rejected`, les rejets, détaillés au journal d'import. **gh_archive** écrit des
+   lignes de tendance, pas des items (décision du 2026-10-08, « `trend` reste hors d'`item` ») :
+   sa cellule `written` les nomme, et le total les compte à part, sous la colonne des items. Les
+   retraits ne sont comptés qu'au total. Les bruts remplacés (`Older raw files deleted`) sont
+   supprimés après la validation de l'import ; si la suppression échoue, la ligne manque, le
+   bilan est affiché quand même et l'erreur suit.
 
    - **Registre** : la table `raw_data`, une ligne par fichier lu, ou par page d'un dossier de
      pages. Un fichier lu y entre, même s'il n'a donné aucun item, et même si certaines de ses
@@ -710,7 +764,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
      correction du lecteur ou du brut le lit, sans reconstruction. Une collecte mal nommée
      (dossier ou fichier dont le nom n'est pas une date) n'a pas de date de collecte : elle
      n'entre pas non plus au registre, et elle est rejetée à chaque import, sans compter dans
-     `raw files read`. **Un classement GH Archive dont la base refuse une ligne n'y entre pas
+     `raw read`. **Un classement GH Archive dont la base refuse une ligne n'y entre pas
      non plus** (décision de Sabine du 2026-10-13, #136) : il est refusé entier et relu à chaque
      import. Limite, la même que pour un fichier illisible : une fois accepté, il est inscrit
      après des classements collectés plus tard ; le premier classement vu d'une fenêtre peut
@@ -778,7 +832,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
      pas une version. Si la ligne réapparaît dans un catalogue plus récent, elle est réécrite
      même à contenu identique : `withdrawn_at` est vidé, `revised_at` daté, l'item pointe vers
      ce fichier. `kb import` affiche le nombre de lignes retirées
-     (`rows withdrawn (vulnerabilities, Zotero entries, highlights)`, qui compte aussi les
+     (`Withdrawn (vulnerabilities, Zotero entries, highlights)`, qui compte aussi les
      retraits Zotero).
      - **Écart au MCD** (décision de Sabine du 2026-10-12) : un catalogue dont une entrée est
        rejetée, ou qui ne donne aucun item, ne retire rien. Une ligne rejetée est présente, pas

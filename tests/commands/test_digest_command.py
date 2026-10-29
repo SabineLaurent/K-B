@@ -140,14 +140,6 @@ def test_digest_logs_its_start_and_its_end_with_the_duration(
         assert re.search(line, read_kb_log(data_dir), re.MULTILINE)
 
 
-@pytest.mark.parametrize(
-    ("seconds", "duration"),
-    [(0.4, "0 s"), (57, "57 s"), (60, "1 min 0 s"), (246.2, "4 min 6 s")],
-)
-def test_the_duration_of_digest_is_in_seconds_then_minutes(seconds, duration):
-    assert digest_command.describe_duration(seconds) == duration
-
-
 def test_digest_without_digest_in_the_window_says_so_and_succeeds(
     monkeypatch, digest_environment, capsys
 ):
