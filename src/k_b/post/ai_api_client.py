@@ -137,6 +137,8 @@ class DigestsResponse(AiApiModel):
     window: Window
     digests: list[Digest]
     failed_subjects: list[FailedSubject]
+    # The items of the window read by the AI API, shown in the summary of kb digest.
+    items_in: int
     items_capped: bool
 
 

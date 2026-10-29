@@ -1250,7 +1250,7 @@ légitimes l'utilisent.
 
 | Code | Quand |
 |---|---|
-| 0 | chaque fiche rendue est écrite ; ou aucune fiche dans la fenêtre (`digests: none in the window`) |
+| 0 | chaque fiche rendue est écrite ; ou aucune fiche dans la fenêtre (`total  none in the window`) |
 | 1 | l'API IA injoignable (`ai_api_unavailable`), délai dépassé (`ai_api_timeout`), clé refusée (`ai_api_unauthorized`, 401), panne (`ai_api_failed`, 5xx), autre réponse ou réponse hors schéma (`ai_api_invalid_response`) : aucune fiche écrite ; ou un sujet en échec et aucune fiche écrite ; ou une `OSError` au contrôle d'avant la demande |
 | 2 | réglage refusé, `KB_VAULT_DIR` absente ou pas un dossier, fiche du jour déjà là ou lien, vus avant la demande : rien n'est demandé |
 | 4 | un sujet en échec (nommé dans `failed_subjects`, ou sa fiche non écrite) et au moins une fiche écrite |
@@ -1278,8 +1278,30 @@ terminal (sortie redirigée, conteneur sans TTY), une ligne datée toutes les
 `still waiting for the digests: 10 seconds, read timeout 240 seconds`. Le mode se choisit sur la
 sortie d'erreur, là où l'attente s'écrit ; un conteneur lancé avec un TTY (`docker run -t`,
 `tty: true`) recevrait donc l'animation dans son journal. La ligne dit que `kb` attend, pas que l'API
-IA avance (l'avancement par sujet : #350). Puis une ligne par fiche écrite, et un résumé (fiches
-écrites et en échec, `model`, `request_id`). Chaque échec va une fois au journal, sur la sortie d'erreur et
+IA avance (l'avancement par sujet : #350). Deux lignes de journal datées bornent la commande :
+`digest started: 8 subjects`, avant la demande, et `digest finished in 4 min 6 s`, une fois les fiches
+écrites (aucune ligne de fin si la réponse est refusée : la ligne d'erreur termine). Puis le bilan, sur
+la sortie standard (exemple de l'essai du 2026-10-28, la fenêtre et le nombre d'items en moins) :
+
+```
+Digest summary
+Window: 2026-10-25 → 2026-10-28, 412 items read
+
+subject               status         sheet
+vulnerabilities       sheet written  veille/vulnerabilities/2026-10-28.md
+…
+software_engineering  sheet written  veille/software_engineering/2026-10-28.md
+------------------------------------------------------------------------------
+total                 written 8, failed 0
+
+Model: gpt-6-luna
+Request id: 1bc0caf3-78ad-4b8d-ae56-397ba9d766c7
+```
+
+La fenêtre (`window.since` → `window.until`, en jours UTC) et `items_in` viennent de la réponse de
+`POST /digests`. Un sujet en échec a sa ligne (`digest failed`, ou `sheet not written`), sans chemin ;
+la raison est dans sa ligne d'erreur. Le `request_id` vient en dernier, seul : c'est la référence à
+donner en cas de problème (décision de Sabine du 2026-10-28). Chaque échec va une fois au journal, sur la sortie d'erreur et
 dans `<KB_DATA_DIR>/logs/kb.log` : sujet en échec (étape et état), fiche non écrite, ou réponse
 refusée, avec son état, son statut HTTP, l'état de son corps, son `X-Request-ID` (pour la retrouver
 dans `logs/kb-serve-ai.log`) et son `Retry-After`, chacun écrit tel quel s'il suit sa règle, sinon

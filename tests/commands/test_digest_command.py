@@ -110,10 +110,42 @@ def test_digest_writes_the_sheet_of_each_subject_and_says_so(
         "veille/research/2026-10-21.md",
     ]
     assert capsys.readouterr().out == (
-        "agent_tools: sheet written, veille/agent_tools/2026-10-21.md\n"
-        "research: sheet written, veille/research/2026-10-21.md\n"
-        f"digests: written 2, failed 0; model gpt-6-luna, request_id {REQUEST_ID}\n"
+        "\n"
+        "Digest summary\n"
+        "Window: 2026-10-18 → 2026-10-21, 4 items read\n"
+        "\n"
+        "subject      status         sheet\n"
+        "agent_tools  sheet written  veille/agent_tools/2026-10-21.md\n"
+        "research     sheet written  veille/research/2026-10-21.md\n"
+        f"{'-' * 60}\n"
+        "total        written 2, failed 0\n"
+        "\n"
+        "Model: gpt-6-luna\n"
+        f"Request id: {REQUEST_ID}\n"
     )
+
+
+def test_digest_logs_its_start_and_its_end_with_the_duration(
+    monkeypatch, digest_environment, capsys
+):
+    data_dir, _ = digest_environment
+    answer_digests(monkeypatch, answer_with(make_response([AGENT_DIGEST])))
+
+    assert cli.main(["digest"]) == cli.ExitCode.SUCCEEDED
+    started = rf"^{LOG_LINE_DATE} INFO k_b\.cli: digest started: 3 subjects$"
+    finished = rf"^{LOG_LINE_DATE} INFO k_b\.cli: digest finished in \d+ s$"
+    err = capsys.readouterr().err
+    for line in (started, finished):
+        assert re.search(line, err, re.MULTILINE)
+        assert re.search(line, read_kb_log(data_dir), re.MULTILINE)
+
+
+@pytest.mark.parametrize(
+    ("seconds", "duration"),
+    [(0.4, "0 s"), (57, "57 s"), (60, "1 min 0 s"), (246.2, "4 min 6 s")],
+)
+def test_the_duration_of_digest_is_in_seconds_then_minutes(seconds, duration):
+    assert digest_command.describe_duration(seconds) == duration
 
 
 def test_digest_without_digest_in_the_window_says_so_and_succeeds(
@@ -123,9 +155,7 @@ def test_digest_without_digest_in_the_window_says_so_and_succeeds(
     answer_digests(monkeypatch, answer_with(make_response([])))
 
     assert cli.main(["digest"]) == cli.ExitCode.SUCCEEDED
-    assert capsys.readouterr().out == (
-        f"digests: none in the window; model gpt-6-luna, request_id {REQUEST_ID}\n"
-    )
+    assert "total    none in the window\n" in capsys.readouterr().out
     assert list_sheets(vault_dir) == []
 
 
@@ -327,9 +357,12 @@ def test_digest_with_failed_subjects_writes_the_others_names_them_and_exits_4(
     assert "ERROR k_b.cli: research: digest failed: llm_timeout at the stage write" in (
         output.err
     )
-    assert output.out.endswith(
-        f"digests: written 1, failed 1; model gpt-6-luna, request_id {REQUEST_ID}\n"
-    )
+    assert (
+        "subject      status         sheet\n"
+        "agent_tools  sheet written  veille/agent_tools/2026-10-21.md\n"
+        "research     digest failed\n"
+    ) in output.out
+    assert "total        written 1, failed 1\n" in output.out
 
 
 def test_digest_with_failed_subjects_only_exits_1(monkeypatch, digest_environment):
