@@ -70,7 +70,7 @@ def run_digest(environ: Mapping[str, str]) -> int:
     except OSError as error:
         logger.error("no digest asked: %s", describe_os_error(error))
         return ExitCode.FAILED
-    logger.info("digest started: %d subjects", len(subject_names))
+    logger.info("digest started: %d subjects asked", len(subject_names))
     logger.info(
         "digests asked of the AI API, read timeout %d seconds",
         AI_API_READ_TIMEOUT_SECONDS,

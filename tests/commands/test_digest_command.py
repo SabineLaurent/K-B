@@ -132,7 +132,7 @@ def test_digest_logs_its_start_and_its_end_with_the_duration(
     answer_digests(monkeypatch, answer_with(make_response([AGENT_DIGEST])))
 
     assert cli.main(["digest"]) == cli.ExitCode.SUCCEEDED
-    started = rf"^{LOG_LINE_DATE} INFO k_b\.cli: digest started: 3 subjects$"
+    started = rf"^{LOG_LINE_DATE} INFO k_b\.cli: digest started: 3 subjects asked$"
     finished = rf"^{LOG_LINE_DATE} INFO k_b\.cli: digest finished in \d+ s$"
     err = capsys.readouterr().err
     for line in (started, finished):

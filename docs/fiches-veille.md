@@ -1279,7 +1279,7 @@ terminal (sortie redirigée, conteneur sans TTY), une ligne datée toutes les
 sortie d'erreur, là où l'attente s'écrit ; un conteneur lancé avec un TTY (`docker run -t`,
 `tty: true`) recevrait donc l'animation dans son journal. La ligne dit que `kb` attend, pas que l'API
 IA avance (l'avancement par sujet : #350). Deux lignes de journal datées bornent la commande :
-`digest started: 8 subjects`, avant la demande, et `digest finished in 4 min 6 s`, une fois les fiches
+`digest started: 8 subjects asked`, avant la demande, et `digest finished in 4 min 6 s`, une fois les fiches
 écrites (aucune ligne de fin si la réponse est refusée : la ligne d'erreur termine). Puis le bilan, sur
 la sortie standard (exemple de l'essai du 2026-10-28, la fenêtre et le nombre d'items en moins) :
 
