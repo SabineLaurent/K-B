@@ -8,6 +8,7 @@ from pathlib import Path
 from time import monotonic
 from typing import NamedTuple
 
+from k_b.commands.batch_summary import describe_duration, render_rule
 from k_b.commands.exit_codes import ExitCode, find_exit_code
 from k_b.commands.run_log import (
     LOGGER_NAME,
@@ -146,7 +147,7 @@ def render_digest_summary(
             f"Window: {since} → {until}, {response.items_in} items read",
             "",
             *table,
-            "-" * max(len(line) for line in table),
+            render_rule(table),
             f"{'total':<{subject_width}}  {describe_counts(written_count, failed_count)}",
             "",
             f"Model: {response.model}",
@@ -159,12 +160,6 @@ def describe_counts(written_count: int, failed_count: int) -> str:
     if written_count == failed_count == 0:
         return "none in the window"
     return f"written {written_count}, failed {failed_count}"
-
-
-def describe_duration(seconds: float) -> str:
-    """57 s, or 4 min 6 s."""
-    minutes, seconds_left = divmod(round(seconds), 60)
-    return f"{minutes} min {seconds_left} s" if minutes else f"{seconds_left} s"
 
 
 def describe_remedy(error: AiApiError) -> str:

@@ -4,7 +4,9 @@ import logging
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
+from time import monotonic
 
+from k_b.commands.batch_summary import describe_count, describe_duration, render_table
 from k_b.commands.exit_codes import ExitCode, find_exit_code
 from k_b.commands.run_log import LOGGER_NAME, value_or_log_refusal
 from k_b.etl.collected_sources import (
@@ -45,23 +47,25 @@ def run_collect(data_dir: Path, environ: Mapping[str, str]) -> int:
         collect_only, environ, SOURCE_KINDS, RawStore(data_dir)
     )
     log_collection_start(sources, environ)
+    started = monotonic()
     try:
         outcome = collect(sources, data_dir, datetime.now(UTC))
     except InvalidCollectionStateError as error:
         logger.error("%s", error)
         return ExitCode.NOT_STARTED
-    for source_name, source_error in outcome.errors_by_source.items():
-        print(f"{source_name}: {describe_outcome(source_error)}")
-    print_skipped_sources(collect_only, environ)
-    if outcome.state_error is not None:
-        print(f"collection_state: {describe_outcome(outcome.state_error)}")
+    logger.info("collection finished in %s", describe_duration(monotonic() - started))
+    print(
+        render_collection_summary(outcome, list_skipped_sources(collect_only, environ))
+    )
     return find_collection_exit_code(outcome)
 
 
 def log_collection_start(sources: Sequence[Source], environ: Mapping[str, str]) -> None:
     """Log, before the first source, the sources run and, when one uses the GitHub API without
     KB_GITHUB_TOKEN, its quota; of the token, only whether it is set is read."""
-    logger.info("sources to collect: %s", ", ".join(source.name for source in sources))
+    logger.info(
+        "collection started: %s selected", describe_count(len(sources), "source")
+    )
     if not environ.get(TOKEN_VARIABLE) and any(
         is_github_core_quota_source(source) for source in sources
     ):
@@ -77,16 +81,58 @@ def is_github_core_quota_source(source: Source) -> bool:
     return kind is not None and kind.folder_prefix in GITHUB_CORE_QUOTA_FOLDER_PREFIXES
 
 
-def print_skipped_sources(
+def render_collection_summary(
+    outcome: CollectionOutcome, skipped_sources: Sequence[tuple[str, str]]
+) -> str:
+    """The summary after the end line: a row per source run, the state if not written, then the
+    sources not run, one per line with the setting that leaves them out."""
+    rows = [
+        ("source", "status", "raw files"),
+        *(
+            (
+                source_name,
+                describe_outcome(source_error),
+                describe_raw_file_count(
+                    source_error, outcome.raw_file_counts[source_name]
+                ),
+            )
+            for source_name, source_error in outcome.errors_by_source.items()
+        ),
+    ]
+    lines = ["", "Collection summary", "", *render_table(rows)]
+    if outcome.state_error is not None:
+        lines += ["", f"collection_state: {describe_outcome(outcome.state_error)}"]
+    if skipped_sources:
+        lines += [
+            "",
+            "Not part of this collection (excluded by your settings):",
+            *(f"  {name} ({reason})" for name, reason in skipped_sources),
+        ]
+    return "\n".join(lines)
+
+
+def describe_raw_file_count(source_error: Exception | None, count: int) -> str:
+    """0 of a source that succeeded is a source that said nothing changed."""
+    if source_error is None and count == 0:
+        return "0 (nothing new)"
+    return str(count)
+
+
+def list_skipped_sources(
     collect_only: CollectOnly, environ: Mapping[str, str]
-) -> None:
-    """One line per source not run: not chosen, or its variable not set."""
-    for kind in SOURCE_KINDS:
-        if not collect_only.is_collected(kind.folder_prefix):
-            print(f"{kind.folder_prefix}: skipped (not in {COLLECT_ONLY_VARIABLE})")
-    for source_name, variable in VARIABLE_BY_SOURCE_NAME.items():
-        if collect_only.is_collected(source_name) and not environ.get(variable):
-            print(f"{source_name}: skipped ({variable} not set)")
+) -> list[tuple[str, str]]:
+    """Each source not run and why: not chosen, or its variable not set."""
+    skipped = [
+        (kind.folder_prefix, f"not in {COLLECT_ONLY_VARIABLE}")
+        for kind in SOURCE_KINDS
+        if not collect_only.is_collected(kind.folder_prefix)
+    ]
+    skipped += [
+        (source_name, f"{variable} not set")
+        for source_name, variable in VARIABLE_BY_SOURCE_NAME.items()
+        if collect_only.is_collected(source_name) and not environ.get(variable)
+    ]
+    return skipped
 
 
 def find_collection_exit_code(outcome: CollectionOutcome) -> ExitCode:

@@ -26,6 +26,9 @@ SAFE_PAGE_NAME = re.compile(r"[a-z0-9_-]+")
 
 class CollectionOutcome(NamedTuple):
     errors_by_source: dict[str, Exception | None]
+    # The raw files each source wrote: 0 when it said nothing changed; those written before a
+    # failure included.
+    raw_file_counts: dict[str, int]
     # The raw files are written even when the state is not: the next run collects again.
     state_error: OSError | None
 
@@ -38,12 +41,20 @@ def collect_all_sources(
         raise ValueError(f"collection time must be in UTC, got {now!r}")
     last_collection_dates = load_last_collection_dates(data_dir)
     errors_by_source: dict[str, Exception | None] = {}
+    raw_file_counts: dict[str, int] = {}
     for source in sources:
+        written_paths: list[Path] = []
+        raw_file_counts[source.name] = 0
         try:
             collect_one_source(
-                source, raw_dir, now, last_collection_dates.get(source.name)
+                source,
+                raw_dir,
+                now,
+                last_collection_dates.get(source.name),
+                written_paths,
             )
         except Exception as error:
+            raw_file_counts[source.name] = len(written_paths)
             # The error and the notes of a source (the day and url of a page) go on the dated
             # line, quoted: any source may raise any text. The traceback follows it.
             notes = "".join(
@@ -59,6 +70,14 @@ def collect_all_sources(
             )
             errors_by_source[source.name] = error
         else:
+            raw_file_counts[source.name] = len(written_paths)
+            # One line per source collected, whatever it brought (decision of Sabine of
+            # 2026-10-28): a source that writes no line of its own is not silent.
+            logger.info(
+                "source %r collected, raw files written: %d",
+                source.name,
+                len(written_paths),
+            )
             last_collection_dates[source.name] = now
             errors_by_source[source.name] = None
     try:
@@ -67,15 +86,20 @@ def collect_all_sources(
         logger.exception(
             "collection state not written to %s", data_dir / COLLECTION_STATE_FILENAME
         )
-        return CollectionOutcome(errors_by_source, error)
-    return CollectionOutcome(errors_by_source, None)
+        return CollectionOutcome(errors_by_source, raw_file_counts, error)
+    return CollectionOutcome(errors_by_source, raw_file_counts, None)
 
 
 def collect_one_source(
-    source: Source, raw_dir: Path, now: datetime, last_collected_at: datetime | None
+    source: Source,
+    raw_dir: Path,
+    now: datetime,
+    last_collected_at: datetime | None,
+    written_paths: list[Path],
 ) -> None:
     """Collect one source and write what it gives under raw/: one raw file named by now, or a
-    folder of that name holding one file per page; nothing if the source says nothing changed."""
+    folder of that name holding one file per page; nothing if the source says nothing changed.
+    Each raw file written is added to written_paths, also when a later write fails."""
     if source.acquisition_dir_name not in RAW_DIR_NAMES:
         raise ValueError(f"not a folder of raw/: {source.acquisition_dir_name!r}")
     for path_segment in (source.name, source.extension):
@@ -87,9 +111,9 @@ def collect_one_source(
     source_dir = raw_dir / source.acquisition_dir_name / source.name
     collection_name = now.strftime(COLLECTION_NAME_FORMAT)
     if isinstance(raw_content, bytes):
-        write_new_raw_file(
-            source_dir / f"{collection_name}.{source.extension}", raw_content
-        )
+        raw_file_path = source_dir / f"{collection_name}.{source.extension}"
+        write_new_raw_file(raw_file_path, raw_content)
+        written_paths.append(raw_file_path)
         return
     # Every name is checked before the first write: a refused name leaves no partial collection.
     # A write that fails midway (disk full) does leave the pages already written.
@@ -97,6 +121,6 @@ def collect_one_source(
         if not SAFE_PAGE_NAME.fullmatch(page_name):
             raise ValueError(f"not a safe page name: {page_name!r}")
     for page_name, page in raw_content.items():
-        write_new_raw_file(
-            source_dir / collection_name / f"{page_name}.{source.extension}", page
-        )
+        page_path = source_dir / collection_name / f"{page_name}.{source.extension}"
+        write_new_raw_file(page_path, page)
+        written_paths.append(page_path)
