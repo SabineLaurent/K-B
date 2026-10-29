@@ -61,6 +61,28 @@ def test_collect_reports_a_failure_but_still_stores_the_other_sources(
     assert list((tmp_path / "raw" / "automated_watch" / "working").iterdir())
 
 
+def test_collect_shows_the_traceback_of_an_unexpected_failure_only(
+    monkeypatch, tmp_path, capsys
+):
+    class FaultySource(WorkingSource):
+        def fetch(self, last_collected_at):
+            raise KeyError("a fault of the code")
+
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        collect_command,
+        "SOURCE_KINDS",
+        collected_kinds(BrokenSource(), FaultySource("faulty")),
+    )
+
+    assert cli.main(["collect"]) == cli.ExitCode.FAILED
+    error_output = capsys.readouterr().err
+    # The ConnectionError of broken is expected: its line alone.
+    assert error_output.count("Traceback") == 1
+    assert "KeyError: 'a fault of the code'" in error_output
+    assert "ConnectionError: source is down" not in error_output
+
+
 def test_collect_writes_its_state_at_the_root_of_the_data_directory_not_in_raw(
     monkeypatch, tmp_path
 ):

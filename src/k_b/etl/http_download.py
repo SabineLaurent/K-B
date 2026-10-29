@@ -13,12 +13,13 @@ from k_b.etl.http_retry import (
     find_retry_wait,
     note_rate_limit_reset,
 )
+from k_b.etl.source_contract import PageRefusedError
 from k_b.etl.user_agent import USER_AGENT
 
 logger = logging.getLogger(__name__)
 
 
-class RedirectedOutsideError(ValueError):
+class RedirectedOutsideError(PageRefusedError):
     """The answer came from outside the trusted prefix; redirect_url says where it led, resolved
     against the requested url (tldr.tech redirects a day without an edition)."""
 
@@ -89,7 +90,7 @@ def download_once(
         note_rate_limit_reset(error, trusted_url_prefix)
         raise
     if len(body) > max_bytes:
-        raise ValueError(f"response larger than {max_bytes} bytes, refused")
+        raise PageRefusedError(f"response larger than {max_bytes} bytes, refused")
     return body
 
 

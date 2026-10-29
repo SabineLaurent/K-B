@@ -12,6 +12,7 @@ from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import (
     EntryReading,
+    PageRefusedError,
     SourceReader,
     check_not_all_invalid,
     read_each_entry,
@@ -55,7 +56,7 @@ class GithubReleasesSource:
         # write differently.
         for release in reading.entries:
             if release.repository.lower() != self.repository.lower():
-                raise ValueError(
+                raise PageRefusedError(
                     f"{self.repository}: release {release.release_id} is of the repository "
                     f"{quote_value(release.repository)}"
                 )
@@ -114,7 +115,7 @@ def read_releases(raw_response: bytes) -> EntryReading[Release]:
     first; an invalid one is rejected with its position."""
     entries = json.loads(raw_response)
     if not isinstance(entries, list):
-        raise ValueError("expected a list of releases")
+        raise PageRefusedError("expected a list of releases")
     return read_each_entry(enumerate(entries), parse_release)
 
 

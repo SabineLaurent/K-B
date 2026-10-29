@@ -7,6 +7,7 @@ from http_helpers import http_error
 
 from k_b.etl import http_download
 from k_b.etl.http_download import RedirectedOutsideError, download
+from k_b.etl.source_contract import PageRefusedError
 from k_b.etl.user_agent import USER_AGENT
 
 BODY = b"<feed>one paper</feed>"
@@ -137,7 +138,7 @@ def test_a_refused_redirection_tells_where_it_led(fake_urlopen):
 
 
 def test_a_body_larger_than_the_limit_is_refused(fake_urlopen):
-    with pytest.raises(ValueError, match="larger than"):
+    with pytest.raises(PageRefusedError, match="larger than"):
         download(URL, TRUSTED_URL_PREFIX, max_bytes=len(BODY) - 1)
 
 

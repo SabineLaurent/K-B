@@ -9,7 +9,7 @@ from k_b.core.quoting import quote_value
 from k_b.etl import http_download
 from k_b.etl.extract import collect_all_sources
 from k_b.etl.raw_store import load_last_collection_dates, save_last_collection_dates
-from k_b.etl.source_contract import EntryReading, list_sources
+from k_b.etl.source_contract import EntryReading, PageRefusedError, list_sources
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources.arxiv import (
     ArxivSource,
@@ -149,7 +149,7 @@ def test_a_page_that_does_not_hold_every_result_is_refused(fake_urlopen):
         b"<opensearch:totalResults>3<", b"<opensearch:totalResults>2001<"
     )
 
-    with pytest.raises(ValueError, match="2001"):
+    with pytest.raises(PageRefusedError, match="2001"):
         ArxivSource().fetch(last_collected_at=None)
 
 
@@ -164,7 +164,9 @@ def test_a_page_whose_entries_are_all_invalid_fails_the_collection(fake_urlopen)
         b"<author>", b"<contributor>"
     ).replace(b"</author>", b"</contributor>")
 
-    with pytest.raises(ValueError, match="^all_items_invalid: 3 entries, all rejected"):
+    with pytest.raises(
+        PageRefusedError, match="^all_items_invalid: 3 entries, all rejected"
+    ):
         ArxivSource().fetch(last_collected_at=None)
 
 
@@ -173,7 +175,7 @@ def test_an_api_error_answered_with_http_200_is_refused(fake_urlopen):
         b"http://arxiv.org/abs/2609.31282v1", b"http://arxiv.org/api/errors#malformed"
     )
 
-    with pytest.raises(ValueError, match="error"):
+    with pytest.raises(PageRefusedError, match="error"):
         ArxivSource().fetch(last_collected_at=None)
 
 
@@ -298,7 +300,7 @@ def test_a_feed_reporting_an_api_error_is_refused():
         entry_id="http://arxiv.org/api/errors#incorrect_id_format_for_1234"
     )
 
-    with pytest.raises(ValueError, match="incorrect_id_format_for_1234"):
+    with pytest.raises(PageRefusedError, match="incorrect_id_format_for_1234"):
         count_papers(feed_with_entry(error_entry))
 
 
@@ -306,7 +308,7 @@ def test_the_id_of_an_api_error_is_quoted_cut():
     error_id = "http://arxiv.org/api/errors#" + "x" * 200
     error_entry = entry_xml(entry_id=error_id)
 
-    with pytest.raises(ValueError) as refusal:
+    with pytest.raises(PageRefusedError) as refusal:
         count_papers(feed_with_entry(error_entry))
 
     assert str(refusal.value).endswith(quote_value(error_id))
@@ -322,7 +324,7 @@ def test_the_id_of_an_api_error_is_quoted_cut():
     ],
 )
 def test_a_response_that_is_not_an_arxiv_feed_is_refused(raw_response):
-    with pytest.raises(ValueError):
+    with pytest.raises(PageRefusedError):
         read_total_results(raw_response)
 
 

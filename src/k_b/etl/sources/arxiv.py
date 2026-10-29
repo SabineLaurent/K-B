@@ -17,6 +17,7 @@ from k_b.etl.http_download import download
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import (
     EntryReading,
+    PageRefusedError,
     SourceReader,
     check_not_all_invalid,
     read_each_entry,
@@ -72,7 +73,7 @@ class ArxivSource:
         total_results = read_total_results(raw_response)
         if total_results > paper_count:
             # Failing keeps the last collection date: the next collection asks again.
-            raise ValueError(
+            raise PageRefusedError(
                 f"{total_results} papers found, only {paper_count} returned"
             )
         if paper_count == 0:
@@ -114,7 +115,9 @@ def count_papers(raw_response: bytes) -> int:
     for entry in entries:
         entry_id = (entry.findtext(f"{ATOM}id") or "").strip()
         if API_ERROR_ID.match(entry_id):
-            raise ValueError(f"the arXiv API reports an error: {quote_value(entry_id)}")
+            raise PageRefusedError(
+                f"the arXiv API reports an error: {quote_value(entry_id)}"
+            )
     return len(entries)
 
 
@@ -122,7 +125,7 @@ def read_total_results(raw_response: bytes) -> int:
     """The number of papers matching the query, which may exceed the papers of this page."""
     total_results = parse_feed(raw_response).findtext(f"{OPENSEARCH}totalResults")
     if total_results is None or not total_results.strip().isdigit():
-        raise ValueError("totalResults is missing or not a number")
+        raise PageRefusedError("totalResults is missing or not a number")
     return int(total_results)
 
 
@@ -157,9 +160,9 @@ def parse_feed(raw_response: bytes) -> ElementTree.Element:
     try:
         feed = ElementTree.fromstring(raw_response)  # noqa: S314 — XML entities: #69
     except ElementTree.ParseError as error:
-        raise ValueError(f"not an XML document: {error}") from error
+        raise PageRefusedError(f"not an XML document: {error}") from error
     if feed.tag != f"{ATOM}feed":
-        raise ValueError("expected an Atom feed")
+        raise PageRefusedError("expected an Atom feed")
     return feed
 
 

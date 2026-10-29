@@ -6,6 +6,7 @@ from urllib.error import HTTPError
 import pytest
 
 from k_b.etl import http_download
+from k_b.etl.source_contract import PageRefusedError
 from k_b.etl.sources import cisa_kev
 from k_b.etl.sources.cisa_kev import (
     CisaKevSource,
@@ -90,7 +91,7 @@ def test_a_page_that_is_not_the_catalog_fails_the_collection(monkeypatch):
     maintenance_page = b"<html><body>Site under maintenance</body></html>"
     monkeypatch.setattr(http_download, "urlopen", FakeUrlopen(body=maintenance_page))
 
-    with pytest.raises(ValueError, match="catalog without the columns"):
+    with pytest.raises(PageRefusedError, match="catalog without the columns"):
         CisaKevSource().fetch(last_collected_at=None)
 
 
@@ -136,7 +137,7 @@ def test_a_vulnerability_keeps_its_publication_date_and_description():
 
 
 def test_a_catalog_without_the_expected_columns_is_refused():
-    with pytest.raises(ValueError, match="dateAdded"):
+    with pytest.raises(PageRefusedError, match="dateAdded"):
         read_new_vulnerabilities(b"cveID,vendorProject\nCVE-2026-1234,Apple\n", None)
 
 
@@ -146,7 +147,7 @@ def test_a_catalog_without_the_ransomware_column_is_refused():
         "knownRansomwareCampaignUse", "otherColumn"
     )
 
-    with pytest.raises(ValueError, match="knownRansomwareCampaignUse"):
+    with pytest.raises(PageRefusedError, match="knownRansomwareCampaignUse"):
         read_new_vulnerabilities(catalog.encode(), None)
 
 
@@ -221,7 +222,9 @@ def test_a_catalog_whose_rows_are_all_invalid_fails_the_collection(monkeypatch):
     catalog = catalog_with_invalid_rows(0, 1, 2, 3)
     monkeypatch.setattr(http_download, "urlopen", FakeUrlopen(body=catalog))
 
-    with pytest.raises(ValueError, match="^all_items_invalid: 4 entries, all rejected"):
+    with pytest.raises(
+        PageRefusedError, match="^all_items_invalid: 4 entries, all rejected"
+    ):
         CisaKevSource().fetch(last_collected_at=None)
 
 
@@ -230,7 +233,7 @@ def test_a_catalog_without_any_row_fails_the_collection(monkeypatch):
     header = EXTRACT.splitlines(keepends=True)[0]
     monkeypatch.setattr(http_download, "urlopen", FakeUrlopen(body=header))
 
-    with pytest.raises(ValueError, match="^empty_catalog: 0 entries$"):
+    with pytest.raises(PageRefusedError, match="^empty_catalog: 0 entries$"):
         CisaKevSource().fetch(last_collected_at=None)
 
 

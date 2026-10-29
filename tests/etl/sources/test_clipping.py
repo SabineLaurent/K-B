@@ -12,7 +12,7 @@ import pytest
 from pydantic import ValidationError
 
 from k_b.core.config import CLIP_CHANGE_MARGIN
-from k_b.etl.source_contract import check_not_all_invalid
+from k_b.etl.source_contract import PageRefusedError, check_not_all_invalid
 from k_b.etl.sources import clipping
 from k_b.etl.sources.clipping import (
     CLIPPINGS_DIR_NAME,
@@ -230,7 +230,7 @@ def test_clips_all_unreadable_fail_the_source_as_all_items_invalid(tmp_path):
     (clippings_dir / "a.md").write_bytes(b"no frontmatter")
     (clippings_dir / "b.md").write_bytes(b"\xff not UTF-8")
 
-    with pytest.raises(ValueError, match="all_items_invalid: 2 entries"):
+    with pytest.raises(PageRefusedError, match="all_items_invalid: 2 entries"):
         ClippingSource(tmp_path / "vault").fetch(None)
 
 
@@ -259,7 +259,7 @@ def test_clips_all_refused_as_items_fail_the_source_as_all_items_invalid(
     clippings_dir.mkdir(parents=True)
     (clippings_dir / "a.md").write_bytes(raw_clip)
 
-    with pytest.raises(ValueError, match="all_items_invalid: 1 entries"):
+    with pytest.raises(PageRefusedError, match="all_items_invalid: 1 entries"):
         ClippingSource(tmp_path / "vault").fetch(None)
 
 
@@ -281,7 +281,8 @@ def test_a_vault_without_its_clippings_folder_fails_without_its_path(tmp_path, v
         ClippingSource(tmp_path / vault).fetch(None)
 
     assert str(failure.value) == (
-        "clippings_folder_missing: no Clippings folder in the vault of KB_VAULT_DIR"
+        "clippings_folder_missing: no Clippings folder in the vault of KB_VAULT_DIR;"
+        " create it, or check KB_VAULT_DIR"
     )
 
 

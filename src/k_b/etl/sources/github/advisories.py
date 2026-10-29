@@ -13,6 +13,7 @@ from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import (
     EntryReading,
+    PageRefusedError,
     SourceReader,
     check_not_all_invalid,
     read_each_entry,
@@ -123,7 +124,7 @@ def read_advisories(raw_response: bytes) -> EntryReading[Advisory]:
     is rejected with its position."""
     entries = json.loads(raw_response)
     if not isinstance(entries, list):
-        raise ValueError("expected a list of advisories")
+        raise PageRefusedError("expected a list of advisories")
     return read_each_entry(enumerate(entries), parse_advisory)
 
 

@@ -18,7 +18,7 @@ from k_b.core.config import (
 from k_b.core.quoting import quote_value
 from k_b.etl.http_download import RedirectedOutsideError, download
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME, find_stream
-from k_b.etl.source_contract import EntryReading, SourceReader
+from k_b.etl.source_contract import EntryReading, PageRefusedError, SourceReader
 from k_b.items import EDITION_SLUG, Item, SourceCode, at_midnight_utc
 
 SOURCE_CODE: SourceCode = "tldr"
@@ -137,10 +137,10 @@ class TldrSource:
                 read_pages[day] = PageRefusal(page_url, observed)
         return read_pages
 
-    def refuse(self, refusals: dict[date, PageRefusal]) -> ValueError:
+    def refuse(self, refusals: dict[date, PageRefusal]) -> PageRefusedError:
         """The failure of the source, one note per day refused, with its day, url and
         observation."""
-        error = ValueError(NOT_THE_EDITION_OF_THE_DAY)
+        error = PageRefusedError(NOT_THE_EDITION_OF_THE_DAY)
         for day, refusal in refusals.items():
             error.add_note(f"{self.name} {day}, from {refusal.page_url}")
             error.add_note(refusal.observed)

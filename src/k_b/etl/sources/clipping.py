@@ -26,7 +26,12 @@ from k_b.core.config import CLIP_CHANGE_MARGIN
 from k_b.core.quoting import quote_value, without_values
 from k_b.etl.normalize import remove_tracking_parameters
 from k_b.etl.raw_store import SELECTED_LIBRARY_DIR_NAME
-from k_b.etl.source_contract import EntryReading, SourceReader, check_not_all_invalid
+from k_b.etl.source_contract import (
+    EntryReading,
+    ExpectedSourceError,
+    SourceReader,
+    check_not_all_invalid,
+)
 from k_b.items import (
     CLIP_MAX_BYTES,
     Item,
@@ -58,12 +63,12 @@ EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 ONE_MICROSECOND = timedelta(microseconds=1)
 
 
-class ClipTooLargeError(Exception):
+class ClipTooLargeError(ExpectedSourceError):
     """A clip of the vault is larger than CLIP_MAX_BYTES: nothing is copied and each collection
     fails until it is shrunk or removed, so that the bound is never passed silently."""
 
 
-class ClippingsFolderMissingError(Exception):
+class ClippingsFolderMissingError(ExpectedSourceError):
     """The vault, or its Clippings folder, is missing: not taken for a vault without clips, or
     the clips a mount brings later with their old dates would never be copied. No path in the
     message."""
@@ -95,7 +100,7 @@ class ClippingSource:
         except FileNotFoundError:
             raise ClippingsFolderMissingError(
                 f"clippings_folder_missing: no {CLIPPINGS_DIR_NAME} folder in the vault of"
-                " KB_VAULT_DIR"
+                " KB_VAULT_DIR; create it, or check KB_VAULT_DIR"
             ) from None
         changed = [
             clip_file

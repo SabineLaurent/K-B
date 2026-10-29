@@ -2,13 +2,14 @@ import logging
 import os
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 import pytest
 
 from k_b.etl.extract import collect_all_sources
 from k_b.etl.http_download import RedirectedOutsideError
 from k_b.etl.raw_store import load_last_collection_dates, save_last_collection_dates
+from k_b.etl.source_contract import ExpectedSourceError, PageRefusedError
 from k_b.etl.sources import cisa_kev, tldr
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -36,6 +37,58 @@ class BrokenSource:
 
     def fetch(self, last_collected_at):
         raise ConnectionError("source is down")
+
+
+class FailingSource:
+    name = "failing"
+    extension = "json"
+    acquisition_dir_name = "automated_watch"
+
+    def __init__(self, error):
+        self.error = error
+
+    def fetch(self, last_collected_at):
+        raise self.error
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ExpectedSourceError("a failure met in normal operation"),
+        PageRefusedError("incomplete search results, refused"),
+        URLError("nodename nor servname provided"),
+        ConnectionError("source is down"),
+        TimeoutError("timed out"),
+    ],
+)
+def test_an_expected_failure_is_logged_on_its_line_without_its_traceback(
+    tmp_path, caplog, error
+):
+    with caplog.at_level(logging.ERROR, logger="k_b.etl.extract"):
+        collect_all_sources(
+            [FailingSource(error)], tmp_path / "raw", tmp_path, FIRST_RUN_AT
+        )
+
+    [record] = caplog.records
+    assert record.getMessage().startswith(
+        f"collection failed for source 'failing': {type(error).__name__} "
+    )
+    # False, not None: exc_info=False stays as given.
+    assert not record.exc_info
+
+
+@pytest.mark.parametrize(
+    "error", [ValueError("invalid literal for int()"), KeyError("id")]
+)
+def test_an_unexpected_failure_is_logged_with_its_traceback(tmp_path, caplog, error):
+    with caplog.at_level(logging.ERROR, logger="k_b.etl.extract"):
+        collect_all_sources(
+            [FailingSource(error)], tmp_path / "raw", tmp_path, FIRST_RUN_AT
+        )
+
+    [record] = caplog.records
+    assert record.exc_info is not None
+    assert record.exc_info[1] is error
 
 
 def test_a_broken_source_does_not_stop_the_others(tmp_path):
@@ -384,7 +437,7 @@ def test_a_tldr_page_that_is_not_an_edition_writes_nothing_and_keeps_the_date(
         record for record in caplog.records if record.levelno >= logging.ERROR
     ]
     assert error_record.getMessage() == (
-        "collection failed for source 'tldr_ai': ValueError "
+        "collection failed for source 'tldr_ai': PageRefusedError "
         "'not_the_edition_of_the_day'; "
         "'tldr_ai 2026-10-03, from https://tldr.tech/ai/2026-10-03'; "
         '"first h1 is not an edition title with its date: '
