@@ -96,6 +96,9 @@ def run_digest(environ: Mapping[str, str]) -> int:
     written_count = sum(1 for row in rows if row.status == SHEET_WRITTEN)
     failed_count = len(rows) - written_count
     print(render_digest_summary(response, rows, written_count, failed_count))
+    # A blank line after the result, apart from what follows (make's line of an error):
+    # decision of Sabine of 2026-10-29, as for kb collect.
+    print()
     return find_exit_code(has_failed=failed_count > 0, has_done=written_count > 0)
 
 

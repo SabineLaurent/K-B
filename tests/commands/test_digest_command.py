@@ -122,6 +122,7 @@ def test_digest_writes_the_sheet_of_each_subject_and_says_so(
         "\n"
         "Model: gpt-6-luna\n"
         f"Request id: {REQUEST_ID}\n"
+        "\n"
     )
 
 
