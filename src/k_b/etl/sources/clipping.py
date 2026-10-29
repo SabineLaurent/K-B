@@ -99,8 +99,9 @@ class ClippingSource:
             clip_files = list_clip_files(self.vault_dir / CLIPPINGS_DIR_NAME)
         except FileNotFoundError:
             raise ClippingsFolderMissingError(
-                f"clippings_folder_missing: no {CLIPPINGS_DIR_NAME} folder in the vault of"
-                " KB_VAULT_DIR; create it, or check KB_VAULT_DIR"
+                # Short enough for the log line not to cut its remedy (quote_value).
+                f"clippings_folder_missing: no {CLIPPINGS_DIR_NAME} folder in KB_VAULT_DIR;"
+                " create it, or check KB_VAULT_DIR"
             ) from None
         changed = [
             clip_file
