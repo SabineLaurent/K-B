@@ -52,7 +52,7 @@ def test_write_tops_writes_the_sheets_of_each_top_then_deletes_the_older_ranking
         assert (older.exists(), last.exists()) == (False, True)
     output = capsys.readouterr()
     assert output.out == (
-        "most_starred: ok, 2 sheets written\n"
+        "\nmost_starred: ok, 2 sheets written\n"
         "most_forked: ok, 2 sheets written\n"
         "Older raw files deleted: 2\n"
         "Sheets vault path: veille/tops/\n"
@@ -74,7 +74,7 @@ def test_write_tops_again_writes_nothing_new(data_and_vault_dirs, test_tops, cap
 
     assert cli.main(["write-tops"]) == 0
     assert capsys.readouterr().out.startswith(
-        "most_starred: ok, 0 sheets written, the sheet of the day already exists\n"
+        "\nmost_starred: ok, 0 sheets written, the sheet of the day already exists\n"
     )
 
 
@@ -85,7 +85,7 @@ def test_write_tops_without_ranking_says_so_and_succeeds(
 
     assert cli.main(["write-tops"]) == 0
     assert capsys.readouterr().out == (
-        "most_starred: no ranking\n"
+        "\nmost_starred: no ranking\n"
         "most_forked: no ranking\n"
         "Older raw files deleted: 0\n"
         "Sheets vault path: veille/tops/\n"
@@ -168,7 +168,7 @@ def test_a_sheet_not_written_keeps_its_rankings_exits_4_and_the_other_top_is_wri
     # The type alone, never the message, which names the vault; no count of the raw files
     # deleted, as the top stopped may have deleted some.
     assert output.out == (
-        "most_starred: failed (PermissionError)\n"
+        "\nmost_starred: failed (PermissionError)\n"
         "most_forked: ok, 2 sheets written\n"
         "Sheets vault path: veille/tops/\n"
     )
@@ -189,7 +189,7 @@ def test_an_unreadable_ranking_is_kept_and_write_tops_exits_4_with_the_sheets_wr
     assert len(list_sheets(vault_dir)) == 2
     # The sheet written does not hide the ranking kept unread: the top failed.
     assert capsys.readouterr().out.startswith(
-        "most_starred: failed (ranking_unreadable)\nmost_forked: ok, 1 sheet written\n"
+        "\nmost_starred: failed (ranking_unreadable)\nmost_forked: ok, 1 sheet written\n"
     )
 
 

@@ -62,6 +62,8 @@ def run_write_tops(data_dir: Path, environ: Mapping[str, str]) -> int:
         if deleted_count is not None:
             deleted_count += outcome.deleted_count
     logger.info("write-tops finished in %s", describe_duration(monotonic() - started))
+    # A blank line between the log and the result (decision of Sabine of 2026-10-29).
+    print()
     for line in lines:
         print(line)
     if deleted_count is not None:

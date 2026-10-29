@@ -4554,6 +4554,10 @@ time-knight relu par un sous-agent et validé par elle.
     n'écrit pas », « ça foire une erreur ». Suivent `Older raw files deleted: N` et
     `Sheets vault path: veille/tops/`. Le type d'une erreur est affiché seul, jamais son message,
     qui nomme le coffre. Le code de sortie ne change pas.
+  - **Une ligne vide sépare le journal du résultat** dans les trois commandes, comme pour digest.
+    C'est la proposition de Sabine, « une séparation entre le retour log et le print en console ».
+    Écartés : un titre au-dessus du résultat, plus long que la ligne de l'import ; une règle
+    `-----`, qui sépare le total d'un tableau dans digest.
 
   Options écartées :
   - le bilan de l'import en ligne de journal, pour qu'il entre dans `kb.log` : la règle 3 de

@@ -64,6 +64,8 @@ def run_import(data_dir: Path) -> int:
     # Where the rejections are detailed (decision of Sabine of 2026-10-29); its name only, as
     # etl/load.py logs it: the path names the data directory.
     logger.info("import log kept: %s", quote_value(outcome.log_path.name))
+    # A blank line between the log and the result (decision of Sabine of 2026-10-29).
+    print()
     print(describe_import_summary(outcome))
     try:
         purge_superseded_raw(data_dir, LATEST_ONLY_FOLDER_KEYS)
