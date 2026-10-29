@@ -201,10 +201,10 @@ uv sync
 | Variable | Obligatoire | Rôle |
 |---|---|---|
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
-| `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
-| `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les comptes rendus de veille dans `veille/<sujet>/` ; ni l'un ni l'autre ne tourne sans elle (code 2). |
-| `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
-| `KB_COLLECT_ONLY` | non | les dossiers des sources que `kb collect` lance, séparés par des virgules (`zotero,clipping`) ; la casse ne compte pas. Sans elle, pas de filtre : chaque source tourne comme avant (Zotero, clips et GH Archive selon leur variable). Une source écartée affiche `<dossier>: skipped (not in KB_COLLECT_ONLY)` ; un nom qui n'est pas un dossier de source, une valeur ou une entrée vide, ou une source choisie sans sa variable (`zotero` sans `KB_ZOTERO_DIR`) : code 2, rien n'est collecté ([docs/specs-collecte.md](docs/specs-collecte.md), « Choisir les sources »). |
+| `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero (KB_ZOTERO_DIR not set)`, sous la remarque du bilan). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
+| `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les comptes rendus de veille dans `veille/<sujet>/` ; ni l'un ni l'autre ne tourne sans elle (code 2). |
+| `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
+| `KB_COLLECT_ONLY` | non | les dossiers des sources que `kb collect` lance, séparés par des virgules (`zotero,clipping`) ; la casse ne compte pas. Sans elle, pas de filtre : chaque source tourne comme avant (Zotero, clips et GH Archive selon leur variable). Une source écartée est nommée sous la remarque du bilan, `<dossier> (not in KB_COLLECT_ONLY)` ; un nom qui n'est pas un dossier de source, une valeur ou une entrée vide, ou une source choisie sans sa variable (`zotero` sans `KB_ZOTERO_DIR`) : code 2, rien n'est collecté ([docs/specs-collecte.md](docs/specs-collecte.md), « Choisir les sources »). |
 | `KB_GITHUB_TOKEN` | non | jeton GitHub en lecture seule ([docs/jeton-github.md](docs/jeton-github.md)). Sans lui, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000. |
 | `KB_DATA_API_KEY_<CLIENT>` | pour `kb serve-data` | la clé d'un client de l'API de données (`<CLIENT>` en `A-Z`, `0-9` et `_`, par exemple `KB_DATA_API_KEY_TERMINAL`), une variable par client ([docs/specs-api.md](docs/specs-api.md)). |
 | `KB_AI_API_KEY_<CLIENT>` | pour `kb serve-ai` et `kb digest` | la clé d'un client de l'API IA, une variable par client, mêmes règles que `KB_DATA_API_KEY_<CLIENT>` ; `kb digest` est le client `KB_DIGEST` et lit la même variable, `KB_AI_API_KEY_KB_DIGEST`. Les autres réglages de `kb serve-ai` (modèle, API de données, hôte, port, fenêtre) sont décrits dans `.env.example`. |
@@ -237,9 +237,13 @@ KB_DATA_DIR=~/.knowledge_base uv run kb collect
 Avec le jeton rangé dans le `.env` à la racine du dépôt, ignoré par git :
 `KB_DATA_DIR=~/.knowledge_base uv run --env-file .env kb collect`.
 
-`kb collect` affiche une ligne par source (`ok` ou `failed`, avec le type de l'erreur ; `skipped`
-pour Zotero sans `KB_ZOTERO_DIR`, les clips sans `KB_VAULT_DIR`, GH Archive sans
-`GOOGLE_APPLICATION_CREDENTIALS`, une source que `KB_COLLECT_ONLY` écarte). Code de sortie : 0 si
+`kb collect` journalise son début (`collection started: 17 sources selected`), une ligne par
+source collectée (les bruts écrits) et sa fin avec la durée, puis affiche un bilan : un tableau
+par source lancée (`ok` ou `failed`, avec le type de l'erreur ; le nombre de bruts écrits,
+`0 (nothing new)` pour une source sans rien de neuf), puis les sources non lancées, une par ligne
+avec le réglage qui les écarte : Zotero sans `KB_ZOTERO_DIR`, les clips sans `KB_VAULT_DIR`, GH
+Archive sans `GOOGLE_APPLICATION_CREDENTIALS`, une source que `KB_COLLECT_ONLY` écarte
+([docs/specs-collecte.md](docs/specs-collecte.md), « Règles communes »). Code de sortie : 0 si
 tout a réussi ; 4 si au moins une source a réussi et au moins une a échoué, l'état de collecte
 écrit ; 1 si aucune source lancée n'a réussi ou si l'état de collecte n'a pas pu être écrit ; 2 si
 `KB_DATA_DIR` manque, n'est pas un dossier existant, si l'état de collecte est illisible, ou si
@@ -257,9 +261,13 @@ KB_DATA_DIR=~/.knowledge_base uv run kb import
 `<KB_DATA_DIR>/raw/selected_library/` (les extraits Zotero) pas encore importés et
 écrit leurs items dans la base, qui écarte les doublons, et les lignes des classements GH Archive
 dans sa table `trend` ; sans nouveau brut, il ne lit rien,
-sauf un fichier illisible, relu et rejeté à chaque import. Il affiche le nombre de fichiers bruts lus, d'items écrits (nouveaux ou mis à jour), de lignes de tendance écrites, d'items et de fenêtres de
-classement écartés (doublons, ou versions qui ne sont pas plus récentes que celle de la base), de lignes retirées
-(CISA, entrées et surlignages Zotero) et de rejets, détaillés dans
+sauf un fichier illisible, relu et rejeté à chaque import. Il journalise son début et sa fin
+avec la durée, puis affiche un bilan : un tableau par source (fichiers bruts lus, items écrits,
+nouveaux ou mis à jour, items et fenêtres de classement écartés, doublons ou versions qui ne sont
+pas plus récentes que celle de la base, rejets) et son total, les lignes de tendance de GH Archive
+à part des items, les sources sans lecteur (les tops, lus par `kb write-tops`), puis les lignes
+retirées (CISA, entrées et surlignages Zotero), les bruts remplacés supprimés et le journal, où
+les rejets sont détaillés :
 `<KB_DATA_DIR>/import-log-<AAAA-MM-JJTHHMMSSZ>.jsonl`, un journal par import. Pour reconstruire
 la base depuis tout le brut : supprimer `k-b.sqlite`, puis `kb create-db` et `kb import`. Code de
 sortie :

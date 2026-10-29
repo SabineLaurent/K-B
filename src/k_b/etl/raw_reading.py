@@ -40,6 +40,8 @@ class Collections(NamedTuple):
 
     of_items: list[tuple[Path, SourceReader[Any]]]
     of_trends: list[tuple[Path, TrendReader]]
+    # The sources of a kind without a reader, named in the summary of kb import.
+    without_reader: list[str]
 
 
 def list_collections(raw_dir: Path, kinds: Sequence[SourceKind]) -> Collections:
@@ -47,6 +49,7 @@ def list_collections(raw_dir: Path, kinds: Sequence[SourceKind]) -> Collections:
     tracked or not."""
     of_items: list[tuple[Path, SourceReader[Any]]] = []
     of_trends: list[tuple[Path, TrendReader]] = []
+    without_reader: list[str] = []
     source_dirs = [
         source_dir
         for raw_dir_name in RAW_DIR_NAMES
@@ -78,7 +81,8 @@ def list_collections(raw_dir: Path, kinds: Sequence[SourceKind]) -> Collections:
             logger.info(
                 "source without a reader, skipped: %s", quote_value(source_dir.name)
             )
-    return Collections(of_items, of_trends)
+            without_reader.append(source_dir.name)
+    return Collections(of_items, of_trends, without_reader)
 
 
 def read_collection(
@@ -102,7 +106,7 @@ def read_collection(
         return RawReading(
             [],
             [reject(relative_collection_path, f"{type(error).__name__}: {error}")],
-            0,
+            [],
         )
     return join_readings(
         [
@@ -128,7 +132,9 @@ def read_page(
     except (ValueError, csv.Error, OSError, RecursionError) as error:
         # Not a file read: it is not registered, and is read again at the next import.
         return RawReading(
-            [], [reject(raw_file_path, f"{type(error).__name__}: {error}")], 1
+            [],
+            [reject(raw_file_path, f"{type(error).__name__}: {error}")],
+            [raw_file_path],
         )
     items = []
     rejections = [
@@ -149,7 +155,7 @@ def read_page(
     raw_file = RawFile(
         raw_file_path, reader.source_code, collected_at, items, len(rejections)
     )
-    return RawReading([raw_file], rejections, 1)
+    return RawReading([raw_file], rejections, [raw_file_path])
 
 
 def read_trend_file(path: Path, raw_dir: Path, reader: TrendReader) -> TrendReading:
@@ -157,20 +163,20 @@ def read_trend_file(path: Path, raw_dir: Path, reader: TrendReader) -> TrendRead
     registered, so the next import reads it again."""
     raw_file_path = path.relative_to(raw_dir).as_posix()
     if path.is_dir():
-        return TrendReading([], [reject(raw_file_path, "a folder, not a raw file")], 0)
+        return TrendReading([], [reject(raw_file_path, "a folder, not a raw file")], [])
     try:
         collected_at = parse_collection_name(path.stem)
     except ValueError as error:
         reason = f"{type(error).__name__}: {error}"
-        return TrendReading([], [reject(raw_file_path, reason)], 0)
+        return TrendReading([], [reject(raw_file_path, reason)], [])
     try:
         rows = reader.read_rows(path.read_bytes())
     except (ValueError, OSError) as error:
         # Counted as opened, as a page of items that cannot be read.
         reason = f"{type(error).__name__}: {error}"
-        return TrendReading([], [reject(raw_file_path, reason)], 1)
+        return TrendReading([], [reject(raw_file_path, reason)], [raw_file_path])
     raw_file = RawFile(raw_file_path, reader.source_code, collected_at, [], 0)
-    return TrendReading([TrendFile(raw_file, rows)], [], 1)
+    return TrendReading([TrendFile(raw_file, rows)], [], [raw_file_path])
 
 
 def list_pages(collection_dir: Path, raw_dir: Path) -> list[Path]:

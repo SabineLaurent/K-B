@@ -13,6 +13,7 @@ from load_helpers import (
     fetch_rows,
     read_log,
     run_import,
+    totals,
 )
 from test_items import (
     COLLECTED_AT,
@@ -302,7 +303,7 @@ def test_an_item_with_every_text_and_list_at_its_maximum_goes_into_the_database(
 
     summary = run_import(tmp_path, kinds=kinds)
 
-    assert summary == (5, 0, 0, 1, 0, 0)
+    assert totals(summary) == (5, 0, 0, 1, 0, 0)
     paper, vulnerability, release, advisory, newsletter_article = (
         build_item_at_its_maximums(build_fields, COLLECTED_AT, RAW_FILE_PATH)
         for build_fields in builders
