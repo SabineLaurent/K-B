@@ -82,13 +82,13 @@ def import_raw_files(
 
 def purge_superseded_raw(
     data_dir: Path, latest_only_folder_keys: Collection[str]
-) -> int:
-    """Delete the raw files of the folders given that the last one imported superseded; return
-    how many.
+) -> None:
+    """Delete the raw files of the folders given that the last one imported superseded; the
+    purge logs how many.
 
     Run after the import, so that a file the base registers for the first time can be the one
     kept."""
-    return delete_superseded_raw_files(
+    delete_superseded_raw_files(
         RawStore(data_dir),
         read_imported_paths(data_dir / DATABASE_FILE_NAME),
         latest_only_folder_keys,

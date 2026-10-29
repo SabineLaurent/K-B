@@ -37,37 +37,36 @@ def run_write_tops(data_dir: Path, environ: Mapping[str, str]) -> int:
     logger.info("write-tops started: %s selected", describe_count(len(TOPS), "ranking"))
     started = monotonic()
     store = RawStore(data_dir)
-    # The outcome of each top, or the error that stopped it, printed once all are done.
-    outcomes: dict[str, TopSheetsOutcome | Exception] = {}
+    has_failed = False
+    has_done = False
+    # The line of each top, printed once all are done; no count of the rankings deleted once a
+    # top stopped, as it may have deleted some before its error.
+    lines: list[str] = []
+    deleted_count: int | None = 0
     for top in TOPS:
         try:
-            outcomes[top.name] = write_top_sheets(store, vault_dir, top)
+            outcome = write_top_sheets(store, vault_dir, top)
         except (OSError, VaultEntryRefusedError) as error:
             logger.error("top sheets failed: %s: %s", top.name, describe_error(error))
-            outcomes[top.name] = error
-    logger.info("write-tops finished in %s", describe_duration(monotonic() - started))
-    for top_name, outcome in outcomes.items():
-        print(f"{top_name}: {describe_outcome(outcome)}")
-    ended = [
-        outcome
-        for outcome in outcomes.values()
-        if isinstance(outcome, TopSheetsOutcome)
-    ]
-    # A top stopped may have deleted some rankings before its error: no count, rather than a
-    # wrong one.
-    if len(ended) == len(outcomes):
-        print(
-            f"Older raw files deleted: {sum(outcome.deleted_count for outcome in ended)}"
+            # The type alone, never the message, which names the vault or a raw file.
+            lines.append(f"{top.name}: failed ({type(error).__name__})")
+            has_failed = True
+            deleted_count = None
+            continue
+        lines.append(f"{top.name}: {describe_outcome(outcome)}")
+        has_failed = has_failed or outcome.unreadable_count > 0
+        has_done = (
+            has_done or outcome.written_count > 0 or outcome.unreadable_count == 0
         )
+        if deleted_count is not None:
+            deleted_count += outcome.deleted_count
+    logger.info("write-tops finished in %s", describe_duration(monotonic() - started))
+    for line in lines:
+        print(line)
+    if deleted_count is not None:
+        print(f"Older raw files deleted: {deleted_count}")
     print(f"Sheets vault path: {SHEETS_VAULT_PATH.as_posix()}/")
-    return find_exit_code(
-        has_failed=len(ended) < len(outcomes)
-        or any(outcome.unreadable_count > 0 for outcome in ended),
-        has_done=any(
-            outcome.written_count > 0 or outcome.unreadable_count == 0
-            for outcome in ended
-        ),
-    )
+    return find_exit_code(has_failed=has_failed, has_done=has_done)
 
 
 def describe_error(error: OSError | VaultEntryRefusedError) -> str:
@@ -78,11 +77,9 @@ def describe_error(error: OSError | VaultEntryRefusedError) -> str:
     return f"{describe_os_error(error)}; run kb write-tops again"
 
 
-def describe_outcome(outcome: TopSheetsOutcome | Exception) -> str:
-    """An error first, then the sheets written, then the sheet of the day already there; the type
-    of an error alone, never its message, which names the vault or a raw file."""
-    if isinstance(outcome, Exception):
-        return f"failed ({type(outcome).__name__})"
+def describe_outcome(outcome: TopSheetsOutcome) -> str:
+    """A ranking kept unread first, then the sheets written, then the sheet of the day already
+    there."""
     if outcome.unreadable_count > 0:
         return "failed (ranking_unreadable)"
     if outcome.written_count > 0:
