@@ -417,7 +417,10 @@ def test_a_report_not_written_leaves_the_register_and_exits_1(
     assert read_register(data_dir) == [PREVIOUS_ENTRY]
     output = capsys.readouterr()
     assert output.out == ""
-    assert "trend report not written: PermissionError (Permission denied)" in output.err
+    assert (
+        "trend report not written: PermissionError (Permission denied),"
+        f" request_id {REQUEST_ID}"
+    ) in output.err
     assert str(vault_dir) not in output.err
 
 
@@ -439,7 +442,7 @@ def test_a_register_not_updated_keeps_the_report_and_exits_1(
     error_output = capsys.readouterr().err
     assert (
         "sheet written, trend_reports.json not updated: PermissionError (Permission"
-        " denied); the next report covers these windows again"
+        f" denied), request_id {REQUEST_ID}; the next report covers these windows again"
     ) in error_output
     assert str(data_dir) not in error_output
 

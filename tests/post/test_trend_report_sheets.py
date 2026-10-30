@@ -13,7 +13,8 @@ from k_b.post.digest_sheets import is_writable_url
 from k_b.post.trend_report_client import TrendReportResponse
 from k_b.post.trend_report_sheets import (
     GITHUB_URL,
-    find_sheet_path,
+    ReportFile,
+    locate_report_file,
     refuse_written_sheet,
     render_trend_report_sheet,
     write_trend_report_sheet,
@@ -168,18 +169,20 @@ def test_the_url_of_a_valid_name_is_an_autolink_written_as_it_is(name):
     assert is_writable_url(f"{GITHUB_URL}{name}")
 
 
-def test_the_report_of_a_day_is_under_veille_tendances():
-    assert find_sheet_path(Path("vault"), DAY) == Path(
-        "vault/veille/tendances/2026-11-01.md"
+def test_the_report_of_a_day_is_located_once_under_veille_tendances():
+    assert locate_report_file(Path("vault"), DAY) == ReportFile(
+        vault_dir=Path("vault"),
+        path=Path("vault/veille/tendances/2026-11-01.md"),
+        name="veille/tendances/2026-11-01.md",
     )
 
 
-def test_a_report_is_written_at_the_path_it_is_given(tmp_path):
-    sheet_path = find_sheet_path(tmp_path, DAY)
+def test_a_report_is_written_where_it_is_located(tmp_path):
+    report_file = locate_report_file(tmp_path, DAY)
 
-    write_trend_report_sheet(tmp_path, sheet_path, read(make_report()), GENERATED)
+    write_trend_report_sheet(report_file, read(make_report()), GENERATED)
 
-    assert sheet_path.read_text("utf-8") == render(make_report())
+    assert (tmp_path / report_file.name).read_text("utf-8") == render(make_report())
 
 
 def test_a_report_of_the_day_written_meanwhile_is_refused_and_kept(tmp_path):
@@ -188,7 +191,9 @@ def test_a_report_of_the_day_written_meanwhile_is_refused_and_kept(tmp_path):
     sheet.write_bytes(b"read by Sabine\n")
 
     with pytest.raises(VaultEntryRefusedError) as refused:
-        write_trend_report_sheet(tmp_path, sheet, read(make_report()), GENERATED)
+        write_trend_report_sheet(
+            locate_report_file(tmp_path, DAY), read(make_report()), GENERATED
+        )
 
     assert str(refused.value) == (
         "sheet_exists: veille/tendances/2026-11-01.md is there;"
@@ -203,8 +208,8 @@ def test_before_the_request_a_report_of_the_day_is_refused(tmp_path):
     sheet.write_bytes(b"read by Sabine\n")
 
     with pytest.raises(VaultEntryRefusedError, match="^sheet_exists: "):
-        refuse_written_sheet(tmp_path, DAY)
-    refuse_written_sheet(tmp_path, date(2026, 11, 2))
+        refuse_written_sheet(locate_report_file(tmp_path, DAY))
+    refuse_written_sheet(locate_report_file(tmp_path, date(2026, 11, 2)))
 
 
 def test_before_the_request_a_folder_linked_elsewhere_is_refused(tmp_path):
@@ -215,7 +220,7 @@ def test_before_the_request_a_folder_linked_elsewhere_is_refused(tmp_path):
     (vault / "veille" / "tendances").symlink_to(elsewhere, target_is_directory=True)
 
     with pytest.raises(VaultEntryRefusedError) as refused:
-        refuse_written_sheet(vault, DAY)
+        refuse_written_sheet(locate_report_file(vault, DAY))
 
     assert str(refused.value) == (
         "vault_link_refused: veille/tendances is a symbolic link"

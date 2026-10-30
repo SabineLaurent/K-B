@@ -9,6 +9,7 @@ response is free, so none needs neutralize_digest_text, which would break a URL 
 import json
 from datetime import date, datetime
 from pathlib import Path
+from typing import NamedTuple
 
 from k_b.core.config import (
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
@@ -55,39 +56,46 @@ def find_sheets_dir(vault_dir: Path) -> Path:
     return vault_dir / WATCH_DIR_NAME / TRENDS_DIR_NAME
 
 
-def find_sheet_path(vault_dir: Path, day: date) -> Path:
-    return find_sheets_dir(vault_dir) / f"{day.isoformat()}.md"
+class ReportFile(NamedTuple):
+    """The report of a day in the vault, located once: checked before the request, kept in the
+    register and written by the same values."""
+
+    vault_dir: Path
+    path: Path
+    # Its path in the vault, POSIX: what the register keeps and the log says.
+    name: str
 
 
-def refuse_written_sheet(vault_dir: Path, day: date) -> None:
-    """Before the request, refuse the report of day already written, or a folder down to it that
-    is a symbolic link; creates nothing."""
-    refuse_linked_folders(vault_dir, find_sheets_dir(vault_dir))
-    sheet_path = find_sheet_path(vault_dir, day)
-    if has_sheet(sheet_path, vault_dir):
-        raise find_sheet_exists_error(sheet_path, vault_dir)
+def locate_report_file(vault_dir: Path, day: date) -> ReportFile:
+    path = find_sheets_dir(vault_dir) / f"{day.isoformat()}.md"
+    return ReportFile(vault_dir, path, path.relative_to(vault_dir).as_posix())
 
 
-def find_sheet_exists_error(
-    sheet_path: Path, vault_dir: Path
-) -> VaultEntryRefusedError:
+def refuse_written_sheet(report_file: ReportFile) -> None:
+    """Before the request, refuse the report already written, or a folder down to it that is a
+    symbolic link; creates nothing."""
+    refuse_linked_folders(report_file.vault_dir, find_sheets_dir(report_file.vault_dir))
+    if has_sheet(report_file.path, report_file.vault_dir):
+        raise find_sheet_exists_error(report_file)
+
+
+def find_sheet_exists_error(report_file: ReportFile) -> VaultEntryRefusedError:
     return VaultEntryRefusedError(
-        f"sheet_exists: {sheet_path.relative_to(vault_dir).as_posix()} is there;"
-        " kb trend-report never rewrites a report"
+        f"sheet_exists: {report_file.name} is there; kb trend-report never rewrites a report"
     )
 
 
 def write_trend_report_sheet(
-    vault_dir: Path,
-    sheet_path: Path,
-    response: TrendReportResponse,
-    generated: datetime,
+    report_file: ReportFile, response: TrendReportResponse, generated: datetime
 ) -> None:
-    """Write the report at sheet_path, the one of find_sheet_path. A report written meanwhile and
-    seen is refused (sheet_exists), with the limit of post/vault_files.py."""
+    """Write the report; a report written meanwhile and seen is refused (sheet_exists), with the
+    limit of post/vault_files.py."""
     content = render_trend_report_sheet(response, generated)
-    if not write_new_sheet(vault_dir, find_sheets_dir(vault_dir), sheet_path, content):
-        raise find_sheet_exists_error(sheet_path, vault_dir)
+    vault_dir = report_file.vault_dir
+    if not write_new_sheet(
+        vault_dir, find_sheets_dir(vault_dir), report_file.path, content
+    ):
+        raise find_sheet_exists_error(report_file)
 
 
 def render_trend_report_sheet(

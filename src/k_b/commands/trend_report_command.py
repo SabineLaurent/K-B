@@ -42,7 +42,8 @@ from k_b.post.trend_report_registry import (
     load_trend_reports,
 )
 from k_b.post.trend_report_sheets import (
-    find_sheet_path,
+    ReportFile,
+    locate_report_file,
     refuse_written_sheet,
     write_trend_report_sheet,
 )
@@ -56,7 +57,7 @@ SUMMARY_TITLE = "Trend report summary"
 class Preparation(NamedTuple):
     """What the request needs, once every check before it has passed."""
 
-    vault_dir: Path
+    report_file: ReportFile
     settings: AiApiClientSettings
     entries: list[TrendReportEntry]
 
@@ -78,12 +79,10 @@ def run_trend_report(data_dir: Path, environ: Mapping[str, str]) -> int:
     if not response.period.windows:
         report_empty_period(response, previous)
         return ExitCode.SUCCEEDED
-    # One path, for the register and for the writing.
-    sheet_path = find_sheet_path(preparation.vault_dir, generated.date())
-    entry = make_entry(preparation.vault_dir, sheet_path, response, generated)
+    entry = make_entry(preparation.report_file, response, generated)
     if entry is None:
         return ExitCode.FAILED
-    if not write_sheet(preparation.vault_dir, sheet_path, response, generated):
+    if not write_sheet(preparation.report_file, response, generated):
         return ExitCode.FAILED
     if not add_entry(data_dir, preparation.entries, entry):
         return ExitCode.FAILED
@@ -101,8 +100,8 @@ def read_now() -> datetime:
 def prepare_request(
     data_dir: Path, environ: Mapping[str, str], day: date
 ) -> Preparation | ExitCode:
-    """The vault, the settings and the register, the report of day not written yet; else the
-    code to exit with, its reason logged."""
+    """The report of day located, not written yet, the settings and the register; else the code
+    to exit with, its reason logged."""
     vault_dir = value_or_log_refusal(
         read_vault_dir_or_refusal(environ, "the trend report is written in the vault")
     )
@@ -113,9 +112,10 @@ def prepare_request(
     )
     if settings is None:
         return ExitCode.NOT_STARTED
+    report_file = locate_report_file(vault_dir, day)
     try:
         entries = load_trend_reports(data_dir)
-        refuse_written_sheet(vault_dir, day)
+        refuse_written_sheet(report_file)
     except (InvalidTrendRegistryError, VaultEntryRefusedError) as error:
         logger.error("no trend report asked: %s", error)
         return ExitCode.NOT_STARTED
@@ -123,7 +123,7 @@ def prepare_request(
         # A folder of the vault that cannot be looked into: as kb digest.
         logger.error("no trend report asked: %s", describe_os_error(error))
         return ExitCode.FAILED
-    return Preparation(vault_dir, settings, entries)
+    return Preparation(report_file, settings, entries)
 
 
 def describe_previous(previous: TrendReportEntry | None) -> str:
@@ -191,10 +191,7 @@ def report_empty_period(
 
 
 def make_entry(
-    vault_dir: Path,
-    sheet_path: Path,
-    response: TrendReportResponse,
-    generated: datetime,
+    report_file: ReportFile, response: TrendReportResponse, generated: datetime
 ) -> TrendReportEntry | None:
     """The entry of the report in the register, checked as it will be read back, before anything
     is written; None once its refusal is logged."""
@@ -205,7 +202,7 @@ def make_entry(
                 # Written YYYY-MM-DD, as read back.
                 "first_window": windows[0].isoformat(),
                 "last_window": windows[-1].isoformat(),
-                "file": sheet_path.relative_to(vault_dir).as_posix(),
+                "file": report_file.name,
                 "written_at": generated,
                 "request_id": response.request_id,
                 "model": response.model,
@@ -224,22 +221,19 @@ def make_entry(
 
 
 def write_sheet(
-    vault_dir: Path,
-    sheet_path: Path,
-    response: TrendReportResponse,
-    generated: datetime,
+    report_file: ReportFile, response: TrendReportResponse, generated: datetime
 ) -> bool:
-    """Whether the report is written at sheet_path; its failure logged."""
+    """Whether the report is written; its failure logged with the request_id."""
     try:
-        write_trend_report_sheet(vault_dir, sheet_path, response, generated)
-    except VaultEntryRefusedError as error:
-        logger.error("trend report not written: %s", error)
+        write_trend_report_sheet(report_file, response, generated)
+    except (OSError, VaultEntryRefusedError) as error:
+        logger.error(
+            "trend report not written: %s, request_id %s",
+            describe_error(error),
+            response.request_id,
+        )
         return False
-    except OSError as error:
-        # The type and the reason, never the path, which names the vault.
-        logger.error("trend report not written: %s", describe_os_error(error))
-        return False
-    logger.info("sheet written: %s", sheet_path.relative_to(vault_dir).as_posix())
+    logger.info("sheet written: %s", report_file.name)
     return True
 
 
@@ -251,12 +245,22 @@ def add_entry(
         append_trend_report(data_dir, entries, entry)
     except OSError as error:
         logger.error(
-            "sheet written, %s not updated: %s; the next report covers these windows again",
+            "sheet written, %s not updated: %s, request_id %s; the next report covers these"
+            " windows again",
             TREND_REPORTS_FILENAME,
             describe_os_error(error),
+            entry.request_id,
         )
         return False
     return True
+
+
+def describe_error(error: OSError | VaultEntryRefusedError) -> str:
+    """A refused entry of the vault by its state and its path in the vault; an OSError by its
+    type and reason, never a path, which names the vault."""
+    if isinstance(error, VaultEntryRefusedError):
+        return str(error)
+    return describe_os_error(error)
 
 
 def render_trend_report_summary(response: TrendReportResponse, sheet: str) -> str:
