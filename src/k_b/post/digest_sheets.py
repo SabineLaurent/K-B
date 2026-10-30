@@ -17,32 +17,13 @@ from k_b.core.dates import format_date
 from k_b.post.ai_api_client import Digest, DigestsResponse, Source
 from k_b.post.vault_files import (
     CHARACTER_REFERENCE,
-    MARKDOWN_SYNTAX_CHARACTERS,
     VaultEntryRefusedError,
     has_sheet,
-    neutralize_text,
+    neutralize_digest_text,
     refuse_linked_folders,
     write_new_sheet,
 )
 
-# Beyond the characters of the sheets of the tops: a fence of code (~~~), an autolink of GFM or a
-# field of Dataview (:: , http:, mailto:, xmpp:), an e-mail address (@). The & of a character
-# reference is escaped by neutralize_text, as in the sheets of the tops. A bare URL stays text
-# here: a claim of the model never makes a link (ADR of 2026-10-21, #209). In Obsidian, as the
-# recipe of 2026-10-21 shows; cmark-gfm (GitHub) still links an e-mail address and its mailto:.
-DIGEST_ESCAPED_CHARACTERS = MARKDOWN_SYNTAX_CHARACTERS | frozenset("~:@")
-# The autolink of GFM that needs none of them, www. in any case (GitHub Flavored Markdown, 6.9):
-# its dot is escaped, after the backslashes of the text.
-WWW_DOT = re.compile(r"(www)\.", re.IGNORECASE)
-# A list marker at the start of a text (CommonMark 0.31.2, 5.2 and 5.3): a claim starts a list
-# item and a title a numbered line, where it would nest a list. [0-9], not \d, which takes the
-# digits of other scripts too. A rule or an underline (---, ***, ===) never stands alone on its line:
-# the claim ends with its sources, the title with its URL.
-LEADING_LIST_MARKER = re.compile(r"^([-+*]|[0-9]{1,9}[.)])(?= |$)")
-# Two colons in a row, once escaped: Dataview takes [key:: value], (key:: value) and key:: value for
-# a field, and in reading mode looks for :: in the rendered text, where the escapes are gone
-# (replaceInlineFields reads innerHTML, Dataview 0.5.68). A space keeps them apart: : : is shown.
-ESCAPED_DOUBLE_COLON = re.compile(r"\\:(?=\\:)")
 URL_SCHEMES = ("http://", "https://")
 # A URL is written, as an autolink, only when it is made of the characters of RFC 3986 (unreserved,
 # delimiters, a percent and two hexadecimal digits), less [ ] and $, a wikilink and a formula of
@@ -182,16 +163,3 @@ def has_hidden_character(url: str) -> bool:
     return any(
         unicodedata.category(character) in HIDDEN_CATEGORIES for character in decoded
     )
-
-
-def neutralize_digest_text(text: str) -> str:
-    """The text on one line, as text, without an autolink, a field of Dataview nor a list; after
-    neutralize_text, which would escape their backslash again."""
-    neutralized = neutralize_text(text, DIGEST_ESCAPED_CHARACTERS)
-    neutralized = ESCAPED_DOUBLE_COLON.sub(r"\\: ", WWW_DOT.sub(r"\1\\.", neutralized))
-    return LEADING_LIST_MARKER.sub(escape_list_marker, neutralized)
-
-
-def escape_list_marker(marker: re.Match[str]) -> str:
-    """- becomes \\-, 2026. becomes 2026\\. : CommonMark lets any ASCII punctuation be escaped."""
-    return f"{marker[1][:-1]}\\{marker[1][-1]}"

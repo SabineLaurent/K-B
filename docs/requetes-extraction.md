@@ -182,11 +182,11 @@ rattrapage de plusieurs fenêtres lit chaque jour une fois.
 Posés par `configure_query`, jamais collés dans le texte :
 - `@first_suffix`, `@last_suffix` : premier et dernier jour lus, au format `TABLE_SUFFIX_FORMAT` ;
 - `@window_ends` : les fins de fenêtre ;
-- `@window_days` : `WINDOW_DAYS` ;
+- `@window_days` : `GH_ARCHIVE_WINDOW_DAYS` ;
 - `@top_size` : `GH_ARCHIVE_TOP_SIZE`.
 
 Les jours et les fenêtres changent d'une collecte à l'autre. `@window_days` et `@top_size` ne
-changent pas : ils sont des paramètres pour que `WINDOW_DAYS` et `GH_ARCHIVE_TOP_SIZE` ne soient écrits qu'à un
+changent pas : ils sont des paramètres pour que `GH_ARCHIVE_WINDOW_DAYS` et `GH_ARCHIVE_TOP_SIZE` ne soient écrits qu'à un
 endroit (un test de `tests/etl/sources/test_gh_archive.py` vérifie que la taille du classement
 n'est pas dans le texte de la requête). Restent écrits dans le texte : la table, les types d'événement,
 et ce qui reconstruit le jour à partir du nom de la table (le préfixe du siècle, le format de
