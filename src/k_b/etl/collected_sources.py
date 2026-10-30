@@ -91,6 +91,21 @@ def read_vault_dir(environ: Mapping[str, str]) -> Path | None:
     return Path(vault_dir) if vault_dir else None
 
 
+def read_vault_dir_or_refusal(
+    environ: Mapping[str, str], what_goes_there: str
+) -> Path | str:
+    """The vault of KB_VAULT_DIR for a command that writes it, or why it is refused; no folder is
+    created, as write_file_atomically would create a vault misspelt."""
+    vault_dir = read_vault_dir(environ)
+    if vault_dir is None:
+        return f"{VAULT_DIR_VARIABLE} not set; {what_goes_there}"
+    if not vault_dir.is_dir():
+        return (
+            f"{VAULT_DIR_VARIABLE} is not an existing directory; no folder is created"
+        )
+    return vault_dir
+
+
 def list_collected_sources(
     collect_only: CollectOnly,
     environ: Mapping[str, str],

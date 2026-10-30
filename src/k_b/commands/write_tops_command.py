@@ -11,8 +11,9 @@ from k_b.commands.exit_codes import ExitCode, find_exit_code
 from k_b.commands.run_log import (
     LOGGER_NAME,
     describe_os_error,
-    read_vault_dir_or_log_refusal,
+    value_or_log_refusal,
 )
+from k_b.etl.collected_sources import read_vault_dir_or_refusal
 from k_b.etl.raw_store import RawStore
 from k_b.etl.source_kinds import TOPS
 from k_b.post.top_sheets import SHEETS_VAULT_PATH, TopSheetsOutcome, write_top_sheets
@@ -25,8 +26,10 @@ def run_write_tops(data_dir: Path, environ: Mapping[str, str]) -> int:
     """Each top in turn, a top that fails not stopping the other; without a vault, nothing is
     read nor deleted, and nothing created, as write_file_atomically would create a vault
     misspelt."""
-    vault_dir = read_vault_dir_or_log_refusal(
-        environ, "the sheets of the tops are written in the vault"
+    vault_dir = value_or_log_refusal(
+        read_vault_dir_or_refusal(
+            environ, "the sheets of the tops are written in the vault"
+        )
     )
     if vault_dir is None:
         return ExitCode.NOT_STARTED

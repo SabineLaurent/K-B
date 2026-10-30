@@ -444,6 +444,28 @@ def test_a_register_not_updated_keeps_the_report_and_exits_1(
     assert str(data_dir) not in error_output
 
 
+def test_an_entry_the_register_would_refuse_writes_nothing_and_exits_1(
+    monkeypatch, trend_environment, capsys
+):
+    data_dir, vault_dir = trend_environment
+    # No register to read: the check refuses the new entry alone.
+    answer_trend_report(monkeypatch, answer_with(first_report()))
+    monkeypatch.setattr(
+        trend_report_registry, "has_too_many_windows", lambda first, last: True
+    )
+
+    assert cli.main(["trend-report"]) == cli.ExitCode.FAILED
+    assert list_sheets(vault_dir) == []
+    assert not (data_dir / "trend_reports.json").exists()
+    error_output = capsys.readouterr().err
+    assert (
+        "trend report not written: its entry of trend_reports.json is invalid: input"
+        " (value_error)"
+    ) in error_output
+    assert "Traceback" not in error_output
+    assert "2026-10-28" not in error_output
+
+
 def test_a_sigterm_after_the_report_keeps_it_and_leaves_the_register(
     monkeypatch, trend_environment, sigterm_handler_of_the_test
 ):

@@ -3,7 +3,7 @@ an untrusted input read by a closed schema, then checked against the request and
 a period that would move the register back or widen it is refused before anything is written."""
 
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 from itertools import pairwise
 from typing import Annotated, get_args
 
@@ -11,7 +11,11 @@ import httpx2
 from pydantic import AfterValidator, Field
 
 from k_b.core.api_keys import AI_API_KEY_VARIABLE_PREFIX
-from k_b.core.config import GH_ARCHIVE_TOP_SIZE, MODEL_NAME
+from k_b.core.config import (
+    GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
+    GH_ARCHIVE_TOP_SIZE,
+    MODEL_NAME,
+)
 from k_b.items import (
     Criterion,
     WindowState,
@@ -126,8 +130,8 @@ def refuse_inconsistent_period(
 def refuse_inconsistent_windows(
     response: TrendReportResponse, after: date | None
 ) -> None:
-    """Consecutive days after `after`, as many as a report holds, up to the latest window, with
-    the missing ones among them."""
+    """Consecutive days from the day after `after`, as many as a report holds, up to the latest
+    window, with the missing ones among them."""
     period = response.period
     windows = period.windows
     request_id = response.request_id
@@ -135,12 +139,27 @@ def refuse_inconsistent_windows(
         raise_invalid(request_id, "period.windows", "not_consecutive")
     if has_too_many_windows(windows[0], windows[-1]):
         raise_invalid(request_id, "period.windows", "too_many_windows")
-    if after is not None and windows[0] <= after:
-        raise_invalid(request_id, "period.windows", "not_after_the_previous_report")
+    if not is_following(after, windows, period.windows_capped):
+        raise_invalid(request_id, "period.windows", "not_following_the_previous_report")
     if windows[-1] != period.latest_window:
         raise_invalid(request_id, "period.windows", "not_up_to_the_latest_window")
     if not is_in_order_once(period.missing_windows, windows):
         raise_invalid(request_id, "period.missing_windows", "not_among_the_windows")
+
+
+def is_following(
+    after: date | None, windows: Sequence[date], windows_capped: bool
+) -> bool:
+    """Whether the windows start the day after `after`, or, capped, are the most a report holds,
+    older ones left out; a first report is never capped."""
+    if after is None:
+        return not windows_capped
+    day_after = after + timedelta(days=1)
+    if windows_capped:
+        return (
+            windows[0] > day_after and len(windows) == GH_ARCHIVE_MAX_CATCH_UP_WINDOWS
+        )
+    return windows[0] == day_after
 
 
 def is_in_order_once[Value](values: Sequence[Value], listed: Sequence[Value]) -> bool:

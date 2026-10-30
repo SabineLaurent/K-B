@@ -223,7 +223,48 @@ def test_the_first_report_sends_both_fields_null():
         (
             make_report(repositories=[]),
             date(2026, 10, 28),
-            "period.windows (not_after_the_previous_report)",
+            "period.windows (not_following_the_previous_report)",
+        ),
+        (
+            change_period(
+                make_report(repositories=[]),
+                windows=["2026-10-29", "2026-10-30", "2026-10-31"],
+            ),
+            AFTER,
+            "period.windows (not_following_the_previous_report)",
+        ),
+        (
+            change_period(make_report(repositories=[]), windows_capped=True),
+            AFTER,
+            "period.windows (not_following_the_previous_report)",
+        ),
+        (
+            change_period(
+                make_report(repositories=[]),
+                windows=["2026-10-29", "2026-10-30", "2026-10-31"],
+                windows_capped=True,
+            ),
+            AFTER,
+            "period.windows (not_following_the_previous_report)",
+        ),
+        (
+            change_period(
+                make_report(repositories=[]),
+                windows=[f"2026-10-{day:02}" for day in range(17, 32)],
+                windows_capped=True,
+            ),
+            date(2026, 10, 16),
+            "period.windows (not_following_the_previous_report)",
+        ),
+        (
+            change_period(
+                make_report(repositories=[]),
+                first_report=True,
+                new_evaluated=False,
+                windows_capped=True,
+            ),
+            None,
+            "period.windows (not_following_the_previous_report)",
         ),
         (
             change_period(make_report(repositories=[]), latest_window="2026-11-01"),
@@ -267,6 +308,17 @@ def test_fifteen_consecutive_windows_are_accepted():
     response, _ = ask(answer(content=body(report)), after=date(2026, 10, 16))
 
     assert len(response.period.windows) == 15
+
+
+def test_fifteen_windows_capped_after_older_ones_are_accepted():
+    windows = [f"2026-10-{day:02}" for day in range(17, 32)]
+    report = change_period(
+        make_report(repositories=[]), windows=windows, windows_capped=True
+    )
+
+    response, _ = ask(answer(content=body(report)), after=date(2026, 10, 10))
+
+    assert response.period.windows_capped
 
 
 def test_an_empty_period_up_to_the_previous_report_is_accepted():

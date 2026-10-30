@@ -18,11 +18,11 @@ from k_b.commands.exit_codes import ExitCode, find_exit_code
 from k_b.commands.run_log import (
     LOGGER_NAME,
     describe_os_error,
-    read_vault_dir_or_log_refusal,
     value_or_log_refusal,
 )
 from k_b.commands.wait_display import showing_the_wait
 from k_b.core.config import AI_API_READ_TIMEOUT_SECONDS, DIGEST_SUBJECTS
+from k_b.etl.collected_sources import read_vault_dir_or_refusal
 from k_b.post.ai_api_client import (
     DIGEST_KEY_VARIABLE,
     AiApiError,
@@ -55,8 +55,8 @@ SUMMARY_TITLE = "Digest summary"
 def run_digest(environ: Mapping[str, str]) -> int:
     """Read the settings, check the vault, ask the digests, write their sheets; nothing is asked
     while a setting is refused or a sheet of the day is there, so no item is sent for nothing."""
-    vault_dir = read_vault_dir_or_log_refusal(
-        environ, "the digests are written in the vault"
+    vault_dir = value_or_log_refusal(
+        read_vault_dir_or_refusal(environ, "the digests are written in the vault")
     )
     if vault_dir is None:
         return ExitCode.NOT_STARTED

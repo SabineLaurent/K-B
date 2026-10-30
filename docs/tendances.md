@@ -78,8 +78,8 @@ registre : `first_window` et `last_window` (les bornes de `period.windows`, manq
 aussi le jour du fichier), `request_id`, `model` (nul) et `choice_made` (faux) ; schéma fermé
 (`post/trend_report_registry.py`), une entrée de plus de 15 fenêtres refusée comme la demande
 (`has_too_many_windows`, `items.py`). La précédente est la dernière entrée. La réponse est revalidée
-par `post/trend_report_client.py` : la période doit suivre `after`, jour après jour, jusqu'à
-`latest_window`, sans dépasser le jour du lancement ; chaque dépôt, une trajectoire alignée sur la
+par `post/trend_report_client.py` : la période doit partir du lendemain d'`after` (ou, plafonnée,
+compter 15 fenêtres), jour après jour, jusqu'à `latest_window`, sans dépasser le jour du lancement ; chaque dépôt, une trajectoire alignée sur la
 période et des critères que la période permet. Cas ajoutés au tableau :
 
 | Cas | Ce que fait `kb trend-report` |

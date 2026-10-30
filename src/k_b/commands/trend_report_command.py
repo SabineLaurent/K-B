@@ -9,16 +9,19 @@ from pathlib import Path
 from time import monotonic
 from typing import NamedTuple
 
+from pydantic import ValidationError
+
 from k_b.commands.batch_summary import describe_duration
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import (
     LOGGER_NAME,
     describe_os_error,
-    read_vault_dir_or_log_refusal,
     value_or_log_refusal,
 )
 from k_b.commands.wait_display import showing_the_wait
 from k_b.core.config import AI_API_READ_TIMEOUT_SECONDS
+from k_b.core.quoting import locate_first_error
+from k_b.etl.collected_sources import read_vault_dir_or_refusal
 from k_b.post.ai_api_client import (
     AiApiClientSettings,
     AiApiError,
@@ -39,6 +42,7 @@ from k_b.post.trend_report_registry import (
     load_trend_reports,
 )
 from k_b.post.trend_report_sheets import (
+    find_sheet_path,
     refuse_written_sheet,
     write_trend_report_sheet,
 )
@@ -74,13 +78,15 @@ def run_trend_report(data_dir: Path, environ: Mapping[str, str]) -> int:
     if not response.period.windows:
         report_empty_period(response, previous)
         return ExitCode.SUCCEEDED
-    sheet = write_sheet(preparation.vault_dir, response, generated)
-    if sheet is None:
+    entry = make_entry(preparation.vault_dir, response, generated)
+    if entry is None:
         return ExitCode.FAILED
-    if not add_entry(data_dir, preparation.entries, response, sheet, generated):
+    if not write_sheet(preparation.vault_dir, response, generated):
+        return ExitCode.FAILED
+    if not add_entry(data_dir, preparation.entries, entry):
         return ExitCode.FAILED
     logger.info("trend report finished in %s", describe_duration(monotonic() - started))
-    print(render_trend_report_summary(response, sheet))
+    print(render_trend_report_summary(response, entry.file))
     # A blank line after the result, apart from what follows, as for kb digest.
     print()
     return ExitCode.SUCCEEDED
@@ -95,8 +101,8 @@ def prepare_request(
 ) -> Preparation | ExitCode:
     """The vault, the settings and the register, the report of day not written yet; else the
     code to exit with, its reason logged."""
-    vault_dir = read_vault_dir_or_log_refusal(
-        environ, "the trend report is written in the vault"
+    vault_dir = value_or_log_refusal(
+        read_vault_dir_or_refusal(environ, "the trend report is written in the vault")
     )
     if vault_dir is None:
         return ExitCode.NOT_STARTED
@@ -182,45 +188,57 @@ def report_empty_period(
     print()
 
 
+def make_entry(
+    vault_dir: Path, response: TrendReportResponse, generated: datetime
+) -> TrendReportEntry | None:
+    """The entry of the report in the register, checked as it will be read back, before anything
+    is written; None once its refusal is logged."""
+    windows = response.period.windows
+    sheet_path = find_sheet_path(vault_dir, generated.date())
+    try:
+        return TrendReportEntry.model_validate(
+            {
+                # Written YYYY-MM-DD, as read back.
+                "first_window": windows[0].isoformat(),
+                "last_window": windows[-1].isoformat(),
+                "file": sheet_path.relative_to(vault_dir).as_posix(),
+                "written_at": generated,
+                "request_id": response.request_id,
+                "model": response.model,
+                # No model chooses yet (#368).
+                "choice_made": False,
+            }
+        )
+    except ValidationError as error:
+        logger.error(
+            "trend report not written: its entry of %s is invalid: %s",
+            TREND_REPORTS_FILENAME,
+            locate_first_error(error),
+        )
+        return None
+
+
 def write_sheet(
     vault_dir: Path, response: TrendReportResponse, generated: datetime
-) -> str | None:
-    """The path of the report in the vault; None once its failure is logged."""
+) -> bool:
+    """Whether the report is written; its failure logged."""
     try:
         sheet = write_trend_report_sheet(vault_dir, response, generated)
     except VaultEntryRefusedError as error:
         logger.error("trend report not written: %s", error)
-        return None
+        return False
     except OSError as error:
         # The type and the reason, never the path, which names the vault.
         logger.error("trend report not written: %s", describe_os_error(error))
-        return None
+        return False
     logger.info("sheet written: %s", sheet)
-    return sheet
+    return True
 
 
 def add_entry(
-    data_dir: Path,
-    entries: list[TrendReportEntry],
-    response: TrendReportResponse,
-    sheet: str,
-    generated: datetime,
+    data_dir: Path, entries: list[TrendReportEntry], entry: TrendReportEntry
 ) -> bool:
     """Add the report to the register; False once its failure is logged, the report kept."""
-    windows = response.period.windows
-    # Checked as it will be read back, its days written YYYY-MM-DD.
-    entry = TrendReportEntry.model_validate(
-        {
-            "first_window": windows[0].isoformat(),
-            "last_window": windows[-1].isoformat(),
-            "file": sheet,
-            "written_at": generated,
-            "request_id": response.request_id,
-            "model": response.model,
-            # No model chooses yet (#368).
-            "choice_made": False,
-        }
-    )
     try:
         append_trend_report(data_dir, entries, entry)
     except OSError as error:

@@ -506,7 +506,7 @@ choisit, #368) et le `request_id`. Code de sortie :
   plus ancienne que le registre, restaurée, donne un avertissement avec les deux dates) ;
 - 1 : rien n'est écrit : l'API IA échoue comme pour `kb digest` (le message nomme
   `KB_AI_API_KEY_KB_TREND_REPORT` sur un 401), ou sa réponse contredit la demande (une période qui
-  ferait reculer ou grossir le registre) ; ou le compte rendu n'est pas écrit (registre inchangé) ;
+  ferait reculer, sauter ou grossir le registre) ; ou le compte rendu n'est pas écrit (registre inchangé) ;
   ou il est écrit mais le registre n'est pas mis à jour : le message le dit, et le compte rendu
   suivant reprend ces fenêtres ; ou une erreur du système arrête le contrôle d'avant la demande ;
 - 2 : rien n'est demandé : `KB_DATA_DIR`, `KB_VAULT_DIR` ou `KB_AI_API_KEY_KB_TREND_REPORT` manque
