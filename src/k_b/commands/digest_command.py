@@ -18,16 +18,17 @@ from k_b.commands.exit_codes import ExitCode, find_exit_code
 from k_b.commands.run_log import (
     LOGGER_NAME,
     describe_os_error,
+    read_vault_dir_or_log_refusal,
     value_or_log_refusal,
 )
 from k_b.commands.wait_display import showing_the_wait
 from k_b.core.config import AI_API_READ_TIMEOUT_SECONDS, DIGEST_SUBJECTS
-from k_b.etl.collected_sources import VAULT_DIR_VARIABLE, read_vault_dir
 from k_b.post.ai_api_client import (
-    AI_API_KEY_VARIABLE,
+    DIGEST_KEY_VARIABLE,
     AiApiError,
     DigestsResponse,
     build_ai_api_client,
+    describe_remedy,
     read_ai_api_client_settings_or_refusal,
     request_digests,
 )
@@ -54,18 +55,14 @@ SUMMARY_TITLE = "Digest summary"
 def run_digest(environ: Mapping[str, str]) -> int:
     """Read the settings, check the vault, ask the digests, write their sheets; nothing is asked
     while a setting is refused or a sheet of the day is there, so no item is sent for nothing."""
-    vault_dir = read_vault_dir(environ)
+    vault_dir = read_vault_dir_or_log_refusal(
+        environ, "the digests are written in the vault"
+    )
     if vault_dir is None:
-        logger.error(
-            "%s not set; the digests are written in the vault", VAULT_DIR_VARIABLE
-        )
         return ExitCode.NOT_STARTED
-    if not vault_dir.is_dir():
-        logger.error(
-            "%s is not an existing directory; no folder is created", VAULT_DIR_VARIABLE
-        )
-        return ExitCode.NOT_STARTED
-    settings = value_or_log_refusal(read_ai_api_client_settings_or_refusal(environ))
+    settings = value_or_log_refusal(
+        read_ai_api_client_settings_or_refusal(environ, DIGEST_KEY_VARIABLE)
+    )
     if settings is None:
         return ExitCode.NOT_STARTED
     subject_names = [subject.name for subject in DIGEST_SUBJECTS]
@@ -90,7 +87,11 @@ def run_digest(environ: Mapping[str, str]) -> int:
         ):
             response = request_digests(http_client, subject_names)
     except AiApiError as error:
-        logger.error("digests not received: %s%s", error, describe_remedy(error))
+        logger.error(
+            "digests not received: %s%s",
+            error,
+            describe_remedy(error, DIGEST_KEY_VARIABLE),
+        )
         return ExitCode.FAILED
     rows = write_digest_sheets(vault_dir, response)
     logger.info("digest finished in %s", describe_duration(monotonic() - started))
@@ -169,13 +170,6 @@ def describe_counts(written_count: int, failed_count: int) -> str:
     if written_count == failed_count == 0:
         return "none in the window"
     return f"written {written_count}, failed {failed_count}"
-
-
-def describe_remedy(error: AiApiError) -> str:
-    """The variable to check after a 401: named, never its key."""
-    if error.state == "ai_api_unauthorized":
-        return f"; the AI API refused the key of {AI_API_KEY_VARIABLE}"
-    return ""
 
 
 def describe_error(error: OSError | VaultEntryRefusedError) -> str:

@@ -2,13 +2,14 @@
 
 import logging
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 from k_b.core.config import LOG_FILES_KEPT
 from k_b.core.dates import DATABASE_DATE_FORMAT
+from k_b.etl.collected_sources import VAULT_DIR_VARIABLE, read_vault_dir
 
 # The name of the logger of cli.py and of every module of commands/, written in each line: one
 # name for the command line, whichever of its modules logs.
@@ -81,6 +82,23 @@ def value_or_log_refusal[ValueT](value_or_refusal: ValueT | str) -> ValueT | Non
         logger.error("%s", value_or_refusal)
         return None
     return value_or_refusal
+
+
+def read_vault_dir_or_log_refusal(
+    environ: Mapping[str, str], what_goes_there: str
+) -> Path | None:
+    """The vault of KB_VAULT_DIR, or None after logging why it is refused; no folder is created,
+    as write_file_atomically would create a vault misspelt."""
+    vault_dir = read_vault_dir(environ)
+    if vault_dir is None:
+        logger.error("%s not set; %s", VAULT_DIR_VARIABLE, what_goes_there)
+        return None
+    if not vault_dir.is_dir():
+        logger.error(
+            "%s is not an existing directory; no folder is created", VAULT_DIR_VARIABLE
+        )
+        return None
+    return vault_dir
 
 
 def describe_os_error(error: OSError) -> str:

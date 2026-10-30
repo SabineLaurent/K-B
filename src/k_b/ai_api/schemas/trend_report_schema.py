@@ -1,16 +1,18 @@
 """The request and the response of POST /trend-reports (docs/tendances.md, "Contrats")."""
 
 from datetime import date
-from typing import Annotated, Self
+from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from k_b.ai_api.trajectories import Criterion, WindowState
-from k_b.core.config import GH_ARCHIVE_MAX_CATCH_UP_WINDOWS
-from k_b.items import WrittenDay
+from k_b.items import (
+    Criterion,
+    WindowState,
+    WrittenDayInStrictModel,
+    has_too_many_windows,
+)
 
-# Not strict: under FastAPI, strict refuses a date given as text.
-RequestDay = Annotated[WrittenDay | None, Field(strict=False)]
+RequestDay = WrittenDayInStrictModel | None
 
 
 class TrendReportRequestSchema(BaseModel):
@@ -36,9 +38,7 @@ class TrendReportRequestSchema(BaseModel):
             )
         if self.previous_first_window > self.after:
             raise ValueError("previous_first_window is after after")
-        if (
-            self.after - self.previous_first_window
-        ).days >= GH_ARCHIVE_MAX_CATCH_UP_WINDOWS:
+        if has_too_many_windows(self.previous_first_window, self.after):
             raise ValueError("the previous report holds too many windows")
         return self
 

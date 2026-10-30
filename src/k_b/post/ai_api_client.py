@@ -1,7 +1,8 @@
-"""The request of kb digest to the AI API, by HTTP: its settings, POST /digests, and the response
-it accepts, an untrusted input read by a closed schema and checked against the closed lists.
+"""The requests of kb to the AI API, by HTTP: their settings and their answer, an untrusted input
+read by a closed schema; POST /digests and its response, checked against the closed lists.
 
-The body is read without a bound on its size: risk accepted by Sabine for the POC (2026-10-21)."""
+The body is read without a bound on its size: risk accepted by Sabine for the POC (2026-10-21), for
+kb trend-report too (2026-10-30)."""
 
 import re
 from collections.abc import Callable, Mapping, Sequence
@@ -35,7 +36,7 @@ from k_b.items import ItemKind, UtcDatetime
 
 AI_API_URL_VARIABLE = "KB_AI_API_URL"
 # The client KB_DIGEST of kb serve-ai: one value for both sides (README, "Changer une clé").
-AI_API_KEY_VARIABLE = f"{AI_API_KEY_VARIABLE_PREFIX}KB_DIGEST"
+DIGEST_KEY_VARIABLE = f"{AI_API_KEY_VARIABLE_PREFIX}KB_DIGEST"
 # No TLS before Azure Container Apps, as for the data API: http on the machine and in the compose
 # network.
 AI_API_SCHEMES = ("http", "https")
@@ -57,7 +58,7 @@ type AiApiState = Literal[
 
 
 class AiApiError(Exception):
-    """A request of the digests stopped: its state, the HTTP status, and what the answer says,
+    """A request to the AI API stopped: its state, the HTTP status, and what the answer says,
     checked or quoted; never the URL nor the key."""
 
     def __init__(
@@ -90,7 +91,7 @@ def match_fully(pattern: re.Pattern[str]) -> Callable[[str], str]:
 
 
 class AiApiModel(BaseModel):
-    """A part of the response of POST /digests: the fields read are typed, the others ignored."""
+    """A part of a response of the AI API: the fields read are typed, the others ignored."""
 
     model_config = ConfigDict(extra="ignore", strict=True, frozen=True)
 
@@ -147,19 +148,18 @@ class ErrorBody(AiApiModel):
 
 
 def read_ai_api_client_settings_or_refusal(
-    environ: Mapping[str, str],
+    environ: Mapping[str, str], key_variable: str
 ) -> AiApiClientSettings | str:
-    """The settings of the AI API, or why a variable is refused: never the key nor the URL."""
+    """The settings of the AI API for the client of key_variable, or why a variable is refused:
+    never the key nor the URL."""
     # Empty is not set, as for the settings of the AI API.
     base_url = environ.get(AI_API_URL_VARIABLE) or AI_API_URL
-    api_key = environ.get(AI_API_KEY_VARIABLE)
+    api_key = environ.get(key_variable)
     if not api_key:
-        return f"{AI_API_KEY_VARIABLE}: not set"
+        return f"{key_variable}: not set"
     refusal = find_url_refusal(
         AI_API_URL_VARIABLE, base_url, AI_API_SCHEMES
-    ) or find_api_key_refusal(
-        AI_API_KEY_VARIABLE_PREFIX, AI_API_KEY_VARIABLE, api_key, {}
-    )
+    ) or find_api_key_refusal(AI_API_KEY_VARIABLE_PREFIX, key_variable, api_key, {})
     if refusal is not None:
         return refusal
     return AiApiClientSettings(base_url=base_url, api_key=SecretStr(api_key))
@@ -184,10 +184,20 @@ def build_ai_api_client(
 def request_digests(
     http_client: httpx2.Client, subject_names: Sequence[str]
 ) -> DigestsResponse:
-    """The digests of the default window of the AI API, checked against subject_names; raised
-    from None, as the error of httpx2 names the URL and a ValidationError quotes the value."""
+    """The digests of the default window of the AI API, checked against subject_names."""
+    response = read_response(
+        send_request(http_client, DIGESTS_PATH, {}), DigestsResponse
+    )
+    refuse_out_of_lists(response, subject_names)
+    return response
+
+
+def send_request(
+    http_client: httpx2.Client, path: str, body: Mapping[str, object]
+) -> httpx2.Response:
+    """POST body to path; raised from None, as the error of httpx2 names the URL."""
     try:
-        answer = http_client.post(DIGESTS_PATH, json={})
+        return http_client.post(path, json=body)
     except httpx2.TimeoutException:
         raise AiApiError("ai_api_timeout") from None
     except httpx2.TransportError:
@@ -195,13 +205,13 @@ def request_digests(
     except httpx2.RequestError:
         # An answer that cannot be read (a body badly encoded).
         raise AiApiError("ai_api_invalid_response") from None
-    response = read_response(answer)
-    refuse_out_of_lists(response, subject_names)
-    return response
 
 
-def read_response(answer: httpx2.Response) -> DigestsResponse:
-    """The body of a 200 in its schema; any other answer is a named state."""
+def read_response[Response: AiApiModel](
+    answer: httpx2.Response, schema: type[Response]
+) -> Response:
+    """The body of a 200 in its schema; any other answer is a named state. Raised from None, as a
+    ValidationError quotes the value."""
     status = answer.status_code
     if status == httpx2.codes.UNAUTHORIZED:
         raise AiApiError("ai_api_unauthorized", status, describe_answer(answer))
@@ -211,7 +221,7 @@ def read_response(answer: httpx2.Response) -> DigestsResponse:
         # A redirection not followed, a 404 of a route, a 422.
         raise AiApiError("ai_api_invalid_response", status, describe_answer(answer))
     try:
-        return DigestsResponse.model_validate_json(answer.content)
+        return schema.model_validate_json(answer.content)
     except ValidationError as error:
         raise AiApiError(
             "ai_api_invalid_response",
@@ -265,26 +275,35 @@ def refuse_out_of_lists(
     ]
     for place, subject in subjects:
         if subject not in subject_names:
-            raise_invalid(response, place, "subject_not_listed")
+            raise_invalid(response.request_id, place, "subject_not_listed")
         if subject in seen_subjects:
-            raise_invalid(response, place, "subject_twice")
+            raise_invalid(response.request_id, place, "subject_twice")
         seen_subjects.add(subject)
     for number, digest in enumerate(response.digests):
         source_ids = [source.item_id for source in digest.sources]
         if len(set(source_ids)) != len(source_ids):
-            raise_invalid(response, f"digests.{number}.sources", "item_twice")
+            raise_invalid(
+                response.request_id, f"digests.{number}.sources", "item_twice"
+            )
         for claim_number, claim in enumerate(digest.claims):
             place = f"digests.{number}.claims.{claim_number}.item_ids"
             if not set(claim.item_ids) <= set(source_ids):
-                raise_invalid(response, place, "item_not_in_sources")
+                raise_invalid(response.request_id, place, "item_not_in_sources")
             if len(set(claim.item_ids)) != len(claim.item_ids):
-                raise_invalid(response, place, "item_twice")
+                raise_invalid(response.request_id, place, "item_twice")
 
 
-def raise_invalid(response: DigestsResponse, place: str, check: str) -> NoReturn:
-    """A response refused by a closed list, named by its place and its request_id."""
+def raise_invalid(request_id: str, place: str, check: str) -> NoReturn:
+    """A response refused by a check, named by its place and the request_id, never a value."""
     raise AiApiError(
         "ai_api_invalid_response",
         httpx2.codes.OK,
-        (f"{place} ({check})", f"request_id {response.request_id}"),
+        (f"{place} ({check})", f"request_id {request_id}"),
     )
+
+
+def describe_remedy(error: AiApiError, key_variable: str) -> str:
+    """The variable to check after a 401: named, never its key."""
+    if error.state == "ai_api_unauthorized":
+        return f"; the AI API refused the key of {key_variable}"
+    return ""

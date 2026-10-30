@@ -19,6 +19,7 @@ from k_b.ai_api.schemas.digest_schema import (
 )
 from k_b.core.config import AI_API_READ_TIMEOUT_SECONDS, DIGEST_REQUEST_TIMEOUT_SECONDS
 from k_b.post.ai_api_client import (
+    DIGEST_KEY_VARIABLE,
     AiApiClientSettings,
     AiApiError,
     build_ai_api_client,
@@ -128,7 +129,7 @@ def ask_and_fail(handle):
 
 def test_the_settings_take_the_local_ai_api_by_default():
     settings = read_ai_api_client_settings_or_refusal(
-        {"KB_AI_API_KEY_KB_DIGEST": TEST_API_KEY}
+        {"KB_AI_API_KEY_KB_DIGEST": TEST_API_KEY}, DIGEST_KEY_VARIABLE
     )
 
     assert settings == SETTINGS
@@ -139,7 +140,8 @@ def test_the_settings_take_the_url_of_kb_ai_api_url():
         {
             "KB_AI_API_KEY_KB_DIGEST": TEST_API_KEY,
             "KB_AI_API_URL": "http://api-ia:8001",
-        }
+        },
+        DIGEST_KEY_VARIABLE,
     )
 
     assert settings.base_url == "http://api-ia:8001"
@@ -168,13 +170,17 @@ def test_the_settings_take_the_url_of_kb_ai_api_url():
     ],
 )
 def test_a_setting_refused_names_its_variable_never_its_value(environ, refusal):
-    assert read_ai_api_client_settings_or_refusal(environ) == refusal
+    assert (
+        read_ai_api_client_settings_or_refusal(environ, DIGEST_KEY_VARIABLE) == refusal
+    )
 
 
 def test_a_key_of_a_character_out_of_the_rule_is_refused_without_being_quoted():
     key = TEST_API_KEY[:-1] + "!"
 
-    refusal = read_ai_api_client_settings_or_refusal({"KB_AI_API_KEY_KB_DIGEST": key})
+    refusal = read_ai_api_client_settings_or_refusal(
+        {"KB_AI_API_KEY_KB_DIGEST": key}, DIGEST_KEY_VARIABLE
+    )
 
     assert refusal == (
         "'KB_AI_API_KEY_KB_DIGEST': key with a character outside [A-Za-z0-9_-]"

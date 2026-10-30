@@ -1,5 +1,5 @@
-"""The common item every source is read into, before the import, and the row of a GH Archive
-ranking; which source field goes where: docs/stockage.md."""
+"""The common item every source is read into, before the import, the row of a GH Archive ranking
+and the words of a trend report; which source field goes where: docs/stockage.md."""
 
 import re
 from datetime import UTC, date, datetime, time
@@ -17,6 +17,7 @@ from pydantic import (
     model_validator,
 )
 
+from k_b.core.config import GH_ARCHIVE_MAX_CATCH_UP_WINDOWS
 from k_b.core.quoting import quote_value
 
 # The sources of seed_sources.sql: a test keeps both lists equal.
@@ -210,6 +211,14 @@ Tag = Annotated[
 ]
 # A day of a request, written YYYY-MM-DD; still a date to pydantic: the OpenAPI declares it so.
 WrittenDay = Annotated[date, BeforeValidator(check_day_form)]
+# The same in a strict model: once check_day_form has seen the text, strict would refuse it as a
+# date (as FastAPI validates a body, and as a BeforeValidator hands on its value).
+WrittenDayInStrictModel = Annotated[WrittenDay, Field(strict=False)]
+# What a repository of a trend report meets, and the state of a window of its trajectory
+# (docs/tendances.md, "Rang et critères"): the AI API computes them, kb writes them. Type
+# statements: the OpenAPI names them.
+type Criterion = Literal["durable", "new", "accelerating"]
+type WindowState = Literal["top", "out_of_top", "missing"]
 # A date with its time zone, held in UTC.
 UtcDatetime = Annotated[AwareDatetime, AfterValidator(convert_to_utc)]
 # An integer SQLite holds: a larger one fails to be written.
@@ -550,3 +559,9 @@ class TrendRow(BaseModel):
     ]
     stars_gained: Annotated[Int64, Field(ge=0)]
     forks_gained: Annotated[Int64, Field(ge=0)]
+
+
+def has_too_many_windows(first_window: date, last_window: date) -> bool:
+    """Whether the daily windows from first_window to last_window exceed
+    GH_ARCHIVE_MAX_CATCH_UP_WINDOWS, the most a trend report holds."""
+    return (last_window - first_window).days >= GH_ARCHIVE_MAX_CATCH_UP_WINDOWS

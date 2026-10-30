@@ -1,4 +1,4 @@
-"""The stop of kb collect, kb import, kb write-tops and kb digest on SIGTERM."""
+"""The stop of kb collect, kb import, kb write-tops, kb digest and kb trend-report on SIGTERM."""
 
 import signal
 from collections.abc import Iterator
@@ -16,7 +16,9 @@ class StoppedBySigtermError(SystemExit):
 
 
 # The commands that stop on SIGTERM; kb serve-data and kb serve-ai keep the handler of uvicorn.
-COMMANDS_STOPPED_BY_SIGTERM = frozenset({"collect", "import", "write-tops", "digest"})
+COMMANDS_STOPPED_BY_SIGTERM = frozenset(
+    {"collect", "import", "write-tops", "digest", "trend-report"}
+)
 
 
 @contextmanager

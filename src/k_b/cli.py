@@ -33,6 +33,7 @@ from k_b.commands.run_log import (
 from k_b.commands.serve_ai_command import run_serve_ai
 from k_b.commands.serve_data_command import run_serve_data
 from k_b.commands.sigterm import StoppedBySigtermError, stopping_on_sigterm
+from k_b.commands.trend_report_command import run_trend_report
 from k_b.commands.write_tops_command import run_write_tops
 from k_b.core.config import AI_API_HOST, AI_API_PORT, DATA_API_HOST, DATA_API_PORT
 from k_b.database.connection import DATABASE_FILE_NAME
@@ -87,6 +88,11 @@ def main(argv: list[str] | None = None) -> int:
         "digest",
         help="ask the AI API for the digests of the watch, then write the sheet of each"
         f" subject in the vault of {VAULT_DIR_VARIABLE}",
+    )
+    command_parsers.add_parser(
+        "trend-report",
+        help="ask the AI API for the trend report of the GH Archive windows after the previous"
+        f" one, then write it in the vault of {VAULT_DIR_VARIABLE}",
     )
     command_parsers.add_parser(
         "openapi",
@@ -154,4 +160,6 @@ def run_command(command: str, data_dir: Path, environ: Mapping[str, str]) -> int
         return run_serve_ai(environ)
     if command == "digest":
         return run_digest(environ)
+    if command == "trend-report":
+        return run_trend_report(data_dir, environ)
     return run_collect(data_dir, environ)

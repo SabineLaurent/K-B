@@ -1,7 +1,7 @@
 # The .env of the main working tree, shared by its git worktrees.
 ENV_FILE := $(dir $(shell git rev-parse --path-format=absolute --git-common-dir)).env
 
-.PHONY: create-db collect import write-tops digest serve-data serve-ai openapi
+.PHONY: create-db collect import write-tops digest trend-report serve-data serve-ai openapi
 
 create-db:
 	uv run --env-file $(ENV_FILE) kb create-db
@@ -17,6 +17,9 @@ write-tops:
 
 digest:
 	uv run --env-file $(ENV_FILE) kb digest
+
+trend-report:
+	uv run --env-file $(ENV_FILE) kb trend-report
 
 serve-data:
 	uv run --env-file $(ENV_FILE) kb serve-data

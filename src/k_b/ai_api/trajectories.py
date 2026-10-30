@@ -5,7 +5,6 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from itertools import pairwise
-from typing import Literal
 
 from k_b.core.config import (
     GH_ARCHIVE_TOP_SIZE,
@@ -14,9 +13,7 @@ from k_b.core.config import (
     TREND_DURABLE_MIN_WINDOWS,
     TREND_MAX_CANDIDATES,
 )
-
-type Criterion = Literal["durable", "new", "accelerating"]
-type WindowState = Literal["top", "out_of_top", "missing"]
+from k_b.items import Criterion, WindowState
 
 
 @dataclass(frozen=True)
