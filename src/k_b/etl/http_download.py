@@ -8,13 +8,13 @@ from urllib.request import Request, urlopen
 
 from k_b.core.config import HTTP_TIMEOUT_SECONDS
 from k_b.core.quoting import quote_value
+from k_b.core.user_agent import USER_AGENT
 from k_b.etl.http_retry import (
     RETRY_WAIT_SECONDS,
     find_retry_wait,
     note_rate_limit_reset,
 )
 from k_b.etl.source_contract import PageRefusedError
-from k_b.etl.user_agent import USER_AGENT
 
 logger = logging.getLogger(__name__)
 
