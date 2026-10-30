@@ -979,6 +979,7 @@ def test_only_the_public_routes_answer_without_a_key(make_ai_api):
         ("/openapi.json", "GET"),
         ("/health", "GET"),
         ("/digests", "POST"),
+        ("/trend-reports", "POST"),
     }
     assert answered_without_key == {"/docs", "/openapi.json", "/health"}
 

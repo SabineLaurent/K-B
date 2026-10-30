@@ -149,6 +149,7 @@ AI_API_LAYERS = (
     {
         "ai_api.deadline",
         "ai_api.watch_items",
+        "ai_api.trajectories",
         "ai_api.settings",
         "ai_api.tracing",
         "ai_api.connectors.metrics_export",
@@ -161,15 +162,16 @@ AI_API_LAYERS = (
     {"ai_api.stages.classification", "ai_api.stages.writing"},
     {"ai_api.stages.fidelity"},
     {"ai_api.stages.checking"},
-    {"ai_api.digests"},
+    {"ai_api.digests", "ai_api.trend_reports"},
     {
         "ai_api.errors",
         "ai_api.dependencies",
         "ai_api.schemas.digest_schema",
+        "ai_api.schemas.trend_report_schema",
         "ai_api.observability.metrics",
     },
     {"ai_api.observability.metric_instruments"},
-    {"ai_api.routers.digest_router"},
+    {"ai_api.routers.digest_router", "ai_api.routers.trend_report_router"},
     {"ai_api.api_router"},
     {"ai_api.app"},
 )
@@ -250,6 +252,8 @@ TRACED_FUNCTIONS = {
     "write_subject",
     "call_model",
     "read_window",
+    "build_trend_report",
+    "read_trend_report",
 }
 TRACING_PARAMETER = "tracing"
 

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "K-B AI API",
-    "version": "0.4.0"
+    "version": "0.5.0"
   },
   "paths": {
     "/digests": {
@@ -101,6 +101,93 @@
           }
         ]
       }
+    },
+    "/trend-reports": {
+      "post": {
+        "tags": [
+          "trend-reports"
+        ],
+        "summary": "Post Trend Reports",
+        "description": "The repositories that meet a criterion over the windows after the previous report, each\nwith its trajectory; no window after it gives an empty period, a reading that fails fails the\nrequest.",
+        "operationId": "post_trend_reports_trend_reports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrendReportRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrendReportSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidParameterSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "internal_error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "data_api_invalid_response, data_api_unauthorized, data_api_unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "data_api_timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -125,6 +212,14 @@
           "item_ids"
         ],
         "title": "ClaimSchema"
+      },
+      "Criterion": {
+        "type": "string",
+        "enum": [
+          "durable",
+          "new",
+          "accelerating"
+        ]
       },
       "DigestRequestSchema": {
         "properties": {
@@ -382,6 +477,231 @@
           "write"
         ]
       },
+      "TrajectoryPointSchema": {
+        "properties": {
+          "window_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Window End"
+          },
+          "state": {
+            "$ref": "#/components/schemas/WindowState"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank",
+            "description": "The rank by stars, in the top only."
+          },
+          "stars_gained": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stars Gained",
+            "description": "Counted by GH Archive, a sample of the stars; in the top only."
+          }
+        },
+        "type": "object",
+        "required": [
+          "window_end",
+          "state",
+          "rank",
+          "stars_gained"
+        ],
+        "title": "TrajectoryPointSchema"
+      },
+      "TrendPeriodSchema": {
+        "properties": {
+          "first_report": {
+            "type": "boolean",
+            "title": "First Report"
+          },
+          "windows": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Windows",
+            "description": "The windows of the report, the oldest first, the missing ones included."
+          },
+          "missing_windows": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Missing Windows"
+          },
+          "windows_capped": {
+            "type": "boolean",
+            "title": "Windows Capped",
+            "description": "Older windows after the previous report left out."
+          },
+          "new_evaluated": {
+            "type": "boolean",
+            "title": "New Evaluated",
+            "description": "False for the first report, and when every window of the previous report is missing."
+          },
+          "latest_window": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Window",
+            "description": "The latest window in the base; null when it has none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "first_report",
+          "windows",
+          "missing_windows",
+          "windows_capped",
+          "new_evaluated",
+          "latest_window"
+        ],
+        "title": "TrendPeriodSchema"
+      },
+      "TrendReportRequestSchema": {
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After",
+            "description": "The last window of the previous report; null for the first report."
+          },
+          "previous_first_window": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous First Window",
+            "description": "The first window of the previous report; null with after only."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "after",
+          "previous_first_window"
+        ],
+        "title": "TrendReportRequestSchema"
+      },
+      "TrendReportSchema": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "The model that chose the repositories; null when none chose them."
+          },
+          "period": {
+            "$ref": "#/components/schemas/TrendPeriodSchema"
+          },
+          "repositories": {
+            "items": {
+              "$ref": "#/components/schemas/TrendRepositorySchema"
+            },
+            "type": "array",
+            "title": "Repositories",
+            "description": "Those meeting a criterion, by best rank then repository_id."
+          },
+          "repositories_dropped": {
+            "type": "integer",
+            "title": "Repositories Dropped",
+            "description": "Repositories meeting a criterion left out, their name `.` or with `..`."
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "model",
+          "period",
+          "repositories",
+          "repositories_dropped"
+        ],
+        "title": "TrendReportSchema"
+      },
+      "TrendRepositorySchema": {
+        "properties": {
+          "repository_id": {
+            "type": "integer",
+            "title": "Repository Id"
+          },
+          "repository_name": {
+            "type": "string",
+            "title": "Repository Name",
+            "description": "Its name in the most recent window."
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/Criterion"
+            },
+            "type": "array",
+            "title": "Criteria"
+          },
+          "best_rank": {
+            "type": "integer",
+            "title": "Best Rank"
+          },
+          "trajectory": {
+            "items": {
+              "$ref": "#/components/schemas/TrajectoryPointSchema"
+            },
+            "type": "array",
+            "title": "Trajectory",
+            "description": "One point per window of the period, in its order."
+          }
+        },
+        "type": "object",
+        "required": [
+          "repository_id",
+          "repository_name",
+          "criteria",
+          "best_rank",
+          "trajectory"
+        ],
+        "title": "TrendRepositorySchema"
+      },
       "WatchKind": {
         "type": "string",
         "enum": [
@@ -442,6 +762,14 @@
           "covered_after"
         ],
         "title": "WindowSchema"
+      },
+      "WindowState": {
+        "type": "string",
+        "enum": [
+          "top",
+          "out_of_top",
+          "missing"
+        ]
       }
     },
     "securitySchemes": {

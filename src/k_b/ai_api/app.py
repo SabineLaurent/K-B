@@ -1,6 +1,6 @@
-"""The AI API: the digests of the watch, the one door of K-B to the model
-(docs/fiches-veille.md); it keeps nothing between two requests but the measures, the spans and the
-log records not sent yet (.claude/rules/poc.md, rule 7)."""
+"""The AI API: the digests of the watch and the trend reports, the one door of K-B to the model
+(docs/fiches-veille.md, docs/tendances.md); it keeps nothing between two requests but the
+measures, the spans and the log records not sent yet (.claude/rules/poc.md, rule 7)."""
 
 import asyncio
 from collections.abc import AsyncIterator, Mapping, Sequence
@@ -22,8 +22,9 @@ from k_b.core.api_request_log import log_request
 from k_b.core.api_telemetry import NATIVE_TELEMETRY_OFF
 from k_b.core.config import DigestSubject
 
-# The version of the contract of docs/fiches-veille.md: a change a client can see changes both.
-API_VERSION = "0.4.0"
+# The version of the contracts of docs/fiches-veille.md and docs/tendances.md: a change a client
+# can see changes both.
+API_VERSION = "0.5.0"
 
 
 def create_app(

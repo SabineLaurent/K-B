@@ -95,14 +95,17 @@ Les critères se calculent en code pur, sur les **étoiles seules** en v1 (les f
 - **Rang** : recalculé par `(stars_gained desc, repository_id asc)`, 30 premiers. C'est la définition
   de `star_rank` à la collecte (`etl/sources/gh_archive.py:76-78`) ; `GET /trends` rend ses lignes
   départagées par les forks (`database/reading.py:150`), qui n'entrent pas dans le rang des étoiles.
+  Un dépôt sans étoile gagnée dans une fenêtre (entré par ses forks) n'est dans aucun top.
 - **Durable** : dans le top 30 de deux fenêtres **sans jour commun**, lues sur la période et les 2
   fenêtres qui la précèdent, et dans le top d'au moins une fenêtre de la période. Deux fenêtres de
   3 jours finissant à D et D+2 partagent un jour ; D et D+3, non.
 - **Nouveau** : absent du top dans les fenêtres du compte rendu précédent. Non évalué au premier
   compte rendu, ni si toutes les fenêtres précédentes manquent.
-- **En accélération** : un rang qui monte à chaque fenêtre présente, et 5 rangs gagnés au moins en
-  tout. Un écart de moins de 5 rangs est « stable ». Une fenêtre où le dépôt est hors du top rompt la
-  suite ; une fenêtre manquante est sautée.
+- **En accélération** : lu sur la **dernière suite** de fenêtres où le dépôt est dans le top
+  (décision A de Sabine, 30/10) : au moins deux rangs, chacun meilleur que le précédent, et 5 rangs
+  gagnés au moins sur la suite. Un écart de moins de 5 rangs est « stable ». Une fenêtre où le dépôt
+  est hors du top rompt la suite, qui repart ; une fenêtre manquante est sautée. Un dépôt hors du top
+  à la dernière fenêtre présente n'est donc pas en accélération (sa suite repart, vide).
 - **Candidats** : 60 au plus ; d'abord ceux qui remplissent un critère, puis par meilleur pic (le
   meilleur rang atteint, départagé par `repository_id`).
 - **Seuils** (2 jours actifs, 5 rangs) : revus sur les premiers comptes rendus réels (#370).
@@ -131,6 +134,11 @@ remplacé).
 `after` est la dernière fenêtre du compte rendu précédent, `previous_first_window` sa première ; les
 deux sont nuls ensemble (premier compte rendu) ou renseignés ensemble. 422 : un champ en trop, une
 demande incohérente, un écart de plus de 15 fenêtres.
+
+Depuis #366 (`docs/api/openapi-ia.json`, version 0.5.0) : les deux champs sont obligatoires, et un
+jour s'écrit `AAAA-MM-JJ` seulement (la garde `WrittenDay` d'`items.py`, celle de `GET /trends`). Le
+refus rend `{"error": "invalid_parameter", "parameters": [...]}` : le nom du champ refusé, `body`
+pour un champ en trop ou un contrôle croisé (un seul nul, ordre inversé, plus de 15 fenêtres).
 
 ### Choix
 
@@ -174,6 +182,29 @@ paramètre ; le masque `[email]` est retiré des textes cherchés ; `is_disguise
 (trajectoire, faits du code, textes gardés, `texts_removed`) et les compteurs de candidats (lus,
 écartés par motif). **Le code rend les faits** : rangs, critères, licence, dates, étoiles totales,
 prudence, URL. Le modèle n'écrit que les 4 textes.
+
+**Ce que rend #366**, le compte rendu factuel, sans GitHub ni modèle :
+
+| Champ | Contenu |
+|---|---|
+| `request_id` | celui de l'en-tête `X-Request-ID` |
+| `model` | `null` : aucun modèle n'a choisi |
+| `period.first_report` | vrai si `after` est nul |
+| `period.windows` | les fenêtres du compte rendu, de la plus ancienne à la plus récente, manquantes comprises ; vide si aucune n'est postérieure à `after` |
+| `period.missing_windows` | celles que la base n'a pas |
+| `period.windows_capped` | des fenêtres plus anciennes laissées de côté (plafond de 15) |
+| `period.new_evaluated` | faux au premier compte rendu, et si toutes les fenêtres du précédent manquent |
+| `period.latest_window` | la plus récente en base, `null` si elle n'en a aucune ; antérieure à `after` si la base a été restaurée |
+| `repositories[]` | ceux qui remplissent au moins un critère, par meilleur rang puis `repository_id` : `repository_id`, `repository_name` (celui de la fenêtre la plus récente), `criteria` (`durable`, `new`, `accelerating`, dans cet ordre), `best_rank`, `trajectory[]` |
+| `repositories[].trajectory[]` | un point par fenêtre de la période : `window_end`, `state` (`top`, `out_of_top`, `missing`), `rank` et `stars_gained` dans le top seulement |
+| `repositories_dropped` | ceux qui remplissent un critère, écartés : leur nom vaut `.` ou contient `..`, et irait dans un chemin |
+
+Ses erreurs sont celles de l'API de données seulement : 502 (`data_api_invalid_response`,
+`data_api_unauthorized`, `data_api_unavailable`), 504 (`data_api_timeout`). Les lectures sont 32 au
+plus (la plus récente, puis la période, ses 2 fenêtres de recul et celles du compte rendu précédent,
+chacune une fois), sous `TREND_REPORT_REQUEST_TIMEOUT_SECONDS` (60 s, `core/config.py`). Les
+candidats (`select_candidates`, `ai_api/trajectories.py`) sont calculés et testés, mais ne servent
+qu'à partir de #367, qui lit leur fiche sur GitHub.
 
 ## Défenses et échecs
 

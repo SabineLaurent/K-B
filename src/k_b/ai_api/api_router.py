@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter
 
-from k_b.ai_api.routers import digest_router
+from k_b.ai_api.routers import digest_router, trend_report_router
 
 api_router = APIRouter()
 api_router.include_router(digest_router.router)
+api_router.include_router(trend_report_router.router)

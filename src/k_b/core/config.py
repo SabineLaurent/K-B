@@ -85,6 +85,18 @@ GH_ARCHIVE_WINDOW_DAYS = 3
 # (decision of 2026-10-11). Beyond, the most recent windows are kept.
 GH_ARCHIVE_MAX_CATCH_UP_WINDOWS = 15
 
+# The trend report (docs/tendances.md, "Période", "Rang et critères"); the thresholds are to be
+# reviewed on the first real reports. The first report reads the last 4 windows.
+TREND_FIRST_REPORT_WINDOWS = 4
+# Durable: in the top of 2 windows without a day in common, read over the period and the 2
+# windows before it.
+TREND_DURABLE_MIN_WINDOWS = 2
+TREND_DURABLE_LOOKBACK_WINDOWS = 2
+# Accelerating: 5 ranks gained at least over the last run of windows in the top.
+TREND_ACCELERATION_MIN_RANKS = 5
+# The repositories whose sheet is read on GitHub, those meeting a criterion first.
+TREND_MAX_CANDIDATES = 60
+
 # HTTP. A source download waits this long for each network operation: the connection, or each
 # read (docs/specs-collecte.md).
 HTTP_TIMEOUT_SECONDS = 30
@@ -290,6 +302,9 @@ TOPS_DIR_NAME = "tops"
 # #158 on gpt-6-luna: about 98 seconds for 8 subjects, the judge included (113 with the slowest
 # calls). Beyond it, a subject not yet written is llm_timeout, the others are returned.
 DIGEST_REQUEST_TIMEOUT_SECONDS = 200
+# The bound of a trend report request: 1 + 31 GET /trends at most, one after the other, on a service
+# of the same network.
+TREND_REPORT_REQUEST_TIMEOUT_SECONDS = 60
 # The request of kb digest to the AI API (post/ai_api_client.py, #209). The URL of kb serve-ai with
 # its defaults, changed by KB_AI_API_URL; it does not follow KB_AI_API_PORT: set KB_AI_API_URL too
 # when the port of kb serve-ai changes. Connection, pool and write: assumed values for a service on

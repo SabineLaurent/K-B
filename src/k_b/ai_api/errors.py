@@ -1,8 +1,9 @@
 """The errors of the AI API that the model or the data API gives; 502, 503 and 504 say the
 failure upstream, as a gateway (RFC 9110, § 15.6)."""
 
+from collections.abc import Iterable
 from itertools import groupby
-from typing import Any
+from typing import Any, get_args
 
 from k_b.ai_api.connectors.data_api_client import DataApiState
 from k_b.ai_api.connectors.llm_client import LlmFailure
@@ -36,9 +37,14 @@ def to_api_error(
     return ApiError(STATUS_BY_STATE[state], state, headers)
 
 
-def describe_upstream_errors() -> dict[int | str, dict[str, Any]]:
+def describe_upstream_errors(
+    states: Iterable[LlmFailure | DataApiState],
+) -> dict[int | str, dict[str, Any]]:
     """The states of each upstream status, for the OpenAPI."""
-    by_status = sorted(STATUS_BY_STATE.items(), key=lambda pair: (pair[1], pair[0]))
+    by_status = sorted(
+        ((state, STATUS_BY_STATE[state]) for state in states),
+        key=lambda pair: (pair[1], pair[0]),
+    )
     return {
         status: {
             "model": ErrorSchema,
@@ -48,9 +54,19 @@ def describe_upstream_errors() -> dict[int | str, dict[str, Any]]:
     }
 
 
-# The error bodies of POST /digests, declared in the OpenAPI.
-ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
-    **API_ERROR_RESPONSES,
-    500: {"model": ErrorSchema, "description": "internal_error"},
-    **describe_upstream_errors(),
-}
+def describe_error_responses(
+    states: Iterable[LlmFailure | DataApiState],
+) -> dict[int | str, dict[str, Any]]:
+    """The error bodies of a route whose upstream states are these, for the OpenAPI."""
+    return {
+        **API_ERROR_RESPONSES,
+        500: {"model": ErrorSchema, "description": "internal_error"},
+        **describe_upstream_errors(states),
+    }
+
+
+# POST /digests reads the data API and calls the model; POST /trend-reports reads the data API only.
+ERROR_RESPONSES = describe_error_responses(STATUS_BY_STATE)
+TREND_REPORT_ERROR_RESPONSES = describe_error_responses(
+    get_args(DataApiState.__value__)
+)
