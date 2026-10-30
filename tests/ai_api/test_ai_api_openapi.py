@@ -61,10 +61,11 @@ def test_the_versioned_openapi_is_valid_and_closes_its_route_by_a_key():
     openapi = read_versioned_openapi()
 
     OpenAPIV31SpecValidator(openapi).validate()
-    # 0.2.0: model in the response (#209); 0.3.0: unanswered (#210); 0.4.0: three fields renamed.
-    assert openapi["info"] == {"title": "K-B AI API", "version": "0.4.0"}
+    # 0.2.0: model in the response (#209); 0.3.0: unanswered (#210); 0.4.0: three fields renamed;
+    # 0.5.0: POST /trend-reports (#366).
+    assert openapi["info"] == {"title": "K-B AI API", "version": "0.5.0"}
     assert "model" in openapi["components"]["schemas"]["DigestsSchema"]["required"]
-    assert list(openapi["paths"]) == ["/digests"]
+    assert list(openapi["paths"]) == ["/digests", "/trend-reports"]
     assert openapi["components"]["securitySchemes"] == {
         "HTTPBearer": {
             "type": "http",
@@ -72,7 +73,8 @@ def test_the_versioned_openapi_is_valid_and_closes_its_route_by_a_key():
             "description": BEARER_SCHEME_DESCRIPTION,
         }
     }
-    assert openapi["paths"]["/digests"]["post"]["security"] == [{"HTTPBearer": []}]
+    for path in openapi["paths"]:
+        assert openapi["paths"][path]["post"]["security"] == [{"HTTPBearer": []}]
 
 
 def test_the_route_documents_each_named_state():
@@ -91,6 +93,31 @@ def test_the_route_documents_each_named_state():
         "503": "llm_rate_limited",
         "504": "data_api_timeout, llm_timeout",
     }
+
+
+def test_the_trend_report_documents_the_states_of_the_data_api_only():
+    paths = read_versioned_openapi()["paths"]
+    responses = paths["/trend-reports"]["post"]["responses"]
+
+    assert {
+        status: response["description"]
+        for status, response in responses.items()
+        if status != "200"
+    } == {
+        "401": "invalid_api_key",
+        "422": "invalid_parameter",
+        "500": "internal_error",
+        "502": "data_api_invalid_response, data_api_unauthorized, data_api_unavailable",
+        "504": "data_api_timeout",
+    }
+
+
+def test_the_trend_report_request_refuses_any_other_field_and_needs_both():
+    schemas = read_versioned_openapi()["components"]["schemas"]
+    request = schemas["TrendReportRequestSchema"]
+
+    assert request["additionalProperties"] is False
+    assert request["required"] == ["after", "previous_first_window"]
 
 
 def test_the_request_refuses_any_other_field_and_bounds_the_window():

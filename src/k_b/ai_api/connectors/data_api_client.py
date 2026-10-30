@@ -1,9 +1,10 @@
-"""The reading of the watch by the data API, with the key of the client AI_DIGEST
-(docs/fiches-veille.md): a failure is a named state, raised as a DataApiError, without retry."""
+"""The reading of the watch and of the trend windows by the data API, with the key of the client
+AI_DIGEST (docs/fiches-veille.md, docs/tendances.md): a failure is a named state, raised as a
+DataApiError, without retry."""
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Literal
 
 import httpx2
@@ -11,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.deadline import Deadline
+from k_b.ai_api.trajectories import RepositoryStars, StarWindow
 from k_b.ai_api.watch_items import (
     WATCH_KINDS,
     WatchItem,
@@ -27,9 +29,16 @@ from k_b.core.config import (
     MAX_ITEMS_PER_DIGEST_REQUEST,
 )
 from k_b.core.outbound import open_http_client
-from k_b.items import Int64, RansomwareUse, UtcDatetime
+from k_b.items import (
+    TREND_REPOSITORY_NAME_MAX_LENGTH,
+    Int64,
+    RansomwareUse,
+    RepositoryName,
+    UtcDatetime,
+)
 
 ITEMS_PATH = "items"
+TRENDS_PATH = "trends"
 # The largest page of GET /items (docs/specs-api.md, "Paramètres").
 LIST_PAGE_SIZE = 100
 
@@ -127,6 +136,24 @@ DETAIL: TypeAdapter[KindDetail] = TypeAdapter(
     Annotated[KindDetail, Field(discriminator="kind")]
 )
 PAGE = TypeAdapter(ItemPage)
+
+
+class TrendBody(DataApiModel):
+    """A repository of a window; its forks are not read, the ranks being by stars."""
+
+    repository_id: Annotated[Int64, Field(gt=0)]
+    repository_name: Annotated[
+        RepositoryName, Field(max_length=TREND_REPOSITORY_NAME_MAX_LENGTH)
+    ]
+    stars_gained: Annotated[Int64, Field(ge=0)]
+
+
+class TrendWindowBody(DataApiModel):
+    window_end: date
+    trends: list[TrendBody]
+
+
+TREND_WINDOW = TypeAdapter(TrendWindowBody)
 
 
 class ErrorBody(DataApiModel):
@@ -254,12 +281,46 @@ def read_detail(
 ) -> KindDetail | None:
     """The detail of the item listed, or None if it is gone since the list."""
     response = send(http_client, f"{ITEMS_PATH}/{listed_item.id}", None, deadline)
-    if response.status_code == httpx2.codes.NOT_FOUND and is_item_not_found(response):
+    if response.status_code == httpx2.codes.NOT_FOUND and is_error(
+        response, "item_not_found"
+    ):
         return None
     detail = read_body(response, DETAIL)
     if detail.id != listed_item.id or detail.kind != listed_item.kind:
         raise DataApiError("data_api_invalid_response", response.status_code)
     return detail
+
+
+def read_trend_window(
+    http_client: httpx2.Client, window_end: date | None, *, deadline: Deadline
+) -> StarWindow | None:
+    """The repositories of the window that ends on window_end, of the latest in the base when it is
+    None; None if the base has no such window."""
+    params: dict[str, str | int] | None = (
+        None if window_end is None else {"window_end": window_end.isoformat()}
+    )
+    response = send(http_client, TRENDS_PATH, params, deadline)
+    if response.status_code == httpx2.codes.NOT_FOUND and is_error(
+        response, "trend_window_not_found"
+    ):
+        return None
+    body = read_body(response, TREND_WINDOW)
+    repository_ids = {trend.repository_id for trend in body.trends}
+    if (window_end is not None and body.window_end != window_end) or len(
+        repository_ids
+    ) != len(body.trends):
+        raise DataApiError("data_api_invalid_response", response.status_code)
+    return StarWindow(
+        window_end=body.window_end,
+        rows=tuple(
+            RepositoryStars(
+                repository_id=trend.repository_id,
+                repository_name=trend.repository_name,
+                stars_gained=trend.stars_gained,
+            )
+            for trend in body.trends
+        ),
+    )
 
 
 def send(
@@ -325,9 +386,10 @@ def read_body[BodyT](response: Answer, adapter: TypeAdapter[BodyT]) -> BodyT:
         raise DataApiError("data_api_invalid_response", status) from None
 
 
-def is_item_not_found(response: Answer) -> bool:
+def is_error(response: Answer, state: str) -> bool:
+    """Whether the body names this state, a 404 of a route not being one of a resource."""
     try:
-        return ErrorBody.model_validate_json(response.content).error == "item_not_found"
+        return ErrorBody.model_validate_json(response.content).error == state
     except ValidationError:
         return False
 

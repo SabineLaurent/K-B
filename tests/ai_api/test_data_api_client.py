@@ -4,7 +4,7 @@ simulated transport for the answers the base cannot give."""
 import json
 import logging
 import secrets
-from datetime import UTC, datetime, tzinfo
+from datetime import UTC, date, datetime, tzinfo
 
 import httpx2
 import pytest
@@ -15,6 +15,7 @@ from k_b.ai_api.connectors import data_api_client
 from k_b.ai_api.connectors.data_api_client import (
     DataApiError,
     build_data_api_client,
+    read_trend_window,
     read_watch,
 )
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
@@ -684,3 +685,144 @@ def test_a_deadline_passed_while_an_answer_is_read_stops_the_reading():
         read_watch(http_client, SINCE_ALL, deadline=deadline)
 
     assert raised.value.state == "data_api_timeout"
+
+
+# The windows of GH Archive, for the trend report (docs/tendances.md).
+
+# The window of 2026-10-10 of the test base, in the order of GET /trends: the stars, then the forks.
+LATEST_TREND_WINDOW = [
+    (1209966933, "morluto/rea", 1087),
+    (1398080271, "storytold/photocraft", 449),
+    (1322250666, "boykopovar/AnyPS5", 318),
+    (1035334306, "wwwwwwworld/solana-trading-bot-v3", 0),
+    (928981629, "rhtap-perf-test/nodejs-devfile-sample2", 0),
+]
+TREND = {
+    "repository_id": 1209966933,
+    "repository_name": "morluto/rea",
+    "stars_gained": 1087,
+    "forks_gained": 215,
+}
+
+
+def list_rows(window):
+    return [
+        (row.repository_id, row.repository_name, row.stars_gained)
+        for row in window.rows
+    ]
+
+
+def test_the_latest_trend_window_is_read_without_a_day(data_api):
+    window = read_trend_window(data_api, None, deadline=far_deadline())
+
+    assert window.window_end == date(2026, 10, 10)
+    assert list_rows(window) == LATEST_TREND_WINDOW
+    assert data_api.paths == ["/trends"]
+
+
+def test_a_trend_window_is_read_by_its_day(data_api):
+    window = read_trend_window(data_api, date(2026, 10, 9), deadline=far_deadline())
+
+    assert window.window_end == date(2026, 10, 9)
+    assert [row.repository_id for row in window.rows] == [1209966933, 1398080271]
+
+
+def test_a_trend_window_the_base_does_not_have_is_none(data_api):
+    assert (
+        read_trend_window(data_api, date(2026, 10, 8), deadline=far_deadline()) is None
+    )
+
+
+def simulate_trends(answer_trends):
+    requests = []
+
+    def handle(request):
+        requests.append(request)
+        return answer_trends(request)
+
+    settings = DataApiSettings(
+        base_url="http://api-donnees:8000", api_key=SecretStr(TEST_API_KEY)
+    )
+    return (
+        build_data_api_client(settings, transport=httpx2.MockTransport(handle)),
+        requests,
+    )
+
+
+def test_the_day_asked_is_sent_as_the_spec_writes_it():
+    http_client, requests = simulate_trends(
+        lambda request: answer(body={"window_end": "2026-10-09", "trends": [TREND]})
+    )
+
+    read_trend_window(http_client, date(2026, 10, 9), deadline=far_deadline())
+
+    assert requests[0].url.path == "/trends"
+    assert dict(requests[0].url.params) == {"window_end": "2026-10-09"}
+
+
+@pytest.mark.parametrize(
+    ("status", "body", "state"),
+    [
+        (404, {"error": "route_not_found"}, "data_api_invalid_response"),
+        (404, None, "data_api_invalid_response"),
+        (401, {"error": "invalid_api_key"}, "data_api_unauthorized"),
+        (503, {"error": "database_missing"}, "data_api_unavailable"),
+    ],
+)
+def test_a_trend_window_that_fails_gives_its_state(status, body, state):
+    http_client, _ = simulate_trends(lambda request: answer(status, body))
+
+    with pytest.raises(DataApiError) as raised:
+        read_trend_window(http_client, date(2026, 10, 9), deadline=far_deadline())
+
+    assert raised.value.state == state
+    assert raised.value.http_status == status
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"window_end": "2026-10-08", "trends": [TREND]},
+        {"window_end": "2026-10-09", "trends": [TREND, TREND]},
+        {"window_end": "2026-10-09", "trends": [TREND | {"stars_gained": -1}]},
+        {"window_end": "2026-10-09", "trends": [TREND | {"stars_gained": "12"}]},
+        {"window_end": "2026-10-09", "trends": [TREND | {"repository_id": 0}]},
+        {"window_end": "2026-10-09", "trends": [TREND | {"repository_name": "rea"}]},
+        {
+            "window_end": "2026-10-09",
+            "trends": [TREND | {"repository_name": "owner/" + "a" * 255}],
+        },
+        {"window_end": "2026-10-09"},
+        {"window_end": "9 octobre", "trends": []},
+    ],
+    ids=[
+        "other-day",
+        "same-repository-twice",
+        "negative-stars",
+        "stars-as-text",
+        "repository-id-zero",
+        "name-without-owner",
+        "name-too-long",
+        "no-trends",
+        "day-not-a-date",
+    ],
+)
+def test_a_trend_window_out_of_its_schema_gives_data_api_invalid_response(body):
+    http_client, _ = simulate_trends(lambda request: answer(body=body))
+
+    with pytest.raises(DataApiError) as raised:
+        read_trend_window(http_client, date(2026, 10, 9), deadline=far_deadline())
+
+    assert raised.value.state == "data_api_invalid_response"
+    assert raised.value.http_status == 200
+
+
+def test_a_trend_window_above_the_bound_gives_data_api_invalid_response(monkeypatch):
+    body = {"window_end": "2026-10-09", "trends": [TREND]}
+    bound_bodies(monkeypatch, len(json.dumps(body)) - 1)
+    http_client, _ = simulate_trends(lambda request: answer(body=body))
+
+    with pytest.raises(DataApiError) as raised:
+        read_trend_window(http_client, date(2026, 10, 9), deadline=far_deadline())
+
+    assert raised.value.state == "data_api_invalid_response"

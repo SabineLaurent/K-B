@@ -10,6 +10,7 @@ from pydantic import (
     AfterValidator,
     AwareDatetime,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     StringConstraints,
@@ -49,6 +50,8 @@ CVE_ID = r"CVE-[0-9]{4}-[0-9]{4,}"
 GHSA_ID = r"GHSA(?:-[23456789cfghjmpqrvwx]{4}){3}"
 # owner/name, in the letters, digits and signs GitHub uses; a control character is refused too.
 REPOSITORY_NAME = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+# A day as the specs write it, YYYY-MM-DD: no time, no number of seconds.
+DAY_FORM = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 # The slug of a newsletter edition, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
 EDITION_SLUG = re.compile(r"[a-z]+")
 # An arXiv identifier without its version, as text: the form of since 2007 (2609.31282), or the
@@ -84,6 +87,14 @@ def is_repository_name(text: str) -> bool:
         and ".." not in text
         and "." not in text.split("/")
     )
+
+
+def check_day_form(day: object) -> object:
+    """A day as written in a request: left to pydantic, 1760227200 would be a Unix time and
+    2026-10-12T00:00:00Z a day."""
+    if not isinstance(day, str) or not DAY_FORM.fullmatch(day):
+        raise ValueError("not a day written YYYY-MM-DD")
+    return day
 
 
 def check_url_can_be_normalized(url: str) -> str:
@@ -197,6 +208,8 @@ Tag = Annotated[
     AfterValidator(check_tag_is_normalized),
     CAN_BE_STORED,
 ]
+# A day of a request, written YYYY-MM-DD; still a date to pydantic: the OpenAPI declares it so.
+WrittenDay = Annotated[date, BeforeValidator(check_day_form)]
 # A date with its time zone, held in UTC.
 UtcDatetime = Annotated[AwareDatetime, AfterValidator(convert_to_utc)]
 # An integer SQLite holds: a larger one fails to be written.
