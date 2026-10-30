@@ -170,9 +170,9 @@ def is_durable(top_ends: Sequence[date]) -> bool:
 
 def is_accelerating(points: Sequence[TrajectoryPoint]) -> bool:
     """Whether each rank of the last run of windows in the top beats the one before, with
-    TREND_ACCELERATION_MIN_RANKS gained at least."""
-    # A missing window is skipped, a window out of the top starts the run again (decision A of
-    # Sabine, 2026-10-30, docs/tendances.md).
+    TREND_ACCELERATION_MIN_RANKS gained at least, a missing window skipped and a window out of the
+    top starting the run again."""
+    # Decision A of Sabine, 2026-10-30 (docs/tendances.md).
     run: list[int] = []
     for point in points:
         if point.state == "out_of_top":

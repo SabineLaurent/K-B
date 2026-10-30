@@ -563,6 +563,8 @@ def test_a_response_that_fails_to_be_built_is_traced_as_a_500(
     response = post_trend_reports(make_ai_api(simulate([LATEST])))
 
     assert response.status_code == 500
+    assert response.json() == {"error": "internal_error"}
+    assert "a fault of the test" not in response.text
     [root] = recorded_traces.find_spans("POST /trend-reports")
     assert root.attributes["http.response.status_code"] == 500
     assert root.status.status_code == StatusCode.ERROR
