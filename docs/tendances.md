@@ -227,11 +227,14 @@ jetons (`docs/jeton-github.md`, mis à jour par #367).
 des `ref`, jamais un nom de dépôt ni un `repository_id` (registre des traitements) ; le type `Stage`
 est étendu (`ai_api/stage_calls.py:11`). Aucun nom de dépôt dans les journaux.
 
-**Contenu des appels sous `KB_TRACE_CONTENT` : décision en attente de Sabine.** La conception du 29/10
-prévoyait que les étapes des tendances n'appellent jamais `trace_contents` ; la décision D1 du
-2026-10-27 (précisée le 28/10, #347 ; journal ADR, « Traces : le contenu des appels au modèle, sous
-réglage ») veut qu'une étape nouvelle qui appelle le modèle l'appelle après avoir jugé l'appel. Le
-registre des traitements suivra la décision avant le premier envoi.
+**Contenu des appels sous `KB_TRACE_CONTENT`**, comme les fiches (décision D1 du 2026-10-27, précisée
+le 28/10, #347 ; journal ADR, « Traces : le contenu des appels au modèle, sous réglage ») : le choix
+et la rédaction appellent `trace_contents(llm_call, tracing=tracing)` après avoir jugé l'appel. Le
+contenu (`owner/repo`, description, topics, README nettoyé, sortie du modèle) part vers Grafana Cloud
+selon `KB_TRACE_CONTENT` : `none` par défaut, et tant que Grafana Labs n'a pas accusé réception du
+DPA ; `anomalies` ; `all` en bac à sable seulement. Il n'est que dans le corps de l'enregistrement ;
+les spans et leurs attributs restent sans nom de dépôt ni `repository_id`. Décision de Sabine du
+2026-10-30 (~16:12Z), qui remplace le « jamais tracé » de la conception du 29/10.
 
 ## Ce qui le prouve
 
@@ -248,7 +251,7 @@ Les tests que portent #366 à #369 :
 | GitHub | 301 non suivie ; `id` différent écarté ; plus de requête après un 403 de quota ; 403 nu ; taille bornée ; sans jeton, `kb serve-ai` ne démarre pas |
 | Choix | description piégée absente des messages `system` ; dépôt inventé, critère faux, sujet hors liste, plus de 5 choix refusés ; choix en échec → compte rendu factuel écrit et noté au registre |
 | Rédaction | README piégé absent des messages `system` ; README qui vise un autre dépôt ; commande, lien, accent grave refusés ; fait introuvable → texte retiré ; rédaction en échec → ses seuls textes retirés |
-| Traces et journaux | sans nom de dépôt ni `repository_id` ; contenu des appels selon la décision en attente (« Traces ») |
+| Traces et journaux | spans sans nom de dépôt ni `repository_id` ; avec `KB_TRACE_CONTENT=none`, aucun enregistrement de contenu ; avec `all`, le contenu n'est que dans le corps de l'enregistrement |
 | Couches | `tests/architecture/` : `AI_API_LAYERS`, `TRACED_FUNCTIONS`, environnement lu par `commands/environment.py` seul |
 
 Aucun test n'appelle GitHub ni le modèle : réponses enregistrées, fixture tirée d'une vraie réponse.
