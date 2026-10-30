@@ -59,6 +59,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   PostgreSQL au 08/11 (décision 2) », décision en attente de « La base au temps 3 » ; la règle 6
   dit « Le POC en conteneurs », alors que le premier temps se fait sans conteneur (journal ADR,
   2026-10-20, décision 1).
+- **GH Archive ne voit qu'environ 1 % des étoiles** (mesure de time-knight du 2026-10-29, cause
+  inconnue) : `trend` est un échantillon. Ne jamais écrire « étoiles gagnées » tirées de GH Archive
+  sans le dire (`docs/specs-collecte.md`, « Limite mesurée le 2026-10-29 »).
 
 ## Interface
 
@@ -96,6 +99,10 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   Ce qu'est une anomalie (D1, précisée le 2026-10-28) ne se change que par Sabine, dans
   `is_anomaly` (`ai_api/connectors/llm_client.py`) ; une étape nouvelle qui appelle le modèle appelle
   `trace_contents(llm_call, tracing=tracing)` après avoir jugé l'appel.
+- Le compte rendu des tendances (`kb trend-report`, #364 à #370) : contrat dans `docs/tendances.md`,
+  écrit avant le code ; #365 à #370 sont codées par time-knight (organisation de Sabine du
+  2026-10-30). Sortie dans `veille/tendances/<date>.md` ; période tenue par
+  `KB_DATA_DIR/trend_reports.json`, jamais par une relecture du coffre.
 
 ## Consignes de travail
 

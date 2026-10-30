@@ -4632,7 +4632,82 @@ sous-agent et validé par elle.
 
   — branche `fix/collect-expected-errors-without-traceback`
 
+## 2026-10-30
+
+### Tendances : un compte rendu deux fois par semaine, orchestré par l'API IA
+
+Décisions de Sabine du 2026-10-29 (heures UTC), sur une conception de time-knight (architecte en
+sous-agent, rendue vers 19:16Z ; relecture en sous-agent vers 19:50Z), plan approuvé le soir même.
+Contrat : [tendances.md](../tendances.md). Le pourquoi est celui de Sabine quand il est entre
+guillemets ou attribué ; sinon, celui de la conception qu'elle a approuvée.
+
+- **Un compte rendu des tendances de GH Archive, deux fois par semaine, dans le coffre :
+  `veille/tendances/<date>.md`** (rythme ~17:00, depuis la fin du compte rendu précédent ; lieu
+  ~17:20). Pourquoi : la table `trend` n'est rendue nulle part. Le coffre reste le seul lieu où K-B
+  écrit (« Coffre : organisation », 2026-10-19, inchangé) ; `tendances` devient un nom réservé sous
+  `veille/`, comme `tops`. En v1, `kb trend-report` est lancé à la main, comme la collecte (« POC du
+  25/10 », décision 3) ; la planification vient avec la mise en ligne.
+- **Les fenêtres glissantes de 3 jours restent ; la collecte ne change pas** (13:41). Le compte
+  rendu est du **post-traitement** : rien de ce qu'il lit sur GitHub n'est gardé, ni brut ni base
+  (~17:50).
+- **Ce que disent les textes** (16:53) : trajectoire, secteur (topics), rattachement aux sujets de la
+  veille, prudence en faits et non en verdicts, licence ; résumé du README attribué à l'auteur,
+  tronqué ; une version récente du dépôt n'est pas retenue ; aucune commande ni bloc de code en
+  sortie.
+- **V1 sans recomptage par GitHub : les comptes de GH Archive seuls, avec leur limite écrite**
+  (~17:25). La limite dite alors, « 1 à 2 % des étoiles vues », est remplacée par la mesure du
+  2026-10-29 : environ 1 % ([specs-collecte.md](../specs-collecte.md), « GH Archive sur BigQuery »).
+  Écarté pour la v1 : recompter le top 100 par GitHub (« Hors v1 » du contrat).
+- **Une chaîne fixe en 4 temps, pas un agent** (vision ~17:40, chaîne ~18:55) : le modèle choisit,
+  le code lit GitHub, le modèle écrit, le code enregistre. Une **fiche légère** GitHub de chaque
+  candidat est lue avant le choix, le README des seuls choisis après (~18:50). Écarté : un agent qui
+  choisit ses lectures (piste après le 08/11).
+- **Quatre critères (durable, nouveau, en accélération, sujet de la veille), au plus 5 dépôts
+  choisis, sur les étoiles seules** (~19:00). Les forks viendront ensuite, avec un filtre à décider
+  sur les premiers vrais tops (décisions encore ouvertes). **Durable** est jugé sur la période et les
+  2 fenêtres qui la précèdent (19:16–19:26). Le code recalcule le rang des étoiles (`stars_gained desc,
+  repository_id asc`), parce que `GET /trends` départage par les forks ; le code rend les faits
+  (rangs, critères, licence, dates, étoiles totales), le modèle n'écrit que 4 textes.
+- **L'API IA orchestre ; un client GitHub neuf ; un second jeton, `KB_AI_GITHUB_TOKEN`**
+  (19:16–19:26). Pourquoi : l'API IA n'importe ni `etl` ni les sources (`tests/architecture/`), et
+  le même parcours que `kb digest` → `POST /digests` garde l'API IA sans état. Le second jeton est du
+  même compte : la limite de 5 000 requêtes par heure est par compte (conditions de GitHub,
+  `specs-collecte.md`). Écarté : `kb` lit GitHub (`post` n'importe ni les sources ni les API) ;
+  réutiliser le client de la collecte (couches).
+- **« Propriétaire récent » retiré de la v1** (19:16–19:26) : c'est la seule donnée qu'il aurait
+  fallu lire sur une personne (`GET /users/{owner}`).
+- **Le code garde un registre des comptes rendus, en fichier : `KB_DATA_DIR/trend_reports.json`**
+  (19:33 : « Je préfèrerais que le code garde un registre » ; fichier, 19:43). Une entrée par compte
+  rendu (fenêtres, fichier, date, `request_id`, modèle), sur le modèle de `collection_state.json`,
+  écrite par `write_file_atomically` ; registre illisible = arrêt. Écarté : lire la période dans
+  l'en-tête du dernier compte rendu (proposé vers 19:20, remplacé à 19:33) : le coffre resterait lu
+  par K-B. Une table viendra si une interface web liste l'historique.
+- **Un choix du modèle en échec donne un compte rendu factuel**, avec « choix non fait » et la
+  raison ; le registre le note et la période avance (~19:45). Remplace le 502
+  `llm_invalid_output` que prévoyait la conception. Une rédaction en échec ne retire que les textes
+  de son dépôt.
+- **Plafonds** : 15 fenêtres (`GH_ARCHIVE_MAX_CATCH_UP_WINDOWS`), 60 candidats, 70 requêtes GitHub
+  par compte rendu, en série ; un 301 n'est pas suivi en v1 (`core/outbound.py` ne suit aucune
+  redirection), écart à la recommandation de GitHub accepté. Écarté : suivre un seul 301 vers
+  `api.github.com` (une exception au client sortant).
+
+  Lien avec #143 (étoiles et forks totaux lus par GraphQL à la collecte, ADR du 2026-10-08) : non
+  remplacé ; le compte rendu lit les étoiles totales en REST au moment de l'écrire, sans les garder.
+
+  Limites assumées : les comptes de GH Archive sont un échantillon, des rangs proches ne se
+  départagent pas ; le filtre de contenu d'Azure peut refuser une description ou un README qui parle
+  de jailbreak ; le côté `kb` (registre, coffre) suit la question ouverte « Où tourne `kb
+  write-tops` en ligne ».
+
+  — #364 (contrat) ; code : #365 à #370
+
 ## Décisions encore ouvertes
+
+- **Les seuils des critères des tendances** (2026-10-30) : 2 jours actifs pour « durable », 5 rangs
+  pour « en accélération ». À revoir sur les premiers comptes rendus réels (#370).
+
+- **Le filtre des forks dans le compte rendu des tendances** (2026-10-30) : les forks entrent après la
+  v1, avec un filtre (`is_template` ou autre) à décider sur les premiers vrais tops.
 
 - **Un sujet secondaire par item au classement** (2026-10-26, idée de Sabine) : une case de sujet
   principal et une case de sujet secondaire, pour ne pas perdre qu'un item touche deux sujets.
@@ -4664,7 +4739,8 @@ sous-agent et validé par elle.
 - **Où tourne `kb write-tops` en ligne** (2026-10-19) : elle écrit le coffre, qu'aucun conteneur
   ne monte au POC (règle 4 de `.claude/rules/poc.md`) ; à trancher avant la mise en ligne du
   08/11 (« Tops : les fiches par `kb write-tops` »). La même question vaut pour `kb digest`
-  (2026-10-21, « Fiches de veille : `kb digest` les écrit dans le coffre »).
+  (2026-10-21, « Fiches de veille : `kb digest` les écrit dans le coffre »), et pour
+  `kb trend-report` (2026-10-30, « Tendances : un compte rendu deux fois par semaine »).
 
 - **Une borne de lecture des réponses de l'API IA et de l'API de données** (2026-10-21) : avant la
   mise en ligne du 08/11, dans `core/outbound.py`, commune aux deux clients ; `kb digest` lit
