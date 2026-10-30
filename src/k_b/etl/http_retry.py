@@ -24,7 +24,7 @@ MIN_RETRY_WAIT_SECONDS = 3
 # A Retry-After above it is not waited: the source fails, its last collection date stays, and the
 # next collection asks again.
 RETRY_AFTER_MAX_SECONDS = 60
-# A rate limit with no request left (GitHub, core/rate_limit.py): its reset may be an hour away, so
+# A rate limit with no request left (GitHub, core/rate_limit.py): its reset can be an hour away, so
 # the answer gets no retry; the reset time, in epoch seconds, is noted on the error.
 
 
