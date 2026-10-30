@@ -4,8 +4,8 @@ from urllib.error import URLError
 import pytest
 from http_helpers import http_error
 
+from k_b.core.rate_limit import MIN_PAUSE_SECONDS
 from k_b.etl.http_retry import (
-    MIN_PAUSE_SECONDS,
     MIN_RETRY_WAIT_SECONDS,
     RETRY_AFTER_MAX_SECONDS,
     RETRY_WAIT_SECONDS,

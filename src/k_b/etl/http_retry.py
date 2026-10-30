@@ -2,11 +2,16 @@
 services it collects (RFC 9110 Retry-After, rate limits)."""
 
 import math
-import re
 from datetime import UTC, datetime
 from http import HTTPStatus
 from urllib.error import HTTPError, URLError
 
+from k_b.core.rate_limit import (
+    EPOCH_SECONDS,
+    MIN_PAUSE_SECONDS,
+    RATE_LIMIT_REMAINING_HEADER,
+    RATE_LIMIT_RESET_HEADER,
+)
 from k_b.core.retry_after import is_retry_after_too_long, read_retry_after
 
 # The wait before the one retry after a 429, a 5xx or a failed connection, when the answer gives
@@ -19,14 +24,8 @@ MIN_RETRY_WAIT_SECONDS = 3
 # A Retry-After above it is not waited: the source fails, its last collection date stays, and the
 # next collection asks again.
 RETRY_AFTER_MAX_SECONDS = 60
-# A rate limit with no request left (GitHub): its reset may be an hour away, so the answer gets no
-# retry; the reset time, in epoch seconds, is noted on the error.
-RATE_LIMIT_REMAINING_HEADER = "x-ratelimit-remaining"
-RATE_LIMIT_RESET_HEADER = "x-ratelimit-reset"
-EPOCH_SECONDS = re.compile(r"[0-9]{1,10}")
-# A pause asked by a service lasts at least a minute: GitHub asks it when it gives no reset
-# (docs: "Rate limits for the REST API", 2026-10-25).
-MIN_PAUSE_SECONDS = 60
+# A rate limit with no request left (GitHub, core/rate_limit.py): its reset can be an hour away, so
+# the answer gets no retry; the reset time, in epoch seconds, is noted on the error.
 
 
 def find_retry_wait(

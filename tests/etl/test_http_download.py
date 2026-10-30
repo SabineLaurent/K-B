@@ -5,10 +5,10 @@ from urllib.error import HTTPError, URLError
 import pytest
 from http_helpers import http_error
 
+from k_b.core.user_agent import USER_AGENT
 from k_b.etl import http_download
 from k_b.etl.http_download import RedirectedOutsideError, download
 from k_b.etl.source_contract import PageRefusedError
-from k_b.etl.user_agent import USER_AGENT
 
 BODY = b"<feed>one paper</feed>"
 TRUSTED_URL_PREFIX = "https://example.org/"

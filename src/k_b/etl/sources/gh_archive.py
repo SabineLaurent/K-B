@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from k_b.core.config import (
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
     GH_ARCHIVE_TOP_SIZE,
+    GH_ARCHIVE_WINDOW_DAYS,
     MILLISECONDS_PER_SECOND,
 )
 from k_b.core.quoting import quote_value
@@ -33,7 +34,6 @@ FOLDER_PREFIX = "gh_archive"
 
 # === EXTRACT ===
 
-WINDOW_DAYS = 3
 # The cap grows with the windows, up to a bound (decision of 2026-10-11): the heaviest window
 # alone read 433.5 MB, x 1.5; 15 windows read 1.58 GB (dry runs of 2026-10-11, measures and
 # reckoning in docs/bigquery.md).
@@ -226,7 +226,7 @@ def drop_windows_over_the_cap(
 
 
 def configure_query(window_ends: list[date], dry_run: bool) -> bigquery.QueryJobConfig:
-    first_day = window_ends[0] - timedelta(days=WINDOW_DAYS - 1)
+    first_day = window_ends[0] - timedelta(days=GH_ARCHIVE_WINDOW_DAYS - 1)
     parameters = [
         bigquery.ScalarQueryParameter(
             "first_suffix", "STRING", f"{first_day:{TABLE_SUFFIX_FORMAT}}"
@@ -235,7 +235,7 @@ def configure_query(window_ends: list[date], dry_run: bool) -> bigquery.QueryJob
             "last_suffix", "STRING", f"{window_ends[-1]:{TABLE_SUFFIX_FORMAT}}"
         ),
         bigquery.ArrayQueryParameter("window_ends", "DATE", window_ends),
-        bigquery.ScalarQueryParameter("window_days", "INT64", WINDOW_DAYS),
+        bigquery.ScalarQueryParameter("window_days", "INT64", GH_ARCHIVE_WINDOW_DAYS),
         bigquery.ScalarQueryParameter("top_size", "INT64", GH_ARCHIVE_TOP_SIZE),
     ]
     if dry_run:

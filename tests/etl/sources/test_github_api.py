@@ -3,10 +3,10 @@ import io
 import pytest
 from http_helpers import http_error
 
+from k_b.core.user_agent import USER_AGENT
 from k_b.etl import http_download
 from k_b.etl.sources.github import api as github_api
 from k_b.etl.sources.github.api import GithubPausedError, get_from_github_api
-from k_b.etl.user_agent import USER_AGENT
 
 BODY = b'[{"tag_name": "v1.0.0"}]'
 PATH = "repos/octocat/hello-world/releases?per_page=100"

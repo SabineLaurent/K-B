@@ -79,6 +79,8 @@ GITHUB_MOST_FORKED_SEARCH_QUERY = "forks:>10000"
 
 # GH Archive. The 30 first by stars and the 30 first by forks, together (decision of 2026-10-08).
 GH_ARCHIVE_TOP_SIZE = 30
+# A window: 3 full UTC days, from D-3 to D-1, rolling (decision of 2026-10-11).
+GH_ARCHIVE_WINDOW_DAYS = 3
 # Two weeks of missed collections: a repository that rose earlier adds little to the watch
 # (decision of 2026-10-11). Beyond, the most recent windows are kept.
 GH_ARCHIVE_MAX_CATCH_UP_WINDOWS = 15
