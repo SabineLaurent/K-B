@@ -174,6 +174,27 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   `KB_GITHUB_TOKEN` ([jeton-github.md](jeton-github.md)).
 - **Limites** : 5 000 requêtes par heure avec jeton (60 sans) ; la recherche a sa propre limite,
   30 requêtes par minute, et ne renvoie jamais plus de 1 000 résultats.
+- **Conditions d'utilisation** (décision de Sabine du 2026-10-30, « oui », après relecture à la
+  source par time-knight le même jour) : l'usage de K-B est accepté, **zone grise comprise**. Vaut pour
+  toute la collecte GitHub de K-B, GH Archive compris, et pour le compte rendu des tendances
+  ([tendances.md](tendances.md)).
+  - Collecter par l'API n'est pas du *scraping* (AUP §7) : l'API relève de la section H des Terms
+    (en vigueur le 27/04/2026).
+  - Un second jeton du **même compte** (`KB_AI_GITHUB_TOKEN`, #367) est conforme : la limite de
+    5 000 requêtes par heure est par compte, pas par jeton, et la section H n'interdit que de
+    partager des jetons pour la dépasser.
+  - Envoyer la description, les topics et le README d'un dépôt au modèle n'est pas de
+    l'entraînement : la clause D.9 des Terms ne vise que l'entraînement d'un système d'IA
+    commercial ; selon D.8, les Terms ne restreignent pas l'usage légal du contenu des dépôts
+    publics par un tiers.
+  - Ni spam ni revente de données personnelles (AUP §7, Terms H). Le §8 de l'AUP (données
+    personnelles à la seule finalité autorisée, sécurisées, supprimées sur demande) est tenu par le
+    [registre des traitements](registre-traitements.md).
+  - **Risque restant, dit tel quel** : l'AUP §7 n'autorise que la recherche (informations publiques
+    **non personnelles**, publications en libre accès) et l'archivage, quelle que soit la façon de
+    les obtenir, GH Archive compris ; une veille personnelle n'y figure pas à la lettre, et
+    `owner/repo` porte un login quand le propriétaire est une personne. Usage le plus proche retenu :
+    la recherche, minimisée.
 - **Données personnelles** : les releases et alertes portent le login de leur auteur, une donnée
   personnelle (pseudonyme rattaché à une personne), comme celui des personnes créditées dans une
   alerte (`credits`). Non nécessaire à la veille : il reste dans le
@@ -655,7 +676,33 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   [bigquery.md](bigquery.md#anomalie-constatée--les-tables-de-gh-archive-incomplètes-depuis-le-2026-10-06).
   La collecte réelle du 2026-10-11 (fenêtre du 08 au 10/10, 48 dépôts) a été faite sur ces
   données partielles : ses comptes sont trop bas, son classement possiblement faux. Les contrôles
-  de la source (table close, résultat valide) sont passés.
+  de la source (table close, résultat valide) sont passés. Ce jour-là, seules l'existence et la
+  taille des fichiers horaires ont été vérifiées : la mesure du 2026-10-29 (puce suivante) lit la
+  baisse dans ce que GH Archive reçoit, pas dans BigQuery.
+- **Limite mesurée le 2026-10-29 : environ 1 % des étoiles** (mesures de time-knight, lues le
+  2026-10-29 ; méthode et chiffres ci-dessous). Les comptes de `trend` sont un **échantillon** : des
+  rangs proches ne se départagent pas, et une sortie de K-B n'écrit jamais « étoiles gagnées »
+  tirées de GH Archive sans le dire ([tendances.md](tendances.md)).
+  - Méthode : les étoiles d'une fenêtre de 3 jours dans `trend`, contre
+    `GET /repos/{o}/{r}/stargazers/history` (comptes agrégés par jour UTC, sans identité ; la somme
+    des jours égale `stargazers_count`, vérifié sur 3 dépôts ; lu de 13:50Z à 14:21Z).
+  - Mesures : `morluto/rea`, 1,0 à 1,8 % (fenêtres finissant du 10 au 12/10 et du 25 au 28/10 ; le
+    28/10, 184 contre 17 983) ; `Gathin23/cleanyourtv`, 88 sur 7 955 (1,1 %) ;
+    `Ebony-Vinyl/dsh-our-free-model`, 94 sur 6 510 (1,4 %), ces deux derniers dans l'ordre inverse
+    dans GH Archive. Le 10/06, avant le changement de GitHub du 30/06 : 1,7 à 4,1 % sur le top 5.
+    Forks (`GET /repos/{o}/{r}/forks?sort=newest`, fenêtre du 26 au 28/10) : 0,8 à 1,3 %, jusqu'à
+    4,2 %.
+  - Où est la baisse : dans ce que GH Archive reçoit. Événements par jour dans les tables BigQuery
+    (`COUNT(*)` des tables `githubarchive.day`, requête lancée par Sabine vers 13:51Z) : 3,5 à
+    3,9 M du 13/05 au 12/08, 82 128 le 27/10. BigQuery est **cohérent avec** les fichiers horaires,
+    en ordre de grandeur : le fichier de 12 h UTC (`data.gharchive.org/<jour>-12.json.gz`), compté
+    ligne à ligne vers 14:21Z, porte 165 276 événements le 12/08 (44 `WatchEvent`, 8 `ForkEvent`)
+    et 2 944 le 27/10 (214 `WatchEvent`, 31 `ForkEvent`), pour environ 3 400 événements et 243
+    étoiles par heure le 27/10 selon BigQuery (total du jour divisé par 24). Limite : une heure sur
+    deux jours ; l'heure 12 de BigQuery n'a pas été comptée à part. La taille d'un fichier ne suit
+    pas son nombre d'événements. Cause de la baisse : inconnue.
+  - Les **conditions de GitHub** valent aussi pour ce qu'on lit par GH Archive (« API GitHub »,
+    « Conditions d'utilisation »).
 - **Accès** : compte de service `k-b-collecte`, seul rôle Utilisateur de job BigQuery, clé
   désignée par `GOOGLE_APPLICATION_CREDENTIALS` ([bigquery.md](bigquery.md)).
 - **Limites** : bac à sable sans facturation : 1 Tio lu par mois, 10 Gio de stockage, tables
@@ -1016,3 +1063,17 @@ facturation, le dépassement est refusé.
 - [Les six grands principes du RGPD](https://www.cnil.fr/fr/comprendre-le-rgpd/les-six-grands-principes-du-rgpd) — CNIL
 - [Access annotation database](https://forums.zotero.org/discussion/101244/access-annotation-database) — forum Zotero
 - `https://tldr.tech/robots.txt`, lu le 2026-10-01
+
+Conditions de GitHub, lues le 2026-10-30 par time-knight :
+
+- [GitHub Acceptable Use Policies](https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies)
+  — §4, §7, §8, §9 ; pas de date affichée
+- [GitHub Terms of Service](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service)
+  — A.3, C, D.8, D.9, H ; en vigueur le 27/04/2026
+- [Rate limits for the REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
+
+Limite de GH Archive, lues le 2026-10-29 par time-knight :
+
+- <https://github.blog/changelog/2026-09-04-new-api-endpoint-provides-privacy-safe-star-history-data>
+  — GitHub Changelog
+- <https://www.star-history.com/blog/github-stargazer-api-restriction> — star-history.com

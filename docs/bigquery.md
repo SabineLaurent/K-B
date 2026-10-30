@@ -143,6 +143,11 @@ for count in (1, 7, 15, 30):
 
 ### Anomalie constatée : les tables de GH Archive incomplètes depuis le 2026-10-06
 
+Lecture revue le 2026-10-29 : la baisse est dans ce que GH Archive reçoit, BigQuery est cohérent
+avec ses fichiers horaires ; mesures dans [specs-collecte.md](specs-collecte.md) (« GH Archive sur
+BigQuery », « Limite mesurée le 2026-10-29 »). Le relevé du 11/10 ci-dessous reste tel qu'il a été
+fait.
+
 Les fenêtres finissant du 07 au 10/10 lisent 3 à 4 fois moins que celles de fin septembre, sans
 effet de semaine (le samedi 26/09 lit 312 Mo, le samedi 10/10 134 Mo). Vérifié en trois temps.
 
