@@ -18,6 +18,7 @@ from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.dependencies import open_data_api_client, open_llm_client
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
+from k_b.ai_api.routers import trend_report_router
 from k_b.core.config import (
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
     GH_ARCHIVE_TOP_SIZE,
@@ -549,3 +550,20 @@ def test_neither_the_traces_nor_the_logs_hold_a_repository(
         ), value
     messages = " ".join(record.getMessage() for record in caplog.records)
     assert not any(name in messages for name in names)
+
+
+def test_a_response_that_fails_to_be_built_is_traced_as_a_500(
+    make_ai_api, recorded_traces, monkeypatch
+):
+    def fail(request_id, report):
+        raise ValueError("a fault of the test")
+
+    monkeypatch.setattr(trend_report_router, "to_trend_report_schema", fail)
+
+    response = post_trend_reports(make_ai_api(simulate([LATEST])))
+
+    assert response.status_code == 500
+    [root] = recorded_traces.find_spans("POST /trend-reports")
+    assert root.attributes["http.response.status_code"] == 500
+    assert root.status.status_code == StatusCode.ERROR
+    assert root.attributes["error.type"] == "ValueError"

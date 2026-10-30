@@ -54,15 +54,19 @@ def describe_upstream_errors(
     }
 
 
-# The error bodies of POST /digests, declared in the OpenAPI.
-ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
-    **API_ERROR_RESPONSES,
-    500: {"model": ErrorSchema, "description": "internal_error"},
-    **describe_upstream_errors(STATUS_BY_STATE),
-}
-# Those of POST /trend-reports, which reads the data API only.
-TREND_REPORT_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
-    **API_ERROR_RESPONSES,
-    500: {"model": ErrorSchema, "description": "internal_error"},
-    **describe_upstream_errors(get_args(DataApiState.__value__)),
-}
+def describe_error_responses(
+    states: Iterable[LlmFailure | DataApiState],
+) -> dict[int | str, dict[str, Any]]:
+    """The error bodies of a route whose upstream states are these, for the OpenAPI."""
+    return {
+        **API_ERROR_RESPONSES,
+        500: {"model": ErrorSchema, "description": "internal_error"},
+        **describe_upstream_errors(states),
+    }
+
+
+# POST /digests reads the data API and calls the model; POST /trend-reports reads the data API only.
+ERROR_RESPONSES = describe_error_responses(STATUS_BY_STATE)
+TREND_REPORT_ERROR_RESPONSES = describe_error_responses(
+    get_args(DataApiState.__value__)
+)

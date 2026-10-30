@@ -57,6 +57,7 @@ def post_trend_reports(
             report = read_trend_report(
                 data_api_client, request_id, demand, tracing=tracing
             )
+            response = to_trend_report_schema(request_id, report)
         except ApiError as error:
             root.fail(error.state)
             root.set({HTTP_STATUS: error.status_code})
@@ -66,7 +67,7 @@ def post_trend_reports(
             root.set({HTTP_STATUS: status.HTTP_500_INTERNAL_SERVER_ERROR})
             raise
         root.set({HTTP_STATUS: status.HTTP_200_OK})
-        return to_trend_report_schema(request_id, report)
+        return response
 
 
 def read_trend_report(
