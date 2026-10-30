@@ -202,13 +202,13 @@ uv sync
 |---|---|---|
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
 | `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
-| `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les comptes rendus de veille dans `veille/<sujet>/` ; ni l'un ni l'autre ne tourne sans elle (code 2). |
+| `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les comptes rendus de veille dans `veille/<sujet>/`, `kb trend-report` les comptes rendus des tendances dans `veille/tendances/` ; aucun des trois ne tourne sans elle (code 2). |
 | `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
 | `KB_COLLECT_ONLY` | non | les dossiers des sources que `kb collect` lance, séparés par des virgules (`zotero,clipping`) ; la casse ne compte pas. Sans elle, pas de filtre : chaque source tourne comme avant (Zotero, clips et GH Archive selon leur variable). Une source écartée affiche `<dossier>: skipped (not in KB_COLLECT_ONLY)` ; un nom qui n'est pas un dossier de source, une valeur ou une entrée vide, ou une source choisie sans sa variable (`zotero` sans `KB_ZOTERO_DIR`) : code 2, rien n'est collecté ([docs/specs-collecte.md](docs/specs-collecte.md), « Choisir les sources »). |
 | `KB_GITHUB_TOKEN` | non | jeton GitHub en lecture seule ([docs/jeton-github.md](docs/jeton-github.md)). Sans lui, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000. |
 | `KB_DATA_API_KEY_<CLIENT>` | pour `kb serve-data` | la clé d'un client de l'API de données (`<CLIENT>` en `A-Z`, `0-9` et `_`, par exemple `KB_DATA_API_KEY_TERMINAL`), une variable par client ([docs/specs-api.md](docs/specs-api.md)). |
-| `KB_AI_API_KEY_<CLIENT>` | pour `kb serve-ai` et `kb digest` | la clé d'un client de l'API IA, une variable par client, mêmes règles que `KB_DATA_API_KEY_<CLIENT>` ; `kb digest` est le client `KB_DIGEST` et lit la même variable, `KB_AI_API_KEY_KB_DIGEST`. Les autres réglages de `kb serve-ai` (modèle, API de données, hôte, port, fenêtre) sont décrits dans `.env.example`. |
-| `KB_AI_API_URL` | non | l'adresse de l'API IA pour `kb digest`, `http` ou `https`, sans utilisateur, requête ni fragment. Sans elle, `http://127.0.0.1:8001` (`core/config.py`) ; elle ne suit pas `KB_AI_API_PORT` : la changer aussi quand le port change. |
+| `KB_AI_API_KEY_<CLIENT>` | pour `kb serve-ai`, `kb digest` et `kb trend-report` | la clé d'un client de l'API IA, une variable par client, mêmes règles que `KB_DATA_API_KEY_<CLIENT>` ; `kb digest` est le client `KB_DIGEST` et lit la même variable, `KB_AI_API_KEY_KB_DIGEST` ; `kb trend-report` est le client `KB_TREND_REPORT`, `KB_AI_API_KEY_KB_TREND_REPORT`, avec une autre clé (`kb serve-ai` refuse deux fois la même). Les autres réglages de `kb serve-ai` (modèle, API de données, hôte, port, fenêtre) sont décrits dans `.env.example`. |
+| `KB_AI_API_URL` | non | l'adresse de l'API IA pour `kb digest` et `kb trend-report`, `http` ou `https`, sans utilisateur, requête ni fragment. Sans elle, `http://127.0.0.1:8001` (`core/config.py`) ; elle ne suit pas `KB_AI_API_PORT` : la changer aussi quand le port change. |
 
 **Créer la base** (une fois) :
 
@@ -390,7 +390,7 @@ Limites :
 donc tourner, et appelle le modèle ; elle ne garde rien entre deux demandes.
 
 1. Ranger dans le `.env` une clé par client de l'API IA, faite comme celles de l'API de données
-   (`KB_AI_API_KEY_KB_DIGEST=<la clé>`), la clé que l'API IA envoie à l'API de données
+   (`KB_AI_API_KEY_KB_DIGEST=<la clé>`, `KB_AI_API_KEY_KB_TREND_REPORT=<une autre clé>`), la clé que l'API IA envoie à l'API de données
    (`KB_DATA_API_KEY_AI_DIGEST=<une autre clé>`, que `kb serve-data` lit aussi : redémarrer `kb serve-data`), et
    le modèle (`KB_LLM_PROVIDER` et ses variables, `.env.example`). `replay` répond par les
    réponses d'un fichier, sans réseau ni clé ni coût.
@@ -424,7 +424,7 @@ fois démarré : code 0, comme `kb serve-data`.
 « Squelette E1 E3 », décision 3) :
 
 - clé d'un client de l'API IA : faire une nouvelle clé, la ranger dans sa variable
-  (`KB_AI_API_KEY_KB_DIGEST`), puis redémarrer `kb serve-ai` ; l'ancienne clé est refusée dès le
+  (`KB_AI_API_KEY_KB_DIGEST`, `KB_AI_API_KEY_KB_TREND_REPORT`), puis redémarrer `kb serve-ai` ; l'ancienne clé est refusée dès le
   redémarrage, pas avant. Retirer un client : retirer sa variable et redémarrer ;
 - clé `KB_DATA_API_KEY_AI_DIGEST` : la changer dans le `.env`, puis redémarrer `kb serve-data` et
   `kb serve-ai`, qui la lisent tous deux ; tant que l'un des deux garde l'ancienne, chaque demande
@@ -432,7 +432,8 @@ fois démarré : code 0, comme `kb serve-data`.
 - sur un 401 de l'API IA (`invalid_api_key`, clé absente, changée d'un seul côté ou retirée),
   `kb digest` n'écrit aucune fiche, ne cite jamais la clé, nomme la variable
   `KB_AI_API_KEY_KB_DIGEST` et sort en code 1 : la requête est partie (une clé absente de
-  `kb digest` donne 2, rien n'est demandé).
+  `kb digest` donne 2, rien n'est demandé) ; de même `kb trend-report`, qui nomme
+  `KB_AI_API_KEY_KB_TREND_REPORT`.
 
 Limites : une variable `KB_AI_API_KEY_*` exportée dans le profil du shell reste valide même retirée
 du `.env` ; `uv run --env-file .env kb serve-ai` charge tout le `.env`, donc aussi des secrets dont
@@ -477,6 +478,42 @@ de sortie, l'unité étant le sujet :
 
 Le code 4 dit la même chose pour `kb collect` (l'unité est la source), `kb write-tops` (le top) et
 `kb digest` (le sujet) : une partie a échoué, une autre est faite et gardée.
+
+**Écrire le compte rendu des tendances dans le coffre** (`kb serve-data` et `kb serve-ai` lancés ;
+contrat : [docs/tendances.md](docs/tendances.md)) :
+
+```sh
+KB_DATA_DIR=~/.knowledge_base KB_VAULT_DIR=<coffre> uv run --env-file .env kb trend-report
+```
+
+`kb trend-report` lit le registre des comptes rendus, `<KB_DATA_DIR>/trend_reports.json`, puis
+demande à l'API IA les fenêtres de GH Archive postérieures à la dernière du compte rendu précédent
+(les 4 dernières au premier), avec la clé `KB_AI_API_KEY_KB_TREND_REPORT`, à l'adresse
+`KB_AI_API_URL`. Il écrit `<KB_VAULT_DIR>/veille/tendances/AAAA-MM-JJ.md`, au jour UTC du lancement :
+un frontmatter (`generated`, la première et la dernière fenêtre, leur nombre, celui des manquantes,
+`windows_capped`, `first_report`, `new_evaluated`, `repositories_dropped`, `model`, `request_id`), la
+période et ses limites, la limite de GH Archive (un échantillon d'environ 1 % des étoiles), puis un
+tableau des dépôts qui remplissent au moins un critère (durable, nouveau, en accélération) : lien,
+critères, meilleur rang et rang par fenêtre (`hors top`, `—` pour une fenêtre manquante). Il ajoute
+enfin une entrée au registre, qui donne sa période au compte rendu suivant : le coffre n'est jamais
+relu. Un compte rendu n'est jamais réécrit : s'il en existe un du jour, aucune demande n'est faite.
+Il montre qu'il attend comme `kb digest`, puis affiche un bilan en comptes, sans nom de dépôt : la
+période, les dépôts retenus et écartés, le chemin du fichier, le modèle (`none` tant qu'aucun ne
+choisit, #368) et le `request_id`. Code de sortie :
+
+- 0 : le compte rendu est écrit et noté au registre ; ou aucune fenêtre n'est postérieure au
+  compte rendu précédent, ou la base n'en a aucune : rien n'est écrit, et le bilan le dit (une base
+  plus ancienne que le registre, restaurée, donne un avertissement avec les deux dates) ;
+- 1 : rien n'est écrit : l'API IA échoue comme pour `kb digest` (le message nomme
+  `KB_AI_API_KEY_KB_TREND_REPORT` sur un 401), ou sa réponse contredit la demande (une période qui
+  ferait reculer ou grossir le registre) ; ou le compte rendu n'est pas écrit (registre inchangé) ;
+  ou il est écrit mais le registre n'est pas mis à jour : le message le dit, et le compte rendu
+  suivant reprend ces fenêtres ; ou une erreur du système arrête le contrôle d'avant la demande ;
+- 2 : rien n'est demandé : `KB_DATA_DIR`, `KB_VAULT_DIR` ou `KB_AI_API_KEY_KB_TREND_REPORT` manque
+  ou est refusée, le registre est illisible ou hors de son schéma, le compte rendu du jour est déjà
+  là, ou un dossier `veille/…` est un lien symbolique ;
+- 143 : SIGTERM, 130 : SIGINT (Ctrl-C). Un compte rendu déjà écrit est gardé ; si le registre n'a
+  pas suivi, le compte rendu suivant reprend ces fenêtres.
 
 **Lire la base sans l'API** : la base s'ouvre en lecture seule avec `sqlite3`, sans clé ni
 serveur :

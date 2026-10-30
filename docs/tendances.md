@@ -72,6 +72,26 @@ seule : `kb` ne relit jamais un compte rendu pour trouver le précédent.
 | Compte rendu écrit | Entrée ajoutée au registre après l'écriture du fichier |
 | Choix en échec | Compte rendu factuel écrit (« choix non fait ») ; le registre le note ; la période avance |
 
+**Ce que fait `kb trend-report` depuis #366** (`commands/trend_report_command.py`). Une entrée du
+registre : `first_window` et `last_window` (les bornes de `period.windows`, manquantes comprises),
+`file` (chemin dans le coffre), `written_at` (l'instant UTC du lancement, lu une fois, qui donne
+aussi le jour du fichier), `request_id`, `model` (nul) et `choice_made` (faux) ; schéma fermé
+(`post/trend_report_registry.py`), une entrée de plus de 15 fenêtres refusée comme la demande
+(`has_too_many_windows`, `items.py`). La précédente est la dernière entrée. La réponse est revalidée
+par `post/trend_report_client.py` : la période doit suivre `after`, jour après jour, jusqu'à
+`latest_window`, sans dépasser le jour du lancement ; chaque dépôt, une trajectoire alignée sur la
+période et des critères que la période permet. Cas ajoutés au tableau :
+
+| Cas | Ce que fait `kb trend-report` |
+|---|---|
+| Base sans aucune fenêtre (`latest_window` nul) | Avertissement, sortie en 0, rien d'écrit |
+| Base plus ancienne que le registre (`latest_window` < `after`) | Avertissement avec les deux dates, sortie en 0, rien d'écrit |
+| Réponse qui contredit la demande ou elle-même | Code 1, rien d'écrit ; le refus cite la place et le contrôle, jamais une valeur |
+| Fichier écrit, registre non mis à jour (disque, SIGTERM) | Code 1 (143 sur SIGTERM), fichier gardé ; le compte rendu suivant reprend ces fenêtres |
+
+Deux lancements qui se chevauchent ajoutent chacun leur entrée à la liste lue au début : le dernier
+écrit l'emporte, comme pour le coffre (`post/vault_files.py`).
+
 Le nom `tendances` est réservé sous `veille/` (`TRENDS_DIR_NAME` dans `core/config.py`, comme
 `TOPS_DIR_NAME`, `:283`) : aucun sujet de `DIGEST_SUBJECTS` ne peut le prendre. Comme chaque commande,
 `kb trend-report` sort avec un code nommé, s'arrête sur SIGTERM (règle 6 de `poc.md`) et reçoit
