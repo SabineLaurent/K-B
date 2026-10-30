@@ -4691,6 +4691,15 @@ guillemets ou attribué ; sinon, celui de la conception qu'elle a approuvée.
   redirection), écart à la recommandation de GitHub accepté. Écarté : suivre un seul 301 vers
   `api.github.com` (une exception au client sortant).
 
+- **Le contenu des appels des tendances suit D1 : tracé sous `KB_TRACE_CONTENT`, comme les fiches.**
+  Décision de Sabine du 2026-10-30 (~16:12Z), relayée par time-knight. Le choix et la rédaction
+  appellent `trace_contents` après avoir jugé l'appel ; le contenu (`owner/repo`, description, topics,
+  README nettoyé, sortie du modèle) part vers Grafana Cloud selon le réglage (`none` par défaut, et
+  tant que Grafana Labs n'a pas accusé réception du DPA) ; les spans restent sans nom de dépôt ni
+  `repository_id`. Remplace le « jamais tracé » de la conception du 29/10, qui revenait sur D1
+  (« Traces : le contenu des appels au modèle, sous réglage », 2026-10-28) sans que ce soit vu.
+  Écarté : une exception pour les tendances.
+
   Lien avec #143 (étoiles et forks totaux lus par GraphQL à la collecte, ADR du 2026-10-08) : non
   remplacé ; le compte rendu lit les étoiles totales en REST au moment de l'écrire, sans les garder.
 

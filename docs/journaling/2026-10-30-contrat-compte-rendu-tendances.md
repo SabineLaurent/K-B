@@ -111,7 +111,7 @@ Archive reçoit qui a chuté. La note du 11/10 n'est pas réécrite : elle reço
 | Un contrat complet dans `docs/tendances.md` (définitions, états, cas de test) | Le plan de time-knight n'est pas dans K-B ; le relecteur a demandé que le contrat suffise à coder | Un contrat qui renvoie au plan (illisible par un tiers) |
 | Les conditions de GitHub dans `specs-collecte.md` | C'est là que K-B consigne l'accès et la conformité de chaque source (le `robots.txt` de tldr.tech y est) | Dans `tendances.md` (la conclusion vaut pour toute la collecte) |
 | « Cohérent avec », pas « fidèle » | La mesure ne compte qu'une heure sur deux jours (précision de time-knight) | « Fidèle » (affirme plus que mesuré) |
-| Le contenu des appels sous `KB_TRACE_CONTENT` laissé « en attente » | Le plan disait « jamais tracé », ce qui revient sur la décision D1 du 27/10 sans que Sabine l'ait vu comme tel ; time-knight le lui soumet | Écrire l'exception (décision non prise) |
+| Le contenu des appels des tendances tracé sous `KB_TRACE_CONTENT`, comme les fiches | Décision de Sabine du 30/10 (~16:12Z) : le plan disait « jamais tracé », ce qui revenait sur sa décision D1 du 27/10 sans qu'elle l'ait vu comme tel ; signalé par la session, soumis par time-knight | Une exception pour les tendances (« jamais tracé ») |
 | Les décisions de Sabine reprises dans une seule entrée ADR, avec leurs heures | Une entrée par sujet, comme les entrées voisines du journal | Une entrée par décision (13 entrées pour un sujet) |
 | `docs/jeton-github.md` et `.env.example` laissés à #367 | Mission : ils vont avec le code qui introduit le second jeton | Les écrire ici (doc d'un réglage qui n'existe pas encore) |
 
@@ -160,8 +160,6 @@ Archive reçoit qui a chuté. La note du 11/10 n'est pas réécrite : elle reço
 
 ## Ce qui reste
 
-- **Décision de Sabine** sur le contenu des appels des tendances sous `KB_TRACE_CONTENT` ; selon elle,
-  le contrat, le registre et les corps de #368 et #369 sont mis à jour.
 - Le code : #365 (déplacements vers `core`), #366 (compte rendu factuel), #367 (fiche GitHub, second
   jeton, `docs/jeton-github.md`, `.env.example`), #368 (choix), #369 (rédaction), #370 (essai réel,
   seuils), par time-knight.
