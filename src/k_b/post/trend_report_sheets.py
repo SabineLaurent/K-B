@@ -78,16 +78,16 @@ def find_sheet_exists_error(
 
 
 def write_trend_report_sheet(
-    vault_dir: Path, response: TrendReportResponse, generated: datetime
-) -> str:
-    """Write the report of the UTC day of generated; return its path in the vault. A report
-    written meanwhile and seen is refused (sheet_exists), with the limit of
-    post/vault_files.py."""
-    sheet_path = find_sheet_path(vault_dir, generated.date())
+    vault_dir: Path,
+    sheet_path: Path,
+    response: TrendReportResponse,
+    generated: datetime,
+) -> None:
+    """Write the report at sheet_path, the one of find_sheet_path. A report written meanwhile and
+    seen is refused (sheet_exists), with the limit of post/vault_files.py."""
     content = render_trend_report_sheet(response, generated)
     if not write_new_sheet(vault_dir, find_sheets_dir(vault_dir), sheet_path, content):
         raise find_sheet_exists_error(sheet_path, vault_dir)
-    return sheet_path.relative_to(vault_dir).as_posix()
 
 
 def render_trend_report_sheet(

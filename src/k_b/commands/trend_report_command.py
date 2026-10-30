@@ -78,10 +78,12 @@ def run_trend_report(data_dir: Path, environ: Mapping[str, str]) -> int:
     if not response.period.windows:
         report_empty_period(response, previous)
         return ExitCode.SUCCEEDED
-    entry = make_entry(preparation.vault_dir, response, generated)
+    # One path, for the register and for the writing.
+    sheet_path = find_sheet_path(preparation.vault_dir, generated.date())
+    entry = make_entry(preparation.vault_dir, sheet_path, response, generated)
     if entry is None:
         return ExitCode.FAILED
-    if not write_sheet(preparation.vault_dir, response, generated):
+    if not write_sheet(preparation.vault_dir, sheet_path, response, generated):
         return ExitCode.FAILED
     if not add_entry(data_dir, preparation.entries, entry):
         return ExitCode.FAILED
@@ -189,12 +191,14 @@ def report_empty_period(
 
 
 def make_entry(
-    vault_dir: Path, response: TrendReportResponse, generated: datetime
+    vault_dir: Path,
+    sheet_path: Path,
+    response: TrendReportResponse,
+    generated: datetime,
 ) -> TrendReportEntry | None:
     """The entry of the report in the register, checked as it will be read back, before anything
     is written; None once its refusal is logged."""
     windows = response.period.windows
-    sheet_path = find_sheet_path(vault_dir, generated.date())
     try:
         return TrendReportEntry.model_validate(
             {
@@ -211,19 +215,23 @@ def make_entry(
         )
     except ValidationError as error:
         logger.error(
-            "trend report not written: its entry of %s is invalid: %s",
+            "trend report not written: its entry of %s is invalid: %s, request_id %s",
             TREND_REPORTS_FILENAME,
             locate_first_error(error),
+            response.request_id,
         )
         return None
 
 
 def write_sheet(
-    vault_dir: Path, response: TrendReportResponse, generated: datetime
+    vault_dir: Path,
+    sheet_path: Path,
+    response: TrendReportResponse,
+    generated: datetime,
 ) -> bool:
-    """Whether the report is written; its failure logged."""
+    """Whether the report is written at sheet_path; its failure logged."""
     try:
-        sheet = write_trend_report_sheet(vault_dir, response, generated)
+        write_trend_report_sheet(vault_dir, sheet_path, response, generated)
     except VaultEntryRefusedError as error:
         logger.error("trend report not written: %s", error)
         return False
@@ -231,7 +239,7 @@ def write_sheet(
         # The type and the reason, never the path, which names the vault.
         logger.error("trend report not written: %s", describe_os_error(error))
         return False
-    logger.info("sheet written: %s", sheet)
+    logger.info("sheet written: %s", sheet_path.relative_to(vault_dir).as_posix())
     return True
 
 

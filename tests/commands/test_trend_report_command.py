@@ -460,7 +460,7 @@ def test_an_entry_the_register_would_refuse_writes_nothing_and_exits_1(
     error_output = capsys.readouterr().err
     assert (
         "trend report not written: its entry of trend_reports.json is invalid: input"
-        " (value_error)"
+        f" (value_error), request_id {REQUEST_ID}"
     ) in error_output
     assert "Traceback" not in error_output
     assert "2026-10-28" not in error_output

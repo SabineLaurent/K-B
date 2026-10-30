@@ -3,6 +3,7 @@ writing."""
 
 import json
 from datetime import UTC, date, datetime
+from pathlib import Path
 
 import pytest
 from post.test_trend_report_client import change_period, make_report, repository
@@ -12,6 +13,7 @@ from k_b.post.digest_sheets import is_writable_url
 from k_b.post.trend_report_client import TrendReportResponse
 from k_b.post.trend_report_sheets import (
     GITHUB_URL,
+    find_sheet_path,
     refuse_written_sheet,
     render_trend_report_sheet,
     write_trend_report_sheet,
@@ -166,13 +168,18 @@ def test_the_url_of_a_valid_name_is_an_autolink_written_as_it_is(name):
     assert is_writable_url(f"{GITHUB_URL}{name}")
 
 
-def test_a_report_is_written_once_under_veille_tendances(tmp_path):
-    response = read(make_report())
+def test_the_report_of_a_day_is_under_veille_tendances():
+    assert find_sheet_path(Path("vault"), DAY) == Path(
+        "vault/veille/tendances/2026-11-01.md"
+    )
 
-    sheet = write_trend_report_sheet(tmp_path, response, GENERATED)
 
-    assert sheet == "veille/tendances/2026-11-01.md"
-    assert (tmp_path / sheet).read_text("utf-8") == render(make_report())
+def test_a_report_is_written_at_the_path_it_is_given(tmp_path):
+    sheet_path = find_sheet_path(tmp_path, DAY)
+
+    write_trend_report_sheet(tmp_path, sheet_path, read(make_report()), GENERATED)
+
+    assert sheet_path.read_text("utf-8") == render(make_report())
 
 
 def test_a_report_of_the_day_written_meanwhile_is_refused_and_kept(tmp_path):
@@ -181,7 +188,7 @@ def test_a_report_of_the_day_written_meanwhile_is_refused_and_kept(tmp_path):
     sheet.write_bytes(b"read by Sabine\n")
 
     with pytest.raises(VaultEntryRefusedError) as refused:
-        write_trend_report_sheet(tmp_path, read(make_report()), GENERATED)
+        write_trend_report_sheet(tmp_path, sheet, read(make_report()), GENERATED)
 
     assert str(refused.value) == (
         "sheet_exists: veille/tendances/2026-11-01.md is there;"
