@@ -98,7 +98,8 @@ def send_following_redirections(
 ) -> httpx2.Response:
     """The first answer that is not a redirection, its body not read yet. Each redirection is
     checked on the url httpx2 would request, before it is requested; its body is never read. A
-    Location httpx2 cannot read raises httpx2.RemoteProtocolError in client.send."""
+    Location httpx2 cannot read raises httpx2.RemoteProtocolError in client.send; one it reads,
+    but not once urljoin has resolved it, raises PageRefusedError, never requested."""
     request = build_request(client, url, {**headers, **unredirected_headers})
     if not str(request.url).startswith(trusted_url_prefix):
         raise ValueError(
@@ -115,15 +116,17 @@ def send_following_redirections(
         redirections += 1
         # Built from the headers alone, never by response.next_request: it would send the
         # unredirected headers again to a redirection on the same host.
-        target = response.headers["Location"]
+        location = response.headers["Location"]
         try:
-            target = urljoin(str(request.url), target)
+            target = urljoin(str(request.url), location)
             request = build_request(client, target, headers)
-        except (ValueError, httpx2.InvalidURL):
+        except (ValueError, httpx2.InvalidURL) as error:
             # A Location httpx2 reads, but not once urljoin has resolved it: refused, never
-            # requested.
+            # requested. Cut by hand: urlsplit, behind without_query, refuses it too.
+            cut_location = location.partition("?")[0].partition("#")[0]
             raise PageRefusedError(
-                "redirection to an unreadable location, refused"
+                f"redirection to an unreadable location {quote_value(cut_location)}, "
+                f"refused ({type(error).__name__})"
             ) from None
         if not str(request.url).startswith(trusted_url_prefix):
             raise RedirectedOutsideError(trusted_url_prefix, target)

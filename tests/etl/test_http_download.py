@@ -80,19 +80,26 @@ def test_a_redirection_to_a_url_with_a_tab_is_never_requested(network):
 
 
 @pytest.mark.parametrize(
-    "location",
-    [b"https://a]b/", b"//a]b/x", " //\N{SOFT HYPHEN}".encode()],
+    ("location", "quoted", "refused_by"),
+    [
+        (b"https://a]b/?token=secret#part", "'https://a]b/'", "ValueError"),
+        (b"//a]b/x", "'//a]b/x'", "ValueError"),
+        (" //\N{SOFT HYPHEN}".encode(), "' //\\xad'", "InvalidURL"),
+    ],
     ids=["urljoin-refuses", "urljoin-refuses-relative", "httpx2-refuses-the-target"],
 )
 def test_a_redirection_httpx2_reads_but_not_its_resolution_is_refused(
-    network, location
+    network, location, quoted, refused_by
 ):
     # httpx2 reads these Locations; urljoin, or httpx2 once urljoin has resolved them, does not.
     network.answers = [answer(302, Location=location)]
 
-    with pytest.raises(PageRefusedError, match="unreadable location"):
+    with pytest.raises(PageRefusedError) as refusal:
         download(URL, TRUSTED_URL_PREFIX, max_bytes=1000)
 
+    assert str(refusal.value) == (
+        f"redirection to an unreadable location {quoted}, refused ({refused_by})"
+    )
     assert network.requested_urls() == [URL]
 
 
