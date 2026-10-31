@@ -115,8 +115,16 @@ def send_following_redirections(
         redirections += 1
         # Built from the headers alone, never by response.next_request: it would send the
         # unredirected headers again to a redirection on the same host.
-        target = urljoin(str(request.url), response.headers["Location"])
-        request = build_request(client, target, headers)
+        target = response.headers["Location"]
+        try:
+            target = urljoin(str(request.url), target)
+            request = build_request(client, target, headers)
+        except (ValueError, httpx2.InvalidURL):
+            # A Location httpx2 reads, but not once urljoin has resolved it: refused, never
+            # requested.
+            raise PageRefusedError(
+                "redirection to an unreadable location, refused"
+            ) from None
         if not str(request.url).startswith(trusted_url_prefix):
             raise RedirectedOutsideError(trusted_url_prefix, target)
         response = client.send(request, stream=True)

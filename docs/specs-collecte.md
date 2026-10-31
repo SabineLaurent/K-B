@@ -135,7 +135,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     HTTP d'erreur (`SourceStatusError`, sauf le 304 de CISA KEV) ; redirection hors de l'adresse
     attendue, jamais demandée (`RedirectedOutsideError`, qui garde sa cible, sauf la page d'accueil
     d'une édition tldr) ; plus de 10 redirections ; une `Location` que `httpx2` ne sait pas lire
-    (`httpx2.RemoteProtocolError`, une erreur réseau) ; réponse plus grande que le maximum de la
+    (`httpx2.RemoteProtocolError`, une erreur réseau), ou qu'il lit mais que `urljoin` ne résout
+    pas en une adresse qu'il accepte (refusée, jamais demandée) ; réponse plus grande que le maximum de la
     source, une fois décompressée, ou corps compressé illisible.
     **Un seul nouvel essai** (`src/k_b/etl/http_retry.py`, depuis le 2026-10-25) après un 429, un
     5xx, un 403 qui porte un `Retry-After` (la limite secondaire de GitHub) ou un échec de

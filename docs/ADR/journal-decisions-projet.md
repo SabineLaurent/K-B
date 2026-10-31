@@ -4784,6 +4784,9 @@ par la PR de #209 (« à harmoniser après le POC ») : la collecte passe par `o
   constatée sur httpx2 2.13.1 : `client.send` lit lui-même la `Location` d'un 3xx ; une `Location`
   qu'il ne sait pas lire (une tabulation) y lève `httpx2.RemoteProtocolError`, une erreur réseau,
   relancée une fois, la cible jamais demandée. Tranché par la session K-B : aucun code pour ce cas.
+  Une `Location` qu'il lit, mais que `urljoin` refuse (`https://a]b/`) ou résout en une adresse
+  qu'il refuse, est refusée (`PageRefusedError`), jamais demandée (revue de #86, tranché par
+  time-knight).
 - **Un statut hors 2xx est une `SourceStatusError(ExpectedSourceError)`, dans
   `etl/source_contract.py`, avec `status` et `headers` (`httpx2.Headers`, insensibles à la
   casse).** Son message est `HTTP <statut> <raison>`, la raison de `httpx2.codes`, jamais celle du
