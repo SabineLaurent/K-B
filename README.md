@@ -391,9 +391,11 @@ donc tourner, et appelle le modèle ; elle ne garde rien entre deux demandes.
 
 1. Ranger dans le `.env` une clé par client de l'API IA, faite comme celles de l'API de données
    (`KB_AI_API_KEY_KB_DIGEST=<la clé>`, `KB_AI_API_KEY_KB_TREND_REPORT=<une autre clé>`), la clé que l'API IA envoie à l'API de données
-   (`KB_DATA_API_KEY_AI_DIGEST=<une autre clé>`, que `kb serve-data` lit aussi : redémarrer `kb serve-data`), et
-   le modèle (`KB_LLM_PROVIDER` et ses variables, `.env.example`). `replay` répond par les
-   réponses d'un fichier, sans réseau ni clé ni coût.
+   (`KB_DATA_API_KEY_AI_DIGEST=<une autre clé>`, que `kb serve-data` lit aussi : redémarrer `kb serve-data`),
+   le jeton GitHub des comptes rendus des tendances (`KB_AI_GITHUB_TOKEN=<le jeton>`, un second jeton
+   *fine-grained* sans permission : [docs/jeton-github.md](docs/jeton-github.md)), et le modèle
+   (`KB_LLM_PROVIDER` et ses variables, `.env.example`). `replay` répond par les réponses d'un
+   fichier, sans réseau ni clé ni coût.
 2. Lancer l'API IA, à côté de `kb serve-data` ; elle écoute par défaut sur `http://127.0.0.1:8001`, et
    seulement sur la machine (`KB_AI_API_HOST` et `KB_AI_API_PORT` changent l'hôte et le port ;
    `KB_DIGEST_WINDOW_DAYS`, de 1 à 14, la fenêtre par défaut, 3 jours) :
@@ -416,8 +418,9 @@ l'API de données. `kb serve-ai` journalise une ligne par requête dans
 `KB_DATA_DIR`), avec le nom du client et l'identifiant de la requête, rendu aussi dans l'en-tête
 `X-Request-ID` de chaque réponse ; chaque appel au modèle écrit une ligne JSON de métrique sur la
 sortie standard, sans texte. Code de sortie 2, sans lancer l'API, si `KB_DATA_DIR` manque, si une
-clé, l'hôte, le port, la fenêtre, le modèle ou la clé `KB_DATA_API_KEY_AI_DIGEST` est refusé : le
-message nomme la variable, jamais une clé ni l'URL du modèle. Port déjà pris : code 3, et Ctrl-C une
+clé, l'hôte, le port, la fenêtre, le modèle, la clé `KB_DATA_API_KEY_AI_DIGEST` ou le jeton
+`KB_AI_GITHUB_TOKEN` (absent, *classic*, ou un caractère hors `[A-Za-z0-9_]`) est refusé : le
+message nomme la variable, jamais une clé, un jeton ni l'URL du modèle. Port déjà pris : code 3, et Ctrl-C une
 fois démarré : code 0, comme `kb serve-data`.
 
 **Changer une clé** (la clé reste fixe, sans date d'expiration : journal ADR, 2026-10-20,
@@ -494,7 +497,9 @@ un frontmatter (`generated`, la première et la dernière fenêtre, leur nombre,
 `windows_capped`, `first_report`, `new_evaluated`, `repositories_dropped`, `model`, `request_id`), la
 période et ses limites, la limite de GH Archive (un échantillon d'environ 1 % des étoiles), puis un
 tableau des dépôts qui remplissent au moins un critère (durable, nouveau, en accélération) : lien,
-critères, meilleur rang et rang par fenêtre (`hors top`, `—` pour une fenêtre manquante). Il ajoute
+critères, meilleur rang et rang par fenêtre (`hors top`, `—` pour une fenêtre manquante), et une
+ligne des dépôts que GitHub a écartés, par motif, s'il y en a (l'API IA lit sur GitHub la fiche de
+chaque candidat depuis #367 ; ses faits entrent dans le fichier avec #369). Il ajoute
 enfin une entrée au registre, qui donne sa période au compte rendu suivant : le coffre n'est jamais
 relu. Un compte rendu n'est jamais réécrit : s'il en existe un du jour, aucune demande n'est faite.
 Il montre qu'il attend comme `kb digest`, puis affiche un bilan en comptes, sans nom de dépôt : la

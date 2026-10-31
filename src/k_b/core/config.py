@@ -320,8 +320,10 @@ TRENDS_DIR_NAME = "tendances"
 # #158 on gpt-6-luna: about 98 seconds for 8 subjects, the judge included (113 with the slowest
 # calls). Beyond it, a subject not yet written is llm_timeout, the others are returned.
 DIGEST_REQUEST_TIMEOUT_SECONDS = 200
-# The bound of a trend report request: 1 + 31 GET /trends at most, one after the other, on a service
-# of the same network.
+# The bound of a trend report request: 1 + 31 GET /trends at most on a service of the same network,
+# then GITHUB_MAX_REQUESTS_PER_REPORT GET /repos at most on GitHub, one after the other; each
+# timeout of HTTP_TIMEOUT_SECONDS is shortened by it. Its hold for 60 requests to GitHub is
+# measured by #370.
 TREND_REPORT_REQUEST_TIMEOUT_SECONDS = 60
 # The requests of kb digest and kb trend-report to the AI API (post/ai_api_client.py, #209, #366).
 # The URL of kb serve-ai with its defaults, changed by KB_AI_API_URL; it does not follow

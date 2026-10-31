@@ -537,13 +537,15 @@ de la requête.
   aucune donnée, si bien qu'un rebinding DNS n'obtient rien et ne coûte aucun appel. Signalé à
   #161 (OWASP API Top 10 de l'API IA) et à revoir en conteneurs (#200), où l'hôte appelant change.
 - **`GET /health`** répond 200 `{"status": "ok"}` sans clé, comme celle de l'API de données.
-- **Version** : `0.4.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
+- **Version** : `0.6.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
   un changement visible par un client change les deux. `0.1.0` : `POST /digests` (#156) ; `0.2.0` :
   `model` dans la réponse (#209) ; `0.3.0` : `unanswered`, et `not_retained` du premier niveau
   renommé `no_suitable_subject` (#210, `classify-2`) ; `0.4.0` : `items_dropped` renommé
   `items_dropped_before_writing_stage`, `digests[].not_retained` renommé
   `digests[].items_not_retained_in_output`, `digests[].items_uncited` renommé
-  `digests[].items_removed_by_checks` (décision de Sabine du 2026-10-26).
+  `digests[].items_removed_by_checks` (décision de Sabine du 2026-10-26) ; `0.5.0` :
+  `POST /trend-reports` (#366) ; `0.6.0` : les fiches lues sur GitHub dans la réponse de
+  `POST /trend-reports`, et ses erreurs `github_*` (#367) ; `POST /digests` ne change pas.
 
 ## Contrôles
 

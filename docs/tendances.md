@@ -223,8 +223,36 @@ Ses erreurs sont celles de l'API de données seulement : 502 (`data_api_invalid_
 `data_api_unauthorized`, `data_api_unavailable`), 504 (`data_api_timeout`). Les lectures sont 32 au
 plus (la plus récente, puis la période, ses 2 fenêtres de recul et celles du compte rendu précédent,
 chacune une fois), sous `TREND_REPORT_REQUEST_TIMEOUT_SECONDS` (60 s, `core/config.py`). Les
-candidats (`select_candidates`, `ai_api/trajectories.py`) sont calculés et testés, mais ne servent
-qu'à partir de #367, qui lit leur fiche sur GitHub.
+candidats (`select_candidates`, `ai_api/trajectories.py`) servent depuis #367, qui lit leur fiche sur
+GitHub.
+
+**Ce que rend #367** (version 0.6.0 de `docs/api/openapi-ia.json`) : le compte rendu de #366, plus la
+fiche GitHub de chaque candidat, lue par l'API IA après les fenêtres et avant tout choix du modèle,
+sans être gardée. Les candidats sont les trajectoires de la période dont le nom peut aller dans un
+chemin (`is_repository_name`), qu'elles remplissent un critère ou non : 60 au plus, ceux qui
+remplissent un critère d'abord. Le fichier du coffre ne gagne qu'une ligne (ci-dessous) : les faits y
+entrent avec #369.
+
+| Champ | Contenu |
+|---|---|
+| `repositories[].facts` | la fiche d'un candidat lu ; `null` pour un dépôt qui remplit un critère sans être candidat (au-delà des 60) |
+| `facts.license` | l'identifiant SPDX (`license.spdx_id`) ; `null` quand `license` est nul, ou `spdx_id` nul ou `NOASSERTION` : aucune licence reconnue par GitHub |
+| `facts.created_at` | la date de création, en UTC |
+| `facts.language` | le langage, ou `null` |
+| `facts.topics` | tels que lus, chacun `[a-z0-9-]{1,50}`, 100 au plus (20 au plus envoyés au modèle par #368) |
+| `facts.stars_total` | les étoiles totales (`stargazers_count`), lues au moment du compte rendu |
+| `facts.cautions` | `created_recently` (créé moins de 7 jours avant l'heure de la demande, `TREND_RECENT_REPOSITORY_DAYS` ; à 7 jours pile, non), puis `no_license` |
+| `candidates.selected` | les candidats dont la fiche est demandée ; `read` plus la somme de `dropped` |
+| `candidates.read` | ceux dont la fiche est lue |
+| `candidates.dropped` | ceux que GitHub écarte, par motif : `not_found` (404, 410), `unavailable_for_legal_reasons` (451), `moved` (une redirection, non suivie), `id_mismatch` (un autre dépôt sous ce nom), `forbidden` (un 403 qui n'est pas une limite) |
+
+Un candidat écarté **sort de `repositories[]`** : son nom peut désigner désormais un autre dépôt, et
+le coffre en ferait un lien. `kb` relit les compteurs par un schéma fermé, refuse ceux qui ne
+s'additionnent pas, et écrit, seulement si au moins un candidat est écarté : « Dépôts écartés par
+GitHub : n (introuvables : …, bloqués : …, renommés ou déplacés : …, remplacés : …, refusés : …) »,
+les motifs à zéro omis. Sans écarté, le fichier est celui de #366. L'URL d'un dépôt reste construite
+par `kb` depuis son nom. Ses erreurs : celles de l'API de données et celles de GitHub (« Défenses et
+échecs »).
 
 ## Défenses et échecs
 
@@ -250,18 +278,26 @@ déplacé dans `post/vault_files.py` pour les deux écrivains du coffre (#365). 
 
 | Réponse | Ce que fait l'API IA |
 |---|---|
-| 404, 451, 301 | candidat écarté et compté (un 301 n'est pas suivi en v1 : `core/outbound.py` ne suit aucune redirection ; c'est un écart à la recommandation de GitHub, et un dépôt transféré est compté) |
+| 404, 410, 451, toute redirection (301, 302, 307…) | candidat écarté et compté (une redirection n'est pas suivie en v1 : `core/outbound.py` ne suit aucune redirection ; c'est un écart à la recommandation de GitHub, et un dépôt transféré est compté) |
 | `id` ≠ `repository_id` | candidat écarté et compté |
-| 401 | `github_unauthorized` |
-| tout 403, 429 | plus aucune requête ; 503 `github_rate_limited` avec `Retry-After` (l'en-tête `retry-after`, sinon reset − maintenant, sinon 60 s) |
-| 5xx | une relance, puis 502 `github_unavailable` |
-| délai dépassé | `github_timeout` |
-| corps illisible ou hors schéma | `github_invalid_response` |
+| 401 | 502 `github_unauthorized` |
+| tout 429 ; un 403 **de limite** : `x-ratelimit-remaining: 0`, un en-tête `retry-after`, ou un message qui contient « rate limit » ou « abuse » (sans tenir compte de la casse) | plus aucune requête ; 503 `github_rate_limited` avec `Retry-After` : l'en-tête `retry-after` ; sinon, si `x-ratelimit-remaining` vaut 0, le reset moins l'heure de la demande, 60 s au moins ; sinon 60 s ; 3 600 s au plus (`MAX_GITHUB_RETRY_AFTER_SECONDS`), un `retry-after` trop long à lire compris |
+| tout autre 403 | candidat écarté et compté `forbidden` ; au 3e d'un même compte rendu (`GITHUB_MAX_FORBIDDEN_PER_REPORT`), plus aucune requête : 502 `github_forbidden`, sans `Retry-After` (décision de Sabine du 31/10, Q1 (b)) |
+| 5xx | une relance, sans attente, puis 502 `github_unavailable` |
+| connexion impossible ; budget de 70 requêtes épuisé | 502 `github_unavailable` |
+| délai ou échéance dépassés | 504 `github_timeout` |
+| corps au-delà de `MAX_GITHUB_REPOSITORY_BYTES`, illisible ou hors schéma ; tout autre statut (204, 400, 422…) | 502 `github_invalid_response` |
 
-Requêtes en série, 70 au plus par compte rendu, avec le `User-Agent` de K-B et
-`X-GitHub-Api-Version`, par un jeton *fine-grained* sans permission, `KB_AI_GITHUB_TOKEN`, du même
-compte que celui de la collecte : `kb serve-ai` ne démarre pas sans lui (`ExitCode.NOT_STARTED`),
-jamais en anonyme. La limite de 5 000 requêtes par heure est celle du compte, partagée par ses
+Toute erreur arrête le compte rendu : pas de compte rendu partiel. La route journalise l'état et le
+statut HTTP avec le `request_id`, jamais un nom de dépôt ; `kb serve-ai` ne garde aucune ligne de
+requête de httpx2, qui porterait l'URL `repos/<owner>/<repo>` (`commands/run_log.py`).
+
+Requêtes en série, 70 au plus par compte rendu (`GITHUB_MAX_REQUESTS_PER_REPORT`, relances
+comprises, comptées par le client), avec le `User-Agent` de K-B et `X-GitHub-Api-Version`, chaque
+délai de `HTTP_TIMEOUT_SECONDS` réduit par l'échéance de la demande, par un jeton *fine-grained* sans
+permission, `KB_AI_GITHUB_TOKEN`, du même compte que celui de la collecte : `kb serve-ai` ne démarre
+pas sans lui (`ExitCode.NOT_STARTED`), jamais en anonyme, ni avec un jeton *classic* (préfixe autre
+que `github_pat_`). La limite de 5 000 requêtes par heure est celle du compte, partagée par ses
 jetons (`docs/jeton-github.md`, mis à jour par #367).
 
 **Modèle.** Un appel de choix, puis un appel de rédaction par dépôt choisi, une relance chacun, avec
@@ -275,7 +311,9 @@ jetons (`docs/jeton-github.md`, mis à jour par #367).
   jailbreak (sujet `llm_security` de la veille).
 
 **Traces.** Cinq spans (fenêtres, fiches, choix, README, rédaction), avec des comptes, des états et
-des `ref`, jamais un nom de dépôt ni un `repository_id` (registre des traitements) ; le type `Stage`
+des `ref` (le span des fiches, `read_repository_cards`, depuis #367 : `k_b.candidates.selected`,
+`k_b.candidates.read`, `k_b.candidates.dropped.<motif>`, `k_b.github.requests`, et l'état d'un échec ;
+les `ref` naissent avec #368), jamais un nom de dépôt ni un `repository_id` (registre des traitements) ; le type `Stage`
 est étendu (`ai_api/stage_calls.py:11`). Aucun nom de dépôt dans les journaux.
 
 **Contenu des appels sous `KB_TRACE_CONTENT`**, comme les fiches (décision D1 du 2026-10-27, précisée

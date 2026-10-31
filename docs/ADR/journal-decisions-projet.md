@@ -4710,6 +4710,40 @@ guillemets ou attribué ; sinon, celui de la conception qu'elle a approuvée.
 
   — #364 (contrat) ; code : #365 à #370
 
+## 2026-10-31
+
+### Tendances : la fiche GitHub de chaque candidat (#367)
+
+Conception de time-knight, relue par un sous-agent, validée par Sabine le 31/10 (~14:33Z).
+
+- **Seul un 403 de limite arrête le compte rendu ; tout autre 403 écarte le candidat, et le 3e
+  arrête en `github_forbidden`.** Décision de Sabine du 31/10 (14:20Z), « Q1 (b) ». Revient sur le
+  tableau « GitHub » du contrat (#364), où tout 403 arrêtait : la doc de GitHub (« Get a
+  repository ») donne le 403 comme une réponse de l'endpoint lui-même, en plus des limites de débit.
+  Un candidat qui répondrait toujours 403 ferait échouer chaque compte rendu dont la période le
+  contient, et un compte rendu en échec ne fait pas avancer la période. Une limite : tout 429, ou un
+  403 avec `x-ratelimit-remaining: 0`, un `retry-after`, ou un message « rate limit » ou « abuse »
+  (classeur des 403 d'Octokit) → 503 `github_rate_limited`. Le garde-fou du 3e 403
+  (`GITHUB_MAX_FORBIDDEN_PER_REPORT`) évite d'insister si une limite était mal lue ; il porte un état
+  à lui, pas `github_rate_limited`, qui nommerait une supposition. Écarté : (a) le contrat tel quel.
+  Limite assumée : un 403 de limite au message changé par GitHub serait lu comme un refus, deux fois
+  au plus par compte rendu.
+- **`KB_AI_GITHUB_TOKEN` doit être un jeton *fine-grained* (`github_pat_`).** Un jeton *classic*
+  porte des *scopes* larges, au-delà de la lecture de dépôts publics (moindre privilège,
+  `docs/jeton-github.md`) : `kb serve-ai` le refuse au démarrage, sans le citer. Écarté : accepter
+  tout jeton. Limite : la forme du jeton est vérifiée, pas ses permissions.
+- **Un candidat écarté par GitHub sort du compte rendu et n'est que compté.** 404, 410, 451, toute
+  redirection (non suivie), un `id` différent, un 403 hors limite : son nom peut désigner désormais
+  un autre dépôt, et le coffre en ferait un lien. La réponse le compte par motif (`candidates`), et
+  `kb` écrit une ligne des écartés, motifs à zéro omis. Écarté : le garder dans `repositories[]`
+  avec `facts: null`.
+- **Le budget de 70 requêtes par compte rendu est compté par le client, relances comprises.** Un
+  objet par compte rendu (`GithubReading`) tient le budget, les refus et l'échéance ; épuisé, la
+  lecture s'arrête en `github_unavailable`. Une relance sur 5xx, sans attente : attendre 5 s comme la
+  collecte mangerait l'échéance de 60 s. Les README de #369 partageront ce budget.
+
+— #367
+
 ## Décisions encore ouvertes
 
 - **Les seuils des critères des tendances** (2026-10-30) : 2 jours actifs pour « durable », 5 rangs
