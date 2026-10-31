@@ -4763,6 +4763,52 @@ Conception de time-knight, relue par un sous-agent, validée par Sabine le 31/10
 
 — #69
 
+### Collecte : téléchargée par httpx2, chaque redirection contrôlée avant d'être demandée (#86)
+
+Plan de time-knight, relu par un sous-agent, validé par Sabine le 31/10 (~18:08Z). Reprend le
+contrat de #54 (fermée) ; fait l'harmonisation des deux modules de connexions sortantes signalée
+par la PR de #209 (« à harmoniser après le POC ») : la collecte passe par `open_http_client` de
+`core/outbound.py`, comme l'API IA.
+
+- **Les redirections sont suivies par le code, pas par httpx2, et chacune est contrôlée sur l'URL
+  que httpx2 demandera, avant d'être demandée.** Le client ne suit rien (`follow_redirects=False`) ;
+  la cible, `urljoin(URL demandée, Location)`, est construite par `client.build_request`, puis
+  `str(request.url)` est comparée au préfixe de confiance, et c'est cette requête-là qui part :
+  `https://tldr.tech/ai/2026-10-04/../../login` passerait un `startswith` sur la chaîne brute, puis
+  httpx2 demanderait `https://tldr.tech/login`. Une cible hors préfixe lève `RedirectedOutsideError`
+  sans requête vers elle, et garde sa cible entière (`redirect_url`, que lit tldr). Au plus 10 sauts
+  (`HTTP_MAX_REDIRECTS`, la valeur d'urllib), en `GET`, avec les seuls en-têtes ordinaires : jamais
+  `response.next_request`, qui renverrait `Authorization` à une redirection de même origine. Écarté :
+  `follow_redirects=True` (httpx2 suivrait avant tout contrôle : l'écart même de #54, où `urlopen`
+  suivait jusqu'à 10 sauts, `http://` compris, et seule l'URL finale était contrôlée). Limite
+  constatée sur httpx2 2.13.1 : `client.send` lit lui-même la `Location` d'un 3xx ; une `Location`
+  qu'il ne sait pas lire (une tabulation) y lève `httpx2.RemoteProtocolError`, une erreur réseau,
+  relancée une fois, la cible jamais demandée. Tranché par la session K-B : aucun code pour ce cas.
+- **Un statut hors 2xx est une `SourceStatusError(ExpectedSourceError)`, dans
+  `etl/source_contract.py`, avec `status` et `headers` (`httpx2.Headers`, insensibles à la
+  casse).** Son message est `HTTP <statut> <raison>`, la raison de `httpx2.codes`, jamais celle du
+  serveur. Elle remplace `HTTPError` ; le 304 de CISA KEV se lit sur `status`. Des `headers` en
+  `dict` rendraient `Retry-After` invisible sous une autre casse, et un 429 serait relancé à 60 s.
+  Écartés : `HttpStatusError` (trop proche de `httpx2.HTTPStatusError`) ; rendre `bytes | None` pour
+  un 304 (le téléchargement saurait ce que CISA veut dire) ; laisser `httpx2.HTTPStatusError` aux
+  sources (elles dépendraient de httpx2). `is_served_from` et l'URL de l'erreur sont retirés : une
+  fois chaque saut contrôlé, une réponse vient toujours du préfixe.
+- **La lecture bornée d'un corps vit une fois, `read_bounded_body(response, max_bytes, is_late)`
+  dans `core/outbound.py`.** Décision de Sabine du 31/10 (~18:05Z, Q-B), à la troisième occurrence
+  (`code.md`) : la collecte et les deux connecteurs de l'API IA (`data_api_client.py`,
+  `github_client.py`) changent `BodyTooLargeError` et `BodyTooLateError` en leur erreur, leurs tests
+  inchangés. Octets décodés : un corps compressé est borné par sa taille une fois lu, à un pic de
+  `max_bytes` + 1 Mio (httpx2 décompresse par morceaux d'1 Mio au plus). Écarté : une troisième copie,
+  réunie plus tard.
+- **`EXPECTED_SOURCE_ERRORS` : `URLError` devient `httpx2.TransportError`.** Une erreur réseau
+  reste sur sa ligne, sans trace (décision du 2026-10-29, #361) ; un délai dépassé
+  (`httpx2.TimeoutException`) n'a toujours pas de relance. `ConnectionError` sort de `download` et de
+  `find_retry_wait` (httpx2 change toute `OSError` en `ConnectError`, `ReadError` ou `WriteError`) ;
+  il reste dans `EXPECTED_SOURCE_ERRORS`, que lèvent d'autres chemins. Écarté : envelopper
+  `httpx2.TransportError` dans une erreur de K-B (une classe de plus, pour le même message).
+
+— #86
+
 ## Décisions encore ouvertes
 
 - **Les seuils des critères des tendances** (2026-10-30) : 2 jours actifs pour « durable », 5 rangs
