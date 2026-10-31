@@ -328,6 +328,24 @@ def test_a_response_that_is_not_an_arxiv_feed_is_refused(raw_response):
         read_total_results(raw_response)
 
 
+def test_a_feed_declaring_an_internal_entity_is_refused_unexpanded():
+    raw_response = b'<!DOCTYPE feed [<!ENTITY a "x">]>' + feed_with_entry(
+        entry_xml(title="<title>&a;</title>")
+    )
+
+    with pytest.raises(PageRefusedError, match="^XML refused: EntitiesForbidden$"):
+        read_papers(raw_response)
+
+
+def test_a_feed_declaring_an_external_entity_is_refused_unread():
+    raw_response = b'<!DOCTYPE feed [<!ENTITY a SYSTEM "file:///etc/hostname">]>' + (
+        feed_with_entry(entry_xml(title="<title>&a;</title>"))
+    )
+
+    with pytest.raises(PageRefusedError, match="^XML refused: EntitiesForbidden$"):
+        read_papers(raw_response)
+
+
 def test_a_paper_keeps_its_id_without_version_and_its_revision_date():
     paper = Paper(
         arxiv_id="2509.12345",
