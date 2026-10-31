@@ -1,9 +1,9 @@
-"""The rules of a connection K-B opens by HTTP (AI API to the model and to the data API, kb
-digest to the AI API): the URL it accepts and its HTTP client, in one place since both are
-security rules."""
+"""The rules of a connection K-B opens by HTTP (the collection to its sources, AI API to the model,
+to the data API and to GitHub, kb digest to the AI API): the URL it accepts, its HTTP client and
+the bound of a body read, in one place since all are security rules."""
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from urllib.parse import urlsplit
 
 import httpx2
@@ -52,3 +52,37 @@ def open_http_client(
         trust_env=False,
         transport=transport,
     )
+
+
+class BodyTooLargeError(Exception):
+    """A body beyond its maximum, refused without reading the rest."""
+
+
+class BodyTooLateError(Exception):
+    """A body still being read when its deadline passed."""
+
+
+def read_bounded_body(
+    response: httpx2.Response,
+    max_bytes: int,
+    is_late: Callable[[], bool] | None = None,
+) -> bytes:
+    """The body of a streamed response, refused beyond max_bytes, stopped as soon as is_late()
+    between two pieces. Decoded bytes: a compressed body is bounded by what it takes once read,
+    at a peak of max_bytes + 1 MiB (httpx2 decodes by pieces of 1 MiB at most)."""
+    length = response.headers.get("Content-Length")
+    if (
+        length is not None
+        and length.isascii()
+        and length.isdigit()
+        and int(length) > max_bytes
+    ):
+        raise BodyTooLargeError
+    body = bytearray()
+    for chunk in response.iter_bytes():
+        body += chunk
+        if len(body) > max_bytes:
+            raise BodyTooLargeError
+        if is_late is not None and is_late():
+            raise BodyTooLateError
+    return bytes(body)

@@ -92,10 +92,10 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
   2026-10-12). La règle vaut par enregistrement : la trace d'une erreur suit sa ligne datée et
   lui appartient (décision du 2026-10-14).
 - L'échec d'une source à la collecte : une erreur prévue (`ExpectedSourceError`, dont
-  `PageRefusedError`, ou une erreur réseau : `URLError`, dont `HTTPError`, un statut HTTP refusé ;
-  `ConnectionError` ; `TimeoutError` ; pas les erreurs de BigQuery) est journalisée sur sa ligne
-  seule, sans trace ; toute autre garde sa trace (`EXPECTED_SOURCE_ERRORS`, `etl/extract.py` ;
-  décision de Sabine du 2026-10-29, #361). Sans trace, la ligne est la seule copie du message :
+  `PageRefusedError` et `SourceStatusError`, un statut HTTP refusé ; ou une erreur réseau :
+  `httpx2.TransportError` ; `ConnectionError` ; `TimeoutError` ; pas les erreurs de BigQuery) est
+  journalisée sur sa ligne seule, sans trace ; toute autre garde sa trace
+  (`EXPECTED_SOURCE_ERRORS`, `etl/extract.py` ; décision de Sabine du 2026-10-29, #361). Sans trace, la ligne est la seule copie du message :
   son message et ses notes sont coupés à 300 caractères (`MAX_QUOTED_FAILURE_LENGTH`), pas à 100.
 - `print` donne le résultat d'une commande ; `logger` donne le déroulé. Un échec est journalisé
   une fois, là où il est traité.

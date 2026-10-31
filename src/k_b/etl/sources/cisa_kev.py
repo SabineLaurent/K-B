@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from email.utils import format_datetime
 from typing import TypeIs, get_args
-from urllib.error import HTTPError
 
 from k_b.core.quoting import quote_value
 from k_b.etl.http_download import download
@@ -17,6 +16,7 @@ from k_b.etl.source_contract import (
     EntryReading,
     PageRefusedError,
     SourceReader,
+    SourceStatusError,
     check_not_all_invalid,
     check_not_empty,
     read_each_entry,
@@ -43,7 +43,7 @@ CATALOG_URL = (
 )
 # The catalog weighs about 1 MB in 2026: ten times that is not a catalog any more.
 MAX_CATALOG_BYTES = 10 * 1024 * 1024
-# Redirections are followed, even to plain HTTP: only a catalog served from here is trusted.
+# A redirection out of it is refused before it is requested (etl/http_download.py).
 TRUSTED_URL_PREFIX = "https://www.cisa.gov/"
 HTTP_NOT_MODIFIED = 304
 
@@ -67,9 +67,8 @@ class CisaKevSource:
             raw_catalog = download(
                 CATALOG_URL, TRUSTED_URL_PREFIX, MAX_CATALOG_BYTES, headers
             )
-        except HTTPError as error:
-            if error.code == HTTP_NOT_MODIFIED:
-                error.close()
+        except SourceStatusError as error:
+            if error.status == HTTP_NOT_MODIFIED:
                 return None
             raise
         catalog = read_catalog(raw_catalog)

@@ -23,7 +23,12 @@ from k_b.core.config import (
     MAX_GITHUB_TOPICS,
 )
 from k_b.core.github_api import API_URL, API_VERSION
-from k_b.core.outbound import open_http_client
+from k_b.core.outbound import (
+    BodyTooLargeError,
+    BodyTooLateError,
+    open_http_client,
+    read_bounded_body,
+)
 from k_b.core.rate_limit import (
     MIN_PAUSE_SECONDS,
     RATE_LIMIT_REMAINING_HEADER,
@@ -177,11 +182,16 @@ def send(reading: GithubReading, path: str) -> Answer:
         with http_client.stream(
             "GET", path, timeout=reading.deadline.cap(http_client.timeout)
         ) as response:
-            return Answer(
-                response.status_code,
-                response.headers,
-                read_bounded_body(response, reading.deadline),
-            )
+            status = response.status_code
+            try:
+                body = read_bounded_body(
+                    response, MAX_GITHUB_REPOSITORY_BYTES, reading.deadline.is_passed
+                )
+            except BodyTooLargeError:
+                raise GithubError("github_invalid_response", status) from None
+            except BodyTooLateError:
+                raise GithubError("github_timeout", status) from None
+            return Answer(status, response.headers, body)
     except httpx2.TimeoutException:
         raise GithubError("github_timeout") from None
     except httpx2.TransportError:
@@ -189,29 +199,6 @@ def send(reading: GithubReading, path: str) -> Answer:
     except httpx2.RequestError:
         # An answer that cannot be read (a body badly encoded).
         raise GithubError("github_invalid_response") from None
-
-
-def read_bounded_body(response: httpx2.Response, deadline: Deadline) -> bytes:
-    """The body, refused beyond MAX_GITHUB_REPOSITORY_BYTES without quoting it, and stopped as
-    soon as the deadline passes between two pieces, as in connectors/data_api_client.py."""
-    status = response.status_code
-    length = response.headers.get("Content-Length")
-    if (
-        length is not None
-        and length.isascii()
-        and length.isdigit()
-        and int(length) > MAX_GITHUB_REPOSITORY_BYTES
-    ):
-        raise GithubError("github_invalid_response", status)
-    body = bytearray()
-    # Decoded bytes: a compressed body is bounded by what it takes once read.
-    for chunk in response.iter_bytes():
-        body += chunk
-        if len(body) > MAX_GITHUB_REPOSITORY_BYTES:
-            raise GithubError("github_invalid_response", status)
-        if deadline.is_passed():
-            raise GithubError("github_timeout", status)
-    return bytes(body)
 
 
 def to_card(answer: Answer, repository_id: int) -> RepositoryCard | DropReason:

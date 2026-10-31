@@ -4,6 +4,8 @@ from collections.abc import Callable, Iterable, Sequence
 from datetime import datetime
 from typing import Any, NamedTuple, Protocol
 
+import httpx2
+
 from k_b.items import Item, SourceCode, TrendRow
 
 
@@ -29,6 +31,20 @@ class ExpectedSourceError(Exception):
 class PageRefusedError(ExpectedSourceError, ValueError):
     """A page refused on what it holds (conventions.md, rule 1); a ValueError still, which the
     import rejects as a page it cannot read."""
+
+
+class SourceStatusError(ExpectedSourceError):
+    """A source answered a status other than 2xx, once its redirections followed; the caller
+    alone knows what a status such as 304 means."""
+
+    def __init__(self, status: int, headers: httpx2.Headers):
+        # The reason of the status, not the server's: a server may write anything there.
+        super().__init__(
+            f"HTTP {status} {httpx2.codes.get_reason_phrase(status)}".rstrip()
+        )
+        self.status = status
+        # Read whatever their case: Retry-After as retry-after.
+        self.headers = headers
 
 
 class EntryReading[EntryT](NamedTuple):

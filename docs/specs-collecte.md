@@ -108,17 +108,17 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   (`empty_catalog`) : importé, il remplacerait le dernier catalogue, que la purge supprimerait
   (journal ADR, 2026-10-19).
 - **Entrées non fiables** : tout contenu collecté est une donnée, jamais une instruction. Chaque
-  téléchargement a un délai, une taille maximale, et refuse une redirection hors du domaine
-  attendu. Le `User-Agent` est `K-B (+https://github.com/SabineLaurent)` : le profil public de
+  téléchargement a un délai, une taille maximale, et refuse une redirection hors de l'adresse
+  attendue avant de la suivre. Le `User-Agent` est `K-B (+https://github.com/SabineLaurent)` : le profil public de
   Sabine, le dépôt étant privé jusqu'au 25/10, puis public.
 - **Panne d'une source** (`src/k_b/etl/extract.py`) : toute erreur levée par une source est
   rattrapée. La source affiche `failed (<type d'erreur>)`, l'erreur va au journal de
   fonctionnement, sa date de dernière collecte reste, et les sources suivantes sont lancées ; la
   collecte suivante redemande la même fenêtre. Une erreur prévue (`ExpectedSourceError` et ses
-  filles, dont `PageRefusedError` pour une page refusée sur ce qu'elle contient, ou une erreur
-  réseau : `URLError`, dont `HTTPError` pour un statut HTTP refusé, `ConnectionError`,
-  `TimeoutError` ; pas les erreurs de BigQuery) tient sur sa ligne, sans trace ; toute autre garde
-  sa trace Python, la faute étant à chercher dans le code (décision de Sabine du 2026-10-29, #361).
+  filles, dont `PageRefusedError` pour une page refusée sur ce qu'elle contient et
+  `SourceStatusError` pour un statut HTTP refusé, ou une erreur réseau : `httpx2.TransportError`,
+  `ConnectionError`, `TimeoutError` ; pas les erreurs de BigQuery) tient sur sa ligne, sans
+  trace ; toute autre garde sa trace Python, la faute étant à chercher dans le code (décision de Sabine du 2026-10-29, #361).
   Le message et les notes y sont coupés à 300 caractères : sans trace, la ligne en est la seule
   copie. Le brut n'est écrit qu'une fois la source allée au bout de sa lecture : une source en
   échec n'écrit rien. Exception : une source à
@@ -126,19 +126,25 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   une écriture qui échoue au milieu (disque plein) laisse les pages déjà écrites. Chaque source dit
   ses états propres (« En cas de panne », dans sa section) ; deux familles valent pour plusieurs :
   - **téléchargement** (`src/k_b/etl/http_download.py`), pour tldr, arXiv, CISA KEV et l'API
-    GitHub ; Zotero, les clips et GH Archive n'y passent pas : erreur réseau (DNS, connexion,
-    TLS, 30 s sans réponse à une opération réseau : la connexion, ou chaque lecture ; la durée
-    totale d'un téléchargement n'est pas bornée) ; statut HTTP d'erreur (`HTTPError`, sauf le 304 de CISA KEV) ;
-    réponse servie, après une redirection, hors de l'adresse attendue (`RedirectedOutsideError`,
-    sauf la page d'accueil d'une édition tldr) ; réponse plus grande que le maximum de la source.
+    GitHub ; Zotero, les clips et GH Archive n'y passent pas. Le client est `httpx2`, sans proxy
+    ni certificat de l'environnement (`core/outbound.py`) ; il ne suit aucune redirection : le
+    code les suit, au plus 10 (`HTTP_MAX_REDIRECTS`), en `GET`, sans le jeton, chacune contrôlée
+    sur l'URL que `httpx2` demandera (les segments `..` résolus) avant d'être demandée. Les
+    échecs : erreur réseau (DNS, connexion, TLS, 30 s sans réponse à une opération réseau : la
+    connexion, ou chaque lecture ; la durée totale d'un téléchargement n'est pas bornée) ; statut
+    HTTP d'erreur (`SourceStatusError`, sauf le 304 de CISA KEV) ; redirection hors de l'adresse
+    attendue, jamais demandée (`RedirectedOutsideError`, qui garde sa cible, sauf la page d'accueil
+    d'une édition tldr) ; plus de 10 redirections ; une `Location` que `httpx2` ne sait pas lire
+    (`httpx2.RemoteProtocolError`, une erreur réseau), ou qu'il lit mais que `urljoin` ne résout
+    pas en une adresse qu'il accepte (refusée, jamais demandée) ; réponse plus grande que le maximum de la
+    source, une fois décompressée, ou corps compressé illisible.
     **Un seul nouvel essai** (`src/k_b/etl/http_retry.py`, depuis le 2026-10-25) après un 429, un
     5xx, un 403 qui porte un `Retry-After` (la limite secondaire de GitHub) ou un échec de
-    connexion (refusée, ou coupée avant la réponse) : il attend le `Retry-After` de la réponse (en
+    connexion (refusée, ou coupée avant ou pendant la réponse) : il attend le `Retry-After` de la réponse (en
     secondes), jamais moins de 3 s (ce qu'arXiv demande entre deux requêtes) ; sans lui, 5 s, et 60 s
     pour un 429 de l'API GitHub (GitHub demande au moins une minute). Pas de nouvel essai : un
     `Retry-After` au-delà de 60 s (la source échoue, la collecte suivante redemande), un délai dépassé
-    (il doublerait l'attente), un autre statut, une réponse d'erreur servie hors de l'adresse
-    attendue après une redirection (ses en-têtes ne sont pas lus), et un quota épuisé
+    (il doublerait l'attente), un autre statut, et un quota épuisé
     (`x-ratelimit-remaining: 0`, GitHub) : sa remise à zéro peut être dans une heure, et le journal
     de la source en échec donne son heure (UTC). Après un quota épuisé ou un `Retry-After` au-delà de
     60 s de l'API GitHub, les sources GitHub suivantes n'envoient aucune requête avant la remise à
@@ -159,7 +165,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 
 ### API GitHub — service web
 
-- **Technologie** : API REST, JSON, `urllib` de la bibliothèque standard.
+- **Technologie** : API REST, JSON, `httpx2` (`src/k_b/etl/http_download.py`).
 - **Ce qu'on en tire** :
   - releases des dépôts suivis : `GET /repos/{owner}/{repo}/releases` ;
   - alertes de sécurité : `GET /advisories` (base publique des *security advisories*), relues
@@ -560,7 +566,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   n'est pas observé : la fixture du test est la page d'accueil de l'édition reçue le
   2026-10-20, réduite à sa structure et à son `h1`.
 - **Journal** : chaque jour donne une ligne, avec l'édition, le jour et ce qui a été observé :
-  page gardée (taille en octets), redirection vers la page d'accueil (adresse d'arrivée), page
+  page gardée (taille en octets), redirection vers la page d'accueil (sa cible, jamais demandée), page
   qui n'est pas l'édition du jour (ci-dessus), ou erreur (message reçu et URL demandée) ; une
   collecte sans aucune page le dit aussi. `kb collect` affiche les lignes de niveau INFO et
   au-dessus.

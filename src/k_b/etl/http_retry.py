@@ -4,7 +4,8 @@ services it collects (RFC 9110 Retry-After, rate limits)."""
 import math
 from datetime import UTC, datetime
 from http import HTTPStatus
-from urllib.error import HTTPError, URLError
+
+import httpx2
 
 from k_b.core.rate_limit import (
     MIN_PAUSE_SECONDS,
@@ -13,6 +14,7 @@ from k_b.core.rate_limit import (
     read_rate_limit_reset_value,
 )
 from k_b.core.retry_after import is_retry_after_too_long, read_retry_after
+from k_b.etl.source_contract import SourceStatusError
 
 # The wait before the one retry after a 429, a 5xx or a failed connection, when the answer gives
 # no Retry-After. A timeout gets no retry, as for the model (ai_api/connectors/llm_client.py): it
@@ -29,23 +31,18 @@ RETRY_AFTER_MAX_SECONDS = 60
 
 
 def find_retry_wait(
-    error: URLError | ConnectionError,
-    trusted_url_prefix: str,
-    rate_limited_wait: float,
+    error: httpx2.TransportError | SourceStatusError, rate_limited_wait: float
 ) -> float | None:
     """The wait before the retry, or None: no retry.
 
     rate_limited_wait follows a 429 without Retry-After; a 403 is retried only with a Retry-After
-    (the secondary rate limit of GitHub), as it is first a refusal. An answer served from outside
-    trusted_url_prefix, after a redirection, is not read."""
-    if not isinstance(error, HTTPError):
-        # A failed connection, also when it drops before the answer (ConnectionError); a
-        # timeout is not retried (see RETRY_WAIT_SECONDS).
-        is_timeout = isinstance(error, URLError) and isinstance(
-            error.reason, TimeoutError
-        )
+    (the secondary rate limit of GitHub), as it is first a refusal."""
+    if isinstance(error, httpx2.TransportError):
+        # A failed connection, also when it drops before or during the answer; a timeout is not
+        # retried (see RETRY_WAIT_SECONDS).
+        is_timeout = isinstance(error, httpx2.TimeoutException)
         return None if is_timeout else RETRY_WAIT_SECONDS
-    if not is_served_from(error, trusted_url_prefix) or is_rate_limit_exhausted(error):
+    if is_rate_limit_exhausted(error):
         return None
     retry_after = error.headers.get("Retry-After")
     if not is_retried_status(error, retry_after) or is_retry_after_beyond_max(
@@ -55,19 +52,15 @@ def find_retry_wait(
         return None
     seconds = read_retry_after(retry_after)
     if seconds is None:
-        if error.code == HTTPStatus.TOO_MANY_REQUESTS:
+        if error.status == HTTPStatus.TOO_MANY_REQUESTS:
             return rate_limited_wait
         return RETRY_WAIT_SECONDS
     return max(seconds, MIN_RETRY_WAIT_SECONDS)
 
 
-def find_pause_end(
-    error: HTTPError, trusted_url_prefix: str, now: float
-) -> float | None:
+def find_pause_end(error: SourceStatusError, now: float) -> float | None:
     """Until when, in epoch seconds, the service asks for no request at all, or None: the reset
     of an exhausted rate limit, or the end of a Retry-After beyond RETRY_AFTER_MAX_SECONDS."""
-    if not is_served_from(error, trusted_url_prefix):
-        return None
     # Both may come together (a secondary rate limit of GitHub): the longer wins.
     pause_ends: list[float] = []
     if is_rate_limit_exhausted(error):
@@ -83,13 +76,13 @@ def find_pause_end(
     return max(pause_ends, default=None)
 
 
-def is_retried_status(error: HTTPError, retry_after: str | None) -> bool:
+def is_retried_status(error: SourceStatusError, retry_after: str | None) -> bool:
     """A 429, a 5xx, or a 403 with a Retry-After (the secondary rate limit of GitHub): a 403
     without it is first a refusal."""
     return (
-        error.code == HTTPStatus.TOO_MANY_REQUESTS
-        or error.code >= HTTPStatus.INTERNAL_SERVER_ERROR
-        or (error.code == HTTPStatus.FORBIDDEN and retry_after is not None)
+        error.status == HTTPStatus.TOO_MANY_REQUESTS
+        or error.status >= HTTPStatus.INTERNAL_SERVER_ERROR
+        or (error.status == HTTPStatus.FORBIDDEN and retry_after is not None)
     )
 
 
@@ -100,26 +93,19 @@ def is_retry_after_beyond_max(retry_after: str | None) -> bool:
     )
 
 
-def read_rate_limit_reset(error: HTTPError) -> int | None:
+def read_rate_limit_reset(error: SourceStatusError) -> int | None:
     """Its reset in epoch seconds; None when missing or unreadable."""
     return read_rate_limit_reset_value(error.headers.get(RATE_LIMIT_RESET_HEADER))
 
 
-def is_served_from(error: HTTPError, trusted_url_prefix: str) -> bool:
-    """Whether the error answer came from the trusted prefix: urlopen follows redirections."""
-    return error.geturl().startswith(trusted_url_prefix)
-
-
-def is_rate_limit_exhausted(error: HTTPError) -> bool:
+def is_rate_limit_exhausted(error: SourceStatusError) -> bool:
     return error.headers.get(RATE_LIMIT_REMAINING_HEADER) == "0"
 
 
-def note_rate_limit_reset(error: HTTPError, trusted_url_prefix: str) -> None:
+def note_rate_limit_reset(error: SourceStatusError) -> None:
     """Note on the error when a rate limit with no request left resets: the log of the failed
-    source gives it. An answer served from outside trusted_url_prefix is not read."""
-    if not is_served_from(error, trusted_url_prefix) or not is_rate_limit_exhausted(
-        error
-    ):
+    source gives it."""
+    if not is_rate_limit_exhausted(error):
         return
     reset = read_rate_limit_reset(error)
     if reset is None:

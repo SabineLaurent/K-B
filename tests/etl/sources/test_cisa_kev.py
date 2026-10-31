@@ -1,12 +1,11 @@
-import io
 from datetime import UTC, date, datetime
 from pathlib import Path
-from urllib.error import HTTPError
 
 import pytest
+from http_helpers import answer
 
-from k_b.etl import http_download
-from k_b.etl.source_contract import PageRefusedError
+from k_b.etl.http_download import RedirectedOutsideError
+from k_b.etl.source_contract import PageRefusedError, SourceStatusError
 from k_b.etl.sources import cisa_kev
 from k_b.etl.sources.cisa_kev import (
     CisaKevSource,
@@ -20,76 +19,60 @@ EXTRACT = (
 ).read_bytes()
 
 
-class FakeResponse(io.BytesIO):
-    def __init__(self, body, url):
-        super().__init__(body)
-        self.url = url
-
-
-class FakeUrlopen:
-    """Stands for urllib's urlopen: records the request, answers without any network."""
-
-    def __init__(self, body=EXTRACT, error=None, final_url=cisa_kev.CATALOG_URL):
-        self.body = body
-        self.final_url = final_url
-        self.error = error
-        self.requests = []
-        self.timeouts = []
-
-    def __call__(self, request, timeout):
-        self.requests.append(request)
-        self.timeouts.append(timeout)
-        if self.error:
-            raise self.error
-        return FakeResponse(self.body, self.final_url)
-
-
 @pytest.fixture
-def fake_urlopen(monkeypatch):
-    fake = FakeUrlopen()
-    monkeypatch.setattr(http_download, "urlopen", fake)
-    return fake
+def network(fake_network):
+    fake_network.body = EXTRACT
+    return fake_network
 
 
-def test_the_whole_catalog_is_returned_unchanged(fake_urlopen):
+def test_the_whole_catalog_is_returned_unchanged(network):
     assert CisaKevSource().fetch(last_collected_at=None) == EXTRACT
 
 
-def test_the_request_names_k_b_and_has_a_timeout(fake_urlopen):
+def test_the_request_names_k_b_and_has_a_timeout(network):
     CisaKevSource().fetch(last_collected_at=None)
 
-    request = fake_urlopen.requests[0]
-    assert request.full_url == cisa_kev.CATALOG_URL
-    assert request.get_header("User-agent").startswith("K-B")
-    assert fake_urlopen.timeouts[0] > 0
-    assert not request.has_header("If-modified-since")
+    request = network.requests[0]
+    assert str(request.url) == cisa_kev.CATALOG_URL
+    assert request.headers["User-Agent"].startswith("K-B")
+    assert request.extensions["timeout"]["read"] > 0
+    assert "If-Modified-Since" not in request.headers
 
 
 def test_a_later_collection_asks_only_for_a_catalog_modified_since_the_last_one(
-    fake_urlopen,
+    network,
 ):
     CisaKevSource().fetch(last_collected_at=datetime(2026, 9, 30, 10, 0, tzinfo=UTC))
 
-    request = fake_urlopen.requests[0]
-    assert request.get_header("If-modified-since") == "Wed, 30 Sep 2026 10:00:00 GMT"
+    request = network.requests[0]
+    assert request.headers["If-Modified-Since"] == "Wed, 30 Sep 2026 10:00:00 GMT"
 
 
-def test_an_unmodified_catalog_returns_nothing(fake_urlopen):
-    fake_urlopen.error = HTTPError(cisa_kev.CATALOG_URL, 304, "Not Modified", {}, None)
+def test_an_unmodified_catalog_returns_nothing(network):
+    network.answers = [answer(304)]
 
     assert CisaKevSource().fetch(datetime(2026, 9, 30, 10, 0, tzinfo=UTC)) is None
 
 
-def test_another_http_error_is_raised(fake_urlopen):
-    fake_urlopen.error = HTTPError(cisa_kev.CATALOG_URL, 503, "Unavailable", {}, None)
+def test_another_status_error_is_raised(network):
+    network.answers = [answer(503), answer(503)]
 
-    with pytest.raises(HTTPError):
+    with pytest.raises(SourceStatusError):
         CisaKevSource().fetch(last_collected_at=None)
 
 
-def test_a_page_that_is_not_the_catalog_fails_the_collection(monkeypatch):
+def test_a_redirection_out_of_cisa_is_refused_not_read_as_unmodified(network):
+    network.answers = [answer(301, Location="https://example.com/kev.csv")]
+
+    with pytest.raises(RedirectedOutsideError):
+        CisaKevSource().fetch(datetime(2026, 9, 30, 10, 0, tzinfo=UTC))
+
+    assert network.requested_urls() == [cisa_kev.CATALOG_URL]
+
+
+def test_a_page_that_is_not_the_catalog_fails_the_collection(network):
     maintenance_page = b"<html><body>Site under maintenance</body></html>"
-    monkeypatch.setattr(http_download, "urlopen", FakeUrlopen(body=maintenance_page))
+    network.body = maintenance_page
 
     with pytest.raises(PageRefusedError, match="catalog without the columns"):
         CisaKevSource().fetch(last_collected_at=None)
@@ -211,16 +194,16 @@ def test_an_invalid_row_is_rejected_with_its_line_cve_and_field_and_the_others_a
     ]
 
 
-def test_a_catalog_with_an_invalid_row_is_collected(monkeypatch):
+def test_a_catalog_with_an_invalid_row_is_collected(network):
     catalog = catalog_with_invalid_rows(1)
-    monkeypatch.setattr(http_download, "urlopen", FakeUrlopen(body=catalog))
+    network.body = catalog
 
     assert CisaKevSource().fetch(last_collected_at=None) == catalog
 
 
-def test_a_catalog_whose_rows_are_all_invalid_fails_the_collection(monkeypatch):
+def test_a_catalog_whose_rows_are_all_invalid_fails_the_collection(network):
     catalog = catalog_with_invalid_rows(0, 1, 2, 3)
-    monkeypatch.setattr(http_download, "urlopen", FakeUrlopen(body=catalog))
+    network.body = catalog
 
     with pytest.raises(
         PageRefusedError, match="^all_items_invalid: 4 entries, all rejected"
@@ -228,10 +211,10 @@ def test_a_catalog_whose_rows_are_all_invalid_fails_the_collection(monkeypatch):
         CisaKevSource().fetch(last_collected_at=None)
 
 
-def test_a_catalog_without_any_row_fails_the_collection(monkeypatch):
+def test_a_catalog_without_any_row_fails_the_collection(network):
     """Imported, an empty catalog would supersede the last one, and the purge delete it."""
     header = EXTRACT.splitlines(keepends=True)[0]
-    monkeypatch.setattr(http_download, "urlopen", FakeUrlopen(body=header))
+    network.body = header
 
     with pytest.raises(PageRefusedError, match="^empty_catalog: 0 entries$"):
         CisaKevSource().fetch(last_collected_at=None)
