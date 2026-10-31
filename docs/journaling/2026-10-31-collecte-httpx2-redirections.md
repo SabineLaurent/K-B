@@ -258,8 +258,12 @@ ne prouve pas le comportement : c'est le faux réseau, sur le nouveau code, qui 
 - **Le comportement des vrais sites** : la PR n'a été testée que contre le faux réseau. tldr lit
   désormais la cible du premier saut hors préfixe, plus l'URL finale. Si tldr.tech passait par un
   saut intermédiaire avant `https://tldr.tech/ai`, chaque jour sans édition ferait échouer la
-  source. L'essai de bout en bout de Sabine (`uv run --env-file .env.e2e_test pytest -m e2e`, deux
-  fois pour le 304 de CISA) le vérifie avant la fusion ; son résultat va dans la PR.
+  source. L'essai de bout en bout de Sabine (tldr, arXiv, CISA KEV et GitHub, un seul lancement)
+  le vérifie avant la fusion ; son résultat va dans la PR.
+- **Le 304 de CISA KEV sur le vrai site** : chaque test de bout en bout part d'un dossier de
+  données vide (`tests/e2e/test_real_sources.py:189`), donc aucun n'envoie de date de dernière
+  collecte et le 304 n'y est jamais atteint. Seuls les tests unitaires le prouvent
+  (`test_an_unmodified_catalog_returns_nothing`).
 - **Le cas `httpx2.InvalidURL`** du bloc de la section 3 n'a été trouvé qu'avec une `Location` qui
   commence par une espace (` //` suivi d'un trait d'union conditionnel) : `urljoin` retire l'espace
   et y lit un hôte, httpx2 y lit un chemin. 300 000 `Location` tirées au hasard, sans espace en tête
