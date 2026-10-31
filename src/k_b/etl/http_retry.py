@@ -7,10 +7,10 @@ from http import HTTPStatus
 from urllib.error import HTTPError, URLError
 
 from k_b.core.rate_limit import (
-    EPOCH_SECONDS,
     MIN_PAUSE_SECONDS,
     RATE_LIMIT_REMAINING_HEADER,
     RATE_LIMIT_RESET_HEADER,
+    read_rate_limit_reset_value,
 )
 from k_b.core.retry_after import is_retry_after_too_long, read_retry_after
 
@@ -102,10 +102,7 @@ def is_retry_after_beyond_max(retry_after: str | None) -> bool:
 
 def read_rate_limit_reset(error: HTTPError) -> int | None:
     """Its reset in epoch seconds; None when missing or unreadable."""
-    reset = error.headers.get(RATE_LIMIT_RESET_HEADER)
-    if reset is None or not EPOCH_SECONDS.fullmatch(reset):
-        return None
-    return int(reset)
+    return read_rate_limit_reset_value(error.headers.get(RATE_LIMIT_RESET_HEADER))
 
 
 def is_served_from(error: HTTPError, trusted_url_prefix: str) -> bool:

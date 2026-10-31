@@ -39,6 +39,7 @@ TREND_REPORTS_PATH = "trend-reports"
 CRITERIA: tuple[Criterion, ...] = get_args(Criterion.__value__)
 
 Rank = Annotated[int, Field(ge=1, le=GH_ARCHIVE_TOP_SIZE)]
+Count = Annotated[int, Field(ge=0)]
 
 
 def check_repository_name(name: str) -> str:
@@ -73,12 +74,29 @@ class TrendPeriod(AiApiModel):
     latest_window: WrittenDayInStrictModel | None
 
 
+class DroppedCandidates(AiApiModel):
+    not_found: Count
+    unavailable_for_legal_reasons: Count
+    moved: Count
+    id_mismatch: Count
+    forbidden: Count
+
+
+class Candidates(AiApiModel):
+    """The repositories whose sheet the AI API read on GitHub, counted; kb reads no fact."""
+
+    selected: Count
+    read: Count
+    dropped: DroppedCandidates
+
+
 class TrendReportResponse(AiApiModel):
     request_id: Annotated[str, AfterValidator(match_fully(REQUEST_ID))]
     model: Annotated[str, AfterValidator(match_fully(MODEL_NAME))] | None
     period: TrendPeriod
     repositories: list[TrendRepository]
-    repositories_dropped: Annotated[int, Field(ge=0)]
+    repositories_dropped: Count
+    candidates: Candidates
 
 
 def request_trend_report(
@@ -98,6 +116,7 @@ def request_trend_report(
     )
     refuse_inconsistent_period(response, after, today)
     refuse_inconsistent_repositories(response)
+    refuse_inconsistent_candidates(response)
     return response
 
 
@@ -206,3 +225,12 @@ def refuse_inconsistent_criteria(
         raise_invalid(response.request_id, f"{place}.criteria", "not_in_order_once")
     if "new" in repository.criteria and not response.period.new_evaluated:
         raise_invalid(response.request_id, f"{place}.criteria", "new_not_evaluated")
+
+
+def refuse_inconsistent_candidates(response: TrendReportResponse) -> None:
+    """The candidates selected are those read and those left out."""
+    candidates = response.candidates
+    if candidates.selected != candidates.read + sum(
+        candidates.dropped.model_dump().values()
+    ):
+        raise_invalid(response.request_id, "candidates", "not_the_sum")

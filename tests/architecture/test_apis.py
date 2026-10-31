@@ -150,14 +150,23 @@ AI_API_LAYERS = (
         "ai_api.deadline",
         "ai_api.watch_items",
         "ai_api.trajectories",
+        "ai_api.repository_cards",
         "ai_api.settings",
         "ai_api.tracing",
         "ai_api.connectors.metrics_export",
     },
     {"ai_api.connectors.trace_export"},
     {"ai_api.connectors.llm_replay"},
-    {"ai_api.connectors.llm_settings", "ai_api.connectors.data_api_settings"},
-    {"ai_api.connectors.llm_client", "ai_api.connectors.data_api_client"},
+    {
+        "ai_api.connectors.llm_settings",
+        "ai_api.connectors.data_api_settings",
+        "ai_api.connectors.github_settings",
+    },
+    {
+        "ai_api.connectors.llm_client",
+        "ai_api.connectors.data_api_client",
+        "ai_api.connectors.github_client",
+    },
     {"ai_api.stage_calls"},
     {"ai_api.stages.classification", "ai_api.stages.writing"},
     {"ai_api.stages.fidelity"},
@@ -254,6 +263,7 @@ TRACED_FUNCTIONS = {
     "read_window",
     "build_trend_report",
     "read_trend_report",
+    "read_repository_cards",
 }
 TRACING_PARAMETER = "tracing"
 

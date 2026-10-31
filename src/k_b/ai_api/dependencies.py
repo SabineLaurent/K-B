@@ -1,4 +1,5 @@
-"""The dependencies of POST /digests: the HTTP clients of the request and its time."""
+"""The dependencies of POST /digests and POST /trend-reports: the HTTP clients of the request and
+its time."""
 
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -8,6 +9,7 @@ import httpx2
 from fastapi import Depends, Request
 
 from k_b.ai_api.connectors.data_api_client import build_data_api_client
+from k_b.ai_api.connectors.github_client import build_github_client
 from k_b.ai_api.connectors.llm_client import build_http_client
 
 
@@ -23,10 +25,16 @@ def open_data_api_client(request: Request) -> Iterator[httpx2.Client]:
         yield http_client
 
 
+def open_github_client(request: Request) -> Iterator[httpx2.Client]:
+    with build_github_client(request.app.state.github_settings) as http_client:
+        yield http_client
+
+
 def read_request_time() -> datetime:
     return datetime.now(UTC)
 
 
 LlmClient = Annotated[httpx2.Client, Depends(open_llm_client)]
 DataApiClient = Annotated[httpx2.Client, Depends(open_data_api_client)]
+GithubClient = Annotated[httpx2.Client, Depends(open_github_client)]
 RequestTime = Annotated[datetime, Depends(read_request_time)]

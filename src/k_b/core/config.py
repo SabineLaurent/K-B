@@ -96,6 +96,22 @@ TREND_DURABLE_LOOKBACK_WINDOWS = 2
 TREND_ACCELERATION_MIN_RANKS = 5
 # The repositories whose sheet is read on GitHub, those meeting a criterion first.
 TREND_MAX_CANDIDATES = 60
+# A repository created less than 7 days before the request: a caution of its sheet.
+TREND_RECENT_REPOSITORY_DAYS = 7
+# The reading of the sheets on GitHub by the AI API (docs/tendances.md, "GitHub"). Requests per
+# report, retries included: 60 candidates and room for their retries; the README of #369 will
+# share it.
+GITHUB_MAX_REQUESTS_PER_REPORT = 70
+# A 403 that is not a rate limit leaves its candidate out; the third of a report stops the reading,
+# so that a rate limit misread is never insisted on (decision of Sabine of 2026-10-31, Q1 (b)).
+GITHUB_MAX_FORBIDDEN_PER_REPORT = 3
+# The Retry-After returned for a rate limit, at most: the hour of the primary rate limit.
+MAX_GITHUB_RETRY_AFTER_SECONDS = 3600
+# The body of GET /repos/{owner}/{repo}: 6,382 bytes for fastapi/fastapi (2026-10-31,
+# tests/fixtures/github_repository_extract.json); about 60 times it.
+MAX_GITHUB_REPOSITORY_BYTES = 400_000
+# The topics of a repository read, at most, by defense: a longer list is refused.
+MAX_GITHUB_TOPICS = 100
 
 # HTTP. A source download waits this long for each network operation: the connection, or each
 # read (docs/specs-collecte.md).
@@ -304,8 +320,10 @@ TRENDS_DIR_NAME = "tendances"
 # #158 on gpt-6-luna: about 98 seconds for 8 subjects, the judge included (113 with the slowest
 # calls). Beyond it, a subject not yet written is llm_timeout, the others are returned.
 DIGEST_REQUEST_TIMEOUT_SECONDS = 200
-# The bound of a trend report request: 1 + 31 GET /trends at most, one after the other, on a service
-# of the same network.
+# The bound of a trend report request: 1 + 31 GET /trends at most on a service of the same network,
+# then GITHUB_MAX_REQUESTS_PER_REPORT GET /repos at most on GitHub, one after the other; each
+# timeout of HTTP_TIMEOUT_SECONDS is shortened by it. Its hold for 60 requests to GitHub is
+# measured by #370.
 TREND_REPORT_REQUEST_TIMEOUT_SECONDS = 60
 # The requests of kb digest and kb trend-report to the AI API (post/ai_api_client.py, #209, #366).
 # The URL of kb serve-ai with its defaults, changed by KB_AI_API_URL; it does not follow

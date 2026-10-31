@@ -1,9 +1,12 @@
-"""POST /trend-reports on a simulated data API that counts its requests, and on the data API of
-the test base (docs/tendances.md)."""
+"""POST /trend-reports on a simulated data API and a simulated GitHub that count their requests,
+and on the data API of the test base (docs/tendances.md); no test calls GitHub."""
 
+import json
 import logging
 import secrets
-from datetime import date, timedelta
+import sqlite3
+from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 import httpx2
 import pytest
@@ -13,12 +16,21 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.trace import SpanKind, StatusCode
 from pydantic import SecretStr
 
+from k_b.ai_api import trajectories
 from k_b.ai_api.app import create_app
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
+from k_b.ai_api.connectors.github_client import build_github_client
+from k_b.ai_api.connectors.github_settings import GithubSettings
 from k_b.ai_api.connectors.llm_settings import LlmSettings
-from k_b.ai_api.dependencies import open_data_api_client, open_llm_client
+from k_b.ai_api.dependencies import (
+    open_data_api_client,
+    open_github_client,
+    open_llm_client,
+    read_request_time,
+)
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.ai_api.routers import trend_report_router
+from k_b.commands.run_log import logging_to
 from k_b.core.config import (
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
     GH_ARCHIVE_TOP_SIZE,
@@ -31,6 +43,13 @@ from k_b.data_api.app import create_app as create_data_app
 CLIENT_KEY = secrets.token_urlsafe(32)
 AUTHORIZATION = {"Authorization": f"Bearer {CLIENT_KEY}"}
 LATEST = date(2026, 10, 31)
+REQUEST_TIME = datetime(2026, 10, 31, 12, 0, tzinfo=UTC)
+# A real answer of GET /repos/{owner}/{repo}, served for every candidate with its id.
+GITHUB_ANSWER = json.loads(
+    (
+        Path(__file__).parent.parent / "fixtures" / "github_repository_extract.json"
+    ).read_bytes()
+)
 FIRST_REPORT = {"after": None, "previous_first_window": None}
 # The repository each test follows: 12, 7, 4 then 2 over the 4 windows of a first report.
 RISING_ID = 4_242
@@ -110,6 +129,38 @@ def simulate(days, ranks=None, extra=()):
     return SimulatedDataApi({end: build_window(end, ranks, extra) for end in days})
 
 
+class SimulatedGithub:
+    """GET /repos/{owner}/{repo}: the real answer with the id of the repository in the windows of
+    the data API, or the answer given for its name; keeps each request."""
+
+    def __init__(self, data_api, answers=None, ids=None):
+        windows = data_api.windows if isinstance(data_api, SimulatedDataApi) else {}
+        self.ids = ids or {
+            row["repository_name"]: row["repository_id"]
+            for window in windows.values()
+            for row in window["trends"]
+        }
+        self.answers = answers or {}
+        self.requests = []
+
+    def handle(self, request):
+        self.requests.append(request)
+        name = request.url.path.removeprefix("/repos/")
+        if name in self.answers:
+            return self.answers[name]
+        return httpx2.Response(200, json=GITHUB_ANSWER | {"id": self.ids[name]})
+
+    def client(self):
+        return build_github_client(
+            GithubSettings(token=SecretStr(f"github_pat_{secrets.token_hex(41)}")),
+            httpx2.MockTransport(self.handle),
+        )
+
+    @property
+    def names_asked(self):
+        return [request.url.path.removeprefix("/repos/") for request in self.requests]
+
+
 def make_app(recorded_traces):
     app = create_app(
         {"TERMINAL": SecretStr(CLIENT_KEY)},
@@ -124,6 +175,7 @@ def make_app(recorded_traces):
         DataApiSettings(
             base_url="http://localhost", api_key=SecretStr(secrets.token_urlsafe(32))
         ),
+        GithubSettings(token=SecretStr(f"github_pat_{secrets.token_hex(41)}")),
         (DigestSubject("subject_of_the_test", "défini par le test"),),
         3,
         ModelMetrics(
@@ -135,22 +187,27 @@ def make_app(recorded_traces):
     )
 
     def fail_the_test():
-        raise AssertionError("a client of the model was opened")
+        raise AssertionError("a client of the model or of the real GitHub was opened")
 
     app.dependency_overrides[open_llm_client] = fail_the_test
+    app.dependency_overrides[open_github_client] = fail_the_test
+    app.dependency_overrides[read_request_time] = lambda: REQUEST_TIME
     return app
 
 
 @pytest.fixture
 def make_ai_api(recorded_traces):
-    """A client of the AI API reading this data API."""
+    """A client of the AI API reading this data API and this GitHub, by default one serving the
+    real answer for each candidate."""
 
-    def make(data_api):
+    def make(data_api, github=None):
         app = make_app(recorded_traces)
         http_client = (
             data_api.client() if isinstance(data_api, SimulatedDataApi) else data_api
         )
+        github = github or SimulatedGithub(data_api)
         app.dependency_overrides[open_data_api_client] = lambda: http_client
+        app.dependency_overrides[open_github_client] = github.client
         return TestClient(app, raise_server_exceptions=False)
 
     return make
@@ -197,6 +254,14 @@ def test_the_first_report_reads_the_last_four_windows_without_new(make_ai_api):
             }
             for end, rank in RISING_RANKS.items()
         ],
+        "facts": {
+            "license": "MIT",
+            "created_at": "2018-12-08T08:21:47Z",
+            "language": "Python",
+            "topics": GITHUB_ANSWER["topics"],
+            "stars_total": GITHUB_ANSWER["stargazers_count"],
+            "cautions": [],
+        },
     }
     assert body["repositories_dropped"] == 0
     # The latest, then the 2 windows before the period and the 3 others of the period, once each.
@@ -326,12 +391,20 @@ def test_a_repository_whose_name_would_go_up_a_path_is_dropped_and_counted(
 
 def test_the_report_of_the_test_base_reads_its_two_windows(make_ai_api, items_database):
     key = secrets.token_urlsafe(32)
+    connection = sqlite3.connect(items_database)
+    try:
+        ids = dict(
+            connection.execute("SELECT repository_name, repository_id FROM trend")
+        )
+    finally:
+        connection.close()
+    github = SimulatedGithub(None, ids=ids)
     with TestClient(
         create_data_app(items_database, {"AI_DIGEST": SecretStr(key)}),
         base_url="http://localhost",
         headers={"Authorization": f"Bearer {key}"},
     ) as data_api:
-        body = post_trend_reports(make_ai_api(data_api)).json()
+        body = post_trend_reports(make_ai_api(data_api, github)).json()
 
     assert body["period"]["windows"] == [
         "2026-10-07",
@@ -340,8 +413,9 @@ def test_the_report_of_the_test_base_reads_its_two_windows(make_ai_api, items_da
         "2026-10-10",
     ]
     assert body["period"]["missing_windows"] == ["2026-10-07", "2026-10-08"]
-    # Ranks 1 and 2 on both windows, which share a day: no criterion.
+    # Ranks 1 and 2 on both windows, which share a day: no criterion, both candidates read.
     assert body["repositories"] == []
+    assert body["candidates"]["selected"] == body["candidates"]["read"] > 0
 
 
 @pytest.mark.parametrize(
@@ -514,6 +588,22 @@ def test_a_report_is_a_trace_of_counts(make_ai_api, recorded_traces):
         "k_b.repositories.reported": reported,
         "k_b.repositories.dropped": 0,
     }
+    [cards] = recorded_traces.find_spans("read_repository_cards")
+    assert cards.parent.span_id == root.context.span_id
+    assert {
+        name: value
+        for name, value in cards.attributes.items()
+        if name.startswith("k_b.")
+    } == {
+        "k_b.candidates.selected": reported,
+        "k_b.candidates.read": reported,
+        "k_b.candidates.dropped.not_found": 0,
+        "k_b.candidates.dropped.unavailable_for_legal_reasons": 0,
+        "k_b.candidates.dropped.moved": 0,
+        "k_b.candidates.dropped.id_mismatch": 0,
+        "k_b.candidates.dropped.forbidden": 0,
+        "k_b.github.requests": reported,
+    }
 
 
 def list_values(recorded_traces):
@@ -528,14 +618,18 @@ def list_values(recorded_traces):
 
 
 def test_neither_the_traces_nor_the_logs_hold_a_repository(
-    make_ai_api, recorded_traces, caplog
+    make_ai_api, recorded_traces, caplog, tmp_path
 ):
+    """With the log of kb serve-ai (commands/run_log.py), which keeps no request line of httpx2:
+    each one names its URL, repos/<owner>/<repo>."""
     data_api = simulate([day(offset) for offset in range(6)])
+    github = SimulatedGithub(data_api, {RISING_NAME: httpx2.Response(404)})
 
-    with caplog.at_level(logging.DEBUG):
-        body = post_trend_reports(make_ai_api(data_api)).json()
+    with logging_to(tmp_path, None), caplog.at_level(logging.DEBUG, logger="k_b"):
+        body = post_trend_reports(make_ai_api(data_api, github)).json()
 
     assert body["repositories"]
+    assert github.names_asked
     rows = [row for window in data_api.windows.values() for row in window["trends"]]
     names = {row["repository_name"] for row in rows}
     ids = {row["repository_id"] for row in rows}
@@ -569,3 +663,203 @@ def test_a_response_that_fails_to_be_built_is_traced_as_a_500(
     assert root.attributes["http.response.status_code"] == 500
     assert root.status.status_code == StatusCode.ERROR
     assert root.attributes["error.type"] == "ValueError"
+
+
+def test_each_candidate_is_read_once_on_github_in_the_order_of_the_candidates(
+    make_ai_api,
+):
+    data_api = simulate([day(offset) for offset in range(6)])
+    github = SimulatedGithub(data_api)
+
+    body = post_trend_reports(make_ai_api(data_api, github)).json()
+
+    reported = [r["repository_name"] for r in body["repositories"]]
+    # Every repository of a top meets a criterion here: the candidates are the repositories
+    # reported, in their order, the best rank first.
+    assert github.names_asked == reported
+    assert body["candidates"] == {
+        "selected": len(reported),
+        "read": len(reported),
+        "dropped": {
+            "not_found": 0,
+            "unavailable_for_legal_reasons": 0,
+            "moved": 0,
+            "id_mismatch": 0,
+            "forbidden": 0,
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("answer", "reason"),
+    [
+        (httpx2.Response(404, json={"message": "Not Found"}), "not_found"),
+        (
+            httpx2.Response(451, json={"message": "blocked"}),
+            "unavailable_for_legal_reasons",
+        ),
+        (
+            httpx2.Response(
+                301, headers={"Location": "https://api.github.com/repositories/1"}
+            ),
+            "moved",
+        ),
+        (
+            httpx2.Response(200, json=GITHUB_ANSWER | {"id": RISING_ID + 1}),
+            "id_mismatch",
+        ),
+        (
+            httpx2.Response(403, json={"message": "Repository access blocked"}),
+            "forbidden",
+        ),
+    ],
+    ids=["404", "451", "301", "id", "403"],
+)
+def test_a_candidate_left_out_by_github_leaves_the_report_and_is_counted(
+    make_ai_api, answer, reason
+):
+    data_api = simulate([day(offset) for offset in range(6)])
+    github = SimulatedGithub(data_api, {RISING_NAME: answer})
+
+    response = post_trend_reports(make_ai_api(data_api, github))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert RISING_ID not in [r["repository_id"] for r in body["repositories"]]
+    candidates = body["candidates"]
+    assert candidates["dropped"][reason] == 1
+    assert candidates["selected"] == candidates["read"] + sum(
+        candidates["dropped"].values()
+    )
+    # A redirection is not followed: one request for the rising one.
+    assert github.names_asked.count(RISING_NAME) == 1
+
+
+def test_beyond_the_candidates_a_repository_has_no_facts(make_ai_api, monkeypatch):
+    monkeypatch.setattr(trajectories, "TREND_MAX_CANDIDATES", 2)
+    data_api = simulate([day(offset) for offset in range(6)])
+    github = SimulatedGithub(data_api)
+
+    body = post_trend_reports(make_ai_api(data_api, github)).json()
+
+    with_facts = [r for r in body["repositories"] if r["facts"] is not None]
+    assert len(with_facts) == 2
+    assert len(body["repositories"]) > 2
+    assert len(github.names_asked) == 2
+    assert body["candidates"]["selected"] == 2
+
+
+def test_a_repository_created_this_week_without_license_has_both_cautions(make_ai_api):
+    data_api = simulate([day(offset) for offset in range(6)])
+    recent = GITHUB_ANSWER | {
+        "id": RISING_ID,
+        "created_at": "2026-10-30T09:00:00Z",
+        "license": None,
+    }
+    github = SimulatedGithub(data_api, {RISING_NAME: httpx2.Response(200, json=recent)})
+
+    facts = find_rising(post_trend_reports(make_ai_api(data_api, github)).json())[
+        "facts"
+    ]
+
+    assert facts["license"] is None
+    assert facts["cautions"] == ["created_recently", "no_license"]
+
+
+@pytest.mark.parametrize(
+    "after", [None, LATEST], ids=["base-without-window", "no-window-after"]
+)
+def test_without_any_window_github_is_not_called(make_ai_api, after):
+    data_api = SimulatedDataApi({}) if after is None else simulate([LATEST])
+    github = SimulatedGithub(data_api)
+    demand = (
+        FIRST_REPORT
+        if after is None
+        else {"after": text(after), "previous_first_window": text(after)}
+    )
+
+    body = post_trend_reports(make_ai_api(data_api, github), demand).json()
+
+    assert github.requests == []
+    assert body["candidates"]["selected"] == 0
+
+
+# Rank 1 in every window: the first candidate.
+FIRST_CANDIDATE = "filler/repo-0"
+
+
+def test_a_rate_limit_stops_every_reading_with_a_503_and_its_retry_after(
+    make_ai_api, caplog, recorded_traces
+):
+    data_api = simulate([day(offset) for offset in range(6)])
+    reset = int(REQUEST_TIME.timestamp()) + 900
+    github = SimulatedGithub(
+        data_api,
+        {
+            FIRST_CANDIDATE: httpx2.Response(
+                403,
+                json={"message": "API rate limit exceeded"},
+                headers={"x-ratelimit-remaining": "0", "x-ratelimit-reset": str(reset)},
+            )
+        },
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="k_b"):
+        response = post_trend_reports(make_ai_api(data_api, github))
+
+    assert response.status_code == 503
+    assert response.json() == {"error": "github_rate_limited"}
+    assert response.headers["Retry-After"] == "900"
+    # No request after the first candidate.
+    assert github.names_asked == [FIRST_CANDIDATE]
+    request_id = response.headers["X-Request-ID"]
+    [failure] = [
+        r.getMessage() for r in caplog.records if r.name.startswith("k_b.ai_api")
+    ]
+    assert failure == (
+        "reading of the repository cards failed: github_rate_limited, HTTP 403,"
+        f" request_id={request_id}"
+    )
+    [cards] = recorded_traces.find_spans("read_repository_cards")
+    assert cards.status.status_code == StatusCode.ERROR
+    assert cards.attributes["error.type"] == "github_rate_limited"
+    [root] = recorded_traces.find_spans("POST /trend-reports")
+    assert root.attributes["http.response.status_code"] == 503
+
+
+@pytest.mark.parametrize(
+    ("answer", "status", "state"),
+    [
+        (
+            httpx2.Response(401, json={"message": "Bad credentials"}),
+            502,
+            "github_unauthorized",
+        ),
+        (httpx2.Response(500), 502, "github_unavailable"),
+        (httpx2.Response(200, content=b"<html>"), 502, "github_invalid_response"),
+        (httpx2.Response(429), 503, "github_rate_limited"),
+    ],
+    ids=["401", "5xx", "out-of-schema", "429"],
+)
+def test_a_failure_of_github_fails_the_whole_report(make_ai_api, answer, status, state):
+    data_api = simulate([day(offset) for offset in range(6)])
+    github = SimulatedGithub(data_api, {RISING_NAME: answer})
+
+    response = post_trend_reports(make_ai_api(data_api, github))
+
+    assert response.status_code == status
+    assert response.json() == {"error": state}
+
+
+def test_the_third_refusal_of_a_report_fails_it_as_github_forbidden(make_ai_api):
+    data_api = simulate([day(offset) for offset in range(6)])
+    refused = httpx2.Response(403, json={"message": "Repository access blocked"})
+    github = SimulatedGithub(
+        data_api, {f"filler/repo-{k}": refused for k in range(GH_ARCHIVE_TOP_SIZE)}
+    )
+
+    response = post_trend_reports(make_ai_api(data_api, github))
+
+    assert response.status_code == 502
+    assert response.json() == {"error": "github_forbidden"}
+    assert "Retry-After" not in response.headers

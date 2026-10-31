@@ -12,6 +12,7 @@ from pydantic import SecretStr
 
 from k_b.ai_api.api_router import api_router
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
+from k_b.ai_api.connectors.github_settings import GithubSettings
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.connectors.trace_export import TraceExport
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
@@ -24,20 +25,21 @@ from k_b.core.config import DigestSubject
 
 # The version of the contracts of docs/fiches-veille.md and docs/tendances.md: a change a client
 # can see changes both.
-API_VERSION = "0.5.0"
+API_VERSION = "0.6.0"
 
 
 def create_app(
     api_keys: Mapping[str, SecretStr],
     llm_settings: LlmSettings,
     data_api_settings: DataApiSettings,
+    github_settings: GithubSettings,
     subjects: Sequence[DigestSubject],
     default_window_days: int,
     model_metrics: ModelMetrics,
     trace_export: TraceExport,
 ) -> FastAPI:
-    """The app, its keys, the model and the data API it calls, its subjects, its default window,
-    its measures and its traces given; without any key, POST /digests answers 401."""
+    """The app, its keys, the model, the data API and GitHub it calls, its subjects, its default
+    window, its measures and its traces given; without any key, POST /digests answers 401."""
     app = FastAPI(
         title="K-B AI API",
         version=API_VERSION,
@@ -56,6 +58,7 @@ def create_app(
     app.state.api_keys = dict(api_keys)
     app.state.llm_settings = llm_settings
     app.state.data_api_settings = data_api_settings
+    app.state.github_settings = github_settings
     app.state.subjects = tuple(subjects)
     app.state.default_window_days = default_window_days
     app.state.model_metrics = model_metrics

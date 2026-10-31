@@ -20,6 +20,7 @@ from k_b.core.config import (
 from k_b.core.dates import format_date
 from k_b.items import Criterion
 from k_b.post.trend_report_client import (
+    DroppedCandidates,
     TrendPeriod,
     TrendPoint,
     TrendReportResponse,
@@ -37,6 +38,14 @@ CRITERION_LABELS: dict[Criterion, str] = {
     "durable": "durable",
     "new": "nouveau",
     "accelerating": "en accélération",
+}
+# The reasons GitHub leaves a candidate out, in the order of the response.
+DROP_REASON_LABELS = {
+    "not_found": "introuvables",
+    "unavailable_for_legal_reasons": "bloqués",
+    "moved": "renommés ou déplacés",
+    "id_mismatch": "remplacés",
+    "forbidden": "refusés",
 }
 OUT_OF_TOP = "hors top"
 MISSING = "—"
@@ -145,7 +154,20 @@ def render_trend_report_sheet(
                 " (nom inutilisable dans un chemin)."
             ),
         ]
+    if response.candidates.read < response.candidates.selected:
+        lines += ["", describe_dropped_candidates(response.candidates.dropped)]
     return "\n".join(lines) + "\n"
+
+
+def describe_dropped_candidates(dropped: DroppedCandidates) -> str:
+    """The candidates GitHub left out, by reason, the reasons at 0 left out."""
+    counts = dropped.model_dump()
+    reasons = ", ".join(
+        f"{label} : {counts[reason]}"
+        for reason, label in DROP_REASON_LABELS.items()
+        if counts[reason]
+    )
+    return f"Candidats écartés par GitHub : {sum(counts.values())} ({reasons})."
 
 
 def describe_period(period: TrendPeriod) -> str:

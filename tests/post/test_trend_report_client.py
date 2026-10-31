@@ -2,7 +2,7 @@
 schema of the AI API, which ties the client to the contract, then changed to break one check."""
 
 import json
-from datetime import date
+from datetime import UTC, date, datetime
 
 import httpx2
 import pytest
@@ -15,6 +15,9 @@ from post.test_ai_api_client import (
 )
 
 from k_b.ai_api.schemas.trend_report_schema import (
+    CandidatesSchema,
+    DroppedCandidatesSchema,
+    RepositoryFactsSchema,
     TrajectoryPointSchema,
     TrendPeriodSchema,
     TrendReportSchema,
@@ -56,6 +59,15 @@ RISING = TrendRepositorySchema(
     trajectory=[
         point(day, rank) for day, rank in zip(WINDOWS, (12, 7, 4, 2), strict=True)
     ],
+    # Read on GitHub; kb does not show them before #369.
+    facts=RepositoryFactsSchema(
+        license=None,
+        created_at=datetime(2026, 10, 27, 9, 0, tzinfo=UTC),
+        language="Rust",
+        topics=["cli", "llm"],
+        stars_total=1_250,
+        cautions=["created_recently", "no_license"],
+    ),
 )
 STEADY = TrendRepositorySchema(
     repository_id=17,
@@ -68,6 +80,11 @@ STEADY = TrendRepositorySchema(
         point(WINDOWS[2], 5),
         point(WINDOWS[3], 9),
     ],
+    # Beyond the candidates.
+    facts=None,
+)
+NO_CANDIDATE_DROPPED = DroppedCandidatesSchema(
+    not_found=0, unavailable_for_legal_reasons=0, moved=0, id_mismatch=0, forbidden=0
 )
 
 
@@ -86,6 +103,7 @@ def make_report(**changes):
         ),
         repositories=[RISING, STEADY],
         repositories_dropped=0,
+        candidates=CandidatesSchema(selected=1, read=1, dropped=NO_CANDIDATE_DROPPED),
     ).model_dump(mode="json")
     return report | changes
 
@@ -500,3 +518,43 @@ def test_a_refused_key_is_ai_api_unauthorized():
 
     assert failure.state == "ai_api_unauthorized"
     assert TEST_API_KEY not in str(failure)
+
+
+def test_the_counts_of_the_candidates_are_read():
+    dropped = NO_CANDIDATE_DROPPED.model_dump() | {"not_found": 1, "moved": 2}
+    report = make_report(candidates={"selected": 9, "read": 6, "dropped": dropped})
+
+    response, _ = ask(answer(content=body(report)))
+
+    assert response.candidates.selected == 9
+    assert response.candidates.read == 6
+    assert response.candidates.dropped.not_found == 1
+    assert response.candidates.dropped.moved == 2
+
+
+@pytest.mark.parametrize(
+    ("candidates", "detail"),
+    [
+        (
+            {"read": 2},
+            "candidates (not_the_sum)",
+        ),
+        ({"selected": 0, "read": -1}, "candidates.read (greater_than_equal)"),
+        (
+            {"dropped": NO_CANDIDATE_DROPPED.model_dump() | {"forbidden": -1}},
+            "candidates.dropped.forbidden (greater_than_equal)",
+        ),
+        (
+            {"dropped": {"not_found": 0}},
+            "candidates.dropped.unavailable_for_legal_reasons",
+        ),
+    ],
+    ids=["not-the-sum", "read-negative", "dropped-negative", "reason-missing"],
+)
+def test_counts_of_candidates_that_do_not_add_up_are_refused(candidates, detail):
+    report = make_report()
+    report["candidates"] |= candidates
+
+    failure = ask_and_fail(answer(content=body(report)))
+
+    assert str(failure).startswith(f"ai_api_invalid_response, HTTP 200, {detail}")

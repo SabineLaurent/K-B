@@ -10,6 +10,7 @@ from pydantic import SecretStr
 
 from k_b.ai_api.app import create_app as create_ai_app
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
+from k_b.ai_api.connectors.github_settings import GithubSettings
 from k_b.ai_api.connectors.llm_settings import REPLAY_MODEL, LlmSettings
 from k_b.ai_api.connectors.metrics_export import build_resource
 from k_b.ai_api.connectors.trace_export import TraceExport
@@ -74,6 +75,7 @@ def describe_ai_api() -> dict[str, Any]:
             replay_steps=(),
         ),
         DataApiSettings(base_url=DATA_API_URL, api_key=SecretStr("")),
+        GithubSettings(token=SecretStr("")),
         DIGEST_SUBJECTS,
         DIGEST_WINDOW_DAYS,
         # Without export: no measure nor span leaves while the OpenAPI is written.

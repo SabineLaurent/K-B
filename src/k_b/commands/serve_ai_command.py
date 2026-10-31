@@ -1,4 +1,5 @@
-"""kb serve-ai: serve the digests of the watch by the AI API, beside kb serve-data."""
+"""kb serve-ai: serve the digests of the watch and the trend reports by the AI API, beside kb
+serve-data."""
 
 import logging
 from collections.abc import Mapping
@@ -10,6 +11,7 @@ from k_b.ai_api.connectors.data_api_settings import (
     DATA_API_KEY_VARIABLE,
     read_data_api_settings_or_refusal,
 )
+from k_b.ai_api.connectors.github_settings import read_github_settings_or_refusal
 from k_b.ai_api.connectors.llm_settings import read_llm_settings_or_refusal
 from k_b.ai_api.connectors.metrics_export import (
     build_resource,
@@ -39,6 +41,8 @@ def run_serve_ai(environ: Mapping[str, str]) -> int:
     settings = value_or_log_refusal(read_ai_api_settings_or_refusal(environ))
     llm_settings = value_or_log_refusal(read_llm_settings_or_refusal(environ))
     data_api_settings = value_or_log_refusal(read_data_api_settings_or_refusal(environ))
+    # Never anonymous: the trend reports read GitHub with it (docs/tendances.md, "GitHub").
+    github_settings = value_or_log_refusal(read_github_settings_or_refusal(environ))
     # None is a setting here: the export is off.
     export_settings = read_metrics_export_settings_or_refusal(environ)
     if isinstance(export_settings, str):
@@ -48,6 +52,7 @@ def run_serve_ai(environ: Mapping[str, str]) -> int:
         or settings is None
         or llm_settings is None
         or data_api_settings is None
+        or github_settings is None
         or isinstance(export_settings, str)
     ):
         return ExitCode.NOT_STARTED
@@ -70,6 +75,7 @@ def run_serve_ai(environ: Mapping[str, str]) -> int:
     # mistake says it.
     logger.info("LLM provider %s, model %s", llm_settings.provider, llm_settings.model)
     logger.info("digest window by default: %s days", settings.window_days)
+    logger.info("GitHub token of the trend reports loaded")
     # The environment and the content sent with the traces, never the endpoint nor the headers.
     logger.info(
         "metrics and traces export: %s",
@@ -87,6 +93,7 @@ def run_serve_ai(environ: Mapping[str, str]) -> int:
             api_keys,
             llm_settings,
             data_api_settings,
+            github_settings,
             DIGEST_SUBJECTS,
             settings.window_days,
             # Both stopped by the lifespan of the app (ai_api/app.py).
