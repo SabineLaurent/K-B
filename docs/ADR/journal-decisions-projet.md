@@ -4744,6 +4744,25 @@ Conception de time-knight, relue par un sous-agent, validée par Sabine le 31/10
 
 — #367
 
+### Collecte : le flux arXiv lu par defusedxml (#69)
+
+- **Le flux arXiv est lu par `defusedxml.ElementTree.fromstring`, réglages par défaut
+  (`forbid_entities=True`, `forbid_external=True`).** Option tranchée par Sabine le 18/10, « pour
+  raison de sécurité » ; dépendances accordées le 31/10 : `defusedxml`, et `types-defusedxml` en
+  dépendance de développement (`mypy --strict` en CI ; Q-A, « je suis ta recommandation »). Le flux
+  est une donnée non fiable, et `xml.etree.ElementTree` seul développe une entité interne déclarée
+  dans son DTD (observé le 31/10 : le test de l'entité interne, lancé sur l'ancien code, ne lève
+  rien). Une déclaration d'entité devient `PageRefusedError("XML refused: <type>")`, l'exception de
+  defusedxml masquée de la trace (`from None`) : elle cite le nom de l'entité et l'adresse déclarés
+  dans le flux. Écartés : garder `ElementTree` avec un `# noqa: S314` justifié (l'entité interne
+  resterait développée) ; `forbid_dtd=True` (refuse un flux pour un seul `DOCTYPE`, sans protection
+  de plus que les entités et références externes refusées) ; `# type: ignore[import-untyped]` ou un
+  `cast` au lieu des types. Limites assumées : une dépendance de plus, verrouillée en 0.7.1, publiée
+  le 2021-03-08 (`uv.lock`) ; l'exception de defusedxml reste dans `__context__`, que rien dans l'ETL
+  ne lit.
+
+— #69
+
 ## Décisions encore ouvertes
 
 - **Les seuils des critères des tendances** (2026-10-30) : 2 jours actifs pour « durable », 5 rangs

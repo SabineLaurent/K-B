@@ -265,7 +265,12 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 ### API arXiv — service web
 
 - **Technologie** : API `https://export.arxiv.org/api/query`, réponse Atom (XML), lue avec
-  `xml.etree.ElementTree` de la bibliothèque standard.
+  `defusedxml.ElementTree` : `xml.etree.ElementTree` seul développe une entité déclarée dans
+  le flux ; defusedxml refuse toute déclaration d'entité, interne ou externe, et ne charge
+  jamais un DTD externe.
+  - **Dépendance** : `defusedxml` (0.7.1, du 2021-03-08), sans dépendance ; ses types viennent
+    de `types-defusedxml` (0.7.0.20260504, du 2026-05-04), en dépendance de développement
+    (accord de Sabine du 2026-10-31).
 - **Ce qu'on en tire** : métadonnées et résumé des papiers soumis depuis la dernière collecte.
 - **Accès** : sans authentification.
 - **Limites** : une requête toutes les 3 secondes au plus, une connexion à la fois, pour toutes
@@ -299,7 +304,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   échouer la collecte. Limites assumées : la révision (`v2`) d'un papier soumis avant la fenêtre
   n'est pas collectée, ni un papier retenu en modération plus de 7 jours.
 - **En cas de panne :** en plus des états communs (dont le `503` sous charge, ci-dessus), la
-  source échoue si la réponse n'est pas du XML ou pas un flux Atom, si le flux porte une entrée
+  source échoue si la réponse n'est pas du XML ou pas un flux Atom, si elle déclare une entité
+  XML (`XML refused: EntitiesForbidden`), si le flux porte une entrée
   d'erreur de l'API, si `totalResults` manque ou n'est pas un nombre, si l'API annonce plus de
   papiers que la page n'en contient, ou si toutes les entrées sont invalides
   (`all_items_invalid`). La fenêtre partant de la dernière collecte réussie, un échec passager est

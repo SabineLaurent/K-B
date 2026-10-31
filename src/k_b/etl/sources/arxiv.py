@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from urllib.parse import urlencode
 
+import defusedxml.ElementTree as DefusedElementTree
+from defusedxml import DefusedXmlException
+
 from k_b.core.config import (
     ARXIV_ANNOUNCEMENT_DELAY_MARGIN,
     ARXIV_FIRST_COLLECTION_START,
@@ -34,8 +37,6 @@ from k_b.items import (
 SOURCE_CODE: SourceCode = "arxiv"
 
 
-# Python's expat (2.4.1 and later) refuses entity expansion attacks and never fetches
-# external entities: the standard library parser is safe on this untrusted feed.
 ATOM = "{http://www.w3.org/2005/Atom}"
 
 
@@ -157,10 +158,17 @@ def read_papers(raw_response: bytes) -> EntryReading[Paper]:
 
 
 def parse_feed(raw_response: bytes) -> ElementTree.Element:
+    # Read by defusedxml: ElementTree alone expands an entity declared in the feed. defusedxml
+    # refuses any entity declaration, internal or external; an external DTD is accepted but
+    # never loaded.
     try:
-        feed = ElementTree.fromstring(raw_response)  # noqa: S314 — XML entities: #69
+        feed = DefusedElementTree.fromstring(raw_response)
     except ElementTree.ParseError as error:
         raise PageRefusedError(f"not an XML document: {error}") from error
+    except DefusedXmlException as error:
+        # The type only, its cause hidden from the trace: the exception quotes the entity name
+        # and the address declared in the feed.
+        raise PageRefusedError(f"XML refused: {type(error).__name__}") from None
     if feed.tag != f"{ATOM}feed":
         raise PageRefusedError("expected an Atom feed")
     return feed
