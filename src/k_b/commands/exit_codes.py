@@ -21,7 +21,8 @@ class ExitCode(IntEnum):
         1,
         (
             "the command ran and failed; kb collect, kb write-tops, kb digest: no part done,"
-            " or kb collect: state not written"
+            " or kb collect: state not written; kb trend-report: no report written, or written"
+            " and its register not updated"
         ),
     )
     NOT_STARTED = 2, "nothing was run: a setting, a file or the command line is refused"
@@ -44,8 +45,9 @@ class ExitCode(IntEnum):
     STOPPED_BY_SIGINT = (
         130,
         (
-            "kb collect, kb import, kb write-tops, kb digest: stopped by SIGINT (Ctrl-C); what was"
-            " done before it is kept; kb create-db: stopped by SIGINT, no database left"
+            "kb collect, kb import, kb write-tops, kb digest, kb trend-report: stopped by SIGINT"
+            " (Ctrl-C); what was done before it is kept; kb create-db: stopped by SIGINT, no"
+            " database left"
         ),
     )
     # 128 + 15, the code of a process stopped by SIGTERM. kb serve-data and kb serve-ai exit with it
@@ -54,8 +56,9 @@ class ExitCode(IntEnum):
     STOPPED_BY_SIGTERM = (
         143,
         (
-            "kb collect, kb import, kb write-tops, kb digest: stopped by SIGTERM; what was done"
-            " before it is kept; kb serve-data, kb serve-ai: stopped by SIGTERM, outside PID 1"
+            "kb collect, kb import, kb write-tops, kb digest, kb trend-report: stopped by"
+            " SIGTERM; what was done before it is kept; kb serve-data, kb serve-ai: stopped by"
+            " SIGTERM, outside PID 1"
         ),
     )
 

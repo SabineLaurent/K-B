@@ -4753,7 +4753,8 @@ guillemets ou attribué ; sinon, celui de la conception qu'elle a approuvée.
 
 - **Une borne de lecture des réponses de l'API IA et de l'API de données** (2026-10-21) : avant la
   mise en ligne du 08/11, dans `core/outbound.py`, commune aux deux clients ; `kb digest` lit
-  aujourd'hui sans borne (risque accepté par Sabine pour le POC).
+  aujourd'hui sans borne (risque accepté par Sabine pour le POC), et `kb trend-report` aussi, par le
+  même client (risque étendu par Sabine le 2026-10-30, #366).
 
 - **Un code de sortie dédié à l'authentification**, pour toutes les commandes (2026-10-21) : à
   reconsidérer avec #160 (jetons qui expirent) ; une clé refusée sort aujourd'hui en 1.

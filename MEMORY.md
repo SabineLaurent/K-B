@@ -102,7 +102,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 - Le compte rendu des tendances (`kb trend-report`, #364 à #370) : contrat dans `docs/tendances.md`,
   écrit avant le code ; #365 à #370 sont codées par time-knight (organisation de Sabine du
   2026-10-30). Sortie dans `veille/tendances/<date>.md` ; période tenue par
-  `KB_DATA_DIR/trend_reports.json`, jamais par une relecture du coffre.
+  `KB_DATA_DIR/trend_reports.json`, jamais par une relecture du coffre. `kb trend-report` est le
+  client `KB_TREND_REPORT` de l'API IA (`KB_AI_API_KEY_KB_TREND_REPORT`, une clé distincte de celle
+  de `kb digest`).
 
 ## Consignes de travail
 

@@ -290,11 +290,13 @@ DIGEST_SUBJECTS = (
 NO_SUITABLE_SUBJECT_ANSWER = "no_suitable_subject"
 
 # The folder of the vault that kb writes (ADR of 2026-10-19, "Coffre : organisation"): the digests
-# of each subject in veille/<subject>/ (#209), the sheets of the top rankings in veille/tops/.
+# of each subject in veille/<subject>/ (#209), the sheets of the top rankings in veille/tops/, the
+# trend reports in veille/tendances/ (#366).
 WATCH_DIR_NAME = "veille"
-# A reserved name under veille/: no subject of DIGEST_SUBJECTS may take it, or its digests would be
-# written in the folder of the sheets of the tops (a test keeps it).
+# Reserved names under veille/: no subject of DIGEST_SUBJECTS may take one, or its digests would be
+# written in the folder of the sheets of the tops or of the trend reports (a test keeps it).
 TOPS_DIR_NAME = "tops"
+TRENDS_DIR_NAME = "tendances"
 
 # The bound of a digest request, from its arrival: the reading by the data API and every call to
 # the model, which go one after the other. Under the 240 seconds the HTTP ingress of Azure
@@ -305,13 +307,15 @@ DIGEST_REQUEST_TIMEOUT_SECONDS = 200
 # The bound of a trend report request: 1 + 31 GET /trends at most, one after the other, on a service
 # of the same network.
 TREND_REPORT_REQUEST_TIMEOUT_SECONDS = 60
-# The request of kb digest to the AI API (post/ai_api_client.py, #209). The URL of kb serve-ai with
-# its defaults, changed by KB_AI_API_URL; it does not follow KB_AI_API_PORT: set KB_AI_API_URL too
-# when the port of kb serve-ai changes. Connection, pool and write: assumed values for a service on
-# the same machine or in the same compose network, as for the data API. Read: the AI API answers
-# in one block once its request is done, within DIGEST_REQUEST_TIMEOUT_SECONDS and the last call to
-# the model under way (about 20 seconds more, ai_api/deadline.py); 240 is also the bound the HTTP
-# ingress of Azure Container Apps gives a request. No retry: a Retry-After is shown, never waited.
+# The requests of kb digest and kb trend-report to the AI API (post/ai_api_client.py, #209, #366).
+# The URL of kb serve-ai with its defaults, changed by KB_AI_API_URL; it does not follow
+# KB_AI_API_PORT: set KB_AI_API_URL too when the port of kb serve-ai changes. Connection, pool and
+# write: assumed values for a service on the same machine or in the same compose network, as for
+# the data API. Read: the AI API answers in one block once its request is done, within
+# DIGEST_REQUEST_TIMEOUT_SECONDS and the last call to the model under way (about 20 seconds more,
+# ai_api/deadline.py); 240 is also the bound the HTTP ingress of Azure Container Apps gives a
+# request, and holds the shorter TREND_REPORT_REQUEST_TIMEOUT_SECONDS. No retry: a Retry-After is
+# shown, never waited.
 AI_API_URL = f"http://{AI_API_HOST}:{AI_API_PORT}"
 AI_API_CONNECT_TIMEOUT_SECONDS = 5
 AI_API_POOL_TIMEOUT_SECONDS = 5
