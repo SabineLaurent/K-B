@@ -1,10 +1,11 @@
 import logging
 from datetime import UTC, date, datetime
 from pathlib import Path
-from urllib.error import HTTPError, URLError
 
+import httpx2
 import pytest
 from bs4.exceptions import ParserRejectedMarkup
+from http_helpers import answer, status_error
 from pydantic import ValidationError
 
 from k_b.core.config import (
@@ -13,7 +14,12 @@ from k_b.core.config import (
 )
 from k_b.etl.http_download import RedirectedOutsideError
 from k_b.etl.normalize import normalize_item
-from k_b.etl.source_contract import PageRefusedError, find_source_kind, list_sources
+from k_b.etl.source_contract import (
+    PageRefusedError,
+    SourceStatusError,
+    find_source_kind,
+    list_sources,
+)
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources import tldr
 from k_b.etl.sources.tldr import (
@@ -129,6 +135,16 @@ def test_a_day_redirected_to_the_edition_landing_page_is_logged_and_skipped(
     )
 
 
+def test_a_day_redirected_by_the_site_to_the_landing_page_is_skipped_unrequested(
+    fake_network, monkeypatch
+):
+    monkeypatch.setattr(tldr, "current_day", lambda: TODAY)
+    fake_network.answers = [answer(302, Location="/ai")]
+
+    assert TldrSource("ai").fetch(datetime(2026, 10, 4, 6, 0, tzinfo=UTC)) is None
+    assert fake_network.requested_urls() == ["https://tldr.tech/ai/2026-10-04"]
+
+
 def test_a_redirection_elsewhere_than_the_edition_landing_page_is_raised_with_its_day_and_url(
     fake_download, caplog
 ):
@@ -159,17 +175,8 @@ def test_no_edition_page_in_the_window_returns_none_and_is_logged(
 @pytest.mark.parametrize(
     ("error", "observed"),
     [
-        (
-            HTTPError(
-                "https://tldr.tech/ai/2026-10-04",
-                500,
-                "Internal Server Error",
-                {},
-                None,
-            ),
-            "HTTP Error 500: Internal Server Error",
-        ),
-        (URLError("timed out"), "<urlopen error timed out>"),
+        (status_error(500), "HTTP 500 Internal Server Error"),
+        (httpx2.ReadTimeout("timed out"), "timed out"),
         (
             PageRefusedError("response larger than 1048576 bytes, refused"),
             "response larger than",
@@ -315,11 +322,9 @@ def test_a_page_of_today_that_is_not_an_edition_is_skipped_and_logged(
 
 def test_an_http_error_after_a_page_refused_is_raised(fake_download):
     fake_download.answers["https://tldr.tech/ai/2026-10-03"] = LANDING_PAGE
-    fake_download.answers["https://tldr.tech/ai/2026-10-04"] = HTTPError(
-        "https://tldr.tech/ai/2026-10-04", 500, "Internal Server Error", {}, None
-    )
+    fake_download.answers["https://tldr.tech/ai/2026-10-04"] = status_error(500)
 
-    with pytest.raises(HTTPError) as raised:
+    with pytest.raises(SourceStatusError) as raised:
         TldrSource("ai").fetch(datetime(2026, 10, 3, 6, 0, tzinfo=UTC))
     assert raised.value.__notes__ == [
         "tldr_ai 2026-10-04, from https://tldr.tech/ai/2026-10-04"

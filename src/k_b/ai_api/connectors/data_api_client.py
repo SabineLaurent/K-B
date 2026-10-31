@@ -28,7 +28,12 @@ from k_b.core.config import (
     MAX_DATA_API_BODY_BYTES,
     MAX_ITEMS_PER_DIGEST_REQUEST,
 )
-from k_b.core.outbound import open_http_client
+from k_b.core.outbound import (
+    BodyTooLargeError,
+    BodyTooLateError,
+    open_http_client,
+    read_bounded_body,
+)
 from k_b.items import (
     TREND_REPOSITORY_NAME_MAX_LENGTH,
     Int64,
@@ -337,7 +342,16 @@ def send(
         with http_client.stream(
             "GET", path, params=params, timeout=deadline.cap(http_client.timeout)
         ) as response:
-            return Answer(response.status_code, read_bounded_body(response, deadline))
+            status = response.status_code
+            try:
+                body = read_bounded_body(
+                    response, MAX_DATA_API_BODY_BYTES, deadline.is_passed
+                )
+            except BodyTooLargeError:
+                raise DataApiError("data_api_invalid_response", status) from None
+            except BodyTooLateError:
+                raise DataApiError("data_api_timeout", status) from None
+            return Answer(status, body)
     except httpx2.TimeoutException:
         raise DataApiError("data_api_timeout") from None
     except httpx2.TransportError:
@@ -345,29 +359,6 @@ def send(
     except httpx2.RequestError:
         # An answer that cannot be read (a body badly encoded).
         raise DataApiError("data_api_invalid_response") from None
-
-
-def read_bounded_body(response: httpx2.Response, deadline: Deadline) -> bytes:
-    """The body, refused beyond MAX_DATA_API_BODY_BYTES without quoting it, and stopped as soon
-    as the deadline passes between two pieces."""
-    status = response.status_code
-    length = response.headers.get("Content-Length")
-    if (
-        length is not None
-        and length.isascii()
-        and length.isdigit()
-        and int(length) > MAX_DATA_API_BODY_BYTES
-    ):
-        raise DataApiError("data_api_invalid_response", status)
-    body = bytearray()
-    # Decoded bytes: a compressed body is bounded by what it takes once read.
-    for chunk in response.iter_bytes():
-        body += chunk
-        if len(body) > MAX_DATA_API_BODY_BYTES:
-            raise DataApiError("data_api_invalid_response", status)
-        if deadline.is_passed():
-            raise DataApiError("data_api_timeout", status)
-    return bytes(body)
 
 
 def read_body[BodyT](response: Answer, adapter: TypeAdapter[BodyT]) -> BodyT:

@@ -4,12 +4,11 @@ import math
 import os
 from datetime import UTC, datetime
 from time import time
-from urllib.error import HTTPError
 
 from k_b.core.github_api import API_URL, API_VERSION
 from k_b.etl.http_download import download
 from k_b.etl.http_retry import find_pause_end
-from k_b.etl.source_contract import ExpectedSourceError
+from k_b.etl.source_contract import ExpectedSourceError, SourceStatusError
 from k_b.items import SourceCode
 
 # The source of every GitHub module, in the source table of the base.
@@ -60,8 +59,8 @@ def get_from_github_api(path_and_query: str) -> bytes:
             else None,
             rate_limited_wait_seconds=RATE_LIMITED_WAIT_SECONDS,
         )
-    except HTTPError as error:
-        pause_end = find_pause_end(error, API_URL, time())
+    except SourceStatusError as error:
+        pause_end = find_pause_end(error, time())
         if pause_end is not None:
             paused_until = max(paused_until, pause_end)
         raise

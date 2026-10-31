@@ -5,7 +5,8 @@ import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import NamedTuple
-from urllib.error import URLError
+
+import httpx2
 
 from k_b.core.quoting import quote_value
 from k_b.etl.raw_files import COLLECTION_NAME_FORMAT
@@ -25,7 +26,12 @@ SAFE_PATH_SEGMENT = re.compile(r"[a-z0-9_]+")
 SAFE_PAGE_NAME = re.compile(r"[a-z0-9_-]+")
 # Failures a source meets in normal operation: their line says all (decision of Sabine of
 # 2026-10-29). Any other error keeps its traceback: a fault to find in the code.
-EXPECTED_SOURCE_ERRORS = (ExpectedSourceError, URLError, ConnectionError, TimeoutError)
+EXPECTED_SOURCE_ERRORS = (
+    ExpectedSourceError,
+    httpx2.TransportError,
+    ConnectionError,
+    TimeoutError,
+)
 # The longest message, or note, of a failure quoted on its line: without a traceback, the line is
 # its only copy. Enough for the longest of K-B, Zotero's: 252 characters quoted for a printable
 # problem cut to 200; control characters, escaped twice, can pass it.

@@ -2,14 +2,18 @@ import logging
 import os
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from urllib.error import HTTPError, URLError
 
+import httpx2
 import pytest
 
 from k_b.etl.extract import MAX_QUOTED_FAILURE_LENGTH, collect_all_sources
 from k_b.etl.http_download import RedirectedOutsideError
 from k_b.etl.raw_store import load_last_collection_dates, save_last_collection_dates
-from k_b.etl.source_contract import ExpectedSourceError, PageRefusedError
+from k_b.etl.source_contract import (
+    ExpectedSourceError,
+    PageRefusedError,
+    SourceStatusError,
+)
 from k_b.etl.sources import cisa_kev, tldr
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -56,7 +60,8 @@ class FailingSource:
     [
         ExpectedSourceError("a failure met in normal operation"),
         PageRefusedError("incomplete search results, refused"),
-        URLError("nodename nor servname provided"),
+        httpx2.ConnectError("[Errno 8] nodename nor servname provided, or not known"),
+        SourceStatusError(503, httpx2.Headers()),
         ConnectionError("source is down"),
         TimeoutError("timed out"),
     ],
@@ -384,7 +389,7 @@ def test_a_failed_tldr_page_is_logged_once_with_its_day_and_url(
     tmp_path, monkeypatch, caplog
 ):
     def failing_download(url, trusted_url_prefix, max_bytes):
-        raise HTTPError(url, 500, "Internal Server Error", {}, None)
+        raise SourceStatusError(500, httpx2.Headers())
 
     monkeypatch.setattr(tldr, "download", failing_download)
     monkeypatch.setattr(tldr, "current_day", lambda: date(2026, 10, 4))
@@ -398,14 +403,14 @@ def test_a_failed_tldr_page_is_logged_once_with_its_day_and_url(
             [tldr.TldrSource("ai")], tmp_path / "raw", tmp_path, SECOND_RUN_AT
         )
 
-    assert isinstance(outcome.errors_by_source["tldr_ai"], HTTPError)
+    assert isinstance(outcome.errors_by_source["tldr_ai"], SourceStatusError)
     [error_record] = [
         record for record in caplog.records if record.levelno >= logging.ERROR
     ]
     assert error_record.name == "k_b.etl.extract"
     assert error_record.getMessage() == (
-        "collection failed for source 'tldr_ai': HTTPError "
-        "'HTTP Error 500: Internal Server Error'; "
+        "collection failed for source 'tldr_ai': SourceStatusError "
+        "'HTTP 500 Internal Server Error'; "
         "'tldr_ai 2026-10-04, from https://tldr.tech/ai/2026-10-04'"
     )
 

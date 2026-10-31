@@ -116,6 +116,9 @@ MAX_GITHUB_TOPICS = 100
 # HTTP. A source download waits this long for each network operation: the connection, or each
 # read (docs/specs-collecte.md).
 HTTP_TIMEOUT_SECONDS = 30
+# The redirections a source download follows, each one checked before it is requested: the number
+# urllib followed.
+HTTP_MAX_REDIRECTS = 10
 
 
 # How long the data of each acquisition mode is kept, in years after its collection; the purge

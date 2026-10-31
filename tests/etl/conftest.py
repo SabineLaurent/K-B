@@ -2,6 +2,7 @@
 empty base; a test file that needs another one defines its own."""
 
 import pytest
+from http_helpers import FakeNetwork, open_offline_http_client
 from test_transform import copy_fixture
 
 from k_b.database.creation import create_database
@@ -17,6 +18,21 @@ def no_wait_before_a_retry(monkeypatch):
     waits = []
     monkeypatch.setattr(http_download, "sleep", waits.append)
     return waits
+
+
+@pytest.fixture(autouse=True)
+def no_network(monkeypatch):
+    """A download in a test without its fake network fails the test instead of leaving the
+    machine."""
+    monkeypatch.setattr(http_download, "open_http_client", open_offline_http_client)
+
+
+@pytest.fixture
+def fake_network(monkeypatch):
+    """The network of a download: each request recorded, each answer given by the test."""
+    fake = FakeNetwork()
+    monkeypatch.setattr(http_download, "open_http_client", fake.open_http_client)
+    return fake
 
 
 @pytest.fixture(autouse=True)
