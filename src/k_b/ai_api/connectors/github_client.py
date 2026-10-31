@@ -82,8 +82,12 @@ class RepositoryBody(GithubModel):
     id: Annotated[Int64, Field(gt=0)]
     stargazers_count: Annotated[Int64, Field(ge=0)]
     created_at: UtcDatetime
-    # Without a control character (Cc).
-    language: Annotated[str, Field(pattern=r"^[^\x00-\x1f\x7f-\x9f]{1,100}$")] | None
+    # Without a hidden character (Cc, Cf, Co, Zl, Zp), as post/digest_sheets.py; no language name
+    # holds U+200D.
+    language: (
+        Annotated[str, Field(pattern=r"^[^\p{Cc}\p{Cf}\p{Co}\p{Zl}\p{Zp}]{1,100}$")]
+        | None
+    )
     topics: Annotated[
         list[Annotated[str, Field(pattern=r"^[a-z0-9-]{1,50}$")]],
         Field(max_length=MAX_GITHUB_TOPICS),

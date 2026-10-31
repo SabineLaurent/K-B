@@ -110,6 +110,11 @@ def test_a_language_null_is_none():
     assert read(SimulatedGithub(edit(language=None))).language is None
 
 
+@pytest.mark.parametrize("language", ["C#", "C++", "F*", "Ren'Py", "Visual Basic .NET"])
+def test_a_language_with_punctuation_is_read(language):
+    assert read(SimulatedGithub(edit(language=language))).language == language
+
+
 def test_another_id_leaves_the_candidate_out():
     assert read(SimulatedGithub(edit(id=REPOSITORY_ID + 1))) == "id_mismatch"
 
@@ -288,6 +293,9 @@ def test_a_body_beyond_the_bound_without_its_length_is_refused():
         {"created_at": "2018-12-08T08:21:47"},
         {"language": "Py\x1bthon"},
         {"language": ""},
+        {"language": "Py" + chr(0x202E) + "thon"},
+        {"language": "Py" + chr(0x200B) + "thon"},
+        {"language": "Py" + chr(0x2028) + "thon"},
         {"topics": ["Python"]},
         {"topics": ["a" * 51]},
         {"topics": ["python"] * 101},
@@ -301,6 +309,9 @@ def test_a_body_beyond_the_bound_without_its_length_is_refused():
         "created-at-naive",
         "language-control",
         "language-empty",
+        "language-format",
+        "language-zero-width",
+        "language-line-separator",
         "topic-uppercase",
         "topic-too-long",
         "too-many-topics",
