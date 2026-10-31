@@ -189,9 +189,7 @@ def send(reading: GithubReading, path: str) -> Answer:
 
 def read_bounded_body(response: httpx2.Response, deadline: Deadline) -> bytes:
     """The body, refused beyond MAX_GITHUB_REPOSITORY_BYTES without quoting it, and stopped as
-    soon as the deadline passes between two pieces. The second copy of the reading of
-    connectors/data_api_client.py: the decision "Une borne de lecture" (journal ADR) puts it in
-    core/outbound.py before 08/11."""
+    soon as the deadline passes between two pieces, as in connectors/data_api_client.py."""
     status = response.status_code
     length = response.headers.get("Content-Length")
     if (

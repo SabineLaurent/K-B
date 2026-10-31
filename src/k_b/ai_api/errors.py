@@ -37,7 +37,7 @@ STATUS_BY_STATE: dict[UpstreamState, int] = {
 def to_api_error(
     state: UpstreamState, retry_after_seconds: int | None = None
 ) -> ApiError:
-    """The error of the state; a Retry-After only when the provider gave one."""
+    """The error of the state, with its Retry-After when it has one."""
     headers = (
         None
         if retry_after_seconds is None

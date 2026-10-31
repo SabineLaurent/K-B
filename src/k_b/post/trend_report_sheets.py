@@ -167,7 +167,7 @@ def describe_dropped_candidates(dropped: DroppedCandidates) -> str:
         for reason, label in DROP_REASON_LABELS.items()
         if counts[reason]
     )
-    return f"Dépôts écartés par GitHub : {sum(counts.values())} ({reasons})."
+    return f"Candidats écartés par GitHub : {sum(counts.values())} ({reasons})."
 
 
 def describe_period(period: TrendPeriod) -> str:

@@ -248,7 +248,7 @@ entrent avec #369.
 
 Un candidat écarté **sort de `repositories[]`** : son nom peut désigner désormais un autre dépôt, et
 le coffre en ferait un lien. `kb` relit les compteurs par un schéma fermé, refuse ceux qui ne
-s'additionnent pas, et écrit, seulement si au moins un candidat est écarté : « Dépôts écartés par
+s'additionnent pas, et écrit, seulement si au moins un candidat est écarté : « Candidats écartés par
 GitHub : n (introuvables : …, bloqués : …, renommés ou déplacés : …, remplacés : …, refusés : …) »,
 les motifs à zéro omis. Sans écarté, le fichier est celui de #366. L'URL d'un dépôt reste construite
 par `kb` depuis son nom. Ses erreurs : celles de l'API de données et celles de GitHub (« Défenses et
@@ -311,9 +311,11 @@ jetons (`docs/jeton-github.md`, mis à jour par #367).
   jailbreak (sujet `llm_security` de la veille).
 
 **Traces.** Cinq spans (fenêtres, fiches, choix, README, rédaction), avec des comptes, des états et
-des `ref` (le span des fiches, `read_repository_cards`, depuis #367 : `k_b.candidates.selected`,
-`k_b.candidates.read`, `k_b.candidates.dropped.<motif>`, `k_b.github.requests`, et l'état d'un échec ;
-les `ref` naissent avec #368), jamais un nom de dépôt ni un `repository_id` (registre des traitements) ; le type `Stage`
+des `ref` (le span des fenêtres, `read_trend_windows`, porte `k_b.repositories.reported` : les dépôts
+qui remplissent un critère, comptés sur les fenêtres, avant GitHub ; le span des fiches,
+`read_repository_cards`, depuis #367 : `k_b.candidates.selected`, `k_b.candidates.read`,
+`k_b.candidates.dropped.<motif>` (les écartés), `k_b.github.requests`, et l'état d'un échec ; les `ref`
+naissent avec #368), jamais un nom de dépôt ni un `repository_id` (registre des traitements) ; le type `Stage`
 est étendu (`ai_api/stage_calls.py:11`). Aucun nom de dépôt dans les journaux.
 
 **Contenu des appels sous `KB_TRACE_CONTENT`**, comme les fiches (décision D1 du 2026-10-27, précisée

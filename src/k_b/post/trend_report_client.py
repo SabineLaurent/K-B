@@ -83,8 +83,7 @@ class DroppedCandidates(AiApiModel):
 
 
 class Candidates(AiApiModel):
-    """The repositories whose sheet the AI API read on GitHub; their facts are not read before
-    #369, which shows them."""
+    """The repositories whose sheet the AI API read on GitHub, counted; kb reads no fact."""
 
     selected: Count
     read: Count

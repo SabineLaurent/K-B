@@ -10,8 +10,9 @@ from post.test_trend_report_client import change_period, make_report, repository
 
 from k_b.core.config import DIGEST_SUBJECTS, TRENDS_DIR_NAME, WATCH_DIR_NAME
 from k_b.post.digest_sheets import is_writable_url
-from k_b.post.trend_report_client import TrendReportResponse
+from k_b.post.trend_report_client import DroppedCandidates, TrendReportResponse
 from k_b.post.trend_report_sheets import (
+    DROP_REASON_LABELS,
     GITHUB_URL,
     ReportFile,
     locate_report_file,
@@ -246,7 +247,7 @@ def test_the_candidates_left_out_by_github_are_counted_by_reason_after_the_table
     assert render(report).endswith(
         "Fenêtres manquantes : aucune.\n"
         "\n"
-        "Dépôts écartés par GitHub : 4 (introuvables : 1, renommés ou déplacés : 2,"
+        "Candidats écartés par GitHub : 4 (introuvables : 1, renommés ou déplacés : 2,"
         " refusés : 1).\n"
     )
 
@@ -262,6 +263,10 @@ def test_every_reason_of_github_has_its_label():
     report = make_report(candidates={"selected": 6, "read": 1, "dropped": dropped})
 
     assert render(report).endswith(
-        "Dépôts écartés par GitHub : 5 (introuvables : 1, bloqués : 1, renommés ou"
+        "Candidats écartés par GitHub : 5 (introuvables : 1, bloqués : 1, renommés ou"
         " déplacés : 1, remplacés : 1, refusés : 1).\n"
     )
+
+
+def test_the_labels_of_the_reasons_follow_the_dropped_candidates():
+    assert list(DROP_REASON_LABELS) == list(DroppedCandidates.model_fields)
