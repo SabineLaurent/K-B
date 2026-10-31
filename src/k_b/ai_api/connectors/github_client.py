@@ -82,8 +82,8 @@ class RepositoryBody(GithubModel):
     id: Annotated[Int64, Field(gt=0)]
     stargazers_count: Annotated[Int64, Field(ge=0)]
     created_at: UtcDatetime
-    # Without a hidden character (Cc, Cf, Co, Zl, Zp), as post/digest_sheets.py; no language name
-    # holds U+200D.
+    # Without a hidden character (Cc, Cf, Co, Zl, Zp): the family of post/digest_sheets.py, Co
+    # added; a lone surrogate (Cs) is refused by the JSON parser. No language name holds U+200D.
     language: (
         Annotated[str, Field(pattern=r"^[^\p{Cc}\p{Cf}\p{Co}\p{Zl}\p{Zp}]{1,100}$")]
         | None

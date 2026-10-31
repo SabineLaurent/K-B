@@ -105,6 +105,10 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   `KB_DATA_DIR/trend_reports.json`, jamais par une relecture du coffre. `kb trend-report` est le
   client `KB_TREND_REPORT` de l'API IA (`KB_AI_API_KEY_KB_TREND_REPORT`, une clé distincte de celle
   de `kb digest`).
+- Depuis #367, `kb serve-ai` ne démarre pas sans `KB_AI_GITHUB_TOKEN`, un second jeton
+  *fine-grained* (`github_pat_`, `docs/jeton-github.md`) : l'API IA lit la fiche GitHub de chaque
+  candidat d'un compte rendu. Aucun test n'appelle GitHub : `make_app` des tests de la route sert la
+  fixture par un GitHub simulé.
 
 ## Consignes de travail
 

@@ -311,8 +311,9 @@ jetons (`docs/jeton-github.md`, mis à jour par #367).
   jailbreak (sujet `llm_security` de la veille).
 
 **Traces.** Cinq spans (fenêtres, fiches, choix, README, rédaction), avec des comptes, des états et
-des `ref` (le span des fenêtres, `read_trend_windows`, porte `k_b.repositories.reported` : les dépôts
-qui remplissent un critère, comptés sur les fenêtres, avant GitHub ; le span des fiches,
+des `ref` (le span des fenêtres, `read_trend_windows`, porte `k_b.windows.period`, `k_b.windows.read`,
+`k_b.windows.missing`, `k_b.windows.capped`, `k_b.repositories.dropped` et `k_b.repositories.reported` :
+les dépôts qui remplissent un critère, comptés sur les fenêtres, avant GitHub ; le span des fiches,
 `read_repository_cards`, depuis #367 : `k_b.candidates.selected`, `k_b.candidates.read`,
 `k_b.candidates.dropped.<motif>` (les écartés), `k_b.github.requests`, et l'état d'un échec ; les `ref`
 naissent avec #368), jamais un nom de dépôt ni un `repository_id` (registre des traitements) ; le type `Stage`
