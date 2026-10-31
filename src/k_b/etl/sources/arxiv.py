@@ -37,9 +37,6 @@ from k_b.items import (
 SOURCE_CODE: SourceCode = "arxiv"
 
 
-# The feed is read by defusedxml: ElementTree alone expands an entity declared in the feed.
-# defusedxml refuses any entity declaration, internal or external; an external DTD is
-# accepted but never loaded.
 ATOM = "{http://www.w3.org/2005/Atom}"
 
 
@@ -161,13 +158,17 @@ def read_papers(raw_response: bytes) -> EntryReading[Paper]:
 
 
 def parse_feed(raw_response: bytes) -> ElementTree.Element:
+    # Read by defusedxml: ElementTree alone expands an entity declared in the feed. defusedxml
+    # refuses any entity declaration, internal or external; an external DTD is accepted but
+    # never loaded.
     try:
         feed = DefusedElementTree.fromstring(raw_response)
     except ElementTree.ParseError as error:
         raise PageRefusedError(f"not an XML document: {error}") from error
     except DefusedXmlException as error:
-        # The type only: the exception holds the declared values, which come from the feed.
-        raise PageRefusedError(f"XML refused: {type(error).__name__}") from error
+        # The type only, unchained: the exception quotes the entity name and the address
+        # declared in the feed.
+        raise PageRefusedError(f"XML refused: {type(error).__name__}") from None
     if feed.tag != f"{ATOM}feed":
         raise PageRefusedError("expected an Atom feed")
     return feed

@@ -1,4 +1,5 @@
 import io
+import traceback
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -328,13 +329,28 @@ def test_a_response_that_is_not_an_arxiv_feed_is_refused(raw_response):
         read_total_results(raw_response)
 
 
-def test_a_feed_declaring_an_internal_entity_is_refused_unexpanded():
+@pytest.mark.parametrize("read_feed", [count_papers, read_total_results, read_papers])
+def test_a_feed_declaring_an_internal_entity_is_refused_unexpanded(read_feed):
     raw_response = b'<!DOCTYPE feed [<!ENTITY a "x">]>' + feed_with_entry(
         entry_xml(title="<title>&a;</title>")
     )
 
     with pytest.raises(PageRefusedError, match="^XML refused: EntitiesForbidden$"):
+        read_feed(raw_response)
+
+
+def test_a_refused_entity_leaves_no_value_of_the_feed_in_the_traceback():
+    raw_response = (
+        b'<!DOCTYPE feed [<!ENTITY declaredname SYSTEM "https://declared.example/">]>'
+        + feed_with_entry(entry_xml())
+    )
+
+    with pytest.raises(PageRefusedError) as refusal:
         read_papers(raw_response)
+
+    trace = "".join(traceback.format_exception(refusal.value))
+    assert "declaredname" not in trace
+    assert "declared.example" not in trace
 
 
 def test_a_feed_declaring_an_external_entity_is_refused_unread():

@@ -4751,8 +4751,9 @@ Conception de time-knight, relue par un sous-agent, validée par Sabine le 31/10
   raison de sécurité » ; dépendances accordées le 31/10 : `defusedxml`, et `types-defusedxml` en
   dépendance de développement (`mypy --strict` en CI ; Q-A, « je suis ta recommandation »). Le flux
   est une donnée non fiable, et `xml.etree.ElementTree` seul développe une entité interne déclarée
-  dans son DTD (observé par le test). Une déclaration d'entité devient `PageRefusedError("XML
-  refused: <type>")`, sans le contenu du flux, que l'exception porte. Écartés : garder `ElementTree`
+  dans son DTD (observé le 31/10 : le test de l'entité interne, lancé sur l'ancien code, ne lève
+  rien). Une déclaration d'entité devient `PageRefusedError("XML refused: <type>")`, sans chaîner
+  l'exception de defusedxml, qui cite le nom de l'entité et l'adresse déclarés dans le flux. Écartés : garder `ElementTree`
   avec un `# noqa: S314` justifié (l'entité interne resterait développée) ; `forbid_dtd=True` (refuse
   un flux pour un seul `DOCTYPE`, sans protection de plus que les entités et références externes
   refusées) ; `# type: ignore[import-untyped]` ou un `cast` au lieu des types. Limite assumée : une
