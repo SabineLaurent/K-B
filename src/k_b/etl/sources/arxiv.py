@@ -166,8 +166,8 @@ def parse_feed(raw_response: bytes) -> ElementTree.Element:
     except ElementTree.ParseError as error:
         raise PageRefusedError(f"not an XML document: {error}") from error
     except DefusedXmlException as error:
-        # The type only, unchained: the exception quotes the entity name and the address
-        # declared in the feed.
+        # The type only, its cause hidden from the trace: the exception quotes the entity name
+        # and the address declared in the feed.
         raise PageRefusedError(f"XML refused: {type(error).__name__}") from None
     if feed.tag != f"{ATOM}feed":
         raise PageRefusedError("expected an Atom feed")
