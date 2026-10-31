@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from time import time
 from urllib.error import HTTPError
 
-from k_b.core.github_api import API_VERSION
+from k_b.core.github_api import API_URL, API_VERSION
 from k_b.etl.http_download import download
 from k_b.etl.http_retry import find_pause_end
 from k_b.etl.source_contract import ExpectedSourceError
@@ -14,7 +14,6 @@ from k_b.items import SourceCode
 
 # The source of every GitHub module, in the source table of the base.
 SOURCE_CODE: SourceCode = "github"
-API_URL = "https://api.github.com/"
 TOKEN_VARIABLE = "KB_GITHUB_TOKEN"  # noqa: S105 — the variable's name, not a token
 # A page of 100 releases of anthropics/claude-code weighs 2.2 MB in 2026.
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024

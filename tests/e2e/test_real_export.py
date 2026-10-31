@@ -21,6 +21,7 @@ from pydantic import SecretStr
 from k_b.ai_api.app import create_app
 from k_b.ai_api.connectors import metrics_export
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
+from k_b.ai_api.connectors.github_settings import GithubSettings
 from k_b.ai_api.connectors.llm_replay import REPLAY_STEPS
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.connectors.metrics_export import (
@@ -87,6 +88,7 @@ def test_the_measures_of_a_request_reach_the_otlp_endpoint(
             replay_steps=tuple(REPLAY_STEPS.validate_python(REPLAY)),
         ),
         DataApiSettings(base_url="http://localhost", api_key=SecretStr(data_api_key)),
+        GithubSettings(token=SecretStr(f"github_pat_{secrets.token_hex(41)}")),
         DIGEST_SUBJECTS,
         WINDOW_DAYS,
         ModelMetrics.from_settings(settings, resource),

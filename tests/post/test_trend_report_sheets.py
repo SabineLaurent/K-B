@@ -226,3 +226,42 @@ def test_before_the_request_a_folder_linked_elsewhere_is_refused(tmp_path):
         "vault_link_refused: veille/tendances is a symbolic link"
     )
     assert not (vault / "veille" / "tendances" / "2026-11-01.md").exists()
+
+
+def test_the_candidates_left_out_by_github_are_counted_by_reason_after_the_table():
+    report = make_report(
+        candidates={
+            "selected": 10,
+            "read": 6,
+            "dropped": {
+                "not_found": 1,
+                "unavailable_for_legal_reasons": 0,
+                "moved": 2,
+                "id_mismatch": 0,
+                "forbidden": 1,
+            },
+        }
+    )
+
+    assert render(report).endswith(
+        "Fenêtres manquantes : aucune.\n"
+        "\n"
+        "Dépôts écartés par GitHub : 4 (introuvables : 1, renommés ou déplacés : 2,"
+        " refusés : 1).\n"
+    )
+
+
+def test_every_reason_of_github_has_its_label():
+    dropped = {
+        "not_found": 1,
+        "unavailable_for_legal_reasons": 1,
+        "moved": 1,
+        "id_mismatch": 1,
+        "forbidden": 1,
+    }
+    report = make_report(candidates={"selected": 6, "read": 1, "dropped": dropped})
+
+    assert render(report).endswith(
+        "Dépôts écartés par GitHub : 5 (introuvables : 1, bloqués : 1, renommés ou"
+        " déplacés : 1, remplacés : 1, refusés : 1).\n"
+    )

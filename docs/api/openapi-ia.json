@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "K-B AI API",
-    "version": "0.5.0"
+    "version": "0.6.0"
   },
   "paths": {
     "/digests": {
@@ -162,7 +162,17 @@
             }
           },
           "502": {
-            "description": "data_api_invalid_response, data_api_unauthorized, data_api_unavailable",
+            "description": "data_api_invalid_response, data_api_unauthorized, data_api_unavailable, github_forbidden, github_invalid_response, github_unauthorized, github_unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "github_rate_limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -172,7 +182,7 @@
             }
           },
           "504": {
-            "description": "data_api_timeout",
+            "description": "data_api_timeout, github_timeout",
             "content": {
               "application/json": {
                 "schema": {
@@ -192,6 +202,37 @@
   },
   "components": {
     "schemas": {
+      "CandidatesSchema": {
+        "properties": {
+          "selected": {
+            "type": "integer",
+            "title": "Selected",
+            "description": "The repositories whose sheet is read on GitHub, 60 at most, those meeting a criterion first; read plus the sum of dropped."
+          },
+          "read": {
+            "type": "integer",
+            "title": "Read"
+          },
+          "dropped": {
+            "$ref": "#/components/schemas/DroppedCandidatesSchema",
+            "description": "Left out by GitHub, by reason; out of repositories."
+          }
+        },
+        "type": "object",
+        "required": [
+          "selected",
+          "read",
+          "dropped"
+        ],
+        "title": "CandidatesSchema"
+      },
+      "Caution": {
+        "type": "string",
+        "enum": [
+          "created_recently",
+          "no_license"
+        ]
+      },
       "ClaimSchema": {
         "properties": {
           "text": {
@@ -369,6 +410,42 @@
         ],
         "title": "DigestsSchema"
       },
+      "DroppedCandidatesSchema": {
+        "properties": {
+          "not_found": {
+            "type": "integer",
+            "title": "Not Found"
+          },
+          "unavailable_for_legal_reasons": {
+            "type": "integer",
+            "title": "Unavailable For Legal Reasons"
+          },
+          "moved": {
+            "type": "integer",
+            "title": "Moved",
+            "description": "A redirection, not followed."
+          },
+          "id_mismatch": {
+            "type": "integer",
+            "title": "Id Mismatch",
+            "description": "Another repository under the name."
+          },
+          "forbidden": {
+            "type": "integer",
+            "title": "Forbidden",
+            "description": "A 403 that is not a rate limit."
+          }
+        },
+        "type": "object",
+        "required": [
+          "not_found",
+          "unavailable_for_legal_reasons",
+          "moved",
+          "id_mismatch",
+          "forbidden"
+        ],
+        "title": "DroppedCandidatesSchema"
+      },
       "ErrorSchema": {
         "properties": {
           "error": {
@@ -434,6 +511,68 @@
           "llm_unavailable",
           "llm_timeout"
         ]
+      },
+      "RepositoryFactsSchema": {
+        "properties": {
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License",
+            "description": "Its SPDX identifier; null when GitHub recognizes no license."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Topics"
+          },
+          "stars_total": {
+            "type": "integer",
+            "title": "Stars Total",
+            "description": "Read on GitHub at the request, never kept."
+          },
+          "cautions": {
+            "items": {
+              "$ref": "#/components/schemas/Caution"
+            },
+            "type": "array",
+            "title": "Cautions",
+            "description": "created_recently (less than 7 days before the request), then no_license."
+          }
+        },
+        "type": "object",
+        "required": [
+          "license",
+          "created_at",
+          "language",
+          "topics",
+          "stars_total",
+          "cautions"
+        ],
+        "title": "RepositoryFactsSchema"
       },
       "SourceSchema": {
         "properties": {
@@ -643,12 +782,15 @@
             },
             "type": "array",
             "title": "Repositories",
-            "description": "Those meeting a criterion, by best rank then repository_id."
+            "description": "Those meeting a criterion, by best rank then repository_id, but the candidates GitHub left out."
           },
           "repositories_dropped": {
             "type": "integer",
             "title": "Repositories Dropped",
             "description": "Repositories meeting a criterion left out, their name `.` or with `..`."
+          },
+          "candidates": {
+            "$ref": "#/components/schemas/CandidatesSchema"
           }
         },
         "type": "object",
@@ -657,7 +799,8 @@
           "model",
           "period",
           "repositories",
-          "repositories_dropped"
+          "repositories_dropped",
+          "candidates"
         ],
         "title": "TrendReportSchema"
       },
@@ -690,6 +833,17 @@
             "type": "array",
             "title": "Trajectory",
             "description": "One point per window of the period, in its order."
+          },
+          "facts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RepositoryFactsSchema"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Read on GitHub; null when the repository is not a candidate."
           }
         },
         "type": "object",
@@ -698,7 +852,8 @@
           "repository_name",
           "criteria",
           "best_rank",
-          "trajectory"
+          "trajectory",
+          "facts"
         ],
         "title": "TrendRepositorySchema"
       },

@@ -1,17 +1,35 @@
 """The factual trend report: the period after the previous report, its windows read by the data API
-under the deadline, then the repositories that meet a criterion (docs/tendances.md); nothing is
-written nor logged here, the reading is a span without any repository."""
+under the deadline, the repositories that meet a criterion, then the sheet of each candidate read
+on GitHub (docs/tendances.md); nothing is written nor logged here, each reading is a span without
+any repository."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import httpx2
 
 from k_b.ai_api.connectors.data_api_client import DataApiError, read_trend_window
+from k_b.ai_api.connectors.github_client import (
+    GithubError,
+    GithubReading,
+    read_repository,
+)
 from k_b.ai_api.deadline import Deadline
+from k_b.ai_api.repository_cards import (
+    CandidateCounts,
+    DropReason,
+    RepositoryCard,
+    RepositoryFacts,
+    to_facts,
+)
 from k_b.ai_api.tracing import TRACING_OFF, Tracing
-from k_b.ai_api.trajectories import StarWindow, Trajectory, find_trajectories
+from k_b.ai_api.trajectories import (
+    StarWindow,
+    Trajectory,
+    find_trajectories,
+    select_candidates,
+)
 from k_b.core.config import (
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
     TREND_DURABLE_LOOKBACK_WINDOWS,
@@ -33,11 +51,35 @@ class TrendPeriod:
 
 
 @dataclass(frozen=True)
-class TrendReport:
+class Trends:
+    """The trajectories of the period, before GitHub."""
+
     period: TrendPeriod
-    repositories: tuple[Trajectory, ...]
+    # Every repository of a top of the period whose name can go into a path, meeting a criterion
+    # or not, by best rank then repository_id.
+    trajectories: tuple[Trajectory, ...]
     # Meeting a criterion, left out: their name, `.` or with `..`, would go into a path.
     repositories_dropped: int
+
+
+@dataclass(frozen=True)
+class CardReading:
+    """The sheets of the candidates read on GitHub."""
+
+    facts: Mapping[int, RepositoryFacts]
+    dropped_ids: frozenset[int]
+    counts: CandidateCounts
+
+
+@dataclass(frozen=True)
+class TrendReport:
+    period: TrendPeriod
+    # Meeting a criterion, but the candidates GitHub left out.
+    repositories: tuple[Trajectory, ...]
+    repositories_dropped: int
+    # By repository_id, for the candidates read only.
+    facts: Mapping[int, RepositoryFacts]
+    candidates: CandidateCounts
 
 
 @dataclass(frozen=True)
@@ -55,33 +97,47 @@ class PeriodReading:
 
 
 def build_trend_report(
-    http_client: httpx2.Client,
+    data_api_client: httpx2.Client,
+    github_client: httpx2.Client,
     after: date | None,
     previous_first_window: date | None,
     deadline: Deadline,
+    now: datetime,
     *,
     tracing: Tracing = TRACING_OFF,
 ) -> TrendReport:
     """The repositories that meet a criterion over the windows after `after`, the last window of
-    the previous report, None for the first; a failure of the data API raises its DataApiError."""
+    the previous report, None for the first, with the sheet of each candidate read on GitHub at
+    `now`, the time of the request; a failure raises its DataApiError or its GithubError."""
     with tracing.step("read_trend_windows") as step:
         try:
-            reading = read_period(http_client, after, previous_first_window, deadline)
+            reading = read_period(
+                data_api_client, after, previous_first_window, deadline
+            )
         except DataApiError as error:
             step.fail(error.state)
             raise
-        report = to_trend_report(after is None, reading)
+        trends = find_trends(after is None, reading)
         step.set(
             {
-                "k_b.windows.period": len(report.period.windows),
+                "k_b.windows.period": len(trends.period.windows),
                 "k_b.windows.read": reading.requests,
-                "k_b.windows.missing": len(report.period.missing_windows),
-                "k_b.windows.capped": report.period.windows_capped,
-                "k_b.repositories.reported": len(report.repositories),
-                "k_b.repositories.dropped": report.repositories_dropped,
+                "k_b.windows.missing": len(trends.period.missing_windows),
+                "k_b.windows.capped": trends.period.windows_capped,
+                "k_b.repositories.reported": count_meeting_a_criterion(
+                    trends.trajectories
+                ),
+                "k_b.repositories.dropped": trends.repositories_dropped,
             }
         )
-        return report
+    cards = read_repository_cards(
+        github_client,
+        select_candidates(trends.trajectories),
+        deadline,
+        now,
+        tracing=tracing,
+    )
+    return to_trend_report(trends, cards)
 
 
 def read_period(
@@ -148,24 +204,21 @@ def list_days_before(day: date, count: int) -> list[date]:
     return [day - timedelta(days=count - offset) for offset in range(count)]
 
 
-def to_trend_report(first_report: bool, reading: PeriodReading) -> TrendReport:
-    """The repositories that meet a criterion; new is not evaluated when every window of the
-    previous report is missing."""
+def find_trends(first_report: bool, reading: PeriodReading) -> Trends:
+    """The trajectories of the period; new is not evaluated when every window of the previous
+    report is missing."""
     previous = reading.previous
     if previous is not None and not any(end in reading.windows for end in previous):
         previous = None
     trajectories = find_trajectories(
         reading.period, reading.windows, reading.lookback, previous
     )
-    meeting_a_criterion = [
-        trajectory for trajectory in trajectories if trajectory.criteria
-    ]
-    repositories = tuple(
+    named = tuple(
         trajectory
-        for trajectory in meeting_a_criterion
+        for trajectory in trajectories
         if is_repository_name(trajectory.repository_name)
     )
-    return TrendReport(
+    return Trends(
         period=TrendPeriod(
             first_report=first_report,
             windows=tuple(reading.period),
@@ -176,6 +229,69 @@ def to_trend_report(first_report: bool, reading: PeriodReading) -> TrendReport:
             new_evaluated=previous is not None,
             latest_window=reading.latest_window,
         ),
-        repositories=repositories,
-        repositories_dropped=len(meeting_a_criterion) - len(repositories),
+        trajectories=named,
+        repositories_dropped=count_meeting_a_criterion(trajectories)
+        - count_meeting_a_criterion(named),
+    )
+
+
+def count_meeting_a_criterion(trajectories: Sequence[Trajectory]) -> int:
+    return sum(1 for trajectory in trajectories if trajectory.criteria)
+
+
+def read_repository_cards(
+    http_client: httpx2.Client,
+    candidates: Sequence[Trajectory],
+    deadline: Deadline,
+    now: datetime,
+    *,
+    tracing: Tracing = TRACING_OFF,
+) -> CardReading:
+    """The sheet of each candidate, one request after the other; none without a candidate. A
+    span of counts and states, never a repository."""
+    reading = GithubReading(http_client, deadline, now)
+    facts: dict[int, RepositoryFacts] = {}
+    dropped: dict[int, DropReason] = {}
+    with tracing.step("read_repository_cards") as step:
+        try:
+            for candidate in candidates:
+                card = read_repository(
+                    reading, candidate.repository_id, candidate.repository_name
+                )
+                if isinstance(card, RepositoryCard):
+                    facts[candidate.repository_id] = to_facts(card, now)
+                else:
+                    dropped[candidate.repository_id] = card
+        except GithubError as error:
+            step.fail(error.state)
+            step.set({"k_b.github.requests": reading.requests})
+            raise
+        counts = CandidateCounts.count(len(candidates), dropped.values())
+        step.set(
+            {
+                "k_b.candidates.selected": counts.selected,
+                "k_b.candidates.read": counts.read,
+                **{
+                    f"k_b.candidates.dropped.{reason}": count
+                    for reason, count in counts.dropped.items()
+                },
+                "k_b.github.requests": reading.requests,
+            }
+        )
+    return CardReading(facts, frozenset(dropped), counts)
+
+
+def to_trend_report(trends: Trends, cards: CardReading) -> TrendReport:
+    """The repositories that meet a criterion, but the candidates GitHub left out: their name may
+    now name another repository."""
+    return TrendReport(
+        period=trends.period,
+        repositories=tuple(
+            trajectory
+            for trajectory in trends.trajectories
+            if trajectory.criteria and trajectory.repository_id not in cards.dropped_ids
+        ),
+        repositories_dropped=trends.repositories_dropped,
+        facts=cards.facts,
+        candidates=cards.counts,
     )

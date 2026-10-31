@@ -29,6 +29,7 @@ from k_b.core.config import DIGEST_SUBJECTS
 # The variables kb serve-ai reads, which a terminal may export (a .env loaded).
 READ_PREFIXES = (
     "KB_AI_API_",
+    "KB_AI_GITHUB_",
     "KB_LLM_",
     "KB_DATA_API_",
     "KB_DIGEST_",
@@ -45,6 +46,9 @@ def make_key():
 
 # Made for the test: never a real token.
 OTLP_TOKEN = make_key()
+# Made for the test: never a real token; token_hex gives characters a fine-grained token holds.
+GITHUB_TOKEN = f"github_pat_{secrets.token_hex(41)}"
+CLASSIC_GITHUB_TOKEN = f"ghp_{secrets.token_hex(18)}"
 
 
 @pytest.fixture(autouse=True)
@@ -69,6 +73,7 @@ def environment(replay_file):
         "KB_LLM_PROVIDER": "replay",
         "KB_LLM_REPLAY_FILE": str(replay_file),
         "KB_DATA_API_KEY_AI_DIGEST": make_key(),
+        "KB_AI_GITHUB_TOKEN": GITHUB_TOKEN,
     }
 
 
@@ -210,6 +215,15 @@ def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
             },
             "KB_TRACE_CONTENT: all refused in production, anomalies or none",
         ),
+        ({"KB_AI_GITHUB_TOKEN": None}, "KB_AI_GITHUB_TOKEN: not set"),
+        (
+            {"KB_AI_GITHUB_TOKEN": CLASSIC_GITHUB_TOKEN},
+            "KB_AI_GITHUB_TOKEN: not a fine-grained token (prefix github_pat_)",
+        ),
+        (
+            {"KB_AI_GITHUB_TOKEN": f"{GITHUB_TOKEN}-"},
+            "KB_AI_GITHUB_TOKEN: token with a character outside [A-Za-z0-9_]+",
+        ),
     ],
     ids=[
         "no-key",
@@ -229,6 +243,9 @@ def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
         "otel-variable",
         "content-without-export",
         "content-all-in-production",
+        "no-github-token",
+        "classic-github-token",
+        "github-token-with-a-dash",
     ],
 )
 def test_serve_ai_exits_2_and_names_the_variable_refused(
@@ -253,6 +270,23 @@ def test_serve_ai_exits_2_and_names_the_variable_refused(
         if environment.get(name):
             assert environment[name] not in error_output
     assert OTLP_TOKEN not in error_output
+    assert GITHUB_TOKEN not in error_output
+    assert CLASSIC_GITHUB_TOKEN not in error_output
+
+
+def test_serve_ai_says_it_loaded_the_github_token_never_its_value(
+    monkeypatch, capsys, data_dir, uvicorn_calls, environment
+):
+    set_environment(monkeypatch, environment)
+
+    exit_code = cli.main(["serve-ai"])
+
+    [(app, _)] = uvicorn_calls
+    error_output = capsys.readouterr().err
+    assert exit_code == 0
+    assert "GitHub token of the trend reports loaded" in error_output
+    assert GITHUB_TOKEN not in error_output
+    assert app.state.github_settings.token.get_secret_value() == GITHUB_TOKEN
 
 
 def test_serve_ai_without_export_says_it_and_gives_the_app_its_measures(

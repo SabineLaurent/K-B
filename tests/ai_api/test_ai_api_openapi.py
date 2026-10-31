@@ -11,6 +11,7 @@ from pydantic import SecretStr
 from k_b import cli
 from k_b.ai_api.app import create_app
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
+from k_b.ai_api.connectors.github_settings import GithubSettings
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.connectors.metrics_export import build_resource
 from k_b.ai_api.connectors.trace_export import TraceExport
@@ -48,6 +49,7 @@ def test_the_openapi_depends_on_neither_the_keys_nor_the_settings():
             base_url="http://api-donnees:8000",
             api_key=SecretStr(secrets.token_urlsafe(32)),
         ),
+        GithubSettings(token=SecretStr(f"github_pat_{secrets.token_hex(41)}")),
         (DigestSubject("subject_of_the_test", "défini par le test"),),
         14,
         ModelMetrics.from_settings(None, build_resource(None)),
@@ -62,8 +64,8 @@ def test_the_versioned_openapi_is_valid_and_closes_its_route_by_a_key():
 
     OpenAPIV31SpecValidator(openapi).validate()
     # 0.2.0: model in the response (#209); 0.3.0: unanswered (#210); 0.4.0: three fields renamed;
-    # 0.5.0: POST /trend-reports (#366).
-    assert openapi["info"] == {"title": "K-B AI API", "version": "0.5.0"}
+    # 0.5.0: POST /trend-reports (#366); 0.6.0: the sheets read on GitHub (#367).
+    assert openapi["info"] == {"title": "K-B AI API", "version": "0.6.0"}
     assert "model" in openapi["components"]["schemas"]["DigestsSchema"]["required"]
     assert list(openapi["paths"]) == ["/digests", "/trend-reports"]
     assert openapi["components"]["securitySchemes"] == {
@@ -95,7 +97,7 @@ def test_the_route_documents_each_named_state():
     }
 
 
-def test_the_trend_report_documents_the_states_of_the_data_api_only():
+def test_the_trend_report_documents_the_states_of_the_data_api_and_of_github():
     paths = read_versioned_openapi()["paths"]
     responses = paths["/trend-reports"]["post"]["responses"]
 
@@ -107,8 +109,10 @@ def test_the_trend_report_documents_the_states_of_the_data_api_only():
         "401": "invalid_api_key",
         "422": "invalid_parameter",
         "500": "internal_error",
-        "502": "data_api_invalid_response, data_api_unauthorized, data_api_unavailable",
-        "504": "data_api_timeout",
+        "502": "data_api_invalid_response, data_api_unauthorized, data_api_unavailable,"
+        " github_forbidden, github_invalid_response, github_unauthorized, github_unavailable",
+        "503": "github_rate_limited",
+        "504": "data_api_timeout, github_timeout",
     }
 
 

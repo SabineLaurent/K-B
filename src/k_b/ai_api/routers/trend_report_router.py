@@ -1,17 +1,23 @@
 """POST /trend-reports: the repositories of the GH Archive windows after the previous report that
-meet a criterion, read by the data API under the deadline; nothing is kept, each request is a
-trace."""
+meet a criterion, read by the data API under the deadline, with the sheet of each candidate read
+on GitHub; nothing is kept, each request is a trace."""
 
 import logging
+from datetime import datetime
 
 import httpx2
 from fastapi import APIRouter, Request, status
 
 from k_b.ai_api.connectors.data_api_client import DataApiError
+from k_b.ai_api.connectors.github_client import GithubError
 from k_b.ai_api.deadline import Deadline
-from k_b.ai_api.dependencies import DataApiClient
+from k_b.ai_api.dependencies import DataApiClient, GithubClient, RequestTime
 from k_b.ai_api.errors import TREND_REPORT_ERROR_RESPONSES, to_api_error
+from k_b.ai_api.repository_cards import RepositoryFacts
 from k_b.ai_api.schemas.trend_report_schema import (
+    CandidatesSchema,
+    DroppedCandidatesSchema,
+    RepositoryFactsSchema,
     TrajectoryPointSchema,
     TrendPeriodSchema,
     TrendReportRequestSchema,
@@ -42,6 +48,8 @@ def post_trend_reports(
     request: Request,
     demand: TrendReportRequestSchema,
     data_api_client: DataApiClient,
+    github_client: GithubClient,
+    request_time: RequestTime,
 ) -> TrendReportSchema:
     """The repositories that meet a criterion over the windows after the previous report, each
     with its trajectory; no window after it gives an empty period, a reading that fails fails the
@@ -56,7 +64,12 @@ def post_trend_reports(
     ) as root:
         try:
             report = read_trend_report(
-                data_api_client, request_id, demand, tracing=tracing
+                data_api_client,
+                github_client,
+                request_id,
+                demand,
+                request_time,
+                tracing=tracing,
             )
             response = to_trend_report_schema(request_id, report)
         except ApiError as error:
@@ -72,21 +85,25 @@ def post_trend_reports(
 
 
 def read_trend_report(
-    http_client: httpx2.Client,
+    data_api_client: httpx2.Client,
+    github_client: httpx2.Client,
     request_id: str,
     demand: TrendReportRequestSchema,
+    request_time: datetime,
     *,
     tracing: Tracing = TRACING_OFF,
 ) -> TrendReport:
-    """The report under its deadline; a failure of the data API is logged here and fails the
-    request."""
+    """The report under its deadline; a failure of the data API or of GitHub is logged here, its
+    state and its HTTP status, never a repository, and fails the whole request."""
     deadline = Deadline.after(TREND_REPORT_REQUEST_TIMEOUT_SECONDS)
     try:
         return build_trend_report(
-            http_client,
+            data_api_client,
+            github_client,
             demand.after,
             demand.previous_first_window,
             deadline,
+            request_time,
             tracing=tracing,
         )
     except DataApiError as error:
@@ -94,6 +111,13 @@ def read_trend_report(
             "reading of the trend windows failed: %s, request_id=%s", error, request_id
         )
         raise to_api_error(error.state) from None
+    except GithubError as error:
+        logger.error(
+            "reading of the repository cards failed: %s, request_id=%s",
+            error,
+            request_id,
+        )
+        raise to_api_error(error.state, error.retry_after_seconds) from None
 
 
 def to_trend_report_schema(request_id: str, report: TrendReport) -> TrendReportSchema:
@@ -111,13 +135,21 @@ def to_trend_report_schema(request_id: str, report: TrendReport) -> TrendReportS
             latest_window=period.latest_window,
         ),
         repositories=[
-            to_repository_schema(trajectory) for trajectory in report.repositories
+            to_repository_schema(trajectory, report.facts.get(trajectory.repository_id))
+            for trajectory in report.repositories
         ],
         repositories_dropped=report.repositories_dropped,
+        candidates=CandidatesSchema(
+            selected=report.candidates.selected,
+            read=report.candidates.read,
+            dropped=DroppedCandidatesSchema.model_validate(report.candidates.dropped),
+        ),
     )
 
 
-def to_repository_schema(trajectory: Trajectory) -> TrendRepositorySchema:
+def to_repository_schema(
+    trajectory: Trajectory, facts: RepositoryFacts | None
+) -> TrendRepositorySchema:
     return TrendRepositorySchema(
         repository_id=trajectory.repository_id,
         repository_name=trajectory.repository_name,
@@ -132,4 +164,16 @@ def to_repository_schema(trajectory: Trajectory) -> TrendRepositorySchema:
             )
             for point in trajectory.points
         ],
+        facts=None if facts is None else to_facts_schema(facts),
+    )
+
+
+def to_facts_schema(facts: RepositoryFacts) -> RepositoryFactsSchema:
+    return RepositoryFactsSchema(
+        license=facts.license,
+        created_at=facts.created_at,
+        language=facts.language,
+        topics=list(facts.topics),
+        stars_total=facts.stars_total,
+        cautions=list(facts.cautions),
     )

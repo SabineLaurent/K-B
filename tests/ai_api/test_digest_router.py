@@ -22,6 +22,8 @@ from pydantic import SecretStr
 from k_b.ai_api.app import create_app
 from k_b.ai_api.connectors.data_api_client import DataApiState
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
+from k_b.ai_api.connectors.github_client import GithubState
+from k_b.ai_api.connectors.github_settings import GithubSettings
 from k_b.ai_api.connectors.llm_client import LlmFailure, build_http_client
 from k_b.ai_api.connectors.llm_replay import REPLAY_STEPS, ReplayTransport
 from k_b.ai_api.connectors.llm_settings import LlmSettings
@@ -30,7 +32,11 @@ from k_b.ai_api.dependencies import (
     open_llm_client,
     read_request_time,
 )
-from k_b.ai_api.errors import STATUS_BY_STATE
+from k_b.ai_api.errors import (
+    ERROR_RESPONSES,
+    STATUS_BY_STATE,
+    TREND_REPORT_ERROR_RESPONSES,
+)
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.ai_api.routers import digest_router
 from k_b.ai_api.tracing import TRACING_OFF
@@ -170,6 +176,7 @@ def make_ai_api(data_api, metric_reader, recorded_traces):
                 base_url="http://localhost",
                 api_key=SecretStr(secrets.token_urlsafe(32)),
             ),
+            GithubSettings(token=SecretStr(f"github_pat_{secrets.token_hex(41)}")),
             TEST_SUBJECTS,
             default_window_days,
             ModelMetrics(
@@ -911,6 +918,7 @@ def test_the_measures_the_spans_and_the_logs_are_sent_at_once_when_the_app_stops
         DataApiSettings(
             base_url="http://localhost", api_key=SecretStr(secrets.token_urlsafe(32))
         ),
+        GithubSettings(token=SecretStr(f"github_pat_{secrets.token_hex(41)}")),
         TEST_SUBJECTS,
         WINDOW_DAYS,
         model_metrics,
@@ -998,6 +1006,7 @@ def test_each_state_that_fails_a_request_has_its_status():
     failure_states = {
         *get_args(LlmFailure.__value__),
         *get_args(DataApiState.__value__),
+        *get_args(GithubState.__value__),
     }
 
     assert set(STATUS_BY_STATE) == failure_states
@@ -1251,3 +1260,23 @@ def test_each_claim_removed_is_an_evaluation_tied_to_its_last_request(
     assert not any(name.startswith("exception.") for name in log_record.attributes)
     agent = recorded_traces.find_spans("write_subject")[1]
     assert agent.attributes["k_b.claims.removed"] == 1
+
+
+def test_the_errors_of_each_route_are_its_upstream_states():
+    """POST /digests does not read GitHub; POST /trend-reports does not call the model."""
+    digest_states = {
+        state
+        for status in ERROR_RESPONSES.values()
+        for state in status["description"].split(", ")
+    }
+    trend_states = {
+        state
+        for status in TREND_REPORT_ERROR_RESPONSES.values()
+        for state in status["description"].split(", ")
+    }
+
+    assert not any(state.startswith("github_") for state in digest_states)
+    assert {*get_args(LlmFailure.__value__)} <= digest_states
+    assert not any(state.startswith("llm_") for state in trend_states)
+    assert {*get_args(GithubState.__value__)} <= trend_states
+    assert {*get_args(DataApiState.__value__)} <= digest_states & trend_states

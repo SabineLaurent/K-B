@@ -96,6 +96,22 @@ TREND_DURABLE_LOOKBACK_WINDOWS = 2
 TREND_ACCELERATION_MIN_RANKS = 5
 # The repositories whose sheet is read on GitHub, those meeting a criterion first.
 TREND_MAX_CANDIDATES = 60
+# A repository created less than 7 days before the request: a caution of its sheet.
+TREND_RECENT_REPOSITORY_DAYS = 7
+# The reading of the sheets on GitHub by the AI API (docs/tendances.md, "GitHub"). Requests per
+# report, retries included: 60 candidates and room for their retries; the README of #369 will
+# share it.
+GITHUB_MAX_REQUESTS_PER_REPORT = 70
+# A 403 that is not a rate limit leaves its candidate out; the third of a report stops the reading,
+# so that a rate limit misread is never insisted on (decision of Sabine of 2026-10-31, Q1 (b)).
+GITHUB_MAX_FORBIDDEN_PER_REPORT = 3
+# The Retry-After returned for a rate limit, at most: the hour of the primary rate limit.
+MAX_GITHUB_RETRY_AFTER_SECONDS = 3600
+# The body of GET /repos/{owner}/{repo}: 6,382 bytes for fastapi/fastapi (2026-10-31,
+# tests/fixtures/github_repository_extract.json); about 60 times it.
+MAX_GITHUB_REPOSITORY_BYTES = 400_000
+# The topics of a repository read, at most, by defense: a longer list is refused.
+MAX_GITHUB_TOPICS = 100
 
 # HTTP. A source download waits this long for each network operation: the connection, or each
 # read (docs/specs-collecte.md).

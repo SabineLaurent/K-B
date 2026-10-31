@@ -1,10 +1,11 @@
 """The request and the response of POST /trend-reports (docs/tendances.md, "Contrats")."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from k_b.ai_api.repository_cards import Caution
 from k_b.items import (
     Criterion,
     WindowState,
@@ -70,6 +71,19 @@ class TrajectoryPointSchema(BaseModel):
     )
 
 
+class RepositoryFactsSchema(BaseModel):
+    license: str | None = Field(
+        description="Its SPDX identifier; null when GitHub recognizes no license."
+    )
+    created_at: datetime
+    language: str | None
+    topics: list[str]
+    stars_total: int = Field(description="Read on GitHub at the request, never kept.")
+    cautions: list[Caution] = Field(
+        description="created_recently (less than 7 days before the request), then no_license."
+    )
+
+
 class TrendRepositorySchema(BaseModel):
     repository_id: int
     repository_name: str = Field(description="Its name in the most recent window.")
@@ -77,6 +91,28 @@ class TrendRepositorySchema(BaseModel):
     best_rank: int
     trajectory: list[TrajectoryPointSchema] = Field(
         description="One point per window of the period, in its order."
+    )
+    facts: RepositoryFactsSchema | None = Field(
+        description="Read on GitHub; null when the repository is not a candidate."
+    )
+
+
+class DroppedCandidatesSchema(BaseModel):
+    not_found: int
+    unavailable_for_legal_reasons: int
+    moved: int = Field(description="A redirection, not followed.")
+    id_mismatch: int = Field(description="Another repository under the name.")
+    forbidden: int = Field(description="A 403 that is not a rate limit.")
+
+
+class CandidatesSchema(BaseModel):
+    selected: int = Field(
+        description="The repositories whose sheet is read on GitHub, 60 at most, those meeting a"
+        " criterion first; read plus the sum of dropped."
+    )
+    read: int
+    dropped: DroppedCandidatesSchema = Field(
+        description="Left out by GitHub, by reason; out of repositories."
     )
 
 
@@ -87,8 +123,10 @@ class TrendReportSchema(BaseModel):
     )
     period: TrendPeriodSchema
     repositories: list[TrendRepositorySchema] = Field(
-        description="Those meeting a criterion, by best rank then repository_id."
+        description="Those meeting a criterion, by best rank then repository_id, but the"
+        " candidates GitHub left out."
     )
     repositories_dropped: int = Field(
         description="Repositories meeting a criterion left out, their name `.` or with `..`."
     )
+    candidates: CandidatesSchema
