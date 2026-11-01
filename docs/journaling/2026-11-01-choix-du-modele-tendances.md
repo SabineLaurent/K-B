@@ -227,6 +227,17 @@ métrique, la relecture et le rendu par `kb`, le journal de `kb`, l'autorisation
 | 9 | `windows` lu sur la trajectoire du premier candidat | Écarté : un point par fenêtre de la période pour chaque dépôt (`trajectories.py:89-92`) |
 | 10 | Unicité et appartenance des `ref` réécrites à la main | Corrigé (`1fe2752`) : `is_once_among(refs, list(criteria_by_ref))` ; les 46 tests `item_id` restent verts |
 
+`/code-review medium` sur `eb6f36c..HEAD` (les corrections ci-dessus) : 8 constats, tranchés par
+time-knight (délégation de Sabine du 15/10).
+
+| N° | Constat | Décision et raison |
+|---|---|---|
+| 1 à 4 | Données personnelles : adresse coupée juste après son `@` ; partie locale hors ASCII (« josé@example.com » donne « josé@user.com », le prénom part) ; test qui fige la fuite ; coupe brute au milieu d'un mot | **En attente** du verdict d'un relecteur neuf en lecture seule. *(à compléter)* |
+| 5 | `CRITERIA` resté dans `post` | Écarté : `get_args(Criterion` n'apparaît qu'à `trend_report_client.py:44`, rien n'est dupliqué |
+| 6 | `is_once_among` et `is_in_order_once` se ressemblent | Écarté : `code.md` factorise à la troisième occurrence ; il y en a deux, dans deux couches |
+| 7 | Les faux positifs du masque font perdre du sens au README de #369 | Écarté : compromis déjà accepté et écrit |
+| 8 | `list(criteria_by_ref)` copie les clés | Écarté : coût négligeable |
+
 ## 4. Preuve
 
 | Test ou sortie observée | Ce que ça démontre |
