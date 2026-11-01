@@ -29,7 +29,7 @@ ARXIV_ANNOUNCEMENT_DELAY_MARGIN = timedelta(days=7)
 ARXIV_FIRST_COLLECTION_START = datetime(2026, 5, 1, tzinfo=UTC)
 
 # TLDR. Adding an edition is adding its slug, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
-TLDR_TRACKED_EDITIONS = ("ai", "infosec", "dev")
+TLDR_TRACKED_EDITIONS = ("ai", "infosec", "dev", "tech")
 # One page at a time, with a pause before each, from one edition to the next too: tldr.tech
 # publishes no rate limit (decided in #6).
 TLDR_PAUSE_BETWEEN_PAGES_SECONDS = 2

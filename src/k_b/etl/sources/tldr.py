@@ -182,8 +182,9 @@ def list_days_to_collect(last_collected_at: datetime | None, today: date) -> lis
 
 # === TRANSFORM ===
 
-# The first h1 of an edition page: "TLDR AI 2026-10-08"; the landing page has no date.
-EDITION_PAGE_TITLE = re.compile(r"TLDR .+ (\d{4}-\d{2}-\d{2})")
+# The first h1 of an edition page: "TLDR AI 2026-10-08", or "TLDR 2026-10-08" for the general
+# edition (tech); the landing page has no date.
+EDITION_PAGE_TITLE = re.compile(r"TLDR (?:.+ )?(\d{4}-\d{2}-\d{2})")
 SPONSOR_MARK = "(Sponsor)"
 # The job board of TLDR itself: its offers are published among the articles, without a mark.
 TLDR_JOB_OFFER_URL_PREFIX = "https://jobs.ashbyhq.com/tldr.tech/"
