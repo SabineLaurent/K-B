@@ -4812,6 +4812,55 @@ par la PR de #209 (« à harmoniser après le POC ») : la collecte passe par `o
 
 — #86
 
+## 2026-11-01
+
+### Tendances : le choix du modèle et ses contrôles (#368)
+
+Conception de time-knight (31/10), relue par un sous-agent, corrigée, complétée par les réponses de
+Sabine (Q1 le 31/10, Q2 et Q3 le 01/11), validée par Sabine le 01/11 (~20:40Z). Contrat :
+[tendances.md](../tendances.md), « Ce que rend #368 ». Le pourquoi est celui de Sabine quand la
+décision lui est attribuée ; sinon, celui de la conception qu'elle a validée.
+
+- **Le modèle reçoit la trajectoire (le rang par fenêtre), pas une « direction ».** Décision de
+  Sabine du 01/11 (~20:27Z), « Q2 (a) ». Pourquoi : « direction » n'était définie nulle part dans
+  le contrat (#364) ; la trajectoire porte le décollage, le pic et le recul. Format court : les
+  fenêtres une fois, puis par candidat une liste de rangs alignée sur elles. Écartés : (b) une
+  direction calculée par le code (une mesure à inventer, et la forme de la courbe perdue) ; (c) ni
+  l'une ni l'autre (le modèle ne distinguerait plus un dépôt qui monte d'un dépôt qui retombe).
+- **L'échéance de `POST /trend-reports` passe de 60 à 200 s**, comme celle de `POST /digests`, et
+  pour la même raison : sous les 240 s de `kb` et de l'ingress d'ACA, avec une marge pour le dernier
+  appel en cours. Écarté : garder 60 s, qui couvre les lectures GitHub mais laisse moins qu'un appel
+  au modèle (`LLM_CALL_TIMEOUT_SECONDS` = 90) ; écartée aussi, une réserve de temps pour le modèle
+  pendant la lecture de GitHub. Limite assumée : si GitHub prend presque toute l'échéance, le choix
+  échoue en `llm_timeout` et le compte rendu reste factuel, la période avance ; #370 le mesure.
+- **Les choisis vont dans le fichier du coffre dès #368**, dans une section « Choisis par le modèle »
+  avant « Dépôts qui ressortent » (nom en lien, critères, sujets ; ou la raison d'un choix non
+  fait). Décision de Sabine du 31/10 (~16:02Z), « Q1 (a) ». #369 y ajoutera les textes sans réécrire
+  la section. Écarté : (b) rien dans le fichier avant #369, le choix au seul registre.
+- **Plus de 5 choix sont refusés par le schéma de sortie (`schema`), pas par un contrôle du code.**
+  `Field(max_length=5)` dans le modèle Pydantic, comme les bornes de structure de la rédaction ; le
+  schéma envoyé n'a pas de `maxItems`, dont le support en mode strict n'est pas vérifié. Le nouvel
+  état de contrôle, `criterion`, refuse ce qui touche aux critères (aucun, en double, hors des 4, un
+  critère 1 à 3 non calculé, `watch_subject` sans sujet ou l'inverse) ; il entre dans toutes les
+  tables de rappels. Écarté : `completeness` pour plus de 5 choix (le contrôle de la complétude du
+  classement, d'un autre sens) ; un second état neuf (le contrat n'en nomme qu'un).
+- **`Stage` gagne `select` : l'appel du choix écrit sa ligne de métrique et ses mesures
+  OpenTelemetry**, qu'il réussisse ou échoue. Décision de Sabine du 01/11 (~20:35Z), « Q3 (a) » :
+  le contrat le disait déjà (« le type `Stage` est étendu ») et la règle 4 de `poc.md` le demande
+  (une ligne JSON par appel au modèle). Les mesures de la demande (`data_fetch_ms`, `items_capped`,
+  `items_dropped_before_writing_stage`) y sont nulles, choix de time-knight : les lectures sont
+  mesurées dans leurs spans. Écartés : les métriques hors de #368 (le premier plan) ;
+  `data_fetch_ms` rempli par la lecture des fenêtres et de GitHub (un autre sens sous le même nom
+  que les fiches). `FailedSubjectSchema.stage` des fiches garde `classify` ou `write`.
+
+Limites assumées : une description peut pousser son dépôt vers un choix par `watch_subject` (le code
+vérifie que le sujet est de la liste, pas que le dépôt en relève) ; le message au plafond mesure
+116 323 caractères, environ 39 000 jetons à 3 caractères par jeton (estimation), et un choix au
+plafond et sa relance partagent le quota de 140 000 jetons par minute avec un `kb digest` lancé dans
+la même minute.
+
+— #368
+
 ## Décisions encore ouvertes
 
 - **Les seuils des critères des tendances** (2026-10-30) : 2 jours actifs pour « durable », 5 rangs
