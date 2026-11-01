@@ -476,7 +476,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   page. Le titre est le texte de `a.font-bold`, le lien son `href`, le résumé le texte de
   `div.newsletter-html`, ses morceaux (paragraphes, liens) séparés par une espace. L'édition est lue dans le nom du dossier brut
   (`tldr_ai` → `ai`), la date de l'édition dans le premier `h1` de la page
-  (`TLDR AI 2026-10-08`), le rang est la position de l'entrée parmi les `<article>` de la
+  (`TLDR AI 2026-10-08`, ou `TLDR 2026-10-08` pour l'édition générale `tech`), le rang est la position de l'entrée parmi les `<article>` de la
   page, à partir de 1.
   - **Entrées écartées**, sans rejet ni ligne de journal : celles dont le titre contient
     « (Sponsor) », et les offres d'emploi de TLDR, reconnues par leur lien
@@ -485,7 +485,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   - **Page refusée entière** (refusée dès la collecte depuis #274 ; une page gardée avant est
     rejetée au journal d'import, non inscrite au registre, relue à chaque import) : elle n'est
     pas en UTF-8 ; elle n'a pas de `h1` ; son premier `h1` n'est
-    pas « TLDR <titre> <date> » (le `h1` trouvé est cité, échappé et coupé à 100 caractères) ;
+    pas « TLDR <titre> <date> » ni « TLDR <date> » (le `h1` trouvé est cité, échappé et coupé à 100 caractères) ;
     un `<article>` en contient un autre (refusée avant la lecture des entrées : une page
     d'articles imbriqués coûterait un temps quadratique, 18 s mesurées pour 50 Ko) ;
     aucun de ses articles n'a à la fois un titre, un lien et un résumé (le nombre d'`<article>`
@@ -504,9 +504,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     édition rangée sous `tldr_ai` entrerait comme édition `ai`. Une page dont la date du `h1`
     n'est pas le jour demandé est refusée à la collecte depuis #274 (« Page qui n'est pas
     l'édition du jour », ci-dessous) ; pour une page gardée avant, la date du `h1` l'emporte
-    sur celle du nom du fichier (18 pages sur 18 ont la même). Le `h1` doit porter un nom d'édition entre « TLDR » et la
-    date : une édition titrée « TLDR <date> » serait refusée à chaque import (forme non
-    observée ; à vérifier quand une édition est ajoutée à `TLDR_TRACKED_EDITIONS`). Une offre
+    sur celle du nom du fichier (18 pages sur 18 ont la même). Le nom d'édition entre « TLDR » et la date est facultatif :
+    l'édition `tech` est titrée « TLDR <date> » (observé le 2026-11-01 sur la page du 2026-10-30) ;
+    la forme du `h1` d'une édition ajoutée à `TLDR_TRACKED_EDITIONS` reste à vérifier. Une offre
     d'emploi publiée ailleurs que sur le site d'offres de TLDR entre comme article. Un lien
     qui passe par `links.tldrnewsletter.com` est gardé tel quel (3 liens) : l'adresse de
     l'article demanderait un appel réseau.
@@ -587,13 +587,14 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   l'import, `already_seen` (12 à 18 lignes au journal d'import par page relue : ses
   articles gardés).
 - **Accès** : sans authentification. Le `robots.txt` autorise tout, sauf les pages d'abonnement
-  et de compte (`/subscribed`, `/manage`, `/info`…), qu'on ne lit pas.
+  et de compte (`/subscribed`, `/manage`, `/info`…), qu'on ne lit pas. Relu le 2026-11-01 avant
+  d'ajouter l'édition `tech` : `Allow: /`, rien n'interdit `/tech/<date>`.
 - **Limites** : pas de quota publié ; on s'impose une page à la fois, avec une pause de 2 s avant
   chaque page, d'une édition à la suivante aussi (depuis le 2026-10-25). Les liens portent des paramètres de suivi `utm_*` et certaines entrées sont
   sponsorisées : traité à la lecture (ci-dessus).
 - **Données personnelles** : aucune (voir le registre des traitements).
-- **Suivi** : éditions **ai**, **infosec** et **dev** (ai le 2026-10-01, les deux autres le
-  2026-10-04), une source par édition (`tldr_ai`…), dans `TLDR_TRACKED_EDITIONS` de
+- **Suivi** : éditions **ai**, **infosec**, **dev** et **tech** (ai le 2026-10-01, infosec et dev
+  le 2026-10-04, tech le 2026-11-01), une source par édition (`tldr_ai`…), dans `TLDR_TRACKED_EDITIONS` de
   `k_b/core/config.py` (neuf candidates dans [sources-detaillees.md](sources-detaillees.md)).
 
 ### Zotero — base de données
@@ -1074,7 +1075,7 @@ facturation, le dépassement est refusé.
 - [Try BigQuery using the sandbox](https://docs.cloud.google.com/bigquery/docs/sandbox)
 - [Les six grands principes du RGPD](https://www.cnil.fr/fr/comprendre-le-rgpd/les-six-grands-principes-du-rgpd) — CNIL
 - [Access annotation database](https://forums.zotero.org/discussion/101244/access-annotation-database) — forum Zotero
-- `https://tldr.tech/robots.txt`, lu le 2026-10-01
+- `https://tldr.tech/robots.txt`, lu le 2026-10-01, relu le 2026-11-01 (édition `tech`)
 
 Conditions de GitHub, lues le 2026-10-30 par time-knight :
 

@@ -29,7 +29,7 @@ ARXIV_ANNOUNCEMENT_DELAY_MARGIN = timedelta(days=7)
 ARXIV_FIRST_COLLECTION_START = datetime(2026, 5, 1, tzinfo=UTC)
 
 # TLDR. Adding an edition is adding its slug, as in https://tldr.tech/<slug>/<YYYY-MM-DD>.
-TLDR_TRACKED_EDITIONS = ("ai", "infosec", "dev")
+TLDR_TRACKED_EDITIONS = ("ai", "infosec", "dev", "tech")
 # One page at a time, with a pause before each, from one edition to the next too: tldr.tech
 # publishes no rate limit (decided in #6).
 TLDR_PAUSE_BETWEEN_PAGES_SECONDS = 2
@@ -247,12 +247,13 @@ MAX_ITEMS_PER_DIGEST = 60
 MAX_FIELD_CHARS_FOR_WRITING = 2000
 
 # The classification of the items of a request (ai_api/stages/classification.py): batches in the order
-# of the reading, each of 50 items and 36,000 characters of user message at most, about 9,000
-# input tokens (#158: 46 items took about 5,500). 300 items make 6 batches, up to about 10 when
+# of the reading, each of 45 items and 36,000 characters of user message at most, about 9,000
+# input tokens (#158: 46 items took about 5,500). 300 items make 7 batches, up to about 10 when
 # the titles are long. The long text of an item is cut to 500 characters: sorting needs less text
 # than writing. The schema of a batch has one property per item, within the bounds of strict mode
-# that tests/ai_api/test_stages.py keeps.
-MAX_ITEMS_PER_CLASSIFICATION_CALL = 50
+# that tests/ai_api/test_stages.py keeps: 45 items and 9 subjects give 450 values of enum, as 50
+# items and 8 subjects did before 2026-11-01; 50 items would reach 500, the bound itself.
+MAX_ITEMS_PER_CLASSIFICATION_CALL = 45
 MAX_CLASSIFICATION_INPUT_CHARS = 36_000
 MAX_FIELD_CHARS_FOR_CLASSIFICATION = 500
 
@@ -302,6 +303,10 @@ DIGEST_SUBJECTS = (
     DigestSubject(
         "software_engineering",
         "outils, langages et pratiques de développement hors IA",
+    ),
+    DigestSubject(
+        "tech_industry",
+        "entreprises, produits, plateformes et matériel de la tech, hors IA",
     ),
 )
 # The answer of the classification for an item that no subject suits, then not retained: a

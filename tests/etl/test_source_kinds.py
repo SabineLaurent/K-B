@@ -31,6 +31,7 @@ def test_the_sources_are_collected_in_the_order_of_2026_10_06():
         "tldr_ai",
         "tldr_infosec",
         "tldr_dev",
+        "tldr_tech",
     ]
 
 

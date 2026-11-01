@@ -76,7 +76,7 @@ def fake_download(monkeypatch):
 
 def test_each_tracked_edition_is_a_source_of_kb_collect():
     names = [source.name for source in list_sources(SOURCE_KINDS)]
-    assert {"tldr_ai", "tldr_infosec", "tldr_dev"} <= set(names)
+    assert {"tldr_ai", "tldr_infosec", "tldr_dev", "tldr_tech"} <= set(names)
 
 
 def test_the_page_of_a_day_is_asked_at_its_edition_and_date_url(fake_download):
@@ -406,6 +406,14 @@ def test_an_article_is_read_with_the_date_of_its_edition_its_link_and_its_summar
     assert read_articles(AI_PAGE).entries[0] == MISTRAL_ARTICLE
 
 
+def test_the_general_edition_is_read_though_its_title_names_no_edition():
+    # The tech edition, as collected on 2026-11-01: its h1 is "TLDR 2026-10-30", the others
+    # name theirs ("TLDR AI 2026-10-30").
+    page = AI_PAGE.replace(AI_HEADING, b"TLDR 2026-10-07</h1>")
+
+    assert read_articles(page).entries[0] == MISTRAL_ARTICLE
+
+
 def test_a_summary_with_a_link_is_read_as_displayed():
     # The sponsored entry, read as an article: its summary holds a link.
     page = AI_PAGE.replace(b" (Sponsor)", b"")
@@ -482,6 +490,22 @@ def test_a_link_escaped_twice_in_the_page_loses_its_tracking_parameters():
                 "'TLDR AI 2026-10-07 and more'"
             ),
         ),
+        # The same forms without an edition name, as the general edition (tech) titles itself.
+        (
+            AI_PAGE.replace(AI_HEADING, b"TLDR 2026-13-45</h1>"),
+            "first h1 is not an edition title with its date: 'TLDR 2026-13-45'",
+        ),
+        (
+            AI_PAGE.replace(AI_HEADING, b"TLDR 2026-10-07 and more</h1>"),
+            (
+                "first h1 is not an edition title with its date: "
+                "'TLDR 2026-10-07 and more'"
+            ),
+        ),
+        (
+            AI_PAGE.replace(AI_HEADING, b"TLDR2026-10-07</h1>"),
+            "first h1 is not an edition title with its date: 'TLDR2026-10-07'",
+        ),
         (
             AI_PAGE.replace(b'class="font-bold"', b'class="font-semibold"'),
             "no article with a title, a link and a summary among 5 article elements",
@@ -506,6 +530,9 @@ def test_a_link_escaped_twice_in_the_page_loses_its_tracking_parameters():
         "landing page",
         "no such day",
         "text after the date",
+        "no such day, no edition name",
+        "text after the date, no edition name",
+        "no space before the date",
         "no title link",
         "no summary",
         "no article",
