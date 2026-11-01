@@ -61,12 +61,15 @@ plusieurs sujets va au **premier** de la liste, dans cet ordre.
 | 6 | `ai_industry` | entreprises, produits, financements et régulation de l'IA |
 | 7 | `cybersecurity` | incidents, campagnes d'attaque, outils et pratiques de sécurité hors IA, sans CVE ni GHSA |
 | 8 | `software_engineering` | outils, langages et pratiques de développement hors IA |
+| 9 | `tech_industry` | entreprises, produits, plateformes et matériel de la tech, hors IA |
 
 Liste de départ proposée par la session K-B à partir des sources collectées (dépôts suivis,
 `GITHUB_TRACKED_REPOSITORIES` de `core/config.py` ; éditions TLDR `ai`, `infosec` et `dev`,
 `etl/sources/tldr.py` ; arXiv sur la sécurité de l'IA, [specs-collecte.md](specs-collecte.md) ;
 catalogue KEV ; alertes GitHub), validée par Sabine le 2026-10-15. Un item qui n'entre dans aucun
-sujet reçoit `no_suitable_subject` : il n'y a pas de sujet « autre ».
+sujet reçoit `no_suitable_subject` : il n'y a pas de sujet « autre ». `tech_industry` est ajouté
+le 2026-11-01 (Sabine), avec l'édition TLDR générale `tech` : en dernier, il ne prend que ce
+qu'aucun sujet précis ne prend.
 
 **Changer la liste.** On la modifie dans `core/config.py`, par une PR. Le `json_schema` envoyé au
 modèle et le contrôle des sujets (contrôle 3) sont construits à partir de cette liste ; la
@@ -221,8 +224,8 @@ rapportées sur son forum ([500 valeurs](https://community.openai.com/t/500-enum
 [15 000 caractères](https://community.openai.com/t/possible-structured-output-schema-length-error-bug-in-api/984509),
 lus le 2026-10-26 ; la doc relevée le 2026-10-16 disait 1 000 valeurs, voir « Sources »). Le
 schéma du classement porte une propriété par item du lot (`classify-2`) : au plafond de 50 items
-et 8 sujets, 50 propriétés, 50 × 9 = 450 valeurs d'`enum` et environ 6 400 caractères, sous les
-trois limites ; un test les tient (`tests/ai_api/test_stages.py`). Un 10e sujet (550 valeurs)
+et 9 sujets, 50 propriétés, 50 × 10 = 500 valeurs d'`enum` (pile à la limite, sans marge) et
+environ 7 500 caractères (mesurés le 2026-11-01), sous les trois limites ; un test les tient (`tests/ai_api/test_stages.py`). Un 10e sujet (550 valeurs)
 ferait échouer ce test avant tout appel réel : il faudrait alors des lots plus petits.
 
 **Réglages d'appel**, lus dans la configuration (#150) : `reasoning_effort: "none"`

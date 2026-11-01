@@ -3,7 +3,7 @@
 - **Date** : 2026-11-01
 - **Branche** : `fix/tldr-tech-edition` (sans issue)
 - **Fichiers** : `src/k_b/etl/sources/tldr.py`, `src/k_b/core/config.py`, `docs/specs-collecte.md`,
-  `tests/etl/sources/test_tldr.py`, `tests/etl/test_source_kinds.py`
+  `docs/fiches-veille.md`, `tests/etl/sources/test_tldr.py`, `tests/etl/test_source_kinds.py`
 - **Série** : [lecture des articles TLDR](2026-10-12-lecture-articles-tldr.md),
   [refuser une page qui n'est pas l'édition](2026-10-20-refuser-une-page-tldr-qui-n-est-pas-l-edition.md)
 
@@ -43,6 +43,22 @@ TLDR_TRACKED_EDITIONS = ("ai", "infosec", "dev", "tech")
 Chaque slug devient une source `tldr_<slug>` (`src/k_b/etl/source_kinds.py:80`), collectée après
 les autres : `tldr_tech` arrive en dernier, l'ordre des sources existantes ne change pas.
 
+**Un sujet pour ses articles.** Une acquisition de DoorDash n'entrait dans aucun des huit sujets
+des fiches. Sabine a ajouté un neuvième sujet (`src/k_b/core/config.py:307`) :
+
+```python
+    DigestSubject(
+        "tech_industry",
+        "entreprises, produits, plateformes et matériel de la tech, hors IA",
+    ),
+```
+
+Il vient en dernier : un article qui relève de plusieurs sujets va au premier de la liste, donc un
+sujet générique ne prend que ce qu'aucun sujet précis ne prend. Le schéma de classement envoyé au
+modèle est construit à partir de cette liste : au plafond de 50 articles par appel, il passe à
+50 × 10 = 500 valeurs d'`enum` (9 sujets plus `no_suitable_subject`), pile à la limite la plus
+stricte connue, que tient `test_the_schema_of_a_full_batch_is_within_the_bounds_of_strict_mode`.
+
 ## Choix faits et options écartées
 
 | Retenu | Écarté, et pourquoi |
@@ -50,6 +66,8 @@ les autres : `tldr_tech` arrive en dernier, l'ordre des sources existantes ne ch
 | Nom d'édition facultatif dans le motif | Un second motif propre à `tech` : deux règles pour une seule forme de titre. Comparer le nom du `h1` au dossier : la spec l'a écarté le 12/10 (il faudrait une table « ai → AI ») |
 | Test sur la page `ai` déjà en fixture, titre remplacé | Une fixture tirée d'une page `tech` : la structure est la même. La vraie page du 30/10 a été lue hors des tests (voir Preuve) |
 | `tech` en dernier dans le tuple | En tête : `tldr_tech` passerait avant `tldr_ai`, et l'ordre de collecte des sources existantes changerait |
+| Un sujet `tech_industry`, en dernier (Sabine) | Rien : les articles généraux finiraient en `no_suitable_subject`, coûtant un appel sans rien donner. Un sujet « autre » : écarté le 15/10 ; un article hors tech reste en `no_suitable_subject` |
+| Pas de test neuf pour le sujet | Un test qui recopie la liste : les tests utilisent leur propre liste de sujets (`docs/fiches-veille.md`) ; ceux qui lisent la vraie (borne du schéma, nom réservé) tournent |
 
 ## Preuve
 
@@ -60,6 +78,8 @@ les autres : `tldr_tech` arrive en dernier, l'ordre des sources existantes ne ch
 | Tests de refus du `h1` inchangés et verts (« … and more », page d'accueil, `2026-13-45`) | Le motif élargi ne laisse pas passer une page qui n'est pas une édition |
 | `uv run pytest` : 3113 passés ; `ruff check`, `ruff format --check`, `mypy --strict` verts | Rien d'autre n'a cassé |
 | La vraie page `https://tldr.tech/tech/2026-10-30`, téléchargée le 01/11 et lue par `read_articles` | Pas de refus : 14 articles, dont le premier est « DoorDash to Buy Instacart… » |
+| `TldrSource("tech").read_pages` en réel sur le 31/10 et le 30/10 | Le 31/10 : `no edition page, redirected to https://tldr.tech/tech`, sauté ; le 30/10 : la page |
+| Schéma de classement mesuré avec 8 puis 9 sujets | 450 puis 500 valeurs d'`enum`, 6 850 puis 7 500 caractères : sous les limites, sans marge sur l'`enum` |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -80,9 +100,10 @@ les autres : `tldr_tech` arrive en dernier, l'ordre des sources existantes ne ch
 
 - Je n'ai lancé ni `kb collect` ni `kb import` en réel sur `tldr_tech`. La lecture a été vérifiée
   sur une seule page réelle, celle du 30/10.
-- Je n'ai pas mesuré combien d'articles de culture tech générale recevront `no_suitable_subject`
-  dans les fiches : la liste des huit sujets ne couvre pas, par exemple, une acquisition de
-  DoorDash.
+- Je n'ai lancé aucun `kb digest` réel avec le neuvième sujet : ni la limite de 500 valeurs
+  d'`enum`, atteinte exactement, ni la durée (98 s mesurées pour 8 sujets, limite de 200 s) n'ont
+  été vérifiées sur le modèle. Je n'ai pas mesuré non plus combien d'articles `tech` iront à
+  `tech_industry`, et combien à `no_suitable_subject`.
 
 ## Ce qui reste
 
@@ -90,3 +111,5 @@ les autres : `tldr_tech` arrive en dernier, l'ordre des sources existantes ne ch
   suivies. Pour chacune, il faudrait vérifier la forme de son `h1` avant de l'ajouter.
 - Les documents datés (`docs/2026-10-04-flux-donnees.md`…) citent encore trois éditions. Ce sont
   des instantanés, je ne les ai pas modifiés.
+- Un dixième sujet ferait passer le schéma à 550 valeurs d'`enum` : le test échouerait, et il
+  faudrait des lots de moins de 50 articles.

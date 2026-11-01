@@ -303,6 +303,10 @@ DIGEST_SUBJECTS = (
         "software_engineering",
         "outils, langages et pratiques de développement hors IA",
     ),
+    DigestSubject(
+        "tech_industry",
+        "entreprises, produits, plateformes et matériel de la tech, hors IA",
+    ),
 )
 # The answer of the classification for an item that no subject suits, then not retained: a
 # reserved name, no subject of DIGEST_SUBJECTS may take it (a test keeps it).
