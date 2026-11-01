@@ -60,7 +60,8 @@ cleaned = CODE_BLOCK.sub(" ", cleaned)
   motif.
 - **Le HTML est retiré en boucle** (`remove_markup`, `:83-95`), jusqu'à ce que le texte ne change
   plus : un seul passage sur `<<b>script>` laisse `<script>`.
-- Viennent ensuite les blocs de code, les badges et les images, les adresses (`[email]`), **avant**
+- Viennent ensuite les blocs de code, les badges et les images, les adresses (`[email]`, sans
+  exiger de point dans le domaine depuis le constat 1 de la revue), **avant**
   les URL (sinon `jane.doe@www.example.com` deviendrait `jane.doe@[url]` et la partie personnelle
   partirait), les URL (`[url]`), les logins (`@user`), puis la réduction des espaces et la coupe à
   500, comptée (`is_cut`).
@@ -215,7 +216,7 @@ métrique, la relecture et le rendu par `kb`, le journal de `kb`, l'autorisation
 
 | N° | Constat | Décision et raison |
 |---|---|---|
-| 1 | `EMAIL` exige un point dans le domaine : « jane@localhost », ou « jane.doe@example » laissé par la coupe brute, part tel quel au modèle | **En attente** du verdict d'un relecteur neuf : c'est une donnée personnelle, introduite par la PR. *(à compléter)* |
+| 1 | `EMAIL` exige un point dans le domaine : « jane@localhost », ou « jane.doe@example » laissé par la coupe brute, part tel quel au modèle | Corrigé, après un relecteur neuf en lecture seule (règle des données personnelles) : `(?:\.[A-Za-z0-9-]+)*` au lieu de `+` (`repository_texts.py:38`), tests d'abord (6 rouges avant le code). Nouveaux faux positifs acceptés, le texte n'étant jamais affiché : les `x@y` sans point (`react@latest`, `user@server`, `img@sha256:…`). Limite écrite dans `docs/tendances.md` et le registre : une adresse coupée juste après son `@`, hors ASCII (`josé@…`, `＠` pleine chasse) ou maquillée (`[at]`) part telle quelle. Selon le relecteur, une description GitHub tient en 350 caractères (slategit.com, article du 03/08/2026 lu le 01/11/2026 ; issuetracker.unity.com, issue 22197 ; non vérifié dans la documentation de GitHub) : la coupe brute ne joue alors jamais sur une description, le risque porte sur le README de #369 |
 | 2 | `description` est obligatoire dans le modèle strict : une réponse sans la clé fait échouer tout le compte rendu | Écarté : même forme que `license` ; une réponse sans la clé est invalide, et la refuser, c'est échouer fermé |
 | 3 | Une seule échéance pour GitHub et le modèle | Écarté : la réserve a été écartée par le plan (constat 22), la limite est écrite dans `tendances.md`, #370 mesure |
 | 4 | `CODE_BLOCK` prend ``` ou ~~~ au milieu d'une ligne, et un bloc non fermé efface jusqu'à la fin | Écarté : c'est le plan ; on perd du texte sans en laisser passer ; `is_cut` dit une coupe, pas un retrait |
@@ -268,8 +269,8 @@ factuel ; la période avance. C'est le cas prévu par le contrat ; #370 mesure s
 **Où sont les données personnelles ?** Les logins et les adresses de la description sont masqués
 avant l'envoi. Ni nom de dépôt ni `repository_id` dans les spans, les journaux ou la ligne de
 métrique (les `ref` seuls). Le contenu de l'appel ne part chez Grafana que sous `KB_TRACE_CONTENT`,
-jamais avant la signature du DPA. Le constat 1 de la revue, en attente, porte sur une adresse qui
-échappe au masque.
+jamais avant la signature du DPA. Ce qui échappe encore au masque est écrit au registre : un nom en
+texte libre, une adresse coupée juste après son `@`, hors ASCII ou maquillée.
 
 **Pourquoi `kb` revérifie-t-il ce que l'API IA a déjà contrôlé ?** Défense en profondeur : pour
 `kb`, la réponse de l'API IA est une entrée externe. Les contrôles croisés empêchent un fichier du
@@ -285,9 +286,20 @@ coffre ou une ligne de registre incohérents (un modèle nommé avec un échec, 
   limite, non mesurée.
 - **Le support de `maxItems` en mode strict** n'est pas vérifié ; c'est pourquoi le schéma n'en a
   pas et que Pydantic compte.
-- **Constat 1** (adresse sans point dans le domaine) : verdict en attente au moment d'écrire.
-- **Sources** : les lectures de documentation faites avant le code (skill `fastapi`, Context7) ne
-  sont pas consignées par la session qui a codé, et ne sont donc pas citées ici.
+- **Documentation consultée après le code, pas avant** : ni le skill `fastapi` ni Context7 n'ont été
+  consultés pendant le code. La confrontation a été faite ensuite, le 01/11/2026, sans contradiction
+  trouvée :
+  - skill `fastapi` du dépôt (`.claude/skills/fastapi`, références `pydantic.md` et `responses.md`) :
+    la route est un `def` synchrone avec un type de retour, ses dépendances en `Annotated`, sans
+    `...` ni `RootModel` ;
+  - Context7, Pydantic (`/pydantic/pydantic`, `docs/errors/validation_errors.md`) : `Field(max_length=3)`
+    sur une liste lève `too_long`, `extra='forbid'` lève `extra_forbidden` ; `docs/migration.md` : un
+    champ `str | None` sans défaut est requis et accepte `None` (la forme de `description`) ;
+    `docs/errors/usage_errors.md` : un `TypeAdapter` d'un `BaseModel` garde la configuration du modèle ;
+  - Context7, OpenTelemetry Python (`/websites/opentelemetry-python_readthedocs_io_en_stable`,
+    `opentelemetry.attributes`, `Span.set_attribute`) : une valeur d'attribut peut être une séquence
+    de `str`, convertie en tuple ; c'est la forme de `k_b.choices.refs`. Cette documentation est
+    celle de la version stable ; le dépôt borne OpenTelemetry sous 1.46.
 
 ## 7. Ce qui reste
 

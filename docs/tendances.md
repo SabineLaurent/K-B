@@ -373,6 +373,9 @@ jetons (`docs/jeton-github.md`, mis à jour par #367).
   la sécurité des agents ») ; le code vérifie que le sujet est de la liste, pas que le dépôt en
   relève (comme un item qui oriente le classement entre deux sujets permis,
   [fiches-veille.md](fiches-veille.md), « Injection d'instructions »).
+- Limite du masquage : une adresse coupée juste après son `@`, une adresse hors ASCII (`josé@…`,
+  `＠` pleine chasse) ou maquillée (`[at]`) part telle quelle ; une adresse sans point dans son
+  domaine est masquée, comme un `x@y` qui n'en est pas une (`react@latest`).
 - Limite : si GitHub prend presque toute l'échéance, le choix échoue en `llm_timeout` et le compte
   rendu reste factuel ; aucune réserve de temps n'est gardée pour le modèle. Mesuré par #370.
 - Limite : le message au plafond mesure 116 323 caractères ; en jetons, ce n'est qu'une estimation,

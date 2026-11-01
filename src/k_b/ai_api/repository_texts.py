@@ -34,7 +34,8 @@ CODE_BLOCK = re.compile(r"(```|~~~).*?(?:\1|\Z)", re.DOTALL)
 BADGE = re.compile(r"\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)")
 IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 # Before the URLs: jane.doe@www.example.com would become jane.doe@[url].
-EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
+# No dot required: a raw cut can leave jane.doe@example; x@latest is masked too.
+EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*")
 MASKED_EMAIL = "[email]"
 # The new lines are kept: the README of #369 has lines.
 SPACES = re.compile(r"[^\S\n]+")

@@ -7,7 +7,7 @@ import unicodedata
 
 import pytest
 
-from k_b.ai_api.repository_texts import clean_repository_text
+from k_b.ai_api.repository_texts import RAW_CUT_FACTOR, clean_repository_text
 
 MAX_CHARS = 500
 
@@ -123,6 +123,60 @@ def test_an_address_is_masked_before_the_urls():
     assert clean("write to jane.doe@www.example.com or a+b@mail.example.org") == (
         "write to [email] or [email]"
     )
+
+
+def test_an_address_without_a_dot_in_its_domain_is_masked():
+    assert clean("write to jane@localhost") == "write to [email]"
+
+
+def padded_to_the_raw_cut(tail):
+    """A comment the cleaning removes, sized so that the raw cut falls right after tail."""
+    raw_bound = RAW_CUT_FACTOR * MAX_CHARS
+    filler = raw_bound - len(tail) - len("<!---->")
+    return "<!--" + "x" * filler + "-->" + tail
+
+
+@pytest.mark.parametrize("cut_address", ["jane.doe@example", "jane.doe@e"])
+def test_an_address_cut_in_its_domain_by_the_raw_cut_is_masked(cut_address):
+    cleaned = clean_repository_text(
+        padded_to_the_raw_cut(f" Contact {cut_address}") + ".com rest", MAX_CHARS
+    )
+
+    assert cleaned.text.endswith("Contact [email]")
+    assert "jane" not in cleaned.text
+    assert cleaned.is_cut is True
+
+
+@pytest.mark.parametrize(
+    "split",
+    [chr(9), "```code```"],
+    ids=["control", "code-block"],
+)
+def test_an_address_split_by_what_the_cleaning_removes_is_masked(split):
+    assert clean(f"jane@example{split}.com") == "[email] .com"
+
+
+def test_a_name_at_a_version_without_a_dot_is_masked_too():
+    """A false positive accepted: the text is never shown."""
+    assert clean("npm i react@latest") == "npm i [email]"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [("@app.route", "@user.route"), ("git@github.com:o/r", "[email]:o/r")],
+    ids=["decorator", "ssh-remote"],
+)
+def test_a_login_and_an_address_keep_their_masks(text, expected):
+    assert clean(text) == expected
+
+
+def test_an_address_cut_right_after_its_at_sign_is_left_as_it_is():
+    """A limit (docs/registre-traitements.md, "Limite du masquage"): nothing follows the @."""
+    cleaned = clean_repository_text(
+        padded_to_the_raw_cut(" Contact jane.doe@") + "example.com", MAX_CHARS
+    )
+
+    assert cleaned.text.endswith("Contact jane.doe@")
 
 
 def test_a_login_is_masked():
