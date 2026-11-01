@@ -155,7 +155,7 @@ AI_API_LAYERS = (
         "ai_api.tracing",
         "ai_api.connectors.metrics_export",
     },
-    {"ai_api.connectors.trace_export"},
+    {"ai_api.connectors.trace_export", "ai_api.repository_texts"},
     {"ai_api.connectors.llm_replay"},
     {
         "ai_api.connectors.llm_settings",
@@ -168,7 +168,11 @@ AI_API_LAYERS = (
         "ai_api.connectors.github_client",
     },
     {"ai_api.stage_calls"},
-    {"ai_api.stages.classification", "ai_api.stages.writing"},
+    {
+        "ai_api.stages.classification",
+        "ai_api.stages.writing",
+        "ai_api.stages.trend_selection",
+    },
     {"ai_api.stages.fidelity"},
     {"ai_api.stages.checking"},
     {"ai_api.digests", "ai_api.trend_reports"},
@@ -264,6 +268,7 @@ TRACED_FUNCTIONS = {
     "build_trend_report",
     "read_trend_report",
     "read_repository_cards",
+    "select_trends",
 }
 TRACING_PARAMETER = "tracing"
 

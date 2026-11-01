@@ -113,8 +113,8 @@ def test_the_first_report_is_written_then_added_to_the_register(
             "file": SHEET,
             "written_at": "2026-11-01T10:00:05Z",
             "request_id": REQUEST_ID,
-            "model": None,
-            "choice_made": False,
+            "model": "gpt-6-luna",
+            "choice_made": True,
         }
     ]
     assert capsys.readouterr().out == (
@@ -125,7 +125,7 @@ def test_the_first_report_is_written_then_added_to_the_register(
         "Repositories: 1 meeting a criterion, 0 dropped\n"
         f"Sheet: {SHEET}\n"
         "\n"
-        "Model: none\n"
+        "Model: gpt-6-luna\n"
         f"Request id: {REQUEST_ID}\n"
         "\n"
     )
@@ -525,3 +525,35 @@ def test_a_response_refused_writes_nothing_and_never_quotes_a_name(
     for name in NAMES:
         assert name not in output.err
         assert name not in read_kb_log(data_dir)
+
+
+def test_a_choice_that_failed_writes_the_factual_report_and_the_register_notes_it(
+    monkeypatch, trend_environment, capsys
+):
+    """The period moves on (decision of Sabine, 2026-10-29); the failure is a warning in the
+    log, the standard output unchanged."""
+    data_dir, vault_dir = trend_environment
+    write_register(data_dir, [PREVIOUS_ENTRY])
+    answer_trend_report(
+        monkeypatch,
+        answer_with(make_report(model=None, choice_failure="llm_unavailable")),
+    )
+
+    assert cli.main(["trend-report"]) == cli.ExitCode.SUCCEEDED
+
+    assert list_sheets(vault_dir) == [SHEET]
+    sheet = (vault_dir / SHEET).read_text("utf-8")
+    assert "Choix non fait : le modèle est indisponible." in sheet
+    [_, entry] = read_register(data_dir)
+    assert (entry["model"], entry["choice_made"]) == (None, False)
+    assert entry["last_window"] == "2026-10-31"
+    log = read_kb_log(data_dir)
+    assert re.search(
+        rf"^{LOG_LINE_DATE} WARNING k_b\.cli: choice of the model not made:"
+        rf" llm_unavailable, request_id {REQUEST_ID}$",
+        log,
+        re.MULTILINE,
+    )
+    assert "Model: none\n" in capsys.readouterr().out
+    for name in NAMES:
+        assert name not in log

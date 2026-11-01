@@ -6,7 +6,15 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
-from post.test_trend_report_client import change_period, make_report, repository
+from post.test_trend_report_client import (
+    NO_CANDIDATE_READ,
+    RISING,
+    STEADY,
+    change_period,
+    choose,
+    make_report,
+    repository,
+)
 
 from k_b.core.config import DIGEST_SUBJECTS, TRENDS_DIR_NAME, WATCH_DIR_NAME
 from k_b.post.digest_sheets import is_writable_url
@@ -51,7 +59,8 @@ def test_a_report_gives_its_period_its_limit_and_a_row_per_repository():
         "first_report: false\n"
         "new_evaluated: true\n"
         "repositories_dropped: 0\n"
-        "model: null\n"
+        'model: "gpt-6-luna"\n'
+        "choice_failure: null\n"
         "request_id: 1b4e28ba-2fa1-4d2e-9b5c-6c8e1f0a7d3e\n"
         "---\n"
         "\n"
@@ -61,6 +70,10 @@ def test_a_report_gives_its_period_its_limit_and_a_row_per_repository():
         "\n"
         "Les comptes viennent de GH Archive, un échantillon d'environ 1 % des étoiles données"
         " sur GitHub (mesure du 2026-10-29) : des rangs proches ne se départagent pas.\n"
+        "\n"
+        "## Choisis par le modèle\n"
+        "\n"
+        "gpt-6-luna n'en a retenu aucun sur 1 candidat.\n"
         "\n"
         "## Dépôts qui ressortent\n"
         "\n"
@@ -270,3 +283,69 @@ def test_every_reason_of_github_has_its_label():
 
 def test_the_labels_of_the_reasons_follow_the_dropped_candidates():
     assert list(DROP_REASON_LABELS) == list(DroppedCandidates.model_fields)
+
+
+# The choice of the model (#368): a section before the repositories.
+def find_choice_section(sheet):
+    start = sheet.index("## Choisis par le modèle\n")
+    return sheet[start : sheet.index("## Dépôts qui ressortent\n")]
+
+
+def test_the_repositories_chosen_are_listed_with_their_criteria_and_subjects():
+    alone = STEADY.model_copy(
+        update={"repository_id": 99, "repository_name": "only/subject", "criteria": []}
+    )
+    report = make_report(
+        candidates={"selected": 3, "read": 3, "dropped": make_report()["candidates"]["dropped"]},
+        chosen=[
+            choose(RISING, ["new", "accelerating", "watch_subject"], ["agent_tools"]),
+            choose(STEADY, ["durable"]),
+            choose(alone, ["watch_subject"], ["agent_tools", "llm_security"]),
+        ],
+    )
+
+    assert find_choice_section(render(report)) == (
+        "## Choisis par le modèle\n"
+        "\n"
+        "gpt-6-luna en a retenu 3 sur 3 candidats :\n"
+        "\n"
+        "- <https://github.com/owner/rising-repository> : nouveau, en accélération ;"
+        " sujet de la veille (agent_tools)\n"
+        "- <https://github.com/steady/tool> : durable\n"
+        "- <https://github.com/only/subject> : sujet de la veille (agent_tools,"
+        " llm_security)\n"
+        "\n"
+    )
+
+
+@pytest.mark.parametrize(
+    ("state", "reason"),
+    [
+        ("llm_timeout", "le modèle n'a pas répondu à temps"),
+        ("llm_rate_limited", "le quota du modèle est atteint"),
+        ("llm_unavailable", "le modèle est indisponible"),
+        (
+            "llm_invalid_output",
+            "sa réponse n'a pas passé les contrôles, relance comprise",
+        ),
+        ("llm_truncated", "sa réponse a été coupée"),
+        ("llm_content_filtered", "le filtre de contenu d'Azure a refusé la demande"),
+    ],
+)
+def test_a_choice_that_failed_says_why_and_keeps_the_factual_report(state, reason):
+    sheet = render(make_report(model=None, choice_failure=state))
+
+    assert find_choice_section(sheet) == (
+        f"## Choisis par le modèle\n\nChoix non fait : {reason}.\n\n"
+    )
+    assert "\nchoice_failure: " + json.dumps(state) + "\n" in sheet
+    assert "\nmodel: null\n" in sheet
+    assert "| <https://github.com/steady/tool> | durable |" in sheet
+
+
+def test_without_any_candidate_read_the_choice_is_said_not_made():
+    sheet = render(make_report(model=None, candidates=NO_CANDIDATE_READ))
+
+    assert find_choice_section(sheet) == (
+        "## Choisis par le modèle\n\nChoix non fait : aucun candidat lu.\n\n"
+    )
