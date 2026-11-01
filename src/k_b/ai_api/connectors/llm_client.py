@@ -56,7 +56,7 @@ PROVIDER_FAILURES: frozenset[LlmOutcome] = frozenset(
     {"llm_rate_limited", "llm_unavailable"}
 )
 # The check that refused the output (docs/fiches-veille.md, "Contrôles"); 1 and 2 here, 3 to 6
-# by the stage.
+# by the stage, criterion by the choice of a trend report (docs/tendances.md, "Choix").
 type FailedCheck = Literal[
     "content_filter",
     "finish_reason",
@@ -65,6 +65,7 @@ type FailedCheck = Literal[
     "item_id",
     "completeness",
     "markup",
+    "criterion",
 ]
 FAILED_CHECKS: tuple[FailedCheck, ...] = get_args(FailedCheck.__value__)
 # A finish_reason is read whatever its length, and cut to this length in the call: it goes to a

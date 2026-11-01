@@ -75,7 +75,7 @@ def describe_error_responses(
 
 
 # POST /digests reads the data API and calls the model; POST /trend-reports reads the data API and
-# GitHub.
+# GitHub, and a failure of its model leaves the report factual, with a 200.
 ERROR_RESPONSES = describe_error_responses(
     (*get_args(DataApiState.__value__), *get_args(LlmFailure.__value__))
 )

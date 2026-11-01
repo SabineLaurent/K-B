@@ -49,8 +49,8 @@ withdrawn since; false means it is absent from the catalog, not that it is not e
 means an advisory without CVE.
 - Answer with the JSON object of the schema, and nothing else."""
 # One reminder per check, added to the system prompt of a retry (llm_client.call_model). Those of
-# content_filter, subject and completeness are never sent: the first ends the call without
-# retry, the others are checks of the classification.
+# content_filter, subject, completeness and criterion are never sent: the first ends the call
+# without retry, the others are checks of the classification and of the choice of a trend report.
 WRITING_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
     "content_filter": "Your previous answer was filtered. Write about the items only.",
     "finish_reason": "Your previous answer did not end normally. Answer with the JSON "
@@ -66,6 +66,8 @@ WRITING_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
     "schema only.",
     "markup": "Your previous answer had a link, an image or a tag in a text. Write plain text "
     "only.",
+    "criterion": "Your previous answer was refused. Answer with the JSON object of the "
+    "schema only.",
 }
 # Check 6: a link with a scheme, from www., or a mailto: or xmpp: link (GFM makes a link of
 # them without //), an image, a wikilink, a Markdown link or link definition, a tag

@@ -2,8 +2,9 @@
 written once by kb trend-report from the response of the AI API, with the limit of
 post/vault_files.py.
 
-Each text is made by the code from checked values: a day, a count, a word of a closed list, and
-the name of a repository, checked by is_repository_name, which makes its URL. No text of the
+Each text is made by the code from checked values: a day, a count, a word of a closed list (a
+subject of the watch among them), the name of the model, checked by MODEL_NAME, and the name of a
+repository, checked by is_repository_name, which makes its URL. No text of the
 response is free, so none needs neutralize_digest_text, which would break a URL (www. escaped)."""
 
 import json
@@ -20,6 +21,9 @@ from k_b.core.config import (
 from k_b.core.dates import format_date
 from k_b.items import Criterion
 from k_b.post.trend_report_client import (
+    CRITERIA,
+    ChoiceFailure,
+    ChosenRepository,
     DroppedCandidates,
     TrendPeriod,
     TrendPoint,
@@ -47,6 +51,16 @@ DROP_REASON_LABELS = {
     "id_mismatch": "remplacés",
     "forbidden": "refusés",
 }
+# Why the choice of the model was not made, by state of the response.
+CHOICE_FAILURE_REASONS: dict[ChoiceFailure, str] = {
+    "llm_timeout": "le modèle n'a pas répondu à temps",
+    "llm_rate_limited": "le quota du modèle est atteint",
+    "llm_unavailable": "le modèle est indisponible",
+    "llm_invalid_output": "sa réponse n'a pas passé les contrôles, relance comprise",
+    "llm_truncated": "sa réponse a été coupée",
+    "llm_content_filtered": "le filtre de contenu d'Azure a refusé la demande",
+}
+NO_CANDIDATE_READ = "aucun candidat lu"
 OUT_OF_TOP = "hors top"
 MISSING = "—"
 # The limit of the counts (docs/tendances.md, "Limite de GH Archive"): never stars gained alone.
@@ -127,6 +141,8 @@ def render_trend_report_sheet(
         f"repositories_dropped: {response.repositories_dropped}",
         # Checked by MODEL_NAME, or null; written as JSON, which YAML reads as it is.
         f"model: {json.dumps(response.model)}",
+        # A state of a closed list, or null.
+        f"choice_failure: {json.dumps(response.choice_failure)}",
         f"request_id: {response.request_id}",
         "---",
         "",
@@ -139,6 +155,10 @@ def render_trend_report_sheet(
     lines += [
         "",
         GH_ARCHIVE_LIMIT,
+        "",
+        "## Choisis par le modèle",
+        "",
+        *render_choice(response),
         "",
         "## Dépôts qui ressortent",
         "",
@@ -157,6 +177,37 @@ def render_trend_report_sheet(
     if response.candidates.read < response.candidates.selected:
         lines += ["", describe_dropped_candidates(response.candidates.dropped)]
     return "\n".join(lines) + "\n"
+
+
+def render_choice(response: TrendReportResponse) -> list[str]:
+    """The repositories the model chose, in its order, or why it chose none."""
+    read = response.candidates.read
+    if response.model is None:
+        reason = (
+            NO_CANDIDATE_READ
+            if response.choice_failure is None
+            else CHOICE_FAILURE_REASONS[response.choice_failure]
+        )
+        return [f"Choix non fait : {reason}."]
+    candidates = f"{read} candidat{'s' if read > 1 else ''}"
+    if not response.chosen:
+        return [f"{response.model} n'en a retenu aucun sur {candidates}."]
+    return [
+        f"{response.model} en a retenu {len(response.chosen)} sur {candidates} :",
+        "",
+        *(render_chosen(chosen) for chosen in response.chosen),
+    ]
+
+
+def render_chosen(chosen: ChosenRepository) -> str:
+    """Its URL, made as in render_row, then its criteria of the code and its subjects."""
+    parts = []
+    criteria = [CRITERION_LABELS[c] for c in CRITERIA if c in chosen.criteria]
+    if criteria:
+        parts.append(", ".join(criteria))
+    if chosen.watch_subjects:
+        parts.append(f"sujet de la veille ({', '.join(chosen.watch_subjects)})")
+    return f"- <{GITHUB_URL}{chosen.repository_name}> : {' ; '.join(parts)}"
 
 
 def describe_dropped_candidates(dropped: DroppedCandidates) -> str:

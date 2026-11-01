@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "K-B AI API",
-    "version": "0.6.0"
+    "version": "0.7.0"
   },
   "paths": {
     "/digests": {
@@ -108,7 +108,7 @@
           "trend-reports"
         ],
         "summary": "Post Trend Reports",
-        "description": "The repositories that meet a criterion over the windows after the previous report, each\nwith its trajectory; no window after it gives an empty period, a reading that fails fails the\nrequest.",
+        "description": "The repositories that meet a criterion over the windows after the previous report, each\nwith its trajectory, and those the model chose among the candidates read; no window after it\ngives an empty period, a reading that fails fails the request, a choice that fails leaves the\nreport factual, with its state.",
         "operationId": "post_trend_reports_trend_reports_post",
         "requestBody": {
           "content": {
@@ -232,6 +232,71 @@
           "created_recently",
           "no_license"
         ]
+      },
+      "ChoiceCriterion": {
+        "type": "string",
+        "enum": [
+          "durable",
+          "new",
+          "accelerating",
+          "watch_subject"
+        ]
+      },
+      "ChosenRepositorySchema": {
+        "properties": {
+          "repository_id": {
+            "type": "integer",
+            "title": "Repository Id"
+          },
+          "repository_name": {
+            "type": "string",
+            "title": "Repository Name",
+            "description": "Its name in the most recent window."
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/ChoiceCriterion"
+            },
+            "type": "array",
+            "title": "Criteria",
+            "description": "Those the model gave and the code checked, in the order durable, new, accelerating, watch_subject."
+          },
+          "watch_subjects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Watch Subjects",
+            "description": "With watch_subject only, in the order of the subjects of the watch."
+          },
+          "best_rank": {
+            "type": "integer",
+            "title": "Best Rank"
+          },
+          "trajectory": {
+            "items": {
+              "$ref": "#/components/schemas/TrajectoryPointSchema"
+            },
+            "type": "array",
+            "title": "Trajectory",
+            "description": "One point per window of the period, in its order."
+          },
+          "facts": {
+            "$ref": "#/components/schemas/RepositoryFactsSchema",
+            "description": "Read on GitHub."
+          }
+        },
+        "type": "object",
+        "required": [
+          "repository_id",
+          "repository_name",
+          "criteria",
+          "watch_subjects",
+          "best_rank",
+          "trajectory",
+          "facts"
+        ],
+        "title": "ChosenRepositorySchema"
       },
       "ClaimSchema": {
         "properties": {
@@ -613,7 +678,8 @@
         "type": "string",
         "enum": [
           "classify",
-          "write"
+          "write",
+          "select"
         ]
       },
       "TrajectoryPointSchema": {
@@ -771,7 +837,26 @@
               }
             ],
             "title": "Model",
-            "description": "The model that chose the repositories; null when none chose them."
+            "description": "The model that chose the repositories, none chosen included; null when the choice failed or no candidate was read."
+          },
+          "choice_failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LlmFailure"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The state of a choice that failed; null otherwise. The report stays factual."
+          },
+          "chosen": {
+            "items": {
+              "$ref": "#/components/schemas/ChosenRepositorySchema"
+            },
+            "type": "array",
+            "title": "Chosen",
+            "description": "5 at most, in the order of the model; one chosen by watch_subject alone may be out of repositories."
           },
           "period": {
             "$ref": "#/components/schemas/TrendPeriodSchema"
@@ -797,6 +882,8 @@
         "required": [
           "request_id",
           "model",
+          "choice_failure",
+          "chosen",
           "period",
           "repositories",
           "repositories_dropped",

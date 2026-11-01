@@ -1,7 +1,7 @@
-"""The factual trend report: the period after the previous report, its windows read by the data API
-under the deadline, the repositories that meet a criterion, then the sheet of each candidate read
-on GitHub (docs/tendances.md); nothing is written nor logged here, each reading is a span without
-any repository."""
+"""The trend report: the period after the previous report, its windows read by the data API under
+the deadline, the repositories that meet a criterion, the sheet of each candidate read on GitHub,
+then the choice of the model among those read (docs/tendances.md); nothing is written nor logged
+here, each step is a span without any repository."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -15,6 +15,7 @@ from k_b.ai_api.connectors.github_client import (
     GithubReading,
     read_repository,
 )
+from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.repository_cards import (
     CandidateCounts,
@@ -22,6 +23,12 @@ from k_b.ai_api.repository_cards import (
     RepositoryCard,
     RepositoryFacts,
     to_facts,
+)
+from k_b.ai_api.stages.trend_selection import (
+    Selection,
+    SelectionCandidate,
+    SelectionFailure,
+    select_trends,
 )
 from k_b.ai_api.tracing import TRACING_OFF, Tracing
 from k_b.ai_api.trajectories import (
@@ -34,6 +41,7 @@ from k_b.core.config import (
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
     TREND_DURABLE_LOOKBACK_WINDOWS,
     TREND_FIRST_REPORT_WINDOWS,
+    DigestSubject,
 )
 from k_b.items import is_repository_name
 
@@ -67,6 +75,8 @@ class CardReading:
     """The sheets of the candidates read on GitHub."""
 
     facts: Mapping[int, RepositoryFacts]
+    # Raw, by repository_id: cleaned when the message of the choice is built, never in facts.
+    descriptions: Mapping[int, str | None]
     dropped_ids: frozenset[int]
     counts: CandidateCounts
 
@@ -80,6 +90,8 @@ class TrendReport:
     # By repository_id, for the candidates read only.
     facts: Mapping[int, RepositoryFacts]
     candidates: CandidateCounts
+    # None when no candidate is read: no call to the model.
+    choice: Selection | SelectionFailure | None
 
 
 @dataclass(frozen=True)
@@ -99,6 +111,9 @@ class PeriodReading:
 def build_trend_report(
     data_api_client: httpx2.Client,
     github_client: httpx2.Client,
+    llm_client: httpx2.Client,
+    llm_settings: LlmSettings,
+    subjects: Sequence[DigestSubject],
     after: date | None,
     previous_first_window: date | None,
     deadline: Deadline,
@@ -108,7 +123,9 @@ def build_trend_report(
 ) -> TrendReport:
     """The repositories that meet a criterion over the windows after `after`, the last window of
     the previous report, None for the first, with the sheet of each candidate read on GitHub at
-    `now`, the time of the request; a failure raises its DataApiError or its GithubError."""
+    `now`, the time of the request, and the choice of the model among those read; a failure of a
+    reading raises its DataApiError or its GithubError, a failure of the choice is in the
+    report."""
     with tracing.step("read_trend_windows") as step:
         try:
             reading = read_period(
@@ -130,14 +147,32 @@ def build_trend_report(
                 "k_b.repositories.dropped": trends.repositories_dropped,
             }
         )
+    candidates = select_candidates(trends.trajectories)
     cards = read_repository_cards(
-        github_client,
-        select_candidates(trends.trajectories),
-        deadline,
-        now,
-        tracing=tracing,
+        github_client, candidates, deadline, now, tracing=tracing
     )
-    return to_trend_report(trends, cards)
+    read = [
+        SelectionCandidate(
+            candidate,
+            cards.facts[candidate.repository_id],
+            cards.descriptions[candidate.repository_id],
+        )
+        for candidate in candidates
+        if candidate.repository_id in cards.facts
+    ]
+    choice = (
+        select_trends(
+            llm_client,
+            llm_settings,
+            read,
+            subjects,
+            deadline,
+            tracing=tracing,
+        )
+        if read
+        else None
+    )
+    return to_trend_report(trends, cards, choice)
 
 
 def read_period(
@@ -251,6 +286,7 @@ def read_repository_cards(
     span of counts and states, never a repository."""
     reading = GithubReading(http_client, deadline, now)
     facts: dict[int, RepositoryFacts] = {}
+    descriptions: dict[int, str | None] = {}
     dropped: dict[int, DropReason] = {}
     with tracing.step("read_repository_cards") as step:
         try:
@@ -260,6 +296,7 @@ def read_repository_cards(
                 )
                 if isinstance(card, RepositoryCard):
                     facts[candidate.repository_id] = to_facts(card, now)
+                    descriptions[candidate.repository_id] = card.description
                 else:
                     dropped[candidate.repository_id] = card
         except GithubError as error:
@@ -278,10 +315,12 @@ def read_repository_cards(
                 "k_b.github.requests": reading.requests,
             }
         )
-    return CardReading(facts, frozenset(dropped), counts)
+    return CardReading(facts, descriptions, frozenset(dropped), counts)
 
 
-def to_trend_report(trends: Trends, cards: CardReading) -> TrendReport:
+def to_trend_report(
+    trends: Trends, cards: CardReading, choice: Selection | SelectionFailure | None
+) -> TrendReport:
     """The repositories that meet a criterion, but the candidates GitHub left out: their name may
     now name another repository."""
     return TrendReport(
@@ -294,4 +333,5 @@ def to_trend_report(trends: Trends, cards: CardReading) -> TrendReport:
         repositories_dropped=trends.repositories_dropped,
         facts=cards.facts,
         candidates=cards.counts,
+        choice=choice,
     )

@@ -25,7 +25,7 @@ from k_b.core.config import DigestSubject
 
 # The version of the contracts of docs/fiches-veille.md and docs/tendances.md: a change a client
 # can see changes both.
-API_VERSION = "0.6.0"
+API_VERSION = "0.7.0"
 
 
 def create_app(

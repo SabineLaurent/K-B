@@ -3,6 +3,7 @@ schema of the AI API, which ties the client to the contract, then changed to bre
 
 import json
 from datetime import UTC, date, datetime
+from typing import get_args
 
 import httpx2
 import pytest
@@ -13,8 +14,6 @@ from post.test_ai_api_client import (
     TEST_API_KEY,
     answer,
 )
-
-from typing import get_args
 
 from k_b.ai_api.connectors.llm_client import LlmFailure
 from k_b.ai_api.schemas.trend_report_schema import (
@@ -586,7 +585,11 @@ def test_counts_of_candidates_that_do_not_add_up_are_refused(candidates, detail)
 
 
 # The choice of the model (#368, docs/tendances.md, "Choix").
-CANDIDATE_READ = {"selected": 1, "read": 1, "dropped": NO_CANDIDATE_DROPPED.model_dump()}
+CANDIDATE_READ = {
+    "selected": 1,
+    "read": 1,
+    "dropped": NO_CANDIDATE_DROPPED.model_dump(),
+}
 NO_CANDIDATE_READ = {
     "selected": 1,
     "read": 0,
@@ -602,7 +605,9 @@ def test_the_failures_of_the_choice_are_those_of_the_model():
 def test_the_repositories_chosen_are_read_with_their_criteria_and_subjects():
     report = make_report(
         chosen=[
-            choose(RISING, ["new", "watch_subject"], ["agent_tools", "llm_security"]),
+            choose(
+                RISING, ["new", "watch_subject"], ["llm_security", "coding_assistants"]
+            ),
             choose(STEADY, ["durable"]),
         ]
     )
@@ -612,7 +617,7 @@ def test_the_repositories_chosen_are_read_with_their_criteria_and_subjects():
     [rising, steady] = response.chosen
     assert (rising.repository_id, rising.repository_name) == (4_242, RISING_NAME)
     assert rising.criteria == ["new", "watch_subject"]
-    assert rising.watch_subjects == ["agent_tools", "llm_security"]
+    assert rising.watch_subjects == ["llm_security", "coding_assistants"]
     assert steady.criteria == ["durable"]
     assert response.choice_failure is None
 
@@ -621,7 +626,9 @@ def test_a_repository_chosen_by_its_subject_alone_may_be_out_of_the_repositories
     alone = STEADY.model_copy(
         update={"repository_id": 99, "repository_name": "only/subject", "criteria": []}
     )
-    report = make_report(chosen=[choose(alone, ["watch_subject"], ["agent_tools"])])
+    report = make_report(
+        chosen=[choose(alone, ["watch_subject"], ["coding_assistants"])]
+    )
 
     response, _ = ask(answer(content=body(report)))
 
@@ -657,7 +664,12 @@ SUBJECT_ALONE = STEADY.model_copy(
     ("changes", "detail"),
     [
         (
-            {"chosen": [choose(SUBJECT_ALONE, ["watch_subject"], ["agent_tools"])] * 6},
+            {
+                "chosen": [
+                    choose(SUBJECT_ALONE, ["watch_subject"], ["coding_assistants"])
+                ]
+                * 6
+            },
             "chosen (too_long)",
         ),
         ({"choice_failure": "llm_tired"}, "choice_failure (literal_error)"),
@@ -677,7 +689,11 @@ SUBJECT_ALONE = STEADY.model_copy(
             "model (choice_without_candidate_read)",
         ),
         (
-            {"model": None, "choice_failure": "llm_timeout", "candidates": NO_CANDIDATE_READ},
+            {
+                "model": None,
+                "choice_failure": "llm_timeout",
+                "candidates": NO_CANDIDATE_READ,
+            },
             "choice_failure (choice_without_candidate_read)",
         ),
         (
@@ -685,7 +701,10 @@ SUBJECT_ALONE = STEADY.model_copy(
             "chosen.1 (repository_twice)",
         ),
         ({"chosen": [choose(STEADY, [])]}, "chosen.0.criteria (too_short)"),
-        ({"chosen": [choose(STEADY, ["popular"])]}, "chosen.0.criteria.0 (literal_error)"),
+        (
+            {"chosen": [choose(STEADY) | {"criteria": ["popular"]}]},
+            "chosen.0.criteria.0 (literal_error)",
+        ),
         (
             {"chosen": [choose(RISING, ["accelerating", "new"])]},
             "chosen.0.criteria (not_in_order_once)",
@@ -695,7 +714,7 @@ SUBJECT_ALONE = STEADY.model_copy(
             "chosen.0.watch_subjects (not_with_watch_subject)",
         ),
         (
-            {"chosen": [choose(STEADY, ["durable"], ["agent_tools"])]},
+            {"chosen": [choose(STEADY, ["durable"], ["coding_assistants"])]},
             "chosen.0.watch_subjects (not_with_watch_subject)",
         ),
         (
@@ -705,7 +724,9 @@ SUBJECT_ALONE = STEADY.model_copy(
         (
             {
                 "chosen": [
-                    choose(STEADY, ["watch_subject"], ["llm_security", "agent_tools"])
+                    choose(
+                        STEADY, ["watch_subject"], ["coding_assistants", "llm_security"]
+                    )
                 ]
             },
             "chosen.0.watch_subjects (not_in_order_once)",

@@ -83,7 +83,9 @@ def build_window(window_end, ranks=None, extra=()):
     ranks = RISING_RANKS if ranks is None else ranks
     rows = [
         {
-            "repository_id": 1_000 + k,
+            # Far from any count of a span (gen_ai.request.max_tokens is 1,024), which the test of
+            # the traces would take for an identifier.
+            "repository_id": 100_000 + k,
             "repository_name": f"filler/repo-{k}",
             "stars_gained": 1_000 - 10 * k,
             "forks_gained": 3,
@@ -678,7 +680,7 @@ def test_neither_the_traces_nor_the_logs_hold_a_repository(
 def test_a_response_that_fails_to_be_built_is_traced_as_a_500(
     make_ai_api, recorded_traces, monkeypatch
 ):
-    def fail(request_id, report):
+    def fail(request_id, report, model):
         raise ValueError("a fault of the test")
 
     monkeypatch.setattr(trend_report_router, "to_trend_report_schema", fail)
@@ -1191,11 +1193,13 @@ def test_with_content_none_no_content_record_is_sent(make_ai_api, recorded_trace
 
 
 def test_with_content_all_only_the_body_of_a_content_record_holds_a_repository(
-    make_ai_api, recorded_traces, capsys, caplog
+    make_ai_api, recorded_traces, capsys, caplog, tmp_path
 ):
+    """With the log of kb serve-ai, which keeps no request line of httpx2 (as the test of the
+    traces above)."""
     data_api = simulate([day(offset) for offset in range(6)])
 
-    with caplog.at_level(logging.DEBUG):
+    with logging_to(tmp_path, None), caplog.at_level(logging.DEBUG, logger="k_b"):
         body = post_trend_reports(make_ai_api(data_api, trace_content="all")).json()
 
     assert body["model"] == "replay"

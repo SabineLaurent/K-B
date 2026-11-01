@@ -23,6 +23,7 @@ def make_card(license="MIT", created_at=datetime(2018, 12, 8, tzinfo=UTC)):
         language="Python",
         topics=("api", "python"),
         stars_total=104_367,
+        description="FastAPI framework, high performance, easy to learn",
     )
 
 

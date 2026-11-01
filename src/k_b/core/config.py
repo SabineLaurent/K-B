@@ -196,8 +196,11 @@ MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,99}")
 # The largest token count read in an answer of the provider (prompt, completion, reasoning): an
 # answer beyond it is not read (llm_unavailable), since the answer of a provider is an input not
 # trusted (OWASP API10:2023). Far above a call of K-B (about 9,000 input tokens and 8,192 output
-# tokens at most, #205) and the context of any current model, and far below 2**53, the largest
-# integer a float holds exactly: the cost of a metric line stays a finite number (review of #156).
+# tokens at most for a digest, #205; for the choice of a trend report, 116,323 characters of user
+# message measured at the cap by tests/ai_api/test_trend_selection.py, about 39,000 tokens at 3
+# characters per token, assumed) and the context of any current model, and far below 2**53, the
+# largest integer a float holds exactly: the cost of a metric line stays a finite number (review
+# of #156).
 MAX_TOKENS_READ_PER_ANSWER = 10_000_000
 # The prices of gpt-6-luna (ADR of 2026-10-17, "Modèle des fiches : gpt-6-luna sur l'abonnement
 # de l'organisme de formation"), in USD per million tokens, for cost_estimated of each metric
@@ -256,6 +259,12 @@ MAX_FIELD_CHARS_FOR_WRITING = 2000
 MAX_ITEMS_PER_CLASSIFICATION_CALL = 45
 MAX_CLASSIFICATION_INPUT_CHARS = 36_000
 MAX_FIELD_CHARS_FOR_CLASSIFICATION = 500
+# The description of a candidate of a trend report sent to the choice of the model, once cleaned
+# (ai_api/repository_texts.py): cut as the long text of the classification. 20 topics at most.
+MAX_DESCRIPTION_CHARS_FOR_SELECTION = 500
+MAX_TOPICS_FOR_SELECTION = 20
+# The repositories the model may choose for a trend report (docs/tendances.md, "Choix").
+TREND_MAX_CHOSEN = 5
 
 
 # A subject of the digests: its name, a value of enum and a folder name, and its definition, sent
@@ -329,10 +338,13 @@ TRENDS_DIR_NAME = "tendances"
 # calls). Beyond it, a subject not yet written is llm_timeout, the others are returned.
 DIGEST_REQUEST_TIMEOUT_SECONDS = 200
 # The bound of a trend report request: 1 + 31 GET /trends at most on a service of the same network,
-# then GITHUB_MAX_REQUESTS_PER_REPORT GET /repos at most on GitHub, one after the other; each
-# timeout of HTTP_TIMEOUT_SECONDS is shortened by it. Its hold for 60 requests to GitHub is
-# measured by #370.
-TREND_REPORT_REQUEST_TIMEOUT_SECONDS = 60
+# then GITHUB_MAX_REQUESTS_PER_REPORT GET /repos at most on GitHub, one after the other, then the
+# call of the choice to the model; each timeout is shortened by it. As
+# DIGEST_REQUEST_TIMEOUT_SECONDS and for the same reason: under the 240 seconds of kb and of the
+# ingress of Azure Container Apps, with a margin for the last call under way. GitHub may leave too
+# little time to the model: the choice then fails in llm_timeout, the report factual
+# (docs/tendances.md). Its hold is measured by #370.
+TREND_REPORT_REQUEST_TIMEOUT_SECONDS = 200
 # The requests of kb digest and kb trend-report to the AI API (post/ai_api_client.py, #209, #366).
 # The URL of kb serve-ai with its defaults, changed by KB_AI_API_URL; it does not follow
 # KB_AI_API_PORT: set KB_AI_API_URL too when the port of kb serve-ai changes. Connection, pool and
@@ -340,8 +352,8 @@ TREND_REPORT_REQUEST_TIMEOUT_SECONDS = 60
 # the data API. Read: the AI API answers in one block once its request is done, within
 # DIGEST_REQUEST_TIMEOUT_SECONDS and the last call to the model under way (about 20 seconds more,
 # ai_api/deadline.py); 240 is also the bound the HTTP ingress of Azure Container Apps gives a
-# request, and holds the shorter TREND_REPORT_REQUEST_TIMEOUT_SECONDS. No retry: a Retry-After is
-# shown, never waited.
+# request, and holds TREND_REPORT_REQUEST_TIMEOUT_SECONDS, of the same length. No retry: a
+# Retry-After is shown, never waited.
 AI_API_URL = f"http://{AI_API_HOST}:{AI_API_PORT}"
 AI_API_CONNECT_TIMEOUT_SECONDS = 5
 AI_API_POOL_TIMEOUT_SECONDS = 5

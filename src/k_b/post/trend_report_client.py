@@ -5,18 +5,21 @@ a period that would move the register back or widen it is refused before anythin
 from collections.abc import Sequence
 from datetime import date, timedelta
 from itertools import pairwise
-from typing import Annotated, get_args
+from typing import Annotated, Literal, get_args
 
 import httpx2
 from pydantic import AfterValidator, Field
 
 from k_b.core.api_keys import AI_API_KEY_VARIABLE_PREFIX
 from k_b.core.config import (
+    DIGEST_SUBJECTS,
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
     GH_ARCHIVE_TOP_SIZE,
     MODEL_NAME,
+    TREND_MAX_CHOSEN,
 )
 from k_b.items import (
+    ChoiceCriterion,
     Criterion,
     WindowState,
     WrittenDayInStrictModel,
@@ -37,6 +40,19 @@ TREND_REPORT_KEY_VARIABLE = f"{AI_API_KEY_VARIABLE_PREFIX}KB_TREND_REPORT"
 TREND_REPORTS_PATH = "trend-reports"
 # The criteria in the order the AI API gives them (docs/tendances.md, "Ce que rend #366").
 CRITERIA: tuple[Criterion, ...] = get_args(Criterion.__value__)
+CHOICE_CRITERIA: tuple[ChoiceCriterion, ...] = get_args(ChoiceCriterion.__value__)
+WATCH_SUBJECT: ChoiceCriterion = "watch_subject"
+SUBJECT_NAMES = tuple(subject.name for subject in DIGEST_SUBJECTS)
+# The states of a choice that failed, those of LlmFailure in ai_api, which post does not import:
+# a test keeps both equal.
+type ChoiceFailure = Literal[
+    "llm_invalid_output",
+    "llm_truncated",
+    "llm_content_filtered",
+    "llm_rate_limited",
+    "llm_unavailable",
+    "llm_timeout",
+]
 
 Rank = Annotated[int, Field(ge=1, le=GH_ARCHIVE_TOP_SIZE)]
 Count = Annotated[int, Field(ge=0)]
@@ -63,6 +79,16 @@ class TrendRepository(AiApiModel):
     criteria: Annotated[list[Criterion], Field(min_length=1)]
     best_rank: Rank
     trajectory: list[TrendPoint]
+
+
+class ChosenRepository(AiApiModel):
+    """A repository the model chose; its trajectory and facts are not read: the report shows
+    them for the repositories of the table."""
+
+    repository_id: int
+    repository_name: Annotated[str, AfterValidator(check_repository_name)]
+    criteria: Annotated[list[ChoiceCriterion], Field(min_length=1)]
+    watch_subjects: list[str]
 
 
 class TrendPeriod(AiApiModel):
@@ -93,6 +119,8 @@ class Candidates(AiApiModel):
 class TrendReportResponse(AiApiModel):
     request_id: Annotated[str, AfterValidator(match_fully(REQUEST_ID))]
     model: Annotated[str, AfterValidator(match_fully(MODEL_NAME))] | None
+    choice_failure: ChoiceFailure | None
+    chosen: Annotated[list[ChosenRepository], Field(max_length=TREND_MAX_CHOSEN)]
     period: TrendPeriod
     repositories: list[TrendRepository]
     repositories_dropped: Count
@@ -117,6 +145,8 @@ def request_trend_report(
     refuse_inconsistent_period(response, after, today)
     refuse_inconsistent_repositories(response)
     refuse_inconsistent_candidates(response)
+    refuse_inconsistent_choice(response)
+    refuse_inconsistent_chosen(response)
     return response
 
 
@@ -234,3 +264,57 @@ def refuse_inconsistent_candidates(response: TrendReportResponse) -> None:
         candidates.dropped.model_dump().values()
     ):
         raise_invalid(response.request_id, "candidates", "not_the_sum")
+
+
+def refuse_inconsistent_choice(response: TrendReportResponse) -> None:
+    """A model or a failure when a candidate is read, never both; a failure chooses nothing, and
+    a choice names its model."""
+    request_id = response.request_id
+    if response.model is not None and response.choice_failure is not None:
+        raise_invalid(request_id, "choice_failure", "with_a_model")
+    if response.chosen and response.choice_failure is not None:
+        raise_invalid(request_id, "chosen", "with_a_choice_failure")
+    if response.chosen and response.model is None:
+        raise_invalid(request_id, "chosen", "without_a_model")
+    if response.candidates.read == 0:
+        if response.model is not None:
+            raise_invalid(request_id, "model", "choice_without_candidate_read")
+        if response.choice_failure is not None:
+            raise_invalid(request_id, "choice_failure", "choice_without_candidate_read")
+    elif response.model is None and response.choice_failure is None:
+        raise_invalid(request_id, "model", "no_choice_with_candidates_read")
+
+
+def refuse_inconsistent_chosen(response: TrendReportResponse) -> None:
+    """Each chosen once, its criteria in order, met in the table of the repositories but
+    watch_subject, which goes with its subjects, taken from the list in its order."""
+    criteria_by_id = {r.repository_id: r.criteria for r in response.repositories}
+    seen_ids: set[int] = set()
+    for number, chosen in enumerate(response.chosen):
+        place = f"chosen.{number}"
+        if chosen.repository_id in seen_ids:
+            raise_invalid(response.request_id, place, "repository_twice")
+        seen_ids.add(chosen.repository_id)
+        refuse_inconsistent_chosen_criteria(
+            response, place, chosen, criteria_by_id.get(chosen.repository_id, [])
+        )
+
+
+def refuse_inconsistent_chosen_criteria(
+    response: TrendReportResponse,
+    place: str,
+    chosen: ChosenRepository,
+    criteria_met: Sequence[Criterion],
+) -> None:
+    request_id = response.request_id
+    criteria = chosen.criteria
+    if not is_in_order_once(criteria, CHOICE_CRITERIA):
+        raise_invalid(request_id, f"{place}.criteria", "not_in_order_once")
+    if "new" in criteria and not response.period.new_evaluated:
+        raise_invalid(request_id, f"{place}.criteria", "new_not_evaluated")
+    if any(c != WATCH_SUBJECT and c not in criteria_met for c in criteria):
+        raise_invalid(request_id, f"{place}.criteria", "not_met_in_the_repositories")
+    if (WATCH_SUBJECT in criteria) != bool(chosen.watch_subjects):
+        raise_invalid(request_id, f"{place}.watch_subjects", "not_with_watch_subject")
+    if not is_in_order_once(chosen.watch_subjects, SUBJECT_NAMES):
+        raise_invalid(request_id, f"{place}.watch_subjects", "not_in_order_once")

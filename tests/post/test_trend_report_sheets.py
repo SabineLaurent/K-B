@@ -296,11 +296,17 @@ def test_the_repositories_chosen_are_listed_with_their_criteria_and_subjects():
         update={"repository_id": 99, "repository_name": "only/subject", "criteria": []}
     )
     report = make_report(
-        candidates={"selected": 3, "read": 3, "dropped": make_report()["candidates"]["dropped"]},
+        candidates={
+            "selected": 3,
+            "read": 3,
+            "dropped": make_report()["candidates"]["dropped"],
+        },
         chosen=[
-            choose(RISING, ["new", "accelerating", "watch_subject"], ["agent_tools"]),
+            choose(
+                RISING, ["new", "accelerating", "watch_subject"], ["coding_assistants"]
+            ),
             choose(STEADY, ["durable"]),
-            choose(alone, ["watch_subject"], ["agent_tools", "llm_security"]),
+            choose(alone, ["watch_subject"], ["llm_security", "coding_assistants"]),
         ],
     )
 
@@ -310,10 +316,10 @@ def test_the_repositories_chosen_are_listed_with_their_criteria_and_subjects():
         "gpt-6-luna en a retenu 3 sur 3 candidats :\n"
         "\n"
         "- <https://github.com/owner/rising-repository> : nouveau, en accélération ;"
-        " sujet de la veille (agent_tools)\n"
+        " sujet de la veille (coding_assistants)\n"
         "- <https://github.com/steady/tool> : durable\n"
-        "- <https://github.com/only/subject> : sujet de la veille (agent_tools,"
-        " llm_security)\n"
+        "- <https://github.com/only/subject> : sujet de la veille (llm_security,"
+        " coding_assistants)\n"
         "\n"
     )
 

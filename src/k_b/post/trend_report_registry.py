@@ -41,7 +41,8 @@ class TrendReportEntry(BaseModel):
     file: str
     written_at: UtcDatetime
     request_id: Annotated[str, AfterValidator(match_fully(REQUEST_ID))]
-    # Null and false until a model chooses the repositories (#368).
+    # The model that chose, none chosen included, and true; null and false when the choice failed
+    # or no candidate was read.
     model: Annotated[str, AfterValidator(match_fully(MODEL_NAME))] | None
     choice_made: bool
 

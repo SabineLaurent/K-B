@@ -79,6 +79,14 @@ def run_trend_report(data_dir: Path, environ: Mapping[str, str]) -> int:
     if not response.period.windows:
         report_empty_period(response, previous)
         return ExitCode.SUCCEEDED
+    if response.choice_failure is not None:
+        # The report stays factual and the period moves on (decision of Sabine, 2026-10-29); a
+        # refused key (llm_unavailable) is no longer silent.
+        logger.warning(
+            "choice of the model not made: %s, request_id %s",
+            response.choice_failure,
+            response.request_id,
+        )
     entry = make_entry(preparation.report_file, response, generated)
     if entry is None:
         return ExitCode.FAILED
@@ -206,8 +214,8 @@ def make_entry(
                 "written_at": generated,
                 "request_id": response.request_id,
                 "model": response.model,
-                # No model chooses yet (#368).
-                "choice_made": False,
+                # The response names its model only when the choice is made.
+                "choice_made": response.model is not None,
             }
         )
     except ValidationError as error:

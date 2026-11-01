@@ -28,6 +28,8 @@ class RepositoryCard:
     language: str | None
     topics: tuple[str, ...]
     stars_total: int
+    # Raw: for the choice of the model alone, never in the response.
+    description: str | None
 
 
 @dataclass(frozen=True)

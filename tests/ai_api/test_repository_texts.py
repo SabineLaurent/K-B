@@ -60,9 +60,18 @@ def test_an_html_tag_is_removed_and_its_text_kept(text, expected):
         chr(0xE0100),  # variation selector supplement
         chr(0x180B),  # Mongolian free variation selector
         chr(0xE0041),  # tag LATIN CAPITAL LETTER A, Cf
-        chr(0xE0080),  # in the block of the tags, Cn: removed by range
+        chr(0xE0002),  # in the block of the tags, Cn: removed by range
     ],
-    ids=["rlo", "zwsp", "private-use", "fe0f", "e0100", "mongolian", "tag", "tag-block-cn"],
+    ids=[
+        "rlo",
+        "zwsp",
+        "private-use",
+        "fe0f",
+        "e0100",
+        "mongolian",
+        "tag",
+        "tag-block-cn",
+    ],
 )
 def test_a_hidden_character_is_removed(hidden):
     assert clean(f"ign{hidden}ore") == "ignore"
@@ -133,9 +142,8 @@ def test_a_text_is_cut_and_the_cut_is_said():
 
 def test_a_text_cut_before_its_cleaning_is_said_cut_even_once_short():
     """The raw cut at 4 times the bound comes first: what it drops is lost."""
-    cleaned = clean_repository_text(
-        "<b>" * (2 * MAX_CHARS) + "end", MAX_CHARS
-    )
+    # 2,000 characters of tags, cut whole at 4 times the bound.
+    cleaned = clean_repository_text("<br/>" * (2 * MAX_CHARS) + "end", MAX_CHARS)
 
     assert cleaned.text == ""
     assert cleaned.is_cut is True

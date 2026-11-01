@@ -26,8 +26,8 @@ from k_b.ai_api.connectors.llm_settings import (
 )
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.stages.classification import CLASSIFICATION_MAX_COMPLETION_TOKENS
-from k_b.ai_api.stages.writing import WRITING_MAX_COMPLETION_TOKENS
 from k_b.ai_api.stages.trend_selection import SELECTION_MAX_COMPLETION_TOKENS
+from k_b.ai_api.stages.writing import WRITING_MAX_COMPLETION_TOKENS
 from k_b.ai_api.tracing import TRACING_OFF, SpanRef
 from k_b.core.config import (
     LLM_CALL_TIMEOUT_SECONDS,

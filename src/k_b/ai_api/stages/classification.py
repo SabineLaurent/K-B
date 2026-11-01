@@ -45,8 +45,8 @@ subject, taken from "subjects" only, or "no_suitable_subject".
 - An item that fits no subject is "no_suitable_subject".
 - Answer with the JSON object of the schema, and nothing else."""
 # One reminder per check, added to the system prompt of a retry (llm_client.call_model). Those of
-# content_filter and markup are never sent: the first ends the call without retry, the second is
-# a check of the writing.
+# content_filter, markup and criterion are never sent: the first ends the call without retry, the
+# others are checks of the writing and of the choice of a trend report.
 CLASSIFICATION_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
     "content_filter": "Your previous answer was filtered. Sort the items only.",
     "finish_reason": "Your previous answer did not end normally. Answer with the JSON "
@@ -59,6 +59,8 @@ CLASSIFICATION_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
     "under the item_id given.",
     "completeness": "Your previous answer answered no item. Answer once for each item.",
     "markup": "Your previous answer was refused. Answer with the JSON object of the schema "
+    "only.",
+    "criterion": "Your previous answer was refused. Answer with the JSON object of the schema "
     "only.",
 }
 # 50 answers of about 10 tokens each, with a wide margin; under the read timeout at the rate

@@ -92,7 +92,8 @@ def build_candidate(
 FASTAPI = build_candidate(
     81_000,
     "fastapi/fastapi",
-    (9, 5, 2),
+    # A window missing is missing for every candidate.
+    (9, "missing", 2),
     ("durable", "accelerating"),
     GITHUB_ANSWER["description"],
 )
@@ -106,7 +107,11 @@ def completion(output):
 
 
 def choice(ref, criteria, watch_subjects=()):
-    return {"ref": ref, "criteria": list(criteria), "watch_subjects": list(watch_subjects)}
+    return {
+        "ref": ref,
+        "criteria": list(criteria),
+        "watch_subjects": list(watch_subjects),
+    }
 
 
 def chosen(*choices):
@@ -162,7 +167,7 @@ def test_the_user_message_holds_the_subjects_the_windows_and_each_candidate():
                 "language": "Python",
                 "criteria": ["durable", "accelerating"],
                 "best_rank": 2,
-                "ranks": [9, 5, 2],
+                "ranks": [9, None, 2],
             },
             {
                 "ref": "c2",

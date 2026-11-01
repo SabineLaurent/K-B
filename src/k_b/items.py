@@ -218,6 +218,8 @@ WrittenDayInStrictModel = Annotated[WrittenDay, Field(strict=False)]
 # (docs/tendances.md, "Rang et critères"): the AI API computes them, kb writes them. Type
 # statements: the OpenAPI names them.
 type Criterion = Literal["durable", "new", "accelerating"]
+# A criterion of a repository the model chose: those of the code, or a subject of the watch.
+type ChoiceCriterion = Literal["durable", "new", "accelerating", "watch_subject"]
 type WindowState = Literal["top", "out_of_top", "missing"]
 # A date with its time zone, held in UTC.
 UtcDatetime = Annotated[AwareDatetime, AfterValidator(convert_to_utc)]

@@ -98,6 +98,9 @@ class RepositoryBody(GithubModel):
         Field(max_length=MAX_GITHUB_TOPICS),
     ]
     license: LicenseBody | None
+    # Free text of the owner, bounded by the body only: cleaned before the model
+    # (ai_api/repository_texts.py), never refused here, as an emoji is legitimate.
+    description: str | None
 
 
 REPOSITORY = TypeAdapter(RepositoryBody)
@@ -221,6 +224,7 @@ def to_card(answer: Answer, repository_id: int) -> RepositoryCard | DropReason:
         language=body.language,
         topics=tuple(body.topics),
         stars_total=body.stargazers_count,
+        description=body.description,
     )
 
 
