@@ -64,16 +64,10 @@ def collect_all_sources(
             # The error and the notes of a source (the day and url of a page) go on the dated
             # line, quoted: any source may raise any text. The traceback of an unexpected error
             # follows it.
-            notes = "".join(
-                f"; {quote_value(note, MAX_QUOTED_FAILURE_LENGTH)}"
-                for note in getattr(error, "__notes__", [])
-            )
             logger.error(
-                "collection failed for source %r: %s %s%s",
+                "collection failed for source %r: %s",
                 source.name,
-                type(error).__name__,
-                quote_value(str(error), MAX_QUOTED_FAILURE_LENGTH),
-                notes,
+                describe_source_failure(error),
                 exc_info=not isinstance(error, EXPECTED_SOURCE_ERRORS),
             )
             errors_by_source[source.name] = error
@@ -95,6 +89,15 @@ def collect_all_sources(
         )
         return CollectionOutcome(errors_by_source, error)
     return CollectionOutcome(errors_by_source, None)
+
+
+def describe_source_failure(error: Exception) -> str:
+    """The type of the error, its message and its notes, each quoted."""
+    notes = "".join(
+        f"; {quote_value(note, MAX_QUOTED_FAILURE_LENGTH)}"
+        for note in getattr(error, "__notes__", [])
+    )
+    return f"{type(error).__name__} {quote_value(str(error), MAX_QUOTED_FAILURE_LENGTH)}{notes}"
 
 
 def collect_one_source(
