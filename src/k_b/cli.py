@@ -50,6 +50,20 @@ LOG_FILE_PATH_BY_COMMAND = {
 
 
 def main(argv: list[str] | None = None) -> int:
+    command = read_command(argv)
+    # Neither data nor key: the document is the same on every machine.
+    if command == "openapi":
+        return run_openapi()
+    # Read once, here: every command gets the same mapping.
+    environ = read_environment()
+    data_dir = read_data_dir(environ)
+    log_to_file = read_log_to_file(environ)
+    if data_dir is None or log_to_file is None:
+        return ExitCode.NOT_STARTED
+    return run_with_log(command, data_dir, environ, log_to_file)
+
+
+def read_command(argv: list[str] | None) -> str:
     parser = argparse.ArgumentParser(
         prog="kb",
         epilog=describe_exit_codes(),
@@ -100,19 +114,17 @@ def main(argv: list[str] | None = None) -> int:
         f" the AI API in {AI_API_OPENAPI_PATH}",
     )
     arguments = parser.parse_args(argv)
+    command: str = arguments.command
+    return command
 
-    # Neither data nor key: the document is the same on every machine.
-    if arguments.command == "openapi":
-        return run_openapi()
-    # Read once, here: every command gets the same mapping.
-    environ = read_environment()
-    data_dir = read_data_dir(environ)
-    log_to_file = read_log_to_file(environ)
-    if data_dir is None or log_to_file is None:
-        return ExitCode.NOT_STARTED
+
+def run_with_log(
+    command: str, data_dir: Path, environ: Mapping[str, str], log_to_file: bool
+) -> int:
+    """Open the log of the run, then run the command; none is run without its log."""
     log_file_path = None
     if log_to_file:
-        log_file_path = LOG_FILE_PATH_BY_COMMAND.get(arguments.command, LOG_FILE_PATH)
+        log_file_path = LOG_FILE_PATH_BY_COMMAND.get(command, LOG_FILE_PATH)
     with ExitStack() as log_stack:
         try:
             log_stack.enter_context(logging_to(data_dir, log_file_path))
@@ -123,23 +135,31 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return ExitCode.NOT_STARTED
-        try:
-            with stopping_on_sigterm(arguments.command):
-                return run_command(arguments.command, data_dir, environ)
-        except StoppedBySigtermError:
-            # Caught once the import or the collection has cleaned up on its way out.
-            logger.error("kb stopped by SIGTERM")
-            return ExitCode.STOPPED_BY_SIGTERM
-        except KeyboardInterrupt:
-            # The same for SIGINT (Ctrl-C), which Python raises as KeyboardInterrupt, not an
-            # Exception: uncaught, Python would print its whole traceback.
-            logger.error("kb stopped by SIGINT")
-            return ExitCode.STOPPED_BY_SIGINT
-        except Exception:
-            # Logged here, while the log file is open, and not raised again: Python would print
-            # its traceback a second time. 1, as Python exits on an exception: kb was run.
-            logger.exception("kb stopped by an exception it does not handle")
-            return ExitCode.FAILED
+        return run_with_safety_nets(command, data_dir, environ)
+
+
+def run_with_safety_nets(
+    command: str, data_dir: Path, environ: Mapping[str, str]
+) -> int:
+    """Run the command; a stop by a signal or an unhandled exception is logged with its exit
+    code."""
+    try:
+        with stopping_on_sigterm(command):
+            return run_command(command, data_dir, environ)
+    except StoppedBySigtermError:
+        # Caught once the import or the collection has cleaned up on its way out.
+        logger.error("kb stopped by SIGTERM")
+        return ExitCode.STOPPED_BY_SIGTERM
+    except KeyboardInterrupt:
+        # The same for SIGINT (Ctrl-C), which Python raises as KeyboardInterrupt, not an
+        # Exception: uncaught, Python would print its whole traceback.
+        logger.error("kb stopped by SIGINT")
+        return ExitCode.STOPPED_BY_SIGINT
+    except Exception:
+        # Logged here, while the log file is open, and not raised again: Python would print
+        # its traceback a second time. 1, as Python exits on an exception: kb was run.
+        logger.exception("kb stopped by an exception it does not handle")
+        return ExitCode.FAILED
 
 
 def describe_exit_codes() -> str:

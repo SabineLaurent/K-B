@@ -64,11 +64,21 @@ def run_import(data_dir: Path) -> int:
     # Where the rejections are detailed (decision of Sabine of 2026-10-29); its name only, as
     # etl/load.py logs it: the path names the data directory.
     logger.info("import log kept: %s", quote_value(outcome.log_path.name))
+    print_import_result(outcome)
+    return purge_raw_after_import(data_dir)
+
+
+def print_import_result(outcome: ImportOutcome) -> None:
+    """The summary of the import on screen, between two blank lines."""
     # A blank line before and after the result, apart from the log and from what follows (make's
     # line of an error): decisions of Sabine of 2026-10-29.
     print()
     print(describe_import_summary(outcome))
     print()
+
+
+def purge_raw_after_import(data_dir: Path) -> ExitCode:
+    """Purge the raw files superseded; a failure leaves the import committed."""
     try:
         purge_superseded_raw(data_dir, LATEST_ONLY_FOLDER_KEYS)
     except (sqlite3.Error, OSError, ValueError) as error:

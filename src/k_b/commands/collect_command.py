@@ -54,6 +54,14 @@ def run_collect(data_dir: Path, environ: Mapping[str, str]) -> int:
         logger.error("%s", error)
         return ExitCode.NOT_STARTED
     logger.info("collection finished in %s", describe_duration(monotonic() - started))
+    print_collection_result(outcome, collect_only, environ)
+    return find_collection_exit_code(outcome)
+
+
+def print_collection_result(
+    outcome: CollectionOutcome, collect_only: CollectOnly, environ: Mapping[str, str]
+) -> None:
+    """One line per source run, then per source skipped, then the state if it was not written."""
     # A blank line before and after the result, apart from the log and from what follows (make's
     # line of an error): decisions of Sabine of 2026-10-29.
     print()
@@ -63,7 +71,6 @@ def run_collect(data_dir: Path, environ: Mapping[str, str]) -> int:
     if outcome.state_error is not None:
         print(f"collection_state: {describe_outcome(outcome.state_error)}")
     print()
-    return find_collection_exit_code(outcome)
 
 
 def log_collection_start(sources: Sequence[Source], environ: Mapping[str, str]) -> None:
