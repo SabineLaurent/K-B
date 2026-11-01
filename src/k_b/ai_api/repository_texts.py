@@ -35,7 +35,7 @@ BADGE = re.compile(r"\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)")
 IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 # Before the URLs: jane.doe@www.example.com would become jane.doe@[url].
 # No dot required: jane@localhost; x@latest is masked too.
-EMAIL = re.compile(r"[\w.%+-]+@[\w-]+(?:\.[\w-]+)*")
+EMAIL = re.compile(r"[\w.%+'-]+@[\w-]+(?:\.[\w-]+)*")
 MASKED_EMAIL = "[email]"
 # The word a raw cut breaks; the lookbehind keeps the search linear.
 CUT_WORD = re.compile(r"(?<!\S)\S*\Z")

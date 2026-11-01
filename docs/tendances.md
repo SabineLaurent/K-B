@@ -373,12 +373,14 @@ jetons (`docs/jeton-github.md`, mis à jour par #367).
   la sécurité des agents ») ; le code vérifie que le sujet est de la liste, pas que le dépôt en
   relève (comme un item qui oriente le classement entre deux sujets permis,
   [fiches-veille.md](fiches-veille.md), « Injection d'instructions »).
-- Limite du masquage : une adresse part telle quelle quand elle est écrite avec `＠` pleine
-  chasse (U+FF20) ou `﹫` (U+FE6B), avec une lettre suivie d'un accent combinant (NFD), maquillée
-  (`[at]`, « at », espaces autour du `@`), ou scindée avant son `@` par un bloc de code ou par une
-  balise non fermée où tombe la coupe brute ; un nom en texte libre aussi. Une adresse hors ASCII
-  (`josé@exemple.fr`) ou sans point dans son domaine est masquée, comme un `x@y` qui n'en est pas
-  une (`react@latest`). Après une coupe brute, le mot qu'elle entame est retiré.
+- Limite du masquage : une adresse part telle quelle quand elle est écrite avec `＠` pleine chasse
+  (U+FF20) ou `﹫` (U+FE6B), avec une lettre suivie d'une marque combinante (accent en NFD, signe
+  vocalique…), maquillée (`[at]`, « at », espaces autour du `@`), ou scindée autour de son `@` par
+  un bloc de code, une image ou un badge, ou par une balise non fermée où tombe la coupe brute ;
+  quand sa partie locale porte un autre caractère hors `\w.%+'-` (`&`…), ce qui précède ce caractère
+  part ; un nom en texte libre aussi. Une adresse hors ASCII (`josé@exemple.fr`), avec une
+  apostrophe (`o'brien@…`) ou sans point dans son domaine est masquée, comme un `x@y` qui n'en est
+  pas une (`react@latest`). Après une coupe brute, le mot qu'elle entame est retiré.
 - Limite : si GitHub prend presque toute l'échéance, le choix échoue en `llm_timeout` et le compte
   rendu reste factuel ; aucune réserve de temps n'est gardée pour le modèle. Mesuré par #370.
 - Limite : le message au plafond mesure 116 323 caractères ; en jetons, ce n'est qu'une estimation,

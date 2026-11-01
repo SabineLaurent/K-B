@@ -177,6 +177,10 @@ def test_an_address_out_of_ascii_is_masked(address):
     assert clean(f"write to {address} now") == "write to [email] now"
 
 
+def test_an_address_with_an_apostrophe_is_masked_whole():
+    assert clean("write to jean-marie.o'neil@example.fr now") == "write to [email] now"
+
+
 @pytest.mark.parametrize(
     "split",
     [chr(9), "```code```"],
@@ -228,7 +232,7 @@ def test_a_long_text_of_letters_is_cleaned_within_a_second():
     """The raw cut bounds the patterns: the URL of watch_items takes 1.27 s on 20,000 letters."""
     started = time.perf_counter()
 
-    # Letters up to the raw cut, then short words: the cut removes only the last.
-    clean("a" * (RAW_CUT_FACTOR * MAX_CHARS - 2) + " b" * 1000)
+    # Letters up to the raw cut, then a long word: without the raw cut, the patterns read it all.
+    clean("a" * (RAW_CUT_FACTOR * MAX_CHARS - 2) + " " + "a" * 40_000)
 
     assert time.perf_counter() - started < 1
