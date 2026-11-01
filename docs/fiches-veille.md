@@ -105,8 +105,9 @@ si Sabine la modifie souvent.
 ### Lecture plafonnée
 
 La lecture et les appels au modèle sont bornés par demande (OWASP API4:2023, consommation de
-ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 600 sur 14 (TLDR
-≈ 450, arXiv ≈ 45, releases 20 à 60, KEV et alertes quelques-uns).
+ressources sans limite). Volume estimé : 140 à 205 items sur 3 jours, 640 à 740 sur 14 (TLDR
+≈ 590, dont ≈ 140 pour l'édition `tech` ajoutée le 2026-11-01, comptée à 14 articles par édition
+d'après celle du 2026-10-30 ; arXiv ≈ 45, releases 20 à 60, KEV et alertes quelques-uns).
 
 - **Filtre** : `GET /items?since=…&kind=…`, avec les cinq sortes de la liste blanche (section
   « Schémas ») ; `kind` est répétable ([specs-api.md](specs-api.md), « Paramètres »). Sans ce
@@ -167,11 +168,11 @@ ressources sans limite). Volume estimé : 110 à 165 items sur 3 jours, 500 à 6
     la marge de 40 s sous les 240 s de l'ingress reste au-dessus de ces dépassements. Option
     écartée : lire la réponse du modèle en flux pour contrôler l'échéance entre deux morceaux ;
     elle resterait dépassable de la somme des délais.
-- **Appels au modèle** : au plafond, 6 classements ou plus (des lots de 50 items et de 36 000
+- **Appels au modèle** : au plafond, 7 classements ou plus (des lots de 45 items et de 36 000
   caractères de message au plus, `MAX_ITEMS_PER_CLASSIFICATION_CALL` et
-  `MAX_CLASSIFICATION_INPUT_CHARS` ; jusqu'à environ 10 quand les titres sont longs), 8
-  rédactions (une par sujet) : environ 14 appels, et le double de tentatives au plus avec les
-  nouvelles tentatives, soit environ 28. Ce nombre découle du plafond et des sujets : pas de
+  `MAX_CLASSIFICATION_INPUT_CHARS` ; jusqu'à environ 10 quand les titres sont longs), 9
+  rédactions (une par sujet) : environ 16 appels, et le double de tentatives au plus avec les
+  nouvelles tentatives, soit environ 32. Ce nombre découle du plafond et des sujets : pas de
   constante de plus.
 
 **Limites** : une seule demande à la fois est supposée (une seule utilisatrice, en local) ; le
@@ -223,10 +224,13 @@ outputs](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structure
 rapportées sur son forum ([500 valeurs](https://community.openai.com/t/500-enums-limitation-in-structured-output/974416),
 [15 000 caractères](https://community.openai.com/t/possible-structured-output-schema-length-error-bug-in-api/984509),
 lus le 2026-10-26 ; la doc relevée le 2026-10-16 disait 1 000 valeurs, voir « Sources »). Le
-schéma du classement porte une propriété par item du lot (`classify-2`) : au plafond de 50 items
-et 9 sujets, 50 propriétés, 50 × 10 = 500 valeurs d'`enum` (pile à la limite, sans marge) et
-environ 7 500 caractères (mesurés le 2026-11-01), sous les trois limites ; un test les tient (`tests/ai_api/test_stages.py`). Un 10e sujet (550 valeurs)
-ferait échouer ce test avant tout appel réel : il faudrait alors des lots plus petits.
+schéma du classement porte une propriété par item du lot (`classify-2`) : au plafond de 45 items
+et 9 sujets, 45 propriétés, 45 × 10 = 450 valeurs d'`enum` et 6 750 caractères (mesurés le
+2026-11-01), sous les trois limites ; un test les tient (`tests/ai_api/test_stages.py`). Les lots
+sont passés de 50 à 45 items avec le neuvième sujet, le 2026-11-01 : 50 items auraient donné
+500 valeurs, la limite elle-même, jamais essayée sur le modèle ; 45 garde les 450 valeurs d'avant
+(50 items, 8 sujets). Un 11e sujet (540 valeurs) ferait échouer ce test avant tout appel réel : il
+faudrait alors des lots plus petits.
 
 **Réglages d'appel**, lus dans la configuration (#150) : `reasoning_effort: "none"`
 (`KB_LLM_REASONING_EFFORT=none`) pour un modèle à raisonnement, sinon `temperature=0`. Mesure de

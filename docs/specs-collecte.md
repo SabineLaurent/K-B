@@ -587,7 +587,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   l'import, `already_seen` (12 à 18 lignes au journal d'import par page relue : ses
   articles gardés).
 - **Accès** : sans authentification. Le `robots.txt` autorise tout, sauf les pages d'abonnement
-  et de compte (`/subscribed`, `/manage`, `/info`…), qu'on ne lit pas.
+  et de compte (`/subscribed`, `/manage`, `/info`…), qu'on ne lit pas. Relu le 2026-11-01 avant
+  d'ajouter l'édition `tech` : `Allow: /`, rien n'interdit `/tech/<date>`.
 - **Limites** : pas de quota publié ; on s'impose une page à la fois, avec une pause de 2 s avant
   chaque page, d'une édition à la suivante aussi (depuis le 2026-10-25). Les liens portent des paramètres de suivi `utm_*` et certaines entrées sont
   sponsorisées : traité à la lecture (ci-dessus).
@@ -1074,7 +1075,7 @@ facturation, le dépassement est refusé.
 - [Try BigQuery using the sandbox](https://docs.cloud.google.com/bigquery/docs/sandbox)
 - [Les six grands principes du RGPD](https://www.cnil.fr/fr/comprendre-le-rgpd/les-six-grands-principes-du-rgpd) — CNIL
 - [Access annotation database](https://forums.zotero.org/discussion/101244/access-annotation-database) — forum Zotero
-- `https://tldr.tech/robots.txt`, lu le 2026-10-01
+- `https://tldr.tech/robots.txt`, lu le 2026-10-01, relu le 2026-11-01 (édition `tech`)
 
 Conditions de GitHub, lues le 2026-10-30 par time-knight :
 

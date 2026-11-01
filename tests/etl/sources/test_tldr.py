@@ -490,6 +490,22 @@ def test_a_link_escaped_twice_in_the_page_loses_its_tracking_parameters():
                 "'TLDR AI 2026-10-07 and more'"
             ),
         ),
+        # The same forms without an edition name, as the general edition (tech) titles itself.
+        (
+            AI_PAGE.replace(AI_HEADING, b"TLDR 2026-13-45</h1>"),
+            "first h1 is not an edition title with its date: 'TLDR 2026-13-45'",
+        ),
+        (
+            AI_PAGE.replace(AI_HEADING, b"TLDR 2026-10-07 and more</h1>"),
+            (
+                "first h1 is not an edition title with its date: "
+                "'TLDR 2026-10-07 and more'"
+            ),
+        ),
+        (
+            AI_PAGE.replace(AI_HEADING, b"TLDR2026-10-07</h1>"),
+            "first h1 is not an edition title with its date: 'TLDR2026-10-07'",
+        ),
         (
             AI_PAGE.replace(b'class="font-bold"', b'class="font-semibold"'),
             "no article with a title, a link and a summary among 5 article elements",
@@ -514,6 +530,9 @@ def test_a_link_escaped_twice_in_the_page_loses_its_tracking_parameters():
         "landing page",
         "no such day",
         "text after the date",
+        "no such day, no edition name",
+        "text after the date, no edition name",
+        "no space before the date",
         "no title link",
         "no summary",
         "no article",

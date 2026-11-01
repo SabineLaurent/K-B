@@ -54,10 +54,20 @@ des fiches. Sabine a ajouté un neuvième sujet (`src/k_b/core/config.py:307`) :
 ```
 
 Il vient en dernier : un article qui relève de plusieurs sujets va au premier de la liste, donc un
-sujet générique ne prend que ce qu'aucun sujet précis ne prend. Le schéma de classement envoyé au
-modèle est construit à partir de cette liste : au plafond de 50 articles par appel, il passe à
-50 × 10 = 500 valeurs d'`enum` (9 sujets plus `no_suitable_subject`), pile à la limite la plus
-stricte connue, que tient `test_the_schema_of_a_full_batch_is_within_the_bounds_of_strict_mode`.
+sujet générique ne prend que ce qu'aucun sujet précis ne prend.
+
+**La taille des lots de classement.** Le schéma de classement envoyé au modèle porte, pour chaque
+article du lot, la liste des réponses possibles : les sujets plus `no_suitable_subject`. Avec
+50 articles et 9 sujets, il aurait atteint 50 × 10 = 500 valeurs d'`enum`, la limite la plus
+stricte connue, sans marge. Les lots passent donc à 45 articles (`src/k_b/core/config.py:256`) :
+
+```python
+MAX_ITEMS_PER_CLASSIFICATION_CALL = 45
+```
+
+45 × 10 = 450 valeurs, exactement ce qu'envoyaient les lots d'avant (50 × 9). Le test
+`test_the_schema_of_a_full_batch_is_within_the_bounds_of_strict_mode` construit le schéma avec la
+vraie liste et la vraie taille de lot, et tient la borne.
 
 ## Choix faits et options écartées
 
@@ -67,6 +77,7 @@ stricte connue, que tient `test_the_schema_of_a_full_batch_is_within_the_bounds_
 | Test sur la page `ai` déjà en fixture, titre remplacé | Une fixture tirée d'une page `tech` : la structure est la même. La vraie page du 30/10 a été lue hors des tests (voir Preuve) |
 | `tech` en dernier dans le tuple | En tête : `tldr_tech` passerait avant `tldr_ai`, et l'ordre de collecte des sources existantes changerait |
 | Un sujet `tech_industry`, en dernier (Sabine) | Rien : les articles généraux finiraient en `no_suitable_subject`, coûtant un appel sans rien donner. Un sujet « autre » : écarté le 15/10 ; un article hors tech reste en `no_suitable_subject` |
+| Lots de 45 articles (tri de la revue) | Garder 50 : 500 valeurs, une limite tirée de messages d'erreur rapportés sur un forum, jamais essayée sur le modèle. Un appel de classement de plus au plafond (7 lots au lieu de 6 pour 300 articles) coûte moins qu'une fiche qui échoue |
 | Pas de test neuf pour le sujet | Un test qui recopie la liste : les tests utilisent leur propre liste de sujets (`docs/fiches-veille.md`) ; ceux qui lisent la vraie (borne du schéma, nom réservé) tournent |
 
 ## Preuve
@@ -79,7 +90,9 @@ stricte connue, que tient `test_the_schema_of_a_full_batch_is_within_the_bounds_
 | `uv run pytest` : 3113 passés ; `ruff check`, `ruff format --check`, `mypy --strict` verts | Rien d'autre n'a cassé |
 | La vraie page `https://tldr.tech/tech/2026-10-30`, téléchargée le 01/11 et lue par `read_articles` | Pas de refus : 14 articles, dont le premier est « DoorDash to Buy Instacart… » |
 | `TldrSource("tech").read_pages` en réel sur le 31/10 et le 30/10 | Le 31/10 : `no edition page, redirected to https://tldr.tech/tech`, sauté ; le 30/10 : la page |
-| Schéma de classement mesuré avec 8 puis 9 sujets | 450 puis 500 valeurs d'`enum`, 6 850 puis 7 500 caractères : sous les limites, sans marge sur l'`enum` |
+| Schéma de classement mesuré : 50 articles et 8 sujets, 50 et 9, 45 et 9 | 450, 500, puis 450 valeurs d'`enum` ; 6 850, 7 500, puis 6 750 caractères |
+| Cas de refus ajoutés au test paramétré : `TLDR 2026-13-45`, `TLDR 2026-10-07 and more`, `TLDR2026-10-07` | La forme sans nom refuse ce que la forme avec nom refusait déjà |
+| `robots.txt` relu le 01/11 ; page `tech` cherchée pour un auteur | `Allow: /` ; seul auteur : l'organisation « TLDR » dans les métadonnées, comme sur la page `ai` |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -100,9 +113,9 @@ stricte connue, que tient `test_the_schema_of_a_full_batch_is_within_the_bounds_
 
 - Je n'ai lancé ni `kb collect` ni `kb import` en réel sur `tldr_tech`. La lecture a été vérifiée
   sur une seule page réelle, celle du 30/10.
-- Je n'ai lancé aucun `kb digest` réel avec le neuvième sujet : ni la limite de 500 valeurs
-  d'`enum`, atteinte exactement, ni la durée (98 s mesurées pour 8 sujets, limite de 200 s) n'ont
-  été vérifiées sur le modèle. Je n'ai pas mesuré non plus combien d'articles `tech` iront à
+- Je n'ai lancé aucun `kb digest` réel avec le neuvième sujet : la durée (98 s mesurées pour
+  8 sujets, limite de 200 s ; une rédaction et parfois un classement de plus) n'a pas été mesurée
+  sur le modèle. Je n'ai pas mesuré non plus combien d'articles `tech` iront à
   `tech_industry`, et combien à `no_suitable_subject`.
 
 ## Ce qui reste
@@ -111,5 +124,5 @@ stricte connue, que tient `test_the_schema_of_a_full_batch_is_within_the_bounds_
   suivies. Pour chacune, il faudrait vérifier la forme de son `h1` avant de l'ajouter.
 - Les documents datés (`docs/2026-10-04-flux-donnees.md`…) citent encore trois éditions. Ce sont
   des instantanés, je ne les ai pas modifiés.
-- Un dixième sujet ferait passer le schéma à 550 valeurs d'`enum` : le test échouerait, et il
-  faudrait des lots de moins de 50 articles.
+- Un dixième sujet passerait encore (45 × 11 = 495 valeurs, sans marge) ; un onzième ferait
+  échouer le test (540) : il faudrait des lots plus petits.
