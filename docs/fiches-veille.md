@@ -552,7 +552,9 @@ de la requête.
   `digests[].items_not_retained_in_output`, `digests[].items_uncited` renommé
   `digests[].items_removed_by_checks` (décision de Sabine du 2026-10-26) ; `0.5.0` :
   `POST /trend-reports` (#366) ; `0.6.0` : les fiches lues sur GitHub dans la réponse de
-  `POST /trend-reports`, et ses erreurs `github_*` (#367) ; `POST /digests` ne change pas.
+  `POST /trend-reports`, et ses erreurs `github_*` (#367) ; `0.7.0` : le choix du modèle dans la
+  réponse de `POST /trend-reports`, `model`, `choice_failure` et `chosen` (#368) ; `POST /digests`
+  ne change pas.
 
 ## Contrôles
 
@@ -570,6 +572,9 @@ par du code déterministe).
 | 5 | **Complétude** (classement) | une sortie qui ne répond à **aucun** item du lot (`{}`, un fournisseur qui ignore le mode strict) ; un item sans réponse parmi d'autres n'est pas refusé, il est compté à part (`unanswered`, `items_unanswered`) ; un item répondu deux fois est refusé par le contrôle 2 (avant `classify-2`, le contrôle 5 refusait un item présent deux fois) | `completeness` |
 | 6 | **Markdown** (rédaction) | un `text` qui contient `(?i)[a-z][a-z0-9+.-]*://`, `(?i)www\.`, `(?i)mailto:`, `(?i)xmpp:`, `![`, `[[`, `](`, `]:` ou `<[a-zA-Z/!?]` | `markup` |
 | 7 | **Fidélité** (rédaction) | voir ci-dessous : retire l'affirmation, n'est pas un échec | — |
+
+Le choix du compte rendu des tendances suit le même ordre (sujets, `item_id`, puis un contrôle à
+lui, `criterion`) : [tendances.md](tendances.md), « Ce que rend #368 ».
 
 - **Contrôles 2 à 6, et une valeur de `finish_reason` hors liste** : `llm_invalid_output`,
   **une** nouvelle tentative (#150) ; au second échec, le sujet échoue (rédaction) ou toute
@@ -813,7 +818,7 @@ ne sont écrites qu'au retour du parcours.
 | `ts` | date de la ligne, ISO 8601 UTC à la seconde (`2026-10-15T09:00:00Z`, règle 3 de `conventions.md`) |
 | `event` | `llm_call` |
 | `request_id` | celui de la réponse |
-| `stage` | `classify` ou `write` |
+| `stage` | `classify` ou `write` ; `select` pour le choix d'un compte rendu des tendances ([tendances.md](tendances.md), « Ce que rend #368 ») |
 | `subject` | le sujet rédigé ; nul au classement |
 | `provider`, `model` | lus dans la configuration (#150) |
 | `prompt_version` | constante de la consigne utilisée (`classify-2`, `write-1`), changée à la main avec elle |
@@ -830,7 +835,7 @@ ne sont écrites qu'au retour du parcours.
 | `finish_reason` | celui de la dernière tentative, coupé à 64 caractères ; nul s'il manque |
 | `http_status` | le statut HTTP de la dernière réponse du fournisseur (un 401 de clé refusée se distingue ainsi d'un 503) ; nul sans réponse (délai, connexion refusée) |
 | `schema_valid` | la dernière tentative a passé le contrôle 2 |
-| `failed_check` | le contrôle qui a refusé la dernière tentative (`content_filter`, `finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`) ; nul si `ok` |
+| `failed_check` | le contrôle qui a refusé la dernière tentative (`content_filter`, `finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`, et `criterion` pour le choix des tendances) ; nul si `ok` |
 | `first_failed_check` | le contrôle qui a refusé la première tentative, quand une seconde a suivi ; nul sinon (#205, `LlmCall`, constat de #158 : le motif de la première tentative était perdu) |
 | `facts_checked`, `facts_found` | compteurs de la fidélité (rédaction, section « Fidélité », « Ce qui est compté ») ; nuls au classement et pour une rédaction en échec |
 | `fidelity_rate` | `facts_found` / `facts_checked`, arrondi à 4 décimales ; nul au classement, pour une rédaction en échec, et quand `facts_checked` vaut 0 |

@@ -17,7 +17,11 @@ from k_b.ai_api.schemas.digest_schema import (
     SourceSchema,
     WindowSchema,
 )
-from k_b.core.config import AI_API_READ_TIMEOUT_SECONDS, DIGEST_REQUEST_TIMEOUT_SECONDS
+from k_b.core.config import (
+    AI_API_READ_TIMEOUT_SECONDS,
+    DIGEST_REQUEST_TIMEOUT_SECONDS,
+    TREND_REPORT_REQUEST_TIMEOUT_SECONDS,
+)
 from k_b.post.ai_api_client import (
     DIGEST_KEY_VARIABLE,
     AiApiClientSettings,
@@ -210,6 +214,7 @@ def test_the_read_timeout_waits_beyond_the_bound_of_a_request_of_the_ai_api():
     """A request lasts up to DIGEST_REQUEST_TIMEOUT_SECONDS, its last call a little more, and the
     answer comes in one block at the end."""
     assert AI_API_READ_TIMEOUT_SECONDS > DIGEST_REQUEST_TIMEOUT_SECONDS + 20
+    assert AI_API_READ_TIMEOUT_SECONDS > TREND_REPORT_REQUEST_TIMEOUT_SECONDS + 20
 
 
 def test_a_response_gives_its_digests_its_window_and_its_model():

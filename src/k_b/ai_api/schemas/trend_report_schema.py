@@ -5,8 +5,10 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from k_b.ai_api.connectors.llm_client import LlmFailure
 from k_b.ai_api.repository_cards import Caution
 from k_b.items import (
+    ChoiceCriterion,
     Criterion,
     WindowState,
     WrittenDayInStrictModel,
@@ -97,6 +99,23 @@ class TrendRepositorySchema(BaseModel):
     )
 
 
+class ChosenRepositorySchema(BaseModel):
+    repository_id: int
+    repository_name: str = Field(description="Its name in the most recent window.")
+    criteria: list[ChoiceCriterion] = Field(
+        description="Those the model gave and the code checked, in the order durable, new,"
+        " accelerating, watch_subject."
+    )
+    watch_subjects: list[str] = Field(
+        description="With watch_subject only, in the order of the subjects of the watch."
+    )
+    best_rank: int
+    trajectory: list[TrajectoryPointSchema] = Field(
+        description="One point per window of the period, in its order."
+    )
+    facts: RepositoryFactsSchema = Field(description="Read on GitHub.")
+
+
 class DroppedCandidatesSchema(BaseModel):
     not_found: int
     unavailable_for_legal_reasons: int
@@ -119,7 +138,16 @@ class CandidatesSchema(BaseModel):
 class TrendReportSchema(BaseModel):
     request_id: str
     model: str | None = Field(
-        description="The model that chose the repositories; null when none chose them."
+        description="The model that chose the repositories, none chosen included; null when"
+        " the choice failed or no candidate was read."
+    )
+    choice_failure: LlmFailure | None = Field(
+        description="The state of a choice that failed; null otherwise. The report stays"
+        " factual."
+    )
+    chosen: list[ChosenRepositorySchema] = Field(
+        description="5 at most, in the order of the model; one chosen by watch_subject alone"
+        " may be out of repositories."
     )
     period: TrendPeriodSchema
     repositories: list[TrendRepositorySchema] = Field(

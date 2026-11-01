@@ -5,6 +5,7 @@ import json
 import logging
 import secrets
 import sqlite3
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -21,6 +22,8 @@ from k_b.ai_api.app import create_app
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.connectors.github_client import build_github_client
 from k_b.ai_api.connectors.github_settings import GithubSettings
+from k_b.ai_api.connectors.llm_client import build_http_client
+from k_b.ai_api.connectors.llm_replay import ReplayTransport
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.dependencies import (
     open_data_api_client,
@@ -39,6 +42,10 @@ from k_b.core.config import (
 )
 from k_b.data_api.app import create_app as create_data_app
 
+TEST_SUBJECTS = (
+    DigestSubject("agent_tools", "outils pour agents"),
+    DigestSubject("llm_security", "sécurité des modèles"),
+)
 # Made for the test: never a real key.
 CLIENT_KEY = secrets.token_urlsafe(32)
 AUTHORIZATION = {"Authorization": f"Bearer {CLIENT_KEY}"}
@@ -76,7 +83,9 @@ def build_window(window_end, ranks=None, extra=()):
     ranks = RISING_RANKS if ranks is None else ranks
     rows = [
         {
-            "repository_id": 1_000 + k,
+            # Far from any count of a span (gen_ai.request.max_tokens is 1,024), which the test of
+            # the traces would take for an identifier.
+            "repository_id": 100_000 + k,
             "repository_name": f"filler/repo-{k}",
             "stars_gained": 1_000 - 10 * k,
             "forks_gained": 3,
@@ -161,54 +170,73 @@ class SimulatedGithub:
         return [request.url.path.removeprefix("/repos/") for request in self.requests]
 
 
-def make_app(recorded_traces):
+# The answer of the model by default: no repository chosen.
+NO_CHOICE = {"kind": "completion", "content": json.dumps({"choices": []})}
+
+
+def make_app(recorded_traces, metric_reader, steps, trace_content):
+    """The AI API on the replay of these steps, through a transport that keeps each request."""
+    settings = LlmSettings(
+        provider="replay",
+        base_url=LLM_REPLAY_BASE_URL,
+        model="replay",
+        api_key=None,
+        reasoning_effort=None,
+        replay_steps=None,
+    )
     app = create_app(
         {"TERMINAL": SecretStr(CLIENT_KEY)},
-        LlmSettings(
-            provider="replay",
-            base_url=LLM_REPLAY_BASE_URL,
-            model="replay",
-            api_key=None,
-            reasoning_effort=None,
-            replay_steps=(),
-        ),
+        settings,
         DataApiSettings(
             base_url="http://localhost", api_key=SecretStr(secrets.token_urlsafe(32))
         ),
         GithubSettings(token=SecretStr(f"github_pat_{secrets.token_hex(41)}")),
-        (DigestSubject("subject_of_the_test", "défini par le test"),),
+        TEST_SUBJECTS,
         3,
         ModelMetrics(
-            MeterProvider(
-                metric_readers=[InMemoryMetricReader()], shutdown_on_exit=False
-            )
+            MeterProvider(metric_readers=[metric_reader], shutdown_on_exit=False)
         ),
-        recorded_traces.trace_export,
+        replace(recorded_traces.trace_export, content=trace_content),
     )
+    transport = ReplayTransport(steps)
+
+    def open_replay():
+        with build_http_client(settings, transport=transport) as http_client:
+            yield http_client
 
     def fail_the_test():
-        raise AssertionError("a client of the model or of the real GitHub was opened")
+        raise AssertionError("a client of the real GitHub was opened")
 
-    app.dependency_overrides[open_llm_client] = fail_the_test
+    app.dependency_overrides[open_llm_client] = open_replay
     app.dependency_overrides[open_github_client] = fail_the_test
     app.dependency_overrides[read_request_time] = lambda: REQUEST_TIME
-    return app
+    return app, transport
 
 
 @pytest.fixture
-def make_ai_api(recorded_traces):
-    """A client of the AI API reading this data API and this GitHub, by default one serving the
-    real answer for each candidate."""
+def metric_reader():
+    return InMemoryMetricReader()
 
-    def make(data_api, github=None):
-        app = make_app(recorded_traces)
+
+@pytest.fixture
+def make_ai_api(recorded_traces, metric_reader):
+    """A client of the AI API reading this data API and this GitHub, by default one serving the
+    real answer for each candidate, and a model choosing none; the replay transport is its
+    llm_transport."""
+
+    def make(data_api, github=None, steps=(NO_CHOICE,), trace_content="none"):
+        app, transport = make_app(
+            recorded_traces, metric_reader, list(steps), trace_content
+        )
         http_client = (
             data_api.client() if isinstance(data_api, SimulatedDataApi) else data_api
         )
         github = github or SimulatedGithub(data_api)
         app.dependency_overrides[open_data_api_client] = lambda: http_client
         app.dependency_overrides[open_github_client] = github.client
-        return TestClient(app, raise_server_exceptions=False)
+        client = TestClient(app, raise_server_exceptions=False)
+        client.llm_transport = transport
+        return client
 
     return make
 
@@ -231,7 +259,10 @@ def test_the_first_report_reads_the_last_four_windows_without_new(make_ai_api):
     assert response.status_code == 200
     body = response.json()
     assert body["request_id"] == response.headers["X-Request-ID"]
-    assert body["model"] is None
+    # Candidates read: the model chose, none here.
+    assert body["model"] == "replay"
+    assert body["choice_failure"] is None
+    assert body["chosen"] == []
     assert body["period"] == {
         "first_report": True,
         "windows": [text(day(offset)) for offset in (3, 2, 1, 0)],
@@ -649,7 +680,7 @@ def test_neither_the_traces_nor_the_logs_hold_a_repository(
 def test_a_response_that_fails_to_be_built_is_traced_as_a_500(
     make_ai_api, recorded_traces, monkeypatch
 ):
-    def fail(request_id, report):
+    def fail(request_id, report, model):
         raise ValueError("a fault of the test")
 
     monkeypatch.setattr(trend_report_router, "to_trend_report_schema", fail)
@@ -863,3 +894,341 @@ def test_the_third_refusal_of_a_report_fails_it_as_github_forbidden(make_ai_api)
     assert response.status_code == 502
     assert response.json() == {"error": "github_forbidden"}
     assert "Retry-After" not in response.headers
+
+
+# The choice of the model (#368, docs/tendances.md, "Choix").
+CONTENT_EVENT = "gen_ai.client.inference.operation.details"
+
+
+def answer(*choices):
+    return {"kind": "completion", "content": json.dumps({"choices": list(choices)})}
+
+
+def sent_bodies(transport):
+    return [json.loads(request.content) for request in transport.requests]
+
+
+def read_metric_lines(capsys):
+    return [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+
+
+def find_ref(client, name):
+    """The ref the code gave to the candidate of this name in the message of the choice."""
+    [body] = sent_bodies(client.llm_transport)
+    user_data = json.loads(body["messages"][1]["content"])
+    [ref] = [c["ref"] for c in user_data["candidates"] if c["repository"] == name]
+    return ref
+
+
+def test_the_model_chooses_among_the_candidates_read_and_the_code_gives_the_facts(
+    make_ai_api,
+):
+    data_api = simulate([day(offset) for offset in range(6)])
+    # c1 is the first candidate, filler/repo-0 (rank 1 everywhere, durable).
+    client = make_ai_api(
+        data_api,
+        steps=[
+            answer(
+                {
+                    "ref": "c1",
+                    "criteria": ["watch_subject", "durable"],
+                    "watch_subjects": ["llm_security"],
+                }
+            )
+        ],
+    )
+
+    body = post_trend_reports(client).json()
+
+    assert find_ref(client, FIRST_CANDIDATE) == "c1"
+    assert body["model"] == "replay"
+    assert body["choice_failure"] is None
+    [first] = body["chosen"]
+    assert first["repository_name"] == FIRST_CANDIDATE
+    assert first["criteria"] == ["durable", "watch_subject"]
+    assert first["watch_subjects"] == ["llm_security"]
+    assert first["best_rank"] == 1
+    assert [point["rank"] for point in first["trajectory"]] == [1, 1, 1, 1]
+    assert first["facts"]["stars_total"] == GITHUB_ANSWER["stargazers_count"]
+    # The factual report is unchanged.
+    assert FIRST_CANDIDATE in [r["repository_name"] for r in body["repositories"]]
+
+
+def test_a_candidate_chosen_by_its_subject_alone_comes_with_its_name_and_facts(
+    make_ai_api,
+):
+    """A candidate meeting no criterion is not in repositories: its name and facts are in
+    chosen."""
+    # In the top of the last window only, of a first report: neither durable nor accelerating,
+    # and new is not evaluated. The 30 fillers, durable, are c1 to c30.
+    data_api = simulate([day(offset) for offset in range(6)], ranks={day(0): 5})
+    client = make_ai_api(
+        data_api,
+        steps=[
+            answer(
+                {
+                    "ref": "c31",
+                    "criteria": ["watch_subject"],
+                    "watch_subjects": ["agent_tools"],
+                }
+            )
+        ],
+    )
+
+    body = post_trend_reports(client).json()
+
+    assert find_ref(client, RISING_NAME) == "c31"
+    [rising] = body["chosen"]
+    assert rising["repository_name"] == RISING_NAME
+    assert rising["criteria"] == ["watch_subject"]
+    assert rising["watch_subjects"] == ["agent_tools"]
+    assert rising["facts"] is not None
+    assert RISING_ID not in [r["repository_id"] for r in body["repositories"]]
+
+
+@pytest.mark.parametrize(
+    ("steps", "state"),
+    [
+        (
+            [
+                answer({"ref": "c99", "criteria": ["durable"], "watch_subjects": []}),
+                answer({"ref": "c99", "criteria": ["durable"], "watch_subjects": []}),
+            ],
+            "llm_invalid_output",
+        ),
+        (
+            [
+                {"kind": "response", "status": 429, "retry_after": "0"},
+                {"kind": "response", "status": 429, "retry_after": "0"},
+            ],
+            "llm_rate_limited",
+        ),
+        ([{"kind": "timeout"}], "llm_timeout"),
+        (
+            [
+                {
+                    "kind": "response",
+                    "status": 400,
+                    "body": json.dumps({"error": {"code": "content_filter"}}),
+                }
+            ],
+            "llm_content_filtered",
+        ),
+    ],
+    ids=["refused-twice", "429", "timeout", "content-filter"],
+)
+def test_a_choice_that_fails_gives_the_factual_report_with_its_state(
+    make_ai_api, steps, state
+):
+    data_api = simulate([day(offset) for offset in range(6)])
+
+    response = post_trend_reports(make_ai_api(data_api, steps=steps))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["model"] is None
+    assert body["choice_failure"] == state
+    assert body["chosen"] == []
+    assert body["repositories"]
+
+
+def test_without_the_time_a_request_needs_the_model_is_not_called(
+    make_ai_api, monkeypatch
+):
+    monkeypatch.setattr(trend_report_router, "TREND_REPORT_REQUEST_TIMEOUT_SECONDS", 5)
+    data_api = simulate([day(offset) for offset in range(6)])
+    client = make_ai_api(data_api)
+
+    body = post_trend_reports(client).json()
+
+    assert client.llm_transport.requests == []
+    assert body["choice_failure"] == "llm_timeout"
+    assert body["model"] is None
+
+
+@pytest.mark.parametrize(
+    "github_answer",
+    [None, httpx2.Response(404)],
+    ids=["no-window", "every-candidate-left-out"],
+)
+def test_without_any_candidate_read_the_model_is_not_called(
+    make_ai_api, capsys, github_answer
+):
+    if github_answer is None:
+        data_api, github = simulate([LATEST]), None
+        demand = {"after": text(LATEST), "previous_first_window": text(LATEST)}
+    else:
+        data_api = simulate([day(offset) for offset in range(6)])
+        names = {
+            row["repository_name"]
+            for window in data_api.windows.values()
+            for row in window["trends"]
+        }
+        github = SimulatedGithub(data_api, dict.fromkeys(names, github_answer))
+        demand = FIRST_REPORT
+    client = make_ai_api(data_api, github)
+
+    body = post_trend_reports(client, demand).json()
+
+    assert client.llm_transport.requests == []
+    assert body["candidates"]["read"] == 0
+    assert (body["model"], body["choice_failure"], body["chosen"]) == (None, None, [])
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize(
+    ("steps", "lines"),
+    [
+        ([NO_CHOICE], [("ok", 1, None)]),
+        (
+            [{"kind": "completion", "content": "not json"}, NO_CHOICE],
+            [("ok", 2, "schema")],
+        ),
+        (
+            [
+                {"kind": "completion", "content": "not json"},
+                {"kind": "completion", "content": "not json"},
+            ],
+            [("llm_invalid_output", 2, "schema")],
+        ),
+    ],
+    ids=["chosen", "retried", "failed"],
+)
+def test_the_choice_writes_one_metric_line_without_a_repository(
+    make_ai_api, capsys, metric_reader, steps, lines
+):
+    """Rule 4 of poc.md: one JSON line per call to the model, on stdout."""
+    data_api = simulate([day(offset) for offset in range(6)])
+    client = make_ai_api(data_api, steps=steps)
+
+    response = post_trend_reports(client)
+
+    output = capsys.readouterr().out
+    metric_lines = [json.loads(line) for line in output.splitlines()]
+    assert [
+        (line["outcome"], line["attempts"], line["first_failed_check"])
+        for line in metric_lines
+    ] == lines
+    [line] = metric_lines
+    assert line["request_id"] == response.headers["X-Request-ID"]
+    assert line["stage"] == "select"
+    assert line["subject"] is None
+    assert line["prompt_version"] == "select-trends-1"
+    assert line["items_in"] == response.json()["candidates"]["read"]
+    assert line["items_truncated"] == 0
+    assert (
+        line["data_fetch_ms"],
+        line["items_capped"],
+        line["items_dropped_before_writing_stage"],
+    ) == (None, None, None)
+    names = {
+        row["repository_name"]
+        for window in data_api.windows.values()
+        for row in window["trends"]
+    }
+    assert not any(name in output for name in names)
+    points = metric_reader.get_metrics_data()
+    stages = {
+        point.attributes.get("k_b.stage")
+        for resource in points.resource_metrics
+        for scope in resource.scope_metrics
+        for metric in scope.metrics
+        for point in metric.data.data_points
+    }
+    assert stages == {"select"}
+
+
+def test_the_choice_is_a_span_of_counts_and_refs(make_ai_api, recorded_traces):
+    data_api = simulate([day(offset) for offset in range(6)])
+    client = make_ai_api(
+        data_api,
+        steps=[
+            answer(
+                {"ref": "c2", "criteria": ["durable"], "watch_subjects": []},
+                {"ref": "c1", "criteria": ["durable"], "watch_subjects": []},
+            )
+        ],
+    )
+
+    post_trend_reports(client)
+
+    [root] = recorded_traces.find_spans("POST /trend-reports")
+    [step] = recorded_traces.find_spans("select_trends")
+    assert step.parent.span_id == root.context.span_id
+    assert {
+        name: value
+        for name, value in step.attributes.items()
+        if name.startswith("k_b.")
+    } == {
+        "k_b.descriptions.truncated": 0,
+        "k_b.choices.count": 2,
+        "k_b.choices.refs": ("c2", "c1"),
+        "k_b.outcome": "ok",
+    }
+    [chat] = [
+        span
+        for span in recorded_traces.spans.get_finished_spans()
+        if span.name.startswith("chat ")
+    ]
+    assert chat.parent.span_id == step.context.span_id
+    assert chat.attributes["gen_ai.prompt.version"] == "select-trends-1"
+
+
+def test_a_failed_choice_is_a_span_in_error(make_ai_api, recorded_traces):
+    data_api = simulate([day(offset) for offset in range(6)])
+
+    post_trend_reports(make_ai_api(data_api, steps=[{"kind": "timeout"}]))
+
+    [step] = recorded_traces.find_spans("select_trends")
+    assert step.status.status_code == StatusCode.ERROR
+    assert step.attributes["error.type"] == "llm_timeout"
+
+
+def test_with_content_none_no_content_record_is_sent(make_ai_api, recorded_traces):
+    data_api = simulate([day(offset) for offset in range(6)])
+
+    post_trend_reports(make_ai_api(data_api, trace_content="none"))
+
+    assert recorded_traces.find_log_records(CONTENT_EVENT) == []
+
+
+def test_with_content_all_only_the_body_of_a_content_record_holds_a_repository(
+    make_ai_api, recorded_traces, capsys, caplog, tmp_path
+):
+    """With the log of kb serve-ai, which keeps no request line of httpx2 (as the test of the
+    traces above)."""
+    data_api = simulate([day(offset) for offset in range(6)])
+
+    with logging_to(tmp_path, None), caplog.at_level(logging.DEBUG, logger="k_b"):
+        body = post_trend_reports(make_ai_api(data_api, trace_content="all")).json()
+
+    assert body["model"] == "replay"
+    [content] = recorded_traces.find_log_records(CONTENT_EVENT)
+    assert FIRST_CANDIDATE in str(content.body)
+    out, err = capsys.readouterr()
+    values = [
+        *(
+            v
+            for s in recorded_traces.spans.get_finished_spans()
+            for v in s.attributes.values()
+        ),
+        *(
+            v
+            for r in recorded_traces.log_records.get_finished_logs()
+            for v in r.log_record.attributes.values()
+        ),
+        *(
+            r.log_record.body
+            for r in recorded_traces.log_records.get_finished_logs()
+            if r.log_record.event_name != CONTENT_EVENT
+        ),
+        *(record.getMessage() for record in caplog.records),
+        out,
+        err,
+    ]
+    assert not any(FIRST_CANDIDATE in str(value) for value in values)
+
+
+def test_the_deadline_of_a_report_leaves_time_for_the_model():
+    """As POST /digests: under the read timeout of kb and the ingress of ACA (240 s)."""
+    assert trend_report_router.TREND_REPORT_REQUEST_TIMEOUT_SECONDS == 200

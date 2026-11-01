@@ -75,7 +75,8 @@ seule : `kb` ne relit jamais un compte rendu pour trouver le précédent.
 **Ce que fait `kb trend-report` depuis #366** (`commands/trend_report_command.py`). Une entrée du
 registre : `first_window` et `last_window` (les bornes de `period.windows`, manquantes comprises),
 `file` (chemin dans le coffre), `written_at` (l'instant UTC du lancement, lu une fois, qui donne
-aussi le jour du fichier), `request_id`, `model` (nul) et `choice_made` (faux) ; schéma fermé
+aussi le jour du fichier), `request_id`, `model` (nul) et `choice_made` (faux ; depuis #368,
+`model` est celui de la réponse et `choice_made` est vrai quand il est rempli) ; schéma fermé
 (`post/trend_report_registry.py`), une entrée de plus de 15 fenêtres refusée comme la demande
 (`has_too_many_windows`, `items.py`). La précédente est la dernière entrée. La réponse est revalidée
 par `post/trend_report_client.py` : la période doit partir du lendemain d'`after` (ou, plafonnée,
@@ -164,14 +165,17 @@ pour un champ en trop ou un contrôle croisé (un seul nul, ordre inversé, plus
 
 Consigne `select-trends-1`, une constante (règle 8 de `poc.md`). Message utilisateur : un JSON
 encodé, `watch_subjects` (les sujets de `DIGEST_SUBJECTS` et leur définition) et `candidates[]`
-(`ref`, `repository`, description, topics, langage, critères calculés, pic, direction).
+(`ref`, `repository`, description, topics, langage, critères calculés, pic, trajectoire (rang par
+fenêtre)). « Direction », qui n'était définie nulle part, est remplacée par la trajectoire
+(décision de Sabine du 01/11, Q2 du plan de #368) : elle porte décollage, pic et recul.
 
 Sortie stricte : `{"choices": [{"ref", "criteria", "watch_subjects"}]}`, où `ref` est un des `ref`
 envoyés, `criteria` ⊂ {`durable`, `new`, `accelerating`, `watch_subject`} et chaque sujet ∈
 `DIGEST_SUBJECTS`. Le code revérifie : 5 choix au plus ; un critère 1 à 3 annoncé est un critère
 calculé ; `watch_subject` va avec au moins un sujet. Zéro choix est permis. Un contrôle refusé
 déclenche une relance avec rappel ; l'état de contrôle nouveau est `criterion` (dans toutes les
-tables de rappels). Après la relance, le choix est en échec (« Défenses et échecs »).
+tables de rappels). Après la relance, le choix est en échec (« Défenses et échecs »). Les états
+de contrôle, leur ordre et ce que chacun refuse sont dans « Ce que rend #368 ».
 
 ### Rédaction
 
@@ -222,7 +226,8 @@ prudence, URL. Le modèle n'écrit que les 4 textes.
 Ses erreurs sont celles de l'API de données seulement : 502 (`data_api_invalid_response`,
 `data_api_unauthorized`, `data_api_unavailable`), 504 (`data_api_timeout`). Les lectures sont 32 au
 plus (la plus récente, puis la période, ses 2 fenêtres de recul et celles du compte rendu précédent,
-chacune une fois), sous `TREND_REPORT_REQUEST_TIMEOUT_SECONDS` (60 s, `core/config.py`). Les
+chacune une fois), sous `TREND_REPORT_REQUEST_TIMEOUT_SECONDS` (60 s, `core/config.py` ; 200 s
+depuis #368). Les
 candidats (`select_candidates`, `ai_api/trajectories.py`) servent depuis #367, qui lit leur fiche sur
 GitHub.
 
@@ -253,6 +258,61 @@ GitHub : n (introuvables : …, bloqués : …, renommés ou déplacés : …, r
 les motifs à zéro omis. Sans écarté, le fichier est celui de #366. L'URL d'un dépôt reste construite
 par `kb` depuis son nom. Ses erreurs : celles de l'API de données et celles de GitHub (« Défenses et
 échecs »).
+
+**Ce que rend #368** (version 0.7.0 de `docs/api/openapi-ia.json`) : le compte rendu de #367, plus le
+choix du modèle parmi les candidats lus (`ai_api/stages/trend_selection.py`), sous l'échéance de la
+demande, passée à 200 s (`TREND_REPORT_REQUEST_TIMEOUT_SECONDS`, comme `POST /digests` : sous les
+240 s de `kb` et de l'ingress d'ACA). Aucun candidat lu : aucun appel, ni choix ni échec.
+
+| Champ | Contenu |
+|---|---|
+| `model` | le nom du déploiement quand le choix est fait, zéro choisi compris ; `null` si le choix a échoué ou si aucun candidat n'est lu |
+| `choice_failure` | l'état `llm_*` d'un choix en échec ; `null` sinon. Le compte rendu reste factuel (`repositories[]` inchangé) |
+| `chosen[]` | 5 au plus, dans l'ordre du modèle : `repository_id`, `repository_name`, `criteria` (annoncés et revérifiés, dans l'ordre `durable`, `new`, `accelerating`, `watch_subject`), `watch_subjects` (avec `watch_subject` seulement, dans l'ordre de `DIGEST_SUBJECTS`), `best_rank`, `trajectory[]`, `facts`. Un choisi par `watch_subject` seul peut ne pas être dans `repositories[]` : d'où son nom et ses faits ici |
+
+Le message envoyé : `watch_subjects`, puis `windows` une fois (`window_end`, `missing`), puis un
+objet par candidat lu, dans l'ordre des candidats : `ref` (`c1` … `c60`, le seul identifiant d'un
+candidat dans les spans), `repository`, `description` (nettoyée par `ai_api/repository_texts.py`,
+500 caractères au plus, `null` si GitHub n'en donne pas), `topics` (les 20 premiers), `language`,
+`criteria` (calculés), `best_rank` et `ranks`, alignés sur `windows` (un rang, ou `null` hors du top
+et pour une fenêtre manquante). Au plafond (60 candidats, descriptions de 500 caractères, 20 topics
+de 50, 15 fenêtres), le message mesure 116 323 caractères (`tests/ai_api/test_trend_selection.py`).
+
+La sortie est relue par un modèle Pydantic fermé (`extra="forbid"`), `choices` borné à 5 ; le schéma
+envoyé, écrit à la main, porte les `enum` (`ref` envoyés, les 4 critères, les sujets) et pas de
+`maxItems`. Puis le code revérifie, dans l'ordre des contrôles des fiches
+([fiches-veille.md](fiches-veille.md), « Contrôles ») :
+
+| Contrôle | Refuse | `failed_check` |
+|---|---|---|
+| Schéma | plus de 5 choix, un champ en trop, un type faux | `schema` |
+| Sujets | un sujet hors de `DIGEST_SUBJECTS`, ou deux fois pour un dépôt | `subject` |
+| `ref` | un `ref` non envoyé, ou deux fois | `item_id` |
+| Critères | aucun critère ; un critère deux fois ou hors des 4 ; `durable`, `new` ou `accelerating` non calculé pour ce candidat ; `watch_subject` sans sujet, ou des sujets sans `watch_subject` | `criterion` |
+
+Chaque refus déclenche une relance avec le rappel de son contrôle (`SELECTION_RETRY_REMINDERS`) ;
+refusé deux fois, le choix est en échec `llm_invalid_output`. Avant l'appel, une échéance qui ne
+laisse plus `MIN_SECONDS_FOR_LLM_REQUEST` n'envoie rien : échec `llm_timeout`. Tout échec du choix
+rend 200, le compte rendu factuel et l'état ; les erreurs de la route ne changent pas.
+
+`kb` relit `model`, `choice_failure` et `chosen[]` (nom, critères, sujets) par un schéma fermé, et
+refuse une réponse qui se contredit : un modèle et un échec ensemble, des choisis avec un échec ou
+sans modèle, un choix ou un échec sans candidat lu, ni l'un ni l'autre avec des candidats lus, un
+choisi deux fois, des critères hors d'ordre, `new` non évalué, un critère 1 à 3 absent de ce dépôt
+dans `repositories[]`, `watch_subject` sans sujet ou l'inverse, des sujets hors de `DIGEST_SUBJECTS`
+ou hors d'ordre. Un choix en échec est journalisé en avertissement (l'état et le `request_id`,
+jamais un nom) ; la sortie standard ne change pas. Le registre note `model` et `choice_made`.
+
+Le fichier du coffre gagne une section « Choisis par le modèle », avant « Dépôts qui ressortent »
+(décision de Sabine du 31/10, Q1 (a)), et `choice_failure` dans son front matter :
+
+- choix fait : « <modèle> en a retenu n sur m candidats : », puis une ligne par choisi,
+  `- <https://github.com/owner/repo> : <critères> ; sujet de la veille (a, b)` ;
+- zéro choisi : « <modèle> n'en a retenu aucun sur m candidats. » ;
+- échec : « Choix non fait : <raison>. », une phrase par état ;
+- aucun candidat lu : « Choix non fait : aucun candidat lu. ».
+
+#369 y ajoute les textes sous chaque dépôt.
 
 ## Défenses et échecs
 
@@ -309,15 +369,46 @@ jetons (`docs/jeton-github.md`, mis à jour par #367).
   faits restent (même isolement que `routers/digest_router.py:54-56`).
 - Limite : le filtre de contenu d'Azure peut refuser une description ou un README qui parle de
   jailbreak (sujet `llm_security` de la veille).
+- Limite : une description peut pousser son dépôt vers un choix par `watch_subject` (« idéal pour
+  la sécurité des agents ») ; le code vérifie que le sujet est de la liste, pas que le dépôt en
+  relève (comme un item qui oriente le classement entre deux sujets permis,
+  [fiches-veille.md](fiches-veille.md), « Injection d'instructions »).
+- Limite du masquage : une adresse part telle quelle quand elle est écrite avec `＠` pleine chasse
+  (U+FF20) ou `﹫` (U+FE6B), avec une lettre suivie d'une marque combinante (accent en NFD, signe
+  vocalique…), maquillée (`[at]`, « at », espaces autour du `@`), ou scindée autour de son `@` par
+  un bloc de code, une image ou un badge, ou par une balise non fermée où tombe la coupe brute ;
+  quand sa partie locale porte un autre caractère hors `\w.%+'-` (`&`…), ce qui précède ce caractère
+  part ; un nom en texte libre aussi. Une adresse hors ASCII (`josé@exemple.fr`), avec une
+  apostrophe (`o'brien@…`) ou sans point dans son domaine est masquée, comme un `x@y` qui n'en est
+  pas une (`react@latest`). Après une coupe brute, le mot qu'elle entame est retiré.
+- Limite : si GitHub prend presque toute l'échéance, le choix échoue en `llm_timeout` et le compte
+  rendu reste factuel ; aucune réserve de temps n'est gardée pour le modèle. Mesuré par #370.
+- Limite : le message au plafond mesure 116 323 caractères ; en jetons, ce n'est qu'une estimation,
+  environ 39 000 à 3 caractères par jeton (supposé), davantage si un JSON fait de topics courts
+  tourne plus près de 2,5. Un choix au plafond et sa relance font environ 80 000 jetons, sous le
+  quota de 140 000 jetons par minute du déploiement (journal ADR, « gpt-6-luna est déployé… ») ; un
+  `kb digest` lancé dans la même minute partage ce quota. Mesuré par #370.
 
 **Traces.** Cinq spans (fenêtres, fiches, choix, README, rédaction), avec des comptes, des états et
 des `ref` (le span des fenêtres, `read_trend_windows`, porte `k_b.windows.period`, `k_b.windows.read`,
 `k_b.windows.missing`, `k_b.windows.capped`, `k_b.repositories.dropped` et `k_b.repositories.reported` :
 les dépôts qui remplissent un critère, comptés sur les fenêtres, avant GitHub ; le span des fiches,
 `read_repository_cards`, depuis #367 : `k_b.candidates.selected`, `k_b.candidates.read`,
-`k_b.candidates.dropped.<motif>` (les écartés), `k_b.github.requests`, et l'état d'un échec ; les `ref`
-naissent avec #368), jamais un nom de dépôt ni un `repository_id` (registre des traitements) ; le type `Stage`
-est étendu (`ai_api/stage_calls.py:11`). Aucun nom de dépôt dans les journaux.
+`k_b.candidates.dropped.<motif>` (les écartés), `k_b.github.requests`, et l'état d'un échec ; le span
+du choix, `select_trends`, depuis #368 : `k_b.descriptions.truncated`, `k_b.outcome`,
+`k_b.choices.count`, `k_b.choices.refs` (les `ref` choisis, dans l'ordre du modèle) et l'état d'un
+échec, avec sous lui le span `chat <modèle>` de chaque tentative), jamais un nom de dépôt ni un
+`repository_id` (registre des traitements). Aucun nom de dépôt dans les journaux.
+
+**Métriques** (règle 4 de `poc.md`, décision de Sabine du 01/11, Q3 du plan de #368) : le type `Stage`
+(`ai_api/stage_calls.py`) gagne `select`. L'appel du choix écrit une ligne `llm_call` sur la sortie
+standard, comme un appel des fiches ([fiches-veille.md](fiches-veille.md), « Métriques »), qu'il
+réussisse ou échoue, et ses mesures OpenTelemetry portent `k_b.stage=select` : `stage` `select`,
+`subject` nul, `prompt_version` `select-trends-1`, `items_in` les candidats envoyés,
+`items_truncated` les descriptions coupées ; `data_fetch_ms`, `items_capped` et
+`items_dropped_before_writing_stage` nuls (les lectures sont mesurées dans leurs spans). Aucun
+appel (aucun candidat lu, ou l'échéance avant l'envoi) : aucune ligne. `FailedSubjectSchema.stage`
+de `POST /digests` garde `classify` ou `write`.
 
 **Contenu des appels sous `KB_TRACE_CONTENT`**, comme les fiches (décision D1 du 2026-10-27, précisée
 le 28/10, #347 ; journal ADR, « Traces : le contenu des appels au modèle, sous réglage ») : le choix

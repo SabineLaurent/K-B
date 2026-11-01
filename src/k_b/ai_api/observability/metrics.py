@@ -24,7 +24,8 @@ FIDELITY_RATE_DECIMALS = 4
 
 @dataclass(frozen=True)
 class RequestMeasures:
-    """The measures of the request, on the first line of classification only."""
+    """The measures of a digest request, on its first line of classification only; a trend
+    report has none, its readings measured in their spans."""
 
     data_fetch_ms: int
     items_dropped_before_writing_stage: int
@@ -35,7 +36,7 @@ def write_llm_call_lines(
     request_id: str,
     settings: LlmSettings,
     stage_calls: Sequence[StageCall],
-    request_measures: RequestMeasures,
+    request_measures: RequestMeasures | None,
 ) -> None:
     """One line per call, each written and flushed at once, as a line kept in a pipe buffer would
     be lost on SIGTERM."""

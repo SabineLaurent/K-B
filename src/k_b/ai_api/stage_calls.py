@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from k_b.ai_api.connectors.llm_client import LlmCall
 
-type Stage = Literal["classify", "write"]
+type Stage = Literal["classify", "write", "select"]
 
 
 @dataclass(frozen=True)
@@ -16,7 +16,7 @@ class StageCall:
     """A call to the model and what its metric line needs of it."""
 
     stage: Stage
-    # None for the classification.
+    # None for the classification and the choice of a trend report.
     subject: str | None
     prompt_version: str
     items_in: int

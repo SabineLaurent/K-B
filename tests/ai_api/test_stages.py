@@ -17,6 +17,10 @@ from k_b.ai_api.stages.classification import (
     build_classification_schema,
     project_for_classification,
 )
+from k_b.ai_api.stages.trend_selection import (
+    SELECTION_RETRY_REMINDERS,
+    SELECTION_SYSTEM_PROMPT,
+)
 from k_b.ai_api.stages.writing import (
     FACT_VALUE_CHARS,
     FACTS_PER_CLAIM,
@@ -297,7 +301,12 @@ def test_the_schemas_carry_the_enums_of_the_call():
 
 
 @pytest.mark.parametrize(
-    "reminders", [CLASSIFICATION_RETRY_REMINDERS, WRITING_RETRY_REMINDERS]
+    "reminders",
+    [
+        CLASSIFICATION_RETRY_REMINDERS,
+        WRITING_RETRY_REMINDERS,
+        SELECTION_RETRY_REMINDERS,
+    ],
 )
 def test_each_stage_gives_a_reminder_per_failed_check(reminders):
     assert set(reminders) == set(FAILED_CHECKS)
@@ -321,7 +330,8 @@ def test_the_writing_prompt_states_the_bounds_the_code_checks():
 
 
 @pytest.mark.parametrize(
-    "system_prompt", [CLASSIFICATION_SYSTEM_PROMPT, WRITING_SYSTEM_PROMPT]
+    "system_prompt",
+    [CLASSIFICATION_SYSTEM_PROMPT, WRITING_SYSTEM_PROMPT, SELECTION_SYSTEM_PROMPT],
 )
 def test_each_system_prompt_says_the_user_message_is_data(system_prompt):
     """Rule 8 of poc.md: the system prompt says the items are data."""

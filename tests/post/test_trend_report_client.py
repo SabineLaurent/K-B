@@ -3,6 +3,7 @@ schema of the AI API, which ties the client to the contract, then changed to bre
 
 import json
 from datetime import UTC, date, datetime
+from typing import get_args
 
 import httpx2
 import pytest
@@ -14,8 +15,10 @@ from post.test_ai_api_client import (
     answer,
 )
 
+from k_b.ai_api.connectors.llm_client import LlmFailure
 from k_b.ai_api.schemas.trend_report_schema import (
     CandidatesSchema,
+    ChosenRepositorySchema,
     DroppedCandidatesSchema,
     RepositoryFactsSchema,
     TrajectoryPointSchema,
@@ -30,6 +33,7 @@ from k_b.post.ai_api_client import (
 )
 from k_b.post.trend_report_client import (
     TREND_REPORT_KEY_VARIABLE,
+    ChoiceFailure,
     request_trend_report,
 )
 
@@ -88,11 +92,31 @@ NO_CANDIDATE_DROPPED = DroppedCandidatesSchema(
 )
 
 
+MODEL = "gpt-6-luna"
+
+
+def choose(repository, criteria=None, watch_subjects=()):
+    """A repository of the response as the model chose it, by its criteria by default."""
+    facts = repository.facts or RISING.facts
+    return ChosenRepositorySchema(
+        repository_id=repository.repository_id,
+        repository_name=repository.repository_name,
+        criteria=list(repository.criteria) if criteria is None else criteria,
+        watch_subjects=list(watch_subjects),
+        best_rank=repository.best_rank,
+        trajectory=repository.trajectory,
+        facts=facts,
+    ).model_dump(mode="json")
+
+
 def make_report(**changes):
-    """A response of POST /trend-reports after a previous report, as JSON to change."""
+    """A response of POST /trend-reports after a previous report, as JSON to change: its one
+    candidate read, the model chose none."""
     report = TrendReportSchema(
         request_id=REQUEST_ID,
-        model=None,
+        model=MODEL,
+        choice_failure=None,
+        chosen=[],
         period=TrendPeriodSchema(
             first_report=False,
             windows=WINDOWS,
@@ -558,3 +582,215 @@ def test_counts_of_candidates_that_do_not_add_up_are_refused(candidates, detail)
     failure = ask_and_fail(answer(content=body(report)))
 
     assert str(failure).startswith(f"ai_api_invalid_response, HTTP 200, {detail}")
+
+
+# The choice of the model (#368, docs/tendances.md, "Choix").
+CANDIDATE_READ = {
+    "selected": 1,
+    "read": 1,
+    "dropped": NO_CANDIDATE_DROPPED.model_dump(),
+}
+NO_CANDIDATE_READ = {
+    "selected": 1,
+    "read": 0,
+    "dropped": NO_CANDIDATE_DROPPED.model_dump() | {"not_found": 1},
+}
+
+
+def test_the_failures_of_the_choice_are_those_of_the_model():
+    """post does not import ai_api: its Literal is a copy, kept equal here."""
+    assert get_args(ChoiceFailure.__value__) == get_args(LlmFailure.__value__)
+
+
+def test_the_repositories_chosen_are_read_with_their_criteria_and_subjects():
+    report = make_report(
+        chosen=[
+            choose(
+                RISING, ["new", "watch_subject"], ["llm_security", "coding_assistants"]
+            ),
+            choose(STEADY, ["durable"]),
+        ]
+    )
+
+    response, _ = ask(answer(content=body(report)))
+
+    [rising, steady] = response.chosen
+    assert (rising.repository_id, rising.repository_name) == (4_242, RISING_NAME)
+    assert rising.criteria == ["new", "watch_subject"]
+    assert rising.watch_subjects == ["llm_security", "coding_assistants"]
+    assert steady.criteria == ["durable"]
+    assert response.choice_failure is None
+
+
+def test_a_repository_chosen_by_its_subject_alone_may_be_out_of_the_repositories():
+    alone = STEADY.model_copy(
+        update={"repository_id": 99, "repository_name": "only/subject", "criteria": []}
+    )
+    report = make_report(
+        chosen=[choose(alone, ["watch_subject"], ["coding_assistants"])]
+    )
+
+    response, _ = ask(answer(content=body(report)))
+
+    assert response.chosen[0].repository_name == "only/subject"
+
+
+def test_a_choice_that_failed_is_read_with_its_state():
+    report = make_report(model=None, choice_failure="llm_rate_limited")
+
+    response, _ = ask(answer(content=body(report)))
+
+    assert (response.model, response.choice_failure) == (None, "llm_rate_limited")
+
+
+def test_without_any_candidate_read_neither_a_model_nor_a_failure_is_read():
+    report = make_report(model=None, candidates=NO_CANDIDATE_READ)
+
+    response, _ = ask(answer(content=body(report)))
+
+    assert (response.model, response.choice_failure, response.chosen) == (
+        None,
+        None,
+        [],
+    )
+
+
+SUBJECT_ALONE = STEADY.model_copy(
+    update={"repository_id": 99, "repository_name": "only/subject", "criteria": []}
+)
+
+
+@pytest.mark.parametrize(
+    ("changes", "detail"),
+    [
+        (
+            {
+                "chosen": [
+                    choose(SUBJECT_ALONE, ["watch_subject"], ["coding_assistants"])
+                ]
+                * 6
+            },
+            "chosen (too_long)",
+        ),
+        ({"choice_failure": "llm_tired"}, "choice_failure (literal_error)"),
+        ({"choice_failure": "llm_timeout"}, "choice_failure (with_a_model)"),
+        (
+            {
+                "model": None,
+                "choice_failure": "llm_timeout",
+                "chosen": [choose(STEADY)],
+            },
+            "chosen (with_a_choice_failure)",
+        ),
+        ({"model": None, "chosen": [choose(STEADY)]}, "chosen (without_a_model)"),
+        ({"model": None}, "model (no_choice_with_candidates_read)"),
+        (
+            {"candidates": NO_CANDIDATE_READ},
+            "model (choice_without_candidate_read)",
+        ),
+        (
+            {
+                "model": None,
+                "choice_failure": "llm_timeout",
+                "candidates": NO_CANDIDATE_READ,
+            },
+            "choice_failure (choice_without_candidate_read)",
+        ),
+        (
+            {"chosen": [choose(STEADY), choose(STEADY)]},
+            "chosen.1 (repository_twice)",
+        ),
+        ({"chosen": [choose(STEADY, [])]}, "chosen.0.criteria (too_short)"),
+        (
+            {"chosen": [choose(STEADY) | {"criteria": ["popular"]}]},
+            "chosen.0.criteria.0 (literal_error)",
+        ),
+        (
+            {"chosen": [choose(RISING, ["accelerating", "new"])]},
+            "chosen.0.criteria (not_in_order_once)",
+        ),
+        (
+            {"chosen": [choose(STEADY, ["durable", "watch_subject"])]},
+            "chosen.0.watch_subjects (not_with_watch_subject)",
+        ),
+        (
+            {"chosen": [choose(STEADY, ["durable"], ["coding_assistants"])]},
+            "chosen.0.watch_subjects (not_with_watch_subject)",
+        ),
+        (
+            {"chosen": [choose(STEADY, ["watch_subject"], ["cooking"])]},
+            "chosen.0.watch_subjects (not_in_order_once)",
+        ),
+        (
+            {
+                "chosen": [
+                    choose(
+                        STEADY, ["watch_subject"], ["coding_assistants", "llm_security"]
+                    )
+                ]
+            },
+            "chosen.0.watch_subjects (not_in_order_once)",
+        ),
+        (
+            {"chosen": [choose(STEADY, ["accelerating"])]},
+            "chosen.0.criteria (not_met_in_the_repositories)",
+        ),
+        (
+            {"chosen": [choose(SUBJECT_ALONE, ["durable"])]},
+            "chosen.0.criteria (not_met_in_the_repositories)",
+        ),
+    ],
+    ids=[
+        "six-chosen",
+        "failure-unknown",
+        "failure-with-a-model",
+        "failure-with-chosen",
+        "chosen-without-model",
+        "candidates-read-without-choice",
+        "model-without-candidate",
+        "failure-without-candidate",
+        "repository-twice",
+        "no-criterion",
+        "criterion-unknown",
+        "criteria-out-of-order",
+        "watch-subject-without-subject",
+        "subject-without-watch-subject",
+        "subject-out-of-the-list",
+        "subjects-out-of-order",
+        "criterion-not-met",
+        "criterion-of-a-repository-not-reported",
+    ],
+)
+def test_a_choice_the_response_contradicts_is_refused_by_its_place(changes, detail):
+    report = make_report(**changes)
+
+    failure = ask_and_fail(answer(content=body(report)))
+
+    assert str(failure).startswith(f"ai_api_invalid_response, HTTP 200, {detail}")
+
+
+def test_new_chosen_while_not_evaluated_is_refused():
+    first = make_report(
+        repositories=[STEADY.model_dump(mode="json")],
+        chosen=[choose(RISING, ["new"])],
+    )
+    first["period"] |= {"first_report": True, "new_evaluated": False}
+
+    failure = ask_and_fail(
+        answer(content=body(first)), after=None, previous_first_window=None
+    )
+
+    assert str(failure).startswith(
+        "ai_api_invalid_response, HTTP 200, chosen.0.criteria (new_not_evaluated)"
+    )
+
+
+def test_a_name_chosen_that_cannot_make_a_url_is_refused_never_quoted():
+    report = make_report(chosen=[choose(STEADY) | {"repository_name": "owner/.."}])
+
+    failure = ask_and_fail(answer(content=body(report)))
+
+    assert str(failure).startswith(
+        "ai_api_invalid_response, HTTP 200, chosen.0.repository_name (value_error)"
+    )
+    assert "owner/.." not in str(failure)
