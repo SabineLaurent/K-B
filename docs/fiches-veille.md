@@ -143,7 +143,7 @@ d'après celle du 2026-10-30 ; arXiv ≈ 45, releases 20 à 60, KEV et alertes q
   écartées : rédiger les sujets en parallèle (environ 30 s, mais un `replay` à refaire et des 429
   possibles sous le quota, pour un gain sans besoin mesuré) ; une tâche de fond (un état gardé
   entre deux requêtes, contraire à la règle 7 de `poc.md`, utile seulement au-delà de 240 s).
-  Le pire cas, 14 appels de 210 s, dépasse 240 s en série comme en parallèle : seule l'échéance
+  Le pire cas, 16 appels de 210 s, dépasse 240 s en série comme en parallèle : seule l'échéance
   borne la demande.
   - **Mécanisme** (`ai_api/deadline.py`) : aucune requête au modèle s'il reste moins de
     `MIN_SECONDS_FOR_LLM_REQUEST` = 10 s, au-dessus de la rédaction la plus lente mesurée par #158
