@@ -34,9 +34,11 @@ CODE_BLOCK = re.compile(r"(```|~~~).*?(?:\1|\Z)", re.DOTALL)
 BADGE = re.compile(r"\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)")
 IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 # Before the URLs: jane.doe@www.example.com would become jane.doe@[url].
-# No dot required: a raw cut can leave jane.doe@example; x@latest is masked too.
-EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*")
+# No dot required: jane@localhost; x@latest is masked too.
+EMAIL = re.compile(r"[\w.%+-]+@[\w-]+(?:\.[\w-]+)*")
 MASKED_EMAIL = "[email]"
+# The word a raw cut breaks; the lookbehind keeps the search linear.
+CUT_WORD = re.compile(r"(?<!\S)\S*\Z")
 # The new lines are kept: the README of #369 has lines.
 SPACES = re.compile(r"[^\S\n]+")
 
@@ -55,6 +57,8 @@ def clean_repository_text(text: str, max_chars: int) -> CleanedText:
     cleaned = remove_markup(cleaned)
     cleaned = CODE_BLOCK.sub(" ", cleaned)
     cleaned = IMAGE.sub(" ", BADGE.sub(" ", cleaned))
+    if len(raw) < len(text):
+        cleaned = CUT_WORD.sub("", cleaned)
     cleaned = EMAIL.sub(MASKED_EMAIL, cleaned)
     cleaned = URL.sub(MASKED_URL, cleaned)
     cleaned = LOGIN.sub(MASKED_LOGIN, cleaned)

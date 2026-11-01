@@ -60,8 +60,9 @@ cleaned = CODE_BLOCK.sub(" ", cleaned)
   motif.
 - **Le HTML est retiré en boucle** (`remove_markup`, `:83-95`), jusqu'à ce que le texte ne change
   plus : un seul passage sur `<<b>script>` laisse `<script>`.
-- Viennent ensuite les blocs de code, les badges et les images, les adresses (`[email]`, sans
-  exiger de point dans le domaine depuis le constat 1 de la revue), **avant**
+- Viennent ensuite les blocs de code, les badges et les images ; puis, si la coupe brute a joué, le
+  mot qu'elle a entamé (`CUT_WORD`, revue medium) ; puis les adresses (`[email]`, lettres hors ASCII
+  comprises, sans exiger de point dans le domaine : revues high et medium), **avant**
   les URL (sinon `jane.doe@www.example.com` deviendrait `jane.doe@[url]` et la partie personnelle
   partirait), les URL (`[url]`), les logins (`@user`), puis la réduction des espaces et la coupe à
   500, comptée (`is_cut`).
@@ -216,7 +217,7 @@ métrique, la relecture et le rendu par `kb`, le journal de `kb`, l'autorisation
 
 | N° | Constat | Décision et raison |
 |---|---|---|
-| 1 | `EMAIL` exige un point dans le domaine : « jane@localhost », ou « jane.doe@example » laissé par la coupe brute, part tel quel au modèle | Corrigé, après un relecteur neuf en lecture seule (règle des données personnelles) : `(?:\.[A-Za-z0-9-]+)*` au lieu de `+` (`repository_texts.py:38`), tests d'abord (6 rouges avant le code). Nouveaux faux positifs acceptés, le texte n'étant jamais affiché : les `x@y` sans point (`react@latest`, `user@server`, `img@sha256:…`). Limite écrite dans `docs/tendances.md` et le registre : une adresse coupée juste après son `@`, hors ASCII (`josé@…`, `＠` pleine chasse) ou maquillée (`[at]`) part telle quelle. Selon le relecteur, une description GitHub tient en 350 caractères (slategit.com, article du 03/08/2026 lu le 01/11/2026 ; issuetracker.unity.com, issue 22197 ; non vérifié dans la documentation de GitHub) : la coupe brute ne joue alors jamais sur une description, le risque porte sur le README de #369 |
+| 1 | `EMAIL` exige un point dans le domaine : « jane@localhost », ou « jane.doe@example » laissé par la coupe brute, part tel quel au modèle | Corrigé, après un relecteur neuf en lecture seule (règle des données personnelles) : `(?:\.[A-Za-z0-9-]+)*` au lieu de `+` (`repository_texts.py:38`), tests d'abord (6 rouges avant le code). Nouveaux faux positifs acceptés, le texte n'étant jamais affiché : les `x@y` sans point (`react@latest`, `user@server`, `img@sha256:…`). Les limites écrites alors ont été revues par la revue medium (constats 1 à 4 ci-dessous). Selon le relecteur, une description GitHub tient en 350 caractères (slategit.com, article du 03/08/2026 lu le 01/11/2026 ; issuetracker.unity.com, issue 22197 ; non vérifié dans la documentation de GitHub) : la coupe brute ne joue alors jamais sur une description, le risque porte sur le README de #369 |
 | 2 | `description` est obligatoire dans le modèle strict : une réponse sans la clé fait échouer tout le compte rendu | Écarté : même forme que `license` ; une réponse sans la clé est invalide, et la refuser, c'est échouer fermé |
 | 3 | Une seule échéance pour GitHub et le modèle | Écarté : la réserve a été écartée par le plan (constat 22), la limite est écrite dans `tendances.md`, #370 mesure |
 | 4 | `CODE_BLOCK` prend ``` ou ~~~ au milieu d'une ligne, et un bloc non fermé efface jusqu'à la fin | Écarté : c'est le plan ; on perd du texte sans en laisser passer ; `is_cut` dit une coupe, pas un retrait |
@@ -232,7 +233,7 @@ time-knight (délégation de Sabine du 15/10).
 
 | N° | Constat | Décision et raison |
 |---|---|---|
-| 1 à 4 | Données personnelles : adresse coupée juste après son `@` ; partie locale hors ASCII (« josé@example.com » donne « josé@user.com », le prénom part) ; test qui fige la fuite ; coupe brute au milieu d'un mot | **En attente** du verdict d'un relecteur neuf en lecture seule. *(à compléter)* |
+| 1 à 4 | Données personnelles : adresse coupée juste après son `@` ; partie locale hors ASCII (« josé@example.com » donnait « josé@user.com », le prénom partait) ; test qui figeait la fuite ; coupe brute au milieu d'un mot | Corrigé, après un relecteur neuf en lecture seule, autrement que la session le proposait : `\S*\Z` sur le texte brut laissait « Contact jane.doe » (une coupe dans un commentaire non fermé), `\w` dans la seule partie locale laissait « jane@ëxample.com », et `\S*\Z` est quadratique (0,49 s sur 16 000 lettres). Retenu : `EMAIL` en `\w` des deux côtés du `@` ; `CUT_WORD = (?<!\S)\S*\Z` (le lookbehind garde la recherche linéaire, 0,2 ms sur 16 000 caractères), appliqué après les badges et les images, avant les adresses, seulement après une coupe brute. Tests d'abord (10 rouges avant le code) : cinq coupes (`jane.doe@example`, `jane.doe@e`, `jane.doe@`, `jane.do`, `jane.doe<!-- x`), cinq adresses hors ASCII ; le test qui figeait la fuite est retiré ; le test de vitesse change d'entrée, car la coupe efface une suite unique de lettres. Limites restantes, écrites au registre et dans `docs/tendances.md` : `＠` (U+FF20) et `﹫` (U+FE6B), une lettre suivie d'un accent combinant (NFD), une adresse maquillée (`[at]`, « at », espaces autour du `@`), une adresse scindée avant son `@` par un bloc de code ou par une balise non fermée où tombe la coupe brute, un nom en texte libre |
 | 5 | `CRITERIA` resté dans `post` | Écarté : `get_args(Criterion` n'apparaît qu'à `trend_report_client.py:44`, rien n'est dupliqué |
 | 6 | `is_once_among` et `is_in_order_once` se ressemblent | Écarté : `code.md` factorise à la troisième occurrence ; il y en a deux, dans deux couches |
 | 7 | Les faux positifs du masque font perdre du sens au README de #369 | Écarté : compromis déjà accepté et écrit |
@@ -243,6 +244,7 @@ time-knight (délégation de Sabine du 15/10).
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
 | `tests/ai_api/test_repository_texts.py` (16 tests, un par piège : commentaire, balise, caractère caché, bloc des étiquettes, contrôle, code, badge, URL, adresse avant URL, login, coupe) | Chaque étape du nettoyage, caractères écrits par `chr()` |
+| `test_the_word_the_raw_cut_breaks_is_removed`, `test_an_address_out_of_ascii_is_masked`, `test_an_address_without_a_dot_in_its_domain_is_masked` (revues) | Rien d'une adresse entamée par la coupe brute, ni d'une adresse hors ASCII ou sans point, ne part au modèle |
 | `test_a_long_text_of_letters_is_cleaned_within_a_second` | La coupe brute borne le temps des motifs |
 | `test_a_trapped_description_goes_in_no_system_message_even_at_the_retry` | Règle 8 : le texte d'un dépôt n'entre jamais dans la consigne, relance comprise |
 | `test_a_refused_choice_is_retried_with_its_reminder_then_fails` (paramétré : `ref` inventé ou en double, sujet hors liste, critère non calculé, aucun critère, `watch_subject` sans sujet et l'inverse, 6 choix) | Chaque refus a son état et son rappel, et deux refus donnent `llm_invalid_output` |
@@ -281,7 +283,8 @@ factuel ; la période avance. C'est le cas prévu par le contrat ; #370 mesure s
 avant l'envoi. Ni nom de dépôt ni `repository_id` dans les spans, les journaux ou la ligne de
 métrique (les `ref` seuls). Le contenu de l'appel ne part chez Grafana que sous `KB_TRACE_CONTENT`,
 jamais avant la signature du DPA. Ce qui échappe encore au masque est écrit au registre : un nom en
-texte libre, une adresse coupée juste après son `@`, hors ASCII ou maquillée.
+texte libre, une adresse écrite avec un `@` d'une autre forme (U+FF20, U+FE6B), avec un accent
+combinant, maquillée, ou scindée avant son `@`.
 
 **Pourquoi `kb` revérifie-t-il ce que l'API IA a déjà contrôlé ?** Défense en profondeur : pour
 `kb`, la réponse de l'API IA est une entrée externe. Les contrôles croisés empêchent un fichier du

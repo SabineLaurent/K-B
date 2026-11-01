@@ -136,15 +136,45 @@ def padded_to_the_raw_cut(tail):
     return "<!--" + "x" * filler + "-->" + tail
 
 
-@pytest.mark.parametrize("cut_address", ["jane.doe@example", "jane.doe@e"])
-def test_an_address_cut_in_its_domain_by_the_raw_cut_is_masked(cut_address):
+@pytest.mark.parametrize(
+    ("cut_address", "rest"),
+    [
+        ("jane.doe@example", ".com rest"),
+        ("jane.doe@e", "xample.com rest"),
+        ("jane.doe@", "example.com rest"),
+        ("jane.do", "e@example.com rest"),
+        ("jane.doe<!-- x", " -->@example.com rest"),
+    ],
+    ids=[
+        "in-the-domain",
+        "after-a-letter",
+        "after-the-at",
+        "before-the-at",
+        "in-a-comment",
+    ],
+)
+def test_the_word_the_raw_cut_breaks_is_removed(cut_address, rest):
     cleaned = clean_repository_text(
-        padded_to_the_raw_cut(f" Contact {cut_address}") + ".com rest", MAX_CHARS
+        padded_to_the_raw_cut(f" Contact {cut_address}") + rest, MAX_CHARS
     )
 
-    assert cleaned.text.endswith("Contact [email]")
+    assert cleaned.text.endswith("Contact")
     assert "jane" not in cleaned.text
     assert cleaned.is_cut is True
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "josé@example.com",
+        "zoë.dupont@exemple.fr",
+        "jane@ëxample.com",
+        "josé@exämple.com",
+        "user@例え.jp",
+    ],
+)
+def test_an_address_out_of_ascii_is_masked(address):
+    assert clean(f"write to {address} now") == "write to [email] now"
 
 
 @pytest.mark.parametrize(
@@ -168,15 +198,6 @@ def test_a_name_at_a_version_without_a_dot_is_masked_too():
 )
 def test_a_login_and_an_address_keep_their_masks(text, expected):
     assert clean(text) == expected
-
-
-def test_an_address_cut_right_after_its_at_sign_is_left_as_it_is():
-    """A limit (docs/registre-traitements.md, "Limite du masquage"): nothing follows the @."""
-    cleaned = clean_repository_text(
-        padded_to_the_raw_cut(" Contact jane.doe@") + "example.com", MAX_CHARS
-    )
-
-    assert cleaned.text.endswith("Contact jane.doe@")
 
 
 def test_a_login_is_masked():
@@ -207,6 +228,7 @@ def test_a_long_text_of_letters_is_cleaned_within_a_second():
     """The raw cut bounds the patterns: the URL of watch_items takes 1.27 s on 20,000 letters."""
     started = time.perf_counter()
 
-    clean("a" * 400_000)
+    # Letters up to the raw cut, then short words: the cut removes only the last.
+    clean("a" * (RAW_CUT_FACTOR * MAX_CHARS - 2) + " b" * 1000)
 
     assert time.perf_counter() - started < 1
