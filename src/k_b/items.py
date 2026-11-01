@@ -3,7 +3,7 @@ and the words of a trend report; which source field goes where: docs/stockage.md
 
 import re
 from datetime import UTC, date, datetime, time
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 from urllib.parse import urlsplit
 
 from pydantic import (
@@ -220,6 +220,8 @@ WrittenDayInStrictModel = Annotated[WrittenDay, Field(strict=False)]
 type Criterion = Literal["durable", "new", "accelerating"]
 # A criterion of a repository the model chose: those of the code, or a subject of the watch.
 type ChoiceCriterion = Literal["durable", "new", "accelerating", "watch_subject"]
+CHOICE_CRITERIA: tuple[ChoiceCriterion, ...] = get_args(ChoiceCriterion.__value__)
+WATCH_SUBJECT: ChoiceCriterion = "watch_subject"
 type WindowState = Literal["top", "out_of_top", "missing"]
 # A date with its time zone, held in UTC.
 UtcDatetime = Annotated[AwareDatetime, AfterValidator(convert_to_utc)]

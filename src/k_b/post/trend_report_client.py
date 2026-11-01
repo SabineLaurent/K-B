@@ -19,6 +19,8 @@ from k_b.core.config import (
     TREND_MAX_CHOSEN,
 )
 from k_b.items import (
+    CHOICE_CRITERIA,
+    WATCH_SUBJECT,
     ChoiceCriterion,
     Criterion,
     WindowState,
@@ -40,8 +42,6 @@ TREND_REPORT_KEY_VARIABLE = f"{AI_API_KEY_VARIABLE_PREFIX}KB_TREND_REPORT"
 TREND_REPORTS_PATH = "trend-reports"
 # The criteria in the order the AI API gives them (docs/tendances.md, "Ce que rend #366").
 CRITERIA: tuple[Criterion, ...] = get_args(Criterion.__value__)
-CHOICE_CRITERIA: tuple[ChoiceCriterion, ...] = get_args(ChoiceCriterion.__value__)
-WATCH_SUBJECT: ChoiceCriterion = "watch_subject"
 SUBJECT_NAMES = tuple(subject.name for subject in DIGEST_SUBJECTS)
 # The states of a choice that failed, those of LlmFailure in ai_api, which post does not import:
 # a test keeps both equal.

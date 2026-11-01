@@ -3,7 +3,7 @@
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Annotated, get_args
+from typing import Annotated
 
 import httpx2
 from pydantic import BaseModel, ConfigDict, Field
@@ -29,13 +29,11 @@ from k_b.core.config import (
     TREND_MAX_CHOSEN,
     DigestSubject,
 )
-from k_b.items import ChoiceCriterion, Criterion
+from k_b.items import CHOICE_CRITERIA, WATCH_SUBJECT, ChoiceCriterion, Criterion
 
 SELECTION_PROMPT_NAME = "select-trends"
 SELECTION_PROMPT_VERSION = "select-trends-1"
 SELECTION_MAX_CHOICES = TREND_MAX_CHOSEN
-CHOICE_CRITERIA: tuple[ChoiceCriterion, ...] = get_args(ChoiceCriterion.__value__)
-WATCH_SUBJECT: ChoiceCriterion = "watch_subject"
 # A module constant, never an expression: no text of a repository can be in it (poc.md, rule 8).
 # Its bound is written as text; a test keeps it equal to SELECTION_MAX_CHOICES.
 SELECTION_SYSTEM_PROMPT = """You choose, among the candidates of a report on the trends of \
@@ -334,7 +332,7 @@ def check_selection(
     if not all(is_once_among(c.watch_subjects, subject_names) for c in choices):
         return "subject"
     refs = [choice.ref for choice in choices]
-    if len(set(refs)) < len(refs) or not set(refs) <= set(criteria_by_ref):
+    if not is_once_among(refs, list(criteria_by_ref)):
         return "item_id"
     if not all(has_criteria_met(c, criteria_by_ref[c.ref]) for c in choices):
         return "criterion"
