@@ -100,6 +100,8 @@ class DryRunVolumeUnknownError(ExpectedSourceError):
 
 
 class GhArchiveSource:
+    """The GH Archive source: the trending GitHub repositories of each window, from BigQuery."""
+
     name = FOLDER_PREFIX
     extension = "json"
     acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
@@ -139,14 +141,17 @@ class GhArchiveSource:
 
 
 def create_bigquery_client() -> bigquery.Client:
+    """Create a BigQuery client, which reads its key from GOOGLE_APPLICATION_CREDENTIALS."""
     return bigquery.Client()
 
 
 def compute_bytes_cap(window_count: int) -> int:
+    """Compute the most bytes the query may bill for this many windows."""
     return min(window_count * MAX_BYTES_PER_WINDOW, MAX_BYTES_BILLED)
 
 
 def current_day() -> date:
+    """Return the current day in UTC."""
     return datetime.now(UTC).date()
 
 
@@ -185,6 +190,7 @@ def check_day_table_closed(client: bigquery.Client, day: date) -> None:
 
 
 def describe_time(moment: datetime | None) -> str:
+    """Describe a moment for a message, or say it is unknown."""
     return "an unknown time" if moment is None else moment.isoformat()
 
 
@@ -226,6 +232,7 @@ def drop_windows_over_the_cap(
 
 
 def configure_query(window_ends: list[date], dry_run: bool) -> bigquery.QueryJobConfig:
+    """Configure the BigQuery query of these windows, as a dry run or a real one."""
     first_day = window_ends[0] - timedelta(days=GH_ARCHIVE_WINDOW_DAYS - 1)
     parameters = [
         bigquery.ScalarQueryParameter(
@@ -251,6 +258,7 @@ def configure_query(window_ends: list[date], dry_run: bool) -> bigquery.QueryJob
 
 
 def encode_result(window_ends: list[date], rows: Iterable[Mapping[str, Any]]) -> bytes:
+    """Encode the windows and the rows of the query as the JSON of the raw file."""
     result = {
         "window_ends": [window_end.isoformat() for window_end in window_ends],
         "rows": [
@@ -280,6 +288,8 @@ class TrendsExtractInvalidError(PageRefusedError):
 
 
 class TrendsExtract(BaseModel):
+    """The raw result of GH Archive as read at the import: its windows and its rows."""
+
     model_config = ConfigDict(strict=True, extra="forbid")
 
     window_ends: Annotated[list[date], Field(min_length=1)]
@@ -353,6 +363,7 @@ def describe_location_part(part: int | str) -> str:
 
 
 def describe_value(value: object, field: object) -> str:
+    """Describe an invalid value for a refusal: quoted if safe, else only its type and size."""
     # A missing field gives the whole row as its value, even for a field quoted otherwise.
     if isinstance(value, dict | list):
         return f"{type(value).__name__} of {len(value)}"
@@ -364,6 +375,7 @@ def describe_value(value: object, field: object) -> str:
 
 
 def read_trend_rows(raw_result: bytes) -> list[TrendRow]:
+    """Read the trend rows of a raw GH Archive result."""
     return read_trends(raw_result).rows
 
 

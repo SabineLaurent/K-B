@@ -39,6 +39,8 @@ MAX_QUOTED_FAILURE_LENGTH = 300
 
 
 class CollectionOutcome(NamedTuple):
+    """The result of a collection: each source's error, None on success, and the state's error."""
+
     errors_by_source: dict[str, Exception | None]
     # The raw files are written even when the state is not: the next run collects again.
     state_error: OSError | None

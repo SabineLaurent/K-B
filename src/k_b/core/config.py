@@ -47,6 +47,8 @@ GITHUB_ECOSYSTEMS: tuple[Ecosystem, ...] = get_args(Ecosystem.__value__)
 # collection derives its sources from it.
 @dataclass(frozen=True)
 class TrackedRepository:
+    """A GitHub repository that K-B watches, with its ecosystem and the packages it publishes."""
+
     name: str
     ecosystem: Ecosystem
     # Only the main packages: integrations are added when they are used.
@@ -271,6 +273,8 @@ TREND_MAX_CHOSEN = 5
 # to the model with it.
 @dataclass(frozen=True)
 class DigestSubject:
+    """A subject of the digests: its name and the definition sent to the model."""
+
     name: str
     definition: str
 

@@ -180,12 +180,16 @@ class ZoteroQueryFailedError(ExpectedSourceError):
 
 
 class FileState(NamedTuple):
+    """The size, modification time and inode of a file, to tell whether it changed."""
+
     size: int
     modified_at_ns: int
     inode: int
 
 
 class ZoteroSource:
+    """The Zotero source: the documents of the user's library and their highlights."""
+
     name = FOLDER_PREFIX
     extension = "json"
     acquisition_dir_name = SELECTED_LIBRARY_DIR_NAME
@@ -256,6 +260,7 @@ def read_file_states(zotero_dir: Path) -> tuple[FileState, FileState | None]:
 
 
 def read_file_state(path: Path) -> FileState:
+    """Read the size, modification time and inode of a file."""
     status = path.stat()
     return FileState(status.st_size, status.st_mtime_ns, status.st_ino)
 
@@ -304,6 +309,7 @@ def extract_documents(copy_path: Path) -> list[dict[str, Any]]:
 
 
 def check_integrity(connection: sqlite3.Connection) -> None:
+    """Refuse a copy of the Zotero database whose integrity check fails."""
     try:
         problems = [row[0] for row in connection.execute("PRAGMA integrity_check")]
     except sqlite3.DatabaseError as error:

@@ -39,6 +39,7 @@ class FileWriting:
 def write_file(
     connection: sqlite3.Connection, file_read: RawFile | TrendFile
 ) -> FileWriting:
+    """Write one raw file read into the database, as items or as trend rows."""
     if isinstance(file_read, TrendFile):
         return write_trend_file(connection, file_read)
     return write_items_file(connection, file_read)

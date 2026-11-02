@@ -35,6 +35,7 @@ GITHUB_CORE_QUOTA_FOLDER_PREFIXES = frozenset(
 
 
 def run_collect(data_dir: Path, environ: Mapping[str, str]) -> int:
+    """Run kb collect: collect the chosen sources, print one line each and return the exit code."""
     # The check and the sources read the same mapping, given by cli.py; the BigQuery client reads
     # GOOGLE_APPLICATION_CREDENTIALS from the environment itself, as the GitHub API client reads its
     # token (sources/github/api.py, for now).
@@ -90,6 +91,7 @@ def log_collection_start(sources: Sequence[Source], environ: Mapping[str, str]) 
 
 
 def is_github_core_quota_source(source: Source) -> bool:
+    """Tell whether the source uses the GitHub REST API quota that KB_GITHUB_TOKEN raises."""
     kind = find_source_kind(source.name, SOURCE_KINDS)
     return kind is not None and kind.folder_prefix in GITHUB_CORE_QUOTA_FOLDER_PREFIXES
 
@@ -119,4 +121,5 @@ def find_collection_exit_code(outcome: CollectionOutcome) -> ExitCode:
 
 
 def describe_outcome(error: Exception | None) -> str:
+    """Describe the outcome of a source: ok, or failed with the type of its error."""
     return "ok" if error is None else f"failed ({type(error).__name__})"

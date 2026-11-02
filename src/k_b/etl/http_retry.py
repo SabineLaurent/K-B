@@ -87,6 +87,7 @@ def is_retried_status(error: SourceStatusError, retry_after: str | None) -> bool
 
 
 def is_retry_after_beyond_max(retry_after: str | None) -> bool:
+    """Tell whether the server asks to wait longer than K-B is willing to."""
     seconds = read_retry_after(retry_after)
     return is_retry_after_too_long(retry_after) or (
         seconds is not None and seconds > RETRY_AFTER_MAX_SECONDS
@@ -99,6 +100,7 @@ def read_rate_limit_reset(error: SourceStatusError) -> int | None:
 
 
 def is_rate_limit_exhausted(error: SourceStatusError) -> bool:
+    """Tell whether the response says no request is left in the rate limit."""
     return error.headers.get(RATE_LIMIT_REMAINING_HEADER) == "0"
 
 

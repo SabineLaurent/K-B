@@ -75,12 +75,16 @@ class ClippingsFolderMissingError(ExpectedSourceError):
 
 
 class ClipFile(NamedTuple):
+    """A clip file of the vault, with the date it last changed."""
+
     path: Path
     # The newest of its modification and change dates, in nanoseconds since EPOCH.
     changed_at_ns: int
 
 
 class ClippingSource:
+    """The clipping source: the web pages clipped into the Clippings folder of the vault."""
+
     name = FOLDER_PREFIX
     extension = "md"
     acquisition_dir_name = SELECTED_LIBRARY_DIR_NAME
@@ -141,6 +145,7 @@ class ClippingSource:
 
 
 def current_time() -> datetime:
+    """Return the current time in UTC."""
     return datetime.now(UTC)
 
 
@@ -203,10 +208,13 @@ def read_clip_files(clip_files: list[ClipFile]) -> dict[str, bytes]:
 
 
 def make_page_name(path: Path) -> str:
+    """Make the page name of a clip from a hash of its file name."""
     return hashlib.sha256(os.fsencode(path.name)).hexdigest()[:PAGE_NAME_LENGTH]
 
 
 class ClipRead(NamedTuple):
+    """A clip as read: its content, its size and the date it last changed."""
+
     # At most one byte more than the maximum.
     content: bytes
     # The size of the file once read, or of the content if it grew since.
@@ -227,6 +235,7 @@ def read_clip_file(path: Path) -> ClipRead:
 
 
 def check_clip_size(path: Path, size: int) -> None:
+    """Refuse a clip larger than CLIP_MAX_BYTES."""
     if size > CLIP_MAX_BYTES:
         raise ClipTooLargeError(
             f"clip_too_large: {quote_value(path.name)}: {size} bytes,"
@@ -306,6 +315,7 @@ def split_frontmatter(text: str) -> tuple[str, str]:
 
 
 def describe_yaml_error(error: yaml.YAMLError) -> str:
+    """Describe a frontmatter that is not YAML, with its line and column in the clip."""
     mark = getattr(error, "problem_mark", None)
     if mark is None:
         return "frontmatter not YAML"
@@ -314,6 +324,7 @@ def describe_yaml_error(error: yaml.YAMLError) -> str:
 
 
 def read_absent(value: object) -> object:
+    """Read an empty, null or ~ value of the frontmatter as None."""
     return None if value in ABSENT_VALUES else value
 
 

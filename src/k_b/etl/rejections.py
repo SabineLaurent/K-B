@@ -9,5 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 def reject(raw_file_path: str, reason: str) -> Rejection:
+    """Log the rejection of a raw file or of an entry, and return it."""
     logger.warning("rejected from %s: %s", raw_file_path, reason)
     return Rejection(raw_file_path, reason)

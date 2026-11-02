@@ -75,6 +75,7 @@ def download_once(
     headers: dict[str, str] | None,
     unredirected_headers: dict[str, str] | None,
 ) -> bytes:
+    """Download a URL once, following only trusted redirections, and return its body."""
     with open_http_client("", {}, httpx2.Timeout(HTTP_TIMEOUT_SECONDS), None) as client:
         response = send_following_redirections(
             client, url, trusted_url_prefix, headers or {}, unredirected_headers or {}
@@ -144,6 +145,7 @@ def build_request(
 
 
 def read_body(response: httpx2.Response, max_bytes: int) -> bytes:
+    """Read the body of a response, refusing one larger than max_bytes or not decodable."""
     try:
         return read_bounded_body(response, max_bytes)
     except BodyTooLargeError:

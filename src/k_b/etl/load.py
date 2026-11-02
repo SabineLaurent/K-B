@@ -28,6 +28,8 @@ class ImportLogExistsError(FileExistsError):
 
 
 class ImportSummary(NamedTuple):
+    """The counts of an import, as printed on its summary line."""
+
     item_count: int
     # The items and the windows of trends left out.
     discard_count: int
@@ -40,6 +42,7 @@ class ImportSummary(NamedTuple):
 
 
 def read_imported_paths(database_path: Path) -> frozenset[str]:
+    """Read the paths of the raw files already imported, from the registry of the database."""
     check_database_exists(database_path)
     connection = connect_database(database_path)
     try:
@@ -136,6 +139,7 @@ def commit_with_log(
 
 
 def check_log_absent(log_path: Path) -> None:
+    """Refuse to import when the import log of this second already exists."""
     if log_path.exists():
         raise ImportLogExistsError(f"{log_path} already exists")
 

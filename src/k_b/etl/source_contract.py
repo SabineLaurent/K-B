@@ -10,6 +10,8 @@ from k_b.items import Item, SourceCode, TrendRow
 
 
 class Source(Protocol):
+    """What every source of the collection provides: its name, extension, raw folder and fetch."""
+
     name: str
     extension: str
     # The folder of raw/ its raw files go to: the watch, or what the user selected.
@@ -131,6 +133,7 @@ class SourceKind(NamedTuple):
 
 
 def list_sources(kinds: Sequence[SourceKind]) -> list[Source]:
+    """List the sources of every kind given."""
     return [source for kind in kinds for source in kind.sources]
 
 

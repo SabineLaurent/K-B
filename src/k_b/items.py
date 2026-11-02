@@ -372,12 +372,15 @@ class Highlight(BaseModel):
 
     @model_validator(mode="after")
     def check_text_or_comment(self) -> "Highlight":
+        """Refuse a highlight that has neither text nor comment."""
         if self.text is None and self.comment is None:
             raise ValueError("a highlight without text or comment")
         return self
 
 
 class Item(BaseModel):
+    """An item of the watch, of any kind, as every source is read into before the import."""
+
     # strict: a date given as text is refused, not parsed.
     model_config = ConfigDict(
         frozen=True, extra="forbid", strict=True, hide_input_in_errors=True
@@ -426,6 +429,7 @@ class Item(BaseModel):
 
     @model_validator(mode="after")
     def check_the_fields_of_its_kind(self) -> "Item":
+        """Check the fields of the item against the rules of its kind."""
         check_source(self)
         check_required_fields(self)
         check_fields_of_other_kinds(self)
@@ -439,12 +443,14 @@ class Item(BaseModel):
 
 
 def check_source(item: Item) -> None:
+    """Refuse an item whose source is not the one of its kind."""
     source_code = SOURCE_BY_KIND.get(item.kind, item.source_code)
     if item.source_code != source_code:
         raise ValueError(f"a {item.kind} item from {item.source_code}")
 
 
 def check_required_fields(item: Item) -> None:
+    """Refuse an item that lacks a field its kind requires."""
     missing = [
         field
         for field in REQUIRED_FIELDS_BY_KIND.get(item.kind, ())
@@ -459,6 +465,7 @@ def check_required_fields(item: Item) -> None:
 
 
 def check_fields_of_other_kinds(item: Item) -> None:
+    """Refuse an item that fills a field of another kind."""
     filled = [
         field
         for kind, fields in FIELDS_OF_ONE_KIND.items()
@@ -471,11 +478,13 @@ def check_fields_of_other_kinds(item: Item) -> None:
 
 
 def check_cve(item: Item) -> None:
+    """Refuse a CVE on an item whose kind has none."""
     if item.cve is not None and item.kind not in KINDS_WITH_CVE:
         raise ValueError(f"a {item.kind} item with a CVE")
 
 
 def check_url_scheme(item: Item) -> None:
+    """Refuse a URL that is not https, unless the kind of the item allows http."""
     if (
         item.url is not None
         and not item.url.startswith("https://")
@@ -487,6 +496,7 @@ def check_url_scheme(item: Item) -> None:
 
 
 def check_source_item_id(item: Item) -> None:
+    """Refuse a source identifier that is not of the form of its kind."""
     form = SOURCE_ITEM_ID_BY_KIND.get(item.kind)
     if form is not None and not re.fullmatch(form, item.source_item_id):
         raise ValueError(
@@ -500,6 +510,7 @@ def check_source_item_id(item: Item) -> None:
 
 
 def check_tag_count(item: Item) -> None:
+    """Refuse an item with more tags than allowed."""
     if len(item.tags) > TAG_MAX_COUNT:
         raise ValueError(
             f"tags too long: {len(item.tags)} elements, maximum {TAG_MAX_COUNT}"
@@ -507,6 +518,7 @@ def check_tag_count(item: Item) -> None:
 
 
 def check_tags_once(item: Item) -> None:
+    """Refuse an item that has the same tag twice."""
     if len(set(item.tags)) != len(item.tags):
         raise ValueError(
             f"tags not each once: {len(item.tags)} tags, {len(set(item.tags))} distinct"
@@ -522,6 +534,7 @@ def check_lengths(item: Item) -> None:
 
 
 def list_texts_too_long(item: Item) -> list[str]:
+    """List the text fields of the item that are longer than its kind allows."""
     too_long = []
     for field, maximum in MAX_LENGTH_BY_KIND.get(item.kind, {}).items():
         text = getattr(item, field)
@@ -533,6 +546,7 @@ def list_texts_too_long(item: Item) -> list[str]:
 
 
 def list_lists_too_long(item: Item) -> list[str]:
+    """List the list fields of the item, or their elements, that are longer than its kind allows."""
     too_long = []
     for field, maximum in MAX_COUNT_BY_KIND.get(item.kind, {}).items():
         count = len(getattr(item, field))

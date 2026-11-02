@@ -33,6 +33,7 @@ from k_b.etl.tops import Top
 def list_packages_by_ecosystem(
     repositories: tuple[TrackedRepository, ...],
 ) -> dict[str, tuple[str, ...]]:
+    """Group the packages of the tracked repositories by ecosystem, pip or npm."""
     packages_by_ecosystem: dict[str, tuple[str, ...]] = {}
     for repository in repositories:
         known_packages = packages_by_ecosystem.get(repository.ecosystem, ())

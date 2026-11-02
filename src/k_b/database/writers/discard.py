@@ -11,6 +11,8 @@ DiscardRule = Literal[
 
 
 class Discard(NamedTuple):
+    """An item left out at the import: the rule applied and the date it was compared with."""
+
     rule: DiscardRule
     item: Item
     # The date of the base the item was compared with, in the format of the base; None when

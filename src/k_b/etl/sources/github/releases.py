@@ -34,6 +34,8 @@ RELEASES_PER_PAGE = 100
 
 
 class GithubReleasesSource:
+    """The GitHub releases source of one tracked repository."""
+
     extension = "json"
     acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
 
@@ -120,6 +122,7 @@ def read_releases(raw_response: bytes) -> EntryReading[Release]:
 
 
 def parse_release(entry: object, position: int) -> Release:
+    """Read one release of the GitHub response, refusing a malformed one."""
     if not isinstance(entry, dict):
         raise ValueError(f"release {position}: not an object")
     release_id = entry.get("id")
@@ -171,6 +174,7 @@ def has_dot_segment(url: str) -> bool:
 def convert_release(
     release: Release, collected_at: datetime, raw_file_path: str
 ) -> Item:
+    """Convert a GitHub release into an item."""
     return Item(
         source_code=SOURCE_CODE,
         source_item_id=str(release.release_id),

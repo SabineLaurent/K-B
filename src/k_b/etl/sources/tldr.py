@@ -40,12 +40,16 @@ NOT_THE_EDITION_OF_THE_DAY = "not_the_edition_of_the_day"
 
 
 class PageRefusal(NamedTuple):
+    """A page refused by the TLDR reader: its URL and what it is instead."""
+
     page_url: str
     # What the page is instead: the refusal of the reader, or the date of its edition.
     observed: str
 
 
 class TldrSource:
+    """The TLDR source of one newsletter edition, such as ai or infosec."""
+
     extension = "html"
     acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
 
@@ -162,6 +166,7 @@ def find_refusal(page: bytes, day: date) -> str | None:
 
 
 def current_day() -> date:
+    """Return the current day in UTC."""
     return datetime.now(UTC).date()
 
 
@@ -238,6 +243,7 @@ def read_articles(page: bytes) -> EntryReading[TldrArticle]:
 
 
 def read_edition_date(soup: BeautifulSoup) -> date:
+    """Read the date of the edition from the title of its page."""
     heading = soup.select_one("h1")
     if heading is None:
         raise ValueError("no h1 in the page")
@@ -256,6 +262,7 @@ def read_edition_date(soup: BeautifulSoup) -> date:
 
 
 def read_article(entry: Tag, edition_date: date, rank: int) -> TldrArticle:
+    """Read one article of the edition page."""
     link = entry.select_one("a.font-bold")
     href = link.get("href") if link else None
     return TldrArticle(
@@ -275,6 +282,7 @@ def read_text_or_empty(element: Tag | None) -> str:
 
 
 def is_left_out(article: TldrArticle) -> bool:
+    """Tell whether the article is a sponsor or a job offer, left out of the watch."""
     return SPONSOR_MARK in article.title or article.link.startswith(
         TLDR_JOB_OFFER_URL_PREFIX
     )
@@ -283,6 +291,7 @@ def is_left_out(article: TldrArticle) -> bool:
 def convert_article(
     article: TldrArticle, collected_at: datetime, raw_file_path: str
 ) -> Item:
+    """Convert a TLDR article into an item."""
     # The edition is the end of the name of its raw folder (tldr_ai). find_stream cannot
     # raise here: the path of a page read holds its source folder.
     edition = find_stream(raw_file_path).removeprefix(FOLDER_PREFIX).removeprefix("_")

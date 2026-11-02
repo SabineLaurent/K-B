@@ -11,6 +11,7 @@ class ExitCode(IntEnum):
     meaning: str
 
     def __new__(cls, value: int, meaning: str) -> Self:
+        """Create an exit code from its value and its meaning."""
         member = int.__new__(cls, value)
         member._value_ = value
         member.meaning = meaning

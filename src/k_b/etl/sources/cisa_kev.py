@@ -49,6 +49,8 @@ HTTP_NOT_MODIFIED = 304
 
 
 class CisaKevSource:
+    """The CISA KEV source: the catalog of known exploited vulnerabilities."""
+
     name = FOLDER_PREFIX
     extension = "csv"
     acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
@@ -92,6 +94,8 @@ REQUIRED_COLUMNS = (
 
 @dataclass(frozen=True)
 class Vulnerability:
+    """A vulnerability of the CISA KEV catalog, as read from one row."""
+
     cve_id: str
     vendor_project: str
     product: str
@@ -139,6 +143,7 @@ def read_new_vulnerabilities(
 
 
 def parse_vulnerability(row: dict[str, str], line_number: int) -> Vulnerability:
+    """Read one row of the catalog into a vulnerability, refusing missing or malformed fields."""
     missing_columns = [column for column in REQUIRED_COLUMNS if row[column] is None]
     if missing_columns:
         raise ValueError(
@@ -175,12 +180,14 @@ def parse_vulnerability(row: dict[str, str], line_number: int) -> Vulnerability:
 
 
 def is_ransomware_use(value: str) -> TypeIs[RansomwareUse]:
+    """Tell whether the value is one the catalog allows in its ransomware column."""
     return value in get_args(RansomwareUse)
 
 
 def convert_vulnerability(
     vulnerability: Vulnerability, collected_at: datetime, raw_file_path: str
 ) -> Item:
+    """Convert a vulnerability of the catalog into an item."""
     return Item(
         source_code=SOURCE_CODE,
         source_item_id=vulnerability.cve_id,

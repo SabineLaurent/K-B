@@ -7,7 +7,7 @@ DATABASE_FILE_NAME = "k-b.sqlite"
 
 
 class MissingDatabaseError(FileNotFoundError):
-    pass
+    """The database file does not exist yet: kb create-db creates it."""
 
 
 def check_database_exists(database_path: Path) -> None:

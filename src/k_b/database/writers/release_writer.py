@@ -39,6 +39,7 @@ INSERT INTO release (
 def write_tracked_repositories(
     connection: sqlite3.Connection, tracked_repositories: Sequence[TrackedRepository]
 ) -> None:
+    """Write the tracked repositories in the database, updating the ones already there."""
     connection.executemany(
         UPSERT_TRACKED_REPOSITORY,
         [

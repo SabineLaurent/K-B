@@ -43,6 +43,7 @@ def stopping_on_sigterm(command: str) -> Iterator[None]:
 
 
 def raise_stopped_by_sigterm(signal_number: int, frame: FrameType | None) -> None:
+    """Stop kb on SIGTERM by raising StoppedBySigtermError, and ignore any further SIGTERM."""
     # A second SIGTERM would stop the clean-up; Docker sends SIGKILL after its delay anyway.
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
     raise StoppedBySigtermError

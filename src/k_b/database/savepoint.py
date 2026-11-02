@@ -49,6 +49,7 @@ def write_in_savepoint(connection: sqlite3.Connection) -> Iterator[None]:
 
 
 def is_entry_refusal(error: BaseException) -> bool:
+    """Tell whether the error refuses this entry only, so that the import goes on."""
     if isinstance(error, sqlite3.IntegrityError):
         return error.sqlite_errorname in ENTRY_CONSTRAINT_ERROR_NAMES
     return isinstance(error, (OverflowError, UnicodeEncodeError))

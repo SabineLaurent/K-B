@@ -21,6 +21,8 @@ FOLDER_PREFIX = "github_most_starred"
 
 
 class GithubMostStarredSource:
+    """The source of the most starred GitHub repositories, a ranking taken at each collection."""
+
     name = FOLDER_PREFIX
     extension = "json"
     acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
@@ -45,6 +47,8 @@ REPOSITORY_URL_PREFIX = "https://github.com/"
 
 @dataclass(frozen=True)
 class StarredRepository:
+    """A repository of the most starred ranking, with its rank, its stars and its topics."""
+
     rank: int
     # owner/name: the owner's login is kept, as it identifies the repository (see the register).
     full_name: str
@@ -76,6 +80,7 @@ def read_most_starred(
 
 
 def parse_repository(item: object, rank: int) -> StarredRepository:
+    """Read one repository of the ranking, refusing a malformed one."""
     if not isinstance(item, dict):
         raise PageRefusedError(f"repository {rank}: not an object")
     full_name = item.get("full_name")
@@ -122,6 +127,7 @@ def parse_repository(item: object, rank: int) -> StarredRepository:
 
 
 def read_ranking(raw_response: bytes) -> list[StarredRepository]:
+    """Read the ranking of the most starred repositories from the raw response."""
     return read_most_starred(raw_response, expected_size=GITHUB_RANKING_SIZE)
 
 

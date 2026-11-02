@@ -35,6 +35,8 @@ ADVISORIES_PER_PAGE = 100
 
 
 class GithubAdvisoriesSource:
+    """The GitHub advisories source: the advisories of the tracked packages of one ecosystem."""
+
     extension = "json"
     acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
 
@@ -129,6 +131,7 @@ def read_advisories(raw_response: bytes) -> EntryReading[Advisory]:
 
 
 def parse_advisory(entry: object, position: int) -> Advisory:
+    """Read one advisory of the GitHub response, refusing a malformed one."""
     if not isinstance(entry, dict):
         raise ValueError(f"advisory {position}: not an object")
     ghsa_id = entry.get("ghsa_id")
@@ -191,6 +194,7 @@ def parse_package_names(vulnerabilities: object, label: str) -> tuple[str, ...]:
 def convert_advisory(
     advisory: Advisory, collected_at: datetime, raw_file_path: str
 ) -> Item:
+    """Convert a GitHub advisory into an item."""
     return Item(
         source_code=SOURCE_CODE,
         source_item_id=advisory.ghsa_id,

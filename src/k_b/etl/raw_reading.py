@@ -174,6 +174,7 @@ def read_trend_file(path: Path, raw_dir: Path, reader: TrendReader) -> TrendRead
 
 
 def list_pages(collection_dir: Path, raw_dir: Path) -> list[Path]:
+    """List the pages of a collection folder; a folder inside it is skipped and logged."""
     pages = []
     for path in list_visible_entries(collection_dir):
         if path.is_dir():

@@ -97,6 +97,7 @@ def reject_untracked_releases(
 
 
 def is_untracked_release(item: Item, tracked_names: set[str]) -> bool:
+    """Tell whether the item is a release of a repository K-B does not track."""
     # A release always has its repository (items.py): str() only satisfies the typing.
     return (
         item.kind == "release"
