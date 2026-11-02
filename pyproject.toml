@@ -41,7 +41,9 @@ dev = [
 kb = "k_b.cli:main"
 
 [tool.ruff.lint]
-extend-select = ["I", "B", "UP", "S", "N", "SIM", "C90"]
+extend-select = ["I", "B", "UP", "S", "N", "SIM", "C90", "D100", "D102", "D103"]
+# D100, D102, D103 : une docstring sur chaque module, méthode et fonction publics du pipeline ETL
+# (.claude/rules/code.md, exception du 2026-11-02) ; le reste en est exempté plus bas.
 # Règles actives par défaut depuis ruff 0.16, hors de .claude/rules/outillage.md : désactivées
 # tant que Sabine n'a pas décidé (2026-10-06).
 ignore = ["TRY004", "DTZ001", "RUF012", "PLR0402", "PLW1510"]
@@ -51,7 +53,13 @@ ignore = ["TRY004", "DTZ001", "RUF012", "PLR0402", "PLW1510"]
 exclude = ["*.md"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]  # assert est l'outil des tests
+"tests/**" = ["S101", "D100", "D102", "D103"]  # assert est l'outil des tests
+# Hors du pipeline ETL (de cli.py à l'écriture en base) : pas de docstring exigée.
+"src/k_b/{ai_api,data_api,post}/**" = ["D100", "D102", "D103"]
+"src/k_b/commands/{create_db,digest,openapi,serve_ai,serve_data,trend_report,write_tops}_command.py" = ["D100", "D102", "D103"]
+"src/k_b/commands/wait_display.py" = ["D100", "D102", "D103"]
+"src/k_b/core/api_*.py" = ["D100", "D102", "D103"]
+"src/k_b/database/creation.py" = ["D100", "D102", "D103"]
 
 [tool.mypy]
 files = ["src"]
