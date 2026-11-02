@@ -1,4 +1,4 @@
-<!-- consignes/code.md v2026-10-24 — source : time-knight. Ne pas modifier ici sans la reporter. -->
+<!-- consignes/code.md v2026-11-02 — source : time-knight. Ne pas modifier ici sans la reporter. -->
 # Principes de code
 
 Chaque règle dit quoi faire et où elle s'arrête. En cas de conflit :
@@ -23,6 +23,10 @@ Chaque règle dit quoi faire et où elle s'arrête. En cas de conflit :
   nom ne suffit pas. Le pourquoi seulement s'il n'est pas évident, en une ou deux lignes de plus. Ni
   rappel d'issue, ni historique, ni paraphrase du code : le détail va dans `docs/` ou dans la note
   pédagogique. (Sabine, 2026-10-24 : une docstring longue coûte à chaque lecture et personne ne la lit.)
+  **Exception, le pipeline de données** (Sabine, 2026-11-02) : du point d'entrée de la ligne de
+  commande à l'écriture en base (K-B : `kb collect` et `kb import`, depuis `cli.py`), chaque classe,
+  méthode et fonction publique a sa docstring, même quand le nom suffit : une phrase simple et
+  explicite, en anglais.
 
 ### Journalisation
 - **Un log dit ce qui a été observé, jamais ce qui est supposé.** Pas de cause devinée
