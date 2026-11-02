@@ -74,6 +74,7 @@ def write_row(connection: sqlite3.Connection, row: TrendRow, raw_data_id: int) -
 
 
 def read_window_collected_at(connection: sqlite3.Connection, window_end: date) -> str:
+    """Read when the raw file of a trend window was collected."""
     (collected_at,) = connection.execute(
         SELECT_TREND_WINDOW_COLLECTED_AT, (format_day(window_end),)
     ).fetchone()

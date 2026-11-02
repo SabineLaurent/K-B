@@ -19,6 +19,8 @@ def parse_collection_name(collection_name: str) -> datetime:
 
 
 class Rejection(NamedTuple):
+    """A raw file, or an entry of it, refused at the import, with the reason."""
+
     raw_file_path: str
     reason: str
 
@@ -36,6 +38,8 @@ class RawFile(NamedTuple):
 
 
 class RawReading(NamedTuple):
+    """The raw files of items read, the rejections, and how many pages were opened."""
+
     files: list[RawFile]
     rejections: list[Rejection]
     # The pages opened, readable or not.
@@ -43,6 +47,7 @@ class RawReading(NamedTuple):
 
 
 def join_readings(readings: list[RawReading]) -> RawReading:
+    """Join several readings of raw files into one."""
     return RawReading(
         [raw_file for reading in readings for raw_file in reading.files],
         [rejection for reading in readings for rejection in reading.rejections],
@@ -59,6 +64,8 @@ class TrendFile(NamedTuple):
 
 
 class TrendReading(NamedTuple):
+    """The files of trends read, the rejections, and how many files were opened."""
+
     files: list[TrendFile]
     rejections: list[Rejection]
     # The files of trends opened, readable or not.
@@ -66,6 +73,7 @@ class TrendReading(NamedTuple):
 
 
 def join_trend_readings(readings: list[TrendReading]) -> TrendReading:
+    """Join several readings of trend files into one."""
     return TrendReading(
         [trend_file for reading in readings for trend_file in reading.files],
         [rejection for reading in readings for rejection in reading.rejections],

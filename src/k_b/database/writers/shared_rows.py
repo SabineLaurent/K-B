@@ -44,6 +44,7 @@ def write_raw_data(
 def insert_item(
     connection: sqlite3.Connection, kind: ItemKind, raw_data_id: int
 ) -> int:
+    """Insert the row of a new item and return its id."""
     (item_id,) = connection.execute(
         "INSERT INTO item (kind, raw_data_id) VALUES (?, ?) RETURNING id",
         (kind, raw_data_id),
@@ -61,6 +62,7 @@ def point_item_at_raw_data(
 
 
 def read_item_collected_at(connection: sqlite3.Connection, item_id: int) -> str:
+    """Read when the raw file of an item was collected."""
     (collected_at,) = connection.execute(
         SELECT_ITEM_COLLECTED_AT, (item_id,)
     ).fetchone()

@@ -24,6 +24,8 @@ FOLDER_PREFIX = "github_most_forked"
 
 
 class GithubMostForkedSource:
+    """The source of the most forked GitHub repositories, a ranking taken at each collection."""
+
     name = FOLDER_PREFIX
     extension = "json"
     acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
@@ -46,6 +48,8 @@ class GithubMostForkedSource:
 
 @dataclass(frozen=True)
 class ForkedRepository:
+    """A repository of the most forked ranking, with its rank and its fork count."""
+
     rank: int
     # owner/name: the owner's login is kept, as it identifies the repository (see the register).
     full_name: str
@@ -70,6 +74,7 @@ def read_most_forked(raw_response: bytes, expected_size: int) -> list[ForkedRepo
 
 
 def parse_repository(item: object, rank: int) -> ForkedRepository:
+    """Read one repository of the ranking, refusing a malformed one."""
     if not isinstance(item, dict):
         raise PageRefusedError(f"repository {rank}: not an object")
     full_name = item.get("full_name")
@@ -99,6 +104,7 @@ def parse_repository(item: object, rank: int) -> ForkedRepository:
 
 
 def read_ranking(raw_response: bytes) -> list[ForkedRepository]:
+    """Read the ranking of the most forked repositories from the raw response."""
     return read_most_forked(raw_response, expected_size=GITHUB_RANKING_SIZE)
 
 

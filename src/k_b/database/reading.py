@@ -152,6 +152,8 @@ ORDER BY stars_gained DESC, forks_gained DESC, repository_id
 
 
 class ListedItem(NamedTuple):
+    """An item as listed: its id, kind, title, date, URL and the date it was withdrawn."""
+
     id: int
     kind: ItemKind
     title: str
@@ -164,12 +166,16 @@ class ListedItem(NamedTuple):
 
 
 class ItemPage(NamedTuple):
+    """A page of listed items, with the offset of the next page."""
+
     items: list[ListedItem]
     # The offset of the next page; None on the last one.
     next_offset: int | None
 
 
 class StoredHighlight(NamedTuple):
+    """A highlight of a Zotero entry, as stored in the database."""
+
     zotero_key: str
     text: str | None
     comment: str | None
@@ -179,6 +185,8 @@ class StoredHighlight(NamedTuple):
 
 
 class PaperDetail(NamedTuple):
+    """The details of a paper: its arXiv id, authors, summary and arXiv update date."""
+
     arxiv_id: str
     # The names, in arXiv's order.
     authors: list[str]
@@ -188,6 +196,8 @@ class PaperDetail(NamedTuple):
 
 
 class VulnerabilityDetail(NamedTuple):
+    """The details of a vulnerability of the CISA KEV catalog."""
+
     cve_id: str
     description: str
     vendor: str
@@ -198,6 +208,8 @@ class VulnerabilityDetail(NamedTuple):
 
 
 class ReleaseDetail(NamedTuple):
+    """The details of a GitHub release."""
+
     release_id: int
     repository_name: str
     tag_name: str
@@ -205,6 +217,8 @@ class ReleaseDetail(NamedTuple):
 
 
 class AdvisoryDetail(NamedTuple):
+    """The details of a GitHub advisory, with whether its CVE is known to be exploited."""
+
     ghsa_id: str
     cve_id: str | None
     # In the KEV catalog; None for an advisory without CVE.
@@ -213,6 +227,8 @@ class AdvisoryDetail(NamedTuple):
 
 
 class NewsletterArticleDetail(NamedTuple):
+    """The details of a TLDR newsletter article."""
+
     edition: str
     edition_date: str
     rank: int
@@ -220,6 +236,8 @@ class NewsletterArticleDetail(NamedTuple):
 
 
 class ZoteroEntryDetail(NamedTuple):
+    """The details of a Zotero entry, with its highlights."""
+
     zotero_key: str
     item_type: str
     # None for a document without arXiv reference.
@@ -230,6 +248,8 @@ class ZoteroEntryDetail(NamedTuple):
 
 
 class ClipDetail(NamedTuple):
+    """The details of a clip: its publication date and its text."""
+
     # published of Web Clipper, a day at midnight UTC; None when the page gives none.
     published_at: str | None
     # The text kept, as written.
@@ -248,11 +268,15 @@ KindDetail = (
 
 
 class ItemDetail(NamedTuple):
+    """A listed item with the details of its kind."""
+
     listed: ListedItem
     details: KindDetail
 
 
 class StoredTrend(NamedTuple):
+    """The stars and forks a repository gained in a trend window."""
+
     repository_id: int
     repository_name: str
     stars_gained: int
@@ -260,6 +284,8 @@ class StoredTrend(NamedTuple):
 
 
 class TrendWindow(NamedTuple):
+    """A trend window: its last day and its trends, the most stars gained first."""
+
     # The last day of the window.
     window_end: date
     # The most stars gained first, then the most forks, then by repository_id.
@@ -388,6 +414,7 @@ def read_item_detail(connection: sqlite3.Connection, item_id: int) -> ItemDetail
 
 
 def read_paper_detail(connection: sqlite3.Connection, item_id: int) -> PaperDetail:
+    """Read the details of a paper item."""
     arxiv_id, authors, summary, arxiv_updated_at = fetch_row(
         connection, SELECT_PAPER, item_id
     )
@@ -397,18 +424,21 @@ def read_paper_detail(connection: sqlite3.Connection, item_id: int) -> PaperDeta
 def read_vulnerability_detail(
     connection: sqlite3.Connection, item_id: int
 ) -> VulnerabilityDetail:
+    """Read the details of a vulnerability item."""
     return VulnerabilityDetail._make(
         fetch_row(connection, SELECT_VULNERABILITY, item_id)
     )
 
 
 def read_release_detail(connection: sqlite3.Connection, item_id: int) -> ReleaseDetail:
+    """Read the details of a release item."""
     return ReleaseDetail._make(fetch_row(connection, SELECT_RELEASE, item_id))
 
 
 def read_advisory_detail(
     connection: sqlite3.Connection, item_id: int
 ) -> AdvisoryDetail:
+    """Read the details of an advisory item."""
     ghsa_id, cve_id, exploited, packages = fetch_row(
         connection, SELECT_ADVISORY, item_id
     )
@@ -424,6 +454,7 @@ def read_advisory_detail(
 def read_newsletter_article_detail(
     connection: sqlite3.Connection, item_id: int
 ) -> NewsletterArticleDetail:
+    """Read the details of a newsletter article item."""
     return NewsletterArticleDetail._make(
         fetch_row(connection, SELECT_NEWSLETTER_ARTICLE, item_id)
     )
@@ -432,6 +463,7 @@ def read_newsletter_article_detail(
 def read_zotero_entry_detail(
     connection: sqlite3.Connection, item_id: int
 ) -> ZoteroEntryDetail:
+    """Read the details of a Zotero entry item, with its highlights."""
     zotero_key, item_type, arxiv_id, revised_at = fetch_row(
         connection, SELECT_ZOTERO_ENTRY, item_id
     )
@@ -445,6 +477,7 @@ def read_zotero_entry_detail(
 
 
 def read_clip_detail(connection: sqlite3.Connection, item_id: int) -> ClipDetail:
+    """Read the details of a clip item."""
     return ClipDetail._make(fetch_row(connection, SELECT_CLIP, item_id))
 
 

@@ -57,6 +57,8 @@ API_ERROR_ID = re.compile(r"https?://arxiv\.org/api/errors")
 
 
 class ArxivSource:
+    """The arXiv source: the papers of cs.CR and cs.AI that match the keywords of K-B."""
+
     name = FOLDER_PREFIX
     extension = "xml"
     acquisition_dir_name = AUTOMATED_WATCH_DIR_NAME
@@ -86,6 +88,7 @@ class ArxivSource:
 
 
 def build_search_query(window_start: datetime, window_end: datetime) -> str:
+    """Build the arXiv query: cs.CR and cs.AI papers with a keyword, submitted in the window."""
     keywords = " OR ".join(
         f'abs:"{keyword}"' if " " in keyword else f"abs:{keyword}"
         for keyword in ARXIV_KEYWORDS
@@ -97,6 +100,7 @@ def build_search_query(window_start: datetime, window_end: datetime) -> str:
 
 
 def download_papers(search_query: str) -> bytes:
+    """Download the papers that match the query, oldest first, at most one page."""
     parameters = {
         "search_query": search_query,
         "start": 0,
@@ -158,6 +162,7 @@ def read_papers(raw_response: bytes) -> EntryReading[Paper]:
 
 
 def parse_feed(raw_response: bytes) -> ElementTree.Element:
+    """Read the Atom feed of arXiv safely, refusing a document that is not plain XML."""
     # Read by defusedxml: ElementTree alone expands an entity declared in the feed. defusedxml
     # refuses any entity declaration, internal or external; an external DTD is accepted but
     # never loaded.
@@ -175,6 +180,7 @@ def parse_feed(raw_response: bytes) -> ElementTree.Element:
 
 
 def parse_paper(entry: ElementTree.Element, position: int) -> Paper:
+    """Read one entry of the feed into a paper, refusing one without its required fields."""
     label = f"entry {position}"
     entry_id = read_required_text(entry, "id", label)
     paper_id = PAPER_ID.fullmatch(entry_id)
@@ -207,6 +213,7 @@ def parse_paper(entry: ElementTree.Element, position: int) -> Paper:
 
 
 def read_required_text(entry: ElementTree.Element, field: str, label: str) -> str:
+    """Read a required text field of an entry, refusing it when missing or empty."""
     text = (entry.findtext(f"{ATOM}{field}") or "").strip()
     if not text:
         raise ValueError(f"{label}: {field} is missing")
@@ -214,6 +221,7 @@ def read_required_text(entry: ElementTree.Element, field: str, label: str) -> st
 
 
 def convert_paper(paper: Paper, collected_at: datetime, raw_file_path: str) -> Item:
+    """Convert a paper read from arXiv into an item."""
     return Item(
         source_code=SOURCE_CODE,
         source_item_id=paper.arxiv_id,

@@ -30,6 +30,7 @@ def find_stream(raw_file_path: str) -> str:
 
 
 def make_source_folder_key(acquisition_dir_name: str, source_name: str) -> str:
+    """Make the key of the raw folder of a source: raw/<acquisition folder>/<source>."""
     return f"{RAW_DIR_NAME}/{acquisition_dir_name}/{source_name}"
 
 
@@ -49,6 +50,7 @@ class RawStore:
         return True
 
     def has_file(self, key: str) -> bool:
+        """Tell whether the store holds a file under this key."""
         return self.find_path(key).is_file()
 
     def read_latest(self, folder_key: str) -> bytes | None:
@@ -71,6 +73,7 @@ class RawStore:
         )
 
     def read(self, key: str) -> bytes:
+        """Read the bytes of the file under this key."""
         return self.find_path(key).read_bytes()
 
     def find_path(self, key: str) -> Path:

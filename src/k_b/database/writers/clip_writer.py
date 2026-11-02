@@ -186,6 +186,7 @@ def write_changed_tags(
 
 
 def read_tag_ids(connection: sqlite3.Connection, item_id: int) -> dict[str, int]:
+    """Read the tags of an item: the id of each tag, by its name."""
     return dict(connection.execute(SELECT_ITEM_TAGS, (item_id,)).fetchall())
 
 

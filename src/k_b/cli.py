@@ -50,6 +50,7 @@ LOG_FILE_PATH_BY_COMMAND = {
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the kb command typed on the command line and return its exit code."""
     command = read_command(argv)
     # Neither data nor key: the document is the same on every machine.
     if command == "openapi":
@@ -64,6 +65,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def read_command(argv: list[str] | None) -> str:
+    """Read the kb command typed, such as collect or import."""
     parser = argparse.ArgumentParser(
         prog="kb",
         epilog=describe_exit_codes(),
@@ -163,11 +165,13 @@ def run_with_safety_nets(
 
 
 def describe_exit_codes() -> str:
+    """List each exit code of kb with its meaning, shown at the end of kb --help."""
     lines = [f"  {code.value:>3}  {code.meaning}" for code in ExitCode]
     return "exit codes:\n" + "\n".join(lines)
 
 
 def run_command(command: str, data_dir: Path, environ: Mapping[str, str]) -> int:
+    """Run the kb command given and return its exit code."""
     if command == "create-db":
         return run_create_db(data_dir)
     if command == "import":

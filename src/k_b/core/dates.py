@@ -10,6 +10,7 @@ DATABASE_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 def format_date(moment: datetime | None) -> str | None:
+    """Format a moment as a UTC date for the database, or keep None."""
     return (
         None
         if moment is None

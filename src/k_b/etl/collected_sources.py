@@ -41,6 +41,7 @@ class CollectOnly:
     folder_names: frozenset[str] | None
 
     def is_collected(self, folder_name: str) -> bool:
+        """Tell whether this source folder is collected: all are when KB_COLLECT_ONLY is unset."""
         return self.folder_names is None or folder_name in self.folder_names
 
 
