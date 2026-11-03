@@ -71,10 +71,10 @@ def print_collection_result(
             written_count = outcome.written_count_by_source[source_name]
             print(f"{source_name}: ok ({describe_count(written_count, 'raw file')})")
         else:
-            print(f"{source_name}: {describe_outcome(source_error)}")
+            print(f"{source_name}: {describe_failure(source_error)}")
     print_skipped_sources(collect_only, environ)
     if outcome.state_error is not None:
-        print(f"collection_state: {describe_outcome(outcome.state_error)}")
+        print(f"collection_state: {describe_failure(outcome.state_error)}")
     print()
 
 
@@ -124,6 +124,6 @@ def find_collection_exit_code(outcome: CollectionOutcome) -> ExitCode:
     )
 
 
-def describe_outcome(error: Exception) -> str:
+def describe_failure(error: Exception) -> str:
     """Describe a failure, of a source or of the state: failed with the type of its error."""
     return f"failed ({type(error).__name__})"

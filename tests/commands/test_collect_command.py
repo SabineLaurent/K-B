@@ -10,7 +10,12 @@ from commands.cli_helpers import (
     LOG_LINE_DATE,
     collected_kinds,
 )
-from etl.test_extract import BrokenSource, UnchangedSource, WorkingSource
+from etl.test_extract import (
+    BrokenSource,
+    ScrapedSource,
+    UnchangedSource,
+    WorkingSource,
+)
 from etl.test_transform import FIXTURES_DIR
 
 from k_b import cli
@@ -340,16 +345,27 @@ def test_collect_without_collect_only_runs_every_source(monkeypatch, tmp_path, c
     ) == ["other", "working"]
 
 
-def test_collect_says_0_raw_files_for_a_source_with_nothing_new(
+def test_collect_says_how_many_raw_files_each_source_collected_wrote(
     monkeypatch, tmp_path, capsys
 ):
+    pages = {
+        "2026-09-29": b"<html>monday</html>",
+        "2026-09-30": b"<html>tuesday</html>",
+    }
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(
-        collect_command, "SOURCE_KINDS", collected_kinds(UnchangedSource())
+        collect_command,
+        "SOURCE_KINDS",
+        collected_kinds(
+            UnchangedSource(), WorkingSource(), ScrapedSource(pages), BrokenSource()
+        ),
     )
 
-    assert cli.main(["collect"]) == 0
-    assert capsys.readouterr().out.startswith("\nunchanged: ok (0 raw files)\n")
+    assert cli.main(["collect"]) == cli.ExitCode.PARTIAL_FAILURE
+    assert capsys.readouterr().out.startswith(
+        "\nunchanged: ok (0 raw files)\nworking: ok (1 raw file)\n"
+        "scraped: ok (2 raw files)\nbroken: failed (ConnectionError)\n"
+    )
 
 
 def test_collect_only_prints_one_line_for_a_source_not_chosen(

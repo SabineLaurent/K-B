@@ -40,7 +40,7 @@ MAX_QUOTED_FAILURE_LENGTH = 300
 
 class CollectionOutcome(NamedTuple):
     """The result of a collection: each source's error, None on success, the state's error, and
-    the raw files written by each source collected."""
+    the number of raw files written by each source collected."""
 
     errors_by_source: dict[str, Exception | None]
     # The raw files are written even when the state is not: the next run collects again.
@@ -54,7 +54,7 @@ def collect_all_sources(
     sources: list[Source], raw_dir: Path, data_dir: Path, now: datetime
 ) -> CollectionOutcome:
     """Collect each source; return each source's error (None: success), the state's error and
-    the raw files written by each source collected."""
+    the number of raw files written by each source collected."""
     if now.utcoffset() != timedelta(0):
         raise ValueError(f"collection time must be in UTC, got {now!r}")
     last_collection_dates = load_last_collection_dates(data_dir)

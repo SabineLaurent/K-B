@@ -22,8 +22,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   Sabine du 2026-10-29) puis, collectée, ce qu'elle a écrit (`source 'cisa_kev' collected, raw
   files written: 1`, `src/k_b/etl/extract.py`), qu'elle écrive ou non ses propres lignes
   (décision de Sabine du 2026-10-28). À la fin, `collection finished in 1 min 26 s`, puis une
-  ligne par source lancée (`ok (<n> raw files)` ou `failed (<type d'erreur>)`), puis une par source
-  non lancée, avec le réglage qui l'écarte (pas de tableau : décision de Sabine du 2026-10-29, qui
+  ligne par source lancée (`ok (<n> raw files)`, `ok (1 raw file)` au singulier, ou
+  `failed (<type d'erreur>)`), puis une par source non lancée, avec le réglage qui l'écarte (pas de tableau : décision de Sabine du 2026-10-29, qui
   remplace celui de #291) :
 
   ```
