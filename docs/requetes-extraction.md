@@ -112,9 +112,11 @@ sur les colonnes de `JSON_COLUMNS`), et `ZoteroSource.fetch` rend l'extrait enti
 
 - **Une instruction pour toute la bibliothèque**, au lieu d'une requête par document lancée depuis
   Python : la définition d'un document n'est écrite qu'une fois, et SQLite fait les jointures.
+  Sur une bibliothèque fabriquée, elle va environ 1,9 fois plus vite qu'une requête par document
+  (mesure du temps ci-dessous).
 - **Chaque liste est cherchée par la clé du document** : chaque sous-requête corrélée filtre sur
   `itemID` ou `parentItemID`, des colonnes que Zotero indexe. Seule la table `items` est parcourue
-  en entier, une fois (mesure ci-dessous).
+  en entier, une fois (mesure du plan ci-dessous).
 - **Seuls les champs utiles sont nommés**, et tous les filtres sont dans le SQL : rien n'est lu
   pour être jeté ensuite en Python.
 - **Une copie, lue seule** : la requête ne prend aucun verrou sur la base de Zotero.
@@ -141,7 +143,8 @@ chaque document.
   ([The Next-Generation Query Planner](https://www.sqlite.org/queryplanner-ng.html), lu le
   2026-11-03). Cette copie n'a pas de statistiques d'`ANALYZE` : pas de table `sqlite_stat1`.
   Ce relevé vaut pour ce schéma de Zotero, cette requête et SQLite 3.50.4.
-- **Temps** : non mesuré, car sur 5 documents il ne dirait rien.
+- **Temps** : non mesuré ici, car sur 5 documents il ne dirait rien. Il est mesuré sur une
+  bibliothèque fabriquée, dans la sous-section suivante.
 - **Date** : 2026-11-03.
 
 Commande, depuis la racine du dépôt, avec `KB_ZOTERO_DIR` dans `.env` :
@@ -308,11 +311,550 @@ Ce que le plan montre de chaque économie de la liste :
 
 | Économie | Ce que montre le plan |
 |---|---|
-| Une instruction pour toute la bibliothèque | une instruction, un seul parcours de `items`, chaque liste en sous-requête corrélée ; l'écart avec une requête par document n'est pas mesuré ici |
+| Une instruction pour toute la bibliothèque | une instruction, un seul parcours de `items`, chaque liste en sous-requête corrélée ; l'écart avec une requête par document est mesuré dans la sous-section suivante |
 | Chaque liste cherchée par la clé du document | montré : `SEARCH` sur `itemID` ou `parentItemID`, aucun autre `SCAN` |
 | Seuls les champs utiles nommés | rien : un plan ne dit pas les colonnes lues |
 | Une copie, lue seule | rien : c'est un fait du code (`copy_library`, `extract_documents`) |
 | Rien d'écrit quand rien n'a changé | rien : c'est un fait du code (`ZoteroSource.fetch`) |
+
+### Mesure : le temps, une instruction contre une requête par document
+
+La mesure du plan ne donne pas de temps : sur 5 documents, il ne dirait rien. Celle-ci chronomètre
+`EXTRACTION_QUERY` contre ce qu'elle remplace : une requête par document, lancée depuis Python. La
+comparaison porte sur deux bibliothèques fabriquées, de 1 000 et de 10 000 documents. Aucune donnée
+réelle n'y entre.
+
+#### Le schéma
+
+C'est la structure des 14 tables lues et de `itemNotes`, avec leurs 15 index créés à part
+(`CREATE INDEX`). Elle est relevée sur une copie d'une base Zotero réelle : schéma `userdata` en version 130,
+pages de 32 768 octets.
+
+Seuls les `CREATE TABLE` et les `CREATE INDEX` sont relevés : ni ligne, ni trigger, ni vue. Les
+triggers n'agissent qu'à l'écriture, et les vues ne sont pas lues.
+
+La bibliothèque inventée des tests ne sert pas ici : elle n'a pas ces index (« Mise en regard »,
+mesure précédente).
+
+#### Les données inventées
+
+Pour chaque document de la bibliothèque personnelle :
+
+| Élément | Par document |
+|---|---|
+| champs (`itemData`) | 10 : les 4 lus (`title`, `date`, `url`, `archiveID`) et 6 autres |
+| créateurs | 3 auteurs et 1 éditeur, pris parmi 2 000 créateurs |
+| étiquettes | 4, prises parmi 300 |
+| pièces jointes | 1 PDF rangé par Zotero (`storage:`), 1 PDF lié hors de Zotero, 1 capture HTML |
+| annotations du PDF | 6 surlignages et 2 annotations d'un autre type |
+| notes | 1 |
+
+En plus :
+- 5 % des documents, 2 % des PDF et 2 % des annotations sont à la corbeille ;
+- une bibliothèque de groupe ajoute 10 % de documents, avec leurs pièces.
+
+Chaque filtre de la requête a donc des lignes à écarter.
+
+Les créateurs, les étiquettes et les dates sont pris dans des réservoirs partagés, parce que le
+schéma veut uniques ses créateurs, ses étiquettes et ses valeurs. Les autres champs (titre, URL…)
+sont propres à chaque document.
+
+`synced` vaut 0 partout, donc le parcours de `items` par l'index `items_synced` suit l'ordre de
+`itemID`, et `dateAdded` croît avec `itemID`. Les deux façons de faire lancent donc leurs
+recherches dans le même ordre de documents.
+
+#### La variante comparée
+
+- D'abord, la liste des documents : les CTE de `EXTRACTION_QUERY`, puis `SELECT document.itemID`
+  avec son `ORDER BY`.
+- Puis, pour chaque document, `EXTRACTION_QUERY` avec `WHERE document.itemID = ?` à la place de
+  son `ORDER BY`.
+
+Seuls `SELECT document.itemID` et `WHERE document.itemID = ?` sont écrits à la main ; le reste
+est découpé dans la constante. Le script
+vérifie que les deux façons de faire rendent les mêmes lignes, et que le plan de la variante n'a
+aucun `SCAN`.
+
+#### Le chronomètre
+
+- Une connexion en lecture seule, avec `sqlite3.Row`, comme `extract_documents`.
+- Un passage de chauffe de chaque façon de faire, puis 7 passages. L'ordre alterne d'un passage à
+  l'autre : l'instruction unique d'abord, puis la variante d'abord, et ainsi de suite. Le
+  ramasse-miettes de Python est arrêté pendant la mesure.
+- Le temps couvre l'exécution et la lecture des lignes, requête de liste comprise pour la variante.
+  Il ne couvre ni la fabrication de la base, ni `json.loads`.
+
+#### Conditions
+
+- **Machine** : Apple M4, 16 Go, macOS (Darwin 25.6.0).
+- **Logiciels** : Python 3.13.13, SQLite 3.50.4.
+- **Code** : `main` au commit bd433db.
+- **Date** : 2026-11-03, 16:10 UTC.
+
+#### Commandes et scripts
+
+Depuis la racine du dépôt :
+1. relever le schéma, sur une copie de la bibliothèque de `KB_ZOTERO_DIR` :
+   `uv run --env-file .env python -I <relevé> <fichier>` ;
+2. mesurer, sans `.env` : `uv run python -I <mesure> <fichier>`.
+
+`<relevé>` et `<mesure>` sont les deux scripts ci-dessous, gardés hors du dépôt. `<fichier>` est le
+fichier JSON où le relevé écrit le schéma, et où la mesure le lit.
+
+<details><summary>Script du relevé du schéma</summary>
+
+```python
+"""Write the structure of the tables EXTRACTION_QUERY reads, taken from a copy of the library of
+KB_ZOTERO_DIR: their CREATE TABLE and CREATE INDEX, the page size and the version of Zotero's
+schema. No row of the library is written. An error shows only its type."""
+
+import contextlib
+import json
+import os
+import sqlite3
+import sys
+import tempfile
+from pathlib import Path
+
+from k_b.etl.collected_sources import ZOTERO_DIR_VARIABLE
+from k_b.etl.sources import zotero as z
+
+# The 14 tables the query reads, and itemNotes, which it must leave alone.
+TABLES = (
+    "libraries", "itemTypes", "items", "deletedItems", "fields", "itemDataValues", "itemData",
+    "creators", "creatorTypes", "itemCreators", "tags", "itemTags", "itemAttachments",
+    "itemAnnotations", "itemNotes",
+)
+
+
+def main(output: Path) -> None:
+    zotero_dir = Path(os.environ[ZOTERO_DIR_VARIABLE])
+    with tempfile.TemporaryDirectory(prefix=z.TEMPORARY_DIR_PREFIX) as copy_dir:
+        copy_path = z.copy_library(zotero_dir, Path(copy_dir))
+        with contextlib.closing(
+            sqlite3.connect(f"{copy_path.as_uri()}?mode=ro", uri=True)
+        ) as connection:
+            z.check_integrity(connection)
+            # Tables first, then indexes; no trigger, no view, no automatic index (sql is NULL).
+            statements = [
+                sql
+                for (sql,) in connection.execute(
+                    f"SELECT sql FROM sqlite_master WHERE type IN ('table', 'index')"
+                    f" AND sql IS NOT NULL AND tbl_name IN ({', '.join('?' * len(TABLES))})"
+                    " ORDER BY type = 'index', name",
+                    TABLES,
+                )
+            ]
+            page_size = connection.execute("PRAGMA page_size").fetchone()[0]
+            try:
+                schema_version = connection.execute(
+                    "SELECT version FROM version WHERE schema = 'userdata'"
+                ).fetchone()[0]
+            except sqlite3.OperationalError:
+                schema_version = None
+    output.write_text(
+        json.dumps(
+            {"userdata_version": schema_version, "page_size": page_size, "statements": statements},
+            indent=2,
+        )
+        + "\n"
+    )
+    print("tables", sum(sql.startswith("CREATE TABLE") for sql in statements))
+    print("indexes", sum(sql.startswith("CREATE INDEX") for sql in statements))
+    print("page_size", page_size)
+    print("userdata_version", schema_version)
+
+
+try:
+    main(Path(sys.argv[1]))
+except Exception as error:
+    # Its message could hold a path or a value of the library: only the type is shown.
+    sys.exit(f"failed ({type(error).__name__})")
+```
+
+</details>
+
+<details><summary>Script de la mesure</summary>
+
+```python
+"""Time EXTRACTION_QUERY against one query per document, on libraries fabricated from a schema
+written by dump_zotero_schema.py. Every value is invented; nothing of a real library is read."""
+
+import contextlib
+import gc
+import json
+import platform
+import sqlite3
+import statistics
+import sys
+import tempfile
+import time
+from pathlib import Path
+from typing import Any
+
+from k_b.etl.sources import zotero as z
+
+SIZES = (1_000, 10_000)
+RUNS = 7
+# For each document of the user's library.
+OTHER_FIELDS = ("abstractNote", "publicationTitle", "volume", "issue", "pages", "language")
+AUTHORS_PER_DOCUMENT = 3
+TAGS_PER_DOCUMENT = 4
+HIGHLIGHTS_PER_PDF = 6
+OTHER_ANNOTATIONS_PER_PDF = 2
+# One in ..._TRASH_EVERY documents, PDFs and annotations goes to the trash: 5 %, 2 %, 2 %.
+DOCUMENT_TRASH_EVERY = 20
+PIECE_TRASH_EVERY = 50
+# The group library, never read, holds this share of documents more, with their pieces.
+GROUP_SHARE = 0.10
+# Pools shared by the documents: itemDataValues.value, tags.name and creators are UNIQUE.
+AUTHOR_POOL = 2_000
+TAG_POOL = 300
+YEAR_POOL = 30
+
+# The variant is cut from the text of EXTRACTION_QUERY, not written by hand: same CTEs, same
+# columns, same filters; only the last FROM changes, from every document to one.
+FIRST_COLUMN = "\nSELECT\n    document.key,"
+ORDER_CLAUSE = "ORDER BY document.dateAdded, document.itemID\n"
+LAST_FROM = "FROM document\n" + ORDER_CLAUSE
+for anchor in (FIRST_COLUMN, ORDER_CLAUSE, LAST_FROM):
+    assert z.EXTRACTION_QUERY.count(anchor) == 1, anchor
+IDS_QUERY = (
+    z.EXTRACTION_QUERY.split(FIRST_COLUMN)[0]
+    + "\nSELECT document.itemID\nFROM document\n"
+    + ORDER_CLAUSE
+)
+ONE_DOCUMENT_QUERY = z.EXTRACTION_QUERY.replace(
+    LAST_FROM, "FROM document\nWHERE document.itemID = ?\n"
+)
+
+
+class Library:
+    """Fabricates rows, with keys and identifiers that never repeat."""
+
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self.connection = connection
+        self.next_item_id = 1
+        self.second = 0
+        self.value_ids: dict[str, int] = {}
+        self.counts = {"documents": 0, "highlights": 0}
+
+    def add_item(self, library_id: int, type_id: int) -> int:
+        item_id = self.next_item_id
+        self.next_item_id += 1
+        # dateAdded grows with itemID: both variants read the documents in the same order.
+        self.second += 1
+        date_added = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(1_600_000_000 + self.second))
+        self.connection.execute(
+            "INSERT INTO items (itemID, itemTypeID, dateAdded, dateModified, clientDateModified,"
+            " libraryID, key, synced) VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
+            (item_id, type_id, date_added, date_added, date_added, library_id, f"K{item_id:07d}"),
+        )
+        return item_id
+
+    def value_id(self, value: str) -> int:
+        if value not in self.value_ids:
+            cursor = self.connection.execute(
+                "INSERT INTO itemDataValues (value) VALUES (?)", (value,)
+            )
+            self.value_ids[value] = cursor.lastrowid or 0
+        return self.value_ids[value]
+
+    def trash(self, item_id: int) -> None:
+        self.connection.execute("INSERT INTO deletedItems (itemID) VALUES (?)", (item_id,))
+
+    def add_attachment(
+        self, library_id: int, parent_id: int, content_type: str, path: str, link_mode: int
+    ) -> int:
+        item_id = self.add_item(library_id, TYPE_IDS["attachment"])
+        self.connection.execute(
+            "INSERT INTO itemAttachments (itemID, parentItemID, linkMode, contentType, path)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (item_id, parent_id, link_mode, content_type, path),
+        )
+        return item_id
+
+    def add_document(self, library_id: int, number: int) -> None:
+        read = library_id == USER_LIBRARY_ID
+        document_id = self.add_item(library_id, TYPE_IDS["journalArticle"])
+        trashed = number % DOCUMENT_TRASH_EVERY == 0
+        if trashed:
+            self.trash(document_id)
+        fields = {
+            "title": f"Invented title {number}",
+            "date": f"{2000 + number % YEAR_POOL}-01-01 {2000 + number % YEAR_POOL}-01-01",
+            "url": f"https://example.org/paper/{number}",
+            "archiveID": f"arXiv:2601.{number:05d}",
+        }
+        fields.update({name: f"Invented {name} {number}" for name in OTHER_FIELDS})
+        for name, value in fields.items():
+            self.connection.execute(
+                "INSERT INTO itemData (itemID, fieldID, valueID) VALUES (?, ?, ?)",
+                (document_id, FIELD_IDS[name], self.value_id(value)),
+            )
+        creators = [
+            (1 + (number * AUTHORS_PER_DOCUMENT + order) % AUTHOR_POOL, CREATOR_TYPE_IDS["author"])
+            for order in range(AUTHORS_PER_DOCUMENT)
+        ] + [(1 + (number * 7) % AUTHOR_POOL, CREATOR_TYPE_IDS["editor"])]
+        for order, (creator_id, creator_type_id) in enumerate(dict.fromkeys(creators)):
+            self.connection.execute(
+                "INSERT INTO itemCreators (itemID, creatorID, creatorTypeID, orderIndex)"
+                " VALUES (?, ?, ?, ?)",
+                (document_id, creator_id, creator_type_id, order),
+            )
+        for tag_number in {(number * TAGS_PER_DOCUMENT + n) % TAG_POOL for n in range(TAGS_PER_DOCUMENT)}:
+            self.connection.execute(
+                "INSERT INTO itemTags (itemID, tagID, type) VALUES (?, ?, ?)",
+                (document_id, 1 + tag_number, tag_number % 2),
+            )
+        pdf_id = self.add_attachment(
+            library_id, document_id, "application/pdf", f"storage:paper-{number}.pdf", 1
+        )
+        pdf_trashed = number % PIECE_TRASH_EVERY == 1
+        if pdf_trashed:
+            self.trash(pdf_id)
+        # Not read: a linked PDF outside Zotero's storage, an HTML snapshot, a note.
+        self.add_attachment(
+            library_id, document_id, "application/pdf", f"/invented/linked-{number}.pdf", 2
+        )
+        self.add_attachment(
+            library_id, document_id, "text/html", f"storage:snapshot-{number}.html", 1
+        )
+        note_id = self.add_item(library_id, TYPE_IDS["note"])
+        self.connection.execute(
+            "INSERT INTO itemNotes (itemID, parentItemID, note, title) VALUES (?, ?, ?, ?)",
+            (note_id, document_id, "<p>Invented note</p>", "Invented note"),
+        )
+        for order in range(HIGHLIGHTS_PER_PDF + OTHER_ANNOTATIONS_PER_PDF):
+            highlight = order < HIGHLIGHTS_PER_PDF
+            annotation_id = self.add_item(library_id, TYPE_IDS["annotation"])
+            self.connection.execute(
+                "INSERT INTO itemAnnotations (itemID, parentItemID, type, text, comment, color,"
+                " pageLabel, sortIndex, position, isExternal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+                (
+                    annotation_id, pdf_id, 1 if highlight else 2,
+                    f"Invented highlighted text {number}-{order}", None, "#ffd400",
+                    str(1 + order), f"{order:05d}|000000|00000", '{"pageIndex": 0, "rects": []}',
+                ),
+            )
+            annotation_trashed = (
+                number * (HIGHLIGHTS_PER_PDF + OTHER_ANNOTATIONS_PER_PDF) + order
+            ) % PIECE_TRASH_EVERY == 3
+            if annotation_trashed:
+                self.trash(annotation_id)
+            if read and highlight and not (trashed or pdf_trashed or annotation_trashed):
+                self.counts["highlights"] += 1
+        if read and not trashed:
+            self.counts["documents"] += 1
+
+
+USER_LIBRARY_ID, GROUP_LIBRARY_ID = 1, 2
+TYPE_IDS = {"annotation": 1, "attachment": 3, "journalArticle": 22, "note": 28}
+FIELD_IDS = {
+    name: number
+    for number, name in enumerate(("title", "date", "url", "archiveID", *OTHER_FIELDS), 1)
+}
+CREATOR_TYPE_IDS = {"author": 1, "editor": 2}
+
+
+def build(schema: dict[str, Any], path: Path, size: int) -> dict[str, int]:
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute(f"PRAGMA page_size = {int(schema['page_size'])}")
+        connection.execute("PRAGMA journal_mode = WAL")
+        for statement in schema["statements"]:
+            connection.execute(statement)
+        connection.executemany(
+            "INSERT INTO libraries (libraryID, type, editable, filesEditable) VALUES (?, ?, 1, 1)",
+            [(USER_LIBRARY_ID, "user"), (GROUP_LIBRARY_ID, "group")],
+        )
+        connection.executemany(
+            "INSERT INTO itemTypes (itemTypeID, typeName) VALUES (?, ?)",
+            [(type_id, name) for name, type_id in TYPE_IDS.items()],
+        )
+        connection.executemany(
+            "INSERT INTO fields (fieldID, fieldName) VALUES (?, ?)",
+            [(field_id, name) for name, field_id in FIELD_IDS.items()],
+        )
+        connection.executemany(
+            "INSERT INTO creatorTypes (creatorTypeID, creatorType) VALUES (?, ?)",
+            [(type_id, name) for name, type_id in CREATOR_TYPE_IDS.items()],
+        )
+        connection.executemany(
+            "INSERT INTO creators (creatorID, firstName, lastName, fieldMode) VALUES (?, ?, ?, 0)",
+            [(n, f"First{n}", f"Last{n}") for n in range(1, AUTHOR_POOL + 1)],
+        )
+        connection.executemany(
+            "INSERT INTO tags (tagID, name) VALUES (?, ?)",
+            [(n, f"invented-tag-{n}") for n in range(1, TAG_POOL + 1)],
+        )
+        library = Library(connection)
+        for number in range(1, size + 1):
+            library.add_document(USER_LIBRARY_ID, number)
+        for number in range(size + 1, size + 1 + int(size * GROUP_SHARE)):
+            library.add_document(GROUP_LIBRARY_ID, number)
+        connection.commit()
+        connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        counts = dict(library.counts)
+        counts["items"] = connection.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+        return counts
+    finally:
+        connection.close()
+
+
+def one_statement(connection: sqlite3.Connection) -> list[sqlite3.Row]:
+    return connection.execute(z.EXTRACTION_QUERY).fetchall()
+
+
+def one_query_per_document(connection: sqlite3.Connection) -> list[sqlite3.Row]:
+    item_ids = [row[0] for row in connection.execute(IDS_QUERY)]
+    return [connection.execute(ONE_DOCUMENT_QUERY, (item_id,)).fetchone() for item_id in item_ids]
+
+
+def plan_of(
+    connection: sqlite3.Connection, query: str, parameters: tuple[int, ...] = ()
+) -> list[str]:
+    lines, depths = [], {0: -1}
+    for node_id, parent_id, _, detail in connection.execute(
+        "EXPLAIN QUERY PLAN " + query, parameters
+    ):
+        depths[node_id] = depths.get(parent_id, -1) + 1
+        lines.append("  " * depths[node_id] + detail)
+    return lines
+
+
+def main(schema_path: Path, sizes: tuple[int, ...]) -> None:
+    schema = json.loads(schema_path.read_text())
+    print("machine", platform.machine(), platform.system(), platform.release())
+    print("python", platform.python_version(), "sqlite", sqlite3.sqlite_version)
+    print("userdata_version", schema["userdata_version"], "page_size", schema["page_size"])
+    variants = {"one_statement": one_statement, "one_query_per_document": one_query_per_document}
+    for size in sizes:
+        with tempfile.TemporaryDirectory(prefix="kb-zotero-timing-") as directory:
+            path = Path(directory) / "zotero.sqlite"
+            counts = build(schema, path, size)
+            with contextlib.closing(
+                sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)
+            ) as connection:
+                connection.row_factory = sqlite3.Row
+                assert connection.execute(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE name = 'sqlite_stat1'"
+                ).fetchone()[0] == 0
+                # The first run of each variant warms the cache and checks the rows.
+                rows = one_statement(connection)
+                assert [tuple(row) for row in one_query_per_document(connection)] == [
+                    tuple(row) for row in rows
+                ]
+                assert len(rows) == counts["documents"]
+                assert sum(len(json.loads(row["highlights"])) for row in rows) == counts["highlights"]
+                print()
+                print("size", size, "items", counts["items"], "documents", counts["documents"],
+                      "highlights", counts["highlights"])
+                if size == sizes[-1]:
+                    print("plan of EXTRACTION_QUERY:")
+                    print("\n".join(plan_of(connection, z.EXTRACTION_QUERY)))
+                    one_document_plan = plan_of(connection, ONE_DOCUMENT_QUERY, (1,))
+                    assert not any(line.strip().startswith("SCAN") for line in one_document_plan)
+                    print("plan of the query for one document:")
+                    print("\n".join(one_document_plan))
+                durations: dict[str, list[float]] = {name: [] for name in variants}
+                gc.disable()
+                try:
+                    for run in range(RUNS):
+                        order = list(variants) if run % 2 == 0 else list(reversed(variants))
+                        for name in order:
+                            start = time.perf_counter()
+                            variants[name](connection)
+                            durations[name].append(time.perf_counter() - start)
+                finally:
+                    gc.enable()
+                for name, values in durations.items():
+                    print(name, "median_ms", round(statistics.median(values) * 1000, 1),
+                          "runs_ms", [round(value * 1000, 1) for value in values])
+                ratio = statistics.median(durations["one_query_per_document"]) / statistics.median(
+                    durations["one_statement"]
+                )
+                print("ratio", round(ratio, 2))
+
+
+main(Path(sys.argv[1]), tuple(int(size) for size in sys.argv[2:]) or SIZES)
+```
+
+</details>
+
+#### Sorties
+
+Sortie du relevé :
+
+```
+tables 15
+indexes 15
+page_size 32768
+userdata_version 130
+```
+
+Sortie de la mesure. Les deux plans, imprimés pour 10 000 documents, sont remplacés ici par `[…]` ;
+ils sont lus plus bas :
+
+```
+machine arm64 Darwin 25.6.0
+python 3.13.13 sqlite 3.50.4
+userdata_version 130 page_size 32768
+
+size 1000 items 14300 documents 950 highlights 5470
+one_statement median_ms 12.6 runs_ms [14.4, 12.6, 12.6, 12.6, 12.5, 12.4, 12.5]
+one_query_per_document median_ms 23.6 runs_ms [24.2, 24.0, 23.3, 23.6, 23.6, 23.5, 23.6]
+ratio 1.88
+
+size 10000 items 143000 documents 9500 highlights 54700
+plan of EXTRACTION_QUERY:
+[…]
+plan of the query for one document:
+[…]
+one_statement median_ms 145.5 runs_ms [144.0, 145.5, 147.8, 142.7, 151.4, 145.0, 160.3]
+one_query_per_document median_ms 269.1 runs_ms [270.5, 269.1, 267.4, 266.9, 271.3, 271.1, 264.9]
+ratio 1.85
+```
+
+#### Résultats
+
+| Documents lus | Items dans la base | `EXTRACTION_QUERY` (médiane) | Une requête par document (médiane) | Rapport |
+|---|---|---|---|---|
+| 950 | 14 300 | 12,6 ms | 23,6 ms | 1,88 |
+| 9 500 | 143 000 | 145,5 ms | 269,1 ms | 1,85 |
+
+#### Lecture
+
+- **Une seule instruction va environ 1,9 fois plus vite** qu'une requête par document, aux deux
+  tailles. Chaque passage reste à 15 % au plus de sa médiane ; le plus éloigné est un passage de
+  l'instruction unique, 14,4 ms contre 12,6.
+- **Le temps des deux grandit comme le nombre de documents.** De 950 à 9 500 documents lus (× 10),
+  `EXTRACTION_QUERY` passe de 12,6 à 145,5 ms (× 11,5), et la variante de 23,6 à 269,1 ms
+  (× 11,4). Aucune des deux ne relit une table entière par document.
+- **Le plan de `EXTRACTION_QUERY` sur 10 000 documents est identique, ligne pour ligne, à celui
+  relevé sur 5 documents** dans la mesure précédente (vérifié par `diff`). Ce n'est pas une preuve
+  que le plan reste stable ; c'est un contrôle : la base fabriquée a bien le schéma de la vraie. Le
+  schéma relevé dit aussi ce qu'est `items_synced` : un index sur `items(synced)`. Pourquoi SQLite
+  le préfère à la table pour parcourir `items`, ce relevé ne le dit pas.
+- **Le plan de la variante ne diffère que de deux lignes** (vérifié par `diff`) :
+  - `SEARCH items USING INTEGER PRIMARY KEY (rowid=?)` au lieu de
+    `SCAN items USING INDEX items_synced` ;
+  - pas de `USE TEMP B-TREE FOR ORDER BY`, puisque c'est la requête de liste qui trie.
+
+  Les deux façons de faire lancent donc les mêmes recherches. Ce qui les sépare, c'est le nombre
+  d'instructions : une seule, ou une par document en plus de la liste.
+- **Ce qui joue pour la variante.** Le module `sqlite3` de Python garde en cache les instructions
+  préparées d'une connexion, « to avoid parsing overhead » (`cached_statements`, 128 par défaut,
+  [documentation de sqlite3](https://docs.python.org/3/library/sqlite3.html), lue le 2026-11-03).
+  Le texte de la requête par document n'est donc compilé qu'une fois. L'écart n'est pas décomposé
+  par poste : la mesure ne dit pas quelle part revient à chaque instruction lancée, à la boucle
+  Python ou à la création d'un curseur par document.
+
+  Ce qui joue pour `EXTRACTION_QUERY` en sens inverse : elle trie à la fin ses lignes entières,
+  listes JSON comprises, et ce coût est compté dans son temps.
+- **Portée.** Ces temps valent pour ces données inventées, sur cette machine, cache chaud. Ils ne
+  disent pas le temps sur la vraie bibliothèque, ni sur une autre machine. Ils ne comparent pas
+  non plus `EXTRACTION_QUERY` à une variante qui ferait une requête par champ et par liste.
 
 ### Ce qu'elle suppose
 
