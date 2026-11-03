@@ -362,10 +362,25 @@ def test_collect_says_how_many_raw_files_each_source_collected_wrote(
     )
 
     assert cli.main(["collect"]) == cli.ExitCode.PARTIAL_FAILURE
-    assert capsys.readouterr().out.startswith(
+    assert capsys.readouterr().out == (
         "\nunchanged: ok (0 raw files)\nworking: ok (1 raw file)\n"
         "scraped: ok (2 raw files)\nbroken: failed (ConnectionError)\n"
+        "zotero: skipped (KB_ZOTERO_DIR not set)\n"
+        "clipping: skipped (KB_VAULT_DIR not set)\n"
+        "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n\n"
     )
+
+
+def test_collect_succeeds_with_a_source_that_has_nothing_new(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", collected_kinds(UnchangedSource())
+    )
+
+    assert cli.main(["collect"]) == 0
+    assert capsys.readouterr().out.startswith("\nunchanged: ok (0 raw files)\n")
 
 
 def test_collect_only_prints_one_line_for_a_source_not_chosen(

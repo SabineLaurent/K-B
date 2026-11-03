@@ -118,7 +118,9 @@ définitions publiques du pipeline tenues à jour (`.claude/rules/code.md`).
 |---|---|
 | Avant le code : 11 tests rouges, dont `AttributeError: 'CollectionOutcome' object has no attribute 'written_count_by_source'` et `- working: ok (1 raw file)` / `+ working: ok` | Les tests mesurent bien le changement demandé, pas autre chose. |
 | `test_the_outcome_gives_the_raw_files_written_by_each_source_collected` (`tests/etl/test_extract.py:319`) → `{"working": 1, "unchanged": 0, "scraped": 2}` | Un fichier, rien de neuf et deux pages sont comptés comme au journal ; la source en échec est absente. |
-| `test_collect_says_how_many_raw_files_each_source_collected_wrote` (`tests/commands/test_collect_command.py:348`) | Dans une même collecte : `ok (0 raw files)` (le cas qui a fait naître le besoin), `ok (1 raw file)` au singulier, `ok (2 raw files)` pour deux pages, et `failed (ConnectionError)` inchangé. |
+| `test_collect_says_how_many_raw_files_each_source_collected_wrote` (`tests/commands/test_collect_command.py:348`) | Dans une même collecte : `ok (0 raw files)` (le cas qui a fait naître le besoin), `ok (1 raw file)` au singulier, `ok (2 raw files)` pour deux pages, et `failed (ConnectionError)` inchangé ; toute la sortie est comparée. |
+| `test_collect_succeeds_with_a_source_that_has_nothing_new` (`tests/commands/test_collect_command.py:374`) | Une collecte dont la seule source n'a rien de neuf sort en 0 avec `ok (0 raw files)` : « rien de neuf » n'est pas un échec. |
+| `make collect` lancé par Sabine sur la branche, 17 vraies sources (2026-11-03 13:43 UTC) | Le bilan réel montre les trois formes : `ok (0 raw files)` (cisa_kev, zotero…), `ok (1 raw file)`, `ok (2 raw files)` (tldr_dev, tldr_tech). |
 | Les 8 sorties attendues de `test_collect_command.py` passées à `ok (1 raw file)` | Zotero, les clips, GH Archive, `KB_COLLECT_ONLY` et l'état non écrit gardent leur bilan, avec le nombre en plus. |
 | `uv run pytest` : 3 251 passés ; `ruff check`, `ruff format --check`, `mypy --strict` verts | Rien d'autre ne lisait l'ancienne forme. |
 
@@ -139,8 +141,8 @@ définitions publiques du pipeline tenues à jour (`.claude/rules/code.md`).
 
 ## Zones non vérifiées
 
-- La sortie réelle de `kb collect` sur les 17 vraies sources n'a pas été relancée : seules les
-  sources de test l'ont été. La capture de l'annexe E1 c1.8 la montrera.
+- Aucune. La sortie réelle sur les 17 sources a été vue par Sabine (`make collect`, ligne
+  ci-dessus).
 
 ## Ce qui reste
 
