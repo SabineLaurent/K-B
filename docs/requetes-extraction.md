@@ -10,8 +10,8 @@ nom de sa constante, et seules des clauses courtes (un filtre, un nom de colonne
 ligne pour le décrire. Les mesures, les plafonds et les valeurs de réglage vivent dans le code et
 dans [specs-collecte.md](specs-collecte.md) ou [bigquery.md](bigquery.md), où ce document renvoie.
 Une référence au code donne le fichier et le nom de la constante, de la fonction ou de la méthode,
-jamais un numéro de ligne. Seule la mesure de la section 2 est écrite ici, parce qu'elle n'existe
-nulle part ailleurs.
+jamais un numéro de ligne. Seules les mesures des sections 1 et 2 sont écrites ici, parce qu'elles
+n'existent nulle part ailleurs.
 
 **Hors de ce document** : le SQL de la base K-B (sous `src/k_b/database/`, règle 5 de
 `.claude/rules/conventions.md`) ;
@@ -112,6 +112,9 @@ sur les colonnes de `JSON_COLUMNS`), et `ZoteroSource.fetch` rend l'extrait enti
 
 - **Une instruction pour toute la bibliothèque**, au lieu d'une requête par document lancée depuis
   Python : la définition d'un document n'est écrite qu'une fois, et SQLite fait les jointures.
+- **Chaque liste est cherchée par la clé du document** : chaque sous-requête corrélée filtre sur
+  `itemID` ou `parentItemID`, des colonnes que Zotero indexe. Seule la table `items` est parcourue
+  en entier, une fois (mesure ci-dessous).
 - **Seuls les champs utiles sont nommés**, et tous les filtres sont dans le SQL : rien n'est lu
   pour être jeté ensuite en Python.
 - **Une copie, lue seule** : la requête ne prend aucun verrou sur la base de Zotero.
@@ -120,7 +123,196 @@ sur les colonnes de `JSON_COLUMNS`), et `ZoteroSource.fetch` rend l'extrait enti
   date des fichiers de Zotero n'est plus comparée : elle ne disait pas si la bibliothèque avait
   changé.
 
-Cette économie n'est **pas mesurée** : ni plan d'exécution, ni temps.
+### Mesure : le plan d'exécution
+
+Le plan d'exécution (`EXPLAIN QUERY PLAN`) dit comment SQLite lit chaque table :
+- `SEARCH` : une recherche par index ou par clé, qui ne lit que les lignes cherchées ;
+- `SCAN` : un parcours de la table entière.
+
+Dans une sous-requête corrélée, rejouée pour chaque document, un `SCAN` relirait toute sa table à
+chaque document.
+
+- **Bibliothèque** : une bibliothèque Zotero réelle, 5 documents et 6 surlignages. Elle est lue sur
+  une copie faite comme à la collecte (`copy_library`, puis `extract_documents`), ouverte en lecture
+  seule.
+- **Code** : `main` au commit 236d22c ; SQLite 3.50.4, celui du Python de K-B.
+- **Statistiques** : SQLite estime le coût d'une boucle d'après les index disponibles et les
+  contraintes du `WHERE`. `ANALYZE` peut affiner ces estimations
+  ([The Next-Generation Query Planner](https://www.sqlite.org/queryplanner-ng.html), lu le
+  2026-11-03). Cette copie n'a pas de statistiques d'`ANALYZE` : pas de table `sqlite_stat1`.
+  Ce relevé vaut pour ce schéma de Zotero, cette requête et SQLite 3.50.4.
+- **Temps** : non mesuré, car sur 5 documents il ne dirait rien.
+- **Date** : 2026-11-03.
+
+Commande, depuis la racine du dépôt, avec `KB_ZOTERO_DIR` dans `.env` :
+`uv run --env-file .env python -I <script>`. Le script est gardé hors du dépôt :
+
+```python
+"""The query plan of EXTRACTION_QUERY on a copy of the library of KB_ZOTERO_DIR, as the collection
+reads it. Prints no title, author, key or path, not even in an error: only its type."""
+
+import contextlib
+import os
+import sqlite3
+import sys
+import tempfile
+from pathlib import Path
+
+from k_b.etl.collected_sources import ZOTERO_DIR_VARIABLE
+from k_b.etl.sources import zotero as z
+
+
+def main() -> None:
+    zotero_dir = Path(os.environ[ZOTERO_DIR_VARIABLE])
+    with tempfile.TemporaryDirectory(prefix=z.TEMPORARY_DIR_PREFIX) as copy_dir:
+        copy_path = z.copy_library(zotero_dir, Path(copy_dir))
+        # The collection's own extraction: same opening, same check, its errors without content.
+        documents = z.extract_documents(copy_path)
+        with contextlib.closing(
+            sqlite3.connect(f"{copy_path.as_uri()}?mode=ro", uri=True)
+        ) as connection:
+            print("sqlite", sqlite3.sqlite_version)
+            print("documents", len(documents))
+            print("highlights", sum(len(document["highlights"]) for document in documents))
+            # With statistics, SQLite also weighs the sizes measured by the last ANALYZE.
+            has_statistics = connection.execute(
+                "SELECT COUNT(*) FROM sqlite_master WHERE name = 'sqlite_stat1'"
+            ).fetchone()[0]
+            print("sqlite_stat1", "yes" if has_statistics else "no")
+            if has_statistics:
+                for table, index, numbers in connection.execute(
+                    "SELECT tbl, idx, stat FROM sqlite_stat1 ORDER BY tbl, idx"
+                ):
+                    print("  ", table, index, numbers)
+            depths = {0: -1}
+            for node_id, parent_id, _, detail in connection.execute(
+                "EXPLAIN QUERY PLAN " + z.EXTRACTION_QUERY
+            ):
+                depths[node_id] = depths.get(parent_id, -1) + 1
+                print("  " * depths[node_id] + detail)
+
+
+try:
+    main()
+except Exception as error:
+    # Its message could hold a path or a value of the library: only the type is shown.
+    sys.exit(f"failed ({type(error).__name__})")
+```
+
+Sortie (les numéros des sous-requêtes sont ceux de SQLite) :
+
+```
+sqlite 3.50.4
+documents 5
+highlights 6
+sqlite_stat1 no
+SCAN items USING INDEX items_synced
+USING ROWID SEARCH ON TABLE deletedItems FOR IN-OPERATOR
+SEARCH itemTypes USING INTEGER PRIMARY KEY (rowid=?)
+SEARCH libraries USING INTEGER PRIMARY KEY (rowid=?)
+CORRELATED SCALAR SUBQUERY 4
+  SEARCH itemData USING INDEX sqlite_autoindex_itemData_1 (itemID=?)
+  SEARCH fields USING INTEGER PRIMARY KEY (rowid=?)
+  SEARCH itemDataValues USING INTEGER PRIMARY KEY (rowid=?)
+CORRELATED SCALAR SUBQUERY 5
+  SEARCH itemData USING INDEX sqlite_autoindex_itemData_1 (itemID=?)
+  SEARCH fields USING INTEGER PRIMARY KEY (rowid=?)
+  SEARCH itemDataValues USING INTEGER PRIMARY KEY (rowid=?)
+CORRELATED SCALAR SUBQUERY 6
+  SEARCH itemData USING INDEX sqlite_autoindex_itemData_1 (itemID=?)
+  SEARCH fields USING INTEGER PRIMARY KEY (rowid=?)
+  SEARCH itemDataValues USING INTEGER PRIMARY KEY (rowid=?)
+CORRELATED SCALAR SUBQUERY 7
+  SEARCH itemData USING INDEX sqlite_autoindex_itemData_1 (itemID=?)
+  SEARCH fields USING INTEGER PRIMARY KEY (rowid=?)
+  SEARCH itemDataValues USING INTEGER PRIMARY KEY (rowid=?)
+CORRELATED SCALAR SUBQUERY 8
+  USE TEMP B-TREE FOR json_group_array(ORDER BY)
+  SEARCH itemCreators USING COVERING INDEX sqlite_autoindex_itemCreators_1 (itemID=?)
+  SEARCH creatorTypes USING INTEGER PRIMARY KEY (rowid=?)
+  SEARCH creators USING INTEGER PRIMARY KEY (rowid=?)
+CORRELATED SCALAR SUBQUERY 9
+  USE TEMP B-TREE FOR json_group_array(ORDER BY)
+  SEARCH itemTags USING INDEX sqlite_autoindex_itemTags_1 (itemID=?)
+  SEARCH tags USING INTEGER PRIMARY KEY (rowid=?)
+CORRELATED SCALAR SUBQUERY 11
+  USE TEMP B-TREE FOR json_group_array(ORDER BY)
+  SEARCH itemAttachments USING INDEX itemAttachments_parentItemID (parentItemID=?)
+  USING ROWID SEARCH ON TABLE deletedItems FOR IN-OPERATOR
+  SEARCH attachment USING INTEGER PRIMARY KEY (rowid=?)
+CORRELATED SCALAR SUBQUERY 14
+  USE TEMP B-TREE FOR json_group_array(ORDER BY)
+  SEARCH itemAttachments USING INDEX itemAttachments_parentItemID (parentItemID=?)
+  USING ROWID SEARCH ON TABLE deletedItems FOR IN-OPERATOR
+  SEARCH attachment USING INTEGER PRIMARY KEY (rowid=?)
+  SEARCH itemAnnotations USING INDEX itemAnnotations_parentItemID (parentItemID=?)
+  USING ROWID SEARCH ON TABLE deletedItems FOR IN-OPERATOR
+  SEARCH annotation USING INTEGER PRIMARY KEY (rowid=?)
+USE TEMP B-TREE FOR ORDER BY
+```
+
+| Partie de la requête | Table | Accès | Par |
+|---|---|---|---|
+| CTE `document` | `items` | `SCAN`, une fois | parcours complet, par l'index `items_synced` de Zotero |
+| CTE `document` | `itemTypes`, `libraries` | `SEARCH` | clé (`rowid`) |
+| corbeille (`NOT IN`), partout | `deletedItems` | `SEARCH` | clé (`rowid`) |
+| titre, date, URL, `archiveID` (4 à 7) | `itemData` | `SEARCH` | index de sa clé primaire, sur `itemID` |
+| titre, date, URL, `archiveID` (4 à 7) | `fields`, `itemDataValues` | `SEARCH` | clé (`rowid`) |
+| auteurs (8) | `itemCreators` | `SEARCH` | index couvrant de sa clé primaire, sur `itemID` |
+| auteurs (8) | `creatorTypes`, `creators` | `SEARCH` | clé (`rowid`) |
+| étiquettes (9) | `itemTags` | `SEARCH` | index de sa clé primaire, sur `itemID` |
+| étiquettes (9) | `tags` | `SEARCH` | clé (`rowid`) |
+| PDF (11) et surlignages (14) | `itemAttachments` | `SEARCH` | index `itemAttachments_parentItemID`, sur `parentItemID` |
+| PDF (11) et surlignages (14) | `items` (alias `attachment`) | `SEARCH` | clé (`rowid`) |
+| surlignages (14) | `itemAnnotations` | `SEARCH` | index `itemAnnotations_parentItemID`, sur `parentItemID` |
+| surlignages (14) | `items` (alias `annotation`) | `SEARCH` | clé (`rowid`) |
+
+Lecture :
+
+- **Un seul `SCAN`, celui de `items`, une fois pour toute la requête.** Il est attendu : un
+  document se reconnaît à son type, à sa bibliothèque et à son absence de la corbeille, donc chaque
+  item est examiné. SQLite le fait par l'index `items_synced` de Zotero. Pourquoi cet index plutôt
+  que la table, ce relevé ne l'établit pas.
+- **Tout le reste est `SEARCH`.** Les huit sous-requêtes corrélées sont rejouées pour chaque
+  document. Chacune entre par la clé du document dans un index : `itemID=?` pour les champs, les
+  auteurs et les étiquettes, `parentItemID=?` pour les PDF. Les surlignages sont ensuite cherchés
+  par la clé de leur PDF (`itemAnnotations.parentItemID`). Pour chaque document, SQLite lit donc
+  ses champs, ses auteurs, ses étiquettes, ses PDF et ses surlignages, sans relire les tables
+  entières.
+- **La CTE `field_value` n'est pas bâtie à part.** `itemData`, `fields` et `itemDataValues`
+  apparaissent dans chacune des sous-requêtes de champ (4 à 7) : SQLite y fond la CTE, au lieu de
+  bâtir d'abord la table des champs de toute la bibliothèque. Chaque recherche lit les champs du
+  document (`itemID=?`), et le filtre sur `fields.fieldName` n'en garde que quatre.
+- **La corbeille** : `NOT IN (SELECT itemID FROM deletedItems)` devient une recherche par clé dans
+  `deletedItems` (`USING ROWID SEARCH … FOR IN-OPERATOR`).
+- **Les cinq `USE TEMP B-TREE` sont des tris** :
+  - un par liste triée dans son agrégat (auteurs, étiquettes, PDF, surlignages), sur les lignes
+    d'un seul document ;
+  - le tri final, par `dateAdded` puis `itemID`.
+
+  Le plan ne dit pas pourquoi SQLite trie ces lignes au lieu de suivre un index.
+
+**Mise en regard.** La bibliothèque inventée des tests (`tests/fixtures/zotero_extract.sql`)
+reprend les tables de Zotero sans les index que Zotero crée à part (`CREATE INDEX`). Elle garde
+ceux de leurs clés primaires et de leurs `UNIQUE`. On y lance la même requête, avec le même
+SQLite :
+- la sous-requête des PDF passe à `SCAN itemAttachments` ;
+- celle des surlignages passe à `SCAN itemAnnotations`.
+
+Ces deux tables seraient alors parcourues en entier pour chaque document. Les index
+`itemAttachments_parentItemID` et `itemAnnotations_parentItemID` de Zotero changent ces parcours
+en recherches. La requête en profite parce qu'elle relie un PDF à son document, et un surlignage
+à son PDF, par `parentItemID`.
+
+Ce que le plan montre de chaque économie de la liste :
+
+| Économie | Ce que montre le plan |
+|---|---|
+| Une instruction pour toute la bibliothèque | une instruction, un seul parcours de `items`, chaque liste en sous-requête corrélée ; l'écart avec une requête par document n'est pas mesuré ici |
+| Chaque liste cherchée par la clé du document | montré : `SEARCH` sur `itemID` ou `parentItemID`, aucun autre `SCAN` |
+| Seuls les champs utiles nommés | rien : un plan ne dit pas les colonnes lues |
+| Une copie, lue seule | rien : c'est un fait du code (`copy_library`, `extract_documents`) |
+| Rien d'écrit quand rien n'a changé | rien : c'est un fait du code (`ZoteroSource.fetch`) |
 
 ### Ce qu'elle suppose
 
