@@ -316,6 +316,27 @@ def test_each_source_logs_its_start_and_the_raw_files_it_wrote(tmp_path, caplog)
     ]
 
 
+def test_the_outcome_gives_the_raw_files_written_by_each_source_collected(tmp_path):
+    pages = {
+        "2026-09-29": b"<html>monday</html>",
+        "2026-09-30": b"<html>tuesday</html>",
+    }
+
+    outcome = collect_all_sources(
+        [WorkingSource(), UnchangedSource(), ScrapedSource(pages), BrokenSource()],
+        tmp_path / "raw",
+        tmp_path,
+        FIRST_RUN_AT,
+    )
+
+    # The failed source has no count: its line says failed.
+    assert outcome.written_count_by_source == {
+        "working": 1,
+        "unchanged": 0,
+        "scraped": 2,
+    }
+
+
 def test_a_source_failing_at_its_second_page_keeps_the_first_one_written(tmp_path):
     pages = {
         "2026-09-29": b"<html>monday</html>",

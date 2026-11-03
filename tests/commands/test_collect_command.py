@@ -10,7 +10,12 @@ from commands.cli_helpers import (
     LOG_LINE_DATE,
     collected_kinds,
 )
-from etl.test_extract import BrokenSource, WorkingSource
+from etl.test_extract import (
+    BrokenSource,
+    ScrapedSource,
+    UnchangedSource,
+    WorkingSource,
+)
 from etl.test_transform import FIXTURES_DIR
 
 from k_b import cli
@@ -121,7 +126,7 @@ def test_collect_still_prints_the_summary_and_exits_1_when_the_state_cannot_be_w
     assert exit_code == 1
     assert (
         capsys.readouterr().out
-        == "\nworking: ok\nzotero: skipped (KB_ZOTERO_DIR not set)\n"
+        == "\nworking: ok (1 raw file)\nzotero: skipped (KB_ZOTERO_DIR not set)\n"
         "clipping: skipped (KB_VAULT_DIR not set)\n"
         "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n"
         "collection_state: failed (PermissionError)\n\n"
@@ -146,7 +151,7 @@ def test_collect_skips_zotero_and_says_so_without_its_directory(
     assert exit_code == 0
     assert (
         capsys.readouterr().out
-        == "\nworking: ok\nzotero: skipped (KB_ZOTERO_DIR not set)\n"
+        == "\nworking: ok (1 raw file)\nzotero: skipped (KB_ZOTERO_DIR not set)\n"
         "clipping: skipped (KB_VAULT_DIR not set)\n"
         "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n\n"
     )
@@ -166,7 +171,7 @@ def test_collect_extracts_zotero_into_the_selected_library_with_its_directory(
 
     assert exit_code == 0
     assert capsys.readouterr().out == (
-        "\nzotero: ok\nclipping: skipped (KB_VAULT_DIR not set)\n"
+        "\nzotero: ok (1 raw file)\nclipping: skipped (KB_VAULT_DIR not set)\n"
         "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n\n"
     )
     [extract_path] = (data_dir / "raw" / "selected_library" / "zotero").iterdir()
@@ -238,7 +243,7 @@ def test_collect_copies_the_clips_into_the_selected_library_with_the_vault(
     exit_code = cli.main(["collect"])
 
     assert exit_code == 0
-    assert "clipping: ok\n" in capsys.readouterr().out
+    assert "clipping: ok (1 raw file)\n" in capsys.readouterr().out
     [collection_dir] = (data_dir / "raw" / "selected_library" / "clipping").iterdir()
     assert [page.read_bytes() for page in collection_dir.iterdir()] == [clip]
     assert (clippings_dir / "A clip.md").read_bytes() == clip
@@ -278,7 +283,7 @@ def test_collect_runs_gh_archive_with_the_bigquery_key(monkeypatch, tmp_path, ca
     assert exit_code == 0
     assert created == [collected_sources.create_bigquery_client]
     output = capsys.readouterr().out
-    assert "gh_archive: ok\n" in output
+    assert "gh_archive: ok (1 raw file)\n" in output
     assert "gh_archive: skipped" not in output
     assert list((tmp_path / "raw" / "automated_watch" / "gh_archive").iterdir())
 
@@ -311,7 +316,8 @@ def test_collect_only_runs_the_sources_chosen_and_keeps_the_date_of_the_others(
 
     assert exit_code == 0
     assert capsys.readouterr().out == (
-        "\nzotero: ok\nclipping: ok\ntest: skipped (not in KB_COLLECT_ONLY)\n"
+        "\nzotero: ok (1 raw file)\nclipping: ok (1 raw file)\n"
+        "test: skipped (not in KB_COLLECT_ONLY)\n"
         "gh_archive: skipped (not in KB_COLLECT_ONLY)\n\n"
     )
     assert sorted(path.name for path in (data_dir / "raw").iterdir()) == [
@@ -331,10 +337,50 @@ def test_collect_without_collect_only_runs_every_source(monkeypatch, tmp_path, c
     )
 
     assert cli.main(["collect"]) == 0
-    assert capsys.readouterr().out.startswith("\nworking: ok\nother: ok\n")
+    assert capsys.readouterr().out.startswith(
+        "\nworking: ok (1 raw file)\nother: ok (1 raw file)\n"
+    )
     assert sorted(
         path.name for path in (tmp_path / "raw" / "automated_watch").iterdir()
     ) == ["other", "working"]
+
+
+def test_collect_says_how_many_raw_files_each_source_collected_wrote(
+    monkeypatch, tmp_path, capsys
+):
+    pages = {
+        "2026-09-29": b"<html>monday</html>",
+        "2026-09-30": b"<html>tuesday</html>",
+    }
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        collect_command,
+        "SOURCE_KINDS",
+        collected_kinds(
+            UnchangedSource(), WorkingSource(), ScrapedSource(pages), BrokenSource()
+        ),
+    )
+
+    assert cli.main(["collect"]) == cli.ExitCode.PARTIAL_FAILURE
+    assert capsys.readouterr().out == (
+        "\nunchanged: ok (0 raw files)\nworking: ok (1 raw file)\n"
+        "scraped: ok (2 raw files)\nbroken: failed (ConnectionError)\n"
+        "zotero: skipped (KB_ZOTERO_DIR not set)\n"
+        "clipping: skipped (KB_VAULT_DIR not set)\n"
+        "gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)\n\n"
+    )
+
+
+def test_collect_succeeds_with_a_source_that_has_nothing_new(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        collect_command, "SOURCE_KINDS", collected_kinds(UnchangedSource())
+    )
+
+    assert cli.main(["collect"]) == 0
+    assert capsys.readouterr().out.startswith("\nunchanged: ok (0 raw files)\n")
 
 
 def test_collect_only_prints_one_line_for_a_source_not_chosen(
@@ -349,7 +395,7 @@ def test_collect_only_prints_one_line_for_a_source_not_chosen(
     assert cli.main(["collect"]) == 0
     # Not "zotero: skipped (KB_ZOTERO_DIR not set)" as well: Zotero was not chosen.
     assert capsys.readouterr().out == (
-        "\nworking: ok\nzotero: skipped (not in KB_COLLECT_ONLY)\n"
+        "\nworking: ok (1 raw file)\nzotero: skipped (not in KB_COLLECT_ONLY)\n"
         "clipping: skipped (not in KB_COLLECT_ONLY)\n"
         "gh_archive: skipped (not in KB_COLLECT_ONLY)\n\n"
     )

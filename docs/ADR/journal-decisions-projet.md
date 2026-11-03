@@ -4861,6 +4861,38 @@ la même minute.
 
 — #368
 
+## 2026-11-03
+
+### Collecte : le nombre de bruts écrits sur la ligne de chaque source
+
+Décision de Sabine du 2026-11-03, demandée pendant la rédaction de l'annexe E1 c1.8 (la capture
+d'une collecte) ; plan de time-knight relu par un sous-agent et validé par elle. Pas d'issue.
+
+- **Le bilan de `kb collect` donne, à côté de `ok`, le nombre de fichiers bruts écrits par la
+  source : `cisa_kev: ok (1 raw file)`, `tldr_ai: ok (6 raw files)`, `ok (0 raw files)` pour une
+  source sans rien de neuf.** Les lignes `failed (…)`, `skipped (…)` et `collection_state` ne
+  changent pas. **Revient sur un point** de « Commandes : le retour console sans tableau (#359) »
+  du 2026-10-29 : « le nombre de bruts écrits par une source collectée est au journal
+  seulement ». Ce qui a changé : le nombre revient sans tableau, sur la ligne que #359 a gardée ;
+  un `ok` seul ne dit pas si la source a rapporté quelque chose (constat de Sabine du
+  2026-10-28 : « ok » laisse croire que la source a été collectée).
+  - Format : trois options présentées, `ok (6 raw files)` retenu par Sabine, sans autre raison
+    dite que celle présentée (les parenthèses de `failed (…)` et `skipped (…)` du même bilan).
+    Écartés : `ok, 6 raw files written`, aligné sur `kb write-tops` (`ok, 2 sheets written`) ;
+    garder `ok` seul, comme décidé le 2026-10-29.
+  - Le nombre est celui que la collecte journalisait déjà (`source 'cisa_kev' collected, raw
+    files written: 1`) : un par fichier, un par page pour une source à pages (tldr : un jour
+    d'édition ; clips : un clip), 0 seulement quand la source dit « rien de neuf ».
+  - Code : `CollectionOutcome.written_count_by_source`, un dict à part (la forme de
+    `raw_file_counts` de #291) ; `errors_by_source`, le code de sortie et les 17 assertions de
+    tests qui le lisent ne bougent pas. Écarté : un résultat par source (erreur ou nombre) dans un
+    seul dict, plus juste en type mais qui réécrit ces assertions, hors besoin.
+
+Limites assumées : un fichier brut écrit ne dit pas combien d'items il porte (une réponse vide
+fait `1 raw file`) ; le nombre d'items vient à l'import. Une source en échec au milieu de ses
+pages garde les pages déjà écrites, mais sa ligne reste `failed (…)`, sans leur nombre, comme
+avant.
+
 ## Décisions encore ouvertes
 
 - **Les seuils des critères des tendances** (2026-10-30) : 2 jours actifs pour « durable », 5 rangs

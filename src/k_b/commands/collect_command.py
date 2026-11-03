@@ -67,10 +67,14 @@ def print_collection_result(
     # line of an error): decisions of Sabine of 2026-10-29.
     print()
     for source_name, source_error in outcome.errors_by_source.items():
-        print(f"{source_name}: {describe_outcome(source_error)}")
+        if source_error is None:
+            written_count = outcome.written_count_by_source[source_name]
+            print(f"{source_name}: ok ({describe_count(written_count, 'raw file')})")
+        else:
+            print(f"{source_name}: {describe_failure(source_error)}")
     print_skipped_sources(collect_only, environ)
     if outcome.state_error is not None:
-        print(f"collection_state: {describe_outcome(outcome.state_error)}")
+        print(f"collection_state: {describe_failure(outcome.state_error)}")
     print()
 
 
@@ -120,6 +124,6 @@ def find_collection_exit_code(outcome: CollectionOutcome) -> ExitCode:
     )
 
 
-def describe_outcome(error: Exception | None) -> str:
-    """Describe the outcome of a source: ok, or failed with the type of its error."""
-    return "ok" if error is None else f"failed ({type(error).__name__})"
+def describe_failure(error: Exception) -> str:
+    """Describe a failure, of a source or of the state: failed with the type of its error."""
+    return f"failed ({type(error).__name__})"

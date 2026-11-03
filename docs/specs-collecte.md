@@ -22,21 +22,25 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   Sabine du 2026-10-29) puis, collectée, ce qu'elle a écrit (`source 'cisa_kev' collected, raw
   files written: 1`, `src/k_b/etl/extract.py`), qu'elle écrive ou non ses propres lignes
   (décision de Sabine du 2026-10-28). À la fin, `collection finished in 1 min 26 s`, puis une
-  ligne par source lancée (`ok` ou `failed (<type d'erreur>)`), puis une par source non lancée,
-  avec le réglage qui l'écarte (pas de tableau : décision de Sabine du 2026-10-29, qui remplace
-  celui de #291) :
+  ligne par source lancée (`ok (<n> raw files)`, `ok (1 raw file)` au singulier, ou
+  `failed (<type d'erreur>)`), puis une par source non lancée, avec le réglage qui l'écarte (pas
+  de tableau : décision de Sabine du 2026-10-29, qui remplace celui de #291) :
 
   ```
-  tldr_ai: ok
+  tldr_ai: ok (6 raw files)
+  cisa_kev: ok (1 raw file)
   github_most_forked: failed (HTTPStatusError)
   zotero: skipped (KB_ZOTERO_DIR not set)
   clipping: skipped (KB_VAULT_DIR not set)
   gh_archive: skipped (not in KB_COLLECT_ONLY)
   ```
 
-  Le nombre de bruts écrits par une source collectée est au journal seulement. Une source en
-  échec au milieu de ses pages (une écriture qui échoue) garde dans `raw/` les pages déjà écrites,
-  entières, que l'import suivant lit ; leur nombre n'est donné nulle part. Quand
+  Le nombre de bruts écrits par une source collectée est sur sa ligne, `ok (1 raw file)`, et au
+  journal (décision de Sabine du 2026-11-03, qui revient sur « au journal seulement » du
+  2026-10-29) : un par fichier, un par page pour une source à pages (tldr, clips), 0 pour une
+  source sans rien de neuf. Une source en échec au milieu de ses pages (une écriture qui échoue)
+  garde dans `raw/` les pages déjà écrites, entières, que l'import suivant lit ; leur nombre
+  n'est donné nulle part. Quand
   l'état ne s'écrit pas, le brut est déjà écrit : `kb collect` journalise l'erreur avec le chemin
   du fichier et ajoute la ligne `collection_state: failed (<type d'erreur>)`. Les dates de
   dernière collecte n'avancent pas : la collecte suivante relit les mêmes fenêtres, et l'import
@@ -46,7 +50,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 
   | Code | Nom | Quand |
   |---|---|---|
-  | **0** | `SUCCEEDED` | chaque source lancée a réussi ; une source sans rien de neuf réussit (`ok`, rien d'écrit, sa date avance) |
+  | **0** | `SUCCEEDED` | chaque source lancée a réussi ; une source sans rien de neuf réussit (`ok (0 raw files)`, sa date avance) |
   | **1** | `FAILED` | aucune source lancée n'a réussi ; ou `collection_state.json` n'a pas pu être écrit (disque plein, droits), quel que soit le sort des sources ; ou une exception que `kb` ne traite pas, journalisée avec sa trace |
   | **2** | `NOT_STARTED` | rien n'a été collecté, ni brut ni état écrit : `KB_DATA_DIR` absente ou vide ; `KB_DATA_DIR` qui n'est pas un dossier existant ; `KB_LOG_TO_FILE` qui n'est ni `true` ni `false` ; fichier de journal qui ne s'ouvre pas ; `collection_state.json` illisible ou invalide (pas du JSON, pas un objet, une date sans fuseau) ; `KB_COLLECT_ONLY` refusée (ci-dessous) ; commande absente ou inconnue, refusée par `argparse` (son message d'usage, sur la sortie d'erreur seulement : le journal n'est pas encore ouvert) |
   | **4** | `PARTIAL_FAILURE` | au moins une source a réussi, au moins une a échoué, et l'état est écrit : les sources réussies sont acquises, les autres repartent de leur date à la collecte suivante |
