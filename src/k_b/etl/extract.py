@@ -39,21 +39,27 @@ MAX_QUOTED_FAILURE_LENGTH = 300
 
 
 class CollectionOutcome(NamedTuple):
-    """The result of a collection: each source's error, None on success, and the state's error."""
+    """The result of a collection: each source's error, None on success, the state's error, and
+    the raw files written by each source collected."""
 
     errors_by_source: dict[str, Exception | None]
     # The raw files are written even when the state is not: the next run collects again.
     state_error: OSError | None
+    # Shown beside "ok" (decision of Sabine of 2026-11-03, which takes back that of 2026-10-29:
+    # in the log only). A failed source has none: its line says failed.
+    written_count_by_source: dict[str, int]
 
 
 def collect_all_sources(
     sources: list[Source], raw_dir: Path, data_dir: Path, now: datetime
 ) -> CollectionOutcome:
-    """Collect each source; return each source's error (None: success) and the state's error."""
+    """Collect each source; return each source's error (None: success), the state's error and
+    the raw files written by each source collected."""
     if now.utcoffset() != timedelta(0):
         raise ValueError(f"collection time must be in UTC, got {now!r}")
     last_collection_dates = load_last_collection_dates(data_dir)
     errors_by_source: dict[str, Exception | None] = {}
+    written_count_by_source: dict[str, int] = {}
     for source in sources:
         # Its start apart from its end: a source that hangs is named (decision of Sabine of
         # 2026-10-29).
@@ -83,14 +89,15 @@ def collect_all_sources(
             )
             last_collection_dates[source.name] = now
             errors_by_source[source.name] = None
+            written_count_by_source[source.name] = written_count
     try:
         save_last_collection_dates(data_dir, last_collection_dates)
     except OSError as error:
         logger.exception(
             "collection state not written to %s", data_dir / COLLECTION_STATE_FILENAME
         )
-        return CollectionOutcome(errors_by_source, error)
-    return CollectionOutcome(errors_by_source, None)
+        return CollectionOutcome(errors_by_source, error, written_count_by_source)
+    return CollectionOutcome(errors_by_source, None, written_count_by_source)
 
 
 def describe_source_failure(error: Exception) -> str:

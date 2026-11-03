@@ -239,7 +239,8 @@ Avec le jeton rangé dans le `.env` à la racine du dépôt, ignoré par git :
 
 `kb collect` journalise son début (`collection started: 17 sources selected`), le départ de
 chaque source puis ce qu'elle a écrit, et sa fin avec la durée, puis affiche une ligne par source
-(`ok` ou `failed`, avec le type de l'erreur ; `skipped` pour Zotero sans `KB_ZOTERO_DIR`, les clips
+(`ok` avec le nombre de fichiers bruts écrits, `ok (1 raw file)`, ou `failed`, avec le type de
+l'erreur ; `skipped` pour Zotero sans `KB_ZOTERO_DIR`, les clips
 sans `KB_VAULT_DIR`, GH Archive sans `GOOGLE_APPLICATION_CREDENTIALS`, une source que
 `KB_COLLECT_ONLY` écarte). Code de sortie : 0 si
 tout a réussi ; 4 si au moins une source a réussi et au moins une a échoué, l'état de collecte
