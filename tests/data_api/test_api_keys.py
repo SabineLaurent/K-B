@@ -5,6 +5,7 @@ import secrets
 import pytest
 from fastapi.routing import iter_route_contexts
 
+from k_b.core.api_settings import OPENAPI_PATH
 from k_b.data_api.app import create_app
 
 INVALID_API_KEY = {"error": "invalid_api_key"}
@@ -15,7 +16,7 @@ PUBLIC_ROUTES = {"/docs", "/openapi.json", "/health"}
 def list_routes(items_database, api_keys):
     """Every route of the app, read by the walk FastAPI makes for its OpenAPI, so that a route
     added later is tested as well."""
-    app = create_app(items_database, api_keys)
+    app = create_app(items_database, api_keys, openapi_url=OPENAPI_PATH)
     return [route.path for route in iter_route_contexts(app.routes)]
 
 

@@ -7,7 +7,7 @@ erreurs et les exigences de sécurité. Les décisions et leur pourquoi sont dan
 [journal ADR](ADR/journal-decisions-projet.md) (entrées du 2026-10-14) ; la collecte, dans
 [specs-collecte.md](specs-collecte.md) ; la base, dans [stockage.md](stockage.md).
 
-**Version de la spec : 0.5.0**, la même que `info.version` de l'OpenAPI
+**Version de la spec : 0.6.0**, la même que `info.version` de l'OpenAPI
 (`docs/api/openapi-donnees.json`, que #184 écrit). Un changement de comportement visible par un client, comme
 l'ordre des résultats, change la version.
 
@@ -18,6 +18,7 @@ l'ordre des résultats, change la version.
 | 0.3.0 | `GET /health` servi sans clé ; hôte, port et hôtes permis réglables (#199) |
 | 0.4.0 | la sorte `clip` (pages gardées avec Web Clipper) servie par `GET /items` et `GET /items/{item_id}` (#14) |
 | 0.5.0 | l'en-tête `X-Request-ID` sur chaque réponse ; les tags `items` et `trends` dans l'OpenAPI ; les clés des clients lues dans `KB_DATA_API_KEY_<CLIENT>`, et non plus `KB_API_KEY_<CLIENT>` (#156) |
+| 0.6.0 | `/docs` et `/openapi.json` servis seulement si `KB_DEPLOYMENT_ENVIRONMENT=sandbox` ; 404 sinon (#393) |
 
 ## Règles communes
 
@@ -41,6 +42,11 @@ l'ordre des résultats, change la version.
   connexion par requête.
 - **Clé** : chaque route de données demande `Authorization: Bearer <clé>`. `/docs`,
   `/openapi.json` et `/health` sont publics : ils ne contiennent aucune donnée.
+- **Documentation** : `/docs` et `/openapi.json` ne sont servis que si
+  `KB_DEPLOYMENT_ENVIRONMENT=sandbox`. Avec `production`, une autre valeur ou rien, ils répondent
+  404 : une variable oubliée ou mal écrite ne montre rien (décision de Sabine du 2026-11-04, #393).
+  Ce n'est pas une mesure de sécurité : la clé protège les données. Le contrat reste versionné :
+  `kb openapi` l'écrit depuis l'application, que la route soit servie ou non.
 - **Santé** : `GET /health` répond 200 `{"status": "ok"}`, sans clé, pour la sonde d'un conteneur.
   Il dit que le processus répond, rien d'autre : ni version, ni chemin, ni état de la base (une
   sonde qui ouvrirait la base ferait redémarrer le conteneur en boucle tant que la base manque).
@@ -332,8 +338,8 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 | API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon ; aucune route d'administration. | **Tenue.** `test_every_data_route_refuses_another_method_with_405`, `test_the_routes_are_listed`, `test_docs_openapi_and_health_are_public_and_no_other_page_is_served`, `test_health_refuses_another_method_with_405` |
 | API6:2023 Unrestricted Access to Sensitive Business Flows | Sans objet : l'API n'a aucun flux métier à protéger (ni achat, ni réservation, ni création de compte), seulement des lectures. | Sans objet, sans test |
 | API7:2023 Server Side Request Forgery | Sans objet : l'API ne va chercher aucune adresse fournie par un client. | Sans objet, sans test |
-| API8:2023 Security Misconfiguration | Hôte d'écoute réglable (`KB_DATA_API_HOST`, une adresse IPv4), `127.0.0.1` par défaut ; hôtes permis réglables (`KB_DATA_API_ALLOWED_HOSTS`), `127.0.0.1` et `localhost` par défaut ; `*`, une liste ou une entrée vide et un nom hors motif refusés au démarrage ; en conteneur, écoute sur `0.0.0.0` et port publié sur `127.0.0.1` de la machine (#200) ; pas de CORS ; erreurs sans pile ; `/health` ne dit que `ok`. Limites : Swagger UI (`/docs`) charge ses fichiers depuis un CDN ; pas de TLS, alors qu'OWASP le demande même pour une API interne (local et réseau compose au 25/10 ; l'entrée HTTPS d'ACA au 08/11). | **Tenue en partie** : sans TLS, et la publication sur `127.0.0.1` revient à #200 (critère « ports publiés sur `127.0.0.1` »), pas encore tenue. Ce qui est tenu : `test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_config`, `test_serve_listens_on_the_host_and_port_of_the_environment`, `test_serve_exits_2_on_a_host_or_port_refused`, `test_serve_exits_2_and_names_the_allowed_hosts_refused`, `test_serve_allows_the_hosts_of_the_environment_and_no_other`, `test_a_host_other_than_localhost_gives_400`, `test_a_host_other_than_the_allowed_ones_gives_400_on_health`, `test_health_answers_ok_without_key`, `test_no_route_answers_cors`, `test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only`, `test_a_database_error_gives_500_without_detail_and_logs_its_type` |
-| API9:2023 Improper Inventory Management | OpenAPI versionnée (`docs/api/openapi-donnees.json`), comparée en CI au schéma produit. `/health`, hors OpenAPI comme `/docs`, est inventoriée par ce document (« Santé »). | **Tenue.** `test_the_versioned_openapi_is_the_one_the_app_produces`, `test_the_versioned_openapi_is_valid_and_declares_its_security_scheme`, `test_each_data_route_documents_its_errors` |
+| API8:2023 Security Misconfiguration | Hôte d'écoute réglable (`KB_DATA_API_HOST`, une adresse IPv4), `127.0.0.1` par défaut ; hôtes permis réglables (`KB_DATA_API_ALLOWED_HOSTS`), `127.0.0.1` et `localhost` par défaut ; `*`, une liste ou une entrée vide et un nom hors motif refusés au démarrage ; en conteneur, écoute sur `0.0.0.0` et port publié sur `127.0.0.1` de la machine (#200) ; pas de CORS ; erreurs sans pile ; `/health` ne dit que `ok`. `/docs` et `/openapi.json` servis en `sandbox` seulement (#393). Limites : Swagger UI (`/docs`) charge ses fichiers depuis un CDN ; pas de TLS, alors qu'OWASP le demande même pour une API interne (local et réseau compose au 25/10 ; l'entrée HTTPS d'ACA au 08/11). | **Tenue en partie** : sans TLS, et la publication sur `127.0.0.1` revient à #200 (critère « ports publiés sur `127.0.0.1` »), pas encore tenue. Ce qui est tenu : `test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_config`, `test_serve_listens_on_the_host_and_port_of_the_environment`, `test_serve_exits_2_on_a_host_or_port_refused`, `test_serve_exits_2_and_names_the_allowed_hosts_refused`, `test_serve_allows_the_hosts_of_the_environment_and_no_other`, `test_a_host_other_than_localhost_gives_400`, `test_a_host_other_than_the_allowed_ones_gives_400_on_health`, `test_health_answers_ok_without_key`, `test_no_route_answers_cors`, `test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only`, `test_a_database_error_gives_500_without_detail_and_logs_its_type` |
+| API9:2023 Improper Inventory Management | OpenAPI versionnée (`docs/api/openapi-donnees.json`), comparée en CI au schéma produit ; hors `sandbox`, la route ne la sert pas, le contrat reste dans le dépôt (#393). `/health`, hors OpenAPI comme `/docs`, est inventoriée par ce document (« Santé »). | **Tenue.** `test_the_versioned_openapi_is_the_one_the_app_produces`, `test_the_versioned_openapi_is_valid_and_declares_its_security_scheme`, `test_each_data_route_documents_its_errors` |
 | API10:2023 Unsafe Consumption of APIs | Le contenu servi vient de tiers (arXiv, GitHub, CISA, TLDR, Zotero, pages gardées avec Web Clipper) : pour un client, et d'abord pour un agent, c'est une donnée, jamais une consigne. Côté K-B, la réponse d'une source est validée à la collecte (modèles de `items.py`, `CHECK` de `schema.sql`). | **Tenue côté K-B** : `tests/test_schema.py` (chaque type refusé par l'item et par la base) et les tests de chaque source. Côté client, une consigne, sans test |
 
 ## Hors de cette version

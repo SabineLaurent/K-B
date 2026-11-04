@@ -27,6 +27,7 @@ from k_b.core.api_keys import (
     find_shared_key_refusal,
     read_api_keys_or_refusal,
 )
+from k_b.core.api_settings import read_openapi_url
 from k_b.core.config import DIGEST_SUBJECTS
 
 logger = logging.getLogger(LOGGER_NAME)
@@ -99,6 +100,7 @@ def run_serve_ai(environ: Mapping[str, str]) -> int:
             # Both stopped by the lifespan of the app (ai_api/app.py).
             ModelMetrics.from_settings(export_settings, resource),
             TraceExport.from_settings(export_settings, resource),
+            openapi_url=read_openapi_url(environ),
         ),
         host=settings.host,
         port=settings.port,

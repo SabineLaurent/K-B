@@ -1,9 +1,18 @@
-"""Where kb serve-data and kb serve-ai listen: the host and the port, each read by its variable."""
+"""Where kb serve-data and kb serve-ai listen, the host and the port, each read by its variable, and
+whether they serve their documentation."""
 
 import ipaddress
 import re
+from collections.abc import Mapping
+from typing import Literal
 
 from k_b.core.quoting import quote_value
+
+DEPLOYMENT_ENVIRONMENT_VARIABLE = "KB_DEPLOYMENT_ENVIRONMENT"
+type DeploymentEnvironment = Literal["sandbox", "production"]
+DEPLOYMENT_ENVIRONMENTS: tuple[DeploymentEnvironment, ...] = ("sandbox", "production")
+# Where an API serves its OpenAPI, which its /docs reads.
+OPENAPI_PATH = "/openapi.json"
 
 # Digits only: int() would also read " 8000", "+8000" and "8_000".
 PORT_DIGITS = re.compile(r"[0-9]{1,5}")
@@ -27,3 +36,11 @@ def find_port_refusal(variable: str, port: str) -> str | None:
         f"{variable}: {quote_value(port)} not an integer"
         f" from {PORT_NUMBERS.start} to {PORT_NUMBERS.stop - 1}"
     )
+
+
+def read_openapi_url(environ: Mapping[str, str]) -> str | None:
+    """The path of the OpenAPI in the sandbox; None serves neither it nor /docs, whatever else the
+    variable holds, or nothing: a value forgotten shows nothing (decision of Sabine of 2026-11-04)."""
+    if environ.get(DEPLOYMENT_ENVIRONMENT_VARIABLE) == "sandbox":
+        return OPENAPI_PATH
+    return None

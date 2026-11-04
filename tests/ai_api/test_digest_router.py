@@ -40,6 +40,7 @@ from k_b.ai_api.errors import (
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.ai_api.routers import digest_router
 from k_b.ai_api.tracing import TRACING_OFF
+from k_b.core.api_settings import OPENAPI_PATH
 from k_b.core.config import (
     LLM_INPUT_USD_PER_MILLION_TOKENS,
     LLM_OUTPUT_USD_PER_MILLION_TOKENS,
@@ -183,6 +184,7 @@ def make_ai_api(data_api, metric_reader, recorded_traces):
                 MeterProvider(metric_readers=[metric_reader], shutdown_on_exit=False)
             ),
             replace(recorded_traces.trace_export, content=trace_content),
+            openapi_url=OPENAPI_PATH,
         )
         transport = ReplayTransport(steps)
 

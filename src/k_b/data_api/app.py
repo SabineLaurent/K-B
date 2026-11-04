@@ -17,7 +17,7 @@ from k_b.data_api.api_router import api_router
 from k_b.data_api.errors import ERROR_HANDLERS
 
 # The version of docs/specs-api.md: a change a client can see changes both.
-API_VERSION = "0.5.0"
+API_VERSION = "0.6.0"
 # Asked of every user of the arXiv API, "on your product" (arXiv API Access, 2026-10-25): the
 # data API serves its papers.
 ARXIV_ACKNOWLEDGEMENT = (
@@ -29,9 +29,10 @@ def create_app(
     database_path: Path,
     api_keys: Mapping[str, SecretStr],
     allowed_hosts: Sequence[str] = DATA_API_ALLOWED_HOSTS,
+    openapi_url: str | None = None,
 ) -> FastAPI:
-    """The app, its keys, its base and the hosts it answers given; without any key, every data
-    route answers 401."""
+    """The app, its keys, its base, the hosts it answers and the path of its OpenAPI given; without
+    any key, every data route answers 401; without a path, neither the OpenAPI nor /docs is served."""
     app = FastAPI(
         title="K-B data API",
         version=API_VERSION,
@@ -40,6 +41,7 @@ def create_app(
         # /health are routes of Starlette, outside: they hold no data. ReDoc and the OAuth2
         # redirect of Swagger UI, which K-B does not use, are not served.
         dependencies=[Depends(check_api_key)],
+        openapi_url=openapi_url,
         redoc_url=None,
         swagger_ui_oauth2_redirect_url=None,
         # /items/ is an unknown route (404), not a redirection to /items.

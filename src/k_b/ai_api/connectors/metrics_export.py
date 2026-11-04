@@ -10,7 +10,6 @@ import re
 import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Literal
 from urllib.parse import unquote
 
 import requests
@@ -24,6 +23,11 @@ from opentelemetry.sdk.metrics.export import (
 from opentelemetry.sdk.resources import Resource
 from pydantic import SecretStr
 
+from k_b.core.api_settings import (
+    DEPLOYMENT_ENVIRONMENT_VARIABLE,
+    DEPLOYMENT_ENVIRONMENTS,
+    DeploymentEnvironment,
+)
 from k_b.core.config import (
     METRICS_EXPORT_INTERVAL_SECONDS,
     METRICS_EXPORT_TIMEOUT_SECONDS,
@@ -44,7 +48,6 @@ EXPORTER_LOGGERS = (
 
 ENDPOINT_VARIABLE = "KB_OTLP_ENDPOINT"
 HEADERS_VARIABLE = "KB_OTLP_HEADERS"
-ENVIRONMENT_VARIABLE = "KB_DEPLOYMENT_ENVIRONMENT"
 TRACE_CONTENT_VARIABLE = "KB_TRACE_CONTENT"
 OPENTELEMETRY_VARIABLE_PREFIX = "OTEL_"
 # The paths K-B adds to the base endpoint, one per signal.
@@ -53,8 +56,6 @@ TRACES_PATH = "/v1/traces"
 LOGS_PATH = "/v1/logs"
 SIGNAL_PATHS = (METRICS_PATH, TRACES_PATH, LOGS_PATH)
 SERVICE_NAME = "k-b-ai-api"
-type DeploymentEnvironment = Literal["sandbox", "production"]
-DEPLOYMENT_ENVIRONMENTS: tuple[DeploymentEnvironment, ...] = ("sandbox", "production")
 # A header name: a token of RFC 9110 (section 5.6.2).
 HEADER_NAME = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+")
 # A header value, once percent-decoded: words of printable ASCII, one space between two. Stricter
@@ -171,14 +172,12 @@ def read_environment_and_content_or_refusal(
     """The environment of the export, required, and the content sent with the traces, none by
     default; or why one is refused: all in production, as each request to the model would send its
     items (poc.md, rule 5, exception)."""
-    environment = environ.get(ENVIRONMENT_VARIABLE) or None
+    environment = environ.get(DEPLOYMENT_ENVIRONMENT_VARIABLE) or None
     if environment is None:
-        return (
-            f"{ENVIRONMENT_VARIABLE}: not set, {' or '.join(DEPLOYMENT_ENVIRONMENTS)}"
-        )
+        return f"{DEPLOYMENT_ENVIRONMENT_VARIABLE}: not set, {' or '.join(DEPLOYMENT_ENVIRONMENTS)}"
     if environment not in DEPLOYMENT_ENVIRONMENTS:
         return (
-            f"{ENVIRONMENT_VARIABLE}: {quote_value(environment)} not"
+            f"{DEPLOYMENT_ENVIRONMENT_VARIABLE}: {quote_value(environment)} not"
             f" {' nor '.join(DEPLOYMENT_ENVIRONMENTS)}"
         )
     trace_content = environ.get(TRACE_CONTENT_VARIABLE) or "none"
