@@ -231,3 +231,30 @@ def test_the_log_gives_numbers_never_a_name(database_path, caplog):
     )
     assert "claude-code" not in caplog.text
     assert "2609." not in caplog.text
+
+
+def test_an_item_collected_at_the_bound_is_kept(database_path):
+    """The papers, the releases and the advisories of 2026-10-05T09:30:00Z, three years to the
+    second."""
+    count = purge(database_path, datetime(2029, 10, 5, 9, 30, tzinfo=UTC))
+
+    assert count.item_count == 0
+    assert fetch_column(database_path, "SELECT count(*) FROM release") == [3]
+    assert fetch_column(
+        database_path, "SELECT count(*) FROM publication WHERE title IS NOT NULL"
+    ) == [2]
+
+
+def test_a_tracked_repository_named_in_another_case_in_the_base_is_still_tracked(
+    database_path,
+):
+    execute(
+        database_path,
+        "UPDATE tracked_repository SET repository_name = 'Anthropics/Claude-Code'",
+    )
+
+    count = purge(
+        database_path, AFTER_THE_FIRST_COLLECTIONS, ("anthropics/claude-code",)
+    )
+
+    assert count.tracked_repository_count == 0

@@ -271,3 +271,35 @@ def test_the_store_tells_whether_it_has_a_folder(tmp_path):
         False,
         False,
     )
+
+
+def test_a_collection_that_is_a_link_is_kept_and_its_target_too(tmp_path):
+    target = tmp_path / "outside.xml"
+    target.write_bytes(b"")
+    link = tmp_path / "raw/automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
+    link.parent.mkdir(parents=True)
+    link.symlink_to(target)
+
+    deletion = RawStore(tmp_path).delete_collection(
+        "raw/automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
+    )
+
+    assert deletion == "kept"
+    assert link.is_symlink()
+    assert target.exists()
+
+
+def test_an_error_other_than_a_collection_gone_is_raised(tmp_path, monkeypatch):
+    page = tmp_path / "raw/automated_watch/tldr_ai/2026-10-05T093000Z/2026-10-01.html"
+    page.parent.mkdir(parents=True)
+    page.write_bytes(b"")
+
+    def refuse(store, key):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(RawStore, "delete", refuse)
+
+    with pytest.raises(PermissionError):
+        RawStore(tmp_path).delete_collection(
+            "raw/automated_watch/tldr_ai/2026-10-05T093000Z"
+        )
