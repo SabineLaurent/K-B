@@ -266,7 +266,7 @@ la durée et le nom de son journal, puis affiche son bilan sur une ligne
 bruts lus, items écrits (nouveaux ou mis à jour), lignes de tendance écrites, items et fenêtres de
 classement écartés (doublons, ou versions qui ne sont pas plus récentes que celle de la base),
 rejets et lignes retirées (CISA, entrées et surlignages Zotero). Les rejets sont détaillés dans
-`<KB_DATA_DIR>/import-log-<AAAA-MM-JJTHHMMSSZ>.jsonl`, un journal par import. Pour reconstruire
+`<KB_DATA_DIR>/journals/import-journal-<AAAA-MM-JJTHHMMSSZ>.jsonl`, un journal par import, gardé 6 mois. Pour reconstruire
 la base depuis tout le brut : supprimer `k-b.sqlite`, puis `kb create-db` et `kb import`. Code de
 sortie :
 
