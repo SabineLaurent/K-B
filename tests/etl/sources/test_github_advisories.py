@@ -271,7 +271,7 @@ def test_a_page_with_an_invalid_advisory_is_collected_even_without_a_new_valid_o
     fake_github_api,
 ):
     # The rejected advisory leaves the page as the window moves on: kept now, it reaches the
-    # import log.
+    # import journal.
     fake_github_api.response = page_with_invalid_advisories(1)
 
     assert (

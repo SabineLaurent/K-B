@@ -1,4 +1,4 @@
-"""The register of the raw files read, and the lines of the import log."""
+"""The register of the raw files read, and the lines of the import journal."""
 
 import re
 
@@ -15,11 +15,11 @@ from load_helpers import (
     RELEASES_PATH,
     count_rows,
     dump_database,
+    journal_path_at,
     kev_catalog,
-    list_logs,
-    log_path_at,
-    read_log,
-    read_log_lines,
+    list_journals,
+    read_journal,
+    read_journal_lines,
     refuse_in_the_base,
     registered_paths,
     run_import,
@@ -29,7 +29,7 @@ from test_transform import FIXTURES_DIR, copy_fixture
 
 from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.etl.load import (
-    ImportLogExistsError,
+    ImportJournalExistsError,
     import_items,
     read_imported_paths,
 )
@@ -113,25 +113,25 @@ def test_an_unreadable_file_and_a_file_without_reader_are_not_registered(data_di
     assert (second.read_count, second.rejection_count) == (1, 1)
 
 
-def test_only_a_new_raw_file_is_read_and_the_log_of_the_first_import_stays_whole(
+def test_only_a_new_raw_file_is_read_and_the_journal_of_the_first_import_stays_whole(
     data_dir,
 ):
     run_import(data_dir)
-    (first_log,) = list_logs(data_dir)
-    first_log_content = first_log.read_bytes()
+    (first_journal,) = list_journals(data_dir)
+    first_journal_content = first_journal.read_bytes()
     write_collection(data_dir, CISA_KEV_DIR, "2026-10-06T093000Z", kev_catalog("Known"))
 
     second = run_import(data_dir)
 
     assert second.read_count == 1
     assert second.item_count == 1
-    assert len(list_logs(data_dir)) == 2
-    assert first_log.read_bytes() == first_log_content
+    assert len(list_journals(data_dir)) == 2
+    assert first_journal.read_bytes() == first_journal_content
 
 
-def test_a_log_of_the_same_second_stops_the_import_before_the_database(data_dir):
-    log_path = log_path_at(data_dir, FIRST_IMPORT_AT)
-    log_path.write_text("earlier import\n")
+def test_a_journal_of_the_same_second_stops_the_import_before_the_database(data_dir):
+    journal_path = journal_path_at(data_dir, FIRST_IMPORT_AT)
+    journal_path.write_text("earlier import\n")
     tables_before = dump_database(data_dir)
     database_path = data_dir / "k-b.sqlite"
     reading = read_raw_files(
@@ -141,28 +141,28 @@ def test_a_log_of_the_same_second_stops_the_import_before_the_database(data_dir)
         GITHUB_TRACKED_REPOSITORIES,
     ).items
 
-    with pytest.raises(ImportLogExistsError):
+    with pytest.raises(ImportJournalExistsError):
         import_items(
             reading,
             TrendReading([], [], 0),
             database_path,
-            log_path,
+            journal_path,
             FIRST_IMPORT_AT,
             GITHUB_TRACKED_REPOSITORIES,
         )
 
     assert dump_database(data_dir) == tables_before
-    assert log_path.read_text() == "earlier import\n"
+    assert journal_path.read_text() == "earlier import\n"
 
 
-def test_each_line_of_the_log_carries_the_time_of_its_import(data_dir):
+def test_each_line_of_the_journal_carries_the_time_of_its_import(data_dir):
     write_collection(data_dir, ARXIV_DIR, "2026-10-06T093000Z", "not xml")
     releases = (FIXTURES_DIR / "github_releases_extract.json").read_text()
     write_collection(data_dir, RELEASES_DIR, "2026-10-06T093000Z", releases)
 
     run_import(data_dir)
 
-    lines = read_log_lines(data_dir)
+    lines = read_journal_lines(data_dir)
     assert {line["kind"] for line in lines} == {"rejection", "discard"}
     assert {line["imported_at"] for line in lines} == {"2026-10-12T15:49:03Z"}
     assert all(
@@ -171,7 +171,7 @@ def test_each_line_of_the_log_carries_the_time_of_its_import(data_dir):
     )
 
 
-def test_the_log_lists_what_the_reading_rejected_before_what_the_writing_refused(
+def test_the_journal_lists_what_the_reading_rejected_before_what_the_writing_refused(
     data_dir, monkeypatch
 ):
     """What the reading rejected comes first: an unreadable page and a release out of the list
@@ -188,7 +188,9 @@ def test_the_log_lists_what_the_reading_rejected_before_what_the_writing_refused
 
     run_import(data_dir, still_tracked)
 
-    rejections = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
+    rejections = [
+        line for line in read_journal(data_dir) if line["kind"] == "rejection"
+    ]
     assert [line["raw_file_path"] for line in rejections] == [
         unreadable,
         RELEASES_PATH,

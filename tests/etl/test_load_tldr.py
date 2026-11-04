@@ -6,7 +6,7 @@ from load_helpers import (
     count_rows,
     fetch_rows,
     read_discards,
-    read_log,
+    read_journal,
     registered_paths,
     run_import,
 )
@@ -167,7 +167,7 @@ def test_a_tldr_page_without_edition_title_is_rejected_and_not_registered(
 
     assert (summary.item_count, summary.rejection_count) == (3, 1)
     assert landing_page not in registered_paths(tldr_data_dir)
-    assert read_log(tldr_data_dir) == [
+    assert read_journal(tldr_data_dir) == [
         {
             "kind": "rejection",
             "raw_file_path": landing_page,

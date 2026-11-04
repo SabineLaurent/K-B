@@ -11,7 +11,7 @@ from load_helpers import (
     PAPER_QUERY,
     count_rows,
     fetch_rows,
-    read_log,
+    read_journal,
     run_import,
 )
 from test_items import (
@@ -237,7 +237,9 @@ def test_a_release_of_a_repository_no_longer_tracked_is_rejected_and_logged(data
 
     summary = run_import(data_dir, still_tracked)
 
-    rejections = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
+    rejections = [
+        line for line in read_journal(data_dir) if line["kind"] == "rejection"
+    ]
     assert summary.rejection_count == len(rejections) == 3
     assert rejections[0] == {
         "kind": "rejection",

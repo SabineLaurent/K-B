@@ -11,11 +11,11 @@ from load_helpers import (
     count_rows,
     dump_database,
     fetch_rows,
+    journal_path_at,
     kev_catalog,
-    list_logs,
-    log_path_at,
+    list_journals,
     read_discards,
-    read_log,
+    read_journal,
     rebuild_database,
     registered_paths,
     run_import,
@@ -115,7 +115,7 @@ def test_a_ranking_gives_a_trend_row_per_repository_of_its_window_and_no_item(
         " JOIN source ON source.id = raw_data.source_id",
     ) == [("gh_archive", "gh_archive", RANKING_COLLECTED_AT)]
     assert count_rows(trend_data_dir, "SELECT count(*) FROM item") == 0
-    assert read_log(trend_data_dir) == []
+    assert read_journal(trend_data_dir) == []
 
 
 def test_a_second_import_reads_no_ranking_again_and_changes_nothing(trend_data_dir):
@@ -138,7 +138,7 @@ def test_a_ranking_read_again_changes_nothing_and_its_window_is_logged_already_s
 
     assert second == (0, 1, 0, 1, 0, 0)
     assert dump_database(trend_data_dir) == tables
-    assert read_log(trend_data_dir) == [
+    assert read_journal(trend_data_dir) == [
         {
             "kind": "discard",
             "rule": "already_seen",
@@ -173,10 +173,10 @@ def test_a_window_collected_again_keeps_its_first_ranking_whole_and_is_logged(
     assert second == (0, 1, 0, 1, 0, 0)
     assert fetch_rows(trend_data_dir, TREND_QUERY) == first_ranking
     assert again in registered_paths(trend_data_dir)
-    log = list_logs(trend_data_dir)[-1].read_text()
+    log = list_journals(trend_data_dir)[-1].read_text()
     assert "newcomer" not in log
     assert RANKING["rows"][0]["repository_name"] not in log
-    assert read_log(trend_data_dir) == [
+    assert read_journal(trend_data_dir) == [
         {
             "kind": "discard",
             "rule": "already_seen",
@@ -249,7 +249,7 @@ def test_a_ranking_refused_is_rejected_logged_and_read_again_at_the_next_import(
     assert first == (0, 0, 1, 2, 0, 5)
     assert second == (0, 0, 1, 1, 0, 0)
     assert refused not in registered_paths(trend_data_dir)
-    [rejection] = read_log(trend_data_dir)
+    [rejection] = read_journal(trend_data_dir)
     assert (rejection["kind"], rejection["raw_file_path"]) == ("rejection", refused)
     assert rejection["reason"].startswith(
         "TrendsExtractInvalidError: row 0: stars_gained"
@@ -260,7 +260,7 @@ def test_a_ranking_refused_is_rejected_logged_and_read_again_at_the_next_import(
 def run_import_with_a_ranking_row_changed(data_dir, raw_file_path, **changes):
     """kb import, the last row of the ranking changed after its reading, as by a reader that let
     it through."""
-    imported_at = FIRST_IMPORT_AT + timedelta(seconds=len(list_logs(data_dir)))
+    imported_at = FIRST_IMPORT_AT + timedelta(seconds=len(list_journals(data_dir)))
     database_path = data_dir / "k-b.sqlite"
     imported_paths = read_imported_paths(database_path)
     readings = read_raw_files(
@@ -278,7 +278,7 @@ def run_import_with_a_ranking_row_changed(data_dir, raw_file_path, **changes):
         readings.items,
         readings.trends._replace(files=changed_files),
         database_path,
-        log_path_at(data_dir, imported_at),
+        journal_path_at(data_dir, imported_at),
         imported_at,
         GITHUB_TRACKED_REPOSITORIES,
     )
@@ -301,7 +301,7 @@ def test_a_ranking_with_a_row_the_base_refuses_is_refused_whole_and_read_again(
     # The ranking of the fixture is written; none of the rows of the refused one is.
     assert first == (0, 0, 1, 2, 0, 5)
     assert refused not in registered_paths(trend_data_dir)
-    assert read_log(trend_data_dir) == [
+    assert read_journal(trend_data_dir) == [
         {
             "kind": "rejection",
             "raw_file_path": refused,

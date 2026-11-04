@@ -1,6 +1,7 @@
 """The purges kb import runs once its import committed, in this order: the superseded catalogs,
-the base, the raw, then the registry (docs/registre-traitements.md, procedure of sorting). The
-first error stops the others; the next import runs them again."""
+the base, the raw, the registry, then the logs and the journals (docs/registre-traitements.md,
+procedure of sorting).
+The first error stops the others; the next import runs them again."""
 
 from collections.abc import Sequence
 from datetime import datetime
@@ -19,6 +20,7 @@ from k_b.purge.base import purge_expired_rows
 from k_b.purge.catalogs import delete_superseded_raw_files
 from k_b.purge.raw import delete_expired_raw
 from k_b.purge.registry import purge_registry
+from k_b.purge.run_records import delete_expired_records
 
 
 class StateCatalog(NamedTuple):
@@ -50,6 +52,7 @@ def purge_after_import(
     )
     delete_expired_raw(store, imported_at, folder_keys, imported_paths)
     purge_registry(database_path, store, source_codes)
+    delete_expired_records(data_dir, imported_at)
 
 
 def read_imported_paths(database_path: Path) -> frozenset[str]:

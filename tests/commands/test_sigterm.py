@@ -45,27 +45,27 @@ def dump_database(data_dir):
         connection.close()
 
 
-def test_a_sigterm_after_the_import_log_is_written_leaves_neither_the_import_nor_its_log(
+def test_a_sigterm_after_the_import_journal_is_written_leaves_neither_the_import_nor_its_log(
     monkeypatch, tmp_path, sigterm_handler_of_the_test
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
     copy_fixture(tmp_path / "raw", "cisa_kev_extract.csv", "cisa_kev", "csv")
     tables_before = dump_database(tmp_path)
-    write_import_log = load.write_import_log
+    write_import_journal = load.write_import_journal
 
-    def write_then_receive_sigterm(log_path, *arguments):
-        write_import_log(log_path, *arguments)
-        assert log_path.is_file()
+    def write_then_receive_sigterm(journal_path, *arguments):
+        write_import_journal(journal_path, *arguments)
+        assert journal_path.is_file()
         signal.raise_signal(signal.SIGTERM)
 
-    monkeypatch.setattr(load, "write_import_log", write_then_receive_sigterm)
+    monkeypatch.setattr(load, "write_import_journal", write_then_receive_sigterm)
 
     exit_code = cli.main(["import"])
 
     assert exit_code == cli.ExitCode.STOPPED_BY_SIGTERM
     assert dump_database(tmp_path) == tables_before
-    assert list(tmp_path.glob("import-log-*.jsonl")) == []
+    assert list(tmp_path.glob("journals/import-journal-*.jsonl")) == []
     assert list_hidden_files(tmp_path) == []
     assert signal.getsignal(signal.SIGTERM) is sigterm_handler_of_the_test
     assert re.search(
@@ -83,7 +83,7 @@ class SigtermAfterCommitConnection(sqlite3.Connection):
         signal.raise_signal(signal.SIGTERM)
 
 
-def test_a_sigterm_once_the_base_has_committed_keeps_the_import_and_its_log(
+def test_a_sigterm_once_the_base_has_committed_keeps_the_import_and_its_journal(
     monkeypatch, tmp_path, capsys, sigterm_handler_of_the_test, connect_with_factory
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
@@ -105,15 +105,18 @@ def test_a_sigterm_once_the_base_has_committed_keeps_the_import_and_its_log(
     connection = sqlite3.connect(tmp_path / "k-b.sqlite")
     assert connection.execute("SELECT count(*) FROM raw_data").fetchone() == (1,)
     connection.close()
-    [log_path] = tmp_path.glob("import-log-*.jsonl")
-    log_lines = [json.loads(line) for line in log_path.read_text("utf-8").splitlines()]
-    assert [line["kind"] for line in log_lines] == ["rejection"]
-    imported_at = datetime.fromisoformat(log_lines[0]["imported_at"])
-    assert log_path.name == f"import-log-{imported_at:%Y-%m-%dT%H%M%SZ}.jsonl"
+    [journal_path] = tmp_path.glob("journals/import-journal-*.jsonl")
+    journal_lines = [
+        json.loads(line) for line in journal_path.read_text("utf-8").splitlines()
+    ]
+    assert [line["kind"] for line in journal_lines] == ["rejection"]
+    imported_at = datetime.fromisoformat(journal_lines[0]["imported_at"])
+    assert journal_path.name == f"import-journal-{imported_at:%Y-%m-%dT%H%M%SZ}.jsonl"
     output = capsys.readouterr()
     assert output.out == ""
-    assert f"INFO k_b.etl.load: import committed, log kept: '{log_path.name}'" in (
-        output.err
+    assert (
+        f"INFO k_b.etl.load: import committed, journal kept: '{journal_path.name}'"
+        in (output.err)
     )
 
 

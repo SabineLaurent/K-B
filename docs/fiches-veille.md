@@ -853,7 +853,7 @@ s'ajoutent à la liste de #156, puis `first_failed_check` (#205), puis `fidelity
 
 **Jamais** dans une ligne : le texte d'un item ou d'une affirmation, la consigne, la sortie du
 modèle, un titre, un auteur, une clé (règle 5 de `poc.md`). Un échec `data_api_*` ne fait aucun appel au modèle, donc
-aucune ligne `llm_call` : il va au journal de fonctionnement (sortie d'erreur), avec le
+aucune ligne `llm_call` : il va au log de fonctionnement (sortie d'erreur), avec le
 `request_id`.
 
 ### Les mêmes mesures en OpenTelemetry (#162)

@@ -786,7 +786,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
    Archive d'un seul parcours de `raw/`), puis écrit la base
    (`import_items`) : fichiers d'items et classements en une seule suite, dans l'ordre des
    collectes. La commande journalise `import started`, `import finished in 0 s` et le nom de son
-   journal (`import log kept: 'import-log-2026-10-28T194943Z.jsonl'`, le nom seul : le chemin
+   journal (`import journal kept: 'import-journal-2026-10-28T194943Z.jsonl'`, le nom seul : le chemin
    nomme le dossier des données), puis affiche son bilan sur une ligne, ici celui de l'essai du
    2026-10-28 (pas de tableau : décision de Sabine du 2026-10-29, qui remplace celui de #291) :
 
@@ -802,8 +802,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
    bilan est affiché avant les purges, qui suivent la validation de l'import (`src/k_b/purge/`,
    registre des traitements, « Procédure de tri ») : les bruts remplacés des catalogues d'état
    (`raw purge: N superseded files deleted`), la base (`base purge: …`), le brut de plus de 6 mois
-   (`raw purge: N collections older than 6 months deleted, …`), puis le registre
-   (`registry purge: N rows deleted`). Si l'une échoue, le bilan est affiché quand même, les
+   (`raw purge: N collections older than 6 months deleted, …`), le registre
+   (`registry purge: N rows deleted`), puis les logs et les journaux de plus de 6 mois
+   (`logs and journals purge: N files older than 6 months deleted`). Si l'une échoue, le bilan est affiché quand même, les
    suivantes ne tournent pas, l'erreur suit (`import committed, purge failed: … ; run kb import
    again`) et `kb import` sort en 1.
 
@@ -835,8 +836,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
      plein, base verrouillée), ou un journal qui ne s'écrit pas, n'écrit rien : aucun fichier
      n'est inscrit, tous seront relus. Si la validation échoue, ou sur une interruption (Ctrl-C,
      SIGTERM) reçue avant elle, le journal écrit est supprimé ; une interruption reçue pendant ou
-     après la validation garde l'import et son journal, et le journal de fonctionnement le dit
-     (`import committed, log kept`). Pourquoi : un fichier
+     après la validation garde l'import et son journal, et le log de fonctionnement le dit
+     (`import committed, journal kept`). Pourquoi : un fichier
      inscrit n'est plus relu, un journal perdu après la validation perdrait pour toujours la
      trace de ses rejets et de ses écarts (décision de Sabine du 2026-10-12, qui revient sur le
      journal écrit après la base de #105).
@@ -1041,7 +1042,7 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
        fois.
      - La colonne `publication_id` (papier cité) est créée et laissée vide : la remplir pour
        un lien `https://arxiv.org/abs/<id>` (2 articles sur 272) n'est pas fait.
-   - **Journal** : `<KB_DATA_DIR>/import-log-<AAAA-MM-JJTHHMMSSZ>.jsonl`, un fichier par
+   - **Journal** : `<KB_DATA_DIR>/journals/import-journal-<AAAA-MM-JJTHHMMSSZ>.jsonl`, un fichier par
      import, nommé par sa seconde au format des noms de bruts, jamais réécrit : si le journal
      de cette seconde existe déjà, l'import s'arrête sans rien écrire (code de sortie 2). Une
      ligne JSON par rejet (`raw_file_path`, `reason`), puis par item écarté (`rule`,

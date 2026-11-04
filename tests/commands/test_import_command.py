@@ -1,4 +1,4 @@
-"""kb import: the raw items written into the base, the purge and the import log."""
+"""kb import: the raw items written into the base, the purge and the import journal."""
 
 import re
 import shutil
@@ -27,15 +27,17 @@ def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, ca
 
     assert exit_code == 0
     output = capsys.readouterr()
-    (log_path,) = tmp_path.glob("import-log-*.jsonl")
-    assert re.fullmatch(r"import-log-\d{4}-\d{2}-\d{2}T\d{6}Z\.jsonl", log_path.name)
+    (journal_path,) = tmp_path.glob("journals/import-journal-*.jsonl")
+    assert re.fullmatch(
+        r"import-journal-\d{4}-\d{2}-\d{2}T\d{6}Z\.jsonl", journal_path.name
+    )
     assert output.out == (
         "\nimport: 0 raw read, 0 written, 0 trend rows, 0 left out, 0 rejected, 0 withdrawn\n\n"
     )
     for line in (
         "import started",
         r"import finished in \d+ s",
-        re.escape(f"import log kept: '{log_path.name}'"),
+        re.escape(f"import journal kept: '{journal_path.name}'"),
     ):
         assert re.search(
             rf"^{LOG_LINE_DATE} INFO k_b\.cli: {line}$", output.err, re.MULTILINE
@@ -218,14 +220,15 @@ def test_import_refuses_to_rewrite_the_log_of_its_second_and_exits_2(
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
     monkeypatch.setattr(import_command, "datetime", FrozenDatetime)
-    log_path = tmp_path / "import-log-2026-10-12T154903Z.jsonl"
-    log_path.write_text("earlier import\n")
+    journal_path = tmp_path / "journals" / "import-journal-2026-10-12T154903Z.jsonl"
+    journal_path.parent.mkdir(exist_ok=True)
+    journal_path.write_text("earlier import\n")
 
     exit_code = cli.main(["import"])
 
     assert exit_code == 2
-    assert str(log_path) in capsys.readouterr().err
-    assert log_path.read_text() == "earlier import\n"
+    assert str(journal_path) in capsys.readouterr().err
+    assert journal_path.read_text() == "earlier import\n"
 
 
 def test_import_refuses_a_missing_database_and_does_not_create_it(
@@ -248,7 +251,7 @@ def test_import_reports_a_failed_import_and_exits_1(monkeypatch, tmp_path, capsy
         reading,
         trend_reading,
         database_path,
-        log_path,
+        journal_path,
         imported_at,
         tracked_repositories,
     ):
@@ -275,7 +278,7 @@ def test_import_reports_a_source_missing_from_the_database_and_exits_1(
         reading,
         trend_reading,
         database_path,
-        log_path,
+        journal_path,
         imported_at,
         tracked_repositories,
     ):
@@ -300,7 +303,7 @@ def test_import_reports_a_kind_without_table_and_exits_1(monkeypatch, tmp_path, 
         reading,
         trend_reading,
         database_path,
-        log_path,
+        journal_path,
         imported_at,
         tracked_repositories,
     ):
@@ -335,12 +338,15 @@ def test_import_purges_what_it_committed_once_past_its_durations(
     monkeypatch, tmp_path, capsys
 ):
     """Imported three years after its collection, a raw file of arXiv is written, then purged:
-    the purge runs after the commit, the base, the raw and the registry in turn."""
+    the purge runs after the commit, the base, the raw, the registry, then the logs and the
+    journals in turn."""
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
     raw_path = copy_fixture(
         tmp_path / "raw", "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml"
     )
+    older_log = tmp_path / "logs" / "kb.log.2020-01-01"
+    older_log.write_text("a line\n", encoding="utf-8")
     monkeypatch.setattr(import_command, "datetime", make_clock(THREE_YEARS_LATER))
     capsys.readouterr()
 
@@ -357,6 +363,8 @@ def test_import_purges_what_it_committed_once_past_its_durations(
         " 0 kept" in output.err
     )
     assert "registry purge: 1 rows deleted" in output.err
+    assert not older_log.exists()
+    assert "logs and journals purge: 1 files older than 6 months deleted" in output.err
 
 
 def test_a_failed_purge_of_the_base_stops_the_purges_after_it(

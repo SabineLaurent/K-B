@@ -161,7 +161,7 @@ def test_the_rule_of_the_stages_refuses_every_way_to_another_stage(
 # nor the steps the pipeline chains around them (conventions.md, rule 5).
 ETL_RUN_MODULES = ETL_STAGE_MODULES | {
     "etl.normalize",
-    "etl.import_log",
+    "etl.import_journal",
 }
 
 
@@ -180,7 +180,7 @@ def test_commands_reach_the_runs_only_through_the_pipeline():
     [
         ("from k_b.etl.load import import_items", True),
         ("from k_b.etl import transform", True),
-        ("from ..etl.import_log import write_import_log", True),
+        ("from ..etl.import_journal import write_import_journal", True),
         ("from k_b.etl.pipeline import collect", False),
         ("from k_b.etl.raw_store import RawStore", False),
     ],

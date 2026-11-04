@@ -18,9 +18,9 @@ from load_helpers import (
     RELEASES_PATH,
     count_rows,
     dump_database,
-    list_logs,
-    log_path_at,
-    read_log,
+    journal_path_at,
+    list_journals,
+    read_journal,
     refuse_in_the_base,
     registered_paths,
     run_import,
@@ -48,7 +48,9 @@ def test_each_rejected_file_is_written_to_the_log(data_dir):
 
     summary = run_import(data_dir)
 
-    rejections = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
+    rejections = [
+        line for line in read_journal(data_dir) if line["kind"] == "rejection"
+    ]
     assert summary.rejection_count == len(rejections) == 1
     assert (
         rejections[0]["raw_file_path"]
@@ -57,7 +59,7 @@ def test_each_rejected_file_is_written_to_the_log(data_dir):
     assert rejections[0]["reason"]
 
 
-def test_an_invalid_release_is_written_to_the_log_and_the_others_are_imported(
+def test_an_invalid_release_is_written_to_the_journal_and_the_others_are_imported(
     data_dir,
 ):
     releases = json.loads((FIXTURES_DIR / "github_releases_extract.json").read_text())
@@ -68,7 +70,9 @@ def test_an_invalid_release_is_written_to_the_log_and_the_others_are_imported(
 
     run_import(data_dir)
 
-    rejections = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
+    rejections = [
+        line for line in read_journal(data_dir) if line["kind"] == "rejection"
+    ]
     assert rejections == [
         {
             "kind": "rejection",
@@ -79,7 +83,7 @@ def test_an_invalid_release_is_written_to_the_log_and_the_others_are_imported(
     assert count_rows(data_dir, "SELECT count(*) FROM release") == 3
 
 
-def test_a_failed_import_leaves_the_database_and_the_log_unchanged(
+def test_a_failed_import_leaves_the_database_and_the_journal_unchanged(
     data_dir, monkeypatch
 ):
     tables_before = dump_database(data_dir)
@@ -95,7 +99,7 @@ def test_a_failed_import_leaves_the_database_and_the_log_unchanged(
         run_import(data_dir)
 
     assert dump_database(data_dir) == tables_before
-    assert list_logs(data_dir) == []
+    assert list_journals(data_dir) == []
 
 
 def test_a_foreign_key_the_base_refuses_stops_the_import_and_writes_nothing(
@@ -119,7 +123,7 @@ def test_a_foreign_key_the_base_refuses_stops_the_import_and_writes_nothing(
         run_import(data_dir)
 
     assert dump_database(data_dir) == tables_before
-    assert list_logs(data_dir) == []
+    assert list_journals(data_dir) == []
 
 
 ARXIV_PATH = f"{AUTOMATED_WATCH}/{ARXIV_DIR}/{FIRST_COLLECTION}.xml"
@@ -193,7 +197,9 @@ def test_an_item_the_base_refuses_is_rejected_and_logged_and_the_others_are_impo
 
     summary = run_import(data_dir)
 
-    rejections = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
+    rejections = [
+        line for line in read_journal(data_dir) if line["kind"] == "rejection"
+    ]
     assert rejections == [
         {"kind": "rejection", "raw_file_path": raw_file_path, "reason": reason}
     ]
@@ -262,7 +268,7 @@ def test_a_missing_database_is_refused_and_not_created(tmp_path):
             RawReading([], [], 0),
             TrendReading([], [], 0),
             tmp_path / "k-b.sqlite",
-            log_path_at(tmp_path, FIRST_IMPORT_AT),
+            journal_path_at(tmp_path, FIRST_IMPORT_AT),
             FIRST_IMPORT_AT,
             GITHUB_TRACKED_REPOSITORIES,
         )

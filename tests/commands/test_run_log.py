@@ -142,3 +142,24 @@ def test_a_log_file_of_an_earlier_utc_day_is_rotated_at_the_first_line(tmp_path)
     assert rotated_path.read_text("utf-8") == "a line of yesterday\n"
     assert log_path.read_text("utf-8").endswith(" INFO k_b.test: a line of today\n")
     assert "yesterday" not in log_path.read_text("utf-8")
+
+
+def test_a_rotation_deletes_no_log_file_only_the_purge_does(tmp_path):
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    yesterday = datetime.now(UTC).date() - timedelta(days=1)
+    rotated_paths = [
+        logs_dir / f"kb.log.{(yesterday - timedelta(days=days)).isoformat()}"
+        for days in range(1, 40)
+    ]
+    for path in rotated_paths:
+        path.write_text("a line of before\n", encoding="utf-8")
+    log_path = logs_dir / "kb.log"
+    log_path.write_text("a line of yesterday\n", encoding="utf-8")
+    yesterday_noon = datetime.combine(yesterday, time(12), tzinfo=UTC).timestamp()
+    os.utime(log_path, (yesterday_noon, yesterday_noon))
+
+    with cli.logging_to(tmp_path):
+        logging.getLogger("k_b.test").info("a line of today")
+
+    assert all(path.exists() for path in rotated_paths)

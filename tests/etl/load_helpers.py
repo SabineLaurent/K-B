@@ -1,4 +1,4 @@
-"""What the tests of the load share: a data directory with a base, the import run, the base and the import log read."""
+"""What the tests of the load share: a data directory with a base, the import run, the base and the import journal read."""
 
 import csv
 import io
@@ -67,12 +67,12 @@ PAPER_QUERY = (
 )
 
 
-def log_path_at(data_dir, imported_at):
-    return data_dir / f"import-log-{imported_at:%Y-%m-%dT%H%M%SZ}.jsonl"
+def journal_path_at(data_dir, imported_at):
+    return data_dir / f"import-journal-{imported_at:%Y-%m-%dT%H%M%SZ}.jsonl"
 
 
-def list_logs(data_dir):
-    return sorted(data_dir.glob("import-log-*.jsonl"))
+def list_journals(data_dir):
+    return sorted(data_dir.glob("import-journal-*.jsonl"))
 
 
 def run_import(
@@ -81,9 +81,9 @@ def run_import(
     kinds=SOURCE_KINDS,
     read_again=False,
 ):
-    """kb import, one second after the one before, so that each writes its own log; read_again
+    """kb import, one second after the one before, so that each writes its own journal; read_again
     reads every raw file, as a base without registry."""
-    imported_at = FIRST_IMPORT_AT + timedelta(seconds=len(list_logs(data_dir)))
+    imported_at = FIRST_IMPORT_AT + timedelta(seconds=len(list_journals(data_dir)))
     database_path = data_dir / "k-b.sqlite"
     imported_paths = frozenset() if read_again else read_imported_paths(database_path)
     readings = read_raw_files(
@@ -93,7 +93,7 @@ def run_import(
         readings.items,
         readings.trends,
         database_path,
-        log_path_at(data_dir, imported_at),
+        journal_path_at(data_dir, imported_at),
         imported_at,
         tracked_repositories,
     )
@@ -120,16 +120,17 @@ def count_rows(data_dir, query):
     return fetch_rows(data_dir, query)[0][0]
 
 
-def read_log_lines(data_dir):
-    """The lines of the log of the latest import."""
+def read_journal_lines(data_dir):
+    """The lines of the journal of the latest import."""
     return [
-        json.loads(line) for line in list_logs(data_dir)[-1].read_text().splitlines()
+        json.loads(line)
+        for line in list_journals(data_dir)[-1].read_text().splitlines()
     ]
 
 
-def read_log(data_dir):
+def read_journal(data_dir):
     """The lines of the latest log, without their time, which a test of its own checks."""
-    lines = read_log_lines(data_dir)
+    lines = read_journal_lines(data_dir)
     for line in lines:
         del line["imported_at"]
     return lines
@@ -138,7 +139,7 @@ def read_log(data_dir):
 def read_discards(data_dir, source_item_id=None):
     return [
         line
-        for line in read_log(data_dir)
+        for line in read_journal(data_dir)
         if line["kind"] == "discard"
         and source_item_id in (None, line["source_item_id"])
     ]

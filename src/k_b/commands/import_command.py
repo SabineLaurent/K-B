@@ -14,7 +14,7 @@ from k_b.core.quoting import quote_value
 from k_b.database.connection import MissingDatabaseError
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl.pipeline import (
-    ImportLogExistsError,
+    ImportJournalExistsError,
     ImportOutcome,
     import_raw_files,
 )
@@ -56,7 +56,7 @@ def run_import(data_dir: Path) -> int:
     except MissingDatabaseError as error:
         logger.error("%s; create it with kb create-db", error)
         return ExitCode.NOT_STARTED
-    except ImportLogExistsError as error:
+    except ImportJournalExistsError as error:
         logger.error("%s; run kb import again", error)
         return ExitCode.NOT_STARTED
     except (
@@ -70,7 +70,7 @@ def run_import(data_dir: Path) -> int:
     logger.info("import finished in %s", describe_duration(monotonic() - started))
     # Where the rejections are detailed (decision of Sabine of 2026-10-29); its name only, as
     # etl/load.py logs it: the path names the data directory.
-    logger.info("import log kept: %s", quote_value(outcome.log_path.name))
+    logger.info("import journal kept: %s", quote_value(outcome.journal_path.name))
     print_import_result(outcome)
     return purge_after_the_import(data_dir, imported_at)
 

@@ -34,7 +34,7 @@ def data_dir(tmp_path):
 def run_import(data_dir):
     """kb import, one second after the one before, so that each writes its own log."""
     imported_at = FIRST_IMPORT_AT + timedelta(
-        seconds=len(list(data_dir.glob("import-log-*.jsonl")))
+        seconds=len(list(data_dir.glob("journals/import-journal-*.jsonl")))
     )
     import_raw_files(data_dir, SOURCE_KINDS, GITHUB_TRACKED_REPOSITORIES, imported_at)
 

@@ -4993,6 +4993,30 @@ restées ouvertes.
   `KB_DEPLOYMENT_ENVIRONMENT=sandbox` dans le `.env`. Le contrat reste versionné : `kb openapi`
   l'écrit par `app.openapi()`, indépendant de la route. — PR de #393
 
+### Journaux : deux mots, deux dossiers, 6 mois (#267)
+
+Décisions de Sabine du 2026-11-04.
+
+- **Un log dit ce qu'un programme a fait, pour le surveiller ; un journal dit ce qu'un import a décidé
+  sur les données. Les fichiers JSON de l'import deviennent des journaux, dans leur dossier :
+  `journals/import-journal-<date>.jsonl`. Les logs de fonctionnement ne changent ni de nom, ni de
+  place, ni de format (`logs/kb.log`, `logs/kb-serve-data.log`, `logs/kb-serve-ai.log`).** Pourquoi,
+  celui de Sabine : « les log partent à grafana et les journals reste dans kb work dir », « in fine
+  toute l'application sera tracées de bout en bout pour suivre le flux d'une requetes » : c'est la
+  cible ; aujourd'hui, seul `kb serve-ai` envoie à Grafana. Écarté : tout dans `logs/` (d'abord
+  recommandé par time-knight : un journal y aurait recréé la confusion, et les tests de bout en
+  bout, qui gardent `logs/`, auraient gardé les journaux, qui portent des URL de clips).
+- **Logs et journaux sont gardés 6 mois, jour lu dans leur nom, par une seule purge à la fin de `kb
+  import` ; la rotation de minuit ne supprime plus rien (`backupCount=0`).** Décision de Sabine
+  (« oui et note que c'est une recommandation de la CNIL »), sur la recommandation de time-knight.
+  Pourquoi : six mois est le bas de la fourchette de la CNIL pour une journalisation, six mois à un
+  an (délibération n° 2021-122, recommandation non contraignante ; page lue, PDF non lu), et la durée
+  du brut ; une seule règle pour tout ce qui n'est pas la base. Sabine sur les deux purges :
+  « Est ce utile et nécessaire que leur purge soit différente ? » **Révise** sa décision du 2026-10-19
+  (30 jours glissants, #267). Écartés : 30 jours, sous la recommandation ; 30 fichiers (`backupCount`
+  compte des fichiers, pas des jours : un jour sans commande n'en crée pas, la durée n'est donc pas
+  dite). Limite : sans `kb import`, rien n'est supprimé. — PR de #267
+
 ## Décisions encore ouvertes
 
 - **Les seuils des critères des tendances** (2026-10-30) : 2 jours actifs pour « durable », 5 rangs
