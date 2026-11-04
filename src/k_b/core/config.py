@@ -154,11 +154,12 @@ CLIP_CHANGE_MARGIN = timedelta(seconds=60)
 
 # The folder of the data directory that holds the logs of the runs: what a program did, to watch it.
 LOGS_DIR_NAME = "logs"
-# The logs kb writes there, the only ones the purge deletes (commands/run_log.py): kb.log for every
-# command, kb-serve-data.log and kb-serve-ai.log apart.
+# The logs kb writes there (commands/run_log.py), the only ones the purge deletes
+# (purge/run_records.py): kb.log for every command, kb-serve-data.log and kb-serve-ai.log apart.
 LOG_FILE_NAME = "kb.log"
 SERVE_DATA_LOG_FILE_NAME = "kb-serve-data.log"
 SERVE_AI_LOG_FILE_NAME = "kb-serve-ai.log"
+LOG_FILE_NAMES = (LOG_FILE_NAME, SERVE_DATA_LOG_FILE_NAME, SERVE_AI_LOG_FILE_NAME)
 # The folder that holds the journals of the imports: what an import decided about the data, in JSON.
 JOURNALS_DIR_NAME = "journals"
 # How many months a log and a journal are kept after the day in their name; the purge deletes the

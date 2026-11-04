@@ -50,9 +50,9 @@ DATED_NAME_BY_FOLDER = {
     ),
 }
 ```
-`src/k_b/purge/run_records.py:28-35`
+`src/k_b/purge/run_records.py:23-30`
 
-`fullmatch` exige le nom entier (`is_dated_before`, ligne 65). Un nom qui ne correspond pas, ou dont
+`fullmatch` exige le nom entier (`is_dated_before`, ligne 60). Un nom qui ne correspond pas, ou dont
 la date n'existe pas (`2020-13-45`, `ValueError`), n'est jamais supprimé. Le log en cours
 (`kb.log`, sans date) non plus.
 
@@ -60,22 +60,25 @@ la date n'existe pas (`2020-13-45`, `ValueError`), n'est jamais supprimé. Le lo
 
 Le premier motif, `[a-z-]+\.log\.<jour>`, acceptait n'importe quel préfixe : un
 `incident.log.2026-01-01` posé à la main aurait été supprimé. Les trois noms vivent maintenant à un
-seul endroit, `core/config.py`, lus par `run_log.py` qui écrit les logs et par la purge qui les
-supprime :
+seul endroit, `core/config.py`, avec leur liste juste en dessous (constat 7 de la 2e revue : un nom
+ajouté sans la liste ne serait jamais purgé). `run_log.py`, qui écrit les logs, lit les noms ; la
+purge, qui les supprime, lit la liste :
 
 ```python
-LOG_NAMES_PATTERN = "|".join(
-    re.escape(name)
-    for name in (LOG_FILE_NAME, SERVE_DATA_LOG_FILE_NAME, SERVE_AI_LOG_FILE_NAME)
-)
+LOG_FILE_NAMES = (LOG_FILE_NAME, SERVE_DATA_LOG_FILE_NAME, SERVE_AI_LOG_FILE_NAME)
 ```
-`src/k_b/purge/run_records.py:21-24`
+`src/k_b/core/config.py:162`
+
+```python
+LOG_NAMES_PATTERN = "|".join(re.escape(name) for name in LOG_FILE_NAMES)
+```
+`src/k_b/purge/run_records.py:19`
 
 `re.escape` rend littéral le point de `kb.log` : sans lui, `kb_log.2020-01-01` serait accepté.
 
 ### Ne lire que deux dossiers, ne suivre aucun lien
 
-`list_files` (`src/k_b/purge/run_records.py:56`) renvoie une liste vide si le dossier manque ou est un
+`list_files` (`src/k_b/purge/run_records.py:51`) renvoie une liste vide si le dossier manque ou est un
 lien. Elle écarte aussi un sous-dossier ou un lien posé dans le dossier. Rien n'est lu hors de
 `logs/` et `journals/`.
 
@@ -93,7 +96,7 @@ ni de format.
 | Durée | 6 mois, logs et journaux (Sabine) | 30 jours : sous la recommandation de la CNIL. 30 fichiers : pas une durée |
 | Mesure de l'âge | jour lu dans le nom | `mtime` : changé par une copie ou une restauration |
 | Rangement | `logs/` et `journals/` (Sabine) | tout dans `logs/` : un journal y aurait recréé la confusion des mots, et les tests de bout en bout, qui gardent `logs/`, auraient gardé les journaux |
-| Noms des logs | trois constantes de `core/config.py` | les recopier dans le motif de la purge : un même savoir à deux endroits, un 4e log jamais purgé. `purge/` n'a pas le droit d'importer `commands/` (`tests/architecture/test_layers.py:257`) |
+| Noms des logs | trois constantes de `core/config.py` et leur liste, `LOG_FILE_NAMES` | les recopier dans le motif de la purge : un même savoir à deux endroits, un 4e log jamais purgé. `purge/` n'a pas le droit d'importer `commands/` (`tests/architecture/test_layers.py:257`) |
 | Moment | fin de `kb import` | une rotation à chaque commande : `backupCount` ne compte pas des jours |
 | Nom de la constante | `RECORD_RETENTION_MONTHS` (constat 10) | `LOG_RETENTION_MONTHS` : elle règle aussi les journaux |
 | `/security-review` | non lancée (proposé dans le plan) | deux dossiers nommés, des noms vérifiés strictement, aucun lien suivi, aucune entrée externe |
@@ -111,6 +114,9 @@ ni de format.
 | `test_the_bound_is_computed_in_utc_whatever_the_time_zone_given` | la borne est calculée en UTC |
 | `test_a_rotation_deletes_no_log_file_only_the_purge_does` (`tests/commands/test_run_log.py`) | 40 anciens logs survivent à une rotation |
 | `test_the_log_gives_numbers_never_a_name` | le log donne un nombre, jamais un nom de fichier |
+| `test_import_purges_what_it_committed_once_past_its_durations` (`tests/commands/test_import_command.py`) | par `kb import`, un vieux `kb.log.2020-01-01` est supprimé, et la ligne `logs and journals purge: 1 files…` est dans le log ; mutation (appel de la purge retiré de `after_import.py`) : le test échoue |
+| `test_the_logs_and_the_journals_are_purged_after_an_import` (`tests/purge/test_purge_after_import.py`) | le journal qu'un vrai import écrit est reconnu par la purge ; mutation (nom changé dans `pipeline.py`) : le test échoue |
+| Un vrai `kb import` dans un dossier neuf (2026-11-04) | `logs/kb.log` reçoit une ligne par étape de la purge (base, brut, registre, logs et journaux) ; l'ancien log et l'ancien journal partent, `incident.log.2026-01-01` reste |
 | `uv run pytest` : 3 367 verts ; ruff, format, `mypy --strict` verts | rien d'autre n'est cassé |
 
 ## Ce que tu dois pouvoir défendre
@@ -121,7 +127,7 @@ ni de format.
    un an), et la durée du brut. C'est une recommandation, pas une obligation : l'appliquer aux
    logs techniques est un choix de K-B, écrit dans le registre (étape 11).
 3. **Un fichier que je dépose dans `logs/` peut-il disparaître ?** Non, seuls les trois noms que K-B
-   écrit sont supprimés (`run_records.py:21-31`, test `incident.log`).
+   écrit sont supprimés (`run_records.py:19-30`, test `incident.log`).
 4. **Et si je n'importe plus ?** Rien n'est purgé : c'est une limite écrite dans le registre
    (« Limites de la purge »).
 5. **Pourquoi lire la date dans le nom ?** Une copie ou une restauration change le `mtime`, pas le
@@ -133,7 +139,8 @@ ni de format.
   `TimedRotatingFileHandler`, tenu par `test_a_log_file_of_an_earlier_utc_day_is_rotated_at_the_first_line`.
   Le code de CPython n'a pas été relu pour cette PR.
 - La recommandation de la CNIL : la page de présentation a été lue, pas le PDF complet.
-- La 1re `/code-review` (medium) a été coupée par le quota : une partie du code n'a pas été relue.
+- La 1re `/code-review` (medium) a été coupée par le quota ; une 2e, complète (medium), a relu toute
+  la branche.
 
 ## Ce qui reste
 

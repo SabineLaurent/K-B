@@ -8,20 +8,15 @@ from pathlib import Path
 
 from k_b.core.config import (
     JOURNALS_DIR_NAME,
-    LOG_FILE_NAME,
+    LOG_FILE_NAMES,
     LOGS_DIR_NAME,
     RECORD_RETENTION_MONTHS,
-    SERVE_AI_LOG_FILE_NAME,
-    SERVE_DATA_LOG_FILE_NAME,
 )
 from k_b.core.dates import subtract_months
 
 logger = logging.getLogger(__name__)
 
-LOG_NAMES_PATTERN = "|".join(
-    re.escape(name)
-    for name in (LOG_FILE_NAME, SERVE_DATA_LOG_FILE_NAME, SERVE_AI_LOG_FILE_NAME)
-)
+LOG_NAMES_PATTERN = "|".join(re.escape(name) for name in LOG_FILE_NAMES)
 # The day comes from the name: a copy or a restoration changes the time of a file. A log of a past
 # day: kb.log.2026-10-05; a journal: import-journal-2026-10-05T093000Z.jsonl. Only the logs kb
 # writes: a dated file the user left in logs/ stays.

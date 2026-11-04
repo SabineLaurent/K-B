@@ -338,12 +338,15 @@ def test_import_purges_what_it_committed_once_past_its_durations(
     monkeypatch, tmp_path, capsys
 ):
     """Imported three years after its collection, a raw file of arXiv is written, then purged:
-    the purge runs after the commit, the base, the raw and the registry in turn."""
+    the purge runs after the commit, the base, the raw, the registry, then the logs and the
+    journals in turn."""
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
     raw_path = copy_fixture(
         tmp_path / "raw", "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml"
     )
+    older_log = tmp_path / "logs" / "kb.log.2020-01-01"
+    older_log.write_text("a line\n", encoding="utf-8")
     monkeypatch.setattr(import_command, "datetime", make_clock(THREE_YEARS_LATER))
     capsys.readouterr()
 
@@ -360,6 +363,8 @@ def test_import_purges_what_it_committed_once_past_its_durations(
         " 0 kept" in output.err
     )
     assert "registry purge: 1 rows deleted" in output.err
+    assert not older_log.exists()
+    assert "logs and journals purge: 1 files older than 6 months deleted" in output.err
 
 
 def test_a_failed_purge_of_the_base_stops_the_purges_after_it(
