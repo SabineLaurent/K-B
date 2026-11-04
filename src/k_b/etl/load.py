@@ -1,8 +1,8 @@
-"""Import the raw files not imported yet into the items database, in one transaction with the log
+"""Import the raw files not imported yet into the items database, in one transaction with the journal
 of the import.
 
 An entry the base refuses becomes a rejection and the import goes on; any other error writes
-nothing in the base and leaves no log."""
+nothing in the base and leaves no journal."""
 
 import logging
 import sqlite3
@@ -17,14 +17,14 @@ from k_b.database.connection import check_database_exists, connect_database
 from k_b.database.reading import read_raw_file_paths
 from k_b.database.writing import write_tracked_repositories
 from k_b.etl.file_writing import FileWriting, write_file
-from k_b.etl.import_log import write_import_log
+from k_b.etl.import_journal import write_import_journal
 from k_b.etl.raw_files import RawFile, RawReading, TrendFile, TrendReading
 
 logger = logging.getLogger(__name__)
 
 
-class ImportLogExistsError(FileExistsError):
-    """The log of this second is already written: the log of an import is never rewritten."""
+class ImportJournalExistsError(FileExistsError):
+    """The journal of this second is already written: the journal of an import is never rewritten."""
 
 
 class ImportSummary(NamedTuple):
@@ -55,11 +55,11 @@ def import_items(
     reading: RawReading,
     trend_reading: TrendReading,
     database_path: Path,
-    log_path: Path,
+    journal_path: Path,
     imported_at: datetime,
     tracked_repositories: Sequence[TrackedRepository],
 ) -> ImportSummary:
-    """Write the tracked repositories, each file read and the log, in one transaction; files of
+    """Write the tracked repositories, each file read and the journal, in one transaction; files of
     items and of trends in collection order, so that a rebuilt base registers them in the same
     order."""
     check_database_exists(database_path)
@@ -68,7 +68,7 @@ def import_items(
         try:
             write_tracked_repositories(connection, tracked_repositories)
             writing = write_files(connection, reading, trend_reading)
-            commit_with_log(connection, log_path, imported_at, writing)
+            commit_with_journal(connection, journal_path, imported_at, writing)
         except BaseException:
             # BaseException: Ctrl-C must not leave half an import either.
             connection.rollback()
@@ -103,21 +103,21 @@ def write_files(
     )
 
 
-def commit_with_log(
+def commit_with_journal(
     connection: sqlite3.Connection,
-    log_path: Path,
+    journal_path: Path,
     imported_at: datetime,
     writing: FileWriting,
 ) -> None:
-    """Write the log, then commit: a file registered is not read again, so its log must not be
-    lost. A failed commit, or an interruption before it, removes the log; an interruption
-    (Ctrl-C, SIGTERM) once the base has committed keeps the import and its log."""
+    """Write the journal, then commit: a file registered is not read again, so its journal must not be
+    lost. A failed commit, or an interruption before it, removes the journal; an interruption
+    (Ctrl-C, SIGTERM) once the base has committed keeps the import and its journal."""
     # Checked once the base holds the write lock: two imports of the same second cannot both
-    # find no log.
-    check_log_absent(log_path)
+    # find no journal.
+    check_journal_absent(journal_path)
     try:
-        write_import_log(
-            log_path,
+        write_import_journal(
+            journal_path,
             imported_at,
             writing.rejections,
             writing.discards,
@@ -125,23 +125,25 @@ def commit_with_log(
         )
         connection.commit()
     except BaseException as error:
-        # The log goes with the import it describes. A commit that fails raises a sqlite3.Error,
+        # The journal goes with the import it describes. A commit that fails raises a sqlite3.Error,
         # whether SQLite keeps the transaction or undoes it itself. A Ctrl-C or a SIGTERM
         # received before the commit finds the transaction open; one received during the commit
         # is raised by Python once the commit has returned, with no transaction left.
         if isinstance(error, sqlite3.Error) or connection.in_transaction:
-            # The log at log_path can only be this import's: it was absent above.
-            log_path.unlink(missing_ok=True)
+            # The journal at journal_path can only be this import's: it was absent above.
+            journal_path.unlink(missing_ok=True)
         else:
             # The name, not the path: quote_value cuts a long path before the name.
-            logger.info("import committed, log kept: %s", quote_value(log_path.name))
+            logger.info(
+                "import committed, journal kept: %s", quote_value(journal_path.name)
+            )
         raise
 
 
-def check_log_absent(log_path: Path) -> None:
-    """Refuse to import when the import log of this second already exists."""
-    if log_path.exists():
-        raise ImportLogExistsError(f"{log_path} already exists")
+def check_journal_absent(journal_path: Path) -> None:
+    """Refuse to import when the import journal of this second already exists."""
+    if journal_path.exists():
+        raise ImportJournalExistsError(f"{journal_path} already exists")
 
 
 def list_files_in_collection_order(

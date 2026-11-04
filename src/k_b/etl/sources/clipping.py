@@ -56,7 +56,7 @@ CLIPPINGS_DIR_NAME = "Clippings"
 CLIP_EXTENSION = ".md"
 # The page name of a clip: the start of the SHA-256 of its file name, in hexadecimal. The same
 # clip has the same name from one collection to the next, and its file name, which is its
-# title, goes neither into the path of the raw nor into the import log.
+# title, goes neither into the path of the raw nor into the import journal.
 PAGE_NAME_LENGTH = 16
 # A file date is in nanoseconds since EPOCH; a datetime, in microseconds.
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
@@ -373,7 +373,7 @@ class ClipFrontmatter(BaseModel):
 
 def convert_clip(entry: ClipEntry, collected_at: datetime, raw_file_path: str) -> Item:
     """A clip as an item of the library, its text as written; refused, the error never quotes a
-    value, as a title or a text goes into the import log."""
+    value, as a title or a text goes into the import journal."""
     try:
         frontmatter = ClipFrontmatter.model_validate(entry.properties)
         return Item(

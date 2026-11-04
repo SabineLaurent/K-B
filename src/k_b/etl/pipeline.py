@@ -9,11 +9,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple
 
-from k_b.core.config import TrackedRepository
+from k_b.core.config import JOURNALS_DIR_NAME, TrackedRepository
 from k_b.database.connection import DATABASE_FILE_NAME
 from k_b.etl.extract import CollectionOutcome, collect_all_sources
 from k_b.etl.load import (
-    ImportLogExistsError,
+    ImportJournalExistsError,
     ImportSummary,
     import_items,
     read_imported_paths,
@@ -25,21 +25,21 @@ from k_b.etl.transform import read_raw_files
 
 __all__ = [
     "CollectionOutcome",
-    "ImportLogExistsError",
+    "ImportJournalExistsError",
     "ImportOutcome",
     "collect",
     "import_raw_files",
 ]
 
-# One log per import, named by its second as a raw file by its collection: never rewritten.
-IMPORT_LOG_FILE_NAME = "import-log-{imported_at}.jsonl"
+# One journal per import, named by its second as a raw file by its collection: never rewritten.
+IMPORT_JOURNAL_FILE_NAME = "import-journal-{imported_at}.jsonl"
 
 
 class ImportOutcome(NamedTuple):
-    """What the import gives its command: what it wrote, and the log that details it."""
+    """What the import gives its command: what it wrote, and the journal that details it."""
 
     summary: ImportSummary
-    log_path: Path
+    journal_path: Path
 
 
 def collect(sources: list[Source], data_dir: Path, now: datetime) -> CollectionOutcome:
@@ -55,13 +55,17 @@ def import_raw_files(
     imported_at: datetime,
 ) -> ImportOutcome:
     """Run the import: the raw files not in the registry of the base read in one walk of raw/,
-    then written with the log in one transaction.
+    then written with the journal in one transaction.
 
     The tracked repositories are given once, so that the reading and the base cannot read two
     lists."""
     database_path = data_dir / DATABASE_FILE_NAME
-    log_path = data_dir / IMPORT_LOG_FILE_NAME.format(
-        imported_at=imported_at.strftime(COLLECTION_NAME_FORMAT)
+    journal_path = (
+        data_dir
+        / JOURNALS_DIR_NAME
+        / IMPORT_JOURNAL_FILE_NAME.format(
+            imported_at=imported_at.strftime(COLLECTION_NAME_FORMAT)
+        )
     )
     imported_paths = read_imported_paths(database_path)
     readings = read_raw_files(
@@ -71,8 +75,8 @@ def import_raw_files(
         readings.items,
         readings.trends,
         database_path,
-        log_path,
+        journal_path,
         imported_at,
         tracked_repositories,
     )
-    return ImportOutcome(summary, log_path)
+    return ImportOutcome(summary, journal_path)

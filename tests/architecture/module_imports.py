@@ -26,7 +26,7 @@ ETL_PIPELINE_MODULES = {
     "etl.extract",
     "etl.transform",
     "etl.load",
-    "etl.import_log",
+    "etl.import_journal",
     "etl.normalize",
     "etl.raw_files",
     "etl.raw_reading",

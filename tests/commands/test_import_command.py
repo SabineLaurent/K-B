@@ -1,4 +1,4 @@
-"""kb import: the raw items written into the base, the purge and the import log."""
+"""kb import: the raw items written into the base, the purge and the import journal."""
 
 import re
 import shutil
@@ -27,15 +27,17 @@ def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, ca
 
     assert exit_code == 0
     output = capsys.readouterr()
-    (log_path,) = tmp_path.glob("import-log-*.jsonl")
-    assert re.fullmatch(r"import-log-\d{4}-\d{2}-\d{2}T\d{6}Z\.jsonl", log_path.name)
+    (log_path,) = tmp_path.glob("journals/import-journal-*.jsonl")
+    assert re.fullmatch(
+        r"import-journal-\d{4}-\d{2}-\d{2}T\d{6}Z\.jsonl", log_path.name
+    )
     assert output.out == (
         "\nimport: 0 raw read, 0 written, 0 trend rows, 0 left out, 0 rejected, 0 withdrawn\n\n"
     )
     for line in (
         "import started",
         r"import finished in \d+ s",
-        re.escape(f"import log kept: '{log_path.name}'"),
+        re.escape(f"import journal kept: '{log_path.name}'"),
     ):
         assert re.search(
             rf"^{LOG_LINE_DATE} INFO k_b\.cli: {line}$", output.err, re.MULTILINE
@@ -218,7 +220,8 @@ def test_import_refuses_to_rewrite_the_log_of_its_second_and_exits_2(
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
     monkeypatch.setattr(import_command, "datetime", FrozenDatetime)
-    log_path = tmp_path / "import-log-2026-10-12T154903Z.jsonl"
+    log_path = tmp_path / "journals" / "import-journal-2026-10-12T154903Z.jsonl"
+    log_path.parent.mkdir(exist_ok=True)
     log_path.write_text("earlier import\n")
 
     exit_code = cli.main(["import"])

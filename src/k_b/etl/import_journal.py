@@ -1,4 +1,4 @@
-"""The log of an import: one JSON line per entry rejected, per item left out and per window of
+"""The journal of an import: one JSON line per entry rejected, per item left out and per window of
 trends left out."""
 
 import json
@@ -34,8 +34,8 @@ class TrendDiscard(NamedTuple):
     compared_with: str
 
 
-def write_import_log(
-    log_path: Path,
+def write_import_journal(
+    journal_path: Path,
     imported_at: datetime,
     rejections: list[Rejection],
     discards: list[Discard],
@@ -80,6 +80,6 @@ def write_import_log(
         ]
     )
     write_file_atomically(
-        log_path,
+        journal_path,
         "".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines).encode(),
     )

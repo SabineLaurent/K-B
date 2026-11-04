@@ -3,7 +3,7 @@
 from typing import get_args
 
 from k_b.database.writers.discard import DiscardRule
-from k_b.etl.import_log import COMPARED_FIELD_BY_RULE
+from k_b.etl.import_journal import COMPARED_FIELD_BY_RULE
 
 
 def test_every_discard_rule_has_its_field_in_the_log():

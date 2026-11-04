@@ -21,7 +21,7 @@ from load_helpers import (
     fetch_rows,
     kev_catalog,
     read_discards,
-    read_log,
+    read_journal,
     run_import,
     write_collection,
 )
@@ -37,10 +37,10 @@ def test_a_second_import_without_new_raw_reads_nothing_and_changes_nothing(data_
     assert first.read_count == 4
     assert second == (0, 0, 0, 0, 0, 0)
     assert dump_database(data_dir) == tables
-    assert read_log(data_dir) == []
+    assert read_journal(data_dir) == []
 
 
-def test_raw_files_read_again_give_the_same_database_and_log_every_item_as_a_discard(
+def test_raw_files_read_again_give_the_same_database_and_journal_every_item_as_a_discard(
     data_dir,
 ):
     # A base of before #106 reads every file again: the base still removes the duplicates.

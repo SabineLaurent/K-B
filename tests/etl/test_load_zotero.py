@@ -10,7 +10,7 @@ from load_helpers import (
     dump_database,
     fetch_rows,
     read_discards,
-    read_log,
+    read_journal,
     refuse_in_the_base,
     run_import,
 )
@@ -442,7 +442,9 @@ def test_a_document_with_a_highlight_the_base_refuses_is_written_in_none_of_its_
         == 0
     )
     assert count_rows(data_dir, "SELECT count(*) FROM item") == 1
-    [rejection] = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
+    [rejection] = [
+        line for line in read_journal(data_dir) if line["kind"] == "rejection"
+    ]
     assert rejection == {
         "kind": "rejection",
         "raw_file_path": extract_path,
@@ -520,7 +522,9 @@ def test_a_rejected_document_is_logged_without_its_title_or_highlight_text(
     summary = run_import(data_dir)
 
     assert summary.rejection_count == 2
-    rejections = [line for line in read_log(data_dir) if line["kind"] == "rejection"]
+    rejections = [
+        line for line in read_journal(data_dir) if line["kind"] == "rejection"
+    ]
     assert [line["raw_file_path"] for line in rejections] == [extract_path] * 2
     assert "SECRET" not in json.dumps(rejections)
     assert "title too long: 1300 characters, maximum 1000" in rejections[1]["reason"]

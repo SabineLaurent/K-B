@@ -110,7 +110,7 @@ def write_console(console_dir, command, stdout, stderr):
 
 
 def delete_all_but_logs(data_dir):
-    """Delete all but logs/: the raw files, the base and the import logs hold authors, clips and
+    """Delete all but logs/: the raw files, the base and the import journals hold authors, clips and
     URLs."""
     for entry in data_dir.iterdir():
         if entry.name == LOG_DIR_NAME:
@@ -160,10 +160,10 @@ def count_log_lines_above_info(console_dir):
 
 
 def count_rejections(data_dir):
-    """The rejections of the import logs of data_dir: kb import exits 0 with them."""
+    """The rejections of the import journals of data_dir: kb import exits 0 with them."""
     return sum(
         1
-        for log_path in data_dir.glob("import-log-*.jsonl")
+        for log_path in data_dir.glob("journals/import-journal-*.jsonl")
         for line in log_path.read_text().splitlines()
         if json.loads(line)["kind"] == "rejection"
     )

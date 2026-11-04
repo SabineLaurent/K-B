@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from k_b.core.quoting import quote_value
 from k_b.database.savepoint import EntryRefusedError, write_in_savepoint
 from k_b.database.writing import Discard, write_item, write_raw_data, write_trend_rows
-from k_b.etl.import_log import TrendDiscard
+from k_b.etl.import_journal import TrendDiscard
 from k_b.etl.raw_files import RawFile, Rejection, TrendFile
 from k_b.etl.raw_store import find_stream
 from k_b.etl.rejections import reject

@@ -5,7 +5,13 @@ import sqlite3
 from pathlib import Path
 
 import pytest
-from load_helpers import dump_database, fetch_rows, read_discards, read_log, run_import
+from load_helpers import (
+    dump_database,
+    fetch_rows,
+    read_discards,
+    read_journal,
+    run_import,
+)
 
 from k_b.database.creation import create_database
 
@@ -80,7 +86,7 @@ def test_a_clip_gives_an_item_and_its_clip(data_dir):
         " JOIN raw_data ON raw_data.id = item.raw_data_id"
         " JOIN source ON source.id = raw_data.source_id",
     ) == [("clipper", "library", "clip")]
-    assert read_log(data_dir) == []
+    assert read_journal(data_dir) == []
 
 
 def test_a_clip_without_publication_date_has_none(data_dir):
@@ -185,7 +191,7 @@ def test_a_clip_whose_content_changed_is_written_again(
     )[0]
     assert (value, revised_at, raw_file_path) == (written, SECOND_AT, second_path)
     assert fetch_rows(data_dir, "SELECT count(*) FROM item") == [(1,)]
-    assert read_log(data_dir) == []
+    assert read_journal(data_dir) == []
 
 
 @pytest.mark.parametrize(
@@ -310,7 +316,7 @@ def test_a_refused_clip_is_logged_by_its_field_without_its_title(data_dir):
 
     run_import(data_dir)
 
-    (rejection,) = read_log(data_dir)
+    (rejection,) = read_journal(data_dir)
     assert rejection["raw_file_path"] == raw_file_path
     assert "created" in rejection["reason"]
     assert "Coding Patterns" not in rejection["reason"]
@@ -324,7 +330,7 @@ def test_an_unreadable_clip_is_rejected_at_each_import_and_not_registered(data_d
     run_import(data_dir)
     run_import(data_dir)
 
-    assert read_log(data_dir) == [
+    assert read_journal(data_dir) == [
         {
             "kind": "rejection",
             "raw_file_path": raw_file_path,
@@ -422,7 +428,7 @@ def test_a_tag_added_or_removed_writes_the_clip_again(data_dir):
         ("2026-10-19T09:30:00Z",)
     ]
     assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [third_path]
-    assert read_log(data_dir) == []
+    assert read_journal(data_dir) == []
 
 
 # The columns of clip a rewrite may write.

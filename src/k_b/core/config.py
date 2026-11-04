@@ -152,10 +152,15 @@ RAW_RETENTION_MONTHS = 6
 # without a trace is worse than a few bytes of raw).
 CLIP_CHANGE_MARGIN = timedelta(seconds=60)
 
-# How many log files of past days kb keeps, of each log (logs/kb.log.<day> and
-# logs/kb-serve-data.log.<day> of the data directory), the oldest removed at the rotation: about a
-# month of daily collections (Sabine, 2026-10-14).
-LOG_FILES_KEPT = 30
+# The folder of the data directory that holds the logs of the runs: what a program did, to watch it.
+LOGS_DIR_NAME = "logs"
+# The folder that holds the journals of the imports: what an import decided about the data, in JSON.
+JOURNALS_DIR_NAME = "journals"
+# How many months a log and a journal are kept after the day in their name; the purge deletes the
+# others, at the end of kb import (purge/run_records.py). The bottom of what the CNIL recommends for
+# a log, six months to a year, a recommendation not binding (deliberation 2021-122; decision of
+# Sabine of 2026-11-04, which replaces the 30 days of 2026-10-19).
+LOG_RETENTION_MONTHS = 6
 
 # The local defaults of kb serve-data, each changed by its variable (data_api/settings.py;
 # .claude/rules/poc.md, rule 2): the data API listens on the machine only and answers these hosts

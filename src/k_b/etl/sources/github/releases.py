@@ -65,7 +65,7 @@ class GithubReleasesSource:
         if last_collected_at is None:
             return raw_response
         # A page whose only new release is invalid returns nothing: its rejection reaches the
-        # import log with the next page written, while it is among the RELEASES_PER_PAGE latest.
+        # import journal with the next page written, while it is among the RELEASES_PER_PAGE latest.
         publication_dates = [release.published_at for release in reading.entries]
         if not any(
             published_at > last_collected_at for published_at in publication_dates
