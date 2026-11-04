@@ -35,6 +35,14 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 ## Problèmes connus
 
+- **La base est la seule copie au-delà de 6 mois, et K-B n'a pas de migration** (#83, décision de
+  Sabine du 2026-11-04) : la purge supprime le brut de plus de 6 mois, et la base n'a pas encore de
+  sauvegarde (règle du 2026-10-19 écrite au registre, étape 3, pas codée). Dès que le plus ancien
+  brut a 6 mois, un changement de schéma ne se fait plus par `kb create-db` et `kb import` : il lui
+  faut une migration (journal ADR, 2026-10-09, W7).
+- **Une donnée que la source republie revient après sa purge** (limite acceptée par Sabine le
+  2026-11-04, registre, étape 2) : une release encore parmi les 100 dernières de son dépôt, une
+  alerte que GitHub met à jour sont une collecte nouvelle, et leurs 3 ans repartent.
 - **arXiv bloqué au-delà de 2 000 papiers** (constat du 2026-10-05, porté par #71, hors E1 et
   non planifié). Si la fenêtre de collecte contient plus de
   2 000 papiers, la source échoue et sa date reste (`src/k_b/etl/sources/arxiv.py:85-89`). La fenêtre

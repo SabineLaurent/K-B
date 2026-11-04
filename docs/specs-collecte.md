@@ -238,7 +238,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   Après l'import, `kb write-tops` (#265) écrit une fiche Markdown par top et par jour de collecte
   encore dans le brut, dans le coffre (`veille/tops/<most_starred|most_forked>/AAAA-MM-JJ.md`),
   puis supprime les relevés lisibles antérieurs au dernier relevé lisible : le brut d'un top ne
-  garde que son dernier relevé lisible (registre des traitements, étape 7).
+  garde que son dernier relevé lisible (registre des traitements, étape 7), et aucun relevé plus de
+  6 mois, illisible ou sans fiche compris (étape 3).
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-02) : les
   alertes sont demandées pour les seuls paquets suivis (`affects=`). Tout l'écosystème `npm`
   dépasse 100 alertes par semaine et obligerait à paginer.
@@ -798,16 +799,21 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
    2026-10-08, « `trend` reste hors d'`item` ») ; `left out`, les items et les fenêtres de
    classement écartés (doublons, ou versions qui ne sont pas plus récentes que celle de la base) ;
    `rejected`, les rejets, détaillés au journal d'import ; `withdrawn`, les lignes retirées. Le
-   bilan est affiché avant la suppression des bruts remplacés, qui suit la validation de l'import
-   et a sa ligne au journal (`raw purge: N superseded files deleted`) ; si elle échoue, le bilan
-   est affiché quand même et l'erreur suit.
+   bilan est affiché avant les purges, qui suivent la validation de l'import (`src/k_b/purge/`,
+   registre des traitements, « Procédure de tri ») : les bruts remplacés des catalogues d'état
+   (`raw purge: N superseded files deleted`), la base (`base purge: …`), le brut de plus de 6 mois
+   (`raw purge: N collections older than 6 months deleted, …`), puis le registre
+   (`registry purge: N rows deleted`). Si l'une échoue, le bilan est affiché quand même, les
+   suivantes ne tournent pas, l'erreur suit (`import committed, purge failed: … ; run kb import
+   again`) et `kb import` sort en 1.
 
    - **Registre** : la table `raw_data`, une ligne par fichier lu, ou par page d'un dossier de
      pages. Un fichier lu y entre, même s'il n'a donné aucun item, et même si certaines de ses
      entrées sont rejetées : celles-ci ne seront relues que par une reconstruction. Un fichier
      sauté faute de lecteur n'y entre pas. **Un fichier illisible n'y entre pas** (décision de
      Sabine du 2026-10-12) : il est relu et rejeté à chaque import, et l'import qui suit la
-     correction du lecteur ou du brut le lit, sans reconstruction. Une collecte mal nommée
+     correction du lecteur ou du brut le lit, sans reconstruction ; 6 mois au plus, la purge du
+     brut le supprime ensuite (registre des traitements, étape 3). Une collecte mal nommée
      (dossier ou fichier dont le nom n'est pas une date) n'a pas de date de collecte : elle
      n'entre pas non plus au registre, et elle est rejetée à chaque import, sans compter dans
      `raw read`. **Un classement GH Archive dont la base refuse une ligne n'y entre pas
@@ -839,7 +845,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
      acceptée ce jour-là, une interruption juste après la validation qui supprimait le journal
      d'un import validé, est levée par la décision de Sabine du 2026-10-18 (#193).
    - **Reconstruction complète** : supprimer la base, `kb create-db`, puis `kb import`, qui
-     relit tout `raw/`. Pas d'option : une base vide n'a rien au registre.
+     relit tout `raw/`. Pas d'option : une base vide n'a rien au registre. Elle ne retrouve que
+     les 6 derniers mois de la veille, et le dernier état des catalogues : la base est la source
+     de vérité (décision de Sabine du 2026-11-04).
 
    **La base dédoublonne** (#105, décisions de Sabine du 2026-10-12). Les items arrivent dans
    l'ordre des collectes. Un item déjà en base est reconnu par la clé naturelle de son sous-type

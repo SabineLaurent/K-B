@@ -156,7 +156,8 @@ CREATE TABLE vulnerability (
 
 -- A reference table, like source: the list GITHUB_TRACKED_REPOSITORIES of src/k_b/core/config.py is the
 -- source of truth; each import adds its repositories or updates them, and a repository removed
--- from the list keeps its row (#87). GitHub ignores the case of a repository name.
+-- from the list keeps its row while a release cites it, then the purge deletes it (#87, #83).
+-- GitHub ignores the case of a repository name.
 CREATE TABLE tracked_repository (
     id              INTEGER PRIMARY KEY,
     repository_name TEXT NOT NULL UNIQUE COLLATE NOCASE CHECK (repository_name GLOB '?*/?*'),
@@ -330,7 +331,8 @@ CREATE TABLE tag (
 
 -- The tags of an item: many to many, an item carries each tag once. The links of an item go
 -- with it, as its highlights. A tag whose last link a rewrite removes is removed with it
--- (clip_writer.py); a tag left without link by the removal of an item, by the purge (#83).
+-- (clip_writer.py); the purge removes no item that carries a tag: only clips do, and the library
+-- is never purged (#83).
 CREATE TABLE item_has_tag (
     item_id INTEGER NOT NULL REFERENCES item (id) ON DELETE CASCADE,
     tag_id  INTEGER NOT NULL REFERENCES tag (id),
