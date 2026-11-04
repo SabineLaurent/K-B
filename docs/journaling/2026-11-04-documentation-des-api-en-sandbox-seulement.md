@@ -90,8 +90,8 @@ L'environnement est lu par la commande et passé à l'application (règle 2 de `
 - `openapi_url=None` n'a été essayé qu'avec `TestClient`, pas sur un serveur réel lancé par `uvicorn`.
 - L'absence de `/docs` avec `openapi_url=None` vient du guide de FastAPI (« Conditional OpenAPI »,
   lu par Context7 le 2026-11-04) et elle est prouvée par les tests ; le code de FastAPI n'a pas été relu.
-- Je ne sais pas si ton `.env` local contient déjà `KB_DEPLOYMENT_ENVIRONMENT=sandbox` : sans cette
-  ligne, `/docs` répond 404 chez toi.
+- Ton `.env` local contient déjà `KB_DEPLOYMENT_ENVIRONMENT` (dit par toi, le 2026-11-04) ; je n'ai pas
+  lu sa valeur : `/docs` n'y répond que si elle vaut exactement `sandbox`.
 
 ## Ce qui reste
 
