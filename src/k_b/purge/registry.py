@@ -5,7 +5,7 @@ the base cites it any more; the last catalog of a state catalog stays, as the im
 import logging
 import sqlite3
 from collections.abc import Collection
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from k_b.database import purge as purge_queries
 from k_b.database.connection import connect_database
@@ -56,10 +56,19 @@ def delete_rows_without_file(
     return sum(
         purge_queries.delete_uncited_raw_data(connection, row.id)
         for row in purge_queries.read_uncited_raw_data(connection)
-        if PurePosixPath(row.raw_file_path).parts[0] in mounted_dir_names
+        if row.raw_file_path.partition("/")[0] in mounted_dir_names
         and not (
             row.source_id in state_catalog_source_ids
             and row.collected_at == last_collections[row.source_id]
         )
-        and not store.has_file(f"{RAW_DIR_NAME}/{row.raw_file_path}")
+        and is_file_gone(store, row.raw_file_path)
     )
+
+
+def is_file_gone(store: RawStore, raw_file_path: str) -> bool:
+    """Tell whether the raw file of a row is gone; a path the store refuses stays, as the raw purge
+    leaves a name it refuses."""
+    try:
+        return not store.has_file(f"{RAW_DIR_NAME}/{raw_file_path}")
+    except ValueError:
+        return False

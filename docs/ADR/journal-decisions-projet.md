@@ -4913,11 +4913,11 @@ restées ouvertes.
   d'état (Zotero, CISA KEV), dont il garde le dernier fichier importé (#139). Les relevés des tops
   et les copies des clips suivent la même règle ; un fichier jamais importé part aussi : 6 mois est
   un maximum.** Décision de Sabine : « hors zotero et cisa, les raw files sont gardés 6 mois max
-  […] La base devient la "source" de vérité. » Pourquoi, déduit de la séance et à valider par
-  Sabine : la minimisation (les logins des auteurs des releases et des personnes créditées dans
-  les alertes ne sont que dans le brut) ; le brut n'a plus d'usage une fois importé, aucune
-  collecte ne relit un brut ancien (vérifié : seuls l'import, `kb write-tops` et le dernier extrait
-  Zotero lisent `raw/`). **Inverse** l'ADR du 2026-10-09 (« c'est le brut qu'on sauvegarde ») et
+  […] La base devient la "source" de vérité. » Pourquoi, celui de Sabine : « Une veille de plus de
+  six mois n'est plus de première fraîcheur. Ça minimise aussi le stockage et retire des données
+  inutilisées. » Vérifié : aucune collecte ne relit un brut ancien (seuls l'import, `kb write-tops`
+  et le dernier extrait Zotero lisent `raw/`) ; les logins des auteurs des releases et des personnes
+  créditées dans les alertes, qui ne sont que dans le brut, partent avec lui. **Inverse** l'ADR du 2026-10-09 (« c'est le brut qu'on sauvegarde ») et
   la décision 5 de « Squelette E1 E3 : cadrage du 20/10 » pour le brut (3 ans). Écarté : garder le
   brut 3 ans, comme la base. Limites assumées : tant que la base n'a pas de sauvegarde, elle est la
   seule copie de ce qui a plus de 6 mois ; dès que le plus ancien brut a 6 mois, un changement de

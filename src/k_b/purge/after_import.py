@@ -37,6 +37,7 @@ def purge_after_import(
     """Run the purges, the registry last; each logs how many it deleted."""
     store = RawStore(data_dir)
     database_path = data_dir / DATABASE_FILE_NAME
+    # Read once: no purge before the one of the registry writes to raw_data.
     imported_paths = read_imported_paths(database_path)
     folder_keys = [catalog.folder_key for catalog in state_catalogs]
     source_codes = frozenset(catalog.source_code for catalog in state_catalogs)

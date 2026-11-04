@@ -130,3 +130,25 @@ def test_the_log_gives_numbers_never_a_name(data_dir, caplog):
 
     assert "registry purge: 3 rows deleted" in caplog.messages
     assert "claude_code" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "refused_path",
+    [
+        "selected_library/clipping/2026-10-05T093000Z/a\\b.md",
+        "automated_watch/../../outside.json",
+        "",
+    ],
+)
+def test_a_row_whose_path_the_store_refuses_stays_and_the_others_go(
+    data_dir, refused_path
+):
+    """A page named by hand with a backslash is imported all the same; a path is otherwise only
+    refused in a base written by hand."""
+    add_raw_data(data_dir, "arxiv", refused_path, "2026-10-04T09:30:00Z")
+
+    purge(data_dir)
+
+    paths = fetch_paths(data_dir)
+    assert refused_path in paths
+    assert ARXIV_PATH not in paths
