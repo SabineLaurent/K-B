@@ -25,7 +25,7 @@ from k_b.core.config import DigestSubject
 
 # The version of the contracts of docs/fiches-veille.md and docs/tendances.md: a change a client
 # can see changes both.
-API_VERSION = "0.7.0"
+API_VERSION = "0.8.0"
 
 
 def create_app(
@@ -37,9 +37,11 @@ def create_app(
     default_window_days: int,
     model_metrics: ModelMetrics,
     trace_export: TraceExport,
+    openapi_url: str | None = None,
 ) -> FastAPI:
     """The app, its keys, the model, the data API and GitHub it calls, its subjects, its default
-    window, its measures and its traces given; without any key, POST /digests answers 401."""
+    window, its measures, its traces and the path of its OpenAPI given; without any key, POST
+    /digests answers 401; without a path, neither the OpenAPI nor /docs is served."""
     app = FastAPI(
         title="K-B AI API",
         version=API_VERSION,
@@ -47,6 +49,7 @@ def create_app(
         # /openapi.json and /health are routes of Starlette, outside: they hold no data. ReDoc
         # and the OAuth2 redirect of Swagger UI, which K-B does not use, are not served.
         dependencies=[Depends(check_api_key)],
+        openapi_url=openapi_url,
         redoc_url=None,
         swagger_ui_oauth2_redirect_url=None,
         # /digests/ is an unknown route (404), not a redirection to /digests.

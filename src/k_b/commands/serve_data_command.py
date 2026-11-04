@@ -9,6 +9,7 @@ import uvicorn
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME, value_or_log_refusal
 from k_b.core.api_keys import API_KEY_VARIABLE_PREFIX, read_api_keys_or_refusal
+from k_b.core.api_settings import read_openapi_url
 from k_b.data_api.app import create_app
 from k_b.data_api.settings import read_serve_settings_or_refusal
 from k_b.database.connection import DATABASE_FILE_NAME
@@ -31,6 +32,7 @@ def run_serve_data(data_dir: Path, environ: Mapping[str, str]) -> int:
             data_dir / DATABASE_FILE_NAME,
             api_keys,
             allowed_hosts=settings.allowed_hosts,
+            openapi_url=read_openapi_url(environ),
         ),
         host=settings.host,
         port=settings.port,

@@ -13,6 +13,7 @@ import time
 
 import httpx2
 import pytest
+from fastapi.testclient import TestClient
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from test_metrics_export import FakeExporter
@@ -518,3 +519,39 @@ def test_serve_ai_exits_2_when_a_client_has_the_key_it_sends_to_the_data_api(
     )
     assert shared_key not in error_output
     assert uvicorn_calls == []
+
+
+@pytest.mark.parametrize(
+    ("deployment_environment", "documentation_status"),
+    [
+        ("sandbox", 200),
+        ("production", 404),
+        # A value mistyped, or none: nothing is shown.
+        ("prod", 404),
+        ("Sandbox", 404),
+        ("", 404),
+        (None, 404),
+    ],
+)
+def test_the_documentation_is_served_in_the_sandbox_only(
+    monkeypatch,
+    data_dir,
+    uvicorn_calls,
+    environment,
+    deployment_environment,
+    documentation_status,
+):
+    set_environment(monkeypatch, environment)
+    monkeypatch.delenv("KB_DEPLOYMENT_ENVIRONMENT", raising=False)
+    if deployment_environment is not None:
+        monkeypatch.setenv("KB_DEPLOYMENT_ENVIRONMENT", deployment_environment)
+
+    assert cli.main(["serve-ai"]) == 0
+
+    [(app, _)] = uvicorn_calls
+    client = TestClient(app)
+    assert client.get("/docs").status_code == documentation_status
+    assert client.get("/openapi.json").status_code == documentation_status
+    assert client.get("/health").status_code == 200
+    # kb openapi writes the contract from the app, whatever is served.
+    assert app.openapi()["info"]["title"] == "K-B AI API"

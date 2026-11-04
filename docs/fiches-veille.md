@@ -540,11 +540,13 @@ de la requête.
   clé valide, 401 `invalid_api_key`. La clé est fixe ; sa rotation est dans le `README.md`
   (« Changer une clé »).
 - **Pas de `TrustedHostMiddleware`**, écart voulu à la ligne API8 de [specs-api.md](specs-api.md) :
-  sans clé, une requête n'atteint que `/health`, `/docs` et `/openapi.json`, qui ne contiennent
-  aucune donnée, si bien qu'un rebinding DNS n'obtient rien et ne coûte aucun appel. Signalé à
+  sans clé, une requête n'atteint que `/health`, et `/docs` et `/openapi.json` en `sandbox`, qui ne
+  contiennent aucune donnée, si bien qu'un rebinding DNS n'obtient rien et ne coûte aucun appel. Signalé à
   #161 (OWASP API Top 10 de l'API IA) et à revoir en conteneurs (#200), où l'hôte appelant change.
 - **`GET /health`** répond 200 `{"status": "ok"}` sans clé, comme celle de l'API de données.
-- **Version** : `0.6.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
+- **Documentation** : `/docs` et `/openapi.json` ne sont servis que si
+  `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, 404 sinon, comme l'API de données ([specs-api.md](specs-api.md), #393).
+- **Version** : `0.8.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
   un changement visible par un client change les deux. `0.1.0` : `POST /digests` (#156) ; `0.2.0` :
   `model` dans la réponse (#209) ; `0.3.0` : `unanswered`, et `not_retained` du premier niveau
   renommé `no_suitable_subject` (#210, `classify-2`) ; `0.4.0` : `items_dropped` renommé
@@ -554,7 +556,7 @@ de la requête.
   `POST /trend-reports` (#366) ; `0.6.0` : les fiches lues sur GitHub dans la réponse de
   `POST /trend-reports`, et ses erreurs `github_*` (#367) ; `0.7.0` : le choix du modèle dans la
   réponse de `POST /trend-reports`, `model`, `choice_failure` et `chosen` (#368) ; `POST /digests`
-  ne change pas.
+  ne change pas ; `0.8.0` : `/docs` et `/openapi.json` en `sandbox` seulement (#393).
 
 ## Contrôles
 

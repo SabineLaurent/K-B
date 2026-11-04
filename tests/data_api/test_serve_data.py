@@ -368,3 +368,34 @@ def test_serve_exits_with_the_code_of_uvicorn_when_it_does_not_start_and_sets_no
 
     assert stop.value.code == cli.ExitCode.SERVER_NOT_STARTED
     assert sigterm_handlers == [handler_before]
+
+
+@pytest.mark.parametrize(
+    ("deployment_environment", "documentation_status"),
+    [
+        ("sandbox", 200),
+        ("production", 404),
+        # A value mistyped, or none: nothing is shown.
+        ("prod", 404),
+        ("Sandbox", 404),
+        ("", 404),
+        (None, 404),
+    ],
+)
+def test_the_documentation_is_served_in_the_sandbox_only(
+    monkeypatch, data_dir, uvicorn_calls, deployment_environment, documentation_status
+):
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
+    monkeypatch.delenv("KB_DEPLOYMENT_ENVIRONMENT", raising=False)
+    if deployment_environment is not None:
+        monkeypatch.setenv("KB_DEPLOYMENT_ENVIRONMENT", deployment_environment)
+
+    assert cli.main(["serve-data"]) == 0
+
+    [(app, _)] = uvicorn_calls
+    client = TestClient(app, base_url="http://localhost")
+    assert client.get("/docs").status_code == documentation_status
+    assert client.get("/openapi.json").status_code == documentation_status
+    assert client.get("/health").status_code == 200
+    # kb openapi writes the contract from the app, whatever is served.
+    assert app.openapi()["info"]["title"] == "K-B data API"

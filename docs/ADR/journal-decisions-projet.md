@@ -4979,6 +4979,20 @@ restées ouvertes.
   au brut (`RawStore`) est rangé dans `etl/` alors que c'est un accès au stockage ; le déplacer
   touche 21 modules, une refonte hors de #83, à revoir avec le passage du brut à Blob. — PR de #83
 
+### API : la documentation servie en `sandbox` seulement (#393)
+
+- **Les deux API ne servent `/docs` et `/openapi.json` que si `KB_DEPLOYMENT_ENVIRONMENT=sandbox` ;
+  avec `production`, une autre valeur ou rien, ces routes répondent 404 ; `/health` reste servi.**
+  Décision de Sabine : « production ok, sandbox pour développement, si autre valeur ou rien on
+  affiche rien ». Pourquoi : une variable oubliée ou mal écrite ne montre rien (échouer fermé,
+  `code.md`). Ce n'est pas une mesure de sécurité, dit-elle aussi : « ce qui est caché n'est pas
+  pour autant protégé » ; la clé protège les données, et l'entrée interne de l'API de données en
+  ligne reste à faire. Écartés : couper sur la seule valeur `production` (proposé par time-knight :
+  une variable oubliée laissait la doc servie) ; refuser de démarrer sur une valeur inconnue
+  (inutile : elle ne montre rien). Limite : en local, `/docs` demande
+  `KB_DEPLOYMENT_ENVIRONMENT=sandbox` dans le `.env`. Le contrat reste versionné : `kb openapi`
+  l'écrit par `app.openapi()`, indépendant de la route. — PR de #393
+
 ## Décisions encore ouvertes
 
 - **Les seuils des critères des tendances** (2026-10-30) : 2 jours actifs pour « durable », 5 rangs

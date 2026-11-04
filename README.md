@@ -359,8 +359,9 @@ Les codes de toutes les commandes et leur sens sont listés par `uv run kb --hel
    curl -H "Authorization: Bearer <la clé>" "http://127.0.0.1:8000/items?kind=paper&limit=5"
    ```
 
-La documentation de l'API est servie sur `http://127.0.0.1:8000/docs`, sans clé ; son OpenAPI est
-versionnée dans `docs/api/openapi-donnees.json`, réécrite par `uv run kb openapi` lancé à la
+La documentation de l'API est servie sur `http://127.0.0.1:8000/docs`, sans clé, seulement avec
+`KB_DEPLOYMENT_ENVIRONMENT=sandbox` dans le `.env` (404 sinon, en production comme sans la variable) ;
+son OpenAPI est versionnée dans `docs/api/openapi-donnees.json`, réécrite par `uv run kb openapi` lancé à la
 racine du dépôt (ailleurs, sans dossier `docs/api`, il n'écrit rien et sort en code 2). `kb serve-data` journalise une ligne par requête dans
 `<KB_DATA_DIR>/logs/kb-serve-data.log`, avec le nom du client, jamais sa clé. Code de sortie 2, sans
 lancer l'API, si `KB_DATA_DIR` manque, si aucune clé n'est donnée, si un nom de client est vide ou
@@ -412,8 +413,8 @@ donc tourner, et appelle le modèle ; elle ne garde rien entre deux demandes.
      -d '{"window_days": 3}' http://127.0.0.1:8001/digests
    ```
 
-La documentation de l'API IA est servie sur `http://127.0.0.1:8001/docs`, sans clé ; son OpenAPI
-est versionnée dans `docs/api/openapi-ia.json`, réécrite par `uv run kb openapi` avec celle de
+La documentation de l'API IA est servie sur `http://127.0.0.1:8001/docs`, sans clé, seulement avec
+`KB_DEPLOYMENT_ENVIRONMENT=sandbox` (404 sinon) ; son OpenAPI est versionnée dans `docs/api/openapi-ia.json`, réécrite par `uv run kb openapi` avec celle de
 l'API de données. `kb serve-ai` journalise une ligne par requête dans
 `<KB_DATA_DIR>/logs/kb-serve-ai.log` (ni `kb.log` ni `kb-serve-data.log` : un seul `kb serve-ai` par
 `KB_DATA_DIR`), avec le nom du client et l'identifiant de la requête, rendu aussi dans l'en-tête
@@ -554,4 +555,4 @@ Les papiers viennent de l'API arXiv, qui demande cette mention à chacun de ses 
 
 > Thank you to arXiv for use of its open access interoperability.
 
-L'API de données la donne aussi, dans la description de son OpenAPI (`/docs`).
+L'API de données la donne aussi, dans la description de son OpenAPI (`docs/api/openapi-donnees.json`, et `/docs` en `sandbox`).

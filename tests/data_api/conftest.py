@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
+from k_b.core.api_settings import OPENAPI_PATH
 from k_b.data_api.app import create_app
 
 
@@ -25,7 +26,7 @@ def make_client():
 
     def make(database_path, api_keys):
         return TestClient(
-            create_app(database_path, api_keys),
+            create_app(database_path, api_keys, openapi_url=OPENAPI_PATH),
             base_url="http://localhost",
             raise_server_exceptions=False,
         )
