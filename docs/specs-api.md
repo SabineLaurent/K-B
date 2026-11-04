@@ -40,8 +40,8 @@ l'ordre des résultats, change la version.
   de la machine (#200). Pas de CORS.
 - **Lecture seule** : GET seulement. La base est ouverte en lecture seule (`mode=ro`), une
   connexion par requête.
-- **Clé** : chaque route de données demande `Authorization: Bearer <clé>`. `/docs`,
-  `/openapi.json` et `/health` sont publics : ils ne contiennent aucune donnée.
+- **Clé** : chaque route de données demande `Authorization: Bearer <clé>`. `/health` est public,
+  `/docs` et `/openapi.json` aussi quand ils sont servis : ils ne contiennent aucune donnée.
 - **Documentation** : `/docs` et `/openapi.json` ne sont servis que si
   `KB_DEPLOYMENT_ENVIRONMENT=sandbox`. Avec `production`, une autre valeur ou rien, ils répondent
   404 : une variable oubliée ou mal écrite ne montre rien (décision de Sabine du 2026-11-04, #393).
