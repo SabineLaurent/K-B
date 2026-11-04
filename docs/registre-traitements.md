@@ -185,6 +185,9 @@ Limites de la purge (étapes 2, 3 et 7), écrites le 2026-11-04 :
   il reste jusqu'à ce que l'utilisatrice le retire ; dans un dossier de pages, il part avec lui.
 - Un nom de collection que l'import lit sans que K-B l'ait écrit ainsi (`2026-10-5T…`) n'est
   jamais supprimé par l'étape 3.
+- Un dossier de catalogue d'état renommé à la main (`cisa_kev_<suffixe>`, `zotero_<suffixe>`) est lu
+  par l'import comme son catalogue, mais n'est plus protégé par son nom : l'étape 3 le supprime à
+  6 mois, la base garde ses lignes.
 - La première erreur arrête les étapes suivantes : une étape qui échoue à chaque import bloque les
   autres jusqu'à sa correction (`kb import` sort en 1 et le dit).
 

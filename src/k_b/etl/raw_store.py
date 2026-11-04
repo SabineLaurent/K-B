@@ -76,9 +76,9 @@ class RawStore:
         for acquisition_dir_name in RAW_DIR_NAMES:
             acquisition_key = f"{RAW_DIR_NAME}/{acquisition_dir_name}"
             keys += sorted(
-                f"{acquisition_key}/{path.name}"
-                for path in self.list_visible_entries(acquisition_key)
-                if is_folder_not_link(path)
+                key
+                for key in self.list_visible_keys(acquisition_key)
+                if self.has_folder_not_link(key)
             )
         return keys
 
@@ -86,9 +86,9 @@ class RawStore:
         """The collections of a source folder, in name order: its visible files and folders, a
         link left out."""
         collections = []
-        for path in sorted(self.list_visible_entries(folder_key)):
-            key = f"{folder_key}/{path.name}"
-            if is_folder_not_link(path):
+        for key in sorted(self.list_visible_keys(folder_key)):
+            path = self.find_path(key)
+            if self.has_folder_not_link(key):
                 collections.append(RawCollection(key, path.name))
             elif path.is_file() and not path.is_symlink():
                 collections.append(RawCollection(key, path.stem))
@@ -105,7 +105,10 @@ class RawStore:
                 path.unlink()
                 return "deleted"
             entries = list(path.iterdir())
-            if any(is_kept_in_a_collection(entry) for entry in entries):
+            if any(
+                entry.is_symlink() or entry.is_dir() or "\\" in entry.name
+                for entry in entries
+            ):
                 return "kept"
             for entry in entries:
                 self.delete(f"{key}/{entry.name}")
@@ -114,20 +117,24 @@ class RawStore:
             return "already_gone"
         return "deleted"
 
-    def list_visible_entries(self, folder_key: str) -> list[Path]:
-        """The entries of a folder that a key can name and a dot does not hide; none when the
-        folder is absent, a link, or gone meanwhile."""
-        folder = self.find_path(folder_key)
-        if not is_folder_not_link(folder):
+    def list_visible_keys(self, folder_key: str) -> list[str]:
+        """The keys of the entries of a folder, a hidden name or one a key refuses left out; none
+        when the folder is absent, a link, or gone meanwhile."""
+        if not self.has_folder_not_link(folder_key):
             return []
         try:
             return [
-                path
-                for path in folder.iterdir()
+                f"{folder_key}/{path.name}"
+                for path in self.find_path(folder_key).iterdir()
                 if not path.name.startswith(".") and "\\" not in path.name
             ]
         except FileNotFoundError:
             return []
+
+    def has_folder_not_link(self, key: str) -> bool:
+        """Tell whether key names a folder that is not a link: the purge of the raw follows none."""
+        path = self.find_path(key)
+        return path.is_dir() and not path.is_symlink()
 
     def read_latest(self, folder_key: str) -> bytes | None:
         """The last raw file of a folder in collection order; None when it has none."""
@@ -166,17 +173,6 @@ class RawStore:
                 f"not a key relative to the data directory: {quote_value(key)}"
             )
         return self.data_dir.joinpath(*key_path.parts)
-
-
-def is_folder_not_link(path: Path) -> bool:
-    """Tell whether path is a folder that is not a link: the purge never follows one."""
-    return path.is_dir() and not path.is_symlink()
-
-
-def is_kept_in_a_collection(entry: Path) -> bool:
-    """Tell whether an entry keeps its folder of pages: a folder, a link, or a name with a
-    backslash, which a key refuses (a character of a name on macOS and Linux)."""
-    return entry.is_symlink() or entry.is_dir() or "\\" in entry.name
 
 
 class InvalidCollectionStateError(ValueError):
