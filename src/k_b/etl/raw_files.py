@@ -18,6 +18,18 @@ def parse_collection_name(collection_name: str) -> datetime:
     )
 
 
+def read_collection_time(collection_name: str) -> datetime | None:
+    """The collection time of a name kb gave, None for another name; strptime alone would take
+    2026-10-5, which breaks the order of the names."""
+    try:
+        collected_at = parse_collection_name(collection_name)
+    except ValueError:
+        return None
+    if collected_at.strftime(COLLECTION_NAME_FORMAT) != collection_name:
+        return None
+    return collected_at
+
+
 class Rejection(NamedTuple):
     """A raw file, or an entry of it, refused at the import, with the reason."""
 

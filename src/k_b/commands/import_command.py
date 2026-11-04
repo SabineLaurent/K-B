@@ -17,7 +17,6 @@ from k_b.etl.pipeline import (
     ImportLogExistsError,
     ImportOutcome,
     import_raw_files,
-    purge_superseded_raw,
 )
 from k_b.etl.raw_store import (
     AUTOMATED_WATCH_DIR_NAME,
@@ -26,19 +25,27 @@ from k_b.etl.raw_store import (
 )
 from k_b.etl.source_kinds import SOURCE_KINDS
 from k_b.etl.sources import cisa_kev, zotero
+from k_b.purge.after_import import StateCatalog, purge_after_import
 
 logger = logging.getLogger(LOGGER_NAME)
 
-# The state catalogs: of each, only the last raw file imported is kept (ADR of 2026-10-19).
-LATEST_ONLY_FOLDER_KEYS = (
-    make_source_folder_key(SELECTED_LIBRARY_DIR_NAME, zotero.FOLDER_PREFIX),
-    make_source_folder_key(AUTOMATED_WATCH_DIR_NAME, cisa_kev.FOLDER_PREFIX),
+# The state catalogs: of each, the raw keeps only the last file imported (ADR of 2026-10-19) and
+# the base every row (decision of Sabine of 2026-11-04).
+STATE_CATALOGS = (
+    StateCatalog(
+        make_source_folder_key(SELECTED_LIBRARY_DIR_NAME, zotero.FOLDER_PREFIX),
+        zotero.SOURCE_CODE,
+    ),
+    StateCatalog(
+        make_source_folder_key(AUTOMATED_WATCH_DIR_NAME, cisa_kev.FOLDER_PREFIX),
+        cisa_kev.SOURCE_CODE,
+    ),
 )
 
 
 def run_import(data_dir: Path) -> int:
-    """Run the import, print its summary, then purge the raw files superseded; before the purge,
-    so that whatever stops it (an error, Ctrl-C) leaves the summary of the import committed."""
+    """Run the import, print its summary, then run the purges; the summary before them, so that
+    whatever stops them (an error, Ctrl-C) leaves the summary of the import committed."""
     imported_at = datetime.now(UTC).replace(microsecond=0)
     logger.info("import started")
     started = monotonic()
@@ -65,7 +72,7 @@ def run_import(data_dir: Path) -> int:
     # etl/load.py logs it: the path names the data directory.
     logger.info("import log kept: %s", quote_value(outcome.log_path.name))
     print_import_result(outcome)
-    return purge_raw_after_import(data_dir)
+    return purge_after_the_import(data_dir, imported_at)
 
 
 def print_import_result(outcome: ImportOutcome) -> None:
@@ -77,14 +84,16 @@ def print_import_result(outcome: ImportOutcome) -> None:
     print()
 
 
-def purge_raw_after_import(data_dir: Path) -> ExitCode:
-    """Purge the raw files superseded; a failure leaves the import committed."""
+def purge_after_the_import(data_dir: Path, imported_at: datetime) -> ExitCode:
+    """Run the purges, dated by the import; a failure leaves the import committed."""
     try:
-        purge_superseded_raw(data_dir, LATEST_ONLY_FOLDER_KEYS)
+        purge_after_import(
+            data_dir, imported_at, STATE_CATALOGS, GITHUB_TRACKED_REPOSITORIES
+        )
     except (sqlite3.Error, OSError, ValueError) as error:
         # The type, and the reason of an OSError, never the name of a raw file.
         logger.error(
-            "import committed, raw purge failed: %s; run kb import again",
+            "import committed, purge failed: %s; run kb import again",
             describe_os_error(error)
             if isinstance(error, OSError)
             else type(error).__name__,

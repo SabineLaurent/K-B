@@ -1,7 +1,9 @@
 """The helpers several test files of the kb commands use."""
 
+import itertools
 import logging
 import threading
+from datetime import UTC, datetime, timedelta
 
 from k_b.etl.source_contract import SourceKind
 
@@ -40,3 +42,21 @@ def list_sheets(vault_dir):
     return sorted(
         path.relative_to(vault_dir).as_posix() for path in vault_dir.rglob("*.md")
     )
+
+
+# The day the tests run kb import, unless one says otherwise: its purge deletes by age, and the
+# raw files of the tests are named in October 2026.
+KB_IMPORT_DAY = datetime(2026, 10, 20, tzinfo=UTC)
+
+
+def make_clock(start):
+    """A datetime whose now gives start, then a second later at each call, so that two imports
+    of a test each write their own log."""
+    seconds = itertools.count()
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return start + timedelta(seconds=next(seconds))
+
+    return Clock

@@ -16,6 +16,7 @@ TOP_LEVEL_MODULES = {
     "data_api",
     "ai_api",
     "post",
+    "purge",
 }
 # Under k_b.etl, each module is in exactly one of the three.
 ETL_COMPOSITION_MODULES = {"etl.source_kinds", "etl.collected_sources"}
@@ -30,7 +31,6 @@ ETL_PIPELINE_MODULES = {
     "etl.raw_files",
     "etl.raw_reading",
     "etl.raw_store",
-    "etl.raw_purge",
     "etl.rejections",
     "etl.tops",
     "etl.source_contract",

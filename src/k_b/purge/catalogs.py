@@ -1,13 +1,28 @@
-"""Delete the raw files of a state catalog superseded by a newer one imported: of each folder,
-only the last raw file imported is kept."""
+"""Step 7 of the sorting: delete the raw files of a state catalog superseded by a newer one
+imported; of each folder, only the last raw file imported is kept."""
 
 import logging
 from collections.abc import Collection
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
+from k_b.database.connection import connect_database
+from k_b.database.reading import read_raw_file_paths
 from k_b.etl.raw_store import RAW_DIR_NAME, RawStore
 
 logger = logging.getLogger(__name__)
+
+
+def purge_superseded_catalogs(
+    database_path: Path, store: RawStore, folder_keys: Collection[str]
+) -> int:
+    """Read the registry of the base, then delete the raw files each folder's last one imported
+    superseded; return how many."""
+    connection = connect_database(database_path)
+    try:
+        imported_paths = read_raw_file_paths(connection)
+    finally:
+        connection.close()
+    return delete_superseded_raw_files(store, imported_paths, folder_keys)
 
 
 def delete_superseded_raw_files(

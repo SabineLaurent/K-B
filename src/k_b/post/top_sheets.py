@@ -13,7 +13,7 @@ from typing import NamedTuple
 from k_b.core.config import TOPS_DIR_NAME, WATCH_DIR_NAME
 from k_b.core.dates import format_date
 from k_b.core.quoting import quote_value
-from k_b.etl.raw_files import COLLECTION_NAME_FORMAT, parse_collection_name
+from k_b.etl.raw_files import read_collection_time
 from k_b.etl.raw_store import RawStore
 from k_b.etl.tops import Top, TopEntry
 from k_b.post.vault_files import (
@@ -104,16 +104,8 @@ def read_ranking(store: RawStore, top: Top, key: str) -> Ranking | None:
 
 
 def find_collection_time(key: str) -> datetime | None:
-    """The time of the collection that named the file of key, None for another name; strptime
-    alone would take 2026-10-5, which breaks the order of the names."""
-    collection_name = PurePosixPath(key).stem
-    try:
-        collected_at = parse_collection_name(collection_name)
-    except ValueError:
-        return None
-    if collected_at.strftime(COLLECTION_NAME_FORMAT) != collection_name:
-        return None
-    return collected_at
+    """The time of the collection that named the file of key, None for another name."""
+    return read_collection_time(PurePosixPath(key).stem)
 
 
 def find_sheets_dir(vault_dir: Path, top: Top) -> Path:

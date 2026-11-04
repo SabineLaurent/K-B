@@ -23,6 +23,7 @@ DATA_API_ALLOWED_MODULES = {"data_api", "database", "items", "core"}
 DATA_API_FORBIDDEN_MODULES = {
     "database.writers",
     "database.writing",
+    "database.purge",
     "core.atomic_write",
 }
 
@@ -57,6 +58,8 @@ def test_data_api_imports_only_data_api_database_items_and_core():
         ("from k_b.database import writing", True),
         ("from k_b import database", True),
         ("from k_b.core.atomic_write import write_file_atomically", True),
+        ("from k_b.database.purge import delete_expired_items", True),
+        ("from k_b.purge.base import purge_expired_rows", True),
         ("from k_b.database import reading", False),
         ("from k_b.database.reading import read_items", False),
         ("from k_b.data_api.errors import ApiError", False),
