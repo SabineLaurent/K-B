@@ -599,7 +599,8 @@ encore l'ancien modèle.
   chaque machine.
 - **Le dossier de données est `~/.knowledge_base`, hors de tout dossier synchronisé et compris
   dans une sauvegarde.** Décision de Sabine. Pourquoi : la base SQLite et les données restent sur
-  la machine ; c'est le brut qu'on sauvegarde. Options écartées : `~/.local/share/k-b`
+  la machine ; c'est le brut qu'on sauvegarde (**inversé le 2026-11-04** : la base est la source
+  de vérité, le brut gardé 6 mois, #83). Options écartées : `~/.local/share/k-b`
   (convention XDG, moins connue sur Mac), `~/Library/Application Support/K-B` (pensé pour les
   applications graphiques), `~/K-B-data` (exemple du 2026-09-29, un dossier visible de plus).
   **Révisée le 2026-10-15** : dans le POC, la base va dans un volume nommé et le brut dans un
@@ -628,7 +629,8 @@ encore l'ancien modèle.
   reconstructible depuis le brut (registre, fiche 1), et c'est le brut qu'on sauvegarde. Options
   écartées : des migrations numérotées avec `PRAGMA user_version` ; Alembic et SQLAlchemy (deux
   dépendances, schéma à réécrire en Python). Limite : des migrations deviendront nécessaires le
-  jour où la base gardera des données sans brut. **Contredit** l'ADR du 2026-10-05 (PR de #82),
+  jour où la base gardera des données sans brut (**ce jour arrive avec #83**, 2026-11-04 : dès que
+  le plus ancien brut a 6 mois). **Contredit** l'ADR du 2026-10-05 (PR de #82),
   qui écartait la reconstruction parce qu'elle renumérote `item_id`, que l'API exposera : la
   stabilité de `item_id` est ouverte (ci-dessous). **Révisée le 2026-10-15** : la base passe à
   PostgreSQL au 08/11 ; les migrations Alembic sont à reprendre pour PostgreSQL seulement,
@@ -2964,7 +2966,8 @@ time-knight (délégation de Sabine du 2026-10-15).
   ou par un `CHECK`) fait quand même supprimer le précédent, la collecte ne pouvant valider ni
   l'un ni l'autre sans valeurs factices ; un item inchangé reste rattaché au fichier qui l'a écrit
   (`item.raw_data_id`), et `raw_data` garde le chemin d'un fichier supprimé : il dit ce qui a été
-  importé et quand, plus que le fichier existe ; un dossier renommé à la main
+  importé et quand, plus que le fichier existe (**précisé le 2026-11-04** : tant qu'une ligne de
+  la base le cite, ou s'il est le dernier catalogue importé, #83) ; un dossier renommé à la main
   (`cisa_kev_<suffixe>`) n'est pas purgé. **Révise** l'entrée CISA du 2026-10-07 (« l'historique
   des versions n'est pas en base, le brut le garde ») et la phrase du 2026-10-09 « c'est le brut
   qu'on sauvegarde » pour ces deux sources. Tranche la question ouverte du 2026-10-11, « Durée de
@@ -2979,7 +2982,8 @@ time-knight (délégation de Sabine du 2026-10-15).
   jusque-là, chaque version d'un clip reste dans le brut, sans durée. — PR de #139 **Précisée le
   2026-10-20** : la règle reste ; « au 08/11, avec PostgreSQL et Alembic » attend « La base au
   temps 3 » ; fréquence : à chaque sauvegarde de la base (« Squelette E1 E3 : cadrage du 20/10 »,
-  décision 6).
+  décision 6). **Inversée le 2026-11-04** : le brut des clips est gardé 6 mois au plus, puis part
+  dès que deux sauvegardes saines le couvrent (#83).
 
 ### Collecte : mise à jour des `.md` importés
 
@@ -3341,7 +3345,8 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
 - **5. La veille collectée en base est purgée au terme de sa durée. « Immuable » veut dire jamais
   réécrit, pas gardé pour toujours. Les fiches déjà écrites dans le coffre ne sont pas touchées.
   La durée passe de 2 à 3 ans pour les items de veille, le brut de veille (`raw/automated_watch/`)
-  et les tendances (`trend`).** Décision de Sabine. Pourquoi, selon la proposition : rendre
+  et les tendances (`trend`).** **Inversée le 2026-11-04 pour le brut, gardé 6 mois au plus
+  (#83).** Décision de Sabine. Pourquoi, selon la proposition : rendre
   cohérentes les étapes 2 (purge des items de veille) et 9 (« le *cleansed* est immuable ») de la
   procédure de tri du registre. Pourquoi 3 ans plutôt que 2 (décision de Sabine du 2026-10-20) :
   « Je ne prévois pas d'interroger la base sur des sujets de plus de 3 ans. Une durée plus courte
@@ -3360,7 +3365,8 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
 - **6. L'étape 8 de la procédure de tri (suppression du brut des clips) reste rattachée à la
   base : elle attend « La base au temps 3 » (question ouverte, plus bas). Sa règle du 2026-10-19 ne
   change pas : le brut des clips n'est supprimé qu'une fois la base sauvegardée. Sa fréquence : à
-  chaque sauvegarde de la base.** Décision de Sabine, prise au découpage. Pourquoi (décision de
+  chaque sauvegarde de la base.** **Inversée le 2026-11-04** : le brut des clips suit la règle
+  des 6 mois (#83). Décision de Sabine, prise au découpage. Pourquoi (décision de
   Sabine du 2026-10-20) : « la base sera certainement PostgreSQL, avec Alembic pour les
   migrations. On est en développement : le plan reste de supprimer le brut des clips quand une
   sauvegarde de la base sera fonctionnelle. » « La base au temps 3 » reste pourtant ouverte :
@@ -3872,7 +3878,8 @@ Sabine du 2026-10-15).
   — branche `refactoring/etl`
 - **La purge du brut reste une étape à part, appelée par la commande après l'affichage du résumé :
   `pipeline.purge_superseded_raw(data_dir, latest_only_folder_keys)`, et non une étape de
-  `import_raw_files`.** Décision de Sabine du 2026-10-23, sur les deux options du compte rendu de
+  `import_raw_files`.** **Révisée le 2026-11-04** : les purges sortent de l'ETL, dans
+  `src/k_b/purge/` (#83). Décision de Sabine du 2026-10-23, sur les deux options du compte rendu de
   la session. Pourquoi : aucun changement de comportement — le résumé de l'import sort avant la
   purge, donc un import qui a commité dit ce qu'il a écrit même quand la purge échoue — et le plan
   classe la rétention hors des trois stages (§1). Conséquence : `ImportOutcome` ne porte que le
@@ -4893,6 +4900,85 @@ fait `1 raw file`) ; le nombre d'items vient à l'import. Une source en échec a
 pages garde les pages déjà écrites, mais sa ligne reste `failed (…)`, sans leur nombre, comme
 avant.
 
+## 2026-11-04
+
+### Conservation : la base, source de vérité, et la purge hors de l'ETL (#83)
+
+Décisions de Sabine du 2026-11-04, en séance avec time-knight (session « code K-B »), demandées
+pour finir la purge et le critère C4 d'E1 ; plan relu par un sous-agent (17 constats pris), puis
+« go ». Elles tranchent les questions de « Durées de conservation et fréquence de la purge »
+restées ouvertes.
+
+- **La base devient la source de vérité ; le brut est gardé 6 mois au plus, sauf les catalogues
+  d'état (Zotero, CISA KEV), dont il garde le dernier fichier importé (#139). Les relevés des tops
+  et les copies des clips suivent la même règle ; un fichier jamais importé part aussi : 6 mois est
+  un maximum.** Décision de Sabine : « hors zotero et cisa, les raw files sont gardés 6 mois max
+  […] La base devient la "source" de vérité. » Pourquoi, déduit de la séance et à valider par
+  Sabine : la minimisation (les logins des auteurs des releases et des personnes créditées dans
+  les alertes ne sont que dans le brut) ; le brut n'a plus d'usage une fois importé, aucune
+  collecte ne relit un brut ancien (vérifié : seuls l'import, `kb write-tops` et le dernier extrait
+  Zotero lisent `raw/`). **Inverse** l'ADR du 2026-10-09 (« c'est le brut qu'on sauvegarde ») et
+  la décision 5 de « Squelette E1 E3 : cadrage du 20/10 » pour le brut (3 ans). Écarté : garder le
+  brut 3 ans, comme la base. Limites assumées : tant que la base n'a pas de sauvegarde, elle est la
+  seule copie de ce qui a plus de 6 mois ; dès que le plus ancien brut a 6 mois, un changement de
+  schéma passe par une migration, que K-B n'a pas encore (la limite de W7, 2026-10-09, arrive).
+- **Une fois la base sauvegardée, le brut (hors Zotero et CISA KEV) part dès que deux sauvegardes
+  saines le couvrent ; les 6 mois restent le maximum. Règle écrite au registre (étape 3), pas
+  codée.** Décision de Sabine : « A partir du moment où le système de backup de bdd est en place,
+  purge toutes les deux sauvegardes de base. » Elle reprend les intervalles qu'elle avait fixés le
+  2026-10-19 avec time-knight, jamais entrés dans K-B jusqu'ici : deux sauvegardes par semaine,
+  chacune vérifiée par une restauration d'essai, 8 gardées, celle d'avant une migration gardée sans
+  limite, une copie hors du Mac. Écarté pour l'instant : une commande `kb purge` à part, ou un
+  dossier `cron_jobs/` (proposé par Sabine) : le cron vit hors du code (« le code ne planifie
+  rien »), et sur le Mac rien n'est planifié, une purge à part pourrait ne jamais tourner ; la purge
+  du brut après sauvegarde ira avec la commande de sauvegarde.
+- **En base, la veille est gardée 3 ans jour pour jour depuis la collecte de son fichier
+  (`raw_data.collected_at`), `trend` comprise ; les catalogues d'état et la bibliothèque sont
+  gardés sans limite, CISA KEV comme Zotero et les clips.** Décisions de Sabine : `trend`
+  (« pour trend ok », sur la recommandation : une seule règle pour toute la veille, et l'écart avec
+  `window_end` n'est que de quelques jours, une ligne n'étant écrite que par le premier fichier
+  qui apporte sa fenêtre) ; CISA KEV (« cisa devrait être comme zotero et clips pour base de
+  données » ; avis de time-knight : la base porte l'état du catalogue, une entrée retirée y est
+  marquée, `vulnerability` ne porte aucune donnée personnelle, et une durée comptée depuis la
+  première collecte purgerait une entrée encore au catalogue pour la réécrire au suivant). Écarté :
+  `trend.window_end` comme point de départ. Un papier encore cité par une `zotero_entry` ou une
+  `newsletter_article` ne garde que son identifiant arXiv ; une référence que plus rien ne cite
+  est supprimée (minimisation, choix de time-knight nommé au plan).
+- **Un dépôt suivi (`tracked_repository`) reste tant qu'il est dans `GITHUB_TRACKED_REPOSITORIES`
+  ; retiré de la liste, il part avec sa dernière release. Une ligne de `raw_data` part quand son
+  fichier n'existe plus et que plus rien ne la cite, sauf celle du dernier fichier importé d'un
+  catalogue d'état.** Décisions de Sabine (« pour track repository ok », « ok pour raw_data »).
+  Pourquoi : une release cite son dépôt (clé étrangère) ; une ligne de `raw_data` date ses items
+  et ses tendances, et celle du dernier catalogue dit à l'import quel catalogue est le dernier
+  (`SELECT_LATEST_CATALOG`, `catalog.py`) : la supprimer ferait prendre un catalogue tardif pour
+  plus récent (constat de la relecture du plan). Écarté : supprimer le dépôt et ses releases dès
+  qu'il sort de la liste (ses releases partiraient avant leurs 3 ans). Sans dossier `raw/` (un
+  volume non monté), le registre n'est pas purgé : chaque fichier y paraîtrait absent.
+- **Ce que Sabine dépose dans K-B n'est jamais supprimé automatiquement.** Décision de Sabine :
+  « ce que je dépose moi dans kb n'est jamais supprimé automatiquement. » Déjà vrai : K-B n'écrit
+  ni dans un clip du coffre ni dans Zotero, et la bibliothèque n'a pas de durée en base. Les copies
+  brutes des clips suivent pourtant la règle des 6 mois (option b, choisie par Sabine) : le clip
+  reste dans le coffre et dans la base. **Inverse** la décision 6 de « Squelette E1 E3 : cadrage du
+  20/10 » et la règle du 2026-10-19 (brut des clips gardé jusqu'à une sauvegarde).
+- **Limite acceptée : une donnée que la source republie est une nouvelle collecte, ses 3 ans
+  repartent.** Décision de Sabine (« a, je suis ta recommandation ») : une release encore parmi
+  les 100 dernières de son dépôt, ou une alerte que GitHub met à jour, revient comme un item neuf
+  après sa purge. Écarté : l'import qui écarte un item de flux dont la date de publication précède
+  la borne (il perdrait la mise à jour d'une alerte). Tranche le cas du commentaire de #83 du
+  2026-10-06.
+- **La purge a sa place hors de l'ETL : le paquet `src/k_b/purge/`, à côté de `post/`, lancé par
+  `kb import` après le commit et le bilan, dans cet ordre : les catalogues remplacés (étape 7,
+  déplacée de `etl/raw_purge.py`), la base, le brut, le registre ; la première erreur arrête la
+  suite, que l'import suivant relance. Le SQL est dans `src/k_b/database/purge.py`.** Décision de
+  Sabine : « je veux que la purge ait une place hors de ETL », « avec un emplacement logique et
+  adapté du code qui respecte nos principes architecturaux ». La purge n'est ni E, ni T, ni L
+  (`docs/refactoring/orchestration.md`, « `raw_purge` est le cas douteux »). Les tests
+  d'architecture la tiennent comme `post/` : l'ETL n'importe rien d'elle, elle n'importe de l'ETL
+  que `raw_store` et `raw_files`, les API ne l'importent pas. **Révise** la décision du 2026-10-23
+  (la purge du brut, fonction de `etl/pipeline.py`). Limite signalée à Sabine et gardée : l'accès
+  au brut (`RawStore`) est rangé dans `etl/` alors que c'est un accès au stockage ; le déplacer
+  touche 21 modules, une refonte hors de #83, à revoir avec le passage du brut à Blob. — PR de #83
+
 ## Décisions encore ouvertes
 
 - **Les seuils des critères des tendances** (2026-10-30) : 2 jours actifs pour « durable », 5 rangs
@@ -4925,8 +5011,8 @@ avant.
   recommandée par le rapport de l'architecte, la base est un fichier produit par le job de
   collecte et d'import, puis rangé dans Azure Blob Storage ; rien ne change aux temps 1 et 2.
   Non tranchée le 2026-10-20. Met en attente « PostgreSQL au 08/11 » (« POC du 25/10 »,
-  décision 2) et l'étape 8 de la procédure de tri (« Squelette E1 E3 : cadrage du 20/10 »,
-  décision 6). `README.md` et `docs/stockage.md` (« Le SGBD ») y renvoient.
+  décision 2) et la sauvegarde de la base, donc la purge du brut après deux sauvegardes saines
+  (2026-11-04) ; l'étape 8 de la procédure de tri n'en dépend plus depuis le 2026-11-04 (#83). `README.md` et `docs/stockage.md` (« Le SGBD ») y renvoient.
 
 - **Où tourne `kb write-tops` en ligne** (2026-10-19) : elle écrit le coffre, qu'aucun conteneur
   ne monte au POC (règle 4 de `.claude/rules/poc.md`) ; à trancher avant la mise en ligne du
@@ -4973,17 +5059,9 @@ avant.
 
 - **Nommage des tables et des colonnes.** Gardé tel quel le 2026-10-02 ; Sabine demandera les
   renommages à l'usage, une fois les schémas sous les yeux.
-- **Durées de conservation et fréquence de la purge** : provisoirement 2 ans après la collecte
-  (base et brut), purge à chaque collecte (une par jour) ; la durée, par mode d'acquisition,
-  sera dans `config.py` (2026-10-10), à revoir. Sabine n'a pas tranché le 2026-10-02 ; à confirmer
-  quand #20 code la purge. La purge des tables nouvelles (référentiels, TENDANCE, bibliothèque)
-  n'est pas définie (relecture du 2026-10-09). **Close le 2026-10-20 pour la veille** : 3 ans pour
-  les items, le brut de veille et les tendances (`trend`), dont la purge est ainsi définie
-  (« Squelette E1 E3 : cadrage du 20/10 », décision 5) ; le reste, et les fréquences : #276.
-  **Fréquences écrites le 2026-10-25** (PR de #276) : chaque étape de tri du registre a la sienne ;
-  les purges de la veille (étapes 2 et 3) tournent à chaque import. Restent ouverts, décision de
-  Sabine en attente : le point de départ des 3 ans pour `trend`, la garde de `tracked_repository`
-  et de `raw_data`, et l'effacement d'un login de propriétaire de dépôt suivi (#268).
+- **L'effacement d'un login de propriétaire de dépôt suivi** (#268), dernier reste de « Durées de
+  conservation et fréquence de la purge », close le 2026-11-04 (« Conservation : la base, source
+  de vérité, et la purge hors de l'ETL (#83) ») : décision de Sabine en attente.
 - **Liste d'exclusion** des personnes qui demandent l'effacement, pour qu'une collecte ou une
   reconstruction ne les réintroduise pas : proposée dans le registre, à concevoir dans #20.
   Indispensable avec une base reconstruite, en développement (2026-10-10).
