@@ -55,6 +55,9 @@ def test_a_log_or_a_journal_leaves_after_6_months_and_stays_at_6_months(
         ("journals", "import-journal-2020-01-01.jsonl"),
         ("journals", "import-journal-2020-13-45T093000Z.jsonl"),
         ("journals", ".import-journal-2020-01-01T093000Z.jsonl.a1b2c3.tmp"),
+        # A dated log that kb does not write, as one the user left there.
+        ("logs", "incident.log.2020-01-01"),
+        ("logs", "kb_log.2020-01-01"),
         # A name of the other folder, or the name of before.
         ("journals", "kb.log.2020-01-01"),
         ("logs", "import-journal-2020-01-01T093000Z.jsonl"),

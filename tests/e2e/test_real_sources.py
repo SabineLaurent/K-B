@@ -163,8 +163,8 @@ def count_rejections(data_dir):
     """The rejections of the import journals of data_dir: kb import exits 0 with them."""
     return sum(
         1
-        for log_path in data_dir.glob("journals/import-journal-*.jsonl")
-        for line in log_path.read_text().splitlines()
+        for journal_path in data_dir.glob("journals/import-journal-*.jsonl")
+        for line in journal_path.read_text().splitlines()
         if json.loads(line)["kind"] == "rejection"
     )
 

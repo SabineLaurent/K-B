@@ -27,9 +27,9 @@ def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, ca
 
     assert exit_code == 0
     output = capsys.readouterr()
-    (log_path,) = tmp_path.glob("journals/import-journal-*.jsonl")
+    (journal_path,) = tmp_path.glob("journals/import-journal-*.jsonl")
     assert re.fullmatch(
-        r"import-journal-\d{4}-\d{2}-\d{2}T\d{6}Z\.jsonl", log_path.name
+        r"import-journal-\d{4}-\d{2}-\d{2}T\d{6}Z\.jsonl", journal_path.name
     )
     assert output.out == (
         "\nimport: 0 raw read, 0 written, 0 trend rows, 0 left out, 0 rejected, 0 withdrawn\n\n"
@@ -37,7 +37,7 @@ def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, ca
     for line in (
         "import started",
         r"import finished in \d+ s",
-        re.escape(f"import journal kept: '{log_path.name}'"),
+        re.escape(f"import journal kept: '{journal_path.name}'"),
     ):
         assert re.search(
             rf"^{LOG_LINE_DATE} INFO k_b\.cli: {line}$", output.err, re.MULTILINE
@@ -220,15 +220,15 @@ def test_import_refuses_to_rewrite_the_log_of_its_second_and_exits_2(
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
     monkeypatch.setattr(import_command, "datetime", FrozenDatetime)
-    log_path = tmp_path / "journals" / "import-journal-2026-10-12T154903Z.jsonl"
-    log_path.parent.mkdir(exist_ok=True)
-    log_path.write_text("earlier import\n")
+    journal_path = tmp_path / "journals" / "import-journal-2026-10-12T154903Z.jsonl"
+    journal_path.parent.mkdir(exist_ok=True)
+    journal_path.write_text("earlier import\n")
 
     exit_code = cli.main(["import"])
 
     assert exit_code == 2
-    assert str(log_path) in capsys.readouterr().err
-    assert log_path.read_text() == "earlier import\n"
+    assert str(journal_path) in capsys.readouterr().err
+    assert journal_path.read_text() == "earlier import\n"
 
 
 def test_import_refuses_a_missing_database_and_does_not_create_it(
@@ -251,7 +251,7 @@ def test_import_reports_a_failed_import_and_exits_1(monkeypatch, tmp_path, capsy
         reading,
         trend_reading,
         database_path,
-        log_path,
+        journal_path,
         imported_at,
         tracked_repositories,
     ):
@@ -278,7 +278,7 @@ def test_import_reports_a_source_missing_from_the_database_and_exits_1(
         reading,
         trend_reading,
         database_path,
-        log_path,
+        journal_path,
         imported_at,
         tracked_repositories,
     ):
@@ -303,7 +303,7 @@ def test_import_reports_a_kind_without_table_and_exits_1(monkeypatch, tmp_path, 
         reading,
         trend_reading,
         database_path,
-        log_path,
+        journal_path,
         imported_at,
         tracked_repositories,
     ):

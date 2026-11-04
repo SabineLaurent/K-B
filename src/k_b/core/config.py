@@ -154,13 +154,18 @@ CLIP_CHANGE_MARGIN = timedelta(seconds=60)
 
 # The folder of the data directory that holds the logs of the runs: what a program did, to watch it.
 LOGS_DIR_NAME = "logs"
+# The logs kb writes there, the only ones the purge deletes (commands/run_log.py): kb.log for every
+# command, kb-serve-data.log and kb-serve-ai.log apart.
+LOG_FILE_NAME = "kb.log"
+SERVE_DATA_LOG_FILE_NAME = "kb-serve-data.log"
+SERVE_AI_LOG_FILE_NAME = "kb-serve-ai.log"
 # The folder that holds the journals of the imports: what an import decided about the data, in JSON.
 JOURNALS_DIR_NAME = "journals"
 # How many months a log and a journal are kept after the day in their name; the purge deletes the
 # others, at the end of kb import (purge/run_records.py). The bottom of what the CNIL recommends for
 # a log, six months to a year, a recommendation not binding (deliberation 2021-122; decision of
 # Sabine of 2026-11-04, which replaces the 30 days of 2026-10-19).
-LOG_RETENTION_MONTHS = 6
+RECORD_RETENTION_MONTHS = 6
 
 # The local defaults of kb serve-data, each changed by its variable (data_api/settings.py;
 # .claude/rules/poc.md, rule 2): the data API listens on the machine only and answers these hosts

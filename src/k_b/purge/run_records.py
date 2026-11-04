@@ -6,15 +6,29 @@ import re
 from datetime import UTC, date, datetime
 from pathlib import Path
 
-from k_b.core.config import JOURNALS_DIR_NAME, LOG_RETENTION_MONTHS, LOGS_DIR_NAME
+from k_b.core.config import (
+    JOURNALS_DIR_NAME,
+    LOG_FILE_NAME,
+    LOGS_DIR_NAME,
+    RECORD_RETENTION_MONTHS,
+    SERVE_AI_LOG_FILE_NAME,
+    SERVE_DATA_LOG_FILE_NAME,
+)
 from k_b.core.dates import subtract_months
 
 logger = logging.getLogger(__name__)
 
+LOG_NAMES_PATTERN = "|".join(
+    re.escape(name)
+    for name in (LOG_FILE_NAME, SERVE_DATA_LOG_FILE_NAME, SERVE_AI_LOG_FILE_NAME)
+)
 # The day comes from the name: a copy or a restoration changes the time of a file. A log of a past
-# day: kb.log.2026-10-05; a journal: import-journal-2026-10-05T093000Z.jsonl.
+# day: kb.log.2026-10-05; a journal: import-journal-2026-10-05T093000Z.jsonl. Only the logs kb
+# writes: a dated file the user left in logs/ stays.
 DATED_NAME_BY_FOLDER = {
-    LOGS_DIR_NAME: re.compile(r"[a-z-]+\.log\.([0-9]{4}-[0-9]{2}-[0-9]{2})"),
+    LOGS_DIR_NAME: re.compile(
+        rf"(?:{LOG_NAMES_PATTERN})\.([0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}})"
+    ),
     JOURNALS_DIR_NAME: re.compile(
         r"import-journal-([0-9]{4}-[0-9]{2}-[0-9]{2})T[0-9]{6}Z\.jsonl"
     ),
@@ -24,7 +38,7 @@ DATED_NAME_BY_FOLDER = {
 def delete_expired_records(data_dir: Path, imported_at: datetime) -> int:
     """Delete the logs and the journals older than the duration and return how many; the log gives
     the number, never a name."""
-    bound = subtract_months(imported_at.astimezone(UTC), LOG_RETENTION_MONTHS).date()
+    bound = subtract_months(imported_at.astimezone(UTC), RECORD_RETENTION_MONTHS).date()
     deleted_count = sum(
         delete_file(path)
         for folder_name, dated_name in DATED_NAME_BY_FOLDER.items()
@@ -34,7 +48,7 @@ def delete_expired_records(data_dir: Path, imported_at: datetime) -> int:
     logger.info(
         "logs and journals purge: %d files older than %d months deleted",
         deleted_count,
-        LOG_RETENTION_MONTHS,
+        RECORD_RETENTION_MONTHS,
     )
     return deleted_count
 

@@ -117,8 +117,8 @@ def test_only_a_new_raw_file_is_read_and_the_journal_of_the_first_import_stays_w
     data_dir,
 ):
     run_import(data_dir)
-    (first_log,) = list_journals(data_dir)
-    first_journal_content = first_log.read_bytes()
+    (first_journal,) = list_journals(data_dir)
+    first_journal_content = first_journal.read_bytes()
     write_collection(data_dir, CISA_KEV_DIR, "2026-10-06T093000Z", kev_catalog("Known"))
 
     second = run_import(data_dir)
@@ -126,7 +126,7 @@ def test_only_a_new_raw_file_is_read_and_the_journal_of_the_first_import_stays_w
     assert second.read_count == 1
     assert second.item_count == 1
     assert len(list_journals(data_dir)) == 2
-    assert first_log.read_bytes() == first_journal_content
+    assert first_journal.read_bytes() == first_journal_content
 
 
 def test_a_journal_of_the_same_second_stops_the_import_before_the_database(data_dir):

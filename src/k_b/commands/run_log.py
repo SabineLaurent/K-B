@@ -7,7 +7,12 @@ from contextlib import contextmanager
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
-from k_b.core.config import LOGS_DIR_NAME
+from k_b.core.config import (
+    LOG_FILE_NAME,
+    LOGS_DIR_NAME,
+    SERVE_AI_LOG_FILE_NAME,
+    SERVE_DATA_LOG_FILE_NAME,
+)
 from k_b.core.dates import DATABASE_DATE_FORMAT
 
 # The name of the logger of cli.py and of every module of commands/, written in each line: one
@@ -15,13 +20,13 @@ from k_b.core.dates import DATABASE_DATE_FORMAT
 LOGGER_NAME = "k_b.cli"
 # The log of every run, successes and failures, apart from the import journals: those are written
 # only when an import reaches the end of its writing in the base.
-LOG_FILE_PATH = Path(LOGS_DIR_NAME) / "kb.log"
+LOG_FILE_PATH = Path(LOGS_DIR_NAME) / LOG_FILE_NAME
 # The log of kb serve-data, apart: a long run that shared kb.log would keep writing in the file of the
 # day before once a rotation done by kb collect or kb import has renamed it (docs/specs-api.md,
 # "Journal").
-SERVE_DATA_LOG_FILE_PATH = Path(LOGS_DIR_NAME) / "kb-serve-data.log"
+SERVE_DATA_LOG_FILE_PATH = Path(LOGS_DIR_NAME) / SERVE_DATA_LOG_FILE_NAME
 # The log of kb serve-ai, apart for the same reason: a long run, beside kb serve-data.
-SERVE_AI_LOG_FILE_PATH = Path(LOGS_DIR_NAME) / "kb-serve-ai.log"
+SERVE_AI_LOG_FILE_PATH = Path(LOGS_DIR_NAME) / SERVE_AI_LOG_FILE_NAME
 LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 # The HTTP client of the AI API logs each request at INFO, with its URL (the resource of the
 # provider) and without the id of the request of kb serve-ai: from WARNING only.

@@ -54,9 +54,9 @@ def test_a_sigterm_after_the_import_journal_is_written_leaves_neither_the_import
     tables_before = dump_database(tmp_path)
     write_import_journal = load.write_import_journal
 
-    def write_then_receive_sigterm(log_path, *arguments):
-        write_import_journal(log_path, *arguments)
-        assert log_path.is_file()
+    def write_then_receive_sigterm(journal_path, *arguments):
+        write_import_journal(journal_path, *arguments)
+        assert journal_path.is_file()
         signal.raise_signal(signal.SIGTERM)
 
     monkeypatch.setattr(load, "write_import_journal", write_then_receive_sigterm)
@@ -105,15 +105,18 @@ def test_a_sigterm_once_the_base_has_committed_keeps_the_import_and_its_journal(
     connection = sqlite3.connect(tmp_path / "k-b.sqlite")
     assert connection.execute("SELECT count(*) FROM raw_data").fetchone() == (1,)
     connection.close()
-    [log_path] = tmp_path.glob("journals/import-journal-*.jsonl")
-    log_lines = [json.loads(line) for line in log_path.read_text("utf-8").splitlines()]
-    assert [line["kind"] for line in log_lines] == ["rejection"]
-    imported_at = datetime.fromisoformat(log_lines[0]["imported_at"])
-    assert log_path.name == f"import-journal-{imported_at:%Y-%m-%dT%H%M%SZ}.jsonl"
+    [journal_path] = tmp_path.glob("journals/import-journal-*.jsonl")
+    journal_lines = [
+        json.loads(line) for line in journal_path.read_text("utf-8").splitlines()
+    ]
+    assert [line["kind"] for line in journal_lines] == ["rejection"]
+    imported_at = datetime.fromisoformat(journal_lines[0]["imported_at"])
+    assert journal_path.name == f"import-journal-{imported_at:%Y-%m-%dT%H%M%SZ}.jsonl"
     output = capsys.readouterr()
     assert output.out == ""
-    assert f"INFO k_b.etl.load: import committed, journal kept: '{log_path.name}'" in (
-        output.err
+    assert (
+        f"INFO k_b.etl.load: import committed, journal kept: '{journal_path.name}'"
+        in (output.err)
     )
 
 
