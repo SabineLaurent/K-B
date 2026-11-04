@@ -352,7 +352,10 @@ def test_import_purges_what_it_committed_once_past_its_durations(
     assert count_rows(tmp_path, "SELECT count(*) FROM raw_data") == 0
     assert not raw_path.exists()
     assert re.search(r"base purge: [1-9]\d* items, 0 trend rows,", output.err)
-    assert "raw purge: 1 collections older than 6 months deleted, 0 kept" in output.err
+    assert (
+        "raw purge: 1 collections older than 6 months deleted, 0 of them never imported,"
+        " 0 kept" in output.err
+    )
     assert "registry purge: 1 rows deleted" in output.err
 
 

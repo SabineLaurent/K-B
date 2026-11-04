@@ -303,3 +303,26 @@ def test_an_error_other_than_a_collection_gone_is_raised(tmp_path, monkeypatch):
         RawStore(tmp_path).delete_collection(
             "raw/automated_watch/tldr_ai/2026-10-05T093000Z"
         )
+
+
+def test_a_name_holding_a_backslash_is_never_listed_and_keeps_its_collection(tmp_path):
+    """A key of the store refuses a backslash: such a name is never handed out."""
+    watch = tmp_path / "raw/automated_watch"
+    (watch / "tldr\\ai").mkdir(parents=True)
+    (watch / "tldr_ai").mkdir()
+    (watch / "tldr_ai/2026-10-05T093000Z\\x.html").write_bytes(b"")
+    collection = watch / "tldr_ai/2026-10-06T093000Z"
+    collection.mkdir()
+    (collection / "a\\b.html").write_bytes(b"")
+    store = RawStore(tmp_path)
+
+    assert store.list_source_folder_keys() == ["raw/automated_watch/tldr_ai"]
+    assert store.list_collections("raw/automated_watch/tldr_ai") == [
+        RawCollection(
+            "raw/automated_watch/tldr_ai/2026-10-06T093000Z", "2026-10-06T093000Z"
+        )
+    ]
+    assert (
+        store.delete_collection("raw/automated_watch/tldr_ai/2026-10-06T093000Z")
+        == "kept"
+    )

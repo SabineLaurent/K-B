@@ -95,9 +95,8 @@ class RawStore:
         return collections
 
     def delete_collection(self, key: str) -> CollectionDeletion:
-        """Delete a collection: its file, or the files of its folder, hidden ones included, then
-        the folder. One that holds a folder or a link is kept whole; one already gone, deleted by
-        another import, is no error."""
+        """Delete a file, or a folder of pages with its hidden files; one holding a folder, a link
+        or a name the keys refuse is kept, one already gone is no error."""
         path = self.find_path(key)
         try:
             if path.is_symlink():
@@ -106,7 +105,7 @@ class RawStore:
                 path.unlink()
                 return "deleted"
             entries = list(path.iterdir())
-            if any(entry.is_symlink() or entry.is_dir() for entry in entries):
+            if any(is_kept_in_a_collection(entry) for entry in entries):
                 return "kept"
             for entry in entries:
                 self.delete(f"{key}/{entry.name}")
@@ -116,13 +115,17 @@ class RawStore:
         return "deleted"
 
     def list_visible_entries(self, folder_key: str) -> list[Path]:
-        """The entries of a folder whose name does not start with a dot; none when the folder is
-        absent or a link, or gone meanwhile."""
+        """The entries of a folder that a key can name and a dot does not hide; none when the
+        folder is absent, a link, or gone meanwhile."""
         folder = self.find_path(folder_key)
         if not is_folder_not_link(folder):
             return []
         try:
-            return [path for path in folder.iterdir() if not path.name.startswith(".")]
+            return [
+                path
+                for path in folder.iterdir()
+                if not path.name.startswith(".") and "\\" not in path.name
+            ]
         except FileNotFoundError:
             return []
 
@@ -168,6 +171,12 @@ class RawStore:
 def is_folder_not_link(path: Path) -> bool:
     """Tell whether path is a folder that is not a link: the purge never follows one."""
     return path.is_dir() and not path.is_symlink()
+
+
+def is_kept_in_a_collection(entry: Path) -> bool:
+    """Tell whether an entry keeps its folder of pages: a folder, a link, or a name with a
+    backslash, which a key refuses (a character of a name on macOS and Linux)."""
+    return entry.is_symlink() or entry.is_dir() or "\\" in entry.name
 
 
 class InvalidCollectionStateError(ValueError):

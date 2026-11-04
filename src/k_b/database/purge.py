@@ -7,49 +7,30 @@ from typing import NamedTuple
 
 SELECT_SOURCES = "SELECT id, source_code, acquisition_mode FROM source ORDER BY id"
 
+# The items of a source collected before the bound: read once, then deleted by id.
+SELECT_EXPIRED_ITEM_IDS = """
+SELECT item.id FROM item JOIN raw_data ON raw_data.id = item.raw_data_id
+WHERE raw_data.source_id = :source_id AND raw_data.collected_at < :bound
+"""
+
 # No cascade goes to the subtypes: the rows of the three of the watch go before their items. A
 # vulnerability has none here: CISA KEV is a state catalog, never purged, and the foreign key of
 # vulnerability refuses the purge of its item (the purge fails closed).
-DELETE_EXPIRED_RELEASES = """
-DELETE FROM release WHERE item_id IN (
-    SELECT item.id FROM item JOIN raw_data ON raw_data.id = item.raw_data_id
-    WHERE raw_data.source_id = :source_id AND raw_data.collected_at < :bound
-)
-"""
-
-DELETE_EXPIRED_ADVISORIES = """
-DELETE FROM advisory WHERE item_id IN (
-    SELECT item.id FROM item JOIN raw_data ON raw_data.id = item.raw_data_id
-    WHERE raw_data.source_id = :source_id AND raw_data.collected_at < :bound
-)
-"""
-
-DELETE_EXPIRED_NEWSLETTER_ARTICLES = """
-DELETE FROM newsletter_article WHERE item_id IN (
-    SELECT item.id FROM item JOIN raw_data ON raw_data.id = item.raw_data_id
-    WHERE raw_data.source_id = :source_id AND raw_data.collected_at < :bound
-)
-"""
+DELETE_RELEASE_OF_ITEM = "DELETE FROM release WHERE item_id = ?"
+DELETE_ADVISORY_OF_ITEM = "DELETE FROM advisory WHERE item_id = ?"
+DELETE_NEWSLETTER_ARTICLE_OF_ITEM = "DELETE FROM newsletter_article WHERE item_id = ?"
 
 # A paper becomes a reference, its arXiv identifier alone, authors gone (the CHECK of
 # publication empties the five columns together): one still cited keeps it, the others go with
 # DELETE_UNCITED_PUBLICATIONS.
-EMPTY_EXPIRED_PAPERS = """
+EMPTY_PAPER_OF_ITEM = """
 UPDATE publication SET item_id = NULL, title = NULL, summary = NULL, authors = NULL,
     submitted_at = NULL, revised_at = NULL
-WHERE item_id IN (
-    SELECT item.id FROM item JOIN raw_data ON raw_data.id = item.raw_data_id
-    WHERE raw_data.source_id = :source_id AND raw_data.collected_at < :bound
-)
+WHERE item_id = ?
 """
 
-# Their links to tags and their highlights go by cascade (schema.sql).
-DELETE_EXPIRED_ITEMS = """
-DELETE FROM item WHERE id IN (
-    SELECT item.id FROM item JOIN raw_data ON raw_data.id = item.raw_data_id
-    WHERE raw_data.source_id = :source_id AND raw_data.collected_at < :bound
-)
-"""
+# Its links to tags and its highlights go by cascade (schema.sql).
+DELETE_ITEM = "DELETE FROM item WHERE id = ?"
 
 # A trend row expires with the collection of its file, not the end of its window (decision of
 # Sabine of 2026-11-04).
@@ -148,15 +129,20 @@ def delete_expired_items(
 ) -> int:
     """Delete the items of a source collected before the bound, with their subtypes; a paper
     keeps its arXiv identifier as a reference. Return how many items."""
-    parameters = {"source_id": source_id, "bound": bound}
+    item_ids = [
+        (item_id,)
+        for (item_id,) in connection.execute(
+            SELECT_EXPIRED_ITEM_IDS, {"source_id": source_id, "bound": bound}
+        )
+    ]
     for statement in (
-        DELETE_EXPIRED_RELEASES,
-        DELETE_EXPIRED_ADVISORIES,
-        DELETE_EXPIRED_NEWSLETTER_ARTICLES,
-        EMPTY_EXPIRED_PAPERS,
+        DELETE_RELEASE_OF_ITEM,
+        DELETE_ADVISORY_OF_ITEM,
+        DELETE_NEWSLETTER_ARTICLE_OF_ITEM,
+        EMPTY_PAPER_OF_ITEM,
     ):
-        connection.execute(statement, parameters)
-    return connection.execute(DELETE_EXPIRED_ITEMS, parameters).rowcount
+        connection.executemany(statement, item_ids)
+    return connection.executemany(DELETE_ITEM, item_ids).rowcount
 
 
 def delete_expired_trends(

@@ -3,39 +3,55 @@ apart, of which the raw keeps the last file imported (step 7)."""
 
 import logging
 from collections.abc import Collection
-from datetime import datetime
+from datetime import UTC, datetime
+from pathlib import PurePosixPath
 
 from k_b.core.config import RAW_RETENTION_MONTHS
 from k_b.core.dates import subtract_months
 from k_b.etl.raw_files import read_collection_time
-from k_b.etl.raw_store import RawCollection, RawStore
+from k_b.etl.raw_store import RAW_DIR_NAME, RawCollection, RawStore
 
 logger = logging.getLogger(__name__)
 
 
 def delete_expired_raw(
-    store: RawStore, imported_at: datetime, state_catalog_folder_keys: Collection[str]
+    store: RawStore,
+    imported_at: datetime,
+    state_catalog_folder_keys: Collection[str],
+    imported_paths: frozenset[str],
 ) -> int:
-    """Delete the collections of every source folder but the state catalogs' collected before the
-    bound; return how many. The list comes from the folders, not the registry: the duration is
-    a maximum, and the tops are not in the registry. The log gives numbers, never a name."""
-    bound = subtract_months(imported_at, RAW_RETENTION_MONTHS)
-    deletions = [
-        store.delete_collection(collection.key)
-        for folder_key in store.list_source_folder_keys()
-        if folder_key not in state_catalog_folder_keys
-        for collection in store.list_collections(folder_key)
-        if is_collected_before(collection, bound)
-    ]
-    deleted_count = deletions.count("deleted")
+    """Delete the collections older than the duration, listed from the folders: the duration is a
+    maximum, a collection never imported goes too, and the log counts it."""
+    bound = subtract_months(imported_at.astimezone(UTC), RAW_RETENTION_MONTHS)
+    imported_keys = find_imported_keys(imported_paths)
+    deleted_count = never_imported_count = kept_count = 0
+    for folder_key in store.list_source_folder_keys():
+        if folder_key in state_catalog_folder_keys:
+            continue
+        for collection in store.list_collections(folder_key):
+            if not is_collected_before(collection, bound):
+                continue
+            deletion = store.delete_collection(collection.key)
+            deleted_count += deletion == "deleted"
+            never_imported_count += (
+                deletion == "deleted" and collection.key not in imported_keys
+            )
+            kept_count += deletion == "kept"
     logger.info(
-        "raw purge: %d collections older than %d months deleted, %d kept"
-        " (a folder or a link inside)",
+        "raw purge: %d collections older than %d months deleted, %d of them never imported,"
+        " %d kept (a folder or a link inside)",
         deleted_count,
         RAW_RETENTION_MONTHS,
-        deletions.count("kept"),
+        never_imported_count,
+        kept_count,
     )
     return deleted_count
+
+
+def find_imported_keys(imported_paths: frozenset[str]) -> frozenset[str]:
+    """The keys of the collections the registry holds: a raw file, or the folder of a page."""
+    keys = {f"{RAW_DIR_NAME}/{path}" for path in imported_paths}
+    return frozenset(keys | {str(PurePosixPath(key).parent) for key in keys})
 
 
 def is_collected_before(collection: RawCollection, bound: datetime) -> bool:

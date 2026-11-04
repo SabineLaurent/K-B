@@ -5,6 +5,7 @@ import logging
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -31,9 +32,9 @@ def write_fixture(data_dir, key, fixture):
     return path
 
 
-def purge(data_dir):
+def purge(data_dir, imported_paths=frozenset(), imported_at=IMPORTED_AT):
     return delete_expired_raw(
-        RawStore(data_dir), IMPORTED_AT, STATE_CATALOG_FOLDER_KEYS
+        RawStore(data_dir), imported_at, STATE_CATALOG_FOLDER_KEYS, imported_paths
     )
 
 
@@ -226,8 +227,93 @@ def test_the_log_gives_numbers_never_a_name(tmp_path, caplog):
     purge(tmp_path)
 
     assert (
-        "raw purge: 1 collections older than 6 months deleted, 1 kept"
-        " (a folder or a link inside)" in caplog.messages
+        "raw purge: 1 collections older than 6 months deleted, 1 of them never imported,"
+        " 1 kept (a folder or a link inside)" in caplog.messages
     )
     assert OLD not in caplog.text
     assert "arxiv" not in caplog.text
+
+
+def test_the_log_counts_the_collections_deleted_that_were_never_imported(
+    tmp_path, caplog
+):
+    caplog.set_level(logging.INFO)
+    write_fixture(
+        tmp_path,
+        f"raw/automated_watch/arxiv_cscr_x_csai/{OLD}.xml",
+        "arxiv_extract.xml",
+    )
+    write_fixture(
+        tmp_path,
+        f"raw/automated_watch/tldr_ai/{OLD}/2026-10-01.html",
+        "tldr_ai_extract.html",
+    )
+    write_fixture(
+        tmp_path,
+        f"raw/automated_watch/github_most_starred/{OLD}.json",
+        "github_most_starred_extract.json",
+    )
+    # The arXiv file and the page of TLDR are in the registry; the ranking of the top never is.
+    imported_paths = frozenset(
+        {
+            f"automated_watch/arxiv_cscr_x_csai/{OLD}.xml",
+            f"automated_watch/tldr_ai/{OLD}/2026-10-01.html",
+        }
+    )
+
+    assert purge(tmp_path, imported_paths) == 3
+    assert (
+        "raw purge: 3 collections older than 6 months deleted, 1 of them never imported,"
+        " 0 kept (a folder or a link inside)" in caplog.messages
+    )
+
+
+def test_a_name_holding_a_backslash_is_never_deleted_nor_stops_the_purge(tmp_path):
+    """On macOS and Linux a backslash is a character of a name, which a key of the store refuses:
+    such a name is left where it is, by the hand that put it there."""
+    source_folder = write_fixture(
+        tmp_path,
+        f"raw/automated_watch/tldr\\ai/{OLD}/2026-10-01.html",
+        "tldr_ai_extract.html",
+    )
+    collection = write_fixture(
+        tmp_path,
+        f"raw/automated_watch/arxiv_cscr_x_csai/{OLD}\\x.xml",
+        "arxiv_extract.xml",
+    )
+    page = write_fixture(
+        tmp_path,
+        f"raw/automated_watch/tldr_dev/{OLD}/a\\b.html",
+        "tldr_ai_extract.html",
+    )
+    deleted = write_fixture(
+        tmp_path,
+        f"raw/automated_watch/arxiv_cscr_x_csai/{OLD}.xml",
+        "arxiv_extract.xml",
+    )
+
+    assert purge(tmp_path) == 1
+    assert not deleted.exists()
+    assert (source_folder.exists(), collection.exists(), page.exists()) == (
+        True,
+        True,
+        True,
+    )
+
+
+def test_the_bound_is_computed_in_utc_whatever_the_time_zone_given(tmp_path):
+    """2027-04-30T00:30 in Paris is 2027-04-29T22:30Z; six months earlier on the calendar of UTC,
+    the bound is 2026-10-29T22:30Z, an hour before the one of the calendar of Paris (winter time
+    since 2026-10-25)."""
+    collection = write_fixture(
+        tmp_path,
+        "raw/automated_watch/arxiv_cscr_x_csai/2026-10-29T230000Z.xml",
+        "arxiv_extract.xml",
+    )
+
+    purge(
+        tmp_path,
+        imported_at=datetime(2027, 4, 30, 0, 30, tzinfo=ZoneInfo("Europe/Paris")),
+    )
+
+    assert collection.exists()

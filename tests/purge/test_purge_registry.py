@@ -2,6 +2,7 @@
 cites any more; the last catalog of a state catalog stays, read as such by the import."""
 
 import logging
+import shutil
 import sqlite3
 from pathlib import Path
 
@@ -44,7 +45,8 @@ def data_dir(tmp_path):
                 connection.execute(statement)
     finally:
         connection.close()
-    (tmp_path / "raw").mkdir()
+    (tmp_path / "raw/automated_watch").mkdir(parents=True)
+    (tmp_path / "raw/selected_library").mkdir()
     return tmp_path
 
 
@@ -79,7 +81,7 @@ def purge(data_dir):
 
 def test_a_row_whose_file_is_gone_and_that_nothing_cites_is_deleted(data_dir):
     present = data_dir / "raw" / ADVISORIES_PATH
-    present.parent.mkdir(parents=True)
+    present.parent.mkdir()
     present.write_bytes(b"[]")
     before = fetch_paths(data_dir)
 
@@ -110,14 +112,15 @@ def test_the_last_catalog_of_a_state_catalog_stays_without_its_file(data_dir):
     assert older not in paths
 
 
-def test_without_a_raw_folder_no_row_is_deleted(data_dir, caplog):
-    caplog.set_level(logging.INFO)
-    (data_dir / "raw").rmdir()
+@pytest.mark.parametrize("missing", ["raw/automated_watch", "raw"])
+def test_without_its_acquisition_folder_no_row_of_it_is_deleted(data_dir, missing):
+    """A volume not mounted would make every file of it look gone: they would be imported again
+    once it is back."""
+    shutil.rmtree(data_dir / missing)
     before = fetch_paths(data_dir)
 
     assert purge(data_dir) == 0
     assert fetch_paths(data_dir) == before
-    assert "registry purge skipped: no raw folder" in caplog.messages
 
 
 def test_the_log_gives_numbers_never_a_name(data_dir, caplog):

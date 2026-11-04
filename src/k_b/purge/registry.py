@@ -5,11 +5,11 @@ the base cites it any more; the last catalog of a state catalog stays, as the im
 import logging
 import sqlite3
 from collections.abc import Collection
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from k_b.database import purge as purge_queries
 from k_b.database.connection import connect_database
-from k_b.etl.raw_store import RAW_DIR_NAME, RawStore
+from k_b.etl.raw_store import RAW_DIR_NAME, RAW_DIR_NAMES, RawStore
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +18,7 @@ def purge_registry(
     database_path: Path, store: RawStore, state_catalog_source_codes: Collection[str]
 ) -> int:
     """Delete the rows of the registry whose file is gone and that nothing cites; return how
-    many. Without a raw folder, nothing: every file would seem gone, and be imported again once
-    the folder is back (a volume not mounted)."""
-    if not store.has_folder(RAW_DIR_NAME):
-        logger.info("registry purge skipped: no raw folder")
-        return 0
+    many."""
     connection = connect_database(database_path)
     try:
         deleted_count = delete_rows_without_file(
@@ -43,8 +39,14 @@ def delete_rows_without_file(
     store: RawStore,
     state_catalog_source_codes: Collection[str],
 ) -> int:
-    """Delete each uncited row whose file is gone, but the last catalog of a state catalog, which
-    tells the import which catalog came last; return how many."""
+    """Delete each uncited row whose file is gone, but the last catalog of a state catalog, and
+    any row of an acquisition folder absent: a volume not mounted makes every file of it look gone,
+    to be imported again once it is back."""
+    mounted_dir_names = {
+        dir_name
+        for dir_name in RAW_DIR_NAMES
+        if store.has_folder(f"{RAW_DIR_NAME}/{dir_name}")
+    }
     state_catalog_source_ids = {
         source.id
         for source in purge_queries.read_sources(connection)
@@ -54,7 +56,8 @@ def delete_rows_without_file(
     return sum(
         purge_queries.delete_uncited_raw_data(connection, row.id)
         for row in purge_queries.read_uncited_raw_data(connection)
-        if not (
+        if PurePosixPath(row.raw_file_path).parts[0] in mounted_dir_names
+        and not (
             row.source_id in state_catalog_source_ids
             and row.collected_at == last_collections[row.source_id]
         )
