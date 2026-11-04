@@ -20,7 +20,7 @@ la commande. Complète `code.md` (comment coder) et `conformite.md` (selon quell
   invalides (`all_items_invalid`) ; sa date de dernière collecte reste alors inchangée.
   Exception : un classement (instantané dont la complétude compte) refuse sa page entière.
 - À l'écriture en base, chaque item et son sous-type sont écrits dans un `SAVEPOINT`. Si la base
-  refuse l'entrée, `ROLLBACK TO` de cet item seul : il devient un rejet de `import-log.jsonl`
+  refuse l'entrée, `ROLLBACK TO` de cet item seul : il devient un rejet du journal d'import (`journals/import-journal-<date>.jsonl`)
   (motif : ce que la base refuse) et l'import continue. Ne sont rattrapées que les erreurs dues
   à l'entrée : `sqlite3.IntegrityError` (`CHECK`, `UNIQUE`, `NOT NULL`) et les erreurs de
   conversion Python → SQLite (`OverflowError`, `UnicodeEncodeError`), liste tenue par un test
@@ -84,7 +84,7 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
   reçue, maximum, nombre attendu). Un échec est un état nommé (`code.md`).
 - Une valeur observée (identifiant, URL, code HTTP, titre trouvé) est citée **tronquée** à une
   longueur fixe et **échappée** (retours à la ligne et caractères de contrôle), par une seule
-  fonction, `quote_value` (`core/quoting.py`). `import-log.jsonl` est protégé par le JSON.
+  fonction, `quote_value` (`core/quoting.py`). Le journal d'import est protégé par le JSON.
 - Un champ qui porte une donnée personnelle au registre des traitements (les auteurs) n'est
   jamais cité : sa position et sa mesure seulement.
 - Chaque ligne de journal est **horodatée** (quand, où, qui, quoi) en ISO 8601, en UTC, à la
@@ -103,8 +103,8 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
   n'est ni un résultat ni une ligne de journal ; hors terminal, une ligne datée la remplace
   (`commands/wait_display.py` ; accord de Sabine du 2026-10-28, #349).
 - Le journal de fonctionnement (le déroulé, réussites et échecs) va sur la sortie d'erreur et
-  dans `<KB_DATA_DIR>/logs/kb.log` (`logs/kb-serve-data.log` pour `kb serve-data`, `logs/kb-serve-ai.log` pour `kb serve-ai`), tourné chaque jour à minuit UTC, `LOG_FILES_KEPT` fichiers
-  gardés (`core/config.py`), sauf `KB_LOG_TO_FILE=false` : sortie d'erreur seule, sans fichier (en
+  dans `<KB_DATA_DIR>/logs/kb.log` (`logs/kb-serve-data.log` pour `kb serve-data`, `logs/kb-serve-ai.log` pour `kb serve-ai`), tourné chaque jour à minuit UTC, gardé 6 mois
+  (`RECORD_RETENTION_MONTHS`, `core/config.py`, purge à la fin de `kb import`), sauf `KB_LOG_TO_FILE=false` : sortie d'erreur seule, sans fichier (en
   conteneur, la sortie d'erreur est le journal ; décision du 2026-10-15, #199) ; le résultat d'une commande reste un `print`. Le journal d'import garde sa règle : écrit seulement si l'import va au
   bout de l'écriture en base.
 
@@ -203,7 +203,7 @@ statu quo).
   compris, n'importe de K-B autre chose que `database`, `items` et `core` ; hors de `database/`,
   aucun module n'atteint `database/writers` (`test_only_database_imports_its_writers`).
 - `grep -c "execute" src/k_b/etl/load.py` renvoie 0.
-- `grep -nE "etl\.(extract|transform|load|normalize|import_log|raw_purge)" src/k_b/commands` ne
+- `grep -nE "etl\.(extract|transform|load|normalize|import_journal|raw_purge)" src/k_b/commands` ne
   renvoie rien : les commandes passent par `etl/pipeline.py`.
 - `uv run pytest tests/architecture/test_layers.py -k "pipeline or stage"` : `etl/pipeline.py`
   n'importe ni les sources ni la composition, et les trois stages ne s'importent pas entre eux.
