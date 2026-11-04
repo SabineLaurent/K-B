@@ -4,8 +4,12 @@ import signal
 
 import pytest
 from commands.cli_helpers import (
+    KB_IMPORT_DAY,
     SigtermNotHandledByKbError,
+    make_clock,
 )
+
+from k_b.commands import import_command
 
 
 @pytest.fixture(autouse=True)
@@ -67,3 +71,10 @@ def data_and_vault_dirs(monkeypatch, tmp_path):
     monkeypatch.setenv("KB_DATA_DIR", str(data_dir))
     monkeypatch.setenv("KB_VAULT_DIR", str(vault_dir))
     return data_dir, vault_dir
+
+
+@pytest.fixture(autouse=True)
+def clock_of_kb_import(monkeypatch):
+    """kb import reads the clock and purges by age: the tests run it on KB_IMPORT_DAY, so that what
+    they find never depends on the day they run."""
+    monkeypatch.setattr(import_command, "datetime", make_clock(KB_IMPORT_DAY))

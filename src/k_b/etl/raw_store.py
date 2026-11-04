@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
+from typing import Literal, NamedTuple
 
 from k_b.core.atomic_write import write_file_atomically
 from k_b.core.quoting import quote_value
@@ -19,6 +20,17 @@ SELECTED_LIBRARY_DIR_NAME = "selected_library"
 # no reader looks for.
 RAW_DIR_NAMES = (AUTOMATED_WATCH_DIR_NAME, SELECTED_LIBRARY_DIR_NAME)
 COLLECTION_STATE_FILENAME = "collection_state.json"
+
+# What became of a collection the purge deleted: kept, it holds a folder or a link.
+type CollectionDeletion = Literal["deleted", "already_gone", "kept"]
+
+
+class RawCollection(NamedTuple):
+    """A collection of a source folder, a raw file or a folder of pages, and the name that dates
+    it: the name of a folder, the name of a file without its extension."""
+
+    key: str
+    name: str
 
 
 def find_stream(raw_file_path: str) -> str:
@@ -53,6 +65,77 @@ class RawStore:
         """Tell whether the store holds a file under this key."""
         return self.find_path(key).is_file()
 
+    def has_folder(self, key: str) -> bool:
+        """Tell whether the store holds a folder under this key."""
+        return self.find_path(key).is_dir()
+
+    def list_source_folder_keys(self) -> list[str]:
+        """The keys of the source folders of both acquisition folders, in name order; a hidden
+        entry, a file or a link left out."""
+        keys: list[str] = []
+        for acquisition_dir_name in RAW_DIR_NAMES:
+            acquisition_key = f"{RAW_DIR_NAME}/{acquisition_dir_name}"
+            keys += sorted(
+                key
+                for key in self.list_visible_keys(acquisition_key)
+                if self.has_folder_not_link(key)
+            )
+        return keys
+
+    def list_collections(self, folder_key: str) -> list[RawCollection]:
+        """The collections of a source folder, in name order: its visible files and folders, a
+        link left out."""
+        collections = []
+        for key in sorted(self.list_visible_keys(folder_key)):
+            path = self.find_path(key)
+            if self.has_folder_not_link(key):
+                collections.append(RawCollection(key, path.name))
+            elif path.is_file() and not path.is_symlink():
+                collections.append(RawCollection(key, path.stem))
+        return collections
+
+    def delete_collection(self, key: str) -> CollectionDeletion:
+        """Delete a file, or a folder of pages with its hidden files; one holding a folder, a link
+        or a name the keys refuse is kept, one already gone is no error."""
+        path = self.find_path(key)
+        try:
+            if path.is_symlink():
+                return "kept"
+            if not path.is_dir():
+                path.unlink()
+                return "deleted"
+            entries = list(path.iterdir())
+            if any(
+                entry.is_symlink() or entry.is_dir() or "\\" in entry.name
+                for entry in entries
+            ):
+                return "kept"
+            for entry in entries:
+                self.delete(f"{key}/{entry.name}")
+            path.rmdir()
+        except FileNotFoundError:
+            return "already_gone"
+        return "deleted"
+
+    def list_visible_keys(self, folder_key: str) -> list[str]:
+        """The keys of the entries of a folder, a hidden name or one a key refuses left out; none
+        when the folder is absent, a link, or gone meanwhile."""
+        if not self.has_folder_not_link(folder_key):
+            return []
+        try:
+            return [
+                f"{folder_key}/{path.name}"
+                for path in self.find_path(folder_key).iterdir()
+                if not path.name.startswith(".") and "\\" not in path.name
+            ]
+        except FileNotFoundError:
+            return []
+
+    def has_folder_not_link(self, key: str) -> bool:
+        """Tell whether key names a folder that is not a link: the purge of the raw follows none."""
+        path = self.find_path(key)
+        return path.is_dir() and not path.is_symlink()
+
     def read_latest(self, folder_key: str) -> bytes | None:
         """The last raw file of a folder in collection order; None when it has none."""
         keys = self.list_file_keys(folder_key)
@@ -78,7 +161,7 @@ class RawStore:
 
     def find_path(self, key: str) -> Path:
         """The path of key in the data directory; a key empty, absolute, going up (..) or holding
-        a backslash is refused, as the keys of the purge come from the base."""
+        a backslash is refused, as the keys of the purges come from the base and the folders."""
         key_path = PurePosixPath(key)
         if (
             not key_path.parts

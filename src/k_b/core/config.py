@@ -123,20 +123,27 @@ HTTP_TIMEOUT_SECONDS = 30
 HTTP_MAX_REDIRECTS = 10
 
 
-# How long the data of each acquisition mode is kept, in years after its collection; the purge
-# (#83) reads it. None: K-B sets no duration, the library being kept by the user in Zotero and
-# Obsidian (docs/registre-traitements.md, record 2). The watch: 3 years, for its items, its raw
-# and the trends (ADR of 2026-10-20, decision 5).
+# How long the base keeps the data of each acquisition mode, in years after its collection; the
+# purge reads it (purge/base.py). None: K-B sets no duration, the library being kept by the user in
+# Zotero and Obsidian (docs/registre-traitements.md, record 2). The watch: 3 years, for its items
+# and the trends (ADR of 2026-10-20, decision 5). A state catalog (Zotero, CISA KEV) is kept
+# without limit whatever its mode: the base holds its current state (decision of Sabine of
+# 2026-11-04).
 # One entry per value of the CHECK on source.acquisition_mode in schema.sql: a test keeps both
-# lists equal. Of a state catalog (Zotero, CISA KEV), the raw keeps only the last file imported,
-# whatever the duration: kb import deletes the others (etl/raw_purge.py, ADR of 2026-10-19). Of a
-# top ranking, the raw keeps only the last one readable: kb write-tops deletes the older ones once
-# their sheets are written (post/top_sheets.py).
+# lists equal.
 RETENTION_YEARS_BY_ACQUISITION_MODE: dict[str, int | None] = {
     "watch": 3,
     "library": None,
     "wiki": None,
 }
+
+# How long a raw file is kept, in months after its collection, tops and copies of the clips
+# included: the base is the source of truth (decision of Sabine of 2026-11-04; purge/raw.py). Of a
+# state catalog, the raw keeps only the last file imported, whatever its age (purge/catalogs.py,
+# ADR of 2026-10-19); of a top ranking, the last one readable, within the duration
+# (post/top_sheets.py). Once the base has backups, a raw file goes as soon as two sound ones hold
+# it: not coded yet (docs/registre-traitements.md, step 3).
+RAW_RETENTION_MONTHS = 6
 
 # How long before the last collection a clip of the vault still counts as changed, and is copied
 # again: the clock of a file system can be coarser than, or lag behind, the one of kb (a tick of

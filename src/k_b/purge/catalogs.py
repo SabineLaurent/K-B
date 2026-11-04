@@ -1,5 +1,5 @@
-"""Delete the raw files of a state catalog superseded by a newer one imported: of each folder,
-only the last raw file imported is kept."""
+"""Step 7 of the sorting: delete the raw files of a state catalog superseded by a newer one
+imported; of each folder, only the last raw file imported is kept."""
 
 import logging
 from collections.abc import Collection

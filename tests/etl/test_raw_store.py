@@ -7,6 +7,7 @@ from k_b.core.quoting import quote_value
 from k_b.etl.raw_store import (
     COLLECTION_STATE_FILENAME,
     InvalidCollectionStateError,
+    RawCollection,
     RawStore,
     find_stream,
     load_last_collection_dates,
@@ -184,4 +185,144 @@ def test_a_folder_that_does_not_exist_has_no_key(tmp_path):
 def test_the_folder_key_of_a_source_is_under_raw_and_its_acquisition_folder():
     assert make_source_folder_key("selected_library", "zotero") == (
         "raw/selected_library/zotero"
+    )
+
+
+def test_the_source_folders_are_listed_under_both_acquisition_folders_links_left_out(
+    tmp_path,
+):
+    for folder in (
+        "raw/automated_watch/arxiv_cscr_x_csai",
+        "raw/automated_watch/.hidden",
+        "raw/selected_library/zotero",
+    ):
+        (tmp_path / folder).mkdir(parents=True)
+    (tmp_path / "raw/automated_watch/notes.txt").write_bytes(b"")
+    (tmp_path / "outside").mkdir()
+    (tmp_path / "raw/automated_watch/tldr_ai").symlink_to(tmp_path / "outside")
+
+    assert RawStore(tmp_path).list_source_folder_keys() == [
+        "raw/automated_watch/arxiv_cscr_x_csai",
+        "raw/selected_library/zotero",
+    ]
+
+
+def test_the_collections_of_a_folder_are_its_files_and_folders_by_their_name(tmp_path):
+    folder = tmp_path / "raw/automated_watch/tldr_ai"
+    (folder / "2026-10-05T093000Z").mkdir(parents=True)
+    (folder / "2026-10-06T093000Z.html").write_bytes(b"")
+    (folder / ".2026-10-07T093000Z.html.a1b2c3.tmp").write_bytes(b"")
+    (folder / "2026-10-08T093000Z.html").symlink_to(folder / "2026-10-06T093000Z.html")
+
+    assert RawStore(tmp_path).list_collections("raw/automated_watch/tldr_ai") == [
+        RawCollection(
+            "raw/automated_watch/tldr_ai/2026-10-05T093000Z", "2026-10-05T093000Z"
+        ),
+        RawCollection(
+            "raw/automated_watch/tldr_ai/2026-10-06T093000Z.html", "2026-10-06T093000Z"
+        ),
+    ]
+
+
+def test_a_collection_is_deleted_once_then_found_gone(tmp_path):
+    page = tmp_path / "raw/automated_watch/tldr_ai/2026-10-05T093000Z/2026-10-01.html"
+    page.parent.mkdir(parents=True)
+    page.write_bytes(b"")
+    (page.parent / ".DS_Store").write_bytes(b"")
+    store = RawStore(tmp_path)
+    key = "raw/automated_watch/tldr_ai/2026-10-05T093000Z"
+
+    assert store.delete_collection(key) == "deleted"
+    assert not page.parent.exists()
+    assert store.delete_collection(key) == "already_gone"
+
+
+@pytest.mark.parametrize("inside", ["folder", "link"])
+def test_a_collection_holding_a_folder_or_a_link_is_kept(tmp_path, inside):
+    collection = tmp_path / "raw/automated_watch/tldr_ai/2026-10-05T093000Z"
+    collection.mkdir(parents=True)
+    page = collection / "2026-10-01.html"
+    page.write_bytes(b"")
+    if inside == "folder":
+        (collection / "inside").mkdir()
+    else:
+        (collection / "link.html").symlink_to(tmp_path)
+
+    store = RawStore(tmp_path)
+
+    assert (
+        store.delete_collection("raw/automated_watch/tldr_ai/2026-10-05T093000Z")
+        == "kept"
+    )
+    assert page.exists()
+
+
+def test_the_store_tells_whether_it_has_a_folder(tmp_path):
+    (tmp_path / "raw").mkdir()
+    (tmp_path / "file").write_bytes(b"")
+    store = RawStore(tmp_path)
+
+    assert (
+        store.has_folder("raw"),
+        store.has_folder("file"),
+        store.has_folder("absent"),
+    ) == (
+        True,
+        False,
+        False,
+    )
+
+
+def test_a_collection_that_is_a_link_is_kept_and_its_target_too(tmp_path):
+    target = tmp_path / "outside.xml"
+    target.write_bytes(b"")
+    link = tmp_path / "raw/automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
+    link.parent.mkdir(parents=True)
+    link.symlink_to(target)
+
+    deletion = RawStore(tmp_path).delete_collection(
+        "raw/automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
+    )
+
+    assert deletion == "kept"
+    assert link.is_symlink()
+    assert target.exists()
+
+
+def test_an_error_other_than_a_collection_gone_is_raised(tmp_path, monkeypatch):
+    page = tmp_path / "raw/automated_watch/tldr_ai/2026-10-05T093000Z/2026-10-01.html"
+    page.parent.mkdir(parents=True)
+    page.write_bytes(b"")
+
+    def refuse(store, key):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(RawStore, "delete", refuse)
+
+    with pytest.raises(PermissionError):
+        RawStore(tmp_path).delete_collection(
+            "raw/automated_watch/tldr_ai/2026-10-05T093000Z"
+        )
+
+
+def test_a_name_holding_a_backslash_is_never_listed_and_keeps_its_collection(tmp_path):
+    """A key of the store refuses a backslash: such a name is never handed out."""
+    watch = tmp_path / "raw/automated_watch"
+    (watch / "tldr\\ai").mkdir(parents=True)
+    (watch / "tldr_ai").mkdir()
+    (watch / "tldr_ai/2026-10-05T093000Z\\x.html").write_bytes(b"")
+    collection = watch / "tldr_ai/2026-10-06T093000Z"
+    collection.mkdir()
+    (collection / "a\\b.html").write_bytes(b"")
+    store = RawStore(tmp_path)
+
+    assert store.list_source_folder_keys() == ["raw/automated_watch/tldr_ai"]
+    assert store.list_collections("raw/automated_watch/tldr_ai") == [
+        RawCollection(
+            "raw/automated_watch/tldr_ai/2026-10-06T093000Z", "2026-10-06T093000Z"
+        )
+    ]
+    assert (
+        store.delete_collection("raw/automated_watch/tldr_ai/2026-10-06T093000Z")
+        == "kept"
     )

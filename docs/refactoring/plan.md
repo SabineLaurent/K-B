@@ -28,7 +28,8 @@ etl/
   tops.py               # types partagés des classements, partie collecte ;
                         # la partie rendu va dans post/top_sheets.py (étape 8)
   raw_store.py          # zone d'atterrissage : seul accès au brut et à l'état
-  raw_purge.py          # rétention : purge du brut, hors des trois stages
+  (raw_purge.py)        # rétention : sortie de l'ETL le 2026-11-04, dans
+                        # src/k_b/purge/catalogs.py (décision de Sabine, #83)
   extract.py            # stage 1 : parcourt la liste, contrôle, écrit raw/
   http_download.py      # aide à l'extract : téléchargement commun
   user_agent.py         # aide à l'extract : en-tête HTTP
@@ -87,7 +88,7 @@ la vérifie.
 - Load : transaction tout ou rien, registre des fichiers chargés
   (idempotence), journal d'import (audit), SQL isolé dans database/.
 - Orchestration séparée des stages (pipeline.py, commands/),
-  post-traitement hors de l'ETL, rétention à part (raw_purge.py).
+  post-traitement hors de l'ETL, rétention hors de l'ETL (src/k_b/purge/, depuis le 2026-11-04).
 
 Points défendables :
 - Un paquet par source : c'est le modèle des connecteurs (Singer : un

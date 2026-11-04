@@ -1,5 +1,6 @@
-"""The format of the dates of the items database."""
+"""The dates of the items database: their format, and the bounds of the purge."""
 
+import calendar
 from datetime import UTC, date, datetime
 
 # The date format the CHECK constraints of schema.sql accept.
@@ -22,3 +23,13 @@ def format_day(day: date) -> str:
     """A day at midnight UTC, in the format of the base; isoformat, as strftime leaves the width
     of the year to the C library."""
     return f"{day.isoformat()}T00:00:00Z"
+
+
+def subtract_months(moment: datetime, months: int) -> datetime:
+    """The same time, months earlier on the calendar; a day the month lacks becomes its last one
+    (2028-02-29 less 36 months is 2025-02-28)."""
+    month_index = moment.year * 12 + moment.month - 1 - months
+    year, month_offset = divmod(month_index, 12)
+    month = month_offset + 1
+    day = min(moment.day, calendar.monthrange(year, month)[1])
+    return moment.replace(year=year, month=month, day=day)

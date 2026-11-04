@@ -7,12 +7,13 @@ import signal
 import sqlite3
 import subprocess
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 
 from commands.cli_helpers import (
     LOG_LINE_DATE,
     collected_kinds,
     list_hidden_files,
+    make_clock,
 )
 from etl.test_extract import WorkingSource
 from etl.test_transform import copy_fixture
@@ -20,7 +21,9 @@ from etl.test_transform import copy_fixture
 from k_b import cli
 from k_b.commands import (
     collect_command,
+    import_command,
 )
+from k_b.database import purge as database_purge
 from k_b.etl import load
 
 
@@ -191,3 +194,36 @@ def test_kb_collect_sent_sigterm_in_its_own_process_exits_with_143(tmp_path):
     assert process.returncode == cli.ExitCode.STOPPED_BY_SIGTERM
     assert "ERROR k_b.cli: kb stopped by SIGTERM" in error_output
     assert not (tmp_path / "collection_state.json").exists()
+
+
+def test_a_sigterm_during_the_purge_of_the_base_keeps_the_import_and_undoes_the_purge(
+    monkeypatch, tmp_path, capsys, sigterm_handler_of_the_test
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    copy_fixture(tmp_path / "raw", "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml")
+    # Three years after the collection of the recorded raw file: its papers expire at once.
+    monkeypatch.setattr(
+        import_command, "datetime", make_clock(datetime(2029, 10, 12, tzinfo=UTC))
+    )
+    delete_expired_items = database_purge.delete_expired_items
+
+    def stopped_after_the_first_deletion(*arguments):
+        count = delete_expired_items(*arguments)
+        signal.raise_signal(signal.SIGTERM)
+        return count
+
+    monkeypatch.setattr(
+        database_purge, "delete_expired_items", stopped_after_the_first_deletion
+    )
+    capsys.readouterr()
+
+    exit_code = cli.main(["import"])
+
+    assert exit_code == cli.ExitCode.STOPPED_BY_SIGTERM
+    assert capsys.readouterr().out.startswith("\nimport: 1 raw read, ")
+    connection = sqlite3.connect(tmp_path / "k-b.sqlite")
+    # The papers the import committed: the purge was undone whole.
+    assert connection.execute("SELECT count(*) FROM item").fetchone()[0] > 0
+    assert connection.execute("SELECT count(*) FROM publication").fetchone()[0] > 0
+    connection.close()

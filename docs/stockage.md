@@ -11,8 +11,12 @@ schéma, l'entrée du 2026-10-10 du journal fait foi.
 collecte → raw/ (brut intact) → lecture + normalisation → base (qui dédoublonne)
 ```
 
-La base n'est pas le brut : elle se reconstruit en rejouant la lecture et l'import sur `raw/`, à
-une limite près : après un catalogue CISA importé en retard, les dates d'une ligne (`revised_at`,
+La base est la source de vérité (décision de Sabine du 2026-11-04) : le brut n'est gardé que 6 mois
+au plus, sauf le dernier fichier importé d'un catalogue d'état (Zotero, CISA KEV), et la base garde
+la veille 3 ans, la bibliothèque et les catalogues d'état sans limite
+([registre-traitements.md](registre-traitements.md), « Procédure de tri »). La base ne se
+reconstruit donc en rejouant la lecture et l'import sur `raw/` que pour les 6 derniers mois, à une
+limite près : après un catalogue CISA importé en retard, les dates d'une ligne (`revised_at`,
 `withdrawn_at`) et le fichier rattaché à son item peuvent différer, pas son contenu (étape 4 de
 [specs-collecte.md](specs-collecte.md)). `kb import` n'importe que les fichiers bruts pas encore
 importés : leur registre est la table `raw_data`.
@@ -312,10 +316,12 @@ source ne touche pas aux tables.
   contraintes `UNIQUE` créent
   leur propre index.
 - **Suppressions en cascade** : seulement de `item` vers `highlight` et vers `item_has_tag` (#260 ;
-  un tag ainsi laissé sans liaison reste dans `tag` jusqu'à la purge, #83 ; celui dont une
-  réécriture retire la dernière liaison est supprimé avec elle, journal ADR, 2026-10-19). Il n'y en a pas vers `publication`, `vulnerability`, `release`,
+  aucun item que la purge supprime ne porte de tag : seuls les clips en portent, et la bibliothèque
+  n'est pas purgée, #83 ; un tag dont une réécriture retire la dernière liaison est supprimé avec
+  elle, journal ADR, 2026-10-19). Il n'y en a pas vers `publication`, `vulnerability`, `release`,
   `advisory`, `newsletter_article`, `zotero_entry` ni `clip` : supprimer un item qu'une de ces tables référence est refusé par la clé
-  étrangère. La purge n'est pas codée.
+  étrangère. La purge (`src/k_b/purge/base.py`, SQL dans `src/k_b/database/purge.py`) supprime donc
+  les sous-types avant leurs items, et vide un papier encore cité avant de supprimer son item.
 - **Formats contrôlés** par un `CHECK` : les dates (ci-dessus) ; `cve_id` (`CVE-AAAA-NNNN…`) ;
   `repository_name` (`owner/repo`) ; `ghsa_id` (`GHSA-…`) ; `url` (`https://…`, ou `http://…`
   pour `zotero_entry` et `clip`) ; `zotero_key` (8 caractères `0-9A-Z`) ; `edition` (lettres minuscules sans accent) ; les listes
@@ -354,7 +360,11 @@ règle ci-dessus (`tests/test_database.py`).
 ## Faire évoluer le schéma
 
 - **En développement, la base est jetable** : un changement de schéma = supprimer la base,
-  `kb create-db`, puis `kb import`, qui la reconstruit depuis le brut. Pas de migration.
+  `kb create-db`, puis `kb import`, qui la reconstruit depuis le brut. Pas de migration. Cela ne
+  vaut que tant que le brut couvre toute la base : dès que le plus ancien brut a 6 mois, la purge le
+  supprime (décision de Sabine du 2026-11-04), la base garde des données que le brut n'a plus, et un
+  changement de schéma passe par une migration (journal ADR, 2026-10-09, W7), que K-B n'a pas
+  encore.
 - **En usage réel, la base est gardée** et l'`id` technique des items reste stable. SQLite aux
   temps 1 et 2 ; PostgreSQL au 08/11 selon la décision 2 du 2026-10-15 (journal ADR, « POC du
   25/10 »), en attente de « La base au temps 3 » : les migrations Alembic écrites en SQL (journal

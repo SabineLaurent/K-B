@@ -162,7 +162,6 @@ def test_the_rule_of_the_stages_refuses_every_way_to_another_stage(
 ETL_RUN_MODULES = ETL_STAGE_MODULES | {
     "etl.normalize",
     "etl.import_log",
-    "etl.raw_purge",
 }
 
 
@@ -181,7 +180,7 @@ def test_commands_reach_the_runs_only_through_the_pipeline():
     [
         ("from k_b.etl.load import import_items", True),
         ("from k_b.etl import transform", True),
-        ("from ..etl.raw_purge import purge_raw_files", True),
+        ("from ..etl.import_log import write_import_log", True),
         ("from k_b.etl.pipeline import collect", False),
         ("from k_b.etl.raw_store import RawStore", False),
     ],
@@ -250,6 +249,66 @@ def test_the_rule_of_etl_refuses_every_way_to_the_post_processing(code, is_refus
     imported = parse_imported_modules(code, package="k_b.etl")
 
     assert bool(list_imports_of_the_post_processing(imported)) is is_refused
+
+
+# The purge runs beside the pipeline, outside it (decision of Sabine of 2026-11-04): etl never
+# reads it, and it reads of etl only the store of the raw and its vocabulary, never a source, the
+# composition, a stage or the writers.
+PURGE_ALLOWED_MODULES = {
+    "purge",
+    "core",
+    "items",
+    "database",
+    "etl.raw_store",
+    "etl.raw_files",
+}
+PURGE_FORBIDDEN_MODULES = {"database.writers", "database.writing"}
+
+
+def list_imports_of_the_purge(imported: set[str]) -> set[str]:
+    return {name for name in imported if reaches(name, {"purge", "database.purge"})}
+
+
+def list_forbidden_imports_of_the_purge(imported: set[str]) -> set[str]:
+    return {
+        name
+        for name in imported
+        if not is_within(name, PURGE_ALLOWED_MODULES)
+        or reaches(name, PURGE_FORBIDDEN_MODULES)
+    }
+
+
+def test_etl_imports_nothing_of_the_purge():
+    for path in list_python_files("etl"):
+        imported = list_imported_modules(path, find_package(path))
+        assert list_imports_of_the_purge(imported) == set(), path
+
+
+def test_the_purge_imports_only_the_store_of_the_raw_of_etl():
+    for path in list_python_files("purge"):
+        imported = list_imported_modules(path, find_package(path))
+        assert list_forbidden_imports_of_the_purge(imported) == set(), path
+
+
+@pytest.mark.parametrize(
+    ("code", "is_refused"),
+    [
+        ("from k_b.etl import load", True),
+        ("from k_b.etl.pipeline import import_raw_files", True),
+        ("from k_b.etl.sources import cisa_kev", True),
+        ("from k_b.etl.source_kinds import SOURCE_KINDS", True),
+        ("from k_b.database.writing import write_item", True),
+        ("from k_b import cli", True),
+        ("from k_b.etl.raw_store import RawStore", False),
+        ("from k_b.etl.raw_files import read_collection_time", False),
+        ("from k_b.database import purge", False),
+        ("from k_b.core.config import RAW_RETENTION_MONTHS", False),
+    ],
+)
+def test_the_rule_of_the_purge_refuses_every_way_into_etl(code, is_refused):
+    imported = parse_imported_modules(code, package="k_b.purge")
+
+    assert bool(list_forbidden_imports_of_the_purge(imported)) is is_refused
 
 
 def test_no_module_of_the_sources_imports_the_composition():

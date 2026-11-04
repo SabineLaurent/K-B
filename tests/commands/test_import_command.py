@@ -5,8 +5,8 @@ import shutil
 import sqlite3
 from datetime import UTC, datetime
 
-from commands.cli_helpers import LOG_LINE_DATE
-from etl.test_transform import FIXTURES_DIR
+from commands.cli_helpers import LOG_LINE_DATE, make_clock
+from etl.test_transform import FIXTURES_DIR, copy_fixture
 
 from k_b import cli
 from k_b.commands import (
@@ -14,6 +14,8 @@ from k_b.commands import (
 )
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl import pipeline
+from k_b.etl.raw_store import RawStore
+from k_b.purge import after_import
 
 
 def test_import_writes_the_raw_items_into_the_database(monkeypatch, tmp_path, capsys):
@@ -108,7 +110,7 @@ def test_a_failed_import_deletes_no_raw_file(monkeypatch, tmp_path):
         raise AssertionError("purged after a failed import")
 
     monkeypatch.setattr(pipeline, "import_items", fail_to_import)
-    monkeypatch.setattr(pipeline, "delete_superseded_raw_files", refuse_to_purge)
+    monkeypatch.setattr(import_command, "purge_after_import", refuse_to_purge)
 
     assert cli.main(["import"]) == 1
     assert all(path.exists() for path in paths)
@@ -124,11 +126,11 @@ def test_a_failed_purge_without_a_reason_names_its_type_only(
     def fail_to_delete(store, key):
         raise OSError("raised by code, without an errno")
 
-    monkeypatch.setattr(pipeline.RawStore, "delete", fail_to_delete)
+    monkeypatch.setattr(RawStore, "delete", fail_to_delete)
 
     assert cli.main(["import"]) == 1
     error_output = capsys.readouterr().err
-    assert "import committed, raw purge failed: OSError; run kb import again" in (
+    assert "import committed, purge failed: OSError; run kb import again" in (
         error_output
     )
     assert "None" not in error_output
@@ -145,14 +147,13 @@ def test_a_failed_purge_keeps_the_import_exits_1_and_the_next_import_purges(
         raise PermissionError(13, "Permission denied", str(tmp_path / key))
 
     with monkeypatch.context() as patch:
-        patch.setattr(pipeline.RawStore, "delete", fail_to_delete)
+        patch.setattr(RawStore, "delete", fail_to_delete)
         patch.setattr(import_command, "datetime", FrozenDatetime)
         assert cli.main(["import"]) == 1
 
     error_output = capsys.readouterr().err
-    assert (
-        "import committed, raw purge failed: PermissionError (Permission denied)"
-        in (error_output)
+    assert "import committed, purge failed: PermissionError (Permission denied)" in (
+        error_output
     )
     assert "2026-10-05T093000Z" not in error_output
     assert older_extract.exists()
@@ -177,14 +178,14 @@ def test_a_failed_purge_leaves_the_summary_of_the_import_it_committed(
     def fail_to_delete(store, key):
         raise PermissionError(13, "Permission denied", str(tmp_path / key))
 
-    monkeypatch.setattr(pipeline.RawStore, "delete", fail_to_delete)
+    monkeypatch.setattr(RawStore, "delete", fail_to_delete)
 
     assert cli.main(["import"]) == 1
     output = capsys.readouterr()
     blank_line, summary_line, last_line = output.out.splitlines()
     assert blank_line == last_line == ""
     assert summary_line.startswith("import: 4 raw read, ")
-    assert "import committed, raw purge failed: PermissionError" in output.err
+    assert "import committed, purge failed: PermissionError" in output.err
 
 
 def test_a_purge_stopped_by_ctrl_c_still_prints_the_summary(
@@ -194,10 +195,10 @@ def test_a_purge_stopped_by_ctrl_c_still_prints_the_summary(
     cli.main(["create-db"])
     capsys.readouterr()
 
-    def interrupt(data_dir, folder_keys):
+    def interrupt(*arguments):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(import_command, "purge_superseded_raw", interrupt)
+    monkeypatch.setattr(import_command, "purge_after_import", interrupt)
 
     assert cli.main(["import"]) == cli.ExitCode.STOPPED_BY_SIGINT
     assert capsys.readouterr().out == (
@@ -316,3 +317,67 @@ def test_import_reports_a_kind_without_table_and_exits_1(monkeypatch, tmp_path, 
         "ERROR k_b.cli: KindWithoutTableError: kind without a table in the base: newsletter_article"
         in capsys.readouterr().err
     )
+
+
+# Three years and a week after the collection of the recorded raw files (2026-10-05).
+THREE_YEARS_LATER = datetime(2029, 10, 12, tzinfo=UTC)
+
+
+def count_rows(data_dir, query):
+    connection = sqlite3.connect(data_dir / "k-b.sqlite")
+    try:
+        return connection.execute(query).fetchone()[0]
+    finally:
+        connection.close()
+
+
+def test_import_purges_what_it_committed_once_past_its_durations(
+    monkeypatch, tmp_path, capsys
+):
+    """Imported three years after its collection, a raw file of arXiv is written, then purged:
+    the purge runs after the commit, the base, the raw and the registry in turn."""
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    raw_path = copy_fixture(
+        tmp_path / "raw", "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml"
+    )
+    monkeypatch.setattr(import_command, "datetime", make_clock(THREE_YEARS_LATER))
+    capsys.readouterr()
+
+    assert cli.main(["import"]) == 0
+
+    output = capsys.readouterr()
+    assert re.match(r"\nimport: 1 raw read, [1-9]\d* written,", output.out)
+    assert count_rows(tmp_path, "SELECT count(*) FROM item") == 0
+    assert count_rows(tmp_path, "SELECT count(*) FROM raw_data") == 0
+    assert not raw_path.exists()
+    assert re.search(r"base purge: [1-9]\d* items, 0 trend rows,", output.err)
+    assert (
+        "raw purge: 1 collections older than 6 months deleted, 0 of them never imported,"
+        " 0 kept" in output.err
+    )
+    assert "registry purge: 1 rows deleted" in output.err
+
+
+def test_a_failed_purge_of_the_base_stops_the_purges_after_it(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    raw_path = copy_fixture(
+        tmp_path / "raw", "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml"
+    )
+    monkeypatch.setattr(import_command, "datetime", make_clock(THREE_YEARS_LATER))
+
+    def fail_to_purge(*arguments):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(after_import, "purge_expired_rows", fail_to_purge)
+
+    assert cli.main(["import"]) == 1
+    assert (
+        "import committed, purge failed: OperationalError; run kb import again"
+        in capsys.readouterr().err
+    )
+    assert raw_path.exists()
+    assert count_rows(tmp_path, "SELECT count(*) FROM item") > 0

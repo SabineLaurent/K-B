@@ -3,15 +3,21 @@ kept."""
 
 import logging
 import shutil
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
-from load_helpers import run_import
-from test_transform import FIXTURES_DIR
 
+from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.database.creation import create_database
 from k_b.etl.load import read_imported_paths
-from k_b.etl.raw_purge import delete_superseded_raw_files
+from k_b.etl.pipeline import import_raw_files
 from k_b.etl.raw_store import RawStore
+from k_b.etl.source_kinds import SOURCE_KINDS
+from k_b.purge.catalogs import delete_superseded_raw_files
+
+FIXTURES_DIR = Path(__file__).parents[1] / "fixtures"
+FIRST_IMPORT_AT = datetime(2026, 10, 12, 15, 49, 3, tzinfo=UTC)
 
 ZOTERO_FOLDER = "raw/selected_library/zotero"
 CISA_FOLDER = "raw/automated_watch/cisa_kev"
@@ -23,6 +29,14 @@ EMPTY_EXTRACT = b"[]\n"
 def data_dir(tmp_path):
     create_database(tmp_path / "k-b.sqlite")
     return tmp_path
+
+
+def run_import(data_dir):
+    """kb import, one second after the one before, so that each writes its own log."""
+    imported_at = FIRST_IMPORT_AT + timedelta(
+        seconds=len(list(data_dir.glob("import-log-*.jsonl")))
+    )
+    import_raw_files(data_dir, SOURCE_KINDS, GITHUB_TRACKED_REPOSITORIES, imported_at)
 
 
 def write_raw(data_dir, key, content):
@@ -140,7 +154,7 @@ def test_the_log_gives_the_number_of_files_deleted_never_a_name(data_dir, caplog
         write_extract(data_dir, collection)
     run_import(data_dir)
 
-    with caplog.at_level(logging.INFO, logger="k_b.etl.raw_purge"):
+    with caplog.at_level(logging.INFO, logger="k_b.purge.catalogs"):
         purge(data_dir)
 
     assert caplog.messages == ["raw purge: 1 superseded files deleted"]
