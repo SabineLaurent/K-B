@@ -358,14 +358,14 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 | Exigence | Intention | Tenue, par quel test |
 |---|---|---|
 | API1:2023 Broken Object Level Authorization | Une seule propriétaire, Sabine : tout client authentifié lit tous les items. Un identifiant inconnu rend 404, jamais une erreur qui dirait autre chose. `item.id`, séquentiel, est dans l'URL : la recommandation d'identifiants difficiles à deviner est écartée tant que l'API n'a qu'une propriétaire (journal ADR, 2026-10-15). | **Tenue.** `test_each_client_is_served_with_its_key`, `test_an_unknown_item_id_gives_404_item_not_found`, `test_an_unknown_window_gives_404` |
-| API2:2023 Broken Authentication | Une clé par client, générée en 256 bits (minimum contrôlé : 32 caractères) ; pas de route de connexion ; comparaison en temps constant ; 401 testé sur chaque route de données. | **Tenue.** `test_every_data_route_refuses_a_missing_and_a_wrong_key_with_the_same_body` (chaque route, lue dans l'app par le parcours de FastAPI, routes hors OpenAPI comprises), `test_only_the_public_routes_answer_without_a_key` (`/docs`, `/openapi.json` et `/health`, aucune autre), `test_an_app_without_key_refuses_every_data_route`, `test_a_removed_key_gives_401_and_the_other_clients_are_still_served`, `test_serve_exits_2_and_names_the_variable_without_its_value` ; le temps constant n'est pas mesuré par un test (`hmac.compare_digest`, `src/k_b/core/api_access.py`) |
+| API2:2023 Broken Authentication | Une clé par client, générée en 256 bits (minimum contrôlé : 32 caractères) ; pas de route de connexion ; comparaison en temps constant ; 401 testé sur chaque route de données. | **Tenue, sauf l'anti-force brute** (« Ce qui manque, et comment le tenir ») : `test_every_data_route_refuses_a_missing_and_a_wrong_key_with_the_same_body` (chaque route, lue dans l'app par le parcours de FastAPI, routes hors OpenAPI comprises), `test_only_the_public_routes_answer_without_a_key` (`/docs`, `/openapi.json` et `/health`, aucune autre), `test_an_app_without_key_refuses_every_data_route`, `test_a_removed_key_gives_401_and_the_other_clients_are_still_served`, `test_serve_exits_2_and_names_the_variable_without_its_value` ; le temps constant n'est pas mesuré par un test (`hmac.compare_digest`, `src/k_b/core/api_access.py`) |
 | API3:2023 Broken Object Property Level Authorization | Réponses en liste blanche : ni `raw_file_path`, ni `collected_at`, ni texte long dans la liste ; au détail, les champs du tableau de sa sorte et rien d'autre. | **Tenue.** `test_the_list_serves_only_the_six_fields`, `test_each_kind_has_its_detail` (corps entier, une sorte par cas), `test_no_detail_serves_a_raw_file_path_or_a_collection_date`, `test_trends_without_window_end_give_the_latest_window`, `test_no_error_body_holds_a_raw_file_path_or_a_path`, `test_no_route_documents_a_raw_file_path_or_a_collection_date` |
 | API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000), `q` (200 caractères) et du nombre de `kind` (7) ; `/trends` rend 60 lignes au plus, sans pagination. Une limite de débit par client et par route (« Débit »). | **Non tenue** : aucun délai de requête (« Hors de cette version »), et le détail d'une entrée Zotero sert tous ses surlignages, sans borne de nombre (chacun jusqu'à 10 000 caractères de texte et autant de commentaire) ; le détail d'un clip sert son texte entier, jusqu'à 1 000 000 de caractères. Ce qui est tenu : les bornes et la taille de page, `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_next_offset_stops_at_the_offset_bound`, `test_an_item_id_not_written_as_an_integer_gives_422`, `test_a_malformed_window_end_gives_422` ; le débit, pour les clients authentifiés, `test_beyond_its_limit_a_client_gets_429_with_its_wait_and_its_id`, `test_the_limit_is_per_client_and_per_route`, `test_every_data_route_has_its_limit` ; les 60 lignes d'une fenêtre sont bornées à la collecte (`gh_archive.py`), pas par l'API |
 | API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon, `HEAD` compris ; aucune route d'administration. | **Tenue.** `test_every_route_answers_get_only_and_405_to_any_other_method`, `test_the_routes_are_listed`, `test_docs_openapi_and_health_are_public_and_no_other_page_is_served`, `test_health_refuses_another_method_with_405` |
 | API6:2023 Unrestricted Access to Sensitive Business Flows | Sans objet : l'API n'a aucun flux métier à protéger (ni achat, ni réservation, ni création de compte), seulement des lectures. | Sans objet, sans test |
 | API7:2023 Server Side Request Forgery | Sans objet : l'API ne va chercher aucune adresse fournie par un client. | Sans objet, sans test |
 | API8:2023 Security Misconfiguration | Hôte d'écoute réglable (`KB_DATA_API_HOST`, une adresse IPv4), `127.0.0.1` par défaut ; hôtes permis réglables (`KB_DATA_API_ALLOWED_HOSTS`), `127.0.0.1` et `localhost` par défaut ; `*`, une liste ou une entrée vide et un nom hors motif refusés au démarrage ; en conteneur, écoute sur `0.0.0.0` et port publié sur `127.0.0.1` de la machine (#200) ; pas de CORS ; erreurs sans pile ; `/health` ne dit que `ok` ; chaque route n'accepte que `GET` : `HEAD`, que Starlette ajoute à toute route `GET`, est retiré, et toute autre méthode sur le chemin d'une route, `TRACE` et `CONNECT` compris, rend 405 ; `CONNECT hôte:port` et `OPTIONS *`, qui ne visent aucun chemin, rendent 404 `route_not_found` avec un hôte permis, 400 sinon (essayé sous uvicorn le 2026-11-05). `/docs` et `/openapi.json` servis en `sandbox` seulement (#393). Limites : Swagger UI (`/docs`) charge ses fichiers depuis un CDN ; pas de TLS, alors qu'OWASP le demande même pour une API interne (local et réseau compose au 25/10 ; l'entrée HTTPS d'ACA au 08/11). | **Tenue en partie** : sans TLS, et la publication sur `127.0.0.1` revient à #200 (critère « ports publiés sur `127.0.0.1` »), pas encore tenue. Ce qui est tenu : `test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_config`, `test_serve_listens_on_the_host_and_port_of_the_environment`, `test_serve_exits_2_on_a_host_or_port_refused`, `test_serve_exits_2_and_names_the_allowed_hosts_refused`, `test_serve_allows_the_hosts_of_the_environment_and_no_other`, `test_a_host_other_than_localhost_gives_400`, `test_a_host_other_than_the_allowed_ones_gives_400_on_health`, `test_health_answers_ok_without_key`, `test_every_route_answers_get_only_and_405_to_any_other_method`, `test_no_route_answers_cors`, `test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only`, `test_a_database_error_gives_500_without_detail_and_logs_its_type` |
-| API9:2023 Improper Inventory Management | OpenAPI versionnée (`docs/api/openapi-donnees.json`), comparée en CI au schéma produit ; hors `sandbox`, la route ne la sert pas, le contrat reste dans le dépôt (#393). `/health`, hors OpenAPI comme `/docs`, est inventoriée par ce document (« Santé »). | **Tenue.** `test_the_versioned_openapi_is_the_one_the_app_produces`, `test_the_versioned_openapi_is_valid_and_declares_its_security_scheme`, `test_each_data_route_documents_its_errors` |
+| API9:2023 Improper Inventory Management | OpenAPI versionnée (`docs/api/openapi-donnees.json`), comparée en CI au schéma produit ; hors `sandbox`, la route ne la sert pas, le contrat reste dans le dépôt (#393). `/health`, hors OpenAPI comme `/docs`, est inventoriée par ce document (« Santé »). | **Tenue, sauf en `sandbox`** (« Ce qui manque, et comment le tenir ») : `test_the_versioned_openapi_is_the_one_the_app_produces`, `test_the_versioned_openapi_is_valid_and_declares_its_security_scheme`, `test_each_data_route_documents_its_errors` |
 | API10:2023 Unsafe Consumption of APIs | Le contenu servi vient de tiers (arXiv, GitHub, CISA, TLDR, Zotero, pages gardées avec Web Clipper) : pour un client, et d'abord pour un agent, c'est une donnée, jamais une consigne. Côté K-B, la réponse d'une source est validée à la collecte (modèles de `items.py`, `CHECK` de `schema.sql`). | **Tenue côté K-B** : `tests/test_schema.py` (chaque type refusé par l'item et par la base) et les tests de chaque source. Côté client, une consigne, sans test |
 
 ### Ce qui manque, et comment le tenir
@@ -375,29 +375,44 @@ mesure manquante, sans la faire maintenant. Tailles : XS ≤ 1 h, S ≤ 3 h, M �
 touche à Azure Container Apps (ACA) est dans la même section de [fiches-veille.md](fiches-veille.md),
 avec ses sources.
 
-- **API1, identifiants aléatoires et imprévisibles** (mesure écartée le 2026-10-15, ligne API1) :
-  conçu le 2026-11-05 pour #403, environ 20 à 24 h en trois PR.
+- **API1, identifiants aléatoires et imprévisibles** (mesure écartée le 2026-10-15, ligne API1 ;
+  Sabine a décidé le 2026-11-05 de la tenir, #403) : conçu le 2026-11-05, environ 20 à 24 h en
+  trois PR.
   1. L'API IA ne montre plus au modèle l'identifiant de la base, mais la place de l'item dans la
      lecture (`i1` à `i300`), comme `c1…cN` pour les tendances : ni les consignes, ni les schémas,
      ni les bornes du modèle ne changent. S.
   2. Une colonne `item.public_id`, un UUID v4 tiré en Python (`uuid.uuid4()`) à chaque insertion,
-     `NOT NULL UNIQUE`, avec un `CHECK` de sa forme en SQL portable (règle 1 de `poc.md`) ; l'entier
+     `NOT NULL UNIQUE`, avec un `CHECK` de sa forme en SQL portable (règle 1 de `.claude/rules/poc.md`) ; l'entier
      reste la clé interne et départage toujours l'ordre de la liste. M.
   3. `GET /items/{item_id}` ne prend plus qu'un UUID sous sa forme canonique, 422 sinon ; chaque
-     identifiant servi devient l'UUID, dans les deux API et chez `kb digest`. L.
+     identifiant d'item servi devient l'UUID, dans les deux API et chez `kb digest` ;
+     `repository_id`, l'identifiant de GitHub, reste un entier. L.
 
-  Pas de migration : la base de développement est recréée (`kb create-db`, puis `kb import`) ; une
-  recréation tire de nouveaux UUID, ce qu'aucune fiche ne voit (elles n'écrivent aucun identifiant).
+  Pas de migration : la base de développement est recréée (son fichier retiré, car `kb create-db`
+  refuse une base existante, puis `kb create-db` et `kb import`). Elle ne retrouve que ce que garde
+  le brut ([stockage.md](stockage.md) : la base est la source de vérité, le brut est gardé 6 mois
+  au plus) : pas l'historique des extraits Zotero et CISA KEV remplacés, perte que Sabine juge sans
+  conséquence pour sa base de développement (2026-11-05). Une recréation tire aussi de nouveaux
+  UUID, qu'aucune fiche ne voit (elles n'écrivent aucun identifiant).
+- **API2, essais de clé sans limite** : la limite de débit ne compte que les clients à clé valide
+  (« Débit ») ; l'anti-force brute manque comme dans l'API IA, et se tiendrait de la même façon
+  ([fiches-veille.md](fiches-veille.md), API2). S, au déploiement.
 - **API4, délai de requête** (#331) : un délai posé sur la connexion SQLite par
   `set_progress_handler`, d'environ 5 s, sous les 10 s de lecture du client de l'API IA
   (`DATA_API_READ_TIMEOUT_SECONDS`), valeur à confirmer par une mesure du pire `LIKE` ; dépassé,
-  503 `query_timeout`, sans le message de SQLite ; en PostgreSQL, `statement_timeout`. S.
+  503 `query_timeout`, sans le message de SQLite ; en PostgreSQL, `statement_timeout`. S avec
+  les bornes du détail (taille de #331).
 - **API4, bornes du détail** (#331) : un nombre maximal de surlignages servis par entrée Zotero, et
   une longueur maximale du texte d'un clip servi ; les valeurs, et ce que reçoit le client au-delà
-  (texte coupé et signalé, ou autre), sont à décider. S.
+  (texte coupé et signalé, ou autre), sont à décider. Compté avec le délai.
 - **API8, TLS** : au déploiement, l'API de données derrière l'entrée interne d'ACA, joignable des
-  seules apps de son environnement, avec le chiffrement entre apps de l'environnement. S.
+  seules apps de son environnement (les clients `TERMINAL` et `AGENT` ne la joindraient plus de
+  l'extérieur), avec le chiffrement entre apps et le nom de l'app ajouté à
+  `KB_DATA_API_ALLOWED_HOSTS` ; compté avec l'API IA ([fiches-veille.md](fiches-veille.md), API8).
 - **API8, ports publiés sur `127.0.0.1`** : dans le compose de #200. XS.
+- **API9, documentation en `sandbox`** : `/docs` et `/openapi.json` sans clé en `sandbox`, écart
+  voulu (#393), comme l'API IA ; pour le lever, ne plus les servir du tout, ce qui ferme les deux
+  API ensemble (`read_openapi_url`, `core/api_settings.py`). XS.
 
 ## Hors de cette version
 
