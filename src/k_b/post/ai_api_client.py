@@ -27,6 +27,7 @@ from k_b.core.config import (
     AI_API_READ_TIMEOUT_SECONDS,
     AI_API_URL,
     AI_API_WRITE_TIMEOUT_SECONDS,
+    DIGEST_CLIENT,
     MODEL_NAME,
 )
 from k_b.core.outbound import find_url_refusal, open_http_client
@@ -36,7 +37,7 @@ from k_b.items import ItemKind, UtcDatetime
 
 AI_API_URL_VARIABLE = "KB_AI_API_URL"
 # The client KB_DIGEST of kb serve-ai: one value for both sides (README, "Changer une clé").
-DIGEST_KEY_VARIABLE = f"{AI_API_KEY_VARIABLE_PREFIX}KB_DIGEST"
+DIGEST_KEY_VARIABLE = f"{AI_API_KEY_VARIABLE_PREFIX}{DIGEST_CLIENT}"
 # No TLS before Azure Container Apps, as for the data API: http on the machine and in the compose
 # network.
 AI_API_SCHEMES = ("http", "https")
@@ -52,6 +53,8 @@ type AiApiState = Literal[
     "ai_api_unavailable",
     "ai_api_timeout",
     "ai_api_unauthorized",
+    "ai_api_forbidden",
+    "ai_api_rate_limited",
     "ai_api_failed",
     "ai_api_invalid_response",
 ]
@@ -215,6 +218,10 @@ def read_response[Response: AiApiModel](
     status = answer.status_code
     if status == httpx2.codes.UNAUTHORIZED:
         raise AiApiError("ai_api_unauthorized", status, describe_answer(answer))
+    if status == httpx2.codes.FORBIDDEN:
+        raise AiApiError("ai_api_forbidden", status, describe_answer(answer))
+    if status == httpx2.codes.TOO_MANY_REQUESTS:
+        raise AiApiError("ai_api_rate_limited", status, describe_answer(answer))
     if status >= httpx2.codes.INTERNAL_SERVER_ERROR:
         raise AiApiError("ai_api_failed", status, describe_answer(answer))
     if status != httpx2.codes.OK:
@@ -303,7 +310,9 @@ def raise_invalid(request_id: str, place: str, check: str) -> NoReturn:
 
 
 def describe_remedy(error: AiApiError, key_variable: str) -> str:
-    """The variable to check after a 401: named, never its key."""
+    """The variable to check after a 401 or a 403: named, never its key."""
     if error.state == "ai_api_unauthorized":
         return f"; the AI API refused the key of {key_variable}"
+    if error.state == "ai_api_forbidden":
+        return f"; the AI API does not open this route to the client of {key_variable}"
     return ""

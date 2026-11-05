@@ -395,6 +395,7 @@ def test_a_failed_request_gives_its_state(error, state):
         (500, {"error": "database_error"}, None, "data_api_unavailable"),
         (503, {"error": "database_missing"}, None, "data_api_unavailable"),
         (401, {"error": "invalid_api_key"}, None, "data_api_unauthorized"),
+        (429, {"error": "rate_limit_exceeded"}, None, "data_api_rate_limited"),
         (422, {"error": "invalid_parameter"}, None, "data_api_invalid_response"),
         (404, {"error": "route_not_found"}, None, "data_api_invalid_response"),
         (

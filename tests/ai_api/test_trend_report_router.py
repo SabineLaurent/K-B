@@ -34,11 +34,14 @@ from k_b.ai_api.dependencies import (
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.ai_api.routers import trend_report_router
 from k_b.commands.run_log import logging_to
+from k_b.core.api_rate_limit import RateLimiter
 from k_b.core.config import (
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
     GH_ARCHIVE_TOP_SIZE,
     LLM_REPLAY_BASE_URL,
+    TREND_REPORT_CLIENT,
     DigestSubject,
+    RateLimit,
 )
 from k_b.data_api.app import create_app as create_data_app
 
@@ -185,7 +188,7 @@ def make_app(recorded_traces, metric_reader, steps, trace_content):
         replay_steps=None,
     )
     app = create_app(
-        {"TERMINAL": SecretStr(CLIENT_KEY)},
+        {TREND_REPORT_CLIENT: SecretStr(CLIENT_KEY)},
         settings,
         DataApiSettings(
             base_url="http://localhost", api_key=SecretStr(secrets.token_urlsafe(32))
@@ -1232,3 +1235,32 @@ def test_with_content_all_only_the_body_of_a_content_record_holds_a_repository(
 def test_the_deadline_of_a_report_leaves_time_for_the_model():
     """As POST /digests: under the read timeout of kb and the ingress of ACA (240 s)."""
     assert trend_report_router.TREND_REPORT_REQUEST_TIMEOUT_SECONDS == 200
+
+
+def test_while_a_report_runs_the_next_one_gets_429_without_a_reading(make_ai_api):
+    data_api = simulate([LATEST])
+    client = make_ai_api(data_api)
+    client.app.state.slot_by_route["/trend-reports"].acquire()
+
+    response = post_trend_reports(client)
+
+    assert response.status_code == 429
+    assert response.json() == {"error": "request_already_running"}
+    assert data_api.requests == []
+
+
+def test_beyond_its_limit_the_client_of_the_reports_gets_429_without_a_reading(
+    make_ai_api,
+):
+    data_api = simulate([LATEST])
+    client = make_ai_api(data_api)
+    client.app.state.rate_limiter = RateLimiter(
+        {"/trend-reports": RateLimit(requests=1, window_seconds=86_400)}
+    )
+    client.app.state.rate_limiter.admit_call(TREND_REPORT_CLIENT, "/trend-reports")
+
+    response = post_trend_reports(client)
+
+    assert response.status_code == 429
+    assert response.json() == {"error": "rate_limit_exceeded"}
+    assert data_api.requests == []

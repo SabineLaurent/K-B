@@ -543,6 +543,27 @@ de la requête.
   `kb trend-report` (#366) le client `KB_TREND_REPORT` ([tendances.md](tendances.md)). Sans
   clé valide, 401 `invalid_api_key`. La clé est fixe ; sa rotation est dans le `README.md`
   (« Changer une clé »).
+- **Une route, un client** (OWASP API5:2023) : `POST /digests` s'ouvre à `KB_DIGEST` seul,
+  `POST /trend-reports` à `KB_TREND_REPORT` seul (`AI_API_CLIENT_BY_ROUTE`, `core/config.py`). Tout
+  autre client à clé valide reçoit 403 `client_not_allowed` ; une route absente de la table est refusée
+  à tous.
+- **Une demande à la fois par route** (OWASP API4:2023) : tant qu'une demande tourne, la suivante
+  reçoit 429 `request_already_running`, avec `Retry-After: 200`, sans file d'attente. Une demande
+  court jusqu'à son échéance même si son client est parti : après un Ctrl-C, la relance est refusée
+  tant que la première n'a pas fini, environ 200 s au plus. Un digest et un compte rendu peuvent
+  tourner ensemble.
+- **Débit par client et par route** (OWASP API4 et API6:2023) : 20 demandes par 24 h glissantes sur
+  chaque route (`AI_API_RATE_LIMITS`, `core/config.py`), environ 3 fois le pic mesuré du 26 au 29/10 (7 par jour). Au-delà, 429
+  `rate_limit_exceeded`, avec `Retry-After`. Ni un 401, ni un 403, ni un refus de concurrence ne comptent.
+  **Ce n'est pas un budget** : le compte vit en mémoire, un redémarrage ou un passage à zéro réplique
+  le remet à zéro, et il ne vaut que pour une réplique (`maxReplicas: 1` au déploiement, #317). Une
+  boucle qui s'emballe est arrêtée, car elle garde la réplique en vie ; un voleur patient de clé ne
+  l'est pas. Le compte porte sur les tentatives, pas sur les appels au modèle : un 422 de schéma ou
+  une panne rapide consomme aussi. Aucune limite pour les requêtes sans clé valide. Sur le Mac, la
+  veille ne compte pas dans les 24 h (`time.monotonic` y lit `mach_absolute_time()`, vérifié le
+  2026-11-05) : la fenêtre s'allonge d'autant, la limite est donc plus stricte, jamais plus large.
+- **Ordre des contrôles** : 413, 404 ou 405, 422 d'un corps illisible, 401, 403, 429 de concurrence,
+  429 de débit, 422 de schéma, puis la route.
 - **Pas de `TrustedHostMiddleware`**, écart voulu à la ligne API8 de [specs-api.md](specs-api.md) :
   sans clé, une requête n'atteint que `/health`, et `/docs` et `/openapi.json` en `sandbox`, qui ne
   contiennent aucune donnée, si bien qu'un rebinding DNS n'obtient rien et ne coûte aucun appel. Signalé à
@@ -550,7 +571,7 @@ de la requête.
 - **`GET /health`** répond 200 `{"status": "ok"}` sans clé, comme celle de l'API de données.
 - **Documentation** : `/docs` et `/openapi.json` ne sont servis que si
   `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, 404 sinon, comme l'API de données ([specs-api.md](specs-api.md), #393).
-- **Version** : `0.9.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
+- **Version** : `0.10.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
   un changement visible par un client change les deux. `0.1.0` : `POST /digests` (#156) ; `0.2.0` :
   `model` dans la réponse (#209) ; `0.3.0` : `unanswered`, et `not_retained` du premier niveau
   renommé `no_suitable_subject` (#210, `classify-2`) ; `0.4.0` : `items_dropped` renommé
@@ -561,7 +582,9 @@ de la requête.
   `POST /trend-reports`, et ses erreurs `github_*` (#367) ; `0.7.0` : le choix du modèle dans la
   réponse de `POST /trend-reports`, `model`, `choice_failure` et `chosen` (#368) ; `POST /digests`
   ne change pas ; `0.8.0` : `/docs` et `/openapi.json` en `sandbox` seulement (#393) ; `0.9.0` :
-  413 `content_too_large` sur les deux routes, pour un corps de plus de 1 024 octets (#161).
+  413 `content_too_large` sur les deux routes, pour un corps de plus de 1 024 octets (#161) ;
+  `0.10.0` : 403 `client_not_allowed`, 429 `rate_limit_exceeded` et `request_already_running`, 503
+  `data_api_rate_limited` (#161).
 
 ## Contrôles
 
@@ -1059,7 +1082,8 @@ son `chat` à l'instant où il a fini, comme une évaluation.
 - **Sortie refusée** : elle part comme une chaîne échappée dans un corps de journal, jamais
   interprétée ni écrite dans le coffre ou la réponse de l'API (règle 8 de `poc.md`, inchangée).
 
-**Angles morts** : un 401 et un 422 n'ont pas de trace, la route n'étant pas atteinte. Une erreur
+**Angles morts** : un 401, un 403, un 422 et un 429 n'ont pas de trace, la route n'étant pas
+atteinte ; seule la ligne de `log_request` les dit. Une erreur
 après le `return` de la route (la validation de la réponse, la fermeture des dépendances) laisse
 une racine à 200 alors que le client reçoit 500 ; la ligne de `log_request` dit le vrai code.
 
@@ -1094,9 +1118,13 @@ Sources, lues le 2026-10-27 :
 | `data_api_unavailable` | API de données injoignable, ou 5xx | 502 | — |
 | `data_api_timeout` | délai de lecture dépassé | 504 | — |
 | `data_api_unauthorized` | 401 de l'API de données : clé `AI_DIGEST` refusée (sans clé, l'API IA ne démarre pas, règle 2 de `poc.md`) | 502 | — |
+| `data_api_rate_limited` | 429 de l'API de données, sans nouvelle tentative ni `Retry-After` transmis | 503 | — |
 | `data_api_invalid_response` | réponse hors du schéma attendu | 502 | — |
 | `invalid_parameter` | demande mal formée, `window_days` hors bornes | 422 | — |
 | `invalid_api_key` | appel sans clé, ou clé inconnue (#156) | 401 | — |
+| `client_not_allowed` | clé valide d'un autre client que celui de la route (« Accès », #161) | 403 | — |
+| `rate_limit_exceeded` | client au-delà de la limite de la route (« Accès », #161) | 429, avec `Retry-After` | — |
+| `request_already_running` | une demande tourne déjà sur la route (« Accès », #161) | 429, avec `Retry-After` | — |
 | `content_too_large` | corps de plus de `MAX_AI_API_BODY_BYTES` (1 024 octets), avant la clé (#161) | 413 | — |
 | `route_not_found`, `method_not_allowed`, `internal_error` | comme l'API de données | 404, 405, 500 | — |
 
@@ -1274,7 +1302,7 @@ légitimes l'utilisent.
 | Code | Quand |
 |---|---|
 | 0 | chaque fiche rendue est écrite ; ou aucune fiche dans la fenêtre (`total  none in the window`) |
-| 1 | l'API IA injoignable (`ai_api_unavailable`), délai dépassé (`ai_api_timeout`), clé refusée (`ai_api_unauthorized`, 401), panne (`ai_api_failed`, 5xx), autre réponse ou réponse hors schéma (`ai_api_invalid_response`) : aucune fiche écrite ; ou un sujet en échec et aucune fiche écrite ; ou une `OSError` au contrôle d'avant la demande |
+| 1 | l'API IA injoignable (`ai_api_unavailable`), délai dépassé (`ai_api_timeout`), clé refusée (`ai_api_unauthorized`, 401), route refusée au client (`ai_api_forbidden`, 403), limite atteinte (`ai_api_rate_limited`, 429), panne (`ai_api_failed`, 5xx), autre réponse ou réponse hors schéma (`ai_api_invalid_response`) : aucune fiche écrite ; ou un sujet en échec et aucune fiche écrite ; ou une `OSError` au contrôle d'avant la demande |
 | 2 | réglage refusé, `KB_VAULT_DIR` absente ou pas un dossier, fiche du jour déjà là ou lien, vus avant la demande : rien n'est demandé |
 | 4 | un sujet en échec (nommé dans `failed_subjects`, ou sa fiche non écrite) et au moins une fiche écrite |
 | 130 | SIGINT (Ctrl-C) : les fiches déjà écrites restent |

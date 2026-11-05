@@ -11,6 +11,7 @@ from fastapi.responses import Response
 from k_b.core.api_errors import (
     API_ERROR_HANDLERS,
     API_ERROR_RESPONSES,
+    RATE_LIMIT_EXCEEDED,
     ErrorHandlers,
     ErrorSchema,
     respond_with_error,
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 # The error bodies of a data route, declared in the OpenAPI.
 ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     **API_ERROR_RESPONSES,
+    429: {"model": ErrorSchema, "description": RATE_LIMIT_EXCEEDED},
     500: {"model": ErrorSchema, "description": "database_error, internal_error"},
     503: {"model": ErrorSchema, "description": "database_missing"},
 }

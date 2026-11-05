@@ -337,6 +337,37 @@ def test_another_answer_is_ai_api_invalid_response_and_no_redirection_is_followe
     assert "elsewhere" not in str(failure)
 
 
+def test_a_route_refused_to_the_client_is_ai_api_forbidden():
+    failure = ask_and_fail(
+        answer(403, b'{"error": "client_not_allowed"}', {"X-Request-ID": REQUEST_ID})
+    )
+
+    assert failure.state == "ai_api_forbidden"
+    assert str(failure) == (
+        f"ai_api_forbidden, HTTP 403, error client_not_allowed, X-Request-ID {REQUEST_ID}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("state", "wait"),
+    [("rate_limit_exceeded", "41237"), ("request_already_running", "200")],
+)
+def test_a_request_refused_for_now_is_ai_api_rate_limited_with_its_wait(state, wait):
+    failure = ask_and_fail(
+        answer(
+            429,
+            json.dumps({"error": state}).encode(),
+            {"X-Request-ID": REQUEST_ID, "Retry-After": wait},
+        )
+    )
+
+    assert failure.state == "ai_api_rate_limited"
+    assert str(failure) == (
+        f"ai_api_rate_limited, HTTP 429, error {state}, X-Request-ID {REQUEST_ID},"
+        f" Retry-After {wait}"
+    )
+
+
 def make_body_with(**changes):
     body = json.loads(to_body(make_response()))
     body.update(changes)

@@ -65,8 +65,9 @@ def test_the_versioned_openapi_is_valid_and_closes_its_route_by_a_key():
     OpenAPIV31SpecValidator(openapi).validate()
     # 0.2.0: model in the response (#209); 0.3.0: unanswered (#210); 0.4.0: three fields renamed;
     # 0.5.0: POST /trend-reports (#366); 0.6.0: the sheets read on GitHub (#367); 0.7.0: the
-    # choice of the model (#368); 0.8.0: /docs and /openapi.json in the sandbox only (#393).
-    assert openapi["info"] == {"title": "K-B AI API", "version": "0.9.0"}
+    # choice of the model (#368); 0.8.0: /docs and /openapi.json in the sandbox only (#393); 0.9.0:
+    # the bound of the body (#161); 0.10.0: the right per route and the limits (#161).
+    assert openapi["info"] == {"title": "K-B AI API", "version": "0.10.0"}
     assert "model" in openapi["components"]["schemas"]["DigestsSchema"]["required"]
     assert list(openapi["paths"]) == ["/digests", "/trend-reports"]
     assert openapi["components"]["securitySchemes"] == {
@@ -89,12 +90,14 @@ def test_the_route_documents_each_named_state():
         if status != "200"
     } == {
         "401": "invalid_api_key",
+        "403": "client_not_allowed",
         "413": "content_too_large",
         "422": "invalid_parameter",
+        "429": "rate_limit_exceeded, request_already_running",
         "500": "internal_error",
         "502": "data_api_invalid_response, data_api_unauthorized, data_api_unavailable,"
         " llm_content_filtered, llm_invalid_output, llm_truncated, llm_unavailable",
-        "503": "llm_rate_limited",
+        "503": "data_api_rate_limited, llm_rate_limited",
         "504": "data_api_timeout, llm_timeout",
     }
 
@@ -109,12 +112,14 @@ def test_the_trend_report_documents_the_states_of_the_data_api_and_of_github():
         if status != "200"
     } == {
         "401": "invalid_api_key",
+        "403": "client_not_allowed",
         "413": "content_too_large",
         "422": "invalid_parameter",
+        "429": "rate_limit_exceeded, request_already_running",
         "500": "internal_error",
         "502": "data_api_invalid_response, data_api_unauthorized, data_api_unavailable,"
         " github_forbidden, github_invalid_response, github_unauthorized, github_unavailable",
-        "503": "github_rate_limited",
+        "503": "data_api_rate_limited, github_rate_limited",
         "504": "data_api_timeout, github_timeout",
     }
 

@@ -7,7 +7,7 @@ erreurs et les exigences de sécurité. Les décisions et leur pourquoi sont dan
 [journal ADR](ADR/journal-decisions-projet.md) (entrées du 2026-10-14) ; la collecte, dans
 [specs-collecte.md](specs-collecte.md) ; la base, dans [stockage.md](stockage.md).
 
-**Version de la spec : 0.7.0**, la même que `info.version` de l'OpenAPI
+**Version de la spec : 0.8.0**, la même que `info.version` de l'OpenAPI
 (`docs/api/openapi-donnees.json`, que #184 écrit). Un changement de comportement visible par un client, comme
 l'ordre des résultats, change la version.
 
@@ -20,6 +20,7 @@ l'ordre des résultats, change la version.
 | 0.5.0 | l'en-tête `X-Request-ID` sur chaque réponse ; les tags `items` et `trends` dans l'OpenAPI ; les clés des clients lues dans `KB_DATA_API_KEY_<CLIENT>`, et non plus `KB_API_KEY_<CLIENT>` (#156) |
 | 0.6.0 | `/docs` et `/openapi.json` servis seulement si `KB_DEPLOYMENT_ENVIRONMENT=sandbox` ; 404 sinon (#393) |
 | 0.7.0 | `kind` pris 7 fois au plus, autant que de sortes ; au-delà, 422 (#161) |
+| 0.8.0 | une limite de débit par client et par route ; au-delà, 429 `rate_limit_exceeded` (#161) |
 
 ## Règles communes
 
@@ -101,6 +102,27 @@ l'ordre des résultats, change la version.
 - **Pas de route de connexion**, pas de jeton à durée de vie : voir l'entrée « Clés par client »
   du journal.
 - **Journal** : il nomme le client, jamais la clé. Un 401 est journalisé sans nom ni valeur reçue.
+
+## Débit
+
+Chaque client a sa limite sur chaque route de données, sur une fenêtre glissante
+(`DATA_API_RATE_LIMITS`, `core/config.py` ; `core/api_rate_limit.py`). Au-delà, 429
+`rate_limit_exceeded`, avec `Retry-After` : les secondes avant que l'appel le plus ancien sorte de la
+fenêtre. Un appel refusé ne compte pas.
+
+| Route | Par client | Repère |
+|---|---|---|
+| `GET /items` | 120 par minute | 21 par minute au plus dans les journaux d'essai du 26 au 29/10 |
+| `GET /items/{item_id}` | 1 200 par minute | 804 par minute au plus dans les mêmes journaux ; 4 demandes de fiches à 300 items |
+| `GET /trends` | 120 par minute | 3 comptes rendus à 32 lectures, sans mesure dans ces journaux |
+
+- **Ordre** : le 401 d'abord, une requête sans clé valide ne compte donc pas. Un paramètre refusé
+  (422) compte. `/health`, `/docs` et `/openapi.json` n'ont pas de limite.
+- **Limites** : le compte vit en mémoire. Un redémarrage ou un passage à zéro réplique le remet à
+  zéro, et il ne vaut que pour une réplique (`maxReplicas: 1` au déploiement, #317). Les requêtes sans
+  clé valide n'ont pas de limite : par adresse, elle passerait par `X-Forwarded-For`, à valider
+  derrière l'entrée d'ACA (à justifier avec la revue des 10 points de #161). Sur le Mac, la veille ne
+  compte pas dans la fenêtre (`time.monotonic`, `mach_absolute_time()`) : elle s'allonge d'autant.
 
 ## Les parcours P1–P9
 
@@ -276,6 +298,7 @@ valeur reçue.
 | `route_not_found` | 404 | chemin inconnu |
 | `method_not_allowed` | 405 | méthode autre que GET |
 | `invalid_parameter` | 422 | paramètre hors bornes ou mal formé ; le corps ajoute `"parameters": [<noms>]`, sans les valeurs |
+| `rate_limit_exceeded` | 429 | client au-delà de la limite de la route (« Débit »), avec `Retry-After` |
 | `database_missing` | 503 | la base n'existe pas |
 | `database_error` | 500 | toute autre erreur de la base, sans détail |
 | `internal_error` | 500 | toute autre erreur, sans détail ; journalisée par son type seul, sans pile ni message |
@@ -335,7 +358,7 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 | API1:2023 Broken Object Level Authorization | Une seule propriétaire, Sabine : tout client authentifié lit tous les items. Un identifiant inconnu rend 404, jamais une erreur qui dirait autre chose. `item.id`, séquentiel, est dans l'URL : la recommandation d'identifiants difficiles à deviner est écartée tant que l'API n'a qu'une propriétaire (journal ADR, 2026-10-15). | **Tenue.** `test_each_client_is_served_with_its_key`, `test_an_unknown_item_id_gives_404_item_not_found`, `test_an_unknown_window_gives_404` |
 | API2:2023 Broken Authentication | Une clé par client, générée en 256 bits (minimum contrôlé : 32 caractères) ; pas de route de connexion ; comparaison en temps constant ; 401 testé sur chaque route de données. | **Tenue.** `test_every_data_route_refuses_a_missing_and_a_wrong_key_with_the_same_body` (chaque route, lue dans l'app par le parcours de FastAPI, routes hors OpenAPI comprises), `test_only_the_public_routes_answer_without_a_key` (`/docs`, `/openapi.json` et `/health`, aucune autre), `test_an_app_without_key_refuses_every_data_route`, `test_a_removed_key_gives_401_and_the_other_clients_are_still_served`, `test_serve_exits_2_and_names_the_variable_without_its_value` ; le temps constant n'est pas mesuré par un test (`hmac.compare_digest`, `src/k_b/core/api_access.py`) |
 | API3:2023 Broken Object Property Level Authorization | Réponses en liste blanche : ni `raw_file_path`, ni `collected_at`, ni texte long dans la liste ; au détail, les champs du tableau de sa sorte et rien d'autre. | **Tenue.** `test_the_list_serves_only_the_six_fields`, `test_each_kind_has_its_detail` (corps entier, une sorte par cas), `test_no_detail_serves_a_raw_file_path_or_a_collection_date`, `test_trends_without_window_end_give_the_latest_window`, `test_no_error_body_holds_a_raw_file_path_or_a_path`, `test_no_route_documents_a_raw_file_path_or_a_collection_date` |
-| API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000), `q` (200 caractères) et du nombre de `kind` (7) ; `/trends` rend 60 lignes au plus, sans pagination. Pas de limite de débit : le client est local. | **Non tenue** : aucun délai de requête (« Hors de cette version »), aucune limite de débit, et le détail d'une entrée Zotero sert tous ses surlignages, sans borne de nombre (chacun jusqu'à 10 000 caractères de texte et autant de commentaire) ; le détail d'un clip sert son texte entier, jusqu'à 1 000 000 de caractères. Ce qui est tenu : les bornes et la taille de page, `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_next_offset_stops_at_the_offset_bound`, `test_an_item_id_not_written_as_an_integer_gives_422`, `test_a_malformed_window_end_gives_422` ; les 60 lignes d'une fenêtre sont bornées à la collecte (`gh_archive.py`), pas par l'API |
+| API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000), `q` (200 caractères) et du nombre de `kind` (7) ; `/trends` rend 60 lignes au plus, sans pagination. Une limite de débit par client et par route (« Débit »). | **Non tenue** : aucun délai de requête (« Hors de cette version »), et le détail d'une entrée Zotero sert tous ses surlignages, sans borne de nombre (chacun jusqu'à 10 000 caractères de texte et autant de commentaire) ; le détail d'un clip sert son texte entier, jusqu'à 1 000 000 de caractères. Ce qui est tenu : les bornes et la taille de page, `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_next_offset_stops_at_the_offset_bound`, `test_an_item_id_not_written_as_an_integer_gives_422`, `test_a_malformed_window_end_gives_422` ; le débit, pour les clients authentifiés, `test_beyond_its_limit_a_client_gets_429_with_its_wait_and_its_id`, `test_the_limit_is_per_client_and_per_route`, `test_every_data_route_has_its_limit` ; les 60 lignes d'une fenêtre sont bornées à la collecte (`gh_archive.py`), pas par l'API |
 | API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon ; aucune route d'administration. | **Tenue.** `test_every_data_route_refuses_another_method_with_405`, `test_the_routes_are_listed`, `test_docs_openapi_and_health_are_public_and_no_other_page_is_served`, `test_health_refuses_another_method_with_405` |
 | API6:2023 Unrestricted Access to Sensitive Business Flows | Sans objet : l'API n'a aucun flux métier à protéger (ni achat, ni réservation, ni création de compte), seulement des lectures. | Sans objet, sans test |
 | API7:2023 Server Side Request Forgery | Sans objet : l'API ne va chercher aucune adresse fournie par un client. | Sans objet, sans test |
@@ -348,7 +371,6 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 - Les filtres `source` et `in` : options de `kb search` seulement (#187).
 - Le filtre par paquet (P3).
 - Les tops P7 et P8.
-- Une limite de débit : le client est local.
 - **Un délai de requête : non tenu.** `conformite.md` (API4) cite le délai, et un `LIKE '%q%'`
   lit tout `release.body`, jusqu'à 125 000 caractères par release. Signalé, sans issue.
 - **D'une alerte à sa vulnérabilité** : le détail d'une alerte dit `cve_id` et `exploited`, pas

@@ -300,6 +300,51 @@ def test_digest_with_a_refused_key_writes_nothing_names_its_variable_never_the_k
         assert TEST_API_KEY not in text
 
 
+def test_digest_refused_on_its_route_names_the_variable_of_its_key_and_exits_1(
+    monkeypatch, digest_environment, capsys
+):
+    _, vault_dir = digest_environment
+    answer_digests(
+        monkeypatch,
+        answer_with(
+            status=403,
+            content=b'{"error": "client_not_allowed"}',
+            headers={"X-Request-ID": REQUEST_ID},
+        ),
+    )
+
+    assert cli.main(["digest"]) == cli.ExitCode.FAILED
+    assert list(vault_dir.iterdir()) == []
+    assert (
+        "digests not received: ai_api_forbidden, HTTP 403, error client_not_allowed,"
+        f" X-Request-ID {REQUEST_ID}; the AI API does not open this route to the client"
+        " of KB_AI_API_KEY_KB_DIGEST"
+    ) in capsys.readouterr().err
+
+
+def test_digest_while_another_runs_exits_1_with_the_wait_and_no_remedy(
+    monkeypatch, digest_environment, capsys
+):
+    _, vault_dir = digest_environment
+    answer_digests(
+        monkeypatch,
+        answer_with(
+            status=429,
+            content=b'{"error": "request_already_running"}',
+            headers={"X-Request-ID": REQUEST_ID, "Retry-After": "200"},
+        ),
+    )
+
+    assert cli.main(["digest"]) == cli.ExitCode.FAILED
+    assert list(vault_dir.iterdir()) == []
+    error_output = capsys.readouterr().err
+    assert (
+        "digests not received: ai_api_rate_limited, HTTP 429, error request_already_running,"
+        f" X-Request-ID {REQUEST_ID}, Retry-After 200"
+    ) in error_output
+    assert "KB_AI_API_KEY_KB_DIGEST" not in error_output
+
+
 def test_digest_on_a_failure_of_the_ai_api_exits_1_at_once_with_its_retry_after(
     monkeypatch, digest_environment, capsys
 ):

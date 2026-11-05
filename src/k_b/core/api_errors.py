@@ -18,6 +18,12 @@ logger = logging.getLogger(__name__)
 
 # The state of a request body beyond its bound (core/api_body_limit.py).
 CONTENT_TOO_LARGE = "content_too_large"
+# The state of a client on a route that is not its own (core/api_access.py).
+CLIENT_NOT_ALLOWED = "client_not_allowed"
+# The states of a client beyond the limit of a route, and of a route already busy
+# (core/api_rate_limit.py).
+RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
+REQUEST_ALREADY_RUNNING = "request_already_running"
 # The states of the errors Starlette raises when it routes a request, or when the bytes of its
 # body go beyond the bound of RequestBodyLimitMiddleware.
 STATE_BY_ROUTING_STATUS = {

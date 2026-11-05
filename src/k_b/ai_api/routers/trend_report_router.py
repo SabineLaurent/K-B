@@ -68,9 +68,10 @@ def post_trend_reports(
     with its trajectory, and those the model chose among the candidates read; no window after it
     gives an empty period, a reading that fails fails the request, a choice that fails leaves the
     report factual, with its state."""
-    # The root span ends whatever happens, its state named, as the one of POST /digests. A 401 and
-    # a 422 have none, and an error once the response is returned, when FastAPI serializes it,
-    # leaves it at 200. Not in the docstring: it is the description of the route in the OpenAPI.
+    # The root span ends whatever happens, its state named, as the one of POST /digests. A 401, a
+    # 403, a 422 and a 429 have none, and an error once the response is returned, when FastAPI
+    # serializes it, leaves it at 200. Not in the docstring: it is the description of the route in
+    # the OpenAPI.
     request_id = read_request_id(request)
     tracing: Tracing = request.app.state.tracing
     with tracing.step(

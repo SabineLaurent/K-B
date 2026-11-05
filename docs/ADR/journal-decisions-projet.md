@@ -5043,7 +5043,57 @@ Décisions de Sabine du 2026-11-04.
   réponse trop grosse ne donne pas ses jetons consommés (lire l'usage demanderait de lire le corps).
   — PR de #161, à venir
 
+### API : un client par route, une demande à la fois, un débit par client (#161)
+
+- **Chaque route de l'API IA s'ouvre à un seul client, par une table (`AI_API_CLIENT_BY_ROUTE`) lue
+  par une dépendance de l'app : `POST /digests` à `KB_DIGEST`, `POST /trend-reports` à
+  `KB_TREND_REPORT` ; tout autre client à clé valide reçoit 403 `client_not_allowed`, et une route
+  absente de la table est refusée à tous.** Recommandation de time-knight, validée par Sabine avec le
+  plan de la PR (2026-11-05). Pourquoi : toute clé valide ouvrait les deux routes, qui appellent un
+  modèle payant (OWASP API5:2023, revue de la certif du 05/11). Écartée : une dépendance par routeur,
+  qu'une route oubliée contournerait. Limite assumée : une clé sans route est acceptée au démarrage ;
+  elle ne reçoit que des 403. — PR 2A de #161, à venir
+
+- **Une demande à la fois par route de l'API IA, sans file : la suivante reçoit 429
+  `request_already_running`, avec `Retry-After: 200`.** Validé par Sabine avec le plan. Pourquoi :
+  une demande dure jusqu'à 200 s et fait plusieurs appels payants, si bien qu'un débit par minute ne
+  suffit pas (commentaire de #161 du 2026-10-21). Par route et non pour toute l'API : un digest et un
+  compte rendu peuvent tourner ensemble. Écartés : une file d'attente (le client attendrait jusqu'à
+  200 s pour rien) ; `limit_concurrency` d'uvicorn, qui compte aussi les connexions muettes (31 sockets
+  sans clé couperaient l'API, `/health` compris : essai du relecteur du plan à 4, doc d'uvicorn 0.54),
+  renvoyé au jalon ACA. Limites assumées : la demande court jusqu'à son échéance même si son client est
+  parti, donc après un Ctrl-C la relance est refusée environ 200 s au plus ; `Retry-After` vaut toujours
+  200, une borne haute. Essayé : un client qui ne lit pas une réponse de 50 Mo ne garde pas le verrou
+  (rendu à 0,1 s, uvicorn 0.54, FastAPI 0.143.1). — PR 2A de #161, à venir
+
+- **Un débit par client et par route sur les deux API, compté par une fenêtre glissante en mémoire
+  écrite dans K-B (`core/api_rate_limit.py`) : 20 demandes par 24 h sur chaque route du modèle ;
+  1 200 (`/items/{item_id}`), 120 (`/items`) et 120 (`/trends`) par minute sur l'API de données ; au-delà,
+  429 `rate_limit_exceeded`, avec `Retry-After`.** Validé par Sabine avec le plan. Pourquoi : rien ne
+  limitait le nombre d'appels au modèle (OWASP API4 et API6:2023), et les deux API seront exposées au
+  08/11. Les chiffres viennent des journaux d'essai du 26 au 29/10 : 7 demandes de fiches par jour au
+  plus (20 en fait environ 3 fois), 804 détails et 21 listes par minute au plus. **Revient sur « Pas de
+  limite de débit : le client est local »** (`docs/specs-api.md`, « Hors de cette version », depuis
+  #185) : ce qui a changé, c'est la mise en ligne prévue au 08/11 et la revue OWASP de la certif.
+  Écartés : `slowapi` 0.1.10 (un décorateur et un paramètre `request` sur chaque route, et il ajoute
+  `limits`) ; `limits` 5.8.0 (3 dépendances, et son atout, Redis, ne sert pas ici) ; une limite d'Azure
+  (rien en local, rien dans le dépôt) ; une fenêtre fixe (double rafale à la frontière) ; une variable
+  d'environnement par limite (aucun environnement n'en demande une autre). Limites assumées : **ce n'est
+  pas un budget**, car un redémarrage ou un passage à zéro réplique remet le compte à zéro, et il ne
+  vaut que pour une réplique ; il compte les tentatives, un 422 de schéma ou une panne rapide compris ;
+  aucune limite pour les requêtes sans clé valide (par adresse, elle passerait par `X-Forwarded-For`,
+  à justifier avec la revue des 10 points) ; sur le Mac, la veille ne compte pas dans la fenêtre
+  (`time.monotonic`, `mach_absolute_time()`). — PR 2A de #161, à venir
+
 ## Décisions encore ouvertes
+
+- **`minReplicas` des deux API au déploiement** (2026-11-05, #161) : 0 réplique au repos (3,29 $ par
+  mois pour les deux, `README.md`) ou 1 (23,65 $). Avec 0, le compte du débit repart de zéro à chaque
+  réveil ; `maxReplicas: 1` dans les deux cas, le compte ne valant que pour une réplique. À décider au
+  jalon ACA (#317).
+
+- **Une limite de connexions du serveur** (2026-11-05, #161) : `limit_concurrency` d'uvicorn, écarté
+  de la PR 2A parce qu'il compte les connexions muettes, à mesurer derrière l'entrée d'ACA.
 
 - **Les seuils des critères des tendances** (2026-10-30) : 2 jours actifs pour « durable », 5 rangs
   pour « en accélération ». À revoir sur les premiers comptes rendus réels (#370).
