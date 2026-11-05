@@ -227,6 +227,12 @@ MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,99}")
 # largest integer a float holds exactly: the cost of a metric line stays a finite number (review
 # of #156).
 MAX_TOKENS_READ_PER_ANSWER = 10_000_000
+# The largest body of an answer of the provider, read or announced by Content-Length; beyond, the
+# reading stops with llm_unavailable, without retry (OWASP API10:2023). Far above the largest
+# honest answer: 8,192 output tokens at most (WRITING_MAX_COMPLETION_TOKENS), about 65 KB at 4
+# bytes per token doubled by the escaping of a JSON output inside the JSON of the completion,
+# assumed, not measured; the margin covers the annotations of the content filter of Azure.
+MAX_LLM_ANSWER_BYTES = 1_000_000
 # The prices of gpt-6-luna (ADR of 2026-10-17, "Modèle des fiches : gpt-6-luna sur l'abonnement
 # de l'organisme de formation"), in USD per million tokens, for cost_estimated of each metric
 # line: Data Zone Standard, France Central, short context, effective from 2026-09-01. Read on
@@ -243,6 +249,10 @@ LLM_OUTPUT_USD_PER_MILLION_TOKENS = 0.60
 # .claude/rules/poc.md, rule 2): the AI API listens on the machine only, beside kb serve-data.
 AI_API_HOST = "127.0.0.1"
 AI_API_PORT = 8001
+# The largest body of a request to the AI API, read or announced by Content-Length; beyond, 413
+# content_too_large, before the key is checked (OWASP API4:2023). Far above the largest honest
+# body: 62 bytes for the two days of POST /trend-reports.
+MAX_AI_API_BODY_BYTES = 1024
 # The window of a digest request, in days (docs/fiches-veille.md, "Fenêtre"): the default, changed
 # by KB_DIGEST_WINDOW_DAYS, and the bounds of both the variable and window_days of a request.
 DIGEST_WINDOW_DAYS = 3

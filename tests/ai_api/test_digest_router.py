@@ -45,6 +45,7 @@ from k_b.core.config import (
     LLM_INPUT_USD_PER_MILLION_TOKENS,
     LLM_OUTPUT_USD_PER_MILLION_TOKENS,
     LLM_REPLAY_BASE_URL,
+    MAX_AI_API_BODY_BYTES,
     NO_SUITABLE_SUBJECT_ANSWER,
     DigestSubject,
 )
@@ -383,6 +384,100 @@ def test_without_key_only_a_body_that_cannot_be_read_gets_422(
 
     assert response.status_code == status
     assert transport.requests == []
+
+
+# The bound of a request body (MAX_AI_API_BODY_BYTES, OWASP API4:2023).
+JSON_CONTENT = {"Content-Type": "application/json"}
+
+
+def padded_body(length):
+    """A request of a digest, padded with spaces to this length."""
+    body = json.dumps({"window_days": WINDOW_DAYS}).encode()
+    return body + b" " * (length - len(body))
+
+
+def as_sent(body, is_announced):
+    """The body with its Content-Length, or streamed without it."""
+    return body if is_announced else iter([body])
+
+
+@pytest.mark.parametrize("is_announced", [True, False], ids=["announced", "streamed"])
+@pytest.mark.parametrize("path", ["/digests", "/trend-reports"])
+def test_a_body_beyond_the_bound_is_refused_413_before_the_key(
+    make_ai_api, path, is_announced
+):
+    """Refused on its Content-Length before any reading, or once its bytes go beyond the bound;
+    nothing is read nor sent."""
+    client, transport = make_ai_api(VALID_STEPS)
+    body = padded_body(MAX_AI_API_BODY_BYTES + 1)
+
+    response = client.post(
+        path, content=as_sent(body, is_announced), headers=JSON_CONTENT
+    )
+
+    assert response.status_code == 413
+    assert response.json() == {"error": "content_too_large"}
+    assert transport.requests == []
+
+
+@pytest.mark.parametrize("is_announced", [True, False], ids=["announced", "streamed"])
+def test_a_body_at_the_bound_is_read(make_ai_api, is_announced):
+    client, _ = make_ai_api(VALID_STEPS)
+    body = padded_body(MAX_AI_API_BODY_BYTES)
+
+    response = client.post(
+        "/digests",
+        content=as_sent(body, is_announced),
+        headers={**AUTHORIZATION, **JSON_CONTENT},
+    )
+
+    assert response.status_code == 200
+
+
+def test_a_body_announced_beyond_the_bound_gets_the_413_of_k_b_on_any_route(
+    make_ai_api,
+):
+    """Starlette alone would answer it in plain text, out of the error schema of the API."""
+    client, _ = make_ai_api([])
+
+    response = client.request(
+        "GET", "/health", content=b" " * (MAX_AI_API_BODY_BYTES + 1)
+    )
+
+    assert response.status_code == 413
+    assert response.json() == {"error": "content_too_large"}
+
+
+@pytest.mark.parametrize("length", ["+2000", "2_000"])
+def test_a_length_starlette_reads_beyond_the_bound_gets_the_413_of_k_b(
+    make_ai_api, length
+):
+    """Read by int(), as Starlette reads it: uvicorn refuses these forms, another server may not,
+    and Starlette would answer them in plain text."""
+    client, _ = make_ai_api([])
+
+    response = client.request(
+        "GET", "/health", content=b" ", headers={"Content-Length": length}
+    )
+
+    assert response.status_code == 413
+    assert response.json() == {"error": "content_too_large"}
+
+
+def test_a_length_that_is_not_a_number_is_left_to_the_count_of_starlette(make_ai_api):
+    client, _ = make_ai_api([])
+    unreadable_length = {"Content-Length": "not a number"}
+
+    small = client.request("GET", "/health", content=b" ", headers=unreadable_length)
+    beyond = client.post(
+        "/digests",
+        content=padded_body(MAX_AI_API_BODY_BYTES + 1),
+        headers={**JSON_CONTENT, **unreadable_length},
+    )
+
+    assert small.status_code == 200
+    assert beyond.status_code == 413
+    assert beyond.json() == {"error": "content_too_large"}
 
 
 @pytest.mark.parametrize(

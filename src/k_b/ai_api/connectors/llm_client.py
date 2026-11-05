@@ -24,10 +24,16 @@ from k_b.core.config import (
     LLM_RETRY_AFTER_MAX_SECONDS,
     LLM_RETRY_WAIT_SECONDS,
     LLM_WRITE_TIMEOUT_SECONDS,
+    MAX_LLM_ANSWER_BYTES,
     MAX_TOKENS_READ_PER_ANSWER,
     MILLISECONDS_PER_SECOND,
 )
-from k_b.core.outbound import open_http_client
+from k_b.core.outbound import (
+    BodyTooLargeError,
+    BodyTooLateError,
+    open_http_client,
+    read_bounded_body,
+)
 from k_b.core.retry_after import is_retry_after_too_long, read_retry_after
 
 # Relative to the base URL, which keeps its path (/openai/v1, /v1).
@@ -283,7 +289,7 @@ def call_model[OutputT: BaseModel](
             },
         ) as step:
             attempt = send_and_check(
-                http_client, body, output_model, check_output, timeout
+                http_client, body, output_model, check_output, timeout, deadline
             )
             trace_attempt(step, attempt)
         span_refs.append(step.ref)
@@ -421,10 +427,23 @@ def send_and_check[OutputT: BaseModel](
     output_model: type[OutputT],
     check_output: Callable[[OutputT], FailedCheck | None],
     timeout: httpx2.Timeout,
+    deadline: Deadline | None,
 ) -> Attempt[OutputT]:
-    """One request: the state of a failure of the provider, or the checks of its completion."""
+    """One request, its answer read within its bounds: the state of a failure of the provider,
+    or the checks of its completion."""
+    is_late = None if deadline is None else deadline.is_passed
     try:
-        response = http_client.post(CHAT_COMPLETIONS_PATH, json=body, timeout=timeout)
+        with http_client.stream(
+            "POST", CHAT_COMPLETIONS_PATH, json=body, timeout=timeout
+        ) as response:
+            try:
+                content = read_bounded_body(response, MAX_LLM_ANSWER_BYTES, is_late)
+            except BodyTooLargeError:
+                return Attempt(
+                    outcome="llm_unavailable", http_status=response.status_code
+                )
+            except BodyTooLateError:
+                return Attempt(outcome="llm_timeout", http_status=response.status_code)
     except httpx2.TimeoutException:
         return Attempt(outcome="llm_timeout")
     except httpx2.TransportError:
@@ -434,25 +453,28 @@ def send_and_check[OutputT: BaseModel](
     except httpx2.RequestError:
         # An answer that cannot be read (a body badly encoded): the same answer again.
         return Attempt(outcome="llm_unavailable")
-    attempt = read_answer(response, output_model, check_output)
+    attempt = read_answer(response, content, output_model, check_output)
     return replace(attempt, http_status=response.status_code)
 
 
 def read_answer[OutputT: BaseModel](
     response: httpx2.Response,
+    content: bytes,
     output_model: type[OutputT],
     check_output: Callable[[OutputT], FailedCheck | None],
 ) -> Attempt[OutputT]:
     if response.status_code != httpx2.codes.OK:
-        return read_failure(response)
+        return read_failure(response, content)
     try:
-        completion = ChatCompletion.model_validate_json(response.content)
+        completion = ChatCompletion.model_validate_json(content)
     except ValidationError:
         return Attempt(outcome="llm_unavailable")
     return check_completion(completion, output_model, check_output)
 
 
-def read_failure[OutputT: BaseModel](response: httpx2.Response) -> Attempt[OutputT]:
+def read_failure[OutputT: BaseModel](
+    response: httpx2.Response, content: bytes
+) -> Attempt[OutputT]:
     """The state of an answer other than 200: a 429 or a 5xx gets a retry unless wait_or_end
     refuses it, a 400 of a prompt filtered none."""
     status = response.status_code
@@ -462,7 +484,7 @@ def read_failure[OutputT: BaseModel](response: httpx2.Response) -> Attempt[Outpu
         return wait_or_end(response, "llm_unavailable")
     if (
         status == httpx2.codes.BAD_REQUEST
-        and read_error_code(response) == "content_filter"
+        and read_error_code(content) == "content_filter"
     ):
         return Attempt(outcome="llm_content_filtered", failed_check="content_filter")
     return Attempt(outcome="llm_unavailable")
@@ -486,9 +508,9 @@ def wait_or_end[OutputT: BaseModel](
     )
 
 
-def read_error_code(response: httpx2.Response) -> str | None:
+def read_error_code(content: bytes) -> str | None:
     try:
-        return ErrorBody.model_validate_json(response.content).error.code
+        return ErrorBody.model_validate_json(content).error.code
     except ValidationError:
         return None
 

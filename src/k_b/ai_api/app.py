@@ -17,15 +17,16 @@ from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.connectors.trace_export import TraceExport
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.core.api_access import check_api_key
+from k_b.core.api_body_limit import bound_request_bodies
 from k_b.core.api_errors import API_ERROR_HANDLERS, respond_to_unexpected_error
 from k_b.core.api_health import HEALTH_PATH, answer_health
 from k_b.core.api_request_log import log_request
 from k_b.core.api_telemetry import NATIVE_TELEMETRY_OFF
-from k_b.core.config import DigestSubject
+from k_b.core.config import MAX_AI_API_BODY_BYTES, DigestSubject
 
 # The version of the contracts of docs/fiches-veille.md and docs/tendances.md: a change a client
 # can see changes both.
-API_VERSION = "0.8.0"
+API_VERSION = "0.9.0"
 
 
 def create_app(
@@ -67,9 +68,11 @@ def create_app(
     app.state.model_metrics = model_metrics
     app.state.trace_export = trace_export
     app.state.tracing = trace_export.build_tracing()
-    # The last added is the outermost: the 500 of an unexpected error has its line too. No
+    # The last added is the outermost: the 500 of an unexpected error has its line too, and so
+    # has the 413 of a body beyond its bound, given before the key is checked. No
     # TrustedHostMiddleware: without the key, a request reaches only /health, /docs and
     # /openapi.json, which hold no data (docs/fiches-veille.md, "Sécurité").
+    bound_request_bodies(app, MAX_AI_API_BODY_BYTES)
     app.middleware("http")(respond_to_unexpected_error)
     app.middleware("http")(log_request)
     app.include_router(api_router)

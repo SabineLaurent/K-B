@@ -9,6 +9,7 @@ import pytest
 from opentelemetry.trace import INVALID_SPAN_CONTEXT, SpanKind, StatusCode
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
+from k_b.ai_api.connectors import llm_client
 from k_b.ai_api.connectors.llm_client import (
     Attempt,
     FailedCheck,
@@ -19,7 +20,11 @@ from k_b.ai_api.connectors.llm_client import (
     to_failure,
     trace_contents,
 )
-from k_b.ai_api.connectors.llm_replay import ReplayTransport
+from k_b.ai_api.connectors.llm_replay import (
+    REPLAY_STEPS,
+    ReplayTransport,
+    build_completion,
+)
 from k_b.ai_api.connectors.llm_settings import (
     LlmSettings,
     read_llm_settings_or_refusal,
@@ -120,10 +125,11 @@ def call(
     check_output=accept_every_output,
     deadline=None,
     tracing=TRACING_OFF,
+    transport=None,
 ):
-    """Call the model on the replay with these steps: the call, the transport, which kept every
-    request, and the waits asked."""
-    transport = ReplayTransport(steps)
+    """Call the model on the replay with these steps, or on the transport given: the call, the
+    transport, which kept every request, and the waits asked."""
+    transport = ReplayTransport(steps) if transport is None else transport
     sleeps = Sleeps()
     with build_http_client(settings, transport=transport) as http_client:
         llm_call = call_model(
@@ -1226,3 +1232,72 @@ def test_the_call_keeps_the_outcome_of_its_first_attempt(steps, first_outcome):
     llm_call, _, _ = call(steps)
 
     assert llm_call.first_outcome == first_outcome
+
+
+# The bound of an answer of the provider (MAX_LLM_ANSWER_BYTES), reduced for the tests: an answer
+# is an input not trusted (OWASP API10:2023).
+
+ANSWER_BODY = json.dumps(
+    build_completion(REPLAY_STEPS.validate_python([completion()])[0])
+).encode()
+
+
+class AnsweringTransport(httpx2.MockTransport):
+    """A provider that gives this answer to each request, and keeps the requests."""
+
+    def __init__(self, answer):
+        self.requests: list[httpx2.Request] = []
+
+        def handle(request):
+            self.requests.append(request)
+            return answer()
+
+        super().__init__(handle)
+
+
+def bound_answers(monkeypatch, max_bytes):
+    monkeypatch.setattr(llm_client, "MAX_LLM_ANSWER_BYTES", max_bytes)
+
+
+def test_an_answer_up_to_the_bound_is_read(monkeypatch):
+    bound_answers(monkeypatch, len(ANSWER_BODY))
+    transport = AnsweringTransport(lambda: httpx2.Response(200, content=ANSWER_BODY))
+
+    llm_call, _, _ = call([], transport=transport)
+
+    assert llm_call.outcome == "ok"
+
+
+@pytest.mark.parametrize("is_announced", [True, False], ids=["announced", "streamed"])
+def test_an_answer_above_the_bound_is_llm_unavailable_without_retry(
+    monkeypatch, is_announced
+):
+    """Refused on its Content-Length, or once its bytes go beyond the bound."""
+    bound_answers(monkeypatch, len(ANSWER_BODY) - 1)
+    content = ANSWER_BODY if is_announced else iter([ANSWER_BODY])
+    transport = AnsweringTransport(lambda: httpx2.Response(200, content=content))
+
+    llm_call, _, sleeps = call([], transport=transport)
+
+    assert llm_call.outcome == "llm_unavailable"
+    assert llm_call.attempts == 1
+    assert llm_call.http_status == 200
+    assert sleeps == []
+    assert len(transport.requests) == 1
+
+
+def test_an_answer_still_read_at_the_deadline_is_llm_timeout():
+    clock = Clock()
+    deadline = Deadline.after(30, clock)
+
+    def answer_after_the_deadline():
+        clock.now += 31
+        return httpx2.Response(200, content=iter([ANSWER_BODY]))
+
+    transport = AnsweringTransport(answer_after_the_deadline)
+
+    llm_call, _, _ = call([], deadline=deadline, transport=transport)
+
+    assert llm_call.outcome == "llm_timeout"
+    assert llm_call.attempts == 1
+    assert llm_call.http_status == 200
