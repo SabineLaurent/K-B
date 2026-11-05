@@ -83,8 +83,19 @@ def test_a_report_gives_its_period_its_limit_and_a_row_per_repository():
         " | 12 → 7 → 4 → 2 |\n"
         "| <https://github.com/steady/tool> | durable | 3 | 3 → hors top → 5 → 9 |\n"
         "\n"
+        "« durable » : dans le top 30 de 2 fenêtres sans jour commun, lues sur la période et les"
+        " 2 fenêtres qui la précèdent (non affichées dans le tableau).\n"
+        "\n"
         "Fenêtres manquantes : aucune.\n"
     )
+
+
+def test_the_reading_of_durable_is_said_only_when_a_repository_is_durable():
+    durable = make_report(repositories=[repository(criteria=["durable"])])
+    not_durable = make_report(repositories=[repository()])
+
+    assert "« durable » : " in render(durable)
+    assert "« durable » : " not in render(not_durable)
 
 
 def test_the_same_response_and_instant_give_the_same_bytes():
