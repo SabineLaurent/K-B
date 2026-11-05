@@ -28,6 +28,7 @@ from k_b.items import (
     Criterion,
     GithubLanguage,
     GithubTopic,
+    Int64,
     SpdxId,
     UtcDatetime,
     WindowState,
@@ -87,7 +88,7 @@ class RepositoryFacts(AiApiModel):
     created_at: UtcDatetime
     language: GithubLanguage | None
     topics: Annotated[list[GithubTopic], Field(max_length=MAX_GITHUB_TOPICS)]
-    stars_total: Count
+    stars_total: Annotated[Int64, Field(ge=0)]
     cautions: list[Caution]
 
 

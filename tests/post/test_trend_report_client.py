@@ -526,6 +526,10 @@ def test_a_repository_out_of_the_schema_is_refused_never_quoted(changes, detail)
             "repositories.0.facts.created_at (timezone_aware)",
         ),
         ({"stars_total": -1}, "repositories.0.facts.stars_total (greater_than_equal)"),
+        (
+            {"stars_total": 2**63},
+            "repositories.0.facts.stars_total (less_than_equal)",
+        ),
         ({"cautions": ["<b>"]}, "repositories.0.facts.cautions.0 (literal_error)"),
     ],
 )
@@ -567,6 +571,16 @@ def test_facts_that_contradict_themselves_are_refused(facts, detail):
     failure = ask_and_fail(answer(content=body(report)))
 
     assert str(failure).startswith(f"ai_api_invalid_response, HTTP 200, {detail}")
+
+
+def test_a_repository_chosen_has_facts_in_the_table_when_it_is_there():
+    report = make_report(chosen=[choose(STEADY)])
+
+    failure = ask_and_fail(answer(content=body(report)))
+
+    assert str(failure).startswith(
+        "ai_api_invalid_response, HTTP 200, chosen.0.facts (not_those_of_the_table)"
+    )
 
 
 def test_the_facts_of_a_repository_chosen_are_those_of_the_table():

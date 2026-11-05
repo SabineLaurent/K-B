@@ -81,7 +81,7 @@ def test_a_report_gives_its_period_its_limit_and_a_row_per_repository():
         "\n"
         "Période : fenêtres du 2026-10-28 au 2026-10-31 (4 fenêtres de 3 jours).\n"
         "\n"
-        "Les comptes viennent de GH Archive, un échantillon d'environ 1 % des étoiles données"
+        "Les rangs viennent de GH Archive, un échantillon d'environ 1 % des étoiles données"
         " sur GitHub (mesure du 2026-10-29) : des rangs proches ne se départagent pas. Les"
         " dates de création et les étoiles totales sont lues sur GitHub.\n"
         "\n"
@@ -118,7 +118,7 @@ def test_the_same_response_and_instant_give_the_same_bytes():
     assert render(make_report()) == render(make_report())
 
 
-def test_the_counts_of_stars_are_never_written():
+def test_the_stars_gained_are_never_written():
     sheet = render(make_report())
 
     assert "étoiles gagnées" not in sheet
@@ -385,6 +385,12 @@ def test_the_language_of_a_repository_chosen_makes_neither_link_nor_field(
     language, written
 ):
     assert f" ; {written} ; " in chosen_facts_line(language=language)
+
+
+def test_a_license_makes_no_link():
+    assert " ; www\\.evil.example ; " in chosen_facts_line(
+        license="www.evil.example", cautions=[]
+    )
 
 
 def test_a_language_of_spaces_alone_is_left_out_of_the_line():

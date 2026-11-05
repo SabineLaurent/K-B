@@ -324,7 +324,7 @@ Le fichier du coffre gagne une section « Choisis par le modèle », avant « D�
 - dans « Dépôts qui ressortent », trois colonnes : « Créé le », « Étoiles totales », « Prudence » ;
   `—` pour un dépôt sans fiche, au-delà de `TREND_MAX_CANDIDATES`.
 
-Le langage, seul texte libre, passe par `neutralize_digest_text`. `kb` refuse des faits qui se
+Le langage et la licence passent par `neutralize_digest_text`. `kb` refuse des faits qui se
 contredisent : prudences hors d'ordre, `no_license` sans licence nulle ou l'inverse, faits d'un choisi
 autres que ceux du tableau. Les étoiles gagnées restent absentes du fichier : elles viennent de
 l'échantillon de GH Archive (« Limite de GH Archive »).

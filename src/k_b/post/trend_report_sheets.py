@@ -3,10 +3,10 @@ written once by kb trend-report from the response of the AI API, with the limit 
 post/vault_files.py.
 
 Each text is made by the code from checked values: a day, a count, a word of a closed list (a
-subject of the watch among them), the name of the model, checked by MODEL_NAME, an SPDX identifier
-and a topic, checked by their patterns, and the name of a repository, checked by
-is_repository_name, which makes its URL. The language alone is free, written by
-neutralize_digest_text, which would break a URL (www. escaped) in any other."""
+subject of the watch among them), the name of the model, checked by MODEL_NAME, a topic, checked
+by its pattern, and the name of a repository, checked by is_repository_name, which makes its URL.
+The language and the license are written by neutralize_digest_text, which would break a URL
+(www. escaped) in any other."""
 
 import json
 from datetime import date, datetime
@@ -73,7 +73,7 @@ OUT_OF_TOP = "hors top"
 MISSING = "—"
 # The limit of the counts (docs/tendances.md, "Limite de GH Archive"): never stars gained alone.
 GH_ARCHIVE_LIMIT = (
-    "Les comptes viennent de GH Archive, un échantillon d'environ 1 % des étoiles données sur"
+    "Les rangs viennent de GH Archive, un échantillon d'environ 1 % des étoiles données sur"
     " GitHub (mesure du 2026-10-29) : des rangs proches ne se départagent pas. Les dates de"
     " création et les étoiles totales sont lues sur GitHub."
 )
@@ -240,14 +240,14 @@ def render_chosen(chosen: ChosenRepository) -> str:
 
 def render_facts(facts: RepositoryFacts) -> str:
     """The line under a repository chosen, indented to stay in its item; a fact GitHub does not
-    give is left out, the license said absent by its caution."""
+    give is left out, a license it does not recognize said by its caution."""
     stars = facts.stars_total
     parts = [f"Créé le {format_created_day(facts)}"]
     language = neutralize_digest_text(facts.language or "")
     if language:
         parts.append(language)
     if facts.license:
-        parts.append(facts.license)
+        parts.append(neutralize_digest_text(facts.license))
     parts.append(f"{stars} étoile{'s' if stars > 1 else ''}")
     if facts.topics:
         parts.append(", ".join(facts.topics[:MAX_TOPICS_FOR_SELECTION]))
