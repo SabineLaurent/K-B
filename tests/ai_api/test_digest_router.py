@@ -466,12 +466,18 @@ def test_a_length_starlette_reads_beyond_the_bound_gets_the_413_of_k_b(
 
 def test_a_length_that_is_not_a_number_is_left_to_the_count_of_starlette(make_ai_api):
     client, _ = make_ai_api([])
+    unreadable_length = {"Content-Length": "not a number"}
 
-    response = client.request(
-        "GET", "/health", content=b" ", headers={"Content-Length": "not a number"}
+    small = client.request("GET", "/health", content=b" ", headers=unreadable_length)
+    beyond = client.post(
+        "/digests",
+        content=padded_body(MAX_AI_API_BODY_BYTES + 1),
+        headers={**JSON_CONTENT, **unreadable_length},
     )
 
-    assert response.status_code == 200
+    assert small.status_code == 200
+    assert beyond.status_code == 413
+    assert beyond.json() == {"error": "content_too_large"}
 
 
 @pytest.mark.parametrize(

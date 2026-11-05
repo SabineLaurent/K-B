@@ -189,7 +189,7 @@ versions montent, car un client voit le changement : API IA 0.9.0, API de donné
 | `test_a_body_at_the_bound_is_read` | 1 024 octets passent, annoncés ou en flux |
 | `test_a_body_announced_beyond_the_bound_gets_the_413_of_k_b_on_any_route` | le JSON de K-B sur une route qui ne lit pas de corps |
 | `test_a_length_starlette_reads_beyond_the_bound_gets_the_413_of_k_b` | `+2000` et `2_000` reçoivent le JSON ; rouge avant la correction (`JSONDecodeError`) |
-| `test_a_length_that_is_not_a_number_is_left_to_the_count_of_starlette` | une longueur illisible ne fait pas échouer la requête |
+| `test_a_length_that_is_not_a_number_is_left_to_the_count_of_starlette` | une longueur illisible ne fait pas échouer la requête, et le comptage refuse quand même un corps trop gros |
 | `test_an_answer_up_to_the_bound_is_read`, `test_an_answer_above_the_bound_is_llm_unavailable_without_retry` | la borne au mot près, annoncée ou comptée, sans relance |
 | `test_an_answer_still_read_at_the_deadline_is_llm_timeout` | l'échéance arrête la lecture |
 | `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_every_kind_at_once_is_read` | 8 valeurs refusées, 7 acceptées |
@@ -198,7 +198,7 @@ versions montent, car un client voit le changement : API IA 0.9.0, API de donné
 | Même essai, `Content-Length: +2000` | 400 en texte brut, d'uvicorn : la requête n'atteint pas l'application |
 | Même essai, 1 024 octets sans clé | 401 : la borne laisse passer, la clé refuse |
 | Tests rouges lancés avant le code | l'ordre test puis code |
-| 18 mutations du nouveau code, toutes tuées | les tests mordent |
+| 19 mutations du nouveau code, toutes tuées | les tests mordent |
 | `/security-review` | aucun constat |
 
 ## Ce que tu dois pouvoir défendre
