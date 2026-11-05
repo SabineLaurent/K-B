@@ -4,7 +4,6 @@ writing."""
 import json
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import get_args
 
 import pytest
 from post.test_trend_report_client import (
@@ -23,12 +22,9 @@ from k_b.core.config import (
     TRENDS_DIR_NAME,
     WATCH_DIR_NAME,
 )
+from k_b.items import CAUTIONS
 from k_b.post.digest_sheets import is_writable_url
-from k_b.post.trend_report_client import (
-    Caution,
-    DroppedCandidates,
-    TrendReportResponse,
-)
+from k_b.post.trend_report_client import DroppedCandidates, TrendReportResponse
 from k_b.post.trend_report_sheets import (
     CAUTION_LABELS,
     DROP_REASON_LABELS,
@@ -46,8 +42,8 @@ GENERATED = datetime(2026, 11, 1, 10, 0, 5, tzinfo=UTC)
 DAY = GENERATED.date()
 # The facts of RISING, those of a repository chosen by default.
 FACTS_LINE = (
-    "  Créé le 2026-10-27 ; Rust ; aucune licence reconnue par GitHub ; 1250 étoiles ; cli, llm ;"
-    " Prudence : créé il y a moins de 7 jours, pas de licence"
+    "  Créé le 2026-10-27 ; Rust ; 1250 étoiles ; cli, llm ;"
+    " Prudence : créé il y a moins de 7 jours, aucune licence reconnue par GitHub"
 )
 
 
@@ -86,7 +82,8 @@ def test_a_report_gives_its_period_its_limit_and_a_row_per_repository():
         "Période : fenêtres du 2026-10-28 au 2026-10-31 (4 fenêtres de 3 jours).\n"
         "\n"
         "Les comptes viennent de GH Archive, un échantillon d'environ 1 % des étoiles données"
-        " sur GitHub (mesure du 2026-10-29) : des rangs proches ne se départagent pas.\n"
+        " sur GitHub (mesure du 2026-10-29) : des rangs proches ne se départagent pas. Les"
+        " dates de création et les étoiles totales sont lues sur GitHub.\n"
         "\n"
         "## Choisis par le modèle\n"
         "\n"
@@ -99,7 +96,7 @@ def test_a_report_gives_its_period_its_limit_and_a_row_per_repository():
         "|---|---|---|---|---|---|---|\n"
         "| <https://github.com/owner/rising-repository> | nouveau, en accélération | 2"
         " | 12 → 7 → 4 → 2 | 2026-10-27 | 1250"
-        " | créé il y a moins de 7 jours, pas de licence |\n"
+        " | créé il y a moins de 7 jours, aucune licence reconnue par GitHub |\n"
         "| <https://github.com/steady/tool> | durable | 3 | 3 → hors top → 5 → 9 | — | — | — |\n"
         "\n"
         "« durable » : dans le top 30 de 2 fenêtres sans jour commun, lues sur la période et les"
@@ -371,15 +368,33 @@ def test_the_facts_of_a_repository_chosen_without_caution_name_its_license():
 
 
 def test_a_fact_github_does_not_give_is_left_out_of_the_line():
-    assert chosen_facts_line(license="MIT", language=None, topics=[], cautions=[]) == (
-        "  Créé le 2026-10-27 ; MIT ; 1250 étoiles"
+    assert chosen_facts_line(license=None, language=None, topics=[], cautions=[]) == (
+        "  Créé le 2026-10-27 ; 1250 étoiles"
     )
 
 
-def test_the_language_of_a_repository_chosen_is_written_as_text():
-    line = chosen_facts_line(language="[C](http://evil) | <b>#")
+@pytest.mark.parametrize(
+    ("language", "written"),
+    [
+        ("[C](http://evil) | <b>#", "\\[C\\](http\\://evil) \\| \\<b\\>\\#"),
+        ("www.evil.example", "www\\.evil.example"),
+        ("a:: b", "a\\: \\: b"),
+    ],
+)
+def test_the_language_of_a_repository_chosen_makes_neither_link_nor_field(
+    language, written
+):
+    assert f" ; {written} ; " in chosen_facts_line(language=language)
 
-    assert "\\[C\\](http://evil) \\| \\<b\\>\\# ;" in line
+
+def test_a_language_of_spaces_alone_is_left_out_of_the_line():
+    assert " ;  ; " not in chosen_facts_line(language="   ")
+
+
+def test_the_day_of_creation_is_the_one_in_utc():
+    line = chosen_facts_line(created_at="2026-10-27T23:30:00-05:00")
+
+    assert line.startswith("  Créé le 2026-10-28 ; ")
 
 
 def test_the_topics_of_a_repository_chosen_are_as_many_as_the_model_reads():
@@ -399,7 +414,7 @@ def test_one_star_is_written_in_the_singular():
     ("cautions", "said"),
     [
         (["created_recently"], "créé il y a moins de 7 jours"),
-        (["no_license"], "pas de licence"),
+        (["no_license"], "aucune licence reconnue par GitHub"),
         ([], MISSING),
     ],
 )
@@ -411,7 +426,7 @@ def test_the_table_says_the_cautions_of_a_repository(cautions, said):
 
 
 def test_every_caution_has_its_label():
-    assert set(CAUTION_LABELS) == set(get_args(Caution.__value__))
+    assert set(CAUTION_LABELS) == set(CAUTIONS)
 
 
 @pytest.mark.parametrize(

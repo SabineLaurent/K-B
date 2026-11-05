@@ -8,7 +8,7 @@ from itertools import pairwise
 from typing import Annotated, Literal, get_args
 
 import httpx2
-from pydantic import AfterValidator, AwareDatetime, Field
+from pydantic import AfterValidator, Field
 
 from k_b.core.api_keys import AI_API_KEY_VARIABLE_PREFIX
 from k_b.core.config import (
@@ -20,10 +20,16 @@ from k_b.core.config import (
     TREND_MAX_CHOSEN,
 )
 from k_b.items import (
+    CAUTIONS,
     CHOICE_CRITERIA,
     WATCH_SUBJECT,
+    Caution,
     ChoiceCriterion,
     Criterion,
+    GithubLanguage,
+    GithubTopic,
+    SpdxId,
+    UtcDatetime,
     WindowState,
     WrittenDayInStrictModel,
     has_too_many_windows,
@@ -55,9 +61,6 @@ type ChoiceFailure = Literal[
     "llm_timeout",
 ]
 
-# The cautions of a repository, those of ai_api/repository_cards.py, which post does not import: a
-# test keeps both equal.
-type Caution = Literal["created_recently", "no_license"]
 Rank = Annotated[int, Field(ge=1, le=GH_ARCHIVE_TOP_SIZE)]
 Count = Annotated[int, Field(ge=0)]
 
@@ -78,16 +81,12 @@ class TrendPoint(AiApiModel):
 
 
 class RepositoryFacts(AiApiModel):
-    """What GitHub says of a repository; the same bounds as ai_api/connectors/github_client.py,
-    but for the language, which the report writes through neutralize_text."""
+    """What GitHub says of a repository, with the bounds the AI API read it by."""
 
-    license: Annotated[str, Field(pattern=r"^[A-Za-z0-9.+-]{1,64}$")] | None
-    created_at: AwareDatetime
-    language: Annotated[str, Field(min_length=1, max_length=100)] | None
-    topics: Annotated[
-        list[Annotated[str, Field(pattern=r"^[a-z0-9-]{1,50}$")]],
-        Field(max_length=MAX_GITHUB_TOPICS),
-    ]
+    license: SpdxId | None
+    created_at: UtcDatetime
+    language: GithubLanguage | None
+    topics: Annotated[list[GithubTopic], Field(max_length=MAX_GITHUB_TOPICS)]
     stars_total: Count
     cautions: list[Caution]
 
@@ -249,6 +248,7 @@ def refuse_inconsistent_repositories(response: TrendReportResponse) -> None:
         seen_ids.add(repository.repository_id)
         refuse_inconsistent_trajectory(response, place, repository)
         refuse_inconsistent_criteria(response, place, repository)
+        refuse_inconsistent_facts(response, place, repository.facts)
 
 
 def refuse_inconsistent_trajectory(
@@ -277,6 +277,21 @@ def refuse_inconsistent_criteria(
         raise_invalid(response.request_id, f"{place}.criteria", "not_in_order_once")
     if "new" in repository.criteria and not response.period.new_evaluated:
         raise_invalid(response.request_id, f"{place}.criteria", "new_not_evaluated")
+
+
+def refuse_inconsistent_facts(
+    response: TrendReportResponse, place: str, facts: RepositoryFacts | None
+) -> None:
+    """The cautions in their order, no_license with no license only; the other caution depends on
+    the instant of the AI API, which kb does not know."""
+    if facts is None:
+        return
+    if not is_in_order_once(facts.cautions, CAUTIONS):
+        raise_invalid(
+            response.request_id, f"{place}.facts.cautions", "not_in_order_once"
+        )
+    if (facts.license is None) != ("no_license" in facts.cautions):
+        raise_invalid(response.request_id, f"{place}.facts.cautions", "not_the_license")
 
 
 def refuse_inconsistent_candidates(response: TrendReportResponse) -> None:
@@ -309,8 +324,10 @@ def refuse_inconsistent_choice(response: TrendReportResponse) -> None:
 
 def refuse_inconsistent_chosen(response: TrendReportResponse) -> None:
     """Each chosen once, its criteria in order, met in the table of the repositories but
-    watch_subject, which goes with its subjects, taken from the list in its order."""
+    watch_subject, which goes with its subjects, taken from the list in its order; its facts
+    consistent, and those of the table when it is there."""
     criteria_by_id = {r.repository_id: r.criteria for r in response.repositories}
+    facts_by_id = {r.repository_id: r.facts for r in response.repositories}
     seen_ids: set[int] = set()
     for number, chosen in enumerate(response.chosen):
         place = f"chosen.{number}"
@@ -320,6 +337,11 @@ def refuse_inconsistent_chosen(response: TrendReportResponse) -> None:
         refuse_inconsistent_chosen_criteria(
             response, place, chosen, criteria_by_id.get(chosen.repository_id, [])
         )
+        refuse_inconsistent_facts(response, place, chosen.facts)
+        if facts_by_id.get(chosen.repository_id, chosen.facts) != chosen.facts:
+            raise_invalid(
+                response.request_id, f"{place}.facts", "not_those_of_the_table"
+            )
 
 
 def refuse_inconsistent_chosen_criteria(

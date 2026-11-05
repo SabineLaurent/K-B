@@ -5,11 +5,11 @@ post/vault_files.py.
 Each text is made by the code from checked values: a day, a count, a word of a closed list (a
 subject of the watch among them), the name of the model, checked by MODEL_NAME, an SPDX identifier
 and a topic, checked by their patterns, and the name of a repository, checked by
-is_repository_name, which makes its URL. The language alone is free, written by neutralize_text;
-none needs neutralize_digest_text, which would break a URL (www. escaped)."""
+is_repository_name, which makes its URL. The language alone is free, written by
+neutralize_digest_text, which would break a URL (www. escaped) in any other."""
 
 import json
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import NamedTuple
 
@@ -25,10 +25,9 @@ from k_b.core.config import (
     WATCH_DIR_NAME,
 )
 from k_b.core.dates import format_date
-from k_b.items import Criterion
+from k_b.items import Caution, Criterion
 from k_b.post.trend_report_client import (
     CRITERIA,
-    Caution,
     ChoiceFailure,
     ChosenRepository,
     DroppedCandidates,
@@ -39,10 +38,9 @@ from k_b.post.trend_report_client import (
     TrendRepository,
 )
 from k_b.post.vault_files import (
-    MARKDOWN_SYNTAX_CHARACTERS,
     VaultEntryRefusedError,
     has_sheet,
-    neutralize_text,
+    neutralize_digest_text,
     refuse_linked_folders,
     write_new_sheet,
 )
@@ -76,7 +74,8 @@ MISSING = "—"
 # The limit of the counts (docs/tendances.md, "Limite de GH Archive"): never stars gained alone.
 GH_ARCHIVE_LIMIT = (
     "Les comptes viennent de GH Archive, un échantillon d'environ 1 % des étoiles données sur"
-    " GitHub (mesure du 2026-10-29) : des rangs proches ne se départagent pas."
+    " GitHub (mesure du 2026-10-29) : des rangs proches ne se départagent pas. Les dates de"
+    " création et les étoiles totales sont lues sur GitHub."
 )
 NO_REPOSITORY = "Aucun dépôt ne remplit un critère sur la période."
 # The table shows the period alone: without this, a repository in one window of it looks
@@ -93,10 +92,10 @@ TABLE_HEADER = (
     ),
     "|---|---|---|---|---|---|---|",
 )
-NO_LICENSE = "aucune licence reconnue par GitHub"
 CAUTION_LABELS: dict[Caution, str] = {
     "created_recently": f"créé il y a moins de {TREND_RECENT_REPOSITORY_DAYS} jours",
-    "no_license": "pas de licence",
+    # Not "no license": GitHub also says none for a license it does not recognize.
+    "no_license": "aucune licence reconnue par GitHub",
 }
 
 
@@ -241,18 +240,15 @@ def render_chosen(chosen: ChosenRepository) -> str:
 
 def render_facts(facts: RepositoryFacts) -> str:
     """The line under a repository chosen, indented to stay in its item; a fact GitHub does not
-    give is left out, the license being said absent."""
+    give is left out, the license said absent by its caution."""
     stars = facts.stars_total
-    parts = [
-        f"Créé le {format_created_day(facts)}",
-        *(
-            ()
-            if facts.language is None
-            else (neutralize_text(facts.language, MARKDOWN_SYNTAX_CHARACTERS),)
-        ),
-        facts.license or NO_LICENSE,
-        f"{stars} étoile{'s' if stars > 1 else ''}",
-    ]
+    parts = [f"Créé le {format_created_day(facts)}"]
+    language = neutralize_digest_text(facts.language or "")
+    if language:
+        parts.append(language)
+    if facts.license:
+        parts.append(facts.license)
+    parts.append(f"{stars} étoile{'s' if stars > 1 else ''}")
     if facts.topics:
         parts.append(", ".join(facts.topics[:MAX_TOPICS_FOR_SELECTION]))
     if facts.cautions:
@@ -261,14 +257,11 @@ def render_facts(facts: RepositoryFacts) -> str:
 
 
 def format_created_day(facts: RepositoryFacts) -> str:
-    return facts.created_at.astimezone(UTC).date().isoformat()
+    return facts.created_at.date().isoformat()
 
 
 def describe_cautions(facts: RepositoryFacts) -> str:
-    """In the order of CAUTION_LABELS, each once, whatever the response gives."""
-    return ", ".join(
-        label for caution, label in CAUTION_LABELS.items() if caution in facts.cautions
-    )
+    return ", ".join(CAUTION_LABELS[caution] for caution in facts.cautions)
 
 
 def describe_dropped_candidates(dropped: DroppedCandidates) -> str:
