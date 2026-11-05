@@ -14,7 +14,10 @@ from typing import NamedTuple
 
 from k_b.core.config import (
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
+    GH_ARCHIVE_TOP_SIZE,
     GH_ARCHIVE_WINDOW_DAYS,
+    TREND_DURABLE_LOOKBACK_WINDOWS,
+    TREND_DURABLE_MIN_WINDOWS,
     TRENDS_DIR_NAME,
     WATCH_DIR_NAME,
 )
@@ -69,6 +72,13 @@ GH_ARCHIVE_LIMIT = (
     " GitHub (mesure du 2026-10-29) : des rangs proches ne se départagent pas."
 )
 NO_REPOSITORY = "Aucun dépôt ne remplit un critère sur la période."
+# The table shows the period alone: without this, a repository in one window of it looks
+# wrongly durable.
+DURABLE_READING = (
+    f"« durable » : dans le top {GH_ARCHIVE_TOP_SIZE} de {TREND_DURABLE_MIN_WINDOWS} fenêtres sans"
+    f" jour commun, lues sur la période et les {TREND_DURABLE_LOOKBACK_WINDOWS} fenêtres qui la"
+    " précèdent (non affichées dans le tableau)."
+)
 TABLE_HEADER = (
     "| Dépôt | Critères | Meilleur rang | Trajectoire (rang par fenêtre) |",
     "|---|---|---|---|",
@@ -262,7 +272,10 @@ def describe_limits(period: TrendPeriod) -> list[str]:
 def render_repositories(repositories: list[TrendRepository]) -> list[str]:
     if not repositories:
         return [NO_REPOSITORY]
-    return [*TABLE_HEADER, *(render_row(repository) for repository in repositories)]
+    lines = [*TABLE_HEADER, *(render_row(repository) for repository in repositories)]
+    if any("durable" in repository.criteria for repository in repositories):
+        lines += ["", DURABLE_READING]
+    return lines
 
 
 def render_row(repository: TrendRepository) -> str:

@@ -132,7 +132,9 @@ Les critères se calculent en code pur, sur les **étoiles seules** en v1 (les f
 - **Seuils** (2 jours actifs, 5 rangs) : revus sur les premiers comptes rendus réels (#370).
 
 **Le compte rendu factuel** (#366, et quand le choix échoue) affiche les dépôts qui remplissent au
-moins un critère, chacun avec sa trajectoire et ses critères.
+moins un critère, chacun avec sa trajectoire et ses critères. Dès qu'un dépôt du tableau est durable,
+une phrase sous le tableau rappelle la règle : il n'affiche que la période, pas ses 2
+fenêtres de recul.
 
 ## Fiche légère
 
