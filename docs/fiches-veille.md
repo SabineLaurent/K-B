@@ -263,8 +263,12 @@ jamais le nom d'un champ en trop, qui vient du client.
 **Limite** (FastAPI 0.143, `fastapi/routing.py`) : le corps est lu en entier, et son JSON décodé,
 avant la vérification de la clé. Un corps qui n'est pas du JSON reçoit donc 422 même sans clé ;
 tout autre appel sans clé reçoit 401, et aucun ne lit la veille ni n'appelle le modèle. La taille
-du corps n'est pas bornée (OWASP API4:2023) : signalé à #161, dont le critère borne la taille
-d'entrée en configuration.
+du corps est bornée avant toute route (OWASP API4:2023, #161) : au-delà de `MAX_AI_API_BODY_BYTES`
+(1 024 octets, `core/config.py`), qu'elle soit annoncée par `Content-Length` ou comptée au fil du
+flux, la demande reçoit 413 `content_too_large`, avec ou sans clé. Annoncée, rien n'est lu ; en
+flux, la lecture s'arrête au premier morceau reçu qui dépasse la borne. Le comptage est celui de
+Starlette (`RequestBodyLimitMiddleware`) ; K-B refuse d'abord la longueur annoncée, que Starlette
+rendrait en texte brut, hors du schéma d'erreur (`core/api_body_limit.py`).
 
 ### Entrée du modèle
 
@@ -546,7 +550,7 @@ de la requête.
 - **`GET /health`** répond 200 `{"status": "ok"}` sans clé, comme celle de l'API de données.
 - **Documentation** : `/docs` et `/openapi.json` ne sont servis que si
   `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, 404 sinon, comme l'API de données ([specs-api.md](specs-api.md), #393).
-- **Version** : `0.8.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
+- **Version** : `0.9.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
   un changement visible par un client change les deux. `0.1.0` : `POST /digests` (#156) ; `0.2.0` :
   `model` dans la réponse (#209) ; `0.3.0` : `unanswered`, et `not_retained` du premier niveau
   renommé `no_suitable_subject` (#210, `classify-2`) ; `0.4.0` : `items_dropped` renommé
@@ -556,7 +560,8 @@ de la requête.
   `POST /trend-reports` (#366) ; `0.6.0` : les fiches lues sur GitHub dans la réponse de
   `POST /trend-reports`, et ses erreurs `github_*` (#367) ; `0.7.0` : le choix du modèle dans la
   réponse de `POST /trend-reports`, `model`, `choice_failure` et `chosen` (#368) ; `POST /digests`
-  ne change pas ; `0.8.0` : `/docs` et `/openapi.json` en `sandbox` seulement (#393).
+  ne change pas ; `0.8.0` : `/docs` et `/openapi.json` en `sandbox` seulement (#393) ; `0.9.0` :
+  413 `content_too_large` sur les deux routes, pour un corps de plus de 1 024 octets (#161).
 
 ## Contrôles
 
@@ -1084,14 +1089,15 @@ Sources, lues le 2026-10-27 :
 | `llm_truncated` | `finish_reason` `length` ; pas de nouvelle tentative (même entrée, même modèle figé : même sortie attendue) | 502 | `failed_subjects` |
 | `llm_content_filtered` | `finish_reason` `content_filter` : le filtre de contenu du fournisseur a retenu la sortie (celui d'Azure peut réagir aux textes sur le jailbreak et l'injection, sujets de la veille) ; ou un 400 dont `error.code` vaut `content_filter` : il a retenu l'entrée ; pas de nouvelle tentative (même entrée) | 502 | `failed_subjects` |
 | `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec le `Retry-After` du fournisseur ; sans en-tête s'il n'en a pas donné (aucune attente inventée) | `failed_subjects`, et chaque sujet suivant, sans envoi (#205) |
-| `llm_unavailable` | 5xx, connexion refusée ou coupée, après la nouvelle tentative ; autre 4xx, réponse qui ne se décode pas, ou réponse 200 qui n'est pas une complétion lisible (pas du JSON, aucun `choices`, un type faux), sans nouvelle tentative | 502 | `failed_subjects` |
-| `llm_timeout` | pas de connexion ou pas de réponse dans le délai du client (#150), sans nouvelle tentative ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé | 504 | `failed_subjects` |
+| `llm_unavailable` | 5xx, connexion refusée ou coupée, après la nouvelle tentative ; autre 4xx, réponse qui ne se décode pas, réponse au-delà de `MAX_LLM_ANSWER_BYTES` (1 000 000 d'octets, annoncés ou comptés, OWASP API10:2023), ou réponse 200 qui n'est pas une complétion lisible (pas du JSON, aucun `choices`, un type faux), sans nouvelle tentative | 502 | `failed_subjects` |
+| `llm_timeout` | pas de connexion ou pas de réponse dans le délai du client (#150), sans nouvelle tentative ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé, ou pendant la lecture d'une réponse | 504 | `failed_subjects` |
 | `data_api_unavailable` | API de données injoignable, ou 5xx | 502 | — |
 | `data_api_timeout` | délai de lecture dépassé | 504 | — |
 | `data_api_unauthorized` | 401 de l'API de données : clé `AI_DIGEST` refusée (sans clé, l'API IA ne démarre pas, règle 2 de `poc.md`) | 502 | — |
 | `data_api_invalid_response` | réponse hors du schéma attendu | 502 | — |
 | `invalid_parameter` | demande mal formée, `window_days` hors bornes | 422 | — |
 | `invalid_api_key` | appel sans clé, ou clé inconnue (#156) | 401 | — |
+| `content_too_large` | corps de plus de `MAX_AI_API_BODY_BYTES` (1 024 octets), avant la clé (#161) | 413 | — |
 | `route_not_found`, `method_not_allowed`, `internal_error` | comme l'API de données | 404, 405, 500 | — |
 
 - Les états `data_api_*` sont ceux de la lecture par l'API de données (#204). Un item disparu entre

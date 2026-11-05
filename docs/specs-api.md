@@ -7,7 +7,7 @@ erreurs et les exigences de sécurité. Les décisions et leur pourquoi sont dan
 [journal ADR](ADR/journal-decisions-projet.md) (entrées du 2026-10-14) ; la collecte, dans
 [specs-collecte.md](specs-collecte.md) ; la base, dans [stockage.md](stockage.md).
 
-**Version de la spec : 0.6.0**, la même que `info.version` de l'OpenAPI
+**Version de la spec : 0.7.0**, la même que `info.version` de l'OpenAPI
 (`docs/api/openapi-donnees.json`, que #184 écrit). Un changement de comportement visible par un client, comme
 l'ordre des résultats, change la version.
 
@@ -19,6 +19,7 @@ l'ordre des résultats, change la version.
 | 0.4.0 | la sorte `clip` (pages gardées avec Web Clipper) servie par `GET /items` et `GET /items/{item_id}` (#14) |
 | 0.5.0 | l'en-tête `X-Request-ID` sur chaque réponse ; les tags `items` et `trends` dans l'OpenAPI ; les clés des clients lues dans `KB_DATA_API_KEY_<CLIENT>`, et non plus `KB_API_KEY_<CLIENT>` (#156) |
 | 0.6.0 | `/docs` et `/openapi.json` servis seulement si `KB_DEPLOYMENT_ENVIRONMENT=sandbox` ; 404 sinon (#393) |
+| 0.7.0 | `kind` pris 7 fois au plus, autant que de sortes ; au-delà, 422 (#161) |
 
 ## Règles communes
 
@@ -127,7 +128,7 @@ dossier personnel (API3, ci-dessous).
 
 | Paramètre | Forme | Bornes | Défaut | Hors bornes |
 |---|---|---|---|---|
-| `kind` | une valeur d'`ItemKind`, répétable (`kind=paper&kind=release`) | valeurs exactes : `kind=vulnerability` ne ramène pas les alertes (`advisory`) | toutes les sortes | 422 |
+| `kind` | une valeur d'`ItemKind`, répétable (`kind=paper&kind=release`) | valeurs exactes : `kind=vulnerability` ne ramène pas les alertes (`advisory`) ; 7 valeurs au plus, autant que de sortes (`MAX_KINDS`, OWASP API4:2023) | toutes les sortes | 422 |
 | `since` | date-heure ISO 8601 **avec fuseau** (`2026-10-07T00:00:00Z`, `2026-10-07T00:00:00%2B02:00`) ; dans l'URL, `+` s'écrit `%2B`, sinon il est lu comme une espace | — | aucun filtre de date | 422, sans fuseau compris, et pour un nombre (jamais lu comme une date Unix) |
 | `q` | texte | de 1 à 200 caractères | aucune recherche | 422 |
 | `limit` | entier | de 1 à 100 | 20 | 422 |
@@ -334,7 +335,7 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 | API1:2023 Broken Object Level Authorization | Une seule propriétaire, Sabine : tout client authentifié lit tous les items. Un identifiant inconnu rend 404, jamais une erreur qui dirait autre chose. `item.id`, séquentiel, est dans l'URL : la recommandation d'identifiants difficiles à deviner est écartée tant que l'API n'a qu'une propriétaire (journal ADR, 2026-10-15). | **Tenue.** `test_each_client_is_served_with_its_key`, `test_an_unknown_item_id_gives_404_item_not_found`, `test_an_unknown_window_gives_404` |
 | API2:2023 Broken Authentication | Une clé par client, générée en 256 bits (minimum contrôlé : 32 caractères) ; pas de route de connexion ; comparaison en temps constant ; 401 testé sur chaque route de données. | **Tenue.** `test_every_data_route_refuses_a_missing_and_a_wrong_key_with_the_same_body` (chaque route, lue dans l'app par le parcours de FastAPI, routes hors OpenAPI comprises), `test_only_the_public_routes_answer_without_a_key` (`/docs`, `/openapi.json` et `/health`, aucune autre), `test_an_app_without_key_refuses_every_data_route`, `test_a_removed_key_gives_401_and_the_other_clients_are_still_served`, `test_serve_exits_2_and_names_the_variable_without_its_value` ; le temps constant n'est pas mesuré par un test (`hmac.compare_digest`, `src/k_b/core/api_access.py`) |
 | API3:2023 Broken Object Property Level Authorization | Réponses en liste blanche : ni `raw_file_path`, ni `collected_at`, ni texte long dans la liste ; au détail, les champs du tableau de sa sorte et rien d'autre. | **Tenue.** `test_the_list_serves_only_the_six_fields`, `test_each_kind_has_its_detail` (corps entier, une sorte par cas), `test_no_detail_serves_a_raw_file_path_or_a_collection_date`, `test_trends_without_window_end_give_the_latest_window`, `test_no_error_body_holds_a_raw_file_path_or_a_path`, `test_no_route_documents_a_raw_file_path_or_a_collection_date` |
-| API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000) et `q` (200 caractères) ; `/trends` rend 60 lignes au plus, sans pagination. Pas de limite de débit : le client est local. | **Non tenue** : aucun délai de requête (« Hors de cette version »), aucune limite de débit, et le détail d'une entrée Zotero sert tous ses surlignages, sans borne de nombre (chacun jusqu'à 10 000 caractères de texte et autant de commentaire) ; le détail d'un clip sert son texte entier, jusqu'à 1 000 000 de caractères. Ce qui est tenu : les bornes et la taille de page, `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_next_offset_stops_at_the_offset_bound`, `test_an_item_id_not_written_as_an_integer_gives_422`, `test_a_malformed_window_end_gives_422` ; les 60 lignes d'une fenêtre sont bornées à la collecte (`gh_archive.py`), pas par l'API |
+| API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000), `q` (200 caractères) et du nombre de `kind` (7) ; `/trends` rend 60 lignes au plus, sans pagination. Pas de limite de débit : le client est local. | **Non tenue** : aucun délai de requête (« Hors de cette version »), aucune limite de débit, et le détail d'une entrée Zotero sert tous ses surlignages, sans borne de nombre (chacun jusqu'à 10 000 caractères de texte et autant de commentaire) ; le détail d'un clip sert son texte entier, jusqu'à 1 000 000 de caractères. Ce qui est tenu : les bornes et la taille de page, `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_next_offset_stops_at_the_offset_bound`, `test_an_item_id_not_written_as_an_integer_gives_422`, `test_a_malformed_window_end_gives_422` ; les 60 lignes d'une fenêtre sont bornées à la collecte (`gh_archive.py`), pas par l'API |
 | API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon ; aucune route d'administration. | **Tenue.** `test_every_data_route_refuses_another_method_with_405`, `test_the_routes_are_listed`, `test_docs_openapi_and_health_are_public_and_no_other_page_is_served`, `test_health_refuses_another_method_with_405` |
 | API6:2023 Unrestricted Access to Sensitive Business Flows | Sans objet : l'API n'a aucun flux métier à protéger (ni achat, ni réservation, ni création de compte), seulement des lectures. | Sans objet, sans test |
 | API7:2023 Server Side Request Forgery | Sans objet : l'API ne va chercher aucune adresse fournie par un client. | Sans objet, sans test |

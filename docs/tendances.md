@@ -156,7 +156,9 @@ remplacé).
 `POST /trend-reports` : `{"after": "AAAA-MM-JJ" | null, "previous_first_window": "AAAA-MM-JJ" | null}`.
 `after` est la dernière fenêtre du compte rendu précédent, `previous_first_window` sa première ; les
 deux sont nuls ensemble (premier compte rendu) ou renseignés ensemble. 422 : un champ en trop, une
-demande incohérente, un écart de plus de 15 fenêtres.
+demande incohérente, un écart de plus de 15 fenêtres. 413 `content_too_large` : un corps de plus de
+1 024 octets, avant la clé, comme pour `POST /digests` ([fiches-veille.md](fiches-veille.md),
+« Demande »).
 
 Depuis #366 (`docs/api/openapi-ia.json`, version 0.5.0) : les deux champs sont obligatoires, et un
 jour s'écrit `AAAA-MM-JJ` seulement (la garde `WrittenDay` d'`items.py`, celle de `GET /trends`). Le
@@ -445,7 +447,7 @@ Les tests que portent #366 à #369 :
 | Accélération | 4 rangs contre 5 ; fenêtre manquante sautée ; fenêtre hors top = rupture |
 | Période | premier compte rendu sans « nouveau » ; plafond ; aucune fenêtre nouvelle = aucun appel (faux clients qui comptent) |
 | Registre et coffre | registre illisible → code 2, rien lancé ; fichier existant vu avant la demande → code 2 ; `tendances` réservé ; rendu déterministe et échappé |
-| Demande | les bornes (422) |
+| Demande | les bornes (422) ; un corps de plus de 1 024 octets, annoncé ou en flux (413) |
 | GitHub | 301 non suivie ; `id` différent écarté ; plus de requête après un 403 de quota ; 403 nu ; taille bornée ; sans jeton, `kb serve-ai` ne démarre pas |
 | Choix | description piégée absente des messages `system` ; dépôt inventé, critère faux, sujet hors liste, plus de 5 choix refusés ; choix en échec → compte rendu factuel écrit et noté au registre |
 | Rédaction | README piégé absent des messages `system` ; README qui vise un autre dépôt ; commande, lien, accent grave refusés ; fait introuvable → texte retiré ; rédaction en échec → ses seuls textes retirés |
