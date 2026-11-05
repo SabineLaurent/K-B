@@ -56,8 +56,9 @@ async def check_rate_limit(request: Request) -> None:
 
 async def hold_route_slot(request: Request) -> AsyncIterator[None]:
     """One request at a time on a route, the next one refused with a 429 and no queue: waiting
-    would only delay it. Held until the response is sent, or until the route ends when its client
-    has gone: a route stops spending at its own deadline, not with its client."""
+    would only delay it. Held until the response is handed to the server, not until its client has
+    read it (tried with 50 MB unread); when its client has gone, until the route ends: a route stops
+    spending at its own deadline, not with its client."""
     slot = request.app.state.slot_by_route[find_route_template(request)]
     if not slot.acquire(blocking=False):
         raise ApiError(
