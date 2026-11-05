@@ -541,6 +541,13 @@ sqlite3 -readonly ~/.knowledge_base/k-b.sqlite "SELECT kind, count(*) FROM item 
 uv run pytest
 ```
 
+**Mesurer la couverture des tests** (lignes et branches de `src/k_b/`, et les lignes non couvertes de
+chaque fichier) :
+
+```sh
+uv run pytest --cov --cov-report=term-missing
+```
+
 La CI (GitHub Actions, `.github/workflows/ci.yml`) lance quatre jobs, `audit` (pip-audit sur `uv.lock`),
 `tests` (pytest), `lint` (ruff check et ruff format --check) et `types` (mypy --strict), sur chaque PR vers
 `main` et sur chaque push sur `main`, donc après chaque fusion.

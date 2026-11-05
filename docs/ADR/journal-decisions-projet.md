@@ -5085,7 +5085,42 @@ Décisions de Sabine du 2026-11-04.
   à justifier avec la revue des 10 points) ; sur le Mac, la veille ne compte pas dans la fenêtre
   (`time.monotonic`, `mach_absolute_time()`). — PR 2A de #161, à venir
 
+## 2026-11-06
+
+### Tests : mesurer la couverture par `pytest-cov`, sans seuil
+
+- **La couverture des tests se mesure par `uv run pytest --cov --cov-report=term-missing` : `pytest-cov`
+  7.1.0 en dépendance de développement, `coverage` 7.17.0 figée dans `uv.lock`, réglée dans
+  `[tool.coverage.run]` de `pyproject.toml` (`source = ["k_b"]`, `branch = true`,
+  `patch = ["subprocess"]`). Aucun seuil, CI inchangée.** Demandée par l'utilisatrice en rédigeant E3
+  (05/11) : mesurer d'abord, elle fixe le seuil ensuite. Plan de time-knight validé le 06/11 :
+  - `coverage` 7.17.0 (22/10), recommandation de time-knight suivie par l'utilisatrice : 7.17.1 (03/11)
+    et 7.17.2 (04/11), publiées depuis deux ou trois jours, n'ont pas laissé le temps de signaler un
+    paquet compromis ;
+  - `branch = true` : une ligne d'un `if` compte couverte même si l'une de ses branches n'est jamais
+    prise ; écartée, la mesure des lignes seules ;
+  - `patch = ["subprocess"]` : `pytest-cov` 7.0 ne mesure plus les processus enfants (son journal des
+    versions renvoie à ce réglage de `coverage`), et des tests lancent le code de K-B dans un enfant
+    (`test_sigint.py`, `test_sigterm.py`, `test_serve_ai.py`…). Écarté : laisser ce code compter comme
+    non testé. Mesuré le 06/11 : 130 lignes de plus sur le seul test du SIGINT en processus propre,
+    écart nul sur la suite entière, où chaque ligne lancée par un enfant l'est aussi dans le processus
+    de pytest ;
+  - ni `fail_under` ni job de CI : le seuil attend la décision de l'utilisatrice sur la mesure
+    (« Décisions encore ouvertes »).
+
+  Limites assumées :
+  - les tests de bout en bout (`-m e2e`, écartés de `uv run pytest` par `tests/conftest.py`) ne
+    comptent pas dans la mesure ;
+  - un enfant lancé avec un environnement réduit à quelques variables (`test_api_telemetry.py`) ne
+    reçoit pas `COVERAGE_PROCESS_CONFIG` et n'est pas mesuré ;
+  - `coverage` pose `a1_coverage.pth` dans `.venv`, lu à chaque démarrage de Python dans cet
+    environnement ; il n'agit que si `COVERAGE_PROCESS_START` ou `COVERAGE_PROCESS_CONFIG` est posé ;
+  - `uv.lock` gagne deux paquets (`pytest-cov`, `coverage`), en développement seulement. — PR de #405
+
 ## Décisions encore ouvertes
+
+- **Seuil de couverture des tests** (2026-11-06, #405) : quel `fail_under`, et la CI le vérifie-t-elle ?
+  À décider par l'utilisatrice sur la mesure du 06/11 (99,26 % : lignes 99,44 %, branches 98,36 %).
 
 - **`minReplicas` des deux API au déploiement** (2026-11-05, #161) : 0 réplique au repos (3,29 $ par
   mois pour les deux, `README.md`) ou 1 (23,65 $). Avec 0, le compte du débit repart de zéro à chaque

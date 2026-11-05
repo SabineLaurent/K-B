@@ -31,6 +31,7 @@ dev = [
     "mypy>=2.4.0",
     "openapi-spec-validator>=0.9.0",
     "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
     "pytest-html>=4.2.0",
     "ruff>=0.16.10",
     "types-defusedxml>=0.7.0.20260504",
@@ -63,3 +64,11 @@ exclude = ["*.md"]
 
 [tool.mypy]
 files = ["src"]
+
+[tool.coverage.run]
+# Couverture des tests : `uv run pytest --cov --cov-report=term-missing` (README, « Lancer les tests »).
+source = ["k_b"]
+# Compte aussi les branches jamais prises d'un `if`, pas seulement les lignes.
+branch = true
+# pytest-cov 7 ne mesure plus les sous-processus : des tests lancent un processus enfant.
+patch = ["subprocess"]
