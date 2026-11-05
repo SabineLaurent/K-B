@@ -566,7 +566,7 @@ de la requête.
   429 de débit, 422 de schéma, puis la route.
 - **Pas de `TrustedHostMiddleware`**, écart voulu à la ligne API8 de [specs-api.md](specs-api.md) :
   sans clé, une requête n'atteint que `/health`, et `/docs` et `/openapi.json` en `sandbox`, qui ne
-  contiennent aucune donnée, si bien qu'un rebinding DNS n'obtient rien et ne coûte aucun appel. Écrit à
+  contiennent aucune donnée, si bien qu'un rebinding DNS n'obtient rien et ne coûte aucun appel. Rappelé à
   « Sécurité : OWASP API Security Top 10 (2023) » (API8), et à revoir en conteneurs (#200), où l'hôte
   appelant change.
 - **`GET /health`** répond 200 `{"status": "ok"}` sans clé, comme celle de l'API de données.
@@ -823,39 +823,44 @@ pas »).
 L'auto-évaluation de l'API IA, mesure par mesure (section « How To Prevent » de chaque entrée de
 l'édition 2023, la dernière au 2026-11-05), au commit qui la contient (#161). Le pendant de
 l'API de données est dans [specs-api.md](specs-api.md). « Tenue » dit la mesure appliquée et sa
-preuve, un test ou un essai daté ; « non tenue » dit pourquoi, et où elle se tiendra ; *s.o.* :
-sans objet pour cette API. Une entrée est tenue quand toutes ses mesures applicables le sont.
+preuve : un test, un essai daté ou le passage du code cité ; « non tenue » dit pourquoi, et où
+elle se tiendra ; *s.o.* : sans objet pour cette API. Une entrée est tenue quand toutes ses
+mesures applicables le sont. « Au déploiement » renvoie au déploiement sur Azure Container Apps :
+au 2026-11-05, une case de #317 (« Plus tard : déploiement », sans jalon) le porte, et aucune
+issue du jalon « Mise en ligne 08/11 ».
 
 | Entrée | État | Ce qui reste, et où |
 |---|---|---|
 | API1 Broken Object Level Authorization | **Tenue** | — |
 | API2 Broken Authentication | Non tenue | Anti-force brute : écart voulu (décision de Sabine du 2026-11-05) |
 | API3 Broken Object Property Level Authorization | **Tenue** | — |
-| API4 Unrestricted Resource Consumption | Non tenue | Ressources des conteneurs : jalon ACA (#200, #317) ; plafond de dépense : abonnement de l'organisme de formation |
+| API4 Unrestricted Resource Consumption | Non tenue | Ressources des conteneurs : au déploiement ; plafond de dépense : abonnement de l'organisme de formation |
 | API5 Broken Function Level Authorization | **Tenue** | — |
 | API6 Unrestricted Access to Sensitive Business Flows | **Tenue** | — |
 | API7 Server Side Request Forgery | **Tenue** | — |
-| API8 Security Misconfiguration | Non tenue | TLS, durcissement répétable, évaluation et revue de l'environnement déployé : jalon ACA |
-| API9 Improper Inventory Management | Non tenue | Documentation sans clé en `sandbox` : écart voulu ; protection externe : jalon ACA |
-| API10 Unsafe Consumption of APIs | Non tenue | TLS vers l'API de données : jalon ACA |
+| API8 Security Misconfiguration | Non tenue | TLS, durcissement répétable, évaluation et revue de l'environnement déployé : au déploiement |
+| API9 Improper Inventory Management | Non tenue | Documentation sans clé en `sandbox` : écart voulu ; protection externe : au déploiement |
+| API10 Unsafe Consumption of APIs | Non tenue | TLS vers l'API de données : au déploiement |
 
-Le compte : 5 entrées tenues sur 10. Ce qui ne dépend que du code et de la doc est tenu ; ce qui
-reste demande le déploiement, ou une décision qui n'est pas celle de K-B.
+Le compte : 5 entrées tenues sur 10. Ce qui ne dépend que du code et de la doc est tenu, sauf deux
+écarts voulus (API2, anti-force brute ; API9, documentation en `sandbox`) ; le reste demande le
+déploiement, ou l'organisme de formation pour le plafond de dépense.
 
 ### API1:2023 Broken Object Level Authorization
 
 - **Autorisation fondée sur une politique** : tenue. Une seule propriétaire ; une clé par client
   et un client par route (« Accès ») ; la clé et le droit sont des dépendances de l'app
-  (`ai_api/app.py`), aucune route ne peut les oublier.
+  (`ai_api/app.py`) : aucune route du modèle ne peut les oublier. `/health`, et `/docs` et
+  `/openapi.json` en `sandbox`, routes de Starlette sans donnée, répondent sans clé.
 - **Contrôle dans chaque fonction qui lit un enregistrement à partir d'une entrée du client** :
   tenue. Les entrées du client ne désignent qu'une période (`window_days`, `after`,
   `previous_first_window`) ; sans clé valide, rien n'est lu :
-  `test_a_request_without_a_valid_key_is_refused_before_any_reading` (les deux routes).
+  `test_a_request_without_a_valid_key_is_refused_before_any_reading`, sur chaque route.
 - **Identifiants aléatoires et imprévisibles** : *s.o.*, aucune route ne prend d'identifiant ; les
   entiers des réponses (`item_id`, `repository_id`) ne sont relus par aucune route de l'API IA.
-- **Tests du mécanisme d'autorisation** : tenue. `test_only_the_public_routes_answer_without_a_key`,
-  `test_a_client_is_refused_403_on_a_route_that_is_not_its_own` ; la CI doit passer avant une
-  fusion.
+- **Tests du mécanisme d'autorisation** : tenue. `test_only_the_public_routes_answer_without_a_key`
+  et `test_a_client_is_refused_403_on_a_route_that_is_not_its_own`
+  (`tests/ai_api/test_digest_router.py`) ; la CI doit passer avant une fusion.
 
 ### API2:2023 Broken Authentication
 
@@ -864,44 +869,56 @@ reste demande le déploiement, ou une décision qui n'est pas celle de K-B.
 - **Comprendre ses mécanismes** : tenue. La clé identifie un programme, `KB_DIGEST` ou
   `KB_TREND_REPORT`, jamais une personne.
 - **Suivre les standards, ne pas réinventer** : tenue.
-  - Bearer, avec `WWW-Authenticate: Bearer` sur le 401 (RFC 6750) ; le même corps sans clé, avec
-    une clé inconnue ou un `Bearer` vide : `test_a_request_without_a_valid_key_is_refused_before_any_reading`.
+  - Bearer, avec `WWW-Authenticate: Bearer` sur le 401 (RFC 6750). Sur `POST /digests`, le même
+    corps et l'en-tête sans clé, avec une clé inconnue ou un `Bearer` vide :
+    `test_a_request_without_a_valid_key_is_refused_before_any_reading`
+    (`tests/ai_api/test_digest_router.py`) ; sur `POST /trend-reports`, le test du même nom
+    n'essaie que l'absence d'en-tête, et ne vérifie que le 401.
   - Comparaison en temps constant, `hmac.compare_digest`, avec chaque clé (`core/api_access.py`) ;
     non mesurée par un test.
   - Clé de 32 caractères au moins, dans l'alphabet de `secrets.token_urlsafe`, refusée au
-    démarrage sinon (`core/api_keys.py`, `test_serve_ai_exits_2_and_names_the_variable_refused`) ;
-    une clé égale à celle que l'API IA envoie à l'API de données est refusée
+    démarrage sinon (`core/api_keys.py`) : la clé trop courte par
+    `test_serve_ai_exits_2_and_names_the_variable_refused`, le caractère hors alphabet par
+    `test_a_key_of_a_character_out_of_the_rule_is_refused_without_being_quoted`
+    (`tests/post/test_ai_api_client.py`) et par `test_serve_exits_2_and_names_the_variable_without_its_value`
+    (`tests/data_api/test_serve_data.py`), sur la même fonction ; une clé égale à celle que l'API
+    IA envoie à l'API de données est refusée
     (`test_serve_ai_exits_2_when_a_client_has_the_key_it_sends_to_the_data_api`).
-- **Utiliser l'OWASP Authentication Cheat Sheet** : tenue : la fiche a été confrontée à l'API le 2026-11-05. La
+- **Utiliser l'OWASP Authentication Cheat Sheet** : confrontée le 2026-11-05, tenue en partie. La
   plupart de ses consignes portent sur les mots de passe, les comptes humains, la MFA ou les
   sessions : *s.o.* Celles qui s'appliquent à une clé entre programmes :
   - comparaison en temps constant : tenue (`hmac.compare_digest`) ;
   - messages et codes d'erreur génériques, sans énumération : tenue, le même 401 pour toute clé
     refusée (ci-dessus) ;
-  - journal des échecs : tenue, chaque requête est journalisée avec son statut et son client,
-    `client=-` sans clé valide (`core/api_request_log.py`) ; aucune revue ni alerte sur les 401 à ce
-    commit ;
+  - journal des échecs : tenue, chaque requête est journalisée avec son statut et son client, sauf
+    un `/health` qui répond 200 ; `client=-` sans clé valide (`core/api_request_log.py`, module
+    des deux API, `test_a_401_is_logged_without_name_nor_received_value` dans
+    `tests/data_api/test_request_log.py`). Aucune revue ni alerte sur les 401 à ce commit ;
   - limitation des essais et défenses contre les attaques automatisées : non tenue, c'est
     l'anti-force brute ci-dessous ;
   - transport sous TLS : non tenue en local, c'est le TLS d'API8 ;
-  - authentification TLS mutuelle entre programmes : non appliquée, une option du jalon ACA.
-  La section « API Keys » de la REST Security Cheat Sheet, que la fiche ne cite pas, est tenue
-  aussi : clé exigée sur chaque point d'accès protégé, 429 au-delà du débit (#400), clé jamais
-  dans l'URL, révocation par rotation (`README.md`, « Changer une clé »). Elle demande de ne pas
-  s'en remettre à la seule clé pour une ressource de valeur : la clé s'ajoute au droit par route,
-  au débit et à l'écoute sur `127.0.0.1` ; le réseau d'ACA s'y ajoutera.
+  - authentification TLS mutuelle entre programmes : non appliquée, une option du déploiement.
+
+  La section « API Keys » de la REST Security Cheat Sheet, que la fiche ne cite pas, est tenue :
+  clé exigée sur chaque point d'accès protégé, 429 au-delà du débit (#400), clé jamais dans l'URL,
+  révocation par rotation (`README.md`, « Changer une clé »). Elle demande de ne pas s'en remettre
+  à la seule clé pour une ressource de valeur : la clé s'ajoute au droit par route, au débit et à
+  l'écoute sur `127.0.0.1` ; le réseau du déploiement s'y ajoutera.
 - **Anti-force brute, plus strict que la limite de débit** : non tenue, écart voulu (décision de
   Sabine du 2026-11-05). La limite de débit ne compte que les clients à clé valide ; les essais
   de clé ne sont pas limités. Pourquoi :
-  - une clé de 256 bits rend la recherche exhaustive impraticable : le NIST classe une clé
-    de 256 bits dans la catégorie 5, la plus haute, face à un ordinateur quantique (NIST IR 8547,
-    tableau 1), et juge que doubler la longueur d'une clé suffit contre l'algorithme de Grover
-    (NIST IR 8105, 2016). Même en supposant son gain quadratique appliqué à des essais en ligne,
-    il resterait environ 2^128 essais ; à 10 000 requêtes par seconde, plus de 10^34 secondes ;
+  - la recherche exhaustive d'une clé est impraticable. La commande du `README.md`
+    (`secrets.token_urlsafe(32)`) génère une clé de 256 bits ; le code n'en contrôle que le
+    minimum, 32 caractères de l'alphabet, soit 192 bits. Le NIST définit sa catégorie 5, la plus
+    haute face à un ordinateur quantique, par la recherche d'une clé AES de 256 bits (NIST IR
+    8547, tableau 1), et juge que doubler la longueur d'une clé suffit contre l'algorithme de
+    Grover (NIST IR 8105, 2016). Même en supposant son gain quadratique appliqué à des essais en
+    ligne, il resterait environ 2^128 essais, 2^96 au minimum contrôlé ; à 10 000 requêtes par
+    seconde (débit supposé), plus de 10^34 secondes, et plus de 10^24 au minimum ;
   - une limite des 401 par adresse bloquerait les clients légitimes : en local, tous viennent de
     `127.0.0.1`, et un essai répété couperait `kb digest` ;
   - derrière l'entrée d'ACA, l'adresse du client passe par un mandataire : une limite par adresse
-    se règle au déploiement (#317), si elle y est décidée.
+    se règle au déploiement, si elle y est décidée.
 - **Récupération d'identifiants, ré-authentification, MFA, verrouillage, captcha, mots de passe
   faibles** : *s.o.*, ni compte, ni utilisateur humain, ni mot de passe.
 - **Clés d'API pour les seuls clients d'API** : tenue. Les deux clients sont des commandes de K-B.
@@ -915,56 +932,63 @@ reste demande le déploiement, ou une décision qui n'est pas celle de K-B.
   par son nom (`ai_api/routers/digest_router.py`, `ai_api/routers/trend_report_router.py`).
 - **Pas de liaison automatique des entrées** (*Mass Assignment*) : tenue. Schémas fermés,
   `extra="forbid"` et `strict=True` (`ai_api/schemas/`) ;
-  `test_a_malformed_request_is_refused_422_before_any_call`,
-  `test_the_request_refuses_any_other_field_and_bounds_the_window`.
+  `test_a_malformed_request_is_refused_422_before_any_call` (`POST /digests`) et
+  `test_a_malformed_request_is_refused_422_on_its_body_before_any_reading` (`POST /trend-reports`,
+  un champ en trop compris).
 - **Modification des seules propriétés permises** : *s.o.*, l'API n'enregistre rien.
 - **Validation des réponses par un schéma** : tenue. FastAPI valide chaque réponse contre le type
-  de retour de sa route.
+  de retour de sa route (`-> DigestsSchema`, `-> TrendReportSchema`).
 - **Structures de données minimales** : tenue. `DigestsSchema` et `TrendReportSchema` ne portent
-  que les champs du contrat.
+  que les champs du contrat (`ai_api/schemas/`).
 
 ### API4:2023 Unrestricted Resource Consumption
 
 - **Limiter la mémoire, le CPU, les redémarrages, les descripteurs et les processus** : non tenue.
-  Aucun fichier de conteneur ni de déploiement à ce commit : au jalon ACA du 08/11 (#200, #317),
-  avec `maxReplicas: 1` (« Accès »).
+  Aucun fichier de conteneur ni de déploiement à ce commit : au déploiement, avec
+  `maxReplicas: 1` (« Accès »).
 - **Taille maximale de toutes les entrées** : tenue (#399). Corps de 1 024 octets au plus, refusé
   en 413 avant la clé (`MAX_AI_API_BODY_BYTES`) ; `window_days` de 1 à 14 ; `after` et
-  `previous_first_window` au format `AAAA-MM-JJ`. `test_a_body_beyond_the_bound_is_refused_413_before_the_key`,
+  `previous_first_window` au format `AAAA-MM-JJ`, sur 15 fenêtres au plus.
+  `test_a_body_beyond_the_bound_is_refused_413_before_the_key`,
   `test_a_body_announced_beyond_the_bound_gets_the_413_of_k_b_on_any_route`,
   `test_a_length_starlette_reads_beyond_the_bound_gets_the_413_of_k_b`,
-  `test_the_request_refuses_any_other_field_and_bounds_the_window`.
+  `test_a_malformed_request_is_refused_422_on_its_body_before_any_reading` et
+  `test_a_day_not_written_yyyy_mm_dd_is_refused_422_by_its_name`
+  (`tests/ai_api/test_trend_report_router.py`).
 - **Limite de débit** : tenue (#400), pour les clients à clé valide : 20 demandes par 24 h
   glissantes et par route. `test_beyond_its_limit_a_client_gets_429_before_any_reading`,
   `test_beyond_its_limit_the_client_of_the_reports_gets_429_without_a_reading`. Limites écrites
   (« Accès ») : le compte vit en mémoire, ce n'est pas un budget ; les essais sans clé valide ne
   sont pas comptés (API2).
-- **Limite de débit ajustée par point d'accès** : tenue. Une limite par route,
-  `test_every_route_of_the_model_has_its_limit`.
+- **Limite de débit ajustée par point d'accès** : tenue. Une limite par route, la même pour les
+  deux : 20 par 24 h, tirée des demandes de fiches et reprise pour les comptes rendus
+  (`AI_API_RATE_LIMITS`, `core/config.py`) ; `test_every_route_of_the_model_has_its_limit`.
 - **Limiter une opération unique par client** : tenue. Une demande à la fois par route,
   `test_while_a_request_runs_the_next_one_on_its_route_gets_429_without_a_queue`.
 - **Valider côté serveur le nombre d'enregistrements renvoyés** : tenue. Le client n'en fixe aucun ;
   le code plafonne la lecture (« Lecture plafonnée ») : `test_the_reading_is_capped_inside_a_kind`,
   `test_beyond_the_cap_the_most_recent_windows_are_kept`.
 - **Plafonds de dépense ou alertes de facturation** : non tenue. Le modèle est sur l'abonnement de
-  l'organisme de formation, dont Sabine ne voit pas la facturation (`README.md`, « Coûts ») :
-  l'alerte est à demander à l'organisme, décision de Sabine. Ce que bornent les limites, par
-  demande : les jetons de sortie de chaque appel, une relance au plus, 200 s par demande, une
-  réponse du modèle de 1 000 000 d'octets au plus (#399). Par jour, l'ordre de grandeur que
-  permettent les limites de débit, au prix de sortie (0,60 $ par million de jetons, le plus cher)
-  et sur les estimations de pire cas de la doc : 20 demandes de fiches × 420 000 jetons
-  (`README.md`), environ 5 $, et 20 comptes rendus × 80 000 jetons ([tendances.md](tendances.md)),
-  environ 1 $. Ce n'est pas un plafond : un redémarrage remet le compte à zéro.
+  l'organisme de formation, dont Sabine ne voit pas la facturation (`README.md`, « Budget », ligne
+  « Modèle des fiches ») : l'alerte est à demander à l'organisme, décision de Sabine. Ce que
+  bornent les limites, par demande : les jetons de sortie de chaque appel, une relance au plus,
+  une échéance de 200 s, que le dernier appel en cours peut dépasser (« Lecture plafonnée »,
+  « Limite »), une réponse du modèle de 1 000 000 d'octets au plus (#399). Par jour, l'ordre de
+  grandeur que permettent les limites de débit, au prix de sortie (0,60 $ par million de jetons,
+  le plus cher) et sur les estimations de pire cas de la doc : 20 demandes de fiches × 420 000
+  jetons (`README.md`), environ 5 $, et 20 comptes rendus × 80 000 jetons
+  ([tendances.md](tendances.md)), environ 1 $. Ce n'est pas un plafond : un redémarrage remet le
+  compte à zéro.
 
 ### API5:2023 Broken Function Level Authorization
 
 - **Refus par défaut, droit explicite sur chaque fonction** : tenue (#400). La clé est exigée sur
-  toute l'app ; chaque route s'ouvre à un client (`AI_API_CLIENT_BY_ROUTE`) ; une route absente de
-  la table est refusée à tous. `test_a_client_is_refused_403_on_a_route_that_is_not_its_own`,
+  toute l'app ; chaque route du modèle s'ouvre à un client (`AI_API_CLIENT_BY_ROUTE`) ; une route
+  absente de la table est refusée à tous. `test_a_client_is_refused_403_on_a_route_that_is_not_its_own`,
   `test_the_client_of_the_digests_is_refused_on_the_trend_reports`,
   `test_a_route_absent_from_the_table_is_refused_to_every_client`.
 - **Revue des points d'accès** : tenue. Les routes et leurs méthodes sont figées par
-  `test_only_the_public_routes_answer_without_a_key`.
+  `test_only_the_public_routes_answer_without_a_key` (`tests/ai_api/test_digest_router.py`).
 - **Contrôleurs et fonctions d'administration** : *s.o.*, aucun.
 
 ### API6:2023 Unrestricted Access to Sensitive Business Flows
@@ -982,36 +1006,44 @@ Aucune URL ne vient du client ni d'un tiers : les hôtes sont fixés par K-B ou 
 configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, sous l'hôte de GitHub.
 
 - **Isoler la récupération de ressources dans le réseau** : *s.o.* à ce commit, aucune URL n'étant
-  fournie par une requête ; l'isolation réseau est à revoir au jalon ACA.
+  fournie par une requête ; l'isolation réseau est à revoir au déploiement.
 - **Listes d'origines et de schémas permis** : tenue. Hôte GitHub constant (`core/github_api.py`) ;
   `https` seul vers le modèle et vers l'export ; `http` ou `https` vers l'API de données (API10).
-  `core/outbound.py`, `tests/test_outbound.py`.
-- **Redirections coupées** : tenue. `follow_redirects=False` (`core/outbound.py`) ;
+  `core/outbound.py`, `test_a_url_of_an_allowed_scheme_is_accepted` et
+  `test_a_url_refused_is_named_by_its_variable_never_quoted` (`tests/test_outbound.py`).
+- **Redirections coupées** : tenue. Vers le modèle, l'API de données et GitHub,
+  `follow_redirects=False` (`core/outbound.py`) :
   `test_the_client_of_the_provider_sends_the_key_and_follows_no_redirection`,
-  `test_a_redirection_is_not_followed_and_leaves_the_candidate_out`.
+  `test_a_redirection_is_not_followed_and_leaves_the_candidate_out`. Vers l'export, le transport du
+  SDK OpenTelemetry ne suit aucune redirection, mais compte un 3xx comme un succès
+  (`ai_api/connectors/metrics_export.py`).
 - **Analyseur d'URL éprouvé** : tenue. `urlsplit` de la bibliothèque standard, avec refus d'une
-  identité, d'une requête ou d'un fragment (`core/outbound.py`).
+  identité, d'une requête ou d'un fragment (`core/outbound.py`,
+  `test_a_url_refused_is_named_by_its_variable_never_quoted`).
 - **Valider et assainir toute entrée du client** : tenue. Schémas stricts (API3) ; le nom de dépôt
   qui forme le chemin GitHub est contrôlé :
   `test_a_repository_whose_name_would_go_up_a_path_is_dropped_and_counted`.
-- **Ne pas renvoyer de réponse brute** : tenue. Réponses reconstruites champ par champ ; une erreur
-  d'amont ne cite jamais son corps : `test_the_error_carries_neither_the_key_nor_what_was_received`.
+- **Ne pas renvoyer de réponse brute** : tenue. Réponses reconstruites champ par champ
+  (`ai_api/routers/`) ; une erreur de l'API de données ne cite ni la clé ni ce qui a été reçu
+  (`test_the_error_carries_neither_the_key_nor_what_was_received`, sur une redirection qui porte la
+  clé) ; une erreur du modèle ou de GitHub n'est rendue que par son état nommé (« États nommés »).
 
 ### API8:2023 Security Misconfiguration
 
 - **Durcissement répétable** : non tenue, en partie. Un réglage refusé empêche le démarrage
   (`test_serve_ai_exits_2_and_names_the_variable_refused`) ; les fichiers de déploiement, qui
-  rendraient le durcissement répétable, viennent au jalon ACA (#200, #317).
+  rendraient le durcissement répétable, viennent au déploiement.
 - **Revue périodique des configurations de toute la pile** : non tenue. Rien à relire dans le dépôt
-  avant les fichiers de déploiement : au jalon ACA.
+  avant les fichiers de déploiement : au déploiement.
 - **Évaluation automatisée et continue dans tous les environnements** : non tenue, en partie. La CI
-  lance `pip-audit`, les règles de sécurité de ruff et les tests sur chaque PR ; aucun
-  environnement déployé n'est évalué.
+  lance `pip-audit`, les règles de sécurité de ruff et les tests sur chaque PR
+  (`.github/workflows/ci.yml`) ; aucun environnement déployé n'est évalué.
 - **TLS, même pour une API interne** : non tenue, en partie. `https` vers le modèle, GitHub et
   l'export ; sans TLS : l'API IA elle-même, en local, et le lien vers l'API de données (API10).
-  L'entrée HTTPS d'ACA vient au 08/11 ; l'échange de clés hybride post-quantique qu'elle propose (ML-KEM, FIPS 203
-  du 13/08/2024) est à vérifier ce jour-là. Côté client, `core/outbound.py` garde le contexte TLS
-  par défaut de httpx2 2.13.1 : TLS 1.2 au moins (lu le 2026-11-05).
+  L'entrée HTTPS d'ACA viendra au déploiement ; un échange de clés hybride post-quantique (ML-KEM,
+  FIPS 203 du 13/08/2024) qu'elle proposerait est à vérifier ce jour-là. Côté client, K-B ne règle
+  pas la version de TLS : les bibliothèques gardent leur contexte par défaut, TLS 1.2 au moins,
+  httpx2 2.13.1 pour `core/outbound.py` et urllib3 de `requests` pour l'export (lu le 2026-11-05).
 - **N'accepter que les verbes HTTP nécessaires** : tenue (#401). Chaque route n'accepte que sa
   méthode ; `HEAD`, que Starlette ajoute à toute route `GET`, est retiré ; toute autre méthode
   rend 405 `method_not_allowed`. `test_every_route_answers_its_method_only_and_405_to_any_other`.
@@ -1028,8 +1060,12 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
 - **Traitement uniforme dans la chaîne de serveurs** : *s.o.*, un seul serveur, uvicorn ; à revoir
   derrière l'entrée d'ACA.
 - **Schémas de réponse, erreurs comprises, sans trace d'exception** : tenue. Corps `{"error":
-  "<état>"}` (« États nommés ») ; une erreur imprévue donne 500 `internal_error`, son type seul au
-  journal. `test_an_unexpected_error_names_its_type_never_its_text_on_the_root`,
+  "<état>"}` (« États nommés » ; les états `github_*` dans [tendances.md](tendances.md), « Défenses
+  et échecs ») ; une erreur imprévue donne 500 `internal_error`, son type seul au journal.
+  `test_a_response_that_fails_to_be_built_is_traced_as_a_500` (le corps),
+  `test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only`
+  (`tests/data_api/test_api_errors.py`, le même middleware, la ligne de journal),
+  `test_an_unexpected_error_names_its_type_never_its_text_on_the_root` (la trace),
   `test_the_route_documents_each_named_state`. Limites :
   - une requête HTTP mal formée reçoit le 400 d'uvicorn en texte brut, `Invalid HTTP request
     received.`, avant l'app (uvicorn 0.54, h11 0.16, essayé le 2026-11-05) ;
@@ -1038,51 +1074,56 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
   - le budget de 70 requêtes à GitHub épuisé rend 502 `github_unavailable`, alors que la limite est
     celle de K-B, pas une panne de GitHub.
 
-Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu (« Accès »).
+Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié dans « Accès ».
 
 ### API9:2023 Improper Inventory Management
 
 - **Inventaire des hôtes** : tenue. `127.0.0.1:8001` par défaut, version `0.11.0` (« Accès »),
   environnements `sandbox` et `production` (`core/api_settings.py`).
 - **Inventaire des services intégrés** : tenue. Le modèle, GitHub et Grafana Cloud, avec les
-  données échangées (`docs/registre-traitements.md`) ; l'API de données (« Lecture plafonnée »).
+  données échangées ([registre-traitements.md](registre-traitements.md)) ; l'API de données
+  (« Lecture plafonnée »).
 - **Documenter l'authentification, les erreurs, les redirections, la limite de débit, CORS et les
-  points d'accès** : tenue. Accès et débit (« Accès »), erreurs (« États nommés »), routes
-  (`docs/api/openapi-ia.json`), redirections sortantes ([tendances.md](tendances.md)), CORS
-  (API8 ci-dessus : aucun).
+  points d'accès** : tenue. Accès et débit (« Accès »), erreurs (« États nommés » ;
+  [tendances.md](tendances.md), « Défenses et échecs »), routes (`docs/api/openapi-ia.json`),
+  redirections sortantes ([tendances.md](tendances.md)), CORS (API8 ci-dessus : aucun).
 - **Documentation générée depuis un standard, dans la CI** : tenue. `kb openapi` écrit
-  `docs/api/openapi-ia.json` ; `test_the_versioned_openapi_is_the_one_the_app_produces`.
+  `docs/api/openapi-ia.json` ; `test_the_versioned_openapi_is_the_one_the_app_produces`
+  (`tests/ai_api/test_ai_api_openapi.py`).
 - **Documentation réservée aux utilisateurs autorisés** : non tenue en `sandbox`, écart voulu. Hors
-  `sandbox`, `/docs` et `/openapi.json` rendent 404 (`test_the_documentation_is_served_in_the_sandbox_only`) ;
-  en `sandbox`, ils répondent sans clé, sans aucune donnée. Le contrat est versionné dans le dépôt,
-  qui sera public : fermer `/docs` ne le cacherait pas.
+  `sandbox`, `/docs` et `/openapi.json` rendent 404 (`test_the_documentation_is_served_in_the_sandbox_only`,
+  `tests/ai_api/test_serve_ai.py`) ; en `sandbox`, ils répondent sans clé, sans aucune donnée. Le
+  contrat est versionné dans le dépôt, privé au 2026-11-05 et appelé à devenir public : s'il l'est,
+  fermer `/docs` ne cacherait pas le contrat.
 - **Protections externes pour toutes les versions exposées** : non tenue. Aucune solution de
-  sécurité d'API devant l'app à ce commit : à décider au jalon ACA (#317).
+  sécurité d'API devant l'app à ce commit : à décider au déploiement.
 - **Pas de données de production hors production** : *s.o.* à ce commit, aucune production
-  déployée ; à revoir à la mise en ligne.
+  déployée ; à revoir au déploiement.
 - **Analyse de risque des anciennes versions** : *s.o.*, une seule version servie.
 
 ### API10:2023 Unsafe Consumption of APIs
 
 L'API IA consomme le modèle, l'API de données, GitHub et l'export OTLP vers Grafana Cloud.
 
-- **Évaluer la sécurité des fournisseurs** : tenue, le 2026-11-05, sur les pages officielles de chacun. Aucun ne
-  publie la version minimale de TLS de son point d'accès précis ; le client de K-B en impose 1.2
-  au moins (API8).
+- **Évaluer la sécurité des fournisseurs** : tenue sur pièces publiques, le 2026-11-05, sur les
+  pages officielles de chacun. Azure publie sa version de TLS pour l'ensemble des « Foundry
+  Tools », GitHub par le retrait de TLS 1.0 et 1.1, Grafana pas ; aucun pour le point d'accès
+  précis qu'appelle K-B. Le client de K-B accepte TLS 1.2 au moins, par défaut de ses
+  bibliothèques (API8).
 
   | Fournisseur | Transport | Accès de K-B, moindre privilège | Certifications publiées | Vulnérabilités | Limite |
   |---|---|---|---|---|---|
   | Modèle, Azure AI Foundry (France Central, Data Zone UE) | TLS 1.2 ou 1.3 sur les points d'accès « Foundry Tools » | Clé d'API, la méthode « la plus simple mais pas la plus sûre » selon Microsoft ; deux clés pour la rotation, une clé régénérée cesse aussitôt de marcher ; le moindre privilège passe par Entra ID et un rôle d'inférence, non utilisé par K-B | SOC 2 Type 2, ISO/IEC 27001:2022 (Azure) | Microsoft Azure Bounty | Invites et réponses ni données à OpenAI ni utilisées pour l'entraînement ; traitées dans l'UE ; surveillance des abus possible, durée de conservation non trouvée |
-  | API REST de GitHub | TLS 1.0 et 1.1 retirés en 2018 ; SHA-1 retiré de HTTPS au 15/09/2026 | Jeton *fine-grained* en lecture seule, sur les dépôts publics ([jeton-github.md](jeton-github.md)) ; expiration de 1 à 366 jours | SOC 1 et SOC 2 Type 2, ISO/IEC 27001:2022, CSA STAR | GitHub Security Bug Bounty (HackerOne) | Le produit couvert par chaque rapport n'est pas dit |
-  | Grafana Cloud, export OTLP | Version de TLS non publiée | Jeton de politique d'accès aux seuls `metrics:write`, `traces:write`, `logs:write`, ce que Grafana recommande ([registre-traitements.md](registre-traitements.md)) | ISO 27001, SOC 2 Type 2 (A-LIGN), CSA STAR | Divulgation sur Intigriti, sans prime | K-B ne relit rien de ce qu'il envoie |
-  | API de données de K-B | `http` en local et dans compose (ci-dessous) | Clé `AI_DIGEST`, lecture seule | — | — | Son auto-évaluation : [specs-api.md](specs-api.md) |
+  | API REST de GitHub | TLS 1.0 et 1.1 retirés en 2018 ; SHA-1 retiré de HTTPS au 15/09/2026 | Jeton *fine-grained* en lecture seule ([jeton-github.md](jeton-github.md)) ; expiration de 1 à 366 jours | SOC 1 et SOC 2 Type 2, ISO/IEC 27001:2022, CSA STAR | GitHub Security Bug Bounty (HackerOne) | Le produit couvert par chaque rapport n'est pas dit |
+  | Grafana Cloud, export OTLP | Version de TLS non publiée | Jeton de politique d'accès aux seuls `metrics:write`, `traces:write`, `logs:write` ([registre-traitements.md](registre-traitements.md)), comme la page des politiques d'accès le recommande ; à vérifier : le 2026-10-27, la politique recréée couvrait toute l'organisation (même registre) | ISO 27001, SOC 2 Type 2 (A-LIGN), CSA STAR | Divulgation sur Intigriti, sans prime | K-B ne relit rien de ce qu'il envoie |
+  | API de données de K-B | `http` sur la machine, et dans le réseau compose prévu (#200) | Clé `AI_DIGEST`, lecture seule | — | — | Son auto-évaluation : [specs-api.md](specs-api.md) |
 
   Ce n'est pas un audit : les rapports SOC 2 et ISO sont derrière une connexion chez Microsoft et
   GitHub, et n'ont pas été lus ; la liste des services Azure couverts par ces audits n'a pas été
   lue.
 - **TLS avec toutes les API intégrées** : non tenue, en partie. `https` seul vers le modèle, GitHub
-  et l'export (API7) ; `http` permis vers l'API de données, sur la machine et dans le réseau de
-  compose (`ai_api/connectors/data_api_settings.py`) : au jalon ACA.
+  et l'export (API7) ; `http` permis vers l'API de données, sur la machine et dans le réseau compose
+  prévu (#200) (`ai_api/connectors/data_api_settings.py`) : au déploiement.
 - **Valider et assainir les données reçues** : tenue. Modèles Pydantic stricts pour chaque réponse ;
   corps bornés, la réponse du modèle comprise (#399,
   `test_an_answer_above_the_bound_is_llm_unavailable_without_retry`) ; textes de dépôt nettoyés
