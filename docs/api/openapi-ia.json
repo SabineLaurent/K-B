@@ -105,7 +105,7 @@
             }
           },
           "503": {
-            "description": "llm_rate_limited",
+            "description": "data_api_rate_limited, llm_rate_limited",
             "content": {
               "application/json": {
                 "schema": {
@@ -232,7 +232,7 @@
             }
           },
           "503": {
-            "description": "github_rate_limited",
+            "description": "data_api_rate_limited, github_rate_limited",
             "content": {
               "application/json": {
                 "schema": {

@@ -96,7 +96,7 @@ def test_the_route_documents_each_named_state():
         "500": "internal_error",
         "502": "data_api_invalid_response, data_api_unauthorized, data_api_unavailable,"
         " llm_content_filtered, llm_invalid_output, llm_truncated, llm_unavailable",
-        "503": "llm_rate_limited",
+        "503": "data_api_rate_limited, llm_rate_limited",
         "504": "data_api_timeout, llm_timeout",
     }
 
@@ -118,7 +118,7 @@ def test_the_trend_report_documents_the_states_of_the_data_api_and_of_github():
         "500": "internal_error",
         "502": "data_api_invalid_response, data_api_unauthorized, data_api_unavailable,"
         " github_forbidden, github_invalid_response, github_unauthorized, github_unavailable",
-        "503": "github_rate_limited",
+        "503": "data_api_rate_limited, github_rate_limited",
         "504": "data_api_timeout, github_timeout",
     }
 

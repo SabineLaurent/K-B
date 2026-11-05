@@ -1,11 +1,14 @@
 """POST /digests on the replay provider and the data API of the test base, without network nor
 key of a provider."""
 
+import io
 import json
 import logging
+import os
 import secrets
 import sys
 import threading
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -39,6 +42,7 @@ from k_b.ai_api.errors import (
     TREND_REPORT_ERROR_RESPONSES,
 )
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
+from k_b.ai_api.observability.metrics import write_llm_call_lines
 from k_b.ai_api.routers import digest_router
 from k_b.ai_api.tracing import TRACING_OFF
 from k_b.core.api_rate_limit import RateLimiter
@@ -587,8 +591,16 @@ def raise_timeout(request):
             502,
             "data_api_unauthorized",
         ),
+        (
+            httpx2.Client(
+                base_url="http://localhost",
+                transport=httpx2.MockTransport(lambda request: httpx2.Response(429)),
+            ),
+            503,
+            "data_api_rate_limited",
+        ),
     ],
-    ids=["timeout", "key-refused"],
+    ids=["timeout", "key-refused", "rate-limited"],
 )
 def test_a_reading_that_fails_fails_the_request_without_a_call_to_the_model(
     make_ai_api, capsys, caplog, data_api_client, status, state
@@ -1597,3 +1609,41 @@ def test_while_a_request_runs_the_key_and_the_right_are_checked_first(
     client.app.state.slot_by_route["/digests"].acquire()
 
     assert post_digests(client, headers=headers).status_code == expected_status
+
+
+def test_two_requests_at_once_write_whole_metric_lines_on_a_real_pipe(
+    make_ai_api, monkeypatch
+):
+    client, _ = make_ai_api(VALID_STEPS)
+    written = []
+    monkeypatch.setattr(
+        digest_router,
+        "write_llm_call_lines",
+        lambda *arguments: written.append(arguments),
+    )
+    assert post_digests(client).status_code == 200
+    [(_, settings, stage_calls, measures)] = written
+    read_fd, write_fd = os.pipe()
+    stdout = io.TextIOWrapper(os.fdopen(write_fd, "wb"), encoding="utf-8")
+    monkeypatch.setattr(sys, "stdout", stdout)
+    repetitions = 200
+
+    def write_lines(request_id):
+        for _ in range(repetitions):
+            write_llm_call_lines(request_id, settings, stage_calls, measures)
+
+    with (
+        os.fdopen(read_fd, encoding="utf-8") as pipe,
+        ThreadPoolExecutor(max_workers=3) as executor,
+    ):
+        reading = executor.submit(pipe.read)
+        writers = [executor.submit(write_lines, name) for name in ("first", "second")]
+        for writer in writers:
+            writer.result(timeout=30)
+        stdout.close()
+        lines = reading.result(timeout=30).splitlines()
+
+    # json.loads refuses a line cut or mixed with another.
+    written_by_request = Counter(json.loads(line)["request_id"] for line in lines)
+    expected_lines = repetitions * len(stage_calls)
+    assert written_by_request == {"first": expected_lines, "second": expected_lines}

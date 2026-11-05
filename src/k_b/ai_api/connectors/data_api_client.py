@@ -51,6 +51,7 @@ type DataApiState = Literal[
     "data_api_unavailable",
     "data_api_timeout",
     "data_api_unauthorized",
+    "data_api_rate_limited",
     "data_api_invalid_response",
 ]
 
@@ -366,6 +367,8 @@ def read_body[BodyT](response: Answer, adapter: TypeAdapter[BodyT]) -> BodyT:
     status = response.status_code
     if status == httpx2.codes.UNAUTHORIZED:
         raise DataApiError("data_api_unauthorized", status)
+    if status == httpx2.codes.TOO_MANY_REQUESTS:
+        raise DataApiError("data_api_rate_limited", status)
     if status >= httpx2.codes.INTERNAL_SERVER_ERROR:
         raise DataApiError("data_api_unavailable", status)
     if status != httpx2.codes.OK:

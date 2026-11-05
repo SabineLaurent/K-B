@@ -24,6 +24,7 @@ type UpstreamState = LlmFailure | DataApiState | GithubState
 # names its subject in the response instead.
 STATUS_BY_STATE: dict[UpstreamState, int] = {
     "data_api_invalid_response": 502,
+    "data_api_rate_limited": 503,
     "data_api_timeout": 504,
     "data_api_unauthorized": 502,
     "data_api_unavailable": 502,
