@@ -135,7 +135,7 @@ envoyées par le client de test, `TRACE` et `CONNECT` compris.
 | `test_only_the_public_routes_answer_without_a_key` (IA), sans filtre `HEAD` | L'app n'a que ces routes et ces méthodes |
 | `test_a_route_declaring_head_only_keeps_it_and_refuses_any_other_method` : rouge (`200 == 405`), puis vert | Le retrait ne vide jamais une route |
 | 3 mutations sur fd95f29 (appel retiré de l'une ou l'autre app, `GET` retiré au lieu de `HEAD`) : 1, 2 et 6 tests rouges | Les tests tiennent le code |
-| Sous uvicorn, sur les deux API (sonde par socket) : `HEAD /health` 405 sans corps ; `GET /health` 200 ; `CONNECT /health` et `TRACE /health` 405 ; `CONNECT localhost:443` et `OPTIONS *` 404 `route_not_found` | Le comportement réel, pas seulement celui du client de test |
+| Sous uvicorn, sur les deux API (sonde par socket) : `HEAD /health` 405 sans corps ; `GET /health` 200 ; `CONNECT /health` et `TRACE /health` 405 ; `CONNECT localhost:443` et `OPTIONS *` 404 `route_not_found` avec un hôte permis ; sur l'API de données, 400 `Invalid host header` sinon (`TrustedHostMiddleware`) | Le comportement réel, pas seulement celui du client de test |
 | Revue de sécurité (sous-agent, essais) : 4 680 requêtes refusées en 405, `rate_limiter.calls` vide, aucun verrou tenu, `client=-` au journal | Un 405 ne consomme ni clé, ni débit, ni verrou : le routage répond avant les dépendances de l'app |
 | Suite entière : 3 446 verts ; ruff, format, `mypy --strict` verts | Rien d'autre n'a bougé |
 

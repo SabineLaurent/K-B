@@ -572,7 +572,8 @@ de la requête.
 - **Méthodes** (OWASP API8:2023) : chaque route n'accepte que sa méthode, `GET` ou `POST` ; `HEAD`,
   que Starlette ajoute à toute route `GET`, est retiré (`core/api_methods.py`), et toute autre
   méthode sur le chemin d'une route, `TRACE` et `CONNECT` compris, rend 405 `method_not_allowed`,
-  comme l'API de données ; `CONNECT hôte:port` et `OPTIONS *` rendent 404 `route_not_found`.
+  comme l'API de données ; `CONNECT hôte:port` et `OPTIONS *` rendent 404 `route_not_found` (essayé
+  sous uvicorn le 2026-11-05).
 - **Documentation** : `/docs` et `/openapi.json` ne sont servis que si
   `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, 404 sinon, comme l'API de données ([specs-api.md](specs-api.md), #393).
 - **Version** : `0.11.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
