@@ -16,8 +16,15 @@ from k_b.core.api_request_log import read_request_id
 
 logger = logging.getLogger(__name__)
 
-# The states of the errors Starlette raises when it routes a request.
-STATE_BY_ROUTING_STATUS = {404: "route_not_found", 405: "method_not_allowed"}
+# The state of a request body beyond its bound (core/api_body_limit.py).
+CONTENT_TOO_LARGE = "content_too_large"
+# The states of the errors Starlette raises when it routes a request, or when the bytes of its
+# body go beyond the bound of RequestBodyLimitMiddleware.
+STATE_BY_ROUTING_STATUS = {
+    404: "route_not_found",
+    405: "method_not_allowed",
+    413: CONTENT_TOO_LARGE,
+}
 # FastAPI raises a 400 for a body it cannot read as JSON, one not in UTF-8 among them
 # (fastapi/routing.py:485, 0.143): a malformed request, refused as any other. The only other
 # HTTPException(400) of FastAPI 0.143 and Starlette 1.8 is a form that cannot be read

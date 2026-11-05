@@ -1,10 +1,12 @@
 """GET /items on the test base (tests/fixtures/items_database.sql), whose ids the tests name."""
 
+from typing import get_args
+
 import pytest
 
 from k_b.data_api.routers import item_router
 from k_b.database.reading import ItemPage
-from k_b.items import MAX_INT64, MIN_INT64
+from k_b.items import MAX_INT64, MIN_INT64, ItemKind
 
 # The fields of an item of the list (docs/specs-api.md, "Réponse"): nothing else is served.
 LISTED_FIELDS = {"id", "kind", "title", "source_date", "url", "withdrawn_at"}
@@ -65,6 +67,7 @@ def test_kind_since_q_limit_offset_filter_as_the_reading(
         ("q=" + "a" * 201, "q"),
         ("q=a%00b", "q"),
         ("kind=vuln", "kind"),
+        ("&".join(["kind=paper"] * (len(get_args(ItemKind)) + 1)), "kind"),
         ("since=2026-10-07T00:00:00", "since"),
         ("since=0001-01-01T00:00:00%2B01:00", "since"),
         ("since=9999-12-31T23:59:59.5Z", "since"),
@@ -81,6 +84,15 @@ def test_a_parameter_out_of_bounds_gives_422_with_its_name_only(
 
     assert response.status_code == 422
     assert response.json() == {"error": "invalid_parameter", "parameters": [parameter]}
+
+
+def test_every_kind_at_once_is_read(client, authorization):
+    """kind takes at most one value per kind (OWASP API4:2023)."""
+    response = client.get(
+        "/items", params={"kind": list(get_args(ItemKind))}, headers=authorization
+    )
+
+    assert response.status_code == 200
 
 
 @pytest.mark.parametrize(

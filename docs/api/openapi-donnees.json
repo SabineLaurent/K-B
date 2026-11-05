@@ -3,7 +3,7 @@
   "info": {
     "title": "K-B data API",
     "description": "Thank you to arXiv for use of its open access interoperability.",
-    "version": "0.6.0"
+    "version": "0.7.0"
   },
   "paths": {
     "/items": {
@@ -39,7 +39,8 @@
                       "clip"
                     ],
                     "type": "string"
-                  }
+                  },
+                  "maxItems": 7
                 },
                 {
                   "type": "null"

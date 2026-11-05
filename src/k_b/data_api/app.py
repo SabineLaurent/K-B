@@ -17,7 +17,7 @@ from k_b.data_api.api_router import api_router
 from k_b.data_api.errors import ERROR_HANDLERS
 
 # The version of docs/specs-api.md: a change a client can see changes both.
-API_VERSION = "0.6.0"
+API_VERSION = "0.7.0"
 # Asked of every user of the arXiv API, "on your product" (arXiv API Access, 2026-10-25): the
 # data API serves its papers.
 ARXIV_ACKNOWLEDGEMENT = (

@@ -8,7 +8,12 @@ from typing import Any, get_args
 from k_b.ai_api.connectors.data_api_client import DataApiState
 from k_b.ai_api.connectors.github_client import GithubState
 from k_b.ai_api.connectors.llm_client import LlmFailure
-from k_b.core.api_errors import API_ERROR_RESPONSES, ApiError, ErrorSchema
+from k_b.core.api_errors import (
+    API_ERROR_RESPONSES,
+    CONTENT_TOO_LARGE,
+    ApiError,
+    ErrorSchema,
+)
 
 type UpstreamState = LlmFailure | DataApiState | GithubState
 
@@ -69,6 +74,7 @@ def describe_error_responses(
     """The error bodies of a route whose upstream states are these, for the OpenAPI."""
     return {
         **API_ERROR_RESPONSES,
+        413: {"model": ErrorSchema, "description": CONTENT_TOO_LARGE},
         500: {"model": ErrorSchema, "description": "internal_error"},
         **describe_upstream_errors(states),
     }

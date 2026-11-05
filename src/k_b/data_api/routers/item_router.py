@@ -3,7 +3,7 @@
 
 import re
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, get_args
 
 from fastapi import APIRouter, Path, Query
 from pydantic import AfterValidator, BeforeValidator, TypeAdapter
@@ -30,6 +30,8 @@ DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
 MAX_OFFSET = 10_000
 MAX_SEARCH_LENGTH = 200
+# One value of kind per kind at most (OWASP API4:2023).
+MAX_KINDS = len(get_args(ItemKind))
 
 
 def read_since_text(since: object) -> datetime:
@@ -79,7 +81,7 @@ DETAIL_RESPONSES = {
 @router.get("", responses=ERROR_RESPONSES)
 def list_items(
     connection: Database,
-    kind: Annotated[list[ItemKind] | None, Query()] = None,
+    kind: Annotated[list[ItemKind] | None, Query(max_length=MAX_KINDS)] = None,
     since: Annotated[Since | None, Query()] = None,
     q: Annotated[NonEmptyText | None, Query(max_length=MAX_SEARCH_LENGTH)] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,

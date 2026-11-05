@@ -28,7 +28,7 @@ def test_the_versioned_openapi_is_valid_and_declares_its_security_scheme():
     openapi = read_versioned_openapi()
 
     OpenAPIV31SpecValidator(openapi).validate()
-    assert openapi["info"]["version"] == "0.6.0"
+    assert openapi["info"]["version"] == "0.7.0"
     assert openapi["info"]["description"] == ARXIV_ACKNOWLEDGEMENT
     assert openapi["components"]["securitySchemes"] == {
         "HTTPBearer": {
