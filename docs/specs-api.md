@@ -368,13 +368,44 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 | API9:2023 Improper Inventory Management | OpenAPI versionnée (`docs/api/openapi-donnees.json`), comparée en CI au schéma produit ; hors `sandbox`, la route ne la sert pas, le contrat reste dans le dépôt (#393). `/health`, hors OpenAPI comme `/docs`, est inventoriée par ce document (« Santé »). | **Tenue.** `test_the_versioned_openapi_is_the_one_the_app_produces`, `test_the_versioned_openapi_is_valid_and_declares_its_security_scheme`, `test_each_data_route_documents_its_errors` |
 | API10:2023 Unsafe Consumption of APIs | Le contenu servi vient de tiers (arXiv, GitHub, CISA, TLDR, Zotero, pages gardées avec Web Clipper) : pour un client, et d'abord pour un agent, c'est une donnée, jamais une consigne. Côté K-B, la réponse d'une source est validée à la collecte (modèles de `items.py`, `CHECK` de `schema.sql`). | **Tenue côté K-B** : `tests/test_schema.py` (chaque type refusé par l'item et par la base) et les tests de chaque source. Côté client, une consigne, sans test |
 
+### Ce qui manque, et comment le tenir
+
+Rien de ce qui suit n'est codé : décision de Sabine du 2026-11-05, dire comment on tiendrait chaque
+mesure manquante, sans la faire maintenant. Tailles : XS ≤ 1 h, S ≤ 3 h, M ≈ 6 h, L ≈ 15 h. Ce qui
+touche à Azure Container Apps (ACA) est dans la même section de [fiches-veille.md](fiches-veille.md),
+avec ses sources.
+
+- **API1, identifiants aléatoires et imprévisibles** (mesure écartée le 2026-10-15, ligne API1) :
+  conçu le 2026-11-05 pour #403, environ 20 à 24 h en trois PR.
+  1. L'API IA ne montre plus au modèle l'identifiant de la base, mais la place de l'item dans la
+     lecture (`i1` à `i300`), comme `c1…cN` pour les tendances : ni les consignes, ni les schémas,
+     ni les bornes du modèle ne changent. S.
+  2. Une colonne `item.public_id`, un UUID v4 tiré en Python (`uuid.uuid4()`) à chaque insertion,
+     `NOT NULL UNIQUE`, avec un `CHECK` de sa forme en SQL portable (règle 1 de `poc.md`) ; l'entier
+     reste la clé interne et départage toujours l'ordre de la liste. M.
+  3. `GET /items/{item_id}` ne prend plus qu'un UUID sous sa forme canonique, 422 sinon ; chaque
+     identifiant servi devient l'UUID, dans les deux API et chez `kb digest`. L.
+
+  Pas de migration : la base de développement est recréée (`kb create-db`, puis `kb import`) ; une
+  recréation tire de nouveaux UUID, ce qu'aucune fiche ne voit (elles n'écrivent aucun identifiant).
+- **API4, délai de requête** (#331) : un délai posé sur la connexion SQLite par
+  `set_progress_handler`, d'environ 5 s, sous les 10 s de lecture du client de l'API IA
+  (`DATA_API_READ_TIMEOUT_SECONDS`), valeur à confirmer par une mesure du pire `LIKE` ; dépassé,
+  503 `query_timeout`, sans le message de SQLite ; en PostgreSQL, `statement_timeout`. S.
+- **API4, bornes du détail** (#331) : un nombre maximal de surlignages servis par entrée Zotero, et
+  une longueur maximale du texte d'un clip servi ; les valeurs, et ce que reçoit le client au-delà
+  (texte coupé et signalé, ou autre), sont à décider. S.
+- **API8, TLS** : au déploiement, l'API de données derrière l'entrée interne d'ACA, joignable des
+  seules apps de son environnement, avec le chiffrement entre apps de l'environnement. S.
+- **API8, ports publiés sur `127.0.0.1`** : dans le compose de #200. XS.
+
 ## Hors de cette version
 
 - Les filtres `source` et `in` : options de `kb search` seulement (#187).
 - Le filtre par paquet (P3).
 - Les tops P7 et P8.
 - **Un délai de requête : non tenu.** `conformite.md` (API4) cite le délai, et un `LIKE '%q%'`
-  lit tout `release.body`, jusqu'à 125 000 caractères par release. Signalé, sans issue.
+  lit tout `release.body`, jusqu'à 125 000 caractères par release. Porté par #331.
 - **D'une alerte à sa vulnérabilité** : le détail d'une alerte dit `cve_id` et `exploited`, pas
   l'`id` de l'item vulnérabilité ; la liste n'a pas `cve_id` et `q` ne le cherche pas. Un client
   ne peut donc pas lire au détail de la vulnérabilité si elle a été retirée du catalogue KEV.

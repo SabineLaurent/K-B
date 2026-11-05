@@ -829,6 +829,12 @@ mesures applicables le sont. « Au déploiement » renvoie au déploiement sur A
 au 2026-11-05, une case de #317 (« Plus tard : déploiement », sans jalon) le porte, et aucune
 issue du jalon « Mise en ligne 08/11 ».
 
+« **Pour la tenir** » dit comment chaque mesure non tenue le serait, avec sa taille (XS ≤ 1 h,
+S ≤ 3 h, M ≈ 6 h, L ≈ 15 h) et ce dont elle dépend ; rien n'en est codé (décision de Sabine du
+2026-11-05 : dire comment on ferait, sans le faire maintenant). Ce qui touche à ACA vient de sa
+documentation, lue le 2026-11-05 (« Sources de l'auto-évaluation ») ; ce qu'elle ne dit pas est
+écrit « à vérifier au déploiement ».
+
 | Entrée | État | Ce qui reste, et où |
 |---|---|---|
 | API1 Broken Object Level Authorization | **Tenue** | — |
@@ -898,6 +904,10 @@ déploiement, ou l'organisme de formation pour le plafond de dépense.
     l'anti-force brute ci-dessous ;
   - transport sous TLS : non tenue en local, c'est le TLS d'API8 ;
   - authentification TLS mutuelle entre programmes : non appliquée, une option du déploiement.
+    **Pour la tenir** : `clientCertificateMode: require` sur l'entrée d'ACA, un certificat par
+    client ; l'entrée transmet le certificat à l'app dans `X-Forwarded-Client-Cert`, et la doc ne
+    dit pas si elle en valide la chaîne : à vérifier au déploiement, sinon l'app la valide. M, au
+    déploiement.
 
   La section « API Keys » de la REST Security Cheat Sheet, que la fiche ne cite pas, est tenue :
   clé exigée sur chaque point d'accès protégé, 429 au-delà du débit (#400), clé jamais dans l'URL,
@@ -919,6 +929,12 @@ déploiement, ou l'organisme de formation pour le plafond de dépense.
     `127.0.0.1`, et un essai répété couperait `kb digest` ;
   - derrière l'entrée d'ACA, l'adresse du client passe par un mandataire : une limite par adresse
     se règle au déploiement, si elle y est décidée.
+
+  **Pour la tenir**, si elle est décidée : compter les 401 par adresse de client et rendre 429
+  au-delà d'un seuil à fixer, dans le compteur du débit (`core/api_rate_limit.py`). Derrière
+  l'entrée d'ACA, l'adresse vient de `X-Forwarded-For`, dont ACA ne fournit que la valeur la plus à
+  droite ; uvicorn 0.54 ne la lit que des adresses de `FORWARDED_ALLOW_IPS` (`127.0.0.1,::1` par
+  défaut, K-B ne la règle pas), à poser sur l'entrée. S, au déploiement.
 - **Récupération d'identifiants, ré-authentification, MFA, verrouillage, captcha, mots de passe
   faibles** : *s.o.*, ni compte, ni utilisateur humain, ni mot de passe.
 - **Clés d'API pour les seuls clients d'API** : tenue. Les deux clients sont des commandes de K-B.
@@ -946,6 +962,11 @@ déploiement, ou l'organisme de formation pour le plafond de dépense.
 - **Limiter la mémoire, le CPU, les redémarrages, les descripteurs et les processus** : non tenue.
   Aucun fichier de conteneur ni de déploiement à ce commit : au déploiement, avec
   `maxReplicas: 1` (« Accès »).
+  **Pour la tenir** : dans le fichier de déploiement, `resources.cpu` et `resources.memory` de
+  chaque conteneur (en plan Consumption, l'une des paires de 0,25 vCPU et 0,5 Gi à 4 vCPU et 8 Gi ;
+  0,5 vCPU et 1 Gi est l'hypothèse du `README.md`, « Budget »), `maxReplicas: 1`, et `minReplicas`
+  à décider (0 par défaut, une réplique gardée coûte). Un conteneur qui plante redémarre seul ;
+  aucune politique de redémarrage n'est réglable pour une app. S, au déploiement.
 - **Taille maximale de toutes les entrées** : tenue (#399). Corps de 1 024 octets au plus, refusé
   en 413 avant la clé (`MAX_AI_API_BODY_BYTES`) ; `window_days` de 1 à 14 ; `after` et
   `previous_first_window` au format `AAAA-MM-JJ`, sur 15 fenêtres au plus.
@@ -979,6 +1000,11 @@ déploiement, ou l'organisme de formation pour le plafond de dépense.
   jetons (`README.md`), environ 5 $, et 20 comptes rendus × 80 000 jetons
   ([tendances.md](tendances.md)), environ 1 $. Ce n'est pas un plafond : un redémarrage remet le
   compte à zéro.
+  **Pour la tenir** : un budget de Cost Management sur l'abonnement, avec un seuil et une adresse
+  de courriel ; le créer demande le rôle Contributor ou Cost Management Contributor, que Sabine n'a
+  pas : à demander à l'organisme. Le budget alerte sans arrêter la consommation, et n'est évalué
+  que toutes les 24 h. Un arrêt réel ne peut venir que de K-B : un compte des jetons par jour,
+  gardé hors de la mémoire, qui refuse au-delà d'un plafond ; non conçu, M.
 
 ### API5:2023 Broken Function Level Authorization
 
@@ -1033,17 +1059,31 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
 - **Durcissement répétable** : non tenue, en partie. Un réglage refusé empêche le démarrage
   (`test_serve_ai_exits_2_and_names_the_variable_refused`) ; les fichiers de déploiement, qui
   rendraient le durcissement répétable, viennent au déploiement.
+  **Pour la tenir** : les fichiers de déploiement versionnés dans le dépôt (l'image, le compose de
+  #200, la description des apps d'ACA), relus en PR comme le code. M, au déploiement.
 - **Revue périodique des configurations de toute la pile** : non tenue. Rien à relire dans le dépôt
   avant les fichiers de déploiement : au déploiement.
+  **Pour la tenir** : à chaque déploiement, relire la configuration déployée contre ces fichiers et
+  contre cette section. XS par revue.
 - **Évaluation automatisée et continue dans tous les environnements** : non tenue, en partie. La CI
   lance `pip-audit`, les règles de sécurité de ruff et les tests sur chaque PR
   (`.github/workflows/ci.yml`) ; aucun environnement déployé n'est évalué.
+  **Pour la tenir** : un scan de l'image dans la CI (l'outil, une dépendance de la CI, est à
+  choisir) et, une fois déployé, les essais de cette section rejoués contre l'environnement (les
+  `curl` des essais réels). S.
 - **TLS, même pour une API interne** : non tenue, en partie. `https` vers le modèle, GitHub et
   l'export ; sans TLS : l'API IA elle-même, en local, et le lien vers l'API de données (API10).
   L'entrée HTTPS d'ACA viendra au déploiement ; un échange de clés hybride post-quantique (ML-KEM,
   FIPS 203 du 13/08/2024) qu'elle proposerait est à vérifier ce jour-là. Côté client, K-B ne règle
   pas la version de TLS : les bibliothèques gardent leur contexte par défaut, TLS 1.2 au moins,
   httpx2 2.13.1 pour `core/outbound.py` et urllib3 de `requests` pour l'export (lu le 2026-11-05).
+  **Pour la tenir** : l'entrée HTTPS d'ACA, qui n'accepte que TLS 1.2 ou 1.3 et redirige `http`
+  vers `https` tant que `allowInsecure` reste `false` ; entre les deux API, l'entrée interne de
+  l'API de données et le chiffrement entre apps de l'environnement (désactivé par défaut,
+  `peerTrafficConfiguration.encryption.enabled`), qui chiffre aussi un appel par le nom de l'app :
+  `KB_DATA_API_URL` peut alors garder `http://<app>`. L'échange de clés post-quantique
+  (`X25519MLKEM768`) est documenté pour Azure Front Door, du client à Front Door seulement, pas
+  pour l'entrée d'ACA. S, au déploiement.
 - **N'accepter que les verbes HTTP nécessaires** : tenue (#401). Chaque route n'accepte que sa
   méthode ; `HEAD`, que Starlette ajoute à toute route `GET`, est retiré ; toute autre méthode
   rend 405 `method_not_allowed`. `test_every_route_answers_its_method_only_and_405_to_any_other`.
@@ -1051,12 +1091,16 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
   la même section laisse chaque ressource décider des méthodes qu'elle permet, et les clients de
   l'API, connus, n'envoient jamais `HEAD`. Une méthode inconnue (`FOO`) rend 405, là où la RFC
   recommande 501 ; `OPTIONS *` et `CONNECT hôte:port` rendent 404 (essayé le 2026-11-05).
+  **Pour la tenir**, si l'écart est levé : 501 pour une méthode qui n'est pas dans la RFC 9110,
+  405 pour les autres. S.
 - **CORS et en-têtes de sécurité des clients en navigateur** : *s.o.*, aucun client en navigateur
   et aucun `CORSMiddleware` : un navigateur d'une autre origine ne peut pas lire une réponse. Seule
   `/docs`, en `sandbox`, est une page.
 - **Restreindre les types de contenu entrants** : tenue. Seul un corps JSON est lu ; un autre type
   rend 422 `invalid_parameter` `["body"]` (essayé le 2026-11-05 avec `text/plain`, sans test). La
   RFC 9110 donnerait 415 : écart voulu, un seul état pour tout corps refusé.
+  **Pour la tenir**, si l'écart est levé : 415 pour un corps qui n'est pas `application/json`,
+  avant sa lecture, et un test. S.
 - **Traitement uniforme dans la chaîne de serveurs** : *s.o.*, un seul serveur, uvicorn ; à revoir
   derrière l'entrée d'ACA.
 - **Schémas de réponse, erreurs comprises, sans trace d'exception** : tenue. Corps `{"error":
@@ -1073,6 +1117,11 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
     seul état ;
   - le budget de 70 requêtes à GitHub épuisé rend 502 `github_unavailable`, alors que la limite est
     celle de K-B, pas une panne de GitHub.
+
+  **Pour les tenir** : derrière l'entrée d'ACA, une requête mal formée passe d'abord par son
+  mandataire (Envoy) : ce qu'il en fait est à vérifier au déploiement. Un 400 nommé pour un corps
+  illisible, distinct du 422 de schéma (S). Un 503 et un état nommé pour le budget GitHub épuisé
+  (XS).
 
 Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié dans « Accès ».
 
@@ -1095,8 +1144,16 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
   `tests/ai_api/test_serve_ai.py`) ; en `sandbox`, ils répondent sans clé, sans aucune donnée. Le
   contrat est versionné dans le dépôt, privé au 2026-11-05 et appelé à devenir public : s'il l'est,
   fermer `/docs` ne cacherait pas le contrat.
+  **Pour la tenir** : ne plus servir `/docs` ni `/openapi.json`, même en `sandbox` ; le contrat reste
+  dans le dépôt (`kb openapi`). Le coût : plus d'essai dans le navigateur. XS.
 - **Protections externes pour toutes les versions exposées** : non tenue. Aucune solution de
   sécurité d'API devant l'app à ce commit : à décider au déploiement.
+  **Pour la tenir**, au déploiement, l'une de ces voies, à chiffrer :
+  - des restrictions d'adresses sur l'entrée d'ACA (`ipSecurityRestrictions`, toutes en `Allow` ou
+    toutes en `Deny`) : utiles seulement si les clients ont des adresses fixes ;
+  - Azure API Management devant l'app, avec ses politiques (limite de débit) ;
+  - Application Gateway avec son WAF, devant un environnement interne dans un réseau virtuel ;
+  - Front Door Premium avec son WAF, par Private Link, sur un environnement « workload profiles ».
 - **Pas de données de production hors production** : *s.o.* à ce commit, aucune production
   déployée ; à revoir au déploiement.
 - **Analyse de risque des anciennes versions** : *s.o.*, une seule version servie.
@@ -1124,6 +1181,7 @@ L'API IA consomme le modèle, l'API de données, GitHub et l'export OTLP vers Gr
 - **TLS avec toutes les API intégrées** : non tenue, en partie. `https` seul vers le modèle, GitHub
   et l'export (API7) ; `http` permis vers l'API de données, sur la machine et dans le réseau compose
   prévu (#200) (`ai_api/connectors/data_api_settings.py`) : au déploiement.
+  **Pour la tenir** : le chiffrement entre apps d'ACA (API8). S, au déploiement.
 - **Valider et assainir les données reçues** : tenue. Modèles Pydantic stricts pour chaque réponse ;
   corps bornés, la réponse du modèle comprise (#399,
   `test_an_answer_above_the_bound_is_llm_unavailable_without_retry`) ; textes de dépôt nettoyés
@@ -1157,6 +1215,17 @@ Lues le 2026-11-05.
 - Grafana Cloud : [politiques d'accès](https://grafana.com/docs/grafana-cloud/security-and-account-management/authentication-and-permissions/access-policies/),
   [conformité](https://grafana.com/legal/security-compliance/),
   [signaler une vulnérabilité](https://grafana.com/legal/report-a-security-issue/).
+- Azure Container Apps : [conteneurs](https://learn.microsoft.com/en-us/azure/container-apps/containers),
+  [mise à l'échelle](https://learn.microsoft.com/en-us/azure/container-apps/scale-app),
+  [entrée](https://learn.microsoft.com/en-us/azure/container-apps/ingress-overview),
+  [chiffrement entre apps](https://learn.microsoft.com/en-us/azure/container-apps/ingress-environment-configuration),
+  [restrictions d'adresses](https://learn.microsoft.com/en-us/azure/container-apps/ip-restrictions),
+  [certificats clients](https://learn.microsoft.com/en-us/azure/container-apps/client-certificate-authorization),
+  [Application Gateway et WAF](https://learn.microsoft.com/en-us/azure/container-apps/waf-app-gateway),
+  [Front Door](https://learn.microsoft.com/en-us/azure/container-apps/how-to-integrate-with-azure-front-door) ;
+  [échange de clés de Front Door](https://learn.microsoft.com/en-us/azure/frontdoor/tls-key-exchange-policy) ;
+  [API Management](https://learn.microsoft.com/en-us/azure/api-management/import-container-app-with-oas) ;
+  [budgets de Cost Management](https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/tutorial-acm-create-budgets).
 
 ## Ce que la spec ne couvre pas
 
