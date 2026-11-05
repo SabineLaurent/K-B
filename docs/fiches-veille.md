@@ -569,9 +569,14 @@ de la requête.
   contiennent aucune donnée, si bien qu'un rebinding DNS n'obtient rien et ne coûte aucun appel. Signalé à
   #161 (OWASP API Top 10 de l'API IA) et à revoir en conteneurs (#200), où l'hôte appelant change.
 - **`GET /health`** répond 200 `{"status": "ok"}` sans clé, comme celle de l'API de données.
+- **Méthodes** (OWASP API8:2023) : chaque route n'accepte que sa méthode, `GET` ou `POST` ; `HEAD`,
+  que Starlette ajoute à toute route `GET`, est retiré (`core/api_methods.py`), et toute autre
+  méthode sur le chemin d'une route, `TRACE` et `CONNECT` compris, rend 405 `method_not_allowed`,
+  comme l'API de données ; `CONNECT hôte:port` et `OPTIONS *` rendent 404 `route_not_found` (essayé
+  sous uvicorn le 2026-11-05).
 - **Documentation** : `/docs` et `/openapi.json` ne sont servis que si
   `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, 404 sinon, comme l'API de données ([specs-api.md](specs-api.md), #393).
-- **Version** : `0.10.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
+- **Version** : `0.11.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
   un changement visible par un client change les deux. `0.1.0` : `POST /digests` (#156) ; `0.2.0` :
   `model` dans la réponse (#209) ; `0.3.0` : `unanswered`, et `not_retained` du premier niveau
   renommé `no_suitable_subject` (#210, `classify-2`) ; `0.4.0` : `items_dropped` renommé
@@ -584,7 +589,8 @@ de la requête.
   ne change pas ; `0.8.0` : `/docs` et `/openapi.json` en `sandbox` seulement (#393) ; `0.9.0` :
   413 `content_too_large` sur les deux routes, pour un corps de plus de 1 024 octets (#161) ;
   `0.10.0` : 403 `client_not_allowed`, 429 `rate_limit_exceeded` et `request_already_running`, 503
-  `data_api_rate_limited` (#161).
+  `data_api_rate_limited` (#161) ; `0.11.0` : `HEAD` refusé sur `/health`, et sur `/docs` et
+  `/openapi.json` en `sandbox`, 405 `method_not_allowed` (#161).
 
 ## Contrôles
 

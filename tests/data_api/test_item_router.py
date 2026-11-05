@@ -142,17 +142,6 @@ def test_the_list_serves_only_the_six_fields(client, authorization):
         assert absent not in response.text
 
 
-@pytest.mark.parametrize("path", ["/items", "/items/1", "/trends"])
-@pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE"])
-def test_every_data_route_refuses_another_method_with_405(
-    client, authorization, path, method
-):
-    response = client.request(method, path, headers=authorization)
-
-    assert response.status_code == 405
-    assert response.json() == {"error": "method_not_allowed"}
-
-
 # The detail of one item of each kind, whole (docs/specs-api.md, "GET /items/{item_id}"): the
 # fields of the list, then those of its kind, and nothing else (API3).
 PAPER_2 = {

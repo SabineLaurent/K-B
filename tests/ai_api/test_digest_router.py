@@ -86,6 +86,26 @@ TREND_REPORT_AUTHORIZATION = {"Authorization": f"Bearer {TREND_REPORT_KEY}"}
 UNLISTED_CLIENT = "TERMINAL"
 UNLISTED_CLIENT_KEY = secrets.token_urlsafe(32)
 UNLISTED_CLIENT_AUTHORIZATION = {"Authorization": f"Bearer {UNLISTED_CLIENT_KEY}"}
+# The one method each route of the app declares; HEAD is none of them (OWASP API8:2023, verbs).
+METHOD_OF_EACH_ROUTE = {
+    "/docs": "GET",
+    "/openapi.json": "GET",
+    "/health": "GET",
+    "/digests": "POST",
+    "/trend-reports": "POST",
+}
+# The methods of RFC 9110 (section 9) and PATCH (RFC 5789), all sent by the test client.
+HTTP_METHODS = (
+    "GET",
+    "HEAD",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+    "TRACE",
+    "CONNECT",
+)
 # The time of the requests, set by the test. Over 14 days, the window reads the vulnerabilities 3
 # and 4, the papers 2 and 1, the releases 6, 7 and 8 and the newsletter articles 12, 11 and 13 of
 # the test base; the advisories, of June, are older.
@@ -1100,7 +1120,6 @@ def test_only_the_public_routes_answer_without_a_key(make_ai_api):
         (route.path, method)
         for route in iter_route_contexts(client.app.routes)
         for method in route.methods or ()
-        if method != "HEAD"
     }
 
     answered_without_key = {
@@ -1109,14 +1128,40 @@ def test_only_the_public_routes_answer_without_a_key(make_ai_api):
         if client.request(method, path).status_code != 401
     }
 
-    assert routes == {
-        ("/docs", "GET"),
-        ("/openapi.json", "GET"),
-        ("/health", "GET"),
-        ("/digests", "POST"),
-        ("/trend-reports", "POST"),
-    }
+    assert routes == set(METHOD_OF_EACH_ROUTE.items())
     assert answered_without_key == {"/docs", "/openapi.json", "/health"}
+
+
+def read_status_allow_and_body(response):
+    """The status, the Allow header and the JSON body of a response; None for an empty body, as
+    a response to HEAD always is (RFC 9110, section 9.3.2)."""
+    return (
+        response.status_code,
+        response.headers.get("allow"),
+        response.json() if response.content else None,
+    )
+
+
+def test_every_route_answers_its_method_only_and_405_to_any_other(make_ai_api):
+    client, _ = make_ai_api([])
+
+    answers = {
+        (path, method): read_status_allow_and_body(
+            client.request(method, path, headers=AUTHORIZATION)
+        )
+        for path, declared_method in METHOD_OF_EACH_ROUTE.items()
+        for method in HTTP_METHODS
+        if method != declared_method
+    }
+
+    assert answers == {
+        (path, method): (
+            405,
+            METHOD_OF_EACH_ROUTE[path],
+            None if method == "HEAD" else {"error": "method_not_allowed"},
+        )
+        for path, method in answers
+    }
 
 
 def test_a_final_slash_is_an_unknown_route(make_ai_api):

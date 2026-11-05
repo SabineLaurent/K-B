@@ -3,8 +3,32 @@
 import logging
 
 import pytest
+from fastapi.routing import iter_route_contexts
 
 from k_b.data_api.routers import item_router
+
+# The methods of RFC 9110 (section 9) and PATCH (RFC 5789), all sent by the test client.
+HTTP_METHODS = (
+    "GET",
+    "HEAD",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+    "TRACE",
+    "CONNECT",
+)
+
+
+def read_status_allow_and_body(response):
+    """The status, the Allow header and the JSON body of a response; None for an empty body, as
+    a response to HEAD always is (RFC 9110, section 9.3.2)."""
+    return (
+        response.status_code,
+        response.headers.get("allow"),
+        response.json() if response.content else None,
+    )
 
 
 def test_a_host_other_than_localhost_gives_400(client, authorization):
@@ -104,6 +128,30 @@ def test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only(
     assert "status=500" in caplog.text
     assert "value received by the test" not in caplog.text
     assert "Traceback" not in caplog.text
+
+
+def test_every_route_answers_get_only_and_405_to_any_other_method(
+    client, authorization
+):
+    """HEAD too, which Starlette adds to a GET route (OWASP API8:2023, verbs)."""
+    answers = {
+        (route.path, method): read_status_allow_and_body(
+            client.request(method, route.path.format(item_id=1), headers=authorization)
+        )
+        for route in iter_route_contexts(client.app.routes)
+        for method in HTTP_METHODS
+        if method != "GET"
+    }
+
+    assert answers
+    assert answers == {
+        (path, method): (
+            405,
+            "GET",
+            None if method == "HEAD" else {"error": "method_not_allowed"},
+        )
+        for path, method in answers
+    }
 
 
 @pytest.mark.parametrize("path", ["/items", "/items/1", "/trends"])

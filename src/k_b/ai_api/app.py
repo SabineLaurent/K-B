@@ -22,6 +22,7 @@ from k_b.core.api_access import check_api_key, check_client_allowed
 from k_b.core.api_body_limit import bound_request_bodies
 from k_b.core.api_errors import API_ERROR_HANDLERS, respond_to_unexpected_error
 from k_b.core.api_health import HEALTH_PATH, answer_health
+from k_b.core.api_methods import remove_implicit_head
 from k_b.core.api_rate_limit import RateLimiter, check_rate_limit, hold_route_slot
 from k_b.core.api_request_log import log_request
 from k_b.core.api_telemetry import NATIVE_TELEMETRY_OFF
@@ -34,7 +35,7 @@ from k_b.core.config import (
 
 # The version of the contracts of docs/fiches-veille.md and docs/tendances.md: a change a client
 # can see changes both.
-API_VERSION = "0.10.0"
+API_VERSION = "0.11.0"
 
 
 def create_app(
@@ -97,6 +98,8 @@ def create_app(
     # add_route, as FastAPI adds /docs: a route of Starlette, which the key of the app does not
     # reach (fastapi/applications.py, 0.143).
     app.add_route(HEALTH_PATH, answer_health, methods=["GET"], include_in_schema=False)
+    # Last: after every route is added.
+    remove_implicit_head(app)
     return app
 
 
