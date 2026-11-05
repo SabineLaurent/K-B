@@ -674,6 +674,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   vides étant écartées par la requête et la règle du nom (`owner/name`, sans espace) étant large.
   Requête : `TRENDS_QUERY`, `src/k_b/etl/sources/gh_archive.py`. `kb import` écrit ses lignes dans
   la table `trend` (« Du brut au jeu d'items », étape 4, « Classements GH Archive »).
+- **Première collecte** : les fenêtres que lit un premier compte rendu des tendances, soit sa période
+  et les fenêtres de recul de « durable » (`GH_ARCHIVE_FIRST_COLLECTION_WINDOWS`, 6 ;
+  [tendances.md](tendances.md), « Période ») : le compte rendu du premier lancement n'en manque aucune.
 - **Rattrapage** : les fenêtres manquées depuis la dernière collecte, 15 au plus (un dépôt qui a
   monté il y a plus de deux semaines n'apporte plus grand-chose à la veille), en une seule
   requête qui lit chaque jour une fois. La table de la veille doit être close (modifiée après

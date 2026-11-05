@@ -94,6 +94,11 @@ TREND_FIRST_REPORT_WINDOWS = 4
 # windows before it.
 TREND_DURABLE_MIN_WINDOWS = 2
 TREND_DURABLE_LOOKBACK_WINDOWS = 2
+# A first collection of GH Archive takes the windows a first trend report reads, its period and the
+# lookback of durable: the report of the first run misses none.
+GH_ARCHIVE_FIRST_COLLECTION_WINDOWS = (
+    TREND_FIRST_REPORT_WINDOWS + TREND_DURABLE_LOOKBACK_WINDOWS
+)
 # Accelerating: 5 ranks gained at least over the last run of windows in the top.
 TREND_ACCELERATION_MIN_RANKS = 5
 # The repositories whose sheet is read on GitHub, those meeting a criterion first.
