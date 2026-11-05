@@ -270,9 +270,9 @@ AI_API_CLIENT_BY_ROUTE = {
     "/digests": DIGEST_CLIENT,
     "/trend-reports": TREND_REPORT_CLIENT,
 }
-# The routes of the AI API call a paid model: 20 requests a day, 3 times the most measured (7, in
-# the trial logs of 2026-10-26 to 29), about 420,000 tokens each at worst (README.md). Counted in
-# memory: not a budget, a restart empties the count (docs/fiches-veille.md, "Accès").
+# The routes of the AI API call a paid model: 20 requests a day, about 3 times the most measured
+# (7, in the trial logs of 2026-10-26 to 29), about 420,000 tokens each at worst (README.md).
+# Counted in memory: not a budget, a restart empties the count (docs/fiches-veille.md, "Accès").
 AI_API_RATE_LIMITS = {
     "/digests": RateLimit(requests=20, window_seconds=86_400),
     "/trend-reports": RateLimit(requests=20, window_seconds=86_400),

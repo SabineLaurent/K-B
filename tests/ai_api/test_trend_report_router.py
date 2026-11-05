@@ -1257,9 +1257,7 @@ def test_beyond_its_limit_the_client_of_the_reports_gets_429_without_a_reading(
     client.app.state.rate_limiter = RateLimiter(
         {"/trend-reports": RateLimit(requests=1, window_seconds=86_400)}
     )
-    client.app.state.rate_limiter.find_wait_seconds(
-        TREND_REPORT_CLIENT, "/trend-reports"
-    )
+    client.app.state.rate_limiter.admit_call(TREND_REPORT_CLIENT, "/trend-reports")
 
     response = post_trend_reports(client)
 

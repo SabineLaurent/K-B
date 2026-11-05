@@ -48,6 +48,7 @@ from k_b.ai_api.tracing import TRACING_OFF
 from k_b.core.api_rate_limit import RateLimiter
 from k_b.core.api_settings import OPENAPI_PATH
 from k_b.core.config import (
+    AI_API_CLIENT_BY_ROUTE,
     AI_API_RATE_LIMITS,
     DIGEST_CLIENT,
     DIGEST_REQUEST_TIMEOUT_SECONDS,
@@ -1425,6 +1426,7 @@ def test_every_route_of_the_model_has_its_limit(make_ai_api):
 
     assert model_routes
     assert model_routes == set(AI_API_RATE_LIMITS)
+    assert model_routes == set(AI_API_CLIENT_BY_ROUTE)
 
 
 def test_beyond_its_limit_a_client_gets_429_before_any_reading(make_ai_api):

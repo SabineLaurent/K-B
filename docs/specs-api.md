@@ -121,7 +121,8 @@ fenêtre. Un appel refusé ne compte pas.
 - **Limites** : le compte vit en mémoire. Un redémarrage ou un passage à zéro réplique le remet à
   zéro, et il ne vaut que pour une réplique (`maxReplicas: 1` au déploiement, #317). Les requêtes sans
   clé valide n'ont pas de limite : par adresse, elle passerait par `X-Forwarded-For`, à valider
-  derrière l'entrée d'ACA (à justifier avec la revue des 10 points de #161).
+  derrière l'entrée d'ACA (à justifier avec la revue des 10 points de #161). Sur le Mac, la veille ne
+  compte pas dans la fenêtre (`time.monotonic`, `mach_absolute_time()`) : elle s'allonge d'autant.
 
 ## Les parcours P1–P9
 

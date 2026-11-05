@@ -553,13 +553,15 @@ de la requête.
   tant que la première n'a pas fini, environ 200 s au plus. Un digest et un compte rendu peuvent
   tourner ensemble.
 - **Débit par client et par route** (OWASP API4 et API6:2023) : 20 demandes par 24 h glissantes sur
-  chaque route (`AI_API_RATE_LIMITS`, `core/config.py`), 3 fois le pic mesuré du 26 au 29/10. Au-delà, 429
+  chaque route (`AI_API_RATE_LIMITS`, `core/config.py`), environ 3 fois le pic mesuré du 26 au 29/10 (7 par jour). Au-delà, 429
   `rate_limit_exceeded`, avec `Retry-After`. Ni un 401, ni un 403, ni un refus de concurrence ne comptent.
   **Ce n'est pas un budget** : le compte vit en mémoire, un redémarrage ou un passage à zéro réplique
   le remet à zéro, et il ne vaut que pour une réplique (`maxReplicas: 1` au déploiement, #317). Une
   boucle qui s'emballe est arrêtée, car elle garde la réplique en vie ; un voleur patient de clé ne
   l'est pas. Le compte porte sur les tentatives, pas sur les appels au modèle : un 422 de schéma ou
-  une panne rapide consomme aussi. Aucune limite pour les requêtes sans clé valide.
+  une panne rapide consomme aussi. Aucune limite pour les requêtes sans clé valide. Sur le Mac, la
+  veille ne compte pas dans les 24 h (`time.monotonic` y lit `mach_absolute_time()`, vérifié le
+  2026-11-05) : la fenêtre s'allonge d'autant, la limite est donc plus stricte, jamais plus large.
 - **Ordre des contrôles** : 413, 404 ou 405, 422 d'un corps illisible, 401, 403, 429 de concurrence,
   429 de débit, 422 de schéma, puis la route.
 - **Pas de `TrustedHostMiddleware`**, écart voulu à la ligne API8 de [specs-api.md](specs-api.md) :

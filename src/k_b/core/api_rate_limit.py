@@ -29,9 +29,10 @@ class RateLimiter:
         self.clock = clock
         self.calls: dict[tuple[str, str], deque[float]] = {}
 
-    def find_wait_seconds(self, client_name: str, route: str) -> int | None:
-        """Count a call and return None, or the seconds until the oldest call leaves the window,
-        without counting it; a route without a limit raises KeyError, a 500 that fails closed."""
+    def admit_call(self, client_name: str, route: str) -> int | None:
+        """Admit the call, counted, and return None; or refuse it, not counted, and return the
+        seconds until the oldest call leaves the window. A route without a limit raises KeyError,
+        a 500 that fails closed."""
         limit = self.limit_by_route[route]
         calls = self.calls.setdefault((client_name, route), deque())
         now = self.clock()
@@ -46,7 +47,7 @@ class RateLimiter:
 async def check_rate_limit(request: Request) -> None:
     """Refuse a client beyond the limit of the route with a 429 that says how long to wait; after
     check_api_key, so that a request without a valid key counts for nothing."""
-    wait_seconds = request.app.state.rate_limiter.find_wait_seconds(
+    wait_seconds = request.app.state.rate_limiter.admit_call(
         request.state.client_name, find_route_template(request)
     )
     if wait_seconds is not None:

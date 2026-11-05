@@ -227,10 +227,12 @@ prudence, URL. Le modèle n'écrit que les 4 textes.
 | `repositories[].trajectory[]` | un point par fenêtre de la période : `window_end`, `state` (`top`, `out_of_top`, `missing`), `rank` et `stars_gained` dans le top seulement |
 | `repositories_dropped` | ceux qui remplissent un critère, écartés : leur nom vaut `.` ou contient `..`, et irait dans un chemin |
 
-Ses erreurs sont celles de l'API de données seulement : 502 (`data_api_invalid_response`,
+Ses erreurs d'amont sont celles de l'API de données : 502 (`data_api_invalid_response`,
 `data_api_unauthorized`, `data_api_unavailable`), 503 (`data_api_rate_limited`), 504
-(`data_api_timeout`). La route s'ouvre au seul client `KB_TREND_REPORT`, une demande à la fois, 20 par
-24 h glissantes, comme `POST /digests` ([fiches-veille.md](fiches-veille.md), « Accès »). Les lectures sont 32 au
+(`data_api_timeout`). S'y ajoutent celles de l'accès, comme pour `POST /digests`
+([fiches-veille.md](fiches-veille.md), « Accès ») : la route s'ouvre au seul client `KB_TREND_REPORT`
+(403 `client_not_allowed` pour un autre), une demande à la fois (429 `request_already_running`), 20 par
+24 h glissantes (429 `rate_limit_exceeded`). Les lectures sont 32 au
 plus (la plus récente, puis la période, ses 2 fenêtres de recul et celles du compte rendu précédent,
 chacune une fois), sous `TREND_REPORT_REQUEST_TIMEOUT_SECONDS` (60 s, `core/config.py` ; 200 s
 depuis #368). Les

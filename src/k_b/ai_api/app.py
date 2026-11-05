@@ -74,7 +74,7 @@ def create_app(
         telemetry=NATIVE_TELEMETRY_OFF,
     )
     app.state.api_keys = dict(api_keys)
-    app.state.client_by_route = AI_API_CLIENT_BY_ROUTE
+    app.state.client_by_route = dict(AI_API_CLIENT_BY_ROUTE)
     # threading.Lock, not asyncio.Lock: acquired without waiting, and tied to no event loop.
     app.state.slot_by_route = {route: Lock() for route in AI_API_CLIENT_BY_ROUTE}
     app.state.rate_limiter = RateLimiter(AI_API_RATE_LIMITS)
