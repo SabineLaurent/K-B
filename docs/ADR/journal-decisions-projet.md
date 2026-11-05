@@ -5017,6 +5017,32 @@ Décisions de Sabine du 2026-11-04.
   compte des fichiers, pas des jours : un jour sans commande n'en crée pas, la durée n'est donc pas
   dite). Limite : sans `kb import`, rien n'est supprimé. — PR de #267
 
+## 2026-11-05
+
+### API : borner le corps des requêtes et la réponse du modèle (#161)
+
+- **Le corps d'une requête à l'API IA est borné à 1 024 octets par le `RequestBodyLimitMiddleware` de
+  Starlette, précédé d'un contrôle de `Content-Length` propre à K-B : au-delà, 413
+  `content_too_large`, avant la clé.** Recommandation de time-knight, acceptée par Sabine (« go » sur
+  l'option B). Pourquoi : FastAPI lit le corps avant la clé, et ce corps n'avait pas de taille
+  maximale (OWASP API4:2023, revue de la certif du 05/11). Starlette compte les octets reçus, en flux
+  compris ; mais quand la longueur annoncée dépasse la borne, il remplace toute réponse par un 413 en
+  texte brut (`send_with_limit`, essayé sur 1.8.0), hors du schéma d'erreur qu'API8 demande. K-B répond
+  donc d'abord, en lisant la longueur par `int()` comme Starlette. Écartés : Starlette seul (413 en
+  texte brut dans le cas courant) ; un middleware entièrement à K-B (refait le comptage que la
+  bibliothèque fournit) ; lever une exception depuis `receive` (FastAPI en fait un 400) ; une borne
+  posée par ACA (rien dans le dépôt, rien en local). Limite : en flux, le serveur lit encore le morceau
+  qui franchit la borne, sans clé. — PR de #161, à venir
+
+- **La réponse du fournisseur du modèle est lue par `read_bounded_body`, à 1 000 000 d'octets au plus :
+  au-delà, `llm_unavailable` sans nouvelle tentative ; à l'échéance, `llm_timeout`.** Validé par Sabine
+  avec le plan de la PR. Pourquoi : une réponse de tiers est une entrée non fiable (OWASP API10:2023),
+  et l'API de données et GitHub ont déjà cette lecture. Écarté : garder `http_client.post`, qui lit tout
+  en mémoire avant toute décision. Limites assumées : la valeur repose sur une estimation (environ
+  65 Ko pour 8 192 jetons), non mesurée ; un 429 ou un 5xx de plus d'1 Mo perd son `Retry-After`, et une
+  réponse trop grosse ne donne pas ses jetons consommés (lire l'usage demanderait de lire le corps).
+  — PR de #161, à venir
+
 ## Décisions encore ouvertes
 
 - **Les seuils des critères des tendances** (2026-10-30) : 2 jours actifs pour « durable », 5 rangs
