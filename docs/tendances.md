@@ -228,7 +228,9 @@ prudence, URL. Le modèle n'écrit que les 4 textes.
 | `repositories_dropped` | ceux qui remplissent un critère, écartés : leur nom vaut `.` ou contient `..`, et irait dans un chemin |
 
 Ses erreurs sont celles de l'API de données seulement : 502 (`data_api_invalid_response`,
-`data_api_unauthorized`, `data_api_unavailable`), 504 (`data_api_timeout`). Les lectures sont 32 au
+`data_api_unauthorized`, `data_api_unavailable`), 503 (`data_api_rate_limited`), 504
+(`data_api_timeout`). La route s'ouvre au seul client `KB_TREND_REPORT`, une demande à la fois, 20 par
+24 h glissantes, comme `POST /digests` ([fiches-veille.md](fiches-veille.md), « Accès »). Les lectures sont 32 au
 plus (la plus récente, puis la période, ses 2 fenêtres de recul et celles du compte rendu précédent,
 chacune une fois), sous `TREND_REPORT_REQUEST_TIMEOUT_SECONDS` (60 s, `core/config.py` ; 200 s
 depuis #368). Les

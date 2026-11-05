@@ -54,8 +54,9 @@ def post_digests(
     """The digests of the items of the window, one per subject with items; a subject whose
     writing fails is named in failed_subjects, a reading or a classification that fails fails
     the request."""
-    # The root span ends whatever happens, its state named. A 401 and a 422 have none, and an
-    # error once the response is returned leaves it at 200 (docs/fiches-veille.md, "Traces").
+    # The root span ends whatever happens, its state named. A 401, a 403, a 422 and a 429 have
+    # none, and an error once the response is returned leaves it at 200 (docs/fiches-veille.md,
+    # "Traces").
     # Not in the docstring: it is the description of the route in the OpenAPI.
     request_id = read_request_id(request)
     tracing: Tracing = request.app.state.tracing

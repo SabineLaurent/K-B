@@ -207,7 +207,7 @@ uv sync
 | `KB_COLLECT_ONLY` | non | les dossiers des sources que `kb collect` lance, séparés par des virgules (`zotero,clipping`) ; la casse ne compte pas. Sans elle, pas de filtre : chaque source tourne comme avant (Zotero, clips et GH Archive selon leur variable). Une source écartée affiche `<dossier>: skipped (not in KB_COLLECT_ONLY)` ; un nom qui n'est pas un dossier de source, une valeur ou une entrée vide, ou une source choisie sans sa variable (`zotero` sans `KB_ZOTERO_DIR`) : code 2, rien n'est collecté ([docs/specs-collecte.md](docs/specs-collecte.md), « Choisir les sources »). |
 | `KB_GITHUB_TOKEN` | non | jeton GitHub en lecture seule ([docs/jeton-github.md](docs/jeton-github.md)). Sans lui, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000. |
 | `KB_DATA_API_KEY_<CLIENT>` | pour `kb serve-data` | la clé d'un client de l'API de données (`<CLIENT>` en `A-Z`, `0-9` et `_`, par exemple `KB_DATA_API_KEY_TERMINAL`), une variable par client ([docs/specs-api.md](docs/specs-api.md)). |
-| `KB_AI_API_KEY_<CLIENT>` | pour `kb serve-ai`, `kb digest` et `kb trend-report` | la clé d'un client de l'API IA, une variable par client, mêmes règles que `KB_DATA_API_KEY_<CLIENT>` ; `kb digest` est le client `KB_DIGEST` et lit la même variable, `KB_AI_API_KEY_KB_DIGEST` ; `kb trend-report` est le client `KB_TREND_REPORT`, `KB_AI_API_KEY_KB_TREND_REPORT`, avec une autre clé (`kb serve-ai` refuse deux fois la même). Les autres réglages de `kb serve-ai` (modèle, API de données, hôte, port, fenêtre) sont décrits dans `.env.example`. |
+| `KB_AI_API_KEY_<CLIENT>` | pour `kb serve-ai`, `kb digest` et `kb trend-report` | la clé d'un client de l'API IA, une variable par client, mêmes règles que `KB_DATA_API_KEY_<CLIENT>` ; `kb digest` est le client `KB_DIGEST` et lit la même variable, `KB_AI_API_KEY_KB_DIGEST` ; `kb trend-report` est le client `KB_TREND_REPORT`, `KB_AI_API_KEY_KB_TREND_REPORT`, avec une autre clé (`kb serve-ai` refuse deux fois la même). Chacun n'ouvre que sa route ; tout autre client reçoit 403. Les autres réglages de `kb serve-ai` (modèle, API de données, hôte, port, fenêtre) sont décrits dans `.env.example`. |
 | `KB_AI_API_URL` | non | l'adresse de l'API IA pour `kb digest` et `kb trend-report`, `http` ou `https`, sans utilisateur, requête ni fragment. Sans elle, `http://127.0.0.1:8001` (`core/config.py`) ; elle ne suit pas `KB_AI_API_PORT` : la changer aussi quand le port change. |
 
 **Créer la base** (une fois) :
@@ -440,6 +440,11 @@ fois démarré : code 0, comme `kb serve-data`.
   `kb digest` donne 2, rien n'est demandé) ; de même `kb trend-report`, qui nomme
   `KB_AI_API_KEY_KB_TREND_REPORT`.
 
+**Limites de l'API IA** : une demande à la fois par route, 20 par 24 h glissantes
+([docs/fiches-veille.md](docs/fiches-veille.md), « Accès »). Redémarrer `kb serve-ai` remet le compte à
+zéro. Après un Ctrl-C de `kb digest`, l'API finit la demande en cours : la relance est refusée (429)
+tant qu'elle n'a pas fini, environ 200 s au plus.
+
 Limites : une variable `KB_AI_API_KEY_*` exportée dans le profil du shell reste valide même retirée
 du `.env` ; `uv run --env-file .env kb serve-ai` charge tout le `.env`, donc aussi des secrets dont
 l'API IA n'a pas besoin (moindre privilège).
@@ -472,8 +477,9 @@ de sortie, l'unité étant le sujet :
 - 4 : un sujet a échoué (nommé par l'API IA, ou sa fiche non écrite) et au moins une fiche est
   écrite ;
 - 1 : rien n'est écrit : l'API IA est injoignable, dépasse le délai, refuse la clé (le message
-  nomme `KB_AI_API_KEY_KB_DIGEST`, jamais la clé), répond en échec (502, 503, 504 : son état, son
-  `X-Request-ID` et son `Retry-After` sont affichés) ou hors du schéma attendu ; ou chaque sujet a
+  nomme `KB_AI_API_KEY_KB_DIGEST`, jamais la clé), refuse la route à ce client (403, même message),
+  refuse pour l'instant (429 : une demande tourne déjà, ou 20 demandes en 24 h), répond en échec (502,
+  503, 504 : son état, son `X-Request-ID` et son `Retry-After` sont affichés) ou hors du schéma attendu ; ou chaque sujet a
   échoué ; ou une erreur du système (`OSError`, un dossier illisible) arrête le contrôle d'avant la
   demande, sans rien demander ;
 - 2 : rien n'est demandé : `KB_DATA_DIR`, `KB_VAULT_DIR` (absente, ou pas un dossier existant) ou
@@ -512,7 +518,7 @@ choisit, #368) et le `request_id`. Code de sortie :
   compte rendu précédent, ou la base n'en a aucune : rien n'est écrit, et le bilan le dit (une base
   plus ancienne que le registre, restaurée, donne un avertissement avec les deux dates) ;
 - 1 : rien n'est écrit : l'API IA échoue comme pour `kb digest` (le message nomme
-  `KB_AI_API_KEY_KB_TREND_REPORT` sur un 401), ou sa réponse contredit la demande (une période qui
+  `KB_AI_API_KEY_KB_TREND_REPORT` sur un 401 ou un 403), ou sa réponse contredit la demande (une période qui
   ferait reculer, sauter ou grossir le registre) ; ou le compte rendu n'est pas écrit (registre inchangé) ;
   ou il est écrit mais le registre n'est pas mis à jour : le message le dit, et le compte rendu
   suivant reprend ces fenêtres ; ou une erreur du système arrête le contrôle d'avant la demande ;
