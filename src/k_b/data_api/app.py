@@ -10,6 +10,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from k_b.core.api_access import check_api_key
 from k_b.core.api_errors import respond_to_unexpected_error
 from k_b.core.api_health import HEALTH_PATH, answer_health
+from k_b.core.api_methods import refuse_head_on_every_route
 from k_b.core.api_rate_limit import RateLimiter, check_rate_limit
 from k_b.core.api_request_log import log_request
 from k_b.core.api_telemetry import NATIVE_TELEMETRY_OFF
@@ -64,4 +65,6 @@ def create_app(
     # add_route, as FastAPI adds /docs: a route of Starlette, which the key of the app does not
     # reach (fastapi/applications.py, 0.143).
     app.add_route(HEALTH_PATH, answer_health, methods=["GET"], include_in_schema=False)
+    # Last: after every route is added.
+    refuse_head_on_every_route(app)
     return app
