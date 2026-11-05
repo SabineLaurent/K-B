@@ -253,6 +253,30 @@ AI_API_PORT = 8001
 # content_too_large, before the key is checked (OWASP API4:2023). Far above the largest honest
 # body: 62 bytes for the two days of POST /trend-reports.
 MAX_AI_API_BODY_BYTES = 1024
+
+
+@dataclass(frozen=True)
+class RateLimit:
+    """The requests a client may send to a route over a sliding window (OWASP API4:2023)."""
+
+    requests: int
+    window_seconds: int
+
+
+# The routes of the AI API call a paid model: 20 requests a day, 3 times the most measured (7, in
+# the trial logs of 2026-10-26 to 29), about 420,000 tokens each at worst (README.md). Counted in
+# memory: not a budget, a restart empties the count (docs/fiches-veille.md, "Accès").
+AI_API_RATE_LIMITS = {
+    "/digests": RateLimit(requests=20, window_seconds=86_400),
+    "/trend-reports": RateLimit(requests=20, window_seconds=86_400),
+}
+# By the most read in a minute in the same logs: 804 details, 21 lists. The details hold 4 digests
+# at MAX_ITEMS_PER_DIGEST_REQUEST, the trends 3 trend reports at their 32 readings.
+DATA_API_RATE_LIMITS = {
+    "/items": RateLimit(requests=120, window_seconds=60),
+    "/items/{item_id}": RateLimit(requests=1200, window_seconds=60),
+    "/trends": RateLimit(requests=120, window_seconds=60),
+}
 # The window of a digest request, in days (docs/fiches-veille.md, "Fenêtre"): the default, changed
 # by KB_DIGEST_WINDOW_DAYS, and the bounds of both the variable and window_days of a request.
 DIGEST_WINDOW_DAYS = 3

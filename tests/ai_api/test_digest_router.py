@@ -40,14 +40,17 @@ from k_b.ai_api.errors import (
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.ai_api.routers import digest_router
 from k_b.ai_api.tracing import TRACING_OFF
+from k_b.core.api_rate_limit import RateLimiter
 from k_b.core.api_settings import OPENAPI_PATH
 from k_b.core.config import (
+    AI_API_RATE_LIMITS,
     LLM_INPUT_USD_PER_MILLION_TOKENS,
     LLM_OUTPUT_USD_PER_MILLION_TOKENS,
     LLM_REPLAY_BASE_URL,
     MAX_AI_API_BODY_BYTES,
     NO_SUITABLE_SUBJECT_ANSWER,
     DigestSubject,
+    RateLimit,
 )
 from k_b.data_api.app import create_app as create_data_app
 
@@ -1377,3 +1380,51 @@ def test_the_errors_of_each_route_are_its_upstream_states():
     assert not any(state.startswith("llm_") for state in trend_states)
     assert {*get_args(GithubState.__value__)} <= trend_states
     assert {*get_args(DataApiState.__value__)} <= digest_states & trend_states
+
+
+def limit_each_route_to_one_call(client):
+    client.app.state.rate_limiter = RateLimiter(
+        dict.fromkeys(AI_API_RATE_LIMITS, RateLimit(requests=1, window_seconds=86_400))
+    )
+
+
+def test_every_route_of_the_model_has_its_limit(make_ai_api):
+    client, _ = make_ai_api([])
+
+    model_routes = {
+        route.path
+        for route in iter_route_contexts(client.app.routes)
+        if route.path not in {"/docs", "/openapi.json", "/health"}
+    }
+
+    assert model_routes
+    assert model_routes == set(AI_API_RATE_LIMITS)
+
+
+def test_beyond_its_limit_a_client_gets_429_before_any_reading(make_ai_api):
+    client, transport = make_ai_api(VALID_STEPS)
+    limit_each_route_to_one_call(client)
+    assert post_digests(client).status_code == 200
+    calls_of_the_first_request = len(transport.requests)
+    failing_reading = httpx2.Client(
+        base_url="http://localhost", transport=httpx2.MockTransport(fail_the_test)
+    )
+    client.app.dependency_overrides[open_data_api_client] = lambda: failing_reading
+
+    response = post_digests(client)
+
+    assert response.status_code == 429
+    assert response.json() == {"error": "rate_limit_exceeded"}
+    assert response.headers["Retry-After"] == "86400"
+    assert "X-Request-ID" in response.headers
+    assert len(transport.requests) == calls_of_the_first_request
+
+
+def test_a_request_without_a_valid_key_consumes_no_call_of_the_limit(make_ai_api):
+    client, _ = make_ai_api(VALID_STEPS)
+    limit_each_route_to_one_call(client)
+
+    for _ in range(3):
+        assert post_digests(client, headers={}).status_code == 401
+
+    assert post_digests(client).status_code == 200

@@ -28,7 +28,7 @@ def test_the_versioned_openapi_is_valid_and_declares_its_security_scheme():
     openapi = read_versioned_openapi()
 
     OpenAPIV31SpecValidator(openapi).validate()
-    assert openapi["info"]["version"] == "0.7.0"
+    assert openapi["info"]["version"] == "0.8.0"
     assert openapi["info"]["description"] == ARXIV_ACKNOWLEDGEMENT
     assert openapi["components"]["securitySchemes"] == {
         "HTTPBearer": {
@@ -62,6 +62,7 @@ def test_each_data_route_documents_its_errors(path, not_found):
     expected = {
         "401": "invalid_api_key",
         "422": "invalid_parameter",
+        "429": "rate_limit_exceeded",
         "500": "database_error, internal_error",
         "503": "database_missing",
     }

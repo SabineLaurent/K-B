@@ -11,6 +11,7 @@ from k_b.ai_api.connectors.llm_client import LlmFailure
 from k_b.core.api_errors import (
     API_ERROR_RESPONSES,
     CONTENT_TOO_LARGE,
+    RATE_LIMIT_EXCEEDED,
     ApiError,
     ErrorSchema,
 )
@@ -75,6 +76,7 @@ def describe_error_responses(
     return {
         **API_ERROR_RESPONSES,
         413: {"model": ErrorSchema, "description": CONTENT_TOO_LARGE},
+        429: {"model": ErrorSchema, "description": RATE_LIMIT_EXCEEDED},
         500: {"model": ErrorSchema, "description": "internal_error"},
         **describe_upstream_errors(states),
     }

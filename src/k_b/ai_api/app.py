@@ -20,13 +20,14 @@ from k_b.core.api_access import check_api_key
 from k_b.core.api_body_limit import bound_request_bodies
 from k_b.core.api_errors import API_ERROR_HANDLERS, respond_to_unexpected_error
 from k_b.core.api_health import HEALTH_PATH, answer_health
+from k_b.core.api_rate_limit import RateLimiter, check_rate_limit
 from k_b.core.api_request_log import log_request
 from k_b.core.api_telemetry import NATIVE_TELEMETRY_OFF
-from k_b.core.config import MAX_AI_API_BODY_BYTES, DigestSubject
+from k_b.core.config import AI_API_RATE_LIMITS, MAX_AI_API_BODY_BYTES, DigestSubject
 
 # The version of the contracts of docs/fiches-veille.md and docs/tendances.md: a change a client
 # can see changes both.
-API_VERSION = "0.9.0"
+API_VERSION = "0.10.0"
 
 
 def create_app(
@@ -49,7 +50,7 @@ def create_app(
         # On the app, not on a router: no route of the model can leave it out. /docs,
         # /openapi.json and /health are routes of Starlette, outside: they hold no data. ReDoc
         # and the OAuth2 redirect of Swagger UI, which K-B does not use, are not served.
-        dependencies=[Depends(check_api_key)],
+        dependencies=[Depends(check_api_key), Depends(check_rate_limit)],
         openapi_url=openapi_url,
         redoc_url=None,
         swagger_ui_oauth2_redirect_url=None,
@@ -60,6 +61,7 @@ def create_app(
         telemetry=NATIVE_TELEMETRY_OFF,
     )
     app.state.api_keys = dict(api_keys)
+    app.state.rate_limiter = RateLimiter(AI_API_RATE_LIMITS)
     app.state.llm_settings = llm_settings
     app.state.data_api_settings = data_api_settings
     app.state.github_settings = github_settings
