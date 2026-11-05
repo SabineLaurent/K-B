@@ -4,7 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from k_b.core.config import GH_ARCHIVE_MAX_CATCH_UP_WINDOWS
+from k_b.core.config import (
+    GH_ARCHIVE_FIRST_COLLECTION_WINDOWS,
+    GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
+)
 from k_b.etl.sources import gh_archive
 from k_b.etl.sources.gh_archive import (
     MAX_BYTES_BILLED,
@@ -121,9 +124,37 @@ def today(monkeypatch):
 
 # The windows of a collection.
 
+# A collection the day after the last one: a single window is due.
+DAY_AFTER_THE_LAST = datetime(2026, 10, 10, 9, 0, tzinfo=UTC)
 
-def test_a_first_collection_takes_the_window_that_ends_yesterday():
-    assert list_window_ends(None, TODAY) == [YESTERDAY]
+
+def test_a_first_collection_takes_the_windows_of_a_first_trend_report():
+    # 4 windows for its period, 2 before them for durable (docs/tendances.md).
+    assert GH_ARCHIVE_FIRST_COLLECTION_WINDOWS == 6
+    assert list_window_ends(None, TODAY) == [
+        date(2026, 10, 5),
+        date(2026, 10, 6),
+        date(2026, 10, 7),
+        date(2026, 10, 8),
+        date(2026, 10, 9),
+        YESTERDAY,
+    ]
+
+
+def test_a_first_collection_reads_each_day_of_its_windows_once(today):
+    client = FakeClient()
+
+    raw = GhArchiveSource(lambda: client).fetch(None)
+
+    [executed] = client.executed_configs()
+    parameters = read_parameters(executed)
+    # From the first day of the oldest window, 10/03, to yesterday.
+    assert (parameters["first_suffix"], parameters["last_suffix"]) == (
+        "261003",
+        "261010",
+    )
+    assert executed.maximum_bytes_billed == compute_bytes_cap(6)
+    assert len(read_trends(raw).window_ends) == 6
 
 
 def test_a_collection_the_day_after_the_last_takes_one_window():
@@ -193,7 +224,7 @@ def test_a_last_collection_after_today_is_refused():
 def test_fetch_runs_a_dry_run_then_the_query_capped_with_its_parameters(today):
     client = FakeClient()
 
-    raw = GhArchiveSource(lambda: client).fetch(None)
+    raw = GhArchiveSource(lambda: client).fetch(DAY_AFTER_THE_LAST)
 
     dry_run, executed = client.queries
     assert dry_run[1].dry_run is True
@@ -287,7 +318,7 @@ def test_fetch_refuses_to_run_a_single_window_over_the_cap(today):
     client = FakeClient(dry_run_bytes=lambda window_count: 2_700_000_000)
 
     with pytest.raises(DryRunOverLimitError) as raised:
-        GhArchiveSource(lambda: client).fetch(None)
+        GhArchiveSource(lambda: client).fetch(DAY_AFTER_THE_LAST)
 
     assert client.executed_configs() == []
     assert "2700000000" in str(raised.value)

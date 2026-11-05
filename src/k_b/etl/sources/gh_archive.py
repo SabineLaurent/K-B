@@ -15,6 +15,7 @@ from google.cloud import bigquery
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from k_b.core.config import (
+    GH_ARCHIVE_FIRST_COLLECTION_WINDOWS,
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
     GH_ARCHIVE_TOP_SIZE,
     GH_ARCHIVE_WINDOW_DAYS,
@@ -156,10 +157,14 @@ def current_day() -> date:
 
 
 def list_window_ends(last_collected_at: datetime | None, today: date) -> list[date]:
-    """The last day of each window due, oldest first, the most recent ending yesterday."""
+    """The last day of each window due, oldest first, the most recent ending yesterday; a first
+    collection takes those of a first trend report."""
     yesterday = today - timedelta(days=1)
     if last_collected_at is None:
-        return [yesterday]
+        due_count = GH_ARCHIVE_FIRST_COLLECTION_WINDOWS
+        return [
+            yesterday - timedelta(days=offset) for offset in reversed(range(due_count))
+        ]
     first_end = last_collected_at.astimezone(UTC).date()
     if first_end > today:
         raise ValueError(f"last collection day {first_end} is after today {today}")
