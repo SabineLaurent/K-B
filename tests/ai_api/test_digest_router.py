@@ -448,6 +448,32 @@ def test_a_body_announced_beyond_the_bound_gets_the_413_of_k_b_on_any_route(
     assert response.json() == {"error": "content_too_large"}
 
 
+@pytest.mark.parametrize("length", ["+2000", "2_000"])
+def test_a_length_starlette_reads_beyond_the_bound_gets_the_413_of_k_b(
+    make_ai_api, length
+):
+    """Read by int(), as Starlette reads it: uvicorn refuses these forms, another server may not,
+    and Starlette would answer them in plain text."""
+    client, _ = make_ai_api([])
+
+    response = client.request(
+        "GET", "/health", content=b" ", headers={"Content-Length": length}
+    )
+
+    assert response.status_code == 413
+    assert response.json() == {"error": "content_too_large"}
+
+
+def test_a_length_that_is_not_a_number_is_left_to_the_count_of_starlette(make_ai_api):
+    client, _ = make_ai_api([])
+
+    response = client.request(
+        "GET", "/health", content=b" ", headers={"Content-Length": "not a number"}
+    )
+
+    assert response.status_code == 200
+
+
 @pytest.mark.parametrize(
     ("steps", "status", "state", "retry_after"),
     [

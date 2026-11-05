@@ -34,12 +34,12 @@ class RefuseBodyAnnouncedTooLarge:
 
 
 def is_announced_beyond(scope: Scope, max_bytes: int) -> bool:
-    """True when the Content-Length of the request is a number beyond max_bytes; any other value
-    is left to the count of Starlette."""
+    """True when the Content-Length of the request, read by int() as Starlette reads it, is beyond
+    max_bytes; a value int() refuses is left to the count of Starlette."""
     length = Headers(scope=scope).get("content-length")
-    return (
-        length is not None
-        and length.isascii()
-        and length.isdigit()
-        and int(length) > max_bytes
-    )
+    if length is None:
+        return False
+    try:
+        return int(length) > max_bytes
+    except ValueError:
+        return False
