@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 from typing import Literal, Self, get_args
 
 from k_b.core.config import TREND_RECENT_REPOSITORY_DAYS
+from k_b.items import Caution
 
-type Caution = Literal["created_recently", "no_license"]
 # Why a candidate is left out: its name may now name another repository (docs/tendances.md).
 type DropReason = Literal[
     "not_found", "unavailable_for_legal_reasons", "moved", "id_mismatch", "forbidden"

@@ -63,7 +63,7 @@ RISING = TrendRepositorySchema(
     trajectory=[
         point(day, rank) for day, rank in zip(WINDOWS, (12, 7, 4, 2), strict=True)
     ],
-    # Read on GitHub; kb does not show them before #369.
+    # Read on GitHub.
     facts=RepositoryFactsSchema(
         license=None,
         created_at=datetime(2026, 10, 27, 9, 0, tzinfo=UTC),
@@ -498,6 +498,103 @@ def test_a_repository_out_of_the_schema_is_refused_never_quoted(changes, detail)
 
 
 @pytest.mark.parametrize(
+    ("facts", "detail"),
+    [
+        (
+            {"license": "MIT <b>"},
+            "repositories.0.facts.license (string_pattern_mismatch)",
+        ),
+        (
+            {"topics": ["<b>"]},
+            "repositories.0.facts.topics.0 (string_pattern_mismatch)",
+        ),
+        ({"language": ""}, "repositories.0.facts.language (string_pattern_mismatch)"),
+        (
+            {"language": "x" * 101},
+            "repositories.0.facts.language (string_pattern_mismatch)",
+        ),
+        (
+            {"language": "C\u200b"},
+            "repositories.0.facts.language (string_pattern_mismatch)",
+        ),
+        (
+            {"created_at": "0001-01-01T00:00:00+14:00"},
+            "repositories.0.facts.created_at (value_error)",
+        ),
+        (
+            {"created_at": "2026-10-27T09:00:00"},
+            "repositories.0.facts.created_at (timezone_aware)",
+        ),
+        ({"stars_total": -1}, "repositories.0.facts.stars_total (greater_than_equal)"),
+        (
+            {"stars_total": 2**63},
+            "repositories.0.facts.stars_total (less_than_equal)",
+        ),
+        ({"cautions": ["<b>"]}, "repositories.0.facts.cautions.0 (literal_error)"),
+    ],
+)
+def test_facts_out_of_the_schema_are_refused_never_quoted(facts, detail):
+    report = make_report()
+    report["repositories"][0]["facts"] |= facts
+
+    failure = ask_and_fail(answer(content=body(report)))
+
+    assert str(failure).startswith(f"ai_api_invalid_response, HTTP 200, {detail}")
+    assert "<b>" not in str(failure)
+
+
+@pytest.mark.parametrize(
+    ("facts", "detail"),
+    [
+        (
+            {"license": "MIT", "cautions": ["no_license"]},
+            "repositories.0.facts.cautions (not_the_license)",
+        ),
+        (
+            {"license": None, "cautions": []},
+            "repositories.0.facts.cautions (not_the_license)",
+        ),
+        (
+            {"cautions": ["no_license", "created_recently"]},
+            "repositories.0.facts.cautions (not_in_order_once)",
+        ),
+        (
+            {"cautions": ["no_license", "no_license"]},
+            "repositories.0.facts.cautions (not_in_order_once)",
+        ),
+    ],
+)
+def test_facts_that_contradict_themselves_are_refused(facts, detail):
+    report = make_report()
+    report["repositories"][0]["facts"] |= facts
+
+    failure = ask_and_fail(answer(content=body(report)))
+
+    assert str(failure).startswith(f"ai_api_invalid_response, HTTP 200, {detail}")
+
+
+def test_a_repository_chosen_has_facts_in_the_table_when_it_is_there():
+    report = make_report(chosen=[choose(STEADY)])
+
+    failure = ask_and_fail(answer(content=body(report)))
+
+    assert str(failure).startswith(
+        "ai_api_invalid_response, HTTP 200, chosen.0.facts (not_those_of_the_table)"
+    )
+
+
+def test_the_facts_of_a_repository_chosen_are_those_of_the_table():
+    report = make_report(chosen=[choose(RISING)])
+    report["chosen"][0]["facts"]["stars_total"] = 99
+
+    failure = ask_and_fail(answer(content=body(report)))
+
+    assert str(failure).startswith(
+        "ai_api_invalid_response, HTTP 200, chosen.0.facts (not_those_of_the_table)"
+    )
+
+
+@pytest.mark.parametrize(
     ("changes", "detail"),
     [
         ({"request_id": "not-a-uuid"}, "request_id (value_error)"),
@@ -603,13 +700,18 @@ def test_the_failures_of_the_choice_are_those_of_the_model():
 
 
 def test_the_repositories_chosen_are_read_with_their_criteria_and_subjects():
+    steady_read = STEADY.model_copy(update={"facts": RISING.facts})
     report = make_report(
+        repositories=[
+            RISING.model_dump(mode="json"),
+            steady_read.model_dump(mode="json"),
+        ],
         chosen=[
             choose(
                 RISING, ["new", "watch_subject"], ["llm_security", "coding_assistants"]
             ),
-            choose(STEADY, ["durable"]),
-        ]
+            choose(steady_read, ["durable"]),
+        ],
     )
 
     response, _ = ask(answer(content=body(report)))
@@ -697,7 +799,7 @@ SUBJECT_ALONE = STEADY.model_copy(
             "choice_failure (choice_without_candidate_read)",
         ),
         (
-            {"chosen": [choose(STEADY), choose(STEADY)]},
+            {"chosen": [choose(RISING), choose(RISING)]},
             "chosen.1 (repository_twice)",
         ),
         ({"chosen": [choose(STEADY, [])]}, "chosen.0.criteria (too_short)"),

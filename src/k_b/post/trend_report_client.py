@@ -15,14 +15,22 @@ from k_b.core.config import (
     DIGEST_SUBJECTS,
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
     GH_ARCHIVE_TOP_SIZE,
+    MAX_GITHUB_TOPICS,
     MODEL_NAME,
     TREND_MAX_CHOSEN,
 )
 from k_b.items import (
+    CAUTIONS,
     CHOICE_CRITERIA,
     WATCH_SUBJECT,
+    Caution,
     ChoiceCriterion,
     Criterion,
+    GithubLanguage,
+    GithubTopic,
+    Int64,
+    SpdxId,
+    UtcDatetime,
     WindowState,
     WrittenDayInStrictModel,
     has_too_many_windows,
@@ -69,8 +77,19 @@ def check_repository_name(name: str) -> str:
 class TrendPoint(AiApiModel):
     window_end: WrittenDayInStrictModel
     state: WindowState
-    # In the top only; stars_gained is not read: the report shows no count of stars.
+    # In the top only; stars_gained is not read: the report shows no count of GH Archive.
     rank: Rank | None
+
+
+class RepositoryFacts(AiApiModel):
+    """What GitHub says of a repository, with the bounds the AI API read it by."""
+
+    license: SpdxId | None
+    created_at: UtcDatetime
+    language: GithubLanguage | None
+    topics: Annotated[list[GithubTopic], Field(max_length=MAX_GITHUB_TOPICS)]
+    stars_total: Annotated[Int64, Field(ge=0)]
+    cautions: list[Caution]
 
 
 class TrendRepository(AiApiModel):
@@ -79,16 +98,19 @@ class TrendRepository(AiApiModel):
     criteria: Annotated[list[Criterion], Field(min_length=1)]
     best_rank: Rank
     trajectory: list[TrendPoint]
+    # None beyond the candidates, whose sheet is not read on GitHub.
+    facts: RepositoryFacts | None
 
 
 class ChosenRepository(AiApiModel):
-    """A repository the model chose; its trajectory and facts are not read: the report shows
-    them for the repositories of the table."""
+    """A repository the model chose; its trajectory is not read: the report shows it for the
+    repositories of the table."""
 
     repository_id: int
     repository_name: Annotated[str, AfterValidator(check_repository_name)]
     criteria: Annotated[list[ChoiceCriterion], Field(min_length=1)]
     watch_subjects: list[str]
+    facts: RepositoryFacts
 
 
 class TrendPeriod(AiApiModel):
@@ -109,7 +131,7 @@ class DroppedCandidates(AiApiModel):
 
 
 class Candidates(AiApiModel):
-    """The repositories whose sheet the AI API read on GitHub, counted; kb reads no fact."""
+    """The repositories whose sheet the AI API read on GitHub, counted."""
 
     selected: Count
     read: Count
@@ -227,6 +249,7 @@ def refuse_inconsistent_repositories(response: TrendReportResponse) -> None:
         seen_ids.add(repository.repository_id)
         refuse_inconsistent_trajectory(response, place, repository)
         refuse_inconsistent_criteria(response, place, repository)
+        refuse_inconsistent_facts(response, place, repository.facts)
 
 
 def refuse_inconsistent_trajectory(
@@ -255,6 +278,21 @@ def refuse_inconsistent_criteria(
         raise_invalid(response.request_id, f"{place}.criteria", "not_in_order_once")
     if "new" in repository.criteria and not response.period.new_evaluated:
         raise_invalid(response.request_id, f"{place}.criteria", "new_not_evaluated")
+
+
+def refuse_inconsistent_facts(
+    response: TrendReportResponse, place: str, facts: RepositoryFacts | None
+) -> None:
+    """The cautions in their order, no_license with no license only; the other caution depends on
+    the instant of the AI API, which kb does not know."""
+    if facts is None:
+        return
+    if not is_in_order_once(facts.cautions, CAUTIONS):
+        raise_invalid(
+            response.request_id, f"{place}.facts.cautions", "not_in_order_once"
+        )
+    if (facts.license is None) != ("no_license" in facts.cautions):
+        raise_invalid(response.request_id, f"{place}.facts.cautions", "not_the_license")
 
 
 def refuse_inconsistent_candidates(response: TrendReportResponse) -> None:
@@ -287,8 +325,10 @@ def refuse_inconsistent_choice(response: TrendReportResponse) -> None:
 
 def refuse_inconsistent_chosen(response: TrendReportResponse) -> None:
     """Each chosen once, its criteria in order, met in the table of the repositories but
-    watch_subject, which goes with its subjects, taken from the list in its order."""
+    watch_subject, which goes with its subjects, taken from the list in its order; its facts
+    consistent, and those of the table when it is there."""
     criteria_by_id = {r.repository_id: r.criteria for r in response.repositories}
+    facts_by_id = {r.repository_id: r.facts for r in response.repositories}
     seen_ids: set[int] = set()
     for number, chosen in enumerate(response.chosen):
         place = f"chosen.{number}"
@@ -298,6 +338,11 @@ def refuse_inconsistent_chosen(response: TrendReportResponse) -> None:
         refuse_inconsistent_chosen_criteria(
             response, place, chosen, criteria_by_id.get(chosen.repository_id, [])
         )
+        refuse_inconsistent_facts(response, place, chosen.facts)
+        if facts_by_id.get(chosen.repository_id, chosen.facts) != chosen.facts:
+            raise_invalid(
+                response.request_id, f"{place}.facts", "not_those_of_the_table"
+            )
 
 
 def refuse_inconsistent_chosen_criteria(

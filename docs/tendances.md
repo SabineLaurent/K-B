@@ -143,7 +143,7 @@ Lue sur GitHub pour chaque candidat, avant le choix (#367), jamais gardée :
 - licence, ou « aucune licence reconnue par GitHub » ;
 - date de création, langage, topics (`[a-z0-9-]{1,50}`, 20 au plus envoyés au modèle) ;
 - étoiles totales, lues au moment du compte rendu ;
-- prudence : créé il y a moins de 7 jours ; pas de licence ;
+- prudence : créé il y a moins de 7 jours ; aucune licence reconnue par GitHub ;
 - l'URL du dépôt est construite depuis son nom, jamais lue dans une réponse.
 
 Un `id` GitHub différent du `repository_id` de `trend` écarte le candidat (dépôt renommé ou
@@ -237,8 +237,8 @@ GitHub.
 fiche GitHub de chaque candidat, lue par l'API IA après les fenêtres et avant tout choix du modèle,
 sans être gardée. Les candidats sont les trajectoires de la période dont le nom peut aller dans un
 chemin (`is_repository_name`), qu'elles remplissent un critère ou non : 60 au plus, ceux qui
-remplissent un critère d'abord. Le fichier du coffre ne gagne qu'une ligne (ci-dessous) : les faits y
-entrent avec #369.
+remplissent un critère d'abord. Le fichier du coffre gagne alors une ligne (ci-dessous) ; les faits y
+sont écrits depuis (« Les faits dans le fichier »).
 
 | Champ | Contenu |
 |---|---|
@@ -297,7 +297,7 @@ refusé deux fois, le choix est en échec `llm_invalid_output`. Avant l'appel, u
 laisse plus `MIN_SECONDS_FOR_LLM_REQUEST` n'envoie rien : échec `llm_timeout`. Tout échec du choix
 rend 200, le compte rendu factuel et l'état ; les erreurs de la route ne changent pas.
 
-`kb` relit `model`, `choice_failure` et `chosen[]` (nom, critères, sujets) par un schéma fermé, et
+`kb` relit `model`, `choice_failure` et `chosen[]` (nom, critères, sujets, faits) par un schéma fermé, et
 refuse une réponse qui se contredit : un modèle et un échec ensemble, des choisis avec un échec ou
 sans modèle, un choix ou un échec sans candidat lu, ni l'un ni l'autre avec des candidats lus, un
 choisi deux fois, des critères hors d'ordre, `new` non évalué, un critère 1 à 3 absent de ce dépôt
@@ -315,6 +315,19 @@ Le fichier du coffre gagne une section « Choisis par le modèle », avant « D�
 - aucun candidat lu : « Choix non fait : aucun candidat lu. ».
 
 #369 y ajoute les textes sous chaque dépôt.
+
+**Les faits dans le fichier.** `kb` relit `facts` par un schéma fermé et les écrit :
+
+- sous chaque choisi, une ligne : date de création, langage, licence, étoiles totales, topics
+  (`MAX_TOPICS_FOR_SELECTION` au plus), puis la prudence s'il y en a une ; un fait que GitHub ne donne
+  pas est omis ;
+- dans « Dépôts qui ressortent », trois colonnes : « Créé le », « Étoiles totales », « Prudence » ;
+  `—` pour un dépôt sans fiche, au-delà de `TREND_MAX_CANDIDATES`.
+
+Le langage et la licence passent par `neutralize_digest_text`. `kb` refuse des faits qui se
+contredisent : prudences hors d'ordre, `no_license` sans licence nulle ou l'inverse, faits d'un choisi
+autres que ceux du tableau. Les étoiles gagnées restent absentes du fichier : elles viennent de
+l'échantillon de GH Archive (« Limite de GH Archive »).
 
 ## Défenses et échecs
 

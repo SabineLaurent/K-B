@@ -218,6 +218,17 @@ WrittenDayInStrictModel = Annotated[WrittenDay, Field(strict=False)]
 # (docs/tendances.md, "Rang et critères"): the AI API computes them, kb writes them. Type
 # statements: the OpenAPI names them.
 type Criterion = Literal["durable", "new", "accelerating"]
+# What GitHub says of a repository (docs/tendances.md, "Fiche légère"): the AI API reads it, kb
+# reads it again in the response. Why to be careful with it, in the order the AI API gives them.
+type Caution = Literal["created_recently", "no_license"]
+CAUTIONS: tuple[Caution, ...] = get_args(Caution.__value__)
+SpdxId = Annotated[str, Field(pattern=r"^[A-Za-z0-9.+-]{1,64}$")]
+GithubTopic = Annotated[str, Field(pattern=r"^[a-z0-9-]{1,50}$")]
+# Without a hidden character (Cc, Cf, Co, Zl, Zp): the family of post/digest_sheets.py, Co added;
+# a lone surrogate (Cs) is refused by the JSON parser. No language name holds U+200D.
+GithubLanguage = Annotated[
+    str, Field(pattern=r"^[^\p{Cc}\p{Cf}\p{Co}\p{Zl}\p{Zp}]{1,100}$")
+]
 # A criterion of a repository the model chose: those of the code, or a subject of the watch.
 type ChoiceCriterion = Literal["durable", "new", "accelerating", "watch_subject"]
 CHOICE_CRITERIA: tuple[ChoiceCriterion, ...] = get_args(ChoiceCriterion.__value__)

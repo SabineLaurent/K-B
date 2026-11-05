@@ -6,8 +6,8 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from k_b.ai_api.connectors.llm_client import LlmFailure
-from k_b.ai_api.repository_cards import Caution
 from k_b.items import (
+    Caution,
     ChoiceCriterion,
     Criterion,
     WindowState,

@@ -37,7 +37,7 @@ from k_b.core.rate_limit import (
 )
 from k_b.core.retry_after import is_retry_after_too_long, read_retry_after
 from k_b.core.user_agent import USER_AGENT
-from k_b.items import Int64, UtcDatetime
+from k_b.items import GithubLanguage, GithubTopic, Int64, SpdxId, UtcDatetime
 
 type GithubState = Literal[
     "github_unauthorized",
@@ -80,23 +80,15 @@ class GithubModel(BaseModel):
 
 class LicenseBody(GithubModel):
     # NOASSERTION: a license GitHub does not recognize.
-    spdx_id: Annotated[str, Field(pattern=r"^[A-Za-z0-9.+-]{1,64}$")] | None
+    spdx_id: SpdxId | None
 
 
 class RepositoryBody(GithubModel):
     id: Annotated[Int64, Field(gt=0)]
     stargazers_count: Annotated[Int64, Field(ge=0)]
     created_at: UtcDatetime
-    # Without a hidden character (Cc, Cf, Co, Zl, Zp): the family of post/digest_sheets.py, Co
-    # added; a lone surrogate (Cs) is refused by the JSON parser. No language name holds U+200D.
-    language: (
-        Annotated[str, Field(pattern=r"^[^\p{Cc}\p{Cf}\p{Co}\p{Zl}\p{Zp}]{1,100}$")]
-        | None
-    )
-    topics: Annotated[
-        list[Annotated[str, Field(pattern=r"^[a-z0-9-]{1,50}$")]],
-        Field(max_length=MAX_GITHUB_TOPICS),
-    ]
+    language: GithubLanguage | None
+    topics: Annotated[list[GithubTopic], Field(max_length=MAX_GITHUB_TOPICS)]
     license: LicenseBody | None
     # Free text of the owner, bounded by the body only: cleaned before the model
     # (ai_api/repository_texts.py), never refused here, as an emoji is legitimate.
