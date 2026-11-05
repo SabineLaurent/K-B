@@ -8,13 +8,14 @@ from itertools import pairwise
 from typing import Annotated, Literal, get_args
 
 import httpx2
-from pydantic import AfterValidator, Field
+from pydantic import AfterValidator, AwareDatetime, Field
 
 from k_b.core.api_keys import AI_API_KEY_VARIABLE_PREFIX
 from k_b.core.config import (
     DIGEST_SUBJECTS,
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
     GH_ARCHIVE_TOP_SIZE,
+    MAX_GITHUB_TOPICS,
     MODEL_NAME,
     TREND_MAX_CHOSEN,
 )
@@ -54,6 +55,9 @@ type ChoiceFailure = Literal[
     "llm_timeout",
 ]
 
+# The cautions of a repository, those of ai_api/repository_cards.py, which post does not import: a
+# test keeps both equal.
+type Caution = Literal["created_recently", "no_license"]
 Rank = Annotated[int, Field(ge=1, le=GH_ARCHIVE_TOP_SIZE)]
 Count = Annotated[int, Field(ge=0)]
 
@@ -69,8 +73,23 @@ def check_repository_name(name: str) -> str:
 class TrendPoint(AiApiModel):
     window_end: WrittenDayInStrictModel
     state: WindowState
-    # In the top only; stars_gained is not read: the report shows no count of stars.
+    # In the top only; stars_gained is not read: the report shows no count of GH Archive.
     rank: Rank | None
+
+
+class RepositoryFacts(AiApiModel):
+    """What GitHub says of a repository; the same bounds as ai_api/connectors/github_client.py,
+    but for the language, which the report writes through neutralize_text."""
+
+    license: Annotated[str, Field(pattern=r"^[A-Za-z0-9.+-]{1,64}$")] | None
+    created_at: AwareDatetime
+    language: Annotated[str, Field(min_length=1, max_length=100)] | None
+    topics: Annotated[
+        list[Annotated[str, Field(pattern=r"^[a-z0-9-]{1,50}$")]],
+        Field(max_length=MAX_GITHUB_TOPICS),
+    ]
+    stars_total: Count
+    cautions: list[Caution]
 
 
 class TrendRepository(AiApiModel):
@@ -79,16 +98,19 @@ class TrendRepository(AiApiModel):
     criteria: Annotated[list[Criterion], Field(min_length=1)]
     best_rank: Rank
     trajectory: list[TrendPoint]
+    # None beyond the candidates, whose sheet is not read on GitHub.
+    facts: RepositoryFacts | None
 
 
 class ChosenRepository(AiApiModel):
-    """A repository the model chose; its trajectory and facts are not read: the report shows
-    them for the repositories of the table."""
+    """A repository the model chose; its trajectory is not read: the report shows it for the
+    repositories of the table."""
 
     repository_id: int
     repository_name: Annotated[str, AfterValidator(check_repository_name)]
     criteria: Annotated[list[ChoiceCriterion], Field(min_length=1)]
     watch_subjects: list[str]
+    facts: RepositoryFacts
 
 
 class TrendPeriod(AiApiModel):
@@ -109,7 +131,7 @@ class DroppedCandidates(AiApiModel):
 
 
 class Candidates(AiApiModel):
-    """The repositories whose sheet the AI API read on GitHub, counted; kb reads no fact."""
+    """The repositories whose sheet the AI API read on GitHub, counted."""
 
     selected: Count
     read: Count

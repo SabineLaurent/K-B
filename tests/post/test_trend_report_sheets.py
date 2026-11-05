@@ -4,6 +4,7 @@ writing."""
 import json
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import get_args
 
 import pytest
 from post.test_trend_report_client import (
@@ -16,12 +17,23 @@ from post.test_trend_report_client import (
     repository,
 )
 
-from k_b.core.config import DIGEST_SUBJECTS, TRENDS_DIR_NAME, WATCH_DIR_NAME
+from k_b.core.config import (
+    DIGEST_SUBJECTS,
+    MAX_TOPICS_FOR_SELECTION,
+    TRENDS_DIR_NAME,
+    WATCH_DIR_NAME,
+)
 from k_b.post.digest_sheets import is_writable_url
-from k_b.post.trend_report_client import DroppedCandidates, TrendReportResponse
+from k_b.post.trend_report_client import (
+    Caution,
+    DroppedCandidates,
+    TrendReportResponse,
+)
 from k_b.post.trend_report_sheets import (
+    CAUTION_LABELS,
     DROP_REASON_LABELS,
     GITHUB_URL,
+    MISSING,
     ReportFile,
     locate_report_file,
     refuse_written_sheet,
@@ -32,6 +44,11 @@ from k_b.post.vault_files import VaultEntryRefusedError
 
 GENERATED = datetime(2026, 11, 1, 10, 0, 5, tzinfo=UTC)
 DAY = GENERATED.date()
+# The facts of RISING, those of a repository chosen by default.
+FACTS_LINE = (
+    "  Créé le 2026-10-27 ; Rust ; aucune licence reconnue par GitHub ; 1250 étoiles ; cli, llm ;"
+    " Prudence : créé il y a moins de 7 jours, pas de licence"
+)
 
 
 def read(report):
@@ -77,11 +94,13 @@ def test_a_report_gives_its_period_its_limit_and_a_row_per_repository():
         "\n"
         "## Dépôts qui ressortent\n"
         "\n"
-        "| Dépôt | Critères | Meilleur rang | Trajectoire (rang par fenêtre) |\n"
-        "|---|---|---|---|\n"
+        "| Dépôt | Critères | Meilleur rang | Trajectoire (rang par fenêtre) | Créé le"
+        " | Étoiles totales | Prudence |\n"
+        "|---|---|---|---|---|---|---|\n"
         "| <https://github.com/owner/rising-repository> | nouveau, en accélération | 2"
-        " | 12 → 7 → 4 → 2 |\n"
-        "| <https://github.com/steady/tool> | durable | 3 | 3 → hors top → 5 → 9 |\n"
+        " | 12 → 7 → 4 → 2 | 2026-10-27 | 1250"
+        " | créé il y a moins de 7 jours, pas de licence |\n"
+        "| <https://github.com/steady/tool> | durable | 3 | 3 → hors top → 5 → 9 | — | — | — |\n"
         "\n"
         "« durable » : dans le top 30 de 2 fenêtres sans jour commun, lues sur la période et les"
         " 2 fenêtres qui la précèdent (non affichées dans le tableau).\n"
@@ -181,7 +200,7 @@ def test_a_missing_window_shows_in_the_trajectory():
         missing_windows=["2026-10-29"],
     )
 
-    assert " | 12 → — → 4 → 2 |\n" in render(report)
+    assert " | 12 → — → 4 → 2 | " in render(report)
 
 
 @pytest.mark.parametrize(
@@ -328,11 +347,71 @@ def test_the_repositories_chosen_are_listed_with_their_criteria_and_subjects():
         "\n"
         "- <https://github.com/owner/rising-repository> : nouveau, en accélération ;"
         " sujet de la veille (coding_assistants)\n"
+        f"{FACTS_LINE}\n"
         "- <https://github.com/steady/tool> : durable\n"
+        f"{FACTS_LINE}\n"
         "- <https://github.com/only/subject> : sujet de la veille (llm_security,"
         " coding_assistants)\n"
+        f"{FACTS_LINE}\n"
         "\n"
     )
+
+
+def chosen_facts_line(**facts):
+    """The line of facts of a repository chosen, its facts changed."""
+    report = make_report(chosen=[choose(RISING)])
+    report["chosen"][0]["facts"] |= facts
+    return find_choice_section(render(report)).splitlines()[5]
+
+
+def test_the_facts_of_a_repository_chosen_without_caution_name_its_license():
+    assert chosen_facts_line(license="MIT", cautions=[]) == (
+        "  Créé le 2026-10-27 ; Rust ; MIT ; 1250 étoiles ; cli, llm"
+    )
+
+
+def test_a_fact_github_does_not_give_is_left_out_of_the_line():
+    assert chosen_facts_line(license="MIT", language=None, topics=[], cautions=[]) == (
+        "  Créé le 2026-10-27 ; MIT ; 1250 étoiles"
+    )
+
+
+def test_the_language_of_a_repository_chosen_is_written_as_text():
+    line = chosen_facts_line(language="[C](http://evil) | <b>#")
+
+    assert "\\[C\\](http://evil) \\| \\<b\\>\\# ;" in line
+
+
+def test_the_topics_of_a_repository_chosen_are_as_many_as_the_model_reads():
+    topics = [f"topic-{number}" for number in range(MAX_TOPICS_FOR_SELECTION + 1)]
+
+    line = chosen_facts_line(topics=topics)
+
+    assert f"topic-{MAX_TOPICS_FOR_SELECTION - 1}" in line
+    assert f"topic-{MAX_TOPICS_FOR_SELECTION}" not in line
+
+
+def test_one_star_is_written_in_the_singular():
+    assert " ; 1 étoile ; " in chosen_facts_line(stars_total=1)
+
+
+@pytest.mark.parametrize(
+    ("cautions", "said"),
+    [
+        (["created_recently"], "créé il y a moins de 7 jours"),
+        (["no_license"], "pas de licence"),
+        ([], MISSING),
+    ],
+)
+def test_the_table_says_the_cautions_of_a_repository(cautions, said):
+    report = make_report()
+    report["repositories"][0]["facts"]["cautions"] = cautions
+
+    assert f" | 1250 | {said} |\n" in render(report)
+
+
+def test_every_caution_has_its_label():
+    assert set(CAUTION_LABELS) == set(get_args(Caution.__value__))
 
 
 @pytest.mark.parametrize(

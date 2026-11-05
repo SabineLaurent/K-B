@@ -3,12 +3,13 @@ written once by kb trend-report from the response of the AI API, with the limit 
 post/vault_files.py.
 
 Each text is made by the code from checked values: a day, a count, a word of a closed list (a
-subject of the watch among them), the name of the model, checked by MODEL_NAME, and the name of a
-repository, checked by is_repository_name, which makes its URL. No text of the
-response is free, so none needs neutralize_digest_text, which would break a URL (www. escaped)."""
+subject of the watch among them), the name of the model, checked by MODEL_NAME, an SPDX identifier
+and a topic, checked by their patterns, and the name of a repository, checked by
+is_repository_name, which makes its URL. The language alone is free, written by neutralize_text;
+none needs neutralize_digest_text, which would break a URL (www. escaped)."""
 
 import json
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import NamedTuple
 
@@ -16,8 +17,10 @@ from k_b.core.config import (
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
     GH_ARCHIVE_TOP_SIZE,
     GH_ARCHIVE_WINDOW_DAYS,
+    MAX_TOPICS_FOR_SELECTION,
     TREND_DURABLE_LOOKBACK_WINDOWS,
     TREND_DURABLE_MIN_WINDOWS,
+    TREND_RECENT_REPOSITORY_DAYS,
     TRENDS_DIR_NAME,
     WATCH_DIR_NAME,
 )
@@ -25,17 +28,21 @@ from k_b.core.dates import format_date
 from k_b.items import Criterion
 from k_b.post.trend_report_client import (
     CRITERIA,
+    Caution,
     ChoiceFailure,
     ChosenRepository,
     DroppedCandidates,
+    RepositoryFacts,
     TrendPeriod,
     TrendPoint,
     TrendReportResponse,
     TrendRepository,
 )
 from k_b.post.vault_files import (
+    MARKDOWN_SYNTAX_CHARACTERS,
     VaultEntryRefusedError,
     has_sheet,
+    neutralize_text,
     refuse_linked_folders,
     write_new_sheet,
 )
@@ -80,9 +87,17 @@ DURABLE_READING = (
     " précèdent (non affichées dans le tableau)."
 )
 TABLE_HEADER = (
-    "| Dépôt | Critères | Meilleur rang | Trajectoire (rang par fenêtre) |",
-    "|---|---|---|---|",
+    (
+        "| Dépôt | Critères | Meilleur rang | Trajectoire (rang par fenêtre) | Créé le"
+        " | Étoiles totales | Prudence |"
+    ),
+    "|---|---|---|---|---|---|---|",
 )
+NO_LICENSE = "aucune licence reconnue par GitHub"
+CAUTION_LABELS: dict[Caution, str] = {
+    "created_recently": f"créé il y a moins de {TREND_RECENT_REPOSITORY_DAYS} jours",
+    "no_license": "pas de licence",
+}
 
 
 def find_sheets_dir(vault_dir: Path) -> Path:
@@ -205,7 +220,11 @@ def render_choice(response: TrendReportResponse) -> list[str]:
     return [
         f"{response.model} en a retenu {len(response.chosen)} sur {candidates} :",
         "",
-        *(render_chosen(chosen) for chosen in response.chosen),
+        *(
+            line
+            for chosen in response.chosen
+            for line in (render_chosen(chosen), render_facts(chosen.facts))
+        ),
     ]
 
 
@@ -218,6 +237,38 @@ def render_chosen(chosen: ChosenRepository) -> str:
     if chosen.watch_subjects:
         parts.append(f"sujet de la veille ({', '.join(chosen.watch_subjects)})")
     return f"- <{GITHUB_URL}{chosen.repository_name}> : {' ; '.join(parts)}"
+
+
+def render_facts(facts: RepositoryFacts) -> str:
+    """The line under a repository chosen, indented to stay in its item; a fact GitHub does not
+    give is left out, the license being said absent."""
+    stars = facts.stars_total
+    parts = [
+        f"Créé le {format_created_day(facts)}",
+        *(
+            ()
+            if facts.language is None
+            else (neutralize_text(facts.language, MARKDOWN_SYNTAX_CHARACTERS),)
+        ),
+        facts.license or NO_LICENSE,
+        f"{stars} étoile{'s' if stars > 1 else ''}",
+    ]
+    if facts.topics:
+        parts.append(", ".join(facts.topics[:MAX_TOPICS_FOR_SELECTION]))
+    if facts.cautions:
+        parts.append(f"Prudence : {describe_cautions(facts)}")
+    return f"  {' ; '.join(parts)}"
+
+
+def format_created_day(facts: RepositoryFacts) -> str:
+    return facts.created_at.astimezone(UTC).date().isoformat()
+
+
+def describe_cautions(facts: RepositoryFacts) -> str:
+    """In the order of CAUTION_LABELS, each once, whatever the response gives."""
+    return ", ".join(
+        label for caution, label in CAUTION_LABELS.items() if caution in facts.cautions
+    )
 
 
 def describe_dropped_candidates(dropped: DroppedCandidates) -> str:
@@ -287,7 +338,17 @@ def render_row(repository: TrendRepository) -> str:
     trajectory = " → ".join(render_point(point) for point in repository.trajectory)
     return (
         f"| <{GITHUB_URL}{repository.repository_name}> | {criteria}"
-        f" | {repository.best_rank} | {trajectory} |"
+        f" | {repository.best_rank} | {trajectory} | {render_row_facts(repository.facts)} |"
+    )
+
+
+def render_row_facts(facts: RepositoryFacts | None) -> str:
+    """A date, a count and words of a closed list: nothing a table would read."""
+    if facts is None:
+        return f"{MISSING} | {MISSING} | {MISSING}"
+    return (
+        f"{format_created_day(facts)} | {facts.stars_total}"
+        f" | {describe_cautions(facts) or MISSING}"
     )
 
 

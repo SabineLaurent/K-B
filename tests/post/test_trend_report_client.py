@@ -16,6 +16,7 @@ from post.test_ai_api_client import (
 )
 
 from k_b.ai_api.connectors.llm_client import LlmFailure
+from k_b.ai_api.repository_cards import Caution as ApiCaution
 from k_b.ai_api.schemas.trend_report_schema import (
     CandidatesSchema,
     ChosenRepositorySchema,
@@ -33,6 +34,7 @@ from k_b.post.ai_api_client import (
 )
 from k_b.post.trend_report_client import (
     TREND_REPORT_KEY_VARIABLE,
+    Caution,
     ChoiceFailure,
     request_trend_report,
 )
@@ -63,7 +65,7 @@ RISING = TrendRepositorySchema(
     trajectory=[
         point(day, rank) for day, rank in zip(WINDOWS, (12, 7, 4, 2), strict=True)
     ],
-    # Read on GitHub; kb does not show them before #369.
+    # Read on GitHub.
     facts=RepositoryFactsSchema(
         license=None,
         created_at=datetime(2026, 10, 27, 9, 0, tzinfo=UTC),
@@ -498,6 +500,37 @@ def test_a_repository_out_of_the_schema_is_refused_never_quoted(changes, detail)
 
 
 @pytest.mark.parametrize(
+    ("facts", "detail"),
+    [
+        (
+            {"license": "MIT <b>"},
+            "repositories.0.facts.license (string_pattern_mismatch)",
+        ),
+        (
+            {"topics": ["<b>"]},
+            "repositories.0.facts.topics.0 (string_pattern_mismatch)",
+        ),
+        ({"language": ""}, "repositories.0.facts.language (string_too_short)"),
+        ({"language": "x" * 101}, "repositories.0.facts.language (string_too_long)"),
+        (
+            {"created_at": "2026-10-27T09:00:00"},
+            "repositories.0.facts.created_at (timezone_aware)",
+        ),
+        ({"stars_total": -1}, "repositories.0.facts.stars_total (greater_than_equal)"),
+        ({"cautions": ["<b>"]}, "repositories.0.facts.cautions.0 (literal_error)"),
+    ],
+)
+def test_facts_out_of_the_schema_are_refused_never_quoted(facts, detail):
+    report = make_report()
+    report["repositories"][0]["facts"] |= facts
+
+    failure = ask_and_fail(answer(content=body(report)))
+
+    assert str(failure).startswith(f"ai_api_invalid_response, HTTP 200, {detail}")
+    assert "<b>" not in str(failure)
+
+
+@pytest.mark.parametrize(
     ("changes", "detail"),
     [
         ({"request_id": "not-a-uuid"}, "request_id (value_error)"),
@@ -595,6 +628,11 @@ NO_CANDIDATE_READ = {
     "read": 0,
     "dropped": NO_CANDIDATE_DROPPED.model_dump() | {"not_found": 1},
 }
+
+
+def test_the_cautions_are_those_of_the_ai_api():
+    """post does not import ai_api: its Literal is a copy, kept equal here."""
+    assert get_args(Caution.__value__) == get_args(ApiCaution.__value__)
 
 
 def test_the_failures_of_the_choice_are_those_of_the_model():

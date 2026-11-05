@@ -316,6 +316,17 @@ Le fichier du coffre gagne une section « Choisis par le modèle », avant « D�
 
 #369 y ajoute les textes sous chaque dépôt.
 
+**Les faits dans le fichier.** `kb` relit `facts` par un schéma fermé et les écrit :
+
+- sous chaque choisi, une ligne : date de création, langage, licence ou « aucune licence reconnue par
+  GitHub », étoiles totales, topics (`MAX_TOPICS_FOR_SELECTION` au plus), puis la prudence s'il y en a
+  une ; un fait que GitHub ne donne pas est omis ;
+- dans « Dépôts qui ressortent », trois colonnes : « Créé le », « Étoiles totales », « Prudence » ;
+  `—` pour un dépôt sans fiche, au-delà de `TREND_MAX_CANDIDATES`.
+
+Le langage, seul texte libre, passe par `neutralize_text`. Les étoiles gagnées restent absentes du
+fichier : elles viennent de l'échantillon de GH Archive (« Limite de GH Archive »).
+
 ## Défenses et échecs
 
 **Avant l'envoi au modèle**, en plus des défenses de [fiches-veille.md](fiches-veille.md)
