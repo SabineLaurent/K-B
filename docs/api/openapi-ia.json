@@ -54,6 +54,16 @@
               }
             }
           },
+          "403": {
+            "description": "client_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
           "413": {
             "description": "content_too_large",
             "content": {
@@ -65,7 +75,7 @@
             }
           },
           "429": {
-            "description": "rate_limit_exceeded",
+            "description": "rate_limit_exceeded, request_already_running",
             "content": {
               "application/json": {
                 "schema": {
@@ -171,6 +181,16 @@
               }
             }
           },
+          "403": {
+            "description": "client_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
           "413": {
             "description": "content_too_large",
             "content": {
@@ -182,7 +202,7 @@
             }
           },
           "429": {
-            "description": "rate_limit_exceeded",
+            "description": "rate_limit_exceeded, request_already_running",
             "content": {
               "application/json": {
                 "schema": {

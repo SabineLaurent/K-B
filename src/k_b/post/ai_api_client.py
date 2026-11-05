@@ -27,6 +27,7 @@ from k_b.core.config import (
     AI_API_READ_TIMEOUT_SECONDS,
     AI_API_URL,
     AI_API_WRITE_TIMEOUT_SECONDS,
+    DIGEST_CLIENT,
     MODEL_NAME,
 )
 from k_b.core.outbound import find_url_refusal, open_http_client
@@ -36,7 +37,7 @@ from k_b.items import ItemKind, UtcDatetime
 
 AI_API_URL_VARIABLE = "KB_AI_API_URL"
 # The client KB_DIGEST of kb serve-ai: one value for both sides (README, "Changer une clé").
-DIGEST_KEY_VARIABLE = f"{AI_API_KEY_VARIABLE_PREFIX}KB_DIGEST"
+DIGEST_KEY_VARIABLE = f"{AI_API_KEY_VARIABLE_PREFIX}{DIGEST_CLIENT}"
 # No TLS before Azure Container Apps, as for the data API: http on the machine and in the compose
 # network.
 AI_API_SCHEMES = ("http", "https")

@@ -89,9 +89,10 @@ def test_the_route_documents_each_named_state():
         if status != "200"
     } == {
         "401": "invalid_api_key",
+        "403": "client_not_allowed",
         "413": "content_too_large",
         "422": "invalid_parameter",
-        "429": "rate_limit_exceeded",
+        "429": "rate_limit_exceeded, request_already_running",
         "500": "internal_error",
         "502": "data_api_invalid_response, data_api_unauthorized, data_api_unavailable,"
         " llm_content_filtered, llm_invalid_output, llm_truncated, llm_unavailable",
@@ -110,9 +111,10 @@ def test_the_trend_report_documents_the_states_of_the_data_api_and_of_github():
         if status != "200"
     } == {
         "401": "invalid_api_key",
+        "403": "client_not_allowed",
         "413": "content_too_large",
         "422": "invalid_parameter",
-        "429": "rate_limit_exceeded",
+        "429": "rate_limit_exceeded, request_already_running",
         "500": "internal_error",
         "502": "data_api_invalid_response, data_api_unauthorized, data_api_unavailable,"
         " github_forbidden, github_invalid_response, github_unauthorized, github_unavailable",

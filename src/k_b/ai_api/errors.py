@@ -10,8 +10,10 @@ from k_b.ai_api.connectors.github_client import GithubState
 from k_b.ai_api.connectors.llm_client import LlmFailure
 from k_b.core.api_errors import (
     API_ERROR_RESPONSES,
+    CLIENT_NOT_ALLOWED,
     CONTENT_TOO_LARGE,
     RATE_LIMIT_EXCEEDED,
+    REQUEST_ALREADY_RUNNING,
     ApiError,
     ErrorSchema,
 )
@@ -75,8 +77,12 @@ def describe_error_responses(
     """The error bodies of a route whose upstream states are these, for the OpenAPI."""
     return {
         **API_ERROR_RESPONSES,
+        403: {"model": ErrorSchema, "description": CLIENT_NOT_ALLOWED},
         413: {"model": ErrorSchema, "description": CONTENT_TOO_LARGE},
-        429: {"model": ErrorSchema, "description": RATE_LIMIT_EXCEEDED},
+        429: {
+            "model": ErrorSchema,
+            "description": f"{RATE_LIMIT_EXCEEDED}, {REQUEST_ALREADY_RUNNING}",
+        },
         500: {"model": ErrorSchema, "description": "internal_error"},
         **describe_upstream_errors(states),
     }

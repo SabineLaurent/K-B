@@ -1,5 +1,6 @@
 """Who may call an API of K-B: the key of a request, checked against the keys of its clients
-(docs/specs-api.md, "Accès par clé")."""
+(docs/specs-api.md, "Accès par clé"), and the client each route of the AI API opens to
+(docs/fiches-veille.md, "Accès")."""
 
 import hmac
 from collections.abc import Mapping
@@ -9,7 +10,8 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import SecretStr
 
-from k_b.core.api_errors import ApiError
+from k_b.core.api_errors import CLIENT_NOT_ALLOWED, ApiError
+from k_b.core.api_request_log import find_route_template
 
 # The access rules a client reads in the OpenAPI of both APIs (docs/specs-api.md, "Accès par clé").
 BEARER_SCHEME_DESCRIPTION = (
@@ -37,6 +39,14 @@ def check_api_key(
     if client_name is None:
         raise ApiError(401, "invalid_api_key", INVALID_API_KEY_HEADERS)
     request.state.client_name = client_name
+
+
+async def check_client_allowed(request: Request) -> None:
+    """Refuse a client on a route that is not its own, after check_api_key; a route absent from
+    the table of the app is refused to every client."""
+    route = find_route_template(request)
+    if request.app.state.client_by_route.get(route) != request.state.client_name:
+        raise ApiError(403, CLIENT_NOT_ALLOWED)
 
 
 def find_client(received_key: str, api_keys: Mapping[str, SecretStr]) -> str | None:

@@ -263,6 +263,13 @@ class RateLimit:
     window_seconds: int
 
 
+# Each route of the AI API opens to one client, every other refused (OWASP API5:2023).
+DIGEST_CLIENT = "KB_DIGEST"
+TREND_REPORT_CLIENT = "KB_TREND_REPORT"
+AI_API_CLIENT_BY_ROUTE = {
+    "/digests": DIGEST_CLIENT,
+    "/trend-reports": TREND_REPORT_CLIENT,
+}
 # The routes of the AI API call a paid model: 20 requests a day, 3 times the most measured (7, in
 # the trial logs of 2026-10-26 to 29), about 420,000 tokens each at worst (README.md). Counted in
 # memory: not a budget, a restart empties the count (docs/fiches-veille.md, "Accès").
@@ -406,6 +413,10 @@ DIGEST_REQUEST_TIMEOUT_SECONDS = 200
 # little time to the model: the choice then fails in llm_timeout, the report factual
 # (docs/tendances.md). Its hold is measured by #370.
 TREND_REPORT_REQUEST_TIMEOUT_SECONDS = 200
+# What a request refused on a busy route is told to wait: the deadline of the one under way.
+RUNNING_REQUEST_RETRY_AFTER_SECONDS = max(
+    DIGEST_REQUEST_TIMEOUT_SECONDS, TREND_REPORT_REQUEST_TIMEOUT_SECONDS
+)
 # The requests of kb digest and kb trend-report to the AI API (post/ai_api_client.py, #209, #366).
 # The URL of kb serve-ai with its defaults, changed by KB_AI_API_URL; it does not follow
 # KB_AI_API_PORT: set KB_AI_API_URL too when the port of kb serve-ai changes. Connection, pool and

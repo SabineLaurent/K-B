@@ -1,16 +1,17 @@
 """How often a client may call a route of an API (OWASP API4:2023): a sliding window per client
-and per route, in memory, that a restart empties (docs/specs-api.md, "Débit")."""
+and per route, in memory, that a restart empties (docs/specs-api.md, "Débit"); and the one request
+at a time of a route that calls the model (docs/fiches-veille.md, "Accès")."""
 
 import math
 import time
 from collections import deque
-from collections.abc import Callable, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 
 from fastapi import Request
 
-from k_b.core.api_errors import RATE_LIMIT_EXCEEDED, ApiError
+from k_b.core.api_errors import RATE_LIMIT_EXCEEDED, REQUEST_ALREADY_RUNNING, ApiError
 from k_b.core.api_request_log import find_route_template
-from k_b.core.config import RateLimit
+from k_b.core.config import RUNNING_REQUEST_RETRY_AFTER_SECONDS, RateLimit
 
 
 class RateLimiter:
@@ -50,3 +51,20 @@ async def check_rate_limit(request: Request) -> None:
     )
     if wait_seconds is not None:
         raise ApiError(429, RATE_LIMIT_EXCEEDED, {"Retry-After": str(wait_seconds)})
+
+
+async def hold_route_slot(request: Request) -> AsyncIterator[None]:
+    """One request at a time on a route, the next one refused with a 429 and no queue: waiting
+    would only delay it. Held until the response is sent, or until the route ends when its client
+    has gone: a route stops spending at its own deadline, not with its client."""
+    slot = request.app.state.slot_by_route[find_route_template(request)]
+    if not slot.acquire(blocking=False):
+        raise ApiError(
+            429,
+            REQUEST_ALREADY_RUNNING,
+            {"Retry-After": str(RUNNING_REQUEST_RETRY_AFTER_SECONDS)},
+        )
+    try:
+        yield
+    finally:
+        slot.release()

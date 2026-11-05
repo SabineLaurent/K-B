@@ -38,6 +38,7 @@ from k_b.core.config import (
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
     GH_ARCHIVE_TOP_SIZE,
     LLM_REPLAY_BASE_URL,
+    TREND_REPORT_CLIENT,
     DigestSubject,
 )
 from k_b.data_api.app import create_app as create_data_app
@@ -185,7 +186,7 @@ def make_app(recorded_traces, metric_reader, steps, trace_content):
         replay_steps=None,
     )
     app = create_app(
-        {"TERMINAL": SecretStr(CLIENT_KEY)},
+        {TREND_REPORT_CLIENT: SecretStr(CLIENT_KEY)},
         settings,
         DataApiSettings(
             base_url="http://localhost", api_key=SecretStr(secrets.token_urlsafe(32))

@@ -6,6 +6,7 @@ import logging
 import secrets
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import get_args
@@ -44,11 +45,14 @@ from k_b.core.api_rate_limit import RateLimiter
 from k_b.core.api_settings import OPENAPI_PATH
 from k_b.core.config import (
     AI_API_RATE_LIMITS,
+    DIGEST_CLIENT,
+    DIGEST_REQUEST_TIMEOUT_SECONDS,
     LLM_INPUT_USD_PER_MILLION_TOKENS,
     LLM_OUTPUT_USD_PER_MILLION_TOKENS,
     LLM_REPLAY_BASE_URL,
     MAX_AI_API_BODY_BYTES,
     NO_SUITABLE_SUBJECT_ANSWER,
+    TREND_REPORT_CLIENT,
     DigestSubject,
     RateLimit,
 )
@@ -71,6 +75,12 @@ REPLAY_SETTINGS = LlmSettings(
 # Made for the test: never a real key.
 CLIENT_KEY = secrets.token_urlsafe(32)
 AUTHORIZATION = {"Authorization": f"Bearer {CLIENT_KEY}"}
+TREND_REPORT_KEY = secrets.token_urlsafe(32)
+TREND_REPORT_AUTHORIZATION = {"Authorization": f"Bearer {TREND_REPORT_KEY}"}
+# A key that is valid, of a client named by no route.
+UNLISTED_CLIENT = "TERMINAL"
+UNLISTED_CLIENT_KEY = secrets.token_urlsafe(32)
+UNLISTED_CLIENT_AUTHORIZATION = {"Authorization": f"Bearer {UNLISTED_CLIENT_KEY}"}
 # The time of the requests, set by the test. Over 14 days, the window reads the vulnerabilities 3
 # and 4, the papers 2 and 1, the releases 6, 7 and 8 and the newsletter articles 12, 11 and 13 of
 # the test base; the advisories, of June, are older.
@@ -175,7 +185,11 @@ def make_ai_api(data_api, metric_reader, recorded_traces):
             REPLAY_SETTINGS, replay_steps=tuple(REPLAY_STEPS.validate_python(steps))
         )
         app = create_app(
-            {"TERMINAL": SecretStr(CLIENT_KEY)},
+            {
+                DIGEST_CLIENT: SecretStr(CLIENT_KEY),
+                TREND_REPORT_CLIENT: SecretStr(TREND_REPORT_KEY),
+                UNLISTED_CLIENT: SecretStr(UNLISTED_CLIENT_KEY),
+            },
             settings,
             DataApiSettings(
                 base_url="http://localhost",
@@ -1013,7 +1027,7 @@ def test_the_measures_the_spans_and_the_logs_are_sent_at_once_when_the_app_stops
     )
     model_metrics.stop = lambda: stop("metrics")
     app = create_app(
-        {"TERMINAL": SecretStr(CLIENT_KEY)},
+        {DIGEST_CLIENT: SecretStr(CLIENT_KEY)},
         REPLAY_SETTINGS,
         DataApiSettings(
             base_url="http://localhost", api_key=SecretStr(secrets.token_urlsafe(32))
@@ -1428,3 +1442,158 @@ def test_a_request_without_a_valid_key_consumes_no_call_of_the_limit(make_ai_api
         assert post_digests(client, headers={}).status_code == 401
 
     assert post_digests(client).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "headers", [TREND_REPORT_AUTHORIZATION, UNLISTED_CLIENT_AUTHORIZATION]
+)
+def test_a_client_is_refused_403_on_a_route_that_is_not_its_own(make_ai_api, headers):
+    client, transport = make_ai_api(VALID_STEPS)
+    failing_reading = httpx2.Client(
+        base_url="http://localhost", transport=httpx2.MockTransport(fail_the_test)
+    )
+    client.app.dependency_overrides[open_data_api_client] = lambda: failing_reading
+
+    response = post_digests(client, headers=headers)
+
+    assert response.status_code == 403
+    assert response.json() == {"error": "client_not_allowed"}
+    assert "X-Request-ID" in response.headers
+    assert transport.requests == []
+
+
+def test_the_client_of_the_digests_is_refused_on_the_trend_reports(make_ai_api):
+    client, _ = make_ai_api([])
+
+    response = client.post(
+        "/trend-reports",
+        json={"after": None, "previous_first_window": None},
+        headers=AUTHORIZATION,
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"error": "client_not_allowed"}
+
+
+def test_a_route_absent_from_the_table_is_refused_to_every_client(make_ai_api):
+    client, _ = make_ai_api([])
+    client.app.state.client_by_route = {}
+
+    assert post_digests(client).status_code == 403
+
+
+def test_a_client_refused_stays_refused_and_consumes_nothing(make_ai_api):
+    client, _ = make_ai_api(VALID_STEPS)
+    limit_each_route_to_one_call(client)
+
+    for _ in range(3):
+        response = post_digests(client, headers=UNLISTED_CLIENT_AUTHORIZATION)
+        assert response.status_code == 403
+
+    assert post_digests(client).status_code == 200
+
+
+def test_while_a_request_runs_the_next_one_on_its_route_gets_429_without_a_queue(
+    make_ai_api,
+):
+    client, _ = make_ai_api(VALID_STEPS)
+    request_started = threading.Event()
+    finish_the_request = threading.Event()
+
+    def hold_the_request():
+        request_started.set()
+        assert finish_the_request.wait(timeout=10)
+        return REQUEST_TIME
+
+    client.app.dependency_overrides[read_request_time] = hold_the_request
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        first = executor.submit(post_digests, client)
+        assert request_started.wait(timeout=10)
+
+        second = post_digests(client)
+        finish_the_request.set()
+
+        assert first.result(timeout=10).status_code == 200
+    assert second.status_code == 429
+    assert second.json() == {"error": "request_already_running"}
+    assert second.headers["Retry-After"] == str(DIGEST_REQUEST_TIMEOUT_SECONDS)
+    assert "X-Request-ID" in second.headers
+
+
+def raise_an_unexpected_error():
+    raise RuntimeError("of the test")
+
+
+def test_the_route_is_free_again_after_a_response(make_ai_api):
+    client, _ = make_ai_api(VALID_STEPS + VALID_STEPS)
+
+    assert post_digests(client).status_code == 200
+    assert post_digests(client).status_code == 200
+
+
+def test_the_route_is_free_again_after_a_schema_refused(make_ai_api):
+    client, _ = make_ai_api(VALID_STEPS)
+
+    assert post_digests(client, body={"window_days": 0}).status_code == 422
+    assert post_digests(client).status_code == 200
+
+
+def test_the_route_is_free_again_after_an_upstream_failure(make_ai_api):
+    client, _ = make_ai_api(VALID_STEPS)
+    working_reading = client.app.dependency_overrides[open_data_api_client]
+
+    def refuse_the_connection(request):
+        raise httpx2.ConnectError("of the test", request=request)
+
+    failing_reading = httpx2.Client(
+        base_url="http://localhost",
+        transport=httpx2.MockTransport(refuse_the_connection),
+    )
+    client.app.dependency_overrides[open_data_api_client] = lambda: failing_reading
+
+    assert post_digests(client).status_code == 502
+
+    client.app.dependency_overrides[open_data_api_client] = working_reading
+    assert post_digests(client).status_code == 200
+
+
+def test_the_route_is_free_again_after_an_unexpected_error(make_ai_api):
+    client, _ = make_ai_api(VALID_STEPS)
+    client.app.dependency_overrides[read_request_time] = raise_an_unexpected_error
+
+    assert post_digests(client).status_code == 500
+
+    client.app.dependency_overrides[read_request_time] = lambda: REQUEST_TIME
+    assert post_digests(client).status_code == 200
+
+
+def test_a_request_under_way_on_a_route_leaves_the_other_route_free(make_ai_api):
+    client, _ = make_ai_api(VALID_STEPS)
+    client.app.state.slot_by_route["/trend-reports"].acquire()
+
+    assert post_digests(client).status_code == 200
+
+
+def test_a_refusal_while_a_request_runs_consumes_no_call_of_the_limit(make_ai_api):
+    client, _ = make_ai_api(VALID_STEPS)
+    limit_each_route_to_one_call(client)
+    slot = client.app.state.slot_by_route["/digests"]
+    slot.acquire()
+
+    assert post_digests(client).status_code == 429
+
+    slot.release()
+    assert post_digests(client).status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("headers", "expected_status"),
+    [({}, 401), (UNLISTED_CLIENT_AUTHORIZATION, 403)],
+)
+def test_while_a_request_runs_the_key_and_the_right_are_checked_first(
+    make_ai_api, headers, expected_status
+):
+    client, _ = make_ai_api([])
+    client.app.state.slot_by_route["/digests"].acquire()
+
+    assert post_digests(client, headers=headers).status_code == expected_status
