@@ -197,6 +197,7 @@ versions montent, car un client voit le changement : API IA 0.9.0, API de donné
 | Même essai, corps en flux de 2 × 600 octets | 413 JSON |
 | Même essai, `Content-Length: +2000` | 400 en texte brut, d'uvicorn : la requête n'atteint pas l'application |
 | Même essai, 1 024 octets sans clé | 401 : la borne laisse passer, la clé refuse |
+| `make digest` réel de Sabine, le 05/11 vers 13:48Z, sur cette branche, dans un coffre temporaire | 9 fiches sur 9 écrites par le vrai modèle à travers la nouvelle lecture ; `GET /items` en 200 avec ses `kind` |
 | Tests rouges lancés avant le code | l'ordre test puis code |
 | 19 mutations du nouveau code, toutes tuées | les tests mordent |
 | `/security-review` | aucun constat |
@@ -224,10 +225,11 @@ autre champ n'est accepté. La borne ne gêne donc aucun usage.
 
 ## Zones non vérifiées
 
-- **Aucun appel réel au modèle n'a traversé la nouvelle lecture** : le rejeu et des transports
-  simulés seulement. Un `make digest` réel reste à faire.
-- **La taille réelle d'une réponse du modèle n'est pas mesurée** : les 65 Ko sont une estimation, et
-  la taille des annotations du filtre de contenu d'Azure est supposée.
+- **La taille réelle d'une réponse du modèle n'est pas mesurée** : l'essai réel montre que les
+  réponses de ce jour passent sous la borne, pas leur taille. Les 65 Ko restent une estimation, et la
+  taille des annotations du filtre de contenu d'Azure est supposée.
+- **L'essai réel n'a couvert que `POST /digests`** : la nouvelle lecture sert aussi au choix de
+  `POST /trend-reports`, par le même code, sans essai réel depuis cette PR.
 - **Le volume lu au-delà de la borne, en flux, n'est pas mesuré** : le comptage intervient après
   chaque message reçu, et sa taille dépend de ce qu'uvicorn délivre d'un coup.
 - **Rien n'a été essayé derrière l'entrée HTTPS d'ACA** (08/11).
