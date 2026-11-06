@@ -5289,8 +5289,11 @@ l'API IA lit déjà l'API de données dans sa borne (`MAX_DATA_API_BODY_BYTES`) 
     `citext` ;
   - une entrée est rejetée seule sur les SQLSTATE 23514, 23505 hors clé primaire, 23502 et 22003,
     comme `sqlite3.IntegrityError` en SQLite (règle 1 de `conventions.md`, modifiée dans cette PR
-    sur accord de Sabine) ; le motif garde le SQLSTATE et le message principal, jamais le `DETAIL`,
-    qui recopie la ligne refusée ;
+    sur accord de Sabine) ; le motif d'un refus, comme la ligne de journal d'une erreur, garde la
+    classe, le SQLSTATE et les noms que donne `diag` (table, colonne, type, contrainte), par
+    `quote_value`, jamais un message de PostgreSQL : le message principal peut citer la valeur
+    refusée (22003, 22P02), et le `DETAIL` recopie la ligne (revue de sécurité, tranché par
+    time-knight le 06/11) ;
   - les lignes retirées (KEV, Zotero) se trouvent par une différence en Python, puis un `UPDATE`
     par clé, au lieu du `IN` généré que demandait #417 : un `IN` de plus de 32 766 paramètres
     lève « too many SQL variables » en SQLite (observé), une erreur du système qui arrêterait

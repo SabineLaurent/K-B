@@ -164,6 +164,8 @@ CREATE TABLE note_link (
 """
 
 on_postgresql = pytest.mark.postgresql
+# A value PostgreSQL quotes in the message of a 22003 it reads as text: it must reach no motive.
+OUT_OF_RANGE_MARKER = "987654321098765432109876543210"
 
 
 @pytest.fixture
@@ -200,8 +202,9 @@ def test_a_connection_is_in_a_transaction_while_it_writes_and_after_an_error(
         connection.close()
 
 
-# The errors due to the entry (conventions.md, rule 1), each with its description: the SQLSTATE
-# and the primary message of PostgreSQL, never its DETAIL, which quotes the row refused.
+# The errors due to the entry (conventions.md, rule 1), each with its description: its class, its
+# SQLSTATE and the names diag gives, never a message of PostgreSQL, which may quote the value
+# refused (22003), nor its DETAIL, which quotes the row.
 @on_postgresql
 @pytest.mark.parametrize(
     ("statement", "parameters", "description"),
@@ -209,28 +212,27 @@ def test_a_connection_is_in_a_transaction_while_it_writes_and_after_an_error(
         (
             "INSERT INTO note (text) VALUES (?)",
             ("",),
-            (
-                '23514: new row for relation "note" violates check constraint'
-                ' "note_text_check"'
-            ),
+            "CheckViolation 23514: table 'note', constraint 'note_text_check'",
         ),
         (
             "INSERT INTO note (text) VALUES (?)",
             ("before",),
-            '23505: duplicate key value violates unique constraint "note_text_key"',
+            "UniqueViolation 23505: table 'note', constraint 'note_text_key'",
         ),
         (
             "INSERT INTO note (text) VALUES (?)",
             (None,),
-            (
-                '23502: null value in column "text" of relation "note" violates'
-                " not-null constraint"
-            ),
+            "NotNullViolation 23502: table 'note', column 'text'",
         ),
         (
             "INSERT INTO note (text, rank) VALUES ('ranked', ?)",
             (2**63,),
-            "22003: bigint out of range",
+            "NumericValueOutOfRange 22003",
+        ),
+        (
+            "INSERT INTO note (text, rank) VALUES ('ranked', CAST(? AS bigint))",
+            (OUT_OF_RANGE_MARKER,),
+            "NumericValueOutOfRange 22003",
         ),
         (
             "INSERT INTO note (text) VALUES (?)",
@@ -238,7 +240,14 @@ def test_a_connection_is_in_a_transaction_while_it_writes_and_after_an_error(
             "UnicodeEncodeError: surrogates not allowed at position 2",
         ),
     ],
-    ids=["23514", "23505", "23502", "22003", "lone surrogate"],
+    ids=[
+        "23514",
+        "23505",
+        "23502",
+        "22003",
+        "22003 quoting its value",
+        "lone surrogate",
+    ],
 )
 def test_an_error_due_to_the_entry_is_refused_alone_and_the_import_goes_on(
     connection, statement, parameters, description

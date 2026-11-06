@@ -4,7 +4,6 @@ KB_DATABASE_URL names; and the check that the file exists before a connection op
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from urllib.parse import urlsplit
 
 from k_b.core.config import DATABASE_FILE_NAME
 
@@ -108,11 +107,12 @@ def read_database_location_or_refusal(
 
 
 def describe_location(location: DatabaseLocation) -> str:
-    """The base for a message: the path of its file, or the name of the PostgreSQL base, never the
-    rest of its URL (user, password, host)."""
+    """The base for a message: the path of its file, or no part of the URL of a PostgreSQL base: a
+    character the URL does not encode (a slash, a fullwidth one) moves a part of the password into
+    its path, or into the text of the error of urlsplit."""
     if isinstance(location, Path):
         return str(location)
-    return f"PostgreSQL base {urlsplit(location.value).path.lstrip('/')}"
+    return f"the PostgreSQL base of {DATABASE_URL_VARIABLE}"
 
 
 def check_database_exists(location: DatabaseLocation) -> None:

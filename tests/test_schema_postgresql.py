@@ -166,7 +166,7 @@ def test_kb_create_db_creates_the_tables_and_the_sources_of_a_postgresql_base(
     assert count_tables(postgresql_base) == 15
     assert (
         capsys.readouterr().out
-        == f"database created: PostgreSQL base {postgresql_base.value.rsplit('/', 1)[1]}\n"
+        == "database created: the PostgreSQL base of KB_DATABASE_URL\n"
     )
     # kb create-db writes no SQLite file beside it.
     assert not (tmp_path / "k-b.sqlite").exists()

@@ -5,6 +5,8 @@ import sqlite3
 
 import psycopg
 
+from k_b.core.quoting import quote_value
+
 # The roots of the errors of each engine, for except and isinstance. sqlite3.Error is wider than
 # sqlite3.DatabaseError (PEP 249: InterfaceError does not descend from it): any error of the base,
 # a refused constraint as a full disk.
@@ -49,13 +51,13 @@ def is_primary_key_refusal(error: psycopg.Error) -> bool:
 
 def describe_refusal(error: BaseException) -> str:
     """What the base refused, without the value refused: a constraint by its state and the
-    message of SQLite, which names the constraint, never the value; on PostgreSQL by its SQLSTATE
-    and primary message, never its DETAIL, which quotes the row refused; a UnicodeEncodeError by
-    its reason and position, as its text quotes the character."""
+    message of SQLite, which names the constraint, never the value; on PostgreSQL by its names
+    (describe_postgresql_error); a UnicodeEncodeError by its reason and position, as its text
+    quotes the character."""
     if isinstance(error, sqlite3.IntegrityError):
         return f"{error.sqlite_errorname}: {' '.join(str(error).split())}"
     if isinstance(error, psycopg.Error):
-        return f"{error.sqlstate}: {error.diag.message_primary}"
+        return describe_postgresql_error(error)
     if isinstance(error, UnicodeEncodeError):
         return f"UnicodeEncodeError: {error.reason} at position {error.start}"
     return f"{type(error).__name__}: {error}"
@@ -63,14 +65,31 @@ def describe_refusal(error: BaseException) -> str:
 
 def describe_engine_error(error: EngineError) -> str:
     """An error of the base, for the log of a command: as SQLite gives it; on PostgreSQL by its
-    class, its SQLSTATE and its primary message, never its DETAIL, which quotes the row refused; an
-    error of psycopg without SQLSTATE by its class alone, as its text may quote the URL of the
-    base, password included."""
+    names (describe_postgresql_error)."""
     if not isinstance(error, psycopg.Error):
         return f"{type(error).__name__}: {error}"
+    return describe_postgresql_error(error)
+
+
+def describe_postgresql_error(error: psycopg.Error) -> str:
+    """An error of PostgreSQL by its class, its SQLSTATE and the names of the schema diag gives,
+    never by a message: the primary one may quote the value refused (22003, 22P02), the DETAIL
+    quotes the row, and the text of an error without SQLSTATE may quote the URL of the base,
+    password included."""
     if error.sqlstate is None:
         return type(error).__name__
-    return f"{type(error).__name__} {error.sqlstate}: {error.diag.message_primary}"
+    description = f"{type(error).__name__} {error.sqlstate}"
+    names = [
+        f"{label} {quote_value(name)}"
+        for label, name in (
+            ("table", error.diag.table_name),
+            ("column", error.diag.column_name),
+            ("type", error.diag.datatype_name),
+            ("constraint", error.diag.constraint_name),
+        )
+        if name is not None
+    ]
+    return f"{description}: {', '.join(names)}" if names else description
 
 
 def is_query_timeout(error: EngineError) -> bool:

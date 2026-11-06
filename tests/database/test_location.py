@@ -89,7 +89,24 @@ def test_a_postgresql_url_is_never_shown():
 
     assert PASSWORD not in repr(location)
     assert PASSWORD not in str(location)
-    assert describe_location(location) == "PostgreSQL base kb_production"
+    assert describe_location(location) == "the PostgreSQL base of KB_DATABASE_URL"
+
+
+# A slash not encoded ends the netloc of urlsplit early, and a fullwidth slash or colon makes it
+# raise an error that quotes the netloc: the password must not reach the description either way.
+@pytest.mark.parametrize(
+    "password",
+    [
+        f"Ab3/{PASSWORD}/Q=",
+        f"Ab3{chr(0xFF0F)}{PASSWORD}",
+        f"Ab3{chr(0xFF1A)}{PASSWORD}",
+    ],
+    ids=["slash", "fullwidth slash", "fullwidth colon"],
+)
+def test_a_postgresql_base_is_described_without_any_part_of_its_url(password):
+    location = PostgresUrl(f"postgresql://kb:{password}@127.0.0.1:1/kb")
+
+    assert describe_location(location) == "the PostgreSQL base of KB_DATABASE_URL"
 
 
 def test_the_sqlite_file_is_described_by_its_path():
