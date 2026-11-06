@@ -160,6 +160,8 @@ module dataApi 'modules/api-container-app.bicep' = if (deployWorkloads) {
     tags: tags
     environmentId: containerAppsEnvironment.outputs.id
     identityName: identityNames.dataApi
+    // Its code asks the token of its identity that opens the base (#421).
+    identityLifecycle: 'Main'
     registryServer: registry.outputs.loginServer
     image: image
     command: 'serve-data'

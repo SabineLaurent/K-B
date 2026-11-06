@@ -374,7 +374,8 @@ observés.
    #414 n'a pas. Puis « Vérifier la chaîne TLS du job ». L'étape 4 n'a rien de neuf : Entra seul, aucun secret.
 5. La seconde passe (étape 5), avec l'étiquette de cette image. Aperçu attendu :
    - **à créer** : `caj-kb-migrate-database` ;
-   - **à modifier** : `ca-kb-data-api` (son image, et `KB_DATABASE_URL`, `KB_DATABASE_AUTH`, `AZURE_CLIENT_ID`),
+   - **à modifier** : `ca-kb-data-api` (son image, `KB_DATABASE_URL`, `KB_DATABASE_AUTH`, `AZURE_CLIENT_ID`, et
+     `identitySettings` : `lifecycle` passe de `None` à `Main`),
      l'image de `ca-kb-ai-api` et de `caj-kb-smoke-test`, et le bruit de l'étape 5.
 6. Aussitôt après, `caj-kb-migrate-database` (critère 1 de « Vérifier les trois critères de #421 ») : jusqu'à son
    premier lancement, l'API de données pointe vers une base sans tables. Puis les critères 2 et 3, et « Fermer
