@@ -231,6 +231,7 @@ def send_request(
             try:
                 content = read_bounded_body(response, MAX_AI_API_ANSWER_BYTES, is_late)
             except BodyTooLargeError:
+                # Any status keeps its state; a 200 beyond the bound is an invalid answer.
                 raise AiApiError(
                     find_failure_state(status) or "ai_api_invalid_response",
                     status,
@@ -240,7 +241,9 @@ def send_request(
                     ),
                 ) from None
             except BodyTooLateError:
-                raise AiApiError("ai_api_timeout", status) from None
+                raise AiApiError(
+                    "ai_api_timeout", status, describe_headers(response.headers)
+                ) from None
             return Answer(status, response.headers, content)
     except httpx2.TimeoutException:
         raise AiApiError("ai_api_timeout") from None

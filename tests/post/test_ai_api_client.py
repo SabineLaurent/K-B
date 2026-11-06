@@ -629,6 +629,30 @@ def test_an_answer_counted_beyond_the_bound_stops_its_reading_and_never_quotes_i
     assert len(pulled) < len(chunks)
 
 
+def send_pieces(pieces):
+    """send_request on an answer sent as pieces, without Content-Length."""
+    http_client, _ = simulate(
+        lambda request: httpx2.Response(200, content=stream_of(pieces))
+    )
+    with http_client:
+        return send_request(http_client, DIGESTS_PATH, {})
+
+
+def test_an_answer_counted_up_to_the_bound_is_read_and_one_byte_more_is_refused(
+    monkeypatch,
+):
+    bound_answers(monkeypatch)
+    half = b" " * (TEST_MAX_ANSWER_BYTES // 2)
+
+    assert len(send_pieces([half, half]).content) == TEST_MAX_ANSWER_BYTES
+    with pytest.raises(AiApiError) as raised:
+        send_pieces([half, half, b" "])
+    assert (raised.value.state, raised.value.http_status) == (
+        "ai_api_invalid_response",
+        200,
+    )
+
+
 def test_a_failure_beyond_the_bound_keeps_the_state_of_its_status(monkeypatch):
     bound_answers(monkeypatch)
     chunks = [b'{"error": "llm_timeout", "padding": "', b"x" * TEST_MAX_ANSWER_BYTES]
@@ -666,7 +690,11 @@ def send_on_a_clock(clock, seconds_between_pieces):
         clock.now += seconds_between_pieces
         yield b"}"
 
-    http_client, _ = simulate(lambda request: httpx2.Response(200, content=pieces()))
+    http_client, _ = simulate(
+        lambda request: httpx2.Response(
+            200, content=pieces(), headers={"X-Request-ID": REQUEST_ID}
+        )
+    )
     with http_client:
         return send_request(http_client, DIGESTS_PATH, {}, clock=clock)
 
@@ -676,7 +704,7 @@ def test_an_answer_still_read_at_its_deadline_is_ai_api_timeout():
         send_on_a_clock(Clock(), AI_API_REQUEST_DEADLINE_SECONDS)
 
     assert (raised.value.state, raised.value.http_status) == ("ai_api_timeout", 200)
-    assert str(raised.value) == "ai_api_timeout, HTTP 200"
+    assert str(raised.value) == f"ai_api_timeout, HTTP 200, X-Request-ID {REQUEST_ID}"
 
 
 def test_an_answer_read_before_its_deadline_is_kept_whole():
