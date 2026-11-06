@@ -17,9 +17,11 @@ secrets sont posés dans le coffre (« Appliquer »).
 | `key-vault.bicep` | coffre `kv-kb-…` en RBAC, suppression réversible 7 jours ; Key Vault Secrets Officer pour l'opératrice | 1 | #414 |
 | `exchange-storage.bicep` | compte Blob `stkbexchange…`, clé partagée coupée ; conteneur `smoke-test`, lisible par `id-kb-smoke-test` seul | 1 | #414 (#420 le complète) |
 | `budget.bicep` | budget `budget-kb` : 30 €/mois des coûts étiquetés `project=k-b`, e-mail à 50 % et 100 % du réel, à 100 % de la prévision ; rien n'est coupé au dépassement | 1 | #437 |
+| `postgresql-server.bicep` | serveur PostgreSQL 18 flexible `pgsql-kb-…` (`Standard_B1ms`), Entra seul, 32 Gio, sauvegardes 7 jours, règle de pare-feu « services Azure » (« La base PostgreSQL ») | 1 | #421 |
 | `key-vault-secret-access.bicep` | Key Vault Secrets User pour chaque identité, sur chacun de ses secrets seulement | 2 | #414 |
 | `api-container-app.bicep` | `ca-kb-data-api` et `ca-kb-ai-api` : ingress interne seul, HTTPS, 0 à 1 réplique, sondes `GET /health` | 2 | #414 |
 | `smoke-test-job.bicep` | job manuel `caj-kb-smoke-test`, qui lance `kb smoke-test` | 2 | #414 |
+| `migrate-database-job.bicep` | identité `id-kb-migrate-database` et son AcrPull ; job manuel `caj-kb-migrate-database`, qui lance `kb migrate-database` | 1 (l'identité), 2 (le job) | #421 |
 
 ## Noms des ressources
 
@@ -81,14 +83,17 @@ Les étapes ci-dessous sont celles de la première mise en ligne, le 2026-11-06 
 RG=<groupe de ressources>
 EMAIL=<adresse des alertes du budget>
 OPERATOR=$(az ad signed-in-user show --query id -o tsv)
+OPERATOR_UPN=$(az ad signed-in-user show --query userPrincipalName -o tsv)
 # Refuse une valeur vide, ou laissée entre chevrons.
 kb_check() {
   for value in "$@"; do
     case "$value" in ''|*'<'*) echo "une valeur est vide ou encore un gabarit" >&2; return 1 ;; esac
   done
 }
-kb_check "$RG" "$EMAIL" "$OPERATOR" && echo ok
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" && echo ok
 ```
+
+`OPERATOR_UPN` fait de l'opératrice l'administratrice Entra du serveur PostgreSQL (#421).
 
 Chaque `<…>` se remplace par sa valeur. Une valeur laissée entre chevrons part telle quelle : le 2026-11-06, une
 adresse `<adresse>` a fait refuser le budget (« Notification cannot have invalid email addresses »), et le reste du
@@ -107,21 +112,21 @@ dans l'historique des déploiements du groupe, côté Azure, et dans la sortie d
 Le rôle de Lecteur de l'abonnement suffit pour cette lecture :
 
 ```sh
-for ns in Microsoft.App Microsoft.ContainerRegistry Microsoft.KeyVault Microsoft.OperationalInsights Microsoft.Insights Microsoft.ManagedIdentity Microsoft.Storage; do
+for ns in Microsoft.App Microsoft.ContainerRegistry Microsoft.KeyVault Microsoft.OperationalInsights Microsoft.Insights Microsoft.ManagedIdentity Microsoft.Storage Microsoft.DBforPostgreSQL; do
   printf '%s ' "$ns"; az provider show -n "$ns" --query registrationState -o tsv
 done
 ```
 
-Les sept doivent répondre `Registered`. Si l'un d'eux manque, seul un propriétaire de l'abonnement peut
+Les huit doivent répondre `Registered`. Si l'un d'eux manque, seul un propriétaire de l'abonnement peut
 l'enregistrer.
 
 ### 2. Première passe : le socle
 
 ```sh
-kb_check "$RG" "$EMAIL" "$OPERATOR" && az deployment group what-if -g "$RG" -f infra/main.bicep \
-  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR"
-kb_check "$RG" "$EMAIL" "$OPERATOR" && az deployment group create -g "$RG" -f infra/main.bicep \
-  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" \
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" && az deployment group what-if -g "$RG" -f infra/main.bicep \
+  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN"
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" && az deployment group create -g "$RG" -f infra/main.bicep \
+  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" \
   --query "{state:properties.provisioningState,outputs:properties.outputs}"
 ```
 
@@ -225,13 +230,13 @@ Les trois valeurs sont celles du `.env` de l'opératrice : `KB_LLM_BASE_URL`, `K
 LLM_URL=<KB_LLM_BASE_URL>
 LLM_MODEL=<KB_LLM_MODEL>
 OTLP=<KB_OTLP_ENDPOINT>
-kb_check "$RG" "$EMAIL" "$OPERATOR" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" && az deployment group what-if \
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" && az deployment group what-if \
   -g "$RG" -f infra/main.bicep \
-  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" imageTag="$TAG" \
+  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" imageTag="$TAG" \
      llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP"
-kb_check "$RG" "$EMAIL" "$OPERATOR" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" && az deployment group create \
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" && az deployment group create \
   -g "$RG" -f infra/main.bicep \
-  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" imageTag="$TAG" \
+  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" imageTag="$TAG" \
      llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP" \
   --query "{state:properties.provisioningState}"
 ```
@@ -388,9 +393,9 @@ Homebrew), et force `verify-full`.
 
 ### Créer les rôles et la base (une fois)
 
-Après la première passe de `main.bicep`, qui crée le serveur et les identités (`id-kb-data-api`, et
-`id-kb-migrate-database` par `modules/migrate-database-job.bicep`), et avant la seconde, qui crée le job et l'API
-de données. Chaque rôle est rattaché à son identité par l'identifiant de son principal de service, pas par son
+Après la première passe de `main.bicep` (étape 2 d'« Appliquer »), qui crée le serveur et les identités
+(`id-kb-data-api`, et `id-kb-migrate-database` par `modules/migrate-database-job.bicep`), et avant la seconde
+(étape 5), qui crée le job et donne la base à l'API de données. Chaque rôle est rattaché à son identité par l'identifiant de son principal de service, pas par son
 nom, qu'une autre identité de l'annuaire peut porter.
 
 ```sh
@@ -440,11 +445,15 @@ Attendu : la seule règle `AllowAllAzureServicesAndResourcesWithinAzureIps`, de 
    az containerapp job start -g "$RG" -n caj-kb-migrate-database
    az containerapp job execution list -g "$RG" -n caj-kb-migrate-database \
      --query "[].{name:name,status:properties.status,start:properties.startTime}" -o table
-   az containerapp job logs show -g "$RG" -n caj-kb-migrate-database --container kb --format text
+   WS=$(az monitor log-analytics workspace show -n log-kb -g "$RG" --query customerId -o tsv)
+   az monitor log-analytics query -w "$WS" -o tsv \
+     --analytics-query "ContainerAppConsoleLogs | where TimeGenerated > ago(1h) and JobName == 'caj-kb-migrate-database' | order by TimeGenerated asc" \
+     --query "[].[TimeGenerated, Log]"
    ```
 
    La ligne de résultat du premier lancement est `database created: …`, celle du second
-   `database unchanged: … already has its tables`.
+   `database unchanged: … already has its tables`. Elle se lit dans `log-kb` quelques minutes après la fin de
+   l'exécution : `az containerapp job logs show` ne lit qu'une exécution en cours (étape 6 d'« Appliquer »).
 2. Le mot de passe est coupé : `az postgres flexible-server show -g "$RG" -n "$PG" --query authConfig` rend
    `"passwordAuth": "Disabled"` et `"activeDirectoryAuth": "Enabled"`.
 3. Sous `id-kb-data-api`, une écriture est refusée. Dans le catalogue, depuis l'administration :
