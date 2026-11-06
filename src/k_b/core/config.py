@@ -508,3 +508,22 @@ TRACE_CONTENTS: tuple[TraceContent, ...] = get_args(TraceContent.__value__)
 # The longest body of such a record, in bytes of UTF-8: Loki refuses a line beyond 256 KB, the
 # margin is left to its own counting. Beyond, each text is cut, the structure kept.
 MAX_CONTENT_EVENT_BYTES = 200_000
+
+# kb smoke-test, run by the job caj-kb-smoke-test (#412): GET /health of both APIs, then the listing
+# of the container of the test of the exchange storage, by the identity of the job. The container of
+# the test, created with the exchange storage (#414): a constant, not a variable, as no deployment
+# changes it.
+SMOKE_TEST_CONTAINER = "smoke-test"
+# One page of names at most, counted and never kept: the job proves it can list, and reads no more
+# (OWASP API4:2023).
+MAX_LISTED_BLOBS = 100
+# GET /health from a job, without retry. Connection, pool and write: as for the AI API. Read: 60 s, an
+# assumption, the wake of an API at 0 replica, to be measured by #414. The whole answer within the
+# same 60 s, checked after each piece read (core/outbound.py).
+HEALTH_CONNECT_TIMEOUT_SECONDS = 5
+HEALTH_POOL_TIMEOUT_SECONDS = 5
+HEALTH_WRITE_TIMEOUT_SECONDS = 10
+HEALTH_READ_TIMEOUT_SECONDS = 60
+HEALTH_REQUEST_DEADLINE_SECONDS = HEALTH_READ_TIMEOUT_SECONDS
+# The body of GET /health is {"status":"ok"}, 15 bytes: beyond 1 KiB, it is not the answer of K-B.
+MAX_HEALTH_ANSWER_BYTES = 1024

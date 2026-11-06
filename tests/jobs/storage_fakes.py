@@ -1,0 +1,130 @@
+"""A fake Azure Blob Storage and a fake identity endpoint: the transport of the Azure SDK answers
+from a handler of the test, never from the network."""
+
+import http
+import io
+import json
+from urllib.parse import quote
+
+import requests
+import urllib3
+from azure.core.pipeline.transport import RequestsTransport
+from requests.adapters import HTTPAdapter
+
+# The name of a clip is its title (etl/sources/clipping.py), the file name Web Clipper gives it:
+# spotted in a log, it would name what Sabine reads.
+SPOTTED_BLOB_NAME = "A title of a clip spotted in the log 7Q3ZK.md"
+
+
+def names_the_spotted_blob(text):
+    """Whether text holds the name of the spotted blob, as written or as a URL writes it."""
+    return SPOTTED_BLOB_NAME in text or quote(SPOTTED_BLOB_NAME) in text
+
+
+TEST_ACCOUNT_URL = "https://stkbexchangetest.blob.core.windows.net"
+TEST_CLIENT_ID = "6f1c2a9e-3b4d-4e5f-8a7b-9c0d1e2f3a4b"
+TEST_TOKEN = "token-of-the-test"  # noqa: S105 — a token of the tests, which grants nothing
+# The endpoint and the header of the identity of a container app (azure-identity reads them).
+TEST_IDENTITY_ENDPOINT = "http://localhost:42356/msi/token"
+TEST_IDENTITY_HEADER = "identity-header-of-the-test"
+XML_HEADERS = {"Content-Type": "application/xml"}
+
+
+class AnsweringAdapter(HTTPAdapter):
+    """The adapter of requests under the transport of the SDK: each request is kept, then answered
+    by handle with its status, its headers and its body."""
+
+    def __init__(self, handle):
+        super().__init__()
+        self.handle = handle
+        self.requests = []
+
+    def send(self, request, **kwargs):
+        self.requests.append(request)
+        status, headers, body = self.handle(request)
+        raw = urllib3.HTTPResponse(
+            body=io.BytesIO(body),
+            headers={"Content-Length": str(len(body)), **headers},
+            status=status,
+            reason=http.HTTPStatus(status).phrase,
+            preload_content=False,
+        )
+        return self.build_response(request, raw)
+
+
+class FakeTransport(RequestsTransport):
+    """The transport of the SDK on a fake adapter; its retries do not wait."""
+
+    def __init__(self, handle):
+        self.adapter = AnsweringAdapter(handle)
+        session = requests.Session()
+        session.mount("https://", self.adapter)
+        session.mount("http://", self.adapter)
+        super().__init__(session=session, session_owner=False)
+
+    def sleep(self, duration):
+        pass
+
+
+def answer_listing(*names):
+    """The answer of List Blobs, its format as the REST API documents it
+    (learn.microsoft.com/en-us/rest/api/storageservices/list-blobs, "Response body")."""
+    blobs = "".join(f"<Blob><Name>{name}</Name></Blob>" for name in names)
+    body = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        f'<EnumerationResults ServiceEndpoint="{TEST_ACCOUNT_URL}/" ContainerName="smoke-test">'
+        f"<MaxResults>100</MaxResults><Blobs>{blobs}</Blobs><NextMarker />"
+        "</EnumerationResults>"
+    )
+
+    def handle(request):
+        return 200, XML_HEADERS, body.encode()
+
+    return handle
+
+
+def answer_error(status, code, message):
+    """An error of Blob Storage: its code in x-ms-error-code and in the body, as the REST API
+    documents it (learn.microsoft.com/en-us/rest/api/storageservices/status-and-error-codes2)."""
+    body = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        f"<Error><Code>{code}</Code><Message>{message}</Message></Error>"
+    )
+
+    def handle(request):
+        return status, {**XML_HEADERS, "x-ms-error-code": code}, body.encode()
+
+    return handle
+
+
+# A 403 whose body names the blob: AuthenticationFailed gives the resource it refused.
+answer_forbidden_naming_the_blob = answer_error(
+    403,
+    "AuthenticationFailed",
+    "Server failed to authenticate the request.\n"
+    f"AuthenticationErrorDetail: resource /stkbexchangetest/smoke-test/{SPOTTED_BLOB_NAME}",
+)
+
+
+def answer_token(request):
+    """The identity endpoint of a container app, as azure-identity reads it (api-version
+    2019-08-01)."""
+    body = {
+        "access_token": TEST_TOKEN,
+        "expires_on": "4102444800",
+        "resource": "https://storage.azure.com",
+        "token_type": "Bearer",
+    }
+    return 200, {"Content-Type": "application/json"}, json.dumps(body).encode()
+
+
+def answer_identity_refusal(request):
+    """The identity endpoint refusing a client id it does not know: an OAuth error, in JSON."""
+    body = {"error": "invalid_request", "error_description": "Identity not found"}
+    return 400, {"Content-Type": "application/json"}, json.dumps(body).encode()
+
+
+def set_identity_endpoint(monkeypatch):
+    """The variables azure-identity reads in a container app."""
+    monkeypatch.setenv("IDENTITY_ENDPOINT", TEST_IDENTITY_ENDPOINT)
+    monkeypatch.setenv("IDENTITY_HEADER", TEST_IDENTITY_HEADER)

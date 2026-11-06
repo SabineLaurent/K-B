@@ -1,5 +1,6 @@
 """The log of kb: its lines dated in UTC, its file, its rotation and the errors it records."""
 
+import contextlib
 import logging
 import os
 import re
@@ -8,16 +9,26 @@ import sys
 from datetime import UTC, datetime, time, timedelta
 
 import pytest
+from azure.core.credentials import AccessToken
+from azure.core.exceptions import HttpResponseError
 from commands.cli_helpers import (
     LOG_LINE_DATE,
     collected_kinds,
 )
 from etl.test_extract import BrokenSource, WorkingSource
+from jobs.storage_fakes import (
+    SPOTTED_BLOB_NAME,
+    TEST_ACCOUNT_URL,
+    FakeTransport,
+    answer_forbidden_naming_the_blob,
+    names_the_spotted_blob,
+)
 
 from k_b import cli
 from k_b.commands import (
     collect_command,
 )
+from k_b.jobs.exchange_storage import open_container_client
 
 
 def test_a_log_line_is_dated_in_utc_with_its_zone(tmp_path):
@@ -163,3 +174,40 @@ def test_a_rotation_deletes_no_log_file_only_the_purge_does(tmp_path):
         logging.getLogger("k_b.test").info("a line of today")
 
     assert all(path.exists() for path in rotated_paths)
+
+
+class StorageCredential:
+    """A token for the storage, without the identity endpoint."""
+
+    def get_token(self, *scopes, **kwargs):
+        return AccessToken("token-of-the-test", 4102444800)
+
+
+def test_the_azure_sdk_writes_no_url_of_a_blob_in_the_log(tmp_path, capsys):
+    """A transfer names its blob in its URL, which the SDK logs at INFO: the name of a clip is its
+    title (#412)."""
+    storage = FakeTransport(answer_forbidden_naming_the_blob)
+
+    with (
+        cli.logging_to(tmp_path),
+        open_container_client(
+            TEST_ACCOUNT_URL, "smoke-test", StorageCredential(), transport=storage
+        ) as container,
+        contextlib.suppress(HttpResponseError),
+    ):
+        container.download_blob(SPOTTED_BLOB_NAME).readall()
+
+    [transfer] = storage.adapter.requests
+    assert names_the_spotted_blob(transfer.url)
+    assert not names_the_spotted_blob((tmp_path / "logs" / "kb.log").read_text("utf-8"))
+    assert not names_the_spotted_blob(capsys.readouterr().err)
+
+
+def test_the_level_of_the_azure_sdk_is_set_back_once_the_log_is_closed(tmp_path):
+    azure_logger = logging.getLogger("azure")
+    level_before = azure_logger.level
+
+    with cli.logging_to(tmp_path):
+        assert azure_logger.level == logging.WARNING
+
+    assert azure_logger.level == level_before

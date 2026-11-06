@@ -317,3 +317,72 @@ def test_no_module_of_the_sources_imports_the_composition():
         assert {
             name for name in imported if reaches(name, COMPOSITION_MODULES)
         } == set(), path
+
+
+# The code the jobs of Azure Container Apps share (#412): the exchange storage and the health of the
+# APIs, below commands. It imports only core; only commands import it: neither the pipeline nor the
+# APIs, which have no access to the exchange storage.
+JOBS_ALLOWED_MODULES = {"jobs", "core"}
+JOBS_IMPORTERS = {"jobs", "commands"}
+
+
+def list_forbidden_imports_of_jobs(imported: set[str]) -> set[str]:
+    return {name for name in imported if not is_within(name, JOBS_ALLOWED_MODULES)}
+
+
+def list_imports_of_jobs(imported: set[str]) -> set[str]:
+    return {name for name in imported if reaches(name, {"jobs"})}
+
+
+def test_jobs_imports_only_core():
+    for path in list_python_files("jobs"):
+        imported = list_imported_modules(path, find_package(path))
+        assert list_forbidden_imports_of_jobs(imported) == set(), path
+
+
+def test_only_commands_import_jobs():
+    paths = [
+        path.relative_to(PACKAGE_DIR).as_posix()
+        for path in sorted(PACKAGE_DIR.rglob("*.py"))
+        if path.relative_to(PACKAGE_DIR).parts[0].removesuffix(".py")
+        not in JOBS_IMPORTERS
+        and list_imports_of_jobs(list_imported_modules(path, find_package(path)))
+    ]
+
+    assert paths == []
+
+
+@pytest.mark.parametrize(
+    ("code", "is_refused"),
+    [
+        ("from k_b.etl.raw_store import RawStore", True),
+        ("from k_b import database", True),
+        ("from k_b.post.ai_api_client import AI_API_URL_VARIABLE", True),
+        ("from ..commands.run_log import LOGGER_NAME", True),
+        ("from k_b.core.outbound import open_http_client", False),
+        ("from .api_health import check_health", False),
+    ],
+)
+def test_the_rule_of_jobs_refuses_every_layer_but_core(code, is_refused):
+    imported = parse_imported_modules(code, package="k_b.jobs")
+
+    assert bool(list_forbidden_imports_of_jobs(imported)) is is_refused
+
+
+@pytest.mark.parametrize(
+    ("package", "code", "is_refused"),
+    [
+        (
+            "k_b.ai_api",
+            "from k_b.jobs.exchange_storage import open_container_client",
+            True,
+        ),
+        ("k_b.etl", "from k_b import jobs", True),
+        ("k_b.data_api", "from ..jobs import api_health", True),
+        ("k_b.commands", "from k_b.core.outbound import open_http_client", False),
+    ],
+)
+def test_the_rule_of_jobs_refuses_every_way_to_it(package, code, is_refused):
+    imported = parse_imported_modules(code, package=package)
+
+    assert bool(list_imports_of_jobs(imported)) is is_refused

@@ -31,6 +31,10 @@ LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 # The HTTP client of the AI API logs each request at INFO, with its URL (the resource of the
 # provider) and without the id of the request of kb serve-ai: from WARNING only.
 HTTP_CLIENT_LOGGER_NAME = "httpx2"
+# The Azure SDK logs each request at INFO, with its URL, which names the blob of a transfer: the
+# title of a clip (jobs/exchange_storage.py, #412). From WARNING only, as httpx2.
+AZURE_SDK_LOGGER_NAME = "azure"
+QUIETED_LOGGER_NAMES = (HTTP_CLIENT_LOGGER_NAME, AZURE_SDK_LOGGER_NAME)
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -64,18 +68,22 @@ def logging_to(
     formatter.converter = time.gmtime
     root_logger = logging.getLogger()
     previous_level = root_logger.level
-    http_client_logger = logging.getLogger(HTTP_CLIENT_LOGGER_NAME)
-    previous_http_client_level = http_client_logger.level
+    quieted_loggers = [logging.getLogger(name) for name in QUIETED_LOGGER_NAMES]
+    previous_quieted_levels = [quieted.level for quieted in quieted_loggers]
     for handler in handlers:
         handler.setFormatter(formatter)
         root_logger.addHandler(handler)
     root_logger.setLevel(logging.INFO)
-    http_client_logger.setLevel(logging.WARNING)
+    for quieted in quieted_loggers:
+        quieted.setLevel(logging.WARNING)
     try:
         yield
     finally:
         root_logger.setLevel(previous_level)
-        http_client_logger.setLevel(previous_http_client_level)
+        for quieted, previous_quieted_level in zip(
+            quieted_loggers, previous_quieted_levels, strict=True
+        ):
+            quieted.setLevel(previous_quieted_level)
         for handler in handlers:
             root_logger.removeHandler(handler)
             handler.close()

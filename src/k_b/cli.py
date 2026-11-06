@@ -33,6 +33,7 @@ from k_b.commands.run_log import (
 from k_b.commands.serve_ai_command import run_serve_ai
 from k_b.commands.serve_data_command import run_serve_data
 from k_b.commands.sigterm import StoppedBySigtermError, stopping_on_sigterm
+from k_b.commands.smoke_test_command import run_smoke_test
 from k_b.commands.trend_report_command import run_trend_report
 from k_b.commands.write_tops_command import run_write_tops
 from k_b.core.config import (
@@ -41,6 +42,7 @@ from k_b.core.config import (
     DATA_API_HOST,
     DATA_API_PORT,
     DATABASE_FILE_NAME,
+    SMOKE_TEST_CONTAINER,
 )
 from k_b.database.location import DATABASE_URL_VARIABLE
 from k_b.etl.collected_sources import COLLECT_ONLY_VARIABLE, VAULT_DIR_VARIABLE
@@ -119,6 +121,11 @@ def read_command(argv: list[str] | None) -> str:
         f" one, then write it in the vault of {VAULT_DIR_VARIABLE}",
     )
     command_parsers.add_parser(
+        "smoke-test",
+        help="check that both APIs answer GET /health and that the identity of the job lists"
+        f" the container {SMOKE_TEST_CONTAINER} of the exchange storage; writes counts only",
+    )
+    command_parsers.add_parser(
         "openapi",
         help=f"write the OpenAPI of the data API in {DATA_API_OPENAPI_PATH} and the one of"
         f" the AI API in {AI_API_OPENAPI_PATH}",
@@ -194,4 +201,6 @@ def run_command(command: str, data_dir: Path, environ: Mapping[str, str]) -> int
         return run_digest(environ)
     if command == "trend-report":
         return run_trend_report(data_dir, environ)
+    if command == "smoke-test":
+        return run_smoke_test(environ)
     return run_collect(data_dir, environ)
