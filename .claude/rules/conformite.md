@@ -1,4 +1,4 @@
-<!-- consignes/conformite.md v2026-10-16 — source : time-knight. Ne pas modifier ici sans la reporter. -->
+<!-- consignes/conformite.md v2026-11-06 — source : time-knight. Ne pas modifier ici sans la reporter. -->
 # Conformité — référentiels en vigueur
 
 Ce que le code des projets applique en sécurité, données, accessibilité et écoconception, dans la
@@ -8,7 +8,7 @@ version **en vigueur**. Complète `code.md`, qui dit comment coder ; ce fichier 
 
 | Référentiel | Version en vigueur | Vérifiée le | Source officielle | S'applique à |
 |---|---|---|---|---|
-| OWASP API Security Top 10 | 2023 | 2026-10-04 | https://api-security.owasp.org/ | toute API exposée |
+| OWASP API Security Top 10 | 2023 | 2026-11-06 | https://api-security.owasp.org/ | toute API exposée |
 | RGPD, fiche CNIL « intérêt légitime : collecte par moissonnage » | fiche en ligne | 2026-10-04 | https://www.cnil.fr/fr/focus-interet-legitime-collecte-par-moissonnage | collecte, scraping, base, purge |
 | RGAA | 4.1.2 (WCAG 2.1 AA) ; RGAA 5 (WCAG 2.2) annoncé fin 2026 | 2026-10-04 | https://accessibilite.numerique.gouv.fr/ | interfaces, documentation publiée |
 | RGESN | v2, 28/05/2024 | 2026-10-04 | https://ecoresponsable.numerique.gouv.fr/publications/referentiel-general-ecoconception/ | collecte, stockage, hébergement, IA |
@@ -41,6 +41,9 @@ version **en vigueur**. Complète `code.md`, qui dit comment coder ; ce fichier 
 - Lieu de traitement choisi et écrit (zone UE quand le fournisseur l'offre) ; un transfert hors UE est inscrit au
   registre avec sa garantie (chap. V).
 - Un changement de fournisseur, de compte ou d'abonnement : relire le contrat et mettre le registre à jour avant.
+- Inférence : l'abonnement Azure de l'organisme de formation d'abord, en zone de données UE par défaut. Une zone
+  hors UE ou un autre fournisseur seulement si une mesure montre un gain, avec un seuil fixé avant de mesurer ; le
+  transfert est inscrit au registre avec sa garantie avant le premier envoi.
 
 **RGAA 4.1.2**
 - Toute interface vise WCAG 2.1 AA ; un contrôle d'accessibilité en apporte la preuve.
