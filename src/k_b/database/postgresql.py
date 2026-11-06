@@ -23,9 +23,9 @@ NAMED_PLACEHOLDER = re.compile(r"(?<![:\w\\]):(\w+)(?![:\w])")
 OPEN_TRANSACTION_STATUSES = frozenset(
     {pq.TransactionStatus.INTRANS, pq.TransactionStatus.INERROR}
 )
-# The lock of the writers of K-B, held until the end of the transaction: two imports, or an import
-# and a purge, write one after the other, as behind the write lock of SQLite. The key is any one
-# number, the same for every writer: the bytes "k-b" read as an integer.
+# The lock of the writers of K-B, held until the end of the transaction: two imports write one after
+# the other, as behind the write lock of SQLite; the purges do not take it yet (#418). The key is
+# any one number, the same for every writer: the bytes "k-b" read as an integer.
 WRITING_LOCK_KEY = int.from_bytes(b"k-b")
 SET_LOCK_TIMEOUT = "SELECT set_config('lock_timeout', ?, true)"
 LOCK_FOR_WRITING = "SELECT pg_advisory_xact_lock(?)"

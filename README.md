@@ -99,11 +99,14 @@ Les utilisateurs du produit sont décrits plus haut, dans « Utilisateurs ».
 
 - **Python 3.13** (`.python-version`), langage du code ; dépendances et environnement par
   [uv](https://docs.astral.sh/uv/). **SQL** pour le schéma et les requêtes
-  (`src/k_b/database/schema.sql`, module `sqlite3`, sans ORM).
+  (`src/k_b/database/schema.sql`, module `sqlite3`, sans ORM ; pour PostgreSQL,
+  `schema_postgresql.sql` et psycopg 3).
 - **Base** : SQLite aux deux premiers temps, le Mac puis des conteneurs en local (voir « Le POC
-  du 25/10 et la suite ») ; au troisième (Azure Container Apps, 08/11), SQLite et Blob ou
-  PostgreSQL, non tranché (journal ADR, « Décisions encore ouvertes », « La base au
-  temps 3 »). D'ici là, aucun SQL propre à SQLite n'est ajouté (règle 1 de `.claude/rules/poc.md`).
+  du 25/10 et la suite ») ; au troisième (Azure Container Apps, 08/11), PostgreSQL, que
+  `KB_DATABASE_URL` choisit (journal ADR, 2026-11-06, « Base : PostgreSQL en ligne, par un
+  adaptateur maison (#417) »). Les deux moteurs lisent le même SQL : aucun SQL propre à SQLite
+  n'est ajouté (règle 1 de `.claude/rules/poc.md`). La base du Mac ne passe pas en ligne : la base
+  en ligne repart du brut ([docs/stockage.md](docs/stockage.md), « Faire évoluer le schéma »).
 - **Données hors du dépôt**, dans le dossier `KB_DATA_DIR` (`~/.knowledge_base` sur ma machine,
   journal ADR du 2026-10-09). Au deuxième temps, en conteneurs, la base ira dans un volume nommé et
   le brut dans un dossier partagé avec les conteneurs (journal ADR, 2026-10-15, « POC du 25/10 »,
@@ -127,7 +130,7 @@ Les utilisateurs du produit sont décrits plus haut, dans « Utilisateurs ».
 | Mise en ligne, option PostgreSQL | **18,13 $ par mois** de plus : Azure Database for PostgreSQL, serveur flexible Burstable B1ms (1 vCore, 2 Gio), 0,019 $ de l'heure, 13,87 $, et 32 Gio de stockage, le minimum, à 0,133 $ par Go et par mois, 4,26 $ ; une sauvegarde au-delà du stockage compris est comptée 0,10 $ par Go et par mois, non chiffrée. Microsoft déconseille le niveau Burstable pour la production. |
 | Temps | chaque issue porte son estimation en heures ; les jalons les regroupent |
 
-Ces coûts ne tranchent pas « La base au temps 3 » (journal ADR, « Décisions encore ouvertes ») : ils en donnent le prix.
+Ces coûts ont été relevés avant que « La base au temps 3 » soit tranchée, pour PostgreSQL, le 2026-11-06 (journal ADR).
 
 #### Sources du budget (consultées le 2026-10-25)
 
@@ -179,7 +182,7 @@ temps, l'image et les conteneurs (#200) et l'installation par compose (#202).
 **La suite** :
 
 - au 08/11, mise en ligne sur Azure Container Apps : brut dans Azure Blob Storage, collecte en
-  job déclenché par cron ; la base, SQLite et Blob ou PostgreSQL, reste à trancher ;
+  job déclenché par cron ; la base sur PostgreSQL ;
 - après le 29/10, la compilation des clips en wiki ;
 - après le 08/11, la recherche `kb search`.
 
@@ -201,6 +204,7 @@ uv sync
 | Variable | Obligatoire | Rôle |
 |---|---|---|
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
+| `KB_DATABASE_URL` | non | l'URL d'une base PostgreSQL, `postgresql://…` ou `postgres://…`, créée hors de K-B en UTF8 et en collation C ([docs/stockage.md](docs/stockage.md), « Le SGBD »). Sans elle, la base est le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`. Une autre valeur, vide comprise, ou une variable que libpq lit posée à côté (`PGHOST`, `PGPASSWORD`…) : code 2, sans que la valeur soit citée. Lue aujourd'hui par `kb create-db` et `kb import` ; `kb serve-data` lit le fichier SQLite jusqu'à #418. |
 | `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
 | `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les comptes rendus de veille dans `veille/<sujet>/`, `kb trend-report` les comptes rendus des tendances dans `veille/tendances/` ; aucun des trois ne tourne sans elle (code 2). |
 | `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
@@ -217,14 +221,17 @@ mkdir -p ~/.knowledge_base
 KB_DATA_DIR=~/.knowledge_base uv run kb create-db
 ```
 
-`kb create-db` crée `<KB_DATA_DIR>/k-b.sqlite` : les tables, les 7 sources, le mode WAL. Code de
-sortie :
+`kb create-db` crée `<KB_DATA_DIR>/k-b.sqlite` : les tables, les 7 sources, le mode WAL. Avec
+`KB_DATABASE_URL`, il crée les tables et les 7 sources dans la base PostgreSQL de l'URL, qui doit
+déjà exister. Code de sortie :
 
 - 0 : la base est créée ;
 - 1 : la création a échoué (dossier en lecture seule, disque plein…). Le message dit l'erreur, et
   aucun fichier de base ne reste ;
 - 2 : `KB_DATA_DIR` manque ou n'est pas un dossier existant, ou la base existe déjà. Une base
-  existante n'est pas touchée : pour repartir de zéro, supprimer le fichier ;
+  existante n'est pas touchée : pour repartir de zéro, supprimer le fichier. Sur PostgreSQL :
+  `KB_DATABASE_URL` est refusée, ou la base a déjà sa table `source`, ou elle n'est pas en UTF8 et
+  en collation C ;
 - 130 : `kb create-db` a reçu SIGINT (Ctrl-C) : comme pour 1, aucun fichier de base ne reste, sauf
   si un second Ctrl-C coupe sa suppression (le supprimer à la main).
 
@@ -273,8 +280,9 @@ sortie :
 - 0 : l'import a réussi ;
 - 1 : l'import a échoué. Il n'écrit rien, ni dans la base ni au journal : le journal est écrit
   avant la validation de la base ;
-- 2 : `KB_DATA_DIR` manque, la base n'existe pas (`kb create-db`), ou le journal de cette
-  seconde existe déjà (relancer `kb import`) ;
+- 2 : `KB_DATA_DIR` manque, la base n'existe pas (`kb create-db`), le journal de cette
+  seconde existe déjà (relancer `kb import`), ou `KB_DATABASE_URL` est refusée. Une base
+  PostgreSQL sans ses tables sort en 1 (#421) ;
 - 143 : `kb import` a reçu SIGTERM (`docker stop`). Reçu avant la validation de la base, il
   n'écrit rien, comme pour 1, ni dans la base ni au journal ; reçu pendant ou après, l'import est
   gardé, avec son journal ;
