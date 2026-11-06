@@ -232,8 +232,8 @@ prend en voyant le contrat.
 
 ## Ce qui reste
 
-- **Borner la lecture elle-même** (`LIMIT 101` des surlignages, `substr` du texte d'un clip) : après
-  #416, dans une issue à part (constat 4 de la revue de code). Aujourd'hui, la lecture n'est bornée
+- **Borner la lecture elle-même** (`LIMIT 101` des surlignages, `substr` du texte d'un clip) : #430,
+  après #416 (constat 4 de la revue de code). Aujourd'hui, la lecture n'est bornée
   qu'en temps, par le délai.
 - **Un plafond de requêtes simultanées** pour l'API de données, que l'API IA a déjà (« une demande à
   la fois »). Le délai se multiplie par le débit (120 listes par minute, 5 s chacune au plus). C'est

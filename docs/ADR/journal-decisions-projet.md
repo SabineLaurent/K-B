@@ -5179,8 +5179,8 @@ Décisions de Sabine du 2026-11-04.
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
   d'une entrée, puis en sert 100 au plus. Une lecture bornée (`LIMIT 101` dans `SELECT_HIGHLIGHTS`,
-  `database/reading.py`) bornerait aussi la mémoire. #416 ne change aucun comportement : à décider à
-  part, avec #418 ou plus tard (time-knight, 06/11).
+  `database/reading.py`), et `substr` pour le texte d'un clip, borneraient aussi la mémoire. #416 ne
+  change aucun comportement : à décider à part, avec #418 ou plus tard (time-knight, 06/11), dans #430.
 
 - **Seuil de couverture des tests** (2026-11-06, #405) : quel `fail_under`, et la CI le vérifie-t-elle ?
   À décider par l'utilisatrice sur la mesure du 06/11 (99,26 % : lignes 99,44 %, branches 98,36 %).
