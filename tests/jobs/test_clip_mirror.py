@@ -107,17 +107,18 @@ def test_a_clip_sent_again_within_the_same_second_is_copied_by_its_size(
     assert result.copied == 1
 
 
-def test_a_file_newer_than_its_blob_is_left_as_it_is(clippings_dir):
+# Of the size of the blob, or of another: ifSourceNewer keeps a newer file whatever its size.
+@pytest.mark.parametrize("on_the_share", [b"# here", b"# edited on the share"])
+def test_a_file_newer_than_its_blob_is_left_as_it_is(clippings_dir, on_the_share):
     clippings_dir.mkdir()
-    # Of the size of the blob: a file of another size is copied again.
-    (clippings_dir / CLIP_NAME).write_bytes(b"# here")
+    (clippings_dir / CLIP_NAME).write_bytes(on_the_share)
     os.utime(clippings_dir / CLIP_NAME, ns=(to_ns(LATER), to_ns(LATER)))
     container = FakeContainer("clippings", {CLIP_NAME: FakeBlob(b"# clip", SENT_ON)})
 
     result = mirror(container, clippings_dir)
 
     assert container.downloaded_names() == []
-    assert (clippings_dir / CLIP_NAME).read_bytes() == b"# here"
+    assert (clippings_dir / CLIP_NAME).read_bytes() == on_the_share
     assert result.unchanged == 1
 
 
@@ -408,8 +409,8 @@ def test_a_local_error_is_counted_by_its_errno_never_its_path(
     assert "7Q3ZK" not in caplog.text
 
 
-def test_a_date_that_cannot_be_set_is_a_failure_and_the_clip_is_kept(
-    monkeypatch, clippings_dir
+def test_a_date_that_cannot_be_set_is_a_failure_and_the_clip_is_copied(
+    monkeypatch, clippings_dir, caplog
 ):
     def refuse_the_date(*arguments, **keywords):
         raise PermissionError(errno.EPERM, os.strerror(errno.EPERM))
@@ -417,10 +418,14 @@ def test_a_date_that_cannot_be_set_is_a_failure_and_the_clip_is_kept(
     monkeypatch.setattr(clip_mirror.os, "utime", refuse_the_date)
     container = FakeContainer("clippings", {CLIP_NAME: FakeBlob(b"# clip", SENT_ON)})
 
-    result = mirror(container, clippings_dir)
+    with caplog.at_level(logging.INFO, logger="k_b"):
+        result = mirror(container, clippings_dir)
 
     assert dict(result.failed) == {"EPERM": 1}
+    # Written: kb collect must wait for it, as for any clip copied.
+    assert result.copied == 1
     assert (clippings_dir / CLIP_NAME).read_bytes() == b"# clip"
+    assert "blob 1 of 1 not dated: EPERM" in caplog.text
 
 
 def test_the_clip_copied_is_seen_changed_by_the_collection_that_follows(
@@ -460,5 +465,5 @@ def test_the_end_line_counts_each_outcome_without_a_name(clippings_dir, caplog):
     assert (
         "clip mirror: 3 blobs listed: 1 copied, 0 unchanged, 0 left to the next run,"
         " 1 left aside (blob_name_hidden: 1), 1 refused"
-        " (clip_name_refused_by_azure_files: 1), 0 not written"
+        " (clip_name_refused_by_azure_files: 1), 0 failed"
     ) in caplog.text

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from azure.storage.blob import ContainerClient
 
-from k_b.jobs.clip_mirror import name_os_error
+from k_b.core.quoting import name_os_error
 from k_b.jobs.exchange_storage import ExchangeStorageError, naming_storage_errors
 
 logger = logging.getLogger(__name__)

@@ -1,5 +1,6 @@
 """How a value observed in an input is quoted in a log line or an error (conventions.md, rule 3)."""
 
+import errno
 import re
 
 from pydantic import ValidationError
@@ -16,6 +17,14 @@ def quote_value(value: object, max_length: int = MAX_QUOTED_VALUE_LENGTH) -> str
     """The value with its line breaks and control characters escaped by repr, cut to max_length:
     it cannot write a line of its own in a log."""
     return repr(value)[:max_length]
+
+
+def name_os_error(error: OSError) -> str:
+    """An OSError by the name of its errno (ENAMETOOLONG), or its type, never its text, which
+    names the file."""
+    if error.errno is not None and error.errno in errno.errorcode:
+        return errno.errorcode[error.errno]
+    return type(error).__name__
 
 
 def without_values(error: ValidationError) -> ValidationError:

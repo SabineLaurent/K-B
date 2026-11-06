@@ -6,7 +6,6 @@ plan of 2026-11-06): it is recoded by the date of the blob against the date of i
 named by the title of its clip (etl/sources/clipping.py): never logged, its position in the listing
 instead (conventions.md, rule 3)."""
 
-import errno
 import logging
 import os
 import stat
@@ -22,6 +21,7 @@ from azure.storage.blob import BlobProperties, ContainerClient
 
 from k_b.core.atomic_write import write_file_atomically
 from k_b.core.config import MAX_CLIP_NAME_BYTES
+from k_b.core.quoting import name_os_error
 from k_b.jobs.exchange_storage import ExchangeStorageError, naming_storage_errors
 
 logger = logging.getLogger(__name__)
@@ -214,11 +214,12 @@ def copy_when_newer(
     where: str,
     result: MirrorResult,
 ) -> None:
-    """Copy the blob unless its file is as recent and of its size, then date the file as the blob:
-    the next run compares two dates of the storage, whatever the clock of the container. The date set
-    changes the ctime, which etl/sources/clipping.py reads: the collection sees the clip changed.
-    The size tells a second version sent within the same second, last_modified being to the second
-    (RFC 1123); one of the same size is not told (limit accepted, #413)."""
+    """Copy the blob when its file is missing or older (ifSourceNewer), then date the file as the
+    blob: the next run compares two dates of the storage, whatever the clock of the container. The
+    date set changes the ctime, which etl/sources/clipping.py reads: the collection sees the clip
+    changed. At the same date, the size tells a second version sent within the same second,
+    last_modified being to the second (RFC 1123); one of the same size is not told (limit accepted,
+    #413). A file the date of which cannot be set stays copied, and counts as a failure."""
     try:
         status = path.lstat()
     except FileNotFoundError:
@@ -227,10 +228,9 @@ def copy_when_newer(
         refuse_clip(result, where, "local_entry_not_a_file", "")
         return
     modified_ns = to_ns(blob.last_modified)
-    if (
-        status is not None
-        and status.st_mtime_ns >= modified_ns
-        and status.st_size == blob.size
+    if status is not None and (
+        status.st_mtime_ns > modified_ns
+        or (status.st_mtime_ns == modified_ns and status.st_size == blob.size)
     ):
         result.unchanged += 1
         return
@@ -239,8 +239,13 @@ def copy_when_newer(
         result.left_to_next_run += 1
         return
     write_file_atomically(path, content)
-    os.utime(path, ns=(modified_ns, modified_ns), follow_symlinks=False)
     result.copied += 1
+    try:
+        os.utime(path, ns=(modified_ns, modified_ns), follow_symlinks=False)
+    except OSError as error:
+        name = name_os_error(error)
+        logger.error("clip mirror: %s not dated: %s", where, name)
+        result.failed[name] += 1
 
 
 def download_listed_version(
@@ -269,24 +274,16 @@ def to_ns(moment: datetime) -> int:
     return (moment - EPOCH) // ONE_MICROSECOND * 1000
 
 
-def name_os_error(error: OSError) -> str:
-    """An OSError by the name of its errno (ENAMETOOLONG), or its type, never its text, which
-    names the file."""
-    if error.errno is not None and error.errno in errno.errorcode:
-        return errno.errorcode[error.errno]
-    return type(error).__name__
-
-
 def describe_mirror_result(result: MirrorResult) -> str:
     """3 blobs listed: 1 copied, 0 unchanged, 0 left to the next run, 1 left aside
-    (blob_name_hidden: 1), 1 refused (clip_name_too_long: 1), 0 not written."""
+    (blob_name_hidden: 1), 1 refused (clip_name_too_long: 1), 0 failed: not written or not dated."""
     listed = f"{result.listed} blob{'' if result.listed == 1 else 's'} listed"
     return (
         f"{listed}: {result.copied} copied, {result.unchanged} unchanged,"
         f" {result.left_to_next_run} left to the next run,"
         f" {describe_counter(result.left_aside, 'left aside')},"
         f" {describe_counter(result.refused, 'refused')},"
-        f" {describe_counter(result.failed, 'not written')}"
+        f" {describe_counter(result.failed, 'failed')}"
     )
 
 

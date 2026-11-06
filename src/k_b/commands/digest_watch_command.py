@@ -101,7 +101,7 @@ def read_digest_watch_settings_or_refusal(
 ) -> DigestWatchSettings | str:
     """The settings of the routine, or why one is refused; those of a step are read by the step.
     The URLs of the APIs have the local defaults of kb smoke-test: online, a URL not set fails the
-    wake (1), not the start (2)."""
+    wake, not counted, then kb digest, whose code the routine returns; never the start (2)."""
     job = read_smoke_test_settings_or_refusal(environ)
     if isinstance(job, str):
         return job
