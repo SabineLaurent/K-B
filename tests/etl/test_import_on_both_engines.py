@@ -59,7 +59,7 @@ IMPORTS_AT = (
 # one, and LIKE folds the ASCII letters only, on both engines.
 ACCENTED_TITLE = "Notes d'École d'été"
 # The searches whose pages are compared, the accented letter among them.
-SEARCHES = (None, "école", "ÉCOLE", "École", "CODING", "a")
+SEARCHES = (None, "école", "ÉCOLE", "École", "HABITS", "a")
 # The tables of schema.sql, in the order of their foreign keys, each with its key: its rows are
 # compared in the order of that key, its id replaced by its rank.
 TABLE_KEYS = {
@@ -162,7 +162,7 @@ def accented_clip():
     """The article of the collection under another title and address."""
     text = fixture_text(ARTICLE)
     title = 'title: "7 Habits I Picked Up From Experienced Engineers"'
-    source = "c95f757e52a6"
+    source = "7-habits-from-experienced-engineers"
     assert title in text and source in text
     return text.replace(title, f'title: "{ACCENTED_TITLE}"').replace(
         source, "notes-ecole-ete"

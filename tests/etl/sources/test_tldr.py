@@ -44,7 +44,10 @@ EDITION_PAGE = AI_PAGE.replace(AI_HEADING, b"TLDR AI 2026-10-02</h1>")
 # its structure and its h1, without any text of its own. It is the page a day without edition
 # is redirected to; served with a 200 at the url of a day, as here, is not observed.
 LANDING_PAGE = (FIXTURES_DIR / "tldr_ai_landing_extract.html").read_bytes()
-LANDING_REFUSAL = "first h1 is not an edition title with its date: 'Stay current on AI in a few minutes'"
+LANDING_REFUSAL = (
+    "first h1 is not an edition title with its date: "
+    "'Stay current on AI in a few minutes'"
+)
 
 
 class FakeDownload:
