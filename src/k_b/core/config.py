@@ -438,6 +438,20 @@ AI_API_CONNECT_TIMEOUT_SECONDS = 5
 AI_API_POOL_TIMEOUT_SECONDS = 5
 AI_API_WRITE_TIMEOUT_SECONDS = 10
 AI_API_READ_TIMEOUT_SECONDS = 240
+# The whole answer, from the request sent to its last piece read, checked after each piece decoded:
+# the bound of the ingress of Azure Container Apps (OWASP API4:2023). It bounds no wait before the
+# first piece (each read of the headers waits AI_API_READ_TIMEOUT_SECONDS at most, not their sum),
+# nor raw pieces that decode to nothing; online, the ingress cuts a request at 240 s
+# (docs/fiches-veille.md, "Limites" of kb digest).
+AI_API_REQUEST_DEADLINE_SECONDS = AI_API_READ_TIMEOUT_SECONDS
+# The largest body of an answer of the AI API that kb reads, decoded, announced by Content-Length or
+# counted; beyond, the reading stops (OWASP API4:2023, API10:2023). Not MAX_AI_API_BODY_BYTES, the
+# body of a request to the AI API. Above the worst answer the bounds of the code allow, all its
+# characters escaped in \u00XX (6 bytes): about 5.7 MB for POST /digests (300 items read, each in
+# one sheet, a title of 1,024 characters and a URL of 2,000; 12 claims of 400 characters a sheet),
+# about 1.7 MB for POST /trend-reports (450 repositories, 60 sheets of GitHub); about 1.7 MB and
+# 1 MB unescaped.
+MAX_AI_API_ANSWER_BYTES = 8_000_000
 # The wait for an answer shown out of a terminal (commands/wait_display.py): a log line every 10
 # seconds, the step of the "Still creating... [10s elapsed]" of Terraform and the limit of attention
 # of NN/g (docs/fiches-veille.md, "Console"). A constant, not a variable: no need to change it by

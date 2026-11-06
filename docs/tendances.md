@@ -37,7 +37,9 @@ Comme `kb digest` → `POST /digests` ([fiches-veille.md](fiches-veille.md)) :
    5. lit le README des seuls choisis ;
    6. fait écrire au modèle 4 textes par dépôt choisi, **un appel par dépôt**
       (`ai_api/stages/trend_writing.py`), puis contrôle la forme et la fidélité.
-3. **`kb`** relit la réponse par un schéma fermé (`post/trend_report_client.py`), rend le Markdown
+3. **`kb`** lit la réponse dans la borne de `kb digest` (8 000 000 d'octets et 240 s :
+   [fiches-veille.md](fiches-veille.md), « Fiches dans le coffre », étape 3), la relit par un schéma fermé
+   (`post/trend_report_client.py`), rend le Markdown
    (`post/trend_report_sheets.py`), l'écrit par `write_new_sheet` (`post/vault_files.py:41`), puis
    ajoute l'entrée au registre.
 

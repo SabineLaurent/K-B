@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 import httpx2
 import pytest
+from ai_api.test_data_api_client import Clock, UnreadStream
 from pydantic import SecretStr
 
 from k_b.ai_api.schemas.digest_schema import (
@@ -19,16 +20,21 @@ from k_b.ai_api.schemas.digest_schema import (
 )
 from k_b.core.config import (
     AI_API_READ_TIMEOUT_SECONDS,
+    AI_API_REQUEST_DEADLINE_SECONDS,
     DIGEST_REQUEST_TIMEOUT_SECONDS,
+    MAX_AI_API_ANSWER_BYTES,
     TREND_REPORT_REQUEST_TIMEOUT_SECONDS,
 )
+from k_b.post import ai_api_client
 from k_b.post.ai_api_client import (
     DIGEST_KEY_VARIABLE,
+    DIGESTS_PATH,
     AiApiClientSettings,
     AiApiError,
     build_ai_api_client,
     read_ai_api_client_settings_or_refusal,
     request_digests,
+    send_request,
 )
 
 # Made for the test: never a real key.
@@ -534,3 +540,184 @@ def test_a_response_with_failed_subjects_is_accepted():
         for failed in response.failed_subjects
     ] == [("research", "write", "llm_timeout")]
     assert response.request_id == OTHER_REQUEST_ID
+
+
+# The bound of an answer (MAX_AI_API_ANSWER_BYTES), reduced for the tests but the one at the
+# bound; the answers counted come as a stream, without Content-Length (content=bytes sets it).
+
+TEST_MAX_ANSWER_BYTES = 1_000
+
+
+def bound_answers(monkeypatch, max_bytes=TEST_MAX_ANSWER_BYTES):
+    monkeypatch.setattr(ai_api_client, "MAX_AI_API_ANSWER_BYTES", max_bytes)
+
+
+def stream_of(chunks, pulled=None):
+    """A body sent piece by piece; pulled, if given, keeps each piece sent."""
+    for chunk in chunks:
+        if pulled is not None:
+            pulled.append(chunk)
+        yield chunk
+
+
+def answer_beyond_the_bound(marker):
+    """A 200 counted beyond the reduced bound, marker in its first piece."""
+
+    def handle(request):
+        first_piece = b'{"request_id": "' + marker.encode() + b'", '
+        return httpx2.Response(
+            200, content=stream_of([first_piece, b" " * TEST_MAX_ANSWER_BYTES])
+        )
+
+    return handle
+
+
+def test_an_answer_of_the_bound_is_read():
+    body = to_body(make_response()).ljust(MAX_AI_API_ANSWER_BYTES, b" ")
+
+    response, _ = ask(answer(content=body))
+
+    assert len(body) == MAX_AI_API_ANSWER_BYTES
+    assert response.request_id == REQUEST_ID
+
+
+def test_an_answer_announced_beyond_the_bound_is_refused_before_reading(monkeypatch):
+    bound_answers(monkeypatch)
+
+    failure = ask_and_fail(
+        lambda request: httpx2.Response(
+            200,
+            headers={"Content-Length": str(TEST_MAX_ANSWER_BYTES + 1)},
+            stream=UnreadStream(),
+        )
+    )
+
+    assert (failure.state, failure.http_status) == ("ai_api_invalid_response", 200)
+    assert str(failure) == (
+        f"ai_api_invalid_response, HTTP 200, response larger than {TEST_MAX_ANSWER_BYTES}"
+        " bytes"
+    )
+
+
+def test_an_answer_counted_beyond_the_bound_stops_its_reading_and_never_quotes_it(
+    monkeypatch,
+):
+    bound_answers(monkeypatch)
+    marker = secrets.token_hex(16).encode()
+    chunks = [b'{"request_id": "' + marker + b'", ', *[b" " * 500] * 10]
+    pulled = []
+
+    failure = ask_and_fail(
+        lambda request: httpx2.Response(
+            200,
+            content=stream_of(chunks, pulled),
+            headers={"X-Request-ID": REQUEST_ID},
+        )
+    )
+
+    assert str(failure) == (
+        f"ai_api_invalid_response, HTTP 200, response larger than {TEST_MAX_ANSWER_BYTES}"
+        f" bytes, X-Request-ID {REQUEST_ID}"
+    )
+    assert marker.decode() not in str(failure)
+    assert len(pulled) < len(chunks)
+
+
+def send_pieces(pieces):
+    """send_request on an answer sent as pieces, without Content-Length."""
+    http_client, _ = simulate(
+        lambda request: httpx2.Response(200, content=stream_of(pieces))
+    )
+    with http_client:
+        return send_request(http_client, DIGESTS_PATH, {})
+
+
+def test_an_answer_counted_up_to_the_bound_is_read_and_one_byte_more_is_refused(
+    monkeypatch,
+):
+    bound_answers(monkeypatch)
+    half = b" " * (TEST_MAX_ANSWER_BYTES // 2)
+
+    assert len(send_pieces([half, half]).content) == TEST_MAX_ANSWER_BYTES
+    with pytest.raises(AiApiError) as raised:
+        send_pieces([half, half, b" "])
+    assert (raised.value.state, raised.value.http_status) == (
+        "ai_api_invalid_response",
+        200,
+    )
+
+
+def test_a_failure_beyond_the_bound_keeps_the_state_of_its_status(monkeypatch):
+    bound_answers(monkeypatch)
+    chunks = [b'{"error": "llm_timeout", "padding": "', b"x" * TEST_MAX_ANSWER_BYTES]
+
+    failure = ask_and_fail(
+        lambda request: httpx2.Response(
+            503,
+            content=stream_of(chunks),
+            headers={"X-Request-ID": REQUEST_ID, "Retry-After": "20"},
+        )
+    )
+
+    assert (failure.state, failure.http_status) == ("ai_api_failed", 503)
+    assert str(failure) == (
+        f"ai_api_failed, HTTP 503, response larger than {TEST_MAX_ANSWER_BYTES} bytes,"
+        f" X-Request-ID {REQUEST_ID}, Retry-After 20"
+    )
+
+
+def send_on_a_clock(clock, seconds_between_pieces):
+    """send_request on clock, the clock moved on by seconds_between_pieces between two pieces."""
+
+    def pieces():
+        yield b"{"
+        clock.now += seconds_between_pieces
+        yield b"}"
+
+    http_client, _ = simulate(
+        lambda request: httpx2.Response(
+            200, content=pieces(), headers={"X-Request-ID": REQUEST_ID}
+        )
+    )
+    with http_client:
+        return send_request(http_client, DIGESTS_PATH, {}, clock=clock)
+
+
+def test_an_answer_still_read_at_its_deadline_is_ai_api_timeout():
+    with pytest.raises(AiApiError) as raised:
+        send_on_a_clock(Clock(), AI_API_REQUEST_DEADLINE_SECONDS)
+
+    assert (raised.value.state, raised.value.http_status) == ("ai_api_timeout", 200)
+    assert str(raised.value) == f"ai_api_timeout, HTTP 200, X-Request-ID {REQUEST_ID}"
+
+
+def test_an_answer_read_before_its_deadline_is_kept_whole():
+    answer_read = send_on_a_clock(Clock(), AI_API_REQUEST_DEADLINE_SECONDS - 1)
+
+    assert (answer_read.status_code, answer_read.content) == (200, b"{}")
+
+
+def test_the_deadline_of_an_answer_holds_a_request_of_the_ai_api_and_its_last_call():
+    assert AI_API_REQUEST_DEADLINE_SECONDS > DIGEST_REQUEST_TIMEOUT_SECONDS + 20
+    assert AI_API_REQUEST_DEADLINE_SECONDS > TREND_REPORT_REQUEST_TIMEOUT_SECONDS + 20
+
+
+@pytest.mark.parametrize(
+    ("error", "state"),
+    [
+        (httpx2.ReadError("reset"), "ai_api_unavailable"),
+        (httpx2.ReadTimeout("read"), "ai_api_timeout"),
+        (httpx2.DecodingError("gzip"), "ai_api_invalid_response"),
+    ],
+)
+def test_a_failure_in_the_middle_of_an_answer_gives_its_state_without_the_url(
+    error, state
+):
+    def pieces():
+        yield b'{"request_id": '
+        raise error
+
+    failure = ask_and_fail(lambda request: httpx2.Response(200, content=pieces()))
+
+    assert (failure.state, failure.http_status) == (state, None)
+    assert str(failure) == state

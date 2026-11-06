@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+import secrets
 import signal
 import subprocess
 import sys
@@ -21,6 +22,9 @@ from post.test_ai_api_client import (
     AGENT_DIGEST,
     REQUEST_ID,
     TEST_API_KEY,
+    TEST_MAX_ANSWER_BYTES,
+    answer_beyond_the_bound,
+    bound_answers,
     make_response,
     to_body,
 )
@@ -380,6 +384,25 @@ def test_digest_on_a_response_out_of_the_schema_writes_nothing_and_exits_1(
         "digests not received: ai_api_invalid_response, HTTP 200,"
         f" digests.0.subject (subject_not_listed), request_id {REQUEST_ID}\n"
     ) in capsys.readouterr().err
+
+
+def test_digest_on_an_answer_beyond_its_bound_never_shows_nor_logs_it_and_exits_1(
+    monkeypatch, digest_environment, capsys
+):
+    data_dir, vault_dir = digest_environment
+    bound_answers(monkeypatch)
+    marker = secrets.token_hex(16)
+    answer_digests(monkeypatch, answer_beyond_the_bound(marker))
+
+    assert cli.main(["digest"]) == cli.ExitCode.FAILED
+    assert list(vault_dir.iterdir()) == []
+    output = capsys.readouterr()
+    assert (
+        "digests not received: ai_api_invalid_response, HTTP 200,"
+        f" response larger than {TEST_MAX_ANSWER_BYTES} bytes\n"
+    ) in output.err
+    for shown in (output.out, output.err, read_kb_log(data_dir)):
+        assert marker not in shown
 
 
 def test_digest_with_failed_subjects_writes_the_others_names_them_and_exits_4(

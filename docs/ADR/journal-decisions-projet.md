@@ -5198,6 +5198,51 @@ Décisions de Sabine du 2026-11-04.
   - entre deux applications, rien ne compare l'état d'Azure au Bicep : une modification faite dans le
     portail reste invisible jusqu'au `what-if` suivant. — PR de #411, à venir
 
+### `kb` : la réponse de l'API IA lue dans sa borne (#422)
+
+Choix de la session dans le plan validé par Sabine le 06/11, relu en sous-agent. Clôt la décision
+ouverte « Une borne de lecture des réponses de l'API IA et de l'API de données » (2026-10-21) :
+l'API IA lit déjà l'API de données dans sa borne (`MAX_DATA_API_BODY_BYTES`) ; restait `kb`.
+
+- **`kb digest` et `kb trend-report` lisent la réponse de l'API IA par `read_bounded_body`
+  (`core/outbound.py`), dans `send_request` (`post/ai_api_client.py`), qu'ils partagent :
+  8 000 000 d'octets décodés au plus (`MAX_AI_API_ANSWER_BYTES`), annoncés ou comptés, une borne
+  pour les deux routes.** **Révise** 2026-10-21, « Fiches de veille : `kb digest` les écrit dans le
+  coffre » (« Le corps de la réponse est lu sans borne de taille », décision 6 de Sabine, risque
+  accepté pour le POC jusqu'à la mise en ligne), et son extension à `kb trend-report` du 2026-10-30
+  (#366) : la mise en ligne vient (#423). Pourquoi 8 Mo : au-dessus du pire que les bornes du code
+  permettent, tout caractère échappé en `\u00XX` (6 octets, la sérialisation de FastAPI) : environ
+  5,7 Mo pour `POST /digests` (300 items lus, chacun dans une fiche, un titre de 1 024 caractères et
+  une URL de 2 000 ; 12 affirmations de 400 caractères par fiche), 1,7 Mo pour
+  `POST /trend-reports` (450 dépôts, 60 fiches GitHub) ; environ 1,7 Mo et 1 Mo sans échappement.
+  Écartés : 4 Mo comme l'API de données, sous ce pire ; une borne par route (deux constantes pour un
+  client, sans gain). Limite assumée : une estimation sur les bornes du code, pas la mesure d'une
+  réponse réelle. — PR de #422
+
+- **La réponse a 240 s depuis l'envoi (`AI_API_REQUEST_DEADLINE_SECONDS`, égal à
+  `AI_API_READ_TIMEOUT_SECONDS`, la borne de l'ingress d'ACA), contrôlées après chaque morceau ;
+  au-delà, `ai_api_timeout`.** Pourquoi : les délais d'httpx2 bornent chaque attente, jamais la
+  réponse ; une réponse au compte-gouttes, sous la borne de taille, tiendrait `kb` sans fin.
+  L'horloge est un paramètre de `send_request` (`time.monotonic` par défaut), pour le test.
+  Écartés : déplacer `Deadline` d'`ai_api/` vers `core/` (`post` n'importe pas `ai_api`, et
+  17 fichiers l'importent) ; aucune échéance. Limite assumée : le contrôle vient après chaque
+  morceau décodé ; rien ne borne l'attente avant le premier (chaque lecture de l'en-tête attend
+  240 s, pas leur somme), ni des morceaux bruts qui ne se décodent en rien (un corps gzip de blocs
+  vides) : un défaut de `read_bounded_body` pour ses quatre clients, déjà sur `main` avant #422
+  (revue de code, tranché par time-knight le 06/11, délégation de Sabine du 15/10), porté par
+  #436 ; en ligne, l'ingress d'ACA coupe une requête à 240 s. — PR de #422
+
+- **Au-delà de la borne, l'erreur garde l'état de son statut (`ai_api_invalid_response` pour un 200,
+  `ai_api_failed` pour une 5xx…), son statut HTTP, `response larger than 8000000 bytes`, son
+  `X-Request-ID` et son `Retry-After`, jamais le corps.** Pourquoi : une 5xx reste une panne de
+  l'API IA quel que soit son corps (le défaut que #376 relève dans deux clients de l'API IA) ; les
+  en-têtes retrouvent la demande dans `logs/kb-serve-ai.log`. Écartés : un état nouveau
+  `ai_api_response_too_large` (l'API de données et GitHub nomment ce cas `…_invalid_response`, le
+  modèle `llm_unavailable` ; le code de sortie, 1, ne change pas) ; toujours
+  `ai_api_invalid_response` (reproduirait le défaut de #376). Écart voulu avec la correction que
+  propose #376 (« sur une 5xx, ne pas lire le corps ») : `kb` lit le corps d'une 5xx, dans sa borne,
+  pour afficher son `error` ; time-knight n'y voit pas de contradiction (06/11). — PR de #422
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
@@ -5254,11 +5299,6 @@ Décisions de Sabine du 2026-11-04.
   08/11 (« Tops : les fiches par `kb write-tops` »). La même question vaut pour `kb digest`
   (2026-10-21, « Fiches de veille : `kb digest` les écrit dans le coffre »), et pour
   `kb trend-report` (2026-10-30, « Tendances : un compte rendu deux fois par semaine »).
-
-- **Une borne de lecture des réponses de l'API IA et de l'API de données** (2026-10-21) : avant la
-  mise en ligne du 08/11, dans `core/outbound.py`, commune aux deux clients ; `kb digest` lit
-  aujourd'hui sans borne (risque accepté par Sabine pour le POC), et `kb trend-report` aussi, par le
-  même client (risque étendu par Sabine le 2026-10-30, #366).
 
 - **Un code de sortie dédié à l'authentification**, pour toutes les commandes (2026-10-21) : à
   reconsidérer avec #160 (jetons qui expirent) ; une clé refusée sort aujourd'hui en 1.

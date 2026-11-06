@@ -467,7 +467,8 @@ titre et leur URL. Chaque affirmation et chaque titre est écrit en texte : ni l
 balise, ni code, ni requête Dataview ne peut s'y activer. Une fiche n'est jamais réécrite (sauf deux
 lancements qui se chevauchent, qui peuvent en remplacer une sans message : #295) : s'il en existe
 une du jour, aucune demande n'est faite. Une demande dure jusqu'à environ 220 s ; `kb digest`
-attend 240 s au plus, sans nouvelle tentative, et montre qu'il attend : une ligne qui tourne dans un
+attend 240 s au plus (une réponse de 8 000 000 d'octets au plus, et sans borne avant son premier
+morceau : [docs/fiches-veille.md](docs/fiches-veille.md), « Fiches dans le coffre », « Limites »), sans nouvelle tentative, et montre qu'il attend : une ligne qui tourne dans un
 terminal, une ligne datée toutes les 10 s ailleurs. Il journalise son début et sa fin, avec la durée, puis
 affiche un bilan : la fenêtre et le nombre d'items lus, un tableau par sujet (statut, chemin de la
 fiche), le total, puis le modèle et le `request_id`, que `logs/kb-serve-ai.log` reprend. Code
