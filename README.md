@@ -580,6 +580,25 @@ La CI (GitHub Actions, `.github/workflows/ci.yml`) lance quatre jobs, `audit` (p
 `tests` (pytest), `lint` (ruff check et ruff format --check) et `types` (mypy --strict), sur chaque PR vers
 `main` et sur chaque push sur `main`, donc après chaque fusion.
 
+**Construire l'image** (Docker ; une image pour toutes les commandes `kb`, voir le `Dockerfile`) :
+
+```sh
+docker buildx build --platform linux/amd64 --tag k-b .
+docker run --rm k-b --help
+docker volume create k-b-data
+docker run --rm -v k-b-data:/var/lib/knowledge_base -e KB_DATA_DIR=/var/lib/knowledge_base k-b create-db
+```
+
+Azure Container Apps ne lance que des images `linux/amd64` : sur un Mac à puce Apple, Docker Desktop les
+construit et les lance par émulation. L'image lance `kb` sous l'utilisateur `10001:10001`, jamais root. Son
+dossier de données, où se monte le volume, est `/var/lib/knowledge_base`, et il appartient à cet utilisateur.
+`KB_DATA_DIR` n'a pas de valeur dans l'image : elle se donne au lancement, avec le volume, et sans elle `kb`
+refuse de démarrer. Le journal est la sortie d'erreur (`KB_LOG_TO_FILE=false`). Chaque variable se change au
+lancement (`-e`). `.dockerignore` refuse tout par défaut : la construction ne reçoit que `pyproject.toml`,
+`uv.lock`, `README.md` et `src/`, sans les fichiers d'environnement, les bases `*.sqlite` (et leurs fichiers
+annexes) ni les caches de `src/`. Le job `image-build` de la CI (`.github/workflows/image.yml`) construit
+l'image sur chaque PR vers `main` et sur chaque push sur `main`, et la contrôle, sans la pousser nulle part.
+
 ## Licence
 
 © 2026 Sabine Laurent — sous licence [Creative Commons Attribution - Pas d'Utilisation Commerciale 4.0 International (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/deed.fr).

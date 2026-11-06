@@ -7,3 +7,18 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7 # a new version waits 7 days (default 3); security updates are never delayed
+  # Keeps the digest-pinned base images of the Dockerfile up to date, with their tag.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7 # same delay as the actions
+    # Digest and patch updates only: a minor update changes the tag itself (3.13-slim-trixie to
+    # 3.14-slim-trixie: same suffix, higher version, dependabot-core docker/README.md, "Semver").
+    # Python stays at the 3.13 of .python-version; uv in the uv_build range of pyproject.toml.
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "astral-sh/uv"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]

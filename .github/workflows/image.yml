@@ -1,0 +1,61 @@
+name: Image
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Builds the image of K-B for Azure Container Apps, which runs linux/amd64 images only, then checks
+# it (issue #200). Nothing is pushed: the registry and the delivery are #415.
+jobs:
+  image-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Files that .dockerignore keeps out of the build context, planted at the root and in src/k_b/
+      # (the build backend packs every file of src/k_b/), then looked for in the context and in the
+      # image. .git/ is there already, from the checkout.
+      - run: |
+          mkdir -p temp reports .venv
+          touch .env .env.decoy temp/decoy reports/decoy .venv/decoy
+          touch src/k_b/.env.decoy src/k_b/decoy.sqlite src/k_b/decoy.sqlite-wal src/k_b/.DS_Store
+          mkdir -p src/k_b/__pycache__ && touch src/k_b/__pycache__/decoy.pyc
+      # The context a builder receives, a remote one included, written whole to a folder (no image):
+      # the four paths the Dockerfile copies, and none of the planted files.
+      - name: Sends only what the Dockerfile copies to the build
+        run: |
+          context="$RUNNER_TEMP/context"
+          printf 'FROM scratch\nCOPY . /\n' | docker buildx build --file - --output "type=local,dest=$context" .
+          diff <(LC_ALL=C ls -A "$context") <(printf '%s\n' README.md pyproject.toml src uv.lock)
+          found=$(find "$context" \( -name '.env*' -o -name '*.sqlite*' -o -name decoy -o -name .DS_Store -o -name __pycache__ \) -print)
+          test -z "$found" || { echo "$found"; exit 1; }
+      - run: docker buildx build --platform linux/amd64 --tag k-b:ci .
+      - name: Runs as a non-root user
+        # In a variable, so that a failed docker run fails the step (bash -e); -ne refuses an empty value.
+        run: |
+          uid=$(docker run --rm --entrypoint id k-b:ci -u)
+          test "$uid" -ne 0
+      # As root, to read every folder of the image.
+      - name: Holds none of the planted files
+        run: |
+          found=$(docker run --rm --user 0 --entrypoint find k-b:ci / -xdev \( -name '.env*' -o -name '*.sqlite*' -o -name decoy -o -name .DS_Store -o -name .git \) -print)
+          test -z "$found" || { echo "$found"; exit 1; }
+      # KB_DATA_DIR has no default (.claude/rules/poc.md, rule 2): a container without it fails at
+      # its start, rather than writing in a folder that is not its volume.
+      - name: Refuses to start without KB_DATA_DIR
+        run: |
+          exit_code=0
+          error=$(docker run --rm k-b:ci create-db 2>&1) || exit_code=$?
+          echo "$error"
+          test "$exit_code" -eq 2
+          grep -qF "KB_DATA_DIR must point to the data directory" <<< "$error"
+      # create-db runs the SQL of k_b.database, read from the installed package, and writes in the
+      # data directory of the image, owned by its user.
+      - name: Starts kb and creates the database
+        run: |
+          docker run --rm k-b:ci --help
+          docker run --rm -e KB_DATA_DIR=/var/lib/knowledge_base k-b:ci create-db

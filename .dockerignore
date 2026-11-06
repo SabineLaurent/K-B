@@ -1,0 +1,13 @@
+# Refused by default (issue #200): a builder, a remote one included, receives only what the
+# Dockerfile copies, so .git/, .venv/, temp/ and reports/ (personal data), tests/, docs/ and infra/
+# never leave the machine. The build backend packs every file of src/k_b/: secrets, databases and
+# caches left in src/ are refused as well.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+**/.env*
+**/*.sqlite*
+**/__pycache__/
+**/.DS_Store

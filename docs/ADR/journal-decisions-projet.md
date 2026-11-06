@@ -5356,6 +5356,73 @@ l'API IA lit déjà l'API de données dans sa borne (`MAX_DATA_API_BODY_BYTES`) 
   sur une base qui garde des données que le brut n'a plus (« Faire évoluer le schéma »,
   `docs/stockage.md`). — PR de #417, à venir
 
+### Image : deux étapes, UID 10001, sans processus d'init (#200)
+
+Plan validé par Sabine le 06/11 (I1 du plan de mise en ligne).
+
+- **Une seule image pour toutes les commandes `kb` (`Dockerfile` à la racine), en deux étapes sur la même
+  base, `python:3.13-slim-trixie` épinglée par digest. L'étape de construction installe l'environnement
+  par uv 0.11.13, épinglé par digest lui aussi (`uv sync --locked --no-dev --no-editable`, les
+  dépendances puis K-B). L'étape finale ne garde que `/app/.venv`, sans uv ni `src/`, et compile en `.pyc`
+  la bibliothèque standard, que la base livre sans eux.** Pourquoi : l'image ne porte ni l'outil de
+  construction ni les dépendances de développement. Avec la même base, l'environnement retrouve le Python
+  vers lequel il pointe. uv 0.11.13 : uv construit K-B avec son propre backend, et sa version reste dans la
+  plage de `build-system.requires` (`uv_build>=0.11.13,<0.12.0`), la version du Mac ; uv 0.13.6, prévu au
+  plan, construisait hors de cette plage (relecture du 06/11). Sans les `.pyc`, chaque démarrage
+  recompilait en mémoire environ 200 modules, que l'UID 10001 ne peut pas écrire. Une seule image : « une
+  container app par service, un environnement » (18/10), chaque service lançant sa commande. Écartée :
+  une étape unique, qui garderait uv et son cache dans l'image. — PR de #200
+- **Le dossier de données de l'image est `/var/lib/knowledge_base`, où se monte le volume.** Décidé par
+  Sabine le 06/11 (« ok pour la convention linux »), à la place de `/data`, prévu au plan. Pourquoi : le
+  Filesystem Hierarchy Standard range sous `/var/lib` « state information pertaining to an application »
+  (FHS 3.0, § 5.8.1, lu le 06/11), et le nom reprend le dossier local `~/.knowledge_base`. — PR de #200
+- **`KB_DATA_DIR` n'a pas de valeur dans l'image : elle se pose au lancement, avec le volume.** Tranché par
+  Sabine le 06/11. Pourquoi : la règle 2 de `.claude/rules/poc.md` (sans `KB_DATA_DIR`, la commande
+  échoue). Une container app ou un job déployé sans son montage refuse alors de démarrer (code 2), au
+  lieu d'écrire dans un dossier éphémère de l'image ; la CI vérifie ce refus. Écartée : `ENV KB_DATA_DIR`
+  dans l'image, prévue au plan, une exception à la règle (relecture du 06/11). — PR de #200
+- **`kb` tourne sous l'UID et le GID fixes `10001`, propriétaires du dossier de données.** Pourquoi : jamais root,
+  et `kb` écrit ses fichiers en `0600` (commentaire du 16/10 sur #200). Tout conteneur qui les lit doit
+  tourner sous l'UID qui les a écrits, donc sous un UID connu d'avance. Écarté : un UID choisi au
+  lancement, qui pourrait changer d'un conteneur à l'autre. Essai du 06/11 : sous cet UID, l'écriture
+  par `write_file_atomically` dans un dossier du Mac monté sur `/data/raw` sort en 0 (#200). — PR de #200
+- **Pas de processus d'init (ni tini ni `--init`) : `kb` est le PID 1, lancé en forme exec.** Mesure
+  du 06/11 sur l'image : `docker stop` d'un `kb serve-data` prend 0,32 s, uvicorn s'arrête en entier et
+  le code de sortie est 0. Avec `--init`, l'arrêt prend 0,28 s et le code est 143. Pourquoi : l'arrêt
+  est propre sans init, et rien ne s'ajoute à l'image. Limite assumée : après SIGTERM, `kb serve-data`
+  et `kb serve-ai` sortent en 0, pas en 143. uvicorn remet le gestionnaire par défaut, puis relance le
+  signal, qu'un PID 1 ignore (tri de la PR #244, 18/10). Autre limite (revue de code du 06/11, tranché
+  par time-knight, délégation de Sabine du 15/10) : en PID 1, une commande sans gestionnaire de
+  SIGTERM l'ignore et finit en SIGKILL au bout du délai d'arrêt. C'est le cas de `kb create-db` et de
+  `kb openapi` : seules les commandes de `COMMANDS_STOPPED_BY_SIGTERM` (`commands/sigterm.py`) en
+  posent un. Une transaction ainsi coupée est annulée par la base, sans perte. Chaque commande lancée en
+  job entre donc dans `COMMANDS_STOPPED_BY_SIGTERM` (règle 6 de `poc.md`) : `daily-routine` et
+  `digest-watch` (#413), `migrate-database` (#421). — PR de #200
+- **Ni `curl`, ni `azcopy`, ni `HEALTHCHECK` dans l'image.** Les transferts passent par
+  `azure-storage-blob` (#412), et `/health` par httpx2 (décision de Sabine du 06/11). Les sondes sont
+  celles d'Azure Container Apps (#414). — PR de #200
+- **`.dockerignore` refuse tout par défaut : la construction ne reçoit que `pyproject.toml`, `uv.lock`,
+  `README.md` et `src/`, moins les fichiers d'environnement, les bases (`*.sqlite*`), `__pycache__` et
+  `.DS_Store` de `src/`.** Pourquoi : un constructeur distant (#415, s'il construit sur Azure) reçoit
+  tout le contexte ; refuser par défaut garde sur le Mac `temp/` et `reports/` (données personnelles),
+  `tests/`, `docs/`, `infra/`, et tout fichier nouveau. Et le backend de construction emballe tout
+  fichier de `src/k_b/` : un `.env` ou une base laissés là entraient dans l'image (essai du 06/11, avant
+  `.dockerignore`). Écartée : une liste d'exclusions, qui laissait partir tout le reste (revue de code du
+  06/11, tranché par time-knight, délégation de Sabine du 15/10). — PR de #200
+- **La CI construit l'image en `linux/amd64` sur chaque PR vers `main` et sur chaque push sur `main`,
+  dans son propre workflow (`image.yml`, job `image-build`), et ne la pousse nulle part** (le registre et
+  la livraison sont #415). Elle plante des fichiers que `.dockerignore` refuse, à la racine et dans
+  `src/k_b/`, puis vérifie que le contexte de construction, écrit tel quel dans un dossier, ne contient
+  que les quatre chemins copiés et aucun fichier planté, et que l'image n'en contient aucun. Elle
+  contrôle aussi l'UID (≠ 0), le refus de démarrer sans `KB_DATA_DIR` (code 2), `kb --help` et
+  `kb create-db` (le SQL du paquet installé). — PR de #200
+- **Dependabot tient les digests des deux images de base, et leurs versions de correctif seulement, avec
+  7 jours d'attente comme pour les actions.** Pourquoi : sur un tag à suffixe, il propose la plus haute
+  version au même suffixe (dependabot-core, `docker/README.md`, « Semver », lu le 06/11) :
+  `3.13-slim-trixie` passerait à `3.14-slim-trixie`, alors que `.python-version` dit 3.13, et uv sortirait
+  de la plage de `uv_build`. Les montées mineures et majeures de `python` et d'`astral-sh/uv` sont donc
+  ignorées. Une montée de Python ou de la plage d'`uv_build` lève la règle avec elle. — PR de #200
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
