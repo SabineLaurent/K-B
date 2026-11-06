@@ -137,10 +137,16 @@ def connect_postgresql(location: PostgresUrl) -> PostgresConnection:
             location.value, connect_timeout=DATABASE_CONNECT_TIMEOUT_SECONDS
         )
     except psycopg.ProgrammingError:
-        raise UnreadableDatabaseUrlError(
-            f"{DATABASE_URL_VARIABLE} is not a URL libpq reads"
-        ) from None
+        raise make_unreadable_url_error() from None
     return PostgresConnection(connection)
+
+
+def make_unreadable_url_error() -> UnreadableDatabaseUrlError:
+    """The refusal of a URL libpq cannot read, which names the variable only: the text of libpq
+    quotes the whole URL, its password included, and is never chained (raise … from None)."""
+    return UnreadableDatabaseUrlError(
+        f"{DATABASE_URL_VARIABLE} is not a URL libpq reads"
+    )
 
 
 def lock_for_writing(connection: PostgresConnection) -> None:
@@ -172,9 +178,7 @@ def open_reading_pool(
     try:
         conninfo_to_dict(location.value)
     except psycopg.ProgrammingError:
-        raise UnreadableDatabaseUrlError(
-            f"{DATABASE_URL_VARIABLE} is not a URL libpq reads"
-        ) from None
+        raise make_unreadable_url_error() from None
     pool: ReadingPool = ConnectionPool(
         location.value,
         kwargs={"connect_timeout": DATABASE_CONNECT_TIMEOUT_SECONDS},
