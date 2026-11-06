@@ -5970,6 +5970,12 @@ sauf mention.
   sur le schéma N. La migration doit donc accepter une base en avance, et le schéma rester compatible avec la
   version précédente. — PR de #415
 
+- **La migration de la base passe avant les apps : `caj-kb-migrate-database` à l'image du tag, lancé et attendu
+  jusqu'à `Succeeded`. Rien n'est mis à jour après un échec.** Pourquoi : les apps d'une version ne doivent pas
+  tourner sur une base sans son schéma. `kb migrate-database` laisse telle quelle une base qui a ses tables (#421),
+  donc un retour à un tag précédent la relance sans effet. La limite viendra avec la première vraie migration
+  (#186) : le schéma devra rester compatible avec la version précédente. — PR de #415
+
 - **Un test de fumée clôt chaque déploiement : `caj-kb-smoke-test` lancé et attendu jusqu'à `Succeeded`.**
   Validé par Sabine avec le plan, hors du texte de l'issue. Pourquoi : c'est la preuve que la version déployée
   répond. Une mise à jour réussie ne dit pas si les apps démarrent. — PR de #415

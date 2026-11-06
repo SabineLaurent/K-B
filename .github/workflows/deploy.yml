@@ -50,7 +50,8 @@ jobs:
     needs: check
     runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 30
+    # The build, then the migration (11 min at most) and the smoke test (16 min at most) when they wait to the end.
+    timeout-minutes: 45
     permissions:
       contents: read
       id-token: write
@@ -107,8 +108,35 @@ jobs:
           echo "DEPLOYED_IMAGE=$pinned" >> "$GITHUB_ENV"
           echo "DIGEST=$digest" >> "$GITHUB_ENV"
           echo "$GITHUB_REF_NAME: $digest"
-      # The migration of the base (#421) goes here: caj-kb-migrate-database at $DEPLOYED_IMAGE, started and
-      # awaited; nothing below runs if it fails.
+      # Starts a job at the image of the tag and waits for its end, polled every 15 s a little beyond its
+      # replicaTimeout; any end other than Succeeded fails the step.
+      - name: Writes the run of a job
+        run: |
+          cat > "$RUNNER_TEMP/run-job.sh" <<'EOF'
+          run_job() {
+            local job=$1 polls=$2 execution status=""
+            az containerapp job update -n "$job" -g "$RG" --container-name kb --image "$DEPLOYED_IMAGE" -o none
+            execution=$(az containerapp job start -n "$job" -g "$RG" --query name -o tsv)
+            for _ in $(seq 1 "$polls"); do
+              status=$(az containerapp job execution show -n "$job" -g "$RG" \
+                --job-execution-name "$execution" --query properties.status -o tsv)
+              case "$status" in
+                Succeeded) echo "$job: Succeeded"; return 0 ;;
+                Failed|Stopped|Degraded) echo "$job: $status"; return 1 ;;
+              esac
+              sleep 15
+            done
+            echo "$job: still $status after $((polls * 15)) s"
+            return 1
+          }
+          EOF
+      # The migration of the base (#421), before the apps: kb migrate-database creates a base without its tables
+      # and leaves one that has them as it is, so a rollback to an earlier tag runs it again safely. Its
+      # replicaTimeout is 600 s. Nothing below runs if it fails.
+      - name: Migrates the base
+        run: |
+          source "$RUNNER_TEMP/run-job.sh"
+          run_job caj-kb-migrate-database 44
       - name: Sets the apps to the image of the tag
         run: |
           for app in $(jq -r '.apps[]' infra/deployment.json); do
@@ -122,18 +150,8 @@ jobs:
             echo "$job: $GITHUB_REF_NAME ($DIGEST)"
           done
       # The proof that the version deployed answers: both /health, and the exchange storage by the identity of
-      # the job. Its replicaTimeout is 900 s: the wait stops after it.
+      # the job. Its replicaTimeout is 900 s.
       - name: Runs the smoke test
         run: |
-          execution=$(az containerapp job start -n caj-kb-smoke-test -g "$RG" --query name -o tsv)
-          for _ in $(seq 1 64); do
-            status=$(az containerapp job execution show -n caj-kb-smoke-test -g "$RG" \
-              --job-execution-name "$execution" --query properties.status -o tsv)
-            case "$status" in
-              Succeeded) echo "caj-kb-smoke-test: Succeeded"; exit 0 ;;
-              Failed|Stopped|Degraded) echo "caj-kb-smoke-test: $status"; exit 1 ;;
-            esac
-            sleep 15
-          done
-          echo "caj-kb-smoke-test: still $status after 16 min"
-          exit 1
+          source "$RUNNER_TEMP/run-job.sh"
+          run_job caj-kb-smoke-test 64

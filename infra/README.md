@@ -319,11 +319,13 @@ Un tag de version posé sur `main` part en ligne (#415). Une fusion ne déploie 
 - **`deploy`**, dans l'environnement GitHub `production`, fait le reste dans cet ordre :
   1. il se connecte à Azure en `id-kb-deploy`, par OIDC ;
   2. il construit et pousse `k-b:<tag>`, sauf si l'image existe déjà, construite depuis ce même commit ;
-  3. il met les apps et les jobs de `deployment.json` à l'image du tag, par son digest (`k-b@sha256:…`) :
+  3. il lance `caj-kb-migrate-database` à cette image et attend `Succeeded`. `kb migrate-database` laisse telle
+     quelle une base qui a ses tables : un retour à un tag précédent la relance sans risque ;
+  4. il met les apps et les jobs de `deployment.json` à l'image du tag, par son digest (`k-b@sha256:…`) :
      une réplique qui se réveille tire l'image déployée, même si le tag est réécrit ;
-  4. il lance `caj-kb-smoke-test` et attend `Succeeded`.
+  5. il lance `caj-kb-smoke-test` et attend `Succeeded`.
 
-La migration de la base (#421) se placera entre l'image et les apps.
+Si une étape échoue, les suivantes ne tournent pas.
 
 **Où est le verrou.** Le workflow qui tourne est celui du commit tagué. Le contrôle de `check` ne protège donc que
 d'une erreur. Le verrou tient en trois pièces :
@@ -351,7 +353,7 @@ gh api -X PUT "repos/$REPO/environments/production" --input - -q .name <<'EOF'
 {"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}
 EOF
 gh api -X POST "repos/$REPO/environments/production/deployment-branch-policies" -f name='v*.*.*' -f type=tag -q .name
-# Création et suppression des tags v* : les administrateurs seuls (actor_id 5, à vérifier ci-dessous).
+# Création et suppression des tags v* : les administrateurs seuls (actor_id 5 : « Repository admin »).
 gh api -X POST "repos/$REPO/rulesets" --input - -q .name <<'EOF'
 {"name": "tags v", "target": "tag", "enforcement": "active",
  "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
@@ -369,7 +371,7 @@ EOF
 
 À vérifier ensuite :
 - dans Settings → Rules → Rulesets → « tags v », la liste des contournements montre « Repository admin ». La doc
-  de GitHub ne donne pas le numéro de ce rôle ;
+  de GitHub ne donne pas le numéro de ce rôle : le 5 a été vérifié ainsi le 06/11 ;
 - `gh api "repos/$REPO/environments/production/deployment-branch-policies" -q '.branch_policies[] | [.name, .type]'`
   donne `["v*.*.*","tag"]`.
 

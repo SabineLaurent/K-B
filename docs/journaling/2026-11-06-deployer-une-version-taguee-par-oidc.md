@@ -92,7 +92,7 @@ resource appRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
 - Container Apps Contributor sur chaque app ;
 - Container Apps Jobs Contributor sur chaque job.
 
-Il n'a rien sur le coffre, le stockage ni les données. Les apps et les jobs viennent d'une seule liste,
+Il n'a rien sur le coffre, le stockage ni les données. Les apps et les jobs, `caj-kb-migrate-database` de #421 compris, viennent d'une seule liste,
 `infra/deployment.json`. Le Bicep la lit pour donner les rôles (`loadJsonContent`, `infra/main.bicep:43`), et le
 workflow pour mettre les images à jour (`jq`).
 
@@ -149,7 +149,8 @@ actions sont épinglées par SHA (#234) ; un workflow nouveau a son propre fichi
 | Registre local : `imagetools inspect` lit le label `abc123` et le digest `sha256:…` ; un tag absent répond `not found` (sortie 1) | la lecture du label, du digest et du « not found » |
 | `az bicep build` sans avertissement | le Bicep est valide |
 | `/security-review` (xhigh) : aucun constat à 8 ou plus | aucune faille trouvée avant d'appliquer |
-| *(à venir)* essai 5.1 : un tag `v0.0.1` sur la tête de la branche, `check` en échec | un tag hors de `main` est refusé |
+| Essai 5.1 (06/11, 20:37Z) : `v0.0.1` sur la tête de la branche ; au push, « Bypassed rule violations… creations being restricted » ; exécution 42289900589, `check` en échec (« v0.0.1 is not on main: 80d1327… »), `deploy` `skipped` ; suppression : « Bypassed… Cannot delete this tag » | un tag hors de `main` est refusé ; la règle des tags s'applique, et Sabine la contourne comme administratrice (`actor_id 5` = « Repository admin », vu dans les réglages) |
+| Fonction `run_job` avec un faux `az` : `Succeeded` rend 0, `Failed` et `Degraded` rendent 1, un job qui ne finit pas rend 1 après `polls × 15 s` | l'attente d'un job, migration et test de fumée |
 | *(à venir)* essais 5.2 et 5.3 : refus OIDC hors de l'environnement, et environnement refusé à une branche | la connexion n'existe que depuis `production` |
 | *(à venir)* `v0.1.0` : les apps et le job au digest de `k-b:v0.1.0`, `caj-kb-smoke-test` `Succeeded` | le critère de l'issue |
 
@@ -179,16 +180,12 @@ actions sont épinglées par SHA (#234) ; un workflow nouveau a son propre fichi
 - Le `PATCH` de `az containerapp update` sans `assign/action` : lu dans le code d'azure-cli par le relecteur, pas
   encore essayé. Le repli est écrit (Container Apps Jobs Operator sur `cae-kb`).
 - `azure/login` avec des rôles posés seulement sur des ressources, sans rien sur l'abonnement : non essayé.
-- Le numéro du rôle administrateur dans un ruleset (`actor_id: 5`) : absent de la doc de GitHub. Il se vérifie dans
-  les réglages, et par le push du tag de l'essai 5.1.
 - `{{ .Manifest.Digest }}` sur une image poussée par le pilote `docker` du runner : essayé sur un registre local
   avec le pilote `docker-container`.
 - La forme exacte du sujet avec `environment` : déduite du préfixe immuable, à confirmer par l'essai 5.3.
 
 ## Ce qui reste
 
-- La migration de la base dans le workflow (étape marquée) et `caj-kb-migrate-database` dans la liste : au rebase
-  sur #421.
 - La passe 2 qui crée `id-kb-deploy` et ses rôles : après la fusion de #421, une passe à la fois.
 - Les essais 5.1 à 5.3, puis le premier tag `v0.1.0`, sur ta demande.
 - Le 08/11 : toi en « required reviewer », sans contournement pour les administrateurs.
