@@ -2,7 +2,6 @@
 core/api_errors.py."""
 
 import logging
-import sqlite3
 from typing import Any
 
 from fastapi import Request
@@ -18,6 +17,7 @@ from k_b.core.api_errors import (
 )
 from k_b.core.api_request_log import read_request_id
 from k_b.database.connection import MissingDatabaseError
+from k_b.database.errors import EngineError, is_query_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ async def handle_missing_database(
     return respond_with_error(503, "database_missing")
 
 
-async def handle_database_error(request: Request, error: sqlite3.Error) -> Response:
+async def handle_database_error(request: Request, error: EngineError) -> Response:
     if is_query_timeout(error):
         return respond_to_query_timeout(request)
     # The type only: the message of SQLite may hold a path or a part of the query.
@@ -48,12 +48,6 @@ async def handle_database_error(request: Request, error: sqlite3.Error) -> Respo
         read_request_id(request),
     )
     return respond_with_error(500, "database_error")
-
-
-def is_query_timeout(error: sqlite3.Error) -> bool:
-    """Whether the deadline stopped the reading, the only interruption of a connection of the data
-    API; an error raised by Python, not by SQLite, has no code."""
-    return getattr(error, "sqlite_errorcode", None) == sqlite3.SQLITE_INTERRUPT
 
 
 def respond_to_query_timeout(request: Request) -> Response:
@@ -70,5 +64,5 @@ def respond_to_query_timeout(request: Request) -> Response:
 ERROR_HANDLERS: ErrorHandlers = {
     **API_ERROR_HANDLERS,
     MissingDatabaseError: handle_missing_database,
-    sqlite3.Error: handle_database_error,
+    EngineError: handle_database_error,
 }

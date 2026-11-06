@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from k_b.database.connection import connect_database
 from k_b.database.creation import create_database
+from k_b.database.engine import connect_database
 from k_b.purge.base import BasePurgeCount, purge_expired_rows
 
 ITEMS_DATABASE_SCRIPT = Path(__file__).parents[1] / "fixtures" / "items_database.sql"

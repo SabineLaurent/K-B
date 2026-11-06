@@ -5,7 +5,7 @@ import sqlite3
 
 import pytest
 
-from k_b.database.connection import connect_database
+from k_b.database.engine import connect_database
 from k_b.database.savepoint import (
     EntryRefusedError,
     NoTransactionError,

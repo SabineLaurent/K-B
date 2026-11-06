@@ -8,8 +8,8 @@ from datetime import UTC, datetime, timedelta
 from test_transform import FIXTURES_DIR
 
 from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
-from k_b.database.connection import connect_database
 from k_b.database.creation import create_database
+from k_b.database.engine import connect_database
 from k_b.etl import transform as read_raw_items_module
 from k_b.etl.load import (
     import_items,

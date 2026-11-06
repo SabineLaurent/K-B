@@ -10,8 +10,7 @@ from typing import NamedTuple
 from k_b.core.config import RETENTION_YEARS_BY_ACQUISITION_MODE
 from k_b.core.dates import DATABASE_DATE_FORMAT, subtract_months
 from k_b.database import purge as purge_queries
-from k_b.database.connection import connect_database
-from k_b.database.engine import Connection
+from k_b.database.engine import Connection, connect_database
 
 logger = logging.getLogger(__name__)
 

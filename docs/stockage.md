@@ -60,7 +60,7 @@ avec son équivalent PostgreSQL.
 ## Spécifications de stockage
 
 - **Clés étrangères** : SQLite les ignore si la connexion n'exécute pas `PRAGMA foreign_keys = ON`.
-  `connect_database` et `connect_database_read_only` (`src/k_b/database/connection.py`)
+  `connect_database` et `connect_database_read_only` (`src/k_b/database/engine.py`)
   l'exécutent à chaque ouverture.
 - **Mode WAL** (`PRAGMA journal_mode = WAL`, gardé dans le fichier) : le pipeline écrit pendant
   que l'API lit, sans se bloquer. Tous les programmes tournent sur la même machine.

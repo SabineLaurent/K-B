@@ -3,8 +3,8 @@ import sqlite3
 import pytest
 
 import k_b.database.creation
-from k_b.database.connection import connect_database
 from k_b.database.creation import create_database
+from k_b.database.engine import connect_database
 
 
 def test_a_new_database_has_the_sources_and_the_wal_mode(tmp_path):

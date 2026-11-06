@@ -34,3 +34,9 @@ def describe_refusal(error: BaseException) -> str:
     if isinstance(error, UnicodeEncodeError):
         return f"UnicodeEncodeError: {error.reason} at position {error.start}"
     return f"{type(error).__name__}: {error}"
+
+
+def is_query_timeout(error: EngineError) -> bool:
+    """Whether the deadline stopped the reading, the only interruption of a connection of the data
+    API; an error raised by Python, not by SQLite, has no code."""
+    return getattr(error, "sqlite_errorcode", None) == sqlite3.SQLITE_INTERRUPT

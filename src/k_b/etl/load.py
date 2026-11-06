@@ -12,8 +12,8 @@ from typing import NamedTuple
 
 from k_b.core.config import TrackedRepository
 from k_b.core.quoting import quote_value
-from k_b.database.connection import check_database_exists, connect_database
-from k_b.database.engine import Connection
+from k_b.database.connection import check_database_exists
+from k_b.database.engine import Connection, connect_database
 from k_b.database.errors import EngineError
 from k_b.database.reading import read_raw_file_paths
 from k_b.database.writing import write_tracked_repositories

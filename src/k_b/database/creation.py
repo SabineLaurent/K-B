@@ -3,7 +3,7 @@
 from importlib.resources import files
 from pathlib import Path
 
-from k_b.database.connection import connect_database
+from k_b.database.engine import connect_database
 
 DATABASE_SCRIPTS = files("k_b.database")
 

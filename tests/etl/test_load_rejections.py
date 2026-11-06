@@ -30,8 +30,9 @@ from test_transform import FIXTURES_DIR, convert_line
 
 from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.database import writing
-from k_b.database.connection import MissingDatabaseError, connect_database
+from k_b.database.connection import MissingDatabaseError
 from k_b.database.creation import create_database
+from k_b.database.engine import connect_database
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl.load import (
     import_items,

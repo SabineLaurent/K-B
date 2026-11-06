@@ -49,7 +49,7 @@ l'ordre des résultats, change la version.
   compris ; l'attente d'un fil du pool, avant la dépendance et avant la route, ne compte pas. Au-delà,
   SQLite arrête la lecture et l'API répond 503 `query_timeout`, sans le message de SQLite. Le
   contrôle passe toutes les 1 000 instructions de SQLite (`set_progress_handler`,
-  `data_api/dependencies.py`) : chaque contrôle reprend le GIL de Python, et 1 000 en font dix fois
+  `database/engine.py`) : chaque contrôle reprend le GIL de Python, et 1 000 en font dix fois
   moins que 100 pour les autres requêtes (revue de code, tranché par time-knight, que Sabine a
   laissé trancher le 2026-11-06). 5 s, mesuré par l'API le 2026-11-06 : la pire recherche `q`
   (199 « a » puis « b ») sur 400 corps de release de 125 000 « a » prend environ 10 s sans délai ;

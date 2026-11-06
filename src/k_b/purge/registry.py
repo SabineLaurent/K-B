@@ -7,8 +7,7 @@ from collections.abc import Collection
 from pathlib import Path
 
 from k_b.database import purge as purge_queries
-from k_b.database.connection import connect_database
-from k_b.database.engine import Connection
+from k_b.database.engine import Connection, connect_database
 from k_b.etl.raw_store import RAW_DIR_NAME, RAW_DIR_NAMES, RawStore
 
 logger = logging.getLogger(__name__)

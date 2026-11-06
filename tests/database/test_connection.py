@@ -4,8 +4,9 @@ import sqlite3
 
 import pytest
 
-from k_b.database.connection import MissingDatabaseError, connect_database_read_only
+from k_b.database.connection import MissingDatabaseError
 from k_b.database.creation import create_database
+from k_b.database.engine import connect_database_read_only
 
 INSERT_SOURCE = (
     "INSERT INTO source (source_code, label, source_type, acquisition_mode)"

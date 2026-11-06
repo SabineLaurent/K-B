@@ -9,9 +9,9 @@ from k_b.core.config import (
     DATA_API_QUERY_TIMEOUT_SECONDS,
     DATA_API_READ_TIMEOUT_SECONDS,
 )
-from k_b.data_api import dependencies
-from k_b.data_api.dependencies import make_deadline_check
 from k_b.data_api.routers import item_router
+from k_b.database import engine
+from k_b.database.engine import make_deadline_check
 
 # The methods of RFC 9110 (section 9) and PATCH (RFC 5789), all sent by the test client.
 HTTP_METHODS = (
@@ -91,7 +91,7 @@ def test_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail(
     """Each data route reads through the connection that carries the deadline: at 0 s, its first
     check stops the first reading."""
     # The detail and the trends of the test base run fewer instructions than one step.
-    monkeypatch.setattr(dependencies, "INSTRUCTIONS_BETWEEN_CHECKS", 1)
+    monkeypatch.setattr(engine, "INSTRUCTIONS_BETWEEN_CHECKS", 1)
     client.app.state.query_timeout_seconds = 0
 
     with caplog.at_level(logging.WARNING, logger="k_b.data_api"):

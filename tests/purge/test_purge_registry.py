@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from k_b.database.connection import connect_database
 from k_b.database.creation import create_database
+from k_b.database.engine import connect_database
 from k_b.etl.raw_store import RawStore
 from k_b.purge.registry import purge_registry
 
