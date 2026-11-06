@@ -1,4 +1,5 @@
-"""GET /items on the test base (tests/fixtures/items_database.sql), whose ids the tests name."""
+"""GET /items on the test base (tests/fixtures/items_database.sql), whose ids the tests name, on
+each engine."""
 
 from typing import get_args
 
@@ -10,6 +11,12 @@ from k_b.items import MAX_INT64, MAX_LENGTH_BY_KIND, MIN_INT64, ItemKind
 
 # The fields of an item of the list (docs/specs-api.md, "Réponse"): nothing else is served.
 LISTED_FIELDS = {"id", "kind", "title", "source_date", "url", "withdrawn_at"}
+
+
+@pytest.fixture
+def client(reading_client):
+    """Every test of the module reads the base: on each engine."""
+    return reading_client
 
 
 def test_each_kind_is_listed_with_the_fields_of_the_spec(client, authorization):

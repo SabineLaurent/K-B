@@ -2,16 +2,18 @@
 
 import logging
 
+import psycopg
 import pytest
 from fastapi.routing import iter_route_contexts
 
 from k_b.core.config import (
+    DATA_API_POOL_WAIT_SECONDS,
     DATA_API_QUERY_TIMEOUT_SECONDS,
     DATA_API_READ_TIMEOUT_SECONDS,
 )
 from k_b.data_api.routers import item_router
 from k_b.database import engine
-from k_b.database.engine import make_deadline_check
+from k_b.database.engine import make_deadline_check, open_readers
 
 # The methods of RFC 9110 (section 9) and PATCH (RFC 5789), all sent by the test client.
 HTTP_METHODS = (
@@ -105,6 +107,64 @@ def test_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail(
     assert "SELECT" not in caplog.text
 
 
+# The deadline of the tests on PostgreSQL: statement_timeout at 0 would disable it.
+POSTGRESQL_TIMEOUT_SECONDS = 0.1
+
+
+@pytest.mark.postgresql
+@pytest.mark.parametrize(
+    ("path", "table"),
+    [("/items", "item"), ("/items/14", "item"), ("/trends", "trend")],
+)
+def test_on_postgresql_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail(
+    make_client, items_postgresql_base, api_keys, authorization, caplog, path, table
+):
+    """A reading that waits for a table another connection holds is stopped by statement_timeout
+    (57014): the same 503 as on SQLite."""
+    holder = psycopg.connect(items_postgresql_base.value)
+    try:
+        # Names of the test only: nothing from outside enters the statement.
+        holder.execute(f"LOCK TABLE {table} IN ACCESS EXCLUSIVE MODE")
+        with open_readers(items_postgresql_base, POSTGRESQL_TIMEOUT_SECONDS) as readers:
+            client = make_client(readers, api_keys)
+            client.app.state.query_timeout_seconds = POSTGRESQL_TIMEOUT_SECONDS
+            with caplog.at_level(logging.WARNING):
+                response = client.get(path, headers=authorization)
+            # The connection is given back without transaction, and the pool says nothing.
+            with readers.connection() as connection:
+                status = connection.info.transaction_status
+    finally:
+        holder.close()
+
+    assert response.status_code == 503
+    assert response.json() == {"error": "query_timeout"}
+    request_id = response.headers["X-Request-ID"]
+    assert f"query_timeout: 0.1 s request_id={request_id}" in caplog.text
+    assert "canceling statement" not in caplog.text
+    assert "SELECT" not in caplog.text
+    assert status == psycopg.pq.TransactionStatus.IDLE
+    assert not [
+        record for record in caplog.records if record.name.startswith("psycopg")
+    ]
+
+
+@pytest.mark.postgresql
+def test_on_postgresql_a_database_error_gives_500_without_detail_and_logs_its_type(
+    make_client, postgresql_base, api_keys, authorization, caplog
+):
+    """A base without the tables of K-B: the type of the error only, never its message."""
+    with open_readers(postgresql_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
+        client = make_client(readers, api_keys)
+        with caplog.at_level(logging.ERROR, logger="k_b.data_api"):
+            response = client.get("/items", headers=authorization)
+
+    assert response.status_code == 500
+    assert response.json() == {"error": "database_error"}
+    request_id = response.headers["X-Request-ID"]
+    assert f"database_error: UndefinedTable request_id={request_id}" in caplog.text
+    assert "does not exist" not in caplog.text
+
+
 def test_the_deadline_starts_at_the_first_check_of_sqlite_not_at_the_opening():
     """The wait for a thread between the dependency and the route is not counted."""
     now = [100.0]
@@ -123,6 +183,14 @@ def test_the_deadline_of_a_request_is_below_the_read_timeout_of_the_ai_api_clien
 ):
     assert client.app.state.query_timeout_seconds == DATA_API_QUERY_TIMEOUT_SECONDS
     assert DATA_API_QUERY_TIMEOUT_SECONDS < DATA_API_READ_TIMEOUT_SECONDS
+
+
+def test_the_wait_for_a_connection_and_one_reading_hold_below_the_read_timeout_of_the_client():
+    """On PostgreSQL, a request may first wait for a connection of the pool."""
+    assert (
+        DATA_API_POOL_WAIT_SECONDS + DATA_API_QUERY_TIMEOUT_SECONDS
+        < DATA_API_READ_TIMEOUT_SECONDS
+    )
 
 
 @pytest.fixture

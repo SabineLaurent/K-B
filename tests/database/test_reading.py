@@ -1,13 +1,15 @@
 """The reading of the items and the highlights on the test base
-(tests/fixtures/items_database.sql), whose ids the tests name."""
+(tests/fixtures/items_database.sql), whose ids the tests name, on each engine: SQLite, then
+PostgreSQL under -m postgresql, through the connection the data API reads with."""
 
 import typing
+from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta, timezone, tzinfo
 
 import pytest
 
-from k_b.database.creation import create_database
-from k_b.database.engine import connect_database, connect_database_read_only
+from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
+from k_b.database.engine import connect_database, connect_reader, open_readers
 from k_b.database.reading import (
     AdvisoryDetail,
     ClipDetail,
@@ -30,10 +32,19 @@ PLUS_TWO_HOURS = timezone(timedelta(hours=2))
 
 
 @pytest.fixture
-def connection(items_database):
-    connection = connect_database_read_only(items_database)
-    yield connection
-    connection.close()
+def connection(items_readers):
+    with connect_reader(items_readers, DATA_API_QUERY_TIMEOUT_SECONDS) as connection:
+        yield connection
+
+
+@contextmanager
+def reading(location):
+    """A connection of the data API on a base of the test."""
+    with (
+        open_readers(location, DATA_API_QUERY_TIMEOUT_SECONDS) as readers,
+        connect_reader(readers, DATA_API_QUERY_TIMEOUT_SECONDS) as connection,
+    ):
+        yield connection
 
 
 def read_ids(connection, **filters):
@@ -490,14 +501,9 @@ def test_an_unknown_window_has_no_trend(connection):
     assert read_trends(connection, date(2026, 1, 1)) is None
 
 
-def test_a_base_without_trend_has_no_latest_window(tmp_path):
-    database_path = tmp_path / "k-b.sqlite"
-    create_database(database_path)
-    connection = connect_database_read_only(database_path)
-    try:
+def test_a_base_without_trend_has_no_latest_window(new_base):
+    with reading(new_base) as connection:
         assert read_trends(connection) is None
-    finally:
-        connection.close()
 
 
 @pytest.mark.parametrize(
@@ -509,12 +515,10 @@ def test_no_field_of_a_kind_takes_the_name_of_a_field_of_the_list(kind_detail):
 
 
 @pytest.fixture
-def base_with_vulnerabilities_on_papers(tmp_path):
+def base_with_vulnerabilities_on_papers(new_base):
     """Papers designated by a vulnerability row too, which the schema does not refuse; paper 1
     has its publication, paper 2 none."""
-    database_path = tmp_path / "k-b.sqlite"
-    create_database(database_path)
-    connection = connect_database(database_path)
+    connection = connect_database(new_base)
     try:
         connection.executescript(
             """
@@ -535,11 +539,11 @@ def base_with_vulnerabilities_on_papers(tmp_path):
                     '2026-09-27T00:00:00Z', 'Unknown');
             """
         )
+        connection.commit()
     finally:
         connection.close()
-    connection = connect_database_read_only(database_path)
-    yield connection
-    connection.close()
+    with reading(new_base) as connection:
+        yield connection
 
 
 def test_an_item_is_read_by_the_branch_of_its_kind_only(

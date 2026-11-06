@@ -1,5 +1,5 @@
 """kb serve-data and kb openapi: the keys and the settings checked at the start, the hosts allowed,
-the log, the OpenAPI written without data directory."""
+the log, the base of KB_DATABASE_URL, the OpenAPI written without data directory."""
 
 import os
 import secrets
@@ -13,6 +13,10 @@ from fastapi.testclient import TestClient
 
 from k_b import cli
 from k_b.commands import serve_data_command
+from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
+from k_b.database import postgresql
+from k_b.database.engine import connect_reader
+from k_b.database.location import DATABASE_URL_VARIABLE
 
 VERSIONED_OPENAPI = Path(__file__).parents[2] / "docs" / "api" / "openapi-donnees.json"
 
@@ -279,7 +283,7 @@ def test_serve_reads_the_base_and_writes_its_own_log_file_under_kb_data_dir(
     cli.main(["serve-data"])
 
     [(app, _)] = uvicorn_calls
-    assert app.state.database_path == data_dir / "k-b.sqlite"
+    assert app.state.readers == data_dir / "k-b.sqlite"
     assert "API clients loaded: TERMINAL" in (
         data_dir / "logs" / "kb-serve-data.log"
     ).read_text(encoding="utf-8")
@@ -316,6 +320,112 @@ def test_a_log_to_file_value_refused_exits_2(
     )
     assert uvicorn_calls == []
     assert not (data_dir / "logs").exists()
+
+
+PASSWORD = "S3cret-of-the-test"  # noqa: S105 — a marker the test looks for, no secret
+
+
+@pytest.fixture
+def requests_while_serving(monkeypatch):
+    """uvicorn.run replaced by a request to the app it is given, while kb serve-data serves:
+    the status and body of each response, and the deadline of the base the app reads."""
+    served = []
+
+    def serve_one_request(app, **options):
+        client = TestClient(app, base_url="http://localhost")
+        key = os.environ["KB_DATA_API_KEY_TERMINAL"]
+        response = client.get("/items", headers={"Authorization": f"Bearer {key}"})
+        deadline = None
+        if not isinstance(app.state.readers, Path) and response.status_code == 200:
+            with connect_reader(
+                app.state.readers, app.state.query_timeout_seconds
+            ) as connection:
+                deadline = connection.execute("SHOW statement_timeout").fetchone()[0]
+        served.append((app, response.status_code, response.json(), deadline))
+
+    monkeypatch.setattr(serve_data_command.uvicorn, "run", serve_one_request)
+    return served
+
+
+@pytest.mark.postgresql
+def test_serve_reads_the_postgresql_base_of_kb_database_url_with_the_deadline_it_logs(
+    monkeypatch, data_dir, items_postgresql_base, requests_while_serving
+):
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv(DATABASE_URL_VARIABLE, items_postgresql_base.value)
+
+    assert cli.main(["serve-data"]) == 0
+
+    [(app, status, body, deadline)] = requests_while_serving
+    assert status == 200
+    assert len(body["items"]) == 18
+    assert app.state.query_timeout_seconds == DATA_API_QUERY_TIMEOUT_SECONDS
+    assert deadline == f"{DATA_API_QUERY_TIMEOUT_SECONDS}s"
+    assert not (data_dir / "k-b.sqlite").exists()
+
+
+@pytest.mark.parametrize(
+    ("variables", "message"),
+    [
+        (
+            {DATABASE_URL_VARIABLE: ""},
+            "KB_DATABASE_URL is neither a postgresql:// nor a postgres:// URL",
+        ),
+        (
+            {
+                DATABASE_URL_VARIABLE: "postgresql://kb@127.0.0.1:1/kb",
+                "PGPASSWORD": PASSWORD,
+            },
+            "PGPASSWORD set: libpq reads these variables besides KB_DATABASE_URL",
+        ),
+        # libpq stops at the [ of an IPv6 host never closed, and its error quotes the whole URL.
+        (
+            {DATABASE_URL_VARIABLE: f"postgresql://kb:{PASSWORD}@[::1/kb"},
+            "KB_DATABASE_URL is not a URL libpq reads",
+        ),
+    ],
+    ids=["empty", "libpq-variable", "unreadable"],
+)
+def test_serve_exits_2_on_a_database_url_refused_without_quoting_it(
+    monkeypatch, capsys, data_dir, requests_while_serving, variables, message
+):
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
+    for name, value in variables.items():
+        monkeypatch.setenv(name, value)
+
+    exit_code = cli.main(["serve-data"])
+
+    error_output = capsys.readouterr().err
+    assert exit_code == 2
+    assert f"ERROR k_b.cli: {message}" in error_output
+    assert "Traceback" not in error_output
+    assert PASSWORD not in error_output
+    assert PASSWORD not in (data_dir / "logs" / "kb-serve-data.log").read_text()
+    assert requests_while_serving == []
+
+
+def test_serve_on_a_base_out_of_reach_answers_500_and_writes_no_text_of_libpq(
+    monkeypatch, capfd, data_dir, requests_while_serving
+):
+    """The pool fails to connect in the background: its lines, and those of psycopg, would quote
+    the text of libpq (host, port, user); the request says only the type of the error."""
+    monkeypatch.setattr(postgresql, "DATA_API_POOL_WAIT_SECONDS", 0.3)
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv(
+        DATABASE_URL_VARIABLE, f"postgresql://kb_user:{PASSWORD}@127.0.0.1:1/kb_base"
+    )
+
+    assert cli.main(["serve-data"]) == 0
+
+    [(_, status, body, _)] = requests_while_serving
+    assert (status, body) == (500, {"error": "database_error"})
+    written = (
+        capfd.readouterr().err + (data_dir / "logs" / "kb-serve-data.log").read_text()
+    )
+    assert "database_error: PoolTimeout" in written
+    # The names of the URL and the words of libpq ("connection to server at … failed").
+    for observed in ("kb_user", "kb_base", PASSWORD, "connection to server", "failed"):
+        assert observed not in written
 
 
 def test_openapi_writes_the_document_without_data_dir(monkeypatch, tmp_path):

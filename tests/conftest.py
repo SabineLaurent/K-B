@@ -1,6 +1,6 @@
-"""What the tests share: the fabricated Zotero library, the test base of the readers, the
-settings of the terminal removed, the end-to-end tests and those on PostgreSQL left out, a fresh
-PostgreSQL base, and the HTML report."""
+"""What the tests share: the fabricated Zotero library, the test base of the readers on each engine,
+the settings of the terminal removed, the end-to-end tests and those on PostgreSQL left out, a
+fresh PostgreSQL base, and the HTML report."""
 
 import html
 import os
@@ -13,8 +13,9 @@ from urllib.parse import urlsplit, urlunsplit
 import psycopg
 import pytest
 
+from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
 from k_b.database.creation import create_database
-from k_b.database.engine import connect_database
+from k_b.database.engine import connect_database, open_readers
 from k_b.database.location import LIBPQ_VARIABLES, PostgresUrl
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -39,6 +40,9 @@ POSTGRESQL_MARKER = "postgresql"
 POSTGRESQL_SERVER_VARIABLE = "KB_TEST_POSTGRESQL_URL"
 # The markers -m must name for their tests to run.
 MARKERS_LEFT_OUT_BY_DEFAULT = (E2E_MARKER, POSTGRESQL_MARKER)
+# The engines a test of the reading runs on: its PostgreSQL half is left out unless -m names
+# postgresql, as any test with the marker, never skipped.
+ENGINES = ("sqlite", pytest.param("postgresql", marks=pytest.mark.postgresql))
 # A marker name of a -m expression, by the rule ident of pytest's grammar
 # (_pytest/mark/expression.py:10, pytest 9.1.1): nightly-e2e and e2e.slow are one name each.
 MARKER_NAME = re.compile(r"(?:\w|:|\+|-|\.|\[|\]|\\|/)+")
@@ -152,6 +156,18 @@ def postgresql_server_url():
     return url
 
 
+def create_postgresql_base(server, server_url, encoding="UTF8", collation="C"):
+    """Create a new base on the test server; its name and its URL."""
+    name = f"kb_test_{uuid.uuid4().hex}"
+    # Names and settings of the test only: nothing from outside enters the statement.
+    server.execute(
+        f"CREATE DATABASE {name} TEMPLATE template0 ENCODING '{encoding}'"
+        f" LC_COLLATE '{collation}' LC_CTYPE '{collation}'"
+    )
+    parts = urlsplit(server_url)
+    return name, PostgresUrl(urlunsplit(parts._replace(path=f"/{name}")))
+
+
 @pytest.fixture(scope="module")
 def make_postgresql_base(postgresql_server_url):
     """Create a new base on the test server, in UTF8 and collation C as kb create-db asks unless
@@ -160,15 +176,11 @@ def make_postgresql_base(postgresql_server_url):
     server = psycopg.connect(postgresql_server_url, autocommit=True)
 
     def make(encoding="UTF8", collation="C"):
-        name = f"kb_test_{uuid.uuid4().hex}"
-        # Names and settings of the test only: nothing from outside enters the statement.
-        server.execute(
-            f"CREATE DATABASE {name} TEMPLATE template0 ENCODING '{encoding}'"
-            f" LC_COLLATE '{collation}' LC_CTYPE '{collation}'"
+        name, location = create_postgresql_base(
+            server, postgresql_server_url, encoding, collation
         )
         created.append(name)
-        parts = urlsplit(postgresql_server_url)
-        return PostgresUrl(urlunsplit(parts._replace(path=f"/{name}")))
+        return location
 
     yield make
     for name in created:
@@ -220,3 +232,66 @@ def items_database(tmp_path_factory):
     finally:
         connection.close()
     return database_path
+
+
+@pytest.fixture(scope="session")
+def items_postgresql_base(postgresql_server_url):
+    """The test base of the readers on PostgreSQL, built once, read only: the schema of
+    kb create-db, then the rows of items_database.sql."""
+    server = psycopg.connect(postgresql_server_url, autocommit=True)
+    name, location = create_postgresql_base(server, postgresql_server_url)
+    try:
+        create_database(location)
+        connection = connect_database(location)
+        try:
+            connection.executescript(ITEMS_DATABASE_SCRIPT.read_text())
+            connection.commit()
+        finally:
+            connection.close()
+        yield location
+    finally:
+        server.execute(f"DROP DATABASE {name} WITH (FORCE)")
+        server.close()
+
+
+@pytest.fixture(scope="session")
+def items_postgresql_readers(items_postgresql_base):
+    """The pool of the data API on the test base of the readers on PostgreSQL."""
+    with open_readers(items_postgresql_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
+        yield readers
+
+
+@pytest.fixture(params=ENGINES)
+def engine(request):
+    """The engine of the test: SQLite, then PostgreSQL under -m postgresql."""
+    return request.param
+
+
+@pytest.fixture
+def items_base(engine, request, items_database):
+    """The test base of the readers on the engine of the test; the PostgreSQL one is asked for in
+    its half only, so that the SQLite half never needs its server."""
+    if engine == "sqlite":
+        return items_database
+    return request.getfixturevalue("items_postgresql_base")
+
+
+@pytest.fixture
+def items_readers(engine, request, items_database):
+    """What the data API reads the test base of the readers through, on the engine of the test:
+    the SQLite file, or the pool of the PostgreSQL base."""
+    if engine == "sqlite":
+        return items_database
+    return request.getfixturevalue("items_postgresql_readers")
+
+
+@pytest.fixture
+def new_base(engine, request, tmp_path):
+    """A new base, created by create_database on the engine of the test: its location."""
+    location = (
+        tmp_path / "k-b.sqlite"
+        if engine == "sqlite"
+        else request.getfixturevalue("postgresql_base")
+    )
+    create_database(location)
+    return location
