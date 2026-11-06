@@ -15,6 +15,9 @@ DATABASE_AUTH_VARIABLE = "KB_DATABASE_AUTH"
 # password of each new connection (database/postgresql.py).
 LIBPQ_AUTH = "libpq"
 ENTRA_AUTH = "entra"
+UNKNOWN_AUTH_REFUSAL = (
+    f"{DATABASE_AUTH_VARIABLE} is neither {LIBPQ_AUTH} nor {ENTRA_AUTH}"
+)
 # The client id of the user-assigned identity, the variable azure-identity reads, as
 # jobs/exchange_storage.py does: a job that reaches the storage and the base has one GUID.
 CLIENT_ID_VARIABLE = "AZURE_CLIENT_ID"
@@ -110,12 +113,16 @@ def read_database_location_or_refusal(
     why the setting is refused; the value is never quoted, as it may hold a password."""
     value = environ.get(DATABASE_URL_VARIABLE)
     if value is None:
-        # Entra names a base online: a URL not given to a container must not send it to SQLite.
-        if environ.get(DATABASE_AUTH_VARIABLE) == ENTRA_AUTH:
+        # Entra, or a value kb does not know, names no SQLite file: a URL not given to a container
+        # must not send the base to SQLite.
+        authentication = environ.get(DATABASE_AUTH_VARIABLE, DEFAULT_DATABASE_AUTH)
+        if authentication == ENTRA_AUTH:
             return (
                 f"{DATABASE_AUTH_VARIABLE} is {ENTRA_AUTH},"
                 f" and {DATABASE_URL_VARIABLE} is not set"
             )
+        if authentication != LIBPQ_AUTH:
+            return UNKNOWN_AUTH_REFUSAL
         return data_dir / DATABASE_FILE_NAME
     # An empty value too: a secret not given to a container must not send the import to SQLite.
     if not value.startswith(POSTGRESQL_URL_PREFIXES):
@@ -140,7 +147,7 @@ def read_postgresql_authentication_or_refusal(
     if authentication == LIBPQ_AUTH:
         return PostgresUrl(url)
     if authentication != ENTRA_AUTH:
-        return f"{DATABASE_AUTH_VARIABLE} is neither {LIBPQ_AUTH} nor {ENTRA_AUTH}"
+        return UNKNOWN_AUTH_REFUSAL
     client_id = environ.get(CLIENT_ID_VARIABLE)
     if not client_id:
         return (
