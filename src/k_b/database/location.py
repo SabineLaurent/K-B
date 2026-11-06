@@ -110,6 +110,12 @@ def read_database_location_or_refusal(
     why the setting is refused; the value is never quoted, as it may hold a password."""
     value = environ.get(DATABASE_URL_VARIABLE)
     if value is None:
+        # Entra names a base online: a URL not given to a container must not send it to SQLite.
+        if environ.get(DATABASE_AUTH_VARIABLE) == ENTRA_AUTH:
+            return (
+                f"{DATABASE_AUTH_VARIABLE} is {ENTRA_AUTH},"
+                f" and {DATABASE_URL_VARIABLE} is not set"
+            )
         return data_dir / DATABASE_FILE_NAME
     # An empty value too: a secret not given to a container must not send the import to SQLite.
     if not value.startswith(POSTGRESQL_URL_PREFIXES):
