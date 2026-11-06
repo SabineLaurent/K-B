@@ -16,11 +16,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Files that .dockerignore keeps out of the build: planted where the build copies from (src/)
-      # and at the root, then looked for in the image.
+      # Files that .dockerignore keeps out of the build context, planted at the root and in src/k_b/
+      # (the build backend packs every file of src/k_b/), then looked for in the context and in the
+      # image. .git/ is there already, from the checkout.
       - run: |
-          mkdir -p temp reports
-          touch .env .env.decoy temp/decoy reports/decoy src/k_b/.env.decoy src/k_b/decoy.sqlite
+          mkdir -p temp reports .venv
+          touch .env .env.decoy temp/decoy reports/decoy .venv/decoy
+          touch src/k_b/.env.decoy src/k_b/decoy.sqlite src/k_b/decoy.sqlite-wal src/k_b/.DS_Store
+      # The context a builder receives, a remote one included, copied whole into a throwaway image.
+      - name: Sends none of the planted files to the build
+        run: |
+          printf 'FROM python:3.13-slim-trixie@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc\nCOPY . /context\n' \
+            | docker buildx build --platform linux/amd64 --file - --tag k-b-context:ci .
+          found=$(docker run --rm --entrypoint find k-b-context:ci /context \( -name '.env*' -o -name '*.sqlite*' -o -name decoy -o -name .DS_Store -o -name .git \) -print)
+          test -z "$found" || { echo "$found"; exit 1; }
       - run: docker buildx build --platform linux/amd64 --tag k-b:ci .
       - name: Runs as a non-root user
         # In a variable, so that a failed docker run fails the step (bash -e); -ne refuses an empty value.
@@ -30,7 +39,7 @@ jobs:
       # As root, to read every folder of the image.
       - name: Holds none of the planted files
         run: |
-          found=$(docker run --rm --user 0 --entrypoint find k-b:ci / -xdev \( -name '.env*' -o -name '*.sqlite' -o -name decoy -o -name .git \) -print)
+          found=$(docker run --rm --user 0 --entrypoint find k-b:ci / -xdev \( -name '.env*' -o -name '*.sqlite*' -o -name decoy -o -name .DS_Store -o -name .git \) -print)
           test -z "$found" || { echo "$found"; exit 1; }
       # create-db runs the SQL of k_b.database, read from the installed package, and writes in /data.
       - name: Starts kb and creates the database

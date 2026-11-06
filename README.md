@@ -591,11 +591,12 @@ docker run --rm -v k-b-data:/data k-b create-db
 
 Azure Container Apps ne lance que des images `linux/amd64` : sur un Mac à puce Apple, Docker Desktop les
 construit et les lance par émulation. L'image lance `kb` sous l'utilisateur `10001:10001`, jamais root. Son
-dossier de données est `/data` (`KB_DATA_DIR`), qui appartient à cet utilisateur, et son journal est la
-sortie d'erreur (`KB_LOG_TO_FILE=false`). Chaque variable se change au lancement (`-e`). `.dockerignore`
+dossier de données est `/data` (`KB_DATA_DIR=/data` dans l'image), où se monte le volume, et il appartient à
+cet utilisateur. Sans volume monté, `kb` écrit dans le `/data` du conteneur, perdu à sa suppression. Le
+journal est la sortie d'erreur (`KB_LOG_TO_FILE=false`). Chaque variable se change au lancement (`-e`). `.dockerignore`
 garde hors de la construction `.git/`, `.venv/`, `temp/`, `reports/`, les fichiers d'environnement et les
-bases `*.sqlite`. Le job `image-build` de la CI (`.github/workflows/image.yml`) construit l'image sur
-chaque PR et la contrôle, sans la pousser nulle part.
+bases `*.sqlite`, avec leurs fichiers annexes. Le job `image-build` de la CI (`.github/workflows/image.yml`)
+construit l'image sur chaque PR vers `main` et la contrôle, sans la pousser nulle part.
 
 ## Licence
 

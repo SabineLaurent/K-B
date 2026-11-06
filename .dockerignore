@@ -8,8 +8,10 @@ temp/
 reports/
 # Environment files, at any depth: secrets.
 **/.env*
-**/*.sqlite
+# Databases and their side files (-wal, -shm, -journal), at any depth.
+**/*.sqlite*
 **/__pycache__/
+**/.DS_Store
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/

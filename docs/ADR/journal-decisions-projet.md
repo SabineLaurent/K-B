@@ -5362,12 +5362,23 @@ Plan validé par Sabine le 06/11 (I1 du plan de mise en ligne).
 
 - **Une seule image pour toutes les commandes `kb` (`Dockerfile` à la racine), en deux étapes sur la même
   base, `python:3.13-slim-trixie` épinglée par digest. L'étape de construction installe l'environnement
-  par uv 0.13.6, épinglé par digest lui aussi (`uv sync --locked --no-dev --no-editable`, les
-  dépendances puis K-B). L'étape finale ne garde que `/app/.venv`, sans uv ni `src/`.** Pourquoi :
-  l'image ne porte ni l'outil de construction ni les dépendances de développement. Avec la même base,
-  l'environnement retrouve le Python vers lequel il pointe. Une seule image : « une container app par
-  service, un environnement » (18/10), chaque service lançant sa commande. Écartée : une étape unique,
-  qui garderait uv et son cache dans l'image. — PR de #200
+  par uv 0.11.13, épinglé par digest lui aussi (`uv sync --locked --no-dev --no-editable`, les
+  dépendances puis K-B). L'étape finale ne garde que `/app/.venv`, sans uv ni `src/`, et compile en `.pyc`
+  la bibliothèque standard, que la base livre sans eux.** Pourquoi : l'image ne porte ni l'outil de
+  construction ni les dépendances de développement. Avec la même base, l'environnement retrouve le Python
+  vers lequel il pointe. uv 0.11.13 : uv construit K-B avec son propre backend, et sa version reste dans la
+  plage de `build-system.requires` (`uv_build>=0.11.13,<0.12.0`), la version du Mac ; uv 0.13.6, prévu au
+  plan, construisait hors de cette plage (relecture du 06/11). Sans les `.pyc`, chaque démarrage
+  recompilait en mémoire environ 200 modules, que l'UID 10001 ne peut pas écrire. Une seule image : « une
+  container app par service, un environnement » (18/10), chaque service lançant sa commande. Écartée :
+  une étape unique, qui garderait uv et son cache dans l'image. — PR de #200
+- **L'image fixe `KB_DATA_DIR=/data` : une exception à la règle 2 de `.claude/rules/poc.md`, selon
+  laquelle `KB_DATA_DIR` n'a pas de valeur par défaut et la commande échoue sans elle.** Pourquoi, dans
+  les mots de Sabine (06/11) : « en prod, il n'a pas de surprise, il est fixe ». Dans l'image, le dossier
+  de données est toujours `/data`. La relecture du 06/11 avait relevé la contradiction ; Sabine a tranché.
+  Écartée : pas de valeur dans l'image, `KB_DATA_DIR` posée avec chaque montage. Risque qui reste : une
+  container app ou un job déployé sans son montage écrit dans le `/data` de l'image, éphémère, sans
+  erreur. Parade : le Bicep de #414, qui pose chaque montage, relu en parcours complet. — PR de #200
 - **`kb` tourne sous l'UID et le GID fixes `10001`, propriétaires de `/data`.** Pourquoi : jamais root,
   et `kb` écrit ses fichiers en `0600` (commentaire du 16/10 sur #200). Tout conteneur qui les lit doit
   tourner sous l'UID qui les a écrits, donc sous un UID connu d'avance. Écarté : un UID choisi au
@@ -5382,13 +5393,20 @@ Plan validé par Sabine le 06/11 (I1 du plan de mise en ligne).
 - **Ni `curl`, ni `azcopy`, ni `HEALTHCHECK` dans l'image.** Les transferts passent par
   `azure-storage-blob` (#412), et `/health` par httpx2 (décision de Sabine du 06/11). Les sondes sont
   celles d'Azure Container Apps (#414). — PR de #200
-- **La CI construit l'image en `linux/amd64` sur chaque PR, dans son propre workflow (`image.yml`, job
-  `image-build`), et ne la pousse nulle part** (le registre et la livraison sont #415). Elle contrôle
-  l'UID (≠ 0), `kb --help` et `kb create-db` (le SQL du paquet installé). Avant la construction, elle
-  plante des fichiers que `.dockerignore` exclut, dans `src/k_b/` et à la racine, puis vérifie qu'aucun
-  n'est dans l'image. Pourquoi : le backend de construction emballe tout fichier de `src/k_b/`, et un
-  `.env` ou une base laissés là entraient dans l'image (essai du 06/11, avant `.dockerignore`). Dependabot
-  tient les digests des deux images de base, avec 7 jours d'attente comme pour les actions. — PR de #200
+- **La CI construit l'image en `linux/amd64` sur chaque PR vers `main`, dans son propre workflow
+  (`image.yml`, job `image-build`), et ne la pousse nulle part** (le registre et la livraison sont #415).
+  Elle contrôle l'UID (≠ 0), `kb --help` et `kb create-db` (le SQL du paquet installé). Avant la construction, elle plante des fichiers que `.dockerignore` exclut, dans
+  `src/k_b/` et à la racine, puis vérifie qu'aucun n'est ni dans le contexte de construction (copié tel
+  quel dans une image jetable) ni dans l'image. Pourquoi : le backend de construction emballe tout fichier
+  de `src/k_b/`, et un `.env` ou une base laissés là entraient dans l'image (essai du 06/11, avant
+  `.dockerignore`) ; et un constructeur distant reçoit tout le contexte, `temp/` et ses données
+  personnelles compris, si `.dockerignore` le laisse passer. — PR de #200
+- **Dependabot tient les digests des deux images de base, et leurs versions de correctif seulement, avec
+  7 jours d'attente comme pour les actions.** Pourquoi : sur un tag à suffixe, il propose la plus haute
+  version au même suffixe (dependabot-core, `docker/README.md`, « Semver », lu le 06/11) :
+  `3.13-slim-trixie` passerait à `3.14-slim-trixie`, alors que `.python-version` dit 3.13, et uv sortirait
+  de la plage de `uv_build`. Les montées mineures et majeures de `python` et d'`astral-sh/uv` sont donc
+  ignorées. Une montée de Python ou de la plage d'`uv_build` lève la règle avec elle. — PR de #200
 
 ## Décisions encore ouvertes
 

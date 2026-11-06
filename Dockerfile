@@ -2,13 +2,15 @@
 # Azure Container Apps (issue #200). Base images are pinned by digest, tag in front (Dependabot
 # updates both). Build: docker buildx build --platform linux/amd64 --tag k-b . (README).
 
-FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
+# uv builds K-B with its own build backend: its version stays in the range of build-system.requires
+# of pyproject.toml (uv_build>=0.11.13,<0.12.0).
+FROM ghcr.io/astral-sh/uv:0.11.13@sha256:841c8e6fe30a8b07b4478d12d0c608cba6de66102d29d65d1cc423af86051563 AS uv
 
 # Build stage: the virtual environment, from uv.lock, without the development dependencies.
 FROM python:3.13-slim-trixie@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc AS builder
 COPY --from=uv /uv /usr/local/bin/uv
 # The Python of the base image, never one uv downloads; .pyc compiled now, since the final image
-# cannot write them (owned by root, read-only file system on Azure).
+# cannot write them (owned by root).
 ENV UV_PYTHON_DOWNLOADS=0 \
     UV_COMPILE_BYTECODE=1
 WORKDIR /app
@@ -23,17 +25,21 @@ RUN uv sync --locked --no-dev --no-editable
 
 # Final stage: the same base, the virtual environment only, without uv.
 FROM python:3.13-slim-trixie@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc
+# The base image ships its standard library without .pyc: compiled here, as root, or every start
+# compiles them again in memory.
+RUN python -m compileall -q /usr/local/lib/python3.13
 # A fixed UID and GID, not root: the owner of /data, and of the files kb writes there in mode 0600
-# (comment of 2026-10-16 on #200). /data is the data directory, where Azure mounts its volume.
-RUN groupadd --system --gid 10001 kb \
-    && useradd --system --uid 10001 --gid 10001 --no-create-home --home-dir /nonexistent \
+# (comment of 2026-10-16 on #200). /data is the data directory, where the volume is mounted.
+RUN groupadd --gid 10001 kb \
+    && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /nonexistent \
         --shell /usr/sbin/nologin kb \
     && mkdir /data \
     && chown 10001:10001 /data
 COPY --from=builder /app/.venv /app/.venv
 # Defaults of the image, each changed by its variable at run time. In a container, stderr is the
 # log (.claude/rules/conventions.md, rule 3). stdout is not buffered: a result or a metric line
-# reaches the log at once, and is not lost when the container stops.
+# reaches the log at once, and is not lost when the container stops. KB_DATA_DIR has a value here,
+# an exception to .claude/rules/poc.md, rule 2 (decision of Sabine of 2026-11-06, journal ADR).
 ENV PATH="/app/.venv/bin:$PATH" \
     KB_DATA_DIR=/data \
     KB_LOG_TO_FILE=false \
