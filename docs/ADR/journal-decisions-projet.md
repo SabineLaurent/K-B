@@ -5548,8 +5548,7 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   Décision de Sabine du 06/11, sur le relevé de #278 (voie « l'accepter et le consigner »). Ce qui
   reste lisible dans l'historique : l'adresse personnelle de l'autrice (1 354 commits) et celle de
   l'organisme de formation (32 commits, 2 tags annotés), dans les métadonnées seulement ; le chemin du
-  compte macOS dans la revue de `brief09_assistant-veille-tech` depuis `7130351`, et dans 2 anciennes
-  versions de `docs/refactoring/` ; 23 lignes `Claude-Session:` ; les contenus de tiers d'avant leur
+  compte macOS, dans 3 fichiers de l'historique ; 23 lignes `Claude-Session:` ; les contenus de tiers d'avant leur
   déplacement ou leur retrait ; 13 commits que les refs ne montrent plus (anciens force-push, branches
   supprimées), que GitHub sert par leur SHA. Aucun secret : gitleaks 8.30.1 ne trouve que des faux
   positifs. Pourquoi : Sabine ne l'a pas dit ; déduit des coûts présentés, à confirmer par elle : les
