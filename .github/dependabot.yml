@@ -1,0 +1,9 @@
+version: 2
+updates:
+  # Keeps the SHA-pinned actions of .github/workflows/ up to date, with their version comment.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7 # a new version waits 7 days (default 3); security updates are never delayed
