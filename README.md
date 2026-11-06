@@ -632,6 +632,21 @@ l'image sur chaque PR vers `main` et sur chaque push sur `main`, et la contrôle
 
 Texte complet : voir [LICENSE](LICENSE).
 
+## Contenus de tiers
+
+La licence ci-dessus couvre ce que j'ai écrit. Quelques fichiers de test reprennent des extraits d'autrui, sous
+leur propre licence (lues à la source le 2026-11-06) :
+
+| Fichier | Source | Licence |
+|---|---|---|
+| `tests/fixtures/clipping/page_with_a_rule_in_its_text.md` | [WCAG 2.2](https://www.w3.org/TR/WCAG22/), Copyright © 2020-2024 World Wide Web Consortium | [W3C Document License](https://www.w3.org/copyright/document-license/) |
+| `tests/fixtures/clipping/page_without_author_or_date.md` | une page du site de l'[OWASP](https://owasp.org/) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.fr) |
+| `tests/fixtures/github_advisories_extract.json` | [GitHub Advisory Database](https://github.com/github/advisory-database) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.fr) |
+| `tests/fixtures/arxiv_extract.xml` | métadonnées de l'API arXiv ([conditions](https://info.arxiv.org/help/api/tou.html)) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/deed.fr) |
+| `tests/fixtures/cisa_kev_extract.csv` | catalogue KEV de la CISA ([`cisagov/kev-data`](https://github.com/cisagov/kev-data)) | CC0 1.0 |
+| `tests/fixtures/zotero_extract.sql` | 15 tables du schéma de Zotero (`resource/schema/userdata.sql` du dépôt [`zotero/zotero`](https://github.com/zotero/zotero)), © 2009 Center for History and New Media, George Mason University ; les valeurs sont inventées | [AGPL v3 ou plus](https://www.gnu.org/licenses/agpl-3.0.html) |
+| `tests/fixtures/github_*_extract.json`, `tests/fixtures/gh_archive_extract.json` | métadonnées publiques de dépôts GitHub (noms, descriptions, notes de version), par l'API de GitHub et GH Archive | celle de chaque dépôt ; de courts extraits, gardés pour les tests |
+
 ## Crédits
 
 Les papiers viennent de l'API arXiv, qui demande cette mention à chacun de ses utilisateurs

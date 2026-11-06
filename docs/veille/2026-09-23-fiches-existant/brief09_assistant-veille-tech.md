@@ -1,6 +1,6 @@
 # Fiche — `SabineLaurent/brief09_assistant-veille-tech`
 
-*Revue du 2026-09-23, lecture seule (copie locale `/Users/sabine/REPO_GIT/brief09_assistant-veille-tech`).
+*Revue du 2026-09-23, lecture seule (copie locale de `brief09_assistant-veille-tech`).
 Rien n'a été exécuté, aucun `.env` n'a été lu. Les chemins sont relatifs à la racine du dépôt.*
 
 > **Avertissement de lecture.** Une bonne partie du code n'est pas de Sabine. Le premier commit
