@@ -44,23 +44,26 @@ l'ordre des résultats, change la version.
   de la machine (#200). Pas de CORS.
 - **Lecture seule** : GET seulement. La base est ouverte en lecture seule (`mode=ro`), une
   connexion par requête.
-- **Délai** : une requête a 5 s dans la base, toutes ses lectures comptées
-  (`DATA_API_QUERY_TIMEOUT_SECONDS`, `core/config.py`) ; au-delà, SQLite arrête la lecture et
-  l'API répond 503 `query_timeout`, sans le message de SQLite. Le contrôle passe toutes les 1 000
-  instructions de SQLite (`set_progress_handler`, `data_api/dependencies.py`) : mesuré par l'API le
-  2026-11-06, la pire recherche est arrêtée à 5,75 s, environ 0,75 s après l'échéance (5,10 s à
-  100 instructions) ; chaque contrôle reprend le GIL, et 1 000 en fait dix fois moins que 100 pour
-  les autres requêtes (revue de code, tranché par time-knight, que Sabine a laissé trancher le
-  2026-11-06). L'échéance part du premier contrôle, quand SQLite lit : la dépendance et
-  la route attendent chacune un fil du pool, et cette attente ne compte pas. 5 s, mesuré le 2026-11-06 : la pire recherche `q` (199 « a » puis
-  « b ») sur 400 corps de release de 125 000 « a » prend environ 10 s sans délai, une recherche
-  ordinaire sur 50 millions de caractères 0,03 s ; sous les 10 s que le client de l'API IA
-  attend chaque morceau d'une réponse (`DATA_API_READ_TIMEOUT_SECONDS`). Limites : une
-  instruction seule ne s'interrompt pas (un `LIKE` sur le plus long texte, un clip de 1 000 000
-  de caractères, environ 0,2 s, extrapolé) ; chaque contrôle reprend le GIL de Python : à côté
-  d'un fil qui calcule sans pause, une requête de 3 ms en prend 1,5 s à 1 000 instructions, plus
-  de 5 s à 100, et sous une charge par à-coups (deux requêtes en même temps), 46 ms deviennent
-  70 ms (essais du relecteur du plan, à 100).
+- **Délai** : une requête a 5 s dans la base (`DATA_API_QUERY_TIMEOUT_SECONDS`, `core/config.py`),
+  comptées depuis le premier contrôle de sa première lecture, le temps de Python entre deux lectures
+  compris ; l'attente d'un fil du pool, avant la dépendance et avant la route, ne compte pas. Au-delà,
+  SQLite arrête la lecture et l'API répond 503 `query_timeout`, sans le message de SQLite. Le
+  contrôle passe toutes les 1 000 instructions de SQLite (`set_progress_handler`,
+  `data_api/dependencies.py`) : chaque contrôle reprend le GIL de Python, et 1 000 en font dix fois
+  moins que 100 pour les autres requêtes (revue de code, tranché par time-knight, que Sabine a
+  laissé trancher le 2026-11-06). 5 s, mesuré par l'API le 2026-11-06 : la pire recherche `q`
+  (199 « a » puis « b ») sur 400 corps de release de 125 000 « a » prend environ 10 s sans délai ;
+  avec lui, l'API répond 503 à 5,75 s (5,10 s à 100 instructions) ; une recherche ordinaire prend
+  0,02 s. 5 s reste sous les 10 s que le client de l'API IA attend chaque morceau d'une réponse
+  (`DATA_API_READ_TIMEOUT_SECONDS`). Limites :
+  - le dépassement croît avec le coût d'une instruction, et une instruction seule ne s'interrompt
+    pas : mesuré, 0,75 s sur des releases, le texte d'un tiers ; non mesuré sur des clips de
+    1 000 000 de caractères, le texte de Sabine, où un `LIKE` prend environ 0,2 s (extrapolé) et
+    un paquet de 1 000 instructions plusieurs secondes ;
+  - sous charge, l'attente du pool, non comptée, peut porter la réponse au-delà des 10 s du client
+    de l'API IA, qui lit alors `data_api_timeout` au lieu du 503 : une erreur dans les deux cas ;
+  - à côté d'un fil Python qui calcule sans pause, une requête de 3 ms en prend 1,5 s à 1 000
+    instructions (essai du relecteur du plan).
 - **Clé** : chaque route de données demande `Authorization: Bearer <clé>`. `/health` est public,
   `/docs` et `/openapi.json` aussi quand ils sont servis : ils ne contiennent aucune donnée.
 - **Documentation** : `/docs` et `/openapi.json` ne sont servis que si
@@ -268,7 +271,7 @@ de texte long au plus, la longueur maximale du corps d'une release, qu'il sert d
 (`MAX_LENGTH_BY_KIND`, `items.py`) ; écrite à part, un test la garde égale à celle-ci, si bien
 qu'un changement de la borne d'une release se voit avec le contrat. La coupe se fait au caractère
 (point de code), sans égard à un graphème ni à la syntaxe Markdown : un texte coupé peut finir
-par un emoji composé, une lettre sans son accent combiné ou un lien incomplets.
+par un emoji composé, une lettre sans son accent combiné ou un lien incomplet.
 - Une entrée Zotero sert ses surlignages dans l'ordre (date de création, retirés compris : un
   retiré prend une place) tant qu'ils sont 100 au plus et que leurs `text` et `comment` font
   ensemble 125 000 caractères au plus ; `highlights_truncated` dit qu'il en manque. La coupe

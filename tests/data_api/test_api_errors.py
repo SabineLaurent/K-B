@@ -88,9 +88,9 @@ def test_a_database_error_gives_500_without_detail_and_logs_its_type(
 def test_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail(
     client, authorization, caplog, monkeypatch, path
 ):
-    """Each data route reads through the connection that carries the deadline; at 0 s, its first
-    check stops the first reading. A check at each instruction: the detail and the trends of the
-    test base run fewer than the 1,000 of production."""
+    """Each data route reads through the connection that carries the deadline: at 0 s, its first
+    check stops the first reading."""
+    # The detail and the trends of the test base run fewer instructions than one step.
     monkeypatch.setattr(dependencies, "INSTRUCTIONS_BETWEEN_CHECKS", 1)
     client.app.state.query_timeout_seconds = 0
 

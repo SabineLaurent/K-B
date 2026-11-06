@@ -80,7 +80,10 @@ code l'a relevé (constat 1). Les routes sont des `def` et la dépendance un gé
 FastAPI les exécute en deux passages par son pool de fils. Si le pool est occupé, la requête attend
 un fil entre la dépendance et la route. Avec l'échéance posée à l'ouverture, ce temps d'attente
 comptait dans les 5 s, et une requête saine pouvait recevoir un faux 503 sous charge. Posée au
-premier contrôle, l'échéance ne compte que le temps passé dans la base.
+premier contrôle, l'échéance compte le temps depuis la première lecture, celui de Python entre deux
+lectures compris, mais plus l'attente d'un fil. Revers : sous charge, cette attente non comptée peut
+porter la réponse au-delà des 10 s du client de l'API IA, qui lit alors `data_api_timeout` au lieu
+du 503, une erreur dans les deux cas (second `/code-review`, constat 1, écarté).
 
 `clock` est un paramètre, `time.monotonic` par défaut, comme dans `RateLimiter`
 (`core/api_rate_limit.py:26`). Le test lui donne une horloge simulée. `time.monotonic` et non
@@ -214,7 +217,9 @@ prend en voyant le contrat.
 ## Zones non vérifiées
 
 - **Les 0,2 s d'un `LIKE` sur un clip de 1 000 000 de caractères** sont extrapolées de la mesure sur
-  125 000 caractères (24 ms par corps), pas mesurées.
+  125 000 caractères (24 ms par corps), pas mesurées. Sur de tels clips, un paquet de 1 000 instructions pourrait durer
+  plusieurs secondes, et le dépassement avec lui : non mesuré (second `/code-review`, constat 6,
+  écarté : le texte d'un clip vient de Sabine, celui d'une release, mesuré, d'un tiers).
 - **Le coût du GIL sous charge** vient des essais du relecteur du plan (une requête de 3 ms devient
   1,5 s à 1 000 instructions, à côté d'un fil qui calcule sans pause). Ils n'ont pas été refaits
   ici.
