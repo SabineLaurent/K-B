@@ -3,7 +3,7 @@
   "info": {
     "title": "K-B data API",
     "description": "Thank you to arXiv for use of its open access interoperability.",
-    "version": "0.9.0"
+    "version": "0.10.0"
   },
   "paths": {
     "/items": {
@@ -161,7 +161,7 @@
             }
           },
           "503": {
-            "description": "database_missing",
+            "description": "database_missing, query_timeout",
             "content": {
               "application/json": {
                 "schema": {
@@ -286,7 +286,7 @@
             }
           },
           "503": {
-            "description": "database_missing",
+            "description": "database_missing, query_timeout",
             "content": {
               "application/json": {
                 "schema": {
@@ -392,7 +392,7 @@
             }
           },
           "503": {
-            "description": "database_missing",
+            "description": "database_missing, query_timeout",
             "content": {
               "application/json": {
                 "schema": {
@@ -566,7 +566,12 @@
           "body": {
             "type": "string",
             "title": "Body",
-            "description": "The text kept, Markdown, as Web Clipper wrote it."
+            "description": "The text kept, Markdown, as Web Clipper wrote it, cut at the bound of the detail."
+          },
+          "body_truncated": {
+            "type": "boolean",
+            "title": "Body Truncated",
+            "description": "The text is cut at the bound of the detail."
           }
         },
         "type": "object",
@@ -578,7 +583,8 @@
           "url",
           "withdrawn_at",
           "published_at",
-          "body"
+          "body",
+          "body_truncated"
         ],
         "title": "ClipDetailSchema"
       },
@@ -1229,6 +1235,11 @@
             },
             "type": "array",
             "title": "Highlights"
+          },
+          "highlights_truncated": {
+            "type": "boolean",
+            "title": "Highlights Truncated",
+            "description": "Highlights are left out: the first ones by date are served while their number and the length of their text and comment hold within the bounds of the detail."
           }
         },
         "type": "object",
@@ -1243,7 +1254,8 @@
           "item_type",
           "arxiv_id",
           "revised_at",
-          "highlights"
+          "highlights",
+          "highlights_truncated"
         ],
         "title": "ZoteroEntryDetailSchema"
       }

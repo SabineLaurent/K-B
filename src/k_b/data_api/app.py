@@ -14,12 +14,16 @@ from k_b.core.api_methods import remove_implicit_head
 from k_b.core.api_rate_limit import RateLimiter, check_rate_limit
 from k_b.core.api_request_log import log_request
 from k_b.core.api_telemetry import NATIVE_TELEMETRY_OFF
-from k_b.core.config import DATA_API_ALLOWED_HOSTS, DATA_API_RATE_LIMITS
+from k_b.core.config import (
+    DATA_API_ALLOWED_HOSTS,
+    DATA_API_QUERY_TIMEOUT_SECONDS,
+    DATA_API_RATE_LIMITS,
+)
 from k_b.data_api.api_router import api_router
 from k_b.data_api.errors import ERROR_HANDLERS
 
 # The version of docs/specs-api.md: a change a client can see changes both.
-API_VERSION = "0.9.0"
+API_VERSION = "0.10.0"
 # Asked of every user of the arXiv API, "on your product" (arXiv API Access, 2026-10-25): the
 # data API serves its papers.
 ARXIV_ACKNOWLEDGEMENT = (
@@ -53,6 +57,7 @@ def create_app(
         telemetry=NATIVE_TELEMETRY_OFF,
     )
     app.state.database_path = database_path
+    app.state.query_timeout_seconds = DATA_API_QUERY_TIMEOUT_SECONDS
     app.state.api_keys = dict(api_keys)
     app.state.rate_limiter = RateLimiter(DATA_API_RATE_LIMITS)
     # The last added is the outermost.

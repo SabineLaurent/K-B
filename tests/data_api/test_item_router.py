@@ -242,6 +242,7 @@ ZOTERO_ENTRY_14 = {
             "withdrawn_at": "2026-10-06T09:30:00Z",
         },
     ],
+    "highlights_truncated": False,
 }
 
 
@@ -254,6 +255,7 @@ CLIP_18 = {
     "withdrawn_at": None,
     "published_at": "2026-06-08T00:00:00Z",
     "body": "Most junior developers think senior engineers know more tricks.",
+    "body_truncated": False,
 }
 
 
@@ -275,6 +277,58 @@ def test_each_kind_has_its_detail(client, authorization, detail):
 
     assert response.status_code == 200
     assert response.json() == detail
+
+
+def measure_highlights(highlights):
+    """The characters of their text and comment, as the bound of the detail counts them."""
+    return sum(
+        len(highlight["text"] or "") + len(highlight["comment"] or "")
+        for highlight in highlights
+    )
+
+
+@pytest.mark.parametrize(
+    ("max_highlights", "served", "is_truncated"),
+    [(2, 2, True), (3, 3, False)],
+)
+def test_the_highlights_beyond_their_number_are_cut_and_the_cut_is_said(
+    client, authorization, monkeypatch, max_highlights, served, is_truncated
+):
+    monkeypatch.setattr(item_router, "MAX_SERVED_HIGHLIGHTS", max_highlights)
+
+    detail = client.get("/items/14", headers=authorization).json()
+
+    assert detail["highlights"] == ZOTERO_ENTRY_14["highlights"][:served]
+    assert detail["highlights_truncated"] is is_truncated
+
+
+@pytest.mark.parametrize(("served", "is_truncated"), [(2, True), (3, False)])
+def test_the_highlights_beyond_their_length_are_cut_and_the_cut_is_said(
+    client, authorization, monkeypatch, served, is_truncated
+):
+    """The first ones by date while their text and comment fit, the withdrawn one included."""
+    highlights = ZOTERO_ENTRY_14["highlights"]
+    monkeypatch.setattr(
+        item_router, "MAX_SERVED_TEXT_LENGTH", measure_highlights(highlights[:served])
+    )
+
+    detail = client.get("/items/14", headers=authorization).json()
+
+    assert detail["highlights"] == highlights[:served]
+    assert detail["highlights_truncated"] is is_truncated
+
+
+@pytest.mark.parametrize(("shortened_by", "is_truncated"), [(1, True), (0, False)])
+def test_the_text_of_a_clip_beyond_its_length_is_cut_and_the_cut_is_said(
+    client, authorization, monkeypatch, shortened_by, is_truncated
+):
+    max_length = len(CLIP_18["body"]) - shortened_by
+    monkeypatch.setattr(item_router, "MAX_SERVED_TEXT_LENGTH", max_length)
+
+    detail = client.get("/items/18", headers=authorization).json()
+
+    assert detail["body"] == CLIP_18["body"][:max_length]
+    assert detail["body_truncated"] is is_truncated
 
 
 def test_a_withdrawn_highlight_is_served_with_its_withdrawn_at(client, authorization):

@@ -5,6 +5,10 @@ import logging
 import pytest
 from fastapi.routing import iter_route_contexts
 
+from k_b.core.config import (
+    DATA_API_QUERY_TIMEOUT_SECONDS,
+    DATA_API_READ_TIMEOUT_SECONDS,
+)
 from k_b.data_api.routers import item_router
 
 # The methods of RFC 9110 (section 9) and PATCH (RFC 5789), all sent by the test client.
@@ -76,6 +80,31 @@ def test_a_database_error_gives_500_without_detail_and_logs_its_type(
     assert response.json() == {"error": "database_error"}
     request_id = response.headers["X-Request-ID"]
     assert f"database_error: DatabaseError request_id={request_id}" in caplog.text
+
+
+@pytest.mark.parametrize("path", ["/items", "/items/14", "/trends"])
+def test_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail(
+    client, authorization, caplog, path
+):
+    """Every reading of the request is bounded: the list, the three of a detail, the trends."""
+    client.app.state.query_timeout_seconds = 0
+
+    with caplog.at_level(logging.WARNING, logger="k_b.data_api"):
+        response = client.get(path, headers=authorization)
+
+    assert response.status_code == 503
+    assert response.json() == {"error": "query_timeout"}
+    request_id = response.headers["X-Request-ID"]
+    assert f"query_timeout: 0 s request_id={request_id}" in caplog.text
+    assert "interrupted" not in caplog.text
+    assert "SELECT" not in caplog.text
+
+
+def test_the_deadline_of_a_request_is_below_the_read_timeout_of_the_ai_api_client(
+    client,
+):
+    assert client.app.state.query_timeout_seconds == DATA_API_QUERY_TIMEOUT_SECONDS
+    assert DATA_API_QUERY_TIMEOUT_SECONDS < DATA_API_READ_TIMEOUT_SECONDS
 
 
 @pytest.fixture

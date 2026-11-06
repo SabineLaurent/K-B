@@ -284,6 +284,13 @@ DATA_API_RATE_LIMITS = {
     "/items/{item_id}": RateLimit(requests=1200, window_seconds=60),
     "/trends": RateLimit(requests=120, window_seconds=60),
 }
+
+# The time a request of the data API may spend in its base, all its readings counted
+# (data_api/dependencies.py); beyond, 503 query_timeout. Measured on 2026-11-06: the worst search q
+# on 400 release bodies takes about 10 s, an ordinary one 0.03 s. Below
+# DATA_API_READ_TIMEOUT_SECONDS, the wait of the AI API for each piece of an answer.
+DATA_API_QUERY_TIMEOUT_SECONDS = 5
+
 # The window of a digest request, in days (docs/fiches-veille.md, "Fenêtre"): the default, changed
 # by KB_DIGEST_WINDOW_DAYS, and the bounds of both the variable and window_days of a request.
 DIGEST_WINDOW_DAYS = 3
