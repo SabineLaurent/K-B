@@ -1,7 +1,6 @@
 """kb import: read the raw files not imported yet and write them into the database."""
 
 import logging
-import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 from time import monotonic
@@ -12,6 +11,7 @@ from k_b.commands.run_log import LOGGER_NAME, describe_os_error
 from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.core.quoting import quote_value
 from k_b.database.connection import MissingDatabaseError
+from k_b.database.errors import EngineError
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl.pipeline import (
     ImportJournalExistsError,
@@ -60,7 +60,7 @@ def run_import(data_dir: Path) -> int:
         logger.error("%s; run kb import again", error)
         return ExitCode.NOT_STARTED
     except (
-        sqlite3.Error,
+        EngineError,
         OSError,
         UnknownSourceError,
         KindWithoutTableError,
@@ -90,7 +90,7 @@ def purge_after_the_import(data_dir: Path, imported_at: datetime) -> ExitCode:
         purge_after_import(
             data_dir, imported_at, STATE_CATALOGS, GITHUB_TRACKED_REPOSITORIES
         )
-    except (sqlite3.Error, OSError, ValueError) as error:
+    except (EngineError, OSError, ValueError) as error:
         # The type, and the reason of an OSError, never the name of a raw file.
         logger.error(
             "import committed, purge failed: %s; run kb import again",

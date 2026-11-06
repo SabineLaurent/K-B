@@ -1,9 +1,9 @@
 """The rows every writer shares: raw_data, the registry of the files read, and item."""
 
-import sqlite3
 from datetime import datetime
 
 from k_b.core.dates import format_date
+from k_b.database.engine import Connection
 from k_b.items import ItemKind
 
 SELECT_ITEM_COLLECTED_AT = """
@@ -18,7 +18,7 @@ class UnknownSourceError(LookupError):
 
 
 def write_raw_data(
-    connection: sqlite3.Connection,
+    connection: Connection,
     source_code: str,
     raw_file_path: str,
     stream: str,
@@ -41,9 +41,7 @@ def write_raw_data(
     return int(raw_data_id)
 
 
-def insert_item(
-    connection: sqlite3.Connection, kind: ItemKind, raw_data_id: int
-) -> int:
+def insert_item(connection: Connection, kind: ItemKind, raw_data_id: int) -> int:
     """Insert the row of a new item and return its id."""
     (item_id,) = connection.execute(
         "INSERT INTO item (kind, raw_data_id) VALUES (?, ?) RETURNING id",
@@ -53,7 +51,7 @@ def insert_item(
 
 
 def point_item_at_raw_data(
-    connection: sqlite3.Connection, item_id: int, raw_data_id: int
+    connection: Connection, item_id: int, raw_data_id: int
 ) -> None:
     """A known item now points to the raw data of its current version."""
     connection.execute(
@@ -61,7 +59,7 @@ def point_item_at_raw_data(
     )
 
 
-def read_item_collected_at(connection: sqlite3.Connection, item_id: int) -> str:
+def read_item_collected_at(connection: Connection, item_id: int) -> str:
     """Read when the raw file of an item was collected."""
     (collected_at,) = connection.execute(
         SELECT_ITEM_COLLECTED_AT, (item_id,)

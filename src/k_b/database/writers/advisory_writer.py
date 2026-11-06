@@ -1,9 +1,9 @@
 """Write a GitHub advisory: a news feed, the first version seen is kept."""
 
 import json
-import sqlite3
 
 from k_b.core.dates import format_date
+from k_b.database.engine import Connection
 from k_b.database.writers import shared_rows
 from k_b.database.writers.discard import Discard
 from k_b.items import Item
@@ -22,9 +22,7 @@ INSERT INTO advisory (
 """
 
 
-def write(
-    connection: sqlite3.Connection, item: Item, raw_data_id: int
-) -> Discard | None:
+def write(connection: Connection, item: Item, raw_data_id: int) -> Discard | None:
     """The GitHub item and its advisory, unless the advisory is known; the CVE it cites is
     created without its KEV columns if new."""
     row = connection.execute(

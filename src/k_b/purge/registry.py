@@ -3,12 +3,12 @@ the base cites it any more; the last catalog of a state catalog stays, as the im
 (database/writers/catalog.py)."""
 
 import logging
-import sqlite3
 from collections.abc import Collection
 from pathlib import Path
 
 from k_b.database import purge as purge_queries
 from k_b.database.connection import connect_database
+from k_b.database.engine import Connection
 from k_b.etl.raw_store import RAW_DIR_NAME, RAW_DIR_NAMES, RawStore
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ def purge_registry(
 
 
 def delete_rows_without_file(
-    connection: sqlite3.Connection,
+    connection: Connection,
     store: RawStore,
     state_catalog_source_codes: Collection[str],
 ) -> int:

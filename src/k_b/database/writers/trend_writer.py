@@ -1,11 +1,11 @@
 """Write the rows of a GH Archive ranking: a news feed applied to the whole window, the first
 ranking seen of a window is kept."""
 
-import sqlite3
 from collections.abc import Sequence
 from datetime import date
 
 from k_b.core.dates import format_day
+from k_b.database.engine import Connection
 from k_b.database.writers.discard import DiscardRule
 from k_b.items import TrendRow
 
@@ -38,7 +38,7 @@ LIMIT 1
 
 
 def write(
-    connection: sqlite3.Connection, rows: Sequence[TrendRow], raw_data_id: int
+    connection: Connection, rows: Sequence[TrendRow], raw_data_id: int
 ) -> tuple[int, dict[date, str]]:
     """Write the rows of a ranking; return how many were written, and each window left out with
     the collection of the ranking kept."""
@@ -56,7 +56,7 @@ def write(
     }
 
 
-def write_row(connection: sqlite3.Connection, row: TrendRow, raw_data_id: int) -> bool:
+def write_row(connection: Connection, row: TrendRow, raw_data_id: int) -> bool:
     """Write the row unless another raw file brought its window; return whether the base wrote
     it."""
     written = connection.execute(
@@ -73,7 +73,7 @@ def write_row(connection: sqlite3.Connection, row: TrendRow, raw_data_id: int) -
     return written is not None
 
 
-def read_window_collected_at(connection: sqlite3.Connection, window_end: date) -> str:
+def read_window_collected_at(connection: Connection, window_end: date) -> str:
     """Read when the raw file of a trend window was collected."""
     (collected_at,) = connection.execute(
         SELECT_TREND_WINDOW_COLLECTED_AT, (format_day(window_end),)
