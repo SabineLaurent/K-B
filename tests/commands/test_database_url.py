@@ -1,5 +1,5 @@
-"""kb create-db and kb import read KB_DATABASE_URL: a value refused stops them before they start,
-and a URL libpq cannot read never reaches the log, its password with it."""
+"""kb create-db, kb migrate-database and kb import read KB_DATABASE_URL: a value refused stops them
+before they start, and a URL libpq cannot read never reaches the log, its password with it."""
 
 import pytest
 
@@ -12,7 +12,7 @@ PASSWORD = "S3cret-of-the-test"  # noqa: S105 — a marker the test looks for, n
 MALFORMED_URL = f"postgresql://kb:{PASSWORD}@[::1/kb"
 
 
-@pytest.mark.parametrize("command", ["create-db", "import"])
+@pytest.mark.parametrize("command", ["create-db", "migrate-database", "import"])
 def test_an_empty_kb_database_url_stops_the_command_before_it_starts(
     monkeypatch, tmp_path, capsys, command
 ):
@@ -24,7 +24,7 @@ def test_an_empty_kb_database_url_stops_the_command_before_it_starts(
     assert not (tmp_path / "k-b.sqlite").exists()
 
 
-@pytest.mark.parametrize("command", ["create-db", "import"])
+@pytest.mark.parametrize("command", ["create-db", "migrate-database", "import"])
 def test_a_variable_libpq_reads_stops_the_command_before_it_starts(
     monkeypatch, tmp_path, capsys, command
 ):
@@ -59,7 +59,7 @@ def test_kb_create_db_never_shows_a_part_of_a_password_the_url_does_not_encode(
     assert PASSWORD not in (tmp_path / "logs" / "kb.log").read_text()
 
 
-@pytest.mark.parametrize("command", ["create-db", "import"])
+@pytest.mark.parametrize("command", ["create-db", "migrate-database", "import"])
 def test_a_url_libpq_cannot_read_is_refused_without_its_password_in_the_log(
     monkeypatch, tmp_path, capsys, command
 ):

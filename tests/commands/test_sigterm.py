@@ -23,6 +23,7 @@ from k_b.commands import (
     collect_command,
     import_command,
 )
+from k_b.database import creation
 from k_b.database import purge as database_purge
 from k_b.etl import load
 
@@ -230,3 +231,21 @@ def test_a_sigterm_during_the_purge_of_the_base_keeps_the_import_and_undoes_the_
     assert connection.execute("SELECT count(*) FROM item").fetchone()[0] > 0
     assert connection.execute("SELECT count(*) FROM publication").fetchone()[0] > 0
     connection.close()
+
+
+def test_a_sigterm_during_kb_migrate_database_leaves_no_base_and_exits_with_its_code(
+    monkeypatch, tmp_path
+):
+    """kb is the PID 1 of the job: without its own handler, it would ignore SIGTERM."""
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    connect_sqlite = creation.connect_sqlite
+
+    def connect_then_stop(database_path):
+        connection = connect_sqlite(database_path)
+        signal.raise_signal(signal.SIGTERM)
+        return connection
+
+    monkeypatch.setattr(creation, "connect_sqlite", connect_then_stop)
+
+    assert cli.main(["migrate-database"]) == cli.ExitCode.STOPPED_BY_SIGTERM
+    assert not (tmp_path / "k-b.sqlite").exists()
