@@ -1,7 +1,6 @@
 """The data API: the items of the base, read only, for the clients of Sabine (docs/specs-api.md)."""
 
 from collections.abc import Mapping, Sequence
-from pathlib import Path
 
 from fastapi import Depends, FastAPI
 from pydantic import SecretStr
@@ -21,9 +20,10 @@ from k_b.core.config import (
 )
 from k_b.data_api.api_router import api_router
 from k_b.data_api.errors import ERROR_HANDLERS
+from k_b.database.engine import Readers
 
 # The version of docs/specs-api.md: a change a client can see changes both.
-API_VERSION = "0.10.0"
+API_VERSION = "0.11.0"
 # Asked of every user of the arXiv API, "on your product" (arXiv API Access, 2026-10-25): the
 # data API serves its papers.
 ARXIV_ACKNOWLEDGEMENT = (
@@ -32,13 +32,16 @@ ARXIV_ACKNOWLEDGEMENT = (
 
 
 def create_app(
-    database_path: Path,
+    readers: Readers,
     api_keys: Mapping[str, SecretStr],
     allowed_hosts: Sequence[str] = DATA_API_ALLOWED_HOSTS,
     openapi_url: str | None = None,
+    query_timeout_seconds: float = DATA_API_QUERY_TIMEOUT_SECONDS,
 ) -> FastAPI:
-    """The app, its keys, its base, the hosts it answers and the path of its OpenAPI given; without
-    any key, every data route answers 401; without a path, neither the OpenAPI nor /docs is served."""
+    """The app, its keys, its readers (the SQLite file, or the pool of a PostgreSQL base opened with
+    the same query_timeout_seconds), the hosts it answers and the path of its OpenAPI given;
+    without any key, every data route answers 401; without a path, neither the OpenAPI nor /docs
+    is served."""
     app = FastAPI(
         title="K-B data API",
         version=API_VERSION,
@@ -56,8 +59,8 @@ def create_app(
         # Its traces would carry the raw query of a request (core/api_telemetry.py).
         telemetry=NATIVE_TELEMETRY_OFF,
     )
-    app.state.database_path = database_path
-    app.state.query_timeout_seconds = DATA_API_QUERY_TIMEOUT_SECONDS
+    app.state.readers = readers
+    app.state.query_timeout_seconds = query_timeout_seconds
     app.state.api_keys = dict(api_keys)
     app.state.rate_limiter = RateLimiter(DATA_API_RATE_LIMITS)
     # The last added is the outermost.

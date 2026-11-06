@@ -9,7 +9,7 @@ from typing import NamedTuple
 from k_b.core.config import RETENTION_YEARS_BY_ACQUISITION_MODE
 from k_b.core.dates import DATABASE_DATE_FORMAT, subtract_months
 from k_b.database import purge as purge_queries
-from k_b.database.engine import Connection, connect_database
+from k_b.database.engine import Connection, connect_database, lock_for_writing
 from k_b.database.location import DatabaseLocation
 
 logger = logging.getLogger(__name__)
@@ -30,10 +30,11 @@ def purge_expired_rows(
     state_catalog_source_codes: Collection[str],
     tracked_repository_names: Sequence[str],
 ) -> BasePurgeCount:
-    """Delete, in one transaction, what is past its duration and what it leaves uncited; log how
-    many rows, never a name."""
+    """Delete, in one transaction, what is past its duration and what it leaves uncited, once an
+    import in progress on PostgreSQL has committed; log how many rows, never a name."""
     connection = connect_database(database)
     try:
+        lock_for_writing(connection)
         count = delete_expired_rows(
             connection,
             imported_at,
@@ -42,8 +43,11 @@ def purge_expired_rows(
         )
         connection.commit()
     except BaseException:
-        # Ctrl-C and SIGTERM too: the base stays as the import committed it.
-        connection.rollback()
+        # Ctrl-C and SIGTERM too: the base stays as the import committed it. Only an open
+        # transaction: a connection psycopg closed on a signal refuses the rollback, whose error
+        # would replace the signal (exit 1 instead of 143), as in etl/load.py.
+        if connection.in_transaction:
+            connection.rollback()
         raise
     finally:
         connection.close()

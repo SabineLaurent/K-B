@@ -1,9 +1,10 @@
-"""GET /trends on the test base: the window of 2026-10-10, the latest, and the older one of
-2026-10-09."""
+"""GET /trends on the test base, on each engine: the window of 2026-10-10, the latest, and the older
+one of 2026-10-09."""
 
 import pytest
 
-from k_b.database.creation import create_database
+from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
+from k_b.database.engine import open_readers
 
 LATEST_WINDOW = {
     "window_end": "2026-10-10",
@@ -41,6 +42,12 @@ LATEST_WINDOW = {
         },
     ],
 }
+
+
+@pytest.fixture
+def client(reading_client):
+    """Every test of the module reads the base: on each engine."""
+    return reading_client
 
 
 def test_trends_without_window_end_give_the_latest_window(client, authorization):
@@ -81,12 +88,9 @@ def test_an_unknown_window_gives_404(client, authorization):
     assert response.json() == {"error": "trend_window_not_found"}
 
 
-def test_a_base_without_trend_gives_404(make_client, tmp_path, api_keys, authorization):
-    database_path = tmp_path / "k-b.sqlite"
-    create_database(database_path)
-    client = make_client(database_path, api_keys)
-
-    response = client.get("/trends", headers=authorization)
+def test_a_base_without_trend_gives_404(make_client, new_base, api_keys, authorization):
+    with open_readers(new_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
+        response = make_client(readers, api_keys).get("/trends", headers=authorization)
 
     assert response.status_code == 404
     assert response.json() == {"error": "trend_window_not_found"}

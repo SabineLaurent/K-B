@@ -27,6 +27,8 @@ ENTRY_CONSTRAINT_ERROR_NAMES = frozenset(
 # numeric_value_out_of_range, which a bigint column raises on an integer beyond 64 bits.
 ENTRY_SQLSTATES = frozenset({"23514", "23505", "23502", "22003"})
 UNIQUE_VIOLATION = "23505"
+# The state of a statement PostgreSQL stopped past statement_timeout (database/postgresql.py).
+QUERY_CANCELED = "57014"
 # The name PostgreSQL gives the constraint of a primary key, <table>_pkey: schema_postgresql.sql
 # names none itself (tests/test_schema_postgresql.py).
 PRIMARY_KEY_SUFFIX = "_pkey"
@@ -93,6 +95,9 @@ def describe_postgresql_error(error: psycopg.Error) -> str:
 
 
 def is_query_timeout(error: EngineError) -> bool:
-    """Whether the deadline stopped the reading, the only interruption of a connection of the data
-    API; an error raised by Python, not by SQLite, has no code."""
+    """Whether the deadline stopped the reading: SQLITE_INTERRUPT on SQLite, where an error raised
+    by Python has no code; query_canceled on PostgreSQL, past statement_timeout, which a cancel by
+    an administrator raises too."""
+    if isinstance(error, psycopg.Error):
+        return error.sqlstate == QUERY_CANCELED
     return getattr(error, "sqlite_errorcode", None) == sqlite3.SQLITE_INTERRUPT

@@ -7,7 +7,7 @@ erreurs et les exigences de sécurité. Les décisions et leur pourquoi sont dan
 [journal ADR](ADR/journal-decisions-projet.md) (entrées du 2026-10-14) ; la collecte, dans
 [specs-collecte.md](specs-collecte.md) ; la base, dans [stockage.md](stockage.md).
 
-**Version de la spec : 0.10.0**, la même que `info.version` de l'OpenAPI
+**Version de la spec : 0.11.0**, la même que `info.version` de l'OpenAPI
 (`docs/api/openapi-donnees.json`, que #184 écrit). Un changement de comportement visible par un client, comme
 l'ordre des résultats, change la version.
 
@@ -23,6 +23,7 @@ l'ordre des résultats, change la version.
 | 0.8.0 | une limite de débit par client et par route ; au-delà, 429 `rate_limit_exceeded` (#161) |
 | 0.9.0 | `HEAD` refusé sur `/health`, et sur `/docs` et `/openapi.json` en `sandbox`, comme il l'était déjà sur les routes de données : 405 `method_not_allowed`, `Allow: GET` (#161) |
 | 0.10.0 | une requête a 5 s dans la base ; au-delà, 503 `query_timeout` ; le détail d'une entrée Zotero sert 100 surlignages et 125 000 caractères de leur texte et commentaire au plus, et celui d'un clip 125 000 caractères de son texte, la coupe dite par `highlights_truncated` et `body_truncated` (#331) |
+| 0.11.0 | la base PostgreSQL que nomme `KB_DATABASE_URL` servie, et non plus le fichier SQLite ; sur elle, une base injoignable ou sans tables répond 500 `database_error`, et non 503 `database_missing` ; au-delà de 4 lectures en même temps, une requête attend 2 s puis répond 500 `database_error` ; la recherche `q` rend les mêmes résultats qu'en SQLite (#418) |
 
 ## Règles communes
 
@@ -42,11 +43,29 @@ l'ordre des résultats, change la version.
   `*`, entrée hors motif) fait sortir `kb serve-data` en code 2 avant d'écouter, avec un message qui
   nomme la variable et la position de l'entrée. En conteneur, le port est publié sur `127.0.0.1`
   de la machine (#200). Pas de CORS.
-- **Lecture seule** : GET seulement. La base est ouverte en lecture seule (`mode=ro`), une
-  connexion par requête.
-- **Délai** : une requête a 5 s dans la base (`DATA_API_QUERY_TIMEOUT_SECONDS`, `core/config.py`),
-  comptées depuis le premier contrôle de sa première lecture, le temps de Python entre deux lectures
-  compris ; l'attente d'un fil du pool, avant la dépendance et avant la route, ne compte pas. Au-delà,
+- **Lecture seule** : GET seulement. La base est celle que nomme `KB_DATABASE_URL`
+  ([stockage.md](stockage.md), « Le SGBD »), lue en lecture seule sur les deux moteurs, par
+  `connect_reader` (`database/engine.py`) :
+  - en SQLite, le fichier est ouvert en `mode=ro`, une connexion par requête ;
+  - en PostgreSQL, `kb serve-data` ouvre au démarrage un pool de 1 à 4 connexions
+    (`psycopg-pool`, `READING_POOL_MIN_SIZE` et `READING_POOL_MAX_SIZE`, `core/config.py`), qui se
+    connecte en arrière-plan : `kb serve-data` démarre sans attendre la base, comme en SQLite. Chaque
+    connexion lit en `REPEATABLE READ READ ONLY` : une écriture est refusée par le serveur (SQLSTATE
+    25006), et les lectures du détail voient un seul état de la base. Une requête attend une
+    connexion 2 s au plus (`READING_POOL_WAIT_SECONDS`), puis répond 500 `database_error`
+    (`PoolTimeout` au journal) ; une connexion coupée (redémarrage, bascule du serveur) n'est pas
+    prêtée. Chaque connexion revient au pool sans transaction, sur un succès comme sur une erreur ;
+    une session que le serveur a finie avant (redémarrage, coupure) laisse à la requête sa réponse ou
+    sa propre erreur, se journalise `reader_session_lost: <type de l'erreur>`, sans message, et le
+    pool remplace la connexion.
+    Les lignes de `psycopg` et `psycopg_pool` sous ERROR ne sont pas journalisées
+    (`LIBRARY_LOG_LEVELS`, `commands/run_log.py`) : elles citent le texte de libpq et la connexion
+    (hôte, utilisateur, base). Une base injoignable ne se voit donc qu'à la requête, par
+    `database_error: PoolTimeout`.
+- **Délai** : une requête a 5 s dans la base (`DATA_API_QUERY_TIMEOUT_SECONDS`, `core/config.py`).
+  En SQLite, elles sont comptées depuis le premier contrôle de sa première lecture, le temps de
+  Python entre deux lectures compris ; l'attente d'un fil (le pool de fils de Starlette), avant la
+  dépendance et avant la route, ne compte pas. Au-delà,
   SQLite arrête la lecture et l'API répond 503 `query_timeout`, sans le message de SQLite. Le
   contrôle passe toutes les 1 000 instructions de SQLite (`set_progress_handler`,
   `database/engine.py`) : chaque contrôle reprend le GIL de Python, et 1 000 en font dix fois
@@ -64,6 +83,23 @@ l'ordre des résultats, change la version.
     de l'API IA, qui lit alors `data_api_timeout` au lieu du 503 : une erreur dans les deux cas ;
   - à côté d'un fil Python qui calcule sans pause, une requête de 3 ms en prend 1,5 s à 1 000
     instructions (essai du relecteur du plan).
+
+  En PostgreSQL, le même délai est le `statement_timeout` de chaque connexion du pool, posé par
+  K-B à son ouverture (`SET_STATEMENT_TIMEOUT`, `database/postgresql.py`), pas par le serveur : une
+  base installée sans réglage n'est jamais lue sans délai, et la valeur est dans le dépôt, la même
+  pour les deux moteurs. Au-delà, le serveur arrête l'instruction (SQLSTATE 57014) et l'API répond
+  le même 503 `query_timeout`. Un délai de moins d'1 ms est refusé au démarrage : à 0,
+  `statement_timeout` n'arrête plus rien. Écartés : `ALTER ROLE … SET statement_timeout` (la valeur
+  hors du dépôt, et un oubli à l'installation laisse la lecture sans délai) ;
+  `options=-c statement_timeout` dans l'URL (refusé par un pooler comme PgBouncer) ; `SET LOCAL` à
+  chaque requête (utile derrière un pooler en mode transaction seulement) ; `transaction_timeout`
+  (il ferme la session). Journal ADR, 2026-11-06, « API de données sur PostgreSQL ». Limites :
+  - le délai compte par instruction, pas par requête : la liste et les tendances en font une, le
+    détail jusqu'à trois (15 s au plus en théorie) ;
+  - l'attente d'une connexion (2 s au plus) s'ajoute : avec une instruction, 7 s, sous les 10 s du
+    client de l'API IA ;
+  - une instruction annulée par un administrateur (`pg_cancel_backend`) lève aussi 57014 et
+    répond aussi 503 `query_timeout`.
 - **Clé** : chaque route de données demande `Authorization: Bearer <clé>`. `/health` est public,
   `/docs` et `/openapi.json` aussi quand ils sont servis : ils ne contiennent aucune donnée.
 - **Documentation** : `/docs` et `/openapi.json` ne sont servis que si
@@ -341,7 +377,7 @@ valeur reçue.
 | `invalid_parameter` | 422 | paramètre hors bornes ou mal formé ; le corps ajoute `"parameters": [<noms>]`, sans les valeurs |
 | `rate_limit_exceeded` | 429 | client au-delà de la limite de la route (« Débit »), avec `Retry-After` |
 | `query_timeout` | 503 | la requête a passé 5 s dans la base (« Délai »), sans détail |
-| `database_missing` | 503 | la base n'existe pas |
+| `database_missing` | 503 | le fichier SQLite de la base n'existe pas ; en PostgreSQL, une base injoignable ou sans tables répond 500 `database_error` |
 | `database_error` | 500 | toute autre erreur de la base, sans détail |
 | `internal_error` | 500 | toute autre erreur, sans détail ; journalisée par son type seul, sans pile ni message |
 
@@ -352,9 +388,21 @@ de `TrustedHostMiddleware`, qui répond avant l'app, en texte.
 
 - `q` cherche un morceau de texte dans le titre et le résumé (tableau « Date, titre et résumé par
   sorte »), jamais dans le texte des surlignages (journal ADR, 2026-10-09).
-- Moyen : `LIKE … ESCAPE` de SQLite ; `%` et `_` sont cherchés tels quels.
+- Moyen : `lower(champ) LIKE lower(q) ESCAPE '\'`, le même SQL sur les deux moteurs
+  (`LIST_FILTERS`, `database/reading.py`) ; `%`, `_` et `\` sont cherchés tels quels. `lower()` des
+  deux côtés : `LIKE` ignore la casse des lettres ASCII en SQLite seulement ; `lower()` ne plie
+  qu'elles, en SQLite comme en PostgreSQL dans la collation C que `kb create-db` exige
+  ([stockage.md](stockage.md)). Écartés : `ILIKE`, propre à PostgreSQL (règle 1 de
+  `.claude/rules/poc.md`) ; plier `q` en Python, qui plierait aussi `É`, alors que la base ne le
+  plie pas.
+  Coût de `lower()`, qui copie chaque titre et résumé à chaque recherche, mesuré le 2026-11-06 sur
+  SQLite, base en mémoire de 400 corps de release de 125 000 « a » et 5 textes de 1 000 000 de
+  caractères, sans délai : une recherche ordinaire passe de 0,017 s à 0,029 s, la pire recherche
+  (« Délai ») de 9,66 s à 9,72 s.
 - Comportement relevé le 2026-10-14 sur SQLite 3.50.4 (module `sqlite3` de Python) et 3.51.0
-  (commande `sqlite3`), base en mémoire :
+  (commande `sqlite3`), base en mémoire, et le 2026-11-06 sur PostgreSQL 18.4, en collation C, par
+  la même expression ; les mêmes résultats sur les deux moteurs sont tenus par
+  `test_read_items_gives_the_same_results_on_postgresql_as_on_sqlite` :
 
   | Recherche | Texte | Trouvé |
   |---|---|---|
@@ -369,8 +417,9 @@ de `TrustedHostMiddleware`, qui répond avant l'app, en texte.
 - **Écart temporaire** à la recherche plein texte triée par pertinence (journal ADR,
   2026-10-09) : elle changera l'ordre des résultats avec `q`, et passera la spec et l'OpenAPI à
   une nouvelle version. Elle était prévue avec PostgreSQL (`tsvector`) après le 08/11 (journal
-  ADR, 2026-10-15, « POC du 25/10 », décision 2) ; son moteur attend « La base au temps 3 »
-  (journal ADR, « Décisions encore ouvertes »).
+  ADR, 2026-10-15, « POC du 25/10 », décision 2). Son moteur est choisi : PostgreSQL en ligne,
+  SQLite en local (journal ADR, 2026-11-06, « Base : PostgreSQL en ligne, par un adaptateur
+  maison (#417) »), qui ferme « La base au temps 3 ».
 
 ## Données personnelles
 
@@ -402,7 +451,7 @@ détail et les tendances (#185 : « chaque ligne dit si l'exigence est tenue, et
 | API1:2023 Broken Object Level Authorization | Une seule propriétaire, Sabine : tout client authentifié lit tous les items. Un identifiant inconnu rend 404, jamais une erreur qui dirait autre chose. `item.id`, séquentiel, est dans l'URL : la recommandation d'identifiants difficiles à deviner est écartée tant que l'API n'a qu'une propriétaire (journal ADR, 2026-10-15). | **Tenue.** `test_each_client_is_served_with_its_key`, `test_an_unknown_item_id_gives_404_item_not_found`, `test_an_unknown_window_gives_404` |
 | API2:2023 Broken Authentication | Une clé par client, générée en 256 bits (minimum contrôlé : 32 caractères) ; pas de route de connexion ; comparaison en temps constant ; 401 testé sur chaque route de données. | **Tenue, sauf l'anti-force brute** (« Ce qui manque, et comment le tenir ») : `test_every_data_route_refuses_a_missing_and_a_wrong_key_with_the_same_body` (chaque route, lue dans l'app par le parcours de FastAPI, routes hors OpenAPI comprises), `test_only_the_public_routes_answer_without_a_key` (`/docs`, `/openapi.json` et `/health`, aucune autre), `test_an_app_without_key_refuses_every_data_route`, `test_a_removed_key_gives_401_and_the_other_clients_are_still_served`, `test_serve_exits_2_and_names_the_variable_without_its_value` ; le temps constant n'est pas mesuré par un test (`hmac.compare_digest`, `src/k_b/core/api_access.py`) |
 | API3:2023 Broken Object Property Level Authorization | Réponses en liste blanche : ni `raw_file_path`, ni `collected_at`, ni texte long dans la liste ; au détail, les champs du tableau de sa sorte et rien d'autre. | **Tenue.** `test_the_list_serves_only_the_six_fields`, `test_each_kind_has_its_detail` (corps entier, une sorte par cas), `test_no_detail_serves_a_raw_file_path_or_a_collection_date`, `test_trends_without_window_end_give_the_latest_window`, `test_no_error_body_holds_a_raw_file_path_or_a_path`, `test_no_route_documents_a_raw_file_path_or_a_collection_date` |
-| API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000), `q` (200 caractères) et du nombre de `kind` (7) ; `/trends` rend 60 lignes au plus, sans pagination. Une limite de débit par client et par route (« Débit »). Un délai de 5 s par requête dans la base (« Délai ») ; au détail, 100 surlignages et 125 000 caractères de texte long au plus (« Bornes du détail »). | **Tenue.** Le délai : `test_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail` (la liste, le détail, les tendances : chaque route lit par la connexion qui porte le délai), `test_the_deadline_of_a_request_is_below_the_read_timeout_of_the_ai_api_client` ; les bornes du détail : `test_the_highlights_beyond_their_number_are_cut_and_the_cut_is_said`, `test_the_highlights_beyond_their_length_are_cut_and_the_cut_is_said`, `test_the_text_of_a_clip_beyond_its_length_is_cut_and_the_cut_is_said` ; les bornes et la taille de page, `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_next_offset_stops_at_the_offset_bound`, `test_an_item_id_not_written_as_an_integer_gives_422`, `test_a_malformed_window_end_gives_422` ; le débit, pour les clients authentifiés, `test_beyond_its_limit_a_client_gets_429_with_its_wait_and_its_id`, `test_the_limit_is_per_client_and_per_route`, `test_every_data_route_has_its_limit` ; les 60 lignes d'une fenêtre sont bornées à la collecte (`gh_archive.py`), pas par l'API. Limites : les surlignages sont tous lus avant la coupe, bornés en temps par le délai, pas en mémoire ; une instruction seule de SQLite ne s'interrompt pas, et chaque contrôle du délai reprend le GIL (« Délai ») ; le délai se multiplie par le débit (120 listes par minute, 5 s chacune au plus), sans plafond de requêtes en même temps |
+| API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000), `q` (200 caractères) et du nombre de `kind` (7) ; `/trends` rend 60 lignes au plus, sans pagination. Une limite de débit par client et par route (« Débit »). Un délai de 5 s par requête dans la base (« Délai ») ; au détail, 100 surlignages et 125 000 caractères de texte long au plus (« Bornes du détail »). | **Tenue.** Le délai : `test_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail` (la liste, le détail, les tendances : chaque route lit par la connexion qui porte le délai), `test_the_deadline_of_a_request_is_below_the_read_timeout_of_the_ai_api_client` ; sur PostgreSQL, `test_on_postgresql_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail` (les trois routes), `test_a_reading_past_its_deadline_is_stopped_and_its_connection_given_back_idle`, `test_a_deadline_below_one_millisecond_is_refused_as_statement_timeout_0_disables_it`, `test_serve_reads_the_postgresql_base_of_kb_database_url_with_the_deadline_it_logs` (le délai appliqué est celui du journal), et l'attente d'une connexion, `test_the_pool_lends_no_connection_beyond_its_wait`, `test_the_wait_for_a_connection_and_one_reading_hold_below_the_read_timeout_of_the_client` ; les bornes du détail : `test_the_highlights_beyond_their_number_are_cut_and_the_cut_is_said`, `test_the_highlights_beyond_their_length_are_cut_and_the_cut_is_said`, `test_the_text_of_a_clip_beyond_its_length_is_cut_and_the_cut_is_said` ; les bornes et la taille de page, `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_next_offset_stops_at_the_offset_bound`, `test_an_item_id_not_written_as_an_integer_gives_422`, `test_a_malformed_window_end_gives_422` ; le débit, pour les clients authentifiés, `test_beyond_its_limit_a_client_gets_429_with_its_wait_and_its_id`, `test_the_limit_is_per_client_and_per_route`, `test_every_data_route_has_its_limit` ; les 60 lignes d'une fenêtre sont bornées à la collecte (`gh_archive.py`), pas par l'API. Limites : les surlignages sont tous lus avant la coupe, bornés en temps par le délai, pas en mémoire ; une instruction seule de SQLite ne s'interrompt pas, et chaque contrôle du délai reprend le GIL ; sur PostgreSQL, le délai compte par instruction, et le détail en fait jusqu'à trois (« Délai ») ; le délai se multiplie par le débit (120 listes par minute, 5 s chacune au plus), sans plafond de requêtes en même temps en SQLite ; en PostgreSQL, 4 lectures en même temps au plus, les connexions du pool, et une requête de plus attend 2 s puis répond 500 `database_error` |
 | API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon, `HEAD` compris ; aucune route d'administration. | **Tenue.** `test_every_route_answers_get_only_and_405_to_any_other_method`, `test_the_routes_are_listed`, `test_docs_openapi_and_health_are_public_and_no_other_page_is_served`, `test_health_refuses_another_method_with_405` |
 | API6:2023 Unrestricted Access to Sensitive Business Flows | Sans objet : l'API n'a aucun flux métier à protéger (ni achat, ni réservation, ni création de compte), seulement des lectures. | Sans objet, sans test |
 | API7:2023 Server Side Request Forgery | Sans objet : l'API ne va chercher aucune adresse fournie par un client. | Sans objet, sans test |

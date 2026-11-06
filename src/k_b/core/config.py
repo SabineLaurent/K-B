@@ -181,6 +181,14 @@ DATABASE_CONNECT_TIMEOUT_SECONDS = 10
 # How long a writer waits for the lock of another one on PostgreSQL, then fails: the 5 seconds
 # sqlite3.connect waits by default for the write lock of SQLite (database/postgresql.py).
 DATABASE_LOCK_TIMEOUT_SECONDS = 5
+# The pool of connections the data API reads a PostgreSQL base with (database/postgresql.py): one
+# replica, a few clients. A request waits for a connection at most READING_POOL_WAIT_SECONDS, then
+# fails: that wait and one statement (DATA_API_QUERY_TIMEOUT_SECONDS) stay below the
+# DATA_API_READ_TIMEOUT_SECONDS of the client of the AI API; the detail, up to three statements,
+# may not (docs/specs-api.md, "Délai").
+READING_POOL_MIN_SIZE = 1
+READING_POOL_MAX_SIZE = 4
+READING_POOL_WAIT_SECONDS = 2
 
 # The local defaults of kb serve-data, each changed by its variable (data_api/settings.py;
 # .claude/rules/poc.md, rule 2): the data API listens on the machine only and answers these hosts
@@ -294,10 +302,11 @@ DATA_API_RATE_LIMITS = {
     "/trends": RateLimit(requests=120, window_seconds=60),
 }
 
-# The time a request of the data API may spend in its base, all its readings counted
-# (data_api/dependencies.py); beyond, 503 query_timeout. Measured on 2026-11-06: the worst search q
-# on 400 release bodies takes about 10 s, an ordinary one 0.03 s. Below
-# DATA_API_READ_TIMEOUT_SECONDS, the wait of the AI API for each piece of an answer.
+# The time a request of the data API may spend in its base, all its readings counted, on SQLite;
+# each of its statements, on PostgreSQL (statement_timeout, database/postgresql.py); beyond, 503
+# query_timeout. Measured on 2026-11-06: the worst search q on 400 release bodies takes about 10 s,
+# an ordinary one 0.03 s. Below DATA_API_READ_TIMEOUT_SECONDS, the wait of the AI API for each
+# piece of an answer.
 DATA_API_QUERY_TIMEOUT_SECONDS = 5
 
 # The window of a digest request, in days (docs/fiches-veille.md, "Fenêtre"): the default, changed

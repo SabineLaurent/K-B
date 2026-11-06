@@ -1,4 +1,5 @@
-"""The data API on the test base of the readers (tests/conftest.py), with two clients."""
+"""The data API on the test base of the readers (tests/conftest.py), with two clients; on each
+engine for the routes that read the base."""
 
 import secrets
 
@@ -22,11 +23,11 @@ def api_keys():
 @pytest.fixture
 def make_client():
     """A client of a new app, on localhost, as TrustedHostMiddleware refuses the testserver host
-    of TestClient."""
+    of TestClient; the app reads the SQLite file, or the pool of a PostgreSQL base, it is given."""
 
-    def make(database_path, api_keys):
+    def make(readers, api_keys):
         return TestClient(
-            create_app(database_path, api_keys, openapi_url=OPENAPI_PATH),
+            create_app(readers, api_keys, openapi_url=OPENAPI_PATH),
             base_url="http://localhost",
             raise_server_exceptions=False,
         )
@@ -36,7 +37,14 @@ def make_client():
 
 @pytest.fixture
 def client(make_client, items_database, api_keys):
+    """The data API on the test base of the readers, on SQLite: for what does not read the base."""
     return make_client(items_database, api_keys)
+
+
+@pytest.fixture
+def reading_client(make_client, items_readers, api_keys):
+    """The data API on the test base of the readers, on each engine: for what reads the base."""
+    return make_client(items_readers, api_keys)
 
 
 @pytest.fixture

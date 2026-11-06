@@ -1,6 +1,7 @@
 """The drivers of the base are imported by the access layer only: sqlite3 by database/engine.py
 and database/errors.py (and the Zotero source, whose base is Zotero's), psycopg by
-database/postgresql.py and database/errors.py (MEMORY.md, "Accès à la base")."""
+database/postgresql.py and database/errors.py, and its pool by database/postgresql.py only
+(MEMORY.md, "Accès à la base")."""
 
 import ast
 
@@ -10,6 +11,8 @@ from module_imports import PACKAGE_DIR
 MODULES_ALLOWED_BY_DRIVER = {
     "sqlite3": {"database/engine.py", "database/errors.py", "etl/sources/zotero.py"},
     "psycopg": {"database/postgresql.py", "database/errors.py"},
+    # Its pool, for the readings of the data API.
+    "psycopg_pool": {"database/postgresql.py"},
 }
 
 

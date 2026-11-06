@@ -1,5 +1,6 @@
 """kb create-db, then kb import, write the same rows on PostgreSQL as on SQLite, from the same raw
-files: the withdrawals of CISA KEV and of Zotero, and an extract without highlight, included."""
+files: the withdrawals of CISA KEV and of Zotero, and an extract without highlight, included; and
+the data API reads the same items from both (#418)."""
 
 import shutil
 import sqlite3
@@ -34,9 +35,12 @@ from test_transform import FIXTURES_DIR
 from k_b import cli
 from k_b.commands import import_command
 from k_b.commands.exit_codes import ExitCode
+from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
 from k_b.database import writing
 from k_b.database.creation import DATABASE_SCRIPTS
-from k_b.database.location import DATABASE_URL_VARIABLE
+from k_b.database.engine import connect_reader, open_readers
+from k_b.database.location import DATABASE_URL_VARIABLE, PostgresUrl
+from k_b.database.reading import read_item_detail, read_items
 
 pytestmark = pytest.mark.postgresql
 
@@ -51,6 +55,11 @@ IMPORTS_AT = (
     datetime(2026, 10, 7, 12, tzinfo=UTC),
     datetime(2030, 10, 8, 12, tzinfo=UTC),
 )
+# A clip of the collection, its title given an accented letter: no fixture of the collection has
+# one, and LIKE folds the ASCII letters only, on both engines.
+ACCENTED_TITLE = "Notes d'École d'été"
+# The searches whose pages are compared, the accented letter among them.
+SEARCHES = (None, "école", "ÉCOLE", "École", "CODING", "a")
 # The tables of schema.sql, in the order of their foreign keys, each with its key: its rows are
 # compared in the order of that key, its id replaced by its rank.
 TABLE_KEYS = {
@@ -145,7 +154,60 @@ def write_first_collection(data_dir, zotero_extract):
         "article",
         with_tags(fixture_text(ARTICLE), "llm", "agents"),
     )
+    write_clip(data_dir, FIRST_COLLECTION, "accented", accented_clip())
     write_extract(data_dir, FIRST_COLLECTION, zotero_extract)
+
+
+def accented_clip():
+    """The article of the collection under another title and address."""
+    text = fixture_text(ARTICLE)
+    title = 'title: "7 Coding Patterns I Stole From Senior Engineers"'
+    source = "c95f757e52a6"
+    assert title in text and source in text
+    return text.replace(title, f'title: "{ACCENTED_TITLE}"').replace(
+        source, "notes-ecole-ete"
+    )
+
+
+def read_listing(data_dir, database_url):
+    """What the data API reads of the base: every page of each search, then the detail of each
+    item, each id replaced by its rank."""
+    location = (
+        data_dir / "k-b.sqlite" if database_url is None else PostgresUrl(database_url)
+    )
+    with (
+        open_readers(location, DATA_API_QUERY_TIMEOUT_SECONDS) as readers,
+        connect_reader(readers, DATA_API_QUERY_TIMEOUT_SECONDS) as connection,
+    ):
+        pages = {search: read_every_page(connection, search) for search in SEARCHES}
+        details = [read_item_detail(connection, item.id) for item in pages[None]]
+    rank_by_id = {
+        item_id: rank
+        for rank, item_id in enumerate(sorted(item.id for item in pages[None]))
+    }
+    return {
+        "pages": {
+            search: [item._replace(id=rank_by_id[item.id]) for item in items]
+            for search, items in pages.items()
+        },
+        "details": [
+            detail._replace(
+                listed=detail.listed._replace(id=rank_by_id[detail.listed.id])
+            )
+            for detail in details
+        ],
+    }
+
+
+def read_every_page(connection, search_text):
+    """The items of a search, page after page, as a client of the data API reads them."""
+    items = []
+    offset = 0
+    while offset is not None:
+        page = read_items(connection, limit=7, offset=offset, search_text=search_text)
+        items.extend(page.items)
+        offset = page.next_offset
+    return items
 
 
 def read_rows(data_dir, database_url):
@@ -228,7 +290,7 @@ def read_journals(data_dir):
 
 def import_on_both(monkeypatch, capsys, engines, now):
     """kb import on each engine at the same time; each prints the same summary, writes the same
-    journals and leaves the same rows."""
+    journals, leaves the same rows, and the data API reads the same items from it."""
     results = []
     for data_dir, database_url in engines.items():
         capsys.readouterr()
@@ -239,12 +301,13 @@ def import_on_both(monkeypatch, capsys, engines, now):
                 capsys.readouterr().out,
                 read_journals(data_dir),
                 read_rows(data_dir, database_url),
+                read_listing(data_dir, database_url),
             )
         )
     sqlite_result, postgresql_result = results
     assert sqlite_result[0] == ExitCode.SUCCEEDED
     assert postgresql_result == sqlite_result
-    return postgresql_result[3]
+    return postgresql_result[3], postgresql_result[4]
 
 
 def test_kb_create_db_then_kb_import_write_the_same_rows_on_postgresql_as_on_sqlite(
@@ -259,7 +322,9 @@ def test_kb_create_db_then_kb_import_write_the_same_rows_on_postgresql_as_on_sql
     for data_dir in engines:
         write_first_collection(data_dir, first_extract)
 
-    first_rows = import_on_both(monkeypatch, capsys, engines, IMPORTS_AT[0])
+    first_rows, first_listing = import_on_both(
+        monkeypatch, capsys, engines, IMPORTS_AT[0]
+    )
 
     # A newer catalog without a CVE, and a newer extract without a document and one highlight.
     delete_in_zotero(
@@ -274,7 +339,7 @@ def test_kb_create_db_then_kb_import_write_the_same_rows_on_postgresql_as_on_sql
             kev_catalog(without=(WITHDRAWN_CVE_ID,)),
         )
         write_extract(data_dir, SECOND_COLLECTION, second_extract)
-    second_rows = import_on_both(monkeypatch, capsys, engines, IMPORTS_AT[1])
+    second_rows, _ = import_on_both(monkeypatch, capsys, engines, IMPORTS_AT[1])
 
     # A newer extract whose documents have no highlight left: the list of highlights present is
     # empty, and every highlight is withdrawn.
@@ -282,10 +347,12 @@ def test_kb_create_db_then_kb_import_write_the_same_rows_on_postgresql_as_on_sql
     third_extract = extract_of(zotero_dir)
     for data_dir in engines:
         write_extract(data_dir, THIRD_COLLECTION, third_extract)
-    third_rows = import_on_both(monkeypatch, capsys, engines, IMPORTS_AT[2])
+    third_rows, _ = import_on_both(monkeypatch, capsys, engines, IMPORTS_AT[2])
 
     # Four years later, the purges of kb import delete the watch past its duration.
-    last_rows = import_on_both(monkeypatch, capsys, engines, IMPORTS_AT[3])
+    last_rows, last_listing = import_on_both(
+        monkeypatch, capsys, engines, IMPORTS_AT[3]
+    )
 
     # The scenario did what it says, on both engines.
     assert {row["kind"] for row in first_rows["item"]} == {
@@ -298,6 +365,11 @@ def test_kb_create_db_then_kb_import_write_the_same_rows_on_postgresql_as_on_sql
         "clip",
     }
     assert first_rows["trend"] and first_rows["item_has_tag"]
+    # The reading compared read every item, and the accented title as SQLite finds it.
+    assert len(first_listing["pages"][None]) == len(first_rows["item"])
+    assert [item.title for item in first_listing["pages"]["ÉCOLE"]] == [ACCENTED_TITLE]
+    assert first_listing["pages"]["École"] == first_listing["pages"]["ÉCOLE"]
+    assert first_listing["pages"]["école"] == []
     assert [
         row["cve_id"]
         for row in second_rows["vulnerability"]
@@ -312,6 +384,7 @@ def test_kb_create_db_then_kb_import_write_the_same_rows_on_postgresql_as_on_sql
         "clip",
     }
     assert last_rows["trend"] == []
+    assert len(last_listing["details"]) == len(last_rows["item"])
 
 
 def test_a_foreign_key_postgresql_refuses_stops_the_import_writes_nothing_and_logs_no_row(

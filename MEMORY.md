@@ -38,7 +38,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 - **Le détail de l'API de données lit tout avant de couper** (#331, porté par #430, après #416) :
   `GET /items/{item_id}` lit tous les surlignages d'une entrée Zotero et le texte entier d'un clip
   (jusqu'à 1 000 000 de caractères), puis la route en sert 100 et 125 000 caractères au plus. La
-  lecture n'est bornée qu'en temps, par le délai de 5 s, pas en mémoire.
+  lecture n'est bornée qu'en temps, pas en mémoire : 5 s par requête en SQLite ; en PostgreSQL, 5 s par
+  instruction (`statement_timeout`, #418), et le détail en fait jusqu'à trois, 15 s en théorie, plus
+  2 s d'attente du pool, au-delà des 10 s du client de l'API IA (limite choisie au plan de #418).
 - **La base est la seule copie au-delà de 6 mois, et K-B n'a pas de migration** (#83, décision de
   Sabine du 2026-11-04) : la purge supprime le brut de plus de 6 mois, et la base n'a pas encore de
   sauvegarde (règle du 2026-10-19 écrite au registre, étape 3, pas codée). Dès que le plus ancien
@@ -141,8 +143,12 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 - **Accès à la base** (#416, puis #417, 2026-11-06) : seuls `database/engine.py` (`Connection`,
   `connect_database`, `lock_for_writing`, `connect_database_read_only`, `set_query_timeout`), `database/errors.py`
   (`ENGINE_ERRORS`, refus d'une entrée, `describe_engine_error`, `is_query_timeout`) et `etl/sources/zotero.py` (la
-  base de Zotero) importent `sqlite3` ; seuls `database/postgresql.py` et `database/errors.py` importent psycopg.
-  Un module nouveau passe par eux. `Connection` est l'union `sqlite3.Connection | PostgresConnection` ; une erreur
+  base de Zotero) importent `sqlite3` ; seuls `database/postgresql.py` et `database/errors.py` importent psycopg,
+  et `database/postgresql.py` seul `psycopg_pool` (#418). Un module nouveau passe par eux. L'API de données lit par
+  `connect_reader(readers, …)` (`database/engine.py`) : `Readers` est le fichier SQLite ou le pool de lecture
+  PostgreSQL, ouvert par `open_readers` dans `kb serve-data` ; une lecture de plusieurs requêtes s'ouvre par
+  `begin_reading`, jamais par `execute("BEGIN")`. `psycopg` et `psycopg_pool` sont tenus à ERROR
+  (`LIBRARY_LOG_LEVELS`) : à WARNING, ils citent le texte de libpq et la connexion (hôte, utilisateur, base). `Connection` est l'union `sqlite3.Connection | PostgresConnection` ; une erreur
   du moteur se rattrape par `except ENGINE_ERRORS` (un tuple), jamais par `EngineError`, l'alias des annotations.
   Tenu par `tests/architecture/test_engine_imports.py`.
 - **Tests sur PostgreSQL** (#417, 2026-11-06) : marqués `postgresql`, écartés par `uv run pytest` comme `e2e`,
@@ -151,7 +157,11 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   annulée par test pour les autres (`tests/conftest.py`). En CI : le workflow `postgresql.yml`, PostgreSQL 18 par son
   digest, mis à jour à la main. Sur le Mac : un PostgreSQL de Homebrew, sans conteneur. Un SQL nouveau de
   `database/` passe par le traducteur de marqueurs (test de `tests/database/test_postgresql.py`) ; une table ou un
-  `CHECK` nouveau s'écrit dans `schema.sql` et `schema_postgresql.sql`.
+  `CHECK` nouveau s'écrit dans `schema.sql` et `schema_postgresql.sql`. Un test de lecture prend la fixture `engine` (`tests/conftest.py`, #418) :
+  une moitié SQLite, une moitié marquée `postgresql` ; ses fixtures PostgreSQL se prennent par
+  `request.getfixturevalue` dans la seule moitié PostgreSQL, sinon `uv run pytest` demande le serveur. La
+  structure des deux schémas est comparée par `tests/test_schema_structures.py` : un écart nouveau voulu
+  s'écrit dans `WANTED_DIFFERENCES`.
 - Pour la documentation d'une bibliothèque ou d'un service, utiliser Context7 plutôt qu'une
   lecture de page web. Ce que Context7 ne couvre pas : WebSearch, source et date à l'appui ;
   WebFetch seulement sur une URL qu'une recherche du jour vient de rendre.

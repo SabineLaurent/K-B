@@ -39,11 +39,19 @@ AZURE_SDK_LOGGER_NAME = "azure"
 # The HTTP client under the Azure SDK, and the BigQuery client: at WARNING, it may quote a whole URL
 # (urllib3/connection.py, "Failed to parse headers"), the one of a blob. From ERROR only.
 URLLIB3_LOGGER_NAME = "urllib3"
+# The driver of PostgreSQL and its pool (psycopg.pool, psycopg_pool.sched): at WARNING, they quote
+# the text of libpq and the connection (its host, user and base), which kb never logs (#417), and
+# kb logs each failure itself, by its type (data_api/errors.py). At ERROR, psycopg writes only the
+# failure of a notice callback, and the pool nothing (psycopg 3.3.8, psycopg_pool 3.3.3).
+POSTGRESQL_DRIVER_LOGGER_NAME = "psycopg"
+POSTGRESQL_POOL_LOGGER_NAME = "psycopg_pool"
 # The lowest level each library logs at in the log of kb.
 LIBRARY_LOG_LEVELS = {
     HTTP_CLIENT_LOGGER_NAME: logging.WARNING,
     AZURE_SDK_LOGGER_NAME: logging.ERROR,
     URLLIB3_LOGGER_NAME: logging.ERROR,
+    POSTGRESQL_DRIVER_LOGGER_NAME: logging.ERROR,
+    POSTGRESQL_POOL_LOGGER_NAME: logging.ERROR,
 }
 
 logger = logging.getLogger(LOGGER_NAME)

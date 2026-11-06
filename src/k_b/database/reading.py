@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, NamedTuple
 
 from k_b.core.dates import format_day
-from k_b.database.engine import Connection
+from k_b.database.engine import Connection, begin_reading, end_reading
 from k_b.items import (
     ARXIV_ABSTRACT_PAGE_URL,
     MAX_INT64,
@@ -66,22 +66,29 @@ LISTED_ITEMS = """
 
 LISTED_FIELDS = "listed.id, listed.kind, listed.title, listed.source_date, listed.url, listed.withdrawn_at"
 
-# The filters of the list, every one a bound parameter. Raw string: SQLite must receive
-# ESCAPE '\'.
+# The filters of the list, every one a bound parameter, the kinds apart (KINDS_FILTER). The cast
+# gives PostgreSQL the type of a parameter it cannot deduce from IS NULL (42P08). lower() on both
+# sides: LIKE ignores the case of the ASCII letters on SQLite only; lower() folds them alone, on
+# SQLite as on PostgreSQL in the collation C kb create-db asks for. Raw string: the base must
+# receive ESCAPE '\'.
 LIST_FILTERS = r"""
 JOIN raw_data ON raw_data.id = listed.raw_data_id
 JOIN source ON source.id = raw_data.source_id
-WHERE (:kinds IS NULL OR listed.kind IN (SELECT value FROM json_each(:kinds)))
-    AND (:since IS NULL OR listed.source_date >= :since)
-    AND (:pattern IS NULL
-        OR listed.title LIKE :pattern ESCAPE '\' OR listed.summary LIKE :pattern ESCAPE '\')
-    AND (:mode IS NULL OR source.acquisition_mode = :mode)
+WHERE (CAST(:since AS TEXT) IS NULL OR listed.source_date >= :since)
+    AND (CAST(:pattern AS TEXT) IS NULL
+        OR lower(listed.title) LIKE lower(:pattern) ESCAPE '\'
+        OR lower(listed.summary) LIKE lower(:pattern) ESCAPE '\')
+    AND (CAST(:mode AS TEXT) IS NULL OR source.acquisition_mode = :mode)
+"""
+# One named placeholder per kind asked for, joined into the IN: no value enters the text.
+KINDS_FILTER = "AND listed.kind IN ({placeholders})"
+LIST_ORDER = """
 ORDER BY listed.source_date DESC, listed.id DESC
 LIMIT :limit OFFSET :offset
 """
 
 # S608: the queries below join constants of this module only; every value is bound.
-SELECT_ITEMS = f"SELECT {LISTED_FIELDS} FROM ({LISTED_ITEMS}) AS listed {LIST_FILTERS}"  # noqa: S608
+SELECT_LISTED = f"SELECT {LISTED_FIELDS} FROM ({LISTED_ITEMS}) AS listed {LIST_FILTERS}"  # noqa: S608
 # Its own query, not a filter of the list: each branch then reads its item by its index.
 SELECT_LISTED_ITEM = (
     f"SELECT {LISTED_FIELDS} FROM ({LISTED_ITEMS}) AS listed WHERE listed.id = :item_id"  # noqa: S608
@@ -317,13 +324,14 @@ def read_items(
     # limit + 1 is bound as a 64-bit integer: one more would raise an OverflowError.
     check_within_bounds("limit", limit, 1, MAX_INT64 - 1)
     check_within_bounds("offset", offset, 0, MAX_INT64)
+    kinds_filter, kind_parameters = make_kinds_filter(kinds)
     # One row more than the page tells whether a next page exists, in the same query.
     rows = connection.execute(
-        SELECT_ITEMS,
+        SELECT_LISTED + kinds_filter + LIST_ORDER,
         {
             "arxiv_page_url": ARXIV_ABSTRACT_PAGE_URL,
             "nvd_page_url": NVD_PAGE_URL,
-            "kinds": json.dumps(list(kinds)) if kinds else None,
+            **kind_parameters,
             "since": None if since is None else format_since(since),
             "pattern": None if search_text is None else to_like_pattern(search_text),
             "mode": mode,
@@ -334,6 +342,20 @@ def read_items(
     return ItemPage(
         [ListedItem._make(row) for row in rows[:limit]],
         offset + limit if len(rows) > limit else None,
+    )
+
+
+def make_kinds_filter(kinds: Collection[ItemKind]) -> tuple[str, dict[str, ItemKind]]:
+    """The filter of the kinds and its parameters, one per kind asked for, each once; no kind
+    asked for, no filter: every kind is read."""
+    distinct_kinds = list(dict.fromkeys(kinds))
+    if not distinct_kinds:
+        return "", {}
+    names = [f"kind_{position}" for position in range(len(distinct_kinds))]
+    placeholders = ", ".join(f":{name}" for name in names)
+    return (
+        KINDS_FILTER.format(placeholders=placeholders),
+        dict(zip(names, distinct_kinds, strict=True)),
     )
 
 
@@ -389,7 +411,7 @@ def read_item_detail(connection: Connection, item_id: int) -> ItemDetail | None:
     Its queries share one read transaction, so that a write between them cannot mix two states of
     a catalog row: the connection must hold no transaction."""
     check_within_bounds("item_id", item_id, MIN_INT64, MAX_INT64)
-    connection.execute("BEGIN")
+    begin_reading(connection)
     try:
         row = connection.execute(
             SELECT_LISTED_ITEM,
@@ -406,9 +428,7 @@ def read_item_detail(connection: Connection, item_id: int) -> ItemDetail | None:
             listed, READ_DETAILS_BY_KIND[listed.kind](connection, item_id)
         )
     finally:
-        # SQLite may have ended it on an error: a ROLLBACK would then raise, in place of it.
-        if connection.in_transaction:
-            connection.rollback()
+        end_reading(connection)
 
 
 def read_paper_detail(connection: Connection, item_id: int) -> PaperDetail:
