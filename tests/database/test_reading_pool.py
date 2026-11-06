@@ -126,6 +126,48 @@ def test_a_connection_is_given_back_to_the_pool_without_transaction(readers, cap
         assert connection.info.transaction_status == psycopg.pq.TransactionStatus.IDLE
 
 
+def end_the_session_of(location, connection):
+    """The server ends the session of the connection, as a restart or a cut of the network would;
+    the connection does not know it until its next statement."""
+    process_id = connection.execute("SELECT pg_backend_pid()").fetchone()[0]
+    with psycopg.connect(location.value, autocommit=True) as administrator:
+        # Waits for the end of the session, 5 s at most.
+        administrator.execute("SELECT pg_terminate_backend(%s, 5000)", (process_id,))
+
+
+class RequestFailure(Exception):
+    """An error a request raises after its connection was lost."""
+
+
+@on_postgresql
+def test_a_request_that_read_is_served_when_its_connection_is_lost_before_given_back(
+    readers, items_postgresql_base
+):
+    with connect_reader(readers, TIMEOUT_SECONDS) as connection:
+        page = read_items(connection, limit=1)
+        end_the_session_of(items_postgresql_base, connection)
+
+    assert len(page.items) == 1
+    # The pool lends another connection.
+    with connect_reader(readers, TIMEOUT_SECONDS) as connection:
+        assert len(read_items(connection, limit=1).items) == 1
+
+
+@on_postgresql
+def test_the_error_of_a_request_passes_when_its_connection_is_lost_before_given_back(
+    readers, items_postgresql_base
+):
+    """A rollback that fails on the lost connection must not replace the error: a query_timeout
+    would become a database_error."""
+    with (
+        pytest.raises(RequestFailure),
+        connect_reader(readers, TIMEOUT_SECONDS) as connection,
+    ):
+        read_items(connection, limit=1)
+        end_the_session_of(items_postgresql_base, connection)
+        raise RequestFailure
+
+
 @on_postgresql
 def test_the_detail_reads_one_state_of_the_base_while_a_writer_commits(
     postgresql_base, monkeypatch
