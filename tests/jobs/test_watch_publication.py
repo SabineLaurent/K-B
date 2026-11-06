@@ -177,7 +177,7 @@ def test_the_end_line_gives_the_counts(watch_dir, caplog):
         "watch", {"tendances/2026-11-02.md": FakeBlob(b"# trends", SENT_ON)}
     )
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="k_b"):
         publish(container, watch_dir)
 
     assert (

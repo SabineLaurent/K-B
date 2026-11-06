@@ -57,7 +57,7 @@ def test_a_step_is_not_run_after_the_codes_named_by_its_rule(capsys, caplog):
         {"kb import": NotRunAfter("kb collect", frozenset({FAILED, NOT_STARTED}))},
     )
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="k_b"):
         exit_code = run_routine("kb test-routine", steps, settings=None)
 
     assert ran == ["kb collect", "kb write-tops"]
@@ -86,7 +86,7 @@ def test_an_exception_of_a_step_counts_as_1_and_the_next_steps_run(capsys, caplo
     ran = []
     steps = make_steps({"first": ValueError("a bug"), "second": SUCCEEDED}, ran)
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="k_b"):
         exit_code = run_routine("kb test-routine", steps, settings=None)
 
     assert exit_code == FAILED
@@ -109,7 +109,7 @@ def test_a_stop_is_never_caught_and_no_later_step_runs(capsys, stop):
 def test_the_end_of_each_step_is_logged_with_its_code(capsys, caplog):
     steps = make_steps({"first": SUCCEEDED, "second": PARTIAL_FAILURE}, [])
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="k_b"):
         run_routine("kb test-routine", steps, settings=None)
 
     assert "kb test-routine: step 1 of 2, first, exited with 0" in caplog.text

@@ -141,6 +141,7 @@ def test_each_clip_is_written_by_write_file_atomically(monkeypatch, clippings_di
         (".", "blob_name_hidden"),
         ("..", "blob_name_hidden"),
         ("..md", "blob_name_hidden"),
+        ("..\\Un clip.md", "blob_name_hidden"),
         ("Une image.png", "blob_not_markdown"),
         ("Un clip.md.txt", "blob_not_markdown"),
         ("Un clip.MD", "blob_not_markdown"),
@@ -173,7 +174,7 @@ def test_a_clip_name_the_share_can_hold_is_neither_left_aside_nor_refused(name):
     ("name", "refusal"),
     [
         ("Un\\clip.md", "clip_name_with_backslash"),
-        ("..\\Un clip.md", "clip_name_with_backslash"),
+        ("a\\..\\b.md", "clip_name_with_backslash"),
         ("Un" + chr(0x07) + "clip.md", "clip_name_with_control_character"),
         ("Un" + chr(0x0A) + "clip.md", "clip_name_with_control_character"),
         ("Un" + chr(0x7F) + "clip.md", "clip_name_with_control_character"),
@@ -231,7 +232,7 @@ def test_a_refused_clip_fails_by_its_position_and_its_measure_never_its_name(
         },
     )
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="k_b"):
         result = mirror(container, clippings_dir)
 
     assert dict(result.refused) == {"clip_name_refused_by_azure_files": 1}
@@ -247,7 +248,7 @@ def test_a_name_too_long_is_refused_with_its_length_and_the_maximum(
 ):
     container = FakeContainer("clippings", {"a" * 250 + ".md": FakeBlob(b"#", SENT_ON)})
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="k_b"):
         mirror(container, clippings_dir)
 
     assert "clip_name_too_long, 253 bytes, maximum 241" in caplog.text
@@ -258,7 +259,7 @@ def test_a_clip_larger_than_the_maximum_is_refused_without_being_downloaded(
 ):
     container = FakeContainer("clippings", {CLIP_NAME: FakeBlob(b"x" * 11, SENT_ON)})
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="k_b"):
         result = mirror(container, clippings_dir, ClipRules(".md", max_bytes=10))
 
     assert dict(result.refused) == {"clip_too_large": 1}
@@ -383,7 +384,7 @@ def test_a_local_error_is_counted_by_its_errno_never_its_path(
         },
     )
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="k_b"):
         result = mirror(container, clippings_dir)
 
     assert dict(result.failed) == {"ENAMETOOLONG": 2}
@@ -438,7 +439,7 @@ def test_the_end_line_counts_each_outcome_without_a_name(clippings_dir, caplog):
         },
     )
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="k_b"):
         mirror(container, clippings_dir)
 
     assert (

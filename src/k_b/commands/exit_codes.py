@@ -23,10 +23,17 @@ class ExitCode(IntEnum):
         (
             "the command ran and failed; kb collect, kb write-tops, kb digest: no part done,"
             " or kb collect: state not written; kb trend-report: no report written, or written"
-            " and its register not updated; kb smoke-test: a check failed"
+            " and its register not updated; kb smoke-test: a check failed; kb daily-routine,"
+            " kb digest-watch: a step exited with 1, the worst in the order 0, 4, 2, 1"
         ),
     )
-    NOT_STARTED = 2, "nothing was run: a setting, a file or the command line is refused"
+    NOT_STARTED = (
+        2,
+        (
+            "nothing was run: a setting, a file or the command line is refused; kb daily-routine,"
+            " kb digest-watch: or a step exited with 2, none with 1"
+        ),
+    )
     # Not returned by kb: uvicorn exits with it (STARTUP_FAILURE, uvicorn/config.py). Named here
     # so that no other code takes its value.
     SERVER_NOT_STARTED = 3, "kb serve-data, kb serve-ai: the server did not start"
@@ -36,7 +43,8 @@ class ExitCode(IntEnum):
         4,
         (
             "kb collect, kb write-tops, kb digest: a part failed, another is done and kept;"
-            " kb collect: state written"
+            " kb collect: state written; kb daily-routine, kb digest-watch: a step exited with 4,"
+            " none with 2 or 1"
         ),
     )
     # 128 + 2, the code a shell reads for a process stopped by SIGINT. A normal exit, not a death by
@@ -46,8 +54,9 @@ class ExitCode(IntEnum):
     STOPPED_BY_SIGINT = (
         130,
         (
-            "kb collect, kb import, kb write-tops, kb digest, kb trend-report, kb smoke-test:"
-            " stopped by SIGINT (Ctrl-C); what was done before it is kept; kb create-db: stopped"
+            "kb collect, kb import, kb write-tops, kb digest, kb trend-report, kb smoke-test,"
+            " kb daily-routine, kb digest-watch: stopped by SIGINT (Ctrl-C), no further step run;"
+            " what was done before it is kept; kb create-db: stopped"
             " by SIGINT, no database left"
         ),
     )
@@ -57,8 +66,9 @@ class ExitCode(IntEnum):
     STOPPED_BY_SIGTERM = (
         143,
         (
-            "kb collect, kb import, kb write-tops, kb digest, kb trend-report, kb smoke-test:"
-            " stopped by SIGTERM; what was done before it is kept; kb serve-data, kb serve-ai:"
+            "kb collect, kb import, kb write-tops, kb digest, kb trend-report, kb smoke-test,"
+            " kb daily-routine, kb digest-watch: stopped by SIGTERM, no further step run; what was"
+            " done before it is kept; kb serve-data, kb serve-ai:"
             " stopped by SIGTERM, outside PID 1"
         ),
     )

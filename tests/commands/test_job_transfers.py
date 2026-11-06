@@ -104,7 +104,7 @@ def test_an_identity_refused_fails_the_mirror_with_1(monkeypatch, vault_dir, cap
     clippings = FakeContainer("clippings", {"Un clip.md": FakeBlob(b"# clip", SENT_ON)})
     simulate(monkeypatch, {"clippings": clippings}, answer_identity_refusal)
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="k_b"):
         exit_code = job_transfers.mirror_the_clips(SETTINGS, vault_dir)
 
     assert exit_code == ExitCode.FAILED
@@ -120,7 +120,7 @@ def test_a_clippings_folder_that_is_a_link_fails_the_mirror_with_1(
     clippings = FakeContainer("clippings", {"Un clip.md": FakeBlob(b"# clip", SENT_ON)})
     simulate(monkeypatch, {"clippings": clippings})
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="k_b"):
         exit_code = job_transfers.mirror_the_clips(SETTINGS, vault_dir)
 
     assert exit_code == ExitCode.FAILED

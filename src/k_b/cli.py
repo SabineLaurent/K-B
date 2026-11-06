@@ -4,13 +4,22 @@ opens the log and hands the run to its module in commands/, the environment give
 import argparse
 import logging
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from contextlib import ExitStack
 from pathlib import Path
+from typing import NamedTuple
 
 from k_b.commands.collect_command import run_collect
 from k_b.commands.create_db_command import run_create_db
+from k_b.commands.daily_routine_command import (
+    describe_daily_routine,
+    run_daily_routine,
+)
 from k_b.commands.digest_command import run_digest
+from k_b.commands.digest_watch_command import (
+    describe_digest_watch,
+    run_digest_watch,
+)
 from k_b.commands.environment import (
     read_data_dir,
     read_environment,
@@ -40,10 +49,12 @@ from k_b.commands.write_tops_command import run_write_tops
 from k_b.core.config import (
     AI_API_HOST,
     AI_API_PORT,
+    CLIPPINGS_CONTAINER,
     DATA_API_HOST,
     DATA_API_PORT,
     DATABASE_FILE_NAME,
     SMOKE_TEST_CONTAINER,
+    WATCH_CONTAINER,
 )
 from k_b.database.location import DATABASE_URL_VARIABLE
 from k_b.etl.collected_sources import COLLECT_ONLY_VARIABLE, VAULT_DIR_VARIABLE
@@ -58,9 +69,23 @@ LOG_FILE_PATH_BY_COMMAND = {
 }
 
 
+class RoutineCommand(NamedTuple):
+    """A command of a job that chains steps (#413): its run, and its steps for --dry-run."""
+
+    run: Callable[[Path, Mapping[str, str]], int]
+    describe: Callable[[], str]
+
+
+ROUTINE_BY_COMMAND = {
+    "daily-routine": RoutineCommand(run_daily_routine, describe_daily_routine),
+    "digest-watch": RoutineCommand(run_digest_watch, describe_digest_watch),
+}
+DRY_RUN_HELP = "print the steps and their rules, run none and transfer nothing"
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the kb command typed on the command line and return its exit code."""
-    command = read_command(argv)
+    command, is_dry_run = read_command(argv)
     # Neither data nor key: the document is the same on every machine.
     if command == "openapi":
         return run_openapi()
@@ -70,11 +95,15 @@ def main(argv: list[str] | None = None) -> int:
     log_to_file = read_log_to_file(environ)
     if data_dir is None or log_to_file is None:
         return ExitCode.NOT_STARTED
+    if is_dry_run:
+        # Nothing run, nothing logged: the start is checked as for a run, then the steps printed.
+        print(ROUTINE_BY_COMMAND[command].describe())
+        return ExitCode.SUCCEEDED
     return run_with_log(command, data_dir, environ, log_to_file)
 
 
-def read_command(argv: list[str] | None) -> str:
-    """Read the kb command typed, such as collect or import."""
+def read_command(argv: list[str] | None) -> tuple[str, bool]:
+    """Read the kb command typed, such as collect or import, and whether --dry-run is given."""
     parser = argparse.ArgumentParser(
         prog="kb",
         epilog=describe_exit_codes(),
@@ -137,9 +166,22 @@ def read_command(argv: list[str] | None) -> str:
         help=f"write the OpenAPI of the data API in {DATA_API_OPENAPI_PATH} and the one of"
         f" the AI API in {AI_API_OPENAPI_PATH}",
     )
+    command_parsers.add_parser(
+        "daily-routine",
+        help=f"the job of each day: mirror the container {CLIPPINGS_CONTAINER} to the vault,"
+        " kb collect, kb import unless kb collect exits with 1 or 2, kb write-tops, then"
+        f" publish veille to the container {WATCH_CONTAINER} without replacing a blob",
+    ).add_argument("--dry-run", action="store_true", help=DRY_RUN_HELP)
+    command_parsers.add_parser(
+        "digest-watch",
+        help="the job of the watch: wake both APIs, kb digest, wake them again, kb trend-report,"
+        f" then publish veille to the container {WATCH_CONTAINER} without replacing a blob",
+    ).add_argument("--dry-run", action="store_true", help=DRY_RUN_HELP)
     arguments = parser.parse_args(argv)
     command: str = arguments.command
-    return command
+    # Only the commands of ROUTINE_BY_COMMAND take --dry-run.
+    is_dry_run: bool = getattr(arguments, "dry_run", False)
+    return command, is_dry_run
 
 
 def run_with_log(
@@ -212,4 +254,6 @@ def run_command(command: str, data_dir: Path, environ: Mapping[str, str]) -> int
         return run_trend_report(data_dir, environ)
     if command == "smoke-test":
         return run_smoke_test(environ)
+    if command in ROUTINE_BY_COMMAND:
+        return ROUTINE_BY_COMMAND[command].run(data_dir, environ)
     return run_collect(data_dir, environ)
