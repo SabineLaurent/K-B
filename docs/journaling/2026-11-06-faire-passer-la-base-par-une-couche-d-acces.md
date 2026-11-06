@@ -57,7 +57,7 @@ C'est ce qui rend le déplacement sûr **par construction**, et pas seulement pa
 
 ### 2. Les signatures et les `except` passent à ces noms
 
-Dans 18 fichiers, `connection: sqlite3.Connection` devient `connection: Connection`, et `import sqlite3` devient
+Dans 19 fichiers (`savepoint.py` compris), `connection: sqlite3.Connection` devient `connection: Connection`, et `import sqlite3` devient
 `from k_b.database.engine import Connection`. Exemple, `src/k_b/database/writers/clip_writer.py:89` :
 
 ```python
@@ -153,7 +153,7 @@ commentaire « Read at each request: a test lowers it » reste vrai.
 | Liste des tests collectés (clé tirée au hasard remplacée par un repère) : diff vide avec `90b7383`, puis avec `9725dc4` | Aucun test ajouté, retiré ou renommé. |
 | `uv run pytest --collect-only -m e2e -q` : 11 collectés | Les tests de bout en bout, que `uv run pytest` écarte après les avoir importés, s'importent toujours. |
 | `git diff --name-status origin/main HEAD -- tests` : que des `M` | Aucun fichier de test supprimé ni renommé. |
-| Les lignes de test changées, hors imports de `connection` et `engine` : les deux imports de `tests/data_api/test_api_errors.py:12-13` et sa ligne 94, `monkeypatch.setattr(engine, "INSTRUCTIONS_BETWEEN_CHECKS", 1)` au lieu de `dependencies` | Seule la cible d'un remplacement change, parce que la constante a changé de module ; aucun `assert` ne bouge (écart accepté par time-knight). |
+| Les lignes de test changées, hors imports de `k_b.database.connection` et `k_b.database.engine` : dans `tests/data_api/test_api_errors.py`, les deux imports retirés de `k_b.data_api` (`dependencies`, `make_deadline_check`), l'import ajouté `from k_b.database import engine` (`:13`), et la ligne 94, `monkeypatch.setattr(engine, "INSTRUCTIONS_BETWEEN_CHECKS", 1)` au lieu de `dependencies` | Seule la cible d'un remplacement change, parce que la constante a changé de module ; aucun `assert` ne bouge (écart accepté par time-knight). |
 | `grep -rlE "^import sqlite3\|^from sqlite3" src/k_b` : `database/engine.py`, `database/errors.py`, `etl/sources/zotero.py` | Le critère de fin de l'issue. |
 | `uv run ruff check --no-cache`, `uv run ruff format --check`, `uv run mypy --strict` : verts | Les contrôles du dépôt. |
 | `tests/data_api/test_openapi.py` vert | L'OpenAPI produite par l'application est toujours celle de `docs/api/openapi-donnees.json`. |
@@ -165,8 +165,8 @@ commentaire « Read at each request: a test lowers it » reste vrai.
 
 1. **« Un alias, ce n'est pas une couche d'accès. »** Si. Une couche d'accès, c'est le seul endroit par où le
    reste du code atteint la base. Aujourd'hui, ce point d'entrée nomme les objets de `sqlite3` ; demain, #417 y
-   mettra un adaptateur PostgreSQL derrière les mêmes noms. Ce qui compte pour la suite, c'est que 22 fichiers
-   ne disent plus `sqlite3` : #417 ne touchera qu'`engine.py` et `errors.py`, plus les quelques sites où
+   mettra un adaptateur PostgreSQL derrière les mêmes noms. Ce qui compte pour la suite, c'est que 24 des 25
+   fichiers de départ ne disent plus `sqlite3` : #417 ne touchera qu'`engine.py` et `errors.py`, plus les quelques sites où
    `EngineError` sert de clé ou d'annotation (`data_api/errors.py:41` et `:67`).
 2. **« Comment sais-tu que rien n'a changé ? »** Par construction, puisque les noms nouveaux sont les mêmes objets
    (section 1). Par les tests aussi : la même suite, la même liste de tests, aucun attendu modifié. Enfin par la
@@ -190,8 +190,8 @@ commentaire « Read at each request: a test lowers it » reste vrai.
   ferait encore sous une autre forme, comme l'instruction `type` de Python 3.12. Ce n'est pas la forme écrite, et
   FastAPI n'a pas été essayé avec elle dans `Annotated[Connection, Depends(…)]`.
 - Le `__module__` des trois fonctions et de la constante déplacées change (`k_b.database.errors`,
-  `k_b.database.engine`). Seule une trace le montre, et aucun test ni journal ne le lit (vérifié par `grep` par le
-  relecteur du plan, pas par moi).
+  `k_b.database.engine`). Seule une trace le montre : aucun test ni journal ne le lit (`grep` de `__module__` et
+  de leurs noms dans `src` et `tests`, le 2026-11-06).
 
 ## Ce qui reste
 
