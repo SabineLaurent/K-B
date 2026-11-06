@@ -20,7 +20,7 @@ from jobs.storage_fakes import (
 
 from k_b.commands import job_transfers
 from k_b.commands.exit_codes import ExitCode
-from k_b.core.config import CLIP_CHANGE_MARGIN
+from k_b.core.config import CLIP_CHANGE_MARGIN, CLIP_MIRROR_CLOCK_SLACK
 from k_b.jobs.exchange_storage import (
     ExchangeStorageSettings,
     build_managed_identity_credential,
@@ -75,7 +75,8 @@ def test_the_clips_are_mirrored_then_kb_collect_waits_for_them_to_settle(
 
     assert exit_code == ExitCode.SUCCEEDED
     assert (vault_dir / "Clippings" / "Un clip.md").read_bytes() == b"# clip"
-    assert waits == [CLIP_CHANGE_MARGIN.total_seconds()]
+    assert waits == [(CLIP_CHANGE_MARGIN + CLIP_MIRROR_CLOCK_SLACK).total_seconds()]
+    assert waits == [65.0]
 
 
 def test_no_wait_when_no_clip_was_copied(monkeypatch, vault_dir):

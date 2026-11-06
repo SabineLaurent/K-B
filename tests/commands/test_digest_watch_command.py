@@ -88,17 +88,21 @@ def test_kb_trend_report_and_the_publication_run_after_kb_digest_fails(
     assert exit_code == digest_code
 
 
-def test_a_failed_wake_does_not_stop_kb_digest(
-    monkeypatch, routine_environment, capsys
+@pytest.mark.parametrize(
+    "failed_apis", [{TEST_DATA_API_URL}, {TEST_DATA_API_URL, TEST_AI_API_URL}]
+)
+def test_a_failed_wake_neither_stops_kb_digest_nor_counts_in_the_exit_code(
+    monkeypatch, routine_environment, capsys, failed_apis
 ):
-    ran = replace_steps(monkeypatch, failed_apis={TEST_DATA_API_URL})
+    ran = replace_steps(monkeypatch, failed_apis=failed_apis)
 
     exit_code = cli.main(["digest-watch"])
 
     assert ran.count("run_digest") == 1
     assert "run_trend_report" in ran
-    # One API answered, the other did not.
-    assert exit_code == ExitCode.PARTIAL_FAILURE
+    # kb digest and kb trend-report succeeded: the job did its work.
+    assert exit_code == ExitCode.SUCCEEDED
+    assert "not counted" in capsys.readouterr().out
 
 
 def test_a_sigterm_during_kb_digest_stops_the_routine_with_143(
@@ -143,9 +147,9 @@ def test_the_dry_run_lists_the_steps_runs_none_and_exits_with_0(
     assert ran == []
     assert capsys.readouterr().out == (
         "kb digest-watch, dry run: 5 steps, none run\n"
-        "  1. wake of the APIs before kb digest\n"
+        "  1. wake of the APIs before kb digest, its code not counted\n"
         "  2. kb digest\n"
-        "  3. wake of the APIs before kb trend-report\n"
+        "  3. wake of the APIs before kb trend-report, its code not counted\n"
         "  4. kb trend-report\n"
         "  5. watch publication\n"
     )

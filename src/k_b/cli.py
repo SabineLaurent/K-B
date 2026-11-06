@@ -96,7 +96,8 @@ def main(argv: list[str] | None = None) -> int:
     if data_dir is None or log_to_file is None:
         return ExitCode.NOT_STARTED
     if is_dry_run:
-        # Nothing run, nothing logged: the start is checked as for a run, then the steps printed.
+        # KB_DATA_DIR and KB_LOG_TO_FILE checked as for a run, then the steps printed: nothing run
+        # nor logged, and no setting of the job read (the criterion of #413 runs it without them).
         print(ROUTINE_BY_COMMAND[command].describe())
         return ExitCode.SUCCEEDED
     return run_with_log(command, data_dir, environ, log_to_file)

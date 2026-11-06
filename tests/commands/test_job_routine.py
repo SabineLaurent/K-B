@@ -5,6 +5,8 @@ import logging
 
 import pytest
 
+from k_b.commands.daily_routine_command import DAILY_ROUTINE_STEPS
+from k_b.commands.digest_watch_command import DIGEST_WATCH_STEPS
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.job_routine import (
     NotRunAfter,
@@ -23,8 +25,9 @@ SUCCEEDED, FAILED, NOT_STARTED, PARTIAL_FAILURE = (
 )
 
 
-def make_steps(codes, ran, not_run_after=None):
-    """A step per name of codes, which records its name in ran and returns its code."""
+def make_steps(codes, ran, not_run_after=None, not_counted=()):
+    """A step per name of codes, which records its name in ran and returns its code; a step of
+    not_counted does not count in the exit code."""
 
     def make_run(name, code):
         def run(settings):
@@ -36,7 +39,12 @@ def make_steps(codes, ran, not_run_after=None):
         return run
 
     return [
-        RoutineStep(name, make_run(name, code), (not_run_after or {}).get(name))
+        RoutineStep(
+            name,
+            make_run(name, code),
+            (not_run_after or {}).get(name),
+            is_counted=name not in not_counted,
+        )
         for name, code in codes.items()
     ]
 
@@ -130,6 +138,31 @@ def test_the_summary_gives_each_step_its_code_or_not_run(capsys):
     output = capsys.readouterr().out
     assert "kb collect  2 (not started)" in output
     assert "kb import   not run" in output
+
+
+def test_a_step_not_counted_is_run_and_shown_but_never_sets_the_exit_code(capsys):
+    steps = make_steps(
+        {"wake": FAILED, "kb digest": SUCCEEDED}, [], not_counted={"wake"}
+    )
+
+    assert run_routine("kb test-routine", steps, settings=None) == SUCCEEDED
+    assert "wake       1 (failed), not counted" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "steps", [DAILY_ROUTINE_STEPS, DIGEST_WATCH_STEPS], ids=["daily", "digest"]
+)
+def test_each_rule_of_a_routine_names_an_earlier_step(steps):
+    for position, step in enumerate(steps):
+        if step.not_run_after is not None:
+            earlier_names = [earlier.name for earlier in steps[:position]]
+            assert step.not_run_after.step_name in earlier_names, step.name
+
+
+def test_the_names_of_the_steps_of_a_routine_are_distinct():
+    for steps in (DAILY_ROUTINE_STEPS, DIGEST_WATCH_STEPS):
+        names = [step.name for step in steps]
+        assert len(set(names)) == len(names)
 
 
 def test_the_dry_run_lists_the_steps_and_their_rule():

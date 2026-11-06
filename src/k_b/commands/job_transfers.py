@@ -9,6 +9,7 @@ from k_b.commands.exit_codes import ExitCode, find_exit_code
 from k_b.commands.run_log import LOGGER_NAME
 from k_b.core.config import (
     CLIP_CHANGE_MARGIN,
+    CLIP_MIRROR_CLOCK_SLACK,
     CLIPPINGS_CONTAINER,
     WATCH_CONTAINER,
     WATCH_DIR_NAME,
@@ -30,11 +31,13 @@ logger = logging.getLogger(LOGGER_NAME)
 
 # The clips as etl/sources/clipping.py reads them, given to jobs/, which imports only core.
 CLIP_RULES = ClipRules(extension=CLIP_EXTENSION, max_bytes=CLIP_MAX_BYTES)
+# The wait after a copy: the margin of etl/sources/clipping.py, and the gap of the clocks.
+CLIP_MIRROR_WAIT = CLIP_CHANGE_MARGIN + CLIP_MIRROR_CLOCK_SLACK
 
 
 def mirror_the_clips(settings: ExchangeStorageSettings, vault_dir: Path) -> int:
     """Mirror the container clippings to the Clippings folder of the vault; once a clip is copied,
-    wait CLIP_CHANGE_MARGIN, so that the kb collect that follows reads it the same day."""
+    wait CLIP_MIRROR_WAIT, so that the kb collect that follows reads it the same day."""
     try:
         with (
             naming_storage_errors(),
@@ -56,9 +59,9 @@ def mirror_the_clips(settings: ExchangeStorageSettings, vault_dir: Path) -> int:
         # depending on how long the sources before it take.
         logger.info(
             "clip mirror: waiting %d seconds, so that kb collect reads the clips copied",
-            CLIP_CHANGE_MARGIN.total_seconds(),
+            CLIP_MIRROR_WAIT.total_seconds(),
         )
-        sleep(CLIP_CHANGE_MARGIN.total_seconds())
+        sleep(CLIP_MIRROR_WAIT.total_seconds())
     return find_exit_code(has_failed=result.has_failed, has_done=result.has_done)
 
 

@@ -93,16 +93,31 @@ def test_a_clip_newer_in_the_container_than_its_file_is_copied_again(clippings_d
     assert result.copied == 1
 
 
+def test_a_clip_sent_again_within_the_same_second_is_copied_by_its_size(
+    clippings_dir,
+):
+    # last_modified is to the second (RFC 1123): the size tells a second version of that second.
+    container = FakeContainer("clippings", {CLIP_NAME: FakeBlob(b"# v1", SENT_ON)})
+    mirror(container, clippings_dir)
+    container.blobs[CLIP_NAME] = FakeBlob(b"# v1, edited", SENT_ON)
+
+    result = mirror(container, clippings_dir)
+
+    assert (clippings_dir / CLIP_NAME).read_bytes() == b"# v1, edited"
+    assert result.copied == 1
+
+
 def test_a_file_newer_than_its_blob_is_left_as_it_is(clippings_dir):
     clippings_dir.mkdir()
-    (clippings_dir / CLIP_NAME).write_bytes(b"# on the share")
+    # Of the size of the blob: a file of another size is copied again.
+    (clippings_dir / CLIP_NAME).write_bytes(b"# here")
     os.utime(clippings_dir / CLIP_NAME, ns=(to_ns(LATER), to_ns(LATER)))
     container = FakeContainer("clippings", {CLIP_NAME: FakeBlob(b"# clip", SENT_ON)})
 
     result = mirror(container, clippings_dir)
 
     assert container.downloaded_names() == []
-    assert (clippings_dir / CLIP_NAME).read_bytes() == b"# on the share"
+    assert (clippings_dir / CLIP_NAME).read_bytes() == b"# here"
     assert result.unchanged == 1
 
 

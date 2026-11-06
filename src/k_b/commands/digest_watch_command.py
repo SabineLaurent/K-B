@@ -53,15 +53,20 @@ def wake_the_apis(settings: DigestWatchSettings) -> int:
 
 
 # The steps call their function by its name in this module, at the time they run: a test replaces
-# it there. A failed wake does not stop kb digest, which logs its own failure.
+# it there. A failed wake neither stops kb digest nor counts in the exit code: an API that stays out
+# of reach fails the step that follows, which reports it (decided by time-knight on 2026-11-06,
+# under Sabine's delegation of 2026-10-15).
 DIGEST_WATCH_STEPS: tuple[RoutineStep[DigestWatchSettings], ...] = (
     RoutineStep(
-        "wake of the APIs before kb digest", lambda settings: wake_the_apis(settings)
+        "wake of the APIs before kb digest",
+        lambda settings: wake_the_apis(settings),
+        is_counted=False,
     ),
     RoutineStep("kb digest", lambda settings: run_digest(settings.environ)),
     RoutineStep(
         "wake of the APIs before kb trend-report",
         lambda settings: wake_the_apis(settings),
+        is_counted=False,
     ),
     RoutineStep(
         "kb trend-report",

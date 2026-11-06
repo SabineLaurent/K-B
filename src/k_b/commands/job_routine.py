@@ -25,9 +25,11 @@ EXIT_CODES_FROM_BEST_TO_WORST = (
     ExitCode.NOT_STARTED,
     ExitCode.FAILED,
 )
-# The code of each value, as ExitCode(value) needs its meaning too.
+# The member of each value: mypy --strict reads ExitCode(value) as a call of its __new__, which takes
+# the meaning too, and refuses it.
 EXIT_CODE_BY_VALUE = {int(code): code for code in ExitCode}
 NOT_RUN = "not run"
+NOT_COUNTED = "not counted"
 SUMMARY_HEADER = ("step", "result")
 
 
@@ -41,11 +43,14 @@ class NotRunAfter:
 
 @dataclass(frozen=True)
 class RoutineStep[Settings]:
-    """A step of a routine: its name, what it runs with the settings of the routine, and its rule."""
+    """A step of a routine: its name, what it runs with the settings of the routine, its rule, and
+    whether its code counts in the one of the routine (not for a means, such as the wake of an API,
+    whose failure the next step meets and reports)."""
 
     name: str
     run: Callable[[Settings], int]
     not_run_after: NotRunAfter | None = None
+    is_counted: bool = True
 
 
 def run_routine[Settings](
@@ -71,7 +76,11 @@ def run_routine[Settings](
         codes[step.name] = run_step(step, settings)
         # Each end on its line: on SIGTERM, no summary is printed, and these lines say what was done.
         logger.info("%s, exited with %d", where, codes[step.name])
-    exit_code = find_worst_exit_code(codes.values())
+    exit_code = find_worst_exit_code(
+        code
+        for step in steps
+        if step.is_counted and (code := codes.get(step.name)) is not None
+    )
     logger.info(
         "%s finished in %s: exit code %d",
         title,
@@ -114,7 +123,7 @@ def find_worst_exit_code(codes: Iterable[int]) -> int:
 def rank_exit_code(code: int) -> int:
     """The rank of a code from the best, 0; a code out of the order comes last."""
     if code in EXIT_CODES_FROM_BEST_TO_WORST:
-        return EXIT_CODES_FROM_BEST_TO_WORST.index(EXIT_CODE_BY_VALUE[code])
+        return EXIT_CODES_FROM_BEST_TO_WORST.index(code)
     return len(EXIT_CODES_FROM_BEST_TO_WORST)
 
 
@@ -122,20 +131,26 @@ def render_routine_summary[Settings](
     title: str, steps: Sequence[RoutineStep[Settings]], codes: Mapping[str, int]
 ) -> str:
     """A row per step: its code and its name, 2 (not started), or not run."""
-    rows = [(step.name, describe_step_result(codes.get(step.name))) for step in steps]
+    rows = [
+        (step.name, describe_step_result(codes.get(step.name), step.is_counted))
+        for step in steps
+    ]
     table = render_table([SUMMARY_HEADER, *rows])
     # Underlined, the title of the block, as for kb digest (decision of Sabine of 2026-10-29).
     return "\n".join(["", title, "-" * len(title), *table])
 
 
-def describe_step_result(code: int | None) -> str:
-    """4 (partial failure), 3, or not run."""
+def describe_step_result(code: int | None, is_counted: bool) -> str:
+    """4 (partial failure), 1 (failed), not counted, 3, or not run."""
     if code is None:
         return NOT_RUN
     exit_code = EXIT_CODE_BY_VALUE.get(code)
-    if exit_code is None:
-        return str(code)
-    return f"{code} ({exit_code.name.lower().replace('_', ' ')})"
+    described = (
+        str(code)
+        if exit_code is None
+        else f"{code} ({exit_code.name.lower().replace('_', ' ')})"
+    )
+    return described if is_counted else f"{described}, {NOT_COUNTED}"
 
 
 def describe_routine[Settings](
@@ -144,7 +159,10 @@ def describe_routine[Settings](
     """The steps of the routine and their rules, for --dry-run: nothing is run."""
     lines = [f"{title}, dry run: {len(steps)} steps, none run"]
     for position, step in enumerate(steps, start=1):
-        lines.append(f"  {position}. {step.name}{describe_rule(step.not_run_after)}")
+        not_counted = "" if step.is_counted else f", its code {NOT_COUNTED}"
+        lines.append(
+            f"  {position}. {step.name}{describe_rule(step.not_run_after)}{not_counted}"
+        )
     return "\n".join(lines)
 
 

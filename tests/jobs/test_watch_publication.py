@@ -130,6 +130,26 @@ def test_links_are_neither_followed_nor_sent(watch_dir, tmp_path):
     assert result.left_aside == 2
 
 
+def test_a_folder_that_cannot_be_listed_is_counted_and_fails_the_publication(
+    watch_dir, caplog
+):
+    write_sheets(watch_dir, SHEETS)
+    unreadable = watch_dir / "tops" / "github-most-starred"
+    unreadable.chmod(0)
+    container = FakeContainer("watch")
+
+    try:
+        with caplog.at_level(logging.INFO, logger="k_b"):
+            result = publish(container, watch_dir)
+    finally:
+        unreadable.chmod(0o700)
+
+    assert dict(result.failed) == {"EACCES": 1}
+    assert result.has_failed
+    assert result.sent == 2
+    assert "watch publication: a folder not listed: EACCES" in caplog.text
+
+
 def test_a_watch_folder_that_is_a_link_is_refused(watch_dir, tmp_path):
     elsewhere = tmp_path / "elsewhere"
     write_sheets(elsewhere, {"securite/2026-11-05.md": b"# digest"})

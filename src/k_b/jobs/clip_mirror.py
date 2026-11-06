@@ -214,9 +214,11 @@ def copy_when_newer(
     where: str,
     result: MirrorResult,
 ) -> None:
-    """Copy the blob unless its file is as recent, then date the file as the blob: the next run
-    compares two dates of the storage, whatever the clock of the container. The date set changes the
-    ctime, which etl/sources/clipping.py reads: the collection sees the clip changed."""
+    """Copy the blob unless its file is as recent and of its size, then date the file as the blob:
+    the next run compares two dates of the storage, whatever the clock of the container. The date set
+    changes the ctime, which etl/sources/clipping.py reads: the collection sees the clip changed.
+    The size tells a second version sent within the same second, last_modified being to the second
+    (RFC 1123); one of the same size is not told (limit accepted, #413)."""
     try:
         status = path.lstat()
     except FileNotFoundError:
@@ -225,7 +227,11 @@ def copy_when_newer(
         refuse_clip(result, where, "local_entry_not_a_file", "")
         return
     modified_ns = to_ns(blob.last_modified)
-    if status is not None and status.st_mtime_ns >= modified_ns:
+    if (
+        status is not None
+        and status.st_mtime_ns >= modified_ns
+        and status.st_size == blob.size
+    ):
         result.unchanged += 1
         return
     content = download_listed_version(container_client, blob)

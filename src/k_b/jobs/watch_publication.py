@@ -39,7 +39,7 @@ class PublicationResult:
 
     @property
     def has_failed(self) -> bool:
-        """Whether a sheet was not read, or the storage stopped the publication."""
+        """Whether a sheet or a folder was not read, or the storage stopped the publication."""
         return bool(self.failed or self.storage_error)
 
     @property
@@ -92,10 +92,20 @@ def send_missing_sheets(
 
 def list_sheet_names(watch_dir: Path, result: PublicationResult) -> list[str]:
     """The path of each regular, visible file under watch_dir, relative and POSIX, in name order;
-    a hidden entry or one that is not a regular file is counted, never followed."""
+    a hidden entry or one that is not a regular file is counted, never followed, as a folder that
+    cannot be listed."""
     sheet_names = []
+
+    def count_folder_not_listed(error: OSError) -> None:
+        """A folder that cannot be listed: its sheets are not sent, which fails the publication."""
+        name = name_os_error(error)
+        logger.error("watch publication: a folder not listed: %s", name)
+        result.failed[name] += 1
+
     # Not following the links: a link to a folder is listed among the files, then left aside.
-    for folder, folder_names, file_names in watch_dir.walk():
+    for folder, folder_names, file_names in watch_dir.walk(
+        on_error=count_folder_not_listed
+    ):
         hidden_folders = [name for name in folder_names if name.startswith(".")]
         result.left_aside += len(hidden_folders)
         folder_names[:] = sorted(set(folder_names) - set(hidden_folders))

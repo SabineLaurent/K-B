@@ -569,3 +569,7 @@ WATCH_CONTAINER = "watch"
 # the 14 characters write_file_atomically adds to the name for its temporary file: a dot before it,
 # then a dot, 8 random characters and a suffix of 4 (core/atomic_write.py).
 MAX_CLIP_NAME_BYTES = 241
+# Added to CLIP_CHANGE_MARGIN in the wait after the mirror: the ctime of a clip copied is given by
+# the server of the share (CIFS), CLIP_CHANGE_MARGIN is measured on the clock of the container; their
+# gap is not measured (#413), 5 s keep a gap of a few seconds from leaving the clip to the next day.
+CLIP_MIRROR_CLOCK_SLACK = timedelta(seconds=5)
