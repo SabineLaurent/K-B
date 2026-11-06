@@ -438,10 +438,11 @@ AI_API_CONNECT_TIMEOUT_SECONDS = 5
 AI_API_POOL_TIMEOUT_SECONDS = 5
 AI_API_WRITE_TIMEOUT_SECONDS = 10
 AI_API_READ_TIMEOUT_SECONDS = 240
-# The whole answer, from the request sent to its last piece read, checked after each piece: the
-# same bound of the ingress of Azure Container Apps (OWASP API4:2023). The first check comes after
-# the first piece, so an answer may last up to the waits before it, 500 s at most (5 + 5 + 10 for
-# the pool, the connection and the request, then 240 for the headers and 240 for the first piece).
+# The whole answer, from the request sent to its last piece read, checked after each piece decoded:
+# the bound of the ingress of Azure Container Apps (OWASP API4:2023). It bounds no wait before the
+# first piece (each read of the headers waits AI_API_READ_TIMEOUT_SECONDS at most, not their sum),
+# nor raw pieces that decode to nothing; online, the ingress cuts a request at 240 s
+# (docs/fiches-veille.md, "Limites" of kb digest).
 AI_API_REQUEST_DEADLINE_SECONDS = AI_API_READ_TIMEOUT_SECONDS
 # The largest body of an answer of the AI API that kb reads, decoded, announced by Content-Length or
 # counted; beyond, the reading stops (OWASP API4:2023, API10:2023). Not MAX_AI_API_BODY_BYTES, the

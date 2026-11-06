@@ -5225,9 +5225,12 @@ l'API IA lit déjà l'API de données dans sa borne (`MAX_DATA_API_BODY_BYTES`) 
   réponse ; une réponse au compte-gouttes, sous la borne de taille, tiendrait `kb` sans fin.
   L'horloge est un paramètre de `send_request` (`time.monotonic` par défaut), pour le test.
   Écartés : déplacer `Deadline` d'`ai_api/` vers `core/` (`post` n'importe pas `ai_api`, et
-  18 fichiers l'importent) ; aucune échéance. Limite assumée : le premier contrôle vient après le
-  premier morceau ; le pool, la connexion, l'écriture, l'en-tête et le premier morceau peuvent
-  porter une réponse à 500 s. — PR de #422
+  18 fichiers l'importent) ; aucune échéance. Limite assumée : le contrôle vient après chaque
+  morceau décodé ; rien ne borne l'attente avant le premier (chaque lecture de l'en-tête attend
+  240 s, pas leur somme), ni des morceaux bruts qui ne se décodent en rien (un corps gzip de blocs
+  vides) : un défaut de `read_bounded_body` pour ses quatre clients, déjà sur `main` avant #422
+  (revue de code, tranché par time-knight le 06/11, délégation de Sabine du 15/10), porté par
+  #436 ; en ligne, l'ingress d'ACA coupe une requête à 240 s. — PR de #422
 
 - **Au-delà de la borne, l'erreur garde l'état de son statut (`ai_api_invalid_response` pour un 200,
   `ai_api_failed` pour une 5xx…), son statut HTTP, `response larger than 8000000 bytes`, son

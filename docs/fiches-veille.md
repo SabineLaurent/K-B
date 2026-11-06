@@ -1800,11 +1800,14 @@ tronqué et échappé (règle 3 de `conventions.md`).
 
 **Limites**
 
-- **L'échéance de la réponse** n'est contrôlée qu'après son premier morceau : avant lui viennent
-  le pool (5 s), la connexion (5 s), l'écriture (10 s), l'en-tête (240 s) et le premier morceau
-  (240 s), soit 500 s au plus. Les clients de l'API IA raccourcissent chaque délai au temps qui
-  reste (`ai_api/deadline.py`), que `post` n'importe pas ; au départ d'une demande de `kb`, il
-  reste 240 s, et le raccourci ne changerait rien (#422).
+- **L'échéance de la réponse** n'est contrôlée qu'après chaque morceau décodé : rien ne borne
+  l'attente avant le premier, ni des morceaux bruts qui ne se décodent en rien. Chaque lecture de
+  l'en-tête attend 240 s au plus, mais pas leur somme : un en-tête envoyé octet par octet, ou un
+  corps compressé fait de blocs vides, tient `kb` sans fin ; en ligne, l'ingress d'ACA coupe une
+  requête à 240 s. C'est un défaut de `read_bounded_body` pour ses quatre clients, déjà sur `main`
+  avant #422 (porté par #436). Les clients de l'API IA raccourcissent aussi chaque délai au temps
+  qui reste (`ai_api/deadline.py`), que `post` n'importe pas ; au départ d'une demande de `kb`, il
+  reste 240 s, et le raccourci ne changerait rien.
 - **Relancer le même jour** après un échec partiel sort en 2 : une fiche du jour existe. Les
   sujets en échec s'écrivent le lendemain, si leurs items restent dans la fenêtre.
 - **Le jour contrôlé** avant la demande est celui de l'horloge de `kb` ; celui de la fiche,
