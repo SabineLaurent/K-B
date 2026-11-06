@@ -47,5 +47,6 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
 USER 10001:10001
 # Exec form: kb is PID 1 and receives SIGTERM itself (.claude/rules/poc.md, rule 6). No init
-# process: docker stop of kb serve-data is measured in the pull request of #200.
+# process: docker stop of kb serve-data is measured in the pull request of #200. As PID 1, a command
+# without its own SIGTERM handler ignores it until SIGKILL (journal ADR, 2026-11-06).
 ENTRYPOINT ["/app/.venv/bin/kb"]

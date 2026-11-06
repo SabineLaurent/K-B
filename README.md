@@ -594,9 +594,10 @@ construit et les lance par émulation. L'image lance `kb` sous l'utilisateur `10
 dossier de données, où se monte le volume, est `/var/lib/knowledge_base`, et il appartient à cet utilisateur.
 `KB_DATA_DIR` n'a pas de valeur dans l'image : elle se donne au lancement, avec le volume, et sans elle `kb`
 refuse de démarrer. Le journal est la sortie d'erreur (`KB_LOG_TO_FILE=false`). Chaque variable se change au
-lancement (`-e`). `.dockerignore` garde hors de la construction `.git/`, `.venv/`, `temp/`, `reports/`, les fichiers d'environnement et les
-bases `*.sqlite`, avec leurs fichiers annexes. Le job `image-build` de la CI (`.github/workflows/image.yml`)
-construit l'image sur chaque PR vers `main` et la contrôle, sans la pousser nulle part.
+lancement (`-e`). `.dockerignore` refuse tout par défaut : la construction ne reçoit que `pyproject.toml`,
+`uv.lock`, `README.md` et `src/`, sans les fichiers d'environnement, les bases `*.sqlite` (et leurs fichiers
+annexes) ni les caches de `src/`. Le job `image-build` de la CI (`.github/workflows/image.yml`) construit
+l'image sur chaque PR vers `main` et sur chaque push sur `main`, et la contrôle, sans la pousser nulle part.
 
 ## Licence
 

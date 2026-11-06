@@ -5391,18 +5391,31 @@ Plan validé par Sabine le 06/11 (I1 du plan de mise en ligne).
   le code de sortie est 0. Avec `--init`, l'arrêt prend 0,28 s et le code est 143. Pourquoi : l'arrêt
   est propre sans init, et rien ne s'ajoute à l'image. Limite assumée : après SIGTERM, `kb serve-data`
   et `kb serve-ai` sortent en 0, pas en 143. uvicorn remet le gestionnaire par défaut, puis relance le
-  signal, qu'un PID 1 ignore (tri de la PR #244, 18/10). — PR de #200
+  signal, qu'un PID 1 ignore (tri de la PR #244, 18/10). Autre limite (revue de code du 06/11, tranché
+  par time-knight, délégation de Sabine du 15/10) : en PID 1, une commande sans gestionnaire de
+  SIGTERM l'ignore et finit en SIGKILL au bout du délai d'arrêt. C'est le cas de `kb create-db` et de
+  `kb openapi` : seules les commandes de `COMMANDS_STOPPED_BY_SIGTERM` (`commands/sigterm.py`) en
+  posent un. Une transaction ainsi coupée est annulée par la base, sans perte. Chaque commande lancée en
+  job entre donc dans `COMMANDS_STOPPED_BY_SIGTERM` (règle 6 de `poc.md`) : `daily-routine` et
+  `digest-watch` (#413), `migrate-database` (#421). — PR de #200
 - **Ni `curl`, ni `azcopy`, ni `HEALTHCHECK` dans l'image.** Les transferts passent par
   `azure-storage-blob` (#412), et `/health` par httpx2 (décision de Sabine du 06/11). Les sondes sont
   celles d'Azure Container Apps (#414). — PR de #200
-- **La CI construit l'image en `linux/amd64` sur chaque PR vers `main`, dans son propre workflow
-  (`image.yml`, job `image-build`), et ne la pousse nulle part** (le registre et la livraison sont #415).
-  Elle contrôle l'UID (≠ 0), `kb --help` et `kb create-db` (le SQL du paquet installé). Avant la construction, elle plante des fichiers que `.dockerignore` exclut, dans
-  `src/k_b/` et à la racine, puis vérifie qu'aucun n'est ni dans le contexte de construction (copié tel
-  quel dans une image jetable) ni dans l'image. Pourquoi : le backend de construction emballe tout fichier
-  de `src/k_b/`, et un `.env` ou une base laissés là entraient dans l'image (essai du 06/11, avant
-  `.dockerignore`) ; et un constructeur distant reçoit tout le contexte, `temp/` et ses données
-  personnelles compris, si `.dockerignore` le laisse passer. — PR de #200
+- **`.dockerignore` refuse tout par défaut : la construction ne reçoit que `pyproject.toml`, `uv.lock`,
+  `README.md` et `src/`, moins les fichiers d'environnement, les bases (`*.sqlite*`), `__pycache__` et
+  `.DS_Store` de `src/`.** Pourquoi : un constructeur distant (#415, s'il construit sur Azure) reçoit
+  tout le contexte ; refuser par défaut garde sur le Mac `temp/` et `reports/` (données personnelles),
+  `tests/`, `docs/`, `infra/`, et tout fichier nouveau. Et le backend de construction emballe tout
+  fichier de `src/k_b/` : un `.env` ou une base laissés là entraient dans l'image (essai du 06/11, avant
+  `.dockerignore`). Écartée : une liste d'exclusions, qui laissait partir tout le reste (revue de code du
+  06/11, tranché par time-knight, délégation de Sabine du 15/10). — PR de #200
+- **La CI construit l'image en `linux/amd64` sur chaque PR vers `main` et sur chaque push sur `main`,
+  dans son propre workflow (`image.yml`, job `image-build`), et ne la pousse nulle part** (le registre et
+  la livraison sont #415). Elle plante des fichiers que `.dockerignore` refuse, à la racine et dans
+  `src/k_b/`, puis vérifie que le contexte de construction, écrit tel quel dans un dossier, ne contient
+  que les quatre chemins copiés et aucun fichier planté, et que l'image n'en contient aucun. Elle
+  contrôle aussi l'UID (≠ 0), le refus de démarrer sans `KB_DATA_DIR` (code 2), `kb --help` et
+  `kb create-db` (le SQL du paquet installé). — PR de #200
 - **Dependabot tient les digests des deux images de base, et leurs versions de correctif seulement, avec
   7 jours d'attente comme pour les actions.** Pourquoi : sur un tag à suffixe, il propose la plus haute
   version au même suffixe (dependabot-core, `docker/README.md`, « Semver », lu le 06/11) :

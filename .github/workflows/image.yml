@@ -23,12 +23,15 @@ jobs:
           mkdir -p temp reports .venv
           touch .env .env.decoy temp/decoy reports/decoy .venv/decoy
           touch src/k_b/.env.decoy src/k_b/decoy.sqlite src/k_b/decoy.sqlite-wal src/k_b/.DS_Store
-      # The context a builder receives, a remote one included, copied whole into a throwaway image.
-      - name: Sends none of the planted files to the build
+          mkdir -p src/k_b/__pycache__ && touch src/k_b/__pycache__/decoy.pyc
+      # The context a builder receives, a remote one included, written whole to a folder (no image):
+      # the four paths the Dockerfile copies, and none of the planted files.
+      - name: Sends only what the Dockerfile copies to the build
         run: |
-          printf 'FROM python:3.13-slim-trixie@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc\nCOPY . /context\n' \
-            | docker buildx build --platform linux/amd64 --file - --tag k-b-context:ci .
-          found=$(docker run --rm --entrypoint find k-b-context:ci /context \( -name '.env*' -o -name '*.sqlite*' -o -name decoy -o -name .DS_Store -o -name .git \) -print)
+          context="$RUNNER_TEMP/context"
+          printf 'FROM scratch\nCOPY . /\n' | docker buildx build --file - --output "type=local,dest=$context" .
+          diff <(LC_ALL=C ls -A "$context") <(printf '%s\n' README.md pyproject.toml src uv.lock)
+          found=$(find "$context" \( -name '.env*' -o -name '*.sqlite*' -o -name decoy -o -name .DS_Store -o -name __pycache__ \) -print)
           test -z "$found" || { echo "$found"; exit 1; }
       - run: docker buildx build --platform linux/amd64 --tag k-b:ci .
       - name: Runs as a non-root user

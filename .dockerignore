@@ -1,19 +1,13 @@
-# Kept out of the build context (issue #200). The Dockerfile copies pyproject.toml, uv.lock,
-# README.md and src/ only, and the build backend packs every file of src/k_b/: a file left there
-# would end up in the image.
-.git/
-.venv/
-# The KB_DATA_DIR of the trials, and the reports of the end-to-end tests: personal data.
-temp/
-reports/
-# Environment files, at any depth: secrets.
+# Refused by default (issue #200): a builder, a remote one included, receives only what the
+# Dockerfile copies, so .git/, .venv/, temp/ and reports/ (personal data), tests/, docs/ and infra/
+# never leave the machine. The build backend packs every file of src/k_b/: secrets, databases and
+# caches left in src/ are refused as well.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
 **/.env*
-# Databases and their side files (-wal, -shm, -journal), at any depth.
 **/*.sqlite*
 **/__pycache__/
 **/.DS_Store
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-.coverage
-htmlcov/
