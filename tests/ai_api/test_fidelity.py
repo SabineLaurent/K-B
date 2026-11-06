@@ -64,8 +64,8 @@ ARTICLE = watch_item(
     "newsletter_article",
     edition="ai",
     title="Mistral Large 4 (9 minute read)",
-    summary="Mistral Large 4 is a one-trillion-parameter multimodal model positioned as a "
-    "European alternative to leading closed and open AI systems.",
+    summary="Mistral Large 4 is a very large multimodal model, presented as an open alternative "
+    "to the main AI systems of the moment.",
 )
 # The trapped article of #206, as test_digests.py reads it.
 TRAPPED_ARTICLE = read_articles(

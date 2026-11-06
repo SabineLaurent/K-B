@@ -374,7 +374,7 @@ def test_the_detail_of_a_paper_reads_its_arxiv_date_in_revised_at(connection):
     assert detail.listed.source_date == "2026-09-27T09:30:13Z"
     assert detail.details._asdict() == {
         "arxiv_id": "2609.33401",
-        "authors": ["Yixuan Liu"],
+        "authors": ["Lena Marsh"],
         "summary": "Model-based judges support agent security by detecting prompt"
         " injections, assessing interaction risks, and screening harmful requests.",
         "arxiv_updated_at": "2026-09-29T16:41:24Z",
@@ -439,21 +439,20 @@ def test_a_clip_is_listed_by_its_day_saved_and_detailed_with_its_text(connection
         ListedItem(
             18,
             "clip",
-            "7 Coding Patterns I Stole From Senior Engineers",
+            "7 Habits I Picked Up From Experienced Engineers",
             "2026-09-17T00:00:00Z",
-            "https://medium.com/skillstuff/"
-            "7-coding-patterns-i-stole-from-senior-engineers-c95f757e52a6",
+            "https://example.com/blog/7-habits-from-experienced-engineers",
             None,
         ),
         ClipDetail(
             "2026-06-08T00:00:00Z",
-            "Most junior developers think senior engineers know more tricks.",
+            "Many new developers assume that experienced engineers know more tricks.",
         ),
     )
 
 
 def test_the_text_of_a_clip_is_searched(connection):
-    assert read_ids(connection, search_text="junior developers") == [18]
+    assert read_ids(connection, search_text="new developers") == [18]
 
 
 @pytest.mark.parametrize("item_id", [999, 0, -1, MAX_INT64, MIN_INT64])

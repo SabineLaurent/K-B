@@ -45,7 +45,8 @@ EDITION_PAGE = AI_PAGE.replace(AI_HEADING, b"TLDR AI 2026-10-02</h1>")
 # is redirected to; served with a 200 at the url of a day, as here, is not observed.
 LANDING_PAGE = (FIXTURES_DIR / "tldr_ai_landing_extract.html").read_bytes()
 LANDING_REFUSAL = (
-    "first h1 is not an edition title with its date: 'Keep up with AI in 5 minutes'"
+    "first h1 is not an edition title with its date: "
+    "'Stay current on AI in a few minutes'"
 )
 
 
@@ -356,8 +357,8 @@ MISTRAL_ARTICLE = TldrArticle(
     title="Mistral Large 4 (9 minute read)",
     link="https://mistral.ai/news/mistral-large-4/?utm_source=tldrai",
     summary=(
-        "Mistral Large 4 is a one-trillion-parameter multimodal model positioned as a"
-        " European alternative to leading closed and open AI systems."
+        "Mistral Large 4 is a very large multimodal model, presented as an open alternative"
+        " to the main AI systems of the moment."
     ),
 )
 
@@ -368,11 +369,11 @@ def test_one_article_per_entry_without_the_sponsored_one_that_its_rank_counts():
 
     assert [(article.rank, article.title) for article in articles] == [
         (2, "Mistral Large 4 (9 minute read)"),
-        (3, "Sharing AI progress in mathematics (2 minute read)"),
+        (3, "Notes on machine progress in algebra (2 minute read)"),
         (
             4,
             (
-                "In Race With US, China Struggles to Recruit Foreign AI Researchers"
+                "China Finds It Hard to Attract AI Researchers From Abroad"
                 " (6 minute read)"
             ),
         ),
@@ -418,18 +419,18 @@ def test_a_summary_with_a_link_is_read_as_displayed():
     # The sponsored entry, read as an article: its summary holds a link.
     page = AI_PAGE.replace(b" (Sponsor)", b"")
 
-    assert read_articles(page).entries[0].summary == "Copilot. Read the Report"
+    assert read_articles(page).entries[0].summary == "Overview. Read the Report"
 
 
 def test_the_paragraphs_of_a_summary_are_read_apart():
     # Two paragraphs written as in the sponsored entries collected: text<p></p><p>text.
     page = AI_PAGE.replace(
-        b"multimodal model positioned", b"multimodal model.<p></p><p>Positioned"
+        b"multimodal model, presented", b"multimodal model.<p></p><p>Presented"
     )
 
     assert read_articles(page).entries[0].summary == (
-        "Mistral Large 4 is a one-trillion-parameter multimodal model. Positioned as a"
-        " European alternative to leading closed and open AI systems."
+        "Mistral Large 4 is a very large multimodal model. Presented as an open alternative"
+        " to the main AI systems of the moment."
     )
 
 
@@ -473,10 +474,10 @@ def test_a_link_escaped_twice_in_the_page_loses_its_tracking_parameters():
         ),
         (
             # The landing page of an edition, as feat/tldr recorded its title.
-            AI_PAGE.replace(AI_HEADING, b"Keep up with AI in 5 minutes</h1>"),
+            AI_PAGE.replace(AI_HEADING, b"Stay current on AI in a few minutes</h1>"),
             (
                 "first h1 is not an edition title with its date: "
-                "'Keep up with AI in 5 minutes'"
+                "'Stay current on AI in a few minutes'"
             ),
         ),
         (

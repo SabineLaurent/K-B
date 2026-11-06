@@ -204,7 +204,7 @@ dans `core/config.py` : `kb serve` et l'API IA appliquent la même règle.
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
 | `test_the_reading_gives_the_items_of_the_whitelist_in_the_order_of_the_spec` | Contre la vraie API de données et la base d'essai : ordre des sortes, aucun `zotero_entry`, l'entrée retirée comptée et jamais demandée au détail |
-| `test_an_item_read_keeps_its_source_and_sends_its_whitelist_only` | Le papier garde `url` et `source_title` pour les sources ; ses champs envoyés sont `title` et `summary` ; « Yixuan Liu » n'apparaît nulle part |
+| `test_an_item_read_keeps_its_source_and_sends_its_whitelist_only` | Le papier garde `url` et `source_title` pour les sources ; ses champs envoyés sont `title` et `summary` ; « Lena Marsh » n'apparaît nulle part |
 | `test_the_reading_follows_the_pages` | La pagination réelle (pages de 2) rend les mêmes items |
 | `test_the_reading_is_capped_inside_a_kind`, `…_between_two_kinds_names_the_next_one`, `test_a_withdrawn_entry_takes_no_place_under_the_cap` | `capped_kind` et `covered_after` dans les deux cas de coupe ; les sortes suivantes ne sont pas lues |
 | `test_a_failed_request_gives_its_state`, `test_an_answer_of_the_list_other_than_200_gives_its_state`, `test_a_detail_that_fails_gives_its_state` | Chaque état `data_api_*`, une redirection jamais suivie |

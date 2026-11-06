@@ -109,7 +109,7 @@ def test_an_item_read_keeps_its_source_and_sends_its_whitelist_only(data_api):
     # Neither its authors nor its url: the model never receives them.
     assert isinstance(paper.fields, PaperFields)
     assert set(paper.fields.model_dump()) == {"title", "summary"}
-    assert "Yixuan Liu" not in repr(reading)
+    assert "Lena Marsh" not in repr(reading)
 
 
 def test_the_advisory_says_whether_its_cve_was_in_the_kev_catalog(data_api):
@@ -269,7 +269,7 @@ LISTED_PAPER = {
 }
 PAPER_DETAIL = LISTED_PAPER | {
     "arxiv_id": "2609.33401",
-    "authors": ["Yixuan Liu"],
+    "authors": ["Lena Marsh"],
     "summary": "Model-based judges support agent security.",
     "arxiv_updated_at": "2026-09-29T16:41:24Z",
 }
@@ -549,11 +549,11 @@ def test_a_newsletter_article_read_is_ready_for_the_writing(data_api):
     article = next(item for item in reading.items if item.item_id == 13)
     assert article.fields == NewsletterArticleFields(
         edition="dev",
-        title="Write your Own Virtual Machine (35 minute read)",
+        title="A Small Virtual Machine, Step by Step (35 minute read)",
         summary=(
-            "This literate tutorial builds an LC-3 virtual machine in about 250 lines of C,"
-            " covering registers, memory, opcodes, traps, loading programs, and"
-            " platform-specific input."
+            "This step-by-step guide writes a toy virtual machine in a few hundred lines of C,"
+            " from registers and memory to instructions, traps and the loading of"
+            " programs."
         ),
     )
 

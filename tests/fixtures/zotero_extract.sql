@@ -7,6 +7,12 @@
 -- column, type, default, key and UNIQUE of the real base. Left out: its 44 other tables, its
 -- indexes and triggers, and the foreign keys that point to a table left out (fieldsCombined,
 -- fieldFormats, charsets).
+--
+-- These tables follow the schema of Zotero, resource/schema/userdata.sql of
+-- https://github.com/zotero/zotero: Copyright (c) 2009 Center for History and New Media, George
+-- Mason University, under the GNU Affero General Public License, version 3 or later
+-- (https://www.gnu.org/licenses/agpl-3.0.html). This file is under that licence, not under the
+-- licence of K-B (README, "Contenus de tiers").
 
 CREATE TABLE libraries (
     libraryID      INTEGER PRIMARY KEY,

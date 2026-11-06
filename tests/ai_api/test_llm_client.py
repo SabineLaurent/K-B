@@ -579,8 +579,8 @@ def test_a_trapped_item_stays_in_the_user_message_and_its_output_is_never_return
         "kind": "newsletter_article",
         "title": "Mistral Large 4 (9 minute read)",
         "summary": (
-            "Mistral Large 4 is a one-trillion-parameter multimodal model positioned as a"
-            f" European alternative to leading closed and open AI systems. {trap}"
+            "Mistral Large 4 is a very large multimodal model, presented as an open alternative"
+            f" to the main AI systems of the moment. {trap}"
         ),
     }
     obeyed_output = json.dumps({"subject": "admin", "count": 2, "cite": "i99999"})

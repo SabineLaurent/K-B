@@ -565,7 +565,7 @@ VALID_ROW_BY_TABLE = {
             " Blockchain for Secure Software Supply Chains"
         ),
         "summary": "This paper proposes a blockchain-backed agentic security framework",
-        "authors": '["Toqeer Ali Syed", "Asadullah Abdullah Khan"]',
+        "authors": '["Ada May Fenwick", "Bertrand Ellis Quarrier"]',
         "submitted_at": "2026-09-25T13:53:50Z",
         "revised_at": "2026-09-25T13:53:50Z",
     },
@@ -628,7 +628,7 @@ VALID_ROW_BY_TABLE = {
         "edition_date": "2026-10-07T00:00:00Z",
         "rank": 2,
         "title": "Mistral Large 4 (9 minute read)",
-        "summary": "Mistral Large 4 is a one-trillion-parameter multimodal model",
+        "summary": "Mistral Large 4 is a very large multimodal model",
         "url": "https://mistral.ai/news/mistral-large-4/",
     },
     "zotero_entry": {
@@ -646,12 +646,9 @@ VALID_ROW_BY_TABLE = {
     "clip": {
         "item_id": CLIP_ITEM_ID,
         "kind": "clip",
-        "url": (
-            "https://medium.com/skillstuff/"
-            "7-coding-patterns-i-stole-from-senior-engineers-c95f757e52a6"
-        ),
-        "title": "7 Coding Patterns I Stole From Senior Engineers",
-        "body": "Most junior developers think senior engineers know more tricks.",
+        "url": "https://example.com/blog/7-habits-from-experienced-engineers",
+        "title": "7 Habits I Picked Up From Experienced Engineers",
+        "body": "Many new developers assume that experienced engineers know more tricks.",
         "saved_at": "2026-09-17T00:00:00Z",
         "published_at": "2026-06-08T00:00:00Z",
     },
@@ -758,7 +755,7 @@ REFUSED_VALUES = [
     ("zotero_entry", "revised_at IS strftime", {"revised_at": INVALID_DATE}),
     ("zotero_entry", "withdrawn_at IS strftime", {"withdrawn_at": INVALID_DATE}),
     ("clip", "kind = 'clip'", {"kind": "paper"}),
-    ("clip", "substr(url, 1, 8)", {"url": "ftp://medium.com/skillstuff"}),
+    ("clip", "substr(url, 1, 8)", {"url": "ftp://example.com/blog"}),
     ("clip", "length(url) <= 2000", {"url": "https://" + "x" * 1_993}),
     ("clip", "length(title) > 0", {"title": ""}),
     ("clip", "length(title) <= 1000", {"title": "x" * 1_001}),

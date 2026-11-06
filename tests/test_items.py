@@ -114,7 +114,7 @@ def newsletter_article_fields(**changes):
         "title": "Mistral Large 4 (9 minute read)",
         "url": "https://mistral.ai/news/mistral-large-4/",
         "published_at": datetime(2026, 10, 7, tzinfo=UTC),
-        "summary": "Mistral Large 4 is a one-trillion-parameter multimodal model.",
+        "summary": "Mistral Large 4 is a very large multimodal model.",
         "collected_at": COLLECTED_AT,
         "raw_file_path": "automated_watch/tldr_ai/2026-10-11T153130Z/2026-10-07.html",
         "edition": "ai",
@@ -158,19 +158,16 @@ def zotero_entry_fields(**changes):
 
 def clip_fields(**changes):
     """The article of tests/fixtures/clipping, with every field its kind requires."""
-    url = (
-        "https://medium.com/skillstuff/"
-        "7-coding-patterns-i-stole-from-senior-engineers-c95f757e52a6"
-    )
+    url = "https://example.com/blog/7-habits-from-experienced-engineers"
     fields = {
         "source_code": "clipper",
         "source_item_id": url,
         "kind": "clip",
-        "title": "7 Coding Patterns I Stole From Senior Engineers",
+        "title": "7 Habits I Picked Up From Experienced Engineers",
         "url": url,
         "saved_at": datetime(2026, 9, 17, tzinfo=UTC),
         "published_at": datetime(2026, 6, 8, tzinfo=UTC),
-        "summary": "Most junior developers think senior engineers know more tricks.",
+        "summary": "Many new developers assume that experienced engineers know more tricks.",
         "collected_at": COLLECTED_AT,
         "raw_file_path": "selected_library/clipping/2026-10-17T093000Z/0123456789abcdef.md",
     }

@@ -139,7 +139,7 @@ def test_the_list_serves_only_the_six_fields(client, authorization):
     for absent in (
         "A highlighted sentence on the first page.",
         "A comment on it.",
-        "Toqeer Ali Syed",
+        "Ada May Fenwick",
         "This paper proposes",
         "raw_file_path",
         "selected_library/zotero/",
@@ -159,7 +159,7 @@ PAPER_2 = {
     "url": "https://arxiv.org/abs/2609.33401",
     "withdrawn_at": None,
     "arxiv_id": "2609.33401",
-    "authors": ["Yixuan Liu"],
+    "authors": ["Lena Marsh"],
     "summary": "Model-based judges support agent security by detecting prompt injections, assessing interaction risks, and screening harmful requests.",
     # publication.revised_at, a date of arXiv: not the source_date.
     "arxiv_updated_at": "2026-09-29T16:41:24Z",
@@ -212,7 +212,7 @@ NEWSLETTER_ARTICLE_11 = {
     "edition": "ai",
     "edition_date": "2026-10-07T00:00:00Z",
     "rank": 2,
-    "summary": "Mistral Large 4 is a one-trillion-parameter multimodal model positioned as a European alternative to leading closed and open AI systems.",
+    "summary": "Mistral Large 4 is a very large multimodal model, presented as an open alternative to the main AI systems of the moment.",
 }
 ZOTERO_ENTRY_14 = {
     "id": 14,
@@ -256,12 +256,12 @@ ZOTERO_ENTRY_14 = {
 CLIP_18 = {
     "id": 18,
     "kind": "clip",
-    "title": "7 Coding Patterns I Stole From Senior Engineers",
+    "title": "7 Habits I Picked Up From Experienced Engineers",
     "source_date": "2026-09-17T00:00:00Z",
-    "url": "https://medium.com/skillstuff/7-coding-patterns-i-stole-from-senior-engineers-c95f757e52a6",
+    "url": "https://example.com/blog/7-habits-from-experienced-engineers",
     "withdrawn_at": None,
     "published_at": "2026-06-08T00:00:00Z",
-    "body": "Most junior developers think senior engineers know more tricks.",
+    "body": "Many new developers assume that experienced engineers know more tricks.",
     "body_truncated": False,
 }
 

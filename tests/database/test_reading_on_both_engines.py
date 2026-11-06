@@ -51,8 +51,8 @@ READ_ITEMS_CALLS = [
             "_",
             "%",
             "\\",
-            "junior developers",
-            "JUNIOR",
+            "new developers",
+            "NEW DEVELOPERS",
             "no item holds this",
         )
     ),

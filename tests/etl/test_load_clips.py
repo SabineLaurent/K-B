@@ -18,10 +18,7 @@ from k_b.database.creation import create_database
 FIXTURES_DIR = Path(__file__).parents[1] / "fixtures" / "clipping"
 ARTICLE = "article_with_author.md"
 PAGE_WITHOUT_AUTHOR = "page_without_author_or_date.md"
-ARTICLE_URL = (
-    "https://medium.com/skillstuff/"
-    "7-coding-patterns-i-stole-from-senior-engineers-c95f757e52a6"
-)
+ARTICLE_URL = "https://example.com/blog/7-habits-from-experienced-engineers"
 FIRST = "2026-10-17T093000Z"
 SECOND = "2026-10-18T093000Z"
 FIRST_AT = "2026-10-17T09:30:00Z"
@@ -69,11 +66,11 @@ def test_a_clip_gives_an_item_and_its_clip(data_dir):
     assert fetch_rows(data_dir, CLIP_QUERY) == [
         (
             ARTICLE_URL,
-            "7 Coding Patterns I Stole From Senior Engineers",
+            "7 Habits I Picked Up From Experienced Engineers",
             (
-                "## Most developers do not become better simply by learning more syntax.\n\n"
-                "Most junior developers think senior engineers know more tricks.\n\n"
-                "They usually do not.\n"
+                "## Learning more syntax is rarely what makes a developer better.\n\n"
+                "Many new developers assume that experienced engineers know more tricks.\n\n"
+                "Most of the time, they do not.\n"
             ),
             "2026-09-17T00:00:00Z",
             "2026-06-08T00:00:00Z",
@@ -125,21 +122,21 @@ def test_a_clip_copied_again_with_the_same_content_is_left_out(data_dir):
     [
         (
             ARTICLE,
-            "They usually do not.",
+            "Most of the time, they do not.",
             "Changed.",
             "body",
             (
-                "## Most developers do not become better simply by learning more syntax.\n\n"
-                "Most junior developers think senior engineers know more tricks.\n\n"
+                "## Learning more syntax is rarely what makes a developer better.\n\n"
+                "Many new developers assume that experienced engineers know more tricks.\n\n"
                 "Changed.\n"
             ),
         ),
         (
             ARTICLE,
-            'title: "7 Coding',
-            'title: "Seven Coding',
+            'title: "7 Habits',
+            'title: "Seven Habits',
             "title",
-            "Seven Coding Patterns I Stole From Senior Engineers",
+            "Seven Habits I Picked Up From Experienced Engineers",
         ),
         (
             ARTICLE,
@@ -198,7 +195,7 @@ def test_a_clip_whose_content_changed_is_written_again(
     ("kept", "changed"),
     [
         ('"[[Jane Doe]]"', '"[[John Roe]]"'),
-        ('simply by learning more syntax."', 'by learning syntax."'),
+        ('what makes a developer better."', 'what makes a developer."'),
         ('- "clippings"', '- "Clippings"'),
     ],
     ids=["author", "description", "template_tag"],
@@ -230,7 +227,10 @@ def test_an_older_version_imported_after_a_newer_one_is_left_out(data_dir):
     run_import(data_dir)
 
     assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [second_path]
-    assert "They usually never." in fetch_rows(data_dir, "SELECT body FROM clip")[0][0]
+    assert (
+        "Most of the time, they never."
+        in fetch_rows(data_dir, "SELECT body FROM clip")[0][0]
+    )
     assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(None,)]
     assert read_discards(data_dir) == [
         {
@@ -286,7 +286,10 @@ def test_an_older_version_imported_after_a_newer_copy_of_the_same_content_is_lef
 
     run_import(data_dir)
 
-    assert "They usually do not." in fetch_rows(data_dir, "SELECT body FROM clip")[0][0]
+    assert (
+        "Most of the time, they do not."
+        in fetch_rows(data_dir, "SELECT body FROM clip")[0][0]
+    )
     assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(None,)]
     assert [
         (discard["rule"], discard["compared_with_collected_at"])
@@ -304,7 +307,10 @@ def test_of_two_files_of_one_url_in_a_collection_the_second_is_written_again(dat
     run_import(data_dir)
 
     assert [row[5] for row in fetch_rows(data_dir, CLIP_QUERY)] == [second_path]
-    assert "They usually never." in fetch_rows(data_dir, "SELECT body FROM clip")[0][0]
+    assert (
+        "Most of the time, they never."
+        in fetch_rows(data_dir, "SELECT body FROM clip")[0][0]
+    )
     assert fetch_rows(data_dir, "SELECT revised_at FROM clip") == [(FIRST_AT,)]
     assert read_discards(data_dir) == []
 
@@ -319,13 +325,13 @@ def test_a_refused_clip_is_logged_by_its_field_without_its_title(data_dir):
     (rejection,) = read_journal(data_dir)
     assert rejection["raw_file_path"] == raw_file_path
     assert "created" in rejection["reason"]
-    assert "Coding Patterns" not in rejection["reason"]
+    assert "Picked Up" not in rejection["reason"]
     assert "Jane Doe" not in rejection["reason"]
     assert fetch_rows(data_dir, "SELECT count(*) FROM clip") == [(1,)]
 
 
 def test_an_unreadable_clip_is_rejected_at_each_import_and_not_registered(data_dir):
-    raw_file_path = write_clip(data_dir, FIRST, "a1", "Coding Patterns, no frontmatter")
+    raw_file_path = write_clip(data_dir, FIRST, "a1", "Habits, no frontmatter")
 
     run_import(data_dir)
     run_import(data_dir)
@@ -468,7 +474,7 @@ def test_a_title_changed_alone_writes_only_the_title(data_dir):
     links = fetch_rows(data_dir, LINKS_QUERY)
     watch_written_columns(data_dir)
     changed = with_tags(fixture_text(ARTICLE), "llm").replace(
-        'title: "7 Coding', 'title: "Seven Coding'
+        'title: "7 Habits', 'title: "Seven Habits'
     )
     write_clip(data_dir, SECOND, "a1", changed)
 
