@@ -328,11 +328,13 @@ PASSWORD = "S3cret-of-the-test"  # noqa: S105 — a marker the test looks for, n
 @pytest.fixture
 def requests_while_serving(monkeypatch):
     """uvicorn.run replaced by a request to the app it is given, while kb serve-data serves:
-    the status and body of each response, and the deadline of the base the app reads."""
+    the status and body of its response, the deadline of the base the app reads, and the status
+    of /health."""
     served = []
 
     def serve_one_request(app, **options):
         client = TestClient(app, base_url="http://localhost")
+        health_status = client.get("/health").status_code
         key = os.environ["KB_DATA_API_KEY_TERMINAL"]
         response = client.get("/items", headers={"Authorization": f"Bearer {key}"})
         deadline = None
@@ -341,7 +343,9 @@ def requests_while_serving(monkeypatch):
                 app.state.readers, app.state.query_timeout_seconds
             ) as connection:
                 deadline = connection.execute("SHOW statement_timeout").fetchone()[0]
-        served.append((app, response.status_code, response.json(), deadline))
+        served.append(
+            (app, response.status_code, response.json(), deadline, health_status)
+        )
 
     monkeypatch.setattr(serve_data_command.uvicorn, "run", serve_one_request)
     return served
@@ -356,7 +360,7 @@ def test_serve_reads_the_postgresql_base_of_kb_database_url_with_the_deadline_it
 
     assert cli.main(["serve-data"]) == 0
 
-    [(app, status, body, deadline)] = requests_while_serving
+    [(app, status, body, deadline, _)] = requests_while_serving
     assert status == 200
     assert len(body["items"]) == 18
     assert app.state.query_timeout_seconds == DATA_API_QUERY_TIMEOUT_SECONDS
@@ -404,6 +408,27 @@ def test_serve_exits_2_on_a_database_url_refused_without_quoting_it(
     assert requests_while_serving == []
 
 
+def test_serve_without_base_answers_health_and_503_database_missing_without_pool(
+    monkeypatch, data_dir, requests_while_serving
+):
+    """Online, the data API may start before its base exists: /health answers, and a data route
+    says the base is missing; without KB_DATABASE_URL, no pool is opened."""
+    opened_pools = []
+    monkeypatch.setattr(
+        postgresql, "open_reading_pool", lambda *args: opened_pools.append(args)
+    )
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
+
+    assert cli.main(["serve-data"]) == 0
+
+    [(app, status, body, _, health_status)] = requests_while_serving
+    assert health_status == 200
+    assert (status, body) == (503, {"error": "database_missing"})
+    assert app.state.readers == data_dir / "k-b.sqlite"
+    assert opened_pools == []
+    assert not (data_dir / "k-b.sqlite").exists()
+
+
 def test_serve_on_a_base_out_of_reach_answers_500_and_writes_no_text_of_libpq(
     monkeypatch, capfd, data_dir, requests_while_serving
 ):
@@ -417,8 +442,9 @@ def test_serve_on_a_base_out_of_reach_answers_500_and_writes_no_text_of_libpq(
 
     assert cli.main(["serve-data"]) == 0
 
-    [(_, status, body, _)] = requests_while_serving
+    [(_, status, body, _, health_status)] = requests_while_serving
     assert (status, body) == (500, {"error": "database_error"})
+    assert health_status == 200
     written = (
         capfd.readouterr().err + (data_dir / "logs" / "kb-serve-data.log").read_text()
     )
