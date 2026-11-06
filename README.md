@@ -184,8 +184,9 @@ machine (`KB_COLLECT_ONLY`), sans que ma bibliothèque soit montée dans un cont
 
 **Où on en est** : la collecte, l'import, l'API de données, le service des fiches par l'API IA
 (`kb serve-ai`, #156) et leur écriture en `.md` dans le coffre (`kb digest`, #209) sont codés (voir
-« Installer et lancer »). Restent les métriques du modèle vers Grafana Cloud (#162, #164) ; puis, au deuxième
-temps, l'image et les conteneurs (#200) et l'installation par compose (#202).
+« Installer et lancer »), comme l'export des métriques du modèle vers Grafana Cloud (#162). Restent
+leur restitution, avec une alerte sur seuil (#164) ; puis, au deuxième temps, l'image étant
+construite (#200), l'installation par compose (#202).
 
 **La suite** :
 
