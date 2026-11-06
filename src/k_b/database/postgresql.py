@@ -2,6 +2,7 @@
 of sqlite3, its SQL translated to the placeholders of psycopg, the lock of the writers, and the
 pool the data API reads with."""
 
+import logging
 import re
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
@@ -46,6 +47,11 @@ LOCK_FOR_WRITING = "SELECT pg_advisory_xact_lock(?)"
 SET_STATEMENT_TIMEOUT = "SELECT set_config('statement_timeout', ?, false)"
 # statement_timeout at 0 disables the deadline: a shorter one is refused.
 MIN_STATEMENT_TIMEOUT_MILLISECONDS = 1
+
+logger = logging.getLogger(__name__)
+
+# The state logged when the server ended the session of a reader before its rollback.
+READER_SESSION_LOST = "reader_session_lost"
 
 # The parameters of a statement: by position for ?, by name for :name.
 type Parameters = Sequence[Any] | Mapping[str, Any]
@@ -216,20 +222,24 @@ def configure_reader(
 @contextmanager
 def borrow_reader(pool: ReadingPool) -> Iterator[PostgresConnection]:
     """A connection of the pool for one request, waited for at most READING_POOL_WAIT_SECONDS
-    (PoolTimeout), given back without transaction, on a success as on an error: the pool would
-    otherwise undo it itself and log the connection, its host and user."""
+    (PoolTimeout), its transaction ended here, on a success as on an error: the pool would
+    otherwise undo it itself and log the connection, its host and user.
+
+    A session the server ended before the rollback is logged by the type of the error, the
+    connection closed for the pool to replace: the request keeps its response or its own
+    error."""
     connection = pool.getconn()
     reader = PostgresConnection(connection)
     try:
         yield reader
     finally:
         try:
-            # A connection psycopg closed has none: its rollback would raise.
+            # A connection psycopg knows closed has no transaction left to end.
             if reader.in_transaction:
                 reader.rollback()
-        except psycopg.Error:
-            # The server ended the session before the rollback: the request keeps its response or
-            # its own error, and the pool replaces the closed connection.
+        except psycopg.Error as error:
+            # The type only: the message of libpq may name the server.
+            logger.warning("%s: %s", READER_SESSION_LOST, type(error).__name__)
             connection.close()
         finally:
             pool.putconn(connection)

@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, NamedTuple
 
 from k_b.core.dates import format_day
-from k_b.database.engine import Connection, begin_reading
+from k_b.database.engine import Connection, begin_reading, end_reading
 from k_b.items import (
     ARXIV_ABSTRACT_PAGE_URL,
     MAX_INT64,
@@ -428,9 +428,7 @@ def read_item_detail(connection: Connection, item_id: int) -> ItemDetail | None:
             listed, READ_DETAILS_BY_KIND[listed.kind](connection, item_id)
         )
     finally:
-        # SQLite may have ended it on an error: a ROLLBACK would then raise, in place of it.
-        if connection.in_transaction:
-            connection.rollback()
+        end_reading(connection)
 
 
 def read_paper_detail(connection: Connection, item_id: int) -> PaperDetail:

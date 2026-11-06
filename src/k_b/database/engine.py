@@ -95,6 +95,14 @@ def begin_reading(connection: Connection) -> None:
         connection.execute("BEGIN")
 
 
+def end_reading(connection: Connection) -> None:
+    """End the transaction begin_reading opened: ROLLBACK on SQLite, while one is open (SQLite may
+    have ended it on an error, and a ROLLBACK would then raise in place of it); nothing on
+    PostgreSQL, where the readers end it when the connection is given back to the pool."""
+    if isinstance(connection, SqliteConnection) and connection.in_transaction:
+        connection.rollback()
+
+
 def connect_database_read_only(database_path: Path) -> SqliteConnection:
     """Open the database read only, one connection per request of the data API
     (check_same_thread=False).

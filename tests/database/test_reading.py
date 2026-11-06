@@ -468,10 +468,12 @@ def test_the_detail_of_an_item_id_beyond_64_bits_is_refused_by_its_bound(connect
     assert str(refusal.value) == f"item_id above maximum {MAX_INT64}"
 
 
-def test_the_detail_leaves_no_transaction_open(connection):
+def test_the_detail_ends_its_own_transaction_on_sqlite_only(connection, engine):
     read_item_detail(connection, 14)
 
-    assert not connection.in_transaction
+    # On PostgreSQL, the readers end it when the connection is given back to the pool
+    # (tests/database/test_reading_pool.py).
+    assert connection.in_transaction == (engine == "postgresql")
 
 
 LATEST_TRENDS = [
