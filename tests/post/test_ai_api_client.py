@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 import httpx2
 import pytest
+from ai_api.test_data_api_client import Clock, UnreadStream
 from pydantic import SecretStr
 
 from k_b.ai_api.schemas.digest_schema import (
@@ -571,13 +572,6 @@ def answer_beyond_the_bound(marker):
     return handle
 
 
-class UnreadStream(httpx2.SyncByteStream):
-    """A body that fails the test if it is read."""
-
-    def __iter__(self):
-        raise AssertionError("the body was read")
-
-
 def test_an_answer_of_the_bound_is_read():
     body = to_body(make_response()).ljust(MAX_AI_API_ANSWER_BYTES, b" ")
 
@@ -670,16 +664,6 @@ def test_a_failure_beyond_the_bound_keeps_the_state_of_its_status(monkeypatch):
         f"ai_api_failed, HTTP 503, response larger than {TEST_MAX_ANSWER_BYTES} bytes,"
         f" X-Request-ID {REQUEST_ID}, Retry-After 20"
     )
-
-
-class Clock:
-    """A clock set by the test: never the time of the machine."""
-
-    def __init__(self, now=1000.0):
-        self.now = now
-
-    def __call__(self):
-        return self.now
 
 
 def send_on_a_clock(clock, seconds_between_pieces):
