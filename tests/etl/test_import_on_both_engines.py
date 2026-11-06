@@ -35,8 +35,8 @@ from test_transform import FIXTURES_DIR
 from k_b import cli
 from k_b.commands import import_command
 from k_b.commands.exit_codes import ExitCode
-from k_b.database import writing
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
+from k_b.database import writing
 from k_b.database.creation import DATABASE_SCRIPTS
 from k_b.database.engine import connect_reader, open_readers
 from k_b.database.location import DATABASE_URL_VARIABLE, PostgresUrl

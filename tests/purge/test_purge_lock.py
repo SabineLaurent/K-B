@@ -3,10 +3,10 @@ does: it never deletes while an import writes; and a connection psycopg closed o
 the signal its exit code."""
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 import psycopg
 import pytest
-from conftest import ITEMS_DATABASE_SCRIPT
 
 from k_b.database import postgresql
 from k_b.database.creation import create_database
@@ -17,6 +17,7 @@ from k_b.purge import registry as registry_purge
 from k_b.purge.base import purge_expired_rows
 from k_b.purge.registry import purge_registry
 
+ITEMS_DATABASE_SCRIPT = Path(__file__).parents[1] / "fixtures" / "items_database.sql"
 pytestmark = pytest.mark.postgresql
 
 # Four years after the collections of the test base: the purge would delete its watch.

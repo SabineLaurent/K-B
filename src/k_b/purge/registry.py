@@ -6,7 +6,7 @@ import logging
 from collections.abc import Collection
 
 from k_b.database import purge as purge_queries
-from k_b.database.engine import Connection, connect_database
+from k_b.database.engine import Connection, connect_database, lock_for_writing
 from k_b.database.location import DatabaseLocation
 from k_b.etl.raw_store import RAW_DIR_NAME, RAW_DIR_NAMES, RawStore
 
@@ -18,16 +18,19 @@ def purge_registry(
     store: RawStore,
     state_catalog_source_codes: Collection[str],
 ) -> int:
-    """Delete the rows of the registry whose file is gone and that nothing cites; return how
-    many."""
+    """Delete the rows of the registry whose file is gone and that nothing cites, once an import in
+    progress on PostgreSQL has committed; return how many."""
     connection = connect_database(database)
     try:
+        lock_for_writing(connection)
         deleted_count = delete_rows_without_file(
             connection, store, state_catalog_source_codes
         )
         connection.commit()
     except BaseException:
-        connection.rollback()
+        # Only an open transaction, as in purge/base.py.
+        if connection.in_transaction:
+            connection.rollback()
         raise
     finally:
         connection.close()

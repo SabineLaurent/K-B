@@ -7,9 +7,9 @@ import pytest
 from fastapi.routing import iter_route_contexts
 
 from k_b.core.config import (
-    DATA_API_POOL_WAIT_SECONDS,
     DATA_API_QUERY_TIMEOUT_SECONDS,
     DATA_API_READ_TIMEOUT_SECONDS,
+    READING_POOL_WAIT_SECONDS,
 )
 from k_b.data_api.routers import item_router
 from k_b.database import engine
@@ -188,7 +188,7 @@ def test_the_deadline_of_a_request_is_below_the_read_timeout_of_the_ai_api_clien
 def test_the_wait_for_a_connection_and_one_reading_hold_below_the_read_timeout_of_the_client():
     """On PostgreSQL, a request may first wait for a connection of the pool."""
     assert (
-        DATA_API_POOL_WAIT_SECONDS + DATA_API_QUERY_TIMEOUT_SECONDS
+        READING_POOL_WAIT_SECONDS + DATA_API_QUERY_TIMEOUT_SECONDS
         < DATA_API_READ_TIMEOUT_SECONDS
     )
 

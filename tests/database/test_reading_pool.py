@@ -4,10 +4,10 @@ of libpq in what kb writes."""
 
 import logging
 import threading
+from pathlib import Path
 
 import psycopg
 import pytest
-from conftest import ITEMS_DATABASE_SCRIPT
 
 from k_b.database import reading
 from k_b.database.creation import create_database
@@ -16,6 +16,7 @@ from k_b.database.errors import is_query_timeout
 from k_b.database.location import PostgresUrl, UnreadableDatabaseUrlError
 from k_b.database.reading import read_item_detail, read_items
 
+ITEMS_DATABASE_SCRIPT = Path(__file__).parents[1] / "fixtures" / "items_database.sql"
 PASSWORD = "S3cret-of-the-test"  # noqa: S105 — a marker the test looks for, no secret
 # libpq stops at the [ of an IPv6 host never closed, and its error quotes the whole URL.
 MALFORMED_URL = PostgresUrl(f"postgresql://kb:{PASSWORD}@[::1/kb")
@@ -36,9 +37,11 @@ def test_a_deadline_below_one_millisecond_is_refused_as_statement_timeout_0_disa
 
 
 def test_a_url_libpq_cannot_read_is_refused_before_the_pool_without_its_text():
-    with pytest.raises(UnreadableDatabaseUrlError) as refusal:
-        with open_readers(MALFORMED_URL, TIMEOUT_SECONDS):
-            pass
+    with (
+        pytest.raises(UnreadableDatabaseUrlError) as refusal,
+        open_readers(MALFORMED_URL, TIMEOUT_SECONDS),
+    ):
+        pass
 
     assert str(refusal.value) == "KB_DATABASE_URL is not a URL libpq reads"
     assert refusal.value.__cause__ is None
@@ -108,10 +111,12 @@ def test_a_reading_past_its_deadline_is_stopped_and_its_connection_given_back_id
 
 @on_postgresql
 def test_a_connection_is_given_back_to_the_pool_without_transaction(readers, caplog):
-    with caplog.at_level(logging.INFO, logger="psycopg"):
-        with connect_reader(readers, TIMEOUT_SECONDS) as connection:
-            read_items(connection, limit=1)
-            assert connection.in_transaction
+    with (
+        caplog.at_level(logging.INFO, logger="psycopg"),
+        connect_reader(readers, TIMEOUT_SECONDS) as connection,
+    ):
+        read_items(connection, limit=1)
+        assert connection.in_transaction
 
     # The pool rolls back and logs a connection given back in a transaction: none here.
     assert not [
@@ -163,8 +168,8 @@ def test_the_pool_lends_no_connection_beyond_its_wait(
     """Every connection lent, the next request waits for its bound, then fails."""
     from k_b.database import postgresql
 
-    monkeypatch.setattr(postgresql, "DATA_API_POOL_MAX_SIZE", 1)
-    monkeypatch.setattr(postgresql, "DATA_API_POOL_WAIT_SECONDS", 0.2)
+    monkeypatch.setattr(postgresql, "READING_POOL_MAX_SIZE", 1)
+    monkeypatch.setattr(postgresql, "READING_POOL_WAIT_SECONDS", 0.2)
     with open_readers(items_postgresql_base, TIMEOUT_SECONDS) as readers:
         lent = threading.Event()
         release = threading.Event()

@@ -47,18 +47,18 @@ def collect(target, *options):
 
 
 def engine_of(test_id):
-    """The engine a collected test runs on, by its id."""
-    [engine] = re.findall(r"\b(sqlite|postgresql)\b", test_id.partition("[")[2])
-    return engine
+    """The engine a collected test runs on, by its id; None for a test that reads no base."""
+    engines = re.findall(r"\b(sqlite|postgresql)\b", test_id.partition("[")[2])
+    return engines[0] if engines else None
 
 
 def test_without_m_a_test_of_the_reading_runs_on_sqlite_only():
     ids, output, exit_code = collect(READING_TESTS)
+    postgresql_ids, _, _ = collect(READING_TESTS, "-m", "postgresql")
 
     assert exit_code == pytest.ExitCode.OK
-    assert ids
-    assert {engine_of(test_id) for test_id in ids} == {"sqlite"}
-    assert f"{len(ids)} deselected" in output
+    assert {engine_of(test_id) for test_id in ids} == {"sqlite", None}
+    assert f"{len(postgresql_ids)} deselected" in output
 
 
 def test_m_postgresql_collects_the_postgresql_half_of_each_test_of_the_reading():
@@ -69,7 +69,7 @@ def test_m_postgresql_collects_the_postgresql_half_of_each_test_of_the_reading()
     assert exit_code == pytest.ExitCode.OK
     assert {engine_of(test_id) for test_id in ids} == {"postgresql"}
     assert sorted(test_id.replace("postgresql", "sqlite") for test_id in ids) == sorted(
-        sqlite_ids
+        test_id for test_id in sqlite_ids if engine_of(test_id) == "sqlite"
     )
 
 

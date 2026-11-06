@@ -1,19 +1,24 @@
 """Connect to the items database, SQLite or PostgreSQL, through the one type of connection every
-module of K-B is given; lock it for a writer, and bound the time of its readings on SQLite."""
+module of K-B is given; lock it for a writer, and give the data API its readers, each reading
+bounded in time."""
 
 import sqlite3
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from k_b.database import postgresql
 from k_b.database.location import DatabaseLocation, check_database_exists
-from k_b.database.postgresql import PostgresConnection
+from k_b.database.postgresql import PostgresConnection, ReadingPool
 
 # The class of sqlite3 itself, not a wrapper: the SQLite path stays as it is.
 SqliteConnection = sqlite3.Connection
 # The connection of either engine: PostgresConnection has the methods of sqlite3 that K-B uses.
 Connection = SqliteConnection | PostgresConnection
+# What the data API reads: the SQLite file, opened at each request, or the pool of a PostgreSQL
+# base.
+Readers = Path | ReadingPool
 
 # The instructions SQLite runs between two checks of the deadline: about 0.75 s past it on the
 # longest search, measured (0.1 s at 100); each check takes the GIL back, so fewer checks spare
@@ -48,6 +53,46 @@ def is_commit_finished_before_a_signal(connection: Connection) -> bool:
     waits for the answer to COMMIT in Python and, on the signal, asks the server to cancel it,
     which the server may or may not do."""
     return isinstance(connection, SqliteConnection)
+
+
+@contextmanager
+def open_readers(
+    location: DatabaseLocation, query_timeout_seconds: float
+) -> Iterator[Readers]:
+    """The readers of the base for the block: its SQLite file as it is, or the pool of its
+    PostgreSQL base, each statement of which has query_timeout_seconds (refused below 1 ms)."""
+    if isinstance(location, Path):
+        yield location
+        return
+    with postgresql.open_reading_pool(location, query_timeout_seconds) as pool:
+        yield pool
+
+
+@contextmanager
+def connect_reader(
+    readers: Readers, query_timeout_seconds: float
+) -> Iterator[Connection]:
+    """One read-only connection for a request, its readings stopped past their deadline: a new one
+    on the SQLite file, with query_timeout_seconds, closed after; one of the pool on PostgreSQL,
+    whose deadline the pool set, given back after."""
+    if not isinstance(readers, Path):
+        with postgresql.borrow_reader(readers) as reader:
+            yield reader
+        return
+    connection = connect_database_read_only(readers)
+    try:
+        set_query_timeout(connection, query_timeout_seconds)
+        yield connection
+    finally:
+        connection.close()
+
+
+def begin_reading(connection: Connection) -> None:
+    """Open the transaction that holds several readings in one state of the base: BEGIN on
+    SQLite, which opens none for a reading; nothing on PostgreSQL, where psycopg opens it at the
+    first statement, in REPEATABLE READ READ ONLY for a connection of the readers."""
+    if isinstance(connection, SqliteConnection):
+        connection.execute("BEGIN")
 
 
 def connect_database_read_only(database_path: Path) -> SqliteConnection:

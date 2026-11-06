@@ -409,7 +409,7 @@ def test_serve_on_a_base_out_of_reach_answers_500_and_writes_no_text_of_libpq(
 ):
     """The pool fails to connect in the background: its lines, and those of psycopg, would quote
     the text of libpq (host, port, user); the request says only the type of the error."""
-    monkeypatch.setattr(postgresql, "DATA_API_POOL_WAIT_SECONDS", 0.3)
+    monkeypatch.setattr(postgresql, "READING_POOL_WAIT_SECONDS", 0.3)
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv(
         DATABASE_URL_VARIABLE, f"postgresql://kb_user:{PASSWORD}@127.0.0.1:1/kb_base"
