@@ -330,3 +330,140 @@ az rest --method post \
 ```
 
 L'API répond parfois 429 (trop de requêtes) : relancer quelques minutes plus tard.
+
+## La base PostgreSQL (#421)
+
+`modules/postgresql-server.bicep` crée le serveur `pgsql-kb-<suffixe>` : PostgreSQL 18, `Standard_B1ms`
+(Burstable), 32 Gio sans croissance automatique, sauvegardes du serveur 7 jours sans géoredondance, sans haute
+disponibilité, accès public sans VNet, **Entra seul** (mot de passe coupé), `citext` permise,
+`log_error_verbosity = TERSE`, et la règle de pare-feu « services Azure » (`0.0.0.0`). Le serveur se paie à
+l'heure, qu'il serve ou non : environ 16 €/mois avec ses 32 Gio (estimation du plan de mise en ligne).
+
+Le Bicep ne crée ni la base `kb` ni les rôles : l'administratrice Entra du serveur les crée en SQL, une fois
+(`postgresql/`). Puis le job `caj-kb-migrate-database` lance `kb migrate-database`, qui pose le schéma sur une
+base vide et ne fait rien sur une base qui l'a déjà.
+
+| Rôle PostgreSQL | Pour | Droits |
+|---|---|---|
+| `id-kb-migrate-database` | le job `caj-kb-migrate-database` | `CONNECT`, `USAGE` et `CREATE` sur `public` ; propriétaire des tables |
+| `id-kb-data-api` | l'API de données | membre de `kb_reader` : `CONNECT`, `USAGE`, `SELECT` sur les tables |
+| `kb_writer` (sans connexion) | la routine quotidienne, avec #330 | `CONNECT`, `USAGE`, `SELECT`, `INSERT`, `UPDATE`, `DELETE` |
+
+Aucun autre rôle ne se connecte à `kb` ni n'y crée rien : `grant-roles.sql` retire à `PUBLIC` les droits
+qu'Azure lui laisse.
+
+### Ouvrir une administration
+
+Depuis le Mac, l'adresse publique du Mac est ouverte le temps de l'administration, par `az`, jamais par le
+Bicep : une adresse IP resterait dans l'historique des déploiements. Le jeton d'accès sert de mot de passe à
+`psql` ; il vit 5 à 60 minutes ([Microsoft Learn](https://learn.microsoft.com/azure/postgresql/security/security-entra-configure)),
+il se demande juste avant chaque commande et n'est posé que pour elle (`PGPASSWORD=… psql`, sans `export` : `kb`
+refuse une variable `PG*` dans son environnement).
+
+```sh
+RG=<groupe de ressources>
+IP=<adresse IPv4 publique du Mac>
+PG=$(az postgres flexible-server list -g "$RG" --query "[0].name" -o tsv)
+FQDN=$(az postgres flexible-server show -g "$RG" -n "$PG" --query fullyQualifiedDomainName -o tsv)
+ADMIN=$(az ad signed-in-user show --query userPrincipalName -o tsv)
+CONN="host=$FQDN port=5432 user=$ADMIN sslmode=verify-full sslrootcert=system"
+token() { az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv; }
+az postgres flexible-server firewall-rule create -g "$RG" --server-name "$PG" --name admin-mac \
+  --start-ip-address "$IP" --end-ip-address "$IP"
+```
+
+`sslrootcert=system` fait vérifier le certificat du serveur par les autorités de la libssl de `psql` (sur le Mac,
+celles d'OpenSSL de Homebrew), et force `verify-full`.
+
+### Créer les rôles et la base (une fois)
+
+Les deux identités doivent exister d'abord (`id-kb-data-api` et `id-kb-migrate-database`, créées par
+`main.bicep`). Chaque rôle est rattaché à son identité par l'identifiant de son principal de service, pas par son
+nom, qu'une autre identité de l'annuaire peut porter.
+
+```sh
+MIGRATE_ID=$(az identity show -g "$RG" -n id-kb-migrate-database --query principalId -o tsv)
+DATA_API_ID=$(az identity show -g "$RG" -n id-kb-data-api --query principalId -o tsv)
+PGPASSWORD="$(token)" psql "$CONN dbname=postgres" \
+  -v migrate_database_principal_id="$MIGRATE_ID" -v data_api_principal_id="$DATA_API_ID" \
+  -f infra/postgresql/create-principals.sql
+PGPASSWORD="$(token)" psql "$CONN dbname=kb" -v ON_ERROR_STOP=1 -f infra/postgresql/grant-roles.sql
+```
+
+`grant-roles.sql` se relance sans rien changer. `create-principals.sql` ne se relance pas : la base `kb` existe
+déjà et `CREATE DATABASE` échoue.
+
+### Vérifier la chaîne TLS du job
+
+Le job ouvre la base en `sslmode=verify-full` contre `/etc/ssl/certs/ca-certificates.crt` de l'image. Avant le
+premier lancement, la chaîne du serveur se vérifie contre ce même fichier (pare-feu du Mac ouvert) :
+
+```sh
+docker run --rm --entrypoint cat k-b:<étiquette de l'image poussée> /etc/ssl/certs/ca-certificates.crt > "$TMPDIR/k-b-ca.crt"
+openssl s_client -starttls postgres -connect "$FQDN:5432" -servername "$FQDN" -verify_hostname "$FQDN" \
+  -CAfile "$TMPDIR/k-b-ca.crt" -verify_return_error </dev/null 2>&1 | grep "Verify return code"
+```
+
+Attendu : `Verify return code: 0 (ok)`.
+
+### Fermer l'administration
+
+```sh
+az postgres flexible-server firewall-rule delete -g "$RG" --server-name "$PG" --name admin-mac --yes
+az postgres flexible-server firewall-rule list -g "$RG" --server-name "$PG" \
+  --query "[].{name:name,start:startIpAddress,end:endIpAddress}" -o table
+```
+
+Attendu : la seule règle `AllowAllAzureServicesAndResourcesWithinAzureIps`, de `0.0.0.0` à `0.0.0.0`.
+
+### Vérifier les trois critères de #421
+
+1. `caj-kb-migrate-database` lancé deux fois rend `Succeeded` les deux fois, et la seconde ne change rien. Avant
+   et après le second lancement, la même requête (administration ouverte) doit rendre la même ligne : le nombre
+   de tables, une empreinte de leurs noms et de leurs droits, et le nombre de lignes écrites depuis le
+   démarrage du serveur.
+
+   ```sh
+   PGPASSWORD="$(token)" psql "$CONN dbname=kb" -At -c "SELECT count(*), md5(string_agg(c.relname || ':' || coalesce(c.relacl::text, ''), ',' ORDER BY c.relname)), (SELECT sum(n_tup_ins + n_tup_upd + n_tup_del) FROM pg_stat_user_tables) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r'"
+   az containerapp job start -g "$RG" -n caj-kb-migrate-database
+   az containerapp job execution list -g "$RG" -n caj-kb-migrate-database \
+     --query "[].{name:name,status:properties.status,start:properties.startTime}" -o table
+   az containerapp job logs show -g "$RG" -n caj-kb-migrate-database --container kb --format text
+   ```
+
+   La ligne de résultat du premier lancement est `database created: …`, celle du second
+   `database unchanged: … already has its tables`.
+2. Le mot de passe est coupé : `az postgres flexible-server show -g "$RG" -n "$PG" --query authConfig` rend
+   `"passwordAuth": "Disabled"` et `"activeDirectoryAuth": "Enabled"`.
+3. Sous `id-kb-data-api`, une écriture est refusée. Dans le catalogue, depuis l'administration :
+
+   ```sh
+   PGPASSWORD="$(token)" psql "$CONN dbname=kb" -At -c "SELECT has_table_privilege('id-kb-data-api', 'source', 'SELECT'), has_table_privilege('id-kb-data-api', 'source', 'INSERT'), has_schema_privilege('id-kb-data-api', 'public', 'CREATE'), has_database_privilege('id-kb-data-api', 'kb', 'TEMPORARY')"
+   ```
+
+   Attendu : `t|f|f|f`. Puis dans l'API elle-même, par son identité :
+   `az containerapp exec -g "$RG" -n ca-kb-data-api --command sh`, puis, dans le conteneur :
+
+   ```sh
+   python - <<'EOF'
+   import os
+   from pathlib import Path
+   from k_b.database.engine import connect_database
+   from k_b.database.location import read_database_location_or_refusal
+   location = read_database_location_or_refusal(os.environ, Path(os.environ["KB_DATA_DIR"]))
+   connection = connect_database(location)
+   print("SELECT", connection.execute("SELECT count(*) FROM source").fetchone())
+   connection.rollback()
+   for statement in ("INSERT INTO source (source_code, label, source_type, acquisition_mode) VALUES ('probe', 'probe', 'file', 'watch')", "CREATE TABLE probe (n integer)"):
+       try:
+           connection.execute(statement)
+           print("ACCEPTED", statement.split()[0])
+       except Exception as error:
+           print("REFUSED", statement.split()[0], type(error).__name__, getattr(error, "sqlstate", None))
+       connection.rollback()
+   connection.close()
+   EOF
+   ```
+
+   Attendu : `SELECT (7,)` (les sept sources que `kb migrate-database` écrit ; aucun item, #330 amorce la base),
+   puis `REFUSED INSERT InsufficientPrivilege 42501` et `REFUSED CREATE InsufficientPrivilege 42501`.
