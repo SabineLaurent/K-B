@@ -13,7 +13,7 @@ deux passes, l'image est poussée dans le registre et les secrets sont posés da
 |---|---|---|---|
 | `log-analytics.bicep` | espace Log Analytics `log-kb` : 30 jours de rétention, plafond de 0,2 Go par jour | 1 | #414 |
 | `container-apps-environment.bicep` | environnement Container Apps `cae-kb` : profil Consumption seul, sans VNet ; journaux vers `log-kb` par Azure Monitor, sans clé ; trafic chiffré entre les apps | 1 | #411, #414 |
-| `identities.bicep` | identités managées `id-kb-ai-api`, `id-kb-data-api`, `id-kb-smoke-test` | 1 | #414 |
+| `identities.bicep` | identités managées `id-kb-ai-api`, `id-kb-data-api`, `id-kb-smoke-test`, et `id-kb-deploy` (le déploiement continu) | 1 | #414, #415 |
 | `container-registry.bicep` | registre `crkb…` (ACR Basic), sans utilisateur admin ; AcrPull pour les trois identités | 1 | #414 |
 | `key-vault.bicep` | coffre `kv-kb-…` en RBAC, suppression réversible 7 jours ; Key Vault Secrets Officer pour l'opératrice | 1 | #414 |
 | `exchange-storage.bicep` | compte Blob `stkbexchange…`, clé partagée coupée ; conteneur `smoke-test`, lisible par `id-kb-smoke-test` seul | 1 | #414 (#420 le complète) |
@@ -23,6 +23,7 @@ deux passes, l'image est poussée dans le registre et les secrets sont posés da
 | `api-container-app.bicep` | `ca-kb-data-api` et `ca-kb-ai-api` : ingress interne seul, HTTPS, 0 à 1 réplique, sondes `GET /health` | 2 | #414 |
 | `smoke-test-job.bicep` | job manuel `caj-kb-smoke-test`, qui lance `kb smoke-test` | 2 | #414 |
 | `migrate-database-job.bicep` | identité `id-kb-migrate-database` et son AcrPull ; job manuel `caj-kb-migrate-database`, qui lance `kb migrate-database` | 1 (l'identité), 2 (le job) | #421 |
+| `deploy-access.bicep` | pour `id-kb-deploy` : connexion OIDC depuis l'environnement GitHub `production` seul ; AcrPush et Reader sur le registre, Container Apps Contributor sur chaque app, Container Apps Jobs Contributor sur chaque job de `deployment.json` | 2 | #415 |
 
 ## Noms des ressources
 
@@ -255,6 +256,9 @@ L'aperçu attendu :
 Les rôles sur les secrets se créent dans le même déploiement que les apps. Si une app échoue sur
 « unable to fetch secret », c'est qu'ils ne sont pas encore actifs : relancer la même commande 10 minutes plus tard.
 
+Une fois une version déployée par un tag (« Déployer une version »), `TAG` est la version en ligne, et non le SHA
+de l'étape 3. Sinon, la passe remettrait l'ancienne image.
+
 ### 6. Vérifier la mise en ligne
 
 Les deux apps sont internes, et leur révision est saine :
@@ -296,6 +300,123 @@ apparaître. Le démarrage, le tirage de l'image et le réveil d'une app à 0 r�
 
 Mesuré le 06/11 : 1 s pour le test quand les API sont éveillées, 50 s quand elles sont au repos. L'API de données
 répond 26 s après la première demande, et l'API IA 20 s après. Le job les appelle l'une après l'autre.
+
+## Déployer une version
+
+Un tag de version posé sur `main` part en ligne (#415). Une fusion ne déploie rien. Le workflow
+`.github/workflows/deploy.yml` a deux jobs :
+- **`check`** refuse un tag qui n'a pas la forme `vMAJEUR.MINEUR.CORRECTIF`, ou dont le commit n'est pas sur la
+  première lignée de `main`.
+- **`deploy`**, dans l'environnement GitHub `production`, fait le reste dans cet ordre :
+  1. il se connecte à Azure en `id-kb-deploy`, par OIDC ;
+  2. il construit et pousse `k-b:<tag>`, sauf si l'image existe déjà, construite depuis ce même commit ;
+  3. il met les apps et les jobs de `deployment.json` à l'image du tag ;
+  4. il lance `caj-kb-smoke-test` et attend `Succeeded`.
+
+La migration de la base (#421) se placera entre l'image et les apps.
+
+**Où est le verrou.** Le workflow qui tourne est celui du commit tagué. Le contrôle de `check` ne protège donc que
+d'une erreur. Le verrou tient en trois pièces :
+- **le ruleset « tags v »** réserve la création et la suppression des tags `v*` aux administrateurs du dépôt ;
+- **le ruleset « tags v immuables »** interdit de déplacer un tag, à tout le monde. Supprimer puis recréer un tag
+  revient à le déplacer, mais le déploiement échoue alors : l'image existante porte le SHA de l'ancien commit
+  (label `org.opencontainers.image.revision`) ;
+- **`id-kb-deploy` ne fait confiance qu'aux jetons de l'environnement `production`**, que seuls les tags
+  `v*.*.*` peuvent atteindre.
+
+Une administratrice peut modifier un ruleset : « personne ne déplace un tag » est une règle de travail, pas un
+verrou absolu. Aucune session Claude ne pose ni ne pousse de tag sans une demande explicite de Sabine.
+
+### Les réglages de GitHub, une fois, avant la passe 2
+
+Avant la passe 2, qui crée la connexion de `id-kb-deploy`. Sinon, un workflow de branche qui déclarerait
+`production` créerait l'environnement sans règle, et obtiendrait un jeton.
+
+```sh
+REPO=SabineLaurent/K-B
+# L'environnement production, atteint par les seuls tags v*.*.*.
+gh api -X PUT "repos/$REPO/environments/production" --input - -q .name <<'EOF'
+{"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}
+EOF
+gh api -X POST "repos/$REPO/environments/production/deployment-branch-policies" -f name='v*.*.*' -f type=tag -q .name
+# Création et suppression des tags v* : les administrateurs seuls (actor_id 5, à vérifier ci-dessous).
+gh api -X POST "repos/$REPO/rulesets" --input - -q .name <<'EOF'
+{"name": "tags v", "target": "tag", "enforcement": "active",
+ "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
+ "rules": [{"type": "creation"}, {"type": "deletion"}],
+ "bypass_actors": [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}]}
+EOF
+# Un tag v* ne se déplace pas : sans contournement.
+gh api -X POST "repos/$REPO/rulesets" --input - -q .name <<'EOF'
+{"name": "tags v immuables", "target": "tag", "enforcement": "active",
+ "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
+ "rules": [{"type": "update", "parameters": {"update_allows_fetch_and_merge": false}}, {"type": "non_fast_forward"}],
+ "bypass_actors": []}
+EOF
+```
+
+À vérifier ensuite :
+- dans Settings → Rules → Rulesets → « tags v », la liste des contournements montre « Repository admin ». La doc
+  de GitHub ne donne pas le numéro de ce rôle ;
+- `gh api "repos/$REPO/environments/production/deployment-branch-policies" -q '.branch_policies[] | [.name, .type]'`
+  donne `["v*.*.*","tag"]`.
+
+### Les secrets du dépôt, après la passe 2
+
+Ce sont des identifiants, pas des mots de passe. En secrets, ils sont masqués dans les journaux, publics dès le
+08/11. Aucune valeur ne s'affiche.
+
+```sh
+CLIENT_ID=$(az deployment group show -g "$RG" -n main --query properties.outputs.deployIdentityClientId.value -o tsv)
+kb_check "$RG" "$REGISTRY" "$CLIENT_ID" && {
+  gh secret set AZURE_CLIENT_ID --repo "$REPO" --body "$CLIENT_ID"
+  gh secret set AZURE_TENANT_ID --repo "$REPO" --body "$(az account show --query tenantId -o tsv)"
+  gh secret set AZURE_SUBSCRIPTION_ID --repo "$REPO" --body "$(az account show --query id -o tsv)"
+  gh secret set KB_RESOURCE_GROUP --repo "$REPO" --body "$RG"
+  gh secret set KB_REGISTRY --repo "$REPO" --body "$REGISTRY"
+}
+gh secret list --repo "$REPO"    # les 5 noms, jamais les valeurs
+```
+
+`az account show` doit être l'abonnement du groupe de ressources (`az group show -n "$RG"` le confirme).
+
+### Poser une version
+
+Sur demande de Sabine seulement, et toujours sur un commit de `main` :
+
+```sh
+git -C ~/REPO_GIT/K-B pull --ff-only
+git -C ~/REPO_GIT/K-B tag -a v0.1.0 -m "v0.1.0" origin/main
+git -C ~/REPO_GIT/K-B push origin v0.1.0
+# Quelques secondes plus tard, l'exécution du tag :
+gh run list --repo "$REPO" --workflow deploy.yml --limit 1
+gh run watch --repo "$REPO" <id de l'exécution>
+```
+
+Un tag nouveau à chaque version, jamais déplacé. Une exécution en attente est annulée si une plus récente arrive ;
+celle qui tourne va jusqu'au bout.
+
+**Revenir en arrière**, c'est redéployer le tag précédent : l'image existe déjà, rien n'est reconstruit.
+- Dans les 30 jours : « Re-run all jobs » sur l'exécution de ce tag.
+- Au-delà : `gh workflow run deploy.yml --repo "$REPO" --ref v0.1.0`.
+
+**Un job nouveau** (#421, #413) s'ajoute à `deployment.json`. Le Bicep lui donne le rôle de `id-kb-deploy`, et le
+workflow met son image à jour.
+
+### Le 08/11, une fois le dépôt public
+
+Jusque-là, un tag déploie sans validation : c'est un risque accepté par Sabine le 06/11 (journal ADR, registre).
+Les « required reviewers » ne s'ouvrent qu'aux dépôts publics. Le PUT remplace tout l'environnement, d'où la règle
+des tags reprise dans le même corps.
+
+```sh
+gh api -X PUT "repos/$REPO/environments/production" --input - -q '.protection_rules[].type' <<'EOF'
+{"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true},
+ "reviewers": [{"type": "User", "id": 189640103}], "prevent_self_review": false}
+EOF
+```
+
+`prevent_self_review` reste à `false` : Sabine est la seule à valider.
 
 ## Vérifier le budget
 

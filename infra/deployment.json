@@ -1,0 +1,4 @@
+{
+  "apps": ["ca-kb-data-api", "ca-kb-ai-api"],
+  "jobs": ["caj-kb-smoke-test"]
+}

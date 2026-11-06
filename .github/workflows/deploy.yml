@@ -1,0 +1,125 @@
+name: Deploy
+
+# The continuous deployment of K-B (#415): a version tag on main goes online. A merge deploys nothing.
+# The workflow that runs is the one of the tagged commit: the check job guards against a mistake only. The lock
+# is the ruleset that keeps the tags v* to the administrators of the repository, and the environment
+# production, the only one id-kb-deploy trusts (infra/README.md, « Déployer une version »).
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  # Deploys an earlier tag again, beyond the 30 days a run can be re-run: gh workflow run deploy.yml --ref <tag>.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time. The running one is never canceled; a pending one is, by a newer one.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Refuses a ref that is not a version tag
+        run: |
+          if ! [[ "$GITHUB_REF" =~ ^refs/tags/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "not a version tag vMAJOR.MINOR.PATCH: $GITHUB_REF"
+            exit 1
+          fi
+      # The first-parent line: the commits of main itself, its merge commits included, not those of a merged
+      # branch. ^{commit} follows an annotated tag to its commit.
+      - name: Refuses a tag whose commit is not on main
+        id: commit
+        run: |
+          sha=$(git rev-parse "$GITHUB_REF^{commit}")
+          if ! git rev-list --first-parent origin/main | grep -qx "$sha"; then
+            echo "$GITHUB_REF_NAME is not on main: $sha"
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    # Secrets, so that the logs, public from 2026-11-08, mask them; every az command prints a narrow query or
+    # nothing.
+    env:
+      SHA: ${{ needs.check.outputs.sha }}
+      RG: ${{ secrets.KB_RESOURCE_GROUP }}
+      REGISTRY: ${{ secrets.KB_REGISTRY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.check.outputs.sha }}
+          persist-credentials: false
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Signs in to the registry
+        run: |
+          az acr login --name "$REGISTRY" -o none
+          echo "IMAGE=$REGISTRY.azurecr.io/k-b:$GITHUB_REF_NAME" >> "$GITHUB_ENV"
+      # An image is never overwritten: there with the commit of the tag, it is deployed again (a rollback);
+      # there with another commit (a tag deleted and created again elsewhere), the deployment stops.
+      - name: Builds and pushes the image of the tag, unless it is there
+        run: |
+          inspect_error="$RUNNER_TEMP/inspect-error"
+          if revision=$(docker buildx imagetools inspect "$IMAGE" \
+              --format '{{ index .Image.Config.Labels "org.opencontainers.image.revision" }}' 2>"$inspect_error"); then
+            if [ "$revision" != "$SHA" ]; then
+              echo "the image of $GITHUB_REF_NAME was built from another commit: $revision"
+              exit 1
+            fi
+            echo "the image of $GITHUB_REF_NAME is there, built from $SHA"
+          elif grep -q "not found" "$inspect_error"; then
+            docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
+              --label "org.opencontainers.image.revision=$SHA" --tag "$IMAGE" --push .
+          else
+            cat "$inspect_error"
+            exit 1
+          fi
+      # The migration of the base (#421) goes here: caj-kb-migrate-database at the image of the tag, started and
+      # awaited; nothing below runs if it fails.
+      - name: Sets the apps to the image of the tag
+        run: |
+          for app in $(jq -r '.apps[]' infra/deployment.json); do
+            az containerapp update -n "$app" -g "$RG" --container-name kb --image "$IMAGE" -o none
+            echo "$app: $GITHUB_REF_NAME"
+          done
+      - name: Sets the jobs to the image of the tag
+        run: |
+          for job in $(jq -r '.jobs[]' infra/deployment.json); do
+            az containerapp job update -n "$job" -g "$RG" --container-name kb --image "$IMAGE" -o none
+            echo "$job: $GITHUB_REF_NAME"
+          done
+      # The proof that the version deployed answers: both /health, and the exchange storage by the identity of
+      # the job. Its replicaTimeout is 900 s: the wait stops after it.
+      - name: Runs the smoke test
+        run: |
+          execution=$(az containerapp job start -n caj-kb-smoke-test -g "$RG" --query name -o tsv)
+          for _ in $(seq 1 64); do
+            status=$(az containerapp job execution show -n caj-kb-smoke-test -g "$RG" \
+              --job-execution-name "$execution" --query properties.status -o tsv)
+            case "$status" in
+              Succeeded) echo "caj-kb-smoke-test: Succeeded"; exit 0 ;;
+              Failed|Stopped|Degraded) echo "caj-kb-smoke-test: $status"; exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "caj-kb-smoke-test: still $status after 16 min"
+          exit 1
