@@ -2,11 +2,11 @@
 version seen is kept."""
 
 import json
-import sqlite3
 from collections.abc import Sequence
 
 from k_b.core.config import TrackedRepository
 from k_b.core.dates import format_date
+from k_b.database.engine import Connection
 from k_b.database.writers import shared_rows
 from k_b.database.writers.discard import Discard
 from k_b.items import Item
@@ -37,7 +37,7 @@ INSERT INTO release (
 
 
 def write_tracked_repositories(
-    connection: sqlite3.Connection, tracked_repositories: Sequence[TrackedRepository]
+    connection: Connection, tracked_repositories: Sequence[TrackedRepository]
 ) -> None:
     """Write the tracked repositories in the database, updating the ones already there."""
     connection.executemany(
@@ -53,9 +53,7 @@ def write_tracked_repositories(
     )
 
 
-def write(
-    connection: sqlite3.Connection, item: Item, raw_data_id: int
-) -> Discard | None:
+def write(connection: Connection, item: Item, raw_data_id: int) -> Discard | None:
     """The GitHub item and its release, unless the release is known: the first seen is kept."""
     release_id = int(item.source_item_id)
     row = connection.execute(

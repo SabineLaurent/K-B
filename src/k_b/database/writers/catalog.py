@@ -1,11 +1,11 @@
 """The rule of a state catalog (CISA KEV, Zotero): the version of its latest collection is
 kept."""
 
-import sqlite3
 from datetime import datetime
 from typing import NamedTuple
 
 from k_b.core.dates import format_date
+from k_b.database.engine import Connection
 from k_b.database.writers import shared_rows
 from k_b.database.writers.discard import Discard
 from k_b.items import Item
@@ -33,7 +33,7 @@ class LatestCatalog(NamedTuple):
 
 
 def read_latest(
-    connection: sqlite3.Connection,
+    connection: Connection,
     source_code: str,
     collected_at: datetime,
     raw_data_id: int,
@@ -62,7 +62,7 @@ def find_withdrawn_at_of_new_row(latest: LatestCatalog) -> str | None:
 
 
 def build_discard(
-    connection: sqlite3.Connection, item: Item, item_id: int, latest: LatestCatalog
+    connection: Connection, item: Item, item_id: int, latest: LatestCatalog
 ) -> Discard:
     """The discard of an item the base did not write, naming which of the two conditions failed."""
     if latest.is_file_after:

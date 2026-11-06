@@ -1,8 +1,7 @@
 """Mark as withdrawn what a state catalog (CISA KEV, a Zotero extract) no longer lists, while its
 raw file is written into the base; the SQL is in the writer of the kind."""
 
-import sqlite3
-
+from k_b.database.engine import Connection
 from k_b.database.writing import (
     mark_withdrawn_vulnerabilities_not_in,
     mark_withdrawn_zotero_rows_not_in,
@@ -11,7 +10,7 @@ from k_b.etl.raw_files import RawFile
 
 
 def mark_withdrawn_vulnerabilities(
-    connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
+    connection: Connection, raw_file: RawFile, raw_data_id: int
 ) -> int:
     """Mark as withdrawn the CVE a catalog no longer lists; return how many.
 
@@ -34,7 +33,7 @@ def mark_withdrawn_vulnerabilities(
 
 
 def mark_withdrawn_zotero_rows(
-    connection: sqlite3.Connection, raw_file: RawFile, raw_data_id: int
+    connection: Connection, raw_file: RawFile, raw_data_id: int
 ) -> int:
     """Mark as withdrawn the entries and highlights an extract no longer lists; return how many.
     An extract with a rejected entry, or without entry, withdraws nothing."""

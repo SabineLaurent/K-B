@@ -2,12 +2,12 @@
 "what's new", one branch per kind, every filter a bound parameter."""
 
 import json
-import sqlite3
 from collections.abc import Callable, Collection
 from datetime import date, datetime, timedelta
 from typing import Any, NamedTuple
 
 from k_b.core.dates import format_day
+from k_b.database.engine import Connection
 from k_b.items import (
     ARXIV_ABSTRACT_PAGE_URL,
     MAX_INT64,
@@ -292,7 +292,7 @@ class TrendWindow(NamedTuple):
     trends: list[StoredTrend]
 
 
-def read_raw_file_paths(connection: sqlite3.Connection) -> frozenset[str]:
+def read_raw_file_paths(connection: Connection) -> frozenset[str]:
     """The raw files already imported, one row of raw_data per file."""
     return frozenset(
         str(raw_file_path)
@@ -301,7 +301,7 @@ def read_raw_file_paths(connection: sqlite3.Connection) -> frozenset[str]:
 
 
 def read_items(
-    connection: sqlite3.Connection,
+    connection: Connection,
     *,
     limit: int,
     offset: int = 0,
@@ -373,9 +373,7 @@ def to_like_pattern(search_text: str) -> str:
     return f"%{escaped}%"
 
 
-def read_highlights(
-    connection: sqlite3.Connection, item_id: int
-) -> list[StoredHighlight]:
+def read_highlights(connection: Connection, item_id: int) -> list[StoredHighlight]:
     """The highlights of a Zotero entry, the withdrawn ones included, by date of creation;
     item_id must hold in 64 bits, or sqlite3 raises an OverflowError."""
     check_within_bounds("item_id", item_id, MIN_INT64, MAX_INT64)
@@ -385,7 +383,7 @@ def read_highlights(
     ]
 
 
-def read_item_detail(connection: sqlite3.Connection, item_id: int) -> ItemDetail | None:
+def read_item_detail(connection: Connection, item_id: int) -> ItemDetail | None:
     """An item with what its kind serves beyond the list, or None if no item has this id.
 
     Its queries share one read transaction, so that a write between them cannot mix two states of
@@ -413,7 +411,7 @@ def read_item_detail(connection: sqlite3.Connection, item_id: int) -> ItemDetail
             connection.rollback()
 
 
-def read_paper_detail(connection: sqlite3.Connection, item_id: int) -> PaperDetail:
+def read_paper_detail(connection: Connection, item_id: int) -> PaperDetail:
     """Read the details of a paper item."""
     arxiv_id, authors, summary, arxiv_updated_at = fetch_row(
         connection, SELECT_PAPER, item_id
@@ -422,7 +420,7 @@ def read_paper_detail(connection: sqlite3.Connection, item_id: int) -> PaperDeta
 
 
 def read_vulnerability_detail(
-    connection: sqlite3.Connection, item_id: int
+    connection: Connection, item_id: int
 ) -> VulnerabilityDetail:
     """Read the details of a vulnerability item."""
     return VulnerabilityDetail._make(
@@ -430,14 +428,12 @@ def read_vulnerability_detail(
     )
 
 
-def read_release_detail(connection: sqlite3.Connection, item_id: int) -> ReleaseDetail:
+def read_release_detail(connection: Connection, item_id: int) -> ReleaseDetail:
     """Read the details of a release item."""
     return ReleaseDetail._make(fetch_row(connection, SELECT_RELEASE, item_id))
 
 
-def read_advisory_detail(
-    connection: sqlite3.Connection, item_id: int
-) -> AdvisoryDetail:
+def read_advisory_detail(connection: Connection, item_id: int) -> AdvisoryDetail:
     """Read the details of an advisory item."""
     ghsa_id, cve_id, exploited, packages = fetch_row(
         connection, SELECT_ADVISORY, item_id
@@ -452,7 +448,7 @@ def read_advisory_detail(
 
 
 def read_newsletter_article_detail(
-    connection: sqlite3.Connection, item_id: int
+    connection: Connection, item_id: int
 ) -> NewsletterArticleDetail:
     """Read the details of a newsletter article item."""
     return NewsletterArticleDetail._make(
@@ -460,9 +456,7 @@ def read_newsletter_article_detail(
     )
 
 
-def read_zotero_entry_detail(
-    connection: sqlite3.Connection, item_id: int
-) -> ZoteroEntryDetail:
+def read_zotero_entry_detail(connection: Connection, item_id: int) -> ZoteroEntryDetail:
     """Read the details of a Zotero entry item, with its highlights."""
     zotero_key, item_type, arxiv_id, revised_at = fetch_row(
         connection, SELECT_ZOTERO_ENTRY, item_id
@@ -476,20 +470,18 @@ def read_zotero_entry_detail(
     )
 
 
-def read_clip_detail(connection: sqlite3.Connection, item_id: int) -> ClipDetail:
+def read_clip_detail(connection: Connection, item_id: int) -> ClipDetail:
     """Read the details of a clip item."""
     return ClipDetail._make(fetch_row(connection, SELECT_CLIP, item_id))
 
 
-def fetch_row(connection: sqlite3.Connection, query: str, item_id: int) -> Any:
+def fetch_row(connection: Connection, query: str, item_id: int) -> Any:
     """The row of the subtype of an item the list has read, which exists since its branch in
     LISTED_ITEMS reads the same table by the same item_id."""
     return connection.execute(query, (item_id,)).fetchone()
 
 
-READ_DETAILS_BY_KIND: dict[
-    ItemKind, Callable[[sqlite3.Connection, int], KindDetail]
-] = {
+READ_DETAILS_BY_KIND: dict[ItemKind, Callable[[Connection, int], KindDetail]] = {
     "paper": read_paper_detail,
     "vulnerability": read_vulnerability_detail,
     "release": read_release_detail,
@@ -501,7 +493,7 @@ READ_DETAILS_BY_KIND: dict[
 
 
 def read_trends(
-    connection: sqlite3.Connection, window_end: date | None = None
+    connection: Connection, window_end: date | None = None
 ) -> TrendWindow | None:
     """The trends of a window, the latest when none is given; None if the base has none."""
     rows = connection.execute(

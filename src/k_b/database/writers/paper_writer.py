@@ -1,9 +1,9 @@
 """Write an arXiv paper: a feed with revisions, the newest revision is kept."""
 
 import json
-import sqlite3
 
 from k_b.core.dates import format_date
+from k_b.database.engine import Connection
 from k_b.database.writers import shared_rows
 from k_b.database.writers.discard import Discard
 from k_b.items import Item
@@ -25,9 +25,7 @@ RETURNING id
 """
 
 
-def write(
-    connection: sqlite3.Connection, item: Item, raw_data_id: int
-) -> Discard | None:
+def write(connection: Connection, item: Item, raw_data_id: int) -> Discard | None:
     """The arXiv item and its publication, found by its arXiv identifier."""
     row = connection.execute(
         "SELECT item_id, revised_at FROM publication WHERE arxiv_id = ?",

@@ -1,10 +1,10 @@
 """Write a clip: the latest version of a URL is kept, a clip whose content changed is written
 again, revised_at dated."""
 
-import sqlite3
 from typing import NamedTuple
 
 from k_b.core.dates import format_date
+from k_b.database.engine import Connection
 from k_b.database.writers import shared_rows
 from k_b.database.writers.discard import Discard
 from k_b.items import Item
@@ -86,9 +86,7 @@ class ClipContent(NamedTuple):
         return columns
 
 
-def write(
-    connection: sqlite3.Connection, item: Item, raw_data_id: int
-) -> Discard | None:
+def write(connection: Connection, item: Item, raw_data_id: int) -> Discard | None:
     """The item and its clip; a clip of a URL already known is written again if it changed."""
     content = ClipContent(
         item.title,
@@ -110,7 +108,7 @@ def write(
 
 
 def write_known_clip(
-    connection: sqlite3.Connection, item: Item, raw_data_id: int, content: ClipContent
+    connection: Connection, item: Item, raw_data_id: int, content: ClipContent
 ) -> Discard | None:
     """The known clip of the URL takes content, unless it is the same or the file was collected
     before the raw file of the clip; of two files of a URL in one collection, the second in page
@@ -150,7 +148,7 @@ def write_known_clip(
 
 
 def write_changed_columns(
-    connection: sqlite3.Connection,
+    connection: Connection,
     item_id: int,
     known: ClipContent,
     content: ClipContent,
@@ -172,7 +170,7 @@ def write_changed_columns(
 
 
 def write_changed_tags(
-    connection: sqlite3.Connection,
+    connection: Connection,
     item_id: int,
     known_tag_ids: dict[str, int],
     tags: frozenset[str],
@@ -185,14 +183,12 @@ def write_changed_tags(
     write_tags(connection, item_id, tuple(sorted(tags - known_tag_ids.keys())))
 
 
-def read_tag_ids(connection: sqlite3.Connection, item_id: int) -> dict[str, int]:
+def read_tag_ids(connection: Connection, item_id: int) -> dict[str, int]:
     """Read the tags of an item: the id of each tag, by its name."""
     return dict(connection.execute(SELECT_ITEM_TAGS, (item_id,)).fetchall())
 
 
-def write_tags(
-    connection: sqlite3.Connection, item_id: int, tags: tuple[str, ...]
-) -> None:
+def write_tags(connection: Connection, item_id: int, tags: tuple[str, ...]) -> None:
     """Link the item to each of its tags, created if new, in the order given; the id is read, so
     that a missing tag stops the import instead of dropping its link silently."""
     for tag in tags:

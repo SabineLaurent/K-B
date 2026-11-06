@@ -5,7 +5,6 @@ An entry the base refuses becomes a rejection and the import goes on; any other 
 nothing in the base and leaves no journal."""
 
 import logging
-import sqlite3
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
@@ -13,7 +12,9 @@ from typing import NamedTuple
 
 from k_b.core.config import TrackedRepository
 from k_b.core.quoting import quote_value
-from k_b.database.connection import check_database_exists, connect_database
+from k_b.database.connection import check_database_exists
+from k_b.database.engine import Connection, connect_database
+from k_b.database.errors import EngineError
 from k_b.database.reading import read_raw_file_paths
 from k_b.database.writing import write_tracked_repositories
 from k_b.etl.file_writing import FileWriting, write_file
@@ -86,7 +87,7 @@ def import_items(
 
 
 def write_files(
-    connection: sqlite3.Connection, reading: RawReading, trend_reading: TrendReading
+    connection: Connection, reading: RawReading, trend_reading: TrendReading
 ) -> FileWriting:
     """Write each file in collection order; what the reading rejected comes first."""
     rejected_when_read = FileWriting(
@@ -104,7 +105,7 @@ def write_files(
 
 
 def commit_with_journal(
-    connection: sqlite3.Connection,
+    connection: Connection,
     journal_path: Path,
     imported_at: datetime,
     writing: FileWriting,
@@ -125,11 +126,11 @@ def commit_with_journal(
         )
         connection.commit()
     except BaseException as error:
-        # The journal goes with the import it describes. A commit that fails raises a sqlite3.Error,
+        # The journal goes with the import it describes. A commit that fails raises an EngineError,
         # whether SQLite keeps the transaction or undoes it itself. A Ctrl-C or a SIGTERM
         # received before the commit finds the transaction open; one received during the commit
         # is raised by Python once the commit has returned, with no transaction left.
-        if isinstance(error, sqlite3.Error) or connection.in_transaction:
+        if isinstance(error, EngineError) or connection.in_transaction:
             # The journal at journal_path can only be this import's: it was absent above.
             journal_path.unlink(missing_ok=True)
         else:

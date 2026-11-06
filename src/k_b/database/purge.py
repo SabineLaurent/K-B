@@ -2,8 +2,9 @@
 tracked repositories no longer tracked, and the rows of the registry whose raw file is gone
 (docs/registre-traitements.md, steps 2 and 3)."""
 
-import sqlite3
 from typing import NamedTuple
+
+from k_b.database.engine import Connection
 
 SELECT_SOURCES = "SELECT id, source_code, acquisition_mode FROM source ORDER BY id"
 
@@ -119,14 +120,12 @@ class RawDataRow(NamedTuple):
     collected_at: str
 
 
-def read_sources(connection: sqlite3.Connection) -> list[SourceRow]:
+def read_sources(connection: Connection) -> list[SourceRow]:
     """The sources of the base, with their acquisition mode."""
     return [SourceRow(*row) for row in connection.execute(SELECT_SOURCES)]
 
 
-def delete_expired_items(
-    connection: sqlite3.Connection, source_id: int, bound: str
-) -> int:
+def delete_expired_items(connection: Connection, source_id: int, bound: str) -> int:
     """Delete the items of a source collected before the bound, with their subtypes; a paper
     keeps its arXiv identifier as a reference. Return how many items."""
     item_ids = [
@@ -145,9 +144,7 @@ def delete_expired_items(
     return connection.executemany(DELETE_ITEM, item_ids).rowcount
 
 
-def delete_expired_trends(
-    connection: sqlite3.Connection, source_id: int, bound: str
-) -> int:
+def delete_expired_trends(connection: Connection, source_id: int, bound: str) -> int:
     """Delete the trend rows of a source whose file was collected before the bound; return how
     many."""
     return connection.execute(
@@ -155,7 +152,7 @@ def delete_expired_trends(
     ).rowcount
 
 
-def delete_uncited_references(connection: sqlite3.Connection) -> int:
+def delete_uncited_references(connection: Connection) -> int:
     """Delete the papers and the CVE without item that nothing cites any more; return how many."""
     return (
         connection.execute(DELETE_UNCITED_PUBLICATIONS).rowcount
@@ -164,7 +161,7 @@ def delete_uncited_references(connection: sqlite3.Connection) -> int:
 
 
 def read_tracked_repositories_without_release(
-    connection: sqlite3.Connection,
+    connection: Connection,
 ) -> list[TrackedRepositoryRow]:
     """The tracked repositories no release cites."""
     return [
@@ -174,7 +171,7 @@ def read_tracked_repositories_without_release(
 
 
 def delete_tracked_repository_without_release(
-    connection: sqlite3.Connection, repository_id: int
+    connection: Connection, repository_id: int
 ) -> int:
     """Delete a tracked repository if no release cites it; return 1 if deleted, else 0."""
     return connection.execute(
@@ -182,13 +179,13 @@ def delete_tracked_repository_without_release(
     ).rowcount
 
 
-def read_uncited_raw_data(connection: sqlite3.Connection) -> list[RawDataRow]:
+def read_uncited_raw_data(connection: Connection) -> list[RawDataRow]:
     """The rows of the registry that no item and no trend row cites."""
     return [RawDataRow(*row) for row in connection.execute(SELECT_UNCITED_RAW_DATA)]
 
 
 def read_last_collection_of_each_source(
-    connection: sqlite3.Connection,
+    connection: Connection,
 ) -> dict[int, str]:
     """The latest collection the registry holds, by source id."""
     return {
@@ -199,6 +196,6 @@ def read_last_collection_of_each_source(
     }
 
 
-def delete_uncited_raw_data(connection: sqlite3.Connection, raw_data_id: int) -> int:
+def delete_uncited_raw_data(connection: Connection, raw_data_id: int) -> int:
     """Delete a row of the registry if nothing cites it; return 1 if deleted, else 0."""
     return connection.execute(DELETE_UNCITED_RAW_DATA, (raw_data_id,)).rowcount

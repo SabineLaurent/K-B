@@ -4,10 +4,10 @@ own savepoint, a file of trends whole.
 The base removes the duplicates, by the rule of each source's writer (database/writers/); only
 exact duplicates are found, the same identifier within its source (docs/specs-collecte.md)."""
 
-import sqlite3
 from dataclasses import dataclass, field
 
 from k_b.core.quoting import quote_value
+from k_b.database.engine import Connection
 from k_b.database.savepoint import EntryRefusedError, write_in_savepoint
 from k_b.database.writing import Discard, write_item, write_raw_data, write_trend_rows
 from k_b.etl.import_journal import TrendDiscard
@@ -36,16 +36,14 @@ class FileWriting:
     trend_count: int = 0
 
 
-def write_file(
-    connection: sqlite3.Connection, file_read: RawFile | TrendFile
-) -> FileWriting:
+def write_file(connection: Connection, file_read: RawFile | TrendFile) -> FileWriting:
     """Write one raw file read into the database, as items or as trend rows."""
     if isinstance(file_read, TrendFile):
         return write_trend_file(connection, file_read)
     return write_items_file(connection, file_read)
 
 
-def write_items_file(connection: sqlite3.Connection, raw_file: RawFile) -> FileWriting:
+def write_items_file(connection: Connection, raw_file: RawFile) -> FileWriting:
     """Register the file read, write each of its items, then mark as withdrawn what its catalog
     no longer lists; the file is registered even with an item the base refuses."""
     raw_data_id = register_raw_file(connection, raw_file)
@@ -70,9 +68,7 @@ def write_items_file(connection: sqlite3.Connection, raw_file: RawFile) -> FileW
     )
 
 
-def write_trend_file(
-    connection: sqlite3.Connection, trend_file: TrendFile
-) -> FileWriting:
+def write_trend_file(connection: Connection, trend_file: TrendFile) -> FileWriting:
     """Register the file of trends and write its rows in one savepoint; return how many were
     written, and each window left out.
 
@@ -95,7 +91,7 @@ def write_trend_file(
     return FileWriting(trend_discards=discards, trend_count=written_count)
 
 
-def register_raw_file(connection: sqlite3.Connection, raw_file: RawFile) -> int:
+def register_raw_file(connection: Connection, raw_file: RawFile) -> int:
     """Register the file read under its stream, the name of its source folder."""
     return write_raw_data(
         connection,
@@ -107,7 +103,7 @@ def register_raw_file(connection: sqlite3.Connection, raw_file: RawFile) -> int:
 
 
 def write_item_in_savepoint(
-    connection: sqlite3.Connection, item: Item, raw_data_id: int
+    connection: Connection, item: Item, raw_data_id: int
 ) -> Discard | Rejection | None:
     """Write the item in its savepoint: an item the base refuses is returned as a rejection, one
     it left out as a discard."""

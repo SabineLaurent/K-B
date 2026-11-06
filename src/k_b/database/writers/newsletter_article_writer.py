@@ -1,8 +1,7 @@
 """Write a TLDR article: a news feed, the first version seen is kept."""
 
-import sqlite3
-
 from k_b.core.dates import format_date
+from k_b.database.engine import Connection
 from k_b.database.writers import shared_rows
 from k_b.database.writers.discard import Discard
 from k_b.items import Item
@@ -33,9 +32,7 @@ INSERT INTO newsletter_article (
 """
 
 
-def write(
-    connection: sqlite3.Connection, item: Item, raw_data_id: int
-) -> Discard | None:
+def write(connection: Connection, item: Item, raw_data_id: int) -> Discard | None:
     """The TLDR item and its article, unless the article is known: the first seen is kept."""
     natural_key = {
         "edition": item.edition,

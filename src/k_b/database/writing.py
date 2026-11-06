@@ -4,9 +4,9 @@ writer of each kind (WRITER_BY_KIND).
 Only objects pass the door, never a module of writers/: __all__ lists them, and mypy --strict
 refuses any other name."""
 
-import sqlite3
 from collections.abc import Callable
 
+from k_b.database.engine import Connection
 from k_b.database.writers import (
     advisory_writer,
     clip_writer,
@@ -50,7 +50,7 @@ class KindWithoutTableError(LookupError):
 
 
 # The kinds that have a table in the base, each with its writer.
-WRITER_BY_KIND: dict[str, Callable[[sqlite3.Connection, Item, int], Discard | None]] = {
+WRITER_BY_KIND: dict[str, Callable[[Connection, Item, int], Discard | None]] = {
     "paper": paper_writer.write,
     "vulnerability": vulnerability_writer.write,
     "release": release_writer.write,
@@ -61,9 +61,7 @@ WRITER_BY_KIND: dict[str, Callable[[sqlite3.Connection, Item, int], Discard | No
 }
 
 
-def write_item(
-    connection: sqlite3.Connection, item: Item, raw_data_id: int
-) -> Discard | None:
+def write_item(connection: Connection, item: Item, raw_data_id: int) -> Discard | None:
     """Write the item of the raw data raw_data_id, or return why the base left it out."""
     write_kind = WRITER_BY_KIND.get(item.kind)
     if write_kind is None:

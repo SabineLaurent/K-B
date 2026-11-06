@@ -2,11 +2,11 @@
 (catalog.py), at the level of the entry and of the highlight."""
 
 import json
-import sqlite3
 from collections.abc import Sequence
 from datetime import datetime
 
 from k_b.core.dates import format_date
+from k_b.database.engine import Connection
 from k_b.database.writers import catalog, shared_rows
 from k_b.database.writers.discard import Discard
 from k_b.items import Item
@@ -81,9 +81,7 @@ WHERE withdrawn_at IS NULL
 """
 
 
-def write(
-    connection: sqlite3.Connection, item: Item, raw_data_id: int
-) -> Discard | None:
+def write(connection: Connection, item: Item, raw_data_id: int) -> Discard | None:
     """The Zotero item, its entry and its highlights, found by their Zotero keys; a highlight
     changed is a new version of the entry."""
     row = connection.execute(
@@ -147,9 +145,7 @@ def write(
     return None
 
 
-def write_cited_publication(
-    connection: sqlite3.Connection, arxiv_id: str | None
-) -> int | None:
+def write_cited_publication(connection: Connection, arxiv_id: str | None) -> int | None:
     """The publication of arxiv_id, created without its arXiv columns if absent."""
     if arxiv_id is None:
         return None
@@ -161,7 +157,7 @@ def write_cited_publication(
 
 
 def mark_withdrawn(
-    connection: sqlite3.Connection,
+    connection: Connection,
     source_code: str,
     collected_at: datetime,
     raw_data_id: int,

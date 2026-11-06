@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from k_b.database.connection import connect_database
 from k_b.database.creation import create_database
+from k_b.database.engine import connect_database
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 ZOTERO_LIBRARY_SCRIPT = FIXTURES_DIR / "zotero_extract.sql"

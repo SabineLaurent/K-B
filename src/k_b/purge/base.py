@@ -2,7 +2,6 @@
 nothing cites any more and the tracked repositories no longer tracked."""
 
 import logging
-import sqlite3
 from collections.abc import Collection, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,7 +10,7 @@ from typing import NamedTuple
 from k_b.core.config import RETENTION_YEARS_BY_ACQUISITION_MODE
 from k_b.core.dates import DATABASE_DATE_FORMAT, subtract_months
 from k_b.database import purge as purge_queries
-from k_b.database.connection import connect_database
+from k_b.database.engine import Connection, connect_database
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +55,7 @@ def purge_expired_rows(
 
 
 def delete_expired_rows(
-    connection: sqlite3.Connection,
+    connection: Connection,
     imported_at: datetime,
     state_catalog_source_codes: Collection[str],
     tracked_repository_names: Sequence[str],
@@ -93,7 +92,7 @@ def find_bound(
 
 
 def delete_untracked_repositories(
-    connection: sqlite3.Connection,
+    connection: Connection,
     tracked_repository_names: Sequence[str],
 ) -> int:
     """Delete the tracked repositories out of the list that no release cites any more; the names

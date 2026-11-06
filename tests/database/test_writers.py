@@ -5,8 +5,8 @@ from datetime import timedelta
 import pytest
 from test_items import COLLECTED_AT, vulnerability_fields, zotero_entry_fields
 
-from k_b.database.connection import connect_database
 from k_b.database.creation import create_database
+from k_b.database.engine import connect_database
 from k_b.database.writers import (
     shared_rows,
     vulnerability_writer,
