@@ -85,3 +85,19 @@ def find_absent_keys(
         for (key,) in connection.execute(select_not_withdrawn)
         if key not in present
     )
+
+
+def mark_absent_withdrawn(
+    connection: Connection,
+    select_not_withdrawn: str,
+    mark_withdrawn: str,
+    present_keys: Sequence[str],
+    collected_at: str | None,
+) -> int:
+    """Mark as withdrawn at collected_at the rows not withdrawn whose key the catalog no longer
+    lists, one statement per key (:key); return how many."""
+    absent_keys = find_absent_keys(connection, select_not_withdrawn, present_keys)
+    return connection.executemany(
+        mark_withdrawn,
+        [{"collected_at": collected_at, "key": key} for key in absent_keys],
+    ).rowcount

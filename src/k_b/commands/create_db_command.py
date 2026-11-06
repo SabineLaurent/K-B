@@ -13,7 +13,11 @@ from k_b.database.creation import (
     create_database,
 )
 from k_b.database.errors import ENGINE_ERRORS, describe_engine_error
-from k_b.database.location import describe_location, read_database_location_or_refusal
+from k_b.database.location import (
+    UnreadableDatabaseUrlError,
+    describe_location,
+    read_database_location_or_refusal,
+)
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -28,7 +32,12 @@ def run_create_db(data_dir: Path, environ: Mapping[str, str]) -> int:
         return ExitCode.NOT_STARTED
     try:
         create_database(location)
-    except (FileExistsError, ExistingDatabaseError, UnsuitableDatabaseError) as error:
+    except (
+        FileExistsError,
+        ExistingDatabaseError,
+        UnsuitableDatabaseError,
+        UnreadableDatabaseUrlError,
+    ) as error:
         logger.error("%s", error)
         return ExitCode.NOT_STARTED
     except ENGINE_ERRORS as error:

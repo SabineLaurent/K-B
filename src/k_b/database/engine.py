@@ -42,6 +42,13 @@ def lock_for_writing(connection: Connection) -> None:
         postgresql.lock_for_writing(connection)
 
 
+def is_commit_finished_before_a_signal(connection: Connection) -> bool:
+    """Whether a signal received during a commit is raised once the commit has returned: on
+    SQLite, where Python runs the handler after the call to SQLite; not on PostgreSQL, where psycopg
+    waits for the answer to COMMIT in Python and cancels it on the signal."""
+    return isinstance(connection, SqliteConnection)
+
+
 def connect_database_read_only(database_path: Path) -> SqliteConnection:
     """Open the database read only, one connection per request of the data API
     (check_same_thread=False).

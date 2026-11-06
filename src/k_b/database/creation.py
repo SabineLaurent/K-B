@@ -4,6 +4,7 @@ schema_postgresql.sql in a PostgreSQL base, then the sources."""
 from importlib.resources import files
 from pathlib import Path
 
+from k_b.core.quoting import quote_value
 from k_b.database.engine import connect_database, connect_sqlite
 from k_b.database.location import DatabaseLocation, PostgresUrl
 
@@ -100,6 +101,9 @@ def check_database_settings(settings: tuple[str | bytes | None, ...]) -> None:
     is_libc_c = provider == LIBC_PROVIDER and collation == character_type == C_LOCALE
     is_builtin_c = provider == BUILTIN_PROVIDER and locale == C_LOCALE
     if not (is_libc_c or is_builtin_c):
+        # Each setting read: the one to change depends on the provider.
         raise UnsuitableDatabaseError(
-            f"the PostgreSQL base is in the collation {collation}, not {C_LOCALE}"
+            f"the PostgreSQL base is not in the collation {C_LOCALE}:"
+            f" datlocprovider {quote_value(provider)}, datcollate {quote_value(collation)},"
+            f" datctype {quote_value(character_type)}, datlocale {quote_value(locale)}"
         )

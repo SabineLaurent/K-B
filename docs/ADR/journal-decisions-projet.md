@@ -5304,8 +5304,9 @@ l'API IA lit déjà l'API de données dans sa borne (`MAX_DATA_API_BODY_BYTES`) 
     (décision 10 du plan de mise en ligne : chaque dépendance dans la PR qui en a besoin) ;
   - les tests sur PostgreSQL portent le marqueur `postgresql`, écarté de `uv run pytest`, et
     tournent dans un workflow à eux (`postgresql.yml`), sur PostgreSQL 18 épinglé par son digest :
-    la version du Mac, disponible sur le serveur flexible d'Azure ; le schéma demande 16 ou plus
-    (`IS JSON`, `pg_input_is_valid`).
+    la version du Mac, disponible sur le serveur flexible d'Azure ; K-B demande 17 ou plus (`IS JSON`
+    et `pg_input_is_valid` depuis 16, `pg_database.datlocale`, que lit `kb create-db`, et le
+    fournisseur builtin depuis 17 ; revue de code, tranché par time-knight le 06/11).
 
   Ce qui reste ouvert après cette PR : la lecture sur PostgreSQL (`read_items`, l'API de données,
   le délai des requêtes, le verrou en tête des purges : #418) ; le compose de préproduction (#419) ;

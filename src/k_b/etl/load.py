@@ -12,7 +12,12 @@ from typing import NamedTuple
 
 from k_b.core.config import TrackedRepository
 from k_b.core.quoting import quote_value
-from k_b.database.engine import Connection, connect_database, lock_for_writing
+from k_b.database.engine import (
+    Connection,
+    connect_database,
+    is_commit_finished_before_a_signal,
+    lock_for_writing,
+)
 from k_b.database.errors import ENGINE_ERRORS
 from k_b.database.location import DatabaseLocation, check_database_exists
 from k_b.database.reading import read_raw_file_paths
@@ -114,7 +119,8 @@ def commit_with_journal(
 ) -> None:
     """Write the journal, then commit: a file registered is not read again, so its journal must not be
     lost. A failed commit, or an interruption before it, removes the journal; an interruption
-    (Ctrl-C, SIGTERM) once the base has committed keeps the import and its journal."""
+    (Ctrl-C, SIGTERM) once the base has committed keeps the import and its journal, as one during
+    the commit on PostgreSQL, whose outcome kb does not know."""
     # Checked once the base holds the write lock: two imports of the same second cannot both
     # find no journal.
     check_journal_absent(journal_path)
@@ -130,18 +136,23 @@ def commit_with_journal(
     except BaseException as error:
         # The journal goes with the import it describes. A commit that fails raises an error of
         # the engine, whether the base keeps the transaction or undoes it itself. A Ctrl-C or a
-        # SIGTERM received before the commit finds the transaction open. On SQLite, one received
-        # during the commit is raised by Python once the commit has returned, with no transaction
-        # left. On PostgreSQL, psycopg waits for the answer to COMMIT in Python, so a signal can
-        # be raised during that wait: whether the server committed is then not known, a case
-        # not tested (a limit written in the PR of #417).
+        # SIGTERM received before the commit finds the transaction open.
         if isinstance(error, ENGINE_ERRORS) or connection.in_transaction:
             # The journal at journal_path can only be this import's: it was absent above.
             journal_path.unlink(missing_ok=True)
-        else:
-            # The name, not the path: quote_value cuts a long path before the name.
+        # The name, not the path: quote_value cuts a long path before the name.
+        elif is_commit_finished_before_a_signal(connection):
             logger.info(
                 "import committed, journal kept: %s", quote_value(journal_path.name)
+            )
+        else:
+            # psycopg cancels COMMIT on the signal: the server may have committed the import or
+            # undone it. The journal is kept: if undone, the next import reads the files again and
+            # writes a second journal of the same rejections, which costs less than an import
+            # committed without its journal (family of #302).
+            logger.info(
+                "import commit interrupted, outcome unknown, journal kept: %s",
+                quote_value(journal_path.name),
             )
         raise
 

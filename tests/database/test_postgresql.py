@@ -12,7 +12,11 @@ import pytest
 
 import k_b
 from k_b.database import postgresql
-from k_b.database.creation import create_database
+from k_b.database.creation import (
+    UnsuitableDatabaseError,
+    check_database_settings,
+    create_database,
+)
 from k_b.database.engine import connect_database, lock_for_writing
 from k_b.database.postgresql import translate_placeholders
 from k_b.database.savepoint import EntryRefusedError, write_in_savepoint
@@ -65,6 +69,27 @@ def list_sql_texts():
 
 
 SQL_TEXTS = list_sql_texts()
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        ("UTF8", "c", "C", "en_US.UTF-8", None),
+        ("UTF8", "i", "C", "C", "und"),
+        ("UTF8", "b", None, None, "C.UTF-8"),
+    ],
+)
+def test_a_base_out_of_the_collation_c_is_refused_with_each_setting_read(settings):
+    _, provider, collation, character_type, locale = settings
+
+    with pytest.raises(UnsuitableDatabaseError) as raised:
+        check_database_settings(settings)
+
+    assert str(raised.value) == (
+        "the PostgreSQL base is not in the collation C:"
+        f" datlocprovider {provider!r}, datcollate {collation!r},"
+        f" datctype {character_type!r}, datlocale {locale!r}"
+    )
 
 
 def test_the_sql_texts_of_database_are_found():

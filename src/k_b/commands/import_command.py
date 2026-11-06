@@ -15,6 +15,7 @@ from k_b.database.errors import ENGINE_ERRORS, describe_engine_error
 from k_b.database.location import (
     DatabaseLocation,
     MissingDatabaseError,
+    UnreadableDatabaseUrlError,
     read_database_location_or_refusal,
 )
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
@@ -69,6 +70,9 @@ def run_import(data_dir: Path, environ: Mapping[str, str]) -> int:
         return ExitCode.NOT_STARTED
     except ImportJournalExistsError as error:
         logger.error("%s; run kb import again", error)
+        return ExitCode.NOT_STARTED
+    except UnreadableDatabaseUrlError as error:
+        logger.error("%s", error)
         return ExitCode.NOT_STARTED
     except ENGINE_ERRORS as error:
         logger.error("%s", describe_engine_error(error))

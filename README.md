@@ -204,7 +204,7 @@ uv sync
 | Variable | Obligatoire | Rôle |
 |---|---|---|
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
-| `KB_DATABASE_URL` | non | l'URL d'une base PostgreSQL, `postgresql://…` ou `postgres://…`, créée hors de K-B en UTF8 et en collation C ([docs/stockage.md](docs/stockage.md), « Le SGBD »). Sans elle, la base est le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`. Une autre valeur, vide comprise, ou une variable que libpq lit posée à côté (`PGHOST`, `PGPASSWORD`…) : code 2, sans que la valeur soit citée. Lue aujourd'hui par `kb create-db` et `kb import` ; `kb serve-data` lit le fichier SQLite jusqu'à #418. |
+| `KB_DATABASE_URL` | non | l'URL d'une base PostgreSQL, `postgresql://…` ou `postgres://…`, créée hors de K-B en UTF8 et en collation C ([docs/stockage.md](docs/stockage.md), « Le SGBD »). Sans elle, la base est le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`. Une autre valeur, vide comprise, une URL que libpq ne lit pas, ou une variable que libpq lit posée à côté (`PGHOST`, `PGPASSWORD`…) : code 2, sans que la valeur soit citée. Lue aujourd'hui par `kb create-db` et `kb import` ; `kb serve-data` lit le fichier SQLite jusqu'à #418. |
 | `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
 | `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les comptes rendus de veille dans `veille/<sujet>/`, `kb trend-report` les comptes rendus des tendances dans `veille/tendances/` ; aucun des trois ne tourne sans elle (code 2). |
 | `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
@@ -285,7 +285,9 @@ sortie :
   PostgreSQL sans ses tables sort en 1 (#421) ;
 - 143 : `kb import` a reçu SIGTERM (`docker stop`). Reçu avant la validation de la base, il
   n'écrit rien, comme pour 1, ni dans la base ni au journal ; reçu pendant ou après, l'import est
-  gardé, avec son journal ;
+  gardé, avec son journal. Sur PostgreSQL, un signal reçu pendant la validation laisse son issue
+  inconnue : le journal est gardé, et la ligne `import commit interrupted, outcome unknown` le
+  dit ;
 - 130 : `kb import` a reçu SIGINT (Ctrl-C), avec le même effet que SIGTERM, sauf un second Ctrl-C,
   qui peut couper l'annulation : SIGTERM ignore un second signal, SIGINT non.
 

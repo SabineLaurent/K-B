@@ -185,7 +185,7 @@ def test_kb_create_db_refuses_a_postgresql_base_that_has_its_tables(
     ("encoding", "collation", "refusal"),
     [
         ("SQL_ASCII", "C", "encoding SQL_ASCII"),
-        ("UTF8", "en_US.UTF-8", "collation en_US.UTF-8"),
+        ("UTF8", "en_US.UTF-8", "datcollate 'en_US.UTF-8'"),
     ],
 )
 def test_kb_create_db_refuses_a_postgresql_base_out_of_utf8_or_of_the_collation_c(

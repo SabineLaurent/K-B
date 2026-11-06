@@ -73,7 +73,7 @@ SELECT zotero_key FROM zotero_entry WHERE withdrawn_at IS NULL
 
 MARK_ZOTERO_ENTRY_WITHDRAWN = """
 UPDATE zotero_entry SET withdrawn_at = :collected_at
-WHERE zotero_key = :zotero_key AND withdrawn_at IS NULL
+WHERE zotero_key = :key AND withdrawn_at IS NULL
 """
 
 SELECT_HIGHLIGHTS_NOT_WITHDRAWN = """
@@ -82,7 +82,7 @@ SELECT zotero_key FROM highlight WHERE withdrawn_at IS NULL
 
 MARK_HIGHLIGHT_WITHDRAWN = """
 UPDATE highlight SET withdrawn_at = :collected_at
-WHERE zotero_key = :zotero_key AND withdrawn_at IS NULL
+WHERE zotero_key = :key AND withdrawn_at IS NULL
 """
 
 
@@ -187,34 +187,16 @@ def mark_withdrawn(
         highlight.zotero_key for entry in entries for highlight in entry.highlights
     ]
     # An extract whose entries have no highlight withdraws every highlight: none is present.
-    return mark_absent_withdrawn(
+    return catalog.mark_absent_withdrawn(
         connection,
         SELECT_ZOTERO_ENTRIES_NOT_WITHDRAWN,
         MARK_ZOTERO_ENTRY_WITHDRAWN,
         entry_keys,
         formatted_collected_at,
-    ) + mark_absent_withdrawn(
+    ) + catalog.mark_absent_withdrawn(
         connection,
         SELECT_HIGHLIGHTS_NOT_WITHDRAWN,
         MARK_HIGHLIGHT_WITHDRAWN,
         highlight_keys,
         formatted_collected_at,
     )
-
-
-def mark_absent_withdrawn(
-    connection: Connection,
-    select_not_withdrawn: str,
-    mark_withdrawn_statement: str,
-    present_keys: Sequence[str],
-    collected_at: str | None,
-) -> int:
-    """Mark as withdrawn at collected_at the rows not withdrawn whose Zotero key is absent from the
-    extract; return how many."""
-    absent_keys = catalog.find_absent_keys(
-        connection, select_not_withdrawn, present_keys
-    )
-    return connection.executemany(
-        mark_withdrawn_statement,
-        [{"collected_at": collected_at, "zotero_key": key} for key in absent_keys],
-    ).rowcount

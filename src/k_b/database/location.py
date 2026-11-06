@@ -76,6 +76,11 @@ class PostgresUrl:
 DatabaseLocation = Path | PostgresUrl
 
 
+class UnreadableDatabaseUrlError(Exception):
+    """KB_DATABASE_URL is not a URL libpq reads: a setting refused, as one that names no PostgreSQL
+    base."""
+
+
 class MissingDatabaseError(FileNotFoundError):
     """The database file does not exist yet: kb create-db creates it."""
 

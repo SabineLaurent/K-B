@@ -42,7 +42,8 @@ ligne, par un adaptateur maison (#417) »).
   nommé (journal ADR, 2026-10-15, « POC du 25/10 », décision 2 ; #200).
 - **Avec elle, PostgreSQL** : une URL `postgresql://` ou `postgres://`, lue par psycopg 3
   (`src/k_b/database/postgresql.py`). C'est la base en ligne, au troisième temps. Une autre valeur,
-  vide comprise, est refusée (code 2), sans être citée : elle peut porter un mot de passe. Une
+  vide comprise, ou une URL que libpq ne lit pas, est refusée (code 2), sans être citée : elle peut
+  porter un mot de passe. Une
   variable que libpq lit en plus de l'URL (`PGHOST`, `PGPASSWORD`… : les 42 noms de la
   [doc de libpq](https://www.postgresql.org/docs/18/libpq-envars.html), lue le 2026-11-06) est
   refusée de même : libpq la lirait en silence (règle 2 de `.claude/rules/poc.md`).
@@ -81,13 +82,15 @@ Ce que chaque schéma écrit à sa façon est listé plus bas.
   et `-wal` s'ils manquent, dans le dossier de la base, et les laisse à sa fermeture
   (documentation SQLite, WAL, § 5 ; constat sur SQLite 3.50.4).
 - **La base PostgreSQL est créée hors de K-B** (compose, Azure : #419, #421), en UTF8 et en
-  collation C, PostgreSQL 16 ou plus récent (`IS JSON`, `pg_input_is_valid`). `kb create-db` refuse
-  une autre base, puis crée dans celle de l'URL les tables de `schema_postgresql.sql` et les 7
-  sources, en une transaction : sur une erreur, rien ne reste. Pourquoi UTF8 : en `SQL_ASCII`,
-  psycopg rend des octets et `length()` compte des octets. Pourquoi C (fournisseur libc, ou
-  builtin à `C`) : le texte se trie et se compare octet par octet, comme en SQLite, et `citext` ne
-  plie la casse que des lettres ASCII, comme `COLLATE NOCASE` (observé le 2026-11-06). Une base qui
-  a déjà la table `source` est refusée, comme un fichier SQLite qui existe (code 2).
+  collation C, PostgreSQL 17 ou plus récent (`IS JSON` et `pg_input_is_valid` depuis 16,
+  `pg_database.datlocale`, que lit `kb create-db`, et le fournisseur builtin depuis 17).
+  `kb create-db` refuse une autre base, puis crée dans celle de l'URL les tables de
+  `schema_postgresql.sql` et les 7 sources, en une transaction : sur une erreur, rien ne reste.
+  Pourquoi UTF8 : en `SQL_ASCII`, psycopg rend des octets et `length()` compte des octets.
+  Pourquoi C (fournisseur libc, ou builtin à `C`) : le texte se trie et se compare octet par
+  octet, comme en SQLite, et `citext` ne plie la casse que des lettres ASCII, comme
+  `COLLATE NOCASE` (observé le 2026-11-06). Une base qui a déjà la table `source` est refusée,
+  comme un fichier SQLite qui existe (code 2).
 - **Un import à la fois** : en SQLite, par le verrou d'écriture du fichier ; en PostgreSQL, par un
   verrou consultatif (`pg_advisory_xact_lock`) pris au début de la transaction de l'import et
   rendu à sa fin. Un import qui attend ce verrou plus de 5 s (`DATABASE_LOCK_TIMEOUT_SECONDS`, le

@@ -39,12 +39,15 @@ def test_a_variable_libpq_reads_stops_the_command_before_it_starts(
 
 
 @pytest.mark.parametrize("command", ["create-db", "import"])
-def test_a_url_libpq_cannot_read_fails_without_its_password_in_the_log(
+def test_a_url_libpq_cannot_read_is_refused_without_its_password_in_the_log(
     monkeypatch, tmp_path, capsys, command
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setenv(DATABASE_URL_VARIABLE, MALFORMED_URL)
 
-    assert cli.main([command]) == ExitCode.FAILED
-    assert PASSWORD not in capsys.readouterr().err
+    assert cli.main([command]) == ExitCode.NOT_STARTED
+    error_output = capsys.readouterr().err
+    assert "ERROR k_b.cli: KB_DATABASE_URL is not a URL libpq reads" in error_output
+    assert "Traceback" not in error_output
+    assert PASSWORD not in error_output
     assert PASSWORD not in (tmp_path / "logs" / "kb.log").read_text()

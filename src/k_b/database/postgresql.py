@@ -12,7 +12,11 @@ from k_b.core.config import (
     DATABASE_CONNECT_TIMEOUT_SECONDS,
     DATABASE_LOCK_TIMEOUT_SECONDS,
 )
-from k_b.database.location import DATABASE_URL_VARIABLE, PostgresUrl
+from k_b.database.location import (
+    DATABASE_URL_VARIABLE,
+    PostgresUrl,
+    UnreadableDatabaseUrlError,
+)
 
 # A named placeholder of sqlite3 by the rule of SQLAlchemy 2.0.55, for its text(): a name after a
 # colon that follows neither a colon, a letter, a digit nor a backslash, and that a colon does not
@@ -113,14 +117,14 @@ class PostgresConnection:
 def connect_postgresql(location: PostgresUrl) -> PostgresConnection:
     """Open the base of the URL, with a bound on the wait for its server.
 
-    A URL libpq cannot read is refused by an error without its text: libpq quotes the whole URL,
-    its password included."""
+    A URL libpq cannot read is refused by an error of K-B without the text of libpq, which quotes
+    the whole URL, its password included."""
     try:
         connection = psycopg.connect(
             location.value, connect_timeout=DATABASE_CONNECT_TIMEOUT_SECONDS
         )
     except psycopg.ProgrammingError:
-        raise psycopg.ProgrammingError(
+        raise UnreadableDatabaseUrlError(
             f"{DATABASE_URL_VARIABLE} is not a URL libpq reads"
         ) from None
     return PostgresConnection(connection)
