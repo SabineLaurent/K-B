@@ -1,10 +1,9 @@
 """The requests of kb to the AI API, by HTTP: their settings and their answer, an untrusted input
-read by a closed schema; POST /digests and its response, checked against the closed lists.
-
-The body is read without a bound on its size: risk accepted by Sabine for the POC (2026-10-21), for
-kb trend-report too (2026-10-30)."""
+read within its bounds, then by a closed schema; POST /digests and its response, checked against
+the closed lists."""
 
 import re
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Annotated, Literal, NoReturn
@@ -25,12 +24,20 @@ from k_b.core.config import (
     AI_API_CONNECT_TIMEOUT_SECONDS,
     AI_API_POOL_TIMEOUT_SECONDS,
     AI_API_READ_TIMEOUT_SECONDS,
+    AI_API_REQUEST_DEADLINE_SECONDS,
     AI_API_URL,
     AI_API_WRITE_TIMEOUT_SECONDS,
     DIGEST_CLIENT,
+    MAX_AI_API_ANSWER_BYTES,
     MODEL_NAME,
 )
-from k_b.core.outbound import find_url_refusal, open_http_client
+from k_b.core.outbound import (
+    BodyTooLargeError,
+    BodyTooLateError,
+    find_url_refusal,
+    open_http_client,
+    read_bounded_body,
+)
 from k_b.core.quoting import locate_first_error, quote_value
 from k_b.core.retry_after import RETRY_AFTER_SECONDS
 from k_b.items import ItemKind, UtcDatetime
@@ -80,6 +87,15 @@ class AiApiError(Exception):
 class AiApiClientSettings:
     base_url: str
     api_key: SecretStr
+
+
+@dataclass(frozen=True)
+class Answer:
+    """An answer of the AI API, its body read within its bounds."""
+
+    status_code: int
+    headers: httpx2.Headers
+    content: bytes
 
 
 def match_fully(pattern: re.Pattern[str]) -> Callable[[str], str]:
@@ -196,11 +212,36 @@ def request_digests(
 
 
 def send_request(
-    http_client: httpx2.Client, path: str, body: Mapping[str, object]
-) -> httpx2.Response:
-    """POST body to path; raised from None, as the error of httpx2 names the URL."""
+    http_client: httpx2.Client,
+    path: str,
+    body: Mapping[str, object],
+    *,
+    clock: Callable[[], float] = time.monotonic,
+) -> Answer:
+    """POST body to path, its answer read within its size and its deadline; raised from None, as
+    the error of httpx2 names the URL."""
+    deadline = clock() + AI_API_REQUEST_DEADLINE_SECONDS
+
+    def is_late() -> bool:
+        return clock() >= deadline
+
     try:
-        return http_client.post(path, json=body)
+        with http_client.stream("POST", path, json=body) as response:
+            status = response.status_code
+            try:
+                content = read_bounded_body(response, MAX_AI_API_ANSWER_BYTES, is_late)
+            except BodyTooLargeError:
+                raise AiApiError(
+                    find_failure_state(status) or "ai_api_invalid_response",
+                    status,
+                    (
+                        f"response larger than {MAX_AI_API_ANSWER_BYTES} bytes",
+                        *describe_headers(response.headers),
+                    ),
+                ) from None
+            except BodyTooLateError:
+                raise AiApiError("ai_api_timeout", status) from None
+            return Answer(status, response.headers, content)
     except httpx2.TimeoutException:
         raise AiApiError("ai_api_timeout") from None
     except httpx2.TransportError:
@@ -211,22 +252,14 @@ def send_request(
 
 
 def read_response[Response: AiApiModel](
-    answer: httpx2.Response, schema: type[Response]
+    answer: Answer, schema: type[Response]
 ) -> Response:
     """The body of a 200 in its schema; any other answer is a named state. Raised from None, as a
     ValidationError quotes the value."""
     status = answer.status_code
-    if status == httpx2.codes.UNAUTHORIZED:
-        raise AiApiError("ai_api_unauthorized", status, describe_answer(answer))
-    if status == httpx2.codes.FORBIDDEN:
-        raise AiApiError("ai_api_forbidden", status, describe_answer(answer))
-    if status == httpx2.codes.TOO_MANY_REQUESTS:
-        raise AiApiError("ai_api_rate_limited", status, describe_answer(answer))
-    if status >= httpx2.codes.INTERNAL_SERVER_ERROR:
-        raise AiApiError("ai_api_failed", status, describe_answer(answer))
-    if status != httpx2.codes.OK:
-        # A redirection not followed, a 404 of a route, a 422.
-        raise AiApiError("ai_api_invalid_response", status, describe_answer(answer))
+    state = find_failure_state(status)
+    if state is not None:
+        raise AiApiError(state, status, describe_answer(answer))
     try:
         return schema.model_validate_json(answer.content)
     except ValidationError as error:
@@ -237,19 +270,41 @@ def read_response[Response: AiApiModel](
         ) from None
 
 
-def describe_answer(answer: httpx2.Response) -> list[str]:
+def find_failure_state(status: int) -> AiApiState | None:
+    """The state of an answer that is not a 200; None for a 200."""
+    if status == httpx2.codes.OK:
+        return None
+    if status == httpx2.codes.UNAUTHORIZED:
+        return "ai_api_unauthorized"
+    if status == httpx2.codes.FORBIDDEN:
+        return "ai_api_forbidden"
+    if status == httpx2.codes.TOO_MANY_REQUESTS:
+        return "ai_api_rate_limited"
+    if status >= httpx2.codes.INTERNAL_SERVER_ERROR:
+        return "ai_api_failed"
+    # A redirection not followed, a 404 of a route, a 422.
+    return "ai_api_invalid_response"
+
+
+def describe_answer(answer: Answer) -> list[str]:
     """What a failed answer says: the state of its body, the id of its request and its
     Retry-After."""
     details = []
     error = read_error_state(answer.content)
     if error is not None:
         details.append(f"error {describe_value(error, LOWERCASE_NAME)}")
+    return details + describe_headers(answer.headers)
+
+
+def describe_headers(headers: httpx2.Headers) -> list[str]:
+    """The id of the request and the Retry-After of an answer, each as it is or quoted."""
+    details = []
     for header, pattern in (
         (REQUEST_ID_HEADER, REQUEST_ID),
         # A Retry-After in seconds as it is; a date is quoted.
         (RETRY_AFTER_HEADER, RETRY_AFTER_SECONDS),
     ):
-        value = answer.headers.get(header)
+        value = headers.get(header)
         if value is not None:
             details.append(f"{header} {describe_value(value, pattern)}")
     return details

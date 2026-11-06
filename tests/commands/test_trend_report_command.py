@@ -3,6 +3,7 @@ register; never a name of a repository in the log nor in the summary."""
 
 import json
 import re
+import secrets
 import signal
 from datetime import UTC, datetime
 from functools import partial
@@ -10,7 +11,13 @@ from functools import partial
 import httpx2
 import pytest
 from commands.cli_helpers import LOG_LINE_DATE, list_hidden_files, list_sheets
-from post.test_ai_api_client import REQUEST_ID, TEST_API_KEY
+from post.test_ai_api_client import (
+    REQUEST_ID,
+    TEST_API_KEY,
+    TEST_MAX_ANSWER_BYTES,
+    answer_beyond_the_bound,
+    bound_answers,
+)
 from post.test_trend_report_client import (
     RISING_NAME,
     STEADY,
@@ -525,6 +532,27 @@ def test_a_response_refused_writes_nothing_and_never_quotes_a_name(
     for name in NAMES:
         assert name not in output.err
         assert name not in read_kb_log(data_dir)
+
+
+def test_an_answer_beyond_its_bound_writes_nothing_never_shows_nor_logs_it(
+    monkeypatch, trend_environment, capsys
+):
+    data_dir, vault_dir = trend_environment
+    write_register(data_dir, [PREVIOUS_ENTRY])
+    bound_answers(monkeypatch)
+    marker = secrets.token_hex(16)
+    answer_trend_report(monkeypatch, answer_beyond_the_bound(marker))
+
+    assert cli.main(["trend-report"]) == cli.ExitCode.FAILED
+    assert list_sheets(vault_dir) == []
+    assert read_register(data_dir) == [PREVIOUS_ENTRY]
+    output = capsys.readouterr()
+    assert (
+        "trend report not received: ai_api_invalid_response, HTTP 200,"
+        f" response larger than {TEST_MAX_ANSWER_BYTES} bytes\n"
+    ) in output.err
+    for shown in (output.out, output.err, read_kb_log(data_dir)):
+        assert marker not in shown
 
 
 def test_a_choice_that_failed_writes_the_factual_report_and_the_register_notes_it(
