@@ -139,7 +139,7 @@ resource app 'Microsoft.App/containerApps@2026-01-01' = {
         }
       ]
       // 0 at rest (decision of Sabine of 06/11); 1 at most: the rate of each client is counted in
-      // the memory of one replica.
+      // the memory of one replica, two during a rollout, when the old and the new revision run together.
       scale: {
         minReplicas: 0
         maxReplicas: 1

@@ -166,7 +166,7 @@ Le détail est au journal ADR, 2026-11-06, « Mise en ligne : le squelette de K-
 | `Host` dans les sondes de l'API de données (session) | sans lui, `/health` répond 400 à la sonde | des sondes TCP, le repli prévu : elles ne vérifient pas que l'app répond |
 | Journaux par `azure-monitor` et un paramètre de diagnostic (session) | aucune clé de l'espace dans la configuration | `log-analytics` : la clé partagée dans `cae-kb` |
 | Délai d'arrêt de 250 s pour l'API IA (session) | 240 s de demande au plus, les exports de fin, une marge | le défaut de 30 s : une fiche en cours coupée à l'arrêt |
-| Job sans nouvel essai, 600 s au plus (session) | un échec doit se voir ; couvre les nouvelles tentatives du SDK | 1 nouvel essai (recommandé pour la maintenance) |
+| Job sans nouvel essai, 900 s au plus (session ; 600 s au plan, 900 s après la revue de code de #451) | un échec doit se voir ; les bornes du job (environ 576 s) tombent avant l'arrêt forcé, avec une marge pour azure-identity | 1 nouvel essai (recommandé pour la maintenance) ; 600 s, trop serré |
 | Coffre : 7 jours de suppression réversible, sans protection de purge (session) | réglages irréversibles ; un nom gardé 90 jours bloquerait une recréation | 90 jours, protection de purge |
 
 Imposés par une consigne : Sabine applique le Bicep à la main (#411, la CI n'a pas le droit de donner des rôles) ;

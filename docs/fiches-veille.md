@@ -841,7 +841,7 @@ documentation, lue le 2026-11-05 (« Sources de l'auto-évaluation ») ; ce qu'e
 | API1 Broken Object Level Authorization | **Tenue** | — |
 | API2 Broken Authentication | Non tenue | Anti-force brute : écart voulu (décision de Sabine du 2026-11-05) |
 | API3 Broken Object Property Level Authorization | **Tenue** | — |
-| API4 Unrestricted Resource Consumption | Non tenue | Ressources des conteneurs : au déploiement ; plafond de dépense : abonnement de l'organisme de formation |
+| API4 Unrestricted Resource Consumption | Non tenue | Ressources des conteneurs : CPU, mémoire et répliques tenus par #414, redémarrages, descripteurs et processus sans moyen trouvé ; plafond de dépense : abonnement de l'organisme de formation |
 | API5 Broken Function Level Authorization | **Tenue** | — |
 | API6 Unrestricted Access to Sensitive Business Flows | **Tenue** | — |
 | API7 Server Side Request Forgery | **Tenue** | — |
@@ -964,17 +964,17 @@ déploiement, ou l'organisme de formation pour le plafond de dépense.
 
 ### API4:2023 Unrestricted Resource Consumption
 
-- **Limiter la mémoire, le CPU, les redémarrages, les descripteurs et les processus** : non tenue.
-  Aucun fichier de conteneur ni de déploiement à ce commit : au déploiement, avec
-  `maxReplicas: 1` (« Accès »).
-  **Pour la tenir** : dans le fichier de déploiement, `resources.cpu` et `resources.memory` de
-  chaque conteneur (en plan Consumption, l'une des paires de 0,25 vCPU et 0,5 Gi à 4 vCPU et 8 Gi ;
-  0,5 vCPU et 1 Gi est l'hypothèse du `README.md`, « Budget »), `maxReplicas: 1`, et `minReplicas`,
-  décision ouverte du journal ADR (une réplique gardée coûte ; à 0, le compte du débit repart de
-  zéro à chaque réveil). Un conteneur qui plante redémarre seul ; aucune politique de redémarrage
-  n'est réglable pour une app. Restent sans moyen trouvé : les redémarrages, les descripteurs et
-  les processus ; la limite de connexions (`limit_concurrency` d'uvicorn) est une autre décision
-  ouverte du journal ADR. La mesure ne serait donc tenue qu'en partie. S, au déploiement.
+- **Limiter la mémoire, le CPU, les redémarrages, les descripteurs et les processus** : tenue en
+  partie (#414).
+  - La mémoire et le CPU sont tenus : chaque API a 0,5 vCPU et 1 Gi
+    (`infra/modules/api-container-app.bicep:110-113`).
+  - Les répliques aussi : `maxReplicas: 1` (« Accès »), et `minReplicas: 0`, décision de Sabine du 06/11
+    (`api-container-app.bicep:143-146`). À 0, le compte du débit repart de zéro à chaque réveil.
+    Pendant un déploiement, l'ancienne et la nouvelle révision tournent ensemble, deux répliques
+    (journal ADR, 2026-11-06, « Mise en ligne »).
+  - Restent sans moyen trouvé : les redémarrages, les descripteurs et les processus. Un conteneur qui
+    plante redémarre seul, et aucune politique de redémarrage n'est réglable pour une app.
+  - La limite de connexions (`limit_concurrency` d'uvicorn) reste une décision ouverte du journal ADR.
 - **Taille maximale de toutes les entrées** : tenue (#399). Corps de 1 024 octets au plus, refusé
   en 413 avant la clé (`MAX_AI_API_BODY_BYTES`) ; `window_days` de 1 à 14 ; `after` et
   `previous_first_window` au format `AAAA-MM-JJ`, sur 15 fenêtres au plus.

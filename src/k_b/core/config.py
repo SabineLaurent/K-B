@@ -526,9 +526,10 @@ SMOKE_TEST_CONTAINER = "smoke-test"
 # One page of names at most, counted and never kept: the job proves it can list, and reads no more
 # (OWASP API4:2023).
 MAX_LISTED_BLOBS = 100
-# GET /health from a job, without retry. Connection, pool and write: as for the AI API. Read: 60 s, an
-# assumption, the wake of an API at 0 replica, to be measured by #414. The whole answer within its
-# deadline, checked after each piece read (core/outbound.py).
+# GET /health from a job, without retry. Connection, pool and write: as for the AI API. Read: 60 s, for
+# the wake of an API at 0 replica, measured by #414 at 20 to 26 s (caj-kb-smoke-test-us77d03,
+# 2026-11-06): a margin of about 2.3 times, kept. The whole answer within its deadline, checked after
+# each piece read (core/outbound.py).
 HEALTH_CONNECT_TIMEOUT_SECONDS = 5
 HEALTH_POOL_TIMEOUT_SECONDS = 5
 HEALTH_WRITE_TIMEOUT_SECONDS = 10

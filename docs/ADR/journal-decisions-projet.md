@@ -5617,6 +5617,9 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
 
   Limites assumées :
   - le compte du débit (#161) repart de zéro à chaque réveil ;
+  - pendant un déploiement, l'ancienne et la nouvelle révision tournent ensemble : deux répliques, chacune avec
+    son compte, si bien qu'un client peut brièvement passer jusqu'au double de sa limite (revue de code de la
+    PR #451, tranché par time-knight le 06/11, délégation de Sabine du 15/10) ;
   - le client de l'API IA vers l'API de données lit en 10 s au plus, sans nouvel essai
     (`DATA_API_READ_TIMEOUT_SECONDS`). Une fiche demandée pendant que l'API de données dort échoue donc. Moyen
     proposé à #413 : un `GET /health` des deux API avant les fiches ; une API reste éveillée 300 s après sa
@@ -5641,7 +5644,11 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
   purger, et un nom gardé 90 jours bloquerait une recréation. La protection contre la purge est irréversible
   elle aussi. Sabine pose les secrets par `read -rs` et `--file`, avec `-o none` : la valeur ne passe ni par
   l'historique ni par l'écran. Limites assumées : on ne récupère un secret supprimé que pendant 7 jours ; une
-  nouvelle valeur atteint une app en 30 min au plus. — PR de #414
+  nouvelle valeur atteint une app en 30 min au plus. Un conteneur qui tourne garde ses variables, et un
+  redémarrage automatique n'est pas vérifié. Après une rotation, on redémarre donc la révision de chaque app
+  qui lit le secret (`infra/README.md`, « Poser les secrets »). Pour `kb-data-api-key-ai-digest`, lu par les
+  deux API, les deux valeurs peuvent différer jusqu'à 30 min, et l'API IA reçoit alors 401 (revue de code de la
+  PR #451, tranché par time-knight le 06/11, délégation de Sabine du 15/10). — PR de #414
 
 - **Les deux API sont internes : `https://<app>.internal.<defaultDomain>`, `allowInsecure: false`. Le
   trafic entre apps est chiffré (`peerTrafficConfiguration`), le mTLS reste coupé, et `cae-kb` garde
@@ -5678,9 +5685,14 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
   par `AZURE_CLIENT_ID`.** Le stockage d'échange refuse la clé partagée, et le job n'y est que Storage Blob
   Data Reader, sur le seul conteneur `smoke-test`. #420 complète le compte. — PR de #414
 
-- **Le job `caj-kb-smoke-test` se lance à la main, avec un `replicaTimeout` de 600 s et sans nouvel essai
-  (`replicaRetryLimit: 0`).** Pourquoi : 600 s couvrent les nouvelles tentatives du SDK de stockage (environ
-  7 min, #412) et deux `/health` de 65 s ; un échec doit se voir, et Sabine relance à la main. Écarté : 1
+- **Le job `caj-kb-smoke-test` se lance à la main, avec un `replicaTimeout` de 900 s et sans nouvel essai
+  (`replicaRetryLimit: 0`).** Pourquoi 900 s : les bornes du job doivent tomber avant l'arrêt forcé, sinon
+  l'échec nommé de #412 se perd. Elles font environ 576 s, soit deux `/health` de 65 s, les nouvelles
+  tentatives du SDK de stockage (environ 7 min, #412) et le démarrage du job, sans compter les nouvelles
+  tentatives d'azure-identity (`core/config.py`). Le coût ne compte qu'en cas de blocage. Le plan disait 600 s ;
+  porté à 900 s par la revue de code de la PR #451 (tranché par time-knight le 06/11, délégation de Sabine du
+  15/10), et appliqué en ligne par la passe suivante, celle de #421. Pourquoi sans nouvel essai : un échec doit
+  se voir, et Sabine relance à la main. Écarté : 1
   nouvel essai, que Microsoft recommande pour la maintenance. Confirmé au déploiement : le nom d'un job tient
   sous 32 caractères, en minuscules, chiffres et `-`. Limite assumée, pour la CD de #415 : le droit
   `jobs/start/action` permet de changer l'image et les variables au lancement, donc de se servir de
