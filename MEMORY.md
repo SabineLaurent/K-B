@@ -74,6 +74,10 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 - **GH Archive ne voit qu'environ 1 % des étoiles** (mesure de time-knight du 2026-10-29, cause
   inconnue) : `trend` est un échantillon. Ne jamais écrire « étoiles gagnées » tirées de GH Archive
   sans le dire (`docs/specs-collecte.md`, « Limite mesurée le 2026-10-29 »).
+- **`read_bounded_body` ne borne rien avant le premier morceau décodé** (#436, revue de #422, le
+  2026-11-06) : un en-tête envoyé octet par octet, ou un corps gzip fait de blocs vides, échappe à
+  l'échéance chez ses quatre clients (`kb`, API de données, modèle, GitHub). En ligne, l'ingress
+  d'ACA coupe une requête à 240 s ; en local, rien ne la coupe.
 
 ## Interface
 
