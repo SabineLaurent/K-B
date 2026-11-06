@@ -9,9 +9,10 @@ from fastapi import Depends, Request
 
 from k_b.database.connection import connect_database_read_only
 
-# The instructions SQLite runs between two checks of the deadline: about 70 ms past it on the
-# longest search, measured; each check takes the GIL back (docs/specs-api.md, API4).
-INSTRUCTIONS_BETWEEN_CHECKS = 100
+# The instructions SQLite runs between two checks of the deadline: about 0.75 s past it on the
+# longest search, measured (0.1 s at 100); each check takes the GIL back, so fewer checks spare
+# the other requests (docs/specs-api.md, "Délai"). Read at each request: a test lowers it.
+INSTRUCTIONS_BETWEEN_CHECKS = 1_000
 
 
 def open_database(request: Request) -> Iterator[sqlite3.Connection]:

@@ -5127,9 +5127,12 @@ Décisions de Sabine du 2026-11-04.
   mesuré le 06/11, la pire recherche (199 « a » puis « b ») sur 400 corps de 125 000 « a » prend
   environ 10 s, une recherche ordinaire sur 50 millions de caractères 0,03 s (OWASP API4:2023).
   5 s reste sous les 10 s que le client de l'API IA attend chaque morceau d'une réponse
-  (`DATA_API_READ_TIMEOUT_SECONDS`), ce qu'un test tient. 100 instructions et non 1 000 : environ
-  70 ms après l'échéance au pire, contre 750 ms ; à 1 000, le détail et `/trends` ne passent jamais
-  par le contrôle sur la base de test, et aucun test ne les interromprait. L'interruption se
+  (`DATA_API_READ_TIMEOUT_SECONDS`), ce qu'un test tient. 1 000 instructions et non 100, comme le
+  disait le plan validé : chaque contrôle reprend le GIL, et 1 000 en fait dix fois moins pour les
+  autres requêtes ; la pire recherche, mesurée par l'API, s'arrête à 5,75 s au lieu de 5,10 s, sous
+  les 10 s du client ; les tests le ramènent à 1, la base de test n'atteignant pas 1 000
+  instructions au détail ni aux tendances (revue de code, tranché par time-knight, que Sabine a
+  laissé trancher le 06/11). L'interruption se
   reconnaît à `SQLITE_INTERRUPT` (`sqlite_errorcode`, lu par `getattr` : une erreur levée par Python
   n'en a pas). L'échéance part du premier contrôle, pas de l'ouverture de la connexion : la
   dépendance et la route attendent chacune un fil du pool, et cette attente ne se passe pas dans la
@@ -5139,9 +5142,9 @@ Décisions de Sabine du 2026-11-04.
   route, que SQLite ignorerait (la route tourne dans un fil) ; une variable d'environnement (une borne
   de protection, comme le débit, pas un réglage de déploiement) ; 504, qui dit qu'une passerelle n'a
   pas eu de réponse. Limites assumées : une instruction seule ne s'interrompt pas (un `LIKE` sur un
-  clip de 1 000 000 de caractères, environ 0,2 s, extrapolé) ; chaque contrôle reprend le GIL : à
-  côté d'un fil Python qui calcule sans pause, une requête de 3 ms en prend plusieurs secondes, et
-  sous une charge mesurée (deux requêtes, un calcul par à-coups), 46 ms deviennent 70 ms ; le délai
+  clip de 1 000 000 de caractères, environ 0,2 s, extrapolé) ; à côté d'un fil Python qui calcule
+  sans pause, une requête de 3 ms en prend 1,5 s à 1 000 instructions (essai du relecteur du
+  plan) ; le délai
   se multiplie par le débit (120 listes par minute), sans plafond de requêtes simultanées
   (« Une limite de connexions du serveur », ci-dessous). Pour #418 (PostgreSQL) :
   `statement_timeout` à 5 000 ms pour le rôle de l'API de données (`ALTER ROLE … SET`, côté

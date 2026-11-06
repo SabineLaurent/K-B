@@ -46,17 +46,21 @@ l'ordre des résultats, change la version.
   connexion par requête.
 - **Délai** : une requête a 5 s dans la base, toutes ses lectures comptées
   (`DATA_API_QUERY_TIMEOUT_SECONDS`, `core/config.py`) ; au-delà, SQLite arrête la lecture et
-  l'API répond 503 `query_timeout`, sans le message de SQLite. Le contrôle passe toutes les 100
-  instructions de SQLite (`set_progress_handler`, `data_api/dependencies.py`) : au pire environ
-  70 ms après l'échéance. L'échéance part du premier contrôle, quand SQLite lit : la dépendance et
+  l'API répond 503 `query_timeout`, sans le message de SQLite. Le contrôle passe toutes les 1 000
+  instructions de SQLite (`set_progress_handler`, `data_api/dependencies.py`) : mesuré par l'API le
+  2026-11-06, la pire recherche est arrêtée à 5,75 s, environ 0,75 s après l'échéance (5,10 s à
+  100 instructions) ; chaque contrôle reprend le GIL, et 1 000 en fait dix fois moins que 100 pour
+  les autres requêtes (revue de code, tranché par time-knight, que Sabine a laissé trancher le
+  2026-11-06). L'échéance part du premier contrôle, quand SQLite lit : la dépendance et
   la route attendent chacune un fil du pool, et cette attente ne compte pas. 5 s, mesuré le 2026-11-06 : la pire recherche `q` (199 « a » puis
   « b ») sur 400 corps de release de 125 000 « a » prend environ 10 s sans délai, une recherche
   ordinaire sur 50 millions de caractères 0,03 s ; sous les 10 s que le client de l'API IA
   attend chaque morceau d'une réponse (`DATA_API_READ_TIMEOUT_SECONDS`). Limites : une
   instruction seule ne s'interrompt pas (un `LIKE` sur le plus long texte, un clip de 1 000 000
   de caractères, environ 0,2 s, extrapolé) ; chaque contrôle reprend le GIL de Python : à côté
-  d'un fil qui calcule sans pause, une requête de 3 ms en prend plusieurs secondes, et sous une
-  charge mesurée (deux requêtes en même temps, un calcul par à-coups), 46 ms deviennent 70 ms.
+  d'un fil qui calcule sans pause, une requête de 3 ms en prend 1,5 s à 1 000 instructions, plus
+  de 5 s à 100, et sous une charge par à-coups (deux requêtes en même temps), 46 ms deviennent
+  70 ms (essais du relecteur du plan, à 100).
 - **Clé** : chaque route de données demande `Authorization: Bearer <clé>`. `/health` est public,
   `/docs` et `/openapi.json` aussi quand ils sont servis : ils ne contiennent aucune donnée.
 - **Documentation** : `/docs` et `/openapi.json` ne sont servis que si

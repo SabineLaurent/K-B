@@ -37,7 +37,7 @@ instructions environ. Si elle rend une valeur non nulle, SQLite arrête la requ�
 `sqlite3.OperationalError('interrupted')` ([doc de `sqlite3`](https://docs.python.org/3/library/sqlite3.html),
 `set_progress_handler`).
 
-`src/k_b/data_api/dependencies.py:20-26` :
+`src/k_b/data_api/dependencies.py:21-27` :
 
 ```python
     connection = connect_database_read_only(request.app.state.database_path)
@@ -50,14 +50,16 @@ instructions environ. Si elle rend une valeur non nulle, SQLite arrête la requ�
 ```
 
 Le contrôle est posé dans la dépendance `open_database`, qui ouvre la connexion de chaque requête.
-Toutes les routes de données passent par elle (`Database`, `dependencies.py:50`). La liste, le
+Toutes les routes de données passent par elle (`Database`, `dependencies.py:51`). Le pas, 1 000
+instructions (`INSTRUCTIONS_BETWEEN_CHECKS`, `dependencies.py:15`), est lu à chaque requête : les
+tests le ramènent à 1, la base de test étant trop petite pour atteindre 1 000 au détail. La liste, le
 détail et ses trois lectures, les tendances : tout ce qui lit la base passe par cette connexion, et
 donc par le contrôle. La fonction est passée par position : le mot-clé `progress_handler=` est
 déprécié et deviendra interdit en Python 3.15.
 
 ### 2. L'échéance part du premier contrôle
 
-`src/k_b/data_api/dependencies.py:38-45` :
+`src/k_b/data_api/dependencies.py:39-46` :
 
 ```python
     deadline: float | None = None
@@ -166,7 +168,7 @@ prend en voyant le contrat.
 |---|---|---|
 | Le mécanisme du délai | `set_progress_handler` : déterministe, synchrone, dans le fil de la requête ; la façon écrite le 05/11 dans la spec (#404). Plan validé par Sabine le 06/11. | `interrupt()` par un minuteur de la boucle (`call_later`) : une échéance tombée entre deux instructions n'arrête pas la suivante, un test à 0 s ferait courir le minuteur contre la requête, et il faut une dépendance async. Un délai asyncio autour de la route : la route tourne dans un fil, SQLite continuerait. |
 | La valeur, 5 s | Au-dessus de la pire recherche honnête (0,03 s), sous les 10 s que le client de l'API IA attend chaque morceau d'une réponse (`DATA_API_READ_TIMEOUT_SECONDS`). Un test tient l'écart. | Une variable d'environnement : c'est une borne de protection, comme le débit (`DATA_API_RATE_LIMITS`), pas un réglage de déploiement (règle 2 de `poc.md`). |
-| Le pas du contrôle, 100 instructions | Dépassement d'environ 70 ms ; à 1 000, environ 750 ms, et le détail et `/trends` ne passent jamais le contrôle sur la base de test. **En attente** : la revue de code (constat 2) propose 1 000 en production (chaque contrôle reprend le GIL), 1 dans les tests ; Sabine décide. | — |
+| Le pas du contrôle, 1 000 instructions | Chaque contrôle reprend le GIL : 1 000 en fait dix fois moins que 100 pour les autres requêtes. La pire recherche, mesurée par l'API, s'arrête à 5,75 s, sous les 10 s du client. Les tests le ramènent à 1 par `monkeypatch` (revue de code, constat 2 ; tranché par time-knight, que Sabine a laissé trancher le 06/11). | 100, celui du plan validé : arrêt à 5,10 s, mais dix fois plus de reprises du GIL ; il servait surtout à ce que la base de test, au détail et aux tendances, atteigne le contrôle. |
 | L'erreur | 503 `query_timeout`, comme l'écrivait la spec. Le client de l'API IA lit déjà tout statut ≥ 500 comme `data_api_unavailable` (`data_api_client.py:372`) : rien à changer chez lui. | 504 : il dit qu'une passerelle n'a pas eu de réponse en amont. |
 | Les bornes du détail | Nombre et taille (choix de Sabine du 06/11) : sans la taille, 100 surlignages de 10 000 + 10 000 caractères feraient 2 000 000 de caractères, 16 fois le clip. | Le nombre seul, que l'issue demandait. Refuser le détail : le client ne lirait plus rien de l'item. Paginer : une route de plus, hors de la taille S. Servir le nombre total : aucun client ne le lit. |
 | Où couper | Dans la route, après la lecture : `database/` appartient à l'axe PostgreSQL (#416), qui le réécrit en même temps. | Un `LIMIT` et un `substr` dans le SQL : à faire après #416, dans une issue à part (constat 4, écarté de cette PR par time-knight). |
@@ -183,7 +185,7 @@ prend en voyant le contrat.
 | `test_the_text_of_a_clip_beyond_its_length_is_cut_and_the_cut_is_said` | Borne à la longueur − 1 : `body[:longueur − 1]`, vrai ; à la longueur : entier, faux. |
 | `test_the_longest_text_a_detail_serves_is_the_longest_body_of_a_release` | 125 000 reste égal à la limite d'une release. |
 | `test_each_kind_has_its_detail` (zotero_entry, clip) | Les deux drapeaux sont servis, faux sans coupe ; les autres sortes n'ont pas changé. |
-| Mesure du 06/11 (scratchpad, SQLite 3.50.4, Python 3.13.13) | Pire recherche sur 400 corps : environ 10 s sans délai, arrêtée vers 5,05 à 5,2 s avec. |
+| Mesure du 06/11 par l'API (scratchpad, la base de test et 400 releases de 125 000 « a », SQLite 3.50.4, Python 3.13.13) | Pire recherche : environ 10 s sans délai ; 503 `query_timeout` à 5,75 s (1 000 instructions) et 5,10 s (100) ; une recherche ordinaire, 0,021 s. |
 | `uv run pytest` (3 458 passés), `ruff check --no-cache`, `ruff format --check`, `mypy --strict` | Contrôles du dépôt verts. |
 
 ## Ce que tu dois pouvoir défendre
@@ -192,9 +194,9 @@ prend en voyant le contrat.
    FastAPI la lance dans un fil du pool. Un délai asyncio rendrait la main au client, mais le fil,
    lui, continuerait sa requête SQLite jusqu'au bout. Il n'y aurait plus d'attente côté client,
    mais toujours la même consommation côté serveur. `set_progress_handler` arrête SQLite lui-même
-   (`dependencies.py:22-25`).
-2. **Une requête peut-elle dépasser 5 s ?** Oui, de peu. Le contrôle ne passe qu'entre deux paquets
-   d'instructions : environ 70 ms de dépassement mesuré. Une instruction seule ne s'interrompt pas :
+   (`dependencies.py:23-26`).
+2. **Une requête peut-elle dépasser 5 s ?** Oui, de peu. Le contrôle ne passe que toutes les 1 000
+   instructions : la pire recherche, mesurée par l'API, s'arrête à 5,75 s. Une instruction seule ne s'interrompt pas :
    un `LIKE` sur le texte le plus long, un clip de 1 000 000 de caractères, prend environ 0,2 s
    (extrapolé). C'est écrit dans les limites de la ligne API4.
 3. **Que reçoit un client dont le détail est coupé ?** Le début de la liste ou du texte, et un drapeau
@@ -214,8 +216,8 @@ prend en voyant le contrat.
 - **Les 0,2 s d'un `LIKE` sur un clip de 1 000 000 de caractères** sont extrapolées de la mesure sur
   125 000 caractères (24 ms par corps), pas mesurées.
 - **Le coût du GIL sous charge** vient des essais du relecteur du plan (une requête de 3 ms devient
-  plusieurs secondes à côté d'un fil qui calcule sans pause ; 46 → 70 ms sous une charge par
-  à-coups). Ils n'ont pas été refaits ici. C'est l'objet du constat 2, en attente.
+  1,5 s à 1 000 instructions, à côté d'un fil qui calcule sans pause). Ils n'ont pas été refaits
+  ici.
 - **PostgreSQL** : rien n'est essayé. `statement_timeout` et son comptage par instruction viennent de
   la doc de PostgreSQL 17 (`runtime-config-client.html`, par Context7). Le code 57014 vient de
   l'annexe A (`errcodes-appendix.html`), lue dans une version ancienne seulement. Le refus du
@@ -228,7 +230,6 @@ prend en voyant le contrat.
 - **Borner la lecture elle-même** (`LIMIT 101` des surlignages, `substr` du texte d'un clip) : après
   #416, dans une issue à part (constat 4 de la revue de code). Aujourd'hui, la lecture n'est bornée
   qu'en temps, par le délai.
-- **Le pas du contrôle** (100 ou 1 000) : en attente de la décision de Sabine (constat 2).
 - **Un plafond de requêtes simultanées** pour l'API de données, que l'API IA a déjà (« une demande à
   la fois »). Le délai se multiplie par le débit (120 listes par minute, 5 s chacune au plus). C'est
   la décision ouverte « Une limite de connexions du serveur » du journal ADR, au jalon ACA.

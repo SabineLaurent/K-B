@@ -9,6 +9,7 @@ from k_b.core.config import (
     DATA_API_QUERY_TIMEOUT_SECONDS,
     DATA_API_READ_TIMEOUT_SECONDS,
 )
+from k_b.data_api import dependencies
 from k_b.data_api.dependencies import make_deadline_check
 from k_b.data_api.routers import item_router
 
@@ -85,10 +86,12 @@ def test_a_database_error_gives_500_without_detail_and_logs_its_type(
 
 @pytest.mark.parametrize("path", ["/items", "/items/14", "/trends"])
 def test_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail(
-    client, authorization, caplog, path
+    client, authorization, caplog, monkeypatch, path
 ):
     """Each data route reads through the connection that carries the deadline; at 0 s, its first
-    check stops the first reading."""
+    check stops the first reading. A check at each instruction: the detail and the trends of the
+    test base run fewer than the 1,000 of production."""
+    monkeypatch.setattr(dependencies, "INSTRUCTIONS_BETWEEN_CHECKS", 1)
     client.app.state.query_timeout_seconds = 0
 
     with caplog.at_level(logging.WARNING, logger="k_b.data_api"):
