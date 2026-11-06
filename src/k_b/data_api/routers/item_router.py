@@ -16,7 +16,15 @@ from k_b.data_api.schemas.item_schema import (
     ItemPageSchema,
     ListedItemSchema,
 )
-from k_b.database.reading import format_since, read_item_detail, read_items
+from k_b.database.reading import (
+    ClipDetail,
+    KindDetail,
+    StoredHighlight,
+    ZoteroEntryDetail,
+    format_since,
+    read_item_detail,
+    read_items,
+)
 from k_b.items import (
     Int64,
     ItemKind,
@@ -32,6 +40,12 @@ MAX_OFFSET = 10_000
 MAX_SEARCH_LENGTH = 200
 # One value of kind per kind at most (OWASP API4:2023).
 MAX_KINDS = len(get_args(ItemKind))
+# The bounds of a detail (docs/specs-api.md, "GET /items/{item_id}"; OWASP API4:2023): the
+# highlights of a Zotero entry, and the characters of long text, the longest body of a release,
+# which a detail already serves whole. Written apart, a test keeps them equal: the contract of the
+# API does not move with a bound of the import.
+MAX_SERVED_HIGHLIGHTS = 100
+MAX_SERVED_TEXT_LENGTH = 125_000
 
 
 def read_since_text(since: object) -> datetime:
@@ -118,5 +132,40 @@ def read_item(
     if detail is None:
         raise ApiError(404, "item_not_found")
     # The discriminator picks the schema of the kind; a field it does not name is not served.
-    fields: dict[str, Any] = {**detail.listed._asdict(), **detail.details._asdict()}
+    fields: dict[str, Any] = {
+        **detail.listed._asdict(),
+        **bound_details(detail.details),
+    }
     return DETAIL_ADAPTER.validate_python(fields)
+
+
+def bound_details(details: KindDetail) -> dict[str, Any]:
+    """The fields of the kind, the highlights or the text of a clip cut at their bounds, the cut
+    said."""
+    if isinstance(details, ZoteroEntryDetail):
+        highlights = bound_highlights(details.highlights)
+        return {
+            **details._asdict(),
+            "highlights": highlights,
+            "highlights_truncated": len(highlights) < len(details.highlights),
+        }
+    if isinstance(details, ClipDetail):
+        return {
+            **details._asdict(),
+            "body": details.body[:MAX_SERVED_TEXT_LENGTH],
+            "body_truncated": len(details.body) > MAX_SERVED_TEXT_LENGTH,
+        }
+    return details._asdict()
+
+
+def bound_highlights(highlights: list[StoredHighlight]) -> list[StoredHighlight]:
+    """The first highlights, by date, while their number and the characters of their text and
+    comment hold within the bounds."""
+    served: list[StoredHighlight] = []
+    length = 0
+    for highlight in highlights[:MAX_SERVED_HIGHLIGHTS]:
+        length += len(highlight.text or "") + len(highlight.comment or "")
+        if length > MAX_SERVED_TEXT_LENGTH:
+            break
+        served.append(highlight)
+    return served

@@ -100,6 +100,10 @@ class ZoteroEntryDetailSchema(ListedItemSchema):
     revised_at: str | None = Field(description=DATE_OF_K_B)
     # The withdrawn ones included, by date of creation.
     highlights: list[HighlightSchema]
+    highlights_truncated: bool = Field(
+        description="Highlights are left out: the first ones by date are served while their"
+        " number and the length of their text and comment hold within the bounds of the detail."
+    )
 
 
 class ClipDetailSchema(ListedItemSchema):
@@ -108,7 +112,13 @@ class ClipDetailSchema(ListedItemSchema):
         description="A date of the page kept (published of Web Clipper): a day, at midnight"
         " UTC; null when the page gives none."
     )
-    body: str = Field(description="The text kept, Markdown, as Web Clipper wrote it.")
+    body: str = Field(
+        description="The text kept, Markdown, as Web Clipper wrote it, cut at the bound of the"
+        " detail."
+    )
+    body_truncated: bool = Field(
+        description="The text is cut at the bound of the detail."
+    )
 
 
 ItemDetailSchema = Annotated[

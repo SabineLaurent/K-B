@@ -5117,7 +5117,70 @@ Décisions de Sabine du 2026-11-04.
     environnement ; il n'agit que si `COVERAGE_PROCESS_START` ou `COVERAGE_PROCESS_CONFIG` est posé ;
   - `uv.lock` gagne deux paquets (`pytest-cov`, `coverage`), en développement seulement. — PR de #405
 
+### API de données : un délai par requête et les bornes du détail (#331)
+
+- **Une requête de l'API de données a 5 s dans la base, comptées depuis le premier contrôle de sa
+  première lecture : le contrôle posé par `set_progress_handler` sur sa connexion, toutes les 1 000
+  instructions de SQLite, arrête la lecture une fois l'échéance passée ; l'API répond 503
+  `query_timeout`, sans le message de SQLite.**
+  Plan validé par Sabine le 06/11, sur la façon écrite le 05/11 dans `docs/specs-api.md` (« Ce qui
+  manque, et comment le tenir », #404). Pourquoi : un `LIKE` de `q` lit tout le corps des releases ;
+  mesuré le 06/11, la pire recherche (199 « a » puis « b ») sur 400 corps de 125 000 « a » prend
+  environ 10 s, une recherche ordinaire sur 50 millions de caractères 0,03 s (OWASP API4:2023).
+  5 s reste sous les 10 s que le client de l'API IA attend chaque morceau d'une réponse
+  (`DATA_API_READ_TIMEOUT_SECONDS`), ce qu'un test tient. 1 000 instructions, et non 100 comme le
+  disait le plan validé : chaque contrôle reprend le GIL, et 1 000 en fait dix fois moins pour les
+  autres requêtes ; la pire recherche, mesurée par l'API, s'arrête à 5,75 s au lieu de 5,10 s, sous
+  les 10 s du client ; les tests le ramènent à 1, la base de test n'atteignant pas 1 000
+  instructions au détail ni aux tendances (revue de code, tranché par time-knight, que Sabine a
+  laissé trancher le 06/11). L'interruption se
+  reconnaît à `SQLITE_INTERRUPT` (`sqlite_errorcode`, lu par `getattr` : une erreur levée par Python
+  n'en a pas). L'échéance part du premier contrôle, pas de l'ouverture de la connexion : la
+  dépendance et la route attendent chacune un fil du pool, et cette attente ne se passe pas dans la
+  base ; le temps de Python entre deux lectures, lui, compte (revue de code, tranché par time-knight
+  le 06/11). Écartés : `interrupt()` lancé par un minuteur de la boucle (`call_later`), car une
+  échéance tombée entre deux instructions n'arrête pas la suivante, un test à 0 s ferait courir le
+  minuteur contre la requête, et il faudrait une dépendance async ; un délai asyncio autour de la
+  route, que SQLite ignorerait (la route tourne dans un fil) ; une variable d'environnement (une borne
+  de protection, comme le débit, pas un réglage de déploiement) ; 504, qui dit qu'une passerelle n'a
+  pas eu de réponse. Limites assumées : une instruction seule ne s'interrompt pas (un `LIKE` sur un
+  clip de 1 000 000 de caractères, environ 0,2 s, extrapolé) ; à côté d'un fil Python qui calcule
+  sans pause, une requête de 3 ms en prend 1,5 s à 1 000 instructions (essai du relecteur du
+  plan) ; sous charge, l'attente du pool, non comptée, peut porter la réponse au-delà des 10 s du
+  client de l'API IA, qui lit alors `data_api_timeout` au lieu du 503 ; le délai
+  se multiplie par le débit (120 listes par minute), sans plafond de requêtes simultanées
+  (« Une limite de connexions du serveur », ci-dessous). Pour #418 (PostgreSQL) :
+  `statement_timeout` à 5 000 ms pour le rôle de l'API de données (`ALTER ROLE … SET`, côté
+  serveur ; le paramètre de démarrage `options` peut être refusé par un pooler comme PgBouncer, à
+  vérifier alors) ; son dépassement, SQLSTATE 57014 `query_canceled`, donne le même 503. Il compte par
+  instruction : le détail en fait jusqu'à trois, 15 s en théorie, au-delà des 10 s du client.
+  `transaction_timeout` (PostgreSQL 17) bornerait la requête entière, mais il ferme la session
+  (FATAL), qu'on ne distingue pas d'une panne. `set_progress_handler` (`data_api/dependencies.py`)
+  et `SQLITE_INTERRUPT` (`data_api/errors.py`) sont propres à SQLite : c'est là que #416 et #418
+  les trouveront. — PR de #331, à venir
+
+- **Un détail sert 125 000 caractères de texte long au plus, la longueur maximale du corps d'une
+  release qu'il sert déjà entier : une entrée Zotero sert ses surlignages dans l'ordre, retirés
+  compris, tant qu'ils sont 100 au plus et que leurs `text` et `comment` tiennent ensemble dans
+  125 000 caractères ; un clip, les 125 000 premiers caractères de son texte. `highlights_truncated`
+  et `body_truncated`, toujours servis, disent la coupe.** Choix de Sabine du 06/11 : le nombre et la
+  taille, plutôt que le nombre seul que demandait l'issue. Pourquoi : 100 surlignages de 10 000
+  caractères de texte et autant de commentaire feraient 2 000 000 de caractères, 16 fois le clip
+  (relecture du plan). La coupe garde un début de la liste : un surlignage fait plus tard, donc daté
+  plus tard, ne décale pas ceux déjà servis. Écartés : refuser le détail (le client ne lirait plus
+  rien de l'item) ; paginer les surlignages ou le texte (une route de plus, hors de la taille S) ;
+  servir le nombre total (aucun client ne le lit). Limites assumées : la coupe se fait dans la route,
+  après la lecture, pour ne pas toucher `database/`, que l'axe PostgreSQL réécrit : les surlignages
+  sont tous lus, bornés en temps par le délai, pas en mémoire ; `q` trouve un clip par la partie de
+  son texte que le détail ne sert pas ; les valeurs ne reposent sur aucune mesure de la bibliothèque
+  réelle (6 surlignages dans la base de test). — PR de #331, à venir
+
 ## Décisions encore ouvertes
+
+- **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
+  d'une entrée, puis en sert 100 au plus. Une lecture bornée (`LIMIT 101` dans `SELECT_HIGHLIGHTS`,
+  `database/reading.py`), et `substr` pour le texte d'un clip, borneraient aussi la mémoire. #416 ne
+  change aucun comportement : à décider à part, avec #418 ou plus tard (time-knight, 06/11), dans #430.
 
 - **Seuil de couverture des tests** (2026-11-06, #405) : quel `fail_under`, et la CI le vérifie-t-elle ?
   À décider par l'utilisatrice sur la mesure du 06/11 (99,26 % : lignes 99,44 %, branches 98,36 %).
