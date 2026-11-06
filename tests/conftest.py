@@ -212,8 +212,11 @@ def identity_roles(postgresql_server_url):
             # Names of the test only: nothing from outside enters the statement.
             server.execute(f'CREATE ROLE "{role}" LOGIN')
     yield
-    names = ", ".join(f'"{role}"' for role in (*IDENTITY_ROLES, *GROUP_ROLES))
-    server.execute(f"DROP ROLE IF EXISTS {names}")
+    # Only the roles the session created: a role the server had before is left as it was.
+    created = [role for role in (*IDENTITY_ROLES, *GROUP_ROLES) if role not in existing]
+    if created:
+        names = ", ".join(f'"{role}"' for role in created)
+        server.execute(f"DROP ROLE IF EXISTS {names}")
     server.close()
 
 
