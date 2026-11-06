@@ -10,12 +10,19 @@
 -- objects in public until this script revokes it (Microsoft Learn, "Access management", read on
 -- 2026-11-06).
 
+-- First: the role of the job may create functions and operators in public, and one whose arguments
+-- match a call below better than those of pg_catalog would run under the rights of the
+-- administrator (CVE-2018-1058). With pg_catalog alone, no name of this script is looked up in
+-- public.
+SET search_path = pg_catalog;
+
 -- citext, which the role of kb migrate-database does not create on Azure
--- (src/k_b/database/schema_postgresql.sql).
+-- (src/k_b/database/schema_postgresql.sql). In public, where the tables find it: with the
+-- search_path above, CREATE EXTENSION would otherwise choose pg_catalog.
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_extension WHERE extname = 'citext') THEN
-        CREATE EXTENSION citext;
+        CREATE EXTENSION citext SCHEMA public;
     END IF;
 END
 $$;

@@ -360,6 +360,12 @@ Bicep : une adresse IP resterait dans l'historique des déploiements. Le jeton d
 il se demande juste avant chaque commande et n'est posé que pour elle (`PGPASSWORD=… psql`, sans `export` : `kb`
 refuse une variable `PG*` dans son environnement).
 
+Chaque `psql` de l'administration passe par `admin_psql`, qui pose aussi `search_path` à `pg_catalog` seul
+(`PGOPTIONS`) : le rôle du job peut créer des fonctions et des opérateurs dans `public`, et l'un d'eux, s'il
+correspond mieux à un appel que celui de `pg_catalog`, s'exécuterait avec les droits de l'administratrice
+(CVE-2018-1058). Pour la même raison, l'administratrice ne lit dans `kb` que les catalogues, jamais une table du
+job : le code d'une vue ou d'une politique de lignes qu'il y poserait s'exécuterait avec ses droits à elle.
+
 ```sh
 RG=<groupe de ressources>
 IP=<adresse IPv4 publique du Mac>
@@ -368,12 +374,17 @@ FQDN=$(az postgres flexible-server show -g "$RG" -n "$PG" --query fullyQualified
 ADMIN=$(az ad signed-in-user show --query userPrincipalName -o tsv)
 CONN="host=$FQDN port=5432 user=$ADMIN sslmode=verify-full sslrootcert=system"
 token() { az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv; }
+admin_psql() {  # admin_psql <base> <arguments de psql>
+  PGPASSWORD="$(token)" PGOPTIONS='-c search_path=pg_catalog' psql "$CONN dbname=$1" "${@:2}"
+}
 az postgres flexible-server firewall-rule create -g "$RG" --server-name "$PG" --name admin-mac \
   --start-ip-address "$IP" --end-ip-address "$IP"
+admin_psql postgres -At -c "SHOW search_path"
 ```
 
-`sslrootcert=system` fait vérifier le certificat du serveur par les autorités de la libssl de `psql` (sur le Mac,
-celles d'OpenSSL de Homebrew), et force `verify-full`.
+Attendu : `pg_catalog` (non vérifié sur Azure avant la première administration). `sslrootcert=system` fait
+vérifier le certificat du serveur par les autorités de la libssl de `psql` (sur le Mac, celles d'OpenSSL de
+Homebrew), et force `verify-full`.
 
 ### Créer les rôles et la base (une fois)
 
@@ -385,10 +396,10 @@ nom, qu'une autre identité de l'annuaire peut porter.
 ```sh
 MIGRATE_ID=$(az identity show -g "$RG" -n id-kb-migrate-database --query principalId -o tsv)
 DATA_API_ID=$(az identity show -g "$RG" -n id-kb-data-api --query principalId -o tsv)
-PGPASSWORD="$(token)" psql "$CONN dbname=postgres" \
+admin_psql postgres \
   -v migrate_database_principal_id="$MIGRATE_ID" -v data_api_principal_id="$DATA_API_ID" \
   -f infra/postgresql/create-principals.sql
-PGPASSWORD="$(token)" psql "$CONN dbname=kb" -v ON_ERROR_STOP=1 -f infra/postgresql/grant-roles.sql
+admin_psql kb -v ON_ERROR_STOP=1 -f infra/postgresql/grant-roles.sql
 ```
 
 `grant-roles.sql` se relance sans rien changer. `create-principals.sql` ne se relance pas : la base `kb` existe
@@ -425,7 +436,7 @@ Attendu : la seule règle `AllowAllAzureServicesAndResourcesWithinAzureIps`, de 
    démarrage du serveur.
 
    ```sh
-   PGPASSWORD="$(token)" psql "$CONN dbname=kb" -At -c "SELECT count(*), md5(string_agg(c.relname || ':' || coalesce(c.relacl::text, ''), ',' ORDER BY c.relname)), (SELECT sum(n_tup_ins + n_tup_upd + n_tup_del) FROM pg_stat_user_tables) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r'"
+   admin_psql kb -At -c "SELECT count(*), md5(string_agg(c.relname || ':' || coalesce(c.relacl::text, ''), ',' ORDER BY c.relname)), (SELECT sum(n_tup_ins + n_tup_upd + n_tup_del) FROM pg_stat_user_tables) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r'"
    az containerapp job start -g "$RG" -n caj-kb-migrate-database
    az containerapp job execution list -g "$RG" -n caj-kb-migrate-database \
      --query "[].{name:name,status:properties.status,start:properties.startTime}" -o table
@@ -439,7 +450,7 @@ Attendu : la seule règle `AllowAllAzureServicesAndResourcesWithinAzureIps`, de 
 3. Sous `id-kb-data-api`, une écriture est refusée. Dans le catalogue, depuis l'administration :
 
    ```sh
-   PGPASSWORD="$(token)" psql "$CONN dbname=kb" -At -c "SELECT has_table_privilege('id-kb-data-api', 'source', 'SELECT'), has_table_privilege('id-kb-data-api', 'source', 'INSERT'), has_schema_privilege('id-kb-data-api', 'public', 'CREATE'), has_database_privilege('id-kb-data-api', 'kb', 'TEMPORARY')"
+   admin_psql kb -At -c "SELECT has_table_privilege('id-kb-data-api', 'public.source', 'SELECT'), has_table_privilege('id-kb-data-api', 'public.source', 'INSERT'), has_schema_privilege('id-kb-data-api', 'public', 'CREATE'), has_database_privilege('id-kb-data-api', 'kb', 'TEMPORARY')"
    ```
 
    Attendu : `t|f|f|f`. Puis dans l'API elle-même, par son identité :
