@@ -181,7 +181,7 @@ passerait sans le garde.
 - Rattraper `ValueError` et `AttributeError` autour de `get_token` range aussi sous `exchange_storage_no_token`,
   sans trace, un bogue de K-B ou du SDK qui lèverait l'une d'elles (seconde revue, constat écarté).
 - Les bibliothèques autres qu'`azure` et `urllib3` (BigQuery, OpenTelemetry) peuvent écrire à WARNING le texte d'une
-  réponse, non échappé : un défaut déjà sur `main`, porté par une issue à part.
+  réponse, non échappé : un défaut déjà sur `main`, porté par #441.
 - Le critère `docker run --rm -e KB_DATA_DIR=/var/lib/knowledge_base <image> kb smoke-test --help` attend l'image
   de #200.
 

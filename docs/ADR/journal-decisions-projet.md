@@ -5452,7 +5452,9 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   neuf. Écartés : WARNING, le niveau de `httpx2` (le premier choix du
   plan, qui laissait passer ces lignes) ; `azure.identity` seul (le stockage écrit aussi des valeurs) ;
   un filtre de masquage des URL (plus de code pour le même effet). Limite assumée : les avertissements
-  de `urllib3` sont aussi perdus pour les autres sources qui passent par `requests`. — PR de #412
+  de `urllib3` sont aussi perdus pour les autres sources qui passent par `requests` ; les lignes des
+  autres bibliothèques (BigQuery, OpenTelemetry) restent non échappées, un défaut déjà sur `main`,
+  porté par #441. — PR de #412
 
 - **Une erreur du stockage est nommée par son état (`exchange_storage_forbidden`, `_not_found`,
   `_unauthorized`, `_unavailable`, `_no_token`, `_failed`), son statut HTTP et son code (`x-ms-error-code`,
