@@ -267,6 +267,7 @@ auteur dans un journal (règle 5 de `poc.md`) ; les actions épinglées par SHA 
 | `test_kb_create_db_never_shows_a_part_of_a_password_the_url_does_not_encode` | `/` et `／` dans le mot de passe : rien sur stdout, stderr ni `kb.log` |
 | `test_the_variables_refused_cover_every_one_the_libpq_installed_reads` | la liste des 42 variables couvre celles que la libpq installée déclare |
 | `test_only_the_access_layer_imports_a_driver_of_the_base` | psycopg n'est importé que par `postgresql.py` et `errors.py` |
+| Essai réel du 2026-11-06, lancé par toi, sur deux copies de ton `raw/` (45 fichiers) : un import neuf en SQLite, un en PostgreSQL 18.4 ; sorties console gardées telles quelles dans la PR #440, section « Real run » | les deux imports rendent `import: 40 raw read, 3207 written, 763 trend rows, 1 left out, 0 rejected, 0 withdrawn` et la sortie 0 ; les 15 tables ont les mêmes comptes (`0 difference(s)`), et les deux journaux d'import, sans leur date, sont identiques. Ni retrait ni clip tagué dans ce brut : le test « mêmes lignes » les couvre |
 | `uv run pytest` → 3592 passed, 146 deselected ; `uv run pytest -m postgresql` → 135 passed (rebasé sur `2e8b5d7`) | la suite SQLite existante reste verte, et les tests PostgreSQL passent sur le 18.4 local |
 
 ## 5. Ce que tu dois pouvoir défendre
