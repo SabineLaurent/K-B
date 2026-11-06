@@ -57,7 +57,7 @@ def test_the_fields_out_of_the_whitelist_are_not_kept():
         {
             "title": "Evaluating System One Models for Agent Security Decisions",
             "summary": "Model-based judges support agent security.",
-            "authors": ["Yixuan Liu"],
+            "authors": ["Lena Marsh"],
             "arxiv_id": "2609.33401",
             "url": "https://arxiv.org/abs/2609.33401",
         },

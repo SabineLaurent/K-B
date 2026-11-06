@@ -498,7 +498,7 @@ def test_a_tldr_page_that_is_not_an_edition_writes_nothing_and_keeps_the_date(
         "'not_the_edition_of_the_day'; "
         "'tldr_ai 2026-10-03, from https://tldr.tech/ai/2026-10-03'; "
         '"first h1 is not an edition title with its date: '
-        "'Keep up with AI in 5 minutes'\""
+        "'Stay current on AI in a few minutes'\""
     )
 
 

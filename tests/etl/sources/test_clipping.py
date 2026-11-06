@@ -386,21 +386,17 @@ def test_a_clip_becomes_a_clip_item_with_its_text():
     assert item.model_dump(exclude_defaults=True) == {
         "source_code": "clipper",
         "source_item_id": (
-            "https://medium.com/skillstuff/"
-            "7-coding-patterns-i-stole-from-senior-engineers-c95f757e52a6"
+            "https://example.com/blog/7-habits-from-experienced-engineers"
         ),
         "kind": "clip",
-        "title": "7 Coding Patterns I Stole From Senior Engineers",
-        "url": (
-            "https://medium.com/skillstuff/"
-            "7-coding-patterns-i-stole-from-senior-engineers-c95f757e52a6"
-        ),
+        "title": "7 Habits I Picked Up From Experienced Engineers",
+        "url": "https://example.com/blog/7-habits-from-experienced-engineers",
         "published_at": datetime(2026, 6, 8, tzinfo=UTC),
         "saved_at": datetime(2026, 9, 17, tzinfo=UTC),
         "summary": (
-            "## Most developers do not become better simply by learning more syntax.\n\n"
-            "Most junior developers think senior engineers know more tricks.\n\n"
-            "They usually do not.\n"
+            "## Learning more syntax is rarely what makes a developer better.\n\n"
+            "Many new developers assume that experienced engineers know more tricks.\n\n"
+            "Most of the time, they do not.\n"
         ),
         "collected_at": COLLECTED_AT,
         "raw_file_path": CLIP_PATH,
@@ -449,7 +445,7 @@ def test_a_clip_that_starts_with_a_byte_order_mark_is_read():
     """Obsidian reads it; an editor may add one."""
     item = convert(b"\xef\xbb\xbf" + fixture_bytes(ARTICLE))
 
-    assert item.title == "7 Coding Patterns I Stole From Senior Engineers"
+    assert item.title == "7 Habits I Picked Up From Experienced Engineers"
 
 
 def test_the_byte_not_utf8_is_counted_from_the_start_of_the_file_byte_order_mark_included():
@@ -463,7 +459,7 @@ def test_a_clip_with_crlf_line_ends_is_read():
     item = convert(raw_clip)
 
     assert item.saved_at == datetime(2026, 9, 17, tzinfo=UTC)
-    assert item.summary.startswith("## Most developers")
+    assert item.summary.startswith("## Learning more syntax")
 
 
 @pytest.mark.parametrize(

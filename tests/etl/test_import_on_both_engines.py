@@ -161,7 +161,7 @@ def write_first_collection(data_dir, zotero_extract):
 def accented_clip():
     """The article of the collection under another title and address."""
     text = fixture_text(ARTICLE)
-    title = 'title: "7 Coding Patterns I Stole From Senior Engineers"'
+    title = 'title: "7 Habits I Picked Up From Experienced Engineers"'
     source = "c95f757e52a6"
     assert title in text and source in text
     return text.replace(title, f'title: "{ACCENTED_TITLE}"').replace(

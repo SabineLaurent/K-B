@@ -32,8 +32,8 @@ MISTRAL_TITLE = "Mistral Large 4 (9 minute read)"
 
 
 MISTRAL_SUMMARY = (
-    "Mistral Large 4 is a one-trillion-parameter multimodal model positioned as a"
-    " European alternative to leading closed and open AI systems."
+    "Mistral Large 4 is a very large multimodal model, presented as an open alternative"
+    " to the main AI systems of the moment."
 )
 
 
@@ -160,7 +160,7 @@ def test_a_tldr_page_without_edition_title_is_rejected_and_not_registered(
         tldr_data_dir,
         "tldr_ai",
         TLDR_SECOND_COLLECTION,
-        TLDR_AI_PAGE.replace("TLDR AI 2026-10-07</h1>", "Keep up with AI</h1>"),
+        TLDR_AI_PAGE.replace("TLDR AI 2026-10-07</h1>", "Stay current on AI</h1>"),
     )
 
     summary = run_import(tldr_data_dir)
@@ -172,6 +172,6 @@ def test_a_tldr_page_without_edition_title_is_rejected_and_not_registered(
             "kind": "rejection",
             "raw_file_path": landing_page,
             "reason": "ValueError: first h1 is not an edition title with its date: "
-            "'Keep up with AI'",
+            "'Stay current on AI'",
         }
     ]

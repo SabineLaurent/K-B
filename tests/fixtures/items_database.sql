@@ -58,11 +58,11 @@ VALUES
     ('2609.31282', 1,
         'Resource-Optimized and Energy-Aware Agentic AI Framework Anchored on Blockchain for Secure Software Supply Chains',
         'This paper proposes a blockchain-backed agentic security framework designed to safeguard the complete software development lifecycle (SDLC) while also securing the agentic AI components responsible for monitoring it.',
-        '["Toqeer Ali Syed"]', '2026-09-25T13:53:50Z', '2026-09-25T13:53:50Z'),
+        '["Ada May Fenwick"]', '2026-09-25T13:53:50Z', '2026-09-25T13:53:50Z'),
     ('2609.33401', 2,
         'Evaluating System One Models for Agent Security Decisions: Reliability, Calibration, and Selective Automation',
         'Model-based judges support agent security by detecting prompt injections, assessing interaction risks, and screening harmful requests.',
-        '["Yixuan Liu"]', '2026-09-27T09:30:13Z', '2026-09-29T16:41:24Z');
+        '["Lena Marsh"]', '2026-09-27T09:30:13Z', '2026-09-29T16:41:24Z');
 
 -- cisa_kev_extract.csv, lines 2, 3 and 5.
 INSERT INTO vulnerability (
@@ -143,15 +143,15 @@ INSERT INTO advisory (
 INSERT INTO newsletter_article (item_id, kind, edition, edition_date, rank, title, summary, url)
 VALUES
     (11, 'newsletter_article', 'ai', '2026-10-07T00:00:00Z', 2, 'Mistral Large 4 (9 minute read)',
-        'Mistral Large 4 is a one-trillion-parameter multimodal model positioned as a European alternative to leading closed and open AI systems.',
+        'Mistral Large 4 is a very large multimodal model, presented as an open alternative to the main AI systems of the moment.',
         'https://mistral.ai/news/mistral-large-4/'),
     (12, 'newsletter_article', 'ai', '2026-10-07T00:00:00Z', 3,
-        'Sharing AI progress in mathematics (2 minute read)',
-        'OpenAI has released a broad range of mathematical results produced by an internal frontier model.',
+        'Notes on machine progress in algebra (2 minute read)',
+        'OpenAI has published a set of algebra results found by one of its internal models.',
         'https://openai.com/index/sharing-ai-progress-in-mathematics/'),
     (13, 'newsletter_article', 'dev', '2026-10-05T00:00:00Z', 2,
-        'Write your Own Virtual Machine (35 minute read)',
-        'This literate tutorial builds an LC-3 virtual machine in about 250 lines of C, covering registers, memory, opcodes, traps, loading programs, and platform-specific input.',
+        'A Small Virtual Machine, Step by Step (35 minute read)',
+        'This step-by-step guide writes a toy virtual machine in a few hundred lines of C, from registers and memory to instructions, traps and the loading of programs.',
         'https://www.jmeiners.com/lc3-vm/');
 
 -- The papers of the Zotero entries 14 and 15 (their archiveID in zotero_extract.sql), which arXiv
@@ -206,7 +206,7 @@ INSERT INTO trend (
 -- clipping/article_with_author.md, the clip of the vault of 2026-10-17 cut down; its text cut.
 INSERT INTO clip (item_id, kind, url, title, body, saved_at, published_at) VALUES
     (18, 'clip',
-        'https://medium.com/skillstuff/7-coding-patterns-i-stole-from-senior-engineers-c95f757e52a6',
-        '7 Coding Patterns I Stole From Senior Engineers',
-        'Most junior developers think senior engineers know more tricks.',
+        'https://example.com/blog/7-habits-from-experienced-engineers',
+        '7 Habits I Picked Up From Experienced Engineers',
+        'Many new developers assume that experienced engineers know more tricks.',
         '2026-09-17T00:00:00Z', '2026-06-08T00:00:00Z');

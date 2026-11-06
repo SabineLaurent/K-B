@@ -130,7 +130,7 @@ def test_a_page_that_does_not_hold_every_result_is_refused(network):
 
 
 def test_a_page_with_an_invalid_entry_is_still_returned(network):
-    network.body = RECORDED_RESPONSE.replace(b"<name>Yixuan Liu</name>", b"")
+    network.body = RECORDED_RESPONSE.replace(b"<name>Lena Marsh</name>", b"")
 
     assert ArxivSource().fetch(last_collected_at=None) == network.body
 
@@ -193,7 +193,7 @@ def test_a_recorded_response_gives_one_paper_per_entry():
         "Resource-Optimized and Energy-Aware Agentic AI Framework"
     )
     assert first.summary.startswith("This paper proposes a blockchain-backed agentic")
-    assert first.authors == ("Toqeer Ali Syed", "Asadullah Abdullah Khan")
+    assert first.authors == ("Ada May Fenwick", "Bertrand Ellis Quarrier")
     assert first.published_at == datetime(2026, 9, 25, 13, 53, 50, tzinfo=UTC)
     assert first.updated_at == datetime(2026, 9, 25, 13, 53, 50, tzinfo=UTC)
 

@@ -61,7 +61,7 @@ def test_an_arxiv_item_gives_an_item_and_its_publication(data_dir):
     assert kind == "paper"
     assert raw_file_path == "automated_watch/arxiv_cscr_x_csai/2026-10-05T093000Z.xml"
     assert title.startswith("Resource-Optimized and Energy-Aware Agentic AI")
-    assert json.loads(authors) == ["Toqeer Ali Syed", "Asadullah Abdullah Khan"]
+    assert json.loads(authors) == ["Ada May Fenwick", "Bertrand Ellis Quarrier"]
     assert submitted_at == revised_at == "2026-09-25T13:53:50Z"
 
 

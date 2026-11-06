@@ -271,7 +271,7 @@ def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir)
         "<updated>2026-09-25T13:53:50Z</updated>",
         "<updated>2026-10-02T08:00:00Z</updated>",
         1,
-    ).replace("Asadullah Abdullah Khan", "Another Author")
+    ).replace("Bertrand Ellis Quarrier", "Another Author")
     (
         data_dir / "raw/automated_watch/arxiv_cscr_x_csai/2026-10-06T093000Z.xml"
     ).write_text(revision)
@@ -283,7 +283,7 @@ def test_a_newer_revision_rewrites_the_paper_under_the_same_identifier(data_dir)
     )
     assert new_item_id == item_id
     assert raw_file_path == "automated_watch/arxiv_cscr_x_csai/2026-10-06T093000Z.xml"
-    assert json.loads(authors) == ["Toqeer Ali Syed", "Another Author"]
+    assert json.loads(authors) == ["Ada May Fenwick", "Another Author"]
     assert (submitted_at, revised_at) == (
         "2026-09-25T13:53:50Z",
         "2026-10-02T08:00:00Z",
