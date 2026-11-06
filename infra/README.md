@@ -377,8 +377,9 @@ celles d'OpenSSL de Homebrew), et force `verify-full`.
 
 ### Créer les rôles et la base (une fois)
 
-Les deux identités doivent exister d'abord (`id-kb-data-api` et `id-kb-migrate-database`, créées par
-`main.bicep`). Chaque rôle est rattaché à son identité par l'identifiant de son principal de service, pas par son
+Après la première passe de `main.bicep`, qui crée le serveur et les identités (`id-kb-data-api`, et
+`id-kb-migrate-database` par `modules/migrate-database-job.bicep`), et avant la seconde, qui crée le job et l'API
+de données. Chaque rôle est rattaché à son identité par l'identifiant de son principal de service, pas par son
 nom, qu'une autre identité de l'annuaire peut porter.
 
 ```sh
