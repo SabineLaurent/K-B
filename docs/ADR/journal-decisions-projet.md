@@ -5723,7 +5723,10 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
   Pourquoi un jeton par connexion : il vit une heure environ ; le pool reçoit ses paramètres de
   connexion par une fonction (`kwargs` appelable de `psycopg_pool` 3.3.3), et son `max_lifetime` par
   défaut (3 600 s) borne la vie d'une session. Pourquoi une variable explicite : déduire Entra
-  d'`AZURE_CLIENT_ID` ou d'`IDENTITY_ENDPOINT` le rendrait implicite. Le certificat se vérifie contre
+  d'`AZURE_CLIENT_ID` ou d'`IDENTITY_ENDPOINT` le rendrait implicite ; et `entra` sans
+  `KB_DATABASE_URL` est refusé, au lieu du fichier SQLite du dossier de données : le job écrirait sa
+  base sur son disque éphémère et dirait « database created » (revue de code, tranché par time-knight
+  le 06/11, délégation de Sabine du 15/10). Le certificat se vérifie contre
   le magasin de l'image, `sslrootcert=/etc/ssl/certs/ca-certificates.crt` (vérifié dans `k-b:ci` le
   06/11 : DigiCert Global Root G2 et Microsoft RSA Root Certificate Authority 2017 y sont). Un jeton
   que l'identité ne donne pas devient `DatabaseNoTokenError`, une `psycopg.OperationalError` sans le
@@ -5754,7 +5757,12 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
   (`pgaadauth_create_principal_with_oid`), pas par son nom : une identité d'un autre groupe de
   l'annuaire de l'école peut porter le même. `REVOKE ALL ON DATABASE` et `REVOKE CREATE ON SCHEMA
   public` à `PUBLIC` : sur Azure, tout rôle peut créer dans `public` (Microsoft Learn, « Access
-  management », lu le 06/11). La base se crée depuis `template0`, en UTF8 et en collation C, que
+  management », lu le 06/11). L'administration de la base passe avec `search_path` à `pg_catalog`
+  seul (`SET` en tête de `grant-roles.sql`, `PGOPTIONS` devant chaque `psql` du README) : le rôle du
+  job peut créer des fonctions et des opérateurs dans `public`, et l'un d'eux, plus proche d'un appel
+  que celui de `pg_catalog`, s'exécuterait avec les droits de l'administratrice (CVE-2018-1058 ;
+  revue de sécurité, tranché par time-knight le 06/11, prouvé par un test qui pose un
+  `public.format(text, name)`). La base se crée depuis `template0`, en UTF8 et en collation C, que
   `kb migrate-database` vérifie ; écarté : la créer par le Bicep, dont la doc ne dit pas qu'il pose
   `LC_CTYPE`. Les droits sur les tables (`grants_postgresql.sql`) sont posés par leur propriétaire, à
   la création ; écartés : l'identité de migration administratrice Entra (membre d'`azure_pg_admin`,
@@ -5765,8 +5773,9 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
   une base qui a ses tables n'est pas touchée, code 0 ; sinon, réglages vérifiés, puis schéma, sources
   et droits dans une transaction. Écartés : relancer les `GRANT` à chaque exécution (la seconde
   écrirait au catalogue, contre le critère de #421) ; un verrou consultatif (de deux migrations à la
-  fois, la seconde échoue sur la table déjà créée, et rien n'est écrit à moitié, le DDL de
-  PostgreSQL étant transactionnel). Limites assumées : une table ajoutée à la base en ligne n'a de
+  fois, la seconde échoue sur la table déjà créée, en 23505 sur `pg_type`, et rien n'est écrit à
+  moitié, le DDL de PostgreSQL étant transactionnel ; la relance dit « unchanged » ; le verrou
+  PostgreSQL d'une seconde commande `kb` est #426). Limites assumées : une table ajoutée à la base en ligne n'a de
   droits que par une migration (#186) ; les deux scripts d'administration se lancent à la main, et la
   livraison continue ne les rejoue pas ; `grant-roles.sql` est testé tel quel, `create-principals.sql`,
   propre à Azure, ne l'est pas. — PR de #421, à venir
