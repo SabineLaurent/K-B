@@ -173,6 +173,15 @@ JOURNALS_DIR_NAME = "journals"
 # Sabine of 2026-11-04, which replaces the 30 days of 2026-10-19).
 RECORD_RETENTION_MONTHS = 6
 
+# The items database. KB_DATABASE_URL names a PostgreSQL base; not set, the base is this SQLite file
+# of the data directory, its local default (database/location.py; .claude/rules/poc.md, rule 2).
+DATABASE_FILE_NAME = "k-b.sqlite"
+# How long kb waits for PostgreSQL to accept a connection, then fails (code.md, a bound of time).
+DATABASE_CONNECT_TIMEOUT_SECONDS = 10
+# How long a writer waits for the lock of another one on PostgreSQL, then fails: the 5 seconds
+# sqlite3.connect waits by default for the write lock of SQLite (database/postgresql.py).
+DATABASE_LOCK_TIMEOUT_SECONDS = 5
+
 # The local defaults of kb serve-data, each changed by its variable (data_api/settings.py;
 # .claude/rules/poc.md, rule 2): the data API listens on the machine only and answers these hosts
 # only.

@@ -775,6 +775,12 @@ REFUSED_VALUES = [
 @pytest.fixture
 def filled_database(database):
     """The base with the rows a valid row of each table points to."""
+    return fill_database(database)
+
+
+def fill_database(database):
+    """Write the rows a valid row of each table points to; test_schema_postgresql.py does it on
+    PostgreSQL."""
     insert_row(
         database,
         "raw_data",

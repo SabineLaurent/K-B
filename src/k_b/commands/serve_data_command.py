@@ -10,9 +10,9 @@ from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME, value_or_log_refusal
 from k_b.core.api_keys import API_KEY_VARIABLE_PREFIX, read_api_keys_or_refusal
 from k_b.core.api_settings import read_openapi_url
+from k_b.core.config import DATABASE_FILE_NAME
 from k_b.data_api.app import create_app
 from k_b.data_api.settings import read_serve_settings_or_refusal
-from k_b.database.connection import DATABASE_FILE_NAME
 
 logger = logging.getLogger(LOGGER_NAME)
 

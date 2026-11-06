@@ -1,7 +1,6 @@
 """Write a Zotero entry, its highlights and the publication it cites: a state catalog
 (catalog.py), at the level of the entry and of the highlight."""
 
-import json
 from collections.abc import Sequence
 from datetime import datetime
 
@@ -41,7 +40,7 @@ WHERE :is_after_latest_catalog
     AND (zotero_entry.withdrawn_at IS NOT NULL
         OR (zotero_entry.item_type, zotero_entry.title, zotero_entry.url,
             zotero_entry.saved_at, zotero_entry.publication_id)
-        IS NOT (excluded.item_type, excluded.title, excluded.url, excluded.saved_at,
+        IS DISTINCT FROM (excluded.item_type, excluded.title, excluded.url, excluded.saved_at,
             excluded.publication_id))
 RETURNING id
 """
@@ -60,24 +59,30 @@ ON CONFLICT (zotero_key) DO UPDATE SET
 WHERE :is_after_latest_catalog
     AND (highlight.withdrawn_at IS NOT NULL
         OR (highlight.text, highlight.comment, highlight.highlighted_at, highlight.item_id)
-        IS NOT (excluded.text, excluded.comment, excluded.highlighted_at,
+        IS DISTINCT FROM (excluded.text, excluded.comment, excluded.highlighted_at,
             excluded.item_id))
 RETURNING highlight_id
 """
 
 # State catalog (Zotero): an entry or a highlight absent from an extract collected after the
 # latest one imported is withdrawn at that collection, never removed; the first absence keeps
-# its date.
-MARK_WITHDRAWN_ZOTERO_ENTRIES = """
-UPDATE zotero_entry SET withdrawn_at = :collected_at
-WHERE withdrawn_at IS NULL
-    AND zotero_key NOT IN (SELECT value FROM json_each(:present_keys))
+# its date. The keys absent are found in Python, as for CISA KEV (vulnerability_writer.py).
+SELECT_ZOTERO_ENTRIES_NOT_WITHDRAWN = """
+SELECT zotero_key FROM zotero_entry WHERE withdrawn_at IS NULL
 """
 
-MARK_WITHDRAWN_HIGHLIGHTS = """
+MARK_ZOTERO_ENTRY_WITHDRAWN = """
+UPDATE zotero_entry SET withdrawn_at = :collected_at
+WHERE zotero_key = :key AND withdrawn_at IS NULL
+"""
+
+SELECT_HIGHLIGHTS_NOT_WITHDRAWN = """
+SELECT zotero_key FROM highlight WHERE withdrawn_at IS NULL
+"""
+
+MARK_HIGHLIGHT_WITHDRAWN = """
 UPDATE highlight SET withdrawn_at = :collected_at
-WHERE withdrawn_at IS NULL
-    AND zotero_key NOT IN (SELECT value FROM json_each(:present_keys))
+WHERE zotero_key = :key AND withdrawn_at IS NULL
 """
 
 
@@ -181,18 +186,17 @@ def mark_withdrawn(
     highlight_keys = [
         highlight.zotero_key for entry in entries for highlight in entry.highlights
     ]
-    withdrawn_entries = connection.execute(
-        MARK_WITHDRAWN_ZOTERO_ENTRIES,
-        {
-            "collected_at": formatted_collected_at,
-            "present_keys": json.dumps(entry_keys),
-        },
-    ).rowcount
-    withdrawn_highlights = connection.execute(
-        MARK_WITHDRAWN_HIGHLIGHTS,
-        {
-            "collected_at": formatted_collected_at,
-            "present_keys": json.dumps(highlight_keys),
-        },
-    ).rowcount
-    return withdrawn_entries + withdrawn_highlights
+    # An extract whose entries have no highlight withdraws every highlight: none is present.
+    return catalog.mark_absent_withdrawn(
+        connection,
+        SELECT_ZOTERO_ENTRIES_NOT_WITHDRAWN,
+        MARK_ZOTERO_ENTRY_WITHDRAWN,
+        entry_keys,
+        formatted_collected_at,
+    ) + catalog.mark_absent_withdrawn(
+        connection,
+        SELECT_HIGHLIGHTS_NOT_WITHDRAWN,
+        MARK_HIGHLIGHT_WITHDRAWN,
+        highlight_keys,
+        formatted_collected_at,
+    )

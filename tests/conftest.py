@@ -1,29 +1,44 @@
 """What the tests share: the fabricated Zotero library, the test base of the readers, the
-settings of the terminal removed, the end-to-end tests left out, and the HTML report."""
+settings of the terminal removed, the end-to-end tests and those on PostgreSQL left out, a fresh
+PostgreSQL base, and the HTML report."""
 
 import html
 import os
 import re
 import sqlite3
+import uuid
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
+import psycopg
 import pytest
 
 from k_b.database.creation import create_database
 from k_b.database.engine import connect_database
+from k_b.database.location import LIBPQ_VARIABLES, PostgresUrl
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 ZOTERO_LIBRARY_SCRIPT = FIXTURES_DIR / "zotero_extract.sql"
 ITEMS_DATABASE_SCRIPT = FIXTURES_DIR / "items_database.sql"
 # The settings of kb serve-data and of the log, which a terminal may export (a .env loaded).
+# KB_DATABASE_URL among them: a terminal that exports it must not make the suite write into a real
+# PostgreSQL base.
 KB_SETTINGS_VARIABLES = (
     "KB_DATA_API_HOST",
     "KB_DATA_API_PORT",
     "KB_DATA_API_ALLOWED_HOSTS",
     "KB_LOG_TO_FILE",
+    "KB_DATABASE_URL",
 )
 # The marker of the tests that run kb on the real sources (tests/e2e/).
 E2E_MARKER = "e2e"
+# The marker of the tests that need a PostgreSQL server, given by KB_TEST_POSTGRESQL_URL: the URL
+# of a base of that server whose role may create and drop a base (the CI service, or a server of
+# the developer's machine, never the base of production).
+POSTGRESQL_MARKER = "postgresql"
+POSTGRESQL_SERVER_VARIABLE = "KB_TEST_POSTGRESQL_URL"
+# The markers -m must name for their tests to run.
+MARKERS_LEFT_OUT_BY_DEFAULT = (E2E_MARKER, POSTGRESQL_MARKER)
 # A marker name of a -m expression, by the rule ident of pytest's grammar
 # (_pytest/mark/expression.py:10, pytest 9.1.1): nightly-e2e and e2e.slow are one name each.
 MARKER_NAME = re.compile(r"(?:\w|:|\+|-|\.|\[|\]|\\|/)+")
@@ -42,6 +57,11 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         f"{E2E_MARKER}: runs kb on a real source; left out unless -m names {E2E_MARKER}",
+    )
+    config.addinivalue_line(
+        "markers",
+        f"{POSTGRESQL_MARKER}: needs the PostgreSQL server of {POSTGRESQL_SERVER_VARIABLE};"
+        f" left out unless -m names {POSTGRESQL_MARKER}",
     )
     restrict_report_to_user(config)
 
@@ -84,16 +104,18 @@ def pytest_html_results_table_row(report, cells):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Leave out the end-to-end tests unless -m names them, so that the CI never calls a real
-    source."""
+    """Leave out the end-to-end tests and those on PostgreSQL unless -m names them, so that the CI
+    never calls a real source, and the job without PostgreSQL never needs one."""
     # The name e2e, not a marker name that holds it (nightly_e2e, nightly-e2e, e2e.slow).
-    if E2E_MARKER in MARKER_NAME.findall(config.option.markexpr):
-        return
-    deselected = [item for item in items if item.get_closest_marker(E2E_MARKER)]
-    if not deselected:
-        return
-    config.hook.pytest_deselected(items=deselected)
-    items[:] = [item for item in items if not item.get_closest_marker(E2E_MARKER)]
+    named = set(MARKER_NAME.findall(config.option.markexpr))
+    for marker in MARKERS_LEFT_OUT_BY_DEFAULT:
+        if marker in named:
+            continue
+        deselected = [item for item in items if item.get_closest_marker(marker)]
+        if not deselected:
+            continue
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = [item for item in items if not item.get_closest_marker(marker)]
 
 
 @pytest.fixture
@@ -113,9 +135,51 @@ def connect_with_factory():
 
 @pytest.fixture(autouse=True)
 def no_kb_setting_of_the_terminal(monkeypatch):
-    """A terminal that exports a setting of kb must not change what the tests check."""
-    for name in KB_SETTINGS_VARIABLES:
+    """A terminal that exports a setting of kb, or a variable libpq reads, must not change what the
+    tests check."""
+    for name in (*KB_SETTINGS_VARIABLES, *LIBPQ_VARIABLES):
         monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture(scope="session")
+def postgresql_server_url():
+    """The URL of the test server; a test on PostgreSQL run without it fails, never skipped."""
+    url = os.environ.get(POSTGRESQL_SERVER_VARIABLE)
+    if not url:
+        pytest.fail(
+            f"{POSTGRESQL_SERVER_VARIABLE} must name the PostgreSQL server of the tests"
+        )
+    return url
+
+
+@pytest.fixture(scope="module")
+def make_postgresql_base(postgresql_server_url):
+    """Create a new base on the test server, in UTF8 and collation C as kb create-db asks unless
+    the test gives other settings; each one is dropped after the tests of its module."""
+    created = []
+    server = psycopg.connect(postgresql_server_url, autocommit=True)
+
+    def make(encoding="UTF8", collation="C"):
+        name = f"kb_test_{uuid.uuid4().hex}"
+        # Names and settings of the test only: nothing from outside enters the statement.
+        server.execute(
+            f"CREATE DATABASE {name} TEMPLATE template0 ENCODING '{encoding}'"
+            f" LC_COLLATE '{collation}' LC_CTYPE '{collation}'"
+        )
+        created.append(name)
+        parts = urlsplit(postgresql_server_url)
+        return PostgresUrl(urlunsplit(parts._replace(path=f"/{name}")))
+
+    yield make
+    for name in created:
+        server.execute(f"DROP DATABASE {name} WITH (FORCE)")
+    server.close()
+
+
+@pytest.fixture
+def postgresql_base(make_postgresql_base):
+    """A new, empty PostgreSQL base, as the compose or Azure gives it to kb create-db."""
+    return make_postgresql_base()
 
 
 def run_on_library(zotero_dir, script):

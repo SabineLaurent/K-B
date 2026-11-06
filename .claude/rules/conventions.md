@@ -22,9 +22,10 @@ la commande. Complète `code.md` (comment coder) et `conformite.md` (selon quell
 - À l'écriture en base, chaque item et son sous-type sont écrits dans un `SAVEPOINT`. Si la base
   refuse l'entrée, `ROLLBACK TO` de cet item seul : il devient un rejet du journal d'import (`journals/import-journal-<date>.jsonl`)
   (motif : ce que la base refuse) et l'import continue. Ne sont rattrapées que les erreurs dues
-  à l'entrée : `sqlite3.IntegrityError` (`CHECK`, `UNIQUE`, `NOT NULL`) et les erreurs de
-  conversion Python → SQLite (`OverflowError`, `UnicodeEncodeError`), liste tenue par un test
-  par cas. Une erreur du système (disque plein, base verrouillée) arrête tout l'import.
+  à l'entrée : en SQLite, `sqlite3.IntegrityError` (`CHECK`, `UNIQUE`, `NOT NULL`) ; en
+  PostgreSQL, les SQLSTATE 23514, 23505 hors clé primaire, 23502 et 22003 ; et les erreurs de
+  conversion Python → base (`OverflowError`, `UnicodeEncodeError`), liste tenue par un test par
+  cas (`database/errors.py`). Une erreur du système (disque plein, base verrouillée) arrête tout l'import.
 
 **Vérifier.**
 - `grep -n "logger.warning" src/k_b/etl/sources/*.py` ne renvoie aucun rejet d'entrée.

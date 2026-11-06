@@ -12,9 +12,14 @@ from typing import NamedTuple
 
 from k_b.core.config import TrackedRepository
 from k_b.core.quoting import quote_value
-from k_b.database.connection import check_database_exists
-from k_b.database.engine import Connection, connect_database
-from k_b.database.errors import EngineError
+from k_b.database.engine import (
+    Connection,
+    connect_database,
+    is_commit_finished_before_a_signal,
+    lock_for_writing,
+)
+from k_b.database.errors import ENGINE_ERRORS
+from k_b.database.location import DatabaseLocation, check_database_exists
 from k_b.database.reading import read_raw_file_paths
 from k_b.database.writing import write_tracked_repositories
 from k_b.etl.file_writing import FileWriting, write_file
@@ -42,10 +47,10 @@ class ImportSummary(NamedTuple):
     trend_count: int
 
 
-def read_imported_paths(database_path: Path) -> frozenset[str]:
+def read_imported_paths(database: DatabaseLocation) -> frozenset[str]:
     """Read the paths of the raw files already imported, from the registry of the database."""
-    check_database_exists(database_path)
-    connection = connect_database(database_path)
+    check_database_exists(database)
+    connection = connect_database(database)
     try:
         return read_raw_file_paths(connection)
     finally:
@@ -55,24 +60,29 @@ def read_imported_paths(database_path: Path) -> frozenset[str]:
 def import_items(
     reading: RawReading,
     trend_reading: TrendReading,
-    database_path: Path,
+    database: DatabaseLocation,
     journal_path: Path,
     imported_at: datetime,
     tracked_repositories: Sequence[TrackedRepository],
 ) -> ImportSummary:
     """Write the tracked repositories, each file read and the journal, in one transaction; files of
     items and of trends in collection order, so that a rebuilt base registers them in the same
-    order."""
-    check_database_exists(database_path)
-    connection = connect_database(database_path)
+    order. The lock of the writers is taken first: on PostgreSQL, two imports write one after the
+    other, as behind the write lock of SQLite."""
+    check_database_exists(database)
+    connection = connect_database(database)
     try:
         try:
+            lock_for_writing(connection)
             write_tracked_repositories(connection, tracked_repositories)
             writing = write_files(connection, reading, trend_reading)
             commit_with_journal(connection, journal_path, imported_at, writing)
         except BaseException:
-            # BaseException: Ctrl-C must not leave half an import either.
-            connection.rollback()
+            # BaseException: Ctrl-C must not leave half an import either. Only an open
+            # transaction: a connection psycopg closed on a signal refuses the rollback, whose
+            # error would replace the signal (exit 1 instead of 143).
+            if connection.in_transaction:
+                connection.rollback()
             raise
     finally:
         connection.close()
@@ -112,7 +122,8 @@ def commit_with_journal(
 ) -> None:
     """Write the journal, then commit: a file registered is not read again, so its journal must not be
     lost. A failed commit, or an interruption before it, removes the journal; an interruption
-    (Ctrl-C, SIGTERM) once the base has committed keeps the import and its journal."""
+    (Ctrl-C, SIGTERM) once the base has committed keeps the import and its journal, as one during
+    the commit on PostgreSQL, whose outcome kb does not know."""
     # Checked once the base holds the write lock: two imports of the same second cannot both
     # find no journal.
     check_journal_absent(journal_path)
@@ -126,17 +137,25 @@ def commit_with_journal(
         )
         connection.commit()
     except BaseException as error:
-        # The journal goes with the import it describes. A commit that fails raises an EngineError,
-        # whether SQLite keeps the transaction or undoes it itself. A Ctrl-C or a SIGTERM
-        # received before the commit finds the transaction open; one received during the commit
-        # is raised by Python once the commit has returned, with no transaction left.
-        if isinstance(error, EngineError) or connection.in_transaction:
+        # The journal goes with the import it describes. A commit that fails raises an error of
+        # the engine, whether the base keeps the transaction or undoes it itself. A Ctrl-C or a
+        # SIGTERM received before the commit finds the transaction open. Each line names the
+        # journal, not its path: quote_value cuts a long path before the name.
+        if isinstance(error, ENGINE_ERRORS) or connection.in_transaction:
             # The journal at journal_path can only be this import's: it was absent above.
             journal_path.unlink(missing_ok=True)
-        else:
-            # The name, not the path: quote_value cuts a long path before the name.
+        elif is_commit_finished_before_a_signal(connection):
             logger.info(
                 "import committed, journal kept: %s", quote_value(journal_path.name)
+            )
+        else:
+            # On the signal, psycopg asks the server to cancel COMMIT: the server may have
+            # committed the import all the same, or undone it. The journal is kept: if undone, the next import reads the files again and
+            # writes a second journal of the same rejections, which costs less than an import
+            # committed without its journal (family of #302).
+            logger.info(
+                "import commit interrupted, outcome unknown, journal kept: %s",
+                quote_value(journal_path.name),
             )
         raise
 

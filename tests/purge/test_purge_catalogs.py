@@ -36,7 +36,13 @@ def run_import(data_dir):
     imported_at = FIRST_IMPORT_AT + timedelta(
         seconds=len(list(data_dir.glob("journals/import-journal-*.jsonl")))
     )
-    import_raw_files(data_dir, SOURCE_KINDS, GITHUB_TRACKED_REPOSITORIES, imported_at)
+    import_raw_files(
+        data_dir,
+        data_dir / "k-b.sqlite",
+        SOURCE_KINDS,
+        GITHUB_TRACKED_REPOSITORIES,
+        imported_at,
+    )
 
 
 def write_raw(data_dir, key, content):

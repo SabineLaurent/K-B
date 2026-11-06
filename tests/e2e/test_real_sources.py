@@ -19,7 +19,7 @@ import pytest
 from k_b.commands.environment import DATA_DIR_VARIABLE
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOG_FILE_PATH, LOGGER_NAME
-from k_b.database.connection import DATABASE_FILE_NAME
+from k_b.core.config import DATABASE_FILE_NAME
 from k_b.etl.collected_sources import COLLECT_ONLY_VARIABLE, VARIABLE_BY_SOURCE_NAME
 from k_b.etl.raw_store import (
     AUTOMATED_WATCH_DIR_NAME,

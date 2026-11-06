@@ -1,15 +1,19 @@
-"""Connect to the items database and bound the time of its readings, through the one type of
-connection every module of K-B is given."""
+"""Connect to the items database, SQLite or PostgreSQL, through the one type of connection every
+module of K-B is given; lock it for a writer, and bound the time of its readings on SQLite."""
 
 import sqlite3
 import time
 from collections.abc import Callable
 from pathlib import Path
 
-from k_b.database.connection import check_database_exists
+from k_b.database import postgresql
+from k_b.database.location import DatabaseLocation, check_database_exists
+from k_b.database.postgresql import PostgresConnection
 
 # The class of sqlite3 itself, not a wrapper: the SQLite path stays as it is.
-Connection = sqlite3.Connection
+SqliteConnection = sqlite3.Connection
+# The connection of either engine: PostgresConnection has the methods of sqlite3 that K-B uses.
+Connection = SqliteConnection | PostgresConnection
 
 # The instructions SQLite runs between two checks of the deadline: about 0.75 s past it on the
 # longest search, measured (0.1 s at 100); each check takes the GIL back, so fewer checks spare
@@ -17,14 +21,36 @@ Connection = sqlite3.Connection
 INSTRUCTIONS_BETWEEN_CHECKS = 1_000
 
 
-def connect_database(database_path: Path) -> Connection:
-    """Open the database; SQLite ignores foreign keys unless each connection turns them on."""
+def connect_database(location: DatabaseLocation) -> Connection:
+    """Open the database of the engine the location names."""
+    if isinstance(location, Path):
+        return connect_sqlite(location)
+    return postgresql.connect_postgresql(location)
+
+
+def connect_sqlite(database_path: Path) -> SqliteConnection:
+    """Open the SQLite file; SQLite ignores foreign keys unless each connection turns them on."""
     connection = sqlite3.connect(database_path)
     connection.execute("PRAGMA foreign_keys = ON")
     return connection
 
 
-def connect_database_read_only(database_path: Path) -> Connection:
+def lock_for_writing(connection: Connection) -> None:
+    """Hold the lock of the writers until the end of the transaction, on PostgreSQL; SQLite holds
+    its own write lock from the first write to the commit."""
+    if isinstance(connection, PostgresConnection):
+        postgresql.lock_for_writing(connection)
+
+
+def is_commit_finished_before_a_signal(connection: Connection) -> bool:
+    """Whether a signal received during a commit is raised once the commit has returned: on
+    SQLite, where Python runs the handler after the call to SQLite; not on PostgreSQL, where psycopg
+    waits for the answer to COMMIT in Python and, on the signal, asks the server to cancel it,
+    which the server may or may not do."""
+    return isinstance(connection, SqliteConnection)
+
+
+def connect_database_read_only(database_path: Path) -> SqliteConnection:
     """Open the database read only, one connection per request of the data API
     (check_same_thread=False).
 
@@ -40,7 +66,7 @@ def connect_database_read_only(database_path: Path) -> Connection:
     return connection
 
 
-def set_query_timeout(connection: Connection, timeout_seconds: float) -> None:
+def set_query_timeout(connection: SqliteConnection, timeout_seconds: float) -> None:
     """Stop the readings of the connection once its deadline is passed: the error raised is one
     is_query_timeout (database/errors.py) recognizes."""
     connection.set_progress_handler(

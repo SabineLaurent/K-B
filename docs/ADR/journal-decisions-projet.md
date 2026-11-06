@@ -5243,6 +5243,119 @@ l'API IA lit déjà l'API de données dans sa borne (`MAX_DATA_API_BODY_BYTES`) 
   propose #376 (« sur une 5xx, ne pas lire le corps ») : `kb` lit le corps d'une 5xx, dans sa borne,
   pour afficher son `error` ; time-knight n'y voit pas de contradiction (06/11). — PR de #422
 
+### Base : PostgreSQL en ligne, par un adaptateur maison (#417)
+
+- **En ligne, la base est PostgreSQL ; en local, SQLite, pleinement fonctionnel. `KB_DATABASE_URL`
+  choisit le moteur : absente, la base est le fichier `<KB_DATA_DIR>/k-b.sqlite` ; posée, une URL
+  `postgresql://` ou `postgres://`. Les deux moteurs passent par un adaptateur maison,
+  `database/engine.py`, dont la branche PostgreSQL (`database/postgresql.py`) enveloppe psycopg 3 ;
+  SQLAlchemy Core est écarté.** Cadre posé par Sabine le 05/11 au soir : « avoir une variable
+  switch entre sqlite et postgressql. En production c'est postgresql qui est le porteur de la base
+  de donnée. Comme ça je garde sqlite fonctionnel dans le cas où je fais une installation locale de
+  kb » ; précisé le 06/11 : l'un ou l'autre selon le mode d'installation, sans copie d'une base
+  vers l'autre (transmis par time-knight). Il ferme « La base au temps 3 » (« Décisions encore
+  ouvertes ») et confirme la décision 2 du « POC du 25/10 » (2026-10-15), mise en attente le
+  2026-10-20. Options écartées en ligne, selon le rapport des faits Azure de time-knight du 06/11,
+  non relu dans cette session : SQLite sur un partage Azure Files monté, parce que la doc de
+  Container Apps ne dit rien des verrous de SQLite sur un partage SMB, et que des sources de la
+  communauté le jugent peu fiable
+  ([Preventing File Locks, Azure Container Apps](https://azureossd.github.io/2024/05/16/Preventing-File-Locks-Azure-Container-Apps),
+  [SQLite on Azure Files (SMB)](https://dev.to/argha_dev/sqlite-on-azure-files-smb-a-debugging-story-with-a-humbling-ending-1p93)) ;
+  SQLite et Blob, que recommandait le rapport de l'architecte du 20/10, parce qu'un conteneur Blob
+  ne se monte pas dans Container Apps
+  ([Storage mounts](https://learn.microsoft.com/en-gb/azure/container-apps/storage-mounts)). Pourquoi un
+  adaptateur maison plutôt que SQLAlchemy Core, que time-knight avait recommandé le 05/11 : la doc
+  du dialecte SQLite de SQLAlchemy 2.0 décrit, avec le pilote pysqlite, un « Incorrect behavior for
+  SAVEPOINT » (le pilote n'ouvre une transaction qu'avant un ordre qui écrit) ; ses deux remèdes
+  changent le moment du `BEGIN`, et il faudrait réécrire le `BEGIN` explicite de la lecture
+  (`database/reading.py`), les savepoints (`database/savepoint.py`) et la prise des erreurs de
+  l'import (`etl/load.py`), soit le code SQLite que décrit le livrable E1 (relecture du plan de
+  mise en ligne, 06/11). L'adaptateur garde la branche SQLite telle quelle (`sqlite3.Connection`,
+  sans enveloppe) et le SQL écrit pour `sqlite3` (décision du 2026-10-10 : `sqlite3` et SQL, pas
+  d'ORM) : il traduit les marqueurs `?` et `:nom` selon la règle de SQLAlchemy 2.0.55, double les
+  `%`, et un test fait passer chaque texte SQL de `database/` dans le traducteur. Plan validé par
+  Sabine le 06/11 (commentaire de #417), dont ces choix :
+  - le type de la connexion est l'union `sqlite3.Connection | PostgresConnection`. Écartés : un
+    `Protocol` (une abstraction ouverte pour deux moteurs connus) ; envelopper aussi SQLite ;
+  - les dates restent du texte UTC `AAAA-MM-JJTHH:MM:SSZ`, et les listes JSON du texte, contrôlés
+    par `CHECK` (`schema_postgresql.sql`, à côté de `schema.sql`, qui fait foi) : les deux moteurs
+    rendent les mêmes valeurs, et le SQL compare les dates en texte. Écartés : `timestamptz` et
+    `jsonb`, que `docs/stockage.md` proposait : psycopg rendrait des `datetime` et des listes, et
+    une ligne lue différerait d'un moteur à l'autre ;
+  - la base PostgreSQL est créée hors de K-B (compose, Azure : #419, #421), en UTF8 et en collation
+    C ; `kb create-db` en refuse une autre. Pourquoi C : `citext`, qui remplace `COLLATE NOCASE`,
+    plie la casse selon la collation de la base, et en C celle des lettres ASCII seules, comme
+    `NOCASE` (observé le 06/11). Écarté : `COLLATE "C"` colonne par colonne, qui ne règle pas
+    `citext` ;
+  - une entrée est rejetée seule sur les SQLSTATE 23514, 23505 hors clé primaire, 23502 et 22003,
+    comme `sqlite3.IntegrityError` en SQLite (règle 1 de `conventions.md`, modifiée dans cette PR
+    sur accord de Sabine) ; le motif d'un refus, comme la ligne de journal d'une erreur, garde la
+    classe, le SQLSTATE et les noms que donne `diag` (table, colonne, type, contrainte), par
+    `quote_value`, jamais un message de PostgreSQL : le message principal peut citer la valeur
+    refusée (22003, 22P02), et le `DETAIL` recopie la ligne (revue de sécurité, tranché par
+    time-knight le 06/11) ;
+  - les lignes retirées (KEV, Zotero) se trouvent par une différence en Python, puis un `UPDATE`
+    par clé, au lieu du `IN` généré que demandait #417 : un `IN` de plus de 32 766 paramètres
+    lève « too many SQL variables » en SQLite (observé), une erreur du système qui arrêterait
+    chaque import ;
+  - un import à la fois, par un verrou consultatif (`pg_advisory_xact_lock`) attendu 5 s au plus,
+    le délai de `sqlite3` ;
+  - avec une base PostgreSQL, une variable que libpq lit en plus de l'URL (`PGHOST`, `PGPASSWORD`…,
+    les 42 noms de sa doc) fait refuser la commande (code 2) : libpq la lirait en silence (règle 2
+    de `poc.md`) ; `PGDATA`, que pose Homebrew, n'en est pas (précision de Sabine du 06/11) ;
+  - `psycopg[binary]` entre seul dans cette PR ; `psycopg-pool` entre avec #418, qui s'en sert
+    (décision 10 du plan de mise en ligne : chaque dépendance dans la PR qui en a besoin) ;
+  - les tests sur PostgreSQL portent le marqueur `postgresql`, écarté de `uv run pytest`, et
+    tournent dans un workflow à eux (`postgresql.yml`), sur PostgreSQL 18 épinglé par son digest :
+    la version du Mac, disponible sur le serveur flexible d'Azure ; K-B demande 17 ou plus (`IS JSON`
+    et `pg_input_is_valid` depuis 16, `pg_database.datlocale`, que lit `kb create-db`, et le
+    fournisseur builtin depuis 17 ; revue de code, tranché par time-knight le 06/11).
+
+  Ce qui reste ouvert après cette PR : la lecture sur PostgreSQL (`read_items`, l'API de données,
+  le délai des requêtes, le verrou en tête des purges : #418) ; le compose de préproduction (#419) ;
+  la base en ligne, ses rôles et son schéma par `caj-kb-migrate-database` (#421) ; les migrations
+  (#186) ; la sauvegarde de la base, par un `pg_dump` planifié, puis la purge du brut couvert par
+  deux sauvegardes saines (#390, Sabine, 06/11). Limites assumées : jusqu'à #418, `kb serve-data`
+  lit le fichier SQLite pendant que `kb import` écrit dans PostgreSQL ; un commit perdu sur une
+  coupure du réseau a une issue incertaine (le serveur a pu le valider), et `etl/load.py` efface
+  alors le journal d'import (famille de #302) ; le digest de l'image de PostgreSQL de la CI se met
+  à jour à la main, Dependabot ne suivant que les `uses:` ; deux schémas à tenir ensemble, dont la
+  structure n'est pas encore comparée par un test (#418). — PR de #417, à venir
+
+### Base : la base du Mac est jetable
+
+- **La base SQLite du Mac ne passe pas en ligne : la base PostgreSQL en ligne repart du brut, par
+  `kb create-db` puis `kb import`.** Décision de Sabine du 06/11 (« b »), raison non dite, entre
+  deux options posées par la relecture du plan de mise en ligne : (a) copier la base du Mac dans
+  PostgreSQL avec ses `id`, comme le prévoyait `docs/stockage.md` (chaque table copiée, puis sa
+  séquence recalée par `setval`), un outil que K-B n'a pas, et que recommandait time-knight ; (b) la
+  déclarer jetable. Sa suite, le même jour : « en ligne on aura un cron de pg dump […] et un autre
+  systeme de purge automatique » (#390). Ce que la
+  décision coûte : ce que le brut n'a plus est perdu, soit le brut de plus de 6 mois et les
+  lignes de Zotero et de CISA KEV retirées avant le dernier fichier importé de leur catalogue, dont
+  seul celui-là est gardé ; et les `id` techniques changent. **Inverse en partie** deux décisions : « en usage réel, la base est gardée
+  et l'`id` technique des items reste stable » (2026-10-10), dont l'`id` change une fois, au passage
+  en ligne ; et « la base devient la source de vérité » (2026-11-04), qui vaut pour la base en
+  ligne, pas pour celle du Mac. `docs/stockage.md` (« Faire évoluer le schéma ») est corrigé dans la
+  PR de #417. Limite assumée : la base du Mac garde des lignes que la base en ligne n'aura jamais.
+  — PR de #417, à venir
+
+### Base : pas de migration avant le premier changement de schéma en ligne
+
+- **La base en ligne part vierge, et K-B n'a pas encore de migration : `kb migrate-database` (#421)
+  pose le schéma sur une base vide et ne fait rien sur une base qui l'a déjà ; il ne lance pas
+  `alembic upgrade head`. Les migrations Alembic (#186) attendent le premier changement de schéma de
+  la base en ligne, et ne passent plus avant #421.** Décision de Sabine du 06/11 (vers 10:55 UTC,
+  transmise par time-knight) : « pour le moment on a pas de migration. On repart d'une base de prod
+  vierge ». Raison non dite au-delà de ces mots. **Révise** la décision du 2026-10-10 (« Les
+  changements de schéma de la base d'usage réel passent par des migrations Alembic », dont la
+  limite disait Alembic nécessaire à partir de l'installation locale) : Alembic n'est plus
+  nécessaire avant le premier changement de schéma d'une base gardée. Ordre de l'axe PostgreSQL qui
+  en découle : #418, #419, #202, puis #421 ; #186 plus tard. Limite assumée : le premier changement
+  de schéma de la base en ligne attend #186 ; d'ici là, un changement de schéma n'a pas de chemin
+  sur une base qui garde des données que le brut n'a plus (« Faire évoluer le schéma »,
+  `docs/stockage.md`). — PR de #417, à venir
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
@@ -5292,7 +5405,9 @@ l'API IA lit déjà l'API de données dans sa borne (`MAX_DATA_API_BODY_BYTES`) 
   collecte et d'import, puis rangé dans Azure Blob Storage ; rien ne change aux temps 1 et 2.
   Non tranchée le 2026-10-20. Met en attente « PostgreSQL au 08/11 » (« POC du 25/10 »,
   décision 2) et la sauvegarde de la base, donc la purge du brut après deux sauvegardes saines
-  (2026-11-04) ; l'étape 8 de la procédure de tri n'en dépend plus depuis le 2026-11-04 (#83). `README.md` et `docs/stockage.md` (« Le SGBD ») y renvoient.
+  (2026-11-04) ; l'étape 8 de la procédure de tri n'en dépend plus depuis le 2026-11-04 (#83). `README.md` et `docs/stockage.md` (« Le SGBD ») y renvoient. **Close le 2026-11-06** :
+  PostgreSQL en ligne (« Base : PostgreSQL en ligne, par un adaptateur maison (#417) ») ; la
+  sauvegarde de la base et la purge qui en dépend passent à #390.
 
 - **Où tourne `kb write-tops` en ligne** (2026-10-19) : elle écrit le coffre, qu'aucun conteneur
   ne monte au POC (règle 4 de `.claude/rules/poc.md`) ; à trancher avant la mise en ligne du

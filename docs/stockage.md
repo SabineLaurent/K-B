@@ -29,16 +29,30 @@ base : il lit la veille par l'API de données (`src/k_b/ai_api/connectors/data_a
 est servi par `kb serve-ai` (#156). `kb search` vient après le 08/11 (journal ADR, 2026-10-15, « POC du
 25/10 », décision 1).
 
-## Le SGBD : SQLite, puis la base au temps 3, non tranchée
+## Le SGBD : SQLite en local, PostgreSQL en ligne
 
-Retenu aux deux premiers temps, le Mac puis les conteneurs en local (journal ADR, 2026-10-20,
-« Squelette E1 E3 : cadrage du 20/10 », décision 1) : **SQLite**, un fichier hors du dépôt, lu
-avec le module `sqlite3` de la bibliothèque standard. En local, il est dans le dossier de données,
-donné par la variable `KB_DATA_DIR`, que le journal ADR du 2026-10-09 fixe à `~/.knowledge_base`.
-Dans les conteneurs du deuxième temps, il sera dans un volume nommé (journal ADR, 2026-10-15,
-« POC du 25/10 », décision 2 ; #200).
+La variable `KB_DATABASE_URL` choisit le moteur (journal ADR, 2026-11-06, « Base : PostgreSQL en
+ligne, par un adaptateur maison (#417) »).
 
-| | SQLite (temps 1 et 2) | PostgreSQL (une option au temps 3) |
+- **Sans elle, SQLite** : un fichier hors du dépôt, `<KB_DATA_DIR>/k-b.sqlite`, lu avec le module
+  `sqlite3` de la bibliothèque standard. C'est la base des deux premiers temps, le Mac puis les
+  conteneurs en local (journal ADR, 2026-10-20, « Squelette E1 E3 : cadrage du 20/10 »,
+  décision 1). Le dossier de données est donné par `KB_DATA_DIR`, que le journal ADR du 2026-10-09
+  fixe à `~/.knowledge_base` ; dans les conteneurs du deuxième temps, le fichier sera dans un volume
+  nommé (journal ADR, 2026-10-15, « POC du 25/10 », décision 2 ; #200).
+- **Avec elle, PostgreSQL** : une URL `postgresql://` ou `postgres://`, lue par psycopg 3
+  (`src/k_b/database/postgresql.py`). C'est la base en ligne, au troisième temps. Une autre valeur,
+  vide comprise, ou une URL que libpq ne lit pas, est refusée (code 2), sans être citée : elle peut
+  porter un mot de passe. Une
+  variable que libpq lit en plus de l'URL (`PGHOST`, `PGPASSWORD`… : les 42 noms de la
+  [doc de libpq](https://www.postgresql.org/docs/18/libpq-envars.html), lue le 2026-11-06) est
+  refusée de même : libpq la lirait en silence (règle 2 de `.claude/rules/poc.md`).
+
+Aujourd'hui, `kb create-db` et `kb import`, purges comprises, écrivent sur les deux moteurs ;
+`kb serve-data` lit encore le fichier SQLite seul, même quand `KB_DATABASE_URL` est posée, jusqu'à
+#418.
+
+| | SQLite (en local) | PostgreSQL (en ligne) |
 |---|---|---|
 | Installation | aucune : un fichier, rejouable par un tiers | un serveur à installer, lancer et sécuriser |
 | Écritures | une à la fois ; ici un seul écrivain, le pipeline | plusieurs en parallèle (MVCC) |
@@ -47,15 +61,14 @@ Dans les conteneurs du deuxième temps, il sera dans un volume nommé (journal A
 | Typage | souple par défaut ; strict avec les tables `STRICT` | strict |
 | Dépendance | aucune | un pilote (`psycopg`) |
 
-Pourquoi SQLite aux deux premiers temps : un utilisateur, un écrivain par jour, quelques milliers
-d'items par an ; en localhost, un fichier suffit. Limite assumée : pas de rôles dans la base.
-Pourquoi PostgreSQL au 08/11, selon la décision du 2026-10-15 : sur Azure Container Apps, un
-fichier SQLite n'a pas de disque fiable (journal ADR, « POC du 25/10 », décision 2). Cette
-décision est en attente depuis le 2026-10-20 : l'autre option est SQLite et Blob, la base
-devenant un fichier produit par le job et rangé dans Azure Blob Storage (journal ADR, « Décisions
-encore ouvertes », « La base au temps 3 »). D'ici là, aucun SQL propre à
-SQLite n'est ajouté (règle 1 de `.claude/rules/poc.md`) ; ce qui l'est déjà est listé plus bas,
-avec son équivalent PostgreSQL.
+Pourquoi SQLite en local : un utilisateur, un écrivain par jour, quelques milliers d'items par
+an ; en localhost, un fichier suffit, sans serveur à lancer. Limite assumée : pas de rôles dans la
+base. Pourquoi PostgreSQL en ligne : sur Azure Container Apps, un fichier SQLite n'a pas de disque
+fiable (journal ADR, « POC du 25/10 », décision 2). Sabine l'a tranché les 05 et 06/11, contre
+SQLite et Blob (journal ADR, 2026-11-06, qui ferme « La base au temps 3 »). Les deux moteurs
+lisent le même SQL : aucun SQL propre à SQLite n'est ajouté (règle 1 de `.claude/rules/poc.md`),
+et la branche PostgreSQL traduit les marqueurs de `sqlite3` (`?`, `:nom`) en ceux de psycopg.
+Ce que chaque schéma écrit à sa façon est listé plus bas.
 
 ## Spécifications de stockage
 
@@ -68,6 +81,22 @@ avec son équivalent PostgreSQL.
   données. Une lecture en `mode=ro` crée les fichiers `-shm`
   et `-wal` s'ils manquent, dans le dossier de la base, et les laisse à sa fermeture
   (documentation SQLite, WAL, § 5 ; constat sur SQLite 3.50.4).
+- **La base PostgreSQL est créée hors de K-B** (compose, Azure : #419, #421), en UTF8 et en
+  collation C, PostgreSQL 17 ou plus récent (`IS JSON` et `pg_input_is_valid` depuis 16,
+  `pg_database.datlocale`, que lit `kb create-db`, et le fournisseur builtin depuis 17).
+  `kb create-db` refuse une autre base, puis crée dans celle de l'URL les tables de
+  `schema_postgresql.sql` et les 7 sources, en une transaction : sur une erreur, rien ne reste.
+  Pourquoi UTF8 : en `SQL_ASCII`, psycopg rend des octets et `length()` compte des octets.
+  Pourquoi C (fournisseur libc, ou builtin à `C`) : le texte se trie et se compare octet par
+  octet, comme en SQLite, et `citext` ne plie la casse que des lettres ASCII, comme
+  `COLLATE NOCASE` (observé le 2026-11-06). Une base qui a déjà la table `source` est refusée,
+  comme un fichier SQLite qui existe (code 2).
+- **Un import à la fois** : en SQLite, par le verrou d'écriture du fichier ; en PostgreSQL, par un
+  verrou consultatif (`pg_advisory_xact_lock`) pris au début de la transaction de l'import et
+  rendu à sa fin. Un import qui attend ce verrou plus de 5 s (`DATABASE_LOCK_TIMEOUT_SECONDS`, le
+  délai de `sqlite3`) échoue, comme sur « database is locked » ; une connexion attend le serveur
+  10 s au plus (`DATABASE_CONNECT_TIMEOUT_SECONDS`). Les purges ne prennent pas encore ce verrou
+  (#418).
 - **Dates** : du texte `AAAA-MM-JJTHH:MM:SSZ`, en UTC. Un `CHECK` refuse toute autre forme, et
   un jour qui n'existe pas. Exception, `clip` (#14), écrite en SQL portable (règle 1 de
   `.claude/rules/poc.md`, sans `strftime`) : le `CHECK` de chacune de ses dates (`saved_at`,
@@ -331,23 +360,28 @@ source ne touche pas aux tables.
 
 ### Ce qui est propre à SQLite
 
-Le MPD est écrit pour SQLite. Pour migrer vers un autre SGBD, voici ce qui change, avec
-l'équivalent PostgreSQL :
+Le MPD est écrit pour SQLite : `schema.sql` fait foi. `schema_postgresql.sql` le suit table par
+table, colonne par colonne, chaque `CHECK` traduit ; voici ce qui change, et pourquoi :
 
 | Dans le script SQLite | Pourquoi | En PostgreSQL |
 |---|---|---|
-| `STRICT` sur chaque table | sinon SQLite accepte une valeur du mauvais type | inutile : typage strict par défaut |
-| dates en `TEXT` + `CHECK (… IS strftime(…))` | SQLite n'a pas de type date | `timestamptz`, sans `CHECK` de format |
-| `INTEGER PRIMARY KEY` | numérotation automatique (alias de `rowid`) | `bigint GENERATED ALWAYS AS IDENTITY` |
-| `GLOB` dans les `CHECK` (`cve_id`, `repository_name`, `ghsa_id`, `url`, `edition`) | motif simple | `~` (expression régulière) |
-| `IS` dans les `CHECK` de date | compare sans que `NULL` fasse passer le contrôle | `IS NOT DISTINCT FROM` |
-| `CHECK (length(colonne) <= n)` | SQLite ignore la longueur d'un `VARCHAR(n)` | `varchar(n)` |
-| listes en `TEXT` + `json_valid`, `json_type`, `json_array_length` | SQLite n'a pas de type JSON | `jsonb`, `jsonb_typeof`, `jsonb_array_length` |
-| `COLLATE NOCASE` sur le nom d'un dépôt suivi | unicité sans tenir compte de la casse | un index unique sur `lower(colonne)` |
+| `STRICT` sur chaque table | sinon SQLite accepte une valeur du mauvais type | retiré : typage strict par défaut |
+| dates en `TEXT` + `CHECK (… IS strftime(…))` | SQLite n'a pas de type date | `text` encore, typé par le domaine `utc_date` (`utc_day` pour `trend.window_end`) : la forme `AAAA-MM-JJTHH:MM:SSZ` par `~`, l'heure de 00 à 23 (PostgreSQL accepte `24:00:00`), et un jour qui existe par `pg_input_is_valid(…, 'timestamptz')`, qui rend faux là où un cast lèverait une erreur |
+| `INTEGER PRIMARY KEY` | numérotation automatique (alias de `rowid`) | `bigint GENERATED BY DEFAULT AS IDENTITY` : comme SQLite, la colonne accepte un `id` donné, ce que font les fixtures des tests |
+| `GLOB` dans les `CHECK` (`cve_id`, `repository_name`, `ghsa_id`, `url`, `edition`) | motif simple | `~` (expression régulière), ancrée par `^` et `$` quand `GLOB` couvre toute la valeur |
+| `IS` dans les `CHECK` de date | compare sans que `NULL` fasse passer le contrôle | inutile : `~` et `pg_input_is_valid` ne rendent jamais `NULL` pour une valeur donnée |
+| `CHECK (length(colonne) <= n)` | SQLite ignore la longueur d'un `VARCHAR(n)` | le même `CHECK` : `varchar(n)` refuserait une valeur trop longue en SQLSTATE 22001, qui arrête l'import au lieu de rejeter l'entrée (`database/errors.py`) |
+| listes en `TEXT` + `json_valid`, `json_type`, `json_array_length` | SQLite n'a pas de type JSON | `text` encore, contrôlé par `IS JSON ARRAY`, puis `json_array_length(colonne::json)` dans un `CASE` : le cast ne tourne que sur un tableau JSON |
+| `COLLATE NOCASE` sur le nom d'un dépôt suivi | unicité sans tenir compte de la casse | `citext`, dans une base en collation C : la casse des lettres ASCII seules, comme `NOCASE` |
 | `PRAGMA foreign_keys = ON` à chaque connexion | clés étrangères ignorées sinon | inutile : toujours vérifiées |
 | `PRAGMA journal_mode = WAL` | lire pendant l'écriture | inutile : MVCC |
-| `UNIQUE` sur `clip.url` (2 000 caractères au plus) | la clé d'un clip | une entrée d'index B-tree ne peut dépasser environ un tiers de page, 2 704 octets ([B-Tree Indexes](https://www.postgresql.org/docs/current/btree.html), PostgreSQL 18, lu le 2026-10-17), et 2 000 caractères UTF-8 peuvent en faire 8 000 : un index unique sur une empreinte de l'URL |
-| `CHECK` de forme des dates de `clip` (`length`, `substr`) | SQL portable, sans `strftime` | `timestamptz`, sans `CHECK` de format, comme les autres dates |
+| `UNIQUE` sur `clip.url` (2 000 caractères au plus) | la clé d'un clip | une entrée d'index B-tree ne peut dépasser environ un tiers de page, 2 704 octets ([B-Tree Indexes](https://www.postgresql.org/docs/current/btree.html), PostgreSQL 18, lu le 2026-10-17), et 2 000 caractères UTF-8 peuvent en faire 8 000 : un index unique sur l'empreinte de l'URL, `md5(url)` |
+| `CHECK` de forme des dates de `clip` (`length`, `substr`) | SQL portable, sans `strftime` | les mêmes `CHECK` |
+
+Pourquoi les dates et les listes restent du texte, et non `timestamptz` et `jsonb` : psycopg rendrait
+des `datetime` et des listes Python, et une ligne lue sur PostgreSQL différerait de la même ligne lue
+sur SQLite ; le SQL de K-B compare les dates en texte (`collected_at < :bound`, `max(…)`), ce qui
+reste juste pour des dates UTC d'une seule forme.
 
 Reste identique : les tables, les clés, `UNIQUE`, `ON DELETE CASCADE`, les index, et
 `ON CONFLICT (…) DO NOTHING` ou `DO UPDATE`. Le MCD et le MLD ne dépendent d'aucun SGBD.
@@ -355,7 +389,11 @@ Reste identique : les tables, les clés, `UNIQUE`, `ON DELETE CASCADE`, les inde
 Vérifié par les tests, sur une base créée par `schema.sql` (`tests/test_schema.py`) : chaque
 `CHECK` du script refuse une valeur qu'il interdit, et un `CHECK` ajouté sans sa valeur refusée
 fait échouer la suite. Sans `PRAGMA foreign_keys = ON`, une clé étrangère fausse passe : d'où la
-règle ci-dessus (`tests/test_database.py`).
+règle ci-dessus (`tests/test_database.py`). Sur PostgreSQL (`tests/test_schema_postgresql.py`,
+marqué `postgresql`), la ligne valide de chaque table est acceptée, chaque valeur refusée de
+`tests/test_schema.py` l'est aussi, en SQLSTATE 23514, et chaque longueur et chaque nombre maximal
+de `items.py` est le `CHECK` de sa colonne. La structure des deux scripts (colonnes, `NOT NULL`,
+clés, index) n'est pas encore comparée (#418).
 
 ## Faire évoluer le schéma
 
@@ -365,18 +403,22 @@ règle ci-dessus (`tests/test_database.py`).
   supprime (décision de Sabine du 2026-11-04), la base garde des données que le brut n'a plus, et un
   changement de schéma passe par une migration (journal ADR, 2026-10-09, W7), que K-B n'a pas
   encore.
-- **En usage réel, la base est gardée** et l'`id` technique des items reste stable. SQLite aux
-  temps 1 et 2 ; PostgreSQL au 08/11 selon la décision 2 du 2026-10-15 (journal ADR, « POC du
-  25/10 »), en attente de « La base au temps 3 » : les migrations Alembic écrites en SQL (journal
-  ADR, 2026-10-10), pas encore codées, sont à reprendre pour PostgreSQL seulement, avec #186.
-  `schema.sql` reste le MPD et fait foi.
-- **Si la base passe à PostgreSQL, l'`id` est copié tel quel.** Les lignes de chaque table sont
-  copiées avec leur `id` ; un `INSERT` dans une colonne `GENERATED ALWAYS AS IDENTITY` (tableau
-  ci-dessus) ne l'accepte qu'avec `OVERRIDING SYSTEM VALUE`. Puis la séquence de chaque table est
-  recalée sur le plus grand `id` copié, sans quoi le prochain `INSERT` sans `id` reprendrait à 1
-  et heurterait une clé existante :
+- **En usage réel, la base est gardée** et l'`id` technique des items reste stable : SQLite en
+  local, PostgreSQL en ligne (journal ADR, 2026-11-06). Les migrations Alembic écrites en SQL
+  (journal ADR, 2026-10-10), pas encore codées, sont à reprendre pour PostgreSQL seulement, avec
+  #186, qui attend le premier changement de schéma de la base en ligne : celle-ci part vierge, et
+  `kb migrate-database` (#421) n'y pose le schéma que sur une base vide (décision de Sabine du
+  2026-11-06, journal ADR). `schema.sql` reste le MPD et fait foi ; un changement de schéma s'écrit aussi dans
+  `schema_postgresql.sql`.
+- **La base du Mac ne passe pas en ligne** (décision de Sabine du 2026-11-06, journal ADR,
+  « Base : la base du Mac est jetable ») : la base PostgreSQL en ligne repart du brut, par
+  `kb create-db` puis `kb import`. Ce que le brut n'a plus est perdu : le brut de plus de 6 mois, et
+  les lignes de Zotero et de CISA KEV retirées avant le dernier fichier importé de leur catalogue.
+  Les `id` changent : ils viennent de la séquence de la base en ligne. Une colonne
+  `GENERATED BY DEFAULT AS IDENTITY` accepte un `id` donné sans avancer sa séquence : une copie de
+  lignes avec leur `id`, si elle devenait nécessaire, se finirait par
   `SELECT setval(pg_get_serial_sequence('<table>', '<colonne>'), max(<colonne>)) FROM <table>;`
-  pour les 12 tables à `INTEGER PRIMARY KEY` de `schema.sql`, `highlight_id` compris.
+  pour chaque table, sans quoi le prochain `INSERT` sans `id` heurterait une clé existante.
 - Les champs propres d'une source s'ajoutent quand on traite sa lecture : l'issue de la source
   ajoute ses colonnes, leurs longueurs maximales (dans `items.py` et en `CHECK`), et met à jour ce
   document dans sa PR.

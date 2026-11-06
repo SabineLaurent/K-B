@@ -26,7 +26,8 @@ def stopping_on_sigterm(command: str) -> Iterator[None]:
     """Turn SIGTERM into StoppedBySigtermError, a SystemExit, so that the command undoes its work
     as on any exception; the handler found is set back on exit.
 
-    A SIGTERM received during the commit of the import is raised once the commit has returned.
+    A SIGTERM received during the commit of the import is raised once the commit has returned on
+    SQLite, during it on PostgreSQL (etl/load.py).
     Main thread only: Python sets a signal handler nowhere else."""
     if command not in COMMANDS_STOPPED_BY_SIGTERM:
         yield

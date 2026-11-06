@@ -70,7 +70,8 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   2026-10-20 ; signalé à Sabine, qui modifie `.claude/`) : la règle 1 dit « La base passe à
   PostgreSQL au 08/11 (décision 2) », décision en attente de « La base au temps 3 » ; la règle 6
   dit « Le POC en conteneurs », alors que le premier temps se fait sans conteneur (journal ADR,
-  2026-10-20, décision 1).
+  2026-10-20, décision 1). La règle 1 est de nouveau juste depuis le 2026-11-06 : PostgreSQL en ligne
+  (journal ADR, « Base : PostgreSQL en ligne, par un adaptateur maison (#417) »).
 - **GH Archive ne voit qu'environ 1 % des étoiles** (mesure de time-knight du 2026-10-29, cause
   inconnue) : `trend` est un échantillon. Ne jamais écrire « étoiles gagnées » tirées de GH Archive
   sans le dire (`docs/specs-collecte.md`, « Limite mesurée le 2026-10-29 »).
@@ -128,11 +129,20 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 ## Consignes de travail
 
-- **Accès à la base** (#416, 2026-11-06) : seuls `database/engine.py` (`Connection`, `connect_database`,
-  `connect_database_read_only`, `set_query_timeout`), `database/errors.py` (`EngineError`, refus d'une entrée,
-  `is_query_timeout`) et `etl/sources/zotero.py` (la base de Zotero) importent `sqlite3`. Un module nouveau passe
-  par eux. Aujourd'hui, `Connection` et `EngineError` sont des alias de `sqlite3.Connection` et `sqlite3.Error`.
-  Aucun test ne tient encore la règle : le plan de #417 l'ajoute (outils : `tests/architecture/module_imports.py`).
+- **Accès à la base** (#416, puis #417, 2026-11-06) : seuls `database/engine.py` (`Connection`,
+  `connect_database`, `lock_for_writing`, `connect_database_read_only`, `set_query_timeout`), `database/errors.py`
+  (`ENGINE_ERRORS`, refus d'une entrée, `describe_engine_error`, `is_query_timeout`) et `etl/sources/zotero.py` (la
+  base de Zotero) importent `sqlite3` ; seuls `database/postgresql.py` et `database/errors.py` importent psycopg.
+  Un module nouveau passe par eux. `Connection` est l'union `sqlite3.Connection | PostgresConnection` ; une erreur
+  du moteur se rattrape par `except ENGINE_ERRORS` (un tuple), jamais par `EngineError`, l'alias des annotations.
+  Tenu par `tests/architecture/test_engine_imports.py`.
+- **Tests sur PostgreSQL** (#417, 2026-11-06) : marqués `postgresql`, écartés par `uv run pytest` comme `e2e`,
+  lancés par `KB_TEST_POSTGRESQL_URL=<URL d'un serveur> uv run pytest -m postgresql` ; sans cette variable, un test
+  marqué échoue, jamais sauté. Une base neuve par test qui écrit par `kb`, une transaction
+  annulée par test pour les autres (`tests/conftest.py`). En CI : le workflow `postgresql.yml`, PostgreSQL 18 par son
+  digest, mis à jour à la main. Sur le Mac : un PostgreSQL de Homebrew, sans conteneur. Un SQL nouveau de
+  `database/` passe par le traducteur de marqueurs (test de `tests/database/test_postgresql.py`) ; une table ou un
+  `CHECK` nouveau s'écrit dans `schema.sql` et `schema_postgresql.sql`.
 - Pour la documentation d'une bibliothèque ou d'un service, utiliser Context7 plutôt qu'une
   lecture de page web. Ce que Context7 ne couvre pas : WebSearch, source et date à l'appui ;
   WebFetch seulement sur une URL qu'une recherche du jour vient de rendre.
