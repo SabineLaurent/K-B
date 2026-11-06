@@ -151,7 +151,7 @@ actions sont épinglées par SHA (#234) ; un workflow nouveau a son propre fichi
 | `/security-review` (xhigh) : aucun constat à 8 ou plus | aucune faille trouvée avant d'appliquer |
 | Essai 5.1 (06/11, 20:37Z) : `v0.0.1` sur la tête de la branche ; au push, « Bypassed rule violations… creations being restricted » ; exécution 42289900589, `check` en échec (« v0.0.1 is not on main: 80d1327… »), `deploy` `skipped` ; suppression : « Bypassed… Cannot delete this tag » | un tag hors de `main` est refusé ; la règle des tags s'applique, et Sabine la contourne comme administratrice (`actor_id 5` = « Repository admin », vu dans les réglages) |
 | Fonction `run_job` avec un faux `az` : `Succeeded` rend 0, `Failed` et `Degraded` rendent 1, un job qui ne finit pas rend 1 après `polls × 15 s` | l'attente d'un job, migration et test de fumée |
-| *(à venir)* essais 5.2 et 5.3 : refus OIDC hors de l'environnement, et environnement refusé à une branche | la connexion n'existe que depuis `production` |
+| Essais 5.2 et 5.3 (exécution 42293728980, branche temporaire supprimée ensuite) : sans environnement, `azure/login` reçoit « AADSTS700213: No matching federated identity record found for presented assertion subject 'repo:SabineLaurent@189640103/K-B@1383589029:ref:refs/heads/test/oidc-outside-production' » ; un job de branche qui déclare `production` est refusé avant toute étape (« Branch … is not allowed to deploy to production due to environment protection rules ») | la connexion n'existe que depuis `production`, et une branche ne l'atteint pas ; le préfixe immuable du sujet est celui que GitHub émet |
 | *(à venir)* `v0.1.0` : les apps et le job au digest de `k-b:v0.1.0`, `caj-kb-smoke-test` `Succeeded` | le critère de l'issue |
 
 ## Ce que tu dois pouvoir défendre
@@ -182,7 +182,7 @@ actions sont épinglées par SHA (#234) ; un workflow nouveau a son propre fichi
 - `azure/login` avec des rôles posés seulement sur des ressources, sans rien sur l'abonnement : non essayé.
 - `{{ .Manifest.Digest }}` sur une image poussée par le pilote `docker` du runner : essayé sur un registre local
   avec le pilote `docker-container`.
-- La forme exacte du sujet avec `environment` : déduite du préfixe immuable, à confirmer par l'essai 5.3.
+- La fin du sujet, `:environment:production` : le préfixe immuable est confirmé par l'essai 5.2, la fin par la doc de GitHub. Le premier tag `v0.1.0` le prouvera.
 
 ## Ce qui reste
 
