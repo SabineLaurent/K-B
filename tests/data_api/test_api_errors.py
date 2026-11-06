@@ -9,6 +9,7 @@ from k_b.core.config import (
     DATA_API_QUERY_TIMEOUT_SECONDS,
     DATA_API_READ_TIMEOUT_SECONDS,
 )
+from k_b.data_api.dependencies import make_deadline_check
 from k_b.data_api.routers import item_router
 
 # The methods of RFC 9110 (section 9) and PATCH (RFC 5789), all sent by the test client.
@@ -86,7 +87,8 @@ def test_a_database_error_gives_500_without_detail_and_logs_its_type(
 def test_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail(
     client, authorization, caplog, path
 ):
-    """Every reading of the request is bounded: the list, the three of a detail, the trends."""
+    """Each data route reads through the connection that carries the deadline; at 0 s, its first
+    check stops the first reading."""
     client.app.state.query_timeout_seconds = 0
 
     with caplog.at_level(logging.WARNING, logger="k_b.data_api"):
@@ -98,6 +100,19 @@ def test_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail(
     assert f"query_timeout: 0 s request_id={request_id}" in caplog.text
     assert "interrupted" not in caplog.text
     assert "SELECT" not in caplog.text
+
+
+def test_the_deadline_starts_at_the_first_check_of_sqlite_not_at_the_opening():
+    """The wait for a thread between the dependency and the route is not counted."""
+    now = [100.0]
+    check_deadline = make_deadline_check(5, clock=lambda: now[0])
+
+    now[0] = 130.0
+    assert check_deadline() == 0
+    now[0] = 134.9
+    assert check_deadline() == 0
+    now[0] = 135.0
+    assert check_deadline() == 1
 
 
 def test_the_deadline_of_a_request_is_below_the_read_timeout_of_the_ai_api_client(

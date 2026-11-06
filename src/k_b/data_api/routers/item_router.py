@@ -26,7 +26,6 @@ from k_b.database.reading import (
     read_items,
 )
 from k_b.items import (
-    MAX_LENGTH_BY_KIND,
     Int64,
     ItemKind,
     NonEmptyText,
@@ -43,9 +42,10 @@ MAX_SEARCH_LENGTH = 200
 MAX_KINDS = len(get_args(ItemKind))
 # The bounds of a detail (docs/specs-api.md, "GET /items/{item_id}"; OWASP API4:2023): the
 # highlights of a Zotero entry, and the characters of long text, the longest body of a release,
-# which a detail already serves whole.
+# which a detail already serves whole. Written apart, a test keeps them equal: the contract of the
+# API does not move with a bound of the import.
 MAX_SERVED_HIGHLIGHTS = 100
-MAX_SERVED_TEXT_LENGTH = MAX_LENGTH_BY_KIND["release"]["summary"]
+MAX_SERVED_TEXT_LENGTH = 125_000
 
 
 def read_since_text(since: object) -> datetime:

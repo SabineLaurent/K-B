@@ -6,7 +6,7 @@ import pytest
 
 from k_b.data_api.routers import item_router
 from k_b.database.reading import ItemPage
-from k_b.items import MAX_INT64, MIN_INT64, ItemKind
+from k_b.items import MAX_INT64, MAX_LENGTH_BY_KIND, MIN_INT64, ItemKind
 
 # The fields of an item of the list (docs/specs-api.md, "Réponse"): nothing else is served.
 LISTED_FIELDS = {"id", "kind", "title", "source_date", "url", "withdrawn_at"}
@@ -277,6 +277,13 @@ def test_each_kind_has_its_detail(client, authorization, detail):
 
     assert response.status_code == 200
     assert response.json() == detail
+
+
+def test_the_longest_text_a_detail_serves_is_the_longest_body_of_a_release():
+    """Written apart, so that a change of the release bound is seen here, with the contract."""
+    assert (
+        MAX_LENGTH_BY_KIND["release"]["summary"] == item_router.MAX_SERVED_TEXT_LENGTH
+    )
 
 
 def measure_highlights(highlights):

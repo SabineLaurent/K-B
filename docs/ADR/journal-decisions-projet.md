@@ -5131,7 +5131,9 @@ Décisions de Sabine du 2026-11-04.
   70 ms après l'échéance au pire, contre 750 ms ; à 1 000, le détail et `/trends` ne passent jamais
   par le contrôle sur la base de test, et aucun test ne les interromprait. L'interruption se
   reconnaît à `SQLITE_INTERRUPT` (`sqlite_errorcode`, lu par `getattr` : une erreur levée par Python
-  n'en a pas). Écartés : `interrupt()` lancé par un minuteur de la boucle (`call_later`), car une
+  n'en a pas). L'échéance part du premier contrôle, pas de l'ouverture de la connexion : la
+  dépendance et la route attendent chacune un fil du pool, et cette attente ne se passe pas dans la
+  base (revue de code, tranché par time-knight le 06/11). Écartés : `interrupt()` lancé par un minuteur de la boucle (`call_later`), car une
   échéance tombée entre deux instructions n'arrête pas la suivante, un test à 0 s ferait courir le
   minuteur contre la requête, et il faudrait une dépendance async ; un délai asyncio autour de la
   route, que SQLite ignorerait (la route tourne dans un fil) ; une variable d'environnement (une borne

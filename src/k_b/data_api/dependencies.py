@@ -19,20 +19,30 @@ def open_database(request: Request) -> Iterator[sqlite3.Connection]:
     closed once the response is made."""
     connection = connect_database_read_only(request.app.state.database_path)
     try:
-        deadline = time.monotonic() + request.app.state.query_timeout_seconds
         connection.set_progress_handler(
-            make_deadline_check(deadline), INSTRUCTIONS_BETWEEN_CHECKS
+            make_deadline_check(request.app.state.query_timeout_seconds),
+            INSTRUCTIONS_BETWEEN_CHECKS,
         )
         yield connection
     finally:
         connection.close()
 
 
-def make_deadline_check(deadline: float) -> Callable[[], int]:
-    """A progress handler of SQLite: once it gives 1, the reading stops with SQLITE_INTERRUPT."""
+def make_deadline_check(
+    timeout_seconds: float, clock: Callable[[], float] = time.monotonic
+) -> Callable[[], int]:
+    """A progress handler of SQLite: once it gives 1, the reading stops with SQLITE_INTERRUPT.
+
+    The deadline starts at its first call, once SQLite reads: the dependency and the route each
+    wait for a thread of the pool, and that wait is not spent in the base."""
+    deadline: float | None = None
 
     def check_deadline() -> int:
-        return int(time.monotonic() >= deadline)
+        nonlocal deadline
+        now = clock()
+        if deadline is None:
+            deadline = now + timeout_seconds
+        return int(now >= deadline)
 
     return check_deadline
 
