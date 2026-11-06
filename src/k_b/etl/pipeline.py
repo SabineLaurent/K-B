@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from k_b.core.config import JOURNALS_DIR_NAME, TrackedRepository
-from k_b.database.connection import DATABASE_FILE_NAME
+from k_b.database.location import DatabaseLocation
 from k_b.etl.extract import CollectionOutcome, collect_all_sources
 from k_b.etl.load import (
     ImportJournalExistsError,
@@ -50,6 +50,7 @@ def collect(sources: list[Source], data_dir: Path, now: datetime) -> CollectionO
 
 def import_raw_files(
     data_dir: Path,
+    database: DatabaseLocation,
     kinds: Sequence[SourceKind],
     tracked_repositories: Sequence[TrackedRepository],
     imported_at: datetime,
@@ -59,7 +60,6 @@ def import_raw_files(
 
     The tracked repositories are given once, so that the reading and the base cannot read two
     lists."""
-    database_path = data_dir / DATABASE_FILE_NAME
     journal_path = (
         data_dir
         / JOURNALS_DIR_NAME
@@ -67,14 +67,14 @@ def import_raw_files(
             imported_at=imported_at.strftime(COLLECTION_NAME_FORMAT)
         )
     )
-    imported_paths = read_imported_paths(database_path)
+    imported_paths = read_imported_paths(database)
     readings = read_raw_files(
         data_dir / RAW_DIR_NAME, kinds, imported_paths, tracked_repositories
     )
     summary = import_items(
         readings.items,
         readings.trends,
-        database_path,
+        database,
         journal_path,
         imported_at,
         tracked_repositories,

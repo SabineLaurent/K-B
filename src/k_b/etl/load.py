@@ -12,9 +12,9 @@ from typing import NamedTuple
 
 from k_b.core.config import TrackedRepository
 from k_b.core.quoting import quote_value
-from k_b.database.connection import check_database_exists
-from k_b.database.engine import Connection, connect_database
-from k_b.database.errors import EngineError
+from k_b.database.engine import Connection, connect_database, lock_for_writing
+from k_b.database.errors import ENGINE_ERRORS
+from k_b.database.location import DatabaseLocation, check_database_exists
 from k_b.database.reading import read_raw_file_paths
 from k_b.database.writing import write_tracked_repositories
 from k_b.etl.file_writing import FileWriting, write_file
@@ -42,10 +42,10 @@ class ImportSummary(NamedTuple):
     trend_count: int
 
 
-def read_imported_paths(database_path: Path) -> frozenset[str]:
+def read_imported_paths(database: DatabaseLocation) -> frozenset[str]:
     """Read the paths of the raw files already imported, from the registry of the database."""
-    check_database_exists(database_path)
-    connection = connect_database(database_path)
+    check_database_exists(database)
+    connection = connect_database(database)
     try:
         return read_raw_file_paths(connection)
     finally:
@@ -55,18 +55,20 @@ def read_imported_paths(database_path: Path) -> frozenset[str]:
 def import_items(
     reading: RawReading,
     trend_reading: TrendReading,
-    database_path: Path,
+    database: DatabaseLocation,
     journal_path: Path,
     imported_at: datetime,
     tracked_repositories: Sequence[TrackedRepository],
 ) -> ImportSummary:
     """Write the tracked repositories, each file read and the journal, in one transaction; files of
     items and of trends in collection order, so that a rebuilt base registers them in the same
-    order."""
-    check_database_exists(database_path)
-    connection = connect_database(database_path)
+    order. The lock of the writers is taken first: on PostgreSQL, two imports write one after the
+    other, as behind the write lock of SQLite."""
+    check_database_exists(database)
+    connection = connect_database(database)
     try:
         try:
+            lock_for_writing(connection)
             write_tracked_repositories(connection, tracked_repositories)
             writing = write_files(connection, reading, trend_reading)
             commit_with_journal(connection, journal_path, imported_at, writing)
@@ -126,11 +128,14 @@ def commit_with_journal(
         )
         connection.commit()
     except BaseException as error:
-        # The journal goes with the import it describes. A commit that fails raises an EngineError,
-        # whether SQLite keeps the transaction or undoes it itself. A Ctrl-C or a SIGTERM
-        # received before the commit finds the transaction open; one received during the commit
-        # is raised by Python once the commit has returned, with no transaction left.
-        if isinstance(error, EngineError) or connection.in_transaction:
+        # The journal goes with the import it describes. A commit that fails raises an error of
+        # the engine, whether the base keeps the transaction or undoes it itself. A Ctrl-C or a
+        # SIGTERM received before the commit finds the transaction open. On SQLite, one received
+        # during the commit is raised by Python once the commit has returned, with no transaction
+        # left. On PostgreSQL, psycopg waits for the answer to COMMIT in Python, so a signal can
+        # be raised during that wait: whether the server committed is then not known, a case
+        # not tested (a limit written in the PR of #417).
+        if isinstance(error, ENGINE_ERRORS) or connection.in_transaction:
             # The journal at journal_path can only be this import's: it was absent above.
             journal_path.unlink(missing_ok=True)
         else:

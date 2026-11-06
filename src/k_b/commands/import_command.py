@@ -1,6 +1,7 @@
 """kb import: read the raw files not imported yet and write them into the database."""
 
 import logging
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from time import monotonic
@@ -10,8 +11,12 @@ from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME, describe_os_error
 from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.core.quoting import quote_value
-from k_b.database.connection import MissingDatabaseError
-from k_b.database.errors import EngineError
+from k_b.database.errors import ENGINE_ERRORS, describe_engine_error
+from k_b.database.location import (
+    DatabaseLocation,
+    MissingDatabaseError,
+    read_database_location_or_refusal,
+)
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl.pipeline import (
     ImportJournalExistsError,
@@ -43,15 +48,21 @@ STATE_CATALOGS = (
 )
 
 
-def run_import(data_dir: Path) -> int:
-    """Run the import, print its summary, then run the purges; the summary before them, so that
-    whatever stops them (an error, Ctrl-C) leaves the summary of the import committed."""
+def run_import(data_dir: Path, environ: Mapping[str, str]) -> int:
+    """Run the import into the base the environment names, print its summary, then run the purges;
+    the summary before them, so that whatever stops them (an error, Ctrl-C) leaves the summary of
+    the import committed."""
+    # Not value_or_log_refusal: mypy would join the two kinds of location into object.
+    database = read_database_location_or_refusal(environ, data_dir)
+    if isinstance(database, str):
+        logger.error("%s", database)
+        return ExitCode.NOT_STARTED
     imported_at = datetime.now(UTC).replace(microsecond=0)
     logger.info("import started")
     started = monotonic()
     try:
         outcome = import_raw_files(
-            data_dir, SOURCE_KINDS, GITHUB_TRACKED_REPOSITORIES, imported_at
+            data_dir, database, SOURCE_KINDS, GITHUB_TRACKED_REPOSITORIES, imported_at
         )
     except MissingDatabaseError as error:
         logger.error("%s; create it with kb create-db", error)
@@ -59,12 +70,10 @@ def run_import(data_dir: Path) -> int:
     except ImportJournalExistsError as error:
         logger.error("%s; run kb import again", error)
         return ExitCode.NOT_STARTED
-    except (
-        EngineError,
-        OSError,
-        UnknownSourceError,
-        KindWithoutTableError,
-    ) as error:
+    except ENGINE_ERRORS as error:
+        logger.error("%s", describe_engine_error(error))
+        return ExitCode.FAILED
+    except (OSError, UnknownSourceError, KindWithoutTableError) as error:
         logger.error("%s: %s", type(error).__name__, error)
         return ExitCode.FAILED
     logger.info("import finished in %s", describe_duration(monotonic() - started))
@@ -72,7 +81,7 @@ def run_import(data_dir: Path) -> int:
     # etl/load.py logs it: the path names the data directory.
     logger.info("import journal kept: %s", quote_value(outcome.journal_path.name))
     print_import_result(outcome)
-    return purge_after_the_import(data_dir, imported_at)
+    return purge_after_the_import(data_dir, database, imported_at)
 
 
 def print_import_result(outcome: ImportOutcome) -> None:
@@ -84,13 +93,15 @@ def print_import_result(outcome: ImportOutcome) -> None:
     print()
 
 
-def purge_after_the_import(data_dir: Path, imported_at: datetime) -> ExitCode:
+def purge_after_the_import(
+    data_dir: Path, database: DatabaseLocation, imported_at: datetime
+) -> ExitCode:
     """Run the purges, dated by the import; a failure leaves the import committed."""
     try:
         purge_after_import(
-            data_dir, imported_at, STATE_CATALOGS, GITHUB_TRACKED_REPOSITORIES
+            data_dir, database, imported_at, STATE_CATALOGS, GITHUB_TRACKED_REPOSITORIES
         )
-    except (EngineError, OSError, ValueError) as error:
+    except (*ENGINE_ERRORS, OSError, ValueError) as error:
         # The type, and the reason of an OSError, never the name of a raw file.
         logger.error(
             "import committed, purge failed: %s; run kb import again",

@@ -15,14 +15,17 @@ DISCARD_RULE: DiscardRule = "already_seen"
 # News feed, by window (GH Archive): the first ranking seen of a window is kept whole. A row is
 # written only if no other raw file has brought its window: the rows of the file being written
 # share its raw_data_id, and none is left out. The same file read again meets the UNIQUE key.
+# Each CAST gives :window_end one type: PostgreSQL would deduce the type of the column from the
+# SELECT and text from the comparison, and refuse the two (42P08).
 INSERT_TREND_OF_NEW_WINDOW = """
 INSERT INTO trend (
     raw_data_id, window_end, repository_id, repository_name, stars_gained, forks_gained
 )
-SELECT :raw_data_id, :window_end, :repository_id, :repository_name, :stars_gained,
-    :forks_gained
+SELECT :raw_data_id, CAST(:window_end AS TEXT), :repository_id, :repository_name,
+    :stars_gained, :forks_gained
 WHERE NOT EXISTS (
-    SELECT 1 FROM trend WHERE window_end = :window_end AND raw_data_id <> :raw_data_id
+    SELECT 1 FROM trend
+    WHERE window_end = CAST(:window_end AS TEXT) AND raw_data_id <> :raw_data_id
 )
 ON CONFLICT (window_end, repository_id) DO NOTHING
 RETURNING id

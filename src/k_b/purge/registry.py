@@ -4,21 +4,23 @@ the base cites it any more; the last catalog of a state catalog stays, as the im
 
 import logging
 from collections.abc import Collection
-from pathlib import Path
 
 from k_b.database import purge as purge_queries
 from k_b.database.engine import Connection, connect_database
+from k_b.database.location import DatabaseLocation
 from k_b.etl.raw_store import RAW_DIR_NAME, RAW_DIR_NAMES, RawStore
 
 logger = logging.getLogger(__name__)
 
 
 def purge_registry(
-    database_path: Path, store: RawStore, state_catalog_source_codes: Collection[str]
+    database: DatabaseLocation,
+    store: RawStore,
+    state_catalog_source_codes: Collection[str],
 ) -> int:
     """Delete the rows of the registry whose file is gone and that nothing cites; return how
     many."""
-    connection = connect_database(database_path)
+    connection = connect_database(database)
     try:
         deleted_count = delete_rows_without_file(
             connection, store, state_catalog_source_codes

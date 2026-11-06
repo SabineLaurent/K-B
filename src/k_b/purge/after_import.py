@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import NamedTuple
 
 from k_b.core.config import TrackedRepository
-from k_b.database.connection import DATABASE_FILE_NAME, check_database_exists
 from k_b.database.engine import connect_database
+from k_b.database.location import DatabaseLocation, check_database_exists
 from k_b.database.reading import read_raw_file_paths
 from k_b.etl.raw_store import RawStore
 from k_b.purge.base import purge_expired_rows
@@ -29,33 +29,33 @@ class StateCatalog(NamedTuple):
 
 def purge_after_import(
     data_dir: Path,
+    database: DatabaseLocation,
     imported_at: datetime,
     state_catalogs: Sequence[StateCatalog],
     tracked_repositories: Sequence[TrackedRepository],
 ) -> None:
     """Run the purges, the registry last; each logs how many it deleted."""
     store = RawStore(data_dir)
-    database_path = data_dir / DATABASE_FILE_NAME
     # Read once: no purge before the one of the registry writes to raw_data.
-    imported_paths = read_imported_paths(database_path)
+    imported_paths = read_imported_paths(database)
     folder_keys = [catalog.folder_key for catalog in state_catalogs]
     source_codes = frozenset(catalog.source_code for catalog in state_catalogs)
     delete_superseded_raw_files(store, imported_paths, folder_keys)
     purge_expired_rows(
-        database_path,
+        database,
         imported_at,
         source_codes,
         [repository.name for repository in tracked_repositories],
     )
     delete_expired_raw(store, imported_at, folder_keys, imported_paths)
-    purge_registry(database_path, store, source_codes)
+    purge_registry(database, store, source_codes)
     delete_expired_records(data_dir, imported_at)
 
 
-def read_imported_paths(database_path: Path) -> frozenset[str]:
+def read_imported_paths(database: DatabaseLocation) -> frozenset[str]:
     """The raw files the registry holds; a missing base is refused, never created."""
-    check_database_exists(database_path)
-    connection = connect_database(database_path)
+    check_database_exists(database)
+    connection = connect_database(database)
     try:
         return read_raw_file_paths(connection)
     finally:

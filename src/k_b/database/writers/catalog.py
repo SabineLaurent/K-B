@@ -1,6 +1,7 @@
 """The rule of a state catalog (CISA KEV, Zotero): the version of its latest collection is
 kept."""
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import NamedTuple
 
@@ -28,7 +29,8 @@ class LatestCatalog(NamedTuple):
 
     # Its collection, in the format of the base; None when the source has none yet.
     collected_at: str | None
-    # Whether the file being imported was collected after it: 1 or 0; None when there is none.
+    # Whether the file being imported was collected after it: 1 or 0 from SQLite, True or False
+    # from PostgreSQL; None when there is none.
     is_file_after: int | None
 
 
@@ -70,3 +72,16 @@ def build_discard(
             "unchanged", item, shared_rows.read_item_collected_at(connection, item_id)
         )
     return Discard("no_newer_version", item, latest.collected_at)
+
+
+def find_absent_keys(
+    connection: Connection, select_not_withdrawn: str, present_keys: Sequence[str]
+) -> list[str]:
+    """The keys of the rows not withdrawn that the catalog no longer lists, in order: a row is
+    withdrawn by its key, whatever the size of the catalog."""
+    present = set(present_keys)
+    return sorted(
+        str(key)
+        for (key,) in connection.execute(select_not_withdrawn)
+        if key not in present
+    )

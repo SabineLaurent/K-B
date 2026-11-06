@@ -35,8 +35,14 @@ from k_b.commands.serve_data_command import run_serve_data
 from k_b.commands.sigterm import StoppedBySigtermError, stopping_on_sigterm
 from k_b.commands.trend_report_command import run_trend_report
 from k_b.commands.write_tops_command import run_write_tops
-from k_b.core.config import AI_API_HOST, AI_API_PORT, DATA_API_HOST, DATA_API_PORT
-from k_b.database.connection import DATABASE_FILE_NAME
+from k_b.core.config import (
+    AI_API_HOST,
+    AI_API_PORT,
+    DATA_API_HOST,
+    DATA_API_PORT,
+    DATABASE_FILE_NAME,
+)
+from k_b.database.location import DATABASE_URL_VARIABLE
 from k_b.etl.collected_sources import COLLECT_ONLY_VARIABLE, VAULT_DIR_VARIABLE
 
 logger = logging.getLogger(LOGGER_NAME)
@@ -79,7 +85,9 @@ def read_command(argv: list[str] | None) -> str:
         " output in raw/",
     )
     command_parsers.add_parser(
-        "create-db", help=f"create the items database, {DATABASE_FILE_NAME}"
+        "create-db",
+        help=f"create the items database, {DATABASE_FILE_NAME}, or the tables of the"
+        f" PostgreSQL base of {DATABASE_URL_VARIABLE}",
     )
     command_parsers.add_parser(
         "import",
@@ -173,9 +181,9 @@ def describe_exit_codes() -> str:
 def run_command(command: str, data_dir: Path, environ: Mapping[str, str]) -> int:
     """Run the kb command given and return its exit code."""
     if command == "create-db":
-        return run_create_db(data_dir)
+        return run_create_db(data_dir, environ)
     if command == "import":
-        return run_import(data_dir)
+        return run_import(data_dir, environ)
     if command == "write-tops":
         return run_write_tops(data_dir, environ)
     if command == "serve-data":

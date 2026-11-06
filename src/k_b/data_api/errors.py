@@ -16,8 +16,8 @@ from k_b.core.api_errors import (
     respond_with_error,
 )
 from k_b.core.api_request_log import read_request_id
-from k_b.database.connection import MissingDatabaseError
-from k_b.database.errors import EngineError, is_query_timeout
+from k_b.database.errors import ENGINE_ERRORS, EngineError, is_query_timeout
+from k_b.database.location import MissingDatabaseError
 
 logger = logging.getLogger(__name__)
 
@@ -64,5 +64,5 @@ def respond_to_query_timeout(request: Request) -> Response:
 ERROR_HANDLERS: ErrorHandlers = {
     **API_ERROR_HANDLERS,
     MissingDatabaseError: handle_missing_database,
-    EngineError: handle_database_error,
+    **dict.fromkeys(ENGINE_ERRORS, handle_database_error),
 }

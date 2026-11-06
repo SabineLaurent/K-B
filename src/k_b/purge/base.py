@@ -4,13 +4,13 @@ nothing cites any more and the tracked repositories no longer tracked."""
 import logging
 from collections.abc import Collection, Sequence
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import NamedTuple
 
 from k_b.core.config import RETENTION_YEARS_BY_ACQUISITION_MODE
 from k_b.core.dates import DATABASE_DATE_FORMAT, subtract_months
 from k_b.database import purge as purge_queries
 from k_b.database.engine import Connection, connect_database
+from k_b.database.location import DatabaseLocation
 
 logger = logging.getLogger(__name__)
 
@@ -25,14 +25,14 @@ class BasePurgeCount(NamedTuple):
 
 
 def purge_expired_rows(
-    database_path: Path,
+    database: DatabaseLocation,
     imported_at: datetime,
     state_catalog_source_codes: Collection[str],
     tracked_repository_names: Sequence[str],
 ) -> BasePurgeCount:
     """Delete, in one transaction, what is past its duration and what it leaves uncited; log how
     many rows, never a name."""
-    connection = connect_database(database_path)
+    connection = connect_database(database)
     try:
         count = delete_expired_rows(
             connection,
