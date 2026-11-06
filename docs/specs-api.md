@@ -392,6 +392,10 @@ de `TrustedHostMiddleware`, qui répond avant l'app, en texte.
   ([stockage.md](stockage.md)). Écartés : `ILIKE`, propre à PostgreSQL (règle 1 de
   `.claude/rules/poc.md`) ; plier `q` en Python, qui plierait aussi `É`, alors que la base ne le
   plie pas.
+  Coût de `lower()`, qui copie chaque titre et résumé à chaque recherche, mesuré le 2026-11-06 sur
+  SQLite, base en mémoire de 400 corps de release de 125 000 « a » et 5 textes de 1 000 000 de
+  caractères, sans délai : une recherche ordinaire passe de 0,017 s à 0,029 s, la pire recherche
+  (« Délai ») de 9,66 s à 9,72 s.
 - Comportement relevé le 2026-10-14 sur SQLite 3.50.4 (module `sqlite3` de Python) et 3.51.0
   (commande `sqlite3`), base en mémoire, et le 2026-11-06 sur PostgreSQL 18.4, en collation C, par
   la même expression ; les mêmes résultats sur les deux moteurs sont tenus par

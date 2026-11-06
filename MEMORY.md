@@ -38,7 +38,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 - **Le détail de l'API de données lit tout avant de couper** (#331, porté par #430, après #416) :
   `GET /items/{item_id}` lit tous les surlignages d'une entrée Zotero et le texte entier d'un clip
   (jusqu'à 1 000 000 de caractères), puis la route en sert 100 et 125 000 caractères au plus. La
-  lecture n'est bornée qu'en temps, par le délai de 5 s, pas en mémoire.
+  lecture n'est bornée qu'en temps, pas en mémoire : 5 s par requête en SQLite ; en PostgreSQL, 5 s par
+  instruction (`statement_timeout`, #418), et le détail en fait jusqu'à trois, 15 s en théorie, plus
+  2 s d'attente du pool, au-delà des 10 s du client de l'API IA (limite choisie au plan de #418).
 - **La base est la seule copie au-delà de 6 mois, et K-B n'a pas de migration** (#83, décision de
   Sabine du 2026-11-04) : la purge supprime le brut de plus de 6 mois, et la base n'a pas encore de
   sauvegarde (règle du 2026-10-19 écrite au registre, étape 3, pas codée). Dès que le plus ancien
