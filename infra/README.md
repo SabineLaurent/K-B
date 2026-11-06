@@ -257,7 +257,16 @@ Les rôles sur les secrets se créent dans le même déploiement que les apps. S
 « unable to fetch secret », c'est qu'ils ne sont pas encore actifs : relancer la même commande 10 minutes plus tard.
 
 Une fois une version déployée par un tag (« Déployer une version »), `TAG` est la version en ligne, et non le SHA
-de l'étape 3. Sinon, la passe remettrait l'ancienne image.
+de l'étape 3. Sinon, la passe remettrait l'ancienne image. Les apps tiennent leur image par son digest. La version
+se retrouve à partir de ce digest :
+
+```sh
+DIGEST=$(az containerapp show -n ca-kb-ai-api -g "$RG" --query "properties.template.containers[0].image" -o tsv | cut -d@ -f2)
+az acr manifest list-metadata -r "$REGISTRY" -n k-b --query "[?digest=='$DIGEST'].tags[]" -o tsv
+```
+
+Limite : la passe repose alors `k-b:<TAG>`, la même image, mais par une référence que l'on peut réécrire. Le
+prochain déploiement par tag la repinne par digest. L'outil des passes (#455) pourra lire le digest en ligne.
 
 ### 6. Vérifier la mise en ligne
 
@@ -310,7 +319,8 @@ Un tag de version posé sur `main` part en ligne (#415). Une fusion ne déploie 
 - **`deploy`**, dans l'environnement GitHub `production`, fait le reste dans cet ordre :
   1. il se connecte à Azure en `id-kb-deploy`, par OIDC ;
   2. il construit et pousse `k-b:<tag>`, sauf si l'image existe déjà, construite depuis ce même commit ;
-  3. il met les apps et les jobs de `deployment.json` à l'image du tag ;
+  3. il met les apps et les jobs de `deployment.json` à l'image du tag, par son digest (`k-b@sha256:…`) :
+     une réplique qui se réveille tire l'image déployée, même si le tag est réécrit ;
   4. il lance `caj-kb-smoke-test` et attend `Succeeded`.
 
 La migration de la base (#421) se placera entre l'image et les apps.
@@ -412,11 +422,16 @@ des tags reprise dans le même corps.
 ```sh
 gh api -X PUT "repos/$REPO/environments/production" --input - -q '.protection_rules[].type' <<'EOF'
 {"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true},
- "reviewers": [{"type": "User", "id": 189640103}], "prevent_self_review": false}
+ "reviewers": [{"type": "User", "id": 189640103}], "prevent_self_review": false, "can_admins_bypass": false}
 EOF
 ```
 
-`prevent_self_review` reste à `false` : Sabine est la seule à valider.
+`prevent_self_review` reste à `false` : Sabine est la seule à valider. `can_admins_bypass` passe à `false` : sinon,
+une administratrice, donc Sabine ou une session qui a ses droits, pourrait passer outre la validation.
+
+Limite : avec ses droits, une session pourrait aussi approuver elle-même un déploiement en attente, par l'API
+(`pending_deployments`). La validation reste donc un geste humain. Comme pour la pose d'un tag, seule la règle du
+`MEMORY.md` l'en protège : aucune session n'approuve un déploiement.
 
 ## Vérifier le budget
 

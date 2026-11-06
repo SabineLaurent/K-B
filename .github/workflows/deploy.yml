@@ -75,12 +75,13 @@ jobs:
           az acr login --name "$REGISTRY" -o none
           echo "IMAGE=$REGISTRY.azurecr.io/k-b:$GITHUB_REF_NAME" >> "$GITHUB_ENV"
       # An image is never overwritten: there with the commit of the tag, it is deployed again (a rollback);
-      # there with another commit (a tag deleted and created again elsewhere), the deployment stops.
+      # there with another commit (a tag deleted and created again elsewhere), the deployment stops. The apps
+      # and the jobs then get the image by its digest, which no push can change, checked again for its commit.
       - name: Builds and pushes the image of the tag, unless it is there
         run: |
+          label='{{ index .Image.Config.Labels "org.opencontainers.image.revision" }}'
           inspect_error="$RUNNER_TEMP/inspect-error"
-          if revision=$(docker buildx imagetools inspect "$IMAGE" \
-              --format '{{ index .Image.Config.Labels "org.opencontainers.image.revision" }}' 2>"$inspect_error"); then
+          if revision=$(docker buildx imagetools inspect "$IMAGE" --format "$label" 2>"$inspect_error"); then
             if [ "$revision" != "$SHA" ]; then
               echo "the image of $GITHUB_REF_NAME was built from another commit: $revision"
               exit 1
@@ -93,19 +94,32 @@ jobs:
             cat "$inspect_error"
             exit 1
           fi
-      # The migration of the base (#421) goes here: caj-kb-migrate-database at the image of the tag, started and
+          digest=$(docker buildx imagetools inspect "$IMAGE" --format '{{ .Manifest.Digest }}')
+          if ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "no digest for the image of $GITHUB_REF_NAME"
+            exit 1
+          fi
+          pinned="$REGISTRY.azurecr.io/k-b@$digest"
+          if [ "$(docker buildx imagetools inspect "$pinned" --format "$label")" != "$SHA" ]; then
+            echo "the image $digest was not built from $SHA"
+            exit 1
+          fi
+          echo "DEPLOYED_IMAGE=$pinned" >> "$GITHUB_ENV"
+          echo "DIGEST=$digest" >> "$GITHUB_ENV"
+          echo "$GITHUB_REF_NAME: $digest"
+      # The migration of the base (#421) goes here: caj-kb-migrate-database at $DEPLOYED_IMAGE, started and
       # awaited; nothing below runs if it fails.
       - name: Sets the apps to the image of the tag
         run: |
           for app in $(jq -r '.apps[]' infra/deployment.json); do
-            az containerapp update -n "$app" -g "$RG" --container-name kb --image "$IMAGE" -o none
-            echo "$app: $GITHUB_REF_NAME"
+            az containerapp update -n "$app" -g "$RG" --container-name kb --image "$DEPLOYED_IMAGE" -o none
+            echo "$app: $GITHUB_REF_NAME ($DIGEST)"
           done
       - name: Sets the jobs to the image of the tag
         run: |
           for job in $(jq -r '.jobs[]' infra/deployment.json); do
-            az containerapp job update -n "$job" -g "$RG" --container-name kb --image "$IMAGE" -o none
-            echo "$job: $GITHUB_REF_NAME"
+            az containerapp job update -n "$job" -g "$RG" --container-name kb --image "$DEPLOYED_IMAGE" -o none
+            echo "$job: $GITHUB_REF_NAME ($DIGEST)"
           done
       # The proof that the version deployed answers: both /health, and the exchange storage by the identity of
       # the job. Its replicaTimeout is 900 s: the wait stops after it.
