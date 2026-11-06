@@ -223,5 +223,9 @@ def borrow_reader(pool: ReadingPool) -> Iterator[PostgresConnection]:
             # A connection psycopg closed has none: its rollback would raise.
             if reader.in_transaction:
                 reader.rollback()
+        except psycopg.Error:
+            # The server ended the session before the rollback: the request keeps its response or
+            # its own error, and the pool replaces the closed connection.
+            connection.close()
         finally:
             pool.putconn(connection)
