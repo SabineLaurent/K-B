@@ -1,0 +1,17 @@
+# Kept out of the build context (issue #200). The Dockerfile copies pyproject.toml, uv.lock,
+# README.md and src/ only, and the build backend packs every file of src/k_b/: a file left there
+# would end up in the image.
+.git/
+.venv/
+# The KB_DATA_DIR of the trials, and the reports of the end-to-end tests: personal data.
+temp/
+reports/
+# Environment files, at any depth: secrets.
+**/.env*
+**/*.sqlite
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/

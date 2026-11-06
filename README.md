@@ -580,6 +580,23 @@ La CI (GitHub Actions, `.github/workflows/ci.yml`) lance quatre jobs, `audit` (p
 `tests` (pytest), `lint` (ruff check et ruff format --check) et `types` (mypy --strict), sur chaque PR vers
 `main` et sur chaque push sur `main`, donc après chaque fusion.
 
+**Construire l'image** (Docker ; une image pour toutes les commandes `kb`, voir le `Dockerfile`) :
+
+```sh
+docker buildx build --platform linux/amd64 --tag k-b .
+docker run --rm k-b --help
+docker volume create k-b-data
+docker run --rm -v k-b-data:/data k-b create-db
+```
+
+Azure Container Apps ne lance que des images `linux/amd64` : sur un Mac à puce Apple, Docker Desktop les
+construit et les lance par émulation. L'image lance `kb` sous l'utilisateur `10001:10001`, jamais root. Son
+dossier de données est `/data` (`KB_DATA_DIR`), qui appartient à cet utilisateur, et son journal est la
+sortie d'erreur (`KB_LOG_TO_FILE=false`). Chaque variable se change au lancement (`-e`). `.dockerignore`
+garde hors de la construction `.git/`, `.venv/`, `temp/`, `reports/`, les fichiers d'environnement et les
+bases `*.sqlite`. Le job `image-build` de la CI (`.github/workflows/image.yml`) construit l'image sur
+chaque PR et la contrôle, sans la pousser nulle part.
+
 ## Licence
 
 © 2026 Sabine Laurent — sous licence [Creative Commons Attribution - Pas d'Utilisation Commerciale 4.0 International (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/deed.fr).

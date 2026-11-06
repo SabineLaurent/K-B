@@ -5356,6 +5356,40 @@ l'API IA lit déjà l'API de données dans sa borne (`MAX_DATA_API_BODY_BYTES`) 
   sur une base qui garde des données que le brut n'a plus (« Faire évoluer le schéma »,
   `docs/stockage.md`). — PR de #417, à venir
 
+### Image : deux étapes, UID 10001, sans processus d'init (#200)
+
+Plan validé par Sabine le 06/11 (I1 du plan de mise en ligne).
+
+- **Une seule image pour toutes les commandes `kb` (`Dockerfile` à la racine), en deux étapes sur la même
+  base, `python:3.13-slim-trixie` épinglée par digest. L'étape de construction installe l'environnement
+  par uv 0.13.6, épinglé par digest lui aussi (`uv sync --locked --no-dev --no-editable`, les
+  dépendances puis K-B). L'étape finale ne garde que `/app/.venv`, sans uv ni `src/`.** Pourquoi :
+  l'image ne porte ni l'outil de construction ni les dépendances de développement. Avec la même base,
+  l'environnement retrouve le Python vers lequel il pointe. Une seule image : « une container app par
+  service, un environnement » (18/10), chaque service lançant sa commande. Écartée : une étape unique,
+  qui garderait uv et son cache dans l'image. — PR de #200
+- **`kb` tourne sous l'UID et le GID fixes `10001`, propriétaires de `/data`.** Pourquoi : jamais root,
+  et `kb` écrit ses fichiers en `0600` (commentaire du 16/10 sur #200). Tout conteneur qui les lit doit
+  tourner sous l'UID qui les a écrits, donc sous un UID connu d'avance. Écarté : un UID choisi au
+  lancement, qui pourrait changer d'un conteneur à l'autre. Essai du 06/11 : sous cet UID, l'écriture
+  par `write_file_atomically` dans un dossier du Mac monté sur `/data/raw` sort en 0 (#200). — PR de #200
+- **Pas de processus d'init (ni tini ni `--init`) : `kb` est le PID 1, lancé en forme exec.** Mesure
+  du 06/11 sur l'image : `docker stop` d'un `kb serve-data` prend 0,32 s, uvicorn s'arrête en entier et
+  le code de sortie est 0. Avec `--init`, l'arrêt prend 0,28 s et le code est 143. Pourquoi : l'arrêt
+  est propre sans init, et rien ne s'ajoute à l'image. Limite assumée : après SIGTERM, `kb serve-data`
+  et `kb serve-ai` sortent en 0, pas en 143. uvicorn remet le gestionnaire par défaut, puis relance le
+  signal, qu'un PID 1 ignore (tri de la PR #244, 18/10). — PR de #200
+- **Ni `curl`, ni `azcopy`, ni `HEALTHCHECK` dans l'image.** Les transferts passent par
+  `azure-storage-blob` (#412), et `/health` par httpx2 (décision de Sabine du 06/11). Les sondes sont
+  celles d'Azure Container Apps (#414). — PR de #200
+- **La CI construit l'image en `linux/amd64` sur chaque PR, dans son propre workflow (`image.yml`, job
+  `image-build`), et ne la pousse nulle part** (le registre et la livraison sont #415). Elle contrôle
+  l'UID (≠ 0), `kb --help` et `kb create-db` (le SQL du paquet installé). Avant la construction, elle
+  plante des fichiers que `.dockerignore` exclut, dans `src/k_b/` et à la racine, puis vérifie qu'aucun
+  n'est dans l'image. Pourquoi : le backend de construction emballe tout fichier de `src/k_b/`, et un
+  `.env` ou une base laissés là entraient dans l'image (essai du 06/11, avant `.dockerignore`). Dependabot
+  tient les digests des deux images de base, avec 7 jours d'attente comme pour les actions. — PR de #200
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
