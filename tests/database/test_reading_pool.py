@@ -135,7 +135,7 @@ def end_the_session_of(location, connection):
         administrator.execute("SELECT pg_terminate_backend(%s, 5000)", (process_id,))
 
 
-class RequestFailure(Exception):
+class RequestFailedError(Exception):
     """An error a request raises after its connection was lost."""
 
 
@@ -160,12 +160,12 @@ def test_the_error_of_a_request_passes_when_its_connection_is_lost_before_given_
     """A rollback that fails on the lost connection must not replace the error: a query_timeout
     would become a database_error."""
     with (
-        pytest.raises(RequestFailure),
+        pytest.raises(RequestFailedError),
         connect_reader(readers, TIMEOUT_SECONDS) as connection,
     ):
         read_items(connection, limit=1)
         end_the_session_of(items_postgresql_base, connection)
-        raise RequestFailure
+        raise RequestFailedError
 
 
 @on_postgresql
