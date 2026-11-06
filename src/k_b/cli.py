@@ -94,8 +94,9 @@ def read_command(argv: list[str] | None) -> str:
     )
     command_parsers.add_parser(
         "migrate-database",
-        help="create the items database as create-db does, unless it already has its tables:"
-        " then nothing is written",
+        help="create the items database unless it already has its tables, then nothing is"
+        " written; on PostgreSQL, also grant its tables to the roles of"
+        " infra/postgresql/grant-roles.sql, which must exist",
     )
     command_parsers.add_parser(
         "import",
