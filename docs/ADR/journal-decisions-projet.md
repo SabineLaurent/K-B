@@ -5739,7 +5739,8 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
   `conventions.md`), mis en commun à la troisième (accord de time-knight du 06/11) ; aucune source
   officielle ne dit qu'une session survit à l'expiration de son jeton, `max_lifetime` la borne ; les
   tests prouvent ce que libpq reçoit, pas que le serveur le vérifie (le serveur de test est en
-  `trust`) ; le code du conteneur de `ca-kb-data-api` obtient des jetons d'`id-kb-data-api`, donc de
+  `trust`), mais en ligne, le 06/11, le serveur a accepté le jeton du job et celui de l'API, mot de
+  passe coupé (critères de #421, `infra/README.md`) ; le code du conteneur de `ca-kb-data-api` obtient des jetons d'`id-kb-data-api`, donc de
   tous ses droits : `kb_reader`, AcrPull sur le registre et Key Vault Secrets User sur
   `kb-data-api-key-ai-digest`, déjà dans son environnement (`identityLifecycle: 'Main'`, l'API IA gardant
   `'None'`). Sans `'Main'`, chaque connexion échoue en `database_no_token` (revue de code, R1). Écartée :
@@ -5785,13 +5786,14 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
   livraison continue ne les rejoue pas ; `grant-roles.sql` est testé tel quel, `create-principals.sql`,
   propre à Azure, ne l'est pas ; la lecture seule d'`id-kb-data-api` ne vaut que dans `kb` : dans
   `postgres`, la base du serveur, les identités gardent `CONNECT` et `TEMPORARY` (les droits de `PUBLIC`
-  par défaut dans PostgreSQL), peut-être `CREATE` sur son schéma `public` (Azure, non vérifié), de quoi
-  remplir le disque de 32 Gio que `postgres` partage avec `kb` ; `postgres` ne porte aucune donnée de
-  K-B (revue de sécurité, S2 ; risque accepté par Sabine le 06/11 vers 17:12 UTC, sur la recommandation
-  de time-knight). Le critère 3 de `infra/README.md` le lit en lecture seule ; un `t` en ligne ouvre une
-  issue de suite, qui révoque `TEMPORARY` et `CREATE`, jamais `CONNECT` : l'administratrice se connecte à
-  `postgres` pour lancer `create-principals.sql`, peut-être par le seul `CONNECT` de `PUBLIC`, ce qui ne
-  se vérifie qu'à l'application ; retirer `TEMPORARY` ou `CREATE` ne coupe l'accès de personne.
+  par défaut dans PostgreSQL), de quoi remplir le disque de 32 Gio que `postgres` partage avec `kb`,
+  mais pas `CREATE` sur son schéma `public` (lu en ligne le 06/11 : `t|f|azure_pg_admin`, `postgres`
+  appartenant à `azure_pg_admin`) ; `postgres` ne porte aucune donnée de K-B (revue de sécurité, S2 ;
+  risque accepté par Sabine le 06/11 vers 17:12 UTC, sur la recommandation de time-knight). Le critère 3
+  de `infra/README.md` le lit en lecture seule ; un `t` en ligne ouvre une issue de suite, qui révoque
+  `TEMPORARY` et `CREATE`, jamais `CONNECT` : l'administratrice se connecte à `postgres` pour lancer
+  `create-principals.sql`, peut-être par le seul `CONNECT` de `PUBLIC` (non vérifié) ; retirer
+  `TEMPORARY` ou `CREATE` ne coupe l'accès de personne.
   — PR de #421, à venir
 
 ### Base en ligne : le serveur (#421)
@@ -5811,8 +5813,8 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
   tient donc ; `ALTER ROLE` reste écarté pour la raison de #418 (la valeur hors du dépôt). 32 Gio sans
   croissance : un disque plein arrête les écritures au lieu de faire monter la facture. API
   `2025-08-01` : `2026-10-01` donne l'avertissement BCP081 sous Bicep v0.48.1 (essayé le 06/11).
-  Limites assumées : le serveur se paie à l'heure, qu'il serve ou non ; qu'Azure accepte
-  `log_error_verbosity` et `citext` en 18 ne se voit qu'à l'application ; les sauvegardes du serveur
+  Azure a accepté `log_error_verbosity` et `citext` en 18 (application du 06/11). Limites assumées :
+  le serveur se paie à l'heure, qu'il serve ou non ; les sauvegardes du serveur
   ne sont pas celles de #390 (aucune restauration d'essai), et ne permettent pas de supprimer le
   brut. — PR de #421, à venir
 

@@ -360,8 +360,9 @@ qu'Azure lui laisse.
 
 ### Appliquer #421 sur le squelette en ligne
 
-Dans l'ordre, sur le squelette déjà en ligne (#414). Les aperçus attendus sont déduits du Bicep, pas encore
-observés.
+Dans l'ordre, sur le squelette déjà en ligne (#414). Les aperçus attendus, déduits du Bicep, ont été observés à
+l'application du 06/11, avec le bruit des étapes 2 et 5 (valeurs par défaut qu'Azure renvoie, sondes permutées,
+`reference(…)` non résolus).
 
 1. Les étapes 0 et 1 d'« Appliquer » (`OPERATOR_UPN`, les huit fournisseurs).
 2. La première passe (étape 2). Aperçu attendu :
@@ -411,7 +412,7 @@ az postgres flexible-server firewall-rule create -g "$RG" --server-name "$PG" --
 admin_psql postgres -At -c "SHOW search_path"
 ```
 
-Attendu : `pg_catalog` (non vérifié sur Azure avant la première administration). `sslrootcert=system` fait
+Attendu : `pg_catalog` (vérifié sur Azure le 06/11). `sslrootcert=system` fait
 vérifier le certificat du serveur par les autorités de la libssl de `psql` (sur le Mac, celles d'OpenSSL de
 Homebrew), et force `verify-full`.
 
