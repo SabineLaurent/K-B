@@ -55,6 +55,19 @@ def test_kb_migrate_database_creates_a_sqlite_base_then_leaves_it_as_it_is(
     assert database_path.read_bytes() == database_content
 
 
+def test_kb_migrate_database_under_entra_without_kb_database_url_creates_no_sqlite_base(
+    monkeypatch, tmp_path
+):
+    # The job online would otherwise create a file on its ephemeral disk, and succeed.
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv(DATABASE_URL_VARIABLE, raising=False)
+    monkeypatch.setenv(DATABASE_AUTH_VARIABLE, "entra")
+    monkeypatch.setenv(CLIENT_ID_VARIABLE, TEST_CLIENT_ID)
+
+    assert cli.main(["migrate-database"]) == ExitCode.NOT_STARTED
+    assert not (tmp_path / "k-b.sqlite").exists()
+
+
 @pytest.mark.postgresql
 def test_kb_migrate_database_run_twice_creates_the_postgresql_base_then_changes_nothing(
     monkeypatch, tmp_path, capsys, administered_base

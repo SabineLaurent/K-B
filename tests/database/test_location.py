@@ -166,9 +166,16 @@ def test_a_setting_of_the_authentication_refused_names_the_variable(settings, re
     assert read_database_location_or_refusal(environ, DATA_DIR) == refusal
 
 
-def test_kb_database_auth_is_left_alone_with_the_sqlite_base():
+def test_kb_database_auth_entra_without_kb_database_url_is_refused():
+    # A URL not given to a container must not send the base to a SQLite file.
     assert read_database_location_or_refusal(
         {DATABASE_AUTH_VARIABLE: "entra"}, DATA_DIR
+    ) == ("KB_DATABASE_AUTH is entra, and KB_DATABASE_URL is not set")
+
+
+def test_kb_database_auth_libpq_is_left_alone_with_the_sqlite_base():
+    assert read_database_location_or_refusal(
+        {DATABASE_AUTH_VARIABLE: "libpq"}, DATA_DIR
     ) == (DATA_DIR / "k-b.sqlite")
 
 
