@@ -124,6 +124,11 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 ## Consignes de travail
 
+- **Accès à la base** (#416, 2026-11-06) : seuls `database/engine.py` (`Connection`, `connect_database`,
+  `connect_database_read_only`, `set_query_timeout`), `database/errors.py` (`EngineError`, refus d'une entrée,
+  `is_query_timeout`) et `etl/sources/zotero.py` (la base de Zotero) importent `sqlite3`. Un module nouveau passe
+  par eux. Aujourd'hui, `Connection` et `EngineError` sont des alias de `sqlite3.Connection` et `sqlite3.Error`.
+  Aucun test ne tient encore la règle : le plan de #417 l'ajoute (outils : `tests/architecture/module_imports.py`).
 - Pour la documentation d'une bibliothèque ou d'un service, utiliser Context7 plutôt qu'une
   lecture de page web. Ce que Context7 ne couvre pas : WebSearch, source et date à l'appui ;
   WebFetch seulement sur une URL qu'une recherche du jour vient de rendre.
