@@ -22,7 +22,11 @@ from azure.core.pipeline.transport import RequestsTransport
 from azure.identity import ManagedIdentityCredential
 from azure.storage.blob import ContainerClient
 
-from k_b.core.config import MAX_LISTED_BLOBS
+from k_b.core.config import (
+    EXCHANGE_STORAGE_CONNECT_TIMEOUT_SECONDS,
+    EXCHANGE_STORAGE_READ_TIMEOUT_SECONDS,
+    MAX_LISTED_BLOBS,
+)
 from k_b.core.outbound import find_url_refusal
 
 EXCHANGE_BLOB_URL_VARIABLE = "KB_EXCHANGE_BLOB_URL"
@@ -41,6 +45,7 @@ ERROR_CODE = re.compile(r"[A-Za-z]{1,64}")
 
 type ExchangeStorageState = Literal[
     "exchange_storage_unavailable",
+    "exchange_storage_identity_unavailable",
     "exchange_storage_unauthorized",
     "exchange_storage_forbidden",
     "exchange_storage_not_found",
@@ -108,8 +113,12 @@ def read_exchange_storage_settings_or_refusal(
 
 def build_transport() -> RequestsTransport:
     """The transport of the SDK: it reads neither a proxy nor a certificate of the environment, as
-    open_http_client (core/outbound.py)."""
-    return RequestsTransport(use_env_settings=False)
+    open_http_client (core/outbound.py), and waits as the SDK of the storage does without one."""
+    return RequestsTransport(
+        use_env_settings=False,
+        connection_timeout=EXCHANGE_STORAGE_CONNECT_TIMEOUT_SECONDS,
+        read_timeout=EXCHANGE_STORAGE_READ_TIMEOUT_SECONDS,
+    )
 
 
 def build_managed_identity_credential(
@@ -139,9 +148,12 @@ def open_container_client(
 
 def check_identity(credential: TokenCredential) -> None:
     """Ask the token of the storage for the identity of the job, which the credential keeps for the
-    requests that follow: a refusal names the identity, whatever the status of its endpoint."""
+    requests that follow: an endpoint out of reach is unavailable, a refusal names the identity,
+    whatever the status of its endpoint."""
     try:
         credential.get_token(STORAGE_SCOPE)
+    except (ServiceRequestError, ServiceResponseError):
+        raise ExchangeStorageError("exchange_storage_identity_unavailable") from None
     except AzureError:
         raise ExchangeStorageError("exchange_storage_unauthorized") from None
 

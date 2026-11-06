@@ -213,6 +213,23 @@ def test_a_token_refused_by_the_identity_endpoint_is_unauthorized(monkeypatch):
     assert raised.value.__suppress_context__
 
 
+def test_an_identity_endpoint_out_of_reach_is_unavailable_not_unauthorized(monkeypatch):
+    set_identity_endpoint(monkeypatch)
+
+    def refuse(request):
+        raise requests.ConnectionError("connection refused")
+
+    with (
+        pytest.raises(ExchangeStorageError) as raised,
+        build_managed_identity_credential(
+            TEST_CLIENT_ID, transport=FakeTransport(refuse)
+        ) as credential,
+    ):
+        check_identity(credential)
+
+    assert str(raised.value) == "exchange_storage_identity_unavailable"
+
+
 def test_a_redirection_of_the_storage_is_not_followed():
     def redirect(request):
         return 307, {"Location": "https://elsewhere.example/smoke-test"}, b""
@@ -221,6 +238,14 @@ def test_a_redirection_of_the_storage_is_not_followed():
         list_with(redirect)
 
     assert str(raised.value) == "exchange_storage_failed, HTTP 307"
+
+
+def test_the_transport_waits_as_the_sdk_of_the_storage_does_without_one():
+    """The SDK sets its own timeouts only when it builds the transport (base_client.py)."""
+    configuration = build_transport().connection_config
+
+    assert configuration.timeout == 20
+    assert configuration.read_timeout == 60
 
 
 def test_the_transport_reads_neither_a_proxy_nor_a_certificate_of_the_environment():

@@ -1,6 +1,7 @@
 """kb smoke-test: the health of both APIs, then the listing of the container of the test by the
 identity of the job; only counts are written."""
 
+import re
 import signal
 from functools import partial
 
@@ -15,6 +16,7 @@ from jobs.storage_fakes import (
     answer_listing,
     answer_token,
     names_the_spotted_blob,
+    remove_online_variables,
     set_identity_endpoint,
 )
 
@@ -33,15 +35,10 @@ HEALTH_BODY = b'{"status":"ok"}'
 
 @pytest.fixture(autouse=True)
 def no_smoke_test_settings(monkeypatch):
-    """A terminal that exports a setting of the job must not make the tests reach Azure."""
-    for variable in (
-        "AZURE_CLIENT_ID",
-        "KB_EXCHANGE_BLOB_URL",
-        "KB_DATA_API_URL",
-        "IDENTITY_ENDPOINT",
-        "IDENTITY_HEADER",
-    ):
-        monkeypatch.delenv(variable, raising=False)
+    """A terminal that exports a setting of the job must not make the tests reach Azure;
+    KB_AI_API_URL is removed by conftest.py."""
+    remove_online_variables(monkeypatch)
+    monkeypatch.delenv("KB_DATA_API_URL", raising=False)
 
 
 @pytest.fixture
@@ -120,6 +117,9 @@ def test_smoke_test_passes_once_both_apis_answer_and_the_container_is_listed(
     assert "exchange storage  1 blob listed in smoke-test" in output
     log = read_kb_log(smoke_test_environment)
     assert "exchange storage: 1 blob listed in smoke-test" in log
+    assert re.search(
+        r"INFO k_b\.cli: smoke test finished in \d+ s: 3 of 3 checks passed\n", log
+    )
 
 
 def test_the_name_of_a_blob_listed_is_written_nowhere(
@@ -171,8 +171,10 @@ def test_an_api_that_fails_its_health_fails_the_smoke_test_and_the_other_checks_
     output = capsys.readouterr().out
     assert "data API          failed" in output
     assert "AI API            ok" in output
-    assert "data API: /health failed: health_failed, HTTP 503" in read_kb_log(
-        smoke_test_environment
+    log = read_kb_log(smoke_test_environment)
+    assert "data API: /health failed: health_failed, HTTP 503" in log
+    assert re.search(
+        r"INFO k_b\.cli: smoke test finished in \d+ s: 2 of 3 checks passed\n", log
     )
 
 

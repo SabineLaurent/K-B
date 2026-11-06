@@ -5,13 +5,18 @@ counts are written."""
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
+from time import monotonic
 from typing import NamedTuple
 
 from k_b.ai_api.connectors.data_api_settings import (
     DATA_API_SCHEMES,
     DATA_API_URL_VARIABLE,
 )
-from k_b.commands.batch_summary import render_table
+from k_b.commands.batch_summary import (
+    describe_count,
+    describe_duration,
+    render_table,
+)
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME, value_or_log_refusal
 from k_b.core.config import AI_API_URL, DATA_API_URL, SMOKE_TEST_CONTAINER
@@ -50,12 +55,15 @@ class SmokeTestSettings:
 
 
 class CheckResult(NamedTuple):
-    """A check of kb smoke-test: what it reached, its result as the summary shows it, and whether it
-    passed."""
+    """A check of kb smoke-test: what it reached, and its result as the summary shows it."""
 
     check: str
     result: str
-    has_passed: bool
+
+    @property
+    def has_passed(self) -> bool:
+        """Whether the check passed: any result but failed."""
+        return self.result != CHECK_FAILED
 
 
 def run_smoke_test(environ: Mapping[str, str]) -> int:
@@ -68,11 +76,19 @@ def run_smoke_test(environ: Mapping[str, str]) -> int:
         "smoke test started: /health of 2 APIs, then the listing of %s",
         SMOKE_TEST_CONTAINER,
     )
+    started = monotonic()
     results = [
         check_api(DATA_API_NAME, settings.data_api_url),
         check_api(AI_API_NAME, settings.ai_api_url),
         check_exchange_storage(settings.exchange_storage),
     ]
+    # A count, at INFO: each failed check has its own line already.
+    logger.info(
+        "smoke test finished in %s: %d of %d checks passed",
+        describe_duration(monotonic() - started),
+        sum(1 for result in results if result.has_passed),
+        len(results),
+    )
     print(render_smoke_test_summary(results))
     # A blank line after the result, as for kb digest (decision of Sabine of 2026-10-29).
     print()
@@ -106,9 +122,9 @@ def check_api(name: str, base_url: str) -> CheckResult:
             check_health(http_client)
     except HealthCheckError as error:
         logger.error("%s: /health failed: %s", name, error)
-        return CheckResult(name, CHECK_FAILED, has_passed=False)
+        return CheckResult(name, CHECK_FAILED)
     logger.info("%s: /health answered", name)
-    return CheckResult(name, CHECK_PASSED, has_passed=True)
+    return CheckResult(name, CHECK_PASSED)
 
 
 def check_exchange_storage(settings: ExchangeStorageSettings) -> CheckResult:
@@ -126,20 +142,19 @@ def check_exchange_storage(settings: ExchangeStorageSettings) -> CheckResult:
             count = count_listed_blobs(container_client)
     except ExchangeStorageError as error:
         logger.error("%s: not listed: %s", EXCHANGE_STORAGE_NAME, error)
-        return CheckResult(EXCHANGE_STORAGE_NAME, CHECK_FAILED, has_passed=False)
+        return CheckResult(EXCHANGE_STORAGE_NAME, CHECK_FAILED)
     listed = describe_listed_blobs(count)
     logger.info("%s: %s", EXCHANGE_STORAGE_NAME, listed)
-    return CheckResult(EXCHANGE_STORAGE_NAME, listed, has_passed=True)
+    return CheckResult(EXCHANGE_STORAGE_NAME, listed)
 
 
 def describe_listed_blobs(count: int) -> str:
     """1 blob listed in smoke-test, or 3 blobs."""
-    noun = "blob" if count == 1 else "blobs"
-    return f"{count} {noun} listed in {SMOKE_TEST_CONTAINER}"
+    return f"{describe_count(count, 'blob')} listed in {SMOKE_TEST_CONTAINER}"
 
 
 def render_smoke_test_summary(results: list[CheckResult]) -> str:
-    """The summary after the end line: a row per check, with its result."""
+    """The summary after the end line of the log: a row per check, with its result."""
     table = render_table([SUMMARY_HEADER, *[(r.check, r.result) for r in results]])
     # Underlined, the title of the block, as for kb digest (decision of Sabine of 2026-10-29).
     return "\n".join(["", SUMMARY_TITLE, "-" * len(SUMMARY_TITLE), *table])

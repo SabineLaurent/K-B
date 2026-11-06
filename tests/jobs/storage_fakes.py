@@ -124,6 +124,36 @@ def answer_identity_refusal(request):
     return 400, {"Content-Type": "application/json"}, json.dumps(body).encode()
 
 
+# The variables of a run online: those of the job (jobs/exchange_storage.py), and those
+# ManagedIdentityCredential reads to choose its way to a token (azure/identity/_constants.py,
+# EnvironmentVariables, azure-identity 1.27.0).
+ONLINE_VARIABLES = (
+    "KB_EXCHANGE_BLOB_URL",
+    "AZURE_CLIENT_ID",
+    "AZURE_TENANT_ID",
+    "AZURE_AUTHORITY_HOST",
+    "AZURE_FEDERATED_TOKEN_FILE",
+    "AZURE_POD_IDENTITY_AUTHORITY_HOST",
+    "AZURE_KUBERNETES_TOKEN_PROXY",
+    "AZURE_KUBERNETES_CA_FILE",
+    "AZURE_KUBERNETES_CA_DATA",
+    "AZURE_KUBERNETES_SNI_NAME",
+    "IDENTITY_ENDPOINT",
+    "IDENTITY_HEADER",
+    "IDENTITY_SERVER_THUMBPRINT",
+    "IMDS_ENDPOINT",
+    "MSI_ENDPOINT",
+    "MSI_SECRET",
+)
+
+
+def remove_online_variables(monkeypatch):
+    """A terminal that exports a variable of a run online must not make the tests reach Azure, nor
+    change the way of the credential to its token."""
+    for variable in ONLINE_VARIABLES:
+        monkeypatch.delenv(variable, raising=False)
+
+
 def set_identity_endpoint(monkeypatch):
     """The variables azure-identity reads in a container app."""
     monkeypatch.setenv("IDENTITY_ENDPOINT", TEST_IDENTITY_ENDPOINT)

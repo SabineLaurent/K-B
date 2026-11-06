@@ -5450,7 +5450,9 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   gardé s'il est un mot de lettres), jamais par `str(error)` ; rien du SDK n'est chaîné (`from
   None`). L'état se lit au statut, pas à la classe, et le jeton est demandé à part
   (`check_identity`) : un refus de l'identité est `exchange_storage_unauthorized`, quel que soit le
-  statut de son point d'accès.** Pourquoi : le message du SDK recopie le corps de la réponse, qui
+  statut de son point d'accès, et un point d'accès injoignable
+  `exchange_storage_identity_unavailable` (revue de code, tranché par time-knight le 06/11,
+  délégation de Sabine du 15/10).** Pourquoi : le message du SDK recopie le corps de la réponse, qui
   peut citer le chemin d'un blob (`AuthenticationErrorDetail`) ; le SDK lève
   `ClientAuthenticationError` pour une 403 `AuthenticationFailed`
   (`azure/storage/blob/_shared/response_handlers.py`) ; et le diagnostic utile d'un job en ligne est
@@ -5461,13 +5463,18 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   `KB_EXCHANGE_BLOB_URL` (en `https`) sans défaut ; le conteneur d'essai est une constante,
   `SMOKE_TEST_CONTAINER = "smoke-test"`, créé par #414. Le transport du SDK ne lit ni proxy ni
   certificat de l'environnement (`RequestsTransport(use_env_settings=False)`) et ne suit aucune
-  redirection (`permit_redirects=False`), comme `open_http_client`. `/health` : 60 s de lecture et
-  d'échéance, corps de 1 Kio au plus, `{"status":"ok"}` exact, sans nouvel essai.** Pourquoi : sans
+  redirection (`permit_redirects=False`), comme `open_http_client` ; il attend 20 s une connexion et
+  60 s une lecture, les délais que le SDK de stockage ne pose que s'il construit lui-même son
+  transport (sans eux, 300 s : revue de code, tranché par time-knight le 06/11, délégation de Sabine
+  du 15/10). `/health` : 60 s de lecture, une échéance de 65 s (connexion puis lecture), corps de
+  1 Kio au plus, `{"status":"ok"}` exact, sans nouvel essai.** Pourquoi : sans
   `client_id`, `ManagedIdentityCredential` cherche l'identité système, que les jobs de K-B n'ont pas ;
   aucune valeur locale n'existe pour un compte Azure (règle 2 de `poc.md`, comme `KB_LLM_BASE_URL`) ;
   rien ne change le conteneur d'un déploiement à l'autre. Écarté : une variable pour le conteneur.
   Limite assumée : les 60 s sont une hypothèse (le réveil d'une API à 0 réplique), à mesurer à #414 ;
-  les délais et les nouvelles tentatives du SDK restent ceux par défaut. — PR de #412
+  les nouvelles tentatives du stockage restent celles du SDK (3, après environ 18, 24 et 42 s, à 3 s
+  près, mesuré le 06/11) : environ 7 min au pire, sans trace au journal, le logger `azure` étant
+  tenu à WARNING. — PR de #412
 
 ## Décisions encore ouvertes
 

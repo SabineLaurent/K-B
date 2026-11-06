@@ -518,12 +518,23 @@ SMOKE_TEST_CONTAINER = "smoke-test"
 # (OWASP API4:2023).
 MAX_LISTED_BLOBS = 100
 # GET /health from a job, without retry. Connection, pool and write: as for the AI API. Read: 60 s, an
-# assumption, the wake of an API at 0 replica, to be measured by #414. The whole answer within the
-# same 60 s, checked after each piece read (core/outbound.py).
+# assumption, the wake of an API at 0 replica, to be measured by #414. The whole answer within its
+# deadline, checked after each piece read (core/outbound.py).
 HEALTH_CONNECT_TIMEOUT_SECONDS = 5
 HEALTH_POOL_TIMEOUT_SECONDS = 5
 HEALTH_WRITE_TIMEOUT_SECONDS = 10
 HEALTH_READ_TIMEOUT_SECONDS = 60
-HEALTH_REQUEST_DEADLINE_SECONDS = HEALTH_READ_TIMEOUT_SECONDS
+# A connection, then a whole read: the wake of an API at 0 replica may take the read timeout once
+# connected.
+HEALTH_REQUEST_DEADLINE_SECONDS = (
+    HEALTH_CONNECT_TIMEOUT_SECONDS + HEALTH_READ_TIMEOUT_SECONDS
+)
 # The body of GET /health is {"status":"ok"}, 15 bytes: beyond 1 KiB, it is not the answer of K-B.
 MAX_HEALTH_ANSWER_BYTES = 1024
+# The waits of a request to the exchange storage or to the identity endpoint: those the SDK of the
+# storage sets only when it builds its transport (CONNECTION_TIMEOUT and READ_TIMEOUT,
+# azure/storage/blob/_shared/constants.py, azure-storage-blob 12.31.1); the transport of K-B would
+# otherwise get the 300 s of azure-core. The retries stay those of the SDK: 3, after about 18 s, 24 s
+# and 42 s (± 3 s, seen on 2026-11-06), so about 7 min at worst: 4 times 20 s and 60 s, and 84 s.
+EXCHANGE_STORAGE_CONNECT_TIMEOUT_SECONDS = 20
+EXCHANGE_STORAGE_READ_TIMEOUT_SECONDS = 60

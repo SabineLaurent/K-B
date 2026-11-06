@@ -2,12 +2,17 @@
 a closed schema."""
 
 import asyncio
+from functools import partial
 
 import httpx2
 import pytest
 
 from k_b.core.api_health import answer_health
-from k_b.core.config import MAX_HEALTH_ANSWER_BYTES
+from k_b.core.config import (
+    HEALTH_CONNECT_TIMEOUT_SECONDS,
+    HEALTH_READ_TIMEOUT_SECONDS,
+    MAX_HEALTH_ANSWER_BYTES,
+)
 from k_b.jobs.api_health import HealthCheckError, build_health_client, check_health
 
 TEST_API_URL = (
@@ -89,3 +94,42 @@ def test_an_api_out_of_reach_fails_with_a_named_state(error, state):
 
     assert raised.value.state == state
     assert str(raised.value) == state
+
+
+def make_clock(*times):
+    """A clock that gives each time in turn, then the last one."""
+    remaining = list(times)
+
+    def clock():
+        return remaining.pop(0) if len(remaining) > 1 else remaining[0]
+
+    return clock
+
+
+@pytest.mark.parametrize(
+    ("seconds_to_answer", "is_late"),
+    [
+        # Connection, then a whole read: the wake of an API at 0 replica.
+        (HEALTH_CONNECT_TIMEOUT_SECONDS + HEALTH_READ_TIMEOUT_SECONDS - 1, False),
+        (HEALTH_CONNECT_TIMEOUT_SECONDS + HEALTH_READ_TIMEOUT_SECONDS + 1, True),
+    ],
+)
+def test_the_answer_has_the_time_of_a_connection_then_of_a_read(
+    health_body, seconds_to_answer, is_late
+):
+    with build_health_client(
+        TEST_API_URL,
+        transport=httpx2.MockTransport(
+            lambda request: httpx2.Response(200, content=health_body)
+        ),
+    ) as http_client:
+        check = partial(
+            check_health, http_client, clock=make_clock(0, seconds_to_answer)
+        )
+        if not is_late:
+            check()
+            return
+        with pytest.raises(HealthCheckError) as raised:
+            check()
+
+    assert str(raised.value) == "health_timeout"
