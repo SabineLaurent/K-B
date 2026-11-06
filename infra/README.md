@@ -462,7 +462,8 @@ Attendu : la seule règle `AllowAllAzureServicesAndResourcesWithinAzureIps`, de 
    ```
 
    Un `t` à l'une des deux premières colonnes ouvre une issue de suite : révoquer `TEMPORARY` et `CREATE` à
-   `PUBLIC` dans `postgres`, jamais `CONNECT`. La troisième nomme le propriétaire de `postgres`, pour cette issue.
+   `PUBLIC` dans `postgres`, jamais `CONNECT`, par lequel l'administratrice entre peut-être dans `postgres` pour
+   `create-principals.sql`. La troisième nomme le propriétaire de `postgres`, pour cette issue.
 
    Puis dans l'API elle-même, par son identité :
    `az containerapp exec -g "$RG" -n ca-kb-data-api --command sh`, puis, dans le conteneur :

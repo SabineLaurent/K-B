@@ -5784,7 +5784,10 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
   remplir le disque de 32 Gio que `postgres` partage avec `kb` ; `postgres` ne porte aucune donnée de
   K-B (revue de sécurité, S2 ; risque accepté par Sabine le 06/11 vers 17:12 UTC, sur la recommandation
   de time-knight). Le critère 3 de `infra/README.md` le lit en lecture seule ; un `t` en ligne ouvre une
-  issue de suite, qui révoque `TEMPORARY` et `CREATE`, jamais `CONNECT`. — PR de #421, à venir
+  issue de suite, qui révoque `TEMPORARY` et `CREATE`, jamais `CONNECT` : l'administratrice se connecte à
+  `postgres` pour lancer `create-principals.sql`, peut-être par le seul `CONNECT` de `PUBLIC`, ce qui ne
+  se vérifie qu'à l'application ; retirer `TEMPORARY` ou `CREATE` ne coupe l'accès de personne.
+  — PR de #421, à venir
 
 ### Base en ligne : le serveur (#421)
 
