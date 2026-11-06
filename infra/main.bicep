@@ -1,6 +1,6 @@
 // K-B on Azure. Applied by hand by Sabine to her resource group (infra/README.md), checked by the CI.
-// Two passes: without imageTag, the foundation (logs, registry, vault, identities, exchange storage);
-// once the image is pushed and the secrets set, with imageTag, the two APIs and the smoke test job.
+// Two passes: without imageTag, the foundation (logs, registry, vault, identities, exchange storage, PostgreSQL server);
+// once the image is pushed and the secrets set, with imageTag, the two APIs and the two jobs.
 targetScope = 'resourceGroup'
 
 @description('Region of every K-B resource: the resource group\'s by default (France Central).')

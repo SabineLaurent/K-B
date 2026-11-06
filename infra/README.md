@@ -4,9 +4,10 @@ Le Bicep de ce dossier décrit les ressources de K-B dans Azure. `main.bicep` ap
 ressources (`modules/`). Les ressources portent l'étiquette `project=k-b` et sont créées dans la région du groupe
 de ressources ; le budget, qui n'a ni étiquette ni région, compte les coûts de cette étiquette.
 
-`main.bicep` se déploie en **deux passes**. Sans `imageTag`, il pose le socle. Avec `imageTag`, il ajoute les deux
-API, le job d'essai et les rôles sur les secrets. Entre les deux passes, l'image est poussée dans le registre et les
-secrets sont posés dans le coffre (« Appliquer »).
+`main.bicep` se déploie en **deux passes**. Sans `imageTag`, il pose le socle, dont le serveur PostgreSQL (#421). Avec
+`imageTag`, il ajoute les deux API, les deux jobs (`caj-kb-smoke-test`, `caj-kb-migrate-database`) et les rôles sur
+les secrets. Chaque passe repose le socle, le serveur et l'identité de `caj-kb-migrate-database` compris. Entre les
+deux passes, l'image est poussée dans le registre et les secrets sont posés dans le coffre (« Appliquer »).
 
 | Module | Ressource | Passe | Issue |
 |---|---|---|---|
@@ -356,6 +357,28 @@ base vide et ne fait rien sur une base qui l'a déjà.
 
 Aucun autre rôle ne se connecte à `kb` ni n'y crée rien : `grant-roles.sql` retire à `PUBLIC` les droits
 qu'Azure lui laisse.
+
+### Appliquer #421 sur le squelette en ligne
+
+Dans l'ordre, sur le squelette déjà en ligne (#414). Les aperçus attendus sont déduits du Bicep, pas encore
+observés.
+
+1. Les étapes 0 et 1 d'« Appliquer » (`OPERATOR_UPN`, les huit fournisseurs).
+2. La première passe (étape 2). Aperçu attendu :
+   - **à créer** : `pgsql-kb-<suffixe>`, son administratrice Entra, ses deux paramètres (`azure.extensions`,
+     `log_error_verbosity`), sa règle de pare-feu `AllowAllAzureServicesAndResourcesWithinAzureIps`, l'identité
+     `id-kb-migrate-database` et son rôle AcrPull sur le registre ;
+   - **à modifier** : du bruit seulement, comme à l'étape 2.
+3. « Ouvrir une administration », puis « Créer les rôles et la base » (ci-dessous).
+4. L'image (étape 3) : elle doit porter le code de #421 (`kb migrate-database`, `KB_DATABASE_AUTH`), que celle de
+   #414 n'a pas. Puis « Vérifier la chaîne TLS du job ». L'étape 4 n'a rien de neuf : Entra seul, aucun secret.
+5. La seconde passe (étape 5), avec l'étiquette de cette image. Aperçu attendu :
+   - **à créer** : `caj-kb-migrate-database` ;
+   - **à modifier** : `ca-kb-data-api` (son image, et `KB_DATABASE_URL`, `KB_DATABASE_AUTH`, `AZURE_CLIENT_ID`),
+     l'image de `ca-kb-ai-api` et de `caj-kb-smoke-test`, et le bruit de l'étape 5.
+6. Aussitôt après, `caj-kb-migrate-database` (critère 1 de « Vérifier les trois critères de #421 ») : jusqu'à son
+   premier lancement, l'API de données pointe vers une base sans tables. Puis les critères 2 et 3, et « Fermer
+   l'administration ».
 
 ### Ouvrir une administration
 
