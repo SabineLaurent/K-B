@@ -54,26 +54,34 @@ L'étape 1 couvre la porte « veille » :
   cette semaine ».
 - **Données personnelles** : un registre des traitements et une procédure de purge.
 
-### Étape 2 — le wiki
+### Étape 2 — les comptes rendus de veille
 
-L'étape 2 ouvre la porte « base de connaissance », d'abord pour mes clips du Web Clipper, puis
-pour les papiers que je garde dans Zotero :
+L'étape 2 fait lire la veille par un modèle, à travers l'API de données, et range ce qui en sort
+dans mon coffre Obsidian, sous `veille/` :
 
-- **Ingest** : de chaque document, le modèle écrit une note de lecture, comme après une lecture
-  du texte entier : le clip tel quel, puis le texte intégral du PDF d'un papier. Il met aussi à
-  jour les fiches thématiques que le document touche : une fiche par sujet, qui rassemble ce
-  qu'en disent les documents, chaque affirmation renvoyant au sien. Les sujets viennent d'une
-  liste que je tiens ; un sujet nouveau proposé par le modèle attend mon accord.
-- **Contrôles** : le modèle renvoie des opérations JSON ; le code les valide (liste fermée
-  d'opérations, sujets connus, citations, nombres et dates retrouvés mot pour mot dans la source,
-  liens et frontmatter), puis écrit dans le wiki si tout passe. Sinon, la proposition attend dans
-  une file « à voir ».
-- **API IA authentifiée**, distincte de l'API de données et documentée en OpenAPI. La commande
-  `kb` en est le client. L'inférence passe par Azure, en API compatible OpenAI : le modèle se
-  choisit en configuration.
-- **Métriques** de chaque appel (durée, jetons, coût, erreurs, fidélité, propositions
-  acceptées), émises en OpenTelemetry, gardées sur ma machine et restituées en temps réel, avec
-  une alerte sur seuil, par un outil à choisir.
+- **Comptes rendus de veille par sujet** (`kb digest`) : le modèle range les items de la
+  fenêtre (3 jours par défaut) dans les sujets d'une liste fermée que je tiens, puis écrit, pour
+  chaque sujet, des affirmations qui citent leurs items ; une fiche par sujet,
+  `veille/<sujet>/AAAA-MM-JJ.md`.
+- **Compte rendu des tendances** (`kb trend-report`) : parmi les dépôts qui montent sur GH
+  Archive, le code calcule les rangs et les critères (durables, nouveaux, en accélération) et lit
+  la fiche GitHub de chaque candidat ; le modèle en choisit au plus 5 ;
+  `veille/tendances/<date>.md`. Les textes qu'il écrira sur chaque dépôt choisi viendront avec
+  #369.
+- **Tops** (`kb write-tops`, sans modèle) : une fiche datée pour chacun des deux classements de
+  100 dépôts, les plus étoilés et les plus forkés, sous `veille/tops/`.
+- **Contrôles** : le modèle renvoie du JSON ; le code le revalide (schéma fermé, sujets de la
+  liste, items cités parmi ceux envoyés, ni lien ni balise) et retire une affirmation dont les
+  faits ne se retrouvent pas dans l'item cité. Une sortie hors schéma n'est jamais écrite.
+- **API IA authentifiée**, distincte de l'API de données et documentée en OpenAPI. `kb digest`
+  et `kb trend-report` en sont les clients. L'inférence passe par Azure, en zone de données UE,
+  en API compatible OpenAI : le modèle se choisit en configuration.
+- **Métriques** de chaque appel (durée, jetons, coût estimé, erreurs, fidélité), sur une ligne
+  JSON de la sortie standard et en OpenTelemetry vers Grafana Cloud, en région UE. Leur
+  restitution en temps réel, avec une alerte sur seuil, viendra avec #164.
+- **Plus tard, les fiches de lecture** : de mes clips du Web Clipper, puis des papiers que je
+  garde dans Zotero, le modèle rédigera des fiches de lecture, réunies en un wiki (#168). Aucun
+  code ne les écrit encore, et le wiki n'est pas de la mise en ligne du 08/11 (#170).
 
 ## Hors périmètre de la v0
 
@@ -176,8 +184,9 @@ machine (`KB_COLLECT_ONLY`), sans que ma bibliothèque soit montée dans un cont
 
 **Où on en est** : la collecte, l'import, l'API de données, le service des fiches par l'API IA
 (`kb serve-ai`, #156) et leur écriture en `.md` dans le coffre (`kb digest`, #209) sont codés (voir
-« Installer et lancer »). Restent les métriques du modèle vers Grafana Cloud (#162, #164) ; puis, au deuxième
-temps, l'image et les conteneurs (#200) et l'installation par compose (#202).
+« Installer et lancer »), comme l'export des métriques du modèle vers Grafana Cloud (#162). Restent
+leur restitution, avec une alerte sur seuil (#164) ; puis, au deuxième temps, l'image étant
+construite (#200), l'installation par compose (#202).
 
 **La suite** :
 
