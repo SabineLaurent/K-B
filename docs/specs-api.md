@@ -7,7 +7,7 @@ erreurs et les exigences de sécurité. Les décisions et leur pourquoi sont dan
 [journal ADR](ADR/journal-decisions-projet.md) (entrées du 2026-10-14) ; la collecte, dans
 [specs-collecte.md](specs-collecte.md) ; la base, dans [stockage.md](stockage.md).
 
-**Version de la spec : 0.10.0**, la même que `info.version` de l'OpenAPI
+**Version de la spec : 0.11.0**, la même que `info.version` de l'OpenAPI
 (`docs/api/openapi-donnees.json`, que #184 écrit). Un changement de comportement visible par un client, comme
 l'ordre des résultats, change la version.
 
@@ -23,6 +23,7 @@ l'ordre des résultats, change la version.
 | 0.8.0 | une limite de débit par client et par route ; au-delà, 429 `rate_limit_exceeded` (#161) |
 | 0.9.0 | `HEAD` refusé sur `/health`, et sur `/docs` et `/openapi.json` en `sandbox`, comme il l'était déjà sur les routes de données : 405 `method_not_allowed`, `Allow: GET` (#161) |
 | 0.10.0 | une requête a 5 s dans la base ; au-delà, 503 `query_timeout` ; le détail d'une entrée Zotero sert 100 surlignages et 125 000 caractères de leur texte et commentaire au plus, et celui d'un clip 125 000 caractères de son texte, la coupe dite par `highlights_truncated` et `body_truncated` (#331) |
+| 0.11.0 | la base PostgreSQL que nomme `KB_DATABASE_URL` servie, et non plus le fichier SQLite ; sur elle, une base injoignable ou sans tables répond 500 `database_error`, et non 503 `database_missing` ; au-delà de 4 lectures en même temps, une requête attend 2 s puis répond 500 `database_error` ; la recherche `q` rend les mêmes résultats qu'en SQLite (#418) |
 
 ## Règles communes
 
