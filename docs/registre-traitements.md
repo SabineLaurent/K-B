@@ -158,6 +158,22 @@ Le dépôt de code, ses issues, ses PR et les journaux de GitHub Actions devienn
 | Durée | Celle du dépôt public : sans limite fixée. |
 | Effacement | Retirer une valeur de l'historique demande de le réécrire, puis de faire purger par le support de GitHub les `refs/pull/*` et les commits hors des refs ; un clone fait avant l'effacement la garde. |
 
+## Hébergement sur Azure (#414)
+
+K-B est en ligne depuis le 06/11/2026 (#414) : deux API internes, un job d'essai, leurs journaux et leurs secrets,
+dans Azure. Section générale, décidée par Sabine le 06/11 : les sections qui suivent la mise en ligne y renvoient
+(la base, #421).
+
+| Rubrique | Contenu |
+|---|---|
+| Sous-traitant | Microsoft, hébergeur : Azure Container Apps (les deux API et les jobs), Azure Container Registry (l'image), Key Vault (les secrets), Storage (le stockage d'échange `stkbexchange…`), Azure Monitor et son espace Log Analytics `log-kb` (les journaux des conteneurs), les identités managées (Microsoft Entra ID). |
+| Abonnement et contrat | L'abonnement de l'organisme de formation (« Plan Azure », offre du Microsoft Customer Agreement : section « Envoi des items au modèle des fiches »), dans un groupe de ressources dont l'utilisatrice est propriétaire (Owner). Contrat : le DPA de Microsoft, que le Microsoft Customer Agreement incorpore ; les rôles qu'il fixe sont cités dans la même section. **Limite** : le contrat sous lequel l'organisme tient l'abonnement n'est pas vérifié à la source. |
+| Services couverts | *Privacy and Security Terms* du programme MCA, section « Core Online Services », ligne « Microsoft Azure Core Services », lue le 2026-11-06 : on y lit « Azure Container Apps », « Azure Container Registry (ACR) », « Key Vault », « Storage », « Azure Monitor » et « Microsoft Entra ID ». Aucun de ces services n'est dans le tableau « Exceptions to the DPA ». **Non vérifié** : Log Analytics et les identités managées n'y sont pas nommés tels quels. |
+| Région | France Central, la région du groupe de ressources (`infra/main.bicep`). Engagement des mêmes termes pour les Azure Core Services : « If Customer configures a particular service to be deployed within a Geo then, for that service, […] Microsoft will store Customer Data at rest within the specified Geo » ; la même entrée prévient que certains services peuvent garder leurs sauvegardes ailleurs. |
+| Données personnelles au 06/11 | Aucune donnée des fiches 1 et 2. L'API de données n'a pas encore de base et répond 503 (#421). Le stockage d'échange ne contient que le conteneur vide `smoke-test`. Les journaux ne portent que des états, des comptes, des routes et des noms de clients (règle 5 de `.claude/rules/poc.md`). Les données arrivent avec #413 (les jobs), #420 (les comptes de stockage) et #421 (la base) : chacune met à jour cette section. |
+| Journaux en ligne | Dans `log-kb`, France Central, 30 jours, effacés ensuite par Log Analytics. |
+| Droits d'accès | Les propriétaires (Owner) et les contributeurs (Contributor) du groupe de ressources. Les lecteurs de l'abonnement (rôle Lecteur, `*/read`) lisent aussi `log-kb`, peuvent sans doute tirer l'image et voient la configuration des apps, mais pas la valeur des secrets (coffre en RBAC). **Risque accepté par Sabine le 06/11**, à revoir avec #413 (journaux des jobs) et #420 (comptes de stockage). S'ajoutent les destinataires possibles chez l'organisme, comme pour le modèle : un administrateur général de l'annuaire peut se donner l'accès à tout l'abonnement (section « Envoi des items au modèle des fiches »). |
+
 ## Procédure de tri
 
 Chaque étape dit ce qu'elle fait, si elle est automatisée, et sa fréquence. Le code de la purge
@@ -231,6 +247,12 @@ Limites de la purge (étapes 2, 3 et 7), écrites le 2026-11-04 :
 ## Source de la durée des logs (consultée le 2026-11-04)
 
 - [La CNIL publie une recommandation relative aux mesures de journalisation](https://cnil.fr/la-cnil-publie-une-recommandation-relative-aux-mesures-de-journalisation) — CNIL, page lue ; le [texte de la recommandation](https://www.cnil.fr/sites/cnil/files/atoms/files/recommandation_-_journalisation.pdf), en PDF, n'a pas pu être lu
+
+## Sources de l'hébergement sur Azure (consultées le 2026-11-06)
+
+- [Privacy & Security Terms, Microsoft Customer Agreement](https://www.microsoft.com/licensing/terms/product/PrivacyandSecurityTerms/MCA) — Microsoft, page lue le 2026-11-06, sans date de publication (« Effective Date » vide) : « Core Online Services », ligne « Microsoft Azure Core Services », « Exceptions to the DPA », « Location of Customer Data at Rest for Core Online Services ».
+- [Manage access to Log Analytics workspaces](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/manage-access) — Microsoft Learn : le rôle Lecteur (`*/read`) lit les données de l'espace.
+- [Azure Monitor Logs cost calculations](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/cost-logs) — Microsoft Learn : 31 jours de rétention compris dans l'ingestion.
 
 ## Sources (consultées le 2026-10-02)
 

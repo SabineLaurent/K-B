@@ -14,6 +14,9 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7 # same delay as the actions
+    # The cooldown needs the publication date of a version, which ghcr.io does not give: for
+    # astral-sh/uv, Dependabot opens the pull request at once ("Cooldown could not be applied", #444).
+    # Before merging a docker update, check the date of the version by hand (journal ADR, #414).
     # Digest and patch updates only: a minor update changes the tag itself (3.13-slim-trixie to
     # 3.14-slim-trixie: same suffix, higher version, dependabot-core docker/README.md, "Semver").
     # Python stays at the 3.13 of .python-version; uv in the uv_build range of pyproject.toml.

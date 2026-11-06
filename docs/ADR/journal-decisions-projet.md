@@ -5592,6 +5592,110 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   un dépôt sous CC BY-NC 4.0 ; la compatibilité des deux n'est pas tranchée par un juriste. Clôt la
   décision ouverte du 2026-10-11 (« Licence du schéma de Zotero »). — PR de #278
 
+### Mise en ligne : le squelette de K-B sur Azure (#414)
+
+Choix de la session dans le plan validé par Sabine le 06/11 (parcours complet), sauf mention. Appliqué par
+Sabine le 06/11 ; les mesures viennent de `log-kb`.
+
+- **Un seul `main.bicep`, appliqué en deux passes que pilote le paramètre `imageTag`. Vide, il pose le socle :
+  journaux, environnement, identités, registre et ses rôles AcrPull, coffre, stockage d'échange, budget. Avec
+  une étiquette, il ajoute les deux API, le job et les rôles du coffre par secret.** Pourquoi : une app ne se
+  crée qu'une fois son image dans le registre et ses secrets dans le coffre ; et AcrPull, donné en passe 1, a
+  propagé quand vient la passe 2. Écartés : deux fichiers Bicep, qui déclareraient deux fois les mêmes noms ;
+  des secrets factices posés par Bicep, qu'un nouveau passage écraserait. Limite assumée : un rôle du coffre
+  peut mettre jusqu'à 10 min à propager, et une passe 2 refusée se relance par la même commande
+  (`infra/README.md`, « Appliquer »). — PR de #414
+
+- **Les deux API à 0 réplique au repos, 1 au plus.** Décision de Sabine du 06/11, sur la recommandation de la
+  session. Pourquoi : avec PostgreSQL et le registre, 0 réplique tient sous le budget de 30 € par mois
+  (environ 27 $), et 1 le dépasse (environ 47 $). Clôt la décision ouverte du 2026-11-05 (« `minReplicas` des
+  deux API »). Mesuré le 06/11 sur l'exécution `caj-kb-smoke-test-us77d03`, les API au repos depuis plus de
+  300 s :
+  - l'API de données répond 26 s après la première demande, et l'API IA 20 s après ;
+  - le test dure 50 s, contre 1 s quand les API sont éveillées ; l'image se tire en 4 s environ ;
+  - l'hypothèse des 60 s de lecture de `/health` (#412) tient, avec une marge d'environ ×2,3.
+
+  Limites assumées :
+  - le compte du débit (#161) repart de zéro à chaque réveil ;
+  - le client de l'API IA vers l'API de données lit en 10 s au plus, sans nouvel essai
+    (`DATA_API_READ_TIMEOUT_SECONDS`). Une fiche demandée pendant que l'API de données dort échoue donc. Moyen
+    proposé à #413 : un `GET /health` des deux API avant les fiches ; une API reste éveillée 300 s après sa
+    dernière demande, le délai par défaut d'ACA. — PR de #414
+
+- **Registre : Azure Container Registry Basic (`crkb` et le suffixe), en France Central. Pas de compte admin.
+  Chaque pièce tire l'image par son identité (AcrPull), et le mode des rôles est fixé à
+  `LegacyRegistryPermissions`.** Décision de Sabine du 06/11, sur la recommandation de la session. Pourquoi :
+  l'image se tire par identité managée, sans aucun secret, pour 5,07 $ par mois. Écarté : le registre de
+  GitHub (GHCR), gratuit pour un paquet public. ACA n'y tire pas par identité managée : il faudrait un jeton
+  GitHub, rangé dans le coffre et à renouveler, et l'image serait hébergée hors de l'UE. Le mode des rôles est
+  fixé parce que le mode ABAC d'ACR, bientôt le défaut, ignore AcrPull. Sabine pousse l'image depuis une copie
+  propre de `main`, avec le SHA court du commit pour étiquette, par `docker buildx build --platform
+  linux/amd64 --push`. Écarté : `az acr build`, suspendu sur les crédits gratuits. — PR de #414
+
+- **Coffre `kv-kb` (et le suffixe) en RBAC. Un rôle Key Vault Secrets User par secret et par identité (7
+  rôles), Secrets Officer pour Sabine. Suppression réversible pendant 7 jours, sans protection contre la purge.
+  Les apps lisent les secrets par des références sans version.** Pourquoi un rôle par secret : l'API de
+  données ne lit que `kb-data-api-key-ai-digest`, un secret qu'elle partage avec l'API IA, et un coffre par
+  app obligerait à le copier. C'est un écart à la recommandation de Microsoft, qui supporte ce rôle mais
+  conseille un coffre par application. Pourquoi 7 jours : le réglage est irréversible, Sabine ne peut pas
+  purger, et un nom gardé 90 jours bloquerait une recréation. La protection contre la purge est irréversible
+  elle aussi. Sabine pose les secrets par `read -rs` et `--file`, avec `-o none` : la valeur ne passe ni par
+  l'historique ni par l'écran. Limites assumées : on ne récupère un secret supprimé que pendant 7 jours ; une
+  nouvelle valeur atteint une app en 30 min au plus. — PR de #414
+
+- **Les deux API sont internes : `https://<app>.internal.<defaultDomain>`, `allowInsecure: false`. Le
+  trafic entre apps est chiffré (`peerTrafficConfiguration`), le mTLS reste coupé, et `cae-kb` garde
+  `publicNetworkAccess: 'Enabled'`.** Pourquoi : le client de K-B ne suit aucune redirection, et l'API IA
+  envoie sa clé à l'API de données. Le mTLS est coupé parce que ce qu'il ajoute au chiffrement n'est pas
+  documenté. `Disabled` n'accepterait que des points de terminaison privés, qui demandent un VNet, absent
+  (décision réseau du 06/11). Vérifié : `external: false` pour les deux, et le job joint les deux `/health`
+  par leur nom interne. Limite assumée : le coffre, le registre et le stockage restent joignables sur
+  Internet, sous Entra ID ; seul un VNet les fermerait. — PR de #414
+
+- **Les sondes (démarrage, disponibilité, vie) font un `GET /health`. Celles de l'API de données portent
+  l'en-tête `Host` de son nom interne, seul nom de `KB_DATA_API_ALLOWED_HOSTS`.** Pourquoi : par défaut, une
+  sonde envoie l'IP du pod en `Host`, ce que l'API de données refuse, `/health` compris. La sonde de
+  démarrage attend 1 + 6 × 10 s au plus : `failureThreshold` est plafonné à 10, et le plan prévoyait
+  2 s × 30. Vérifié : aucune ligne `route=/health` dans les journaux des API, et une révision saine.
+  Écartées : des sondes TCP, le repli prévu. — PR de #414
+
+- **Un délai d'arrêt de 250 s pour l'API IA, le défaut de 30 s pour l'API de données.** Pourquoi : 240 s
+  pour la plus longue demande que laisse passer l'entrée d'ACA, 6 s au plus pour les exports de fin, et une
+  marge. Les requêtes de l'API de données sont bornées à 5 s. Limite assumée, pour #413 : un job n'a pas de
+  délai d'arrêt réglable. — PR de #414
+
+- **Les journaux vont dans `log-kb` (30 jours, 0,2 Go par jour au plus) par `azure-monitor` et un paramètre
+  de diagnostic de `cae-kb`, une table par catégorie (`Dedicated`).** Pourquoi : la destination
+  `log-analytics` mettrait la clé partagée de l'espace dans la configuration, et le plafond borne un
+  emballement. Observé : Azure relit `logAnalyticsDestinationType` vide, mais les lignes arrivent bien dans
+  `ContainerAppConsoleLogs` et `ContainerAppSystemLogs`. Limite assumée (risque accepté par Sabine le 06/11,
+  à revoir avec #413 et #420) : les lecteurs de l'abonnement lisent `log-kb`, tirent sans doute l'image et
+  voient la configuration des apps, sans les valeurs du coffre (registre, « Hébergement sur Azure »). —
+  PR de #414
+
+- **Une identité par pièce (`id-kb-ai-api`, `id-kb-data-api`, `id-kb-smoke-test`). Celles des API servent au
+  tirage et au coffre, pas au conteneur (`identitySettings.lifecycle: 'None'`) ; celle du job lui est donnée
+  par `AZURE_CLIENT_ID`.** Le stockage d'échange refuse la clé partagée, et le job n'y est que Storage Blob
+  Data Reader, sur le seul conteneur `smoke-test`. #420 complète le compte. — PR de #414
+
+- **Le job `caj-kb-smoke-test` se lance à la main, avec un `replicaTimeout` de 600 s et sans nouvel essai
+  (`replicaRetryLimit: 0`).** Pourquoi : 600 s couvrent les nouvelles tentatives du SDK de stockage (environ
+  7 min, #412) et deux `/health` de 65 s ; un échec doit se voir, et Sabine relance à la main. Écarté : 1
+  nouvel essai, que Microsoft recommande pour la maintenance. Confirmé au déploiement : le nom d'un job tient
+  sous 32 caractères, en minuscules, chiffres et `-`. Limite assumée, pour la CD de #415 : le droit
+  `jobs/start/action` permet de changer l'image et les variables au lancement, donc de se servir de
+  l'identité du job. — PR de #414
+
+- **Les noms suivent les préfixes du Cloud Adoption Framework, suivis de `kb`. Un suffixe
+  `take(uniqueString(resourceGroup().id), 8)` termine les noms uniques sur Azure, sans environnement ni
+  région (`infra/README.md`, « Noms des ressources »).** Pourquoi 8 caractères : `stkbexchange` et
+  13 caractères dépasseraient les 24 d'un compte de stockage. — PR de #414
+
+- **Le `cooldown` de Dependabot ne joue pas sur ghcr.io, qui ne donne pas la date d'une version : une mise à
+  jour de l'image `astral-sh/uv` arrive aussitôt (« Cooldown could not be applied », #444). La date d'une
+  version se vérifie à la main avant de fusionner** (commentaire de `.github/dependabot.yml`). Gardé dans
+  #414 sur la décision de tn-orchestrateur du 06/11. — PR de #414
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
@@ -5602,13 +5706,10 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
 - **Seuil de couverture des tests** (2026-11-06, #405) : quel `fail_under`, et la CI le vérifie-t-elle ?
   À décider par l'utilisatrice sur la mesure du 06/11 (99,26 % : lignes 99,44 %, branches 98,36 %).
 
-- **`minReplicas` des deux API au déploiement** (2026-11-05, #161) : 0 réplique au repos (3,29 $ par
-  mois pour les deux, `README.md`) ou 1 (23,65 $). Avec 0, le compte du débit repart de zéro à chaque
-  réveil ; `maxReplicas: 1` dans les deux cas, le compte ne valant que pour une réplique. À décider au
-  jalon ACA (#317).
-
 - **Une limite de connexions du serveur** (2026-11-05, #161) : `limit_concurrency` d'uvicorn, écarté
-  de la PR 2A parce qu'il compte les connexions muettes, à mesurer derrière l'entrée d'ACA.
+  de la PR 2A parce qu'il compte les connexions muettes, à mesurer derrière l'entrée d'ACA. Laissée
+  ouverte par Sabine le 06/11 (#414), qui n'a rien mesuré : en ligne, les deux API sont internes, et seules
+  les pièces de `cae-kb` les joignent.
 
 - **Les seuils des critères des tendances** (2026-10-30) : 2 jours actifs pour « durable », 5 rangs
   pour « en accélération ». À revoir sur les premiers comptes rendus réels (#370).
