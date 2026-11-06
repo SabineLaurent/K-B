@@ -1,5 +1,5 @@
-"""The stop of kb collect, kb import, kb write-tops, kb digest, kb trend-report, kb smoke-test and
-kb migrate-database on SIGTERM."""
+"""The stop of kb collect, kb import, kb write-tops, kb digest, kb trend-report, kb smoke-test,
+kb migrate-database, kb daily-routine and kb digest-watch on SIGTERM."""
 
 import signal
 from collections.abc import Iterator
@@ -27,6 +27,8 @@ COMMANDS_STOPPED_BY_SIGTERM = frozenset(
         "smoke-test",
         "migrate-database",
     }
+    # The commands of the jobs that chain steps (#413): the handler covers each step.
+    | {"daily-routine", "digest-watch"}
 )
 
 

@@ -1,9 +1,12 @@
+import errno
+
 import pytest
 from pydantic import BaseModel, ValidationError
 
 from k_b.core.quoting import (
     MAX_QUOTED_VALUE_LENGTH,
     locate_first_error,
+    name_os_error,
     quote_value,
     without_values,
 )
@@ -82,3 +85,18 @@ def test_a_place_that_comes_from_the_input_is_quoted_cut_and_escaped():
         locate_first_error(refusal.value) == "by_name.'a\\nERROR forged' (int_parsing)"
     )
     assert "\n" not in locate_first_error(refusal.value)
+
+
+@pytest.mark.parametrize(
+    ("error", "name"),
+    [
+        (
+            OSError(errno.ENAMETOOLONG, "File name too long", "/vault/A clip title.md"),
+            "ENAMETOOLONG",
+        ),
+        (PermissionError(errno.EPERM, "Operation not permitted"), "EPERM"),
+        (OSError("no errno"), "OSError"),
+    ],
+)
+def test_an_os_error_is_named_by_its_errno_never_its_text(error, name):
+    assert name_os_error(error) == name

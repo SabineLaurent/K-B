@@ -557,3 +557,19 @@ MAX_HEALTH_ANSWER_BYTES = 1024
 # retries of azure-identity are not counted.
 EXCHANGE_STORAGE_CONNECT_TIMEOUT_SECONDS = 20
 EXCHANGE_STORAGE_READ_TIMEOUT_SECONDS = 60
+
+# kb daily-routine and kb digest-watch, run by the jobs caj-kb-daily-routine and caj-kb-digest-watch
+# (#413). The containers of the exchange storage they reach, created with it (#414, #420): the clips
+# the Mac sends, mirrored to the Clippings folder of the vault; the sheets of veille, published for
+# the Mac to read. Constants, as SMOKE_TEST_CONTAINER: no deployment changes them.
+CLIPPINGS_CONTAINER = "clippings"
+WATCH_CONTAINER = "watch"
+# The longest name of a clip the mirror writes, in bytes of UTF-8: 255, the longest name of a file
+# on ext4 and through the CIFS client of Linux (in bytes), and on Azure Files (in characters), less
+# the 14 characters write_file_atomically adds to the name for its temporary file: a dot before it,
+# then a dot, 8 random characters and a suffix of 4 (core/atomic_write.py).
+MAX_CLIP_NAME_BYTES = 241
+# Added to CLIP_CHANGE_MARGIN in the wait after the mirror: the ctime of a clip copied is given by
+# the server of the share (CIFS), CLIP_CHANGE_MARGIN is measured on the clock of the container; their
+# gap is not measured (#413), 5 s keep a gap of a few seconds from leaving the clip to the next day.
+CLIP_MIRROR_CLOCK_SLACK = timedelta(seconds=5)
