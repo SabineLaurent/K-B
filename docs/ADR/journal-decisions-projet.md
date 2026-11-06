@@ -5551,9 +5551,9 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   compte macOS, dans 3 fichiers de l'historique ; 23 lignes `Claude-Session:` ; les contenus de tiers d'avant leur
   déplacement ou leur retrait ; 13 commits que les refs ne montrent plus (anciens force-push, branches
   supprimées), que GitHub sert par leur SHA. Aucun secret : gitleaks 8.30.1 ne trouve que des faux
-  positifs. Pourquoi : Sabine ne l'a pas dit ; déduit des coûts présentés, à confirmer par elle : les
-  deux autres voies changent tous les SHA, dont ceux que citent les rapports de la certification, et
-  aucune ne tient avant la bascule du 08/11. Écartés : réécrire par `git filter-repo`, puis faire
+  positifs. Pourquoi, selon Sabine (06/11) : les deux autres voies changent tous les SHA, dont ceux que
+  citent les rapports de la certification ; et l'historique (les PR, les revues de code et leurs
+  comptes rendus) montre la façon de travailler sur le projet. Écartés : réécrire par `git filter-repo`, puis faire
   purger `refs/pull/*` et les commits hors des refs par le support de GitHub (branches réécrites, pistes
   en cours à rebaser, purge par le support qui prend des jours) ; repartir d'un nouveau dépôt (issues
   à transférer, PR et comptes rendus de revue perdus, board, CI et réglages à refaire, lien du jury
