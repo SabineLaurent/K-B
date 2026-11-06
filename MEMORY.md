@@ -126,6 +126,15 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   *fine-grained* (`github_pat_`, `docs/jeton-github.md`) : l'API IA lit la fiche GitHub de chaque
   candidat d'un compte rendu. Aucun test n'appelle GitHub : `make_app` des tests de la route sert la
   fixture par un GitHub simulé.
+- Depuis #412, `kb smoke-test` (job `caj-kb-smoke-test`) et le paquet `jobs/`, le code commun aux
+  commandes des jobs (stockage d'échange par l'identité managée, `/health`) : seul `commands` l'importe,
+  il n'importe que `core` (`test_layers`). Le nom d'un blob est le titre d'un clip : jamais dans un
+  journal. `logging_to` tient `azure` et `urllib3` à ERROR (`LIBRARY_LOG_LEVELS`) ; une erreur du SDK
+  passe par `naming_storage_errors`, jamais par `str(error)`. Un transport donné au SDK de stockage
+  lui fait perdre ses délais (300 s au lieu de 20 et 60) : toujours `build_transport`. Les tests
+  simulent le SDK par `FakeTransport` et le point d'identité par `IDENTITY_ENDPOINT`
+  (`tests/jobs/storage_fakes.py`), sans réseau ; un nom repérable se cherche brut et encodé dans une
+  URL (`names_the_spotted_blob`). L'envoi et le téléchargement viennent avec #413.
 
 ## Consignes de travail
 

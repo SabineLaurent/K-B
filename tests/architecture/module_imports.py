@@ -17,6 +17,7 @@ TOP_LEVEL_MODULES = {
     "ai_api",
     "post",
     "purge",
+    "jobs",
 }
 # Under k_b.etl, each module is in exactly one of the three.
 ETL_COMPOSITION_MODULES = {"etl.source_kinds", "etl.collected_sources"}

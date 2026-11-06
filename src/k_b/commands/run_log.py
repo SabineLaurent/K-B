@@ -31,6 +31,20 @@ LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 # The HTTP client of the AI API logs each request at INFO, with its URL (the resource of the
 # provider) and without the id of the request of kb serve-ai: from WARNING only.
 HTTP_CLIENT_LOGGER_NAME = "httpx2"
+# The Azure SDK logs each request at INFO, with its URL, which names the blob of a transfer: the
+# title of a clip (jobs/exchange_storage.py, #412). At WARNING, it quotes the text of an answer,
+# unescaped (the failure of a token, a value of the storage), and kb logs each failure itself: from
+# ERROR only, where it writes fixed texts (review of #412, decided by time-knight on 2026-11-06).
+AZURE_SDK_LOGGER_NAME = "azure"
+# The HTTP client under the Azure SDK, and the BigQuery client: at WARNING, it may quote a whole URL
+# (urllib3/connection.py, "Failed to parse headers"), the one of a blob. From ERROR only.
+URLLIB3_LOGGER_NAME = "urllib3"
+# The lowest level each library logs at in the log of kb.
+LIBRARY_LOG_LEVELS = {
+    HTTP_CLIENT_LOGGER_NAME: logging.WARNING,
+    AZURE_SDK_LOGGER_NAME: logging.ERROR,
+    URLLIB3_LOGGER_NAME: logging.ERROR,
+}
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -64,18 +78,21 @@ def logging_to(
     formatter.converter = time.gmtime
     root_logger = logging.getLogger()
     previous_level = root_logger.level
-    http_client_logger = logging.getLogger(HTTP_CLIENT_LOGGER_NAME)
-    previous_http_client_level = http_client_logger.level
+    previous_library_levels = {
+        name: logging.getLogger(name).level for name in LIBRARY_LOG_LEVELS
+    }
     for handler in handlers:
         handler.setFormatter(formatter)
         root_logger.addHandler(handler)
     root_logger.setLevel(logging.INFO)
-    http_client_logger.setLevel(logging.WARNING)
+    for name, level in LIBRARY_LOG_LEVELS.items():
+        logging.getLogger(name).setLevel(level)
     try:
         yield
     finally:
         root_logger.setLevel(previous_level)
-        http_client_logger.setLevel(previous_http_client_level)
+        for name, previous_library_level in previous_library_levels.items():
+            logging.getLogger(name).setLevel(previous_library_level)
         for handler in handlers:
             root_logger.removeHandler(handler)
             handler.close()

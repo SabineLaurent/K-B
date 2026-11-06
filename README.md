@@ -539,6 +539,27 @@ choisit, #368) et le `request_id`. Code de sortie :
 - 143 : SIGTERM, 130 : SIGINT (Ctrl-C). Un compte rendu déjà écrit est gardé ; si le registre n'a
   pas suivi, le compte rendu suivant reprend ces fenêtres.
 
+**Vérifier un job en ligne** (`kb smoke-test`, la commande du job `caj-kb-smoke-test`, #412) :
+
+```sh
+KB_DATA_DIR=<dossier> KB_EXCHANGE_BLOB_URL=https://<compte>.blob.core.windows.net \
+  AZURE_CLIENT_ID=<client id de l'identité du job> uv run kb smoke-test
+```
+
+`kb smoke-test` demande `GET /health` à l'API de données (`KB_DATA_API_URL`) et à l'API IA
+(`KB_AI_API_URL`), sans clé, puis le jeton de l'identité managée attribuée au job (`AZURE_CLIENT_ID`,
+un GUID ; sans lui, le SDK chercherait l'identité système, que les jobs de K-B n'ont pas), et liste
+une page d'au plus 100 noms du conteneur `smoke-test` du stockage d'échange (`KB_EXCHANGE_BLOB_URL`,
+en `https`, sans défaut). Les trois contrôles tournent toujours. Il n'écrit que des comptes : jamais
+le nom d'un blob (celui d'un clip est son titre), ni le message d'une erreur du SDK, mais son état
+(`exchange_storage_forbidden`…), son statut HTTP et son code ; l'identité sans jeton, refusée ou
+injoignable, est `exchange_storage_no_token`. Code de sortie :
+
+- 0 : les deux API répondent `{"status":"ok"}` et le conteneur est listé ;
+- 1 : un contrôle échoue (`health_failed`, `health_timeout`… pour une API) ;
+- 2 : rien n'est contrôlé : une variable manque ou est refusée ;
+- 143 : SIGTERM, 130 : SIGINT (Ctrl-C).
+
 **Lire la base sans l'API** : la base s'ouvre en lecture seule avec `sqlite3`, sans clé ni
 serveur :
 

@@ -508,3 +508,35 @@ TRACE_CONTENTS: tuple[TraceContent, ...] = get_args(TraceContent.__value__)
 # The longest body of such a record, in bytes of UTF-8: Loki refuses a line beyond 256 KB, the
 # margin is left to its own counting. Beyond, each text is cut, the structure kept.
 MAX_CONTENT_EVENT_BYTES = 200_000
+
+# kb smoke-test, run by the job caj-kb-smoke-test (#412): GET /health of both APIs, then the listing
+# of the container of the test of the exchange storage, by the identity of the job. The container of
+# the test, created with the exchange storage (#414): a constant, not a variable, as no deployment
+# changes it.
+SMOKE_TEST_CONTAINER = "smoke-test"
+# One page of names at most, counted and never kept: the job proves it can list, and reads no more
+# (OWASP API4:2023).
+MAX_LISTED_BLOBS = 100
+# GET /health from a job, without retry. Connection, pool and write: as for the AI API. Read: 60 s, an
+# assumption, the wake of an API at 0 replica, to be measured by #414. The whole answer within its
+# deadline, checked after each piece read (core/outbound.py).
+HEALTH_CONNECT_TIMEOUT_SECONDS = 5
+HEALTH_POOL_TIMEOUT_SECONDS = 5
+HEALTH_WRITE_TIMEOUT_SECONDS = 10
+HEALTH_READ_TIMEOUT_SECONDS = 60
+# A connection, then a whole read: the wake of an API at 0 replica may take the read timeout once
+# connected.
+HEALTH_REQUEST_DEADLINE_SECONDS = (
+    HEALTH_CONNECT_TIMEOUT_SECONDS + HEALTH_READ_TIMEOUT_SECONDS
+)
+# The body of GET /health is {"status":"ok"}, 15 bytes: beyond 1 KiB, it is not the answer of K-B.
+MAX_HEALTH_ANSWER_BYTES = 1024
+# The waits of a request to the exchange storage or to the identity endpoint: those the SDK of the
+# storage sets only when it builds its transport (CONNECTION_TIMEOUT and READ_TIMEOUT,
+# azure/storage/blob/_shared/constants.py, azure-storage-blob 12.31.1); the transport of K-B would
+# otherwise get the 300 s of azure-core. The retries stay those of the SDK: 3, after about 18 s, 24 s
+# and 42 s (± 3 s, seen on 2026-11-06): about 7 min when each try waits its timeouts, 4 times 20 s
+# and 60 s, and 84 s. Not a bound: the read timeout bounds each read, not an answer, and the
+# retries of azure-identity are not counted.
+EXCHANGE_STORAGE_CONNECT_TIMEOUT_SECONDS = 20
+EXCHANGE_STORAGE_READ_TIMEOUT_SECONDS = 60
