@@ -5437,20 +5437,28 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   de la veille. Limite assumée : `jobs` ne porte aujourd'hui que la liste d'un conteneur ; l'envoi et
   le téléchargement viennent avec #413, qui les appelle (pas de code sans appelant). — PR de #412
 
-- **Le journal de `kb` garde le logger `azure` à WARNING (`logging_to`, `commands/run_log.py`),
-  comme `httpx2`.** Pourquoi, observé avec azure-core 1.41.0 : à INFO, `HttpLoggingPolicy` écrit
-  `Request URL: '…/<conteneur>/<blob>'` pour un transfert, donc le nom d'un clip, qui est son titre
-  (règle 5 de `poc.md`) ; une liste n'y écrit que le conteneur. Écarté : un filtre de masquage des
-  URL (plus de code pour le même effet). Limite assumée : `azure.identity` écrit à WARNING l'échec
-  d'un jeton avec le texte que renvoie le point d'identité de la plateforme, sans `quote_value` ; ce
-  texte ne connaît aucun blob. — PR de #412
+- **Le journal de `kb` tient les loggers `azure` et `urllib3` à ERROR (`LIBRARY_LOG_LEVELS`,
+  `logging_to`, `commands/run_log.py`), `httpx2` restant à WARNING.** Pourquoi, observé avec
+  azure-core 1.41.0 : à INFO, `HttpLoggingPolicy` écrit `Request URL: '…/<conteneur>/<blob>'` pour un
+  transfert, donc le nom d'un clip, qui est son titre (règle 5 de `poc.md`) ; une liste n'y écrit que
+  le conteneur. À WARNING, `azure.identity` écrit deux fois l'échec d'un jeton avec le texte de la
+  réponse, sans `quote_value` (un `\n` y fabrique une fausse ligne de `kb`), et
+  `storage/blob/_generated/_utils/serialization.py` des valeurs de la réponse ; `urllib3` peut écrire
+  une URL entière (`urllib3/connection.py`, « Failed to parse headers »). À ERROR, ces bibliothèques
+  n'écrivent que des textes fixes, et `kb` journalise lui-même chaque échec, une fois (règle 3 de
+  `conventions.md`). Revue de code, tranché par time-knight le 06/11 (délégation de Sabine du 15/10),
+  sur le verdict d'un sous-agent neuf. Écartés : WARNING, le niveau de `httpx2` (le premier choix du
+  plan, qui laissait passer ces lignes) ; `azure.identity` seul (le stockage écrit aussi des valeurs) ;
+  un filtre de masquage des URL (plus de code pour le même effet). Limite assumée : les avertissements
+  de `urllib3` sont aussi perdus pour les autres sources qui passent par `requests`. — PR de #412
 
 - **Une erreur du stockage est nommée par son état (`exchange_storage_forbidden`, `_not_found`,
   `_unauthorized`, `_unavailable`, `_failed`), son statut HTTP et son code (`x-ms-error-code`,
   gardé s'il est un mot de lettres), jamais par `str(error)` ; rien du SDK n'est chaîné (`from
   None`). L'état se lit au statut, pas à la classe, et le jeton est demandé à part
   (`check_identity`) : un refus de l'identité est `exchange_storage_unauthorized`, quel que soit le
-  statut de son point d'accès, et un point d'accès injoignable
+  statut de son point d'accès, et un point d'accès injoignable, ou dont la réponse n'est pas un objet
+  JSON (une 500 en HTML lève `JSONDecodeError`, une liste `AttributeError`, hors des `AzureError`),
   `exchange_storage_identity_unavailable` (revue de code, tranché par time-knight le 06/11,
   délégation de Sabine du 15/10).** Pourquoi : le message du SDK recopie le corps de la réponse, qui
   peut citer le chemin d'un blob (`AuthenticationErrorDetail`) ; le SDK lève
@@ -5474,7 +5482,7 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   Limite assumée : les 60 s sont une hypothèse (le réveil d'une API à 0 réplique), à mesurer à #414 ;
   les nouvelles tentatives du stockage restent celles du SDK (3, après environ 18, 24 et 42 s, à 3 s
   près, mesuré le 06/11) : environ 7 min au pire, sans trace au journal, le logger `azure` étant
-  tenu à WARNING. — PR de #412
+  tenu à ERROR. — PR de #412
 
 ## Décisions encore ouvertes
 

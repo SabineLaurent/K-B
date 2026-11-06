@@ -118,10 +118,27 @@ def answer_token(request):
     return 200, {"Content-Type": "application/json"}, json.dumps(body).encode()
 
 
+# A forged line in the text of an answer: written unescaped, it would pass for a line of kb.
+FORGED_LOG_LINE = "2026-11-06T00:00:00Z ERROR k_b.cli: a line forged by an answer"
+
+
 def answer_identity_refusal(request):
-    """The identity endpoint refusing a client id it does not know: an OAuth error, in JSON."""
-    body = {"error": "invalid_request", "error_description": "Identity not found"}
+    """The identity endpoint refusing a client id it does not know: an OAuth error, in JSON, whose
+    text holds a forged line."""
+    body = {
+        "error": "invalid_request",
+        "error_description": f"Identity not found\n{FORGED_LOG_LINE}",
+    }
     return 400, {"Content-Type": "application/json"}, json.dumps(body).encode()
+
+
+def answer_identity_with(status, content_type, body):
+    """The identity endpoint answering a body that is not a token."""
+
+    def handle(request):
+        return status, {"Content-Type": content_type}, body
+
+    return handle
 
 
 # The variables of a run online: those of the job (jobs/exchange_storage.py), and those

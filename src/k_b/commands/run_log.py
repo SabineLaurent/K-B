@@ -32,9 +32,19 @@ LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 # provider) and without the id of the request of kb serve-ai: from WARNING only.
 HTTP_CLIENT_LOGGER_NAME = "httpx2"
 # The Azure SDK logs each request at INFO, with its URL, which names the blob of a transfer: the
-# title of a clip (jobs/exchange_storage.py, #412). From WARNING only, as httpx2.
+# title of a clip (jobs/exchange_storage.py, #412). At WARNING, it quotes the text of an answer,
+# unescaped (the failure of a token, a value of the storage), and kb logs each failure itself: from
+# ERROR only, where it writes fixed texts (review of #412, decided by time-knight on 2026-11-06).
 AZURE_SDK_LOGGER_NAME = "azure"
-QUIETED_LOGGER_NAMES = (HTTP_CLIENT_LOGGER_NAME, AZURE_SDK_LOGGER_NAME)
+# The HTTP client under the Azure SDK, and the BigQuery client: at WARNING, it may quote a whole URL
+# (urllib3/connection.py, "Failed to parse headers"), the one of a blob. From ERROR only.
+URLLIB3_LOGGER_NAME = "urllib3"
+# The lowest level each library logs at in the log of kb.
+LIBRARY_LOG_LEVELS = {
+    HTTP_CLIENT_LOGGER_NAME: logging.WARNING,
+    AZURE_SDK_LOGGER_NAME: logging.ERROR,
+    URLLIB3_LOGGER_NAME: logging.ERROR,
+}
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -68,22 +78,21 @@ def logging_to(
     formatter.converter = time.gmtime
     root_logger = logging.getLogger()
     previous_level = root_logger.level
-    quieted_loggers = [logging.getLogger(name) for name in QUIETED_LOGGER_NAMES]
-    previous_quieted_levels = [quieted.level for quieted in quieted_loggers]
+    previous_library_levels = {
+        name: logging.getLogger(name).level for name in LIBRARY_LOG_LEVELS
+    }
     for handler in handlers:
         handler.setFormatter(formatter)
         root_logger.addHandler(handler)
     root_logger.setLevel(logging.INFO)
-    for quieted in quieted_loggers:
-        quieted.setLevel(logging.WARNING)
+    for name, level in LIBRARY_LOG_LEVELS.items():
+        logging.getLogger(name).setLevel(level)
     try:
         yield
     finally:
         root_logger.setLevel(previous_level)
-        for quieted, previous_quieted_level in zip(
-            quieted_loggers, previous_quieted_levels, strict=True
-        ):
-            quieted.setLevel(previous_quieted_level)
+        for name, previous_library_level in previous_library_levels.items():
+            logging.getLogger(name).setLevel(previous_library_level)
         for handler in handlers:
             root_logger.removeHandler(handler)
             handler.close()

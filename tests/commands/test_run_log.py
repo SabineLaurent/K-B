@@ -203,11 +203,24 @@ def test_the_azure_sdk_writes_no_url_of_a_blob_in_the_log(tmp_path, capsys):
     assert not names_the_spotted_blob(capsys.readouterr().err)
 
 
-def test_the_level_of_the_azure_sdk_is_set_back_once_the_log_is_closed(tmp_path):
-    azure_logger = logging.getLogger("azure")
-    level_before = azure_logger.level
+@pytest.mark.parametrize(
+    ("logger_name", "level"),
+    [
+        # Its requests at INFO, with their URL.
+        ("httpx2", logging.WARNING),
+        # Its WARNING lines quote the text of an answer, unescaped (review of #412).
+        ("azure", logging.ERROR),
+        # Its WARNING lines may quote a whole URL, the one of a blob (urllib3/connection.py).
+        ("urllib3", logging.ERROR),
+    ],
+)
+def test_a_library_that_logs_what_an_answer_says_is_held_and_set_back(
+    tmp_path, logger_name, level
+):
+    library_logger = logging.getLogger(logger_name)
+    level_before = library_logger.level
 
     with cli.logging_to(tmp_path):
-        assert azure_logger.level == logging.WARNING
+        assert library_logger.level == level
 
-    assert azure_logger.level == level_before
+    assert library_logger.level == level_before

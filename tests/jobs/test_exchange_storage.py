@@ -16,6 +16,7 @@ from jobs.storage_fakes import (
     answer_error,
     answer_forbidden_naming_the_blob,
     answer_identity_refusal,
+    answer_identity_with,
     answer_listing,
     answer_token,
     names_the_spotted_blob,
@@ -228,6 +229,30 @@ def test_an_identity_endpoint_out_of_reach_is_unavailable_not_unauthorized(monke
         check_identity(credential)
 
     assert str(raised.value) == "exchange_storage_identity_unavailable"
+
+
+@pytest.mark.parametrize(
+    "handle",
+    [
+        answer_identity_with(500, "text/html", b"<html>Internal Server Error</html>"),
+        answer_identity_with(200, "application/json", b"[]"),
+        answer_identity_with(200, "application/json", b'"a token"'),
+    ],
+)
+def test_an_identity_endpoint_that_answers_no_token_is_unavailable(monkeypatch, handle):
+    set_identity_endpoint(monkeypatch)
+
+    with (
+        pytest.raises(ExchangeStorageError) as raised,
+        build_managed_identity_credential(
+            TEST_CLIENT_ID, transport=FakeTransport(handle)
+        ) as credential,
+    ):
+        check_identity(credential)
+
+    assert str(raised.value) == "exchange_storage_identity_unavailable"
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__
 
 
 def test_a_redirection_of_the_storage_is_not_followed():

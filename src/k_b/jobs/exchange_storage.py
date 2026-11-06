@@ -2,7 +2,7 @@
 its settings, its clients, and its errors named without what the storage answers.
 
 A blob is named by its path, the title of a clip for one (etl/sources/clipping.py): K-B never
-writes it, and keeps the SDK, which logs the URL of a request at INFO, at WARNING
+writes it, and keeps the SDK, which logs the URL of a request at INFO, at ERROR
 (commands/run_log.py)."""
 
 import re
@@ -148,11 +148,13 @@ def open_container_client(
 
 def check_identity(credential: TokenCredential) -> None:
     """Ask the token of the storage for the identity of the job, which the credential keeps for the
-    requests that follow: an endpoint out of reach is unavailable, a refusal names the identity,
-    whatever the status of its endpoint."""
+    requests that follow: an endpoint out of reach, or that answers no token, is unavailable; a
+    refusal names the identity, whatever the status of its endpoint."""
     try:
         credential.get_token(STORAGE_SCOPE)
-    except (ServiceRequestError, ServiceResponseError):
+    # ValueError and AttributeError: an answer that is not a JSON object (a 500 in HTML, a list),
+    # which azure-identity does not turn into an AzureError (review of #412).
+    except (ServiceRequestError, ServiceResponseError, ValueError, AttributeError):
         raise ExchangeStorageError("exchange_storage_identity_unavailable") from None
     except AzureError:
         raise ExchangeStorageError("exchange_storage_unauthorized") from None

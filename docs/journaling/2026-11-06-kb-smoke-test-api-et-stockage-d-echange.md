@@ -34,19 +34,25 @@ JOBS_IMPORTERS = {"jobs", "commands"}
 (plan de mise en ligne du 06/11) : la règle le rend visible dans le code, et le test refuse tout chemin vers `jobs`
 depuis `etl`, `data_api` ou `ai_api`.
 
-### Le SDK ne doit pas écrire l'URL d'un transfert
+### Les bibliothèques n'écrivent ni l'URL d'un transfert ni le texte d'une réponse
 
 ```python
-AZURE_SDK_LOGGER_NAME = "azure"
-QUIETED_LOGGER_NAMES = (HTTP_CLIENT_LOGGER_NAME, AZURE_SDK_LOGGER_NAME)
+LIBRARY_LOG_LEVELS = {
+    HTTP_CLIENT_LOGGER_NAME: logging.WARNING,
+    AZURE_SDK_LOGGER_NAME: logging.ERROR,
+    URLLIB3_LOGGER_NAME: logging.ERROR,
+}
 ```
-(`src/k_b/commands/run_log.py:36-37`)
+(`src/k_b/commands/run_log.py:43-47`)
 
 `logging_to` met le journal racine à INFO. Or, à INFO, `HttpLoggingPolicy` d'azure-core écrit
 `Request URL: 'https://<compte>.blob.core.windows.net/<conteneur>/<blob>'` : observé avant le plan, puis par le
 test rouge `test_the_azure_sdk_writes_no_url_of_a_blob_in_the_log`. Une liste ne cite que le conteneur ; un
-transfert cite le blob. Le logger `azure` est donc tenu à WARNING (`run_log.py:78`), comme `httpx2` l'était déjà,
-et remis à son niveau à la sortie.
+transfert cite le blob. Le premier choix, `azure` à WARNING comme `httpx2`, ne suffisait pas (revue de code) : à
+WARNING, `azure.identity` écrit deux fois l'échec d'un jeton avec le texte de la réponse, non échappé (un `\n` y
+fabrique une fausse ligne de `kb`), et `urllib3` peut écrire une URL entière. Les deux sont tenus à ERROR
+(`run_log.py:89`), où ils n'écrivent que des textes fixes, et remis à leur niveau à la sortie ; `kb` écrit lui-même
+chaque échec, une fois.
 
 ### Une erreur nommée, jamais son message
 
@@ -61,7 +67,7 @@ STATE_BY_STATUS: dict[int, ExchangeStorageState] = {
 
 Le message d'une `HttpResponseError` recopie le corps de la réponse, qui peut citer le chemin du blob. K-B n'en
 garde que l'état, le statut et le code `x-ms-error-code` s'il est un mot de lettres (`ERROR_CODE`, l. 44), et lève
-`from None` (l. 177) : une trace ne montrerait pas l'erreur du SDK. L'état se lit au **statut** et non à la classe,
+`from None` (l. 179) : une trace ne montrerait pas l'erreur du SDK. L'état se lit au **statut** et non à la classe,
 parce que le SDK lève `ClientAuthenticationError` pour une 403 dont le code est `AuthenticationFailed`
 (`azure/storage/blob/_shared/response_handlers.py:139-140`).
 
@@ -70,15 +76,18 @@ parce que le SDK lève `ClientAuthenticationError` pour une 403 dont le code est
 ```python
     try:
         credential.get_token(STORAGE_SCOPE)
-    except (ServiceRequestError, ServiceResponseError):
+    # ValueError and AttributeError: an answer that is not a JSON object (a 500 in HTML, a list),
+    # which azure-identity does not turn into an AzureError (review of #412).
+    except (ServiceRequestError, ServiceResponseError, ValueError, AttributeError):
         raise ExchangeStorageError("exchange_storage_identity_unavailable") from None
     except AzureError:
         raise ExchangeStorageError("exchange_storage_unauthorized") from None
 ```
-(`src/k_b/jobs/exchange_storage.py:153-158`)
+(`src/k_b/jobs/exchange_storage.py:153-160`)
 
 Le jeton est demandé avant la liste : un refus nomme l'identité, quel que soit le statut de son point d'accès, et un
-point d'accès injoignable est `…_identity_unavailable` (revue de code). Le diagnostic utile en ligne est « l'identité
+point d'accès injoignable, ou qui ne répond pas un objet JSON, est `…_identity_unavailable` (revue de code : sans
+cela, `JSONDecodeError` ou `AttributeError` sortaient de `kb` avec leur trace). Le diagnostic utile en ligne est « l'identité
 ou le rôle ». La demande ne coûte rien de plus : le crédit garde le jeton pour la suite (une seule demande dans
 `test_the_token_is_asked_for_the_identity_of_its_client_id_and_sent_to_the_storage`).
 
@@ -112,7 +121,7 @@ l. 51) : seul `{"status":"ok"}` passe.
 | Choix | Retenu parce que | Écarté |
 |---|---|---|
 | Paquet `jobs` sous `commands` | une couche visible, refusée aux API | `core/` (ouvert aux API) ; `commands/` (présentation et E/S mêlées) ; `post/` (post-traitement) |
-| Logger `azure` à WARNING | même effet qu'un filtre, une ligne | un filtre de masquage des URL |
+| `azure` et `urllib3` à ERROR | seuls des textes fixes à ce niveau ; `kb` écrit chaque échec | WARNING (laissait le texte d'une réponse) ; `azure.identity` seul ; un filtre de masquage |
 | État, statut et code de l'erreur | le message peut citer le blob | `quote_value(str(error))`, qui garde le début du nom |
 | La liste seule | `kb smoke-test` n'appelle qu'elle | envoi et téléchargement maintenant (sans appelant, `code.md`) : #413 |
 | `AZURE_CLIENT_ID` obligatoire | sans lui, l'identité système, que les jobs n'ont pas | une valeur par défaut |
@@ -129,6 +138,8 @@ dans la PR.
 | `test_the_name_of_a_blob_listed_is_written_nowhere` | une liste au nom repérable : rien sur stdout, stderr, `kb.log` |
 | `test_a_403_of_the_storage_fails_the_smoke_test_without_the_name_its_body_gives` | une 403 dont le corps cite le blob : code 1, état et code écrits, nom absent |
 | `test_the_azure_sdk_writes_no_url_of_a_blob_in_the_log` | un transfert par le SDK : l'URL du blob n'entre pas au journal (rouge avant le garde) |
+| `test_a_token_refused_is_logged_once_by_kb_without_what_the_endpoint_says` | une seule ligne, celle de `kb` ; la fausse ligne du point d'identité n'entre ni dans `kb.log` ni sur stderr |
+| `test_an_identity_endpoint_that_answers_no_token_is_unavailable` | 500 en HTML, `[]`, une chaîne : `exchange_storage_identity_unavailable`, sans trace |
 | `test_the_token_is_asked_for_the_identity_of_its_client_id_and_sent_to_the_storage` | `client_id` dans la demande de jeton, `X-IDENTITY-HEADER`, `Bearer` vers le stockage, une seule demande |
 | `test_the_transport_waits_as_the_sdk_of_the_storage_does_without_one` | 20 s et 60 s (rouge : 300) |
 | `test_an_answer_other_than_its_health_fails_with_a_named_state` | 503, 307, HTML, `down`, champ en trop, trop grand : refusés |
@@ -146,9 +157,9 @@ passerait sans le garde.
 ## Ce que tu dois pouvoir défendre
 
 - **Pourquoi ne pas citer l'erreur tronquée, comme une valeur observée ?** Le début du nom d'un clip resterait ; un
-  état, un statut et un code suffisent au diagnostic (`exchange_storage.py:178-185`).
+  état, un statut et un code suffisent au diagnostic (`exchange_storage.py:182-189`).
 - **Une liste renvoie tous les noms : où vont-ils ?** Nulle part : comptés à la volée sur une page de 100 au plus
-  (`count_listed_blobs`, l. 161-167), jamais gardés.
+  (`count_listed_blobs`, l. 163-169), jamais gardés.
 - **Que se passe-t-il si l'identité n'a pas le rôle ?** Le stockage répond 403 `AuthorizationPermissionMismatch` :
   `exchange_storage_forbidden, HTTP 403, AuthorizationPermissionMismatch`, code 1.
 - **Pourquoi `AZURE_CLIENT_ID` alors que le SDK sait trouver une identité ?** Sans `client_id`,
@@ -162,8 +173,8 @@ passerait sans le garde.
 - Aucun essai contre Azure : le format des réponses (liste, erreurs, point d'identité) vient de la documentation
   REST et du comportement du SDK installé, pas d'une réponse réelle. L'essai réel est #414.
 - Les 60 s de lecture de `/health` sont une hypothèse (réveil d'une API à 0 réplique).
-- `azure.identity` écrit à WARNING l'échec d'un jeton avec le texte de son point d'accès (constat 3 de la revue, en
-  cours d'arbitrage).
+- Les avertissements d'`urllib3` sont perdus pour toutes les commandes, les autres sources comprises : aucun n'a
+  été relevé comme utile, mais la liste n'a pas été faite.
 - Le critère `docker run --rm -e KB_DATA_DIR=/var/lib/knowledge_base <image> kb smoke-test --help` attend l'image
   de #200.
 

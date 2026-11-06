@@ -8,11 +8,13 @@ from functools import partial
 import httpx2
 import pytest
 from jobs.storage_fakes import (
+    FORGED_LOG_LINE,
     SPOTTED_BLOB_NAME,
     TEST_ACCOUNT_URL,
     TEST_CLIENT_ID,
     FakeTransport,
     answer_forbidden_naming_the_blob,
+    answer_identity_refusal,
     answer_listing,
     answer_token,
     names_the_spotted_blob,
@@ -153,6 +155,27 @@ def test_a_403_of_the_storage_fails_the_smoke_test_without_the_name_its_body_giv
     assert not names_the_spotted_blob(captured.out)
     assert not names_the_spotted_blob(captured.err)
     assert not names_the_spotted_blob(log)
+
+
+def test_a_token_refused_is_logged_once_by_kb_without_what_the_endpoint_says(
+    monkeypatch, smoke_test_environment, capsys
+):
+    simulate(monkeypatch)
+    identity = FakeTransport(answer_identity_refusal)
+    monkeypatch.setattr(
+        smoke_test_command,
+        "build_managed_identity_credential",
+        partial(build_managed_identity_credential, transport=identity),
+    )
+
+    exit_code = cli.main(["smoke-test"])
+
+    assert exit_code == cli.ExitCode.FAILED
+    log = read_kb_log(smoke_test_environment)
+    assert "exchange storage: not listed: exchange_storage_unauthorized\n" in log
+    assert "get_token failed" not in log
+    assert FORGED_LOG_LINE not in log
+    assert FORGED_LOG_LINE not in capsys.readouterr().err
 
 
 def test_an_api_that_fails_its_health_fails_the_smoke_test_and_the_other_checks_still_run(
