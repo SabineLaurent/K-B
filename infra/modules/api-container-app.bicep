@@ -18,6 +18,12 @@ param vaultUri string
 @description('Host header of the probes, for an API that refuses any other host; empty: none.')
 param probeHost string = ''
 param terminationGracePeriodSeconds int = 30
+@description('Who may use the identity: None, the platform only (image, secrets); Main, also the code of the container.')
+@allowed([
+  'None'
+  'Main'
+])
+param identityLifecycle string = 'None'
 
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
   name: identityName
@@ -87,12 +93,12 @@ resource app 'Microsoft.App/containerApps@2026-01-01' = {
           identity: identity.id
         }
       ]
-      // The identity pulls the image and reads the secrets; the container itself cannot get a token
-      // of it.
+      // The identity pulls the image and reads the secrets. With 'None', the container itself cannot get
+      // a token of it; with 'Main', its code can (the data API, for the base online, #421).
       identitySettings: [
         {
           identity: identity.id
-          lifecycle: 'None'
+          lifecycle: identityLifecycle
         }
       ]
     }

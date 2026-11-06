@@ -1,6 +1,6 @@
 """What the tests share: the fabricated Zotero library, the test base of the readers on each engine,
 the settings of the terminal removed, the end-to-end tests and those on PostgreSQL left out, a
-fresh PostgreSQL base, and the HTML report."""
+fresh PostgreSQL base, the roles of the base online, and the HTML report."""
 
 import html
 import os
@@ -30,6 +30,7 @@ KB_SETTINGS_VARIABLES = (
     "KB_DATA_API_ALLOWED_HOSTS",
     "KB_LOG_TO_FILE",
     "KB_DATABASE_URL",
+    "KB_DATABASE_AUTH",
 )
 # The marker of the tests that run kb on the real sources (tests/e2e/).
 E2E_MARKER = "e2e"
@@ -192,6 +193,41 @@ def make_postgresql_base(postgresql_server_url):
 def postgresql_base(make_postgresql_base):
     """A new, empty PostgreSQL base, as the compose or Azure gives it to kb create-db."""
     return make_postgresql_base()
+
+
+@pytest.fixture(scope="session")
+def identity_roles(postgresql_server_url):
+    """The roles of the identities on the test server, for the session; roles are shared by the
+    bases of a server, so they are dropped with the roles grant-roles.sql created, once the bases of
+    the tests are."""
+    # Imported here: tests/test_e2e_selection.py runs this file without the rest of tests/.
+    from database.online_roles import GROUP_ROLES, IDENTITY_ROLES
+
+    server = psycopg.connect(postgresql_server_url, autocommit=True)
+    existing = {
+        name for (name,) in server.execute("SELECT rolname FROM pg_roles").fetchall()
+    }
+    for role in IDENTITY_ROLES:
+        if role not in existing:
+            # Names of the test only: nothing from outside enters the statement.
+            server.execute(f'CREATE ROLE "{role}" LOGIN')
+    yield
+    # Only the roles the session created: a role the server had before is left as it was.
+    created = [role for role in (*IDENTITY_ROLES, *GROUP_ROLES) if role not in existing]
+    if created:
+        names = ", ".join(f'"{role}"' for role in created)
+        server.execute(f"DROP ROLE IF EXISTS {names}")
+    server.close()
+
+
+@pytest.fixture
+def administered_base(identity_roles, postgresql_base):
+    """A new base on which grant-roles.sql ran, as on Azure before the first kb migrate-database."""
+    from database.online_roles import GRANT_ROLES_SCRIPT
+
+    with psycopg.connect(postgresql_base.value, autocommit=True) as administrator:
+        administrator.execute(GRANT_ROLES_SCRIPT.read_text())
+    return postgresql_base
 
 
 def run_on_library(zotero_dir, script):

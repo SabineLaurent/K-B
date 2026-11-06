@@ -4,9 +4,10 @@ Le Bicep de ce dossier décrit les ressources de K-B dans Azure. `main.bicep` ap
 ressources (`modules/`). Les ressources portent l'étiquette `project=k-b` et sont créées dans la région du groupe
 de ressources ; le budget, qui n'a ni étiquette ni région, compte les coûts de cette étiquette.
 
-`main.bicep` se déploie en **deux passes**. Sans `imageTag`, il pose le socle. Avec `imageTag`, il ajoute les deux
-API, le job d'essai et les rôles sur les secrets. Entre les deux passes, l'image est poussée dans le registre et les
-secrets sont posés dans le coffre (« Appliquer »).
+`main.bicep` se déploie en **deux passes**. Sans `imageTag`, il pose le socle, dont le serveur PostgreSQL (#421). Avec
+`imageTag`, il ajoute les deux API, les deux jobs (`caj-kb-smoke-test`, `caj-kb-migrate-database`) et les rôles sur
+les secrets. Chaque passe repose le socle, le serveur et l'identité de `caj-kb-migrate-database` compris. Entre les
+deux passes, l'image est poussée dans le registre et les secrets sont posés dans le coffre (« Appliquer »).
 
 | Module | Ressource | Passe | Issue |
 |---|---|---|---|
@@ -17,9 +18,11 @@ secrets sont posés dans le coffre (« Appliquer »).
 | `key-vault.bicep` | coffre `kv-kb-…` en RBAC, suppression réversible 7 jours ; Key Vault Secrets Officer pour l'opératrice | 1 | #414 |
 | `exchange-storage.bicep` | compte Blob `stkbexchange…`, clé partagée coupée ; conteneur `smoke-test`, lisible par `id-kb-smoke-test` seul | 1 | #414 (#420 le complète) |
 | `budget.bicep` | budget `budget-kb` : 30 €/mois des coûts étiquetés `project=k-b`, e-mail à 50 % et 100 % du réel, à 100 % de la prévision ; rien n'est coupé au dépassement | 1 | #437 |
+| `postgresql-server.bicep` | serveur PostgreSQL 18 flexible `pgsql-kb-…` (`Standard_B1ms`), Entra seul, 32 Gio, sauvegardes 7 jours, règle de pare-feu « services Azure » (« La base PostgreSQL ») | 1 | #421 |
 | `key-vault-secret-access.bicep` | Key Vault Secrets User pour chaque identité, sur chacun de ses secrets seulement | 2 | #414 |
 | `api-container-app.bicep` | `ca-kb-data-api` et `ca-kb-ai-api` : ingress interne seul, HTTPS, 0 à 1 réplique, sondes `GET /health` | 2 | #414 |
 | `smoke-test-job.bicep` | job manuel `caj-kb-smoke-test`, qui lance `kb smoke-test` | 2 | #414 |
+| `migrate-database-job.bicep` | identité `id-kb-migrate-database` et son AcrPull ; job manuel `caj-kb-migrate-database`, qui lance `kb migrate-database` | 1 (l'identité), 2 (le job) | #421 |
 
 ## Noms des ressources
 
@@ -81,14 +84,17 @@ Les étapes ci-dessous sont celles de la première mise en ligne, le 2026-11-06 
 RG=<groupe de ressources>
 EMAIL=<adresse des alertes du budget>
 OPERATOR=$(az ad signed-in-user show --query id -o tsv)
+OPERATOR_UPN=$(az ad signed-in-user show --query userPrincipalName -o tsv)
 # Refuse une valeur vide, ou laissée entre chevrons.
 kb_check() {
   for value in "$@"; do
     case "$value" in ''|*'<'*) echo "une valeur est vide ou encore un gabarit" >&2; return 1 ;; esac
   done
 }
-kb_check "$RG" "$EMAIL" "$OPERATOR" && echo ok
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" && echo ok
 ```
+
+`OPERATOR_UPN` fait de l'opératrice l'administratrice Entra du serveur PostgreSQL (#421).
 
 Chaque `<…>` se remplace par sa valeur. Une valeur laissée entre chevrons part telle quelle : le 2026-11-06, une
 adresse `<adresse>` a fait refuser le budget (« Notification cannot have invalid email addresses »), et le reste du
@@ -107,21 +113,21 @@ dans l'historique des déploiements du groupe, côté Azure, et dans la sortie d
 Le rôle de Lecteur de l'abonnement suffit pour cette lecture :
 
 ```sh
-for ns in Microsoft.App Microsoft.ContainerRegistry Microsoft.KeyVault Microsoft.OperationalInsights Microsoft.Insights Microsoft.ManagedIdentity Microsoft.Storage; do
+for ns in Microsoft.App Microsoft.ContainerRegistry Microsoft.KeyVault Microsoft.OperationalInsights Microsoft.Insights Microsoft.ManagedIdentity Microsoft.Storage Microsoft.DBforPostgreSQL; do
   printf '%s ' "$ns"; az provider show -n "$ns" --query registrationState -o tsv
 done
 ```
 
-Les sept doivent répondre `Registered`. Si l'un d'eux manque, seul un propriétaire de l'abonnement peut
+Les huit doivent répondre `Registered`. Si l'un d'eux manque, seul un propriétaire de l'abonnement peut
 l'enregistrer.
 
 ### 2. Première passe : le socle
 
 ```sh
-kb_check "$RG" "$EMAIL" "$OPERATOR" && az deployment group what-if -g "$RG" -f infra/main.bicep \
-  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR"
-kb_check "$RG" "$EMAIL" "$OPERATOR" && az deployment group create -g "$RG" -f infra/main.bicep \
-  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" \
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" && az deployment group what-if -g "$RG" -f infra/main.bicep \
+  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN"
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" && az deployment group create -g "$RG" -f infra/main.bicep \
+  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" \
   --query "{state:properties.provisioningState,outputs:properties.outputs}"
 ```
 
@@ -225,13 +231,13 @@ Les trois valeurs sont celles du `.env` de l'opératrice : `KB_LLM_BASE_URL`, `K
 LLM_URL=<KB_LLM_BASE_URL>
 LLM_MODEL=<KB_LLM_MODEL>
 OTLP=<KB_OTLP_ENDPOINT>
-kb_check "$RG" "$EMAIL" "$OPERATOR" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" && az deployment group what-if \
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" && az deployment group what-if \
   -g "$RG" -f infra/main.bicep \
-  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" imageTag="$TAG" \
+  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" imageTag="$TAG" \
      llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP"
-kb_check "$RG" "$EMAIL" "$OPERATOR" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" && az deployment group create \
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" && az deployment group create \
   -g "$RG" -f infra/main.bicep \
-  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" imageTag="$TAG" \
+  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" imageTag="$TAG" \
      llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP" \
   --query "{state:properties.provisioningState}"
 ```
@@ -330,3 +336,192 @@ az rest --method post \
 ```
 
 L'API répond parfois 429 (trop de requêtes) : relancer quelques minutes plus tard.
+
+## La base PostgreSQL (#421)
+
+`modules/postgresql-server.bicep` crée le serveur `pgsql-kb-<suffixe>` : PostgreSQL 18, `Standard_B1ms`
+(Burstable), 32 Gio sans croissance automatique, sauvegardes du serveur 7 jours sans géoredondance, sans haute
+disponibilité, accès public sans VNet, **Entra seul** (mot de passe coupé), `citext` permise,
+`log_error_verbosity = TERSE`, et la règle de pare-feu « services Azure » (`0.0.0.0`). Le serveur se paie à
+l'heure, qu'il serve ou non : environ 16 €/mois avec ses 32 Gio (estimation du plan de mise en ligne).
+
+Le Bicep ne crée ni la base `kb` ni les rôles : l'administratrice Entra du serveur les crée en SQL, une fois
+(`postgresql/`). Puis le job `caj-kb-migrate-database` lance `kb migrate-database`, qui pose le schéma sur une
+base vide et ne fait rien sur une base qui l'a déjà.
+
+| Rôle PostgreSQL | Pour | Droits |
+|---|---|---|
+| `id-kb-migrate-database` | le job `caj-kb-migrate-database` | `CONNECT`, `USAGE` et `CREATE` sur `public` ; propriétaire des tables |
+| `id-kb-data-api` | l'API de données | membre de `kb_reader` : `CONNECT`, `USAGE`, `SELECT` sur les tables |
+| `kb_writer` (sans connexion) | la routine quotidienne, avec #330 | `CONNECT`, `USAGE`, `SELECT`, `INSERT`, `UPDATE`, `DELETE` |
+
+Aucun autre rôle ne se connecte à `kb` ni n'y crée rien : `grant-roles.sql` retire à `PUBLIC` les droits
+qu'Azure lui laisse.
+
+### Appliquer #421 sur le squelette en ligne
+
+Dans l'ordre, sur le squelette déjà en ligne (#414). Les aperçus attendus, déduits du Bicep, ont été observés à
+l'application du 06/11, avec le bruit des étapes 2 et 5 (valeurs par défaut qu'Azure renvoie, sondes permutées,
+`reference(…)` non résolus).
+
+1. Les étapes 0 et 1 d'« Appliquer » (`OPERATOR_UPN`, les huit fournisseurs).
+2. La première passe (étape 2). Aperçu attendu :
+   - **à créer** : `pgsql-kb-<suffixe>`, son administratrice Entra, ses deux paramètres (`azure.extensions`,
+     `log_error_verbosity`), sa règle de pare-feu `AllowAllAzureServicesAndResourcesWithinAzureIps`, l'identité
+     `id-kb-migrate-database` et son rôle AcrPull sur le registre ;
+   - **à modifier** : du bruit seulement, comme à l'étape 2.
+3. « Ouvrir une administration », puis « Créer les rôles et la base » (ci-dessous).
+4. L'image (étape 3) : elle doit porter le code de #421 (`kb migrate-database`, `KB_DATABASE_AUTH`), que celle de
+   #414 n'a pas. Puis « Vérifier la chaîne TLS du job ». L'étape 4 n'a rien de neuf : Entra seul, aucun secret.
+5. La seconde passe (étape 5), avec l'étiquette de cette image. Aperçu attendu :
+   - **à créer** : `caj-kb-migrate-database` ;
+   - **à modifier** : `ca-kb-data-api` (son image, `KB_DATABASE_URL`, `KB_DATABASE_AUTH`, `AZURE_CLIENT_ID`, et
+     `identitySettings` : `lifecycle` passe de `None` à `Main`),
+     l'image de `ca-kb-ai-api` et de `caj-kb-smoke-test`, et le bruit de l'étape 5.
+6. Aussitôt après, `caj-kb-migrate-database` (critère 1 de « Vérifier les trois critères de #421 ») : jusqu'à son
+   premier lancement, l'API de données pointe vers une base sans tables. Puis les critères 2 et 3, et « Fermer
+   l'administration ».
+
+### Ouvrir une administration
+
+Depuis le Mac, l'adresse publique du Mac est ouverte le temps de l'administration, par `az`, jamais par le
+Bicep : une adresse IP resterait dans l'historique des déploiements. Le jeton d'accès sert de mot de passe à
+`psql` ; il vit 5 à 60 minutes ([Microsoft Learn](https://learn.microsoft.com/azure/postgresql/security/security-entra-configure)),
+il se demande juste avant chaque commande et n'est posé que pour elle (`PGPASSWORD=… psql`, sans `export` : `kb`
+refuse une variable `PG*` dans son environnement).
+
+Chaque `psql` de l'administration passe par `admin_psql`, qui pose aussi `search_path` à `pg_catalog` seul
+(`PGOPTIONS`) : le rôle du job peut créer des fonctions et des opérateurs dans `public`, et l'un d'eux, s'il
+correspond mieux à un appel que celui de `pg_catalog`, s'exécuterait avec les droits de l'administratrice
+(CVE-2018-1058). Pour la même raison, l'administratrice ne lit dans `kb` que les catalogues, jamais une table du
+job : le code d'une vue ou d'une politique de lignes qu'il y poserait s'exécuterait avec ses droits à elle.
+
+```sh
+RG=<groupe de ressources>
+IP=<adresse IPv4 publique du Mac>
+PG=$(az postgres flexible-server list -g "$RG" --query "[0].name" -o tsv)
+FQDN=$(az postgres flexible-server show -g "$RG" -n "$PG" --query fullyQualifiedDomainName -o tsv)
+ADMIN=$(az ad signed-in-user show --query userPrincipalName -o tsv)
+CONN="host=$FQDN port=5432 user=$ADMIN sslmode=verify-full sslrootcert=system"
+token() { az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv; }
+admin_psql() {  # admin_psql <base> <arguments de psql>
+  PGPASSWORD="$(token)" PGOPTIONS='-c search_path=pg_catalog' psql "$CONN dbname=$1" "${@:2}"
+}
+az postgres flexible-server firewall-rule create -g "$RG" --server-name "$PG" --name admin-mac \
+  --start-ip-address "$IP" --end-ip-address "$IP"
+admin_psql postgres -At -c "SHOW search_path"
+```
+
+Attendu : `pg_catalog` (vérifié sur Azure le 06/11). `sslrootcert=system` fait
+vérifier le certificat du serveur par les autorités de la libssl de `psql` (sur le Mac, celles d'OpenSSL de
+Homebrew), et force `verify-full`.
+
+### Créer les rôles et la base (une fois)
+
+Après la première passe de `main.bicep` (étape 2 d'« Appliquer »), qui crée le serveur et les identités
+(`id-kb-data-api`, et `id-kb-migrate-database` par `modules/migrate-database-job.bicep`), et avant la seconde
+(étape 5), qui crée le job et donne la base à l'API de données. Chaque rôle est rattaché à son identité par l'identifiant de son principal de service, pas par son
+nom, qu'une autre identité de l'annuaire peut porter.
+
+```sh
+MIGRATE_ID=$(az identity show -g "$RG" -n id-kb-migrate-database --query principalId -o tsv)
+DATA_API_ID=$(az identity show -g "$RG" -n id-kb-data-api --query principalId -o tsv)
+admin_psql postgres \
+  -v migrate_database_principal_id="$MIGRATE_ID" -v data_api_principal_id="$DATA_API_ID" \
+  -f infra/postgresql/create-principals.sql
+admin_psql kb -v ON_ERROR_STOP=1 -f infra/postgresql/grant-roles.sql
+```
+
+`grant-roles.sql` se relance sans rien changer. `create-principals.sql` ne se relance pas : la base `kb` existe
+déjà et `CREATE DATABASE` échoue.
+
+### Vérifier la chaîne TLS du job
+
+Le job ouvre la base en `sslmode=verify-full` contre `/etc/ssl/certs/ca-certificates.crt` de l'image. Avant le
+premier lancement, la chaîne du serveur se vérifie contre ce même fichier (pare-feu du Mac ouvert) :
+
+```sh
+docker run --rm --entrypoint cat k-b:<étiquette de l'image poussée> /etc/ssl/certs/ca-certificates.crt > "$TMPDIR/k-b-ca.crt"
+openssl s_client -starttls postgres -connect "$FQDN:5432" -servername "$FQDN" -verify_hostname "$FQDN" \
+  -CAfile "$TMPDIR/k-b-ca.crt" -verify_return_error </dev/null 2>&1 | grep "Verify return code"
+```
+
+Attendu : `Verify return code: 0 (ok)`.
+
+### Fermer l'administration
+
+```sh
+az postgres flexible-server firewall-rule delete -g "$RG" --server-name "$PG" --name admin-mac --yes
+az postgres flexible-server firewall-rule list -g "$RG" --server-name "$PG" \
+  --query "[].{name:name,start:startIpAddress,end:endIpAddress}" -o table
+```
+
+Attendu : la seule règle `AllowAllAzureServicesAndResourcesWithinAzureIps`, de `0.0.0.0` à `0.0.0.0`.
+
+### Vérifier les trois critères de #421
+
+1. `caj-kb-migrate-database` lancé deux fois rend `Succeeded` les deux fois, et la seconde ne change rien. Avant
+   et après le second lancement, la même requête (administration ouverte) doit rendre la même ligne : le nombre
+   de tables, une empreinte de leurs noms et de leurs droits, et le nombre de lignes écrites depuis le
+   démarrage du serveur.
+
+   ```sh
+   admin_psql kb -At -c "SELECT count(*), md5(string_agg(c.relname || ':' || coalesce(c.relacl::text, ''), ',' ORDER BY c.relname)), (SELECT sum(n_tup_ins + n_tup_upd + n_tup_del) FROM pg_stat_user_tables) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r'"
+   az containerapp job start -g "$RG" -n caj-kb-migrate-database
+   az containerapp job execution list -g "$RG" -n caj-kb-migrate-database \
+     --query "[].{name:name,status:properties.status,start:properties.startTime}" -o table
+   WS=$(az monitor log-analytics workspace show -n log-kb -g "$RG" --query customerId -o tsv)
+   az monitor log-analytics query -w "$WS" -o tsv \
+     --analytics-query "ContainerAppConsoleLogs | where TimeGenerated > ago(1h) and JobName == 'caj-kb-migrate-database' | order by TimeGenerated asc" \
+     --query "[].[TimeGenerated, Log]"
+   ```
+
+   La ligne de résultat du premier lancement est `database created: …`, celle du second
+   `database unchanged: … already has its tables`. Elle se lit dans `log-kb` quelques minutes après la fin de
+   l'exécution : `az containerapp job logs show` ne lit qu'une exécution en cours (étape 6 d'« Appliquer »).
+2. Le mot de passe est coupé : `az postgres flexible-server show -g "$RG" -n "$PG" --query authConfig` rend
+   `"passwordAuth": "Disabled"` et `"activeDirectoryAuth": "Enabled"`.
+3. Sous `id-kb-data-api`, une écriture est refusée. Dans le catalogue, depuis l'administration :
+
+   ```sh
+   admin_psql kb -At -c "SELECT has_table_privilege('id-kb-data-api', 'public.source', 'SELECT'), has_table_privilege('id-kb-data-api', 'public.source', 'INSERT'), has_schema_privilege('id-kb-data-api', 'public', 'CREATE'), has_database_privilege('id-kb-data-api', 'kb', 'TEMPORARY')"
+   ```
+
+   Attendu : `t|f|f|f`. Cette lecture seule ne vaut que dans `kb` : dans `postgres`, la base du serveur, les
+   identités gardent ce que `PUBLIC` y a (limite acceptée par Sabine le 06/11, journal ADR, « Base en ligne :
+   trois rôles, posés par l'administratrice »). Ce qu'il en reste se lit, de même en lecture seule :
+
+   ```sh
+   admin_psql postgres -At -c "SELECT has_database_privilege('id-kb-data-api', 'postgres', 'TEMPORARY'), has_schema_privilege('id-kb-data-api', 'public', 'CREATE'), pg_get_userbyid(datdba) FROM pg_database WHERE datname = 'postgres'"
+   ```
+
+   Un `t` à l'une des deux premières colonnes ouvre une issue de suite : révoquer `TEMPORARY` et `CREATE` à
+   `PUBLIC` dans `postgres`, jamais `CONNECT`, par lequel l'administratrice entre peut-être dans `postgres` pour
+   `create-principals.sql`. La troisième nomme le propriétaire de `postgres`, pour cette issue.
+
+   Puis dans l'API elle-même, par son identité :
+   `az containerapp exec -g "$RG" -n ca-kb-data-api --command sh`, puis, dans le conteneur :
+
+   ```sh
+   python - <<'EOF'
+   import os
+   from pathlib import Path
+   from k_b.database.engine import connect_database
+   from k_b.database.location import read_database_location_or_refusal
+   location = read_database_location_or_refusal(os.environ, Path(os.environ["KB_DATA_DIR"]))
+   connection = connect_database(location)
+   print("SELECT", connection.execute("SELECT count(*) FROM source").fetchone())
+   connection.rollback()
+   for statement in ("INSERT INTO source (source_code, label, source_type, acquisition_mode) VALUES ('probe', 'probe', 'file', 'watch')", "CREATE TABLE probe (n integer)"):
+       try:
+           connection.execute(statement)
+           print("ACCEPTED", statement.split()[0])
+       except Exception as error:
+           print("REFUSED", statement.split()[0], type(error).__name__, getattr(error, "sqlstate", None))
+       connection.rollback()
+   connection.close()
+   EOF
+   ```
+
+   Attendu : `SELECT (7,)` (les sept sources que `kb migrate-database` écrit ; aucun item, #330 amorce la base),
+   puis `REFUSED INSERT InsufficientPrivilege 42501` et `REFUSED CREATE InsufficientPrivilege 42501`.

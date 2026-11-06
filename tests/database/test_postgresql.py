@@ -1,6 +1,6 @@
 """The PostgreSQL branch of the engine: the placeholders translated, every SQL text of database/
-through the translator, the state of a transaction, the errors of an entry refused alone, and the
-lock of the writers."""
+through the translator, the state of a transaction, the errors of an entry refused alone, the
+lock of the writers, and the token of the identity as the password of each new connection."""
 
 import ast
 import re
@@ -9,17 +9,22 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from azure.core.credentials import AccessToken
+from azure.core.exceptions import ClientAuthenticationError
 from commands.test_postgresql_errors_in_logs import OUT_OF_RANGE_MARKER
 
 import k_b
-from k_b.database import postgresql
+from k_b.database import entra, postgresql
 from k_b.database.creation import (
     UnsuitableDatabaseError,
     check_database_settings,
     create_database,
 )
 from k_b.database.engine import connect_database, lock_for_writing
-from k_b.database.postgresql import translate_placeholders
+from k_b.database.entra import POSTGRESQL_TOKEN_SCOPE
+from k_b.database.errors import ENGINE_ERRORS, describe_engine_error
+from k_b.database.location import PostgresUrl, RefusedDatabaseUrlError
+from k_b.database.postgresql import DatabaseNoTokenError, translate_placeholders
 from k_b.database.savepoint import EntryRefusedError, write_in_savepoint
 
 DATABASE_DIR = Path(k_b.__file__).parent / "database"
@@ -340,3 +345,147 @@ def test_a_writer_gets_the_lock_once_the_other_commits(postgresql_base):
     finally:
         holder.close()
         waiter.close()
+
+
+# The client id of a user-assigned identity, as Azure gives it.
+CLIENT_ID = "6f1c2a9e-3b4d-4e5f-8a7b-9c0d1e2f3a4b"
+ENTRA_URL = "postgresql://id-kb-data-api@127.0.0.1:1/kb?sslmode=verify-full"
+NO_VERIFY_FULL = "KB_DATABASE_URL does not set sslmode=verify-full, which KB_DATABASE_AUTH entra asks for"
+
+
+class TokenSequence:
+    """A credential of the test: each token it gives is a new one, and each scope asked is kept."""
+
+    def __init__(self):
+        self.scopes = []
+
+    def get_token(self, *scopes, **kwargs):
+        self.scopes.append(scopes)
+        return AccessToken(f"token-{len(self.scopes)}", 4102444800)
+
+
+@pytest.fixture
+def token_sequence(monkeypatch):
+    """The credential each connection under Entra gets."""
+    credential = TokenSequence()
+    monkeypatch.setattr(
+        entra, "build_database_credential", lambda client_id: credential
+    )
+    return credential
+
+
+@pytest.fixture
+def without_tls(monkeypatch):
+    """The test server has no TLS, and verify-full would refuse it: the check of the URL is left
+    out, so that what libpq receives can be read; the server, in trust, checks no token."""
+    monkeypatch.setattr(postgresql, "find_entra_url_refusal", lambda settings: None)
+
+
+@pytest.mark.parametrize(
+    ("url", "refusal"),
+    [
+        (
+            "postgresql://id-kb-data-api@db.example/kb",
+            NO_VERIFY_FULL,
+        ),
+        (
+            "postgresql://id-kb-data-api@db.example/kb?sslmode=require",
+            NO_VERIFY_FULL,
+        ),
+        (
+            "postgresql://id-kb-data-api:S3cret@db.example/kb?sslmode=verify-full",
+            "KB_DATABASE_URL holds a password, which KB_DATABASE_AUTH entra refuses",
+        ),
+        (
+            "postgresql://id-kb-data-api@db.example/kb?sslmode=verify-full&password=S3cret",
+            "KB_DATABASE_URL holds a password, which KB_DATABASE_AUTH entra refuses",
+        ),
+    ],
+    ids=["no sslmode", "sslmode require", "password", "password parameter"],
+)
+@pytest.mark.parametrize(
+    "open_base",
+    [
+        postgresql.connect_postgresql,
+        lambda location: postgresql.open_reading_pool(location, 5).__enter__(),
+    ],
+    ids=["connection", "pool"],
+)
+def test_under_entra_a_url_that_could_give_the_token_away_is_refused_before_any_token(
+    token_sequence, url, refusal, open_base
+):
+    with pytest.raises(RefusedDatabaseUrlError) as raised:
+        open_base(PostgresUrl(url, entra_client_id=CLIENT_ID))
+
+    assert str(raised.value) == refusal
+    assert token_sequence.scopes == []
+
+
+def test_under_entra_an_identity_without_token_is_a_named_error_of_the_base(
+    monkeypatch,
+):
+    class RefusingCredential:
+        def get_token(self, *scopes, **kwargs):
+            raise ClientAuthenticationError("refused by the endpoint")
+
+    monkeypatch.setattr(
+        entra, "build_database_credential", lambda client_id: RefusingCredential()
+    )
+
+    with pytest.raises(DatabaseNoTokenError) as raised:
+        postgresql.connect_postgresql(PostgresUrl(ENTRA_URL, entra_client_id=CLIENT_ID))
+
+    assert isinstance(raised.value, ENGINE_ERRORS)
+    assert describe_engine_error(raised.value) == "DatabaseNoTokenError"
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__
+
+
+@pytest.mark.postgresql
+def test_under_entra_each_connection_gets_a_token_of_the_base_as_its_password(
+    postgresql_base, token_sequence, without_tls
+):
+    location = PostgresUrl(postgresql_base.value, entra_client_id=CLIENT_ID)
+
+    connections = [postgresql.connect_postgresql(location) for _ in range(2)]
+    try:
+        passwords = [connection._connection.info.password for connection in connections]
+    finally:
+        for connection in connections:
+            connection.close()
+
+    assert passwords == ["token-1", "token-2"]
+    assert token_sequence.scopes == [(POSTGRESQL_TOKEN_SCOPE,)] * 2
+
+
+@pytest.mark.postgresql
+def test_under_entra_the_pool_asks_a_token_for_each_connection_it_opens(
+    postgresql_base, token_sequence, without_tls
+):
+    location = PostgresUrl(postgresql_base.value, entra_client_id=CLIENT_ID)
+
+    with (
+        postgresql.open_reading_pool(location, 5) as pool,
+        pool.connection() as first,
+        pool.connection() as second,
+    ):
+        passwords = {first.info.password, second.info.password}
+
+    assert len(passwords) == 2
+    assert passwords <= {f"token-{n}" for n in range(1, len(token_sequence.scopes) + 1)}
+
+
+@pytest.mark.postgresql
+def test_without_entra_a_connection_sends_no_password_of_k_b(
+    postgresql_base, monkeypatch
+):
+    monkeypatch.setattr(
+        entra, "build_database_credential", lambda client_id: pytest.fail("no token")
+    )
+
+    connection = postgresql.connect_postgresql(postgresql_base)
+    try:
+        # libpq gives an empty text for a password it was not given.
+        assert connection._connection.info.password == ""
+    finally:
+        connection.close()

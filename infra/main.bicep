@@ -1,6 +1,6 @@
 // K-B on Azure. Applied by hand by Sabine to her resource group (infra/README.md), checked by the CI.
-// Two passes: without imageTag, the foundation (logs, registry, vault, identities, exchange storage);
-// once the image is pushed and the secrets set, with imageTag, the two APIs and the smoke test job.
+// Two passes: without imageTag, the foundation (logs, registry, vault, identities, exchange storage, PostgreSQL server);
+// once the image is pushed and the secrets set, with imageTag, the two APIs and the two jobs.
 targetScope = 'resourceGroup'
 
 @description('Region of every K-B resource: the resource group\'s by default (France Central).')
@@ -11,6 +11,9 @@ param budgetContactEmail string
 
 @description('Object ID of the Entra account of the operator (Sabine), Key Vault Secrets Officer.')
 param operatorObjectId string
+
+@description('User principal name of the Entra account of the operator (Sabine), administrator of the PostgreSQL server.')
+param operatorPrincipalName string
 
 @description('Tag of the image k-b in the registry; empty: the first pass, without the APIs and the job.')
 param imageTag string = ''
@@ -157,14 +160,18 @@ module dataApi 'modules/api-container-app.bicep' = if (deployWorkloads) {
     tags: tags
     environmentId: containerAppsEnvironment.outputs.id
     identityName: identityNames.dataApi
+    // Its code asks the token of its identity that opens the base (#421).
+    identityLifecycle: 'Main'
     registryServer: registry.outputs.loginServer
     image: image
     command: 'serve-data'
     port: dataApiPort
-    // No KB_DATABASE_URL: until the base is online (#421), /health answers and the routes of data
-    // answer 503 database_missing.
     environmentVariables: {
       KB_DATA_DIR: dataDir
+      // The base online (#421), opened by the token of the identity of the API, role kb_reader.
+      KB_DATABASE_URL: 'postgresql://${identityNames.dataApi}@${databaseHost}:5432/${databaseName}?${databaseUrlOptions}'
+      KB_DATABASE_AUTH: 'entra'
+      AZURE_CLIENT_ID: dataApiIdentity.properties.clientId
       KB_DATA_API_HOST: '0.0.0.0'
       KB_DATA_API_PORT: string(dataApiPort)
       // TrustedHost compares the Host received, /health included: the internal name only.
@@ -238,6 +245,50 @@ module smokeTestJob 'modules/smoke-test-job.bicep' = if (deployWorkloads) {
   ]
 }
 
+// The base online (#421): its name, created by infra/postgresql/create-principals.sql, and the TLS of
+// libpq: the token is a bearer secret, it goes only to a server whose certificate is checked against
+// the store of the image.
+var databaseName = 'kb'
+var databaseUrlOptions = 'sslmode=verify-full&sslrootcert=/etc/ssl/certs/ca-certificates.crt'
+var migrateDatabaseIdentityName = 'id-kb-migrate-database'
+
+// First pass: the server and the identity of the job, for infra/postgresql/; second pass: the job.
+module postgresqlServer 'modules/postgresql-server.bicep' = {
+  params: {
+    location: location
+    tags: tags
+    suffix: suffix
+    administratorObjectId: operatorObjectId
+    administratorPrincipalName: operatorPrincipalName
+  }
+}
+
+var databaseHost = postgresqlServer.outputs.fullyQualifiedDomainName
+
+module migrateDatabaseJob 'modules/migrate-database-job.bicep' = {
+  params: {
+    location: location
+    tags: tags
+    identityName: migrateDatabaseIdentityName
+    registryName: registry.outputs.name
+    deployJob: deployWorkloads
+    environmentId: containerAppsEnvironment.outputs.id
+    registryServer: registry.outputs.loginServer
+    image: image
+    environmentVariables: {
+      KB_DATA_DIR: dataDir
+      KB_DATABASE_URL: 'postgresql://${migrateDatabaseIdentityName}@${databaseHost}:5432/${databaseName}?${databaseUrlOptions}'
+      KB_DATABASE_AUTH: 'entra'
+    }
+  }
+}
+
+resource dataApiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
+  name: identityNames.dataApi
+}
+
 output registryName string = registry.outputs.name
 output registryLoginServer string = registry.outputs.loginServer
 output keyVaultName string = keyVault.outputs.name
+output postgresqlServerName string = postgresqlServer.outputs.name
+output postgresqlServerHost string = databaseHost

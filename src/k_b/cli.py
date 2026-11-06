@@ -18,6 +18,7 @@ from k_b.commands.environment import (
 )
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.import_command import run_import
+from k_b.commands.migrate_database_command import run_migrate_database
 from k_b.commands.openapi_command import (
     AI_API_OPENAPI_PATH,
     DATA_API_OPENAPI_PATH,
@@ -90,6 +91,12 @@ def read_command(argv: list[str] | None) -> str:
         "create-db",
         help=f"create the items database, {DATABASE_FILE_NAME}, or the tables of the"
         f" PostgreSQL base of {DATABASE_URL_VARIABLE}",
+    )
+    command_parsers.add_parser(
+        "migrate-database",
+        help="create the items database unless it already has its tables, then nothing is"
+        " written; on PostgreSQL, also grant its tables to the roles of"
+        " infra/postgresql/grant-roles.sql, which must exist",
     )
     command_parsers.add_parser(
         "import",
@@ -189,6 +196,8 @@ def run_command(command: str, data_dir: Path, environ: Mapping[str, str]) -> int
     """Run the kb command given and return its exit code."""
     if command == "create-db":
         return run_create_db(data_dir, environ)
+    if command == "migrate-database":
+        return run_migrate_database(data_dir, environ)
     if command == "import":
         return run_import(data_dir, environ)
     if command == "write-tops":
