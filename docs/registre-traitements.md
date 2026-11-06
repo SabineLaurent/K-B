@@ -146,6 +146,18 @@ Google ».
 | Décision | Le 16/10, Sabine : « On laisse de côté le RGPD pour le moment, de toute façon c'est pour du perso, on sort des cases. Je précise que c'est du temporaire. » Aucune section n'avait alors été écrite. **Révisée le 17/10** : Sabine demande cette trace (décision relayée par time-knight). |
 | Fin | Le repli s'arrête avec #158 : depuis le 17/10, l'appel passe par Azure AI Foundry, et plus rien ne part chez Google. |
 
+## Dépôt public (#278)
+
+Le dépôt de code, ses issues, ses PR et les journaux de GitHub Actions deviennent publics le 08/11/2026. Relevé de
+#278, le 06/11 ; décisions de Sabine du même jour (journal ADR, « Mise en public du dépôt (#278) »).
+
+| Rubrique | Contenu |
+|---|---|
+| Ce qui devient public | Les métadonnées des commits et des tags : le nom de l'autrice, son adresse personnelle (1 354 commits) et son adresse à l'organisme de formation (32 commits, 2 tags annotés). Dans les fixtures de test et la documentation : des logins GitHub (auteur de notes de version, personnes créditées dans un avis de sécurité, propriétaires de dépôts, dans le nom du dépôt), donnée publique gardée pour sa finalité de test. La base, le brut et le coffre n'ont jamais été versionnés (aucun chemin `temp/`, `raw/`, `logs/`, `reports/` ni `*.sqlite` dans l'historique, relevé du 06/11). |
+| Historique | Gardé tel quel : une adresse ou un chemin corrigé dans l'arbre reste lisible dans les commits d'avant, et dans ceux que GitHub sert encore par leur SHA. |
+| Durée | Celle du dépôt public : sans limite fixée. |
+| Effacement | Retirer une valeur de l'historique demande de le réécrire, puis de faire purger par le support de GitHub les `refs/pull/*` et les commits hors des refs ; un clone fait avant l'effacement la garde. |
+
 ## Procédure de tri
 
 Chaque étape dit ce qu'elle fait, si elle est automatisée, et sa fréquence. Le code de la purge

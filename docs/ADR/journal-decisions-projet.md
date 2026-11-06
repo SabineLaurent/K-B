@@ -5542,6 +5542,52 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   `str.lower` plie aussi `É`, alors que la base ne le plie pas. Limite assumée, inchangée : une
   lettre accentuée ne se trouve que dans sa casse exacte. — PR de #418
 
+### Mise en public du dépôt (#278)
+
+- **L'historique git est rendu public tel quel, et consigné ici et au registre (« Dépôt public »).**
+  Décision de Sabine du 06/11, sur le relevé de #278 (voie « l'accepter et le consigner »). Ce qui
+  reste lisible dans l'historique : l'adresse personnelle de l'autrice (1 354 commits) et celle de
+  l'organisme de formation (32 commits, 2 tags annotés), dans les métadonnées seulement ; le chemin du
+  compte macOS dans la revue de `brief09_assistant-veille-tech` depuis `7130351`, et dans 2 anciennes
+  versions de `docs/refactoring/` ; 23 lignes `Claude-Session:` ; les contenus de tiers d'avant leur
+  déplacement ou leur retrait ; 13 commits que les refs ne montrent plus (anciens force-push, branches
+  supprimées), que GitHub sert par leur SHA. Aucun secret : gitleaks 8.30.1 ne trouve que des faux
+  positifs. Pourquoi : Sabine ne l'a pas dit ; déduit des coûts présentés, à confirmer par elle : les
+  deux autres voies changent tous les SHA, dont ceux que citent les rapports de la certification, et
+  aucune ne tient avant la bascule du 08/11. Écartés : réécrire par `git filter-repo`, puis faire
+  purger `refs/pull/*` et les commits hors des refs par le support de GitHub (branches réécrites, pistes
+  en cours à rebaser, purge par le support qui prend des jours) ; repartir d'un nouveau dépôt (issues
+  à transférer, PR et comptes rendus de revue perdus, board, CI et réglages à refaire, lien du jury
+  changé). Décisions du même jour : les commits à venir gardent la même adresse ; le nom `time-knight`
+  reste dans le dépôt, les issues et les PR (aucun lien vers ce dépôt privé, ses 2 chemins corrigés) ;
+  les anciennes versions des textes GitHub corrigés ne sont pas supprimées ; le wiki, sans page, est
+  désactivé. Limite assumée : un clone fait après la bascule garde tout ce qui précède. — PR de #278
+  (documentation)
+
+- **Une fixture qui reprend le texte d'autrui garde la forme d'un exemple collecté, avec un texte
+  écrit pour l'occasion ; les auteurs arXiv des fixtures deviennent des noms fictifs, les logins GitHub
+  sont gardés.** Décision de Sabine du 06/11, sur la recommandation de la session. **Précise la
+  consigne du 2026-10-10** (« une fixture part d'un exemple issu de la collecte ») : la structure vient
+  toujours de la collecte, le texte non, quand sa licence ne permet pas de le publier. Pourquoi : la
+  newsletter TLDR n'a aucune condition d'utilisation trouvée (droits réservés par défaut) et l'auteur
+  d'un article Medium garde ses droits ; les tests vérifient la structure lue, pas le texte. Les noms
+  fictifs des auteurs arXiv sont un choix de Sabine (leurs métadonnées sont sous CC0). Gardés, avec leur
+  licence au README (« Contenus de tiers ») : WCAG 2.2 (W3C Document License), une page de l'OWASP
+  (CC BY-SA 4.0), les avis de sécurité de GitHub (CC BY 4.0), les métadonnées arXiv et le catalogue
+  KEV (CC0 1.0), les métadonnées de dépôts GitHub (logins compris : donnée publique, finalité de
+  test). Retirées de l'arbre : les notes d'une vidéo YouTube dont la source n'est pas citée. Écartée :
+  l'autre option posée par #278, un texte pris sous une licence compatible (raison non dite). — PR de
+  #278
+
+- **Le schéma de Zotero recopié dans `tests/fixtures/zotero_extract.sql` est gardé, avec la mention
+  de sa licence, l'AGPL v3 ou plus.** Décision de Sabine du 06/11, sur la recommandation de la
+  session. L'en-tête de `resource/schema/userdata.sql` (dépôt `zotero/zotero`, lu le 06/11) dit :
+  © 2009 Center for History and New Media, George Mason University, AGPL v3 ou plus. Pourquoi : le
+  test de fidélité au schéma réel garde sa force. Écarté : réduire la fixture aux colonnes que lit
+  K-B (le test ne verrait plus un changement du schéma réel). Limite : la fixture est sous AGPL dans
+  un dépôt sous CC BY-NC 4.0 ; la compatibilité des deux n'est pas tranchée par un juriste. Clôt la
+  décision ouverte du 2026-10-11 (« Licence du schéma de Zotero »). — PR de #278
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
@@ -5630,6 +5676,8 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   fichier qui dit autrement » (page « Licensing » de zotero.org), K-B sous CC BY-NC 4.0.
   La base d'essai réécrit 15 tables aux noms et types de Zotero ; si cela pose une question de
   licence n'est pas tranché, et l'en-tête du fichier de schéma de Zotero n'a pas été lu.
+  **Close le 2026-11-06** : la fixture est gardée, avec la mention de l'AGPL v3 ou plus (« Mise en
+  public du dépôt (#278) »).
 - **Notes Zotero et autres types d'annotation** (soulignement, note, encre, image) : remis à
   plus tard par Sabine le 2026-10-11.
 

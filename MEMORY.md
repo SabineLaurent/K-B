@@ -2,7 +2,7 @@
 
 Ce que le code et le README ne disent pas : le contexte, les estimations et les consignes. Les
 décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque session par le
-`CLAUDE.md`. Le dépôt est privé jusqu'au 25/10, puis public : rien de personnel ici.
+`CLAUDE.md`. Le dépôt devient public le 08/11 : rien de personnel ici.
 
 ## Contexte
 
@@ -214,7 +214,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   comparer deux listes, remplacer d'abord cette clé par un repère :
   `sed -E 's/(never_quoted)\[[A-Za-z0-9_-]{43} /\1[<random key> /'`.
 - **Fixtures** (consigne de Sabine, 2026-10-10) : une fixture part toujours d'un exemple issu de
-  la collecte.
+  la collecte. Quand la licence de son texte ne permet pas de le publier, elle garde la forme de
+  l'exemple, avec un texte écrit pour l'occasion ; un auteur arXiv y prend un nom fictif (journal
+  ADR, 2026-11-06, « Mise en public du dépôt (#278) » ; licences au README, « Contenus de tiers »).
 - **K-B est déterministe** dans sa conception, son code et ses journaux (consigne de Sabine,
   2026-10-04) : un journal ou un message d'erreur dit ce qui a été observé (URL de redirection,
   code HTTP, titre trouvé et titre attendu), jamais une supposition ni une interprétation

@@ -145,7 +145,7 @@ PR rouge pourrait être fusionnée.
 | `diff` des lignes `run:` distinctes, `main` contre la branche : rien | Aucune commande ajoutée ni retirée |
 | `grep -c "uv sync --locked" .github/workflows/ci.yml` : 4 | Chaque job installe son environnement |
 | `yaml.safe_load` : `permissions` vaut `{'contents': 'read'}` au niveau du workflow | Le jeton de chaque job n'a que la lecture du contenu ; que les quatre jobs passent toujours avec ce jeton, c'est le run de la PR qui le montre |
-| `diff ~/REPO_GIT/time-knight/consignes/conformite.md .claude/rules/conformite.md` : rien | Copie identique, octet pour octet |
+| `diff` de la copie de `conformite.md` tenue par time-knight et de `.claude/rules/conformite.md` : rien | Copie identique, octet pour octet |
 | `uv run pytest` (1525 passed), `ruff check`, `ruff format --check`, `mypy --strict` en local : verts | Les quatre commandes que les jobs lancent passent sur la branche |
 | Run de la PR, puis `gh run list --branch main --event push --limit 1` après la fusion | La vraie preuve du critère : quatre checks verts sur la PR, puis un run vert sur `main` |
 
