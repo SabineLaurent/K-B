@@ -45,9 +45,11 @@ resource job 'Microsoft.App/jobs@2026-01-01' = {
         parallelism: 1
         replicaCompletionCount: 1
       }
-      // The retries of the storage SDK may last about 7 min (core/config.py), after the two /health
-      // of 65 s at most each: beyond it, the replica is killed before its summary.
-      replicaTimeout: 600
+      // The bounds of the job must fall before this one, or the replica is killed before its summary:
+      // the two /health of 65 s at most each, then the retries of the storage SDK, about 7 min
+      // (core/config.py), about 576 s with the start of the job; the retries of azure-identity are not
+      // counted there. 900 s leaves them a margin, and costs only when the job is stuck.
+      replicaTimeout: 900
       // A failed smoke test must show: it is run again by hand, never retried.
       replicaRetryLimit: 0
       registries: [

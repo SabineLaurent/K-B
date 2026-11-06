@@ -63,7 +63,7 @@ az bicep build --file infra/main.bicep --stdout > /dev/null
 ```
 
 Le build ne doit donner aucun avertissement : un avertissement de type inconnu signale une version d'API que cette
-version de Bicep ne connaît pas.
+version de Bicep ne connaît pas. La CI ne le vérifie pas encore (#452).
 
 ## Appliquer (Sabine, à la main)
 
@@ -81,12 +81,23 @@ Les étapes ci-dessous sont celles de la première mise en ligne, le 2026-11-06 
 RG=<groupe de ressources>
 EMAIL=<adresse des alertes du budget>
 OPERATOR=$(az ad signed-in-user show --query id -o tsv)
-case "$RG$EMAIL" in *'<'*) echo "une valeur est encore un gabarit" ;; esac
+# Refuse une valeur vide, ou laissée entre chevrons.
+kb_check() {
+  for value in "$@"; do
+    case "$value" in ''|*'<'*) echo "une valeur est vide ou encore un gabarit" >&2; return 1 ;; esac
+  done
+}
+kb_check "$RG" "$EMAIL" "$OPERATOR" && echo ok
 ```
 
 Chaque `<…>` se remplace par sa valeur. Une valeur laissée entre chevrons part telle quelle : le 2026-11-06, une
 adresse `<adresse>` a fait refuser le budget (« Notification cannot have invalid email addresses »), et le reste du
-déploiement a été créé sans lui. La ligne `case` le signale avant tout envoi.
+déploiement a été créé sans lui. `kb_check` refuse aussi une variable vide, par exemple dans un nouveau terminal où
+elle n'a pas été posée.
+
+Chaque `az deployment` qui suit commence par `kb_check … &&`. Dans un shell interactif, un contrôle qui échoue
+n'arrête pas les lignes collées après lui : seul le `&&` empêche l'envoi. Dans un nouveau terminal, `kb_check`
+n'existe pas encore : la commande échoue (`command not found`), et le `&&` bloque aussi.
 
 L'adresse des alertes du budget se passe au déploiement : elle n'est jamais écrite dans le dépôt, mais elle reste
 dans l'historique des déploiements du groupe, côté Azure, et dans la sortie du `what-if`.
@@ -107,9 +118,9 @@ l'enregistrer.
 ### 2. Première passe : le socle
 
 ```sh
-az deployment group what-if -g "$RG" -f infra/main.bicep \
+kb_check "$RG" "$EMAIL" "$OPERATOR" && az deployment group what-if -g "$RG" -f infra/main.bicep \
   -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR"
-az deployment group create -g "$RG" -f infra/main.bicep \
+kb_check "$RG" "$EMAIL" "$OPERATOR" && az deployment group create -g "$RG" -f infra/main.bicep \
   -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" \
   --query "{state:properties.provisioningState,outputs:properties.outputs}"
 ```
@@ -185,15 +196,25 @@ Ce que dit chaque cas :
 - **Jamais Entrée sur une invite vide.** Elle poserait une version vide par-dessus la bonne, et l'API IA refuserait
   de démarrer. Pour sortir sans rien poser : Ctrl-C.
 
-Pour refaire un seul secret (erreur, ou mauvaise valeur collée), la nouvelle version remplace l'ancienne. Les apps
-lisent la dernière version dans les 30 minutes, puis redémarrent.
+Pour refaire un seul secret (erreur, mauvaise valeur collée, ou rotation), la nouvelle version remplace l'ancienne.
+Container Apps lit la dernière version dans les 30 minutes (référence sans version). Mais un conteneur qui tourne
+garde ses variables d'environnement, et un redémarrage automatique n'est pas vérifié. Après la nouvelle valeur, on
+redémarre donc la révision active de chaque app qui lit ce secret (colonne « Lu par »).
 
 ```sh
 name=kb-ai-github-token
 printf '%s : ' "$name"; read -rs VALUE; echo
 az keyvault secret set --vault-name "$KV" --name "$name" --file <(printf '%s' "$VALUE") -o none
 unset VALUE
+for app in ca-kb-ai-api; do    # ca-kb-data-api ca-kb-ai-api pour kb-data-api-key-ai-digest
+  az containerapp revision restart -n "$app" -g "$RG" \
+    --revision "$(az containerapp revision list -n "$app" -g "$RG" --query "[?properties.active].name | [0]" -o tsv)"
+done
 ```
+
+Limite : `kb-data-api-key-ai-digest` est lu par les deux API. Tant qu'elles n'ont pas toutes deux la nouvelle
+valeur, jusqu'à 30 minutes, l'API IA reçoit 401 de l'API de données. Si les 401 continuent après le redémarrage,
+redémarrer de nouveau une fois les 30 minutes passées.
 
 ### 5. Seconde passe : les API et le job
 
@@ -204,15 +225,20 @@ Les trois valeurs sont celles du `.env` de l'opératrice : `KB_LLM_BASE_URL`, `K
 LLM_URL=<KB_LLM_BASE_URL>
 LLM_MODEL=<KB_LLM_MODEL>
 OTLP=<KB_OTLP_ENDPOINT>
-case "$LLM_URL$LLM_MODEL$OTLP" in *'<'*) echo "une valeur est encore un gabarit" ;; esac
-az deployment group what-if -g "$RG" -f infra/main.bicep \
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" && az deployment group what-if \
+  -g "$RG" -f infra/main.bicep \
   -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" imageTag="$TAG" \
      llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP"
-az deployment group create -g "$RG" -f infra/main.bicep \
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" && az deployment group create \
+  -g "$RG" -f infra/main.bicep \
   -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" imageTag="$TAG" \
      llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP" \
   --query "{state:properties.provisioningState}"
 ```
+
+Le Bicep ne refuse pas ces valeurs vides : la passe 1 les laisse vides. Le contrôle vient donc de `kb_check`. Sans
+lui, un `TAG` vide referait la passe 1 sans erreur, et une adresse vide déploierait une API IA qui refuse de démarrer
+(`KB_OTLP_ENDPOINT: not set, while KB_OTLP_HEADERS is`).
 
 L'aperçu attendu :
 - **à créer** : `ca-kb-data-api`, `ca-kb-ai-api`, `caj-kb-smoke-test`, et 7 rôles Key Vault Secrets User, un par
