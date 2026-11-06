@@ -535,6 +535,8 @@ MAX_HEALTH_ANSWER_BYTES = 1024
 # storage sets only when it builds its transport (CONNECTION_TIMEOUT and READ_TIMEOUT,
 # azure/storage/blob/_shared/constants.py, azure-storage-blob 12.31.1); the transport of K-B would
 # otherwise get the 300 s of azure-core. The retries stay those of the SDK: 3, after about 18 s, 24 s
-# and 42 s (± 3 s, seen on 2026-11-06), so about 7 min at worst: 4 times 20 s and 60 s, and 84 s.
+# and 42 s (± 3 s, seen on 2026-11-06): about 7 min when each try waits its timeouts, 4 times 20 s
+# and 60 s, and 84 s. Not a bound: the read timeout bounds each read, not an answer, and the
+# retries of azure-identity are not counted.
 EXCHANGE_STORAGE_CONNECT_TIMEOUT_SECONDS = 20
 EXCHANGE_STORAGE_READ_TIMEOUT_SECONDS = 60

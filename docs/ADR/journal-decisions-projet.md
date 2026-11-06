@@ -5445,26 +5445,32 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   réponse, sans `quote_value` (un `\n` y fabrique une fausse ligne de `kb`), et
   `storage/blob/_generated/_utils/serialization.py` des valeurs de la réponse ; `urllib3` peut écrire
   une URL entière (`urllib3/connection.py`, « Failed to parse headers »). À ERROR, ces bibliothèques
-  n'écrivent que des textes fixes, et `kb` journalise lui-même chaque échec, une fois (règle 3 de
-  `conventions.md`). Revue de code, tranché par time-knight le 06/11 (délégation de Sabine du 15/10),
-  sur le verdict d'un sous-agent neuf. Écartés : WARNING, le niveau de `httpx2` (le premier choix du
+  n'écrivent que des textes fixes, sauf `storage/blob/_shared/avro/avro_io.py:166`, qui y écrit des
+  octets d'une réponse avro qu'aucune liste n'atteint (à revoir par #413 s'il lit un flux avro) ; et
+  `kb` journalise lui-même chaque échec, une fois (règle 3 de `conventions.md`). Revue de code,
+  tranché par time-knight le 06/11 (délégation de Sabine du 15/10), sur le verdict d'un sous-agent
+  neuf. Écartés : WARNING, le niveau de `httpx2` (le premier choix du
   plan, qui laissait passer ces lignes) ; `azure.identity` seul (le stockage écrit aussi des valeurs) ;
   un filtre de masquage des URL (plus de code pour le même effet). Limite assumée : les avertissements
   de `urllib3` sont aussi perdus pour les autres sources qui passent par `requests`. — PR de #412
 
 - **Une erreur du stockage est nommée par son état (`exchange_storage_forbidden`, `_not_found`,
-  `_unauthorized`, `_unavailable`, `_failed`), son statut HTTP et son code (`x-ms-error-code`,
+  `_unauthorized`, `_unavailable`, `_no_token`, `_failed`), son statut HTTP et son code (`x-ms-error-code`,
   gardé s'il est un mot de lettres), jamais par `str(error)` ; rien du SDK n'est chaîné (`from
-  None`). L'état se lit au statut, pas à la classe, et le jeton est demandé à part
-  (`check_identity`) : un refus de l'identité est `exchange_storage_unauthorized`, quel que soit le
-  statut de son point d'accès, et un point d'accès injoignable, ou dont la réponse n'est pas un objet
-  JSON (une 500 en HTML lève `JSONDecodeError`, une liste `AttributeError`, hors des `AzureError`),
-  `exchange_storage_identity_unavailable` (revue de code, tranché par time-knight le 06/11,
-  délégation de Sabine du 15/10).** Pourquoi : le message du SDK recopie le corps de la réponse, qui
+  None`). L'état du stockage se lit au statut, pas à la classe. Le jeton est demandé à part
+  (`check_identity`) : tout échec de l'identité est `exchange_storage_no_token`, refus ou panne,
+  réponse qui n'est pas un objet JSON comprise (une 500 en HTML lève `JSONDecodeError`, une liste
+  `AttributeError`, hors des `AzureError`) ; un 401 du stockage reste `exchange_storage_unauthorized`
+  (deux revues de code, tranché par time-knight le 06/11, délégation de Sabine du 15/10).** Pourquoi : le message du SDK recopie le corps de la réponse, qui
   peut citer le chemin d'un blob (`AuthenticationErrorDetail`) ; le SDK lève
   `ClientAuthenticationError` pour une 403 `AuthenticationFailed`
-  (`azure/storage/blob/_shared/response_handlers.py`) ; et le diagnostic utile d'un job en ligne est
-  « l'identité » ou « le rôle ». Écarté : `quote_value(str(error))`, qui garderait le début du nom.
+  (`azure/storage/blob/_shared/response_handlers.py`) ; le diagnostic utile d'un job en ligne est
+  « l'identité » ou « le rôle » ; et la classe d'une erreur d'azure-identity ne distingue pas un
+  refus d'une panne (une 500 en JSON est `CredentialUnavailableError`, comme un client id inconnu),
+  sans porter le statut du point d'accès (azure-identity 1.27.0, observé le 06/11). Écartés :
+  `quote_value(str(error))`, qui garderait le début du nom ; deux états pour l'identité
+  (`…_unauthorized` et `…_identity_unavailable`, premier tri de la revue), qui suivaient la classe et
+  non ce qu'avait fait le point d'accès.
   — PR de #412
 
 - **Réglages de `kb smoke-test` : `AZURE_CLIENT_ID` (un GUID, passé en `client_id=`) et
@@ -5481,8 +5487,10 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   rien ne change le conteneur d'un déploiement à l'autre. Écarté : une variable pour le conteneur.
   Limite assumée : les 60 s sont une hypothèse (le réveil d'une API à 0 réplique), à mesurer à #414 ;
   les nouvelles tentatives du stockage restent celles du SDK (3, après environ 18, 24 et 42 s, à 3 s
-  près, mesuré le 06/11) : environ 7 min au pire, sans trace au journal, le logger `azure` étant
-  tenu à ERROR. — PR de #412
+  près, mesuré le 06/11) : environ 7 min quand chaque essai attend son délai, sans trace au journal,
+  le logger `azure` étant tenu à ERROR. Ce n'est pas une borne : le délai de lecture borne chaque
+  lecture, pas une réponse, et les nouvelles tentatives d'azure-identity n'y sont pas comptées
+  (seconde revue de code). — PR de #412
 
 ## Décisions encore ouvertes
 

@@ -172,7 +172,7 @@ def test_a_token_refused_is_logged_once_by_kb_without_what_the_endpoint_says(
 
     assert exit_code == cli.ExitCode.FAILED
     log = read_kb_log(smoke_test_environment)
-    assert "exchange storage: not listed: exchange_storage_unauthorized\n" in log
+    assert "exchange storage: not listed: exchange_storage_no_token\n" in log
     assert "get_token failed" not in log
     assert FORGED_LOG_LINE not in log
     assert FORGED_LOG_LINE not in capsys.readouterr().err

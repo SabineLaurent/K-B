@@ -45,7 +45,7 @@ ERROR_CODE = re.compile(r"[A-Za-z]{1,64}")
 
 type ExchangeStorageState = Literal[
     "exchange_storage_unavailable",
-    "exchange_storage_identity_unavailable",
+    "exchange_storage_no_token",
     "exchange_storage_unauthorized",
     "exchange_storage_forbidden",
     "exchange_storage_not_found",
@@ -148,16 +148,17 @@ def open_container_client(
 
 def check_identity(credential: TokenCredential) -> None:
     """Ask the token of the storage for the identity of the job, which the credential keeps for the
-    requests that follow: an endpoint out of reach, or that answers no token, is unavailable; a
-    refusal names the identity, whatever the status of its endpoint."""
+    requests that follow. Any failure is exchange_storage_no_token: the class of an error of
+    azure-identity does not tell a refusal from an outage (a 500 in JSON is
+    CredentialUnavailableError, as a client id it does not know), and none carries the HTTP status
+    of the endpoint (azure-identity 1.27.0: 400, 401, 403, 404, seen on 2026-11-06; review of
+    #412)."""
     try:
         credential.get_token(STORAGE_SCOPE)
     # ValueError and AttributeError: an answer that is not a JSON object (a 500 in HTML, a list),
-    # which azure-identity does not turn into an AzureError (review of #412).
-    except (ServiceRequestError, ServiceResponseError, ValueError, AttributeError):
-        raise ExchangeStorageError("exchange_storage_identity_unavailable") from None
-    except AzureError:
-        raise ExchangeStorageError("exchange_storage_unauthorized") from None
+    # which azure-identity does not turn into an AzureError.
+    except (AzureError, ValueError, AttributeError):
+        raise ExchangeStorageError("exchange_storage_no_token") from None
 
 
 def count_listed_blobs(container_client: ContainerClient) -> int:

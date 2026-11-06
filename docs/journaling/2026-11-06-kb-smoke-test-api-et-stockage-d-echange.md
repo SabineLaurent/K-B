@@ -77,18 +77,19 @@ parce que le SDK lève `ClientAuthenticationError` pour une 403 dont le code est
     try:
         credential.get_token(STORAGE_SCOPE)
     # ValueError and AttributeError: an answer that is not a JSON object (a 500 in HTML, a list),
-    # which azure-identity does not turn into an AzureError (review of #412).
-    except (ServiceRequestError, ServiceResponseError, ValueError, AttributeError):
-        raise ExchangeStorageError("exchange_storage_identity_unavailable") from None
-    except AzureError:
-        raise ExchangeStorageError("exchange_storage_unauthorized") from None
+    # which azure-identity does not turn into an AzureError.
+    except (AzureError, ValueError, AttributeError):
+        raise ExchangeStorageError("exchange_storage_no_token") from None
 ```
-(`src/k_b/jobs/exchange_storage.py:153-160`)
+(`src/k_b/jobs/exchange_storage.py:156-161`)
 
-Le jeton est demandé avant la liste : un refus nomme l'identité, quel que soit le statut de son point d'accès, et un
-point d'accès injoignable, ou qui ne répond pas un objet JSON, est `…_identity_unavailable` (revue de code : sans
-cela, `JSONDecodeError` ou `AttributeError` sortaient de `kb` avec leur trace). Le diagnostic utile en ligne est « l'identité
-ou le rôle ». La demande ne coûte rien de plus : le crédit garde le jeton pour la suite (une seule demande dans
+Le jeton est demandé avant la liste, et tout échec de l'identité est `exchange_storage_no_token`. La classe d'une
+erreur d'azure-identity ne dit pas un refus d'une panne : une 500 en JSON lève `CredentialUnavailableError`, comme un
+client id inconnu ; une 500 en HTML lève `JSONDecodeError`, une liste `AttributeError`, qui ne sont pas des
+`AzureError` et sortaient sinon de `kb` avec leur trace ; et aucune ne porte le statut du point d'accès (400, 401,
+403, 404 essayés). Le premier tri de la revue donnait deux états (`…_unauthorized`, `…_identity_unavailable`) ; la
+seconde revue a montré qu'ils suivaient la classe, pas ce qu'avait fait le point d'accès. Le diagnostic utile en
+ligne reste « l'identité ou le rôle » : `no_token` contre `exchange_storage_forbidden`. La demande ne coûte rien de plus : le crédit garde le jeton pour la suite (une seule demande dans
 `test_the_token_is_asked_for_the_identity_of_its_client_id_and_sent_to_the_storage`).
 
 ### Le transport, ses délais, ses nouvelles tentatives
@@ -99,7 +100,8 @@ certificat de l'environnement, comme `open_http_client` ; le client du conteneur
 lecture), qu'il ne pose que s'il construit lui-même le transport (`base_client.py:314-315`) : azure-core donnerait
 300 s (relevé par la revue). K-B les repose (`EXCHANGE_STORAGE_*_TIMEOUT_SECONDS`, `core/config.py`). Les nouvelles
 tentatives restent celles du SDK : 3, après environ 18, 24 et 42 s (mesuré par un faux transport), soit environ
-7 min au pire.
+7 min quand chaque essai attend ses délais. Ce n'est pas une borne : le délai de lecture borne chaque lecture, pas
+une réponse, et les nouvelles tentatives d'azure-identity n'y sont pas comptées.
 
 ### `/health`, borné et fermé
 
@@ -139,7 +141,8 @@ dans la PR.
 | `test_a_403_of_the_storage_fails_the_smoke_test_without_the_name_its_body_gives` | une 403 dont le corps cite le blob : code 1, état et code écrits, nom absent |
 | `test_the_azure_sdk_writes_no_url_of_a_blob_in_the_log` | un transfert par le SDK : l'URL du blob n'entre pas au journal (rouge avant le garde) |
 | `test_a_token_refused_is_logged_once_by_kb_without_what_the_endpoint_says` | une seule ligne, celle de `kb` ; la fausse ligne du point d'identité n'entre ni dans `kb.log` ni sur stderr |
-| `test_an_identity_endpoint_that_answers_no_token_is_unavailable` | 500 en HTML, `[]`, une chaîne : `exchange_storage_identity_unavailable`, sans trace |
+| `test_an_identity_endpoint_that_answers_no_token_gives_no_token` | 500 en HTML, `[]`, une chaîne, 500 en JSON : `exchange_storage_no_token`, sans trace |
+| `test_an_identity_endpoint_out_of_reach_gives_no_token`, `test_a_token_refused_by_the_identity_endpoint_is_no_token` | injoignable ou refus : le même état |
 | `test_the_token_is_asked_for_the_identity_of_its_client_id_and_sent_to_the_storage` | `client_id` dans la demande de jeton, `X-IDENTITY-HEADER`, `Bearer` vers le stockage, une seule demande |
 | `test_the_transport_waits_as_the_sdk_of_the_storage_does_without_one` | 20 s et 60 s (rouge : 300) |
 | `test_an_answer_other_than_its_health_fails_with_a_named_state` | 503, 307, HTML, `down`, champ en trop, trop grand : refusés |
@@ -175,6 +178,10 @@ passerait sans le garde.
 - Les 60 s de lecture de `/health` sont une hypothèse (réveil d'une API à 0 réplique).
 - Les avertissements d'`urllib3` sont perdus pour toutes les commandes, les autres sources comprises : aucun n'a
   été relevé comme utile, mais la liste n'a pas été faite.
+- Rattraper `ValueError` et `AttributeError` autour de `get_token` range aussi sous `exchange_storage_no_token`,
+  sans trace, un bogue de K-B ou du SDK qui lèverait l'une d'elles (seconde revue, constat écarté).
+- Les bibliothèques autres qu'`azure` et `urllib3` (BigQuery, OpenTelemetry) peuvent écrire à WARNING le texte d'une
+  réponse, non échappé : un défaut déjà sur `main`, porté par une issue à part.
 - Le critère `docker run --rm -e KB_DATA_DIR=/var/lib/knowledge_base <image> kb smoke-test --help` attend l'image
   de #200.
 

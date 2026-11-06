@@ -552,8 +552,8 @@ un GUID ; sans lui, le SDK chercherait l'identité système, que les jobs de K-B
 une page d'au plus 100 noms du conteneur `smoke-test` du stockage d'échange (`KB_EXCHANGE_BLOB_URL`,
 en `https`, sans défaut). Les trois contrôles tournent toujours. Il n'écrit que des comptes : jamais
 le nom d'un blob (celui d'un clip est son titre), ni le message d'une erreur du SDK, mais son état
-(`exchange_storage_forbidden`…), son statut HTTP et son code ; un jeton refusé à l'identité est
-`exchange_storage_unauthorized`. Code de sortie :
+(`exchange_storage_forbidden`…), son statut HTTP et son code ; l'identité sans jeton, refusée ou
+injoignable, est `exchange_storage_no_token`. Code de sortie :
 
 - 0 : les deux API répondent `{"status":"ok"}` et le conteneur est listé ;
 - 1 : un contrôle échoue (`health_failed`, `health_timeout`… pour une API) ;

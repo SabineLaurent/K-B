@@ -196,7 +196,7 @@ def test_a_storage_out_of_reach_is_unavailable():
     assert str(raised.value) == "exchange_storage_unavailable"
 
 
-def test_a_token_refused_by_the_identity_endpoint_is_unauthorized(monkeypatch):
+def test_a_token_refused_by_the_identity_endpoint_is_no_token(monkeypatch):
     set_identity_endpoint(monkeypatch)
     identity = FakeTransport(answer_identity_refusal)
 
@@ -208,13 +208,14 @@ def test_a_token_refused_by_the_identity_endpoint_is_unauthorized(monkeypatch):
     ):
         check_identity(credential)
 
-    # The identity, not the storage, whatever the status of the endpoint.
-    assert str(raised.value) == "exchange_storage_unauthorized"
+    # The identity, not the storage: refused or out of reach, which the class of the error of
+    # azure-identity does not tell.
+    assert str(raised.value) == "exchange_storage_no_token"
     assert raised.value.__cause__ is None
     assert raised.value.__suppress_context__
 
 
-def test_an_identity_endpoint_out_of_reach_is_unavailable_not_unauthorized(monkeypatch):
+def test_an_identity_endpoint_out_of_reach_gives_no_token(monkeypatch):
     set_identity_endpoint(monkeypatch)
 
     def refuse(request):
@@ -228,7 +229,7 @@ def test_an_identity_endpoint_out_of_reach_is_unavailable_not_unauthorized(monke
     ):
         check_identity(credential)
 
-    assert str(raised.value) == "exchange_storage_identity_unavailable"
+    assert str(raised.value) == "exchange_storage_no_token"
 
 
 @pytest.mark.parametrize(
@@ -237,9 +238,11 @@ def test_an_identity_endpoint_out_of_reach_is_unavailable_not_unauthorized(monke
         answer_identity_with(500, "text/html", b"<html>Internal Server Error</html>"),
         answer_identity_with(200, "application/json", b"[]"),
         answer_identity_with(200, "application/json", b'"a token"'),
+        # The same outage in JSON: azure-identity raises CredentialUnavailableError, an AzureError.
+        answer_identity_with(500, "application/json", b'{"error": "unavailable"}'),
     ],
 )
-def test_an_identity_endpoint_that_answers_no_token_is_unavailable(monkeypatch, handle):
+def test_an_identity_endpoint_that_answers_no_token_gives_no_token(monkeypatch, handle):
     set_identity_endpoint(monkeypatch)
 
     with (
@@ -250,7 +253,7 @@ def test_an_identity_endpoint_that_answers_no_token_is_unavailable(monkeypatch, 
     ):
         check_identity(credential)
 
-    assert str(raised.value) == "exchange_storage_identity_unavailable"
+    assert str(raised.value) == "exchange_storage_no_token"
     assert raised.value.__cause__ is None
     assert raised.value.__suppress_context__
 
