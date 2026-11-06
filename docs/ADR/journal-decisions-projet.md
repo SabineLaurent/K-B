@@ -5423,6 +5423,52 @@ Plan validé par Sabine le 06/11 (I1 du plan de mise en ligne).
   de la plage de `uv_build`. Les montées mineures et majeures de `python` et d'`astral-sh/uv` sont donc
   ignorées. Une montée de Python ou de la plage d'`uv_build` lève la règle avec elle. — PR de #200
 
+### Jobs : `kb smoke-test` et le paquet `jobs` (#412)
+
+Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #412, parcours allégé).
+
+- **Le code commun aux commandes des jobs d'ACA vit dans un paquet nouveau, `src/k_b/jobs/` :
+  `exchange_storage.py` (le stockage d'échange, Blob, par l'identité managée) et `api_health.py`
+  (`GET /health` des deux API). Seul `commands` l'importe, et il n'importe que `core` (tenu par
+  `test_layers`).** Pourquoi : une couche sous `commands`, comme `post` pour l'API IA ; les deux API
+  n'ont aucun accès au stockage d'échange (plan de mise en ligne du 06/11), la règle le rend visible
+  dans le code. Écartés : `core/`, ouvert à toutes les couches, les deux API comprises ; `commands/`,
+  qui mêlerait la présentation et les entrées/sorties (`code.md`, SoC) ; `post/`, le post-traitement
+  de la veille. Limite assumée : `jobs` ne porte aujourd'hui que la liste d'un conteneur ; l'envoi et
+  le téléchargement viennent avec #413, qui les appelle (pas de code sans appelant). — PR de #412
+
+- **Le journal de `kb` garde le logger `azure` à WARNING (`logging_to`, `commands/run_log.py`),
+  comme `httpx2`.** Pourquoi, observé avec azure-core 1.41.0 : à INFO, `HttpLoggingPolicy` écrit
+  `Request URL: '…/<conteneur>/<blob>'` pour un transfert, donc le nom d'un clip, qui est son titre
+  (règle 5 de `poc.md`) ; une liste n'y écrit que le conteneur. Écarté : un filtre de masquage des
+  URL (plus de code pour le même effet). Limite assumée : `azure.identity` écrit à WARNING l'échec
+  d'un jeton avec le texte que renvoie le point d'identité de la plateforme, sans `quote_value` ; ce
+  texte ne connaît aucun blob. — PR de #412
+
+- **Une erreur du stockage est nommée par son état (`exchange_storage_forbidden`, `_not_found`,
+  `_unauthorized`, `_unavailable`, `_failed`), son statut HTTP et son code (`x-ms-error-code`,
+  gardé s'il est un mot de lettres), jamais par `str(error)` ; rien du SDK n'est chaîné (`from
+  None`). L'état se lit au statut, pas à la classe, et le jeton est demandé à part
+  (`check_identity`) : un refus de l'identité est `exchange_storage_unauthorized`, quel que soit le
+  statut de son point d'accès.** Pourquoi : le message du SDK recopie le corps de la réponse, qui
+  peut citer le chemin d'un blob (`AuthenticationErrorDetail`) ; le SDK lève
+  `ClientAuthenticationError` pour une 403 `AuthenticationFailed`
+  (`azure/storage/blob/_shared/response_handlers.py`) ; et le diagnostic utile d'un job en ligne est
+  « l'identité » ou « le rôle ». Écarté : `quote_value(str(error))`, qui garderait le début du nom.
+  — PR de #412
+
+- **Réglages de `kb smoke-test` : `AZURE_CLIENT_ID` (un GUID, passé en `client_id=`) et
+  `KB_EXCHANGE_BLOB_URL` (en `https`) sans défaut ; le conteneur d'essai est une constante,
+  `SMOKE_TEST_CONTAINER = "smoke-test"`, créé par #414. Le transport du SDK ne lit ni proxy ni
+  certificat de l'environnement (`RequestsTransport(use_env_settings=False)`) et ne suit aucune
+  redirection (`permit_redirects=False`), comme `open_http_client`. `/health` : 60 s de lecture et
+  d'échéance, corps de 1 Kio au plus, `{"status":"ok"}` exact, sans nouvel essai.** Pourquoi : sans
+  `client_id`, `ManagedIdentityCredential` cherche l'identité système, que les jobs de K-B n'ont pas ;
+  aucune valeur locale n'existe pour un compte Azure (règle 2 de `poc.md`, comme `KB_LLM_BASE_URL`) ;
+  rien ne change le conteneur d'un déploiement à l'autre. Écarté : une variable pour le conteneur.
+  Limite assumée : les 60 s sont une hypothèse (le réveil d'une API à 0 réplique), à mesurer à #414 ;
+  les délais et les nouvelles tentatives du SDK restent ceux par défaut. — PR de #412
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
