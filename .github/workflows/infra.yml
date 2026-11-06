@@ -1,0 +1,27 @@
+name: Infra
+
+on:
+  push:
+    branches: [main]
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+
+permissions:
+  contents: read
+
+# Builds the Bicep of infra/ without any Azure right: Sabine applies it by hand (infra/README.md).
+# Not a required check: with its path filter, it would block every pull request that leaves infra/ alone.
+jobs:
+  bicep-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Use the pinned Bicep, not the one of the runner image found on the PATH.
+      - run: az config set bicep.use_binary_from_path=false
+      - run: az bicep install --version v0.48.1
+      # SHA256 of bicep-linux-x64 v0.48.1 (GitHub release asset digest): update it with the version.
+      - run: echo "b09ec25a9d376c1f8e33ede6ed22b587f915ad68488d5db77a6f9541748c7f6e  $HOME/.azure/bin/bicep" | sha256sum -c
+      - run: az bicep version
+      - run: az bicep build --file infra/main.bicep --stdout > /dev/null

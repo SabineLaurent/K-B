@@ -5175,6 +5175,29 @@ Décisions de Sabine du 2026-11-04.
   son texte que le détail ne sert pas ; les valeurs ne reposent sur aucune mesure de la bibliothèque
   réelle (6 surlignages dans la base de test). — PR de #331, à venir
 
+### Infrastructure : Bicep dans `infra/`, appliqué à la main, vérifié par la CI (#411)
+
+- **L'infrastructure Azure de K-B est décrite en Bicep dans `infra/` : `main.bicep` appelle un module par
+  famille de ressources (`infra/modules/`). Sabine l'applique à la main, `what-if` puis `create`. La CI la
+  vérifie par `az bicep build` (workflow `infra.yml`, job `bicep-build`, Bicep v0.48.1 épinglé), sans
+  aucun droit Azure.** Plan de mise en ligne validé par Sabine le 06/11 :
+  - Bicep n'est pas du Python. C'est une exception à la règle « Python uniquement », acceptée par Sabine
+    le 06/11, comme le YAML de la CI ;
+  - application à la main : les fichiers donneront des rôles aux identités, ce qui demande le droit
+    d'Owner du groupe de ressources (`roleAssignments/write`), et la CI ne l'a jamais. Écarté : un
+    déploiement de l'infrastructure par la CI, qui obligerait à donner ce droit à une identité de la CI.
+    Évolution possible, notée au plan : les identités et les rôles à la main, le reste par la CI ;
+  - un fichier de workflow à lui, pas un job de plus dans `ci.yml` : chaque workflow nouveau a son
+    fichier, pour que deux PR ouvertes ne touchent jamais le même (règle des axes de la mise en ligne,
+    06/11). Filtré sur `infra/**`, le job ne doit pas devenir un contrôle obligatoire de `main` : il
+    bloquerait toute PR qui ne touche pas `infra/`.
+
+  Limites assumées :
+  - `az bicep build` vérifie la syntaxe et les types, pas ce qu'Azure acceptera (droits, quotas, noms
+    déjà pris) : seul le `what-if` le montre, et seule Sabine le lance ;
+  - entre deux applications, rien ne compare l'état d'Azure au Bicep : une modification faite dans le
+    portail reste invisible jusqu'au `what-if` suivant. — PR de #411, à venir
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
