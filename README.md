@@ -204,7 +204,7 @@ uv sync
 | Variable | Obligatoire | Rôle |
 |---|---|---|
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
-| `KB_DATABASE_URL` | non | l'URL d'une base PostgreSQL, `postgresql://…` ou `postgres://…`, créée hors de K-B en UTF8 et en collation C ([docs/stockage.md](docs/stockage.md), « Le SGBD »). Sans elle, la base est le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`. Une autre valeur, vide comprise, une URL que libpq ne lit pas, ou une variable que libpq lit posée à côté (`PGHOST`, `PGPASSWORD`…) : code 2, sans que la valeur soit citée. Lue aujourd'hui par `kb create-db` et `kb import` ; `kb serve-data` lit le fichier SQLite jusqu'à #418. |
+| `KB_DATABASE_URL` | non | l'URL d'une base PostgreSQL, `postgresql://…` ou `postgres://…`, créée hors de K-B en UTF8 et en collation C ([docs/stockage.md](docs/stockage.md), « Le SGBD »). Sans elle, la base est le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`. Une autre valeur, vide comprise, une URL que libpq ne lit pas, ou une variable que libpq lit posée à côté (`PGHOST`, `PGPASSWORD`…) : code 2, sans que la valeur soit citée. Lue par `kb create-db`, `kb import` et `kb serve-data`. |
 | `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
 | `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les comptes rendus de veille dans `veille/<sujet>/`, `kb trend-report` les comptes rendus des tendances dans `veille/tendances/` ; aucun des trois ne tourne sans elle (code 2). |
 | `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
@@ -381,7 +381,10 @@ le message nomme la variable, jamais sa valeur. Code 2 aussi si l'hôte n'est pa
 si le port n'est pas un entier de 1 à 65535, si la liste des hôtes permis est vide ou contient une
 entrée vide, une entrée avec `*` ou une entrée hors nom en minuscules, ou si `KB_LOG_TO_FILE` n'est
 ni `true` ni `false` (`false` : journal sur la sortie d'erreur seule) ; le message nomme la
-variable et cite la valeur refusée. Si le port est déjà pris (par exemple par un autre
+variable et cite la valeur refusée. Code 2 encore si `KB_DATABASE_URL` est refusée (voir « Variables
+d'environnement ») : le message nomme la variable, sans citer sa valeur. Avec une base PostgreSQL,
+`kb serve-data` démarre sans attendre la base ; une base injoignable ne se voit qu'à la requête,
+qui répond 500 `database_error` ([docs/specs-api.md](docs/specs-api.md), « Lecture seule »). Si le port est déjà pris (par exemple par un autre
 `kb serve-data`), uvicorn écrit `address already in use` au journal et `kb serve-data` sort en code 3.
 Une fois le serveur démarré, un Ctrl-C arrête uvicorn proprement : `kb serve-data` sort en code 0,
 sans la ligne `kb stopped by SIGINT` des autres commandes ; pendant le démarrage, le code dépend du

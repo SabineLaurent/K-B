@@ -23,8 +23,8 @@ importés : leur registre est la table `raw_data`.
 Elle ne contient que ce que le brut contient (les papiers arXiv écartés à la requête n'y sont pas).
 Elle est lue par l'API de données, lancée par `kb serve-data` ([specs-api.md](specs-api.md)) : routes
 `/items`, `/items/{item_id}` et `/trends` (`src/k_b/data_api/routers/item_router.py`,
-`trend_router.py`), qui ouvrent la base en lecture seule (`src/k_b/data_api/dependencies.py`,
-`connect_database_read_only`). Le code des comptes rendus de veille (`src/k_b/ai_api/`) n'ouvre pas la
+`trend_router.py`), qui lisent la base en lecture seule, sur l'un ou l'autre moteur
+(`src/k_b/data_api/dependencies.py`, `connect_reader` de `src/k_b/database/engine.py`). Le code des comptes rendus de veille (`src/k_b/ai_api/`) n'ouvre pas la
 base : il lit la veille par l'API de données (`src/k_b/ai_api/connectors/data_api_client.py`), et
 est servi par `kb serve-ai` (#156). `kb search` vient après le 08/11 (journal ADR, 2026-10-15, « POC du
 25/10 », décision 1).
@@ -48,18 +48,17 @@ ligne, par un adaptateur maison (#417) »).
   [doc de libpq](https://www.postgresql.org/docs/18/libpq-envars.html), lue le 2026-11-06) est
   refusée de même : libpq la lirait en silence (règle 2 de `.claude/rules/poc.md`).
 
-Aujourd'hui, `kb create-db` et `kb import`, purges comprises, écrivent sur les deux moteurs ;
-`kb serve-data` lit encore le fichier SQLite seul, même quand `KB_DATABASE_URL` est posée, jusqu'à
-#418.
+`kb create-db` et `kb import`, purges comprises, écrivent sur les deux moteurs ; `kb serve-data`
+lit la base que nomme `KB_DATABASE_URL`, sur l'un ou l'autre (#418).
 
 | | SQLite (en local) | PostgreSQL (en ligne) |
 |---|---|---|
 | Installation | aucune : un fichier, rejouable par un tiers | un serveur à installer, lancer et sécuriser |
 | Écritures | une à la fois ; ici un seul écrivain, le pipeline | plusieurs en parallèle (MVCC) |
 | Lectures pendant l'écriture | oui, en mode WAL | oui (MVCC) |
-| Droits | aucun compte : l'API ouvre la base en lecture seule, le fichier est lisible par sa seule propriétaire | rôles SQL, dont un rôle en lecture seule pour l'API |
+| Droits | aucun compte : l'API ouvre la base en lecture seule, le fichier est lisible par sa seule propriétaire | rôles SQL, dont un rôle en lecture seule pour l'API (#421) ; en attendant, chaque connexion de l'API lit en `READ ONLY`, une écriture est refusée par le serveur |
 | Typage | souple par défaut ; strict avec les tables `STRICT` | strict |
-| Dépendance | aucune | un pilote (`psycopg`) |
+| Dépendance | aucune | un pilote (`psycopg`) et, pour l'API, son pool (`psycopg-pool`) |
 
 Pourquoi SQLite en local : un utilisateur, un écrivain par jour, quelques milliers d'items par
 an ; en localhost, un fichier suffit, sans serveur à lancer. Limite assumée : pas de rôles dans la
@@ -80,7 +79,9 @@ Ce que chaque schéma écrit à sa façon est listé plus bas.
 - **Lecture seule** : `connect_database_read_only` ouvre la base en `mode=ro`, pour l'API de
   données. Une lecture en `mode=ro` crée les fichiers `-shm`
   et `-wal` s'ils manquent, dans le dossier de la base, et les laisse à sa fermeture
-  (documentation SQLite, WAL, § 5 ; constat sur SQLite 3.50.4).
+  (documentation SQLite, WAL, § 5 ; constat sur SQLite 3.50.4). En PostgreSQL, l'API lit par un
+  pool de connexions, chacune en `REPEATABLE READ READ ONLY`, chaque instruction sous son
+  `statement_timeout` ([specs-api.md](specs-api.md), « Lecture seule » et « Délai »).
 - **La base PostgreSQL est créée hors de K-B** (compose, Azure : #419, #421), en UTF8 et en
   collation C, PostgreSQL 17 ou plus récent (`IS JSON` et `pg_input_is_valid` depuis 16,
   `pg_database.datlocale`, que lit `kb create-db`, et le fournisseur builtin depuis 17).
@@ -95,8 +96,9 @@ Ce que chaque schéma écrit à sa façon est listé plus bas.
   verrou consultatif (`pg_advisory_xact_lock`) pris au début de la transaction de l'import et
   rendu à sa fin. Un import qui attend ce verrou plus de 5 s (`DATABASE_LOCK_TIMEOUT_SECONDS`, le
   délai de `sqlite3`) échoue, comme sur « database is locked » ; une connexion attend le serveur
-  10 s au plus (`DATABASE_CONNECT_TIMEOUT_SECONDS`). Les purges ne prennent pas encore ce verrou
-  (#418).
+  10 s au plus (`DATABASE_CONNECT_TIMEOUT_SECONDS`). Les deux purges de la fin de `kb import`
+  (`purge/base.py`, `purge/registry.py`) le prennent aussi, en tête de leur transaction : une purge
+  attend un import en cours, 5 s au plus, puis échoue sans rien supprimer.
 - **Dates** : du texte `AAAA-MM-JJTHH:MM:SSZ`, en UTC. Un `CHECK` refuse toute autre forme, et
   un jour qui n'existe pas. Exception, `clip` (#14), écrite en SQL portable (règle 1 de
   `.claude/rules/poc.md`, sans `strftime`) : le `CHECK` de chacune de ses dates (`saved_at`,
@@ -392,8 +394,11 @@ fait échouer la suite. Sans `PRAGMA foreign_keys = ON`, une clé étrangère fa
 règle ci-dessus (`tests/test_database.py`). Sur PostgreSQL (`tests/test_schema_postgresql.py`,
 marqué `postgresql`), la ligne valide de chaque table est acceptée, chaque valeur refusée de
 `tests/test_schema.py` l'est aussi, en SQLSTATE 23514, et chaque longueur et chaque nombre maximal
-de `items.py` est le `CHECK` de sa colonne. La structure des deux scripts (colonnes, `NOT NULL`,
-clés, index) n'est pas encore comparée (#418).
+de `items.py` est le `CHECK` de sa colonne. La structure des deux scripts est comparée table par
+table (`tests/test_schema_structures.py`, marqué `postgresql`) : les mêmes colonnes dans le même
+ordre, les mêmes `NOT NULL`, clés primaires, `UNIQUE`, clés étrangères avec leur `ON DELETE`, et
+les mêmes index ; seul écart voulu, l'unicité de l'URL d'un clip, tenue par `md5(url)` en
+PostgreSQL.
 
 ## Faire évoluer le schéma
 

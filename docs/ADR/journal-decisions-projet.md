@@ -5494,6 +5494,54 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   lecture, pas une réponse, et les nouvelles tentatives d'azure-identity n'y sont pas comptées
   (seconde revue de code). — PR de #412
 
+### API de données : la lecture sur PostgreSQL (#418)
+
+- **Sur PostgreSQL, l'API de données lit par un pool (`psycopg-pool` 3.3.3, publiée le 2026-09-22),
+  ouvert par `kb serve-data` : 1 à 4 connexions, chacune en `REPEATABLE READ READ ONLY`, avec le
+  délai de 5 s comme `statement_timeout` de sa session, posé par K-B à son ouverture. Un dépassement
+  (SQLSTATE 57014) répond le même 503 `query_timeout` qu'en SQLite ; une requête qui n'a pas de
+  connexion en 2 s répond 500 `database_error`.** Plan validé par Sabine le 06/11 (commentaire sur
+  #418) ; `psycopg-pool` accordé par Sabine le 06/11. **Révise le « Pour #418 » de l'entrée de #331**
+  (« un délai par requête », ci-dessus), qui posait le délai par `ALTER ROLE … SET
+  statement_timeout`, côté serveur : une recommandation de la session de #331, pas une décision de
+  Sabine ; accord de time-knight du 06/11. Ce qui a changé : le rôle de l'API n'existe pas avant
+  #421, et la valeur posée par K-B est la même pour les deux moteurs, dans le dépôt, prouvée en CI ;
+  sans réglage du serveur, la lecture n'est jamais sans délai. Pourquoi un pool : une connexion par
+  requête refait TLS et l'authentification à chaque requête. Pourquoi `REPEATABLE READ` : les
+  trois lectures du détail voient un seul état de la base, ce que le `BEGIN` de SQLite tenait ;
+  `READ ONLY` : une écriture est refusée par le serveur, avant le rôle en lecture seule de #421.
+  Le pool se connecte en arrière-plan, pour que `kb serve-data` démarre sans attendre la base,
+  comme en SQLite ; il vérifie chaque connexion avant de la prêter (une connexion coupée par un
+  redémarrage ou une bascule n'est pas servie), et chaque connexion lui revient sans transaction.
+  2 s d'attente plus 5 s d'instruction restent sous les 10 s du client de l'API IA (un test).
+  Un délai de moins d'1 ms est refusé : à 0, `statement_timeout` n'arrête plus rien. `psycopg` et
+  `psycopg_pool` sont tenus à ERROR (`LIBRARY_LOG_LEVELS`), comme `azure` et `urllib3` (#412) : à
+  WARNING, ils citent le texte de libpq et la connexion (hôte, utilisateur, base). Écartés :
+  `ALTER ROLE` (la valeur hors du dépôt, un oubli à l'installation laisse la lecture sans délai) ;
+  `options=-c statement_timeout` dans l'URL (refusé par un pooler comme PgBouncer) ; `SET LOCAL` à
+  chaque requête (utile seulement derrière un pooler en mode transaction, que #421 ne prévoit pas) ;
+  `transaction_timeout` (il ferme la session, FATAL) ; `SET TRANSACTION` après le `BEGIN` de
+  psycopg (l'isolement écrit à deux endroits) ; fermer le pool dans le `lifespan` de FastAPI (rien
+  à y gagner en lecture seule, et chaque test de l'API devrait entrer dans le `TestClient`) ; un 503
+  propre à l'attente du pool (un code de plus au contrat) ; un `NullHandler` dans `postgresql.py`
+  (une seconde façon de taire une bibliothèque). Limites assumées : le délai compte par
+  instruction, et le détail en fait jusqu'à trois (15 s en théorie, au-delà des 10 s du client) ;
+  une annulation par un administrateur (`pg_cancel_backend`) répond aussi 503 `query_timeout` ;
+  une base injoignable (mot de passe, port, `sslmode`) ne se voit qu'en `PoolTimeout` à chaque
+  requête ; sur SIGTERM, uvicorn relance le signal et le processus meurt sans fermer le pool : le
+  système ferme ses sockets, et une lecture seule n'a rien à perdre ; un `SET` de session ne tient
+  pas derrière un PgBouncer en mode transaction (« For #421 » de la PR). — PR de #418
+
+- **La recherche `q` ignore la casse par `lower(champ) LIKE lower(:pattern) ESCAPE '\'`, le même
+  SQL sur les deux moteurs.** Plan validé par Sabine le 06/11. Pourquoi : `LIKE` ignore la casse des
+  lettres ASCII en SQLite et la respecte en PostgreSQL ; `lower()` ne plie que les lettres ASCII, en
+  SQLite comme en PostgreSQL dans la collation C que `kb create-db` exige, et rend donc en
+  PostgreSQL les résultats de SQLite (le tableau de « Recherche `q` », `docs/specs-api.md`, vérifié
+  le 06/11 sur PostgreSQL 18.4). Écartés : `ILIKE`, propre à PostgreSQL (règle 1 de `poc.md`) ;
+  `citext` sur les titres et les résumés (un changement de schéma) ; plier le motif en Python, car
+  `str.lower` plie aussi `É`, alors que la base ne le plie pas. Limite assumée, inchangée : une
+  lettre accentuée ne se trouve que dans sa casse exacte. — PR de #418
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
