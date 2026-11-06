@@ -1,12 +1,13 @@
 # Infrastructure de K-B sur Azure
 
 Le Bicep de ce dossier décrit les ressources de K-B dans Azure. `main.bicep` appelle un module par famille de
-ressources (`modules/`). Toutes les ressources portent l'étiquette `project=k-b` et sont créées dans la région du
-groupe de ressources.
+ressources (`modules/`). Les ressources portent l'étiquette `project=k-b` et sont créées dans la région du groupe
+de ressources ; le budget, qui n'a ni étiquette ni région, compte les coûts de cette étiquette.
 
 | Module | Ressource | Issue |
 |---|---|---|
 | `container-apps-environment.bicep` | environnement Container Apps `cae-kb` : profil Consumption seul, sans VNet, sans destination de journaux | #411 |
+| `budget.bicep` | budget `budget-kb` : 30 €/mois des coûts étiquetés `project=k-b`, e-mail à 50 % et 100 % du réel, à 100 % de la prévision ; rien n'est coupé au dépassement | #437 |
 
 ## Vérifier
 
@@ -23,12 +24,20 @@ az bicep build --file infra/main.bicep --stdout > /dev/null
 ## Appliquer (Sabine, à la main)
 
 Ces fichiers donneront des rôles aux identités, ce qui demande le droit d'Owner sur le groupe : la CI ne l'a jamais.
-D'abord l'aperçu, puis la création :
+D'abord l'aperçu, puis la création. L'adresse des alertes du budget se passe au déploiement : elle n'est jamais
+écrite dans le dépôt, mais elle reste dans l'historique des déploiements du groupe, côté Azure.
 
 ```sh
 RG=<groupe de ressources>
-az deployment group what-if --resource-group "$RG" --template-file infra/main.bicep
-az deployment group create --resource-group "$RG" --template-file infra/main.bicep
+EMAIL=<adresse des alertes du budget>
+az deployment group what-if --resource-group "$RG" --template-file infra/main.bicep --parameters budgetContactEmail="$EMAIL"
+az deployment group create --resource-group "$RG" --template-file infra/main.bicep --parameters budgetContactEmail="$EMAIL"
+```
+
+Vérifier le budget une fois créé :
+
+```sh
+az consumption budget list --resource-group "$RG" --query "[].{name:name,amount:amount,timeGrain:timeGrain,filter:filter,notifications:notifications}"
 ```
 
 ## Relever la facture
