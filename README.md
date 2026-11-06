@@ -541,6 +541,19 @@ sqlite3 -readonly ~/.knowledge_base/k-b.sqlite "SELECT kind, count(*) FROM item 
 uv run pytest
 ```
 
+**Lancer les tests d'un groupe** (sans le `.env`, comme la CI) :
+
+```sh
+make test-ai-api    # tests/ai_api, puis les tests du code commun aux deux API
+make test-data-api  # tests/data_api, puis les tests du code commun aux deux API
+make test-etl       # tests/etl
+```
+
+Les tests du code commun aux deux API (`core/`) sont à la racine de `tests/` : `test_api_methods.py`,
+`test_api_rate_limit.py` et `test_api_telemetry.py`, listés dans `API_COMMON_TESTS` du `Makefile`. Un
+nouveau test commun s'y ajoute à la main. `make` s'arrête au premier échec : si les tests de l'API échouent,
+les tests communs ne sont pas lancés.
+
 **Mesurer la couverture des tests** (lignes et branches de `src/k_b/`, et les lignes non couvertes de
 chaque fichier) :
 
