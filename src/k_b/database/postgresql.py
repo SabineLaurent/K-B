@@ -196,8 +196,8 @@ def make_connection_parameters(
     location: PostgresUrl,
 ) -> Callable[[], dict[str, Any]]:
     """The parameters of each new connection besides the URL: the bound on the wait for its server
-    and, under Entra, a token of the identity, asked for at each call; the credential keeps its
-    token until it nears its end."""
+    and, under Entra, a token of the identity, asked for at each call. A pool keeps its credential,
+    which keeps its token until it nears its end; a direct connection asks for a token of its own."""
     if location.entra_client_id is None:
         return lambda: {"connect_timeout": DATABASE_CONNECT_TIMEOUT_SECONDS}
     credential = entra.build_database_credential(location.entra_client_id)
