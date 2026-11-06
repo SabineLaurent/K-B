@@ -343,6 +343,8 @@ Avant la passe 2, qui crée la connexion de `id-kb-deploy`. Sinon, un workflow d
 `production` créerait l'environnement sans règle, et obtiendrait un jeton.
 
 ```sh
+# Sans défileur : gh en ouvrirait un après la première commande, et les lignes collées s'y perdraient.
+export GH_PAGER=cat
 REPO=SabineLaurent/K-B
 # L'environnement production, atteint par les seuls tags v*.*.*.
 gh api -X PUT "repos/$REPO/environments/production" --input - -q .name <<'EOF'
