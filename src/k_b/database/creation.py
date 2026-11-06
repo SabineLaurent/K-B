@@ -85,8 +85,7 @@ def create_postgresql_database(location: PostgresUrl) -> None:
 
 def migrate_database(location: DatabaseLocation) -> bool:
     """Create the base of the location when it has no tables yet, and say whether it did: a base
-    that has them is left as it is, nothing written (decision of Sabine of 2026-11-06: no migration
-    before the first change of the schema online).
+    that has them is left as it is, nothing written.
 
     On PostgreSQL, the tables are granted to the roles of the base online in the same transaction:
     their owner, the role of kb migrate-database, is the one that can."""
