@@ -1,6 +1,7 @@
--- K-B: physical data model (MPD) of the items database, for PostgreSQL 17 or later (IS JSON and
--- pg_input_is_valid of 16, and pg_database.datlocale, which kb create-db reads, of 17). schema.sql, written for SQLite, is the reference: this script follows it table
--- by table, column by column, each CHECK translated; what differs, and why, is in docs/stockage.md
+-- K-B: physical data model (MPD) of the items database, for PostgreSQL 17 or later: IS JSON and
+-- pg_input_is_valid come with 16, pg_database.datlocale, which kb create-db reads, with 17.
+-- schema.sql, written for SQLite, is the reference: this script follows it table by table, column
+-- by column, each CHECK translated; what differs, and why, is in docs/stockage.md
 -- ("Ce qui est propre à SQLite"). A test writes on it the rows tests/test_schema.py writes on
 -- schema.sql (tests/test_schema_postgresql.py).
 -- The base is created out of K-B, in UTF8 and in the collation C (kb create-db checks it): text

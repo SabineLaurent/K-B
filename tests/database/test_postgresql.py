@@ -9,6 +9,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from commands.test_postgresql_errors_in_logs import OUT_OF_RANGE_MARKER
 
 import k_b
 from k_b.database import postgresql
@@ -164,8 +165,6 @@ CREATE TABLE note_link (
 """
 
 on_postgresql = pytest.mark.postgresql
-# A value PostgreSQL quotes in the message of a 22003 it reads as text: it must reach no motive.
-OUT_OF_RANGE_MARKER = "987654321098765432109876543210"
 
 
 @pytest.fixture

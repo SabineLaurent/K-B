@@ -78,8 +78,11 @@ def import_items(
             writing = write_files(connection, reading, trend_reading)
             commit_with_journal(connection, journal_path, imported_at, writing)
         except BaseException:
-            # BaseException: Ctrl-C must not leave half an import either.
-            connection.rollback()
+            # BaseException: Ctrl-C must not leave half an import either. Only an open
+            # transaction: a connection psycopg closed on a signal refuses the rollback, whose
+            # error would replace the signal (exit 1 instead of 143).
+            if connection.in_transaction:
+                connection.rollback()
             raise
     finally:
         connection.close()
@@ -136,18 +139,18 @@ def commit_with_journal(
     except BaseException as error:
         # The journal goes with the import it describes. A commit that fails raises an error of
         # the engine, whether the base keeps the transaction or undoes it itself. A Ctrl-C or a
-        # SIGTERM received before the commit finds the transaction open.
+        # SIGTERM received before the commit finds the transaction open. Each line names the
+        # journal, not its path: quote_value cuts a long path before the name.
         if isinstance(error, ENGINE_ERRORS) or connection.in_transaction:
             # The journal at journal_path can only be this import's: it was absent above.
             journal_path.unlink(missing_ok=True)
-        # The name, not the path: quote_value cuts a long path before the name.
         elif is_commit_finished_before_a_signal(connection):
             logger.info(
                 "import committed, journal kept: %s", quote_value(journal_path.name)
             )
         else:
-            # psycopg cancels COMMIT on the signal: the server may have committed the import or
-            # undone it. The journal is kept: if undone, the next import reads the files again and
+            # On the signal, psycopg asks the server to cancel COMMIT: the server may have
+            # committed the import all the same, or undone it. The journal is kept: if undone, the next import reads the files again and
             # writes a second journal of the same rejections, which costs less than an import
             # committed without its journal (family of #302).
             logger.info(

@@ -45,7 +45,8 @@ def lock_for_writing(connection: Connection) -> None:
 def is_commit_finished_before_a_signal(connection: Connection) -> bool:
     """Whether a signal received during a commit is raised once the commit has returned: on
     SQLite, where Python runs the handler after the call to SQLite; not on PostgreSQL, where psycopg
-    waits for the answer to COMMIT in Python and cancels it on the signal."""
+    waits for the answer to COMMIT in Python and, on the signal, asks the server to cancel it,
+    which the server may or may not do."""
     return isinstance(connection, SqliteConnection)
 
 
