@@ -453,7 +453,18 @@ Attendu : la seule règle `AllowAllAzureServicesAndResourcesWithinAzureIps`, de 
    admin_psql kb -At -c "SELECT has_table_privilege('id-kb-data-api', 'public.source', 'SELECT'), has_table_privilege('id-kb-data-api', 'public.source', 'INSERT'), has_schema_privilege('id-kb-data-api', 'public', 'CREATE'), has_database_privilege('id-kb-data-api', 'kb', 'TEMPORARY')"
    ```
 
-   Attendu : `t|f|f|f`. Puis dans l'API elle-même, par son identité :
+   Attendu : `t|f|f|f`. Cette lecture seule ne vaut que dans `kb` : dans `postgres`, la base du serveur, les
+   identités gardent ce que `PUBLIC` y a (limite acceptée par Sabine le 06/11, journal ADR, « Base en ligne :
+   trois rôles, posés par l'administratrice »). Ce qu'il en reste se lit, de même en lecture seule :
+
+   ```sh
+   admin_psql postgres -At -c "SELECT has_database_privilege('id-kb-data-api', 'postgres', 'TEMPORARY'), has_schema_privilege('id-kb-data-api', 'public', 'CREATE'), pg_get_userbyid(datdba) FROM pg_database WHERE datname = 'postgres'"
+   ```
+
+   Un `t` à l'une des deux premières colonnes ouvre une issue de suite : révoquer `TEMPORARY` et `CREATE` à
+   `PUBLIC` dans `postgres`, jamais `CONNECT`. La troisième nomme le propriétaire de `postgres`, pour cette issue.
+
+   Puis dans l'API elle-même, par son identité :
    `az containerapp exec -g "$RG" -n ca-kb-data-api --command sh`, puis, dans le conteneur :
 
    ```sh

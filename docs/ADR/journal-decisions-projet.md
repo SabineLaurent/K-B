@@ -5778,7 +5778,13 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
   PostgreSQL d'une seconde commande `kb` est #426). Limites assumées : une table ajoutée à la base en ligne n'a de
   droits que par une migration (#186) ; les deux scripts d'administration se lancent à la main, et la
   livraison continue ne les rejoue pas ; `grant-roles.sql` est testé tel quel, `create-principals.sql`,
-  propre à Azure, ne l'est pas. — PR de #421, à venir
+  propre à Azure, ne l'est pas ; la lecture seule d'`id-kb-data-api` ne vaut que dans `kb` : dans
+  `postgres`, la base du serveur, les identités gardent `CONNECT` et `TEMPORARY` (les droits de `PUBLIC`
+  par défaut dans PostgreSQL), peut-être `CREATE` sur son schéma `public` (Azure, non vérifié), de quoi
+  remplir le disque de 32 Gio que `postgres` partage avec `kb` ; `postgres` ne porte aucune donnée de
+  K-B (revue de sécurité, S2 ; risque accepté par Sabine le 06/11 vers 17:12 UTC, sur la recommandation
+  de time-knight). Le critère 3 de `infra/README.md` le lit en lecture seule ; un `t` en ligne ouvre une
+  issue de suite, qui révoque `TEMPORARY` et `CREATE`, jamais `CONNECT`. — PR de #421, à venir
 
 ### Base en ligne : le serveur (#421)
 
