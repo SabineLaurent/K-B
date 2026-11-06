@@ -5739,7 +5739,12 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
   `conventions.md`), mis en commun à la troisième (accord de time-knight du 06/11) ; aucune source
   officielle ne dit qu'une session survit à l'expiration de son jeton, `max_lifetime` la borne ; les
   tests prouvent ce que libpq reçoit, pas que le serveur le vérifie (le serveur de test est en
-  `trust`). — PR de #421, à venir
+  `trust`) ; le code du conteneur de `ca-kb-data-api` obtient des jetons d'`id-kb-data-api`, donc de
+  tous ses droits : `kb_reader`, AcrPull sur le registre et Key Vault Secrets User sur
+  `kb-data-api-key-ai-digest`, déjà dans son environnement (`identityLifecycle: 'Main'`, l'API IA gardant
+  `'None'`). Sans `'Main'`, chaque connexion échoue en `database_no_token` (revue de code, R1). Écartée :
+  une seconde identité réservée à la base (une identité, un rôle et du SQL de plus pour un gain presque
+  nul). Risque accepté par Sabine le 06/11, sur la recommandation de time-knight. — PR de #421, à venir
 
 ### Base en ligne : trois rôles, posés par l'administratrice (#421)
 
