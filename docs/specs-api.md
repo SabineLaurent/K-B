@@ -54,7 +54,10 @@ l'ordre des résultats, change la version.
     25006), et les lectures du détail voient un seul état de la base. Une requête attend une
     connexion 2 s au plus (`READING_POOL_WAIT_SECONDS`), puis répond 500 `database_error`
     (`PoolTimeout` au journal) ; une connexion coupée (redémarrage, bascule du serveur) n'est pas
-    prêtée. Chaque connexion revient au pool sans transaction, sur un succès comme sur une erreur.
+    prêtée. Chaque connexion revient au pool sans transaction, sur un succès comme sur une erreur ;
+    une session que le serveur a finie avant (redémarrage, coupure) laisse à la requête sa réponse ou
+    sa propre erreur, se journalise `reader_session_lost: <type de l'erreur>`, sans message, et le
+    pool remplace la connexion.
     Les lignes de `psycopg` et `psycopg_pool` sous ERROR ne sont pas journalisées
     (`LIBRARY_LOG_LEVELS`, `commands/run_log.py`) : elles citent le texte de libpq et la connexion
     (hôte, utilisateur, base). Une base injoignable ne se voit donc qu'à la requête, par
