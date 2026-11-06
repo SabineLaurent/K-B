@@ -1633,7 +1633,14 @@ des tops).
 3. **`POST /digests`** avec `{}` : la fenêtre par défaut de l'API IA (`KB_DIGEST_WINDOW_DAYS`).
    Délais nommés (`core/config.py`) : connexion 5 s, pool 5 s, écriture 10 s, lecture 240 s
    (`AI_API_READ_TIMEOUT_SECONDS`) : au-dessus de `DIGEST_REQUEST_TIMEOUT_SECONDS` et du dernier
-   appel au modèle en cours (environ 20 s de plus, `ai_api/deadline.py`). Aucune nouvelle
+   appel au modèle en cours (environ 20 s de plus, `ai_api/deadline.py`). La réponse est lue en
+   flux par la borne commune des clients de K-B (`read_bounded_body`, `core/outbound.py` ; OWASP
+   API4:2023, API10:2023, #422) : 8 000 000 d'octets décodés au plus (`MAX_AI_API_ANSWER_BYTES`),
+   annoncés par `Content-Length` ou comptés, et 240 s depuis l'envoi
+   (`AI_API_REQUEST_DEADLINE_SECONDS`), contrôlées après chaque morceau. Au-delà de la borne :
+   l'état du statut (`ai_api_invalid_response` pour un 200, `ai_api_failed` pour une 5xx…),
+   `response larger than 8000000 bytes`, le `X-Request-ID` et le `Retry-After`, jamais le corps ;
+   au-delà de l'échéance : `ai_api_timeout`. Aucune nouvelle
    tentative : un `Retry-After` est affiché, jamais attendu. Aucune redirection suivie, aucun proxy
    de l'environnement (`core/outbound.py`). Pendant l'attente, `kb digest` montre qu'il attend
    (`commands/wait_display.py`, paragraphe « Console » ci-dessous).
@@ -1734,7 +1741,7 @@ légitimes l'utilisent.
 | Code | Quand |
 |---|---|
 | 0 | chaque fiche rendue est écrite ; ou aucune fiche dans la fenêtre (`total  none in the window`) |
-| 1 | l'API IA injoignable (`ai_api_unavailable`), délai dépassé (`ai_api_timeout`), clé refusée (`ai_api_unauthorized`, 401), route refusée au client (`ai_api_forbidden`, 403), limite atteinte (`ai_api_rate_limited`, 429), panne (`ai_api_failed`, 5xx), autre réponse ou réponse hors schéma (`ai_api_invalid_response`) : aucune fiche écrite ; ou un sujet en échec et aucune fiche écrite ; ou une `OSError` au contrôle d'avant la demande |
+| 1 | l'API IA injoignable (`ai_api_unavailable`), délai ou échéance dépassés (`ai_api_timeout`), clé refusée (`ai_api_unauthorized`, 401), route refusée au client (`ai_api_forbidden`, 403), limite atteinte (`ai_api_rate_limited`, 429), panne (`ai_api_failed`, 5xx), autre réponse, réponse hors schéma ou 200 au-delà de 8 000 000 d'octets (`ai_api_invalid_response`) : aucune fiche écrite ; ou un sujet en échec et aucune fiche écrite ; ou une `OSError` au contrôle d'avant la demande |
 | 2 | réglage refusé, `KB_VAULT_DIR` absente ou pas un dossier, fiche du jour déjà là ou lien, vus avant la demande : rien n'est demandé |
 | 4 | un sujet en échec (nommé dans `failed_subjects`, ou sa fiche non écrite) et au moins une fiche écrite |
 | 130 | SIGINT (Ctrl-C) : les fiches déjà écrites restent |
@@ -1793,9 +1800,11 @@ tronqué et échappé (règle 3 de `conventions.md`).
 
 **Limites**
 
-- **Pas de borne de taille** sur la réponse lue : risque accepté par Sabine pour le POC
-  (2026-10-21 : le service de K-B, à une adresse qu'elle règle). À poser avant la mise en ligne du
-  08/11, dans `core/outbound.py`, commune aux deux clients (`read_bounded_body` et son échéance).
+- **L'échéance de la réponse** n'est contrôlée qu'après son premier morceau : avant lui viennent
+  le pool (5 s), la connexion (5 s), l'écriture (10 s), l'en-tête (240 s) et le premier morceau
+  (240 s), soit 500 s au plus. Les clients de l'API IA raccourcissent chaque délai au temps qui
+  reste (`ai_api/deadline.py`), que `post` n'importe pas ; au départ d'une demande de `kb`, il
+  reste 240 s, et le raccourci ne changerait rien (#422).
 - **Relancer le même jour** après un échec partiel sort en 2 : une fiche du jour existe. Les
   sujets en échec s'écrivent le lendemain, si leurs items restent dans la fenêtre.
 - **Le jour contrôlé** avant la demande est celui de l'horloge de `kb` ; celui de la fiche,
