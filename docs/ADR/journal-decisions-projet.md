@@ -5567,10 +5567,15 @@ Choix de la session dans le plan validé par Sabine le 06/11 (commentaire de #41
   écrit pour l'occasion ; les auteurs arXiv des fixtures deviennent des noms fictifs, les logins GitHub
   sont gardés.** Décision de Sabine du 06/11, sur la recommandation de la session. **Précise la
   consigne du 2026-10-10** (« une fixture part d'un exemple issu de la collecte ») : la structure vient
-  toujours de la collecte, le texte non, quand sa licence ne permet pas de le publier. Pourquoi : la
-  newsletter TLDR n'a aucune condition d'utilisation trouvée (droits réservés par défaut) et l'auteur
-  d'un article Medium garde ses droits ; les tests vérifient la structure lue, pas le texte. Les noms
-  fictifs des auteurs arXiv sont un choix de Sabine (leurs métadonnées sont sous CC0). Gardés, avec leur
+  toujours de la collecte, le texte non, quand sa licence ne permet pas de le publier ; les chaînes
+  que les tests assertent sont réécrites avec la fixture. Les noms propres (produits, pays) restent :
+  ce sont des faits, et des tests s'en servent (un nom qui ne doit pas fuir dans les traces, le fait
+  que cite l'article piégé ; choix de la session, PR 2). Pourquoi : la newsletter TLDR n'a aucune
+  condition d'utilisation trouvée (droits réservés par défaut) et l'auteur d'un article Medium garde
+  ses droits. Les noms fictifs des auteurs arXiv : décision de Sabine du 06/11, sur la recommandation
+  de time-knight ; pourquoi : les auteurs sont des données personnelles pour K-B (règle 3 de
+  `conventions.md`, registre), et aucun test n'a besoin des vrais noms (minimisation), bien que leurs
+  métadonnées soient sous CC0. Gardés, avec leur
   licence au README (« Contenus de tiers ») : WCAG 2.2 (W3C Document License), une page de l'OWASP
   (CC BY-SA 4.0), les avis de sécurité de GitHub (CC BY 4.0), les métadonnées arXiv et le catalogue
   KEV (CC0 1.0), les métadonnées de dépôts GitHub (logins compris : donnée publique, finalité de
