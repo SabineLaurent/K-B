@@ -131,23 +131,42 @@ def end_the_session_of(location, connection):
     the connection does not know it until its next statement."""
     process_id = connection.execute("SELECT pg_backend_pid()").fetchone()[0]
     with psycopg.connect(location.value, autocommit=True) as administrator:
-        # Waits for the end of the session, 5 s at most.
-        administrator.execute("SELECT pg_terminate_backend(%s, 5000)", (process_id,))
+        # Waits for the end of the session, 5 s at most: true once it has ended.
+        [ended] = administrator.execute(
+            "SELECT pg_terminate_backend(%s, 5000)", (process_id,)
+        ).fetchone()
+    assert ended is True
 
 
 class RequestFailedError(Exception):
     """An error a request raises after its connection was lost."""
 
 
+LOST_SESSION_LINE = "reader_session_lost: AdminShutdown"
+
+
+def lines_of_k_b(caplog):
+    return [
+        record.getMessage()
+        for record in caplog.records
+        if record.name.startswith("k_b")
+    ]
+
+
 @on_postgresql
 def test_a_request_that_read_is_served_when_its_connection_is_lost_before_given_back(
-    readers, items_postgresql_base
+    readers, items_postgresql_base, caplog
 ):
-    with connect_reader(readers, TIMEOUT_SECONDS) as connection:
+    """The loss is logged once, by the type of the error: its message may name the server."""
+    with (
+        caplog.at_level(logging.INFO),
+        connect_reader(readers, TIMEOUT_SECONDS) as connection,
+    ):
         page = read_items(connection, limit=1)
         end_the_session_of(items_postgresql_base, connection)
 
     assert len(page.items) == 1
+    assert lines_of_k_b(caplog) == [LOST_SESSION_LINE]
     # The pool lends another connection.
     with connect_reader(readers, TIMEOUT_SECONDS) as connection:
         assert len(read_items(connection, limit=1).items) == 1
@@ -166,6 +185,57 @@ def test_the_error_of_a_request_passes_when_its_connection_is_lost_before_given_
         read_items(connection, limit=1)
         end_the_session_of(items_postgresql_base, connection)
         raise RequestFailedError
+
+
+def ending_the_session_after_each_detail(monkeypatch, location, error=None):
+    """Each reader of a detail of a kind ends the session of its connection once it has read, as
+    a restart of the server between the last reading and the end of the detail would; then
+    raises the error given, if any."""
+
+    def end_after(read_detail):
+        def read_then_end(connection, item_id):
+            detail = read_detail(connection, item_id)
+            end_the_session_of(location, connection)
+            if error is not None:
+                raise error
+            return detail
+
+        return read_then_end
+
+    for kind, read_detail in list(reading.READ_DETAILS_BY_KIND.items()):
+        monkeypatch.setitem(reading.READ_DETAILS_BY_KIND, kind, end_after(read_detail))
+
+
+@on_postgresql
+def test_a_detail_that_read_is_served_when_its_connection_is_lost_before_its_end(
+    readers, items_postgresql_base, monkeypatch, caplog
+):
+    ending_the_session_after_each_detail(monkeypatch, items_postgresql_base)
+
+    with (
+        caplog.at_level(logging.INFO),
+        connect_reader(readers, TIMEOUT_SECONDS) as connection,
+    ):
+        detail = read_item_detail(connection, 1)
+
+    assert detail is not None
+    assert detail.listed.id == 1
+    assert lines_of_k_b(caplog) == [LOST_SESSION_LINE]
+
+
+@on_postgresql
+def test_the_error_of_a_detail_passes_when_its_connection_is_lost_before_its_end(
+    readers, items_postgresql_base, monkeypatch
+):
+    ending_the_session_after_each_detail(
+        monkeypatch, items_postgresql_base, RequestFailedError()
+    )
+
+    with (
+        pytest.raises(RequestFailedError),
+        connect_reader(readers, TIMEOUT_SECONDS) as connection,
+    ):
+        read_item_detail(connection, 1)
 
 
 @on_postgresql

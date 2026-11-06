@@ -419,13 +419,15 @@ def test_serve_without_base_answers_health_and_503_database_missing_without_pool
     )
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
 
-    assert cli.main(["serve-data"]) == 0
+    exit_code = cli.main(["serve-data"])
 
+    # Read first: a pool opened would fail the command too, which would hide why.
+    assert opened_pools == []
+    assert exit_code == 0
     [(app, status, body, _, health_status)] = requests_while_serving
     assert health_status == 200
     assert (status, body) == (503, {"error": "database_missing"})
     assert app.state.readers == data_dir / "k-b.sqlite"
-    assert opened_pools == []
     assert not (data_dir / "k-b.sqlite").exists()
 
 
