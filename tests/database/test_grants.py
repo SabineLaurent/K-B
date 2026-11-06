@@ -101,3 +101,25 @@ def test_the_tables_belong_to_the_identity_of_kb_migrate_database(migrated_base)
 def test_grant_roles_sql_runs_again_without_error(migrated_base):
     with psycopg.connect(migrated_base.value, autocommit=True) as administrator:
         administrator.execute(GRANT_ROLES_SCRIPT.read_text())
+
+
+# A function the role of the job may create in public, whose arguments match the call of
+# grant-roles.sql better than pg_catalog.format(text, VARIADIC "any"): with the search_path of a
+# session, the administrator would run it under her rights (CVE-2018-1058).
+PLANTED_FORMAT = """
+CREATE FUNCTION public.format(text, name) RETURNS text LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'format planted in public by the role of the job';
+END
+$$
+"""
+
+
+def test_grant_roles_sql_runs_no_function_the_job_created_in_public(
+    administered_base,
+):
+    with connect_as(administered_base, MIGRATE_DATABASE_ROLE) as job:
+        job.execute(PLANTED_FORMAT)
+
+    with psycopg.connect(administered_base.value, autocommit=True) as administrator:
+        administrator.execute(GRANT_ROLES_SCRIPT.read_text())
