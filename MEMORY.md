@@ -140,6 +140,10 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 ## Consignes de travail
 
+- **Mise en ligne sur Azure** (#414, 2026-11-06) : `infra/main.bicep` s'applique en deux passes (sans `imageTag`,
+  puis avec), par Sabine à la main, en suivant `infra/README.md`, « Appliquer ». Une session donne les commandes
+  et lit l'état en lecture seule (`az … show`, `log-kb`), sans rien appliquer elle-même. Une API au repos met
+  20 à 26 s à se réveiller (journal ADR, 2026-11-06, « Mise en ligne »).
 - **Accès à la base** (#416, puis #417, 2026-11-06) : seuls `database/engine.py` (`Connection`,
   `connect_database`, `lock_for_writing`, `connect_database_read_only`, `set_query_timeout`), `database/errors.py`
   (`ENGINE_ERRORS`, refus d'une entrée, `describe_engine_error`, `is_query_timeout`) et `etl/sources/zotero.py` (la
