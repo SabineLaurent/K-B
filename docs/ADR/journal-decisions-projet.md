@@ -5372,14 +5372,16 @@ Plan validé par Sabine le 06/11 (I1 du plan de mise en ligne).
   recompilait en mémoire environ 200 modules, que l'UID 10001 ne peut pas écrire. Une seule image : « une
   container app par service, un environnement » (18/10), chaque service lançant sa commande. Écartée :
   une étape unique, qui garderait uv et son cache dans l'image. — PR de #200
-- **L'image fixe `KB_DATA_DIR=/data` : une exception à la règle 2 de `.claude/rules/poc.md`, selon
-  laquelle `KB_DATA_DIR` n'a pas de valeur par défaut et la commande échoue sans elle.** Pourquoi, dans
-  les mots de Sabine (06/11) : « en prod, il n'a pas de surprise, il est fixe ». Dans l'image, le dossier
-  de données est toujours `/data`. La relecture du 06/11 avait relevé la contradiction ; Sabine a tranché.
-  Écartée : pas de valeur dans l'image, `KB_DATA_DIR` posée avec chaque montage. Risque qui reste : une
-  container app ou un job déployé sans son montage écrit dans le `/data` de l'image, éphémère, sans
-  erreur. Parade : le Bicep de #414, qui pose chaque montage, relu en parcours complet. — PR de #200
-- **`kb` tourne sous l'UID et le GID fixes `10001`, propriétaires de `/data`.** Pourquoi : jamais root,
+- **Le dossier de données de l'image est `/var/lib/knowledge_base`, où se monte le volume.** Décidé par
+  Sabine le 06/11 (« ok pour la convention linux »), à la place de `/data`, prévu au plan. Pourquoi : le
+  Filesystem Hierarchy Standard range sous `/var/lib` « state information pertaining to an application »
+  (FHS 3.0, § 5.8.1, lu le 06/11), et le nom reprend le dossier local `~/.knowledge_base`. — PR de #200
+- **`KB_DATA_DIR` n'a pas de valeur dans l'image : elle se pose au lancement, avec le volume.** Tranché par
+  Sabine le 06/11. Pourquoi : la règle 2 de `.claude/rules/poc.md` (sans `KB_DATA_DIR`, la commande
+  échoue). Une container app ou un job déployé sans son montage refuse alors de démarrer (code 2), au
+  lieu d'écrire dans un dossier éphémère de l'image ; la CI vérifie ce refus. Écartée : `ENV KB_DATA_DIR`
+  dans l'image, prévue au plan, une exception à la règle (relecture du 06/11). — PR de #200
+- **`kb` tourne sous l'UID et le GID fixes `10001`, propriétaires du dossier de données.** Pourquoi : jamais root,
   et `kb` écrit ses fichiers en `0600` (commentaire du 16/10 sur #200). Tout conteneur qui les lit doit
   tourner sous l'UID qui les a écrits, donc sous un UID connu d'avance. Écarté : un UID choisi au
   lancement, qui pourrait changer d'un conteneur à l'autre. Essai du 06/11 : sous cet UID, l'écriture

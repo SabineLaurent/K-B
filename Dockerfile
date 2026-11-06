@@ -28,20 +28,21 @@ FROM python:3.13-slim-trixie@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670eb
 # The base image ships its standard library without .pyc: compiled here, as root, or every start
 # compiles them again in memory.
 RUN python -m compileall -q /usr/local/lib/python3.13
-# A fixed UID and GID, not root: the owner of /data, and of the files kb writes there in mode 0600
-# (comment of 2026-10-16 on #200). /data is the data directory, where the volume is mounted.
+# A fixed UID and GID, not root: the owner of the data directory, and of the files kb writes there
+# in mode 0600 (comment of 2026-10-16 on #200). /var/lib/knowledge_base, where the volume is
+# mounted: the persistent state of an application, in the Filesystem Hierarchy Standard. No
+# KB_DATA_DIR here: it has no default (.claude/rules/poc.md, rule 2), and is set with the mount, at
+# run time; without it, kb refuses to start (decisions of Sabine of 2026-11-06, journal ADR).
 RUN groupadd --gid 10001 kb \
     && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /nonexistent \
         --shell /usr/sbin/nologin kb \
-    && mkdir /data \
-    && chown 10001:10001 /data
+    && mkdir /var/lib/knowledge_base \
+    && chown 10001:10001 /var/lib/knowledge_base
 COPY --from=builder /app/.venv /app/.venv
 # Defaults of the image, each changed by its variable at run time. In a container, stderr is the
 # log (.claude/rules/conventions.md, rule 3). stdout is not buffered: a result or a metric line
-# reaches the log at once, and is not lost when the container stops. KB_DATA_DIR has a value here,
-# an exception to .claude/rules/poc.md, rule 2 (decision of Sabine of 2026-11-06, journal ADR).
+# reaches the log at once, and is not lost when the container stops.
 ENV PATH="/app/.venv/bin:$PATH" \
-    KB_DATA_DIR=/data \
     KB_LOG_TO_FILE=false \
     PYTHONUNBUFFERED=1
 USER 10001:10001

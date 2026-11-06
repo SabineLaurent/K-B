@@ -41,8 +41,18 @@ jobs:
         run: |
           found=$(docker run --rm --user 0 --entrypoint find k-b:ci / -xdev \( -name '.env*' -o -name '*.sqlite*' -o -name decoy -o -name .DS_Store -o -name .git \) -print)
           test -z "$found" || { echo "$found"; exit 1; }
-      # create-db runs the SQL of k_b.database, read from the installed package, and writes in /data.
+      # KB_DATA_DIR has no default (.claude/rules/poc.md, rule 2): a container without it fails at
+      # its start, rather than writing in a folder that is not its volume.
+      - name: Refuses to start without KB_DATA_DIR
+        run: |
+          exit_code=0
+          error=$(docker run --rm k-b:ci create-db 2>&1) || exit_code=$?
+          echo "$error"
+          test "$exit_code" -eq 2
+          grep -qF "KB_DATA_DIR must point to the data directory" <<< "$error"
+      # create-db runs the SQL of k_b.database, read from the installed package, and writes in the
+      # data directory of the image, owned by its user.
       - name: Starts kb and creates the database
         run: |
           docker run --rm k-b:ci --help
-          docker run --rm k-b:ci create-db
+          docker run --rm -e KB_DATA_DIR=/var/lib/knowledge_base k-b:ci create-db

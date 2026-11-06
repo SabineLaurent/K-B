@@ -586,15 +586,15 @@ La CI (GitHub Actions, `.github/workflows/ci.yml`) lance quatre jobs, `audit` (p
 docker buildx build --platform linux/amd64 --tag k-b .
 docker run --rm k-b --help
 docker volume create k-b-data
-docker run --rm -v k-b-data:/data k-b create-db
+docker run --rm -v k-b-data:/var/lib/knowledge_base -e KB_DATA_DIR=/var/lib/knowledge_base k-b create-db
 ```
 
 Azure Container Apps ne lance que des images `linux/amd64` : sur un Mac à puce Apple, Docker Desktop les
 construit et les lance par émulation. L'image lance `kb` sous l'utilisateur `10001:10001`, jamais root. Son
-dossier de données est `/data` (`KB_DATA_DIR=/data` dans l'image), où se monte le volume, et il appartient à
-cet utilisateur. Sans volume monté, `kb` écrit dans le `/data` du conteneur, perdu à sa suppression. Le
-journal est la sortie d'erreur (`KB_LOG_TO_FILE=false`). Chaque variable se change au lancement (`-e`). `.dockerignore`
-garde hors de la construction `.git/`, `.venv/`, `temp/`, `reports/`, les fichiers d'environnement et les
+dossier de données, où se monte le volume, est `/var/lib/knowledge_base`, et il appartient à cet utilisateur.
+`KB_DATA_DIR` n'a pas de valeur dans l'image : elle se donne au lancement, avec le volume, et sans elle `kb`
+refuse de démarrer. Le journal est la sortie d'erreur (`KB_LOG_TO_FILE=false`). Chaque variable se change au
+lancement (`-e`). `.dockerignore` garde hors de la construction `.git/`, `.venv/`, `temp/`, `reports/`, les fichiers d'environnement et les
 bases `*.sqlite`, avec leurs fichiers annexes. Le job `image-build` de la CI (`.github/workflows/image.yml`)
 construit l'image sur chaque PR vers `main` et la contrôle, sans la pousser nulle part.
 
