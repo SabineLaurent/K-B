@@ -541,24 +541,28 @@ sqlite3 -readonly ~/.knowledge_base/k-b.sqlite "SELECT kind, count(*) FROM item 
 uv run pytest
 ```
 
-**Lancer les tests d'un groupe** (sans le `.env`, comme la CI) :
+**Lancer les tests avec leur rapport** (sans le `.env`, comme la CI) : chaque commande écrit le rapport HTML
+de pytest-html dans `reports/`, ignoré par git, en `0600`, écrasé au lancement suivant.
 
 ```sh
+make test           # tous les tests, comme uv run pytest : reports/test.html
 make test-ai-api    # tests/ai_api, puis les tests du code commun aux deux API
 make test-data-api  # tests/data_api, puis les tests du code commun aux deux API
 make test-etl       # tests/etl
 ```
 
-Les tests du code commun aux deux API (`core/`) sont à la racine de `tests/` : `test_api_methods.py`,
-`test_api_rate_limit.py` et `test_api_telemetry.py`, listés dans `API_COMMON_TESTS` du `Makefile`. Un
-nouveau test commun s'y ajoute à la main. `make` s'arrête au premier échec : si les tests de l'API échouent,
-les tests communs ne sont pas lancés.
+Les rapports d'un groupe sont `reports/test-ai-api.html`, `reports/test-data-api.html` et
+`reports/test-etl.html` ; ceux du code commun aux deux API, `reports/test-api-common.html`. Ces tests
+communs (`core/`) sont à la racine de `tests/` : `test_api_methods.py`, `test_api_rate_limit.py` et
+`test_api_telemetry.py`, listés dans `API_COMMON_TESTS` du `Makefile`. Un nouveau test commun s'y ajoute à
+la main. `make` s'arrête au premier échec : si les tests de l'API échouent, les tests communs ne sont pas
+lancés.
 
-**Mesurer la couverture des tests** (lignes et branches de `src/k_b/`, et les lignes non couvertes de
-chaque fichier) :
+**Mesurer la couverture des tests** (lignes et branches de `src/k_b/`) :
 
 ```sh
-uv run pytest --cov --cov-report=term-missing
+make test-cov       # les fichiers sous 100 % dans la console, le tableau complet dans reports/coverage.md
+uv run pytest --cov --cov-report=term-missing   # tous les fichiers dans la console, sans fichier
 ```
 
 La CI (GitHub Actions, `.github/workflows/ci.yml`) lance quatre jobs, `audit` (pip-audit sur `uv.lock`),
