@@ -15,17 +15,17 @@ from jobs.storage_fakes import (
     remove_online_variables,
     set_identity_endpoint,
 )
+
+from k_b.core.config import (
+    DATABASE_TOKEN_CONNECT_TIMEOUT_SECONDS,
+    DATABASE_TOKEN_READ_TIMEOUT_SECONDS,
+)
 from k_b.database.entra import (
     POSTGRESQL_TOKEN_SCOPE,
     EntraTokenError,
     build_database_credential,
     build_identity_transport,
     fetch_database_token,
-)
-
-from k_b.core.config import (
-    DATABASE_TOKEN_CONNECT_TIMEOUT_SECONDS,
-    DATABASE_TOKEN_READ_TIMEOUT_SECONDS,
 )
 
 

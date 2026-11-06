@@ -12,7 +12,6 @@ import pytest
 from azure.core.credentials import AccessToken
 from azure.core.exceptions import ClientAuthenticationError
 from commands.test_postgresql_errors_in_logs import OUT_OF_RANGE_MARKER
-from k_b.database.entra import POSTGRESQL_TOKEN_SCOPE
 
 import k_b
 from k_b.database import entra, postgresql
@@ -22,6 +21,7 @@ from k_b.database.creation import (
     create_database,
 )
 from k_b.database.engine import connect_database, lock_for_writing
+from k_b.database.entra import POSTGRESQL_TOKEN_SCOPE
 from k_b.database.errors import ENGINE_ERRORS, describe_engine_error
 from k_b.database.location import PostgresUrl, RefusedDatabaseUrlError
 from k_b.database.postgresql import DatabaseNoTokenError, translate_placeholders
@@ -485,6 +485,7 @@ def test_without_entra_a_connection_sends_no_password_of_k_b(
 
     connection = postgresql.connect_postgresql(postgresql_base)
     try:
-        assert connection._connection.info.password is None
+        # libpq gives an empty text for a password it was not given.
+        assert connection._connection.info.password == ""
     finally:
         connection.close()

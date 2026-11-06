@@ -12,7 +12,6 @@ from urllib.parse import urlsplit, urlunsplit
 
 import psycopg
 import pytest
-from database.online_roles import GRANT_ROLES_SCRIPT, GROUP_ROLES, IDENTITY_ROLES
 
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
 from k_b.database.creation import create_database
@@ -201,6 +200,9 @@ def identity_roles(postgresql_server_url):
     """The roles of the identities on the test server, for the session; roles are shared by the
     bases of a server, so they are dropped with the roles grant-roles.sql created, once the bases of
     the tests are."""
+    # Imported here: tests/test_e2e_selection.py runs this file without the rest of tests/.
+    from database.online_roles import GROUP_ROLES, IDENTITY_ROLES
+
     server = psycopg.connect(postgresql_server_url, autocommit=True)
     existing = {
         name for (name,) in server.execute("SELECT rolname FROM pg_roles").fetchall()
@@ -218,6 +220,8 @@ def identity_roles(postgresql_server_url):
 @pytest.fixture
 def administered_base(identity_roles, postgresql_base):
     """A new base on which grant-roles.sql ran, as on Azure before the first kb migrate-database."""
+    from database.online_roles import GRANT_ROLES_SCRIPT
+
     with psycopg.connect(postgresql_base.value, autocommit=True) as administrator:
         administrator.execute(GRANT_ROLES_SCRIPT.read_text())
     return postgresql_base

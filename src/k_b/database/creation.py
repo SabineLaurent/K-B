@@ -1,11 +1,13 @@
 """Create the items database from its SQL scripts: schema.sql in a SQLite file, or
-schema_postgresql.sql in a PostgreSQL base, then the sources."""
+schema_postgresql.sql in a PostgreSQL base, then the sources; and kb migrate-database, which creates
+a base that has no tables yet, its tables granted to the roles of the base online, and leaves one
+that has them as it is."""
 
 from importlib.resources import files
 from pathlib import Path
 
 from k_b.core.quoting import quote_value
-from k_b.database.engine import connect_database, connect_sqlite
+from k_b.database.engine import Connection, connect_database, connect_sqlite
 from k_b.database.location import DatabaseLocation, PostgresUrl
 
 DATABASE_SCRIPTS = files("k_b.database")
@@ -72,20 +74,55 @@ def create_postgresql_database(location: PostgresUrl) -> None:
     and without its tables yet; on any failure, the transaction undone leaves the base empty."""
     connection = connect_database(location)
     try:
-        check_database_settings(connection.execute(SELECT_DATABASE_SETTINGS).fetchone())
-        (has_tables,) = connection.execute(SELECT_SOURCE_TABLE).fetchone()
-        if has_tables:
+        if has_its_tables(connection):
             raise ExistingDatabaseError("the PostgreSQL base already has its tables")
-        connection.executescript(
-            DATABASE_SCRIPTS.joinpath("schema_postgresql.sql").read_text()
-        )
-        connection.executescript(
-            DATABASE_SCRIPTS.joinpath("seed_sources.sql").read_text()
-        )
+        write_postgresql_schema(connection)
         connection.commit()
     finally:
         # A transaction not committed is undone by the server.
         connection.close()
+
+
+def migrate_database(location: DatabaseLocation) -> bool:
+    """Create the base of the location when it has no tables yet, and say whether it did: a base
+    that has them is left as it is, nothing written (decision of Sabine of 2026-11-06: no migration
+    before the first change of the schema online).
+
+    On PostgreSQL, the tables are granted to the roles of the base online in the same transaction:
+    their owner, the role of kb migrate-database, is the one that can."""
+    if isinstance(location, Path):
+        if location.exists():
+            return False
+        create_sqlite_database(location)
+        return True
+    connection = connect_database(location)
+    try:
+        if has_its_tables(connection):
+            return False
+        write_postgresql_schema(connection)
+        connection.executescript(
+            DATABASE_SCRIPTS.joinpath("grants_postgresql.sql").read_text()
+        )
+        connection.commit()
+    finally:
+        # A reading or a transaction not committed is undone by the server.
+        connection.close()
+    return True
+
+
+def has_its_tables(connection: Connection) -> bool:
+    """Whether the base, checked to have the settings K-B needs, already has the tables of K-B."""
+    check_database_settings(connection.execute(SELECT_DATABASE_SETTINGS).fetchone())
+    (has_tables,) = connection.execute(SELECT_SOURCE_TABLE).fetchone()
+    return bool(has_tables)
+
+
+def write_postgresql_schema(connection: Connection) -> None:
+    """Write the tables and the sources, in the transaction of the connection."""
+    connection.executescript(
+        DATABASE_SCRIPTS.joinpath("schema_postgresql.sql").read_text()
+    )
+    connection.executescript(DATABASE_SCRIPTS.joinpath("seed_sources.sql").read_text())
 
 
 def check_database_settings(settings: tuple[str | bytes | None, ...]) -> None:

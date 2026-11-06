@@ -181,6 +181,13 @@ DATABASE_CONNECT_TIMEOUT_SECONDS = 10
 # How long a writer waits for the lock of another one on PostgreSQL, then fails: the 5 seconds
 # sqlite3.connect waits by default for the write lock of SQLite (database/postgresql.py).
 DATABASE_LOCK_TIMEOUT_SECONDS = 5
+# How kb authenticates to a PostgreSQL base when KB_DATABASE_AUTH is not set: libpq as the URL says,
+# the local default; entra asks the managed identity for a token (database/location.py).
+DEFAULT_DATABASE_AUTH = "libpq"
+# The waits of a request for that token, to the identity endpoint of the container
+# (database/entra.py): azure-core would otherwise wait 300 s for it.
+DATABASE_TOKEN_CONNECT_TIMEOUT_SECONDS = 5
+DATABASE_TOKEN_READ_TIMEOUT_SECONDS = 10
 # The pool of connections the data API reads a PostgreSQL base with (database/postgresql.py): one
 # replica, a few clients. A request waits for a connection at most READING_POOL_WAIT_SECONDS, then
 # fails: that wait and one statement (DATA_API_QUERY_TIMEOUT_SECONDS) stay below the

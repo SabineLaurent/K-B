@@ -11,7 +11,18 @@
 -- No constraint is named here: PostgreSQL names the one of a primary key <table>_pkey, which
 -- database/errors.py tells from the other unique constraints.
 
-CREATE EXTENSION IF NOT EXISTS citext;
+-- citext is created only when the base does not have it yet, as on a local server. On Azure, the
+-- role of kb migrate-database runs no CREATE EXTENSION: a member of azure_pg_admin may be needed
+-- for one, IF NOT EXISTS included (a report on Microsoft Q&A, learn.microsoft.com/answers/a/1905478,
+-- not the documentation), so the administration creates citext before
+-- (infra/postgresql/grant-roles.sql).
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_extension WHERE extname = 'citext') THEN
+        CREATE EXTENSION citext;
+    END IF;
+END
+$$;
 
 -- A date of the base: the form of strftime('%Y-%m-%dT%H:%M:%SZ'), and a day that exists, as the
 -- CHECK of schema.sql, which compares the text with strftime of itself. pg_input_is_valid returns
