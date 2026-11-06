@@ -65,9 +65,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   l'ADR du 15/10 (décision 8), la règle 4 de `poc.md` (une ligne JSON par appel sur stdout) et
   l'ADR du 20/10 (décision 4 : OpenTelemetry vers Grafana Cloud, l'outil est choisi). Périmètre de
   la v0, non corrigé.
-- **La ligne « Sécurité » du registre** (fiche 1 : fichiers lisibles par la seule utilisatrice)
-  devient fausse quand la base passe dans un volume Docker (#200), puis sur Azure au 08/11 : la PR
-  qui change l'hébergement la met à jour (revue de #5, le 2026-10-18).
+- **La ligne « Sécurité » du registre** (fiche 1) ne dit encore, de ce qui est en ligne, que la base
+  (#421, section « Base en ligne ») : les autres données hébergées sur Azure (stockage d'échange, #412
+  à #414) y entrent avec la PR qui les héberge (revue de #5, le 2026-10-18).
 - **Deux pourquoi de `.claude/rules/poc.md` contredisent le cadrage du 20/10** (revue de #275, le
   2026-10-20 ; signalé à Sabine, qui modifie `.claude/`) : la règle 1 dit « La base passe à
   PostgreSQL au 08/11 (décision 2) », décision en attente de « La base au temps 3 » ; la règle 6
@@ -166,6 +166,15 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   `request.getfixturevalue` dans la seule moitié PostgreSQL, sinon `uv run pytest` demande le serveur. La
   structure des deux schémas est comparée par `tests/test_schema_structures.py` : un écart nouveau voulu
   s'écrit dans `WANTED_DIFFERENCES`.
+- **Base en ligne** (#421, 2026-11-06) : `KB_DATABASE_AUTH=entra` (défaut `libpq`) ouvre la base PostgreSQL par
+  le jeton de l'identité managée d'`AZURE_CLIENT_ID`, demandé à chaque connexion nouvelle, pool compris
+  (`database/entra.py`) ; K-B refuse alors une URL sans `sslmode=verify-full` ou qui porte un mot de passe.
+  `kb migrate-database` (job `caj-kb-migrate-database`) crée la base qui n'a pas ses tables, et laisse telle quelle
+  celle qui les a : ce n'est pas une migration (#186). La base `kb` et les rôles se créent à la main
+  (`infra/postgresql/`, `infra/README.md`). Les droits sur les tables (`grants_postgresql.sql`) ne se posent qu'à
+  la création : une table ajoutée à une base en ligne existante n'a de droits que par une migration (#186). Les
+  tests créent les rôles des identités sur leur serveur et y passent `grant-roles.sql` tel quel
+  (`tests/database/online_roles.py`, fixture `administered_base`).
 - Pour la documentation d'une bibliothèque ou d'un service, utiliser Context7 plutôt qu'une
   lecture de page web. Ce que Context7 ne couvre pas : WebSearch, source et date à l'appui ;
   WebFetch seulement sur une URL qu'une recherche du jour vient de rendre.

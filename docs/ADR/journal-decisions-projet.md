@@ -5708,6 +5708,91 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
   version se vérifie à la main avant de fusionner** (commentaire de `.github/dependabot.yml`). Gardé dans
   #414 sur la décision de tn-orchestrateur du 06/11. — PR de #414
 
+### Base en ligne : Entra seul, un jeton à chaque connexion (#421)
+
+- **En ligne, K-B ouvre la base PostgreSQL sans mot de passe : sous `KB_DATABASE_AUTH=entra`, chaque
+  connexion nouvelle, celles du pool comprises, présente comme mot de passe un jeton de l'identité
+  managée d'`AZURE_CLIENT_ID` (`ManagedIdentityCredential`, portée
+  `https://ossrdbms-aad.database.windows.net/.default`), et K-B refuse alors une URL sans
+  `sslmode=verify-full` ou qui porte un mot de passe. Le serveur coupe l'authentification par mot de
+  passe.** Entra seul et sans VNet : décisions 2 et 1 du plan de mise en ligne du 06/11 (hors du
+  dépôt, recopiées dans #421). Le reste : plan de #421 validé par Sabine le 06/11 (commentaire de
+  l'issue), relu par un sous-agent ; les raisons ci-dessous sont celles du plan. Pourquoi
+  `verify-full` exigé : le jeton est un secret porteur ; sans vérification du certificat, libpq
+  l'enverrait à un serveur qui se fait passer pour celui de K-B (« For #421 » des PR de #440 et #446).
+  Pourquoi un jeton par connexion : il vit une heure environ ; le pool reçoit ses paramètres de
+  connexion par une fonction (`kwargs` appelable de `psycopg_pool` 3.3.3), et son `max_lifetime` par
+  défaut (3 600 s) borne la vie d'une session. Pourquoi une variable explicite : déduire Entra
+  d'`AZURE_CLIENT_ID` ou d'`IDENTITY_ENDPOINT` le rendrait implicite. Le certificat se vérifie contre
+  le magasin de l'image, `sslrootcert=/etc/ssl/certs/ca-certificates.crt` (vérifié dans `k-b:ci` le
+  06/11 : DigiCert Global Root G2 et Microsoft RSA Root Certificate Authority 2017 y sont). Un jeton
+  que l'identité ne donne pas devient `DatabaseNoTokenError`, une `psycopg.OperationalError` sans le
+  texte du SDK, que chaque commande prend par `except ENGINE_ERRORS`. Écartés : la sous-classe de
+  `psycopg.Connection` de l'exemple de Microsoft (plus de code pour le même effet) ; un mot de passe
+  dans le Key Vault (décision 2) ; `sslrootcert=system` (dépend de l'`OPENSSLDIR` de la libssl que
+  psycopg-binary embarque) ; un certificat versionné dans le dépôt (à suivre à chaque rotation
+  d'Azure). Limites assumées : le transport et l'identifiant client sont écrits une seconde fois,
+  après `jobs/exchange_storage.py`, la base ne pouvant importer les jobs (règle 5 de
+  `conventions.md`), mis en commun à la troisième (accord de time-knight du 06/11) ; aucune source
+  officielle ne dit qu'une session survit à l'expiration de son jeton, `max_lifetime` la borne ; les
+  tests prouvent ce que libpq reçoit, pas que le serveur le vérifie (le serveur de test est en
+  `trust`). — PR de #421, à venir
+
+### Base en ligne : trois rôles, posés par l'administratrice (#421)
+
+- **La base en ligne a trois rôles : `id-kb-migrate-database`, celui du job
+  `caj-kb-migrate-database`, crée les tables et en est propriétaire ; `id-kb-data-api` lit, par le
+  groupe `kb_reader` (`SELECT`) ; `kb_writer` (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) attend
+  l'identité de la routine quotidienne (#330). Aucun autre rôle ne se connecte à la base ni n'y crée
+  rien. La base `kb` et les rôles se créent en SQL, une fois, par l'administratrice Entra du serveur
+  (`infra/postgresql/`) ; `kb migrate-database` pose les droits sur les tables dans la transaction qui
+  les crée.** Les trois rôles et leurs droits : contenu de #421 (lecture seule pour l'API, parce que
+  le registre affirme que « l'API ouvre la base en lecture seule »). `kb_writer` créé ici, son membre
+  `id-kb-daily-routine` et son `GRANT` dans #330 : décision de Sabine du 06/11 vers 15:28 UTC,
+  transmise par time-knight, raison non dite. Le reste : plan validé par Sabine le 06/11, raisons du
+  plan. Chaque rôle d'identité est rattaché par l'identifiant de son principal de service
+  (`pgaadauth_create_principal_with_oid`), pas par son nom : une identité d'un autre groupe de
+  l'annuaire de l'école peut porter le même. `REVOKE ALL ON DATABASE` et `REVOKE CREATE ON SCHEMA
+  public` à `PUBLIC` : sur Azure, tout rôle peut créer dans `public` (Microsoft Learn, « Access
+  management », lu le 06/11). La base se crée depuis `template0`, en UTF8 et en collation C, que
+  `kb migrate-database` vérifie ; écarté : la créer par le Bicep, dont la doc ne dit pas qu'il pose
+  `LC_CTYPE`. Les droits sur les tables (`grants_postgresql.sql`) sont posés par leur propriétaire, à
+  la création ; écartés : l'identité de migration administratrice Entra (membre d'`azure_pg_admin`,
+  bien au-delà du DDL) ; `ALTER DEFAULT PRIVILEGES` (utile à une table ajoutée plus tard, donc à
+  #186, pas à une base créée en une transaction) ; les droits dans `schema_postgresql.sql` (`kb
+  create-db` voudrait alors les rôles en local). `kb migrate-database` est le mode « créer si
+  absente » de « Base : pas de migration avant le premier changement de schéma en ligne » (ci-dessus) :
+  une base qui a ses tables n'est pas touchée, code 0 ; sinon, réglages vérifiés, puis schéma, sources
+  et droits dans une transaction. Écartés : relancer les `GRANT` à chaque exécution (la seconde
+  écrirait au catalogue, contre le critère de #421) ; un verrou consultatif (de deux migrations à la
+  fois, la seconde échoue sur la table déjà créée, et rien n'est écrit à moitié, le DDL de
+  PostgreSQL étant transactionnel). Limites assumées : une table ajoutée à la base en ligne n'a de
+  droits que par une migration (#186) ; les deux scripts d'administration se lancent à la main, et la
+  livraison continue ne les rejoue pas ; `grant-roles.sql` est testé tel quel, `create-principals.sql`,
+  propre à Azure, ne l'est pas. — PR de #421, à venir
+
+### Base en ligne : le serveur (#421)
+
+- **Le serveur est un PostgreSQL 18 flexible `Standard_B1ms` (Burstable), 32 Gio sans croissance
+  automatique, sauvegardes 7 jours sans géoredondance, sans haute disponibilité, en accès public avec
+  la seule règle « services Azure » ; `log_error_verbosity = TERSE` ; ni PgBouncer, ni `ALTER ROLE …
+  SET statement_timeout`.** Taille, accès public et sauvegardes : contenu de #421 (B1ms, environ
+  16 €/mois d'après le plan de mise en ligne, sous le budget de 30 €). Le reste : plan validé par
+  Sabine le 06/11. Pourquoi « services Azure » : les adresses de sortie de Container Apps ne sont pas
+  fixes ; la règle ouvre aussi le serveur aux autres clients d'Azure, et c'est l'authentification
+  Entra seule qui le protège. L'adresse du Mac s'ouvre et se ferme par `az`, le temps d'une
+  administration ; écartée : une règle dans le Bicep, qui laisserait une adresse IP dans l'historique
+  des déploiements. `TERSE` : sans le `DETAIL` « Failing row contains », qui recopierait dans les
+  journaux du serveur la ligne refusée, un auteur avec elle (règle 5 de `poc.md`). Pas de PgBouncer :
+  B1ms n'a pas de PgBouncer intégré (faits Azure de time-knight du 05/11), le `SET` de session de #418
+  tient donc ; `ALTER ROLE` reste écarté pour la raison de #418 (la valeur hors du dépôt). 32 Gio sans
+  croissance : un disque plein arrête les écritures au lieu de faire monter la facture. API
+  `2025-08-01` : `2026-10-01` donne l'avertissement BCP081 sous Bicep v0.48.1 (essayé le 06/11).
+  Limites assumées : le serveur se paie à l'heure, qu'il serve ou non ; qu'Azure accepte
+  `log_error_verbosity` et `citext` en 18 ne se voit qu'à l'application ; les sauvegardes du serveur
+  ne sont pas celles de #390 (aucune restauration d'essai), et ne permettent pas de supprimer le
+  brut. — PR de #421, à venir
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
