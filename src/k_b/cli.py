@@ -81,6 +81,17 @@ ROUTINE_BY_COMMAND = {
     "digest-watch": RoutineCommand(run_digest_watch, describe_digest_watch),
 }
 DRY_RUN_HELP = "print the steps and their rules, run none and transfer nothing"
+# The commands run with the data directory and the environment, by name, kb collect the default; a
+# table rather than a branch each, which would pass the complexity ruff allows (C901, 10). kb serve-ai,
+# kb digest and kb smoke-test take the environment only (run_command).
+RUN_BY_COMMAND: dict[str, Callable[[Path, Mapping[str, str]], int]] = {
+    "create-db": run_create_db,
+    "migrate-database": run_migrate_database,
+    "import": run_import,
+    "write-tops": run_write_tops,
+    "serve-data": run_serve_data,
+    "trend-report": run_trend_report,
+} | {command: routine.run for command, routine in ROUTINE_BY_COMMAND.items()}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -237,24 +248,10 @@ def describe_exit_codes() -> str:
 
 def run_command(command: str, data_dir: Path, environ: Mapping[str, str]) -> int:
     """Run the kb command given and return its exit code."""
-    if command == "create-db":
-        return run_create_db(data_dir, environ)
-    if command == "migrate-database":
-        return run_migrate_database(data_dir, environ)
-    if command == "import":
-        return run_import(data_dir, environ)
-    if command == "write-tops":
-        return run_write_tops(data_dir, environ)
-    if command == "serve-data":
-        return run_serve_data(data_dir, environ)
     if command == "serve-ai":
         return run_serve_ai(environ)
     if command == "digest":
         return run_digest(environ)
-    if command == "trend-report":
-        return run_trend_report(data_dir, environ)
     if command == "smoke-test":
         return run_smoke_test(environ)
-    if command in ROUTINE_BY_COMMAND:
-        return ROUTINE_BY_COMMAND[command].run(data_dir, environ)
-    return run_collect(data_dir, environ)
+    return RUN_BY_COMMAND.get(command, run_collect)(data_dir, environ)
