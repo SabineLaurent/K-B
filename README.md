@@ -587,19 +587,23 @@ uv run kb daily-routine --dry-run    # les étapes et leurs règles, rien lancé
   `veille/` vers le conteneur `watch`. L'étape Zotero viendra entre le miroir et `kb collect` (#425).
 - `kb digest-watch` : `GET /health` des deux API, qui réveille une API à 0 réplique (`KB_DATA_API_URL`,
   `KB_AI_API_URL`), `kb digest`, de nouveau les deux `/health`, `kb trend-report`, puis la même
-  publication. `kb trend-report` tourne même si `kb digest` échoue.
-- Le miroir copie un clip du premier niveau que le coffre n'a pas, ou a plus ancien (date du blob
-  contre date du fichier, qui prend ensuite celle du blob) ; il ne supprime rien. Laissé de côté,
+  publication. `kb trend-report` tourne même si `kb digest` échoue ; un réveil échoué n'arrête rien
+  et ne compte pas dans le code de sortie (ses lignes ERROR restent) : une API injoignable fait
+  échouer l'étape qui suit.
+- Le miroir copie un clip du premier niveau que le coffre n'a pas, ou a plus ancien (à la même
+  seconde, d'une autre taille) : date du blob contre date du fichier, qui prend ensuite celle du
+  blob ; il ne supprime rien. Laissé de côté,
   sans échec : un blob dans un dossier (`/`), caché (`.` initial) ou qui ne finit pas par `.md`.
   Refusé, l'étape rend 4 : un clip que le partage ne peut pas porter (`\`, caractère de contrôle ou
   d'usage privé, `" : | < > * ?`, plus de 241 octets) ou plus gros que 1 000 000 octets. Le journal
   le cite par sa position dans la liste (`blob 12 of 120`), jamais par son nom ; il est refusé à
   chaque exécution jusqu'à ce que son blob soit supprimé de `clippings` (le renommer sur le Mac
-  laisse l'ancien blob). Après une copie, la routine attend la marge de `kb collect` (60 s), pour
-  qu'il lise le clip le jour même.
+  laisse l'ancien blob). Après une copie, la routine attend la marge de `kb collect` plus 5 s
+  (65 s), pour qu'il lise le clip le jour même.
 - La publication envoie chaque fiche de `veille/` absente de `watch`, à sa racine
   (`tops/<top>/<jour>.md`), sans jamais remplacer un blob ; les entrées cachées (dont les
-  temporaires d'une écriture interrompue) et les liens sont laissés de côté.
+  temporaires d'une écriture interrompue) et les liens sont laissés de côté ; un dossier illisible
+  fait échouer l'étape.
 
 Code de sortie : le pire de ceux des étapes, dans l'ordre 0, 4, 2, 1 (un 2 peut être bénin :
 `kb digest` le rend quand la fiche du jour existe) ; 2 aussi quand rien n'est lancé, un réglage du job

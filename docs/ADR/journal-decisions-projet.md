@@ -5818,6 +5818,77 @@ Sabine le 06/11 ; les mesures viennent de `log-kb`.
   ne sont pas celles de #390 (aucune restauration d'essai), et ne permettent pas de supprimer le
   brut. — PR de #421, à venir
 
+### Jobs : `kb daily-routine` et `kb digest-watch` (#413)
+
+Plan validé par Sabine le 06/11 (« Je suis les recommandations de time-knight »), relu par un sous-agent neuf.
+
+- **Chaque job lance une commande `kb` qui enchaîne ses étapes dans le même processus, par l'appel des
+  fonctions des commandes (`run_collect(data_dir, environ)`…), pas par `subprocess.run` (`commands/job_routine.py`).**
+  Choix de la session, noté par time-knight le 06/11. Pourquoi : `kb` est le PID 1 du conteneur, le seul processus
+  que SIGTERM atteint ; dans le même processus, `stopping_on_sigterm` couvre chaque étape (`daily-routine` et
+  `digest-watch` dans `COMMANDS_STOPPED_BY_SIGTERM`), et le code d'une étape est celui que rendrait sa commande. Une
+  exception imprévue d'une étape vaut 1 et la suite tourne, comme pour une commande seule (`cli.py`). Écarté : un
+  sous-processus par étape, qui demandait un relais du signal vers l'enfant et l'attente de sa fin. — PR de #413
+- **Le code de sortie d'une routine est le pire de ses étapes, dans l'ordre 0, 4, 2, 1 ; 130 et 143 arrêtent la
+  routine sans lancer la suite.** Décision de Sabine du 06/11, sur la recommandation de time-knight. Pourquoi : leur
+  valeur ne les ordonne pas, et un 2 peut être bénin (`kb digest` le rend quand la fiche du jour existe, donc sur une
+  relance le même jour), alors qu'un 1 est une étape lancée qui a échoué. Écarté : 0, 4, 1, 2, proposé d'abord (un
+  réglage refusé se répète chaque jour), qui laissait un 2 bénin cacher un vrai 1 (relecture du plan). Le réveil des
+  API ne compte pas dans ce code ; ses lignes ERROR restent (revue de code, tranché par time-knight le 06/11,
+  délégation de Sabine du 15/10) : une API injoignable fait échouer l'étape qui suit, qui le dit. — PR de #413
+- **Conduite (issue #413) : `kb import` n'est pas lancé si `kb collect` rend 1 ou 2 ; toute autre étape est lancée
+  quel que soit le code d'avant ; `kb trend-report` tourne après un échec de `kb digest` ; les deux API sont
+  réveillées par `GET /health` avant `kb digest` et à nouveau avant `kb trend-report`.** Pourquoi le second réveil
+  (choix de la session) : une demande de fiches dure jusqu'à 200 s, et les 300 s d'éveil d'une API sont le défaut
+  d'ACA, non chronométré ; un `/health` d'une API éveillée coûte une fraction de seconde. `kb write-tops` tourne même
+  quand `kb import` est sauté : les relevés des tops n'entrent pas en base, `kb write-tops` est leur seul lecteur
+  (« Tops : les fiches par `kb write-tops` », 2026-10-19, `;` choisi par Sabine). — PR de #413
+- **Le miroir des clips recode `ifSourceNewer` (décision 7 du plan de mise en ligne, Sabine, 06/11) : un clip est
+  copié si son fichier manque ou est plus ancien que le blob, ou, à la même date, d'une autre taille ; une fois écrit par
+  `write_file_atomically`, le fichier prend la date du blob (`os.utime`). Le téléchargement demande la version
+  listée (`etag`, `IfNotModified`), jamais décompressée (`decompress=False`) ; rien n'est supprimé.** Pourquoi : le
+  SDK n'a pas l'option d'azcopy ; dater le fichier par le blob fait comparer deux dates du stockage, quelle que soit
+  l'horloge du conteneur, et poser la date change le ctime, que lit `clipping.py` : la collecte voit le clip changé.
+  La taille, à la même date seulement : `last_modified` est à la seconde, et un fichier plus récent est gardé quelle
+  que soit sa taille (deux revues de code, tranché par time-knight). La version épinglée et
+  `decompress=False` : un blob `Content-Encoding: gzip` de moins de 1 Mo pourrait faire des Go une fois décompressé
+  (relecture du plan). Après une copie, la routine attend `CLIP_CHANGE_MARGIN` plus 5 s, sans quoi le clip serait
+  collecté le jour même ou le lendemain selon la durée des autres sources (choix de la session, marge de 5 s
+  tranchée par time-knight). Un fichier écrit dont la date ne peut être posée reste copié, et compte en échec.
+  Limites assumées : un second envoi de même taille dans la même seconde n'est pas vu ; Azure Files ignore la casse
+  (`a.md` et `A.md` tombent sur un fichier, le plus récent l'emporte), un cas qui ne vient que d'un blob déposé
+  autrement, le coffre du Mac en APFS, insensible à la casse par défaut, ne pouvant porter les deux noms ; l'écart des
+  horloges du partage et du conteneur n'est pas mesuré. — PR de #413
+- **Un nom de blob qui n'est pas un clip du premier niveau (avec `/`, un `.` initial, ou qui ne finit pas par `.md`)
+  est laissé de côté, sans échec ; un clip que le partage ne peut pas porter (`\`, caractère `Cc`, `Co` ou `Cs`,
+  `" : | < > * ?`, plus de 241 octets en UTF-8) ou plus gros que `CLIP_MAX_BYTES` est refusé, et l'étape rend 4. Le
+  journal le cite par sa position dans la liste, jamais par son nom.** Choix de la session pour les deux sortes ;
+  `..` refusé comme composant de chemin, ce que couvrent `/`, `\` et le `.` initial, décidé par Sabine le 06/11.
+  Pourquoi : `clipping.py` saute de même ce qui n'est pas un clip, et un `.DS_Store` rendrait 4 chaque jour ; un
+  clip refusé ne doit jamais l'être en silence, comme un clip trop gros (`ClipTooLargeError`) ; 241 : les 255 d'un
+  nom moins les 14 caractères du temporaire de `write_file_atomically` ; le nom d'un clip est son titre (règle 3 de
+  `conventions.md`). Écarté : `..` refusé partout, qui refusait chaque jour un titre « Les options... ». Limite : un
+  clip refusé l'est à chaque exécution jusqu'à la suppression de son blob dans `clippings`. — PR de #413
+- **La publication envoie chaque fiche de `veille/` absente du conteneur `watch`, à sa racine, par
+  `upload_blob(overwrite=False)` (`If-None-Match: *`), après la liste des blobs ; les entrées cachées, les liens et
+  les fichiers qui ne sont pas réguliers sont laissés de côté, un dossier illisible fait échouer l'étape.** Pourquoi :
+  « sans écraser un blob qui existe » (issue) ; la liste évite de renvoyer chaque jour toutes les fiches ; une
+  erreur du stockage arrête l'étape, sinon chaque envoi attendrait ses nouvelles tentatives (environ 7 min, #412).
+  Écarté : envoyer sans liste et compter les 409, qui renverrait chaque jour chaque fiche du partage. Limite : la liste
+  de `watch` grandit sans purge, comme `veille/`. — PR de #413
+- **`--dry-run` imprime les étapes et leurs règles, après le démarrage ordinaire (`KB_DATA_DIR`), sans lire les
+  réglages du job.** Pourquoi : le critère de #413 le lance dans l'image sans eux
+  (`docker run --rm -e KB_DATA_DIR=/var/lib/knowledge_base <image> daily-routine --dry-run`). — PR de #413
+- **En ligne, `kb import` garde sa purge du brut à 6 mois jusqu'à #390, qui la sortira dans l'étape « `pg_dump` puis
+  purge » de `kb daily-routine`.** Décision de Sabine du 06/11 (option c, recommandée par la session et par
+  time-knight). Pourquoi : elle tient la décision du 04/11 (« le brut est gardé 6 mois au plus » ; les deux
+  sauvegardes saines valent « une fois la base sauvegardée ») et celle du 06/11 vers 11:30Z (en ligne, la purge après
+  `pg_dump`), qui suppose une sauvegarde que #390 apporte. Écartées : (a) pas de purge du brut en ligne d'ici #390,
+  qui fait tomber le maximum de 6 mois quelques jours après l'amorçage (il copie le brut du Mac) ; (b) coder
+  `pg_dump` dans #413, le périmètre de #390 (client PostgreSQL dans l'image, jeton Entra, lieu des sauvegardes).
+  Écart avec la carte des axes de time-knight (« enchaînée par `kb daily-routine` (#413) »). Limite déjà assumée le
+  04/11 : sans sauvegarde de K-B, la base est la seule copie de ce qui a plus de 6 mois. — PR de #413
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
