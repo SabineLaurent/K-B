@@ -173,6 +173,14 @@ def test_kb_database_auth_entra_without_kb_database_url_is_refused():
     ) == ("KB_DATABASE_AUTH is entra, and KB_DATABASE_URL is not set")
 
 
+@pytest.mark.parametrize("value", ["Entra", "entra ", "msi", ""])
+def test_an_unknown_kb_database_auth_without_kb_database_url_is_refused(value):
+    # As with a URL: a mistyped entra must not send the base to a SQLite file either.
+    assert read_database_location_or_refusal(
+        {DATABASE_AUTH_VARIABLE: value}, DATA_DIR
+    ) == ("KB_DATABASE_AUTH is neither libpq nor entra")
+
+
 def test_kb_database_auth_libpq_is_left_alone_with_the_sqlite_base():
     assert read_database_location_or_refusal(
         {DATABASE_AUTH_VARIABLE: "libpq"}, DATA_DIR
