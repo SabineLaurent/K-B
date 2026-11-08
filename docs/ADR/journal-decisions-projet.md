@@ -6180,31 +6180,34 @@ Langfuse Cloud (UE), LangSmith (UE) et Honeycomb, selon les critères de « Wiki
 
 - **Grafana Cloud reste le seul outil de suivi pour le rendu du 25/11 ; Application Insights est
   repris après le rendu.** Décision de Sabine du 2026-11-08 (« 10. ta recommandation »), sur la
-  recommandation de time-knight, dont les raisons lui ont été dites : deux outils avant le 25/11,
-  c'est deux mises en place, deux documentations (C11.8) et deux essais d'accessibilité (C11.4) ;
-  Application Insights demande soit un collecteur OpenTelemetry avec une authentification Entra,
-  soit une dépendance nouvelle (l'exportateur Azure Monitor), qui demanderait son accord ; les
-  métriques au format Prometheus et leurs alertes dépendent de `Microsoft.Monitor` et
-  `Microsoft.AlertsManagement`, non enregistrés sur l'abonnement de l'école le 08/11, que Sabine,
-  Reader, ne peut pas enregistrer. Pourquoi le reprendre après le rendu : les traces et les
-  journaux resteraient chez Microsoft, sous le DPA de l'école (le contenu d'un appel au modèle en
-  anomalie ne partirait pas chez un sous-traitant américain), dans un outil Azure natif. Faits de
-  la comparaison : Grafana Cloud reçoit les trois signaux OTLP de K-B (métriques, traces,
-  journaux), il est en place depuis #162, #345 et #347, et coûte 0 $ dans les limites de l'offre
-  gratuite. Option écartée : les deux outils dès maintenant, ce qui couvre Application Insights dès
-  le 25/11, recommandé par la comparaison sans biais du sous-agent de time-knight du 08/11 (aucun
-  sous-traitant nouveau, le DPA de l'école, quelques centimes par mois, tout en Bicep, à condition
-  d'enregistrer les deux fournisseurs, d'avoir l'accord du DPO de l'école et une règle d'alerte qui
-  traite l'absence de données) : écartée pour ces deux raisons. Les autres outils sont écartés dans le document, chacun avec sa raison (Langfuse Cloud et LangSmith :
-  traces OTLP seules, les métriques et les journaux de K-B sans destination). Limites assumées :
-  l'accessibilité n'est essayée que sur Grafana Cloud, les autres outils sont jugés sur leurs
-  déclarations publiées ; le texte des prompts, avantage propre de Langfuse et LangSmith, n'est pas
-  montré par Grafana Cloud tant que `KB_TRACE_CONTENT` vaut `none` en ligne ; le DPA de Grafana
-  Labs, signé le 28/10, ne vaut selon sa réponse du 29/10 que pour les entreprises, ce qui est
-  porté à Sabine (registre, « Envoi des mesures à Grafana Cloud »). **Précise** la décision 4 du
-  20/10 (« Squelette E1 E3 : cadrage du 20/10 ») ; sa phrase « au troisième temps, seuls l'URL et
-  le jeton changent » ne vaut pas pour Application Insights (collecteur et Entra), à revoir à sa
-  reprise. — PR de #163
+  recommandation de time-knight, dont les raisons lui ont été dites. D'abord, deux outils avant le
+  25/11, c'est deux mises en place, deux documentations (C11.8) et deux essais d'accessibilité
+  (C11.4). Ensuite, Application Insights demande soit un collecteur OpenTelemetry avec une
+  authentification Entra, soit une dépendance nouvelle (l'exportateur Azure Monitor), qui
+  demanderait son accord ; les métriques au format Prometheus et leurs alertes dépendent de
+  `Microsoft.Monitor` et `Microsoft.AlertsManagement`, non enregistrés sur l'abonnement de l'école
+  le 08/11, que Sabine, Reader, ne peut pas enregistrer. Pourquoi le reprendre après le rendu : les
+  traces et les journaux resteraient chez Microsoft, sous le DPA de l'école (le contenu d'un appel
+  au modèle en anomalie ne partirait pas chez un sous-traitant américain), dans un outil Azure
+  natif. Faits de la comparaison : Grafana Cloud reçoit les trois signaux OTLP de K-B (métriques,
+  traces, journaux), il est en place depuis #162, #345 et #347, et coûte 0 $ dans les limites de
+  l'offre gratuite. Option écartée : les deux outils dès maintenant, ce qui couvre Application
+  Insights dès le 25/11, recommandé par la comparaison sans biais du sous-agent de time-knight du
+  08/11 (aucun sous-traitant nouveau, le DPA de l'école, quelques centimes par mois, tout en Bicep,
+  à condition d'enregistrer les deux fournisseurs, d'avoir l'accord du DPO de l'école et une règle
+  d'alerte qui traite l'absence de données) ; elle est écartée pour les deux raisons de time-knight
+  (deux mises en place avant le 25/11 ; collecteur ou dépendance nouvelle, et fournisseurs non
+  enregistrés). Les pages de Langfuse Cloud et de LangSmith ne décrivent que des traces OTLP : les
+  métriques et les journaux de K-B n'y auraient pas de destination. Les autres outils sont écartés
+  dans le document, chacun avec sa raison. Limites assumées : l'accessibilité n'est essayée que sur
+  Grafana Cloud, les autres outils sont jugés sur leurs déclarations publiées ; le texte des
+  prompts, avantage propre de Langfuse et LangSmith, n'est pas montré par Grafana Cloud tant que
+  `KB_TRACE_CONTENT` vaut `none` en ligne. Remonté à Sabine, non tranché : le DPA de Grafana Labs,
+  signé le 28/10, ne vaut selon sa réponse du 29/10 que pour les entreprises (registre, « Envoi
+  des mesures à Grafana Cloud »). **Précise** la décision 4 du 20/10 (« Squelette E1 E3 : cadrage
+  du 20/10 ») ; sa phrase « au troisième temps, seuls l'URL et le jeton changent » ne vaut pas pour
+  Application Insights (un collecteur et Entra, ou l'exportateur Azure Monitor ; des métriques en
+  temporalité delta) : remonté à Sabine. — PR de #163
 
 ## Décisions encore ouvertes
 

@@ -30,7 +30,7 @@ outil à l'autre.
 | Cheminement d'un appel dans l'API IA | l'arbre `POST /digests` → `read_watch` → `classify_batch` → `chat` → `write_subject` → `chat`, et la raison de chaque affirmation retirée, en enregistrement de journal `gen_ai.evaluation.result` rattaché à son `chat` | `src/k_b/ai_api/tracing.py:45` ; `docs/fiches-veille.md`, « Traces de `POST /digests` (#345) » |
 | Contenu d'un appel au modèle | un enregistrement `gen_ai.client.inference.operation.details` par requête, sous `KB_TRACE_CONTENT` (`none` par défaut, `anomalies`, `all`) ; `all` refusé au démarrage en production ; en ligne, `none` | `src/k_b/ai_api/tracing.py:54` ; `src/k_b/core/config.py:539` ; `src/k_b/ai_api/connectors/metrics_export.py:51`, `:186-187` ; `infra/main.bicep:217` |
 | Trois chemins OTLP | `/v1/metrics`, `/v1/traces`, `/v1/logs` sous une seule URL de base ; aucune variable `OTEL_*` acceptée | `src/k_b/ai_api/connectors/metrics_export.py:52`, `:54-56` |
-| Envoi | métriques toutes les 60 s ; spans et journaux par lots, chaque seconde | `src/k_b/core/config.py:516` ; `docs/fiches-veille.md:1538` |
+| Envoi | métriques toutes les 60 s, en temporalité cumulative, histogrammes à buckets explicites ; spans par lots toutes les 5 s, journaux chaque seconde (délais par défaut du SDK 1.45.1, que K-B ne règle pas) | `src/k_b/core/config.py:516` ; `src/k_b/ai_api/connectors/metrics_export.py:64-69` ; `src/k_b/ai_api/observability/metric_instruments.py:31-37` ; `src/k_b/ai_api/connectors/trace_export.py:87-98` |
 | Copie hors outil | une ligne JSON par appel au modèle sur la sortie standard, qui reste (journal ADR, « Wiki : métriques », révisée le 2026-10-15) | `src/k_b/ai_api/observability/metrics.py:50-51` |
 | Restitution | tableaux de bord et alertes, à construire dans l'outil choisi (#164) | — |
 
@@ -39,10 +39,10 @@ ouvertes ») est tranchée pour l'API IA par #347, le 2026-10-28 : le texte part
 l'enregistrement de contenu, sous `KB_TRACE_CONTENT`, et c'est inscrit au registre ; elle reste
 ouverte pour le wiki.
 
-Volume : 91 séries de métriques par démarrage de `kb serve-ai` quand une demande réussit, davantage
-en cas d'échec (`docs/fiches-veille.md:1434-1436`).
+Volume : 91 séries de métriques par démarrage de `kb serve-ai` quand une demande réussit (calcul,
+non recompté dans Grafana), davantage en cas d'échec (`docs/fiches-veille.md:1434-1436`).
 
-**Conventions GenAI d'OpenTelemetry.** Elles vivent depuis peu dans un dépôt à part,
+**Conventions GenAI d'OpenTelemetry.** Elles vivent dans un dépôt à part, créé le 2026-05-05,
 `open-telemetry/semantic-conventions-genai` ; l'ancienne page d'opentelemetry.io dit « This page has
 moved » [27]. Au commit `e6658f1` de ce dépôt (2026-11-06), chaque document lu porte « **Status**:
 Development » (`docs/gen-ai/README.md:7`, `client-inference.md:7`, `gen-ai-metrics.md:7`,
@@ -60,18 +60,18 @@ numéros renvoient à la section « Sources ».
 
 | Critère | Application Insights | Grafana Cloud (en place) | Langfuse Cloud (UE) | LangSmith (UE) | Honeycomb (UE) |
 |---|---|---|---|---|---|
-| Métriques OTLP de K-B | oui : une ressource Application Insights avec « OTLP support », les métriques allant dans un Azure Monitor workspace [1][6] | oui, en place depuis #162 | non trouvé : seules les traces sont décrites [14] | non trouvé : seules les traces sont décrites [20] | oui : l'offre gratuite compte « 100M time series data points » [24] |
-| Traces OTLP | oui, dans Log Analytics [1] | oui (Tempo), en place depuis #345 | oui, HTTP seul, « gRPC is not supported yet » [14] | oui [20] | oui, gRPC et HTTP [30] |
-| Journaux OTLP (raisons, contenu) | oui [1] | oui (Loki), en place depuis #345 et #347 | non trouvé [14] | non trouvé [20] | non vérifié |
-| Cheminement d'un appel | les traces arrivent ; vue non essayée | vu à l'essai réel du 2026-10-27 : Tempo, et « Logs for this span » sur un `chat` (`docs/fiches-veille.md:1549`) | les traces arrivent ; vue non essayée | les traces arrivent ; vue non essayée | les traces arrivent ; vue non essayée |
+| Métriques OTLP de K-B | oui : une ressource Application Insights avec « OTLP support », les métriques allant dans un Azure Monitor workspace [1][6] | oui, en place depuis #162 | non trouvé : seules les traces sont décrites [14] | non trouvé : seules les traces sont décrites [20] | oui : « can handle OTLP metrics and logs signals in addition to traces » [28] |
+| Traces OTLP | oui, dans Log Analytics [1] | oui (Tempo), en place depuis #345 | oui, HTTP seul, « gRPC is not supported yet » [14] | oui [20] | oui, gRPC et HTTP [28] |
+| Journaux OTLP (raisons, contenu) | oui [1] | oui (Loki), en place depuis #345 et #347 | non trouvé [14] | non trouvé [20] | oui [28] |
+| Cheminement d'un appel | les traces arrivent ; vue non essayée | Tempo, et « Logs for this span » sur un `chat` (`docs/fiches-veille.md:1545-1547`), sans date d'essai écrite ; les raisons vues dans Loki à l'essai réel du 2026-10-27 (`:1547-1549`) | les traces arrivent ; vue non essayée | les traces arrivent ; vue non essayée | les traces arrivent ; vue non essayée |
 | Tableaux de bord | classeurs et tableaux Grafana du portail [31] | Grafana | personnalisables, sur toutes les offres, à partir des traces, observations et scores ; pas de métriques OTLP [12][15] | personnalisables sur le cloud US seulement ; en UE, une version « legacy » ; à partir des traces (nombre, latence, jetons, coût, retours) [21] | non vérifié |
 | Alerte sur seuil | alertes sur métriques, y compris d'Application Insights ; groupes d'actions par e-mail ; alertes sur métriques OpenTelemetry en « public preview » [2] | alertes Grafana ; pour un compte gratuit ouvert depuis le 20/04/2026 : plus de Cloud Alertmanager, e-mail aux seuls utilisateurs de l'instance, webhooks gardés [9] ; limite de règles non trouvée [8] | 2 alertes en Hobby ; latence, coût, scores ; Slack, PagerDuty, webhook, GitHub Actions ; e-mail non trouvé [16] | erreurs, latence, coût, retours, nombre d'exécutions, sur 5 ou 15 min ; Slack, PagerDuty, Dynatrace, webhook ; offre minimale non trouvée [22] | 2 déclencheurs en offre gratuite [24] |
 | Temps réel | délai d'ingestion non vérifié | délai d'ingestion non vérifié ; K-B envoie ses métriques toutes les 60 s | « new data appears in real time » avec l'en-tête `x-langfuse-ingestion-version: 4`, sinon jusqu'à 10 min [14] | ingestion asynchrone, délai non chiffré [20] | non vérifié |
-| Accessibilité publiée | Azure fait partie des plateformes du rapport WCAG 2.1 de Microsoft ; rapport non ouvert ; portail et Azure Monitor non nommés [4] | « partially conformant with WCAG 2.1 level AA » (09/09/2025), certaines parties pas entièrement accessibles au clavier ; pas de VPAT ni d'ACR [10] ; **essai de Sabine** (section « Accessibilité ») | aucune déclaration trouvée | aucune déclaration trouvée | aucune déclaration trouvée |
-| Région UE | région de l'abonnement de l'école ; un service régional déployé dans une région de l'EU Data Boundary en fait partie, mais Azure Monitor n'est pas nommé [5] | pile en `prod-eu-west-2`, Allemagne (registre, `docs/registre-traitements.md:127`) ; région d'une pile non modifiable [11] ; transferts vers les États-Unis possibles selon le DPA (registre, `:128`) | Irlande (AWS `eu-west-1`), offre gratuite comprise [12][13] | Pays-Bas (GCP `europe-west4`), offre gratuite comprise ; facturation aux États-Unis ; « We do not have a legal entity in the EU » [19] | Irlande (AWS `eu-west-1`) [25] ; sur l'offre gratuite : non trouvé |
-| Coût pour K-B | journaux : 0 $ jusqu'à 5 Go par mois et par compte de facturation, puis 2,76 $/Go ; métriques : 0,11 $ les 10 millions d'échantillons ; alerte sur métrique : 0 $ jusqu'à 10 séries ; alerte sur journaux : 0,50 à 1,50 $ par mois ; facturé à l'école [3] | 0 $ : 10 000 séries actives par mois, 50 Go de journaux et 50 Go de traces par mois, 14 jours, 3 utilisateurs actifs [8] | 0 $ (Hobby) : 50 000 unités par mois, 30 jours, 2 utilisateurs ; Core à 29 $ par mois, 90 jours [12] | 0 $ (Developer) : 1 siège, 5 000 traces par mois, traces de base gardées 14 jours ; Plus à 39 $ par siège et par mois [18] | 0 $ : 20 millions d'événements par mois ; rétention non trouvée [24] |
-| Contrat | DPA de Microsoft, entre Microsoft et l'école, déjà au registre (`docs/registre-traitements.md:18-23`) ; aucun sous-traitant nouveau [32] | Raintank Inc., dba Grafana Labs (New York) ; DPA lu le 24/10, signé et envoyé par Sabine le 28/10 ; le 29/10, Grafana Labs répond qu'il ne vaut que pour les entreprises (source : Sabine, voir « Écarts au choix ») | « Data processing agreement (GDPR) » sur l'offre Hobby [12] ; le lien du DPA mène à celui de ClickHouse, non lu ; société contractante non trouvée [17] | LangChain Inc., société du Delaware ; DPA par le support ; offre gratuite « without warranties, indemnities, support obligations, performance commitments, or data retention rights » [23] | DPA intégré aux conditions, offre gratuite comprise [33] |
-| Mise en place sur l'abonnement de l'école | le 08/11 vers 11:25 UTC, `Microsoft.Monitor` et `Microsoft.AlertsManagement` sont « NotRegistered » (relevé de time-knight par `az provider show`) ; Sabine, Reader, ne peut pas les enregistrer ; un Azure Monitor workspace est une ressource `Microsoft.Monitor/accounts` [7] ; l'envoi passe par un collecteur OpenTelemetry ≥ 0.132.0 et une authentification Entra [1] | en place : `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS` (`infra/main.bicep:224`, `:142`) | URL et en-tête ; métriques et journaux de K-B sans destination | URL et en-tête ; métriques et journaux de K-B sans destination | URL de l'instance UE et clé en en-tête [30] |
+| Accessibilité publiée | Azure fait partie des plateformes du rapport WCAG 2.1 de Microsoft ; rapport non ouvert ; portail et Azure Monitor non nommés [4] | « partially conformant with WCAG 2.1 level AA » (09/09/2025), certaines parties pas entièrement accessibles au clavier ; VPAT et ACR non mentionnés [10] ; **essai de Sabine** (section « Accessibilité ») | aucune déclaration trouvée le 2026-11-08 dans les pages lues [12][13][14][17] | aucune déclaration trouvée le 2026-11-08 dans les pages lues [18][19][23] | aucune déclaration trouvée le 2026-11-08, ni lien depuis la page d'accueil de honeycomb.io [24] |
+| Région UE | région de l'abonnement de l'école ; un service régional déployé dans une région de l'EU Data Boundary en fait partie, mais Azure Monitor n'est pas nommé [5] | pile en `prod-eu-west-2`, Allemagne (registre, « Envoi des mesures à Grafana Cloud », ligne « Région ») ; région d'une pile non modifiable [11] ; transferts vers les États-Unis possibles selon le DPA (même section, ligne « Transferts hors UE ») | Irlande (AWS `eu-west-1`), offre gratuite comprise [12][13] | Pays-Bas (GCP `europe-west4`), offre gratuite comprise ; facturation aux États-Unis ; « We do not have a legal entity in the EU » [19] | Irlande (AWS `eu-west-1`) [25] ; sur l'offre gratuite : non trouvé |
+| Coût pour K-B | journaux : 0 $ jusqu'à 5 Go par mois et par compte de facturation, puis 2,76 $/Go ; métriques : 0,11 $ les 10 millions d'échantillons ; alerte sur métrique : 0 $ jusqu'à 10 séries ; alerte sur journaux : 0,50 à 3 $ par mois selon la fréquence ; facturé à l'école [3] | 0 $ : 10 000 séries actives par mois, 50 Go de journaux et 50 Go de traces par mois, 14 jours, 3 utilisateurs actifs [8] | 0 $ (Hobby) : 50 000 unités par mois, 30 jours, 2 utilisateurs ; Core à 29 $ par mois, 90 jours [12] | 0 $ (Developer) : 1 siège, 5 000 traces par mois, traces de base gardées 14 jours ; Plus à 39 $ par siège et par mois [18] | 0 $ : 20 millions d'événements par mois ; rétention non trouvée [24] |
+| Contrat | DPA de Microsoft, entre Microsoft et l'école, déjà au registre (en-tête, « Sous-traitant ») ; aucun sous-traitant nouveau [32] | Raintank Inc., dba Grafana Labs (New York) ; DPA lu le 24/10, signé et envoyé par Sabine le 28/10 ; le 29/10, Grafana Labs répond qu'il ne vaut que pour les entreprises (source : Sabine, voir « Écarts au choix ») | « Data processing agreement (GDPR) » sur l'offre Hobby [12] ; le lien du DPA mène à celui de ClickHouse, non lu ; société contractante non trouvée [17] | LangChain Inc., société du Delaware ; DPA intégré aux conditions par renvoi (« governed by the Data Processing Addendum »), un PDF pré-signé ; offre gratuite « without warranties, indemnities, support obligations, performance commitments, or data retention rights » [23] | DPA intégré aux conditions, offre gratuite comprise [33] |
+| Mise en place sur l'abonnement de l'école | le 08/11 vers 11:25 UTC, `Microsoft.Monitor` et `Microsoft.AlertsManagement` sont « NotRegistered » (relevé de time-knight par `az provider show`) ; Sabine, Reader, ne peut pas les enregistrer ; un Azure Monitor workspace, qui stocke les métriques OTLP [1][6], est une ressource `Microsoft.Monitor/accounts` [7] ; l'envoi passe par un collecteur OpenTelemetry ≥ 0.132.0 et une authentification Entra [1] ; l'agent OpenTelemetry géré d'ACA n'envoie pas les métriques à Application Insights [38] | en place : `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS` (`infra/main.bicep:224`, `:142`) | URL et en-tête ; métriques et journaux de K-B sans destination | URL et en-tête ; métriques et journaux de K-B sans destination | URL de l'instance UE et clé en en-tête [28] |
 
 ## Accessibilité
 
@@ -79,7 +79,9 @@ Le critère demande une accessibilité « essayée ». Choix de Sabine du 2026-1
 time-knight) : **un seul essai, sur Grafana Cloud**, l'outil en place. Les quatre autres outils
 sont jugés sur leurs déclarations publiées : c'est une limite. Le tableau de bord et l'alerte de
 #164 n'existent pas encore : l'essai porte sur Explore, un tableau de bord de test à un panneau, et
-la liste des règles d'alerte.
+la liste des règles d'alerte. Une règle d'alerte de test, déclenchée exprès, est créée ou non par
+Sabine pendant l'essai ; sans elle, les étapes 9 et 10 portent sur une liste vide, et c'est une
+limite.
 
 Grille : les critères WCAG 2.1 AA visés par RGAA 4.1.2 (`.claude/rules/conformite.md`), là où ils
 touchent la lecture d'une mesure et d'une alerte. Est bloquant ce qui empêche, au clavier seul ou au
@@ -92,15 +94,16 @@ déficiences de la vision de Chrome, Colour Contrast Analyser, le zoom du naviga
 | 1 | contrôles automatiques (FastPass) | Explore, panneau, règles d'alerte | plusieurs | à venir |
 | 2 | clavier seul : ouvrir le tableau de bord, changer la période | panneau | 2.1.1 | à venir |
 | 3 | clavier seul : lire le panneau en tableau (Inspect > Data) | panneau | 2.1.1 | à venir |
-| 4 | clavier : sortir de chaque menu ou fenêtre ouvert | les trois | 2.1.2 | à venir |
-| 5 | focus visible tout au long du parcours | les trois | 2.4.7 | à venir |
-| 6 | lecteur d'écran : nom et rôle des commandes | Explore, panneau | 4.1.2 | à venir |
-| 7 | lecteur d'écran : valeur d'un panneau, résultat d'une requête | Explore, panneau | 4.1.2, 4.1.3 | à venir |
-| 8 | lecteur d'écran : règles d'alerte et leur état | règles d'alerte | 4.1.2, 4.1.3 | à venir |
-| 9 | couleur seule (émulation du daltonisme) | panneau, règles d'alerte | 1.4.1 | à venir |
-| 10 | contrastes du texte, des axes, de la légende | Explore, panneau | 1.4.3, 1.4.11 | à venir |
-| 11 | zoom à 200 % | Explore, panneau | 1.4.4 | à venir |
-| 12 | zoom à 400 % | panneau | 1.4.10 | à venir |
+| 4 | clavier seul : ouvrir une règle d'alerte depuis la liste | règles d'alerte | 2.1.1 | à venir |
+| 5 | clavier : sortir de chaque menu ou fenêtre ouvert | les trois | 2.1.2 | à venir |
+| 6 | focus visible tout au long du parcours | les trois | 2.4.7 | à venir |
+| 7 | lecteur d'écran : nom et rôle des commandes | Explore, panneau | 4.1.2 | à venir |
+| 8 | lecteur d'écran : valeur d'un panneau, résultat d'une requête | Explore, panneau | 4.1.2, 4.1.3 | à venir |
+| 9 | lecteur d'écran : règles d'alerte et leur état | règles d'alerte | 4.1.2, 4.1.3 | à venir |
+| 10 | couleur seule (émulation du daltonisme) | panneau, règles d'alerte | 1.4.1 | à venir |
+| 11 | contrastes du texte, des axes, de la légende | Explore, panneau | 1.4.3, 1.4.11 | à venir |
+| 12 | zoom à 200 % | Explore, panneau | 1.4.4 | à venir |
+| 13 | zoom à 400 % | panneau | 1.4.10 | à venir |
 
 Contournements prévus pour #164, si un point bloque : un texte à côté de la couleur d'un seuil
 (« SOUS SEUIL ») ; l'alerte reçue par e-mail, en texte, qu'un compte gratuit récent n'envoie
@@ -118,25 +121,29 @@ Cloud ».
   outil pour les métriques. Leur avantage propre est de montrer le texte des prompts ; K-B sait
   l'envoyer à Grafana Cloud sous `KB_TRACE_CONTENT`, mais ce réglage vaut `none` en ligne : voir
   « Écarts au choix », point 1.
-- **Application Insights** reçoit les trois signaux [1], mais le 2026-11-08 la souscription ne le
-  permet pas sans un administrateur : deux fournisseurs de ressources ne sont pas enregistrés, et
-  Sabine, Reader, ne peut pas le faire. Il demande aussi un collecteur et Entra [1], soit plus que
-  l'URL et le jeton.
+- **Application Insights** reçoit les trois signaux [1]. Ses métriques OTLP vont dans un Azure
+  Monitor workspace [1][6], une ressource `Microsoft.Monitor/accounts` [7] ; le 2026-11-08,
+  `Microsoft.Monitor` et `Microsoft.AlertsManagement` ne sont pas enregistrés sur l'abonnement de
+  l'école, et Sabine, Reader, ne peut pas les enregistrer. Qu'une ressource Application Insights
+  avec « OTLP support » crée elle-même ce workspace n'est pas écrit dans [1] : non vérifié. L'envoi
+  demande aussi un collecteur et Entra, ou l'exportateur Azure Monitor (une dépendance nouvelle,
+  selon time-knight), et des métriques en temporalité delta [1] : plus que l'URL et le jeton
+  (« Écarts au choix », point 3).
 - **Grafana Cloud** reçoit les trois signaux, est en place, et coûte 0 $ dans les limites de l'offre
   gratuite [8]. Selon la recommandation elle-même, c'est l'outil retenu tant que la souscription ne
   permet pas Application Insights. Le tableau ne montre pas d'écart avec le choix de Sabine sur ce
   point.
-- **Honeycomb** reçoit métriques et traces, en Irlande, gratuitement [24][25][30], mais n'a que deux
-  déclencheurs et aucune déclaration d'accessibilité trouvée.
+- **Honeycomb** reçoit métriques, traces et journaux [28], et son offre gratuite coûte 0 $ [24],
+  mais elle n'a que deux déclencheurs, et aucune déclaration d'accessibilité n'a été trouvée.
 
 ## Écartés, avec leur raison
 
 | Outil | Raison |
 |---|---|
-| Auto-hébergement | décision de Sabine (critère de #163). Langfuse auto-hébergé : 6 services, environ 11 CPU et 25 Gio ; LangSmith auto-hébergé : sous contrat Enterprise seulement (journal ADR, « Wiki : métriques », `docs/ADR/journal-decisions-projet.md:1127-1128`) ; Grafana OSS sur ACA : 10 à 33 $ par mois de calcul [34] |
+| Auto-hébergement | décision de Sabine (critère de #163). Langfuse auto-hébergé : 6 services, environ 11 CPU et 25 Gio ; LangSmith auto-hébergé : sous contrat Enterprise seulement (journal ADR, « Wiki : métriques », `docs/ADR/journal-decisions-projet.md:1127-1128`) ; Grafana OSS sur ACA : 10 à 33 $ par mois de calcul [34] (calcul du sous-agent de time-knight) |
 | Jaeger, pour la restitution | traces seules, ni métriques ni alertes, et il s'héberge soi-même ; gardé comme visionneuse de traces en local après le POC (critère de #163) |
 | Azure Managed Grafana | environ 68 $ par mois, en plus d'Azure Monitor, qu'il lit [35] (prix déduit par le sous-agent de time-knight) |
-| New Relic | requêtes NRQL non portables ; VPAT de 2016 [36] |
+| New Relic | requêtes NRQL non portables (constat du sous-agent de time-knight, sans source) ; VPAT de 2016 [36] |
 | Dash0 | essai de 14 jours seulement [37] |
 | SigNoz Cloud | sources tierces contradictoires (comparaison du sous-agent de time-knight) |
 
@@ -155,7 +162,12 @@ Cloud ».
    par time-knight.
 3. **« Seuls l'URL et le jeton changent »** (décision 4 du 20/10) : vrai tant que l'outil reste
    Grafana Cloud. Pour Application Insights, repris après le rendu, l'envoi passe par un collecteur
-   et Entra [1].
+   et Entra, ou par l'exportateur Azure Monitor, une dépendance nouvelle (selon time-knight) [1] ;
+   et « Application Insights experiences, including prebuilt dashboards and queries, expect and
+   require OTLP metrics with delta temporality and exponential histogram aggregation » ([1], lue le
+   2026-11-08), quand K-B émet en temporalité cumulative
+   (`src/k_b/ai_api/connectors/metrics_export.py:64-69`) avec des buckets explicites
+   (`src/k_b/ai_api/observability/metric_instruments.py:31-37`).
 4. **Les alertes d'un compte gratuit récent** : depuis le 20/04/2026, un compte gratuit nouveau
    n'envoie d'e-mail qu'aux utilisateurs de son instance, sans Cloud Alertmanager [9]. La date
    d'ouverture du compte de Sabine n'est pas relevée ; à vérifier au début de #164.
@@ -173,24 +185,24 @@ Cloud ».
 - Le rapport de conformité d'Azure, non ouvert [4] ; Azure Monitor dans l'EU Data Boundary [5].
 - La limite de règles d'alerte de l'offre gratuite de Grafana Cloud [8] ; la date d'ouverture du
   compte de Sabine, et l'état actuel de la restriction des alertes (page close le 24/04/2026) [9].
-- Les journaux OTLP, les tableaux de bord et la rétention de l'offre gratuite de Honeycomb, et sa
-  région UE sur cette offre [24][25].
+- Les tableaux de bord et la rétention de l'offre gratuite de Honeycomb, et sa région UE sur cette
+  offre [24][25].
 - La société contractante et le DPA de Langfuse (page de ClickHouse non lue) [17].
 - L'offre minimale des alertes de LangSmith [22].
-- Les faits marqués [30] à [37] : lus le 2026-11-08 par un sous-agent de time-knight, non relus par
+- Les faits marqués [31] à [38] : lus le 2026-11-08 par un sous-agent de time-knight, non relus par
   cette session.
 
 ## Sources
 
-Lues le 2026-11-08 par la session de #163, sauf [30] à [37].
+Lues le 2026-11-08 par la session de #163 (elle-même ou ses sous-agents), sauf [31] à [38].
 
-1. [OTLP ingestion in Azure Monitor](https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/opentelemetry-protocol-ingestion) — Microsoft Learn, mise à jour le 2026-05-31 : option recommandée (Application Insights avec « OTLP support »), traces, journaux, métriques ; collecteur ≥ 0.132.0 ; « requires Microsoft Entra authentication ».
+1. [OTLP ingestion in Azure Monitor](https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/opentelemetry-protocol-ingestion) — Microsoft Learn, mise à jour le 2026-05-31 : option recommandée (Application Insights avec « OTLP support »), traces, journaux, métriques ; collecteur ≥ 0.132.0 ; « requires Microsoft Entra authentication » ; « Application Insights experiences, including prebuilt dashboards and queries, expect and require OTLP metrics with delta temporality and exponential histogram aggregation ».
 2. [Azure Monitor alerts overview](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-overview) — Microsoft Learn, 2026-07-08 : types d'alertes, groupes d'actions, alertes sur métriques OpenTelemetry en « public preview ».
-3. [API des prix Azure](https://prices.azure.com/api/retail/prices) — France Central, consommation, `Log Analytics` et `Azure Monitor` ; [Azure Monitor pricing](https://azure.microsoft.com/en-us/pricing/details/monitor/) : « The first 5 GB/month per billing account in this tier are free ».
+3. [API des prix Azure](https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Azure%20Monitor'%20and%20armRegionName%20eq%20'francecentral'%20and%20priceType%20eq%20'Consumption') — lue le 2026-11-08 vers 12:35 et 12:55 UTC, France Central, consommation, services `Azure Monitor` et `Log Analytics` (même filtre) : ingestion des journaux, échantillons de métriques, alertes sur métriques et sur journaux (0,50 $ à 15 min, 1 $ à 10 min, 1,50 $ à 5 min, 3 $ à 1 min) ; [Azure Monitor pricing](https://azure.microsoft.com/en-us/pricing/details/monitor/) : « The first 5 GB/month per billing account in this tier are free ».
 4. [WCAG 2.1 compliance offering](https://learn.microsoft.com/compliance/regulatory/offering-wcag-2-1) — Microsoft Learn, mise à jour le 2026-06-02 : Azure parmi les « in-scope cloud platforms ».
 5. [EU Data Boundary](https://learn.microsoft.com/en-us/privacy/eudb/eu-data-boundary-learn) — Microsoft Learn : « regional services that a customer deploys in an EU Data Boundary region will be in-scope ».
 6. [Azure Monitor workspace overview](https://learn.microsoft.com/en-us/azure/azure-monitor/metrics/azure-monitor-workspace-overview) — Microsoft Learn, 2026-10-28 : stocke les métriques Prometheus et OpenTelemetry.
-7. [Microsoft.Monitor/accounts](https://learn.microsoft.com/en-us/azure/templates/microsoft.monitor/accounts) — référence des modèles ARM, vue dans un résultat de recherche du 2026-11-08, page non ouverte.
+7. [Microsoft.Monitor/accounts](https://learn.microsoft.com/en-us/azure/templates/microsoft.monitor/accounts) — référence des modèles ARM ; son exemple Bicep porte « deploying Azure Monitor Workspace ».
 8. [Grafana Pricing](https://grafana.com/pricing/) — offre gratuite : 10 000 séries actives, 50 Go, 14 jours, 3 utilisateurs actifs.
 9. [Restrictions on Alerts & Reports for Grafana Cloud Free/Trial Users](https://status.grafana.com/incidents/xg2h8ht1d44n) — Grafana, du 20/04/2026, close le 24/04/2026.
 10. [Grafana accessibility](https://grafana.com/accessibility/) — déclaration du 09/09/2025.
@@ -206,16 +218,16 @@ Lues le 2026-11-08 par la session de #163, sauf [30] à [37].
 20. [Trace with OpenTelemetry](https://docs.langchain.com/langsmith/trace-with-opentelemetry) — point OTLP UE, traces, ingestion asynchrone.
 21. [LangSmith dashboards](https://docs.langchain.com/langsmith/dashboards) — tableaux personnalisables réservés au cloud US.
 22. [LangSmith alerts](https://docs.langchain.com/langsmith/alerts).
-23. [LangChain terms of service](https://www.langchain.com/terms-of-service) — DPA, offre gratuite, LangChain Inc. (Delaware).
+23. [LangChain terms of service](https://www.langchain.com/terms-of-service) — section 2.1(C), « governed by the Data Processing Addendum located at » `langchain.com/DPA`, qui redirige vers un PDF pré-signé ; offre gratuite ; LangChain Inc. (Delaware).
 24. [Honeycomb pricing](https://www.honeycomb.io/pricing) — offre gratuite : 20 millions d'événements, 100 millions de points de séries, 2 déclencheurs.
 25. [Where is Honeycomb's data stored](https://support.honeycomb.io/articles/4871225658-where-is-honeycomb-s-data-stored) — UE : « AWS eu-west-1 (Europe - Ireland) ».
 26. [semantic-conventions-genai](https://github.com/open-telemetry/semantic-conventions-genai) — commit `e6658f1` (2026-11-06), `docs/gen-ai/*.md` lus par l'API GitHub : « Status: Development », aucune release.
 27. [Semantic conventions for generative client AI spans](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/) — « This page has moved ».
+28. [Honeycomb OpenTelemetry exporters](https://docs.honeycomb.io/send-data/opentelemetry/collector/exporters) — section « Metrics and Logs Signals » : « The Collector can handle OTLP metrics and logs signals in addition to traces » ; instance UE `api.eu1.honeycomb.io:443`.
 
 Lues le 2026-11-08 par un sous-agent de time-knight (comparaison sans biais, non versionnée), non
 relues par cette session :
 
-30. [Honeycomb OpenTelemetry exporters](https://docs.honeycomb.io/send-data/opentelemetry/collector/exporters) — gRPC et HTTP, `api.eu1.honeycomb.io`.
 31. [Azure Monitor Grafana plugin](https://learn.microsoft.com/azure/azure-monitor/visualize/grafana-plugin) — tableaux Grafana du portail, sans alertes Grafana.
 32. [Microsoft Products and Services Data Protection Addendum](https://www.microsoft.com/licensing/terms/product/PrivacyandSecurityTerms/MCA).
 33. [Honeycomb launches data residency in Europe](https://www.honeycomb.io/blog/honeycomb-launches-data-residency-europe).
@@ -223,3 +235,4 @@ relues par cette session :
 35. [Azure Managed Grafana overview](https://learn.microsoft.com/en-us/azure/managed-grafana/overview).
 36. [New Relic VPAT](https://static.carahsoft.com/concrete/files/9415/5717/4779/New_Relic_VPAT_Final_v1.1.pdf).
 37. [Dash0 pricing](https://dash0.com/pricing).
+38. [OpenTelemetry agents in Azure Container Apps](https://learn.microsoft.com/azure/container-apps/opentelemetry-agents) — l'agent géré n'envoie pas les métriques à Application Insights.
