@@ -1,5 +1,6 @@
-"""The reading of the sheet of a candidate on GitHub, on a simulated GitHub serving a real answer
-(tests/fixtures/github_repository_extract.json): no test calls GitHub."""
+"""The reading of the sheet and of the README of a repository on GitHub, on a simulated GitHub
+serving a real answer (tests/fixtures/github_repository_extract.json) and a README in the form of
+a real one (tests/fixtures/github_readme_extract.md): no test calls GitHub."""
 
 import json
 import secrets
@@ -13,20 +14,29 @@ from pydantic import SecretStr
 from k_b.ai_api.connectors.github_client import (
     GithubError,
     GithubReading,
+    Readme,
     build_github_client,
+    read_readme,
     read_repository,
+    to_repository_path,
 )
 from k_b.ai_api.connectors.github_settings import GithubSettings
 from k_b.ai_api.deadline import Deadline
+from k_b.ai_api.repository_texts import RAW_CUT_FACTOR, clean_repository_text
 from k_b.core.config import (
+    GITHUB_MAX_FORBIDDEN_PER_REPORT,
     GITHUB_MAX_REQUESTS_PER_REPORT,
+    MAX_GITHUB_README_BYTES,
     MAX_GITHUB_REPOSITORY_BYTES,
     MAX_GITHUB_RETRY_AFTER_SECONDS,
+    MAX_README_CHARS_FOR_WRITING,
 )
 from k_b.core.github_api import API_VERSION
 from k_b.core.user_agent import USER_AGENT
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "github_repository_extract.json"
+README_FIXTURE = Path(__file__).parent.parent / "fixtures" / "github_readme_extract.md"
+README_MEDIA_TYPE = "application/vnd.github.raw+json"
 ANSWER = json.loads(FIXTURE.read_bytes())
 REPOSITORY_ID = ANSWER["id"]
 REPOSITORY_NAME = ANSWER["full_name"]
@@ -351,3 +361,212 @@ def test_a_deadline_passed_sends_nothing():
 
     assert read_error(github, reading).state == "github_timeout"
     assert github.requests == []
+
+
+def readme_answer(status=200, content=None, headers=None):
+    body = README_FIXTURE.read_bytes() if content is None else content
+    return httpx2.Response(
+        status,
+        content=body,
+        headers={"Content-Type": "application/vnd.github.raw+json"} | (headers or {}),
+    )
+
+
+def read_the_readme(github, reading=None):
+    return read_readme(reading or start_reading(github), REPOSITORY_NAME)
+
+
+def read_the_readme_error(github, reading=None):
+    with pytest.raises(GithubError) as raised:
+        read_the_readme(github, reading)
+    return raised.value
+
+
+def test_a_readme_is_read_raw_with_the_headers_of_k_b():
+    github = SimulatedGithub(readme_answer())
+
+    readme = read_the_readme(github)
+
+    assert readme == Readme(README_FIXTURE.read_text())
+    [request] = github.requests
+    assert str(request.url) == "https://api.github.com/repos/fastapi/fastapi/readme"
+    assert request.headers["Accept"] == README_MEDIA_TYPE
+    assert request.headers["Authorization"] == f"Bearer {TOKEN}"
+    assert request.headers["User-Agent"] == USER_AGENT
+    assert request.headers["X-GitHub-Api-Version"] == API_VERSION
+
+
+def test_the_sheet_keeps_its_accept_after_a_readme():
+    github = SimulatedGithub(readme_answer(), answer())
+    reading = start_reading(github)
+
+    read_the_readme(github, reading)
+    read(github, reading)
+
+    assert github.requests[1].headers["Accept"] == "application/vnd.github+json"
+
+
+@pytest.mark.parametrize(
+    ("content_type", "is_read"),
+    [
+        ("application/vnd.github.raw+json", True),
+        ("application/vnd.github.raw+json; charset=utf-8", True),
+        ("text/plain; charset=utf-8", True),
+        ("application/json", False),
+        ("application/json; charset=utf-8", False),
+        ("Application/JSON ; charset=utf-8", False),
+    ],
+)
+def test_a_readme_served_as_json_is_refused_by_its_exact_media_type(
+    content_type, is_read
+):
+    github = SimulatedGithub(readme_answer(headers={"Content-Type": content_type}))
+
+    if is_read:
+        assert isinstance(read_the_readme(github), Readme)
+    else:
+        assert read_the_readme_error(github).state == "github_invalid_response"
+
+
+def test_a_readme_keeps_its_head_up_to_its_bound_the_rest_unread():
+    pieces = CountedPieces(b"a" * MAX_GITHUB_README_BYTES, b"b" * 10, b"c" * 10)
+    github = SimulatedGithub(readme_answer(content=pieces))
+
+    readme = read_the_readme(github)
+
+    assert readme == Readme("a" * MAX_GITHUB_README_BYTES)
+    assert pieces.pieces_read == 2
+
+
+def test_a_readme_announced_beyond_the_bound_of_a_sheet_is_still_read():
+    github = SimulatedGithub(
+        readme_answer(
+            content=iter([b"a" * 100]),
+            headers={"Content-Length": str(MAX_GITHUB_REPOSITORY_BYTES + 1)},
+        )
+    )
+
+    assert read_the_readme(github) == Readme("a" * 100)
+
+
+def test_the_head_of_a_readme_holds_more_than_the_raw_cut_of_the_cleaning():
+    # 4 bytes at most per character in UTF-8: the head always reaches the raw cut, which the
+    # cleaning cuts again, the word it breaks removed.
+    assert MAX_GITHUB_README_BYTES // 4 > RAW_CUT_FACTOR * MAX_README_CHARS_FOR_WRITING
+
+
+def test_a_readme_cut_in_a_character_leaves_no_broken_character_to_the_model():
+    emoji = chr(0x1F680).encode()
+    # Cut at the bound in the middle of an emoji, after a word: the cut word and the broken
+    # character go.
+    content = (b"word " + emoji * MAX_GITHUB_README_BYTES)[
+        : MAX_GITHUB_README_BYTES + 2
+    ]
+    github = SimulatedGithub(readme_answer(content=iter([content])))
+
+    readme = read_the_readme(github)
+    cleaned = clean_repository_text(readme.text, MAX_README_CHARS_FOR_WRITING)
+
+    assert readme.text.endswith(chr(0xFFFD))
+    assert chr(0xFFFD) not in cleaned.text
+    assert cleaned.is_cut
+    assert len(cleaned.text) <= MAX_README_CHARS_FOR_WRITING
+
+
+@pytest.mark.parametrize(
+    ("status", "missing"),
+    [(404, "absent"), (410, "absent"), (451, "refused"), (301, "refused")],
+)
+def test_a_readme_github_does_not_give_is_absent_or_refused(status, missing):
+    github = SimulatedGithub(
+        readme_answer(status, b'{"message": "Not Found"}', {"Location": "x"})
+    )
+
+    assert read_the_readme(github) == missing
+    assert len(github.requests) == 1
+
+
+def test_a_403_alone_on_a_readme_is_refused_and_counts_among_the_refusals():
+    github = SimulatedGithub(readme_answer(403, b'{"message": "Access blocked"}'))
+    reading = start_reading(github)
+    reading.forbidden = GITHUB_MAX_FORBIDDEN_PER_REPORT - 2
+
+    assert read_the_readme(github, reading) == "refused"
+    assert read_the_readme_error(github, reading).state == "github_forbidden"
+
+
+def test_a_403_of_rate_limit_on_a_readme_is_read_beyond_the_head():
+    # The head is for a 200 only: a long message would be cut, and no longer read as a limit.
+    message = json.dumps(
+        {"message": "API rate limit exceeded", "documentation_url": "a" * 70_000}
+    ).encode()
+    github = SimulatedGithub(readme_answer(403, message))
+
+    assert read_the_readme_error(github).state == "github_rate_limited"
+
+
+@pytest.mark.parametrize(
+    ("answers", "state"),
+    [
+        ((readme_answer(401, b"{}"),), "github_unauthorized"),
+        ((readme_answer(429, b"{}"),), "github_rate_limited"),
+        (
+            (readme_answer(403, b"{}", {"x-ratelimit-remaining": "0"}),),
+            "github_rate_limited",
+        ),
+        ((readme_answer(503, b"{}"),), "github_unavailable"),
+        ((readme_answer(422, b"{}"),), "github_invalid_response"),
+    ],
+    ids=["401", "429", "403-of-limit", "two-5xx", "422"],
+)
+def test_a_failure_of_github_on_a_readme_raises_its_state(answers, state):
+    assert read_the_readme_error(SimulatedGithub(*answers)).state == state
+
+
+def test_a_server_error_on_a_readme_is_retried_once_without_wait():
+    github = SimulatedGithub(readme_answer(502, b"{}"), readme_answer())
+
+    assert isinstance(read_the_readme(github), Readme)
+    assert len(github.requests) == 2
+
+
+def test_a_readme_counts_in_the_budget():
+    github = SimulatedGithub(readme_answer())
+    reading = start_reading(github)
+    reading.requests = GITHUB_MAX_REQUESTS_PER_REPORT
+
+    assert read_the_readme_error(github, reading).state == "github_unavailable"
+    assert github.requests == []
+
+
+def test_a_readme_late_is_github_timeout():
+    def time_out(request):
+        raise httpx2.ReadTimeout("timeout of the test", request=request)
+
+    assert read_the_readme_error(SimulatedGithub(time_out)).state == "github_timeout"
+
+
+@pytest.mark.parametrize("name", ["owner/..", "../name", "owner/.", "./name", "a/b/c"])
+def test_a_name_with_dot_or_dotdot_never_makes_a_path(name):
+    github = SimulatedGithub(readme_answer())
+
+    with pytest.raises(ValueError, match="not owner/name") as raised:
+        read_readme(start_reading(github), name)
+
+    assert name not in str(raised.value)
+    assert github.requests == []
+    with pytest.raises(ValueError):
+        to_repository_path(name)
+
+
+class CountedPieces:
+    """A body sent in pieces, counting those read."""
+
+    def __init__(self, *pieces):
+        self.pieces = pieces
+        self.pieces_read = 0
+
+    def __iter__(self):
+        for piece in self.pieces:
+            self.pieces_read += 1
+            yield piece

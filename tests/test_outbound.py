@@ -1,9 +1,19 @@
-"""The rules of a connection K-B opens by HTTP: the URL it accepts, and its HTTP client."""
+"""The rules of a connection K-B opens by HTTP: the URL it accepts, its HTTP client, and the
+bound of a body read."""
+
+import gzip
 
 import httpx2
 import pytest
 
-from k_b.core.outbound import find_url_refusal, open_http_client
+from k_b.core.outbound import (
+    BodyTooLargeError,
+    BodyTooLateError,
+    find_url_refusal,
+    open_http_client,
+    read_body_head,
+    read_bounded_body,
+)
 
 VARIABLE = "KB_TEST_URL"
 
@@ -48,3 +58,59 @@ def test_the_client_reads_no_proxy_of_the_environment_and_follows_no_redirection
     ) as http_client:
         assert http_client.trust_env is False
         assert http_client.follow_redirects is False
+
+
+class CountedPieces:
+    """A body sent in pieces, counting those read."""
+
+    def __init__(self, *pieces):
+        self.pieces = pieces
+        self.pieces_read = 0
+
+    def __iter__(self):
+        for piece in self.pieces:
+            self.pieces_read += 1
+            yield piece
+
+
+def test_the_head_of_a_body_is_kept_up_to_its_bound_the_rest_left_unread():
+    body = CountedPieces(b"a" * 6, b"b" * 6, b"c" * 6)
+
+    head = read_body_head(httpx2.Response(200, content=body), 8)
+
+    assert head == b"a" * 6 + b"b" * 2
+    assert body.pieces_read == 2
+
+
+def test_a_body_within_the_bound_of_a_head_is_kept_whole():
+    assert read_body_head(httpx2.Response(200, content=iter([b"abc"])), 8) == b"abc"
+
+
+def test_the_head_ignores_a_length_announced_beyond_its_bound():
+    response = httpx2.Response(
+        200, content=iter([b"a" * 12]), headers={"Content-Length": "1000000"}
+    )
+
+    assert read_body_head(response, 8) == b"a" * 8
+
+
+def test_the_head_of_a_gzip_body_is_kept_once_decoded():
+    response = httpx2.Response(
+        200,
+        content=iter([gzip.compress(b"a" * 100_000)]),
+        headers={"Content-Encoding": "gzip"},
+    )
+
+    assert read_body_head(response, 10) == b"a" * 10
+
+
+def test_the_head_stops_at_its_deadline():
+    with pytest.raises(BodyTooLateError):
+        read_body_head(
+            httpx2.Response(200, content=iter([b"a", b"b"])), 8, lambda: True
+        )
+
+
+def test_a_bounded_body_is_still_refused_beyond_its_bound():
+    with pytest.raises(BodyTooLargeError):
+        read_bounded_body(httpx2.Response(200, content=iter([b"a" * 9])), 8)
