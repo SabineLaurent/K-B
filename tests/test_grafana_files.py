@@ -70,6 +70,26 @@ PROMQL_KEYWORDS = {
 RULE_THRESHOLD = re.compile(r"([<>])\s*([0-9.]+)\s*$")
 # The line of a threshold on a curve of the dashboard: the only expression that reads no measure.
 THRESHOLD_LINE = re.compile(r"vector\([0-9.]+\)")
+# The matchers of a field override, as Grafana names them (FieldMatcherID, packages/grafana-data/
+# src/transformations/matchers/ids.ts, v13.3.0): a name out of the list matches no field, and its
+# override is dropped without a word.
+FIELD_MATCHER_IDS = {
+    "numeric",
+    "time",
+    "first",
+    "firstTimeField",
+    "byType",
+    "byTypes",
+    "byName",
+    "byNames",
+    "byRegexp",
+    "byRegexpOrNames",
+    "byFrameRefID",
+    "byValue",
+}
+# The Prometheus data source of a Grafana Cloud stack, grafanacloud-<stack>-prom: the stack holds
+# others, grafanacloud-ml-metrics first in the list (seen on 2026-11-08).
+STACK_PROMETHEUS = re.compile(r"^grafanacloud-.+-prom$")
 
 
 class RecordingMeter:
@@ -241,7 +261,7 @@ def test_each_state_of_the_dashboard_is_written():
             [override] = [
                 override
                 for override in panel["fieldConfig"]["overrides"]
-                if override["matcher"] == {"id": "frameRefID", "options": ref_id}
+                if override["matcher"] == {"id": "byFrameRefID", "options": ref_id}
             ]
             [mappings] = [
                 item["value"]
@@ -255,6 +275,45 @@ def test_each_state_of_the_dashboard_is_written():
             }
             assert set(texts) == {"0", "1"}, panel["title"]
             assert all(texts.values()), panel["title"]
+
+
+def test_each_override_names_a_matcher_of_grafana():
+    for panel in read_dashboard_panels():
+        for override in panel.get("fieldConfig", {}).get("overrides", []):
+            assert override["matcher"]["id"] in FIELD_MATCHER_IDS, panel["title"]
+
+
+def test_each_threshold_line_is_dashed():
+    for panel in read_dashboard_panels():
+        for target in panel.get("targets", []):
+            if not THRESHOLD_LINE.fullmatch(target["expr"]):
+                continue
+            [override] = [
+                override
+                for override in panel["fieldConfig"]["overrides"]
+                if override["matcher"]
+                == {"id": "byFrameRefID", "options": target["refId"]}
+            ]
+            [style] = [
+                item["value"]
+                for item in override["properties"]
+                if item["id"] == "custom.lineStyle"
+            ]
+            assert style["fill"] == "dash", panel["title"]
+
+
+def test_the_dashboard_reads_the_prometheus_of_the_stack():
+    [variable] = [
+        variable
+        for variable in read_dashboard()["templating"]["list"]
+        if variable["type"] == "datasource"
+    ]
+    regex = variable["regex"].strip("/")
+
+    assert variable["query"] == "prometheus"
+    assert re.fullmatch(regex, "grafanacloud-mystack-prom")
+    assert not re.fullmatch(regex, "grafanacloud-ml-metrics")
+    assert regex == STACK_PROMETHEUS.pattern
 
 
 def test_the_dashboard_keeps_the_threshold_of_each_rule():

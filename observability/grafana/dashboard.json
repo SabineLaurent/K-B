@@ -35,7 +35,7 @@
         "multi": false,
         "options": [],
         "refresh": 1,
-        "regex": "",
+        "regex": "/^grafanacloud-.+-prom$/",
         "skipUrlSync": false
       },
       {
@@ -160,7 +160,7 @@
         "overrides": [
           {
             "matcher": {
-              "id": "frameRefID",
+              "id": "byFrameRefID",
               "options": "B"
             },
             "properties": [
@@ -275,7 +275,7 @@
         "overrides": [
           {
             "matcher": {
-              "id": "frameRefID",
+              "id": "byFrameRefID",
               "options": "B"
             },
             "properties": [
@@ -390,7 +390,7 @@
         "overrides": [
           {
             "matcher": {
-              "id": "frameRefID",
+              "id": "byFrameRefID",
               "options": "B"
             },
             "properties": [
@@ -511,7 +511,7 @@
         "overrides": [
           {
             "matcher": {
-              "id": "frameRefID",
+              "id": "byFrameRefID",
               "options": "B"
             },
             "properties": [
@@ -615,7 +615,7 @@
         "overrides": [
           {
             "matcher": {
-              "id": "frameRefID",
+              "id": "byFrameRefID",
               "options": "B"
             },
             "properties": [
@@ -719,7 +719,7 @@
         "overrides": [
           {
             "matcher": {
-              "id": "frameRefID",
+              "id": "byFrameRefID",
               "options": "B"
             },
             "properties": [
@@ -1165,7 +1165,7 @@
         "overrides": [
           {
             "matcher": {
-              "id": "frameRefID",
+              "id": "byFrameRefID",
               "options": "B"
             },
             "properties": [
@@ -1269,7 +1269,7 @@
         "overrides": [
           {
             "matcher": {
-              "id": "frameRefID",
+              "id": "byFrameRefID",
               "options": "B"
             },
             "properties": [
