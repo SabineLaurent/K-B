@@ -6200,8 +6200,8 @@ Langfuse Cloud (UE), LangSmith (UE) et Honeycomb, selon les critères de « Wiki
   enregistrés). Les pages de Langfuse Cloud et de LangSmith ne décrivent que des traces OTLP : les
   métriques et les journaux de K-B n'y auraient pas de destination. Les autres outils sont écartés
   dans le document, chacun avec sa raison. Limites assumées : l'accessibilité n'est essayée que sur
-  Grafana Cloud, les autres outils sont jugés sur leurs déclarations publiées ; cet essai, reporté
-  par Sabine le 2026-11-08, reste à faire ; le texte des prompts, avantage propre de Langfuse et
+  Grafana Cloud, les autres outils sont jugés sur leurs déclarations publiées ; cet essai passe à
+  #164 (choix 18 de Sabine, 2026-11-08) ; le texte des prompts, avantage propre de Langfuse et
   LangSmith, n'est pas montré par Grafana Cloud tant que `KB_TRACE_CONTENT` vaut `none` en ligne.
   Remonté à Sabine, non tranché : le DPA de Grafana Labs, signé le 28/10, ne vaut selon sa réponse
   du 29/10 que pour les entreprises (registre, « Envoi des mesures à Grafana Cloud »). **Précise**
