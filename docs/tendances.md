@@ -491,6 +491,10 @@ jetons (`docs/jeton-github.md`, mis à jour par #367).
 - Limite : « une version récente n'est pas un fait retenu » et « prudence en faits, pas en verdicts »
   ne sont tenues que par la consigne ; un nombre écrit en lettres et « Installez X » en prose
   échappent aux contrôles (décision de Sabine du 08/11).
+- Limite : `sudo` et `npx` suivis d'une espace sont refusés même en prose (« sans sudo ni droits
+  root », « via npx ou pnpm ») : la sortie entière est refusée, relancée, puis la rédaction de ce
+  dépôt échoue en `llm_invalid_output` si le texte revient. Le refus est fermé ; #370 en mesure la
+  fréquence (tri de la revue du 08/11).
 - Limite : le nettoyage d'un README coûte du temps sans contrôle de l'échéance pendant qu'il tourne
   (`URL` mesure 1,27 s sur 20 000 lettres, `ai_api/repository_texts.py`) ; et l'échéance n'est vérifiée
   qu'avant chaque README : un README lent peut finir en `github_timeout`, ce qui ne retire que les
