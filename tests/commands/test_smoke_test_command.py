@@ -201,6 +201,23 @@ def test_an_api_that_fails_its_health_fails_the_smoke_test_and_the_other_checks_
     )
 
 
+def test_smoke_test_reaches_the_compose_services_in_http_in_the_sandbox(
+    monkeypatch, smoke_test_environment
+):
+    monkeypatch.setenv("KB_DEPLOYMENT_ENVIRONMENT", "sandbox")
+    monkeypatch.setenv("KB_DATA_API_URL", "http://api-donnees:8000")
+    monkeypatch.setenv("KB_AI_API_URL", "http://api-ia:8001")
+    api_requests, _ = simulate(monkeypatch)
+
+    exit_code = cli.main(["smoke-test"])
+
+    assert exit_code == cli.ExitCode.SUCCEEDED
+    assert [str(request.url) for request in api_requests] == [
+        "http://api-donnees:8000/health",
+        "http://api-ia:8001/health",
+    ]
+
+
 @pytest.mark.parametrize(
     ("variable", "value", "refusal"),
     [
@@ -219,12 +236,12 @@ def test_an_api_that_fails_its_health_fails_the_smoke_test_and_the_other_checks_
         (
             "KB_DATA_API_URL",
             "http://ca-kb-data-api.internal.test.example",
-            "KB_DATA_API_URL: http only to 127.0.0.1 or localhost, or with KB_DEPLOYMENT_ENVIRONMENT=sandbox",
+            "KB_DATA_API_URL: https required; http only to the machine (127.0.0.1 or localhost) or a compose service (api-donnees or api-ia)",
         ),
         (
             "KB_AI_API_URL",
             "http://ca-kb-ai-api.internal.test.example",
-            "KB_AI_API_URL: http only to 127.0.0.1 or localhost, or with KB_DEPLOYMENT_ENVIRONMENT=sandbox",
+            "KB_AI_API_URL: https required; http only to the machine (127.0.0.1 or localhost) or a compose service (api-donnees or api-ia)",
         ),
     ],
 )

@@ -8,8 +8,8 @@ from urllib.parse import urlsplit
 
 import httpx2
 
-from k_b.core.api_settings import DEPLOYMENT_ENVIRONMENT_VARIABLE, is_sandbox
-from k_b.core.config import LOCAL_HOSTS
+from k_b.core.api_settings import is_sandbox
+from k_b.core.config import COMPOSE_HOSTS, LOCAL_HOSTS
 
 # A host name in lowercase, as urlsplit gives it: neither an IPv6 address nor a character an HTTP
 # client would refuse later.
@@ -40,25 +40,26 @@ def find_url_refusal(variable: str, url: str, schemes: tuple[str, ...]) -> str |
 
 
 INTERNAL_API_SCHEMES = ("http", "https")
-INTERNAL_API_HTTP_REFUSAL = f"http only to 127.0.0.1 or localhost, or with {DEPLOYMENT_ENVIRONMENT_VARIABLE}=sandbox"
+INTERNAL_API_HTTP_REFUSAL = (
+    f"https required; http only to the machine ({' or '.join(LOCAL_HOSTS)})"
+    f" or a compose service ({' or '.join(COMPOSE_HOSTS)})"
+)
 
 
 def find_internal_api_url_refusal(
     variable: str, url: str, environ: Mapping[str, str]
 ) -> str | None:
-    """Why the URL of an internal API of K-B is refused, or None: https, or http to the machine or in
-    the sandbox."""
+    """Why the URL of an internal API of K-B is refused, or None: https, or http to the machine, or
+    to a compose service in the sandbox."""
     refusal = find_url_refusal(variable, url, INTERNAL_API_SCHEMES)
     if refusal is not None:
         return refusal
     parts = urlsplit(url)
-    if (
-        parts.scheme == "http"
-        and parts.hostname not in LOCAL_HOSTS
-        and not is_sandbox(environ)
-    ):
-        return f"{variable}: {INTERNAL_API_HTTP_REFUSAL}"
-    return None
+    if parts.scheme == "https" or parts.hostname in LOCAL_HOSTS:
+        return None
+    if parts.hostname in COMPOSE_HOSTS and is_sandbox(environ):
+        return None
+    return f"{variable}: {INTERNAL_API_HTTP_REFUSAL}"
 
 
 def open_http_client(

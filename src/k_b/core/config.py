@@ -210,6 +210,8 @@ DATA_API_PORT = 8000
 # of K-B may be reached at in http.
 LOCAL_HOSTS = ("127.0.0.1", "localhost")
 DATA_API_ALLOWED_HOSTS = LOCAL_HOSTS
+# The services of a compose network (#419), reached in http in the sandbox only.
+COMPOSE_HOSTS = ("api-donnees", "api-ia")
 # The key of a client of the data API (docs/specs-api.md, "Accès par clé"), checked by kb serve-data
 # for each client and by the AI API for the key it sends. secrets.token_urlsafe(32) gives 43
 # characters: 32 is the minimum checked. The alphabet of token_urlsafe, the way of making a key

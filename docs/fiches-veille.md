@@ -1053,7 +1053,7 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
   fournie par une requête ; l'isolation réseau est à revoir au déploiement.
 - **Listes d'origines et de schémas permis** : tenue. Hôte GitHub constant (`core/github_api.py`) ;
   `https` seul vers le modèle et vers l'export ; vers l'API de données, `https`, ou `http` vers la
-  machine ou en `sandbox` seulement (API10, #473).
+  machine ou, en `sandbox`, vers un service du compose seulement (API10, #473).
   `core/outbound.py`, `test_a_url_of_an_allowed_scheme_is_accepted` et
   `test_a_url_refused_is_named_by_its_variable_never_quoted` (`tests/test_outbound.py`).
 - **Redirections coupées** : tenue. Vers le modèle, l'API de données et GitHub,
@@ -1146,12 +1146,14 @@ dépend que du code garde son état et sa preuve.
     `https://ca-kb-data-api.internal.<defaultDomain>`, sur `ca-kb-data-api`,
     `KB_DATA_API_ALLOWED_HOSTS` = `ca-kb-data-api.internal.<defaultDomain>`.
   - Le code force aussi le `https` (#473) : une URL d'API interne en `http` n'est acceptée que vers
-    `127.0.0.1` ou `localhost`, ou avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox` (un réseau compose,
-    #419) ; sinon le démarrage est refusé (code 2), le message nommant la variable
-    (`find_internal_api_url_refusal`, `core/outbound.py`), pour `KB_DATA_API_URL` (API IA) et
-    `KB_AI_API_URL` (`kb digest`, `kb trend-report`), et pour les deux URL de `kb smoke-test` et
-    `kb digest-watch`. `test_an_internal_api_url_in_http_outside_the_machine_and_the_sandbox_is_refused`,
-    `test_serve_ai_exits_2_and_names_the_variable_refused` (`data-api-in-http-outside-the-machine`).
+    `127.0.0.1` ou `localhost`, ou, avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, vers `api-donnees` ou
+    `api-ia`, les services d'un compose (#419) ; sinon le démarrage est refusé (code 2), le message
+    nommant la variable (`find_internal_api_url_refusal`, `core/outbound.py` ; `LOCAL_HOSTS` et
+    `COMPOSE_HOSTS`, `core/config.py`), pour `KB_DATA_API_URL` (API IA) et `KB_AI_API_URL`
+    (`kb digest`, `kb trend-report`), et pour les deux URL de `kb smoke-test` et `kb digest-watch`.
+    `test_an_internal_api_url_in_http_elsewhere_is_refused` (un nom public, une IPv4 en un nombre,
+    un service mal écrit, en `sandbox` compris), `test_serve_ai_exits_2_and_names_the_variable_refused`
+    (`data-api-in-http-outside-the-machine`).
   - Non essayé, l'entrée n'étant joignable que de l'environnement : la version de TLS, « always use
     TLS 1.2 or 1.3 » selon la documentation de l'entrée (lue le 2026-11-08). Côté client, K-B ne
     règle pas la version de TLS : les bibliothèques gardent leur contexte par défaut, TLS 1.2 au
@@ -1264,8 +1266,9 @@ point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change
 - **TLS avec toutes les API intégrées** : tenue en ligne. `https` seul vers le modèle, GitHub et
   l'export (API7) ; vers l'API de données, `https://ca-kb-data-api.internal.<defaultDomain>`
   (`infra/main.bicep:223`), avec le chiffrement entre apps (API8, « TLS, même pour une API
-  interne »). `http` n'est permis vers l'API de données que vers `127.0.0.1` ou `localhost`, ou en
-  `sandbox` (un réseau compose, #419) : `find_internal_api_url_refusal` (`core/outbound.py`, #473).
+  interne »). `http` n'est permis vers l'API de données que vers `127.0.0.1` ou `localhost`, ou, en
+  `sandbox`, vers un service du compose (#419) : `find_internal_api_url_refusal` (`core/outbound.py`,
+  #473).
 - **Valider et assainir les données reçues** : tenue. Modèles Pydantic stricts pour chaque réponse ;
   corps bornés, la réponse du modèle comprise (#399,
   `test_an_answer_above_the_bound_is_llm_unavailable_without_retry`) ; textes de dépôt nettoyés
@@ -1691,7 +1694,7 @@ des tops).
 **Parcours**
 
 1. **Réglages** : `KB_VAULT_DIR`, un dossier existant (sinon code 2, aucun dossier créé) ;
-   `KB_AI_API_URL`, `https`, ou `http` vers `127.0.0.1` ou `localhost`, ou en `sandbox` (#473),
+   `KB_AI_API_URL`, `https`, ou `http` vers `127.0.0.1`, `localhost` ou, en `sandbox`, `api-ia` (#473),
    sans utilisateur, requête ni fragment, par défaut
    `http://127.0.0.1:8001` (`AI_API_URL`, `core/config.py`), qui ne suit pas `KB_AI_API_PORT` ;
    `KB_AI_API_KEY_KB_DIGEST`, sans défaut, aux règles des clés (section « Accès »). Un refus nomme
