@@ -5994,6 +5994,96 @@ sauf mention.
   passe 2 faite à la main prend désormais pour `imageTag` la version en ligne : sinon, elle remettrait l'ancienne
   image. — PR de #415
 
+## 2026-11-08
+
+### Tendances : les textes des dépôts choisis, écrits depuis leur README (#369)
+
+Plan de time-knight (08/11), relu par un sous-agent et trié par time-knight (délégation de Sabine du 15/10) ; cinq
+points tranchés par Sabine le 08/11, « je suis tes recommandations ». Contrat : [tendances.md](../tendances.md),
+« Rédaction » et « Ce que rend #369 ». Le pourquoi est celui de Sabine quand la décision lui est attribuée ; sinon,
+celui du plan qu'elle a validé, ou du tri de time-knight quand il est nommé.
+
+- **Le README est lu en brut, sa tête seule : 65 536 octets, le reste jamais téléchargé.**
+  `GET /repos/{owner}/{repo}/readme`, `Accept: application/vnd.github.raw+json`. Pourquoi : GitHub sert un README
+  jusqu'à 100 Mo, et la lecture bornée des fiches refuse un corps trop long : appliquée au README, une longue liste
+  ferait échouer le compte rendu. 65 536 octets font au moins 16 384 caractères en UTF-8, plus que la coupe brute du
+  nettoyage (4 × 4 000) : il voit toujours la coupe et retire le mot entamé. La tête et le corps borné partagent une
+  boucle (`core/outbound.py`), pour que #436 s'y corrige une fois. Un 200 servi en `application/json` est refusé
+  (`github_invalid_response`). Écartés : la forme JSON en base64 (le corps entier à lire, puis à décoder) ; un refus
+  au-delà d'une borne ; l'en-tête `Range` (non documenté par GitHub). Limite : le type de média du brut n'est pas
+  documenté (recherche du 08/11) ; #370 le relève. — PR de #369
+
+- **404 et 410 donnent un README `absent` ; un 403 hors limite, un 451 ou une redirection, `refused` ; le dépôt
+  reste choisi.** Le fichier dit `README : absent.` ou `README : non servi par GitHub.` (décision 1 de Sabine). Le
+  403 compte parmi les 3 refus des fiches : la décision du 31/10 (« Q1 (b) ») s'étend au README. Écarté : écarter
+  un choisi après le choix. — PR de #369
+
+- **Tous les README sont lus avant la première rédaction, en série, dans l'ordre du modèle, sous le budget et le
+  compteur de refus des fiches.** Pourquoi : rédiger dépôt par dépôt enverrait au modèle un README pour un compte
+  rendu qu'une erreur GitHub sur le README suivant priverait de ses textes (minimisation). Une seule
+  `GithubReading` par compte rendu ; le budget de 70 reste, son calcul écrit (60 fiches, 5 README, 5 relances ; tri
+  de time-knight). Avant chaque README, une échéance qui ne laisse plus le temps d'un appel au modèle arrête la
+  lecture, et les choisis non lus prennent `llm_timeout`. Écarté : README et rédaction dépôt par dépôt. — PR de #369
+
+- **Une erreur GitHub pendant la lecture des README ne fait pas échouer le compte rendu.** Décision 3 de Sabine, sur
+  la recommandation de time-knight. Le compte rendu est écrit avec le choix et les faits ; chaque choisi porte l'état
+  en `writing_failure` et `Textes non écrits : <raison>.` ; aucun README ne part au modèle ; `kb` journalise l'état
+  en avertissement, le span `read_readmes` est en erreur. Pourquoi : cohérent avec les décisions du 29/10 (un choix
+  en échec donne un compte rendu factuel, une rédaction en échec ne retire que ses textes), et le choix déjà payé
+  est gardé. **Revient sur le contrat de #364**, « pas de compte rendu partiel » pour toute erreur GitHub : la règle
+  ne vaut plus que pour les fenêtres et les fiches. Écarté : arrêter le compte rendu, que proposait le plan, avec la
+  ligne de métrique du choix écrite quand même (tombée avec la décision). Coût assumé : la période avance, comme
+  pour un choix en échec. — PR de #369
+
+- **Un seul champ d'échec, `writing_failure`, porte les états du modèle (`llm_*`) et de GitHub (`github_*`).**
+  Choix de la session, que la mission lui laissait. Pourquoi : les deux familles sont disjointes par leur préfixe ;
+  une seule ligne dans le fichier, un seul contrôle croisé dans `kb`. Écarté : deux champs, qui demanderaient un
+  contrôle de plus pour interdire les deux à la fois. — PR de #369
+
+- **La rédaction reçoit le `ref`, le nom du dépôt sans le login du propriétaire, son langage, sa licence, ses
+  topics, ses critères, ses seuls sujets avec leur définition, sa description et son README nettoyés ; `null` quand
+  GitHub ne donne pas de README.** Décision 5 de Sabine ; le nom sans le login, tranché par time-knight
+  (minimisation). Pourquoi : ni étoiles, ni dates, ni prudences, que le code écrit lui-même et dont les nombres
+  feraient retirer les textes par la règle des nombres ; `null` plutôt que le mot « absent », qu'un résumé recopié
+  ferait passer à la fidélité. Écartés : « les faits du code », que disait le contrat ; tous les sujets de la
+  veille. — PR de #369
+
+- **Un nombre ne s'écrit que comme fait déclaré et trouvé : le code retire du texte les faits trouvés, du plus long
+  au plus court et entre leurs limites, et un chiffre qui reste retire le texte.** Pourquoi : une règle fermée par
+  construction, NFKC compris (`²`, `３`). Écartée : une liste de motifs de nombres, toujours incomplète. Limite : un
+  nombre écrit en lettres n'est pas vu (décision 4). — PR de #369
+
+- **Un texte vide sans fait est permis, il dit « rien à dire » ; un texte écrit sans source est retiré
+  (`no_source`).** Décision 2 de Sabine. **Relâche la borne de l'architecte du 29/10** (des textes jamais vides),
+  conformément à l'issue. Pourquoi : une borne qui oblige à écrire pousse le modèle à écrire ce que sa source ne
+  dit pas. Un texte qui passe les contrôles sans
+  lettre ni chiffre, une fois normalisé, compte pour vide (tri de la revue de code du 08/11, time-knight).
+  — PR de #369
+
+- **Des limites écrites au contrat plutôt que codées.** Décision 4 de Sabine : un bloc de code indenté de 4 espaces
+  n'est pas retiré du README (il faudrait un analyseur Markdown) ; « version récente non retenue » et « prudence en
+  faits, pas en verdicts » ne sont tenues que par la consigne ; un nombre en lettres et « Installez X » en prose ne
+  sont pas vus. Ajoutées par le tri de la revue de code du 08/11 : `sudo` et `npx` refusés même en prose (refus
+  fermé) ; un gestionnaire hors du motif de commande (`conda`, `poetry`…) non vu ; le README lu par le nom, sans
+  contrôle de l'`id`. Pourquoi : chaque texte est neutralisé dans le coffre, rien ne s'y exécute, et #370 mesure ces
+  cas. Le registre et le contrat, qui disaient « blocs de code retirés », sont corrigés. — PR de #369
+
+- **Dans le coffre, sous la ligne des faits de chaque choisi, une ligne par texte, indentée de 2 espaces :
+  `Secteur`, `Lien avec la veille`, `D'après son README` (`D'après le début de son README` s'il est coupé),
+  `Promesse`.** Décision 1 de Sabine. Pourquoi : l'indentation garde les lignes dans l'élément du dépôt, comme celle
+  des faits ; l'étiquette posée par le code tient l'« attribué à l'auteur » et le « tronqué » du 29/10 (16:53). Un
+  texte retiré : « non retenu par les contrôles. » ; un texte vide : pas de ligne. — PR de #369
+
+- **L'étape de métrique `write_trends` : une ligne par rédaction envoyée ; `FailedSubjectSchema.stage` des fiches
+  reçoit son type, `DigestStage`.** Pourquoi : réutiliser `write` mêlerait les taux des fiches et des tendances.
+  Rétablit ce que disait l'entrée du 01/11 (« `FailedSubjectSchema.stage` des fiches garde `classify` ou
+  `write` ») : le code l'avait typé par `Stage`, et l'OpenAPI y listait `select`. — PR de #369
+
+- **La réponse passe en 0.12.0 : chaque choisi gagne `readme`, `texts`, `texts_removed` (les noms, dans l'ordre) et
+  `writing_failure`.** Pourquoi : le fichier dit quel texte est retiré. Écarté : un compte des textes retirés.
+  `kb` relit chaque texte borné et sans caractère qui cache (Cf sauf U+200D, Co, Cn ; tri de la relecture du plan),
+  et refuse une réponse qui se contredit. — PR de #369
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages

@@ -87,6 +87,15 @@ def run_trend_report(data_dir: Path, environ: Mapping[str, str]) -> int:
             response.choice_failure,
             response.request_id,
         )
+    for number, chosen in enumerate(response.chosen):
+        if chosen.writing_failure is not None:
+            # By its place, never its name: the texts are left out, the report written.
+            logger.warning(
+                "writing of chosen.%d not made: %s, request_id %s",
+                number,
+                chosen.writing_failure,
+                response.request_id,
+            )
     entry = make_entry(preparation.report_file, response, generated)
     if entry is None:
         return ExitCode.FAILED

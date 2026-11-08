@@ -1,7 +1,8 @@
 """The trend report: the period after the previous report, its windows read by the data API under
 the deadline, the repositories that meet a criterion, the sheet of each candidate read on GitHub,
-then the choice of the model among those read (docs/tendances.md); nothing is written nor logged
-here, each step is a span without any repository."""
+the choice of the model among those read, then the README of each repository chosen and the
+writing of its texts (docs/tendances.md); nothing is written nor logged here, each step is a span
+without any repository."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -13,6 +14,10 @@ from k_b.ai_api.connectors.data_api_client import DataApiError, read_trend_windo
 from k_b.ai_api.connectors.github_client import (
     GithubError,
     GithubReading,
+    GithubState,
+    MissingReadme,
+    Readme,
+    read_readme,
     read_repository,
 )
 from k_b.ai_api.connectors.llm_settings import LlmSettings
@@ -24,12 +29,15 @@ from k_b.ai_api.repository_cards import (
     RepositoryFacts,
     to_facts,
 )
+from k_b.ai_api.stage_calls import StageCall
 from k_b.ai_api.stages.trend_selection import (
+    ChosenRepository,
     Selection,
     SelectionCandidate,
     SelectionFailure,
     select_trends,
 )
+from k_b.ai_api.stages.trend_writing import TrendWriting, write_trends
 from k_b.ai_api.tracing import TRACING_OFF, Tracing
 from k_b.ai_api.trajectories import (
     StarWindow,
@@ -92,6 +100,26 @@ class TrendReport:
     candidates: CandidateCounts
     # None when no candidate is read: no call to the model.
     choice: Selection | SelectionFailure | None
+    # One per repository chosen, in the order of the choice; none without a choice made.
+    writings: tuple[TrendWriting, ...]
+
+    @property
+    def stage_calls(self) -> tuple[StageCall, ...]:
+        """The calls to the model, the choice then each writing sent."""
+        choice_calls = () if self.choice is None else self.choice.stage_calls
+        return choice_calls + tuple(
+            writing.stage_call
+            for writing in self.writings
+            if writing.stage_call is not None
+        )
+
+
+@dataclass(frozen=True)
+class ReadmeReading:
+    # One per repository chosen, in their order: None when not read.
+    readmes: tuple[Readme | MissingReadme | None, ...]
+    # The failure of GitHub that stopped the reading, after which no README is sent.
+    failure: GithubState | None
 
 
 @dataclass(frozen=True)
@@ -123,9 +151,10 @@ def build_trend_report(
 ) -> TrendReport:
     """The repositories that meet a criterion over the windows after `after`, the last window of
     the previous report, None for the first, with the sheet of each candidate read on GitHub at
-    `now`, the time of the request, and the choice of the model among those read; a failure of a
-    reading raises its DataApiError or its GithubError, a failure of the choice is in the
-    report."""
+    `now`, the time of the request, the choice of the model among those read, and the texts of
+    each repository chosen; a failure of a reading of the windows or of the sheets raises its
+    DataApiError or its GithubError, a failure of the choice, of a README or of a writing is in
+    the report. The sheets and the READMEs share one budget of requests and of refusals."""
     with tracing.step("read_trend_windows") as step:
         try:
             reading = read_period(
@@ -148,9 +177,8 @@ def build_trend_report(
             }
         )
     candidates = select_candidates(trends.trajectories)
-    cards = read_repository_cards(
-        github_client, candidates, deadline, now, tracing=tracing
-    )
+    github_reading = GithubReading(github_client, deadline, now)
+    cards = read_repository_cards(github_reading, candidates, tracing=tracing)
     read = [
         SelectionCandidate(
             candidate,
@@ -172,7 +200,20 @@ def build_trend_report(
         if read
         else None
     )
-    return to_trend_report(trends, cards, choice)
+    writings: tuple[TrendWriting, ...] = ()
+    if isinstance(choice, Selection) and choice.chosen:
+        readmes = read_readmes(github_reading, choice.chosen, tracing=tracing)
+        writings = write_trends(
+            llm_client,
+            llm_settings,
+            choice.chosen,
+            readmes.readmes,
+            readmes.failure,
+            subjects,
+            deadline,
+            tracing=tracing,
+        )
+    return to_trend_report(trends, cards, choice, writings)
 
 
 def read_period(
@@ -275,16 +316,14 @@ def count_meeting_a_criterion(trajectories: Sequence[Trajectory]) -> int:
 
 
 def read_repository_cards(
-    http_client: httpx2.Client,
+    reading: GithubReading,
     candidates: Sequence[Trajectory],
-    deadline: Deadline,
-    now: datetime,
     *,
     tracing: Tracing = TRACING_OFF,
 ) -> CardReading:
     """The sheet of each candidate, one request after the other; none without a candidate. A
     span of counts and states, never a repository."""
-    reading = GithubReading(http_client, deadline, now)
+    now = reading.now
     facts: dict[int, RepositoryFacts] = {}
     descriptions: dict[int, str | None] = {}
     dropped: dict[int, DropReason] = {}
@@ -318,8 +357,53 @@ def read_repository_cards(
     return CardReading(facts, descriptions, frozenset(dropped), counts)
 
 
+def read_readmes(
+    reading: GithubReading,
+    chosen: Sequence[ChosenRepository],
+    *,
+    tracing: Tracing = TRACING_OFF,
+) -> ReadmeReading:
+    """The README of each repository chosen, one request after the other in the order of the
+    model, all before any writing; none once the deadline leaves no time for a call to the model,
+    nor after a failure of GitHub, which no README follows to the model. A span of counts and
+    states, never a repository."""
+    readmes: list[Readme | MissingReadme | None] = []
+    failure: GithubState | None = None
+    skipped = 0
+    requests_before = reading.requests
+    with tracing.step("read_readmes") as step:
+        for repository in chosen:
+            if failure is not None or not reading.deadline.allows_llm_request():
+                readmes.append(None)
+                skipped += 1
+                continue
+            try:
+                readmes.append(
+                    read_readme(
+                        reading, repository.candidate.trajectory.repository_name
+                    )
+                )
+            except GithubError as error:
+                failure = error.state
+                step.fail(error.state)
+                readmes.append(None)
+        step.set(
+            {
+                "k_b.readmes.read": sum(isinstance(r, Readme) for r in readmes),
+                "k_b.readmes.absent": readmes.count("absent"),
+                "k_b.readmes.refused": readmes.count("refused"),
+                "k_b.readmes.skipped": skipped,
+                "k_b.github.requests": reading.requests - requests_before,
+            }
+        )
+    return ReadmeReading(tuple(readmes), failure)
+
+
 def to_trend_report(
-    trends: Trends, cards: CardReading, choice: Selection | SelectionFailure | None
+    trends: Trends,
+    cards: CardReading,
+    choice: Selection | SelectionFailure | None,
+    writings: tuple[TrendWriting, ...],
 ) -> TrendReport:
     """The repositories that meet a criterion, but the candidates GitHub left out: their name may
     now name another repository."""
@@ -334,4 +418,5 @@ def to_trend_report(
         facts=cards.facts,
         candidates=cards.counts,
         choice=choice,
+        writings=writings,
     )

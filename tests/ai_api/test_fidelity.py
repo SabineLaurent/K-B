@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from k_b.ai_api.stages.fidelity import check_claim, is_found, normalize
+from k_b.ai_api.stages.fidelity import (
+    check_claim,
+    is_found,
+    normalize,
+    to_searched_text,
+)
 from k_b.ai_api.stages.writing import Claim
 from k_b.ai_api.watch_items import WatchItem, build_fields
 from k_b.core.config import MAX_FIELD_CHARS_FOR_WRITING
@@ -501,3 +506,16 @@ def test_a_sign_out_of_ascii_in_an_ordinary_phrase_keeps_the_claim(phrase):
     )
 
     assert fidelity.is_faithful is True
+
+
+def test_the_searched_text_takes_the_length_of_its_cut():
+    field = "x" * (2500 - len(" 1.2")) + " 1.2"
+
+    assert is_found("1.2", to_searched_text(field, max_chars=4000))
+    assert not is_found("1.2", to_searched_text(field))
+
+
+@pytest.mark.parametrize("mask", ["[email]", "[url]", "@user"])
+def test_a_mask_of_k_b_is_never_a_fact(mask):
+    """A mask put by K-B says nothing of the text it stands in."""
+    assert not is_found(normalize(mask), to_searched_text(f"write to {mask} today"))

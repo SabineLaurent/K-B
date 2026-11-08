@@ -8,8 +8,11 @@ from pathlib import Path
 import pytest
 from post.test_trend_report_client import (
     NO_CANDIDATE_READ,
+    NOT_WRITTEN,
     RISING,
     STEADY,
+    TEXTS,
+    WRITING_FAILURES,
     change_period,
     choose,
     make_report,
@@ -30,6 +33,7 @@ from k_b.post.trend_report_sheets import (
     DROP_REASON_LABELS,
     GITHUB_URL,
     MISSING,
+    WRITING_FAILURE_REASONS,
     ReportFile,
     locate_report_file,
     refuse_written_sheet,
@@ -466,3 +470,123 @@ def test_without_any_candidate_read_the_choice_is_said_not_made():
     assert find_choice_section(sheet) == (
         "## Choisis par le modèle\n\nChoix non fait : aucun candidat lu.\n\n"
     )
+
+
+# The texts of the repositories chosen (#369, docs/tendances.md, "Ce que rend #369").
+def text_lines(criteria=None, watch_subjects=(), **writing):
+    """The lines under the facts of RISING, chosen with this writing."""
+    report = make_report(
+        chosen=[
+            choose(RISING, criteria, watch_subjects)
+            | {
+                "readme": "read",
+                "texts": TEXTS,
+                "texts_removed": [],
+                "writing_failure": None,
+            }
+            | writing
+        ]
+    )
+    lines = find_choice_section(render(report)).splitlines()
+    return lines[lines.index(FACTS_LINE) + 1 : -1]
+
+
+def test_the_texts_of_a_repository_chosen_are_written_under_its_facts():
+    lines = text_lines(
+        ["new", "watch_subject"],
+        ["llm_security"],
+        texts=TEXTS | {"watch_link": "Il touche à la sécurité des modèles."},
+    )
+
+    assert lines == [
+        "  Secteur : Outil en ligne de commande.",
+        "  Lien avec la veille : Il touche à la sécurité des modèles.",
+        "  D'après son README : Selon son auteur, un outil pour les LLM.",
+        "  Promesse : Il promet la rapidité.",
+    ]
+
+
+def test_a_readme_cut_is_said_by_its_label():
+    assert (
+        "  D'après le début de son README : Selon son auteur, un outil pour les LLM."
+        in (text_lines(readme="cut"))
+    )
+
+
+def test_a_text_removed_is_said_not_retained_by_the_checks():
+    lines = text_lines(
+        texts=TEXTS | {"sector": None, "promise": None},
+        texts_removed=["sector", "promise"],
+    )
+
+    assert lines == [
+        "  Secteur : non retenu par les contrôles.",
+        "  D'après son README : Selon son auteur, un outil pour les LLM.",
+        "  Promesse : non retenu par les contrôles.",
+    ]
+
+
+def test_an_empty_text_has_no_line():
+    assert text_lines(texts=TEXTS | {"promise": None}) == [
+        "  Secteur : Outil en ligne de commande.",
+        "  D'après son README : Selon son auteur, un outil pour les LLM.",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("readme", "said"),
+    [("absent", "  README : absent."), ("refused", "  README : non servi par GitHub.")],
+)
+def test_a_readme_github_does_not_give_is_said_in_place_of_its_summary(readme, said):
+    lines = text_lines(
+        readme=readme,
+        texts=TEXTS | {"readme_summary": None},
+        texts_removed=["readme_summary"],
+    )
+
+    assert lines == [
+        "  Secteur : Outil en ligne de commande.",
+        said,
+        "  Promesse : Il promet la rapidité.",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("state", "reason"),
+    [
+        ("llm_timeout", "le modèle n'a pas répondu à temps"),
+        ("github_unavailable", "GitHub indisponible"),
+        ("github_timeout", "GitHub n'a pas répondu à temps"),
+        ("github_rate_limited", "le quota de GitHub est atteint"),
+        ("github_unauthorized", "GitHub a refusé le jeton"),
+        ("github_forbidden", "GitHub a refusé 3 lectures"),
+        ("github_invalid_response", "la réponse de GitHub n'a pas passé les contrôles"),
+    ],
+)
+def test_a_writing_that_failed_says_why_in_one_line(state, reason):
+    assert text_lines(**NOT_WRITTEN, writing_failure=state) == [
+        f"  Textes non écrits : {reason}."
+    ]
+
+
+def test_every_failure_of_a_writing_has_its_reason():
+    assert set(WRITING_FAILURE_REASONS) == set(WRITING_FAILURES)
+
+
+@pytest.mark.parametrize(
+    ("sector", "written"),
+    [
+        ("[C](http://evil) | <b>#", "\\[C\\](http\\://evil) \\| \\<b\\>\\#"),
+        ("www.evil.example", "www\\.evil.example"),
+        ("a:: b", "a\\: \\: b"),
+        # On one line: the dash no longer starts a list.
+        ("Deux" + chr(10) + "- lignes", "Deux - lignes"),
+        ("- Une liste", "\\- Une liste"),
+    ],
+)
+def test_a_text_of_the_model_makes_neither_link_nor_markup_in_the_vault(
+    sector, written
+):
+    [line, *_] = text_lines(texts=TEXTS | {"sector": sector})
+
+    assert line == f"  Secteur : {written}"

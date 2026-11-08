@@ -78,11 +78,33 @@ def read_bounded_body(
         and int(length) > max_bytes
     ):
         raise BodyTooLargeError
+    body, is_cut = read_pieces(response, max_bytes, is_late)
+    if is_cut:
+        raise BodyTooLargeError
+    return body
+
+
+def read_body_head(
+    response: httpx2.Response,
+    max_bytes: int,
+    is_late: Callable[[], bool] | None = None,
+) -> bytes:
+    """The first max_bytes of the body of a streamed response, decoded, the rest left unread and
+    its Content-Length ignored; stopped as soon as is_late() between two pieces."""
+    body, _ = read_pieces(response, max_bytes, is_late)
+    return body
+
+
+def read_pieces(
+    response: httpx2.Response, max_bytes: int, is_late: Callable[[], bool] | None
+) -> tuple[bytes, bool]:
+    """The body up to max_bytes, and whether a byte beyond was seen: the one loop of both
+    readings, so that a bound of the wait is written once."""
     body = bytearray()
     for chunk in response.iter_bytes():
         body += chunk
         if len(body) > max_bytes:
-            raise BodyTooLargeError
+            return bytes(body[:max_bytes]), True
         if is_late is not None and is_late():
             raise BodyTooLateError
-    return bytes(body)
+    return bytes(body), False

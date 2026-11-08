@@ -234,6 +234,13 @@ type ChoiceCriterion = Literal["durable", "new", "accelerating", "watch_subject"
 CHOICE_CRITERIA: tuple[ChoiceCriterion, ...] = get_args(ChoiceCriterion.__value__)
 WATCH_SUBJECT: ChoiceCriterion = "watch_subject"
 type WindowState = Literal["top", "out_of_top", "missing"]
+# The README of a repository chosen as the AI API read it (docs/tendances.md, "Ce que rend #369"):
+# read whole, cut, absent (404, 410, or empty once cleaned), or refused, which GitHub holds back
+# (a 403 that is no rate limit, a 451, a redirection).
+type ReadmeState = Literal["read", "cut", "absent", "refused"]
+# The texts the model writes on a repository chosen, in the order of the response.
+type TrendText = Literal["sector", "watch_link", "readme_summary", "promise"]
+TREND_TEXTS: tuple[TrendText, ...] = get_args(TrendText.__value__)
 # A date with its time zone, held in UTC.
 UtcDatetime = Annotated[AwareDatetime, AfterValidator(convert_to_utc)]
 # An integer SQLite holds: a larger one fails to be written.

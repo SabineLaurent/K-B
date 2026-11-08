@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "K-B AI API",
-    "version": "0.11.0"
+    "version": "0.12.0"
   },
   "paths": {
     "/digests": {
@@ -138,7 +138,7 @@
           "trend-reports"
         ],
         "summary": "Post Trend Reports",
-        "description": "The repositories that meet a criterion over the windows after the previous report, each\nwith its trajectory, and those the model chose among the candidates read; no window after it\ngives an empty period, a reading that fails fails the request, a choice that fails leaves the\nreport factual, with its state.",
+        "description": "The repositories that meet a criterion over the windows after the previous report, each\nwith its trajectory, and those the model chose among the candidates read, with their texts;\nno window after it gives an empty period, a reading of the windows or of the sheets that\nfails fails the request, a choice that fails leaves the report factual, with its state, and a\nREADME or a writing that fails leaves its texts unwritten, with its state.",
         "operationId": "post_trend_reports_trend_reports_post",
         "requestBody": {
           "content": {
@@ -344,6 +344,47 @@
           "facts": {
             "$ref": "#/components/schemas/RepositoryFactsSchema",
             "description": "Read on GitHub."
+          },
+          "readme": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReadmeState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "read; cut, to 4,000 characters once cleaned; absent (404, 410, or empty once cleaned); refused (a 403 that is no rate limit, a 451, a redirection); null when not read: GitHub failed, or the deadline came first."
+          },
+          "texts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrendTextsSchema"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when not written, with writing_failure."
+          },
+          "texts_removed": {
+            "items": {
+              "$ref": "#/components/schemas/TrendText"
+            },
+            "type": "array",
+            "title": "Texts Removed",
+            "description": "Removed by the checks, in the order sector, watch_link, readme_summary, promise."
+          },
+          "writing_failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WritingFailure"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the texts are not written: the state of the call to the model, or of GitHub on a README, after which no README is sent; null otherwise. The facts stay."
           }
         },
         "type": "object",
@@ -354,7 +395,11 @@
           "watch_subjects",
           "best_rank",
           "trajectory",
-          "facts"
+          "facts",
+          "readme",
+          "texts",
+          "texts_removed",
+          "writing_failure"
         ],
         "title": "ChosenRepositorySchema"
       },
@@ -457,6 +502,13 @@
           "items_removed_by_checks"
         ],
         "title": "DigestSchema"
+      },
+      "DigestStage": {
+        "type": "string",
+        "enum": [
+          "classify",
+          "write"
+        ]
       },
       "DigestsSchema": {
         "properties": {
@@ -591,7 +643,7 @@
             "title": "Subject"
           },
           "stage": {
-            "$ref": "#/components/schemas/Stage"
+            "$ref": "#/components/schemas/DigestStage"
           },
           "error": {
             "$ref": "#/components/schemas/LlmFailure"
@@ -604,6 +656,17 @@
           "error"
         ],
         "title": "FailedSubjectSchema"
+      },
+      "GithubState": {
+        "type": "string",
+        "enum": [
+          "github_unauthorized",
+          "github_rate_limited",
+          "github_forbidden",
+          "github_unavailable",
+          "github_timeout",
+          "github_invalid_response"
+        ]
       },
       "InvalidParameterSchema": {
         "properties": {
@@ -635,6 +698,15 @@
           "llm_rate_limited",
           "llm_unavailable",
           "llm_timeout"
+        ]
+      },
+      "ReadmeState": {
+        "type": "string",
+        "enum": [
+          "read",
+          "cut",
+          "absent",
+          "refused"
         ]
       },
       "RepositoryFactsSchema": {
@@ -733,14 +805,6 @@
         ],
         "title": "SourceSchema",
         "description": "Read from the data API, never from the output of the model."
-      },
-      "Stage": {
-        "type": "string",
-        "enum": [
-          "classify",
-          "write",
-          "select"
-        ]
       },
       "TrajectoryPointSchema": {
         "properties": {
@@ -1004,6 +1068,76 @@
         ],
         "title": "TrendRepositorySchema"
       },
+      "TrendText": {
+        "type": "string",
+        "enum": [
+          "sector",
+          "watch_link",
+          "readme_summary",
+          "promise"
+        ]
+      },
+      "TrendTextsSchema": {
+        "properties": {
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector",
+            "description": "Its facts taken from the topics."
+          },
+          "watch_link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Watch Link",
+            "description": "Its facts taken from the definition of a subject of the repository."
+          },
+          "readme_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Readme Summary",
+            "description": "What the README says, as its author says it; its facts taken from the README."
+          },
+          "promise": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Promise",
+            "description": "Its facts taken from the README or the description."
+          }
+        },
+        "type": "object",
+        "required": [
+          "sector",
+          "watch_link",
+          "readme_summary",
+          "promise"
+        ],
+        "title": "TrendTextsSchema",
+        "description": "Written in French by the model and checked by the code (docs/tendances.md, \"Rédaction\");\nnull when empty or removed."
+      },
       "WatchKind": {
         "type": "string",
         "enum": [
@@ -1071,6 +1205,16 @@
           "top",
           "out_of_top",
           "missing"
+        ]
+      },
+      "WritingFailure": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/LlmFailure"
+          },
+          {
+            "$ref": "#/components/schemas/GithubState"
+          }
         ]
       }
     },

@@ -1,6 +1,7 @@
 """POST /trend-reports: the repositories of the GH Archive windows after the previous report that
 meet a criterion, read by the data API under the deadline, with the sheet of each candidate read
-on GitHub and the choice of the model among them; nothing is kept, each request is a trace."""
+on GitHub, the choice of the model among them, and the texts of each repository chosen, written
+from its README; nothing is kept, each request is a trace."""
 
 import logging
 from datetime import datetime
@@ -30,12 +31,14 @@ from k_b.ai_api.schemas.trend_report_schema import (
     TrendReportRequestSchema,
     TrendReportSchema,
     TrendRepositorySchema,
+    TrendTextsSchema,
 )
 from k_b.ai_api.stages.trend_selection import (
     ChosenRepository,
     Selection,
     SelectionFailure,
 )
+from k_b.ai_api.stages.trend_writing import TrendWriting
 from k_b.ai_api.tracing import TRACING_OFF, Tracing
 from k_b.ai_api.trajectories import Trajectory
 from k_b.ai_api.trend_reports import TrendReport, build_trend_report
@@ -65,9 +68,10 @@ def post_trend_reports(
     request_time: RequestTime,
 ) -> TrendReportSchema:
     """The repositories that meet a criterion over the windows after the previous report, each
-    with its trajectory, and those the model chose among the candidates read; no window after it
-    gives an empty period, a reading that fails fails the request, a choice that fails leaves the
-    report factual, with its state."""
+    with its trajectory, and those the model chose among the candidates read, with their texts;
+    no window after it gives an empty period, a reading of the windows or of the sheets that
+    fails fails the request, a choice that fails leaves the report factual, with its state, and a
+    README or a writing that fails leaves its texts unwritten, with its state."""
     # The root span ends whatever happens, its state named, as the one of POST /digests. A 401, a
     # 403, a 422 and a 429 have none, and an error once the response is returned, when FastAPI
     # serializes it, leaves it at 200. Not in the docstring: it is the description of the route in
@@ -114,9 +118,9 @@ def read_trend_report(
     *,
     tracing: Tracing = TRACING_OFF,
 ) -> TrendReport:
-    """The report under its deadline and the measures of its call to the model; a failure of the
-    data API or of GitHub is logged here, its state and its HTTP status, never a repository, and
-    fails the whole request."""
+    """The report under its deadline and the measures of its calls to the model; a failure of the
+    data API, or of GitHub on a sheet, is logged here, its state and its HTTP status, never a
+    repository, and fails the whole request. A failure of GitHub on a README is in the report."""
     deadline = Deadline.after(TREND_REPORT_REQUEST_TIMEOUT_SECONDS)
     state = request.app.state
     try:
@@ -144,11 +148,10 @@ def read_trend_report(
             request_id,
         )
         raise to_api_error(error.state, error.retry_after_seconds) from None
-    # One line per call, the choice made or failed (.claude/rules/poc.md, rule 4); the readings
-    # are measured in their spans, so no measure of the request.
-    stage_calls = () if report.choice is None else report.choice.stage_calls
-    write_llm_call_lines(request_id, state.llm_settings, stage_calls, None)
-    state.model_metrics.record_calls(state.llm_settings, stage_calls)
+    # One line per call, made or failed (.claude/rules/poc.md, rule 4); the readings are
+    # measured in their spans, so no measure of the request.
+    write_llm_call_lines(request_id, state.llm_settings, report.stage_calls, None)
+    state.model_metrics.record_calls(state.llm_settings, report.stage_calls)
     return report
 
 
@@ -163,8 +166,12 @@ def to_trend_report_schema(
         model=model if isinstance(choice, Selection) else None,
         choice_failure=choice.state if isinstance(choice, SelectionFailure) else None,
         chosen=[
-            to_chosen_schema(chosen)
-            for chosen in (choice.chosen if isinstance(choice, Selection) else ())
+            to_chosen_schema(chosen, writing)
+            for chosen, writing in zip(
+                choice.chosen if isinstance(choice, Selection) else (),
+                report.writings,
+                strict=True,
+            )
         ],
         period=TrendPeriodSchema(
             first_report=period.first_report,
@@ -212,8 +219,11 @@ def to_trajectory_schema(trajectory: Trajectory) -> list[TrajectoryPointSchema]:
     ]
 
 
-def to_chosen_schema(chosen: ChosenRepository) -> ChosenRepositorySchema:
+def to_chosen_schema(
+    chosen: ChosenRepository, writing: TrendWriting
+) -> ChosenRepositorySchema:
     trajectory = chosen.candidate.trajectory
+    texts = writing.texts
     return ChosenRepositorySchema(
         repository_id=trajectory.repository_id,
         repository_name=trajectory.repository_name,
@@ -222,6 +232,17 @@ def to_chosen_schema(chosen: ChosenRepository) -> ChosenRepositorySchema:
         best_rank=trajectory.best_rank,
         trajectory=to_trajectory_schema(trajectory),
         facts=to_facts_schema(chosen.candidate.facts),
+        readme=writing.readme,
+        texts=None
+        if texts is None
+        else TrendTextsSchema(
+            sector=texts.sector,
+            watch_link=texts.watch_link,
+            readme_summary=texts.readme_summary,
+            promise=texts.promise,
+        ),
+        texts_removed=list(writing.texts_removed),
+        writing_failure=writing.failure,
     )
 
 

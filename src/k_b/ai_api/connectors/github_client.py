@@ -1,7 +1,8 @@
-"""The reading of the sheet of a candidate on GitHub, GET /repos/{owner}/{repo}, one request after
-the other under the deadline and the budget of the report (docs/tendances.md, "GitHub"): a
-candidate gone, moved, replaced or refused is left out by its reason; any other failure is a named
-state, raised as a GithubError, and stops the report."""
+"""The reading of the sheet of a candidate on GitHub, GET /repos/{owner}/{repo}, and of the README
+of a repository chosen, GET /repos/{owner}/{repo}/readme, one request after the other under the
+deadline and the budget of the report (docs/tendances.md, "GitHub"): a candidate gone, moved,
+replaced or refused is left out by its reason, a README GitHub does not give is absent or refused;
+any other failure is a named state, raised as a GithubError."""
 
 import re
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from k_b.core.config import (
     GITHUB_MAX_FORBIDDEN_PER_REPORT,
     GITHUB_MAX_REQUESTS_PER_REPORT,
     HTTP_TIMEOUT_SECONDS,
+    MAX_GITHUB_README_BYTES,
     MAX_GITHUB_REPOSITORY_BYTES,
     MAX_GITHUB_RETRY_AFTER_SECONDS,
     MAX_GITHUB_TOPICS,
@@ -27,6 +29,7 @@ from k_b.core.outbound import (
     BodyTooLargeError,
     BodyTooLateError,
     open_http_client,
+    read_body_head,
     read_bounded_body,
 )
 from k_b.core.rate_limit import (
@@ -37,7 +40,14 @@ from k_b.core.rate_limit import (
 )
 from k_b.core.retry_after import is_retry_after_too_long, read_retry_after
 from k_b.core.user_agent import USER_AGENT
-from k_b.items import GithubLanguage, GithubTopic, Int64, SpdxId, UtcDatetime
+from k_b.items import (
+    GithubLanguage,
+    GithubTopic,
+    Int64,
+    SpdxId,
+    UtcDatetime,
+    is_repository_name,
+)
 
 type GithubState = Literal[
     "github_unauthorized",
@@ -52,6 +62,14 @@ type GithubState = Literal[
 # API"; Octokit, error_for_403), read without case.
 RATE_LIMIT_MESSAGE = re.compile(r"rate limit|abuse", re.IGNORECASE)
 NOT_FOUND_STATUSES = {httpx2.codes.NOT_FOUND, httpx2.codes.GONE}
+# The README as its file, not as a JSON object of its content in base64 (docs: "Get a repository
+# README"). The media type GitHub answers it with is not documented (searched on 2026-11-08): a
+# 200 is refused only when served as the JSON object, compared exactly, its parameters removed.
+README_MEDIA_TYPE = "application/vnd.github.raw+json"
+JSON_MEDIA_TYPE = "application/json"
+# Why a repository chosen has no README to send: absent (404, 410), or refused, which GitHub
+# holds back (a 403 that is no rate limit, a 451, a redirection, not followed).
+type MissingReadme = Literal["absent", "refused"]
 
 
 class GithubError(Exception):
@@ -104,17 +122,25 @@ class ErrorBody(GithubModel):
 
 @dataclass(frozen=True)
 class Answer:
-    """An answer of GitHub, its body read whole within MAX_GITHUB_REPOSITORY_BYTES."""
+    """An answer of GitHub, its body read whole within MAX_GITHUB_REPOSITORY_BYTES, or, for the
+    200 of a README, its head."""
 
     status_code: int
     headers: httpx2.Headers
     content: bytes
 
 
+@dataclass(frozen=True)
+class Readme:
+    """The head of a README as GitHub serves it, decoded, a broken character replaced."""
+
+    text: str
+
+
 @dataclass
 class GithubReading:
-    """The reading of the sheets of one report: its client, its deadline, the time of its request,
-    and what it has spent; nothing is kept beyond the report."""
+    """The reading of the sheets and the READMEs of one report: its client, its deadline, the
+    time of its request, and what it has spent; nothing is kept beyond the report."""
 
     http_client: httpx2.Client
     deadline: Deadline
@@ -143,12 +169,8 @@ def build_github_client(
 def read_repository(
     reading: GithubReading, repository_id: int, repository_name: str
 ) -> RepositoryCard | DropReason:
-    """The sheet of the repository, or why it is left out. The name, checked by
-    is_repository_name, makes the path: neither `.` nor `..`, nor a query."""
-    answer = send(reading, f"repos/{repository_name}")
-    if answer.status_code >= httpx2.codes.INTERNAL_SERVER_ERROR:
-        # Once, without a wait: a wait would eat the deadline of the report.
-        answer = send(reading, f"repos/{repository_name}")
+    """The sheet of the repository, or why it is left out."""
+    answer = send_retried(reading, to_repository_path(repository_name))
     status = answer.status_code
     if status == httpx2.codes.OK:
         return to_card(answer, repository_id)
@@ -164,24 +186,88 @@ def read_repository(
     raise to_error(answer, reading.now)
 
 
-def send(reading: GithubReading, path: str) -> Answer:
-    """One GET within the budget and the deadline, its body read within its bound; raised from
-    None, as the error of httpx2 names the URL."""
+def read_readme(reading: GithubReading, repository_name: str) -> Readme | MissingReadme:
+    """The README of the repository, raw, its head kept; or why GitHub does not give it."""
+    answer = send_retried(
+        reading,
+        f"{to_repository_path(repository_name)}/readme",
+        raw_head_bytes=MAX_GITHUB_README_BYTES,
+    )
+    status = answer.status_code
+    if status == httpx2.codes.OK:
+        if read_media_type(answer.headers) == JSON_MEDIA_TYPE:
+            raise GithubError("github_invalid_response", status)
+        return Readme(answer.content.decode("utf-8", errors="replace"))
+    if status in NOT_FOUND_STATUSES:
+        return "absent"
+    if (
+        httpx2.codes.is_redirect(status)
+        or status == httpx2.codes.UNAVAILABLE_FOR_LEGAL_REASONS
+    ):
+        return "refused"
+    if status == httpx2.codes.FORBIDDEN and not is_rate_limit(answer):
+        count_forbidden(reading, status)
+        return "refused"
+    raise to_error(answer, reading.now)
+
+
+def to_repository_path(repository_name: str) -> str:
+    """The path of the repository: its name, checked by is_repository_name, holds neither `.`
+    nor `..`, nor a query; the message never quotes the name."""
+    if not is_repository_name(repository_name):
+        raise ValueError("not owner/name, or a part . or with ..")
+    return f"repos/{repository_name}"
+
+
+def read_media_type(headers: httpx2.Headers) -> str:
+    """The media type of the body, in lowercase, without its parameters."""
+    return headers.get("Content-Type", "").partition(";")[0].strip().lower()
+
+
+def send_retried(
+    reading: GithubReading, path: str, raw_head_bytes: int | None = None
+) -> Answer:
+    """One GET, sent once more after a server error, without a wait: a wait would eat the
+    deadline of the report."""
+    answer = send(reading, path, raw_head_bytes)
+    if answer.status_code >= httpx2.codes.INTERNAL_SERVER_ERROR:
+        answer = send(reading, path, raw_head_bytes)
+    return answer
+
+
+def send(
+    reading: GithubReading, path: str, raw_head_bytes: int | None = None
+) -> Answer:
+    """One GET within the budget and the deadline, its body read within its bound; with
+    raw_head_bytes, the file asked raw and the head of a 200 kept, any other answer read within
+    its bound, so that a message of rate limit is read whole. Raised from None, as the error of
+    httpx2 names the URL."""
     if reading.requests >= GITHUB_MAX_REQUESTS_PER_REPORT:
         raise GithubError("github_unavailable")
     if reading.deadline.is_passed():
         raise GithubError("github_timeout")
     reading.requests += 1
     http_client = reading.http_client
+    headers = None if raw_head_bytes is None else {"Accept": README_MEDIA_TYPE}
     try:
         with http_client.stream(
-            "GET", path, timeout=reading.deadline.cap(http_client.timeout)
+            "GET",
+            path,
+            headers=headers,
+            timeout=reading.deadline.cap(http_client.timeout),
         ) as response:
             status = response.status_code
             try:
-                body = read_bounded_body(
-                    response, MAX_GITHUB_REPOSITORY_BYTES, reading.deadline.is_passed
-                )
+                if raw_head_bytes is not None and status == httpx2.codes.OK:
+                    body = read_body_head(
+                        response, raw_head_bytes, reading.deadline.is_passed
+                    )
+                else:
+                    body = read_bounded_body(
+                        response,
+                        MAX_GITHUB_REPOSITORY_BYTES,
+                        reading.deadline.is_passed,
+                    )
             except BodyTooLargeError:
                 raise GithubError("github_invalid_response", status) from None
             except BodyTooLateError:

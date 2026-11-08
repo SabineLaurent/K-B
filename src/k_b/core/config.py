@@ -105,9 +105,9 @@ TREND_ACCELERATION_MIN_RANKS = 5
 TREND_MAX_CANDIDATES = 60
 # A repository created less than 7 days before the request: a caution of its sheet.
 TREND_RECENT_REPOSITORY_DAYS = 7
-# The reading of the sheets on GitHub by the AI API (docs/tendances.md, "GitHub"). Requests per
-# report, retries included: 60 candidates and room for their retries; the README of #369 will
-# share it.
+# The reading of the sheets and of the READMEs on GitHub by the AI API (docs/tendances.md,
+# "GitHub"). Requests per report, retries included: 60 sheets, 5 READMEs of the repositories
+# chosen, and 5 retries of a server error.
 GITHUB_MAX_REQUESTS_PER_REPORT = 70
 # A 403 that is not a rate limit leaves its candidate out; the third of a report stops the reading,
 # so that a rate limit misread is never insisted on (decision of Sabine of 2026-10-31, Q1 (b)).
@@ -117,6 +117,10 @@ MAX_GITHUB_RETRY_AFTER_SECONDS = 3600
 # The body of GET /repos/{owner}/{repo}: 6,382 bytes for fastapi/fastapi (2026-10-31,
 # tests/fixtures/github_repository_extract.json); about 60 times it.
 MAX_GITHUB_REPOSITORY_BYTES = 400_000
+# The head of a README read raw, the rest left unread (a README reaches 100 MB on GitHub): at 4
+# bytes a character at most, more than the raw cut of its cleaning (ai_api/repository_texts.py),
+# which cuts it again.
+MAX_GITHUB_README_BYTES = 65_536
 # The topics of a repository read, at most, by defense: a longer list is refused.
 MAX_GITHUB_TOPICS = 100
 
@@ -361,6 +365,14 @@ MAX_FIELD_CHARS_FOR_CLASSIFICATION = 500
 # (ai_api/repository_texts.py): cut as the long text of the classification. 20 topics at most.
 MAX_DESCRIPTION_CHARS_FOR_SELECTION = 500
 MAX_TOPICS_FOR_SELECTION = 20
+# The README of a repository chosen sent to the writing of its texts, once cleaned.
+MAX_README_CHARS_FOR_WRITING = 4000
+# The longest text the model writes on a repository chosen, in characters (docs/tendances.md,
+# "Rédaction"): the system prompt says them, the AI API checks them, kb reads them again.
+TREND_SECTOR_MAX_CHARS = 120
+TREND_WATCH_LINK_MAX_CHARS = 300
+TREND_README_SUMMARY_MAX_CHARS = 400
+TREND_PROMISE_MAX_CHARS = 200
 # The repositories the model may choose for a trend report (docs/tendances.md, "Choix").
 TREND_MAX_CHOSEN = 5
 

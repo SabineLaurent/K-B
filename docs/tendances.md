@@ -73,6 +73,7 @@ seule : `kb` ne relit jamais un compte rendu pour trouver le précédent.
 | Aucune fenêtre nouvelle | Réponse 200 sans appel à GitHub ni au modèle ; sortie en 0, rien d'écrit |
 | Compte rendu écrit | Entrée ajoutée au registre après l'écriture du fichier |
 | Choix en échec | Compte rendu factuel écrit (« choix non fait ») ; le registre le note ; la période avance |
+| Rédaction en échec, ou GitHub en échec sur un README | Compte rendu écrit, choix et faits compris ; « Textes non écrits : <raison>. » sous chaque dépôt concerné ; un avertissement par dépôt (sa place, l'état et le `request_id`, jamais un nom) ; la période avance (décision de Sabine du 08/11) |
 
 **Ce que fait `kb trend-report` depuis #366** (`commands/trend_report_command.py`). Une entrée du
 registre : `first_window` et `last_window` (les bornes de `period.windows`, manquantes comprises),
@@ -185,8 +186,13 @@ de contrôle, leur ordre et ce que chacun refuse sont dans « Ce que rend #368 �
 
 ### Rédaction
 
-Consigne `write-trends-1`, **un appel par dépôt choisi**. Entrée : les faits du code, la description
-et le README nettoyé, coupé à 4 000 caractères (README absent : « absent »).
+Consigne `write-trends-1`, **un appel par dépôt choisi**. Entrée : son `ref`, son nom sans le login
+du propriétaire (`name`), son langage, sa licence, ses topics (les 20 envoyés au choix), ses critères,
+les seuls sujets de la veille qu'il porte avec leur définition, sa description (500 caractères) et son
+README nettoyé, coupé à 4 000 caractères, `null` quand GitHub n'en donne pas (décision de Sabine du
+08/11 : un README réduit au mot « absent » pourrait passer la fidélité). Ni étoiles, ni dates, ni
+prudences : le code les écrit lui-même, et ces nombres feraient retirer les textes par la règle des
+nombres ; le nom sans le login, par minimisation (tranché par time-knight le 08/11).
 
 Sortie : `{"repositories": [{"ref", "sector", "watch_link", "readme_summary", "promise"}]}`, chaque
 texte de la forme `{"text", "facts"}` :
@@ -199,12 +205,41 @@ texte de la forme `{"text", "facts"}` :
 | `promise` | ce que le dépôt promet | le README ou la description (au moins un fait) |
 
 Ni commande ni bloc de code en sortie ; une version récente du dépôt n'est pas un fait retenu
-(décision de Sabine, 29/10, 16:53). Bornes de longueur vérifiées par le code.
+(décision de Sabine, 29/10, 16:53). Bornes de longueur vérifiées par le code : `sector` 120 caractères,
+`watch_link` 300, `readme_summary` 400, `promise` 200 (`core/config.py`), 0 à 5 faits par texte, au
+moins un pour `readme_summary` et `promise`, chacun de 3 à 120 caractères. Un texte vide sans fait est
+permis : il dit qu'il n'y a rien à dire, n'est ni écrit ni retiré (décision de Sabine du 08/11, qui
+relâche la borne de l'architecte du 29/10, « textes jamais vides », conformément à l'issue). Un texte
+qui passe tous les contrôles sans lettre ni chiffre, une fois normalisé, compte pour vide (`is_empty` ;
+tri de la revue de code du 08/11, time-knight, délégation de Sabine du 15/10).
 
 **Fidélité**, par `normalize` et `is_found` (`ai_api/stages/fidelity.py:153,291`) : chaque fait est
-cherché dans la seule source de son texte ; `to_searched_text` prend la longueur coupée (4 000) en
-paramètre ; le masque `[email]` est retiré des textes cherchés ; `is_disguised` s'applique ; un nombre
-écrit doit être un fait déclaré et trouvé.
+cherché dans son texte et dans la seule source de son texte ; `to_searched_text` prend la longueur
+coupée (4 000) en paramètre ; le masque `[email]` est retiré des textes cherchés, avec `[url]` et
+`@user`, pour tous les appelants (un masque de K-B n'est jamais la source d'un fait ; effet nul sur les
+fiches, que `watch_items.py` ne masque pas par `[email]`) ; `is_disguised` s'applique ; un nombre écrit
+doit être un fait déclaré et trouvé.
+
+**Contrôles de la sortie** (`ai_api/stages/trend_writing.py`), dans l'ordre des fiches. La sortie
+entière est refusée, puis relancée une fois avec son rappel : un dépôt de plus ou de moins (`schema`),
+un `ref` autre que celui envoyé (`item_id`), un lien, une image ou une balise (`MARKUP`,
+`ai_api/stages/writing.py`), un accent grave, `~~~` ou un motif de commande (`markup`). Le motif de
+commande : un tube vers un shell (`| sh`, `| bash`, `| zsh`, `| iex`), `Invoke-Expression`, `sudo`,
+`npx`, `curl` ou `wget` suivis d'une option, un gestionnaire qui installe (`pip`, `pip3`, `pipx`, `npm`,
+`pnpm`, `yarn`, `brew`, `apt`, `apt-get`, `cargo`, `gem`, `uv` suivis de `install`, `add` ou `i`),
+`go install` ou `go get`, `docker run` ou `docker pull`, `git clone`, `$(` et `&&`. Le nom d'un
+programme seul reste de la prose (« développé en Go », « un client comme curl », « publié sur npm »).
+
+Puis chaque texte, son premier refus le retire (`texts_removed`, codes sur le span) :
+
+| Ordre | Refus | Code |
+|---|---|---|
+| 1 | longueur, nombre de faits, fait trop court ou trop long, texte vide avec un fait | `out_of_bounds` |
+| 2 | texte écrit sans source : `sector` sans topic, `watch_link` sans sujet, `readme_summary` sans README, `promise` sans README ni description | `no_source` |
+| 3 | un fait introuvable dans son texte ou dans sa source (une valeur sans lettre ni chiffre l'est toujours) | `fact_not_found:<position>` |
+| 4 | une CVE ou une GHSA dans le texte | `identifier_from_free_text` |
+| 5 | un chiffre qui reste une fois retirés les faits trouvés (NFKC : `²`, `３` sont des chiffres) | `undeclared_number` |
+| 6 | un caractère qui cache ou maquille le texte | `disguised_text` |
 
 ### Réponse
 
@@ -322,7 +357,7 @@ Le fichier du coffre gagne une section « Choisis par le modèle », avant « D�
 - échec : « Choix non fait : <raison>. », une phrase par état ;
 - aucun candidat lu : « Choix non fait : aucun candidat lu. ».
 
-#369 y ajoute les textes sous chaque dépôt.
+#369 y ajoute les textes sous chaque dépôt (« Ce que rend #369 », ci-dessous).
 
 **Les faits dans le fichier.** `kb` relit `facts` par un schéma fermé et les écrit :
 
@@ -337,12 +372,58 @@ contredisent : prudences hors d'ordre, `no_license` sans licence nulle ou l'inve
 autres que ceux du tableau. Les étoiles gagnées restent absentes du fichier : elles viennent de
 l'échantillon de GH Archive (« Limite de GH Archive »).
 
+**Ce que rend #369** (version 0.12.0 de `docs/api/openapi-ia.json`) : le compte rendu de #368, plus
+le README de chaque choisi, lu sur GitHub entre le choix et la rédaction, et les textes que le modèle
+en écrit (« Rédaction »). Chaque choisi gagne :
+
+| Champ | Contenu |
+|---|---|
+| `chosen[].readme` | `read` ; `cut` (coupé à 4 000 caractères une fois nettoyé) ; `absent` (404, 410, ou vide une fois nettoyé) ; `refused` (un 403 qui n'est pas une limite, un 451, une redirection) ; `null` quand il n'est pas lu (GitHub en échec, ou l'échéance avant lui) |
+| `chosen[].texts` | `sector`, `watch_link`, `readme_summary`, `promise`, chacun `null` quand il est vide ou retiré ; `null` en entier quand la rédaction n'est pas faite, avec `writing_failure` |
+| `chosen[].texts_removed` | les textes retirés par les contrôles, dans l'ordre `sector`, `watch_link`, `readme_summary`, `promise` |
+| `chosen[].writing_failure` | l'état `llm_*` de l'appel, ou `github_*` de GitHub sur un README, après quoi aucun README ne part au modèle ; `null` sinon. Les faits restent |
+
+Un seul champ d'échec porte les deux familles d'états, disjointes par leur préfixe : une seule ligne
+dans le fichier, un seul contrôle croisé dans `kb`. Les `ref` (`c1`…) restent ceux du choix.
+
+**Les README.** `GET /repos/{owner}/{repo}/readme`, en brut (`Accept: application/vnd.github.raw+json`),
+tous lus avant la première rédaction, en série, dans l'ordre du modèle, sous le budget et le compteur
+de refus des fiches. Seule la tête est lue, 65 536 octets (`MAX_GITHUB_README_BYTES`), le reste jamais
+téléchargé, le flux fermé : à 4 octets par caractère au plus, elle dépasse la coupe brute du nettoyage
+(4 × 4 000 caractères), qui la recoupe et retire le mot entamé. Décodé en UTF-8, un caractère coupé
+remplacé. Un 200 servi en `application/json` (la forme base64, comparée exactement, paramètres
+retirés) est refusé : `github_invalid_response`. Avant chaque README, une échéance qui ne laisse plus
+le temps d'un appel au modèle arrête la lecture : les choisis non lus prennent `llm_timeout`.
+
+**`kb`** relit `readme`, `texts`, `texts_removed` et `writing_failure` par un schéma fermé : chaque
+texte borné comme dans l'API IA, sans caractère des catégories Cf (sauf U+200D, le liant des emoji),
+Co ni Cn. Il refuse une réponse qui se contredit : des textes non écrits sans échec, ou écrits avec
+un échec, des textes retirés avec un échec, hors d'ordre, deux fois ou encore écrits, un README non lu
+sans échec, un résumé sans README (`absent`, `refused`), un lien avec la veille sans sujet, un secteur
+sans topic. Un refus cite la place et le contrôle, jamais une valeur. Une rédaction en échec est
+journalisée en avertissement, `writing of chosen.<n> not made: <état>, request_id <id>`, jamais un
+nom ; la sortie standard ne change pas.
+
+Le fichier gagne, sous la ligne des faits de chaque choisi, une ligne par texte, indentée de 2 espaces
+(décision de Sabine du 08/11), chaque texte passé par `neutralize_digest_text` :
+
+- `Secteur : …`, `Lien avec la veille : …`, `D'après son README : …` (`D'après le début de son
+  README : …` quand il est coupé), `Promesse : …` ;
+- un texte retiré : `<Étiquette> : non retenu par les contrôles.` ; un texte vide : pas de ligne ;
+- `README : absent.` ou `README : non servi par GitHub.` à la place de la ligne du résumé, quel que
+  soit le texte rendu ;
+- une rédaction en échec : la seule ligne `Textes non écrits : <raison>.`, les raisons du choix pour un
+  état `llm_*`, et pour GitHub : « GitHub indisponible », « GitHub n'a pas répondu à temps », « le quota
+  de GitHub est atteint », « GitHub a refusé le jeton », « GitHub a refusé 3 lectures », « la réponse de
+  GitHub n'a pas passé les contrôles ».
+
 ## Défenses et échecs
 
 **Avant l'envoi au modèle**, en plus des défenses de [fiches-veille.md](fiches-veille.md)
 (« Injection d'instructions ») : commentaires HTML retirés ; caractères des catégories Unicode Cf,
 Co, Cs et Cc retirés, sauf le saut de ligne ; sélecteurs de variante et étiquettes Unicode retirés ;
-images, badges, balises HTML et blocs de code retirés ; toute URL devient `[url]`, tout `@login`
+images et badges (en ligne ou par référence), balises HTML et blocs de code délimités (`` ``` `` ou
+`~~~`) retirés, un bloc indenté de 4 espaces gardé (limite ci-dessous) ; toute URL devient `[url]`, tout `@login`
 devient `@user`, toute adresse mail devient `[email]` ; chaque texte est coupé. Les corps lus sur
 GitHub sont bornés avant d'être nettoyés (un README peut atteindre 100 Mo chez GitHub). Le texte d'un
 dépôt n'entre que dans le message utilisateur, jamais dans la consigne (règle 8 de `poc.md`).
@@ -351,8 +432,8 @@ dépôt n'entre que dans le message utilisateur, jamais dans la consigne (règle
 
 | Ce que le code trouve | Ce qu'il fait |
 |---|---|
-| `ref` faux, lien, image, balise (`MARKUP`, `ai_api/stages/writing.py:75`), accent grave, `~~~`, motif de commande | refuse la sortie entière du dépôt |
-| borne dépassée, fait introuvable, CVE ou GHSA tirée d'un texte libre | retire ce texte seul, et le fichier dit « non retenu par les contrôles » |
+| `ref` faux, pas exactement un dépôt, lien, image, balise (`MARKUP`, `ai_api/stages/writing.py`), accent grave, `~~~`, motif de commande | refuse la sortie entière du dépôt (relancée une fois) |
+| borne dépassée, texte sans source, fait introuvable, CVE ou GHSA tirée d'un texte libre, nombre non déclaré, texte maquillé | retire ce texte seul, et le fichier dit « non retenu par les contrôles » |
 
 **Dans le coffre** : chaque texte est échappé par `neutralize_digest_text` (`post/digest_sheets.py:187`),
 déplacé dans `post/vault_files.py` pour les deux écrivains du coffre (#365). Rendu déterministe.
@@ -371,12 +452,26 @@ déplacé dans `post/vault_files.py` pour les deux écrivains du coffre (#365). 
 | délai ou échéance dépassés | 504 `github_timeout` |
 | corps au-delà de `MAX_GITHUB_REPOSITORY_BYTES`, illisible ou hors schéma ; tout autre statut (204, 400, 422…) | 502 `github_invalid_response` |
 
-Toute erreur arrête le compte rendu : pas de compte rendu partiel. La route journalise l'état et le
-statut HTTP avec le `request_id`, jamais un nom de dépôt ; `kb serve-ai` ne garde aucune ligne de
-requête de httpx2, qui porterait l'URL `repos/<owner>/<repo>` (`commands/run_log.py`).
+Pour un README (#369), les mêmes statuts, avec ces différences :
 
-Requêtes en série, 70 au plus par compte rendu (`GITHUB_MAX_REQUESTS_PER_REPORT`, relances
-comprises, comptées par le client), avec le `User-Agent` de K-B et `X-GitHub-Api-Version`, chaque
+| Réponse | Ce que fait l'API IA |
+|---|---|
+| 200 | sa tête lue (« Ce que rend #369 ») ; servi en `application/json` : `github_invalid_response` |
+| 404, 410 | `readme` `absent`, le dépôt reste choisi, sa rédaction se fait sans README |
+| un 403 qui n'est pas une limite, 451, toute redirection | `readme` `refused`, de même ; le 403 compte parmi les 3 refus |
+| toute erreur (401, limite, 5xx deux fois, délai, budget, 3e refus, réponse illisible) | 200 ; aucun README ne part au modèle ; chaque choisi porte l'état en `writing_failure`, ses faits gardés ; le span `read_readmes` en erreur ; le `Retry-After` d'une limite est perdu |
+
+Toute erreur sur les fenêtres ou les fiches arrête le compte rendu : pas de compte rendu partiel. Une
+erreur sur un README n'arrête que la rédaction (décision de Sabine du 08/11 : comme un choix en échec,
+le compte rendu reste factuel ; « pas de compte rendu partiel » vaut pour les fiches) ; le choix déjà
+payé est gardé, la période avance, et `kb` journalise l'état en avertissement. La route journalise
+l'état et le statut HTTP d'une erreur qui arrête le compte rendu avec le `request_id`, jamais un nom
+de dépôt ; `kb serve-ai` ne garde aucune ligne de requête de httpx2, qui porterait l'URL
+`repos/<owner>/<repo>` (`commands/run_log.py`).
+
+Requêtes en série, 70 au plus par compte rendu (`GITHUB_MAX_REQUESTS_PER_REPORT`, relances comprises,
+comptées par le client : 60 fiches, 5 README et 5 relances), avec le `User-Agent` de K-B et
+`X-GitHub-Api-Version`, chaque
 délai de `HTTP_TIMEOUT_SECONDS` réduit par l'échéance de la demande, par un jeton *fine-grained* sans
 permission, `KB_AI_GITHUB_TOKEN`, du même compte que celui de la collecte : `kb serve-ai` ne démarre
 pas sans lui (`ExitCode.NOT_STARTED`), jamais en anonyme, ni avec un jeton *classic* (préfixe autre
@@ -388,8 +483,33 @@ jetons (`docs/jeton-github.md`, mis à jour par #367).
 - **Choix en échec** : compte rendu factuel (les dépôts qui remplissent un critère), avec « choix non
   fait » et la raison ; le registre le note ; la période avance (décision de Sabine, 29/10, ~19:45Z).
 - **Rédaction en échec pour un dépôt** (dont un refus de Prompt Shields sur un README qui parle
-  d'injection, `docs/fiches-veille.md:1116-1120`) : les textes de ce dépôt seul sont retirés, ses
-  faits restent (même isolement que `routers/digest_router.py:54-56`).
+  d'injection, [fiches-veille.md](fiches-veille.md), « Limite : un lot de classement en échec ») : les
+  textes de ce dépôt seul sont retirés, ses faits restent (même isolement que
+  `routers/digest_router.py:54-56`). Après un échec par 429, plus rien n'est envoyé ; sans le temps
+  d'un appel, `llm_timeout`, sans requête (`find_skipped_state`, `ai_api/stage_calls.py`).
+- Limite : un bloc de code indenté de 4 espaces n'est pas retiré du README (il faudrait un analyseur
+  Markdown) ; en sortie restent le refus de l'accent grave et le motif de commande (décision de Sabine
+  du 08/11).
+- Limite : « une version récente n'est pas un fait retenu » et « prudence en faits, pas en verdicts »
+  ne sont tenues que par la consigne ; un nombre écrit en lettres, « Installez X » en prose et un
+  gestionnaire hors de la liste du motif (`conda`, `poetry`, `dnf`, `pacman`…) échappent aux contrôles
+  (décision de Sabine du 08/11 ; le gestionnaire hors liste : tri de la revue du 08/11). Chaque texte
+  est neutralisé dans le coffre (`post/vault_files.py`) : rien ne s'y exécute.
+- Limite : `sudo` et `npx` suivis d'une espace sont refusés même en prose (« sans sudo ni droits
+  root », « via npx ou pnpm ») : la sortie entière est refusée, relancée, puis la rédaction de ce
+  dépôt échoue en `llm_invalid_output` si le texte revient. Le refus est fermé ; #370 en mesure la
+  fréquence (tri de la revue du 08/11).
+- Limite : le nettoyage d'un README coûte du temps sans contrôle de l'échéance pendant qu'il tourne
+  (`URL` mesure 1,27 s sur 20 000 lettres, `ai_api/repository_texts.py`) ; et l'échéance n'est vérifiée
+  qu'avant chaque README : un README lent peut finir en `github_timeout`, ce qui ne retire que les
+  textes. Mesuré par #370.
+- Limite : le type de média d'un README servi en brut n'est pas documenté par GitHub (recherche du
+  08/11) ; seul `application/json` est refusé. Relevé par #370.
+- Limite : le README est lu par le nom (`GET /repos/{owner}/{repo}/readme`, seule forme documentée
+  par GitHub, recherche du 08/11), sans contrôle de l'`id` : un dépôt supprimé puis recréé sous ce nom
+  entre sa fiche et son README (le choix les sépare, 200 s au plus, `TREND_REPORT_REQUEST_TIMEOUT_SECONDS`)
+  donnerait le sien. Seul le titulaire du nom peut le faire, et il tient déjà le README ; une
+  redirection reste refusée (tri de la revue du 08/11).
 - Limite : le filtre de contenu d'Azure peut refuser une description ou un README qui parle de
   jailbreak (sujet `llm_security` de la veille).
 - Limite : une description peut pousser son dépôt vers un choix par `watch_subject` (« idéal pour
@@ -420,8 +540,14 @@ les dépôts qui remplissent un critère, comptés sur les fenêtres, avant GitH
 `k_b.candidates.dropped.<motif>` (les écartés), `k_b.github.requests`, et l'état d'un échec ; le span
 du choix, `select_trends`, depuis #368 : `k_b.descriptions.truncated`, `k_b.outcome`,
 `k_b.choices.count`, `k_b.choices.refs` (les `ref` choisis, dans l'ordre du modèle) et l'état d'un
-échec, avec sous lui le span `chat <modèle>` de chaque tentative), jamais un nom de dépôt ni un
-`repository_id` (registre des traitements). Aucun nom de dépôt dans les journaux.
+échec, avec sous lui le span `chat <modèle>` de chaque tentative ; depuis #369, le span des README,
+`read_readmes` : `k_b.readmes.read` (servis par GitHub), `k_b.readmes.absent`, `k_b.readmes.refused`,
+`k_b.readmes.skipped` (non lus, échéance ou après une erreur), `k_b.github.requests` et l'état d'un
+échec ; puis un span `write_trend` par choisi : `k_b.ref`, `k_b.readme`, `k_b.outcome`,
+`k_b.facts.checked`, `k_b.facts.found`, `k_b.texts.kept` (noms), `k_b.texts.removed`
+(`texte:raison`), en erreur sans requête quand il n'est pas écrit, avec sous lui le span `chat` de
+chaque tentative), jamais un nom de dépôt ni un `repository_id` (registre des traitements). Aucun nom
+de dépôt dans les journaux.
 
 **Métriques** (règle 4 de `poc.md`, décision de Sabine du 01/11, Q3 du plan de #368) : le type `Stage`
 (`ai_api/stage_calls.py`) gagne `select`. L'appel du choix écrit une ligne `llm_call` sur la sortie
@@ -430,13 +556,18 @@ réussisse ou échoue, et ses mesures OpenTelemetry portent `k_b.stage=select` :
 `subject` nul, `prompt_version` `select-trends-1`, `items_in` les candidats envoyés,
 `items_truncated` les descriptions coupées ; `data_fetch_ms`, `items_capped` et
 `items_dropped_before_writing_stage` nuls (les lectures sont mesurées dans leurs spans). Aucun
-appel (aucun candidat lu, ou l'échéance avant l'envoi) : aucune ligne. `FailedSubjectSchema.stage`
-de `POST /digests` garde `classify` ou `write`.
+appel (aucun candidat lu, ou l'échéance avant l'envoi) : aucune ligne. Depuis #369, `Stage` gagne
+`write_trends` : une ligne par rédaction envoyée, `subject` nul, `prompt_version` `write-trends-1`,
+`items_in` 1, `items_truncated` 1 si le README ou la description est coupé, `facts_checked`,
+`facts_found`, `claims_removed` (les textes retirés) ; une rédaction non envoyée n'écrit pas de ligne.
+`FailedSubjectSchema.stage` de `POST /digests` a son propre type, `DigestStage` (`classify` ou
+`write`) : l'OpenAPI n'y liste plus `select`.
 
 **Contenu des appels sous `KB_TRACE_CONTENT`**, comme les fiches (décision D1 du 2026-10-27, précisée
 le 28/10, #347 ; journal ADR, « Traces : le contenu des appels au modèle, sous réglage ») : le choix
 et la rédaction appellent `trace_contents(llm_call, tracing=tracing)` après avoir jugé l'appel. Le
-contenu (`owner/repo`, description, topics, README nettoyé, sortie du modèle) part vers Grafana Cloud
+contenu (`owner/repo` au choix, le nom sans le login à la rédaction, description, topics, README
+nettoyé, sortie du modèle) part vers Grafana Cloud
 selon `KB_TRACE_CONTENT` : `none` par défaut, et tant que Grafana Labs n'a pas accusé réception du
 DPA ; `anomalies` ; `all` en bac à sable seulement. Il n'est que dans le corps de l'enregistrement ;
 les spans et leurs attributs restent sans nom de dépôt ni `repository_id`. Décision de Sabine du

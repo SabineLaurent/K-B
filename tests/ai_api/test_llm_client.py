@@ -32,6 +32,7 @@ from k_b.ai_api.connectors.llm_settings import (
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.stages.classification import CLASSIFICATION_MAX_COMPLETION_TOKENS
 from k_b.ai_api.stages.trend_selection import SELECTION_MAX_COMPLETION_TOKENS
+from k_b.ai_api.stages.trend_writing import TREND_WRITING_MAX_COMPLETION_TOKENS
 from k_b.ai_api.stages.writing import WRITING_MAX_COMPLETION_TOKENS
 from k_b.ai_api.tracing import TRACING_OFF, SpanRef
 from k_b.core.config import (
@@ -650,6 +651,7 @@ MEASURED_MS_PER_OUTPUT_TOKEN = 7.35
         WRITING_MAX_COMPLETION_TOKENS,
         CLASSIFICATION_MAX_COMPLETION_TOKENS,
         SELECTION_MAX_COMPLETION_TOKENS,
+        TREND_WRITING_MAX_COMPLETION_TOKENS,
     ],
 )
 def test_the_read_timeout_covers_the_longest_output_at_the_measured_rate_with_a_margin(

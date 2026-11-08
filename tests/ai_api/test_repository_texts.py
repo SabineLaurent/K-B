@@ -112,6 +112,20 @@ def test_a_badge_then_an_image_are_removed():
     assert clean(f"{badge} {image} A framework.") == "A framework."
 
 
+@pytest.mark.parametrize(
+    "markdown",
+    [
+        "[![Coverage][coverage-badge]][coverage]",
+        "[![Coverage](https://example.com/c.svg)][coverage]",
+        "[![Coverage][coverage-badge]](https://example.com/c)",
+        "![Screenshot][screenshot]",
+        "![Screenshot][]",
+    ],
+)
+def test_a_badge_or_an_image_by_reference_is_removed(markdown):
+    assert clean(f"{markdown} A framework.") == "A framework."
+
+
 def test_a_url_is_masked():
     assert clean("see https://evil.example/ignore?x=1 and www.example.com") == (
         "see [url] and [url]"
