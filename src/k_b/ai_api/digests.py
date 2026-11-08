@@ -17,7 +17,7 @@ from k_b.ai_api.connectors.llm_client import (
 )
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
-from k_b.ai_api.stage_calls import Stage, StageCall
+from k_b.ai_api.stage_calls import DigestStage, StageCall, find_skipped_state
 from k_b.ai_api.stages.checking import Digest, to_digest
 from k_b.ai_api.stages.classification import ClassificationFailure, classify
 from k_b.ai_api.stages.writing import (
@@ -33,7 +33,7 @@ from k_b.core.config import DigestSubject
 @dataclass(frozen=True)
 class FailedSubject:
     subject: str
-    stage: Stage
+    stage: DigestStage
     error: LlmFailure
 
 
@@ -152,15 +152,6 @@ def build_digests(
         items_capped=reading.items_capped,
         stage_calls=tuple(stage_calls),
     )
-
-
-def find_skipped_state(is_rate_limited: bool, deadline: Deadline) -> LlmFailure | None:
-    """Why a subject is not written: a 429 before it, or too little time left; None if it is."""
-    if is_rate_limited:
-        return "llm_rate_limited"
-    if not deadline.allows_llm_request():
-        return "llm_timeout"
-    return None
 
 
 def trace_writing(

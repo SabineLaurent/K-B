@@ -21,6 +21,12 @@ from k_b.ai_api.stages.trend_selection import (
     SELECTION_RETRY_REMINDERS,
     SELECTION_SYSTEM_PROMPT,
 )
+from k_b.ai_api.stages.trend_writing import (
+    FACTS_PER_TEXT,
+    MAX_CHARS_BY_TEXT,
+    TREND_WRITING_RETRY_REMINDERS,
+    TREND_WRITING_SYSTEM_PROMPT,
+)
 from k_b.ai_api.stages.writing import (
     FACT_VALUE_CHARS,
     FACTS_PER_CLAIM,
@@ -306,6 +312,7 @@ def test_the_schemas_carry_the_enums_of_the_call():
         CLASSIFICATION_RETRY_REMINDERS,
         WRITING_RETRY_REMINDERS,
         SELECTION_RETRY_REMINDERS,
+        TREND_WRITING_RETRY_REMINDERS,
     ],
 )
 def test_each_stage_gives_a_reminder_per_failed_check(reminders):
@@ -329,9 +336,29 @@ def test_the_writing_prompt_states_the_bounds_the_code_checks():
     assert f"more than {ITEMS_PER_CLAIM[1]}" in schema_reminder
 
 
+def test_the_trend_writing_prompt_states_the_bounds_the_code_checks():
+    """The bounds of the texts cannot go in the portable schema: the prompt says them."""
+    for name, max_chars in MAX_CHARS_BY_TEXT.items():
+        assert f'"{name}": ' in TREND_WRITING_SYSTEM_PROMPT
+        assert f"of 0 to {max_chars} characters" in TREND_WRITING_SYSTEM_PROMPT
+    assert (
+        f"declares {FACTS_PER_TEXT[0]} to {FACTS_PER_TEXT[1]} facts"
+        in TREND_WRITING_SYSTEM_PROMPT
+    )
+    assert (
+        f"{FACT_VALUE_CHARS[0]} to {FACT_VALUE_CHARS[1]} characters"
+        in TREND_WRITING_SYSTEM_PROMPT
+    )
+
+
 @pytest.mark.parametrize(
     "system_prompt",
-    [CLASSIFICATION_SYSTEM_PROMPT, WRITING_SYSTEM_PROMPT, SELECTION_SYSTEM_PROMPT],
+    [
+        CLASSIFICATION_SYSTEM_PROMPT,
+        WRITING_SYSTEM_PROMPT,
+        SELECTION_SYSTEM_PROMPT,
+        TREND_WRITING_SYSTEM_PROMPT,
+    ],
 )
 def test_each_system_prompt_says_the_user_message_is_data(system_prompt):
     """Rule 8 of poc.md: the system prompt says the items are data."""

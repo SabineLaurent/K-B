@@ -1,14 +1,17 @@
-"""The calls of the stages to the model, and what the metric lines and the response read of
-them."""
+"""The calls of the stages to the model, what the metric lines and the response read of them,
+and when a call is not sent."""
 
 from dataclasses import dataclass
 from typing import Literal
 
 from pydantic import BaseModel
 
-from k_b.ai_api.connectors.llm_client import LlmCall
+from k_b.ai_api.connectors.llm_client import LlmCall, LlmFailure
+from k_b.ai_api.deadline import Deadline
 
-type Stage = Literal["classify", "write", "select"]
+# The stages of POST /digests, which a subject that failed names (docs/tendances.md, "Métriques").
+type DigestStage = Literal["classify", "write"]
+type Stage = DigestStage | Literal["select", "write_trends"]
 
 
 @dataclass(frozen=True)
@@ -16,7 +19,7 @@ class StageCall:
     """A call to the model and what its metric line needs of it."""
 
     stage: Stage
-    # None for the classification and the choice of a trend report.
+    # None for the classification, the choice and the writing of a trend report.
     subject: str | None
     prompt_version: str
     items_in: int
@@ -35,3 +38,14 @@ class StageCall:
     items_no_suitable_subject: int | None
     items_unanswered: int | None
     llm_call: LlmCall[BaseModel]
+
+
+def find_skipped_state(is_rate_limited: bool, deadline: Deadline) -> LlmFailure | None:
+    """Why a call is not sent: a 429 before it, or too little time left; None if it is. After a
+    call that failed with a 429, nothing more is sent: the data of the next calls would leave for
+    an answer refused (minimisation, GDPR art. 5.1.c)."""
+    if is_rate_limited:
+        return "llm_rate_limited"
+    if not deadline.allows_llm_request():
+        return "llm_timeout"
+    return None

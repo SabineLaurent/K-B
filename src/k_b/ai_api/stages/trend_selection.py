@@ -132,6 +132,9 @@ class SelectionMessage:
 
 @dataclass(frozen=True)
 class ChosenRepository:
+    # Its ref in the message of the choice, the one identifier of the repository in the spans
+    # and in the message of its writing.
+    ref: str
     candidate: SelectionCandidate
     # In the order of CHOICE_CRITERIA, and of the subjects of the watch.
     criteria: tuple[ChoiceCriterion, ...]
@@ -358,6 +361,7 @@ def to_chosen(
     choice: Choice, candidate: SelectionCandidate, subject_names: Sequence[str]
 ) -> ChosenRepository:
     return ChosenRepository(
+        ref=choice.ref,
         candidate=candidate,
         criteria=tuple(c for c in CHOICE_CRITERIA if c in choice.criteria),
         watch_subjects=tuple(n for n in subject_names if n in choice.watch_subjects),

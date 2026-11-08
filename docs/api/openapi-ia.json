@@ -458,6 +458,13 @@
         ],
         "title": "DigestSchema"
       },
+      "DigestStage": {
+        "type": "string",
+        "enum": [
+          "classify",
+          "write"
+        ]
+      },
       "DigestsSchema": {
         "properties": {
           "request_id": {
@@ -591,7 +598,7 @@
             "title": "Subject"
           },
           "stage": {
-            "$ref": "#/components/schemas/Stage"
+            "$ref": "#/components/schemas/DigestStage"
           },
           "error": {
             "$ref": "#/components/schemas/LlmFailure"
@@ -733,14 +740,6 @@
         ],
         "title": "SourceSchema",
         "description": "Read from the data API, never from the output of the model."
-      },
-      "Stage": {
-        "type": "string",
-        "enum": [
-          "classify",
-          "write",
-          "select"
-        ]
       },
       "TrajectoryPointSchema": {
         "properties": {

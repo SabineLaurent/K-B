@@ -178,6 +178,7 @@ AI_API_LAYERS = (
     },
     {"ai_api.stages.fidelity"},
     {"ai_api.stages.checking"},
+    {"ai_api.stages.trend_writing"},
     {"ai_api.digests", "ai_api.trend_reports"},
     {
         "ai_api.errors",
@@ -272,6 +273,8 @@ TRACED_FUNCTIONS = {
     "read_trend_report",
     "read_repository_cards",
     "select_trends",
+    "write_trends",
+    "write_trend",
 }
 TRACING_PARAMETER = "tracing"
 

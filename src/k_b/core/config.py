@@ -367,6 +367,12 @@ MAX_DESCRIPTION_CHARS_FOR_SELECTION = 500
 MAX_TOPICS_FOR_SELECTION = 20
 # The README of a repository chosen sent to the writing of its texts, once cleaned.
 MAX_README_CHARS_FOR_WRITING = 4000
+# The longest text the model writes on a repository chosen, in characters (docs/tendances.md,
+# "Rédaction"): the system prompt says them, the AI API checks them, kb reads them again.
+TREND_SECTOR_MAX_CHARS = 120
+TREND_WATCH_LINK_MAX_CHARS = 300
+TREND_README_SUMMARY_MAX_CHARS = 400
+TREND_PROMISE_MAX_CHARS = 200
 # The repositories the model may choose for a trend report (docs/tendances.md, "Choix").
 TREND_MAX_CHOSEN = 5
 
