@@ -6,7 +6,7 @@
 
 Cette fiche dit comment installer l'environnement de développement de K-B sur une machine, le configurer, quelles
 dépendances il installe, puis comment y ajouter l'environnement de test, dont le détail est dans
-[la fiche des tests](tests_pour_docu.md). Elle est écrite d'après le code de `main` au commit `9091533` (2026-11-08).
+[la fiche des tests](tests_pour_docu.md). Elle est écrite d'après le code de `main` au commit `875c638` (2026-11-08).
 Les chemins du code de K-B (`commands/…`, `core/…`, `database/…`) partent de `src/k_b/`, les autres de la racine du
 dépôt.
 
@@ -42,7 +42,7 @@ uv run kb --help
   uv, « Syncing the environment » et « Default groups », lue par Context7 le 2026-11-08).
 - `uv sync --locked`, la commande de la CI, n'écrit jamais `uv.lock`: si `uv.lock` ne correspond plus au
   `pyproject.toml`, elle échoue au lieu de le mettre à jour. `uv lock --check` fait le même contrôle sans rien
-  installer; au commit `9091533`, il répond `Resolved 96 packages` et sort en code 0.
+  installer; au commit `875c638`, il répond `Resolved 96 packages` et sort en code 0.
 - `uv run <commande>` met l'environnement à jour avant de lancer la commande (documentation de uv, « Automatic lock
   and sync »): après un `git pull` qui change `uv.lock`, `uv run kb …` installe d'abord les nouvelles versions.
 - `uv run kb --help` contrôle l'installation. Il liste les 13 commandes de `kb` et leurs codes de sortie, sans lire
