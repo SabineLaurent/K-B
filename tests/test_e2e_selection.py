@@ -54,8 +54,9 @@ def collect_e2e_dir(*options):
 
 
 # The end-to-end tests that are not of a source: the export of the metrics (tests/e2e/
-# test_real_export.py, #162).
-END_TO_END_TESTS_BEYOND_THE_SOURCES = 1
+# test_real_export.py, #162) and the four of the sandbox of the alerts (tests/e2e/
+# test_sandbox_alerts.py, #164).
+END_TO_END_TESTS_BEYOND_THE_SOURCES = 5
 
 
 def check_every_end_to_end_test_left_out(*options):
