@@ -115,7 +115,8 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 - Depuis #347, le contenu d'un appel au modèle (consigne, items, sortie) peut partir avec les traces,
   sous `KB_TRACE_CONTENT` (`none` par défaut, `anomalies`, `all` refusé en production) : une exception
   à la règle 5 de `poc.md`, des données personnelles chez Grafana. Ne jamais poser `anomalies` ni
-  `all` avant la signature du DPA de Grafana Labs (registre, « Envoi des mesures à Grafana Cloud »).
+  `all` : leur condition, le DPA de Grafana Labs, est portée à Sabine depuis la réponse de Grafana
+  Labs du 2026-10-29 (registre, « Envoi des mesures à Grafana Cloud », ligne « Contrat » ; #163).
   Ce qu'est une anomalie (D1, précisée le 2026-10-28) ne se change que par Sabine, dans
   `is_anomaly` (`ai_api/connectors/llm_client.py`) ; une étape nouvelle qui appelle le modèle appelle
   `trace_contents(llm_call, tracing=tracing)` après avoir jugé l'appel.
