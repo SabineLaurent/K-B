@@ -1,8 +1,9 @@
-# The .env of the main working tree, shared by its git worktrees.
+# The .env of the main working tree, shared by its git worktrees, and the one of the end-to-end tests.
 ENV_FILE := $(dir $(shell git rev-parse --path-format=absolute --git-common-dir)).env
+E2E_ENV_FILE := $(ENV_FILE).e2e_test
 
 .PHONY: create-db collect import write-tops digest trend-report serve-data serve-ai openapi \
-	test test-ai-api test-data-api test-etl test-cov
+	test test-ai-api test-data-api test-etl test-cov sandbox-alerts
 
 create-db:
 	uv run --env-file $(ENV_FILE) kb create-db
@@ -55,3 +56,11 @@ test-etl:
 test-cov:
 	mkdir -p -m 700 reports
 	uv run pytest --cov --cov-report=term-missing:skip-covered --cov-report=markdown:reports/coverage.md
+
+# The sandbox of the alerts of the model (documentation/monitoring_pour_docu.md): four scenarios on
+# the replay, their measures sent to Grafana Cloud, labelled sandbox, by KB_OTLP_ENDPOINT and
+# KB_OTLP_HEADERS of the .env of the end-to-end tests. About 3 minutes; from a terminal without .env
+# exported, as every end-to-end test.
+sandbox-alerts:
+	uv run --env-file $(E2E_ENV_FILE) pytest -m e2e tests/e2e/test_sandbox_alerts.py -rs \
+		--html=reports/$@.html --self-contained-html

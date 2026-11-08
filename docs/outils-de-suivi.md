@@ -79,7 +79,7 @@ Choix de Sabine du 2026-11-08 (choix 15 de time-knight) : **un seul essai, sur G
 l'outil en place. Les quatre autres outils sont jugés sur leurs déclarations publiées : c'est une
 limite. **L'essai passe à #164** (choix 18 de Sabine, 2026-11-08) : il se fait sur Explore, le
 tableau de bord et l'alerte du bac à sable, déclenchée exprès, que #164 construit ; ses résultats
-s'écrivent dans la grille ci-dessous. Navigateur prévu : Google Chrome 157.0.8103.39 (arm64).
+s'écrivent dans `docs/accessibilité_pour_docu.md`, la grille ci-dessous en est le protocole. Navigateur prévu : Google Chrome 157.0.8103.39 (arm64).
 D'ici là, l'accessibilité de Grafana Cloud ne repose, comme celle des autres outils, que sur sa
 déclaration publiée [10].
 
@@ -89,21 +89,21 @@ lecteur d'écran, de lire la valeur d'un panneau, de savoir qu'une alerte existe
 ou de l'ouvrir. Outils : Accessibility Insights for Web (FastPass), VoiceOver, l'émulation des
 déficiences de la vision de Chrome, Colour Contrast Analyser, le zoom du navigateur.
 
-| n° | Étape | Écran | Critère WCAG 2.1 | Résultat |
-|---|---|---|---|---|
-| 1 | contrôles automatiques (FastPass) | Explore, panneau, règles d'alerte | plusieurs | à venir |
-| 2 | clavier seul : ouvrir le tableau de bord, changer la période | panneau | 2.1.1 | à venir |
-| 3 | clavier seul : lire le panneau en tableau (Inspect > Data) | panneau | 2.1.1 | à venir |
-| 4 | clavier seul : ouvrir une règle d'alerte depuis la liste | règles d'alerte | 2.1.1 | à venir |
-| 5 | clavier : sortir de chaque menu ou fenêtre ouvert | les trois | 2.1.2 | à venir |
-| 6 | focus visible tout au long du parcours | les trois | 2.4.7 | à venir |
-| 7 | lecteur d'écran : nom et rôle des commandes | Explore, panneau | 4.1.2 | à venir |
-| 8 | lecteur d'écran : valeur d'un panneau, résultat d'une requête | Explore, panneau | 4.1.2, 4.1.3 | à venir |
-| 9 | lecteur d'écran : règles d'alerte et leur état | règles d'alerte | 4.1.2, 4.1.3 | à venir |
-| 10 | couleur seule (émulation du daltonisme) | panneau, règles d'alerte | 1.4.1 | à venir |
-| 11 | contrastes du texte, des axes, de la légende | Explore, panneau | 1.4.3, 1.4.11 | à venir |
-| 12 | zoom à 200 % | Explore, panneau | 1.4.4 | à venir |
-| 13 | zoom à 400 % | panneau | 1.4.10 | à venir |
+| n° | Étape | Écran | Critère WCAG 2.1 |
+|---|---|---|---|
+| 1 | contrôles automatiques (FastPass) | Explore, panneau, règles d'alerte | plusieurs |
+| 2 | clavier seul : ouvrir le tableau de bord, changer la période | panneau | 2.1.1 |
+| 3 | clavier seul : lire le panneau en tableau (Inspect > Data) | panneau | 2.1.1 |
+| 4 | clavier seul : ouvrir une règle d'alerte depuis la liste | règles d'alerte | 2.1.1 |
+| 5 | clavier : sortir de chaque menu ou fenêtre ouvert | les trois | 2.1.2 |
+| 6 | focus visible tout au long du parcours | les trois | 2.4.7 |
+| 7 | lecteur d'écran : nom et rôle des commandes | Explore, panneau | 4.1.2 |
+| 8 | lecteur d'écran : valeur d'un panneau, résultat d'une requête | Explore, panneau | 4.1.2, 4.1.3 |
+| 9 | lecteur d'écran : règles d'alerte et leur état | règles d'alerte | 4.1.2, 4.1.3 |
+| 10 | couleur seule (émulation du daltonisme) | panneau, règles d'alerte | 1.4.1 |
+| 11 | contrastes du texte, des axes, de la légende | Explore, panneau | 1.4.3, 1.4.11 |
+| 12 | zoom à 200 % | Explore, panneau | 1.4.4 |
+| 13 | zoom à 400 % | panneau | 1.4.10 |
 
 Contournements prévus pour #164, si un point bloque : un texte à côté de la couleur d'un seuil
 (« SOUS SEUIL ») ; l'alerte reçue par e-mail, en texte, qu'un compte gratuit récent n'envoie
