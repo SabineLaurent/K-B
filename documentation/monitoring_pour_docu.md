@@ -79,7 +79,9 @@ Relevé le 2026-11-08 sur la pile de Sabine (Grafana 13).
    requête en échec laisserait l'alerte au repos. Pour chacune des trois règles: **Edit**, section **Configure no
    data and error handling**, **Alert state if execution error or timeout** sur **Error**, puis **Save rule**. Une
    requête en échec déclenche alors une alerte à part, `DatasourceError`. Le fichier des règles ne porte pas ce
-   réglage: il est à refaire après chaque import des règles.
+   réglage: il est à refaire après chaque import des règles. Une règle enregistrée repart sans instance jusqu'à son
+   évaluation suivante, au plus 5 minutes après: une alerte en cours y repasse un moment par « Normal » (vu le
+   2026-11-08).
 4. **Le point de contact**: **Alerts & IRM**, **Alerting**, **Notification configuration**, **Contact points**.
    Modifier le point de contact de la politique par défaut: **Add contact point integration**, **Email**, l'adresse
    d'une utilisatrice de la pile, **Test**, puis **Save contact point**. L'adresse n'est pas versionnée: c'est une
