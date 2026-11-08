@@ -94,6 +94,8 @@ def build_llm_call_line(
         "first_failed_check": call.first_failed_check,
         "facts_checked": stage_call.facts_checked,
         "facts_found": stage_call.facts_found,
+        "facts_found_in_item": stage_call.facts_found_in_item,
+        "facts_found_in_text": stage_call.facts_found_in_text,
         "fidelity_rate": compute_fidelity_rate(
             stage_call.facts_found, stage_call.facts_checked
         ),

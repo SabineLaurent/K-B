@@ -581,6 +581,8 @@ def to_stage_call(
         items_truncated=int(message.is_cut),
         facts_checked=None if checked is None else checked.facts_checked,
         facts_found=None if checked is None else checked.facts_found,
+        facts_found_in_item=None,
+        facts_found_in_text=None,
         claims_removed=None if checked is None else len(checked.removal_reasons),
         items_removed_by_checks=None,
         items_with_subject=None,

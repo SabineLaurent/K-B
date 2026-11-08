@@ -30,6 +30,9 @@ class StageCall:
     # items no longer cited once the claims out of their bounds or unfaithful are removed.
     facts_checked: int | None
     facts_found: int | None
+    # Of a writing of POST /digests whose output is checked; None otherwise.
+    facts_found_in_item: int | None
+    facts_found_in_text: int | None
     claims_removed: int | None
     items_removed_by_checks: int | None
     # Of a classification whose output is checked; None otherwise: the items given a subject,

@@ -212,6 +212,8 @@ def select_trends(
             items_truncated=message.descriptions_cut,
             facts_checked=None,
             facts_found=None,
+            facts_found_in_item=None,
+            facts_found_in_text=None,
             claims_removed=None,
             items_removed_by_checks=None,
             items_with_subject=None,

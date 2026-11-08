@@ -49,6 +49,8 @@ class Digest:
     # Every fact of every claim of the output, a claim removed included.
     facts_checked: int
     facts_found: int
+    facts_found_in_item: int
+    facts_found_in_text: int
     removed_claims: tuple[RemovedClaim, ...]
     # Cited by the model, no longer cited once its claims are removed.
     items_removed_by_checks: tuple[int, ...]
@@ -92,6 +94,12 @@ def to_digest(
         ),
         facts_checked=sum(fidelity.facts_checked for fidelity in fidelities),
         facts_found=sum(fidelity.facts_found for fidelity in fidelities),
+        facts_found_in_item=sum(
+            fidelity.facts_found_in_item for fidelity in fidelities
+        ),
+        facts_found_in_text=sum(
+            fidelity.facts_found_in_text for fidelity in fidelities
+        ),
         removed_claims=tuple(
             RemovedClaim(index, reasons)
             for index, reasons in enumerate(reasons_by_claim)

@@ -560,6 +560,8 @@ appel (aucun candidat lu, ou l'échéance avant l'envoi) : aucune ligne. Depuis 
 `write_trends` : une ligne par rédaction envoyée, `subject` nul, `prompt_version` `write-trends-1`,
 `items_in` 1, `items_truncated` 1 si le README ou la description est coupé, `facts_checked`,
 `facts_found`, `claims_removed` (les textes retirés) ; une rédaction non envoyée n'écrit pas de ligne.
+`facts_found_in_item` et `facts_found_in_text`, propres à la rédaction des fiches (#518), sont nuls sur
+les lignes `select` et `write_trends`.
 `FailedSubjectSchema.stage` de `POST /digests` a son propre type, `DigestStage` (`classify` ou
 `write`) : l'OpenAPI n'y liste plus `select`.
 
