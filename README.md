@@ -634,7 +634,7 @@ Cette commande écarte les tests marqués `e2e` et `postgresql` (`MARKERS_LEFT_O
 |---|---|
 | `pytest` | lance les tests |
 | `pytest-cov` | mesure la couverture (`--cov`) et fait échouer la commande sous le seuil |
-| `pytest-html` | écrit le rapport HTML d'une exécution (`--html`, les cibles `make test…`) |
+| `pytest-html` | écrit le rapport HTML d'une exécution (`--html`, les cibles `make test`, `make test-ai-api`, `make test-data-api` et `make test-etl`) |
 | `openapi-spec-validator` | valide l'OpenAPI de chaque API, dans `tests/data_api/test_openapi.py` et `tests/ai_api/test_ai_api_openapi.py` |
 | `ruff` | le lint et le format (`uv run ruff check`, `uv run ruff format --check`) |
 | `mypy` | le typage (`uv run mypy --strict`) |
@@ -647,8 +647,8 @@ Cette commande écarte les tests marqués `e2e` et `postgresql` (`MARKERS_LEFT_O
 KB_TEST_POSTGRESQL_URL=postgresql://<rôle>@127.0.0.1:5432/postgres uv run pytest -m postgresql
 ```
 
-L'URL est celle d'une base d'un serveur de test, sur la machine (sur le Mac, un PostgreSQL de Homebrew) ou
-celui de la CI, jamais la base de production. Son rôle doit pouvoir créer et supprimer une base et, pour les
+L'URL vise une base d'un serveur de test : un PostgreSQL de la machine (sur le Mac, celui de Homebrew) ou le
+service de la CI, jamais la base de production. Son rôle doit pouvoir créer et supprimer une base et, pour les
 tests des droits de la base en ligne, des rôles (`identity_roles`, `tests/conftest.py`). Un test qui écrit
 reçoit une base neuve, en UTF8 et en collation C, comme `kb create-db` la demande, supprimée après les tests de
 son module (`make_postgresql_base`) ; les tests de lecture partagent une base, construite une fois. Un test de
@@ -658,7 +658,9 @@ Sans la variable, un test marqué échoue ; il n'est jamais sauté. La CI les la
 
 **Lancer les tests de bout en bout** (marqués `e2e`, `tests/e2e/`) : ils lancent `kb` sur les vraies sources,
 un test par source, et l'envoi réel des mesures à Grafana Cloud (`test_real_export.py`). Ni la CI ni
-`uv run pytest` ne les lancent. Depuis un terminal sans `.env` exporté :
+`uv run pytest` ne les lancent. Un test dont la variable manque est sauté, et `-rs` en donne la raison : celui
+de sa source sans `KB_ZOTERO_DIR`, `KB_VAULT_DIR` ou `GOOGLE_APPLICATION_CREDENTIALS`, celui de l'envoi des
+mesures sans `KB_OTLP_ENDPOINT` ni `KB_OTLP_HEADERS`. Depuis un terminal sans `.env` exporté :
 
 ```sh
 uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html --self-contained-html
@@ -666,7 +668,8 @@ uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html
 
 `.env.e2e_test` ne porte que leurs variables (modèle : `.env.e2e_test.example`). Si l'environnement tient une
 autre variable de `.env.example`, ou la clé d'un client de l'API de données, ils s'arrêtent avant tout `kb`, en
-citant son nom, jamais sa valeur (`tests/e2e/conftest.py`). `-k <source>` n'en lance qu'un. Celui de
+citant leurs noms, jamais leurs valeurs (`tests/e2e/conftest.py`). `-k <dossier de la source>` n'en lance
+qu'un (par exemple `-k cisa_kev`). Celui de
 `gh_archive` lance une requête BigQuery réelle : à ne pas relancer à la légère. Ce qu'ils écrivent, et ce qu'il
 en reste : le [registre des traitements](docs/registre-traitements.md), « Procédure de tri », étape 10.
 
@@ -709,11 +712,11 @@ son SHA, sa version en commentaire.
 | Job | Workflow | Ce qu'il fait |
 |---|---|---|
 | `audit` | `ci.yml` | cherche les vulnérabilités connues des versions de `uv.lock`, avec leurs empreintes (`uv export`, puis pip-audit 2.10.1) |
-| `tests` | `ci.yml` | `uv run pytest --cov` : la suite, sans `e2e` ni `postgresql`, et le seuil de couverture |
+| `tests` | `ci.yml` | `uv run pytest --cov --cov-report=term-missing:skip-covered` : la suite, sans `e2e` ni `postgresql`, et le seuil de couverture |
 | `lint` | `ci.yml` | `uv run ruff check` et `uv run ruff format --check` |
 | `types` | `ci.yml` | `uv run mypy --strict` |
 | `tests-postgresql` | `ci.yml` | `uv run pytest -m postgresql`, sur un service `postgres:18.6` épinglé par son digest |
-| `image-build` | `image.yml` | construit l'image `linux/amd64`, puis vérifie ce que la construction reçoit, l'utilisateur non root, l'absence dans l'image des fichiers que `.dockerignore` écarte (`.git`, et des `.env*` et `*.sqlite*` plantés pour l'essai), le refus de démarrer sans `KB_DATA_DIR` et `kb create-db` ; l'image n'est poussée nulle part |
+| `image-build` | `image.yml` | construit l'image `linux/amd64`, puis vérifie ce que la construction reçoit, l'utilisateur non root, l'absence dans l'image des fichiers que `.dockerignore` écarte (`.git`, et des `.env*` et `*.sqlite*` plantés pour l'essai), le refus de démarrer sans `KB_DATA_DIR`, puis `kb --help` et `kb create-db` ; l'image n'est poussée nulle part |
 | `bicep-build` | `infra.yml` | compile `infra/main.bicep` par Bicep v0.48.1, vérifié par son SHA256, sans aucun droit sur Azure |
 | `check` | `deploy.yml` | refuse un tag hors de la forme `vX.Y.Z`, dont le commit n'est pas sur `main`, ou dont la CI n'est pas finie et verte |
 | `deploy` | `deploy.yml` | met le tag en ligne : [infra/README.md](infra/README.md), « Déployer une version » |
@@ -727,10 +730,10 @@ le `Dockerfile` fixe uv 0.11.33.
 version nouvelle attend 7 jours avant sa PR, sauf une mise à jour de sécurité ; ghcr.io ne donne pas la date
 d'une version, et l'attente ne s'applique pas à `astral-sh/uv` : sa date se vérifie à la main avant la fusion.
 Pour `python` et `astral-sh/uv`, il ne propose que les correctifs et les digests, jamais une version mineure ou
-majeure. Il ne met à jour ni l'image `postgres` du job `tests-postgresql`, à changer à la main, ni les paquets
-Python de `uv.lock`. Les alertes et les mises à jour de sécurité de Dependabot sont activées dans les réglages
-du dépôt, et le graphe des dépendances y voit les paquets Python (96 le 2026-11-08) ; aucune PR de sécurité
-n'a encore été ouverte.
+majeure. Ses mises à jour de version ne touchent ni l'image `postgres` du job `tests-postgresql`, à changer à
+la main, ni `uv.lock`. Les alertes et les mises à jour de sécurité de Dependabot sont activées dans les
+réglages du dépôt, et le graphe des dépendances y voit les paquets Python (96 le 2026-11-08) : seule une mise
+à jour de sécurité peut ouvrir une PR sur `uv.lock`. Aucune PR de sécurité n'a encore été ouverte.
 
 **La protection de `main`** est le ruleset « Basic-rules-main-protect », actif, sans contournement pour
 personne, administratrice comprise. Il se lit par `gh api repos/SabineLaurent/K-B/rulesets/25257125` :
@@ -742,7 +745,8 @@ personne, administratrice comprise. Il se lit par `gh api repos/SabineLaurent/K-
 
 `image-build` et `bicep-build` ne sont pas requis à la fusion : `bicep-build`, filtré par chemin, bloquerait
 toute PR qui laisse `infra/` de côté (commentaire de `infra.yml`). Ils comptent au déploiement : `check` exige
-que chaque workflow lancé sur le commit du tag ait fini en succès. Sur un dépôt neuf, ce ruleset se recrée dans
+que chaque workflow du dépôt lancé sur le commit du tag ait fini en succès, sauf Deploy et les exécutions que
+GitHub crée lui-même (Dependabot). Sur un dépôt neuf, ce ruleset se recrée dans
 Settings → Rules → Rulesets, avec ces règles. Les rulesets des tags, l'environnement `production` et les secrets
 du déploiement se posent par [infra/README.md](infra/README.md), « Les réglages de GitHub, une fois, avant la
 passe 2 » et « Les secrets du dépôt, après la passe 2 ».
@@ -756,8 +760,8 @@ passe 2 » et « Les secrets du dépôt, après la passe 2 ».
 - Aucun workflow ne lit de variable du dépôt (`vars.`), et les trois autres ne lisent aucun secret.
 
 **Une PR témoin** : [#475](https://github.com/SabineLaurent/K-B/pull/475) a passé, avant sa fusion le
-2026-11-08, les 6 checks que reçoit une PR qui ne touche pas `infra/` : `audit`, `tests`, `lint`, `types`,
-`tests-postgresql` (exécution 42473488447 de CI) et `image-build` (exécution 42473488442 d'Image), tous verts
+2026-11-08, les 6 checks que reçoit une PR qui ne touche pas `infra/` : les cinq de CI, `audit`, `tests`,
+`lint`, `types` et `tests-postgresql` (exécution 42473488447), et `image-build` (exécution 42473488442 d'Image), tous verts
 (`gh pr checks 475 --repo SabineLaurent/K-B`) ; `bicep-build` n'y a pas tourné.
 
 **Construire l'image** (Docker ; une image pour toutes les commandes `kb`, voir le `Dockerfile`) :
