@@ -30,8 +30,9 @@ versions de `uv.lock`, sans le mettre à jour.
 (`Makefile`). Avant chaque test, la fixture `no_kb_setting_of_the_terminal` (`tests/conftest.py`) retire les
 réglages de `kb` qu'un terminal peut exporter (`KB_SETTINGS_VARIABLES`, dont `KB_DATABASE_URL` et
 `KB_DEPLOYMENT_ENVIRONMENT`) et les variables que lit libpq (`LIBPQ_VARIABLES`) : une variable de ces deux listes,
-exportée par le terminal, ne change ni ce que les tests vérifient, ni la base où ils écrivent. Les autres variables
-d'un `.env` exporté ne sont pas retirées.
+exportée par le terminal, ne change ni ce que les tests vérifient, ni la base où ils écrivent. Cette fixture ne
+retire pas les autres variables d'un `.env` exporté ; `tests/commands/conftest.py` et `tests/jobs/conftest.py` en
+retirent d'autres, pour leurs seuls tests.
 
 **Pour les tests marqués `postgresql`** : un serveur PostgreSQL de test, nommé par `KB_TEST_POSTGRESQL_URL`. C'est
 un serveur de la machine (sur le Mac, le PostgreSQL de Homebrew, sans conteneur) ou le service de la CI, jamais la
@@ -91,7 +92,7 @@ en mémoire du SDK OpenTelemetry (`tests/ai_api/conftest.py`).
 | `make test` | comme `uv run pytest`, avec le rapport `reports/test.html` |
 | `make test-ai-api`, `make test-data-api` | `tests/ai_api` ou `tests/data_api`, puis les tests du code commun aux deux API (`API_COMMON_TESTS` du `Makefile`) ; rapports `reports/test-ai-api.html` ou `reports/test-data-api.html`, puis `reports/test-api-common.html` |
 | `make test-etl` | `tests/etl`, rapport `reports/test-etl.html` |
-| `uv run ruff check --no-cache`, `uv run ruff format --check`, `uv run mypy --strict` | le lint, le format et le typage. La CI lance `uv run ruff check` sans `--no-cache` ; sur la machine, `--no-cache` est une précaution, un passage avec le cache ayant déjà laissé passer des imports non triés (`MEMORY.md`, « `ruff` sans son cache ») |
+| `uv run ruff check --no-cache`, `uv run ruff format --check`, `uv run mypy --strict` | le lint, le format et le typage. La CI lance `uv run ruff check` sans `--no-cache` ; sur la machine, `--no-cache` est une précaution : `uv run ruff check` a déjà passé là où `uv run ruff check --no-cache` a trouvé trois imports non triés, cause non établie (`MEMORY.md`, « `ruff` sans son cache ») |
 
 **Sur PostgreSQL.** Un test qui écrit reçoit une base neuve, `kb_test_<hex>`, supprimée après les tests de son
 module (`make_postgresql_base`) ; les tests de lecture partagent une base, construite une fois par session
@@ -304,14 +305,14 @@ bout, dans la CI : `tests/commands/test_live_apis.py`.
 | un classement en échec fait échouer la demande ; une rédaction en échec nomme son sujet et rend les autres | `test_a_classification_that_fails_fails_the_request_with_its_lines`, `test_a_writing_that_fails_names_its_subject_and_the_others_are_returned` | `tests/ai_api/test_digest_router.py` |
 | chaque état qui fait échouer une demande a son statut HTTP | `test_each_state_that_fails_a_request_has_its_status` | `tests/ai_api/test_digest_router.py` |
 | chaque route ne répond qu'à sa méthode ; une barre finale est une route inconnue | `test_every_route_answers_its_method_only_and_405_to_any_other`, `test_a_final_slash_is_an_unknown_route` | `tests/ai_api/test_digest_router.py` |
-| l'échéance de la demande (200 s en production, `DIGEST_REQUEST_TIMEOUT_SECONDS` ; une échéance d'essai dans ces tests) : chaque appel l'attend au plus, un sujet non rédigé à temps est `llm_timeout` | `test_every_call_of_the_request_waits_no_longer_than_its_deadline`, `test_the_subjects_not_written_by_the_deadline_are_llm_timeout` | `tests/ai_api/test_digests.py` |
+| l'échéance de la demande (200 s pour la route, `DIGEST_REQUEST_TIMEOUT_SECONDS` ; une échéance d'essai dans ces tests) : chaque appel l'attend au plus, un sujet non rédigé à temps est `llm_timeout` | `test_every_call_of_the_request_waits_no_longer_than_its_deadline`, `test_the_subjects_not_written_by_the_deadline_are_llm_timeout` | `tests/ai_api/test_digests.py` |
 | l'OpenAPI versionnée est celle que produit l'application, et documente chaque état nommé | `test_the_versioned_openapi_is_the_one_the_app_produces`, `test_the_route_documents_each_named_state` | `tests/ai_api/test_ai_api_openapi.py` |
 | `kb digest` écrit les fiches par les deux API servies pour de vrai | `test_digest_writes_the_sheets_through_the_ai_api_and_the_data_api` | `tests/commands/test_live_apis.py` |
 
 ### 7. Accès
 
-Intégration : `tests/ai_api/test_digest_router.py` ; le démarrage de `kb serve-ai`, par `cli.main`, `uvicorn.run`
-remplacé (il ne tourne pas), `tests/ai_api/test_serve_ai.py` ;
+Intégration : `tests/ai_api/test_digest_router.py` ; le démarrage de `kb serve-ai`, `tests/ai_api/test_serve_ai.py`
+(les tests cités : `cli.main`, `uvicorn.run` remplacé, il ne tourne pas) ;
 la fenêtre de la limite de débit, code commun aux deux API, en unitaire sur une horloge réglée par le test,
 `tests/test_api_rate_limit.py`.
 
