@@ -110,6 +110,7 @@ rapport précédent.
 |---|---|
 | `test_kb_collects_and_imports_the_real_source` (`tests/e2e/test_real_sources.py`) | lance `kb` sur la vraie source, un test par source (paramétré par `SOURCE_KINDS`); pour les trois sources qui ont une variable (Zotero, clips, `gh_archive`), sauté sans elle; les autres ne sont jamais sautées |
 | `test_the_measures_of_a_request_reach_the_otlp_endpoint` (`tests/e2e/test_real_export.py`) | envoie au vrai point OTLP (Grafana Cloud) les mesures d'une demande à l'API IA sur le modèle rejoué, à l'arrêt de l'application; sauté sans `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS` |
+| les quatre tests du bac à sable des alertes (`tests/e2e/test_sandbox_alerts.py`) | envoient chacun un scénario au bac à sable, dont trois visent une alerte du monitorage du modèle: les mesures de demandes à l'API IA sur le modèle rejoué partent au vrai point OTLP, avec l'environnement `sandbox`; sautés sans `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS` (« Le bac à sable des alertes », ci-dessous) |
 
 **Le test de l'export échoue dès que l'export est réglé, tant que #495 est ouverte.** `KB_DEPLOYMENT_ENVIRONMENT` est
 dans `KB_SETTINGS_VARIABLES`: `no_kb_setting_of_the_terminal` la retire avant que le test lise ses réglages dans
@@ -128,6 +129,41 @@ tests/e2e/test_real_export.py:65: AssertionError
 ```
 
 L'envoi réel des mesures n'est donc pas prouvé par ce test tant que #495 n'est pas corrigée.
+
+### Le bac à sable des alertes
+
+Fusionné au commit `1d2f554` (PR #517, 2026-11-08). Il se lance à la main, hors de la CI, depuis un terminal où
+le `.env` n'est pas chargé:
+
+```sh
+make sandbox-alerts
+```
+
+La cible lance les seuls tests de `tests/e2e/test_sandbox_alerts.py`, avec le `.env.e2e_test` de la copie de
+travail principale du dépôt, et écrit le rapport `reports/sandbox-alerts.html` (`Makefile:3`, `:64-66`). Les deux
+variables à y mettre sont `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS`; sans elles, chaque test est sauté
+(`read_sandbox_export_settings`). Chaque test pose lui-même `KB_DEPLOYMENT_ENVIRONMENT=sandbox` avant de lire ces
+réglages, à la place de toute valeur du terminal (`tests/e2e/test_sandbox_alerts.py:96-98`).
+
+Chaque test sert l'API de données sur la base de test et une API IA sur le modèle rejoué, avec des clés tirées au
+hasard, puis envoie ses demandes à `POST /digests` (`run_sandbox_requests`). Il échoue si un envoi de mesures n'est
+pas accepté, s'il y a eu moins d'envois que de demandes, ou si l'environnement n'est pas `sandbox`.
+
+| Test | Ce qu'il vérifie |
+|---|---|
+| `test_valid_requests_spaced_beyond_an_export_reach_the_sandbox` | 3 demandes valides, espacées de plus d'un envoi de mesures, chacune en 200. Il ne vise aucune alerte: l'écart montre dans Grafana si `increase()` compte la première demande (`tests/e2e/test_sandbox_alerts.py:87-90`) |
+| `test_an_invalid_output_reaches_the_sandbox` | un classement refusé deux fois: 502, et une ligne de mesure `llm_invalid_output` |
+| `test_a_low_fidelity_reaches_the_sandbox` | 200, avec 3 faits trouvés sur 7, sous le seuil de l'alerte `KbModelLowFidelity` |
+| `test_a_cost_over_the_budget_reaches_the_sandbox` | 200, avec un coût estimé au-dessus du seuil de l'alerte `KbModelCostOverBudget` |
+
+Les seuils sont lus dans les règles d'alerte du dépôt (`read_alert_thresholds`, `tests/test_grafana_files.py`).
+Les tests prouvent que chaque envoi est accepté et que les valeurs calculées sur la machine sont celles du
+scénario, sous ou au-dessus du seuil pour la fidélité et le coût; le déclenchement d'une alerte se lit dans
+Grafana, pas dans le test.
+`uv run --env-file .env.e2e_test pytest -m e2e` lance aussi ces quatre tests: 15 tests de bout en bout au commit
+`1d2f554`, dont les quatre du bac à sable. Ce que montrent les alertes, et le relevé du bac à sable lancé par
+Sabine: [monitoring_pour_docu.md](monitoring_pour_docu.md), « Le bac à sable » et « Relevé des alertes du bac à
+sable ».
 
 ### Ce que lance la CI
 
@@ -351,6 +387,7 @@ Intégration, mesures et traces en mémoire: `tests/ai_api/test_digest_router.py
 | le vrai modèle: aucun test de la CI ne l'appelle, toutes les sorties sont rejouées | #210 (essai des fiches sur la veille réelle avec gpt-6-luna), ouverte |
 | le juge de chaque affirmation, et son étalonnage | #223 et #224, ouvertes |
 | les vraies sources et l'envoi réel des mesures | les tests `e2e`, lancés à la main (« Les tests de bout en bout »); celui de l'export échoue tant que #495 est ouverte |
+| le déclenchement des alertes du monitorage du modèle | le bac à sable, `make sandbox-alerts`, lancé à la main (« Le bac à sable des alertes ») |
 
 Ce que les tests de l'API IA ne prouvent pas d'autre (le transport réseau hors du bout en bout, les dépendances de
 production qu'ils remplacent, la limite de débit sous une vraie charge) est dans
