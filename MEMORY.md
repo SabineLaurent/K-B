@@ -172,7 +172,7 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 - **Tests sur PostgreSQL** (#417, 2026-11-06) : marqués `postgresql`, écartés par `uv run pytest` comme `e2e`,
   lancés par `KB_TEST_POSTGRESQL_URL=<URL d'un serveur> uv run pytest -m postgresql` ; sans cette variable, un test
   marqué échoue, jamais sauté. Une base neuve par test qui écrit par `kb`, une transaction
-  annulée par test pour les autres (`tests/conftest.py`). En CI : le workflow `postgresql.yml`, PostgreSQL 18 par son
+  annulée par test pour les autres (`tests/conftest.py`). En CI : le job `tests-postgresql` de `ci.yml`, PostgreSQL 18 par son
   digest, mis à jour à la main. Sur le Mac : un PostgreSQL de Homebrew, sans conteneur. Un SQL nouveau de
   `database/` passe par le traducteur de marqueurs (test de `tests/database/test_postgresql.py`) ; une table ou un
   `CHECK` nouveau s'écrit dans `schema.sql` et `schema_postgresql.sql`. Un test de lecture prend la fixture `engine` (`tests/conftest.py`, #418) :

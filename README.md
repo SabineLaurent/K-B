@@ -123,8 +123,8 @@ Les utilisateurs du produit sont décrits plus haut, dans « Utilisateurs ».
   pas de valeur par défaut (règle 2 de `.claude/rules/poc.md`).
 - **Données personnelles** : le modèle traite en zone de données UE ; ce que K-B garde, et
   combien de temps, est tenu par le [registre des traitements](docs/registre-traitements.md).
-- **Contrôles** : chaque PR vers `main`, branche protégée, passe les quatre jobs de la CI
-  (`audit`, `tests`, `lint`, `types`) avant d'être fusionnée.
+- **Contrôles** : chaque PR vers `main`, branche protégée, passe les cinq jobs de la CI
+  (`audit`, `tests`, `lint`, `types`, `tests-postgresql`) avant d'être fusionnée.
 
 ### Budget
 
@@ -647,9 +647,10 @@ make test-cov       # les fichiers sous 100 % dans la console, le tableau comple
 uv run pytest --cov --cov-report=term-missing   # tous les fichiers dans la console, sans fichier
 ```
 
-La CI (GitHub Actions, `.github/workflows/ci.yml`) lance quatre jobs, `audit` (pip-audit sur `uv.lock`),
-`tests` (pytest), `lint` (ruff check et ruff format --check) et `types` (mypy --strict), sur chaque PR vers
-`main` et sur chaque push sur `main`, donc après chaque fusion.
+La CI (GitHub Actions, `.github/workflows/ci.yml`) lance cinq jobs, `audit` (pip-audit sur `uv.lock`),
+`tests` (pytest), `lint` (ruff check et ruff format --check), `types` (mypy --strict) et `tests-postgresql`
+(`pytest -m postgresql` sur un serveur PostgreSQL 18), sur chaque PR vers `main` et sur chaque push sur `main`,
+donc après chaque fusion.
 
 **Construire l'image** (Docker ; une image pour toutes les commandes `kb`, voir le `Dockerfile`) :
 
