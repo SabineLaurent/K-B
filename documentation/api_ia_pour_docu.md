@@ -15,7 +15,7 @@ d'après le code de `main` au commit `1d2f554` (2026-11-08). Les chemins du code
 L'API IA est la seule porte de K-B vers le modèle. Elle rédige les comptes rendus de veille par sujet
 (`POST /digests`) et le compte rendu des tendances de GitHub (`POST /trend-reports`). Elle ne garde rien d'une
 demande à l'autre, sauf ce que sa mémoire tient jusqu'au redémarrage: le compte des demandes récentes, et les
-mesures et traces pas encore envoyées (`ai_api/app.py:1-4`). Seul `kb` écrit dans le coffre.
+mesures, traces et enregistrements de journal pas encore envoyés (`ai_api/app.py:1-4`). Seul `kb` écrit dans le coffre.
 
 Elle se lance par `kb serve-ai`. Sur le Mac, elle écoute par défaut sur `127.0.0.1:8001`, la machine seule
 (`core/config.py:283-284`). En ligne, c'est l'app `ca-kb-ai-api` d'Azure Container Apps, sans adresse publique
@@ -42,7 +42,7 @@ Le schéma se lit ainsi:
   n'ouvre que `POST /digests`; `kb trend-report` est le client `KB_TREND_REPORT` et n'ouvre que
   `POST /trend-reports` (`core/config.py:300-305`).
 - **L'API IA lit la veille par l'API de données**, jamais dans la base. Elle appelle `GET /items`,
-  `GET /items/{item_id}` et `GET /trends` (`ai_api/connectors/data_api_client.py:45-46`, `:289`, `:308`) avec la
+  `GET /items/{item_id}` et `GET /trends` (`ai_api/connectors/data_api_client.py:268`, `:289`, `:308`) avec la
   clé du client `AI_DIGEST` de l'API de données (`ai_api/connectors/data_api_settings.py:15`). Un test refuse
   qu'elle importe autre chose que `ai_api`, `items` et `core` (`tests/architecture/test_apis.py:118`).
 - **Elle appelle le modèle** par une interface compatible OpenAI, sur le chemin `chat/completions`
@@ -52,14 +52,16 @@ Le schéma se lit ainsi:
   (`ai_api/connectors/github_client.py:1-2`).
 - **Elle envoie ses mesures et ses traces en OpenTelemetry** vers Grafana Cloud, quand l'export est réglé. Ce
   qu'elles contiennent et comment les lire: [`monitoring_pour_docu.md`](monitoring_pour_docu.md).
-- **Les deux commandes écrivent le coffre** à partir de la réponse; l'API IA n'écrit aucun fichier (règle 7 de
-  `.claude/rules/poc.md`, tenue par `tests/architecture/test_apis.py:118` et `:141`).
+- **Les deux commandes écrivent le coffre** à partir de la réponse. Le paquet `ai_api` n'écrit aucun fichier
+  (règle 7 de `.claude/rules/poc.md`): ses imports sont tenus par `tests/architecture/test_apis.py:118` et `:141`,
+  son écriture par la commande `grep` de la règle 7 (« Vérifier cette fiche »). Le processus `kb serve-ai` tient
+  son journal, `logs/kb-serve-ai.log` dans `KB_DATA_DIR`, sauf avec `KB_LOG_TO_FILE=false` (`core/config.py:170`).
 
 ### Le parcours de `POST /digests`
 
 1. Les contrôles d'accès (« Authentification et autorisation », plus bas).
-2. Toute la demande est bornée par une échéance de 200 s (`core/config.py:456`,
-   `ai_api/routers/digest_router.py:100`).
+2. Une fois les contrôles passés, la lecture et les appels au modèle sont bornés par une échéance de 200 s
+   (`core/config.py:456`, `ai_api/routers/digest_router.py:100`, `ai_api/deadline.py:1-3`).
 3. L'API IA lit les items de la fenêtre par l'API de données (`ai_api/routers/digest_router.py:108`). Si cette
    lecture échoue, la demande échoue sans appel au modèle.
 4. Le modèle classe les items par sujet, par lots (`ai_api/digests.py:68`). Si le classement échoue, la demande
@@ -88,7 +90,8 @@ cités, `items_removed_by_checks` (`ai_api/stages/checking.py:61-111`).
 
 ### Le parcours de `POST /trend-reports`
 
-1. Les mêmes contrôles d'accès, puis une échéance de 200 s (`core/config.py:464`).
+1. Les mêmes contrôles d'accès, puis une échéance de 200 s sur les lectures et les appels au modèle
+   (`core/config.py:457-464`).
 2. La demande porte les bornes du compte rendu précédent, que `kb trend-report` lit dans son registre: c'est ce qui
    garde l'API IA sans état.
 3. L'API IA lit les fenêtres de GH Archive par l'API de données (`ai_api/trend_reports.py:158`), calcule les rangs
@@ -96,9 +99,14 @@ cités, `items_removed_by_checks` (`ai_api/stages/checking.py:61-111`).
 4. Elle lit sur GitHub la fiche de chaque candidat (`:181`). Le modèle en choisit 5 au plus (`:192`,
    `core/config.py:382`).
 5. Elle lit le README des seuls dépôts choisis, puis le modèle rédige quatre textes par dépôt, un appel par dépôt
-   (`:205-206`). Chaque fait d'un texte doit se retrouver dans ce texte et dans la source de ce texte; sinon le
-   texte est retiré, et nommé dans `texts_removed` (`ai_api/stages/trend_writing.py:539-547`).
-6. Si la lecture des fenêtres ou des fiches échoue, la demande échoue. Si le choix du modèle échoue, le compte
+   (`:205-206`). Le code retire un texte, et le nomme dans `texts_removed`, s'il sort de ses bornes, s'il n'a pas
+   de source, si l'un de ses faits ne se retrouve pas à la fois dans le texte et dans la source de ce texte, s'il
+   contient un identifiant CVE ou GHSA, s'il porte un nombre qui n'est pas un fait déclaré, ou s'il se déguise
+   (`ai_api/stages/trend_writing.py:468-523`, `:539-547`).
+6. Si la lecture des fenêtres échoue, ou si celle des fiches échoue par un état nommé de GitHub (`github_…`), la
+   demande échoue (`ai_api/trend_reports.py:341-344`). Un candidat disparu, déplacé, remplacé ou refusé est
+   seulement écarté (`:333-340`); au troisième refus, la lecture s'arrête en `github_forbidden`
+   (`ai_api/connectors/github_client.py:324-330`, `core/config.py:114`). Si le choix du modèle échoue, le compte
    rendu reste factuel et la réponse est un 200 (`ai_api/errors.py:92-93`).
 
 ### Les couches du code
@@ -119,7 +127,7 @@ ici d'après le code.
 | Chemin | Dans le contrat | Accès | Corps de la demande | Réponse 200 |
 |---|---|---|---|---|
 | `POST /digests` | oui | clé du client `KB_DIGEST` | `DigestRequestSchema`: un objet JSON, avec `window_days` facultatif, un entier de 1 à 14 (`core/config.py:331-332`); absent ou `null`, la fenêtre de `KB_DIGEST_WINDOW_DAYS`, 3 jours par défaut (`:330`) | `DigestsSchema`: une fiche par sujet, les sujets en échec, la fenêtre lue |
-| `POST /trend-reports` | oui | clé du client `KB_TREND_REPORT` | `TrendReportRequestSchema`: `after` et `previous_first_window`, tous deux requis, tous deux `null` (premier compte rendu) ou tous deux un jour | `TrendReportSchema`: la période, les dépôts qui remplissent un critère, ceux que le modèle a choisis, leurs textes |
+| `POST /trend-reports` | oui | clé du client `KB_TREND_REPORT` | `TrendReportRequestSchema`: `after` et `previous_first_window`, tous deux requis, tous deux `null` (premier compte rendu) ou tous deux un jour; alors `previous_first_window` n'est pas après `after`, et les deux jours, compris, couvrent 15 fenêtres quotidiennes au plus (`ai_api/schemas/trend_report_schema.py:35-49`, `items.py:600-603`, `core/config.py:88`) | `TrendReportSchema`: la période, les dépôts qui remplissent un critère, ceux que le modèle a choisis, leurs textes |
 | `GET /health` | non | sans clé | aucun | `{"status": "ok"}` |
 | `GET /openapi.json` | non | sans clé, avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox` seulement; 404 sinon | aucun | l'OpenAPI de l'app |
 | `GET /docs` | non | comme `/openapi.json` | aucun | Swagger UI, qui lit `/openapi.json` |
@@ -127,7 +135,9 @@ ici d'après le code.
 Chaque champ de ces corps et de ces réponses, son type et ses bornes sont dans l'OpenAPI, sous
 `components.schemas`; la fiche ne les recopie pas. Les deux schémas de demande refusent tout champ non déclaré et
 lisent les types sans conversion: `3.0` ou `"3"` n'est pas un entier (`ai_api/schemas/digest_schema.py:16-23`,
-`ai_api/schemas/trend_report_schema.py:24-49`).
+`ai_api/schemas/trend_report_schema.py:24-49`). Deux règles du corps de `POST /trend-reports` ne sont pas dans
+l'OpenAPI, qui n'en donne que les types, les champs requis et le refus d'un champ non déclaré: l'ordre des deux
+jours et le nombre de fenêtres. Le code seul les tient (tableau ci-dessus).
 
 **Hors du contrat, d'après le code.**
 
@@ -136,7 +146,8 @@ lisent les types sans conversion: `3.0` ou `"3"` n'est pas un entier (`ai_api/sc
   que la clé de l'app n'atteint pas (`ai_api/app.py:98-100`). En ligne, c'est la sonde du conteneur.
 - `/openapi.json` et `/docs` ne sont servis que si `KB_DEPLOYMENT_ENVIRONMENT` vaut exactement `sandbox`; toute
   autre valeur, ou aucune, ne sert ni l'un ni l'autre (`core/api_settings.py:41-51`). FastAPI ne sert `/docs` que
-  si l'app a un chemin d'OpenAPI. ReDoc n'est pas servi (`ai_api/app.py:68-70`).
+  si l'app a un chemin d'OpenAPI (fastapi 0.143.1, `applications.py:1158`). ReDoc n'est pas servi
+  (`ai_api/app.py:68-70`).
 - `HEAD` est retiré de chaque route `GET`, où Starlette l'ajoute: une requête `HEAD` reçoit 405
   (`core/api_methods.py:7-13`).
 
@@ -150,7 +161,7 @@ paramètres refusés, jamais leurs valeurs (`core/api_errors.py:47-53`). Les sta
 | 413 | `content_too_large` | corps de plus de 1 024 octets (`core/config.py:288`) |
 | 422 | `invalid_parameter` | corps illisible ou hors de son schéma |
 | 429 | `request_already_running` | une demande tourne déjà sur la route, avec `Retry-After: 200` |
-| 429 | `rate_limit_exceeded` | 20 demandes en 24 h glissantes déjà reçues de ce client sur cette route, avec `Retry-After` |
+| 429 | `rate_limit_exceeded` | 20 demandes en 24 h glissantes déjà admises de ce client sur cette route, avec `Retry-After` |
 | 500 | `internal_error` | erreur imprévue |
 | 502, 503, 504 | un état de l'amont | l'API de données (`data_api_…`), le modèle (`llm_…`, `/digests` seule) ou GitHub (`github_…`, `/trend-reports` seule) a échoué; 503 pour un débit dépassé, 504 pour un délai (`ai_api/errors.py:25-43`) |
 
@@ -167,8 +178,8 @@ identifie un programme, `KB_DIGEST` ou `KB_TREND_REPORT`, jamais une personne. L
 `components.securitySchemes.HTTPBearer`, et chaque route le demande (`security`).
 
 **Les clés.** `kb serve-ai` lit au démarrage chaque variable `KB_AI_API_KEY_<CLIENT>` (`core/api_keys.py:13`,
-`commands/serve_ai_command.py:39-41`). Il refuse de démarrer, avec le code de sortie 2, si l'une est refusée; le
-message nomme la variable, jamais la clé (`core/api_keys.py:37-56`):
+`commands/serve_ai_command.py:39-41`). Il refuse de démarrer, avec le code de sortie 2, s'il n'en trouve aucune ou
+si l'une est refusée; le message nomme la variable, jamais la clé (`core/api_keys.py:17-56`):
 
 - `<CLIENT>` est fait de `A-Z`, `0-9` et `_`;
 - une clé a 32 caractères au moins, pris dans `A-Z`, `a-z`, `0-9`, `_` et `-`, l'alphabet de
@@ -179,7 +190,8 @@ message nomme la variable, jamais la clé (`core/api_keys.py:37-56`):
   (`:60-64`).
 
 **L'authentification.** La clé reçue est comparée à chaque clé connue en temps constant (`hmac.compare_digest`,
-`core/api_access.py:52-62`): le temps de la réponse ne dit ni la clé ni son client. Une clé absente ou inconnue
+`core/api_access.py:52-62`): la comparaison est conçue pour que le temps de la réponse ne dise ni la clé ni son
+client. Ce n'est pas mesuré par un test. Une clé absente ou inconnue
 reçoit le même 401 `invalid_api_key`, avec l'en-tête `WWW-Authenticate: Bearer` de la RFC 6750
 (`core/api_access.py:25-41`).
 
@@ -199,7 +211,10 @@ la route.
 `request_already_running` avec `Retry-After: 200`, l'échéance d'une demande (`core/api_rate_limit.py:57-72`,
 `core/config.py:466-468`). Une demande de fiches et une demande de tendances peuvent tourner ensemble. Au plus
 20 demandes par client et par route sur 24 h glissantes; au-delà, 429 `rate_limit_exceeded`, avec le nombre de
-secondes à attendre dans `Retry-After` (`core/config.py:309-312`, `core/api_rate_limit.py:17-54`).
+secondes à attendre dans `Retry-After` (`core/config.py:309-312`, `core/api_rate_limit.py:17-54`). Seules les
+demandes admises par le débit comptent: une demande refusée avant lui (413, 422 d'un corps illisible, 401, 403,
+429 de concurrence) ou par lui ne compte pas; un 422 d'un corps hors de son schéma, contrôlé après, compte
+(`core/api_rate_limit.py:32-44`, `ai_api/app.py:62-67`).
 
 Les tests qui prouvent ces règles sont dans [`tests_pour_docu.md`](tests_pour_docu.md), « 7. Accès ».
 
@@ -221,7 +236,7 @@ uv run python -c "import secrets; print(secrets.token_urlsafe(32))"
 1. Ranger la nouvelle clé dans sa variable du `.env`: `KB_AI_API_KEY_KB_DIGEST` ou
    `KB_AI_API_KEY_KB_TREND_REPORT`. Le client lit la même variable que le serveur
    (`post/ai_api_client.py:46-47`, `post/trend_report_client.py:59`): un seul changement vaut pour les deux côtés.
-2. Redémarrer `kb serve-ai`. Les clés ne sont lues qu'au démarrage (`ai_api/app.py:77`): l'ancienne clé est
+2. Redémarrer `kb serve-ai`. Les clés ne sont lues qu'au démarrage (`commands/serve_ai_command.py:39-41`): l'ancienne clé est
    refusée dès le redémarrage, pas avant.
 
 Pour retirer un client: retirer sa variable, puis redémarrer `kb serve-ai`. La clé que l'API IA envoie à l'API de
@@ -239,7 +254,8 @@ secret ([`infra/README.md`](../infra/README.md), « 4. Poser les secrets »).
 - le jeton GitHub, `KB_AI_GITHUB_TOKEN`, doit être un jeton *fine-grained* (préfixe `github_pat_`), sinon
   `kb serve-ai` ne démarre pas (`ai_api/connectors/github_settings.py:22-34`). Son expiration est fixée à sa
   création sur GitHub ([`docs/jeton-github.md`](../docs/jeton-github.md)); le code ne la lit pas. Un jeton expiré
-  ou révoqué se voit au premier compte rendu: 502 `github_unauthorized` (`ai_api/connectors/github_client.py:335-336`);
+  ou révoqué se voit au premier compte rendu qui a un candidat, car sans candidat GitHub n'est pas appelé
+  (`ai_api/trend_reports.py:179-181`): 502 `github_unauthorized` (`ai_api/connectors/github_client.py:335-336`);
 - la clé du modèle, `KB_LLM_API_KEY`: une clé refusée par le fournisseur donne l'état `llm_unavailable`
   (`ai_api/connectors/llm_client.py:490`), soit un 502 de `POST /digests` quand c'est le classement qui échoue.
 
@@ -250,7 +266,8 @@ Chacun se change comme une clé: une nouvelle valeur dans sa variable ou son sec
 Les deux clients de l'API IA sont des commandes de K-B. Voici comment elles appliquent ce que dit cette fiche.
 
 - **Avant d'envoyer.** `kb digest` et `kb trend-report` lisent leur clé dans la même variable que le serveur et la
-  contrôlent par les mêmes règles (`post/ai_api_client.py:166-181`). Une clé absente ou refusée: rien n'est
+  contrôlent par ses règles de forme: nom, longueur, alphabet (`post/ai_api_client.py:166-181`). Ils ne
+  contrôlent ni les clés en double ni l'égalité avec `KB_DATA_API_KEY_AI_DIGEST`, que seul `kb serve-ai` vérifie. Une clé absente ou refusée: rien n'est
   demandé, code de sortie 2 (`commands/digest_command.py:63-67`).
 - **À l'envoi.** La clé part dans `Authorization: Bearer` (`post/ai_api_client.py:184-197`), jamais dans l'URL.
   `kb digest` envoie `{}`, la fenêtre par défaut (`post/ai_api_client.py:200-208`).
@@ -275,7 +292,7 @@ deux. Il décrit les deux routes, leurs corps, leurs réponses, chaque état d'e
 
 - **Il est généré, pas écrit à la main.** `uv run kb openapi`, lancé à la racine du dépôt, le réécrit d'après
   l'app, avec celui de l'API de données (`commands/openapi_command.py:30-55`). L'app est faite sans clé ni réglage
-  de l'environnement: le document n'en dépend pas (`:63-80`).
+  de l'environnement: le document n'en dépend pas (`:63-84`).
 - **Un test le tient égal au code**: `test_the_versioned_openapi_is_the_one_the_app_produces`
   (`tests/ai_api/test_ai_api_openapi.py:31-33`). Si le code change sans `kb openapi`, la CI échoue. Un autre test
   vérifie que le document est un OpenAPI 3.1 valide (`:62`).
@@ -291,7 +308,7 @@ deux. Il décrit les deux routes, leurs corps, leurs réponses, chaque état d'e
 - `KB_DEPLOYMENT_ENVIRONMENT=production`: ni `/docs` ni `/openapi.json` (`infra/main.bicep:216`).
 - De 0 à 1 réplique (`infra/modules/api-container-app.bicep:147-152`).
 - Les jobs en ligne sont `caj-kb-smoke-test` et `caj-kb-migrate-database` (`infra/deployment.json`). Seul le
-  premier appelle l'API IA, par `GET /health` (`commands/smoke_test_command.py:118-121`).
+  premier appelle l'API IA, par `GET /health` (`commands/smoke_test_command.py:80-81`, `:117-127`).
 
 ## Limites
 
@@ -320,11 +337,15 @@ python3 -c "import json; d=json.load(open('docs/api/openapi-ia.json')); print(d[
 uv run pytest tests/ai_api/test_ai_api_openapi.py
 # Les couches, et ce que l'API IA importe.
 uv run pytest tests/architecture/test_apis.py
-# Clé, client, corps, débit, concurrence.
-uv run pytest tests/ai_api/test_digest_router.py -k "key or bound or limit or runs or body"
+# Règle 7 de .claude/rules/poc.md, l'écriture: 0 ligne attendue.
+grep -rnE "raw_store|writers|write_file_atomically|write_text|write_bytes|[^a-z_]open\(" src/k_b/ai_api | wc -l
+# Clé, client, autre route, corps, débit, concurrence, méthodes, /health (39 tests au commit 1d2f554).
+uv run pytest tests/ai_api/test_digest_router.py -k "key or bound or limit or runs or body or client or other_route or method or health"
 uv run pytest tests/ai_api/test_trend_report_router.py -k "key or malformed"
-# Les clients de chaque route, les limites, les clés.
-grep -n -A10 "^DIGEST_CLIENT" src/k_b/core/config.py
+# /docs et /openapi.json servis en sandbox seulement.
+uv run pytest tests/ai_api/test_serve_ai.py -k documentation
+# Les clients de chaque route, les limites des deux routes, les clés.
+grep -n -A12 "^DIGEST_CLIENT" src/k_b/core/config.py
 grep -n "MIN_API_KEY_LENGTH =\|API_KEY_CHARACTERS =\|MAX_AI_API_BODY_BYTES =" src/k_b/core/config.py
 # Les jobs déclarés en ligne.
 cat infra/deployment.json
