@@ -1,12 +1,10 @@
-"""The reference set of POST /digests (#479): what its recording and its replay share, and the
-recording, run once by the user who has the model:
+"""The reference set of POST /digests: its recording, run once by the user who has the model, and
+what its replay shares with it.
 
     uv run --env-file .env python tests/ai_api/digests_reference.py
 
-The items are those of two extracts under CC0 1.0 (README, "Contenus de tiers"), imported by the
-code of kb import into a temporary folder: no text is copied. Of the environment, only the
-settings of the model are read; out of the temporary folder, the set is the only file written,
-never over a set already there."""
+Only the settings of the model are read of the environment, and the items are imported from two
+CC0 extracts into a temporary folder: no text is copied, no set is written over."""
 
 import json
 import os
@@ -31,7 +29,7 @@ from k_b.ai_api.app import create_app
 from k_b.ai_api.connectors.data_api_client import read_watch
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.connectors.github_settings import GithubSettings
-from k_b.ai_api.connectors.llm_client import build_http_client
+from k_b.ai_api.connectors.llm_client import PROVIDER_FAILURES, build_http_client
 from k_b.ai_api.connectors.llm_replay import ResponseStep
 from k_b.ai_api.connectors.llm_settings import (
     PROVIDER_VARIABLE,
@@ -87,7 +85,7 @@ PROMPT_VERSION_BY_STAGE: dict[DigestStage, str] = {
     "write": WRITING_PROMPT_VERSION,
 }
 # A subject the model could not answer for: a recording with one of them is not kept.
-UNAVAILABLE_STATES = frozenset({"llm_timeout", "llm_rate_limited", "llm_unavailable"})
+UNAVAILABLE_STATES = PROVIDER_FAILURES | {"llm_timeout"}
 
 
 class Extract(NamedTuple):
@@ -121,6 +119,8 @@ class ReferenceSubject(ReferenceModel):
 class ReferenceItem(ReferenceModel):
     """An item the AI API read for the request, as the data API serves it, with its extract."""
 
+    # The id the model is sent and answers with (i<item_id>).
+    item_id: int
     kind: str
     title: str
     url: str | None
@@ -197,6 +197,7 @@ def read_reference_items(
     )
     return [
         ReferenceItem(
+            item_id=item.item_id,
             kind=item.kind,
             title=item.source_title,
             url=item.url,

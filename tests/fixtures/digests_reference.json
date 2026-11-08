@@ -41,6 +41,7 @@
   ],
   "items": [
     {
+      "item_id": 4,
       "kind": "vulnerability",
       "title": "Apple Multiple Products Out-of-Bounds Write Vulnerability",
       "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-86950",
@@ -48,6 +49,7 @@
       "license": "CC0 1.0"
     },
     {
+      "item_id": 6,
       "kind": "vulnerability",
       "title": "Citrix NetScaler Improper Input Validation Vulnerability",
       "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-88771",
@@ -55,6 +57,7 @@
       "license": "CC0 1.0"
     },
     {
+      "item_id": 5,
       "kind": "vulnerability",
       "title": "Citrix NetScaler Improper Restriction of Operations within the Bounds of a Memory Buffer Vulnerability",
       "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-88772",
@@ -62,6 +65,7 @@
       "license": "CC0 1.0"
     },
     {
+      "item_id": 3,
       "kind": "paper",
       "title": "PACE: Provenance-Aware Capability Enforcement for Tool-Using LLM Agents",
       "url": "https://arxiv.org/abs/2610.01349",
@@ -69,6 +73,7 @@
       "license": "CC0 1.0"
     },
     {
+      "item_id": 2,
       "kind": "paper",
       "title": "Evaluating System One Models for Agent Security Decisions: Reliability, Calibration, and Selective Automation",
       "url": "https://arxiv.org/abs/2609.33401",
@@ -76,6 +81,7 @@
       "license": "CC0 1.0"
     },
     {
+      "item_id": 1,
       "kind": "paper",
       "title": "Resource-Optimized and Energy-Aware Agentic AI Framework Anchored on Blockchain for Secure Software Supply Chains",
       "url": "https://arxiv.org/abs/2609.31282",
