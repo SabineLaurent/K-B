@@ -66,7 +66,7 @@ ruleset de `main`.
 | 96 % | ta décision : un plancher, 2,4 points sous la mesure, au-dessus du plus haut niveau que Google propose (90 %) | 90 % : 8 points de régression passeraient sans signal ; 98 % : une PR ajoutant un peu de code non couvert échouerait sans régression réelle |
 | Le seuil dans `pyproject.toml` | un seul endroit, partagé par `make test-cov` et la CI | `--cov-fail-under=96` dans `ci.yml` : un second endroit à tenir |
 | `precision = 2` | l'arrondi n'avale plus que 0,005 point au lieu de 0,5 | `precision = 0` (défaut) |
-| Dans le job `tests` | la suite ne tourne qu'une fois (30 s → 41 s en local) | un job `coverage` à part : la suite deux fois, et un sixième contrôle à exiger |
+| Dans le job `tests` | la suite ne tourne qu'une fois (30 s → 41 s en local, job de CI 75 s → 112 s) | un job `coverage` à part : la suite deux fois, et un sixième contrôle à exiger |
 
 Choix imposé par une consigne : `pyproject.toml` ne change qu'avec ton accord explicite, donné le 08/11 avec
 le plan.
@@ -78,7 +78,7 @@ le plan.
 | `fail_under = 99` : `ERROR: Coverage failure: total of 98.41 is less than fail-under=99.00`, code 1 | le seuil fait échouer la suite (test rouge, avant le vrai seuil) |
 | `fail_under = 96` : `Required test coverage of 96.0% reached. Total coverage: 98.41%`, code 0 ; `make test-cov`, code 0 | le vrai seuil passe, en local, par les deux commandes |
 | `pytest tests/etl --cov` : code 1 (57,00 %) ; avec `--cov-fail-under=0` : code 0 | une mesure partielle échoue, d'où la ligne du README |
-| CI de la PR, job `tests` : le total affiché dans son journal | le seuil tient sur le runner Linux (chiffre dans la PR et l'ADR) |
+| CI de la PR, job `tests` (run 42469593428) : `Required test coverage of 96.0% reached. Total coverage: 98.41%`, job en 112 s (75 s avant) | le seuil tient sur le runner Linux, avec la même mesure que le Mac |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -95,8 +95,6 @@ le plan.
 
 ## Zones non vérifiées
 
-- La mesure sur le runner Linux n'est connue qu'après le run de la PR. Elle peut différer de celle du Mac
-  (98,41 %).
 - Le message « FAIL » dans la bande de 0,005 point vient de la lecture du code de `pytest-cov`
   (`plugin.py:413`), pas d'un essai.
 

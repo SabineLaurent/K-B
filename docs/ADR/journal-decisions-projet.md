@@ -6095,7 +6095,8 @@ celui du plan qu'elle a validé, ou du tri de time-knight quand il est nommé.
   de `ci.yml` lance `uv run pytest --cov --cov-report=term-missing:skip-covered`, la suite de
   `make test-cov`, et échoue sous le seuil.** Décision de l'utilisatrice du 08/11, pour C12 d'E3 (demande
   de la certif n° 85, 07/11) : un plancher contre la régression, pas une cible. Mesure du 08/11 sur
-  `2d240f7` : 98,41 % (lignes et branches) ; celle du 06/11 : 99,26 %.
+  `2d240f7` : 98,41 % (lignes et branches), la même sur le Mac et sur le runner Linux de la CI (job
+  `tests` de la PR, run 42469593428) ; celle du 06/11 : 99,26 %.
   - 96 %, au-dessus du niveau le plus haut que Google propose à ses projets, 90 % (« exemplary » [1],
     niveau 5 de la Table 2 [2]). Écartés : 90 %, sous lequel 8 points de régression passeraient sans
     signal ; un seuil collé à la mesure (98 %), qui ferait échouer une PR ajoutant un peu de code non
@@ -6110,7 +6111,8 @@ celui du plan qu'elle a validé, ou du tri de time-knight quand il est nommé.
     quand `--cov-fail-under` est absent (`pytest_cov/plugin.py`, 7.1.0), et `make test-cov` comme la CI
     s'en servent. Écarté : `--cov-fail-under=96` dans `ci.yml`, un second endroit à tenir ;
   - dans le job `tests`, pas dans un job à part. Écarté : un job `coverage`, qui relancerait la suite et
-    ajouterait un sixième contrôle exigé au ruleset de `main`. Coût mesuré en local : 30 s → 41 s.
+    ajouterait un sixième contrôle exigé au ruleset de `main`. Coût mesuré : 30 s → 41 s en local ; le
+    job `tests` de la CI, 75 s → 112 s.
 
   Limites assumées : les tests `e2e` et `postgresql` restent hors de la mesure, comme le 06/11, et le
   code qu'eux seuls lancent compte comme non couvert. Le 08/11, les chemins de PostgreSQL laissent
