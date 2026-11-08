@@ -849,9 +849,9 @@ contre `infra/` et l'état en ligne.
 | API5 Broken Function Level Authorization | **Tenue** | — |
 | API6 Unrestricted Access to Sensitive Business Flows | **Tenue** | — |
 | API7 Server Side Request Forgery | **Tenue** | — |
-| API8 Security Misconfiguration | Non tenue | Revue périodique de la configuration en ligne ; évaluation automatisée de l'environnement déployé (scan de l'image, essais après déploiement) ; chaîne Envoy → uvicorn non essayée (relue le 2026-11-08) |
+| API8 Security Misconfiguration | Non tenue | Durcissement dont la construction et la relecture seraient exigées ; revue périodique de la configuration en ligne ; évaluation automatisée de l'environnement déployé (scan de l'image, essais après déploiement) ; chaîne Envoy → uvicorn non essayée (relue le 2026-11-08) |
 | API9 Improper Inventory Management | Non tenue | Documentation sans clé en `sandbox` : écart voulu ; protection externe : au déploiement |
-| API10 Unsafe Consumption of APIs | **Tenue** | — (relue le 2026-11-08) |
+| API10 Unsafe Consumption of APIs | **Tenue** | — (relue le 2026-11-08) ; limite : le code accepte `http` vers l'API de données, #473 |
 
 Le compte : 6 entrées tenues sur 10. Ce qui ne dépend que du code et de la doc est tenu, sauf deux
 écarts voulus (API2, anti-force brute ; API9, documentation en `sandbox`) ; API10 l'est depuis la
@@ -1075,15 +1075,20 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
 Relue point par point le 2026-11-08 (#454), contre `infra/` et l'état en ligne ; une mesure qui ne
 dépend que du code garde son état et sa preuve.
 
-- **Durcissement répétable** : tenue. L'image (`Dockerfile`, utilisateur 10001, #200),
+- **Durcissement répétable** : non tenue, en partie. L'image (`Dockerfile`, utilisateur 10001, #200),
   l'environnement, les apps et les jobs d'ACA (`infra/`, Bicep) sont versionnés et relus en PR comme
   le code ; la CI construit `infra/main.bicep` sur toute PR qui touche `infra/`
   (`.github/workflows/infra.yml:27`) ; une version taguée part en ligne par
   `.github/workflows/deploy.yml` (#415). Un réglage refusé empêche le démarrage
-  (`test_serve_ai_exits_2_and_names_the_variable_refused`). Limites : le socle s'applique à la main,
-  en deux passes (`infra/README.md`) ; `deploy.yml` change l'image des apps et des jobs par
-  `az containerapp update` et `az containerapp job update`, hors du Bicep (`deploy.yml:168`,
-  `:174`) ; la construction du Bicep n'est pas un contrôle exigé de `main` (`infra.yml:15`).
+  (`test_serve_ai_exits_2_and_names_the_variable_refused`). Ce qui manque, en quatre limites : le
+  socle s'applique à la main, en deux passes (`infra/README.md`) ; `deploy.yml` change l'image des
+  apps et des jobs par `az containerapp update` et `az containerapp job update`, hors du Bicep
+  (`deploy.yml:168`, `:174`) ; la construction du Bicep n'est pas un contrôle exigé de `main`
+  (`infra.yml:15`) ; le ruleset de `main` n'exige aucune relecture (`required_approving_review_count`
+  0), la relecture en PR est une pratique, pas une règle.
+  **Pour la tenir** : la construction du Bicep exigée, sans bloquer les PR qui ne touchent pas
+  `infra/` (un job toujours lancé, qui saute la construction hors de `infra/`), et une relecture
+  exigée par le ruleset dès qu'une seconde personne peut relire. S.
 - **Revue périodique des configurations de toute la pile** : non tenue, en partie. Chaque changement
   de `infra/` est relu en PR ; la configuration en ligne n'a été relue contre ces fichiers qu'une
   fois, à la main, le 2026-11-08 (#454), pour l'entrée, le chiffrement entre apps et les URL
@@ -1105,10 +1110,17 @@ dépend que du code garde son état et sa preuve.
     `infra/modules/api-container-app.bicep:74-80`) : « directly reachable only from within the same
     Container Apps environment ». La documentation de l'entrée nomme une seule exception, une route
     HTTP de l'environnement qui viserait l'app : il n'y en a aucune. L'entrée interne coupe aussi les
-    clients `TERMINAL` et `AGENT` de l'API de données, hors de l'environnement.
+    clients `TERMINAL` et `AGENT` de l'API de données, hors de l'environnement. Le point public de
+    l'environnement reste ouvert (`publicNetworkAccess: 'Enabled'`,
+    `infra/modules/container-apps-environment.bicep:40`, la valeur `Disabled` demandant un réseau
+    virtuel) : une requête du dehors atteint son mandataire, qui rend 404 pour une app interne selon
+    la documentation et le commentaire du Bicep ; non essayé.
   - Le chiffrement entre apps est activé (`peerTrafficConfiguration.encryption.enabled`,
     `infra/modules/container-apps-environment.bicep:27-31`) : « Traffic to and from the ingress proxy
-    within the environment is TLS encrypted ». mTLS reste désactivé (l. 33-36).
+    within the environment is TLS encrypted [...] and decrypted by the receiver ». Le réseau est donc
+    chiffré jusqu'à la réplique ; uvicorn y reçoit `http` sur son port (`transport: 'http'`, aucun
+    TLS dans uvicorn), et ce dernier pas, dans la réplique, n'est ni décrit par la documentation ni
+    essayé. mTLS reste désactivé (l. 33-36).
   - Les clients : l'API IA appelle l'API de données en `https://ca-kb-data-api.internal.<defaultDomain>`
     (`infra/main.bicep:223`), le seul hôte que l'API de données accepte (`KB_DATA_API_ALLOWED_HOSTS`,
     l. 187) ; le test de fumée appelle les deux API en `https` (l. 248-249) ; l'API de données lit
@@ -1117,7 +1129,7 @@ dépend que du code garde son état et sa preuve.
 
     ```sh
     az containerapp show -n <app> -g <groupe> \
-      --query "properties.configuration.ingress.{external:external, allowInsecure:allowInsecure, transport:transport}"
+      --query "properties.configuration.ingress.{external:external, allowInsecure:allowInsecure, transport:transport, customDomains:customDomains}"
     az containerapp env show -n <environnement> -g <groupe> \
       --query "{encryption: properties.peerTrafficConfiguration.encryption.enabled, mtls: properties.peerAuthentication.mtls.enabled}"
     az containerapp env http-route-config list -n <environnement> -g <groupe>
@@ -1125,8 +1137,9 @@ dépend que du code garde son état et sa preuve.
       --query "properties.template.containers[0].env[?name=='KB_DATA_API_URL' || name=='KB_DATA_API_ALLOWED_HOSTS'].{name:name, value:value}"
     ```
 
-    `external` false, `allowInsecure` false, `transport` Http pour les deux apps ; `encryption`
-    true, `mtls` false ; aucune route (`[]`) ; sur `ca-kb-ai-api`, `KB_DATA_API_URL` =
+    `external` false, `allowInsecure` false, `transport` Http et `customDomains` null (aucun domaine
+    personnalisé) pour les deux apps ; `encryption` true, `mtls` false ; aucune route (`[]`) ; sur
+    `ca-kb-ai-api`, `KB_DATA_API_URL` =
     `https://ca-kb-data-api.internal.<defaultDomain>`, sur `ca-kb-data-api`,
     `KB_DATA_API_ALLOWED_HOSTS` = `ca-kb-data-api.internal.<defaultDomain>`.
   - Limite : le `https` vers l'API de données vient du réglage du déploiement, que le code ne force
@@ -1255,7 +1268,8 @@ point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change
 
 ### Sources de l'auto-évaluation
 
-Lues le 2026-11-05.
+Lues le 2026-11-05. Relues le 2026-11-08 (#454) : l'entrée et le chiffrement entre apps d'ACA,
+pour API8 et API10.
 
 - [OWASP API Security Top 10, édition 2023](https://owasp.org/API-Security/editions/2023/en/0x11-t10/),
   section « How To Prevent » de chaque entrée ; [API2:2023](https://api-security.owasp.org/editions/2023/en/0xa2-broken-authentication).

@@ -492,7 +492,9 @@ avec ses sources.
   interne, en HTTPS (`external: false`, `allowInsecure: false`,
   `infra/modules/api-container-app.bicep:74-80`), joignable des seules apps et jobs de son
   environnement : les clients `TERMINAL` et `AGENT` ne la joignent plus de l'extérieur. Le chiffrement
-  entre apps est activé (`infra/modules/container-apps-environment.bicep:27-31`), son nom interne est
+  entre apps est activé (`infra/modules/container-apps-environment.bicep:27-31`) : le réseau est
+  chiffré jusqu'à la réplique, et le dernier pas, d'Envoy à uvicorn dans la réplique, n'est ni décrit
+  par la documentation ni essayé. Son nom interne est
   le seul hôte permis (`KB_DATA_API_ALLOWED_HOSTS`, `infra/main.bicep:187`), et elle lit PostgreSQL
   en `sslmode=verify-full` (l. 261). Relu en ligne sur `ca-kb-data-api` : `external` false,
   `allowInsecure` false, `transport` Http ; les commandes, l'environnement et la version de TLS sont
