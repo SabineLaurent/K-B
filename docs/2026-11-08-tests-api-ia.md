@@ -16,7 +16,7 @@ autres de `src/k_b/`. La section « Rejouer ce compte rendu » donne les command
 | `make test` | toute la suite, comme `uv run pytest` | 4061 réussis, 328 écartés, en 31,34 s |
 | `make test-ai-api` (1re commande) | `tests/ai_api` | 1087 réussis, en 13,08 s |
 | `make test-ai-api` (2e commande) | les tests du code commun aux deux API (`API_COMMON_TESTS`) | 8 réussis, en 0,47 s |
-| `uv run pytest` sur la partie `kb` (voir « Rejouer ») | `tests/post` sans `test_top_sheets.py`, les tests de `kb digest`, `kb trend-report`, `kb digest-watch`, et `tests/commands/test_live_apis.py` | 455 réussis, 33 écartés (`test_top_sheets.py`), en 2,23 s |
+| `uv run pytest` sur la partie `kb` (voir « Rejouer ») | `tests/post` sans `test_top_sheets.py` ; dans `tests/commands/` : `test_digest_command.py`, `test_trend_report_command.py`, `test_digest_watch_command.py` et `test_live_apis.py` | 455 réussis, 33 écartés (`test_top_sheets.py`), en 2,23 s |
 
 Aucun échec, aucun test sauté. Le périmètre de ce compte rendu compte **1550 tests** (1087 + 8 + 455), tous réussis.
 
@@ -25,9 +25,24 @@ Les 328 tests écartés par `make test` sont ceux que `tests/conftest.py` laisse
 1550 tests du périmètre ne porte ces marqueurs. Un seul test `e2e` touche l'API IA :
 `tests/e2e/test_real_export.py` (section « Ce que les tests ne prouvent pas »).
 
-`test_top_sheets.py` est hors du périmètre : il teste `kb write-tops`, qui écrit les fiches des tops depuis la
-base, sans l'API IA. `tests/data_api` l'est aussi : l'API de données a ses propres tests, que l'API IA appelle
-comme une dépendance.
+### Hors du compte
+
+Les 1550 tests sont ceux des fichiers du tableau des groupes. Les fichiers ci-dessous testent aussi, en entier ou
+en partie, l'API IA ou la chaîne : ils sont dans les 4061 de `make test`, pas dans les 1550. Chaque nombre vient de
+`uv run pytest --co -q <fichier>`.
+
+| Fichier | Tests | Ce qu'il teste de l'API IA ou de la chaîne | Pourquoi hors du compte |
+|---|---|---|---|
+| `tests/post/test_top_sheets.py` | 33 | rien : il teste `kb write-tops`, qui écrit les fiches des tops depuis la base, sans l'API IA | hors de la chaîne |
+| `tests/data_api/` | 201, plus 79 marqués `postgresql` | l'API de données, que l'API IA appelle ; dont la clé de chaque client, code commun aux deux API (`tests/data_api/test_api_keys.py`, 14 tests), les plafonds d'une demande de fiches et d'un compte rendu sous les limites de l'API de données (`tests/data_api/test_rate_limit.py:82`), l'échéance d'une requête sous le délai de lecture du client de l'API IA (`tests/data_api/test_api_errors.py:181`) | son propre groupe (`make test-data-api`) |
+| `tests/architecture/test_apis.py` | 55 | ce que les deux API peuvent importer (`:1-3`), dont la règle 7 de `.claude/rules/poc.md` pour l'API IA | test d'architecture, commun aux deux API |
+| `tests/architecture/test_opentelemetry.py` | 13 | les quatre modules de l'API IA, seuls à importer OpenTelemetry (`:1-3`) | test d'architecture |
+| `tests/test_outbound.py` | 35 | les règles d'une connexion HTTP de K-B : l'URL acceptée, le client HTTP, la borne d'un corps lu (`:1-2`) | code commun à tous les clients HTTP de K-B (`core/outbound.py`) |
+| `tests/commands/test_smoke_test_command.py` | 14 | `kb smoke-test` : la santé des deux API, puis le listage du stockage d'échange (`:1-2`) | une commande des jobs en ligne |
+| `tests/jobs/test_api_health.py` | 12 | `GET /health` d'une API depuis un job (`:1-2`) | code des jobs |
+| `tests/jobs/test_watch_publication.py` | 11 | la publication de `veille` (`:1-2`), dernière étape de `kb digest-watch` (`publish_the_watch`, `tests/commands/test_digest_watch_command.py:49`) | code des jobs |
+| `tests/commands/test_wait_display.py` | 6 | l'attente d'une commande affichée sur la sortie d'erreur (`:1`), dont `kb digest` se sert (`commands/digest_command.py:23`) | affichage commun aux commandes |
+| `tests/commands/test_job_routine.py:153`, `tests/commands/test_sigint.py:73`, `tests/commands/test_exit_codes.py:31` | en partie | les étapes de `kb digest-watch` (`DIGEST_WATCH_STEPS`) ; un SIGINT pendant l'attente de `kb digest` ; le code de sortie de `kb digest` | fichiers communs à d'autres commandes |
 
 ## Les groupes
 
@@ -51,7 +66,7 @@ Ils sont listés dans sa section, et comptés dans leur groupe.
 
 **Ce qu'il prouve.**
 
-- Les deux routes répondent comme leurs contrats le disent, sur la vraie application de l'API IA
+- Les deux routes répondent comme leurs contrats le disent, dans les cas testés, sur la vraie application de l'API IA
   (`create_app`, `tests/ai_api/test_digest_router.py:26`), appelée par le `TestClient` de FastAPI, dans le
   processus des tests (`tests/ai_api/test_digest_router.py:244`).
 - La vraie application de l'API de données sert la base de test (`data_api`, `tests/ai_api/test_digest_router.py:179-187`).
@@ -60,20 +75,32 @@ Ils sont listés dans sa section, et comptés dans leur groupe.
 - `POST /trend-reports` est testé sur une API de données et un GitHub simulés, qui comptent leurs requêtes
   (docstring de `tests/ai_api/test_trend_report_router.py:1-2`), puis sur l'API de données de la base de test
   (`test_the_report_of_the_test_base_reads_its_two_windows`, `tests/ai_api/test_trend_report_router.py:434`).
-- Une demande mal formée est refusée avant toute lecture : 422 (`tests/ai_api/test_digest_router.py:389`,
-  `tests/ai_api/test_trend_report_router.py:488`). Un corps trop gros est refusé, en 413, avant même la clé
-  (`tests/ai_api/test_digest_router.py:448`).
-- `kb serve-ai` vérifie ses clés et ses réglages au démarrage, puis s'arrête sur SIGTERM avec le code d'un
-  processus arrêté par ce signal (`tests/ai_api/test_serve_ai.py:435`).
+- Une demande mal formée est refusée en 422 : avant tout appel au modèle pour `/digests`
+  (`tests/ai_api/test_digest_router.py:389`), avant toute lecture de l'API de données pour `/trend-reports`
+  (`tests/ai_api/test_trend_report_router.py:488`, assertion `tests/ai_api/test_trend_report_router.py:501`). Un
+  corps trop gros est refusé, en 413, avant même la clé (`tests/ai_api/test_digest_router.py:448`).
+- L'échéance d'une demande de fiches : le temps restant, et les délais d'une requête raccourcis à ce temps, jamais
+  allongés (`tests/ai_api/test_deadline.py:1-2`, `:20`, `:43`).
+- `kb serve-ai` vérifie ses clés et ses réglages au démarrage (`tests/ai_api/test_serve_ai.py:1-2`), puis s'arrête sur
+  SIGTERM avec le code d'un processus arrêté par ce signal (`tests/ai_api/test_serve_ai.py:435`).
 - L'OpenAPI versionnée (`docs/api/openapi-ia.json`) est celle que produit l'application
-  (`tests/ai_api/test_ai_api_openapi.py`).
-- Le code commun aux deux API : le retrait du `HEAD` que Starlette ajoute, la fenêtre glissante de la limite de débit sur
-  une horloge réglée par le test (`tests/test_api_rate_limit.py:25`), et l'OpenTelemetry natif de FastAPI éteint.
+  (`tests/ai_api/test_ai_api_openapi.py:1-2`).
+- Le code commun aux deux API : le retrait du `HEAD` que Starlette ajoute (`tests/test_api_methods.py:1`), la fenêtre
+  glissante de la limite de débit (`tests/test_api_rate_limit.py:63`) sur une horloge réglée par le test (`SetClock`,
+  `tests/test_api_rate_limit.py:10`), et l'OpenTelemetry natif de FastAPI éteint (`tests/test_api_telemetry.py:1-2`).
 
 **Ce qu'il ne prouve pas.**
 
 - Le transport réseau : le `TestClient` appelle l'application sans socket. Le transport réel n'est vu que par le
-  bout en bout.
+  bout en bout et, pour `/health` seul, par `tests/ai_api/test_serve_ai.py:435`, qui lance `kb serve-ai` dans un
+  sous-processus et l'appelle sur `127.0.0.1` (`wait_for_health`, `tests/ai_api/test_serve_ai.py:460`, `:471-475`).
+- Les dépendances de production qui ouvrent les clients et lisent l'heure : les tests remplacent
+  `open_data_api_client` et `read_request_time`, et `open_llm_client` sauf quand ils prennent le replay des réglages
+  (`replay_from_settings`, `tests/ai_api/test_digest_router.py:238-243`), puis `open_github_client`
+  (`tests/ai_api/test_trend_report_router.py:222`, `:247`). `open_github_client` et
+  `read_request_time` (`ai_api/dependencies.py:28-34`) ne sont exécutées par aucun test, bout en bout compris
+  (`tests/commands/test_live_apis.py:179-182`) : la couverture de toute la suite laisse
+  `ai_api/dependencies.py:29-30` et `:34` non exécutées.
 - La limite de débit sous une vraie charge, ni sa tenue dans le temps : elle est comptée en mémoire, et un
   redémarrage la vide (`core/config.py:306-308`).
 - Une base PostgreSQL derrière l'API de données : ces tests lisent la base SQLite de test.
@@ -89,16 +116,22 @@ Ils sont listés dans sa section, et comptés dans leur groupe.
 | Seules les routes publiques, dont `/health`, répondent sans clé | `tests/ai_api/test_digest_router.py:1108`, `:1117` |
 | Un client est refusé en 403 sur une route qui n'est pas la sienne | `tests/ai_api/test_digest_router.py:1509`, `:1524` |
 | Une route absente de la table des droits est refusée à tout client | `tests/ai_api/test_digest_router.py:1537` |
-| Le journal de `kb serve-ai` nomme ses clients, jamais une clé | `tests/ai_api/test_serve_ai.py:379` |
-| Côté `kb digest`, une clé refusée devient `ai_api_unauthorized`, sans être citée, et un 403 `ai_api_forbidden` | `tests/post/test_ai_api_client.py:260`, `:346` |
+| Le journal de `kb serve-ai` nomme ses clients, jamais une clé | `tests/ai_api/test_serve_ai.py:384` |
+| `kb serve-ai` sort en 2 quand un client a la clé qu'il envoie à l'API de données | `tests/ai_api/test_serve_ai.py:503` |
+| Côté `kb digest`, une clé refusée devient `ai_api_unauthorized`, sans être citée, et un 403 `ai_api_forbidden` | `tests/post/test_ai_api_client.py:268`, `:354` |
 | `kb trend-report` lit sa propre variable de clé | `tests/post/test_trend_report_client.py:176` |
 
 La table des droits est `AI_API_CLIENT_BY_ROUTE` : `/digests` à `KB_DIGEST`, `/trend-reports` à `KB_TREND_REPORT`
 (`core/config.py:300-305`).
 
-**Ce qu'il ne prouve pas.** Les clés des tests sont tirées au hasard à chaque test (`secrets.token_urlsafe(32)`,
-par exemple `tests/ai_api/test_digest_router.py:181`). Aucun test ne lit les clés d'un déploiement en ligne, ni
-leur rotation.
+**Ce qu'il ne prouve pas.**
+
+- Les clés des clients de l'API IA sont tirées au hasard une fois, au chargement du module
+  (`secrets.token_urlsafe(32)`, `tests/ai_api/test_digest_router.py:81-87`, `tests/ai_api/test_trend_report_router.py:55`,
+  `tests/post/test_ai_api_client.py:41`) ; celle de l'API de données l'est à chaque test
+  (`tests/ai_api/test_digest_router.py:181`). Aucun test ne lit les clés d'un déploiement en ligne, ni leur rotation.
+- La comparaison des clés en temps constant (`hmac.compare_digest`, `core/api_access.py:55-60`) : aucun test ne la
+  prouve (`grep -rn compare_digest tests/` ne rend rien).
 
 ## Contrôles
 
@@ -107,8 +140,9 @@ leur rotation.
 - **La fidélité** : un fait d'une affirmation est normalisé, puis cherché dans son texte et dans l'item qu'elle
   cite, entre ses limites (docstring de `tests/ai_api/test_fidelity.py:1-2`). Une affirmation piégée est retirée,
   écrite en clair (`tests/ai_api/test_fidelity.py:361`) ou déguisée (`:416`).
-- **Ce qui part au modèle** : les champs d'un item, les lots, le schéma et la consigne (`tests/ai_api/test_stages.py`) ;
-  les items passent par la liste blanche, masqués, puis coupés pour la rédaction (`tests/ai_api/test_watch_items.py`).
+- **Ce qui part au modèle** : les champs d'un item, les lots, le schéma et la consigne
+  (`tests/ai_api/test_stages.py:1-2`) ; les items passent par la liste blanche, masqués, puis coupés pour la rédaction
+  (`tests/ai_api/test_watch_items.py:1-2`).
 - **Le texte d'une source n'est jamais une consigne** (règle 8 de `.claude/rules/poc.md`) : chaque consigne dit que
   le message utilisateur est une donnée (`tests/ai_api/test_stages.py:363`) ; les items vont dans le message
   utilisateur, jamais dans un message `system` (`tests/ai_api/test_digests.py:634`) ; une description piégée et un
@@ -117,14 +151,15 @@ leur rotation.
 - **Une sortie hors contrat n'est jamais rendue** : un modèle qui obéit à un item piégé donne un état nommé et
   aucune fiche (`tests/ai_api/test_digests.py:947`) ; l'affirmation piégée sur une CVE est retirée et la fiche rendue
   (`:1156`).
-- **Les comptes rendus de tendances** : rangs, trajectoires et critères en code pur (`tests/ai_api/test_trajectories.py`) ;
-  la fiche d'un candidat et ses mises en garde (`tests/ai_api/test_repository_cards.py`) ; le nettoyage d'un texte
-  de dépôt, un piège par cas (`tests/ai_api/test_repository_texts.py`) ; le choix du modèle et la rédaction, leurs
-  contrôles et leurs échecs (`tests/ai_api/test_trend_selection.py`, `tests/ai_api/test_trend_writing.py`).
+- **Les comptes rendus de tendances** : rangs, trajectoires et critères en code pur
+  (`tests/ai_api/test_trajectories.py:1-2`) ; la fiche d'un candidat et ses mises en garde
+  (`tests/ai_api/test_repository_cards.py:1-2`) ; le nettoyage d'un texte de dépôt, un piège par cas
+  (`tests/ai_api/test_repository_texts.py:1-3`) ; le choix du modèle et la rédaction, leurs contrôles et leurs
+  échecs (`tests/ai_api/test_trend_selection.py:1-3`, `tests/ai_api/test_trend_writing.py:1-3`).
 
 **Ce qu'il ne prouve pas.** Les contrôles sont prouvés sur des sorties écrites à l'avance. Ils ne disent rien de la
-part des sorties d'un vrai modèle qu'ils retirent ou refusent : c'est ce que mesurent les essais de #210 (section
-« Ce que les tests ne prouvent pas »).
+part des sorties d'un vrai modèle qu'ils retirent ou refusent : c'est ce que mesurent les essais de #210 pour les
+fiches, et de #370 pour les comptes rendus de tendances (section « Ce que les tests ne prouvent pas »).
 
 ## Modèle de remplacement
 
@@ -140,13 +175,13 @@ part des sorties d'un vrai modèle qu'ils retirent ou refusent : c'est ce que me
   sortie coupée (`llm_truncated`, `:387`), une sortie filtrée (`llm_content_filtered`, `:399`), une limite de débit
   atteinte deux fois après l'attente du `Retry-After` (`llm_rate_limited`, `:426`). Un item piégé reste dans le message
   utilisateur, et sa sortie n'est jamais rendue (`tests/ai_api/test_llm_client.py:574`).
-- Le fichier des pas est vérifié, puis rendu dans l'ordre, et refusé une fois épuisé
-  (`tests/ai_api/test_llm_replay.py:24`, `:64`). Les réglages du modèle se lisent d'un dictionnaire, jamais du
-  `.env` (`tests/ai_api/test_llm_settings.py`).
+- Le fichier des pas est lu (`tests/ai_api/test_llm_replay.py:24`), vérifié (`:54`), puis rendu dans l'ordre et
+  refusé une fois épuisé (`:64`). Les réglages du modèle se lisent d'un dictionnaire, jamais du `.env`
+  (`tests/ai_api/test_llm_settings.py:1`).
 
 **Ce qu'il ne prouve pas.** Aucun test n'appelle un vrai modèle : en CI, le job `tests` (`.github/workflows/ci.yml:26`)
-ne règle aucune variable `KB_LLM_*`. Le *replay* ne dit rien de la qualité d'une fiche, ni du filtre de contenu
-d'Azure, ni du temps de réponse réel.
+ne règle aucune variable `KB_LLM_*`. Le *replay* ne dit rien de la qualité d'une fiche ou d'un compte rendu, ni du
+filtre de contenu d'Azure, ni du temps de réponse réel : ce sont les essais de #210 (fiches) et de #370 (tendances).
 
 ## Lecture de la veille et de GitHub
 
@@ -159,7 +194,7 @@ d'Azure, ni du temps de réponse réel.
   (`tests/fixtures/github_readme_extract.md`) ; aucun test n'appelle GitHub (docstring de
   `tests/ai_api/test_github_client.py:1-3`).
 - Les réglages des deux clients se lisent d'un dictionnaire, jamais du `.env`, et le jeton GitHub n'est jamais cité
-  (`tests/ai_api/test_data_api_settings.py`, `tests/ai_api/test_github_settings.py`).
+  (`tests/ai_api/test_data_api_settings.py:1`, `tests/ai_api/test_github_settings.py:1-2`).
 
 **Ce qu'il ne prouve pas.** Le vrai GitHub : un changement de la forme de ses réponses, sa limite de débit, un
 jeton réel. L'API de données sur PostgreSQL : ses tests marqués `postgresql` sont dans `tests/data_api`, hors de ce
@@ -170,12 +205,17 @@ périmètre, et passent par le job `tests-postgresql` de la CI (`.github/workflo
 **Ce qu'il prouve.** L'export des mesures et des traces en OpenTelemetry : ses réglages, refusés sans citer les
 en-têtes ; une ressource fermée ; le dernier export à l'arrêt ; un arrêt borné quand le point d'arrivée ne répond
 pas (docstrings de `tests/ai_api/test_metrics_export.py:1-2` et `tests/ai_api/test_trace_export.py:1-3`) ; un span
-par étape (`tests/ai_api/test_tracing.py`). `KB_TRACE_CONTENT=all` est refusé en production, sans citer de valeur
+par étape (`tests/ai_api/test_tracing.py:1-2`). `KB_TRACE_CONTENT=all` est refusé en production, sans citer de valeur
 (`tests/ai_api/test_metrics_export.py:135`). Les deux docstrings disent « no network » (pour les traces : sauf une
 socket locale).
 
-**Ce qu'il ne prouve pas.** L'arrivée des mesures chez Grafana Cloud : seul le test `e2e`
-`tests/e2e/test_real_export.py` les envoie au vrai point d'arrivée, et la CI l'écarte.
+**Ce qu'il ne prouve pas.**
+
+- L'arrivée des mesures chez Grafana Cloud : seul le test `e2e` `tests/e2e/test_real_export.py` les envoie au vrai
+  point d'arrivée, et la CI l'écarte.
+- L'arrivée des traces et des journaux dans Tempo et Loki : aucun test, même `e2e`. Le test `e2e` n'exporte aucune
+  trace (`TraceExport.from_settings(None, …)`), et son commentaire dit que les traces sont essayées par Sabine sur
+  `kb serve-ai` (`tests/e2e/test_real_export.py:95-96`).
 
 ## Chaîne côté `kb`
 
@@ -184,19 +224,23 @@ socket locale).
 - Les clients de `kb digest` et de `kb trend-report` : leur demande, et la réponse qu'ils acceptent. Chaque 200 des
   tests est construit par le schéma de l'API IA, ce qui lie le client au contrat (docstrings de
   `tests/post/test_ai_api_client.py:1-2` et `tests/post/test_trend_report_client.py:1-2`).
-- Les fiches et les comptes rendus dans le coffre : leur chemin, leur Markdown, et les refus avant et pendant
-  l'écriture (fiche du jour déjà là, lien symbolique) (`tests/post/test_digest_sheets.py:414`, `:438`, `:452` ;
-  `tests/post/test_trend_report_sheets.py`, `tests/post/test_vault_files.py`).
+- Les fiches et les comptes rendus dans le coffre : leur chemin, leur Markdown, les refus avant l'écriture (fiche
+  du jour déjà là, dossier ou fiche liés ailleurs : `tests/post/test_digest_sheets.py:414`, `:438`, `:452`) et
+  pendant l'écriture (fiche écrite entre-temps, `:469` ; fiche vue par l'écriture, `:485` ; dossier lié après le
+  contrôle, `:498`) ; de même pour les comptes rendus et tout fichier du coffre
+  (`tests/post/test_trend_report_sheets.py:1-2`, `tests/post/test_vault_files.py:1-2`).
 - Le registre des comptes rendus (`KB_DATA_DIR/trend_reports.json`) : absent, lu, refusé, réécrit avec une entrée de
-  plus (`tests/post/test_trend_report_registry.py`).
-- Les commandes : `kb trend-report` écrit le premier compte rendu puis l'ajoute au registre
+  plus (`tests/post/test_trend_report_registry.py:1`).
+- Les commandes : `kb digest` écrit la fiche de chaque sujet et le dit (`tests/commands/test_digest_command.py:100`),
+  et ne demande rien quand la fiche du jour existe (`:160`) ; `kb trend-report` écrit le premier compte rendu puis l'ajoute au registre
   (`tests/commands/test_trend_report_command.py:102`), et ne nomme jamais un dépôt dans le journal (`:164`) ;
   `kb digest-watch` réveille les deux API avant `kb digest` et avant `kb trend-report`
   (`tests/commands/test_digest_watch_command.py:56`).
 
 **Ce qu'il ne prouve pas.** Dans ces tests, l'API IA est simulée : ses réponses sont construites par son schéma,
 pas rendues par l'application. `kb digest-watch` y enchaîne des étapes simulées (`check_api`,
-`tests/commands/test_digest_watch_command.py:48`). La chaîne entière n'est vue que par le bout en bout.
+`tests/commands/test_digest_watch_command.py:48-52`). La chaîne de `kb digest` et de `kb trend-report` n'est vue
+entière que par le bout en bout ; celle de `kb digest-watch`, par aucun test.
 
 ## Bout en bout
 
@@ -208,12 +252,16 @@ flowchart LR
     data --> base[("base de test SQLite")]
     ai -.->|"simulé"| replay["replay<br>fichier de pas"]
     ai -.->|"simulé"| github["GitHub simulé"]
+    ai -.->|"réglé par le test"| clock["horloge de l'API IA<br>sujets des tests"]
+    kb -.->|"simulé, kb smoke-test"| azure["identité managée<br>stockage d'échange"]
     kb -->|"écrit"| vault["coffre temporaire"]
 ```
 
 Le schéma se lit ainsi :
 
-- **Ce qui est réel.** Les deux API sont construites par `kb serve-data` et `kb serve-ai` depuis leur environnement,
+- **Ce qui est réel.** `kb digest`, `kb trend-report` et `kb smoke-test` sont lancés par `cli.main`, dans le
+  processus des tests (`tests/commands/test_live_apis.py:203`, `:292`, `:335`). Ils écrivent dans un coffre temporaire
+  (`data_and_vault_dirs`, `tests/commands/conftest.py:67-73`). Les deux API sont construites par `kb serve-data` et `kb serve-ai` depuis leur environnement,
   comme en production (`build_app_as_served`, `tests/commands/test_live_apis.py:111-118`), puis servies par uvicorn
   sur un port libre de `127.0.0.1` (`serving`, `tests/commands/test_live_apis.py:86-108`). `kb` les appelle en
   HTTP, avec ses clés : une par client, car `kb serve-ai` refuse une même clé pour deux
@@ -223,7 +271,8 @@ Le schéma se lit ainsi :
   `tests/commands/test_live_apis.py:168`). GitHub est simulé sur les dépôts de la base de test
   (`tests/commands/test_live_apis.py:180-182`). L'horloge de l'API IA est fixée, pour que la fenêtre des fiches
   tombe sur la base de test (`tests/commands/test_live_apis.py:179`), et les sujets sont ceux des tests
-  (`:164`).
+  (`:164`). Pour `kb smoke-test`, l'identité managée et le stockage d'échange sont simulés
+  (`tests/commands/test_live_apis.py:304-329`).
 
 Les trois tests :
 
@@ -233,23 +282,32 @@ Les trois tests :
 | `test_trend_report_writes_the_chosen_through_the_ai_api_and_the_data_api` (`tests/commands/test_live_apis.py:287`), le test de #462 (PR #472) | `kb trend-report` écrit le compte rendu ; sa section « Choisis par le modèle » est celle attendue, y compris le secteur que les contrôles retirent (`:297`) ; la période vient des fenêtres de la base de test (`:300`) |
 | `test_smoke_test_reaches_the_health_of_both_apis_served` (`tests/commands/test_live_apis.py:332`) | `kb smoke-test` atteint le `/health` des deux API servies ; l'identité et le stockage d'échange sont simulés (`:304-329`) |
 
-**Ce qu'il ne prouve pas.** Le vrai modèle, le vrai GitHub et l'API en ligne. Le réseau ne sort pas de la machine.
+**Ce qu'il ne prouve pas.**
+
+- Le vrai modèle, le vrai GitHub et l'API en ligne. Le réseau ne sort pas de la machine.
+- PostgreSQL : l'API de données y lit la base de test SQLite (`tests/commands/test_live_apis.py:150-159`).
+- HTTPS : les API sont appelées en `http` sur `127.0.0.1` ; hors de la machine, K-B exige `https`
+  (`core/outbound.py:42-58`).
+- `kb digest-watch` : aucun test de bout en bout ; ses tests simulent ses étapes
+  (`tests/commands/test_digest_watch_command.py:48-52`).
 
 ## Ce que les tests ne prouvent pas
 
 | Manque | Ce qui le porte |
 |---|---|
-| La qualité d'une fiche ou d'un compte rendu rédigé par un vrai modèle : fidélité, schémas valides, items oubliés, filtre de contenu | #210, encore ouverte (`gh issue view 210` → `OPEN`). Ses essais ne sont pas tous consignés : le seul essai de #210 cité dans `docs/fiches-veille.md` est l'essai 1 du 2026-10-26, sur le classement ([fiches-veille.md](fiches-veille.md), « Pourquoi une propriété par item ») |
+| La qualité d'une fiche rédigée par un vrai modèle : fidélité, schémas valides, items oubliés, filtre de contenu, temps de réponse | #210, encore ouverte (`gh issue view 210` → `OPEN`). Ses essais ne sont pas tous consignés : le seul essai de #210 cité dans `docs/fiches-veille.md` est l'essai 1 du 2026-10-26, sur le classement ([fiches-veille.md](fiches-veille.md), « Pourquoi une propriété par item ») |
+| La qualité d'un compte rendu de tendances rédigé par un vrai modèle, ses seuils, et la durée de `POST /trend-reports` face au délai de l'ingress d'ACA | #370, encore ouverte (`gh issue view 370` → `OPEN`) : « L'essai réel de bout en bout est #370 » ([tendances.md](tendances.md), ligne 596) ; les seuils (ligne 135) et la durée (lignes 614-615) y sont renvoyés |
 | Le vrai GitHub | aucun test ; la fixture de `test_github_client.py` est une vraie réponse, figée |
-| L'API IA en ligne (Azure Container Apps) : son réveil, l'identité managée, l'ingress | aucun test de la CI ; la vérification en ligne est `kb smoke-test`, la commande du job `caj-kb-smoke-test` (README, « Vérifier un job en ligne ») |
+| L'API IA en ligne (Azure Container Apps) : son réveil, l'identité managée, l'ingress, `POST /digests` et `POST /trend-reports` en ligne | aucun test des PR. `kb smoke-test`, la commande du job `caj-kb-smoke-test`, ne vérifie que le `/health` des deux API et le listage du stockage d'échange (README, « Vérifier un job en ligne ») ; le workflow de déploiement le lance après chaque tag (`.github/workflows/deploy.yml:206-209`) |
 | La chaîne sur PostgreSQL | aucun des 1550 tests ne lit PostgreSQL : ceux qui lisent une base lisent la base de test SQLite ; PostgreSQL n'est testé que dans les tests marqués `postgresql`, hors de ce périmètre |
-| L'arrivée des mesures chez Grafana Cloud | `tests/e2e/test_real_export.py`, marqué `e2e`, écarté de la CI, lancé sur le Mac ; sa preuve finit dans Grafana Explore (sa docstring) |
+| L'arrivée des mesures chez Grafana Cloud | `tests/e2e/test_real_export.py`, marqué `e2e`, écarté de la CI, lancé sur le Mac ; sa preuve finit dans Grafana Explore (`tests/e2e/test_real_export.py:7`) |
+| L'arrivée des traces et des journaux dans Tempo et Loki | aucun test, même `e2e` (`tests/e2e/test_real_export.py:95-96`) ; essayés à la main par Sabine sur `kb serve-ai` |
 | Une lecture bornée avant le premier morceau décodé | #436, ouverte : `read_bounded_body` ne borne rien avant le premier morceau (MEMORY.md, « Problèmes connus ») |
 
 ## Rejouer ce compte rendu
 
 ```sh
-git rev-parse --short HEAD          # f91bb97
+git switch --detach f91bb97         # le commit de l'exécution
 make test                           # 4061 passed, 328 deselected
 make test-ai-api                    # 1087 passed, puis 8 passed
 uv run pytest tests/post tests/commands/test_digest_command.py tests/commands/test_trend_report_command.py \
