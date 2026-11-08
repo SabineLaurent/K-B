@@ -325,6 +325,30 @@ def test_the_dashboard_keeps_the_threshold_of_each_rule():
         assert f"vector({value})" in expressions, rule["alert"]
 
 
+# A space before a colon or a semicolon, plain or no-break: the texts the jury reads in Grafana
+# have none (choice 30 of Sabine, 2026-11-08), the expressions are not texts.
+SPACE_BEFORE_PUNCTUATION = re.compile(r"[ \u00a0][:;]")
+
+
+def read_texts(value, key=None):
+    """The strings of a dashboard or of a rule, but its expressions."""
+    if key == "expr":
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [text for name, item in value.items() for text in read_texts(item, name)]
+    if isinstance(value, list):
+        return [text for item in value for text in read_texts(item)]
+    return []
+
+
+def test_no_text_has_a_space_before_a_colon_or_a_semicolon():
+    texts = read_texts(read_dashboard()) + read_texts(read_alert_rules())
+
+    assert [text for text in texts if SPACE_BEFORE_PUNCTUATION.search(text)] == []
+
+
 def test_the_three_alerts_of_the_criterion_are_there():
     assert set(read_alert_thresholds()) == {
         "KbModelInvalidOutputs",

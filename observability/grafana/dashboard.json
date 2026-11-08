@@ -1,6 +1,6 @@
 {
   "uid": "k-b-model",
-  "title": "K-B, modèle : qualité, coût, alertes",
+  "title": "K-B, modèle: qualité, coût, alertes",
   "description": "Les mesures du modèle de K-B et les seuils de ses trois alertes (observability/grafana/alert-rules.yaml du dépôt K-B).",
   "tags": [
     "k-b"
@@ -80,7 +80,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Comment lire ce tableau.** Chaque valeur couvre une fenêtre glissante : 24 heures, ou 7 jours pour le coût. L'environnement se choisit en haut : `production` ou `sandbox` (le bac à sable). Un état est écrit en toutes lettres : « NORMAL » ou « ALERTE : seuil dépassé ». Un seuil est une ligne en tirets, nommée dans la légende. Les valeurs de chaque panneau se lisent aussi en tableau : menu du panneau, **Inspect**, **Data**. Sans appel au modèle sur la fenêtre, un panneau affiche « Aucun appel sur la période ». Mode d'emploi : `documentation/monitoring_pour_docu.md` du dépôt K-B."
+        "content": "**Comment lire ce tableau.** Chaque valeur couvre une fenêtre glissante: 24 heures, ou 7 jours pour le coût. L'environnement se choisit en haut: `production` ou `sandbox` (le bac à sable). Un état est écrit en toutes lettres: « NORMAL » ou « ALERTE: seuil dépassé ». Un seuil est une ligne en tirets, nommée dans la légende. Les valeurs de chaque panneau se lisent aussi en tableau: menu du panneau, **Inspect**, **Data**. Sans appel au modèle sur la fenêtre, un panneau affiche « Aucun appel sur la période ». Mode d'emploi: `documentation/monitoring_pour_docu.md` du dépôt K-B."
       }
     },
     {
@@ -100,7 +100,7 @@
       "id": 3,
       "type": "stat",
       "title": "Sorties invalides sur 24 h",
-      "description": "Part des appels au modèle refusés après leur nouvelle tentative (llm_invalid_output). Seuil : 0 %, toute sortie invalide déclenche l'alerte KbModelInvalidOutputs.",
+      "description": "Part des appels au modèle refusés après leur nouvelle tentative (llm_invalid_output). Seuil: 0 %, toute sortie invalide déclenche l'alerte KbModelInvalidOutputs.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -183,7 +183,7 @@
                         "index": 0
                       },
                       "1": {
-                        "text": "ALERTE : seuil dépassé",
+                        "text": "ALERTE: seuil dépassé",
                         "index": 1
                       }
                     }
@@ -215,7 +215,7 @@
       "id": 4,
       "type": "stat",
       "title": "Fidélité sur 24 h",
-      "description": "Part des faits des affirmations trouvés dans l'item qu'elles citent. Seuil : 95 %, en dessous l'alerte KbModelLowFidelity se déclenche.",
+      "description": "Part des faits des affirmations trouvés dans l'item qu'elles citent. Seuil: 95 %, en dessous l'alerte KbModelLowFidelity se déclenche.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -298,7 +298,7 @@
                         "index": 0
                       },
                       "1": {
-                        "text": "ALERTE : seuil dépassé",
+                        "text": "ALERTE: seuil dépassé",
                         "index": 1
                       }
                     }
@@ -330,7 +330,7 @@
       "id": 5,
       "type": "stat",
       "title": "Coût estimé sur 7 jours",
-      "description": "Coût estimé des appels au modèle, aux prix de core/config.py. Budget : 1 USD, au-dessus l'alerte KbModelCostOverBudget se déclenche.",
+      "description": "Coût estimé des appels au modèle, aux prix de core/config.py. Budget: 1 USD, au-dessus l'alerte KbModelCostOverBudget se déclenche.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -413,7 +413,7 @@
                         "index": 0
                       },
                       "1": {
-                        "text": "ALERTE : seuil dépassé",
+                        "text": "ALERTE: seuil dépassé",
                         "index": 1
                       }
                     }
@@ -476,7 +476,7 @@
             "uid": "${datasource}"
           },
           "expr": "vector(0)",
-          "legendFormat": "Seuil : 0 %",
+          "legendFormat": "Seuil: 0 %",
           "instant": false,
           "range": true,
           "format": "time_series"
@@ -580,7 +580,7 @@
             "uid": "${datasource}"
           },
           "expr": "vector(0.95)",
-          "legendFormat": "Seuil : 95 %",
+          "legendFormat": "Seuil: 95 %",
           "instant": false,
           "range": true,
           "format": "time_series"
@@ -684,7 +684,7 @@
             "uid": "${datasource}"
           },
           "expr": "vector(1)",
-          "legendFormat": "Budget : 1 USD",
+          "legendFormat": "Budget: 1 USD",
           "instant": false,
           "range": true,
           "format": "time_series"
@@ -914,7 +914,7 @@
       "id": 12,
       "type": "stat",
       "title": "Classement sur 24 h",
-      "description": "Les items du classement : ceux qui ont reçu un sujet, ceux qu'aucun sujet ne convient, ceux que le modèle a laissés sans réponse.",
+      "description": "Les items du classement: ceux qui ont reçu un sujet, ceux qu'aucun sujet ne convient, ceux que le modèle a laissés sans réponse.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1006,7 +1006,7 @@
       "id": 13,
       "type": "stat",
       "title": "Contrôles des fiches sur 24 h",
-      "description": "Ce que les contrôles ont retiré des fiches : affirmations hors bornes ou infidèles, et items qui n'étaient plus cités.",
+      "description": "Ce que les contrôles ont retiré des fiches: affirmations hors bornes ou infidèles, et items qui n'étaient plus cités.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"

@@ -24,8 +24,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "K-B, {{ $labels.deployment_environment_name }} : sorties invalides du modèle sur 24 h, au-dessus du seuil de 0 %"
-          description: "Part des appels au modèle refusés après leur nouvelle tentative (llm_invalid_output) sur 24 h : {{ $value }} (seuil : 0). Tableau de bord : K-B, modèle."
+          summary: "K-B, {{ $labels.deployment_environment_name }}: sorties invalides du modèle sur 24 h, au-dessus du seuil de 0 %"
+          description: "Part des appels au modèle refusés après leur nouvelle tentative (llm_invalid_output) sur 24 h: {{ $value }} (seuil: 0). Tableau de bord: K-B, modèle."
       - alert: KbModelLowFidelity
         expr: |
           sum by (deployment_environment_name) (max_over_time(k_b_digest_facts_found_total[24h]))
@@ -35,8 +35,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "K-B, {{ $labels.deployment_environment_name }} : fidélité des fiches sur 24 h, sous le seuil de 95 %"
-          description: "Part des faits des affirmations trouvés dans l'item qu'elles citent, sur 24 h : {{ $value }} (seuil : 0.95). Tableau de bord : K-B, modèle."
+          summary: "K-B, {{ $labels.deployment_environment_name }}: fidélité des fiches sur 24 h, sous le seuil de 95 %"
+          description: "Part des faits des affirmations trouvés dans l'item qu'elles citent, sur 24 h: {{ $value }} (seuil: 0.95). Tableau de bord: K-B, modèle."
       - alert: KbModelCostOverBudget
         expr: |
           sum by (deployment_environment_name) (max_over_time(k_b_llm_cost_total[7d]))
@@ -45,5 +45,5 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "K-B, {{ $labels.deployment_environment_name }} : coût estimé du modèle sur 7 jours, au-dessus du budget de 1 USD"
-          description: "Coût estimé des appels au modèle sur 7 jours, aux prix de core/config.py : {{ $value }} USD (budget : 1). Tableau de bord : K-B, modèle."
+          summary: "K-B, {{ $labels.deployment_environment_name }}: coût estimé du modèle sur 7 jours, au-dessus du budget de 1 USD"
+          description: "Coût estimé des appels au modèle sur 7 jours, aux prix de core/config.py: {{ $value }} USD (budget: 1). Tableau de bord: K-B, modèle."

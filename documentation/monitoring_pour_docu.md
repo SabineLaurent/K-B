@@ -38,13 +38,13 @@ n'y a pas de série, et l'alerte reste normale.
 
 ## Lire le tableau
 
-Le tableau s'appelle « K-B, modèle : qualité, coût, alertes », dans le dossier K-B de la pile. En haut, deux listes:
+Le tableau s'appelle « K-B, modèle: qualité, coût, alertes », dans le dossier K-B de la pile. En haut, deux listes:
 **Source de données** (la source Prometheus de la pile, `grafanacloud-<pile>-prom`, choisie d'office) et
 **Environnement** (`production` par défaut, ou `sandbox`).
 
 - **Alertes**: pour chaque alerte, un panneau donne la valeur sur sa fenêtre et son état, écrit en toutes lettres,
-  « NORMAL » ou « ALERTE : seuil dépassé ». Dessous, une courbe montre la même valeur dans le temps, et son seuil en
-  ligne de tirets, nommé dans la légende (« Seuil : 95 % »).
+  « NORMAL » ou « ALERTE: seuil dépassé ». Dessous, une courbe montre la même valeur dans le temps, et son seuil en
+  ligne de tirets, nommé dans la légende (« Seuil: 95 % »).
 - **Appels et contenu des fiches**: un tableau des appels sur 24 h par étape et par issue, les jetons, les items du
   classement, et ce que les contrôles ont retiré des fiches.
 - **Durées**: la durée d'un appel au modèle (médiane et 95e centile), celle des contrôles et celle de la lecture
