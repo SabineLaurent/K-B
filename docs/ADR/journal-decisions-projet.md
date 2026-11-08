@@ -5376,7 +5376,12 @@ Plan validé par Sabine le 06/11 (I1 du plan de mise en ligne).
   plan, construisait hors de cette plage (relecture du 06/11). Sans les `.pyc`, chaque démarrage
   recompilait en mémoire environ 200 modules, que l'UID 10001 ne peut pas écrire. Une seule image : « une
   container app par service, un environnement » (18/10), chaque service lançant sa commande. Écartée :
-  une étape unique, qui garderait uv et son cache dans l'image. — PR de #200
+  une étape unique, qui garderait uv et son cache dans l'image. **Révisée le 2026-11-08** : uv 0.13.6
+  (`uv_build>=0.13.6,<0.14.0`), la même version dans l'image, dans la CI (`setup-uv`, jusque-là sans
+  version, prenait la dernière, 0.13.7, hors de la plage, et le disait dans chaque job) et sur le Mac ;
+  décision de Sabine : monter uv plutôt que fixer la CI sur 0.11 (#485). Sur le Mac, `uv self update
+  0.13.6` lancé par Sabine le 2026-11-08 vers 12:30 UTC : `uv --version` rend « uv 0.13.6 (329bf9448
+  2026-10-26 aarch64-apple-darwin) ». — PR de #200
 - **Le dossier de données de l'image est `/var/lib/knowledge_base`, où se monte le volume.** Décidé par
   Sabine le 06/11 (« ok pour la convention linux »), à la place de `/data`, prévu au plan. Pourquoi : le
   Filesystem Hierarchy Standard range sous `/var/lib` « state information pertaining to an application »
