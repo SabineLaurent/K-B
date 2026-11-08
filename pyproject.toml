@@ -76,3 +76,10 @@ source = ["k_b"]
 branch = true
 # pytest-cov 7 ne mesure plus les sous-processus : des tests lancent un processus enfant.
 patch = ["subprocess"]
+
+[tool.coverage.report]
+# Plancher contre la régression, pas une cible (décision du 2026-11-08, journal ADR) : `--cov` échoue
+# sous 96 %, en local (`make test-cov`) comme en CI (job `tests`).
+fail_under = 96
+# Le total est arrondi à `precision` décimales avant d'être comparé au seuil : sans elle, 95,5 % passerait.
+precision = 2

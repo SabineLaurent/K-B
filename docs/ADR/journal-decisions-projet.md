@@ -5107,6 +5107,8 @@ Décisions de Sabine du 2026-11-04.
     de pytest ;
   - ni `fail_under` ni job de CI : le seuil attend la décision de l'utilisatrice sur la mesure
     (« Décisions encore ouvertes »).
+    **Révisée le 2026-11-08** : 96 %, vérifié par le job `tests` de la CI (« Tests : un seuil de
+    couverture de 96 %, vérifié par la CI (#465) »).
 
   Limites assumées :
   - les tests de bout en bout (`-m e2e`, écartés de `uv run pytest` par `tests/conftest.py`) ne
@@ -6087,15 +6089,42 @@ celui du plan qu'elle a validé, ou du tri de time-knight quand il est nommé.
   `kb` relit chaque texte borné et sans caractère qui cache (Cf sauf U+200D, Co, Cn ; tri de la relecture du plan),
   et refuse une réponse qui se contredit. — PR de #369
 
+### Tests : un seuil de couverture de 96 %, vérifié par la CI (#465)
+
+- **`fail_under = 96` et `precision = 2` dans `[tool.coverage.report]` de `pyproject.toml` ; le job `tests`
+  de `ci.yml` lance `uv run pytest --cov --cov-report=term-missing:skip-covered`, la suite de
+  `make test-cov`, et échoue sous le seuil.** Décision de l'utilisatrice du 08/11, pour C12 d'E3 (demande
+  de la certif n° 85, 07/11) : un plancher contre la régression, pas une cible. Mesure du 08/11 sur
+  `2d240f7` : 98,41 % (lignes et branches) ; celle du 06/11 : 99,26 %.
+  - 96 %, au-dessus du niveau le plus haut que Google propose à ses projets, 90 % (« exemplary » [1],
+    niveau 5 de la Table 2 [2]). Écartés : 90 %, sous lequel 8 points de régression passeraient sans
+    signal ; un seuil collé à la mesure (98 %), qui ferait échouer une PR ajoutant un peu de code non
+    couvert sans régression réelle. [1] déconseille de viser plus haut pour le chiffre (« We should not
+    be obsessing on how to get from 90% code coverage to 95% ») et rappelle qu'un fort taux ne garantit
+    pas la qualité des tests ;
+  - `precision = 2` : `coverage` arrondit le total à `precision` décimales avant de le comparer au seuil
+    (`round(total, precision) < fail_under`, `coverage/results.py`, 7.17.0) ; sans elle, 95,5 % passerait ;
+  - le seuil vit dans `pyproject.toml` seul : `pytest-cov` le lit dans la configuration de `coverage`
+    quand `--cov-fail-under` est absent (`pytest_cov/plugin.py`, 7.1.0), et `make test-cov` comme la CI
+    s'en servent. Écarté : `--cov-fail-under=96` dans `ci.yml`, un second endroit à tenir ;
+  - dans le job `tests`, pas dans un job à part. Écarté : un job `coverage`, qui relancerait la suite et
+    ajouterait un sixième contrôle exigé au ruleset de `main`. Coût mesuré en local : 30 s → 41 s.
+
+  Limites assumées : les tests `e2e` et `postgresql` restent hors de la mesure, comme le 06/11 ; la
+  mesure peut baisser de 2,4 points avant le premier échec.
+
+  Sources, lues le 08/11/2026 : [1] C. Arguelles, M. Ivanković, A. Bender, « Code Coverage Best
+  Practices », Google Testing Blog, 7 août 2020,
+  https://testing.googleblog.com/2020/08/code-coverage-best-practices.html ; [2] M. Ivanković,
+  G. Petrović, R. Just, G. Fraser, « Code Coverage at Google », ESEC/FSE ’19, p. 955-963,
+  https://doi.org/10.1145/3338906.3340459. — PR de #465
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
   d'une entrée, puis en sert 100 au plus. Une lecture bornée (`LIMIT 101` dans `SELECT_HIGHLIGHTS`,
   `database/reading.py`), et `substr` pour le texte d'un clip, borneraient aussi la mémoire. #416 ne
   change aucun comportement : à décider à part, avec #418 ou plus tard (time-knight, 06/11), dans #430.
-
-- **Seuil de couverture des tests** (2026-11-06, #405) : quel `fail_under`, et la CI le vérifie-t-elle ?
-  À décider par l'utilisatrice sur la mesure du 06/11 (99,26 % : lignes 99,44 %, branches 98,36 %).
 
 - **Une limite de connexions du serveur** (2026-11-05, #161) : `limit_concurrency` d'uvicorn, écarté
   de la PR 2A parce qu'il compte les connexions muettes, à mesurer derrière l'entrée d'ACA. Laissée
