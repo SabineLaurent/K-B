@@ -658,9 +658,10 @@ Sans la variable, un test marqué échoue ; il n'est jamais sauté. La CI les la
 
 **Lancer les tests de bout en bout** (marqués `e2e`, `tests/e2e/`) : ils lancent `kb` sur les vraies sources,
 un test par source, et l'envoi réel des mesures à Grafana Cloud (`test_real_export.py`). Ni la CI ni
-`uv run pytest` ne les lancent. Un test dont la variable manque est sauté, et `-rs` en donne la raison : celui
-de sa source sans `KB_ZOTERO_DIR`, `KB_VAULT_DIR` ou `GOOGLE_APPLICATION_CREDENTIALS`, celui de l'envoi des
-mesures sans `KB_OTLP_ENDPOINT` ni `KB_OTLP_HEADERS`. Depuis un terminal sans `.env` exporté :
+`uv run pytest` ne les lancent. Les tests qui demandent une variable sont sautés sans elle, et `-rs` en donne la
+raison : celui de Zotero sans `KB_ZOTERO_DIR`, celui des clips sans `KB_VAULT_DIR`, celui de `gh_archive` sans
+`GOOGLE_APPLICATION_CREDENTIALS`, celui de l'envoi des mesures sans `KB_OTLP_ENDPOINT` ni `KB_OTLP_HEADERS`
+(avec une seule des deux, il échoue). Depuis un terminal sans `.env` exporté :
 
 ```sh
 uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html --self-contained-html
@@ -668,9 +669,9 @@ uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html
 
 `.env.e2e_test` ne porte que leurs variables (modèle : `.env.e2e_test.example`). Si l'environnement tient une
 autre variable de `.env.example`, ou la clé d'un client de l'API de données, ils s'arrêtent avant tout `kb`, en
-citant leurs noms, jamais leurs valeurs (`tests/e2e/conftest.py`). `-k <dossier de la source>` n'en lance
-qu'un (par exemple `-k cisa_kev`). Celui de
-`gh_archive` lance une requête BigQuery réelle : à ne pas relancer à la légère. Ce qu'ils écrivent, et ce qu'il
+citant leurs noms, jamais leurs valeurs (`tests/e2e/conftest.py`). `-k <source>` n'en lance qu'un, la source
+nommée comme dans l'identifiant du test (`cisa_kev`, `tldr`, `arxiv_cscr_x_csai`…). Celui de `gh_archive`
+lance une requête BigQuery réelle : à ne pas relancer à la légère. Ce qu'ils écrivent, et ce qu'il
 en reste : le [registre des traitements](docs/registre-traitements.md), « Procédure de tri », étape 10.
 
 **Lancer les tests avec leur rapport** (sans le `.env`, comme la CI) : chaque commande écrit le rapport HTML

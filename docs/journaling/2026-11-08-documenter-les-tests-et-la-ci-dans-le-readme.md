@@ -29,7 +29,7 @@ Une famille absente de la commande par défaut n'est donc plus cachée. Le table
 
 ### Une table par job, pas par workflow
 
-Le tableau de la CI (`README.md:712-722`) a une ligne par job. Chaque ligne est complète : aucune cellule vide,
+Le tableau de la CI (`README.md:713-723`) a une ligne par job. Chaque ligne est complète : aucune cellule vide,
 ce qui la garde lisible par un lecteur d'écran (RGAA, tableaux à en-têtes). Les déclencheurs des quatre
 workflows sont dans la phrase au-dessus.
 
@@ -41,7 +41,7 @@ workflows sont dans la phrase au-dessus.
 
 `.github/workflows/infra.yml:15`. Le ruleset de `main` exige 5 checks. `image-build` et `bicep-build` n'en font
 pas partie. Le README dit où ils comptent quand même : le job `check` de Deploy exige que la CI du commit tagué
-soit verte, sauf Deploy et les exécutions de Dependabot (`deploy.yml:51-53`, `README.md:746-749`).
+soit verte, sauf Deploy et les exécutions de Dependabot (`deploy.yml:51-53`, `README.md:747-750`).
 
 ### Ce que Dependabot touche, et ce qu'il ne touche pas
 
@@ -55,7 +55,7 @@ soit verte, sauf Deploy et les exécutions de Dependabot (`deploy.yml:51-53`, `R
 Ses mises à jour de sécurité sont activées dans les réglages, et elles couvrent uv depuis le 16/12/2025
 ([changelog de GitHub, « Dependabot security updates now support uv »](https://github.blog/changelog/2025-12-16-dependabot-security-updates-now-support-uv/),
 lu le 2026-11-08 par la relecture). D'où la phrase : seule une mise à jour de sécurité peut ouvrir une PR sur
-`uv.lock` (`README.md:735-736`).
+`uv.lock` (`README.md:736-737`).
 
 ## Choix faits et options écartées
 
@@ -67,7 +67,7 @@ lu le 2026-11-08 par la relecture). D'où la phrase : seule une mise à jour de 
   l'issue de XS à S.
 - **Le ruleset est décrit, pas recréé par commande** : une commande de création n'aurait pas pu être essayée
   ici.
-- **uv non fixé en CI** : le fait est écrit (`README.md:724-726`), sans correction. #485 le fixera.
+- **uv non fixé en CI** : le fait est écrit (`README.md:725-727`), sans correction. #485 le fixera.
 - **Écarté : un `docs/tests.md` séparé**, car l'issue demande le README.
 
 ## Preuve
@@ -89,10 +89,10 @@ lu le 2026-11-08 par la relecture). D'où la phrase : seule une mise à jour de 
    tests `e2e` appellent les vraies sources. La CI lance les premiers dans son propre job ; les seconds restent
    sur le Mac (`tests/conftest.py:46`, `README.md:628`).
 2. **Pourquoi `image-build` n'est-il pas requis à la fusion ?** Le ruleset ne l'exige pas. Il compte quand même
-   au déploiement, par `check` (`README.md:746-749`). Le pourquoi de ce choix n'est écrit nulle part : voir la
+   au déploiement, par `check` (`README.md:747-750`). Le pourquoi de ce choix n'est écrit nulle part : voir la
    section suivante.
 3. **Où sont les secrets de la CI ?** Cinq secrets du dépôt, lus par `deploy.yml` seul. Le README les nomme,
-   sans valeur. Aucun autre workflow ne lit de secret (`README.md:754-759`).
+   sans valeur. Aucun autre workflow ne lit de secret (`README.md:755-761`).
 4. **Qui met `uv.lock` à jour ?** Personne d'office. `audit` y cherche les vulnérabilités connues, et seule une
    mise à jour de sécurité de Dependabot peut ouvrir une PR dessus.
 
@@ -107,6 +107,6 @@ lu le 2026-11-08 par la relecture). D'où la phrase : seule une mise à jour de 
 
 ## Ce qui reste
 
-- #485 fixera uv dans la CI, le `Dockerfile` et le `pyproject.toml`, puis réécrira `README.md:724-726`.
+- #485 fixera uv dans la CI, le `Dockerfile` et le `pyproject.toml`, puis réécrira `README.md:725-727`.
 - Une étape de CI nommée pour les tests des données (C13.4) et l'évaluation des sorties du modèle en CI
   (C13.5) ont leurs propres issues.
