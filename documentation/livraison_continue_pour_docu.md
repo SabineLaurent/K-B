@@ -36,8 +36,8 @@ L'image livrée est construite par `deploy`, depuis le commit du tag. Celle d'`i
 | Docker Buildx | construit l'image `linux/amd64`, lit son label et son digest (`docker buildx imagetools inspect`) | `deploy.yml` |
 | Azure Container Registry (`crkb…`) | garde les images `k-b:<tag>` | [infra/modules/container-registry.bicep](../infra/modules/container-registry.bicep) |
 | Azure CLI (`az`) | met les apps et les jobs à l'image, lance les jobs, lit leur état | `deploy.yml` |
-| Azure Container Apps | fait tourner `ca-kb-data-api`, `ca-kb-ai-api`, et les jobs `caj-kb-migrate-database` et `caj-kb-smoke-test` | [infra/deployment.json](../infra/deployment.json) |
-| `gh` et `jq` | `check` lit les exécutions de la CI du commit | `deploy.yml` |
+| Azure Container Apps | fait tourner `ca-kb-data-api`, `ca-kb-ai-api`, et les jobs `caj-kb-migrate-database` et `caj-kb-smoke-test` | `infra/main.bicep` et ses modules; [infra/deployment.json](../infra/deployment.json) liste ceux que la livraison met à jour |
+| `gh` et `jq` | `check` lit les exécutions de la CI du commit; `deploy` lit `deployment.json` et les révisions des apps | `deploy.yml` |
 
 ### Les déclencheurs
 
@@ -48,7 +48,7 @@ L'image livrée est construite par `deploy`, depuis le commit du tag. Celle d'`i
 | « Re-run all jobs » sur une exécution de `Deploy` (ou `gh run rerun <id>`) | la même exécution, sur le même tag |
 | une PR vers `main`, un push sur `main` | la CI seule: rien ne part en ligne |
 
-Une livraison à la fois: `deploy.yml` a la file `concurrency: production`, sans `cancel-in-progress`. Celle qui
+Une livraison à la fois: `deploy.yml` a la file `concurrency: production`, avec `cancel-in-progress: false`. Celle qui
 tourne va au bout; une livraison en attente est annulée par une plus récente.
 
 ### Le job `check`
@@ -61,7 +61,7 @@ refuse arrête l'exécution, et `deploy` est `skipped`.
 |---|---|---|
 | `Refuses a ref that is not a version tag` | une référence qui n'est pas `refs/tags/vMAJEUR.MINEUR.CORRECTIF`, chaque nombre sans zéro de tête | `not a version tag vMAJOR.MINOR.PATCH: <ref>` |
 | `Refuses a tag whose commit is not on main` | un commit absent de la première lignée de `main` (`git rev-list --first-parent origin/main`): la tête d'une branche, ou un commit d'une branche déjà fusionnée. Un tag annoté est suivi jusqu'à son commit (`^{commit}`) | `<tag> is not on main: <sha>` |
-| `Refuses a commit whose CI is not finished and green` | un commit dont une exécution de la CI est en cours, rouge ou annulée, ou qui n'en a aucune. Comptent les exécutions des workflows de `.github/workflows/`, sauf `deploy.yml` (une livraison s'attendrait elle-même, et une livraison ratée bloquerait un retour en arrière). Celles que GitHub crée lui-même, comme Dependabot, ne comptent pas | la liste `<workflow>: <status> <conclusion>`, puis `the CI of <sha> is not finished and green` |
+| `Refuses a commit whose CI is not finished and green` | un commit dont une exécution de la CI est en cours, rouge ou annulée, ou qui n'en a aucune. Comptent les exécutions des workflows de `.github/workflows/`, sauf `deploy.yml` (une livraison s'attendrait elle-même, et une livraison ratée bloquerait un retour en arrière). Celles que GitHub crée lui-même, comme Dependabot, ne comptent pas | la liste `<chemin du workflow>: <status> <conclusion>`, puis `the CI of <sha> is not finished and green` |
 
 Le SHA du commit passe ensuite à `deploy`.
 
@@ -192,10 +192,11 @@ connexion de `v0.1.0` l'a utilisé (plus bas).
 | nombre de lectures et écart | `deploy.yml` | 52 et 72 lectures pour les jobs, 40 pour les révisions, 15 s | les attentes; celles d'un job suivent son `replicaTimeout` plus 180 s |
 
 Ces identifiants ne sont pas des mots de passe. Ils sont des secrets pour que GitHub les masque dans les journaux
-d'exécution, et chaque commande `az` du workflow n'affiche rien (`-o none`) ou une requête étroite (`--query`).
+d'exécution, et chaque commande `az` du workflow n'affiche rien (`-o none`), affiche une requête étroite
+(`--query`), ou passe sa sortie à `jq`.
 
-**Un job nouveau** s'ajoute à `deployment.json`. La passe 2 suivante lui donne le rôle d'`id-kb-deploy`, et le
-workflow met ensuite son image à jour.
+**Un job nouveau** se déclare d'abord dans le Bicep, puis s'ajoute à `deployment.json` (`infra/main.bicep`). La
+passe 2 suivante lui donne le rôle d'`id-kb-deploy`, et le workflow met ensuite son image à jour.
 
 **Une passe 2 après une livraison** prend pour `imageTag` la version en ligne, et non un SHA plus ancien: sinon,
 elle remettrait l'ancienne image (`infra/README.md`, « 5. Seconde passe », qui donne la commande qui lit la
@@ -217,7 +218,7 @@ session de #415, avec de faux `az` et `gh` ou un registre local
 | une CI en cours, rouge, absente, ou faite seulement de `Deploy` ou de Dependabot | `check`, étape 3 | `the CI of <sha> is not finished and green` | simulé; une CI verte est acceptée, même avec un Dependabot en cours ou rouge, et un `Deploy` rouge ne compte pas |
 | un job sans environnement qui demande un jeton à Azure | `id-kb-deploy` | `AADSTS700213: No matching federated identity record found for presented assertion subject 'repo:SabineLaurent@189640103/K-B@1383589029:ref:refs/heads/test/oidc-outside-production'` | vu le 2026-11-06, exécution 42293728980 (workflow d'essai sur une branche supprimée ensuite), job `without-environment` |
 | un job de branche qui déclare `production` | la règle de l'environnement | le job échoue avant toute étape (« Branch … is not allowed to deploy to production due to environment protection rules », relevé par la note) | vu le 2026-11-06, même exécution, job `with-environment` (0 étape) |
-| un tag supprimé puis recréé sur un autre commit | `deploy`, étape 3 | `the image of <tag> was built from another commit: <sha>` | simulé (registre local) |
+| un tag supprimé puis recréé sur un autre commit | `deploy`, étape 3 | `the image of <tag> was built from another commit: <sha>` | non essayé; la lecture du label et du « not found » l'est (registre local) |
 | un job de `run_job` qui finit en `Failed` ou `Degraded`, ou ne finit pas | `deploy`, étapes 5 et 9 | `<job>: Failed`, ou `<job>: still <état> after <n> reads, 15 s apart` | simulé |
 | une révision jamais prête, à une autre image, ou restée l'ancienne | `deploy`, étape 8 | `not ready at the image of <tag> after 40 reads, 15 s apart: <apps>` | simulé |
 
@@ -231,7 +232,8 @@ tag, `success`), est le test de chaque étape sur Azure. Les lignes ci-dessous s
 abrégé).
 
 `check`, de 00:24:09 à 00:24:17Z: les trois étapes passent. La troisième liste quatre workflows,
-`postgresql.yml`, `infra.yml`, `image.yml` et `ci.yml`, tous `completed success`. `postgresql.yml` est entré
+`.github/workflows/postgresql.yml`, `.github/workflows/infra.yml`, `.github/workflows/image.yml` et
+`.github/workflows/ci.yml`, tous `completed success`. `postgresql.yml` est entré
 depuis dans `ci.yml`, comme job `tests-postgresql` (`86a1c94`).
 
 `deploy`, de 00:24:20 à 00:28:22Z:
@@ -273,8 +275,8 @@ nouvelle livraison.
 | `Signs in to the registry` | rien | vérifier `KB_REGISTRY` et les rôles AcrPush et Reader d'`id-kb-deploy` sur le registre |
 | `Builds and pushes…` | au plus, l'image du tag dans le registre | `was built from another commit`: le tag a été recréé ailleurs, livrer un numéro nouveau. `no digest for the image of <tag>` ou `the image <digest> was not built from <sha>`: le digest ou le label ne se lisent pas comme prévu. Le commentaire de l'étape nomme un cas: un runner passé au stockage containerd pousserait un index, dont le label ne se lit plus. Toute autre erreur de lecture est affichée telle quelle |
 | `Migrates the base` | la base a pu être migrée, et `caj-kb-migrate-database` est à l'image du tag | lire le journal du job dans `log-kb` (ci-dessous), corriger, livrer une version nouvelle; ou revenir au tag précédent |
-| `Sets the apps…`, `Sets the jobs…` | les apps et les jobs déjà nommés par une ligne `<nom>: <tag>` | revenir au tag précédent, ou livrer une version corrigée |
-| `Waits for the revisions…` | toutes les apps et tous les jobs sont à l'image du tag | lire l'état des révisions et les journaux système (ci-dessous), puis revenir au tag précédent |
+| `Sets the apps…`, `Sets the jobs…` | la base est migrée et `caj-kb-migrate-database` est à l'image du tag; les apps et les jobs déjà nommés par une ligne `<nom>: <tag>` le sont aussi, et au plus celui dont la mise à jour était en cours | revenir au tag précédent, ou livrer une version corrigée |
+| `Waits for the revisions…` | la base est migrée; le modèle de chaque app et de chaque job est à l'image du tag, mais la révision prête d'une app peut encore être l'ancienne | lire l'état des révisions et les journaux système (ci-dessous), puis revenir au tag précédent |
 | `Runs the smoke test` | tout est à la nouvelle version | lire le journal du test de fumée (ci-dessous), puis revenir au tag précédent si une API ne répond pas |
 
 **L'état des révisions** d'une app (attendu: `Healthy`):
@@ -304,8 +306,8 @@ toujours, et chaque échec a sa ligne, avec son état:
   `exchange_storage_unavailable` ou `exchange_storage_failed`.
 
 Son code de sortie: 0 si les trois contrôles passent, 1 si l'un échoue, 2 si rien n'est contrôlé (une variable
-manque ou est refusée), 143 sur SIGTERM et 130 sur SIGINT (`src/k_b/commands/smoke_test_command.py`,
-`src/k_b/commands/exit_codes.py`).
+manque ou est refusée), rendus par `src/k_b/commands/smoke_test_command.py`; 143 sur SIGTERM et 130 sur SIGINT,
+rendus par `src/k_b/cli.py` pour toute commande. Leurs valeurs sont dans `src/k_b/commands/exit_codes.py`.
 
 ## Limites, lues le 2026-11-08
 
