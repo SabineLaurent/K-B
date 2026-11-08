@@ -36,20 +36,6 @@ jobs:
       # fail_under of pyproject.toml.
       - run: uv run pytest --cov --cov-report=term-missing:skip-covered
 
-  # The tests of the data, apart from the others (#481): before the base, the ETL, the schema and
-  # the common item every source is read into; before the model, the items as the AI API sends
-  # them. They also run in tests, which keeps the coverage threshold of the whole suite.
-  tests-data:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          version: "0.13.6" # the uv of the Dockerfile, in the uv_build range of pyproject.toml
-          save-cache: false # the jobs share one cache key: only tests saves it
-      - run: uv sync --locked
-      - run: uv run pytest tests/etl tests/test_schema.py tests/test_items.py tests/ai_api/test_watch_items.py
-
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -104,3 +90,19 @@ jobs:
           save-cache: false # the jobs share one cache key: only tests saves it
       - run: uv sync --locked
       - run: uv run pytest -m postgresql
+
+  # The tests of the data, apart from the others (#481): before the base, the ETL, the schema and
+  # the common item every source is read into; before the model, the items as the AI API sends
+  # them. They also run in tests, which keeps the coverage threshold of the whole suite. The
+  # postgresql test of tests/etl stays out, as everywhere but in tests-postgresql. Last in the
+  # file, so the line numbers other documents cite do not move.
+  tests-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6" # the uv of the Dockerfile, in the uv_build range of pyproject.toml
+          save-cache: false # the jobs share one cache key: only tests saves it
+      - run: uv sync --locked
+      - run: uv run pytest tests/etl tests/test_schema.py tests/test_items.py tests/ai_api/test_watch_items.py

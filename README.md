@@ -124,7 +124,7 @@ Les utilisateurs du produit sont décrits plus haut, dans « Utilisateurs ».
   pas de valeur par défaut (règle 2 de `.claude/rules/poc.md`).
 - **Données personnelles** : le modèle traite en zone de données UE ; ce que K-B garde, et
   combien de temps, est tenu par le [registre des traitements](docs/registre-traitements.md).
-- **Contrôles** : chaque PR vers `main`, branche protégée, passe les cinq jobs de la CI
+- **Contrôles** : chaque PR vers `main`, branche protégée, passe les cinq jobs requis de la CI
   (`audit`, `tests`, `lint`, `types`, `tests-postgresql`) avant d'être fusionnée.
 
 ### Budget
@@ -715,10 +715,10 @@ son SHA, sa version en commentaire.
 |---|---|---|
 | `audit` | `ci.yml` | cherche les vulnérabilités connues des versions de `uv.lock`, avec leurs empreintes (`uv export`, puis pip-audit 2.10.1) |
 | `tests` | `ci.yml` | `uv run pytest --cov --cov-report=term-missing:skip-covered` : la suite, sans `e2e` ni `postgresql`, et le seuil de couverture |
-| `tests-data` | `ci.yml` | les tests des données, à part des autres : avant la base, `tests/etl`, `tests/test_schema.py` et `tests/test_items.py` (l'item commun où chaque source est lue avant l'import) ; avant le modèle, `tests/ai_api/test_watch_items.py` (les items tels que l'API IA les envoie) ; sans `--cov`, car `tests` les lance aussi et garde le seuil |
 | `lint` | `ci.yml` | `uv run ruff check` et `uv run ruff format --check` |
 | `types` | `ci.yml` | `uv run mypy --strict` |
 | `tests-postgresql` | `ci.yml` | `uv run pytest -m postgresql`, sur un service `postgres:18.6` épinglé par son digest |
+| `tests-data` | `ci.yml` | les tests des données, à part des autres : avant la base, `tests/etl`, `tests/test_schema.py` et `tests/test_items.py` (l'item commun où chaque source est lue avant l'import) ; avant le modèle, `tests/ai_api/test_watch_items.py` (les items tels que l'API IA les envoie) ; sans le test `postgresql` de `tests/etl`, que lance `tests-postgresql`, et sans `--cov`, car `tests` les lance aussi et garde le seuil |
 | `image-build` | `image.yml` | construit l'image `linux/amd64`, puis vérifie ce que la construction reçoit, l'utilisateur non root, l'absence dans l'image des fichiers que `.dockerignore` écarte (`.git`, et des `.env*` et `*.sqlite*` plantés pour l'essai), le refus de démarrer sans `KB_DATA_DIR`, puis `kb --help` et `kb create-db` ; l'image n'est poussée nulle part |
 | `bicep-build` | `infra.yml` | compile `infra/main.bicep` par Bicep v0.48.1, vérifié par son SHA256, sans aucun droit sur Azure |
 | `check` | `deploy.yml` | refuse un tag hors de la forme `vX.Y.Z`, dont le commit n'est pas sur `main`, ou dont la CI n'est pas finie et verte |
