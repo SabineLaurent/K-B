@@ -6200,14 +6200,15 @@ Langfuse Cloud (UE), LangSmith (UE) et Honeycomb, selon les critères de « Wiki
   enregistrés). Les pages de Langfuse Cloud et de LangSmith ne décrivent que des traces OTLP : les
   métriques et les journaux de K-B n'y auraient pas de destination. Les autres outils sont écartés
   dans le document, chacun avec sa raison. Limites assumées : l'accessibilité n'est essayée que sur
-  Grafana Cloud, les autres outils sont jugés sur leurs déclarations publiées ; le texte des
-  prompts, avantage propre de Langfuse et LangSmith, n'est pas montré par Grafana Cloud tant que
-  `KB_TRACE_CONTENT` vaut `none` en ligne. Remonté à Sabine, non tranché : le DPA de Grafana Labs,
-  signé le 28/10, ne vaut selon sa réponse du 29/10 que pour les entreprises (registre, « Envoi
-  des mesures à Grafana Cloud »). **Précise** la décision 4 du 20/10 (« Squelette E1 E3 : cadrage
-  du 20/10 ») ; sa phrase « au troisième temps, seuls l'URL et le jeton changent » ne vaut pas pour
-  Application Insights (un collecteur et Entra, ou l'exportateur Azure Monitor ; des histogrammes
-  exponentiels, la temporalité delta se convertissant dans le collecteur) : remonté à Sabine.
+  Grafana Cloud, les autres outils sont jugés sur leurs déclarations publiées ; cet essai, reporté
+  par Sabine le 2026-11-08, reste à faire ; le texte des prompts, avantage propre de Langfuse et
+  LangSmith, n'est pas montré par Grafana Cloud tant que `KB_TRACE_CONTENT` vaut `none` en ligne.
+  Remonté à Sabine, non tranché : le DPA de Grafana Labs, signé le 28/10, ne vaut selon sa réponse
+  du 29/10 que pour les entreprises (registre, « Envoi des mesures à Grafana Cloud »). **Précise**
+  la décision 4 du 20/10 (« Squelette E1 E3 : cadrage du 20/10 ») ; sa phrase « au troisième temps,
+  seuls l'URL et le jeton changent » ne vaut pas pour Application Insights (un collecteur et Entra,
+  ou l'exportateur Azure Monitor ; des histogrammes exponentiels, la temporalité delta se
+  convertissant dans le collecteur) : remonté à Sabine.
   — PR de #163
 
 ## Décisions encore ouvertes

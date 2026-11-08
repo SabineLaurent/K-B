@@ -32,7 +32,7 @@ LOGS_PATH = "/v1/logs"
 (`src/k_b/ai_api/connectors/metrics_export.py:54-56`). C'est la première section du document
 (`docs/outils-de-suivi.md:20-55`). Elle rend le tri net : Langfuse Cloud et LangSmith ne décrivent
 que des traces OTLP. Les 14 instruments de métriques et les enregistrements de journal de K-B n'y
-auraient donc pas de destination (`docs/outils-de-suivi.md:117-123`).
+auraient donc pas de destination (`docs/outils-de-suivi.md:121-127`).
 
 ### 2. Un tableau où chaque case a sa source
 
@@ -51,7 +51,7 @@ prompts) « pèse moins », parce que K-B sait l'envoyer à Grafana. Or :
 ```
 
 (`infra/main.bicep:217`) : en ligne, Grafana ne montre aucun prompt. Le document l'écrit comme un fait
-(`docs/outils-de-suivi.md:155-158`), sans le juger, et time-knight te le porte.
+(`docs/outils-de-suivi.md:159-162`), sans le juger, et time-knight te le porte.
 
 ### 4. Le DPA : corriger le fait, garder l'interdiction
 
@@ -85,12 +85,14 @@ touché : les engagements, les transferts, trois entrées ADR, `poc.md:134` et l
 1. **Pourquoi pas Application Insights, puisque l'école le paie ?** Le 08/11, deux fournisseurs
    (`Microsoft.Monitor`, `Microsoft.AlertsManagement`) ne sont pas enregistrés sur l'abonnement, et tu
    es Reader. Il demande aussi un collecteur et Entra, et des histogrammes exponentiels
-   (`docs/outils-de-suivi.md:164-174`). Il revient après le rendu, pour garder traces et journaux
+   (`docs/outils-de-suivi.md:168-178`). Il revient après le rendu, pour garder traces et journaux
    chez Microsoft.
 2. **Pourquoi pas Langfuse ou LangSmith, faits pour les LLM ?** Ils ne reçoivent que des traces :
-   fidélité, coût et état des appels resteraient sans outil (`docs/outils-de-suivi.md:117-123`).
-3. **L'accessibilité est-elle prouvée ?** Pour Grafana Cloud, par ton essai, avec ses limites. Pour
-   les autres, par leurs déclarations seules, et aucun des trois outils d'IA n'en publie
+   fidélité, coût et état des appels resteraient sans outil (`docs/outils-de-suivi.md:121-127`).
+3. **L'accessibilité est-elle prouvée ?** Pas encore : ton essai sur Grafana Cloud est reporté
+   (date à fixer avec time-knight), la grille est prête (`docs/outils-de-suivi.md`, section
+   « Accessibilité »). D'ici là, chaque outil n'est jugé que sur sa déclaration ; Grafana Labs se
+   dit partiellement conforme, et aucun des trois outils d'IA n'en publie
    (`docs/outils-de-suivi.md:70`).
 4. **Le choix change-t-il si l'offre gratuite de Grafana change ?** Elle a déjà changé le 20/04/2026
    pour les alertes [9] : l'e-mail ne part qu'aux utilisateurs de l'instance, à vérifier au début de
@@ -107,8 +109,8 @@ touché : les engagements, les transferts, trois entrées ADR, `poc.md:134` et l
 
 ## Ce qui reste
 
-- Les résultats de ton essai d'accessibilité dans la grille (`docs/outils-de-suivi.md`, section
-  « Accessibilité »).
+- Ton essai d'accessibilité, reporté le 08/11 (date à fixer avec time-knight), et ses résultats
+  dans la grille (`docs/outils-de-suivi.md`, section « Accessibilité »).
 - Ton choix 17 sur le DPA, porté par time-knight ; ce qui en dépend reste tel quel d'ici là.
 - Le délai des spans écrit à tort dans `docs/fiches-veille.md:1538` : un commentaire sur #165.
 - Le tableau de bord et l'alerte : #164.
