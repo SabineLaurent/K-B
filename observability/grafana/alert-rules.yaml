@@ -11,6 +11,8 @@
 # new series, whose first increment increase() does not see (12 calls of 21 in the sandbox of
 # 2026-11-08). The windows are long, as the digests come out twice a week; without a call, there is
 # no series, and the alert stays normal.
+# The fidelity divides by the facts checked only when there is one: 0 facts would give NaN, which
+# no comparison catches, and the alert stays normal without data.
 groups:
   - name: k-b-model
     interval: 5m
@@ -29,7 +31,7 @@ groups:
       - alert: KbModelLowFidelity
         expr: |
           sum by (deployment_environment_name) (max_over_time(k_b_digest_facts_found_total[24h]))
-            / sum by (deployment_environment_name) (max_over_time(k_b_digest_facts_checked_total[24h]))
+            / (sum by (deployment_environment_name) (max_over_time(k_b_digest_facts_checked_total[24h])) > 0)
             < 0.95
         for: 0m
         labels:

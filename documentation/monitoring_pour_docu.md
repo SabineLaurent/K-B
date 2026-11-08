@@ -27,7 +27,9 @@ Trois mesures ont une alerte:
 | `KbModelCostOverBudget` | le coût estimé des appels, aux prix de `src/k_b/core/config.py` | 7 jours | au-dessus de 1 USD | budget choisi par Sabine le 2026-11-08, à revoir avec le relevé des coûts de #411 |
 
 Les fenêtres sont longues: les fiches ne sortent que deux fois par semaine. Sans appel au modèle sur la fenêtre, il
-n'y a pas de série, et l'alerte reste normale.
+n'y a pas de série, et l'alerte reste normale. De même pour la fidélité sans fait vérifié: elle n'est pas calculée
+(le tableau affiche « Aucun appel sur la période ») et l'alerte reste au repos, plutôt qu'une fidélité jamais mesurée
+affichée saine.
 
 ## Qui lit le tableau et l'alerte
 
@@ -119,13 +121,14 @@ Environ 2 min 15. Quatre scénarios, un processus de l'API IA chacun, comme apr�
 | fiches valides | 3 demandes à 65 s d'écart, 12 appels |
 | sortie invalide | 1 classement refusé deux fois: `llm_invalid_output` |
 | fidélité basse | 3 faits trouvés sur 7 |
-| coût au-dessus du budget | 10 millions de jetons d'entrée au classement: 1,20084 USD |
+| coût au-dessus du budget | au classement, les jetons d'entrée qui coûtent 1,1 fois le budget de l'alerte, sous le plafond de 10 millions qu'une réponse peut déclarer: 9 166 667 jetons, 1,10084 USD |
 
 Chaque test échoue si un envoi échoue. Sans adresse ni en-tête, il est sauté.
 
 ## Relevé des alertes du bac à sable
 
-Bac à sable lancé par Sabine le 2026-11-08, fin vers 17:45 UTC: 4 tests réussis, chaque envoi accepté.
+Bac à sable lancé par Sabine le 2026-11-08, fin vers 17:45 UTC: 4 tests réussis, chaque envoi accepté. Son scénario
+de coût envoyait alors 10 millions de jetons, soit 1,20084 USD.
 
 | Alerte | Seuil | Valeur observée dans le tableau (19:03 UTC) | Déclenchée | E-mail reçu |
 |---|---|---|---|---|
@@ -139,13 +142,19 @@ Les trois e-mails sont arrivés 12 min 26 s après le déclenchement, une fois l
 alerte. Le sujet donne l'alerte et son environnement (« [FIRING:1] KbModelCostOverBudget K-B/alert-rules.yaml
 (sandbox warning) »), le corps son résumé, sa valeur et ses étiquettes (`deployment_environment_name` vaut `sandbox`).
 
+**À réimporter**: après ce relevé, le tableau et la règle de fidélité ont changé dans le dépôt (la fidélité sans fait
+vérifié ne donne plus de donnée). La pile garde la version importée le 2026-11-08: réimporter les deux fichiers, puis
+refaire l'étape 3 d'« Installer », avant l'essai d'accessibilité.
+
 ## Limites
 
 - **Le décompte par `max_over_time`**. Chaque processus de l'API IA est une série neuve, dont `increase()` ne voit
   pas le premier incrément: dans le bac à sable, `increase` comptait 12 appels sur 21, `max_over_time` les 21. Le
-  tableau et les règles somment donc le maximum de chaque série sur la fenêtre. Un processus encore vivant au début
-  de la fenêtre y compte aussi ses appels d'avant; en ligne, un processus ne vit que quelques minutes (l'API tombe à
-  zéro réplique).
+  tableau et les règles somment donc le maximum de chaque série sur la fenêtre, depuis le début de son processus. Un
+  processus encore vivant au début de la fenêtre y compte aussi ses appels d'avant; en ligne, un processus ne vit que
+  quelques minutes (l'API tombe à zéro réplique). Deux cas faussent donc le décompte: un `kb serve-ai` local laissé
+  ouvert plus longtemps que la fenêtre (une sortie invalide de la veille garde l'alerte déclenchée), et un
+  `minReplicas` de l'API IA au-dessus de 0.
 - **Une série s'éteint 5 minutes après son processus**: aucun panneau ne lit une valeur instantanée.
 - **Une seule pile**: l'offre gratuite n'en a qu'une; le bac à sable est un environnement de la même pile.
 - **E-mail aux seules utilisatrices de la pile**: depuis le 2026-04-20, un compte gratuit nouveau n'envoie d'e-mail

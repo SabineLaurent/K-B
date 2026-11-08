@@ -1,12 +1,9 @@
-"""The sandbox of the alerts of the model: requests to the AI API on the replay, whose measures are
-sent to the real OTLP endpoint, labelled sandbox, one test per alert; skipped without the endpoint
-and the headers.
+"""The sandbox of the alerts of the model, run by make sandbox-alerts: one test per alert, its
+requests on the replay exported to the real OTLP endpoint, labelled sandbox.
 
-Run by make sandbox-alerts (documentation/monitoring_pour_docu.md), with KB_OTLP_ENDPOINT and
-KB_OTLP_HEADERS of .env.e2e_test; the environment is sandbox whatever the terminal gives. Each test
-is one process of the AI API, with its own service.instance.id, as after a wake online; its alert
-is read in Grafana Cloud."""
+Each test is one process of the AI API, as after a wake online (documentation/monitoring_pour_docu.md)."""
 
+import math
 import os
 import secrets
 import time
@@ -43,10 +40,13 @@ from k_b.ai_api.connectors.metrics_export import (
 from k_b.ai_api.connectors.trace_export import TraceExport
 from k_b.ai_api.dependencies import open_data_api_client, read_request_time
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
+from k_b.ai_api.observability.metrics import TOKENS_PER_MILLION
 from k_b.core.api_settings import DEPLOYMENT_ENVIRONMENT_VARIABLE
 from k_b.core.config import (
     DIGEST_CLIENT,
+    LLM_INPUT_USD_PER_MILLION_TOKENS,
     LLM_REPLAY_BASE_URL,
+    MAX_TOKENS_READ_PER_ANSWER,
     METRICS_EXPORT_INTERVAL_SECONDS,
 )
 from k_b.data_api.app import create_app as create_data_app
@@ -71,9 +71,15 @@ LOW_FIDELITY_STEPS = [
     written(AGENT_CLAIM, INVENTED_VERSIONS_CLAIM),
     written(),
 ]
-# Enough input tokens on the classification for one request to cost more than the budget of the
-# alert, at the prices of core/config.py.
-OVER_BUDGET_INPUT_TOKENS = 10_000_000
+# The input tokens of a classification that costs a tenth more than the budget of the alert, at the
+# price of core/config.py.
+OVER_BUDGET_SHARE = 1.1
+OVER_BUDGET_INPUT_TOKENS = math.ceil(
+    read_alert_thresholds()["KbModelCostOverBudget"]
+    * OVER_BUDGET_SHARE
+    * TOKENS_PER_MILLION
+    / LLM_INPUT_USD_PER_MILLION_TOKENS
+)
 OVER_BUDGET_STEPS = [
     classified() | {"prompt_tokens": OVER_BUDGET_INPUT_TOKENS},
     *VALID_STEPS[1:],
@@ -165,7 +171,7 @@ def run_sandbox_requests(
     record_property("statuses", ", ".join(str(status) for status in statuses))
     record_property("export_results", ", ".join(result.name for result in results))
     assert settings.environment == SANDBOX
-    assert results
+    assert len(results) >= request_count
     assert all(result is MetricExportResult.SUCCESS for result in results)
     return statuses
 
@@ -215,6 +221,9 @@ def test_a_low_fidelity_reaches_the_sandbox(
 def test_a_cost_over_the_budget_reaches_the_sandbox(
     items_database, monkeypatch, record_property, capsys
 ):
+    # A provider's answer past the cap is refused: the scenario would end in llm_invalid_output.
+    assert OVER_BUDGET_INPUT_TOKENS <= MAX_TOKENS_READ_PER_ANSWER
+
     statuses = run_sandbox_requests(
         items_database, monkeypatch, record_property, OVER_BUDGET_STEPS
     )

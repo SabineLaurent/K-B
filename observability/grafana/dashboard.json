@@ -233,7 +233,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(max_over_time(k_b_digest_facts_found_total{deployment_environment_name=\"$env\"}[24h])) / sum(max_over_time(k_b_digest_facts_checked_total{deployment_environment_name=\"$env\"}[24h]))",
+          "expr": "sum(max_over_time(k_b_digest_facts_found_total{deployment_environment_name=\"$env\"}[24h])) / (sum(max_over_time(k_b_digest_facts_checked_total{deployment_environment_name=\"$env\"}[24h])) > 0)",
           "legendFormat": "Valeur",
           "instant": true,
           "range": false,
@@ -245,7 +245,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(sum(max_over_time(k_b_digest_facts_found_total{deployment_environment_name=\"$env\"}[24h])) / sum(max_over_time(k_b_digest_facts_checked_total{deployment_environment_name=\"$env\"}[24h]))) < bool 0.95",
+          "expr": "(sum(max_over_time(k_b_digest_facts_found_total{deployment_environment_name=\"$env\"}[24h])) / (sum(max_over_time(k_b_digest_facts_checked_total{deployment_environment_name=\"$env\"}[24h])) > 0)) < bool 0.95",
           "legendFormat": "État",
           "instant": true,
           "range": false,
@@ -567,7 +567,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(max_over_time(k_b_digest_facts_found_total{deployment_environment_name=\"$env\"}[24h])) / sum(max_over_time(k_b_digest_facts_checked_total{deployment_environment_name=\"$env\"}[24h]))",
+          "expr": "sum(max_over_time(k_b_digest_facts_found_total{deployment_environment_name=\"$env\"}[24h])) / (sum(max_over_time(k_b_digest_facts_checked_total{deployment_environment_name=\"$env\"}[24h])) > 0)",
           "legendFormat": "Fidélité",
           "instant": false,
           "range": true,

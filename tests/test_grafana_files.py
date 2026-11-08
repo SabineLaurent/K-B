@@ -123,6 +123,7 @@ def name_in_grafana(name, kind, unit):
     """The names of the series of an instrument in Grafana Cloud."""
     base = name.replace(".", "_")
     if not (unit.startswith("{") and unit.endswith("}")):
+        assert unit in UNIT_WORDS, f"{name}: unit {unit!r} has no word in UNIT_WORDS"
         word = UNIT_WORDS[unit]
         if not base.endswith(f"_{word}"):
             base = f"{base}_{word}"
@@ -317,14 +318,75 @@ def test_the_dashboard_reads_the_prometheus_of_the_stack():
 
 
 def test_the_dashboard_keeps_the_threshold_of_each_rule():
-    expressions = "\n".join(read_dashboard_expressions())
+    expressions = read_dashboard_expressions()
 
     for rule in read_alert_rules():
         operator, value = RULE_THRESHOLD.search(rule["expr"]).groups()
-        assert f"{operator} bool {value}" in expressions, rule["alert"]
+        state_end = re.compile(rf"\s{re.escape(operator)} bool {re.escape(value)}$")
+        assert any(state_end.search(expression) for expression in expressions), rule[
+            "alert"
+        ]
         assert f"vector({value})" in expressions, rule["alert"]
 
 
+def write_threshold(alert, value):
+    """A threshold as the texts write it: a share in percent, the budget in USD."""
+    if alert in THRESHOLDS_IN_USD:
+        return f"{value:g} USD"
+    return f"{value * 100:g} %"
+
+
+def test_the_texts_quote_the_threshold_of_each_rule():
+    legends = [
+        target.get("legendFormat", "")
+        for panel in read_dashboard_panels()
+        for target in panel.get("targets", [])
+    ]
+
+    for rule in read_alert_rules():
+        threshold = write_threshold(
+            rule["alert"], float(RULE_THRESHOLD.search(rule["expr"]).group(2))
+        )
+        assert threshold in rule["annotations"]["summary"], rule["alert"]
+        assert any(legend.endswith(f": {threshold}") for legend in legends), rule[
+            "alert"
+        ]
+
+
+def read_rule_thresholds_written():
+    """The threshold of each rule, as the texts write it."""
+    return {
+        write_threshold(
+            rule["alert"], float(RULE_THRESHOLD.search(rule["expr"]).group(2))
+        )
+        for rule in read_alert_rules()
+    }
+
+
+def test_each_threshold_the_dashboard_writes_is_one_of_a_rule():
+    text = json.dumps(read_dashboard(), ensure_ascii=False)
+    written = set(QUOTED_THRESHOLD.findall(text))
+
+    assert written == read_rule_thresholds_written()
+
+
+def test_a_fidelity_without_a_checked_fact_gives_no_data():
+    """0 facts checked would give NaN, and NaN < 0.95 is false: a state NORMAL never measured."""
+    for expression in read_all_expressions():
+        if "k_b_digest_facts_checked_total" not in expression:
+            continue
+        assert GUARDED_FACTS_CHECKED.search(expression), expression
+
+
+# A threshold the texts of the dashboard write, in a legend or a description.
+QUOTED_THRESHOLD = re.compile(r"(?:Seuil|Budget): ([0-9.]+ (?:%|USD))")
+# The alerts whose threshold is an amount in USD; the others are shares.
+THRESHOLDS_IN_USD = {"KbModelCostOverBudget"}
+# The facts checked, divided by only when there is one: sum(...) > 0, by environment or not.
+GUARDED_FACTS_CHECKED = re.compile(
+    r"/ \(sum(?: by \(deployment_environment_name\) )?"
+    r"\(max_over_time\(k_b_digest_facts_checked_total[^)]*\)\) > 0\)"
+)
 # A space before a colon or a semicolon, plain or no-break: the texts the jury reads in Grafana
 # have none (choice 30 of Sabine, 2026-11-08), the expressions are not texts.
 SPACE_BEFORE_PUNCTUATION = re.compile(r"[ \u00a0][:;]")
