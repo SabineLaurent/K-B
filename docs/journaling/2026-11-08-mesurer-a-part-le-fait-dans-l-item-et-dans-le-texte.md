@@ -21,7 +21,7 @@ française. La cause est la consigne (#519), pas une invention.
 
 Cette PR rend la réponse lisible en production : deux comptes de plus, partout où la fidélité est
 mesurée (ligne JSON, compteurs OpenTelemetry, span, raison d'un retrait). Elle ne change ni la
-consigne, ni la borne des faits (#520), ni les seuils. Le taux de fidélité, le tableau et les
+consigne, ni la borne des faits (#519), ni les seuils. Le taux de fidélité, le tableau et les
 alertes de #164 restent tels quels.
 
 ## Le comment
@@ -129,7 +129,7 @@ même comportement.
   dépassaient la complexité permise (C901). La boucle traite les neuf compteurs optionnels de la
   même façon, et le test des compteurs prouve que le comportement n'a pas changé.
 - **Le test du jeu de référence restera-t-il vrai ?** Non, et c'est voulu : il mesure `write-1`. Le
-  nouvel enregistrement de Sabine après la nouvelle consigne (#519) changera ses nombres, et la
+  nouvel enregistrement de Sabine (#520), après la nouvelle consigne (#519), changera ses nombres, et la
   comparaison aux 54 % se fera là.
 
 ## Zones non vérifiées
@@ -144,6 +144,7 @@ même comportement.
 
 - Lire les deux compteurs dans le tableau de bord : relève de #164 (en option dans sa PR de
   fermeture).
-- La consigne sans contradiction (#519), la borne des faits courts (#520), puis le nouvel
-  enregistrement du jeu de référence et la fidélité remesurée.
+- La consigne sans contradiction et la borne des faits courts (#519), puis le nouvel
+  enregistrement du jeu de référence et la fidélité remesurée (#520), puis les seuils qu'il
+  débloque (PR de fermeture de #164, #482).
 - La même séparation pour la rédaction des tendances : hors de #518.
