@@ -1,0 +1,1307 @@
+{
+  "uid": "k-b-model",
+  "title": "K-B, modèle : qualité, coût, alertes",
+  "description": "Les mesures du modèle de K-B et les seuils de ses trois alertes (observability/grafana/alert-rules.yaml du dépôt K-B).",
+  "tags": [
+    "k-b"
+  ],
+  "timezone": "utc",
+  "editable": true,
+  "graphTooltip": 1,
+  "fiscalYearStartMonth": 0,
+  "liveNow": false,
+  "refresh": "",
+  "schemaVersion": 41,
+  "version": 1,
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "datasource",
+        "label": "Source de données",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "options": [],
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false
+      },
+      {
+        "type": "custom",
+        "name": "env",
+        "label": "Environnement",
+        "query": "production,sandbox",
+        "current": {
+          "selected": true,
+          "text": "production",
+          "value": "production"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "production",
+            "value": "production"
+          },
+          {
+            "selected": false,
+            "text": "sandbox",
+            "value": "sandbox"
+          }
+        ],
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Mode d'emploi",
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Comment lire ce tableau.** Chaque valeur couvre une fenêtre glissante : 24 heures, ou 7 jours pour le coût. L'environnement se choisit en haut : `production` ou `sandbox` (le bac à sable). Un état est écrit en toutes lettres : « NORMAL » ou « ALERTE : seuil dépassé ». Un seuil est une ligne en tirets, nommée dans la légende. Les valeurs de chaque panneau se lisent aussi en tableau : menu du panneau, **Inspect**, **Data**. Sans appel au modèle sur la fenêtre, un panneau affiche « Aucun appel sur la période ». Mode d'emploi : `documentation/monitoring_pour_docu.md` du dépôt K-B."
+      }
+    },
+    {
+      "id": 2,
+      "type": "row",
+      "title": "Alertes",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Sorties invalides sur 24 h",
+      "description": "Part des appels au modèle refusés après leur nouvelle tentative (llm_invalid_output). Seuil : 0 %, toute sortie invalide déclenche l'alerte KbModelInvalidOutputs.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\",k_b_outcome=\"llm_invalid_output\"}[24h])) or vector(0)) / sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Valeur",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "((sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\",k_b_outcome=\"llm_invalid_output\"}[24h])) or vector(0)) / sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\"}[24h]))) > bool 0",
+          "legendFormat": "État",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "noValue": "Aucun appel sur la période",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "frameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "NORMAL",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "ALERTE : seuil dépassé",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Fidélité sur 24 h",
+      "description": "Part des faits des affirmations trouvés dans l'item qu'elles citent. Seuil : 95 %, en dessous l'alerte KbModelLowFidelity se déclenche.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(max_over_time(k_b_digest_facts_found_total{deployment_environment_name=\"$env\"}[24h])) / sum(max_over_time(k_b_digest_facts_checked_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Valeur",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(sum(max_over_time(k_b_digest_facts_found_total{deployment_environment_name=\"$env\"}[24h])) / sum(max_over_time(k_b_digest_facts_checked_total{deployment_environment_name=\"$env\"}[24h]))) < bool 0.95",
+          "legendFormat": "État",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "noValue": "Aucun appel sur la période",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "frameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "NORMAL",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "ALERTE : seuil dépassé",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Coût estimé sur 7 jours",
+      "description": "Coût estimé des appels au modèle, aux prix de core/config.py. Budget : 1 USD, au-dessus l'alerte KbModelCostOverBudget se déclenche.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(max_over_time(k_b_llm_cost_total{deployment_environment_name=\"$env\"}[7d]))",
+          "legendFormat": "Valeur",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(sum(max_over_time(k_b_llm_cost_total{deployment_environment_name=\"$env\"}[7d]))) > bool 1",
+          "legendFormat": "État",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "noValue": "Aucun appel sur la période",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "frameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "NORMAL",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "ALERTE : seuil dépassé",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Sorties invalides sur 24 h glissantes",
+      "description": "La part des sorties invalides dans le temps, et son seuil en tirets.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\",k_b_outcome=\"llm_invalid_output\"}[24h])) or vector(0)) / sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Sorties invalides",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector(0)",
+          "legendFormat": "Seuil : 0 %",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "noValue": "Aucun appel sur la période",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "lineInterpolation": "linear",
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": false,
+            "fillOpacity": 0,
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisPlacement": "auto",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "frameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Fidélité sur 24 h glissantes",
+      "description": "La fidélité dans le temps, et son seuil en tirets.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(max_over_time(k_b_digest_facts_found_total{deployment_environment_name=\"$env\"}[24h])) / sum(max_over_time(k_b_digest_facts_checked_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Fidélité",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector(0.95)",
+          "legendFormat": "Seuil : 95 %",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "noValue": "Aucun appel sur la période",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "lineInterpolation": "linear",
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": false,
+            "fillOpacity": 0,
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisPlacement": "auto",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "frameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Coût estimé sur 7 jours glissants",
+      "description": "Le coût estimé dans le temps, et le budget en tirets.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(max_over_time(k_b_llm_cost_total{deployment_environment_name=\"$env\"}[7d]))",
+          "legendFormat": "Coût estimé",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector(1)",
+          "legendFormat": "Budget : 1 USD",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "noValue": "Aucun appel sur la période",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "lineInterpolation": "linear",
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": false,
+            "fillOpacity": 0,
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisPlacement": "auto",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "frameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "row",
+      "title": "Appels et contenu des fiches",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Appels sur 24 h, par étape et par issue",
+      "description": "Le nombre d'appels au modèle par étape (classify, write, select, write_trends) et par issue (ok, ou l'état llm_* de l'appel).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 19
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (k_b_stage, k_b_outcome) (max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "k_b_stage": "Étape",
+              "k_b_outcome": "Issue",
+              "Value": "Appels sur 24 h"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Aucun appel sur la période",
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Jetons sur 24 h",
+      "description": "Les jetons d'entrée et de sortie comptés par le fournisseur, raisonnement compris.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 19
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(max_over_time(gen_ai_client_inference_usage_input_tokens_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Jetons d'entrée",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(max_over_time(gen_ai_client_inference_usage_output_tokens_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Jetons de sortie",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Aucun appel sur la période",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Classement sur 24 h",
+      "description": "Les items du classement : ceux qui ont reçu un sujet, ceux qu'aucun sujet ne convient, ceux que le modèle a laissés sans réponse.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 19
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(max_over_time(k_b_digest_items_with_subject_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Items classés dans un sujet",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(max_over_time(k_b_digest_items_no_suitable_subject_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Items sans sujet qui convient",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(max_over_time(k_b_digest_items_unanswered_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Items laissés sans réponse",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Aucun appel sur la période",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Contrôles des fiches sur 24 h",
+      "description": "Ce que les contrôles ont retiré des fiches : affirmations hors bornes ou infidèles, et items qui n'étaient plus cités.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 27
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(max_over_time(k_b_digest_claims_removed_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Affirmations retirées",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(max_over_time(k_b_digest_items_removed_by_checks_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Items retirés par les contrôles",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Aucun appel sur la période",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 14,
+      "type": "row",
+      "title": "Durées",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Durée d'un appel au modèle, sur 24 h glissantes",
+      "description": "La médiane (p50, trait plein) et le 95e centile (p95, tirets) de la durée d'un appel, nouvelle tentative comprise.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 33
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (max_over_time(gen_ai_client_inference_duration_seconds_bucket{deployment_environment_name=\"$env\"}[24h])))",
+          "legendFormat": "Appel au modèle, p50",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (max_over_time(gen_ai_client_inference_duration_seconds_bucket{deployment_environment_name=\"$env\"}[24h])))",
+          "legendFormat": "Appel au modèle, p95",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "noValue": "Aucun appel sur la période",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "lineInterpolation": "linear",
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": false,
+            "fillOpacity": 0,
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisPlacement": "auto",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "frameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Contrôles et lecture des données, sur 24 h glissantes",
+      "description": "Le 95e centile de la durée des contrôles d'une sortie (trait plein) et de la lecture de la fenêtre par l'API de données (tirets).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 33
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (max_over_time(k_b_llm_check_duration_seconds_bucket{deployment_environment_name=\"$env\"}[24h])))",
+          "legendFormat": "Contrôles, p95",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (max_over_time(k_b_digest_data_fetch_duration_seconds_bucket{deployment_environment_name=\"$env\"}[24h])))",
+          "legendFormat": "Lecture des données, p95",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "noValue": "Aucun appel sur la période",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "lineInterpolation": "linear",
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": false,
+            "fillOpacity": 0,
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisPlacement": "auto",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "frameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    }
+  ]
+}

@@ -28,6 +28,7 @@ from fastapi.testclient import TestClient
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.sdk.metrics.export import MetricExportResult
 from pydantic import SecretStr
+from test_grafana_files import read_alert_thresholds
 
 from k_b.ai_api.app import create_app
 from k_b.ai_api.connectors import metrics_export
@@ -70,10 +71,8 @@ LOW_FIDELITY_STEPS = [
     written(AGENT_CLAIM, INVENTED_VERSIONS_CLAIM),
     written(),
 ]
-# The budget of the alert on the cost of the model, in USD over 7 days (choice of Sabine of the
-# 2026-11-08), and enough input tokens on the classification for one request to cost more, at the
-# prices of core/config.py.
-BUDGET_USD = 1
+# Enough input tokens on the classification for one request to cost more than the budget of the
+# alert, at the prices of core/config.py.
 OVER_BUDGET_INPUT_TOKENS = 10_000_000
 OVER_BUDGET_STEPS = [
     classified() | {"prompt_tokens": OVER_BUDGET_INPUT_TOKENS},
@@ -209,6 +208,7 @@ def test_a_low_fidelity_reaches_the_sandbox(
     facts_checked = sum(line["facts_checked"] or 0 for line in lines)
     record_property("fidelity", f"{facts_found}/{facts_checked}")
     assert (facts_found, facts_checked) == (3, 7)
+    assert facts_found / facts_checked < read_alert_thresholds()["KbModelLowFidelity"]
 
 
 @pytest.mark.e2e
@@ -222,4 +222,4 @@ def test_a_cost_over_the_budget_reaches_the_sandbox(
     assert statuses == [OK_STATUS]
     cost = sum(line["cost_estimated"] for line in read_metric_lines(capsys))
     record_property("cost_usd", f"{cost:.6f}")
-    assert cost > BUDGET_USD
+    assert cost > read_alert_thresholds()["KbModelCostOverBudget"]

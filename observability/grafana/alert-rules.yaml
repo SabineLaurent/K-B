@@ -1,0 +1,49 @@
+# The alerts of the model of K-B, in the format of Prometheus rules, imported into Grafana Cloud by
+# "Import to Grafana-managed rules" (documentation/monitoring_pour_docu.md). One alert per
+# environment: each sum is by deployment_environment_name, sandbox or production.
+#
+# The thresholds: the reading grid of Sabine of 2026-10-15 (docs/ADR/journal-decisions-projet.md,
+# "100 % of valid outputs after a new attempt, at least 95 % of fidelity") and her budget of
+# 2026-11-08 (1 USD over 7 days). The threshold of an alert is the number its expression ends with:
+# the dashboard and the sandbox read it there (tests/test_grafana_files.py).
+#
+# Each total is the sum over the series of their max_over_time: each process of the AI API is a
+# new series, whose first increment increase() does not see (12 calls of 21 in the sandbox of
+# 2026-11-08). The windows are long, as the digests come out twice a week; without a call, there is
+# no series, and the alert stays normal.
+groups:
+  - name: k-b-model
+    interval: 5m
+    rules:
+      - alert: KbModelInvalidOutputs
+        expr: |
+          sum by (deployment_environment_name) (max_over_time(k_b_llm_calls_total{k_b_outcome="llm_invalid_output"}[24h]))
+            / sum by (deployment_environment_name) (max_over_time(k_b_llm_calls_total[24h]))
+            > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "K-B, {{ $labels.deployment_environment_name }} : sorties invalides du modèle sur 24 h, au-dessus du seuil de 0 %"
+          description: "Part des appels au modèle refusés après leur nouvelle tentative (llm_invalid_output) sur 24 h : {{ $value }} (seuil : 0). Tableau de bord : K-B, modèle."
+      - alert: KbModelLowFidelity
+        expr: |
+          sum by (deployment_environment_name) (max_over_time(k_b_digest_facts_found_total[24h]))
+            / sum by (deployment_environment_name) (max_over_time(k_b_digest_facts_checked_total[24h]))
+            < 0.95
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "K-B, {{ $labels.deployment_environment_name }} : fidélité des fiches sur 24 h, sous le seuil de 95 %"
+          description: "Part des faits des affirmations trouvés dans l'item qu'elles citent, sur 24 h : {{ $value }} (seuil : 0.95). Tableau de bord : K-B, modèle."
+      - alert: KbModelCostOverBudget
+        expr: |
+          sum by (deployment_environment_name) (max_over_time(k_b_llm_cost_total[7d]))
+            > 1
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "K-B, {{ $labels.deployment_environment_name }} : coût estimé du modèle sur 7 jours, au-dessus du budget de 1 USD"
+          description: "Coût estimé des appels au modèle sur 7 jours, aux prix de core/config.py : {{ $value }} USD (budget : 1). Tableau de bord : K-B, modèle."
