@@ -8,7 +8,8 @@
 - **Série** : suit [Tester la chaîne des fiches sur les deux API servies pour de vrai](2026-11-08-tester-la-chaine-des-fiches-sur-les-api-servies.md)
   (#26), dont ce test reprend le montage.
 
-Note qui couvre l'unique commit de la branche, `729bbf4`.
+Note qui couvre le commit `729bbf4` (le test et la ligne de `docs/tendances.md`) ; l'autre commit de la branche
+est cette note.
 
 ## Le pourquoi
 
