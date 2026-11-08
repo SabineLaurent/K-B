@@ -723,16 +723,17 @@ son SHA, sa version en commentaire.
 | `check` | `deploy.yml` | refuse un tag hors de la forme `vX.Y.Z`, dont le commit n'est pas sur `main`, ou dont la CI n'est pas finie et verte |
 | `deploy` | `deploy.yml` | met le tag en ligne : [infra/README.md](infra/README.md), « Déployer une version » |
 
-Les jobs de `ci.yml` installent uv par `astral-sh/setup-uv`, sans version fixée : faute de version dans un
-`uv.toml` ou le `pyproject.toml`, il prend la dernière (0.13.7 le 2026-11-08, exécution 42473488447), alors que
-le `Dockerfile` fixe uv 0.11.33.
+Les jobs de `ci.yml` installent uv par `astral-sh/setup-uv`, à la version fixée dans chacun des cinq
+(`version: "0.13.6"`) : la même que le `Dockerfile`, dans la plage `uv_build` de `build-system.requires` du
+`pyproject.toml`. Sur le Mac, la même version s'installe par `uv self update 0.13.6`.
 
 **Dependabot** (`.github/dependabot.yml`) ouvre chaque semaine les PR de mise à jour des actions des workflows
 (leur SHA et leur commentaire de version) et des images de base du `Dockerfile` (leur digest et leur tag). Une
 version nouvelle attend 7 jours avant sa PR, sauf une mise à jour de sécurité ; ghcr.io ne donne pas la date
 d'une version, et l'attente ne s'applique pas à `astral-sh/uv` : sa date se vérifie à la main avant la fusion.
 Pour `python` et `astral-sh/uv`, il ne propose que les correctifs et les digests, jamais une version mineure ou
-majeure. Ses mises à jour de version ne touchent ni l'image `postgres` du job `tests-postgresql`, à changer à
+majeure. Sa PR d'`astral-sh/uv` ne change que le `Dockerfile` : la `version:` des cinq jobs de `ci.yml` se change
+à la main, dans la même PR. Ses mises à jour de version ne touchent ni l'image `postgres` du job `tests-postgresql`, à changer à
 la main, ni `uv.lock`. Les alertes et les mises à jour de sécurité de Dependabot sont activées dans les
 réglages du dépôt, et le graphe des dépendances y voit les paquets Python (96 le 2026-11-08) : seule une mise
 à jour de sécurité peut ouvrir une PR sur `uv.lock`. Aucune PR de sécurité n'a encore été ouverte.
