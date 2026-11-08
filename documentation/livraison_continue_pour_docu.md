@@ -37,7 +37,7 @@ L'image livrée est construite par `deploy`, depuis le commit du tag. Celle d'`i
 | Azure Container Registry (`crkb…`) | garde les images `k-b:<tag>` | [infra/modules/container-registry.bicep](../infra/modules/container-registry.bicep) |
 | Azure CLI (`az`) | met les apps et les jobs à l'image, lance les jobs, lit leur état | `deploy.yml` |
 | Azure Container Apps | fait tourner `ca-kb-data-api`, `ca-kb-ai-api`, et les jobs `caj-kb-migrate-database` et `caj-kb-smoke-test` | `infra/main.bicep` et ses modules; [infra/deployment.json](../infra/deployment.json) liste ceux que la livraison met à jour |
-| `gh` et `jq` | `check` lit les exécutions de la CI du commit; `deploy` lit `deployment.json` et les révisions des apps | `deploy.yml` |
+| `gh` et `jq` | `check` lit les exécutions de la CI du commit; `deploy` lit `deployment.json`, et l'état des apps et de leur dernière révision | `deploy.yml` |
 
 ### Les déclencheurs
 
@@ -275,7 +275,7 @@ nouvelle livraison.
 | `Signs in to the registry` | rien | vérifier `KB_REGISTRY` et les rôles AcrPush et Reader d'`id-kb-deploy` sur le registre |
 | `Builds and pushes…` | au plus, l'image du tag dans le registre | `was built from another commit`: le tag a été recréé ailleurs, livrer un numéro nouveau. `no digest for the image of <tag>` ou `the image <digest> was not built from <sha>`: le digest ou le label ne se lisent pas comme prévu. Le commentaire de l'étape nomme un cas: un runner passé au stockage containerd pousserait un index, dont le label ne se lit plus. Toute autre erreur de lecture est affichée telle quelle |
 | `Migrates the base` | la base a pu être migrée, et `caj-kb-migrate-database` est à l'image du tag | lire le journal du job dans `log-kb` (ci-dessous), corriger, livrer une version nouvelle; ou revenir au tag précédent |
-| `Sets the apps…`, `Sets the jobs…` | la base est migrée et `caj-kb-migrate-database` est à l'image du tag; les apps et les jobs déjà nommés par une ligne `<nom>: <tag>` le sont aussi, et au plus celui dont la mise à jour était en cours | revenir au tag précédent, ou livrer une version corrigée |
+| `Sets the apps…`, `Sets the jobs…` | la base est migrée et `caj-kb-migrate-database` est à l'image du tag; les apps et les jobs déjà nommés par une ligne `<nom>: <tag> (sha256:…)` le sont aussi, et au plus celui dont la mise à jour était en cours | revenir au tag précédent, ou livrer une version corrigée |
 | `Waits for the revisions…` | la base est migrée; le modèle de chaque app et de chaque job est à l'image du tag, mais la révision prête d'une app peut encore être l'ancienne | lire l'état des révisions et les journaux système (ci-dessous), puis revenir au tag précédent |
 | `Runs the smoke test` | tout est à la nouvelle version | lire le journal du test de fumée (ci-dessous), puis revenir au tag précédent si une API ne répond pas |
 
@@ -307,7 +307,8 @@ toujours, et chaque échec a sa ligne, avec son état:
 
 Son code de sortie: 0 si les trois contrôles passent, 1 si l'un échoue, 2 si rien n'est contrôlé (une variable
 manque ou est refusée), rendus par `src/k_b/commands/smoke_test_command.py`; 143 sur SIGTERM et 130 sur SIGINT,
-rendus par `src/k_b/cli.py` pour toute commande. Leurs valeurs sont dans `src/k_b/commands/exit_codes.py`.
+rendus par `src/k_b/cli.py`, `kb smoke-test` étant dans `COMMANDS_STOPPED_BY_SIGTERM` (`src/k_b/commands/sigterm.py`).
+Leurs valeurs sont dans `src/k_b/commands/exit_codes.py`.
 
 ## Limites, lues le 2026-11-08
 
