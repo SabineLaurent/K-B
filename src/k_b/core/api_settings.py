@@ -38,9 +38,14 @@ def find_port_refusal(variable: str, port: str) -> str | None:
     )
 
 
+def is_sandbox(environ: Mapping[str, str]) -> bool:
+    """Whether KB_DEPLOYMENT_ENVIRONMENT is sandbox, written as is."""
+    return environ.get(DEPLOYMENT_ENVIRONMENT_VARIABLE) == "sandbox"
+
+
 def read_openapi_url(environ: Mapping[str, str]) -> str | None:
     """The path of the OpenAPI in the sandbox; None serves neither it nor /docs, whatever else the
     variable holds, or nothing: a value forgotten shows nothing (decision of Sabine of 2026-11-04)."""
-    if environ.get(DEPLOYMENT_ENVIRONMENT_VARIABLE) == "sandbox":
+    if is_sandbox(environ):
         return OPENAPI_PATH
     return None

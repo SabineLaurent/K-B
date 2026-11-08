@@ -219,12 +219,12 @@ def test_an_api_that_fails_its_health_fails_the_smoke_test_and_the_other_checks_
         (
             "KB_DATA_API_URL",
             "http://ca-kb-data-api.internal.test.example",
-            "KB_DATA_API_URL: http only to 127.0.0.1 or localhost, or in the sandbox",
+            "KB_DATA_API_URL: http only to 127.0.0.1 or localhost, or with KB_DEPLOYMENT_ENVIRONMENT=sandbox",
         ),
         (
             "KB_AI_API_URL",
             "http://ca-kb-ai-api.internal.test.example",
-            "KB_AI_API_URL: http only to 127.0.0.1 or localhost, or in the sandbox",
+            "KB_AI_API_URL: http only to 127.0.0.1 or localhost, or with KB_DEPLOYMENT_ENVIRONMENT=sandbox",
         ),
     ],
 )

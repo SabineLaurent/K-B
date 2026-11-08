@@ -17,7 +17,7 @@ from k_b.core.outbound import (
 )
 
 VARIABLE = "KB_TEST_URL"
-HTTP_REFUSAL = f"{VARIABLE}: http only to 127.0.0.1 or localhost, or in the sandbox"
+HTTP_REFUSAL = f"{VARIABLE}: http only to 127.0.0.1 or localhost, or with KB_DEPLOYMENT_ENVIRONMENT=sandbox"
 
 
 @pytest.mark.parametrize(

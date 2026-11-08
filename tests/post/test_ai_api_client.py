@@ -176,7 +176,7 @@ def test_the_settings_take_the_url_of_kb_ai_api_url():
                 "KB_AI_API_KEY_KB_DIGEST": TEST_API_KEY,
                 "KB_AI_API_URL": "http://api-ia:8001",
             },
-            "KB_AI_API_URL: http only to 127.0.0.1 or localhost, or in the sandbox",
+            "KB_AI_API_URL: http only to 127.0.0.1 or localhost, or with KB_DEPLOYMENT_ENVIRONMENT=sandbox",
         ),
         (
             {

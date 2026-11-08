@@ -8,7 +8,8 @@ from urllib.parse import urlsplit
 
 import httpx2
 
-from k_b.core.api_settings import DEPLOYMENT_ENVIRONMENT_VARIABLE
+from k_b.core.api_settings import DEPLOYMENT_ENVIRONMENT_VARIABLE, is_sandbox
+from k_b.core.config import LOCAL_HOSTS
 
 # A host name in lowercase, as urlsplit gives it: neither an IPv6 address nor a character an HTTP
 # client would refuse later.
@@ -38,18 +39,15 @@ def find_url_refusal(variable: str, url: str, schemes: tuple[str, ...]) -> str |
     return None
 
 
-# The hosts of the machine: an internal API of K-B reached there may be in http.
-LOCAL_HOSTS = ("127.0.0.1", "localhost")
 INTERNAL_API_SCHEMES = ("http", "https")
-INTERNAL_API_HTTP_REFUSAL = "http only to 127.0.0.1 or localhost, or in the sandbox"
+INTERNAL_API_HTTP_REFUSAL = f"http only to 127.0.0.1 or localhost, or with {DEPLOYMENT_ENVIRONMENT_VARIABLE}=sandbox"
 
 
 def find_internal_api_url_refusal(
     variable: str, url: str, environ: Mapping[str, str]
 ) -> str | None:
-    """Why the URL of an internal API of K-B (the data API, the AI API) is refused, or None: http
-    to the machine, or anywhere in the sandbox (a compose network, #419); https everywhere else, so
-    that a key never goes in clear off the machine (OWASP API8 and API10, #473)."""
+    """Why the URL of an internal API of K-B is refused, or None: https, or http to the machine or in
+    the sandbox."""
     refusal = find_url_refusal(variable, url, INTERNAL_API_SCHEMES)
     if refusal is not None:
         return refusal
@@ -57,7 +55,7 @@ def find_internal_api_url_refusal(
     if (
         parts.scheme == "http"
         and parts.hostname not in LOCAL_HOSTS
-        and environ.get(DEPLOYMENT_ENVIRONMENT_VARIABLE) != "sandbox"
+        and not is_sandbox(environ)
     ):
         return f"{variable}: {INTERNAL_API_HTTP_REFUSAL}"
     return None

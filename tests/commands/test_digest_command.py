@@ -267,7 +267,7 @@ def test_digest_with_the_ai_api_in_http_outside_the_machine_asks_nothing_and_exi
     assert cli.main(["digest"]) == cli.ExitCode.NOT_STARTED
     assert requests == []
     assert (
-        "ERROR k_b.cli: KB_AI_API_URL: http only to 127.0.0.1 or localhost, or in the sandbox"
+        "ERROR k_b.cli: KB_AI_API_URL: http only to 127.0.0.1 or localhost, or with KB_DEPLOYMENT_ENVIRONMENT=sandbox"
         in capsys.readouterr().err
     )
 

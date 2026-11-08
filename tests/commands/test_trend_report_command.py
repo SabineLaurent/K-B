@@ -303,7 +303,7 @@ def test_a_file_in_place_of_a_folder_asks_nothing_and_exits_1(
         (
             "KB_AI_API_URL",
             "http://api-ia:8001",
-            "KB_AI_API_URL: http only to 127.0.0.1 or localhost, or in the sandbox",
+            "KB_AI_API_URL: http only to 127.0.0.1 or localhost, or with KB_DEPLOYMENT_ENVIRONMENT=sandbox",
         ),
     ],
 )

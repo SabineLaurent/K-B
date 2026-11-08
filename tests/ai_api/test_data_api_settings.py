@@ -55,7 +55,7 @@ def test_an_http_url_outside_the_machine_and_the_sandbox_is_refused():
 
     assert (
         refusal
-        == "KB_DATA_API_URL: http only to 127.0.0.1 or localhost, or in the sandbox"
+        == "KB_DATA_API_URL: http only to 127.0.0.1 or localhost, or with KB_DEPLOYMENT_ENVIRONMENT=sandbox"
     )
 
 
