@@ -5310,6 +5310,9 @@ l'API IA lit déjà l'API de données dans sa borne (`MAX_DATA_API_BODY_BYTES`) 
     la version du Mac, disponible sur le serveur flexible d'Azure ; K-B demande 17 ou plus (`IS JSON`
     et `pg_input_is_valid` depuis 16, `pg_database.datlocale`, que lit `kb create-db`, et le
     fournisseur builtin depuis 17 ; revue de code, tranché par time-knight le 06/11).
+    **Révisée le 2026-11-08** : ils tournent dans le job `tests-postgresql` de `ci.yml` (#464) ; le
+    workflow à part évitait que deux PR ouvertes en même temps touchent le même fichier, ce qui ne
+    tient plus.
 
   Ce qui reste ouvert après cette PR : la lecture sur PostgreSQL (`read_items`, l'API de données,
   le délai des requêtes, le verrou en tête des purges : #418) ; le compose de préproduction (#419) ;
