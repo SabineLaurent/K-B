@@ -575,7 +575,7 @@ les spans et leurs attributs restent sans nom de dépôt ni `repository_id`. Dé
 
 ## Ce qui le prouve
 
-Les tests que portent #366 à #369 :
+Les tests que portent #366 à #369, et #462 pour la chaîne :
 
 | Défense | Cas de test |
 |---|---|
@@ -590,6 +590,7 @@ Les tests que portent #366 à #369 :
 | Rédaction | README piégé absent des messages `system` ; README qui vise un autre dépôt ; commande, lien, accent grave refusés ; fait introuvable → texte retiré ; rédaction en échec → ses seuls textes retirés |
 | Traces et journaux | spans sans nom de dépôt ni `repository_id` ; avec `KB_TRACE_CONTENT=none`, aucun enregistrement de contenu ; avec `all`, le contenu n'est que dans le corps de l'enregistrement |
 | Couches | `tests/architecture/` : `AI_API_LAYERS`, `TRACED_FUNCTIONS`, environnement lu par `commands/environment.py` seul |
+| Chaîne | `kb trend-report` par les deux API servies par uvicorn sur `127.0.0.1`, la base de test, le rejeu du modèle et un GitHub simulé : les choisis, leurs faits et leurs textes dans le fichier du coffre (`tests/commands/test_live_apis.py`) |
 
 Aucun test n'appelle GitHub ni le modèle : réponses enregistrées, fixture tirée d'une vraie réponse.
 L'essai réel de bout en bout est #370.
