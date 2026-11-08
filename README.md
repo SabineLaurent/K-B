@@ -808,6 +808,7 @@ leur propre licence (lues à la source le 2026-11-06) :
 | `tests/fixtures/github_advisories_extract.json` | [GitHub Advisory Database](https://github.com/github/advisory-database) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.fr) |
 | `tests/fixtures/arxiv_extract.xml` | métadonnées de l'API arXiv ([conditions](https://info.arxiv.org/help/api/tou.html)) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/deed.fr) |
 | `tests/fixtures/cisa_kev_extract.csv` | catalogue KEV de la CISA ([`cisagov/kev-data`](https://github.com/cisagov/kev-data)) | CC0 1.0 |
+| `tests/fixtures/digests_reference.json` | les réponses d'un modèle réel à `POST /digests` (#479) sur les items des deux fichiers ci-dessus, dont elles citent des passages | CC0 1.0 (celle des items cités) |
 | `tests/fixtures/zotero_extract.sql` | 15 tables du schéma de Zotero (`resource/schema/userdata.sql` du dépôt [`zotero/zotero`](https://github.com/zotero/zotero)), © 2009 Center for History and New Media, George Mason University ; les valeurs sont inventées | [AGPL v3 ou plus](https://www.gnu.org/licenses/agpl-3.0.html) |
 | `tests/fixtures/github_*_extract.json`, `tests/fixtures/gh_archive_extract.json` | métadonnées publiques de dépôts GitHub (noms, descriptions, notes de version), par l'API de GitHub et GH Archive | celle de chaque dépôt ; de courts extraits, gardés pour les tests |
 
