@@ -355,7 +355,7 @@ def build_writing_message(
 ) -> WritingMessage:
     """The facts of the code that a text may say, the subjects of the repository alone, then its
     description and its README cleaned; neither its owner, nor a star, a date or a caution, which
-    the code writes itself (minimisation, decision of Sabine of 2026-11-08)."""
+    the code writes itself (minimisation)."""
     candidate = chosen.candidate
     facts = candidate.facts
     readme_state, readme_text, readme_cut = clean_readme(readme)
@@ -482,7 +482,9 @@ def check_texts(
         reason = find_removal_reason(name, written, found, sources[name])
         if reason is not None:
             reasons[name] = reason
-        kept[name] = None if reason is not None or is_empty(written.text) else written.text
+        kept[name] = (
+            None if reason is not None or is_empty(written.text) else written.text
+        )
     return CheckedTexts(TrendTexts(**kept), reasons, facts_checked, facts_found)
 
 

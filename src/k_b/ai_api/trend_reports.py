@@ -365,8 +365,8 @@ def read_readmes(
 ) -> ReadmeReading:
     """The README of each repository chosen, one request after the other in the order of the
     model, all before any writing; none once the deadline leaves no time for a call to the model,
-    nor after a failure of GitHub, which no README follows to the model (decision of Sabine of
-    2026-11-08). A span of counts and states, never a repository."""
+    nor after a failure of GitHub, which no README follows to the model. A span of counts and
+    states, never a repository."""
     readmes: list[Readme | MissingReadme | None] = []
     failure: GithubState | None = None
     skipped = 0
