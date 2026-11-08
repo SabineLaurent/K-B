@@ -1075,13 +1075,15 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
 Relue point par point le 2026-11-08 (#454), contre `infra/` et l'état en ligne ; une mesure qui ne
 dépend que du code garde son état et sa preuve.
 
-- **Durcissement répétable** : tenue. L'image (`Dockerfile`, deux étapes, utilisateur 10001, #200),
+- **Durcissement répétable** : tenue. L'image (`Dockerfile`, utilisateur 10001, #200),
   l'environnement, les apps et les jobs d'ACA (`infra/`, Bicep) sont versionnés et relus en PR comme
   le code ; la CI construit `infra/main.bicep` sur toute PR qui touche `infra/`
   (`.github/workflows/infra.yml:27`) ; une version taguée part en ligne par
   `.github/workflows/deploy.yml` (#415). Un réglage refusé empêche le démarrage
-  (`test_serve_ai_exits_2_and_names_the_variable_refused`). Limite : le socle s'applique à la main,
-  en deux passes (`infra/README.md`).
+  (`test_serve_ai_exits_2_and_names_the_variable_refused`). Limites : le socle s'applique à la main,
+  en deux passes (`infra/README.md`) ; `deploy.yml` change l'image des apps et des jobs par
+  `az containerapp update` et `az containerapp job update`, hors du Bicep (`deploy.yml:168`,
+  `:174`) ; la construction du Bicep n'est pas un contrôle exigé de `main` (`infra.yml:15`).
 - **Revue périodique des configurations de toute la pile** : non tenue, en partie. Chaque changement
   de `infra/` est relu en PR ; la configuration en ligne n'a été relue contre ces fichiers qu'une
   fois, à la main, le 2026-11-08 (#454), pour l'entrée, le chiffrement entre apps et les URL
@@ -1091,8 +1093,9 @@ dépend que du code garde son état et sa preuve.
 - **Évaluation automatisée et continue dans tous les environnements** : non tenue, en partie. La CI
   lance `pip-audit`, les règles de sécurité de ruff, les tests et leur seuil de couverture
   (`.github/workflows/ci.yml`), et la construction du Bicep (`infra.yml`). Après chaque
-  déploiement, `deploy.yml` lance `caj-kb-smoke-test` (l. 206-209), qui demande `GET /health` aux
-  deux API (`src/k_b/jobs/api_health.py`) : il vérifie qu'elles répondent, pas leur sécurité.
+  déploiement, `deploy.yml` lance `caj-kb-smoke-test` (l. 204-209), qui demande `GET /health` aux
+  deux API (`src/k_b/jobs/api_health.py`) et atteint le stockage d'échange par l'identité du job :
+  il vérifie que la version déployée répond, pas sa sécurité.
   **Pour la tenir** : un scan de l'image dans la CI (l'outil, une dépendance de la CI, est à
   choisir), et des essais scriptés des points de cette section, lancés par la CI après chaque
   déploiement, avec une clé de test à prévoir. M.
@@ -1118,10 +1121,17 @@ dépend que du code garde son état et sa preuve.
     az containerapp env show -n <environnement> -g <groupe> \
       --query "{encryption: properties.peerTrafficConfiguration.encryption.enabled, mtls: properties.peerAuthentication.mtls.enabled}"
     az containerapp env http-route-config list -n <environnement> -g <groupe>
+    az containerapp show -n <app> -g <groupe> \
+      --query "properties.template.containers[0].env[?name=='KB_DATA_API_URL' || name=='KB_DATA_API_ALLOWED_HOSTS'].{name:name, value:value}"
     ```
 
     `external` false, `allowInsecure` false, `transport` Http pour les deux apps ; `encryption`
-    true, `mtls` false ; aucune route (`[]`).
+    true, `mtls` false ; aucune route (`[]`) ; sur `ca-kb-ai-api`, `KB_DATA_API_URL` =
+    `https://ca-kb-data-api.internal.<defaultDomain>`, sur `ca-kb-data-api`,
+    `KB_DATA_API_ALLOWED_HOSTS` = `ca-kb-data-api.internal.<defaultDomain>`.
+  - Limite : le `https` vers l'API de données vient du réglage du déploiement, que le code ne force
+    pas : il accepte `http` partout (`DATA_API_SCHEMES`, `ai_api/connectors/data_api_settings.py:18`),
+    pour la machine et le réseau compose.
   - Non essayé, l'entrée n'étant joignable que de l'environnement : la version de TLS, « always use
     TLS 1.2 or 1.3 » selon la documentation de l'entrée (lue le 2026-11-08). Côté client, K-B ne
     règle pas la version de TLS : les bibliothèques gardent leur contexte par défaut, TLS 1.2 au
@@ -1146,7 +1156,8 @@ dépend que du code garde son état et sa preuve.
   **Pour lever l'écart**, s'il est levé : 415 pour un corps qui n'est pas `application/json`,
   avant sa lecture, et un test. S.
 - **Traitement uniforme dans la chaîne de serveurs** : non tenue, non essayée. En ligne, deux
-  serveurs : l'entrée d'ACA (Envoy), puis uvicorn 0.54 et h11 0.16 (`transport: 'http'`,
+  serveurs : l'entrée d'ACA (Envoy), puis uvicorn 0.54 et h11 0.16 (`uv.lock` de `v0.1.0`, l'image
+  en ligne) (`transport: 'http'`,
   `infra/modules/api-container-app.bicep:77`). Aucune requête ambiguë, comme `Content-Length` et
   `Transfer-Encoding` ensemble, n'a été envoyée. Seuls les apps et les jobs de l'environnement
   atteignent l'entrée interne.
