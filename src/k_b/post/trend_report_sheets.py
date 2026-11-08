@@ -17,6 +17,7 @@ from k_b.core.config import (
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
     GH_ARCHIVE_TOP_SIZE,
     GH_ARCHIVE_WINDOW_DAYS,
+    GITHUB_MAX_FORBIDDEN_PER_REPORT,
     MAX_TOPICS_FOR_SELECTION,
     TREND_DURABLE_LOOKBACK_WINDOWS,
     TREND_DURABLE_MIN_WINDOWS,
@@ -77,7 +78,7 @@ GITHUB_FAILURE_REASONS: dict[GithubFailure, str] = {
     "github_timeout": "GitHub n'a pas répondu à temps",
     "github_rate_limited": "le quota de GitHub est atteint",
     "github_unauthorized": "GitHub a refusé le jeton",
-    "github_forbidden": "GitHub a refusé 3 lectures",
+    "github_forbidden": f"GitHub a refusé {GITHUB_MAX_FORBIDDEN_PER_REPORT} lectures",
     "github_invalid_response": "la réponse de GitHub n'a pas passé les contrôles",
 }
 WRITING_FAILURE_REASONS: dict[WritingFailure, str] = {
