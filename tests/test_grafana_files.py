@@ -36,6 +36,8 @@ NAMES_SEEN_IN_GRAFANA = {
     "k_b_digest_data_fetch_duration_seconds_count",
     "k_b_digest_data_fetch_duration_seconds_sum",
     "k_b_digest_facts_checked_total",
+    "k_b_digest_facts_found_in_item_total",
+    "k_b_digest_facts_found_in_text_total",
     "k_b_digest_facts_found_total",
     "k_b_digest_items_no_suitable_subject_total",
     "k_b_digest_items_removed_by_checks_total",
