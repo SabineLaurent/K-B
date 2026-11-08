@@ -13,7 +13,7 @@ L'API IA s'est construite issue après issue : les fiches (#156), les tendances 
 puis la mise en ligne (#414). Ses contrats sont écrits, dans `docs/fiches-veille.md` et `docs/tendances.md`. Il
 manquait une vue d'ensemble : ce qui la compose, ce qu'elle appelle et qui l'appelle. La certification lit le
 critère C9.8 d'E3 comme partiel sans ce document. Il sert aussi d'annexe au rapport E3 : chaque fait doit donc être
-vrai dans le code, au commit cité (`7ba7319`).
+vrai dans le code, au commit cité (`56d013b`).
 
 C'est une PR de documentation seule : aucun code ni test ne change.
 
@@ -76,7 +76,9 @@ demande, comme le RGAA pour la documentation publiée : un schéma est décrit p
 - **La relecture** : un sous-agent neuf a vérifié chaque fait contre le code et a rendu 16 constats. Les 16 ont été
   corrigés : tranché par time-knight, sous la délégation de Sabine du 15/10. Les plus lourds : un échec de GitHub
   sur un README prive de textes tous les dépôts choisis, pas un seul ; le plafond de débit repart de zéro à chaque
-  redémarrage ; l'export OTLP a trois signaux, pas deux.
+  redémarrage ; l'export OTLP a trois signaux, pas deux. Une seconde relecture, sur les seules corrections, a rendu
+  10 constats de plus, corrigés de même : par exemple, la phrase sur les blocs du schéma des couches disait plus
+  que le code, ce qu'un contrôle AST a montré.
 
 ## Preuve
 
@@ -86,7 +88,7 @@ demande, comme le RGAA pour la documentation publiée : un schéma est décrit p
 | `grep -rnE "raw_store\|writers\|write_file_atomically\|write_text\|write_bytes\|[^a-z_]open\(" src/k_b/ai_api \| wc -l` → 0 | règle 7 de `poc.md` : l'API IA n'écrit aucun fichier |
 | `grep -rn "caj-kb-digest-watch" infra/` → rien | le manque écrit dans « En ligne » est réel |
 | contrôle des caractères `Cc` et `Cf`, et des liens relatifs | aucun caractère invisible ; chaque lien ouvre un fichier |
-| `uv run pytest` → 4034 passed | la PR ne casse rien |
+| `uv run pytest` → 4035 passed, 328 deselected, sur la branche rebasée sur `56d013b` | la PR ne casse rien |
 
 ## Ce que tu dois pouvoir défendre
 

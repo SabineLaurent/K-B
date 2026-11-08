@@ -5,8 +5,8 @@ qui l'appelle, sans lire le code. Ses contrats (demandes, réponses, contrôles,
 [fiches-veille.md](fiches-veille.md) pour `POST /digests` et dans [tendances.md](tendances.md) pour
 `POST /trend-reports`. Ce document ne les recopie pas.
 
-Chaque `fichier:ligne` vaut pour `main` au commit `7ba7319`. Les chemins sans dossier de tête sont sous
-`src/k_b/`. La section « Vérifier ce document » donne les commandes qui retrouvent ces faits.
+Chaque `fichier:ligne` vaut pour `main` au commit `56d013b`. Les chemins sans dossier de tête sont sous
+`src/k_b/`, sauf `Dockerfile`, à la racine du dépôt. La section « Vérifier ce document » donne les commandes qui retrouvent ces faits.
 
 ## Vue d'ensemble
 
@@ -144,9 +144,9 @@ Le schéma se lit ainsi :
    - si le choix échoue, le compte rendu reste factuel ;
    - si GitHub échoue sur un README, aucun README ne part au modèle, et aucun dépôt choisi n'a ses textes
      (`ai_api/stages/trend_writing.py:246-248`, `:277-278`) ;
-   - si une rédaction échoue, seuls les textes de ce dépôt restent vides ; après un 429 du modèle, les dépôts
-     suivants ne sont pas rédigés (`:264-265`) ;
-   - un README absent n'est pas un échec : la rédaction se fait sans lui ([tendances.md](tendances.md),
+   - si une rédaction échoue, seuls les textes de ce dépôt restent vides ; après un 429 du modèle, ou si
+     l'échéance arrive avant, les dépôts suivants ne sont pas rédigés (`:264-265`, `:275-281`) ;
+   - un README absent ou refusé n'est pas un échec : la rédaction se fait sans lui ([tendances.md](tendances.md),
      « Défenses et échecs »).
 7. `kb trend-report` écrit le fichier, puis ajoute l'entrée au registre (`commands/trend_report_command.py:102-104`).
 
@@ -174,8 +174,8 @@ flowchart TB
     app --> routers --> edge --> paths --> stages --> calls --> connectors --> base
 ```
 
-Le schéma se lit de haut en bas, et regroupe les 16 couches en 8 blocs par rôle. Au commit cité, chaque bloc
-n'importe que les blocs plus bas. Le test tient l'ordre des 16 couches, pas celui des blocs : `connectors/` et le
+Le schéma se lit de haut en bas, et regroupe les 16 couches en 8 blocs par rôle. Au commit cité, aucun bloc
+n'importe un bloc plus haut ; dans un bloc, un module importe les couches plus basses du même bloc. Le test tient l'ordre des 16 couches, pas celui des blocs : `connectors/` et le
 bloc du bas se partagent les couches 1 et 2 (`metrics_export` et `trace_export` d'un côté, `repository_texts` de
 l'autre). La table donne le détail, de la couche la plus basse à la plus haute.
 
@@ -224,13 +224,14 @@ ligne, ce sont des secrets du coffre Key Vault, que l'app lit par son identité 
 
 Aucune clé d'un client de l'API IA ne peut être celle de l'API IA vers l'API de données : `kb serve-ai` refuse de
 démarrer si l'une est égale à `KB_DATA_API_KEY_AI_DIGEST` (`commands/serve_ai_command.py:65-73`). Le contrôle
-compare les valeurs, pas les droits : sur le Mac, `kb digest` lit tout le `.env`, cette clé comprise (`:60-64`).
+ne compare pas avec les autres clés de l'API de données : sur le Mac, `kb digest` reçoit tout le `.env`, cette clé
+comprise, et chaque clé de l'API de données a les mêmes droits (`:60-64`).
 
 ### Les réglages
 
 | Variable | Ce qu'elle règle | Lue dans le code | Défaut | En ligne (`infra/main.bicep`) |
 |---|---|---|---|---|
-| `KB_DATA_DIR` | dossier de données (journal en fichier) | `commands/environment.py:14` | aucun | `/var/lib/knowledge_base` (`:53`, `:212`) |
+| `KB_DATA_DIR` | dossier de données, obligatoire et existant (`cli.py:105-108`) ; reçoit le journal quand `KB_LOG_TO_FILE` le permet | `commands/environment.py:31` | aucun | `/var/lib/knowledge_base` (`:53`, `:212`) |
 | `KB_AI_API_HOST`, `KB_AI_API_PORT` | écoute | `ai_api/settings.py:17-18` | `127.0.0.1`, `8001` (`core/config.py:278-279`) | `0.0.0.0`, `8001` (`:213-214`) |
 | `KB_DIGEST_WINDOW_DAYS` | fenêtre par défaut des fiches | `ai_api/settings.py:19` | 3 jours (`core/config.py:325`) | défaut |
 | `KB_LLM_PROVIDER`, `KB_LLM_BASE_URL`, `KB_LLM_MODEL`, `KB_LLM_REASONING_EFFORT` | modèle | `ai_api/connectors/llm_settings.py:24-28` | aucun pour les trois premiers | `:218-222` |
@@ -279,7 +280,7 @@ Ce que l'API IA garde en mémoire est perdu à son redémarrage : le compte des 
 et un verrou par route, qui refuse une seconde demande pendant qu'une première tourne (`ai_api/app.py:80-81`). Le
 plafond de 20 demandes par jour en dépend : il repart de zéro à chaque redémarrage. C'est une limite décidée et
 écrite (`core/config.py:301-303`, [fiches-veille.md](fiches-veille.md), « Accès »). Les mesures, spans et
-enregistrements pas encore envoyés partent à l'arrêt (`ai_api/app.py:106-116`). Les clients HTTP vers le modèle,
+enregistrements pas encore envoyés partent à un arrêt propre (`ai_api/app.py:106-116`). Les clients HTTP vers le modèle,
 l'API de données et GitHub sont ouverts pour une demande, puis fermés (`ai_api/dependencies.py:16-30`).
 
 ## En ligne, sur Azure Container Apps
@@ -300,7 +301,7 @@ En ligne, l'API IA est l'app `ca-kb-ai-api`. Elle lance `kb serve-ai` depuis l'i
 - **Sonde** `GET /health`, hors clé (`infra/modules/api-container-app.bicep:40-41`, `ai_api/app.py:100`).
 - **Ni OpenAPI ni `/docs`** : `KB_DEPLOYMENT_ENVIRONMENT=production` (`infra/main.bicep:216`).
 
-**Ce qui appelle l'API IA en ligne.** Au commit `7ba7319`, seul le job `caj-kb-smoke-test` l'appelle, et seulement
+**Ce qui appelle l'API IA en ligne.** Au commit `56d013b`, seul le job `caj-kb-smoke-test` l'appelle, et seulement
 par `GET /health` (`commands/smoke_test_command.py:118-127`, `infra/deployment.json`). La commande
 `kb digest-watch` existe (`commands/digest_watch_command.py` ; [README](../README.md), paragraphe « Les commandes
 des jobs planifiés ») : elle réveille les deux API par `GET /health`, lance `kb digest`, les réveille de nouveau,
@@ -320,7 +321,7 @@ donc encore planifiée.
 
 ## Vérifier ce document
 
-Depuis la racine du dépôt, `7ba7319` extrait :
+Depuis la racine du dépôt, au commit `56d013b` (`git switch --detach 56d013b`) :
 
 ```sh
 uv run pytest tests/architecture/test_apis.py tests/architecture/test_opentelemetry.py    # couches et imports
@@ -334,5 +335,6 @@ grep -rlE "^(from|import) opentelemetry" src/k_b | sort
 cat infra/deployment.json; grep -rn "caj-kb-digest-watch" infra/
 ```
 
-Un `fichier:ligne` se relit sans extraire le commit : `git show 7ba7319:<chemin> | sed -n '<ligne>p'`, où
-`<chemin>` prend `src/k_b/` devant un chemin sans dossier de tête.
+Un `fichier:ligne` se relit sans changer de commit : `git show 56d013b:<chemin> | sed -n '<ligne>p'`, ou
+`sed -n '<début>,<fin>p'` pour un intervalle. `<chemin>` prend `src/k_b/` devant un chemin sans dossier de tête,
+sauf `Dockerfile`, à la racine du dépôt.
