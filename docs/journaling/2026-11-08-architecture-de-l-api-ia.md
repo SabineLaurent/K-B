@@ -104,7 +104,10 @@ demande, comme le RGAA pour la documentation publiée : un schéma est décrit p
 
 ## Zones non vérifiées
 
-- Le rendu des schémas Mermaid n'a pas été vu dans GitHub : la syntaxe a été relue, pas l'affichage.
+- Le rendu des schémas Mermaid a été vu par Sabine le 08/11 vers 10:53 UTC, sur la branche dans GitHub : les 4
+  s'affichent. Le schéma des couches tient en entier. Les trois premiers (la vue d'ensemble et les deux séquences)
+  dépassent leur espace, en largeur et en hauteur : on fait défiler leurs parties cachées par les flèches du
+  visualiseur Mermaid. Leur mise en page sera revue quand le document passera en annexe d'E3.
 - Le temps de réveil d'environ 20 s est repris de la mesure du 06/11 (`infra/README.md`). Il n'a pas été mesuré ici.
 
 ## Ce qui reste
