@@ -829,7 +829,9 @@ L'auto-évaluation de l'API IA, mesure par mesure (section « How To Prevent » 
 l'édition 2023, la dernière au 2026-11-05), au commit qui la contient (#161). Le pendant de
 l'API de données est dans [specs-api.md](specs-api.md). « Tenue » dit la mesure appliquée et sa
 preuve : un test, un essai daté ou le passage du code cité ; « non tenue » dit pourquoi, et où
-elle se tiendra ; *s.o.* : sans objet pour cette API. Une entrée est tenue quand toutes ses
+elle se tiendra ; *s.o.* : sans objet pour cette API ; « écart voulu, justifié » dit une mesure
+non appliquée par décision, dont la justification est écrite sous son entrée ; un écart voulu dans
+une mesure tenue (« Pour lever l'écart ») la laisse tenue. Une entrée est tenue quand toutes ses
 mesures applicables le sont. « Au déploiement » renvoie au déploiement sur Azure Container Apps :
 au 2026-11-05, une case de #317 (« Plus tard : déploiement », sans jalon) le porte, et aucune
 issue du jalon « Mise en ligne 08/11 ».
@@ -845,20 +847,22 @@ contre `infra/` et l'état en ligne.
 | Entrée | État | Ce qui reste, et où |
 |---|---|---|
 | API1 Broken Object Level Authorization | **Tenue** | — |
-| API2 Broken Authentication | Non tenue | Anti-force brute : écart voulu (décision de Sabine du 2026-11-05) |
+| API2 Broken Authentication | Écart voulu, justifié | Écart voulu (décision de Sabine du 2026-11-05), justifié sous API2, « Anti-force brute, plus strict que la limite de débit » (clé de 32 caractères au moins, contrôlée au démarrage) ; TLS mutuel : non appliqué, à justifier (#500) |
 | API3 Broken Object Property Level Authorization | **Tenue** | — |
 | API4 Unrestricted Resource Consumption | Non tenue | Ressources des conteneurs : CPU, mémoire et répliques tenus par #414, redémarrages, descripteurs et processus sans moyen trouvé ; plafond de dépense : abonnement de l'organisme de formation |
 | API5 Broken Function Level Authorization | **Tenue** | — |
 | API6 Unrestricted Access to Sensitive Business Flows | **Tenue** | — |
 | API7 Server Side Request Forgery | **Tenue** | — |
 | API8 Security Misconfiguration | Non tenue | Durcissement dont la construction et la relecture seraient exigées ; revue périodique de la configuration en ligne ; évaluation automatisée de l'environnement déployé (scan de l'image, essais après déploiement) ; chaîne Envoy → uvicorn non essayée (relue le 2026-11-08) |
-| API9 Improper Inventory Management | Non tenue | Documentation sans clé en `sandbox` : écart voulu ; protection externe : au déploiement |
+| API9 Improper Inventory Management | Écart voulu, justifié | Documentation sans clé en `sandbox` seulement : écart voulu, justifié sous API9, « Documentation réservée aux utilisateurs autorisés » ; l'API IA en ligne (`ca-kb-ai-api`) est déployée avec `KB_DEPLOYMENT_ENVIRONMENT` à `production` (`infra/main.bicep:216`, non relu en ligne), où `/docs` et `/openapi.json` rendent 404 ; protection externe : non tenue, à justifier (#500) |
 | API10 Unsafe Consumption of APIs | **Tenue** | — (relue le 2026-11-08) |
 
-Le compte : 6 entrées tenues sur 10. Ce qui ne dépend que du code et de la doc est tenu, sauf deux
-écarts voulus (API2, anti-force brute ; API9, documentation en `sandbox`) ; API10 l'est depuis la
-mise en ligne (TLS vers l'API de données) ; le reste demande des essais sur l'environnement déployé,
-ou l'organisme de formation pour le plafond de dépense.
+Le compte : 6 entrées tenues sur 10. Les 4 autres : 2 écarts voulus et justifiés, API2
+(anti-force brute ; son TLS mutuel reste non appliqué, à justifier par #500) et API9 (documentation
+en `sandbox` ; sa protection externe reste non tenue, à justifier par #500), et 2 non tenues (API4,
+API8). Ce qui ne dépend que du code et de la doc est tenu, hors ces deux écarts ; API10 l'est depuis
+la mise en ligne (TLS vers l'API de données) ; le reste demande des essais sur l'environnement
+déployé, ou l'organisme de formation pour le plafond de dépense.
 
 ### API1:2023 Broken Object Level Authorization
 
@@ -1223,9 +1227,11 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
   (`tests/ai_api/test_ai_api_openapi.py`).
 - **Documentation réservée aux utilisateurs autorisés** : non tenue en `sandbox`, écart voulu. Hors
   `sandbox`, `/docs` et `/openapi.json` rendent 404 (`test_the_documentation_is_served_in_the_sandbox_only`,
-  `tests/ai_api/test_serve_ai.py`) ; en `sandbox`, ils répondent sans clé, sans aucune donnée. Le
-  contrat est versionné dans le dépôt, privé au 2026-11-05 et appelé à devenir public : s'il l'est,
-  fermer `/docs` ne cacherait pas le contrat.
+  `tests/ai_api/test_serve_ai.py`) ; en `sandbox`, ils répondent sans clé, sans aucune donnée. En
+  ligne, l'API IA (`ca-kb-ai-api`) est déployée avec `KB_DEPLOYMENT_ENVIRONMENT` à `production`
+  (`infra/main.bicep:216`, non relu en ligne) : l'écart ne vaut qu'en local, quand la variable vaut
+  `sandbox`. Le contrat est versionné dans le dépôt, privé au 2026-11-05 et appelé à devenir
+  public : s'il l'est, fermer `/docs` ne cacherait pas le contrat.
   **Pour la tenir**, si l'écart est levé : ne plus servir `/docs` ni `/openapi.json`, même en
   `sandbox` ; le contrat reste dans le dépôt (`kb openapi`). `read_openapi_url`
   (`core/api_settings.py`) vaut pour les deux API : l'API de données fermerait son `/docs` aussi.
