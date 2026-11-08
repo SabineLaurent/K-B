@@ -29,6 +29,8 @@ contrôles, les états nommés et la ligne de métrique sont posés ici ; la sp�
 6. Réponse JSON ; une ligne de métrique par appel au modèle, sur la sortie standard (#156).
 7. `kb digest` écrit une fiche par sujet dans le coffre (#209, section « Fiches dans le coffre »).
 
+Ce qui compose l'API IA, ce qu'elle appelle et qui l'appelle : [architecture-api-ia.md](architecture-api-ia.md).
+
 L'appel au modèle, sa nouvelle tentative et le modèle de remplacement des tests sont à #150 ; le
 vrai modèle (gpt-6-luna sur Azure AI Foundry, décision de Sabine du 2026-10-16 ; déployé le
 2026-10-17 sur l'abonnement de son organisme de formation ;
