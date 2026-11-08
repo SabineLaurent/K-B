@@ -170,6 +170,12 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   (`LIBRARY_LOG_LEVELS`) : à WARNING, ils citent le texte de libpq et la connexion (hôte, utilisateur, base). `Connection` est l'union `sqlite3.Connection | PostgresConnection` ; une erreur
   du moteur se rattrape par `except ENGINE_ERRORS` (un tuple), jamais par `EngineError`, l'alias des annotations.
   Tenu par `tests/architecture/test_engine_imports.py`.
+- **Jeu de référence de `POST /digests`** (#479, 2026-11-08) : `tests/fixtures/digests_reference.json`, des sorties
+  de gpt-6-luna enregistrées par Sabine, rejouées par `tests/ai_api/test_digests_reference.py`. Une session ne lance
+  jamais l'enregistrement (`tests/ai_api/digests_reference.py`, un appel payant, qui refuse d'écraser le jeu). Un
+  changement du nombre de requêtes au modèle (lots, nouvelle tentative, étape) décale le rejeu et fait échouer ce
+  test : seul un nouvel enregistrement par Sabine le répare. Un changement de `prompt_version` ne le fait pas
+  échouer (péremption laissée à #482).
 - **Tests sur PostgreSQL** (#417, 2026-11-06) : marqués `postgresql`, écartés par `uv run pytest` comme `e2e`,
   lancés par `KB_TEST_POSTGRESQL_URL=<URL d'un serveur> uv run pytest -m postgresql` ; sans cette variable, un test
   marqué échoue, jamais sauté. Une base neuve par test qui écrit par `kb`, une transaction
