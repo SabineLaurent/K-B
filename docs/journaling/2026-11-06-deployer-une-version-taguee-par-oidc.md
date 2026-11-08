@@ -202,7 +202,8 @@ actions sont épinglées par SHA (#234) ; un workflow nouveau a son propre fichi
 | Pas modifiés, lancés en `bash -e` avec de faux `az`, `gh` et `sleep` (08/11) : CI verte acceptée, même avec un Dependabot en cours ou rouge ; en cours, rouge, vide, seulement Deploy ou seulement Dependabot refusées ; Deploy rouge exclu. Révisions (le modèle montre toujours la nouvelle image) : prêtes de suite, à la 3e lecture, une app en retard, dernière révision qui bouge à la 3e lecture, `revision show` en erreur une fois, acceptées ; jamais prête, autre image, dernière révision restée l'ancienne, `az` toujours en erreur, refusées après 40 lectures et 39 attentes. `run_job` : 52 et 72 lectures, une attente de moins ; une lecture en erreur puis `Succeeded` rend 0 | les corrections des deux revues, sans Azure |
 | Le pas de la CI avec le vrai `gh` sur `0a632b7` (tête de `main`) : `ci.yml`, `image.yml`, `postgresql.yml` `completed success`, sortie 0 | l'appel et le filtre tiennent sur l'API réelle |
 | L'attente des révisions avec le vrai `az`, en lecture seule, à l'image en ligne `k-b:3abd525` : prête à la 1re lecture, sortie 0 | les chemins JSON de `containerapp show` et `revision show` sont les bons |
-| *(à venir)* `v0.1.0` : les apps et le job au digest de `k-b:v0.1.0`, `caj-kb-smoke-test` `Succeeded` | le critère de l'issue |
+| Après la fusion de #460 (`ccf1455`, 08/11, 00:18:31Z) : la CI de `main` tourne, aucune exécution Deploy ne suit ; la seule existante est celle de l'essai `v0.0.1`, et aucun tag `v*` n'existe | « une fusion ne déploie rien » |
+| Premier tag `v0.1.0` sur `ccf1455` (08/11, sur ta demande), exécution 42429577646, réussie de 00:24:09Z à 00:28:22Z. `check` voit la CI verte (4 workflows). Connexion OIDC depuis `production`, puis `az acr login`, puis mise à jour des apps et des jobs, sans aucun refus. Révisions prêtes dès la 1re lecture, 5 s après la mise à jour des jobs. `caj-kb-smoke-test` `Succeeded`. Lu ensuite par `az` : `k-b:v0.1.0` a le digest `sha256:37c6d42b…9fab2`, et les apps (modèle et révision `--0000002`, `Healthy`) comme les jobs sont à ce digest | le critère de l'issue ; la fin du sujet `:environment:production` ; `azure/login` avec des rôles sur les seules ressources ; le `PATCH` sans `assign/action` |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -231,15 +232,12 @@ actions sont épinglées par SHA (#234) ; un workflow nouveau a son propre fichi
 ## Zones non vérifiées
 
 - `az acr login` avec AcrPush seul : la doc ne tranche pas. Reader est donné par précaution, non essayé sans lui.
-- Le `PATCH` de `az containerapp update` sans `assign/action` : lu dans le code d'azure-cli par le relecteur, pas
-  encore essayé. Le repli est écrit (Container Apps Jobs Operator sur `cae-kb`).
-- `azure/login` avec des rôles posés seulement sur des ressources, sans rien sur l'abonnement : non essayé.
-- L'attente des révisions sur un vrai déploiement : l'état `ready` d'une app à 0 réplique est vu, pas la durée
-  qu'il faut pour l'atteindre après une mise à jour. Le premier tag `v0.1.0` le mesurera.
-- La fin du sujet, `:environment:production` : le préfixe immuable est confirmé par l'essai 5.2, la fin par la doc de GitHub. Le premier tag `v0.1.0` le prouvera.
+
+Les autres zones de cette liste sont prouvées par le premier tag `v0.1.0` (voir « Preuve ») : le `PATCH` sans
+`assign/action`, `azure/login` avec des rôles sur les seules ressources, la fin du sujet `:environment:production`,
+et l'attente des révisions sur un vrai déploiement.
 
 ## Ce qui reste
 
-- Le premier tag `v0.1.0`, sur ta demande, après la fusion.
 - Le 08/11 : toi en « required reviewer », sans contournement pour les administrateurs.
 - Une passe Bicep faite à la main repose une image par tag, pas par digest : l'outil des passes (#455).
