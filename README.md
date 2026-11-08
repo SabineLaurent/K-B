@@ -715,6 +715,7 @@ son SHA, sa version en commentaire.
 |---|---|---|
 | `audit` | `ci.yml` | cherche les vulnérabilités connues des versions de `uv.lock`, avec leurs empreintes (`uv export`, puis pip-audit 2.10.1) |
 | `tests` | `ci.yml` | `uv run pytest --cov --cov-report=term-missing:skip-covered` : la suite, sans `e2e` ni `postgresql`, et le seuil de couverture |
+| `tests-data` | `ci.yml` | les tests des données, à part des autres : avant la base, `tests/etl`, `tests/test_schema.py` et `tests/test_items.py` (l'item commun où chaque source est lue avant l'import) ; avant le modèle, `tests/ai_api/test_watch_items.py` (les items tels que l'API IA les envoie) ; sans `--cov`, car `tests` les lance aussi et garde le seuil |
 | `lint` | `ci.yml` | `uv run ruff check` et `uv run ruff format --check` |
 | `types` | `ci.yml` | `uv run mypy --strict` |
 | `tests-postgresql` | `ci.yml` | `uv run pytest -m postgresql`, sur un service `postgres:18.6` épinglé par son digest |
@@ -723,7 +724,7 @@ son SHA, sa version en commentaire.
 | `check` | `deploy.yml` | refuse un tag hors de la forme `vX.Y.Z`, dont le commit n'est pas sur `main`, ou dont la CI n'est pas finie et verte |
 | `deploy` | `deploy.yml` | met le tag en ligne : [infra/README.md](infra/README.md), « Déployer une version » |
 
-Les jobs de `ci.yml` installent uv par `astral-sh/setup-uv`, à la version fixée dans chacun des cinq
+Les jobs de `ci.yml` installent uv par `astral-sh/setup-uv`, à la version fixée dans chacun des six
 (`version: "0.13.6"`) : la même que le `Dockerfile`, dans la plage `uv_build` de `build-system.requires` du
 `pyproject.toml`. Sur le Mac, la même version s'installe par `uv self update 0.13.6`.
 
@@ -732,7 +733,7 @@ Les jobs de `ci.yml` installent uv par `astral-sh/setup-uv`, à la version fixé
 version nouvelle attend 7 jours avant sa PR, sauf une mise à jour de sécurité ; ghcr.io ne donne pas la date
 d'une version, et l'attente ne s'applique pas à `astral-sh/uv` : sa date se vérifie à la main avant la fusion.
 Pour `python` et `astral-sh/uv`, il ne propose que les correctifs et les digests, jamais une version mineure ou
-majeure. Sa PR d'`astral-sh/uv` ne change que le `Dockerfile` : la `version:` des cinq jobs de `ci.yml` se change
+majeure. Sa PR d'`astral-sh/uv` ne change que le `Dockerfile` : la `version:` des six jobs de `ci.yml` se change
 à la main, dans la même PR. Ses mises à jour de version ne touchent ni l'image `postgres` du job `tests-postgresql`, à changer à
 la main, ni `uv.lock`. Les alertes et les mises à jour de sécurité de Dependabot sont activées dans les
 réglages du dépôt, et le graphe des dépendances y voit les paquets Python (96 le 2026-11-08) : seule une mise
