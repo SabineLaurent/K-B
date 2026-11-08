@@ -34,6 +34,11 @@ outil à l'autre.
 | Copie hors outil | une ligne JSON par appel au modèle sur la sortie standard, qui reste (journal ADR, « Wiki : métriques », révisée le 2026-10-15) | `src/k_b/ai_api/observability/metrics.py:50-51` |
 | Restitution | tableaux de bord et alertes, à construire dans l'outil choisi (#164) | — |
 
+La décision ouverte « texte envoyé à l'outil de suivi » (journal ADR, « Décisions encore
+ouvertes ») est tranchée pour l'API IA par #347, le 2026-10-28 : le texte part seulement par
+l'enregistrement de contenu, sous `KB_TRACE_CONTENT`, et c'est inscrit au registre ; elle reste
+ouverte pour le wiki.
+
 Volume : 91 séries de métriques par démarrage de `kb serve-ai` quand une demande réussit, davantage
 en cas d'échec (`docs/fiches-veille.md:1434-1436`).
 

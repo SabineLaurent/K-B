@@ -1130,7 +1130,9 @@ telles que transmises. Le pourquoi n'est écrit que là où il a été donné.
   restitution entre en v0, étape 2. **Révisée le 2026-10-15** : la copie locale devient une
   ligne JSON par appel, sur stdout (« POC du 25/10 », décision 8 ; règle 4 de
   `.claude/rules/poc.md`). **Close le 2026-10-20** : l'outil est Grafana Cloud, en
-  OpenTelemetry (« Squelette E1 E3 : cadrage du 20/10 », décision 4).
+  OpenTelemetry (« Squelette E1 E3 : cadrage du 20/10 », décision 4). La comparaison qui le fonde,
+  selon ces critères : `docs/outils-de-suivi.md` (2026-11-08, « Outils de suivi : la comparaison
+  de #163 »).
 
 ### Périmètre
 
@@ -3341,7 +3343,9 @@ même jour, au découpage du squelette en issues. Un pourquoi que ces sources ne
   sous-traitant, dont le DPA est lu, et qui est inscrit au registre, avant le premier envoi
   (critère de #162). **Clôt** l'outil « à choisir » de « Wiki : métriques » (2026-10-12), où
   Grafana Cloud était candidat. Ne révise pas la ligne JSON sur stdout (« POC du 25/10 »,
-  décision 8). — PR de #275
+  décision 8). **Précisée le 2026-11-08** : la comparaison de #163 est écrite
+  (`docs/outils-de-suivi.md`) ; Grafana Cloud seul pour le rendu du 25/11, Application Insights
+  repris après (« Outils de suivi : la comparaison de #163 », 2026-11-08). — PR de #275
 - **5. La veille collectée en base est purgée au terme de sa durée. « Immuable » veut dire jamais
   réécrit, pas gardé pour toujours. Les fiches déjà écrites dans le coffre ne sont pas touchées.
   La durée passe de 2 à 3 ans pour les items de veille, le brut de veille (`raw/automated_watch/`)
@@ -6167,6 +6171,35 @@ celui du plan qu'elle a validé, ou du tri de time-knight quand il est nommé.
   comme pour les hôtes par défaut de l'API de données (`DATA_API_ALLOWED_HOSTS = LOCAL_HOSTS`) ; un
   compose aux noms de service autres que `api-donnees` et `api-ia` devra les ajouter à
   `COMPOSE_HOSTS`. — PR de #473
+
+### Outils de suivi : la comparaison de #163
+
+La comparaison écrite qui fonde le choix de Grafana Cloud (décision 4 du 20/10) :
+[outils-de-suivi.md](../outils-de-suivi.md). Elle compare Application Insights, Grafana Cloud,
+Langfuse Cloud (UE), LangSmith (UE) et Honeycomb, selon les critères de « Wiki : métriques ».
+
+- **Grafana Cloud reste le seul outil de suivi pour le rendu du 25/11 ; Application Insights est
+  repris après le rendu.** Décision de Sabine du 2026-11-08, relayée par time-knight. Pourquoi :
+  non dit par Sabine. Les faits relevés par la comparaison, sans lui être attribués : Grafana Cloud
+  reçoit les trois signaux OTLP de K-B (métriques, traces, journaux), il est en place depuis #162,
+  #345 et #347, et coûte 0 $ dans les limites de l'offre gratuite ; Application Insights reçoit
+  aussi les trois signaux, mais le 08/11 l'abonnement de l'école a `Microsoft.Monitor` et
+  `Microsoft.AlertsManagement` non enregistrés, que Sabine, Reader, ne peut pas enregistrer, et
+  l'envoi y passe par un collecteur OpenTelemetry et une authentification Entra. Option écartée :
+  Application Insights dès le 25/11, recommandé par la comparaison sans biais du sous-agent de
+  time-knight du 08/11 (aucun sous-traitant nouveau, le DPA de l'école, quelques centimes par mois,
+  tout en Bicep), à condition d'enregistrer les deux fournisseurs, d'avoir l'accord du DPO de
+  l'école et une règle d'alerte qui traite l'absence de données ; raison du rejet non dite. Les
+  autres outils sont écartés dans le document, chacun avec sa raison (Langfuse Cloud et LangSmith :
+  traces OTLP seules, les métriques et les journaux de K-B sans destination). Limites assumées :
+  l'accessibilité n'est essayée que sur Grafana Cloud, les autres outils sont jugés sur leurs
+  déclarations publiées ; le texte des prompts, avantage propre de Langfuse et LangSmith, n'est pas
+  montré par Grafana Cloud tant que `KB_TRACE_CONTENT` vaut `none` en ligne ; le DPA de Grafana
+  Labs, signé le 28/10, ne vaut selon sa réponse du 29/10 que pour les entreprises, ce qui est
+  porté à Sabine (registre, « Envoi des mesures à Grafana Cloud »). **Précise** la décision 4 du
+  20/10 (« Squelette E1 E3 : cadrage du 20/10 ») ; sa phrase « au troisième temps, seuls l'URL et
+  le jeton changent » ne vaut pas pour Application Insights (collecteur et Entra), à revoir à sa
+  reprise. — PR de #163
 
 ## Décisions encore ouvertes
 
