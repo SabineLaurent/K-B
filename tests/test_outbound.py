@@ -9,6 +9,7 @@ import pytest
 from k_b.core.outbound import (
     BodyTooLargeError,
     BodyTooLateError,
+    find_internal_api_url_refusal,
     find_url_refusal,
     open_http_client,
     read_body_head,
@@ -16,6 +17,73 @@ from k_b.core.outbound import (
 )
 
 VARIABLE = "KB_TEST_URL"
+HTTP_REFUSAL = f"{VARIABLE}: https required; http only to the machine (127.0.0.1 or localhost) or, in the sandbox, a compose service (api-donnees or api-ia)"
+
+
+SANDBOX = {"KB_DEPLOYMENT_ENVIRONMENT": "sandbox"}
+PRODUCTION = {"KB_DEPLOYMENT_ENVIRONMENT": "production"}
+
+
+@pytest.mark.parametrize(
+    ("url", "environ"),
+    [
+        ("http://127.0.0.1:8000", {}),
+        ("http://localhost:8001", {}),
+        ("http://127.0.0.1:8000", PRODUCTION),
+        ("https://ca-kb-data-api.internal.test.example", {}),
+        ("https://ca-kb-data-api.internal.test.example", PRODUCTION),
+        ("http://api-donnees:8000", SANDBOX),
+        ("http://api-ia:8001", SANDBOX),
+    ],
+    ids=[
+        "ipv4-loopback",
+        "localhost",
+        "loopback-in-production",
+        "https",
+        "https-in-production",
+        "data-api-service-in-the-sandbox",
+        "ai-api-service-in-the-sandbox",
+    ],
+)
+def test_an_internal_api_url_in_https_on_the_machine_or_to_a_compose_service_is_accepted(
+    url, environ
+):
+    assert find_internal_api_url_refusal(VARIABLE, url, environ) is None
+
+
+@pytest.mark.parametrize(
+    ("url", "environ", "refusal"),
+    [
+        ("http://api-donnees:8000", {}, HTTP_REFUSAL),
+        ("http://api-donnees:8000", PRODUCTION, HTTP_REFUSAL),
+        (
+            "http://api-donnees:8000",
+            {"KB_DEPLOYMENT_ENVIRONMENT": "Sandbox"},
+            HTTP_REFUSAL,
+        ),
+        ("http://ca-kb-data-api.internal.test.example", {}, HTTP_REFUSAL),
+        ("http://ca-kb-ai-api.test.example", SANDBOX, HTTP_REFUSAL),
+        ("http://134744072", SANDBOX, HTTP_REFUSAL),
+        ("http://api-ai:8001", SANDBOX, HTTP_REFUSAL),
+        ("http://127.0.0.2:8000", {}, HTTP_REFUSAL),
+        ("http://localhost.test.example", {}, HTTP_REFUSAL),
+        ("ftp://127.0.0.1", {}, f"{VARIABLE}: scheme not http nor https"),
+    ],
+    ids=[
+        "service-without-environment",
+        "service-in-production",
+        "service-sandbox-capitalised",
+        "internal-name",
+        "public-name-in-the-sandbox",
+        "ipv4-as-one-number-in-the-sandbox",
+        "service-misspelt-in-the-sandbox",
+        "other-loopback",
+        "localhost-prefix",
+        "ftp",
+    ],
+)
+def test_an_internal_api_url_in_http_elsewhere_is_refused(url, environ, refusal):
+    assert find_internal_api_url_refusal(VARIABLE, url, environ) == refusal
 
 
 @pytest.mark.parametrize(

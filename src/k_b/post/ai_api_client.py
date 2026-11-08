@@ -34,7 +34,7 @@ from k_b.core.config import (
 from k_b.core.outbound import (
     BodyTooLargeError,
     BodyTooLateError,
-    find_url_refusal,
+    find_internal_api_url_refusal,
     open_http_client,
     read_bounded_body,
 )
@@ -45,9 +45,6 @@ from k_b.items import ItemKind, UtcDatetime
 AI_API_URL_VARIABLE = "KB_AI_API_URL"
 # The client KB_DIGEST of kb serve-ai: one value for both sides (README, "Changer une clé").
 DIGEST_KEY_VARIABLE = f"{AI_API_KEY_VARIABLE_PREFIX}{DIGEST_CLIENT}"
-# No TLS before Azure Container Apps, as for the data API: http on the machine and in the compose
-# network.
-AI_API_SCHEMES = ("http", "https")
 DIGESTS_PATH = "digests"
 RETRY_AFTER_HEADER = "Retry-After"
 # The id log_request gives a request (core/api_request_log.py): uuid4, in lowercase.
@@ -176,8 +173,8 @@ def read_ai_api_client_settings_or_refusal(
     api_key = environ.get(key_variable)
     if not api_key:
         return f"{key_variable}: not set"
-    refusal = find_url_refusal(
-        AI_API_URL_VARIABLE, base_url, AI_API_SCHEMES
+    refusal = find_internal_api_url_refusal(
+        AI_API_URL_VARIABLE, base_url, environ
     ) or find_api_key_refusal(AI_API_KEY_VARIABLE_PREFIX, key_variable, api_key, {})
     if refusal is not None:
         return refusal

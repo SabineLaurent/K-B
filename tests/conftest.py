@@ -31,6 +31,9 @@ KB_SETTINGS_VARIABLES = (
     "KB_LOG_TO_FILE",
     "KB_DATABASE_URL",
     "KB_DATABASE_AUTH",
+    "KB_DEPLOYMENT_ENVIRONMENT",
+    "KB_DATA_API_URL",
+    "KB_AI_API_URL",
 )
 # The marker of the tests that run kb on the real sources (tests/e2e/).
 E2E_MARKER = "e2e"

@@ -26,16 +26,37 @@ def test_without_url_the_settings_take_the_local_default():
     assert settings.api_key.get_secret_value() == TEST_API_KEY
 
 
-def test_the_url_of_the_environment_is_read():
-    settings = read_data_api_settings_or_refusal(
+@pytest.mark.parametrize(
+    ("url", "deployment_environment"),
+    [
+        ("https://ca-kb-data-api.internal.test.example", None),
+        ("http://api-donnees:8000", "sandbox"),
+    ],
+)
+def test_the_url_of_the_environment_is_read(url, deployment_environment):
+    environ = {"KB_DATA_API_URL": url, "KB_DATA_API_KEY_AI_DIGEST": TEST_API_KEY}
+    if deployment_environment is not None:
+        environ["KB_DEPLOYMENT_ENVIRONMENT"] = deployment_environment
+
+    settings = read_data_api_settings_or_refusal(environ)
+
+    assert isinstance(settings, DataApiSettings)
+    assert settings.base_url == url
+
+
+def test_an_http_url_to_a_compose_service_outside_the_sandbox_is_refused():
+    refusal = read_data_api_settings_or_refusal(
         {
             "KB_DATA_API_URL": "http://api-donnees:8000",
             "KB_DATA_API_KEY_AI_DIGEST": TEST_API_KEY,
+            "KB_DEPLOYMENT_ENVIRONMENT": "production",
         }
     )
 
-    assert isinstance(settings, DataApiSettings)
-    assert settings.base_url == "http://api-donnees:8000"
+    assert (
+        refusal
+        == "KB_DATA_API_URL: https required; http only to the machine (127.0.0.1 or localhost) or, in the sandbox, a compose service (api-donnees or api-ia)"
+    )
 
 
 def test_an_empty_url_is_unset():

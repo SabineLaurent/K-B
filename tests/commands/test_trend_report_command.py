@@ -300,6 +300,11 @@ def test_a_file_in_place_of_a_folder_asks_nothing_and_exits_1(
             "short",
             "'KB_AI_API_KEY_KB_TREND_REPORT': key of 5 characters, minimum 32",
         ),
+        (
+            "KB_AI_API_URL",
+            "http://api-ia:8001",
+            "KB_AI_API_URL: https required; http only to the machine (127.0.0.1 or localhost) or, in the sandbox, a compose service (api-donnees or api-ia)",
+        ),
     ],
 )
 def test_a_setting_refused_asks_nothing_and_exits_2(

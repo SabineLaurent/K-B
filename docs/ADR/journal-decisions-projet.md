@@ -6125,6 +6125,44 @@ celui du plan qu'elle a validé, ou du tri de time-knight quand il est nommé.
   G. Petrović, R. Just, G. Fraser, « Code Coverage at Google », ESEC/FSE ’19, p. 955-963,
   https://doi.org/10.1145/3338906.3340459. — PR de #465
 
+### API : `https` vers une API interne, `http` vers la machine ou un service du compose (#473)
+
+- **Une URL d'API interne de K-B (`KB_DATA_API_URL`, `KB_AI_API_URL`) n'est acceptée en `http` que
+  vers `127.0.0.1` ou `localhost` (`LOCAL_HOSTS`), dans tout environnement, ou vers `api-donnees` ou
+  `api-ia` (`COMPOSE_HOSTS`, `core/config.py`), les services d'un compose (#419), avec
+  `KB_DEPLOYMENT_ENVIRONMENT=sandbox` ; tout autre hôte en `http` est refusé, `sandbox` ou non, et le
+  démarrage avec (code 2), le message nommant la variable sans citer sa valeur ni celle qui
+  débloque.** Décision de l'utilisatrice du 08/11 (option C') ; risque relevé par la relecture
+  d'API8 et d'API10 (#454) : en ligne, le `https` ne tenait qu'au réglage du déploiement, et une URL
+  `http` posée par erreur aurait envoyé une clé en clair. Une fonction,
+  `find_internal_api_url_refusal` (`core/outbound.py`), appelée par les trois lecteurs de ces URL
+  (`kb serve-ai`, `kb digest` et `kb trend-report`, `kb smoke-test` et `kb digest-watch`), selon la
+  règle OWASP des deux API (05/11). Le contrôle du nom d'hôte de `find_url_refusal` passe avant.
+  Révise le commentaire « No TLS before Azure Container Apps : http on the machine and in the
+  compose network » (`DATA_API_SCHEMES`, `AI_API_SCHEMES`, retirés).
+  - Le premier choix de l'utilisatrice, le matin du 08/11 (C), permettait `http` vers tout hôte en
+    `sandbox`. La revue de code l'a relevé (un nom public en `sandbox` aurait reçu la clé en clair),
+    et un sous-agent de sécurité neuf, en lecture seule, l'a jugé : « Le risque existe dans le code,
+    mais il est faible ». Le scénario est sur le Mac, où `.env.example` conseille `sandbox` pour
+    développer, et une restriction aux noms sans point serait contournée par une IPv4 numérique
+    (`http://134744072`). D'où C' : une liste fermée de noms.
+  - Écartées : `http` vers la machine seule (A), qui aurait forcé le compose de #419 au `https` ;
+    `https` exigé en `production` seulement, ouvert par défaut, alors que les jobs n'ont pas la
+    variable ; D, `http` vers `127.0.0.1`, `localhost`, `api-donnees` et `api-ia` dans tout
+    environnement, sans `KB_DEPLOYMENT_ENVIRONMENT` : il s'écarte davantage de C et accepterait
+    `http://api-ia` en production. Aucune app en ligne ne porte ce nom (`ca-kb-*`), mais la
+    résolution d'un nom sans point dans Container Apps n'est pas vérifiée ; C' ferme le même risque
+    en gardant la porte du compose derrière `sandbox` (choix de l'utilisatrice, sur la
+    recommandation de time-knight).
+  - `sandbox` est comparé tel quel (`Sandbox` ne compte pas), par `is_sandbox`
+    (`core/api_settings.py`), que lit aussi `read_openapi_url`.
+
+  Limites assumées : seuls `127.0.0.1` et `localhost` comptent pour la machine (ni le reste de
+  `127.0.0.0/8`, ni `::1`, qu'un nom d'hôte de K-B refuse déjà) ; `localhost` est cru sur son nom,
+  comme pour les hôtes par défaut de l'API de données (`DATA_API_ALLOWED_HOSTS = LOCAL_HOSTS`) ; un
+  compose aux noms de service autres que `api-donnees` et `api-ia` devra les ajouter à
+  `COMPOSE_HOSTS`. — PR de #473
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages

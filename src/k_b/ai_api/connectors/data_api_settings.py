@@ -8,14 +8,11 @@ from pydantic import SecretStr
 
 from k_b.core.api_keys import API_KEY_VARIABLE_PREFIX
 from k_b.core.config import API_KEY_CHARACTERS, DATA_API_URL, MIN_API_KEY_LENGTH
-from k_b.core.outbound import find_url_refusal
+from k_b.core.outbound import find_internal_api_url_refusal
 
 DATA_API_URL_VARIABLE = "KB_DATA_API_URL"
 # The variable kb serve-data reads for its client AI_DIGEST: formed from its prefix, one value for both.
 DATA_API_KEY_VARIABLE = f"{API_KEY_VARIABLE_PREFIX}AI_DIGEST"
-# No TLS before Azure Container Apps (docs/specs-api.md, OWASP API8): http on the machine and in
-# the compose network.
-DATA_API_SCHEMES = ("http", "https")
 
 
 @dataclass(frozen=True)
@@ -33,8 +30,8 @@ def read_data_api_settings_or_refusal(
     api_key = environ.get(DATA_API_KEY_VARIABLE)
     if not api_key:
         return f"{DATA_API_KEY_VARIABLE}: not set"
-    refusal = find_url_refusal(
-        DATA_API_URL_VARIABLE, base_url, DATA_API_SCHEMES
+    refusal = find_internal_api_url_refusal(
+        DATA_API_URL_VARIABLE, base_url, environ
     ) or find_api_key_refusal(api_key)
     if refusal is not None:
         return refusal

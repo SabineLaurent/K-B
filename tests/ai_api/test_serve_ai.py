@@ -225,6 +225,10 @@ def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
             {"KB_AI_GITHUB_TOKEN": f"{GITHUB_TOKEN}-"},
             "KB_AI_GITHUB_TOKEN: token with a character outside [A-Za-z0-9_]+",
         ),
+        (
+            {"KB_DATA_API_URL": "http://api-donnees:8000"},
+            "KB_DATA_API_URL: https required; http only to the machine (127.0.0.1 or localhost) or, in the sandbox, a compose service (api-donnees or api-ia)",
+        ),
     ],
     ids=[
         "no-key",
@@ -247,6 +251,7 @@ def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
         "no-github-token",
         "classic-github-token",
         "github-token-with-a-dash",
+        "data-api-in-http-outside-the-machine",
     ],
 )
 def test_serve_ai_exits_2_and_names_the_variable_refused(

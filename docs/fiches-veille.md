@@ -853,7 +853,7 @@ contre `infra/` et l'état en ligne.
 | API7 Server Side Request Forgery | **Tenue** | — |
 | API8 Security Misconfiguration | Non tenue | Durcissement dont la construction et la relecture seraient exigées ; revue périodique de la configuration en ligne ; évaluation automatisée de l'environnement déployé (scan de l'image, essais après déploiement) ; chaîne Envoy → uvicorn non essayée (relue le 2026-11-08) |
 | API9 Improper Inventory Management | Non tenue | Documentation sans clé en `sandbox` : écart voulu ; protection externe : au déploiement |
-| API10 Unsafe Consumption of APIs | **Tenue** | — (relue le 2026-11-08) ; limite : le code accepte `http` vers l'API de données, #473 |
+| API10 Unsafe Consumption of APIs | **Tenue** | — (relue le 2026-11-08) |
 
 Le compte : 6 entrées tenues sur 10. Ce qui ne dépend que du code et de la doc est tenu, sauf deux
 écarts voulus (API2, anti-force brute ; API9, documentation en `sandbox`) ; API10 l'est depuis la
@@ -1052,7 +1052,8 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
 - **Isoler la récupération de ressources dans le réseau** : *s.o.* à ce commit, aucune URL n'étant
   fournie par une requête ; l'isolation réseau est à revoir au déploiement.
 - **Listes d'origines et de schémas permis** : tenue. Hôte GitHub constant (`core/github_api.py`) ;
-  `https` seul vers le modèle et vers l'export ; `http` ou `https` vers l'API de données (API10).
+  `https` seul vers le modèle et vers l'export ; vers l'API de données, `https`, ou `http` vers la
+  machine ou, en `sandbox`, vers un service du compose seulement (API10, #473).
   `core/outbound.py`, `test_a_url_of_an_allowed_scheme_is_accepted` et
   `test_a_url_refused_is_named_by_its_variable_never_quoted` (`tests/test_outbound.py`).
 - **Redirections coupées** : tenue. Vers le modèle, l'API de données et GitHub,
@@ -1144,9 +1145,15 @@ dépend que du code garde son état et sa preuve.
     `ca-kb-ai-api`, `KB_DATA_API_URL` =
     `https://ca-kb-data-api.internal.<defaultDomain>`, sur `ca-kb-data-api`,
     `KB_DATA_API_ALLOWED_HOSTS` = `ca-kb-data-api.internal.<defaultDomain>`.
-  - Limite : le `https` vers l'API de données vient du réglage du déploiement, que le code ne force
-    pas : il accepte `http` partout (`DATA_API_SCHEMES`, `ai_api/connectors/data_api_settings.py:18`),
-    pour la machine et le réseau compose.
+  - Le code force aussi le `https` (#473) : une URL d'API interne en `http` n'est acceptée que vers
+    `127.0.0.1` ou `localhost`, ou, avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, vers `api-donnees` ou
+    `api-ia`, les services d'un compose (#419) ; sinon le démarrage est refusé (code 2), le message
+    nommant la variable (`find_internal_api_url_refusal`, `core/outbound.py` ; `LOCAL_HOSTS` et
+    `COMPOSE_HOSTS`, `core/config.py`), pour `KB_DATA_API_URL` (API IA) et `KB_AI_API_URL`
+    (`kb digest`, `kb trend-report`), et pour les deux URL de `kb smoke-test` et `kb digest-watch`.
+    `test_an_internal_api_url_in_http_elsewhere_is_refused` (un nom public, une IPv4 en un nombre,
+    un service mal écrit, en `sandbox` compris), `test_serve_ai_exits_2_and_names_the_variable_refused`
+    (`data-api-in-http-outside-the-machine`).
   - Non essayé, l'entrée n'étant joignable que de l'environnement : la version de TLS, « always use
     TLS 1.2 or 1.3 » selon la documentation de l'entrée (lue le 2026-11-08). Côté client, K-B ne
     règle pas la version de TLS : les bibliothèques gardent leur contexte par défaut, TLS 1.2 au
@@ -1259,8 +1266,9 @@ point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change
 - **TLS avec toutes les API intégrées** : tenue en ligne. `https` seul vers le modèle, GitHub et
   l'export (API7) ; vers l'API de données, `https://ca-kb-data-api.internal.<defaultDomain>`
   (`infra/main.bicep:223`), avec le chiffrement entre apps (API8, « TLS, même pour une API
-  interne »). `http` reste permis vers l'API de données, pour la machine et le réseau compose prévu
-  (#200) (`ai_api/connectors/data_api_settings.py`).
+  interne »). `http` n'est permis vers l'API de données que vers `127.0.0.1` ou `localhost`, ou, en
+  `sandbox`, vers un service du compose (#419) : `find_internal_api_url_refusal` (`core/outbound.py`,
+  #473).
 - **Valider et assainir les données reçues** : tenue. Modèles Pydantic stricts pour chaque réponse ;
   corps bornés, la réponse du modèle comprise (#399,
   `test_an_answer_above_the_bound_is_llm_unavailable_without_retry`) ; textes de dépôt nettoyés
@@ -1686,7 +1694,9 @@ des tops).
 **Parcours**
 
 1. **Réglages** : `KB_VAULT_DIR`, un dossier existant (sinon code 2, aucun dossier créé) ;
-   `KB_AI_API_URL`, `http` ou `https`, sans utilisateur, requête ni fragment, par défaut
+   `KB_AI_API_URL`, `https`, ou `http` vers `127.0.0.1`, `localhost` ou, en `sandbox`, un service du
+   compose (`api-donnees` ou `api-ia`, #473),
+   sans utilisateur, requête ni fragment, par défaut
    `http://127.0.0.1:8001` (`AI_API_URL`, `core/config.py`), qui ne suit pas `KB_AI_API_PORT` ;
    `KB_AI_API_KEY_KB_DIGEST`, sans défaut, aux règles des clés (section « Accès »). Un refus nomme
    la variable, jamais la clé ni l'URL.

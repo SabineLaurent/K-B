@@ -9,7 +9,6 @@ from time import monotonic
 from typing import NamedTuple
 
 from k_b.ai_api.connectors.data_api_settings import (
-    DATA_API_SCHEMES,
     DATA_API_URL_VARIABLE,
 )
 from k_b.commands.batch_summary import (
@@ -20,7 +19,7 @@ from k_b.commands.batch_summary import (
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME, value_or_log_refusal
 from k_b.core.config import AI_API_URL, DATA_API_URL, SMOKE_TEST_CONTAINER
-from k_b.core.outbound import find_url_refusal
+from k_b.core.outbound import find_internal_api_url_refusal
 from k_b.jobs.api_health import HealthCheckError, build_health_client, check_health
 from k_b.jobs.exchange_storage import (
     ExchangeStorageError,
@@ -32,7 +31,7 @@ from k_b.jobs.exchange_storage import (
     open_container_client,
     read_exchange_storage_settings_or_refusal,
 )
-from k_b.post.ai_api_client import AI_API_SCHEMES, AI_API_URL_VARIABLE
+from k_b.post.ai_api_client import AI_API_URL_VARIABLE
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -104,9 +103,9 @@ def read_smoke_test_settings_or_refusal(
     # Empty is not set, as for kb digest and the AI API.
     data_api_url = environ.get(DATA_API_URL_VARIABLE) or DATA_API_URL
     ai_api_url = environ.get(AI_API_URL_VARIABLE) or AI_API_URL
-    refusal = find_url_refusal(
-        DATA_API_URL_VARIABLE, data_api_url, DATA_API_SCHEMES
-    ) or find_url_refusal(AI_API_URL_VARIABLE, ai_api_url, AI_API_SCHEMES)
+    refusal = find_internal_api_url_refusal(
+        DATA_API_URL_VARIABLE, data_api_url, environ
+    ) or find_internal_api_url_refusal(AI_API_URL_VARIABLE, ai_api_url, environ)
     if refusal is not None:
         return refusal
     exchange_storage = read_exchange_storage_settings_or_refusal(environ)
