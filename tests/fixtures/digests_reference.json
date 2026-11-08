@@ -1,0 +1,130 @@
+{
+  "request_time": "2026-10-08T12:00:30Z",
+  "window_days": 14,
+  "subjects": [
+    {
+      "name": "vulnerabilities",
+      "definition": "une faille identifiée (CVE, GHSA) : catalogue CISA KEV, alertes GitHub des paquets suivis, article qui la décrit"
+    },
+    {
+      "name": "llm_security",
+      "definition": "attaques et défenses propres aux modèles et aux agents (injection d'instructions, jailbreak, empoisonnement, porte dérobée), sans CVE ni GHSA"
+    },
+    {
+      "name": "agent_frameworks",
+      "definition": "versions et nouvelles de LangChain, LangGraph, LlamaIndex et des cadres d'agents"
+    },
+    {
+      "name": "coding_assistants",
+      "definition": "assistants de code (Claude Code et autres) : versions, fonctions, usages"
+    },
+    {
+      "name": "models",
+      "definition": "nouveaux modèles, évaluations, capacités et limites annoncées"
+    },
+    {
+      "name": "ai_industry",
+      "definition": "entreprises, produits, financements et régulation de l'IA"
+    },
+    {
+      "name": "cybersecurity",
+      "definition": "incidents, campagnes d'attaque, outils et pratiques de sécurité hors IA, sans CVE ni GHSA"
+    },
+    {
+      "name": "software_engineering",
+      "definition": "outils, langages et pratiques de développement hors IA"
+    },
+    {
+      "name": "tech_industry",
+      "definition": "entreprises, produits, plateformes et matériel de la tech, hors IA"
+    }
+  ],
+  "items": [
+    {
+      "kind": "vulnerability",
+      "title": "Apple Multiple Products Out-of-Bounds Write Vulnerability",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-86950",
+      "source_file": "tests/fixtures/cisa_kev_extract.csv",
+      "license": "CC0 1.0"
+    },
+    {
+      "kind": "vulnerability",
+      "title": "Citrix NetScaler Improper Input Validation Vulnerability",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-88771",
+      "source_file": "tests/fixtures/cisa_kev_extract.csv",
+      "license": "CC0 1.0"
+    },
+    {
+      "kind": "vulnerability",
+      "title": "Citrix NetScaler Improper Restriction of Operations within the Bounds of a Memory Buffer Vulnerability",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-88772",
+      "source_file": "tests/fixtures/cisa_kev_extract.csv",
+      "license": "CC0 1.0"
+    },
+    {
+      "kind": "paper",
+      "title": "PACE: Provenance-Aware Capability Enforcement for Tool-Using LLM Agents",
+      "url": "https://arxiv.org/abs/2610.01349",
+      "source_file": "tests/fixtures/arxiv_extract.xml",
+      "license": "CC0 1.0"
+    },
+    {
+      "kind": "paper",
+      "title": "Evaluating System One Models for Agent Security Decisions: Reliability, Calibration, and Selective Automation",
+      "url": "https://arxiv.org/abs/2609.33401",
+      "source_file": "tests/fixtures/arxiv_extract.xml",
+      "license": "CC0 1.0"
+    },
+    {
+      "kind": "paper",
+      "title": "Resource-Optimized and Energy-Aware Agentic AI Framework Anchored on Blockchain for Secure Software Supply Chains",
+      "url": "https://arxiv.org/abs/2609.31282",
+      "source_file": "tests/fixtures/arxiv_extract.xml",
+      "license": "CC0 1.0"
+    }
+  ],
+  "calls": [
+    {
+      "stage": "classify",
+      "prompt_version": "classify-2",
+      "model": "gpt-6-luna",
+      "response_model": "gpt-6-luna-2026-09-22",
+      "reasoning_effort": "none",
+      "called_at": "2026-11-08T20:29:31Z",
+      "step": {
+        "kind": "response",
+        "status": 200,
+        "body": "{\"choices\":[{\"content_filter_results\":{\"hate\":{\"filtered\":false,\"severity\":\"safe\"},\"protected_material_code\":{\"detected\":false,\"filtered\":false},\"protected_material_text\":{\"detected\":false,\"filtered\":false},\"self_harm\":{\"filtered\":false,\"severity\":\"safe\"},\"sexual\":{\"filtered\":false,\"severity\":\"safe\"},\"violence\":{\"filtered\":false,\"severity\":\"safe\"}},\"finish_reason\":\"stop\",\"index\":0,\"logprobs\":null,\"message\":{\"annotations\":[],\"content\":\"{\\\"i4\\\":\\\"vulnerabilities\\\",\\\"i6\\\":\\\"vulnerabilities\\\",\\\"i5\\\":\\\"vulnerabilities\\\",\\\"i3\\\":\\\"llm_security\\\",\\\"i2\\\":\\\"llm_security\\\",\\\"i1\\\":\\\"llm_security\\\"}\",\"refusal\":null,\"role\":\"assistant\"}}],\"created\":1794169770,\"id\":\"chatcmpl-Ei3o2hOj9VRO4CPjuuGuHMbUzpsAW\",\"model\":\"gpt-6-luna-2026-09-22\",\"object\":\"chat.completion\",\"prompt_filter_results\":[{\"prompt_index\":0,\"content_filter_results\":{\"hate\":{\"filtered\":false,\"severity\":\"safe\"},\"jailbreak\":{\"detected\":false,\"filtered\":false},\"self_harm\":{\"filtered\":false,\"severity\":\"safe\"},\"sexual\":{\"filtered\":false,\"severity\":\"safe\"},\"violence\":{\"filtered\":false,\"severity\":\"safe\"}}}],\"routing\":{\"serving_pipereplica\":\"d20261105183740-8825a78a-prefill-r6-dp0-prefill\"},\"service_tier\":\"default\",\"system_fingerprint\":null,\"usage\":{\"completion_tokens\":49,\"completion_tokens_details\":{\"accepted_prediction_tokens\":0,\"audio_tokens\":0,\"reasoning_tokens\":0,\"rejected_prediction_tokens\":0},\"latency_checkpoint\":{\"engine_tbt_ms\":5,\"engine_ttft_ms\":83,\"engine_ttlt_ms\":350,\"pre_inference_ms\":109,\"service_tbt_ms\":6,\"service_ttft_ms\":242,\"service_ttlt_ms\":521,\"user_visible_ttft_ms\":133},\"prompt_tokens\":1382,\"prompt_tokens_details\":{\"audio_tokens\":0,\"cache_write_tokens\":0,\"cached_tokens\":0},\"total_tokens\":1431}}\n",
+        "retry_after": null
+      }
+    },
+    {
+      "stage": "write",
+      "prompt_version": "write-1",
+      "model": "gpt-6-luna",
+      "response_model": "gpt-6-luna-2026-09-22",
+      "reasoning_effort": "none",
+      "called_at": "2026-11-08T20:29:33Z",
+      "step": {
+        "kind": "response",
+        "status": 200,
+        "body": "{\"choices\":[{\"content_filter_results\":{\"hate\":{\"filtered\":false,\"severity\":\"safe\"},\"protected_material_code\":{\"detected\":false,\"filtered\":false},\"protected_material_text\":{\"detected\":false,\"filtered\":false},\"self_harm\":{\"filtered\":false,\"severity\":\"safe\"},\"sexual\":{\"filtered\":false,\"severity\":\"safe\"},\"violence\":{\"filtered\":false,\"severity\":\"safe\"}},\"finish_reason\":\"stop\",\"index\":0,\"logprobs\":null,\"message\":{\"annotations\":[],\"content\":\"{\\\"claims\\\":[{\\\"text\\\":\\\"Apple iOS, macOS et iPadOS présentent une vulnérabilité d’écriture hors limites dans CoreGraphics pouvant mener à l’exécution de code arbitraire.\\\",\\\"item_ids\\\":[\\\"i4\\\"],\\\"facts\\\":[{\\\"value\\\":\\\"CVE-2026-86950\\\",\\\"item_id\\\":\\\"i4\\\"},{\\\"value\\\":\\\"Apple\\\",\\\"item_id\\\":\\\"i4\\\"},{\\\"value\\\":\\\"CoreGraphics\\\",\\\"item_id\\\":\\\"i4\\\"}]},{\\\"text\\\":\\\"Citrix NetScaler ADC et NetScaler Gateway présentent une validation incorrecte des entrées qui pourrait permettre à un attaquant non authentifié d’exécuter des commandes arbitraires.\\\",\\\"item_ids\\\":[\\\"i6\\\"],\\\"facts\\\":[{\\\"value\\\":\\\"CVE-2026-88771\\\",\\\"item_id\\\":\\\"i6\\\"},{\\\"value\\\":\\\"Citrix\\\",\\\"item_id\\\":\\\"i6\\\"},{\\\"value\\\":\\\"NetScaler\\\",\\\"item_id\\\":\\\"i6\\\"}]},{\\\"text\\\":\\\"Citrix NetScaler ADC et NetScaler Gateway présentent une restriction incorrecte des opérations dans les limites d’un tampon mémoire, susceptible d’entraîner une exécution de code à distance ou un déni de service.\\\",\\\"item_ids\\\":[\\\"i5\\\"],\\\"facts\\\":[{\\\"value\\\":\\\"CVE-2026-88772\\\",\\\"item_id\\\":\\\"i5\\\"},{\\\"value\\\":\\\"NetScaler\\\",\\\"item_id\\\":\\\"i5\\\"}]}]}\",\"refusal\":null,\"role\":\"assistant\"}}],\"created\":1794169771,\"id\":\"chatcmpl-Ei3o3QP8NfwnJ1ePTtdDSEJXrrpye\",\"model\":\"gpt-6-luna-2026-09-22\",\"object\":\"chat.completion\",\"prompt_filter_results\":[{\"prompt_index\":0,\"content_filter_results\":{\"hate\":{\"filtered\":false,\"severity\":\"safe\"},\"jailbreak\":{\"detected\":false,\"filtered\":false},\"self_harm\":{\"filtered\":false,\"severity\":\"safe\"},\"sexual\":{\"filtered\":false,\"severity\":\"safe\"},\"violence\":{\"filtered\":false,\"severity\":\"safe\"}}}],\"routing\":{\"serving_pipereplica\":\"d20261105183740-cce0d4f5-prefill-r8-dp0-prefill\"},\"service_tier\":\"default\",\"system_fingerprint\":null,\"usage\":{\"completion_tokens\":271,\"completion_tokens_details\":{\"accepted_prediction_tokens\":0,\"audio_tokens\":0,\"reasoning_tokens\":0,\"rejected_prediction_tokens\":0},\"latency_checkpoint\":{\"engine_tbt_ms\":5,\"engine_ttft_ms\":83,\"engine_ttlt_ms\":1440,\"pre_inference_ms\":109,\"service_tbt_ms\":5,\"service_ttft_ms\":247,\"service_ttlt_ms\":1594,\"user_visible_ttft_ms\":138},\"prompt_tokens\":839,\"prompt_tokens_details\":{\"audio_tokens\":0,\"cache_write_tokens\":0,\"cached_tokens\":0},\"total_tokens\":1110}}\n",
+        "retry_after": null
+      }
+    },
+    {
+      "stage": "write",
+      "prompt_version": "write-1",
+      "model": "gpt-6-luna",
+      "response_model": "gpt-6-luna-2026-09-22",
+      "reasoning_effort": "none",
+      "called_at": "2026-11-08T20:29:37Z",
+      "step": {
+        "kind": "response",
+        "status": 200,
+        "body": "{\"choices\":[{\"content_filter_results\":{\"hate\":{\"filtered\":false,\"severity\":\"safe\"},\"protected_material_code\":{\"detected\":false,\"filtered\":false},\"protected_material_text\":{\"detected\":false,\"filtered\":false},\"self_harm\":{\"filtered\":false,\"severity\":\"safe\"},\"sexual\":{\"filtered\":false,\"severity\":\"safe\"},\"violence\":{\"filtered\":false,\"severity\":\"safe\"}},\"finish_reason\":\"stop\",\"index\":0,\"logprobs\":null,\"message\":{\"annotations\":[],\"content\":\"{\\\"claims\\\":[{\\\"text\\\":\\\"PACE intercepte les appels d’outils juste avant leur exécution et vérifie que leurs effets respectent l’autorité dérivée de la requête authentifiée. Sur 79 colonnes d’attaque admissibles, sa configuration évaluée obtient le taux de réussite d’attaque le plus bas dans 62 cas et est à égalité dans 14.\\\",\\\"item_ids\\\":[\\\"i3\\\"],\\\"facts\\\":[{\\\"value\\\":\\\"PACE\\\",\\\"item_id\\\":\\\"i3\\\"},{\\\"value\\\":\\\"79\\\",\\\"item_id\\\":\\\"i3\\\"},{\\\"value\\\":\\\"62\\\",\\\"item_id\\\":\\\"i3\\\"},{\\\"value\\\":\\\"14\\\",\\\"item_id\\\":\\\"i3\\\"}]},{\\\"text\\\":\\\"Dans une recherche adaptative à échelle réduite, PACE bloque les 30 tentatives visant des cibles hors autorité; l’utilité native sur l’ensemble des benchmarks baisse d’au plus trois points par rapport à l’agent sans défense.\\\",\\\"item_ids\\\":[\\\"i3\\\"],\\\"facts\\\":[{\\\"value\\\":\\\"PACE\\\",\\\"item_id\\\":\\\"i3\\\"},{\\\"value\\\":\\\"0/30\\\",\\\"item_id\\\":\\\"i3\\\"},{\\\"value\\\":\\\"three points\\\",\\\"item_id\\\":\\\"i3\\\"}]},{\\\"text\\\":\\\"L’évaluation de Jev, Laya, Decider et Bespoke Nimble relève que de bonnes performances globales peuvent masquer des attaques classées comme sûres avec une forte confiance; les configurations adaptées n’améliorent pas systématiquement leurs modèles de base.\\\",\\\"item_ids\\\":[\\\"i2\\\"],\\\"facts\\\":[{\\\"value\\\":\\\"Jev\\\",\\\"item_id\\\":\\\"i2\\\"},{\\\"value\\\":\\\"Laya\\\",\\\"item_id\\\":\\\"i2\\\"},{\\\"value\\\":\\\"Decider\\\",\\\"item_id\\\":\\\"i2\\\"},{\\\"value\\\":\\\"Bespoke Nimble\\\",\\\"item_id\\\":\\\"i2\\\"}]},{\\\"text\\\":\\\"Sous les limites d’erreur les plus strictes évaluées, les politiques automatisent peu d’autorisations; séparer les seuils d’autorisation et de blocage augmente surtout l’automatisation en entraînant davantage de blocages.\\\",\\\"item_ids\\\":[\\\"i2\\\"],\\\"facts\\\":[{\\\"value\\\":\\\"allow\\\",\\\"item_id\\\":\\\"i2\\\"},{\\\"value\\\":\\\"block\\\",\\\"item_id\\\":\\\"i2\\\"}]},{\\\"text\\\":\\\"Un juge peut repérer des attaques manquées par un autre modèle, mais aussi signaler à tort davantage d’entrées bénignes et partager ses erreurs à forte confiance.\\\",\\\"item_ids\\\":[\\\"i2\\\"],\\\"facts\\\":[{\\\"value\\\":\\\"high-confidence errors\\\",\\\"item_id\\\":\\\"i2\\\"}]},{\\\"text\\\":\\\"Le cadre proposé pour la chaîne d’approvisionnement logicielle consigne sur une blockchain à accès restreint les attestations signées des agents, et prévoit un registre des agents, un journal immuable et un module de politique de publication.\\\",\\\"item_ids\\\":[\\\"i1\\\"],\\\"facts\\\":[{\\\"value\\\":\\\"permissioned blockchain\\\",\\\"item_id\\\":\\\"i1\\\"},{\\\"value\\\":\\\"agent registry\\\",\\\"item_id\\\":\\\"i1\\\"},{\\\"value\\\":\\\"immutable attestation log\\\",\\\"item_id\\\":\\\"i1\\\"},{\\\"value\\\":\\\"enforceable release-policy module\\\",\\\"item_id\\\":\\\"i1\\\"}]}]}\",\"refusal\":null,\"role\":\"assistant\"}}],\"created\":1794169773,\"id\":\"chatcmpl-Ei3o5bjj5FbKdtvqraviaqDyBEQR6\",\"model\":\"gpt-6-luna-2026-09-22\",\"object\":\"chat.completion\",\"prompt_filter_results\":[{\"prompt_index\":0,\"content_filter_results\":{\"hate\":{\"filtered\":false,\"severity\":\"safe\"},\"jailbreak\":{\"detected\":false,\"filtered\":false},\"self_harm\":{\"filtered\":false,\"severity\":\"safe\"},\"sexual\":{\"filtered\":false,\"severity\":\"safe\"},\"violence\":{\"filtered\":false,\"severity\":\"safe\"}}}],\"routing\":{\"serving_pipereplica\":\"d20261105183740-cce0d4f5-prefill-r6-dp0-prefill\"},\"service_tier\":\"default\",\"system_fingerprint\":null,\"usage\":{\"completion_tokens\":607,\"completion_tokens_details\":{\"accepted_prediction_tokens\":0,\"audio_tokens\":0,\"reasoning_tokens\":0,\"rejected_prediction_tokens\":0},\"latency_checkpoint\":{\"engine_tbt_ms\":6,\"engine_ttft_ms\":123,\"engine_ttlt_ms\":3570,\"pre_inference_ms\":83,\"service_tbt_ms\":6,\"service_ttft_ms\":255,\"service_ttlt_ms\":3699,\"user_visible_ttft_ms\":171},\"prompt_tokens\":1397,\"prompt_tokens_details\":{\"audio_tokens\":0,\"cache_write_tokens\":0,\"cached_tokens\":0},\"total_tokens\":2004}}\n",
+        "retry_after": null
+      }
+    }
+  ]
+}
