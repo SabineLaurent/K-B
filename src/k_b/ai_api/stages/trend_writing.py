@@ -362,6 +362,7 @@ def build_writing_message(
     description, description_cut = clean_description(candidate.description)
     topics = list(facts.topics[:MAX_TOPICS_FOR_SELECTION])
     own_subjects = [s for s in subjects if s.name in chosen.watch_subjects]
+    readme_searched = search_in(readme_text, MAX_README_CHARS_FOR_WRITING)
     return WritingMessage(
         user_data={
             "ref": chosen.ref,
@@ -382,9 +383,9 @@ def build_writing_message(
         sources={
             "sector": tuple(normalize(topic) for topic in topics),
             "watch_link": tuple(normalize(s.definition) for s in own_subjects),
-            "readme_summary": search_in(readme_text, MAX_README_CHARS_FOR_WRITING),
+            "readme_summary": readme_searched,
             "promise": (
-                *search_in(readme_text, MAX_README_CHARS_FOR_WRITING),
+                *readme_searched,
                 *search_in(description, MAX_DESCRIPTION_CHARS_FOR_SELECTION),
             ),
         },
