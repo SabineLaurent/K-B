@@ -10,7 +10,7 @@
   "graphTooltip": 1,
   "fiscalYearStartMonth": 0,
   "liveNow": false,
-  "refresh": "",
+  "refresh": "1m",
   "schemaVersion": 41,
   "version": 1,
   "time": {
