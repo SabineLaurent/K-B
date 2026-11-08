@@ -6,7 +6,8 @@
 
 Cette fiche dit comment installer l'environnement de test, quelles dépendances il installe, comment lancer les
 tests et calculer leur couverture, puis donne le plan de tests de `POST /digests`. Elle est écrite d'après le code de
-`main` au commit `852dad4` (2026-11-08). Les chemins `tests/…` partent de la racine du dépôt, les autres de `src/k_b/`.
+`main` au commit `852dad4` (2026-11-08). Les chemins du code de K-B (`ai_api/…`, `core/…`) partent de `src/k_b/`,
+les autres de la racine du dépôt.
 
 ## Installer l'environnement de test
 
@@ -28,14 +29,16 @@ versions de `uv.lock`, sans le mettre à jour.
 **Sans `.env`** : aucun test ne lit de `.env`. Les cibles `make test*` lancent pytest sans `--env-file`
 (`Makefile`). Avant chaque test, la fixture `no_kb_setting_of_the_terminal` (`tests/conftest.py`) retire les
 réglages de `kb` qu'un terminal peut exporter (`KB_SETTINGS_VARIABLES`, dont `KB_DATABASE_URL` et
-`KB_DEPLOYMENT_ENVIRONMENT`) et les variables que lit libpq (`LIBPQ_VARIABLES`) : un `.env` exporté ne change ni ce
-que les tests vérifient, ni la base où ils écrivent.
+`KB_DEPLOYMENT_ENVIRONMENT`) et les variables que lit libpq (`LIBPQ_VARIABLES`) : une variable de ces deux listes,
+exportée par le terminal, ne change ni ce que les tests vérifient, ni la base où ils écrivent. Les autres variables
+d'un `.env` exporté ne sont pas retirées.
 
 **Pour les tests marqués `postgresql`** : un serveur PostgreSQL de test, nommé par `KB_TEST_POSTGRESQL_URL`. C'est
 un serveur de la machine (sur le Mac, le PostgreSQL de Homebrew, sans conteneur) ou le service de la CI, jamais la
 base de production. Son rôle doit pouvoir créer et supprimer une base (`make_postgresql_base`), et créer des rôles
-pour les tests des droits de la base en ligne (`identity_roles`, `tests/conftest.py`). Chaque base de test est créée
-en UTF8 et en collation C, comme `kb create-db` la demande (`create_postgresql_base`). Dans la CI, le job
+pour les tests des droits de la base en ligne (`identity_roles`, `tests/conftest.py`). Une base de test est créée
+par défaut en UTF8 et en collation C, comme `kb create-db` la demande (`create_postgresql_base`) ; un test peut en
+demander d'autres réglages (`make_postgresql_base`). Dans la CI, le job
 `tests-postgresql` démarre `postgres:18.6`, épinglé par son digest, sans mot de passe (`POSTGRES_HOST_AUTH_METHOD:
 trust`, joignable du seul runner), avec `KB_TEST_POSTGRESQL_URL=postgresql://kb@127.0.0.1:5432/postgres`.
 
@@ -49,7 +52,7 @@ par git, `.gitignore`) et le remplir. Il ne porte que leurs variables :
 | `KB_VAULT_DIR` | le test des clips est sauté |
 | `GOOGLE_APPLICATION_CREDENTIALS` | le test de `gh_archive` est sauté ; avec elle, il lance une vraie requête BigQuery |
 | `KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS` | le test de l'export des mesures est sauté |
-| `KB_DEPLOYMENT_ENVIRONMENT` | `sandbox` dans le modèle ; le test de l'export la lit avec les deux précédentes (voir #495, « Les tests de bout en bout ») |
+| `KB_DEPLOYMENT_ENVIRONMENT` | avec les deux précédentes, le test de l'export échoue (`KB_DEPLOYMENT_ENVIRONMENT: not set, sandbox or production`) ; il échoue aussi avec elle tant que #495 est ouverte (« Les tests de bout en bout ») ; `sandbox` dans le modèle |
 
 Ils se lancent depuis un terminal sans `.env` exporté. Si l'environnement porte une autre variable de
 `.env.example` (hors de celles que le test pose lui-même, `KB_DATA_DIR` et `KB_COLLECT_ONLY`, et de celles que
@@ -60,7 +63,7 @@ noms, jamais leurs valeurs.
 ## Les dépendances installées
 
 Les outils des tests sont le groupe `dev` du `pyproject.toml` (versions planchers ci-dessous ; versions exactes dans
-`uv.lock`). L'image n'en installe aucun : `uv sync --locked --no-dev` (`Dockerfile`).
+`uv.lock`). L'image n'en installe aucun : ses deux `uv sync` portent l'option `--no-dev` (`Dockerfile`).
 
 | Paquet | Version plancher | Rôle |
 |---|---|---|
@@ -88,7 +91,7 @@ en mémoire du SDK OpenTelemetry (`tests/ai_api/conftest.py`).
 | `make test` | comme `uv run pytest`, avec le rapport `reports/test.html` |
 | `make test-ai-api`, `make test-data-api` | `tests/ai_api` ou `tests/data_api`, puis les tests du code commun aux deux API (`API_COMMON_TESTS` du `Makefile`) ; rapports `reports/test-ai-api.html` ou `reports/test-data-api.html`, puis `reports/test-api-common.html` |
 | `make test-etl` | `tests/etl`, rapport `reports/test-etl.html` |
-| `uv run ruff check --no-cache`, `uv run ruff format --check`, `uv run mypy --strict` | le lint, le format et le typage, comme la CI |
+| `uv run ruff check --no-cache`, `uv run ruff format --check`, `uv run mypy --strict` | le lint, le format et le typage. La CI lance `uv run ruff check` sans `--no-cache` ; sur la machine, `--no-cache` est une précaution, un passage avec le cache ayant déjà laissé passer des imports non triés (`MEMORY.md`, « `ruff` sans son cache ») |
 
 **Sur PostgreSQL.** Un test qui écrit reçoit une base neuve, `kb_test_<hex>`, supprimée après les tests de son
 module (`make_postgresql_base`) ; les tests de lecture partagent une base, construite une fois par session
@@ -96,7 +99,7 @@ module (`make_postgresql_base`) ; les tests de lecture partagent une base, const
 `uv run pytest`, sa moitié `[postgresql]` sous `-m postgresql` (`ENGINES`, `tests/conftest.py`).
 
 **Les rapports.** `restrict_report_to_user` (`tests/conftest.py`) crée le rapport de `--html` en `0600`, et son
-dossier en `0700`, avant que pytest-html l'écrive : il garde la sortie capturée de chaque test. Un rapport demandé
+dossier en `0700` s'il le crée, avant que pytest-html l'écrive : il garde la sortie capturée de chaque test. Un rapport demandé
 dans le dépôt hors de `reports/`, que git ne laisserait pas de côté, arrête pytest. Chaque exécution écrase le
 rapport précédent.
 
@@ -104,7 +107,7 @@ rapport précédent.
 
 | Test | Ce qu'il fait |
 |---|---|
-| `test_kb_collects_and_imports_the_real_source` (`tests/e2e/test_real_sources.py`) | lance `kb` sur la vraie source, un test par source (paramétré par `SOURCE_KINDS`) ; sauté sans la variable de sa source |
+| `test_kb_collects_and_imports_the_real_source` (`tests/e2e/test_real_sources.py`) | lance `kb` sur la vraie source, un test par source (paramétré par `SOURCE_KINDS`) ; pour les trois sources qui ont une variable (Zotero, clips, `gh_archive`), sauté sans elle ; les autres ne sont jamais sautées |
 | `test_the_measures_of_a_request_reach_the_otlp_endpoint` (`tests/e2e/test_real_export.py`) | envoie au vrai point OTLP (Grafana Cloud) les mesures d'une demande à l'API IA sur le modèle rejoué, à l'arrêt de l'application ; sauté sans `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS` |
 
 **Le test de l'export échoue dès que l'export est réglé, tant que #495 est ouverte.** `KB_DEPLOYMENT_ENVIRONMENT` est
@@ -145,7 +148,7 @@ Les tests `e2e` ne tournent jamais dans la CI : ils appellent de vraies sources 
 
 ```sh
 make test-cov                                   # les fichiers sous 100 % dans la console, le tableau complet dans reports/coverage.md
-uv run pytest --cov --cov-report=term-missing   # tous les fichiers dans la console, sans fichier
+uv run pytest --cov --cov-report=term-missing   # tous les fichiers dans la console, sans rapport écrit
 ```
 
 Les réglages sont dans `pyproject.toml` :
@@ -215,8 +218,9 @@ Intégration (vraie API de données sur la base de test, faux transport) : `test
 
 ### 2. Préparation de l'entrée du modèle : coupe et plafond
 
-Unitaire : `tests/ai_api/test_watch_items.py`, `tests/ai_api/test_stages.py`. Intégration (modèle rejoué, base de
-test) : `tests/ai_api/test_data_api_client.py`, `tests/ai_api/test_digests.py`. Les bornes sont dans
+Unitaire : `tests/ai_api/test_watch_items.py`, `tests/ai_api/test_stages.py`. Intégration :
+`tests/ai_api/test_data_api_client.py` (vraie API de données sur la base de test, faux transport) ;
+`tests/ai_api/test_digests.py` (modèle rejoué, base de test). Les bornes sont dans
 `core/config.py` : `MAX_ITEMS_PER_DIGEST_REQUEST = 300`, `MAX_ITEMS_PER_DIGEST = 60`,
 `MAX_FIELD_CHARS_FOR_WRITING = 2000`, `MAX_ITEMS_PER_CLASSIFICATION_CALL = 45`,
 `MAX_CLASSIFICATION_INPUT_CHARS = 36_000`, `MAX_FIELD_CHARS_FOR_CLASSIFICATION = 500`.
@@ -233,8 +237,8 @@ test) : `tests/ai_api/test_data_api_client.py`, `tests/ai_api/test_digests.py`. 
 
 ### 3. Consigne
 
-Unitaire : `tests/ai_api/test_stages.py`, `tests/ai_api/test_llm_client.py` (modèle rejoué). Intégration :
-`tests/ai_api/test_digests.py`.
+Unitaire : `tests/ai_api/test_stages.py` (fonctions seules), `tests/ai_api/test_llm_client.py` (modèle rejoué).
+Intégration : `tests/ai_api/test_digests.py` (modèle rejoué, base de test).
 
 | Cas | Test | Fichier |
 |---|---|---|
@@ -249,16 +253,17 @@ Unitaire : `tests/ai_api/test_stages.py`, `tests/ai_api/test_llm_client.py` (mod
 
 ### 4. Contrôles 1 à 6
 
-Les six contrôles de chaque sortie du modèle (`docs/fiches-veille.md`, « Contrôles »). Unitaire, sur le modèle
-rejoué : `tests/ai_api/test_llm_client.py`, `tests/ai_api/test_stages.py`. Intégration : `tests/ai_api/test_digests.py`.
+Les six contrôles de chaque sortie du modèle (`docs/fiches-veille.md`, « Contrôles »). Unitaire :
+`tests/ai_api/test_stages.py` (fonctions seules), `tests/ai_api/test_llm_client.py` (modèle rejoué). Intégration :
+`tests/ai_api/test_digests.py` (modèle rejoué, base de test).
 
 | Contrôle | Cas | Test | Fichier |
 |---|---|---|---|
 | 1. `finish_reason` | `length`, `content_filter`, une valeur inconnue, `null` | `test_a_truncated_output_is_llm_truncated_without_retry`, `test_a_filtered_output_is_llm_content_filtered_without_retry`, `test_an_unknown_finish_reason_is_asked_again`, `test_a_finish_reason_null_is_refused_by_check_1_and_asked_again` | `tests/ai_api/test_llm_client.py` |
-| 2. schéma | une sortie hors modèle, une clé deux fois, trop d'affirmations, une affirmation qui cite 0 ou plus de 5 items | `test_an_output_out_of_its_model_fails_the_schema_check`, `test_only_json_without_a_key_twice_is_read`, `test_more_claims_than_the_structure_allows_is_a_schema_failure`, `test_a_claim_citing_no_item_or_more_than_five_is_a_schema_failure` | `tests/ai_api/test_llm_client.py`, `tests/ai_api/test_digests.py` |
+| 2. schéma | une sortie hors modèle, une clé deux fois, un item répondu deux fois au classement, trop d'affirmations, une affirmation qui cite 0 ou plus de 5 items | `test_an_output_out_of_its_model_fails_the_schema_check`, `test_only_json_without_a_key_twice_is_read`, `test_an_item_answered_twice_at_the_classification_is_llm_invalid_output`, `test_more_claims_than_the_structure_allows_is_a_schema_failure`, `test_a_claim_citing_no_item_or_more_than_five_is_a_schema_failure` | `tests/ai_api/test_llm_client.py`, `tests/ai_api/test_digests.py` |
 | 3. sujets | un sujet hors de la liste | `test_a_subject_out_of_the_list_is_refused` | `tests/ai_api/test_digests.py` |
 | 4. `item_id` | un identifiant inconnu au classement et à la rédaction, un item d'un autre lot, un fait d'un item que son affirmation ne cite pas | `test_an_unknown_item_id_is_refused_at_the_classification`, `test_an_unknown_item_id_is_refused_at_the_writing_and_the_others_are_returned`, `test_an_item_of_another_batch_is_refused`, `test_a_fact_of_an_item_its_claim_does_not_cite_is_refused` | `tests/ai_api/test_digests.py` |
-| 5. complétude | une réponse à aucun item, un item sans réponse, un item répondu deux fois | `test_an_answer_to_no_item_is_asked_again_then_fails_the_request`, `test_an_item_without_answer_is_counted_apart_without_failure`, `test_an_item_answered_twice_at_the_classification_is_llm_invalid_output` | `tests/ai_api/test_digests.py` |
+| 5. complétude | une réponse à aucun item, un item sans réponse | `test_an_answer_to_no_item_is_asked_again_then_fails_the_request`, `test_an_item_without_answer_is_counted_apart_without_failure` | `tests/ai_api/test_digests.py` |
 | 6. Markdown | un lien, une image ou une balise ; un texte simple ; le rappel après un refus | `test_a_text_with_a_link_an_image_or_a_tag_is_refused`, `test_a_plain_text_passes_the_check_of_markup`, `test_the_retry_after_a_markup_sends_its_reminder` | `tests/ai_api/test_stages.py`, `tests/ai_api/test_digests.py` |
 | ordre et nouvelle tentative | les contrôles dans leur ordre ; une sortie refusée deux fois | `test_the_checks_of_the_writing_go_in_their_order`, `test_an_output_refused_twice_is_llm_invalid_output` | `tests/ai_api/test_digests.py`, `tests/ai_api/test_llm_client.py` |
 
@@ -286,8 +291,9 @@ Une fiche ne dit que ce que disent ses items (`docs/fiches-veille.md`, « Fidél
 ### 6. Routes
 
 Intégration : la vraie application de l'API IA (`create_app`), le `TestClient`, la vraie API de données sur la base
-de test et le modèle rejoué, `tests/ai_api/test_digest_router.py` ; l'OpenAPI, `tests/ai_api/test_ai_api_openapi.py`.
-Bout en bout, dans la CI : `tests/commands/test_live_apis.py`.
+de test et le modèle rejoué, `tests/ai_api/test_digest_router.py` ; les étapes (`build_digests`, sans route, modèle
+rejoué, base de test), `tests/ai_api/test_digests.py` ; l'OpenAPI, `tests/ai_api/test_ai_api_openapi.py`. Bout en
+bout, dans la CI : `tests/commands/test_live_apis.py`.
 
 | Cas | Test | Fichier |
 |---|---|---|
@@ -298,13 +304,14 @@ Bout en bout, dans la CI : `tests/commands/test_live_apis.py`.
 | un classement en échec fait échouer la demande ; une rédaction en échec nomme son sujet et rend les autres | `test_a_classification_that_fails_fails_the_request_with_its_lines`, `test_a_writing_that_fails_names_its_subject_and_the_others_are_returned` | `tests/ai_api/test_digest_router.py` |
 | chaque état qui fait échouer une demande a son statut HTTP | `test_each_state_that_fails_a_request_has_its_status` | `tests/ai_api/test_digest_router.py` |
 | chaque route ne répond qu'à sa méthode ; une barre finale est une route inconnue | `test_every_route_answers_its_method_only_and_405_to_any_other`, `test_a_final_slash_is_an_unknown_route` | `tests/ai_api/test_digest_router.py` |
-| l'échéance de 200 s : chaque appel l'attend au plus, un sujet non rédigé à temps est `llm_timeout` | `test_every_call_of_the_request_waits_no_longer_than_its_deadline`, `test_the_subjects_not_written_by_the_deadline_are_llm_timeout` | `tests/ai_api/test_digests.py` |
+| l'échéance de la demande (200 s en production, `DIGEST_REQUEST_TIMEOUT_SECONDS` ; une échéance d'essai dans ces tests) : chaque appel l'attend au plus, un sujet non rédigé à temps est `llm_timeout` | `test_every_call_of_the_request_waits_no_longer_than_its_deadline`, `test_the_subjects_not_written_by_the_deadline_are_llm_timeout` | `tests/ai_api/test_digests.py` |
 | l'OpenAPI versionnée est celle que produit l'application, et documente chaque état nommé | `test_the_versioned_openapi_is_the_one_the_app_produces`, `test_the_route_documents_each_named_state` | `tests/ai_api/test_ai_api_openapi.py` |
 | `kb digest` écrit les fiches par les deux API servies pour de vrai | `test_digest_writes_the_sheets_through_the_ai_api_and_the_data_api` | `tests/commands/test_live_apis.py` |
 
 ### 7. Accès
 
-Intégration : `tests/ai_api/test_digest_router.py` ; le démarrage de `kb serve-ai`, `tests/ai_api/test_serve_ai.py` ;
+Intégration : `tests/ai_api/test_digest_router.py` ; le démarrage de `kb serve-ai`, par `cli.main`, `uvicorn.run`
+remplacé (il ne tourne pas), `tests/ai_api/test_serve_ai.py` ;
 la fenêtre de la limite de débit, code commun aux deux API, en unitaire sur une horloge réglée par le test,
 `tests/test_api_rate_limit.py`.
 
@@ -330,7 +337,7 @@ Intégration, mesures et traces en mémoire : `tests/ai_api/test_digest_router.p
 | le coût, et le taux de fidélité | `test_the_cost_is_the_tokens_at_the_prices_of_the_config`, `test_the_fidelity_rate_is_the_facts_found_over_the_facts_checked` | `tests/ai_api/test_digest_router.py` |
 | les mêmes mesures en OpenTelemetry, à attributs fermés | `test_each_call_is_measured_in_opentelemetry_as_on_its_line`, `test_a_measure_carries_closed_attributes_never_a_text` | `tests/ai_api/test_digest_router.py` |
 | une demande est une trace de ses étapes, sans texte des items ni de la sortie | `test_a_request_is_a_trace_of_its_steps`, `test_no_value_holds_a_text_of_the_items_or_of_the_output` | `tests/ai_api/test_digest_router.py` |
-| avec `KB_TRACE_CONTENT=all`, le contenu n'est que dans le corps d'un enregistrement | `test_with_content_all_only_the_body_of_a_content_record_holds_a_text` | `tests/ai_api/test_digest_router.py` |
+| avec le contenu `all` (ce que pose `KB_TRACE_CONTENT=all`), le contenu n'est que dans le corps d'un enregistrement | `test_with_content_all_only_the_body_of_a_content_record_holds_a_text` | `tests/ai_api/test_digest_router.py` |
 | chaque affirmation retirée est une évaluation liée à sa dernière requête | `test_each_claim_removed_is_an_evaluation_tied_to_its_last_request` | `tests/ai_api/test_digest_router.py` |
 | à l'arrêt de l'application, mesures, spans et journaux partent | `test_the_measures_the_spans_and_the_logs_are_sent_at_once_when_the_app_stops`, `test_stop_sends_the_measures_not_sent_yet` | `tests/ai_api/test_digest_router.py`, `tests/ai_api/test_metrics_export.py` |
 | un réglage de l'export refusé est nommé sans ses en-têtes ; une variable `OTEL_*` est refusée ; `all` en production est refusé | `test_a_setting_of_the_export_refused_is_named_without_its_headers`, `test_any_variable_of_opentelemetry_is_refused_by_its_name_only`, `test_the_content_of_the_requests_all_in_production_quotes_no_value` | `tests/ai_api/test_metrics_export.py` |
