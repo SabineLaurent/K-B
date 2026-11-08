@@ -6179,18 +6179,23 @@ La comparaison écrite qui fonde le choix de Grafana Cloud (décision 4 du 20/10
 Langfuse Cloud (UE), LangSmith (UE) et Honeycomb, selon les critères de « Wiki : métriques ».
 
 - **Grafana Cloud reste le seul outil de suivi pour le rendu du 25/11 ; Application Insights est
-  repris après le rendu.** Décision de Sabine du 2026-11-08, relayée par time-knight. Pourquoi :
-  non dit par Sabine. Les faits relevés par la comparaison, sans lui être attribués : Grafana Cloud
-  reçoit les trois signaux OTLP de K-B (métriques, traces, journaux), il est en place depuis #162,
-  #345 et #347, et coûte 0 $ dans les limites de l'offre gratuite ; Application Insights reçoit
-  aussi les trois signaux, mais le 08/11 l'abonnement de l'école a `Microsoft.Monitor` et
-  `Microsoft.AlertsManagement` non enregistrés, que Sabine, Reader, ne peut pas enregistrer, et
-  l'envoi y passe par un collecteur OpenTelemetry et une authentification Entra. Option écartée :
-  Application Insights dès le 25/11, recommandé par la comparaison sans biais du sous-agent de
-  time-knight du 08/11 (aucun sous-traitant nouveau, le DPA de l'école, quelques centimes par mois,
-  tout en Bicep), à condition d'enregistrer les deux fournisseurs, d'avoir l'accord du DPO de
-  l'école et une règle d'alerte qui traite l'absence de données ; raison du rejet non dite. Les
-  autres outils sont écartés dans le document, chacun avec sa raison (Langfuse Cloud et LangSmith :
+  repris après le rendu.** Décision de Sabine du 2026-11-08 (« 10. ta recommandation »), sur la
+  recommandation de time-knight, dont les raisons lui ont été dites : deux outils avant le 25/11,
+  c'est deux mises en place, deux documentations (C11.8) et deux essais d'accessibilité (C11.4) ;
+  Application Insights demande soit un collecteur OpenTelemetry avec une authentification Entra,
+  soit une dépendance nouvelle (l'exportateur Azure Monitor), qui demanderait son accord ; les
+  métriques au format Prometheus et leurs alertes dépendent de `Microsoft.Monitor` et
+  `Microsoft.AlertsManagement`, non enregistrés sur l'abonnement de l'école le 08/11, que Sabine,
+  Reader, ne peut pas enregistrer. Pourquoi le reprendre après le rendu : les traces et les
+  journaux resteraient chez Microsoft, sous le DPA de l'école (le contenu d'un appel au modèle en
+  anomalie ne partirait pas chez un sous-traitant américain), dans un outil Azure natif. Faits de
+  la comparaison : Grafana Cloud reçoit les trois signaux OTLP de K-B (métriques, traces,
+  journaux), il est en place depuis #162, #345 et #347, et coûte 0 $ dans les limites de l'offre
+  gratuite. Option écartée : les deux outils dès maintenant, ce qui couvre Application Insights dès
+  le 25/11, recommandé par la comparaison sans biais du sous-agent de time-knight du 08/11 (aucun
+  sous-traitant nouveau, le DPA de l'école, quelques centimes par mois, tout en Bicep, à condition
+  d'enregistrer les deux fournisseurs, d'avoir l'accord du DPO de l'école et une règle d'alerte qui
+  traite l'absence de données) : écartée pour ces deux raisons. Les autres outils sont écartés dans le document, chacun avec sa raison (Langfuse Cloud et LangSmith :
   traces OTLP seules, les métriques et les journaux de K-B sans destination). Limites assumées :
   l'accessibilité n'est essayée que sur Grafana Cloud, les autres outils sont jugés sur leurs
   déclarations publiées ; le texte des prompts, avantage propre de Langfuse et LangSmith, n'est pas
