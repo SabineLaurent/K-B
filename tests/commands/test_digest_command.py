@@ -258,6 +258,20 @@ def test_digest_without_its_key_asks_nothing_and_exits_2(
     assert "ERROR k_b.cli: KB_AI_API_KEY_KB_DIGEST: not set" in capsys.readouterr().err
 
 
+def test_digest_with_the_ai_api_in_http_outside_the_machine_asks_nothing_and_exits_2(
+    monkeypatch, digest_environment, capsys
+):
+    monkeypatch.setenv("KB_AI_API_URL", "http://api-ia:8001")
+    requests = answer_digests(monkeypatch, answer_with())
+
+    assert cli.main(["digest"]) == cli.ExitCode.NOT_STARTED
+    assert requests == []
+    assert (
+        "ERROR k_b.cli: KB_AI_API_URL: http only to 127.0.0.1 or localhost, or in the sandbox"
+        in capsys.readouterr().err
+    )
+
+
 def test_digest_without_the_ai_api_writes_nothing_and_exits_1(
     monkeypatch, digest_environment, capsys
 ):

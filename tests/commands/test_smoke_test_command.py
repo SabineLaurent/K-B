@@ -216,6 +216,16 @@ def test_an_api_that_fails_its_health_fails_the_smoke_test_and_the_other_checks_
             "http://kb-ai?key=1",
             "KB_AI_API_URL: with a query or a fragment",
         ),
+        (
+            "KB_DATA_API_URL",
+            "http://ca-kb-data-api.internal.test.example",
+            "KB_DATA_API_URL: http only to 127.0.0.1 or localhost, or in the sandbox",
+        ),
+        (
+            "KB_AI_API_URL",
+            "http://ca-kb-ai-api.internal.test.example",
+            "KB_AI_API_URL: http only to 127.0.0.1 or localhost, or in the sandbox",
+        ),
     ],
 )
 def test_a_refused_setting_runs_no_check(
