@@ -31,8 +31,10 @@ HTML_COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.DOTALL)
 HTML_TAG = re.compile(r"<[a-zA-Z/!?][^>]*>")
 # A block not closed runs to the end of the text.
 CODE_BLOCK = re.compile(r"(```|~~~).*?(?:\1|\Z)", re.DOTALL)
-BADGE = re.compile(r"\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)")
-IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+# The target of a link or an image: inline, (url), or by reference, [label], [] included.
+TARGET = r"(?:\([^)]*\)|\[[^\]]*\])"
+BADGE = re.compile(rf"\[!\[[^\]]*\]{TARGET}\]{TARGET}")
+IMAGE = re.compile(rf"!\[[^\]]*\]{TARGET}")
 # Before the URLs: jane.doe@www.example.com would become jane.doe@[url].
 # No dot required: jane@localhost; x@latest is masked too.
 EMAIL = re.compile(r"[\w.%+'-]+@[\w-]+(?:\.[\w-]+)*")

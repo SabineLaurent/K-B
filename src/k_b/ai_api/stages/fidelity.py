@@ -6,6 +6,7 @@ import unicodedata
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 
+from k_b.ai_api.repository_texts import MASKED_EMAIL
 from k_b.ai_api.stages.writing import Claim, Fact
 from k_b.ai_api.watch_items import MASKED_LOGIN, MASKED_URL, WatchItem, WatchKind
 from k_b.core.config import MAX_FIELD_CHARS_FOR_WRITING
@@ -238,11 +239,15 @@ def is_fact_found(
     )
 
 
-def to_searched_text(field: str) -> str:
-    """The field normalized, without the masks K-B put in it; at the length of the cut, its end is
-    not a limit."""
-    is_cut = len(field) >= MAX_FIELD_CHARS_FOR_WRITING
-    unmasked = field.replace(MASKED_URL, " ").replace(MASKED_LOGIN, " ")
+def to_searched_text(field: str, max_chars: int = MAX_FIELD_CHARS_FOR_WRITING) -> str:
+    """The field normalized, without the masks K-B put in it, for every caller (a mask is never
+    the source of a fact); at max_chars, the length of its cut, its end is not a limit."""
+    is_cut = len(field) >= max_chars
+    unmasked = (
+        field.replace(MASKED_URL, " ")
+        .replace(MASKED_LOGIN, " ")
+        .replace(MASKED_EMAIL, " ")
+    )
     return normalize(unmasked) + (CUT_END if is_cut else "")
 
 
