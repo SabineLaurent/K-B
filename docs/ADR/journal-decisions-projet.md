@@ -6125,6 +6125,31 @@ celui du plan qu'elle a validé, ou du tri de time-knight quand il est nommé.
   G. Petrović, R. Just, G. Fraser, « Code Coverage at Google », ESEC/FSE ’19, p. 955-963,
   https://doi.org/10.1145/3338906.3340459. — PR de #465
 
+### API : `https` vers une API interne, hors de la machine et du sandbox (#473)
+
+- **Une URL d'API interne de K-B (`KB_DATA_API_URL`, `KB_AI_API_URL`) n'est acceptée en `http` que
+  vers `127.0.0.1` ou `localhost`, ou avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox` ; ailleurs, `https`,
+  sinon le démarrage est refusé (code 2), le message nommant la variable sans citer sa valeur.**
+  Décision de l'utilisatrice du 08/11 (option C) ; risque relevé par la relecture d'API8 et d'API10
+  (#454) : en ligne, le `https` ne tenait qu'au réglage du déploiement, et une URL `http` posée par
+  erreur aurait envoyé une clé en clair. Une fonction, `find_internal_api_url_refusal`
+  (`core/outbound.py`), appelée par les trois lecteurs de ces URL (`kb serve-ai`, `kb digest` et
+  `kb trend-report`, `kb smoke-test` et `kb digest-watch`), selon la règle OWASP des deux API (05/11).
+  Révise le commentaire « No TLS before Azure Container Apps : http on the machine and in the compose
+  network » (`DATA_API_SCHEMES`, `AI_API_SCHEMES`, retirés).
+  - Fermée par défaut : sans la variable, ou en `production`, seul `https` passe hors de la machine.
+    Les API en ligne sont en `production` (`infra/main.bicep`), les jobs n'ont pas la variable : les
+    deux sont tenus au `https` sans changer `infra/`.
+  - Écartées : `http` vers la machine seule (option A), qui aurait forcé le compose de #419 au
+    `https` ou rouvert la règle ; `https` exigé en `production` seulement, ouvert par défaut, et les
+    jobs n'ont pas la variable.
+  - `sandbox`, comparé tel quel (`Sandbox` ne compte pas) : la valeur que lit déjà
+    `read_openapi_url`.
+
+  Limites assumées : un `KB_DEPLOYMENT_ENVIRONMENT=sandbox` posé en ligne permettrait `http` (et y
+  servirait `/docs`) ; seuls `127.0.0.1` et `localhost` comptent pour la machine (ni le reste de
+  `127.0.0.0/8`, ni `::1`, qu'un nom d'hôte de K-B refuse déjà). — PR de #473
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
