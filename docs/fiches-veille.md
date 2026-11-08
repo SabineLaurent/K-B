@@ -847,7 +847,7 @@ contre `infra/` et l'état en ligne.
 | Entrée | État | Ce qui reste, et où |
 |---|---|---|
 | API1 Broken Object Level Authorization | **Tenue** | — |
-| API2 Broken Authentication | Écart voulu, justifié | Écart voulu (décision de Sabine du 2026-11-05), justifié sous API2, « Anti-force brute, plus strict que la limite de débit » (clé de 32 caractères au moins, contrôlée au démarrage) |
+| API2 Broken Authentication | Écart voulu, justifié | Écart voulu (décision de Sabine du 2026-11-05), justifié sous API2, « Anti-force brute, plus strict que la limite de débit » (clé de 32 caractères au moins, contrôlée au démarrage) ; TLS mutuel : non appliqué, à justifier (#500) |
 | API3 Broken Object Property Level Authorization | **Tenue** | — |
 | API4 Unrestricted Resource Consumption | Non tenue | Ressources des conteneurs : CPU, mémoire et répliques tenus par #414, redémarrages, descripteurs et processus sans moyen trouvé ; plafond de dépense : abonnement de l'organisme de formation |
 | API5 Broken Function Level Authorization | **Tenue** | — |
@@ -858,11 +858,11 @@ contre `infra/` et l'état en ligne.
 | API10 Unsafe Consumption of APIs | **Tenue** | — (relue le 2026-11-08) |
 
 Le compte : 6 entrées tenues sur 10. Les 4 autres : 2 écarts voulus et justifiés, API2
-(anti-force brute) et API9 (documentation en `sandbox` ; sa protection externe reste non tenue, à
-justifier par #500), et 2 non tenues (API4, API8). Ce qui ne dépend que du code et de la doc est
-tenu, hors ces deux écarts ; API10 l'est depuis la mise en ligne (TLS vers l'API de données) ; le
-reste demande des essais sur l'environnement déployé, ou l'organisme de formation pour le plafond
-de dépense.
+(anti-force brute ; son TLS mutuel reste non appliqué, à justifier par #500) et API9 (documentation
+en `sandbox` ; sa protection externe reste non tenue, à justifier par #500), et 2 non tenues (API4,
+API8). Ce qui ne dépend que du code et de la doc est tenu, hors ces deux écarts ; API10 l'est depuis
+la mise en ligne (TLS vers l'API de données) ; le reste demande des essais sur l'environnement
+déployé, ou l'organisme de formation pour le plafond de dépense.
 
 ### API1:2023 Broken Object Level Authorization
 
