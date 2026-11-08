@@ -65,9 +65,9 @@ dans mon coffre Obsidian, sous `veille/` :
   `veille/<sujet>/AAAA-MM-JJ.md`.
 - **Compte rendu des tendances** (`kb trend-report`) : parmi les dépôts qui montent sur GH
   Archive, le code calcule les rangs et les critères (durables, nouveaux, en accélération) et lit
-  la fiche GitHub de chaque candidat ; le modèle en choisit au plus 5 ;
-  `veille/tendances/<date>.md`. Les textes qu'il écrira sur chaque dépôt choisi viendront avec
-  #369.
+  la fiche GitHub de chaque candidat ; le modèle en choisit au plus 5, puis écrit quatre textes
+  courts sur chacun, depuis sa fiche, son README et les définitions des sujets de veille qu'il
+  porte ; `veille/tendances/<date>.md`.
 - **Tops** (`kb write-tops`, sans modèle) : une fiche datée pour chacun des deux classements de
   100 dépôts, les plus étoilés et les plus forkés, sous `veille/tops/`.
 - **Contrôles** : le modèle renvoie du JSON ; le code le revalide (schéma fermé, sujets de la
@@ -75,7 +75,8 @@ dans mon coffre Obsidian, sous `veille/` :
   faits ne se retrouvent pas dans l'item cité. Une sortie hors schéma n'est jamais écrite.
 - **API IA authentifiée**, distincte de l'API de données et documentée en OpenAPI. `kb digest`
   et `kb trend-report` en sont les clients. L'inférence passe par Azure, en zone de données UE,
-  en API compatible OpenAI : le modèle se choisit en configuration.
+  en API compatible OpenAI : le modèle se choisit en configuration. Son architecture :
+  [docs/architecture-api-ia.md](docs/architecture-api-ia.md).
 - **Métriques** de chaque appel (durée, jetons, coût estimé, erreurs, fidélité), sur une ligne
   JSON de la sortie standard et en OpenTelemetry vers Grafana Cloud, en région UE. Leur
   restitution en temps réel, avec une alerte sur seuil, viendra avec #164.
@@ -572,9 +573,10 @@ injoignable, est `exchange_storage_no_token`. Code de sortie :
 - 2 : rien n'est contrôlé : une variable manque ou est refusée ;
 - 143 : SIGTERM, 130 : SIGINT (Ctrl-C).
 
-**Les commandes des jobs planifiés** (#413) : en ligne, tout tourne dans des jobs, rien sur le Mac.
-`kb daily-routine` (job `caj-kb-daily-routine`) et `kb digest-watch` (job `caj-kb-digest-watch`)
-enchaînent leurs étapes dans le même processus, chacune avec le code qu'elle rendrait seule :
+**Les commandes des jobs planifiés** (#413) : en ligne, tout tournera dans des jobs, rien sur le Mac.
+`kb daily-routine` et `kb digest-watch`, commandes des jobs `caj-kb-daily-routine` (#330) et
+`caj-kb-digest-watch` (#423), pas encore déclarés dans `infra/`, enchaînent leurs étapes dans le
+même processus, chacune avec le code qu'elle rendrait seule :
 
 ```sh
 KB_DATA_DIR=<dossier> KB_VAULT_DIR=<coffre> KB_EXCHANGE_BLOB_URL=https://<compte>.blob.core.windows.net \
