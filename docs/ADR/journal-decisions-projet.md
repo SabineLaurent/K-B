@@ -5978,7 +5978,15 @@ sauf mention.
 
 - **Un test de fumée clôt chaque déploiement : `caj-kb-smoke-test` lancé et attendu jusqu'à `Succeeded`.**
   Validé par Sabine avec le plan, hors du texte de l'issue. Pourquoi : c'est la preuve que la version déployée
-  répond. Une mise à jour réussie ne dit pas si les apps démarrent. — PR de #415
+  répond. Une mise à jour réussie ne dit pas si les apps démarrent. Avant lui, le workflow attend que la dernière
+  révision de chaque app soit prête, à l'image du tag (tranché par time-knight, revue de code de #460) : en mode une
+  révision, l'ancienne répond jusque-là, et `/health` rend un texte fixe. — PR de #415
+
+- **Un tag n'est déployé que si les exécutions des workflows du dépôt sur son commit, sauf celles de Deploy, sont
+  finies et vertes.** Tranché par time-knight, revue de code de #460. Pourquoi : le ruleset de `main` n'exige
+  qu'une partie de la CI, et un contrôle peut rougir après la fusion. Les exécutions que GitHub crée lui-même
+  (Dependabot, sur la tête de `main`) ne comptent pas. Un tag posé trop tôt est refusé : on relance la CI du commit
+  si elle est rouge, puis l'exécution du tag. Écarté : une règle écrite seulement. — PR de #415
 
 - **Les identifiants Azure sont des secrets du dépôt, et chaque commande `az` du workflow passe en `-o none` ou par
   une `--query` étroite.** Pourquoi : les journaux deviennent publics le 08/11, et `az containerapp update`

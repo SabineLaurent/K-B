@@ -21,6 +21,9 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     outputs:
       sha: ${{ steps.commit.outputs.sha }}
     steps:
@@ -45,13 +48,31 @@ jobs:
             exit 1
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      # The ruleset of main requires part of the CI only, and a check can turn red after the merge. Every run of a
+      # workflow of the repository on the commit counts, but those of Deploy: this one would wait for itself, and
+      # an earlier failed one would block a rollback. The runs GitHub creates itself (Dependabot) do not count. A
+      # tag pushed too early is refused: run the CI of the commit again if it is red, then this run.
+      - name: Refuses a commit whose CI is not finished and green
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$SHA&per_page=100" \
+            --jq '[.workflow_runs[] | select(.path | startswith(".github/workflows/"))
+              | select(.path != ".github/workflows/deploy.yml") | {path, status, conclusion}]')
+          jq -r '.[] | "\(.path): \(.status) \(.conclusion)"' <<< "$runs"
+          if ! jq -e 'length > 0 and all(.status == "completed" and .conclusion == "success")' <<< "$runs" > /dev/null; then
+            echo "the CI of $SHA is not finished and green"
+            exit 1
+          fi
 
   deploy:
     needs: check
     runs-on: ubuntu-latest
     environment: production
-    # The build, then the migration (11 min at most) and the smoke test (16 min at most) when they wait to the end.
-    timeout-minutes: 45
+    # The build, then three waits read every 15 s, each read a few seconds of az: the migration (52 reads), the
+    # revisions (40) and the smoke test (72). About an hour when all go to the end.
+    timeout-minutes: 75
     permissions:
       contents: read
       id-token: write
@@ -95,6 +116,9 @@ jobs:
             cat "$inspect_error"
             exit 1
           fi
+          # The docker driver of the runner, on its overlay2 storage, pushes a manifest, not an index (tried on
+          # 2026-11-08, run 42427603062). Should the runner move to the containerd storage, .Image would become a
+          # table by platform: the label would no longer read, and the deployment stops here, before any change.
           digest=$(docker buildx imagetools inspect "$IMAGE" --format '{{ .Manifest.Digest }}')
           if ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
             echo "no digest for the image of $GITHUB_REF_NAME"
@@ -108,8 +132,9 @@ jobs:
           echo "DEPLOYED_IMAGE=$pinned" >> "$GITHUB_ENV"
           echo "DIGEST=$digest" >> "$GITHUB_ENV"
           echo "$GITHUB_REF_NAME: $digest"
-      # Starts a job at the image of the tag and waits for its end, polled every 15 s a little beyond its
-      # replicaTimeout; any end other than Succeeded fails the step.
+      # Starts a job at the image of the tag and waits for its end, read every 15 s up to its replicaTimeout plus
+      # 180 s, for the start and the pull of the image; a read that fails is read again. Any end other than
+      # Succeeded fails the step.
       - name: Writes the run of a job
         run: |
           cat > "$RUNNER_TEMP/run-job.sh" <<'EOF'
@@ -117,16 +142,16 @@ jobs:
             local job=$1 polls=$2 execution status=""
             az containerapp job update -n "$job" -g "$RG" --container-name kb --image "$DEPLOYED_IMAGE" -o none
             execution=$(az containerapp job start -n "$job" -g "$RG" --query name -o tsv)
-            for _ in $(seq 1 "$polls"); do
+            for i in $(seq 1 "$polls"); do
               status=$(az containerapp job execution show -n "$job" -g "$RG" \
-                --job-execution-name "$execution" --query properties.status -o tsv)
+                --job-execution-name "$execution" --query properties.status -o tsv) || status=unreadable
               case "$status" in
                 Succeeded) echo "$job: Succeeded"; return 0 ;;
                 Failed|Stopped|Degraded) echo "$job: $status"; return 1 ;;
               esac
-              sleep 15
+              if [ "$i" -lt "$polls" ]; then sleep 15; fi
             done
-            echo "$job: still $status after $((polls * 15)) s"
+            echo "$job: still $status after $polls reads, 15 s apart"
             return 1
           }
           EOF
@@ -136,7 +161,7 @@ jobs:
       - name: Migrates the base
         run: |
           source "$RUNNER_TEMP/run-job.sh"
-          run_job caj-kb-migrate-database 44
+          run_job caj-kb-migrate-database 52
       - name: Sets the apps to the image of the tag
         run: |
           for app in $(jq -r '.apps[]' infra/deployment.json); do
@@ -149,9 +174,36 @@ jobs:
             az containerapp job update -n "$job" -g "$RG" --container-name kb --image "$DEPLOYED_IMAGE" -o none
             echo "$job: $GITHUB_REF_NAME ($DIGEST)"
           done
+      # In single revision mode, the former revision answers until the new one is ready, and /health answers a
+      # fixed text: the smoke test would pass on the former version. So each app waits for its latest revision
+      # ready, and for the image of that revision, not of the template, to be the image of the tag: right after
+      # the update, the latest revision can still be the former one. An app at 0 replicas has its revision ready
+      # too. 40 reads, 15 s apart; a read that fails is read again.
+      - name: Waits for the revisions of the apps at the image of the tag
+        run: |
+          apps=$(jq -r '.apps[]' infra/deployment.json)
+          for i in $(seq 1 40); do
+            pending=""
+            for app in $apps; do
+              latest=$(az containerapp show -n "$app" -g "$RG" -o json | jq -r '.properties
+                | select(.latestReadyRevisionName == .latestRevisionName) | .latestRevisionName // empty') || latest=""
+              if [ -z "$latest" ] || ! az containerapp revision show -n "$app" -g "$RG" --revision "$latest" -o json \
+                | jq -e --arg image "$DEPLOYED_IMAGE" \
+                  '[.properties.template.containers[] | select(.name == "kb") | .image] == [$image]' > /dev/null; then
+                pending="$pending $app"
+              fi
+            done
+            if [ -z "$pending" ]; then
+              echo "the latest revision of each app is ready at $GITHUB_REF_NAME ($DIGEST)"
+              exit 0
+            fi
+            if [ "$i" -lt 40 ]; then sleep 15; fi
+          done
+          echo "not ready at the image of $GITHUB_REF_NAME after 40 reads, 15 s apart:$pending"
+          exit 1
       # The proof that the version deployed answers: both /health, and the exchange storage by the identity of
       # the job. Its replicaTimeout is 900 s.
       - name: Runs the smoke test
         run: |
           source "$RUNNER_TEMP/run-job.sh"
-          run_job caj-kb-smoke-test 64
+          run_job caj-kb-smoke-test 72

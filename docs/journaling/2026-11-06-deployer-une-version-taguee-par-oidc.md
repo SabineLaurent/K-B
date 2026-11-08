@@ -47,7 +47,7 @@ var githubDeploySubject = 'repo:SabineLaurent@189640103/K-B@1383589029:environme
 (`infra/main.bicep:47`)
 
 Il ne nomme ni une branche ni un tag, mais un **environnement GitHub**, `production`. Seul un job qui déclare
-cet environnement reçoit un jeton de ce sujet (`.github/workflows/deploy.yml:52`).
+cet environnement reçoit un jeton de ce sujet (`.github/workflows/deploy.yml:72`).
 
 Les deux nombres sont les identifiants de la propriétaire et du dépôt. K-B a été créé après le 15/07/2026, et
 GitHub lui donne cette forme « immuable » : renommer le dépôt, ou en créer un autre du même nom, ne la reproduit
@@ -61,7 +61,7 @@ Le contrôle du workflow paraît être la sécurité :
 sha=$(git rev-parse "$GITHUB_REF^{commit}")
 if ! git rev-list --first-parent origin/main | grep -qx "$sha"; then
 ```
-(`.github/workflows/deploy.yml:42-43`)
+(`.github/workflows/deploy.yml:45-46`)
 
 Il refuse un tag dont le commit n'est pas sur la première lignée de `main`, c'est-à-dire les commits de `main`
 lui-même, commits de fusion compris. `--is-ancestor` aurait aussi accepté la tête d'une branche déjà fusionnée.
@@ -104,7 +104,7 @@ digest=$(docker buildx imagetools inspect "$IMAGE" --format '{{ .Manifest.Digest
 pinned="$REGISTRY.azurecr.io/k-b@$digest"
 if [ "$(docker buildx imagetools inspect "$pinned" --format "$label")" != "$SHA" ]; then
 ```
-(`.github/workflows/deploy.yml:97-103`)
+(`.github/workflows/deploy.yml:122-128`)
 
 L'image `k-b:<tag>` porte en label le SHA du commit dont elle vient. Le workflow la construit seulement si elle
 n'existe pas, et seule une réponse « not found » déclenche la construction. Si elle existe déjà, deux cas :
@@ -113,6 +113,44 @@ n'existe pas, et seule une réponse « not found » déclenche la construction. 
 
 Les apps et les jobs reçoivent ensuite l'image par son digest, l'empreinte de son contenu. Une réplique qui se
 réveille de 0 tire exactement cette image, même si quelqu'un réécrit le tag.
+
+Le pilote `docker` du runner pousse un manifeste, pas un index (essai du 08/11). S'il passait un jour au stockage
+containerd, la lecture du label échouerait : le déploiement s'arrêterait là, avant tout changement.
+
+### Un tag n'est déployé qu'après une CI verte
+
+```bash
+runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$SHA&per_page=100" \
+  --jq '[.workflow_runs[] | select(.path | startswith(".github/workflows/"))
+    | select(.path != ".github/workflows/deploy.yml") | {path, status, conclusion}]')
+…
+if ! jq -e 'length > 0 and all(.status == "completed" and .conclusion == "success")' <<< "$runs" > /dev/null; then
+```
+(`.github/workflows/deploy.yml:60-64`)
+
+Le ruleset de `main` n'exige qu'une partie de la CI (`audit`, `tests`, `lint`, `types`), et `audit` peut passer au
+rouge après la fusion. `check` exige donc que les exécutions des workflows du dépôt sur le commit tagué soient
+finies et vertes. Trois détails :
+- **celles de Deploy sont exclues**, sinon l'exécution s'attendrait elle-même, et un ancien déploiement raté
+  bloquerait un retour en arrière ;
+- **celles que GitHub crée lui-même ne comptent pas** : Dependabot tourne sur la tête de `main` (`baab935` en porte
+  deux), et une mise à jour en cours ou rouge bloquerait un tag ;
+- **une liste vide est refusée** : un tag posé avant que la CI démarre ne passe pas.
+
+Un tag posé trop tôt n'attend pas : il est refusé. Si la CI est rouge ou annulée, on la relance d'abord, puis
+l'exécution du tag.
+
+### Le test de fumée parle à la nouvelle révision
+
+En mode une révision, l'ancienne révision répond tant que la nouvelle n'est pas prête, et `/health` rend un texte
+fixe : le test de fumée pourrait donc passer sur l'ancienne version. Avant lui, le workflow attend que chaque app
+ait sa dernière révision prête (`latestReadyRevisionName` égal à `latestRevisionName`), et que l'image de **cette
+révision** soit celle du tag. L'image du modèle de l'app ne suffit pas : juste après la mise à jour, la dernière
+révision peut encore être l'ancienne. Une app à 0 réplique a aussi sa révision prête : vu le 08/11 sur les deux
+apps, `ScaledToZero` et `Healthy`.
+
+Une lecture `az` qui échoue, ici comme dans l'attente des jobs, est relue au tour suivant : un incident d'une
+seconde n'arrête pas un déploiement en route.
 
 ### Les journaux deviennent publics
 
@@ -135,6 +173,14 @@ masque un secret partout où il apparaît. Chaque commande `az` passe en `-o non
 | Test de fumée en fin de déploiement (Sabine, avec le plan) | la preuve que la version déployée répond | s'arrêter à la mise à jour, qui ne dit pas si les apps démarrent |
 | `workflow_dispatch` (Sabine, avec le plan) | redéployer un tag après les 30 jours de relance de GitHub | la relance seule |
 | Identifiants en secrets du dépôt (session) | masqués dans les journaux publics | des variables, affichées en clair |
+| CI du commit finie et verte dans `check` (revue de code, tranché par time-knight) | le ruleset de `main` n'exige qu'une partie de la CI, et un contrôle peut rougir après la fusion | une règle « un tag après la CI verte », écrite seulement |
+| Les exécutions du commit (`actions/runs`), pas ses check-runs (session) | une exécution donne son workflow : celles de Deploy s'excluent par leur chemin | les check-runs : rien ne dit leur workflow, sauf leur nom de job |
+| Attente de la révision prête, à l'image de la révision, avant le test de fumée (revue de code, tranché par time-knight) | l'ancienne révision répond jusque-là, `/health` rend un texte fixe ; juste après la mise à jour, la dernière révision peut encore être l'ancienne | lire la révision dans la réponse de `/health` : du code dans `src/` ; l'image du modèle de l'app |
+| Seuls les workflows du dépôt comptent pour la CI (revue de code, tranché par time-knight) | Dependabot tourne sur la tête de `main`, et une mise à jour en cours ou rouge bloquerait un tag | toutes les exécutions du commit |
+| Une lecture `az` en échec est relue (revue de code, tranché par time-knight) | un incident d'une seconde n'arrête pas un déploiement en route, sans message | arrêter le pas à la première erreur (`bash -e`) |
+| Attente des jobs : `replicaTimeout` + 180 s (revue de code, tranché par time-knight) | le démarrage et le tirage de l'image comptent aussi | + 60 s : trop juste |
+| Pas de retour automatique (revue de code, tranché par time-knight) | revenir = redéployer le tag précédent, déjà écrit | défaire chaque étape : trop de code pour un POC |
+| Pas de cache entre deux tags (revue de code, tranché par time-knight) | `image.yml` ne pousse rien ; le faire pousser donnerait des droits Azure à la CI de chaque fusion | reprendre l'image d'`image.yml` |
 
 Imposés par une consigne : la CI n'applique jamais le Bicep (#411 : il donne des rôles, droit d'Owner) ; les
 actions sont épinglées par SHA (#234) ; un workflow nouveau a son propre fichier (règle des axes).
@@ -150,8 +196,12 @@ actions sont épinglées par SHA (#234) ; un workflow nouveau a son propre fichi
 | `az bicep build` sans avertissement | le Bicep est valide |
 | `/security-review` (xhigh) : aucun constat à 8 ou plus | aucune faille trouvée avant d'appliquer |
 | Essai 5.1 (06/11, 20:37Z) : `v0.0.1` sur la tête de la branche ; au push, « Bypassed rule violations… creations being restricted » ; exécution 42289900589, `check` en échec (« v0.0.1 is not on main: 80d1327… »), `deploy` `skipped` ; suppression : « Bypassed… Cannot delete this tag » | un tag hors de `main` est refusé ; la règle des tags s'applique, et Sabine la contourne comme administratrice (`actor_id 5` = « Repository admin », vu dans les réglages) |
-| Fonction `run_job` avec un faux `az` : `Succeeded` rend 0, `Failed` et `Degraded` rendent 1, un job qui ne finit pas rend 1 après `polls × 15 s` | l'attente d'un job, migration et test de fumée |
+| Fonction `run_job` avec un faux `az` : `Succeeded` rend 0, `Failed` et `Degraded` rendent 1, un job qui ne finit pas rend 1 après `polls` lectures | l'attente d'un job, migration et test de fumée |
 | Essais 5.2 et 5.3 (exécution 42293728980, branche temporaire supprimée ensuite) : sans environnement, `azure/login` reçoit « AADSTS700213: No matching federated identity record found for presented assertion subject 'repo:SabineLaurent@189640103/K-B@1383589029:ref:refs/heads/test/oidc-outside-production' » ; un job de branche qui déclare `production` est refusé avant toute étape (« Branch … is not allowed to deploy to production due to environment protection rules ») | la connexion n'existe que depuis `production`, et une branche ne l'atteint pas ; le préfixe immuable du sujet est celui que GitHub émet |
+| Essai 7 (08/11, exécution 42427603062, branche temporaire supprimée ensuite) : le pas de `deploy.yml` extrait tel quel, pilote `docker` du runner (Docker 28.0.4, stockage `overlay2`), registre local ; 1er passage construit et pousse, 2e « is there, built from 74317ae… » ; le registre tient `application/vnd.docker.distribution.manifest.v2+json` | le runner pousse un manifeste : le label et le digest se lisent comme prévu |
+| Pas modifiés, lancés en `bash -e` avec de faux `az`, `gh` et `sleep` (08/11) : CI verte acceptée, même avec un Dependabot en cours ou rouge ; en cours, rouge, vide, seulement Deploy ou seulement Dependabot refusées ; Deploy rouge exclu. Révisions (le modèle montre toujours la nouvelle image) : prêtes de suite, à la 3e lecture, une app en retard, dernière révision qui bouge à la 3e lecture, `revision show` en erreur une fois, acceptées ; jamais prête, autre image, dernière révision restée l'ancienne, `az` toujours en erreur, refusées après 40 lectures et 39 attentes. `run_job` : 52 et 72 lectures, une attente de moins ; une lecture en erreur puis `Succeeded` rend 0 | les corrections des deux revues, sans Azure |
+| Le pas de la CI avec le vrai `gh` sur `0a632b7` (tête de `main`) : `ci.yml`, `image.yml`, `postgresql.yml` `completed success`, sortie 0 | l'appel et le filtre tiennent sur l'API réelle |
+| L'attente des révisions avec le vrai `az`, en lecture seule, à l'image en ligne `k-b:3abd525` : prête à la 1re lecture, sortie 0 | les chemins JSON de `containerapp show` et `revision show` sont les bons |
 | *(à venir)* `v0.1.0` : les apps et le job au digest de `k-b:v0.1.0`, `caj-kb-smoke-test` `Succeeded` | le critère de l'issue |
 
 ## Ce que tu dois pouvoir défendre
@@ -165,7 +215,7 @@ actions sont épinglées par SHA (#234) ; un workflow nouveau a son propre fichi
 2. **Pourquoi le contrôle « sur `main` » ne suffit-il pas ?** Parce que le workflow qui tourne est celui du commit
    tagué. Le verrou est dans les réglages de GitHub et dans le sujet de l'identité (`deploy-access.bicep:25-30`).
 3. **Que se passe-t-il si un tag est supprimé puis recréé sur un autre commit ?** L'image `k-b:<tag>` existe déjà
-   avec l'ancien SHA en label : le déploiement s'arrête (`deploy.yml:84-88`).
+   avec l'ancien SHA en label : le déploiement s'arrête (`deploy.yml:106-110`).
 4. **Pourquoi l'identité de déploiement peut-elle lire les secrets ?** Les rôles Container Apps couvrent
    `listSecrets`. Mais qui change l'image d'un job peut de toute façon se servir de ses secrets : c'est le
    constat 6, propre à toute livraison continue, accepté et écrit au registre.
@@ -173,6 +223,10 @@ actions sont épinglées par SHA (#234) ; un workflow nouveau a son propre fichi
    - Dans les 30 jours, en relançant l'exécution du tag précédent.
    - Au-delà, par `gh workflow run deploy.yml --ref <tag>`.
    - Dans les deux cas, l'image existe déjà : elle est redéployée sans être reconstruite.
+   - Rien ne revient tout seul : un déploiement qui échoue en route laisse ses premières étapes sur la nouvelle
+     version jusqu'à ce redéploiement.
+6. **Comment sais-tu que le test de fumée a parlé à la nouvelle version ?** Le workflow attend d'abord que la
+   dernière révision de chaque app soit prête, à l'image du tag (`deploy.yml:182-203`).
 
 ## Zones non vérifiées
 
@@ -180,13 +234,12 @@ actions sont épinglées par SHA (#234) ; un workflow nouveau a son propre fichi
 - Le `PATCH` de `az containerapp update` sans `assign/action` : lu dans le code d'azure-cli par le relecteur, pas
   encore essayé. Le repli est écrit (Container Apps Jobs Operator sur `cae-kb`).
 - `azure/login` avec des rôles posés seulement sur des ressources, sans rien sur l'abonnement : non essayé.
-- `{{ .Manifest.Digest }}` sur une image poussée par le pilote `docker` du runner : essayé sur un registre local
-  avec le pilote `docker-container`.
+- L'attente des révisions sur un vrai déploiement : l'état `ready` d'une app à 0 réplique est vu, pas la durée
+  qu'il faut pour l'atteindre après une mise à jour. Le premier tag `v0.1.0` le mesurera.
 - La fin du sujet, `:environment:production` : le préfixe immuable est confirmé par l'essai 5.2, la fin par la doc de GitHub. Le premier tag `v0.1.0` le prouvera.
 
 ## Ce qui reste
 
-- La passe 2 qui crée `id-kb-deploy` et ses rôles : après la fusion de #421, une passe à la fois.
-- Les essais 5.1 à 5.3, puis le premier tag `v0.1.0`, sur ta demande.
+- Le premier tag `v0.1.0`, sur ta demande, après la fusion.
 - Le 08/11 : toi en « required reviewer », sans contournement pour les administrateurs.
 - Une passe Bicep faite à la main repose une image par tag, pas par digest : l'outil des passes (#455).

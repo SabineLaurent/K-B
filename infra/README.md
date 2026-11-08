@@ -257,12 +257,16 @@ Les rôles sur les secrets se créent dans le même déploiement que les apps. S
 « unable to fetch secret », c'est qu'ils ne sont pas encore actifs : relancer la même commande 10 minutes plus tard.
 
 Une fois une version déployée par un tag (« Déployer une version »), `TAG` est la version en ligne, et non le SHA
-de l'étape 3. Sinon, la passe remettrait l'ancienne image. Les apps tiennent leur image par son digest. La version
-se retrouve à partir de ce digest :
+de l'étape 3. Sinon, la passe remettrait l'ancienne image. Après un déploiement par tag, les apps tiennent leur image
+par son digest (`k-b@sha256:…`) ; après une passe à la main, par son tag (`k-b:<TAG>`). La version se retrouve dans
+les deux cas :
 
 ```sh
-DIGEST=$(az containerapp show -n ca-kb-ai-api -g "$RG" --query "properties.template.containers[0].image" -o tsv | cut -d@ -f2)
-az acr manifest list-metadata -r "$REGISTRY" -n k-b --query "[?digest=='$DIGEST'].tags[]" -o tsv
+IMAGE=$(az containerapp show -n ca-kb-ai-api -g "$RG" --query "properties.template.containers[0].image" -o tsv)
+case "$IMAGE" in
+  *@*) az acr manifest list-metadata -r "$REGISTRY" -n k-b --query "[?digest=='${IMAGE#*@}'].tags[]" -o tsv ;;
+  *) echo "${IMAGE##*:}" ;;
+esac
 ```
 
 Limite : la passe repose alors `k-b:<TAG>`, la même image, mais par une référence que l'on peut réécrire. Le
@@ -314,16 +318,21 @@ répond 26 s après la première demande, et l'API IA 20 s après. Le job les ap
 
 Un tag de version posé sur `main` part en ligne (#415). Une fusion ne déploie rien. Le workflow
 `.github/workflows/deploy.yml` a deux jobs :
-- **`check`** refuse un tag qui n'a pas la forme `vMAJEUR.MINEUR.CORRECTIF`, ou dont le commit n'est pas sur la
-  première lignée de `main`.
+- **`check`** refuse un tag qui n'a pas la forme `vMAJEUR.MINEUR.CORRECTIF`, dont le commit n'est pas sur la
+  première lignée de `main`, ou dont la CI n'est pas finie et verte (les exécutions des workflows du dépôt sur ce
+  commit, sauf Deploy ; celles que GitHub crée lui-même, comme Dependabot, ne comptent pas).
 - **`deploy`**, dans l'environnement GitHub `production`, fait le reste dans cet ordre :
   1. il se connecte à Azure en `id-kb-deploy`, par OIDC ;
-  2. il construit et pousse `k-b:<tag>`, sauf si l'image existe déjà, construite depuis ce même commit ;
+  2. il construit et pousse `k-b:<tag>`, sauf si l'image existe déjà, construite depuis ce même commit. Sans
+     cache entre deux tags : une version neuve se construit en entier ;
   3. il lance `caj-kb-migrate-database` à cette image et attend `Succeeded`. `kb migrate-database` laisse telle
      quelle une base qui a ses tables : un retour à un tag précédent la relance sans risque ;
   4. il met les apps et les jobs de `deployment.json` à l'image du tag, par son digest (`k-b@sha256:…`) :
      une réplique qui se réveille tire l'image déployée, même si le tag est réécrit ;
-  5. il lance `caj-kb-smoke-test` et attend `Succeeded`.
+  5. il attend que la dernière révision de chaque app soit prête, et que l'image de cette révision soit celle du
+     tag (40 lectures, 15 s d'écart). En mode une révision, l'ancienne répond jusque-là, et `/health` rend un texte
+     fixe : sans cette attente, le test de fumée pourrait passer sur l'ancienne version ;
+  6. il lance `caj-kb-smoke-test` et attend `Succeeded`.
 
 Si une étape échoue, les suivantes ne tournent pas.
 
@@ -396,7 +405,9 @@ gh secret list --repo "$REPO"    # les 5 noms, jamais les valeurs
 
 ### Poser une version
 
-Sur demande de Sabine seulement, et toujours sur un commit de `main` :
+Sur demande de Sabine seulement, et toujours sur un commit de `main` dont la CI est finie et verte. Un tag posé
+trop tôt, ou sur une CI annulée ou rouge, est refusé par `check`. On relance alors d'abord la CI du commit
+(« Re-run failed jobs » sur son exécution), puis, une fois verte, « Re-run all jobs » sur l'exécution du tag.
 
 ```sh
 git -C ~/REPO_GIT/K-B pull --ff-only
@@ -410,7 +421,9 @@ gh run watch --repo "$REPO" <id de l'exécution>
 Un tag nouveau à chaque version, jamais déplacé. Une exécution en attente est annulée si une plus récente arrive ;
 celle qui tourne va jusqu'au bout.
 
-**Revenir en arrière**, c'est redéployer le tag précédent : l'image existe déjà, rien n'est reconstruit.
+**Revenir en arrière**, c'est redéployer le tag précédent : l'image existe déjà, rien n'est reconstruit. Il n'y a
+pas de retour automatique : si une étape échoue en route, ou le test de fumée, celles déjà faites restent sur la
+nouvelle version (la base migrée, des apps ou des jobs) jusqu'à ce redéploiement.
 - Dans les 30 jours : « Re-run all jobs » sur l'exécution de ce tag.
 - Au-delà : `gh workflow run deploy.yml --repo "$REPO" --ref v0.1.0`.
 
