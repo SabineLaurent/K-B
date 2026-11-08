@@ -40,7 +40,7 @@ l'enregistrement de contenu, sous `KB_TRACE_CONTENT`, et c'est inscrit au regist
 ouverte pour le wiki.
 
 Volume : 91 séries de métriques par démarrage de `kb serve-ai` quand une demande réussit (calcul,
-non recompté dans Grafana), davantage en cas d'échec (`docs/fiches-veille.md:1439-1441`).
+non recompté dans Grafana), davantage en cas d'échec (`docs/fiches-veille.md:1440-1442`).
 
 **Conventions GenAI d'OpenTelemetry.** Elles vivent dans un dépôt à part, créé le 2026-05-05,
 `open-telemetry/semantic-conventions-genai` ; l'ancienne page d'opentelemetry.io dit « This page has
@@ -63,7 +63,7 @@ numéros renvoient à la section « Sources ».
 | Métriques OTLP de K-B | oui : une ressource Application Insights avec « OTLP support », les métriques allant dans un Azure Monitor workspace [1][6] | oui, en place depuis #162 | non trouvé : seules les traces sont décrites [14] | non trouvé : seules les traces sont décrites [20] | oui : « can handle OTLP metrics and logs signals in addition to traces » [28] |
 | Traces OTLP | oui, dans Log Analytics [1] | oui (Tempo), en place depuis #345 | oui, HTTP seul, « gRPC is not supported yet » [14] | oui [20] | oui, gRPC et HTTP [28] |
 | Journaux OTLP (raisons, contenu) | oui [1] | oui (Loki), en place depuis #345 et #347 | non trouvé [14] | non trouvé [20] | oui [28] |
-| Cheminement d'un appel | les traces arrivent ; vue non essayée | Tempo, et « Logs for this span » sur un `chat` (`docs/fiches-veille.md:1550-1552`), sans date d'essai écrite ; les raisons vues dans Loki à l'essai réel du 2026-10-27 (`:1552-1554`) | les traces arrivent ; vue non essayée | les traces arrivent ; vue non essayée | les traces arrivent ; vue non essayée |
+| Cheminement d'un appel | les traces arrivent ; vue non essayée | Tempo, et « Logs for this span » sur un `chat` (`docs/fiches-veille.md:1551-1553`), sans date d'essai écrite ; les raisons vues dans Loki à l'essai réel du 2026-10-27 (`:1553-1555`) | les traces arrivent ; vue non essayée | les traces arrivent ; vue non essayée | les traces arrivent ; vue non essayée |
 | Tableaux de bord | classeurs et tableaux Grafana du portail [31] | Grafana | personnalisables, sur toutes les offres, à partir des traces, observations et scores ; pas de métriques OTLP [12][15] | personnalisables sur le cloud US seulement ; en UE, une version « legacy » ; à partir des traces (nombre, latence, jetons, coût, retours) [21] | non vérifié |
 | Alerte sur seuil | alertes sur métriques, y compris d'Application Insights ; groupes d'actions par e-mail ; alertes sur métriques OpenTelemetry en « public preview » [2] | alertes Grafana ; pour un compte gratuit ouvert depuis le 20/04/2026 : plus de Cloud Alertmanager, e-mail aux seuls utilisateurs de l'instance, webhooks gardés [9] ; limite de règles non trouvée [8] | 2 alertes en Hobby ; latence, coût, scores ; Slack, PagerDuty, webhook, GitHub Actions ; e-mail non trouvé [16] | erreurs, latence, coût, retours, nombre d'exécutions, sur 5 ou 15 min ; Slack, PagerDuty, Dynatrace, webhook ; offre minimale non trouvée [22] | 2 déclencheurs en offre gratuite [24] |
 | Temps réel | délai d'ingestion non vérifié | délai d'ingestion non vérifié ; K-B envoie ses métriques toutes les 60 s | « new data appears in real time » avec l'en-tête `x-langfuse-ingestion-version: 4`, sinon jusqu'à 10 min [14] | ingestion asynchrone, délai non chiffré [20] | non vérifié |
