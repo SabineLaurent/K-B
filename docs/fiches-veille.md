@@ -837,7 +837,8 @@ comment on lèverait un écart voulu d'une mesure tenue, avec sa taille (XS ≤ 
 L ≈ 15 h), ou « non chiffré », et ce dont elle dépend ; rien n'en est codé (décision de Sabine du
 2026-11-05 : dire comment on ferait, sans le faire maintenant). Ce qui touche à ACA vient de sa
 documentation, lue le 2026-11-05 (« Sources de l'auto-évaluation ») ; ce qu'elle ne dit pas est
-écrit « à vérifier au déploiement ».
+écrit « à vérifier au déploiement ». API8 et API10 sont relues point par point le 2026-11-08 (#454),
+contre `infra/` et l'état en ligne.
 
 | Entrée | État | Ce qui reste, et où |
 |---|---|---|
@@ -848,13 +849,14 @@ documentation, lue le 2026-11-05 (« Sources de l'auto-évaluation ») ; ce qu'e
 | API5 Broken Function Level Authorization | **Tenue** | — |
 | API6 Unrestricted Access to Sensitive Business Flows | **Tenue** | — |
 | API7 Server Side Request Forgery | **Tenue** | — |
-| API8 Security Misconfiguration | Non tenue | TLS, durcissement répétable, évaluation et revue de l'environnement déployé : au déploiement |
+| API8 Security Misconfiguration | Non tenue | Durcissement dont la construction et la relecture seraient exigées ; revue périodique de la configuration en ligne ; évaluation automatisée de l'environnement déployé (scan de l'image, essais après déploiement) ; chaîne Envoy → uvicorn non essayée (relue le 2026-11-08) |
 | API9 Improper Inventory Management | Non tenue | Documentation sans clé en `sandbox` : écart voulu ; protection externe : au déploiement |
-| API10 Unsafe Consumption of APIs | Non tenue | TLS vers l'API de données : au déploiement |
+| API10 Unsafe Consumption of APIs | **Tenue** | — (relue le 2026-11-08) ; limite : le code accepte `http` vers l'API de données, #473 |
 
-Le compte : 5 entrées tenues sur 10. Ce qui ne dépend que du code et de la doc est tenu, sauf deux
-écarts voulus (API2, anti-force brute ; API9, documentation en `sandbox`) ; le reste demande le
-déploiement, ou l'organisme de formation pour le plafond de dépense.
+Le compte : 6 entrées tenues sur 10. Ce qui ne dépend que du code et de la doc est tenu, sauf deux
+écarts voulus (API2, anti-force brute ; API9, documentation en `sandbox`) ; API10 l'est depuis la
+mise en ligne (TLS vers l'API de données) ; le reste demande des essais sur l'environnement déployé,
+ou l'organisme de formation pour le plafond de dépense.
 
 ### API1:2023 Broken Object Level Authorization
 
@@ -1070,37 +1072,85 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
 
 ### API8:2023 Security Misconfiguration
 
-- **Durcissement répétable** : non tenue, en partie. Un réglage refusé empêche le démarrage
-  (`test_serve_ai_exits_2_and_names_the_variable_refused`) ; les fichiers de déploiement, qui
-  rendraient le durcissement répétable, viennent au déploiement.
-  **Pour la tenir** : les fichiers de déploiement versionnés dans le dépôt, relus en PR comme le
-  code : l'image et le compose (#200, chiffrée à part), plus la description des apps d'ACA (M).
-- **Revue périodique des configurations de toute la pile** : non tenue. Rien à relire dans le dépôt
-  avant les fichiers de déploiement : au déploiement.
+Relue point par point le 2026-11-08 (#454), contre `infra/` et l'état en ligne ; une mesure qui ne
+dépend que du code garde son état et sa preuve.
+
+- **Durcissement répétable** : non tenue, en partie. L'image (`Dockerfile`, utilisateur 10001, #200),
+  l'environnement, les apps et les jobs d'ACA (`infra/`, Bicep) sont versionnés et relus en PR comme
+  le code ; la CI construit `infra/main.bicep` sur toute PR qui touche `infra/`
+  (`.github/workflows/infra.yml:27`) ; une version taguée part en ligne par
+  `.github/workflows/deploy.yml` (#415). Un réglage refusé empêche le démarrage
+  (`test_serve_ai_exits_2_and_names_the_variable_refused`). Ce qui manque, en quatre limites : le
+  socle s'applique à la main, en deux passes (`infra/README.md`) ; `deploy.yml` change l'image des
+  apps et des jobs par `az containerapp update` et `az containerapp job update`, hors du Bicep
+  (`deploy.yml:168`, `:174`) ; la construction du Bicep n'est pas un contrôle exigé de `main`
+  (`infra.yml:15`) ; le ruleset de `main` n'exige aucune relecture (`required_approving_review_count`
+  0), la relecture en PR est une pratique, pas une règle.
+  **Pour la tenir** : la construction du Bicep exigée, sans bloquer les PR qui ne touchent pas
+  `infra/` (un job toujours lancé, qui saute la construction hors de `infra/`), et une relecture
+  exigée par le ruleset dès qu'une seconde personne peut relire. S.
+- **Revue périodique des configurations de toute la pile** : non tenue, en partie. Chaque changement
+  de `infra/` est relu en PR ; la configuration en ligne n'a été relue contre ces fichiers qu'une
+  fois, à la main, le 2026-11-08 (#454), pour l'entrée, le chiffrement entre apps et les URL
+  internes (« TLS, même pour une API interne », ci-dessous).
   **Pour la tenir** : à chaque déploiement, relire la configuration déployée contre ces fichiers et
   contre cette section. XS par revue.
 - **Évaluation automatisée et continue dans tous les environnements** : non tenue, en partie. La CI
-  lance `pip-audit`, les règles de sécurité de ruff et les tests sur chaque PR
-  (`.github/workflows/ci.yml`) ; aucun environnement déployé n'est évalué.
+  lance `pip-audit`, les règles de sécurité de ruff, les tests et leur seuil de couverture
+  (`.github/workflows/ci.yml`), et la construction du Bicep (`infra.yml`). Après chaque
+  déploiement, `deploy.yml` lance `caj-kb-smoke-test` (l. 204-209), qui demande `GET /health` aux
+  deux API (`src/k_b/jobs/api_health.py`) et atteint le stockage d'échange par l'identité du job :
+  il vérifie que la version déployée répond, pas sa sécurité.
   **Pour la tenir** : un scan de l'image dans la CI (l'outil, une dépendance de la CI, est à
   choisir), et des essais scriptés des points de cette section, lancés par la CI après chaque
   déploiement, avec une clé de test à prévoir. M.
-- **TLS, même pour une API interne** : non tenue, en partie. `https` vers le modèle, GitHub et
-  l'export ; sans TLS : l'API IA elle-même, en local, et le lien vers l'API de données (API10).
-  L'entrée HTTPS d'ACA viendra au déploiement ; un échange de clés hybride post-quantique (ML-KEM,
-  FIPS 203 du 13/08/2024) qu'elle proposerait est à vérifier ce jour-là. Côté client, K-B ne règle
-  pas la version de TLS : les bibliothèques gardent leur contexte par défaut, TLS 1.2 au moins,
-  httpx2 2.13.1 pour `core/outbound.py` et urllib3 de `requests` pour l'export (lu le 2026-11-05).
-  **Pour la tenir** : l'entrée HTTPS d'ACA, qui n'accepte que TLS 1.2 ou 1.3 et redirige `http`
-  vers `https` tant que `allowInsecure` reste `false` ; entre les deux API, l'entrée interne de
-  l'API de données et le chiffrement entre apps de l'environnement (désactivé par défaut,
-  `peerTrafficConfiguration.encryption.enabled`), qui chiffre aussi un appel par le nom de l'app :
-  `KB_DATA_API_URL` peut alors garder `http://<app>`, à condition d'ajouter ce nom à
-  `KB_DATA_API_ALLOWED_HOSTS` (`127.0.0.1` et `localhost` par défaut), sinon l'API de données rend
-  400. L'entrée interne coupe aussi les clients `TERMINAL` et `AGENT` de l'API de données, hors de
-  l'environnement. L'échange de clés post-quantique
-  (`X25519MLKEM768`) est documenté pour Azure Front Door, du client à Front Door seulement, pas
-  pour l'entrée d'ACA. S, au déploiement.
+- **TLS, même pour une API interne** : tenue en ligne ; sur la machine, l'API IA sert en `http` sur
+  `127.0.0.1`, joignable de la machine seule.
+  - Les deux API n'ont qu'une entrée interne, en HTTPS (`external: false`, `allowInsecure: false`,
+    `infra/modules/api-container-app.bicep:74-80`) : « directly reachable only from within the same
+    Container Apps environment ». La documentation de l'entrée nomme une seule exception, une route
+    HTTP de l'environnement qui viserait l'app : il n'y en a aucune. L'entrée interne coupe aussi les
+    clients `TERMINAL` et `AGENT` de l'API de données, hors de l'environnement. Le point public de
+    l'environnement reste ouvert (`publicNetworkAccess: 'Enabled'`,
+    `infra/modules/container-apps-environment.bicep:40`, la valeur `Disabled` demandant un réseau
+    virtuel) : une requête du dehors atteint son mandataire, qui rend 404 pour une app interne selon
+    la documentation et le commentaire du Bicep ; non essayé.
+  - Le chiffrement entre apps est activé (`peerTrafficConfiguration.encryption.enabled`,
+    `infra/modules/container-apps-environment.bicep:27-31`) : « Traffic to and from the ingress proxy
+    within the environment is TLS encrypted [...] and decrypted by the receiver ». Le réseau est donc
+    chiffré jusqu'à la réplique ; uvicorn y reçoit `http` sur son port (`transport: 'http'`, aucun
+    TLS dans uvicorn), et ce dernier pas, dans la réplique, n'est ni décrit par la documentation ni
+    essayé. mTLS reste désactivé (l. 33-36).
+  - Les clients : l'API IA appelle l'API de données en `https://ca-kb-data-api.internal.<defaultDomain>`
+    (`infra/main.bicep:223`), le seul hôte que l'API de données accepte (`KB_DATA_API_ALLOWED_HOSTS`,
+    l. 187) ; le test de fumée appelle les deux API en `https` (l. 248-249) ; l'API de données lit
+    PostgreSQL en `sslmode=verify-full` (l. 261) ; `https` vers le modèle, GitHub et l'export.
+  - Relu en ligne le 2026-11-08, pour `ca-kb-ai-api` et `ca-kb-data-api`, puis pour l'environnement :
+
+    ```sh
+    az containerapp show -n <app> -g <groupe> \
+      --query "properties.configuration.ingress.{external:external, allowInsecure:allowInsecure, transport:transport, customDomains:customDomains}"
+    az containerapp env show -n <environnement> -g <groupe> \
+      --query "{encryption: properties.peerTrafficConfiguration.encryption.enabled, mtls: properties.peerAuthentication.mtls.enabled}"
+    az containerapp env http-route-config list -n <environnement> -g <groupe>
+    az containerapp show -n <app> -g <groupe> \
+      --query "properties.template.containers[0].env[?name=='KB_DATA_API_URL' || name=='KB_DATA_API_ALLOWED_HOSTS'].{name:name, value:value}"
+    ```
+
+    `external` false, `allowInsecure` false, `transport` Http et `customDomains` null (aucun domaine
+    personnalisé) pour les deux apps ; `encryption` true, `mtls` false ; aucune route (`[]`) ; sur
+    `ca-kb-ai-api`, `KB_DATA_API_URL` =
+    `https://ca-kb-data-api.internal.<defaultDomain>`, sur `ca-kb-data-api`,
+    `KB_DATA_API_ALLOWED_HOSTS` = `ca-kb-data-api.internal.<defaultDomain>`.
+  - Limite : le `https` vers l'API de données vient du réglage du déploiement, que le code ne force
+    pas : il accepte `http` partout (`DATA_API_SCHEMES`, `ai_api/connectors/data_api_settings.py:18`),
+    pour la machine et le réseau compose.
+  - Non essayé, l'entrée n'étant joignable que de l'environnement : la version de TLS, « always use
+    TLS 1.2 or 1.3 » selon la documentation de l'entrée (lue le 2026-11-08). Côté client, K-B ne
+    règle pas la version de TLS : les bibliothèques gardent leur contexte par défaut, TLS 1.2 au
+    moins, httpx2 2.13.1 pour `core/outbound.py` et urllib3 de `requests` pour l'export (lu le
+    2026-11-05). L'échange de clés post-quantique (`X25519MLKEM768`, ML-KEM, FIPS 203) est documenté
+    pour Azure Front Door, du client à Front Door seulement, pas pour l'entrée d'ACA.
 - **N'accepter que les verbes HTTP nécessaires** : tenue (#401). Chaque route n'accepte que sa
   méthode ; `HEAD`, que Starlette ajoute à toute route `GET`, est retiré ; toute autre méthode
   rend 405 `method_not_allowed`. `test_every_route_answers_its_method_only_and_405_to_any_other`.
@@ -1118,8 +1168,14 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
   RFC 9110 donnerait 415 : écart voulu, un seul état pour tout corps refusé.
   **Pour lever l'écart**, s'il est levé : 415 pour un corps qui n'est pas `application/json`,
   avant sa lecture, et un test. S.
-- **Traitement uniforme dans la chaîne de serveurs** : *s.o.*, un seul serveur, uvicorn ; à revoir
-  derrière l'entrée d'ACA.
+- **Traitement uniforme dans la chaîne de serveurs** : non tenue, non essayée. En ligne, deux
+  serveurs : l'entrée d'ACA (Envoy), puis uvicorn 0.54 et h11 0.16 (`uv.lock` de `v0.1.0`, l'image
+  en ligne) (`transport: 'http'`,
+  `infra/modules/api-container-app.bicep:77`). Aucune requête ambiguë, comme `Content-Length` et
+  `Transfer-Encoding` ensemble, n'a été envoyée. Seuls les apps et les jobs de l'environnement
+  atteignent l'entrée interne.
+  **Pour la tenir** : depuis un job de l'environnement, envoyer les requêtes ambiguës d'une
+  désynchronisation, et vérifier qu'Envoy les refuse ou que les deux serveurs les lisent de même. S.
 - **Schémas de réponse, erreurs comprises, sans trace d'exception** : tenue. Corps `{"error":
   "<état>"}` (« États nommés » ; les états `github_*` dans [tendances.md](tendances.md), « Défenses
   et échecs ») ; une erreur imprévue donne 500 `internal_error`, son type seul au journal.
@@ -1135,8 +1191,8 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
   - le budget de 70 requêtes à GitHub épuisé rend 502 `github_unavailable`, alors que la limite est
     celle de K-B, pas une panne de GitHub.
 
-  **Pour lever ces écarts**, s'ils sont levés : derrière l'entrée d'ACA, une requête mal formée
-  passe d'abord par son mandataire (Envoy), ce qu'il en fait est à vérifier au déploiement ; un 400
+  **Pour lever ces écarts**, s'ils sont levés : en ligne, une requête mal formée passe d'abord
+  par Envoy, et ce qu'il en fait n'est pas essayé (même essai que la chaîne de serveurs, ci-dessus) ; un 400
   nommé pour un corps illisible, distinct du 422 de schéma (S) ; un 503 et un état nommé pour le
   budget GitHub épuisé (XS).
 
@@ -1179,7 +1235,8 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
 
 ### API10:2023 Unsafe Consumption of APIs
 
-L'API IA consomme le modèle, l'API de données, GitHub et l'export OTLP vers Grafana Cloud.
+L'API IA consomme le modèle, l'API de données, GitHub et l'export OTLP vers Grafana Cloud. Relue
+point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change.
 
 - **Évaluer la sécurité des fournisseurs** : tenue sur pièces publiques, le 2026-11-05, sur les
   pages officielles de chacun. Azure publie sa version de TLS pour l'ensemble des « Foundry
@@ -1192,15 +1249,16 @@ L'API IA consomme le modèle, l'API de données, GitHub et l'export OTLP vers Gr
   | Modèle, Azure AI Foundry (France Central, Data Zone UE) | TLS 1.2 ou 1.3 sur les points d'accès « Foundry Tools » | Clé d'API, la méthode « la plus simple mais pas la plus sûre » selon Microsoft ; deux clés pour la rotation, une clé régénérée cesse aussitôt de marcher ; le moindre privilège passe par Entra ID et un rôle d'inférence, non utilisé par K-B | SOC 2 Type 2, ISO/IEC 27001:2022 (Azure) | Microsoft Azure Bounty | Invites et réponses ni données à OpenAI ni utilisées pour l'entraînement ; traitées dans l'UE ; surveillance des abus possible, durée de conservation non trouvée |
   | API REST de GitHub | TLS 1.0 et 1.1 retirés en 2018 ; SHA-1 retiré de HTTPS au 15/09/2026 | Jeton *fine-grained* en lecture seule ([jeton-github.md](jeton-github.md)) ; expiration de 1 à 366 jours | SOC 1 et SOC 2 Type 2, ISO/IEC 27001:2022, CSA STAR | GitHub Security Bug Bounty (HackerOne) | Le produit couvert par chaque rapport n'est pas dit |
   | Grafana Cloud, export OTLP | Version de TLS non publiée | Jeton de politique d'accès aux seuls `metrics:write`, `traces:write`, `logs:write` ([registre-traitements.md](registre-traitements.md)), comme la page des politiques d'accès le recommande ; à vérifier : le 2026-10-27, la politique recréée couvrait toute l'organisation (même registre) | ISO 27001, SOC 2 Type 2 (A-LIGN), CSA STAR | Divulgation sur Intigriti, sans prime | K-B ne relit rien de ce qu'il envoie |
-  | API de données de K-B | `http` sur la machine, et dans le réseau compose prévu (#200) | Clé `AI_DIGEST`, lecture seule | — | — | Son auto-évaluation : [specs-api.md](specs-api.md) |
+  | API de données de K-B | `https` en ligne, par l'entrée interne et le chiffrement entre apps (API8, relu le 2026-11-08) ; `http` sur la machine, et dans le réseau compose prévu (#200) | Clé `AI_DIGEST`, lecture seule | — | — | Son auto-évaluation : [specs-api.md](specs-api.md) |
 
   Ce n'est pas un audit : les rapports SOC 2 et ISO sont derrière une connexion chez Microsoft et
   GitHub, et n'ont pas été lus ; la liste des services Azure couverts par ces audits n'a pas été
   lue.
-- **TLS avec toutes les API intégrées** : non tenue, en partie. `https` seul vers le modèle, GitHub
-  et l'export (API7) ; `http` permis vers l'API de données, sur la machine et dans le réseau compose
-  prévu (#200) (`ai_api/connectors/data_api_settings.py`) : au déploiement.
-  **Pour la tenir** : le chiffrement entre apps d'ACA, compté en API8.
+- **TLS avec toutes les API intégrées** : tenue en ligne. `https` seul vers le modèle, GitHub et
+  l'export (API7) ; vers l'API de données, `https://ca-kb-data-api.internal.<defaultDomain>`
+  (`infra/main.bicep:223`), avec le chiffrement entre apps (API8, « TLS, même pour une API
+  interne »). `http` reste permis vers l'API de données, pour la machine et le réseau compose prévu
+  (#200) (`ai_api/connectors/data_api_settings.py`).
 - **Valider et assainir les données reçues** : tenue. Modèles Pydantic stricts pour chaque réponse ;
   corps bornés, la réponse du modèle comprise (#399,
   `test_an_answer_above_the_bound_is_llm_unavailable_without_retry`) ; textes de dépôt nettoyés
@@ -1210,7 +1268,8 @@ L'API IA consomme le modèle, l'API de données, GitHub et l'export OTLP vers Gr
 
 ### Sources de l'auto-évaluation
 
-Lues le 2026-11-05.
+Lues le 2026-11-05. Relues le 2026-11-08 (#454) : l'entrée et le chiffrement entre apps d'ACA,
+pour API8 et API10.
 
 - [OWASP API Security Top 10, édition 2023](https://owasp.org/API-Security/editions/2023/en/0x11-t10/),
   section « How To Prevent » de chaque entrée ; [API2:2023](https://api-security.owasp.org/editions/2023/en/0xa2-broken-authentication).
