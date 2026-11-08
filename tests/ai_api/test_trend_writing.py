@@ -493,8 +493,11 @@ def test_a_text_without_source_is_removed(chosen, readme, name):
     assert f"{name}:no_source" in writing.removal_reasons
 
 
-def test_an_empty_text_is_neither_written_nor_removed():
-    writing = write_one([written(watch_link=text())])
+@pytest.mark.parametrize(
+    "watch_link", ["", " ", "-", " . "], ids=["empty", "space", "dash", "dot"]
+)
+def test_an_empty_text_is_neither_written_nor_removed(watch_link):
+    writing = write_one([written(watch_link=text(watch_link))])
 
     assert writing.texts.watch_link is None
     assert writing.texts_removed == ()
