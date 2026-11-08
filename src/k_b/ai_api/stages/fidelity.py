@@ -113,9 +113,14 @@ class FactSearch:
     is_in_text: bool
 
     @property
+    def is_found(self) -> bool:
+        """In the item it cites and in the text of its claim."""
+        return self.is_in_item and self.is_in_text
+
+    @property
     def missing_place(self) -> MissingPlace | None:
-        """Where the fact misses; None if it is found, in its item and in the text."""
-        if self.is_in_item and self.is_in_text:
+        """Where the fact misses; None if it is found."""
+        if self.is_found:
             return None
         if self.is_in_item:
             return "text"
@@ -150,7 +155,7 @@ def check_claim(claim: Claim, item_by_ref: Mapping[str, WatchItem]) -> ClaimFide
         search_fact(fact, text, text_identifiers, item_by_ref[fact.item_id])
         for fact in claim.facts
     ]
-    found = [search.missing_place is None for search in searches]
+    found = [search.is_found for search in searches]
     declared = {
         to_canonical_identifier(to_detection_text(normalize(fact.value)))
         for fact in claim.facts

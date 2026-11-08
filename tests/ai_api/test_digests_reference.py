@@ -73,8 +73,8 @@ def test_each_recorded_output_replays_through_post_digests(tmp_path):
 def test_the_facts_of_the_set_are_all_in_their_item_not_all_in_their_text(
     tmp_path, capsys
 ):
-    """The measure of 2026-11-08 on write-1: no fact invented, 12 of 26 not written in the
-    sentence that declares them (#518)."""
+    """No fact of the set is missing from its item; 12 of its 26 are missing from the text of
+    their claim."""
     replay_reference(read_reference(REFERENCE_PATH), tmp_path)
 
     lines = [json.loads(line) for line in capsys.readouterr().out.splitlines()]

@@ -759,14 +759,18 @@ moyenne des taux. Option écartée : ne compter que les affirmations dans leurs 
 d'une affirmation trop longue ne compterait pas).
 
 **Les deux moitiés du fait trouvé** (#518). `facts_found` mêle deux questions : le fait est-il dans
-l'item qu'il cite (sinon, le modèle l'a inventé), et est-il écrit dans le `text` (sinon, le modèle
-n'a pas suivi la consigne) ? `facts_found_in_item` et `facts_found_in_text` les comptent à part,
-chacune sans regarder l'autre, avec les mêmes règles que ci-dessus (forme canonique d'une CVE ou
-d'une GHSA, limites, champs où chercher). Un fait sans lettre ni chiffre n'est trouvé ni dans l'un
-ni dans l'autre. `facts_found` compte les faits trouvés aux deux, et le taux reste `facts_found` /
-`facts_checked`. Sur le jeu de référence de #479 (`write-1`, enregistré le 2026-11-08), les 26 faits
-vérifiés sont dans leur item, 14 dans leur `text` : aucune invention, 12 faits non recopiés dans la
-phrase (`tests/ai_api/test_digests_reference.py`).
+l'item qu'il cite (sinon, le modèle l'a inventé ou pris hors de ces règles), et est-il écrit dans le
+`text` (sinon, le modèle n'a pas suivi la consigne) ? `facts_found_in_item` et `facts_found_in_text`
+les comptent à part, chacune sans regarder l'autre, avec les mêmes règles que ci-dessus (forme
+canonique d'une CVE ou d'une GHSA, limites, champs où chercher). Ainsi, une CVE que l'item ne porte
+que dans un texte libre (le corps d'une release, le résumé d'un article) compte comme absente de
+l'item, puisqu'elle n'est cherchée que dans `cve_id` et `ghsa_id`. Un fait sans lettre ni chiffre,
+ou un fait qui contient plus qu'un motif CVE ou GHSA (`CVE-2026-86950 critique`, sans forme
+canonique), n'est trouvé ni dans l'un ni dans l'autre (`both`). `facts_found` compte les faits
+trouvés aux deux, et le taux reste `facts_found` / `facts_checked`. Sur le jeu de référence de #479
+(`write-1`, enregistré le 2026-11-08), les 26 faits vérifiés sont dans leur item, 14 dans leur
+`text` : aucun fait absent de son item, 12 faits non recopiés dans la phrase
+(`tests/ai_api/test_digests_reference.py`).
 
 **Partie commune avec le wiki (#153).** Le contrôle de fidélité du wiki reprend d'ici la
 normalisation, la recherche mot pour mot entre deux limites et le taux calculé à chaque appel
