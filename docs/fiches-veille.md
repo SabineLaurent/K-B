@@ -1694,7 +1694,8 @@ des tops).
 **Parcours**
 
 1. **Réglages** : `KB_VAULT_DIR`, un dossier existant (sinon code 2, aucun dossier créé) ;
-   `KB_AI_API_URL`, `https`, ou `http` vers `127.0.0.1`, `localhost` ou, en `sandbox`, `api-ia` (#473),
+   `KB_AI_API_URL`, `https`, ou `http` vers `127.0.0.1`, `localhost` ou, en `sandbox`, un service du
+   compose (`api-donnees` ou `api-ia`, #473),
    sans utilisateur, requête ni fragment, par défaut
    `http://127.0.0.1:8001` (`AI_API_URL`, `core/config.py`), qui ne suit pas `KB_AI_API_PORT` ;
    `KB_AI_API_KEY_KB_DIGEST`, sans défaut, aux règles des clés (section « Accès »). Un refus nomme

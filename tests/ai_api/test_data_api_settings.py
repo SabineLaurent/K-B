@@ -44,7 +44,7 @@ def test_the_url_of_the_environment_is_read(url, deployment_environment):
     assert settings.base_url == url
 
 
-def test_an_http_url_outside_the_machine_and_the_sandbox_is_refused():
+def test_an_http_url_to_a_compose_service_outside_the_sandbox_is_refused():
     refusal = read_data_api_settings_or_refusal(
         {
             "KB_DATA_API_URL": "http://api-donnees:8000",
@@ -55,7 +55,7 @@ def test_an_http_url_outside_the_machine_and_the_sandbox_is_refused():
 
     assert (
         refusal
-        == "KB_DATA_API_URL: https required; http only to the machine (127.0.0.1 or localhost) or a compose service (api-donnees or api-ia)"
+        == "KB_DATA_API_URL: https required; http only to the machine (127.0.0.1 or localhost) or, in the sandbox, a compose service (api-donnees or api-ia)"
     )
 
 

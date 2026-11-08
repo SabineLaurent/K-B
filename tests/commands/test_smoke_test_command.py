@@ -236,12 +236,12 @@ def test_smoke_test_reaches_the_compose_services_in_http_in_the_sandbox(
         (
             "KB_DATA_API_URL",
             "http://ca-kb-data-api.internal.test.example",
-            "KB_DATA_API_URL: https required; http only to the machine (127.0.0.1 or localhost) or a compose service (api-donnees or api-ia)",
+            "KB_DATA_API_URL: https required; http only to the machine (127.0.0.1 or localhost) or, in the sandbox, a compose service (api-donnees or api-ia)",
         ),
         (
             "KB_AI_API_URL",
             "http://ca-kb-ai-api.internal.test.example",
-            "KB_AI_API_URL: https required; http only to the machine (127.0.0.1 or localhost) or a compose service (api-donnees or api-ia)",
+            "KB_AI_API_URL: https required; http only to the machine (127.0.0.1 or localhost) or, in the sandbox, a compose service (api-donnees or api-ia)",
         ),
     ],
 )

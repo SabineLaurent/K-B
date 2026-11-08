@@ -17,7 +17,7 @@ from k_b.core.outbound import (
 )
 
 VARIABLE = "KB_TEST_URL"
-HTTP_REFUSAL = f"{VARIABLE}: https required; http only to the machine (127.0.0.1 or localhost) or a compose service (api-donnees or api-ia)"
+HTTP_REFUSAL = f"{VARIABLE}: https required; http only to the machine (127.0.0.1 or localhost) or, in the sandbox, a compose service (api-donnees or api-ia)"
 
 
 SANDBOX = {"KB_DEPLOYMENT_ENVIRONMENT": "sandbox"}

@@ -42,7 +42,7 @@ def find_url_refusal(variable: str, url: str, schemes: tuple[str, ...]) -> str |
 INTERNAL_API_SCHEMES = ("http", "https")
 INTERNAL_API_HTTP_REFUSAL = (
     f"https required; http only to the machine ({' or '.join(LOCAL_HOSTS)})"
-    f" or a compose service ({' or '.join(COMPOSE_HOSTS)})"
+    f" or, in the sandbox, a compose service ({' or '.join(COMPOSE_HOSTS)})"
 )
 
 
