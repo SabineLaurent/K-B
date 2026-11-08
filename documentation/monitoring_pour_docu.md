@@ -23,7 +23,7 @@ Trois mesures ont une alerte:
 | Alerte | Ce qu'elle mesure | Fenêtre | Seuil | Source du seuil |
 |---|---|---|---|---|
 | `KbModelInvalidOutputs` | la part des appels refusés après leur nouvelle tentative (`llm_invalid_output`) | 24 h | au-dessus de 0 % | grille de Sabine du 2026-10-15: « 100 % de schémas valides après une nouvelle tentative » (`docs/ADR/journal-decisions-projet.md`) |
-| `KbModelLowFidelity` | la part des faits des affirmations trouvés dans l'item qu'elles citent | 24 h | sous 95 % | même grille: « au moins 95 % de fidélité » |
+| `KbModelLowFidelity` | la part des faits des affirmations trouvés dans l'item qu'elles citent | 24 h | sous 95 % | même grille: « au moins 95 % de fidélité »; provisoire jusqu'au benchmark des modèles et à l'optimisation de la consigne (Sabine, 2026-11-08) |
 | `KbModelCostOverBudget` | le coût estimé des appels, aux prix de `src/k_b/core/config.py` | 7 jours | au-dessus de 1 USD | budget choisi par Sabine le 2026-11-08, à revoir avec le relevé des coûts de #411 |
 
 Les fenêtres sont longues: les fiches ne sortent que deux fois par semaine. Sans appel au modèle sur la fenêtre, il
@@ -164,6 +164,11 @@ refaire l'étape 3 d'« Installer », avant l'essai d'accessibilité.
   l'offre gratuite a supprimé ses access policies; le bac à sable a reçu `401 Unauthorized` jusqu'au jeton neuf.
   Le jeton de la production est à refaire de même.
 - **Rétention de 14 jours** sur l'offre gratuite: aucune fenêtre ne la dépasse.
+- **Ce que la fidélité mesure aujourd'hui** (2026-11-08): une recherche de time-knight, sur le jeu de #479 rejoué par
+  les fonctions de K-B, trouve les 26 faits présents dans l'item cité, donc aucune invention; les 12 faits « non
+  trouvés » manquent seulement dans le texte français de la fiche (CVE non écrites, faits traduits). La fidélité
+  mesure donc surtout l'écart entre la consigne, qui demande un texte en français, et le contrôle, qui cherche les
+  faits mot pour mot dans l'anglais des items. Son seuil de 95 % est provisoire.
 - **L'état en cas d'erreur n'est pas dans le fichier**: l'import des règles au format Prometheus règle « Alert state if
   execution error or timeout » sur « OK », comme l'absence de données (vu dans la règle importée le 2026-11-08). Le
   passer sur « Error » est l'étape 3 d'« Installer », faite à la main: une réinstallation qui l'oublie laisse une
