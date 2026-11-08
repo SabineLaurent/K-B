@@ -67,7 +67,7 @@ numéros renvoient à la section « Sources ».
 | Tableaux de bord | classeurs et tableaux Grafana du portail [31] | Grafana | personnalisables, sur toutes les offres, à partir des traces, observations et scores ; pas de métriques OTLP [12][15] | personnalisables sur le cloud US seulement ; en UE, une version « legacy » ; à partir des traces (nombre, latence, jetons, coût, retours) [21] | non vérifié |
 | Alerte sur seuil | alertes sur métriques, y compris d'Application Insights ; groupes d'actions par e-mail ; alertes sur métriques OpenTelemetry en « public preview » [2] | alertes Grafana ; pour un compte gratuit ouvert depuis le 20/04/2026 : plus de Cloud Alertmanager, e-mail aux seuls utilisateurs de l'instance, webhooks gardés [9] ; limite de règles non trouvée [8] | 2 alertes en Hobby ; latence, coût, scores ; Slack, PagerDuty, webhook, GitHub Actions ; e-mail non trouvé [16] | erreurs, latence, coût, retours, nombre d'exécutions, sur 5 ou 15 min ; Slack, PagerDuty, Dynatrace, webhook ; offre minimale non trouvée [22] | 2 déclencheurs en offre gratuite [24] |
 | Temps réel | délai d'ingestion non vérifié | délai d'ingestion non vérifié ; K-B envoie ses métriques toutes les 60 s | « new data appears in real time » avec l'en-tête `x-langfuse-ingestion-version: 4`, sinon jusqu'à 10 min [14] | ingestion asynchrone, délai non chiffré [20] | non vérifié |
-| Accessibilité publiée | Azure fait partie des plateformes du rapport WCAG 2.1 de Microsoft ; rapport non ouvert ; portail et Azure Monitor non nommés [4] | « partially conformant with WCAG 2.1 level AA » (09/09/2025), certaines parties pas entièrement accessibles au clavier ; VPAT et ACR non mentionnés [10] ; **essai de Sabine reporté** (section « Accessibilité ») | aucune déclaration trouvée le 2026-11-08 dans les pages lues [12][13][14][17] | aucune déclaration trouvée le 2026-11-08 dans les pages lues [18][19][23] | aucune déclaration trouvée le 2026-11-08, ni dans [24], ni par un lien de la page d'accueil de honeycomb.io |
+| Accessibilité publiée | Azure fait partie des plateformes du rapport WCAG 2.1 de Microsoft ; rapport non ouvert ; portail et Azure Monitor non nommés [4] | « partially conformant with WCAG 2.1 level AA » (09/09/2025), certaines parties pas entièrement accessibles au clavier ; VPAT et ACR non mentionnés [10] ; **essai de Sabine passé à #164** (choix 18 ; section « Accessibilité ») | aucune déclaration trouvée le 2026-11-08 dans les pages lues [12][13][14][17] | aucune déclaration trouvée le 2026-11-08 dans les pages lues [18][19][23] | aucune déclaration trouvée le 2026-11-08, ni dans [24], ni par un lien de la page d'accueil de honeycomb.io |
 | Région UE | région de l'abonnement de l'école ; un service régional déployé dans une région de l'EU Data Boundary en fait partie, mais Azure Monitor n'est pas nommé [5] | pile en `prod-eu-west-2`, Allemagne (registre, « Envoi des mesures à Grafana Cloud », ligne « Région ») ; région d'une pile non modifiable [11] ; transferts vers les États-Unis possibles selon le DPA (même section, ligne « Transferts hors UE ») | Irlande (AWS `eu-west-1`), offre gratuite comprise [12][13] | Pays-Bas (GCP `europe-west4`), offre gratuite comprise ; facturation aux États-Unis ; « We do not have a legal entity in the EU » [19] | Irlande (AWS `eu-west-1`) [25] ; sur l'offre gratuite : non trouvé |
 | Coût pour K-B | journaux : 0 $ jusqu'à 5 Go par mois et par compte de facturation, puis 2,76 $/Go ; métriques : 0,11 $ les 10 millions d'échantillons ; alerte sur métrique : 0 $ jusqu'à 10 séries ; alerte sur journaux : 0,50 à 3 $ par mois selon la fréquence ; facturé à l'école [3] | 0 $ : 10 000 séries actives par mois, 50 Go de journaux et 50 Go de traces par mois, 14 jours, 3 utilisateurs actifs [8] | 0 $ (Hobby) : 50 000 unités par mois, 30 jours, 2 utilisateurs ; Core à 29 $ par mois, 90 jours [12] | 0 $ (Developer) : 1 siège, 5 000 traces par mois, traces de base gardées 14 jours ; Plus à 39 $ par siège et par mois [18] | 0 $ : 20 millions d'événements par mois ; rétention non trouvée [24] |
 | Contrat | DPA de Microsoft, entre Microsoft et l'école, déjà au registre (en-tête, « Sous-traitant ») ; aucun sous-traitant nouveau [32] | Raintank Inc., dba Grafana Labs (New York) ; DPA lu le 24/10, signé et envoyé par Sabine le 28/10 ; le 29/10, Grafana Labs répond qu'il ne vaut que pour les entreprises (source : Sabine, voir « Écarts au choix ») | « Data processing agreement (GDPR) » sur l'offre Hobby [12] ; le lien du DPA mène à celui de ClickHouse, non lu ; société contractante non trouvée [17] | LangChain Inc., société du Delaware ; DPA intégré aux conditions par renvoi (« governed by the Data Processing Addendum »), un PDF pré-signé ; offre gratuite « without warranties, indemnities, support obligations, performance commitments, or data retention rights » [23] | DPA intégré aux conditions, offre gratuite comprise [33] |
@@ -75,17 +75,13 @@ numéros renvoient à la section « Sources ».
 
 ## Accessibilité
 
-Le critère demande une accessibilité « essayée ». Choix de Sabine du 2026-11-08 (choix 15 de
-time-knight) : **un seul essai, sur Grafana Cloud**, l'outil en place. Les quatre autres outils
-sont jugés sur leurs déclarations publiées : c'est une limite. Le tableau de bord et l'alerte de
-#164 n'existent pas encore : l'essai porte sur Explore, un tableau de bord de test à un panneau, et
-la liste des règles d'alerte. Une règle d'alerte de test, déclenchée exprès, est créée ou non par
-Sabine pendant l'essai ; sans elle, les étapes 4, 9 et 10 portent sur une liste vide, et c'est une
-limite.
-
-**Essai reporté** par Sabine le 2026-11-08, avec une date de reprise à fixer avec time-knight ;
-navigateur prévu : Google Chrome 157.0.8103.39 (arm64). Tant qu'il n'est pas fait, l'accessibilité
-de Grafana Cloud ne repose, comme celle des autres outils, que sur sa déclaration publiée [10].
+Choix de Sabine du 2026-11-08 (choix 15 de time-knight) : **un seul essai, sur Grafana Cloud**,
+l'outil en place. Les quatre autres outils sont jugés sur leurs déclarations publiées : c'est une
+limite. **L'essai passe à #164** (choix 18 de Sabine, 2026-11-08) : il se fait sur Explore, le
+tableau de bord et l'alerte du bac à sable, déclenchée exprès, que #164 construit ; ses résultats
+s'écrivent dans la grille ci-dessous. Navigateur prévu : Google Chrome 157.0.8103.39 (arm64).
+D'ici là, l'accessibilité de Grafana Cloud ne repose, comme celle des autres outils, que sur sa
+déclaration publiée [10].
 
 Grille : les critères WCAG 2.1 AA visés par RGAA 4.1.2 (`.claude/rules/conformite.md`), là où ils
 touchent la lecture d'une mesure et d'une alerte. Est bloquant ce qui empêche, au clavier seul ou au
