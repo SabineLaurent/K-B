@@ -122,12 +122,15 @@ Bac à sable lancé par Sabine le 2026-11-08, fin vers 17:45 UTC: 4 tests réuss
 
 | Alerte | Seuil | Valeur observée dans le tableau (19:03 UTC) | Déclenchée | E-mail reçu |
 |---|---|---|---|---|
-| `KbModelInvalidOutputs` | > 0 % | 4,8 % (1 appel sur 21) | oui, vue à 19:16 UTC | à relever |
-| `KbModelLowFidelity` | < 95 % | 73,3 % (11 faits sur 15) | oui, vue à 19:16 UTC | à relever |
-| `KbModelCostOverBudget` | > 1 USD | 1,2641 USD | oui, vue à 19:16 UTC | à relever |
+| `KbModelInvalidOutputs` | > 0 % | 4,8 % (1 appel sur 21) | oui, 19:15:20 UTC | oui, 19:27 UTC |
+| `KbModelLowFidelity` | < 95 % | 73,3 % (11 faits sur 15) | oui, 19:15:20 UTC | oui, 19:27 UTC |
+| `KbModelCostOverBudget` | > 1 USD | 1,2641 USD | oui, 19:15:20 UTC | oui, 19:27 UTC |
 
 Le coût observé dépasse les 1,20516 USD du bac à sable: le reste vient de mesures `sandbox` plus anciennes de la
 fenêtre de 7 jours (essais locaux du 2 au 6 novembre). L'e-mail de test du point de contact est arrivé à 19:25:12 UTC.
+Les trois e-mails sont arrivés 12 min 26 s après le déclenchement, une fois le point de contact enregistré, un par
+alerte. Le sujet donne l'alerte et son environnement (« [FIRING:1] KbModelCostOverBudget K-B/alert-rules.yaml
+(sandbox warning) »), le corps son résumé, sa valeur et ses étiquettes (`deployment_environment_name` vaut `sandbox`).
 
 ## Limites
 
