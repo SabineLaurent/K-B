@@ -23,6 +23,7 @@ from k_b.commands import (
     collect_command,
     import_command,
 )
+from k_b.commands.sigterm import StoppedBySigtermError
 from k_b.database import creation
 from k_b.database import purge as database_purge
 from k_b.etl import load
@@ -242,7 +243,12 @@ def test_a_sigterm_during_kb_migrate_database_leaves_no_base_and_exits_with_its_
 
     def connect_then_stop(database_path):
         connection = connect_sqlite(database_path)
-        signal.raise_signal(signal.SIGTERM)
+        try:
+            signal.raise_signal(signal.SIGTERM)
+        except StoppedBySigtermError:
+            # The stop comes before the connection is handed back: no caller can close it.
+            connection.close()
+            raise
         return connection
 
     monkeypatch.setattr(creation, "connect_sqlite", connect_then_stop)
