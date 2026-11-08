@@ -13,7 +13,7 @@ L'API IA s'est construite issue après issue : les fiches (#156), les tendances 
 puis la mise en ligne (#414). Ses contrats sont écrits, dans `docs/fiches-veille.md` et `docs/tendances.md`. Il
 manquait une vue d'ensemble : ce qui la compose, ce qu'elle appelle et qui l'appelle. La certification lit le
 critère C9.8 d'E3 comme partiel sans ce document. Il sert aussi d'annexe au rapport E3 : chaque fait doit donc être
-vrai dans le code, au commit cité (`ef64e95`).
+vrai dans le code, au commit cité (`7ba7319`).
 
 C'est une PR de documentation seule : aucun code ni test ne change.
 
@@ -69,8 +69,14 @@ demande, comme le RGAA pour la documentation publiée : un schéma est décrit p
   donnée par time-knight.
 - **Renvois** : une ligne dans le README et une dans `fiches-veille.md`, comme le demande le critère. Écarté : un
   renvoi dans `tendances.md`, hors du critère.
-- **README, lignes 68-69** : la phrase qui annonçait les textes de #369 comme « à venir » est corrigée, à la demande
-  de Sabine : #468 les a livrés.
+- **README, deux corrections** : la phrase qui annonçait les textes de #369 comme « à venir » dit maintenant ce
+  qu'ils font, à la demande de Sabine, puisque #468 les a livrés. Le paragraphe des jobs planifiés ne présente plus
+  `caj-kb-daily-routine` et `caj-kb-digest-watch` comme déclarés (#330, #423) : sinon le README contredirait le
+  document (tranché par time-knight).
+- **La relecture** : un sous-agent neuf a vérifié chaque fait contre le code et a rendu 16 constats. Les 16 ont été
+  corrigés : tranché par time-knight, sous la délégation de Sabine du 15/10. Les plus lourds : un échec de GitHub
+  sur un README prive de textes tous les dépôts choisis, pas un seul ; le plafond de débit repart de zéro à chaque
+  redémarrage ; l'export OTLP a trois signaux, pas deux.
 
 ## Preuve
 
@@ -79,7 +85,7 @@ demande, comme le RGAA pour la documentation publiée : un schéma est décrit p
 | `uv run pytest tests/architecture/test_apis.py tests/architecture/test_opentelemetry.py` → 68 passed | les couches et les imports interdits que le document décrit sont tenus |
 | `grep -rnE "raw_store\|writers\|write_file_atomically\|write_text\|write_bytes\|[^a-z_]open\(" src/k_b/ai_api \| wc -l` → 0 | règle 7 de `poc.md` : l'API IA n'écrit aucun fichier |
 | `grep -rn "caj-kb-digest-watch" infra/` → rien | le manque écrit dans « En ligne » est réel |
-| contrôle des caractères `Cc` et `Cf`, et des 17 liens relatifs | aucun caractère invisible ; chaque lien ouvre un fichier |
+| contrôle des caractères `Cc` et `Cf`, et des liens relatifs | aucun caractère invisible ; chaque lien ouvre un fichier |
 | `uv run pytest` → 4034 passed | la PR ne casse rien |
 
 ## Ce que tu dois pouvoir défendre

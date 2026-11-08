@@ -5,7 +5,7 @@ qui l'appelle, sans lire le code. Ses contrats (demandes, réponses, contrôles,
 [fiches-veille.md](fiches-veille.md) pour `POST /digests` et dans [tendances.md](tendances.md) pour
 `POST /trend-reports`. Ce document ne les recopie pas.
 
-Chaque `fichier:ligne` vaut pour `main` au commit `ef64e95`. Les chemins sans dossier de tête sont sous
+Chaque `fichier:ligne` vaut pour `main` au commit `7ba7319`. Les chemins sans dossier de tête sont sous
 `src/k_b/`. La section « Vérifier ce document » donne les commandes qui retrouvent ces faits.
 
 ## Vue d'ensemble
@@ -18,7 +18,7 @@ flowchart LR
     data -->|"lecture seule"| base[("base<br>SQLite ou PostgreSQL")]
     ai -->|"chat/completions"| model["modèle<br>Azure AI Foundry"]
     ai -->|"GET /repos/{owner}/{repo}<br>et /readme"| github["API GitHub"]
-    ai -->|"OTLP : mesures, traces"| grafana["Grafana Cloud"]
+    ai -->|"OTLP : mesures, traces, enregistrements"| grafana["Grafana Cloud"]
     digest -->|"écrit"| vault["coffre<br>veille/"]
     trend -->|"écrit"| vault
 ```
@@ -33,17 +33,19 @@ Le schéma se lit ainsi :
   `GET /items/{item_id}` et `GET /trends` (`ai_api/connectors/data_api_client.py:45-46`, `:289`, `:308`), avec la
   clé du client `AI_DIGEST` (`ai_api/connectors/data_api_settings.py:15`).
 - **L'API de données lit la base** : ses routeurs importent `database.reading`
-  (`data_api/routers/item_router.py:19`, `data_api/routers/trend_router.py:12`). La base est le fichier SQLite du dossier de données,
-  ou la base PostgreSQL que nomme `KB_DATABASE_URL` (`database/location.py:1-3`) : PostgreSQL en ligne
-  (`infra/main.bicep:181`).
+  (`data_api/routers/item_router.py:19`, `data_api/routers/trend_router.py:12`). La base est le fichier SQLite du
+  dossier de données, ou la base PostgreSQL que nomme `KB_DATABASE_URL` (`database/location.py:1-3`). En ligne,
+  c'est PostgreSQL (`infra/main.bicep:181`).
 - **L'API IA appelle le modèle** par une interface compatible OpenAI, sur le chemin `chat/completions`
   (`ai_api/connectors/llm_client.py:40`). Le fournisseur est `openai_compatible` ou `replay`
-  (`ai_api/connectors/llm_settings.py:31`). Le code ne nomme pas Azure : l'adresse et le modèle sont des réglages
-  (`infra/main.bicep:218-222`). Le modèle retenu est gpt-6-luna sur Azure AI Foundry (journal ADR, « Modèle des
-  fiches : gpt-6-luna sur l'abonnement de l'organisme de formation »).
+  (`ai_api/connectors/llm_settings.py:31`). Aucune branche du code n'est propre à Azure : l'adresse et le modèle
+  sont des réglages (`infra/main.bicep:218-222`). Les prix du coût estimé restent ceux de gpt-6-luna, en
+  constantes, appliqués à tout modèle (`core/config.py:264-274`). Le modèle retenu est gpt-6-luna sur Azure AI
+  Foundry (journal ADR, « Modèle des fiches : gpt-6-luna sur l'abonnement de l'organisme de formation »).
 - **L'API IA lit GitHub** pour les seules tendances : la fiche de chaque candidat et le README de chaque dépôt
   choisi (`ai_api/connectors/github_client.py:169`, `:189`).
-- **L'API IA envoie ses mesures et ses traces** en OTLP, quand l'export est réglé. Leur destinataire est Grafana
+- **L'API IA envoie en OTLP** ses mesures, ses traces et les enregistrements de journal liés à leurs spans, quand
+  l'export est réglé (`ai_api/app.py:108`, `ai_api/connectors/metrics_export.py:56`). Leur destinataire est Grafana
   Cloud ([registre](registre-traitements.md), « Envoi des mesures à Grafana Cloud »).
 - **Seul `kb` écrit dans le coffre.** L'API IA rend les fiches et le compte rendu, sans rien garder
   (« Ce qui est interdit »).
@@ -57,7 +59,7 @@ sequenceDiagram
     participant D as API de données
     participant M as modèle
     K->>A: POST /digests (clé KB_DIGEST)
-    A->>A: clé, client, place libre, débit
+    A->>A: taille du corps, clé, client, place libre, débit
     A->>D: GET /items, puis GET /items/{id} par item gardé
     D-->>A: la veille de la fenêtre
     A->>M: classement, par lots
@@ -73,10 +75,12 @@ sequenceDiagram
 
 Le schéma se lit ainsi :
 
-1. `kb digest` vérifie d'abord le coffre. Si une fiche du jour existe déjà, rien n'est demandé
-   (`commands/digest_command.py:70`). Sinon, il envoie la demande (`:88`).
-2. L'app refuse une demande dans cet ordre : clé inconnue (401), client d'une autre route (403), route déjà
-   occupée, débit dépassé (429) (`ai_api/app.py:62-67`). Une demande refusée ne consomme rien de ce qui suit.
+1. `kb digest` lit d'abord ses réglages, puis vérifie le coffre : si une fiche du jour existe déjà, rien n'est
+   demandé (`commands/digest_command.py:58-70`). Sinon, il envoie la demande (`:88`).
+2. Un corps de plus de 1 024 octets est refusé en 413, avant la clé (`core/config.py:280-283`, `ai_api/app.py:90-94`).
+   Puis l'app refuse dans cet ordre : clé inconnue (401), client d'une autre route (403), route déjà occupée par
+   une demande (429), débit dépassé (429) (`ai_api/app.py:62-67`, `core/api_rate_limit.py:62-68`). Une demande
+   refusée ne consomme rien de ce qui suit.
 3. Toute la demande est bornée par une échéance de 200 s (`core/config.py:451`, `ai_api/routers/digest_router.py:100`).
 4. L'API IA lit la fenêtre par l'API de données (`ai_api/routers/digest_router.py:108`). Si cette lecture échoue,
    la demande échoue sans appel au modèle (`:166-176`).
@@ -86,8 +90,8 @@ Le schéma se lit ainsi :
    (`ai_api/routers/digest_router.py:120`, `:134`).
 7. `kb digest` écrit une fiche par sujet (`commands/digest_command.py:96`).
 
-Les étapes, leurs bornes et leurs états nommés sont dans [fiches-veille.md](fiches-veille.md), « Le parcours
-d'une demande ».
+La fenêtre, les contrôles et les états nommés sont dans [fiches-veille.md](fiches-veille.md), sections « Fenêtre »,
+« Contrôles » et « États nommés ».
 
 ## Le parcours de `POST /trend-reports`
 
@@ -109,7 +113,7 @@ sequenceDiagram
     M-->>A: les dépôts choisis
     A->>G: GET /repos/{owner}/{repo}/readme par dépôt choisi
     loop un appel par dépôt choisi
-        A->>M: rédaction des 4 textes, depuis le README
+        A->>M: rédaction des 4 textes, depuis la fiche, le README et les sujets
         M-->>A: les textes et leurs faits
         A->>A: contrôles de forme et de fidélité
     end
@@ -130,15 +134,24 @@ Le schéma se lit ainsi :
 4. Elle lit sur GitHub la fiche de chaque candidat (`:181`). Le modèle en choisit 5 au plus (`:192`,
    `core/config.py:377`).
 5. Elle lit le README des seuls dépôts choisis (`ai_api/trend_reports.py:205`). Le modèle écrit ensuite quatre
-   textes par dépôt, un appel par dépôt (`:206`) : `sector`, `watch_link`, `readme_summary` et `promise`
-   (`ai_api/schemas/trend_report_schema.py:105-119`). Ce sont les textes de #369 (PR #468).
+   textes par dépôt, un appel par dépôt (`:206`). Chaque texte tire ses faits d'une source à lui
+   (`ai_api/schemas/trend_report_schema.py:105-119`) : `sector` des topics, `watch_link` de la définition d'un sujet
+   de veille, `readme_summary` du README, `promise` du README ou de la description. Ce sont les textes de #369
+   (PR #468).
 6. Si une lecture des fenêtres ou des fiches échoue, toute la demande échoue
-   (`ai_api/routers/trend_report_router.py:139-149`). Si le choix échoue, le compte rendu reste factuel. Si un
-   README ou une rédaction échoue, les textes de ce dépôt restent vides et l'échec est nommé
-   (`ai_api/trend_reports.py:1-5`, [tendances.md](tendances.md), « Défenses et échecs »).
+   (`ai_api/routers/trend_report_router.py:139-150`). Les autres échecs restent dans le compte rendu
+   (`ai_api/trend_reports.py:155-157`) :
+   - si le choix échoue, le compte rendu reste factuel ;
+   - si GitHub échoue sur un README, aucun README ne part au modèle, et aucun dépôt choisi n'a ses textes
+     (`ai_api/stages/trend_writing.py:246-248`, `:277-278`) ;
+   - si une rédaction échoue, seuls les textes de ce dépôt restent vides ; après un 429 du modèle, les dépôts
+     suivants ne sont pas rédigés (`:264-265`) ;
+   - un README absent n'est pas un échec : la rédaction se fait sans lui ([tendances.md](tendances.md),
+     « Défenses et échecs »).
 7. `kb trend-report` écrit le fichier, puis ajoute l'entrée au registre (`commands/trend_report_command.py:102-104`).
 
-Les étapes, les critères et la rédaction sont dans [tendances.md](tendances.md), « Le parcours d'une demande ».
+La période, les critères et la rédaction sont dans [tendances.md](tendances.md), sections « Période », « Rang et
+critères » et « Rédaction ».
 
 ## Les couches de `src/k_b/ai_api/`
 
@@ -161,8 +174,10 @@ flowchart TB
     app --> routers --> edge --> paths --> stages --> calls --> connectors --> base
 ```
 
-Le schéma se lit de haut en bas : chaque bloc n'importe que les blocs plus bas. Il regroupe les 16 couches par rôle.
-La table donne le détail, de la couche la plus basse à la plus haute.
+Le schéma se lit de haut en bas, et regroupe les 16 couches en 8 blocs par rôle. Au commit cité, chaque bloc
+n'importe que les blocs plus bas. Le test tient l'ordre des 16 couches, pas celui des blocs : `connectors/` et le
+bloc du bas se partagent les couches 1 et 2 (`metrics_export` et `trace_export` d'un côté, `repository_texts` de
+l'autre). La table donne le détail, de la couche la plus basse à la plus haute.
 
 | Couche | Modules | Rôle |
 |---|---|---|
@@ -207,24 +222,28 @@ ligne, ce sont des secrets du coffre Key Vault, que l'app lit par son identité 
 | `KB_AI_GITHUB_TOKEN` | jeton GitHub des tendances | `ai_api/connectors/github_settings.py:10` | `kb-ai-github-token` |
 | `KB_OTLP_HEADERS` | en-tête d'authentification de l'export OTLP | `ai_api/connectors/metrics_export.py:50` | `kb-otlp-headers` |
 
-Un client de l'API IA ne peut pas avoir la clé de l'API IA vers l'API de données. `kb serve-ai` refuse de démarrer
-si une clé de client est égale à `KB_DATA_API_KEY_AI_DIGEST` (`commands/serve_ai_command.py:65-73`).
+Aucune clé d'un client de l'API IA ne peut être celle de l'API IA vers l'API de données : `kb serve-ai` refuse de
+démarrer si l'une est égale à `KB_DATA_API_KEY_AI_DIGEST` (`commands/serve_ai_command.py:65-73`). Le contrôle
+compare les valeurs, pas les droits : sur le Mac, `kb digest` lit tout le `.env`, cette clé comprise (`:60-64`).
 
 ### Les réglages
 
 | Variable | Ce qu'elle règle | Lue dans le code | Défaut | En ligne (`infra/main.bicep`) |
 |---|---|---|---|---|
+| `KB_DATA_DIR` | dossier de données (journal en fichier) | `commands/environment.py:14` | aucun | `/var/lib/knowledge_base` (`:53`, `:212`) |
 | `KB_AI_API_HOST`, `KB_AI_API_PORT` | écoute | `ai_api/settings.py:17-18` | `127.0.0.1`, `8001` (`core/config.py:278-279`) | `0.0.0.0`, `8001` (`:213-214`) |
 | `KB_DIGEST_WINDOW_DAYS` | fenêtre par défaut des fiches | `ai_api/settings.py:19` | 3 jours (`core/config.py:325`) | défaut |
 | `KB_LLM_PROVIDER`, `KB_LLM_BASE_URL`, `KB_LLM_MODEL`, `KB_LLM_REASONING_EFFORT` | modèle | `ai_api/connectors/llm_settings.py:24-28` | aucun pour les trois premiers | `:218-222` |
 | `KB_LLM_REPLAY_FILE` | réponses du rejeu | `ai_api/connectors/llm_settings.py:29` | aucun | non posé |
 | `KB_DATA_API_URL` | adresse de l'API de données | `ai_api/connectors/data_api_settings.py:13` | `http://127.0.0.1:8000` (`core/config.py:333`) | nom interne en HTTPS (`:223`) |
-| `KB_OTLP_ENDPOINT`, `KB_TRACE_CONTENT` | export OTLP, contenu des appels dans les traces | `ai_api/connectors/metrics_export.py:49`, `:51` | pas d'export ; `none` | `:224`, `none` (`:217`) |
-| `KB_DEPLOYMENT_ENVIRONMENT` | `sandbox` sert l'OpenAPI et `/docs` | `core/api_settings.py:11`, `:41-46` | rien servi | `production` (`:216`) |
+| `KB_OTLP_ENDPOINT`, `KB_TRACE_CONTENT` | export OTLP, contenu des appels dans les enregistrements | `ai_api/connectors/metrics_export.py:49`, `:51` | pas d'export ; `none` | `:224`, `none` (`:217`) |
+| `KB_DEPLOYMENT_ENVIRONMENT` | `sandbox` sert l'OpenAPI et `/docs` ; obligatoire avec l'export | `core/api_settings.py:11`, `:41-46`, `ai_api/connectors/metrics_export.py:175-177` | rien servi | `production` (`:216`) |
+| `KB_AI_API_URL` | adresse de l'API IA, lue par `kb`, pas par l'API IA | `post/ai_api_client.py:45` | `http://127.0.0.1:8001` (`core/config.py:473`) | posé pour le job d'essai seul (`:249`) |
 
 Les bornes ne sont pas des variables. Ce sont des constantes de `core/config.py` : corps de demande de 1 024 octets
-au plus (`:283`), 20 demandes par jour et par route (`:304-307`), 200 s par demande (`:451`, `:459`), 90 s par appel
-au modèle (`:232`). La liste fermée des sujets est aussi une constante (`:392`).
+au plus (`:283`), 20 demandes par jour et par route (`:304-307`), 200 s par demande (`:451`, `:459`). Chaque lecture
+de la réponse du modèle attend 90 s au plus (`:232`, `ai_api/connectors/llm_client.py:221`) ; l'ensemble est borné
+par les 200 s de la demande (`core/config.py:233-236`). La liste fermée des sujets est aussi une constante (`:392`).
 
 ### Les métriques et les journaux
 
@@ -233,50 +252,59 @@ au modèle (`:232`). La liste fermée des sujets est aussi une constante (`:392`
 | Une ligne JSON par appel au modèle : durée, jetons, coût estimé, états ; jamais un texte ni une clé | sortie standard | sortie standard, lue par l'espace Log Analytics `log-kb` | `ai_api/observability/metrics.py:1-2`, `:35-51` |
 | Les mêmes mesures en instruments OpenTelemetry | rien ne part sans `KB_OTLP_ENDPOINT` | Grafana Cloud, en OTLP | `ai_api/observability/metric_instruments.py`, `ai_api/connectors/metrics_export.py` |
 | Une trace par demande, un span par étape | rien ne part sans export | Grafana Cloud (Tempo) | `ai_api/tracing.py`, `ai_api/connectors/trace_export.py` |
-| Journal de fonctionnement | sortie d'erreur et `logs/kb-serve-ai.log` | sortie d'erreur seule (`KB_LOG_TO_FILE=false`, `Dockerfile:46`), lue par `log-kb` | `cli.py:68` |
+| Enregistrements de journal liés aux spans : les raisons d'une affirmation retirée ; sous `KB_TRACE_CONTENT`, le contenu d'un appel au modèle | rien ne part sans export | Grafana Cloud, en OTLP | `ai_api/tracing.py:1-4`, `ai_api/connectors/trace_export.py:133-137` |
+| Journal de fonctionnement du processus `kb serve-ai` | sortie d'erreur et `logs/kb-serve-ai.log` | sortie d'erreur seule (`KB_LOG_TO_FILE=false`, `Dockerfile:46`), lue par `log-kb` | `cli.py:68` |
 
 L'environnement Container Apps envoie les journaux des apps à `log-kb` ([infra/README.md](../infra/README.md),
-table des modules, `container-apps-environment.bicep`). Les mesures et les traces partent vers Grafana Cloud. Le
-détail des noms et des attributs est dans [fiches-veille.md](fiches-veille.md), « Métriques » et « Traces de
-`POST /digests` ».
+table des modules, `container-apps-environment.bicep`). Les mesures, les traces et les enregistrements partent vers
+Grafana Cloud. Le contenu d'un appel au modèle est une donnée personnelle : il ne part que sous `KB_TRACE_CONTENT`,
+`none` en ligne ([registre](registre-traitements.md), « Envoi des mesures à Grafana Cloud »). Le détail des noms et
+des attributs est dans [fiches-veille.md](fiches-veille.md), « Métriques » et « Traces de `POST /digests` ».
 
 ## Ce qui est interdit
 
 | Interdit | Pourquoi | Ce qui le tient |
 |---|---|---|
-| Importer `etl`, `database`, `data_api`, `cli` ou `core/atomic_write` | l'API IA lit la veille par l'API de données, jamais dans la base, et n'écrit aucun fichier | `AI_API_ALLOWED_MODULES` et `AI_API_FORBIDDEN_MODULES` (`tests/architecture/test_apis.py:105-106`), testés par `:118-121` et `:124-146` |
+| Importer autre chose qu'`ai_api`, `items` et `core`, ou importer `core/atomic_write` | l'API IA lit la veille par l'API de données, jamais dans la base ; son paquet n'écrit aucun fichier | `AI_API_ALLOWED_MODULES` et `AI_API_FORBIDDEN_MODULES` (`tests/architecture/test_apis.py:105-106`, `:113`), testés par `:118-121` et `:124-146` |
 | Écrire ce qui doit survivre à son redémarrage | l'API doit pouvoir être déplacée et redémarrée sans rien perdre (règle 7 de `.claude/rules/poc.md`) | la commande de la règle 7 ne renvoie rien sur `src/k_b/ai_api` (« Vérifier ce document ») ; seul `kb` écrit le coffre |
-| Importer une couche au-dessus de la sienne | un parcours se lit sans ouvrir ses étapes | `tests/architecture/test_apis.py:223` |
+| Importer sa couche ou une couche au-dessus | un parcours se lit sans ouvrir ses étapes | `tests/architecture/test_apis.py:208`, `:223` |
 | Importer OpenTelemetry hors de quatre modules | les règles de l'export restent à un seul endroit | `tests/architecture/test_opentelemetry.py:52`, `:79` |
-| Démarrer avec une variable `OTEL_*` | le SDK la lirait sans que K-B la voie | `ai_api/connectors/metrics_export.py:52`, test `tests/ai_api/test_metrics_export.py:302` |
-| Envoyer tout le contenu des appels en production | ce sont des données personnelles chez Grafana | `ai_api/connectors/metrics_export.py:186-187`, test `tests/ai_api/test_metrics_export.py:135` |
+| Démarrer avec une variable `OTEL_*` | le SDK la lirait sans que K-B la voie | `ai_api/connectors/metrics_export.py:105-112`, test `tests/ai_api/test_metrics_export.py:303` |
+| Envoyer tout le contenu des appels en production | ce sont des données personnelles chez Grafana | `ai_api/connectors/metrics_export.py:186-187`, cas `content-all-in-production` de `tests/ai_api/test_metrics_export.py:287` (`:257-258`, `:284`) |
 
-Ce que l'API IA garde en mémoire est perdu à son redémarrage, et rien n'en dépend : les mesures, spans et
-enregistrements pas encore envoyés, et le compte des demandes récentes (`ai_api/app.py:1-4`). Elle garde aussi un
-verrou par route, qui refuse une seconde demande pendant qu'une première tourne, et le compteur de débit (`:80-81`).
-Les clients HTTP vers le modèle, l'API de données et GitHub sont ouverts pour une demande, puis fermés
-(`ai_api/dependencies.py:16-30`).
+Le paquet `ai_api` n'écrit aucun fichier. Le processus `kb serve-ai` écrit son journal de fonctionnement en fichier
+sur le Mac, par `cli.py:68` (« Les métriques et les journaux »).
+
+Ce que l'API IA garde en mémoire est perdu à son redémarrage : le compte des demandes de chaque client par route,
+et un verrou par route, qui refuse une seconde demande pendant qu'une première tourne (`ai_api/app.py:80-81`). Le
+plafond de 20 demandes par jour en dépend : il repart de zéro à chaque redémarrage. C'est une limite décidée et
+écrite (`core/config.py:301-303`, [fiches-veille.md](fiches-veille.md), « Accès »). Les mesures, spans et
+enregistrements pas encore envoyés partent à l'arrêt (`ai_api/app.py:106-116`). Les clients HTTP vers le modèle,
+l'API de données et GitHub sont ouverts pour une demande, puis fermés (`ai_api/dependencies.py:16-30`).
 
 ## En ligne, sur Azure Container Apps
 
 En ligne, l'API IA est l'app `ca-kb-ai-api`. Elle lance `kb serve-ai` depuis l'image de K-B
-(`infra/main.bicep:199-235`). La procédure (deux passes, secrets, vérification) est dans
+(`infra/main.bicep:200-235`). La procédure (deux passes, secrets, vérification) est dans
 [infra/README.md](../infra/README.md), « Appliquer ».
 
 - **Ingress interne seul**, en HTTPS : l'app n'a pas d'adresse publique (`infra/modules/api-container-app.bicep:74-81`).
   Les clients la joignent par son nom interne, `https://ca-kb-ai-api.internal.<domaine>` (`infra/main.bicep:129`).
-- **De 0 à 1 réplique** (`infra/modules/api-container-app.bicep:149-152`). Au repos, l'API met environ 20 s à se
-  réveiller (mesure du 06/11, [infra/README.md](../infra/README.md), « 6. Vérifier la mise en ligne »).
+- **De 0 à 1 réplique** (`infra/modules/api-container-app.bicep:149-152`). Le compte du débit vit dans la mémoire
+  d'une réplique : il repart de zéro à chaque réveil, et deux répliques tournent pendant un déploiement, l'ancienne
+  révision et la nouvelle (`:147-148`). Au repos, l'API met environ 20 s à se réveiller (mesure du 06/11,
+  [infra/README.md](../infra/README.md), « 6. Vérifier la mise en ligne »).
 - **L'API de données est jointe par son nom interne**, en HTTPS (`infra/main.bicep:223`).
 - **Arrêt** : 250 s de grâce. C'est la plus longue demande que l'ingress laisse passer (240 s), plus les derniers
   exports (`infra/main.bicep:228-230`, `ai_api/app.py:106-116`).
 - **Sonde** `GET /health`, hors clé (`infra/modules/api-container-app.bicep:40-41`, `ai_api/app.py:100`).
 - **Ni OpenAPI ni `/docs`** : `KB_DEPLOYMENT_ENVIRONMENT=production` (`infra/main.bicep:216`).
 
-**Ce qui appelle l'API IA en ligne.** Au commit `ef64e95`, seul le job `caj-kb-smoke-test` l'appelle, et seulement
+**Ce qui appelle l'API IA en ligne.** Au commit `7ba7319`, seul le job `caj-kb-smoke-test` l'appelle, et seulement
 par `GET /health` (`commands/smoke_test_command.py:118-127`, `infra/deployment.json`). La commande
-`kb digest-watch` existe (`commands/digest_watch_command.py`, [README](../README.md), « Les commandes des jobs
-planifiés ») : elle enchaîne `kb digest` puis `kb trend-report`. Son job, `caj-kb-digest-watch`, est prévu par
+`kb digest-watch` existe (`commands/digest_watch_command.py` ; [README](../README.md), paragraphe « Les commandes
+des jobs planifiés ») : elle réveille les deux API par `GET /health`, lance `kb digest`, les réveille de nouveau,
+lance `kb trend-report`, puis publie `veille/` (même paragraphe du README). Son job, `caj-kb-digest-watch`, est prévu par
 #423, mais il n'est pas encore déclaré dans `infra/`. En ligne, aucune demande de fiches ni de compte rendu n'est
 donc encore planifiée.
 
@@ -292,7 +320,7 @@ donc encore planifiée.
 
 ## Vérifier ce document
 
-Depuis la racine du dépôt, au commit `ef64e95` :
+Depuis la racine du dépôt, `7ba7319` extrait :
 
 ```sh
 uv run pytest tests/architecture/test_apis.py tests/architecture/test_opentelemetry.py    # couches et imports
@@ -306,4 +334,5 @@ grep -rlE "^(from|import) opentelemetry" src/k_b | sort
 cat infra/deployment.json; grep -rn "caj-kb-digest-watch" infra/
 ```
 
-Chaque `fichier:ligne` du document se relit par `sed -n '<ligne>p' <fichier>` au même commit.
+Un `fichier:ligne` se relit sans extraire le commit : `git show 7ba7319:<chemin> | sed -n '<ligne>p'`, où
+`<chemin>` prend `src/k_b/` devant un chemin sans dossier de tête.

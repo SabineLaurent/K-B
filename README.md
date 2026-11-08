@@ -66,7 +66,8 @@ dans mon coffre Obsidian, sous `veille/` :
 - **Compte rendu des tendances** (`kb trend-report`) : parmi les dépôts qui montent sur GH
   Archive, le code calcule les rangs et les critères (durables, nouveaux, en accélération) et lit
   la fiche GitHub de chaque candidat ; le modèle en choisit au plus 5, puis écrit quatre textes
-  courts sur chacun, depuis son README ; `veille/tendances/<date>.md`.
+  courts sur chacun, depuis sa fiche, son README et la définition des sujets de veille ;
+  `veille/tendances/<date>.md`.
 - **Tops** (`kb write-tops`, sans modèle) : une fiche datée pour chacun des deux classements de
   100 dépôts, les plus étoilés et les plus forkés, sous `veille/tops/`.
 - **Contrôles** : le modèle renvoie du JSON ; le code le revalide (schéma fermé, sujets de la
@@ -573,8 +574,8 @@ injoignable, est `exchange_storage_no_token`. Code de sortie :
 - 143 : SIGTERM, 130 : SIGINT (Ctrl-C).
 
 **Les commandes des jobs planifiés** (#413) : en ligne, tout tourne dans des jobs, rien sur le Mac.
-`kb daily-routine` (job `caj-kb-daily-routine`) et `kb digest-watch` (job `caj-kb-digest-watch`)
-enchaînent leurs étapes dans le même processus, chacune avec le code qu'elle rendrait seule :
+`kb daily-routine` et `kb digest-watch`, commandes des jobs `caj-kb-daily-routine` (#330) et
+`caj-kb-digest-watch` (#423), pas encore déclarés dans `infra/`, enchaînent leurs étapes dans le même processus, chacune avec le code qu'elle rendrait seule :
 
 ```sh
 KB_DATA_DIR=<dossier> KB_VAULT_DIR=<coffre> KB_EXCHANGE_BLOB_URL=https://<compte>.blob.core.windows.net \
