@@ -28,21 +28,23 @@ Les 328 tests écartés par `make test` sont ceux que `tests/conftest.py` laisse
 ### Hors du compte
 
 Les 1550 tests sont ceux des fichiers du tableau des groupes. Les fichiers ci-dessous testent aussi, en entier ou
-en partie, l'API IA ou la chaîne : ils sont dans les 4061 de `make test`, pas dans les 1550. Chaque nombre vient de
+en partie, l'API IA ou la chaîne : ils sont dans les 4061 de `make test` (sauf les 79 marqués `postgresql`, parmi les
+328 écartés), pas dans les 1550. Chaque nombre vient de
 `uv run pytest --co -q <fichier>`.
 
 | Fichier | Tests | Ce qu'il teste de l'API IA ou de la chaîne | Pourquoi hors du compte |
 |---|---|---|---|
-| `tests/post/test_top_sheets.py` | 33 | rien : il teste `kb write-tops`, qui écrit les fiches des tops depuis la base, sans l'API IA | hors de la chaîne |
-| `tests/data_api/` | 201, plus 79 marqués `postgresql` | l'API de données, que l'API IA appelle ; dont la clé de chaque client, code commun aux deux API (`tests/data_api/test_api_keys.py`, 14 tests), les plafonds d'une demande de fiches et d'un compte rendu sous les limites de l'API de données (`tests/data_api/test_rate_limit.py:82`), l'échéance d'une requête sous le délai de lecture du client de l'API IA (`tests/data_api/test_api_errors.py:181`) | son propre groupe (`make test-data-api`) |
+| `tests/post/test_top_sheets.py` | 33 | rien : il teste `kb write-tops` (`tests/post/test_top_sheets.py:21`), qui écrit les fiches des tops depuis la base, sans l'API IA | hors de la chaîne |
+| `tests/data_api/` | 201, plus 79 marqués `postgresql` | l'API de données, que l'API IA appelle ; dont la clé de chaque client, code commun aux deux API (`tests/data_api/test_api_keys.py:1`, 14 tests), les plafonds d'une demande de fiches et d'un compte rendu sous les limites de l'API de données (`tests/data_api/test_rate_limit.py:82`), l'échéance d'une requête sous le délai de lecture du client de l'API IA (`tests/data_api/test_api_errors.py:181`) | son propre groupe (`make test-data-api`) |
 | `tests/architecture/test_apis.py` | 55 | ce que les deux API peuvent importer (`:1-3`), dont la règle 7 de `.claude/rules/poc.md` pour l'API IA | test d'architecture, commun aux deux API |
 | `tests/architecture/test_opentelemetry.py` | 13 | les quatre modules de l'API IA, seuls à importer OpenTelemetry (`:1-3`) | test d'architecture |
 | `tests/test_outbound.py` | 35 | les règles d'une connexion HTTP de K-B : l'URL acceptée, le client HTTP, la borne d'un corps lu (`:1-2`) | code commun à tous les clients HTTP de K-B (`core/outbound.py`) |
 | `tests/commands/test_smoke_test_command.py` | 14 | `kb smoke-test` : la santé des deux API, puis le listage du stockage d'échange (`:1-2`) | une commande des jobs en ligne |
 | `tests/jobs/test_api_health.py` | 12 | `GET /health` d'une API depuis un job (`:1-2`) | code des jobs |
-| `tests/jobs/test_watch_publication.py` | 11 | la publication de `veille` (`:1-2`), dernière étape de `kb digest-watch` (`publish_the_watch`, `tests/commands/test_digest_watch_command.py:49`) | code des jobs |
+| `tests/jobs/test_watch_publication.py` | 11 | la publication de `veille` (`:1-2`), dans le code des jobs | code des jobs |
+| `tests/commands/test_job_transfers.py` | 8 | les transferts des jobs (`:1-2`), dont la publication de `veille` (`:131`, `:143`, `:161`) : `publish_the_watch`, dernière étape de `kb digest-watch` (`commands/digest_watch_command.py:16`, `:77`) | code des jobs |
 | `tests/commands/test_wait_display.py` | 6 | l'attente d'une commande affichée sur la sortie d'erreur (`:1`), dont `kb digest` se sert (`commands/digest_command.py:23`) | affichage commun aux commandes |
-| `tests/commands/test_job_routine.py:153`, `tests/commands/test_sigint.py:73`, `tests/commands/test_exit_codes.py:31` | en partie | les étapes de `kb digest-watch` (`DIGEST_WATCH_STEPS`) ; un SIGINT pendant l'attente de `kb digest` ; le code de sortie de `kb digest` | fichiers communs à d'autres commandes |
+| `tests/commands/test_job_routine.py:155`, `tests/commands/test_sigint.py:73`, `tests/commands/test_exit_codes.py:31`, `tests/commands/test_daily_routine_command.py:109`, `tests/architecture/test_layers.py:206` | en partie | les étapes de `kb digest-watch` (`DIGEST_WATCH_STEPS`) ; un SIGINT pendant l'attente de `kb digest` ; le code de sortie de `kb digest` ; l'arrêt de `kb digest-watch` sur SIGTERM ; `post` n'importe aucune des deux API | fichiers communs à d'autres commandes, ou test d'architecture |
 
 ## Les groupes
 
@@ -126,10 +128,12 @@ La table des droits est `AI_API_CLIENT_BY_ROUTE` : `/digests` à `KB_DIGEST`, `/
 
 **Ce qu'il ne prouve pas.**
 
-- Les clés des clients de l'API IA sont tirées au hasard une fois, au chargement du module
+- Dans les tests des routes et du client de `kb digest`, les clés des clients de l'API IA sont tirées au hasard une
+  fois, au chargement du module
   (`secrets.token_urlsafe(32)`, `tests/ai_api/test_digest_router.py:81-87`, `tests/ai_api/test_trend_report_router.py:55`,
   `tests/post/test_ai_api_client.py:41`) ; celle de l'API de données l'est à chaque test
-  (`tests/ai_api/test_digest_router.py:181`). Aucun test ne lit les clés d'un déploiement en ligne, ni leur rotation.
+  (`tests/ai_api/test_digest_router.py:181`), comme celles du bout en bout (`tests/commands/test_live_apis.py:161-163`).
+  Aucun test ne lit les clés d'un déploiement en ligne, ni leur rotation.
 - La comparaison des clés en temps constant (`hmac.compare_digest`, `core/api_access.py:55-60`) : aucun test ne la
   prouve (`grep -rn compare_digest tests/` ne rend rien).
 
@@ -212,7 +216,7 @@ socket locale).
 **Ce qu'il ne prouve pas.**
 
 - L'arrivée des mesures chez Grafana Cloud : seul le test `e2e` `tests/e2e/test_real_export.py` les envoie au vrai
-  point d'arrivée, et la CI l'écarte.
+  point d'arrivée (`tests/e2e/test_real_export.py:1-3`), et la CI l'écarte.
 - L'arrivée des traces et des journaux dans Tempo et Loki : aucun test, même `e2e`. Le test `e2e` n'exporte aucune
   trace (`TraceExport.from_settings(None, …)`), et son commentaire dit que les traces sont essayées par Sabine sur
   `kb serve-ai` (`tests/e2e/test_real_export.py:95-96`).
@@ -254,14 +258,15 @@ flowchart LR
     ai -.->|"simulé"| github["GitHub simulé"]
     ai -.->|"réglé par le test"| clock["horloge de l'API IA<br>sujets des tests"]
     kb -.->|"simulé, kb smoke-test"| azure["identité managée<br>stockage d'échange"]
-    kb -->|"écrit"| vault["coffre temporaire"]
+    kb -->|"écrit (kb digest, kb trend-report)"| vault["coffre temporaire"]
 ```
 
 Le schéma se lit ainsi :
 
 - **Ce qui est réel.** `kb digest`, `kb trend-report` et `kb smoke-test` sont lancés par `cli.main`, dans le
-  processus des tests (`tests/commands/test_live_apis.py:203`, `:292`, `:335`). Ils écrivent dans un coffre temporaire
-  (`data_and_vault_dirs`, `tests/commands/conftest.py:67-73`). Les deux API sont construites par `kb serve-data` et `kb serve-ai` depuis leur environnement,
+  processus des tests (`tests/commands/test_live_apis.py:203`, `:292`, `:335`). `kb digest` et `kb trend-report`
+  écrivent dans un coffre temporaire (`data_and_vault_dirs`, `tests/commands/conftest.py:67-73`, pris par
+  `tests/commands/test_live_apis.py:188`, `:265`). Les deux API sont construites par `kb serve-data` et `kb serve-ai` depuis leur environnement,
   comme en production (`build_app_as_served`, `tests/commands/test_live_apis.py:111-118`), puis servies par uvicorn
   sur un port libre de `127.0.0.1` (`serving`, `tests/commands/test_live_apis.py:86-108`). `kb` les appelle en
   HTTP, avec ses clés : une par client, car `kb serve-ai` refuse une même clé pour deux
@@ -286,8 +291,8 @@ Les trois tests :
 
 - Le vrai modèle, le vrai GitHub et l'API en ligne. Le réseau ne sort pas de la machine.
 - PostgreSQL : l'API de données y lit la base de test SQLite (`tests/commands/test_live_apis.py:150-159`).
-- HTTPS : les API sont appelées en `http` sur `127.0.0.1` ; hors de la machine, K-B exige `https`
-  (`core/outbound.py:42-58`).
+- HTTPS : les API sont appelées en `http` sur `127.0.0.1` ; hors de la machine et, dans le bac à sable, des services
+  compose, K-B exige `https` (`core/outbound.py:42-61`).
 - `kb digest-watch` : aucun test de bout en bout ; ses tests simulent ses étapes
   (`tests/commands/test_digest_watch_command.py:48-52`).
 
@@ -297,11 +302,11 @@ Les trois tests :
 |---|---|
 | La qualité d'une fiche rédigée par un vrai modèle : fidélité, schémas valides, items oubliés, filtre de contenu, temps de réponse | #210, encore ouverte (`gh issue view 210` → `OPEN`). Ses essais ne sont pas tous consignés : le seul essai de #210 cité dans `docs/fiches-veille.md` est l'essai 1 du 2026-10-26, sur le classement ([fiches-veille.md](fiches-veille.md), « Pourquoi une propriété par item ») |
 | La qualité d'un compte rendu de tendances rédigé par un vrai modèle, ses seuils, et la durée de `POST /trend-reports` face au délai de l'ingress d'ACA | #370, encore ouverte (`gh issue view 370` → `OPEN`) : « L'essai réel de bout en bout est #370 » ([tendances.md](tendances.md), ligne 596) ; les seuils (ligne 135) et la durée (lignes 614-615) y sont renvoyés |
-| Le vrai GitHub | aucun test ; la fixture de `test_github_client.py` est une vraie réponse, figée |
+| Le vrai GitHub | aucun test ; la fixture de `tests/ai_api/test_github_client.py:1-3` est une vraie réponse, figée |
 | L'API IA en ligne (Azure Container Apps) : son réveil, l'identité managée, l'ingress, `POST /digests` et `POST /trend-reports` en ligne | aucun test des PR. `kb smoke-test`, la commande du job `caj-kb-smoke-test`, ne vérifie que le `/health` des deux API et le listage du stockage d'échange (README, « Vérifier un job en ligne ») ; le workflow de déploiement le lance après chaque tag (`.github/workflows/deploy.yml:206-209`) |
 | La chaîne sur PostgreSQL | aucun des 1550 tests ne lit PostgreSQL : ceux qui lisent une base lisent la base de test SQLite ; PostgreSQL n'est testé que dans les tests marqués `postgresql`, hors de ce périmètre |
 | L'arrivée des mesures chez Grafana Cloud | `tests/e2e/test_real_export.py`, marqué `e2e`, écarté de la CI, lancé sur le Mac ; sa preuve finit dans Grafana Explore (`tests/e2e/test_real_export.py:7`) |
-| L'arrivée des traces et des journaux dans Tempo et Loki | aucun test, même `e2e` (`tests/e2e/test_real_export.py:95-96`) ; essayés à la main par Sabine sur `kb serve-ai` |
+| L'arrivée des traces et des journaux dans Tempo et Loki | aucun test, même `e2e` (`tests/e2e/test_real_export.py:95-96`) ; les traces sont essayées à la main par Sabine sur `kb serve-ai` (le commentaire de `:95`) |
 | Une lecture bornée avant le premier morceau décodé | #436, ouverte : `read_bounded_body` ne borne rien avant le premier morceau (MEMORY.md, « Problèmes connus ») |
 
 ## Rejouer ce compte rendu

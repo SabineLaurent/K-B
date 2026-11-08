@@ -31,11 +31,11 @@ total était passé de 4035 à 4061.
 Chaque fichier est compté dans un seul groupe ; la somme redonne 1550.
 ```
 
-(`docs/2026-11-08-tests-api-ia.md:49`). Le critère nomme cinq groupes (contrôles, routes, clé, modèle de
+(`docs/2026-11-08-tests-api-ia.md:51`). Le critère nomme cinq groupes (contrôles, routes, clé, modèle de
 remplacement, bout en bout). Deux familles de fichiers n'y entrent pas : la lecture de la veille et de GitHub, et les
 mesures et traces. Elles ont donc leur groupe, sinon le total ne se vérifierait pas. La clé, elle, n'a pas de
 fichier : ses tests sont dans les routes et dans les clients. Elle est une table de tests nommés, non recomptés
-(`docs/2026-11-08-tests-api-ia.md:62-63`, `:107-133`).
+(`docs/2026-11-08-tests-api-ia.md:64-65`, `:110-138`).
 
 ### 3. « Ce qu'il prouve » et « ce qu'il ne prouve pas », par groupe
 
@@ -46,12 +46,13 @@ l'application sans socket ; le *replay* remplace le transport du client du modè
 ### 4. Le bout en bout : ce qui est réel, ce qui est simulé
 
 Le schéma Mermaid sépare les flèches réelles (HTTP sur `127.0.0.1`, entre des API construites par `kb serve-data`
-et `kb serve-ai`) des flèches simulées (le *replay*, GitHub). Il est suivi du même contenu en texte
-(`docs/2026-11-08-tests-api-ia.md:244-291`). Le test de #462 (PR #472) en est l'un des trois.
+et `kb serve-ai`) des flèches simulées (le *replay*, GitHub, l'identité managée et le stockage
+d'échange de `kb smoke-test`) et de ce que le test règle (l'horloge, les sujets). Il est suivi du même contenu en texte
+(`docs/2026-11-08-tests-api-ia.md:249-297`). Le test de #462 (PR #472) en est l'un des trois.
 
 ### 5. Les manques rassemblés, chacun avec ce qui le porte
 
-La table finale (`docs/2026-11-08-tests-api-ia.md:293-305`) donne pour chaque manque l'issue ou le test qui le
+La table finale (`docs/2026-11-08-tests-api-ia.md:299-310`) donne pour chaque manque l'issue ou le test qui le
 porte : #210 pour la qualité des fiches d'un vrai modèle, #370 pour celle des comptes rendus de tendances, le test `e2e`
 d'export pour Grafana, aucun test pour les traces, `kb smoke-test` pour la vérification en ligne, #436 pour la lecture
 bornée.
@@ -62,7 +63,7 @@ bornée.
 |---|---|---|
 | Nom du fichier | daté, `docs/2026-11-08-tests-api-ia.md` : c'est le compte rendu d'une exécution, comme `docs/2026-10-26-collecte-reelle.md` | sans date, à côté de `architecture-api-ia.md` : un compte rendu vaut pour son commit, pas pour `main` en général |
 | Groupes | les cinq du critère, plus deux : chaque fichier compté une fois | les seuls cinq groupes : deux familles de fichiers seraient restées sans groupe |
-| Périmètre | `tests/ai_api`, le code commun aux deux API, `tests/post` sans `test_top_sheets.py`, les commandes de la chaîne | `tests/data_api` (son propre groupe) ; `test_top_sheets.py` (`kb write-tops` n'appelle pas l'API IA) ; les fichiers qui ne touchent l'API IA qu'en partie, ou par du code commun, nommés avec leur nombre dans « Hors du compte » (`docs/2026-11-08-tests-api-ia.md:28-45`) |
+| Périmètre | `tests/ai_api`, le code commun aux deux API, `tests/post` sans `test_top_sheets.py`, les commandes de la chaîne | `tests/data_api` (son propre groupe) ; `test_top_sheets.py` (`kb write-tops` n'appelle pas l'API IA) ; les fichiers qui ne touchent l'API IA qu'en partie, ou par du code commun, nommés avec leur nombre dans « Hors du compte » (`docs/2026-11-08-tests-api-ia.md:28-47`) |
 | #210 et #370 | dites comme des manques : ouvertes ; un seul essai de #210 consigné | écrire que les essais « couvrent » la qualité : faux tant qu'elles sont ouvertes |
 | Relecture | par un sous-agent neuf, effort `xhigh`, au lieu de `/code-review` | consigne de la mission (doc seule) |
 
@@ -82,7 +83,7 @@ bornée.
 - **« Vos tests prouvent-ils que les fiches sont bonnes ? »** Non. Ils prouvent que les contrôles retirent ou
   refusent ce qui sort du contrat, sur des sorties écrites à l'avance. La qualité d'un vrai modèle est mesurée par
   les essais de #210 pour les fiches et de #370 pour les tendances, encore ouvertes
-  (`docs/2026-11-08-tests-api-ia.md:297-298`).
+  (`docs/2026-11-08-tests-api-ia.md:303-304`).
 - **« Pourquoi un modèle de remplacement plutôt que le vrai en CI ? »** Pas de clé ni de coût en CI, et des tests
   reproductibles. Le *replay* garde le code de l'appel ; seul le transport change (`llm_client.py:210`).
 - **« Qu'est-ce qui est réellement de bout en bout ? »** Les trois tests de `test_live_apis.py` : les deux API servies
