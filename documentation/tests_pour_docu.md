@@ -132,8 +132,8 @@ L'envoi réel des mesures n'est donc pas prouvé par ce test tant que #495 n'est
 
 ### Le bac à sable des alertes
 
-Fusionné au commit `1d2f554` (PR #517, 2026-11-08). Il se lance à la main, hors de la CI, depuis un terminal où le `.env`
-n'est pas chargé:
+Fusionné au commit `1d2f554` (PR #517, 2026-11-08). Il se lance à la main, hors de la CI, depuis un terminal où
+le `.env` n'est pas chargé:
 
 ```sh
 make sandbox-alerts

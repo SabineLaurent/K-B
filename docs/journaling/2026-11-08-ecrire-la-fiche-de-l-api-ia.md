@@ -120,8 +120,8 @@ au commit `1d2f554`).
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
 | `uv run pytest tests/ai_api/test_ai_api_openapi.py tests/architecture/test_apis.py` → 64 passed | l'OpenAPI versionné est celui du code ; les couches et les imports décrits tiennent |
-| `uv run pytest tests/ai_api/test_digest_router.py -k "key or bound or limit or runs or body or client or other_route or method or health"` → 39 passed | clé, client, corps, débit, concurrence, méthodes et `/health` se comportent comme la fiche le dit |
-| `uv run pytest tests/ai_api/test_serve_ai.py -k documentation` → 1 passed | `/docs` et `/openapi.json` ne sont servis qu'en `sandbox` |
+| `uv run pytest tests/ai_api/test_digest_router.py -k "key or bound or limit or runs or body or client or other_route or method or health or free_again"` → 43 passed, dont 7 hors de l'accès | clé, client, corps, débit, concurrence, méthodes et `/health` se comportent comme la fiche le dit |
+| `uv run pytest tests/ai_api/test_serve_ai.py -k documentation` → 6 passed, 33 deselected (un test, 6 cas) | `/docs` et `/openapi.json` ne sont servis qu'en `sandbox` ; toute autre valeur donne 404 |
 | `grep -rnE "raw_store\|writers\|…" src/k_b/ai_api \| wc -l` → 0 | le paquet `ai_api` n'écrit aucun fichier (règle 7) |
 | `uv run pytest -m e2e --collect-only` → 15 tests | `-m e2e` lance aussi les quatre tests du bac à sable |
 | contrôles de la mission : `Cc`/`Cf` → aucun ; liens → tous existent ; ponctuation hors blocs → 0 ; `git diff --stat --diff-filter=M origin/main -- docs/ README.md` → vide | les règles des fiches sont tenues, et aucun fichier existant de `docs/` n'est modifié |
