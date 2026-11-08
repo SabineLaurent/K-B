@@ -625,11 +625,60 @@ sqlite3 -readonly ~/.knowledge_base/k-b.sqlite "SELECT kind, count(*) FROM item 
 uv run pytest
 ```
 
+Cette commande écarte les tests marqués `e2e` et `postgresql` (`MARKERS_LEFT_OUT_BY_DEFAULT`,
+`tests/conftest.py`) : ils ne tournent que si `-m` les nomme (ci-dessous). Les outils des tests sont le groupe
+`dev` du `pyproject.toml`, que `uv sync` installe avec le projet, et que l'image laisse de côté (`--no-dev`,
+`Dockerfile`) :
+
+| Paquet | Rôle |
+|---|---|
+| `pytest` | lance les tests |
+| `pytest-cov` | mesure la couverture (`--cov`) et fait échouer la commande sous le seuil |
+| `pytest-html` | écrit le rapport HTML d'une exécution (`--html`, les cibles `make test`, `make test-ai-api`, `make test-data-api` et `make test-etl`) |
+| `openapi-spec-validator` | valide l'OpenAPI de chaque API, dans `tests/data_api/test_openapi.py` et `tests/ai_api/test_ai_api_openapi.py` |
+| `ruff` | le lint et le format (`uv run ruff check`, `uv run ruff format --check`) |
+| `mypy` | le typage (`uv run mypy --strict`) |
+| `types-defusedxml`, `types-pyyaml` | les annotations de types de `defusedxml` et de `pyyaml`, deux dépendances de K-B, pour mypy |
+
+**Lancer les tests sur PostgreSQL** (marqués `postgresql`) : il leur faut un serveur PostgreSQL, que nomme
+`KB_TEST_POSTGRESQL_URL`.
+
+```sh
+KB_TEST_POSTGRESQL_URL=postgresql://<rôle>@127.0.0.1:5432/postgres uv run pytest -m postgresql
+```
+
+L'URL vise une base d'un serveur de test : un PostgreSQL de la machine (sur le Mac, celui de Homebrew) ou le
+service de la CI, jamais la base de production. Son rôle doit pouvoir créer et supprimer une base et, pour les
+tests des droits de la base en ligne, des rôles (`identity_roles`, `tests/conftest.py`). Un test qui écrit
+reçoit une base neuve, en UTF8 et en collation C, comme `kb create-db` la demande, supprimée après les tests de
+son module (`make_postgresql_base`) ; les tests de lecture partagent une base, construite une fois. Un test de
+lecture prend la fixture `engine` : sa moitié SQLite tourne dans `uv run pytest`, sa moitié PostgreSQL ici.
+Sans la variable, un test marqué échoue ; il n'est jamais sauté. La CI les lance dans le job
+`tests-postgresql`.
+
+**Lancer les tests de bout en bout** (marqués `e2e`, `tests/e2e/`) : ils lancent `kb` sur les vraies sources,
+un test par source, et l'envoi réel des mesures à Grafana Cloud (`test_real_export.py`). Ni la CI ni
+`uv run pytest` ne les lancent. Les tests qui demandent une variable sont sautés sans elle, et `-rs` en donne la
+raison : celui de Zotero sans `KB_ZOTERO_DIR`, celui des clips sans `KB_VAULT_DIR`, celui de `gh_archive` sans
+`GOOGLE_APPLICATION_CREDENTIALS`, celui de l'envoi des mesures sans `KB_OTLP_ENDPOINT` ni `KB_OTLP_HEADERS`
+(avec une seule des deux, il échoue). Depuis un terminal sans `.env` exporté :
+
+```sh
+uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html --self-contained-html
+```
+
+`.env.e2e_test` ne porte que leurs variables (modèle : `.env.e2e_test.example`). Si l'environnement tient une
+autre variable de `.env.example`, ou la clé d'un client de l'API de données, ils s'arrêtent avant tout `kb`, en
+citant leurs noms, jamais leurs valeurs (`tests/e2e/conftest.py`). `-k <source>` n'en lance qu'un, la source
+nommée comme dans l'identifiant du test (`cisa_kev`, `tldr`, `arxiv_cscr_x_csai`…). Celui de `gh_archive`
+lance une requête BigQuery réelle : à ne pas relancer à la légère. Ce qu'ils écrivent, et ce qu'il
+en reste : le [registre des traitements](docs/registre-traitements.md), « Procédure de tri », étape 10.
+
 **Lancer les tests avec leur rapport** (sans le `.env`, comme la CI) : chaque commande écrit le rapport HTML
 de pytest-html dans `reports/`, ignoré par git, en `0600`, écrasé au lancement suivant.
 
 ```sh
-make test           # tous les tests, comme uv run pytest : reports/test.html
+make test           # comme uv run pytest, sans les tests e2e ni postgresql : reports/test.html
 make test-ai-api    # tests/ai_api, puis les tests du code commun aux deux API
 make test-data-api  # tests/data_api, puis les tests du code commun aux deux API
 make test-etl       # tests/etl
@@ -654,10 +703,67 @@ Sous 96 % (lignes et branches), les deux commandes échouent : c'est le `fail_un
 (journal ADR, 2026-11-08). La CI le vérifie dans le job `tests`. Seules les commandes avec `--cov` le
 vérifient (`make test` et `uv run pytest`, non) ; sur une partie de la suite, ajouter `--cov-fail-under=0`.
 
-La CI (GitHub Actions, `.github/workflows/ci.yml`) lance cinq jobs, `audit` (pip-audit sur `uv.lock`),
-`tests` (pytest, avec la couverture et son seuil), `lint` (ruff check et ruff format --check), `types`
-(mypy --strict) et `tests-postgresql` (`pytest -m postgresql` sur un serveur PostgreSQL 18), sur chaque PR vers
-`main` et sur chaque push sur `main`, donc après chaque fusion.
+**La CI** (GitHub Actions, `.github/workflows/`) : quatre workflows. `ci.yml` et `image.yml` tournent sur chaque
+PR vers `main` et sur chaque push sur `main`, donc après chaque fusion ; `infra.yml` aussi, mais seulement quand
+la PR ou le push touche `infra/` ou ce workflow ; `deploy.yml`, sur un tag `vX.Y.Z` poussé, ou à la main
+(`gh workflow run deploy.yml --ref <tag>`). Le jeton de chaque workflow ne lit que le dépôt
+(`permissions: contents: read`), sauf ce que les jobs de `deploy.yml` ajoutent. Chaque action est épinglée par
+son SHA, sa version en commentaire.
+
+| Job | Workflow | Ce qu'il fait |
+|---|---|---|
+| `audit` | `ci.yml` | cherche les vulnérabilités connues des versions de `uv.lock`, avec leurs empreintes (`uv export`, puis pip-audit 2.10.1) |
+| `tests` | `ci.yml` | `uv run pytest --cov --cov-report=term-missing:skip-covered` : la suite, sans `e2e` ni `postgresql`, et le seuil de couverture |
+| `lint` | `ci.yml` | `uv run ruff check` et `uv run ruff format --check` |
+| `types` | `ci.yml` | `uv run mypy --strict` |
+| `tests-postgresql` | `ci.yml` | `uv run pytest -m postgresql`, sur un service `postgres:18.6` épinglé par son digest |
+| `image-build` | `image.yml` | construit l'image `linux/amd64`, puis vérifie ce que la construction reçoit, l'utilisateur non root, l'absence dans l'image des fichiers que `.dockerignore` écarte (`.git`, et des `.env*` et `*.sqlite*` plantés pour l'essai), le refus de démarrer sans `KB_DATA_DIR`, puis `kb --help` et `kb create-db` ; l'image n'est poussée nulle part |
+| `bicep-build` | `infra.yml` | compile `infra/main.bicep` par Bicep v0.48.1, vérifié par son SHA256, sans aucun droit sur Azure |
+| `check` | `deploy.yml` | refuse un tag hors de la forme `vX.Y.Z`, dont le commit n'est pas sur `main`, ou dont la CI n'est pas finie et verte |
+| `deploy` | `deploy.yml` | met le tag en ligne : [infra/README.md](infra/README.md), « Déployer une version » |
+
+Les jobs de `ci.yml` installent uv par `astral-sh/setup-uv`, sans version fixée : faute de version dans un
+`uv.toml` ou le `pyproject.toml`, il prend la dernière (0.13.7 le 2026-11-08, exécution 42473488447), alors que
+le `Dockerfile` fixe uv 0.11.33.
+
+**Dependabot** (`.github/dependabot.yml`) ouvre chaque semaine les PR de mise à jour des actions des workflows
+(leur SHA et leur commentaire de version) et des images de base du `Dockerfile` (leur digest et leur tag). Une
+version nouvelle attend 7 jours avant sa PR, sauf une mise à jour de sécurité ; ghcr.io ne donne pas la date
+d'une version, et l'attente ne s'applique pas à `astral-sh/uv` : sa date se vérifie à la main avant la fusion.
+Pour `python` et `astral-sh/uv`, il ne propose que les correctifs et les digests, jamais une version mineure ou
+majeure. Ses mises à jour de version ne touchent ni l'image `postgres` du job `tests-postgresql`, à changer à
+la main, ni `uv.lock`. Les alertes et les mises à jour de sécurité de Dependabot sont activées dans les
+réglages du dépôt, et le graphe des dépendances y voit les paquets Python (96 le 2026-11-08) : seule une mise
+à jour de sécurité peut ouvrir une PR sur `uv.lock`. Aucune PR de sécurité n'a encore été ouverte.
+
+**La protection de `main`** est le ruleset « Basic-rules-main-protect », actif, sans contournement pour
+personne, administratrice comprise. Il se lit par `gh api repos/SabineLaurent/K-B/rulesets/25257125` :
+- `main` ne se supprime pas et ne reçoit pas de push forcé ;
+- tout changement passe par une PR, fusionnée par un commit de fusion (la seule méthode permise), sans
+  approbation requise ;
+- 5 checks requis, rendus par GitHub Actions : `audit`, `tests`, `lint`, `types` et `tests-postgresql` ;
+  `strict` : la branche doit être à jour avec `main` avant la fusion, et la CI repasse après sa mise à jour.
+
+`image-build` et `bicep-build` ne sont pas requis à la fusion : `bicep-build`, filtré par chemin, bloquerait
+toute PR qui laisse `infra/` de côté (commentaire de `infra.yml`). Ils comptent au déploiement : `check` exige
+que chaque workflow du dépôt lancé sur le commit du tag ait fini en succès, sauf Deploy et les exécutions que
+GitHub crée lui-même (Dependabot). Sur un dépôt neuf, ce ruleset se recrée dans
+Settings → Rules → Rulesets, avec ces règles. Les rulesets des tags, l'environnement `production` et les secrets
+du déploiement se posent par [infra/README.md](infra/README.md), « Les réglages de GitHub, une fois, avant la
+passe 2 » et « Les secrets du dépôt, après la passe 2 ».
+
+**Ce que la CI lit comme réglages** (les noms, jamais les valeurs) :
+- `deploy.yml` lit cinq secrets du dépôt : `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` et `AZURE_SUBSCRIPTION_ID`
+  (la connexion à Azure par OIDC), `KB_RESOURCE_GROUP` et `KB_REGISTRY`. Son job `deploy` tourne dans
+  l'environnement `production` ; `check` lit les exécutions de la CI par le jeton du workflow (`github.token`).
+- `tests-postgresql` pose `KB_TEST_POSTGRESQL_URL` dans le job, vers son service, sans mot de passe
+  (`POSTGRES_HOST_AUTH_METHOD: trust` : un serveur que seul le runner joint).
+- Aucun workflow ne lit de variable du dépôt (`vars.`), et les trois autres ne lisent aucun secret.
+
+**Une PR témoin** : [#475](https://github.com/SabineLaurent/K-B/pull/475) a passé, avant sa fusion le
+2026-11-08, les 6 checks que reçoit une PR qui ne touche pas `infra/` : les cinq de CI, `audit`, `tests`,
+`lint`, `types` et `tests-postgresql` (exécution 42473488447), et `image-build` (exécution 42473488442 d'Image), tous verts
+(`gh pr checks 475 --repo SabineLaurent/K-B`) ; `bicep-build` n'y a pas tourné.
 
 **Construire l'image** (Docker ; une image pour toutes les commandes `kb`, voir le `Dockerfile`) :
 
