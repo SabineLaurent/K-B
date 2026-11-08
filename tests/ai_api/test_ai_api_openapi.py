@@ -67,8 +67,8 @@ def test_the_versioned_openapi_is_valid_and_closes_its_route_by_a_key():
     # 0.5.0: POST /trend-reports (#366); 0.6.0: the sheets read on GitHub (#367); 0.7.0: the
     # choice of the model (#368); 0.8.0: /docs and /openapi.json in the sandbox only (#393); 0.9.0:
     # the bound of the body (#161); 0.10.0: the right per route and the limits (#161); 0.11.0:
-    # HEAD refused (#161).
-    assert openapi["info"] == {"title": "K-B AI API", "version": "0.11.0"}
+    # HEAD refused (#161); 0.12.0: the texts of the repositories chosen (#369).
+    assert openapi["info"] == {"title": "K-B AI API", "version": "0.12.0"}
     assert "model" in openapi["components"]["schemas"]["DigestsSchema"]["required"]
     assert list(openapi["paths"]) == ["/digests", "/trend-reports"]
     assert openapi["components"]["securitySchemes"] == {

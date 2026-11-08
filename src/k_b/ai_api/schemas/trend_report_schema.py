@@ -6,10 +6,13 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from k_b.ai_api.connectors.llm_client import LlmFailure
+from k_b.ai_api.stages.trend_writing import WritingFailure
 from k_b.items import (
     Caution,
     ChoiceCriterion,
     Criterion,
+    ReadmeState,
+    TrendText,
     WindowState,
     WrittenDayInStrictModel,
     has_too_many_windows,
@@ -99,6 +102,23 @@ class TrendRepositorySchema(BaseModel):
     )
 
 
+class TrendTextsSchema(BaseModel):
+    """Written in French by the model, each checked against its source; null when empty or
+    removed."""
+
+    sector: str | None = Field(description="Its facts taken from the topics.")
+    watch_link: str | None = Field(
+        description="Its facts taken from the definition of a subject of the repository."
+    )
+    readme_summary: str | None = Field(
+        description="What the README says, as its author says it; its facts taken from the"
+        " README."
+    )
+    promise: str | None = Field(
+        description="Its facts taken from the README or the description."
+    )
+
+
 class ChosenRepositorySchema(BaseModel):
     repository_id: int
     repository_name: str = Field(description="Its name in the most recent window.")
@@ -114,6 +134,22 @@ class ChosenRepositorySchema(BaseModel):
         description="One point per window of the period, in its order."
     )
     facts: RepositoryFactsSchema = Field(description="Read on GitHub.")
+    readme: ReadmeState | None = Field(
+        description="read; cut, to 4,000 characters once cleaned; absent (404, 410, or empty"
+        " once cleaned); refused (a 403 that is no rate limit, a 451, a redirection); null when"
+        " not read: GitHub failed, or the deadline came first."
+    )
+    texts: TrendTextsSchema | None = Field(
+        description="Null when not written, with writing_failure."
+    )
+    texts_removed: list[TrendText] = Field(
+        description="Removed by the checks, in the order sector, watch_link, readme_summary,"
+        " promise."
+    )
+    writing_failure: WritingFailure | None = Field(
+        description="Why the texts are not written: the state of the call to the model, or of"
+        " GitHub on a README, after which no README is sent; null otherwise. The facts stay."
+    )
 
 
 class DroppedCandidatesSchema(BaseModel):

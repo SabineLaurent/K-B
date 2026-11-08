@@ -35,7 +35,7 @@ from k_b.core.config import (
 
 # The version of the contracts of docs/fiches-veille.md and docs/tendances.md: a change a client
 # can see changes both.
-API_VERSION = "0.11.0"
+API_VERSION = "0.12.0"
 
 
 def create_app(

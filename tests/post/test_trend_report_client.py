@@ -25,6 +25,7 @@ from k_b.ai_api.schemas.trend_report_schema import (
     TrendPeriodSchema,
     TrendReportSchema,
     TrendRepositorySchema,
+    TrendTextsSchema,
 )
 from k_b.post.ai_api_client import (
     AiApiError,
@@ -106,6 +107,12 @@ def choose(repository, criteria=None, watch_subjects=()):
         best_rank=repository.best_rank,
         trajectory=repository.trajectory,
         facts=facts,
+        readme="read",
+        texts=TrendTextsSchema(
+            sector=None, watch_link=None, readme_summary=None, promise=None
+        ),
+        texts_removed=[],
+        writing_failure=None,
     ).model_dump(mode="json")
 
 
