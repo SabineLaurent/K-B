@@ -111,7 +111,8 @@ même comportement.
 | `test_each_claim_removed_is_an_evaluation_tied_to_its_last_request` | l'évaluation dit `fact_not_found:1:6:item` ; le span porte `(3, 2, 2, 3)` |
 | `test_the_facts_of_the_set_are_all_in_their_item_not_all_in_their_text` (`tests/ai_api/test_digests_reference.py`) | rejeu du jeu de #479 : 26 vérifiés, 26 dans l'item, 14 dans le texte, 14 trouvés |
 | Les 12 tests ci-dessus lancés avant le code | 12 échecs (attribut, clé ou code absents) : les tests mordent |
-| `uv run pytest -q` après le code | tout passe sauf le test des noms Grafana, en attente du bac à sable |
+| `make sandbox-alerts` sur la branche, puis Explore : `count by (__name__) ({deployment_environment_name="sandbox", __name__=~"k_b_digest_facts_.*"})` | Grafana Cloud montre `k_b_digest_facts_found_in_item_total` et `k_b_digest_facts_found_in_text_total` à côté des deux anciens : ces noms entrent dans `NAMES_SEEN_IN_GRAFANA` (`tests/test_grafana_files.py`) |
+| `uv run pytest -q` après cet ajout | 4 087 tests passent |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -133,9 +134,9 @@ même comportement.
 
 ## Zones non vérifiées
 
-- Les noms que Grafana Cloud donne aux deux compteurs (`k_b_digest_facts_found_in_item_total`,
-  `k_b_digest_facts_found_in_text_total`) sont déduits de la règle de conversion tant que le
-  bac à sable de Sabine ne les a pas montrés dans Explore.
+- Au bac à sable, le scénario du coût a échoué une fois sur un envoi de mesures
+  (`Failed to export 'metrics' batch due to timeout, max retries or shutdown`), cause non établie ;
+  les trois autres scénarios ont envoyé les deux compteurs.
 - La production n'envoie plus de mesures depuis le passage de la pile à l'offre gratuite (jeton
   OTLP à refaire) : les deux compteurs n'y ont pas été vus.
 
