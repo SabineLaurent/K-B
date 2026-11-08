@@ -489,8 +489,10 @@ jetons (`docs/jeton-github.md`, mis à jour par #367).
   Markdown) ; en sortie restent le refus de l'accent grave et le motif de commande (décision de Sabine
   du 08/11).
 - Limite : « une version récente n'est pas un fait retenu » et « prudence en faits, pas en verdicts »
-  ne sont tenues que par la consigne ; un nombre écrit en lettres et « Installez X » en prose
-  échappent aux contrôles (décision de Sabine du 08/11).
+  ne sont tenues que par la consigne ; un nombre écrit en lettres, « Installez X » en prose et un
+  gestionnaire hors de la liste du motif (`conda`, `poetry`, `dnf`, `pacman`…) échappent aux contrôles
+  (décision de Sabine du 08/11 ; le gestionnaire hors liste : tri de la revue du 08/11). Chaque texte
+  est neutralisé dans le coffre (`post/vault_files.py`) : rien ne s'y exécute.
 - Limite : `sudo` et `npx` suivis d'une espace sont refusés même en prose (« sans sudo ni droits
   root », « via npx ou pnpm ») : la sortie entière est refusée, relancée, puis la rédaction de ce
   dépôt échoue en `llm_invalid_output` si le texte revient. Le refus est fermé ; #370 en mesure la
@@ -501,6 +503,11 @@ jetons (`docs/jeton-github.md`, mis à jour par #367).
   textes. Mesuré par #370.
 - Limite : le type de média d'un README servi en brut n'est pas documenté par GitHub (recherche du
   08/11) ; seul `application/json` est refusé. Relevé par #370.
+- Limite : le README est lu par le nom (`GET /repos/{owner}/{repo}/readme`, seule forme documentée
+  par GitHub, recherche du 08/11), sans contrôle de l'`id` : un dépôt supprimé puis recréé sous ce nom
+  entre sa fiche et son README (le choix les sépare, 200 s au plus, `TREND_REPORT_REQUEST_TIMEOUT_SECONDS`)
+  donnerait le sien. Seul le titulaire du nom peut le faire, et il tient déjà le README ; une
+  redirection reste refusée (tri de la revue du 08/11).
 - Limite : le filtre de contenu d'Azure peut refuser une description ou un README qui parle de
   jailbreak (sujet `llm_security` de la veille).
 - Limite : une description peut pousser son dépôt vers un choix par `watch_subject` (« idéal pour
