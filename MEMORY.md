@@ -152,6 +152,11 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   puis avec), par Sabine à la main, en suivant `infra/README.md`, « Appliquer ». Une session donne les commandes
   et lit l'état en lecture seule (`az … show`, `log-kb`), sans rien appliquer elle-même. Une API au repos met
   20 à 26 s à se réveiller (journal ADR, 2026-11-06, « Mise en ligne »).
+- **Tags de version** (#415, décision de Sabine du 2026-11-06) : aucune session ne pose ni ne pousse de tag sans une
+  demande explicite de Sabine, et aucune n'approuve un déploiement en attente (`pending_deployments`). Un tag `vX.Y.Z` sur `main` déploie en ligne (`.github/workflows/deploy.yml`), sans
+  validation jusqu'au 08/11 (risque accepté, registre, « Déploiement continu »). Après un déploiement par tag, une
+  passe 2 à la main prend la version en ligne pour `imageTag`. Un job nouveau s'ajoute à `infra/deployment.json`
+  (`infra/README.md`, « Déployer une version »).
 - **Accès à la base** (#416, puis #417, 2026-11-06) : seuls `database/engine.py` (`Connection`,
   `connect_database`, `lock_for_writing`, `connect_database_read_only`, `set_query_timeout`), `database/errors.py`
   (`ENGINE_ERRORS`, refus d'une entrée, `describe_engine_error`, `is_query_timeout`) et `etl/sources/zotero.py` (la

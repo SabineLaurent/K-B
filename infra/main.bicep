@@ -38,7 +38,16 @@ var identityNames = {
   aiApi: 'id-kb-ai-api'
   dataApi: 'id-kb-data-api'
   smokeTest: 'id-kb-smoke-test'
+  // The continuous deployment (#415), signed in from GitHub Actions; it pulls nothing.
+  deploy: 'id-kb-deploy'
 }
+// The apps and the jobs the continuous deployment updates, also read by .github/workflows/deploy.yml: a job
+// added to the Bicep goes in this list too.
+var deployment = loadJsonContent('deployment.json')
+// The subject of the GitHub OIDC tokens of the environment production. K-B was created after 2026-07-15: its
+// tokens carry the immutable form, owner and repository with their numeric IDs
+// (GET /repos/SabineLaurent/K-B/actions/oidc/customization/sub: use_immutable_subject).
+var githubDeploySubject = 'repo:SabineLaurent@189640103/K-B@1383589029:environment:production'
 // The image has no KB_DATA_DIR (journal ADR, 2026-11-06): each piece sets it. No piece mounts a share
 // yet: the directory of the image, emptied at each start, on purpose.
 var dataDir = '/var/lib/knowledge_base'
@@ -287,8 +296,27 @@ resource dataApiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-
   name: identityNames.dataApi
 }
 
+module deployAccess 'modules/deploy-access.bicep' = if (deployWorkloads) {
+  params: {
+    deployIdentityName: identityNames.deploy
+    registryName: registry.outputs.name
+    appNames: deployment.apps
+    jobNames: deployment.jobs
+    githubSubject: githubDeploySubject
+  }
+  dependsOn: [
+    identities
+    dataApi
+    aiApi
+    smokeTestJob
+    migrateDatabaseJob
+  ]
+}
+
 output registryName string = registry.outputs.name
 output registryLoginServer string = registry.outputs.loginServer
 output keyVaultName string = keyVault.outputs.name
 output postgresqlServerName string = postgresqlServer.outputs.name
 output postgresqlServerHost string = databaseHost
+// The secret AZURE_CLIENT_ID of the repository (infra/README.md, « Déployer une version »).
+output deployIdentityClientId string = deployWorkloads ? deployAccess!.outputs.clientId : ''

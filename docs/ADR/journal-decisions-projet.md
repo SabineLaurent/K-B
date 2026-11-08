@@ -5889,6 +5889,111 @@ Plan validé par Sabine le 06/11 (« Je suis les recommandations de time-knight 
   Écart avec la carte des axes de time-knight (« enchaînée par `kb daily-routine` (#413) »). Limite déjà assumée le
   04/11 : sans sauvegarde de K-B, la base est la seule copie de ce qui a plus de 6 mois. — PR de #413
 
+### Livraison continue : une version taguée sur `main`, par OIDC (#415)
+
+Plan validé par Sabine le 06/11 (mode plan, relu en xhigh, avis de tn-orchestrateur). Les choix sont de la session,
+sauf mention.
+
+- **Une mise en ligne part d'un tag de version nouveau `vMAJEUR.MINEUR.CORRECTIF`, posé sur `main` et jamais
+  déplacé. Une fusion ne déploie rien. Revenir en arrière, c'est redéployer le tag précédent.** Décision de Sabine
+  du 06/11 (git-tag, « On Re-tagging »). Écartés : une branche `production` ; un tag mobile `deploy`, qui demande de
+  retaguer, de pousser en force, et ne garde pas l'historique. Le motif et le premier tag, `v0.1.0`, sont validés
+  par Sabine avec le plan : le 0 dit « avant la 1.0 », ce qui est juste pour un POC. Au-delà des 30 jours où GitHub
+  relance une exécution, `workflow_dispatch` redéploie un tag (`gh workflow run deploy.yml --ref <tag>`), sous les
+  mêmes règles. — PR de #415
+
+- **Le verrou n'est pas le workflow, mais trois réglages de GitHub et l'identité Azure.**
+  - Un ruleset réserve la création et la suppression des tags `v*` aux administrateurs.
+  - Un second ruleset interdit à tous de déplacer un tag. C'est la décision de Sabine, validée avec le plan.
+  - L'environnement `production` n'est atteint que par les tags `v*.*.*`.
+  - `id-kb-deploy` n'accepte que les jetons de cet environnement : sujet `repo:SabineLaurent@189640103/K-B@1383589029:environment:production`.
+
+  Pourquoi : un tag poussé lance le workflow **du commit tagué**, si bien que le job `check` (le format du tag, le
+  commit sur la première lignée de `main`) ne protège que d'une erreur. Les réglages se posent avant la passe qui
+  crée la connexion : un job qui déclare un environnement inexistant le crée, sans règle.
+
+  K-B, créé le 23/09, après le 15/07/2026, a le sujet OIDC **immuable**, avec les identifiants numériques
+  (`GET …/actions/oidc/customization/sub`). Le sujet en noms seuls, écrit au premier plan, n'aurait jamais
+  correspondu : constat bloquant de la relecture.
+
+  Limites assumées :
+  - supprimer puis recréer un tag revient à le déplacer. Le déploiement échoue alors, car l'image existante porte le
+    SHA de l'ancien commit (label `org.opencontainers.image.revision`), et une image n'est jamais reconstruite ;
+  - une administratrice peut modifier un ruleset : « personne ne déplace un tag » est une règle de travail. Aucune
+    session ne pose ni ne pousse de tag sans une demande explicite de Sabine (`MEMORY.md`). — PR de #415
+
+- **Risque accepté par Sabine le 06/11, écart à l'issue : jusqu'au 08/11, un tag déploie sans sa validation.**
+  Son plan GitHub est Pro. Dans un dépôt privé, il ouvre les environnements, leurs règles de tags et les rulesets,
+  mais pas les « required reviewers », réservés aux dépôts publics. K-B le devient le 08/11 (#278). Sabine a choisi
+  de déployer par tag dès ce soir, plutôt que d'attendre le 08/11 pour le premier tag (la recommandation de la
+  session). Le contournent jusque-là : Sabine, administratrice, et toute session qui pousse avec ses droits. Le
+  08/11 : Sabine en « required reviewer », avec `prevent_self_review: false`, puisqu'elle est la seule à valider,
+  et `can_admins_bypass: false`, pour qu'une administratrice ne passe pas outre (revue de sécurité, tranché par
+  time-knight le 06/11) (`infra/README.md`). Limite : une session qui a ses droits pourrait approuver elle-même un
+  déploiement en attente par l'API (`pending_deployments`). La validation reste un geste humain, que seule la règle
+  du `MEMORY.md` protège : aucune session n'approuve un déploiement. — PR de #415
+
+- **`id-kb-deploy` a quatre rôles, chacun sur une ressource, jamais sur le groupe : AcrPush et Reader sur le
+  registre, Container Apps Contributor sur chaque app, Container Apps Jobs Contributor sur chaque job. Rien sur le
+  coffre, le stockage ni les données.**
+  - Pourquoi Reader : `az acr login` lit le registre par ARM, ce qu'AcrPush ne permet pas. En mode « RBAC Registry
+    Permissions », Reader permet aussi de tirer, ce qu'AcrPush permet déjà.
+  - Pourquoi le rôle des jobs : Container Apps Contributor ne couvre pas `Microsoft.App/jobs`.
+  - **Managed Identity Operator, prévu au premier plan, est retiré.** La relecture a lu le code d'azure-cli :
+    `az containerapp update --image` envoie un `PATCH` qui ne porte que le `template`, sans l'identité, donc
+    `assign/action` n'est pas vérifié. Moins de droits pour le même effet.
+  - Repli écrit, si le premier déploiement rend `LinkedAuthorizationFailed` sur `managedEnvironments/join/action` :
+    Container Apps Jobs Operator sur `cae-kb` seul.
+  - Limite assumée : les jokers des deux rôles Container Apps couvrent `listSecrets/action`. L'identité lit donc
+    les secrets des apps et des jobs en clair. C'est le constat 6, accepté par Sabine le 06/11 et écrit au registre
+    (« Déploiement continu »). — PR de #415
+
+- **Le workflow construit l'image du tag seulement si elle n'existe pas. Elle porte le SHA de son commit en
+  label, et une image existante d'un autre commit arrête le déploiement. Les apps et les jobs reçoivent l'image
+  par son digest (`k-b@sha256:…`), dont le label est revérifié.** Seule une réponse « not found » fait construire :
+  toute autre erreur de lecture est un échec, pour qu'une panne du registre n'écrase jamais une image.
+  - Pourquoi : un retour en arrière redéploie l'image d'origine, sans la reconstruire. Le digest est la référence
+    immuable : une réplique qui se réveille tire exactement l'image déployée, même si quelqu'un qui a AcrPush
+    réécrit le tag, l'identité de CD comprise.
+  - Écartés : reconstruire à chaque exécution, qui écraserait le tag d'une version déjà en ligne ; verrouiller le tag
+    dans ACR (`--write-enabled false`), car on ne sait pas si AcrPush suffit, et ce serait une étape à défaire.
+  - Le digest vient de la revue de sécurité, tranché par time-knight le 06/11 (délégation de Sabine du 15/10).
+  - Limite assumée : une passe Bicep faite à la main repose `k-b:<imageTag>`, la même image, mais par une référence
+    mobile, jusqu'au déploiement suivant. L'outil des passes (#455) pourra lire le digest en ligne. — PR de #415
+
+- **Une seule liste des apps et des jobs déployés, `infra/deployment.json`, lue par le Bicep
+  (`loadJsonContent`, pour les rôles) et par le workflow (`jq`, pour les images).** Écartées : deux listes à tenir
+  ensemble, et une liste lue dans Azure, qui demanderait de lire tout le groupe. Limite assumée : une ancienne
+  exécution relancée reprend son ancienne liste.
+
+  À dire à #421 : un retour en arrière relance l'ancienne migration sur une base plus récente, puis les apps N-1
+  sur le schéma N. La migration doit donc accepter une base en avance, et le schéma rester compatible avec la
+  version précédente. — PR de #415
+
+- **La migration de la base passe avant les apps : `caj-kb-migrate-database` à l'image du tag, lancé et attendu
+  jusqu'à `Succeeded`. Rien n'est mis à jour après un échec.** Pourquoi : les apps d'une version ne doivent pas
+  tourner sur une base sans son schéma. `kb migrate-database` laisse telle quelle une base qui a ses tables (#421),
+  donc un retour à un tag précédent la relance sans effet. La limite viendra avec la première vraie migration
+  (#186) : le schéma devra rester compatible avec la version précédente. — PR de #415
+
+- **Un test de fumée clôt chaque déploiement : `caj-kb-smoke-test` lancé et attendu jusqu'à `Succeeded`.**
+  Validé par Sabine avec le plan, hors du texte de l'issue. Pourquoi : c'est la preuve que la version déployée
+  répond. Une mise à jour réussie ne dit pas si les apps démarrent. Avant lui, le workflow attend que la dernière
+  révision de chaque app soit prête, à l'image du tag (tranché par time-knight, revue de code de #460) : en mode une
+  révision, l'ancienne répond jusque-là, et `/health` rend un texte fixe. — PR de #415
+
+- **Un tag n'est déployé que si les exécutions des workflows du dépôt sur son commit, sauf celles de Deploy, sont
+  finies et vertes.** Tranché par time-knight, revue de code de #460. Pourquoi : le ruleset de `main` n'exige
+  qu'une partie de la CI, et un contrôle peut rougir après la fusion. Les exécutions que GitHub crée lui-même
+  (Dependabot, sur la tête de `main`) ne comptent pas. Un tag posé trop tôt est refusé : on relance la CI du commit
+  si elle est rouge, puis l'exécution du tag. Écarté : une règle écrite seulement. — PR de #415
+
+- **Les identifiants Azure sont des secrets du dépôt, et chaque commande `az` du workflow passe en `-o none` ou par
+  une `--query` étroite.** Pourquoi : les journaux deviennent publics le 08/11, et `az containerapp update`
+  affiche par défaut toute la configuration de l'app. Écarté : des variables, qui s'afficheraient en clair. Une
+  passe 2 faite à la main prend désormais pour `imageTag` la version en ligne : sinon, elle remettrait l'ancienne
+  image. — PR de #415
+
 ## Décisions encore ouvertes
 
 - **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
