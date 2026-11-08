@@ -689,7 +689,8 @@ Les rapports d'un groupe sont `reports/test-ai-api.html`, `reports/test-data-api
 communs (`core/`) sont à la racine de `tests/` : `test_api_methods.py`, `test_api_rate_limit.py` et
 `test_api_telemetry.py`, listés dans `API_COMMON_TESTS` du `Makefile`. Un nouveau test commun s'y ajoute à
 la main. `make` s'arrête au premier échec : si les tests de l'API échouent, les tests communs ne sont pas
-lancés.
+lancés. Ce que prouvent les tests de l'API IA et de la chaîne des fiches, et ce qu'ils ne prouvent pas :
+[docs/2026-11-08-tests-api-ia.md](docs/2026-11-08-tests-api-ia.md).
 
 **Mesurer la couverture des tests** (lignes et branches de `src/k_b/`) :
 
