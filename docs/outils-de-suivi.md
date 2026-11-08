@@ -67,7 +67,7 @@ numéros renvoient à la section « Sources ».
 | Tableaux de bord | classeurs et tableaux Grafana du portail [31] | Grafana | personnalisables, sur toutes les offres, à partir des traces, observations et scores ; pas de métriques OTLP [12][15] | personnalisables sur le cloud US seulement ; en UE, une version « legacy » ; à partir des traces (nombre, latence, jetons, coût, retours) [21] | non vérifié |
 | Alerte sur seuil | alertes sur métriques, y compris d'Application Insights ; groupes d'actions par e-mail ; alertes sur métriques OpenTelemetry en « public preview » [2] | alertes Grafana ; pour un compte gratuit ouvert depuis le 20/04/2026 : plus de Cloud Alertmanager, e-mail aux seuls utilisateurs de l'instance, webhooks gardés [9] ; limite de règles non trouvée [8] | 2 alertes en Hobby ; latence, coût, scores ; Slack, PagerDuty, webhook, GitHub Actions ; e-mail non trouvé [16] | erreurs, latence, coût, retours, nombre d'exécutions, sur 5 ou 15 min ; Slack, PagerDuty, Dynatrace, webhook ; offre minimale non trouvée [22] | 2 déclencheurs en offre gratuite [24] |
 | Temps réel | délai d'ingestion non vérifié | délai d'ingestion non vérifié ; K-B envoie ses métriques toutes les 60 s | « new data appears in real time » avec l'en-tête `x-langfuse-ingestion-version: 4`, sinon jusqu'à 10 min [14] | ingestion asynchrone, délai non chiffré [20] | non vérifié |
-| Accessibilité publiée | Azure fait partie des plateformes du rapport WCAG 2.1 de Microsoft ; rapport non ouvert ; portail et Azure Monitor non nommés [4] | « partially conformant with WCAG 2.1 level AA » (09/09/2025), certaines parties pas entièrement accessibles au clavier ; VPAT et ACR non mentionnés [10] ; **essai de Sabine** (section « Accessibilité ») | aucune déclaration trouvée le 2026-11-08 dans les pages lues [12][13][14][17] | aucune déclaration trouvée le 2026-11-08 dans les pages lues [18][19][23] | aucune déclaration trouvée le 2026-11-08, ni lien depuis la page d'accueil de honeycomb.io [24] |
+| Accessibilité publiée | Azure fait partie des plateformes du rapport WCAG 2.1 de Microsoft ; rapport non ouvert ; portail et Azure Monitor non nommés [4] | « partially conformant with WCAG 2.1 level AA » (09/09/2025), certaines parties pas entièrement accessibles au clavier ; VPAT et ACR non mentionnés [10] ; **essai de Sabine** (section « Accessibilité ») | aucune déclaration trouvée le 2026-11-08 dans les pages lues [12][13][14][17] | aucune déclaration trouvée le 2026-11-08 dans les pages lues [18][19][23] | aucune déclaration trouvée le 2026-11-08, ni dans [24], ni par un lien de la page d'accueil de honeycomb.io |
 | Région UE | région de l'abonnement de l'école ; un service régional déployé dans une région de l'EU Data Boundary en fait partie, mais Azure Monitor n'est pas nommé [5] | pile en `prod-eu-west-2`, Allemagne (registre, « Envoi des mesures à Grafana Cloud », ligne « Région ») ; région d'une pile non modifiable [11] ; transferts vers les États-Unis possibles selon le DPA (même section, ligne « Transferts hors UE ») | Irlande (AWS `eu-west-1`), offre gratuite comprise [12][13] | Pays-Bas (GCP `europe-west4`), offre gratuite comprise ; facturation aux États-Unis ; « We do not have a legal entity in the EU » [19] | Irlande (AWS `eu-west-1`) [25] ; sur l'offre gratuite : non trouvé |
 | Coût pour K-B | journaux : 0 $ jusqu'à 5 Go par mois et par compte de facturation, puis 2,76 $/Go ; métriques : 0,11 $ les 10 millions d'échantillons ; alerte sur métrique : 0 $ jusqu'à 10 séries ; alerte sur journaux : 0,50 à 3 $ par mois selon la fréquence ; facturé à l'école [3] | 0 $ : 10 000 séries actives par mois, 50 Go de journaux et 50 Go de traces par mois, 14 jours, 3 utilisateurs actifs [8] | 0 $ (Hobby) : 50 000 unités par mois, 30 jours, 2 utilisateurs ; Core à 29 $ par mois, 90 jours [12] | 0 $ (Developer) : 1 siège, 5 000 traces par mois, traces de base gardées 14 jours ; Plus à 39 $ par siège et par mois [18] | 0 $ : 20 millions d'événements par mois ; rétention non trouvée [24] |
 | Contrat | DPA de Microsoft, entre Microsoft et l'école, déjà au registre (en-tête, « Sous-traitant ») ; aucun sous-traitant nouveau [32] | Raintank Inc., dba Grafana Labs (New York) ; DPA lu le 24/10, signé et envoyé par Sabine le 28/10 ; le 29/10, Grafana Labs répond qu'il ne vaut que pour les entreprises (source : Sabine, voir « Écarts au choix ») | « Data processing agreement (GDPR) » sur l'offre Hobby [12] ; le lien du DPA mène à celui de ClickHouse, non lu ; société contractante non trouvée [17] | LangChain Inc., société du Delaware ; DPA intégré aux conditions par renvoi (« governed by the Data Processing Addendum »), un PDF pré-signé ; offre gratuite « without warranties, indemnities, support obligations, performance commitments, or data retention rights » [23] | DPA intégré aux conditions, offre gratuite comprise [33] |
@@ -80,7 +80,7 @@ time-knight) : **un seul essai, sur Grafana Cloud**, l'outil en place. Les quatr
 sont jugés sur leurs déclarations publiées : c'est une limite. Le tableau de bord et l'alerte de
 #164 n'existent pas encore : l'essai porte sur Explore, un tableau de bord de test à un panneau, et
 la liste des règles d'alerte. Une règle d'alerte de test, déclenchée exprès, est créée ou non par
-Sabine pendant l'essai ; sans elle, les étapes 9 et 10 portent sur une liste vide, et c'est une
+Sabine pendant l'essai ; sans elle, les étapes 4, 9 et 10 portent sur une liste vide, et c'est une
 limite.
 
 Grille : les critères WCAG 2.1 AA visés par RGAA 4.1.2 (`.claude/rules/conformite.md`), là où ils
@@ -124,11 +124,12 @@ Cloud ».
 - **Application Insights** reçoit les trois signaux [1]. Ses métriques OTLP vont dans un Azure
   Monitor workspace [1][6], une ressource `Microsoft.Monitor/accounts` [7] ; le 2026-11-08,
   `Microsoft.Monitor` et `Microsoft.AlertsManagement` ne sont pas enregistrés sur l'abonnement de
-  l'école, et Sabine, Reader, ne peut pas les enregistrer. Qu'une ressource Application Insights
-  avec « OTLP support » crée elle-même ce workspace n'est pas écrit dans [1] : non vérifié. L'envoi
-  demande aussi un collecteur et Entra, ou l'exportateur Azure Monitor (une dépendance nouvelle,
-  selon time-knight), et des métriques en temporalité delta [1] : plus que l'URL et le jeton
-  (« Écarts au choix », point 3).
+  l'école, et Sabine, Reader, ne peut pas les enregistrer. Pour la ressource Application Insights
+  avec « OTLP support », [1] dit : « This method automatically provisions all required Azure
+  resources and configures their relationships » ; le workspace n'y est pas nommé : non vérifié.
+  L'envoi demande aussi un collecteur et Entra [1], ou l'exportateur Azure Monitor, une dépendance
+  nouvelle, en préversion [29] ; et des histogrammes exponentiels, la temporalité delta se
+  convertissant dans le collecteur [1] : plus que l'URL et le jeton (« Écarts au choix », point 3).
 - **Grafana Cloud** reçoit les trois signaux, est en place, et coûte 0 $ dans les limites de l'offre
   gratuite [8]. Selon la recommandation elle-même, c'est l'outil retenu tant que la souscription ne
   permet pas Application Insights. Le tableau ne montre pas d'écart avec le choix de Sabine sur ce
@@ -162,12 +163,15 @@ Cloud ».
    par time-knight.
 3. **« Seuls l'URL et le jeton changent »** (décision 4 du 20/10) : vrai tant que l'outil reste
    Grafana Cloud. Pour Application Insights, repris après le rendu, l'envoi passe par un collecteur
-   et Entra, ou par l'exportateur Azure Monitor, une dépendance nouvelle (selon time-knight) [1] ;
-   et « Application Insights experiences, including prebuilt dashboards and queries, expect and
-   require OTLP metrics with delta temporality and exponential histogram aggregation » ([1], lue le
-   2026-11-08), quand K-B émet en temporalité cumulative
-   (`src/k_b/ai_api/connectors/metrics_export.py:64-69`) avec des buckets explicites
-   (`src/k_b/ai_api/observability/metric_instruments.py:31-37`).
+   et Entra [1], ou par l'exportateur Azure Monitor, une dépendance nouvelle, en préversion
+   (`1.0.0b59` du 2026-11-05, Microsoft Corporation) [29]. Et « Application Insights experiences,
+   including prebuilt dashboards and queries, expect and require OTLP metrics with delta temporality
+   and exponential histogram aggregation » ([1], lue le 2026-11-08), quand K-B émet en temporalité
+   cumulative (`src/k_b/ai_api/connectors/metrics_export.py:64-69`) avec des buckets explicites
+   (`src/k_b/ai_api/observability/metric_instruments.py:31-37`). La même page donne la conversion
+   de la temporalité dans le collecteur : « If the OpenTelemetry collector receives OTLP metrics in
+   cumulative temporality, add `processors: [cumulativetodelta]` » ; pour les histogrammes
+   exponentiels, elle ne décrit pas de conversion.
 4. **Les alertes d'un compte gratuit récent** : depuis le 20/04/2026, un compte gratuit nouveau
    n'envoie d'e-mail qu'aux utilisateurs de son instance, sans Cloud Alertmanager [9]. La date
    d'ouverture du compte de Sabine n'est pas relevée ; à vérifier au début de #164.
@@ -224,6 +228,7 @@ Lues le 2026-11-08 par la session de #163 (elle-même ou ses sous-agents), sauf 
 26. [semantic-conventions-genai](https://github.com/open-telemetry/semantic-conventions-genai) — commit `e6658f1` (2026-11-06), `docs/gen-ai/*.md` lus par l'API GitHub : « Status: Development », aucune release.
 27. [Semantic conventions for generative client AI spans](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/) — « This page has moved ».
 28. [Honeycomb OpenTelemetry exporters](https://docs.honeycomb.io/send-data/opentelemetry/collector/exporters) — section « Metrics and Logs Signals » : « The Collector can handle OTLP metrics and logs signals in addition to traces » ; instance UE `api.eu1.honeycomb.io:443`.
+29. [azure-monitor-opentelemetry-exporter](https://pypi.org/pypi/azure-monitor-opentelemetry-exporter/json) — PyPI, métadonnées lues par l'API JSON (la page web renvoie un défi) : version `1.0.0b59` du 2026-11-05, « Microsoft Corporation » ; classes `AzureMonitorTraceExporter`, `AzureMonitorLogExporter`, `AzureMonitorMetricExporter` ; `connection_string` exigée, `credential` pour Entra en option. Aucune page Microsoft Learn de l'exportateur trouvée par deux recherches du 2026-11-08.
 
 Lues le 2026-11-08 par un sous-agent de time-knight (comparaison sans biais, non versionnée), non
 relues par cette session :

@@ -6206,8 +6206,9 @@ Langfuse Cloud (UE), LangSmith (UE) et Honeycomb, selon les critères de « Wiki
   signé le 28/10, ne vaut selon sa réponse du 29/10 que pour les entreprises (registre, « Envoi
   des mesures à Grafana Cloud »). **Précise** la décision 4 du 20/10 (« Squelette E1 E3 : cadrage
   du 20/10 ») ; sa phrase « au troisième temps, seuls l'URL et le jeton changent » ne vaut pas pour
-  Application Insights (un collecteur et Entra, ou l'exportateur Azure Monitor ; des métriques en
-  temporalité delta) : remonté à Sabine. — PR de #163
+  Application Insights (un collecteur et Entra, ou l'exportateur Azure Monitor ; des histogrammes
+  exponentiels, la temporalité delta se convertissant dans le collecteur) : remonté à Sabine.
+  — PR de #163
 
 ## Décisions encore ouvertes
 
