@@ -134,9 +134,9 @@ même comportement.
 
 ## Zones non vérifiées
 
-- Au bac à sable, le scénario du coût a échoué une fois sur un envoi de mesures
+- Au bac à sable, le scénario du coût a échoué à la première exécution sur un envoi de mesures
   (`Failed to export 'metrics' batch due to timeout, max retries or shutdown`), cause non établie ;
-  les trois autres scénarios ont envoyé les deux compteurs.
+  à la seconde exécution, après le rebase, les 4 scénarios passent.
 - La production n'envoie plus de mesures depuis le passage de la pile à l'offre gratuite (jeton
   OTLP à refaire) : les deux compteurs n'y ont pas été vus.
 
