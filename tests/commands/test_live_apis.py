@@ -34,27 +34,28 @@ from jobs.storage_fakes import (
     remove_online_variables,
     set_identity_endpoint,
 )
-from pydantic import SecretStr
 
 from k_b import cli
-from k_b.ai_api.app import create_app
-from k_b.ai_api.connectors.data_api_settings import DataApiSettings
-from k_b.ai_api.connectors.github_settings import GithubSettings
-from k_b.ai_api.connectors.llm_settings import read_llm_settings_or_refusal
-from k_b.ai_api.connectors.metrics_export import build_resource
-from k_b.ai_api.connectors.trace_export import TraceExport
+from k_b.ai_api.connectors.data_api_settings import (
+    DATA_API_KEY_VARIABLE,
+    DATA_API_URL_VARIABLE,
+)
+from k_b.ai_api.connectors.github_settings import GITHUB_TOKEN_VARIABLE
+from k_b.ai_api.connectors.llm_settings import PROVIDER_VARIABLE, REPLAY_FILE_VARIABLE
 from k_b.ai_api.dependencies import read_request_time
-from k_b.ai_api.observability.metric_instruments import ModelMetrics
-from k_b.commands import digest_command, smoke_test_command
-from k_b.core.config import DIGEST_CLIENT
-from k_b.data_api.app import create_app as create_data_app
+from k_b.ai_api.settings import DIGEST_WINDOW_DAYS_VARIABLE
+from k_b.commands import (
+    digest_command,
+    serve_ai_command,
+    serve_data_command,
+    smoke_test_command,
+)
 from k_b.jobs.exchange_storage import (
     build_managed_identity_credential,
     open_container_client,
 )
+from k_b.post.ai_api_client import AI_API_URL_VARIABLE, DIGEST_KEY_VARIABLE
 
-# The client of the data API that the AI API is, as kb serve-ai reads KB_DATA_API_KEY_AI_DIGEST.
-DATA_API_CLIENT = "AI_DIGEST"
 # The title of vulnerability 3 in the test base: only the data API gives it to the sheet.
 SECURITY_SOURCE_TITLE = "Apple Multiple Products Out-of-Bounds Write Vulnerability"
 SERVER_START_SECONDS = 10
@@ -89,44 +90,55 @@ def serving(app: FastAPI) -> Iterator[str]:
     finally:
         server.should_exit = True
         thread.join(SERVER_START_SECONDS)
+        assert not thread.is_alive(), "uvicorn did not stop in time"
         listening.close()
 
 
-def create_ai_app(replay_file, data_api_url, data_api_key):
-    """The AI API as kb serve-ai builds it, on the replay of replay_file and the data API at
-    data_api_url, its export off; its clock set at REQUEST_TIME, so that its default window falls
-    on the test base."""
-    llm_settings = read_llm_settings_or_refusal(
-        {"KB_LLM_PROVIDER": "replay", "KB_LLM_REPLAY_FILE": str(replay_file)}
-    )
-    assert not isinstance(llm_settings, str), llm_settings
-    resource = build_resource(None)
-    digest_key = secrets.token_urlsafe(32)
-    app = create_app(
-        {DIGEST_CLIENT: SecretStr(digest_key)},
-        llm_settings,
-        DataApiSettings(base_url=data_api_url, api_key=SecretStr(data_api_key)),
-        GithubSettings(token=SecretStr(f"github_pat_{secrets.token_hex(41)}")),
-        TEST_SUBJECTS,
-        WINDOW_DAYS,
-        ModelMetrics.from_settings(None, resource),
-        TraceExport.from_settings(None, resource),
-    )
-    app.dependency_overrides[read_request_time] = lambda: REQUEST_TIME
-    return app, digest_key
+def build_app_as_served(monkeypatch, run_command):
+    """The app a kb serve command builds from its environment and gives uvicorn.run, which is
+    not run."""
+    apps = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **options: apps.append(app))
+    assert run_command() == cli.ExitCode.SUCCEEDED
+    [app] = apps
+    return app
 
 
 @pytest.fixture
-def live_apis(items_database, tmp_path):
-    """Both APIs served: the data API on the test base, the AI API on the replay of VALID_STEPS."""
+def live_apis(monkeypatch, items_database, tmp_path):
+    """Both APIs built by kb serve-data and kb serve-ai from their environment, then served: the
+    data API on the test base, the AI API on the replay of VALID_STEPS. Two settings of the test
+    only: the subjects of the tests, and the clock of the AI API at REQUEST_TIME, so that its
+    window falls on the test base."""
     replay_file = tmp_path / "replay.json"
     replay_file.write_text(json.dumps(VALID_STEPS), "utf-8")
     data_api_key = secrets.token_urlsafe(32)
-    data_app = create_data_app(
-        items_database, {DATA_API_CLIENT: SecretStr(data_api_key)}
+    data_app = build_app_as_served(
+        monkeypatch,
+        # The test base is the SQLite file of its folder, as in a data directory.
+        partial(
+            serve_data_command.run_serve_data,
+            items_database.parent,
+            {DATA_API_KEY_VARIABLE: data_api_key},
+        ),
     )
     with serving(data_app) as data_api_url:
-        ai_app, digest_key = create_ai_app(replay_file, data_api_url, data_api_key)
+        digest_key = secrets.token_urlsafe(32)
+        monkeypatch.setattr(serve_ai_command, "DIGEST_SUBJECTS", TEST_SUBJECTS)
+        ai_environ = {
+            DIGEST_KEY_VARIABLE: digest_key,
+            PROVIDER_VARIABLE: "replay",
+            REPLAY_FILE_VARIABLE: str(replay_file),
+            DIGEST_WINDOW_DAYS_VARIABLE: str(WINDOW_DAYS),
+            DATA_API_URL_VARIABLE: data_api_url,
+            DATA_API_KEY_VARIABLE: data_api_key,
+            # Read at the start, never sent: no route of the digests calls GitHub.
+            GITHUB_TOKEN_VARIABLE: f"github_pat_{secrets.token_hex(41)}",
+        }
+        ai_app = build_app_as_served(
+            monkeypatch, partial(serve_ai_command.run_serve_ai, ai_environ)
+        )
+        ai_app.dependency_overrides[read_request_time] = lambda: REQUEST_TIME
         with serving(ai_app) as ai_api_url:
             yield LiveApis(data_api_url, ai_api_url, digest_key)
 
@@ -135,8 +147,8 @@ def live_apis(items_database, tmp_path):
 def digest_environment(monkeypatch, data_and_vault_dirs, live_apis):
     """kb digest on the AI API served, with its key, the subjects of the tests and the day of
     the request."""
-    monkeypatch.setenv("KB_AI_API_URL", live_apis.ai_api_url)
-    monkeypatch.setenv("KB_AI_API_KEY_KB_DIGEST", live_apis.digest_key)
+    monkeypatch.setenv(AI_API_URL_VARIABLE, live_apis.ai_api_url)
+    monkeypatch.setenv(DIGEST_KEY_VARIABLE, live_apis.digest_key)
     monkeypatch.setattr(digest_command, "DIGEST_SUBJECTS", TEST_SUBJECTS)
     monkeypatch.setattr(digest_command, "read_today", REQUEST_TIME.date)
     return data_and_vault_dirs
@@ -173,8 +185,8 @@ def smoke_test_environment(monkeypatch, tmp_path, live_apis):
     simulated."""
     remove_online_variables(monkeypatch)
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("KB_DATA_API_URL", live_apis.data_api_url)
-    monkeypatch.setenv("KB_AI_API_URL", live_apis.ai_api_url)
+    monkeypatch.setenv(DATA_API_URL_VARIABLE, live_apis.data_api_url)
+    monkeypatch.setenv(AI_API_URL_VARIABLE, live_apis.ai_api_url)
     monkeypatch.setenv("KB_EXCHANGE_BLOB_URL", TEST_ACCOUNT_URL)
     monkeypatch.setenv("AZURE_CLIENT_ID", TEST_CLIENT_ID)
     set_identity_endpoint(monkeypatch)
