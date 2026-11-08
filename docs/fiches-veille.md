@@ -515,7 +515,7 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
 | `digests[].items_not_retained_in_output` | les items envoyés pour ce sujet qu'aucune affirmation du modèle ne cite, calculés par le code |
 | `digests[].claims_removed` | affirmations retirées par les contrôles (bornes ou fidélité) |
 | `digests[].items_removed_by_checks` | items du sujet qui ne sont plus cités après les retraits des contrôles (bornes ou fidélité) |
-| `failed_subjects` | chaque sujet en échec, son étape (`stage` : `write`, la rédaction) et son état nommé |
+| `failed_subjects` | chaque sujet en échec, son étape (`stage` : `write`, la rédaction ; son type, `DigestStage`, n'admet que `classify` ou `write` depuis #369) et son état nommé |
 | `no_suitable_subject` | items du classement auxquels aucun sujet ne convient : le modèle a répondu `no_suitable_subject` (champ nommé `not_retained` jusqu'à la version 0.2.0, qui y mêlait les items absents de la sortie) |
 | `unanswered` | items que le classement a laissés sans réponse, absents des fiches eux aussi (depuis la version 0.3.0 de l'API IA, `classify-2`) |
 | `items_in`, `items_truncated`, `items_dropped_before_writing_stage`, `items_capped` | compteurs de la section « Entrée du modèle » |
@@ -577,7 +577,7 @@ de la requête.
   sous uvicorn le 2026-11-05).
 - **Documentation** : `/docs` et `/openapi.json` ne sont servis que si
   `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, 404 sinon, comme l'API de données ([specs-api.md](specs-api.md), #393).
-- **Version** : `0.11.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
+- **Version** : `0.12.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
   un changement visible par un client change les deux. `0.1.0` : `POST /digests` (#156) ; `0.2.0` :
   `model` dans la réponse (#209) ; `0.3.0` : `unanswered`, et `not_retained` du premier niveau
   renommé `no_suitable_subject` (#210, `classify-2`) ; `0.4.0` : `items_dropped` renommé
@@ -591,7 +591,10 @@ de la requête.
   413 `content_too_large` sur les deux routes, pour un corps de plus de 1 024 octets (#161) ;
   `0.10.0` : 403 `client_not_allowed`, 429 `rate_limit_exceeded` et `request_already_running`, 503
   `data_api_rate_limited` (#161) ; `0.11.0` : `HEAD` refusé sur `/health`, et sur `/docs` et
-  `/openapi.json` en `sandbox`, 405 `method_not_allowed` (#161).
+  `/openapi.json` en `sandbox`, 405 `method_not_allowed` (#161) ; `0.12.0` : les textes de chaque
+  dépôt choisi dans la réponse de `POST /trend-reports`, `readme`, `texts`, `texts_removed` et
+  `writing_failure`, et `failed_subjects[].stage` de `POST /digests` typé `DigestStage` (`classify`
+  ou `write`), sans `select` (#369).
 
 ## Contrôles
 
@@ -1141,7 +1144,7 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
 
 ### API9:2023 Improper Inventory Management
 
-- **Inventaire des hôtes** : tenue. `127.0.0.1:8001` par défaut, version `0.11.0` (« Accès »),
+- **Inventaire des hôtes** : tenue. `127.0.0.1:8001` par défaut, version `0.12.0` (« Accès »),
   environnements `sandbox` et `production` (`core/api_settings.py`).
 - **Inventaire des services intégrés** : tenue. Le modèle, GitHub et Grafana Cloud, avec les
   données échangées ([registre-traitements.md](registre-traitements.md)) ; l'API de données
@@ -1280,7 +1283,7 @@ ne sont écrites qu'au retour du parcours.
 | `ts` | date de la ligne, ISO 8601 UTC à la seconde (`2026-10-15T09:00:00Z`, règle 3 de `conventions.md`) |
 | `event` | `llm_call` |
 | `request_id` | celui de la réponse |
-| `stage` | `classify` ou `write` ; `select` pour le choix d'un compte rendu des tendances ([tendances.md](tendances.md), « Ce que rend #368 ») |
+| `stage` | `classify` ou `write` ; `select` pour le choix d'un compte rendu des tendances ([tendances.md](tendances.md), « Ce que rend #368 »), `write_trends` pour la rédaction des textes d'un dépôt choisi (« Ce que rend #369 ») |
 | `subject` | le sujet rédigé ; nul au classement |
 | `provider`, `model` | lus dans la configuration (#150) |
 | `prompt_version` | constante de la consigne utilisée (`classify-2`, `write-1`), changée à la main avec elle |
