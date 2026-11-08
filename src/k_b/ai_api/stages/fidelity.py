@@ -5,6 +5,7 @@ import re
 import unicodedata
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
+from typing import Literal
 
 from k_b.ai_api.repository_texts import MASKED_EMAIL
 from k_b.ai_api.stages.writing import Claim, Fact
@@ -87,7 +88,7 @@ MODIFIER_LETTER = "Lm"
 # the start of 1.2.9).
 CUT_END = "a"
 # Why a claim is not faithful, a closed code each: a fact not found is written with its position
-# in the claim and the item it cites (fact_not_found:0:17).
+# in the claim, the item it cites and where it misses (fact_not_found:0:17:text).
 FACT_NOT_FOUND = "fact_not_found"
 UNDECLARED_IDENTIFIER = "undeclared_identifier"
 CITED_ITEM_WITHOUT_FACT = "cited_item_without_fact"
@@ -102,10 +103,40 @@ SEARCHED_FIELDS_BY_KIND: dict[WatchKind, tuple[str, ...]] = {
 }
 
 
+# Where a fact not found misses: the item it cites, the text of its claim, or both.
+type MissingPlace = Literal["item", "text", "both"]
+
+
+@dataclass(frozen=True)
+class FactSearch:
+    is_in_item: bool
+    is_in_text: bool
+
+    @property
+    def is_found(self) -> bool:
+        """In the item it cites and in the text of its claim."""
+        return self.is_in_item and self.is_in_text
+
+    @property
+    def missing_place(self) -> MissingPlace | None:
+        """Where the fact misses; None if it is found."""
+        if self.is_found:
+            return None
+        if self.is_in_item:
+            return "text"
+        if self.is_in_text:
+            return "item"
+        return "both"
+
+
 @dataclass(frozen=True)
 class ClaimFidelity:
     facts_checked: int
+    # In the item they cite and in the text: the measure of the fidelity.
     facts_found: int
+    # Apart: in the item they cite (none invented), in the text (the instruction followed).
+    facts_found_in_item: int
+    facts_found_in_text: int
     # The codes of what the claim fails, in the order of the checks; none for a faithful claim.
     refusals: tuple[str, ...]
 
@@ -120,18 +151,19 @@ def check_claim(claim: Claim, item_by_ref: Mapping[str, WatchItem]) -> ClaimFide
     """The facts of the claim checked, each against the item it cites."""
     text = normalize(claim.text)
     text_identifiers = set(find_identifiers(to_detection_text(text)))
-    found = [
-        is_fact_found(fact, text, text_identifiers, item_by_ref[fact.item_id])
+    searches = [
+        search_fact(fact, text, text_identifiers, item_by_ref[fact.item_id])
         for fact in claim.facts
     ]
+    found = [search.is_found for search in searches]
     declared = {
         to_canonical_identifier(to_detection_text(normalize(fact.value)))
         for fact in claim.facts
     }
     refusals = [
-        f"{FACT_NOT_FOUND}:{index}:{item_by_ref[fact.item_id].item_id}"
-        for index, (fact, is_found) in enumerate(zip(claim.facts, found, strict=True))
-        if not is_found
+        f"{FACT_NOT_FOUND}:{index}:{item_by_ref[fact.item_id].item_id}:{missing}"
+        for index, (fact, search) in enumerate(zip(claim.facts, searches, strict=True))
+        if (missing := search.missing_place) is not None
     ]
     if not text_identifiers <= declared:
         refusals.append(UNDECLARED_IDENTIFIER)
@@ -147,6 +179,8 @@ def check_claim(claim: Claim, item_by_ref: Mapping[str, WatchItem]) -> ClaimFide
     return ClaimFidelity(
         facts_checked=len(claim.facts),
         facts_found=sum(found),
+        facts_found_in_item=sum(search.is_in_item for search in searches),
+        facts_found_in_text=sum(search.is_in_text for search in searches),
         refusals=tuple(refusals),
     )
 
@@ -215,27 +249,33 @@ def is_free_greek(char: str) -> bool:
     )
 
 
-def is_fact_found(
+def search_fact(
     fact: Fact, text: str, text_identifiers: set[str], item: WatchItem
-) -> bool:
+) -> FactSearch:
+    """Whether the fact is in the item it cites and in the normalized text of its claim."""
     value = normalize(fact.value)
     detection_value = to_detection_text(value)
     if CVE.search(detection_value) or GHSA.search(detection_value):
         identifier = to_canonical_identifier(detection_value)
-        return (
-            identifier is not None
-            and identifier in text_identifiers
-            and any(
+        if identifier is None:
+            return FactSearch(is_in_item=False, is_in_text=False)
+        return FactSearch(
+            is_in_item=any(
                 to_canonical_identifier(to_detection_text(normalize(field)))
                 == identifier
                 for field in list_identifier_fields(item)
-            )
+            ),
+            is_in_text=identifier in text_identifiers,
         )
     # A value without letter nor digit says nothing of the item, and a space is found anywhere.
     if not any(char.isalnum() for char in value):
-        return False
-    return is_found(value, text) and any(
-        is_found(value, to_searched_text(field)) for field in list_searched_fields(item)
+        return FactSearch(is_in_item=False, is_in_text=False)
+    return FactSearch(
+        is_in_item=any(
+            is_found(value, to_searched_text(field))
+            for field in list_searched_fields(item)
+        ),
+        is_in_text=is_found(value, text),
     )
 
 

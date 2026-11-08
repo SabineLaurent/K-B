@@ -758,6 +758,20 @@ essai est la somme des `facts_found` sur la somme des `facts_checked` de ses lig
 moyenne des taux. Option écartée : ne compter que les affirmations dans leurs bornes (un fait exact
 d'une affirmation trop longue ne compterait pas).
 
+**Les deux moitiés du fait trouvé** (#518). `facts_found` mêle deux questions : le fait est-il dans
+l'item qu'il cite (sinon, le modèle l'a inventé ou pris hors de ces règles), et est-il écrit dans le
+`text` (sinon, le modèle n'a pas suivi la consigne) ? `facts_found_in_item` et `facts_found_in_text`
+les comptent à part, chacune sans regarder l'autre, avec les mêmes règles que ci-dessus (forme
+canonique d'une CVE ou d'une GHSA, limites, champs où chercher). Ainsi, une CVE que l'item ne porte
+que dans un texte libre (le corps d'une release, le résumé d'un article) compte comme absente de
+l'item, puisqu'elle n'est cherchée que dans `cve_id` et `ghsa_id`. Un fait sans lettre ni chiffre,
+ou un fait qui contient plus qu'un motif CVE ou GHSA (`CVE-2026-86950 critique`, sans forme
+canonique), n'est trouvé ni dans l'un ni dans l'autre (`both`). `facts_found` compte les faits
+trouvés aux deux, et le taux reste `facts_found` / `facts_checked`. Sur le jeu de référence de #479
+(`write-1`, enregistré le 2026-11-08), les 26 faits vérifiés sont dans leur item, 14 dans leur
+`text` : aucun fait absent de son item, 12 faits non recopiés dans la phrase
+(`tests/ai_api/test_digests_reference.py`).
+
 **Partie commune avec le wiki (#153).** Le contrôle de fidélité du wiki reprend d'ici la
 normalisation, la recherche mot pour mot entre deux limites et le taux calculé à chaque appel
 (critère de #153) ; le code est `ai_api/stages/fidelity.py`. Il n'en reprend pas ce qui tient aux items :
@@ -1378,6 +1392,7 @@ ne sont écrites qu'au retour du parcours.
 | `failed_check` | le contrôle qui a refusé la dernière tentative (`content_filter`, `finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`, et `criterion` pour le choix des tendances) ; nul si `ok` |
 | `first_failed_check` | le contrôle qui a refusé la première tentative, quand une seconde a suivi ; nul sinon (#205, `LlmCall`, constat de #158 : le motif de la première tentative était perdu) |
 | `facts_checked`, `facts_found` | compteurs de la fidélité (rédaction, section « Fidélité », « Ce qui est compté ») ; nuls au classement et pour une rédaction en échec |
+| `facts_found_in_item`, `facts_found_in_text` | les faits trouvés dans l'item qu'ils citent, et ceux trouvés dans le `text` de leur affirmation, chacun sans regarder l'autre (section « Fidélité », « Les deux moitiés du fait trouvé ») ; nuls au classement, pour une rédaction en échec, et sur les lignes d'un compte rendu des tendances |
 | `fidelity_rate` | `facts_found` / `facts_checked`, arrondi à 4 décimales ; nul au classement, pour une rédaction en échec, et quand `facts_checked` vaut 0 |
 | `claims_removed`, `items_removed_by_checks` | compteurs des contrôles, bornes ou fidélité (rédaction) ; nuls au classement |
 | `items_with_subject`, `items_no_suitable_subject`, `items_unanswered` | compteurs du classement (section « Sortie du classement », « Trois cas ») : les items du lot qui ont reçu un sujet, ceux auxquels aucun sujet ne convient, et ceux que le modèle a laissés sans réponse, `items_in` à eux trois ; nuls à la rédaction, et pour un classement en échec |
@@ -1385,7 +1400,8 @@ ne sont écrites qu'au retour du parcours.
 
 `ts`, `stage`, `failed_check`, `items_dropped`, `items_capped`, `reasoning_tokens` et `http_status`
 s'ajoutent à la liste de #156, puis `first_failed_check` (#205), puis `fidelity_rate` (#207), puis
-`items_with_subject`, `items_no_suitable_subject` et `items_unanswered` (`classify-2`, #210). En
+`items_with_subject`, `items_no_suitable_subject` et `items_unanswered` (`classify-2`, #210), puis
+`facts_found_in_item` et `facts_found_in_text` (#518). En
 0.4.0, `items_dropped` devient `items_dropped_before_writing_stage` et `items_uncited`,
 `items_removed_by_checks`.
 
@@ -1414,6 +1430,7 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
 | `k_b.digest.claims_removed`, `k_b.digest.items_removed_by_checks` | Counter | les compteurs de la rédaction | — |
 | `k_b.digest.items_with_subject`, `k_b.digest.items_no_suitable_subject`, `k_b.digest.items_unanswered` | Counter | les compteurs du classement | — |
 | `k_b.digest.facts_checked`, `k_b.digest.facts_found` | Counter, `{fact}` | les compteurs de la fidélité (#207) ; le taux se calcule dans Grafana par leur rapport, un taux ne s'additionnant pas | — |
+| `k_b.digest.facts_found_in_item`, `k_b.digest.facts_found_in_text` | Counter, `{fact}` | les faits trouvés dans leur item, et dans leur `text` (#518) ; rien pour un compte rendu des tendances | — |
 | `k_b.digest.data_fetch.duration` | Histogram, `s` | `data_fetch_ms` / 1000 | aucun |
 
 - **Attributs communs** aux mesures d'un appel : `gen_ai.operation.name = chat`,
@@ -1496,7 +1513,8 @@ POST /digests            SERVER   http.request.method, http.route, http.response
 │  └─ chat <model>       CLIENT   une par requête HTTP au modèle
 └─ write_subject         INTERNAL k_b.subject, k_b.outcome, k_b.items.sent.ids, k_b.items.dropped,
    │                              k_b.items.truncated, k_b.items.not_retained.ids, k_b.items.removed_by_checks.ids,
-   │                              k_b.facts.checked, k_b.facts.found, k_b.claims.removed   (englobe les contrôles)
+   │                              k_b.facts.checked, k_b.facts.found, k_b.facts.found_in_item,
+   │                              k_b.facts.found_in_text, k_b.claims.removed   (englobe les contrôles)
    └─ chat <model>       CLIENT   une par requête ; les évaluations sur la dernière
 ```
 
@@ -1522,8 +1540,10 @@ POST /digests            SERVER   http.request.method, http.route, http.response
   l'instant où il a fini. `gen_ai.evaluation.name = k_b.claim_checks` (bornes et fidélité, une
   évaluation), `gen_ai.evaluation.score.label = fail`, `k_b.claim.index` (sa position dans la
   sortie), et dans `gen_ai.evaluation.explanation` comme dans le corps, les codes séparés par des
-  virgules : `out_of_bounds`, `fact_not_found:<index du fait>:<item>`, `undeclared_identifier`,
-  `cited_item_without_fact`, `disguised_text`. Les premiers codes qui tiennent en 2 048 octets sont
+  virgules : `out_of_bounds`, `fact_not_found:<index du fait>:<item>:<où>`, `undeclared_identifier`,
+  `cited_item_without_fact`, `disguised_text`. `<où>` dit où manque le fait non trouvé : `item`
+  (dans l'item qu'il cite), `text` (dans le `text` de l'affirmation) ou `both` (aux deux) ; un fait
+  sans lettre ni chiffre est `both` (#518). Les premiers codes qui tiennent en 2 048 octets sont
   gardés entiers ; `k_b.claim.reasons_truncated` dit qu'il en manque. Un journal, pas un événement de span : OpenTelemetry
   déprécie l'API des événements de span.
 - **Identifiants** : des entiers internes, sans donnée personnelle (décision de Sabine du

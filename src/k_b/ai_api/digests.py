@@ -124,6 +124,12 @@ def build_digests(
                 items_truncated=selection.items_truncated,
                 facts_checked=None if digest is None else digest.facts_checked,
                 facts_found=None if digest is None else digest.facts_found,
+                facts_found_in_item=None
+                if digest is None
+                else digest.facts_found_in_item,
+                facts_found_in_text=None
+                if digest is None
+                else digest.facts_found_in_text,
                 claims_removed=None if digest is None else digest.claims_removed,
                 items_removed_by_checks=None
                 if digest is None
@@ -179,6 +185,8 @@ def trace_writing(
         {
             "k_b.facts.checked": digest.facts_checked,
             "k_b.facts.found": digest.facts_found,
+            "k_b.facts.found_in_item": digest.facts_found_in_item,
+            "k_b.facts.found_in_text": digest.facts_found_in_text,
             "k_b.claims.removed": digest.claims_removed,
         }
     )

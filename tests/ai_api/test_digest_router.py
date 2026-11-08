@@ -673,6 +673,8 @@ METRIC_FIELDS = [
     "first_failed_check",
     "facts_checked",
     "facts_found",
+    "facts_found_in_item",
+    "facts_found_in_text",
     "fidelity_rate",
     "claims_removed",
     "items_removed_by_checks",
@@ -808,6 +810,7 @@ def test_the_fidelity_rate_is_the_facts_found_over_the_facts_checked(
         3,
         2,
     )
+    assert (agent["facts_found_in_item"], agent["facts_found_in_text"]) == (2, 3)
     assert agent["fidelity_rate"] == 0.6667
     assert agent["claims_removed"] == 1
 
@@ -926,6 +929,12 @@ def test_each_call_is_measured_in_opentelemetry_as_on_its_line(
     )
     assert find_point(points, "k_b.digest.facts_found") == sum(
         line["facts_found"] for line in writes
+    )
+    assert find_point(points, "k_b.digest.facts_found_in_item") == sum(
+        line["facts_found_in_item"] for line in writes
+    )
+    assert find_point(points, "k_b.digest.facts_found_in_text") == sum(
+        line["facts_found_in_text"] for line in writes
     )
     assert find_point(points, "k_b.digest.data_fetch.duration") == (
         1,
@@ -1425,13 +1434,20 @@ def test_each_claim_removed_is_an_evaluation_tied_to_its_last_request(
     ][1]
     assert log_record.span_id == agent_chat.context.span_id
     assert log_record.event_name == "gen_ai.evaluation.result"
+    # v2.1.299 is in the text, in no item.
     assert log_record.attributes["gen_ai.evaluation.explanation"] == (
-        "fact_not_found:1:6"
+        "fact_not_found:1:6:item"
     )
     assert log_record.attributes["k_b.claim.index"] == 1
     assert not any(name.startswith("exception.") for name in log_record.attributes)
     agent = recorded_traces.find_spans("write_subject")[1]
     assert agent.attributes["k_b.claims.removed"] == 1
+    assert (
+        agent.attributes["k_b.facts.checked"],
+        agent.attributes["k_b.facts.found"],
+        agent.attributes["k_b.facts.found_in_item"],
+        agent.attributes["k_b.facts.found_in_text"],
+    ) == (3, 2, 2, 3)
 
 
 def test_the_errors_of_each_route_are_its_upstream_states():

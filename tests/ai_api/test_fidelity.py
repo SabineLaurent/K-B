@@ -234,6 +234,54 @@ def test_a_fact_found_in_the_item_but_not_in_the_text_is_not_found():
     assert fidelity.facts_found == 0
 
 
+def test_the_facts_found_are_those_found_both_in_their_item_and_in_the_text():
+    # Apple in both; v2.1.287 in release 6 only; v2.1.299 in the text only.
+    fidelity = check_claim(
+        claim("Apple publie v2.1.299.", ("Apple", "i3"), ("v2.1.287", "i6"),
+              ("v2.1.299", "i6")),
+        ITEM_BY_REF,
+    )  # fmt: skip
+
+    assert (
+        fidelity.facts_checked,
+        fidelity.facts_found_in_item,
+        fidelity.facts_found_in_text,
+        fidelity.facts_found,
+    ) == (3, 2, 2, 1)
+
+
+@pytest.mark.parametrize(
+    ("text", "fact", "found_in_item_and_text", "missing"),
+    [
+        ("Une nouvelle version.", ("v2.1.287", "i6"), (1, 0), "text"),
+        ("Apple corrige une faille.", ("CVE-2026-86950", "i3"), (1, 0), "text"),
+        ("Claude Code publie v2.1.299.", ("v2.1.299", "i6"), (0, 1), "item"),
+        ("La CVE-2026-0001 touche Apple.", ("CVE-2026-0001", "i3"), (0, 1), "item"),
+        ("Une nouvelle version.", ("v2.1.299", "i6"), (0, 0), "both"),
+        ("China ( ) .", (NO_BREAK_SPACE * 3, "i6"), (0, 0), "both"),
+    ],
+    ids=[
+        "missing_in_the_text",
+        "cve_missing_in_the_text",
+        "missing_in_the_item",
+        "cve_missing_in_the_item",
+        "missing_in_both",
+        "without_letter_nor_digit",
+    ],
+)
+def test_a_fact_not_found_says_whether_it_misses_its_item_its_text_or_both(
+    text, fact, found_in_item_and_text, missing
+):
+    fidelity = check_claim(claim(text, fact), ITEM_BY_REF)
+
+    assert (
+        fidelity.facts_found_in_item,
+        fidelity.facts_found_in_text,
+    ) == found_in_item_and_text
+    item_id = ITEM_BY_REF[fact[1]].item_id
+    assert fidelity.refusals[0] == f"fact_not_found:0:{item_id}:{missing}"
+
+
 @pytest.mark.parametrize(
     "value",
     ["   ", NO_BREAK_SPACE * 3, ZERO_WIDTH_SPACE * 3],

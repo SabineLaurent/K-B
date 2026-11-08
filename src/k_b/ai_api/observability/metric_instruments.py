@@ -110,6 +110,16 @@ class ModelMetrics:
             unit="{fact}",
             description="Facts found in their claim and in the item they cite.",
         )
+        self._facts_found_in_item = meter.create_counter(
+            "k_b.digest.facts_found_in_item",
+            unit="{fact}",
+            description="Facts found in the item they cite, in their claim or not.",
+        )
+        self._facts_found_in_text = meter.create_counter(
+            "k_b.digest.facts_found_in_text",
+            unit="{fact}",
+            description="Facts found in the text of their claim, in the item they cite or not.",
+        )
         self._data_fetch_duration = meter.create_histogram(
             "k_b.digest.data_fetch.duration",
             unit="s",
@@ -158,24 +168,20 @@ class ModelMetrics:
                     call.check_ms / MILLISECONDS_PER_SECOND, attributes
                 )
             self._cost.add(estimate_cost(call.tokens_in, call.tokens_out), attributes)
-            if stage_call.claims_removed is not None:
-                self._claims_removed.add(stage_call.claims_removed, attributes)
-            if stage_call.items_removed_by_checks is not None:
-                self._items_removed_by_checks.add(
-                    stage_call.items_removed_by_checks, attributes
-                )
-            if stage_call.items_with_subject is not None:
-                self._items_with_subject.add(stage_call.items_with_subject, attributes)
-            if stage_call.items_no_suitable_subject is not None:
-                self._items_no_suitable_subject.add(
-                    stage_call.items_no_suitable_subject, attributes
-                )
-            if stage_call.items_unanswered is not None:
-                self._items_unanswered.add(stage_call.items_unanswered, attributes)
-            if stage_call.facts_checked is not None:
-                self._facts_checked.add(stage_call.facts_checked, attributes)
-            if stage_call.facts_found is not None:
-                self._facts_found.add(stage_call.facts_found, attributes)
+            # The counts of the checks of a stage; None for a stage without them.
+            for counter, count in (
+                (self._claims_removed, stage_call.claims_removed),
+                (self._items_removed_by_checks, stage_call.items_removed_by_checks),
+                (self._items_with_subject, stage_call.items_with_subject),
+                (self._items_no_suitable_subject, stage_call.items_no_suitable_subject),
+                (self._items_unanswered, stage_call.items_unanswered),
+                (self._facts_checked, stage_call.facts_checked),
+                (self._facts_found, stage_call.facts_found),
+                (self._facts_found_in_item, stage_call.facts_found_in_item),
+                (self._facts_found_in_text, stage_call.facts_found_in_text),
+            ):
+                if count is not None:
+                    counter.add(count, attributes)
 
     def record_data_fetch(self, data_fetch_ms: int) -> None:
         """The reading of the window of a request, a model called or not."""
