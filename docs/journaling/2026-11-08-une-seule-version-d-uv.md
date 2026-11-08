@@ -119,7 +119,7 @@ fixer la CI sur 0.11 (#485) » (`docs/ADR/journal-decisions-projet.md:5379-5382`
 | Digest du manifeste de `ghcr.io/astral-sh/uv:0.13.6` = `sha256:af22a52f…9986d0` | Le digest du `Dockerfile` est celui du registre. |
 | `uv sync --locked` puis la suite sous 0.13.6 : 4061 passed, couverture 98,42 % (sur `b580372`, avant le rebase, qui n'a apporté que des docs) | K-B s'installe et passe ses tests sous 0.13.6, sans l'avertissement de borne. |
 | CI de la PR (à venir) : aucun « Falling back to latest », aucun « does not contain the current uv version », `image-build` vert | La CI installe 0.13.6, et l'image se construit avec. |
-| `uv --version` sur le Mac après `uv self update 0.13.6` (à venir, écrit dans l'ADR) | Le Mac a la même version. |
+| `uv --version` sur le Mac après `uv self update 0.13.6` (lancé par Sabine le 08/11) : « uv 0.13.6 (329bf9448 2026-10-26 aarch64-apple-darwin) », écrit dans l'ADR ; puis `uv lock --check` : code 0 | Le Mac a la même version, et `uv.lock` lui convient. |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -148,11 +148,10 @@ fixer la CI sur 0.11 (#485) » (`docs/ADR/journal-decisions-projet.md:5379-5382`
   aucune, relu) ; `--require-hashes` désormais respecté par `uv pip`, sans effet (l'audit passe par
   pip-audit, `ci.yml:25`).
 - **La lecture de `required-version` par `setup-uv`** vient du message de son journal, pas d'un essai.
-- **La CI de la PR et la mise à jour du Mac** sont à venir au moment d'écrire cette note.
+- **La CI de la PR** est à venir au moment d'écrire cette note.
 
 ## Ce qui reste
 
-- **Sabine** lance `uv self update 0.13.6` sur le Mac ; sa version est écrite, datée, dans l'ADR.
 - **Une seule source pour la version d'uv** (`[tool.uv] required-version` dans `pyproject.toml`, à la
   place des 5 `version:`), et un pas de CI qui compare l'étiquette `FROM ghcr.io/astral-sh/uv:<x>` du
   `Dockerfile` à la version de la CI (XS) : proposés à Sabine comme suite, avec l'effet de bord sur le
