@@ -649,7 +649,8 @@ uv run pytest --cov --cov-report=term-missing   # tous les fichiers dans la cons
 
 Sous 96 % (lignes et branches), les deux commandes échouent : c'est le `fail_under` de
 `[tool.coverage.report]` dans `pyproject.toml`, un plancher contre la régression et non une cible
-(journal ADR, 2026-11-08). La CI le vérifie dans le job `tests`.
+(journal ADR, 2026-11-08). La CI le vérifie dans le job `tests`. Seules les commandes avec `--cov` le
+vérifient (`make test` et `uv run pytest`, non) ; sur une partie de la suite, ajouter `--cov-fail-under=0`.
 
 La CI (GitHub Actions, `.github/workflows/ci.yml`) lance cinq jobs, `audit` (pip-audit sur `uv.lock`),
 `tests` (pytest, avec la couverture et son seuil), `lint` (ruff check et ruff format --check), `types`

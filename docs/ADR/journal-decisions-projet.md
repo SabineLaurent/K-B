@@ -6103,15 +6103,19 @@ celui du plan qu'elle a validé, ou du tri de time-knight quand il est nommé.
     be obsessing on how to get from 90% code coverage to 95% ») et rappelle qu'un fort taux ne garantit
     pas la qualité des tests ;
   - `precision = 2` : `coverage` arrondit le total à `precision` décimales avant de le comparer au seuil
-    (`round(total, precision) < fail_under`, `coverage/results.py`, 7.17.0) ; sans elle, 95,5 % passerait ;
+    (`round(total, precision) < fail_under`, `coverage/results.py`, 7.17.0) ; sans elle, 95,5 % passerait.
+    Avec elle, l'arrondi ne tolère plus que 0,005 point, et dans cette bande le résumé de `pytest-cov`, qui
+    compare le total brut (`pytest_cov/plugin.py`), affiche « FAIL » sur un job qui passe ;
   - le seuil vit dans `pyproject.toml` seul : `pytest-cov` le lit dans la configuration de `coverage`
     quand `--cov-fail-under` est absent (`pytest_cov/plugin.py`, 7.1.0), et `make test-cov` comme la CI
     s'en servent. Écarté : `--cov-fail-under=96` dans `ci.yml`, un second endroit à tenir ;
   - dans le job `tests`, pas dans un job à part. Écarté : un job `coverage`, qui relancerait la suite et
     ajouterait un sixième contrôle exigé au ruleset de `main`. Coût mesuré en local : 30 s → 41 s.
 
-  Limites assumées : les tests `e2e` et `postgresql` restent hors de la mesure, comme le 06/11 ; la
-  mesure peut baisser de 2,4 points avant le premier échec.
+  Limites assumées : les tests `e2e` et `postgresql` restent hors de la mesure, comme le 06/11, et le
+  code qu'eux seuls lancent compte comme non couvert. Le 08/11, les chemins de PostgreSQL laissent
+  `database/postgresql.py` à 73,79 %, `database/creation.py` à 70,79 % et `database/errors.py` à
+  82,46 % ; la mesure peut baisser de 2,4 points avant le premier échec.
 
   Sources, lues le 08/11/2026 : [1] C. Arguelles, M. Ivanković, A. Bender, « Code Coverage Best
   Practices », Google Testing Blog, 7 août 2020,
