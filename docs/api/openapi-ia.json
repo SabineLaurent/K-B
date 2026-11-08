@@ -1136,7 +1136,7 @@
           "promise"
         ],
         "title": "TrendTextsSchema",
-        "description": "Written in French by the model, each checked by the code: its length, its source not\nempty, each of its facts found in it and in its source, no identifier nor number but a fact;\na sector or a watch link may have no fact; null when empty or removed."
+        "description": "Written in French by the model and checked by the code (docs/tendances.md, \"Rédaction\");\nnull when empty or removed."
       },
       "WatchKind": {
         "type": "string",

@@ -483,7 +483,9 @@ def check_texts(
         if reason is not None:
             reasons[name] = reason
         kept[name] = (
-            None if reason is not None or is_empty(written.text) else written.text
+            None
+            if reason is not None or is_empty(normalize(written.text))
+            else written.text
         )
     return CheckedTexts(TrendTexts(**kept), reasons, facts_checked, facts_found)
 
@@ -496,7 +498,7 @@ def find_removal_reason(
 ) -> str | None:
     """The first refusal of the text, in the order of docs/tendances.md, "Rédaction"; None for a
     text kept, or empty without fact, which says there is nothing to say."""
-    if is_empty(written.text) and not written.facts:
+    if not written.text and not written.facts:
         return None
     if not is_within_text_bounds(name, written):
         return OUT_OF_BOUNDS
@@ -538,7 +540,7 @@ def is_fact_found(fact: str, text: str, sources: tuple[str, ...]) -> bool:
     """In its text, normalized, and in the source of its text alone, each between its limits; a
     value without letter nor digit says nothing."""
     value = normalize(fact)
-    if not any(char.isalnum() for char in value):
+    if is_empty(value):
         return False
     return is_found(value, normalize(text)) and any(
         is_found(value, source) for source in sources

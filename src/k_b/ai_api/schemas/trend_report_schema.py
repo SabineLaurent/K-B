@@ -103,9 +103,8 @@ class TrendRepositorySchema(BaseModel):
 
 
 class TrendTextsSchema(BaseModel):
-    """Written in French by the model, each checked by the code: its length, its source not
-    empty, each of its facts found in it and in its source, no identifier nor number but a fact;
-    a sector or a watch link may have no fact; null when empty or removed."""
+    """Written in French by the model and checked by the code (docs/tendances.md, "Rédaction");
+    null when empty or removed."""
 
     sector: str | None = Field(description="Its facts taken from the topics.")
     watch_link: str | None = Field(

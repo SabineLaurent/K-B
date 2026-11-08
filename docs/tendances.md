@@ -208,8 +208,10 @@ Ni commande ni bloc de code en sortie ; une version récente du dépôt n'est pa
 (décision de Sabine, 29/10, 16:53). Bornes de longueur vérifiées par le code : `sector` 120 caractères,
 `watch_link` 300, `readme_summary` 400, `promise` 200 (`core/config.py`), 0 à 5 faits par texte, au
 moins un pour `readme_summary` et `promise`, chacun de 3 à 120 caractères. Un texte vide sans fait est
-permis, et un texte sans lettre ni chiffre compte pour vide (`is_empty`) : il dit qu'il n'y a rien à dire, n'est ni écrit ni retiré (décision de Sabine du 08/11, qui
-relâche la borne de l'architecte du 29/10, « textes jamais vides », conformément à l'issue).
+permis : il dit qu'il n'y a rien à dire, n'est ni écrit ni retiré (décision de Sabine du 08/11, qui
+relâche la borne de l'architecte du 29/10, « textes jamais vides », conformément à l'issue). Un texte
+qui passe tous les contrôles sans lettre ni chiffre, une fois normalisé, compte pour vide (`is_empty` ;
+tri de la revue de code du 08/11, time-knight, délégation de Sabine du 15/10).
 
 **Fidélité**, par `normalize` et `is_found` (`ai_api/stages/fidelity.py:153,291`) : chaque fait est
 cherché dans son texte et dans la seule source de son texte ; `to_searched_text` prend la longueur

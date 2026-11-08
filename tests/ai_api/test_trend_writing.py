@@ -503,6 +503,29 @@ def test_an_empty_text_is_neither_written_nor_removed(watch_link):
     assert writing.texts_removed == ()
 
 
+@pytest.mark.parametrize(
+    ("texts", "reason"),
+    [
+        ({"watch_link": text(chr(0x202E) + chr(0x200B))}, "watch_link:disguised_text"),
+        ({"sector": text("-" * 500)}, "sector:out_of_bounds"),
+        ({"promise": text("...")}, "promise:out_of_bounds"),
+    ],
+    ids=["invisible", "too-long", "promise-without-fact"],
+)
+def test_a_text_without_letter_nor_digit_is_checked_before_it_counts_as_empty(
+    texts, reason
+):
+    writing = write_one([written(**texts)])
+
+    assert writing.removal_reasons == (reason,)
+
+
+def test_a_text_with_a_letter_once_normalized_is_kept():
+    writing = write_one([written(sector=text(chr(0x2122)))])
+
+    assert writing.texts.sector == chr(0x2122)
+
+
 def test_the_texts_removed_keep_their_order():
     writing = write_one(
         [
