@@ -647,10 +647,15 @@ make test-cov       # les fichiers sous 100 % dans la console, le tableau comple
 uv run pytest --cov --cov-report=term-missing   # tous les fichiers dans la console, sans fichier
 ```
 
+Sous 96 % (lignes et branches), les deux commandes échouent : c'est le `fail_under` de
+`[tool.coverage.report]` dans `pyproject.toml`, un plancher contre la régression et non une cible
+(journal ADR, 2026-11-08). La CI le vérifie dans le job `tests`. Seules les commandes avec `--cov` le
+vérifient (`make test` et `uv run pytest`, non) ; sur une partie de la suite, ajouter `--cov-fail-under=0`.
+
 La CI (GitHub Actions, `.github/workflows/ci.yml`) lance cinq jobs, `audit` (pip-audit sur `uv.lock`),
-`tests` (pytest), `lint` (ruff check et ruff format --check), `types` (mypy --strict) et `tests-postgresql`
-(`pytest -m postgresql` sur un serveur PostgreSQL 18), sur chaque PR vers `main` et sur chaque push sur `main`,
-donc après chaque fusion.
+`tests` (pytest, avec la couverture et son seuil), `lint` (ruff check et ruff format --check), `types`
+(mypy --strict) et `tests-postgresql` (`pytest -m postgresql` sur un serveur PostgreSQL 18), sur chaque PR vers
+`main` et sur chaque push sur `main`, donc après chaque fusion.
 
 **Construire l'image** (Docker ; une image pour toutes les commandes `kb`, voir le `Dockerfile`) :
 
