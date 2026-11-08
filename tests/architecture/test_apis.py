@@ -273,6 +273,7 @@ TRACED_FUNCTIONS = {
     "read_trend_report",
     "read_repository_cards",
     "select_trends",
+    "read_readmes",
     "write_trends",
     "write_trend",
 }

@@ -19,9 +19,11 @@ from post.test_ai_api_client import (
     bound_answers,
 )
 from post.test_trend_report_client import (
+    RISING,
     RISING_NAME,
     STEADY,
     change_period,
+    choose,
     make_report,
 )
 
@@ -583,5 +585,35 @@ def test_a_choice_that_failed_writes_the_factual_report_and_the_register_notes_i
         re.MULTILINE,
     )
     assert "Model: none\n" in capsys.readouterr().out
+    for name in NAMES:
+        assert name not in log
+
+
+def test_a_writing_that_failed_is_logged_by_its_place_never_a_name(
+    monkeypatch, trend_environment
+):
+    """The texts not written leave the report written (decision of Sabine of 2026-11-08); each
+    is a warning, by the place of its repository."""
+    data_dir, vault_dir = trend_environment
+    write_register(data_dir, [PREVIOUS_ENTRY])
+    failed = choose(RISING) | {
+        "readme": None,
+        "texts": None,
+        "texts_removed": [],
+        "writing_failure": "github_unavailable",
+    }
+    answer_trend_report(monkeypatch, answer_with(make_report(chosen=[failed])))
+
+    assert cli.main(["trend-report"]) == cli.ExitCode.SUCCEEDED
+
+    sheet = (vault_dir / SHEET).read_text("utf-8")
+    assert "  Textes non écrits : GitHub indisponible." in sheet
+    log = read_kb_log(data_dir)
+    assert re.search(
+        rf"^{LOG_LINE_DATE} WARNING k_b\.cli: writing of chosen\.0 not made:"
+        rf" github_unavailable, request_id {REQUEST_ID}$",
+        log,
+        re.MULTILINE,
+    )
     for name in NAMES:
         assert name not in log

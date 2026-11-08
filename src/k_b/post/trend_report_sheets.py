@@ -5,8 +5,8 @@ post/vault_files.py.
 Each text is made by the code from checked values: a day, a count, a word of a closed list (a
 subject of the watch among them), the name of the model, checked by MODEL_NAME, a topic, checked
 by its pattern, and the name of a repository, checked by is_repository_name, which makes its URL.
-The language and the license are written by neutralize_digest_text, which would break a URL
-(www. escaped) in any other."""
+The language, the license and the texts the model wrote are written by neutralize_digest_text,
+which would break a URL (www. escaped) in any other."""
 
 import json
 from datetime import date, datetime
@@ -25,17 +25,19 @@ from k_b.core.config import (
     WATCH_DIR_NAME,
 )
 from k_b.core.dates import format_date
-from k_b.items import Caution, Criterion
+from k_b.items import TREND_TEXTS, Caution, Criterion, TrendText
 from k_b.post.trend_report_client import (
     CRITERIA,
-    ChoiceFailure,
     ChosenRepository,
     DroppedCandidates,
+    GithubFailure,
+    ModelFailure,
     RepositoryFacts,
     TrendPeriod,
     TrendPoint,
     TrendReportResponse,
     TrendRepository,
+    WritingFailure,
 )
 from k_b.post.vault_files import (
     VaultEntryRefusedError,
@@ -60,13 +62,45 @@ DROP_REASON_LABELS = {
     "forbidden": "refusés",
 }
 # Why the choice of the model was not made, by state of the response.
-CHOICE_FAILURE_REASONS: dict[ChoiceFailure, str] = {
+CHOICE_FAILURE_REASONS: dict[ModelFailure, str] = {
     "llm_timeout": "le modèle n'a pas répondu à temps",
     "llm_rate_limited": "le quota du modèle est atteint",
     "llm_unavailable": "le modèle est indisponible",
     "llm_invalid_output": "sa réponse n'a pas passé les contrôles, relance comprise",
     "llm_truncated": "sa réponse a été coupée",
     "llm_content_filtered": "le filtre de contenu d'Azure a refusé la demande",
+}
+# Why the texts of a repository chosen are not written: its call to the model failed, or GitHub
+# on a README, after which no README is sent (decision of Sabine of 2026-11-08).
+GITHUB_FAILURE_REASONS: dict[GithubFailure, str] = {
+    "github_unavailable": "GitHub indisponible",
+    "github_timeout": "GitHub n'a pas répondu à temps",
+    "github_rate_limited": "le quota de GitHub est atteint",
+    "github_unauthorized": "GitHub a refusé le jeton",
+    "github_forbidden": "GitHub a refusé 3 lectures",
+    "github_invalid_response": "la réponse de GitHub n'a pas passé les contrôles",
+}
+WRITING_FAILURE_REASONS: dict[WritingFailure, str] = {
+    state: reason
+    for state, reason in (
+        *CHOICE_FAILURE_REASONS.items(),
+        *GITHUB_FAILURE_REASONS.items(),
+    )
+}
+# The label of each text of the model under a repository chosen (decision of Sabine of
+# 2026-11-08): the summary is the README of its author, said cut when it is.
+TEXT_LABELS: dict[TrendText, str] = {
+    "sector": "Secteur",
+    "watch_link": "Lien avec la veille",
+    "readme_summary": "D'après son README",
+    "promise": "Promesse",
+}
+CUT_README_LABEL = "D'après le début de son README"
+NOT_RETAINED = "non retenu par les contrôles"
+# In place of the line of the summary, whatever the text.
+MISSING_README_LINES = {
+    "absent": "README : absent.",
+    "refused": "README : non servi par GitHub.",
 }
 NO_CANDIDATE_READ = "aucun candidat lu"
 OUT_OF_TOP = "hors top"
@@ -222,7 +256,11 @@ def render_choice(response: TrendReportResponse) -> list[str]:
         *(
             line
             for chosen in response.chosen
-            for line in (render_chosen(chosen), render_facts(chosen.facts))
+            for line in (
+                render_chosen(chosen),
+                render_facts(chosen.facts),
+                *render_texts(chosen),
+            )
         ),
     ]
 
@@ -254,6 +292,35 @@ def render_facts(facts: RepositoryFacts) -> str:
     if facts.cautions:
         parts.append(f"Prudence : {describe_cautions(facts)}")
     return f"  {' ; '.join(parts)}"
+
+
+def render_texts(chosen: ChosenRepository) -> list[str]:
+    """The lines under the facts of a repository chosen, indented to stay in its item: one per
+    text written, said not retained when removed, none when empty; why they are not written."""
+    if chosen.writing_failure is not None:
+        return [
+            f"  Textes non écrits : {WRITING_FAILURE_REASONS[chosen.writing_failure]}."
+        ]
+    texts = chosen.texts
+    if texts is None:
+        # Fails closed: refused before, by the reading (refuse_inconsistent_failure).
+        raise ValueError("texts not written without a failure")
+    lines = []
+    for name in TREND_TEXTS:
+        if name == "readme_summary" and chosen.readme in MISSING_README_LINES:
+            lines.append(f"  {MISSING_README_LINES[chosen.readme]}")
+            continue
+        label = (
+            CUT_README_LABEL
+            if name == "readme_summary" and chosen.readme == "cut"
+            else TEXT_LABELS[name]
+        )
+        text = getattr(texts, name)
+        if name in chosen.texts_removed:
+            lines.append(f"  {label} : {NOT_RETAINED}.")
+        elif text is not None:
+            lines.append(f"  {label} : {neutralize_digest_text(text)}")
+    return lines
 
 
 def format_created_day(facts: RepositoryFacts) -> str:

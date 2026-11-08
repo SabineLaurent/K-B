@@ -1,7 +1,9 @@
 """The request of kb trend-report to the AI API, POST /trend-reports, and the response it accepts,
 an untrusted input read by a closed schema, then checked against the request and against itself:
-a period that would move the register back or widen it is refused before anything is written."""
+a period that would move the register back or widen it, or texts that contradict their writing,
+are refused before anything is written."""
 
+import unicodedata
 from collections.abc import Sequence
 from datetime import date, timedelta
 from itertools import pairwise
@@ -18,11 +20,16 @@ from k_b.core.config import (
     MAX_GITHUB_TOPICS,
     MODEL_NAME,
     TREND_MAX_CHOSEN,
+    TREND_PROMISE_MAX_CHARS,
+    TREND_README_SUMMARY_MAX_CHARS,
     TREND_REPORT_CLIENT,
+    TREND_SECTOR_MAX_CHARS,
+    TREND_WATCH_LINK_MAX_CHARS,
 )
 from k_b.items import (
     CAUTIONS,
     CHOICE_CRITERIA,
+    TREND_TEXTS,
     WATCH_SUBJECT,
     Caution,
     ChoiceCriterion,
@@ -30,7 +37,9 @@ from k_b.items import (
     GithubLanguage,
     GithubTopic,
     Int64,
+    ReadmeState,
     SpdxId,
+    TrendText,
     UtcDatetime,
     WindowState,
     WrittenDayInStrictModel,
@@ -52,9 +61,10 @@ TREND_REPORTS_PATH = "trend-reports"
 # The criteria in the order the AI API gives them (docs/tendances.md, "Ce que rend #366").
 CRITERIA: tuple[Criterion, ...] = get_args(Criterion.__value__)
 SUBJECT_NAMES = tuple(subject.name for subject in DIGEST_SUBJECTS)
-# The states of a choice that failed, those of LlmFailure in ai_api, which post does not import:
-# a test keeps both equal.
-type ChoiceFailure = Literal[
+# The states of a call to the model that failed, those of LlmFailure in ai_api, and of a reading
+# of GitHub, those of GithubState, which post does not import: a test keeps each pair equal. A
+# writing fails by the one or the other.
+type ModelFailure = Literal[
     "llm_invalid_output",
     "llm_truncated",
     "llm_content_filtered",
@@ -62,9 +72,38 @@ type ChoiceFailure = Literal[
     "llm_unavailable",
     "llm_timeout",
 ]
+type GithubFailure = Literal[
+    "github_unauthorized",
+    "github_rate_limited",
+    "github_forbidden",
+    "github_unavailable",
+    "github_timeout",
+    "github_invalid_response",
+]
+type WritingFailure = ModelFailure | GithubFailure
+# The joiner of composed emoji, the one invisible character a text of the model may hold.
+ZERO_WIDTH_JOINER = chr(0x200D)
+# What hides a text from its reader, refused in a text of the model: a format character (a
+# control of direction, a zero width space, a tag), a private-use or an unassigned point.
+HIDDEN_CATEGORIES = frozenset({"Cf", "Co", "Cn"})
 
 Rank = Annotated[int, Field(ge=1, le=GH_ARCHIVE_TOP_SIZE)]
 Count = Annotated[int, Field(ge=0)]
+
+
+def check_visible_text(text: str) -> str:
+    """A text of the model without a character that hides, but the joiner of an emoji; the
+    message never quotes the text."""
+    if any(
+        unicodedata.category(char) in HIDDEN_CATEGORIES and char != ZERO_WIDTH_JOINER
+        for char in text
+    ):
+        raise ValueError("a character that hides")
+    return text
+
+
+# A text of the model; each text gets its bound (docs/tendances.md, "Rédaction").
+TrendTextValue = Annotated[str, Field(min_length=1), AfterValidator(check_visible_text)]
 
 
 def check_repository_name(name: str) -> str:
@@ -103,15 +142,34 @@ class TrendRepository(AiApiModel):
     facts: RepositoryFacts | None
 
 
+class TrendTexts(AiApiModel):
+    """The texts the model wrote on a repository chosen, each None when empty or removed."""
+
+    sector: Annotated[TrendTextValue, Field(max_length=TREND_SECTOR_MAX_CHARS)] | None
+    watch_link: (
+        Annotated[TrendTextValue, Field(max_length=TREND_WATCH_LINK_MAX_CHARS)] | None
+    )
+    readme_summary: (
+        Annotated[TrendTextValue, Field(max_length=TREND_README_SUMMARY_MAX_CHARS)]
+        | None
+    )
+    promise: Annotated[TrendTextValue, Field(max_length=TREND_PROMISE_MAX_CHARS)] | None
+
+
 class ChosenRepository(AiApiModel):
-    """A repository the model chose; its trajectory is not read: the report shows it for the
-    repositories of the table."""
+    """A repository the model chose, with its texts; its trajectory is not read: the report shows
+    it for the repositories of the table."""
 
     repository_id: int
     repository_name: Annotated[str, AfterValidator(check_repository_name)]
     criteria: Annotated[list[ChoiceCriterion], Field(min_length=1)]
     watch_subjects: list[str]
     facts: RepositoryFacts
+    readme: ReadmeState | None
+    # None when not written, with writing_failure.
+    texts: TrendTexts | None
+    texts_removed: list[TrendText]
+    writing_failure: WritingFailure | None
 
 
 class TrendPeriod(AiApiModel):
@@ -142,7 +200,7 @@ class Candidates(AiApiModel):
 class TrendReportResponse(AiApiModel):
     request_id: Annotated[str, AfterValidator(match_fully(REQUEST_ID))]
     model: Annotated[str, AfterValidator(match_fully(MODEL_NAME))] | None
-    choice_failure: ChoiceFailure | None
+    choice_failure: ModelFailure | None
     chosen: Annotated[list[ChosenRepository], Field(max_length=TREND_MAX_CHOSEN)]
     period: TrendPeriod
     repositories: list[TrendRepository]
@@ -170,6 +228,7 @@ def request_trend_report(
     refuse_inconsistent_candidates(response)
     refuse_inconsistent_choice(response)
     refuse_inconsistent_chosen(response)
+    refuse_inconsistent_writings(response)
     return response
 
 
@@ -364,3 +423,46 @@ def refuse_inconsistent_chosen_criteria(
         raise_invalid(request_id, f"{place}.watch_subjects", "not_with_watch_subject")
     if not is_in_order_once(chosen.watch_subjects, SUBJECT_NAMES):
         raise_invalid(request_id, f"{place}.watch_subjects", "not_in_order_once")
+
+
+def refuse_inconsistent_writings(response: TrendReportResponse) -> None:
+    """The texts of each repository chosen as their writing gives them: none written with a
+    failure, only then; the texts removed in order, once, each without its text; a README read
+    unless the writing failed, and no summary without it; a link with the watch with a subject,
+    a sector with a topic."""
+    for number, chosen in enumerate(response.chosen):
+        place = f"chosen.{number}"
+        refuse_inconsistent_failure(response.request_id, place, chosen)
+        if chosen.texts is not None:
+            refuse_inconsistent_texts(response.request_id, place, chosen, chosen.texts)
+
+
+def refuse_inconsistent_failure(
+    request_id: str, place: str, chosen: ChosenRepository
+) -> None:
+    if chosen.writing_failure is None:
+        if chosen.texts is None:
+            raise_invalid(request_id, f"{place}.texts", "not_written_without_a_failure")
+        if chosen.readme is None:
+            raise_invalid(request_id, f"{place}.readme", "not_read_without_a_failure")
+        return
+    if chosen.texts is not None:
+        raise_invalid(request_id, f"{place}.texts", "written_with_a_failure")
+    if chosen.texts_removed:
+        raise_invalid(request_id, f"{place}.texts_removed", "with_a_writing_failure")
+
+
+def refuse_inconsistent_texts(
+    request_id: str, place: str, chosen: ChosenRepository, texts: TrendTexts
+) -> None:
+    if not is_in_order_once(chosen.texts_removed, TREND_TEXTS):
+        raise_invalid(request_id, f"{place}.texts_removed", "not_in_order_once")
+    for name in chosen.texts_removed:
+        if getattr(texts, name) is not None:
+            raise_invalid(request_id, f"{place}.texts.{name}", "removed_but_written")
+    if chosen.readme in {"absent", "refused"} and texts.readme_summary is not None:
+        raise_invalid(request_id, f"{place}.texts.readme_summary", "without_a_readme")
+    if texts.watch_link is not None and not chosen.watch_subjects:
+        raise_invalid(request_id, f"{place}.texts.watch_link", "without_a_subject")
+    if texts.sector is not None and not chosen.facts.topics:
+        raise_invalid(request_id, f"{place}.texts.sector", "without_a_topic")

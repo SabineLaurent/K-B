@@ -15,6 +15,7 @@ from post.test_ai_api_client import (
     answer,
 )
 
+from k_b.ai_api.connectors.github_client import GithubState
 from k_b.ai_api.connectors.llm_client import LlmFailure
 from k_b.ai_api.schemas.trend_report_schema import (
     CandidatesSchema,
@@ -27,6 +28,7 @@ from k_b.ai_api.schemas.trend_report_schema import (
     TrendRepositorySchema,
     TrendTextsSchema,
 )
+from k_b.core.config import TREND_SECTOR_MAX_CHARS
 from k_b.post.ai_api_client import (
     AiApiError,
     build_ai_api_client,
@@ -34,7 +36,8 @@ from k_b.post.ai_api_client import (
 )
 from k_b.post.trend_report_client import (
     TREND_REPORT_KEY_VARIABLE,
-    ChoiceFailure,
+    GithubFailure,
+    ModelFailure,
     request_trend_report,
 )
 
@@ -703,7 +706,7 @@ NO_CANDIDATE_READ = {
 
 def test_the_failures_of_the_choice_are_those_of_the_model():
     """post does not import ai_api: its Literal is a copy, kept equal here."""
-    assert get_args(ChoiceFailure.__value__) == get_args(LlmFailure.__value__)
+    assert get_args(ModelFailure.__value__) == get_args(LlmFailure.__value__)
 
 
 def test_the_repositories_chosen_are_read_with_their_criteria_and_subjects():
@@ -903,3 +906,161 @@ def test_a_name_chosen_that_cannot_make_a_url_is_refused_never_quoted():
         "ai_api_invalid_response, HTTP 200, chosen.0.repository_name (value_error)"
     )
     assert "owner/.." not in str(failure)
+
+
+# The texts of the repositories chosen (#369, docs/tendances.md, "Ce que rend #369").
+TEXTS = {
+    "sector": "Outil en ligne de commande.",
+    "watch_link": None,
+    "readme_summary": "Selon son auteur, un outil pour les LLM.",
+    "promise": "Il promet la rapidité.",
+}
+WRITTEN = {
+    "readme": "cut",
+    "texts": TEXTS,
+    "texts_removed": ["watch_link"],
+    "writing_failure": None,
+}
+WRITING_FAILURES = (*get_args(LlmFailure.__value__), *get_args(GithubState.__value__))
+NOT_WRITTEN = {"readme": None, "texts": None, "texts_removed": []}
+
+
+def report_with_writing(**writing):
+    return make_report(chosen=[choose(RISING) | WRITTEN | writing])
+
+
+def test_the_failures_of_a_writing_are_those_of_the_model_and_of_github():
+    """post does not import ai_api: its Literals are copies, kept equal here."""
+    assert get_args(GithubFailure.__value__) == get_args(GithubState.__value__)
+
+
+def test_the_texts_of_a_repository_chosen_are_read():
+    response, _ = ask(answer(content=body(report_with_writing())))
+
+    [chosen] = response.chosen
+    assert chosen.readme == "cut"
+    assert chosen.texts.sector == TEXTS["sector"]
+    assert chosen.texts.watch_link is None
+    assert chosen.texts_removed == ["watch_link"]
+    assert chosen.writing_failure is None
+
+
+@pytest.mark.parametrize("state", WRITING_FAILURES)
+def test_a_writing_that_failed_is_read_with_its_state(state):
+    response, _ = ask(
+        answer(content=body(report_with_writing(**NOT_WRITTEN, writing_failure=state)))
+    )
+
+    [chosen] = response.chosen
+    assert chosen.writing_failure == state
+    assert chosen.texts is None
+
+
+@pytest.mark.parametrize(
+    ("writing", "detail"),
+    [
+        ({"texts": None}, "chosen.0.texts (not_written_without_a_failure)"),
+        (
+            {"writing_failure": "llm_timeout"},
+            "chosen.0.texts (written_with_a_failure)",
+        ),
+        (
+            {
+                **NOT_WRITTEN,
+                "writing_failure": "github_timeout",
+                "texts_removed": ["sector"],
+            },
+            "chosen.0.texts_removed (with_a_writing_failure)",
+        ),
+        (
+            {
+                "texts_removed": ["promise", "watch_link"],
+                "texts": TEXTS | {"promise": None},
+            },
+            "chosen.0.texts_removed (not_in_order_once)",
+        ),
+        (
+            {"texts_removed": ["watch_link", "watch_link"]},
+            "chosen.0.texts_removed (not_in_order_once)",
+        ),
+        ({"texts_removed": ["sector"]}, "chosen.0.texts.sector (removed_but_written)"),
+        ({"readme": None}, "chosen.0.readme (not_read_without_a_failure)"),
+        ({"readme": "absent"}, "chosen.0.texts.readme_summary (without_a_readme)"),
+        ({"readme": "refused"}, "chosen.0.texts.readme_summary (without_a_readme)"),
+        (
+            {
+                "texts": TEXTS | {"watch_link": "Lié à la sécurité."},
+                "texts_removed": [],
+            },
+            "chosen.0.texts.watch_link (without_a_subject)",
+        ),
+    ],
+    ids=[
+        "not-written-without-a-failure",
+        "written-with-a-failure",
+        "removed-with-a-failure",
+        "removed-out-of-order",
+        "removed-twice",
+        "removed-but-written",
+        "readme-not-read-without-a-failure",
+        "summary-without-readme",
+        "summary-of-a-readme-refused",
+        "watch-link-without-a-subject",
+    ],
+)
+def test_texts_that_contradict_the_writing_are_refused(writing, detail):
+    failure = ask_and_fail(answer(content=body(report_with_writing(**writing))))
+
+    assert str(failure).startswith(f"ai_api_invalid_response, HTTP 200, {detail}")
+
+
+def test_a_sector_without_a_topic_is_refused():
+    report = report_with_writing()
+    report["chosen"][0]["facts"]["topics"] = []
+    report["repositories"][0]["facts"]["topics"] = []
+
+    failure = ask_and_fail(answer(content=body(report)))
+
+    assert str(failure).startswith(
+        "ai_api_invalid_response, HTTP 200, chosen.0.texts.sector (without_a_topic)"
+    )
+
+
+@pytest.mark.parametrize(
+    ("sector", "detail"),
+    [
+        ("trop long " * 20, "too_long"),
+        ("", "string_too_short"),
+        ("Outil" + chr(0x200B) + "secret", "value_error"),
+        ("Outil" + chr(0xE000) + "secret", "value_error"),
+        ("Outil" + chr(0x0378) + "secret", "value_error"),
+        ("Outil" + chr(0xE0041) + "secret", "value_error"),
+    ],
+    ids=["too-long", "empty", "zero-width-space", "private-use", "unassigned", "tag"],
+)
+def test_a_text_beyond_its_bound_or_with_a_hidden_character_is_refused_never_quoted(
+    sector, detail
+):
+    assert len("trop long " * 20) > TREND_SECTOR_MAX_CHARS
+    failure = ask_and_fail(
+        answer(content=body(report_with_writing(texts=TEXTS | {"sector": sector})))
+    )
+
+    assert str(failure).startswith(
+        f"ai_api_invalid_response, HTTP 200, chosen.0.texts.sector ({detail})"
+    )
+    assert "secret" not in str(failure)
+    assert "trop long" not in str(failure)
+
+
+def test_the_joiner_of_an_emoji_is_read():
+    developer = chr(0x1F469) + chr(0x200D) + chr(0x1F4BB)
+    response, _ = ask(
+        answer(
+            content=body(
+                report_with_writing(texts=TEXTS | {"sector": f"Outil {developer}."})
+            )
+        )
+    )
+
+    assert response.chosen[0].texts.sector == f"Outil {developer}."
