@@ -148,6 +148,9 @@ alerte. Le sujet donne l'alerte et son environnement (« [FIRING:1] KbModelCostO
   l'offre gratuite a supprimé ses access policies; le bac à sable a reçu `401 Unauthorized` jusqu'au jeton neuf.
   Le jeton de la production est à refaire de même.
 - **Rétention de 14 jours** sur l'offre gratuite: aucune fenêtre ne la dépasse.
+- **Une erreur de requête laisse l'alerte au repos**: l'import des règles au format Prometheus règle l'état en cas
+  d'erreur ou de délai sur « OK », comme l'absence de données (vu dans la règle importée le 2026-11-08). Si la source
+  ne répond pas, aucune alerte ne part. Le changer dans l'interface ferait diverger le fichier du dépôt.
 - **Le coût est une estimation**: tout appel est compté aux prix de `src/k_b/core/config.py`, le rejeu compris.
 - **L'installation est manuelle**: deux imports et un point de contact, sans jeton. L'API de provisioning des
   alertes de Grafana, qui l'automatiserait, est marquée « deprecated » et demanderait un secret.
