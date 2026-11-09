@@ -1,14 +1,17 @@
-# Monitorage du modèle: tableau de bord et alertes
+# Monitorage du modèle et de l'application: tableau de bord, alertes, journaux
 
 « Rédaction de la documentation technique des procédures d'installation, de maintenance du monitorage du modèle. » — C11
 
 « Rédaction de la documentation utilisateur, pour l'utilisation du monitorage. » — C11
 
+« La documentation couvre la procédure d'installation et de configuration des dépendances pour l'outillage du monitorage de l'application. » — C20
+
 Écrit le 2026-11-08 pour #164. Le monitorage du modèle tient dans deux fichiers du dépôt, que Grafana Cloud importe
 tels quels: le tableau de bord, `observability/grafana/dashboard.json`, et les trois règles d'alerte,
 `observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie en OpenTelemetry depuis
 #162 (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »). Le choix de l'outil est écrit dans
-`docs/outils-de-suivi.md`.
+`docs/outils-de-suivi.md`. Le monitorage de l'application, ses journaux, est dans la section « Journaux de
+l'application » (#165).
 
 ## Ce que le monitorage suit
 
@@ -177,6 +180,149 @@ refaire l'étape 3 d'« Installer », avant l'essai d'accessibilité.
 - **Le coût est une estimation**: tout appel est compté aux prix de `src/k_b/core/config.py`, le rejeu compris.
 - **L'installation est manuelle**: deux imports et un point de contact, sans jeton. L'API de provisioning des
   alertes de Grafana, qui l'automatiserait, est marquée « deprecated » et demanderait un secret.
+
+## Journaux de l'application
+
+Écrit le 2026-11-09 pour #165, d'après le code de `main` au commit `0292266`. Le tableau et les alertes ci-dessus
+suivent le modèle; l'application se suit par ses journaux: ceux de `kb`, de `kb serve-data` (l'API de données) et de
+`kb serve-ai` (l'API IA). En local, ils ne demandent rien à installer: `kb` les écrit par le module `logging` de
+Python. En ligne, ils vont dans l'espace Log Analytics `log-kb`, qu'`infra/main.bicep` crée. Aucune alerte ne les lit
+(« Limites des journaux », plus bas).
+
+### Ce que l'application écrit
+
+| Journal | Ce qu'il contient | En local | En ligne | Code |
+|---|---|---|---|---|
+| journal de `kb` | le déroulé d'une commande, réussites et échecs, une ligne datée par événement | sortie d'erreur et `<KB_DATA_DIR>/logs/kb.log` | sortie d'erreur du job, dans `log-kb` | `src/k_b/commands/run_log.py:21-23`, `:61-83` |
+| journal de `kb serve-data` | son démarrage, ses clients, son arrêt, une ligne par requête | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-data.log` | sortie d'erreur de `ca-kb-data-api`, dans `log-kb` | `src/k_b/cli.py:64-69`, `src/k_b/data_api/app.py:71` |
+| journal de `kb serve-ai` | de même, pour l'API IA | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-ai.log` | sortie d'erreur de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/cli.py:64-69`, `src/k_b/ai_api/app.py:96` |
+| ligne de mesure d'un appel au modèle | une ligne JSON par appel: durée, jetons, coût estimé, états; ni texte ni clé | sortie standard de `kb serve-ai`, aucun fichier | sortie standard de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/ai_api/observability/metrics.py:1-2`, `:35-51` |
+| résultat d'une commande | ce que la commande affiche par `print`, le bilan d'un import par exemple | sortie standard | sortie standard du job, dans `log-kb` | `.claude/rules/conventions.md`, règle 3 |
+
+Deux autres sorties ne sont pas des journaux de fonctionnement. Le journal d'import,
+`<KB_DATA_DIR>/journals/import-journal-<AAAA-MM-JJTHHMMSSZ>.jsonl` (`src/k_b/core/config.py:172-173`), dit ce qu'un
+import a décidé des données (`README.md:286-292`). Les traces et les enregistrements de l'API IA partent vers Grafana
+Cloud avec ses mesures, sous le même réglage (`docs/architecture-api-ia.md`, « Les métriques et les journaux »).
+
+### Lire une ligne
+
+Une ligne s'écrit `<date> <niveau> <module>: <message>` (`src/k_b/commands/run_log.py:30`), la date en ISO 8601, en
+UTC, à la seconde, avec son `Z` (`:84-86`). Le niveau est INFO ou au-dessus (`:95`). Les bibliothèques n'écrivent qu'à
+partir d'un niveau plus haut, car en dessous elles citent l'URL d'un blob ou la connexion à la base: `httpx2` dès
+WARNING; `azure`, `urllib3`, `psycopg` et `psycopg_pool` dès ERROR (`:31-55`, `:96-97`). uvicorn écrit par les mêmes
+sorties, sans son propre journal d'accès (`log_config=None`, `access_log=False`:
+`src/k_b/commands/serve_data_command.py:55-56`, `src/k_b/commands/serve_ai_command.py:107-108`).
+
+La ligne d'une requête donne la méthode, le gabarit de la route (`/items/{item_id}`, jamais le chemin reçu), le
+statut, la durée en ms, le nom du client (`-` sans clé valide) et l'identifiant de la requête, rendu aussi dans
+l'en-tête `X-Request-ID` de la réponse (`src/k_b/core/api_request_log.py:27-33`, `:56-81`). Jamais la clé, une
+valeur de paramètre ni un chemin brut (`:1-2`). Un `/health` qui répond 200 n'est pas écrit; une sonde en échec l'est
+(`:36-38`). Une erreur de la base reprend le même identifiant (`src/k_b/data_api/errors.py:46-56`), et la ligne de
+mesure aussi (`src/k_b/ai_api/observability/metrics.py:65`): il relie une demande à ses erreurs et à ses appels au
+modèle.
+
+Relevé le 2026-11-09 sur un `KB_DATA_DIR` neuf: `kb import`, puis `kb serve-data` et quatre requêtes (`/health`, puis
+trois `/items`, dont une sans clé). Les deux premières lignes viennent de `logs/kb.log`, les deux suivantes de
+`logs/kb-serve-data.log`; le `/health` n'a pas de ligne.
+
+```text
+2026-11-09T13:27:23Z INFO k_b.cli: import started
+2026-11-09T13:27:23Z INFO k_b.purge.run_records: logs and journals purge: 0 files older than 6 months deleted
+2026-11-09T13:27:36Z INFO k_b.core.api_request_log: request method='GET' route=/items status=200 duration_ms=3 client=TERMINAL request_id=e5a0072a-ed6b-403f-b2e8-3e397c677f9b
+2026-11-09T13:27:36Z INFO k_b.core.api_request_log: request method='GET' route=/items status=401 duration_ms=0 client=- request_id=7b915163-04a9-4238-9692-89f5cf161959
+```
+
+### En local: installer et configurer
+
+Rien à installer. Deux variables règlent les journaux:
+
+- `KB_DATA_DIR`, obligatoire et sans défaut: les journaux vont dans son dossier `logs/`
+  (`src/k_b/core/config.py:164-171`), créé au premier lancement (`src/k_b/commands/run_log.py:71-72`).
+- `KB_LOG_TO_FILE`, `true` par défaut (`src/k_b/core/config.py:223-225`), lue par
+  `src/k_b/commands/environment.py:46-58`: `false` écrit sur la sortie d'erreur seule, sans fichier. Une autre valeur
+  arrête la commande en code 2, sans rien lancer: `error: KB_LOG_TO_FILE: 'oui' neither true nor false` (relevé le
+  2026-11-09). Son modèle commenté est dans `.env.example:58-60`.
+
+Une commande dont le fichier de journal ne s'ouvre pas ne se lance pas: `error: log file not opened: …`, code 2
+(`src/k_b/cli.py:199-215`). `kb openapi` et le `--dry-run` des routines n'écrivent aucun journal
+(`src/k_b/cli.py:101-113`). Chaque API a son fichier: une rotation faite par une autre commande laisserait un
+processus long écrire dans le fichier de la veille (`src/k_b/cli.py:64-65`; `docs/specs-api.md`, « Journal »).
+
+**Rotation et durée.** Chaque fichier tourne à minuit UTC: la veille passe dans `kb.log.<AAAA-MM-JJ>` (de même pour
+les deux autres), le jour courant reste dans `kb.log` (`src/k_b/commands/run_log.py:74-81`; nom daté:
+`src/k_b/purge/run_records.py:20-26`). La rotation ne supprime rien. La purge, à la fin de chaque `kb import`,
+supprime les journaux et les journaux d'import dont le jour du nom a plus de 6 mois
+(`src/k_b/purge/run_records.py:33-48`, appelée par `src/k_b/purge/after_import.py:52`; durée:
+`src/k_b/core/config.py:174-178`).
+
+### En local: lire
+
+```sh
+tail -f "$KB_DATA_DIR/logs/kb-serve-ai.log"                  # suivre l'API IA
+grep " ERROR " "$KB_DATA_DIR"/logs/kb.log*                   # les échecs des commandes, jours passés compris
+grep "request_id=<id>" "$KB_DATA_DIR"/logs/kb-serve-*.log    # les lignes d'une requête, par son X-Request-ID
+```
+
+Les lignes de mesure ne vont que sur la sortie standard de `kb serve-ai`: aucun fichier ne les garde
+(`src/k_b/ai_api/observability/metrics.py:50-51`). Les mêmes mesures partent vers Grafana Cloud quand l'export est
+réglé (sections ci-dessus).
+
+### En ligne: installer et configurer
+
+Tout est posé par `infra/main.bicep`, que Sabine applique à la main (`infra/README.md`, « Appliquer »):
+
+- l'espace `log-kb` (`infra/modules/log-analytics.bicep:5-20`): 30 jours de rétention, et un plafond de 0,2 Go par
+  jour, au-delà duquel les journaux du jour sont perdus (`:13-19`);
+- l'environnement `cae-kb` y envoie les journaux des conteneurs par Azure Monitor, sans clé partagée, par le paramètre
+  de diagnostic `logs-to-log-kb`, en deux tables: `ContainerAppConsoleLogs` (sortie standard et sortie d'erreur des
+  conteneurs) et `ContainerAppSystemLogs` (démarrage, tirage de l'image, réveil d'une app à 0 réplique)
+  (`infra/modules/container-apps-environment.bicep:20-24`, `:44-64`; `infra/README.md:310-311`);
+- l'image règle `KB_LOG_TO_FILE=false` et `PYTHONUNBUFFERED=1` (`Dockerfile:42-47`): en conteneur, pas de fichier
+  de journal, la sortie d'erreur est le journal, et une ligne de la sortie standard part aussitôt. Le `KB_DATA_DIR`
+  en ligne est un dossier de l'image, vidé à chaque démarrage (`infra/main.bicep:51-53`).
+
+Y écrivent les deux API, `ca-kb-data-api` et `ca-kb-ai-api` (`infra/main.bicep:165-167`, `:200-202`), et les deux
+jobs, `caj-kb-smoke-test` et `caj-kb-migrate-database` (`infra/main.bicep:237`, `:277`). Aucun job d'`infra/` ne
+lance `kb collect` ni `kb import`.
+
+Pour lire `log-kb`: l'Azure CLI, connectée à l'abonnement (`az login`), et son extension `log-analytics`, qui porte
+`az monitor log-analytics query` (`az extension add --name log-analytics`; message « This command is from the
+following extension: log-analytics », relevé le 2026-11-09 avec azure-cli 2.92.0 et l'extension 1.0.0b3). Les
+lecteurs de l'abonnement (rôle Lecteur) lisent `log-kb` (`docs/registre-traitements.md:195`).
+
+### En ligne: lire
+
+Une ligne arrive dans `log-kb` quelques minutes après son écriture (`infra/README.md:299`). Les journaux d'une API:
+
+```sh
+RG=<groupe de ressources>
+WS=$(az monitor log-analytics workspace show -n log-kb -g "$RG" --query customerId -o tsv)
+az monitor log-analytics query -w "$WS" -o tsv \
+  --analytics-query "ContainerAppConsoleLogs | where TimeGenerated > ago(1h) and ContainerAppName == 'ca-kb-ai-api' | order by TimeGenerated asc" \
+  --query "[].[TimeGenerated, Stream, Log]"
+```
+
+`ca-kb-data-api` à la place pour l'API de données; `isnotempty(JobName)` pour les jobs (`infra/README.md:303-306`);
+`ContainerAppSystemLogs` pour le démarrage et le réveil. La colonne `Stream` vaut `stdout` ou `stderr`: les lignes de
+mesure de l'API IA sont sur `stdout`. `az containerapp job logs show` ne lit qu'une exécution en cours
+(`infra/README.md:299-300`).
+
+Relevé le 2026-11-09, en lecture seule, sur les 30 derniers jours: `ca-kb-data-api`, 50 lignes, et `ca-kb-ai-api`, 65,
+toutes sur `stderr`, la dernière le 2026-11-08 à 00:33 UTC; `caj-kb-smoke-test`, 20 lignes sur `stderr` et 32 sur
+`stdout`; `caj-kb-migrate-database`, 3 sur `stdout`. Aucune ligne `stdout` pour `ca-kb-ai-api`: pas de ligne de
+mesure sur la période.
+
+### Limites des journaux
+
+- **Aucune alerte ne lit les journaux**: ni l'échec d'un job, ni une source muette, ni des réponses 5xx, ni `/health`
+  en ligne. Elles sont portées par #282, ouverte. Un échec ne se voit qu'en lisant le journal.
+- **En local, la purge suit `kb import`**: une machine qui ne lance que les API ne purge jamais `logs/`.
+- **En ligne, `log-kb` est la seule copie**: aucun fichier dans le conteneur, et la purge à 6 mois ne s'y applique
+  pas. Log Analytics efface après 30 jours; au-delà de 0,2 Go dans la journée, les lignes du jour sont perdues.
+- **Les lignes de mesure ne sont gardées nulle part en local**: la sortie standard de `kb serve-ai` va au terminal.
+- **Un seul `kb serve-data` par `KB_DATA_DIR`**: deux, sur deux ports, écriraient le même fichier
+  (`docs/specs-api.md`, « Journal »).
+- **L'export vers Grafana Cloud en ligne** attend le jeton neuf de la production (#522).
 
 ## Sources
 

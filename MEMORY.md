@@ -63,11 +63,6 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   et le réécrit en entier à la fin (`src/k_b/etl/extract.py`) : la dernière collecte qui écrit
   l'emporte. Avec `KB_COLLECT_ONLY`, le Mac (`zotero,clipping`) et les conteneurs (le reste)
   collectent à part ; s'ils partagent l'état (#200), leurs collectes ne doivent pas se chevaucher.
-- **Le README annonce des métriques « gardées sur ma machine » et restituées « par un outil à
-  choisir »** (« Étape 2 », constat de la revue de #5, le 2026-10-18, porté par #165) : contredit
-  l'ADR du 15/10 (décision 8), la règle 4 de `poc.md` (une ligne JSON par appel sur stdout) et
-  l'ADR du 20/10 (décision 4 : OpenTelemetry vers Grafana Cloud, l'outil est choisi). Périmètre de
-  la v0, non corrigé.
 - **La ligne « Sécurité » du registre** (fiche 1) ne dit encore, de ce qui est en ligne, que la base
   (#421, section « Base en ligne ») : les autres données hébergées sur Azure (stockage d'échange, #412
   à #414) y entrent avec la PR qui les héberge (revue de #5, le 2026-10-18).
