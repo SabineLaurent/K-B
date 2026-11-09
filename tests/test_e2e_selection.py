@@ -13,8 +13,10 @@ from pathlib import Path
 
 import pytest
 
+from k_b.ai_api.connectors.metrics_export import ENDPOINT_VARIABLE, HEADERS_VARIABLE
 from k_b.commands.environment import DATA_DIR_VARIABLE, LOG_TO_FILE_VARIABLE
 from k_b.core.api_keys import API_KEY_VARIABLE_PREFIX
+from k_b.core.api_settings import DEPLOYMENT_ENVIRONMENT_VARIABLE
 from k_b.etl.collected_sources import ZOTERO_DIR_VARIABLE
 from k_b.etl.source_kinds import SOURCE_KINDS
 
@@ -91,8 +93,8 @@ def test_pytest_m_e2e_collects_one_end_to_end_test_per_source():
 VALUE_BEYOND = "value-beyond-the-end-to-end-tests"
 
 
-def run_the_zotero_end_to_end_test(variables):
-    """pytest -m e2e -k zotero with the variables given, without KB_ZOTERO_DIR, so that even with
+def run_the_end_to_end_tests_of(keyword, variables):
+    """pytest -m e2e -k keyword with the variables given, without KB_ZOTERO_DIR, so that even with
     the guard broken no real source is called."""
     environment = {
         name: value
@@ -110,7 +112,7 @@ def run_the_zotero_end_to_end_test(variables):
             "-m",
             "e2e",
             "-k",
-            "zotero",
+            keyword,
             str(E2E_DIR),
         ],
         capture_output=True,
@@ -121,13 +123,14 @@ def run_the_zotero_end_to_end_test(variables):
 
 
 def test_the_end_to_end_tests_stop_on_a_variable_beyond_theirs_without_its_value():
-    result = run_the_zotero_end_to_end_test(
+    result = run_the_end_to_end_tests_of(
+        "zotero",
         {
             "KB_LLM_API_KEY": VALUE_BEYOND,
             # Set or removed by the test before any kb: never a reason to stop.
             DATA_DIR_VARIABLE: VALUE_BEYOND,
             LOG_TO_FILE_VARIABLE: VALUE_BEYOND,
-        }
+        },
     )
 
     assert result.returncode == pytest.ExitCode.USAGE_ERROR
@@ -145,12 +148,32 @@ def test_the_end_to_end_tests_stop_on_the_key_of_any_client_without_its_value():
     the tests too."""
     key_variable = f"{API_KEY_VARIABLE_PREFIX}CLIENT_NOT_IN_THE_EXAMPLE"
 
-    result = run_the_zotero_end_to_end_test({key_variable: VALUE_BEYOND})
+    result = run_the_end_to_end_tests_of("zotero", {key_variable: VALUE_BEYOND})
 
     assert result.returncode == pytest.ExitCode.USAGE_ERROR
     assert key_variable in result.stdout
     assert " skipped" not in result.stdout
     assert VALUE_BEYOND not in result.stdout + result.stderr
+
+
+def test_the_end_to_end_test_of_the_export_gets_the_environment_of_the_terminal():
+    """tests/conftest.py removes KB_DEPLOYMENT_ENVIRONMENT from the other tests; the export reads
+    it. A value out of the list, refused by its name, proves it reached the test before any
+    request."""
+    result = run_the_end_to_end_tests_of(
+        "real_export",
+        {
+            ENDPOINT_VARIABLE: "https://otlp.example.invalid/otlp",
+            HEADERS_VARIABLE: "Authorization=Basic%20AAAA",
+            DEPLOYMENT_ENVIRONMENT_VARIABLE: "staging",
+        },
+    )
+
+    assert "1 failed" in result.stdout
+    assert (
+        f"{DEPLOYMENT_ENVIRONMENT_VARIABLE}: 'staging' not sandbox nor production"
+        in result.stdout
+    )
 
 
 def write_marker_test(directory):
