@@ -12,8 +12,8 @@
 ## Le pourquoi
 
 La fiche de monitorage, la description de l'alerte `KbModelLowFidelity` et celle du panneau « Fidélité sur 24 h »
-disaient : « la part des faits des affirmations trouvés dans l'item qu'elles citent ». Une relecture du 08/11 l'a
-jugé faux, et le jury lit ces trois textes. Un fait n'est pas compté trouvé s'il est seulement dans l'item : il doit
+disaient que la fidélité est la part des faits trouvés dans l'item que leur affirmation cite. Une relecture du 08/11
+l'a jugé faux, et le jury lit ces trois textes. Un fait n'est pas compté trouvé s'il est seulement dans l'item : il doit
 être aussi dans le texte où il est affirmé. Et les compteurs lus par l'alerte reçoivent aussi les faits du compte
 rendu des tendances, qui n'ont pas d'item. La PR écrit une seule définition, celle du code, aux trois endroits, et
 corrige le point « Ce que la fidélité mesure aujourd'hui » des limites.
@@ -90,8 +90,8 @@ dans l'item, car un CVE est comparé sous sa forme canonique (`fidelity.py:258-2
 |---|---|
 | `uv run pytest tests/test_grafana_files.py -q` → 17 passed | les deux fichiers Grafana restent conformes (seuil cité, pas d'espace avant `:`) |
 | `uv run pytest -q` → 4091 passed, 332 deselected | rien d'autre n'est cassé |
-| `git grep -n "trouvés dans l'item qu'elles citent"` → aucune ligne | l'ancienne définition a disparu |
-| `git grep -n "leur source: l'item que chacun désigne"` → 3 lignes | la même phrase aux trois endroits |
+| `git grep` de l'ancienne phrase, la commande du critère de fin de la mission → aucune ligne | l'ancienne définition a disparu, de cette note aussi |
+| `git grep -n "leur source: l'item que chacun désigne"` → 4 lignes : les trois de la définition, et celle-ci | la même phrase aux trois endroits |
 | relecture du delta par un sous-agent neuf, contre le code | 4 constats d'exactitude, 3 de style ; 1, 3 et 5 corrigés, les autres laissés (tri de time-knight) |
 
 ## Ce que tu dois pouvoir défendre
