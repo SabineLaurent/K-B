@@ -13,6 +13,7 @@ from urllib.parse import urlsplit, urlunsplit
 import psycopg
 import pytest
 
+from k_b.core.api_settings import DEPLOYMENT_ENVIRONMENT_VARIABLE
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
 from k_b.database.creation import create_database
 from k_b.database.engine import connect_database, open_readers
@@ -39,7 +40,7 @@ KB_SETTINGS_VARIABLES = (
 E2E_MARKER = "e2e"
 # The settings an end-to-end test keeps, given by .env.e2e_test: the export of the metrics labels
 # its measures with the environment (tests/e2e/test_real_export.py).
-END_TO_END_SETTINGS = frozenset({"KB_DEPLOYMENT_ENVIRONMENT"})
+END_TO_END_SETTINGS = frozenset({DEPLOYMENT_ENVIRONMENT_VARIABLE})
 # The marker of the tests that need a PostgreSQL server, given by KB_TEST_POSTGRESQL_URL: the URL
 # of a base of that server whose role may create and drop a base (the CI service, or a server of
 # the developer's machine, never the base of production).

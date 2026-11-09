@@ -13,11 +13,14 @@ from pathlib import Path
 
 import pytest
 
-from k_b.ai_api.connectors.metrics_export import ENDPOINT_VARIABLE, HEADERS_VARIABLE
+from k_b.ai_api.connectors.metrics_export import (
+    ENDPOINT_VARIABLE,
+    HEADERS_VARIABLE,
+    OPENTELEMETRY_VARIABLE_PREFIX,
+)
 from k_b.commands.environment import DATA_DIR_VARIABLE, LOG_TO_FILE_VARIABLE
 from k_b.core.api_keys import API_KEY_VARIABLE_PREFIX
 from k_b.core.api_settings import DEPLOYMENT_ENVIRONMENT_VARIABLE
-from k_b.etl.collected_sources import ZOTERO_DIR_VARIABLE
 from k_b.etl.source_kinds import SOURCE_KINDS
 
 TESTS_DIR = Path(__file__).parent
@@ -94,12 +97,21 @@ VALUE_BEYOND = "value-beyond-the-end-to-end-tests"
 
 
 def run_the_end_to_end_tests_of(keyword, variables):
-    """pytest -m e2e -k keyword with the variables given, without KB_ZOTERO_DIR, so that even with
+    """pytest -m e2e -k keyword with the variables given alone: none of kb, of a client or of
+    OpenTelemetry the terminal exports, so that the guard stops only on those given, and even with
     the guard broken no real source is called."""
+    end_to_end_tests = load_end_to_end_module()
+    names_of_kb = end_to_end_tests.read_variable_names(
+        end_to_end_tests.ENV_EXAMPLE_PATH, end_to_end_tests.VARIABLE_LINE
+    )
     environment = {
         name: value
         for name, value in os.environ.items()
-        if name not in ("PYTEST_ADDOPTS", ZOTERO_DIR_VARIABLE)
+        if name != "PYTEST_ADDOPTS"
+        and name not in names_of_kb
+        and not name.startswith(
+            (API_KEY_VARIABLE_PREFIX, OPENTELEMETRY_VARIABLE_PREFIX)
+        )
     }
     environment.update(variables)
     return subprocess.run(  # noqa: S603 — runs this interpreter on pytest, fixed arguments
@@ -169,6 +181,7 @@ def test_the_end_to_end_test_of_the_export_gets_the_environment_of_the_terminal(
         },
     )
 
+    assert result.returncode == pytest.ExitCode.TESTS_FAILED
     assert "1 failed" in result.stdout
     assert (
         f"{DEPLOYMENT_ENVIRONMENT_VARIABLE}: 'staging' not sandbox nor production"

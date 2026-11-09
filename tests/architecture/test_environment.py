@@ -1,14 +1,18 @@
 """The environment is read in one place, commands/environment.py, called once by cli.py: the commands
-and the readers get it as a parameter (.claude/rules/poc.md, rule 2). Each variable kb reads is
-in .env.example, and each variable of the examples is one kb reads."""
+and the readers get it as a parameter (.claude/rules/poc.md, rule 2). Each variable src/k_b names by
+a constant *_VARIABLE, or by the prefix of its family, is in .env.example, and each variable of the
+examples is one of them: a name read without such a constant escapes these tests."""
 
 import ast
+import importlib
+import pkgutil
 import re
 from pathlib import Path
 
 import pytest
 from module_imports import PACKAGE_DIR
 
+import k_b
 from k_b.ai_api.connectors.metrics_export import OPENTELEMETRY_VARIABLE_PREFIX
 
 # The only module that reads the environment, and the only one that calls it.
@@ -105,30 +109,20 @@ def read_modules():
     }
 
 
-def find_constant_values(code: str, constant_name: re.Pattern[str]) -> set[str]:
-    """The text values of the module constants whose name constant_name matches."""
-    return {
-        node.value.value
-        for node in ast.parse(code).body
-        if isinstance(node, ast.Assign)
-        and isinstance(node.value, ast.Constant)
-        and isinstance(node.value.value, str)
-        and any(
-            isinstance(target, ast.Name) and constant_name.fullmatch(target.id)
-            for target in node.targets
-        )
-    }
-
-
 def find_read_variables():
-    """The variables src/k_b reads, and the prefixes of the families it reads, refused ones aside."""
-    codes = read_modules().values()
-    variables = set().union(
-        *(find_constant_values(code, VARIABLE_CONSTANT) for code in codes)
-    )
-    prefixes = set().union(
-        *(find_constant_values(code, VARIABLE_PREFIX_CONSTANT) for code in codes)
-    )
+    """The values of the constants *_VARIABLE and *_VARIABLE_PREFIX of each module of src/k_b,
+    imported to evaluate f-strings and annotated constants; refused prefixes aside. Importing the
+    172 modules reached no network and read no KB_ variable (measured on 2026-11-09)."""
+    variables, prefixes = set(), set()
+    for module_info in pkgutil.walk_packages(k_b.__path__, "k_b."):
+        module = importlib.import_module(module_info.name)
+        for name, value in vars(module).items():
+            if not isinstance(value, str):
+                continue
+            if VARIABLE_PREFIX_CONSTANT.fullmatch(name):
+                prefixes.add(value)
+            elif VARIABLE_CONSTANT.fullmatch(name):
+                variables.add(value)
     return variables, prefixes - REFUSED_PREFIXES
 
 
