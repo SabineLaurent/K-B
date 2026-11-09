@@ -41,7 +41,7 @@ deux fichiers d'état (choix 71), `kb create-db` et `kb migrate-database`, les p
 dernier extrait Zotero par `kb collect`, la suppression des classements remplacés par `kb write-tops`, et les
 commandes que relancent les deux routines.
 
-Un diagramme de flux de données dessine ce qui circule, pas qui appelle qui. Le sens compte ici : c'est l'API IA qui
+Une flèche suit le sens des données, pas celui de l'appel. Le sens compte ici : c'est l'API IA qui
 appelle l'API de données (`src/k_b/ai_api/connectors/data_api_client.py:266-270`, `send(http_client, ITEMS_PATH, …)`),
 mais les items vont dans l'autre sens. La légende le dit avant le diagramme, pour qu'une flèche ne soit pas lue comme un
 appel. Trois états, deux traits : la première version n'en avait que deux (« fait » et « codé »), et la relecture a
@@ -72,7 +72,7 @@ sa place est réservée par un commentaire, `src/k_b/commands/daily_routine_comm
 
 Sa flèche dit donc « pas encore codé (#425) ». La lecture choisie est un groupe, et non un conteneur nommé, à la
 demande de Sabine après lecture de la PR : #420 y prévoit deux conteneurs montants, les clips et les copies de Zotero,
-dont le nom définitif se décidera dans #420. Dessiner un seul conteneur `clippings` laissait Zotero hors du flux en
+que #420 nomme `clippings` et `zotero` ; Sabine garde ces noms hors du dessin jusqu'à #420. Dessiner un seul conteneur `clippings` laissait Zotero hors du flux en
 ligne.
 
 ### Une description en texte qui suit le même ordre
@@ -112,10 +112,10 @@ ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'
 | Le chemin du code, commande par commande | demande de Sabine après lecture de la PR : une flèche est un appel du code, avec son `fichier:ligne` | la vue d'ensemble de la première version : elle sautait les fichiers d'état, les purges et les commandes que relancent les routines |
 | Les deux fichiers d'état dessinés, les journaux cités seulement | choix 71 de Sabine : `collection_state.json` et `trend_reports.json` décident de ce qui circule ; aucune commande ne relit un journal, sauf la purge | dessiner les journaux : des flèches sans donnée de la veille |
 | `kb create-db` et `kb migrate-database` dessinés, `kb openapi` cité | tranché par time-knight : les deux premières écrivent la base ; `kb openapi` écrit un fichier du dépôt | dessiner `kb openapi` |
-| `GET /health` et les jetons de l'identité managée cités, pas dessinés | ils ne portent pas de donnée de la veille | quatre flèches de plus, sans donnée |
-| Les flèches suivent les données | c'est un diagramme de flux de données, la demande de la revue | les flèches des appels : l'API IA → l'API de données, à rebours des items |
+| `GET /health` et les jetons de l'identité managée cités, pas dessinés | ils ne portent pas de donnée de la veille | six flèches de plus au moins, sans donnée |
+| Le sens d'une flèche est celui des données | c'est un diagramme de flux de données, la demande de la revue | le sens des appels : l'API IA → l'API de données, à rebours des items ; seules les flèches « lance » des routines sont des appels sans donnée |
 | Trois états (plein, pointillés, pointillés « pas encore codé ») | `main` a les trois ; le critère demande le stockage d'échange, en ligne pour une part seulement | tout en plein : décrirait le plan ; omettre le non-codé : le flux Mac ↔ stockage disparaîtrait |
-| La lecture choisie en groupe, sans nom de conteneur | demande de Sabine après lecture de la PR : #420 prévoit deux conteneurs montants, clips et Zotero, au nom encore à décider | un seul conteneur `clippings` : Zotero disparaissait du flux en ligne |
+| La lecture choisie en groupe, sans nom de conteneur | demande de Sabine après lecture de la PR : #420 prévoit deux conteneurs montants, `clippings` et `zotero` ; Sabine garde leurs noms hors du dessin jusqu'à #420 | un seul conteneur `clippings` : Zotero disparaissait du flux en ligne |
 | L'interface web absente | décision de Sabine du 09/11 : la fiche décrit `main`, où elle n'existe pas | la dessiner en pointillés : rien n'en est codé |
 | Une seule fiche, renvois aux fiches existantes (installation, tests, API IA, livraison) | critère de fin de #511 ; deux copies divergeraient | recopier leur détail |
 | Les corrections de chaque relecture en un commit | la seconde relecture porte sur le delta d'un seul commit (`9a173a8..ed09991`) | un commit par constat : 26 commits de doc pour une fiche |
@@ -129,7 +129,7 @@ ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'
 | 12 liens relatifs, 12 fichiers qui existent | aucun renvoi mort |
 | `git diff --stat origin/main -- docs/ README.md` → vide (avant cette note) | la fiche ne touche ni `docs/` ni le README |
 | `uv run pytest tests/architecture/` → `243 passed` | les interdits du tableau des couches sont tenus à `d7e5b22` |
-| quatre sous-agents en lecture seule tracent les dix commandes de `cli.py` ; la session revérifie une cinquantaine de leurs renvois : un seul ne visait pas l'appel (`metrics_export.py:105-112`, le refus des variables `OTEL_*`), remplacé par `:301` | chaque flèche du chemin du code a sa ligne |
+| les treize commandes de `cli.py` sont tracées : dix par quatre sous-agents en lecture seule, trois par la session ; la session revérifie une cinquantaine de leurs renvois ; deux ne visaient pas l'appel : `metrics_export.py:105-112` (le refus des variables `OTEL_*`), remplacé par `:301`, trouvé par la session, et `github_client.py:155-161` (la construction du client), remplacé par `:173`, trouvé par la relecture | chaque flèche du chemin du code a sa ligne |
 | première relecture, en deux passes (5 constats, 3 retenus ; puis 18 et 1 de la session, tous retenus), puis seconde sur le delta (4 constats, retenus), triées par time-knight | chaque flèche et chaque renvoi relus contre le code |
 
 La note elle-même est dans `docs/journaling/` : c'est le seul fichier de `docs/` que la PR ajoute.
@@ -154,7 +154,7 @@ La note elle-même est dans `docs/journaling/` : c'est le seul fichier de `docs/
 
 ## Zones non vérifiées
 
-- Le rendu du Mermaid sur GitHub, et la lisibilité d'un diagramme d'une quarantaine de flèches : pas encore vus.
+- Le rendu du Mermaid sur GitHub, et la lisibilité d'un diagramme de 34 flèches : pas encore vus.
 - L'état réel d'Azure : la fiche lit le Bicep et `infra/deployment.json`, pas les ressources en ligne
   (`az … show` non lancé).
 - L'intitulé de C17 est recopié du critère de fin de #511 : le référentiel lui-même, hors du dépôt, n'a pas été relu.

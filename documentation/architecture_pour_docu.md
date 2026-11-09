@@ -15,11 +15,11 @@ de la livraison sur Azure dans [la fiche de la livraison continue](livraison_con
 ## Le flux des données
 
 Le diagramme suit le chemin du code. Un rectangle est une commande `kb`, un cylindre un fichier, une base ou un
-conteneur, un rectangle arrondi un service extérieur. Une flèche est une lecture, une écriture ou un appel que fait
-la commande, dans le sens où vont les données: l'API IA appelle l'API de données, et les items vont de l'API de
-données à l'API IA. Un trait plein est un flux que le code fait aujourd'hui. Un trait en pointillés n'est pas encore
-en ligne: il est codé, sauf si son étiquette dit « pas encore codé ». Un conteneur ou un groupe bordé de pointillés
-n'est pas encore créé.
+conteneur, un rectangle arrondi un service extérieur ou le Mac. Une flèche est une lecture, une écriture ou un appel que
+fait la commande, dans le sens où vont les données: l'API IA appelle l'API de données, et les items vont de l'API de
+données à l'API IA. Un trait plein est un flux que le code fait aujourd'hui. Un trait en pointillés n'est pas encore en
+ligne: il est codé, sauf si son étiquette dit « pas encore codé ». Un conteneur ou un groupe bordé de pointillés n'est
+pas encore créé.
 
 ```mermaid
 flowchart LR
@@ -105,7 +105,7 @@ Le diagramme se lit ainsi, dans l'ordre des flux:
    `etl/extract.py:60`, `:69`). Il lance chaque source, puis écrit ce qu'elle rend tel quel dans le brut, sous
    `KB_DATA_DIR/raw/` (`commands/collect_command.py:37-59`, `etl/extract.py:129`, `:139`). Pour Zotero, il relit
    d'abord le dernier extrait du brut, et n'écrit rien si le nouveau est le même (`etl/sources/zotero.py:225`). À
-   la fin, il récrit l'état, avec la date du jour pour chaque source collectée (`etl/extract.py:90`, `:94`;
+   la fin, il récrit l'état, avec l'heure de la collecte pour chaque source collectée (`etl/extract.py:90`, `:94`;
    `etl/raw_store.py:220`). Les sources sont sept origines de données: l'API GitHub (releases des dépôts suivis,
    alertes de sécurité, dépôts les plus étoilés et les plus forkés), l'API arXiv, le fichier CSV de la CISA, les
    pages de tldr.tech, GH Archive sur BigQuery, la base de Zotero et le dossier `Clippings/` du coffre
@@ -116,26 +116,29 @@ Le diagramme se lit ainsi, dans l'ordre des flux:
    `etl/sources/zotero.py:275`, `etl/sources/clipping.py:103`.
 2. **Du brut à l'import, puis à la base.** `kb create-db` crée la base et ses tables
    (`commands/create_db_command.py:34`); `kb migrate-database` la crée si elle n'a pas encore ses tables, et la
-   laisse telle quelle sinon (`commands/migrate_database_command.py:31`). `kb import` lit dans la base le registre
+   laisse telle quelle sinon (`commands/migrate_database_command.py:31`). Les deux remplissent aussi la table des
+   sources (`database/creation.py:61`, `:124`); sur PostgreSQL, `kb migrate-database` donne aussi leurs droits aux
+   rôles (`:103`). `kb import` lit dans la base le registre
    des fichiers déjà importés, la table `raw_data` (`etl/load.py:52-55`), puis les pages du brut qui n'y sont pas
-   (`etl/raw_reading.py:53`, `:126`). Il les convertit en items, puis les écrit dans la base en une transaction
+   (`etl/raw_reading.py:53`, `:111`, `:126`). Il les convertit en items, puis les écrit dans la base en une transaction
    (`etl/pipeline.py:51-82`, `etl/load.py:60-96`). Les deux classements des dépôts les plus étoilés et les plus
    forkés n'entrent pas dans la base: ils n'ont pas de lecteur (`etl/source_kinds.py:66-77`). Après l'import, les
-   purges suppriment du brut et de la base ce qui a passé sa durée (`purge/after_import.py:43-52`,
-   `purge/catalogs.py:33`, `purge/raw.py:34`).
+   purges suppriment du brut et de la base ce qui a passé sa durée, et du brut les catalogues remplacés; elles
+   retirent aussi du registre les fichiers disparus (`purge/after_import.py:43-52`, `:51`, `purge/catalogs.py:33`,
+   `purge/raw.py:34`).
 3. **De la base aux deux API.** `kb serve-data` lit la base en lecture seule et sert les items et les tendances
    (`database/engine.py:58-87`, `database/reading.py:329`, `:416`, `:519`). `kb serve-ai` ne lit jamais la base:
    il demande les items et les tendances à l'API de données, par HTTP
    (`ai_api/connectors/data_api_client.py:266-268`, `:289`, `:308`).
 4. **De l'API IA au modèle.** L'API IA envoie les items au modèle et reçoit ses textes, par le chemin
    `chat/completions` (`ai_api/connectors/llm_client.py:40`, `:436`). Pour les tendances, elle lit aussi sur l'API
-   GitHub la fiche de chaque candidat et le README des dépôts choisis (`ai_api/connectors/github_client.py:155-161`,
+   GitHub la fiche de chaque candidat et le README des dépôts choisis (`ai_api/connectors/github_client.py:173`,
    `:191`). Elle envoie ses mesures, ses traces et leurs journaux en OpenTelemetry (OTLP) vers Grafana Cloud
    (`ai_api/connectors/metrics_export.py:301`, `ai_api/connectors/trace_export.py:124`, `:134`).
 5. **L'écriture dans le coffre.** `kb digest` envoie `POST /digests` à l'API IA, puis écrit une fiche par sujet,
    `veille/<sujet>/AAAA-MM-JJ.md` (`post/ai_api_client.py:226`, `commands/digest_command.py:118`). Il ne tient pas
    de registre: l'API IA prend une fenêtre de `KB_DIGEST_WINDOW_DAYS` jours, 3 par défaut
-   (`core/config.py:329-330`). `kb trend-report` lit d'abord le registre des comptes rendus,
+   (`ai_api/settings.py:36`, `core/config.py:329-330`). `kb trend-report` lit d'abord le registre des comptes rendus,
    `KB_DATA_DIR/trend_reports.json`, dont le dernier donne la période suivante (`post/trend_report_registry.py:26`,
    `:62`; `commands/trend_report_command.py:73`, `:134`). Il envoie `POST /trend-reports`
    (`post/trend_report_client.py:219-224`), écrit le compte rendu sous `veille/tendances/`
@@ -144,21 +147,23 @@ Le diagramme se lit ainsi, dans l'ordre des flux:
    fiches sous `veille/tops/`, puis supprime du brut les classements remplacés, sans modèle ni base
    (`post/top_sheets.py:58`, `:70`, `:73`, `:92`). Seule la commande `kb` écrit dans le coffre, jamais une API.
 6. **Le stockage d'échange en ligne.** Aujourd'hui, seul le conteneur `smoke-test` existe en ligne
-   (`infra/modules/exchange-storage.bicep:39-46`): `kb smoke-test` le liste et n'écrit que le nombre de blobs de
-   sa première page, 100 au plus (`commands/smoke_test_command.py:1-3`, `:141`, `core/config.py:552`). #420
-   prévoit le reste, que rien ne crée encore: la lecture choisie, où le Mac déposera les clips et les copies de
-   Zotero, et le conteneur `watch`, où les jobs publieront `veille/`. Les deux routines relancent les commandes
-   dans le même processus (`commands/job_routine.py:4-6`). `kb daily-routine` copie les clips dans le coffre du
-   job, puis lance `kb collect`, `kb import` et `kb write-tops`, puis publie `veille/`
-   (`commands/daily_routine_command.py:42-69`, `commands/job_transfers.py:38`, `jobs/clip_mirror.py:241`).
+   (`infra/modules/exchange-storage.bicep:39-46`): `kb smoke-test` le liste et n'écrit que le nombre de blobs de sa
+   première page, 100 au plus (`commands/smoke_test_command.py:1-3`, `:141`, `core/config.py:552`). #420 prévoit le
+   reste, que rien ne crée encore: la lecture choisie, où le Mac déposera les clips et les copies de Zotero, et le
+   conteneur `watch`, où les jobs publieront `veille/`. Les deux routines relancent les commandes dans le même processus
+   (`commands/job_routine.py:4-6`). `kb daily-routine` copie les clips dans le coffre du job, puis lance `kb collect`,
+   `kb import` et `kb write-tops`, puis publie `veille/`; `kb import` est sauté si `kb collect` échoue ou ne démarre pas
+   (`commands/daily_routine_command.py:43-69`, `:57`, `commands/job_transfers.py:38`, `jobs/clip_mirror.py:241`).
    `kb digest-watch` lance `kb digest` et `kb trend-report`, puis publie `veille/`
-   (`commands/digest_watch_command.py:59-81`). La publication lit `veille/` et ajoute au conteneur `watch` les
-   fiches qui n'y sont pas, sans en remplacer (`commands/job_transfers.py:68`, `jobs/watch_publication.py:146`).
-   La copie de Zotero dans le job n'est pas encore codée: elle viendra entre le miroir des clips et `kb collect`
-   (#425, `commands/daily_routine_command.py:50`). Dans un job, le coffre est le dossier `KB_VAULT_DIR` du job, pas
-   celui du Mac. Ces deux jobs ne sont déclarés en ligne ni dans `infra/deployment.json`, ni dans
-   `infra/main.bicep`. L'envoi des clips et des copies de Zotero depuis le Mac, et la relecture de `watch` par le
-   Mac, ne sont pas encore codés: ils viendront par `make upload-library` et `make download-watch-sheets` (#424).
+   (`commands/digest_watch_command.py:59-81`). La publication lit `veille/` et ajoute au conteneur `watch` les fiches
+   qui n'y sont pas, sans en remplacer (`commands/job_transfers.py:68`, `jobs/watch_publication.py:138`, `:146`). La
+   copie de Zotero dans le job n'est pas encore codée: elle viendra entre le miroir des clips et `kb collect` (#425,
+   `commands/daily_routine_command.py:50`). #425 la prévoit dans un dossier temporaire, que `KB_ZOTERO_DIR` nomme pour
+   `kb collect`: la flèche « pose la copie » va vers ce dossier, pas vers le Zotero du Mac. Dans un job, le coffre est
+   le dossier `KB_VAULT_DIR` du job, pas celui du Mac. Ces deux jobs ne sont déclarés en ligne ni dans
+   `infra/deployment.json`, ni dans `infra/main.bicep`. L'envoi des clips et des copies de Zotero depuis le Mac, et la
+   relecture de `watch` par le Mac, ne sont pas encore codés: ils viendront par `make upload-library` et
+   `make download-watch-sheets` (#424).
 
 Les journaux restent hors du dessin: aucune commande ne les relit, sauf la purge, qui les supprime d'après la date
 de leur nom (`purge/run_records.py:38`, `:75`). Ce sont les journaux de fonctionnement, sous `KB_DATA_DIR/logs/`
@@ -169,7 +174,13 @@ donnée de la veille: `GET /health`, par lequel `kb smoke-test` vérifie les deu
 réveille (`commands/smoke_test_command.py:80-81`, `commands/digest_watch_command.py:60-64`), et la demande d'un
 jeton à l'identité managée (`jobs/exchange_storage.py:157`, `database/entra.py:57`). `kb openapi` écrit le contrat
 des deux API dans le dépôt, `docs/api/openapi-donnees.json` et `docs/api/openapi-ia.json`
-(`commands/openapi_command.py:30-32`, `:50`).
+(`commands/openapi_command.py:30-32`, `:50`). Les contrôles du coffre avant une écriture restent hors du dessin
+aussi: ils ne lisent que l'existence d'un fichier. `kb digest` et `kb trend-report` refusent de redemander une fiche
+du jour déjà écrite (`commands/digest_command.py:70`, `commands/trend_report_command.py:135`), `kb write-tops`
+contrôle ses dossiers avant et après l'écriture (`post/top_sheets.py:59-60`, `:71-72`), et le miroir des clips
+compare chaque clip du coffre à son blob (`jobs/clip_mirror.py:231-233`). Avec `KB_LLM_PROVIDER=replay`, l'API IA
+ne joint pas le modèle: elle rejoue les réponses du fichier `KB_LLM_REPLAY_FILE`
+(`ai_api/connectors/llm_settings.py:29`, `ai_api/connectors/llm_replay.py:70`).
 
 ## Les couches du code
 
