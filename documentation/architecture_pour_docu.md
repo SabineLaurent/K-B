@@ -4,7 +4,7 @@
 
 Cette fiche décrit l'architecture applicative de K-B en entier: le flux des données de bout en bout, en bref puis en
 détail, les couches du code, puis chaque partie, de la collecte au déploiement sur Azure. Elle est écrite d'après le
-code de `main` au commit `d7e5b22` (2026-11-09), dont `src/` et `infra/` sont ceux du commit `cbada1e`. Les chemins du
+code de `main` au commit `0292266` (2026-11-09), dont `infra/` est celui du commit `cbada1e`. Les chemins du
 code de K-B (`etl/…`, `commands/…`, `database/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 L'installation de l'environnement de développement, les dépendances et leur configuration sont dans
@@ -176,7 +176,7 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
    retirent aussi du registre les fichiers disparus (`purge/after_import.py:43-52`, `:51`, `purge/catalogs.py:33`,
    `purge/raw.py:34`).
 3. **De la base aux deux API.** `kb serve-data` lit la base en lecture seule et sert les items et les tendances
-   (`database/engine.py:58-87`, `database/reading.py:329`, `:416`, `:519`). `kb serve-ai` ne lit jamais la base:
+   (`database/engine.py:58-87`, `database/reading.py:339`, `:433`, `:553`). `kb serve-ai` ne lit jamais la base:
    il demande les items et les tendances à l'API de données, par HTTP
    (`ai_api/connectors/data_api_client.py:266-268`, `:289`, `:308`).
 4. **De l'API IA au modèle.** L'API IA envoie les items au modèle et reçoit ses textes, par le chemin
@@ -302,7 +302,7 @@ Le modèle de la base est dans [`docs/stockage.md`](../docs/stockage.md).
 |---|---|---|
 | Commande | `kb serve-data` | `kb serve-ai` |
 | Adresse par défaut, sur le Mac | `127.0.0.1:8000` (`core/config.py:207-208`) | `127.0.0.1:8001` (`core/config.py:283-284`) |
-| Routes | `GET /items` (`data_api/routers/item_router.py:95`), `GET /items/{item_id}` (`:126`), `GET /trends` (`data_api/routers/trend_router.py:23`) | `POST /digests` (`ai_api/routers/digest_router.py:46`), `POST /trend-reports` (`ai_api/routers/trend_report_router.py:61`) |
+| Routes | `GET /items` (`data_api/routers/item_router.py:96`), `GET /items/{item_id}` (`:127`), `GET /trends` (`data_api/routers/trend_router.py:23`) | `POST /digests` (`ai_api/routers/digest_router.py:46`), `POST /trend-reports` (`ai_api/routers/trend_report_router.py:61`) |
 | Sans clé | `GET /health` (`data_api/app.py:75`) | `GET /health` (`ai_api/app.py:100`) |
 | Clients | chacun sa clé, `KB_DATA_API_KEY_<CLIENT>` (`core/api_keys.py:12`); l'API IA est le client `AI_DIGEST` (`ai_api/connectors/data_api_settings.py:15`) | `kb digest`, client `KB_DIGEST`, pour `POST /digests`; `kb trend-report`, client `KB_TREND_REPORT`, pour `POST /trend-reports` (`core/config.py:300-305`) |
 | Lit | la base, en lecture seule (`database/engine.py:58-87`) | l'API de données, le modèle, l'API GitHub |
@@ -487,11 +487,11 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
 
 ## Vérifier cette fiche
 
-Depuis la racine du dépôt, au commit `d7e5b22` (`git switch --detach d7e5b22`):
+Depuis la racine du dépôt, au commit `0292266` (`git switch --detach 0292266`):
 
 ```sh
-# src/ et infra/ inchangés depuis cbada1e: aucune ligne attendue.
-git diff --stat cbada1e d7e5b22 -- src/ infra/
+# infra/ inchangé depuis cbada1e: aucune ligne attendue.
+git diff --stat cbada1e 0292266 -- infra/
 # Les couches et les imports de chaque paquet.
 uv run pytest tests/architecture/
 # Les commandes de kb.
@@ -509,5 +509,5 @@ grep -n -A2 "containers@" infra/modules/exchange-storage.bicep
 grep -n "RoutineStep(" -A1 src/k_b/commands/daily_routine_command.py src/k_b/commands/digest_watch_command.py
 ```
 
-Un `fichier:ligne` se relit sans changer de commit: `git show d7e5b22:<chemin> | sed -n '<début>,<fin>p'`, avec
+Un `fichier:ligne` se relit sans changer de commit: `git show 0292266:<chemin> | sed -n '<début>,<fin>p'`, avec
 `src/k_b/` devant un chemin du code de K-B.

@@ -116,9 +116,9 @@ Une règle d'architecture écrite sans test peut être fausse sans que rien ne l
 ### Une fiche qui se vérifie
 
 `documentation/architecture_pour_docu.md:488-513`, « Vérifier cette fiche », donne les commandes qui retrouvent ses
-faits au commit `d7e5b22` : les tests d'architecture, les sources, les routes, les 15 tables, ce qui est déclaré en
+faits au commit `0292266` : les tests d'architecture, les sources, les routes, les 15 tables, ce qui est déclaré en
 ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'appui ». La fiche date son code : `main`
-à `d7e5b22`, dont `src/` et `infra/` sont ceux de `cbada1e` (`git diff --stat cbada1e d7e5b22 -- src/ infra/` vide).
+à `0292266`, dont `infra/` est celui de `cbada1e` (`git diff --stat cbada1e 0292266 -- infra/` vide).
 
 ## Choix faits et options écartées
 
@@ -145,7 +145,7 @@ ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'
 | script Python : aucun caractère `Cc` ou `Cf` hors tabulation et saut de ligne | aucun caractère invisible |
 | 12 liens relatifs, 12 fichiers qui existent | aucun renvoi mort |
 | `git diff --stat origin/main -- docs/ README.md` → vide (avant cette note) | la fiche ne touche ni `docs/` ni le README |
-| `uv run pytest tests/architecture/` → `243 passed` | les interdits du tableau des couches sont tenus à `d7e5b22` |
+| `uv run pytest tests/architecture/` → `243 passed` | les interdits du tableau des couches sont tenus à `0292266` |
 | les treize commandes de `cli.py` sont tracées : dix par quatre sous-agents en lecture seule, trois par la session ; la session revérifie une cinquantaine de leurs renvois ; deux ne visaient pas l'appel : `metrics_export.py:105-112` (le refus des variables `OTEL_*`), remplacé par `:301`, trouvé par la session, et `github_client.py:155-161` (la construction du client), remplacé par `:173`, trouvé par la relecture | chaque flèche du chemin du code a sa ligne |
 | les quatre blocs Mermaid rendus en local par mermaid-cli 11.17.0 : aucune erreur, PNG montrés à Sabine | la syntaxe se rend, `style` d'un sous-graphe compris |
 | première relecture, en deux passes (5 constats, 3 retenus ; puis 18 et 1 de la session, tous retenus), puis seconde sur le delta (4 constats, retenus) ; relecture du flux le long du code (19 constats retenus, 47db667) ; relecture des trois schémas (22 retenus, le 23e en « Not verified ») ; toutes triées par time-knight | chaque flèche et chaque renvoi relus contre le code |
