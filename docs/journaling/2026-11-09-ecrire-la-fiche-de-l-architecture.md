@@ -20,20 +20,31 @@ Le référentiel demande une documentation technique (C17), et aucune ne décriv
 
 ## Le comment
 
-### Un diagramme qui suit le chemin du code
+### Trois schémas, du plus simple au plus détaillé
 
-`documentation/architecture_pour_docu.md:17-22` :
+La fiche porte trois schémas, chacun dans sa section, avec les mêmes noms d'un schéma à l'autre (choix 72 de Sabine,
+le 09/11) : le flux en bref, pour un lecteur qui ne connaît pas K-B, dix boîtes en mots courants, sans nom de commande
+ni de fichier (`documentation/architecture_pour_docu.md:15-46`) ; le flux en détail, tracé dans le code, en deux
+dessins, des sources au coffre puis les jobs en ligne et le stockage d'échange (`:47-228`) ; le déploiement sur
+Azure, d'après `infra/` et `deploy.yml` : où est quoi, ce qui s'y passe, les identités et leurs rôles (`:362-453`).
+Un seul dessin pour tout le flux se lisait mal : rendu en local par mermaid-cli, ses 34 flèches se croisaient, et le
+groupe des sources s'étirait sur toute la largeur.
+
+### Le flux en détail suit le chemin du code
+
+`documentation/architecture_pour_docu.md:49-55` :
 
 ```markdown
-Le diagramme suit le chemin du code. Un rectangle est une commande `kb`, un cylindre un fichier, une base ou un
-conteneur, un rectangle arrondi un service extérieur. Une flèche est une lecture, une écriture ou un appel que fait
-la commande, dans le sens où vont les données: l'API IA appelle l'API de données, et les items vont de l'API de
-données à l'API IA. Un trait plein est un flux que le code fait aujourd'hui. Un trait en pointillés n'est pas encore
-en ligne: il est codé, sauf si son étiquette dit « pas encore codé ». Un conteneur ou un groupe bordé de pointillés
-n'est pas encore créé.
+Les deux schémas suivants suivent le chemin du code: le premier va des sources au coffre, le second montre les jobs
+en ligne et le stockage d'échange. Un rectangle est une commande `kb`, un cylindre un fichier, une base ou un
+conteneur, un rectangle arrondi un service extérieur ou le Mac. Une flèche est une lecture, une écriture ou un appel
+que fait la commande, dans le sens où vont les données: l'API IA appelle l'API de données, et les items vont de l'API
+de données à l'API IA. Un trait plein est un flux que le code fait aujourd'hui. Un trait en pointillés n'est pas
+encore en ligne: il est codé, sauf si son étiquette dit « pas encore codé ». Un conteneur ou un groupe bordé de
+pointillés n'est pas encore créé.
 ```
 
-Le diagramme part de chaque commande de `src/k_b/cli.py` (`RUN_BY_COMMAND`, `run_command`) et suit ses appels jusqu'à
+Le flux en détail part de chaque commande de `src/k_b/cli.py` (`RUN_BY_COMMAND`, `run_command`) et suit ses appels jusqu'à
 chaque lecture et chaque écriture : fichier, base, API, modèle, coffre, conteneur. C'est la demande de Sabine après
 lecture de la PR, dont la première version donnait une vue d'ensemble : une flèche du dessin doit être un appel du
 code, avec son `fichier:ligne` dans le texte. Ce tracé a fait entrer ce que la vue d'ensemble ne montrait pas : les
@@ -50,7 +61,7 @@ bord en pointillés d'un conteneur ou d'un groupe dit autre chose : la ressource
 
 ### Le stockage d'échange : dire ce qui existe en ligne
 
-`documentation/architecture_pour_docu.md:69-98` dessine le stockage d'échange : le conteneur `smoke-test`, le groupe
+`documentation/architecture_pour_docu.md:108-144` dessine le stockage d'échange : le conteneur `smoke-test`, le groupe
 « Lecture choisie (clips, Zotero), prévue par #420 » et le conteneur `watch`. Seul `smoke-test` a un bord plein. Le
 Bicep n'en crée qu'un, `infra/modules/exchange-storage.bicep:39-42` :
 
@@ -77,14 +88,14 @@ ligne.
 
 ### Une description en texte qui suit le même ordre
 
-`documentation/architecture_pour_docu.md:101-161` reprend le diagramme en six points, les six flux du critère de fin,
+`documentation/architecture_pour_docu.md:146-211` reprend les deux dessins en six points, les six flux du critère de fin,
 dans le même ordre. C'est l'alternative textuelle d'une image (#167, RGAA) : un lecteur d'écran ne lit pas un
 `flowchart` Mermaid, et le texte porte aussi les renvois `fichier:ligne` que les étiquettes du diagramme n'ont pas la
 place de porter.
 
 ### Les couches : ce que les tests interdisent, pas ce qu'on souhaite
 
-Le tableau des paquets (`documentation/architecture_pour_docu.md:181-192`) donne, pour chacun, l'interdit que tient un
+Le tableau des paquets (`documentation/architecture_pour_docu.md:237-248`) donne, pour chacun, l'interdit que tient un
 test de `tests/architecture/`, avec sa ligne. Par exemple l'API IA, `tests/architecture/test_apis.py:118-121` :
 
 ```python
@@ -99,7 +110,7 @@ Une règle d'architecture écrite sans test peut être fausse sans que rien ne l
 
 ### Une fiche qui se vérifie
 
-`documentation/architecture_pour_docu.md:316-341`, « Vérifier cette fiche », donne les commandes qui retrouvent ses
+`documentation/architecture_pour_docu.md:465-490`, « Vérifier cette fiche », donne les commandes qui retrouvent ses
 faits au commit `d7e5b22` : les tests d'architecture, les sources, les routes, les 15 tables, ce qui est déclaré en
 ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'appui ». La fiche date son code : `main`
 à `d7e5b22`, dont `src/` et `infra/` sont ceux de `cbada1e` (`git diff --stat cbada1e d7e5b22 -- src/ infra/` vide).
@@ -109,6 +120,7 @@ ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'
 | Choix retenu | Pourquoi | Écarté, et pourquoi |
 |---|---|---|
 | Mermaid dans le `.md` | format fixé par la mission du 09/11 : GitHub le rend, le texte se relit en revue | une image : ne se relit pas ligne à ligne, se périme sans que le diff le montre |
+| Trois schémas : en bref, en détail, le déploiement sur Azure | choix 72 de Sabine : un lecteur néophyte, le flux de données (C15.3), l'environnement d'exécution (C15.1) | un dessin unique : 34 flèches croisées au rendu ; deux dessins de flux sans vue simple ni vue d'Azure |
 | Le chemin du code, commande par commande | demande de Sabine après lecture de la PR : une flèche est un appel du code, avec son `fichier:ligne` | la vue d'ensemble de la première version : elle sautait les fichiers d'état, les purges et les commandes que relancent les routines |
 | Les deux fichiers d'état dessinés, les journaux cités seulement | choix 71 de Sabine : `collection_state.json` et `trend_reports.json` décident de ce qui circule ; aucune commande ne relit un journal, sauf la purge | dessiner les journaux : des flèches sans donnée de la veille |
 | `kb create-db` et `kb migrate-database` dessinés, `kb openapi` cité | tranché par time-knight : les deux premières écrivent la base ; `kb openapi` écrit un fichier du dépôt | dessiner `kb openapi` |
@@ -130,6 +142,7 @@ ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'
 | `git diff --stat origin/main -- docs/ README.md` → vide (avant cette note) | la fiche ne touche ni `docs/` ni le README |
 | `uv run pytest tests/architecture/` → `243 passed` | les interdits du tableau des couches sont tenus à `d7e5b22` |
 | les treize commandes de `cli.py` sont tracées : dix par quatre sous-agents en lecture seule, trois par la session ; la session revérifie une cinquantaine de leurs renvois ; deux ne visaient pas l'appel : `metrics_export.py:105-112` (le refus des variables `OTEL_*`), remplacé par `:301`, trouvé par la session, et `github_client.py:155-161` (la construction du client), remplacé par `:173`, trouvé par la relecture | chaque flèche du chemin du code a sa ligne |
+| les quatre blocs Mermaid rendus en local par mermaid-cli 11.17.0 : aucune erreur, PNG montrés à Sabine | la syntaxe se rend, `style` d'un sous-graphe compris |
 | première relecture, en deux passes (5 constats, 3 retenus ; puis 18 et 1 de la session, tous retenus), puis seconde sur le delta (4 constats, retenus), triées par time-knight | chaque flèche et chaque renvoi relus contre le code |
 
 La note elle-même est dans `docs/journaling/` : c'est le seul fichier de `docs/` que la PR ajoute.
@@ -139,22 +152,24 @@ La note elle-même est dans `docs/journaling/` : c'est le seul fichier de `docs/
 1. **Pourquoi la flèche va de l'API de données à l'API IA, alors que c'est l'API IA qui appelle ?** Un diagramme de
    flux de données suit les données : les items sortent de la base, passent par l'API de données, arrivent à l'API IA
    (`GET /items`, `src/k_b/ai_api/connectors/data_api_client.py:266-270`). La légende le dit
-   (`documentation/architecture_pour_docu.md:19-20`).
+   (`documentation/architecture_pour_docu.md:52-53`).
 2. **Qu'est-ce qui tourne en ligne aujourd'hui ?** Les deux API, le job `caj-kb-smoke-test` et le job
    `caj-kb-migrate-database` (`infra/deployment.json`), sur PostgreSQL et le seul conteneur `smoke-test`. Rien ne
-   collecte, n'importe ni n'écrit de fiche en ligne (`documentation/architecture_pour_docu.md:308-310`).
+   collecte, n'importe ni n'écrit de fiche en ligne (`documentation/architecture_pour_docu.md:457-459`).
 3. **Comment sait-on que les couches sont respectées ?** Les tests de `tests/architecture/` lisent les imports de chaque
    module et échouent sur un import interdit (par exemple `tests/architecture/test_apis.py:118-121`) ; la CI les lance
    à chaque PR.
 4. **Pourquoi l'API IA ne lit-elle pas la base ?** Elle ne peut importer qu'`ai_api`, `items` et `core`
    (`tests/architecture/test_apis.py:118`) : elle demande les items à l'API de données par HTTP, avec sa clé. L'accès
    à la base reste à un seul composant, en lecture seule (`src/k_b/database/engine.py:58-87`).
-5. **Où est l'accessibilité du diagramme ?** Sous le diagramme, la description en six points suit les mêmes flux, dans
-   le même ordre (`documentation/architecture_pour_docu.md:101-161`).
+5. **Où est l'accessibilité des schémas ?** Sous chacun, un texte suit le même parcours : une phrase sous le flux en
+   bref, six points sous le flux en détail (`documentation/architecture_pour_docu.md:146-211`), une liste sous le
+   déploiement sur Azure (`:424-453`).
 
 ## Zones non vérifiées
 
-- Le rendu du Mermaid sur GitHub, et la lisibilité d'un diagramme de 34 flèches : pas encore vus.
+- Le rendu sur GitHub : les quatre blocs se rendent sans erreur en local (mermaid-cli 11.17.0), pas encore vus sur
+  GitHub, dont la version de Mermaid n'est pas connue.
 - L'état réel d'Azure : la fiche lit le Bicep et `infra/deployment.json`, pas les ressources en ligne
   (`az … show` non lancé).
 - L'intitulé de C17 est recopié du critère de fin de #511 : le référentiel lui-même, hors du dépôt, n'a pas été relu.
@@ -164,7 +179,7 @@ La note elle-même est dans `docs/journaling/` : c'est le seul fichier de `docs/
 
 ## Ce qui reste
 
-- Les jobs `kb daily-routine` et `kb digest-watch` en ligne, avec les conteneurs `clippings` et `watch` (#420) : le
-  diagramme passera leurs pointillés en trait plein.
+- Les jobs `caj-kb-daily-routine` (#330) et `caj-kb-digest-watch` (#423) en ligne, avec les conteneurs et le partage
+  `job-data` (#420) : les schémas passeront leurs pointillés en trait plein.
 - L'envoi des clips depuis le Mac et la relecture de `watch` (#424), la copie de Zotero dans un job (#425).
 - L'interface web d'E4 : elle entrera dans la fiche quand elle existera sur `main`.
