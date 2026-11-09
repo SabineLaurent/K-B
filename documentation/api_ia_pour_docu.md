@@ -7,7 +7,7 @@
 Cette fiche dit ce qu'est l'API IA, comment elle est construite, ce que fait chacun de ses points de terminaison,
 qui peut l'appeler, et comment une clé se change. Le contrat de ses deux routes est l'OpenAPI versionnée,
 [`docs/api/openapi-ia.json`](../docs/api/openapi-ia.json): la fiche y renvoie et ne la remplace pas. Elle est écrite
-d'après le code de `main` au commit `1d2f554` (2026-11-08). Les chemins du code de K-B (`ai_api/…`, `core/…`,
+d'après le code de `main` au commit `875c638` (2026-11-08). Les chemins du code de K-B (`ai_api/…`, `core/…`,
 `post/…`, `commands/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 ## Ce qu'est l'API IA
@@ -71,24 +71,24 @@ Le schéma se lit ainsi:
 5. Le modèle rédige chaque sujet qui a des items, un appel par sujet. Un sujet dont la rédaction échoue est nommé
    dans `failed_subjects`, les autres sont rendus.
 6. Le code revalide chaque rédaction avant de la rendre: les bornes de chaque affirmation, puis sa fidélité
-   (`ai_api/stages/checking.py:61-111`).
+   (`ai_api/stages/checking.py:63-119`).
 
 **La fidélité, telle que le code la contrôle.** Chaque affirmation rédigée cite ses items et déclare ses faits,
 chacun avec l'item qui le porte. Le code garde l'affirmation si chacune de ces conditions tient
-(`ai_api/stages/fidelity.py:119-151`):
+(`ai_api/stages/fidelity.py:150-185`):
 
 - chaque fait, normalisé (casse, caractères invisibles, tirets, guillemets, espaces,
-  `ai_api/stages/fidelity.py:154-160`), se retrouve à la fois dans le texte de l'affirmation
+  `ai_api/stages/fidelity.py:188-194`), se retrouve à la fois dans le texte de l'affirmation
   et dans un champ envoyé de l'item qu'il cite: le titre et le résumé d'un article, par exemple
-  (`ai_api/stages/fidelity.py:96-102`). Un identifiant CVE ou GHSA ne se retrouve que dans le `cve_id` ou le
+  (`ai_api/stages/fidelity.py:97-103`). Un identifiant CVE ou GHSA ne se retrouve que dans le `cve_id` ou le
   `ghsa_id` de l'item;
 - chaque identifiant CVE ou GHSA du texte est un fait déclaré;
 - chaque item cité porte au moins un fait retrouvé;
 - le texte ne cache ni ne déguise rien (caractères invisibles, lettres d'un autre alphabet qui imitent les
-  latines, `ai_api/stages/fidelity.py:179-194`).
+  latines, `ai_api/stages/fidelity.py:213-228`).
 
 Sinon, l'affirmation est retirée. La réponse en donne le nombre, `claims_removed`, et les items qui ne sont plus
-cités, `items_removed_by_checks` (`ai_api/stages/checking.py:61-111`).
+cités, `items_removed_by_checks` (`ai_api/stages/checking.py:63-119`).
 
 ### Le parcours de `POST /trend-reports`
 
@@ -340,7 +340,7 @@ deux. Il décrit les deux routes, leurs corps, leurs réponses, chaque état d'e
 
 ## Vérifier cette fiche
 
-Depuis la racine du dépôt, au commit `1d2f554` (`git switch --detach 1d2f554`):
+Depuis la racine du dépôt, au commit `875c638` (`git switch --detach 875c638`):
 
 ```sh
 # Le contrat: les deux routes, la version, le schéma de sécurité; égal au code et valide.
@@ -350,7 +350,7 @@ uv run pytest tests/ai_api/test_ai_api_openapi.py
 uv run pytest tests/architecture/test_apis.py
 # Règle 7 de .claude/rules/poc.md, l'écriture: 0 ligne attendue.
 grep -rnE "raw_store|writers|write_file_atomically|write_text|write_bytes|[^a-z_]open\(" src/k_b/ai_api | wc -l
-# Clé, client, autre route, corps, débit, concurrence, méthodes, /health: 43 tests au commit 1d2f554,
+# Clé, client, autre route, corps, débit, concurrence, méthodes, /health: 43 tests au commit 875c638,
 # dont 7 pris par un mot de leur nom hors de l'accès.
 uv run pytest tests/ai_api/test_digest_router.py -k "key or bound or limit or runs or body or client or other_route or method or health or free_again"
 uv run pytest tests/ai_api/test_trend_report_router.py -k "key or malformed"
@@ -363,5 +363,5 @@ grep -n "MIN_API_KEY_LENGTH =\|API_KEY_CHARACTERS =\|MAX_AI_API_BODY_BYTES =" sr
 cat infra/deployment.json
 ```
 
-Un `fichier:ligne` se relit sans changer de commit: `git show 1d2f554:<chemin> | sed -n '<début>,<fin>p'`, avec
+Un `fichier:ligne` se relit sans changer de commit: `git show 875c638:<chemin> | sed -n '<début>,<fin>p'`, avec
 `src/k_b/` devant un chemin du code de K-B.
