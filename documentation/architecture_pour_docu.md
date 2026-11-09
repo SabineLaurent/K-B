@@ -25,7 +25,7 @@ flowchart LR
     aiApi["API IA"]
     model("Modèle de langage")
     reports["Comptes rendus"]
-    vault[("Coffre Obsidian")]
+    vault[("Base de connaissance<br>(coffre Obsidian)")]
     sources -->|"collecte"| collect
     choice -->|"collecte"| collect
     collect -->|"garde tel quel"| raw
@@ -41,8 +41,8 @@ flowchart LR
 K-B collecte les sources de veille (GitHub, arXiv, la CISA, tldr.tech, GH Archive) et la lecture choisie (les clips du
 coffre et la bibliothèque Zotero), garde ce qu'il reçoit tel quel dans des fichiers bruts, puis les range dans la base,
 que l'API de données sert à l'API IA, qui fait rédiger par le modèle de langage les comptes rendus de la veille et des
-tendances, que K-B écrit dans le coffre Obsidian, avec les fiches des dépôts les plus étoilés et les plus forkés, tirées
-directement des fichiers bruts.
+tendances, que K-B écrit dans la base de connaissance (coffre Obsidian), avec les fiches des dépôts les plus étoilés et
+les plus forkés, tirées directement des fichiers bruts.
 
 ## Le flux des données, en détail
 
@@ -67,7 +67,7 @@ flowchart LR
     end
     subgraph choice["Lecture choisie (clips, Zotero)"]
         zotero[("Zotero<br>zotero.sqlite")]
-        clippings[("coffre Obsidian<br>Clippings/")]
+        clippings[("base de connaissance<br>(coffre Obsidian)<br>Clippings/")]
     end
     collect["kb collect"]
     importCmd["kb import"]
@@ -81,7 +81,7 @@ flowchart LR
     raw[("fichiers bruts<br>KB_DATA_DIR/raw/")]
     base[("base<br>SQLite ou PostgreSQL")]
     register[("registre des comptes rendus<br>KB_DATA_DIR/trend_reports.json")]
-    vault[("coffre Obsidian<br>veille/")]
+    vault[("base de connaissance<br>(coffre Obsidian)<br>veille/")]
     model("modèle de langage")
     githubCards("API GitHub<br>fiches des candidats<br>README des dépôts choisis")
     grafana("Grafana Cloud")
@@ -370,7 +370,7 @@ tag de version sur `main` les met à jour ([la fiche de la livraison continue](l
 ```mermaid
 flowchart TB
     actions("GitHub Actions<br>deploy.yml, sur un tag vX.Y.Z<br>identité id-kb-deploy, OIDC")
-    mac("Mac<br>coffre Obsidian, Zotero")
+    mac("Mac<br>base de connaissance<br>(coffre Obsidian), Zotero")
     sources("Sources de veille")
     subgraph azure["Ressources d'infra/, Azure France Central"]
         registry[("crkb…<br>registre d'images")]
