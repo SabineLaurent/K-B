@@ -16,7 +16,8 @@ de la livraison sur Azure dans [la fiche de la livraison continue](livraison_con
 
 Les flèches suivent les données, pas les appels: l'API IA appelle l'API de données, et les items vont de l'API de
 données à l'API IA. Un trait plein est un flux que le code fait aujourd'hui. Un trait en pointillés n'est pas encore
-en ligne: il est codé, sauf si son étiquette dit « pas encore codé ».
+en ligne: il est codé, sauf si son étiquette dit « pas encore codé ». Un conteneur ou un groupe bordé de pointillés
+n'est pas encore créé.
 
 ```mermaid
 flowchart LR
@@ -41,12 +42,18 @@ flowchart LR
     raw -->|"kb write-tops<br>classements"| vault
     subgraph exchange["Stockage d'échange en ligne, Azure Blob Storage"]
         smokeContainer[("conteneur<br>smoke-test")]
-        clipContainer[("conteneur<br>clippings")]
+        subgraph choice["Lecture choisie (clips, Zotero)<br>prévue par #420"]
+            choiceClips[("clips")]
+            choiceZotero[("copies de Zotero")]
+        end
         watchContainer[("conteneur<br>watch")]
     end
+    style choice stroke-dasharray: 5 5
+    style watchContainer stroke-dasharray: 5 5
     smokeContainer -->|"liste, un compte seul"| smokeJob["kb smoke-test<br>job caj-kb-smoke-test"]
-    mac["Mac"] -.->|"clips<br>pas encore codé (#424)"| clipContainer
-    clipContainer -.->|"kb daily-routine<br>miroir des clips"| clippings
+    mac["Mac"] -.->|"make upload-library<br>pas encore codé (#424)"| choice
+    choiceClips -.->|"kb daily-routine<br>miroir des clips"| clippings
+    choiceZotero -.->|"kb daily-routine<br>copie de Zotero<br>pas encore codé (#425)"| zotero
     vault -.->|"kb daily-routine, kb digest-watch<br>publication de veille/"| watchContainer
     watchContainer -.->|"relu par le Mac<br>pas encore codé (#424)"| mac
 ```
@@ -75,13 +82,16 @@ Le diagramme se lit ainsi, dans l'ordre des flux:
    le brut, sans modèle ni base. Seule la commande `kb` écrit dans le coffre, jamais une API.
 6. **Le stockage d'échange en ligne.** Aujourd'hui, seul le conteneur `smoke-test` existe en ligne
    (`infra/modules/exchange-storage.bicep:39-46`): `kb smoke-test` le liste et n'écrit que le nombre de blobs de
-   sa première page, 100 au plus (`commands/smoke_test_command.py:1-3`, `:141`, `core/config.py:552`). Le code qui
-   lit et écrit les conteneurs `clippings` et `watch` est prêt, mais les conteneurs ne sont pas créés (#420):
-   `kb daily-routine` copiera les clips du conteneur `clippings` dans le coffre du job, et `kb daily-routine` et
-   `kb digest-watch` publieront `veille/` dans le conteneur `watch` (`commands/job_transfers.py:38`, `:68`). Dans
-   un job, le coffre est le dossier `KB_VAULT_DIR` du job, pas celui du Mac. Ces deux jobs ne sont déclarés en
-   ligne ni dans `infra/deployment.json`, ni dans `infra/main.bicep`. L'envoi des clips depuis le Mac, et la
-   relecture de `watch` par le Mac, ne sont pas encore codés: ils viendront par `make upload-library` et
+   sa première page, 100 au plus (`commands/smoke_test_command.py:1-3`, `:141`, `core/config.py:552`). #420
+   prévoit le reste, que rien ne crée encore: la lecture choisie, où le Mac déposera les clips et les copies de
+   Zotero, et le conteneur `watch`, où les jobs publieront `veille/`. Le code des jobs est prêt pour les clips et
+   pour `veille/`: `kb daily-routine` copiera les clips dans le coffre du job (`commands/daily_routine_command.py:45`,
+   `commands/job_transfers.py:38`), et `kb daily-routine` et `kb digest-watch` publieront `veille/`
+   (`commands/job_transfers.py:68`). La copie de Zotero dans le job n'est pas encore codée: elle viendra entre le
+   miroir des clips et `kb collect` (#425, `commands/daily_routine_command.py:50`). Dans un job, le coffre est le
+   dossier `KB_VAULT_DIR` du job, pas celui du Mac. Ces deux jobs ne sont déclarés en ligne ni dans
+   `infra/deployment.json`, ni dans `infra/main.bicep`. L'envoi des clips et des copies de Zotero depuis le Mac, et
+   la relecture de `watch` par le Mac, ne sont pas encore codés: ils viendront par `make upload-library` et
    `make download-watch-sheets` (#424).
 
 ## Les couches du code
@@ -181,8 +191,8 @@ source et une destination:
 
 Deux routines de job, codées mais pas encore en ligne, relancent ces commandes: `kb daily-routine` lance
 `kb write-tops`, et `kb digest-watch` lance `kb digest` et `kb trend-report` (`commands/daily_routine_command.py:59-62`,
-`commands/digest_watch_command.py:65-74`). `kb daily-routine` écrit aussi dans le coffre du job les clips du
-conteneur `clippings`, sous `Clippings/` (`commands/job_transfers.py:50-52`).
+`commands/digest_watch_command.py:65-74`). `kb daily-routine` écrit aussi dans le coffre du job les clips de la
+lecture choisie, sous `Clippings/` (`commands/job_transfers.py:50-52`).
 
 Une fiche est écrite une fois, jamais par un lien symbolique que `kb` voit (`post/vault_files.py:1-2`); une fiche
 ou un lien apparus entre le contrôle et le renommage sont remplacés ou suivis, une limite acceptée (`:4-5`). Une
@@ -220,7 +230,7 @@ tag de version sur `main` les met à jour ([la fiche de la livraison continue](l
 
 - **En ligne, rien ne collecte, n'importe ni n'écrit de fiche.** `kb daily-routine` et `kb digest-watch` sont codés
   (`commands/daily_routine_command.py:43-69`, `commands/digest_watch_command.py:59-81`), mais leurs jobs ne sont pas
-  dans `infra/deployment.json`, et les conteneurs `clippings` et `watch` ne sont pas créés (#420).
+  dans `infra/deployment.json`, et ni la lecture choisie ni le conteneur `watch` ne sont créés (#420).
 - **Zotero n'est pas collecté en ligne**: la copie de la bibliothèque dans un job est à venir, entre le miroir des
   clips et `kb collect` (#425, `commands/daily_routine_command.py:50`).
 - **L'interface web n'existe pas encore**: la fiche décrit `main`, où K-B se lit dans Obsidian et se lance dans le
