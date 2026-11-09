@@ -20,16 +20,26 @@ Le référentiel demande une documentation technique (C17), et aucune ne décriv
 
 ## Le comment
 
-### Un diagramme qui suit les données, en trois états
+### Un diagramme qui suit le chemin du code
 
-`documentation/architecture_pour_docu.md:17-20` :
+`documentation/architecture_pour_docu.md:17-22` :
 
 ```markdown
-Les flèches suivent les données, pas les appels: l'API IA appelle l'API de données, et les items vont de l'API de
+Le diagramme suit le chemin du code. Un rectangle est une commande `kb`, un cylindre un fichier, une base ou un
+conteneur, un rectangle arrondi un service extérieur. Une flèche est une lecture, une écriture ou un appel que fait
+la commande, dans le sens où vont les données: l'API IA appelle l'API de données, et les items vont de l'API de
 données à l'API IA. Un trait plein est un flux que le code fait aujourd'hui. Un trait en pointillés n'est pas encore
 en ligne: il est codé, sauf si son étiquette dit « pas encore codé ». Un conteneur ou un groupe bordé de pointillés
 n'est pas encore créé.
 ```
+
+Le diagramme part de chaque commande de `src/k_b/cli.py` (`RUN_BY_COMMAND`, `run_command`) et suit ses appels jusqu'à
+chaque lecture et chaque écriture : fichier, base, API, modèle, coffre, conteneur. C'est la demande de Sabine après
+lecture de la PR, dont la première version donnait une vue d'ensemble : une flèche du dessin doit être un appel du
+code, avec son `fichier:ligne` dans le texte. Ce tracé a fait entrer ce que la vue d'ensemble ne montrait pas : les
+deux fichiers d'état (choix 71), `kb create-db` et `kb migrate-database`, les purges de `kb import`, la relecture du
+dernier extrait Zotero par `kb collect`, la suppression des classements remplacés par `kb write-tops`, et les
+commandes que relancent les deux routines.
 
 Un diagramme de flux de données dessine ce qui circule, pas qui appelle qui. Le sens compte ici : c'est l'API IA qui
 appelle l'API de données (`src/k_b/ai_api/connectors/data_api_client.py:266-270`, `send(http_client, ITEMS_PATH, …)`),
@@ -40,7 +50,7 @@ bord en pointillés d'un conteneur ou d'un groupe dit autre chose : la ressource
 
 ### Le stockage d'échange : dire ce qui existe en ligne
 
-`documentation/architecture_pour_docu.md:43-58` dessine le stockage d'échange : le conteneur `smoke-test`, le groupe
+`documentation/architecture_pour_docu.md:69-98` dessine le stockage d'échange : le conteneur `smoke-test`, le groupe
 « Lecture choisie (clips, Zotero), prévue par #420 » et le conteneur `watch`. Seul `smoke-test` a un bord plein. Le
 Bicep n'en crée qu'un, `infra/modules/exchange-storage.bicep:39-42` :
 
@@ -67,14 +77,14 @@ ligne.
 
 ### Une description en texte qui suit le même ordre
 
-`documentation/architecture_pour_docu.md:61-95` reprend le diagramme en six points, les six flux du critère de fin,
+`documentation/architecture_pour_docu.md:101-161` reprend le diagramme en six points, les six flux du critère de fin,
 dans le même ordre. C'est l'alternative textuelle d'une image (#167, RGAA) : un lecteur d'écran ne lit pas un
 `flowchart` Mermaid, et le texte porte aussi les renvois `fichier:ligne` que les étiquettes du diagramme n'ont pas la
 place de porter.
 
 ### Les couches : ce que les tests interdisent, pas ce qu'on souhaite
 
-Le tableau des paquets (`documentation/architecture_pour_docu.md:104-115`) donne, pour chacun, l'interdit que tient un
+Le tableau des paquets (`documentation/architecture_pour_docu.md:181-192`) donne, pour chacun, l'interdit que tient un
 test de `tests/architecture/`, avec sa ligne. Par exemple l'API IA, `tests/architecture/test_apis.py:118-121` :
 
 ```python
@@ -89,7 +99,7 @@ Une règle d'architecture écrite sans test peut être fausse sans que rien ne l
 
 ### Une fiche qui se vérifie
 
-`documentation/architecture_pour_docu.md:239-264`, « Vérifier cette fiche », donne les commandes qui retrouvent ses
+`documentation/architecture_pour_docu.md:316-341`, « Vérifier cette fiche », donne les commandes qui retrouvent ses
 faits au commit `d7e5b22` : les tests d'architecture, les sources, les routes, les 15 tables, ce qui est déclaré en
 ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'appui ». La fiche date son code : `main`
 à `d7e5b22`, dont `src/` et `infra/` sont ceux de `cbada1e` (`git diff --stat cbada1e d7e5b22 -- src/ infra/` vide).
@@ -99,6 +109,10 @@ ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'
 | Choix retenu | Pourquoi | Écarté, et pourquoi |
 |---|---|---|
 | Mermaid dans le `.md` | format fixé par la mission du 09/11 : GitHub le rend, le texte se relit en revue | une image : ne se relit pas ligne à ligne, se périme sans que le diff le montre |
+| Le chemin du code, commande par commande | demande de Sabine après lecture de la PR : une flèche est un appel du code, avec son `fichier:ligne` | la vue d'ensemble de la première version : elle sautait les fichiers d'état, les purges et les commandes que relancent les routines |
+| Les deux fichiers d'état dessinés, les journaux cités seulement | choix 71 de Sabine : `collection_state.json` et `trend_reports.json` décident de ce qui circule ; aucune commande ne relit un journal, sauf la purge | dessiner les journaux : des flèches sans donnée de la veille |
+| `kb create-db` et `kb migrate-database` dessinés, `kb openapi` cité | tranché par time-knight : les deux premières écrivent la base ; `kb openapi` écrit un fichier du dépôt | dessiner `kb openapi` |
+| `GET /health` et les jetons de l'identité managée cités, pas dessinés | ils ne portent pas de donnée de la veille | quatre flèches de plus, sans donnée |
 | Les flèches suivent les données | c'est un diagramme de flux de données, la demande de la revue | les flèches des appels : l'API IA → l'API de données, à rebours des items |
 | Trois états (plein, pointillés, pointillés « pas encore codé ») | `main` a les trois ; le critère demande le stockage d'échange, en ligne pour une part seulement | tout en plein : décrirait le plan ; omettre le non-codé : le flux Mac ↔ stockage disparaîtrait |
 | La lecture choisie en groupe, sans nom de conteneur | demande de Sabine après lecture de la PR : #420 prévoit deux conteneurs montants, clips et Zotero, au nom encore à décider | un seul conteneur `clippings` : Zotero disparaissait du flux en ligne |
@@ -115,6 +129,7 @@ ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'
 | 12 liens relatifs, 12 fichiers qui existent | aucun renvoi mort |
 | `git diff --stat origin/main -- docs/ README.md` → vide (avant cette note) | la fiche ne touche ni `docs/` ni le README |
 | `uv run pytest tests/architecture/` → `243 passed` | les interdits du tableau des couches sont tenus à `d7e5b22` |
+| quatre sous-agents en lecture seule tracent les dix commandes de `cli.py` ; la session revérifie une cinquantaine de leurs renvois : un seul ne visait pas l'appel (`metrics_export.py:105-112`, le refus des variables `OTEL_*`), remplacé par `:301` | chaque flèche du chemin du code a sa ligne |
 | première relecture, en deux passes (5 constats, 3 retenus ; puis 18 et 1 de la session, tous retenus), puis seconde sur le delta (4 constats, retenus), triées par time-knight | chaque flèche et chaque renvoi relus contre le code |
 
 La note elle-même est dans `docs/journaling/` : c'est le seul fichier de `docs/` que la PR ajoute.
@@ -124,10 +139,10 @@ La note elle-même est dans `docs/journaling/` : c'est le seul fichier de `docs/
 1. **Pourquoi la flèche va de l'API de données à l'API IA, alors que c'est l'API IA qui appelle ?** Un diagramme de
    flux de données suit les données : les items sortent de la base, passent par l'API de données, arrivent à l'API IA
    (`GET /items`, `src/k_b/ai_api/connectors/data_api_client.py:266-270`). La légende le dit
-   (`documentation/architecture_pour_docu.md:17-18`).
+   (`documentation/architecture_pour_docu.md:19-20`).
 2. **Qu'est-ce qui tourne en ligne aujourd'hui ?** Les deux API, le job `caj-kb-smoke-test` et le job
    `caj-kb-migrate-database` (`infra/deployment.json`), sur PostgreSQL et le seul conteneur `smoke-test`. Rien ne
-   collecte, n'importe ni n'écrit de fiche en ligne (`documentation/architecture_pour_docu.md:231-233`).
+   collecte, n'importe ni n'écrit de fiche en ligne (`documentation/architecture_pour_docu.md:308-310`).
 3. **Comment sait-on que les couches sont respectées ?** Les tests de `tests/architecture/` lisent les imports de chaque
    module et échouent sur un import interdit (par exemple `tests/architecture/test_apis.py:118-121`) ; la CI les lance
    à chaque PR.
@@ -135,11 +150,11 @@ La note elle-même est dans `docs/journaling/` : c'est le seul fichier de `docs/
    (`tests/architecture/test_apis.py:118`) : elle demande les items à l'API de données par HTTP, avec sa clé. L'accès
    à la base reste à un seul composant, en lecture seule (`src/k_b/database/engine.py:58-87`).
 5. **Où est l'accessibilité du diagramme ?** Sous le diagramme, la description en six points suit les mêmes flux, dans
-   le même ordre (`documentation/architecture_pour_docu.md:61-95`).
+   le même ordre (`documentation/architecture_pour_docu.md:101-161`).
 
 ## Zones non vérifiées
 
-- Le rendu du Mermaid sur GitHub : pas encore vu, à regarder dans la PR une fois la branche poussée.
+- Le rendu du Mermaid sur GitHub, et la lisibilité d'un diagramme d'une quarantaine de flèches : pas encore vus.
 - L'état réel d'Azure : la fiche lit le Bicep et `infra/deployment.json`, pas les ressources en ligne
   (`az … show` non lancé).
 - L'intitulé de C17 est recopié du critère de fin de #511 : le référentiel lui-même, hors du dépôt, n'a pas été relu.

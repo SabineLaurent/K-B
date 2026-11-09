@@ -14,7 +14,9 @@ de la livraison sur Azure dans [la fiche de la livraison continue](livraison_con
 
 ## Le flux des données
 
-Les flèches suivent les données, pas les appels: l'API IA appelle l'API de données, et les items vont de l'API de
+Le diagramme suit le chemin du code. Un rectangle est une commande `kb`, un cylindre un fichier, une base ou un
+conteneur, un rectangle arrondi un service extérieur. Une flèche est une lecture, une écriture ou un appel que fait
+la commande, dans le sens où vont les données: l'API IA appelle l'API de données, et les items vont de l'API de
 données à l'API IA. Un trait plein est un flux que le code fait aujourd'hui. Un trait en pointillés n'est pas encore
 en ligne: il est codé, sauf si son étiquette dit « pas encore codé ». Un conteneur ou un groupe bordé de pointillés
 n'est pas encore créé.
@@ -22,24 +24,48 @@ n'est pas encore créé.
 ```mermaid
 flowchart LR
     subgraph sources["Sources"]
-        github["API GitHub<br>releases, alertes, tops"]
-        arxiv["API arXiv"]
-        cisa["CISA<br>fichier CSV"]
-        tldr["tldr.tech<br>pages web"]
-        bigquery["GH Archive<br>sur BigQuery"]
-        zotero["Zotero<br>zotero.sqlite"]
-        clippings["coffre<br>Clippings/"]
+        github("API GitHub<br>releases, alertes, tops")
+        arxiv("API arXiv")
+        cisa("CISA<br>fichier CSV")
+        tldr("tldr.tech<br>pages web")
+        bigquery("GH Archive<br>sur BigQuery")
+        zotero[("Zotero<br>zotero.sqlite")]
+        clippings[("coffre<br>Clippings/")]
     end
-    sources -->|"kb collect"| raw[("brut<br>KB_DATA_DIR/raw/")]
-    raw -->|"kb import"| base[("base<br>SQLite ou PostgreSQL")]
-    base -->|"lecture seule"| dataApi["API de données<br>kb serve-data"]
-    dataApi -->|"GET /items<br>GET /items/{item_id}<br>GET /trends"| aiApi["API IA<br>kb serve-ai"]
-    aiApi <-->|"chat/completions"| model["modèle"]
-    githubCards["API GitHub<br>fiches des candidats<br>README des dépôts choisis"] -->|"tendances seules"| aiApi
-    aiApi -->|"OTLP"| grafana["Grafana Cloud"]
-    aiApi -->|"POST /digests<br>POST /trend-reports"| clients["kb digest<br>kb trend-report"]
-    clients -->|"écrit"| vault["coffre<br>veille/"]
-    raw -->|"kb write-tops<br>classements"| vault
+    collect["kb collect"]
+    importCmd["kb import"]
+    createDb["kb create-db<br>kb migrate-database"]
+    writeTops["kb write-tops"]
+    dataApi["kb serve-data<br>API de données"]
+    aiApi["kb serve-ai<br>API IA"]
+    digest["kb digest"]
+    trendReport["kb trend-report"]
+    state[("état de la collecte<br>KB_DATA_DIR/collection_state.json")]
+    raw[("brut<br>KB_DATA_DIR/raw/")]
+    base[("base<br>SQLite ou PostgreSQL")]
+    register[("registre des comptes rendus<br>KB_DATA_DIR/trend_reports.json")]
+    vault[("coffre<br>veille/")]
+    model("modèle")
+    githubCards("API GitHub<br>fiches des candidats<br>README des dépôts choisis")
+    grafana("Grafana Cloud")
+    sources -->|"lit"| collect
+    state <-->|"date de la dernière collecte<br>de chaque source"| collect
+    collect <-->|"écrit le brut<br>relit le dernier extrait Zotero"| raw
+    raw <-->|"lit les pages non importées<br>purge"| importCmd
+    importCmd <-->|"lit raw_data<br>écrit les items, purge"| base
+    createDb -->|"crée les tables"| base
+    raw <-->|"lit les classements<br>supprime les remplacés"| writeTops
+    writeTops -->|"écrit veille/tops/"| vault
+    base -->|"lecture seule"| dataApi
+    dataApi -->|"GET /items<br>GET /items/{item_id}<br>GET /trends"| aiApi
+    aiApi <-->|"chat/completions"| model
+    githubCards -->|"tendances seules"| aiApi
+    aiApi -->|"OTLP"| grafana
+    aiApi -->|"POST /digests"| digest
+    aiApi -->|"POST /trend-reports"| trendReport
+    digest -->|"écrit une fiche par sujet"| vault
+    trendReport -->|"écrit veille/tendances/"| vault
+    register <-->|"lit la dernière période<br>ajoute le compte rendu"| trendReport
     subgraph exchange["Stockage d'échange en ligne, Azure Blob Storage"]
         smokeContainer[("conteneur<br>smoke-test")]
         subgraph choice["Lecture choisie (clips, Zotero)<br>prévue par #420"]
@@ -50,49 +76,100 @@ flowchart LR
     end
     style choice stroke-dasharray: 5 5
     style watchContainer stroke-dasharray: 5 5
-    smokeContainer -->|"liste, un compte seul"| smokeJob["kb smoke-test<br>job caj-kb-smoke-test"]
-    mac["Mac"] -.->|"make upload-library<br>pas encore codé (#424)"| choice
-    choiceClips -.->|"kb daily-routine<br>miroir des clips"| clippings
-    choiceZotero -.->|"kb daily-routine<br>copie de Zotero<br>pas encore codé (#425)"| zotero
-    vault -.->|"kb daily-routine, kb digest-watch<br>publication de veille/"| watchContainer
-    watchContainer -.->|"relu par le Mac<br>pas encore codé (#424)"| mac
+    smokeTest["kb smoke-test<br>job caj-kb-smoke-test"]
+    dailyRoutine["kb daily-routine"]
+    digestWatch["kb digest-watch"]
+    mac("Mac")
+    smokeContainer -->|"liste, un compte seul"| smokeTest
+    mac -.->|"make upload-library<br>pas encore codé (#424)"| choice
+    choiceClips -.->|"miroir des clips"| dailyRoutine
+    dailyRoutine -.->|"écrit les clips"| clippings
+    choiceZotero -.->|"copie de Zotero<br>pas encore codé (#425)"| dailyRoutine
+    dailyRoutine -.->|"pose la copie<br>pas encore codé (#425)"| zotero
+    dailyRoutine -.->|"lance"| collect
+    dailyRoutine -.->|"lance"| importCmd
+    dailyRoutine -.->|"lance"| writeTops
+    digestWatch -.->|"lance"| digest
+    digestWatch -.->|"lance"| trendReport
+    vault -.->|"lit veille/"| dailyRoutine
+    vault -.->|"lit veille/"| digestWatch
+    dailyRoutine -.->|"publie veille/"| watchContainer
+    digestWatch -.->|"publie veille/"| watchContainer
+    watchContainer -.->|"make download-watch-sheets<br>pas encore codé (#424)"| mac
 ```
 
 Le diagramme se lit ainsi, dans l'ordre des flux:
 
-1. **Des sources au brut.** `kb collect` lance chaque source, puis écrit ce qu'elle rend tel quel dans le brut,
-   sous `KB_DATA_DIR/raw/` (`commands/collect_command.py:37-59`, `etl/extract.py:53-100`). Les sources sont sept
-   origines de données: l'API GitHub (releases des dépôts suivis, alertes de sécurité, dépôts les plus étoilés et
-   les plus forkés), l'API arXiv, le fichier CSV de la CISA, les pages de tldr.tech, GH Archive sur BigQuery, la
-   base de Zotero et le dossier `Clippings/` du coffre (`etl/source_kinds.py:46-95`,
-   `etl/collected_sources.py:110-131`).
-2. **Du brut à l'import, puis à la base.** `kb import` lit les fichiers du brut qui ne sont pas encore importés,
-   les convertit en items, puis les écrit dans la base en une transaction, avec le journal d'import
-   (`etl/pipeline.py:51-82`). Les deux classements des dépôts les plus étoilés et les plus forkés n'entrent pas dans
-   la base: ils n'ont pas de lecteur (`etl/source_kinds.py:66-77`).
-3. **De la base aux deux API.** L'API de données lit la base en lecture seule et sert les items et les tendances
-   (`database/engine.py:58-87`). L'API IA ne lit jamais la base: elle demande les items à l'API de données, par
-   HTTP (`ai_api/connectors/data_api_client.py:266-268`, `:289`, `:308`).
+1. **Des sources au brut.** `kb collect` lit d'abord l'état de la collecte, `KB_DATA_DIR/collection_state.json`, et
+   donne à chaque source la date de sa dernière collecte réussie (`etl/raw_store.py:22`, `:189`;
+   `etl/extract.py:60`, `:69`). Il lance chaque source, puis écrit ce qu'elle rend tel quel dans le brut, sous
+   `KB_DATA_DIR/raw/` (`commands/collect_command.py:37-59`, `etl/extract.py:129`, `:139`). Pour Zotero, il relit
+   d'abord le dernier extrait du brut, et n'écrit rien si le nouveau est le même (`etl/sources/zotero.py:225`). À
+   la fin, il récrit l'état, avec la date du jour pour chaque source collectée (`etl/extract.py:90`, `:94`;
+   `etl/raw_store.py:220`). Les sources sont sept origines de données: l'API GitHub (releases des dépôts suivis,
+   alertes de sécurité, dépôts les plus étoilés et les plus forkés), l'API arXiv, le fichier CSV de la CISA, les
+   pages de tldr.tech, GH Archive sur BigQuery, la base de Zotero et le dossier `Clippings/` du coffre
+   (`etl/source_kinds.py:46-95`, `etl/collected_sources.py:110-131`). Chacune est lue par un appel de son module:
+   `etl/sources/github/releases.py:50`, `etl/sources/github/advisories.py:69`,
+   `etl/sources/github/most_starred.py:38`, `etl/sources/github/most_forked.py:41`, `etl/sources/arxiv.py:111`,
+   `etl/sources/cisa_kev.py:69`, `etl/sources/tldr.py:119`, `etl/sources/gh_archive.py:125`, `:211`,
+   `etl/sources/zotero.py:275`, `etl/sources/clipping.py:103`.
+2. **Du brut à l'import, puis à la base.** `kb create-db` crée la base et ses tables
+   (`commands/create_db_command.py:34`); `kb migrate-database` la crée si elle n'a pas encore ses tables, et la
+   laisse telle quelle sinon (`commands/migrate_database_command.py:31`). `kb import` lit dans la base le registre
+   des fichiers déjà importés, la table `raw_data` (`etl/load.py:52-55`), puis les pages du brut qui n'y sont pas
+   (`etl/raw_reading.py:53`, `:126`). Il les convertit en items, puis les écrit dans la base en une transaction
+   (`etl/pipeline.py:51-82`, `etl/load.py:60-96`). Les deux classements des dépôts les plus étoilés et les plus
+   forkés n'entrent pas dans la base: ils n'ont pas de lecteur (`etl/source_kinds.py:66-77`). Après l'import, les
+   purges suppriment du brut et de la base ce qui a passé sa durée (`purge/after_import.py:43-52`,
+   `purge/catalogs.py:33`, `purge/raw.py:34`).
+3. **De la base aux deux API.** `kb serve-data` lit la base en lecture seule et sert les items et les tendances
+   (`database/engine.py:58-87`, `database/reading.py:329`, `:416`, `:519`). `kb serve-ai` ne lit jamais la base:
+   il demande les items et les tendances à l'API de données, par HTTP
+   (`ai_api/connectors/data_api_client.py:266-268`, `:289`, `:308`).
 4. **De l'API IA au modèle.** L'API IA envoie les items au modèle et reçoit ses textes, par le chemin
-   `chat/completions` (`ai_api/connectors/llm_client.py:40`). Pour les tendances, elle lit aussi sur l'API GitHub
-   la fiche de chaque candidat et le README des dépôts choisis. Elle envoie ses mesures, ses traces et leurs
-   journaux en OpenTelemetry (OTLP) vers Grafana Cloud (`ai_api/connectors/trace_export.py:1`).
-5. **L'écriture dans le coffre.** `kb digest` et `kb trend-report` reçoivent la réponse de l'API IA, puis écrivent
-   les fiches dans le coffre, sous `veille/`. `kb write-tops` écrit les fiches des deux classements, qu'il lit dans
-   le brut, sans modèle ni base. Seule la commande `kb` écrit dans le coffre, jamais une API.
+   `chat/completions` (`ai_api/connectors/llm_client.py:40`, `:436`). Pour les tendances, elle lit aussi sur l'API
+   GitHub la fiche de chaque candidat et le README des dépôts choisis (`ai_api/connectors/github_client.py:155-161`,
+   `:191`). Elle envoie ses mesures, ses traces et leurs journaux en OpenTelemetry (OTLP) vers Grafana Cloud
+   (`ai_api/connectors/metrics_export.py:301`, `ai_api/connectors/trace_export.py:124`, `:134`).
+5. **L'écriture dans le coffre.** `kb digest` envoie `POST /digests` à l'API IA, puis écrit une fiche par sujet,
+   `veille/<sujet>/AAAA-MM-JJ.md` (`post/ai_api_client.py:226`, `commands/digest_command.py:118`). Il ne tient pas
+   de registre: l'API IA prend une fenêtre de `KB_DIGEST_WINDOW_DAYS` jours, 3 par défaut
+   (`core/config.py:329-330`). `kb trend-report` lit d'abord le registre des comptes rendus,
+   `KB_DATA_DIR/trend_reports.json`, dont le dernier donne la période suivante (`post/trend_report_registry.py:26`,
+   `:62`; `commands/trend_report_command.py:73`, `:134`). Il envoie `POST /trend-reports`
+   (`post/trend_report_client.py:219-224`), écrit le compte rendu sous `veille/tendances/`
+   (`commands/trend_report_command.py:245`), puis ajoute son entrée au registre (`:104`;
+   `post/trend_report_registry.py:81-86`). `kb write-tops` lit les deux classements dans le brut, écrit leurs
+   fiches sous `veille/tops/`, puis supprime du brut les classements remplacés, sans modèle ni base
+   (`post/top_sheets.py:58`, `:70`, `:73`, `:92`). Seule la commande `kb` écrit dans le coffre, jamais une API.
 6. **Le stockage d'échange en ligne.** Aujourd'hui, seul le conteneur `smoke-test` existe en ligne
    (`infra/modules/exchange-storage.bicep:39-46`): `kb smoke-test` le liste et n'écrit que le nombre de blobs de
    sa première page, 100 au plus (`commands/smoke_test_command.py:1-3`, `:141`, `core/config.py:552`). #420
    prévoit le reste, que rien ne crée encore: la lecture choisie, où le Mac déposera les clips et les copies de
-   Zotero, et le conteneur `watch`, où les jobs publieront `veille/`. Le code des jobs est prêt pour les clips et
-   pour `veille/`: `kb daily-routine` copiera les clips dans le coffre du job (`commands/daily_routine_command.py:45`,
-   `commands/job_transfers.py:38`), et `kb daily-routine` et `kb digest-watch` publieront `veille/`
-   (`commands/job_transfers.py:68`). La copie de Zotero dans le job n'est pas encore codée: elle viendra entre le
-   miroir des clips et `kb collect` (#425, `commands/daily_routine_command.py:50`). Dans un job, le coffre est le
-   dossier `KB_VAULT_DIR` du job, pas celui du Mac. Ces deux jobs ne sont déclarés en ligne ni dans
-   `infra/deployment.json`, ni dans `infra/main.bicep`. L'envoi des clips et des copies de Zotero depuis le Mac, et
-   la relecture de `watch` par le Mac, ne sont pas encore codés: ils viendront par `make upload-library` et
-   `make download-watch-sheets` (#424).
+   Zotero, et le conteneur `watch`, où les jobs publieront `veille/`. Les deux routines relancent les commandes
+   dans le même processus (`commands/job_routine.py:4-6`). `kb daily-routine` copie les clips dans le coffre du
+   job, puis lance `kb collect`, `kb import` et `kb write-tops`, puis publie `veille/`
+   (`commands/daily_routine_command.py:42-69`, `commands/job_transfers.py:38`, `jobs/clip_mirror.py:241`).
+   `kb digest-watch` lance `kb digest` et `kb trend-report`, puis publie `veille/`
+   (`commands/digest_watch_command.py:59-81`). La publication lit `veille/` et ajoute au conteneur `watch` les
+   fiches qui n'y sont pas, sans en remplacer (`commands/job_transfers.py:68`, `jobs/watch_publication.py:146`).
+   La copie de Zotero dans le job n'est pas encore codée: elle viendra entre le miroir des clips et `kb collect`
+   (#425, `commands/daily_routine_command.py:50`). Dans un job, le coffre est le dossier `KB_VAULT_DIR` du job, pas
+   celui du Mac. Ces deux jobs ne sont déclarés en ligne ni dans `infra/deployment.json`, ni dans
+   `infra/main.bicep`. L'envoi des clips et des copies de Zotero depuis le Mac, et la relecture de `watch` par le
+   Mac, ne sont pas encore codés: ils viendront par `make upload-library` et `make download-watch-sheets` (#424).
+
+Les journaux restent hors du dessin: aucune commande ne les relit, sauf la purge, qui les supprime d'après la date
+de leur nom (`purge/run_records.py:38`, `:75`). Ce sont les journaux de fonctionnement, sous `KB_DATA_DIR/logs/`
+(`commands/run_log.py:23`, `:27`, `:29`), le journal d'import, `KB_DATA_DIR/journals/import-journal-<date>.jsonl`
+(`etl/pipeline.py:35`, `:63-68`), et la ligne JSON que l'API IA écrit sur sa sortie standard pour chaque appel au
+modèle (`ai_api/observability/metrics.py:50`). Restent hors du dessin aussi deux appels qui ne portent pas de
+donnée de la veille: `GET /health`, par lequel `kb smoke-test` vérifie les deux API et `kb digest-watch` les
+réveille (`commands/smoke_test_command.py:80-81`, `commands/digest_watch_command.py:60-64`), et la demande d'un
+jeton à l'identité managée (`jobs/exchange_storage.py:157`, `database/entra.py:57`). `kb openapi` écrit le contrat
+des deux API dans le dépôt, `docs/api/openapi-donnees.json` et `docs/api/openapi-ia.json`
+(`commands/openapi_command.py:30-32`, `:50`).
 
 ## Les couches du code
 
