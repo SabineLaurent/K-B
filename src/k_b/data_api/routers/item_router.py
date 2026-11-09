@@ -18,6 +18,7 @@ from k_b.data_api.schemas.item_schema import (
 )
 from k_b.database.reading import (
     ClipDetail,
+    DetailBounds,
     KindDetail,
     StoredHighlight,
     ZoteroEntryDetail,
@@ -128,7 +129,12 @@ def read_item(
     connection: Database, item_id: Annotated[ItemId, Path()]
 ) -> ItemDetailSchema:
     """An item, with what its kind serves beyond the list."""
-    detail = read_item_detail(connection, item_id)
+    # One more than served: the cut is seen without reading the rest.
+    detail = read_item_detail(
+        connection,
+        item_id,
+        DetailBounds(MAX_SERVED_HIGHLIGHTS + 1, MAX_SERVED_TEXT_LENGTH + 1),
+    )
     if detail is None:
         raise ApiError(404, "item_not_found")
     # The discriminator picks the schema of the kind; a field it does not name is not served.

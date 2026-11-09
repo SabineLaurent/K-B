@@ -99,6 +99,7 @@ SELECT zotero_key, text, comment, highlighted_at, revised_at, withdrawn_at
 FROM highlight
 WHERE item_id = ?
 ORDER BY highlighted_at, highlight_id
+LIMIT ?
 """
 
 # What the detail serves beyond the list, one query per kind, each column named as the response
@@ -143,8 +144,9 @@ FROM zotero_entry LEFT JOIN publication ON publication.id = zotero_entry.publica
 WHERE zotero_entry.item_id = ?
 """
 
+# substr counts characters on both engines, as the base is in UTF8 on PostgreSQL (creation.py).
 SELECT_CLIP = """
-SELECT published_at, body
+SELECT published_at, substr(body, 1, ?) AS body
 FROM clip
 WHERE item_id = ?
 """
@@ -259,8 +261,16 @@ class ClipDetail(NamedTuple):
 
     # published of Web Clipper, a day at midnight UTC; None when the page gives none.
     published_at: str | None
-    # The text kept, as written.
+    # The text kept, as written, its first characters within the bound of the reading.
     body: str
+
+
+class DetailBounds(NamedTuple):
+    """The most highlights of a Zotero entry and characters of the text of a clip a detail reads;
+    the rest is never read."""
+
+    highlights: int
+    body_length: int
 
 
 KindDetail = (
@@ -395,18 +405,23 @@ def to_like_pattern(search_text: str) -> str:
     return f"%{escaped}%"
 
 
-def read_highlights(connection: Connection, item_id: int) -> list[StoredHighlight]:
-    """The highlights of a Zotero entry, the withdrawn ones included, by date of creation;
-    item_id must hold in 64 bits, or sqlite3 raises an OverflowError."""
+def read_highlights(
+    connection: Connection, item_id: int, max_highlights: int
+) -> list[StoredHighlight]:
+    """The first max_highlights highlights of a Zotero entry, the withdrawn ones included, by date
+    of creation; item_id must hold in 64 bits, or sqlite3 raises an OverflowError."""
     check_within_bounds("item_id", item_id, MIN_INT64, MAX_INT64)
     return [
         StoredHighlight._make(row)
-        for row in connection.execute(SELECT_HIGHLIGHTS, (item_id,))
+        for row in connection.execute(SELECT_HIGHLIGHTS, (item_id, max_highlights))
     ]
 
 
-def read_item_detail(connection: Connection, item_id: int) -> ItemDetail | None:
-    """An item with what its kind serves beyond the list, or None if no item has this id.
+def read_item_detail(
+    connection: Connection, item_id: int, bounds: DetailBounds
+) -> ItemDetail | None:
+    """An item with what its kind serves beyond the list, within the bounds, or None if no item
+    has this id.
 
     Its queries share one read transaction, so that a write between them cannot mix two states of
     a catalog row: the connection must hold no transaction."""
@@ -425,13 +440,15 @@ def read_item_detail(connection: Connection, item_id: int) -> ItemDetail | None:
             return None
         listed = ListedItem._make(row)
         return ItemDetail(
-            listed, READ_DETAILS_BY_KIND[listed.kind](connection, item_id)
+            listed, READ_DETAILS_BY_KIND[listed.kind](connection, item_id, bounds)
         )
     finally:
         end_reading(connection)
 
 
-def read_paper_detail(connection: Connection, item_id: int) -> PaperDetail:
+def read_paper_detail(
+    connection: Connection, item_id: int, bounds: DetailBounds
+) -> PaperDetail:
     """Read the details of a paper item."""
     arxiv_id, authors, summary, arxiv_updated_at = fetch_row(
         connection, SELECT_PAPER, item_id
@@ -440,7 +457,7 @@ def read_paper_detail(connection: Connection, item_id: int) -> PaperDetail:
 
 
 def read_vulnerability_detail(
-    connection: Connection, item_id: int
+    connection: Connection, item_id: int, bounds: DetailBounds
 ) -> VulnerabilityDetail:
     """Read the details of a vulnerability item."""
     return VulnerabilityDetail._make(
@@ -448,12 +465,16 @@ def read_vulnerability_detail(
     )
 
 
-def read_release_detail(connection: Connection, item_id: int) -> ReleaseDetail:
+def read_release_detail(
+    connection: Connection, item_id: int, bounds: DetailBounds
+) -> ReleaseDetail:
     """Read the details of a release item."""
     return ReleaseDetail._make(fetch_row(connection, SELECT_RELEASE, item_id))
 
 
-def read_advisory_detail(connection: Connection, item_id: int) -> AdvisoryDetail:
+def read_advisory_detail(
+    connection: Connection, item_id: int, bounds: DetailBounds
+) -> AdvisoryDetail:
     """Read the details of an advisory item."""
     ghsa_id, cve_id, exploited, packages = fetch_row(
         connection, SELECT_ADVISORY, item_id
@@ -468,7 +489,7 @@ def read_advisory_detail(connection: Connection, item_id: int) -> AdvisoryDetail
 
 
 def read_newsletter_article_detail(
-    connection: Connection, item_id: int
+    connection: Connection, item_id: int, bounds: DetailBounds
 ) -> NewsletterArticleDetail:
     """Read the details of a newsletter article item."""
     return NewsletterArticleDetail._make(
@@ -476,8 +497,10 @@ def read_newsletter_article_detail(
     )
 
 
-def read_zotero_entry_detail(connection: Connection, item_id: int) -> ZoteroEntryDetail:
-    """Read the details of a Zotero entry item, with its highlights."""
+def read_zotero_entry_detail(
+    connection: Connection, item_id: int, bounds: DetailBounds
+) -> ZoteroEntryDetail:
+    """Read the details of a Zotero entry item, with its first highlights."""
     zotero_key, item_type, arxiv_id, revised_at = fetch_row(
         connection, SELECT_ZOTERO_ENTRY, item_id
     )
@@ -486,13 +509,17 @@ def read_zotero_entry_detail(connection: Connection, item_id: int) -> ZoteroEntr
         item_type,
         arxiv_id,
         revised_at,
-        read_highlights(connection, item_id),
+        read_highlights(connection, item_id, bounds.highlights),
     )
 
 
-def read_clip_detail(connection: Connection, item_id: int) -> ClipDetail:
-    """Read the details of a clip item."""
-    return ClipDetail._make(fetch_row(connection, SELECT_CLIP, item_id))
+def read_clip_detail(
+    connection: Connection, item_id: int, bounds: DetailBounds
+) -> ClipDetail:
+    """Read the details of a clip item, with the first characters of its text."""
+    return ClipDetail._make(
+        connection.execute(SELECT_CLIP, (bounds.body_length, item_id)).fetchone()
+    )
 
 
 def fetch_row(connection: Connection, query: str, item_id: int) -> Any:
@@ -501,7 +528,10 @@ def fetch_row(connection: Connection, query: str, item_id: int) -> Any:
     return connection.execute(query, (item_id,)).fetchone()
 
 
-READ_DETAILS_BY_KIND: dict[ItemKind, Callable[[Connection, int], KindDetail]] = {
+# One signature for every kind; only a Zotero entry and a clip have something to bound.
+READ_DETAILS_BY_KIND: dict[
+    ItemKind, Callable[[Connection, int, DetailBounds], KindDetail]
+] = {
     "paper": read_paper_detail,
     "vulnerability": read_vulnerability_detail,
     "release": read_release_detail,

@@ -9,6 +9,7 @@ import pytest
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
 from k_b.database.engine import connect_reader, open_readers
 from k_b.database.reading import (
+    DetailBounds,
     read_highlights,
     read_item_detail,
     read_items,
@@ -69,6 +70,8 @@ READ_ITEMS_CALLS = [
     },
 ]
 ITEM_IDS = [*range(1, 19), 999]
+# Bounds no item of the test base reaches.
+BOUNDS = DetailBounds(highlights=100, body_length=125_000)
 TREND_WINDOWS = [None, date(2026, 10, 9), date(2026, 10, 10), date(2026, 1, 1)]
 
 
@@ -80,9 +83,12 @@ def read_everything(location):
     ):
         return {
             "items": [read_items(connection, **call) for call in READ_ITEMS_CALLS],
-            "details": [read_item_detail(connection, item_id) for item_id in ITEM_IDS],
+            "details": [
+                read_item_detail(connection, item_id, BOUNDS) for item_id in ITEM_IDS
+            ],
             "highlights": [
-                read_highlights(connection, item_id) for item_id in (14, 15, 16)
+                read_highlights(connection, item_id, BOUNDS.highlights)
+                for item_id in (14, 15, 16)
             ],
             "trends": [read_trends(connection, window) for window in TREND_WINDOWS],
         }

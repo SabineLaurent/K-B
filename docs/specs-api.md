@@ -320,6 +320,12 @@ par un emoji composé, une lettre sans son accent combiné ou un lien incomplet.
 Les deux drapeaux sont toujours servis, faux sans coupe. La suite n'est pas servie : ni
 pagination, ni nombre total.
 
+La base ne lit pas la suite non plus (#430) : 101 surlignages au plus (`LIMIT`) et les
+125 001 premiers caractères du texte d'un clip (`substr`), un de plus que ce qui est servi, pour
+que la route voie la coupe sans lire le reste. La route passe ces bornes à la lecture
+(`DetailBounds`, `database/reading.py`) ; elles ne sont écrites qu'une fois, dans `item_router.py`.
+`substr` compte des caractères sur les deux moteurs, la base PostgreSQL étant en UTF8.
+
 `exploited` vaut vrai si la CVE de l'alerte est au catalogue CISA KEV
 (`vulnerability.item_id IS NOT NULL`) : faux veut dire « absente du catalogue KEV », pas « non
 exploitée ». Il est nul pour une alerte sans CVE. Il reste vrai si la CVE a été retirée du

@@ -14,9 +14,11 @@ from k_b.database.creation import create_database
 from k_b.database.engine import connect_database, connect_reader, open_readers
 from k_b.database.errors import is_query_timeout
 from k_b.database.location import PostgresUrl, UnreadableDatabaseUrlError
-from k_b.database.reading import read_item_detail, read_items
+from k_b.database.reading import DetailBounds, read_item_detail, read_items
 
 ITEMS_DATABASE_SCRIPT = Path(__file__).parents[1] / "fixtures" / "items_database.sql"
+# Bounds no item of the test base reaches.
+BOUNDS = DetailBounds(highlights=100, body_length=125_000)
 PASSWORD = "S3cret-of-the-test"  # noqa: S105 — a marker the test looks for, no secret
 # libpq stops at the [ of an IPv6 host never closed, and its error quotes the whole URL.
 MALFORMED_URL = PostgresUrl(f"postgresql://kb:{PASSWORD}@[::1/kb")
@@ -193,8 +195,8 @@ def ending_the_session_after_each_detail(monkeypatch, location, error=None):
     raises the error given, if any."""
 
     def end_after(read_detail):
-        def read_then_end(connection, item_id):
-            detail = read_detail(connection, item_id)
+        def read_then_end(connection, item_id, bounds):
+            detail = read_detail(connection, item_id, bounds)
             end_the_session_of(location, connection)
             if error is not None:
                 raise error
@@ -216,7 +218,7 @@ def test_a_detail_that_read_is_served_when_its_connection_is_lost_before_its_end
         caplog.at_level(logging.INFO),
         connect_reader(readers, TIMEOUT_SECONDS) as connection,
     ):
-        detail = read_item_detail(connection, 1)
+        detail = read_item_detail(connection, 1, BOUNDS)
 
     assert detail is not None
     assert detail.listed.id == 1
@@ -235,7 +237,7 @@ def test_the_error_of_a_detail_passes_when_its_connection_is_lost_before_its_end
         pytest.raises(RequestFailedError),
         connect_reader(readers, TIMEOUT_SECONDS) as connection,
     ):
-        read_item_detail(connection, 1)
+        read_item_detail(connection, 1, BOUNDS)
 
 
 @on_postgresql
@@ -250,10 +252,10 @@ def test_the_detail_reads_one_state_of_the_base_while_a_writer_commits(
     writer.commit()
     read_highlights = reading.read_highlights
 
-    def withdraw_every_highlight_first(connection, item_id):
+    def withdraw_every_highlight_first(connection, item_id, max_highlights):
         writer.execute("UPDATE highlight SET withdrawn_at = '2026-11-06T00:00:00Z'")
         writer.commit()
-        return read_highlights(connection, item_id)
+        return read_highlights(connection, item_id, max_highlights)
 
     monkeypatch.setattr(reading, "read_highlights", withdraw_every_highlight_first)
     try:
@@ -261,7 +263,7 @@ def test_the_detail_reads_one_state_of_the_base_while_a_writer_commits(
             open_readers(postgresql_base, TIMEOUT_SECONDS) as readers,
             connect_reader(readers, TIMEOUT_SECONDS) as connection,
         ):
-            detail = read_item_detail(connection, 14)
+            detail = read_item_detail(connection, 14, BOUNDS)
     finally:
         writer.close()
 

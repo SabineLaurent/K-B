@@ -13,6 +13,7 @@ from k_b.database.engine import connect_database, connect_reader, open_readers
 from k_b.database.reading import (
     AdvisoryDetail,
     ClipDetail,
+    DetailBounds,
     ItemDetail,
     KindDetail,
     ListedItem,
@@ -29,6 +30,8 @@ from k_b.items import MAX_INT64, MIN_INT64, ItemKind
 # Every item of the test base, in the order of the reading: source_date, then id, descending.
 ALL_IDS = [12, 11, 13, 15, 6, 14, 7, 8, 3, 2, 4, 1, 16, 18, 9, 10, 17, 5]
 PLUS_TWO_HOURS = timezone(timedelta(hours=2))
+# Bounds no item of the test base reaches.
+BOUNDS = DetailBounds(highlights=100, body_length=125_000)
 
 
 @pytest.fixture
@@ -311,7 +314,7 @@ def test_the_withdrawn_rows_are_listed_with_their_date(connection):
 
 
 def test_the_highlights_of_an_entry_withdrawn_ones_included(connection):
-    assert read_highlights(connection, 14) == [
+    assert read_highlights(connection, 14, BOUNDS.highlights) == [
         StoredHighlight(
             "ANNOTAA2",
             "A highlighted sentence on the first page.",
@@ -340,7 +343,7 @@ def test_the_highlights_of_an_entry_withdrawn_ones_included(connection):
 
 
 def test_an_entry_without_highlight_has_none(connection):
-    assert read_highlights(connection, 15) == []
+    assert read_highlights(connection, 15, BOUNDS.highlights) == []
 
 
 @pytest.mark.parametrize(
@@ -355,20 +358,20 @@ def test_an_item_id_beyond_64_bits_is_refused_by_its_bound(
     connection, item_id, message
 ):
     with pytest.raises(ValueError) as refusal:
-        read_highlights(connection, item_id)
+        read_highlights(connection, item_id, BOUNDS.highlights)
 
     assert str(refusal.value) == message
 
 
 def test_the_detail_of_an_item_holds_its_listed_fields(connection):
-    detail = read_item_detail(connection, 2)
+    detail = read_item_detail(connection, 2, BOUNDS)
 
     assert isinstance(detail, ItemDetail)
     assert detail.listed == read_item(connection, 2)
 
 
 def test_the_detail_of_a_paper_reads_its_arxiv_date_in_revised_at(connection):
-    detail = read_item_detail(connection, 2)
+    detail = read_item_detail(connection, 2, BOUNDS)
 
     assert detail is not None
     assert detail.listed.source_date == "2026-09-27T09:30:13Z"
@@ -409,7 +412,7 @@ def test_the_detail_of_a_paper_reads_its_arxiv_date_in_revised_at(connection):
     ids=["in-kev-withdrawn-since", "not-in-kev", "without-cve"],
 )
 def test_exploited_reads_the_kev_catalog_as_a_boolean(connection, item_id, advisory):
-    detail = read_item_detail(connection, item_id)
+    detail = read_item_detail(connection, item_id, BOUNDS)
 
     assert detail is not None
     assert detail.details == advisory
@@ -417,23 +420,25 @@ def test_exploited_reads_the_kev_catalog_as_a_boolean(connection, item_id, advis
 
 
 def test_the_detail_of_a_zotero_entry_holds_its_paper_and_its_highlights(connection):
-    detail = read_item_detail(connection, 14)
+    detail = read_item_detail(connection, 14, BOUNDS)
 
     assert detail is not None
     assert detail.details.arxiv_id == "2609.00001"
     assert detail.details.revised_at == "2026-10-06T09:30:00Z"
-    assert detail.details.highlights == read_highlights(connection, 14)
+    assert detail.details.highlights == read_highlights(
+        connection, 14, BOUNDS.highlights
+    )
 
 
 def test_a_zotero_entry_without_arxiv_reference_has_no_arxiv_id(connection):
-    detail = read_item_detail(connection, 16)
+    detail = read_item_detail(connection, 16, BOUNDS)
 
     assert detail is not None
     assert detail.details.arxiv_id is None
 
 
 def test_a_clip_is_listed_by_its_day_saved_and_detailed_with_its_text(connection):
-    detail = read_item_detail(connection, 18)
+    detail = read_item_detail(connection, 18, BOUNDS)
 
     assert detail == ItemDetail(
         ListedItem(
@@ -457,18 +462,18 @@ def test_the_text_of_a_clip_is_searched(connection):
 
 @pytest.mark.parametrize("item_id", [999, 0, -1, MAX_INT64, MIN_INT64])
 def test_an_unknown_item_has_no_detail(connection, item_id):
-    assert read_item_detail(connection, item_id) is None
+    assert read_item_detail(connection, item_id, BOUNDS) is None
 
 
 def test_the_detail_of_an_item_id_beyond_64_bits_is_refused_by_its_bound(connection):
     with pytest.raises(ValueError) as refusal:
-        read_item_detail(connection, MAX_INT64 + 1)
+        read_item_detail(connection, MAX_INT64 + 1, BOUNDS)
 
     assert str(refusal.value) == f"item_id above maximum {MAX_INT64}"
 
 
 def test_the_detail_ends_its_own_transaction_on_sqlite_only(connection, engine):
-    read_item_detail(connection, 14)
+    read_item_detail(connection, 14, BOUNDS)
 
     # On PostgreSQL, the readers end it when the connection is given back to the pool
     # (tests/database/test_reading_pool.py).
@@ -553,11 +558,11 @@ def test_an_item_is_read_by_the_branch_of_its_kind_only(
     connection = base_with_vulnerabilities_on_papers
 
     listed = read_items(connection, limit=100).items
-    detail = read_item_detail(connection, 1)
+    detail = read_item_detail(connection, 1, BOUNDS)
 
     assert [(item.id, item.kind, item.title) for item in listed] == [
         (1, "paper", "A paper")
     ]
     assert detail is not None
     assert detail.listed.title == "A paper"
-    assert read_item_detail(connection, 2) is None
+    assert read_item_detail(connection, 2, BOUNDS) is None
