@@ -34,7 +34,7 @@ flowchart LR
     base -->|"lecture seule"| dataApi["API de données<br>kb serve-data"]
     dataApi -->|"GET /items<br>GET /items/{item_id}<br>GET /trends"| aiApi["API IA<br>kb serve-ai"]
     aiApi <-->|"chat/completions"| model["modèle"]
-    githubCards["API GitHub<br>fiches et README<br>des candidats"] -->|"tendances seules"| aiApi
+    githubCards["API GitHub<br>fiches des candidats<br>README des dépôts choisis"] -->|"tendances seules"| aiApi
     aiApi -->|"OTLP"| grafana["Grafana Cloud"]
     aiApi -->|"POST /digests<br>POST /trend-reports"| clients["kb digest<br>kb trend-report"]
     clients -->|"écrit"| vault["coffre<br>veille/"]
@@ -79,7 +79,7 @@ Le diagramme se lit ainsi, dans l'ordre des flux:
    lit et écrit les conteneurs `clippings` et `watch` est prêt, mais les conteneurs ne sont pas créés (#420):
    `kb daily-routine` copiera les clips du conteneur `clippings` dans le coffre du job, et `kb daily-routine` et
    `kb digest-watch` publieront `veille/` dans le conteneur `watch` (`commands/job_transfers.py:38`, `:68`). Dans
-   un job, le coffre est le dossier `KB_VAULT_DIR` du conteneur, pas celui du Mac. Ces deux jobs ne sont déclarés en
+   un job, le coffre est le dossier `KB_VAULT_DIR` du job, pas celui du Mac. Ces deux jobs ne sont déclarés en
    ligne ni dans `infra/deployment.json`, ni dans `infra/main.bicep`. L'envoi des clips depuis le Mac, et la
    relecture de `watch` par le Mac, ne sont pas encore codés: ils viendront par `make upload-library` et
    `make download-watch-sheets` (#424).
@@ -104,9 +104,10 @@ Les tests de `tests/architecture/` lisent les imports de chaque module et tienne
 | `ai_api/` | l'API IA, rangée en 16 couches internes | importer autre chose que `ai_api`, `items` et `core` (`test_apis.py:118`); importer sa couche ou celles du dessus (`:223`) |
 | `items.py`, `core/` | les types communs des items, les réglages par défaut, la citation d'une valeur au journal, le code commun des deux API | `core` n'importe rien de K-B (`test_layers.py:20`) |
 
-Un test tient la liste elle-même: chaque module de premier niveau de K-B y est rangé
-(`tests/architecture/test_packages.py:14`); un autre veut chaque `__init__.py` vide (`:33`). Un module de source a
-la même forme partout, un bloc EXTRACT puis un bloc TRANSFORM (`tests/architecture/test_source_modules.py:67`).
+Deux tests tiennent la liste elle-même: les modules de premier niveau de K-B
+(`tests/architecture/test_packages.py:14`) et ceux d'`etl/` (`:20`); un autre veut chaque `__init__.py` vide
+(`:33`). Un module de source a la même forme partout, un bloc EXTRACT puis un bloc TRANSFORM
+(`tests/architecture/test_source_modules.py:67`).
 
 ## La collecte
 
@@ -183,10 +184,10 @@ Deux routines de job, codées mais pas encore en ligne, relancent ces commandes:
 `commands/digest_watch_command.py:65-74`). `kb daily-routine` écrit aussi dans le coffre du job les clips du
 conteneur `clippings`, sous `Clippings/` (`commands/job_transfers.py:50-52`).
 
-Une fiche est écrite une fois, jamais par un lien symbolique que `kb` voit (`post/vault_files.py:1-2`); un lien
-apparu entre le contrôle et le renommage est suivi, une limite acceptée (`:4-5`). Une commande qui écrit dans
-le coffre refuse de démarrer si `KB_VAULT_DIR` n'est pas un dossier existant: elle ne le crée pas
-(`etl/collected_sources.py:95-107`).
+Une fiche est écrite une fois, jamais par un lien symbolique que `kb` voit (`post/vault_files.py:1-2`); une fiche
+ou un lien apparus entre le contrôle et le renommage sont remplacés ou suivis, une limite acceptée (`:4-5`). Une
+commande qui écrit dans le coffre refuse de démarrer si `KB_VAULT_DIR` n'est pas un dossier existant: elle ne le
+crée pas (`etl/collected_sources.py:95-107`).
 
 ## L'hébergement
 
