@@ -13,6 +13,7 @@ from urllib.parse import urlsplit, urlunsplit
 import psycopg
 import pytest
 
+from k_b.core.api_settings import DEPLOYMENT_ENVIRONMENT_VARIABLE
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
 from k_b.database.creation import create_database
 from k_b.database.engine import connect_database, open_readers
@@ -31,12 +32,15 @@ KB_SETTINGS_VARIABLES = (
     "KB_LOG_TO_FILE",
     "KB_DATABASE_URL",
     "KB_DATABASE_AUTH",
-    "KB_DEPLOYMENT_ENVIRONMENT",
+    DEPLOYMENT_ENVIRONMENT_VARIABLE,
     "KB_DATA_API_URL",
     "KB_AI_API_URL",
 )
 # The marker of the tests that run kb on the real sources (tests/e2e/).
 E2E_MARKER = "e2e"
+# The settings an end-to-end test keeps, given by .env.e2e_test: the export of the metrics labels
+# its measures with the environment (tests/e2e/test_real_export.py).
+END_TO_END_SETTINGS = frozenset({DEPLOYMENT_ENVIRONMENT_VARIABLE})
 # The marker of the tests that need a PostgreSQL server, given by KB_TEST_POSTGRESQL_URL: the URL
 # of a base of that server whose role may create and drop a base (the CI service, or a server of
 # the developer's machine, never the base of production).
@@ -142,11 +146,14 @@ def connect_with_factory():
 
 
 @pytest.fixture(autouse=True)
-def no_kb_setting_of_the_terminal(monkeypatch):
+def no_kb_setting_of_the_terminal(request, monkeypatch):
     """A terminal that exports a setting of kb, or a variable libpq reads, must not change what the
-    tests check."""
+    tests check; an end-to-end test keeps the settings it reads."""
+    is_end_to_end = request.node.get_closest_marker(E2E_MARKER) is not None
+    kept = END_TO_END_SETTINGS if is_end_to_end else frozenset()
     for name in (*KB_SETTINGS_VARIABLES, *LIBPQ_VARIABLES):
-        monkeypatch.delenv(name, raising=False)
+        if name not in kept:
+            monkeypatch.delenv(name, raising=False)
 
 
 @pytest.fixture(scope="session")
