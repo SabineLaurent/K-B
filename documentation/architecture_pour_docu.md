@@ -209,7 +209,9 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
    copie de Zotero dans le job n'est pas encore codée: elle viendra entre le miroir des clips et `kb collect` (#425,
    `commands/daily_routine_command.py:50`). #425 la prévoit dans un dossier temporaire, que `KB_ZOTERO_DIR` nomme pour
    `kb collect`: la flèche « pose la copie » va vers ce dossier, pas vers le Zotero du Mac. Dans un job, le coffre est
-   le dossier `KB_VAULT_DIR` du job, pas celui du Mac. Ces deux jobs ne sont déclarés en ligne ni dans
+   le dossier `KB_VAULT_DIR` du job, pas celui du Mac: `kb collect` y lit `Clippings/`, et lira la copie de Zotero dans
+   le dossier de `KB_ZOTERO_DIR` (`etl/collected_sources.py:18-22`, `etl/sources/clipping.py:103`); `kb write-tops`,
+   `kb digest` et `kb trend-report` y écrivent `veille/`. Ces deux jobs ne sont déclarés en ligne ni dans
    `infra/deployment.json`, ni dans `infra/main.bicep`. L'envoi des clips et des copies de Zotero depuis le Mac, et la
    relecture de `watch` par le Mac, ne sont pas encore codés: ils viendront par `make upload-library` et
    `make download-watch-sheets` (#424).
@@ -379,15 +381,15 @@ flowchart TB
             smokeJob["caj-kb-smoke-test<br>vérifie le déploiement<br>id-kb-smoke-test"]
             dataApi["ca-kb-data-api<br>API de données, sert les items<br>id-kb-data-api"]
             aiApi["ca-kb-ai-api<br>API IA, rédige les comptes rendus<br>id-kb-ai-api"]
-            dailyJob["caj-kb-daily-routine<br>collecte chaque jour<br>id-kb-daily-routine, prévu #330"]
-            digestJob["caj-kb-digest-watch<br>demande les comptes rendus<br>id-kb-digest-watch, prévu #423"]
+            dailyJob["caj-kb-daily-routine<br>collecte chaque jour<br>id-kb-daily-routine (#420)<br>prévu #330"]
+            digestJob["caj-kb-digest-watch<br>demande les comptes rendus<br>id-kb-digest-watch (#420)<br>prévu #423"]
         end
         base[("pgsql-kb-…<br>Base, PostgreSQL 18<br>Entra ID seul")]
         subgraph exchange["Stockage d'échange en ligne, stkbexchange…"]
             smokeContainer[("conteneur<br>smoke-test")]
             subgraph choice["Lecture choisie (clips, Zotero), prévue par #420"]
-                clipContainer[("clips<br>conteneur clippings")]
-                zoteroContainer[("copies de Zotero<br>conteneur zotero")]
+                clipContainer[("clips")]
+                zoteroContainer[("copies de Zotero")]
             end
             watchContainer[("conteneur<br>watch")]
         end
@@ -428,9 +430,10 @@ flowchart TB
 ```
 
 Le schéma dit où est quoi en ligne, et ce qui s'y passe. Un trait plein est déployé; un trait ou un bord en pointillés
-est prévu, avec son issue. Une flèche suit le sens des données, comme dans le flux en détail; seules les deux flèches
-`GET /health` sont des appels sans donnée de la veille, par lesquels le job de vérification teste les deux API. Sur une
-app ou un job, le nœud porte son identité managée; sur une flèche, le rôle qui la permet.
+est prévu, avec son issue. Une flèche suit le sens des données, comme dans le flux en détail; trois flèches sont des
+appels sans donnée de la veille: les deux `GET /health`, par lesquels le job de vérification teste les deux API, et
+« met à jour, lance les jobs », par laquelle le déploiement agit sur les apps et les jobs. Sur une app ou un job, le
+nœud porte son identité managée; sur une flèche, le rôle qui la permet.
 
 - **Les apps et les jobs** tournent dans l'environnement `cae-kb`
   (`infra/modules/container-apps-environment.bicep:7-8`), depuis la même image, tirée du registre par le rôle AcrPull
@@ -456,13 +459,15 @@ app ou un job, le nœud porte son identité managée; sur une flèche, le rôle 
   pousse l'image, lance `caj-kb-migrate-database`, met à jour les apps et les jobs, puis lance `caj-kb-smoke-test`
   (`.github/workflows/deploy.yml:7-11`, `:97-133`, `:161-209`). `id-kb-deploy` a les rôles AcrPush et Reader sur le
   registre, Container Apps Contributor sur chaque app et Container Apps Jobs Contributor sur chaque job
-  d'`infra/deployment.json`, et rien sur le Key Vault, le stockage ni les données
-  (`infra/modules/deploy-access.bicep:13-18`, `:25-35`, `:53-87`).
+  d'`infra/deployment.json`, et aucun rôle direct sur le Key Vault, le stockage ni les données
+  (`infra/modules/deploy-access.bicep:1-4`, `:13-18`, `:25-35`, `:53-87`). Le registre des traitements consigne le
+  risque accepté: ces rôles Contributor permettent de lire en clair les secrets des apps et des jobs
+  (`docs/registre-traitements.md:196`).
 - **L'opératrice**, par son compte Entra, applique le Bicep à la main (`infra/main.bicep:1-3`,
   [`infra/README.md`](../infra/README.md)); elle a le rôle Key Vault Secrets Officer, pour poser les secrets
-  (`infra/modules/key-vault.bicep:33-41`), et elle est l'administratrice Entra du serveur PostgreSQL
-  (`infra/modules/postgresql-server.bicep:53-61`). Le budget `budget-kb` envoie ses alertes par e-mail
-  (`infra/modules/budget.bicep:5-25`).
+  (`infra/modules/key-vault.bicep:33-41`, `infra/main.bicep:102`), et elle est l'administratrice Entra du serveur
+  PostgreSQL (`infra/modules/postgresql-server.bicep:53-61`, `infra/main.bicep:270-271`). Le budget `budget-kb` envoie
+  ses alertes par e-mail (`infra/modules/budget.bicep:1`, `:26-57`).
 - **Hors du Bicep**: le modèle `gpt-6-luna` est déployé sur Azure AI Foundry, en France Central, en zone de données UE
   (`docs/registre-traitements.md:85`, `:88`); les mesures et les traces vont à Grafana Cloud, pile `prod-eu-west-2`, en
   Allemagne (`docs/registre-traitements.md:123`, `:128`). Le Bicep n'en porte que les paramètres et les secrets

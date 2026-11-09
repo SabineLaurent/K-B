@@ -26,9 +26,9 @@ Le référentiel demande une documentation technique (C17), et aucune ne décriv
 
 La fiche porte trois schémas, chacun dans sa section, avec les mêmes noms d'un schéma à l'autre (choix 72 de Sabine,
 le 09/11) : le flux en bref, pour un lecteur qui ne connaît pas K-B, dix boîtes en mots courants, sans nom de commande
-ni de fichier (`documentation/architecture_pour_docu.md:15-46`) ; le flux en détail, tracé dans le code, en deux
-dessins, des sources au coffre puis les jobs en ligne et le stockage d'échange (`:47-228`) ; le déploiement sur
-Azure, d'après `infra/` et `deploy.yml` : où est quoi, ce qui s'y passe, les identités et leurs rôles (`:362-453`).
+ni de fichier (`documentation/architecture_pour_docu.md:15-45`) ; le flux en détail, tracé dans le code, en deux
+dessins, des sources au coffre puis les jobs en ligne et le stockage d'échange (`:47-234`) ; le déploiement sur
+Azure, d'après `infra/` et `deploy.yml` : où est quoi, ce qui s'y passe, les identités et leurs rôles (`:368-476`).
 Un seul dessin pour tout le flux se lisait mal : rendu en local par mermaid-cli, ses 34 flèches se croisaient, et le
 groupe des sources s'étirait sur toute la largeur.
 
@@ -54,17 +54,18 @@ fichiers d'état (choix 71), `kb create-db` et `kb migrate-database`, les purges
 extrait Zotero par `kb collect`, la suppression des classements remplacés par `kb write-tops`, et les commandes que
 relancent les deux routines.
 
-Dans le flux en détail, une flèche suit le sens des données, pas celui de l'appel ; le déploiement sur Azure garde
-ce sens, et y ajoute deux appels sans donnée, `GET /health`. Le sens compte ici : c'est l'API IA qui
-appelle l'API de données (`src/k_b/ai_api/connectors/data_api_client.py:266-270`, `send(http_client, ITEMS_PATH, …)`),
-mais les items vont dans l'autre sens. La légende le dit avant le diagramme, pour qu'une flèche ne soit pas lue comme un
-appel. Trois états, deux traits : la première version n'en avait que deux (« fait » et « codé »), et la relecture a
-montré que l'envoi des clips depuis le Mac n'est pas codé du tout (#424). L'étiquette porte ce troisième état. Le
-bord en pointillés d'un conteneur ou d'un groupe dit autre chose : la ressource elle-même n'existe pas encore en ligne.
+Dans le flux en détail, une flèche suit le sens des données, pas celui de l'appel ; le déploiement sur Azure garde ce
+sens, et y ajoute trois appels sans donnée de la veille : les deux `GET /health` et « met à jour, lance les jobs ». Le
+sens compte ici : c'est l'API IA qui appelle l'API de données (`src/k_b/ai_api/connectors/data_api_client.py:266-270`,
+`send(http_client, ITEMS_PATH, …)`), mais les items vont dans l'autre sens. La légende le dit avant le diagramme, pour
+qu'une flèche ne soit pas lue comme un appel. Trois états, deux traits : la première version n'en avait que deux (« fait
+» et « codé »), et la relecture a montré que l'envoi des clips depuis le Mac n'est pas codé du tout (#424). L'étiquette
+porte ce troisième état. Le bord en pointillés d'un conteneur ou d'un groupe dit autre chose : la ressource elle-même
+n'existe pas encore en ligne.
 
 ### Le stockage d'échange : dire ce qui existe en ligne
 
-`documentation/architecture_pour_docu.md:108-144` dessine le stockage d'échange : le conteneur `smoke-test`, le groupe
+`documentation/architecture_pour_docu.md:108-148` dessine le stockage d'échange : le conteneur `smoke-test`, le groupe
 « Lecture choisie (clips, Zotero), prévue par #420 » et le conteneur `watch`. Seul `smoke-test` a un bord plein. Le
 Bicep n'en crée qu'un, `infra/modules/exchange-storage.bicep:39-42` :
 
@@ -85,20 +86,21 @@ sa place est réservée par un commentaire, `src/k_b/commands/daily_routine_comm
 ```
 
 Sa flèche dit donc « pas encore codé (#425) ». La lecture choisie est un groupe, à la demande de Sabine après lecture de
-la PR : #420 y prévoit deux conteneurs montants, `clippings` pour les clips et `zotero` pour les copies de Zotero. Le
-flux en détail nomme ce qu'ils contiennent ; le déploiement sur Azure, où une ressource se lit par son nom, ajoute le
-nom du conteneur. Dessiner un seul conteneur `clippings` laissait Zotero hors du flux en ligne.
+la PR : #420 y prévoit deux conteneurs montants, `clippings` pour les clips et `zotero` pour les copies de Zotero. Les
+deux schémas nomment ce qu'ils contiennent, jamais le conteneur : Sabine garde les noms des conteneurs hors du dessin
+jusqu'à #420, encore ouverte ; le texte sous le déploiement les cite. Dessiner un seul conteneur `clippings` laissait
+Zotero hors du flux en ligne.
 
 ### Une description en texte qui suit le même ordre
 
-`documentation/architecture_pour_docu.md:146-211` reprend les deux dessins en six points, les six flux du critère de
+`documentation/architecture_pour_docu.md:150-217` reprend les deux dessins en six points, les six flux du critère de
 fin, dans le même ordre. C'est l'alternative textuelle d'une image (#167, RGAA) : un lecteur d'écran ne lit pas un
 `flowchart` Mermaid, et le texte porte aussi les renvois `fichier:ligne` que les étiquettes du diagramme n'ont pas la
 place de porter.
 
 ### Les couches : ce que les tests interdisent, pas ce qu'on souhaite
 
-Le tableau des paquets (`documentation/architecture_pour_docu.md:237-248`) donne, pour chacun, l'interdit que tient un
+Le tableau des paquets (`documentation/architecture_pour_docu.md:243-254`) donne, pour chacun, l'interdit que tient un
 test de `tests/architecture/`, avec sa ligne. Par exemple l'API IA, `tests/architecture/test_apis.py:118-121` :
 
 ```python
@@ -113,7 +115,7 @@ Une règle d'architecture écrite sans test peut être fausse sans que rien ne l
 
 ### Une fiche qui se vérifie
 
-`documentation/architecture_pour_docu.md:465-490`, « Vérifier cette fiche », donne les commandes qui retrouvent ses
+`documentation/architecture_pour_docu.md:488-513`, « Vérifier cette fiche », donne les commandes qui retrouvent ses
 faits au commit `d7e5b22` : les tests d'architecture, les sources, les routes, les 15 tables, ce qui est déclaré en
 ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'appui ». La fiche date son code : `main`
 à `d7e5b22`, dont `src/` et `infra/` sont ceux de `cbada1e` (`git diff --stat cbada1e d7e5b22 -- src/ infra/` vide).
@@ -128,9 +130,9 @@ ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'
 | Les deux fichiers d'état dessinés, les journaux cités seulement | choix 71 de Sabine : `collection_state.json` et `trend_reports.json` décident de ce qui circule ; aucune commande ne relit un journal, sauf la purge | dessiner les journaux : des flèches sans donnée de la veille |
 | `kb create-db` et `kb migrate-database` dessinés, `kb openapi` cité | tranché par time-knight : les deux premières écrivent la base ; `kb openapi` écrit un fichier du dépôt | dessiner `kb openapi` |
 | `GET /health` et les jetons de l'identité managée cités, pas dessinés | ils ne portent pas de donnée de la veille | six flèches de plus au moins, sans donnée |
-| Le sens d'une flèche est celui des données, dans les trois schémas | c'est un diagramme de flux de données, la demande de la revue ; le déploiement y ajoute les deux `GET /health` | le sens des appels : l'API IA → l'API de données, à rebours des items ; seules les flèches « lance » des routines sont des appels sans donnée |
+| Le sens d'une flèche est celui des données, dans les trois schémas | c'est un diagramme de flux de données, la demande de la revue ; s'y ajoutent des appels sans donnée de la veille : « lance » dans le flux en détail, les deux `GET /health` et « met à jour, lance les jobs » dans le déploiement | le sens des appels : l'API IA → l'API de données, à rebours des items |
 | Trois états (plein, pointillés, pointillés « pas encore codé ») | `main` a les trois ; le critère demande le stockage d'échange, en ligne pour une part seulement | tout en plein : décrirait le plan ; omettre le non-codé : le flux Mac ↔ stockage disparaîtrait |
-| La lecture choisie en groupe | demande de Sabine après lecture de la PR : #420 prévoit deux conteneurs montants, `clippings` et `zotero` ; le flux en détail nomme leur contenu, le déploiement sur Azure ajoute leur nom | un seul conteneur `clippings` : Zotero disparaissait du flux en ligne |
+| La lecture choisie en groupe | demande de Sabine après lecture de la PR : #420 prévoit deux conteneurs montants, `clippings` et `zotero` ; les schémas nomment leur contenu ; Sabine garde les noms des conteneurs hors du dessin jusqu'à #420 | un seul conteneur `clippings` : Zotero disparaissait du flux en ligne |
 | L'interface web absente | décision de Sabine du 09/11 : la fiche décrit `main`, où elle n'existe pas | la dessiner en pointillés : rien n'en est codé |
 | Une seule fiche, renvois aux fiches existantes (installation, tests, API IA, livraison) | critère de fin de #511 ; deux copies divergeraient | recopier leur détail |
 | Les corrections de chaque relecture en un commit | la seconde relecture porte sur le delta d'un seul commit (`9a173a8..ed09991`) | un commit par constat : 26 commits de doc pour une fiche |
@@ -158,7 +160,7 @@ La note elle-même est dans `docs/journaling/` : c'est le seul fichier de `docs/
    (`documentation/architecture_pour_docu.md:52-53`).
 2. **Qu'est-ce qui tourne en ligne aujourd'hui ?** Les deux API, le job `caj-kb-smoke-test` et le job
    `caj-kb-migrate-database` (`infra/deployment.json`), sur PostgreSQL et le seul conteneur `smoke-test`. Rien ne
-   collecte, n'importe ni n'écrit de fiche en ligne (`documentation/architecture_pour_docu.md:457-459`).
+   collecte, n'importe ni n'écrit de fiche en ligne (`documentation/architecture_pour_docu.md:480-482`).
 3. **Comment sait-on que les couches sont respectées ?** Les tests de `tests/architecture/` lisent les imports de chaque
    module et échouent sur un import interdit (par exemple `tests/architecture/test_apis.py:118-121`) ; la CI les lance
    à chaque PR.
@@ -166,8 +168,8 @@ La note elle-même est dans `docs/journaling/` : c'est le seul fichier de `docs/
    (`tests/architecture/test_apis.py:118`) : elle demande les items à l'API de données par HTTP, avec sa clé. L'accès
    à la base reste à un seul composant, en lecture seule (`src/k_b/database/engine.py:58-87`).
 5. **Où est l'accessibilité des schémas ?** Sous chacun, un texte suit le même parcours : une phrase sous le flux en
-   bref, six points sous le flux en détail (`documentation/architecture_pour_docu.md:146-211`), une liste sous le
-   déploiement sur Azure (`:424-453`).
+   bref, six points sous le flux en détail (`documentation/architecture_pour_docu.md:150-217`), une liste sous le
+   déploiement sur Azure (`:432-476`).
 
 ## Zones non vérifiées
 
