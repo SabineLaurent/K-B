@@ -32,6 +32,7 @@ from k_b.ai_api.connectors.trace_export import TraceExport
 from k_b.ai_api.dependencies import open_data_api_client, read_request_time
 from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.core.config import (
+    DIGEST_CLIENT,
     DIGEST_SUBJECTS,
     LLM_REPLAY_BASE_URL,
     NO_SUITABLE_SUBJECT_ANSWER,
@@ -78,7 +79,7 @@ def test_the_measures_of_a_request_reach_the_otlp_endpoint(
     data_api_key = secrets.token_urlsafe(32)
     client_key = secrets.token_urlsafe(32)
     app = create_app(
-        {"TERMINAL": SecretStr(client_key)},
+        {DIGEST_CLIENT: SecretStr(client_key)},
         LlmSettings(
             provider="replay",
             base_url=LLM_REPLAY_BASE_URL,

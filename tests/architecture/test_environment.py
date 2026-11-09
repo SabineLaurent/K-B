@@ -1,10 +1,19 @@
 """The environment is read in one place, commands/environment.py, called once by cli.py: the commands
-and the readers get it as a parameter (.claude/rules/poc.md, rule 2)."""
+and the readers get it as a parameter (.claude/rules/poc.md, rule 2). Each variable src/k_b names by
+a constant *_VARIABLE, or by the prefix of its family, is in .env.example, and each variable of the
+examples is one of them: a name read without such a constant escapes these tests."""
 
 import ast
+import importlib
+import pkgutil
+import re
+from pathlib import Path
 
 import pytest
 from module_imports import PACKAGE_DIR
+
+import k_b
+from k_b.ai_api.connectors.metrics_export import OPENTELEMETRY_VARIABLE_PREFIX
 
 # The only module that reads the environment, and the only one that calls it.
 ENVIRONMENT_MODULE = "commands/environment.py"
@@ -23,6 +32,17 @@ OS_ENVIRONMENT_NAMES = {
     "getenvb",
 }
 READ_ENVIRONMENT = "read_environment"
+# src/k_b names each variable it reads by a module constant *_VARIABLE, and each family of them
+# (KB_DATA_API_KEY_<CLIENT>) by a constant *_VARIABLE_PREFIX.
+VARIABLE_CONSTANT = re.compile(r"[A-Z0-9_]*_VARIABLE")
+VARIABLE_PREFIX_CONSTANT = re.compile(r"[A-Z0-9_]*_VARIABLE_PREFIX")
+# A prefix kb refuses, never a setting: kb serve-ai stops on any OTEL_* variable.
+REFUSED_PREFIXES = {OPENTELEMETRY_VARIABLE_PREFIX}
+REPOSITORY_DIR = Path(__file__).parents[2]
+ENV_EXAMPLE_PATH = REPOSITORY_DIR / ".env.example"
+E2E_ENV_EXAMPLE_PATH = REPOSITORY_DIR / ".env.e2e_test.example"
+# A line NAME=value of an example, set or commented out, as tests/e2e/conftest.py reads it.
+VARIABLE_LINE = re.compile(r"^#?[ \t]*([A-Z][A-Z0-9_]*)=", re.MULTILINE)
 
 
 def find_environment_readings(code: str) -> list[int]:
@@ -87,6 +107,56 @@ def read_modules():
         path.relative_to(PACKAGE_DIR).as_posix(): path.read_text(encoding="utf-8")
         for path in PACKAGE_DIR.rglob("*.py")
     }
+
+
+def find_read_variables():
+    """The values of the constants *_VARIABLE and *_VARIABLE_PREFIX of each module of src/k_b,
+    imported to evaluate f-strings and annotated constants; refused prefixes aside. Importing them
+    reaches no network and reads no KB_ variable."""
+    variables, prefixes = set(), set()
+    for module_info in pkgutil.walk_packages(k_b.__path__, "k_b."):
+        module = importlib.import_module(module_info.name)
+        for name, value in vars(module).items():
+            if not isinstance(value, str):
+                continue
+            if VARIABLE_PREFIX_CONSTANT.fullmatch(name):
+                prefixes.add(value)
+            elif VARIABLE_CONSTANT.fullmatch(name):
+                variables.add(value)
+    return variables, prefixes - REFUSED_PREFIXES
+
+
+def read_example_names(path):
+    return set(VARIABLE_LINE.findall(path.read_text(encoding="utf-8")))
+
+
+def test_every_variable_kb_reads_is_in_the_example():
+    variables, prefixes = find_read_variables()
+    example_names = read_example_names(ENV_EXAMPLE_PATH)
+
+    assert variables - example_names == set()
+    assert {
+        prefix
+        for prefix in prefixes
+        if not any(name.startswith(prefix) for name in example_names)
+    } == set()
+
+
+def test_every_variable_of_the_example_is_one_kb_reads():
+    variables, prefixes = find_read_variables()
+
+    assert {
+        name
+        for name in read_example_names(ENV_EXAMPLE_PATH)
+        if name not in variables and not name.startswith(tuple(prefixes))
+    } == set()
+
+
+def test_every_variable_of_the_end_to_end_example_is_in_the_example():
+    assert (
+        read_example_names(E2E_ENV_EXAMPLE_PATH) - read_example_names(ENV_EXAMPLE_PATH)
+        == set()
+    )
 
 
 def test_only_commands_environment_reads_the_environment():
