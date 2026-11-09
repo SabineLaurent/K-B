@@ -7,11 +7,11 @@
 - Série : [2026-11-09-ecrire-la-fiche-de-l-installation.md](2026-11-09-ecrire-la-fiche-de-l-installation.md) et
   [2026-11-08-ecrire-la-fiche-de-l-api-ia.md](2026-11-08-ecrire-la-fiche-de-l-api-ia.md).
 
-La note couvre les commits de la branche : 9a173a8 (la fiche), ed09991 et 7707f5f (ses deux relectures), e9f47ee (cette
-note), ab082b3 (la lecture choisie), 8f036a6 (le flux le long du code), 47db667 (sa relecture), 30faf0d (les trois
-schémas) et le commit qui applique la relecture des trois schémas. Les autres commits et fichiers que liste l'outil
-(`src/k_b/ai_api/`, `tests/`, `README.md`, les autres fiches…) sont ceux de #495, #502, #507, #518, #526 et #164, déjà
-sur `main` : ils ne sont pas de cette PR.
+La note couvre les commits de la branche : 988bc29 (la fiche), 06e598b et 9787dfe (ses deux relectures), 637012a (cette
+note), 4cba543 (la lecture choisie), 3a35c5a (le flux le long du code), 050c693 (sa relecture), 3c18080 (les trois
+schémas), cc65d1e et f3887eb (leurs deux relectures), puis les commits qui datent la fiche à `0292266` après le rebase.
+Les autres commits et fichiers que liste l'outil (`src/k_b/ai_api/`, `tests/`, `README.md`, les autres fiches…) sont
+ceux de #495, #502, #507, #518, #526, #164 et des PR #533 et #534, déjà sur `main` : ils ne sont pas de cette PR.
 
 ## Le pourquoi
 
@@ -135,7 +135,7 @@ ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'
 | La lecture choisie en groupe | demande de Sabine après lecture de la PR : #420 prévoit deux conteneurs montants, `clippings` et `zotero` ; les schémas nomment leur contenu ; Sabine garde les noms des conteneurs hors du dessin jusqu'à #420 | un seul conteneur `clippings` : Zotero disparaissait du flux en ligne |
 | L'interface web absente | décision de Sabine du 09/11 : la fiche décrit `main`, où elle n'existe pas | la dessiner en pointillés : rien n'en est codé |
 | Une seule fiche, renvois aux fiches existantes (installation, tests, API IA, livraison) | critère de fin de #511 ; deux copies divergeraient | recopier leur détail |
-| Les corrections de chaque relecture en un commit | la seconde relecture porte sur le delta d'un seul commit (`9a173a8..ed09991`) | un commit par constat : 26 commits de doc pour une fiche |
+| Les corrections de chaque relecture en un commit | la seconde relecture porte sur le delta d'un seul commit (`988bc29..06e598b`) | un commit par constat : 26 commits de doc pour une fiche |
 
 ## Preuve
 
@@ -148,7 +148,7 @@ ligne. C'est le critère « chaque fait se vérifie dans le code, commande à l'
 | `uv run pytest tests/architecture/` → `243 passed` | les interdits du tableau des couches sont tenus à `0292266` |
 | les treize commandes de `cli.py` sont tracées : dix par quatre sous-agents en lecture seule, trois par la session ; la session revérifie une cinquantaine de leurs renvois ; deux ne visaient pas l'appel : `metrics_export.py:105-112` (le refus des variables `OTEL_*`), remplacé par `:301`, trouvé par la session, et `github_client.py:155-161` (la construction du client), remplacé par `:173`, trouvé par la relecture | chaque flèche du chemin du code a sa ligne |
 | les quatre blocs Mermaid rendus en local par mermaid-cli 11.17.0 : aucune erreur, PNG montrés à Sabine | la syntaxe se rend, `style` d'un sous-graphe compris |
-| première relecture, en deux passes (5 constats, 3 retenus ; puis 18 et 1 de la session, tous retenus), puis seconde sur le delta (4 constats, retenus) ; relecture du flux le long du code (19 constats retenus, 47db667) ; relecture des trois schémas (22 retenus, le 23e en « Not verified ») ; toutes triées par time-knight | chaque flèche et chaque renvoi relus contre le code |
+| première relecture, en deux passes (5 constats, 3 retenus ; puis 18 et 1 de la session, tous retenus), puis seconde sur le delta (4 constats, retenus) ; relecture du flux le long du code (19 constats retenus, 050c693) ; relecture des trois schémas (22 retenus, le 23e en « Not verified ») ; toutes triées par time-knight | chaque flèche et chaque renvoi relus contre le code |
 
 La note elle-même est dans `docs/journaling/` : c'est le seul fichier de `docs/` que la PR ajoute.
 
