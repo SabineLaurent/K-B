@@ -111,8 +111,8 @@ def read_modules():
 
 def find_read_variables():
     """The values of the constants *_VARIABLE and *_VARIABLE_PREFIX of each module of src/k_b,
-    imported to evaluate f-strings and annotated constants; refused prefixes aside. Importing the
-    172 modules reached no network and read no KB_ variable (measured on 2026-11-09)."""
+    imported to evaluate f-strings and annotated constants; refused prefixes aside. Importing them
+    reaches no network and reads no KB_ variable."""
     variables, prefixes = set(), set()
     for module_info in pkgutil.walk_packages(k_b.__path__, "k_b."):
         module = importlib.import_module(module_info.name)

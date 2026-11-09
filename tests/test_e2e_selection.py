@@ -19,7 +19,7 @@ from k_b.ai_api.connectors.metrics_export import (
     OPENTELEMETRY_VARIABLE_PREFIX,
 )
 from k_b.commands.environment import DATA_DIR_VARIABLE, LOG_TO_FILE_VARIABLE
-from k_b.core.api_keys import API_KEY_VARIABLE_PREFIX
+from k_b.core.api_keys import AI_API_KEY_VARIABLE_PREFIX, API_KEY_VARIABLE_PREFIX
 from k_b.core.api_settings import DEPLOYMENT_ENVIRONMENT_VARIABLE
 from k_b.etl.source_kinds import SOURCE_KINDS
 
@@ -110,7 +110,11 @@ def run_the_end_to_end_tests_of(keyword, variables):
         if name != "PYTEST_ADDOPTS"
         and name not in names_of_kb
         and not name.startswith(
-            (API_KEY_VARIABLE_PREFIX, OPENTELEMETRY_VARIABLE_PREFIX)
+            (
+                API_KEY_VARIABLE_PREFIX,
+                AI_API_KEY_VARIABLE_PREFIX,
+                OPENTELEMETRY_VARIABLE_PREFIX,
+            )
         )
     }
     environment.update(variables)
