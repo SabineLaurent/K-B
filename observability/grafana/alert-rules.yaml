@@ -38,7 +38,7 @@ groups:
           severity: warning
         annotations:
           summary: "K-B, {{ $labels.deployment_environment_name }}: fidélité des fiches sur 24 h, sous le seuil de 95 %"
-          description: "Part des faits des affirmations trouvés dans l'item qu'elles citent, sur 24 h: {{ humanizePercentage $value }}. Tableau de bord: K-B, modèle."
+          description: "Part des faits retrouvés à la fois dans le texte où ils sont affirmés et dans la source qu'ils désignent: l'item cité, pour les comptes rendus de veille par sujet, la source du texte, pour le compte rendu des tendances. Sur 24 h: {{ humanizePercentage $value }}. Tableau de bord: K-B, modèle."
       - alert: KbModelCostOverBudget
         expr: |
           sum by (deployment_environment_name) (max_over_time(k_b_llm_cost_total[7d]))

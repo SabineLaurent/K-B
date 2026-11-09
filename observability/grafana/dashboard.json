@@ -215,7 +215,7 @@
       "id": 4,
       "type": "stat",
       "title": "Fidélité sur 24 h",
-      "description": "Part des faits des affirmations trouvés dans l'item qu'elles citent. Seuil: 95 %, en dessous l'alerte KbModelLowFidelity se déclenche.",
+      "description": "Part des faits retrouvés à la fois dans le texte où ils sont affirmés et dans la source qu'ils désignent: l'item cité, pour les comptes rendus de veille par sujet, la source du texte, pour le compte rendu des tendances. Seuil: 95 %, en dessous l'alerte KbModelLowFidelity se déclenche.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
