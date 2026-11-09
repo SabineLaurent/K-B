@@ -6211,12 +6211,35 @@ Langfuse Cloud (UE), LangSmith (UE) et Honeycomb, selon les critères de « Wiki
   convertissant dans le collecteur) : remonté à Sabine.
   — PR de #163
 
-## Décisions encore ouvertes
+## 2026-11-09
 
-- **Un `LIMIT` à la lecture des surlignages** (2026-11-06, #331) : la route lit tous les surlignages
-  d'une entrée, puis en sert 100 au plus. Une lecture bornée (`LIMIT 101` dans `SELECT_HIGHLIGHTS`,
-  `database/reading.py`), et `substr` pour le texte d'un clip, borneraient aussi la mémoire. #416 ne
-  change aucun comportement : à décider à part, avec #418 ou plus tard (time-knight, 06/11), dans #430.
+### API de données : la lecture du détail bornée dans la base (#430)
+
+- **La base ne lit d'un détail que ce que la route peut servir, plus un : `SELECT_HIGHLIGHTS` finit
+  par `LIMIT ?` et `SELECT_CLIP` lit `substr(body, 1, ?)` (`database/reading.py`). La route passe
+  `DetailBounds(MAX_SERVED_HIGHLIGHTS + 1, MAX_SERVED_TEXT_LENGTH + 1)`, soit 101 surlignages et
+  125 001 caractères, à `read_item_detail`, qui le passe à chaque lecteur de `READ_DETAILS_BY_KIND`.**
+  Tranche la décision ouverte du 06/11 (« Un `LIMIT` à la lecture des surlignages », #331) : la
+  lecture n'était bornée qu'en temps, et un clip pouvait faire lire 1 000 000 de caractères pour en
+  servir 125 000. Plan de time-knight validé par l'utilisatrice le 09/11.
+  - La base lit « au plus n » ; c'est la route qui demande un de plus, pour voir la coupe sans lire
+    le reste. Les drapeaux `highlights_truncated` et `body_truncated` de #331 sont inchangés, et
+    `bound_details` aussi : le contrat de l'API ne bouge pas, pas de nouvelle version.
+  - Les bornes ne sont écrites qu'une fois, dans `item_router.py`, comme l'issue le demande.
+  - `substr` compte des caractères en SQLite et en PostgreSQL, la base PostgreSQL étant en UTF8
+    (`creation.py`). En SQL_ASCII, il compterait des octets. Le test le vérifie sur un texte de
+    « é », écrits en deux octets chacun.
+  - Écartées : le +1 dans `database/`, parce que la base connaîtrait la logique de coupe de la
+    route ; un cas à part pour l'entrée Zotero et le clip hors de la table des lecteurs, qui
+    casserait la table ; une valeur par défaut des bornes dans `database/`, qui écrirait la borne
+    une seconde fois.
+  - Limites : les cinq autres lecteurs reçoivent les bornes sans s'en servir, pour garder une
+    seule signature par sorte. Le temps reste borné par instruction, comme avant (5 s, #418).
+  - Preuve : `test_the_detail_reads_one_more_than_it_serves_and_says_the_cut`
+    (`tests/data_api/test_item_router.py`), sur les deux moteurs.
+  — PR de #430
+
+## Décisions encore ouvertes
 
 - **Une limite de connexions du serveur** (2026-11-05, #161) : `limit_concurrency` d'uvicorn, écarté
   de la PR 2A parce qu'il compte les connexions muettes, à mesurer derrière l'entrée d'ACA. Laissée
