@@ -4,7 +4,7 @@
 
 Cette fiche décrit l'architecture applicative de K-B en entier: le flux des données de bout en bout, les couches du
 code, puis chaque partie, de la collecte à l'hébergement. Elle est écrite d'après le code de `main` au commit
-`1c414e9` (2026-11-09), dont `src/` et `infra/` sont ceux du commit `cbada1e`. Les chemins du code de K-B
+`d7e5b22` (2026-11-09), dont `src/` et `infra/` sont ceux du commit `cbada1e`. Les chemins du code de K-B
 (`etl/…`, `commands/…`, `database/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 L'installation de l'environnement de développement, les dépendances et leur configuration sont dans
@@ -15,8 +15,8 @@ de la livraison sur Azure dans [la fiche de la livraison continue](livraison_con
 ## Le flux des données
 
 Les flèches suivent les données, pas les appels: l'API IA appelle l'API de données, et les items vont de l'API de
-données à l'API IA. Un trait plein est un flux que le code fait aujourd'hui. Un trait en pointillés est codé, mais
-pas encore en ligne.
+données à l'API IA. Un trait plein est un flux que le code fait aujourd'hui. Un trait en pointillés n'est pas encore
+en ligne: il est codé, sauf si son étiquette dit « pas encore codé ».
 
 ```mermaid
 flowchart LR
@@ -34,7 +34,7 @@ flowchart LR
     base -->|"lecture seule"| dataApi["API de données<br>kb serve-data"]
     dataApi -->|"GET /items<br>GET /items/{item_id}<br>GET /trends"| aiApi["API IA<br>kb serve-ai"]
     aiApi <-->|"chat/completions"| model["modèle"]
-    githubCards["API GitHub<br>fiches des candidats"] -->|"tendances seules"| aiApi
+    githubCards["API GitHub<br>fiches et README<br>des candidats"] -->|"tendances seules"| aiApi
     aiApi -->|"OTLP"| grafana["Grafana Cloud"]
     aiApi -->|"POST /digests<br>POST /trend-reports"| clients["kb digest<br>kb trend-report"]
     clients -->|"écrit"| vault["coffre<br>veille/"]
@@ -45,16 +45,16 @@ flowchart LR
         watchContainer[("conteneur<br>watch")]
     end
     smokeContainer -->|"liste, un compte seul"| smokeJob["kb smoke-test<br>job caj-kb-smoke-test"]
-    mac["Mac, hors du code de K-B"] -.->|"clips"| clipContainer
+    mac["Mac"] -.->|"clips<br>pas encore codé (#424)"| clipContainer
     clipContainer -.->|"kb daily-routine<br>miroir des clips"| clippings
     vault -.->|"kb daily-routine, kb digest-watch<br>publication de veille/"| watchContainer
-    watchContainer -.->|"relu par le Mac,<br>hors du code de K-B"| mac
+    watchContainer -.->|"relu par le Mac<br>pas encore codé (#424)"| mac
 ```
 
 Le diagramme se lit ainsi, dans l'ordre des flux:
 
 1. **Des sources au brut.** `kb collect` lance chaque source, puis écrit ce qu'elle rend tel quel dans le brut,
-   sous `KB_DATA_DIR/raw/` (`commands/collect_command.py:37-53`, `etl/extract.py:53-94`). Les sources sont sept
+   sous `KB_DATA_DIR/raw/` (`commands/collect_command.py:37-59`, `etl/extract.py:53-100`). Les sources sont sept
    origines de données: l'API GitHub (releases des dépôts suivis, alertes de sécurité, dépôts les plus étoilés et
    les plus forkés), l'API arXiv, le fichier CSV de la CISA, les pages de tldr.tech, GH Archive sur BigQuery, la
    base de Zotero et le dossier `Clippings/` du coffre (`etl/source_kinds.py:46-95`,
@@ -68,19 +68,21 @@ Le diagramme se lit ainsi, dans l'ordre des flux:
    HTTP (`ai_api/connectors/data_api_client.py:266-268`, `:289`, `:308`).
 4. **De l'API IA au modèle.** L'API IA envoie les items au modèle et reçoit ses textes, par le chemin
    `chat/completions` (`ai_api/connectors/llm_client.py:40`). Pour les tendances, elle lit aussi sur l'API GitHub
-   la fiche de chaque candidat et le README des dépôts choisis. Elle envoie ses mesures et ses traces en
-   OpenTelemetry (OTLP) vers Grafana Cloud.
+   la fiche de chaque candidat et le README des dépôts choisis. Elle envoie ses mesures, ses traces et leurs
+   journaux en OpenTelemetry (OTLP) vers Grafana Cloud (`ai_api/connectors/trace_export.py:1`).
 5. **L'écriture dans le coffre.** `kb digest` et `kb trend-report` reçoivent la réponse de l'API IA, puis écrivent
    les fiches dans le coffre, sous `veille/`. `kb write-tops` écrit les fiches des deux classements, qu'il lit dans
    le brut, sans modèle ni base. Seule la commande `kb` écrit dans le coffre, jamais une API.
 6. **Le stockage d'échange en ligne.** Aujourd'hui, seul le conteneur `smoke-test` existe en ligne
-   (`infra/modules/exchange-storage.bicep:39-46`): `kb smoke-test` le liste et n'écrit qu'un nombre de blobs
-   (`commands/smoke_test_command.py:152`). Les conteneurs `clippings` et `watch` sont codés, mais pas encore créés
-   (#420): `kb daily-routine` copiera les clips du conteneur `clippings` dans le coffre du job, et `kb daily-routine`
-   et `kb digest-watch` publieront `veille/` dans le conteneur `watch` (`commands/job_transfers.py:38`, `:68`).
-   Ces deux jobs ne sont pas déclarés en ligne (`infra/deployment.json`). L'envoi des clips depuis le Mac, et la
-   relecture de `watch` par le Mac, ne sont pas dans le code de K-B (note du 2026-11-06,
-   [`docs/journaling/2026-11-06-enchainer-les-etapes-des-jobs.md`](../docs/journaling/2026-11-06-enchainer-les-etapes-des-jobs.md)).
+   (`infra/modules/exchange-storage.bicep:39-46`): `kb smoke-test` le liste et n'écrit que le nombre de blobs de
+   sa première page, 100 au plus (`commands/smoke_test_command.py:1-3`, `:141`, `core/config.py:552`). Le code qui
+   lit et écrit les conteneurs `clippings` et `watch` est prêt, mais les conteneurs ne sont pas créés (#420):
+   `kb daily-routine` copiera les clips du conteneur `clippings` dans le coffre du job, et `kb daily-routine` et
+   `kb digest-watch` publieront `veille/` dans le conteneur `watch` (`commands/job_transfers.py:38`, `:68`). Dans
+   un job, le coffre est le dossier `KB_VAULT_DIR` du conteneur, pas celui du Mac. Ces deux jobs ne sont déclarés en
+   ligne ni dans `infra/deployment.json`, ni dans `infra/main.bicep`. L'envoi des clips depuis le Mac, et la
+   relecture de `watch` par le Mac, ne sont pas encore codés: ils viendront par `make upload-library` et
+   `make download-watch-sheets` (#424).
 
 ## Les couches du code
 
@@ -92,19 +94,19 @@ Les tests de `tests/architecture/` lisent les imports de chaque module et tienne
 | Paquet | Rôle | Ce que les tests lui interdisent |
 |---|---|---|
 | `cli.py` | le point d'entrée de `kb`: lit la commande, lit l'environnement une fois, ouvre le journal, lance la commande (`cli.py:97-115`) | — |
-| `commands/` | une commande `kb` par module (`<commande>_command.py`); `commands/environment.py` est le seul à lire l'environnement | importer `cli` (`tests/architecture/test_layers.py:81`); atteindre une étape de l'ETL autrement que par `etl/pipeline.py` (`:172`). Hors de `commands/environment.py`, seul `etl/sources/github/api.py` lit l'environnement, toléré pour l'instant (`tests/architecture/test_environment.py:23`, `:162`) |
+| `commands/` | une commande `kb` par module (`<commande>_command.py`), et leur code commun; `commands/environment.py` est le seul à lire l'environnement | importer `cli` (`tests/architecture/test_layers.py:81`); atteindre une étape de l'ETL autrement que par `etl/pipeline.py` (`:172`). Hors de `commands/environment.py`, seul `etl/sources/github/api.py` lit l'environnement, toléré pour l'instant (`tests/architecture/test_environment.py:23`, `:162`) |
 | `etl/` | la collecte (`extract.py`) et l'import (`transform.py`, puis `load.py`); `pipeline.py` est la seule porte des deux parcours pour `commands/`; une source par module, dans `etl/sources/` | importer une API (`test_layers.py:200`), `post/` (`:232`) ou `purge/` (`:281`); qu'une étape importe une autre étape (`:130`) |
 | `post/` | ce qui suit le pipeline: les clients HTTP de l'API IA, les fiches du coffre, le registre des comptes rendus des tendances | importer une API (`test_layers.py:206`), une source ou la composition des sources (`:109`) |
-| `purge/` | les purges que `kb import` lance après son import | importer autre chose que `purge`, `core`, `items`, `database` hors de ses écrivains, `etl/raw_store.py` et `etl/raw_files.py` (`test_layers.py:257-265`, `:287`) |
-| `jobs/` | le code commun des jobs en ligne: le stockage d'échange par l'identité managée, le miroir des clips, la publication de `veille/`, `GET /health` | importer autre chose que `core` (`test_layers.py:337`); être importé par un autre paquet que `commands` (`:343`) |
+| `purge/` | les purges que `kb import` lance après son import | importer autre chose que `purge`, `core`, `items`, `database` hors de ses écrivains et de `database/writing`, `etl/raw_store.py` et `etl/raw_files.py` (`test_layers.py:257-265`, `:287`) |
+| `jobs/` | le code commun des jobs en ligne: le stockage d'échange par l'identité managée, le miroir des clips, la publication de `veille/`, l'appel de `GET /health` | importer autre chose que `core` (`test_layers.py:337`); être importé par un autre paquet que `commands` (`:343`) |
 | `database/` | tout le SQL de la base de K-B: création, lecture, écriture (`writers/`, une sorte d'item par module), purge, moteurs | importer autre chose que `database`, `items` et `core` (`test_layers.py:28`); hors de `database/`, atteindre `database/writers` (`:45`). Seul `database/` importe un pilote de base, avec `etl/sources/zotero.py` pour la base de Zotero (`tests/architecture/test_engine_imports.py:36`) |
 | `data_api/` | l'API de données | importer autre chose que `data_api`, `database`, `items` et `core`, ou les écrivains, la purge et l'écriture d'un fichier (`tests/architecture/test_apis.py:42`) |
 | `ai_api/` | l'API IA, rangée en 16 couches internes | importer autre chose que `ai_api`, `items` et `core` (`test_apis.py:118`); importer sa couche ou celles du dessus (`:223`) |
 | `items.py`, `core/` | les types communs des items, les réglages par défaut, la citation d'une valeur au journal, le code commun des deux API | `core` n'importe rien de K-B (`test_layers.py:20`) |
 
-Deux tests tiennent la liste elle-même: chaque module de K-B est rangé (`tests/architecture/test_packages.py:14`), et
-chaque `__init__.py` est vide (`:33`). Un module de source a la même forme partout, un bloc EXTRACT puis un bloc
-TRANSFORM (`tests/architecture/test_source_modules.py:67`).
+Un test tient la liste elle-même: chaque module de premier niveau de K-B y est rangé
+(`tests/architecture/test_packages.py:14`); un autre veut chaque `__init__.py` vide (`:33`). Un module de source a
+la même forme partout, un bloc EXTRACT puis un bloc TRANSFORM (`tests/architecture/test_source_modules.py:67`).
 
 ## La collecte
 
@@ -114,7 +116,7 @@ TRANSFORM (`tests/architecture/test_source_modules.py:67`).
   (`etl/collected_sources.py:18-30`, `:110-131`). `KB_COLLECT_ONLY` choisit les sources d'une collecte (`:34`).
 - **Une source en panne n'arrête pas les autres.** Chaque source écrit ses fichiers bruts, puis la collecte écrit
   la date de la dernière collecte réussie de chacune, dans `KB_DATA_DIR/collection_state.json`
-  (`etl/extract.py:53-94`, `etl/raw_store.py:22`). À la collecte suivante, chaque source reçoit sa date
+  (`etl/extract.py:53-100`, `etl/raw_store.py:22`). À la collecte suivante, chaque source reçoit sa date
   (`etl/extract.py:68-70`); une source en échec garde la sienne.
 - **Le brut est gardé tel que la source l'a rendu**, dans deux dossiers de `raw/`: `automated_watch/` pour ce que
   la veille collecte, `selected_library/` pour ce que Sabine a choisi, Zotero et les clips
@@ -156,8 +158,10 @@ Le modèle de la base est dans [`docs/stockage.md`](../docs/stockage.md).
 | Lit | la base, en lecture seule (`database/engine.py:58-87`) | l'API de données, le modèle, l'API GitHub |
 | Contrat | [`docs/api/openapi-donnees.json`](../docs/api/openapi-donnees.json) | [`docs/api/openapi-ia.json`](../docs/api/openapi-ia.json) |
 
-Les deux API n'écrivent rien de durable: l'API de données ne peut pas importer les écrivains de la base
-(`tests/architecture/test_apis.py:42`), et l'API IA ne peut importer ni la base ni l'écriture d'un fichier (`:118`).
+Les deux API n'écrivent rien de durable, hors du journal de fonctionnement que tient leur commande
+(`logs/kb-serve-data.log`, `logs/kb-serve-ai.log`, `commands/run_log.py:27`, `:29`): l'API de données ne peut pas
+importer les écrivains de la base (`tests/architecture/test_apis.py:42`), et l'API IA ne peut importer ni la base ni
+l'écriture d'un fichier (`:118`).
 Le parcours d'une demande à l'API IA, ses contrôles et ses couches sont dans [sa fiche](api_ia_pour_docu.md).
 
 ## Le coffre
@@ -166,15 +170,21 @@ Le coffre est un coffre Obsidian, le dossier de `KB_VAULT_DIR` (`etl/collected_s
 source et une destination:
 
 - **une source**: `kb collect` lit les clips du dossier `Clippings/` (`etl/sources/clipping.py:55`, `:103`);
-- **une destination**: trois commandes y écrivent, sous `veille/` (`core/config.py:445`):
+- **une destination**: trois commandes y écrivent leurs fiches, sous `veille/` (`core/config.py:445`):
 
 | Commande | Ce qu'elle écrit | D'où viennent les données |
 |---|---|---|
-| `kb digest` | une fiche par sujet et par jour, `veille/<sujet>/AAAA-MM-JJ.md` (`post/digest_sheets.py:40`) | la réponse de `POST /digests` (`commands/digest_command.py:88`, `:96`) |
-| `kb trend-report` | un compte rendu par jour, `veille/tendances/<jour>.md` (`post/trend_report_sheets.py:138`) | la réponse de `POST /trend-reports`; la période suivante est tenue par `KB_DATA_DIR/trend_reports.json`, jamais par une relecture du coffre (`post/trend_report_registry.py:1-3`, `:26`) |
+| `kb digest` | une fiche par sujet et par jour, `veille/<sujet>/AAAA-MM-JJ.md` (`post/digest_sheets.py:43-44`) | la réponse de `POST /digests` (`commands/digest_command.py:88`, `:96`) |
+| `kb trend-report` | un compte rendu par jour, `veille/tendances/<jour>.md` (`post/trend_report_sheets.py:152`) | la réponse de `POST /trend-reports`; la période suivante est tenue par `KB_DATA_DIR/trend_reports.json`, jamais par une relecture du coffre (`post/trend_report_registry.py:1-3`, `:26`) |
 | `kb write-tops` | une fiche par classement et par jour de collecte, sous `veille/tops/` (`post/top_sheets.py:31`) | les deux classements du brut, puis les classements remplacés sont supprimés du brut (`commands/write_tops_command.py:39-70`) |
 
-Une fiche est écrite une fois, jamais par un lien symbolique (`post/vault_files.py:1-2`). Une commande qui écrit dans
+Deux routines de job, codées mais pas encore en ligne, relancent ces commandes: `kb daily-routine` lance
+`kb write-tops`, et `kb digest-watch` lance `kb digest` et `kb trend-report` (`commands/daily_routine_command.py:59-62`,
+`commands/digest_watch_command.py:65-74`). `kb daily-routine` écrit aussi dans le coffre du job les clips du
+conteneur `clippings`, sous `Clippings/` (`commands/job_transfers.py:50-52`).
+
+Une fiche est écrite une fois, jamais par un lien symbolique que `kb` voit (`post/vault_files.py:1-2`); un lien
+apparu entre le contrôle et le renommage est suivi, une limite acceptée (`:4-5`). Une commande qui écrit dans
 le coffre refuse de démarrer si `KB_VAULT_DIR` n'est pas un dossier existant: elle ne le crée pas
 (`etl/collected_sources.py:95-107`).
 
@@ -187,7 +197,8 @@ K-B tourne de deux façons, par le même code.
 (`logs/`) et le registre des tendances. Les deux API écoutent sur `127.0.0.1`, la machine seule.
 
 **En ligne, sur Azure**, depuis l'image de K-B, dans l'environnement Azure Container Apps `cae-kb`. Le Bicep
-d'`infra/` décrit chaque ressource ([`infra/README.md`](../infra/README.md), tableau des modules):
+d'`infra/` décrit chaque ressource ([`infra/README.md`](../infra/README.md), tableau des modules); voici les
+principales:
 
 | Ressource | Ce qu'elle fait | Où |
 |---|---|---|
@@ -216,11 +227,11 @@ tag de version sur `main` les met à jour ([la fiche de la livraison continue](l
 
 ## Vérifier cette fiche
 
-Depuis la racine du dépôt, au commit `1c414e9` (`git switch --detach 1c414e9`):
+Depuis la racine du dépôt, au commit `d7e5b22` (`git switch --detach d7e5b22`):
 
 ```sh
 # src/ et infra/ inchangés depuis cbada1e: aucune ligne attendue.
-git diff --stat cbada1e 1c414e9 -- src/ infra/
+git diff --stat cbada1e d7e5b22 -- src/ infra/
 # Les couches et les imports de chaque paquet.
 uv run pytest tests/architecture/
 # Les commandes de kb.
@@ -238,5 +249,5 @@ grep -n -A2 "containers@" infra/modules/exchange-storage.bicep
 grep -n "RoutineStep(" -A1 src/k_b/commands/daily_routine_command.py src/k_b/commands/digest_watch_command.py
 ```
 
-Un `fichier:ligne` se relit sans changer de commit: `git show 1c414e9:<chemin> | sed -n '<début>,<fin>p'`, avec
+Un `fichier:ligne` se relit sans changer de commit: `git show d7e5b22:<chemin> | sed -n '<début>,<fin>p'`, avec
 `src/k_b/` devant un chemin du code de K-B.
