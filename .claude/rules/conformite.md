@@ -11,7 +11,7 @@ version **en vigueur**. Complète `code.md`, qui dit comment coder ; ce fichier 
 | OWASP API Security Top 10 | 2023 | 2026-11-06 | https://api-security.owasp.org/ | toute API exposée |
 | RGPD, fiche CNIL « intérêt légitime : collecte par moissonnage » | fiche en ligne | 2026-10-04 | https://www.cnil.fr/fr/focus-interet-legitime-collecte-par-moissonnage | collecte, scraping, base, purge |
 | RGAA | 4.1.2 (WCAG 2.1 AA) ; RGAA 5 (WCAG 2.2) annoncé fin 2026 | 2026-10-04 | https://accessibilite.numerique.gouv.fr/ | interfaces, documentation publiée |
-| RGESN | v2, 28/05/2024 | 2026-10-04 | https://ecoresponsable.numerique.gouv.fr/publications/referentiel-general-ecoconception/ | collecte, stockage, hébergement, IA |
+| RGESN | v2 (version 2024), 17/05/2024 | 2026-10-04 | https://ecoresponsable.numerique.gouv.fr/publications/referentiel-general-ecoconception/ | collecte, stockage, hébergement, IA |
 | OWASP Top 10 for LLM Applications | 2026 (août 2026 ; remplace 2025) | 2026-10-15 | https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/ | tout appel à un LLM : consigne, données envoyées, sortie, coût |
 | OWASP Top 10 for Agentic Applications | 2026 (publiée le 09/12/2025) | 2026-10-15 | https://genai.owasp.org/2025/12/09/owasp-top-10-for-agentic-applications-the-benchmark-for-agentic-security-in-the-age-of-autonomous-ai/ | tout agent qui choisit ses actions ou ses outils (aucun au POC du 25/10) |
 | RGPD, sous-traitance et transferts (art. 28, 30, chap. V) ; fiche CNIL « registre » | règlement 2016/679 ; pages CNIL en ligne | 2026-10-16 | https://www.cnil.fr/fr/reglement-europeen-protection-donnees/chapitre4 ; https://www.cnil.fr/fr/RGPD-le-registre-des-activites-de-traitement | tout envoi de données à un fournisseur : modèle (LLM), hébergement |
