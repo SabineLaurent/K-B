@@ -1,13 +1,18 @@
 """GET /items on the test base (tests/fixtures/items_database.sql), whose ids the tests name, on
 each engine."""
 
+from pathlib import Path
 from typing import get_args
 
 import pytest
 
+from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
 from k_b.data_api.routers import item_router
-from k_b.database.reading import ItemPage
+from k_b.database.engine import connect_database, open_readers
+from k_b.database.reading import ItemPage, read_item_detail
 from k_b.items import MAX_INT64, MAX_LENGTH_BY_KIND, MIN_INT64, ItemKind
+
+ITEMS_DATABASE_SCRIPT = Path(__file__).parents[1] / "fixtures" / "items_database.sql"
 
 # The fields of an item of the list (docs/specs-api.md, "Réponse"): nothing else is served.
 LISTED_FIELDS = {"id", "kind", "title", "source_date", "url", "withdrawn_at"}
@@ -343,6 +348,66 @@ def test_the_text_of_a_clip_beyond_its_length_is_cut_and_the_cut_is_said(
 
     assert detail["body"] == CLIP_18["body"][:max_length]
     assert detail["body_truncated"] is is_truncated
+
+
+@pytest.fixture
+def client_beyond_the_detail_bounds(engine, new_base, make_client, api_keys):
+    """The data API on the test base with 102 highlights on entry 14 and a clip 18 of 125 002
+    characters, each written in two bytes in UTF-8, on the engine of the test."""
+    connection = connect_database(new_base)
+    try:
+        connection.executescript(ITEMS_DATABASE_SCRIPT.read_text())
+        for number in range(99):
+            connection.execute(
+                "INSERT INTO highlight (zotero_key, text, highlighted_at, item_id)"
+                " VALUES (?, 'A later highlight.', ?, 14)",
+                (
+                    f"BOUND{number:03d}",
+                    f"2026-10-06T00:{number // 60:02d}:{number % 60:02d}Z",
+                ),
+            )
+        connection.execute(
+            "UPDATE clip SET body = ? WHERE item_id = 18", ("é" * 125_002,)
+        )
+        connection.commit()
+    finally:
+        connection.close()
+    if engine == "sqlite":
+        yield make_client(new_base, api_keys)
+        return
+    with open_readers(new_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
+        yield make_client(readers, api_keys)
+
+
+def test_the_detail_reads_one_more_than_it_serves_and_says_the_cut(
+    client_beyond_the_detail_bounds, authorization, monkeypatch
+):
+    """The base reads the first 101 highlights by date and 125 001 characters, never the rest;
+    the route serves 100 and 125 000, the cut said. The characters are counted, not the bytes."""
+    read_details = []
+
+    def read_and_keep(*arguments):
+        detail = read_item_detail(*arguments)
+        read_details.append(detail.details)
+        return detail
+
+    monkeypatch.setattr(item_router, "read_item_detail", read_and_keep)
+
+    entry = client_beyond_the_detail_bounds.get(
+        "/items/14", headers=authorization
+    ).json()
+    clip = client_beyond_the_detail_bounds.get(
+        "/items/18", headers=authorization
+    ).json()
+
+    read_entry, read_clip = read_details
+    assert len(read_entry.highlights) == 101
+    assert read_entry.highlights[-1].zotero_key == "BOUND097"
+    assert read_clip.body == "é" * 125_001
+    assert len(entry["highlights"]) == 100
+    assert entry["highlights_truncated"] is True
+    assert clip["body"] == "é" * 125_000
+    assert clip["body_truncated"] is True
 
 
 def test_a_withdrawn_highlight_is_served_with_its_withdrawn_at(client, authorization):

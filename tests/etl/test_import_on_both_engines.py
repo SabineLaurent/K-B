@@ -40,9 +40,12 @@ from k_b.database import writing
 from k_b.database.creation import DATABASE_SCRIPTS
 from k_b.database.engine import connect_reader, open_readers
 from k_b.database.location import DATABASE_URL_VARIABLE, PostgresUrl
-from k_b.database.reading import read_item_detail, read_items
+from k_b.database.reading import DetailBounds, read_item_detail, read_items
 
 pytestmark = pytest.mark.postgresql
+
+# Bounds no item of the test base reaches.
+BOUNDS = DetailBounds(highlights=100, body_length=125_000)
 
 FIRST_COLLECTION = "2026-10-05T093000Z"
 SECOND_COLLECTION = "2026-10-06T093000Z"
@@ -180,7 +183,9 @@ def read_listing(data_dir, database_url):
         connect_reader(readers, DATA_API_QUERY_TIMEOUT_SECONDS) as connection,
     ):
         pages = {search: read_every_page(connection, search) for search in SEARCHES}
-        details = [read_item_detail(connection, item.id) for item in pages[None]]
+        details = [
+            read_item_detail(connection, item.id, BOUNDS) for item in pages[None]
+        ]
     rank_by_id = {
         item_id: rank
         for rank, item_id in enumerate(sorted(item.id for item in pages[None]))
