@@ -78,8 +78,12 @@ dans mon coffre Obsidian, sous `veille/` :
   en API compatible OpenAI : le modèle se choisit en configuration. Son architecture :
   [docs/architecture-api-ia.md](docs/architecture-api-ia.md).
 - **Métriques** de chaque appel (durée, jetons, coût estimé, erreurs, fidélité), sur une ligne
-  JSON de la sortie standard et en OpenTelemetry vers Grafana Cloud, en région UE. Leur
-  restitution en temps réel, avec une alerte sur seuil, viendra avec #164.
+  JSON de la sortie standard et en OpenTelemetry vers Grafana Cloud, en région UE. Un tableau de
+  bord les montre à jour et dans le temps, et trois alertes sur seuil partent par e-mail : sorties
+  invalides, fidélité basse, coût au-dessus du budget. Le tableau et les alertes sont versionnés
+  dans `observability/grafana/` ; leur installation, leur lecture et le relevé du bac à sable qui a
+  déclenché les trois alertes sont dans
+  [documentation/monitoring_pour_docu.md](documentation/monitoring_pour_docu.md).
 - **Plus tard, les fiches de lecture** : de mes clips du Web Clipper, puis des papiers que je
   garde dans Zotero, le modèle rédigera des fiches de lecture, réunies en un wiki (#168). Aucun
   code ne les écrit encore, et le wiki n'est pas de la mise en ligne du 08/11 (#170).
@@ -185,8 +189,10 @@ machine (`KB_COLLECT_ONLY`), sans que ma bibliothèque soit montée dans un cont
 
 **Où on en est** : la collecte, l'import, l'API de données, le service des fiches par l'API IA
 (`kb serve-ai`, #156) et leur écriture en `.md` dans le coffre (`kb digest`, #209) sont codés (voir
-« Installer et lancer »), comme l'export des métriques du modèle vers Grafana Cloud (#162). Restent
-leur restitution, avec une alerte sur seuil (#164) ; puis, au deuxième temps, l'image étant
+« Installer et lancer »), comme l'export des métriques du modèle vers Grafana Cloud (#162). Leur
+tableau de bord et leurs trois alertes sur seuil sont livrés (#164), et les trois alertes ont été
+déclenchées dans un bac à sable le 08/11. Restent, dans #164, le réimport du tableau et de la règle
+de fidélité, changés depuis, et l'essai d'accessibilité ; puis, au deuxième temps, l'image étant
 construite (#200), l'installation par compose (#202).
 
 **La suite** :
@@ -214,7 +220,7 @@ uv sync
 | Variable | Obligatoire | Rôle |
 |---|---|---|
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
-| `KB_DATABASE_URL` | non | l'URL d'une base PostgreSQL, `postgresql://…` ou `postgres://…`, créée hors de K-B en UTF8 et en collation C ([docs/stockage.md](docs/stockage.md), « Le SGBD »). Sans elle, la base est le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`. Une autre valeur, vide comprise, une URL que libpq ne lit pas, ou une variable que libpq lit posée à côté (`PGHOST`, `PGPASSWORD`…) : code 2, sans que la valeur soit citée. Lue par `kb create-db`, `kb import` et `kb serve-data`. |
+| `KB_DATABASE_URL` | non | l'URL d'une base PostgreSQL, `postgresql://…` ou `postgres://…`, créée hors de K-B en UTF8 et en collation C ([docs/stockage.md](docs/stockage.md), « Le SGBD »). Sans elle, la base est le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`. Une autre valeur, vide comprise, une URL que libpq ne lit pas, ou une variable que libpq lit posée à côté (`PGHOST`, `PGPASSWORD`…) : code 2, sans que la valeur soit citée. Lue par `kb create-db`, `kb migrate-database`, `kb import` (et `kb daily-routine`, qui le lance) et `kb serve-data`. |
 | `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
 | `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les comptes rendus de veille dans `veille/<sujet>/`, `kb trend-report` les comptes rendus des tendances dans `veille/tendances/` ; aucun des trois ne tourne sans elle (code 2). |
 | `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
