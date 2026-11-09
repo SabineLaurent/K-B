@@ -411,6 +411,8 @@ def read_highlights(
     """The first max_highlights highlights of a Zotero entry, the withdrawn ones included, by date
     of creation; item_id must hold in 64 bits, or sqlite3 raises an OverflowError."""
     check_within_bounds("item_id", item_id, MIN_INT64, MAX_INT64)
+    # A negative LIMIT reads every row in SQLite.
+    check_within_bounds("max_highlights", max_highlights, 0, MAX_INT64)
     return [
         StoredHighlight._make(row)
         for row in connection.execute(SELECT_HIGHLIGHTS, (item_id, max_highlights))
@@ -517,6 +519,8 @@ def read_clip_detail(
     connection: Connection, item_id: int, bounds: DetailBounds
 ) -> ClipDetail:
     """Read the details of a clip item, with the first characters of its text."""
+    # A negative length of substr is refused by PostgreSQL only.
+    check_within_bounds("body_length", bounds.body_length, 0, MAX_INT64)
     return ClipDetail._make(
         connection.execute(SELECT_CLIP, (bounds.body_length, item_id)).fetchone()
     )

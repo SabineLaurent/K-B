@@ -363,6 +363,40 @@ def test_an_item_id_beyond_64_bits_is_refused_by_its_bound(
     assert str(refusal.value) == message
 
 
+@pytest.mark.parametrize(
+    ("item_id", "bounds", "message"),
+    [
+        (14, DetailBounds(-1, 125_000), "max_highlights below minimum 0"),
+        (
+            14,
+            DetailBounds(MAX_INT64 + 1, 125_000),
+            f"max_highlights above maximum {MAX_INT64}",
+        ),
+        (18, DetailBounds(100, -1), "body_length below minimum 0"),
+        (
+            18,
+            DetailBounds(100, MAX_INT64 + 1),
+            f"body_length above maximum {MAX_INT64}",
+        ),
+    ],
+    ids=[
+        "negative-highlights",
+        "highlights-beyond-64-bits",
+        "negative-body",
+        "body-beyond-64-bits",
+    ],
+)
+def test_a_bound_of_the_detail_out_of_range_is_refused(
+    connection, item_id, bounds, message
+):
+    """A negative LIMIT reads every row in SQLite, and a negative length of substr is refused by
+    PostgreSQL only: both engines refuse it the same way."""
+    with pytest.raises(ValueError) as refusal:
+        read_item_detail(connection, item_id, bounds)
+
+    assert str(refusal.value) == message
+
+
 def test_the_detail_of_an_item_holds_its_listed_fields(connection):
     detail = read_item_detail(connection, 2, BOUNDS)
 

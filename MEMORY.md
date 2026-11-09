@@ -36,7 +36,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 ## Problèmes connus
 
 - **Le détail de l'API de données est borné en temps par instruction** (#331, #418) : depuis #430, la
-  base ne lit que 101 surlignages et 125 001 caractères du texte d'un clip au plus. Le temps reste
+  lecture du détail est bornée à 101 surlignages (2 020 000 caractères de texte et de commentaire au
+  plus) et à 125 001 caractères du texte d'un clip ; en SQLite, ce que le moteur charge pour calculer
+  `substr` n'est pas mesuré (`docs/specs-api.md`, « Bornes du détail »). Le temps reste
   borné ainsi : 5 s par requête en SQLite ; en PostgreSQL, 5 s par
   instruction (`statement_timeout`, #418), et le détail en fait jusqu'à trois, 15 s en théorie, plus
   2 s d'attente du pool, au-delà des 10 s du client de l'API IA (limite choisie au plan de #418).
