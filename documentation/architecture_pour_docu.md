@@ -3,9 +3,9 @@
 « Rédaction de la documentation technique. » — C17
 
 Cette fiche décrit l'architecture applicative de K-B en entier: le flux des données de bout en bout, en bref puis en
-détail, les couches du code, puis chaque partie, de la collecte au déploiement sur Azure. Elle est écrite d'après le code de `main` au commit
-`d7e5b22` (2026-11-09), dont `src/` et `infra/` sont ceux du commit `cbada1e`. Les chemins du code de K-B
-(`etl/…`, `commands/…`, `database/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
+détail, les couches du code, puis chaque partie, de la collecte au déploiement sur Azure. Elle est écrite d'après le
+code de `main` au commit `d7e5b22` (2026-11-09), dont `src/` et `infra/` sont ceux du commit `cbada1e`. Les chemins du
+code de K-B (`etl/…`, `commands/…`, `database/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 L'installation de l'environnement de développement, les dépendances et leur configuration sont dans
 [la fiche de l'installation](installation_pour_docu.md); l'exécution des tests, dans
@@ -30,7 +30,7 @@ flowchart LR
     choice -->|"collecte"| collect
     collect -->|"garde tel quel"| raw
     raw -->|"range"| base
-    raw -->|"met en fiche les classements"| reports
+    raw -->|"met en fiche les classements"| vault
     base -->|"sert"| dataApi
     dataApi -->|"sert les items"| aiApi
     aiApi <-->|"rédige"| model
@@ -38,11 +38,11 @@ flowchart LR
     reports -->|"écrit"| vault
 ```
 
-K-B collecte les sources de veille (GitHub, arXiv, la CISA, tldr.tech, GH Archive) et la lecture choisie (les clips
-du coffre et la bibliothèque Zotero), et garde ce qu'il reçoit tel quel dans des fichiers bruts. Il range ces fichiers
-dans la base, que l'API de données sert à l'API IA. L'API IA fait rédiger par le modèle de langage les comptes rendus
-de la veille et des tendances, et K-B les écrit dans le coffre Obsidian, où ils se lisent; les classements des dépôts
-les plus suivis y sont mis en fiche directement depuis les fichiers bruts.
+K-B collecte les sources de veille (GitHub, arXiv, la CISA, tldr.tech, GH Archive) et la lecture choisie (les clips du
+coffre et la bibliothèque Zotero), garde ce qu'il reçoit tel quel dans des fichiers bruts, puis les range dans la base,
+que l'API de données sert à l'API IA, qui fait rédiger par le modèle de langage les comptes rendus de la veille et des
+tendances, que K-B écrit dans le coffre Obsidian, avec les fiches des dépôts les plus étoilés et les plus forkés, tirées
+directement des fichiers bruts.
 
 ## Le flux des données, en détail
 
@@ -111,7 +111,7 @@ flowchart LR
 flowchart LR
     subgraph exchange["Stockage d'échange en ligne, Azure Blob Storage"]
         smokeContainer[("conteneur<br>smoke-test")]
-        subgraph choice["Lecture choisie (clips, Zotero)<br>prévue par #420"]
+        subgraph choice["Lecture choisie (clips, Zotero), prévue par #420"]
             choiceClips[("clips")]
             choiceZotero[("copies de Zotero")]
         end
@@ -136,11 +136,15 @@ flowchart LR
     dailyRoutine -.->|"pose la copie<br>pas encore codé (#425)"| zotero
     dailyRoutine -.->|"lance"| steps
     digestWatch -.->|"lance"| digestSteps
+    clippings -.->|"kb collect lit"| steps
+    zotero -.->|"kb collect lit"| steps
+    steps -.->|"kb write-tops<br>écrit veille/tops/"| vault
+    digestSteps -.->|"écrivent veille/"| vault
     vault -.->|"lit veille/"| dailyRoutine
     vault -.->|"lit veille/"| digestWatch
     dailyRoutine -.->|"publie veille/"| watchContainer
     digestWatch -.->|"publie veille/"| watchContainer
-    watchContainer -.->|"make download-watch-sheets<br>pas encore codé (#424)"| mac
+    watchContainer -.->|"make<br>download-watch-sheets<br>pas encore codé (#424)"| mac
 ```
 
 Les deux schémas se lisent ainsi, dans l'ordre des flux:
@@ -210,22 +214,22 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
    relecture de `watch` par le Mac, ne sont pas encore codés: ils viendront par `make upload-library` et
    `make download-watch-sheets` (#424).
 
-Les journaux restent hors du dessin: aucune commande ne les relit, sauf la purge, qui les supprime d'après la date
-de leur nom (`purge/run_records.py:38`, `:75`). Ce sont les journaux de fonctionnement, sous `KB_DATA_DIR/logs/`
+Les journaux restent hors du dessin: aucune commande ne les relit, sauf la purge, qui les supprime d'après la date de
+leur nom (`purge/run_records.py:38`, `:75`). Ce sont les journaux de fonctionnement, sous `KB_DATA_DIR/logs/`
 (`commands/run_log.py:23`, `:27`, `:29`), le journal d'import, `KB_DATA_DIR/journals/import-journal-<date>.jsonl`
-(`etl/pipeline.py:35`, `:63-68`), et la ligne JSON que l'API IA écrit sur sa sortie standard pour chaque appel au
-modèle (`ai_api/observability/metrics.py:50`). Restent hors du dessin aussi deux appels qui ne portent pas de
-donnée de la veille: `GET /health`, par lequel `kb smoke-test` vérifie les deux API et `kb digest-watch` les
-réveille (`commands/smoke_test_command.py:80-81`, `commands/digest_watch_command.py:60-64`), et la demande d'un
-jeton à l'identité managée (`jobs/exchange_storage.py:157`, `database/entra.py:57`). `kb openapi` écrit le contrat
-des deux API dans le dépôt, `docs/api/openapi-donnees.json` et `docs/api/openapi-ia.json`
-(`commands/openapi_command.py:30-32`, `:50`). Les contrôles du coffre avant une écriture restent hors du dessin
-aussi: ils ne lisent que l'existence d'un fichier. `kb digest` et `kb trend-report` refusent de redemander une fiche
-du jour déjà écrite (`commands/digest_command.py:70`, `commands/trend_report_command.py:135`), `kb write-tops`
-contrôle ses dossiers avant et après l'écriture (`post/top_sheets.py:59-60`, `:71-72`), et le miroir des clips
-compare chaque clip du coffre à son blob (`jobs/clip_mirror.py:231-233`). Avec `KB_LLM_PROVIDER=replay`, l'API IA
-ne joint pas le modèle: elle rejoue les réponses du fichier `KB_LLM_REPLAY_FILE`
-(`ai_api/connectors/llm_settings.py:29`, `ai_api/connectors/llm_replay.py:70`).
+(`etl/pipeline.py:35`, `:63-68`), et la ligne JSON que l'API IA écrit sur sa sortie standard pour chaque appel au modèle
+(`ai_api/observability/metrics.py:50`). Restent hors du dessin aussi deux appels qui ne portent pas de donnée de la
+veille: `GET /health`, par lequel `kb smoke-test` vérifie les deux API et `kb digest-watch` les réveille
+(`commands/smoke_test_command.py:80-81`, `commands/digest_watch_command.py:60-64`), et la demande d'un jeton à
+l'identité managée (`jobs/exchange_storage.py:157`, `database/entra.py:57`). `kb openapi` écrit le contrat des deux API
+dans le dépôt, `docs/api/openapi-donnees.json` et `docs/api/openapi-ia.json` (`commands/openapi_command.py:30-32`,
+`:50`). Les contrôles du coffre avant une écriture restent hors du dessin aussi: ils ne lisent que l'état d'un fichier
+(existence, lien, date, taille). `kb digest` et `kb trend-report` refusent de redemander une fiche du jour déjà écrite
+(`commands/digest_command.py:70`, `commands/trend_report_command.py:135`), `kb write-tops` contrôle ses dossiers avant
+et après l'écriture (`post/top_sheets.py:59-60`, `:71-72`), et le miroir des clips compare la date et la taille de
+chaque clip du coffre à celles de son blob (`jobs/clip_mirror.py:231-233`). Avec `KB_LLM_PROVIDER=replay`, l'API IA ne
+joint pas le modèle: elle rejoue les réponses du fichier `KB_LLM_REPLAY_FILE` (`ai_api/connectors/llm_settings.py:29`,
+`ai_api/connectors/llm_replay.py:70`).
 
 ## Les couches du code
 
@@ -365,32 +369,33 @@ tag de version sur `main` les met à jour ([la fiche de la livraison continue](l
 flowchart TB
     actions("GitHub Actions<br>deploy.yml, sur un tag vX.Y.Z<br>identité id-kb-deploy, OIDC")
     mac("Mac<br>coffre Obsidian, Zotero")
+    sources("Sources de veille")
     subgraph azure["Ressources d'infra/, Azure France Central"]
         registry[("crkb…<br>registre d'images")]
         keyVault[("kv-kb-…<br>Key Vault, secrets")]
+        logs[("log-kb<br>Log Analytics<br>journaux des apps et des jobs")]
         subgraph cae["Environnement Container Apps cae-kb"]
             migrateJob["caj-kb-migrate-database<br>crée la base<br>id-kb-migrate-database"]
             smokeJob["caj-kb-smoke-test<br>vérifie le déploiement<br>id-kb-smoke-test"]
             dataApi["ca-kb-data-api<br>API de données, sert les items<br>id-kb-data-api"]
             aiApi["ca-kb-ai-api<br>API IA, rédige les comptes rendus<br>id-kb-ai-api"]
-            dailyJob["caj-kb-daily-routine<br>collecte chaque jour<br>prévu #330"]
-            digestJob["caj-kb-digest-watch<br>demande les comptes rendus<br>prévu #423"]
+            dailyJob["caj-kb-daily-routine<br>collecte chaque jour<br>id-kb-daily-routine, prévu #330"]
+            digestJob["caj-kb-digest-watch<br>demande les comptes rendus<br>id-kb-digest-watch, prévu #423"]
         end
-        logs[("log-kb<br>Log Analytics")]
         base[("pgsql-kb-…<br>Base, PostgreSQL 18<br>Entra ID seul")]
-        subgraph exchange["stkbexchange…, Azure Blob Storage"]
+        subgraph exchange["Stockage d'échange en ligne, stkbexchange…"]
             smokeContainer[("conteneur<br>smoke-test")]
-            subgraph choice["Lecture choisie (clips, Zotero)<br>prévue par #420"]
-                clipContainer[("conteneur<br>clippings")]
-                zoteroContainer[("conteneur<br>zotero")]
+            subgraph choice["Lecture choisie (clips, Zotero), prévue par #420"]
+                clipContainer[("clips<br>conteneur clippings")]
+                zoteroContainer[("copies de Zotero<br>conteneur zotero")]
             end
             watchContainer[("conteneur<br>watch")]
         end
         jobFiles[("stkbjobfiles…<br>partage job-data, /data<br>prévu #420")]
     end
-    model("Modèle de langage<br>gpt-6-luna, Azure AI Foundry<br>France Central, zone de données UE")
-    githubApi("API GitHub")
     grafana("Grafana Cloud, Allemagne")
+    githubApi("API GitHub")
+    model("Modèle de langage<br>gpt-6-luna, Azure AI Foundry<br>France Central, zone de données UE")
     style dailyJob stroke-dasharray: 5 5
     style digestJob stroke-dasharray: 5 5
     style choice stroke-dasharray: 5 5
@@ -399,56 +404,69 @@ flowchart TB
     actions -->|"pousse l'image, AcrPush"| registry
     actions -->|"met à jour, lance les jobs"| cae
     registry -->|"image, AcrPull"| cae
-    keyVault -->|"secrets"| cae
-    cae -->|"journaux"| logs
+    keyVault -->|"secrets"| dataApi
+    keyVault -->|"secrets"| aiApi
     migrateJob -->|"crée les tables"| base
     base -->|"lecture seule, kb_reader"| dataApi
-    dataApi -->|"GET /items, GET /trends"| aiApi
-    aiApi <-->|"chat/completions"| model
-    githubApi -->|"fiches et README"| aiApi
+    dataApi -->|"GET /items<br>GET /items/{item_id}<br>GET /trends"| aiApi
     aiApi -->|"OTLP"| grafana
+    githubApi -->|"fiches et README"| aiApi
+    aiApi <-->|"chat/completions"| model
     smokeContainer -->|"liste, Blob Data Reader"| smokeJob
     smokeJob -->|"GET /health"| dataApi
     smokeJob -->|"GET /health"| aiApi
-    mac -.->|"make upload-library, prévu #424"| choice
+    mac -.->|"make upload-library<br>prévu #424"| choice
+    sources -.->|"collecte<br>prévu #330"| dailyJob
     choice -.->|"clips et copie de Zotero"| dailyJob
     dailyJob -.->|"écrit les items, kb_writer"| base
-    jobFiles <-.->|"brut, état, coffre du job"| dailyJob
-    jobFiles <-.->|"coffre du job"| digestJob
-    digestJob -.->|"POST /digests, /trend-reports"| aiApi
+    jobFiles <-.->|"fichiers bruts, état de la collecte<br>coffre du job"| dailyJob
+    jobFiles <-.->|"registre des comptes rendus<br>coffre du job"| digestJob
+    aiApi -.->|"POST /digests<br>POST /trend-reports"| digestJob
     dailyJob -.->|"publie veille/"| watchContainer
     digestJob -.->|"publie veille/"| watchContainer
-    watchContainer -.->|"make download-watch-sheets, prévu #424"| mac
+    watchContainer -.->|"make<br>download-watch-sheets<br>prévu #424"| mac
 ```
 
 Le schéma dit où est quoi en ligne, et ce qui s'y passe. Un trait plein est déployé; un trait ou un bord en pointillés
-est prévu, avec son issue. Sur une app ou un job, le nœud porte son identité managée; sur une flèche, le rôle qui la
-permet.
+est prévu, avec son issue. Une flèche suit le sens des données, comme dans le flux en détail; seules les deux flèches
+`GET /health` sont des appels sans donnée de la veille, par lesquels le job de vérification teste les deux API. Sur une
+app ou un job, le nœud porte son identité managée; sur une flèche, le rôle qui la permet.
 
-- **Les apps et les jobs** tournent dans l'environnement `cae-kb` (`infra/modules/container-apps-environment.bicep:1`),
-  depuis la même image, tirée du registre par le rôle AcrPull (`infra/main.bicep:86-90`,
-  `infra/modules/container-registry.bicep:42-53`). Les deux API n'ont qu'une entrée interne
+- **Les apps et les jobs** tournent dans l'environnement `cae-kb`
+  (`infra/modules/container-apps-environment.bicep:7-8`), depuis la même image, tirée du registre par le rôle AcrPull
+  (`infra/main.bicep:86-90`, `infra/modules/container-registry.bicep:42-53`,
+  `infra/modules/migrate-database-job.bicep:35-44`). Les deux API n'ont qu'une entrée interne
   (`infra/modules/api-container-app.bicep:74-81`); l'API IA joint l'API de données par son nom interne, en HTTPS
   (`infra/main.bicep:223`). Les journaux des conteneurs vont dans `log-kb`
   (`infra/modules/container-apps-environment.bicep:45-63`).
-- **Les secrets** (clés des API, clé du modèle, jeton GitHub, en-tête OTLP) sont dans le Key Vault; chaque app lit
-  les siens par le rôle Key Vault Secrets User, un rôle par secret (`infra/main.bicep:133-153`,
+- **Les secrets** (clés des API, clé du modèle, jeton GitHub, en-tête OTLP) sont dans le Key Vault; seules les deux API
+  en lisent, chacune les siens, par le rôle Key Vault Secrets User, un rôle par secret (`infra/main.bicep:133-153`,
   `infra/modules/key-vault-secret-access.bicep:28-38`).
 - **La base** est un serveur PostgreSQL 18 flexible, ouvert par Entra ID seul
   (`infra/modules/postgresql-server.bicep:17-31`). `id-kb-data-api` y lit par le rôle `kb_reader`, et
   `id-kb-migrate-database` possède les tables; la collecte quotidienne écrira par le rôle `kb_writer` (#330,
   `infra/postgresql/grant-roles.sql:6-8`, `:31-58`).
-- **Le stockage d'échange** n'a que le conteneur `smoke-test`, que `id-kb-smoke-test` lit par le rôle Storage Blob
-  Data Reader (`infra/modules/exchange-storage.bicep:40-61`). #420 prévoit les conteneurs `clippings`, `zotero` et
-  `watch`, et un second compte, `stkbjobfiles`, dont le partage `job-data` sera monté sur `/data` des jobs.
+- **Le stockage d'échange** n'a que le conteneur `smoke-test`, que `id-kb-smoke-test` lit par le rôle Storage Blob Data
+  Reader (`infra/modules/exchange-storage.bicep:40-61`). #420 prévoit les conteneurs `clippings`, `zotero` et `watch`,
+  et un second compte, `stkbjobfiles`, dont le partage `job-data` sera monté sur `/data` des jobs. Il prévoit aussi
+  leurs rôles, un par conteneur: `id-kb-daily-routine` lit `clippings` et `zotero` (Storage Blob Data Reader) et écrit
+  `watch` (Storage Blob Data Contributor); `id-kb-digest-watch` écrit `watch`; le compte Entra de l'opératrice écrit
+  `clippings` et `zotero`, et lit `watch`.
 - **Le déploiement**: un tag `vX.Y.Z` sur `main` lance `deploy.yml`, qui se connecte par OIDC sous `id-kb-deploy`,
-  pousse l'image par le rôle AcrPush, lance `caj-kb-migrate-database`, met à jour les apps et les jobs, puis lance
-  `caj-kb-smoke-test` (`.github/workflows/deploy.yml:7-11`, `:97-133`, `:161-209`;
-  `infra/modules/deploy-access.bicep:25-35`, `:53-87`).
-- **Hors du Bicep**: le modèle `gpt-6-luna` est déployé sur Azure AI Foundry, en France Central, en zone de données
-  UE (`docs/registre-traitements.md:85`, `:88`); les mesures et les traces vont à Grafana Cloud, pile
-  `prod-eu-west-2`, en Allemagne (`docs/registre-traitements.md:123`, `:128`). Le Bicep n'en porte que les
-  paramètres et les secrets (`infra/main.bicep:21-28`).
+  pousse l'image, lance `caj-kb-migrate-database`, met à jour les apps et les jobs, puis lance `caj-kb-smoke-test`
+  (`.github/workflows/deploy.yml:7-11`, `:97-133`, `:161-209`). `id-kb-deploy` a les rôles AcrPush et Reader sur le
+  registre, Container Apps Contributor sur chaque app et Container Apps Jobs Contributor sur chaque job
+  d'`infra/deployment.json`, et rien sur le Key Vault, le stockage ni les données
+  (`infra/modules/deploy-access.bicep:13-18`, `:25-35`, `:53-87`).
+- **L'opératrice**, par son compte Entra, applique le Bicep à la main (`infra/main.bicep:1-3`,
+  [`infra/README.md`](../infra/README.md)); elle a le rôle Key Vault Secrets Officer, pour poser les secrets
+  (`infra/modules/key-vault.bicep:33-41`), et elle est l'administratrice Entra du serveur PostgreSQL
+  (`infra/modules/postgresql-server.bicep:53-61`). Le budget `budget-kb` envoie ses alertes par e-mail
+  (`infra/modules/budget.bicep:5-25`).
+- **Hors du Bicep**: le modèle `gpt-6-luna` est déployé sur Azure AI Foundry, en France Central, en zone de données UE
+  (`docs/registre-traitements.md:85`, `:88`); les mesures et les traces vont à Grafana Cloud, pile `prod-eu-west-2`, en
+  Allemagne (`docs/registre-traitements.md:123`, `:128`). Le Bicep n'en porte que les paramètres et les secrets
+  (`infra/main.bicep:21-28`).
 - **Prévu**: `caj-kb-daily-routine` (#330) et `caj-kb-digest-watch` (#423) ne sont pas déclarés
   (`infra/deployment.json`); les échanges avec le Mac viendront avec #424, la copie de Zotero avec #425.
 
