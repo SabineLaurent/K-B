@@ -42,7 +42,9 @@ uv run kb --help
   uv, « Syncing the environment » et « Default groups », lue par Context7 le 2026-11-08).
 - `uv sync --locked`, la commande de la CI, n'écrit jamais `uv.lock`: si `uv.lock` ne correspond plus au
   `pyproject.toml`, elle échoue au lieu de le mettre à jour. `uv lock --check` fait le même contrôle sans rien
-  installer; au commit `875c638`, il répond `Resolved 96 packages` et sort en code 0.
+  installer (documentation de uv 0.13.5, « Automatic lock and sync » et « Checking the lockfile », lue par Context7
+  le 2026-11-09; `.github/workflows/ci.yml`). Au commit `875c638`, `uv lock --check` répond `Resolved 96 packages` et
+  sort en code 0.
 - `uv run <commande>` met l'environnement à jour avant de lancer la commande (documentation de uv, « Automatic lock
   and sync »): après un `git pull` qui change `uv.lock`, `uv run kb …` installe d'abord les nouvelles versions.
 - `uv run kb --help` contrôle l'installation. Il liste les 13 commandes de `kb` et leurs codes de sortie, sans lire
@@ -54,7 +56,7 @@ uv run kb --help
 ### Le dossier de données et la base
 
 `KB_DATA_DIR` nomme le dossier des données, hors du dépôt. Toutes les commandes le lisent, sauf `kb openapi`
-(`main`, `cli.py`). **`kb` ne crée pas ce dossier** (#356, ouverte): s'il n'existe pas, la commande s'arrête en code 2,
+(`main`, `cli.py`). **`kb` ne crée pas ce dossier** (#356, encore ouverte le 2026-11-09): s'il n'existe pas, la commande s'arrête en code 2,
 avant tout travail, sur `error: KB_DATA_DIR is not an existing directory` (`read_data_dir`,
 `commands/environment.py`). Il se crée donc à la main, puis la base, une fois:
 
@@ -68,7 +70,9 @@ base est ce fichier SQLite; avec elle, `kb create-db` crée les tables dans la b
 exister, en UTF8 et en collation C ([docs/stockage.md](../docs/stockage.md), « Le SGBD »).
 
 Chaque commande écrit aussi son journal dans `<KB_DATA_DIR>/logs/`: `kb.log`, ou `kb-serve-data.log` et
-`kb-serve-ai.log` pour les deux API (`core/config.py`). Avec `KB_LOG_TO_FILE=false`, le journal ne va que sur la
+`kb-serve-ai.log` pour les deux API (`core/config.py`). Deux exceptions n'écrivent aucun journal: `kb openapi`, et
+`--dry-run` de `kb daily-routine` et `kb digest-watch`, qui affiche les étapes sans en lancer aucune (`main`,
+`cli.py`). Avec `KB_LOG_TO_FILE=false`, le journal ne va que sur la
 sortie d'erreur.
 
 ### Le fichier `.env`
@@ -101,7 +105,7 @@ obligatoire. `kb daily-routine` et `kb digest-watch` lisent en plus les variable
 | `KB_LOG_TO_FILE` | toutes les commandes, sauf `kb openapi` | non |
 | `KB_DATABASE_URL`, `KB_DATABASE_AUTH` | `kb create-db`, `kb migrate-database`, `kb import`, `kb serve-data` | non: sans `KB_DATABASE_URL`, la base est `<KB_DATA_DIR>/k-b.sqlite` |
 | `KB_ZOTERO_DIR`, `GOOGLE_APPLICATION_CREDENTIALS`, `KB_GITHUB_TOKEN`, `KB_COLLECT_ONLY` | `kb collect` | non: sans les deux premières, Zotero et GH Archive sont sautés; sans le jeton, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000 |
-| `KB_VAULT_DIR` | `kb collect`, `kb write-tops`, `kb digest`, `kb trend-report` | non pour `kb collect`, qui saute alors les clips; oui pour les trois autres |
+| `KB_VAULT_DIR` | `kb collect`, `kb write-tops`, `kb digest`, `kb trend-report`, `kb daily-routine`, `kb digest-watch` | non pour `kb collect`, qui saute alors les clips; oui pour les cinq autres (`read_vault_dir_or_refusal`, `etl/collected_sources.py`) |
 | `KB_DATA_API_KEY_<CLIENT>` | `kb serve-data` | oui, une au moins |
 | `KB_DATA_API_HOST`, `KB_DATA_API_PORT`, `KB_DATA_API_ALLOWED_HOSTS` | `kb serve-data` | non |
 | `KB_AI_API_KEY_<CLIENT>` | `kb serve-ai`; `kb digest` lit `KB_AI_API_KEY_KB_DIGEST`, `kb trend-report` lit `KB_AI_API_KEY_KB_TREND_REPORT` | oui: une au moins pour `kb serve-ai`, la sienne pour `kb digest` et `kb trend-report` |
@@ -110,17 +114,18 @@ obligatoire. `kb daily-routine` et `kb digest-watch` lisent en plus les variable
 | `KB_LLM_REPLAY_FILE` | `kb serve-ai` | oui avec `KB_LLM_PROVIDER=replay`, qui répond par les réponses d'un fichier, sans réseau ni clé |
 | `KB_LLM_REASONING_EFFORT`, `KB_AI_API_HOST`, `KB_AI_API_PORT`, `KB_DIGEST_WINDOW_DAYS` | `kb serve-ai` | non |
 | `KB_DATA_API_URL` | `kb serve-ai`, `kb smoke-test`, `kb digest-watch` | non |
-| `KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS`, `KB_TRACE_CONTENT` | `kb serve-ai` | non: sans les deux premières, rien n'est exporté |
+| `KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS`, `KB_TRACE_CONTENT` | `kb serve-ai` | non: sans les deux premières, rien n'est exporté, et `kb serve-ai` refuse de démarrer avec `KB_TRACE_CONTENT` autre que `none` (`find_content_without_export_refusal`, `ai_api/connectors/metrics_export.py`) |
 | `KB_DEPLOYMENT_ENVIRONMENT` | `kb serve-data`, `kb serve-ai`; les commandes qui lisent `KB_AI_API_URL` ou `KB_DATA_API_URL`, pour une URL `http` vers un service de compose (`find_internal_api_url_refusal`, `core/outbound.py`) | non, sauf avec l'export (`sandbox` ou `production`). Seul `sandbox` sert `/docs` et `/openapi.json` (`read_openapi_url`, `core/api_settings.py`) |
 | `KB_AI_API_URL` | `kb digest`, `kb trend-report`, `kb smoke-test`, `kb digest-watch` | non |
 | `KB_EXCHANGE_BLOB_URL`, `AZURE_CLIENT_ID` | `kb smoke-test`, `kb daily-routine`, `kb digest-watch`; `AZURE_CLIENT_ID` aussi avec `KB_DATABASE_AUTH=entra` | oui pour ces commandes |
-| toute variable `OTEL_*` | `kb serve-ai` | à ne jamais poser: `kb serve-ai` refuse de démarrer avec une seule (`metrics_export.py`, `ai_api/connectors/`) |
+| toute variable `OTEL_*` | `kb serve-ai` | à ne jamais poser: `kb serve-ai` refuse de démarrer avec une seule (`read_metrics_export_settings_or_refusal`, `ai_api/connectors/metrics_export.py`) |
 
 ## Les dépendances
 
 `pyproject.toml` déclare les 16 dépendances de K-B (`[project]`, `dependencies`) et le groupe `dev`
 (`[dependency-groups]`), qui ne sert qu'au développement et aux tests. `uv.lock` fixe la version exacte de chaque
-paquet, dépendances indirectes comprises: 96 paquets, K-B compris, chacun avec l'empreinte `sha256` de ses fichiers.
+paquet, dépendances indirectes comprises: 96 paquets, K-B compris. Chacun porte l'empreinte `sha256` de ses fichiers,
+sauf K-B, installé depuis le dépôt (`source = { editable = "." }`).
 L'image n'installe pas le groupe `dev`: ses deux `uv sync` portent `--no-dev` (`Dockerfile`).
 
 | Paquet | Plancher | Borne haute | Version de `uv.lock` | Rôle dans K-B |
@@ -162,8 +167,9 @@ elle lance `uv run ruff check` sans `--no-cache`, une précaution prise sur la m
 « Lancer les tests »).
 
 Les tests marqués `postgresql` demandent un serveur PostgreSQL de test, jamais la base de production. Sur le Mac,
-c'est le PostgreSQL de Homebrew, sans conteneur; la formule `postgresql@18` est de la version majeure du service de la
-CI (`postgres:18.6`, job `tests-postgresql` de `.github/workflows/ci.yml`):
+c'est le PostgreSQL de Homebrew, sans conteneur; la formule `postgresql@18` (18.6 selon
+`brew info --json=v2 postgresql@18`, observé le 2026-11-08) est de la version majeure du service de la CI
+(`postgres:18.6`, job `tests-postgresql` de `.github/workflows/ci.yml`):
 
 ```sh
 brew install postgresql@18
@@ -185,4 +191,6 @@ commandes et les rapports (« Lancer les tests »), la couverture, et ce que lan
   sur la machine.
 - `read_environment` rend l'environnement du processus tel quel (`os.environ`): une variable exportée par le profil du
   shell (`~/.zshrc`) est lue comme une variable du `.env`, et le reste quand elle est retirée du `.env`. Une clé d'API
-  retirée du `.env` mais exportée par le profil reste donc valide.
+  retirée du `.env` mais exportée par le profil reste donc valide. Avec `KB_DATABASE_URL`, une variable de libpq
+  (`PGHOST`, `PGPASSWORD`…), du `.env` ou du profil, fait refuser la base: libpq la lirait à côté de l'URL
+  (`LIBPQ_VARIABLES`, `read_database_location_or_refusal`, `database/location.py`).
