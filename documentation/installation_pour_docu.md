@@ -42,9 +42,9 @@ uv run kb --help
   uv, « Syncing the environment » et « Default groups », lue par Context7 le 2026-11-08).
 - `uv sync --locked`, la commande de la CI, n'écrit jamais `uv.lock`: si `uv.lock` ne correspond plus au
   `pyproject.toml`, elle échoue au lieu de le mettre à jour. `uv lock --check` fait le même contrôle sans rien
-  installer (documentation de uv 0.13.5, « Automatic lock and sync » et « Checking the lockfile », lue par Context7
-  le 2026-11-09; `.github/workflows/ci.yml`). Au commit `875c638`, `uv lock --check` répond `Resolved 96 packages` et
-  sort en code 0.
+  installer (documentation de uv 0.13.5, la dernière que donne Context7, « Automatic lock and sync » et « Checking
+  the lockfile », lue le 2026-11-09; `.github/workflows/ci.yml`). Lancé le 2026-11-08 au commit `875c638`,
+  `uv lock --check` a répondu `Resolved 96 packages` et est sorti en code 0.
 - `uv run <commande>` met l'environnement à jour avant de lancer la commande (documentation de uv, « Automatic lock
   and sync »): après un `git pull` qui change `uv.lock`, `uv run kb …` installe d'abord les nouvelles versions.
 - `uv run kb --help` contrôle l'installation. Il liste les 13 commandes de `kb` et leurs codes de sortie, sans lire
@@ -97,7 +97,8 @@ cp .env.example .env
 ### Les variables d'environnement
 
 Le rôle et la forme de chaque variable sont dans `.env.example`. Ce tableau dit qui la lit, et si elle est
-obligatoire. `kb daily-routine` et `kb digest-watch` lisent en plus les variables des commandes qu'ils enchaînent.
+obligatoire. `kb daily-routine` et `kb digest-watch` lisent en plus les variables des commandes qu'ils enchaînent;
+avec `--dry-run`, ils ne lisent que `KB_DATA_DIR` et `KB_LOG_TO_FILE` (`main`, `cli.py`).
 
 | Variable | Lue par | Obligatoire |
 |---|---|---|
