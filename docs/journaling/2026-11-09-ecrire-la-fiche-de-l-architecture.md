@@ -9,7 +9,8 @@
 
 La note couvre les commits de la branche : 988bc29 (la fiche), 06e598b et 9787dfe (ses deux relectures), 637012a (cette
 note), 4cba543 (la lecture choisie), 3a35c5a (le flux le long du code), 050c693 (sa relecture), 3c18080 (les trois
-schémas), cc65d1e et f3887eb (leurs deux relectures), puis les commits qui datent la fiche à `0292266` après le rebase.
+schémas), cc65d1e et f3887eb (leurs deux relectures), les commits qui datent la fiche à `0292266` après le rebase, puis
+aba6a4f (le coffre nommé « base de connaissance (coffre Obsidian) » dans les schémas, demande de Sabine du 09/11).
 Les autres commits et fichiers que liste l'outil (`src/k_b/ai_api/`, `tests/`, `README.md`, les autres fiches…) sont
 ceux de #495, #502, #507, #518, #526, #164 et des PR #533 et #534, déjà sur `main` : ils ne sont pas de cette PR.
 
