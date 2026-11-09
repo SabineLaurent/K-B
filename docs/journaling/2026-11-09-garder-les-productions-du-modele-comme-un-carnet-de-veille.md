@@ -51,7 +51,7 @@ Elles ne seront en ligne qu'avec #420 (le partage `job-data` et le conteneur `wa
 (un dossier de `job-data`), `watch` et le coffre du Mac. C'est pourquoi le registre écrit cette partie au
 futur.
 
-### 3. La limite de la suppression à la main
+### 3. Une limite relevée par la relecture, pas écrite au registre
 
 La publication n'envoie que ce que le conteneur n'a pas, et ne remplace jamais rien :
 
@@ -61,17 +61,19 @@ container_client.upload_blob(sheet_name, content, overwrite=False)
 (`src/k_b/jobs/watch_publication.py:146` ; la docstring du module, lignes 1 à 3, le dit aussi :
 « each sheet the container lacks is sent to it (…) never replacing a blob »)
 
-Deux conséquences, écrites comme limite au registre :
-- une fiche supprimée de `watch` y revient tant qu'elle reste dans le coffre de travail ;
-- une fiche corrigée pour un effacement (étape 5) ne remplace jamais celle déjà publiée.
+La relecture en a tiré deux conséquences (constat C2) :
+- une fiche supprimée de `watch` y reviendrait tant qu'elle reste dans le coffre de travail ;
+- une fiche corrigée pour un effacement (étape 5) ne remplacerait jamais celle déjà publiée.
 
-S'y ajoute ce que prévoit #420 :
-- Sabine n'aura que la lecture sur `watch` ;
-- un blob supprimé restera récupérable 30 jours ;
-- ses versions resteront tant que personne ne les efface, et personne n'aura le droit `deleteBlobVersion`.
+Elle a relevé aussi ce que prévoit #420 (constat C1) :
+- Sabine n'aurait que la lecture sur `watch` ;
+- un blob supprimé resterait récupérable 30 jours ;
+- ses versions resteraient tant que personne ne les efface, et personne n'aurait le droit
+  `deleteBlobVersion`.
 
-La règle « supprimées à la main » reste celle de Sabine. Le registre dit où elle ne tiendra pas encore, et
-renvoie à #531.
+Ces constats, et C3 (section suivante), n'ont **pas** été validés par Sabine. Une limite a été écrite au
+registre sur un accord mal relayé, puis retirée par un revert (`710472b`). Ils restent des points ouverts
+pour elle, dans « Not verified » de la PR. #531 porte déjà la suppression synchronisée qui y répondrait.
 
 ### 4. La justification RGPD
 
@@ -98,15 +100,19 @@ lit pas les auteurs.
 ```
 (`src/k_b/ai_api/connectors/data_api_client.py:72-73`)
 
-**La limite, enfin.** Seuls les `@login` des notes d'une release sont masqués avant le modèle :
+**La limite, enfin, telle que le registre l'écrit** : un compte rendu de veille peut recopier une adresse
+mail d'un item (`docs/fiches-veille.md:529`), et le compte rendu des tendances un nom écrit en texte libre
+dans une description ou un README (la ligne « Données » de la fiche 1).
+
+La relecture va plus loin (constat C3, ouvert pour Sabine). Avant le modèle, seuls les `@login` des notes
+d'une release sont masqués :
 
 ```python
 LOGIN_FIELDS_BY_KIND: dict[WatchKind, tuple[str, ...]] = {"release": ("body",)}
 ```
 (`src/k_b/ai_api/watch_items.py:94`)
 
-Un nom ou une adresse mail écrits en texte libre peuvent donc être recopiés par un compte rendu, de veille
-comme des tendances. Les tendances masquent les adresses mail, mais avec des limites (`docs/tendances.md:519`).
+Un compte rendu de veille pourrait donc aussi recopier un nom écrit en texte libre.
 
 ### 5. La copie de `conformite.md`
 
@@ -119,7 +125,7 @@ date du communiqué de l'Arcep.
 | Choix | Retenu | Écarté, et pourquoi |
 |---|---|---|
 | Données personnelles citées | Logins, et la limite du nom ou du mail (décision de Sabine, sur l'écart signalé) | Les « noms d'auteurs de papiers » de la mission : faux aujourd'hui (`data_api_client.py:72-73`). Les fiches de lecture, quand elles viendront, mettront le registre à jour dans leur propre PR. |
-| Limite de la suppression à la main | Écrite au registre, au futur, avec renvoi à #531 (choix 67 de Sabine) | La taire : le registre aurait promis une suppression que `watch` ne permettra pas. Changer la règle : c'est la décision de Sabine. |
+| Limite de la suppression à la main (C1 à C3) | Non écrite au registre : en attente de Sabine, dans « Not verified » de la PR | L'écrire sans son accord : c'est une question de données personnelles, qui revient à Sabine (une première écriture, sur un accord mal relayé, a été retirée par `710472b`). |
 | Condition de la mise en ligne | « #420 et `caj-kb-digest-watch` (#423) » | #420 seule : elle crée le stockage, aucun job. #330 : il ne planifie que `caj-kb-daily-routine` (accepté par time-knight). |
 | Renvois au code | Le module, sans numéro de ligne | `fichier:ligne` : le registre n'en cite aucun ailleurs, et un numéro vieillit. Les lignes sont dans la PR et dans cette note. |
 | Phrase des 99 ans | Rattachée aux fiches des tops | La laisser après les comptes rendus : elle leur attribuerait une décision du 19/10 qui ne les visait pas. |
@@ -132,7 +138,7 @@ date du communiqué de l'Arcep.
 | `grep -c "carnet de veille" docs/registre-traitements.md` → `2` | La règle est écrite, dans la fiche 1 et à l'étape 9. |
 | Nombre de `|` des deux lignes changées : 3 et 6, comme sur `origin/main` ; 319 lignes | Les tableaux ne sont pas cassés. |
 | Contrôle Unicode : aucun caractère `Cc` ou `Cf` ; ponctuation : 0 écart | Aucun caractère invisible, ponctuation française tenue. |
-| Relecture par un sous-agent neuf (high) : 8 constats ; C4, C5, C6 et C8 tranchés par time-knight, C1 à C3 par Sabine, C7 hors du plan | Chaque fait nouveau a été vérifié contre le code de `origin/main`. |
+| Relecture par un sous-agent neuf (high) : 8 constats ; C4, C5, C6 et C8 tranchés par time-knight et appliqués, C1 à C3 ouverts pour Sabine, C7 hors du plan | Chaque fait nouveau a été vérifié contre le code de `origin/main`. |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -142,19 +148,20 @@ date du communiqué de l'Arcep.
    données sont publiques et minimes (`docs/registre-traitements.md:58`).
 2. **Que contient un compte rendu, en données personnelles ?** Des logins GitHub, dans un titre de release
    (`releases.py:182`) ou dans `owner/repo` (`trend_report_sheets.py:277`). Aucun auteur de papier
-   (`data_api_client.py:72-73`). Un nom ou un mail recopiés d'un texte libre restent possibles : c'est la
-   limite écrite.
+   (`data_api_client.py:72-73`). Un mail (veille) ou un nom (tendances) recopiés d'un texte libre restent
+   possibles : c'est la limite écrite. La relecture ajoute le nom pour la veille aussi (C3, ouvert).
 3. **Une personne demande l'effacement : que faire ?** L'étape 5 s'applique aussi à ces fichiers.
-   Aujourd'hui, il suffit de modifier les fiches du coffre. Une fois #420 en place, `watch` ne suivra pas,
-   faute de droit, et une fiche corrigée n'y sera jamais republiée (`watch_publication.py:146`). C'est ce
-   que porte #531.
+   Aujourd'hui, il suffit de modifier les fiches du coffre. Une fois #420 en place, la relecture prévoit
+   deux obstacles (C1 et C2, ouverts) : `watch` ne suivrait pas, faute de droit, et une fiche corrigée n'y
+   serait jamais republiée (`watch_publication.py:146`). #531 y répondrait.
 4. **Pourquoi dire « aujourd'hui sur le Mac », alors que le code de publication existe ?** Parce que
    l'infrastructure n'a pas encore de conteneur `watch` (`infra/modules/exchange-storage.bicep:2`), et
    qu'aucun job qui publie n'est déployé (`infra/deployment.json:3`).
 
 ## Zones non vérifiées
 
-- Les droits sur `watch`, la suppression réversible et les versions viennent du plan de #420, pas d'un
+- C1 à C3 de la relecture sont ouverts pour Sabine et ne sont pas écrits au registre (section 3).
+- Les droits sur `watch`, la suppression réversible et les versions (C1) viennent du plan de #420, pas d'un
   Bicep : rien n'est encore écrit dans `infra/`.
 - La place du coffre de travail sur `job-data` (`KB_VAULT_DIR=/data/vault`) vient du plan de #330. Aucun
   Bicep ne la fixe encore.
