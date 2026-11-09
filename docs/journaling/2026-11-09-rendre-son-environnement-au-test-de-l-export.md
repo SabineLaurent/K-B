@@ -77,7 +77,7 @@ Le test prend la constante `DIGEST_CLIENT` de `src/k_b/core/config.py:300`, comm
 Ce test de la suite par défaut lance le test de l'export dans un pytest à part. Avec `staging`, la
 lecture des réglages rend un refus qui cite la valeur
 (`src/k_b/ai_api/connectors/metrics_export.py:178-182`), et le test de l'export s'arrête à sa
-ligne 65, avant de créer l'application. Rien ne part sur le réseau. Si la variable se perd, le
+ligne 66, avant de créer l'application. Rien ne part sur le réseau. Si la variable se perd, le
 refus devient « not set » et le test échoue. Avec `sandbox`, la valeur aurait été valide, le test
 aurait exporté, et la suite par défaut aurait fait une requête réseau.
 
@@ -116,7 +116,7 @@ préfixe que kb refuse et non un réglage.
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| Commande du constat de #495, avant : `AssertionError: KB_DEPLOYMENT_ENVIRONMENT: not set`, `test_real_export.py:65` | Le défaut 1 est reproduit. |
+| Commande du constat de #495, avant : `AssertionError: KB_DEPLOYMENT_ENVIRONMENT: not set`, `test_real_export.py:65` (ligne 66 depuis l'import de `DIGEST_CLIENT`) | Le défaut 1 est reproduit. |
 | Même commande, après : échec à `test_real_export.py:119` (`all(result is SUCCESS)`) | La variable arrive, la réponse est 200 (ligne 117 passée, donc pas de 403), et le test exporte jusqu'à l'adresse factice. |
 | `test_the_end_to_end_test_of_the_export_gets_the_environment_of_the_terminal` : rouge avant le correctif, vert après | Critère 3 de #495 : la suite par défaut voit la perte de l'environnement. |
 | Les mêmes tests avec `KB_LLM_API_KEY`, `KB_TRACE_CONTENT`, `KB_AI_API_KEY_OTHER`, `OTEL_SERVICE_NAME` exportés : 35 passés | Le sous-processus ne dépend pas du terminal. |
@@ -130,7 +130,7 @@ préfixe que kb refuse et non un réglage.
   et de `/docs` (`src/k_b/core/api_settings.py:41-43`). Seuls les tests e2e lisent leurs réglages
   dans le terminal (`tests/conftest.py:152-153`).
 - **Le test du critère 3 fait-il du réseau ?** Non. `staging` est refusé à la lecture des
-  réglages, avant que l'application soit créée (`metrics_export.py:178-182`, `test_real_export.py:65`).
+  réglages, avant que l'application soit créée (`metrics_export.py:178-182`, `test_real_export.py:66`).
 - **Que se passe-t-il si une nouvelle variable est lue sans être dans `.env.example` ?** Si elle
   est nommée par une constante `*_VARIABLE`, `test_every_variable_kb_reads_is_in_the_example`
   échoue. Si elle est lue par un littéral, rien ne la voit : c'est la limite écrite dans la
