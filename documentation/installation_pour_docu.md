@@ -56,9 +56,9 @@ uv run kb --help
 ### Le dossier de données et la base
 
 `KB_DATA_DIR` nomme le dossier des données, hors du dépôt. Toutes les commandes le lisent, sauf `kb openapi`
-(`main`, `cli.py`). **`kb` ne crée pas ce dossier** (#356, encore ouverte le 2026-11-09): s'il n'existe pas, la commande s'arrête en code 2,
-avant tout travail, sur `error: KB_DATA_DIR is not an existing directory` (`read_data_dir`,
-`commands/environment.py`). Il se crée donc à la main, puis la base, une fois:
+(`main`, `cli.py`). **`kb` ne crée pas ce dossier** (#356, encore ouverte le 2026-11-09): s'il n'existe pas, la
+commande s'arrête en code 2, avant tout travail, sur `error: KB_DATA_DIR is not an existing directory`
+(`read_data_dir`, `commands/environment.py`). Il se crée donc à la main, puis la base, une fois:
 
 ```sh
 mkdir -p ~/.knowledge_base
