@@ -841,12 +841,21 @@ pas »).
 
 L'auto-évaluation de l'API IA, mesure par mesure (section « How To Prevent » de chaque entrée de
 l'édition 2023, la dernière au 2026-11-05), au commit qui la contient (#161). Le pendant de
-l'API de données est dans [specs-api.md](specs-api.md). « Tenue » dit la mesure appliquée et sa
+l'API de données est dans [specs-api.md](specs-api.md). Le référentiel de la certification
+(RNCP37827) renvoie à l'édition 2019, la première ; K-B suit l'édition 2023, la seconde, toujours
+la dernière le 2026-11-10 (page du projet OWASP). Le top 10 des API est la grille de K-B parce que
+K-B n'expose que deux API HTTP, l'API de données et l'API IA : sa console, `kb`, les lance et en
+est le client, sans interface web ni compte humain. « Tenue » dit la mesure appliquée et sa
 preuve : un test, un essai daté ou le passage du code cité ; « non tenue » dit pourquoi, et où
-elle se tiendra ; *s.o.* : sans objet pour cette API ; « écart voulu, justifié » dit une mesure
-non appliquée par décision, dont la justification est écrite sous son entrée ; un écart voulu dans
-une mesure tenue (« Pour lever l'écart ») la laisse tenue. Une entrée est tenue quand toutes ses
-mesures applicables le sont. « Au déploiement » renvoie au déploiement sur Azure Container Apps :
+elle se tiendra : une mesure nécessaire, non intégrée ; *s.o.* : sans objet pour cette API ;
+« écart voulu, justifié » dit une mesure non appliquée par décision, dont la justification, écrite
+sous son entrée, démontre qu'elle n'est pas nécessaire à K-B et nomme sa limite, ce qui la rendrait
+nécessaire ; un écart voulu dans une mesure tenue (« Pour lever l'écart ») la laisse tenue. Une
+entrée est tenue quand toutes ses mesures applicables le sont ; elle est un écart voulu, justifié
+quand ses mesures applicables sont tenues ou justifiées, au moins une justifiée ; elle est non
+tenue dès qu'une mesure l'est. Sous un écart justifié, « Pour la tenir, si la limite est
+franchie » dit comment on appliquerait la mesure devenue nécessaire. « Au déploiement » renvoie au
+déploiement sur Azure Container Apps :
 au 2026-11-05, une case de #317 (« Plus tard : déploiement », sans jalon) le porte, et aucune
 issue du jalon « Mise en ligne 08/11 ».
 
@@ -861,22 +870,22 @@ contre `infra/` et l'état en ligne.
 | Entrée | État | Ce qui reste, et où |
 |---|---|---|
 | API1 Broken Object Level Authorization | **Tenue** | — |
-| API2 Broken Authentication | Écart voulu, justifié | Écart voulu (décision de Sabine du 2026-11-05), justifié sous API2, « Anti-force brute, plus strict que la limite de débit » (clé de 32 caractères au moins, contrôlée au démarrage) ; TLS mutuel : non appliqué, à justifier (#500) |
+| API2 Broken Authentication | Écart voulu, justifié | Deux écarts voulus, justifiés sous API2 : « Anti-force brute, plus strict que la limite de débit » (décision de Sabine du 2026-11-05 ; clé de 256 bits, 32 caractères au moins contrôlés au démarrage) et l'authentification TLS mutuelle entre programmes (entrée interne, aucun client hors de l'environnement) |
 | API3 Broken Object Property Level Authorization | **Tenue** | — |
-| API4 Unrestricted Resource Consumption | Non tenue | Ressources des conteneurs : CPU, mémoire et répliques tenus par #414, redémarrages, descripteurs et processus sans moyen trouvé ; plafond de dépense : abonnement de l'organisme de formation |
+| API4 Unrestricted Resource Consumption | Non tenue | Plafond de dépense : mesure nécessaire non intégrée, #501 (`budget-kb` ne compte pas le modèle, non étiqueté ; en ligne, la borne est le quota de 140 000 jetons par minute). Ressources des conteneurs : CPU, mémoire et répliques tenus par #414 ; redémarrages, descripteurs et processus : écart voulu, justifié (aucun processus lancé, aucun client hors de l'environnement) |
 | API5 Broken Function Level Authorization | **Tenue** | — |
-| API6 Unrestricted Access to Sensitive Business Flows | **Tenue** | — |
+| API6 Unrestricted Access to Sensitive Business Flows | **Tenue** | — (limite : en ligne, le débit repart de zéro à chaque réveil ; API4, #501) |
 | API7 Server Side Request Forgery | **Tenue** | — |
-| API8 Security Misconfiguration | Non tenue | Durcissement dont la construction et la relecture seraient exigées ; revue périodique de la configuration en ligne ; évaluation automatisée de l'environnement déployé (scan de l'image, essais après déploiement) ; chaîne Envoy → uvicorn non essayée (relue le 2026-11-08) |
-| API9 Improper Inventory Management | Écart voulu, justifié | Documentation sans clé en `sandbox` seulement : écart voulu, justifié sous API9, « Documentation réservée aux utilisateurs autorisés » ; l'API IA en ligne (`ca-kb-ai-api`) est déployée avec `KB_DEPLOYMENT_ENVIRONMENT` à `production` (`infra/main.bicep:216`, non relu en ligne), où `/docs` et `/openapi.json` rendent 404 ; protection externe : non tenue, à justifier (#500) |
-| API10 Unsafe Consumption of APIs | **Tenue** | — (relue le 2026-11-08) |
+| API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : durcissement dont la construction et la relecture seraient exigées (#496) ; revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé, scan de l'image (#498) et sondes après déploiement (#499). Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
+| API9 Improper Inventory Management | Écart voulu, justifié | Documentation sans clé en `sandbox` seulement : écart voulu, justifié sous API9, « Documentation réservée aux utilisateurs autorisés » ; l'API IA en ligne (`ca-kb-ai-api`) est déployée avec `KB_DEPLOYMENT_ENVIRONMENT` à `production` (`infra/main.bicep:234`, non relu en ligne), où `/docs` et `/openapi.json` rendent 404 ; protections externes : écart voulu, justifié sous API9 (aucune version exposée) |
+| API10 Unsafe Consumption of APIs | Non tenue | Portée du jeton de Grafana Cloud : mesure nécessaire non intégrée, case ouverte jusqu'au jeton de production refait par #522, sur la seule pile ; le reste tenu (relue le 2026-11-08) |
 
-Le compte : 6 entrées tenues sur 10. Les 4 autres : 2 écarts voulus et justifiés, API2
-(anti-force brute ; son TLS mutuel reste non appliqué, à justifier par #500) et API9 (documentation
-en `sandbox` ; sa protection externe reste non tenue, à justifier par #500), et 2 non tenues (API4,
-API8). Ce qui ne dépend que du code et de la doc est tenu, hors ces deux écarts ; API10 l'est depuis
-la mise en ligne (TLS vers l'API de données) ; le reste demande des essais sur l'environnement
-déployé, ou l'organisme de formation pour le plafond de dépense.
+Le compte : 5 entrées tenues sur 10 (API1, API3, API5, API6, API7). Les 5 autres : 2 écarts voulus
+et justifiés, API2 (anti-force brute, TLS mutuel) et API9 (documentation en `sandbox`, protections
+externes), dont chaque justification démontre que la mesure n'est pas nécessaire à K-B et nomme sa
+limite ; et 3 non tenues, des mesures nécessaires non intégrées : API4 (plafond de dépense, #501),
+API8 (durcissement, revue et évaluation, #496 à #499) et API10 (portée du jeton de Grafana Cloud,
+#522). Ce qui ne dépend que du code et de la doc est tenu ou justifié ; le reste attend ces issues.
 
 ### API1:2023 Broken Object Level Authorization
 
@@ -916,7 +925,8 @@ déployé, ou l'organisme de formation pour le plafond de dépense.
     (`tests/data_api/test_serve_data.py`), sur la même fonction ; une clé égale à celle que l'API
     IA envoie à l'API de données est refusée
     (`test_serve_ai_exits_2_when_a_client_has_the_key_it_sends_to_the_data_api`).
-- **Utiliser l'OWASP Authentication Cheat Sheet** : confrontée le 2026-11-05, tenue en partie. La
+- **Utiliser l'OWASP Authentication Cheat Sheet** : confrontée le 2026-11-05, tenue, avec deux écarts
+  voulus, justifiés (l'anti-force brute et le TLS mutuel). La
   plupart de ses consignes portent sur les mots de passe, les comptes humains, la MFA ou les
   sessions : *s.o.* Celles qui s'appliquent à une clé entre programmes :
   - comparaison en temps constant : tenue (`hmac.compare_digest`) ;
@@ -926,24 +936,49 @@ déployé, ou l'organisme de formation pour le plafond de dépense.
     un `/health` qui répond 200 ; `client=-` sans clé valide (`core/api_request_log.py`, module
     des deux API, `test_a_401_is_logged_without_name_nor_received_value` dans
     `tests/data_api/test_request_log.py`). Aucune revue ni alerte sur les 401 à ce commit ;
-  - limitation des essais et défenses contre les attaques automatisées : non tenue, c'est
-    l'anti-force brute ci-dessous ;
-  - transport sous TLS : non tenue en local, c'est le TLS d'API8 ;
-  - authentification TLS mutuelle entre programmes : non appliquée, une option du déploiement.
-    **Pour la tenir** : `clientCertificateMode: require` sur l'entrée d'ACA, un certificat par
-    client ; l'entrée transmet le certificat à l'app dans `X-Forwarded-Client-Cert`, et la doc ne
-    dit pas si elle en valide la chaîne : à vérifier au déploiement. Si l'app doit la valider, il
-    lui faut une bibliothèque de certificats (`cryptography`, une dépendance directe nouvelle) ; les
-    clients (`core/outbound.py`) enverraient leur certificat et leur clé. M, au déploiement.
+  - limitation des essais et défenses contre les attaques automatisées : écart voulu, justifié,
+    c'est l'anti-force brute ci-dessous ;
+  - transport sous TLS : tenu en ligne ; sur la machine, `http` sur `127.0.0.1`, joignable de la
+    machine seule (API8, « TLS, même pour une API interne ») ;
+  - authentification TLS mutuelle entre programmes : non appliquée, écart voulu, justifié. Elle
+    n'est pas nécessaire : ACA la propose pour un client du dehors (« When your apps are
+    communicating with a client outside of the environment, two-way authentication with mTLS is
+    supported. »), et l'API IA n'en a aucun ; entre les apps de l'environnement, la même page dit
+    l'authentification faite (« Applications within a Container Apps environment are automatically
+    authenticated. However, the Container Apps runtime doesn't support authorization for access
+    control between applications using the built-in peer-to-peer encryption. », page du
+    chiffrement entre apps, lue le 2026-11-10), ce chiffrement que K-B active
+    (`infra/modules/container-apps-environment.bicep:32-36`) : l'autorisation reste à la clé et au
+    droit par route. Le mTLS de l'environnement, `peerAuthentication.mtls`, reste désactivé
+    (`infra/modules/container-apps-environment.bicep:38-42`). Son entrée est interne
+    (`infra/modules/api-container-app.bicep:74-80`), aucune route HTTP de l'environnement ne la vise
+    (API8, « TLS, même pour une API interne »), et seuls les apps et les jobs de l'environnement
+    l'atteignent. À ce commit, deux apps, les deux API, et deux jobs (`infra/deployment.json`), dont
+    un seul l'appelle : `caj-kb-smoke-test`, sur `/health`, sans clé ; `kb digest` et
+    `kb trend-report`, ses clients à clé, n'ont pas de job en ligne. Ce que le certificat prouverait,
+    qu'un appelant est un client permis, la clé le prouve déjà (« Anti-force brute », ci-dessous),
+    sous le chiffrement entre apps (API8). Sur la machine, l'écoute sur `127.0.0.1` n'admet que les
+    programmes de la machine.
+    **Limite** : une entrée externe, une route HTTP de l'environnement qui viserait l'app, ou un
+    client hors de l'environnement.
+    **Pour réduire le risque** : relire à chaque version `external`, `allowInsecure` et les routes de
+    l'environnement, par les commandes d'API8 (« TLS, même pour une API interne »), en lecture
+    seule ; #497 en fait la règle.
+    **Pour la tenir**, si la limite est franchie : `clientCertificateMode: require` sur l'entrée
+    d'ACA, un certificat par client ; l'entrée transmet le certificat à l'app dans
+    `X-Forwarded-Client-Cert`, et la page des certificats clients, relue le 2026-11-10, ne dit pas si
+    elle en valide la chaîne. Si l'app doit la valider, il lui faut une bibliothèque de certificats
+    (`cryptography`, une dépendance directe nouvelle) ; les clients (`core/outbound.py`) enverraient
+    leur certificat et leur clé. M.
 
   La section « API Keys » de la REST Security Cheat Sheet, que la fiche ne cite pas, est tenue :
   clé exigée sur chaque point d'accès protégé, 429 au-delà du débit (#400), clé jamais dans l'URL,
   révocation par rotation (`README.md`, « Changer une clé »). Elle demande de ne pas s'en remettre
   à la seule clé pour une ressource de valeur : la clé s'ajoute au droit par route, au débit et à
-  l'écoute sur `127.0.0.1` ; le réseau du déploiement s'y ajoutera.
-- **Anti-force brute, plus strict que la limite de débit** : non tenue, écart voulu (décision de
-  Sabine du 2026-11-05). La limite de débit ne compte que les clients à clé valide ; les essais
-  de clé ne sont pas limités. Pourquoi :
+  l'écoute sur `127.0.0.1`, et en ligne à l'entrée interne (TLS mutuel, ci-dessus).
+- **Anti-force brute, plus strict que la limite de débit** : non appliqué, écart voulu, justifié
+  (décision de Sabine du 2026-11-05). La limite de débit ne compte que les clients à clé valide ;
+  les essais de clé ne sont pas limités. Il n'est pas nécessaire :
   - la recherche exhaustive d'une clé est impraticable. La commande du `README.md`
     (`secrets.token_urlsafe(32)`) génère une clé de 256 bits ; le code n'en contrôle que le
     minimum, 32 caractères de l'alphabet, soit 192 bits. Le NIST définit sa catégorie 5, la plus
@@ -954,17 +989,23 @@ déployé, ou l'organisme de formation pour le plafond de dépense.
     seconde (débit supposé), plus de 10^34 secondes, et plus de 10^24 au minimum ;
   - une limite des 401 par adresse bloquerait les clients légitimes : en local, tous viennent de
     `127.0.0.1`, et un essai répété couperait `kb digest` ;
-  - derrière l'entrée d'ACA, l'adresse du client passe par un mandataire : une limite par adresse
-    se règle au déploiement, si elle y est décidée.
+  - en ligne, seuls les apps et les jobs de l'environnement atteignent l'entrée interne (TLS mutuel,
+    ci-dessus) : un essai de clé ne peut venir que d'une pièce de K-B.
 
-  **Pour la tenir**, si elle est décidée : compter les 401 par adresse de client et rendre 429
+  **Limite** : une clé qui n'est pas tirée au hasard (le code contrôle sa longueur et son alphabet,
+  pas son hasard), ou une entrée externe, qui ouvrirait les essais au réseau.
+  **Pour réduire le risque** : tirer chaque clé par la commande du `README.md`, et la changer
+  (« Changer une clé ») dès qu'elle a pu fuir ; garder l'entrée interne (TLS mutuel,
+  ci-dessus).
+
+  **Pour la tenir**, si la limite est franchie : compter les 401 par adresse de client et rendre 429
   au-delà d'un seuil à fixer, dans une table à part, bornée : le compteur du débit
   (`core/api_rate_limit.py`) ne connaît que les clients qu'une clé valide nomme, d'où sa taille
   bornée, alors qu'une table par adresse doit oublier les plus anciennes. Derrière l'entrée d'ACA,
   l'adresse vient de `X-Forwarded-For`, dont ACA ne fournit que la valeur la plus à droite ;
   uvicorn 0.54 ne la lit que des adresses de `FORWARDED_ALLOW_IPS` (`127.0.0.1,::1` par défaut, K-B
   ne la règle pas), qui prendrait l'adresse ou la plage de l'entrée, à vérifier au déploiement.
-  S, au déploiement.
+  S.
 - **Récupération d'identifiants, ré-authentification, MFA, verrouillage, captcha, mots de passe
   faibles** : *s.o.*, ni compte, ni utilisateur humain, ni mot de passe.
 - **Clés d'API pour les seuls clients d'API** : tenue. Les deux clients sont des commandes de K-B.
@@ -989,17 +1030,42 @@ déployé, ou l'organisme de formation pour le plafond de dépense.
 
 ### API4:2023 Unrestricted Resource Consumption
 
-- **Limiter la mémoire, le CPU, les redémarrages, les descripteurs et les processus** : tenue en
-  partie (#414).
+- **Limiter la mémoire, le CPU, les redémarrages, les descripteurs et les processus** : tenue pour
+  la mémoire, le CPU et les répliques (#414) ; écart voulu, justifié, pour les redémarrages, les
+  descripteurs et les processus.
   - La mémoire et le CPU sont tenus : chaque API a 0,5 vCPU et 1 Gi
-    (`infra/modules/api-container-app.bicep:110-113`).
+    (`infra/modules/api-container-app.bicep:116-119`).
   - Les répliques aussi : `maxReplicas: 1` (« Accès »), et `minReplicas: 0`, décision de Sabine du 06/11
-    (`api-container-app.bicep:143-146`). À 0, le compte du débit repart de zéro à chaque réveil.
+    (`api-container-app.bicep:149-152`). À 0, le compte du débit repart de zéro à chaque réveil.
     Pendant un déploiement, l'ancienne et la nouvelle révision tournent ensemble, deux répliques
     (journal ADR, 2026-11-06, « Mise en ligne »).
-  - Restent sans moyen trouvé : les redémarrages, les descripteurs et les processus. Un conteneur qui
-    plante redémarre seul, et aucune politique de redémarrage n'est réglable pour une app.
-  - La limite de connexions (`limit_concurrency` d'uvicorn) reste une décision ouverte du journal ADR.
+  - Les redémarrages, les descripteurs et les processus ne sont pas limités, et n'ont pas besoin de
+    l'être. La mesure borne ce qu'un client fait consommer au serveur (« Use a solution that makes
+    it easy to limit memory, CPU, number of restarts, file descriptors, and processes such as
+    Containers / Serverless code (e.g. Lambdas). », API4:2023, lue le 2026-11-10). Aucun client
+    ne fait lancer de processus : l'API n'en lance aucun
+    (`grep -rlE "subprocess|multiprocessing|os\.fork|Popen" src/k_b/ai_api src/k_b/core` ne rend
+    rien), et `uvicorn.run` reçoit l'app elle-même, sans `workers`
+    (`commands/serve_ai_command.py:92`) : un seul processus, uvicorn 0.54 refusant plusieurs
+    processus sans chaîne d'import. Les descripteurs suivent les connexions, qu'uvicorn tient avant
+    tout contrôle de l'app : en ligne, seules les pièces de l'environnement se connectent (API2, TLS
+    mutuel), et sur la machine, ses programmes. Un redémarrage vient d'un plantage (« If a container
+    crashes, it automatically restarts. », page des conteneurs, lue le 2026-11-10), ou des sondes
+    Readiness et Liveness (`infra/modules/api-container-app.bicep:130-143`), qu'une charge peut
+    faire échouer : la page des sondes, lue le 2026-11-10, le dit à propos de Readiness
+    (« Container Apps restarts the replica in question until it's healthy again or the failure
+    threshold is exceeded. »). Là encore, une charge venue des seules pièces de l'environnement. La
+    page des
+    conteneurs ne décrit aucune politique de redémarrage pour une app. Un redémarrage remet le débit
+    à zéro, ce que borne le quota du modèle (« Plafonds de dépense », ci-dessous). Leur coût reste
+    dans le 0,5 vCPU et le 1 Gi de la seule réplique.
+    **Limite** : une entrée externe ou un client hors de l'environnement, qui ouvrirait des
+    connexions sans fin ; un code de l'API qui lancerait des processus.
+    **Pour réduire le risque** : garder l'entrée interne (API2, TLS mutuel) ; si un client du dehors
+    devait la joindre, poser d'abord la limite de connexions d'uvicorn, `limit_concurrency`
+    (« Maximum number of concurrent connections or tasks to allow, before issuing HTTP 503
+    responses. », texte d'aide de `--limit-concurrency` d'uvicorn 0.54, lu le 2026-11-10), une
+    décision ouverte du journal ADR.
 - **Taille maximale de toutes les entrées** : tenue (#399). Corps de 1 024 octets au plus, refusé
   en 413 avant la clé (`MAX_AI_API_BODY_BYTES`) ; `window_days` de 1 à 14 ; `after` et
   `previous_first_window` au format `AAAA-MM-JJ`, sur 15 fenêtres au plus.
@@ -1022,25 +1088,44 @@ déployé, ou l'organisme de formation pour le plafond de dépense.
 - **Valider côté serveur le nombre d'enregistrements renvoyés** : tenue. Le client n'en fixe aucun ;
   le code plafonne la lecture (« Lecture plafonnée ») : `test_the_reading_is_capped_inside_a_kind`,
   `test_beyond_the_cap_the_most_recent_windows_are_kept`.
-- **Plafonds de dépense ou alertes de facturation** : non tenue. Le modèle est sur l'abonnement de
-  l'organisme de formation, dont Sabine ne voit pas la facturation (`README.md`, « Budget », ligne
-  « Modèle des fiches ») : l'alerte est à demander à l'organisme, décision de Sabine. Ce que
-  bornent les limites, par demande : les jetons de sortie de chaque appel, une relance au plus,
-  une échéance de 200 s, que le dernier appel en cours peut dépasser (« Lecture plafonnée »,
-  « Limite »), une réponse du modèle de 1 000 000 d'octets au plus (#399). Par jour, l'ordre de
-  grandeur que permettent les limites de débit, au prix de sortie (0,60 $ par million de jetons,
-  le plus cher) et sur les estimations de pire cas de la doc : 20 demandes de fiches × 420 000
-  jetons (`README.md`), environ 5 $, et 20 comptes rendus × 80 000 jetons
-  ([tendances.md](tendances.md)), environ 1 $. Ce n'est pas un plafond : un redémarrage remet le
-  compte à zéro.
-  **Pour la tenir** : un budget de Cost Management sur l'abonnement, avec un seuil et une adresse
-  de courriel ; le créer demande le rôle Contributor ou Cost Management Contributor sur
-  l'abonnement, à demander à l'organisme. La doc lue ne décrit qu'une alerte, évaluée toutes les
-  24 h, qui n'arrête pas la consommation. Un plafond qui refuse viendrait d'ailleurs : une politique
+- **Plafonds de dépense ou alertes de facturation** : non tenue, mesure nécessaire non intégrée
+  (#501 ; décision de Sabine du 2026-11-08 : la tenir). « Configure spending limits for all service
+  providers/API integrations. When setting spending limits is not possible, billing alerts should be
+  configured instead. » (API4:2023, lue le 2026-11-10). Le budget `budget-kb` existe, au niveau du
+  groupe de ressources (`infra/modules/budget.bicep:5-25`, `infra/main.bicep:136-141`) : 30 € par
+  mois,
+  une alerte par e-mail à 50 et 100 % du réel et à 100 % de la prévision, sans rien arrêter. Il ne
+  compte que les coûts étiquetés `project=k-b` (`budget.bicep:16-25`), et la ressource du modèle,
+  dans le groupe, n'a pas d'étiquette (relevé de Sabine du 2026-11-08, #501) : la dépense du modèle
+  n'y entre pas. Ce que bornent les limites, par demande : les jetons de sortie de chaque appel, une
+  relance au plus, une échéance de 200 s, que le dernier appel en cours peut dépasser (« Lecture
+  plafonnée », « Limite »), une réponse du modèle de 1 000 000 d'octets au plus (#399). Dans la vie
+  d'une réplique, l'ordre de grandeur que permettent les limites de débit, au prix de sortie
+  (0,60 $ par million de jetons, le plus cher) et sur les estimations de pire cas de la doc :
+  20 demandes de fiches × 420 000 jetons (`README.md`), environ 5 $, et 20 comptes rendus × 80 000
+  jetons ([tendances.md](tendances.md)), environ 1 $. En ligne, ce n'est pas un plafond par jour :
+  avec `minReplicas: 0`, une réplique s'arrête 300 s après la dernière requête (« Cool down period
+  is how long after the last event KEDA waits before the application scales down to its minimum
+  replica count. », 300 secondes par défaut, page de la mise à l'échelle d'ACA, lue le 2026-11-10 ;
+  `api-container-app.bicep:149-152` n'en règle pas d'autre), et la suivante repart d'un compte à
+  zéro. Au pire, 20 demandes par route et par réveil, et jusqu'à 288 réveils par jour
+  (86 400 s / 300 s) : 5 760 demandes par route, si chacune était instantanée. La borne qui reste est
+  le quota du déploiement, 140 000 jetons par minute (`README.md`, « Budget ») : 201 600 000 jetons
+  par jour, au plus environ 121 $ par jour au prix de sortie. Ce pire cas demande une clé et une
+  pièce de l'environnement (API2, TLS mutuel) : une boucle de K-B qui attend l'arrêt à vide, ou une
+  clé volée qu'une pièce détournée utilise.
+  **Pour la tenir** : #501, une alerte Azure Monitor par e-mail sur les jetons du déploiement, et
+  l'étiquette `project=k-b` sur la ressource du modèle, pour que `budget-kb` la compte. Une alerte
+  n'arrête pas la consommation (« Resources aren't affected, and your consumption isn't stopped. »),
+  et un budget n'est évalué que toutes les 24 h (« Cost and usage data is typically available within
+  8-24 hours and budgets are evaluated against these costs every 24 hours. », page des budgets de
+  Cost Management, lue le 2026-11-10). Un plafond qui refuse viendrait d'ailleurs : une politique
   de la passerelle d'API (API9), à vérifier ; ou un compte des jetons par jour tenu par K-B, qui
-  devrait survivre au redémarrage, donc vivre hors des deux API (règle 7 de `.claude/rules/poc.md` :
-  l'API IA n'écrit rien qui doive survivre à son redémarrage), dans un stockage à concevoir. Non
-  chiffré.
+  devrait survivre au
+  redémarrage, donc vivre hors des deux API (règle 7 de `.claude/rules/poc.md` : l'API IA n'écrit
+  rien qui doive survivre à son redémarrage), dans un stockage à concevoir. Non chiffré.
+  **Pour réduire le risque** : à ce commit, rien en ligne n'appelle le modèle, aucun job à clé ne
+  tournant (API2, TLS mutuel) ; poser l'alerte de #501 avant le premier job à clé en ligne.
 
 ### API5:2023 Broken Function Level Authorization
 
@@ -1060,15 +1145,22 @@ déployé, ou l'organisme de formation pour le plafond de dépense.
   mesures visent des clients humains ; l'API n'a que des clients programmes.
 - **Sécuriser et limiter l'accès des API consommées par des machines** : tenue (#400). Une clé par
   client, un client par route, une demande à la fois, un débit par client ; écoute sur `127.0.0.1`
-  par défaut (`test_serve_ai_listens_on_127_0_0_1_8001_by_default_with_the_real_subjects`).
+  par défaut (`test_serve_ai_listens_on_127_0_0_1_8001_by_default_with_the_real_subjects`) ; en
+  ligne, une entrée interne, que seules les pièces de l'environnement atteignent (API2, TLS mutuel).
+  **Limite** : en ligne, le débit repart de zéro à chaque réveil (`minReplicas: 0`,
+  `infra/modules/api-container-app.bicep:149-152`) ; il arrête une boucle qui garde la réplique en
+  vie, pas un client qui attend l'arrêt à vide (API4, « Plafonds de dépense »).
+  **Pour réduire le risque** : celui d'API4, « Plafonds de dépense » (#501).
 
 ### API7:2023 Server Side Request Forgery
 
 Aucune URL ne vient du client ni d'un tiers : les hôtes sont fixés par K-B ou par la
 configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, sous l'hôte de GitHub.
 
-- **Isoler la récupération de ressources dans le réseau** : *s.o.* à ce commit, aucune URL n'étant
-  fournie par une requête ; l'isolation réseau est à revoir au déploiement.
+- **Isoler la récupération de ressources dans le réseau** : *s.o.*, aucune URL ne venant d'une
+  requête ni d'un tiers (ci-dessus). En ligne, l'environnement n'a pas de réseau virtuel (aucun dans
+  `infra/modules/container-apps-environment.bicep`, `publicNetworkAccess: 'Enabled'`, l. 45) : ses
+  sorties ne sont pas filtrées, sans objet pour la même raison.
 - **Listes d'origines et de schémas permis** : tenue. Hôte GitHub constant (`core/github_api.py`) ;
   `https` seul vers le modèle et vers l'export ; vers l'API de données, `https`, ou `http` vers la
   machine ou, en `sandbox`, vers un service du compose seulement (API10, #473).
@@ -1096,7 +1188,8 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
 Relue point par point le 2026-11-08 (#454), contre `infra/` et l'état en ligne ; une mesure qui ne
 dépend que du code garde son état et sa preuve.
 
-- **Durcissement répétable** : non tenue, en partie. L'image (`Dockerfile`, utilisateur 10001, #200),
+- **Durcissement répétable** : non tenue, en partie : mesure nécessaire non intégrée, risque accepté
+  jusqu'à #496 (consigne de Sabine du 2026-11-09). L'image (`Dockerfile`, utilisateur 10001, #200),
   l'environnement, les apps et les jobs d'ACA (`infra/`, Bicep) sont versionnés et relus en PR comme
   le code ; la CI construit `infra/main.bicep` sur toute PR qui touche `infra/`
   (`.github/workflows/infra.yml:27`) ; une version taguée part en ligne par
@@ -1108,44 +1201,59 @@ dépend que du code garde son état et sa preuve.
   (`infra.yml:15`) ; le ruleset de `main` n'exige aucune relecture (`required_approving_review_count`
   0), la relecture en PR est une pratique, pas une règle.
   **Pour la tenir** : la construction du Bicep exigée, sans bloquer les PR qui ne touchent pas
-  `infra/` (un job toujours lancé, qui saute la construction hors de `infra/`), et une relecture
-  exigée par le ruleset dès qu'une seconde personne peut relire. S.
-- **Revue périodique des configurations de toute la pile** : non tenue, en partie. Chaque changement
+  `infra/` (un job toujours lancé, qui saute la construction hors de `infra/`, #496), et une
+  relecture exigée par le ruleset dès qu'une seconde personne peut relire. S.
+  **Pour réduire le risque** : d'ici #496, ne fusionner une PR qui touche `infra/` que sur sa
+  construction du Bicep verte (`infra.yml:27`) ; après une passe à la main ou une version, relire la
+  configuration en ligne (« Revue périodique », ci-dessous).
+- **Revue périodique des configurations de toute la pile** : non tenue, en partie : mesure
+  nécessaire non intégrée (#497). Chaque changement
   de `infra/` est relu en PR ; la configuration en ligne n'a été relue contre ces fichiers qu'une
   fois, à la main, le 2026-11-08 (#454), pour l'entrée, le chiffrement entre apps et les URL
   internes (« TLS, même pour une API interne », ci-dessous).
   **Pour la tenir** : à chaque déploiement, relire la configuration déployée contre ces fichiers et
-  contre cette section. XS par revue.
-- **Évaluation automatisée et continue dans tous les environnements** : non tenue, en partie. La CI
+  contre cette section (#497). XS par revue.
+  **Pour réduire le risque** : d'ici #497, relancer à chaque version les commandes de « TLS, même
+  pour une API interne » (ci-dessous), en lecture seule.
+- **Évaluation automatisée et continue dans tous les environnements** : non tenue, en partie :
+  mesure nécessaire non intégrée (#498, #499). La CI
   lance `pip-audit`, les règles de sécurité de ruff, les tests et leur seuil de couverture
   (`.github/workflows/ci.yml`), et la construction du Bicep (`infra.yml`). Après chaque
   déploiement, `deploy.yml` lance `caj-kb-smoke-test` (l. 204-209), qui demande `GET /health` aux
   deux API (`src/k_b/jobs/api_health.py`) et atteint le stockage d'échange par l'identité du job :
   il vérifie que la version déployée répond, pas sa sécurité.
   **Pour la tenir** : un scan de l'image dans la CI (l'outil, une dépendance de la CI, est à
-  choisir), et des essais scriptés des points de cette section, lancés par la CI après chaque
-  déploiement, avec une clé de test à prévoir. M.
+  choisir, #498), et des essais scriptés des points de cette section, lancés par la CI après chaque
+  déploiement, avec une clé de test à prévoir (#499 : des sondes sans clé). M.
+  **Pour réduire le risque** : `pip-audit` audite déjà chaque version de `uv.lock`, uvicorn et h11
+  compris (`.github/workflows/ci.yml:23-25`) ; restent sans contrôle les paquets Debian de l'image
+  (#498).
 - **TLS, même pour une API interne** : tenue en ligne ; sur la machine, l'API IA sert en `http` sur
   `127.0.0.1`, joignable de la machine seule.
   - Les deux API n'ont qu'une entrée interne, en HTTPS (`external: false`, `allowInsecure: false`,
-    `infra/modules/api-container-app.bicep:74-80`) : « directly reachable only from within the same
-    Container Apps environment ». La documentation de l'entrée nomme une seule exception, une route
-    HTTP de l'environnement qui viserait l'app : il n'y en a aucune. L'entrée interne coupe aussi les
+    `infra/modules/api-container-app.bicep:74-80`) : « Internal: Makes the app's own fully qualified
+    domain name (FQDN) directly reachable only from within the same Container Apps environment, such
+    as from other container apps. » (page de l'entrée, relue le 2026-11-10). La documentation de
+    l'entrée nomme une seule exception, une route HTTP de l'environnement qui viserait l'app : il
+    n'y en a aucune. L'entrée interne coupe aussi les
     clients `TERMINAL` et `AGENT` de l'API de données, hors de l'environnement. Le point public de
     l'environnement reste ouvert (`publicNetworkAccess: 'Enabled'`,
-    `infra/modules/container-apps-environment.bicep:40`, la valeur `Disabled` demandant un réseau
-    virtuel) : une requête du dehors atteint son mandataire, qui rend 404 pour une app interne selon
-    la documentation et le commentaire du Bicep ; non essayé.
+    `infra/modules/container-apps-environment.bicep:45`, la valeur `Disabled` demandant un réseau
+    virtuel) : une requête du dehors atteint son mandataire, qui n'expose pas l'app (« The app isn't
+    exposed through the Container Apps environment's inbound IP address. », page de l'entrée, relue
+    le 2026-11-10) ; la documentation donne le 404 pour un environnement interne, le commentaire du
+    Bicep pour celui-ci ; non essayé.
   - Le chiffrement entre apps est activé (`peerTrafficConfiguration.encryption.enabled`,
-    `infra/modules/container-apps-environment.bicep:27-31`) : « Traffic to and from the ingress proxy
-    within the environment is TLS encrypted [...] and decrypted by the receiver ». Le réseau est donc
-    chiffré jusqu'à la réplique ; uvicorn y reçoit `http` sur son port (`transport: 'http'`, aucun
+    `infra/modules/container-apps-environment.bicep:32-36`) : « Traffic to and from the ingress proxy
+    within the environment is TLS encrypted with a private certificate and decrypted by the
+    receiver. » (relue le 2026-11-10). Le réseau est donc chiffré jusqu'à la réplique ; uvicorn y
+    reçoit `http` sur son port (`transport: 'http'`, aucun
     TLS dans uvicorn), et ce dernier pas, dans la réplique, n'est ni décrit par la documentation ni
-    essayé. mTLS reste désactivé (l. 33-36).
+    essayé. mTLS reste désactivé (l. 38-42).
   - Les clients : l'API IA appelle l'API de données en `https://ca-kb-data-api.internal.<defaultDomain>`
-    (`infra/main.bicep:223`), le seul hôte que l'API de données accepte (`KB_DATA_API_ALLOWED_HOSTS`,
-    l. 187) ; le test de fumée appelle les deux API en `https` (l. 248-249) ; l'API de données lit
-    PostgreSQL en `sslmode=verify-full` (l. 261) ; `https` vers le modèle, GitHub et l'export.
+    (`infra/main.bicep:241`), le seul hôte que l'API de données accepte (`KB_DATA_API_ALLOWED_HOSTS`,
+    l. 205) ; le test de fumée appelle les deux API en `https` (l. 266-267) ; l'API de données lit
+    PostgreSQL en `sslmode=verify-full` (l. 279) ; `https` vers le modèle, GitHub et l'export.
   - Relu en ligne le 2026-11-08, pour `ca-kb-ai-api` et `ca-kb-data-api`, puis pour l'environnement :
 
     ```sh
@@ -1195,14 +1303,28 @@ dépend que du code garde son état et sa preuve.
   RFC 9110 donnerait 415 : écart voulu, un seul état pour tout corps refusé.
   **Pour lever l'écart**, s'il est levé : 415 pour un corps qui n'est pas `application/json`,
   avant sa lecture, et un test. S.
-- **Traitement uniforme dans la chaîne de serveurs** : non tenue, non essayée. En ligne, deux
-  serveurs : l'entrée d'ACA (Envoy), puis uvicorn 0.54 et h11 0.16 (`uv.lock` de `v0.1.0`, l'image
-  en ligne) (`transport: 'http'`,
-  `infra/modules/api-container-app.bicep:77`). Aucune requête ambiguë, comme `Content-Length` et
-  `Transfer-Encoding` ensemble, n'a été envoyée. Seuls les apps et les jobs de l'environnement
-  atteignent l'entrée interne.
-  **Pour la tenir** : depuis un job de l'environnement, envoyer les requêtes ambiguës d'une
-  désynchronisation, et vérifier qu'Envoy les refuse ou que les deux serveurs les lisent de même. S.
+- **Traitement uniforme dans la chaîne de serveurs** : non essayé, écart voulu, justifié. En ligne,
+  deux serveurs : l'entrée d'ACA (Envoy), puis uvicorn 0.54 et h11 0.16 (`uv.lock` de `v0.1.0`,
+  les mêmes dans celui de `v0.1.1`) (`transport: 'http'`,
+  `infra/modules/api-container-app.bicep:77`).
+  Aucune requête ambiguë, comme `Content-Length` et `Transfer-Encoding` ensemble, n'a été envoyée.
+  L'essai n'est pas nécessaire : une désynchronisation demande un client qui envoie au premier
+  serveur une
+  requête que le second lira autrement (« Ensure all servers in the HTTP server chain (e.g. load
+  balancers, reverse and forward proxies, and back-end servers) process incoming requests in a
+  uniform manner to avoid desync issues. », API8:2023, lue le 2026-11-10), et l'API IA n'a aucun
+  client tiers. L'adresse entrante de l'environnement n'expose pas l'app (« The app isn't exposed
+  through the Container Apps environment's inbound IP address. », page de l'entrée,
+  lue le 2026-11-10), aucune route HTTP ne la vise (« TLS, même pour une API interne », ci-dessus),
+  et l'environnement ne sert que K-B : seules ses pièces atteignent l'entrée interne (API2, TLS
+  mutuel).
+  **Limite** : une entrée externe, un client tiers dans l'environnement, ou un mandataire de plus
+  devant l'app.
+  **Pour réduire le risque** : garder l'entrée interne (API2, TLS mutuel) ; `pip-audit` signale une
+  vulnérabilité connue d'uvicorn ou de h11 dans la CI (`.github/workflows/ci.yml:23-25`).
+  **Pour la tenir**, si la limite est franchie : depuis un job de l'environnement, envoyer les
+  requêtes ambiguës d'une désynchronisation, et vérifier qu'Envoy les refuse ou que les deux serveurs
+  les lisent de même. S.
 - **Schémas de réponse, erreurs comprises, sans trace d'exception** : tenue. Corps `{"error":
   "<état>"}` (« États nommés » ; les états `github_*` dans [tendances.md](tendances.md), « Défenses
   et échecs ») ; une erreur imprévue donne 500 `internal_error`, son type seul au journal.
@@ -1239,27 +1361,68 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
 - **Documentation générée depuis un standard, dans la CI** : tenue. `kb openapi` écrit
   `docs/api/openapi-ia.json` ; `test_the_versioned_openapi_is_the_one_the_app_produces`
   (`tests/ai_api/test_ai_api_openapi.py`).
-- **Documentation réservée aux utilisateurs autorisés** : non tenue en `sandbox`, écart voulu. Hors
-  `sandbox`, `/docs` et `/openapi.json` rendent 404 (`test_the_documentation_is_served_in_the_sandbox_only`,
-  `tests/ai_api/test_serve_ai.py`) ; en `sandbox`, ils répondent sans clé, sans aucune donnée. En
+- **Documentation réservée aux utilisateurs autorisés** : tenue hors `sandbox` ; en `sandbox`, écart
+  voulu, justifié. Hors `sandbox`, `/docs` et `/openapi.json` rendent 404
+  (`test_the_documentation_is_served_in_the_sandbox_only`, `tests/ai_api/test_serve_ai.py`) ; en
+  `sandbox`, ils répondent sans clé, sans aucune donnée. En
   ligne, l'API IA (`ca-kb-ai-api`) est déployée avec `KB_DEPLOYMENT_ENVIRONMENT` à `production`
-  (`infra/main.bicep:216`, non relu en ligne) : l'écart ne vaut qu'en local, quand la variable vaut
-  `sandbox`. Le contrat est versionné dans le dépôt, privé au 2026-11-05 et appelé à devenir
-  public : s'il l'est, fermer `/docs` ne cacherait pas le contrat.
+  (`infra/main.bicep:234`, non relu en ligne) : l'écart ne vaut qu'en local, quand la variable vaut
+  `sandbox`. Le contrat est versionné dans le dépôt, privé au 2026-11-10 et appelé à devenir
+  public : s'il l'est, fermer `/docs` ne cacherait pas le contrat. La mesure n'est donc pas
+  nécessaire en `sandbox` : ce que `/docs` y sert, le contrat sans aucune donnée, sur `127.0.0.1`,
+  ne demande pas d'être autorisé.
+  **Limite** : une `sandbox` servie au-delà de `127.0.0.1`, ou un `/docs` qui porterait des
+  données.
+  **Pour réduire le risque** : garder `production` en ligne (`infra/main.bicep:234`), et l'écoute
+  par défaut sur `127.0.0.1`
+  (`test_serve_ai_listens_on_127_0_0_1_8001_by_default_with_the_real_subjects`).
   **Pour la tenir**, si l'écart est levé : ne plus servir `/docs` ni `/openapi.json`, même en
   `sandbox` ; le contrat reste dans le dépôt (`kb openapi`). `read_openapi_url`
   (`core/api_settings.py`) vaut pour les deux API : l'API de données fermerait son `/docs` aussi.
   Le coût : plus d'essai dans le navigateur. XS.
-- **Protections externes pour toutes les versions exposées** : non tenue. Aucune solution de
-  sécurité d'API devant l'app à ce commit : à décider au déploiement.
-  **Pour la tenir**, au déploiement, l'une de ces voies ; non chiffré, la taille dépend de la voie :
+- **Protections externes pour toutes les versions exposées** : non appliquée, écart voulu,
+  justifié. Aucune solution de sécurité d'API devant l'app. « Use external protection measures such
+  as API security specific solutions for all exposed versions of your APIs, not just for the current
+  production version. » (API9:2023, lue le 2026-11-10) : la mesure vaut pour chaque version, celle
+  de production comprise. Elle n'est pas nécessaire : une solution de sécurité d'API filtre le
+  trafic du dehors, et aucun n'atteint l'API IA. Une seule version tourne (`activeRevisionsMode:
+  'Single'`, `infra/modules/api-container-app.bicep:73`), derrière une entrée interne que l'adresse
+  entrante de l'environnement n'expose pas (API8, « Traitement uniforme dans la chaîne de
+  serveurs ») ; ses seuls clients sont les pièces de l'environnement, qui ne servent que K-B.
+  **Limite** : une entrée externe, un client hors de l'environnement, ou plusieurs révisions
+  actives.
+  **Pour réduire le risque** : relire à chaque version l'entrée, les routes de l'environnement et
+  `activeRevisionsMode` (#497) ; garder l'entrée interne (API2, TLS mutuel).
+  **Pour la tenir**, si la limite est franchie, l'une de ces voies ; non chiffré, la taille dépend de
+  la voie :
   - des restrictions d'adresses sur l'entrée d'ACA (`ipSecurityRestrictions`, toutes en `Allow` ou
     toutes en `Deny`) : utiles seulement si les clients ont des adresses fixes ;
   - Azure API Management devant l'app, avec ses politiques (limite de débit) ;
   - Application Gateway avec son WAF, devant un environnement interne dans un réseau virtuel ;
   - Front Door Premium avec son WAF, par Private Link, sur un environnement « workload profiles ».
-- **Pas de données de production hors production** : *s.o.* à ce commit, aucune production
-  déployée ; à revoir au déploiement.
+- **Pas de données de production hors production** : tenue. La production tourne en ligne depuis
+  `v0.1.0` (tag du 2026-11-08). Hors production, les deux API tournent sur la machine de Sabine, sur
+  une base que `kb collect` et `kb import` remplissent des mêmes sources (`README.md`, « Le POC du
+  25/10 et la suite ») : des données de la même sorte. La mesure demande alors le même traitement
+  que la production (« If this is unavoidable, these endpoints should get the same security
+  treatment as the production ones. », API9:2023, lue le 2026-11-10), et la machine le leur donne :
+  le même code (`create_app`, `ai_api/app.py:41`, `data_api/app.py:34`), une clé exigée par client
+  et refusée au démarrage si elle manque à la règle, les mêmes limites. Trois différences. Deux sont
+  sans donnée : `http` sur `127.0.0.1`, joignable de la machine seule (API8, « TLS, même pour une API
+  interne ») ; `/docs` et `/openapi.json` sans clé quand `KB_DEPLOYMENT_ENVIRONMENT` vaut `sandbox`
+  (« Documentation réservée aux utilisateurs autorisés »). La troisième porte des données :
+  `KB_TRACE_CONTENT=all`, refusé en production seulement
+  (`ai_api/connectors/metrics_export.py:186-187`), enverrait de la machine le contenu des appels au
+  modèle à Grafana Cloud, données personnelles comprises (règle 5 de `.claude/rules/poc.md`).
+  **Limite** : une base de la machine servie au-delà de `127.0.0.1` ; `KB_TRACE_CONTENT` à `all` ou
+  `anomalies` sur la machine.
+  **Pour réduire le risque** : garder les hôtes d'écoute par défaut, `127.0.0.1`
+  (`test_serve_ai_listens_on_127_0_0_1_8001_by_default_with_the_real_subjects`,
+  `test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_config`) ; garder
+  `KB_TRACE_CONTENT` à `none`, le défaut, comme le veut le registre
+  ([registre-traitements.md](registre-traitements.md), « Envoi des mesures à Grafana Cloud
+  (#162) », ligne « Contrat » : `none` jusqu'à ce que le DPA de Grafana Labs prenne effet,
+  décision de Sabine du 2026-10-24, confirmée le 2026-10-27).
 - **Analyse de risque des anciennes versions** : *s.o.*, une seule version servie.
 
 ### API10:2023 Unsafe Consumption of APIs
@@ -1268,7 +1431,8 @@ L'API IA consomme le modèle, l'API de données, GitHub et l'export OTLP vers Gr
 point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change.
 
 - **Évaluer la sécurité des fournisseurs** : tenue sur pièces publiques, le 2026-11-05, sur les
-  pages officielles de chacun. Azure publie sa version de TLS pour l'ensemble des « Foundry
+  pages officielles de chacun, sauf la portée du jeton de Grafana Cloud : non tenue (ci-dessous).
+  Azure publie sa version de TLS pour l'ensemble des « Foundry
   Tools », GitHub par le retrait de TLS 1.0 et 1.1, Grafana pas ; aucun pour le point d'accès
   précis qu'appelle K-B. Le client de K-B accepte TLS 1.2 au moins, par défaut de ses
   bibliothèques (API8).
@@ -1277,15 +1441,22 @@ point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change
   |---|---|---|---|---|---|
   | Modèle, Azure AI Foundry (France Central, Data Zone UE) | TLS 1.2 ou 1.3 sur les points d'accès « Foundry Tools » | Clé d'API, la méthode « la plus simple mais pas la plus sûre » selon Microsoft ; deux clés pour la rotation, une clé régénérée cesse aussitôt de marcher ; le moindre privilège passe par Entra ID et un rôle d'inférence, non utilisé par K-B | SOC 2 Type 2, ISO/IEC 27001:2022 (Azure) | Microsoft Azure Bounty | Invites et réponses ni données à OpenAI ni utilisées pour l'entraînement ; traitées dans l'UE ; surveillance des abus possible, durée de conservation non trouvée |
   | API REST de GitHub | TLS 1.0 et 1.1 retirés en 2018 ; SHA-1 retiré de HTTPS au 15/09/2026 | Jeton *fine-grained* en lecture seule ([jeton-github.md](jeton-github.md)) ; expiration de 1 à 366 jours | SOC 1 et SOC 2 Type 2, ISO/IEC 27001:2022, CSA STAR | GitHub Security Bug Bounty (HackerOne) | Le produit couvert par chaque rapport n'est pas dit |
-  | Grafana Cloud, export OTLP | Version de TLS non publiée | Jeton de politique d'accès aux seuls `metrics:write`, `traces:write`, `logs:write` ([registre-traitements.md](registre-traitements.md)), comme la page des politiques d'accès le recommande ; à vérifier : le 2026-10-27, la politique recréée couvrait toute l'organisation (même registre) | ISO 27001, SOC 2 Type 2 (A-LIGN), CSA STAR | Divulgation sur Intigriti, sans prime | K-B ne relit rien de ce qu'il envoie |
-  | API de données de K-B | `https` en ligne, par l'entrée interne et le chiffrement entre apps (API8, relu le 2026-11-08) ; `http` sur la machine, et dans le réseau compose prévu (#200) | Clé `AI_DIGEST`, lecture seule | — | — | Son auto-évaluation : [specs-api.md](specs-api.md) |
+  | Grafana Cloud, export OTLP | Version de TLS non publiée | Jeton de politique d'accès aux seuls `metrics:write`, `traces:write`, `logs:write` ([registre-traitements.md](registre-traitements.md)), comme la page des politiques d'accès le recommande ; portée non tenue : le 2026-10-27, la politique recréée couvrait toute l'organisation (même registre), et le passage à l'offre gratuite du 08/11 a supprimé les politiques, si bien que le jeton de production ne vaut plus rien (#522) | ISO 27001, SOC 2 Type 2 (A-LIGN), CSA STAR | Divulgation sur Intigriti, sans prime | K-B ne relit rien de ce qu'il envoie |
+  | API de données de K-B | `https` en ligne, par l'entrée interne et le chiffrement entre apps (API8, relu le 2026-11-08) ; `http` sur la machine | Clé `AI_DIGEST`, lecture seule | — | — | Son auto-évaluation : [specs-api.md](specs-api.md) |
 
   Ce n'est pas un audit : les rapports SOC 2 et ISO sont derrière une connexion chez Microsoft et
   GitHub, et n'ont pas été lus ; la liste des services Azure couverts par ces audits n'a pas été
   lue.
+
+  **Pour la tenir**, pour Grafana Cloud : #522, une politique `kb-production` aux trois droits, sur
+  la seule pile de K-B, et son jeton, avec une date d'expiration ; puis la portée relevée par
+  Sabine, datée. XS.
+  **Pour réduire le risque** : d'ici #522, la production n'envoie rien à Grafana Cloud, son jeton ne
+  valant plus rien (#522, constat de time-knight du 2026-11-08) ; `KB_TRACE_CONTENT` vaut `none` en
+  ligne (`infra/main.bicep:235`), si bien qu'aucun contenu d'appel au modèle n'y part.
 - **TLS avec toutes les API intégrées** : tenue en ligne. `https` seul vers le modèle, GitHub et
   l'export (API7) ; vers l'API de données, `https://ca-kb-data-api.internal.<defaultDomain>`
-  (`infra/main.bicep:223`), avec le chiffrement entre apps (API8, « TLS, même pour une API
+  (`infra/main.bicep:241`), avec le chiffrement entre apps (API8, « TLS, même pour une API
   interne »). `http` n'est permis vers l'API de données que vers `127.0.0.1` ou `localhost`, ou, en
   `sandbox`, vers un service du compose (#419) : `find_internal_api_url_refusal` (`core/outbound.py`,
   #473).
@@ -1299,10 +1470,17 @@ point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change
 ### Sources de l'auto-évaluation
 
 Lues le 2026-11-05. Relues le 2026-11-08 (#454) : l'entrée et le chiffrement entre apps d'ACA,
-pour API8 et API10.
+pour API8 et API10. Relues le 2026-11-10 (#500), pour les justifications et les « Pour réduire le
+risque » : API4, API8 et API9 de l'édition 2023, la page du projet OWASP (édition en vigueur),
+l'entrée, le chiffrement entre apps, les certificats clients, les conteneurs, les sondes et la mise
+à l'échelle d'ACA, les budgets de Cost Management, les réglages d'uvicorn.
 
 - [OWASP API Security Top 10, édition 2023](https://owasp.org/API-Security/editions/2023/en/0x11-t10/),
-  section « How To Prevent » de chaque entrée ; [API2:2023](https://api-security.owasp.org/editions/2023/en/0xa2-broken-authentication).
+  section « How To Prevent » de chaque entrée ;
+  [API2:2023](https://api-security.owasp.org/editions/2023/en/0xa2-broken-authentication) ;
+  [page du projet](https://owasp.org/www-project-api-security/) (« Latest Version » : 2023) et
+  [notes de version de 2023](https://api-security.owasp.org/editions/2023/en/0x04-release-notes/)
+  (la seconde édition, après celle de 2019).
 - [Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html)
   et [REST Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html), OWASP.
 - [NIST IR 8547](https://nvlpubs.nist.gov/nistpubs/ir/2026/NIST.IR.8547.pdf) (tableau 1, §2.1.3),
@@ -1324,6 +1502,7 @@ pour API8 et API10.
   [conformité](https://grafana.com/legal/security-compliance/),
   [signaler une vulnérabilité](https://grafana.com/legal/report-a-security-issue/).
 - Azure Container Apps : [conteneurs](https://learn.microsoft.com/en-us/azure/container-apps/containers),
+  [sondes](https://learn.microsoft.com/en-us/azure/container-apps/health-probes),
   [mise à l'échelle](https://learn.microsoft.com/en-us/azure/container-apps/scale-app),
   [entrée](https://learn.microsoft.com/en-us/azure/container-apps/ingress-overview),
   [chiffrement entre apps](https://learn.microsoft.com/en-us/azure/container-apps/ingress-environment-configuration),
@@ -1334,6 +1513,8 @@ pour API8 et API10.
   [échange de clés de Front Door](https://learn.microsoft.com/en-us/azure/frontdoor/tls-key-exchange-policy) ;
   [API Management](https://learn.microsoft.com/en-us/azure/api-management/import-container-app-with-oas) ;
   [budgets de Cost Management](https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/tutorial-acm-create-budgets).
+- uvicorn 0.54 : le texte d'aide de `--limit-concurrency`, dans le code installé
+  (`uvicorn/main.py`).
 
 ## Ce que la spec ne couvre pas
 
