@@ -6364,14 +6364,11 @@ changes », 8 constats intégrés) et par time-knight.
   le 2026-10-19 (`kb write-tops`) et le 2026-10-21 (`kb digest`). Option écartée : la coder dans #295. La limite et
   sa parade sont au registre (fiche 1, « Sécurité ») : un montage qui ajoute `mfsymlinks` rouvre la course. — PR
   #539
-- **L'essai sur `job-data` de la réservation, avec un vrai second écrivain (un autre client que le conteneur), se
-  fait pendant l'amorçage de #330, sans sonde à part ni tag pour lui.** Décision de Sabine du 10/11, transmise par
-  time-knight ; elle revient sur la forme décidée plus tôt le même jour (un essai à part, le tag de #330 attendant
-  que #295 soit fusionnée et essayée). Avant la première exécution à la main, Sabine pose depuis le Mac, par le rôle
-  de données temporaire qu'elle a pendant l'amorçage, une fiche au nom de celle du jour d'un top, que l'exécution
-  doit laisser intacte, et une réservation pour un autre top, qui doit faire échouer l'exécution en la nommant et
-  rester intacte ; elle les retire ensuite. tn-codeur le prépare. Option écartée : pas d'essai (proposée par le
-  plan, une sonde ne reproduisant pas la course entre deux répliques). — PR #539
+- **L'essai sur `job-data` de la réservation se fait pendant l'amorçage de #330, préparé par tn-codeur dans #330,
+  sans sonde à part ni tag pour lui.** Décision de Sabine du 10/11, transmise par time-knight ; elle revient sur la
+  forme décidée plus tôt le même jour (un essai à part, le tag de #330 attendant que #295 soit fusionnée et
+  essayée). Option écartée : pas d'essai (proposée par le plan, une sonde ne reproduisant pas la course entre deux
+  répliques). — PR #539
 
 ## Décisions encore ouvertes
 

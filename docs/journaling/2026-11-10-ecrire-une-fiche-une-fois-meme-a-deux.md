@@ -185,8 +185,8 @@ autre type d'entrée (`sheet_not_a_file`).
 
 - **Rien n'a tourné sur le partage SMB.** `FILE_CREATE`, le renommage sur un nom absent et la liste vue d'une autre
   réplique reposent sur la documentation Microsoft, la spécification MS-SMB2 et le code du noyau lu sur un miroir
-  (v6.19), pas sur un essai. Le noyau des répliques d'ACA n'est pas connu. L'essai sur `job-data` avec un second
-  écrivain se fait pendant l'amorçage de #330 (décision de Sabine du 10/11).
+  (v6.19), pas sur un essai. Le noyau des répliques d'ACA n'est pas connu. L'essai sur `job-data` se fait pendant
+  l'amorçage de #330, préparé par tn-codeur dans #330 (décision de Sabine du 10/11).
 - **Le moment exact où Python lève l'exception d'un signal** (juste après le retour d'un appel, avant le `try`) est
   raisonné, pas mesuré : la fenêtre du constat 1 n'a pas de test.
 - **Les tests simulent les autres lancements** dans le même processus (un `has_sheet` ou un `fsync` qui écrit la
@@ -197,9 +197,8 @@ autre type d'entrée (`sheet_not_a_file`).
 
 ## Ce qui reste
 
-- L'essai sur `job-data` avec un vrai second écrivain, pendant l'amorçage de #330, sans sonde à part ni tag pour lui
-  (décision de Sabine du 10/11, préparé par tn-codeur) : une fiche du jour d'un top posée depuis le Mac doit rester
-  intacte ; une réservation posée pour un autre top doit faire échouer l'exécution, qui la nomme et la laisse.
+- L'essai sur `job-data` de la réservation, pendant l'amorçage de #330, sans sonde à part ni tag pour lui : préparé
+  par tn-codeur dans #330 (décision de Sabine du 10/11).
 - L'amendement de la règle 2 de `conventions.md`, par Sabine (texte proposé par time-knight).
 - Le retrait d'un temporaire vieux de plus d'une heure et l'alerte sur une exécution en échec : issues de tn-codeur,
   avec #330.
