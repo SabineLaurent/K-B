@@ -458,10 +458,10 @@ def test_a_sheet_not_written_exits_4_and_the_other_sheet_is_written(
     )
     write_file_atomically = vault_files.write_file_atomically
 
-    def refuse_the_agent_tools(path, content):
+    def refuse_the_agent_tools(path, content, **options):
         if "agent_tools" in path.parts:
             raise PermissionError(13, "Permission denied", str(path))
-        write_file_atomically(path, content)
+        write_file_atomically(path, content, **options)
 
     monkeypatch.setattr(vault_files, "write_file_atomically", refuse_the_agent_tools)
 
@@ -474,6 +474,27 @@ def test_a_sheet_not_written_exits_4_and_the_other_sheet_is_written(
     assert str(vault_dir) not in error_output
 
 
+def test_a_temporary_file_left_of_a_sheet_fails_its_subject_and_digest_exits_4(
+    monkeypatch, digest_environment, capsys
+):
+    _, vault_dir = digest_environment
+    answer_digests(
+        monkeypatch, answer_with(make_response([AGENT_DIGEST, RESEARCH_DIGEST]))
+    )
+    sheets_dir = vault_dir / "veille" / "agent_tools"
+    sheets_dir.mkdir(parents=True)
+    claim = sheets_dir / ".2026-10-21.md.tmp"
+    claim.write_text("another run\n", "utf-8")
+
+    assert cli.main(["digest"]) == cli.ExitCode.PARTIAL_FAILURE
+    assert list_sheets(vault_dir) == ["veille/research/2026-10-21.md"]
+    assert claim.read_text("utf-8") == "another run\n"
+    assert (
+        "agent_tools: sheet not written: temporary_file_found:"
+        " veille/agent_tools/.2026-10-21.md.tmp is there\n"
+    ) in capsys.readouterr().err
+
+
 def test_a_sigterm_while_a_sheet_is_written_stops_digest_and_keeps_the_sheet(
     monkeypatch, digest_environment, sigterm_handler_of_the_test
 ):
@@ -483,8 +504,8 @@ def test_a_sigterm_while_a_sheet_is_written_stops_digest_and_keeps_the_sheet(
     )
     write_file_atomically = vault_files.write_file_atomically
 
-    def write_then_receive_sigterm(path, content):
-        write_file_atomically(path, content)
+    def write_then_receive_sigterm(path, content, **options):
+        write_file_atomically(path, content, **options)
         signal.raise_signal(signal.SIGTERM)
 
     monkeypatch.setattr(

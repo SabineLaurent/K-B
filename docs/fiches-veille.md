@@ -1756,8 +1756,9 @@ des tops).
 5. **Une fiche par sujet rendu**, `veille/<sujet>/AAAA-MM-JJ.md`, au jour UTC de `window.until` :
    le chemin est fait de constantes, d'un sujet de la liste et d'un jour. Elle est écrite une fois :
    `kb` ne réécrit jamais une fiche qu'il voit, et ne suit jamais un lien qu'il voit ; les dossiers
-   et la fiche sont recontrôlés juste avant l'écriture, par un temporaire caché renommé (règle 2 de
-   `conventions.md`). Une limite : voir « Limites », ci-dessous.
+   et la fiche sont recontrôlés juste avant l'écriture, par un temporaire caché au nom fixe, créé
+   seulement s'il n'existe pas, puis renommé (règle 2 de `conventions.md`, #295). Une limite : voir
+   « Limites », ci-dessous.
 
 **La fiche** : du Markdown déterministe (la même réponse donne les mêmes octets), ses clés en
 anglais, son texte en français (règle de Sabine du 2026-10-21) :
@@ -1913,14 +1914,20 @@ tronqué et échappé (règle 3 de `conventions.md`).
 - **Le jour contrôlé** avant la demande est celui de l'horloge de `kb` ; celui de la fiche,
   `window.until` de l'API IA. Une demande à cheval sur minuit UTC écrit la fiche du lendemain, et un
   sujet dont la fiche du lendemain existe déjà compte en échec (`sheet_exists`).
-- **Un SIGKILL** pendant une écriture laisse un temporaire caché `.AAAA-MM-JJ.md.*.tmp` dans
-  `veille/<sujet>/`, comme pour les tops ; Obsidian n'affiche pas un fichier caché.
-- **Entre le dernier contrôle et le renommage** (limite acceptée par Sabine pour le POC, le
-  2026-10-21, à corriger par #295) : une fiche apparue dans cette fenêtre est remplacée sans
-  message (CWE-367) ; un dossier remplacé par un lien y fait écrire hors du coffre (CWE-59, déjà
-  accepté pour les tops, registre, fiche 1, « Sécurité »). Seuls deux lancements de l'utilisatrice
-  qui se chevauchent peuvent le déclencher ; un texte de source ou du modèle ne le peut pas. À
-  corriger au plus tard dès que `kb digest` tourne sans elle (tâche planifiée, conteneur).
+- **Deux lancements qui se chevauchent** (#295) : chacun réserve la fiche en créant son temporaire
+  caché `.AAAA-MM-JJ.md.tmp`, qui n'est créé que s'il n'existe pas (`O_EXCL`, FILE_CREATE sur le
+  partage SMB d'Azure Files, où `os.link` n'existe pas), puis cherche la fiche dans la liste du
+  dossier. Le second trouve le temporaire ou la fiche : il ne remplace rien. Un temporaire trouvé
+  fait échouer le sujet (`temporary_file_found`), comme pour les tops et le compte rendu des
+  tendances : un job planifié ne réussit pas sans sa fiche.
+- **Un SIGKILL**, ou une session SMB perdue, pendant une écriture laisse ce temporaire dans
+  `veille/<sujet>/` ; Obsidian n'affiche pas un fichier caché. La fiche de ce jour est alors
+  refusée (`temporary_file_found`) jusqu'à ce que le temporaire soit retiré à la main ; celle du
+  lendemain a son propre nom.
+- **Un dossier remplacé par un lien** entre le dernier contrôle et l'écriture y fait écrire hors du
+  coffre (CWE-59 ; limite acceptée par Sabine le 2026-11-10, registre, fiche 1, « Sécurité »). Seul
+  un processus qui a déjà le compte de l'utilisatrice le peut ; un texte de source ou du modèle ne
+  le peut pas.
 - **Une adresse mail dans un moteur GFM** : dans cmark-gfm (GitHub), `\@` n'empêche pas le lien
   d'une adresse mail, ni `\:` celui de `mailto:` ou `xmpp:`, car les nœuds de texte y sont recollés
   avant l'extension des liens automatiques (`blocks.c`, `extensions/autolink.c`). Aucune correction

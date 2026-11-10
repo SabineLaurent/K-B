@@ -316,8 +316,8 @@ KB_DATA_DIR=~/.knowledge_base KB_VAULT_DIR=<coffre> uv run kb write-tops
 `kb write-tops` écrit, pour le top 100 des dépôts les plus étoilés et celui des plus forkés, une
 fiche Markdown par jour de collecte encore présent dans le brut :
 `<KB_VAULT_DIR>/veille/tops/most_starred/AAAA-MM-JJ.md` et `.../most_forked/AAAA-MM-JJ.md`,
-nommée par le jour UTC du relevé. Une fiche qui existe n'est jamais réécrite (sauf deux lancements
-qui se chevauchent : #295) : deux collectes le
+nommée par le jour UTC du relevé. Une fiche qui existe n'est jamais réécrite, même par deux
+lancements qui se chevauchent (#295) : deux collectes le
 même jour ne donnent qu'une fiche, celle du premier relevé de ce jour encore dans le brut. Une fois
 les fiches d'un top écrites, ses relevés lisibles plus anciens que le dernier relevé lisible sont
 supprimés du brut ; au premier lancement, tout l'historique des relevés devient des fiches, puis
@@ -493,8 +493,8 @@ demande : un frontmatter (`subject`, `generated`, `model`, la fenêtre, `items_c
 coupée par le plafond et la date de son premier item laissé (`capped_kind`, `covered_after`),
 `request_id`), les affirmations, chacune avec le numéro de ses sources, puis les sources, leur
 titre et leur URL. Chaque affirmation et chaque titre est écrit en texte : ni lien, ni image, ni
-balise, ni code, ni requête Dataview ne peut s'y activer. Une fiche n'est jamais réécrite (sauf deux
-lancements qui se chevauchent, qui peuvent en remplacer une sans message : #295) : s'il en existe
+balise, ni code, ni requête Dataview ne peut s'y activer. Une fiche n'est jamais réécrite, même par deux
+lancements qui se chevauchent (#295) : s'il en existe
 une du jour, aucune demande n'est faite. Une demande dure jusqu'à environ 220 s ; `kb digest`
 attend 240 s au plus (une réponse de 8 000 000 d'octets au plus, et sans borne avant son premier
 morceau : [docs/fiches-veille.md](docs/fiches-veille.md), « Fiches dans le coffre », « Limites »), sans nouvelle tentative, et montre qu'il attend : une ligne qui tourne dans un
