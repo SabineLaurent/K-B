@@ -593,11 +593,15 @@ DATA_API_ID=$(az identity show -g "$RG" -n id-kb-data-api --query principalId -o
 admin_psql postgres \
   -v migrate_database_principal_id="$MIGRATE_ID" -v data_api_principal_id="$DATA_API_ID" \
   -f infra/postgresql/create-principals.sql
+DAILY_ROUTINE_ID=$(az identity show -g "$RG" -n id-kb-daily-routine --query principalId -o tsv)
+admin_psql postgres -v daily_routine_principal_id="$DAILY_ROUTINE_ID" \
+  -f infra/postgresql/create-daily-routine-principal.sql
 admin_psql kb -v ON_ERROR_STOP=1 -f infra/postgresql/grant-roles.sql
 ```
 
 `grant-roles.sql` se relance sans rien changer. `create-principals.sql` ne se relance pas : la base `kb` existe
-déjà et `CREATE DATABASE` échoue.
+déjà et `CREATE DATABASE` échoue. Le rôle de la routine a donc son propre fichier, venu avec #330 (« La routine
+quotidienne ») : sur un serveur neuf, les trois fichiers passent dans cet ordre.
 
 ### Vérifier la chaîne TLS du job
 
@@ -791,7 +795,8 @@ JOBFILES=$(az storage account list -g "$RG" --query "[?starts_with(name,'stkbjob
 
 ### Les instantanés de `job-data`
 
-Un instantané avant l'amorçage (#330), un avant chaque mise en production. Ils se prennent et se suppriment à la
+Un instantané avant chaque mise en production, dès le tag qui suit l'amorçage (#330). Aucun avant l'amorçage : le
+partage part vide (décision de Sabine du 10/11). Ils se prennent et se suppriment à la
 main, par l'opératrice : ce sont des gestes du plan de contrôle, que son rôle Owner couvre. `id-kb-deploy` n'y a
 aucun droit. Chacun est **gardé 7 jours au plus** (décision de Sabine du 10/11) et porte sa date de suppression.
 Un brut vit donc au plus 6 mois et 7 jours, écrit au registre des traitements.
@@ -833,3 +838,220 @@ Sources (Microsoft Learn, lues le 2026-11-10) :
 [rôles intégrés du stockage](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/storage),
 [facturation d'Azure Files](https://learn.microsoft.com/en-us/azure/storage/files/understanding-billing),
 [`az storage share-rm`](https://learn.microsoft.com/en-us/cli/azure/storage/share-rm).
+
+## La routine quotidienne (#330)
+
+`caj-kb-daily-routine` lance `kb daily-routine` (#413) chaque jour à 08:00 UTC, soit 9 h à Paris en hiver et 10 h en
+été (décision de Sabine du 10/11). L'ordre des étapes : le miroir des clips, `kb collect`, `kb import`,
+`kb write-tops`, puis la publication de `veille` dans `watch`. Son dossier de données est le partage `job-data`, monté
+sur `/var/lib/knowledge_base` : le brut, l'état de la collecte et le coffre y restent d'une exécution à l'autre. Il
+écrit la base sous `id-kb-daily-routine`, membre de `kb_writer`.
+
+| Réglage | Valeur |
+|---|---|
+| Déclenchement | cron `0 8 * * *`, lu en UTC ; parallélisme 1 |
+| Délai, reprise | 3 600 s, 1 reprise. Le délai borne aussi la reprise : une exécution du cron finit avant 09:00 UTC |
+| Ressources | 0,5 vCPU, 1 Gio, relevés à la première exécution ; à changer par `az containerapp job update --cpu --memory`, jamais par `job start` |
+| Volumes | `job-data` sur `/var/lib/knowledge_base` (uid 10001, `0700` et `0600`, les options essayées par la sonde de #420) ; `secrets` sur `/mnt/secrets`, la seule clé BigQuery |
+| Secrets | `KB_GITHUB_TOKEN` ← `kb-github-token` ; `GOOGLE_APPLICATION_CREDENTIALS=/mnt/secrets/bigquery-key.json` ← `kb-bigquery-key` |
+
+**Le job part de zéro** (décision de Sabine du 10/11) : rien du Mac n'est copié, ni brut, ni état, ni fiche. Le
+partage est vide, et la base n'a que ses sept sources. La première exécution collecte donc comme une première
+collecte : arXiv depuis le 01/05, les 7 derniers jours de TLDR, tout le catalogue de CISA KEV, les 8 derniers jours de
+GH Archive (6 fenêtres de 3 jours), aucun clip ni Zotero. Sur le Mac, le 21/10, une première collecte a pris 84 s, et
+l'import moins de 10 s ([collecte réelle du 21/10](../docs/2026-10-21-collecte-reelle.md)).
+
+Dans l'ordre :
+1. Le critère rouge : `az containerapp job show -n caj-kb-daily-routine -g "$RG"` répond `ResourceNotFound`.
+2. Les deux secrets.
+3. Le principal et ses droits.
+4. Les deux dossiers du coffre.
+5. La seconde passe, avec le tag. Elle attend #295 fusionnée, et son mécanisme essayé sur `job-data`.
+6. La première exécution, à la main.
+7. Le lendemain : l'exécution du cron.
+
+Une seule passe ou écriture dans Azure à la fois : chacune se signale avant d'être lancée.
+
+### Les deux secrets de la routine
+
+Chacun est à part de ceux du Mac et de l'API IA : il se révoque sans rien arrêter d'autre.
+- **`kb-github-token`** : un nouveau jeton *fine-grained* ([docs/jeton-github.md](../docs/jeton-github.md),
+  « Créer un jeton »), nommé `K-B routine en ligne (lecture seule)`, sur les dépôts publics, sans aucune permission,
+  pour 90 jours.
+- **`kb-bigquery-key`** : une nouvelle clé JSON du compte `k-b-collecte` ([docs/bigquery.md](../docs/bigquery.md),
+  « La clé »). Elle se pose depuis le fichier téléchargé, qui est supprimé aussitôt après.
+
+Dans son propre terminal, comme à l'étape 4 d'« Appliquer » :
+
+```sh
+name=kb-github-token
+printf '%s : ' "$name"; read -rs VALUE; echo
+az keyvault secret set --vault-name "$KV" --name "$name" --file <(printf '%s' "$VALUE") -o none
+unset VALUE
+KEY_FILE=<chemin du fichier .json téléchargé>
+kb_check "$KV" "$KEY_FILE" && az keyvault secret set --vault-name "$KV" --name kb-bigquery-key --file "$KEY_FILE" -o none \
+  && rm "$KEY_FILE"
+az keyvault secret list --vault-name "$KV" --query "[].name" -o tsv    # les noms, jamais les valeurs
+```
+
+Les deux secrets doivent exister avant la seconde passe : elle donne à `id-kb-daily-routine` un rôle sur chacun.
+
+Pour en refaire un, la nouvelle version remplace l'ancienne (étape 4, « Pour refaire un seul secret »). Un job n'a pas
+de révision à redémarrer. Qu'une exécution lancée plus de 30 minutes après lise la nouvelle version n'est pas encore
+vérifié : ce sera fait à la première rotation.
+
+### Le principal de la routine et ses droits
+
+`create-principals.sql` ne se relance pas (la base `kb` existe déjà) : le rôle de la routine a son propre fichier.
+L'administration ouverte (« Ouvrir une administration ») :
+
+```sh
+DAILY_ROUTINE_ID=$(az identity show -g "$RG" -n id-kb-daily-routine --query principalId -o tsv)
+kb_check "$DAILY_ROUTINE_ID" && admin_psql postgres -v daily_routine_principal_id="$DAILY_ROUTINE_ID" \
+  -f infra/postgresql/create-daily-routine-principal.sql
+admin_psql kb -v ON_ERROR_STOP=1 -f infra/postgresql/grant-roles.sql
+admin_psql kb -At -c "SELECT pg_has_role('id-kb-daily-routine', 'kb_writer', 'MEMBER'), has_database_privilege('id-kb-daily-routine', 'kb', 'CONNECT'), has_table_privilege('id-kb-daily-routine', 'public.source', 'INSERT')"
+```
+
+Attendu : `t|t|t`. Puis « Fermer l'administration ». La première exécution ne part qu'après ce `t|t|t`.
+
+### Les deux dossiers du coffre
+
+La routine refuse de démarrer sans `vault/` : `KB_VAULT_DIR` doit être un dossier existant, sinon elle sort en 2 et
+rien ne tourne. Sans `vault/Clippings/`, la collecte des clips échoue chaque jour (`clippings_folder_missing`). Ni la
+routine ni le Bicep ne les créent, pour qu'un `KB_VAULT_DIR` mal écrit ou un coffre disparu se voie.
+
+C'est une écriture de données, que l'opératrice fait une fois, par un rôle temporaire posé sur le seul partage. La
+portée s'écrit avec `fileshares`, et non `shares` : sinon le rôle ne vaut pas.
+
+```sh
+JOBFILES=$(az storage account list -g "$RG" --query "[?starts_with(name,'stkbjobfiles')].name" -o tsv)
+SHARE_SCOPE="$(az storage account show -n "$JOBFILES" -g "$RG" --query id -o tsv)/fileServices/default/fileshares/job-data"
+kb_check "$OPERATOR" "$JOBFILES" "$SHARE_SCOPE" && az role assignment create --assignee-object-id "$OPERATOR" \
+  --assignee-principal-type User --role "Storage File Data Privileged Contributor" --scope "$SHARE_SCOPE" \
+  --query roleDefinitionName -o tsv
+```
+
+Dix minutes plus tard, le temps que le rôle soit actif :
+
+```sh
+for dir in vault vault/Clippings; do
+  az storage directory create --account-name "$JOBFILES" --share-name job-data --name "$dir" \
+    --auth-mode login --backup-intent
+done
+az storage file list --account-name "$JOBFILES" --share-name job-data --path vault \
+  --auth-mode login --backup-intent --query "[].name" -o tsv
+```
+
+Attendu : aucune erreur, puis `Clippings` seul. `--backup-intent` est obligatoire pour toute commande
+`az storage file` ou `az storage directory` par compte Entra : sans lui, la commande est refusée.
+
+Puis le rôle se retire, verrou levé (« Le verrou : le lever, agir, le reposer ») :
+
+```sh
+az lock delete -n "lock-$JOBFILES" -g "$RG" --resource "$JOBFILES" --resource-type Microsoft.Storage/storageAccounts
+az role assignment delete --assignee "$OPERATOR" --role "Storage File Data Privileged Contributor" --scope "$SHARE_SCOPE"
+az lock create -n "lock-$JOBFILES" -g "$RG" --resource "$JOBFILES" --resource-type Microsoft.Storage/storageAccounts \
+  --lock-type CanNotDelete --notes "K-B storage of the jobs (#420): lift it only to delete a snapshot, a role or the account (#428)."
+az role assignment list --assignee "$OPERATOR" --scope "$SHARE_SCOPE" --query "[].roleDefinitionName" -o tsv
+az lock list -g "$RG" --query "[].{name:name,level:level}" -o table
+```
+
+Attendu : aucune ligne pour le rôle, puis les deux verrous `CanNotDelete`.
+
+### La seconde passe, avec le tag
+
+`TAG` est un tag posé après la fusion de #295, et son mécanisme essayé sur `job-data`. La passe se lance depuis la
+branche de #330, avec ce `TAG`, comme à l'étape 5 d'« Appliquer », en journée UTC. Aperçu attendu :
+- **à créer** : `caj-kb-daily-routine` ; l'AcrPull d'`id-kb-daily-routine` sur le registre ; ses deux rôles Key Vault
+  Secrets User (`kb-github-token`, `kb-bigquery-key`) ; le Container Apps Jobs Contributor d'`id-kb-deploy` sur le
+  job ;
+- **à modifier** : l'image des deux API et des deux jobs (`k-b@sha256:…` devient `k-b:<TAG>`, la même image), et le
+  bruit de l'étape 5.
+- Tout autre changement arrête la passe, en particulier sur `cae-kb`, le stockage ou les verrous.
+
+Si le job échoue sur « unable to fetch secret », c'est que ses rôles sur les secrets ne sont pas encore actifs :
+relancer la même commande 10 minutes plus tard.
+
+Dès cette passe, chaque tag change aussi l'image de la routine (`deployment.json`). `id-kb-deploy` peut alors agir
+sous l'identité de la routine, et lire ses deux secrets (risque accepté par Sabine le 10/11, registre des traitements,
+ligne « Déploiement continu »).
+
+### La première exécution, puis le cron
+
+La première se lance à la main, hors de la fenêtre du cron (règle des heures, ci-dessous) :
+
+```sh
+EXEC=$(az containerapp job start -n caj-kb-daily-routine -g "$RG" --query name -o tsv)
+az containerapp job execution show -n caj-kb-daily-routine -g "$RG" --job-execution-name "$EXEC" \
+  --query "{status:properties.status,start:properties.startTime,end:properties.endTime}"
+```
+
+Attendu : `Running`, puis `Succeeded`, et `exit code 0` au journal (ci-dessous).
+L'exécution du cron se lit de même, le lendemain :
+
+```sh
+az containerapp job execution list -n caj-kb-daily-routine -g "$RG" \
+  --query "[].{name:name,status:properties.status,start:properties.startTime,end:properties.endTime}" -o table
+```
+
+Le journal se lit dans `log-kb`, quelques minutes après la fin (`WS` : étape 6 d'« Appliquer ») :
+
+```sh
+az monitor log-analytics query -w "$WS" -o tsv \
+  --analytics-query "ContainerAppConsoleLogs | where TimeGenerated > ago(3h) and JobName == 'caj-kb-daily-routine' | order by TimeGenerated asc" \
+  --query "[].[TimeGenerated, Log]"
+```
+
+On y relève :
+- `kb daily-routine started: 5 steps`, puis, pour chaque étape, `… step <n> of 5, <étape>, exited with <code>` ;
+- `kb daily-routine finished in …: exit code <code>`, puis le tableau des étapes ;
+- les octets lus par BigQuery : `gh_archive: … bytes processed, … rows` ;
+- la durée, face au délai de 3 600 s.
+
+Puis la fiche publiée :
+
+```sh
+EXCHANGE=$(az storage account list -g "$RG" --query "[?starts_with(name,'stkbexchange')].name" -o tsv)
+az storage blob list --auth-mode login --account-name "$EXCHANGE" -c watch --prefix tops/ --query "[].name" -o tsv
+```
+
+Attendu : `tops/<top>/<jour>.md`. Le démarrage, le tirage de l'image et le montage sont dans `ContainerAppSystemLogs`.
+La clé BigQuery est un fichier du volume `secrets` : si la ligne `gh_archive` dit qu'elle ne peut pas le lire, c'est
+son mode, pas encore vérifié.
+
+### La règle des heures
+
+Rien ne tient deux exécutions à l'écart l'une de l'autre avant #426. D'où :
+- **aucune exécution à la main ne démarre après 07:00 UTC**, jusqu'à la fin de celle du cron (09:00 UTC au plus) :
+  lancée avant 07:00, elle finit avant 08:00, son délai compris ;
+- un échec se diagnostique avant 07:00 UTC le lendemain ;
+- `caj-kb-digest-watch` démarre à 10:00 UTC (#423), une fois la routine finie.
+
+### Un temporaire resté en ligne (#295)
+
+Un fichier écrit une fois passe par un temporaire caché à son nom, `.<nom>.tmp`, à côté de la fiche (`vault/veille/…`)
+ou du brut (`raw/…`). Si le job est tué pendant l'écriture (délai dépassé), le temporaire reste. Ce fichier ne s'écrit
+plus ensuite : la ligne `temporary_file_found: .<nom>.tmp is there` le nomme, et l'étape échoue chaque jour.
+
+Le retrait se fait à la main, quand aucune exécution n'est `Running` (`az containerapp job execution list`). Il prend le
+même rôle temporaire que les deux dossiers, puis :
+
+```sh
+az storage file list --account-name "$JOBFILES" --share-name job-data --path "<dossier>" \
+  --auth-mode login --backup-intent --query "[?starts_with(name, '.')].name" -o tsv
+az storage file delete --account-name "$JOBFILES" --share-name job-data --path "<dossier>/.<nom>.tmp" \
+  --auth-mode login --backup-intent
+```
+
+Enfin, le rôle se retire, verrou levé, comme pour les deux dossiers. Le retrait par `kb` lui-même, au-delà d'un seuil,
+attend son issue.
+
+Sources (Microsoft Learn, lues le 2026-11-10) :
+[jobs de Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/jobs) (cron en UTC, délai prioritaire
+sur les reprises, rôles qui lisent les secrets d'un job),
+[`Microsoft.App/jobs` 2026-01-01](https://learn.microsoft.com/en-us/azure/templates/microsoft.app/2026-01-01/jobs)
+(volume `Secret`, `secrets` limités à une liste),
+[Azure Files par OAuth sur REST](https://learn.microsoft.com/en-us/azure/storage/files/authorize-oauth-rest) (rôle
+Privileged Contributor, portée en `fileshares`, `--backup-intent`),
+[`az storage directory`](https://learn.microsoft.com/en-us/cli/azure/storage/directory).
