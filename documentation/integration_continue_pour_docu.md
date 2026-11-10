@@ -6,7 +6,7 @@
 
 Cette fiche dit ce que fait la chaîne d'intégration continue (CI) de K-B, comment on la déclenche et la relance,
 comment elle s'installe, se configure et se teste, et que faire quand elle échoue. Elle est écrite d'après le code de
-`main` au commit `0292266` (2026-11-09) et les réglages du dépôt lus le même jour. Les exécutions citées se relisent
+`main` au commit `89ef7fb` (2026-11-10) et les réglages du dépôt lus le même jour. Les exécutions citées se relisent
 par `gh run view <id> --repo SabineLaurent/K-B`. La mise en ligne d'une version, qui suit la CI, est dans
 [la fiche de la livraison continue](livraison_continue_pour_docu.md).
 
@@ -69,7 +69,7 @@ read`, `ci.yml:9-10`, `image.yml:9-10`, `infra.yml:11-12`) et ne lit aucun secre
 
 | # | Étape | Ce qu'elle vérifie |
 |---|---|---|
-| 1 | (l. 22-26) | plante des fichiers que `.dockerignore` doit écarter: `.env`, `.env.decoy`, des bases `*.sqlite*`, un `__pycache__`, `.DS_Store` |
+| 1 | (l. 22-26) | plante des fichiers que `.dockerignore` doit écarter, à la racine (`.env`, `.env.decoy`, `temp/decoy`, `reports/decoy`, `.venv/decoy`) et dans `src/k_b/` (`.env.decoy`, `decoy.sqlite`, `decoy.sqlite-wal`, `.DS_Store`, `__pycache__/decoy.pyc`) |
 | 2 | `Sends only what the Dockerfile copies to the build` (l. 29-35) | le contexte de construction ne contient que `README.md`, `pyproject.toml`, `src` et `uv.lock`, et aucun fichier planté |
 | 3 | (l. 36) | `docker buildx build --platform linux/amd64 --tag k-b:ci .` |
 | 4 | `Runs as a non-root user` (l. 37-41) | l'utilisateur de l'image n'est pas root (`id -u` différent de 0) |
@@ -125,7 +125,7 @@ Une relance reprend le même commit et les mêmes workflows: pour tester une cor
 ```sh
 gh run list --repo SabineLaurent/K-B --commit "$(git rev-parse origin/main)" \
   --json workflowName,event,status,conclusion -q '.[] | [.workflowName, .event, .status, .conclusion] | @tsv'
-# lu sur 0292266 le 2026-11-09: « CI push completed success » et « Image push completed success »
+# lu sur 89ef7fb le 2026-11-10: « CI push completed success » et « Image push completed success »
 ```
 
 ## Installer la chaîne
@@ -140,9 +140,9 @@ dépôt. Ces réglages se lisent sans rien changer, par les commandes données; 
 
 ```sh
 gh api repos/SabineLaurent/K-B/actions/permissions
-# lu le 2026-11-09: {"enabled":true,"allowed_actions":"all","sha_pinning_required":true}
+# lu le 2026-11-10: {"enabled":true,"allowed_actions":"all","sha_pinning_required":true}
 gh api repos/SabineLaurent/K-B/actions/permissions/workflow
-# lu le 2026-11-09: {"default_workflow_permissions":"read","can_approve_pull_request_reviews":false}
+# lu le 2026-11-10: {"default_workflow_permissions":"read","can_approve_pull_request_reviews":false}
 ```
 
 **2. Le ruleset de `main`** (Settings → Rules → Rulesets), avec ces règles:
@@ -165,8 +165,8 @@ Les deux rulesets des tags (« tags v », « tags v immuables ») servent la liv
 `dependabot.yml` règle les mises à jour de version.
 
 ```sh
-gh api -i repos/SabineLaurent/K-B/vulnerability-alerts | head -1   # lu le 2026-11-09: HTTP/2.0 204 (alertes actives)
-gh api repos/SabineLaurent/K-B/automated-security-fixes            # lu le 2026-11-09: {"enabled":true,"paused":false}
+gh api -i repos/SabineLaurent/K-B/vulnerability-alerts | head -1   # lu le 2026-11-10: HTTP/2.0 204 (alertes actives)
+gh api repos/SabineLaurent/K-B/automated-security-fixes            # lu le 2026-11-10: {"enabled":true,"paused":false}
 ```
 
 **4. Sur le poste**, pour reproduire un job: l'environnement de développement de
@@ -214,14 +214,14 @@ touche pas `infra/`. Elle a reçu sept contrôles, tous verts (`gh pr checks 533
 dans l'exécution 42617081839 de `CI`, et `image-build` (23 s), dans l'exécution 42617082007 d'`Image`;
 `bicep-build` n'y a pas tourné.
 
-**Un push témoin**: la fusion `0292266` sur `main`, le 2026-11-09, a lancé `CI` (42620998480) et `Image`
-(42620998487), toutes deux `success`; `Infra` n'a pas tourné, `infra/` n'ayant pas changé. La dernière exécution
-d'`Infra` sur `main` est 42429157192, `success`, sur `ccf1455` (2026-11-08).
+**Un push témoin**: la fusion `89ef7fb` sur `main`, le 2026-11-10, a lancé `CI` (42815479408) et `Image`
+(42815479369), toutes deux `success`; `Infra` n'a pas tourné, `infra/` n'ayant pas changé. La dernière exécution
+d'`Infra` sur `main` est 42750689052, `success`, sur `cad8328` (2026-11-10).
 
 **Un refus témoin**: l'exécution 41215069368 de `CI`, sur la PR de la branche `feat/trend-report-github-cards`
-(2026-10-31), a eu `audit` en échec, et ses trois autres jobs (`tests`, `lint`, `types`) verts. Son journal (`gh run view 41215069368 --repo
-SabineLaurent/K-B --log-failed`) donne `Found 4 known vulnerabilities in 1 package`, puis `pyasn1 0.6.4`, quatre CVE
-et la version corrigée, `0.6.5`.
+(2026-10-31), a eu `audit` en échec, et ses trois autres jobs (`tests`, `lint`, `types`) verts. Son journal
+(`gh run view 41215069368 --repo SabineLaurent/K-B --log-failed`) donne `Found 4 known vulnerabilities in 1 package`,
+puis `pyasn1 0.6.4`, quatre CVE et la version corrigée, `0.6.5`.
 
 ## Quand la CI échoue
 
@@ -248,17 +248,51 @@ Puis reproduire le job sur le poste (tableau plus haut), corriger, pousser un co
 
 Un échec du runner ou du réseau (téléchargement de uv, de pip-audit ou de l'image `postgres`) se relance tel quel.
 
-## Limites, lues le 2026-11-09
+## Limites, lues le 2026-11-10
+
+Chaque parade a été vérifiée à la source le 2026-11-10 (sources en fin de liste).
 
 - **Aucune relecture n'est exigée**: le ruleset demande une PR, mais aucune approbation
   (`required_approving_review_count: 0`). La relecture en PR est une pratique, pas une règle.
+  Pour réduire le risque: exiger une approbation dans le ruleset serait faisable avec nos droits (administratrice du
+  dépôt), mais « Pull request authors cannot approve their own pull requests »: avec une seule personne au dépôt et
+  aucun contournement, plus aucune PR ne fusionnerait. Ce n'est donc pas faisable sans une seconde personne.
 - **Trois contrôles ne bloquent pas la fusion**: `tests-data`, `image-build` et `bicep-build` ne sont pas dans le
   ruleset. `bicep-build`, filtré par chemin, bloquerait toute PR qui ne touche pas `infra/` (`infra.yml:15`). Ils
   comptent à la livraison (`deploy.yml:51-67`).
+  Pour réduire le risque: ajouter `tests-data` et `image-build` aux contrôles requis du ruleset (faisable avec nos
+  droits). Pour `bicep-build`, GitHub conseille de ne pas exiger un workflow qui peut être sauté: un workflow sauté par
+  son filtre de chemins laisse ses contrôles « Pending » et bloque la fusion, alors qu'un job sauté par une condition
+  (`if:`) rend « Success ». Le filtre passerait du déclencheur d'`infra.yml` à une condition du job, calculée par un
+  job préalable (faisable avec nos droits, un changement d'`infra.yml`).
 - **Les tests de bout en bout ne tournent pas en CI**: les tests marqués `e2e` appellent les vraies sources et
   services; ils se lancent sur le poste ([la fiche des tests](tests_pour_docu.md)).
+  Pour réduire le risque: un workflow planifié (`on: schedule`, sur la branche par défaut) lancerait
+  `pytest -m e2e`. C'est faisable avec nos droits, les clés des sources en secrets du dépôt, mais pas pour tout: les
+  tests de Zotero et des clips lisent des fichiers du poste et seraient sautés. Le prix: des appels réels, dont une
+  vraie requête BigQuery pour `gh_archive`, et des clés de plus dans GitHub. Dans un dépôt public, GitHub coupe un
+  workflow planifié après 60 jours sans activité.
 - **L'image n'est pas scannée**: `audit` lit les paquets Python de `uv.lock`, pas les paquets du système de l'image
   de base.
+  Pour réduire le risque: scanner l'image `k-b:ci` dans `image-build`, par exemple par Grype (`anchore/scan-action`,
+  v7.4.2), qui fait échouer le job à partir d'un seuil de sévérité (`severity-cutoff`, `medium` par défaut).
+  Faisable avec nos droits: une action publique, épinglée par son SHA, sans secret. En attendant, Dependabot propose
+  chaque semaine le nouveau digest des images de base du `Dockerfile` (`dependabot.yml:10-16`).
 - **Aucun délai propre aux jobs**: aucun `timeout-minutes` dans `ci.yml`, `image.yml` ni `infra.yml`; le délai par
-  défaut de GitHub s'applique.
+  défaut de GitHub s'applique, 360 minutes par job.
+  Pour réduire le risque: un `timeout-minutes` par job, à quelques fois sa durée observée (1 min 21 s au plus sur
+  #533). Faisable avec nos droits, par un changement des workflows.
 - **Une PR vers une autre branche que `main`** ne lance aucune CI.
+  Pour réduire le risque: rien n'entre dans `main` sans une PR vers `main` (règle `pull_request` du ruleset), qui
+  lance la CI et attend ses cinq contrôles requis. Retirer `branches: [main]` du `pull_request` de chaque workflow
+  lancerait aussi la CI sur les autres PR (faisable avec nos droits).
+
+Sources, lues le 2026-11-10: GitHub Docs,
+[« Approving a pull request with required reviews »](https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/approving-a-pull-request-with-required-reviews),
+[« Troubleshooting required status checks »](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)
+(« Handling skipped but required checks »),
+[« Events that trigger workflows »](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
+(`schedule`) et
+[« Workflow syntax »](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)
+(`jobs.<job_id>.timeout-minutes`); le dépôt [anchore/scan-action](https://github.com/anchore/scan-action), son
+`action.yml` et sa dernière release, v7.4.2 (2026-08-28).
