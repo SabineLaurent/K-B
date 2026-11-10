@@ -133,10 +133,17 @@ kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" && az deployment group creat
   --query "{state:properties.provisioningState,outputs:properties.outputs}"
 ```
 
-L'aperçu attendu à la première fois :
-- **à créer** : `log-kb` et son paramètre de diagnostic, le registre et ses 3 rôles AcrPull, le coffre et le rôle de
-  l'opératrice, les 3 identités, le compte de stockage, son conteneur `smoke-test` et le rôle du job ;
-- **à modifier** : `cae-kb` (les journaux et le chiffrement entre les apps), et `budget-kb`.
+L'aperçu attendu à la première fois, sur un groupe où `cae-kb` existe déjà (#411) :
+- **à créer** :
+  - `log-kb` et son paramètre de diagnostic ; le registre et ses 4 rôles AcrPull ; le coffre et le rôle de
+    l'opératrice ;
+  - les 7 identités : `id-kb-ai-api`, `id-kb-data-api`, `id-kb-smoke-test`, `id-kb-deploy`, `id-kb-daily-routine`,
+    `id-kb-digest-watch` et `id-kb-migrate-database` ;
+  - `pgsql-kb-…`, son administratrice Entra, ses deux paramètres et sa règle de pare-feu (« La base PostgreSQL ») ;
+  - `stkbexchange…`, son service Blob, ses 4 conteneurs, leurs 8 rôles, la règle de cycle de vie et le verrou ;
+    `stkbjobfiles…`, son service de fichiers, le partage `job-data`, le rôle SMB MI Admin, le stockage `job-data`
+    de `cae-kb` et le verrou (« Le stockage ») ;
+- **à modifier** : `cae-kb` (les journaux, le chiffrement entre les apps et l'identité système), et `budget-kb`.
   - Pour `budget-kb`, c'est du bruit : `endDate` disparaît, et le format de `startDate` change. Sans date de fin,
     Azure en remet une à 10 ans.
 
@@ -148,6 +155,9 @@ KV=$(az deployment group show -g "$RG" -n main --query properties.outputs.keyVau
 ```
 
 Une seconde création lancée pendant que la première tourne est refusée (`DeploymentActive`), sans effet.
+
+Si la création échoue sur le stockage `job-data` de `cae-kb`, c'est que le rôle SMB MI Admin, créé dans la même
+passe, n'est pas encore actif (jusqu'à 10 minutes) : relancer la même commande 10 minutes plus tard.
 
 ### 3. Pousser l'image
 
@@ -717,7 +727,7 @@ que le Mac ne touche jamais (décisions 3 à 8 du 06/11, journal ADR).
      `job-data` de `cae-kb`, les identités `id-kb-daily-routine` et `id-kb-digest-watch`, les conteneurs
      `clippings`, `zotero` et `watch`, leurs 7 rôles, la règle de cycle de vie, les 2 verrous ;
    - **à modifier** : `cae-kb` (l'identité système seule), le service Blob de `stkbexchange…` (versions,
-     suppressions réversibles), `caj-kb-smoke-test`, l'image des deux API, et le bruit de l'étape 5.
+     suppressions réversibles), l'image des deux API, et le bruit de l'étape 5.
    - Tout autre changement sur `cae-kb` arrête l'application : l'environnement porte les deux API.
 4. La création. Si le stockage `job-data` de `cae-kb` échoue, c'est que le rôle n'est pas encore actif (jusqu'à
    10 minutes) : relancer la même commande 10 minutes plus tard.
