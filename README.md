@@ -773,10 +773,10 @@ passe 2 » et « Les secrets du dépôt, après la passe 2 ».
   (`POSTGRES_HOST_AUTH_METHOD: trust` : un serveur que seul le runner joint).
 - Aucun workflow ne lit de variable du dépôt (`vars.`), et les trois autres ne lisent aucun secret.
 
-**Une PR témoin** : [#475](https://github.com/SabineLaurent/K-B/pull/475) a passé, avant sa fusion le
-2026-11-08, les 6 checks que reçoit une PR qui ne touche pas `infra/` : les cinq de CI, `audit`, `tests`,
-`lint`, `types` et `tests-postgresql` (exécution 42473488447), et `image-build` (exécution 42473488442 d'Image), tous verts
-(`gh pr checks 475 --repo SabineLaurent/K-B`) ; `bicep-build` n'y a pas tourné.
+**Une PR témoin** : [#533](https://github.com/SabineLaurent/K-B/pull/533) a passé, avant sa fusion le
+2026-11-09, les 7 checks que reçoit une PR qui ne touche pas `infra/` : les six de CI, `audit`, `tests`,
+`lint`, `types`, `tests-postgresql` et `tests-data` (exécution 42617081839), et `image-build` (exécution 42617082007 d'Image), tous verts
+(`gh pr checks 533 --repo SabineLaurent/K-B`) ; `bicep-build` n'y a pas tourné.
 
 **Construire l'image** (Docker ; une image pour toutes les commandes `kb`, voir le `Dockerfile`) :
 
