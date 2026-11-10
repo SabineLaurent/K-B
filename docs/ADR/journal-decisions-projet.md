@@ -6405,12 +6405,24 @@ de Sabine du 10/11).
   #424
 - **Un blob de plus de 4 000 000 octets est refusé, comme un texte qui n'est pas de l'UTF-8, qui porte un caractère
   de contrôle autre que la tabulation et le retour à la ligne, ou un contrôle bidirectionnel ; la liste s'arrête à
-  20 000 blobs.** Pourquoi :
-  borner ce qu'une identité de job peut faire écrire sur le Mac (OWASP API4:2023), et refuser ce que kb n'écrit
-  jamais. 4 000 000 : le double d'une réponse de l'API IA non échappée (`MAX_AI_API_ANSWER_BYTES`), supposé, pas
-  mesuré ; 20 000 : environ 4 ans de fiches à 12 dossiers. Limites assumées : du Markdown actif reste possible (parade,
-  le JavaScript de Dataview désactivé, à vérifier par Sabine sur son coffre) ; au pire, 20 000 blobs de 4 000 000
-  octets sur le disque (parade, une borne d'octets par passage, pas faite). — PR de #424
+  20 000 blobs.** Pourquoi : borner ce qu'une identité de job peut faire écrire sur le Mac (OWASP API4:2023), et
+  refuser ce que kb n'écrit jamais. 4 000 000 : le double d'une réponse de l'API IA non échappée
+  (`MAX_AI_API_ANSWER_BYTES`), supposé, pas mesuré ; 20 000 : environ 4 ans de fiches à 12 dossiers. Limite assumée :
+  au pire, 20 000 blobs de 4 000 000 octets sur le disque (parade, une borne d'octets par passage, pas faite). — PR de
+  #424
+- **Le Markdown actif est refusé, hors échappement compté par la parité des `\` : un accent grave, `~~~` n'importe où
+  dans une ligne, `![`, un `<` qui n'ouvre pas un autolien `http://` ou `https://`.** Tranché par time-knight sur le
+  constat de la revue de sécurité de #424, après la relecture d'un sous-agent neuf, sous la délégation de Sabine du
+  15/10. Pourquoi : une requête Dataview (DQL), active par défaut et que les réglages du JavaScript ne coupent pas
+  (`DEFAULT_SETTINGS` d'obsidian-dataview, lu par Context7 le 2026-11-10), lirait tout le coffre et pourrait
+  l'envoyer par une image distante ; kb n'écrit aucun de ces quatre motifs sans l'échapper (il écrit un `[` dans les
+  liens des tops et des `~` dans une URL ou une description). Options écartées : refuser seulement une clôture en
+  début de ligne (`> ~~~` et `- ~~~` en ouvrent une aussi) ; garder le Markdown actif avec pour seule parade le
+  JavaScript de Dataview désactivé (la parade du plan, qui ne couvre pas DQL). Un faux positif, une description de top
+  qui contient `~~~`, refuse sa fiche : un échec visible. Limite assumée : un plugin qui agit sur un fichier neuf
+  (Templater et « Trigger Templater on new file creation ») reste hors de ce contrôle ; parade, ce déclencheur
+  inactif ou `veille/` dans ses « Excluded folders » (réglages de Templater, lus le 2026-11-10), faisable avec nos
+  droits, à vérifier par Sabine sur son coffre avec le JavaScript de Dataview désactivé. — PR de #424
 
 ## Décisions encore ouvertes
 
