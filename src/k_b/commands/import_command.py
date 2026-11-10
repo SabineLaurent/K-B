@@ -8,12 +8,11 @@ from time import monotonic
 
 from k_b.commands.batch_summary import describe_duration
 from k_b.commands.exit_codes import ExitCode
-from k_b.commands.run_log import LOGGER_NAME, describe_os_error
+from k_b.commands.run_log import LOGGER_NAME
 from k_b.core.config import GITHUB_TRACKED_REPOSITORIES
 from k_b.core.quoting import quote_value
 from k_b.database.errors import ENGINE_ERRORS, describe_engine_error
 from k_b.database.location import (
-    DatabaseLocation,
     MissingDatabaseError,
     UnreadableDatabaseUrlError,
     read_database_location_or_refusal,
@@ -24,35 +23,13 @@ from k_b.etl.pipeline import (
     ImportOutcome,
     import_raw_files,
 )
-from k_b.etl.raw_store import (
-    AUTOMATED_WATCH_DIR_NAME,
-    SELECTED_LIBRARY_DIR_NAME,
-    make_source_folder_key,
-)
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.etl.sources import cisa_kev, zotero
-from k_b.purge.after_import import StateCatalog, purge_after_import
 
 logger = logging.getLogger(LOGGER_NAME)
 
-# The state catalogs: of each, the raw keeps only the last file imported (ADR of 2026-10-19) and
-# the base every row (decision of Sabine of 2026-11-04).
-STATE_CATALOGS = (
-    StateCatalog(
-        make_source_folder_key(SELECTED_LIBRARY_DIR_NAME, zotero.FOLDER_PREFIX),
-        zotero.SOURCE_CODE,
-    ),
-    StateCatalog(
-        make_source_folder_key(AUTOMATED_WATCH_DIR_NAME, cisa_kev.FOLDER_PREFIX),
-        cisa_kev.SOURCE_CODE,
-    ),
-)
-
 
 def run_import(data_dir: Path, environ: Mapping[str, str]) -> int:
-    """Run the import into the base the environment names, print its summary, then run the purges;
-    the summary before them, so that whatever stops them (an error, Ctrl-C) leaves the summary of
-    the import committed."""
+    """Run the import into the base the environment names, then print its summary."""
     # Not value_or_log_refusal: mypy would join the two kinds of location into object.
     database = read_database_location_or_refusal(environ, data_dir)
     if isinstance(database, str):
@@ -85,7 +62,7 @@ def run_import(data_dir: Path, environ: Mapping[str, str]) -> int:
     # etl/load.py logs it: the path names the data directory.
     logger.info("import journal kept: %s", quote_value(outcome.journal_path.name))
     print_import_result(outcome)
-    return purge_after_the_import(data_dir, database, imported_at)
+    return ExitCode.SUCCEEDED
 
 
 def print_import_result(outcome: ImportOutcome) -> None:
@@ -95,26 +72,6 @@ def print_import_result(outcome: ImportOutcome) -> None:
     print()
     print(describe_import_summary(outcome))
     print()
-
-
-def purge_after_the_import(
-    data_dir: Path, database: DatabaseLocation, imported_at: datetime
-) -> ExitCode:
-    """Run the purges, dated by the import; a failure leaves the import committed."""
-    try:
-        purge_after_import(
-            data_dir, database, imported_at, STATE_CATALOGS, GITHUB_TRACKED_REPOSITORIES
-        )
-    except (*ENGINE_ERRORS, OSError, ValueError) as error:
-        # The type, and the reason of an OSError, never the name of a raw file.
-        logger.error(
-            "import committed, purge failed: %s; run kb import again",
-            describe_os_error(error)
-            if isinstance(error, OSError)
-            else type(error).__name__,
-        )
-        return ExitCode.FAILED
-    return ExitCode.SUCCEEDED
 
 
 def describe_import_summary(outcome: ImportOutcome) -> str:

@@ -33,7 +33,7 @@ from test_load_zotero import (
 from test_transform import FIXTURES_DIR
 
 from k_b import cli
-from k_b.commands import import_command
+from k_b.commands import import_command, purge_command
 from k_b.commands.exit_codes import ExitCode
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
 from k_b.database import writing
@@ -133,6 +133,7 @@ def run_kb(monkeypatch, data_dir, database_url, command, now=None):
         monkeypatch.setenv(DATABASE_URL_VARIABLE, database_url)
     if now is not None:
         monkeypatch.setattr(import_command, "datetime", make_clock(now))
+        monkeypatch.setattr(purge_command, "datetime", make_clock(now))
     return cli.main([command])
 
 
@@ -294,25 +295,29 @@ def read_journals(data_dir):
 
 
 def import_on_both(monkeypatch, capsys, engines, now):
-    """kb import on each engine at the same time; each prints the same summary, writes the same
-    journals, leaves the same rows, and the data API reads the same items from it."""
+    """kb import then kb purge on each engine at the same time; each prints the same summary,
+    writes the same journals, leaves the same rows, and the data API reads the same items from
+    it."""
     results = []
     for data_dir, database_url in engines.items():
         capsys.readouterr()
         exit_code = run_kb(monkeypatch, data_dir, database_url, "import", now)
+        summary = capsys.readouterr().out
+        purge_exit_code = run_kb(monkeypatch, data_dir, database_url, "purge", now)
         results.append(
             (
                 exit_code,
-                capsys.readouterr().out,
+                purge_exit_code,
+                summary,
                 read_journals(data_dir),
                 read_rows(data_dir, database_url),
                 read_listing(data_dir, database_url),
             )
         )
     sqlite_result, postgresql_result = results
-    assert sqlite_result[0] == ExitCode.SUCCEEDED
+    assert sqlite_result[:2] == (ExitCode.SUCCEEDED, ExitCode.SUCCEEDED)
     assert postgresql_result == sqlite_result
-    return postgresql_result[3], postgresql_result[4]
+    return postgresql_result[4], postgresql_result[5]
 
 
 def test_kb_create_db_then_kb_import_write_the_same_rows_on_postgresql_as_on_sqlite(
@@ -354,7 +359,7 @@ def test_kb_create_db_then_kb_import_write_the_same_rows_on_postgresql_as_on_sql
         write_extract(data_dir, THIRD_COLLECTION, third_extract)
     third_rows, _ = import_on_both(monkeypatch, capsys, engines, IMPORTS_AT[2])
 
-    # Four years later, the purges of kb import delete the watch past its duration.
+    # Four years later, kb purge deletes the watch past its duration.
     last_rows, last_listing = import_on_both(
         monkeypatch, capsys, engines, IMPORTS_AT[3]
     )

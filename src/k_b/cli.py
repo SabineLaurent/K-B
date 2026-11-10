@@ -33,6 +33,7 @@ from k_b.commands.openapi_command import (
     DATA_API_OPENAPI_PATH,
     run_openapi,
 )
+from k_b.commands.purge_command import run_purge
 from k_b.commands.run_log import (
     LOG_FILE_PATH,
     LOGGER_NAME,
@@ -88,6 +89,7 @@ RUN_BY_COMMAND: dict[str, Callable[[Path, Mapping[str, str]], int]] = {
     "create-db": run_create_db,
     "migrate-database": run_migrate_database,
     "import": run_import,
+    "purge": run_purge,
     "write-tops": run_write_tops,
     "serve-data": run_serve_data,
     "trend-report": run_trend_report,
@@ -144,6 +146,11 @@ def read_command(argv: list[str] | None) -> tuple[str, bool]:
         help="read the raw items and write them into the database, which removes the duplicates",
     )
     command_parsers.add_parser(
+        "purge",
+        help="delete from the database, the raw, the logs and the journals what is past its"
+        " duration, dated by the start of the command",
+    )
+    command_parsers.add_parser(
         "write-tops",
         help="write the sheet of each top ranking in the vault of KB_VAULT_DIR, then delete"
         " the rankings it supersedes",
@@ -181,8 +188,8 @@ def read_command(argv: list[str] | None) -> tuple[str, bool]:
     command_parsers.add_parser(
         "daily-routine",
         help=f"the job of each day: mirror the container {CLIPPINGS_CONTAINER} to the vault,"
-        " kb collect, kb import unless kb collect exits with 1 or 2, kb write-tops, then"
-        f" publish veille to the container {WATCH_CONTAINER} without replacing a blob",
+        " kb collect, kb import unless kb collect exits with 1 or 2, kb purge, kb write-tops,"
+        f" then publish veille to the container {WATCH_CONTAINER} without replacing a blob",
     ).add_argument("--dry-run", action="store_true", help=DRY_RUN_HELP)
     command_parsers.add_parser(
         "digest-watch",

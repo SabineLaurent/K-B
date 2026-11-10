@@ -147,7 +147,8 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   lancée en job entre dans `COMMANDS_STOPPED_BY_SIGTERM`. Un blob refusé se cite par sa position
   (`blob 12 of 120`). `FakeContainer` (`tests/jobs/storage_fakes.py`) simule liste, téléchargement et envoi ; un test
   qui lit le journal capte `caplog.at_level(logging.INFO, logger="k_b")`, car à INFO le SDK écrit l'URL d'un blob.
-  En ligne, `kb import` purge le brut à 6 mois jusqu'à #390 (journal ADR, 2026-11-06).
+  En ligne, `kb purge`, l'étape de `kb daily-routine` qui suit `kb import`, purge le brut à 6 mois jusqu'à #390
+  (journal ADR, 2026-11-06 et 2026-11-10).
 
 ## Consignes de travail
 

@@ -14,7 +14,7 @@ from k_b.purge.raw import delete_expired_raw
 
 FIXTURES_DIR = Path(__file__).parents[1] / "fixtures"
 # Six months after it, the bound is 2026-10-05T09:30:01Z: OLD is a second before it.
-IMPORTED_AT = datetime(2027, 4, 5, 9, 30, 1, tzinfo=UTC)
+PURGED_AT = datetime(2027, 4, 5, 9, 30, 1, tzinfo=UTC)
 OLD = "2026-10-05T093000Z"
 AT_THE_BOUND = "2026-10-05T093001Z"
 YOUNG = "2027-03-01T093000Z"
@@ -32,9 +32,9 @@ def write_fixture(data_dir, key, fixture):
     return path
 
 
-def purge(data_dir, imported_paths=frozenset(), imported_at=IMPORTED_AT):
+def purge(data_dir, imported_paths=frozenset(), purged_at=PURGED_AT):
     return delete_expired_raw(
-        RawStore(data_dir), imported_at, STATE_CATALOG_FOLDER_KEYS, imported_paths
+        RawStore(data_dir), purged_at, STATE_CATALOG_FOLDER_KEYS, imported_paths
     )
 
 
@@ -313,7 +313,7 @@ def test_the_bound_is_computed_in_utc_whatever_the_time_zone_given(tmp_path):
 
     purge(
         tmp_path,
-        imported_at=datetime(2027, 4, 30, 0, 30, tzinfo=ZoneInfo("Europe/Paris")),
+        purged_at=datetime(2027, 4, 30, 0, 30, tzinfo=ZoneInfo("Europe/Paris")),
     )
 
     assert collection.exists()

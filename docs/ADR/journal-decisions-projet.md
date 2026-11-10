@@ -6370,6 +6370,35 @@ changes », 8 constats intégrés) et par time-knight.
   essayée). Option écartée : pas d'essai (proposée par le plan, une sonde ne reproduisant pas la course entre deux
   répliques). — PR #539
 
+### Purge : sa propre commande, `kb purge` (#540)
+
+Plan validé par Sabine le 10/11, relu par time-knight avant elle.
+
+- **La purge sort de `kb import` : une commande à part, `kb purge`, que `kb daily-routine` lance juste après
+  `kb import`.** Décision de Sabine du 2026-11-10 : « Je veux qu'elle soit appelée en dehors du script d'import à
+  proprement parler » ; le principe : des briques qui marchent chacune seule, puis un chapeau par-dessus, la routine
+  quotidienne (#540). **Révise** la décision du 2026-11-04 (« lancé par `kb import` après le commit et le bilan ») et
+  celle du 2026-10-23 (la purge appelée par `kb import` après l'affichage du résumé) : le test qui figeait cet ordre,
+  `test_a_failed_purge_leaves_the_summary_of_the_import_it_committed`, disparaît avec la purge de l'import. L'étape
+  entre dans la routine dans le même changement : sans elle, plus rien ne purgerait en ligne. Elle prend la place que
+  la décision du 2026-11-06 réservait à l'étape « `pg_dump` puis purge » de #390, qui ajoutera la sauvegarde avant
+  elle. — PR de #540
+- **Dans la routine, `kb purge` tourne même après un `kb import` en échec ou non lancé : pas de règle
+  `NotRunAfter`.** Décision de Sabine du 2026-11-10, sur la recommandation du plan (« aussi après un import en échec
+  ou non lancé »). **Lève l'invariant** « la purge ne
+  tourne qu'après le commit » (2026-10-23). Pourquoi : l'import est une seule transaction ; en échec, il n'a rien
+  validé, la base et le registre restent ceux du dernier import validé, et la purge y est cohérente ; un brut pas
+  encore importé n'est jamais supprimé comme catalogue remplacé, la liste venant du registre (`purge/catalogs.py`,
+  vérifié aussi par time-knight) ; avec la règle, un import qui échoue chaque jour ne purgerait plus rien, et les
+  durées, qui sont des maxima, seraient dépassées. Option écartée : `NotRunAfter("kb import", {1, 2})`, qui garde
+  l'invariant, mais purgerait quand l'import est sauté (`kb collect` en 1 ou 2) et pas quand il échoue. Limite
+  assumée, déjà vraie avant : un brut de plus de 6 mois jamais importé part (procédure de tri, étape 3, compté à part
+  au journal), même si les imports échouent depuis. — PR de #540
+- **La purge est datée par l'heure de lancement de `kb purge` (UTC, à la seconde), et non plus par celle de
+  l'import.** Décision de Sabine du 2026-11-10, sur la recommandation du plan. Pourquoi : `kb purge` marche seule,
+  sans import le jour même, et les durées sont des maxima. Option écartée : l'heure du dernier import, lue en base ;
+  une purge sans import nouveau ne supprimerait pas ce qui a expiré depuis. — PR de #540
+
 ## Décisions encore ouvertes
 
 - **Une limite de connexions du serveur** (2026-11-05, #161) : `limit_concurrency` d'uvicorn, écarté

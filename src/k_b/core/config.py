@@ -171,8 +171,8 @@ SERVE_AI_LOG_FILE_NAME = "kb-serve-ai.log"
 LOG_FILE_NAMES = (LOG_FILE_NAME, SERVE_DATA_LOG_FILE_NAME, SERVE_AI_LOG_FILE_NAME)
 # The folder that holds the journals of the imports: what an import decided about the data, in JSON.
 JOURNALS_DIR_NAME = "journals"
-# How many months a log and a journal are kept after the day in their name; the purge deletes the
-# others, at the end of kb import (purge/run_records.py). The bottom of what the CNIL recommends for
+# How many months a log and a journal are kept after the day in their name; kb purge deletes the
+# others (purge/run_records.py). The bottom of what the CNIL recommends for
 # a log, six months to a year, a recommendation not binding (deliberation 2021-122; decision of
 # Sabine of 2026-11-04, which replaces the 30 days of 2026-10-19).
 RECORD_RETENTION_MONTHS = 6
