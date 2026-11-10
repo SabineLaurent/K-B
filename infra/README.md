@@ -1065,8 +1065,10 @@ az storage blob list --auth-mode login --account-name "$EXCHANGE" -c watch --pre
 ```
 
 Attendu : `tops/<top>/<jour>.md`. Le démarrage, le tirage de l'image et le montage sont dans `ContainerAppSystemLogs`.
-La clé BigQuery est un fichier du volume `secrets` : si la ligne `gh_archive` dit qu'elle ne peut pas le lire, c'est
-son mode, pas encore vérifié.
+La clé BigQuery est un fichier du volume `secrets`, dont le mode pour l'uid 10001 n'est pas encore vérifié. S'il ne
+se lit pas, le journal porte `collection failed for source 'gh_archive': PermissionError …`, suivi de sa trace, puis
+`gh_archive: failed (PermissionError)` (`src/k_b/etl/extract.py`, `src/k_b/commands/collect_command.py`) ; la
+collecte sort en 4, les autres sources gardées. S'il manque, l'erreur est `DefaultCredentialsError` (google-auth).
 
 ### La règle des heures
 
