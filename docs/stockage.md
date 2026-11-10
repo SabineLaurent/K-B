@@ -48,7 +48,7 @@ ligne, par un adaptateur maison (#417) »).
   [doc de libpq](https://www.postgresql.org/docs/18/libpq-envars.html), lue le 2026-11-06) est
   refusée de même : libpq la lirait en silence (règle 2 de `.claude/rules/poc.md`).
 
-`kb create-db` et `kb import`, purges comprises, écrivent sur les deux moteurs ; `kb serve-data`
+`kb create-db`, `kb import` et `kb purge` écrivent sur les deux moteurs ; `kb serve-data`
 lit la base que nomme `KB_DATABASE_URL`, sur l'un ou l'autre (#418).
 
 | | SQLite (en local) | PostgreSQL (en ligne) |
@@ -96,7 +96,7 @@ Ce que chaque schéma écrit à sa façon est listé plus bas.
   verrou consultatif (`pg_advisory_xact_lock`) pris au début de la transaction de l'import et
   rendu à sa fin. Un import qui attend ce verrou plus de 5 s (`DATABASE_LOCK_TIMEOUT_SECONDS`, le
   délai de `sqlite3`) échoue, comme sur « database is locked » ; une connexion attend le serveur
-  10 s au plus (`DATABASE_CONNECT_TIMEOUT_SECONDS`). Les deux purges de la fin de `kb import`
+  10 s au plus (`DATABASE_CONNECT_TIMEOUT_SECONDS`). Les deux purges de `kb purge` qui écrivent en base
   (`purge/base.py`, `purge/registry.py`) le prennent aussi, en tête de leur transaction : une purge
   attend un import en cours, 5 s au plus, puis échoue sans rien supprimer.
 - **Dates** : du texte `AAAA-MM-JJTHH:MM:SSZ`, en UTC. Un `CHECK` refuse toute autre forme, et

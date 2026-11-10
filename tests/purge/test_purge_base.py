@@ -62,11 +62,9 @@ def dump(database_path):
         connection.close()
 
 
-def purge(
-    database_path, imported_at, tracked_repository_names=TRACKED_REPOSITORY_NAMES
-):
+def purge(database_path, purged_at, tracked_repository_names=TRACKED_REPOSITORY_NAMES):
     return purge_expired_rows(
-        database_path, imported_at, STATE_CATALOG_SOURCE_CODES, tracked_repository_names
+        database_path, purged_at, STATE_CATALOG_SOURCE_CODES, tracked_repository_names
     )
 
 
@@ -151,7 +149,7 @@ def test_the_state_catalogs_and_the_library_are_kept_without_limit(database_path
 
 
 @pytest.mark.parametrize(
-    ("imported_at", "trend_count"),
+    ("purged_at", "trend_count"),
     [
         # Three years after the end of both windows (2026-10-09 and 2026-10-10), before the
         # collection of their file (2026-10-11T09:30:00Z): the duration counts from the
@@ -164,15 +162,15 @@ def test_the_state_catalogs_and_the_library_are_kept_without_limit(database_path
     ],
 )
 def test_a_trend_row_leaves_three_years_after_the_collection_of_its_file(
-    database_path, imported_at, trend_count
+    database_path, purged_at, trend_count
 ):
-    purge(database_path, imported_at)
+    purge(database_path, purged_at)
 
     assert fetch_column(database_path, "SELECT count(*) FROM trend") == [trend_count]
 
 
 @pytest.mark.parametrize(
-    ("imported_at", "tracked_repository_names", "repository_count"),
+    ("purged_at", "tracked_repository_names", "repository_count"),
     [
         # Out of the list, its releases purged: gone.
         (AFTER_THE_FIRST_COLLECTIONS, (), 0),
@@ -183,9 +181,9 @@ def test_a_trend_row_leaves_three_years_after_the_collection_of_its_file(
     ],
 )
 def test_a_tracked_repository_leaves_once_out_of_the_list_and_without_release(
-    database_path, imported_at, tracked_repository_names, repository_count
+    database_path, purged_at, tracked_repository_names, repository_count
 ):
-    count = purge(database_path, imported_at, tracked_repository_names)
+    count = purge(database_path, purged_at, tracked_repository_names)
 
     assert fetch_column(database_path, "SELECT count(*) FROM tracked_repository") == [
         repository_count

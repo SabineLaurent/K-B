@@ -16,13 +16,13 @@ logger = logging.getLogger(__name__)
 
 def delete_expired_raw(
     store: RawStore,
-    imported_at: datetime,
+    purged_at: datetime,
     state_catalog_folder_keys: Collection[str],
     imported_paths: frozenset[str],
 ) -> int:
     """Delete the collections older than the duration, listed from the folders: the duration is a
     maximum, a collection never imported goes too, and the log counts it."""
-    bound = subtract_months(imported_at.astimezone(UTC), RAW_RETENTION_MONTHS)
+    bound = subtract_months(purged_at.astimezone(UTC), RAW_RETENTION_MONTHS)
     imported_keys = find_imported_keys(imported_paths)
     deleted_count = never_imported_count = kept_count = 0
     for folder_key in store.list_source_folder_keys():

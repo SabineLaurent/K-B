@@ -1,6 +1,6 @@
 """kb daily-routine, the command of the job caj-kb-daily-routine (#413): the mirror of the clips,
-kb collect, kb import unless kb collect exits with 1 or 2, kb write-tops, then the publication of
-veille, which replaces nothing."""
+kb collect, kb import unless kb collect exits with 1 or 2, kb purge, kb write-tops, then the
+publication of veille, which replaces nothing."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -16,6 +16,7 @@ from k_b.commands.job_routine import (
     run_routine,
 )
 from k_b.commands.job_transfers import mirror_the_clips, publish_the_watch
+from k_b.commands.purge_command import run_purge
 from k_b.commands.run_log import value_or_log_refusal
 from k_b.commands.write_tops_command import run_write_tops
 from k_b.etl.collected_sources import read_vault_dir_or_refusal
@@ -55,6 +56,11 @@ DAILY_ROUTINE_STEPS: tuple[RoutineStep[DailyRoutineSettings], ...] = (
         "kb import",
         lambda settings: run_import(settings.data_dir, settings.environ),
         NotRunAfter("kb collect", frozenset({ExitCode.FAILED, ExitCode.NOT_STARTED})),
+    ),
+    # Even after an import that fails or is not run: it committed nothing, and the purge reads the
+    # base of the last import committed (decision of Sabine of 2026-11-10, #540).
+    RoutineStep(
+        "kb purge", lambda settings: run_purge(settings.data_dir, settings.environ)
     ),
     RoutineStep(
         "kb write-tops",
