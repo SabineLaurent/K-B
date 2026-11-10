@@ -115,7 +115,7 @@ chaque lancement) ; garder deux fonctions (elles divergeaient déjà).
   (`commands/wait_display.py` ; accord de Sabine du 2026-10-28, #349).
 - Le journal de fonctionnement (le déroulé, réussites et échecs) va sur la sortie d'erreur et
   dans `<KB_DATA_DIR>/logs/kb.log` (`logs/kb-serve-data.log` pour `kb serve-data`, `logs/kb-serve-ai.log` pour `kb serve-ai`), tourné chaque jour à minuit UTC, gardé 6 mois
-  (`RECORD_RETENTION_MONTHS`, `core/config.py`, purge à la fin de `kb import`), sauf `KB_LOG_TO_FILE=false` : sortie d'erreur seule, sans fichier (en
+  (`RECORD_RETENTION_MONTHS`, `core/config.py`, purge par `kb purge`, étape de `kb daily-routine` après `kb import`), sauf `KB_LOG_TO_FILE=false` : sortie d'erreur seule, sans fichier (en
   conteneur, la sortie d'erreur est le journal ; décision du 2026-10-15, #199) ; le résultat d'une commande reste un `print`. Le journal d'import garde sa règle : écrit seulement si l'import va au
   bout de l'écriture en base.
 
