@@ -6523,6 +6523,15 @@ Plan validé par Sabine le 10/11 (sortie du mode plan à 10:48Z), relu par un so
   Décision de Sabine du 10/11. Ce qui la remplace pour la routine : la vérification des droits de
   `id-kb-daily-routine` (`t|t|t`) avant la première exécution, et un test de `kb import` et de sa purge sous un membre
   de `kb_writer` (`tests/commands/test_import_command.py`). — PR de #330
+- **L'essai de #295 sur `job-data` se fait dans l'amorçage de #330, sans sonde ni tag à part : un temporaire
+  `.<jour>.md.tmp` posé par az (un second client, FileREST) dans le dossier d'une fiche de top, puis deux exécutions
+  du job le même jour UTC. La première doit échouer sur `temporary_file_found` pour ce top ; la seconde, temporaire
+  retiré, doit laisser intacte la fiche de l'autre top écrite par la première.** Décisions de Sabine du 10/11. Le tag
+  n'attend plus que la fusion de #295. Écartées : une sonde sur `job-data`, avec un tag ou une passe à part ; une
+  fausse fiche du jour posée par az, que la publication de la même exécution aurait envoyée dans `watch`, où la vraie
+  fiche de ce jour ne serait jamais arrivée, et que personne ne peut effacer des versions. Limites, écrites au registre
+  avec leur parade (« Écritures concurrentes en ligne ») : deux conteneurs qui écrivent en même temps, et la fraîcheur
+  d'une écriture d'un client pour un autre. — PR de #330
 
 ## Décisions encore ouvertes
 

@@ -865,9 +865,9 @@ Dans l'ordre :
 1. Le critère rouge : `az containerapp job show -n caj-kb-daily-routine -g "$RG"` répond `ResourceNotFound`.
 2. Les deux secrets.
 3. Le principal et ses droits.
-4. Les deux dossiers du coffre.
-5. La seconde passe, avec le tag. Elle attend #295 fusionnée, et son mécanisme essayé sur `job-data`.
-6. La première exécution, à la main.
+4. La seconde passe, avec un tag posé après la fusion de #295.
+5. Un rôle temporaire sur le partage, pour les deux dossiers du coffre et le temporaire de l'essai de #295.
+6. L'exécution d'essai, puis la première vraie exécution, le même jour UTC ; le rôle se retire ensuite.
 7. Le lendemain : l'exécution du cron.
 
 Une seule passe ou écriture dans Azure à la fois : chacune se signale avant d'être lancée.
@@ -915,54 +915,11 @@ admin_psql kb -At -c "SELECT pg_has_role('id-kb-daily-routine', 'kb_writer', 'ME
 
 Attendu : `t|t|t`. Puis « Fermer l'administration ». La première exécution ne part qu'après ce `t|t|t`.
 
-### Les deux dossiers du coffre
-
-La routine refuse de démarrer sans `vault/` : `KB_VAULT_DIR` doit être un dossier existant, sinon elle sort en 2 et
-rien ne tourne. Sans `vault/Clippings/`, la collecte des clips échoue chaque jour (`clippings_folder_missing`). Ni la
-routine ni le Bicep ne les créent, pour qu'un `KB_VAULT_DIR` mal écrit ou un coffre disparu se voie.
-
-C'est une écriture de données, que l'opératrice fait une fois, par un rôle temporaire posé sur le seul partage. La
-portée s'écrit avec `fileshares`, et non `shares` : sinon le rôle ne vaut pas.
-
-```sh
-JOBFILES=$(az storage account list -g "$RG" --query "[?starts_with(name,'stkbjobfiles')].name" -o tsv)
-SHARE_SCOPE="$(az storage account show -n "$JOBFILES" -g "$RG" --query id -o tsv)/fileServices/default/fileshares/job-data"
-kb_check "$OPERATOR" "$JOBFILES" "$SHARE_SCOPE" && az role assignment create --assignee-object-id "$OPERATOR" \
-  --assignee-principal-type User --role "Storage File Data Privileged Contributor" --scope "$SHARE_SCOPE" \
-  --query roleDefinitionName -o tsv
-```
-
-Dix minutes plus tard, le temps que le rôle soit actif :
-
-```sh
-for dir in vault vault/Clippings; do
-  az storage directory create --account-name "$JOBFILES" --share-name job-data --name "$dir" \
-    --auth-mode login --backup-intent
-done
-az storage file list --account-name "$JOBFILES" --share-name job-data --path vault \
-  --auth-mode login --backup-intent --query "[].name" -o tsv
-```
-
-Attendu : aucune erreur, puis `Clippings` seul. `--backup-intent` est obligatoire pour toute commande
-`az storage file` ou `az storage directory` par compte Entra : sans lui, la commande est refusée.
-
-Puis le rôle se retire, verrou levé (« Le verrou : le lever, agir, le reposer ») :
-
-```sh
-az lock delete -n "lock-$JOBFILES" -g "$RG" --resource "$JOBFILES" --resource-type Microsoft.Storage/storageAccounts
-az role assignment delete --assignee "$OPERATOR" --role "Storage File Data Privileged Contributor" --scope "$SHARE_SCOPE"
-az lock create -n "lock-$JOBFILES" -g "$RG" --resource "$JOBFILES" --resource-type Microsoft.Storage/storageAccounts \
-  --lock-type CanNotDelete --notes "K-B storage of the jobs (#420): lift it only to delete a snapshot, a role or the account (#428)."
-az role assignment list --assignee "$OPERATOR" --scope "$SHARE_SCOPE" --query "[].roleDefinitionName" -o tsv
-az lock list -g "$RG" --query "[].{name:name,level:level}" -o table
-```
-
-Attendu : aucune ligne pour le rôle, puis les deux verrous `CanNotDelete`.
-
 ### La seconde passe, avec le tag
 
-`TAG` est un tag posé après la fusion de #295, et son mécanisme essayé sur `job-data`. La passe se lance depuis la
-branche de #330, avec ce `TAG`, comme à l'étape 5 d'« Appliquer », en journée UTC. Aperçu attendu :
+`TAG` est un tag posé après la fusion de #295. La passe se lance depuis la branche de #330, avec ce `TAG`, comme à
+l'étape 5 d'« Appliquer », après 09:00 UTC : l'essai et la première exécution suivent le même jour UTC. Aperçu
+attendu :
 - **à créer** : `caj-kb-daily-routine` ; l'AcrPull d'`id-kb-daily-routine` sur le registre ; ses deux rôles Key Vault
   Secrets User (`kb-github-token`, `kb-bigquery-key`) ; le Container Apps Jobs Contributor d'`id-kb-deploy` sur le
   job ;
@@ -977,9 +934,54 @@ Dès cette passe, chaque tag change aussi l'image de la routine (`deployment.jso
 sous l'identité de la routine, et lire ses deux secrets (risque accepté par Sabine le 10/11, registre des traitements,
 ligne « Déploiement continu »).
 
-### La première exécution, puis le cron
+### Les deux dossiers du coffre et le temporaire de l'essai
 
-La première se lance à la main, hors de la fenêtre du cron (règle des heures, ci-dessous) :
+La routine refuse de démarrer sans `vault/` : `KB_VAULT_DIR` doit être un dossier existant, sinon elle sort en 2 et
+rien ne tourne. Sans `vault/Clippings/`, la collecte des clips échoue chaque jour (`clippings_folder_missing`). Ni la
+routine ni le Bicep ne les créent, pour qu'un `KB_VAULT_DIR` mal écrit ou un coffre disparu se voie.
+
+Le même geste prépare l'essai de #295 sur `job-data` (décision de Sabine du 10/11) : un temporaire `.<jour>.md.tmp`
+posé dans le dossier de la fiche du top `most_forked`, par un autre client que le conteneur (FileREST, depuis le
+Mac). Il est caché : la publication l'écarte, rien de faux ne part dans `watch`.
+
+C'est une écriture de données, que l'opératrice fait une fois, par un rôle temporaire posé sur le seul partage. La
+portée s'écrit avec `fileshares`, et non `shares` : sinon le rôle ne vaut pas.
+
+```sh
+JOBFILES=$(az storage account list -g "$RG" --query "[?starts_with(name,'stkbjobfiles')].name" -o tsv)
+SHARE_SCOPE="$(az storage account show -n "$JOBFILES" -g "$RG" --query id -o tsv)/fileServices/default/fileshares/job-data"
+kb_check "$OPERATOR" "$JOBFILES" "$SHARE_SCOPE" && az role assignment create --assignee-object-id "$OPERATOR" \
+  --assignee-principal-type User --role "Storage File Data Privileged Contributor" --scope "$SHARE_SCOPE" \
+  --query roleDefinitionName -o tsv
+```
+
+Dix minutes plus tard, le temps que le rôle soit actif. `DAY` est le jour UTC de l'essai, celui que portera la fiche :
+
+```sh
+DAY=$(date -u +%F)
+for dir in vault vault/Clippings vault/veille vault/veille/tops vault/veille/tops/most_forked; do
+  az storage directory create --account-name "$JOBFILES" --share-name job-data --name "$dir" \
+    --auth-mode login --backup-intent
+done
+EMPTY=$(mktemp)
+az storage file upload --account-name "$JOBFILES" --share-name job-data --source "$EMPTY" \
+  --path "vault/veille/tops/most_forked/.$DAY.md.tmp" --auth-mode login --backup-intent
+rm "$EMPTY"
+az storage file list --account-name "$JOBFILES" --share-name job-data --path vault \
+  --auth-mode login --backup-intent --query "[].name" -o tsv
+az storage file list --account-name "$JOBFILES" --share-name job-data --path vault/veille/tops/most_forked \
+  --auth-mode login --backup-intent --query "[].name" -o tsv
+```
+
+Attendu : aucune erreur ; `Clippings` et `veille` ; puis `.<DAY>.md.tmp` seul. `--backup-intent` est obligatoire pour
+toute commande `az storage file` ou `az storage directory` par compte Entra : sans lui, la commande est refusée.
+
+### L'essai de #295, puis la première exécution
+
+Le rôle temporaire reste posé jusqu'à la fin de cette section. Les deux exécutions démarrent le même jour UTC, `DAY`,
+hors de la fenêtre du cron (règle des heures, ci-dessous).
+
+**L'exécution d'essai.** C'est aussi la première collecte en ligne : sa durée est celle d'une première collecte.
 
 ```sh
 EXEC=$(az containerapp job start -n caj-kb-daily-routine -g "$RG" --query name -o tsv)
@@ -987,8 +989,54 @@ az containerapp job execution show -n caj-kb-daily-routine -g "$RG" --job-execut
   --query "{status:properties.status,start:properties.startTime,end:properties.endTime}"
 ```
 
-Attendu : `Running`, puis `Succeeded`, et `exit code 0` au journal (ci-dessous).
-L'exécution du cron se lit de même, le lendemain :
+Attendu, lu au journal (« Lire une exécution », ci-dessous) :
+- `top sheets failed: most_forked: temporary_file_found: veille/tops/most_forked/.<DAY>.md.tmp is there` : la fiche
+  de `most_forked` n'est pas écrite, et son relevé reste dans le brut ;
+- `most_starred sheet of <DAY>: sheet_written` : l'autre top est écrit quand même ;
+- `kb write-tops` sort en 4 (un top échoue, un autre est fait) ; la publication tourne quand même, et n'envoie que la
+  fiche de `most_starred` ;
+- `kb daily-routine finished in …: exit code 4`.
+
+Le code 4 fait échouer la réplique : le job la reprend une fois, qui finit de même (sa fiche de `most_starred` est
+alors `sheet_exists, not rewritten`), puis l'exécution est `Failed`. Ce statut et cette reprise sont à constater : c'est
+la première fois qu'un code autre que 0 sort d'un job de K-B en ligne. Le temporaire, lui, reste en place : `kb` ne
+retire jamais un temporaire qu'il n'a pas créé. Une source qui échoue fait aussi sortir `kb collect` en 4 (arXiv a
+déjà expiré au bout de 30 s pendant une première collecte, le 21/10) : l'essai se lit sur les lignes de
+`kb write-tops`.
+
+**Entre les deux.** Le temporaire se retire, et la fiche de `most_starred` se relève :
+
+```sh
+az storage file delete --account-name "$JOBFILES" --share-name job-data \
+  --path "vault/veille/tops/most_forked/.$DAY.md.tmp" --auth-mode login --backup-intent
+az storage file show --account-name "$JOBFILES" --share-name job-data \
+  --path "vault/veille/tops/most_starred/$DAY.md" --auth-mode login --backup-intent \
+  --query "properties.{modified:lastModified,etag:etag}"
+```
+
+**La première vraie exécution,** lancée comme l'essai. Attendu : `most_starred sheet of <DAY>: sheet_exists, not
+rewritten` (la seconde exécution laisse intacte la fiche de la première), `most_forked sheet of <DAY>: sheet_written`,
+`exit code 0`, puis `Succeeded`. La même commande `az storage file show` rend la même date et le même etag.
+
+Puis le rôle se retire, verrou levé (« Le verrou : le lever, agir, le reposer ») :
+
+```sh
+az lock delete -n "lock-$JOBFILES" -g "$RG" --resource "$JOBFILES" --resource-type Microsoft.Storage/storageAccounts
+az role assignment delete --assignee "$OPERATOR" --role "Storage File Data Privileged Contributor" --scope "$SHARE_SCOPE"
+az lock create -n "lock-$JOBFILES" -g "$RG" --resource "$JOBFILES" --resource-type Microsoft.Storage/storageAccounts \
+  --lock-type CanNotDelete --notes "K-B storage of the jobs (#420): lift it only to delete a snapshot, a role or the account (#428)."
+az role assignment list --assignee "$OPERATOR" --scope "$SHARE_SCOPE" --query "[].roleDefinitionName" -o tsv
+az lock list -g "$RG" --query "[].{name:name,level:level}" -o table
+```
+
+Attendu : aucune ligne pour le rôle, puis les deux verrous `CanNotDelete`.
+
+Ce que l'essai ne couvre pas, écrit au registre avec sa parade : deux conteneurs qui écrivent en même temps, et la
+fraîcheur de ce qu'un client voit d'une écriture faite par un autre client.
+
+### Lire une exécution
+
+Les exécutions, dont celle du cron, le lendemain :
 
 ```sh
 az containerapp job execution list -n caj-kb-daily-routine -g "$RG" \
@@ -1009,7 +1057,7 @@ On y relève :
 - les octets lus par BigQuery : `gh_archive: … bytes processed, … rows` ;
 - la durée, face au délai de 3 600 s.
 
-Puis la fiche publiée :
+Puis les fiches publiées :
 
 ```sh
 EXCHANGE=$(az storage account list -g "$RG" --query "[?starts_with(name,'stkbexchange')].name" -o tsv)
