@@ -6348,27 +6348,30 @@ changes », 8 constats intégrés) et par time-knight.
   lancement, son relevé gardé et réessayé (constat 3) ; un programme autre que `kb` qui crée la cible entre la
   lecture de la liste, juste avant le renommage, et le renommage la voit remplacée ; que la liste d'un dossier soit
   à jour entre deux répliques vient du code du noyau et de « SMB Directory Leasing: Not supported », sans essai. La règle 2 de `conventions.md` (une seule fonction d'écriture) reste à amender par
-  Sabine. — PR de #295, à venir (commit `25df4fb`)
+  Sabine. — PR #539 (commit `25df4fb`)
 - **Un temporaire trouvé fait échouer la commande (`temporary_file_found`, une `VaultEntryRefusedError`) dans
   `kb write-tops`, `kb digest` et `kb trend-report`, et `kb` ne le retire jamais.** Pourquoi, fait relevé par
   tn-codeur et transmis par time-knight le 10/11 : `kb write-tops` traite une fiche déjà là comme une information
   (`top_sheets.py:149`) ; un temporaire pris pour une fiche ferait réussir sans fiche le job planifié de #330. Jamais
   retiré : son nom peut être la réservation d'un lancement en cours (plan validé). L'alerte sur une exécution en
   échec et le retrait d'un temporaire vieux de plus d'une heure : deux issues que tn-codeur crée à sa PR (#330). —
-  PR de #295, à venir
+  PR #539
 - **La descente par descripteurs (`dir_fd`, `O_NOFOLLOW | O_DIRECTORY`) contre un dossier remplacé par un lien
   (CWE-59) sort de #295.** Décision de Sabine du 10/11, sur la recommandation du plan : le montage de `job-data`
   essayé pour #420 (`f10e5e3`) n'a pas `mfsymlinks`, sans lequel le client SMB de Linux ne crée pas de lien
   symbolique (« Troubleshoot Azure Files issues in Linux (SMB) », Microsoft Learn, lu le 2026-11-10) ; sur le Mac,
   seul un processus qui a déjà le compte de l'utilisatrice peut remplacer un dossier ; la limite était déjà acceptée
   le 2026-10-19 (`kb write-tops`) et le 2026-10-21 (`kb digest`). Option écartée : la coder dans #295. La limite et
-  sa parade sont au registre (fiche 1, « Sécurité ») : un montage qui ajoute `mfsymlinks` rouvre la course. — PR de
-  #295, à venir
-- **L'essai sur `job-data`, décidé le 2026-11-06, reste à faire pour la réservation, avec un vrai second écrivain
-  (un autre client que le conteneur) ; le tag de #330 attend que #295 soit fusionnée et essayée.** Décision de
-  Sabine du 10/11, transmise par time-knight. Option écartée : pas d'essai (proposée par le plan, une sonde ne
-  reproduisant pas la course entre deux répliques). L'essai est une passe Azure : time-knight est prévenu avant,
-  une seule passe à la fois avec #330. — PR de #295, à venir
+  sa parade sont au registre (fiche 1, « Sécurité ») : un montage qui ajoute `mfsymlinks` rouvre la course. — PR
+  #539
+- **L'essai sur `job-data` de la réservation, avec un vrai second écrivain (un autre client que le conteneur), se
+  fait pendant l'amorçage de #330, sans sonde à part ni tag pour lui.** Décision de Sabine du 10/11, transmise par
+  time-knight ; elle revient sur la forme décidée plus tôt le même jour (un essai à part, le tag de #330 attendant
+  que #295 soit fusionnée et essayée). Avant la première exécution à la main, Sabine pose depuis le Mac, par le rôle
+  de données temporaire qu'elle a pendant l'amorçage, une fiche au nom de celle du jour d'un top, que l'exécution
+  doit laisser intacte, et une réservation pour un autre top, qui doit faire échouer l'exécution en la nommant et
+  rester intacte ; elle les retire ensuite. tn-codeur le prépare. Option écartée : pas d'essai (proposée par le
+  plan, une sonde ne reproduisant pas la course entre deux répliques). — PR #539
 
 ## Décisions encore ouvertes
 
