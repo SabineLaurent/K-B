@@ -8,6 +8,11 @@ resource environment 'Microsoft.App/managedEnvironments@2026-01-01' = {
   name: 'cae-kb'
   location: location
   tags: tags
+  // Mounts the share job-data without account key (#420). System-assigned: bound to the environment, it
+  // cannot be attached to another resource, unlike a user-assigned identity.
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     workloadProfiles: [
       {
@@ -64,4 +69,6 @@ resource logs 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
 }
 
 output id string = environment.id
+output name string = environment.name
 output defaultDomain string = environment.properties.defaultDomain
+output principalId string = environment.identity.principalId
