@@ -145,10 +145,10 @@ def test_a_sheet_not_written_keeps_its_rankings_exits_4_and_the_other_top_is_wri
     )
     write_file_atomically = vault_files.write_file_atomically
 
-    def refuse_the_most_starred(path, content):
+    def refuse_the_most_starred(path, content, **options):
         if "most_starred" in path.parts:
             raise PermissionError(13, "Permission denied", str(path))
-        write_file_atomically(path, content)
+        write_file_atomically(path, content, **options)
 
     monkeypatch.setattr(vault_files, "write_file_atomically", refuse_the_most_starred)
 
@@ -172,6 +172,30 @@ def test_a_sheet_not_written_keeps_its_rankings_exits_4_and_the_other_top_is_wri
         "most_forked: ok, 2 sheets written\n"
         "Sheets vault path: veille/tops/\n\n"
     )
+
+
+def test_a_temporary_file_left_of_a_sheet_fails_its_top_and_write_tops_exits_4(
+    data_and_vault_dirs, test_tops, capsys
+):
+    """A sheet that another run writes, or a run killed left, is never taken for a sheet there:
+    the job of the routine fails instead of succeeding without it."""
+    data_dir, vault_dir = data_and_vault_dirs
+    rankings = write_rankings_of_each_top(data_dir, "2026-10-05T093000Z")
+    sheets_dir = vault_dir / "veille" / "tops" / "most_starred"
+    sheets_dir.mkdir(parents=True)
+    claim = sheets_dir / ".2026-10-05.md.tmp"
+    claim.write_text("another run\n", "utf-8")
+
+    assert cli.main(["write-tops"]) == cli.ExitCode.PARTIAL_FAILURE
+    assert all(path.exists() for path in rankings["most_starred"])
+    assert claim.read_text("utf-8") == "another run\n"
+    assert list_sheets(vault_dir) == ["veille/tops/most_forked/2026-10-05.md"]
+    output = capsys.readouterr()
+    assert (
+        "top sheets failed: most_starred: temporary_file_found:"
+        " veille/tops/most_starred/.2026-10-05.md.tmp is there\n"
+    ) in output.err
+    assert "\nmost_starred: failed (VaultEntryRefusedError)\n" in output.out
 
 
 def test_an_unreadable_ranking_is_kept_and_write_tops_exits_4_with_the_sheets_written(
@@ -202,8 +226,8 @@ def test_a_sigterm_while_a_sheet_is_written_stops_write_tops_and_deletes_no_rank
     )
     write_file_atomically = vault_files.write_file_atomically
 
-    def write_then_receive_sigterm(path, content):
-        write_file_atomically(path, content)
+    def write_then_receive_sigterm(path, content, **options):
+        write_file_atomically(path, content, **options)
         signal.raise_signal(signal.SIGTERM)
 
     monkeypatch.setattr(

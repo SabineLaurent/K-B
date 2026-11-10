@@ -309,7 +309,7 @@ def test_a_sheet_not_written_deletes_no_ranking(
     last = write_ranking(data_dir, STARRED_TOP, "2026-10-06T093000Z")
     written_paths = []
 
-    def write_then_fail(path, content):
+    def write_then_fail(path, content, **options):
         if written_paths:
             raise error
         written_paths.append(path)
@@ -461,8 +461,8 @@ def test_a_folder_replaced_by_a_link_while_the_sheets_are_written_deletes_no_ran
     moved = tmp_path / "moved"
     write_file_atomically = vault_files.write_file_atomically
 
-    def write_then_replace_the_folder(path, content):
-        write_file_atomically(path, content)
+    def write_then_replace_the_folder(path, content, **options):
+        write_file_atomically(path, content, **options)
         if path.name == f"{replaced_after_day}.md":
             sheets_dir.rename(moved)
             sheets_dir.symlink_to(moved, target_is_directory=True)
@@ -508,8 +508,8 @@ def test_a_sheet_replaced_by_a_link_while_the_sheets_are_written_deletes_no_rank
     outside.write_bytes(b"not a sheet\n")
     write_file_atomically = vault_files.write_file_atomically
 
-    def write_then_replace_a_sheet(path, content):
-        write_file_atomically(path, content)
+    def write_then_replace_a_sheet(path, content, **options):
+        write_file_atomically(path, content, **options)
         if path.name == written_name:
             replaced = path.parent / replaced_name
             replaced.unlink(missing_ok=True)
@@ -579,8 +579,8 @@ def test_a_sheet_removed_before_the_deletion_refuses_its_top_and_deletes_no_rank
     ]
     write_file_atomically = vault_files.write_file_atomically
 
-    def write_then_remove_the_first_sheet(path, content):
-        write_file_atomically(path, content)
+    def write_then_remove_the_first_sheet(path, content, **options):
+        write_file_atomically(path, content, **options)
         if path.name == "2026-10-06.md":
             (path.parent / "2026-10-05.md").unlink()
 

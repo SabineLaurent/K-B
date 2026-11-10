@@ -5,7 +5,7 @@ import tempfile
 
 import pytest
 
-from k_b.core.atomic_write import write_file_atomically
+from k_b.core.atomic_write import TemporaryFileFoundError, write_file_atomically
 
 TARGET_NAME = "state.json"
 
@@ -179,3 +179,109 @@ def test_a_failed_fsync_of_the_folder_is_raised(tmp_path, monkeypatch):
         write_file_atomically(tmp_path / TARGET_NAME, b"{}")
 
     assert raised.value.errno == errno.EIO
+
+
+def test_a_file_written_once_is_never_replaced(tmp_path):
+    target = tmp_path / TARGET_NAME
+    target.write_bytes(b"previous")
+
+    with pytest.raises(FileExistsError):
+        write_file_atomically(target, b"next", replace=False)
+
+    assert target.read_bytes() == b"previous"
+    assert list(tmp_path.iterdir()) == [target]
+
+
+def test_a_file_written_once_is_looked_for_in_its_folder_not_by_its_status(
+    tmp_path, monkeypatch
+):
+    # The CIFS client of Linux may answer a status of a file absent from its cache, for up to a
+    # second after a look at the same name: the listing of the folder is asked to the server.
+    target = tmp_path / TARGET_NAME
+    target.write_bytes(b"previous")
+    real_stat = os.stat
+    real_lstat = os.lstat
+
+    def as_absent(real):
+        def status(path, *args, **kwargs):
+            if os.fspath(path) == os.fspath(target):
+                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+            return real(path, *args, **kwargs)
+
+        return status
+
+    monkeypatch.setattr(os, "stat", as_absent(real_stat))
+    monkeypatch.setattr(os, "lstat", as_absent(real_lstat))
+
+    with pytest.raises(FileExistsError):
+        write_file_atomically(target, b"next", replace=False)
+
+    assert target.read_bytes() == b"previous"
+
+
+def test_the_temporary_file_of_another_run_is_neither_removed_nor_replaced(tmp_path):
+    target = tmp_path / TARGET_NAME
+    claim = tmp_path / f".{TARGET_NAME}.tmp"
+    claim.write_bytes(b"another run")
+
+    with pytest.raises(TemporaryFileFoundError) as raised:
+        write_file_atomically(target, b"next", replace=False)
+
+    assert raised.value.temporary_path == claim
+    assert str(raised.value) == f"temporary_file_found: .{TARGET_NAME}.tmp is there"
+    assert claim.read_bytes() == b"another run"
+    assert not target.exists()
+
+
+def test_a_file_written_once_that_fails_leaves_no_temporary_file(tmp_path, monkeypatch):
+    def fail_the_fsync(file_descriptor):
+        raise disk_full()
+
+    monkeypatch.setattr(os, "fsync", fail_the_fsync)
+
+    with pytest.raises(OSError):
+        write_file_atomically(tmp_path / TARGET_NAME, b"{}", replace=False)
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_file_written_once_is_synced_then_readable_by_its_owner_only(
+    tmp_path, monkeypatch
+):
+    events = []
+    real_fsync = os.fsync
+
+    def record_fsync(file_descriptor):
+        events.append(os.fstat(file_descriptor).st_ino)
+        real_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "fsync", record_fsync)
+    target = tmp_path / TARGET_NAME
+
+    write_file_atomically(target, b"{}", replace=False)
+
+    assert target.read_bytes() == b"{}"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o600
+    assert events == [target.stat().st_ino, tmp_path.stat().st_ino]
+    assert list(tmp_path.iterdir()) == [target]
+
+
+def test_a_file_that_appears_while_the_file_written_once_is_synced_is_not_replaced(
+    tmp_path, monkeypatch
+):
+    # A writer other than kb takes no claim: the folder is listed just before the rename.
+    target = tmp_path / TARGET_NAME
+    real_fsync = os.fsync
+
+    def sync_while_another_writer_writes(file_descriptor):
+        real_fsync(file_descriptor)
+        if not target.exists():
+            target.write_bytes(b"another writer")
+
+    monkeypatch.setattr(os, "fsync", sync_while_another_writer_writes)
+
+    with pytest.raises(FileExistsError):
+        write_file_atomically(target, b"next", replace=False)
+
+    assert target.read_bytes() == b"another writer"
+    assert list(tmp_path.iterdir()) == [target]

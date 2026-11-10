@@ -103,7 +103,7 @@ def test_a_folder_named_as_the_sheet_is_refused(vault_dir, sheets_dir):
 def test_a_sheet_not_written_leaves_no_temporary_file(
     vault_dir, sheets_dir, monkeypatch
 ):
-    def fail(path, content):
+    def fail(path, content, **options):
         raise PermissionError(13, "Permission denied")
 
     monkeypatch.setattr(vault_files, "write_file_atomically", fail)
@@ -112,6 +112,44 @@ def test_a_sheet_not_written_leaves_no_temporary_file(
         write_new_sheet(vault_dir, sheets_dir, sheets_dir / "2026-10-21.md", "x\n")
 
     assert list_files(vault_dir) == []
+
+
+def test_a_sheet_written_by_another_run_after_the_check_is_not_replaced(
+    vault_dir, sheets_dir, monkeypatch
+):
+    sheet_path = sheets_dir / "2026-10-21.md"
+    real_has_sheet = vault_files.has_sheet
+    looks = []
+
+    def look_then_another_run_writes(path, vault):
+        is_there = real_has_sheet(path, vault)
+        if not looks:
+            path.parent.mkdir(parents=True)
+            path.write_text("another run\n", "utf-8")
+        looks.append(is_there)
+        return is_there
+
+    monkeypatch.setattr(vault_files, "has_sheet", look_then_another_run_writes)
+
+    assert write_new_sheet(vault_dir, sheets_dir, sheet_path, "# Fiche\n") is False
+    assert sheet_path.read_text("utf-8") == "another run\n"
+    assert list_files(vault_dir) == ["veille/subject/2026-10-21.md"]
+
+
+def test_a_temporary_file_of_the_sheet_is_refused_and_kept(vault_dir, sheets_dir):
+    sheet_path = sheets_dir / "2026-10-21.md"
+    sheets_dir.mkdir(parents=True)
+    claim = sheets_dir / ".2026-10-21.md.tmp"
+    claim.write_text("another run\n", "utf-8")
+
+    with pytest.raises(
+        VaultEntryRefusedError,
+        match=r"^temporary_file_found: veille/subject/\.2026-10-21\.md\.tmp is there$",
+    ):
+        write_new_sheet(vault_dir, sheets_dir, sheet_path, "# Fiche\n")
+
+    assert claim.read_text("utf-8") == "another run\n"
+    assert not sheet_path.exists()
 
 
 @pytest.mark.parametrize(

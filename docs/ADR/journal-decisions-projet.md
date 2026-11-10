@@ -6324,6 +6324,52 @@ time-knight. Appliqué par Sabine le 10/11 ; les essais sont dans `infra/README.
   tard. Limite tenue pendant l'essai : aucune exécution du workflow Deploy tant que la sonde était en ligne,
   `id-kb-deploy` pouvant lancer le job, donc agir sous `id-kb-daily-routine`. — PR de #420
 
+### Coffre et brut : écrire un fichier une fois, même par deux lancements (#295)
+
+Plan validé par Sabine le 10/11 (transmis par time-knight), relu par un sous-agent sans contexte (« sound with
+changes », 8 constats intégrés) et par time-knight.
+
+- **Un fichier écrit une fois (fiche du coffre, brut) est réservé par son temporaire caché au nom fixe,
+  `.<nom>.tmp`, créé seulement s'il n'existe pas (`O_CREAT | O_EXCL`), puis cherché dans la liste de son dossier,
+  juste avant le renommage : `write_file_atomically(…, replace=False)`.** Inverse le moyen prévu le 2026-10-21 et par #295 (« publier par
+  `os.link` ») : « Plan an Azure Files deployment » (Microsoft Learn, mis à jour le 2026-10-26, lu le 2026-11-10)
+  donne « Hard link support: Not supported » pour SMB, et le coffre des jobs est le partage SMB `job-data` (#420).
+  La réservation tient sur SMB : le client Linux envoie `FILE_CREATE` pour `O_EXCL` (`fs/smb/client/dir.c`,
+  `cifs_do_create`), que le serveur refuse si le fichier existe (MS-SMB2 2.2.13 et 3.3.5.9). La liste du dossier, et
+  non le statut du fichier : le client Linux répond « absent » depuis son cache jusqu'à une seconde
+  (`cifs_d_revalidate`, v6.19), constat du relecteur du plan. Options écartées : `os.link` (aucun lien physique sur
+  SMB) ; `renameat2(RENAME_NOREPLACE)` ou `renamex_np` (absents de `os`, appelés par ctypes, comportement non vérifié
+  sur SMB2) ; créer la cible elle-même en `O_EXCL` (après un SIGKILL, une fiche tronquée serait publiée dans `watch`,
+  figée par `If-None-Match`, jamais réécrite) ; un verrou `fcntl` (dépend des options de montage) ou un verrou par
+  lancement (même reste après un arrêt brutal, et il bloque davantage). Limites assumées : un SIGKILL, une session
+  SMB perdue, ou un SIGTERM reçu dans les quelques microsecondes entre la création de la réservation et le bloc qui
+  la retire (constat 1 de la revue de code), laisse `.<nom>.tmp`, qui refuse cette fiche jusqu'à son retrait à la
+  main : la fiche d'un jour pour `kb digest` et `kb trend-report` ; pour `kb write-tops`, la fiche de ce top à chaque
+  lancement, son relevé gardé et réessayé (constat 3) ; un programme autre que `kb` qui crée la cible entre la
+  lecture de la liste, juste avant le renommage, et le renommage la voit remplacée ; que la liste d'un dossier soit
+  à jour entre deux répliques vient du code du noyau et de « SMB Directory Leasing: Not supported », sans essai. La règle 2 de `conventions.md` (une seule fonction d'écriture) reste à amender par
+  Sabine. — PR #539 (commit `25df4fb`)
+- **Un temporaire trouvé fait échouer la commande (`temporary_file_found`, une `VaultEntryRefusedError`) dans
+  `kb write-tops`, `kb digest` et `kb trend-report`, et `kb` ne le retire jamais.** Pourquoi, fait relevé par
+  tn-codeur et transmis par time-knight le 10/11 : `kb write-tops` traite une fiche déjà là comme une information
+  (`top_sheets.py:149`) ; un temporaire pris pour une fiche ferait réussir sans fiche le job planifié de #330. Jamais
+  retiré : son nom peut être la réservation d'un lancement en cours (plan validé). L'alerte sur une exécution en
+  échec et le retrait d'un temporaire vieux de plus d'une heure : deux issues que tn-codeur crée à sa PR (#330). —
+  PR #539
+- **La descente par descripteurs (`dir_fd`, `O_NOFOLLOW | O_DIRECTORY`) contre un dossier remplacé par un lien
+  (CWE-59) sort de #295.** Décision de Sabine du 10/11, sur la recommandation du plan : le montage de `job-data`
+  essayé pour #420 (`f10e5e3`) n'a pas `mfsymlinks`, sans lequel le client SMB de Linux ne crée pas de lien
+  symbolique (« Troubleshoot Azure Files issues in Linux (SMB) », Microsoft Learn, lu le 2026-11-10) ; sur le Mac,
+  seul un processus qui a déjà le compte de l'utilisatrice peut remplacer un dossier ; la limite était déjà acceptée
+  le 2026-10-19 (`kb write-tops`) et le 2026-10-21 (`kb digest`). Option écartée : la coder dans #295. La limite et
+  sa parade sont au registre (fiche 1, « Sécurité ») : un montage qui ajoute `mfsymlinks` rouvre la course. — PR
+  #539
+- **L'essai sur `job-data` de la réservation se fait pendant l'amorçage de #330, préparé par tn-codeur dans #330,
+  sans sonde à part ni tag pour lui.** Décision de Sabine du 10/11, transmise par time-knight ; elle revient sur la
+  forme décidée plus tôt le même jour (un essai à part, le tag de #330 attendant que #295 soit fusionnée et
+  essayée). Option écartée : pas d'essai (proposée par le plan, une sonde ne reproduisant pas la course entre deux
+  répliques). — PR #539
+
 ## Décisions encore ouvertes
 
 - **Une limite de connexions du serveur** (2026-11-05, #161) : `limit_concurrency` d'uvicorn, écarté

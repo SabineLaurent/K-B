@@ -180,10 +180,9 @@ class InvalidCollectionStateError(ValueError):
 
 
 def write_new_raw_file(path: Path, content: bytes) -> None:
-    """Write a raw file once: raw/ is immutable, a raw file is never overwritten."""
-    if path.exists():
-        raise FileExistsError(f"raw file already exists: {path}")
-    write_file_atomically(path, content)
+    """Write a raw file once: raw/ is immutable, a raw file is never overwritten, even one another
+    run writes meanwhile."""
+    write_file_atomically(path, content, replace=False)
 
 
 def load_last_collection_dates(data_dir: Path) -> dict[str, datetime]:

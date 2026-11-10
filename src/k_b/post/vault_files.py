@@ -1,15 +1,17 @@
 """The files kb writes in the vault, under veille/: written once, never through a symbolic link
 kb sees, each text of a source as text, each path named in the vault, never whole.
 
-Limit accepted by Sabine for the POC (#295): a sheet or link appearing between has_sheet and the
-rename is replaced or followed (CWE-367, CWE-59); only two overlapping runs can cause it."""
+Limits accepted by Sabine: a folder replaced by a symbolic link after refuse_linked_folders is
+followed (CWE-59), though a share of Azure Files mounted without mfsymlinks has no symbolic link;
+a file another program writes between the listing of the folder and the rename is replaced
+(CWE-367), as it takes no claim."""
 
 import re
 import stat
 import unicodedata
 from pathlib import Path
 
-from k_b.core.atomic_write import write_file_atomically
+from k_b.core.atomic_write import TemporaryFileFoundError, write_file_atomically
 
 # The format characters that reorder a line as it is displayed (Unicode bidirectional controls
 # and marks, UAX #9). U+200D, which joins the emojis, is kept.
@@ -52,19 +54,30 @@ ESCAPED_DOUBLE_COLON = re.compile(r"\\:(?=\\:)")
 
 class VaultEntryRefusedError(Exception):
     """kb refuses an entry of the vault: a symbolic link (vault_link_refused), a sheet that is
-    not a regular file (sheet_not_a_file), or missing before the deletion of its ranking
-    (sheet_missing)."""
+    not a regular file (sheet_not_a_file), missing before the deletion of its ranking
+    (sheet_missing), or the temporary file of a sheet (temporary_file_found)."""
 
 
 def write_new_sheet(
     vault_dir: Path, sheets_dir: Path, sheet_path: Path, content: str
 ) -> bool:
-    """Write the sheet unless it exists; return whether it was written. Its folders are checked
-    again first, as write_file_atomically follows a link."""
+    """Write the sheet unless it exists, even when another run writes it meanwhile; return
+    whether it was written. Its folders are checked again first, as write_file_atomically follows
+    a link; a temporary file of the sheet is refused, as its sheet may never come."""
     refuse_linked_folders(vault_dir, sheets_dir)
     if has_sheet(sheet_path, vault_dir):
         return False
-    write_file_atomically(sheet_path, content.encode("utf-8"))
+    try:
+        write_file_atomically(sheet_path, content.encode("utf-8"), replace=False)
+    except TemporaryFileFoundError as error:
+        named = error.temporary_path.relative_to(vault_dir).as_posix()
+        raise VaultEntryRefusedError(
+            f"temporary_file_found: {named} is there"
+        ) from error
+    except FileExistsError:
+        # Written by another run since has_sheet: a link or another entry is refused as there.
+        has_sheet(sheet_path, vault_dir)
+        return False
     return True
 
 

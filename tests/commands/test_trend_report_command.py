@@ -421,7 +421,7 @@ def test_a_report_not_written_leaves_the_register_and_exits_1(
     write_register(data_dir, [PREVIOUS_ENTRY])
     answer_trend_report(monkeypatch, answer_with(make_report()))
 
-    def refuse(path, content):
+    def refuse(path, content, **options):
         raise PermissionError(13, "Permission denied", str(path))
 
     monkeypatch.setattr(vault_files, "write_file_atomically", refuse)
@@ -438,6 +438,26 @@ def test_a_report_not_written_leaves_the_register_and_exits_1(
     assert str(vault_dir) not in output.err
 
 
+def test_a_temporary_file_left_of_the_report_leaves_the_register_and_exits_1(
+    monkeypatch, trend_environment, capsys
+):
+    data_dir, vault_dir = trend_environment
+    write_register(data_dir, [PREVIOUS_ENTRY])
+    answer_trend_report(monkeypatch, answer_with(make_report()))
+    claim = vault_dir / "veille" / "tendances" / ".2026-11-01.md.tmp"
+    claim.parent.mkdir(parents=True)
+    claim.write_text("another run\n", "utf-8")
+
+    assert cli.main(["trend-report"]) == cli.ExitCode.FAILED
+    assert list_sheets(vault_dir) == []
+    assert read_register(data_dir) == [PREVIOUS_ENTRY]
+    assert claim.read_text("utf-8") == "another run\n"
+    assert (
+        "trend report not written: temporary_file_found:"
+        f" veille/tendances/.2026-11-01.md.tmp is there, request_id {REQUEST_ID}"
+    ) in capsys.readouterr().err
+
+
 def test_a_register_not_updated_keeps_the_report_and_exits_1(
     monkeypatch, trend_environment, capsys
 ):
@@ -445,7 +465,7 @@ def test_a_register_not_updated_keeps_the_report_and_exits_1(
     write_register(data_dir, [PREVIOUS_ENTRY])
     answer_trend_report(monkeypatch, answer_with(make_report()))
 
-    def refuse(path, content):
+    def refuse(path, content, **options):
         raise PermissionError(13, "Permission denied", str(path))
 
     monkeypatch.setattr(trend_report_registry, "write_file_atomically", refuse)
