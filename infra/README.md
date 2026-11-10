@@ -958,7 +958,8 @@ az role assignment list --assignee "$OPERATOR" --scope "$SHARE_SCOPE" --query "[
 Attendu : `Storage File Data Privileged Contributor`, sur une portée qui finit par `/fileshares/job-data`. La sortie de
 `az role assignment create` ne porte pas ce nom : son `--query roleDefinitionName` ne rend rien (vu le 2026-11-10).
 
-Dix minutes plus tard, le temps que le rôle soit actif. `DAY` est le jour UTC de l'essai, celui que portera la fiche :
+Dix minutes plus tard, le temps que le rôle soit actif (le 2026-11-10, il l'était en 2 minutes environ). `DAY` est le
+jour UTC de l'essai, celui que portera la fiche :
 
 ```sh
 DAY=$(date -u +%F)
@@ -976,7 +977,8 @@ az storage file list --account-name "$JOBFILES" --share-name job-data --path vau
   --auth-mode login --backup-intent --query "[].name" -o tsv
 ```
 
-Attendu : aucune erreur ; `Clippings` et `veille` ; puis `.<DAY>.md.tmp` seul. `--backup-intent` est obligatoire pour
+Attendu : `{"created": true}` pour chaque dossier (vu le 2026-11-10), aucune erreur pour le temporaire ; `Clippings`
+et `veille` ; puis `.<DAY>.md.tmp` seul. `--backup-intent` est obligatoire pour
 toute commande `az storage file` ou `az storage directory` par compte Entra : sans lui, la commande est refusée.
 
 ### L'essai de #295, puis la première exécution
@@ -1001,8 +1003,10 @@ Attendu, lu au journal (« Lire une exécution », ci-dessous) :
 - `kb daily-routine finished in …: exit code 4`.
 
 Le code 4 fait échouer la réplique : le job la reprend une fois, qui finit de même (sa fiche de `most_starred` est
-alors `sheet_exists, not rewritten`), puis l'exécution est `Failed`. Ce statut et cette reprise sont à constater : c'est
-la première fois qu'un code autre que 0 sort d'un job de K-B en ligne. Le temporaire, lui, reste en place : `kb` ne
+alors `sheet_exists, not rewritten`), puis l'exécution est `Failed`. Constaté le 2026-11-10, première fois qu'un code
+autre que 0 sortait d'un job de K-B en ligne : la reprise a écrit deux lignes `sheet_exists` pour `most_starred`, une
+par relevé du jour resté dans le brut (le dernier relevé lu reste jusqu'au suivant), et l'exécution `Failed` n'a pas
+d'heure de fin (`"end": null`). Le temporaire, lui, reste en place : `kb` ne
 retire jamais un temporaire qu'il n'a pas créé. Une source qui échoue fait aussi sortir `kb collect` en 4 (arXiv a
 déjà expiré au bout de 30 s pendant une première collecte, le 21/10) : l'essai se lit sur les lignes de
 `kb write-tops`.
@@ -1012,10 +1016,15 @@ déjà expiré au bout de 30 s pendant une première collecte, le 21/10) : l'ess
 ```sh
 az storage file delete --account-name "$JOBFILES" --share-name job-data \
   --path "vault/veille/tops/most_forked/.$DAY.md.tmp" --auth-mode login --backup-intent
+az storage file list --account-name "$JOBFILES" --share-name job-data --path vault/veille/tops/most_forked \
+  --auth-mode login --backup-intent --query "[].name" -o tsv
 az storage file show --account-name "$JOBFILES" --share-name job-data \
   --path "vault/veille/tops/most_starred/$DAY.md" --auth-mode login --backup-intent \
   --query "properties.{modified:lastModified,etag:etag}"
 ```
+
+`az storage file delete` rend `{"deleted": null}`, même quand le fichier est retiré (vu le 2026-11-10) : le retrait se
+lit à la liste qui suit, qui ne rend plus rien.
 
 **La première vraie exécution,** lancée comme l'essai. Attendu : `most_starred sheet of <DAY>: sheet_exists, not
 rewritten` (la seconde exécution laisse intacte la fiche de la première), `most_forked sheet of <DAY>: sheet_written`,
@@ -1046,6 +1055,8 @@ az containerapp job execution list -n caj-kb-daily-routine -g "$RG" \
   --query "[].{name:name,status:properties.status,start:properties.startTime,end:properties.endTime}" -o table
 ```
 
+Une exécution `Failed` n'a pas d'heure de fin (vu le 2026-11-10) : sa durée se lit au journal.
+
 Le journal se lit dans `log-kb`, quelques minutes après la fin (`WS` : étape 6 d'« Appliquer ») :
 
 ```sh
@@ -1068,8 +1079,8 @@ az storage blob list --auth-mode login --account-name "$EXCHANGE" -c watch --pre
 ```
 
 Attendu : `tops/<top>/<jour>.md`. Le démarrage, le tirage de l'image et le montage sont dans `ContainerAppSystemLogs`.
-La clé BigQuery est un fichier du volume `secrets`, dont le mode pour l'uid 10001 n'est pas encore vérifié. S'il ne
-se lit pas, le journal porte `collection failed for source 'gh_archive': PermissionError …`, suivi de sa trace, puis
+La clé BigQuery est un fichier du volume `secrets`, que l'uid 10001 lit (le 2026-11-10, `gh_archive` a lu 6 fenêtres,
+60 Mo). S'il ne se lit plus, le journal porte `collection failed for source 'gh_archive': PermissionError …`, suivi de sa trace, puis
 `gh_archive: failed (PermissionError)` (`src/k_b/etl/extract.py`, `src/k_b/commands/collect_command.py`) ; la
 collecte sort en 4, les autres sources gardées. S'il manque, l'erreur est `DefaultCredentialsError` (google-auth).
 
@@ -1096,6 +1107,9 @@ az storage file list --account-name "$JOBFILES" --share-name job-data --path "<d
 az storage file delete --account-name "$JOBFILES" --share-name job-data --path "<dossier>/.<nom>.tmp" \
   --auth-mode login --backup-intent
 ```
+
+La suppression rend `{"deleted": null}` même quand elle a eu lieu : la première commande, relancée, ne liste plus le
+temporaire.
 
 Enfin, le rôle se retire, verrou levé, comme pour les deux dossiers. Le retrait par `kb` lui-même, au-delà d'un seuil,
 attend son issue.
