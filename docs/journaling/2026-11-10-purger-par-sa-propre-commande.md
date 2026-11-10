@@ -103,7 +103,7 @@ dossier : « a raw file not imported is never deleted » (`src/k_b/purge/catalog
 | `test_a_failed_purge_exits_1_names_no_raw_file_and_the_next_purge_purges` | Un échec dit « run kb purge again », ne cite aucun fichier, et le `kb purge` suivant purge. |
 | `test_purge_refuses_a_missing_database_does_not_create_it_and_exits_2` | Sans base, le code est 2 et la base n'est pas créée. |
 | `test_kb_purge_comes_right_after_kb_import_without_a_rule`, `test_kb_purge_runs_after_kb_import_exits_with_1_or_2` | La place de l'étape dans la routine, et la décision D2. |
-| `test_a_sigterm_during_the_purge_of_the_base_undoes_the_purge_and_exits_with_143`, `test_a_ctrl_c_during_the_purge_of_the_base_undoes_it_and_exits_with_130` | Un signal annule la purge de la base en cours. Le test Ctrl-C est passé dès son écriture : l'annulation existait déjà (`purge/base.py`). |
+| `test_a_sigterm_during_the_purge_of_the_base_undoes_the_purge_and_exits_with_143`, `test_a_ctrl_c_during_the_purge_of_the_base_undoes_it_and_exits_with_130` | Un signal annule la purge de la base en cours. Le signal tombe au premier appel qui supprime des items : la seconde revue a montré que le premier appel n'en supprimait aucun, et que l'ancienne forme du test ne prouvait donc pas l'annulation. Le test Ctrl-C est passé dès son écriture : l'annulation existait déjà (`purge/base.py`). |
 | `uv run kb daily-routine --dry-run` | Six étapes, `kb purge` en 4e. |
 
 ## Ce que tu dois pouvoir défendre

@@ -246,12 +246,17 @@ Limites de la purge (étapes 2, 3 et 7), écrites le 2026-11-04 :
 - La première erreur arrête les étapes suivantes : une étape qui échoue à chaque purge bloque les
   autres jusqu'à sa correction (`kb purge` sort en 1 et le dit).
 - Sans `kb purge`, aucun log ni journal n'est supprimé, même ceux de `kb serve-data` et `kb serve-ai`.
-- Un `kb purge` lancé pendant un `kb import` peut supprimer un brut de plus de 6 mois que l'import lit : l'import
-  échoue alors (code 1) sans rien écrire, ou importe ce brut, dont le registre garde la ligne sans fichier. Le brut
-  supprimé était au-delà de sa durée : aucune donnée n'est gardée plus longtemps. Les purges de la base et du
-  registre attendent l'import 5 s au plus, puis échouent sans rien supprimer (`docs/stockage.md`, « Un import à la
-  fois ») ; celles des fichiers n'ont pas de verrou. Pour réduire le risque : les lancer l'un après l'autre, comme
-  le fait `kb daily-routine`, et sur le Mac `make import`, puis `make purge` (faisable).
+- Un `kb purge` lancé pendant un `kb import` peut supprimer un brut de plus de 6 mois que l'import lit. Lu dans le
+  code, non testé : l'import qui ne trouve plus le fichier lève une `OSError`, sort en 1
+  (`src/k_b/commands/import_command.py`, `run_import`) et n'écrit rien, puisqu'il est une seule transaction et que son
+  journal n'est écrit qu'avec elle (`src/k_b/etl/load.py`) ; s'il a déjà lu le fichier, il l'importe, et le registre
+  en garde la ligne sans fichier. Les purges de la base et du registre attendent l'import 5 s au plus, puis
+  échouent sans rien supprimer (`docs/stockage.md`, « Un import à la fois ») ; celles des fichiers n'ont pas de
+  verrou. Si l'import est validé pendant cette attente, la purge du brut garde la liste des fichiers importés lue
+  avant lui (`src/k_b/purge/all_purges.py`, « Read once ») : le compte « never imported » de son journal peut alors
+  compter des fichiers que cet import vient d'enregistrer. Le brut supprimé était au-delà de sa durée : aucune
+  donnée n'est gardée plus longtemps. Pour réduire le risque : les lancer l'un après l'autre, comme le fait
+  `kb daily-routine`, et sur le Mac `make import`, puis `make purge` (faisable).
 - Les anciens `import-log-*.jsonl`, à la racine d'un dossier de données d'avant `journals/`, ne sont
   ni lus ni supprimés : l'utilisatrice les retire une fois, à la main.
 - Un log en cours (`kb.log`, `kb-serve-data.log`, `kb-serve-ai.log`) ne prend son jour, et n'entre

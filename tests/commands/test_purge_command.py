@@ -189,13 +189,17 @@ def test_a_ctrl_c_during_the_purge_of_the_base_undoes_it_and_exits_with_130(
     item_count = count_rows(tmp_path, "SELECT count(*) FROM item")
     monkeypatch.setattr(purge_command, "datetime", make_clock(THREE_YEARS_LATER))
     delete_expired_items = database_purge.delete_expired_items
+    deleted_counts = []
 
-    def interrupted_after_the_first_deletion(*arguments):
-        delete_expired_items(*arguments)
-        raise KeyboardInterrupt
+    def interrupted_once_items_are_deleted(*arguments):
+        count = delete_expired_items(*arguments)
+        if count:
+            deleted_counts.append(count)
+            raise KeyboardInterrupt
+        return count
 
     monkeypatch.setattr(
-        database_purge, "delete_expired_items", interrupted_after_the_first_deletion
+        database_purge, "delete_expired_items", interrupted_once_items_are_deleted
     )
     capsys.readouterr()
 
@@ -203,4 +207,6 @@ def test_a_ctrl_c_during_the_purge_of_the_base_undoes_it_and_exits_with_130(
     output = capsys.readouterr()
     assert "ERROR k_b.cli: kb stopped by SIGINT" in output.err
     assert output.out == ""
+    # Items were deleted before the stop: the count unchanged proves the rollback.
+    assert deleted_counts
     assert count_rows(tmp_path, "SELECT count(*) FROM item") == item_count

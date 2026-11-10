@@ -213,14 +213,17 @@ def test_a_sigterm_during_the_purge_of_the_base_undoes_the_purge_and_exits_with_
         purge_command, "datetime", make_clock(datetime(2029, 10, 12, tzinfo=UTC))
     )
     delete_expired_items = database_purge.delete_expired_items
+    deleted_counts = []
 
-    def stopped_after_the_first_deletion(*arguments):
+    def stopped_once_items_are_deleted(*arguments):
         count = delete_expired_items(*arguments)
-        signal.raise_signal(signal.SIGTERM)
+        if count:
+            deleted_counts.append(count)
+            signal.raise_signal(signal.SIGTERM)
         return count
 
     monkeypatch.setattr(
-        database_purge, "delete_expired_items", stopped_after_the_first_deletion
+        database_purge, "delete_expired_items", stopped_once_items_are_deleted
     )
     capsys.readouterr()
 
@@ -228,6 +231,8 @@ def test_a_sigterm_during_the_purge_of_the_base_undoes_the_purge_and_exits_with_
 
     assert exit_code == cli.ExitCode.STOPPED_BY_SIGTERM
     assert "ERROR k_b.cli: kb stopped by SIGTERM" in capsys.readouterr().err
+    # Items were deleted before the stop: the rows left prove the rollback.
+    assert deleted_counts
     connection = sqlite3.connect(tmp_path / "k-b.sqlite")
     # The papers the import committed: the purge was undone whole.
     assert connection.execute("SELECT count(*) FROM item").fetchone()[0] > 0

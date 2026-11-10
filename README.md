@@ -324,7 +324,8 @@ Code de sortie :
 
 - 0 : les purges ont réussi ;
 - 1 : une purge a échoué ; les suivantes ne tournent pas, et le `kb purge` suivant les relance
-  (`purge failed: … ; run kb purge again`) ;
+  (`purge failed: … ; run kb purge again`). Aucun bilan n'est affiché : ce que les purges d'avant ont
+  supprimé n'est qu'au journal ;
 - 2 : `KB_DATA_DIR` manque, la base n'existe pas (`kb create-db`), ou `KB_DATABASE_URL` est refusée ;
 - 143, 130 : `kb purge` a reçu SIGTERM ou SIGINT (Ctrl-C) ; la purge en cours dans la base est
   annulée, et ce qui a déjà été supprimé le reste.
