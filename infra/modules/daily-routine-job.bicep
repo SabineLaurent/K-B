@@ -1,4 +1,4 @@
-// The scheduled job caj-kb-daily-routine (#330): kb daily-routine (#413) every day at 03:00 UTC, the
+// The scheduled job caj-kb-daily-routine (#330): kb daily-routine (#413) every day at 08:00 UTC, the
 // mirror of the clips, kb collect, kb import, kb write-tops, then the publication of the watch. Its data
 // directory is the share job-data (#420), which keeps the raw, the state and the vault from one
 // execution to the next; its secrets come from the vault, the key of BigQuery as a file.
@@ -70,16 +70,18 @@ resource job 'Microsoft.App/jobs@2026-01-01' = {
     workloadProfileName: 'Consumption'
     configuration: {
       triggerType: 'Schedule'
-      // Read in UTC by Container Apps. A run takes minutes; no run by hand from 02:00 UTC to the end
-      // of the run of the cron (infra/README.md, « La routine quotidienne (#330) »): nothing keeps two
-      // runs apart until #426.
+      // Read in UTC by Container Apps (Microsoft Learn, « Jobs in Azure Container Apps », read on
+      // 2026-11-10): 9:00 in Paris in winter, 10:00 in summer (decision of Sabine of 2026-11-10). A run
+      // takes minutes; no run by hand from 07:00 UTC to the end of the run of the cron (infra/README.md,
+      // « La routine quotidienne (#330) »): nothing keeps two runs apart until #426.
       scheduleTriggerConfig: {
-        cronExpression: '0 3 * * *'
+        cronExpression: '0 8 * * *'
         parallelism: 1
         replicaCompletionCount: 1
       }
-      // The bound of #330: replicaTimeout bounds the retry too, so a run never reaches 05:00 UTC, and a
-      // second collect the same day finds no window of GH Archive due (etl/sources/gh_archive.py).
+      // The bound of #330: replicaTimeout bounds the retry too, so a run never reaches 10:00 UTC, when
+      // caj-kb-digest-watch starts (#423), and a second collect the same day finds no window of GH Archive
+      // due (etl/sources/gh_archive.py).
       replicaTimeout: 3600
       replicaRetryLimit: 1
       registries: [
