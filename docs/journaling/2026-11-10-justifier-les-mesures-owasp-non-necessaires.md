@@ -10,7 +10,8 @@
 
 La liste injectée des commits remonte au-delà de la branche : les commits plus anciens que `d53eb8f`
 viennent de #540 (PR #546), déjà fusionnée dans `main`, comme les fichiers de code de la liste.
-Cette note ne couvre que `d53eb8f`, `e8954c6` et `9b2009f`, qui ne touchent que les deux fiches.
+Cette note couvre les commits de la branche, de `d53eb8f` à `23d5adc`, qui ne touchent que les deux
+fiches et cette note.
 
 ## Le pourquoi
 
@@ -86,7 +87,9 @@ tenue » : le durcissement, la revue et l'évaluation sont communs aux deux API.
   par Sabine (#522 encore ouverte à 16:05Z). La portée d'un jeton qui n'existe pas encore ne se
   prouve pas.
 - **API9 « données de production hors production » : tenue.** La machine sert les mêmes données
-  avec le même code, une clé par client et les mêmes limites. Décision : Sabine et time-knight
+  avec le même code, une clé par client et les mêmes limites. Une différence porte des données,
+  `KB_TRACE_CONTENT=all`, refusé en production seulement : elle est nommée, avec sa parade, garder
+  `none` comme le veut le registre. Décision : Sabine et time-knight
   (l'option écartée, laisser la phrase périmée à une autre issue, aurait gardé un état faux).
 - **Citations en phrases entières**, recopiées des pages enregistrées le 2026-11-10 (tranché par
   time-knight) : une citation coupée tomberait à la lecture stricte.
@@ -99,7 +102,7 @@ tenue » : le durcissement, la revue et l'évaluation sont communs aux deux API.
 |---|---|
 | `grep -nE "^\| API(2\|4\|6\|8\|9\|10) " docs/fiches-veille.md` | chaque ligne du tableau suit l'état de ses mesures (critère de #500) |
 | `sed -n '116,119p;149,152p' infra/modules/api-container-app.bicep` | les deux renvois corrigés montrent les ressources et `minReplicas`/`maxReplicas` |
-| deux relectures par un sous-agent neuf (high), sur `d53eb8f` puis sur le delta | 15 constats, tous corrigés sur décision de time-knight ; renvois et citations vérifiés |
+| deux relectures par un sous-agent neuf (high), sur `d53eb8f` puis sur le delta | 15 puis 10 constats, tous corrigés sur décision de time-knight ; renvois et citations vérifiés |
 | contrôle des catégories Unicode `Cc`/`Cf` | aucun caractère invisible dans les deux fichiers |
 
 ## Ce que tu dois pouvoir défendre
