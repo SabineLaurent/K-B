@@ -79,9 +79,9 @@ resource job 'Microsoft.App/jobs@2026-01-01' = {
         parallelism: 1
         replicaCompletionCount: 1
       }
-      // The bound of #330: replicaTimeout bounds the retry too, so a run never reaches 10:00 UTC, when
-      // caj-kb-digest-watch starts (#423), and a second collect the same day finds no window of GH Archive
-      // due (etl/sources/gh_archive.py).
+      // The bound of #330: replicaTimeout bounds the retry too, so a run of the cron ends by 09:00 UTC,
+      // before caj-kb-digest-watch starts at 10:00 (#423), and a second collect the same day finds no
+      // window of GH Archive due (etl/sources/gh_archive.py).
       replicaTimeout: 3600
       replicaRetryLimit: 1
       registries: [
