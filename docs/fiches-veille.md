@@ -853,7 +853,9 @@ sous son entrée, démontre qu'elle n'est pas nécessaire à K-B et nomme sa lim
 nécessaire ; un écart voulu dans une mesure tenue (« Pour lever l'écart ») la laisse tenue. Une
 entrée est tenue quand toutes ses mesures applicables le sont ; elle est un écart voulu, justifié
 quand ses mesures applicables sont tenues ou justifiées, au moins une justifiée ; elle est non
-tenue dès qu'une mesure l'est. « Au déploiement » renvoie au déploiement sur Azure Container Apps :
+tenue dès qu'une mesure l'est. Sous un écart justifié, « Pour la tenir, si la limite est
+franchie » dit comment on appliquerait la mesure devenue nécessaire. « Au déploiement » renvoie au
+déploiement sur Azure Container Apps :
 au 2026-11-05, une case de #317 (« Plus tard : déploiement », sans jalon) le porte, et aucune
 issue du jalon « Mise en ligne 08/11 ».
 
@@ -945,8 +947,9 @@ API8 (durcissement, revue et évaluation, #496 à #499) et API10 (portée du jet
     l'authentification faite (« Applications within a Container Apps environment are automatically
     authenticated. However, the Container Apps runtime doesn't support authorization for access
     control between applications using the built-in peer-to-peer encryption. », page du
-    chiffrement entre apps, lue le 2026-11-10) : l'autorisation reste à la clé et au droit par
-    route. Le mTLS de l'environnement, `peerAuthentication.mtls`, reste désactivé
+    chiffrement entre apps, lue le 2026-11-10), ce chiffrement que K-B active
+    (`infra/modules/container-apps-environment.bicep:32-36`) : l'autorisation reste à la clé et au
+    droit par route. Le mTLS de l'environnement, `peerAuthentication.mtls`, reste désactivé
     (`infra/modules/container-apps-environment.bicep:38-42`). Son entrée est interne
     (`infra/modules/api-container-app.bicep:74-80`), aucune route HTTP de l'environnement ne la vise
     (API8, « TLS, même pour une API interne »), et seuls les apps et les jobs de l'environnement
@@ -1039,17 +1042,20 @@ API8 (durcissement, revue et évaluation, #496 à #499) et API10 (portée du jet
   - Les redémarrages, les descripteurs et les processus ne sont pas limités, et n'ont pas besoin de
     l'être. La mesure borne ce qu'un client fait consommer au serveur (« Use a solution that makes
     it easy to limit memory, CPU, number of restarts, file descriptors, and processes such as
-    Containers / Serverless code (e.g. Lambdas). », API4:2023, lue le 2026-11-10). Aucun client ne fait lancer de processus : l'API n'en lance aucun
+    Containers / Serverless code (e.g. Lambdas). », API4:2023, lue le 2026-11-10). Aucun client
+    ne fait lancer de processus : l'API n'en lance aucun
     (`grep -rlE "subprocess|multiprocessing|os\.fork|Popen" src/k_b/ai_api src/k_b/core` ne rend
     rien), et `uvicorn.run` reçoit l'app elle-même, sans `workers`
     (`commands/serve_ai_command.py:92`) : un seul processus, uvicorn 0.54 refusant plusieurs
     processus sans chaîne d'import. Les descripteurs suivent les connexions, qu'uvicorn tient avant
     tout contrôle de l'app : en ligne, seules les pièces de l'environnement se connectent (API2, TLS
     mutuel), et sur la machine, ses programmes. Un redémarrage vient d'un plantage (« If a container
-    crashes, it automatically restarts. », page des conteneurs, lue le 2026-11-10), ou de la sonde
-    Liveness (`infra/modules/api-container-app.bicep:138-143` ; « Checks if your application is
-    still running and responsive. », page des sondes, lue le 2026-11-10), qu'une charge peut faire
-    échouer : là encore, une charge venue des seules pièces de l'environnement. La page des
+    crashes, it automatically restarts. », page des conteneurs, lue le 2026-11-10), ou des sondes
+    Readiness et Liveness (`infra/modules/api-container-app.bicep:130-143`), qu'une charge peut
+    faire échouer : la page des sondes, lue le 2026-11-10, le dit à propos de Readiness
+    (« Container Apps restarts the replica in question until it's healthy again or the failure
+    threshold is exceeded. »). Là encore, une charge venue des seules pièces de l'environnement. La
+    page des
     conteneurs ne décrit aucune politique de redémarrage pour une app. Un redémarrage remet le débit
     à zéro, ce que borne le quota du modèle (« Plafonds de dépense », ci-dessous). Leur coût reste
     dans le 0,5 vCPU et le 1 Gi de la seule réplique.
@@ -1086,7 +1092,8 @@ API8 (durcissement, revue et évaluation, #496 à #499) et API10 (portée du jet
   (#501 ; décision de Sabine du 2026-11-08 : la tenir). « Configure spending limits for all service
   providers/API integrations. When setting spending limits is not possible, billing alerts should be
   configured instead. » (API4:2023, lue le 2026-11-10). Le budget `budget-kb` existe, au niveau du
-  groupe de ressources (`infra/modules/budget.bicep:5-25`, `infra/main.bicep:136-141`) : 30 € par mois,
+  groupe de ressources (`infra/modules/budget.bicep:5-25`, `infra/main.bicep:136-141`) : 30 € par
+  mois,
   une alerte par e-mail à 50 et 100 % du réel et à 100 % de la prévision, sans rien arrêter. Il ne
   compte que les coûts étiquetés `project=k-b` (`budget.bicep:16-25`), et la ressource du modèle,
   dans le groupe, n'a pas d'étiquette (relevé de Sabine du 2026-11-08, #501) : la dépense du modèle
@@ -1112,8 +1119,9 @@ API8 (durcissement, revue et évaluation, #496 à #499) et API10 (portée du jet
   n'arrête pas la consommation (« Resources aren't affected, and your consumption isn't stopped. »),
   et un budget n'est évalué que toutes les 24 h (« Cost and usage data is typically available within
   8-24 hours and budgets are evaluated against these costs every 24 hours. », page des budgets de
-  Cost Management, lue le 2026-11-10). Un plafond qui refuse viendrait d'ailleurs : une politique de la passerelle d'API
-  (API9), à vérifier ; ou un compte des jetons par jour tenu par K-B, qui devrait survivre au
+  Cost Management, lue le 2026-11-10). Un plafond qui refuse viendrait d'ailleurs : une politique
+  de la passerelle d'API (API9), à vérifier ; ou un compte des jetons par jour tenu par K-B, qui
+  devrait survivre au
   redémarrage, donc vivre hors des deux API (règle 7 de `.claude/rules/poc.md` : l'API IA n'écrit
   rien qui doive survivre à son redémarrage), dans un stockage à concevoir. Non chiffré.
   **Pour réduire le risque** : à ce commit, rien en ligne n'appelle le modèle, aucun job à clé ne
@@ -1225,20 +1233,21 @@ dépend que du code garde son état et sa preuve.
   - Les deux API n'ont qu'une entrée interne, en HTTPS (`external: false`, `allowInsecure: false`,
     `infra/modules/api-container-app.bicep:74-80`) : « Internal: Makes the app's own fully qualified
     domain name (FQDN) directly reachable only from within the same Container Apps environment, such
-    as from other container apps. » (page de l'entrée, relue le 2026-11-10). La documentation de l'entrée nomme une seule exception, une route
-    HTTP de l'environnement qui viserait l'app : il n'y en a aucune. L'entrée interne coupe aussi les
+    as from other container apps. » (page de l'entrée, relue le 2026-11-10). La documentation de
+    l'entrée nomme une seule exception, une route HTTP de l'environnement qui viserait l'app : il
+    n'y en a aucune. L'entrée interne coupe aussi les
     clients `TERMINAL` et `AGENT` de l'API de données, hors de l'environnement. Le point public de
     l'environnement reste ouvert (`publicNetworkAccess: 'Enabled'`,
     `infra/modules/container-apps-environment.bicep:45`, la valeur `Disabled` demandant un réseau
     virtuel) : une requête du dehors atteint son mandataire, qui n'expose pas l'app (« The app isn't
-    exposed through the Container Apps environment's inbound IP address », page de l'entrée, relue
+    exposed through the Container Apps environment's inbound IP address. », page de l'entrée, relue
     le 2026-11-10) ; la documentation donne le 404 pour un environnement interne, le commentaire du
     Bicep pour celui-ci ; non essayé.
   - Le chiffrement entre apps est activé (`peerTrafficConfiguration.encryption.enabled`,
     `infra/modules/container-apps-environment.bicep:32-36`) : « Traffic to and from the ingress proxy
     within the environment is TLS encrypted with a private certificate and decrypted by the
-    receiver. » (relue le 2026-11-10). Le réseau est donc
-    chiffré jusqu'à la réplique ; uvicorn y reçoit `http` sur son port (`transport: 'http'`, aucun
+    receiver. » (relue le 2026-11-10). Le réseau est donc chiffré jusqu'à la réplique ; uvicorn y
+    reçoit `http` sur son port (`transport: 'http'`, aucun
     TLS dans uvicorn), et ce dernier pas, dans la réplique, n'est ni décrit par la documentation ni
     essayé. mTLS reste désactivé (l. 38-42).
   - Les clients : l'API IA appelle l'API de données en `https://ca-kb-data-api.internal.<defaultDomain>`
@@ -1296,14 +1305,16 @@ dépend que du code garde son état et sa preuve.
   avant sa lecture, et un test. S.
 - **Traitement uniforme dans la chaîne de serveurs** : non essayé, écart voulu, justifié. En ligne,
   deux serveurs : l'entrée d'ACA (Envoy), puis uvicorn 0.54 et h11 0.16 (`uv.lock` de `v0.1.0`,
-  les mêmes dans celui de `v0.1.1`) (`transport: 'http'`, `infra/modules/api-container-app.bicep:77`).
-  Aucune requête ambiguë, comme `Content-Length` et `Transfer-Encoding` ensemble, n'a été envoyée. L'essai
-  n'est pas nécessaire : une désynchronisation demande un client qui envoie au premier serveur une
+  les mêmes dans celui de `v0.1.1`) (`transport: 'http'`,
+  `infra/modules/api-container-app.bicep:77`).
+  Aucune requête ambiguë, comme `Content-Length` et `Transfer-Encoding` ensemble, n'a été envoyée.
+  L'essai n'est pas nécessaire : une désynchronisation demande un client qui envoie au premier
+  serveur une
   requête que le second lira autrement (« Ensure all servers in the HTTP server chain (e.g. load
   balancers, reverse and forward proxies, and back-end servers) process incoming requests in a
-  uniform manner to avoid desync issues. », API8:2023, lue le 2026-11-10), et
-  l'API IA n'a aucun client tiers. L'adresse entrante de l'environnement n'expose pas l'app (« The
-  app isn't exposed through the Container Apps environment's inbound IP address », page de l'entrée,
+  uniform manner to avoid desync issues. », API8:2023, lue le 2026-11-10), et l'API IA n'a aucun
+  client tiers. L'adresse entrante de l'environnement n'expose pas l'app (« The app isn't exposed
+  through the Container Apps environment's inbound IP address. », page de l'entrée,
   lue le 2026-11-10), aucune route HTTP ne la vise (« TLS, même pour une API interne », ci-dessus),
   et l'environnement ne sert que K-B : seules ses pièces atteignent l'entrée interne (API2, TLS
   mutuel).
@@ -1351,9 +1362,9 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
   `docs/api/openapi-ia.json` ; `test_the_versioned_openapi_is_the_one_the_app_produces`
   (`tests/ai_api/test_ai_api_openapi.py`).
 - **Documentation réservée aux utilisateurs autorisés** : tenue hors `sandbox` ; en `sandbox`, écart
-  voulu, justifié. Hors
-  `sandbox`, `/docs` et `/openapi.json` rendent 404 (`test_the_documentation_is_served_in_the_sandbox_only`,
-  `tests/ai_api/test_serve_ai.py`) ; en `sandbox`, ils répondent sans clé, sans aucune donnée. En
+  voulu, justifié. Hors `sandbox`, `/docs` et `/openapi.json` rendent 404
+  (`test_the_documentation_is_served_in_the_sandbox_only`, `tests/ai_api/test_serve_ai.py`) ; en
+  `sandbox`, ils répondent sans clé, sans aucune donnée. En
   ligne, l'API IA (`ca-kb-ai-api`) est déployée avec `KB_DEPLOYMENT_ENVIRONMENT` à `production`
   (`infra/main.bicep:234`, non relu en ligne) : l'écart ne vaut qu'en local, quand la variable vaut
   `sandbox`. Le contrat est versionné dans le dépôt, privé au 2026-11-10 et appelé à devenir
@@ -1362,8 +1373,9 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
   ne demande pas d'être autorisé.
   **Limite** : une `sandbox` servie au-delà de `127.0.0.1`, ou un `/docs` qui porterait des
   données.
-  **Pour réduire le risque** : `production` en ligne (`infra/main.bicep:234`) ; l'écoute par
-  défaut sur `127.0.0.1` (`test_serve_ai_listens_on_127_0_0_1_8001_by_default_with_the_real_subjects`).
+  **Pour réduire le risque** : garder `production` en ligne (`infra/main.bicep:234`), et l'écoute
+  par défaut sur `127.0.0.1`
+  (`test_serve_ai_listens_on_127_0_0_1_8001_by_default_with_the_real_subjects`).
   **Pour la tenir**, si l'écart est levé : ne plus servir `/docs` ni `/openapi.json`, même en
   `sandbox` ; le contrat reste dans le dépôt (`kb openapi`). `read_openapi_url`
   (`core/api_settings.py`) vaut pour les deux API : l'API de données fermerait son `/docs` aussi.
@@ -1393,16 +1405,24 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
   une base que `kb collect` et `kb import` remplissent des mêmes sources (`README.md`, « Le POC du
   25/10 et la suite ») : des données de la même sorte. La mesure demande alors le même traitement
   que la production (« If this is unavoidable, these endpoints should get the same security
-  treatment as the production ones », API9:2023, lue le 2026-11-10), et la machine le leur donne :
+  treatment as the production ones. », API9:2023, lue le 2026-11-10), et la machine le leur donne :
   le même code (`create_app`, `ai_api/app.py:41`, `data_api/app.py:34`), une clé exigée par client
-  et refusée au démarrage si elle manque à la règle, les mêmes limites. Deux différences, sans
-  donnée : `http` sur `127.0.0.1`, joignable de la machine seule (API8, « TLS, même pour une API
+  et refusée au démarrage si elle manque à la règle, les mêmes limites. Trois différences. Deux sont
+  sans donnée : `http` sur `127.0.0.1`, joignable de la machine seule (API8, « TLS, même pour une API
   interne ») ; `/docs` et `/openapi.json` sans clé quand `KB_DEPLOYMENT_ENVIRONMENT` vaut `sandbox`
-  (« Documentation réservée aux utilisateurs autorisés »).
-  **Limite** : une base de la machine servie au-delà de `127.0.0.1`.
+  (« Documentation réservée aux utilisateurs autorisés »). La troisième porte des données :
+  `KB_TRACE_CONTENT=all`, refusé en production seulement
+  (`ai_api/connectors/metrics_export.py:186-187`), enverrait de la machine le contenu des appels au
+  modèle à Grafana Cloud, données personnelles comprises (règle 5 de `.claude/rules/poc.md`).
+  **Limite** : une base de la machine servie au-delà de `127.0.0.1` ; `KB_TRACE_CONTENT` à `all` ou
+  `anomalies` sur la machine.
   **Pour réduire le risque** : garder les hôtes d'écoute par défaut, `127.0.0.1`
   (`test_serve_ai_listens_on_127_0_0_1_8001_by_default_with_the_real_subjects`,
-  `test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_config`).
+  `test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_config`) ; garder
+  `KB_TRACE_CONTENT` à `none`, le défaut, comme le veut le registre
+  ([registre-traitements.md](registre-traitements.md), « Envoi des mesures à Grafana Cloud
+  (#162) », ligne « Contrat » : `none` jusqu'à ce que le DPA de Grafana Labs prenne effet,
+  décision de Sabine du 2026-10-24, confirmée le 2026-10-27).
 - **Analyse de risque des anciennes versions** : *s.o.*, une seule version servie.
 
 ### API10:2023 Unsafe Consumption of APIs
@@ -1411,7 +1431,8 @@ L'API IA consomme le modèle, l'API de données, GitHub et l'export OTLP vers Gr
 point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change.
 
 - **Évaluer la sécurité des fournisseurs** : tenue sur pièces publiques, le 2026-11-05, sur les
-  pages officielles de chacun, sauf la portée du jeton de Grafana Cloud : non tenue (ci-dessous). Azure publie sa version de TLS pour l'ensemble des « Foundry
+  pages officielles de chacun, sauf la portée du jeton de Grafana Cloud : non tenue (ci-dessous).
+  Azure publie sa version de TLS pour l'ensemble des « Foundry
   Tools », GitHub par le retrait de TLS 1.0 et 1.1, Grafana pas ; aucun pour le point d'accès
   précis qu'appelle K-B. Le client de K-B accepte TLS 1.2 au moins, par défaut de ses
   bibliothèques (API8).
@@ -1455,7 +1476,8 @@ l'entrée, le chiffrement entre apps, les certificats clients, les conteneurs, l
 à l'échelle d'ACA, les budgets de Cost Management, les réglages d'uvicorn.
 
 - [OWASP API Security Top 10, édition 2023](https://owasp.org/API-Security/editions/2023/en/0x11-t10/),
-  section « How To Prevent » de chaque entrée ; [API2:2023](https://api-security.owasp.org/editions/2023/en/0xa2-broken-authentication) ;
+  section « How To Prevent » de chaque entrée ;
+  [API2:2023](https://api-security.owasp.org/editions/2023/en/0xa2-broken-authentication) ;
   [page du projet](https://owasp.org/www-project-api-security/) (« Latest Version » : 2023) et
   [notes de version de 2023](https://api-security.owasp.org/editions/2023/en/0x04-release-notes/)
   (la seconde édition, après celle de 2019).
