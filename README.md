@@ -318,7 +318,9 @@ les bruts remplacés des catalogues d'état (Zotero, CISA KEV), la veille de la 
 tendances, 3 ans), le brut de plus de 6 mois, les lignes du registre dont le fichier n'est plus là
 et que rien ne cite, puis les logs et les journaux d'import de plus de 6 mois ([registre des traitements](docs/registre-traitements.md),
 « Procédure de tri »). `kb import` ne purge rien. Chaque purge journalise ce qu'elle a supprimé,
-en nombres, jamais un nom. Code de sortie :
+en nombres, jamais un nom, puis `kb purge` affiche le bilan sur une ligne
+(`purge: 2 superseded raw files, 40 items, 0 trend rows, 12 references, 0 tracked repositories, 3 raw collections, 3 registry rows, 5 logs and journals deleted`).
+Code de sortie :
 
 - 0 : les purges ont réussi ;
 - 1 : une purge a échoué ; les suivantes ne tournent pas, et le `kb purge` suivant les relance
@@ -616,7 +618,7 @@ uv run kb daily-routine --dry-run    # les étapes et leurs règles, rien lancé
 ```
 
 - `kb daily-routine` : le miroir du conteneur `clippings` vers `Clippings/` du coffre, `kb collect`,
-  `kb import` (pas lancé si `kb collect` rend 1 ou 2), `kb purge` (lancé même si `kb import` échoue),
+  `kb import` (pas lancé si `kb collect` rend 1 ou 2), `kb purge` (lancé même si `kb import` échoue ou n'est pas lancé),
   `kb write-tops`, puis la publication de
   `veille/` vers le conteneur `watch`. L'étape Zotero viendra entre le miroir et `kb collect` (#425).
 - `kb digest-watch` : `GET /health` des deux API, qui réveille une API à 0 réplique (`KB_DATA_API_URL`,

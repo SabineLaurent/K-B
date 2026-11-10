@@ -8,14 +8,14 @@ from k_b.database.creation import create_database
 from k_b.database.location import MissingDatabaseError
 from k_b.etl.pipeline import import_raw_files
 from k_b.etl.source_kinds import SOURCE_KINDS
-from k_b.purge.all_purges import run_purges
+from k_b.purge.all_purges import purge_all
 
 
 def test_without_a_base_the_purges_fail_and_create_none(tmp_path):
     (tmp_path / "raw").mkdir()
 
     with pytest.raises(MissingDatabaseError):
-        run_purges(
+        purge_all(
             tmp_path, tmp_path / "k-b.sqlite", datetime(2027, 4, 5, tzinfo=UTC), (), ()
         )
 
@@ -35,7 +35,7 @@ def test_the_logs_and_the_journal_an_import_writes_are_purged_6_months_later(tmp
     assert outcome.journal_path.parent == tmp_path / "journals"
     assert outcome.journal_path.exists()
 
-    run_purges(
+    purge_all(
         tmp_path, tmp_path / "k-b.sqlite", datetime(2027, 4, 13, tzinfo=UTC), (), ()
     )
 

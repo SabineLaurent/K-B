@@ -57,8 +57,8 @@ DAILY_ROUTINE_STEPS: tuple[RoutineStep[DailyRoutineSettings], ...] = (
         lambda settings: run_import(settings.data_dir, settings.environ),
         NotRunAfter("kb collect", frozenset({ExitCode.FAILED, ExitCode.NOT_STARTED})),
     ),
-    # Even after an import that fails: it committed nothing, and the purge reads the base of the
-    # last import committed (decision of Sabine of 2026-11-10, #540).
+    # Even after an import that fails or is not run: it committed nothing, and the purge reads the
+    # base of the last import committed (decision of Sabine of 2026-11-10, #540).
     RoutineStep(
         "kb purge", lambda settings: run_purge(settings.data_dir, settings.environ)
     ),

@@ -23,7 +23,7 @@ from k_b.etl.raw_store import (
     make_source_folder_key,
 )
 from k_b.etl.sources import cisa_kev, zotero
-from k_b.purge.all_purges import StateCatalog, run_purges
+from k_b.purge.all_purges import PurgeCount, StateCatalog, purge_all
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -53,7 +53,7 @@ def run_purge(data_dir: Path, environ: Mapping[str, str]) -> int:
     logger.info("purge started")
     started = monotonic()
     try:
-        run_purges(
+        count = purge_all(
             data_dir, database, purged_at, STATE_CATALOGS, GITHUB_TRACKED_REPOSITORIES
         )
     # Before OSError: a FileNotFoundError.
@@ -73,4 +73,24 @@ def run_purge(data_dir: Path, environ: Mapping[str, str]) -> int:
         )
         return ExitCode.FAILED
     logger.info("purge finished in %s", describe_duration(monotonic() - started))
+    print_purge_result(count)
     return ExitCode.SUCCEEDED
+
+
+def print_purge_result(count: PurgeCount) -> None:
+    """The totals of the purges on screen, between two blank lines, as for kb import."""
+    print()
+    print(describe_purge_summary(count))
+    print()
+
+
+def describe_purge_summary(count: PurgeCount) -> str:
+    """The totals of the purges on one line; each purge logs its own."""
+    base = count.base
+    return (
+        f"purge: {count.superseded_count} superseded raw files, {base.item_count} items,"
+        f" {base.trend_count} trend rows, {base.reference_count} references,"
+        f" {base.tracked_repository_count} tracked repositories,"
+        f" {count.expired_raw_count} raw collections, {count.registry_count} registry rows,"
+        f" {count.record_count} logs and journals deleted"
+    )

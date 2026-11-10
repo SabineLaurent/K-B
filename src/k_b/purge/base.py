@@ -43,7 +43,7 @@ def purge_expired_rows(
         )
         connection.commit()
     except BaseException:
-        # Ctrl-C and SIGTERM too: the base stays as the import committed it. Only an open
+        # Ctrl-C and SIGTERM too: the base stays as it was before the purge. Only an open
         # transaction: a connection psycopg closed on a signal refuses the rollback, whose error
         # would replace the signal (exit 1 instead of 143), as in etl/load.py.
         if connection.in_transaction:

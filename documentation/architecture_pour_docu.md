@@ -178,7 +178,7 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
    forkés n'entrent pas dans la base: ils n'ont pas de lecteur (`etl/source_kinds.py:66-77`). `kb import` ne purge
    rien: `kb purge`, une commande à part, supprime du brut et de la base ce qui a passé sa durée, à compter de l'heure
    de son lancement, et du brut les catalogues remplacés; elle retire aussi du registre les fichiers disparus
-   (`commands/purge_command.py:52`, `purge/all_purges.py:42-51`, `:50`, `purge/catalogs.py:33`, `purge/raw.py:34`).
+   (`commands/purge_command.py:52`, `purge/all_purges.py:52-63`, `:62`, `purge/catalogs.py:33`, `purge/raw.py:34`).
 3. **De la base aux deux API.** `kb serve-data` lit la base en lecture seule et sert les items et les tendances
    (`database/engine.py:58-87`, `database/reading.py:339`, `:433`, `:553`). `kb serve-ai` ne lit jamais la base:
    il demande les items et les tendances à l'API de données, par HTTP
@@ -206,7 +206,8 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
    conteneur `watch`, où les jobs publieront `veille/`. Les deux routines relancent les commandes dans le même processus
    (`commands/job_routine.py:4-6`). `kb daily-routine` copie les clips dans le coffre du job, puis lance `kb collect`,
    `kb import`, `kb purge` et `kb write-tops`, puis publie `veille/`; `kb import` est sauté si `kb collect` échoue ou
-   ne démarre pas, et `kb purge` tourne même si `kb import` échoue (`commands/daily_routine_command.py:44-75`, `:58`,
+   ne démarre pas, et `kb purge` tourne même si `kb import` échoue ou n'est pas lancé
+   (`commands/daily_routine_command.py:44-75`, `:58`,
    `:62-64`, `commands/job_transfers.py:38`, `jobs/clip_mirror.py:241`).
    `kb digest-watch` lance `kb digest` et `kb trend-report`, puis publie `veille/`
    (`commands/digest_watch_command.py:59-81`). La publication lit `veille/` et ajoute au conteneur `watch` les fiches
@@ -291,7 +292,7 @@ Les sources, leur accès et leurs limites sont dans [`docs/specs-collecte.md`](.
   (`etl/load.py:60-96`, `etl/pipeline.py:35`). Une entrée que la base refuse devient un rejet du journal, et
   l'import continue; toute autre erreur n'écrit rien (`etl/load.py:1-5`).
 - **Les purges sont une commande à part, `kb purge`**, que la routine quotidienne lance après `kb import`: les
-  catalogues remplacés, la base, le brut, le registre, puis les journaux (`purge/all_purges.py:1-3`, `:42-51`). Leurs
+  catalogues remplacés, la base, le brut, le registre, puis les journaux (`purge/all_purges.py:1-3`, `:52-63`). Leurs
   durées sont dans le
   [registre des traitements](../docs/registre-traitements.md).
 - **La base a deux moteurs.** Sans `KB_DATABASE_URL`, c'est le fichier SQLite `k-b.sqlite` du dossier de données;

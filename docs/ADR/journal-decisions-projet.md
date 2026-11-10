@@ -6384,7 +6384,8 @@ Plan validé par Sabine le 10/11, relu par time-knight avant elle.
   la décision du 2026-11-06 réservait à l'étape « `pg_dump` puis purge » de #390, qui ajoutera la sauvegarde avant
   elle. — PR de #540
 - **Dans la routine, `kb purge` tourne même après un `kb import` en échec ou non lancé : pas de règle
-  `NotRunAfter`.** Décision de Sabine du 2026-11-10, sur la recommandation du plan. **Lève l'invariant** « la purge ne
+  `NotRunAfter`.** Décision de Sabine du 2026-11-10, sur la recommandation du plan (« aussi après un import en échec
+  ou non lancé »). **Lève l'invariant** « la purge ne
   tourne qu'après le commit » (2026-10-23). Pourquoi : l'import est une seule transaction ; en échec, il n'a rien
   validé, la base et le registre restent ceux du dernier import validé, et la purge y est cohérente ; un brut pas
   encore importé n'est jamais supprimé comme catalogue remplacé, la liste venant du registre (`purge/catalogs.py`,

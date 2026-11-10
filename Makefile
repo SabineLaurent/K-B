@@ -2,7 +2,7 @@
 ENV_FILE := $(dir $(shell git rev-parse --path-format=absolute --git-common-dir)).env
 E2E_ENV_FILE := $(ENV_FILE).e2e_test
 
-.PHONY: create-db collect import write-tops digest trend-report serve-data serve-ai openapi \
+.PHONY: create-db collect import purge write-tops digest trend-report serve-data serve-ai openapi \
 	test test-ai-api test-data-api test-etl test-cov sandbox-alerts
 
 create-db:
@@ -13,6 +13,9 @@ collect:
 
 import:
 	uv run --env-file $(ENV_FILE) kb import
+
+purge:
+	uv run --env-file $(ENV_FILE) kb purge
 
 write-tops:
 	uv run --env-file $(ENV_FILE) kb write-tops

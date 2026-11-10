@@ -203,8 +203,8 @@ Chaque étape dit ce qu'elle fait, si elle est automatisée, et sa fréquence. L
 est dans `src/k_b/purge/` (#83), son SQL dans `src/k_b/database/purge.py` : `kb purge` la lance,
 étapes 7, 2, 3, le registre, puis l'étape 11, datée par l'heure de son lancement ; la première erreur arrête les
 suivantes, que le `kb purge` suivant relance (`purge failed: … ; run kb purge again`, code 1). En ligne, `kb purge`
-est l'étape de `kb daily-routine` qui suit `kb import`, lancée même après un import en échec : un import en échec
-n'a rien validé, et la purge lit la base du dernier import validé (décision de Sabine du 2026-11-10, #540).
+est l'étape de `kb daily-routine` qui suit `kb import`, lancée même après un import en échec ou non lancé : un import
+en échec n'a rien validé, et la purge lit la base du dernier import validé (décision de Sabine du 2026-11-10, #540).
 Chaque passage journalise ce qu'il a supprimé (nombre de lignes et de fichiers, jamais les noms).
 Décisions de Sabine du 2026-11-04 : la base est la source de vérité, le brut est gardé 6 mois au
 plus.
@@ -243,9 +243,15 @@ Limites de la purge (étapes 2, 3 et 7), écrites le 2026-11-04 :
 - Un dossier de catalogue d'état renommé à la main (`cisa_kev_<suffixe>`, `zotero_<suffixe>`) est lu
   par l'import comme son catalogue, mais n'est plus protégé par son nom : l'étape 3 le supprime à
   6 mois, la base garde ses lignes.
-- La première erreur arrête les étapes suivantes : une étape qui échoue à chaque import bloque les
-  autres jusqu'à sa correction (`kb import` sort en 1 et le dit).
-- Sans `kb import`, aucun log ni journal n'est supprimé, même ceux de `kb serve-data` et `kb serve-ai`.
+- La première erreur arrête les étapes suivantes : une étape qui échoue à chaque purge bloque les
+  autres jusqu'à sa correction (`kb purge` sort en 1 et le dit).
+- Sans `kb purge`, aucun log ni journal n'est supprimé, même ceux de `kb serve-data` et `kb serve-ai`.
+- Un `kb purge` lancé pendant un `kb import` peut supprimer un brut de plus de 6 mois que l'import lit : l'import
+  échoue alors (code 1) sans rien écrire, ou importe ce brut, dont le registre garde la ligne sans fichier. Le brut
+  supprimé était au-delà de sa durée : aucune donnée n'est gardée plus longtemps. Les purges de la base et du
+  registre attendent l'import 5 s au plus, puis échouent sans rien supprimer (`docs/stockage.md`, « Un import à la
+  fois ») ; celles des fichiers n'ont pas de verrou. Pour réduire le risque : les lancer l'un après l'autre, comme
+  le fait `kb daily-routine`, et sur le Mac `make import`, puis `make purge` (faisable).
 - Les anciens `import-log-*.jsonl`, à la racine d'un dossier de données d'avant `journals/`, ne sont
   ni lus ni supprimés : l'utilisatrice les retire une fois, à la main.
 - Un log en cours (`kb.log`, `kb-serve-data.log`, `kb-serve-ai.log`) ne prend son jour, et n'entre

@@ -10,6 +10,7 @@ from etl.test_transform import copy_fixture
 
 from k_b import cli
 from k_b.commands import purge_command
+from k_b.database import purge as database_purge
 from k_b.etl.raw_store import RawStore
 from k_b.purge import all_purges
 
@@ -45,6 +46,12 @@ def test_purge_alone_deletes_what_is_past_its_durations_without_an_import_that_d
     assert cli.main(["purge"]) == 0
 
     output = capsys.readouterr()
+    assert re.fullmatch(
+        r"\npurge: 0 superseded raw files, [1-9]\d* items, 0 trend rows, \d+ references,"
+        r" 0 tracked repositories, 1 raw collections, 1 registry rows,"
+        r" 2 logs and journals deleted\n\n",
+        output.out,
+    )
     assert count_rows(tmp_path, "SELECT count(*) FROM item") == 0
     assert count_rows(tmp_path, "SELECT count(*) FROM raw_data") == 0
     assert not raw_path.exists()
@@ -80,7 +87,9 @@ def test_purge_keeps_only_the_last_extract_and_catalog_imported(
     exit_code = cli.main(["purge"])
 
     assert exit_code == 0
-    assert "raw purge: 2 superseded files deleted" in capsys.readouterr().err
+    output = capsys.readouterr()
+    assert output.out.startswith("\npurge: 2 superseded raw files, 0 items, ")
+    assert "raw purge: 2 superseded files deleted" in output.err
     assert (older_extract.exists(), older_catalog.exists()) == (False, False)
     assert (last_extract.exists(), last_catalog.exists()) == (True, True)
 
@@ -168,3 +177,30 @@ def test_a_failed_purge_of_the_base_stops_the_purges_after_it(
     )
     assert raw_path.exists()
     assert count_rows(tmp_path, "SELECT count(*) FROM item") > 0
+
+
+def test_a_ctrl_c_during_the_purge_of_the_base_undoes_it_and_exits_with_130(
+    monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    cli.main(["create-db"])
+    copy_fixture(tmp_path / "raw", "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml")
+    assert cli.main(["import"]) == 0
+    item_count = count_rows(tmp_path, "SELECT count(*) FROM item")
+    monkeypatch.setattr(purge_command, "datetime", make_clock(THREE_YEARS_LATER))
+    delete_expired_items = database_purge.delete_expired_items
+
+    def interrupted_after_the_first_deletion(*arguments):
+        delete_expired_items(*arguments)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        database_purge, "delete_expired_items", interrupted_after_the_first_deletion
+    )
+    capsys.readouterr()
+
+    assert cli.main(["purge"]) == cli.ExitCode.STOPPED_BY_SIGINT
+    output = capsys.readouterr()
+    assert "ERROR k_b.cli: kb stopped by SIGINT" in output.err
+    assert output.out == ""
+    assert count_rows(tmp_path, "SELECT count(*) FROM item") == item_count
