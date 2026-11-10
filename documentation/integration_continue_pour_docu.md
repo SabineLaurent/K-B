@@ -45,8 +45,9 @@ change, le Bicep. Une PR ne fusionne que si ses cinq contrôles requis sont vert
 | une alerte de Dependabot, à tout moment (mises à jour de sécurité, activées plus bas) | une PR de sécurité, sans attente, qui lance la CI comme toute PR |
 
 Une PR vers une autre branche que `main` ne lance rien: le filtre `branches: [main]` porte sur la branche visée.
-GitHub lance aussi deux workflows à lui, hors du dépôt, « Dependabot Updates » et « Dependency Graph » (événement
-`dynamic`, `gh api repos/SabineLaurent/K-B/actions/workflows`); `Deploy` ne les compte pas (`deploy.yml:53`).
+GitHub lance aussi deux workflows à lui, hors du dépôt, « Dependabot Updates » et « Dependency Graph » (chemin
+`dynamic/…` dans `gh api repos/SabineLaurent/K-B/actions/workflows`, événement `dynamic` de leurs exécutions);
+`Deploy` ne les compte pas (`deploy.yml:61-62`).
 Aucun workflow de la CI n'a de `concurrency`: deux pushes rapprochés lancent deux exécutions, et la première n'est
 pas annulée.
 
@@ -158,8 +159,9 @@ gh api repos/SabineLaurent/K-B/actions/permissions/workflow
 - cible: la branche par défaut et `refs/heads/main`;
 - interdire la suppression (`deletion`) et le push forcé (`non_fast_forward`);
 - exiger une PR (`pull_request`), fusion par commit de fusion seulement (`allowed_merge_methods: ["merge"]`), aucune
-  approbation requise (`required_approving_review_count: 0`), une approbation de plus pour un changement non
-  attribué (`require_extra_approval_for_unattributed_changes: true`);
+  approbation requise (`required_approving_review_count: 0`), et le réglage par défaut
+  `require_extra_approval_for_unattributed_changes: true`, sans effet ici: il ajoute une approbation à une PR que
+  Copilot ouvre sans personne attribuée, et rien quand aucune n'est requise;
 - exiger les contrôles `audit`, `tests`, `lint`, `types` et `tests-postgresql`, rendus par GitHub Actions
   (`integration_id` 15368), sur une branche à jour (`strict_required_status_checks_policy: true`).
 
@@ -192,13 +194,13 @@ Rien ne se règle hors du dépôt, en dehors de l'étape précédente: aucun wor
 | version de uv | `version:` des six jobs de `ci.yml`; `Dockerfile:7` | les deux ensemble, dans la plage `uv_build>=0.13.6,<0.14.0` de `pyproject.toml:30`. La PR de Dependabot ne change que le `Dockerfile`: les six `version:` se changent à la main, dans la même PR |
 | version de pip-audit | `ci.yml:25` | à la main |
 | image de PostgreSQL | `ci.yml:69`, tag et digest | à la main: d'après le commentaire de `ci.yml:63-64`, Dependabot ne la met pas à jour |
-| chemins envoyés à la construction | `.dockerignore`, `Dockerfile` et la liste de `image.yml:33` | ensemble: un chemin de plus dans le contexte fait échouer l'étape 3 d'`Image` tant qu'il manque à la liste |
+| chemins envoyés à la construction | `.dockerignore`, `Dockerfile` et la liste de `image.yml:33` | ensemble: un chemin de plus à la racine du contexte fait échouer l'étape 3 d'`Image` tant qu'il manque à la liste |
 | version de Bicep | `infra.yml:23`, et son SHA256 à `infra.yml:25` | les deux ensemble, l'empreinte lue sur la release de Bicep |
 | seuil de couverture | `fail_under`, `pyproject.toml:83` | une décision consignée au journal ADR (le seuil de 96 % date du 2026-11-08) |
 | règles de lint | `[tool.ruff.lint]`, `pyproject.toml:48-67` | `uv run ruff check --no-cache` avant de pousser |
 | tests écartés par défaut | marqueurs `e2e` et `postgresql`, écartés sauf s'ils sont nommés par `-m` (`tests/conftest.py:118-130`) | un test marqué `postgresql` ne tourne que dans `tests-postgresql` |
 | contrôles requis à la fusion | le ruleset de `main` | un job nouveau n'est pas requis tant qu'il n'est pas ajouté au ruleset |
-| fréquence et attente de Dependabot | `dependabot.yml`: chaque semaine, 7 jours d'attente pour une version nouvelle (`cooldown`, l. 8-9 et 15-16), sauf une mise à jour de sécurité (l. 9) et `astral-sh/uv`, dont ghcr.io ne donne pas la date, à vérifier à la main avant la fusion (l. 17-19), ni version mineure ni majeure de `python` et d'`astral-sh/uv` (l. 24-28) | à la main |
+| fréquence et attente de Dependabot | `dependabot.yml`: chaque semaine, 7 jours d'attente pour une version nouvelle (`cooldown`, l. 8-9 et 15-16), sauf une mise à jour de sécurité (l. 9) et `astral-sh/uv`, dont ghcr.io ne donne pas la date, à vérifier à la main avant la fusion (l. 17-19). Pour `python` et `astral-sh/uv`, ni version mineure ni majeure (l. 24-28) | à la main |
 
 Une action nouvelle s'écrit par son SHA complet, sa version en commentaire: le dépôt refuse une action non épinglée
 (`sha_pinning_required`).
@@ -216,7 +218,7 @@ d'`image-build` et de `bicep-build` ne refont qu'une partie du job:
 | `types` | `uv run mypy --strict` |
 | `tests-postgresql` | `KB_TEST_POSTGRESQL_URL=<URL d'un serveur> uv run pytest -m postgresql` |
 | `tests-data` | `uv run pytest tests/etl tests/test_schema.py tests/test_items.py tests/ai_api/test_watch_items.py` |
-| `image-build` | `docker buildx build --platform linux/amd64 --tag k-b .`, puis `docker run --rm k-b --help`; les étapes 2, 3, 5 à 7 et le `create-db` de l'étape 8 (`image.yml:22-61`) se refont une à une |
+| `image-build` | `docker buildx build --platform linux/amd64 --tag k-b .`, puis `docker run --rm k-b --help`; les autres étapes (`image.yml:22-61`) ne tournent que sur le runner: elles écrivent dans `$RUNNER_TEMP` et plantent des fichiers dans l'arbre de travail; leur résultat se lit dans le journal du job (`gh run view <id> --log`) |
 | `bicep-build` | `az bicep install --version v0.48.1`, puis `az bicep build --file infra/main.bicep --stdout > /dev/null`; sans le contrôle du SHA256 (`infra.yml:25`) |
 
 **Sur GitHub, une PR témoin**: [#533](https://github.com/SabineLaurent/K-B/pull/533), fusionnée le 2026-11-09, ne
@@ -276,16 +278,18 @@ Chaque parade a été vérifiée à la source le 2026-11-10 (sources en fin de l
   droits). Pour `bicep-build`, GitHub conseille de ne pas exiger un workflow qui peut être sauté: un workflow sauté par
   son filtre de chemins laisse ses contrôles « Pending » et bloque la fusion, alors qu'un job sauté par une condition
   (`if:`) rend « Success ». Le filtre passerait du déclencheur d'`infra.yml` à une condition du job, calculée par un
-  job préalable, avec `always()`: sans lui, un job dont le préalable échoue est sauté et ne bloque pas la fusion
-  (faisable avec nos droits, un changement d'`infra.yml`).
+  job préalable; `bicep-build` devrait alors échouer si ce préalable n'a pas réussi (`always()` et un test de
+  `needs.<id>.result`), car sinon il est sauté, et un job sauté peut ne pas bloquer la fusion (faisable avec nos
+  droits, un changement d'`infra.yml`).
 - **Les tests de bout en bout ne tournent pas en CI**: les tests marqués `e2e` appellent les vraies sources et
   services; ils se lancent sur le poste ([la fiche des tests](tests_pour_docu.md)).
   Pour réduire le risque: un workflow planifié (`on: schedule`, sur la branche par défaut) lancerait
   `pytest -m e2e`. C'est faisable avec nos droits, les clés des sources en secrets du dépôt, mais pas pour tout: les
   tests de Zotero et des clips lisent des fichiers du poste et seraient sautés. Le prix: des appels réels, dont une
   vraie requête BigQuery pour `gh_archive`, et des clés de plus dans GitHub. Le dépôt est privé
-  (`gh api repos/SabineLaurent/K-B` → `"visibility":"private"`): un workflow planifié y prend les minutes du compte,
-  puis est facturé; public, il serait gratuit, mais coupé après 60 jours sans activité.
+  (`gh api repos/SabineLaurent/K-B` → `"visibility":"private"`): un workflow planifié y prend sur l'usage inclus du
+  compte, compté en montant; au-delà, il est payé s'il y a un moyen de paiement, dans la limite des budgets, et
+  bloqué sinon. Public, il serait gratuit, mais coupé après 60 jours sans activité.
 - **L'image n'est pas scannée**: `audit` lit les paquets Python de `uv.lock`, pas les paquets du système de l'image
   de base.
   Pour réduire le risque: scanner l'image `k-b:ci` dans `image-build`, par exemple par Grype (`anchore/scan-action`,
@@ -295,7 +299,7 @@ Chaque parade a été vérifiée à la source le 2026-11-10 (sources en fin de l
   Faisable avec nos droits: une action publique, épinglée par son SHA, sans secret. En attendant, Dependabot propose
   chaque semaine le nouveau digest des images de base du `Dockerfile` (`dependabot.yml:10-16`).
 - **Aucun délai propre aux jobs**: aucun `timeout-minutes` dans `ci.yml`, `image.yml` ni `infra.yml`; le délai par
-  défaut de GitHub s'applique, 360 minutes par job, prises sur les minutes du compte tant que le
+  défaut de GitHub s'applique, 360 minutes par job, prises sur l'usage inclus du compte tant que le
   dépôt est privé.
   Pour réduire le risque: un `timeout-minutes` par job, à quelques fois sa durée observée (1 min 21 s au plus sur
   #533). Faisable avec nos droits, par un changement des workflows.
@@ -309,10 +313,12 @@ Sources, lues le 2026-11-10: GitHub Docs,
 [« Troubleshooting required status checks »](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)
 (« Handling skipped but required checks »),
 [« Events that trigger workflows »](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
-(`schedule`) et
+(`schedule`),
 [« Workflow syntax »](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)
 (`jobs.<job_id>.timeout-minutes`),
 [« Re-running workflows and jobs »](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs)
-(30 jours) et [« GitHub Actions billing »](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
-(dépôt privé); le dépôt [anchore/scan-action](https://github.com/anchore/scan-action), son
+(30 jours), [« GitHub Actions billing »](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
+(dépôt privé) et
+[« Available rules for rulesets »](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets)
+(Copilot); le dépôt [anchore/scan-action](https://github.com/anchore/scan-action), son
 `action.yml` et sa dernière release, v7.4.2 (2026-08-28).
