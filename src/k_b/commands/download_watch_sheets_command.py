@@ -1,4 +1,4 @@
-"""kb download-watch-sheets, run on the Mac by make download-watch-sheets (#424): each sheet of the
+"""kb download-watch-sheets, run on the Mac by make download-watch-sheets: each sheet of the
 container watch that veille lacks is copied there, by the Entra account of az login.
 
 A sheet in veille is never downloaded nor replaced, changed on the Mac or not; one deleted there

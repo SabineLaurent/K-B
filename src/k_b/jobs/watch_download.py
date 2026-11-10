@@ -1,6 +1,6 @@
-"""The sheets of the container watch for the Mac (#424): a blob is a sheet only by a closed list of
-names, <folder>/<day>.md under a folder kb writes, and its text holds nothing kb never writes; each
-is downloaded as listed.
+"""The sheets of the container watch for the Mac: a blob is a sheet only by a closed list of names,
+<folder>/<day>.md under a folder kb writes, and its text holds nothing kb never writes; each is
+downloaded as listed.
 
 Two identities of jobs write in watch: its names and its texts are inputs, never trusted. A name out
 of the list is never logged, its position in the listing instead (conventions.md, rule 3)."""
@@ -16,7 +16,11 @@ from typing import Literal
 
 from azure.storage.blob import BlobProperties, ContainerClient
 
-from k_b.core.config import MAX_WATCH_LISTED_BLOBS, MAX_WATCH_SHEET_BYTES
+from k_b.core.config import (
+    BIDI_CONTROLS,
+    MAX_WATCH_LISTED_BLOBS,
+    MAX_WATCH_SHEET_BYTES,
+)
 from k_b.jobs.clip_mirror import describe_counter, download_listed_version
 from k_b.jobs.exchange_storage import ExchangeStorageError, naming_storage_errors
 
@@ -30,8 +34,8 @@ SHEET_NAME = re.compile(
     r"(?P<folder>[a-z_]{1,64}(?:/[a-z_]{1,64})?)"
     r"/(?P<day>[0-9]{4}-[0-9]{2}-[0-9]{2})\.md"
 )
-# The controls a sheet of kb holds: neutralize_text (post/vault_files.py) turns any other into a
-# space.
+# The controls a sheet of kb holds: neutralize_text (post/vault_files.py) turns any other, and
+# each of BIDI_CONTROLS, into a space.
 SHEET_CONTROL_CHARACTERS = frozenset("\t\n")
 CONTROL_CATEGORY = "Cc"
 
@@ -44,6 +48,7 @@ type SheetRefusal = Literal[
     "sheet_too_large",
     "sheet_text_not_utf8",
     "sheet_text_with_control_character",
+    "sheet_text_with_bidirectional_control",
 ]
 
 
@@ -174,8 +179,8 @@ def download_sheet(
 
 
 def find_sheet_text_refusal(content: bytes) -> SheetRefusal | None:
-    """Why the text is not one kb writes: not UTF-8 (a lone surrogate neither), or a control
-    character but tab and line feed; None when it is."""
+    """Why the text is not one kb writes: not UTF-8 (a lone surrogate neither), a control
+    character but tab and line feed, or a bidirectional control; None when it is."""
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError:
@@ -186,6 +191,8 @@ def find_sheet_text_refusal(content: bytes) -> SheetRefusal | None:
         for character in text
     ):
         return "sheet_text_with_control_character"
+    if any(character in BIDI_CONTROLS for character in text):
+        return "sheet_text_with_bidirectional_control"
     return None
 
 

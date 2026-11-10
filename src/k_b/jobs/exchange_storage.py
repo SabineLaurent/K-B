@@ -1,5 +1,5 @@
 """The exchange storage, Azure Blob Storage, reached by the managed identity of a job, or on the Mac
-by the account of az login (#424): its settings, its clients, and its errors named without what the
+by the account of az login: its settings, its clients, and its errors named without what the
 storage answers.
 
 A blob is named by its path, the title of a clip for one (etl/sources/clipping.py): K-B never
@@ -161,11 +161,11 @@ def open_container_client(
 
 def check_identity(credential: TokenCredential) -> None:
     """Ask the token of the storage for the identity, which ManagedIdentityCredential keeps for the
-    requests that follow; AzureCliCredential asks az again at the first request. Any failure is exchange_storage_no_token: the class of an error of
-    azure-identity does not tell a refusal from an outage (a 500 in JSON is
-    CredentialUnavailableError, as a client id it does not know), and none carries the HTTP status
-    of the endpoint (azure-identity 1.27.0: 400, 401, 403, 404, seen on 2026-11-06; review of
-    #412)."""
+    requests that follow; AzureCliCredential asks az again at the first request. Any failure is
+    exchange_storage_no_token: the class of an error of azure-identity does not tell a refusal from
+    an outage (a 500 in JSON is CredentialUnavailableError, as a client id it does not know), and
+    none carries the HTTP status of the endpoint (azure-identity 1.27.0: 400, 401, 403, 404, seen on
+    2026-11-06; review of #412)."""
     try:
         credential.get_token(STORAGE_SCOPE)
     # ValueError and AttributeError: an answer that is not a JSON object (a 500 in HTML, a list),

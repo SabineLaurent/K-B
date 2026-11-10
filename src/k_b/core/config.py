@@ -448,6 +448,13 @@ WATCH_DIR_NAME = "veille"
 TOPS_DIR_NAME = "tops"
 TRENDS_DIR_NAME = "tendances"
 
+# The format characters that reorder a line as it is displayed (Unicode bidirectional controls
+# and marks, UAX #9): neutralize_text (post/vault_files.py) turns each into a space, and kb
+# download-watch-sheets refuses a sheet that holds one. U+200D, which joins the emojis, is kept.
+BIDI_CONTROLS = frozenset(
+    "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+)
+
 # The bound of a digest request, from its arrival: the reading by the data API and every call to
 # the model, which go one after the other. Under the 240 seconds the HTTP ingress of Azure
 # Container Apps gives a request, with 40 for the last call under way and the answer. Measured by

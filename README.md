@@ -639,15 +639,17 @@ make download-watch-sheets
   9 sujets, `tops/most_starred`, `tops/most_forked`, `tendances`. Un nom de cette forme d'un autre
   dossier (un sujet ajouté ou retiré) est laissé de côté, sans échec. Tout autre nom est refusé, cité
   par sa position (`blob 3 of 12`), jamais écrit ; les autres fiches sont copiées quand même. Refusés
-  aussi : un blob de plus de 4 000 000 octets, un texte qui n'est pas de l'UTF-8 ou qui porte un
-  caractère de contrôle autre que la tabulation et le retour à la ligne. Au-delà de 20 000 blobs, la
-  liste s'arrête et la commande échoue.
+  aussi : un blob de plus de 4 000 000 octets, un texte qui n'est pas de l'UTF-8, qui porte un
+  caractère de contrôle autre que la tabulation et le retour à la ligne, ou un contrôle bidirectionnel
+  (`BIDI_CONTROLS`, que kb n'écrit jamais). Au-delà de 20 000 blobs, la liste s'arrête et la commande
+  échoue.
 - `veille/` ou un de ses dossiers en lien symbolique est refusé ; un temporaire laissé par une écriture
   interrompue (`veille/<dossier>/.<jour>.md.tmp`) fait échouer sa fiche, nommé par son chemin : le
   supprimer à la main.
 
-Code de sortie : 0 ; 4 quand un blob est refusé ou une fiche non écrite, une autre étant dans `veille/` ;
-1 quand aucune ne l'est, ou que le stockage n'est pas joint (sans `az login` :
+Code de sortie : 0 ; 4 quand un blob est refusé, une fiche non écrite, la liste arrêtée à 20 000 blobs
+ou le stockage en erreur pendant le téléchargement, une autre fiche de `watch` étant dans `veille/` ;
+1 dans les mêmes cas quand aucune ne l'est, ou que le stockage n'est pas joint (sans `az login` :
 `exchange_storage_no_token`) ; 2 quand un réglage manque ou est refusé (un coffre qui n'existe pas n'est
 jamais créé) ; 130 : SIGINT, 143 : SIGTERM.
 
@@ -665,7 +667,7 @@ Limites, chacune avec sa parade :
   (CVE-2021-42057).
 - **`az` reçoit tout l'environnement** que `uv run --env-file` charge, secrets du `.env` compris
   (azure-identity le passe au processus d'`az`). Parade : un fichier d'environnement réduit pour cette
-  cible ; pas fait.
+  cible, faisable avec nos droits (un fichier sur le Mac, sans droit Azure) ; pas fait.
 - **Les limites de l'écriture du coffre** (`post/vault_files.py`) : un lien posé après le contrôle est
   suivi, et une fiche qu'un autre programme écrit entre le contrôle et le renommage est remplacée.
 - **Le disque** : au pire, 20 000 blobs de 4 000 000 octets. Parade : une borne d'octets par passage, du

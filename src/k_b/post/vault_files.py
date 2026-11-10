@@ -12,12 +12,8 @@ import unicodedata
 from pathlib import Path
 
 from k_b.core.atomic_write import TemporaryFileFoundError, write_file_atomically
+from k_b.core.config import BIDI_CONTROLS
 
-# The format characters that reorder a line as it is displayed (Unicode bidirectional controls
-# and marks, UAX #9). U+200D, which joins the emojis, is kept.
-BIDI_CONTROLS = frozenset(
-    "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
-)
 # The characters a text loses: the controls (Cc) and the lone surrogates (Cs), which UTF-8
 # cannot encode.
 REMOVED_CATEGORIES = frozenset({"Cc", "Cs"})

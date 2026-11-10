@@ -6386,7 +6386,7 @@ de Sabine du 10/11).
   `azcopy copy --recursive --overwrite=false`, où AzCopy bâtit lui-même le chemin local à partir du nom ;
   `azcopy list`, puis `--include-path`, qui demande deux outils et la lecture d'une sortie texte. Limite assumée :
   `az` reçoit tout l'environnement que charge `uv run --env-file`, secrets compris ; parade, un fichier
-  d'environnement réduit pour cette cible, pas faite. — PR de #424
+  d'environnement réduit pour cette cible, faisable avec nos droits, pas faite. — PR de #424
 - **Une liste fermée de noms : `<dossier>/<jour>.md`, le dossier exactement l'un de ceux où écrivent les écrivains de
   `post/` (les 9 sujets, `tops/<top>`, `tendances`). Un nom de cette forme d'un autre dossier est laissé de côté, sans
   échec ; tout autre nom est refusé, cité par sa position, jamais écrit, et ne bloque pas les fiches valides.**
@@ -6403,8 +6403,9 @@ de Sabine du 10/11).
   une fiche supprimée sur le Mac revient tant que `watch` la porte ; parade, la supprimer dans `job-data`, puis dans
   `watch`, puis sur le Mac, par un rôle temporaire (registre des traitements, « Procédure de tri », étape 9). — PR de
   #424
-- **Un blob de plus de 4 000 000 octets est refusé, comme un texte qui n'est pas de l'UTF-8 ou qui porte un caractère
-  de contrôle autre que la tabulation et le retour à la ligne ; la liste s'arrête à 20 000 blobs.** Pourquoi :
+- **Un blob de plus de 4 000 000 octets est refusé, comme un texte qui n'est pas de l'UTF-8, qui porte un caractère
+  de contrôle autre que la tabulation et le retour à la ligne, ou un contrôle bidirectionnel ; la liste s'arrête à
+  20 000 blobs.** Pourquoi :
   borner ce qu'une identité de job peut faire écrire sur le Mac (OWASP API4:2023), et refuser ce que kb n'écrit
   jamais. 4 000 000 : le double d'une réponse de l'API IA non échappée (`MAX_AI_API_ANSWER_BYTES`), supposé, pas
   mesuré ; 20 000 : environ 4 ans de fiches à 12 dossiers. Limites assumées : du Markdown actif reste possible (parade,

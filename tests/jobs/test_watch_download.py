@@ -159,6 +159,11 @@ def test_a_listing_longer_than_the_bound_stops_and_fails_the_sheets_listed_kept(
         (b"# models\r\n", "sheet_text_with_control_character"),
         (b"# models\x1b[2J", "sheet_text_with_control_character"),
         ("# models\u0085".encode(), "sheet_text_with_control_character"),
+        # Right-to-left override, left-to-right isolate, Arabic letter mark: neutralize_text
+        # turns each into a space.
+        (("# models" + chr(0x202E)).encode(), "sheet_text_with_bidirectional_control"),
+        (("# models" + chr(0x2066)).encode(), "sheet_text_with_bidirectional_control"),
+        (("# models" + chr(0x061C)).encode(), "sheet_text_with_bidirectional_control"),
     ],
 )
 def test_a_text_kb_never_writes_is_refused(content, refusal):
@@ -167,6 +172,11 @@ def test_a_text_kb_never_writes_is_refused(content, refusal):
 
 def test_a_text_of_lines_and_tabs_in_utf_8_is_a_sheet():
     assert find_sheet_text_refusal("# Modèles\n\n\t- un dépôt\n".encode()) is None
+
+
+def test_the_zero_width_joiner_of_an_emoji_is_kept_in_a_sheet():
+    emoji = chr(0x1F469) + chr(0x200D) + chr(0x1F4BB)
+    assert find_sheet_text_refusal(f"# models {emoji}\n".encode()) is None
 
 
 def test_the_result_names_each_outcome_and_its_reasons():
