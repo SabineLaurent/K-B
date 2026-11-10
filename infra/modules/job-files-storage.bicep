@@ -24,8 +24,8 @@ resource account 'Microsoft.Storage/storageAccounts@2026-06-01' = {
     name: 'Standard_LRS'
   }
   properties: {
-    // The hardening of stkbexchange. The key cut is under test (#420): Microsoft advises against it on an
-    // account of Azure Files, and the mount by identity may not need the key.
+    // The hardening of stkbexchange, the key cut included: the mount by identity works without the key (trial
+    // of #420, 2026-11-10), though Microsoft advises against the cut on an account of Azure Files.
     allowSharedKeyAccess: false
     defaultToOAuthAuthentication: true
     allowBlobPublicAccess: false
