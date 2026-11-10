@@ -6452,6 +6452,19 @@ de Sabine du 10/11).
   (Templater et « Trigger Templater on new file creation ») reste hors de ce contrôle ; parade, ce déclencheur
   inactif ou `veille/` dans ses « Excluded folders » (réglages de Templater, lus le 2026-11-10), faisable avec nos
   droits, à vérifier par Sabine sur son coffre avec le JavaScript de Dataview désactivé. — PR de #424
+- **Refusés aussi : une référence de caractère non échappée (`&#x202E;`, `&rlm;`), même dans un autolien, et un `\`
+  dans un autolien ; une URL de source qui contient `~~~` n'est plus écrite en autolien, mais « (sans URL) ».**
+  Tranché par time-knight sur les deuxième et troisième `/code-review` de #424, sous la délégation de Sabine du 15/10 ;
+  complète la puce précédente. Pourquoi : CommonMark décode une référence en contrôle bidirectionnel, même dans un
+  autolien, ce qui contournait le refus des contrôles bidirectionnels ; un `\` n'échappe rien dans un autolien
+  (CommonMark 0.31.2, § 6.5) et y laissait la référence décodée ; kb n'écrit ni l'un ni l'autre
+  (`CHARACTER_REFERENCE`, `URL_CHARACTERS`). Une URL qui contenait `~~~` faisait refuser par la descente toute la
+  fiche du sujet et du jour, et non sa seule source. `CHARACTER_REFERENCE` passe dans `core/config.py` : une seule
+  définition pour les écrivains et la descente (`jobs/` n'importe pas `post/`). Options écartées : échapper `~` dans
+  les descriptions des tops (le faux positif accepté à la puce précédente reste) ; une regex des références plus
+  étroite, à la grammaire de CommonMark, que celle des écrivains (règle de Sabine du 2026-10-21, une règle pour les
+  deux écrivains : la descente refuse exactement ce qu'ils échappent). Non vérifié : qu'Obsidian décode une référence
+  dans un autolien comme cmark-gfm ; le refus vaut dans les deux cas. — PR de #424
 
 ## Décisions encore ouvertes
 
