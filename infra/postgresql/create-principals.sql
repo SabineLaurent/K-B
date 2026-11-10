@@ -4,7 +4,7 @@
 -- Each role is tied to its identity by the object id of its service principal (principalId of
 -- az identity show), not by its name: an identity of another resource group of the directory may
 -- bear the same name (Microsoft Learn, "Manage Microsoft Entra roles", read on 2026-11-06).
--- grant-roles.sql comes next, on the base kb.
+-- create-daily-routine-principal.sql (#330) comes next, then grant-roles.sql on the base kb.
 \set ON_ERROR_STOP on
 
 SELECT * FROM pg_catalog.pgaadauth_create_principal_with_oid(

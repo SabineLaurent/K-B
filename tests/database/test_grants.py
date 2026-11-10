@@ -31,13 +31,6 @@ def migrated_base(administered_base):
     return administered_base
 
 
-@pytest.fixture
-def daily_routine_member(identity_roles, postgresql_server_url):
-    """The daily routine a member of kb_writer, as #330 will make it on Azure."""
-    with psycopg.connect(postgresql_server_url, autocommit=True) as server:
-        server.execute(f'GRANT kb_writer TO "{DAILY_ROUTINE_ROLE}"')
-
-
 def connect_as(location, role):
     """A plain connection under role: not one of the pool, whose READ ONLY would refuse the write
     by itself (25006), whatever the rights of the role."""
@@ -71,7 +64,7 @@ def test_the_data_api_writes_nothing_in_the_base(migrated_base, statement):
 
 
 def test_the_daily_routine_writes_the_data_of_a_table_with_an_identity_column(
-    migrated_base, daily_routine_member
+    migrated_base,
 ):
     with connect_as(migrated_base, DAILY_ROUTINE_ROLE) as writer:
         (source_id,) = writer.execute(f"{INSERT_SOURCE} RETURNING id").fetchone()
@@ -81,7 +74,7 @@ def test_the_daily_routine_writes_the_data_of_a_table_with_an_identity_column(
         writer.execute("DELETE FROM source WHERE id = %s", (source_id,))
 
 
-def test_the_daily_routine_changes_no_table(migrated_base, daily_routine_member):
+def test_the_daily_routine_changes_no_table(migrated_base):
     with (
         connect_as(migrated_base, DAILY_ROUTINE_ROLE) as writer,
         pytest.raises(errors.InsufficientPrivilege),
