@@ -1,5 +1,6 @@
 // K-B on Azure. Applied by hand by Sabine to her resource group (infra/README.md), checked by the CI.
-// Two passes: without imageTag, the foundation (logs, registry, vault, identities, exchange storage, PostgreSQL server);
+// Two passes: without imageTag, the foundation (logs, registry, vault, identities, the two storage accounts,
+// PostgreSQL server);
 // once the image is pushed and the secrets set, with imageTag, the two APIs and the two jobs.
 targetScope = 'resourceGroup'
 
@@ -40,6 +41,9 @@ var identityNames = {
   smokeTest: 'id-kb-smoke-test'
   // The continuous deployment (#415), signed in from GitHub Actions; it pulls nothing.
   deploy: 'id-kb-deploy'
+  // Born with their roles on the exchange storage (#420), before their jobs (#330 for the routine).
+  dailyRoutine: 'id-kb-daily-routine'
+  digestWatch: 'id-kb-digest-watch'
 }
 // The apps and the jobs the continuous deployment updates, also read by .github/workflows/deploy.yml: a job
 // added to the Bicep goes in this list too.
@@ -109,10 +113,24 @@ module exchangeStorage 'modules/exchange-storage.bicep' = {
     tags: tags
     suffix: suffix
     smokeTestIdentityName: identityNames.smokeTest
+    dailyRoutineIdentityName: identityNames.dailyRoutine
+    digestWatchIdentityName: identityNames.digestWatch
+    operatorObjectId: operatorObjectId
   }
   dependsOn: [
     identities
   ]
+}
+
+// The environment first, for its identity; then the role, then the storage of the environment.
+module jobFilesStorage 'modules/job-files-storage.bicep' = {
+  params: {
+    location: location
+    tags: tags
+    suffix: suffix
+    environmentName: containerAppsEnvironment.outputs.name
+    environmentPrincipalId: containerAppsEnvironment.outputs.principalId
+  }
 }
 
 module budget 'modules/budget.bicep' = {
