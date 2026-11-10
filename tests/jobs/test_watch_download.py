@@ -188,6 +188,13 @@ def test_a_listing_longer_than_the_bound_stops_and_fails_the_sheets_listed_kept(
         (b"- &rlm;a\n", "sheet_text_with_character_reference"),
         (b"- <https://x.example/&#x202E;>\n", "sheet_text_with_character_reference"),
         (b"- a \\\\&rlm;\n", "sheet_text_with_character_reference"),
+        # A backslash in an autolink, where it escapes nothing (CommonMark 0.31.2, 6.5) and the
+        # reference after it is still decoded (third code review, finding 1).
+        (
+            b"- <https://x.example/\\&#x202E;txt.exe>\n",
+            "sheet_text_with_backslash_in_autolink",
+        ),
+        (b"- <http://x.example/a\\\\b>\n", "sheet_text_with_backslash_in_autolink"),
     ],
 )
 def test_a_text_kb_never_writes_is_refused(content, refusal):
@@ -205,6 +212,8 @@ def test_a_text_of_lines_and_tabs_in_utf_8_is_a_sheet():
         "- \\`code\\` \\~\\~\\~ !\\[image\\](url) \\<b\\> \\\\\\`",
         # An escaped character reference; another & stays as it is.
         "- R&D \\&rlm; \\&#x202E; <https://example.com/a?b=1&c=2>\n",
+        # An autolink of a text of a source, escaped as kb writes it: no autolink.
+        "| 1 | \\<https://x.example/\\&\\#x202E;\\> |\n",
         # The autolinks, the links of the tops and the tildes of a URL kb writes.
         "- Titre — <https://example.com/~user/a>\n",
         "- <http://example.com/>\n",
