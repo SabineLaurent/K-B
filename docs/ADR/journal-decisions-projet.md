@@ -6251,6 +6251,79 @@ Langfuse Cloud (UE), LangSmith (UE) et Honeycomb, selon les critères de « Wiki
     (`tests/data_api/test_item_router.py`), sur les deux moteurs.
   — PR de #430
 
+## 2026-11-10
+
+### Stockage en ligne : `job-data` et les conteneurs d'échange (#420)
+
+Plan validé par Sabine le 10/11 (« Plan validé : A, B, C (a), D accepté »), relu par un sous-agent neuf et par
+time-knight. Appliqué par Sabine le 10/11 ; les essais sont dans `infra/README.md`, « Vérifier les critères de #420 ».
+
+- **Deux comptes : Files pour les jobs (`stkbjobfiles…`, partage `job-data`, que le Mac ne touche jamais), Blob pour
+  les échanges avec le Mac (`stkbexchange…` : `clippings` et `zotero` montent, `watch` descend), sans conteneur
+  `wiki`.** Décision 3 de Sabine du 06/11. Pourquoi : les jobs ont besoin d'un dossier qui dure, et le Mac n'échange
+  avec Azure que par des dossiers à sens unique (issue #420). Pas de `wiki` : aucune identité ne pourrait y écrire ;
+  un vrai ingest du wiki sur Azure reste #170. — PR de #420
+- **Le sens des échanges est tenu par les rôles : un par identité et par conteneur, aucun sur le compte.
+  `id-kb-daily-routine` lit `clippings` et `zotero` et écrit `watch` ; `id-kb-digest-watch` écrit `watch` ; Sabine
+  écrit `clippings` et `zotero` et lit `watch` ; les API et `id-kb-migrate-database` n'ont rien.** Décision 4 de
+  Sabine du 06/11, le verrou de sens. Pourquoi : la clé partagée coupée, une synchronisation à l'envers échoue en 403.
+  Observé le 10/11 : depuis le Mac, `watch` refuse et `clippings` accepte ; sous `id-kb-daily-routine`, `clippings`
+  refuse (403 `AuthorizationPermissionMismatch`) et `watch` accepte. Les deux tables du Bicep (`principalKeys`,
+  `principals`) viennent de BCP120 : le nom d'un rôle doit être connu au début du déploiement, un `principalId` ne
+  l'est qu'une fois l'identité créée. — PR de #420
+- **Versions ; suppression réversible des blobs et des conteneurs, 30 jours ; les copies Zotero (`zotero/…`)
+  effacées à 14 jours avec leurs versions ; rien n'efface `clippings` ; personne n'a Storage Blob Data Owner.**
+  Décision 6 du 06/11 (les versions dès #420) et constats 3 à 5 de la relecture du plan. Pourquoi : la suppression
+  réversible des conteneurs est la seule parade à un `clippings` supprimé par erreur ; `prefixMatch: ["zotero/"]`,
+  sans quoi la règle toucherait `clippings` ; `version.delete`, sans quoi chaque copie effacée resterait en version
+  précédente, sans fin ; `clippings` sans règle : « ce que je dépose moi dans kb n'est jamais supprimé
+  automatiquement » (Sabine, 04/11). Limite assumée, écrite au registre : les versions des clips et des fiches sont
+  gardées sans limite, contre la minimisation que demande le RGESN (critère 1.6) ; en effacer une demande un rôle
+  Owner temporaire et la levée du verrou. — PR de #420
+- **Un verrou `CanNotDelete` sur chaque compte.** Pourquoi : contre l'erreur de manipulation (issue #420). Écarté :
+  `ReadOnly`, qui bloquerait les attributions de rôle. Limites : il n'arrête pas un Owner, qui peut le lever, et son
+  geste reste au journal d'activité ; il bloque aussi la suppression d'un rôle sur le compte ou ses conteneurs, et
+  celle d'un instantané : le lever, agir, le reposer (`infra/README.md`). — PR de #420
+- **`job-data` est monté par l'identité système de `cae-kb` (Storage File Data SMB MI Admin sur `stkbjobfiles…`),
+  pas par une identité attribuée par l'utilisateur.** Choix de la session, sur le constat 15 de la relecture du plan.
+  Pourquoi : une identité attribuée pourrait être attachée à une autre ressource par un Contributor, qui aurait alors
+  l'accès SMB admin à tout le compte ; l'identité système reste liée à `cae-kb`, et fait une ressource de moins. Son
+  `principalId` se lit dans le même déploiement : l'environnement, puis le rôle, puis le stockage de l'environnement.
+  Écarté : la convention `id-kb-<pièce>`, faite pour les identités qui doivent exister avant leur pièce. Limite
+  assumée : le rôle appartient à l'environnement, et toute app ou tout job de `cae-kb` qui déclare le volume monte le
+  partage. Seuls les jobs de #330 le déclareront : une convention, pas un contrôle, que `id-kb-deploy` peut contourner
+  (registre, « Déploiement continu »). — PR de #420
+- **La clé partagée est coupée aussi sur `stkbjobfiles…`, et le repli par la clé n'est pas codé.** Choix B du plan,
+  validé par Sabine le 10/11 : rien d'écrit d'avance pour le repli, car un repli jamais essayé ne prouve rien ; une
+  clé ouverte lui serait revenue, puis à une revue de sécurité. **Revient sur le repli demandé par Sabine le 06/11**
+  (issue #420 : montage par la clé du seul `stkbjobfiles`, `listKeys()` dans Bicep, paramètre `filesAuth`), rendu
+  inutile par l'essai du 10/11 : le partage se monte par l'identité, clé coupée. Observé aussi : les options
+  `uid=10001,gid=10001,dir_mode=0700,file_mode=0600`, que la doc ne décrit pas pour ce montage, tiennent (partage en
+  `10001` et `0700`, fichier écrit par `write_file_atomically` en `0600`). Limite : la doc de Microsoft déconseille
+  de couper la clé d'un compte Files. — PR de #420
+- **Instantanés de `job-data` : un avant l'amorçage (#330), un avant chaque mise en production, pris et supprimés à
+  la main par Sabine, gardés 7 jours au plus, chacun avec sa date de suppression (`delete_after`).** Décision de
+  Sabine du 10/11 (choix C (a), recommandé par la session). Pourquoi : un instantané sert à revenir sur une mise en
+  production ratée, ce qui se voit en un ou deux jours ; la suppression réversible de Files ne vaut que pour le
+  partage entier. **Écart accepté à la règle du 04/11** (« le brut est gardé 6 mois au plus ») : un brut vit au plus
+  6 mois et 7 jours, écrit au registre, et un effacement à la demande touche aussi les instantanés. Écartées : aucun
+  instantané, qui tient les 6 mois mais laisse un amorçage ou une mise en production ratés sans retour ; Azure Backup,
+  un coffre, une stratégie, un coût, et le même écart. Limite : la borne de 7 jours tient par la date reprise dans la
+  mission suivante, pas par du code. — PR de #420
+- **Risque accepté par Sabine le 10/11 (choix D) : des tiers de l'organisme peuvent atteindre ces données.** Lu ce
+  jour-là : 5 rôles Owner au groupe d'administration ; à l'abonnement, 1 Owner, 4 User Access Administrator et
+  1 Contributor ; Sabine n'y est que Reader. Un Owner ou un User Access Administrator peut se donner un rôle de
+  données et lever les verrous ; un Contributor peut rouvrir la clé partagée, ou créer un job qui monte `job-data`.
+  Pourquoi l'accepter : rien dans les droits de Sabine ne l'empêche, son rôle de Reader ne permet aucune politique de
+  refus. Prolonge le risque accepté le 06/11 (« destinataires possibles chez l'organisme »), cette fois avec des
+  données (registre, « Droits d'accès »). — PR de #420
+- **Les critères qui demandent l'identité d'un job à venir sont essayés par une sonde écrite dans le modèle de
+  `caj-kb-smoke-test`, le temps d'un commit d'essai, retiré par un revert et une seconde passe.** Choix A du plan,
+  validé par Sabine le 10/11. Pourquoi : une exécution ne change ni les identités ni les volumes, et sa surcharge
+  remplace tout le modèle. Écarté : reporter ces essais à #330, qui changeait le critère et tranchait le repli trop
+  tard. Limite tenue pendant l'essai : aucune exécution du workflow Deploy tant que la sonde était en ligne,
+  `id-kb-deploy` pouvant lancer le job, donc agir sous `id-kb-daily-routine`. — PR de #420
+
 ## Décisions encore ouvertes
 
 - **Une limite de connexions du serveur** (2026-11-05, #161) : `limit_concurrency` d'uvicorn, écarté
