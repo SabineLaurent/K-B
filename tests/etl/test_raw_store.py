@@ -1,6 +1,6 @@
 import json
+import os
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
 
@@ -28,18 +28,18 @@ def test_write_new_raw_file_refuses_to_overwrite(tmp_path):
     assert raw_file_path.read_bytes() == b"first"
 
 
-def test_a_raw_file_written_by_another_run_after_the_check_is_not_replaced(
+def test_a_raw_file_written_by_another_run_during_the_write_is_not_replaced(
     tmp_path, monkeypatch
 ):
     raw_file_path = tmp_path / "automated_watch" / "fake" / "2026-09-30T100000Z.json"
-    write_new_raw_file(raw_file_path, b"another run")
-    real_exists = Path.exists
-    # The check of a run that looked just before the other run wrote.
-    monkeypatch.setattr(
-        Path,
-        "exists",
-        lambda path, **options: path != raw_file_path and real_exists(path, **options),
-    )
+    real_fsync = os.fsync
+
+    def sync_while_another_run_writes(file_descriptor):
+        real_fsync(file_descriptor)
+        if not raw_file_path.exists():
+            raw_file_path.write_bytes(b"another run")
+
+    monkeypatch.setattr(os, "fsync", sync_while_another_run_writes)
 
     with pytest.raises(FileExistsError):
         write_new_raw_file(raw_file_path, b"second")

@@ -170,8 +170,8 @@ def find_sheet_exists_error(report_file: ReportFile) -> VaultEntryRefusedError:
 def write_trend_report_sheet(
     report_file: ReportFile, response: TrendReportResponse, generated: datetime
 ) -> None:
-    """Write the report; a report written meanwhile, by another run too, is refused
-    (sheet_exists), with the limit of post/vault_files.py."""
+    """Write the report; a report written meanwhile is refused (sheet_exists), and one another
+    run is writing (temporary_file_found), with the limits of post/vault_files.py."""
     content = render_trend_report_sheet(response, generated)
     vault_dir = report_file.vault_dir
     if not write_new_sheet(
