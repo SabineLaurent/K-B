@@ -6472,10 +6472,14 @@ Plan validé par Sabine le 10/11 (sortie du mode plan à 10:48Z), relu par un so
 
 - **`kb write-tops` tourne en ligne dans `caj-kb-daily-routine`, sur le coffre de travail de `job-data`, et ses
   fiches descendent au Mac par `watch`.** Plan de mise en ligne du 06/11 (I7), validé par Sabine ; ferme la partie
-  `kb write-tops` de la question ouverte « Où tourne … en ligne » (2026-10-19). Pourquoi : la question venait de ce
-  qu'aucun conteneur ne montait le coffre ; depuis #420, la routine monte `job-data`, où vit le coffre de travail, et
-  la publication de `veille` remet les fiches au Mac sans qu'il touche au partage (décisions 3 et 4 du 06/11).
-  `kb digest` et `kb trend-report` restent ouverts jusqu'à #423 (`caj-kb-digest-watch`). — PR de #330
+  `kb write-tops` de la question ouverte « Où tourne … en ligne » (2026-10-19). Pourquoi, dit par Sabine le 10/11 :
+  « Parce qu'ils font partie du process de collect. Il skip l'import parce qu'ils ne vont pas en bdd et suivent
+  ensuite un parcours de digest sans passage par la case llm puisque tout est déterministe par du code python. » Les
+  relevés des deux tops GitHub viennent de `kb collect`, n'entrent pas en base (`etl/raw_reading.py`, journal du
+  2026-10-07), et leurs fiches sont écrites par du code, sans l'API IA (`post/top_sheets.py`) : leur place est la
+  routine, pas `caj-kb-digest-watch`, qui appelle le modèle. Le montage de `job-data` (#420) lève l'obstacle de la
+  question, qu'aucun conteneur ne montait le coffre. `kb digest` et `kb trend-report` restent ouverts jusqu'à #423
+  (`caj-kb-digest-watch`). — PR de #330
 - **Règle 3 de `.claude/rules/poc.md` amendée : en ligne, le brut reste un fichier sous `KB_DATA_DIR`, sur Azure
   Files ; Blob ne sert qu'aux échanges avec le Mac ; les clés POSIX relatives de `raw_store` restent ; le brut dans
   Blob passe en suite du projet (#317).** Décision 9 de Sabine du 06/11, appliquée dans la PR qui met le brut sur
