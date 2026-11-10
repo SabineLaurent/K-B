@@ -697,7 +697,7 @@ que le Mac ne touche jamais (décisions 3 à 8 du 06/11, journal ADR).
 - **Le sens est tenu par les rôles**, un par identité et par conteneur, aucun sur le compte. Les API et
   `id-kb-migrate-database` n'en ont aucun. Écrire à contresens répond 403 (`AuthorizationPermissionMismatch`).
 - **`job-data` est tenu par le Bicep, pas par une identité** : le rôle appartient à l'environnement. Toute app ou
-  tout job de `cae-kb` qui déclare un volume `job-data` monte le partage. Seuls les jobs de #330 le déclareront.
+  tout job de `cae-kb` qui déclare un volume `job-data` monte le partage. Seuls les jobs de #330 le déclareront : c'est une convention, pas un contrôle. `id-kb-deploy`, qui met à jour les apps et les jobs de `deployment.json`, peut passer outre (registre des traitements, ligne « Déploiement continu »).
 - **Protections de `stkbexchange`** : versions ; suppression réversible des blobs et des conteneurs, 30 jours ;
   les copies Zotero (`zotero/…`) effacées à 14 jours avec leurs versions, par la règle `erase-zotero-copies` (elle
   passe sous 24 heures ; ce qu'elle efface reste 30 jours en suppression réversible). Rien n'efface `clippings`.
@@ -723,10 +723,11 @@ que le Mac ne touche jamais (décisions 3 à 8 du 06/11, journal ADR).
    10 minutes) : relancer la même commande 10 minutes plus tard.
 5. Attendre 10 minutes après la création des rôles, puis vérifier les critères.
 
-La passe du 10/11 portait aussi la sonde de l'essai (commit `8ad8c85`, retiré par un revert) : `caj-kb-smoke-test`
-portait `id-kb-daily-routine`, montait `job-data` et lançait la sonde au lieu de `kb smoke-test`. Aucun tag de
-version ne se pose tant qu'elle est en ligne : le déploiement continu lancerait la sonde, et `id-kb-deploy` pourrait
-agir comme `id-kb-daily-routine`.
+La passe de #420 porte aussi la sonde de l'essai (commit `8ad8c85`, à retirer par un revert : critère 5 ci-dessous) :
+`caj-kb-smoke-test` porte `id-kb-daily-routine`, monte `job-data` et lance la sonde au lieu de `kb smoke-test`.
+**Aucune exécution du workflow Deploy** (ni tag, ni re-run, ni `workflow_dispatch`) tant que la sonde est en ligne
+dans Azure, jusqu'à ce qu'une passe sans la sonde soit appliquée : le revert dans git ne suffit pas. Le workflow
+lancerait la sonde, et `id-kb-deploy` pourrait agir comme `id-kb-daily-routine`.
 
 ### Vérifier les critères de #420
 
