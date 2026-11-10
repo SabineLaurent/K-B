@@ -45,10 +45,15 @@ refuse.
 
 ## 2. Fichier temporaire
 
-**Règle.** Tout fichier que K-B écrit lui-même (brut, état de collecte, journal d'import) passe
+**Règle.** Tout fichier que K-B écrit lui-même (brut, état de collecte, journal d'import, fiche du coffre) passe
 par une seule fonction, `write_file_atomically` : un temporaire **caché** dans le dossier cible
 (nom commençant par `.`), renommé sur la cible, et supprimé sur toute exception, Ctrl-C compris
-(`except BaseException`). Le temporaire est vidé sur le disque (`fsync`) avant le renommage, puis
+(`except BaseException`). Un fichier écrit une fois (brut, fiche du coffre : `replace=False`) a un
+temporaire au nom fixe, `.<nom>.tmp`, créé seulement s'il n'existe pas (`O_EXCL`) : c'est la
+réservation qui empêche deux lancements d'écrire le même fichier. La cible est cherchée dans la
+liste du dossier juste avant le renommage ; présente, elle n'est jamais remplacée
+(`FileExistsError`). Un temporaire trouvé n'est jamais supprimé, car il peut être la réservation
+d'un lancement en cours : l'écriture échoue (`TemporaryFileFoundError`). Le temporaire est vidé sur le disque (`fsync`) avant le renommage, puis
 le dossier, et chaque dossier créé pour l'écriture dans son parent ; un dossier dont le système
 de fichiers refuse le `fsync` (`EBADF`, `EINVAL`, comme PostgreSQL) ne fait pas échouer
 l'écriture (décision de Sabine du 2026-10-16, #62). Limite : sur macOS, `fsync` vide les données
@@ -63,15 +68,20 @@ laissées. Le journal de fonctionnement (`logs/kb.log`, `logs/kb-serve-data.log`
 ajouté ligne à ligne par `logging`, est hors de cette règle : il n'est jamais lu comme une page.
 
 **Vérifier.**
-- `grep -rn "NamedTemporaryFile\|\.tmp\|os\.replace" src/k_b` ne renvoie que
-  `write_file_atomically`.
+- `grep -rn "NamedTemporaryFile\|\.tmp\|os\.replace" src/k_b` ne renvoie que `core/atomic_write.py`
+  (`write_file_atomically` et `open_temporary_file`).
+- `uv run pytest tests/test_atomic_write.py -k "once or another_run"` : un fichier écrit une fois
+  n'est jamais remplacé, le temporaire d'un autre lancement n'est jamais retiré, la liste est lue
+  après le `fsync`.
 - `grep -rn "TemporaryDirectory" src/k_b` ne renvoie que la copie d'une base source.
 - `uv run pytest tests/test_atomic_write.py` : `os.fsync` est appelé sur le temporaire avant le
   renommage, puis sur le dossier, puis sur le parent de chaque dossier créé.
 
 **Pourquoi.** Un nom caché est déjà sauté par l'import (`list_visible_entries`) : un reste
-d'écriture interrompue n'est jamais lu comme une page. Une seule fonction à corriger pour trois
-fichiers. Le `fsync` : le brut est écrit avant l'état de collecte ; sans lui, une coupure de
+d'écriture interrompue n'est jamais lu comme une page. Une seule fonction à corriger pour quatre
+sortes de fichiers. La réservation plutôt qu'`os.link` : le partage SMB d'Azure Files, où écrivent
+les jobs, n'a pas de lien physique (Microsoft Learn, « Plan an Azure Files deployment », lu le
+2026-11-10 ; journal ADR, 2026-11-10). Le `fsync` : le brut est écrit avant l'état de collecte ; sans lui, une coupure de
 courant peut laisser l'état à jour et le brut vide ou tronqué, et la collecte suivante repart de
 la date avancée sans que rien ne le dise.
 
