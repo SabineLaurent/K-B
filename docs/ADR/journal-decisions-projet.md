@@ -6370,6 +6370,47 @@ changes », 8 constats intégrés) et par time-knight.
   essayée). Option écartée : pas d'essai (proposée par le plan, une sonde ne reproduisant pas la course entre deux
   répliques). — PR #539
 
+### Le Mac : les fiches de `watch` par le SDK (#424)
+
+Plan validé par Sabine le 10/11 (« Plan validé : le SDK au lieu d'AzCopy »), relu par un sous-agent sans contexte et
+par time-knight. #424 ne fait plus que `make download-watch-sheets` ; `make upload-library` part dans #542 (décision
+de Sabine du 10/11).
+
+- **`make download-watch-sheets` passe par le SDK déjà installé (`azure-storage-blob`, et `AzureCliCredential` sur le
+  compte d'`az login`), pas par AzCopy.** Choix proposé par la session, validé par Sabine. Pourquoi : chaque nom de
+  blob se contrôle avant toute écriture, alors que deux identités de jobs écrivent dans `watch` (revue de sécurité de
+  #420 : des noms non fiables, une traversée de chemin possible). AzCopy n'est pas installé sur le Mac, `az` l'est ;
+  sans AzCopy, rien n'écrit de journal ni de plan citant les noms (essai 4 de #424 sans objet) ; le SDK ne fait que des
+  appels au conteneur, comme les jobs. Revient, pour la descente, sur l'outil du plan de mise en ligne du 06/11 (I9 :
+  AzCopy v10), recopié dans #424 ; pour la montée, le choix est à reprendre dans #542. Options écartées :
+  `azcopy copy --recursive --overwrite=false`, où AzCopy bâtit lui-même le chemin local à partir du nom ;
+  `azcopy list`, puis `--include-path`, qui demande deux outils et la lecture d'une sortie texte. Limite assumée :
+  `az` reçoit tout l'environnement que charge `uv run --env-file`, secrets compris ; parade, un fichier
+  d'environnement réduit pour cette cible, pas faite. — PR de #424
+- **Une liste fermée de noms : `<dossier>/<jour>.md`, le dossier exactement l'un de ceux où écrivent les écrivains de
+  `post/` (les 9 sujets, `tops/<top>`, `tendances`). Un nom de cette forme d'un autre dossier est laissé de côté, sans
+  échec ; tout autre nom est refusé, cité par sa position, jamais écrit, et ne bloque pas les fiches valides.**
+  « Ne bloque pas » : remarque de tn-orchestrateur, validée par Sabine. Sinon, un seul blob inattendu, que Sabine ne
+  peut pas supprimer (elle n'a que Reader sur `watch`), arrêterait pour toujours tous ses téléchargements. Le code de
+  sortie suit `find_exit_code`, la règle commune : 4 quand une fiche est dans `veille/`, 1 sinon (tranché par
+  time-knight). Les dossiers des tops ont deux niveaux (`tops/most_starred`), que le plan omettait : écart trouvé au
+  code, tranché par time-knight. Un test compare la liste aux trois `find_sheets_dir` de `post/`. — PR de #424
+- **Une fiche déjà dans `veille/` n'est ni téléchargée ni remplacée, même modifiée sur le Mac ; l'écriture passe par
+  `write_new_sheet` (`post/vault_files.py`), qui refuse un lien et ne remplace rien.** Pourquoi : le critère de #424
+  (un second passage copie 0 fichier, une fiche modifiée en local n'est pas écrasée), et une seule règle des liens
+  pour tous les écrivains du coffre. Options écartées : déplacer `vault_files` dans `core/`, pour que `jobs/` l'importe
+  (les trois écrivains du coffre à toucher) ; recopier ses contrôles dans `jobs/`. Limite assumée (constat 12 de #424) :
+  une fiche supprimée sur le Mac revient tant que `watch` la porte ; parade, la supprimer dans `job-data`, puis dans
+  `watch`, puis sur le Mac, par un rôle temporaire (registre des traitements, « Procédure de tri », étape 9). — PR de
+  #424
+- **Un blob de plus de 4 000 000 octets est refusé, comme un texte qui n'est pas de l'UTF-8 ou qui porte un caractère
+  de contrôle autre que la tabulation et le retour à la ligne ; la liste s'arrête à 20 000 blobs.** Pourquoi :
+  borner ce qu'une identité de job peut faire écrire sur le Mac (OWASP API4:2023), et refuser ce que kb n'écrit
+  jamais. 4 000 000 : le double d'une réponse de l'API IA non échappée (`MAX_AI_API_ANSWER_BYTES`), supposé, pas
+  mesuré ; 20 000 : environ 4 ans de fiches à 12 dossiers. Limites assumées : du Markdown actif reste possible (parade,
+  le JavaScript de Dataview désactivé, à vérifier par Sabine sur son coffre) ; au pire, 20 000 blobs de 4 000 000
+  octets sur le disque (parade, une borne d'octets par passage, pas faite). — PR de #424
+
 ## Décisions encore ouvertes
 
 - **Une limite de connexions du serveur** (2026-11-05, #161) : `limit_concurrency` d'uvicorn, écarté
