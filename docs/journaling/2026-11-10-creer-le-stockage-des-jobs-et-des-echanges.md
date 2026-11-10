@@ -156,7 +156,7 @@ modèle. La sonde a donc été écrite **dans le modèle** de `caj-kb-smoke-test
 if not os.path.ismount(root):
     failures.append("job-data is not mounted")
 ```
-`git show <commit d'essai>:infra/modules/smoke-test-job.bicep`, ligne 66
+`git show f10e5e3:infra/modules/smoke-test-job.bicep`, ligne 66
 
 Elle échoue si le partage n'est pas monté. Elle appelle deux fois `write_file_atomically` au même chemin (`:72-73`,
 le remplacement d'un fichier existant), puis tente d'écrire dans `clippings`, où le 403 est attendu, et dans `watch`

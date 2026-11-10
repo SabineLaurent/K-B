@@ -734,7 +734,7 @@ que le Mac ne touche jamais (décisions 3 à 8 du 06/11, journal ADR).
    10 minutes) : relancer la même commande 10 minutes plus tard.
 5. Attendre 10 minutes après la création des rôles, puis vérifier les critères.
 
-La passe de #420 a aussi porté la sonde de l'essai (commit `8ad8c85`, retirée par `921b8ae` : critère 5 ci-dessous) :
+La passe de #420 a aussi porté la sonde de l'essai (commit `f10e5e3`, retirée par `d2f5b6e` : critère 5 ci-dessous) :
 `caj-kb-smoke-test` portait `id-kb-daily-routine`, montait `job-data` et lançait la sonde au lieu de `kb smoke-test`.
 Pour la rejouer, même règle : **aucune exécution du workflow Deploy** (ni tag, ni re-run, ni `workflow_dispatch`) tant que la sonde est en ligne
 dans Azure, jusqu'à ce qu'une passe sans la sonde soit appliquée : le revert dans git ne suffit pas. Le workflow
@@ -762,7 +762,7 @@ JOBFILES=$(az storage account list -g "$RG" --query "[?starts_with(name,'stkbjob
 2. La clé partagée est coupée :
    `az storage account show -n "$EXCHANGE" -g "$RG" --query allowSharedKeyAccess` rend `false`, de même pour
    `"$JOBFILES"` : le montage par identité se passe de la clé (essai du 10/11).
-3. La sonde, sous `id-kb-daily-routine`, le partage monté : elle a tourné le 10/11 (`8ad8c85`), lue comme à
+3. La sonde, sous `id-kb-daily-routine`, le partage monté : elle a tourné le 10/11 (`f10e5e3`), lue comme à
    l'étape 6 d'« Appliquer », avec `JobName == 'caj-kb-smoke-test'`. Résultat, puis `Succeeded` :
    - `probe 420: process uid 10001 gid 10001` ;
    - `probe 420: mount uid=10001 gid=10001 mode=0o700` et `probe 420: file uid=10001 gid=10001 mode=0o600` ;
@@ -784,7 +784,7 @@ JOBFILES=$(az storage account list -g "$RG" --query "[?starts_with(name,'stkbjob
 
    Attendu : deux verrous `CanNotDelete` ; `true`, `30`, `30` ; la règle `erase-zotero-copies` sur `zotero/`, `14`
    et `14` ; le partage gardé 30 jours.
-5. Retirer la sonde : revert de `8ad8c85` (`921b8ae`), puis la seconde passe. Aperçu attendu : `caj-kb-smoke-test` seul à
+5. Retirer la sonde : revert de `f10e5e3` (`d2f5b6e`), puis la seconde passe. Aperçu attendu : `caj-kb-smoke-test` seul à
    modifier (son identité, son volume, sa commande). Puis
    `az containerapp job show -n caj-kb-smoke-test -g "$RG" --query "{identities:identity.userAssignedIdentities,volumes:properties.template.volumes}"`
    ne montre plus que `id-kb-smoke-test`, sans volume, et le job repasse : `3 of 3 checks passed`.
