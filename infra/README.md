@@ -12,11 +12,12 @@ deux passes, l'image est poussée dans le registre et les secrets sont posés da
 | Module | Ressource | Passe | Issue |
 |---|---|---|---|
 | `log-analytics.bicep` | espace Log Analytics `log-kb` : 30 jours de rétention, plafond de 0,2 Go par jour | 1 | #414 |
-| `container-apps-environment.bicep` | environnement Container Apps `cae-kb` : profil Consumption seul, sans VNet ; journaux vers `log-kb` par Azure Monitor, sans clé ; trafic chiffré entre les apps | 1 | #411, #414 |
-| `identities.bicep` | identités managées `id-kb-ai-api`, `id-kb-data-api`, `id-kb-smoke-test`, et `id-kb-deploy` (le déploiement continu) | 1 | #414, #415 |
+| `container-apps-environment.bicep` | environnement Container Apps `cae-kb` : profil Consumption seul, sans VNet ; journaux vers `log-kb` par Azure Monitor, sans clé ; trafic chiffré entre les apps ; identité système, qui monte `job-data` | 1 | #411, #414, #420 |
+| `identities.bicep` | identités managées `id-kb-ai-api`, `id-kb-data-api`, `id-kb-smoke-test`, `id-kb-deploy` (le déploiement continu), `id-kb-daily-routine` et `id-kb-digest-watch` (les jobs à venir) | 1 | #414, #415, #420 |
 | `container-registry.bicep` | registre `crkb…` (ACR Basic), sans utilisateur admin ; AcrPull pour les trois identités | 1 | #414 |
 | `key-vault.bicep` | coffre `kv-kb-…` en RBAC, suppression réversible 7 jours ; Key Vault Secrets Officer pour l'opératrice | 1 | #414 |
-| `exchange-storage.bicep` | compte Blob `stkbexchange…`, clé partagée coupée ; conteneur `smoke-test`, lisible par `id-kb-smoke-test` seul | 1 | #414 (#420 le complète) |
+| `exchange-storage.bicep` | compte Blob `stkbexchange…`, clé partagée coupée ; conteneurs `smoke-test`, `clippings`, `zotero`, `watch`, un rôle par identité et par conteneur ; versions, suppression réversible, effacement des copies Zotero, verrou (« Le stockage ») | 1 | #414, #420 |
+| `job-files-storage.bicep` | compte Files `stkbjobfiles…`, partage `job-data` des jobs, monté par l'identité de `cae-kb` ; verrou (« Le stockage ») | 1 | #420 |
 | `budget.bicep` | budget `budget-kb` : 30 €/mois des coûts étiquetés `project=k-b`, e-mail à 50 % et 100 % du réel, à 100 % de la prévision ; rien n'est coupé au dépassement | 1 | #437 |
 | `postgresql-server.bicep` | serveur PostgreSQL 18 flexible `pgsql-kb-…` (`Standard_B1ms`), Entra seul, 32 Gio, sauvegardes 7 jours, règle de pare-feu « services Azure » (« La base PostgreSQL ») | 1 | #421 |
 | `key-vault-secret-access.bicep` | Key Vault Secrets User pour chaque identité, sur chacun de ses secrets seulement | 2 | #414 |
@@ -678,3 +679,145 @@ Attendu : la seule règle `AllowAllAzureServicesAndResourcesWithinAzureIps`, de 
 
    Attendu : `SELECT (7,)` (les sept sources que `kb migrate-database` écrit ; aucun item, #330 amorce la base),
    puis `REFUSED INSERT InsufficientPrivilege 42501` et `REFUSED CREATE InsufficientPrivilege 42501`.
+
+## Le stockage (#420)
+
+Deux comptes, sans clé partagée, joints par les seules identités. Le Mac échange par des conteneurs Blob au sens
+verrouillé : les clips et Zotero montent, les fiches descendent. Les jobs gardent leur état dans un partage Files
+que le Mac ne touche jamais (décisions 3 à 8 du 06/11, journal ADR).
+
+| Compte | Conteneur ou partage | Qui y accède |
+|---|---|---|
+| `stkbexchange…` (Blob) | `clippings` | `id-kb-daily-routine` lit ; l'opératrice écrit (`make upload-library`, #424) |
+| | `zotero` | `id-kb-daily-routine` lit ; l'opératrice écrit |
+| | `watch` | `id-kb-daily-routine` et `id-kb-digest-watch` écrivent ; l'opératrice lit (`make download-watch-sheets`) |
+| | `smoke-test` | `id-kb-smoke-test` lit |
+| `stkbjobfiles…` (Files) | `job-data` | l'identité système de `cae-kb` (Storage File Data SMB MI Admin, sur le compte) |
+
+- **Le sens est tenu par les rôles**, un par identité et par conteneur, aucun sur le compte. Les API et
+  `id-kb-migrate-database` n'en ont aucun. Écrire à contresens répond 403 (`AuthorizationPermissionMismatch`).
+- **`job-data` est tenu par le Bicep, pas par une identité** : le rôle appartient à l'environnement. Toute app ou
+  tout job de `cae-kb` qui déclare un volume `job-data` monte le partage. Seuls les jobs de #330 le déclareront.
+- **Protections de `stkbexchange`** : versions ; suppression réversible des blobs et des conteneurs, 30 jours ;
+  les copies Zotero (`zotero/…`) effacées à 14 jours avec leurs versions, par la règle `erase-zotero-copies` (elle
+  passe sous 24 heures ; ce qu'elle efface reste 30 jours en suppression réversible). Rien n'efface `clippings`.
+  Personne n'a Storage Blob Data Owner : une version précédente ne s'efface pas.
+- **Protections de `stkbjobfiles`** : suppression réversible du partage, 30 jours. Elle ne protège pas un fichier :
+  les instantanés le font (ci-dessous).
+- **Un verrou `CanNotDelete` sur chaque compte**, contre l'erreur de manipulation. Il n'arrête pas un Owner, qui
+  peut le lever ; son geste reste au journal d'activité.
+
+### Appliquer #420 sur le squelette en ligne
+
+1. Les étapes 0 et 1 d'« Appliquer ».
+2. `TAG` = la version en ligne (fin de l'étape 5) : les API tiennent leur image par digest, la passe crée donc une
+   révision par API, à la même image.
+3. La seconde passe (étape 5). Aperçu attendu :
+   - **à créer** : `stkbjobfiles…`, son service de fichiers, le partage `job-data`, le rôle SMB MI Admin, le stockage
+     `job-data` de `cae-kb`, les identités `id-kb-daily-routine` et `id-kb-digest-watch`, les conteneurs
+     `clippings`, `zotero` et `watch`, leurs 7 rôles, la règle de cycle de vie, les 2 verrous ;
+   - **à modifier** : `cae-kb` (l'identité système seule), le service Blob de `stkbexchange…` (versions,
+     suppressions réversibles), `caj-kb-smoke-test`, l'image des deux API, et le bruit de l'étape 5.
+   - Tout autre changement sur `cae-kb` arrête l'application : l'environnement porte les deux API.
+4. La création. Si le stockage `job-data` de `cae-kb` échoue, c'est que le rôle n'est pas encore actif (jusqu'à
+   10 minutes) : relancer la même commande 10 minutes plus tard.
+5. Attendre 10 minutes après la création des rôles, puis vérifier les critères.
+
+La passe du 10/11 portait aussi la sonde de l'essai (commit `8ad8c85`, retiré par un revert) : `caj-kb-smoke-test`
+portait `id-kb-daily-routine`, montait `job-data` et lançait la sonde au lieu de `kb smoke-test`. Aucun tag de
+version ne se pose tant qu'elle est en ligne : le déploiement continu lancerait la sonde, et `id-kb-deploy` pourrait
+agir comme `id-kb-daily-routine`.
+
+### Vérifier les critères de #420
+
+```sh
+EXCHANGE=$(az storage account list -g "$RG" --query "[?starts_with(name,'stkbexchange')].name" -o tsv)
+JOBFILES=$(az storage account list -g "$RG" --query "[?starts_with(name,'stkbjobfiles')].name" -o tsv)
+```
+
+1. Depuis le Mac, par le compte Entra de l'opératrice, un objet caché sans `.md`, au contenu neutre :
+
+   ```sh
+   PROBE=$(mktemp) && printf 'probe 420' > "$PROBE"
+   az storage blob upload --auth-mode login --account-name "$EXCHANGE" -c watch -n .probe-420 -f "$PROBE"
+   az storage blob upload --auth-mode login --account-name "$EXCHANGE" -c clippings -n .probe-420 -f "$PROBE"
+   az storage blob delete --auth-mode login --account-name "$EXCHANGE" -c clippings -n .probe-420
+   rm "$PROBE"
+   ```
+
+   Attendu : `watch` refuse (`AuthorizationPermissionMismatch`), `clippings` accepte. L'objet supprimé reste en
+   version précédente, que personne ne peut effacer : son nom est caché et sans `.md`, le miroir des clips l'écarte.
+2. La clé partagée est coupée :
+   `az storage account show -n "$EXCHANGE" -g "$RG" --query allowSharedKeyAccess` rend `false`, de même pour
+   `"$JOBFILES"` si le montage par identité passe ainsi.
+3. La sonde, sous `id-kb-daily-routine`, le partage monté : `caj-kb-smoke-test` se lance et se lit comme à
+   l'étape 6 d'« Appliquer », avec `JobName == 'caj-kb-smoke-test'`. Attendu, puis `Succeeded` :
+   - `probe 420: process uid 10001 gid 10001` ;
+   - `probe 420: mount uid=10001 gid=10001 mode=0o700` et `probe 420: file uid=10001 gid=10001 mode=0o600` ;
+   - `probe 420: clippings 403 AuthorizationPermissionMismatch` ;
+   - `probe 420: watch written, then deleted` ;
+   - `probe 420: passed`.
+
+   Si la réplique ne démarre pas, le montage a échoué : la cause est dans `ContainerAppSystemLogs`.
+4. Les protections :
+
+   ```sh
+   az lock list -g "$RG" --query "[].{name:name,level:level}" -o table
+   az storage account blob-service-properties show -n "$EXCHANGE" -g "$RG" \
+     --query "{versions:isVersioningEnabled,blobs:deleteRetentionPolicy.days,containers:containerDeleteRetentionPolicy.days}"
+   az storage account management-policy show --account-name "$EXCHANGE" -g "$RG" \
+     --query "policy.rules[].{name:name,prefix:definition.filters.prefixMatch,blob:definition.actions.baseBlob.delete.daysAfterCreationGreaterThan,version:definition.actions.version.delete.daysAfterCreationGreaterThan}"
+   az storage account file-service-properties show -n "$JOBFILES" -g "$RG" --query shareDeleteRetentionPolicy
+   ```
+
+   Attendu : deux verrous `CanNotDelete` ; `true`, `30`, `30` ; la règle `erase-zotero-copies` sur `zotero/`, `14`
+   et `14` ; le partage gardé 30 jours.
+5. Retirer la sonde : revert de `8ad8c85`, puis la seconde passe. Aperçu attendu : `caj-kb-smoke-test` seul à
+   modifier (son identité, son volume, sa commande). Puis
+   `az containerapp job show -n caj-kb-smoke-test -g "$RG" --query "{identities:identity.userAssignedIdentities,volumes:properties.template.volumes}"`
+   ne montre plus que `id-kb-smoke-test`, sans volume, et le job repasse : `3 of 3 checks passed`.
+
+### Les instantanés de `job-data`
+
+Un instantané avant l'amorçage (#330), un avant chaque mise en production. Ils se prennent et se suppriment à la
+main, par l'opératrice : ce sont des gestes du plan de contrôle, que son rôle Owner couvre. `id-kb-deploy` n'y a
+aucun droit. Chacun est **gardé 7 jours au plus** (décision de Sabine du 10/11) et porte sa date de suppression.
+Un brut vit donc au plus 6 mois et 7 jours, écrit au registre des traitements.
+
+```sh
+az storage share-rm snapshot --storage-account "$JOBFILES" -g "$RG" -n job-data --metadata delete_after=<AAAA-MM-JJ>
+az storage share-rm list --storage-account "$JOBFILES" -g "$RG" --include-snapshot \
+  --query "[].{snapshot:snapshotTime,deleteAfter:metadata.delete_after}" -o table
+```
+
+À la date venue, le verrou se lève, l'instantané se supprime **par sa date** (`--snapshot`), et le verrou revient
+(ci-dessous). Sans `--snapshot`, `az storage share-rm delete` vise le partage lui-même. Un effacement à la demande
+(étape 5 de la procédure de tri du registre) touche aussi les instantanés qui gardent la donnée.
+
+```sh
+az storage share-rm delete --storage-account "$JOBFILES" -g "$RG" -n job-data --snapshot "<snapshotTime>" --yes
+```
+
+### Le verrou : le lever, agir, le reposer
+
+`CanNotDelete` bloque toute suppression par le plan de contrôle sur le compte et ce qu'il contient : le compte, un
+conteneur, le partage, un instantané, et un rôle posé sur le compte ou un conteneur (le rôle temporaire de
+l'amorçage, #330 ; un Storage Blob Data Owner posé pour effacer une version). Il ne bloque pas les données : une
+identité qui a le droit écrit et supprime des blobs et des fichiers. Il se lève avant #428, la fermeture.
+
+```sh
+az lock delete -n "lock-$JOBFILES" -g "$RG" --resource "$JOBFILES" --resource-type Microsoft.Storage/storageAccounts
+# … le geste …
+az lock create -n "lock-$JOBFILES" -g "$RG" --resource "$JOBFILES" --resource-type Microsoft.Storage/storageAccounts \
+  --lock-type CanNotDelete --notes "K-B storage of the jobs (#420): lift it only to delete a snapshot, a role or the account (#428)."
+```
+
+Même geste pour `"$EXCHANGE"`. Une passe du Bicep repose aussi un verrou oublié.
+
+Sources (Microsoft Learn, lues le 2026-11-10) :
+[montages de stockage de Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts),
+[Azure Files par identité managée](https://learn.microsoft.com/en-us/azure/storage/files/files-managed-identities),
+[stockage d'un environnement, 2026-03-02-preview](https://learn.microsoft.com/en-us/azure/templates/microsoft.app/2026-03-02-preview/managedenvironments/storages),
+[rôles intégrés du stockage](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/storage),
+[facturation d'Azure Files](https://learn.microsoft.com/en-us/azure/storage/files/understanding-billing),
+[`az storage share-rm`](https://learn.microsoft.com/en-us/cli/azure/storage/share-rm).
