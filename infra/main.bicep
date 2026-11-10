@@ -266,9 +266,6 @@ module smokeTestJob 'modules/smoke-test-job.bicep' = if (deployWorkloads) {
       KB_DATA_API_URL: 'https://${dataApiHost}'
       KB_AI_API_URL: 'https://${aiApiHost}'
     }
-    // Trial of #420, removed by the next commit.
-    probeIdentityName: identityNames.dailyRoutine
-    jobDataStorageName: jobFilesStorage.outputs.storageName
   }
   dependsOn: [
     identities
