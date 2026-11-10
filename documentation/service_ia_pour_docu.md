@@ -5,8 +5,8 @@
 Cette fiche documente le service d'IA de K-B: le déploiement du modèle `gpt-6-luna` dans Microsoft Foundry
 (anciennement Azure AI Foundry), fait à la main dans le portail, hors du code de K-B. Elle dit qui y accède,
 comment il s'installe et se teste, de quoi il dépend, et quelles données il reçoit. L'API IA, qui l'appelle, a sa
-propre fiche, [la fiche de l'API IA](api_ia_pour_docu.md). Le code cité est celui de `main` au commit `c31f408`
-(2026-11-09). Ce qui est hors du code a été lu avec `az`, en lecture seule, le 2026-11-09 entre 23:41 et 23:55 UTC,
+propre fiche, [la fiche de l'API IA](api_ia_pour_docu.md). Le code cité est celui de `main` au commit `cad8328`
+(2026-11-10). Ce qui est hors du code a été lu avec `az`, en lecture seule, le 2026-11-09 entre 23:41 et 23:55 UTC,
 puis essayé par deux appels le 2026-11-10 vers 00:03 UTC (« Relire l'état », « Le test »). Les chemins du code de
 K-B (`ai_api/…`, `core/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
@@ -36,7 +36,7 @@ La ressource porte deux déploiements (`az cognitiveservices account deployment 
   fabriquées (même note, « Choix
   faits et options écartées »). Aucun fichier du code, de l'infrastructure, des tests ni de la configuration ne le
   nomme; seuls la documentation et le journal ADR le citent. La commande suivante ne renvoie rien:
-  `git grep -niE deepseek c31f408 -- src infra tests observability Makefile .github '*.example' Dockerfile pyproject.toml`.
+  `git grep -niE deepseek cad8328 -- src infra tests observability Makefile .github '*.example' Dockerfile pyproject.toml`.
   Le code n'a qu'une variable de modèle, `KB_LLM_MODEL` (`ai_api/connectors/llm_settings.py:26`), et aucune variable
   de juge.
 - **L'ancien déploiement**: un premier déploiement de `gpt-6-luna`, en Global Standard (`GlobalStandard`), a été
@@ -135,7 +135,7 @@ Où vit la clé:
   `kb` ne le lit jamais lui-même (`.claude/rules/poc.md`, règle 2).
 - **En ligne**: dans le secret `kb-llm-api-key` du coffre de secrets de K-B, posé à la main, collé sans écho
   (`infra/README.md`, « 4. Poser les secrets »). Parmi les identités de K-B, seule celle de l'app `ca-kb-ai-api` le
-  lit (`infra/main.bicep:141`, `:144-153`), par le rôle Key Vault Secrets User sur ce seul secret
+  lit (`infra/main.bicep:159`, `:162-171`), par le rôle Key Vault Secrets User sur ce seul secret
   (`infra/modules/key-vault-secret-access.bicep:1-9`, `:28-38`). Container Apps le donne au conteneur comme variable
   d'environnement, par une référence au coffre de secrets (Key Vault)
   (`infra/modules/api-container-app.bicep:52-57`, `:89-93`, `:115`). La
@@ -287,7 +287,7 @@ flowchart LR
   script d'enregistrement du jeu de référence, `tests/ai_api/digests_reference.py`, lancé à la main, passe lui
   aussi par l'API IA, dans le même processus.
 - **En ligne, le modèle n'est pas encore appelé.** L'app `ca-kb-ai-api` est réglée pour joindre le déploiement
-  (`infra/main.bicep:200-235`), mais rien ne lui demande de fiche: les jobs déployés sont `caj-kb-smoke-test` et
+  (`infra/main.bicep:218-253`), mais rien ne lui demande de fiche: les jobs déployés sont `caj-kb-smoke-test` et
   `caj-kb-migrate-database` (`infra/deployment.json`). Le premier n'appelle de l'API IA que `GET /health`, qui
   répond sans appeler le modèle (`core/api_health.py:12-13`). Le job qui lancerait `kb digest` en ligne n'est pas
   déclaré dans `infra/` ([architecture de l'API IA](../docs/architecture-api-ia.md), « En ligne, sur Azure
@@ -370,7 +370,7 @@ envoyés et la sortie du modèle) à Grafana Cloud, avec les traces. C'est un fl
 registre (« Envoi des mesures à Grafana Cloud »).
 
 - **Par défaut, rien ne part**: sans la variable, le réglage vaut `none` (`ai_api/connectors/metrics_export.py:158`).
-- **En production**, il est fixé à `none` (`infra/main.bicep:217`), et `all` y est refusé au démarrage
+- **En production**, il est fixé à `none` (`infra/main.bicep:235`), et `all` y est refusé au démarrage
   (`ai_api/connectors/metrics_export.py:186-187`).
 - **Dans le bac à sable**, aucun fichier du dépôt ne le pose (`.env.example:140-145`, `.env.e2e_test.example`), et
   `make sandbox-alerts` tourne sur le rejeu, sans le modèle et sans traces (`tests/e2e/test_sandbox_alerts.py`).

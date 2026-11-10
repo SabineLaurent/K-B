@@ -8,10 +8,12 @@
   [2026-11-08-ecrire-la-fiche-de-l-api-ia.md](2026-11-08-ecrire-la-fiche-de-l-api-ia.md); le branchement d'origine:
   [2026-10-17-brancher-gpt-6-luna-sur-foundry.md](2026-10-17-brancher-gpt-6-luna-sur-foundry.md).
 
-La PR est un seul commit sur `c31f408`. Il réunit les étapes du travail: la fiche, les constats retenus des deux
+La PR part d'un commit sur `c31f408`, qui réunit les étapes du travail: la fiche, les constats retenus des deux
 relectures, cette note, puis le masquage des noms de la ressource et du groupe. La branche a été refaite en un
-commit avant le push, pour que ces noms n'entrent pas dans l'historique public. Les autres commits et fichiers que
-liste l'outil sont ceux de PR déjà fusionnées sur `main`: ils ne sont pas de cette PR.
+commit avant le push, pour que ces noms n'entrent pas dans l'historique public. Suivent la fusion de `main`
+(`cad8328`, #537) dans la branche, puis un commit qui repointe les lignes de `infra/main.bicep` que #537 a
+décalées. Les autres commits et fichiers que liste l'outil sont ceux de PR déjà fusionnées sur `main`: ils ne sont
+pas de cette PR.
 
 ## Le pourquoi
 
@@ -25,7 +27,7 @@ l'API IA, qui a sa propre fiche.
 
 ### 1. Deux sortes de faits, deux preuves
 
-Ce que montre le code se cite en `fichier:ligne` au commit `c31f408`. Ce qui est hors du code se lit sur Azure, en
+Ce que montre le code se cite en `fichier:ligne` au commit `cad8328`. Ce qui est hors du code se lit sur Azure, en
 lecture seule, par des commandes que l'opératrice lance elle-même; la fiche les recopie dans « Relire l'état », le
 groupe et la ressource en variables (`RG=<groupe de ressources>`). Par exemple, la ressource:
 
@@ -50,7 +52,7 @@ K-B appelle le modèle par la clé de la ressource:
 Microsoft le dit: avec une clé, les rôles ne s'appliquent plus (« the key grants full access without role
 restrictions »). D'où le tableau des rôles: Owner, Contributor et Foundry User suffisent chacun à lire la clé, donc
 à tout appeler. En ligne, la clé est le secret `kb-llm-api-key`, lu par la seule identité de `ca-kb-ai-api` parmi
-celles de K-B (`infra/main.bicep:141`, `:144-153`).
+celles de K-B (`infra/main.bicep:159`, `:162-171`).
 
 ### 3. Tester sans afficher la clé
 
@@ -100,7 +102,7 @@ publiée. Elle n'est modifiable que sur demande du titulaire de l'abonnement, l'
 | `az … account list` (23:54 UTC): une ligne, `Enabled`, `False`, `ContentLogging` absent | une seule ressource dans le groupe; clé active; réseau public activé; surveillance des abus non modifiée |
 | appel avec la clé (2026-11-10, 00:03 UTC): `gpt-6-luna-2026-09-22 stop` | le déploiement répond, à la version figée |
 | appel sans clé (00:03 UTC): `HTTP 401` | sans clé, l'appel est refusé |
-| `git grep -niE deepseek c31f408 -- src infra tests observability …`: rien | K-B n'appelle pas `DeepSeek-V4-Flash` |
+| `git grep -niE deepseek cad8328 -- src infra tests observability …`: rien | K-B n'appelle pas `DeepSeek-V4-Flash` |
 | `git diff origin/main...HEAD`, cherché pour les noms de la ressource et du groupe: rien | aucun des deux noms dans la PR |
 | `git diff --stat origin/main -- docs/ README.md --diff-filter=M`: vide | aucun fichier existant de `docs/` ni le README modifié |
 | deux relectures par un sous-agent neuf, sur le code, les relevés et Microsoft Learn | chaque citation vérifiée; 26, puis 15 constats |
