@@ -1,4 +1,4 @@
-"""SIGTERM: what kb collect and kb import keep when they are stopped."""
+"""SIGTERM: what kb collect, kb import and kb purge keep when they are stopped."""
 
 import json
 import os
@@ -21,7 +21,7 @@ from etl.test_transform import copy_fixture
 from k_b import cli
 from k_b.commands import (
     collect_command,
-    import_command,
+    purge_command,
 )
 from k_b.commands.sigterm import StoppedBySigtermError
 from k_b.database import creation
@@ -201,15 +201,16 @@ def test_kb_collect_sent_sigterm_in_its_own_process_exits_with_143(tmp_path):
     assert not (tmp_path / "collection_state.json").exists()
 
 
-def test_a_sigterm_during_the_purge_of_the_base_keeps_the_import_and_undoes_the_purge(
+def test_a_sigterm_during_the_purge_of_the_base_undoes_the_purge_and_exits_with_143(
     monkeypatch, tmp_path, capsys, sigterm_handler_of_the_test
 ):
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     cli.main(["create-db"])
     copy_fixture(tmp_path / "raw", "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml")
+    assert cli.main(["import"]) == 0
     # Three years after the collection of the recorded raw file: its papers expire at once.
     monkeypatch.setattr(
-        import_command, "datetime", make_clock(datetime(2029, 10, 12, tzinfo=UTC))
+        purge_command, "datetime", make_clock(datetime(2029, 10, 12, tzinfo=UTC))
     )
     delete_expired_items = database_purge.delete_expired_items
 
@@ -223,10 +224,10 @@ def test_a_sigterm_during_the_purge_of_the_base_keeps_the_import_and_undoes_the_
     )
     capsys.readouterr()
 
-    exit_code = cli.main(["import"])
+    exit_code = cli.main(["purge"])
 
     assert exit_code == cli.ExitCode.STOPPED_BY_SIGTERM
-    assert capsys.readouterr().out.startswith("\nimport: 1 raw read, ")
+    assert "ERROR k_b.cli: kb stopped by SIGTERM" in capsys.readouterr().err
     connection = sqlite3.connect(tmp_path / "k-b.sqlite")
     # The papers the import committed: the purge was undone whole.
     assert connection.execute("SELECT count(*) FROM item").fetchone()[0] > 0

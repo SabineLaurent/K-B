@@ -1,7 +1,6 @@
-"""The purges kb import runs once its import committed, in this order: the superseded catalogs,
-the base, the raw, the registry, then the logs and the journals (docs/registre-traitements.md,
-procedure of sorting).
-The first error stops the others; the next import runs them again."""
+"""The purges kb purge runs, in this order: the superseded catalogs, the base, the raw, the
+registry, then the logs and the journals (docs/registre-traitements.md, procedure of sorting).
+The first error stops the others; the next kb purge runs them again."""
 
 from collections.abc import Sequence
 from datetime import datetime
@@ -27,10 +26,10 @@ class StateCatalog(NamedTuple):
     source_code: str
 
 
-def purge_after_import(
+def run_purges(
     data_dir: Path,
     database: DatabaseLocation,
-    imported_at: datetime,
+    purged_at: datetime,
     state_catalogs: Sequence[StateCatalog],
     tracked_repositories: Sequence[TrackedRepository],
 ) -> None:
@@ -43,13 +42,13 @@ def purge_after_import(
     delete_superseded_raw_files(store, imported_paths, folder_keys)
     purge_expired_rows(
         database,
-        imported_at,
+        purged_at,
         source_codes,
         [repository.name for repository in tracked_repositories],
     )
-    delete_expired_raw(store, imported_at, folder_keys, imported_paths)
+    delete_expired_raw(store, purged_at, folder_keys, imported_paths)
     purge_registry(database, store, source_codes)
-    delete_expired_records(data_dir, imported_at)
+    delete_expired_records(data_dir, purged_at)
 
 
 def read_imported_paths(database: DatabaseLocation) -> frozenset[str]:

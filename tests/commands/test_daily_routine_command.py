@@ -1,5 +1,6 @@
 """kb daily-routine, the command of the job caj-kb-daily-routine: the mirror of the clips, kb collect,
-kb import unless kb collect exits with 1 or 2, kb write-tops, then the publication of veille."""
+kb import unless kb collect exits with 1 or 2, kb purge, kb write-tops, then the publication of
+veille."""
 
 import signal
 
@@ -15,6 +16,7 @@ STEP_FUNCTIONS = (
     "mirror_the_clips",
     "run_collect",
     "run_import",
+    "run_purge",
     "run_write_tops",
     "publish_the_watch",
 )
@@ -72,11 +74,33 @@ def test_kb_import_does_not_run_after_kb_collect_exits_with_1_or_2_the_rest_does
     assert ran == [
         "mirror_the_clips",
         "run_collect",
+        "run_purge",
         "run_write_tops",
         "publish_the_watch",
     ]
     assert exit_code == collect_code
     assert "kb import          not run" in capsys.readouterr().out
+
+
+def test_kb_purge_comes_right_after_kb_import_without_a_rule():
+    names = [step.name for step in daily_routine_command.DAILY_ROUTINE_STEPS]
+    purge_step = daily_routine_command.DAILY_ROUTINE_STEPS[names.index("kb purge")]
+
+    assert names.index("kb purge") == names.index("kb import") + 1
+    assert purge_step.not_run_after is None
+
+
+@pytest.mark.parametrize("import_code", [ExitCode.FAILED, ExitCode.NOT_STARTED])
+def test_kb_purge_runs_after_kb_import_exits_with_1_or_2(
+    monkeypatch, routine_environment, capsys, import_code
+):
+    """A failed import committed nothing: the purge reads the base of the last one committed."""
+    ran = replace_steps(monkeypatch, {"run_import": import_code})
+
+    exit_code = cli.main(["daily-routine"])
+
+    assert ran == list(STEP_FUNCTIONS)
+    assert exit_code == import_code
 
 
 def test_a_failed_mirror_does_not_stop_the_routine(
@@ -106,8 +130,8 @@ def test_a_sigterm_during_kb_collect_stops_the_routine_with_143(
     assert signal.getsignal(signal.SIGTERM) is sigterm_handler_of_the_test
 
 
-def test_daily_routine_and_digest_watch_stop_on_sigterm():
-    assert {"daily-routine", "digest-watch"} <= COMMANDS_STOPPED_BY_SIGTERM
+def test_daily_routine_digest_watch_and_kb_purge_stop_on_sigterm():
+    assert {"daily-routine", "digest-watch", "purge"} <= COMMANDS_STOPPED_BY_SIGTERM
 
 
 @pytest.mark.parametrize(
@@ -135,10 +159,11 @@ def test_the_dry_run_lists_the_steps_runs_none_and_exits_with_0(
     assert exit_code == ExitCode.SUCCEEDED
     assert ran == []
     assert capsys.readouterr().out == (
-        "kb daily-routine, dry run: 5 steps, none run\n"
+        "kb daily-routine, dry run: 6 steps, none run\n"
         "  1. clip mirror\n"
         "  2. kb collect\n"
         "  3. kb import, not run when kb collect exits with 1 or 2\n"
-        "  4. kb write-tops\n"
-        "  5. watch publication\n"
+        "  4. kb purge\n"
+        "  5. kb write-tops\n"
+        "  6. watch publication\n"
     )

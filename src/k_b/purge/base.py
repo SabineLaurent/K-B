@@ -26,7 +26,7 @@ class BasePurgeCount(NamedTuple):
 
 def purge_expired_rows(
     database: DatabaseLocation,
-    imported_at: datetime,
+    purged_at: datetime,
     state_catalog_source_codes: Collection[str],
     tracked_repository_names: Sequence[str],
 ) -> BasePurgeCount:
@@ -37,7 +37,7 @@ def purge_expired_rows(
         lock_for_writing(connection)
         count = delete_expired_rows(
             connection,
-            imported_at,
+            purged_at,
             state_catalog_source_codes,
             tracked_repository_names,
         )
@@ -60,14 +60,14 @@ def purge_expired_rows(
 
 def delete_expired_rows(
     connection: Connection,
-    imported_at: datetime,
+    purged_at: datetime,
     state_catalog_source_codes: Collection[str],
     tracked_repository_names: Sequence[str],
 ) -> BasePurgeCount:
     """The steps of the purge of the base, source by source, in the order of the foreign keys."""
     item_count = trend_count = 0
     for source in purge_queries.read_sources(connection):
-        bound = find_bound(source, imported_at, state_catalog_source_codes)
+        bound = find_bound(source, purged_at, state_catalog_source_codes)
         if bound is None:
             continue
         item_count += purge_queries.delete_expired_items(connection, source.id, bound)
@@ -83,7 +83,7 @@ def delete_expired_rows(
 
 def find_bound(
     source: purge_queries.SourceRow,
-    imported_at: datetime,
+    purged_at: datetime,
     state_catalog_source_codes: Collection[str],
 ) -> str | None:
     """The collection before which the data of a source expires, in the format of the base;
@@ -91,7 +91,7 @@ def find_bound(
     years = RETENTION_YEARS_BY_ACQUISITION_MODE[source.acquisition_mode]
     if years is None or source.source_code in state_catalog_source_codes:
         return None
-    bound = subtract_months(imported_at.astimezone(UTC), years * 12)
+    bound = subtract_months(purged_at.astimezone(UTC), years * 12)
     return bound.strftime(DATABASE_DATE_FORMAT)
 
 

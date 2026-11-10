@@ -30,10 +30,10 @@ DATED_NAME_BY_FOLDER = {
 }
 
 
-def delete_expired_records(data_dir: Path, imported_at: datetime) -> int:
+def delete_expired_records(data_dir: Path, purged_at: datetime) -> int:
     """Delete the logs and the journals older than the duration and return how many; the log gives
     the number, never a name."""
-    bound = subtract_months(imported_at.astimezone(UTC), RECORD_RETENTION_MONTHS).date()
+    bound = subtract_months(purged_at.astimezone(UTC), RECORD_RETENTION_MONTHS).date()
     deleted_count = sum(
         delete_file(path)
         for folder_name, dated_name in DATED_NAME_BY_FOLDER.items()
@@ -70,7 +70,7 @@ def is_dated_before(name: str, dated_name: re.Pattern[str], bound: date) -> bool
 
 
 def delete_file(path: Path) -> bool:
-    """Delete a file; False when another import already did."""
+    """Delete a file; False when another run already did."""
     try:
         path.unlink()
     except FileNotFoundError:

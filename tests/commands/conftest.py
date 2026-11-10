@@ -9,7 +9,7 @@ from commands.cli_helpers import (
     make_clock,
 )
 
-from k_b.commands import import_command
+from k_b.commands import import_command, purge_command
 
 
 @pytest.fixture(autouse=True)
@@ -74,7 +74,8 @@ def data_and_vault_dirs(monkeypatch, tmp_path):
 
 
 @pytest.fixture(autouse=True)
-def clock_of_kb_import(monkeypatch):
-    """kb import reads the clock and purges by age: the tests run it on KB_IMPORT_DAY, so that what
-    they find never depends on the day they run."""
+def clock_of_kb_import_and_kb_purge(monkeypatch):
+    """kb import dates its journal by the clock and kb purge purges by age: the tests run both on
+    KB_IMPORT_DAY, so that what they find never depends on the day they run."""
     monkeypatch.setattr(import_command, "datetime", make_clock(KB_IMPORT_DAY))
+    monkeypatch.setattr(purge_command, "datetime", make_clock(KB_IMPORT_DAY))

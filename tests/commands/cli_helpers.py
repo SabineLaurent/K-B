@@ -44,8 +44,8 @@ def list_sheets(vault_dir):
     )
 
 
-# The day the tests run kb import, unless one says otherwise: its purge deletes by age, and the
-# raw files of the tests are named in October 2026.
+# The day the tests run kb import and kb purge, unless one says otherwise: kb purge deletes by age,
+# and the raw files of the tests are named in October 2026.
 KB_IMPORT_DAY = datetime(2026, 10, 20, tzinfo=UTC)
 
 
