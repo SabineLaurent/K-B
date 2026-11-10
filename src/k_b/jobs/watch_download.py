@@ -18,6 +18,7 @@ from azure.storage.blob import BlobProperties, ContainerClient
 
 from k_b.core.config import (
     BIDI_CONTROLS,
+    CHARACTER_REFERENCE,
     MAX_WATCH_LISTED_BLOBS,
     MAX_WATCH_SHEET_BYTES,
 )
@@ -56,16 +57,22 @@ type SheetRefusal = Literal[
     "sheet_text_with_tilde_fence",
     "sheet_text_with_embed",
     "sheet_text_with_html",
+    "sheet_text_with_character_reference",
 ]
 # The Markdown a sheet of kb never holds, which Obsidian or a plugin would run or fetch: code (a
 # span, a fence, a query of Dataview inline or in JavaScript), a fence of tildes anywhere in a
 # line (a quote or a list item opens one too), an embed (a remote image, a note), HTML (a tag, a
-# command of Templater). kb writes < only to open an autolink. A [ after a ! is never escaped.
+# command of Templater), a character reference CommonMark would decode (&#x202E;, even in an
+# autolink). kb writes < only to open an autolink. A [ after a ! is never escaped.
 ACTIVE_MARKDOWN: tuple[tuple[re.Pattern[str], SheetRefusal], ...] = (
     (re.compile(NOT_ESCAPED + "`"), "sheet_text_with_code"),
     (re.compile(NOT_ESCAPED + "~~~"), "sheet_text_with_tilde_fence"),
     (re.compile(r"!\["), "sheet_text_with_embed"),
     (re.compile(NOT_ESCAPED + "<(?!https?://)"), "sheet_text_with_html"),
+    (
+        re.compile(NOT_ESCAPED + CHARACTER_REFERENCE.pattern),
+        "sheet_text_with_character_reference",
+    ),
 )
 
 

@@ -671,7 +671,9 @@ make download-watch-sheets
   requête Dataview, `sheet_text_with_code`), `~~~` n'importe où dans une ligne
   (`sheet_text_with_tilde_fence`), `![` (une image distante, une note incluse, `sheet_text_with_embed`),
   un `<` qui n'ouvre pas un autolien `<http://…>` ou `<https://…>` (du HTML, une commande Templater,
-  `sheet_text_with_html`). Échappé, c'est-à-dire précédé d'un nombre impair de `\`, le caractère passe.
+  `sheet_text_with_html`), une référence de caractère, même dans un autolien (`&#x202E;`, `&rlm;` :
+  Obsidian l'affiche décodée, un contrôle bidirectionnel, `sheet_text_with_character_reference`).
+  Échappé, c'est-à-dire précédé d'un nombre impair de `\`, le caractère passe.
   kb écrit des liens `[dépôt](url)` dans les tops et des `~` dans une URL ou une description : un lien
   ne s'ouvre qu'au clic, et une description de top qui contient `~~~` fait refuser sa fiche, un échec
   visible. Au-delà de 20 000 blobs, la liste s'arrête et la commande échoue.

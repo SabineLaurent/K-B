@@ -181,6 +181,13 @@ def test_a_listing_longer_than_the_bound_stops_and_fails_the_sheets_listed_kept(
         (b"<img src=https://attacker.example/p.png>\n", "sheet_text_with_html"),
         (b"<% tp.file.title %>\n", "sheet_text_with_html"),
         (b"a \\\\<b>\n", "sheet_text_with_html"),
+        # A character reference, which CommonMark decodes, even in an autolink: &#x202E; would
+        # give back the right-to-left override (second code review, finding 3).
+        (b"facture &#x202E;fdp.exe\n", "sheet_text_with_character_reference"),
+        (b"- &#8238;a\n", "sheet_text_with_character_reference"),
+        (b"- &rlm;a\n", "sheet_text_with_character_reference"),
+        (b"- <https://x.example/&#x202E;>\n", "sheet_text_with_character_reference"),
+        (b"- a \\\\&rlm;\n", "sheet_text_with_character_reference"),
     ],
 )
 def test_a_text_kb_never_writes_is_refused(content, refusal):
@@ -196,6 +203,8 @@ def test_a_text_of_lines_and_tabs_in_utf_8_is_a_sheet():
     [
         # The syntax kb escapes in a text of a source: an odd number of backslashes before it.
         "- \\`code\\` \\~\\~\\~ !\\[image\\](url) \\<b\\> \\\\\\`",
+        # An escaped character reference; another & stays as it is.
+        "- R&D \\&rlm; \\&#x202E; <https://example.com/a?b=1&c=2>\n",
         # The autolinks, the links of the tops and the tildes of a URL kb writes.
         "- Titre — <https://example.com/~user/a>\n",
         "- <http://example.com/>\n",

@@ -608,7 +608,8 @@ def test_a_top_sheet_of_a_trapped_description_passes_the_check_of_the_download(
         "2026-10-05T093000Z",
         response_with(
             STARRED_RESPONSE,
-            description="```dataview ![x](https://a.example/p.png) <img src=x> <% tp %> `= this`",
+            description="```dataview ![x](https://a.example/p.png) <img src=x> <% tp %> `= this`"
+            " &#x202E; &rlm;",
         ),
     )
 

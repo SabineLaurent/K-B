@@ -454,6 +454,12 @@ TRENDS_DIR_NAME = "tendances"
 BIDI_CONTROLS = frozenset(
     "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
 )
+# The & of a character reference (&rlm;, &copy;, &#x202E;), which CommonMark decodes: &rlm; would
+# give back the bidirectional control neutralize_text removes. Escaped in both kinds of sheets;
+# another & stays, so that R&D and a bare URL with a query stay as they are (one rule for both
+# writers of the vault, decision of Sabine of 2026-10-21). kb download-watch-sheets refuses a
+# sheet that holds one unescaped. ASCII classes, not \w.
+CHARACTER_REFERENCE = re.compile(r"&(?=#|[A-Za-z0-9]+;)")
 
 # The bound of a digest request, from its arrival: the reading by the data API and every call to
 # the model, which go one after the other. Under the 240 seconds the HTTP ingress of Azure

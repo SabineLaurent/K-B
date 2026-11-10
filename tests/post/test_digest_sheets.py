@@ -368,6 +368,9 @@ def test_a_character_reference_in_a_title_and_a_claim_is_written_as_text():
         # Dataview would take (a::b) in the rendered line for a field (security review).
         "https://example.invalid/(a::b)",
         "https://evil.example.invalid/a(status::done)",
+        # kb download-watch-sheets refuses ~~~ anywhere in a line (second code review of #424,
+        # finding 2).
+        "https://example.invalid/a~~~b",
         "https://exämple.invalid/",
         f"https://example.invalid/{RIGHT_TO_LEFT_OVERRIDE}a",
         "HTTPS://example.invalid/",
@@ -524,14 +527,14 @@ def test_a_digest_sheet_of_a_trapped_claim_and_title_passes_the_check_of_the_dow
     response, digest = read_one_digest(
         claims=[
             ClaimSchema(
-                text="```dataview ~~~ ![x](https://a.example/p.png) <img src=x> <% tp %> `= this`",
+                text="```dataview ~~~ ![x](https://a.example/p.png) <img src=x> <% tp %> `= this` &#x202E; &rlm;",
                 item_ids=[6],
             )
         ],
         sources=[
             RELEASE_SOURCE.model_copy(
                 update={
-                    "title": "```dataview ~~~ ![x](https://a.example/p.png) <img src=x> <% tp %> `= this`"
+                    "title": "```dataview ~~~ ![x](https://a.example/p.png) <img src=x> <% tp %> `= this` &#x202E; &rlm;"
                 }
             )
         ],

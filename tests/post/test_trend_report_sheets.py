@@ -594,5 +594,19 @@ def test_a_text_of_the_model_makes_neither_link_nor_markup_in_the_vault(
 
 
 def test_a_trend_report_passes_the_check_of_the_download():
-    """kb download-watch-sheets refuses the Markdown kb never writes: a report kb writes passes."""
-    assert find_sheet_text_refusal(render(make_report()).encode()) is None
+    """kb download-watch-sheets refuses the Markdown kb never writes: a report kb writes passes,
+    its texts trapped."""
+    trapped = "```dataview ~~~ ![x](https://a.example/p.png) <img src=x> <% tp %> `= this` &#x202E;"
+    report = make_report(
+        chosen=[
+            choose(RISING)
+            | {
+                "readme": "read",
+                "texts": dict.fromkeys(TEXTS, trapped),
+                "texts_removed": [],
+                "writing_failure": None,
+            }
+        ]
+    )
+
+    assert find_sheet_text_refusal(render(report).encode()) is None
