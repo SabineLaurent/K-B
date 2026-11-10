@@ -231,15 +231,16 @@ def test_the_daily_routine_imports_then_purges_with_the_rights_of_kb_writer(
         tmp_path / "raw", "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml"
     )
     assert cli.main(["import"]) == 0
+    assert re.match(r"\nimport: 1 raw read, [1-9]\d* written,", capsys.readouterr().out)
     monkeypatch.setattr(purge_command, "datetime", make_clock(THREE_YEARS_LATER))
-    capsys.readouterr()
 
     assert cli.main(["purge"]) == 0
 
     output = capsys.readouterr()
-    assert re.match(
-        r"\npurge: 0 superseded raw files, [1-9]\d* items, .* 1 raw collections,"
-        r" 1 registry rows,",
+    assert re.fullmatch(
+        r"\npurge: 0 superseded raw files, [1-9]\d* items, 0 trend rows, \d+ references,"
+        r" 0 tracked repositories, 1 raw collections, 1 registry rows,"
+        r" \d+ logs and journals deleted\n\n",
         output.out,
     )
     assert not raw_path.exists()

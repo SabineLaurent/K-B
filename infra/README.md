@@ -1067,8 +1067,8 @@ az monitor log-analytics query -w "$WS" -o tsv \
 ```
 
 On y relève :
-- `kb daily-routine started: 6 steps` (5 avec `v0.1.1`), puis, pour chaque étape, `… step <n> of 6, <étape>, exited
-  with <code>` ;
+- `kb daily-routine started: 6 steps`, puis, pour chaque étape, `… step <n> of 6, <étape>, exited with <code>` ;
+  avec `v0.1.1`, `5 steps` et `step <n> of 5`, sans `kb purge` ;
 - `kb daily-routine finished in …: exit code <code>`, puis le tableau des étapes ;
 - les octets lus par BigQuery : `gh_archive: … bytes processed, … rows` ;
 - la durée, face au délai de 3 600 s.

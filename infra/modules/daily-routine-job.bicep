@@ -1,7 +1,7 @@
 // The scheduled job caj-kb-daily-routine (#330): kb daily-routine (#413) every day at 08:00 UTC, the
-// mirror of the clips, kb collect, kb import, kb write-tops, then the publication of the watch. Its data
-// directory is the share job-data (#420), which keeps the raw, the state and the vault from one
-// execution to the next; its secrets come from the vault, the key of BigQuery as a file.
+// mirror of the clips, kb collect, kb import, kb purge (#540), kb write-tops, then the publication of
+// the watch. Its data directory is the share job-data (#420), which keeps the raw, the state and the
+// vault from one execution to the next; its secrets come from the vault, the key of BigQuery as a file.
 param location string
 param tags object
 param environmentId string

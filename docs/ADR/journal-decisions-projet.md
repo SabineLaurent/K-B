@@ -6522,7 +6522,8 @@ Plan validé par Sabine le 10/11 (sortie du mode plan à 10:48Z), relu par un so
 - **#458 (les échecs de connexion à la base en ligne) n'est plus un préalable de #330 : elle passe après #423.**
   Décision de Sabine du 10/11. Ce qui la remplace pour la routine : la vérification des droits de
   `id-kb-daily-routine` (`t|t|t`) avant la première exécution, et un test de `kb import` puis de `kb purge` sous un
-  membre de `kb_writer` (`tests/commands/test_purge_command.py`). — PR de #330
+  membre de `kb_writer` (`tests/commands/test_purge_command.py`) ; la première exécution en ligne, le 10/11, sous ce
+  rôle et avec l'image `v0.1.1`, dont la purge tourne dans `kb import`, a fini `Succeeded`. — PR de #330
 - **L'essai de #295 sur `job-data` se fait dans l'amorçage de #330, sans sonde ni tag à part : un temporaire
   `.<jour>.md.tmp` posé par az (un second client, FileREST) dans le dossier d'une fiche de top, puis deux exécutions
   du job le même jour UTC. La première doit échouer sur `temporary_file_found` pour ce top ; la seconde, temporaire
