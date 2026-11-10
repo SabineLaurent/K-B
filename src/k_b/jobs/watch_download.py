@@ -1,6 +1,6 @@
 """The sheets of the container watch for the Mac: a blob is a sheet only by a closed list of names,
-<folder>/<day>.md under a folder kb writes, and its text holds nothing kb never writes; each is
-downloaded as listed.
+<folder>/<day>.md under a folder kb writes, and its text holds no control and no Markdown that
+Obsidian would run or fetch; each is downloaded as listed.
 
 Two identities of jobs write in watch: its names and its texts are inputs, never trusted. A name out
 of the list is never logged, its position in the listing instead (conventions.md, rule 3)."""
@@ -38,6 +38,9 @@ SHEET_NAME = re.compile(
 # each of BIDI_CONTROLS, into a space.
 SHEET_CONTROL_CHARACTERS = frozenset("\t\n")
 CONTROL_CATEGORY = "Cc"
+# A character after an even number of backslashes, none included, is not escaped (CommonMark
+# 0.31.2, 2.4): kb escapes the syntax of a text of a source by one.
+NOT_ESCAPED = r"(?<!\\)(?:\\\\)*"
 
 # A blob named as a sheet, in a folder kb does not write, a subject or a top added or retired
 # since: left aside, not a failure.
@@ -49,7 +52,21 @@ type SheetRefusal = Literal[
     "sheet_text_not_utf8",
     "sheet_text_with_control_character",
     "sheet_text_with_bidirectional_control",
+    "sheet_text_with_code",
+    "sheet_text_with_tilde_fence",
+    "sheet_text_with_embed",
+    "sheet_text_with_html",
 ]
+# The Markdown a sheet of kb never holds, which Obsidian or a plugin would run or fetch: code (a
+# span, a fence, a query of Dataview inline or in JavaScript), a fence of tildes anywhere in a
+# line (a quote or a list item opens one too), an embed (a remote image, a note), HTML (a tag, a
+# command of Templater). kb writes < only to open an autolink. A [ after a ! is never escaped.
+ACTIVE_MARKDOWN: tuple[tuple[re.Pattern[str], SheetRefusal], ...] = (
+    (re.compile(NOT_ESCAPED + "`"), "sheet_text_with_code"),
+    (re.compile(NOT_ESCAPED + "~~~"), "sheet_text_with_tilde_fence"),
+    (re.compile(r"!\["), "sheet_text_with_embed"),
+    (re.compile(NOT_ESCAPED + "<(?!https?://)"), "sheet_text_with_html"),
+)
 
 
 @dataclass(frozen=True)
@@ -180,7 +197,8 @@ def download_sheet(
 
 def find_sheet_text_refusal(content: bytes) -> SheetRefusal | None:
     """Why the text is not one kb writes: not UTF-8 (a lone surrogate neither), a control
-    character but tab and line feed, or a bidirectional control; None when it is."""
+    character but tab and line feed, a bidirectional control, or active Markdown; None when it
+    is."""
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError:
@@ -193,6 +211,9 @@ def find_sheet_text_refusal(content: bytes) -> SheetRefusal | None:
         return "sheet_text_with_control_character"
     if any(character in BIDI_CONTROLS for character in text):
         return "sheet_text_with_bidirectional_control"
+    for pattern, refusal in ACTIVE_MARKDOWN:
+        if pattern.search(text):
+            return refusal
     return None
 
 

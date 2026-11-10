@@ -16,6 +16,7 @@ from post.test_ai_api_client import (
 )
 
 from k_b.ai_api.schemas.digest_schema import ClaimSchema, WindowSchema
+from k_b.jobs.watch_download import find_sheet_text_refusal
 from k_b.post import digest_sheets
 from k_b.post.ai_api_client import DigestsResponse
 from k_b.post.digest_sheets import (
@@ -516,3 +517,26 @@ def test_the_sources_are_numbered_in_their_order_and_cited_by_number():
     )
 
     assert "\n- Deux sources. (sources 1, 2)\n" in render_digest_sheet(response, digest)
+
+
+def test_a_digest_sheet_of_a_trapped_claim_and_title_passes_the_check_of_the_download():
+    """kb download-watch-sheets refuses the Markdown kb never writes: a sheet kb writes passes."""
+    response, digest = read_one_digest(
+        claims=[
+            ClaimSchema(
+                text="```dataview ~~~ ![x](https://a.example/p.png) <img src=x> <% tp %> `= this`",
+                item_ids=[6],
+            )
+        ],
+        sources=[
+            RELEASE_SOURCE.model_copy(
+                update={
+                    "title": "```dataview ~~~ ![x](https://a.example/p.png) <img src=x> <% tp %> `= this`"
+                }
+            )
+        ],
+    )
+
+    sheet = render_digest_sheet(response, digest)
+
+    assert find_sheet_text_refusal(sheet.encode()) is None

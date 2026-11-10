@@ -164,6 +164,23 @@ def test_a_listing_longer_than_the_bound_stops_and_fails_the_sheets_listed_kept(
         (("# models" + chr(0x202E)).encode(), "sheet_text_with_bidirectional_control"),
         (("# models" + chr(0x2066)).encode(), "sheet_text_with_bidirectional_control"),
         (("# models" + chr(0x061C)).encode(), "sheet_text_with_bidirectional_control"),
+        # A query of Dataview, in a block, inline, in JavaScript inline; a backtick after an even
+        # number of backslashes is not escaped.
+        (b"```dataview\nTABLE file.path\n```\n", "sheet_text_with_code"),
+        (b"- `= this.file.name`\n", "sheet_text_with_code"),
+        (b"- `$= dv.current()`\n", "sheet_text_with_code"),
+        (b"- a \\\\`code`\n", "sheet_text_with_code"),
+        # A fence of tildes anywhere in a line: in a quote or a list, it still opens a block.
+        (b"~~~dataview\nTABLE file.path\n~~~\n", "sheet_text_with_tilde_fence"),
+        (b"> ~~~dataview\n", "sheet_text_with_tilde_fence"),
+        (b"- ~~~dataview\n", "sheet_text_with_tilde_fence"),
+        # An embed: a remote image, a note of the vault.
+        (b"![](https://attacker.example/p.png)\n", "sheet_text_with_embed"),
+        (b"![[a note]]\n", "sheet_text_with_embed"),
+        # HTML, or a command of Templater; a < after an even number of backslashes is not escaped.
+        (b"<img src=https://attacker.example/p.png>\n", "sheet_text_with_html"),
+        (b"<% tp.file.title %>\n", "sheet_text_with_html"),
+        (b"a \\\\<b>\n", "sheet_text_with_html"),
     ],
 )
 def test_a_text_kb_never_writes_is_refused(content, refusal):
@@ -172,6 +189,21 @@ def test_a_text_kb_never_writes_is_refused(content, refusal):
 
 def test_a_text_of_lines_and_tabs_in_utf_8_is_a_sheet():
     assert find_sheet_text_refusal("# Modèles\n\n\t- un dépôt\n".encode()) is None
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # The syntax kb escapes in a text of a source: an odd number of backslashes before it.
+        "- \\`code\\` \\~\\~\\~ !\\[image\\](url) \\<b\\> \\\\\\`",
+        # The autolinks, the links of the tops and the tildes of a URL kb writes.
+        "- Titre — <https://example.com/~user/a>\n",
+        "- <http://example.com/>\n",
+        "| 1 | [owner/name](https://github.com/owner/name) | 3 | ~~ |\n",
+    ],
+)
+def test_the_markdown_kb_writes_is_a_sheet(text):
+    assert find_sheet_text_refusal(text.encode()) is None
 
 
 def test_the_zero_width_joiner_of_an_emoji_is_kept_in_a_sheet():

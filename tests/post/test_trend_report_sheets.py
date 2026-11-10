@@ -26,6 +26,7 @@ from k_b.core.config import (
     WATCH_DIR_NAME,
 )
 from k_b.items import CAUTIONS
+from k_b.jobs.watch_download import find_sheet_text_refusal
 from k_b.post.digest_sheets import is_writable_url
 from k_b.post.trend_report_client import DroppedCandidates, TrendReportResponse
 from k_b.post.trend_report_sheets import (
@@ -590,3 +591,8 @@ def test_a_text_of_the_model_makes_neither_link_nor_markup_in_the_vault(
     [line, *_] = text_lines(texts=TEXTS | {"sector": sector})
 
     assert line == f"  Secteur : {written}"
+
+
+def test_a_trend_report_passes_the_check_of_the_download():
+    """kb download-watch-sheets refuses the Markdown kb never writes: a report kb writes passes."""
+    assert find_sheet_text_refusal(render(make_report()).encode()) is None

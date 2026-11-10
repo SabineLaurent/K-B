@@ -641,8 +641,15 @@ make download-watch-sheets
   par sa position (`blob 3 of 12`), jamais écrit ; les autres fiches sont copiées quand même. Refusés
   aussi : un blob de plus de 4 000 000 octets, un texte qui n'est pas de l'UTF-8, qui porte un
   caractère de contrôle autre que la tabulation et le retour à la ligne, ou un contrôle bidirectionnel
-  (`BIDI_CONTROLS`, que kb n'écrit jamais). Au-delà de 20 000 blobs, la liste s'arrête et la commande
-  échoue.
+  (`BIDI_CONTROLS`, que kb n'écrit jamais). Refusé enfin, le Markdown qu'Obsidian ou un plugin
+  exécuterait ou chargerait, que kb n'écrit jamais sans l'échapper : un accent grave (du code, une
+  requête Dataview, `sheet_text_with_code`), `~~~` n'importe où dans une ligne
+  (`sheet_text_with_tilde_fence`), `![` (une image distante, une note incluse, `sheet_text_with_embed`),
+  un `<` qui n'ouvre pas un autolien `<http://…>` ou `<https://…>` (du HTML, une commande Templater,
+  `sheet_text_with_html`). Échappé, c'est-à-dire précédé d'un nombre impair de `\`, le caractère passe.
+  kb écrit des liens `[dépôt](url)` dans les tops et des `~` dans une URL ou une description : un lien
+  ne s'ouvre qu'au clic, et une description de top qui contient `~~~` fait refuser sa fiche, un échec
+  visible. Au-delà de 20 000 blobs, la liste s'arrête et la commande échoue.
 - `veille/` ou un de ses dossiers en lien symbolique est refusé ; un temporaire laissé par une écriture
   interrompue (`veille/<dossier>/.<jour>.md.tmp`) fait échouer sa fiche, nommé par son chemin : le
   supprimer à la main.
@@ -661,10 +668,14 @@ Limites, chacune avec sa parade :
   Storage Blob Data Contributor ([Delete Blob](https://learn.microsoft.com/rest/api/storageservices/delete-blob),
   lu le 2026-11-10), un rôle temporaire qu'un Owner peut se donner (registre des traitements,
   « Procédure de tri », étape 9) ; pas fait par #424.
-- **Une fiche est du Markdown qu'Obsidian affiche**, écrit par une identité de job. Le JavaScript de
-  Dataview s'y exécuterait s'il était activé. Geste à faire : vérifier que « Enable JavaScript Queries »
-  et « Enable Inline JavaScript Queries » de Dataview sont désactivés, comme par défaut depuis la 0.4.13
-  (CVE-2021-42057).
+- **Une fiche est du Markdown qu'Obsidian affiche**, écrit par une identité de job. Le téléchargement
+  refuse le Markdown actif (ci-dessus) ; restent hors de ce contrôle les plugins qui agissent sur un
+  fichier neuf, comme Templater avec « Trigger Templater on new file creation », qui remplace alors
+  chaque commande trouvée dans le fichier ([réglages de Templater](https://silentvoid13.github.io/Templater/settings.html),
+  lus le 2026-11-10). Gestes à faire, faisables avec nos droits (les réglages du coffre) : vérifier que
+  « Enable JavaScript Queries » et « Enable Inline JavaScript Queries » de Dataview sont désactivés,
+  comme par défaut depuis la 0.4.13 (CVE-2021-42057), et que le déclencheur de Templater est inactif ou
+  que `veille/` est dans ses « Excluded folders ».
 - **`az` reçoit tout l'environnement** que `uv run --env-file` charge, secrets du `.env` compris
   (azure-identity le passe au processus d'`az`). Parade : un fichier d'environnement réduit pour cette
   cible, faisable avec nos droits (un fichier sur le Mac, sans droit Azure) ; pas fait.
