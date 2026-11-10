@@ -963,7 +963,7 @@ API8 (durcissement, revue et évaluation, #496 à #499) et API10 (portée du jet
   clé exigée sur chaque point d'accès protégé, 429 au-delà du débit (#400), clé jamais dans l'URL,
   révocation par rotation (`README.md`, « Changer une clé »). Elle demande de ne pas s'en remettre
   à la seule clé pour une ressource de valeur : la clé s'ajoute au droit par route, au débit et à
-  l'écoute sur `127.0.0.1` ; le réseau du déploiement s'y ajoutera.
+  l'écoute sur `127.0.0.1`, et en ligne à l'entrée interne (TLS mutuel, ci-dessus).
 - **Anti-force brute, plus strict que la limite de débit** : non appliqué, écart voulu, justifié
   (décision de Sabine du 2026-11-05). La limite de débit ne compte que les clients à clé valide ;
   les essais de clé ne sont pas limités. Il n'est pas nécessaire :
@@ -1134,8 +1134,10 @@ API8 (durcissement, revue et évaluation, #496 à #499) et API10 (portée du jet
 Aucune URL ne vient du client ni d'un tiers : les hôtes sont fixés par K-B ou par la
 configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, sous l'hôte de GitHub.
 
-- **Isoler la récupération de ressources dans le réseau** : *s.o.* à ce commit, aucune URL n'étant
-  fournie par une requête ; l'isolation réseau est à revoir au déploiement.
+- **Isoler la récupération de ressources dans le réseau** : *s.o.*, aucune URL ne venant d'une
+  requête ni d'un tiers (ci-dessus). En ligne, l'environnement n'a pas de réseau virtuel (aucun dans
+  `infra/modules/container-apps-environment.bicep`, `publicNetworkAccess: 'Enabled'`, l. 45) : ses
+  sorties ne sont pas filtrées, sans objet pour la même raison.
 - **Listes d'origines et de schémas permis** : tenue. Hôte GitHub constant (`core/github_api.py`) ;
   `https` seul vers le modèle et vers l'export ; vers l'API de données, `https`, ou `http` vers la
   machine ou, en `sandbox`, vers un service du compose seulement (API10, #473).
@@ -1277,8 +1279,8 @@ dépend que du code garde son état et sa preuve.
   avant sa lecture, et un test. S.
 - **Traitement uniforme dans la chaîne de serveurs** : non essayé, écart voulu, justifié. En ligne,
   deux serveurs : l'entrée d'ACA (Envoy), puis uvicorn 0.54 et h11 0.16 (`uv.lock` de `v0.1.0`,
-  l'image en ligne) (`transport: 'http'`, `infra/modules/api-container-app.bicep:77`). Aucune
-  requête ambiguë, comme `Content-Length` et `Transfer-Encoding` ensemble, n'a été envoyée. L'essai
+  les mêmes dans celui de `v0.1.1`) (`transport: 'http'`, `infra/modules/api-container-app.bicep:77`).
+  Aucune requête ambiguë, comme `Content-Length` et `Transfer-Encoding` ensemble, n'a été envoyée. L'essai
   n'est pas nécessaire : une désynchronisation demande un client qui envoie au premier serveur une
   requête que le second lira autrement (« Ensure all servers in the HTTP server chain [...] process
   incoming requests in a uniform manner to avoid desync issues », API8:2023, lue le 2026-11-10), et
@@ -1359,8 +1361,21 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
   - Azure API Management devant l'app, avec ses politiques (limite de débit) ;
   - Application Gateway avec son WAF, devant un environnement interne dans un réseau virtuel ;
   - Front Door Premium avec son WAF, par Private Link, sur un environnement « workload profiles ».
-- **Pas de données de production hors production** : *s.o.* à ce commit, aucune production
-  déployée ; à revoir au déploiement.
+- **Pas de données de production hors production** : tenue. La production tourne en ligne depuis
+  `v0.1.0` (tag du 2026-11-08). Hors production, les deux API tournent sur la machine de Sabine, sur
+  une base que `kb collect` et `kb import` remplissent des mêmes sources (`README.md`, « Le POC du
+  25/10 et la suite ») : des données de la même sorte. La mesure demande alors le même traitement
+  que la production (« If this is unavoidable, these endpoints should get the same security
+  treatment as the production ones », API9:2023, lue le 2026-11-10), et la machine le leur donne :
+  le même code (`create_app`, `ai_api/app.py:41`, `data_api/app.py:34`), une clé exigée par client
+  et refusée au démarrage si elle manque à la règle, les mêmes limites. Deux différences, sans
+  donnée : `http` sur `127.0.0.1`, joignable de la machine seule (API8, « TLS, même pour une API
+  interne ») ; `/docs` et `/openapi.json` sans clé quand `KB_DEPLOYMENT_ENVIRONMENT` vaut `sandbox`
+  (« Documentation réservée aux utilisateurs autorisés »).
+  **Limite** : une base de la machine servie au-delà de `127.0.0.1`.
+  **Pour réduire le risque** : garder les hôtes d'écoute par défaut, `127.0.0.1`
+  (`test_serve_ai_listens_on_127_0_0_1_8001_by_default_with_the_real_subjects`,
+  `test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_config`).
 - **Analyse de risque des anciennes versions** : *s.o.*, une seule version servie.
 
 ### API10:2023 Unsafe Consumption of APIs
