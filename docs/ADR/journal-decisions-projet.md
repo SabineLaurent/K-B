@@ -6497,7 +6497,7 @@ Plan validé par Sabine le 10/11 (sortie du mode plan à 10:48Z), relu par un so
   tombe ; **et** l'instantané « avant l'amorçage » (2026-11-10, #420) : aucun, le partage étant vide, la règle d'un
   instantané avant chaque mise en production vaut dès le tag qui suit. Ce que la décision coûte : la base en ligne n'a
   que ce qu'une première collecte rapporte (arXiv depuis le 01/05, 7 jours de TLDR, tout CISA KEV, 8 jours de GH
-  Archive). Limite : sur le Mac, la purge du brut ne tourne qu'avec un `kb import` local ; sa parade est au registre
+  Archive). Limite : sur le Mac, la purge du brut ne tourne qu'avec un `kb purge` local ; sa parade est au registre
   (fiche 1, « Sécurité »). — PR de #330
 - **Les deux dossiers vides du coffre, `vault/` et `vault/Clippings/`, sont créés une fois par l'opératrice, sous un
   rôle temporaire Storage File Data Privileged Contributor posé sur le seul partage, retiré ensuite.** Décision de
@@ -6521,8 +6521,8 @@ Plan validé par Sabine le 10/11 (sortie du mode plan à 10:48Z), relu par un so
   d'image, couvre tout le job. — PR de #330
 - **#458 (les échecs de connexion à la base en ligne) n'est plus un préalable de #330 : elle passe après #423.**
   Décision de Sabine du 10/11. Ce qui la remplace pour la routine : la vérification des droits de
-  `id-kb-daily-routine` (`t|t|t`) avant la première exécution, et un test de `kb import` et de sa purge sous un membre
-  de `kb_writer` (`tests/commands/test_import_command.py`). — PR de #330
+  `id-kb-daily-routine` (`t|t|t`) avant la première exécution, et un test de `kb import` puis de `kb purge` sous un
+  membre de `kb_writer` (`tests/commands/test_purge_command.py`). — PR de #330
 - **L'essai de #295 sur `job-data` se fait dans l'amorçage de #330, sans sonde ni tag à part : un temporaire
   `.<jour>.md.tmp` posé par az (un second client, FileREST) dans le dossier d'une fiche de top, puis deux exécutions
   du job le même jour UTC. La première doit échouer sur `temporary_file_found` pour ce top ; la seconde, temporaire

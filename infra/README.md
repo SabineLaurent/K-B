@@ -843,9 +843,10 @@ Sources (Microsoft Learn, lues le 2026-11-10) :
 
 `caj-kb-daily-routine` lance `kb daily-routine` (#413) chaque jour à 08:00 UTC, soit 9 h à Paris en hiver et 10 h en
 été (décision de Sabine du 10/11). L'ordre des étapes : le miroir des clips, `kb collect`, `kb import`,
-`kb write-tops`, puis la publication de `veille` dans `watch`. Son dossier de données est le partage `job-data`, monté
-sur `/var/lib/knowledge_base` : le brut, l'état de la collecte et le coffre y restent d'une exécution à l'autre. Il
-écrit la base sous `id-kb-daily-routine`, membre de `kb_writer`.
+`kb purge`, `kb write-tops`, puis la publication de `veille` dans `watch`. L'image `v0.1.1`, posée avant `kb purge`
+(#540), a 5 étapes, et sa purge tourne dans `kb import`, jusqu'au tag suivant. Son dossier de données est le partage
+`job-data`, monté sur `/var/lib/knowledge_base` : le brut, l'état de la collecte et le coffre y restent d'une exécution
+à l'autre. Il écrit la base sous `id-kb-daily-routine`, membre de `kb_writer`.
 
 | Réglage | Valeur |
 |---|---|
@@ -1066,7 +1067,8 @@ az monitor log-analytics query -w "$WS" -o tsv \
 ```
 
 On y relève :
-- `kb daily-routine started: 5 steps`, puis, pour chaque étape, `… step <n> of 5, <étape>, exited with <code>` ;
+- `kb daily-routine started: 6 steps` (5 avec `v0.1.1`), puis, pour chaque étape, `… step <n> of 6, <étape>, exited
+  with <code>` ;
 - `kb daily-routine finished in …: exit code <code>`, puis le tableau des étapes ;
 - les octets lus par BigQuery : `gh_archive: … bytes processed, … rows` ;
 - la durée, face au délai de 3 600 s.
