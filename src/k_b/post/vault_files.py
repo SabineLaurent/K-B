@@ -1,7 +1,7 @@
 """The files kb writes in the vault, under veille/: written once, never through a symbolic link
 kb sees, each text of a source as text, each path named in the vault, never whole.
 
-Limit accepted by Sabine (#295, 2026-11-10): a folder replaced by a symbolic link after
+Limit accepted by Sabine: a folder replaced by a symbolic link after
 refuse_linked_folders is followed (CWE-59); a share of Azure Files mounted without mfsymlinks has
 no symbolic link."""
 

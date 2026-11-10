@@ -264,3 +264,24 @@ def test_a_file_written_once_is_synced_then_readable_by_its_owner_only(
     assert stat.S_IMODE(target.stat().st_mode) == 0o600
     assert events == [target.stat().st_ino, tmp_path.stat().st_ino]
     assert list(tmp_path.iterdir()) == [target]
+
+
+def test_a_file_that_appears_while_the_file_written_once_is_synced_is_not_replaced(
+    tmp_path, monkeypatch
+):
+    # A writer other than kb takes no claim: the folder is listed just before the rename.
+    target = tmp_path / TARGET_NAME
+    real_fsync = os.fsync
+
+    def sync_while_another_writer_writes(file_descriptor):
+        real_fsync(file_descriptor)
+        if not target.exists():
+            target.write_bytes(b"another writer")
+
+    monkeypatch.setattr(os, "fsync", sync_while_another_writer_writes)
+
+    with pytest.raises(FileExistsError):
+        write_file_atomically(target, b"next", replace=False)
+
+    assert target.read_bytes() == b"another writer"
+    assert list(tmp_path.iterdir()) == [target]

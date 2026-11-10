@@ -29,8 +29,8 @@ class TemporaryFileFoundError(Exception):
 def write_file_atomically(path: Path, content: bytes, *, replace: bool = True) -> None:
     """Write to a hidden temporary file of the target folder, sync it, rename it, then sync the
     folders: a reader never sees a half-written file, and a power cut cannot keep a later file
-    while losing this one (conventions.md, rule 2). With replace=False, a file there is never
-    replaced (FileExistsError), even one another run writes meanwhile (#295)."""
+    while losing this one (conventions.md, rule 2). With replace=False, a file listed just before
+    the rename is never replaced (FileExistsError), nor one another run of kb writes meanwhile."""
     # The folder of the target, then each new parent up to the first that exists: each holds
     # the entry of a new file or folder.
     folders_to_sync = [path.parent]
@@ -43,12 +43,12 @@ def write_file_atomically(path: Path, content: bytes, *, replace: bool = True) -
     path.parent.mkdir(parents=True, exist_ok=True)
     with open_temporary_file(path, replace=replace) as temporary_file:
         try:
-            if not replace:
-                refuse_listed_file(path)
             temporary_file.write(content)
             temporary_file.flush()
             os.fsync(temporary_file.fileno())
             temporary_file.close()
+            if not replace:
+                refuse_listed_file(path)
             os.replace(temporary_file.name, path)
         except BaseException:
             # The original error is raised. A failed flush leaves data in the buffer: closed
@@ -75,7 +75,7 @@ def write_file_atomically(path: Path, content: bytes, *, replace: bool = True) -
 def open_temporary_file(path: Path, *, replace: bool) -> IO[bytes]:
     """A hidden temporary file of the target folder. For a file written once, its name is fixed
     and it is created only if absent (O_EXCL, FILE_CREATE on SMB): the claim that keeps two runs
-    from writing the same file, as Azure Files has no hard link for os.link (#295)."""
+    from writing the same file, as Azure Files has no hard link for os.link."""
     if replace:
         return tempfile.NamedTemporaryFile(
             dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False

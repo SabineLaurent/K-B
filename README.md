@@ -318,7 +318,10 @@ fiche Markdown par jour de collecte encore présent dans le brut :
 `<KB_VAULT_DIR>/veille/tops/most_starred/AAAA-MM-JJ.md` et `.../most_forked/AAAA-MM-JJ.md`,
 nommée par le jour UTC du relevé. Une fiche qui existe n'est jamais réécrite, même par deux
 lancements qui se chevauchent (#295) : deux collectes le
-même jour ne donnent qu'une fiche, celle du premier relevé de ce jour encore dans le brut. Une fois
+même jour ne donnent qu'une fiche, celle du premier relevé de ce jour encore dans le brut. Un
+temporaire caché qu'un arrêt brutal laisse à côté d'une fiche (un SIGKILL, une session SMB perdue, ou
+un SIGTERM reçu dans les quelques microsecondes entre sa création et le bloc qui le retire) arrête ce
+top à chaque lancement, son relevé gardé, jusqu'à ce que le temporaire soit retiré à la main. Une fois
 les fiches d'un top écrites, ses relevés lisibles plus anciens que le dernier relevé lisible sont
 supprimés du brut ; au premier lancement, tout l'historique des relevés devient des fiches, puis
 ces relevés sont supprimés. Il journalise son début et sa fin avec la durée, puis affiche une ligne
@@ -332,7 +335,8 @@ venir pendant ses suppressions) et le dossier des fiches dans le coffre
 - 0 : chaque top a réussi, ou n'a aucun relevé ;
 - 4 : un top a échoué, et un autre a abouti. L'unité est le top : il échoue quand une erreur de
   lecture, d'écriture ou de suppression (`OSError`) ou une entrée refusée du coffre (lien
-  symbolique) l'arrête, ou quand il garde un relevé illisible (gardé, jamais supprimé, tant qu'il
+  symbolique, ou temporaire caché `.AAAA-MM-JJ.md.tmp` d'une fiche, `temporary_file_found`) l'arrête,
+  ou quand il garde un relevé illisible (gardé, jamais supprimé, tant qu'il
   est là) ; il aboutit quand il va au bout et écrit une fiche, ou va au bout sans échec (un top
   sans relevé compris). Un top qui écrit ses fiches et garde un relevé illisible a donc échoué et
   abouti : seul, il sort en 4, jamais en 0 (échouer fermé). Aucun relevé n'est supprimé avant que

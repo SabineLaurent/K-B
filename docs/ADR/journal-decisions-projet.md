@@ -6330,8 +6330,8 @@ Plan validé par Sabine le 10/11 (transmis par time-knight), relu par un sous-ag
 changes », 8 constats intégrés) et par time-knight.
 
 - **Un fichier écrit une fois (fiche du coffre, brut) est réservé par son temporaire caché au nom fixe,
-  `.<nom>.tmp`, créé seulement s'il n'existe pas (`O_CREAT | O_EXCL`), puis cherché dans la liste de son dossier :
-  `write_file_atomically(…, replace=False)`.** Inverse le moyen prévu le 2026-10-21 et par #295 (« publier par
+  `.<nom>.tmp`, créé seulement s'il n'existe pas (`O_CREAT | O_EXCL`), puis cherché dans la liste de son dossier,
+  juste avant le renommage : `write_file_atomically(…, replace=False)`.** Inverse le moyen prévu le 2026-10-21 et par #295 (« publier par
   `os.link` ») : « Plan an Azure Files deployment » (Microsoft Learn, mis à jour le 2026-10-26, lu le 2026-11-10)
   donne « Hard link support: Not supported » pour SMB, et le coffre des jobs est le partage SMB `job-data` (#420).
   La réservation tient sur SMB : le client Linux envoie `FILE_CREATE` pour `O_EXCL` (`fs/smb/client/dir.c`,
@@ -6341,11 +6341,13 @@ changes », 8 constats intégrés) et par time-knight.
   SMB) ; `renameat2(RENAME_NOREPLACE)` ou `renamex_np` (absents de `os`, appelés par ctypes, comportement non vérifié
   sur SMB2) ; créer la cible elle-même en `O_EXCL` (après un SIGKILL, une fiche tronquée serait publiée dans `watch`,
   figée par `If-None-Match`, jamais réécrite) ; un verrou `fcntl` (dépend des options de montage) ou un verrou par
-  lancement (même reste après un arrêt brutal, et il bloque davantage). Limites assumées : un SIGKILL ou une session
-  SMB perdue entre la réservation et le renommage laisse `.<nom>.tmp`, qui refuse cette fiche (un jour) jusqu'à son
-  retrait à la main ; un programme autre que `kb` qui crée la cible dans la fenêtre la voit remplacée ; que la liste
-  d'un dossier soit à jour entre deux répliques vient du code du noyau et de « SMB Directory Leasing: Not
-  supported », sans essai. La règle 2 de `conventions.md` (une seule fonction d'écriture) reste à amender par
+  lancement (même reste après un arrêt brutal, et il bloque davantage). Limites assumées : un SIGKILL, une session
+  SMB perdue, ou un SIGTERM reçu dans les quelques microsecondes entre la création de la réservation et le bloc qui
+  la retire (constat 1 de la revue de code), laisse `.<nom>.tmp`, qui refuse cette fiche jusqu'à son retrait à la
+  main : la fiche d'un jour pour `kb digest` et `kb trend-report` ; pour `kb write-tops`, la fiche de ce top à chaque
+  lancement, son relevé gardé et réessayé (constat 3) ; un programme autre que `kb` qui crée la cible entre la
+  lecture de la liste, juste avant le renommage, et le renommage la voit remplacée ; que la liste d'un dossier soit
+  à jour entre deux répliques vient du code du noyau et de « SMB Directory Leasing: Not supported », sans essai. La règle 2 de `conventions.md` (une seule fonction d'écriture) reste à amender par
   Sabine. — PR de #295, à venir (commit `25df4fb`)
 - **Un temporaire trouvé fait échouer la commande (`temporary_file_found`, une `VaultEntryRefusedError`) dans
   `kb write-tops`, `kb digest` et `kb trend-report`, et `kb` ne le retire jamais.** Pourquoi, fait relevé par

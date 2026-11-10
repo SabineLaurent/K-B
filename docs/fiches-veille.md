@@ -1916,14 +1916,16 @@ tronqué et échappé (règle 3 de `conventions.md`).
   sujet dont la fiche du lendemain existe déjà compte en échec (`sheet_exists`).
 - **Deux lancements qui se chevauchent** (#295) : chacun réserve la fiche en créant son temporaire
   caché `.AAAA-MM-JJ.md.tmp`, qui n'est créé que s'il n'existe pas (`O_EXCL`, FILE_CREATE sur le
-  partage SMB d'Azure Files, où `os.link` n'existe pas), puis cherche la fiche dans la liste du
-  dossier. Le second trouve le temporaire ou la fiche : il ne remplace rien. Un temporaire trouvé
+  partage SMB d'Azure Files, où `os.link` n'existe pas), puis, juste avant le renommage, cherche la
+  fiche dans la liste du dossier. Le second trouve le temporaire ou la fiche : il ne remplace rien. Un temporaire trouvé
   fait échouer le sujet (`temporary_file_found`), comme pour les tops et le compte rendu des
   tendances : un job planifié ne réussit pas sans sa fiche.
-- **Un SIGKILL**, ou une session SMB perdue, pendant une écriture laisse ce temporaire dans
-  `veille/<sujet>/` ; Obsidian n'affiche pas un fichier caché. La fiche de ce jour est alors
-  refusée (`temporary_file_found`) jusqu'à ce que le temporaire soit retiré à la main ; celle du
-  lendemain a son propre nom.
+- **Un SIGKILL**, une session SMB perdue, ou un SIGTERM reçu dans les quelques microsecondes entre
+  la création du temporaire et le bloc qui le retire, laisse ce temporaire dans `veille/<sujet>/` ;
+  Obsidian n'affiche pas un fichier caché. La fiche de ce jour est alors refusée
+  (`temporary_file_found`) jusqu'à ce que le temporaire soit retiré à la main ; celle du lendemain a
+  son propre nom. Pour les tops, le relevé est gardé et la même fiche réessayée : le top échoue à
+  chaque lancement (README, « `kb write-tops` »).
 - **Un dossier remplacé par un lien** entre le dernier contrôle et l'écriture y fait écrire hors du
   coffre (CWE-59 ; limite acceptée par Sabine le 2026-11-10, registre, fiche 1, « Sécurité »). Seul
   un processus qui a déjà le compte de l'utilisatrice le peut ; un texte de source ou du modèle ne
