@@ -709,8 +709,9 @@ que le Mac ne touche jamais (décisions 3 à 8 du 06/11, journal ADR).
 - **`job-data` est tenu par le Bicep, pas par une identité** : le rôle appartient à l'environnement. Toute app ou
   tout job de `cae-kb` qui déclare un volume `job-data` monte le partage. Seuls les jobs de #330 le déclareront : c'est une convention, pas un contrôle. `id-kb-deploy`, qui met à jour les apps et les jobs de `deployment.json`, peut passer outre (registre des traitements, ligne « Déploiement continu »).
 - **Protections de `stkbexchange`** : versions ; suppression réversible des blobs et des conteneurs, 30 jours ;
-  les copies Zotero (`zotero/…`) effacées à 14 jours avec leurs versions, par la règle `erase-zotero-copies` (elle
-  passe sous 24 heures ; ce qu'elle efface reste 30 jours en suppression réversible). Rien n'efface `clippings`.
+  les copies Zotero (`zotero/…`) effacées après 14 jours avec leurs versions, par la règle `erase-zotero-copies` (un
+  passage par jour, sans heure garantie : la copie, puis sa version au passage suivant ; ce qu'elle efface reste
+  30 jours en suppression réversible : environ 46 jours en tout). Rien n'efface `clippings`.
   Personne n'a Storage Blob Data Owner : une version précédente ne s'efface pas.
 - **Protections de `stkbjobfiles`** : suppression réversible du partage, 30 jours. Elle ne protège pas un fichier :
   les instantanés le font (ci-dessous).

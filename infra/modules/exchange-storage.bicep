@@ -188,7 +188,8 @@ resource exchangeRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
   }
 ]
 
-// What the lifecycle rule erases stays 30 days in soft delete; the rule runs within 24 hours.
+// The rule runs once a day, at no set hour: a copy goes at one run, its previous version at the next, then
+// 30 days of soft delete, about 46 days in all.
 resource lifecycle 'Microsoft.Storage/storageAccounts/managementPolicies@2026-06-01' = {
   parent: account
   name: 'default'

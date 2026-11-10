@@ -226,9 +226,9 @@ Toutes ces sorties ont été observées le 10/11, par des commandes lancées par
   Microsoft. Elles ont tenu lors d'un seul essai, le 10/11.
 - **La relance de la première passe sur un groupe neuf** n'a jamais été essayée : le 10/11, le stockage
   d'environnement est passé du premier coup sur le squelette existant.
-- **Le calendrier de la règle Zotero** : elle passe sous 24 heures, d'après la doc. Le délai avant l'effacement de
-  la version précédente, et donc la durée exacte écrite au registre, est en cours de vérification (revue de code). Aucune copie Zotero n'existe encore pour
-  l'observer.
+- **Le calendrier de la règle Zotero** vient de la doc, lue le 10/11 par le relecteur de time-knight : un passage
+  par jour, sans heure garantie ; la copie part à un passage, sa version précédente au suivant, puis 30 jours de
+  suppression réversible, environ 46 jours. Aucune copie Zotero n'existe encore pour l'observer.
 - **Les instantanés et le geste « lever le verrou, agir, le reposer »** sont écrits dans le README, mais non lancés :
   aucun instantané n'est pris dans #420, puisque le partage est vide.
 - **Kerberos reste permis par défaut** sur le compte. Que `SMBOAuth` ne l'active ni ne le contrôle vient de la
