@@ -951,9 +951,12 @@ portée s'écrit avec `fileshares`, et non `shares` : sinon le rôle ne vaut pas
 JOBFILES=$(az storage account list -g "$RG" --query "[?starts_with(name,'stkbjobfiles')].name" -o tsv)
 SHARE_SCOPE="$(az storage account show -n "$JOBFILES" -g "$RG" --query id -o tsv)/fileServices/default/fileshares/job-data"
 kb_check "$OPERATOR" "$JOBFILES" "$SHARE_SCOPE" && az role assignment create --assignee-object-id "$OPERATOR" \
-  --assignee-principal-type User --role "Storage File Data Privileged Contributor" --scope "$SHARE_SCOPE" \
-  --query roleDefinitionName -o tsv
+  --assignee-principal-type User --role "Storage File Data Privileged Contributor" --scope "$SHARE_SCOPE" -o none
+az role assignment list --assignee "$OPERATOR" --scope "$SHARE_SCOPE" --query "[].{role:roleDefinitionName,scope:scope}" -o table
 ```
+
+Attendu : `Storage File Data Privileged Contributor`, sur une portée qui finit par `/fileshares/job-data`. La sortie de
+`az role assignment create` ne porte pas ce nom : son `--query roleDefinitionName` ne rend rien (vu le 2026-11-10).
 
 Dix minutes plus tard, le temps que le rôle soit actif. `DAY` est le jour UTC de l'essai, celui que portera la fiche :
 
