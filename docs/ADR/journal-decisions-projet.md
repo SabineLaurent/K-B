@@ -6474,7 +6474,10 @@ Plan validé par Sabine le 10/11 (sortie du mode plan à 10:48Z), relu par un so
   fiches descendent au Mac par `watch`.** Plan de mise en ligne du 06/11 (I7), validé par Sabine ; ferme la partie
   `kb write-tops` de la question ouverte « Où tourne … en ligne » (2026-10-19). Pourquoi, dit par Sabine le 10/11 :
   « Parce qu'ils font partie du process de collect. Il skip l'import parce qu'ils ne vont pas en bdd et suivent
-  ensuite un parcours de digest sans passage par la case llm puisque tout est déterministe par du code python. » Les
+  ensuite un parcours de digest sans passage par la case llm puisque tout est déterministe par du code python. » Et :
+  « C'est un peu mon témoin de fonctionnement du pipeline + restitution sans llm. » Les tops sont un chemin de
+  référence sans LLM : si les comptes rendus échouent alors que les fiches des tops sortent, la collecte et la
+  publication fonctionnent, et la panne est sur le chemin des comptes rendus (l'import, les deux API ou le modèle). Les
   relevés des deux tops GitHub viennent de `kb collect`, n'entrent pas en base (`etl/raw_reading.py`, journal du
   2026-10-07), et leurs fiches sont écrites par du code, sans l'API IA (`post/top_sheets.py`) : leur place est la
   routine, pas `caj-kb-digest-watch`, qui appelle le modèle. Le montage de `job-data` (#420) lève l'obstacle de la
