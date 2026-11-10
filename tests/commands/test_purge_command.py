@@ -4,13 +4,18 @@ import re
 import sqlite3
 from datetime import UTC, datetime
 
+import psycopg
+import pytest
 from commands.cli_helpers import LOG_LINE_DATE, make_clock
 from commands.test_import_command import write_state_catalogs
+from database.online_roles import DAILY_ROUTINE_ROLE, MIGRATE_DATABASE_ROLE, as_role
 from etl.test_transform import copy_fixture
 
 from k_b import cli
 from k_b.commands import purge_command
 from k_b.database import purge as database_purge
+from k_b.database.creation import migrate_database
+from k_b.database.location import DATABASE_URL_VARIABLE
 from k_b.etl.raw_store import RawStore
 from k_b.purge import all_purges
 
@@ -210,3 +215,34 @@ def test_a_ctrl_c_during_the_purge_of_the_base_undoes_it_and_exits_with_130(
     # Items were deleted before the stop: the count unchanged proves the rollback.
     assert deleted_counts
     assert count_rows(tmp_path, "SELECT count(*) FROM item") == item_count
+
+
+@pytest.mark.postgresql
+def test_the_daily_routine_imports_then_purges_with_the_rights_of_kb_writer(
+    monkeypatch, tmp_path, capsys, administered_base
+):
+    """kb import then kb purge succeed under the role of the daily routine, a member of kb_writer only."""
+    migrate_database(as_role(administered_base, MIGRATE_DATABASE_ROLE))
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv(
+        DATABASE_URL_VARIABLE, as_role(administered_base, DAILY_ROUTINE_ROLE).value
+    )
+    raw_path = copy_fixture(
+        tmp_path / "raw", "arxiv_extract.xml", "arxiv_cscr_x_csai", "xml"
+    )
+    assert cli.main(["import"]) == 0
+    monkeypatch.setattr(purge_command, "datetime", make_clock(THREE_YEARS_LATER))
+    capsys.readouterr()
+
+    assert cli.main(["purge"]) == 0
+
+    output = capsys.readouterr()
+    assert re.match(
+        r"\npurge: 0 superseded raw files, [1-9]\d* items, .* 1 raw collections,"
+        r" 1 registry rows,",
+        output.out,
+    )
+    assert not raw_path.exists()
+    with psycopg.connect(administered_base.value) as administrator:
+        assert administrator.execute("SELECT count(*) FROM item").fetchone() == (0,)
+        assert administrator.execute("SELECT count(*) FROM raw_data").fetchone() == (0,)
