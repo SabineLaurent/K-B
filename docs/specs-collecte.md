@@ -801,15 +801,16 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
    `trend rows`, les lignes de tendance de **gh_archive**, comptées à part des items (décision du
    2026-10-08, « `trend` reste hors d'`item` ») ; `left out`, les items et les fenêtres de
    classement écartés (doublons, ou versions qui ne sont pas plus récentes que celle de la base) ;
-   `rejected`, les rejets, détaillés au journal d'import ; `withdrawn`, les lignes retirées. Le
-   bilan est affiché avant les purges, qui suivent la validation de l'import (`src/k_b/purge/`,
-   registre des traitements, « Procédure de tri ») : les bruts remplacés des catalogues d'état
-   (`raw purge: N superseded files deleted`), la base (`base purge: …`), le brut de plus de 6 mois
-   (`raw purge: N collections older than 6 months deleted, …`), le registre
+   `rejected`, les rejets, détaillés au journal d'import ; `withdrawn`, les lignes retirées.
+   `kb import` ne purge rien : les purges sont la commande `kb purge` (`src/k_b/purge/`,
+   registre des traitements, « Procédure de tri »), datées par l'heure de son lancement, que
+   `kb daily-routine` lance après `kb import`. Elles suppriment, dans l'ordre, les bruts remplacés
+   des catalogues d'état (`raw purge: N superseded files deleted`), la base (`base purge: …`), le
+   brut de plus de 6 mois (`raw purge: N collections older than 6 months deleted, …`), le registre
    (`registry purge: N rows deleted`), puis les logs et les journaux de plus de 6 mois
-   (`logs and journals purge: N files older than 6 months deleted`). Si l'une échoue, le bilan est affiché quand même, les
-   suivantes ne tournent pas, l'erreur suit (`import committed, purge failed: … ; run kb import
-   again`) et `kb import` sort en 1.
+   (`logs and journals purge: N files older than 6 months deleted`). Si l'une échoue, les
+   suivantes ne tournent pas, l'erreur suit (`purge failed: … ; run kb purge again`) et
+   `kb purge` sort en 1.
 
    - **Registre** : la table `raw_data`, une ligne par fichier lu, ou par page d'un dossier de
      pages. Un fichier lu y entre, même s'il n'a donné aucun item, et même si certaines de ses

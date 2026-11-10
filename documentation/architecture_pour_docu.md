@@ -4,7 +4,8 @@
 
 Cette fiche décrit l'architecture applicative de K-B en entier: le flux des données de bout en bout, en bref puis en
 détail, les couches du code, puis chaque partie, de la collecte au déploiement sur Azure. Elle est écrite d'après le
-code de `main` au commit `0292266` (2026-11-09), dont `infra/` est celui du commit `cbada1e`. Les chemins du
+code de `main` au commit `0292266` (2026-11-09), dont `infra/` est celui du commit `cbada1e`, et la purge, sortie
+de `kb import` par #540, d'après le code de sa PR. Les chemins du
 code de K-B (`etl/…`, `commands/…`, `database/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 L'installation de l'environnement de développement, les dépendances et leur configuration sont dans
@@ -71,6 +72,7 @@ flowchart LR
     end
     collect["kb collect"]
     importCmd["kb import"]
+    purgeCmd["kb purge"]
     createDb["kb create-db<br>kb migrate-database"]
     writeTops["kb write-tops"]
     dataApi["kb serve-data<br>API de données"]
@@ -88,8 +90,10 @@ flowchart LR
     github & arxiv & cisa & tldr & bigquery & zotero & clippings -->|"lit"| collect
     state <-->|"date de la dernière collecte<br>de chaque source"| collect
     collect <-->|"écrit le brut<br>relit le dernier extrait Zotero"| raw
-    raw <-->|"lit les pages non importées<br>purge"| importCmd
-    importCmd <-->|"lit raw_data<br>écrit les items, purge"| base
+    raw <-->|"lit les pages non importées"| importCmd
+    importCmd <-->|"lit raw_data<br>écrit les items"| base
+    purgeCmd -->|"supprime ce qui a<br>passé sa durée"| raw
+    base <-->|"lit raw_data<br>supprime ce qui a passé sa durée"| purgeCmd
     createDb -->|"crée les tables"| base
     raw <-->|"lit les classements<br>supprime les remplacés"| writeTops
     writeTops -->|"écrit veille/tops/"| vault
@@ -126,7 +130,7 @@ flowchart LR
     clippings[("coffre du job<br>Clippings/")]
     zotero[("copie de Zotero<br>dossier de KB_ZOTERO_DIR")]
     vault[("coffre du job<br>veille/")]
-    steps["kb collect, kb import<br>kb write-tops"]
+    steps["kb collect, kb import<br>kb purge, kb write-tops"]
     digestSteps["kb digest<br>kb trend-report"]
     smokeContainer -->|"liste, un compte seul"| smokeTest
     mac -.->|"make upload-library<br>pas encore codé (#424)"| choice
@@ -171,10 +175,10 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
    des fichiers déjà importés, la table `raw_data` (`etl/load.py:52-55`), puis les pages du brut qui n'y sont pas
    (`etl/raw_reading.py:53`, `:111`, `:126`). Il les convertit en items, puis les écrit dans la base en une transaction
    (`etl/pipeline.py:51-82`, `etl/load.py:60-96`). Les deux classements des dépôts les plus étoilés et les plus
-   forkés n'entrent pas dans la base: ils n'ont pas de lecteur (`etl/source_kinds.py:66-77`). Après l'import, les
-   purges suppriment du brut et de la base ce qui a passé sa durée, et du brut les catalogues remplacés; elles
-   retirent aussi du registre les fichiers disparus (`purge/after_import.py:43-52`, `:51`, `purge/catalogs.py:33`,
-   `purge/raw.py:34`).
+   forkés n'entrent pas dans la base: ils n'ont pas de lecteur (`etl/source_kinds.py:66-77`). `kb import` ne purge
+   rien: `kb purge`, une commande à part, supprime du brut et de la base ce qui a passé sa durée, à compter de l'heure
+   de son lancement, et du brut les catalogues remplacés; elle retire aussi du registre les fichiers disparus
+   (`commands/purge_command.py:52`, `purge/all_purges.py:42-51`, `:50`, `purge/catalogs.py:33`, `purge/raw.py:34`).
 3. **De la base aux deux API.** `kb serve-data` lit la base en lecture seule et sert les items et les tendances
    (`database/engine.py:58-87`, `database/reading.py:339`, `:433`, `:553`). `kb serve-ai` ne lit jamais la base:
    il demande les items et les tendances à l'API de données, par HTTP
@@ -201,8 +205,9 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
    reste, que rien ne crée encore: la lecture choisie, où le Mac déposera les clips et les copies de Zotero, et le
    conteneur `watch`, où les jobs publieront `veille/`. Les deux routines relancent les commandes dans le même processus
    (`commands/job_routine.py:4-6`). `kb daily-routine` copie les clips dans le coffre du job, puis lance `kb collect`,
-   `kb import` et `kb write-tops`, puis publie `veille/`; `kb import` est sauté si `kb collect` échoue ou ne démarre pas
-   (`commands/daily_routine_command.py:43-69`, `:57`, `commands/job_transfers.py:38`, `jobs/clip_mirror.py:241`).
+   `kb import`, `kb purge` et `kb write-tops`, puis publie `veille/`; `kb import` est sauté si `kb collect` échoue ou
+   ne démarre pas, et `kb purge` tourne même si `kb import` échoue (`commands/daily_routine_command.py:44-75`, `:58`,
+   `:62-64`, `commands/job_transfers.py:38`, `jobs/clip_mirror.py:241`).
    `kb digest-watch` lance `kb digest` et `kb trend-report`, puis publie `veille/`
    (`commands/digest_watch_command.py:59-81`). La publication lit `veille/` et ajoute au conteneur `watch` les fiches
    qui n'y sont pas, sans en remplacer (`commands/job_transfers.py:68`, `jobs/watch_publication.py:138`, `:146`). La
@@ -246,7 +251,7 @@ Les tests de `tests/architecture/` lisent les imports de chaque module et tienne
 | `commands/` | une commande `kb` par module (`<commande>_command.py`), et leur code commun; `commands/environment.py` est le seul à lire l'environnement | importer `cli` (`tests/architecture/test_layers.py:81`); atteindre une étape de l'ETL autrement que par `etl/pipeline.py` (`:172`). Hors de `commands/environment.py`, seul `etl/sources/github/api.py` lit l'environnement, toléré pour l'instant (`tests/architecture/test_environment.py:23`, `:162`) |
 | `etl/` | la collecte (`extract.py`) et l'import (`transform.py`, puis `load.py`); `pipeline.py` est la seule porte des deux parcours pour `commands/`; une source par module, dans `etl/sources/` | importer une API (`test_layers.py:200`), `post/` (`:232`) ou `purge/` (`:281`); qu'une étape importe une autre étape (`:130`) |
 | `post/` | ce qui suit le pipeline: les clients HTTP de l'API IA, les fiches du coffre, le registre des comptes rendus des tendances | importer une API (`test_layers.py:206`), une source ou la composition des sources (`:109`) |
-| `purge/` | les purges que `kb import` lance après son import | importer autre chose que `purge`, `core`, `items`, `database` hors de ses écrivains et de `database/writing`, `etl/raw_store.py` et `etl/raw_files.py` (`test_layers.py:257-265`, `:287`) |
+| `purge/` | les purges que lance `kb purge` | importer autre chose que `purge`, `core`, `items`, `database` hors de ses écrivains et de `database/writing`, `etl/raw_store.py` et `etl/raw_files.py` (`test_layers.py:257-265`, `:287`) |
 | `jobs/` | le code commun des jobs en ligne: le stockage d'échange par l'identité managée, le miroir des clips, la publication de `veille/`, l'appel de `GET /health` | importer autre chose que `core` (`test_layers.py:337`); être importé par un autre paquet que `commands` (`:343`) |
 | `database/` | tout le SQL de la base de K-B: création, lecture, écriture (`writers/`, une sorte d'item par module), purge, moteurs | importer autre chose que `database`, `items` et `core` (`test_layers.py:28`); hors de `database/`, atteindre `database/writers` (`:45`). Seul `database/` importe un pilote de base, avec `etl/sources/zotero.py` pour la base de Zotero (`tests/architecture/test_engine_imports.py:36`) |
 | `data_api/` | l'API de données | importer autre chose que `data_api`, `database`, `items` et `core`, ou les écrivains, la purge et l'écriture d'un fichier (`tests/architecture/test_apis.py:42`) |
@@ -285,8 +290,9 @@ Les sources, leur accès et leurs limites sont dans [`docs/specs-collecte.md`](.
 - **Tout s'écrit en une transaction**, avec le journal d'import, `journals/import-journal-<date>.jsonl`
   (`etl/load.py:60-96`, `etl/pipeline.py:35`). Une entrée que la base refuse devient un rejet du journal, et
   l'import continue; toute autre erreur n'écrit rien (`etl/load.py:1-5`).
-- **Les purges suivent l'import**: les catalogues remplacés, la base, le brut, le registre, puis les journaux
-  (`purge/after_import.py:1-3`, `:43-52`). Leurs durées sont dans le
+- **Les purges sont une commande à part, `kb purge`**, que la routine quotidienne lance après `kb import`: les
+  catalogues remplacés, la base, le brut, le registre, puis les journaux (`purge/all_purges.py:1-3`, `:42-51`). Leurs
+  durées sont dans le
   [registre des traitements](../docs/registre-traitements.md).
 - **La base a deux moteurs.** Sans `KB_DATABASE_URL`, c'est le fichier SQLite `k-b.sqlite` du dossier de données;
   avec, la base PostgreSQL qu'elle nomme (`database/location.py:1-3`, `core/config.py:182`). Les deux schémas ont

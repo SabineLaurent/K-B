@@ -220,7 +220,7 @@ uv sync
 | Variable | Obligatoire | Rôle |
 |---|---|---|
 | `KB_DATA_DIR` | oui | dossier des données, hors du dépôt ; il doit exister. La collecte écrit le brut dans `<KB_DATA_DIR>/raw/` et son état dans `<KB_DATA_DIR>/collection_state.json`. |
-| `KB_DATABASE_URL` | non | l'URL d'une base PostgreSQL, `postgresql://…` ou `postgres://…`, créée hors de K-B en UTF8 et en collation C ([docs/stockage.md](docs/stockage.md), « Le SGBD »). Sans elle, la base est le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`. Une autre valeur, vide comprise, une URL que libpq ne lit pas, ou une variable que libpq lit posée à côté (`PGHOST`, `PGPASSWORD`…) : code 2, sans que la valeur soit citée. Lue par `kb create-db`, `kb migrate-database`, `kb import` (et `kb daily-routine`, qui le lance) et `kb serve-data`. |
+| `KB_DATABASE_URL` | non | l'URL d'une base PostgreSQL, `postgresql://…` ou `postgres://…`, créée hors de K-B en UTF8 et en collation C ([docs/stockage.md](docs/stockage.md), « Le SGBD »). Sans elle, la base est le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`. Une autre valeur, vide comprise, une URL que libpq ne lit pas, ou une variable que libpq lit posée à côté (`PGHOST`, `PGPASSWORD`…) : code 2, sans que la valeur soit citée. Lue par `kb create-db`, `kb migrate-database`, `kb import`, `kb purge` (et `kb daily-routine`, qui lance ces deux-là) et `kb serve-data`. |
 | `KB_ZOTERO_DIR` | non | dossier de données de Zotero, celui qui contient `zotero.sqlite`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute Zotero et l'affiche (`zotero: skipped (KB_ZOTERO_DIR not set)`). Avec elle, les papiers et leurs surlignages sont extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, sans que K-B ouvre la base de Zotero : il en lit une copie temporaire. |
 | `KB_VAULT_DIR` | non | dossier du coffre Obsidian de K-B, celui qui contient `Clippings/`, en chemin complet (un `~` écrit dans `.env` n'est pas développé). Sans elle, `kb collect` saute les clips et l'affiche (`clipping: skipped (KB_VAULT_DIR not set)`). Avec elle, chaque clip nouveau ou changé est copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/` ; K-B ne modifie jamais les clips. `kb write-tops` écrit les fiches des tops dans `veille/tops/` du coffre, `kb digest` les comptes rendus de veille dans `veille/<sujet>/`, `kb trend-report` les comptes rendus des tendances dans `veille/tendances/` ; aucun des trois ne tourne sans elle (code 2). |
 | `GOOGLE_APPLICATION_CREDENTIALS` | non | chemin complet de la clé JSON du compte de service BigQuery, rangée hors du dépôt ([docs/bigquery.md](docs/bigquery.md)). Elle est lue par le client BigQuery ; K-B ne l'ouvre pas. Sans elle, `kb collect` saute GH Archive et l'affiche (`gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)`). Avec elle, les dépôts qui montent sur 3 jours sont extraits dans `<KB_DATA_DIR>/raw/automated_watch/gh_archive/`. |
@@ -307,6 +307,26 @@ sortie :
 - 130 : `kb import` a reçu SIGINT (Ctrl-C), avec le même effet que SIGTERM, sauf un second Ctrl-C,
   qui peut couper l'annulation : SIGTERM ignore un second signal, SIGINT non.
 
+**Purger ce qui a passé sa durée** (après un import, ou seul) :
+
+```sh
+KB_DATA_DIR=~/.knowledge_base uv run kb purge
+```
+
+`kb purge` supprime ce qui a passé sa durée de conservation, à compter de l'heure de son lancement :
+les bruts remplacés des catalogues d'état (Zotero, CISA KEV), la veille de la base (items et
+tendances, 3 ans), le brut de plus de 6 mois, les lignes du registre dont le fichier n'est plus là
+et que rien ne cite, puis les logs et les journaux d'import de plus de 6 mois ([registre des traitements](docs/registre-traitements.md),
+« Procédure de tri »). `kb import` ne purge rien. Chaque purge journalise ce qu'elle a supprimé,
+en nombres, jamais un nom. Code de sortie :
+
+- 0 : les purges ont réussi ;
+- 1 : une purge a échoué ; les suivantes ne tournent pas, et le `kb purge` suivant les relance
+  (`purge failed: … ; run kb purge again`) ;
+- 2 : `KB_DATA_DIR` manque, la base n'existe pas (`kb create-db`), ou `KB_DATABASE_URL` est refusée ;
+- 143, 130 : `kb purge` a reçu SIGTERM ou SIGINT (Ctrl-C) ; la purge en cours dans la base est
+  annulée, et ce qui a déjà été supprimé le reste.
+
 **Écrire les fiches des tops dans le coffre** (après un import) :
 
 ```sh
@@ -355,7 +375,8 @@ venir pendant ses suppressions) et le dossier des fiches dans le coffre
 
 ```sh
 export KB_DATA_DIR=~/.knowledge_base KB_VAULT_DIR=<coffre>
-uv run --env-file .env kb collect; uv run --env-file .env kb import; uv run --env-file .env kb write-tops
+uv run --env-file .env kb collect; uv run --env-file .env kb import; uv run --env-file .env kb purge
+uv run --env-file .env kb write-tops
 ```
 
 Chaque étape tourne même si la précédente a échoué en partie (un code 4 de `kb collect`, une
@@ -595,7 +616,8 @@ uv run kb daily-routine --dry-run    # les étapes et leurs règles, rien lancé
 ```
 
 - `kb daily-routine` : le miroir du conteneur `clippings` vers `Clippings/` du coffre, `kb collect`,
-  `kb import` (pas lancé si `kb collect` rend 1 ou 2), `kb write-tops`, puis la publication de
+  `kb import` (pas lancé si `kb collect` rend 1 ou 2), `kb purge` (lancé même si `kb import` échoue),
+  `kb write-tops`, puis la publication de
   `veille/` vers le conteneur `watch`. L'étape Zotero viendra entre le miroir et `kb collect` (#425).
 - `kb digest-watch` : `GET /health` des deux API, qui réveille une API à 0 réplique (`KB_DATA_API_URL`,
   `KB_AI_API_URL`), `kb digest`, de nouveau les deux `/health`, `kb trend-report`, puis la même
