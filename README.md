@@ -622,6 +622,55 @@ Code de sortie : le pire de ceux des étapes, dans l'ordre 0, 4, 2, 1 (un 2 peut
 (`KB_EXCHANGE_BLOB_URL`, `AZURE_CLIENT_ID`, `KB_VAULT_DIR`) manquant ou refusé ; 143 : SIGTERM, 130 :
 SIGINT, la routine s'arrête sans lancer la suite.
 
+**Les fiches en ligne sur le Mac** (`make download-watch-sheets`, #424) : chaque fiche du conteneur `watch`
+que `veille/` du coffre n'a pas y est copiée, par le compte Entra de l'opératrice (rôle Storage Blob Data
+Reader sur `watch`, #420). Une fois par séance, `az login --tenant <tenant>` : la commande prend le jeton
+d'`az` (Azure CLI), dans le tenant de son compte courant ; ni AzCopy, ni `AZURE_CLIENT_ID`. Le `.env` porte
+`KB_DATA_DIR`, `KB_VAULT_DIR` et `KB_EXCHANGE_BLOB_URL` (`https://<compte>.blob.core.windows.net`).
+
+```sh
+az login --tenant <tenant>
+make download-watch-sheets
+```
+
+- Une fiche déjà dans `veille/` n'est ni téléchargée ni remplacée, même modifiée sur le Mac : un second
+  passage copie 0 fiche.
+- Seuls passent les noms `<dossier>/<jour>.md` (jour en `AAAA-MM-JJ`) d'un dossier où kb écrit : les
+  9 sujets, `tops/most_starred`, `tops/most_forked`, `tendances`. Un nom de cette forme d'un autre
+  dossier (un sujet ajouté ou retiré) est laissé de côté, sans échec. Tout autre nom est refusé, cité
+  par sa position (`blob 3 of 12`), jamais écrit ; les autres fiches sont copiées quand même. Refusés
+  aussi : un blob de plus de 4 000 000 octets, un texte qui n'est pas de l'UTF-8 ou qui porte un
+  caractère de contrôle autre que la tabulation et le retour à la ligne. Au-delà de 20 000 blobs, la
+  liste s'arrête et la commande échoue.
+- `veille/` ou un de ses dossiers en lien symbolique est refusé ; un temporaire laissé par une écriture
+  interrompue (`veille/<dossier>/.<jour>.md.tmp`) fait échouer sa fiche, nommé par son chemin : le
+  supprimer à la main.
+
+Code de sortie : 0 ; 4 quand un blob est refusé ou une fiche non écrite, une autre étant dans `veille/` ;
+1 quand aucune ne l'est, ou que le stockage n'est pas joint (sans `az login` :
+`exchange_storage_no_token`) ; 2 quand un réglage manque ou est refusé (un coffre qui n'existe pas n'est
+jamais créé) ; 130 : SIGINT, 143 : SIGTERM.
+
+Limites, chacune avec sa parade :
+
+- **Une fiche supprimée sur le Mac revient** au passage suivant tant que `watch` la porte, et `watch` la
+  reçoit de nouveau de `job-data` à la publication suivante. Parade : la supprimer dans `job-data`, puis
+  dans `watch`, puis sur le Mac. L'opératrice n'a que Reader sur `watch` : supprimer un blob demande
+  Storage Blob Data Contributor ([Delete Blob](https://learn.microsoft.com/rest/api/storageservices/delete-blob),
+  lu le 2026-11-10), un rôle temporaire qu'un Owner peut se donner (registre des traitements,
+  « Procédure de tri », étape 9) ; pas fait par #424.
+- **Une fiche est du Markdown qu'Obsidian affiche**, écrit par une identité de job. Le JavaScript de
+  Dataview s'y exécuterait s'il était activé. Geste à faire : vérifier que « Enable JavaScript Queries »
+  et « Enable Inline JavaScript Queries » de Dataview sont désactivés, comme par défaut depuis la 0.4.13
+  (CVE-2021-42057).
+- **`az` reçoit tout l'environnement** que `uv run --env-file` charge, secrets du `.env` compris
+  (azure-identity le passe au processus d'`az`). Parade : un fichier d'environnement réduit pour cette
+  cible ; pas fait.
+- **Les limites de l'écriture du coffre** (`post/vault_files.py`) : un lien posé après le contrôle est
+  suivi, et une fiche qu'un autre programme écrit entre le contrôle et le renommage est remplacée.
+- **Le disque** : au pire, 20 000 blobs de 4 000 000 octets. Parade : une borne d'octets par passage, du
+  code seul ; pas faite.
+
 **Lire la base sans l'API** : la base s'ouvre en lecture seule avec `sqlite3`, sans clé ni
 serveur :
 

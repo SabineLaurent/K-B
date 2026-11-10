@@ -590,3 +590,13 @@ MAX_CLIP_NAME_BYTES = 241
 # the server of the share (CIFS), CLIP_CHANGE_MARGIN is measured on the clock of the container; their
 # gap is not measured (#413), 5 s keep a gap of a few seconds from leaving the clip to the next day.
 CLIP_MIRROR_CLOCK_SLACK = timedelta(seconds=5)
+
+# kb download-watch-sheets, run on the Mac (#424): the sheets of the container watch copied to veille.
+# The largest sheet: the sheets of a digest come from an answer of the AI API of about 1.7 MB
+# unescaped at most (MAX_AI_API_ANSWER_BYTES), escaped for Markdown (post/vault_files.py) at most
+# twice as long; assumed, not measured. A blob larger is refused.
+MAX_WATCH_SHEET_BYTES = 4_000_000
+# The blobs of watch listed by a download: a sheet is named by its folder and its day, one a day in
+# each of 12 folders today (9 subjects, 2 tops, tendances), about 4 years of them; beyond, the listing
+# stops and the download fails, the sheets listed copied (OWASP API4:2023).
+MAX_WATCH_LISTED_BLOBS = 20_000

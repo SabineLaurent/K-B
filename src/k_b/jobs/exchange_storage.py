@@ -1,5 +1,6 @@
-"""The exchange storage of the jobs, Azure Blob Storage, reached by the managed identity of the job:
-its settings, its clients, and its errors named without what the storage answers.
+"""The exchange storage, Azure Blob Storage, reached by the managed identity of a job, or on the Mac
+by the account of az login (#424): its settings, its clients, and its errors named without what the
+storage answers.
 
 A blob is named by its path, the title of a clip for one (etl/sources/clipping.py): K-B never
 writes it, and keeps the SDK, which logs the URL of a request at INFO, at ERROR
@@ -19,7 +20,7 @@ from azure.core.exceptions import (
     ServiceResponseError,
 )
 from azure.core.pipeline.transport import RequestsTransport
-from azure.identity import ManagedIdentityCredential
+from azure.identity import AzureCliCredential, ManagedIdentityCredential
 from azure.storage.blob import ContainerClient
 
 from k_b.core.config import (
@@ -95,20 +96,26 @@ def read_exchange_storage_settings_or_refusal(
 ) -> ExchangeStorageSettings | str:
     """The settings of the exchange storage, or why a variable is refused; neither has a default:
     no local value exists for them."""
-    account_url = environ.get(EXCHANGE_BLOB_URL_VARIABLE)
-    if not account_url:
-        return f"{EXCHANGE_BLOB_URL_VARIABLE}: not set"
-    refusal = find_url_refusal(
-        EXCHANGE_BLOB_URL_VARIABLE, account_url, EXCHANGE_BLOB_SCHEMES
-    )
+    refusal = find_exchange_blob_url_refusal(environ)
     if refusal is not None:
         return refusal
+    account_url = environ[EXCHANGE_BLOB_URL_VARIABLE]
     client_id = environ.get(CLIENT_ID_VARIABLE)
     if not client_id:
         return f"{CLIENT_ID_VARIABLE}: not set"
     if not CLIENT_ID.fullmatch(client_id):
         return f"{CLIENT_ID_VARIABLE}: not a GUID"
     return ExchangeStorageSettings(account_url=account_url, client_id=client_id)
+
+
+def find_exchange_blob_url_refusal(environ: Mapping[str, str]) -> str | None:
+    """Why the URL of the account is refused, or None; read by a job and by the Mac."""
+    account_url = environ.get(EXCHANGE_BLOB_URL_VARIABLE)
+    if not account_url:
+        return f"{EXCHANGE_BLOB_URL_VARIABLE}: not set"
+    return find_url_refusal(
+        EXCHANGE_BLOB_URL_VARIABLE, account_url, EXCHANGE_BLOB_SCHEMES
+    )
 
 
 def build_transport() -> RequestsTransport:
@@ -130,6 +137,12 @@ def build_managed_identity_credential(
     )
 
 
+def build_cli_credential() -> AzureCliCredential:
+    """The credential of the Entra account az login opened on the Mac, in the tenant of that
+    account: az is run for each token, found on the PATH, and keeps none."""
+    return AzureCliCredential()
+
+
 def open_container_client(
     account_url: str,
     container_name: str,
@@ -147,8 +160,8 @@ def open_container_client(
 
 
 def check_identity(credential: TokenCredential) -> None:
-    """Ask the token of the storage for the identity of the job, which the credential keeps for the
-    requests that follow. Any failure is exchange_storage_no_token: the class of an error of
+    """Ask the token of the storage for the identity, which ManagedIdentityCredential keeps for the
+    requests that follow; AzureCliCredential asks az again at the first request. Any failure is exchange_storage_no_token: the class of an error of
     azure-identity does not tell a refusal from an outage (a 500 in JSON is
     CredentialUnavailableError, as a client id it does not know), and none carries the HTTP status
     of the endpoint (azure-identity 1.27.0: 400, 401, 403, 404, seen on 2026-11-06; review of

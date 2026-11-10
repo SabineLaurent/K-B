@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 import requests
 from azure.core.credentials import AccessToken
+from azure.identity import AzureCliCredential
 from jobs.storage_fakes import (
     SPOTTED_BLOB_NAME,
     TEST_ACCOUNT_URL,
@@ -28,10 +29,12 @@ from k_b.jobs import exchange_storage
 from k_b.jobs.exchange_storage import (
     ExchangeStorageError,
     ExchangeStorageSettings,
+    build_cli_credential,
     build_managed_identity_credential,
     build_transport,
     check_identity,
     count_listed_blobs,
+    find_exchange_blob_url_refusal,
     naming_storage_errors,
     open_container_client,
     read_exchange_storage_settings_or_refusal,
@@ -74,6 +77,27 @@ def test_a_setting_missing_or_refused_is_named_without_its_value(
         environ[variable] = value
 
     assert read_exchange_storage_settings_or_refusal(environ) == refusal
+
+
+@pytest.mark.parametrize(
+    ("value", "refusal"),
+    [
+        (TEST_ACCOUNT_URL, None),
+        (None, "KB_EXCHANGE_BLOB_URL: not set"),
+        (
+            "http://stkbexchangetest.blob.core.windows.net",
+            "KB_EXCHANGE_BLOB_URL: scheme not https",
+        ),
+    ],
+)
+def test_the_url_of_the_account_is_read_without_the_identity_of_a_job(value, refusal):
+    environ = {} if value is None else {"KB_EXCHANGE_BLOB_URL": value}
+
+    assert find_exchange_blob_url_refusal(environ) == refusal
+
+
+def test_the_mac_reaches_the_storage_by_the_account_of_az_login():
+    assert isinstance(build_cli_credential(), AzureCliCredential)
 
 
 def test_the_token_is_asked_for_the_identity_of_its_client_id_and_sent_to_the_storage(
