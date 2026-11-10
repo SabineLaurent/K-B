@@ -20,6 +20,7 @@ from k_b.commands.digest_watch_command import (
     describe_digest_watch,
     run_digest_watch,
 )
+from k_b.commands.download_watch_sheets_command import run_download_watch_sheets
 from k_b.commands.environment import (
     read_data_dir,
     read_environment,
@@ -84,7 +85,7 @@ ROUTINE_BY_COMMAND = {
 DRY_RUN_HELP = "print the steps and their rules, run none and transfer nothing"
 # The commands run with the data directory and the environment, by name, kb collect the default; a
 # table rather than a branch each, which would pass the complexity ruff allows (C901, 10). kb serve-ai,
-# kb digest and kb smoke-test take the environment only (run_command).
+# kb digest, kb smoke-test and kb download-watch-sheets take the environment only (run_command).
 RUN_BY_COMMAND: dict[str, Callable[[Path, Mapping[str, str]], int]] = {
     "create-db": run_create_db,
     "migrate-database": run_migrate_database,
@@ -192,6 +193,12 @@ def read_command(argv: list[str] | None) -> tuple[str, bool]:
         f" then publish veille to the container {WATCH_CONTAINER} without replacing a blob",
     ).add_argument("--dry-run", action="store_true", help=DRY_RUN_HELP)
     command_parsers.add_parser(
+        "download-watch-sheets",
+        help=f"on the Mac: copy to veille of the vault each sheet of the container"
+        f" {WATCH_CONTAINER} it lacks, by the account of az login; a sheet there is never"
+        " replaced",
+    )
+    command_parsers.add_parser(
         "digest-watch",
         help="the job of the watch: wake both APIs, kb digest, wake them again, kb trend-report,"
         f" then publish veille to the container {WATCH_CONTAINER} without replacing a blob",
@@ -261,4 +268,6 @@ def run_command(command: str, data_dir: Path, environ: Mapping[str, str]) -> int
         return run_digest(environ)
     if command == "smoke-test":
         return run_smoke_test(environ)
+    if command == "download-watch-sheets":
+        return run_download_watch_sheets(environ)
     return RUN_BY_COMMAND.get(command, run_collect)(data_dir, environ)

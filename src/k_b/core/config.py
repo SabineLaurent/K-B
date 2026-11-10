@@ -448,6 +448,19 @@ WATCH_DIR_NAME = "veille"
 TOPS_DIR_NAME = "tops"
 TRENDS_DIR_NAME = "tendances"
 
+# The format characters that reorder a line as it is displayed (Unicode bidirectional controls
+# and marks, UAX #9): neutralize_text (post/vault_files.py) turns each into a space, and kb
+# download-watch-sheets refuses a sheet that holds one. U+200D, which joins the emojis, is kept.
+BIDI_CONTROLS = frozenset(
+    "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+)
+# The & of a character reference (&rlm;, &copy;, &#x202E;), which CommonMark decodes: &rlm; would
+# give back the bidirectional control neutralize_text removes. Escaped in both kinds of sheets;
+# another & stays, so that R&D and a bare URL with a query stay as they are (one rule for both
+# writers of the vault, decision of Sabine of 2026-10-21). kb download-watch-sheets refuses a
+# sheet that holds one unescaped. ASCII classes, not \w.
+CHARACTER_REFERENCE = re.compile(r"&(?=#|[A-Za-z0-9]+;)")
+
 # The bound of a digest request, from its arrival: the reading by the data API and every call to
 # the model, which go one after the other. Under the 240 seconds the HTTP ingress of Azure
 # Container Apps gives a request, with 40 for the last call under way and the answer. Measured by
@@ -590,3 +603,13 @@ MAX_CLIP_NAME_BYTES = 241
 # the server of the share (CIFS), CLIP_CHANGE_MARGIN is measured on the clock of the container; their
 # gap is not measured (#413), 5 s keep a gap of a few seconds from leaving the clip to the next day.
 CLIP_MIRROR_CLOCK_SLACK = timedelta(seconds=5)
+
+# kb download-watch-sheets, run on the Mac (#424): the sheets of the container watch copied to veille.
+# The largest sheet: the sheets of a digest come from an answer of the AI API of about 1.7 MB
+# unescaped at most (MAX_AI_API_ANSWER_BYTES), escaped for Markdown (post/vault_files.py) at most
+# twice as long; assumed, not measured. A blob larger is refused.
+MAX_WATCH_SHEET_BYTES = 4_000_000
+# The blobs of watch listed by a download: a sheet is named by its folder and its day, one a day in
+# each of 12 folders today (9 subjects, 2 tops, tendances), about 4 years of them; beyond, the listing
+# stops and the download fails, the sheets listed copied (OWASP API4:2023).
+MAX_WATCH_LISTED_BLOBS = 20_000

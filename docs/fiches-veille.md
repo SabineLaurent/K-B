@@ -2010,6 +2010,7 @@ deux chiffres hexadécimaux), moins `[`, `]` et `$`, syntaxe d'Obsidian (lien wi
 ne peut pas sortir de ses chevrons, où une barre oblique n'échappe rien (CommonMark 0.31.2, § 6.5).
 Elle est refusée aussi si elle contient une référence de caractère (`&#…`, `&nom;` : cmark-gfm
 affiche `&#x202E;` en U+202E dans le texte du lien), `::` (un champ Dataview dans la ligne rendue),
+`~~~` (`kb download-watch-sheets` refuse sur le Mac une fiche qui en contient, où que ce soit dans une ligne),
 ou, une fois ses pourcents décodés, de l'UTF-8 invalide, un caractère de contrôle, de format (dont
 les bidirectionnels), un surrogate ou un séparateur de ligne (`%E2%80%AE`, `%00` : markdown-it les
 montre décodés) ; sinon un lien se lirait autrement qu'il ne mène (CWE-451), comme

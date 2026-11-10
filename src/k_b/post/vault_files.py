@@ -12,12 +12,8 @@ import unicodedata
 from pathlib import Path
 
 from k_b.core.atomic_write import TemporaryFileFoundError, write_file_atomically
+from k_b.core.config import BIDI_CONTROLS, CHARACTER_REFERENCE
 
-# The format characters that reorder a line as it is displayed (Unicode bidirectional controls
-# and marks, UAX #9). U+200D, which joins the emojis, is kept.
-BIDI_CONTROLS = frozenset(
-    "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
-)
 # The characters a text loses: the controls (Cc) and the lone surrogates (Cs), which UTF-8
 # cannot encode.
 REMOVED_CATEGORIES = frozenset({"Cc", "Cs"})
@@ -27,11 +23,6 @@ REMOVED_CATEGORIES = frozenset({"Cc", "Cs"})
 # punctuation; the backslash too, so that a text ending with one does not escape the character
 # that follows it.
 MARKDOWN_SYNTAX_CHARACTERS = frozenset("\\[]<>|`#%$")
-# The & of a character reference (&rlm;, &copy;, &#x202E;), which CommonMark decodes: &rlm; would
-# give back the bidirectional control neutralize_text removes. Escaped in both kinds of sheets;
-# another & stays, so that R&D and a bare URL with a query stay as they are (one rule for both
-# writers of the vault, decision of Sabine of 2026-10-21). ASCII classes, not \w.
-CHARACTER_REFERENCE = re.compile(r"&(?=#|[A-Za-z0-9]+;)")
 # Beyond the characters of the sheets of the tops: a fence of code (~~~), an autolink of GFM or a
 # field of Dataview (:: , http:, mailto:, xmpp:), an e-mail address (@). The & of a character
 # reference is escaped by neutralize_text, as in the sheets of the tops. A bare URL stays text

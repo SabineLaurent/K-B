@@ -133,7 +133,7 @@ flowchart LR
     steps["kb collect, kb import<br>kb purge, kb write-tops"]
     digestSteps["kb digest<br>kb trend-report"]
     smokeContainer -->|"liste, un compte seul"| smokeTest
-    mac -.->|"make upload-library<br>pas encore codé (#424)"| choice
+    mac -.->|"make upload-library<br>pas encore codé (#542)"| choice
     choiceClips -.->|"miroir des clips"| dailyRoutine
     dailyRoutine -.->|"écrit les clips"| clippings
     choiceZotero -.->|"copie de Zotero<br>pas encore codé (#425)"| dailyRoutine
@@ -148,7 +148,7 @@ flowchart LR
     vault -.->|"lit veille/"| digestWatch
     dailyRoutine -.->|"publie veille/"| watchContainer
     digestWatch -.->|"publie veille/"| watchContainer
-    watchContainer -.->|"make<br>download-watch-sheets<br>pas encore codé (#424)"| mac
+    watchContainer -.->|"make<br>download-watch-sheets<br>(#424)"| mac
 ```
 
 Les deux schémas se lisent ainsi, dans l'ordre des flux:
@@ -218,9 +218,10 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
    le dossier `KB_VAULT_DIR` du job, pas celui du Mac: `kb collect` y lit `Clippings/`, et lira la copie de Zotero dans
    le dossier de `KB_ZOTERO_DIR` (`etl/collected_sources.py:18-22`, `etl/sources/clipping.py:103`); `kb write-tops`,
    `kb digest` et `kb trend-report` y écrivent `veille/`. Ces deux jobs ne sont déclarés en ligne ni dans
-   `infra/deployment.json`, ni dans `infra/main.bicep`. L'envoi des clips et des copies de Zotero depuis le Mac, et la
-   relecture de `watch` par le Mac, ne sont pas encore codés: ils viendront par `make upload-library` et
-   `make download-watch-sheets` (#424).
+   `infra/deployment.json`, ni dans `infra/main.bicep`. L'envoi des clips et des copies de Zotero depuis le Mac n'est pas encore
+   codé: il viendra par `make upload-library` (#542). La relecture de `watch` par le Mac passe par
+   `make download-watch-sheets` (#424, `commands/download_watch_sheets_command.py`), qui ne trouve aucune fiche tant
+   que les jobs ne publient pas.
 
 Les journaux restent hors du dessin: aucune commande ne les relit, sauf la purge, qui les supprime d'après la date de
 leur nom (`purge/run_records.py:38`, `:75`). Ce sont les journaux de fonctionnement, sous `KB_DATA_DIR/logs/`
@@ -424,7 +425,7 @@ flowchart TB
     smokeContainer -->|"liste, Blob Data Reader"| smokeJob
     smokeJob -->|"GET /health"| dataApi
     smokeJob -->|"GET /health"| aiApi
-    mac -.->|"make upload-library<br>prévu #424"| choice
+    mac -.->|"make upload-library<br>prévu #542"| choice
     sources -.->|"collecte<br>prévu #330"| dailyJob
     choice -.->|"clips et copie de Zotero"| dailyJob
     dailyJob -.->|"écrit les items, kb_writer"| base
@@ -433,7 +434,7 @@ flowchart TB
     aiApi -.->|"POST /digests<br>POST /trend-reports"| digestJob
     dailyJob -.->|"publie veille/"| watchContainer
     digestJob -.->|"publie veille/"| watchContainer
-    watchContainer -.->|"make<br>download-watch-sheets<br>prévu #424"| mac
+    watchContainer -.->|"make<br>download-watch-sheets<br>codé #424, sans fiche avant #330"| mac
 ```
 
 Le schéma dit où est quoi en ligne, et ce qui s'y passe. Un trait plein est déployé; un trait ou un bord en pointillés
@@ -480,7 +481,8 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
   Allemagne (`docs/registre-traitements.md:123`, `:128`). Le Bicep n'en porte que les paramètres et les secrets
   (`infra/main.bicep:21-28`).
 - **Prévu**: `caj-kb-daily-routine` (#330) et `caj-kb-digest-watch` (#423) ne sont pas déclarés
-  (`infra/deployment.json`); les échanges avec le Mac viendront avec #424, la copie de Zotero avec #425.
+  (`infra/deployment.json`); l'envoi depuis le Mac viendra avec #542 (la relecture de `watch` est codée par #424), la copie de
+  Zotero avec #425.
 
 ## Limites
 

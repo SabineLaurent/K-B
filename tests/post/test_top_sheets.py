@@ -11,6 +11,7 @@ from k_b.etl.raw_store import RawStore
 from k_b.etl.sources.github import most_forked as github_most_forked
 from k_b.etl.sources.github import most_starred as github_most_starred
 from k_b.etl.tops import Top
+from k_b.jobs.watch_download import find_sheet_text_refusal
 from k_b.post import top_sheets, vault_files
 from k_b.post.top_sheets import TopSheetsOutcome, write_top_sheets
 from k_b.post.vault_files import VaultEntryRefusedError
@@ -595,3 +596,24 @@ def test_a_sheet_removed_before_the_deletion_refuses_its_top_and_deletes_no_rank
         write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
 
     assert all(ranking.exists() for ranking in rankings)
+
+
+def test_a_top_sheet_of_a_trapped_description_passes_the_check_of_the_download(
+    data_dir, vault_dir
+):
+    """kb download-watch-sheets refuses the Markdown kb never writes: a sheet kb writes passes."""
+    write_ranking(
+        data_dir,
+        STARRED_TOP,
+        "2026-10-05T093000Z",
+        response_with(
+            STARRED_RESPONSE,
+            description="```dataview ![x](https://a.example/p.png) <img src=x> <% tp %> `= this`"
+            " &#x202E; &rlm;",
+        ),
+    )
+
+    write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
+
+    sheet = find_sheet(vault_dir, STARRED_TOP, "2026-10-05").read_bytes()
+    assert find_sheet_text_refusal(sheet) is None

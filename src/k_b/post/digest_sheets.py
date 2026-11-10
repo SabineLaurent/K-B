@@ -12,11 +12,10 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import unquote
 
-from k_b.core.config import WATCH_DIR_NAME
+from k_b.core.config import CHARACTER_REFERENCE, WATCH_DIR_NAME
 from k_b.core.dates import format_date
 from k_b.post.ai_api_client import Digest, DigestsResponse, Source
 from k_b.post.vault_files import (
-    CHARACTER_REFERENCE,
     VaultEntryRefusedError,
     has_sheet,
     neutralize_digest_text,
@@ -142,11 +141,13 @@ def render_source(source: Source) -> str:
 
 def is_writable_url(url: str) -> bool:
     """Whether the URL can be written as an autolink, never rewritten: :: would make a field of
-    Dataview, and a character reference is decoded even in an autolink."""
+    Dataview, a character reference is decoded even in an autolink, and kb download-watch-sheets
+    refuses ~~~ anywhere in a line."""
     return (
         url.startswith(URL_SCHEMES)
         and URL_CHARACTERS.fullmatch(url) is not None
         and "::" not in url
+        and "~~~" not in url
         and CHARACTER_REFERENCE.search(url) is None
         and not has_hidden_character(url)
     )

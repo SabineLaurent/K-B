@@ -320,7 +320,7 @@ def test_no_module_of_the_sources_imports_the_composition():
 
 
 # The code the jobs of Azure Container Apps share (#412): the exchange storage and the health of the
-# APIs, below commands. It imports only core; only commands import it: neither the pipeline nor the
+# APIs, below commands; the Mac reaches the exchange storage by it too (kb download-watch-sheets, #424). It imports only core; only commands import it: neither the pipeline nor the
 # APIs, which have no access to the exchange storage.
 JOBS_ALLOWED_MODULES = {"jobs", "core"}
 JOBS_IMPORTERS = {"jobs", "commands"}

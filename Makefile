@@ -2,7 +2,8 @@
 ENV_FILE := $(dir $(shell git rev-parse --path-format=absolute --git-common-dir)).env
 E2E_ENV_FILE := $(ENV_FILE).e2e_test
 
-.PHONY: create-db collect import purge write-tops digest trend-report serve-data serve-ai openapi \
+.PHONY: create-db collect import purge write-tops digest trend-report download-watch-sheets \
+	serve-data serve-ai openapi \
 	test test-ai-api test-data-api test-etl test-cov sandbox-alerts
 
 create-db:
@@ -25,6 +26,11 @@ digest:
 
 trend-report:
 	uv run --env-file $(ENV_FILE) kb trend-report
+
+# On the Mac, once az login --tenant <tenant> is done: each sheet of the container watch that veille
+# lacks is copied there, none replaced (README, "Les fiches en ligne sur le Mac").
+download-watch-sheets:
+	uv run --env-file $(ENV_FILE) kb download-watch-sheets
 
 serve-data:
 	uv run --env-file $(ENV_FILE) kb serve-data

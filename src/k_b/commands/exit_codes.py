@@ -24,7 +24,10 @@ class ExitCode(IntEnum):
             "the command ran and failed; kb collect, kb write-tops, kb digest: no part done,"
             " or kb collect: state not written; kb trend-report: no report written, or written"
             " and its register not updated; kb smoke-test: a check failed; kb daily-routine,"
-            " kb digest-watch: a step exited with 1, the worst in the order 0, 4, 2, 1"
+            " kb digest-watch: a step exited with 1, the worst in the order 0, 4, 2, 1;"
+            " kb download-watch-sheets: the storage not reached, or no sheet of watch in veille"
+            " and a blob refused, a sheet not written, the listing stopped at its bound or an"
+            " error of the storage during the download"
         ),
     )
     NOT_STARTED = (
@@ -44,7 +47,9 @@ class ExitCode(IntEnum):
         (
             "kb collect, kb write-tops, kb digest: a part failed, another is done and kept;"
             " kb collect: state written; kb daily-routine, kb digest-watch: a step exited with 4,"
-            " none with 2 or 1"
+            " none with 2 or 1; kb download-watch-sheets: a blob refused, a sheet not written,"
+            " the listing stopped at its bound or an error of the storage during the download,"
+            " another sheet of watch in veille"
         ),
     )
     # 128 + 2, the code a shell reads for a process stopped by SIGINT. A normal exit, not a death by
@@ -55,7 +60,8 @@ class ExitCode(IntEnum):
         130,
         (
             "kb collect, kb import, kb purge, kb write-tops, kb digest, kb trend-report,"
-            " kb smoke-test, kb daily-routine, kb digest-watch: stopped by SIGINT (Ctrl-C), no further step run;"
+            " kb smoke-test, kb daily-routine, kb digest-watch, kb download-watch-sheets: stopped by"
+            " SIGINT (Ctrl-C), no further step run;"
             " what was done before it is kept; kb create-db: stopped"
             " by SIGINT, no database left"
         ),
@@ -67,7 +73,8 @@ class ExitCode(IntEnum):
         143,
         (
             "kb collect, kb import, kb purge, kb write-tops, kb digest, kb trend-report,"
-            " kb smoke-test, kb daily-routine, kb digest-watch: stopped by SIGTERM, no further step run; what was"
+            " kb smoke-test, kb daily-routine, kb digest-watch, kb download-watch-sheets: stopped by"
+            " SIGTERM, no further step run; what was"
             " done before it is kept; kb serve-data, kb serve-ai:"
             " stopped by SIGTERM, outside PID 1"
         ),

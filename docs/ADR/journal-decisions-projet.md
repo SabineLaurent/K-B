@@ -6399,6 +6399,73 @@ Plan validé par Sabine le 10/11, relu par time-knight avant elle.
   sans import le jour même, et les durées sont des maxima. Option écartée : l'heure du dernier import, lue en base ;
   une purge sans import nouveau ne supprimerait pas ce qui a expiré depuis. — PR de #540
 
+### Le Mac : les fiches de `watch` par le SDK (#424)
+
+Plan validé par Sabine le 10/11 (« Plan validé : le SDK au lieu d'AzCopy »), relu par un sous-agent sans contexte et
+par time-knight. #424 ne fait plus que `make download-watch-sheets` ; `make upload-library` part dans #542 (décision
+de Sabine du 10/11).
+
+- **`make download-watch-sheets` passe par le SDK déjà installé (`azure-storage-blob`, et `AzureCliCredential` sur le
+  compte d'`az login`), pas par AzCopy.** Choix proposé par la session, validé par Sabine. Pourquoi : chaque nom de
+  blob se contrôle avant toute écriture, alors que deux identités de jobs écrivent dans `watch` (revue de sécurité de
+  #420 : des noms non fiables, une traversée de chemin possible). AzCopy n'est pas installé sur le Mac, `az` l'est ;
+  sans AzCopy, rien n'écrit de journal ni de plan citant les noms (essai 4 de #424 sans objet) ; le SDK ne fait que des
+  appels au conteneur, comme les jobs. Revient, pour la descente, sur l'outil du plan de mise en ligne du 06/11 (I9 :
+  AzCopy v10), recopié dans #424 ; pour la montée, le choix est à reprendre dans #542. Options écartées :
+  `azcopy copy --recursive --overwrite=false`, où AzCopy bâtit lui-même le chemin local à partir du nom ;
+  `azcopy list`, puis `--include-path`, qui demande deux outils et la lecture d'une sortie texte. Limite assumée :
+  `az` reçoit tout l'environnement que charge `uv run --env-file`, secrets compris ; parade, un fichier
+  d'environnement réduit pour cette cible, faisable avec nos droits, pas faite. — PR de #424
+- **Une liste fermée de noms : `<dossier>/<jour>.md`, le dossier exactement l'un de ceux où écrivent les écrivains de
+  `post/` (les 9 sujets, `tops/<top>`, `tendances`). Un nom de cette forme d'un autre dossier est laissé de côté, sans
+  échec ; tout autre nom est refusé, cité par sa position, jamais écrit, et ne bloque pas les fiches valides.**
+  « Ne bloque pas » : remarque de tn-orchestrateur, validée par Sabine. Sinon, un seul blob inattendu, que Sabine ne
+  peut pas supprimer (elle n'a que Reader sur `watch`), arrêterait pour toujours tous ses téléchargements. Le code de
+  sortie suit `find_exit_code`, la règle commune : 4 quand une fiche est dans `veille/`, 1 sinon (tranché par
+  time-knight). Les dossiers des tops ont deux niveaux (`tops/most_starred`), que le plan omettait : écart trouvé au
+  code, tranché par time-knight. Un test compare la liste aux trois `find_sheets_dir` de `post/`. — PR de #424
+- **Une fiche déjà dans `veille/` n'est ni téléchargée ni remplacée, même modifiée sur le Mac ; l'écriture passe par
+  `write_new_sheet` (`post/vault_files.py`), qui refuse un lien et ne remplace rien.** Pourquoi : le critère de #424
+  (un second passage copie 0 fichier, une fiche modifiée en local n'est pas écrasée), et une seule règle des liens
+  pour tous les écrivains du coffre. Options écartées : déplacer `vault_files` dans `core/`, pour que `jobs/` l'importe
+  (les trois écrivains du coffre à toucher) ; recopier ses contrôles dans `jobs/`. Limite assumée (constat 12 de #424) :
+  une fiche supprimée sur le Mac revient tant que `watch` la porte ; parade, la supprimer dans `job-data`, puis dans
+  `watch`, puis sur le Mac, par un rôle temporaire (registre des traitements, « Procédure de tri », étape 9). — PR de
+  #424
+- **Un blob de plus de 4 000 000 octets est refusé, comme un texte qui n'est pas de l'UTF-8, qui porte un caractère
+  de contrôle autre que la tabulation et le retour à la ligne, ou un contrôle bidirectionnel ; la liste s'arrête à
+  20 000 blobs.** Pourquoi : borner ce qu'une identité de job peut faire écrire sur le Mac (OWASP API4:2023), et
+  refuser ce que kb n'écrit jamais. 4 000 000 : le double d'une réponse de l'API IA non échappée
+  (`MAX_AI_API_ANSWER_BYTES`), supposé, pas mesuré ; 20 000 : environ 4 ans de fiches à 12 dossiers. Limite assumée :
+  au pire, 20 000 blobs de 4 000 000 octets sur le disque (parade, une borne d'octets par passage, pas faite). — PR de
+  #424
+- **Le Markdown actif est refusé, hors échappement compté par la parité des `\` : un accent grave, `~~~` n'importe où
+  dans une ligne, `![`, un `<` qui n'ouvre pas un autolien `http://` ou `https://`.** Tranché par time-knight sur le
+  constat de la revue de sécurité de #424, après la relecture d'un sous-agent neuf, sous la délégation de Sabine du
+  15/10. Pourquoi : une requête Dataview (DQL), active par défaut et que les réglages du JavaScript ne coupent pas
+  (`DEFAULT_SETTINGS` d'obsidian-dataview, lu par Context7 le 2026-11-10), lirait tout le coffre et pourrait
+  l'envoyer par une image distante ; kb n'écrit aucun de ces quatre motifs sans l'échapper (il écrit un `[` dans les
+  liens des tops et des `~` dans une URL ou une description). Options écartées : refuser seulement une clôture en
+  début de ligne (`> ~~~` et `- ~~~` en ouvrent une aussi) ; garder le Markdown actif avec pour seule parade le
+  JavaScript de Dataview désactivé (la parade du plan, qui ne couvre pas DQL). Un faux positif, une description de top
+  qui contient `~~~`, refuse sa fiche : un échec visible. Limite assumée : un plugin qui agit sur un fichier neuf
+  (Templater et « Trigger Templater on new file creation ») reste hors de ce contrôle ; parade, ce déclencheur
+  inactif ou `veille/` dans ses « Excluded folders » (réglages de Templater, lus le 2026-11-10), faisable avec nos
+  droits, à vérifier par Sabine sur son coffre avec le JavaScript de Dataview désactivé. — PR de #424
+- **Refusés aussi : une référence de caractère non échappée (`&#x202E;`, `&rlm;`), même dans un autolien, et un `\`
+  dans un autolien ; une URL de source qui contient `~~~` n'est plus écrite en autolien, mais « (sans URL) ».**
+  Tranché par time-knight sur les deuxième et troisième `/code-review` de #424, sous la délégation de Sabine du 15/10 ;
+  complète la puce précédente. Pourquoi : CommonMark décode une référence en contrôle bidirectionnel, même dans un
+  autolien, ce qui contournait le refus des contrôles bidirectionnels ; un `\` n'échappe rien dans un autolien
+  (CommonMark 0.31.2, § 6.5) et y laissait la référence décodée ; kb n'écrit ni l'un ni l'autre
+  (`CHARACTER_REFERENCE`, `URL_CHARACTERS`). Une URL qui contenait `~~~` faisait refuser par la descente toute la
+  fiche du sujet et du jour, et non sa seule source. `CHARACTER_REFERENCE` passe dans `core/config.py` : une seule
+  définition pour les écrivains et la descente (`jobs/` n'importe pas `post/`). Options écartées : échapper `~` dans
+  les descriptions des tops (le faux positif accepté à la puce précédente reste) ; une regex des références plus
+  étroite, à la grammaire de CommonMark, que celle des écrivains (règle de Sabine du 2026-10-21, une règle pour les
+  deux écrivains : la descente refuse exactement ce qu'ils échappent). Non vérifié : qu'Obsidian décode une référence
+  dans un autolien comme cmark-gfm ; le refus vaut dans les deux cas. — PR de #424
+
 ## Décisions encore ouvertes
 
 - **Une limite de connexions du serveur** (2026-11-05, #161) : `limit_concurrency` d'uvicorn, écarté
