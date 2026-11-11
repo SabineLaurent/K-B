@@ -179,6 +179,7 @@ def answer_digests(
         reading,
         state.subjects,
         window.since_by_subject,
+        window.until,
         deadline,
         tracing=tracing,
     )

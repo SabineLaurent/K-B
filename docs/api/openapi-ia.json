@@ -547,7 +547,7 @@
             },
             "type": "object",
             "title": "Since By Subject",
-            "description": "The start applied to each subject: its items dated from it are its own."
+            "description": "The start applied to each subject: its items dated from it, and before window.until, are its own."
           },
           "digests": {
             "items": {

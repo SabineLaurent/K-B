@@ -3,7 +3,7 @@ each 200 made by the schema of the AI API, which ties the client to the contract
 
 import json
 import secrets
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import httpx2
 import pytest
@@ -23,6 +23,7 @@ from k_b.core.config import (
     AI_API_REQUEST_DEADLINE_SECONDS,
     DIGEST_REQUEST_TIMEOUT_SECONDS,
     MAX_AI_API_ANSWER_BYTES,
+    MAX_DIGEST_WINDOW_DAYS,
     TREND_REPORT_REQUEST_TIMEOUT_SECONDS,
 )
 from k_b.post import ai_api_client
@@ -145,9 +146,9 @@ def ask(handle, since_by_subject=None):
         ), requests
 
 
-def ask_and_fail(handle):
+def ask_and_fail(handle, since_by_subject=None):
     with pytest.raises(AiApiError) as raised:
-        ask(handle)
+        ask(handle, since_by_subject)
     return raised.value
 
 
@@ -519,6 +520,10 @@ def digest_with(**changes):
             "subjects_without_items.0 (subject_not_listed)",
         ),
         (
+            make_response(subjects_without_items=["research"]),
+            "subjects (subject_missing)",
+        ),
+        (
             make_response(since_by_subject={"agent_tools": SINCE}),
             "since_by_subject (subjects_not_the_list)",
         ),
@@ -560,14 +565,41 @@ def test_a_response_that_breaks_the_closed_lists_is_refused_before_any_sheet(
 
 
 def test_the_request_gives_the_start_of_each_subject_in_the_format_of_the_dates():
-    _, requests = ask(
-        answer(content=to_body(make_response())),
-        {"research": datetime(2026, 10, 18, 16, 29, 55, tzinfo=UTC)},
+    start = datetime(2026, 10, 18, 16, 29, 55, tzinfo=UTC)
+    # The AI API applies the start sent.
+    response = make_response(
+        since_by_subject=dict.fromkeys(SUBJECT_NAMES, SINCE) | {"research": start}
     )
+
+    _, requests = ask(answer(content=to_body(response)), {"research": start})
 
     assert json.loads(requests[0].content) == {
         "since_by_subject": {"research": "2026-10-18T16:29:55Z"}
     }
+
+
+def test_a_start_after_the_one_sent_is_refused_unless_it_is_the_bound():
+    sent = {"research": SINCE - timedelta(days=1)}
+
+    failure = ask_and_fail(answer(content=to_body(make_response())), sent)
+
+    assert str(failure) == (
+        "ai_api_invalid_response, HTTP 200, since_by_subject.research"
+        f" (start_after_the_one_sent), request_id {REQUEST_ID}"
+    )
+
+
+def test_a_start_brought_to_the_bound_is_accepted():
+    bound = UNTIL - timedelta(days=MAX_DIGEST_WINDOW_DAYS)
+    response = make_response(
+        since_by_subject=dict.fromkeys(SUBJECT_NAMES, SINCE) | {"research": bound}
+    )
+
+    received, _ = ask(
+        answer(content=to_body(response)), {"research": bound - timedelta(days=30)}
+    )
+
+    assert received.since_by_subject["research"] == bound
 
 
 def test_a_response_with_failed_subjects_is_accepted():

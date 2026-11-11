@@ -75,12 +75,13 @@ def build_digests(
     reading: WatchReading,
     subjects: Sequence[DigestSubject],
     subject_starts: Mapping[str, datetime],
+    until: datetime,
     deadline: Deadline,
     *,
     tracing: Tracing = TRACING_OFF,
 ) -> DigestsResult | ClassificationFailure:
     """The digests of the items read, one subject after the other in the order of the list,
-    each of its items dated from its start."""
+    each of its items dated from its start and before until, the start of its next digest."""
     classification = classify(
         http_client, settings, reading.items, subjects, deadline, tracing=tracing
     )
@@ -97,12 +98,14 @@ def build_digests(
     for subject in subjects:
         classified_items = list_subject_items(reading, classification, subject.name)
         # Before the selection for the writing: MAX_ITEMS_PER_DIGEST counts the items kept.
-        subject_items = [
+        items_from_start = [
             item
             for item in classified_items
             if item.source_date >= subject_starts[subject.name]
         ]
-        items_before_subject_start += len(classified_items) - len(subject_items)
+        items_before_subject_start += len(classified_items) - len(items_from_start)
+        # From until, the start of the next digest: in it, not in this one too.
+        subject_items = [item for item in items_from_start if item.source_date < until]
         if not subject_items:
             subjects_without_items.append(subject.name)
             continue

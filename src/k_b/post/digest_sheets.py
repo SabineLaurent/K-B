@@ -9,13 +9,13 @@ import os
 import re
 import unicodedata
 from collections.abc import Sequence
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import unquote
 
 from k_b.core.config import CHARACTER_REFERENCE, WATCH_DIR_NAME
 from k_b.core.dates import format_date
-from k_b.items import parse_aware_datetime
+from k_b.items import convert_to_utc, parse_aware_datetime
 from k_b.post.ai_api_client import Digest, DigestsResponse, Source
 from k_b.post.vault_files import (
     VaultEntryRefusedError,
@@ -81,7 +81,7 @@ def find_sheet_exists_error(
 def read_subject_starts(
     vault_dir: Path, subject_names: Sequence[str], now: datetime
 ) -> dict[str, datetime]:
-    """The start of each subject with a sheet: the until of its last sheet (#565)."""
+    """The start of each subject with a sheet: the until of its last sheet."""
     starts: dict[str, datetime] = {}
     for subject in subject_names:
         until = find_previous_until(vault_dir, subject, now)
@@ -97,11 +97,10 @@ def find_previous_until(
     A last sheet that is a link, or without one valid until up to now, is refused."""
     sheets_dir = find_sheets_dir(vault_dir, subject)
     try:
-        names = [
-            entry.name
-            for entry in os.scandir(sheets_dir)
-            if SHEET_NAME.fullmatch(entry.name)
-        ]
+        with os.scandir(sheets_dir) as entries:
+            names = [
+                entry.name for entry in entries if SHEET_NAME.fullmatch(entry.name)
+            ]
     except FileNotFoundError:
         return None
     if not names:
@@ -119,8 +118,9 @@ def find_previous_until(
 
 
 def read_until(sheet_path: Path) -> datetime | None:
-    """The until of the front matter of the sheet, read without following a link; None when the
-    front matter is not there, or holds none or more than one until that is a date."""
+    """The until of the front matter of the sheet, read without following a link, in UTC to its
+    second as kb sends it; None when the front matter is not there, or holds none or more than one
+    until that is a date."""
     descriptor = os.open(sheet_path, os.O_RDONLY | os.O_NOFOLLOW)
     with os.fdopen(descriptor, "rb") as sheet:
         head = sheet.read(MAX_FRONT_MATTER_BYTES)
@@ -137,9 +137,10 @@ def read_until(sheet_path: Path) -> datetime | None:
     if len(values) != 1:
         return None
     try:
-        return parse_aware_datetime(values[0], "until").astimezone(UTC)
+        until = convert_to_utc(parse_aware_datetime(values[0], "until"))
     except ValueError:
         return None
+    return until.replace(microsecond=0)
 
 
 def write_digest_sheet(

@@ -180,7 +180,8 @@ le 18/10/2026 :
 **Le 25/10** (journal ADR, 2026-10-20, « Squelette E1 E3 : cadrage du 20/10 », décision 1) : K-B
 tourne sur ma machine, sans conteneur ; c'est le premier de trois temps. La collecte, l'import,
 l'API de données et l'API IA s'y lancent par `kb`. L'API IA rédige des comptes rendus de veille par sujet,
-sur une fenêtre réglable (`KB_DIGEST_WINDOW_DAYS`, 3 jours par défaut), avec gpt-6-luna ; le modèle
+chacun depuis la fin du précédent du même sujet (le premier sur `KB_DIGEST_WINDOW_DAYS`, 3 jours par
+défaut), avec gpt-6-luna ; le modèle
 ne choisit le sujet que dans une liste fermée que je tiens. Le retour se lit dans la console, et les
 fiches en `.md` dans mon coffre : ni interface CLI dédiée ni front. La collecte et l'import sont
 lancés à la main, et conçus comme des jobs. Au deuxième temps, avant le 29/10 si le temps le permet,
@@ -458,17 +459,20 @@ donc tourner, et appelle le modèle ; elle ne garde rien entre deux demandes.
    fichier, sans réseau ni clé ni coût.
 2. Lancer l'API IA, à côté de `kb serve-data` ; elle écoute par défaut sur `http://127.0.0.1:8001`, et
    seulement sur la machine (`KB_AI_API_HOST` et `KB_AI_API_PORT` changent l'hôte et le port ;
-   `KB_DIGEST_WINDOW_DAYS`, de 1 à 14, la fenêtre par défaut, 3 jours) :
+   `KB_DIGEST_WINDOW_DAYS`, de 1 à 14, la fenêtre d'un sujet sans début, 3 jours) :
 
    ```sh
    KB_DATA_DIR=~/.knowledge_base uv run --env-file .env kb serve-ai
    ```
 
-3. Demander les fiches d'une fenêtre (`window_days` facultatif, de 1 à 14) :
+3. Demander les fiches d'une fenêtre (`window_days` facultatif, de 1 à 14 ; `since_by_subject`
+   facultatif, le début d'un sujet, date avec fuseau, ramené à 14 jours au plus :
+   [docs/fiches-veille.md](docs/fiches-veille.md), « Fenêtre ») :
 
    ```sh
    curl -X POST -H "Authorization: Bearer <la clé>" -H "Content-Type: application/json" \
-     -d '{"window_days": 3}' http://127.0.0.1:8001/digests
+     -d '{"window_days": 3, "since_by_subject": {"models": "2026-11-09T10:00:00Z"}}' \
+     http://127.0.0.1:8001/digests
    ```
 
 La documentation de l'API IA est servie sur `http://127.0.0.1:8001/docs`, sans clé, seulement avec
@@ -514,12 +518,15 @@ l'API IA n'a pas besoin (moindre privilège).
 KB_DATA_DIR=~/.knowledge_base KB_VAULT_DIR=<coffre> uv run --env-file .env kb digest
 ```
 
-`kb digest` demande à l'API IA les fiches de sa fenêtre par défaut (`KB_DIGEST_WINDOW_DAYS`, lue
-par `kb serve-ai`), avec la clé `KB_AI_API_KEY_KB_DIGEST`, à l'adresse `KB_AI_API_URL`
-(`http://127.0.0.1:8001` par défaut ; elle ne suit pas `KB_AI_API_PORT` : la changer aussi). Il
-écrit une fiche par sujet rendu, `<KB_VAULT_DIR>/veille/<sujet>/AAAA-MM-JJ.md`, au jour UTC de la
-demande : un frontmatter (`subject`, `generated`, `model`, la fenêtre, `items_capped`, la sorte
-coupée par le plafond et la date de son premier item laissé (`capped_kind`, `covered_after`),
+`kb digest` demande à l'API IA la fiche de chaque sujet depuis la fin de la précédente : il lit le
+`until` de la dernière fiche du sujet dans le coffre et l'envoie (#565) ; un sujet sans fiche prend
+la fenêtre de `KB_DIGEST_WINDOW_DAYS`, lue par `kb serve-ai` ; un début de plus de 14 jours est
+ramené à 14 jours, et journalisé. La demande part avec la clé `KB_AI_API_KEY_KB_DIGEST`, à
+l'adresse `KB_AI_API_URL` (`http://127.0.0.1:8001` par défaut ; elle ne suit pas `KB_AI_API_PORT` :
+la changer aussi). Il écrit une fiche par sujet rendu, `<KB_VAULT_DIR>/veille/<sujet>/AAAA-MM-JJ.md`,
+au jour UTC de la demande, et une fiche « Aucun item classé dans ce sujet. » pour un sujet sans
+item, d'où part son compte rendu suivant : un frontmatter (`subject`, `generated`, `model`, la
+fenêtre du sujet, `since` et `until`, `items_capped`, la sorte coupée par le plafond et la date de son premier item laissé (`capped_kind`, `covered_after`),
 `request_id`), les affirmations, chacune avec le numéro de ses sources, puis les sources, leur
 titre et leur URL. Chaque affirmation et chaque titre est écrit en texte : ni lien, ni image, ni
 balise, ni code, ni requête Dataview ne peut s'y activer. Une fiche n'est jamais réécrite, même par deux
@@ -532,7 +539,8 @@ affiche un bilan : la fenêtre et le nombre d'items lus, un tableau par sujet (s
 fiche), le total, puis le modèle et le `request_id`, que `logs/kb-serve-ai.log` reprend. Code
 de sortie, l'unité étant le sujet :
 
-- 0 : chaque fiche rendue est écrite, ou la fenêtre n'en a aucune ;
+- 0 : chaque sujet a sa fiche écrite, avec ou sans item ; ou rien n'est lu (une base vide, un
+  import pas lancé) : aucune fiche n'est écrite, et chaque sujet garde son début ;
 - 4 : un sujet a échoué (nommé par l'API IA, ou sa fiche non écrite) et au moins une fiche est
   écrite ;
 - 1 : rien n'est écrit : l'API IA est injoignable, dépasse le délai, refuse la clé (le message
@@ -542,8 +550,9 @@ de sortie, l'unité étant le sujet :
   échoué ; ou une erreur du système (`OSError`, un dossier illisible) arrête le contrôle d'avant la
   demande, sans rien demander ;
 - 2 : rien n'est demandé : `KB_DATA_DIR`, `KB_VAULT_DIR` (absente, ou pas un dossier existant) ou
-  `KB_AI_API_KEY_KB_DIGEST` manque ou est refusée, une fiche du jour est déjà là, ou un dossier
-  `veille/…` est un lien symbolique ;
+  `KB_AI_API_KEY_KB_DIGEST` manque ou est refusée, une fiche du jour est déjà là, un dossier
+  `veille/…` est un lien symbolique, ou la dernière fiche d'un sujet n'a pas de `until` valide
+  (`previous_sheet_invalid`) ;
 - 143 : `kb digest` a reçu SIGTERM, 130 : SIGINT (Ctrl-C). Les fiches déjà écrites sont gardées.
 
 Le code 4 dit la même chose pour `kb collect` (l'unité est la source), `kb write-tops` (le top) et

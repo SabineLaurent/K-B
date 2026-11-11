@@ -6,7 +6,7 @@ import re
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal, NoReturn
 
 import httpx2
@@ -30,6 +30,7 @@ from k_b.core.config import (
     AI_API_WRITE_TIMEOUT_SECONDS,
     DIGEST_CLIENT,
     MAX_AI_API_ANSWER_BYTES,
+    MAX_DIGEST_WINDOW_DAYS,
     MODEL_NAME,
 )
 from k_b.core.dates import DATABASE_DATE_FORMAT
@@ -220,7 +221,7 @@ def request_digests(
         send_request(http_client, DIGESTS_PATH, body), DigestsResponse
     )
     refuse_out_of_lists(response, subject_names)
-    refuse_earlier_starts(response, since_by_subject)
+    refuse_moved_starts(response, since_by_subject)
     return response
 
 
@@ -341,9 +342,16 @@ def describe_value(value: str, pattern: re.Pattern[str]) -> str:
 def refuse_out_of_lists(
     response: DigestsResponse, subject_names: Sequence[str]
 ) -> None:
-    """Refuse a subject out of the closed list or given twice, as its name makes the path of its
-    sheet; starts that are not those of the list; and a claim citing a source not listed once in
-    its digest."""
+    """Refuse a response whose subjects or sources break their closed lists."""
+    refuse_subjects_out_of_list(response, subject_names)
+    refuse_sources_out_of_digests(response)
+
+
+def refuse_subjects_out_of_list(
+    response: DigestsResponse, subject_names: Sequence[str]
+) -> None:
+    """Refuse a subject out of the closed list, given twice or missing, as its name makes the path
+    of its sheet; and starts that are not those of the list."""
     seen_subjects: set[str] = set()
     subjects = (
         [
@@ -367,6 +375,13 @@ def refuse_out_of_lists(
         if subject in seen_subjects:
             raise_invalid(response.request_id, place, "subject_twice")
         seen_subjects.add(subject)
+    if seen_subjects != set(subject_names):
+        raise_invalid(response.request_id, "subjects", "subject_missing")
+
+
+def refuse_sources_out_of_digests(response: DigestsResponse) -> None:
+    """Refuse a source given twice in its digest, and a claim citing a source not listed once in
+    its digest."""
     for number, digest in enumerate(response.digests):
         source_ids = [source.item_id for source in digest.sources]
         if len(set(source_ids)) != len(source_ids):
@@ -381,18 +396,19 @@ def refuse_out_of_lists(
                 raise_invalid(response.request_id, place, "item_twice")
 
 
-def refuse_earlier_starts(
+def refuse_moved_starts(
     response: DigestsResponse, since_by_subject: Mapping[str, datetime]
 ) -> None:
-    """Refuse a subject started before the start sent: its sheet would give again items of its
-    previous sheet. A later start is the bound of the AI API."""
+    """Refuse a subject started before the start sent, as its sheet would give again items of its
+    previous sheet; and one started later, unless at the bound of the AI API."""
+    bound = response.window.until - timedelta(days=MAX_DIGEST_WINDOW_DAYS)
     for subject, start in since_by_subject.items():
-        if response.since_by_subject[subject] < start:
-            raise_invalid(
-                response.request_id,
-                f"since_by_subject.{subject}",
-                "start_before_the_one_sent",
-            )
+        applied = response.since_by_subject[subject]
+        place = f"since_by_subject.{subject}"
+        if applied < start:
+            raise_invalid(response.request_id, place, "start_before_the_one_sent")
+        if applied > start and applied != bound:
+            raise_invalid(response.request_id, place, "start_after_the_one_sent")
 
 
 def raise_invalid(request_id: str, place: str, check: str) -> NoReturn:

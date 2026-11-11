@@ -188,6 +188,21 @@ def test_the_previous_until_is_the_one_of_the_last_sheet_written_with_a_fixed_wi
     )
 
 
+def test_the_previous_until_is_read_to_its_second_as_kb_sends_it(vault_dir):
+    write_sheet(
+        vault_dir,
+        "research",
+        "2026-11-11.md",
+        FIXED_WINDOW_SHEET.replace(
+            "until: 2026-11-11T16:02:41Z", "until: 2026-11-11T16:02:41.700Z"
+        ),
+    )
+
+    assert find_previous_until(vault_dir, "research", NOW) == datetime(
+        2026, 11, 11, 16, 2, 41, tzinfo=UTC
+    )
+
+
 @pytest.mark.parametrize(
     "content",
     [
@@ -200,6 +215,9 @@ def test_the_previous_until_is_the_one_of_the_last_sheet_written_with_a_fixed_wi
             "until: 2026-11-11T16:02:41Z",
             "until: 2026-11-11T16:02:41Z\nuntil: 2026-11-12T16:02:41Z",
         ),
+        FIXED_WINDOW_SHEET.replace(
+            "until: 2026-11-11T16:02:41Z", "until: 0001-01-01T00:00:00+01:00"
+        ),
         "",
         "\xff\xfe",
     ],
@@ -210,6 +228,7 @@ def test_the_previous_until_is_the_one_of_the_last_sheet_written_with_a_fixed_wi
         "quoted",
         "no-front-matter",
         "two-untils",
+        "out-of-range-in-utc",
         "empty",
         "not-utf-8",
     ],

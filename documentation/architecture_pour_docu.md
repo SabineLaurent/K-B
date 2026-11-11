@@ -6,7 +6,8 @@ Cette fiche décrit l'architecture applicative de K-B en entier: le flux des don
 détail, les couches du code, puis chaque partie, de la collecte au déploiement sur Azure. Elle est écrite d'après le
 code de `main` au commit `0292266` (2026-11-09), dont `infra/` est celui du commit `cbada1e`, et la purge, sortie
 de `kb import` par #540, d'après le code de sa PR, et les jobs planifiés en ligne et le stockage qu'ils utilisent
-(#420, #330, #423), d'après le code de la PR de #423. Les chemins du
+(#420, #330, #423), d'après le code de la PR de #423, et la fenêtre par sujet, par #565, d'après le code de sa PR.
+Les chemins du
 code de K-B (`etl/…`, `commands/…`, `database/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 L'installation de l'environnement de développement, les dépendances et leur configuration sont dans
@@ -189,8 +190,11 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
    (`ai_api/connectors/metrics_export.py:301`, `ai_api/connectors/trace_export.py:124`, `:134`).
 5. **L'écriture dans le coffre.** `kb digest` envoie `POST /digests` à l'API IA, puis écrit une fiche par sujet,
    `veille/<sujet>/AAAA-MM-JJ.md` (`post/ai_api_client.py:226`, `commands/digest_command.py:118`). Il ne tient pas
-   de registre: l'API IA prend une fenêtre de `KB_DIGEST_WINDOW_DAYS` jours, 3 par défaut
-   (`ai_api/settings.py:36`, `core/config.py:329-330`). `kb trend-report` lit d'abord le registre des comptes rendus,
+   de registre: il lit le `until` de la dernière fiche de chaque sujet et l'envoie comme début du sujet
+   (`post/digest_sheets.py:81`, `:93`; `post/ai_api_client.py:214`); un sujet sans fiche prend une fenêtre de
+   `KB_DIGEST_WINDOW_DAYS` jours, 3 par défaut, ramenée comme tout début à 14 jours au plus
+   (`ai_api/settings.py:36`, `core/config.py:348-350`, `ai_api/routers/digest_router.py:118`). Un sujet sans item
+   reçoit une fiche qui le dit, d'où part son compte rendu suivant (`post/digest_sheets.py:156`). `kb trend-report` lit d'abord le registre des comptes rendus,
    `KB_DATA_DIR/trend_reports.json`, dont le dernier donne la période suivante (`post/trend_report_registry.py:26`,
    `:62`; `commands/trend_report_command.py:73`, `:134`). Il envoie `POST /trend-reports`
    (`post/trend_report_client.py:219-224`), écrit le compte rendu sous `veille/tendances/`

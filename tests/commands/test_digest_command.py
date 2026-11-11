@@ -291,13 +291,23 @@ def test_a_start_brought_to_the_bound_is_logged_with_its_subject(
     write_previous_sheet(
         vault_dir, "research", datetime(2026, 9, 1, 10, 0, 0, tzinfo=UTC)
     )
-    answer_digests(monkeypatch, answer_with(make_response()))
+    # The AI API brings it to the bound, 14 days before its until (UNTIL).
+    bound = datetime(2026, 10, 7, 16, 30, 0, tzinfo=UTC)
+    answer_digests(
+        monkeypatch,
+        answer_with(
+            make_response(
+                since_by_subject=dict.fromkeys(SUBJECT_NAMES, SINCE)
+                | {"research": bound}
+            )
+        ),
+    )
 
     cli.main(["digest"])
 
     assert re.search(
         rf"^{LOG_LINE_DATE} WARNING k_b\.cli: research: start 2026-09-01T10:00:00Z"
-        r" brought to 2026-10-18T16:30:00Z, the bound of 14 days$",
+        r" brought to 2026-10-07T16:30:00Z, the bound of 14 days$",
         read_kb_log(data_dir),
         re.MULTILINE,
     )
@@ -349,6 +359,24 @@ def test_digest_without_items_writes_the_sheet_of_each_subject_and_succeeds(
         "veille/research/2026-10-21.md",
         "veille/security_alerts/2026-10-21.md",
     ]
+
+
+def test_an_empty_reading_writes_no_sheet_and_keeps_the_starts(
+    monkeypatch, digest_environment, capsys
+):
+    # An empty base, or an import not run: no sheet would move a start over items not read.
+    data_dir, vault_dir = digest_environment
+    answer_digests(monkeypatch, answer_with(make_response([], items_in=0)))
+
+    assert cli.main(["digest"]) == cli.ExitCode.SUCCEEDED
+    assert list_sheets(vault_dir) == []
+    assert "total    written 0, failed 0\n" in capsys.readouterr().out
+    assert re.search(
+        rf"^{LOG_LINE_DATE} WARNING k_b\.cli: no item read: no sheet written, the start of"
+        r" each subject kept$",
+        read_kb_log(data_dir),
+        re.MULTILINE,
+    )
 
 
 def test_digest_with_a_sheet_of_the_day_asks_nothing_and_exits_2(

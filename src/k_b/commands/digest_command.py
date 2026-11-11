@@ -109,7 +109,13 @@ def run_digest(environ: Mapping[str, str]) -> int:
         )
         return ExitCode.FAILED
     log_starts_brought_to_the_bound(response, since_by_subject)
-    rows = write_digest_sheets(vault_dir, response)
+    if response.items_in == 0:
+        # An empty base or an import not run: a sheet would move a start over items not read
+        # (decision of Sabine of 2026-11-11).
+        logger.warning("no item read: no sheet written, the start of each subject kept")
+        rows = []
+    else:
+        rows = write_digest_sheets(vault_dir, response)
     logger.info("digest finished in %s", describe_duration(monotonic() - started))
     written_count = sum(1 for row in rows if row.sheet)
     failed_count = len(rows) - written_count

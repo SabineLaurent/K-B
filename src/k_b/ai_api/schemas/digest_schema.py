@@ -92,7 +92,8 @@ class DigestsSchema(BaseModel):
     )
     window: WindowSchema
     since_by_subject: dict[str, datetime] = Field(
-        description="The start applied to each subject: its items dated from it are its own."
+        description="The start applied to each subject: its items dated from it, and before"
+        " window.until, are its own."
     )
     digests: list[DigestSchema]
     failed_subjects: list[FailedSubjectSchema]

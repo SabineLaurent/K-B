@@ -157,6 +157,8 @@ VALID_STEPS = [
 
 # A start before every item of the tests: each item classified in a subject is its own.
 EARLIEST_START = datetime(2000, 1, 1, tzinfo=UTC)
+# An end after every item of the tests: none is left to the next digest.
+LATEST_END = datetime(2100, 1, 1, tzinfo=UTC)
 
 
 def digest_of(
@@ -167,6 +169,7 @@ def digest_of(
     subjects=TEST_SUBJECTS,
     tracing=TRACING_OFF,
     subject_starts=None,
+    until=LATEST_END,
 ):
     transport = transport or ReplayTransport(steps)
     with build_http_client(REPLAY_SETTINGS, transport=transport) as http_client:
@@ -176,6 +179,7 @@ def digest_of(
             reading,
             subjects,
             subject_starts or {subject.name: EARLIEST_START for subject in subjects},
+            until,
             deadline or Deadline.after(3600),
             tracing=tracing,
         )
@@ -646,6 +650,18 @@ def test_the_items_before_the_start_of_a_subject_leave_before_the_digest_cap(
     assert result.items_before_subject_start == 3
     # None of security_alerts beyond 2; 1 agent item beyond 2, added to those of the reading.
     assert result.items_dropped_before_writing_stage == reading.items_dropped + 1
+
+
+def test_the_items_dated_from_the_until_are_left_to_the_next_digest(reading):
+    # The until on the fourth security item: it and the one after start the next digest.
+    security_dates = sorted(
+        item.source_date for item in reading.items if item.item_id in SECURITY_ITEMS
+    )
+
+    _, transport = digest_of(reading, VALID_STEPS, until=security_dates[3])
+
+    security_body = sent_bodies(transport)[1]
+    assert len(json.loads(messages_of(security_body, "user")[0])["items"]) == 3
 
 
 def test_a_source_url_without_http_scheme_is_returned_null(reading):

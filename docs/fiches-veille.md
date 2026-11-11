@@ -88,21 +88,95 @@ si Sabine la modifie souvent.
 
 ## Fenêtre
 
+Chaque sujet a sa fenêtre : elle part de la fin du compte rendu précédent du même sujet et finit à
+l'instant de la demande (règle de Sabine du 2026-10-26, redite le 2026-11-11 ; #565). Ainsi, aucun
+item ne tombe entre deux comptes rendus d'un sujet, quel que soit l'écart entre deux lancements :
+4 jours du jeudi au lundi, 3 du lundi au jeudi. L'API IA ne garde rien (règle 7 de `poc.md`) :
+`kb digest` lit le `until` de la dernière fiche de chaque sujet et l'envoie (section « Fiches dans
+le coffre »).
+
 | Paramètre | Forme | Bornes | Défaut | Hors bornes |
 |---|---|---|---|---|
+| `since_by_subject` (corps de `POST /digests`) | objet JSON `{sujet: date}`, chaque date en texte ISO 8601 avec son fuseau (`Z` ou `±hh:mm`) | des sujets de la liste fermée ; une date au plus l'instant de la demande | un sujet absent part de `window_days` ; absent ou `null`, tous les sujets | 422 `invalid_parameter`, avant toute lecture et tout appel au modèle : un sujet hors de la liste, une date sans fuseau, un nombre, ou une date après la demande. Une date de plus de 14 jours avant la demande est ramenée à 14 jours, sans erreur |
 | `window_days` (corps de `POST /digests`) | entier JSON | de 1 à 14 | `KB_DIGEST_WINDOW_DAYS`, absent ou `null` | 422 `invalid_parameter`, avant toute lecture et tout appel au modèle ; `true`, `3.0` et `"3"` sont refusés (pas des entiers) |
 | `KB_DIGEST_WINDOW_DAYS` (variable d'environnement) | chiffres seuls | de 1 à 14 | 3, défaut nommé dans `core/config.py` (règle 2 de `poc.md`) | l'API IA ne démarre pas (code de sortie 2, échouer fermé, comme `kb serve-data`) |
 
-- `since` = l'instant de la demande, en UTC à la seconde, moins `window_days` × 24 h ; il est
-  passé à `GET /items?since=…`, et la règle de « quoi de neuf » de l'API de données s'applique :
-  la date est celle de la source, pas celle de la collecte.
-- `until` = l'instant de la demande, rendu dans `window.until`. **Limite** : `GET /items` n'a pas
-  de borne haute ; un item daté après `until` (une date future dans la source, un décalage
-  d'horloge entre `kb serve-data` et `kb serve-ai`) est lu et peut être cité.
-- **Limite** : les articles TLDR et les entrées KEV sont datés à minuit UTC
-  ([specs-api.md](specs-api.md), « Règle de quoi de neuf ») ; selon l'heure de la demande, une
-  fenêtre de 3 jours prend 2 ou 3 éditions. Option écartée : arrondir `since` à minuit (une règle
-  de plus, et la fenêtre ne dit plus « les N derniers jours »).
+- `until` = l'instant de la demande, en UTC à la seconde, rendu dans `window.until` ; c'est le
+  début du compte rendu suivant du sujet. `GET /items` n'a pas de borne haute : un item daté de
+  `until` ou après (une date future dans la source, un décalage d'horloge entre `kb serve-data` et
+  `kb serve-ai`) est lu et classé, mais n'entre dans la fiche d'aucun sujet : il revient au premier
+  compte rendu dont la fenêtre contient sa date (tri de `/code-review` sur #565, time-knight). Sinon
+  il serait dans cette fiche et dans la suivante. **Limite** : il compte dans `items_in` sans être
+  compté à part ; une date future fausse le tient hors de toute fiche jusqu'à cette date. **Pour
+  réduire le risque** : un compteur de plus dans la réponse, comme `items_before_subject_start`,
+  par du code, avec nos droits.
+- **Le début d'un sujet** est sa date de `since_by_subject`. Un sujet absent part de `until` moins
+  `window_days` × 24 h : le premier compte rendu d'un sujet sans fiche, ou une demande sans
+  `since_by_subject`. Un début de plus de `MAX_DIGEST_WINDOW_DAYS` (14 jours, `core/config.py`)
+  avant `until` est ramené à `until` moins 14 jours. La réponse rend le début appliqué à chaque
+  sujet (`since_by_subject`), et `kb digest` journalise un sujet ramené à la borne.
+- **Une seule lecture**, depuis le plus ancien des débuts, rendu dans `window.since` et passé à
+  `GET /items?since=…`. La règle de « quoi de neuf » de l'API de données s'applique : la date est
+  celle de la source, pas celle de la collecte. Puis **un seul classement**. Chaque sujet ne garde
+  que ses items datés de son début (borne incluse) jusqu'à `until` (borne exclue), avant la
+  sélection des 60 items de sa fiche (`select_for_writing`). Les autres sont comptés dans `items_before_subject_start` : ils
+  sont dans sa fiche précédente. Quand tous les débuts sont égaux, rien ne change : même lecture,
+  mêmes appels au modèle qu'avant #565.
+- **Après une lecture plafonnée**, le compte rendu suivant part de `until`, pas de
+  `covered_after` : repartir de `covered_after` relirait les sortes rares déjà écrites, et les
+  écrirait en double. Ce que le plafond laisse de côté n'est donc relu par aucun compte rendu
+  (« Limites de la fenêtre », ci-dessous).
+
+**Limites de la fenêtre.** Toutes les parades se font par du code, avec nos droits, après l'oral
+blanc du 13/11, sauf mention.
+
+- **La marge du lundi** : le lundi relit 4 jours, environ 190 à 275 items d'après le volume
+  estimé de « Lecture plafonnée » (140 à 205 sur 3 jours), sous le plafond de 300 items. Ce qui
+  dépasse est laissé de côté, puis perdu, puisque la reprise se fait à `until` ; la coupe est
+  dite dans la fiche (`items_capped`, `capped_kind`, `covered_after`). **Pour réduire le
+  risque** : un plafond plus haut, mesuré contre l'échéance de 200 s et le coût du modèle ; ou un
+  début par sorte, pour reprendre la sorte coupée à `covered_after`.
+- **Une seule passe de lecture** : un sujet en échec garde son début ; plus ancien, il allonge la
+  lecture de tous, et le plafond peut alors couper des items des sujets à jour. **Pour réduire le
+  risque** : deux passes, la plus récente d'abord.
+- **Les 60 items au plus d'une fiche** (`MAX_ITEMS_PER_DIGEST`, `core/config.py`), **et les items
+  `unanswered`** : un item au-delà des 60 plus récents de son sujet, ou que le classement laisse
+  sans réponse, n'est dans aucune fiche, et le compte rendu suivant ne le relit pas. Avant #565
+  aussi, les fenêtres du lundi et du jeudi se suivaient sans se recouvrir ; une fenêtre plus
+  longue rend la coupe des 60 plus probable. **Pour réduire le risque** : rédiger un sujet en
+  plusieurs appels de 60 items, ou relever `MAX_ITEMS_PER_DIGEST` après une mesure ; reclasser une
+  fois les seuls items `unanswered`. Chacune change le nombre d'appels au modèle : le jeu de
+  référence de `POST /digests` serait à réenregistrer par Sabine.
+- **Un item reclassé** : un item classé dans un sujet A dont la rédaction échoue, puis classé
+  dans un sujet B au compte rendu suivant, alors que B a déjà commencé après la date de l'item,
+  n'est dans aucune fiche. `items_before_subject_start` le compte avec les items, déjà écrits, de
+  la fiche précédente de B : sa perte ne se voit pas à part. Dans l'autre sens, la lecture qui part
+  du début plus ancien de A relit des items déjà écrits dans la fiche d'un autre sujet ; classé
+  cette fois dans A, un tel item est écrit une seconde fois. **Pour réduire le risque** : l'API IA
+  rendrait les items de chaque sujet en échec, et `kb` les garderait pour les renvoyer à la
+  demande suivante. Faisable, mais c'est un registre de plus côté `kb`, que la décision D1 de
+  #565 a écarté.
+- **Un job arrêté plus de 14 jours** : les items d'avant la borne ne sont dans aucune fiche ;
+  `kb digest` journalise le sujet, son début et la borne appliquée. **Pour réduire le risque** :
+  le rejeu des créneaux manqués, une requête par créneau, la fiche datée de son créneau (décision
+  du 2026-10-26, hors de #565).
+- **La date de la source** : la lecture filtre sur la date de la source, pas sur celle de
+  l'arrivée dans K-B. Un item daté avant le `until` d'un compte rendu, mais arrivé dans la base
+  après sa lecture, tombe avant le début du suivant : il n'est dans aucune fiche. Les éditions
+  TLDR et les entrées KEV, datées à minuit UTC ([specs-api.md](specs-api.md), « Règle de quoi de
+  neuf »), en sont l'exemple : une édition datée du jeudi à 0 h et importée après le compte rendu
+  du jeudi n'entre dans aucun. **Pour réduire le risque** : lancer `kb import` avant `kb digest` ;
+  puis filtrer sur la date d'arrivée (hors de #565). La base garde la date de collecte du fichier
+  brut de chaque item (`raw_data.collected_at`, `database/schema.sql`), mais une mise à jour
+  déplace l'item vers le fichier brut le plus récent (`database/writers/shared_rows.py`) : filtrer
+  sur elle reprendrait un item mis à jour. Une date de première arrivée demande une colonne de
+  plus, donc une migration (#186) ou une base recréée.
+- **La transition** : une fiche écrite à fenêtre fixe, avant #565, se reprend comme une autre, par
+  son `until`. Si la version de #565 est en ligne avant le jeudi 12/11 à 10:00 UTC, un sujet sans
+  fiche en ligne démarre ce jeudi 3 jours plus tôt, ce qui recouvre le passage à la main du 11/11 :
+  rien n'est perdu. Si elle ne l'est pas, le lundi 16/11 perd, pour ces sujets, la tranche du jeudi
+  10:00 au vendredi 10:00. **Pour réduire le risque** : le tag avant le jeudi 10:00 UTC, une
+  décision de Sabine.
 
 ### Lecture plafonnée
 
@@ -257,13 +331,20 @@ démarre pas (journal ADR, « Appel du modèle »).
 ### Demande
 
 ```json
-{"window_days": 3}
+{"since_by_subject": {"vulnerabilities": "2026-11-09T10:00:12Z", "models": "2026-11-09T10:00:12Z"}}
 ```
 
-`window_days` est optionnel : absent ou `null`, c'est la fenêtre de `KB_DIGEST_WINDOW_DAYS`.
-Tout autre champ est refusé (422 `invalid_parameter`), comme un corps absent, qui n'est pas un
-objet ou pas du JSON (UTF-8 invalide compris) : le corps renvoie alors `"parameters": ["body"]`,
-jamais le nom d'un champ en trop, qui vient du client.
+Les deux champs sont optionnels (section « Fenêtre ») : `since_by_subject`, le début de chaque
+sujet qui a un compte rendu précédent, et `window_days`, la fenêtre d'un sujet sans début ; absent
+ou `null`, c'est la fenêtre de `KB_DIGEST_WINDOW_DAYS`. Un corps vide, `{}`, demande la fenêtre de
+`KB_DIGEST_WINDOW_DAYS` pour chaque sujet, comme avant #565. Une date est lue par la fonction des
+dates de K-B (`parse_aware_datetime`, `items.py`), pas par Pydantic, qui prendrait un nombre pour
+une heure Unix. `kb digest` envoie `since_by_subject` seul : 379 octets pour les 9 sujets (mesuré
+le 2026-11-11), sous la borne de 1 024 octets ; au plus long nom de sujet (40 caractères), 66
+octets par sujet, soit 15 sujets sous la borne. Tout autre champ est refusé (422
+`invalid_parameter`), comme un corps absent, qui n'est pas un objet ou pas du JSON (UTF-8 invalide
+compris) : le corps renvoie alors `"parameters": ["body"]`, jamais le nom d'un champ en trop, qui
+vient du client.
 
 **Limite** (FastAPI 0.143, `fastapi/routing.py`) : le corps est lu en entier, et son JSON décodé,
 avant la vérification de la clé. Un corps qui n'est pas du JSON reçoit donc 422 même sans clé ;
@@ -486,6 +567,7 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
     "capped_kind": null,
     "covered_after": null
   },
+  "since_by_subject": {"llm_security": "2026-10-12T09:00:00Z", "models": "2026-10-13T09:00:00Z"},
   "digests": [
     {
       "subject": "llm_security",
@@ -500,21 +582,27 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
     }
   ],
   "failed_subjects": [{"subject": "models", "stage": "write", "error": "llm_timeout"}],
+  "subjects_without_items": [],
   "no_suitable_subject": [3, 9],
   "unanswered": [],
   "items_in": 41,
   "items_truncated": 2,
   "items_dropped_before_writing_stage": 0,
+  "items_before_subject_start": 4,
   "items_capped": false
 }
 ```
+
+L'exemple a deux sujets, pour rester court ; `since_by_subject` en a un par sujet de la liste.
 
 | Champ | Contenu |
 |---|---|
 | `request_id` | identifiant de la demande (UUID), repris par chaque ligne de métrique |
 | `model` | le modèle de `KB_LLM_MODEL` qui a rédigé les fiches (`replay` pour le replay), écrit par `kb digest` dans chaque fiche (#209) |
-| `window` | `days`, et `since` et `until` en UTC, au format des dates de la base ; quand `items_capped` est vrai, `capped_kind`, la sorte coupée, et `covered_after`, la date de son premier item laissé de côté (borne exclue) ; nuls sinon (section « Lecture plafonnée ») |
-| `digests` | une fiche par sujet rédigé ; un sujet sans item n'a pas de fiche |
+| `window` | `days`, la fenêtre d'un sujet sans début ; `since`, le début de la lecture, le plus ancien des débuts ; `until`, l'instant de la demande ; les dates en UTC, au format des dates de la base ; quand `items_capped` est vrai, `capped_kind`, la sorte coupée, et `covered_after`, la date de son premier item laissé de côté (borne exclue) ; nuls sinon (section « Lecture plafonnée ») |
+| `since_by_subject` | le début appliqué à chaque sujet de la liste : celui de la demande, ramené à 14 jours au plus, ou `until` moins `days` (section « Fenêtre », #565) |
+| `digests` | une fiche par sujet rédigé |
+| `subjects_without_items` | les sujets où aucun item lu n'est classé à partir de leur début (#565) ; `kb digest` leur écrit une fiche « Aucun item classé dans ce sujet. » |
 | `digests[].claims` | les affirmations gardées après la fidélité, sans leurs `facts` (contrôle interne) |
 | `digests[].sources` | `item_id`, `kind`, `title`, `url` de chaque item des affirmations gardées, lus dans l'API de données, **jamais dans la sortie du modèle** ; une `url` qui ne commence ni par `http://` ni par `https://` est rendue nulle |
 | `digests[].items_not_retained_in_output` | les items envoyés pour ce sujet qu'aucune affirmation du modèle ne cite, calculés par le code |
@@ -524,6 +612,7 @@ de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_token
 | `no_suitable_subject` | items du classement auxquels aucun sujet ne convient : le modèle a répondu `no_suitable_subject` (champ nommé `not_retained` jusqu'à la version 0.2.0, qui y mêlait les items absents de la sortie) |
 | `unanswered` | items que le classement a laissés sans réponse, absents des fiches eux aussi (depuis la version 0.3.0 de l'API IA, `classify-2`) |
 | `items_in`, `items_truncated`, `items_dropped_before_writing_stage`, `items_capped` | compteurs de la section « Entrée du modèle » |
+| `items_before_subject_start` | items classés dans un sujet mais datés d'avant son début : ils sont dans sa fiche précédente (section « Fenêtre », #565) |
 
 **Limite** : `sources[].title` est une donnée de source, pas une sortie du modèle ; le filtre du
 Markdown ne s'y applique pas. `kb digest` l'écrit en texte dans la fiche (section « Fiches dans le
@@ -585,7 +674,7 @@ de la requête.
   le 2026-11-11 ; en ligne, l'en-tête que l'entrée d'ACA peut poser n'est pas constaté.
 - **Documentation** : `/docs` et `/openapi.json` ne sont servis que si
   `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, 404 sinon, comme l'API de données ([specs-api.md](specs-api.md), #393).
-- **Version** : `0.12.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
+- **Version** : `0.13.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;
   un changement visible par un client change les deux. `0.1.0` : `POST /digests` (#156) ; `0.2.0` :
   `model` dans la réponse (#209) ; `0.3.0` : `unanswered`, et `not_retained` du premier niveau
   renommé `no_suitable_subject` (#210, `classify-2`) ; `0.4.0` : `items_dropped` renommé
@@ -602,7 +691,9 @@ de la requête.
   `/openapi.json` en `sandbox`, 405 `method_not_allowed` (#161) ; `0.12.0` : les textes de chaque
   dépôt choisi dans la réponse de `POST /trend-reports`, `readme`, `texts`, `texts_removed` et
   `writing_failure`, et `failed_subjects[].stage` de `POST /digests` typé `DigestStage` (`classify`
-  ou `write`), sans `select` (#369).
+  ou `write`), sans `select` (#369) ; `0.13.0` : `since_by_subject` dans la demande et la réponse de
+  `POST /digests`, `subjects_without_items` et `items_before_subject_start` dans la réponse, et
+  `window.since` devenu le début de la lecture, le plus ancien des débuts (#565).
 
 ## Contrôles
 
@@ -900,8 +991,8 @@ API8 (durcissement, revue et évaluation, #496 à #499) et API10 (portée du jet
   (`ai_api/app.py`) : aucune route du modèle ne peut les oublier. `/health`, et `/docs` et
   `/openapi.json` en `sandbox`, routes de Starlette sans donnée, répondent sans clé.
 - **Contrôle dans chaque fonction qui lit un enregistrement à partir d'une entrée du client** :
-  tenue. Les entrées du client ne désignent qu'une période (`window_days`, `after`,
-  `previous_first_window`) ; sans clé valide, rien n'est lu :
+  tenue. Les entrées du client ne désignent qu'une période (`window_days`, `since_by_subject`,
+  `after`, `previous_first_window`) ; sans clé valide, rien n'est lu :
   `test_a_request_without_a_valid_key_is_refused_before_any_reading`, sur chaque route.
 - **Identifiants aléatoires et imprévisibles** : *s.o.*, aucune route ne prend d'identifiant ; les
   entiers des réponses (`item_id`, `repository_id`) ne sont relus par aucune route de l'API IA.
@@ -1073,14 +1164,17 @@ API8 (durcissement, revue et évaluation, #496 à #499) et API10 (portée du jet
     responses. », texte d'aide de `--limit-concurrency` d'uvicorn 0.54, lu le 2026-11-10), une
     décision ouverte du journal ADR.
 - **Taille maximale de toutes les entrées** : tenue (#399). Corps de 1 024 octets au plus, refusé
-  en 413 avant la clé (`MAX_AI_API_BODY_BYTES`) ; `window_days` de 1 à 14 ; `after` et
+  en 413 avant la clé (`MAX_AI_API_BODY_BYTES`) ; `window_days` de 1 à 14 ; dans
+  `since_by_subject`, les sujets de la liste, et des débuts ramenés à 14 jours au plus ; `after` et
   `previous_first_window` au format `AAAA-MM-JJ`, sur 15 fenêtres au plus.
   `test_a_body_beyond_the_bound_is_refused_413_before_the_key`,
   `test_a_body_announced_beyond_the_bound_gets_the_413_of_k_b_on_any_route`,
   `test_a_length_starlette_reads_beyond_the_bound_gets_the_413_of_k_b`,
   `test_a_malformed_request_is_refused_422_on_its_body_before_any_reading` et
   `test_a_day_not_written_yyyy_mm_dd_is_refused_422_by_its_name`
-  (`tests/ai_api/test_trend_report_router.py`).
+  (`tests/ai_api/test_trend_report_router.py`) ;
+  `test_a_malformed_request_is_refused_422_before_any_call` et
+  `test_a_start_older_than_the_bound_is_brought_to_the_bound` (`tests/ai_api/test_digest_router.py`).
 - **Limite de débit** : tenue (#400), pour les clients à clé valide : 20 demandes par 24 h
   glissantes et par route. `test_beyond_its_limit_a_client_gets_429_before_any_reading`,
   `test_beyond_its_limit_the_client_of_the_reports_gets_429_without_a_reading`. Limites écrites
@@ -1837,7 +1931,7 @@ Sources, lues le 2026-10-27 :
 | `data_api_unauthorized` | 401 de l'API de données : clé `AI_DIGEST` refusée (sans clé, l'API IA ne démarre pas, règle 2 de `poc.md`) | 502 | — |
 | `data_api_rate_limited` | 429 de l'API de données, sans nouvelle tentative ni `Retry-After` transmis | 503 | — |
 | `data_api_invalid_response` | réponse hors du schéma attendu | 502 | — |
-| `invalid_parameter` | demande mal formée, `window_days` hors bornes | 422 | — |
+| `invalid_parameter` | demande mal formée, `window_days` hors bornes ; dans `since_by_subject`, un sujet hors de la liste, une date sans fuseau ou après la demande (#565) | 422 | — |
 | `invalid_api_key` | appel sans clé, ou clé inconnue (#156) | 401 | — |
 | `client_not_allowed` | clé valide d'un autre client que celui de la route (« Accès », #161) | 403 | — |
 | `rate_limit_exceeded` | client au-delà de la limite de la route (« Accès », #161) | 429, avec `Retry-After` | — |
@@ -1917,7 +2011,18 @@ des tops).
    lien symbolique, et la fiche du jour UTC n'existe pas. Sinon : code 2 (`vault_link_refused`,
    `sheet_not_a_file`, `sheet_exists`), aucune demande : aucun item ne part au modèle pour une
    fiche qui ne serait pas écrite. Rien n'est créé par ce contrôle.
-3. **`POST /digests`** avec `{}` : la fenêtre par défaut de l'API IA (`KB_DIGEST_WINDOW_DAYS`).
+   **Le début de chaque sujet** (#565) : le `until` de sa dernière fiche, celle du plus grand jour
+   parmi les noms `AAAA-MM-JJ.md` de `veille/<sujet>/` ; un autre fichier du dossier (une note de
+   Sabine, un temporaire caché) n'est pas une fiche. Seul l'en-tête est lu : 4 096 octets au plus,
+   sans suivre de lien (`O_NOFOLLOW`), après le refus d'un lien ou d'une entrée qui n'est pas un
+   fichier. Il doit tenir une seule ligne `until:`, une date avec son fuseau lue par
+   `parse_aware_datetime` (`items.py`, règle 4 de `conventions.md`), ramenée en UTC à la seconde,
+   comme `kb` l'envoie, au plus l'heure de `kb`. Sinon (une date hors des dates possibles une fois
+   en UTC comprise) :
+   code 2 (`previous_sheet_invalid`, le chemin de la fiche dans le coffre, jamais sa valeur), aucune
+   demande. Un sujet sans fiche n'a pas de début : l'API IA lui donne la fenêtre de
+   `KB_DIGEST_WINDOW_DAYS`. Une fiche écrite à fenêtre fixe, avant #565, se lit comme une autre.
+3. **`POST /digests`** avec `{"since_by_subject": {…}}`, le début de chaque sujet qui a une fiche.
    Délais nommés (`core/config.py`) : connexion 5 s, pool 5 s, écriture 10 s, lecture 240 s
    (`AI_API_READ_TIMEOUT_SECONDS`) : au-dessus de `DIGEST_REQUEST_TIMEOUT_SECONDS` et du dernier
    appel au modèle en cours (environ 20 s de plus, `ai_api/deadline.py`). La réponse est lue en
@@ -1936,12 +2041,24 @@ des tops).
    `stage` et `error` au motif `[a-z_]{1,64}`, `capped_kind` dans la liste fermée des sortes
    d'items (`ItemKind`, `items.py` : un mot que YAML lit comme nul ou booléen ferait passer une
    fenêtre coupée pour entière), dates avec fuseau, au moins une
-   source par affirmation. Puis : chaque sujet est de la liste fermée, une fois dans la réponse ; chaque source
-   est une fois dans sa fiche ; chaque affirmation cite des sources de sa fiche, chacune une fois.
+   source par affirmation. Puis : chaque sujet est de la liste fermée, une fois dans la réponse
+   (`digests`, `failed_subjects` et `subjects_without_items` ensemble), et chacun y est
+   (`subject_missing`) ; `since_by_subject` a les sujets de la liste, ni plus ni moins
+   (`subjects_not_the_list`) ; aucun début n'est avant celui envoyé (`start_before_the_one_sent` :
+   la fiche redonnerait des items de la précédente), ni après, sauf à la borne des 14 jours,
+   `window.until` moins 14 jours (`start_after_the_one_sent` : des items ne seraient dans aucune
+   fiche) ; chaque source est une fois dans sa fiche ; chaque affirmation cite des sources de sa
+   fiche, chacune une fois. Un début ramené à la borne est journalisé, avec le sujet, son début et
+   la borne (`<sujet>: start … brought to …, the bound of 14 days`), et la fiche est écrite.
    Hors de là : `ai_api_invalid_response`, aucune fiche écrite. L'erreur nomme la place et le
    contrôle, jamais la valeur reçue.
-5. **Une fiche par sujet rendu**, `veille/<sujet>/AAAA-MM-JJ.md`, au jour UTC de `window.until` :
-   le chemin est fait de constantes, d'un sujet de la liste et d'un jour. Elle est écrite une fois :
+5. **Une fiche par sujet rendu, et par sujet sans item**, `veille/<sujet>/AAAA-MM-JJ.md`, au jour
+   UTC de `window.until` ; un sujet en échec n'a pas de fiche, il garde son début. **Une lecture
+   entièrement vide** (`items_in` vaut 0 : une base vide, un import pas lancé) n'écrit aucune
+   fiche : chaque sujet garde son début, au lieu de l'avancer sur des items que l'API IA n'a pas
+   lus ; `kb` le journalise (`no item read: no sheet written, the start of each subject kept`) et
+   sort en 0 (décision de Sabine du 2026-11-11, tri de `/code-review` sur #565). Le chemin d'une
+   fiche est fait de constantes, d'un sujet de la liste et d'un jour. Elle est écrite une fois :
    `kb` ne réécrit jamais une fiche qu'il voit, et ne suit jamais un lien qu'il voit ; les dossiers
    et la fiche sont recontrôlés juste avant l'écriture, par un temporaire caché au nom fixe, créé
    seulement s'il n'existe pas, puis renommé (règle 2 de `conventions.md`, #295). Une limite : voir
@@ -1955,7 +2072,6 @@ anglais, son texte en français (règle de Sabine du 2026-10-21) :
 subject: coding_assistants
 generated: 2026-10-21T18:28:37Z
 model: "gpt-6-luna"
-window_days: 3
 since: 2026-10-18T18:28:37Z
 until: 2026-10-21T18:28:37Z
 items_capped: false
@@ -1973,13 +2089,17 @@ request_id: 6ac62295-48be-4dec-9c43-7a71e00e4282
 1. anthropics/claude-code Claude Code 2.1.287 — <https://github.com/anthropics/claude-code/releases/tag/v2.1.287>
 ```
 
-`generated` est `window.until`, l'instant de la demande côté API IA ; `model` est écrit en chaîne
-JSON, que YAML lit telle quelle ; `items_capped` dit une fenêtre coupée par le plafond, et
+`generated` est `window.until`, l'instant de la demande côté API IA ; `since` est le début du
+sujet (`since_by_subject`), et `until` le début de son compte rendu suivant ; `model` est écrit en
+chaîne JSON, que YAML lit telle quelle ; `items_capped` dit une fenêtre coupée par le plafond, et
 `capped_kind` et `covered_after` la sorte coupée et la date de son premier item laissé de côté :
 cette sorte n'est lue qu'après cette date (section « Lecture plafonnée ») ; `null` quand rien
 n'est coupé. Une affirmation cite ses sources par leur numéro, en texte ; seule la liste
 des sources porte des URL. Une fiche sans affirmation dit « Aucune affirmation retenue. », sans
-sources.
+sources. Une fiche d'un sujet sans item dit « Aucun item classé dans ce sujet. », sans sources :
+elle porte le `until` d'où part le compte rendu suivant du sujet. `items_capped`, `capped_kind`
+et `covered_after` sont ceux de la lecture, commune à tous les sujets. `window_days` n'est plus
+écrit depuis #565 : aucun code ne le lisait, et une fenêtre n'a plus de durée fixe.
 
 **Écrit en texte.** Le texte de chaque affirmation et le titre de chaque source : sur une ligne
 (retours à la ligne et blancs réduits à une espace ; contrôles, surrogates isolés et contrôles
@@ -2029,9 +2149,9 @@ légitimes l'utilisent.
 
 | Code | Quand |
 |---|---|
-| 0 | chaque fiche rendue est écrite ; ou aucune fiche dans la fenêtre (`total  none in the window`) |
+| 0 | chaque sujet a sa fiche écrite, avec ou sans item ; ou une lecture entièrement vide, sans fiche (`total  written 0, failed 0`) |
 | 1 | l'API IA injoignable (`ai_api_unavailable`), délai ou échéance dépassés (`ai_api_timeout`), clé refusée (`ai_api_unauthorized`, 401), route refusée au client (`ai_api_forbidden`, 403), limite atteinte (`ai_api_rate_limited`, 429), panne (`ai_api_failed`, 5xx), autre réponse, réponse hors schéma ou 200 au-delà de 8 000 000 d'octets (`ai_api_invalid_response`) : aucune fiche écrite ; ou un sujet en échec et aucune fiche écrite ; ou une `OSError` au contrôle d'avant la demande |
-| 2 | réglage refusé, `KB_VAULT_DIR` absente ou pas un dossier, fiche du jour déjà là ou lien, vus avant la demande : rien n'est demandé |
+| 2 | réglage refusé, `KB_VAULT_DIR` absente ou pas un dossier, fiche du jour déjà là ou lien, dernière fiche d'un sujet sans `until` valide (`previous_sheet_invalid`), vus avant la demande : rien n'est demandé |
 | 4 | un sujet en échec (nommé dans `failed_subjects`, ou sa fiche non écrite) et au moins une fiche écrite |
 | 130 | SIGINT (Ctrl-C) : les fiches déjà écrites restent |
 | 143 | SIGTERM : les fiches déjà écrites restent |
@@ -2078,8 +2198,10 @@ Model: gpt-6-luna
 Request id: 1bc0caf3-78ad-4b8d-ae56-397ba9d766c7
 ```
 
-La fenêtre (`window.since` → `window.until`, en jours UTC) et `items_in` viennent de la réponse de
-`POST /digests`. Un sujet en échec a sa ligne (`digest failed`, ou `sheet not written`), sans chemin ;
+La fenêtre (`window.since` → `window.until`, en jours UTC ; depuis #565, `window.since` est le
+début de la lecture, le plus ancien des débuts) et `items_in` viennent de la réponse de
+`POST /digests`. Un sujet sans item a sa ligne (`no item, sheet written`) et sa fiche. Un sujet en
+échec a sa ligne (`digest failed`, ou `sheet not written`), sans chemin ;
 la raison est dans sa ligne d'erreur. Le `request_id` vient en dernier, seul : c'est la référence à
 donner en cas de problème (décision de Sabine du 2026-10-28). Chaque échec va une fois au journal, sur la sortie d'erreur et
 dans `<KB_DATA_DIR>/logs/kb.log` : sujet en échec (étape et état), fiche non écrite, ou réponse
@@ -2097,8 +2219,15 @@ tronqué et échappé (règle 3 de `conventions.md`).
   avant #422 (porté par #436). Les clients de l'API IA raccourcissent aussi chaque délai au temps
   qui reste (`ai_api/deadline.py`), que `post` n'importe pas ; au départ d'une demande de `kb`, il
   reste 240 s, et le raccourci ne changerait rien.
-- **Relancer le même jour** après un échec partiel sort en 2 : une fiche du jour existe. Les
-  sujets en échec s'écrivent le lendemain, si leurs items restent dans la fenêtre.
+- **Relancer le même jour** après un échec partiel sort en 2 : une fiche du jour existe. Un sujet
+  en échec garde son début : son compte rendu suivant reprend au `until` de sa dernière fiche
+  écrite, 14 jours au plus (section « Fenêtre »).
+- **La fiche précédente est relue** : `kb` ne relisait pas le coffre avant #565 (écart à la règle
+  de `docs/tendances.md`, « Registre des comptes rendus », pour les seules fiches de veille ;
+  journal ADR, 2026-11-11). Un `until` changé à la main dans une fiche décale le début du sujet :
+  plus tôt, la fiche suivante redonne des items, dans la borne des 14 jours ; plus tard, des items
+  ne sont dans aucune fiche ; après l'heure de `kb`, la demande est refusée (code 2). Le coffre est celui de l'utilisatrice : un texte de
+  source ou du modèle n'écrit pas l'en-tête, fait de valeurs relues par un schéma fermé.
 - **Le jour contrôlé** avant la demande est celui de l'horloge de `kb` ; celui de la fiche,
   `window.until` de l'API IA. Une demande à cheval sur minuit UTC écrit la fiche du lendemain, et un
   sujet dont la fiche du lendemain existe déjà compte en échec (`sheet_exists`).
