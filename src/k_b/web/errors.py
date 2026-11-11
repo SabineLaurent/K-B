@@ -10,6 +10,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from k_b.core.api_errors import ErrorHandlers, log_unexpected_error
 from k_b.core.api_request_log import read_request_id
+from k_b.web.french_dates import write_moment
 from k_b.web.rendering import render_page
 
 ERROR_TEMPLATES = {403: "403.html", 404: "404.html", 500: "500.html"}
@@ -31,28 +32,6 @@ FALLBACK_SERVER_ERROR_PAGE = """<!DOCTYPE html>
 </body>
 </html>
 """
-# The months in letters (Opquast 2025, rule 4): written by the site, never by the locale of the
-# machine, which may not be French.
-MONTHS = (
-    "janvier",
-    "février",
-    "mars",
-    "avril",
-    "mai",
-    "juin",
-    "juillet",
-    "août",
-    "septembre",
-    "octobre",
-    "novembre",
-    "décembre",
-)
-
-
-def write_moment(moment: datetime) -> str:
-    """A moment in UTC as the page 500 gives it: 1er novembre 2026 à 09:05 UTC."""
-    day = "1er" if moment.day == 1 else str(moment.day)
-    return f"{day} {MONTHS[moment.month - 1]} {moment.year} à {moment:%H:%M} UTC"
 
 
 def render_error_page(

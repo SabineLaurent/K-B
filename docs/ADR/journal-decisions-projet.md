@@ -6806,6 +6806,74 @@ Plan de la session K-B validé par Sabine le 2026-11-11 vers 16:00 UTC (D1, D2 ;
   chaque début sur des items jamais lus, perdus ensuite pour les fiches. Précise D1 : un sujet sans
   item a sa fiche quand la lecture en a trouvé d'autres. — PR de #565
 
+### Site : le fil de veille (#563)
+
+Plan de la session K-B FO validé par Sabine le 2026-11-11 (décisions D1 à D5) ; écarts aux maquettes et
+points de revue tranchés par time-knight sous la délégation de Sabine du 15/10.
+
+- **Aucun cache côté serveur des réponses de l'API de données (D1) : RGESN 7.1 non tenu, par décision.**
+  Décision de Sabine du 2026-11-11, sur la recommandation du plan : une seule lectrice, un appel
+  d'environ 20 ms, un cache perdu à chaque retour à zéro réplique, et une taille M à deux jours de l'oral.
+  Tranche la question que l'entrée du socle laissait au plan du fil (idée de Sabine du 09/11). Option
+  écartée : un cache en mémoire de 5 min et 64 réponses valides au plus, sous verrou, qui aurait servi le
+  bouton Retour malgré `no-store`, pour environ 40 lignes et une taille L. — PR de #563
+- **Un écran du fil tient en 3 requêtes et 30 Ko transférés, cache vide, gzip compris (D2, RGESN 6.1),
+  mesurés par un test sur 20 items.** Décision de Sabine du 2026-11-11. Option écartée : aucun budget,
+  6.1 non tenu. — PR de #563
+- **« Depuis » vaut « 1 jour » par défaut, en jours UTC : hier et aujourd'hui (D3) ; une date de début
+  remplie ne compte que si « Date » est cochée (D4).** Décisions de Sabine du 2026-11-11. Pourquoi D3 : la
+  maquette. Option écartée : 7 jours, parce qu'un papier porte la date de sa soumission, souvent un à trois
+  jours avant sa collecte ; c'est la limite déjà acceptée de « quoi de neuf ». Pourquoi D4 : sinon, on ne
+  reviendrait plus à « 3 jours » sans vider le champ. Option écartée : la date remplie l'emporte. — PR de
+  #563
+- **Le registre des traitements nomme le site dans #563, et non dans #564 (D5).** Décision de Sabine du
+  2026-11-11 : le fil met en ligne `repository_name`, qui contient le login du propriétaire d'un dépôt
+  suivi, et le registre ne nommait pas le site parmi les moyens de lecture. Option écartée : attendre
+  #564 et les auteurs, le fil étant alors en ligne avant que le registre le dise. — PR de #563
+- **Le site lit l'API de données par un client à lui (`web/data_api_client.py`) : 30 s de lecture, une
+  échéance de 35 s vérifiée entre deux morceaux du corps, 1 Mo, sans redirection ni environnement ; une
+  réponse lue par un modèle fermé aux cinq sortes, un champ ajouté ignoré.** Pourquoi : `web` n'importe
+  que `core` et `items`, il ne peut pas reprendre le client de l'API IA ; les 30 s couvrent le réveil de
+  l'API à zéro réplique, 20 à 26 s (#414). Options écartées : les 10 s du client de l'API IA, qui ne
+  couvrent pas le réveil ; importer les bornes de `GET /items` depuis `core` dans l'API de données, au lieu
+  de les recopier dans `core/config.py`, gardées égales par un test, parce que `src/k_b/data_api/` est à la
+  piste A (revue de code, constat 5, gardé par time-knight) ; lire le 422 par le modèle du serveur, le
+  client lisant par ses propres modèles stricts comme celui de l'API IA (constat 7, gardé). Limite
+  assumée : une requête peut durer environ 70 s au pire (la connexion et le pool, 30 s jusqu'aux en-têtes,
+  30 s jusqu'au premier morceau), rien n'étant borné avant le premier morceau (#436) ; pour réduire le
+  risque : le réveil ci-dessous et ouvrir le site quelques minutes avant l'oral, faisables ; une borne
+  totale demanderait une lecture asynchrone ou un fil à part, non faite. Ce GET borné est la troisième copie
+  du dépôt : sa factorisation dans `core/outbound.py` est reportée après l'oral (constat 10). — PR de #563
+- **Au démarrage, `kb serve-web` fait un seul `GET /health` de l'API de données, dans un fil à part ; le
+  journal donne l'état, jamais l'URL.** Pourquoi : l'idée de Sabine du 09/11, réveiller l'API dès
+  l'ouverture de l'accueil ; au démarrage du site, l'API se réveille pendant que Sabine se connecte par
+  Microsoft Entra. Un échec n'arrête rien : le fil rendra la page 500. — PR de #563
+- **La route du fil lit `request.query_params` brut, jamais des paramètres typés par FastAPI ; une page
+  hors de `[1-9][0-9]{0,2}` ou au-delà de 501 rend la 404 avant tout appel.** Pourquoi : un `page=abc`
+  partirait dans le 422 JSON de FastAPI, qui recopie la valeur reçue (relecture du plan). Option écartée :
+  des paramètres typés. Limite : `page=1` sert aussi la page 1, qu'aucun lien n'écrit (revue de code,
+  constat 9, gardé). — PR de #563
+- **Deux écarts aux maquettes : le lien d'une faille dit « Voir la fiche sur nvd.nist.gov », et une
+  newsletter porte le nom que TLDR donne à son édition (« TLDR AI », `NEWSLETTER_NAME_BY_EDITION`), son
+  identifiant d'API inchangé.** Tranchés par time-knight le 2026-11-11 : un nom de domaine dit la
+  destination du lien, ce n'est pas une abréviation à développer (Opquast 5) ; la maquette écrit « TLDR
+  AI ». Les noms viennent du titre `h1` des pages de TLDR (fixtures de la collecte ; « TLDR InfoSec », lu
+  sur tldr.tech/infosec le 2026-11-11). Options écartées : « Voir la fiche NVD », une abréviation ; le
+  slug tel quel, « TLDR ai ». Limite assumée (revue de code, constat 3, tranché par time-knight) : la
+  pastille « Exploitée (KEV) » reste sur une alerte dont la CVE a quitté le catalogue, la liste ne servant
+  pas ce retrait ; le bandeau à trois états du détail (#564) le dira. — PR de #563
+- **Une faille retirée du catalogue CISA KEV n'a pas la pastille « Exploitée (KEV) » : sa carte garde la
+  ligne « retirée du catalogue le … ».** Décision de Sabine du 2026-11-11, sur la recommandation de la
+  session, après le relecteur d'accessibilité (constat 9) : la pastille affirmait ce que la ligne suivante
+  démentait. Option écartée : garder la pastille, au sens d'`exploited` dans l'API (au catalogue, retiré
+  depuis ou non). — PR de #563
+- **Deux aides de plus que les maquettes : la date de début « Obligatoire avec « Date », sans effet avec 1,
+  3 ou 7 jours », et « Sans case cochée, le fil montre les cinq sortes ».** Tranché par time-knight le
+  2026-11-11 (relecteur d'accessibilité, constat 1) : sans script, `required` ne peut pas dire une
+  obligation qui dépend d'un bouton radio, et WCAG 3.3.2 (niveau A) demande que la règle soit écrite avant
+  l'envoi. Limite assumée (constat 7, gardé) : le lien d'un article de newsletter ne dit pas sa langue, que
+  K-B ne connaît pas ; « souvent en anglais » serait une supposition. — PR de #563
+
 ## Décisions encore ouvertes
 
 - **Le tri du fil** (2026-11-11, #550) : choisir l'ordre de `GET /items`, aujourd'hui du plus

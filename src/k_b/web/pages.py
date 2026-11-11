@@ -1,22 +1,107 @@
-"""The pages of the site: the home page, the sources and the accessibility (docs/site-web.md,
+"""The pages of the site: the watch feed, the sources and the accessibility (docs/site-web.md,
 "Pages")."""
+
+import logging
+from collections.abc import Sequence
 
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import HTMLResponse
 
+from k_b.core.api_request_log import read_request_id
+from k_b.core.config import DATA_API_MAX_SEARCH_LENGTH
+from k_b.web.data_api_client import FEED_KINDS, DataApiError, list_feed_items
+from k_b.web.errors import render_error_page, render_server_error_page
+from k_b.web.feed import (
+    ERRORS_TITLE,
+    FEED_PATH,
+    LABELS_BY_KIND,
+    PERIOD_LABELS,
+    PERIODS,
+    FeedForm,
+    FeedListing,
+    FieldError,
+    build_listing,
+    build_query,
+    count_pages,
+    find_api_field_error,
+    fits_in_search_field,
+    read_feed_form,
+    read_page_number,
+)
 from k_b.web.rendering import render_page
 
-HOME_PATH = "/"
+logger = logging.getLogger(__name__)
+
 SOURCES_PATH = "/sources"
 ACCESSIBILITY_PATH = "/accessibilite"
 
 router = APIRouter(default_response_class=HTMLResponse)
 
 
-@router.get(HOME_PATH)
-def show_home(request: Request) -> Response:
-    """The home page; the watch feed takes its place (#563)."""
-    return render_page(request, "home.html", current_path=HOME_PATH)
+# The query is read raw, never by parameters FastAPI types: a page=abc would get its 422 in JSON,
+# which quotes the value received.
+@router.get(FEED_PATH)
+def show_feed(request: Request) -> Response:
+    """The watch feed: a page of 20 items of the filters of its form, the most recent first."""
+    page = read_page_number(request.query_params)
+    if page is None:
+        return render_error_page(request, 404)
+    form = read_feed_form(request.query_params)
+    if form.errors:
+        return render_feed(request, form, form.errors, None)
+    query = build_query(form, request.app.state.clock(), page)
+    try:
+        item_page = list_feed_items(request.app.state.data_api_client, query)
+    except DataApiError as error:
+        field_error = find_api_field_error(error)
+        if field_error is None:
+            log_data_api_failure(request, error)
+            return render_server_error_page(request)
+        return render_feed(request, form, (field_error,), None)
+    if page > count_pages(item_page.total):
+        return render_error_page(request, 404)
+    listing = build_listing(form, query, page, item_page.items, item_page.total)
+    return render_feed(request, form, (), listing)
+
+
+def render_feed(
+    request: Request,
+    form: FeedForm,
+    errors: Sequence[FieldError],
+    listing: FeedListing | None,
+) -> Response:
+    """The feed with its form; with errors, in 422, without list."""
+    return render_page(
+        request,
+        "feed.html",
+        {
+            "page_title": listing.title if listing else ERRORS_TITLE,
+            "form": form,
+            "errors": errors,
+            "error_by_field": {error.field: error.message for error in errors},
+            # None: the value received is longer than the field allows, which it shows again.
+            "search_maxlength": DATA_API_MAX_SEARCH_LENGTH
+            if fits_in_search_field(form.q)
+            else None,
+            "feed_kinds": FEED_KINDS,
+            "labels_by_kind": LABELS_BY_KIND,
+            "periods": PERIODS,
+            "period_labels": PERIOD_LABELS,
+            "listing": listing,
+        },
+        current_path=FEED_PATH,
+        status_code=422 if errors else 200,
+    )
+
+
+def log_data_api_failure(request: Request, error: DataApiError) -> None:
+    """The state and the HTTP status, never the search nor a value received."""
+    logger.warning(
+        "data_api_failed: %s http_status=%s request_id=%s",
+        error.state,
+        "-" if error.http_status is None else error.http_status,
+        read_request_id(request),
+    )
 
 
 @router.get(SOURCES_PATH)

@@ -1,7 +1,7 @@
 """The criteria of RGAA 4.1.2 (WCAG 2.1 AA) and the rules of Opquast 2025 a test can check on each
 page of the site, read by the parser of the standard library: language, title, headings, landmarks,
 skip link, current link, lists, decorative images, names of the links, links to another site,
-abbreviations, dates (docs/site-web.md, "Accessibilité")."""
+abbreviations, dates, fields and their errors (docs/site-web.md, "Accessibilité")."""
 
 import re
 from dataclasses import dataclass, field
@@ -10,13 +10,16 @@ from itertools import pairwise
 
 import pytest
 from fastapi.testclient import TestClient
-from site_client import OPERATOR_HEADERS, PAGE_PATHS, make_client
-
-from k_b.web.app import create_app
+from feed_fixture import make_page
+from site_client import OPERATOR_HEADERS, PAGE_PATHS, make_app, make_client, serve
 
 HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6")
-LANDMARKS = ("header", "nav", "main", "footer")
+# Once each; nav at least once, each named.
+LANDMARKS = ("header", "main", "footer")
 SKIP_TARGET = "contenu"
+# The feed refused on its three fields: a search too long, a kind out of the five, date without day.
+FEED_REFUSED = "/?q=" + "a" * 201 + "&kind=clip&period=date"
+FEED_PAGES = ("/", "/?page=2", "feed-empty", "feed-refused")
 
 
 @dataclass
@@ -104,7 +107,7 @@ def outline(text):
 def fetch_every_page():
     """Each page the site may answer, by its name: the pages, and the errors 403, 404, 405 and 500."""
     client = make_client()
-    failing_app = create_app(operator_id=None)
+    failing_app = make_app(operator_id=None)
 
     @failing_app.get("/failing")
     def fail() -> None:
@@ -118,6 +121,13 @@ def fetch_every_page():
     pages["404"] = client.get("/no-such-page", headers=OPERATOR_HEADERS)
     pages["405"] = client.post("/", headers=OPERATOR_HEADERS)
     pages["500"] = failing_client.get("/failing")
+    pages["/?page=2"] = make_client(handler=serve(make_page(20, total=45))).get(
+        "/?page=2", headers=OPERATOR_HEADERS
+    )
+    pages["feed-empty"] = make_client(handler=serve(make_page(0))).get(
+        "/", headers=OPERATOR_HEADERS
+    )
+    pages["feed-refused"] = client.get(FEED_REFUSED, headers=OPERATOR_HEADERS)
     return {name: response.text for name, response in pages.items()}
 
 
@@ -147,11 +157,15 @@ def test_a_page_has_one_h1_first_and_no_level_skipped(name):
 
 
 @pytest.mark.parametrize("name", sorted(PAGES))
-def test_a_page_has_each_landmark_once_its_navigation_named(name):
+def test_a_page_has_each_landmark_once_each_navigation_named(name):
+    """RGAA 12.6: the pagination is a second navigation, named apart from the first."""
     page = outline(PAGES[name])
+    names = [nav.get("aria-label") for nav in page.find_all("nav")]
 
-    assert [len(page.find_all(landmark)) for landmark in LANDMARKS] == [1, 1, 1, 1]
-    assert page.find_all("nav")[0].get("aria-label")
+    assert [len(page.find_all(landmark)) for landmark in LANDMARKS] == [1, 1, 1]
+    assert names
+    assert all(names)
+    assert len(set(names)) == len(names)
     assert page.find_all("main")[0].get("id") == SKIP_TARGET
 
 
@@ -270,6 +284,8 @@ def test_the_link_to_a_page_in_english_gives_its_language():
         ),
         ("/accessibilite", "WCAG", "Web Content Accessibility Guidelines"),
         ("500", "UTC", "temps universel coordonné"),
+        ("/", "KEV", "Known Exploited Vulnerabilities"),
+        ("/", "CISA", "Cybersecurity and Infrastructure Security Agency"),
     ],
 )
 def test_the_first_abbreviation_of_a_page_gives_its_meaning(
@@ -286,11 +302,13 @@ def test_the_first_abbreviation_of_a_page_gives_its_meaning(
 
 
 def test_the_home_page_says_what_it_holds_and_for_whom():
-    """Opquast 2025, rules 99 and 100; the first sentence is the one of the mockups."""
+    """Opquast 2025, rules 99 and 100; the first sentence is the one of the mockups, KEV and CISA
+    given their meaning (rule 5)."""
     text = outline(PAGES["/"]).text
 
     assert (
-        "Collecte automatique: arXiv, catalogue CISA KEV, alertes GitHub, releases,"
+        "Collecte automatique: arXiv, catalogue KEV (Known Exploited Vulnerabilities) de la"
+        " CISA (Cybersecurity and Infrastructure Security Agency), alertes GitHub, releases,"
         " newsletters." in text
     )
     assert "Site privé, réservé à son opératrice." in text
@@ -323,3 +341,144 @@ def test_the_note_of_the_page_500_is_in_its_card_out_of_its_list():
         PAGES["500"],
         flags=re.DOTALL,
     )
+
+
+def find_ids(page):
+    return {attributes["id"] for _, attributes in page.tags if attributes.get("id")}
+
+
+@pytest.mark.parametrize("name", FEED_PAGES)
+def test_every_field_of_the_feed_has_its_label(name):
+    """RGAA 11.1; WCAG 1.3.1 and 4.1.2: each input named by a label tied to its id."""
+    page = outline(PAGES[name])
+    inputs = page.find_all("input")
+    labelled = {label.get("for") for label in page.find_all("label")}
+
+    assert len(inputs) == 11
+    assert all(field.get("id") in labelled for field in inputs)
+    assert [button.get("type") for button in page.find_all("button")] == ["submit"]
+
+
+@pytest.mark.parametrize("name", FEED_PAGES)
+def test_each_group_of_the_feed_is_a_fieldset_with_its_legend_first(name):
+    """RGAA 11.5 and 11.6."""
+    assert re.findall(r"<fieldset[^>]*>\s*<legend>([^<]+)</legend>", PAGES[name]) == [
+        "Sortes",
+        "Depuis",
+    ]
+
+
+@pytest.mark.parametrize("name", sorted(PAGES))
+def test_every_reference_of_aria_names_an_element_of_the_page(name):
+    page = outline(PAGES[name])
+    ids = find_ids(page)
+    references = [
+        reference
+        for _, attributes in page.tags
+        for reference in (attributes.get("aria-describedby") or "").split()
+    ]
+
+    assert all(reference in ids for reference in references)
+
+
+def test_each_field_refused_says_why_under_it_and_in_the_summary():
+    """RGAA 11.10 and 11.11; WCAG 3.3.1 to 3.3.3: the message tied to its field, the field marked
+    invalid, the summary linking to each field, the values kept."""
+    page = outline(PAGES["feed-refused"])
+    ids = find_ids(page)
+    tied = {
+        attributes["id"]: attributes.get("aria-describedby", "").split()
+        for tag, attributes in page.tags
+        if tag in ("input", "fieldset") and attributes.get("aria-describedby")
+    }
+    summary_links = [
+        link.attributes["href"]
+        for link in page.links
+        if link.attributes["href"].startswith("#")
+        and link.attributes["href"] != "#contenu"
+    ]
+
+    assert summary_links == ["#q", "#kinds", "#start"]
+    assert all(link[1:] in ids for link in summary_links)
+    # The error first, then the help: the reason of the refusal is heard first.
+    assert tied["q"] == ["q-error", "q-help"]
+    assert tied["kinds"] == ["kinds-error", "kinds-help"]
+    assert tied["start"] == ["start-error", "start-help"]
+    invalid = [
+        attributes["id"]
+        for _, attributes in page.tags
+        if attributes.get("aria-invalid") == "true"
+    ]
+    assert invalid == ["q", "start"]
+
+
+def test_the_feed_refused_shows_no_card():
+    assert '<li class="card">' not in PAGES["feed-refused"]
+
+
+def test_the_cards_are_a_list_their_titles_level_two():
+    """RGAA 9.1 and 9.3."""
+    page = outline(PAGES["/"])
+
+    assert '<ul class="cards" role="list">' in PAGES["/"]
+    assert PAGES["/"].count('<li class="card">') == 14
+    assert page.headings.count("h2") == 14
+
+
+def test_the_titles_given_in_english_are_marked_and_the_word_release():
+    """RGAA 8.7: the titles of papers, vulnerabilities, advisories and newsletters, the kind
+    Release and the box Releases; the title of a release, a name and a version, is not."""
+    english = outline(PAGES["/"]).texts_in_english
+
+    assert "Mistral Large 4 (9 minute read)" in english
+    assert "Apple Multiple Products Out-of-Bounds Write Vulnerability" in english
+    assert "Release" in english
+    assert "Releases" in english
+    assert "anthropics/claude-code v2.1.286" not in english
+
+
+def test_the_dates_of_the_cards_are_time_elements_with_their_month_in_letters():
+    """Opquast 2025, rules 4 and 231."""
+    days = re.findall(r'<time datetime="([0-9-]+)">([^<]+)</time>', PAGES["/"])
+
+    assert len(days) == 14
+    assert all(re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", day) for day, _ in days)
+    assert all(
+        re.fullmatch(r"(1er|[0-9]{1,2}) [a-zéû]+ [0-9]{4}", text) for _, text in days
+    )
+
+
+def test_the_exploited_mark_is_a_word_not_a_colour():
+    """RGAA 3.1: the state is written; three items of the fixture are in the catalog, a fourth was
+    withdrawn from it."""
+    assert PAGES["/"].count('<span class="badge">Exploitée (KEV)</span>') == 3
+
+
+def test_the_pagination_is_named_and_gives_the_page():
+    page = outline(PAGES["/?page=2"])
+
+    assert [nav.get("aria-label") for nav in page.find_all("nav")] == [
+        "Navigation principale",
+        "Pagination",
+    ]
+    assert "Page 2 sur 3" in page.text
+
+
+def test_the_rules_of_a_field_are_written_before_sending():
+    """WCAG 3.3.2 (A), RGAA 11.10.1, Opquast 70 and 71: the start date is required with Date only,
+    and no kind checked is the five; neither can be said by required without a script."""
+    page = outline(PAGES["/"])
+    described = {
+        attributes["id"]: attributes.get("aria-describedby")
+        for tag, attributes in page.tags
+        if tag in ("input", "fieldset")
+    }
+    helps = dict(
+        re.findall(r'<p id="([a-z]+-help)" class="field-help">([^<]+)</p>', PAGES["/"])
+    )
+
+    assert described["q"] == "q-help"
+    assert described["kinds"] == "kinds-help"
+    assert described["start"] == "start-help"
+    assert "Obligatoire avec « Date »" in helps["start-help"]
+    assert "les cinq sortes" in helps["kinds-help"]

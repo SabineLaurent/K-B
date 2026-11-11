@@ -24,6 +24,11 @@ PAIRS = [
     ("--color-on-teal", "--color-teal-deep", 4.5),
     # The focus ring, a component, on the background of the pages.
     ("--color-teal", "--color-paper", 3),
+    # The mark Exploitée (KEV), the messages of a field refused, the border of a field.
+    ("--color-on-alert", "--color-alert", 4.5),
+    ("--color-alert-deep", "--color-card", 4.5),
+    ("--color-alert-deep", "--color-paper", 4.5),
+    ("--color-field-border", "--color-card", 3),
 ]
 
 
@@ -83,14 +88,28 @@ def test_nothing_is_fetched_from_elsewhere():
     assert re.findall(r"@import|@font-face|url\(", STYLESHEET) == []
 
 
-def test_a_link_visited_in_a_text_has_a_colour_of_its_own_of_the_chart():
-    """Opquast 2025, rule 141; a menu is out of the rule. Its contrast on the pages: 4.5 at least."""
-    rule = re.search(r":visited\s*\{\s*color:\s*var\((--[a-z-]+)\);", STYLESHEET)
+@pytest.mark.parametrize("links", [r"\.prose a", r"\.card-link"])
+def test_a_link_visited_in_a_text_has_a_colour_of_its_own_of_the_chart(links):
+    """Opquast 2025, rule 141: a link in a text, and the link of a card to its source; a menu is out
+    of the rule. Its contrast on the pages and on a card: 4.5 at least."""
+    rule = re.search(
+        links + r"\s*\{[^}]*?&:visited\s*\{\s*color:\s*var\((--[a-z-]+)\);", STYLESHEET
+    )
     colours = read_colours()
 
     assert rule is not None
     assert colours[rule.group(1)] != colours["--color-teal"]
     assert measure_contrast(colours[rule.group(1)], colours["--color-paper"]) >= 4.5
+    assert measure_contrast(colours[rule.group(1)], colours["--color-card"]) >= 4.5
+
+
+def test_a_field_reached_from_the_summary_of_the_errors_keeps_its_label_in_sight():
+    """The browser scrolls a target to the top of the window: the label, the help and the message
+    above the field would leave the screen."""
+    assert re.search(
+        r"\.field\s*\{[^}]*?& > input\s*\{\s*scroll-margin-block-start:\s*[0-9.]+rem;",
+        STYLESHEET,
+    )
 
 
 def test_a_page_prints_without_its_navigation():

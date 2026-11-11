@@ -1,10 +1,17 @@
-"""The settings of kb serve-web: where it listens, the hosts it answers, and whose header it checks;
-the check is off only on the machine, outside Azure Container Apps."""
+"""The settings of kb serve-web: where it listens, the hosts it answers, whose header it checks, and
+how it reads the data API; the check is off only on the machine, outside Azure Container Apps."""
 
 import pytest
-from site_client import OPERATOR_ID
+from pydantic import SecretStr
+from site_client import OPERATOR_ID, TEST_API_KEY
 
-from k_b.web.settings import WebSettings, read_web_settings_or_refusal
+from k_b.web.settings import DataApiAccess, WebSettings, read_web_settings_or_refusal
+
+# The key of the client WEB, which kb serve-web needs whatever its access.
+DATA_API_KEY = {"KB_DATA_API_KEY_WEB": TEST_API_KEY}
+DEFAULT_DATA_API = DataApiAccess(
+    base_url="http://127.0.0.1:8000", api_key=SecretStr(TEST_API_KEY)
+)
 
 # The address a container listens on, to be reached by the ingress.
 ALL_INTERFACES = "0.0.0.0"  # noqa: S104 - a value refused or allowed, never bound by a test
@@ -12,24 +19,27 @@ ALL_INTERFACES = "0.0.0.0"  # noqa: S104 - a value refused or allowed, never bou
 
 def test_the_defaults_listen_on_the_machine_and_check_the_operator():
     assert read_web_settings_or_refusal(
-        {"KB_WEB_OPERATOR_ID": OPERATOR_ID}
+        {"KB_WEB_OPERATOR_ID": OPERATOR_ID, **DATA_API_KEY}
     ) == WebSettings(
         host="127.0.0.1",
         port=8002,
         allowed_hosts=("127.0.0.1", "localhost"),
         operator_id=OPERATOR_ID,
+        data_api=DEFAULT_DATA_API,
     )
 
 
 def test_the_object_id_is_kept_in_lowercase():
-    settings = read_web_settings_or_refusal({"KB_WEB_OPERATOR_ID": OPERATOR_ID.upper()})
+    settings = read_web_settings_or_refusal(
+        {"KB_WEB_OPERATOR_ID": OPERATOR_ID.upper(), **DATA_API_KEY}
+    )
 
     assert isinstance(settings, WebSettings)
     assert settings.operator_id == OPERATOR_ID
 
 
 def test_off_on_the_machine_checks_no_header():
-    settings = read_web_settings_or_refusal({"KB_WEB_AUTH": "off"})
+    settings = read_web_settings_or_refusal({"KB_WEB_AUTH": "off", **DATA_API_KEY})
 
     assert isinstance(settings, WebSettings)
     assert settings.operator_id is None
@@ -43,6 +53,8 @@ def test_the_check_on_every_address_in_azure_container_apps():
             "KB_WEB_PORT": "8080",
             "KB_WEB_ALLOWED_HOSTS": "ca-kb-web.example.azurecontainerapps.io,10.0.0.4",
             "CONTAINER_APP_NAME": "ca-kb-web",
+            "KB_DATA_API_URL": "https://ca-kb-data-api.internal.example.azurecontainerapps.io",
+            **DATA_API_KEY,
         }
     )
 
@@ -51,6 +63,10 @@ def test_the_check_on_every_address_in_azure_container_apps():
         port=8080,
         allowed_hosts=("ca-kb-web.example.azurecontainerapps.io", "10.0.0.4"),
         operator_id=OPERATOR_ID,
+        data_api=DataApiAccess(
+            base_url="https://ca-kb-data-api.internal.example.azurecontainerapps.io",
+            api_key=SecretStr(TEST_API_KEY),
+        ),
     )
 
 
@@ -112,3 +128,55 @@ def test_an_object_id_refused_is_never_quoted():
 
     assert isinstance(refusal, str)
     assert OPERATOR_ID not in refusal
+
+
+@pytest.mark.parametrize(
+    ("environ", "refusal"),
+    [
+        ({}, "KB_DATA_API_KEY_WEB: not set"),
+        ({"KB_DATA_API_KEY_WEB": ""}, "KB_DATA_API_KEY_WEB: not set"),
+        (
+            {"KB_DATA_API_KEY_WEB": "short"},
+            "'KB_DATA_API_KEY_WEB': key of 5 characters, minimum 32",
+        ),
+        (
+            {"KB_DATA_API_KEY_WEB": "a" * 31 + " "},
+            "'KB_DATA_API_KEY_WEB': key with a character outside [A-Za-z0-9_-]",
+        ),
+        (
+            {**DATA_API_KEY, "KB_DATA_API_URL": "http://ca-kb-data-api.internal"},
+            (
+                "KB_DATA_API_URL: https required; http only to the machine (127.0.0.1 or"
+                " localhost) or, in the sandbox, a compose service (api-donnees or api-ia)"
+            ),
+        ),
+        (
+            {**DATA_API_KEY, "KB_DATA_API_URL": "https://user:key@example.org"},
+            "KB_DATA_API_URL: with user information",
+        ),
+    ],
+    ids=["absent", "empty", "short", "space", "http-out-of-the-machine", "user"],
+)
+def test_the_access_to_the_data_api_is_refused_never_quoting_the_key_nor_the_url(
+    environ, refusal
+):
+    result = read_web_settings_or_refusal({"KB_WEB_AUTH": "off", **environ})
+
+    assert result == refusal
+    assert "short" not in result
+    assert "key@" not in result
+
+
+def test_an_empty_url_of_the_data_api_is_its_default():
+    settings = read_web_settings_or_refusal(
+        {"KB_WEB_AUTH": "off", "KB_DATA_API_URL": "", **DATA_API_KEY}
+    )
+
+    assert isinstance(settings, WebSettings)
+    assert settings.data_api == DEFAULT_DATA_API
+
+
+def test_the_key_is_never_shown_by_the_settings():
+    settings = read_web_settings_or_refusal({"KB_WEB_AUTH": "off", **DATA_API_KEY})
+
+    assert TEST_API_KEY not in repr(settings)
