@@ -6593,6 +6593,44 @@ time-knight sous la délégation de Sabine du 15/10.
   la base lit tous les paquets avant la coupe, qui borne la réponse, pas la lecture.
   — PR de #550
 
+### Stockage d'échange : son client dans un paquet `exchange`, que l'API de données peut importer (#558)
+
+Choix du plan de la session K-B, accepté par time-knight le 2026-11-11 ; les points de revue,
+tranchés par time-knight sous la délégation de Sabine du 15/10.
+
+- **Le client du stockage d'échange (réglages, identité, transport, erreurs nommées) passe de
+  `jobs/exchange_storage.py` dans un paquet neuf, `exchange/storage.py`, avec le téléchargement
+  d'une version listée (`download_listed_version`, pris de `jobs/clip_mirror.py`). Seuls `jobs`,
+  `commands` et `data_api` l'importent ; il n'importe que `core`, jamais `core.atomic_write` (tenu
+  par `tests/architecture/test_layers.py` et `test_apis.py`).** Pourquoi : le site, entièrement
+  privé, ne lit que l'API de données (décisions de Sabine du 2026-11-11), et il affiche les tops,
+  les comptes rendus de veille et le rapport de tendances, publiés dans le conteneur `watch` (#559
+  à #561) ; or l'API de données ne pouvait pas importer `jobs`. Le téléchargement rend des octets :
+  leur écriture reste dans `jobs`, et l'API de données n'écrit aucun fichier. **Modifie la décision
+  du 2026-11-06 (« Jobs : `kb smoke-test` et le paquet `jobs` », #412)** : `jobs` importe désormais
+  `exchange` et `core`, et l'API de données a accès au stockage d'échange ; l'API IA, `etl` et
+  `database` n'y ont toujours pas accès. Options écartées : `core/`, ouvert à toutes les couches,
+  par lequel l'API IA, `etl` et `database` atteindraient le stockage ; ouvrir `jobs` à `data_api`,
+  qui atteindrait alors l'écriture d'un fichier (`jobs/clip_mirror.py` importe `core.atomic_write`) ;
+  une seconde copie du client, pour deux raisons (time-knight, le 2026-11-11) : une même
+  connaissance à deux endroits (`code.md`, « Duplication ») ; et les gardes du client,
+  `decompress=False` et le contrôle de l'etag (`If-Match`), devraient être tenues à l'identique dans
+  les deux copies, si bien qu'une correction de sécurité faite dans l'une manquerait à l'autre.
+  - Le comportement des jobs ne change pas : leurs tests passent sans changement d'assertion. Les
+    faux du stockage suivent le paquet, dans `tests/exchange/storage_fakes.py` (tri de la revue). La
+    copie du transport et de l'identifiant client dans `database/` (2026-11-06, #421) reste : la
+    base n'importe pas `exchange`, et la mise en commun attend une troisième copie (même entrée).
+  - Limites, préexistantes à l'identique dans `jobs/clip_mirror.py`, reportées à #559, qui fait de
+    l'API de données un appelant : (a) `download_listed_version` rend `None` sur tout 404, un
+    conteneur absent (`ContainerNotFound`) compris, comme pour un blob retiré ou changé ; (b) il lit
+    tout le blob, sans borne en octets, et compte sur chaque appelant pour comparer d'abord la taille
+    listée à sa borne. Pour réduire le risque : (a) garder le code d'erreur dans
+    `ExchangeStorageError` et ne rendre `None` que sur `BlobNotFound` et `ConditionNotMet`
+    (`StorageErrorCode` d'azure-storage-blob 12.31.1, lu le 2026-11-11) ; (b) passer à
+    `download_blob` un `length` égal à la borne plus un octet (paramètre de
+    `ContainerClient.download_blob`, même version, lu le 2026-11-11). Faisables, du code seulement.
+  — PR de #558
+
 ## Décisions encore ouvertes
 
 - **Le tri du fil** (2026-11-11, #550) : choisir l'ordre de `GET /items`, aujourd'hui du plus

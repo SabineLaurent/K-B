@@ -5,7 +5,7 @@ import psycopg
 import pytest
 from azure.core.exceptions import ClientAuthenticationError
 from database.online_roles import MIGRATE_DATABASE_ROLE, as_role
-from jobs.storage_fakes import FORGED_LOG_LINE, TEST_CLIENT_ID
+from exchange.storage_fakes import FORGED_LOG_LINE, TEST_CLIENT_ID
 
 from k_b import cli
 from k_b.commands.exit_codes import ExitCode

@@ -176,7 +176,9 @@ statu quo).
   importer.
 - Une API importe `database`, `items` et `core`, jamais `etl`, `database/writers` ni
   `database/writing` (sa ligne dans `tests/architecture/test_apis.py` s'ajoute à la création du
-  paquet d'API).
+  paquet d'API). L'API de données importe aussi `exchange`, le client du stockage d'échange (#558),
+  que seuls `jobs`, `commands` et elle importent, et qui n'importe que `core`, jamais
+  `core.atomic_write` (`tests/architecture/test_layers.py`).
 - Le SQL **de la base K-B** vit dans `src/k_b/database/` : un dossier d'écriture, `writers/` (un
   module par sorte d'item et un pour le classement, `<sorte>_writer.py`, chacun avec une fonction
   `write`), et un module de lecture (la requête `UNION ALL`, partagée par `kb search`, « quoi de

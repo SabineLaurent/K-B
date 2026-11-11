@@ -16,7 +16,7 @@ from commands.cli_helpers import (
     collected_kinds,
 )
 from etl.test_extract import BrokenSource, WorkingSource
-from jobs.storage_fakes import (
+from exchange.storage_fakes import (
     SPOTTED_BLOB_NAME,
     TEST_ACCOUNT_URL,
     FakeTransport,
@@ -28,7 +28,7 @@ from k_b import cli
 from k_b.commands import (
     collect_command,
 )
-from k_b.jobs.exchange_storage import open_container_client
+from k_b.exchange.storage import open_container_client
 
 
 def test_a_log_line_is_dated_in_utc_with_its_zone(tmp_path):

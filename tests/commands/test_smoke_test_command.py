@@ -7,7 +7,7 @@ from functools import partial
 
 import httpx2
 import pytest
-from jobs.storage_fakes import (
+from exchange.storage_fakes import (
     FORGED_LOG_LINE,
     SPOTTED_BLOB_NAME,
     TEST_ACCOUNT_URL,
@@ -24,11 +24,11 @@ from jobs.storage_fakes import (
 
 from k_b import cli
 from k_b.commands import smoke_test_command
-from k_b.jobs.api_health import build_health_client
-from k_b.jobs.exchange_storage import (
+from k_b.exchange.storage import (
     build_managed_identity_credential,
     open_container_client,
 )
+from k_b.jobs.api_health import build_health_client
 
 TEST_DATA_API_URL = "https://ca-kb-data-api.internal.test.example"
 TEST_AI_API_URL = "https://ca-kb-ai-api.internal.test.example"

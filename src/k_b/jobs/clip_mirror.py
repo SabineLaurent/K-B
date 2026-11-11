@@ -16,13 +16,16 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-from azure.core import MatchConditions
 from azure.storage.blob import BlobProperties, ContainerClient
 
 from k_b.core.atomic_write import write_file_atomically
 from k_b.core.config import MAX_CLIP_NAME_BYTES
 from k_b.core.quoting import name_os_error
-from k_b.jobs.exchange_storage import ExchangeStorageError, naming_storage_errors
+from k_b.exchange.storage import (
+    ExchangeStorageError,
+    download_listed_version,
+    naming_storage_errors,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +56,6 @@ CONTROL_CATEGORY = "Cc"
 # A code point of private use (Co), which Azure Files refuses, and a lone surrogate (Cs), which UTF-8
 # cannot encode.
 UNSUPPORTED_CATEGORIES = frozenset({"Co", "Cs"})
-# A download answered 404 or 412: the blob was removed or changed since the listing, and is seen
-# again by the next run.
-STATUS_LEFT_TO_NEXT_RUN = frozenset({404, 412})
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 ONE_MICROSECOND = timedelta(microseconds=1)
 
@@ -246,27 +246,6 @@ def copy_when_newer(
         name = name_os_error(error)
         logger.error("clip mirror: %s not dated: %s", where, name)
         result.failed[name] += 1
-
-
-def download_listed_version(
-    container_client: ContainerClient, blob: BlobProperties
-) -> bytes | None:
-    """The bytes of the version listed, as stored: never decompressed, as a blob sent with
-    Content-Encoding: gzip would pass any bound once inflated. None when the blob was removed or
-    changed since the listing."""
-    try:
-        with naming_storage_errors():
-            downloader = container_client.download_blob(
-                blob.name,
-                etag=blob.etag,
-                match_condition=MatchConditions.IfNotModified,
-                decompress=False,
-            )
-            return downloader.readall()
-    except ExchangeStorageError as error:
-        if error.http_status in STATUS_LEFT_TO_NEXT_RUN:
-            return None
-        raise
 
 
 def to_ns(moment: datetime) -> int:

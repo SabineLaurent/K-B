@@ -20,7 +20,7 @@ from k_b.commands.purge_command import run_purge
 from k_b.commands.run_log import value_or_log_refusal
 from k_b.commands.write_tops_command import run_write_tops
 from k_b.etl.collected_sources import read_vault_dir_or_refusal
-from k_b.jobs.exchange_storage import (
+from k_b.exchange.storage import (
     ExchangeStorageSettings,
     read_exchange_storage_settings_or_refusal,
 )
