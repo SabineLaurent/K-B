@@ -1322,9 +1322,11 @@ lit que l'API de données, par la clé du client `WEB`, et l'API de données lit
 
 Trois verrous, dans l'ordre où une requête les rencontre :
 1. **La connexion Microsoft Entra de la plateforme** (Easy Auth, `authConfigs`). Elle tourne à côté du conteneur, dans
-   chaque réplique. Sans session, elle renvoie le navigateur vers `/.auth/login/aad` (302). Elle n'admet que les
-   comptes du tenant (`openIdIssuer`), et parmi eux le seul object ID de Sabine (`allowedPrincipals.identities`).
-   Elle seule pose les en-têtes `X-MS-CLIENT-PRINCIPAL-*`, et elle retire ceux qu'envoie un client.
+   chaque réplique. Sans session, elle renvoie un navigateur (`Accept: text/html`) tout droit vers la page de
+   connexion d'Entra, `login.microsoftonline.com/<tenant>` (302), et répond `401` à tout autre client (constaté le
+   2026-11-11, « Les constats »). Elle n'admet que les comptes du tenant (`openIdIssuer`), et parmi eux le seul
+   object ID de Sabine (`allowedPrincipals.identities`). Elle seule pose les en-têtes `X-MS-CLIENT-PRINCIPAL-*`,
+   et elle retire ceux qu'envoie un client.
 2. **Le contrôle du code** (#562) : chaque requête, sauf `/health`, porte `X-MS-CLIENT-PRINCIPAL-ID`, égal à
    `KB_WEB_OPERATOR_ID` ; sinon, 403.
 3. **Le module refuse une entrée externe sans connexion** : `external` n'est suivi que si `entraSignIn` est posé avec
@@ -1469,13 +1471,13 @@ Attendu :
 
 Un champ vide ou absent arrête la suite : le site reste fermé.
 
-`Healthy` ne prouve pas que le site répond. Les sondes visent le port 8002 du conteneur ; Microsoft Learn ne dit pas
-si elles passent par la connexion (« Health probes in Azure Container Apps », lu le 2026-11-11). Si elles y passent,
-le 302 de la connexion compte comme un succès, car une sonde HTTP réussit de 200 à 399 (kubernetes.io) : un site
-cassé paraîtrait sain, et l'attente du Deploy l'accepterait aussi. C'est l'accueil affiché à Sabine (« Les
-constats ») qui prouve que le site répond. Si la révision n'est pas `Healthy`, les sondes reçoivent peut-être un
-401 de la connexion. Le repli est alors `excludedPaths: ['/health']`, qui sert `/health` sans connexion (un texte
-fixe, sans donnée), sur l'accord de Sabine seulement.
+Les sondes visent le port 8002 du conteneur ; Microsoft Learn ne dit pas si elles passent par la connexion
+(« Health probes in Azure Container Apps », lu le 2026-11-11). Une sonde envoie `Accept: */*`, comme `curl` par
+défaut (page des sondes de kubernetes.io, lue le 2026-11-11) : si elle passait par la connexion, elle recevrait son
+`401`, et la révision ne serait pas `Healthy`. C'est une déduction du constat de « Les constats », non vérifiée.
+Le repli serait alors `excludedPaths: ['/health']`, qui sert `/health` sans connexion (un texte fixe, sans donnée),
+sur l'accord de Sabine seulement. `Healthy` ne prouve que `/health` : c'est l'accueil affiché à Sabine (« Les
+constats ») qui prouve que le site répond.
 
 ### La passe B : le site ouvert
 
@@ -1487,16 +1489,25 @@ nom du site. Ensuite, chaque passe tire `exposeWeb` de la connexion en ligne (é
 
 ```sh
 SITE=$(az deployment group show -g "$RG" -n main --query properties.outputs.webAddress.value -o tsv)
-curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' "$SITE/"
-curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -H "X-MS-CLIENT-PRINCIPAL-ID: $OPERATOR" "$SITE/"
-curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' "$SITE/health"
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -H "Accept: text/html" "$SITE/"
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -H "Accept: text/html" \
+  -H "X-MS-CLIENT-PRINCIPAL-ID: $OPERATOR" "$SITE/"
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -H "Accept: text/html" "$SITE/health"
 ```
 
-Attendu : trois fois `302` vers `…/.auth/login/aad…`, **jamais `200`**. Le deuxième essai forge l'en-tête de
-Sabine sans session. Son `302` prouve que la connexion répond avant le code, même à un en-tête forgé ; il ne prouve
-pas que l'en-tête est retiré. Ce retrait tient à la plateforme (Learn : « External requests aren't allowed to set
-these headers »), et au code, qui refuse un en-tête répété (#562). Puis Sabine ouvre `$SITE` dans son navigateur,
-se connecte, consent à la première connexion, et voit l'accueil.
+Attendu : trois fois `302` vers `https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize?…`, **jamais
+`200`**. Le renvoi va tout droit à Entra, sans passer par `/.auth/login/aad`, car la connexion n'a qu'un fournisseur.
+
+La connexion ne renvoie vers la page de connexion qu'un navigateur, qui demande du HTML. Les mêmes `curl` sans
+`-H "Accept: text/html"` reçoivent `401`, avec un en-tête `WWW-Authenticate: Bearer` qui nomme le tenant et l'ID
+de l'inscription : là aussi, **jamais `200`**. Les deux comportements ont été constatés le 2026-11-11, après la
+passe B.
+
+Le deuxième essai forge l'en-tête de Sabine sans session : il ne change rien. Son `302` prouve que la connexion
+répond avant le code, même à un en-tête forgé ; il ne prouve pas que l'en-tête est retiré. Ce retrait tient à la
+plateforme (Learn : « External requests aren't allowed to set these headers »), et au code, qui refuse un en-tête
+répété (#562). Puis Sabine ouvre `$SITE` dans son navigateur, se connecte, consent à la première connexion, et voit
+l'accueil.
 
 Ce que tranche la première connexion :
 - **le consentement** : une application inscrite dans l'organisation reçoit le consentement de l'utilisateur pour les
@@ -1508,7 +1519,8 @@ Ce que tranche la première connexion :
 Un refus « Need admin approval », ou une erreur AADSTS, arrête l'essai. Le repli par mot de passe est alors au choix
 de Sabine.
 
-**Règle d'arrêt.** Si un `curl` rend `200`, ou si la connexion n'est plus posée, fermer l'entrée tout de suite :
+**Règle d'arrêt.** Si un `curl` sans connexion rend `200`, avec ou sans `Accept: text/html`, ou si la connexion n'est
+plus posée, fermer l'entrée tout de suite :
 
 ```sh
 az containerapp ingress disable -n ca-kb-web -g "$RG"

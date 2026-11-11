@@ -54,7 +54,8 @@ L'application en ligne se fait à la main : Sabine fait les gestes, tn-codeur re
 ```
 navigateur ──HTTPS──▶ entrée de cae-kb ──▶ réplique de ca-kb-web
                                            ├─ module de connexion (sidecar de la plateforme)
-                                           │    sans session : 302 vers /.auth/login/aad
+                                           │    sans session, un navigateur : 302 vers login.microsoftonline.com
+                                           │    sans session, tout autre client : 401 (WWW-Authenticate: Bearer)
                                            │    session d'un autre compte : 403 (allowedPrincipals)
                                            │    session de Sabine : pose X-MS-CLIENT-PRINCIPAL-ID, transmet
                                            └─ conteneur kb serve-web (port 8002)
@@ -193,9 +194,10 @@ obtient donc le jeton qui lit `watch`.
 | Les deux `az keyvault secret set`, sans sortie | Les deux secrets sont posés, sans valeur affichée |
 | `/security-review` : aucun constat au-delà de 80 % de confiance | Aucune vulnérabilité exploitable trouvée dans le changement |
 
-La preuve en ligne viendra après les passes A et B (`infra/README.md`, « Les constats ») :
-- `302` sans session, avec l'en-tête forgé ou non, **jamais `200`** ;
-- l'accueil affiché à Sabine une fois connectée.
+La preuve en ligne, après la passe B du 2026-11-11 (`infra/README.md`, « Les constats ») :
+- constaté : sans session, avec `Accept: text/html`, `302` tout droit vers `login.microsoftonline.com/<tenant>` ; sans
+  lui, `401` avec `WWW-Authenticate: Bearer` ; avec l'en-tête forgé ou non, **jamais `200`** ;
+- à venir : l'accueil affiché à Sabine une fois connectée.
 
 ## Ce que tu dois pouvoir défendre
 
@@ -223,15 +225,19 @@ La preuve en ligne viendra après les passes A et B (`infra/README.md`, « Les c
    50 % le signale.
 
 Les codes de réponse :
-- **302** : pas de session, renvoi vers la connexion ;
-- **401** : un client sans navigateur, ou une sonde, si elle passait par la connexion ;
+- **302** : pas de session, un navigateur (`Accept: text/html`). Le renvoi va tout droit à la page de connexion
+  d'Entra, `login.microsoftonline.com/<tenant>`, sans passer par `/.auth/login/aad`, car la connexion n'a qu'un
+  fournisseur ;
+- **401** : pas de session, tout autre client, avec `WWW-Authenticate: Bearer` : `curl` sans `Accept: text/html`, ou
+  une sonde, qui envoie `Accept: */*`, si elle passait par la connexion ;
 - **403** : un compte du tenant hors de `allowedPrincipals`, venant de la plateforme, ou un en-tête refusé par le
   code (#562).
 
 ## Zones non vérifiées
 
-- **Le chemin des sondes.** Learn ne dit pas si elles passent par la connexion. Si oui, le 302 compte comme un succès,
-  si bien que `Healthy` ne prouve pas que le site répond. Seul l'accueil affiché le prouve.
+- **Le chemin des sondes.** Learn ne dit pas si elles passent par la connexion. Si oui, elles recevraient son 401,
+  puisqu'une sonde envoie `Accept: */*` (kubernetes.io), et la révision ne serait pas `Healthy` : une déduction, non
+  constatée. `Healthy` ne prouve que `/health` ; seul l'accueil affiché prouve que le site répond.
 - **Un appel direct au port 8002 depuis une autre pièce de `cae-kb`**, qui passerait à côté de la connexion. Ce n'est
   ni démontré ni exclu : Learn ne décrit d'appel entre apps que par l'entrée, et le réseau de l'environnement est
   commun.

@@ -6932,7 +6932,8 @@ jour, avec ses quatre points ; relu par time-knight et par un sous-agent sans co
   - un module `web-container-app.bicep`, qui recopierait sondes, registre et identité ;
   - 0,25 vCPU, dont le réveil n'est pas mesuré ;
   - `excludedPaths: ['/health']`, gardé en repli sur l'accord de Sabine, si la révision n'est pas `Healthy` parce que
-    les sondes passeraient par la connexion. Learn ne le dit pas, et une sonde HTTP réussit de 200 à 399.
+    les sondes passeraient par la connexion. Learn ne le dit pas. Une sonde envoie `Accept: */*` (kubernetes.io) :
+    elle y recevrait le 401 constaté le 2026-11-11 pour un client sans `Accept: text/html` (une déduction).
 
   Coût estimé au cours de l'API des prix du 2026-11-11 : ≈ 25,7 à 27,2 € par mois pour tout K-B, sous les 30 € du
   budget (accepté par Sabine). Limite assumée : une requête sans connexion réveille la réplique (déduction, non
