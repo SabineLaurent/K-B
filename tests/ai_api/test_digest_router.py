@@ -315,6 +315,85 @@ def test_a_request_without_window_takes_the_window_of_the_settings(make_ai_api, 
     assert response.json()["items_in"] == 2
 
 
+def test_without_a_start_each_subject_starts_at_the_window(make_ai_api):
+    client, _ = make_ai_api(VALID_STEPS)
+
+    body = post_digests(client).json()
+
+    assert body["since_by_subject"] == {
+        "security_alerts": "2026-09-24T12:00:30Z",
+        "agent_tools": "2026-09-24T12:00:30Z",
+        "research": "2026-09-24T12:00:30Z",
+    }
+    assert body["subjects_without_items"] == []
+    assert body["items_before_subject_start"] == 0
+
+
+def test_a_subject_keeps_only_its_items_from_its_start(make_ai_api):
+    client, _ = make_ai_api(VALID_STEPS)
+
+    # KEV entry 3 is dated 2026-09-29, entry 4 2026-09-27: entry 4 was in the previous digest.
+    body = post_digests(
+        client,
+        {
+            "window_days": WINDOW_DAYS,
+            "since_by_subject": {"security_alerts": "2026-09-28T00:00:00Z"},
+        },
+    ).json()
+
+    assert body["since_by_subject"]["security_alerts"] == "2026-09-28T00:00:00Z"
+    assert body["since_by_subject"]["research"] == "2026-09-24T12:00:30Z"
+    security = body["digests"][0]
+    assert security["subject"] == "security_alerts"
+    # Item 4 never reached the writing: it is not among the items the output left out.
+    assert security["items_not_retained_in_output"] == []
+    assert body["items_before_subject_start"] == 1
+
+
+def test_the_reading_starts_at_the_oldest_start_and_names_the_subjects_without_items(
+    make_ai_api,
+):
+    # Over 3 days for the subjects without a start; research starts on 2026-09-25, before
+    # papers 1 and 2. The KEV entries 3 and 4 precede the start of security_alerts.
+    client, transport = make_ai_api(
+        [
+            classified(
+                security=[3, 4], agent=[], research=[2, 1], no_suitable_subject=[]
+            ),
+            written(),
+        ]
+    )
+
+    body = post_digests(
+        client,
+        {"window_days": 3, "since_by_subject": {"research": "2026-09-25T00:00:00Z"}},
+    ).json()
+
+    assert body["window"]["since"] == "2026-09-25T00:00:00Z"
+    assert body["window"]["days"] == 3
+    assert [digest["subject"] for digest in body["digests"]] == ["research"]
+    assert body["subjects_without_items"] == ["security_alerts", "agent_tools"]
+    assert body["items_before_subject_start"] == 2
+    # The classification, then the writing of research only.
+    assert len(transport.requests) == 2
+
+
+def test_a_start_older_than_the_bound_is_brought_to_the_bound(make_ai_api):
+    client, _ = make_ai_api(VALID_STEPS)
+
+    body = post_digests(
+        client,
+        {
+            "window_days": WINDOW_DAYS,
+            "since_by_subject": {"research": "2026-01-01T00:00:00Z"},
+        },
+    ).json()
+
+    # 14 days before the request, MAX_DIGEST_WINDOW_DAYS.
+    assert body["since_by_subject"]["research"] == "2026-09-24T12:00:30Z"
+    assert body["window"]["since"] == "2026-09-24T12:00:30Z"
+
+
 def test_an_empty_window_answers_without_calling_the_model(make_ai_api, capsys):
     client, transport = make_ai_api([])
     client.app.dependency_overrides[read_request_time] = lambda: datetime(
@@ -326,6 +405,12 @@ def test_an_empty_window_answers_without_calling_the_model(make_ai_api, capsys):
     assert response.status_code == 200
     assert response.json()["digests"] == []
     assert response.json()["items_in"] == 0
+    # Each subject named: kb writes its sheet, and its next start moves on.
+    assert response.json()["subjects_without_items"] == [
+        "security_alerts",
+        "agent_tools",
+        "research",
+    ]
     assert transport.requests == []
     assert capsys.readouterr().out == ""
 
@@ -368,6 +453,14 @@ def fail_the_test(request):
         ({"window_days": 3.0}, "window_days"),
         ({"window_days": "3"}, "window_days"),
         ({"window_days": 3, "field\nof the client": 1}, "body"),
+        ({"since_by_subject": {"unknown": "2026-10-01T00:00:00Z"}}, "since_by_subject"),
+        ({"since_by_subject": {"research": "2026-10-01T00:00:00"}}, "since_by_subject"),
+        ({"since_by_subject": {"research": 1790812800}}, "since_by_subject"),
+        (
+            {"since_by_subject": {"research": "2026-10-09T00:00:00Z"}},
+            "since_by_subject",
+        ),
+        ({"since_by_subject": ["research"]}, "since_by_subject"),
         ([3], "body"),
         (None, "body"),
         (b"not JSON", "body"),
@@ -380,6 +473,11 @@ def fail_the_test(request):
         "float",
         "string",
         "extra-field",
+        "unknown-subject",
+        "start-without-zone",
+        "start-as-a-number",
+        "start-after-the-request",
+        "starts-not-an-object",
         "not-an-object",
         "absent",
         "not-json",

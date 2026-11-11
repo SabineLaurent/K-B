@@ -3,14 +3,25 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from k_b.ai_api.connectors.llm_client import LlmFailure
 from k_b.ai_api.stage_calls import DigestStage
 from k_b.ai_api.watch_items import WatchKind
 from k_b.core.config import MAX_DIGEST_WINDOW_DAYS, MIN_DIGEST_WINDOW_DAYS
+from k_b.items import UtcDatetime, parse_aware_datetime
 
 WindowDays = Annotated[int, Field(ge=MIN_DIGEST_WINDOW_DAYS, le=MAX_DIGEST_WINDOW_DAYS)]
+
+
+def read_start_text(start: object) -> datetime:
+    """A start read as an ISO 8601 date with its zone: left to pydantic, a number would be a Unix
+    time, and strict refuses the text FastAPI hands on."""
+    return parse_aware_datetime(start, "start")
+
+
+# Still a date-time to pydantic: the OpenAPI declares it so.
+SubjectStart = Annotated[UtcDatetime, BeforeValidator(read_start_text)]
 
 
 class DigestRequestSchema(BaseModel):
@@ -19,13 +30,22 @@ class DigestRequestSchema(BaseModel):
 
     window_days: WindowDays | None = Field(
         default=None,
-        description="Absent or null: the window of KB_DIGEST_WINDOW_DAYS.",
+        description="The window of a subject without a start; absent or null: the window of"
+        " KB_DIGEST_WINDOW_DAYS.",
+    )
+    since_by_subject: dict[str, SubjectStart] | None = Field(
+        default=None,
+        description="The start of a subject, the until of its previous digest; a subject"
+        " absent starts window_days before the request, a start more than"
+        f" {MAX_DIGEST_WINDOW_DAYS} days before is brought to that bound.",
     )
 
 
 class WindowSchema(BaseModel):
-    days: int
-    since: datetime
+    days: int = Field(description="The window of a subject without a start, in days.")
+    since: datetime = Field(
+        description="The start of the reading: the oldest start of a subject."
+    )
     until: datetime
     capped_kind: WatchKind | None = Field(
         description="The kind cut by the cap of the reading; null when nothing is cut."
@@ -71,8 +91,14 @@ class DigestsSchema(BaseModel):
         description="The model of KB_LLM_MODEL that wrote the digests; replay for the replay."
     )
     window: WindowSchema
+    since_by_subject: dict[str, datetime] = Field(
+        description="The start applied to each subject: its items dated from it are its own."
+    )
     digests: list[DigestSchema]
     failed_subjects: list[FailedSubjectSchema]
+    subjects_without_items: list[str] = Field(
+        description="The subjects no item read and classified falls in, from their start."
+    )
     no_suitable_subject: list[int] = Field(
         description="Items of the classification that no subject suits."
     )
@@ -82,4 +108,7 @@ class DigestsSchema(BaseModel):
     items_in: int
     items_truncated: int
     items_dropped_before_writing_stage: int
+    items_before_subject_start: int = Field(
+        description="Items classified in a subject but dated before its start."
+    )
     items_capped: bool

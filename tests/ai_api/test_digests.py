@@ -155,6 +155,10 @@ VALID_STEPS = [
 ]
 
 
+# A start before every item of the tests: each item classified in a subject is its own.
+EARLIEST_START = datetime(2000, 1, 1, tzinfo=UTC)
+
+
 def digest_of(
     reading,
     steps,
@@ -162,6 +166,7 @@ def digest_of(
     transport=None,
     subjects=TEST_SUBJECTS,
     tracing=TRACING_OFF,
+    subject_starts=None,
 ):
     transport = transport or ReplayTransport(steps)
     with build_http_client(REPLAY_SETTINGS, transport=transport) as http_client:
@@ -170,6 +175,7 @@ def digest_of(
             REPLAY_SETTINGS,
             reading,
             subjects,
+            subject_starts or {subject.name: EARLIEST_START for subject in subjects},
             deadline or Deadline.after(3600),
             tracing=tracing,
         )
@@ -573,11 +579,13 @@ def test_an_empty_window_calls_no_model():
     assert result == DigestsResult(
         digests=(),
         failed_subjects=(),
+        subjects_without_items=tuple(subject.name for subject in TEST_SUBJECTS),
         no_suitable_subject=(),
         unanswered=(),
         items_in=0,
         items_truncated=0,
         items_dropped_before_writing_stage=2,
+        items_before_subject_start=0,
         items_capped=False,
         stage_calls=(),
     )
@@ -613,6 +621,31 @@ def test_the_items_beyond_the_digest_cap_are_dropped_and_counted(reading, monkey
     assert len(json.loads(messages_of(security_body, "user")[0])["items"]) == 2
     # 3 security items and 1 agent item beyond 2, added to those of the reading.
     assert result.items_dropped_before_writing_stage == reading.items_dropped + 3 + 1
+
+
+def test_the_items_before_the_start_of_a_subject_leave_before_the_digest_cap(
+    reading, monkeypatch
+):
+    monkeypatch.setattr(watch_items, "MAX_ITEMS_PER_DIGEST", 2)
+    # The start of security_alerts after its three oldest items: two remain, under the cap.
+    security_dates = sorted(
+        item.source_date for item in reading.items if item.item_id in SECURITY_ITEMS
+    )
+    starts = {subject.name: EARLIEST_START for subject in TEST_SUBJECTS} | {
+        "security_alerts": security_dates[3]
+    }
+
+    result, transport = digest_of(
+        reading,
+        [classified(), written(), written(), written()],
+        subject_starts=starts,
+    )
+
+    security_body = sent_bodies(transport)[1]
+    assert len(json.loads(messages_of(security_body, "user")[0])["items"]) == 2
+    assert result.items_before_subject_start == 3
+    # None of security_alerts beyond 2; 1 agent item beyond 2, added to those of the reading.
+    assert result.items_dropped_before_writing_stage == reading.items_dropped + 1
 
 
 def test_a_source_url_without_http_scheme_is_returned_null(reading):

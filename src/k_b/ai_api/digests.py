@@ -4,8 +4,9 @@ after the other, under the deadline; nothing is written nor logged here, each st
 After a writing failed with a 429, nothing more is sent: the items of the next subjects would
 leave for an answer refused (minimisation, GDPR art. 5.1.c)."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 
 import httpx2
 
@@ -19,14 +20,23 @@ from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.stage_calls import DigestStage, StageCall, find_skipped_state
 from k_b.ai_api.stages.checking import Digest, to_digest
-from k_b.ai_api.stages.classification import ClassificationFailure, classify
+from k_b.ai_api.stages.classification import (
+    Classification,
+    ClassificationFailure,
+    classify,
+)
 from k_b.ai_api.stages.writing import (
     WRITING_PROMPT_VERSION,
     WritingOutput,
     write_subject,
 )
 from k_b.ai_api.tracing import TRACING_OFF, Step, Tracing
-from k_b.ai_api.watch_items import WatchReading, WritingSelection, select_for_writing
+from k_b.ai_api.watch_items import (
+    WatchItem,
+    WatchReading,
+    WritingSelection,
+    select_for_writing,
+)
 from k_b.core.config import DigestSubject
 
 
@@ -41,6 +51,8 @@ class FailedSubject:
 class DigestsResult:
     digests: tuple[Digest, ...]
     failed_subjects: tuple[FailedSubject, ...]
+    # In the order of the list: no item of the reading classified in them from their start.
+    subjects_without_items: tuple[str, ...]
     # Of the classification, in the order of the reading: the items no subject suits, and the
     # items the model left without answer.
     no_suitable_subject: tuple[int, ...]
@@ -51,6 +63,8 @@ class DigestsResult:
     items_truncated: int
     # Dropped by the reading, then beyond MAX_ITEMS_PER_DIGEST of a digest.
     items_dropped_before_writing_stage: int
+    # Classified in a subject, but dated before its start: in its previous digest.
+    items_before_subject_start: int
     items_capped: bool
     stage_calls: tuple[StageCall, ...]
 
@@ -60,11 +74,13 @@ def build_digests(
     settings: LlmSettings,
     reading: WatchReading,
     subjects: Sequence[DigestSubject],
+    subject_starts: Mapping[str, datetime],
     deadline: Deadline,
     *,
     tracing: Tracing = TRACING_OFF,
 ) -> DigestsResult | ClassificationFailure:
-    """The digests of the items read, one subject after the other in the order of the list."""
+    """The digests of the items read, one subject after the other in the order of the list,
+    each of its items dated from its start."""
     classification = classify(
         http_client, settings, reading.items, subjects, deadline, tracing=tracing
     )
@@ -72,17 +88,23 @@ def build_digests(
         return classification
     digests: list[Digest] = []
     failed_subjects: list[FailedSubject] = []
+    subjects_without_items: list[str] = []
+    items_before_subject_start = 0
     stage_calls = list(classification.stage_calls)
     items_truncated = 0
     items_dropped_before_writing_stage = reading.items_dropped
     is_rate_limited = False
     for subject in subjects:
+        classified_items = list_subject_items(reading, classification, subject.name)
+        # Before the selection for the writing: MAX_ITEMS_PER_DIGEST counts the items kept.
         subject_items = [
             item
-            for item in reading.items
-            if classification.subject_by_item_id.get(item.item_id) == subject.name
+            for item in classified_items
+            if item.source_date >= subject_starts[subject.name]
         ]
+        items_before_subject_start += len(classified_items) - len(subject_items)
         if not subject_items:
+            subjects_without_items.append(subject.name)
             continue
         with tracing.step(
             "write_subject", attributes={"k_b.subject": subject.name}
@@ -150,14 +172,27 @@ def build_digests(
     return DigestsResult(
         digests=tuple(digests),
         failed_subjects=tuple(failed_subjects),
+        subjects_without_items=tuple(subjects_without_items),
         no_suitable_subject=classification.no_suitable_subject,
         unanswered=classification.unanswered,
         items_in=len(reading.items),
         items_truncated=items_truncated,
         items_dropped_before_writing_stage=items_dropped_before_writing_stage,
+        items_before_subject_start=items_before_subject_start,
         items_capped=reading.items_capped,
         stage_calls=tuple(stage_calls),
     )
+
+
+def list_subject_items(
+    reading: WatchReading, classification: Classification, subject: str
+) -> list[WatchItem]:
+    """The items the classification put in subject, in the order of the reading."""
+    return [
+        item
+        for item in reading.items
+        if classification.subject_by_item_id.get(item.item_id) == subject
+    ]
 
 
 def trace_writing(

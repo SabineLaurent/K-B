@@ -3,10 +3,13 @@ written by the model under the deadline; nothing is kept, each request is a trac
 
 import logging
 import time
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import httpx2
 from fastapi import APIRouter, Request, status
+from fastapi.exceptions import RequestValidationError
 
 from k_b.ai_api.connectors.data_api_client import DataApiError, read_watch
 from k_b.ai_api.deadline import Deadline
@@ -29,7 +32,12 @@ from k_b.ai_api.tracing import TRACING_OFF, Tracing
 from k_b.ai_api.watch_items import WatchReading
 from k_b.core.api_errors import ApiError
 from k_b.core.api_request_log import read_request_id
-from k_b.core.config import DIGEST_REQUEST_TIMEOUT_SECONDS, MILLISECONDS_PER_SECOND
+from k_b.core.config import (
+    DIGEST_REQUEST_TIMEOUT_SECONDS,
+    MAX_DIGEST_WINDOW_DAYS,
+    MILLISECONDS_PER_SECOND,
+    DigestSubject,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +49,22 @@ ROOT_ATTRIBUTES: dict[str, str] = {
     "http.route": "/digests",
 }
 HTTP_STATUS = "http.response.status_code"
+SUBJECT_STARTS = "since_by_subject"
+
+
+@dataclass(frozen=True)
+class DigestWindow:
+    """The window of a request: the start of each subject, in the order of the list, and the
+    instant of the request; days is the window of a subject without a start."""
+
+    days: int
+    until: datetime
+    since_by_subject: Mapping[str, datetime]
+
+    @property
+    def since(self) -> datetime:
+        """The start of the reading, the oldest start of a subject."""
+        return min(self.since_by_subject.values())
 
 
 @router.post("", responses=ERROR_RESPONSES)
@@ -58,6 +82,13 @@ def post_digests(
     # none, and an error once the response is returned leaves it at 200 (docs/fiches-veille.md,
     # "Traces").
     # Not in the docstring: it is the description of the route in the OpenAPI.
+    # The starts are checked before the root span: a 422 opens none, as a 422 of the body.
+    window = find_digest_window(
+        demand,
+        request.app.state.subjects,
+        request.app.state.default_window_days,
+        request_time,
+    )
     request_id = read_request_id(request)
     tracing: Tracing = request.app.state.tracing
     with tracing.step(
@@ -67,10 +98,9 @@ def post_digests(
             digests = answer_digests(
                 request,
                 request_id,
-                demand,
+                window,
                 llm_client,
                 data_api_client,
-                request_time,
                 tracing=tracing,
             )
         except ApiError as error:
@@ -85,13 +115,50 @@ def post_digests(
         return digests
 
 
+def find_digest_window(
+    demand: DigestRequestSchema,
+    subjects: Sequence[DigestSubject],
+    default_window_days: int,
+    request_time: datetime,
+) -> DigestWindow:
+    """The start of each subject: given, or window_days before the request, and never more than
+    MAX_DIGEST_WINDOW_DAYS before it; a start of a subject out of the list, or after the request,
+    is refused as its parameter."""
+    window_days = (
+        default_window_days if demand.window_days is None else demand.window_days
+    )
+    until = request_time.replace(microsecond=0)
+    given = demand.since_by_subject or {}
+    names = [subject.name for subject in subjects]
+    if any(name not in names for name in given) or any(
+        start > until for start in given.values()
+    ):
+        raise RequestValidationError(
+            [
+                {
+                    "type": "value_error",
+                    "loc": ("body", SUBJECT_STARTS),
+                    "msg": "a subject out of the list, or a start after the request",
+                }
+            ]
+        )
+    default_since = until - timedelta(days=window_days)
+    bound = until - timedelta(days=MAX_DIGEST_WINDOW_DAYS)
+    return DigestWindow(
+        days=window_days,
+        until=until,
+        since_by_subject={
+            name: max(given.get(name, default_since), bound) for name in names
+        },
+    )
+
+
 def answer_digests(
     request: Request,
     request_id: str,
-    demand: DigestRequestSchema,
+    window: DigestWindow,
     llm_client: httpx2.Client,
     data_api_client: httpx2.Client,
-    request_time: datetime,
     *,
     tracing: Tracing = TRACING_OFF,
 ) -> DigestsSchema:
@@ -99,13 +166,10 @@ def answer_digests(
     raises its ApiError."""
     deadline = Deadline.after(DIGEST_REQUEST_TIMEOUT_SECONDS)
     state = request.app.state
-    window_days = (
-        state.default_window_days if demand.window_days is None else demand.window_days
-    )
-    until = request_time.replace(microsecond=0)
-    since = until - timedelta(days=window_days)
     started = time.perf_counter()
-    reading = read_window(data_api_client, since, deadline, request_id, tracing=tracing)
+    reading = read_window(
+        data_api_client, window.since, deadline, request_id, tracing=tracing
+    )
     data_fetch_ms = round((time.perf_counter() - started) * MILLISECONDS_PER_SECOND)
     # Each request read, a model called or not (docs/fiches-veille.md, "Métriques").
     state.model_metrics.record_data_fetch(data_fetch_ms)
@@ -114,6 +178,7 @@ def answer_digests(
         state.llm_settings,
         reading,
         state.subjects,
+        window.since_by_subject,
         deadline,
         tracing=tracing,
     )
@@ -138,19 +203,22 @@ def answer_digests(
         request_id=request_id,
         model=state.llm_settings.model,
         window=WindowSchema(
-            days=window_days,
-            since=since,
-            until=until,
+            days=window.days,
+            since=window.since,
+            until=window.until,
             capped_kind=reading.capped_kind,
             covered_after=reading.covered_after,
         ),
+        since_by_subject=dict(window.since_by_subject),
         digests=[to_digest_schema(digest) for digest in result.digests],
         failed_subjects=to_failed_subject_schemas(result),
+        subjects_without_items=list(result.subjects_without_items),
         no_suitable_subject=list(result.no_suitable_subject),
         unanswered=list(result.unanswered),
         items_in=result.items_in,
         items_truncated=result.items_truncated,
         items_dropped_before_writing_stage=result.items_dropped_before_writing_stage,
+        items_before_subject_start=result.items_before_subject_start,
         items_capped=result.items_capped,
     )
 

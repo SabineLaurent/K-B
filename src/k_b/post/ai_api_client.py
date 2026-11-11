@@ -6,6 +6,7 @@ import re
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Annotated, Literal, NoReturn
 
 import httpx2
@@ -31,6 +32,7 @@ from k_b.core.config import (
     MAX_AI_API_ANSWER_BYTES,
     MODEL_NAME,
 )
+from k_b.core.dates import DATABASE_DATE_FORMAT
 from k_b.core.outbound import (
     BodyTooLargeError,
     BodyTooLateError,
@@ -152,8 +154,12 @@ class DigestsResponse(AiApiModel):
     request_id: Annotated[str, AfterValidator(match_fully(REQUEST_ID))]
     model: Annotated[str, AfterValidator(match_fully(MODEL_NAME))]
     window: Window
+    # The start applied to each subject: the since of its sheet.
+    since_by_subject: dict[str, UtcDatetime]
     digests: list[Digest]
     failed_subjects: list[FailedSubject]
+    # The subjects no item fell in: each gets its sheet, which moves its next start on.
+    subjects_without_items: list[str]
     # The items of the window read by the AI API, shown in the summary of kb digest.
     items_in: int
     items_capped: bool
@@ -198,13 +204,23 @@ def build_ai_api_client(
 
 
 def request_digests(
-    http_client: httpx2.Client, subject_names: Sequence[str]
+    http_client: httpx2.Client,
+    subject_names: Sequence[str],
+    since_by_subject: Mapping[str, datetime],
 ) -> DigestsResponse:
-    """The digests of the default window of the AI API, checked against subject_names."""
+    """The digests of each subject from its start, the default window of the AI API for a
+    subject without one, checked against subject_names and the starts sent."""
+    body = {
+        "since_by_subject": {
+            subject: start.astimezone(UTC).strftime(DATABASE_DATE_FORMAT)
+            for subject, start in since_by_subject.items()
+        }
+    }
     response = read_response(
-        send_request(http_client, DIGESTS_PATH, {}), DigestsResponse
+        send_request(http_client, DIGESTS_PATH, body), DigestsResponse
     )
     refuse_out_of_lists(response, subject_names)
+    refuse_earlier_starts(response, since_by_subject)
     return response
 
 
@@ -326,15 +342,25 @@ def refuse_out_of_lists(
     response: DigestsResponse, subject_names: Sequence[str]
 ) -> None:
     """Refuse a subject out of the closed list or given twice, as its name makes the path of its
-    sheet; and a claim citing a source not listed once in its digest."""
+    sheet; starts that are not those of the list; and a claim citing a source not listed once in
+    its digest."""
     seen_subjects: set[str] = set()
-    subjects = [
-        (f"digests.{number}.subject", digest.subject)
-        for number, digest in enumerate(response.digests)
-    ] + [
-        (f"failed_subjects.{number}.subject", failed.subject)
-        for number, failed in enumerate(response.failed_subjects)
-    ]
+    subjects = (
+        [
+            (f"digests.{number}.subject", digest.subject)
+            for number, digest in enumerate(response.digests)
+        ]
+        + [
+            (f"failed_subjects.{number}.subject", failed.subject)
+            for number, failed in enumerate(response.failed_subjects)
+        ]
+        + [
+            (f"subjects_without_items.{number}", subject)
+            for number, subject in enumerate(response.subjects_without_items)
+        ]
+    )
+    if set(response.since_by_subject) != set(subject_names):
+        raise_invalid(response.request_id, "since_by_subject", "subjects_not_the_list")
     for place, subject in subjects:
         if subject not in subject_names:
             raise_invalid(response.request_id, place, "subject_not_listed")
@@ -353,6 +379,20 @@ def refuse_out_of_lists(
                 raise_invalid(response.request_id, place, "item_not_in_sources")
             if len(set(claim.item_ids)) != len(claim.item_ids):
                 raise_invalid(response.request_id, place, "item_twice")
+
+
+def refuse_earlier_starts(
+    response: DigestsResponse, since_by_subject: Mapping[str, datetime]
+) -> None:
+    """Refuse a subject started before the start sent: its sheet would give again items of its
+    previous sheet. A later start is the bound of the AI API."""
+    for subject, start in since_by_subject.items():
+        if response.since_by_subject[subject] < start:
+            raise_invalid(
+                response.request_id,
+                f"since_by_subject.{subject}",
+                "start_before_the_one_sent",
+            )
 
 
 def raise_invalid(request_id: str, place: str, check: str) -> NoReturn:

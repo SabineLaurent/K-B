@@ -78,20 +78,32 @@ AGENT_DIGEST = DigestSchema(
 )
 
 
+SINCE = datetime(2026, 10, 18, 16, 30, tzinfo=UTC)
+
+
 def make_response(digests=(AGENT_DIGEST,), failed_subjects=(), **changes):
-    """A response of POST /digests, made by the schema of the AI API."""
+    """A response of POST /digests, made by the schema of the AI API; a subject neither written
+    nor failed is a subject without items."""
+    answered = {digest.subject for digest in digests} | {
+        failed.subject for failed in failed_subjects
+    }
     fields = {
         "request_id": REQUEST_ID,
         "model": "gpt-6-luna",
         "window": WindowSchema(
             days=3,
-            since=datetime(2026, 10, 18, 16, 30, tzinfo=UTC),
+            since=SINCE,
             until=UNTIL,
             capped_kind=None,
             covered_after=None,
         ),
+        "since_by_subject": dict.fromkeys(SUBJECT_NAMES, SINCE),
         "digests": list(digests),
         "failed_subjects": list(failed_subjects),
+        "subjects_without_items": [
+            subject for subject in SUBJECT_NAMES if subject not in answered
+        ],
+        "items_before_subject_start": 0,
         "no_suitable_subject": [12],
         "unanswered": [],
         "items_in": 4,
@@ -125,10 +137,12 @@ def answer(status=200, content=b"", headers=None):
     return handle
 
 
-def ask(handle):
+def ask(handle, since_by_subject=None):
     http_client, requests = simulate(handle)
     with http_client:
-        return request_digests(http_client, SUBJECT_NAMES), requests
+        return request_digests(
+            http_client, SUBJECT_NAMES, since_by_subject or {}
+        ), requests
 
 
 def ask_and_fail(handle):
@@ -213,7 +227,8 @@ def test_the_request_asks_the_default_window_with_the_key_and_its_timeouts():
         "POST",
         "http://127.0.0.1:8001/digests",
     )
-    assert json.loads(request.content) == {}
+    # No start: each subject has the default window of the AI API.
+    assert json.loads(request.content) == {"since_by_subject": {}}
     assert request.headers["Authorization"] == f"Bearer {TEST_API_KEY}"
     assert request.extensions["timeout"] == {
         "connect": 5,
@@ -496,6 +511,24 @@ def digest_with(**changes):
             "failed_subjects.0.subject (subject_not_listed)",
         ),
         (
+            make_response(subjects_without_items=["agent_tools", "research"]),
+            "subjects_without_items.0 (subject_twice)",
+        ),
+        (
+            make_response(subjects_without_items=["../tops"]),
+            "subjects_without_items.0 (subject_not_listed)",
+        ),
+        (
+            make_response(since_by_subject={"agent_tools": SINCE}),
+            "since_by_subject (subjects_not_the_list)",
+        ),
+        (
+            make_response(
+                since_by_subject=dict.fromkeys([*SUBJECT_NAMES, "../tops"], SINCE)
+            ),
+            "since_by_subject (subjects_not_the_list)",
+        ),
+        (
             make_response(
                 [digest_with(claims=[ClaimSchema(text="Inventée.", item_ids=[99])])]
             ),
@@ -524,6 +557,17 @@ def test_a_response_that_breaks_the_closed_lists_is_refused_before_any_sheet(
     assert str(failure) == (
         f"ai_api_invalid_response, HTTP 200, {detail}, request_id {REQUEST_ID}"
     )
+
+
+def test_the_request_gives_the_start_of_each_subject_in_the_format_of_the_dates():
+    _, requests = ask(
+        answer(content=to_body(make_response())),
+        {"research": datetime(2026, 10, 18, 16, 29, 55, tzinfo=UTC)},
+    )
+
+    assert json.loads(requests[0].content) == {
+        "since_by_subject": {"research": "2026-10-18T16:29:55Z"}
+    }
 
 
 def test_a_response_with_failed_subjects_is_accepted():
