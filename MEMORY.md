@@ -259,6 +259,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   la collecte. Quand la licence de son texte ne permet pas de le publier, elle garde la forme de
   l'exemple, avec un texte écrit pour l'occasion ; un auteur arXiv y prend un nom fictif (journal
   ADR, 2026-11-06, « Mise en public du dépôt (#278) » ; licences au README, « Contenus de tiers »).
+- **Espaces avant « : » et « ; »** (règle de Sabine du 2026-11-11) : aucune, ni normale ni insécable, dans
+  le texte du site (`src/k_b/web/templates/`, tenu par `tests/web/test_accessibility.py`) et dans
+  `documentation/`. `docs/`, le journal ADR et les notes pédagogiques gardent l'usage du dépôt.
 - **K-B est déterministe** dans sa conception, son code et ses journaux (consigne de Sabine,
   2026-10-04) : un journal ou un message d'erreur dit ce qui a été observé (URL de redirection,
   code HTTP, titre trouvé et titre attendu), jamais une supposition ni une interprétation
