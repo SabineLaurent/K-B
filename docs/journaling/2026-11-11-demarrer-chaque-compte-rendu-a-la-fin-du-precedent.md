@@ -1,11 +1,11 @@
 # Démarrer chaque compte rendu de veille à la fin du précédent de son sujet
 
 - **Date** : 2026-11-11
-- **Branche** : `feat/digest-window-per-subject`, sur `main` au commit `94e3f4e`
+- **Branche** : `feat/digest-window-per-subject`, sur `main` au commit `3afbc73`
 - **Issue** : #565
-- **Commits** : `ac92902` (la règle), `8230dff` (le tri de la première revue et la lecture vide), `7999c3e` (les
-  textes de #423 sur la fenêtre fixe), `42a2da8` (le tri de la seconde revue). Les autres commits de la liste
-  injectée sont ceux de `main` avant la branche (#550 à #577) : ils ont leur propre note.
+- **Commits** : `fe941a1` (la règle), `b73bb48` (le tri de la première revue et la lecture vide), `132ce02` (les
+  textes de #423 sur la fenêtre fixe), `3efc205` (le tri de la seconde revue), puis cette note. Les autres commits
+  de la liste injectée sont ceux de `main` avant la branche (#550 à #579) : ils ont leur propre note.
 - **Fichiers principaux** : `src/k_b/ai_api/routers/digest_router.py`, `src/k_b/ai_api/digests.py`,
   `src/k_b/ai_api/schemas/digest_schema.py`, `src/k_b/post/digest_sheets.py`, `src/k_b/post/vault_files.py`,
   `src/k_b/post/ai_api_client.py`, `src/k_b/commands/digest_command.py`, `docs/fiches-veille.md` (« Fenêtre »,
