@@ -40,10 +40,12 @@ from k_b.commands.run_log import (
     LOGGER_NAME,
     SERVE_AI_LOG_FILE_PATH,
     SERVE_DATA_LOG_FILE_PATH,
+    SERVE_WEB_LOG_FILE_PATH,
     logging_to,
 )
 from k_b.commands.serve_ai_command import run_serve_ai
 from k_b.commands.serve_data_command import run_serve_data
+from k_b.commands.serve_web_command import run_serve_web
 from k_b.commands.sigterm import StoppedBySigtermError, stopping_on_sigterm
 from k_b.commands.smoke_test_command import run_smoke_test
 from k_b.commands.trend_report_command import run_trend_report
@@ -57,6 +59,8 @@ from k_b.core.config import (
     DATABASE_FILE_NAME,
     SMOKE_TEST_CONTAINER,
     WATCH_CONTAINER,
+    WEB_HOST,
+    WEB_PORT,
 )
 from k_b.database.location import DATABASE_URL_VARIABLE
 from k_b.etl.collected_sources import COLLECT_ONLY_VARIABLE, VAULT_DIR_VARIABLE
@@ -68,6 +72,7 @@ logger = logging.getLogger(LOGGER_NAME)
 LOG_FILE_PATH_BY_COMMAND = {
     "serve-data": SERVE_DATA_LOG_FILE_PATH,
     "serve-ai": SERVE_AI_LOG_FILE_PATH,
+    "serve-web": SERVE_WEB_LOG_FILE_PATH,
 }
 
 
@@ -85,7 +90,8 @@ ROUTINE_BY_COMMAND = {
 DRY_RUN_HELP = "print the steps and their rules, run none and transfer nothing"
 # The commands run with the data directory and the environment, by name, kb collect the default; a
 # table rather than a branch each, which would pass the complexity ruff allows (C901, 10). kb serve-ai,
-# kb digest, kb smoke-test and kb download-watch-sheets take the environment only (run_command).
+# kb serve-web, kb digest, kb smoke-test and kb download-watch-sheets take the environment only
+# (run_command).
 RUN_BY_COMMAND: dict[str, Callable[[Path, Mapping[str, str]], int]] = {
     "create-db": run_create_db,
     "migrate-database": run_migrate_database,
@@ -165,6 +171,11 @@ def read_command(argv: list[str] | None) -> tuple[str, bool]:
         "serve-ai",
         help="serve the digests of the watch by the AI API, on"
         f" http://{AI_API_HOST}:{AI_API_PORT} by default",
+    )
+    command_parsers.add_parser(
+        "serve-web",
+        help="serve the site, private to its operator, on"
+        f" http://{WEB_HOST}:{WEB_PORT} by default",
     )
     command_parsers.add_parser(
         "digest",
@@ -264,6 +275,8 @@ def run_command(command: str, data_dir: Path, environ: Mapping[str, str]) -> int
     """Run the kb command given and return its exit code."""
     if command == "serve-ai":
         return run_serve_ai(environ)
+    if command == "serve-web":
+        return run_serve_web(environ)
     if command == "digest":
         return run_digest(environ)
     if command == "smoke-test":

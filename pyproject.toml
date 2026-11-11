@@ -15,6 +15,7 @@ dependencies = [
     "fastapi>=0.122",
     "google-cloud-bigquery>=3.46,<4",
     "httpx2>=2.13.1",
+    "jinja2>=3.1.6",
     "opentelemetry-api>=1.45.1,<1.46",
     "opentelemetry-exporter-otlp-proto-http>=1.45.1,<1.46",
     "opentelemetry-sdk>=1.45.1,<1.46",
@@ -60,8 +61,8 @@ exclude = ["*.md"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "D100", "D102", "D103"]  # assert est l'outil des tests
 # Hors du pipeline ETL (de cli.py à l'écriture en base) : pas de docstring exigée.
-"src/k_b/{ai_api,data_api,post}/**" = ["D100", "D102", "D103"]
-"src/k_b/commands/{create_db,digest,openapi,serve_ai,serve_data,trend_report,write_tops}_command.py" = ["D100", "D102", "D103"]
+"src/k_b/{ai_api,data_api,post,web}/**" = ["D100", "D102", "D103"]
+"src/k_b/commands/{create_db,digest,openapi,serve_ai,serve_data,serve_web,trend_report,write_tops}_command.py" = ["D100", "D102", "D103"]
 "src/k_b/commands/wait_display.py" = ["D100", "D102", "D103"]
 "src/k_b/core/api_*.py" = ["D100", "D102", "D103"]
 "src/k_b/database/creation.py" = ["D100", "D102", "D103"]

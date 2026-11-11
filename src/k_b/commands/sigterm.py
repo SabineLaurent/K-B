@@ -17,7 +17,8 @@ class StoppedBySigtermError(SystemExit):
         super().__init__(ExitCode.STOPPED_BY_SIGTERM)
 
 
-# The commands that stop on SIGTERM; kb serve-data and kb serve-ai keep the handler of uvicorn.
+# The commands that stop on SIGTERM; kb serve-data, kb serve-ai and kb serve-web keep the handler of
+# uvicorn.
 COMMANDS_STOPPED_BY_SIGTERM = frozenset(
     {
         "collect",

@@ -16,6 +16,8 @@ from k_b.core.api_request_log import read_request_id
 
 logger = logging.getLogger(__name__)
 
+# The state of an exception no handler takes, in the log of both APIs and of the site (web/errors.py).
+INTERNAL_ERROR = "internal_error"
 # The state of a request body beyond its bound (core/api_body_limit.py).
 CONTENT_TOO_LARGE = "content_too_large"
 # The state of a client on a route that is not its own (core/api_access.py).
@@ -137,11 +139,12 @@ async def respond_to_unexpected_error(
         return await call_next(request)
     except Exception as error:  # noqa: BLE001 — every exception no handler takes
         logger.error(
-            "internal_error: %s request_id=%s",
+            "%s: %s request_id=%s",
+            INTERNAL_ERROR,
             type(error).__name__,
             read_request_id(request),
         )
-        return respond_with_error(500, "internal_error")
+        return respond_with_error(500, INTERNAL_ERROR)
 
 
 # Given to FastAPI(exception_handlers=...), whose type takes a handler of one exception class.

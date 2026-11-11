@@ -1,0 +1,34 @@
+{%- macro nav_link(href, label) -%}
+<a href="{{ href }}"{% if current_path == href %} aria-current="page"{% endif %}>{{ label }}</a>
+{%- endmacro -%}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{% endblock %} · K-B</title>
+<link rel="stylesheet" href="/static/site.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<a class="skip-link" href="#contenu">Aller au contenu</a>
+<header class="site-header">
+<nav class="site-nav" aria-label="Navigation principale">
+<a class="site-logo" href="/">K-B</a>
+<div class="site-nav-links">
+{{ nav_link("/", "Veille") }}
+</div>
+</nav>
+</header>
+<main id="contenu" class="{% block main_class %}page{% endblock %}">
+{% block content %}{% endblock %}
+</main>
+<footer class="site-footer">
+<div class="site-footer-links">
+{{ nav_link("/sources", "Sources et conditions d’utilisation") }}
+{{ nav_link("/accessibilite", "Accessibilité") }}
+{% if is_operator_checked %}<a href="/.auth/logout">Se déconnecter</a>{% endif %}
+</div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,269 @@
+/* The stylesheet of the site of K-B: the chart of the mockups of 2026-11-09 (planche « Charte
+   graphique »). The fonts of the system, sizes in rem: the text follows the size chosen in the
+   browser. No image, no font, nothing fetched from elsewhere. */
+
+:root {
+  --color-ink: #1C1E21;
+  --color-slate: #4A4F57;
+  --color-teal: #0F5E6B;
+  --color-teal-deep: #0A434C;
+  --color-paper: #FBFBF8;
+  --color-card: #FFFFFF;
+  --color-stone: #DADCD6;
+  --color-on-teal: #FFFFFF;
+  --font-text: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-code: ui-monospace, Menlo, Consolas, monospace;
+  --target-size: 2.75rem;
+  --page-width: 70rem;
+}
+
+/* The focus ring of the chart, on every element reached by the keyboard. */
+:focus-visible {
+  outline: 3px solid var(--color-teal);
+  outline-offset: 2px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-text);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--color-teal);
+  text-underline-offset: 0.15em;
+}
+
+a:hover {
+  color: var(--color-teal-deep);
+}
+
+h1 {
+  margin: 0 0 1rem;
+  font-size: 1.875rem;
+  line-height: 1.25;
+}
+
+h2 {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1.1875rem;
+}
+
+/* Out of sight until the keyboard reaches it, first on the page. */
+.skip-link {
+  position: absolute;
+  top: 0.5rem;
+  left: 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--color-card);
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+.site-header {
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-stone);
+}
+
+.site-nav {
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 0.625rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.site-nav-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  flex: 1 1 auto;
+}
+
+.site-nav a,
+.site-footer a {
+  min-height: var(--target-size);
+  display: inline-flex;
+  align-items: center;
+}
+
+.site-logo {
+  color: var(--color-ink);
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* The link of the current page: bold and underlined further, not by its colour alone. */
+[aria-current="page"] {
+  font-weight: 600;
+  text-underline-offset: 6px;
+}
+
+main {
+  flex: 1 0 auto;
+  width: 100%;
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 1.5rem 1rem 2.5rem;
+}
+
+.prose {
+  max-width: 48rem;
+}
+
+.site-footer {
+  background: var(--color-card);
+  border-top: 1px solid var(--color-stone);
+}
+
+.site-footer-links {
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 0.625rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.75rem;
+  font-size: 0.875rem;
+}
+
+.error-page {
+  max-width: 65rem;
+  padding: 3rem 1rem 4rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2rem 3.5rem;
+}
+
+.error-text {
+  flex: 1 1 20rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.error-text > * {
+  margin: 0;
+}
+
+.error-code {
+  color: var(--color-slate);
+  font-family: var(--font-code);
+  font-size: 0.9375rem;
+}
+
+.error-page h1 {
+  font-size: 2.125rem;
+}
+
+.error-quip {
+  font-size: 1.1875rem;
+}
+
+.error-explanation {
+  color: var(--color-slate);
+  line-height: 1.6;
+}
+
+.error-actions {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+}
+
+.button,
+.button-secondary {
+  min-height: var(--target-size);
+  padding: 0 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  /* The space between the arrow and its text, which a flex container drops. */
+  gap: 0.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.button {
+  background: var(--color-teal);
+  color: var(--color-on-teal);
+}
+
+.button:hover {
+  background: var(--color-teal-deep);
+  color: var(--color-on-teal);
+}
+
+.button-secondary {
+  border: 1px solid var(--color-teal);
+}
+
+.incident {
+  padding: 1.125rem 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem 1.5rem;
+  background: var(--color-card);
+  border: 1px solid var(--color-stone);
+  border-radius: 8px;
+}
+
+.incident dt,
+.incident-note {
+  color: var(--color-slate);
+  font-size: 0.875rem;
+}
+
+.incident dd {
+  margin: 0.25rem 0 0;
+}
+
+.request-id {
+  font-family: var(--font-code);
+  overflow-wrap: anywhere;
+}
+
+.illustration {
+  flex: 0 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+@media (min-width: 48rem) {
+  .site-nav,
+  .site-footer-links {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  main {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .error-page {
+    padding-top: 4.5rem;
+    padding-bottom: 6rem;
+  }
+}

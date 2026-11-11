@@ -92,6 +92,13 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   clients ont leur clé dans `KB_AI_API_KEY_<CLIENT>`, ceux de l'API de données dans
   `KB_DATA_API_KEY_<CLIENT>` (journal ADR, 2026-10-21, « API IA : servir les fiches par
   `POST /digests` »).
+- Le site (#562 à #564) est servi par `kb serve-web`, sur `127.0.0.1:8002`, FastAPI et Jinja2 sans
+  JavaScript (`docs/site-web.md`) : le paquet `web` n'importe que `core` et `items` et lit l'API de
+  données par HTTP, comme son client `WEB` (`KB_DATA_API_KEY_WEB`). Il est privé : chaque requête sauf
+  `/health` porte l'identifiant d'objet de Sabine (`KB_WEB_OPERATOR_ID`) dans l'en-tête
+  `X-MS-CLIENT-PRINCIPAL-ID` posé par Azure Container Apps ; `KB_WEB_AUTH=off` seulement sur
+  `127.0.0.1` et hors d'Azure (`CONTAINER_APP_NAME` absente). Un gabarit n'écrit jamais `|safe`,
+  `url_for`, un script ni un style en ligne (tests de `tests/web/`).
 - `kb digest` (#209) demande les fiches à l'API IA, puis les écrit dans le coffre,
   `veille/<sujet>/AAAA-MM-JJ.md` ; `kb serve-data` et `kb serve-ai` doivent tourner (journal ADR,
   2026-10-21, « Fiches de veille : `kb digest` les écrit dans le coffre »).

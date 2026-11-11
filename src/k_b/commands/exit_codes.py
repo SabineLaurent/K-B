@@ -39,7 +39,10 @@ class ExitCode(IntEnum):
     )
     # Not returned by kb: uvicorn exits with it (STARTUP_FAILURE, uvicorn/config.py). Named here
     # so that no other code takes its value.
-    SERVER_NOT_STARTED = 3, "kb serve-data, kb serve-ai: the server did not start"
+    SERVER_NOT_STARTED = (
+        3,
+        "kb serve-data, kb serve-ai, kb serve-web: the server did not start",
+    )
     # 4: the first value after the one of uvicorn. A part is a source, a top or a subject
     # (README).
     PARTIAL_FAILURE = (
@@ -54,7 +57,8 @@ class ExitCode(IntEnum):
     )
     # 128 + 2, the code a shell reads for a process stopped by SIGINT. A normal exit, not a death by
     # the signal as Python gives a Ctrl-C it leaves uncaught: under uv run, uv exits with 130 itself
-    # (seen on 2026-10-28, #352). kb serve-data and kb serve-ai, once started, exit with 0: uvicorn.run
+    # (seen on 2026-10-28, #352). kb serve-data, kb serve-ai and kb serve-web, once started, exit with
+    # 0: uvicorn.run
     # swallows the KeyboardInterrupt (uvicorn/main.py); during their start, with 130, 3 or 0.
     STOPPED_BY_SIGINT = (
         130,
@@ -66,7 +70,8 @@ class ExitCode(IntEnum):
             " by SIGINT, no database left"
         ),
     )
-    # 128 + 15, the code of a process stopped by SIGTERM. kb serve-data and kb serve-ai exit with it
+    # 128 + 15, the code of a process stopped by SIGTERM. kb serve-data, kb serve-ai and kb serve-web
+    # exit with it
     # through uvicorn, which sends the signal again once stopped (uvicorn/server.py): a shell
     # reads 143, a parent process -15.
     STOPPED_BY_SIGTERM = (
@@ -75,7 +80,7 @@ class ExitCode(IntEnum):
             "kb collect, kb import, kb purge, kb write-tops, kb digest, kb trend-report,"
             " kb smoke-test, kb daily-routine, kb digest-watch, kb download-watch-sheets: stopped by"
             " SIGTERM, no further step run; what was"
-            " done before it is kept; kb serve-data, kb serve-ai:"
+            " done before it is kept; kb serve-data, kb serve-ai, kb serve-web:"
             " stopped by SIGTERM, outside PID 1"
         ),
     )

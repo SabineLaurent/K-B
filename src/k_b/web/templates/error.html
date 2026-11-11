@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Demande non servie{% endblock %}
+{% block main_class %}error-page{% endblock %}
+{% block content %}
+<div class="error-text">
+<p class="error-code">Erreur {{ status_code }}</p>
+<h1>Demande non servie</h1>
+<p class="error-explanation">K-B ne sert pas cette demande à cette adresse.</p>
+<div class="error-actions">
+<a class="button" href="/"><span aria-hidden="true">←</span> Retour au fil de veille</a>
+</div>
+</div>
+{% endblock %}

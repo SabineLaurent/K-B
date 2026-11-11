@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Accessibilité{% endblock %}
+{% block main_class %}page prose{% endblock %}
+{% block content %}
+<h1>Accessibilité</h1>
+<h2>État de conformité</h2>
+<p>Non conforme : aucun audit RGAA n’a été mené, et sans audit le RGAA ne permet pas d’autre état.</p>
+<h2>Référentiel visé</h2>
+<p>RGAA 4.1.2, qui reprend les critères des niveaux A et AA des WCAG 2.1.</p>
+<h2>Ce que les tests vérifient</h2>
+<ul>
+<li>la langue de chaque page et le titre propre à chacune ;</li>
+<li>un seul titre de niveau 1 par page, et des titres sans niveau sauté ;</li>
+<li>les zones de la page : en-tête, navigation, contenu, pied de page ;</li>
+<li>le lien « Aller au contenu », premier de chaque page ;</li>
+<li>le lien de la page courante, signalé autrement que par la couleur ;</li>
+<li>les images décoratives, ignorées des technologies d’assistance ;</li>
+<li>les contrastes des couleurs de la charte, et l’anneau de focus visible au clavier ;</li>
+<li>l’absence de script : le site fonctionne sans JavaScript.</li>
+</ul>
+<h2>Limites connues</h2>
+<ul>
+<li>Aucun outil ne valide le code des pages : sa validité se contrôle à la main.</li>
+<li>Le zoom à 200 %, l’affichage sur 320 pixels de large, l’espacement du texte, la navigation au clavier et la lecture par un lecteur d’écran se contrôlent à la main.</li>
+</ul>
+{% endblock %}
