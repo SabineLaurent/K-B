@@ -1564,10 +1564,13 @@ Puis, dans l'ordre :
   (microsoft/azure-container-apps #531, 2022-12-20), mais « non pris en charge » ne veut pas dire « bloqué » ; et
   les apps d'un environnement partagent le même réseau (Architecture Center, « Container Apps » multitenant, mise à
   jour le 2026-10-13). Ni démontré, ni exclu. Il faut d'abord exécuter du code dans une autre pièce de K-B, et
-  l'attaquant n'y gagne que ce que lit la clé `WEB`, que `ca-kb-data-api` tient déjà.
+  l'attaquant n'y gagne que ce que lit la clé `WEB`, que `ca-kb-data-api` tient déjà. **Risque accepté par Sabine le
+  2026-11-11.**
   Pour réduire le risque : une lecture du site à chaque Deploy, avec le `curl` à l'en-tête forgé, est une issue à
-  ouvrir après #571 (faisable, du workflow seulement) ; un environnement à part pour le site couperait le réseau
-  commun (faisable avec nos droits, non retenu pour le 13/11).
+  ouvrir après #571 (faisable, du workflow seulement) ; vérifier dans le site le jeton signé par Entra au lieu de
+  l'en-tête d'identité, ce qui ne se forge pas sans la clé d'Entra (issue à ouvrir après l'oral blanc, demandée par
+  Sabine ; une dépendance de plus, sur son accord) ; un environnement à part pour le site couperait le réseau commun
+  (faisable avec nos droits, non retenu pour le 13/11).
 - **Des droits posés avant leur code** (consigne de time-knight du 2026-11-11). Le rôle de lecture sur `watch`,
   `KB_EXCHANGE_BLOB_URL`, `KB_DATA_API_URL` et la clé `WEB` existent avant que l'API de données et le site les lisent
   (#559 à #561, #563). Pourquoi : éviter une seconde passe avant le fil. Pour réduire le risque : ils restent sans
