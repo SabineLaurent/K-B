@@ -78,10 +78,16 @@ Chaque règle dit quoi faire et où elle s'arrête. En cas de conflit :
   paramétrées.
 
 ### Pratiques à jour
-- Avant d'écrire du code qui utilise une bibliothèque : **Context7**. Ne pas se fier à sa mémoire.
+- Avant d'écrire du code qui utilise une bibliothèque : **Context7** et **recherche web** (Sabine,
+  2026-11-11). Ne pas se fier à sa mémoire.
 - Pour ce que Context7 ne couvre pas (actions GitHub, CLI, API métier, pratique courante) :
   **recherche web**, source et date à l'appui. Une version d'action se vérifie sur les tags de
   son dépôt.
+- **Avant d'introduire un élément externe** (dépendance, service, outil, image, action) : le vérifier
+  par **Context7** (documentation à jour, API actuelle, réglages sûrs) **et** par **recherche web**
+  (dernière version, maintenance, failles connues sur OSV ou GHSA, alternative de référence), sources
+  et date citées dans le plan ou la PR (Sabine, 2026-11-11). Le 2026-11-11, cette vérification a
+  trouvé que le réglage par défaut d'une bibliothèque de rendu Markdown laissait passer le HTML brut.
 - Signaler une API dépréciée plutôt que l'utiliser.
 
 ### Avant de déclarer un travail fini
