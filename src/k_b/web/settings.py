@@ -56,27 +56,41 @@ def read_web_settings_or_refusal(environ: Mapping[str, str]) -> WebSettings | st
         find_host_refusal(WEB_HOST_VARIABLE, host)
         or find_port_refusal(WEB_PORT_VARIABLE, port)
         or find_allowed_hosts_refusal(WEB_ALLOWED_HOSTS_VARIABLE, allowed_hosts)
-        or find_access_refusal(environ, host)
     )
     if refusal is not None:
         return refusal
+    access = read_access_or_refusal(environ, host)
+    if isinstance(access, str):
+        return access
     return WebSettings(
         host=host,
         port=int(port),
         allowed_hosts=allowed_hosts,
-        operator_id=read_operator_id(environ),
+        operator_id=access.operator_id,
     )
 
 
-def find_access_refusal(environ: Mapping[str, str], host: str) -> str | None:
-    """Why the access of KB_WEB_AUTH is refused on this host, or None; host is an IPv4 address."""
+@dataclass(frozen=True)
+class OperatorAccess:
+    # In lowercase; None under KB_WEB_AUTH=off: no header checked.
+    operator_id: str | None
+
+
+def read_access_or_refusal(
+    environ: Mapping[str, str], host: str
+) -> OperatorAccess | str:
+    """The access KB_WEB_AUTH sets, read once, or why it is refused on this host, an IPv4
+    address."""
     auth = environ.get(WEB_AUTH_VARIABLE, ENTRA_AUTH)
     is_loopback = ipaddress.IPv4Address(host).is_loopback
     is_in_container_apps = bool(environ.get(CONTAINER_APP_NAME_VARIABLE))
     if auth == OFF_AUTH:
-        return find_off_refusal(host, is_loopback, is_in_container_apps)
+        refusal = find_off_refusal(host, is_loopback, is_in_container_apps)
+        return OperatorAccess(operator_id=None) if refusal is None else refusal
     if auth == ENTRA_AUTH:
-        return find_entra_refusal(environ, host, is_loopback, is_in_container_apps)
+        return read_entra_access_or_refusal(
+            environ, host, is_loopback, is_in_container_apps
+        )
     return (
         f"{WEB_AUTH_VARIABLE}: {quote_value(auth)} neither {ENTRA_AUTH} nor {OFF_AUTH}"
     )
@@ -99,11 +113,12 @@ def find_off_refusal(
     return None
 
 
-def find_entra_refusal(
+def read_entra_access_or_refusal(
     environ: Mapping[str, str], host: str, is_loopback: bool, is_in_container_apps: bool
-) -> str | None:
-    """Why the check is refused: the object id is a GUID, never quoted; outside the machine, only
-    Azure Container Apps keeps a client from sending the header itself."""
+) -> OperatorAccess | str:
+    """The object id of the operator in lowercase, or why the check is refused: a GUID, never
+    quoted; outside the machine, only Azure Container Apps keeps a client from sending the header
+    itself."""
     operator_id = environ.get(WEB_OPERATOR_ID_VARIABLE)
     if not operator_id:
         return f"{WEB_OPERATOR_ID_VARIABLE}: not set"
@@ -115,11 +130,4 @@ def find_entra_refusal(
             f" Container Apps ({CONTAINER_APP_NAME_VARIABLE} not set): any device of the network"
             " could send the header of the operator"
         )
-    return None
-
-
-def read_operator_id(environ: Mapping[str, str]) -> str | None:
-    """The object id of the operator in lowercase, once its setting is checked; None under off."""
-    if environ.get(WEB_AUTH_VARIABLE, ENTRA_AUTH) == OFF_AUTH:
-        return None
-    return environ[WEB_OPERATOR_ID_VARIABLE].lower()
+    return OperatorAccess(operator_id=operator_id.lower())

@@ -37,14 +37,15 @@ def create_app(
         telemetry=NATIVE_TELEMETRY_OFF,
     )
     app.state.operator_id = operator_id
-    # The last added is the outermost: the request id first, then the headers of every answer,
-    # the 500 included, then the host and the operator checked before any page.
-    app.add_middleware(GZipMiddleware)
+    # The last added is the outermost: the compression of every answer, the error pages included,
+    # then the request id, the headers of every answer, the 500, and the host and the operator
+    # checked before any page.
     app.middleware("http")(check_operator)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(allowed_hosts))
     app.middleware("http")(respond_to_unexpected_error)
     app.middleware("http")(add_response_headers)
     app.middleware("http")(log_request)
+    app.add_middleware(GZipMiddleware)
     app.include_router(page_router)
     # By the package, never by a path: the image holds the wheel, not src/.
     app.mount(STATIC_PATH, StaticFiles(packages=[("k_b.web", "static")]), name="static")

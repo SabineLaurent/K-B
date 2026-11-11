@@ -1,18 +1,15 @@
 """The errors of the site, each an HTML page: 403, 404, 500 and the others, never with the text of
 an exception nor a value received (docs/site-web.md, "Erreurs")."""
 
-import logging
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 
 from fastapi import Request, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from k_b.core.api_errors import INTERNAL_ERROR, ErrorHandlers
+from k_b.core.api_errors import ErrorHandlers, log_unexpected_error
 from k_b.core.api_request_log import read_request_id
 from k_b.web.rendering import render_page
-
-logger = logging.getLogger(__name__)
 
 ERROR_TEMPLATES = {403: "403.html", 404: "404.html", 500: "500.html"}
 # Any other status: a page that gives its code.
@@ -55,12 +52,7 @@ async def respond_to_unexpected_error(
     try:
         return await call_next(request)
     except Exception as error:  # noqa: BLE001 — every exception no handler takes
-        logger.error(
-            "%s: %s request_id=%s",
-            INTERNAL_ERROR,
-            type(error).__name__,
-            read_request_id(request),
-        )
+        log_unexpected_error(request, error)
         return render_error_page(request, 500)
 
 

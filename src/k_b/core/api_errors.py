@@ -138,13 +138,20 @@ async def respond_to_unexpected_error(
     try:
         return await call_next(request)
     except Exception as error:  # noqa: BLE001 — every exception no handler takes
-        logger.error(
-            "%s: %s request_id=%s",
-            INTERNAL_ERROR,
-            type(error).__name__,
-            read_request_id(request),
-        )
+        log_unexpected_error(request, error)
         return respond_with_error(500, INTERNAL_ERROR)
+
+
+def log_unexpected_error(request: Request, error: Exception) -> None:
+    """An exception no handler takes, logged by its type and the id of its request, for both APIs
+    and the site (web/errors.py): never its message nor its stack, which may quote a value
+    received."""
+    logger.error(
+        "%s: %s request_id=%s",
+        INTERNAL_ERROR,
+        type(error).__name__,
+        read_request_id(request),
+    )
 
 
 # Given to FastAPI(exception_handlers=...), whose type takes a handler of one exception class.

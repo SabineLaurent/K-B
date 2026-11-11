@@ -40,6 +40,7 @@ KB_SETTINGS_VARIABLES = (
     "KB_WEB_ALLOWED_HOSTS",
     "KB_WEB_AUTH",
     "KB_WEB_OPERATOR_ID",
+    "CONTAINER_APP_NAME",
 )
 # The marker of the tests that run kb on the real sources (tests/e2e/).
 E2E_MARKER = "e2e"

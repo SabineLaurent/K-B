@@ -163,3 +163,13 @@ def test_the_templates_escape_every_value_and_refuse_an_undefined_one():
     assert templates.env.autoescape is True
     assert templates.env.undefined is StrictUndefined
     assert templates.env.from_string("{{ value }}").render(value="<b>") == "&lt;b&gt;"
+
+
+def test_an_error_page_is_compressed_too(client):
+    """The page 403 and the page 404 hold an illustration: as large as a page, compressed too."""
+    for headers in ({}, OPERATOR_HEADERS):
+        response = client.get(
+            "/no-such-page", headers={**headers, "Accept-Encoding": "gzip"}
+        )
+
+        assert response.headers["Content-Encoding"] == "gzip"

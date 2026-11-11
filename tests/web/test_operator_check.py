@@ -100,3 +100,20 @@ def test_with_the_check_a_page_offers_to_sign_out():
     assert (
         'href="/.auth/logout"' in make_client().get("/", headers=OPERATOR_HEADERS).text
     )
+
+
+@pytest.mark.parametrize("operator_id", [OPERATOR_ID, ANOTHER_ID])
+def test_no_identity_header_reaches_the_log_or_a_page(client, caplog, operator_id):
+    """Azure Container Apps also sends the name the person signed in with, a personal datum."""
+    name = "operator@example.org"
+    headers = {OPERATOR_HEADER: operator_id, "X-MS-CLIENT-PRINCIPAL-NAME": name}
+    with caplog.at_level(logging.INFO, logger="k_b"):
+        responses = [
+            client.get(path, headers=headers) for path in ("/", "/no-such-page")
+        ]
+
+    assert not any(name in response.text for response in responses)
+    assert not any(
+        name in record.getMessage() or operator_id in record.getMessage()
+        for record in caplog.records
+    )

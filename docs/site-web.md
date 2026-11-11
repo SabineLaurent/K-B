@@ -71,11 +71,14 @@ Il n'y a pas de cache côté serveur : avec une seule lectrice, le cache de son 
 - Une erreur et `/health` : `no-store`.
 - `/static` : `no-cache`, revalidé par son ETag à chaque page.
 
-Une réponse de plus de 500 octets est compressée en gzip si le navigateur l'accepte.
+Une réponse de plus de 500 octets, page d'erreur comprise, est compressée en gzip si le navigateur
+l'accepte.
 
 ## Erreurs
 
-Chaque erreur rend une page HTML : 403, 404, 500, et une page qui donne le code pour les autres (405). Une
+Chaque erreur rend une page HTML : 403, 404, 500, et une page qui donne le code pour les autres (405).
+Une exception : une requête dont le `Host` n'est pas dans `KB_WEB_ALLOWED_HOSTS` reçoit le 400 en texte
+brut de `TrustedHostMiddleware`, avant le site ; il ne vise qu'une sonde ou un réglage faux. Une
 exception imprévue rend la page 500, avec l'heure UTC et l'identifiant de la demande (`X-Request-ID`). Le
 journal en écrit le type, `internal_error: <Type> request_id=…`, jamais le message ni la pile. Le lien
 « Réessayer » pointe vers la page elle-même (`href=""`), jamais vers un chemin reçu.
