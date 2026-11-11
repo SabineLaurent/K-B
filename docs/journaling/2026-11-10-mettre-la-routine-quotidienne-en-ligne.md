@@ -171,7 +171,7 @@ On a ainsi éprouvé l'écriture « une fois » sur un vrai partage SMB, entre d
 | Exécution `y14t4m5` : code 4 deux fois, `temporary_file_found` pour `most_forked`, `most_starred` écrite, statut `Failed` | L'écriture « une fois » de #295 sur `job-data`, et la reprise du job |
 | Exécution `vm5kiy7` : `Succeeded`, code 0 ; `most_starred` en `sheet_exists`, même etag (`0x8DF3F3CF48EDCC5`) | Une fiche écrite n'est jamais réécrite, même par une autre exécution |
 | `gh_archive` : 6 fenêtres, 60 Mo, 288 lignes | La clé BigQuery est lisible par l'utilisateur 10001 |
-| À venir : l'exécution du cron, le 11/11 à 08:00 UTC | Le critère de fin de l'issue |
+| Exécution `29906400` du cron, le 11/11 de 08:00:00 à 08:01:28 UTC : `Succeeded` ; 5 étapes sorties en 0, routine en 56 s ; 16 sources collectées en 41 s ; `gh_archive` : 1 fenêtre, 17,5 Mo, 50 lignes ; import : 8 bruts lus, 0 rejet ; fiches des tops du 11/11 écrites, 2 envoyées à `watch`, 2 déjà présentes | Le critère de fin de l'issue : le cron lance seul la routine, qui collecte, importe et publie |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -196,7 +196,6 @@ On a ainsi éprouvé l'écriture « une fois » sur un vrai partage SMB, entre d
 
 ## Zones non vérifiées
 
-- **L'exécution du cron elle-même**, le 11/11 à 08:00 UTC : elle reste à constater, c'est le critère de fin.
 - **Un secret renouvelé** : qu'une exécution lancée plus de 30 minutes après lise la nouvelle version n'est pas
   vérifié. Ce sera fait à la première rotation.
 - **Le délai qui borne la reprise** : il est lu dans Microsoft Learn, mais pas observé, aucune exécution n'ayant
@@ -212,14 +211,12 @@ On a ainsi éprouvé l'écriture « une fois » sur un vrai partage SMB, entre d
 
 ## Ce qui reste
 
-- **La PR** s'ouvre après l'exécution du cron du 11/11.
 - **Le tag suivant** apporte `kb purge` comme étape à part en ligne (6 étapes). Il ne demande rien au Bicep : la
   purge est une étape de `kb daily-routine`. D'ici là, l'image `v0.1.1` purge dans `kb import`, en 5 étapes.
 - **#423** : les comptes rendus de veille et des tendances en ligne, dans un job à part, à 10:00 UTC le lundi et le
   jeudi.
 - **#426** : tenir deux exécutions à l'écart l'une de l'autre.
-- **#424** : le téléchargement des fiches vers le Mac (piste A) ; **#542** : l'envoi des clips et de Zotero ;
-  **#425** : la copie de Zotero en ligne.
+- **#542** : l'envoi des clips et de Zotero ; **#425** : la copie de Zotero en ligne.
 - **Trois issues en Backlog**, créées à la PR : le retrait d'un temporaire orphelin, l'alerte sur une exécution
   `Failed`, et la factorisation des variables d'environnement des modules Bicep.
 - **Un instantané de `job-data`** avant chaque mise en production, dès le tag suivant.
