@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from functools import partial
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from k_b.etl.raw_store import RawStore
 from k_b.etl.sources.github import most_forked as github_most_forked
 from k_b.etl.sources.github import most_starred as github_most_starred
 from k_b.etl.tops import Top
+from k_b.items import MAX_TOP_DESCRIPTION_CHARS, TopProduction
 from k_b.jobs.watch_download import find_sheet_text_refusal
 from k_b.post import top_sheets, vault_files
 from k_b.post.top_sheets import TopSheetsOutcome, write_top_sheets
@@ -60,6 +62,14 @@ def find_sheet(vault_dir, top, day):
     return vault_dir / "veille" / "tops" / top.name / f"{day}.md"
 
 
+def find_twin(vault_dir, top, day):
+    return vault_dir / "veille" / "tops" / top.name / f"{day}.json"
+
+
+def read_twin(vault_dir, top, day):
+    return json.loads(find_twin(vault_dir, top, day).read_bytes())
+
+
 def list_files(directory):
     return sorted(
         path.relative_to(directory).as_posix()
@@ -86,7 +96,11 @@ def test_a_ranking_gives_the_sheet_of_its_day_by_rank(data_dir, vault_dir):
     outcome = write_top_sheets(RawStore(data_dir), vault_dir, FORKED_TOP)
 
     assert outcome == TopSheetsOutcome(
-        written_count=1, skipped_count=0, deleted_count=0, unreadable_count=0
+        written_count=1,
+        twins_written_count=1,
+        skipped_count=0,
+        deleted_count=0,
+        unreadable_count=0,
     )
     assert find_sheet(vault_dir, FORKED_TOP, "2026-10-05").read_text("utf-8") == (
         "---\n"
@@ -167,11 +181,18 @@ def test_each_day_of_collection_gets_its_sheet_and_the_older_rankings_are_delete
     outcome = write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
 
     assert outcome == TopSheetsOutcome(
-        written_count=3, skipped_count=0, deleted_count=2, unreadable_count=0
+        written_count=3,
+        twins_written_count=3,
+        skipped_count=0,
+        deleted_count=2,
+        unreadable_count=0,
     )
     assert list_files(vault_dir) == [
+        "veille/tops/most_starred/2026-10-05.json",
         "veille/tops/most_starred/2026-10-05.md",
+        "veille/tops/most_starred/2026-10-06.json",
         "veille/tops/most_starred/2026-10-06.md",
+        "veille/tops/most_starred/2026-10-12.json",
         "veille/tops/most_starred/2026-10-12.md",
     ]
     assert (older.exists(), middle.exists(), last.exists()) == (False, False, True)
@@ -189,11 +210,20 @@ def test_two_rankings_of_a_day_give_one_sheet_the_one_of_the_first(data_dir, vau
     outcome = write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
 
     assert outcome == TopSheetsOutcome(
-        written_count=1, skipped_count=1, deleted_count=1, unreadable_count=0
+        written_count=1,
+        twins_written_count=1,
+        skipped_count=1,
+        deleted_count=1,
+        unreadable_count=0,
     )
     sheet = find_sheet(vault_dir, STARRED_TOP, "2026-10-05").read_text("utf-8")
     assert "collected_at: 2026-10-05T09:30:00Z" in sheet
     assert "| 551156 |" in sheet
+    twin = read_twin(vault_dir, STARRED_TOP, "2026-10-05")
+    assert (twin["collected_at"], twin["repositories"][0]["count"]) == (
+        "2026-10-05T09:30:00Z",
+        551156,
+    )
     assert (first.exists(), second.exists()) == (False, True)
 
 
@@ -217,10 +247,17 @@ def test_a_last_ranking_unreadable_keeps_the_last_readable_one(data_dir, vault_d
     outcome = write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
 
     assert outcome == TopSheetsOutcome(
-        written_count=1, skipped_count=0, deleted_count=0, unreadable_count=1
+        written_count=1,
+        twins_written_count=1,
+        skipped_count=0,
+        deleted_count=0,
+        unreadable_count=1,
     )
     assert (readable.exists(), unreadable.exists()) == (True, True)
-    assert list_files(vault_dir) == ["veille/tops/most_starred/2026-10-05.md"]
+    assert list_files(vault_dir) == [
+        "veille/tops/most_starred/2026-10-05.json",
+        "veille/tops/most_starred/2026-10-05.md",
+    ]
 
 
 def test_a_second_ranking_of_a_day_unreadable_is_read_and_kept(data_dir, vault_dir):
@@ -233,7 +270,11 @@ def test_a_second_ranking_of_a_day_unreadable_is_read_and_kept(data_dir, vault_d
     outcome = write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
 
     assert outcome == TopSheetsOutcome(
-        written_count=0, skipped_count=1, deleted_count=0, unreadable_count=1
+        written_count=0,
+        twins_written_count=0,
+        skipped_count=1,
+        deleted_count=0,
+        unreadable_count=1,
     )
     assert (readable.exists(), unreadable.exists()) == (True, True)
 
@@ -296,7 +337,7 @@ def test_a_ranking_written_after_the_folder_is_read_is_neither_read_nor_deleted(
 def test_no_ranking_gives_no_sheet(data_dir, vault_dir):
     outcome = write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
 
-    assert outcome == TopSheetsOutcome(0, 0, 0, 0)
+    assert outcome == TopSheetsOutcome(0, 0, 0, 0, 0)
     assert list_files(vault_dir) == []
 
 
@@ -335,6 +376,7 @@ def test_no_value_of_github_enters_the_path_of_a_sheet(data_dir, vault_dir):
 
     assert list_files(vault_dir.parent) == [
         "data/raw/automated_watch/github_most_starred/2026-10-05T093000Z.json",
+        "vault/veille/tops/most_starred/2026-10-05.json",
         "vault/veille/tops/most_starred/2026-10-05.md",
     ]
 
@@ -448,9 +490,12 @@ def test_a_sheet_that_is_a_symbolic_link_refuses_its_top_before_any_sheet_is_wri
     ("replaced_after_day", "written_days"),
     [
         # Before the second sheet: write_sheet checks its folders again.
-        ("2026-10-05", ["2026-10-05.md"]),
+        ("2026-10-05", ["2026-10-05.json", "2026-10-05.md"]),
         # After the last sheet: the folders are checked again before the deletion.
-        ("2026-10-06", ["2026-10-05.md", "2026-10-06.md"]),
+        (
+            "2026-10-06",
+            ["2026-10-05.json", "2026-10-05.md", "2026-10-06.json", "2026-10-06.md"],
+        ),
     ],
 )
 def test_a_folder_replaced_by_a_link_while_the_sheets_are_written_deletes_no_ranking(
@@ -464,7 +509,7 @@ def test_a_folder_replaced_by_a_link_while_the_sheets_are_written_deletes_no_ran
 
     def write_then_replace_the_folder(path, content, **options):
         write_file_atomically(path, content, **options)
-        if path.name == f"{replaced_after_day}.md":
+        if path.name == f"{replaced_after_day}.json":
             sheets_dir.rename(moved)
             sheets_dir.symlink_to(moved, target_is_directory=True)
 
@@ -487,9 +532,19 @@ def test_a_folder_replaced_by_a_link_while_the_sheets_are_written_deletes_no_ran
     [
         # During the loop: the sheet of 2026-10-06 becomes a link before it is written; the
         # top stops there, the sheet of 2026-10-07 is not written.
-        ("2026-10-05.md", "2026-10-06.md", ["2026-10-05.md"]),
+        ("2026-10-05.json", "2026-10-06.md", ["2026-10-05.json", "2026-10-05.md"]),
         # After the loop: the sheet of 2026-10-05, which justifies its deletion, becomes a link.
-        ("2026-10-07.md", "2026-10-05.md", ["2026-10-06.md", "2026-10-07.md"]),
+        (
+            "2026-10-07.json",
+            "2026-10-05.md",
+            [
+                "2026-10-05.json",
+                "2026-10-06.json",
+                "2026-10-06.md",
+                "2026-10-07.json",
+                "2026-10-07.md",
+            ],
+        ),
     ],
 )
 def test_a_sheet_replaced_by_a_link_while_the_sheets_are_written_deletes_no_ranking(
@@ -617,3 +672,226 @@ def test_a_top_sheet_of_a_trapped_description_passes_the_check_of_the_download(
 
     sheet = find_sheet(vault_dir, STARRED_TOP, "2026-10-05").read_bytes()
     assert find_sheet_text_refusal(sheet) is None
+
+
+def test_a_ranking_gives_the_twin_of_its_sheet_that_its_schema_reads_again(
+    data_dir, vault_dir
+):
+    write_ranking(data_dir, FORKED_TOP, "2026-10-05T093000Z")
+
+    write_top_sheets(RawStore(data_dir), vault_dir, FORKED_TOP)
+
+    twin = find_twin(vault_dir, FORKED_TOP, "2026-10-05").read_bytes()
+    assert json.loads(twin) == {
+        "top": "most_forked",
+        "collected_at": "2026-10-05T09:30:00Z",
+        "repositories": [
+            {
+                "rank": 1,
+                "repository_name": "firstcontributions/first-contributions",
+                "url": "https://github.com/firstcontributions/first-contributions",
+                "description": "🚀✨ Help beginners to contribute to open source projects",
+                "description_truncated": False,
+                "count": 111263,
+            },
+            {
+                "rank": 2,
+                "repository_name": "ultraworkers/claw-code",
+                "url": "https://github.com/ultraworkers/claw-code",
+                "description": "An agent-managed museum exhibit, built in Rust with Gajae-Code"
+                " / LazyCodex — developed and maintained with no human intervention.",
+                "description_truncated": False,
+                "count": 107886,
+            },
+            {
+                "rank": 3,
+                "repository_name": "TheOdinProject/css-exercises",
+                "url": "https://github.com/TheOdinProject/css-exercises",
+                "description": None,
+                "description_truncated": False,
+                "count": 94375,
+            },
+        ],
+    }
+    assert TopProduction.model_validate_json(twin).top == "most_forked"
+
+
+def test_a_sheet_written_before_its_twin_gets_it_and_is_never_rewritten(
+    data_dir, vault_dir
+):
+    """The last ranking still in raw/ gains its twin at the first run that writes twins."""
+    write_ranking(data_dir, STARRED_TOP, "2026-10-05T093000Z")
+    sheet = find_sheet(vault_dir, STARRED_TOP, "2026-10-05")
+    sheet.parent.mkdir(parents=True)
+    sheet.write_bytes(b"written before the twins\n")
+
+    outcome = write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
+
+    assert outcome == TopSheetsOutcome(
+        written_count=0,
+        twins_written_count=1,
+        skipped_count=1,
+        deleted_count=0,
+        unreadable_count=0,
+    )
+    assert sheet.read_bytes() == b"written before the twins\n"
+    assert read_twin(vault_dir, STARRED_TOP, "2026-10-05")["top"] == "most_starred"
+
+
+def test_a_twin_that_exists_is_never_rewritten(data_dir, vault_dir):
+    write_ranking(data_dir, STARRED_TOP, "2026-10-05T093000Z")
+    twin = find_twin(vault_dir, STARRED_TOP, "2026-10-05")
+    twin.parent.mkdir(parents=True)
+    twin.write_bytes(b"{}")
+
+    outcome = write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
+
+    assert (outcome.written_count, outcome.twins_written_count) == (1, 0)
+    assert twin.read_bytes() == b"{}"
+
+
+def test_the_description_of_a_twin_is_visible_on_one_line_and_kept_as_text(
+    data_dir, vault_dir
+):
+    """Each control, format character but U+200D, and lone surrogate becomes a space; the
+    Markdown of the sheet is not escaped: the site shows a text, never Markdown."""
+    hidden = chr(0x202E) + chr(0xFEFF) + chr(0x00AD) + chr(0xD800) + chr(0x0007)
+    joined = "👩" + chr(0x200D) + "💻"
+    write_ranking(
+        data_dir,
+        STARRED_TOP,
+        "2026-10-05T093000Z",
+        response_with(
+            STARRED_RESPONSE,
+            description=f"x |\n---\t# <b>bold</b>{hidden}rtl {joined} &rlm; \\ ",
+        ),
+    )
+
+    write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
+
+    repository = read_twin(vault_dir, STARRED_TOP, "2026-10-05")["repositories"][0]
+    assert repository["description"] == f"x | --- # <b>bold</b> rtl {joined} &rlm; \\"
+    assert repository["description_truncated"] is False
+
+
+@pytest.mark.parametrize(
+    ("length", "is_truncated"),
+    [(MAX_TOP_DESCRIPTION_CHARS, False), (MAX_TOP_DESCRIPTION_CHARS + 1, True)],
+)
+def test_a_description_longer_than_its_bound_is_cut_and_the_twin_says_so(
+    data_dir, vault_dir, length, is_truncated
+):
+    write_ranking(
+        data_dir,
+        STARRED_TOP,
+        "2026-10-05T093000Z",
+        response_with(STARRED_RESPONSE, description="é" * length),
+    )
+
+    write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
+
+    repositories = read_twin(vault_dir, STARRED_TOP, "2026-10-05")["repositories"]
+    assert repositories[0]["description"] == "é" * MAX_TOP_DESCRIPTION_CHARS
+    assert [repository["description_truncated"] for repository in repositories] == [
+        is_truncated,
+        False,
+        False,
+    ]
+
+
+@pytest.mark.parametrize(
+    ("changes", "spotted"),
+    [
+        pytest.param({"stargazers_count": -987654}, "987654", id="count negative"),
+        pytest.param(
+            {"stargazers_count": 2**63 + 987654}, "987654", id="count beyond 64 bits"
+        ),
+        pytest.param(
+            {"full_name": "spotted/" + "b" * 300, "html_url": "https://github.com/a/b"},
+            "spotted",
+            id="name too long",
+        ),
+    ],
+)
+def test_a_ranking_whose_twin_its_schema_refuses_is_kept_without_its_values(
+    data_dir, vault_dir, caplog, changes, spotted
+):
+    """The source reads what the schema of the twin refuses: the ranking is kept unread, without
+    a sheet nor a twin, and never deleted, whatever ranking comes after it."""
+    refused = write_ranking(
+        data_dir,
+        STARRED_TOP,
+        "2026-10-05T093000Z",
+        response_with(STARRED_RESPONSE, **changes),
+    )
+    middle = write_ranking(data_dir, STARRED_TOP, "2026-10-06T093000Z")
+    last = write_ranking(data_dir, STARRED_TOP, "2026-10-07T093000Z")
+
+    with caplog.at_level(logging.INFO, logger=top_sheets.__name__):
+        outcome = write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
+
+    assert outcome == TopSheetsOutcome(
+        written_count=2,
+        twins_written_count=2,
+        skipped_count=0,
+        deleted_count=1,
+        unreadable_count=1,
+    )
+    assert (refused.exists(), middle.exists(), last.exists()) == (True, False, True)
+    assert not find_sheet(vault_dir, STARRED_TOP, "2026-10-05").exists()
+    assert not find_twin(vault_dir, STARRED_TOP, "2026-10-05").exists()
+    assert re.search(
+        r"most_starred ranking of 2026-10-05: ranking_unreadable, kept: twin_refused:"
+        r" repositories\.0\.[a-z_]+ \([a-z_]+\)\n",
+        caplog.text,
+    )
+    assert spotted not in caplog.text
+
+
+def test_a_twin_that_is_a_symbolic_link_refuses_its_top_before_any_sheet_is_written(
+    data_dir, vault_dir, tmp_path
+):
+    older = write_ranking(data_dir, STARRED_TOP, "2026-10-05T093000Z")
+    last = write_ranking(data_dir, STARRED_TOP, "2026-10-06T093000Z")
+    outside = tmp_path / "outside.json"
+    twin = find_twin(vault_dir, STARRED_TOP, "2026-10-06")
+    twin.parent.mkdir(parents=True)
+    twin.symlink_to(outside)
+
+    with pytest.raises(
+        VaultEntryRefusedError,
+        match="^vault_link_refused: veille/tops/most_starred/2026-10-06.json is a symbolic"
+        " link$",
+    ):
+        write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
+
+    assert (older.exists(), last.exists()) == (True, True)
+    assert list_files(vault_dir) == []
+    assert not outside.exists()
+
+
+def test_a_twin_removed_before_the_deletion_refuses_its_top_and_deletes_no_ranking(
+    data_dir, vault_dir, monkeypatch
+):
+    rankings = [
+        write_ranking(data_dir, STARRED_TOP, f"2026-10-0{day}T093000Z")
+        for day in (5, 6)
+    ]
+    write_file_atomically = vault_files.write_file_atomically
+
+    def write_then_remove_the_first_twin(path, content, **options):
+        write_file_atomically(path, content, **options)
+        if path.name == "2026-10-06.json":
+            (path.parent / "2026-10-05.json").unlink()
+
+    monkeypatch.setattr(
+        vault_files, "write_file_atomically", write_then_remove_the_first_twin
+    )
+
+    with pytest.raises(
+        VaultEntryRefusedError,
+        match="^sheet_missing: veille/tops/most_starred/2026-10-05.json is not there$",
+    ):
+        write_top_sheets(RawStore(data_dir), vault_dir, STARRED_TOP)
+
+    assert all(ranking.exists() for ranking in rankings)

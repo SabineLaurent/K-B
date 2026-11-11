@@ -11,7 +11,11 @@ from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import PageRefusedError
 from k_b.etl.sources.github.api import get_from_github_api
 from k_b.etl.tops import TopEntry
-from k_b.items import is_repository_name, parse_aware_datetime
+from k_b.items import (
+    REPOSITORY_URL_PREFIX,
+    is_repository_name,
+    parse_aware_datetime,
+)
 
 # The name of its raw folders, written once: its instances and its kind use it.
 FOLDER_PREFIX = "github_most_starred"
@@ -41,8 +45,6 @@ class GithubMostStarredSource:
 
 
 # === TRANSFORM ===
-
-REPOSITORY_URL_PREFIX = "https://github.com/"
 
 
 @dataclass(frozen=True)

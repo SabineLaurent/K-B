@@ -1,6 +1,7 @@
 """The sheets of the container watch for the Mac: a blob is a sheet only by a closed list of names,
 <folder>/<day>.md under a folder kb writes, and its text holds no control and no Markdown that
-Obsidian would run or fetch; each is downloaded as listed.
+Obsidian would run or fetch; each is downloaded as listed. The twin of a sheet, which the data API
+reads, is left aside.
 
 Two identities of jobs write in watch: its names and its texts are inputs, never trusted. A name out
 of the list is never logged, its position in the listing instead (conventions.md, rule 3)."""
@@ -21,6 +22,7 @@ from k_b.core.config import (
     CHARACTER_REFERENCE,
     MAX_WATCH_LISTED_BLOBS,
     MAX_WATCH_SHEET_BYTES,
+    SHEET_TWIN_SUFFIX,
 )
 from k_b.exchange.storage import (
     ExchangeStorageError,
@@ -35,10 +37,12 @@ logger = logging.getLogger(__name__)
 # (models, tops/most_starred), then its day in ISO 8601. ASCII classes, not \w nor \d, which take the
 # letters and the digits of other scripts; matched whole (fullmatch), as $ would let a line feed end
 # it.
-SHEET_NAME = re.compile(
-    r"(?P<folder>[a-z_]{1,64}(?:/[a-z_]{1,64})?)"
-    r"/(?P<day>[0-9]{4}-[0-9]{2}-[0-9]{2})\.md"
+SHEET_STEM = (
+    r"(?P<folder>[a-z_]{1,64}(?:/[a-z_]{1,64})?)/(?P<day>[0-9]{4}-[0-9]{2}-[0-9]{2})"
 )
+SHEET_NAME = re.compile(SHEET_STEM + r"\.md")
+# The name of the twin of a sheet (#559): the same folder and day, in JSON.
+SHEET_TWIN_NAME = re.compile(SHEET_STEM + re.escape(SHEET_TWIN_SUFFIX))
 # The controls a sheet of kb holds: neutralize_text (post/vault_files.py) turns any other, and
 # each of BIDI_CONTROLS, into a space.
 SHEET_CONTROL_CHARACTERS = frozenset("\t\n")
@@ -49,8 +53,8 @@ CONTROL_CATEGORY = "Cc"
 NOT_ESCAPED = r"(?<!\\)(?:\\\\)*"
 
 # A blob named as a sheet, in a folder kb does not write, a subject or a top added or retired
-# since: left aside, not a failure.
-type LeftAsideReason = Literal["sheet_folder_unknown"]
+# since; or the twin of a sheet, for the data API: left aside, not a failure.
+type LeftAsideReason = Literal["sheet_folder_unknown", "sheet_twin"]
 # A blob that is not a sheet kb writes: never written, a failure at each run until it is removed.
 type SheetRefusal = Literal[
     "sheet_name_refused",
@@ -183,6 +187,9 @@ def read_listed_sheet(
     blob: BlobProperties, folders: frozenset[str], where: str, result: DownloadResult
 ) -> ListedSheet | None:
     """The sheet of the blob, or None when it is left aside or refused."""
+    if SHEET_TWIN_NAME.fullmatch(blob.name):
+        result.left_aside["sheet_twin"] += 1
+        return None
     sheet_name = read_sheet_name(blob.name)
     if sheet_name is None:
         refuse_blob(result, where, "sheet_name_refused")

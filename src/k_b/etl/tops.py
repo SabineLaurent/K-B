@@ -3,6 +3,8 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from k_b.items import TopName
+
 
 @dataclass(frozen=True)
 class TopEntry:
@@ -23,7 +25,7 @@ class Top:
     """A top ranking: the folder of its sheets under veille/tops/, the raw folder of its
     rankings, their reader, and the words of its sheet."""
 
-    name: str
+    name: TopName
     folder_key: str
     read_entries: Callable[[bytes], list[TopEntry]]
     count_heading: str

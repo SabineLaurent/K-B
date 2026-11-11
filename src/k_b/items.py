@@ -2,8 +2,9 @@
 and the words of a trend report; which source field goes where: docs/stockage.md."""
 
 import re
+import unicodedata
 from datetime import UTC, date, datetime, time
-from typing import Annotated, Literal, get_args
+from typing import Annotated, Literal, Self, get_args
 from urllib.parse import urlsplit
 
 from pydantic import (
@@ -17,7 +18,7 @@ from pydantic import (
     model_validator,
 )
 
-from k_b.core.config import GH_ARCHIVE_MAX_CATCH_UP_WINDOWS
+from k_b.core.config import GH_ARCHIVE_MAX_CATCH_UP_WINDOWS, GITHUB_RANKING_SIZE
 from k_b.core.quoting import quote_value
 
 # The sources of seed_sources.sql: a test keeps both lists equal.
@@ -43,6 +44,10 @@ SearchableMode = Literal["watch", "library"]
 # knownRansomwareCampaignUse of CISA KEV.
 RansomwareUse = Literal["Known", "Unknown"]
 
+# The top rankings of GitHub (etl/source_kinds.py, TOPS), each the folder of its sheets and their
+# twins under veille/tops/ (a test keeps both lists equal).
+TopName = Literal["most_starred", "most_forked"]
+
 # CVE_ID, GHSA_ID and REPOSITORY_NAME are written once, as text: each type anchors its own,
 # and the readers apply it with re.fullmatch. [0-9], not \d: \d matches any Unicode digit, which the GLOB of
 # schema.sql refuses.
@@ -64,6 +69,9 @@ ARXIV_ID = r"(?:[0-9]{4}\.[0-9]{4,5}|[a-z]+(?:-[a-z]+)?(?:\.[A-Z]{2})?/[0-9]{7})
 # arxiv.py and cisa_kev.py write the URL of the item, and database/reading.py the URL it lists.
 ARXIV_ABSTRACT_PAGE_URL = "https://arxiv.org/abs/"
 NVD_PAGE_URL = "https://nvd.nist.gov/vuln/detail/"
+# The page of a repository, followed by its owner/name: the sources of the tops build the URL of a
+# repository from its name, and the twin of a sheet of a top holds no other.
+REPOSITORY_URL_PREFIX = "https://github.com/"
 # The key Zotero gives a document or an annotation; the GLOB of schema.sql. Zotero's own
 # alphabet is narrower: this form refuses no key it gives.
 ZOTERO_KEY = r"[0-9A-Z]{8}"
@@ -79,6 +87,15 @@ TAG_MAX_LENGTH = 100
 # The most tags of an item: a bound on the statements one item writes (code.md, defense in
 # depth), not a rule of filing (decision of Sabine of 2026-10-19), not held by the base.
 TAG_MAX_COUNT = 30
+# The longest description of a repository in the twin of a sheet of a top, in characters: kb
+# write-tops cuts a longer one and says so (description_truncated), so that a top of 100 stays
+# under the 1 MB the site reads (MAX_WEB_DATA_API_BODY_BYTES).
+MAX_TOP_DESCRIPTION_CHARS = 1_000
+# The categories of the characters a reader does not see, or that hide or reorder what is around
+# them: the controls, the format characters, the lone surrogates.
+HIDDEN_CATEGORIES = frozenset({"Cc", "Cf", "Cs"})
+# The format character a text keeps: it joins the emojis.
+ZERO_WIDTH_JOINER = "\u200d"
 
 
 def is_repository_name(text: str) -> bool:
@@ -96,6 +113,22 @@ def check_day_form(day: object) -> object:
     if not isinstance(day, str) or not DAY_FORM.fullmatch(day):
         raise ValueError("not a day written YYYY-MM-DD")
     return day
+
+
+def check_is_repository_name(name: str) -> str:
+    """Refuse a name that is_repository_name refuses, saying its length only: it carries the
+    login of its owner."""
+    if not is_repository_name(name):
+        raise ValueError(f"not an owner/name: {len(name)} characters")
+    return name
+
+
+def read_written_datetime(moment: object) -> object:
+    """A date as kb writes it, ISO 8601 with its zone, or a datetime given in Python: left to
+    pydantic, the text "1760000000" would be a Unix time, even in a strict model."""
+    if isinstance(moment, datetime):
+        return moment
+    return parse_aware_datetime(moment, "date")
 
 
 def check_url_can_be_normalized(url: str) -> str:
@@ -121,6 +154,22 @@ def check_text_can_be_stored(text: str) -> str:
     their type."""
     if UNSTORABLE_CHARACTER.search(text):
         raise ValueError(f"text with a NUL or a lone surrogate: {len(text)} characters")
+    return text
+
+
+def is_hidden_character(character: str) -> bool:
+    """Whether a reader would not see the character, or would see the text around it reordered:
+    a control, a format character but ZERO_WIDTH_JOINER, a lone surrogate."""
+    return (
+        unicodedata.category(character) in HIDDEN_CATEGORIES
+        and character != ZERO_WIDTH_JOINER
+    )
+
+
+def check_text_is_visible(text: str) -> str:
+    """Refuse a text that holds a hidden character, saying its length only."""
+    if any(map(is_hidden_character, text)):
+        raise ValueError(f"text with a hidden character: {len(text)} characters")
     return text
 
 
@@ -202,6 +251,8 @@ NewsletterEdition = Annotated[
 ]
 ArxivId = Annotated[str, StringConstraints(pattern=f"^{ARXIV_ID}$")]
 ZoteroKey = Annotated[str, StringConstraints(pattern=f"^{ZOTERO_KEY}$")]
+# A text shown as text, on one line, without a character a reader would not see.
+VisibleText = Annotated[str, AfterValidator(check_text_is_visible)]
 # A tag of an imported .md, in its normalized form.
 Tag = Annotated[
     str,
@@ -602,3 +653,50 @@ def has_too_many_windows(first_window: date, last_window: date) -> bool:
     """Whether the daily windows from first_window to last_window exceed
     GH_ARCHIVE_MAX_CATCH_UP_WINDOWS, the most a trend report holds."""
     return (last_window - first_window).days >= GH_ARCHIVE_MAX_CATCH_UP_WINDOWS
+
+
+class TopRepository(BaseModel):
+    """A repository of a top, as the twin of its sheet holds it."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    rank: Annotated[int, Field(ge=1, le=GITHUB_RANKING_SIZE)]
+    repository_name: Annotated[
+        str,
+        Field(max_length=TREND_REPOSITORY_NAME_MAX_LENGTH),
+        AfterValidator(check_is_repository_name),
+    ]
+    url: str
+    description: (
+        Annotated[VisibleText, Field(max_length=MAX_TOP_DESCRIPTION_CHARS)] | None
+    )
+    # Whether kb write-tops cut the description at MAX_TOP_DESCRIPTION_CHARS.
+    description_truncated: bool
+    # Its stars or its forks, after the top.
+    count: Annotated[Int64, Field(ge=0)]
+
+    @model_validator(mode="after")
+    def check_url_is_built_from_the_name(self) -> Self:
+        """The URL of the repository, as the sources of the tops build it, and no other."""
+        if self.url != f"{REPOSITORY_URL_PREFIX}{self.repository_name}":
+            raise ValueError("url not built from repository_name")
+        return self
+
+
+class TopProduction(BaseModel):
+    """The twin of the sheet of a top of a day (#559): what kb write-tops writes beside the sheet,
+    in JSON, and what the data API reads again from watch."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    top: TopName
+    collected_at: Annotated[UtcDatetime, BeforeValidator(read_written_datetime)]
+    repositories: Annotated[list[TopRepository], Field(max_length=GITHUB_RANKING_SIZE)]
+
+    @model_validator(mode="after")
+    def check_ranks_follow_each_other(self) -> Self:
+        """The ranks from 1, in order, without a gap nor a repeat."""
+        ranks = [repository.rank for repository in self.repositories]
+        if ranks != list(range(1, len(ranks) + 1)):
+            raise ValueError("ranks not 1 to n in order")
+        return self

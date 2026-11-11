@@ -480,6 +480,10 @@ WATCH_DIR_NAME = "veille"
 # written in the folder of the sheets of the tops or of the trend reports (a test keeps it).
 TOPS_DIR_NAME = "tops"
 TRENDS_DIR_NAME = "tendances"
+# The suffix of the twin of a sheet, the same production in JSON beside it (#559): kb write-tops
+# writes one beside each sheet of a top, the data API reads it in watch, kb download-watch-sheets
+# leaves it aside.
+SHEET_TWIN_SUFFIX = ".json"
 
 # The format characters that reorder a line as it is displayed (Unicode bidirectional controls
 # and marks, UAX #9): neutralize_text (post/vault_files.py) turns each into a space, and kb
@@ -643,6 +647,7 @@ CLIP_MIRROR_CLOCK_SLACK = timedelta(seconds=5)
 # twice as long; assumed, not measured. A blob larger is refused.
 MAX_WATCH_SHEET_BYTES = 4_000_000
 # The blobs of watch listed by a download: a sheet is named by its folder and its day, one a day in
-# each of 12 folders today (9 subjects, 2 tops, tendances), about 4 years of them; beyond, the listing
-# stops and the download fails, the sheets listed copied (OWASP API4:2023).
+# each of 12 folders today (9 subjects, 2 tops, tendances), and the twin of each sheet of a top: 14 a
+# day, about 4 years of them; beyond, the listing stops and the download fails, the sheets listed
+# copied (OWASP API4:2023).
 MAX_WATCH_LISTED_BLOBS = 20_000
