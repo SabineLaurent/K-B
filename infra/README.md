@@ -1514,9 +1514,11 @@ Puis :
   image et ses réglages, et peut-être sa connexion : les actions du rôle ne sont pas listées sur Learn, elles sont à
   lire par `az role definition list --name "Container Apps Contributor"`. Il pourrait donc rendre le site public, ou
   lire son secret client. Il n'y gagne aucune donnée : il tient déjà `ca-kb-data-api`.
+  Sans la connexion, un en-tête d'identité se forge, et le contrôle du code ne tient plus.
   Pour réduire le risque :
   - les rulesets des tags et l'environnement `production` (« Déployer une version ») ;
-  - le contrôle du code, qui refuse une requête sans l'en-tête.
+  - une alerte du journal d'activité, gratuite, sur `Microsoft.App/containerApps/authConfigs/write`, qui détecte sans
+    empêcher (faisable avec nos droits, non posée).
 - **Le coût d'un réveil sans connexion.** Le sidecar tourne dans la réplique : une requête sans connexion réveille
   donc le site. C'est une déduction, non vérifiée à la source. Un robot qui le tiendrait éveillé tout le mois
   coûterait environ 39 $ de plus.
