@@ -5,16 +5,16 @@ ressources (`modules/`). Les ressources portent l'étiquette `project=k-b` et so
 de ressources ; le budget, qui n'a ni étiquette ni région, compte les coûts de cette étiquette.
 
 `main.bicep` se déploie en **deux passes**. Sans `imageTag`, il pose le socle, dont le serveur PostgreSQL (#421). Avec
-`imageTag`, il ajoute les deux API, les deux jobs (`caj-kb-smoke-test`, `caj-kb-migrate-database`) et les rôles sur
-les secrets. Chaque passe repose le socle, le serveur et l'identité de `caj-kb-migrate-database` compris. Entre les
+`imageTag`, il ajoute les deux API, les jobs (`caj-kb-smoke-test`, `caj-kb-migrate-database`, `caj-kb-daily-routine`,
+`caj-kb-digest-watch`) et les rôles sur les secrets. Chaque passe repose le socle, le serveur et l'identité de `caj-kb-migrate-database` compris. Entre les
 deux passes, l'image est poussée dans le registre et les secrets sont posés dans le coffre (« Appliquer »).
 
 | Module | Ressource | Passe | Issue |
 |---|---|---|---|
 | `log-analytics.bicep` | espace Log Analytics `log-kb` : 30 jours de rétention, plafond de 0,2 Go par jour | 1 | #414 |
 | `container-apps-environment.bicep` | environnement Container Apps `cae-kb` : profil Consumption seul, sans VNet ; journaux vers `log-kb` par Azure Monitor, sans clé ; trafic chiffré entre les apps ; identité système, qui monte `job-data` | 1 | #411, #414, #420 |
-| `identities.bicep` | identités managées `id-kb-ai-api`, `id-kb-data-api`, `id-kb-smoke-test`, `id-kb-deploy` (le déploiement continu), `id-kb-daily-routine` et `id-kb-digest-watch` (les jobs à venir) | 1 | #414, #415, #420 |
-| `container-registry.bicep` | registre `crkb…` (ACR Basic), sans utilisateur admin ; AcrPull pour les trois identités | 1 | #414 |
+| `identities.bicep` | identités managées `id-kb-ai-api`, `id-kb-data-api`, `id-kb-smoke-test`, `id-kb-deploy` (le déploiement continu), `id-kb-daily-routine` et `id-kb-digest-watch` (les jobs planifiés) | 1 | #414, #415, #420 |
+| `container-registry.bicep` | registre `crkb…` (ACR Basic), sans utilisateur admin ; AcrPull pour les identités des deux API, de la sonde et des deux jobs planifiés | 1 | #414, #330, #423 |
 | `key-vault.bicep` | coffre `kv-kb-…` en RBAC, suppression réversible 7 jours ; Key Vault Secrets Officer pour l'opératrice | 1 | #414 |
 | `exchange-storage.bicep` | compte Blob `stkbexchange…`, clé partagée coupée ; conteneurs `smoke-test`, `clippings`, `zotero`, `watch`, un rôle par identité et par conteneur ; versions, suppression réversible, effacement des copies Zotero, verrou (« Le stockage ») | 1 | #414, #420 |
 | `job-files-storage.bicep` | compte Files `stkbjobfiles…`, partage `job-data` des jobs, monté par l'identité de `cae-kb` ; verrou (« Le stockage ») | 1 | #420 |
@@ -24,6 +24,8 @@ deux passes, l'image est poussée dans le registre et les secrets sont posés da
 | `api-container-app.bicep` | `ca-kb-data-api` et `ca-kb-ai-api` : ingress interne seul, HTTPS, 0 à 1 réplique, sondes `GET /health` | 2 | #414 |
 | `smoke-test-job.bicep` | job manuel `caj-kb-smoke-test`, qui lance `kb smoke-test` | 2 | #414 |
 | `migrate-database-job.bicep` | identité `id-kb-migrate-database` et son AcrPull ; job manuel `caj-kb-migrate-database`, qui lance `kb migrate-database` | 1 (l'identité), 2 (le job) | #421 |
+| `daily-routine-job.bicep` | job planifié `caj-kb-daily-routine`, qui lance `kb daily-routine` chaque jour à 08:00 UTC, sur `job-data` (« La routine quotidienne ») | 2 | #330 |
+| `digest-watch-job.bicep` | job planifié `caj-kb-digest-watch`, qui lance `kb digest-watch` à l'heure du paramètre `digestWatchCronExpression`, le lundi et le jeudi à 10:00 UTC par défaut, sur `job-data` (« Les comptes rendus en ligne ») | 2 | #423 |
 | `deploy-access.bicep` | pour `id-kb-deploy` : connexion OIDC depuis l'environnement GitHub `production` seul ; AcrPush et Reader sur le registre, Container Apps Contributor sur chaque app, Container Apps Jobs Contributor sur chaque job de `deployment.json` | 2 | #415 |
 
 ## Noms des ressources
@@ -711,7 +713,7 @@ que le Mac ne touche jamais (décisions 3 à 8 du 06/11, journal ADR).
 - **Le sens est tenu par les rôles**, un par identité et par conteneur, aucun sur le compte. Les API et
   `id-kb-migrate-database` n'en ont aucun. Écrire à contresens répond 403 (`AuthorizationPermissionMismatch`).
 - **`job-data` est tenu par le Bicep, pas par une identité** : le rôle appartient à l'environnement. Toute app ou
-  tout job de `cae-kb` qui déclare un volume `job-data` monte le partage. Seuls les jobs de #330 le déclareront : c'est une convention, pas un contrôle. `id-kb-deploy`, qui met à jour les apps et les jobs de `deployment.json`, peut passer outre (registre des traitements, ligne « Déploiement continu »).
+  tout job de `cae-kb` qui déclare un volume `job-data` monte le partage. Seuls `caj-kb-daily-routine` (#330) et `caj-kb-digest-watch` (#423) le déclarent : c'est une convention, pas un contrôle. `id-kb-deploy`, qui met à jour les apps et les jobs de `deployment.json`, peut passer outre (registre des traitements, ligne « Déploiement continu »).
 - **Protections de `stkbexchange`** : versions ; suppression réversible des blobs et des conteneurs, 30 jours ;
   les copies Zotero (`zotero/…`) effacées après 14 jours avec leurs versions, par la règle `erase-zotero-copies` (un
   passage par jour, sans heure garantie : la copie, puis sa version au passage suivant ; ce qu'elle efface reste
@@ -1088,11 +1090,18 @@ collecte sort en 4, les autres sources gardées. S'il manque, l'erreur est `Defa
 
 ### La règle des heures
 
-Rien ne tient deux exécutions à l'écart l'une de l'autre avant #426. D'où :
-- **aucune exécution à la main ne démarre après 07:00 UTC**, jusqu'à la fin de celle du cron (09:00 UTC au plus) :
-  lancée avant 07:00, elle finit avant 08:00, son délai compris ;
-- un échec se diagnostique avant 07:00 UTC le lendemain ;
-- `caj-kb-digest-watch` démarre à 10:00 UTC (#423), une fois la routine finie.
+Rien ne tient deux exécutions à l'écart l'une de l'autre avant #426, ni la routine à l'écart de `caj-kb-digest-watch`
+(#423). La règle porte sur l'heure de départ d'une exécution à la main, son délai compris (3 600 s pour la routine,
+1 800 s pour les comptes rendus) :
+- **la routine à la main ne démarre jamais entre 07:00 et 09:00 UTC**, ni, le lundi et le jeudi, entre 07:00 et
+  10:30 UTC : elle finirait pendant celle du cron ou pendant les comptes rendus ;
+- **`caj-kb-digest-watch` à la main ne démarre jamais entre 07:30 et 09:00 UTC**, ni, le lundi et le jeudi, entre
+  09:30 et 10:30 UTC ;
+- un échec de la routine se diagnostique avant 07:00 UTC le lendemain.
+
+Le risque visé : `kb import` qui écrit la base pendant que l'API de données la lit, page par page, pour un compte rendu
+([specs-api.md](../docs/specs-api.md)). Le partage n'est pas en cause : la publication compte une fiche déjà dans
+`watch` (409, 412) comme « déjà là », et une fiche du coffre ne s'écrit qu'une fois (#295).
 
 ### Un temporaire resté en ligne (#295)
 
@@ -1124,3 +1133,120 @@ sur les reprises, rôles qui lisent les secrets d'un job),
 [Azure Files par OAuth sur REST](https://learn.microsoft.com/en-us/azure/storage/files/authorize-oauth-rest) (rôle
 Privileged Contributor, portée en `fileshares`, `--backup-intent`),
 [`az storage directory`](https://learn.microsoft.com/en-us/cli/azure/storage/directory).
+
+## Les comptes rendus en ligne (#423)
+
+`caj-kb-digest-watch` lance `kb digest-watch` (#413) le lundi et le jeudi à 10:00 UTC, une fois la routine finie.
+L'ordre des étapes : `GET /health` des deux API (qui réveille une API à 0 réplique), `kb digest`, de nouveau les deux
+`/health`, `kb trend-report`, puis la publication de `veille` dans `watch`. Son dossier de données est le partage
+`job-data`, comme pour la routine (décision de Sabine du 11/11). Il le faut pour deux raisons :
+- le registre des comptes rendus des tendances (`trend_reports.json`) y reste d'un passage à l'autre ;
+- `kb digest` et `kb trend-report` y cherchent le compte rendu du jour avant toute demande.
+
+Il n'a aucun rôle sur la base : il la lit par les deux API.
+
+| Réglage | Valeur |
+|---|---|
+| Déclenchement | le paramètre `digestWatchCronExpression` de `main.bicep`, `0 10 * * 1,4` par défaut, lu en UTC ; parallélisme 1 |
+| Délai, reprise | 1 800 s, aucune reprise (ci-dessous) |
+| Ressources | 0,25 vCPU, 0,5 Gio, comme la sonde, relevés à la première exécution ; à changer par `az containerapp job update --cpu --memory` |
+| Volume | `job-data` sur `/var/lib/knowledge_base` (uid 10001, `0700` et `0600`) |
+| Variables | `KB_DATA_DIR`, `KB_VAULT_DIR`, `KB_EXCHANGE_BLOB_URL`, `KB_DATA_API_URL` et `KB_AI_API_URL` (les noms internes, en HTTPS), `AZURE_CLIENT_ID` |
+| Secrets | `KB_AI_API_KEY_KB_DIGEST` ← `kb-ai-api-key-kb-digest` ; `KB_AI_API_KEY_KB_TREND_REPORT` ← `kb-ai-api-key-kb-trend-report` |
+
+**Aucun secret nouveau** : ce sont les deux clés que l'API IA vérifie déjà (étape 4 d'« Appliquer »). Une clé se
+change pour les deux côtés à la fois ([README](../README.md), « Changer une clé »). Qu'une exécution du job lise la
+nouvelle version n'est pas encore vérifié, comme pour la routine.
+
+**Changer l'heure** : la passe ajoute `digestWatchCronExpression='<minute> <heure> * * <jours>'` à ses `-p`. Les
+heures restent celles de « La règle des heures ».
+
+**Aucune reprise.** Après une expiration côté `kb`, une reprise appellerait le modèle une seconde fois. Or `kb digest`
+et `kb trend-report` ne refusent que si le compte rendu du jour existe, ce qu'une exécution coupée n'a pas forcément
+écrit. Limite : Microsoft Learn conseille au moins une reprise, parce qu'une maintenance de la plateforme peut couper
+une exécution. Pour réduire le risque : la routine republie `veille` chaque jour ; une exécution manquée se relance à
+la main le même jour, dans les heures permises.
+
+**La fenêtre** : chaque compte rendu par sujet lit les items des 3 derniers jours, comptés depuis sa demande, par la
+date de la source ([fiches-veille.md](../docs/fiches-veille.md), « Fenêtre » ; décision de Sabine du 11/11, 3 jours
+et non 5). Limite : avec un passage le lundi et le jeudi, rien ne couvre du jeudi 10:00 au vendredi 10:00 UTC, ni les
+items datés du jeudi que la collecte du vendredi apporte. Ils n'entrent dans aucun compte rendu. Pour réduire le
+risque : la règle de Sabine du 26/10, qui fait partir chaque compte rendu du `until` du précédent et rejoue chaque
+créneau manqué ([tendances.md](../docs/tendances.md), fin de « Hors v1 »), reste à coder.
+
+Dans l'ordre :
+1. Le critère rouge : `az containerapp job show -n caj-kb-digest-watch -g "$RG"` répond `ResourceNotFound`.
+2. La seconde passe, depuis la branche de #423, avec le tag en ligne.
+3. La première exécution, à la main, dans les heures permises.
+4. Les comptes rendus, sur le Mac.
+5. Le lundi ou le jeudi suivant : l'exécution du cron.
+
+Une seule passe ou écriture dans Azure à la fois : chacune se signale avant d'être lancée.
+
+### La seconde passe
+
+`TAG` est la version en ligne (étape 5 d'« Appliquer », pour la retrouver). La passe se lance depuis la branche de
+#423, rebasée sur `main` juste avant, pour ne défaire aucune infra fusionnée entre-temps. Aperçu attendu :
+- **à créer** : `caj-kb-digest-watch` ; l'AcrPull d'`id-kb-digest-watch` sur le registre ; ses deux rôles Key Vault
+  Secrets User (`kb-ai-api-key-kb-digest`, `kb-ai-api-key-kb-trend-report`) ; le Container Apps Jobs Contributor
+  d'`id-kb-deploy` sur le job ;
+- **à modifier** : l'image des deux API et des jobs (`k-b@sha256:…` devient `k-b:<TAG>`, la même image), et le bruit
+  de l'étape 5 ;
+- tout autre changement arrête la passe, en particulier sur `cae-kb`, le stockage, les verrous ou les variables des
+  API.
+
+Si le job échoue sur « unable to fetch secret », ses rôles sur les secrets ne sont pas encore actifs : relancer la
+même commande 10 minutes plus tard.
+
+Dès cette passe, chaque tag change aussi l'image de ce job (`deployment.json`). `id-kb-deploy` peut alors agir sous
+`id-kb-digest-watch` et lire ses deux clés. Ce n'est pas un accès nouveau : il atteint déjà `watch` et `job-data` par
+la routine, et les deux clés par Container Apps Contributor sur `ca-kb-ai-api`, qui permet `listSecrets` (registre des
+traitements, ligne « Déploiement continu »).
+
+### La première exécution
+
+```sh
+az containerapp job start -n caj-kb-digest-watch -g "$RG" --query name -o tsv
+az containerapp job execution list -n caj-kb-digest-watch -g "$RG" \
+  --query "[].{name:name,status:properties.status,start:properties.startTime,end:properties.endTime}" -o table
+```
+
+Le journal, quelques minutes après la fin (`WS` : étape 6 d'« Appliquer ») :
+
+```sh
+az monitor log-analytics query -w "$WS" -o tsv \
+  --analytics-query "ContainerAppConsoleLogs | where TimeGenerated > ago(3h) and JobName == 'caj-kb-digest-watch' | order by TimeGenerated asc" \
+  --query "[].[TimeGenerated, Log]"
+```
+
+On y relève :
+- `kb digest-watch started: 5 steps`, puis, pour chaque étape, `… step <n> of 5, <étape>, exited with <code>` ; les
+  deux réveils portent `, not counted` dans le tableau des étapes ;
+- pour `kb digest` :
+  - `digest started: <n> subjects asked`, puis `digest finished in …` ;
+  - la durée, face aux 200 s d'une demande ;
+  - par sujet, `<sujet>: digest failed: <état> at the stage <étape>` ou `<sujet>: sheet not written: …` ;
+  - dans le bilan, `Window: <début> → <fin>, <n> items read` ;
+- pour `kb trend-report` : `trend report finished in …`, ou `no window after …; nothing written`. Un code 0 ne
+  prouve pas que le modèle a répondu : `choice of the model not made: …` et `writing of chosen.<n> not made: …`
+  l'écrivent, et le bilan porte `Model: none` ;
+- la publication : `watch publication: <n> sheets found: <n> sent, <n> already in watch, …`.
+
+Un sujet qui expire ne se rattrape pas le même jour : la fiche du jour d'un autre sujet bloque la relance de
+`kb digest`.
+
+### Les comptes rendus, sur le Mac
+
+```sh
+make download-watch-sheets
+ls "$VAULT"/veille/*/$(date -u +%F).md
+```
+
+Le bilan du téléchargement dit `<n> copied`. Il ne remplace jamais une fiche déjà sur le Mac : seul `copied` prouve
+que la fiche vient de l'exécution. La fiche porte le jour UTC de l'exécution, d'où `date -u`.
+
+Sources (Microsoft Learn, lues le 2026-11-11) :
+[jobs de Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/jobs) (cron en UTC, « Set the replica
+retry limit to at least 1 » pour la maintenance de la plateforme, rôles qui lisent les secrets d'un job),
+[secrets de Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/manage-secrets) (« Permissions for
+managing secrets » : Container Apps Contributor permet `Microsoft.App/containerApps/listSecrets/action`).
