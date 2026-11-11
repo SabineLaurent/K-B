@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Accès réservé{% endblock %}
+{% block main_class %}error-page{% endblock %}
+{% block content %}
+<div class="error-text">
+<p class="error-code">Erreur 403</p>
+<h1>Accès réservé</h1>
+<p class="error-explanation">Ce site est privé: le compte connecté n’y a pas accès.</p>
+{% if is_operator_checked %}
+<div class="error-actions">
+<a class="button" href="/.auth/logout">Se déconnecter</a>
+</div>
+{% endif %}
+</div>
+{% endblock %}

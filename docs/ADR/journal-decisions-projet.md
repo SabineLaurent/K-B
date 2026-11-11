@@ -6631,6 +6631,65 @@ tranchés par time-knight sous la délégation de Sabine du 15/10.
     `ContainerClient.download_blob`, même version, lu le 2026-11-11). Faisables, du code seulement.
   — PR de #558
 
+### Site : le socle privé de `kb serve-web` (#562)
+
+Plan de la session K-B FO validé par Sabine le 2026-11-11 ; écarts et points de revue tranchés par
+time-knight sous la délégation de Sabine du 15/10, sauf ce qui est marqué Sabine.
+
+- **Le site est un paquet neuf, `web`, en FastAPI et Jinja2, rendu par le serveur, sans aucun
+  JavaScript dans le navigateur ; il n'importe que `core` et `items`, et seul `commands` l'importe
+  (`tests/architecture/test_layers.py`).** Pourquoi : décision de Sabine du 2026-11-11 (mission FO),
+  qui garde le site dans l'image, la CI et les protections de K-B ; le site lira l'API de données
+  par HTTP (#563), jamais la base. Les gabarits échappent toute valeur (`autoescape=True`, quel que
+  soit le nom du gabarit : le défaut de Starlette 1.8 n'échappe que `.html`, `.htm` et `.xml`) et
+  refusent une valeur absente (`StrictUndefined`). Options écartées : `app.frontend()`, que propose
+  le skill `fastapi`, dont le repli de page unique avalerait les 404 ; des liens par `url_for`, qui
+  prendraient le schéma vu derrière l'entrée d'Azure (`http`). — PR de #562
+- **L'accès est réservé à l'opératrice par l'authentification Microsoft Entra de la plateforme
+  Azure Container Apps, doublée dans le code : un middleware compare l'en-tête
+  `X-MS-CLIENT-PRINCIPAL-ID` (présent une fois, un GUID) à `KB_WEB_OPERATOR_ID` sur chaque requête
+  sauf `/health`, et rend la page 403 sinon, sans la valeur au journal.** Pourquoi : la plateforme
+  refuse cet en-tête venu d'un client (Microsoft Learn, « Authentication and authorization in Azure
+  Container Apps », lu le 2026-11-11), et la connexion se règle sans administrateur de l'école
+  (vérifié par tn-codeur le 2026-11-11). Le chemin comparé est celui que suit le routeur
+  (`scope["path"]`) : `request.url.path` lisait `/health` dans `/health%3F` (relecture de sécurité,
+  corrigé avant la PR). Options écartées : une dépendance FastAPI, qui ne couvre ni `StaticFiles` ni
+  une route inconnue ; `uuid.UUID`, qui accepte accolades, `urn:uuid:` et tirets absents ; une
+  exemption de `/static` pour la page 403 d'un autre compte, puisque `allowedPrincipals` lui rend le
+  403 de la plateforme ; un mot de passe codé par K-B, gardé en repli si l'accès conditionnel de
+  l'école bloquait l'essai. Limites assumées : le contrôle ne protège rien sans l'authentification
+  de la plateforme, l'identifiant de Sabine n'étant pas un secret ; il ne voit pas une connexion
+  WebSocket (`BaseHTTPMiddleware`), et le site n'en a aucune. Pour réduire le risque :
+  l'authentification part dans le même déploiement que l'entrée externe, Entra seul fournisseur,
+  et un `curl` avec l'en-tête forgé sans session doit répondre 302 ou 401 (infra, faisable). — PR
+  de #562
+- **`KB_WEB_AUTH=off`, sans contrôle d'en-tête, n'est accepté que sur une adresse de boucle locale et
+  sans `CONTAINER_APP_NAME`, que la plateforme pose dans chaque conteneur ; en `entra`, une adresse
+  hors de la boucle locale est refusée sans `CONTAINER_APP_NAME`.** Pourquoi : Sabine voit le site
+  sur le Mac, et sur le Mac en `0.0.0.0` tout appareil du réseau pourrait poser l'en-tête. Options
+  écartées : `KB_DEPLOYMENT_ENVIRONMENT`, posée à la main, où un oubli suffit ; aucun mode local.
+  Limite : `CONTAINER_APP_NAME` ne prouve pas que l'authentification de la plateforme est active
+  (première revue de code, écarté : c'est la limite de l'entrée précédente). — PR de #562
+- **Aucune page n'est gardée : `no-store` sur chaque page, chaque erreur et `/health` ; `no-cache`,
+  revalidé par ETag, sur `/static` ; aucun cache côté serveur.** Décision de Sabine du 2026-11-11.
+  **Révise le choix 8 du plan validé le même jour** (`private, max-age=300`) : relevé par la revue de
+  code, une page restait lisible 5 minutes après `/.auth/logout`. Options écartées : `private,
+  max-age=300` ; `private, no-cache`, qui ne garantit pas la revalidation au bouton Retour (MDN, reco
+  de time-knight) ; un cache en mémoire, perdu à chaque retour à zéro réplique et sans gain pour une
+  seule lectrice. Limite : RGESN 6.2 n'est tenu que pour la CSS et l'icône ; un cache court des
+  réponses de l'API de données (idée de Sabine du 09/11, le fil change une fois par jour) se tranche
+  dans le plan du fil (#563). — PR de #562
+- **Le site suit, en plus du RGAA 4.1.2 et du RGESN 2024, le référentiel Opquast – Qualité numérique,
+  Règles 2025, version 5.0 ; chaque PR du site porte le relevé des règles applicables. La feuille de
+  style n'emploie que des fonctions CSS Baseline « Widely available » ; une « Newly available » ne
+  sert qu'en amélioration qui ne retire rien à un navigateur plus ancien.** Pourquoi : demande de
+  Sabine du 2026-11-11, « bonnes pratiques du web et écoconception du web », puis une CSS à jour de
+  fonctions stables ; son choix entre trois options. Options écartées : y ajouter les 115 bonnes
+  pratiques d'écoconception du Collectif Green IT, plus longues à relever à chaque PR ; l'écoconception
+  seule, sans Opquast. La lecture de Baseline (web-features du W3C WebDX, 3.45.0) est acceptée par
+  time-knight. Limite : la CSS n'est pas minifiée (Opquast 229), faute d'outil de build sans
+  dépendance nouvelle. — PR de #562
+
 ## Décisions encore ouvertes
 
 - **Le tri du fil** (2026-11-11, #550) : choisir l'ordre de `GET /items`, aujourd'hui du plus
@@ -6778,4 +6837,7 @@ tranchés par time-knight sous la délégation de Sabine du 15/10.
   de #160. **Révisée le 2026-10-15** : #160 vient en ligne au 08/11 ; la question reste ouverte
   jusque-là (« POC du 25/10 », décision 7). **Précisée le 2026-10-20** : #160 reste hors du
   squelette ; à revoir avec une interface web en ligne (« Squelette E1 E3 : cadrage du 20/10 »,
-  décision 3).
+  décision 3). **Précisée le 2026-11-11** : l'interface web en ligne
+  (#562) se connecte par l'authentification Entra de la plateforme Azure Container Apps ; K-B n'y
+  code ni OAuth 2 ni jeton (« Site : le socle privé de `kb serve-web` »). La question reste posée
+  pour l'accès aux API (#160).

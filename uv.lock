@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -882,6 +882,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "google-cloud-bigquery" },
     { name = "httpx2" },
+    { name = "jinja2" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-sdk" },
@@ -914,6 +915,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.122" },
     { name = "google-cloud-bigquery", specifier = ">=3.46,<4" },
     { name = "httpx2", specifier = ">=2.13.1" },
+    { name = "jinja2", specifier = ">=3.1.6" },
     { name = "opentelemetry-api", specifier = ">=1.45.1,<1.46" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.45.1,<1.46" },
     { name = "opentelemetry-sdk", specifier = ">=1.45.1,<1.46" },

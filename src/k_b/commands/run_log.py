@@ -12,6 +12,7 @@ from k_b.core.config import (
     LOGS_DIR_NAME,
     SERVE_AI_LOG_FILE_NAME,
     SERVE_DATA_LOG_FILE_NAME,
+    SERVE_WEB_LOG_FILE_NAME,
 )
 from k_b.core.dates import DATABASE_DATE_FORMAT
 
@@ -27,6 +28,8 @@ LOG_FILE_PATH = Path(LOGS_DIR_NAME) / LOG_FILE_NAME
 SERVE_DATA_LOG_FILE_PATH = Path(LOGS_DIR_NAME) / SERVE_DATA_LOG_FILE_NAME
 # The log of kb serve-ai, apart for the same reason: a long run, beside kb serve-data.
 SERVE_AI_LOG_FILE_PATH = Path(LOGS_DIR_NAME) / SERVE_AI_LOG_FILE_NAME
+# The log of kb serve-web, apart for the same reason.
+SERVE_WEB_LOG_FILE_PATH = Path(LOGS_DIR_NAME) / SERVE_WEB_LOG_FILE_NAME
 LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 # The HTTP client of the AI API logs each request at INFO, with its URL (the resource of the
 # provider) and without the id of the request of kb serve-ai: from WARNING only.

@@ -22,7 +22,8 @@ from k_b.database.location import LIBPQ_VARIABLES, PostgresUrl
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 ZOTERO_LIBRARY_SCRIPT = FIXTURES_DIR / "zotero_extract.sql"
 ITEMS_DATABASE_SCRIPT = FIXTURES_DIR / "items_database.sql"
-# The settings of kb serve-data and of the log, which a terminal may export (a .env loaded).
+# The settings of kb serve-data, of kb serve-web and of the log, which a terminal may export (a
+# .env loaded).
 # KB_DATABASE_URL among them: a terminal that exports it must not make the suite write into a real
 # PostgreSQL base.
 KB_SETTINGS_VARIABLES = (
@@ -35,6 +36,12 @@ KB_SETTINGS_VARIABLES = (
     DEPLOYMENT_ENVIRONMENT_VARIABLE,
     "KB_DATA_API_URL",
     "KB_AI_API_URL",
+    "KB_WEB_HOST",
+    "KB_WEB_PORT",
+    "KB_WEB_ALLOWED_HOSTS",
+    "KB_WEB_AUTH",
+    "KB_WEB_OPERATOR_ID",
+    "CONTAINER_APP_NAME",
 )
 # The marker of the tests that run kb on the real sources (tests/e2e/).
 E2E_MARKER = "e2e"

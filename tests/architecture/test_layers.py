@@ -464,3 +464,77 @@ def test_the_rule_of_exchange_refuses_every_way_to_it_but_its_importers(
     imported = parse_imported_modules(code, package=package)
 
     assert bool(list_imports_of_exchange(imported)) is is_refused
+
+
+# The site (#562): it reads the data API over HTTP, never the base, and writes nothing that must
+# outlive it; only commands import it (kb serve-web).
+WEB_ALLOWED_MODULES = {"web", "core", "items"}
+WEB_FORBIDDEN_MODULES = {"core.atomic_write"}
+WEB_IMPORTERS = {"web", "commands"}
+
+
+def list_forbidden_imports_of_web(imported: set[str]) -> set[str]:
+    return {
+        name
+        for name in imported
+        if not is_within(name, WEB_ALLOWED_MODULES)
+        or is_within(name, WEB_FORBIDDEN_MODULES)
+    }
+
+
+def list_imports_of_web(imported: set[str]) -> set[str]:
+    return {name for name in imported if reaches(name, {"web"})}
+
+
+def test_web_imports_only_core_and_items():
+    for path in list_python_files("web"):
+        imported = list_imported_modules(path, find_package(path))
+        assert list_forbidden_imports_of_web(imported) == set(), path
+
+
+def test_only_commands_import_web():
+    paths = [
+        path.relative_to(PACKAGE_DIR).as_posix()
+        for path in sorted(PACKAGE_DIR.rglob("*.py"))
+        if path.relative_to(PACKAGE_DIR).parts[0].removesuffix(".py")
+        not in WEB_IMPORTERS
+        and list_imports_of_web(list_imported_modules(path, find_package(path)))
+    ]
+
+    assert paths == []
+
+
+@pytest.mark.parametrize(
+    ("code", "is_refused"),
+    [
+        ("from k_b import database", True),
+        ("from k_b.data_api.app import create_app", True),
+        ("from k_b.ai_api.connectors import data_api_client", True),
+        ("from k_b.jobs.api_health import check_health", True),
+        ("from k_b.exchange.storage import open_container_client", True),
+        ("from k_b.core.atomic_write import write_file_atomically", True),
+        ("from ..commands.run_log import LOGGER_NAME", True),
+        ("from k_b.core.api_request_log import log_request", False),
+        ("from k_b.items import RepositoryName", False),
+        ("from .rendering import templates", False),
+    ],
+)
+def test_the_rule_of_web_refuses_every_layer_but_core_and_items(code, is_refused):
+    imported = parse_imported_modules(code, package="k_b.web")
+
+    assert bool(list_forbidden_imports_of_web(imported)) is is_refused
+
+
+@pytest.mark.parametrize(
+    ("package", "code", "is_refused"),
+    [
+        ("k_b.data_api", "from k_b.web.app import create_app", True),
+        ("k_b.jobs", "from k_b import web", True),
+        ("k_b.core", "from ..web import settings", True),
+        ("k_b.commands", "from k_b.core.api_request_log import log_request", False),
+    ],
+)
+def test_the_rule_of_web_refuses_every_way_to_it(package, code, is_refused):
+    imported = parse_imported_modules(code, package=package)
+
+    assert bool(list_imports_of_web(imported)) is is_refused

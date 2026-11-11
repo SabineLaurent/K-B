@@ -27,6 +27,7 @@ from azure.storage.blob import BlobProperties, ContainerClient
 from k_b.core.config import (
     EXCHANGE_STORAGE_CONNECT_TIMEOUT_SECONDS,
     EXCHANGE_STORAGE_READ_TIMEOUT_SECONDS,
+    GUID,
     MAX_LISTED_BLOBS,
 )
 from k_b.core.outbound import find_url_refusal
@@ -37,8 +38,6 @@ EXCHANGE_BLOB_URL_VARIABLE = "KB_EXCHANGE_BLOB_URL"
 CLIENT_ID_VARIABLE = "AZURE_CLIENT_ID"
 # A bearer token goes over HTTPS only.
 EXCHANGE_BLOB_SCHEMES = ("https",)
-# A client id as Azure gives it: a GUID, without braces.
-CLIENT_ID = re.compile(r"[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
 # The scope of a token for Blob Storage.
 STORAGE_SCOPE = "https://storage.azure.com/.default"
 # The code of an error of Blob Storage (x-ms-error-code), a word of letters: an input of the
@@ -106,7 +105,7 @@ def read_exchange_storage_settings_or_refusal(
     client_id = environ.get(CLIENT_ID_VARIABLE)
     if not client_id:
         return f"{CLIENT_ID_VARIABLE}: not set"
-    if not CLIENT_ID.fullmatch(client_id):
+    if not GUID.fullmatch(client_id):
         return f"{CLIENT_ID_VARIABLE}: not a GUID"
     return ExchangeStorageSettings(account_url=account_url, client_id=client_id)
 

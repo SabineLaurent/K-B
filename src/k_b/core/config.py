@@ -164,11 +164,18 @@ CLIP_CHANGE_MARGIN = timedelta(seconds=60)
 # The folder of the data directory that holds the logs of the runs: what a program did, to watch it.
 LOGS_DIR_NAME = "logs"
 # The logs kb writes there (commands/run_log.py), the only ones the purge deletes
-# (purge/run_records.py): kb.log for every command, kb-serve-data.log and kb-serve-ai.log apart.
+# (purge/run_records.py): kb.log for every command, kb-serve-data.log, kb-serve-ai.log and
+# kb-serve-web.log apart.
 LOG_FILE_NAME = "kb.log"
 SERVE_DATA_LOG_FILE_NAME = "kb-serve-data.log"
 SERVE_AI_LOG_FILE_NAME = "kb-serve-ai.log"
-LOG_FILE_NAMES = (LOG_FILE_NAME, SERVE_DATA_LOG_FILE_NAME, SERVE_AI_LOG_FILE_NAME)
+SERVE_WEB_LOG_FILE_NAME = "kb-serve-web.log"
+LOG_FILE_NAMES = (
+    LOG_FILE_NAME,
+    SERVE_DATA_LOG_FILE_NAME,
+    SERVE_AI_LOG_FILE_NAME,
+    SERVE_WEB_LOG_FILE_NAME,
+)
 # The folder that holds the journals of the imports: what an import decided about the data, in JSON.
 JOURNALS_DIR_NAME = "journals"
 # How many months a log and a journal are kept after the day in their name; kb purge deletes the
@@ -220,6 +227,10 @@ COMPOSE_HOSTS = ("api-donnees", "api-ia")
 # and never match.
 MIN_API_KEY_LENGTH = 32
 API_KEY_CHARACTERS = re.compile(r"[A-Za-z0-9_-]+")
+# An id as Microsoft Entra and Azure give it, a GUID without braces: the client id of a managed
+# identity (database/location.py, exchange/storage.py) and the object id of the operator of the
+# site (web/settings.py, web/operator_check.py).
+GUID = re.compile(r"[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
 # The log of kb in a file of the data directory as well as on stderr; KB_LOG_TO_FILE=false for
 # stderr only, as in a container, whose stderr is its log.
 LOG_TO_FILE = True
@@ -286,6 +297,13 @@ AI_API_PORT = 8001
 # content_too_large, before the key is checked (OWASP API4:2023). Far above the largest honest
 # body: 62 bytes for the two days of POST /trend-reports.
 MAX_AI_API_BODY_BYTES = 1024
+
+# The local defaults of kb serve-web, each changed by its variable (web/settings.py;
+# .claude/rules/poc.md, rule 2): the site listens on the machine only, beside kb serve-data and
+# kb serve-ai, and answers its names only.
+WEB_HOST = "127.0.0.1"
+WEB_PORT = 8002
+WEB_ALLOWED_HOSTS = LOCAL_HOSTS
 
 
 @dataclass(frozen=True)

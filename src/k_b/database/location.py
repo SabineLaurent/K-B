@@ -2,12 +2,11 @@
 KB_DATABASE_URL names, and the managed identity that opens it under KB_DATABASE_AUTH entra; and the
 check that the file exists before a connection opens it."""
 
-import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from k_b.core.config import DATABASE_FILE_NAME, DEFAULT_DATABASE_AUTH
+from k_b.core.config import DATABASE_FILE_NAME, DEFAULT_DATABASE_AUTH, GUID
 
 DATABASE_URL_VARIABLE = "KB_DATABASE_URL"
 DATABASE_AUTH_VARIABLE = "KB_DATABASE_AUTH"
@@ -21,8 +20,6 @@ UNKNOWN_AUTH_REFUSAL = (
 # The client id of the user-assigned identity, the variable azure-identity reads, as
 # exchange/storage.py does: a job that reaches the storage and the base has one GUID.
 CLIENT_ID_VARIABLE = "AZURE_CLIENT_ID"
-# A client id as Azure gives it: a GUID, without braces.
-CLIENT_ID = re.compile(r"[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
 POSTGRESQL_URL_PREFIXES = ("postgresql://", "postgres://")
 # The variables libpq reads besides the URL it is given: PostgreSQL 18, 32.15 "Environment
 # Variables" (https://www.postgresql.org/docs/18/libpq-envars.html, read on 2026-11-06). kb reads its
@@ -153,7 +150,7 @@ def read_postgresql_authentication_or_refusal(
         return (
             f"{CLIENT_ID_VARIABLE}: not set, {DATABASE_AUTH_VARIABLE} is {ENTRA_AUTH}"
         )
-    if not CLIENT_ID.fullmatch(client_id):
+    if not GUID.fullmatch(client_id):
         return f"{CLIENT_ID_VARIABLE}: not a GUID"
     return PostgresUrl(url, entra_client_id=client_id)
 
