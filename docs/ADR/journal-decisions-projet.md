@@ -6965,6 +6965,47 @@ jour, avec ses quatre points ; relu par time-knight et par un sous-agent sans co
   (#559 à #561). Suit l'entrée de #558 du même jour, qui ouvre
   le client du stockage d'échange à l'API de données. — PR de #571
 
+### Site : le fil aligné sur ses maquettes, les liens externes dans un nouvel onglet (#587)
+
+Remarques de Sabine du 2026-11-11 sur le fil vu en local à côté des maquettes, relayées par time-knight ; plan court
+validé par Sabine le même jour ; points de revue tranchés par time-knight sous la délégation de Sabine du 15/10.
+
+- **Chaque lien vers un autre site s'ouvre dans un nouvel onglet (`target="_blank"`, `rel="noopener noreferrer"`),
+  que son texte annonce, en plus petit : « (en anglais, site externe, nouvel onglet) » ; sur le fil comme sur
+  `/sources`, la même forme, et un lien du site s'ouvre toujours dans le même onglet.** Pourquoi : la demande de
+  Sabine, « rester dans K-B » quand elle ouvre une source ; Opquast 2025, règle 146 (« L'utilisateur est averti des
+  ouvertures de nouvelles fenêtres »), et règle 138 (même comportement pour les liens de même nature). Le RGAA 4.1.2
+  ne demande pas l'avertissement : son critère 13.2 interdit seulement une fenêtre ouverte sans action (lu le
+  2026-11-11) ; la technique WCAG G201, conseillée et non exigée, le place dans le texte du lien. `noopener` et
+  `noreferrer` : la page ouverte n'atteint ni la page de K-B ni son adresse. Options écartées : le même onglet, le
+  défaut, que G200 conseille hors besoin ; l'annonce à la taille du lien, plus longue que le lien de la maquette ;
+  l'annonce cachée derrière la seule flèche, que G201 permet mais qu'une personne voyante ne lit pas. Limite
+  assumée : un onglet ouvert d'office peut dérouter (G200) ; pour réduire le risque, l'annonce dans chaque lien,
+  faite. L'annonce est en 0,75rem (12 px par défaut), au contraste de 7,4:1 (gardée par time-knight, relecture
+  d'accessibilité, constat 4). — PR de #587
+- **« Se déconnecter » passe du pied de page à la fin de l'en-tête, une fois par page ; la page 403 ne garde que son
+  bouton.** Pourquoi : la demande de Sabine, qui l'y cherche ; un écart aux maquettes, qui ne le placent pas. Il reste
+  dans le `nav` de l'en-tête, là où la maquette met son lien de droite, « Back office » (revue de code, constat 3,
+  gardé par time-knight). Options écartées : le garder aussi au pied de page, la même action deux fois ; le sortir
+  du `nav` (proposition de la revue de code), alors que la maquette y met son lien de droite et que « Se
+  déconnecter » mène à une page de la plateforme. — PR de #587
+- **Le fil suit ses maquettes à chaque largeur : sur un téléphone, les sortes et les boutons radio en deux colonnes ;
+  sur une tablette, les sortes en trois et la date de début à droite des boutons radio ; sur un ordinateur, les
+  sortes, puis les boutons radio et le champ de date, chacun sur une ligne ; les espacements de la maquette ; la
+  ligne d'une carte réunit sa sorte encadrée, sa date, ses identifiants et sa pastille ; les liens de page sont des
+  boutons qui mènent à la ligne des résultats (`#resultats`).** Pourquoi : les remarques de Sabine sur ses captures du
+  mobile, de la tablette et du desktop ; l'ancre, sa demande de ne pas remonter tout en haut en changeant de page
+  (le formulaire envoyé, une nouvelle recherche, s'ouvre en haut). Mesuré dans Chrome le 2026-11-11, le formulaire
+  passe de 585 à 405 px de haut à 1280 px (334 sur la maquette), de 606 à 539 à 820 et de 728 à 692 à 390. Option
+  écartée : retirer les trois aides, que la maquette n'a pas ; elles tiennent la règle d'un champ avant l'envoi (WCAG
+  3.3.2, ADR de #563) et restent, en 0,875rem, collées à leur libellé. Limite assumée : sur un téléphone, le
+  formulaire reste plus haut que la maquette (692 px contre 398 à 390 px), par ces aides. — PR de #587
+- **Le contenu garde sa largeur de 70rem (1072 px de texte), comme la maquette desktop.** Tranché par time-knight le
+  2026-11-11 sur la mesure de la session : la maquette plafonne elle aussi son contenu (`max-width` de 1120 px moins
+  24 px de marge de chaque côté), et la colonne étroite que Sabine voyait venait de son écran d'environ 2 600 px de
+  large. Option écartée : élargir au-delà de 1280 px, qui allongerait les lignes de l'intro et des titres au-delà
+  d'une longueur lisible. — PR de #587
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
