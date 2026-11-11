@@ -11,14 +11,18 @@
 - **Note précédente de la série** : [Ouvrir le socle du site privé](2026-11-11-ouvrir-le-socle-du-site-prive.md)
   (#562), le contrôle de l'en-tête dans le code
 
-Les commits de la branche, rebasée sur `main` (94e3f4e, après #577), sont :
-- f95eab9, le Bicep ;
-- 48503c4, le README ;
-- 6747fdd, le registre ;
-- e5956f6, l'ADR et `MEMORY.md` ;
-- db2a910, le tri des trois revues ;
-- 78182eb, cette note ;
-- 5905c5c, le risque A4 accepté par Sabine, avec ses deux parades à venir.
+Les commits de la branche, rebasée sur `main` (0a6ba26, après #577 et #582), sont :
+- 8d81b44, le Bicep ;
+- 1257b89, le README ;
+- fd94f65, le registre ;
+- 7f88f60, l'ADR et `MEMORY.md` ;
+- 2fa8a57, le tri des trois revues ;
+- 0deb60e, cette note ;
+- 6c06c0e, le risque A4 accepté par Sabine, avec ses deux parades à venir ;
+- 5de7a7a, la relecture de tn-codeur : l'image attendue à l'aperçu de chaque passe, et la règle des heures pour
+  les passes du site.
+
+S'y ajoutent les commits qui tiennent à jour la liste ci-dessus.
 
 Les autres commits listés depuis `66e03f1` appartiennent à d'autres PR, déjà fusionnées sur `main`, et cette note ne
 les couvre pas.
