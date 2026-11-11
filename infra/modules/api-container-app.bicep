@@ -1,5 +1,17 @@
-// An API of K-B as a container app with internal ingress only: reached from the environment by
-// https://<name>.internal.<defaultDomain>, never from the internet. Called once per API (main.bicep).
+// An app of K-B as a container app. Internal ingress by default, reached from the environment by
+// https://<name>.internal.<defaultDomain> (the two APIs); from the internet only behind the sign-in of
+// Microsoft Entra (the site, #571). Called once per app (main.bicep).
+
+@description('The sign-in of Microsoft Entra in front of an app (Easy Auth): its registration and the one account let in.')
+type entraSignInSettings = {
+  @description('Application (client) ID of the app registration, single tenant: no secret.')
+  clientId: string
+  @description('Key Vault entry of its client secret: a secret of the app the platform reads, never a variable of the container.')
+  clientSecretName: string
+  @description('Object ID of the only Entra account let in.')
+  allowedObjectId: string
+}
+
 param name string
 param location string
 param tags object
@@ -24,6 +36,10 @@ param terminationGracePeriodSeconds int = 30
   'Main'
 ])
 param identityLifecycle string = 'None'
+@description('Ingress from the internet: honoured only with entraSignIn, so that no app of K-B is public without it.')
+param external bool = false
+@description('The sign-in of Microsoft Entra in front of the app; null: none, the app is internal.')
+param entraSignIn entraSignInSettings?
 
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
   name: identityName
@@ -55,6 +71,32 @@ var secretReferences = [
     secretRef: variable.value
   }
 ]
+// Versionless URLs: a new version of a secret reaches the app within 30 minutes.
+var vaultSecrets = [
+  for variable in items(vaultEntries): {
+    name: variable.value
+    keyVaultUrl: '${vaultUri}secrets/${variable.value}'
+    identity: identity.id
+  }
+]
+// Empty values when the app has no sign-in: ARM may evaluate the properties of a conditional resource that
+// it does not deploy, and a property of null fails the deployment.
+var signIn = entraSignIn ?? {
+  clientId: ''
+  clientSecretName: ''
+  allowedObjectId: ''
+}
+var hasSignIn = entraSignIn != null
+// The client secret is a secret of the app, for the sign-in only: it is in no variable of the container.
+var signInSecrets = hasSignIn
+  ? [
+      {
+        name: signIn.clientSecretName
+        keyVaultUrl: '${vaultUri}secrets/${signIn.clientSecretName}'
+        identity: identity.id
+      }
+    ]
+  : []
 
 resource app 'Microsoft.App/containerApps@2026-01-01' = {
   name: name
@@ -72,11 +114,11 @@ resource app 'Microsoft.App/containerApps@2026-01-01' = {
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: {
-        external: false
+        external: external && hasSignIn
         targetPort: port
         transport: 'http'
         // HTTP is redirected to HTTPS; the clients of K-B follow no redirection, so they call in
-        // HTTPS.
+        // HTTPS. The sign-in wants HTTPS only.
         allowInsecure: false
       }
       registries: [
@@ -85,14 +127,7 @@ resource app 'Microsoft.App/containerApps@2026-01-01' = {
           identity: identity.id
         }
       ]
-      // Versionless URLs: a new version of a secret reaches the app within 30 minutes.
-      secrets: [
-        for variable in items(vaultEntries): {
-          name: variable.value
-          keyVaultUrl: '${vaultUri}secrets/${variable.value}'
-          identity: identity.id
-        }
-      ]
+      secrets: concat(vaultSecrets, signInSecrets)
       // The identity pulls the image and reads the secrets. With 'None', the container itself cannot get
       // a token of it; with 'Main', its code can (the data API, for the base online, #421).
       identitySettings: [
@@ -149,6 +184,46 @@ resource app 'Microsoft.App/containerApps@2026-01-01' = {
       scale: {
         minReplicas: 0
         maxReplicas: 1
+      }
+    }
+  }
+}
+
+// The sign-in runs beside the container of each replica: it alone sets the X-MS-CLIENT-PRINCIPAL-*
+// headers, and removes those a client sends (Microsoft Learn, "Authentication and authorization in Azure
+// Container Apps", read on 2026-11-11). Microsoft Entra is the only provider: the code of the site does
+// not check X-MS-CLIENT-PRINCIPAL-IDP, so another provider asks a new look at that check first.
+resource signInConfiguration 'Microsoft.App/containerApps/authConfigs@2026-01-01' = if (hasSignIn) {
+  parent: app
+  name: 'current'
+  properties: {
+    platform: {
+      enabled: true
+    }
+    globalValidation: {
+      unauthenticatedClientAction: 'RedirectToLoginPage'
+    }
+    httpSettings: {
+      requireHttps: true
+    }
+    identityProviders: {
+      azureActiveDirectory: {
+        enabled: true
+        registration: {
+          clientId: signIn.clientId
+          clientSecretSettingName: signIn.clientSecretName
+          // The tenant of the deployment: an account of another tenant is refused.
+          openIdIssuer: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
+        }
+        validation: {
+          defaultAuthorizationPolicy: {
+            allowedPrincipals: {
+              identities: [
+                signIn.allowedObjectId
+              ]
+            }
+          }
+        }
       }
     }
   }

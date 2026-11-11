@@ -1,7 +1,7 @@
 // K-B on Azure. Applied by hand by Sabine to her resource group (infra/README.md), checked by the CI.
 // Two passes: without imageTag, the foundation (logs, registry, vault, identities, the two storage accounts,
 // PostgreSQL server);
-// once the image is pushed and the secrets set, with imageTag, the two APIs and the jobs.
+// once the image is pushed and the secrets set, with imageTag, the two APIs, the site and the jobs.
 targetScope = 'resourceGroup'
 
 @description('Region of every K-B resource: the resource group\'s by default (France Central).')
@@ -31,6 +31,12 @@ param otlpEndpoint string = ''
 @description('Second pass: when caj-kb-digest-watch starts, in UTC; by default Monday and Thursday at 10:00, once the routine of 08:00 is over (#423). Never from 06:55 to 09:05 UTC, while the routine may run (infra/README.md, « La règle des heures »).')
 param digestWatchCronExpression string = '0 10 * * 1,4'
 
+@description('Second pass: application (client) ID of the app registration of the site, created by Sabine (infra/README.md).')
+param webAuthClientId string = ''
+
+@description('Second pass: true opens the site to the internet, once its sign-in is checked; false keeps it internal.')
+param exposeWeb bool = false
+
 var tags = {
   project: 'k-b'
 }
@@ -47,6 +53,8 @@ var identityNames = {
   // Born with their roles on the exchange storage (#420), before their jobs (#330 for the routine).
   dailyRoutine: 'id-kb-daily-routine'
   digestWatch: 'id-kb-digest-watch'
+  // The site (#571): it pulls the image and reads its two secrets, the platform only.
+  web: 'id-kb-web'
 }
 // The apps and the jobs the continuous deployment updates, also read by .github/workflows/deploy.yml: a job
 // added to the Bicep goes in this list too.
@@ -59,9 +67,10 @@ var githubDeploySubject = 'repo:SabineLaurent@189640103/K-B@1383589029:environme
 // caj-kb-digest-watch (#423) mount the share job-data on it; the other pieces keep the directory of the image,
 // emptied at each start, on purpose.
 var dataDir = '/var/lib/knowledge_base'
-// The ports of kb serve-data and kb serve-ai by default (core/config.py), set again on each app.
+// The ports of kb serve-data, kb serve-ai and kb serve-web by default (core/config.py), set again on each app.
 var dataApiPort = 8000
 var aiApiPort = 8001
+var webPort = 8002
 
 module logAnalytics 'modules/log-analytics.bicep' = {
   params: {
@@ -97,6 +106,7 @@ module registry 'modules/container-registry.bicep' = {
       identityNames.smokeTest
       identityNames.dailyRoutine
       identityNames.digestWatch
+      identityNames.web
     ]
   }
   dependsOn: [
@@ -119,6 +129,7 @@ module exchangeStorage 'modules/exchange-storage.bicep' = {
     tags: tags
     suffix: suffix
     smokeTestIdentityName: identityNames.smokeTest
+    dataApiIdentityName: identityNames.dataApi
     dailyRoutineIdentityName: identityNames.dailyRoutine
     digestWatchIdentityName: identityNames.digestWatch
     operatorObjectId: operatorObjectId
@@ -151,11 +162,16 @@ module budget 'modules/budget.bicep' = {
 var internalDomain = 'internal.${containerAppsEnvironment.outputs.defaultDomain}'
 var dataApiHost = 'ca-kb-data-api.${internalDomain}'
 var aiApiHost = 'ca-kb-ai-api.${internalDomain}'
+// The site (#571): its internal name until exposeWeb opens it, then its name on the internet.
+var webHost = exposeWeb
+  ? 'ca-kb-web.${containerAppsEnvironment.outputs.defaultDomain}'
+  : 'ca-kb-web.${internalDomain}'
 var image = '${registry.outputs.loginServer}/k-b:${imageTag}'
-// Variable to Key Vault secret, for each API. KB_DATA_API_KEY_AI_DIGEST is the key of the AI API to
-// the data API: read by both.
+// Variable to Key Vault secret, for each app. KB_DATA_API_KEY_AI_DIGEST is the key of the AI API to
+// the data API, KB_DATA_API_KEY_WEB the key of the site: each read by both apps.
 var dataApiSecretVariables = {
   KB_DATA_API_KEY_AI_DIGEST: 'kb-data-api-key-ai-digest'
+  KB_DATA_API_KEY_WEB: 'kb-data-api-key-web'
 }
 var aiApiSecretVariables = {
   KB_AI_API_KEY_KB_DIGEST: 'kb-ai-api-key-kb-digest'
@@ -176,6 +192,11 @@ var digestWatchSecretVariables = {
   KB_AI_API_KEY_KB_DIGEST: aiApiSecretVariables.KB_AI_API_KEY_KB_DIGEST
   KB_AI_API_KEY_KB_TREND_REPORT: aiApiSecretVariables.KB_AI_API_KEY_KB_TREND_REPORT
 }
+var webSecretVariables = {
+  KB_DATA_API_KEY_WEB: 'kb-data-api-key-web'
+}
+// The client secret of the app registration of the site: read by its sign-in, never by its code.
+var webSignInSecretName = 'kb-web-auth-client-secret'
 var secretGrants = concat(
   map(items(dataApiSecretVariables), variable => {
     secret: variable.value
@@ -189,10 +210,18 @@ var secretGrants = concat(
     secret: variable.value
     identity: identityNames.dailyRoutine
   }),
+  map(items(webSecretVariables), variable => {
+    secret: variable.value
+    identity: identityNames.web
+  }),
   [
     {
       secret: bigQueryKeySecretName
       identity: identityNames.dailyRoutine
+    }
+    {
+      secret: webSignInSecretName
+      identity: identityNames.web
     }
   ],
   map(items(digestWatchSecretVariables), variable => {
@@ -230,6 +259,8 @@ module dataApi 'modules/api-container-app.bicep' = if (deployWorkloads) {
       KB_DATABASE_URL: 'postgresql://${identityNames.dataApi}@${databaseHost}:5432/${databaseName}?${databaseUrlOptions}'
       KB_DATABASE_AUTH: 'entra'
       AZURE_CLIENT_ID: dataApiIdentity.properties.clientId
+      // The sheets of watch it serves to the site (#571), read by the same identity.
+      KB_EXCHANGE_BLOB_URL: exchangeStorage.outputs.blobEndpoint
       KB_DATA_API_HOST: '0.0.0.0'
       KB_DATA_API_PORT: string(dataApiPort)
       // TrustedHost compares the Host received, /health included: the internal name only.
@@ -277,6 +308,46 @@ module aiApi 'modules/api-container-app.bicep' = if (deployWorkloads) {
     // The longest request the ingress lets through (240 s), then the last exports of the lifespan
     // (6 s at most), and a margin: a shorter stop would cut the request and lose its measures.
     terminationGracePeriodSeconds: 250
+  }
+  dependsOn: [
+    secretAccess
+  ]
+}
+
+// The site (#571), Sabine alone: the sign-in of Microsoft Entra in front, the check of her object ID in its
+// code (KB_WEB_OPERATOR_ID). Its identity stays at the default lifecycle None: its code gets no token, and
+// has no right in Azure; it reads the data API only, by its key.
+module web 'modules/api-container-app.bicep' = if (deployWorkloads) {
+  params: {
+    name: 'ca-kb-web'
+    location: location
+    tags: tags
+    environmentId: containerAppsEnvironment.outputs.id
+    identityName: identityNames.web
+    registryServer: registry.outputs.loginServer
+    image: image
+    command: 'serve-web'
+    port: webPort
+    environmentVariables: {
+      KB_DATA_DIR: dataDir
+      KB_WEB_HOST: '0.0.0.0'
+      KB_WEB_PORT: string(webPort)
+      // TrustedHost compares the Host received, /health included: the name of the site only.
+      KB_WEB_ALLOWED_HOSTS: webHost
+      KB_WEB_OPERATOR_ID: operatorObjectId
+      KB_DATA_API_URL: 'https://${dataApiHost}'
+      KB_DEPLOYMENT_ENVIRONMENT: 'production'
+    }
+    vaultEntries: webSecretVariables
+    vaultUri: keyVault.outputs.uri
+    probeHost: webHost
+    // The first pass of the site keeps it internal: it opens once its sign-in is read (infra/README.md).
+    external: exposeWeb
+    entraSignIn: {
+      clientId: webAuthClientId
+      clientSecretName: webSignInSecretName
+      allowedObjectId: operatorObjectId
+    }
   }
   dependsOn: [
     secretAccess
@@ -411,6 +482,7 @@ module deployAccess 'modules/deploy-access.bicep' = if (deployWorkloads) {
     identities
     dataApi
     aiApi
+    web
     smokeTestJob
     migrateDatabaseJob
     dailyRoutineJob
@@ -425,3 +497,5 @@ output postgresqlServerName string = postgresqlServer.outputs.name
 output postgresqlServerHost string = databaseHost
 // The secret AZURE_CLIENT_ID of the repository (infra/README.md, « Déployer une version »).
 output deployIdentityClientId string = deployWorkloads ? deployAccess!.outputs.clientId : ''
+// The address of the site, for the checks of infra/README.md: internal until exposeWeb.
+output webAddress string = 'https://${webHost}'
