@@ -52,8 +52,9 @@ var deployment = loadJsonContent('deployment.json')
 // tokens carry the immutable form, owner and repository with their numeric IDs
 // (GET /repos/SabineLaurent/K-B/actions/oidc/customization/sub: use_immutable_subject).
 var githubDeploySubject = 'repo:SabineLaurent@189640103/K-B@1383589029:environment:production'
-// The image has no KB_DATA_DIR (journal ADR, 2026-11-06): each piece sets it. No piece mounts a share
-// yet: the directory of the image, emptied at each start, on purpose.
+// The image has no KB_DATA_DIR (journal ADR, 2026-11-06): each piece sets it. caj-kb-daily-routine mounts
+// the share job-data on it (#330); the other pieces keep the directory of the image, emptied at each
+// start, on purpose.
 var dataDir = '/var/lib/knowledge_base'
 // The ports of kb serve-data and kb serve-ai by default (core/config.py), set again on each app.
 var dataApiPort = 8000
@@ -91,6 +92,7 @@ module registry 'modules/container-registry.bicep' = {
       identityNames.aiApi
       identityNames.dataApi
       identityNames.smokeTest
+      identityNames.dailyRoutine
     ]
   }
   dependsOn: [
@@ -159,6 +161,12 @@ var aiApiSecretVariables = {
   KB_LLM_API_KEY: 'kb-llm-api-key'
   KB_OTLP_HEADERS: 'kb-otlp-headers'
 }
+// The routine (#330): its own token of GitHub, apart from the one of the AI API, and the key of
+// BigQuery, read as a file.
+var dailyRoutineSecretVariables = {
+  KB_GITHUB_TOKEN: 'kb-github-token'
+}
+var bigQueryKeySecretName = 'kb-bigquery-key'
 var secretGrants = concat(
   map(items(dataApiSecretVariables), variable => {
     secret: variable.value
@@ -167,7 +175,17 @@ var secretGrants = concat(
   map(items(aiApiSecretVariables), variable => {
     secret: variable.value
     identity: identityNames.aiApi
-  })
+  }),
+  map(items(dailyRoutineSecretVariables), variable => {
+    secret: variable.value
+    identity: identityNames.dailyRoutine
+  }),
+  [
+    {
+      secret: bigQueryKeySecretName
+      identity: identityNames.dailyRoutine
+    }
+  ]
 )
 
 module secretAccess 'modules/key-vault-secret-access.bicep' = if (deployWorkloads) {
@@ -272,6 +290,33 @@ module smokeTestJob 'modules/smoke-test-job.bicep' = if (deployWorkloads) {
   ]
 }
 
+module dailyRoutineJob 'modules/daily-routine-job.bicep' = if (deployWorkloads) {
+  params: {
+    location: location
+    tags: tags
+    environmentId: containerAppsEnvironment.outputs.id
+    identityName: identityNames.dailyRoutine
+    registryServer: registry.outputs.loginServer
+    image: image
+    environmentVariables: {
+      KB_DATA_DIR: dataDir
+      KB_VAULT_DIR: '${dataDir}/vault'
+      KB_EXCHANGE_BLOB_URL: exchangeStorage.outputs.blobEndpoint
+      // The base online (#421), opened by the token of the identity of the job, role kb_writer.
+      KB_DATABASE_URL: 'postgresql://${identityNames.dailyRoutine}@${databaseHost}:5432/${databaseName}?${databaseUrlOptions}'
+      KB_DATABASE_AUTH: 'entra'
+    }
+    vaultEntries: dailyRoutineSecretVariables
+    bigQueryKeySecretName: bigQueryKeySecretName
+    vaultUri: keyVault.outputs.uri
+    jobDataStorageName: jobFilesStorage.outputs.storageName
+    dataDir: dataDir
+  }
+  dependsOn: [
+    secretAccess
+  ]
+}
+
 // The base online (#421): its name, created by infra/postgresql/create-principals.sql, and the TLS of
 // libpq: the token is a bearer secret, it goes only to a server whose certificate is checked against
 // the store of the image.
@@ -328,6 +373,7 @@ module deployAccess 'modules/deploy-access.bicep' = if (deployWorkloads) {
     aiApi
     smokeTestJob
     migrateDatabaseJob
+    dailyRoutineJob
   ]
 }
 

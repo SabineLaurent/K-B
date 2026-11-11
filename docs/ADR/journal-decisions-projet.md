@@ -6466,6 +6466,74 @@ de Sabine du 10/11).
   deux écrivains : la descente refuse exactement ce qu'ils échappent). Non vérifié : qu'Obsidian décode une référence
   dans un autolien comme cmark-gfm ; le refus vaut dans les deux cas. — PR de #424
 
+### Routine quotidienne en ligne : `caj-kb-daily-routine` (#330)
+
+Plan validé par Sabine le 10/11 (sortie du mode plan à 10:48Z), relu par un sous-agent neuf et par time-knight.
+
+- **`kb write-tops` tourne en ligne dans `caj-kb-daily-routine`, sur le coffre de travail de `job-data`, et ses
+  fiches descendent au Mac par `watch`.** Plan de mise en ligne du 06/11 (I7), validé par Sabine ; ferme la partie
+  `kb write-tops` de la question ouverte « Où tourne … en ligne » (2026-10-19). Pourquoi, dit par Sabine le 10/11 :
+  « Parce qu'ils font partie du process de collect. Il skip l'import parce qu'ils ne vont pas en bdd et suivent
+  ensuite un parcours de digest sans passage par la case llm puisque tout est déterministe par du code python. » Et :
+  « C'est un peu mon témoin de fonctionnement du pipeline + restitution sans llm. » Les tops sont un chemin de
+  référence sans LLM : si les comptes rendus échouent alors que les fiches des tops sortent, la collecte et la
+  publication fonctionnent, et la panne est sur le chemin des comptes rendus (l'import, les deux API ou le modèle). Les
+  relevés des deux tops GitHub viennent de `kb collect`, n'entrent pas en base (`etl/raw_reading.py`, journal du
+  2026-10-07), et leurs fiches sont écrites par du code, sans l'API IA (`post/top_sheets.py`) : leur place est la
+  routine, pas `caj-kb-digest-watch`, qui appelle le modèle. Le montage de `job-data` (#420) lève l'obstacle de la
+  question, qu'aucun conteneur ne montait le coffre. `kb digest` et `kb trend-report` restent ouverts jusqu'à #423
+  (`caj-kb-digest-watch`). — PR de #330
+- **Règle 3 de `.claude/rules/poc.md` amendée : en ligne, le brut reste un fichier sous `KB_DATA_DIR`, sur Azure
+  Files ; Blob ne sert qu'aux échanges avec le Mac ; les clés POSIX relatives de `raw_store` restent ; le brut dans
+  Blob passe en suite du projet (#317).** Décision 9 de Sabine du 06/11, appliquée dans la PR qui met le brut sur
+  Azure Files. Pourquoi : la raison de la règle (« au 08/11, le brut passe dans Azure Blob Storage ») ne tient plus
+  depuis que les jobs gardent leurs données dans un partage (décision 3 du 06/11) ; les clés restent pour que Blob
+  reste possible sans toucher aux appelants. Le texte de la règle est modifié par Sabine (`.claude/`). — PR de #330
+- **Rien du Mac ne passe en ligne : ni brut, ni état de la collecte, ni fiche. La routine part de zéro, sur un
+  partage vide et une base qui n'a que ses sept sources.** Décision de Sabine du 10/11 : « les collect et production
+  précédente de kb local sur ma machine ne sont pas à garder » (des essais de développement, `kb` n'étant pas encore
+  utilisé pour de vrai). **Inverse en partie** « Base : la base du Mac est jetable » (2026-11-06) : la base en ligne ne
+  repart plus du brut du Mac, et l'amorçage de l'issue (copier `raw/`, l'état et `veille/`, un instantané avant)
+  tombe ; **et** l'instantané « avant l'amorçage » (2026-11-10, #420) : aucun, le partage étant vide, la règle d'un
+  instantané avant chaque mise en production vaut dès le tag qui suit. Ce que la décision coûte : la base en ligne n'a
+  que ce qu'une première collecte rapporte (arXiv depuis le 01/05, 7 jours de TLDR, tout CISA KEV, 8 jours de GH
+  Archive). Limite : sur le Mac, la purge du brut ne tourne qu'avec un `kb purge` local ; sa parade est au registre
+  (fiche 1, « Sécurité »). — PR de #330
+- **Les deux dossiers vides du coffre, `vault/` et `vault/Clippings/`, sont créés une fois par l'opératrice, sous un
+  rôle temporaire Storage File Data Privileged Contributor posé sur le seul partage, retiré ensuite.** Décision de
+  Sabine du 10/11 (« on garde le plan »). Pourquoi : la routine refuse de démarrer sans `vault/`, et la collecte des
+  clips échoue sans `vault/Clippings/`. Écarté : les faire créer par la routine, qui ne verrait plus un `KB_VAULT_DIR`
+  mal écrit ou un coffre disparu ; `kb init` (#356) viendra plus tard. Limite : le temps du geste, l'opératrice lit et
+  écrit tout le partage ; le rôle ne se retire que verrou levé (`infra/README.md`, « Les deux dossiers du coffre »).
+  — PR de #330
+- **La routine démarre à 08:00 UTC (`0 8 * * *`), soit 9 h à Paris en hiver.** Décision de Sabine du 10/11
+  (« collecte quotidienne à 9h »). **Inverse** le cron `0 3 * * *` du plan de mise en ligne du 06/11, venu de
+  l'architecte sans raison écrite. Ce qui suit : aucune exécution à la main ne démarre après 07:00 UTC jusqu'à la fin
+  de celle du cron, 09:00 UTC au plus (le délai de 3 600 s borne aussi la reprise, Microsoft Learn, « Jobs in Azure
+  Container Apps ») ; `caj-kb-digest-watch` démarre à 10:00 UTC (#423). Limite : rien ne tient deux exécutions à
+  l'écart avant #426, la règle des heures est une consigne. — PR de #330
+- **`id-kb-deploy` garde Container Apps Jobs Contributor sur la routine, donc peut agir sous son identité et obtenir
+  ses deux secrets.** Risque accepté par Sabine le 10/11 (plan de #330, décision 3), sous réserve de la revue de
+  sécurité. Pourquoi : le risque est propre à toute livraison continue (risque accepté le 06/11, constat 6 de #415),
+  et les deux secrets sont au moindre privilège : un jeton *fine-grained* sans permission, la clé d'un compte de
+  service qui n'a que BigQuery Job User dans un projet sans facturation, chacun révocable seul. Écarté : un rôle
+  personnalisé sans `Microsoft.App/jobs/*/action`, puisque `Microsoft.App/jobs/write`, qu'exige le changement
+  d'image, couvre tout le job. — PR de #330
+- **#458 (les échecs de connexion à la base en ligne) n'est plus un préalable de #330 : elle passe après #423.**
+  Décision de Sabine du 10/11. Ce qui la remplace pour la routine : la vérification des droits de
+  `id-kb-daily-routine` (`t|t|t`) avant la première exécution, et un test de `kb import` puis de `kb purge` sous un
+  membre de `kb_writer` (`tests/commands/test_purge_command.py`) ; la première exécution en ligne, le 10/11, sous ce
+  rôle et avec l'image `v0.1.1`, dont la purge tourne dans `kb import`, a fini `Succeeded`. — PR de #330
+- **L'essai de #295 sur `job-data` se fait dans l'amorçage de #330, sans sonde ni tag à part : un temporaire
+  `.<jour>.md.tmp` posé par az (un second client, FileREST) dans le dossier d'une fiche de top, puis deux exécutions
+  du job le même jour UTC. La première doit échouer sur `temporary_file_found` pour ce top ; la seconde, temporaire
+  retiré, doit laisser intacte la fiche de l'autre top écrite par la première.** Décisions de Sabine du 10/11. Le tag
+  n'attend plus que la fusion de #295. Écartées : une sonde sur `job-data`, avec un tag ou une passe à part ; une
+  fausse fiche du jour posée par az, que la publication de la même exécution aurait envoyée dans `watch`, où la vraie
+  fiche de ce jour ne serait jamais arrivée, et que personne ne peut effacer des versions. Limites, écrites au registre
+  avec leur parade (« Écritures concurrentes en ligne ») : deux conteneurs qui écrivent en même temps, et la fraîcheur
+  d'une écriture d'un client pour un autre. — PR de #330
+
 ## Décisions encore ouvertes
 
 - **Une limite de connexions du serveur** (2026-11-05, #161) : `limit_concurrency` d'uvicorn, écarté
@@ -6512,7 +6580,9 @@ de Sabine du 10/11).
   ne monte au POC (règle 4 de `.claude/rules/poc.md`) ; à trancher avant la mise en ligne du
   08/11 (« Tops : les fiches par `kb write-tops` »). La même question vaut pour `kb digest`
   (2026-10-21, « Fiches de veille : `kb digest` les écrit dans le coffre »), et pour
-  `kb trend-report` (2026-10-30, « Tendances : un compte rendu deux fois par semaine »).
+  `kb trend-report` (2026-10-30, « Tendances : un compte rendu deux fois par semaine »). **Close pour
+  `kb write-tops` le 2026-11-10** : dans `caj-kb-daily-routine` (« Routine quotidienne en ligne : `caj-kb-daily-routine`
+  (#330) ») ; reste ouverte pour `kb digest` et `kb trend-report`, jusqu'à #423 (`caj-kb-digest-watch`).
 
 - **Un code de sortie dédié à l'authentification**, pour toutes les commandes (2026-10-21) : à
   reconsidérer avec #160 (jetons qui expirent) ; une clé refusée sort aujourd'hui en 1.

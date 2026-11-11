@@ -1,11 +1,11 @@
 -- K-B: the roles and the rights of the base kb online, run by the Microsoft Entra administrator of
--- the server on the base kb, after create-principals.sql and before the first kb migrate-database
--- (infra/README.md). It can be run again: each statement leaves what is already there as it is.
+-- the server on the base kb, after create-principals.sql and create-daily-routine-principal.sql, and
+-- before the first kb migrate-database (infra/README.md). It can be run again: each statement leaves what is already there as it is.
 -- The tests run it as it is on their server (tests/database/test_grants.py).
 --
 -- id-kb-migrate-database creates the tables, and owns them: kb migrate-database grants them to
 -- kb_reader and kb_writer (src/k_b/database/grants_postgresql.sql). kb_reader is the data API, which
--- reads; kb_writer the daily routine, which writes the data (its identity joins it with #330).
+-- reads; kb_writer the daily routine, which writes the data (#330).
 -- No other role connects to the base, nor creates anything in it: on Azure, every role may create
 -- objects in public until this script revokes it (Microsoft Learn, "Access management", read on
 -- 2026-11-06).
@@ -56,3 +56,4 @@ GRANT USAGE ON SCHEMA public TO kb_reader, kb_writer;
 GRANT USAGE, CREATE ON SCHEMA public TO "id-kb-migrate-database";
 
 GRANT kb_reader TO "id-kb-data-api";
+GRANT kb_writer TO "id-kb-daily-routine";
