@@ -490,13 +490,12 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
 
 ## Limites
 
-- **Les comptes rendus laissent deux trous chaque semaine.** Chacun lit les 3 derniers jours, comptés depuis sa
-  demande, par la date de la source (décision de Sabine du 2026-11-11). Le calendrier: rien ne couvre du jeudi 10:00
-  au vendredi 10:00 UTC. Le retard de collecte: un item daté avant le début d'une fenêtre mais collecté après le
-  compte rendu précédent n'entre dans aucun, comme les éditions TLDR et les entrées KEV du lundi et du jeudi, datées
-  de minuit et collectées le lendemain. #565, qui fait partir chaque compte rendu de la fin du précédent, couvre le
-  calendrier; le retard de collecte attend la lecture par date d'arrivée dans K-B, prévue après l'oral blanc
-  ([`infra/README.md`](../infra/README.md), « Les comptes rendus en ligne »).
+- **Les comptes rendus laissent un trou, le retard de collecte.** Depuis #565, chacun part du `until` de la fiche
+  précédente de son sujet, par la date de la source: plus rien ne manque d'un compte rendu au suivant. Un item daté
+  avant le `until` d'un compte rendu mais collecté après lui n'entre dans aucun, comme les éditions TLDR et les
+  entrées KEV du lundi et du jeudi, datées de minuit et collectées le lendemain. Il attend la lecture par date
+  d'arrivée dans K-B, prévue après l'oral blanc ([`infra/README.md`](../infra/README.md), « Les comptes rendus en
+  ligne »).
 - **Rien ne tient deux exécutions à l'écart**, sauf une consigne: les heures de départ à la main de
   [`infra/README.md`](../infra/README.md), « La règle des heures ». Le verrou de #426 tiendra deux exécutions de la
   routine à l'écart, pas le job des comptes rendus, qui ne touche pas la base.

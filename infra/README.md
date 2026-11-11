@@ -1178,21 +1178,19 @@ Limite de cette parade : coupée après une fiche, la relance ne rattrape rien. 
 qu'une fiche du jour existe (`src/k_b/commands/digest_command.py`), et les sujets manquants attendent le passage
 suivant.
 
-**La fenêtre** : chaque compte rendu par sujet lit les items des 3 derniers jours, comptés depuis sa demande, par la
-date de la source ([fiches-veille.md](../docs/fiches-veille.md), « Fenêtre » ; décision de Sabine du 11/11, 3 jours
-et non 5). Limite : deux pertes, chaque semaine.
-- **Le calendrier** : du lundi au jeudi, 3 jours ; du jeudi au lundi, 4. Rien ne couvre du jeudi 10:00 au vendredi
-  10:00 UTC.
-- **Le retard de collecte** : la base ne se remplit qu'à 08:00 UTC. Un item daté avant le début d'une fenêtre, mais
-  collecté après le compte rendu précédent, n'entre dans aucun des deux. C'est le cas des éditions TLDR et des entrées
-  KEV, datées de minuit : celle du lundi, collectée le mardi, tombe avant la fenêtre du jeudi (qui part du lundi
-  10:00) ; celle du jeudi, collectée le vendredi, avant celle du lundi.
+**La fenêtre** : depuis #565, chaque compte rendu par sujet lit les items datés du `until` de la fiche précédente du
+sujet jusqu'à sa demande, par la date de la source : du lundi au jeudi, 3 jours ; du jeudi au lundi, 4, sans trou
+entre deux comptes rendus (règle de Sabine du 26/10, [tendances.md](../docs/tendances.md), fin de « Hors v1 »). Le
+premier compte rendu d'un sujet sans fiche lit 3 jours (`KB_DIGEST_WINDOW_DAYS`, le défaut ; décision de Sabine du
+11/11, 3 jours et non 5) ([fiches-veille.md](../docs/fiches-veille.md), « Fenêtre »). Limite : une perte reste.
+- **Le retard de collecte** : la base ne se remplit qu'à 08:00 UTC. Un item daté avant le `until` d'un compte rendu,
+  mais collecté après lui, n'entre ni dans ce compte rendu ni dans le suivant, qui part de ce `until`. C'est le cas
+  des éditions TLDR et des entrées KEV, datées de minuit : celle du lundi, collectée le mardi, tombe avant la fenêtre
+  du jeudi (qui part du lundi 10:00) ; celle du jeudi, collectée le vendredi, avant celle du lundi.
 
 Pour réduire le risque :
-- #565 (« Démarrer chaque compte rendu de veille à la fin du précédent de son sujet »), qui code la règle de Sabine du
-  26/10 ([tendances.md](../docs/tendances.md), fin de « Hors v1 »), couvre le passage d'un compte rendu au suivant,
-  donc le calendrier, pas le retard de collecte. Celui-ci attend la lecture par date d'arrivée dans K-B, prévue après
-  l'oral blanc (décision de Sabine du 11/11).
+- La lecture par date d'arrivée dans K-B, prévue après l'oral blanc (décision de Sabine du 11/11). #565 a couvert le
+  passage d'un compte rendu au suivant, le trou du jeudi 10:00 au vendredi 10:00 UTC.
 - Les items absents d'un compte rendu ne sont pas perdus pour K-B : ils restent 3 ans dans la base
   ([registre](../docs/registre-traitements.md), fiche 1, « Durée de conservation ») et se lisent par l'API de données
   (`GET /items?since=…`, [specs-api.md](../docs/specs-api.md)).
