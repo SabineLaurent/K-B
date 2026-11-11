@@ -8,9 +8,9 @@
 - **Série** : suite de [Servir la liste par une API locale](2026-10-14-servir-la-liste-par-une-api-locale.md) et
   de [Servir le détail et les tendances](2026-10-15-servir-le-detail-et-les-tendances.md).
 
-Les commits de la branche sont `3e85646` (identifiants, `exploited`, total), `2134eca` (10 paquets et
-`packages_truncated`), puis `6b4c98b` et `972b85d` (tri des deux passages de revue de code). Le diff contre
-`origin/main` (`58f348f`) touche les onze fichiers listés en bas de la section « Preuve ». Les autres commits que
+Les commits de la branche, rebasée sur `origin/main` (`ffff467`), sont `4fc435d` (identifiants, `exploited`,
+total), `89b0069` (10 paquets et `packages_truncated`), puis `b2089cf` et `0f943eb` (tri des deux passages de
+revue de code). Le diff contre `origin/main` touche les onze fichiers listés en bas de la section « Preuve ». Les autres commits que
 liste l'historique (purge, descente des fiches, justifications OWASP, règle des éléments externes) sont ceux de PR
 déjà fusionnées : ils ne font pas partie de cette PR.
 
