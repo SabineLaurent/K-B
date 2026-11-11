@@ -96,7 +96,7 @@ La fiche écrit comme limites ce que le code ne fait pas :
 | `kb create-db`, `kb import`, `kb purge` sur un `KB_DATA_DIR` neuf, le 2026-11-11 : codes 0, lignes de `logs/kb.log` | le format d'une ligne et la ligne de la purge des journaux, citées dans la fiche |
 | Requête en lecture seule sur `log-kb`, 30 jours, le 2026-11-11 à 14:38 UTC | les deux API et les trois jobs écrivent dans `log-kb` ; aucune ligne de mesure en ligne |
 | Script de contrôle : 0 caractère `Cc`/`Cf` ; chaque renvoi `fichier:ligne` dans la longueur de son fichier | pas de caractère invisible ni de renvoi hors du fichier |
-| Relecture 1 (15 constats, tous traités), relecture 2 sur le delta | justesse des renvois au code de `d1b5400` |
+| Relecture 1 (15 constats) et relecture 2 sur le delta (7 constats), tous traités | justesse des renvois au code de `d1b5400` |
 
 ## Ce que tu dois pouvoir défendre
 
