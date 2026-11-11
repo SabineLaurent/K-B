@@ -773,8 +773,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 3. **Normalisation** des items lus (`normalize_item`, `src/k_b/etl/normalize.py`) :
    - dates gardées telles quelles : elles sont déjà en UTC, converties à la lecture par le type
      `UtcDatetime` de l'item (`src/k_b/items.py`) ;
-   - URL normalisées : les paramètres `utm_*` et les `&` en trop sont retirés, les autres
-     restent tels quels et dans leur ordre.
+   - URL normalisées : les paramètres `utm_*` (en minuscules seulement), les `&` en trop et un
+     `?` resté vide sont retirés, les autres restent tels quels et dans leur ordre.
 
    `brief09_assistant-veille-tech` (relu le 2026-10-01) a servi d'indication, pas de modèle : il
    ne fait pas autorité. On y retrouve un modèle d'article commun et la date de révision arXiv. À
@@ -985,9 +985,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
        l'ordre du coffre n'est pas gardé. La clé stable d'un tag est son nom (`tag.name`,
        unique) ; `tag.id` est interne, et SQLite peut redonner l'id d'un tag supprimé au tag
        créé ensuite (rien ne l'expose). Les `#tags` écrits dans le texte ne sont pas lus ;
-     - **clé** : l'URL sans ses paramètres `utm_*` (`remove_tracking_parameters`), les autres
-       paramètres gardés tels quels et dans leur ordre ; pas d'empreinte de contenu (journal ADR,
-       « Collecte : clips ») ;
+     - **clé** : l'URL sans ses paramètres `utm_*` ni ses `&` en trop
+       (`remove_tracking_parameters`), les autres paramètres gardés tels quels et dans leur
+       ordre ; pas d'empreinte de contenu (journal ADR, « Collecte : clips ») ;
      - **homogénéisation** : `created` et `published` sont des jours `AAAA-MM-JJ`, l'année sur
        4 chiffres à partir de 1000, écrits à minuit UTC, comme `dateAdded` de CISA KEV. Le jour
        est celui que Web Clipper a écrit, dans le fuseau de l'utilisatrice. Une valeur vide,
