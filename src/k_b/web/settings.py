@@ -1,18 +1,22 @@
-"""The settings kb serve-web reads: where it listens, the hosts it answers, and whose header it
-checks; the check is off on the machine only, outside Azure Container Apps (docs/site-web.md,
-"Réglages")."""
+"""The settings kb serve-web reads: where it listens, the hosts it answers, whose header it checks,
+and how it reads the data API; the check is off on the machine only, outside Azure Container Apps
+(docs/site-web.md, "Réglages")."""
 
 import ipaddress
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from pydantic import SecretStr
+
+from k_b.core.api_keys import API_KEY_VARIABLE_PREFIX, find_api_key_refusal
 from k_b.core.api_settings import (
     find_allowed_hosts_refusal,
     find_host_refusal,
     find_port_refusal,
     split_allowed_hosts,
 )
-from k_b.core.config import GUID, WEB_ALLOWED_HOSTS, WEB_HOST, WEB_PORT
+from k_b.core.config import DATA_API_URL, GUID, WEB_ALLOWED_HOSTS, WEB_HOST, WEB_PORT
+from k_b.core.outbound import find_internal_api_url_refusal
 from k_b.core.quoting import quote_value
 
 # Where kb serve-web listens and the hosts it answers; not set: the defaults of core/config.py.
@@ -29,6 +33,17 @@ WEB_OPERATOR_ID_VARIABLE = "KB_WEB_OPERATOR_ID"
 # Set by Azure Container Apps in each container of an app (Microsoft Learn, "Manage environment
 # variables on Azure Container Apps", read on 2026-11-11): a fact of the platform, never a setting.
 CONTAINER_APP_NAME_VARIABLE = "CONTAINER_APP_NAME"
+# The data API the site reads, as the AI API reads it (ai_api/connectors/data_api_settings.py,
+# which web may not import), and the key of its client WEB, without default (a secret: fail
+# closed); kb serve-data reads the same variable for its client WEB.
+DATA_API_URL_VARIABLE = "KB_DATA_API_URL"
+DATA_API_KEY_VARIABLE = f"{API_KEY_VARIABLE_PREFIX}WEB"
+
+
+@dataclass(frozen=True)
+class DataApiAccess:
+    base_url: str
+    api_key: SecretStr
 
 
 @dataclass(frozen=True)
@@ -38,11 +53,12 @@ class WebSettings:
     allowed_hosts: tuple[str, ...]
     # In lowercase; None under KB_WEB_AUTH=off: no header checked.
     operator_id: str | None
+    data_api: DataApiAccess
 
 
 def read_web_settings_or_refusal(environ: Mapping[str, str]) -> WebSettings | str:
     """The settings of kb serve-web, or why a variable is refused, its value quoted, but the
-    object id."""
+    object id, the URL and the key."""
     host = environ.get(WEB_HOST_VARIABLE, WEB_HOST)
     port = environ.get(WEB_PORT_VARIABLE, str(WEB_PORT))
     allowed_hosts_value = environ.get(WEB_ALLOWED_HOSTS_VARIABLE)
@@ -62,11 +78,15 @@ def read_web_settings_or_refusal(environ: Mapping[str, str]) -> WebSettings | st
     access = read_access_or_refusal(environ, host)
     if isinstance(access, str):
         return access
+    data_api = read_data_api_access_or_refusal(environ)
+    if isinstance(data_api, str):
+        return data_api
     return WebSettings(
         host=host,
         port=int(port),
         allowed_hosts=allowed_hosts,
         operator_id=access.operator_id,
+        data_api=data_api,
     )
 
 
@@ -131,3 +151,21 @@ def read_entra_access_or_refusal(
             " could send the header of the operator"
         )
     return OperatorAccess(operator_id=operator_id.lower())
+
+
+def read_data_api_access_or_refusal(
+    environ: Mapping[str, str],
+) -> DataApiAccess | str:
+    """The URL of the data API and the key of the client WEB, or why one is refused, by the rules
+    the AI API and kb serve-data apply: never the URL, never the key."""
+    # Empty is not set, as for the AI API.
+    base_url = environ.get(DATA_API_URL_VARIABLE) or DATA_API_URL
+    api_key = environ.get(DATA_API_KEY_VARIABLE)
+    if not api_key:
+        return f"{DATA_API_KEY_VARIABLE}: not set"
+    refusal = find_internal_api_url_refusal(
+        DATA_API_URL_VARIABLE, base_url, environ
+    ) or find_api_key_refusal(API_KEY_VARIABLE_PREFIX, DATA_API_KEY_VARIABLE, api_key, {})
+    if refusal is not None:
+        return refusal
+    return DataApiAccess(base_url=base_url, api_key=SecretStr(api_key))

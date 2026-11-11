@@ -1,0 +1,159 @@
+{
+  "items": [
+    {
+      "id": 12,
+      "kind": "newsletter_article",
+      "title": "Notes on machine progress in algebra (2 minute read)",
+      "source_date": "2026-10-07T00:00:00Z",
+      "url": "https://openai.com/index/sharing-ai-progress-in-mathematics/",
+      "withdrawn_at": null,
+      "edition": "ai"
+    },
+    {
+      "id": 11,
+      "kind": "newsletter_article",
+      "title": "Mistral Large 4 (9 minute read)",
+      "source_date": "2026-10-07T00:00:00Z",
+      "url": "https://mistral.ai/news/mistral-large-4/",
+      "withdrawn_at": null,
+      "edition": "ai"
+    },
+    {
+      "id": 13,
+      "kind": "newsletter_article",
+      "title": "A Small Virtual Machine, Step by Step (35 minute read)",
+      "source_date": "2026-10-05T00:00:00Z",
+      "url": "https://www.jmeiners.com/lc3-vm/",
+      "withdrawn_at": null,
+      "edition": "dev"
+    },
+    {
+      "id": 6,
+      "kind": "release",
+      "title": "anthropics/claude-code Claude Code 2.1.287",
+      "source_date": "2026-10-01T18:00:22Z",
+      "url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.287",
+      "withdrawn_at": null,
+      "repository_name": "anthropics/claude-code",
+      "tag_name": "v2.1.287"
+    },
+    {
+      "id": 7,
+      "kind": "release",
+      "title": "anthropics/claude-code v2.1.286",
+      "source_date": "2026-09-30T19:10:13Z",
+      "url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.286",
+      "withdrawn_at": null,
+      "repository_name": "anthropics/claude-code",
+      "tag_name": "v2.1.286"
+    },
+    {
+      "id": 8,
+      "kind": "release",
+      "title": "anthropics/claude-code v2.1.285",
+      "source_date": "2026-09-29T19:27:30Z",
+      "url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.285",
+      "withdrawn_at": null,
+      "repository_name": "anthropics/claude-code",
+      "tag_name": "v2.1.285"
+    },
+    {
+      "id": 3,
+      "kind": "vulnerability",
+      "title": "Apple Multiple Products Out-of-Bounds Write Vulnerability",
+      "source_date": "2026-09-29T00:00:00Z",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-86950",
+      "withdrawn_at": null,
+      "cve_id": "CVE-2026-86950",
+      "exploited": true
+    },
+    {
+      "id": 2,
+      "kind": "paper",
+      "title": "Evaluating System One Models for Agent Security Decisions: Reliability, Calibration, and Selective Automation",
+      "source_date": "2026-09-27T09:30:13Z",
+      "url": "https://arxiv.org/abs/2609.33401",
+      "withdrawn_at": null,
+      "arxiv_id": "2609.33401"
+    },
+    {
+      "id": 4,
+      "kind": "vulnerability",
+      "title": "Citrix NetScaler Improper Restriction of Operations within the Bounds of a Memory Buffer Vulnerability",
+      "source_date": "2026-09-27T00:00:00Z",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-88772",
+      "withdrawn_at": null,
+      "cve_id": "CVE-2026-88772",
+      "exploited": true
+    },
+    {
+      "id": 1,
+      "kind": "paper",
+      "title": "Resource-Optimized and Energy-Aware Agentic AI Framework Anchored on Blockchain for Secure Software Supply Chains",
+      "source_date": "2026-09-25T13:53:50Z",
+      "url": "https://arxiv.org/abs/2609.31282",
+      "withdrawn_at": null,
+      "arxiv_id": "2609.31282"
+    },
+    {
+      "id": 9,
+      "kind": "advisory",
+      "title": "LangGraph Checkpoint: Unsafe JSON deserialization in checkpoint loading",
+      "source_date": "2026-06-25T18:25:42Z",
+      "url": "https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
+      "withdrawn_at": null,
+      "ghsa_id": "GHSA-fjqc-hq36-qh5p",
+      "cve_id": "CVE-2020-29583",
+      "exploited": true,
+      "packages": [
+        "langgraph-checkpoint"
+      ],
+      "packages_truncated": false
+    },
+    {
+      "id": 10,
+      "kind": "advisory",
+      "title": "LangChain: Path traversal and sandbox escape in LangChain file-search middleware and loaders",
+      "source_date": "2026-06-16T15:03:14Z",
+      "url": "https://github.com/advisories/GHSA-gr75-jv2w-4656",
+      "withdrawn_at": null,
+      "ghsa_id": "GHSA-gr75-jv2w-4656",
+      "cve_id": null,
+      "exploited": null,
+      "packages": [
+        "langchain",
+        "langchain-anthropic"
+      ],
+      "packages_truncated": false
+    },
+    {
+      "id": 17,
+      "kind": "advisory",
+      "title": "LangSmith SDK: Public prompt pull deserializes untrusted manifests without trust boundary warning",
+      "source_date": "2026-05-13T15:29:30Z",
+      "url": "https://github.com/advisories/GHSA-3644-q5cj-c5c7",
+      "withdrawn_at": null,
+      "ghsa_id": "GHSA-3644-q5cj-c5c7",
+      "cve_id": "CVE-2026-45134",
+      "exploited": false,
+      "packages": [
+        "langsmith",
+        "langchain-classic",
+        "langchain"
+      ],
+      "packages_truncated": false
+    },
+    {
+      "id": 5,
+      "kind": "vulnerability",
+      "title": "Zyxel Multiple Products Use of Hard-Coded Credentials Vulnerability",
+      "source_date": "2021-11-03T00:00:00Z",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2020-29583",
+      "withdrawn_at": "2026-10-06T09:30:00Z",
+      "cve_id": "CVE-2020-29583",
+      "exploited": true
+    }
+  ],
+  "next_offset": null,
+  "total": 14
+}
