@@ -16,7 +16,9 @@ Les commits de la branche, rebasée sur `main` (94e7b2d), sont :
 - c9f2d11, le README ;
 - c7067f6, le registre ;
 - 23aa702, l'ADR et `MEMORY.md` ;
-- 76e99df, le tri des trois revues.
+- 76e99df, le tri des trois revues ;
+- cfd9350, cette note ;
+- 83906a9, le risque A4 accepté par Sabine, avec ses deux parades à venir.
 
 Les autres commits listés depuis `66e03f1` appartiennent à d'autres PR, déjà fusionnées sur `main`, et cette note ne
 les couvre pas.
