@@ -168,6 +168,5 @@ test seul. Le reste de la commande tourne tel quel.
 
 - Les deux tests ci-dessus. Les couvrir demanderait un autre mécanisme, par exemple `pool.connection(timeout=…)` :
   hors du plan, accord de time-knight.
-- La mesure de la course au démarrage en ligne : une issue à part, « Vérifier la course du pool au démarrage de kb
-  serve-data en ligne » (S). Son brouillon est écrit ; elle s'ouvre par Sabine. La suite, et le délai de 2 s, restent
-  à Sabine.
+- La mesure de la course au démarrage en ligne : #584, « Vérifier la course du pool au démarrage de kb serve-data en
+  ligne » (S). La suite, et le délai de 2 s, restent à Sabine.
