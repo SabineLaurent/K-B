@@ -36,6 +36,9 @@ valeur reçue.
 Ce contrôle ne protège rien sans l'authentification de la plateforme : l'identifiant de Sabine n'est pas
 un secret. Elle est donc posée dans le même déploiement que l'entrée publique du site.
 
+Le contrôle est un middleware HTTP (`BaseHTTPMiddleware`) : il ne voit pas une connexion WebSocket. Le site
+n'en a aucune route ; une route WebSocket demanderait un contrôle écrit en ASGI pur.
+
 `KB_WEB_AUTH=off` ne vérifie aucun en-tête, pour essayer le site sur le Mac. `kb serve-web` ne l'accepte
 que sur une adresse de boucle locale, hors d'Azure Container Apps (`CONTAINER_APP_NAME` absente). Avec
 `entra`, il refuse d'écouter hors de la boucle locale sans `CONTAINER_APP_NAME` : sur le Mac, tout appareil
