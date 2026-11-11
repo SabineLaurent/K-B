@@ -39,6 +39,9 @@ KIND_FIELD = "kind"
 PERIOD_FIELD = "period"
 START_FIELD = "start"
 PAGE_FIELD = "page"
+# A link to another site opens in a new tab, which its text says (Opquast 2025, rule 146; Sabine,
+# 2026-11-11).
+NEW_TAB_NOTE = "site externe, nouvel onglet"
 # The line of the results, where a link to another page lands (Sabine, 2026-11-11): the form, sent
 # again, starts at the top of the page.
 RESULTS_ID = "resultats"
@@ -401,10 +404,9 @@ def build_card(item: FeedItem) -> FeedCard:
         title_lang=labels.title_lang,
         link=keep_https_link(item.url),
         link_label=labels.link_label,
-        # Opened in a new tab, which the link says (Opquast 2025, rule 146; Sabine, 2026-11-11).
-        link_note="site externe, nouvel onglet"
+        link_note=NEW_TAB_NOTE
         if labels.link_lang is None
-        else "en anglais, site externe, nouvel onglet",
+        else f"en anglais, {NEW_TAB_NOTE}",
         link_lang=labels.link_lang,
     )
 

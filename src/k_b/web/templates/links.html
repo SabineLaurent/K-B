@@ -1,0 +1,6 @@
+{#- A link to another site, the one form of the site (Opquast 2025, rules 138, 142 and 146): in a new
+tab its text announces, smaller; noopener and noreferrer, so that the page opened reaches neither the
+page of K-B nor its address; a no-break space holds the arrow to its text. -#}
+{%- macro external_link(href, label, note, hreflang=none, link_class=none) -%}
+<a{% if link_class %} class="{{ link_class }}"{% endif %} href="{{ href }}"{% if hreflang %} hreflang="{{ hreflang }}"{% endif %} target="_blank" rel="noopener noreferrer">{{ label }}<span aria-hidden="true">&nbsp;↗</span> <span class="link-note">({{ note }})</span></a>
+{%- endmacro -%}

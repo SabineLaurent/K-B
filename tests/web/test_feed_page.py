@@ -110,7 +110,9 @@ def test_a_link_of_a_page_is_a_button_that_lands_on_the_line_of_the_results():
     mockups, a target of 44 px. The form, sent again, starts at the top of the page."""
     response = get_feed("page=2", handler=serve(make_page(20, total=45)))
 
-    assert '<p id="resultats" class="results-line">' in response.text
+    # tabindex -1: following the anchor, the browser focuses the line ("Scrolling to a fragment",
+    # WHATWG), so the keyboard and a screen reader start from the results too.
+    assert '<p id="resultats" class="results-line" tabindex="-1">' in response.text
     links = re.findall(r'<a ([^>]*)rel="(?:prev|next)"', response.text)
     assert len(links) == 2
     assert all(

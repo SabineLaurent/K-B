@@ -404,18 +404,23 @@
       font-weight: 600;
     }
 
-    /* From a tablet on, the start date follows the radios on their line; a message refused takes
-       a line of its own. */
+    /* From a tablet on, the start date follows the radios on their line, as in the mockups; a
+       message refused takes a line of its own. On a tablet, the radios stay under their legend,
+       the date block, taller by its help, on their right; on a computer, both are centred. */
     & .period-group {
       @media (width >= 48rem) {
         display: flex;
         flex-wrap: wrap;
-        align-items: flex-end;
+        align-items: flex-start;
         gap: 0.25rem 1.5rem;
 
         & > .field-error {
           flex-basis: 100%;
         }
+      }
+
+      @media (width >= 64rem) {
+        align-items: center;
       }
     }
 
@@ -667,6 +672,11 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem 1.5rem;
+
+    /* The next page on the right, whatever the line it wraps to (Maquettes-fil.dc.html). */
+    & a[rel="next"] {
+      margin-inline-start: auto;
+    }
 
     & p {
       margin: 0;

@@ -53,3 +53,13 @@ def test_every_attribute_of_a_template_is_quoted(name):
     ]
 
     assert unquoted == []
+
+
+def test_a_link_to_another_site_is_written_by_its_macro_only():
+    """links.html holds the form of every link to another site (code.md, third occurrence): a new
+    tab, noopener and noreferrer, the arrow and the announcement; no other template writes it."""
+    writers = [
+        name for name in TEMPLATE_NAMES if 'target="_blank"' in read_template(name)
+    ]
+
+    assert writers == ["links.html"]

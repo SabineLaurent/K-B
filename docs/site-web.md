@@ -48,7 +48,9 @@ comme les maquettes (« Lire sur arxiv.org ↗ »). Ce lien s'ouvre dans un nouv
 `rel="noopener noreferrer"` : la page ouverte n'atteint ni la page de K-B ni son adresse), que son texte annonce,
 en plus petit : « (en anglais, site externe, nouvel onglet) » ou, pour une newsletter, « (site externe, nouvel
 onglet) » (Opquast 2025, règle 146 ; demande de Sabine du 2026-11-11, pour rester dans K-B). Les liens de
-`/sources` font de même ; un lien du site ne s'ouvre jamais ailleurs (règle 138). Une URL qui n'est pas en
+`/sources` font de même : tout lien vers un autre site s'écrit par la macro `external_link`
+(`web/templates/links.html`), seule à poser `target="_blank"` (`tests/web/test_templates.py`) ; un lien du site ne
+s'ouvre jamais ailleurs (règle 138). Une URL qui n'est pas en
 `https` vers un hôte ne devient jamais un lien. Le titre n'est pas encore un lien : le détail vient avec
 #564. Une newsletter porte le nom que TLDR donne à son édition (`NEWSLETTER_NAME_BY_EDITION`, « TLDR AI »
 comme les maquettes ; time-knight, 2026-11-11), « TLDR » et son identifiant d'API sinon.
@@ -56,8 +58,11 @@ comme les maquettes ; time-knight, 2026-11-11), « TLDR » et son identifiant d'
 **Les pages** : M = max(1, ⌈total ÷ 20⌉), 501 au plus ; la ligne des résultats donne le total, la page,
 M et les 20 items par page (Opquast 13) ; au-delà de 10 020 items, une phrase dit d'affiner
 les filtres. Une page au-delà de M, ou hors de sa forme, rend la page 404. Les liens de page, des boutons
-encadrés comme les maquettes, gardent les filtres et mènent à la ligne des résultats (`#resultats`, décalée
-du bord par `scroll-margin`) : l'autre page s'ouvre sur ses items (Sabine, 2026-11-11). Le formulaire envoyé
+encadrés comme les maquettes, « Page suivante » à droite même quand la ligne se replie, gardent les filtres et mènent à la ligne des résultats (`#resultats`, décalée
+du bord par `scroll-margin`) : l'autre page s'ouvre sur ses items (Sabine, 2026-11-11). Cette ligne porte
+`tabindex="-1"` : en suivant l'ancre, le navigateur lui donne le focus (WHATWG, « Scrolling to a fragment » :
+les étapes de focus sur la cible, le *viewport* sinon), et le clavier comme un lecteur d'écran repartent des
+résultats (tranché par time-knight, deuxième revue de code ; non essayé dans un navigateur). Le formulaire envoyé
 et « Élargir à 7 jours », une nouvelle recherche, s'ouvrent en haut de la page. Le fil vide propose « Élargir
 à 7 jours ».
 
@@ -100,8 +105,12 @@ est celui que suit le routeur, décodé (`scope["path"]`) : `request.url.path` l
 `/health%3F`. L'en-tête doit être
 présent une seule fois, être un GUID, et valoir `KB_WEB_OPERATOR_ID`, sans tenir compte de la casse. Sinon,
 la page 403 « Accès réservé » répond, avec un lien « Se déconnecter » (`/.auth/logout`). Avec le contrôle,
-chaque page porte aussi « Se déconnecter » à la fin de son en-tête (Sabine, 2026-11-11) ; la plateforme sert
-`/.auth/logout`, efface la session et déconnecte de Microsoft Entra. Le journal dit
+chaque autre page porte « Se déconnecter » à la fin de son en-tête (Sabine, 2026-11-11) ; la page 403 ne le
+répète pas, son bouton suffit. La plateforme sert `/.auth/logout` : elle efface les cookies de la session,
+supprime les jetons de l'utilisatrice du magasin de jetons, la déconnecte côté serveur de Microsoft Entra, puis
+renvoie vers `/.auth/logout/done` ([Microsoft Learn, « Authentication and authorization in Azure Container
+Apps »](https://learn.microsoft.com/en-us/azure/container-apps/authentication), « Sign out of a session », page
+mise à jour le 2026-07-08, lue le 2026-11-11). Le journal dit
 `operator_refused: header_absent|header_repeated|header_malformed|header_other request_id=…`, jamais la
 valeur reçue.
 

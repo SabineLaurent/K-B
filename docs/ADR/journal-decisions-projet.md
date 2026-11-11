@@ -6972,7 +6972,8 @@ validé par Sabine le même jour ; points de revue tranchés par time-knight sou
 
 - **Chaque lien vers un autre site s'ouvre dans un nouvel onglet (`target="_blank"`, `rel="noopener noreferrer"`),
   que son texte annonce, en plus petit : « (en anglais, site externe, nouvel onglet) » ; sur le fil comme sur
-  `/sources`, la même forme, et un lien du site s'ouvre toujours dans le même onglet.** Pourquoi : la demande de
+  `/sources`, la même forme, écrite par une seule macro Jinja, `external_link`, et un lien du site s'ouvre
+  toujours dans le même onglet.** Pourquoi : la demande de
   Sabine, « rester dans K-B » quand elle ouvre une source ; Opquast 2025, règle 146 (« L'utilisateur est averti des
   ouvertures de nouvelles fenêtres »), et règle 138 (même comportement pour les liens de même nature). Le RGAA 4.1.2
   ne demande pas l'avertissement : son critère 13.2 interdit seulement une fenêtre ouverte sans action (lu le
@@ -6995,7 +6996,11 @@ validé par Sabine le même jour ; points de revue tranchés par time-knight sou
   ligne d'une carte réunit sa sorte encadrée, sa date, ses identifiants et sa pastille ; les liens de page sont des
   boutons qui mènent à la ligne des résultats (`#resultats`).** Pourquoi : les remarques de Sabine sur ses captures du
   mobile, de la tablette et du desktop ; l'ancre, sa demande de ne pas remonter tout en haut en changeant de page
-  (le formulaire envoyé, une nouvelle recherche, s'ouvre en haut). Mesuré dans Chrome le 2026-11-11, le formulaire
+  (le formulaire envoyé, une nouvelle recherche, s'ouvre en haut). La ligne des résultats porte `tabindex="-1"` :
+  en suivant l'ancre, le navigateur lui donne le focus (WHATWG, « Scrolling to a fragment », les étapes de focus sur
+  la cible, le *viewport* sinon), et le clavier comme un lecteur d'écran repartent des résultats ; tranché par
+  time-knight sur la deuxième revue de code, qui corrige la lecture de la spécification par la session. Option
+  écartée : un `<p>` sans `tabindex`, où le focus irait au *viewport*. Mesuré dans Chrome le 2026-11-11, le formulaire
   passe de 585 à 405 px de haut à 1280 px (334 sur la maquette), de 606 à 539 à 820 et de 728 à 692 à 390. Option
   écartée : retirer les trois aides, que la maquette n'a pas ; elles tiennent la règle d'un champ avant l'envoi (WCAG
   3.3.2, ADR de #563) et restent, en 0,875rem, collées à leur libellé. Limite assumée : sur un téléphone, le

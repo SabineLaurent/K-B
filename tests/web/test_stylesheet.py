@@ -110,6 +110,20 @@ def read_block(text, opening):
     raise AssertionError(f"{opening} is not closed")
 
 
+def strip_nested_rules(block):
+    """The declarations of a block, without the rules nested in it."""
+    kept = []
+    depth = 0
+    for character in block:
+        if character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+        elif not depth:
+            kept.append(character)
+    return "".join(kept)
+
+
 def read_rule(selector, media=None):
     """The declarations of the rule of selector, or of its media query nested in it: a rule that
     opens its line, nested by & or not; never one of another selector, such as & > .field-error."""
@@ -133,12 +147,17 @@ def read_rule(selector, media=None):
         (".kind-choices", "(width >= 64rem)", "display: flex;"),
         (".period-choices", "(width >= 48rem)", "display: flex;"),
         (".period-group", "(width >= 48rem)", "display: flex;"),
+        # The radios under their legend on a tablet, the date block on their right as in the
+        # mockups; on a computer, the radios and the field centred on their line.
+        (".period-group", "(width >= 48rem)", "align-items: flex-start;"),
+        (".period-group", "(width >= 64rem)", "align-items: center;"),
+        # The next page on the right, whatever the line it wraps to (Maquettes-fil.dc.html).
+        ('a[rel="next"]', None, "margin-inline-start: auto;"),
         (
             ".period-field",
             "(width >= 64rem)",
             "grid-template-columns: auto minmax(10rem, 14rem);",
         ),
-        (".period-field", "(width >= 64rem)", "grid-row: 1 / span 2;"),
         (".results-line", None, "scroll-margin-block-start: 1rem;"),
         (".card-link", None, "font-size: 0.875rem;"),
         (".link-note", None, "font-size: 0.75rem;"),
@@ -149,8 +168,17 @@ def test_the_layout_of_the_mockups_holds_at_each_width(selector, media, declarat
     """Maquettes-fil.dc.html (2026-11-09) at 390, 820 and 1280 px (Sabine, 2026-11-11): the helps
     against their label, the choices in two columns on a phone, the kinds in three on a tablet and
     one line on a computer, the start date after the radios, a page link landing on the results,
-    the link of a card short. The heights measured are in the PR; this test keeps each rule."""
-    assert declaration in read_rule(selector, media)
+    the link of a card short. The heights measured are in the PR; this test keeps each rule, in
+    the rule it names, never in one nested in it."""
+    assert declaration in strip_nested_rules(read_rule(selector, media))
+
+
+def test_the_date_field_spans_the_two_lines_of_its_label_and_its_help_on_a_computer():
+    """A message refused comes on a third line, under them."""
+    rule = read_block(read_rule(".period-field", "(width >= 64rem)"), r"& > input\s*\{")
+
+    assert "grid-column: 2;" in rule
+    assert "grid-row: 1 / span 2;" in rule
 
 
 def test_nothing_is_fetched_from_elsewhere():

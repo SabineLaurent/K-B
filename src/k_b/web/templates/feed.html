@@ -6,6 +6,7 @@
 {%- macro invalid(field) -%}
 {%- if field in error_by_field %} aria-invalid="true"{% endif -%}
 {%- endmacro -%}
+{%- from "links.html" import external_link -%}
 {% extends "base.html" %}
 {% block title %}{{ page_title }}{% endblock %}
 {% block main_class %}page feed{% endblock %}
@@ -67,7 +68,7 @@
 </div>
 </form>
 {% if listing %}
-<p id="{{ results_id }}" class="results-line">{{ listing.line }}</p>
+<p id="{{ results_id }}" class="results-line" tabindex="-1">{{ listing.line }}</p>
 {% if listing.has_unlisted_items %}
 <p class="results-note">Au-delà de la page {{ listing.pages }}, les items ne sont pas servis: affinez les filtres pour les lire.</p>
 {% endif %}
@@ -79,7 +80,7 @@
 <p class="card-meta"><span class="card-kind"{% if card.kind_lang %} lang="{{ card.kind_lang }}"{% endif %}>{{ card.kind_label }}</span> <time datetime="{{ card.day }}">{{ card.day_text }}</time> <span class="card-identifiers">{{ card.identifiers }}{% if card.withdrawn_text %}, {{ card.withdrawn_text }}{% endif %}</span>{% if card.is_exploited %} <span class="badge">Exploitée (KEV)</span>{% endif %}</p>
 <h2 class="card-title"{% if card.title_lang %} lang="{{ card.title_lang }}"{% endif %}>{{ card.title }}</h2>
 {% if card.link %}
-<a class="card-link" href="{{ card.link }}"{% if card.link_lang %} hreflang="{{ card.link_lang }}"{% endif %} target="_blank" rel="noopener noreferrer">{{ card.link_label }}<span aria-hidden="true">&nbsp;↗</span> <span class="link-note">({{ card.link_note }})</span></a>
+{{ external_link(card.link, card.link_label, card.link_note, card.link_lang, "card-link") }}
 {% endif %}
 </li>
 {% endfor %}
