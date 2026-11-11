@@ -66,7 +66,8 @@ resource job 'Microsoft.App/jobs@2026-01-01' = {
         parallelism: 1
         replicaCompletionCount: 1
       }
-      // A run takes minutes: a digest request lasts 200 s at most (core/config.py), the trend report as much.
+      // kb waits 240 s at most for each of its two requests and 65 s for each of the four wakes (core/config.py):
+      // 740 s, then the publication, under 1 800 s unless the storage is slow.
       replicaTimeout: 1800
       // No retry (#423): after a timeout on the side of kb, a second run would call the model again. kb digest and kb
       // trend-report refuse only when the report of the day exists, which a cut run may not have written.

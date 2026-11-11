@@ -28,7 +28,7 @@ param llmModel string = ''
 @description('Second pass: OTLP endpoint of the metrics and traces of the AI API (KB_OTLP_ENDPOINT), given by Sabine.')
 param otlpEndpoint string = ''
 
-@description('Second pass: when caj-kb-digest-watch starts, in UTC; by default Monday and Thursday at 10:00, once the routine of 08:00 is over (#423).')
+@description('Second pass: when caj-kb-digest-watch starts, in UTC; by default Monday and Thursday at 10:00, once the routine of 08:00 is over (#423). Never from 06:55 to 09:05 UTC, while the routine may run (infra/README.md, « La règle des heures »).')
 param digestWatchCronExpression string = '0 10 * * 1,4'
 
 var tags = {

@@ -1090,14 +1090,19 @@ collecte sort en 4, les autres sources gardées. S'il manque, l'erreur est `Defa
 
 ### La règle des heures
 
-Rien ne tient deux exécutions à l'écart l'une de l'autre avant #426, ni la routine à l'écart de `caj-kb-digest-watch`
-(#423). La règle porte sur l'heure de départ d'une exécution à la main, son délai compris (3 600 s pour la routine,
-1 800 s pour les comptes rendus) :
-- **la routine à la main ne démarre jamais entre 07:00 et 09:00 UTC**, ni, le lundi et le jeudi, entre 07:00 et
-  10:30 UTC : elle finirait pendant celle du cron ou pendant les comptes rendus ;
-- **`caj-kb-digest-watch` à la main ne démarre jamais entre 07:30 et 09:00 UTC**, ni, le lundi et le jeudi, entre
-  09:30 et 10:30 UTC ;
-- un échec de la routine se diagnostique avant 07:00 UTC le lendemain.
+Rien ne tient deux exécutions de la routine à l'écart l'une de l'autre avant #426, un verrou dans la base. #426 ne
+couvrira pas `caj-kb-digest-watch` (#423), qui ne touche pas la base : pour ce job, seule cette règle tient. Elle
+porte sur l'heure de départ d'une exécution à la main, son délai compris (3 600 s pour la routine, 1 800 s pour les
+comptes rendus), avec 5 minutes de marge pour le démarrage et le tirage de l'image :
+- **la routine à la main ne démarre jamais entre 06:55 et 09:00 UTC**, ni, le lundi et le jeudi, entre 06:55 et
+  10:35 UTC : elle finirait pendant celle du cron ou pendant les comptes rendus ;
+- **`caj-kb-digest-watch` à la main ne démarre jamais le lundi ni le jeudi avant la fin de celle du cron**
+  (10:35 UTC) : ses fiches du jour feraient refuser le cron (`kb digest` sort en 2), qui finirait `Failed`. Après,
+  ces deux jours, seulement pour relancer une exécution du cron coupée avant d'écrire une fiche. Les autres jours,
+  jamais entre 07:25 et 09:05 UTC ;
+- **aucun tag n'est posé pendant une exécution d'un cron** (08:00 à 09:05 UTC chaque jour, 10:00 à 10:35 UTC le lundi
+  et le jeudi) : la livraison change les deux API au milieu d'une demande de 240 s ;
+- un échec de la routine se diagnostique avant 06:55 UTC le lendemain.
 
 Le risque visé : `kb import` qui écrit la base pendant que l'API de données la lit, page par page, pour un compte rendu
 ([specs-api.md](../docs/specs-api.md)). Le partage n'est pas en cause : la publication compte une fiche déjà dans
@@ -1164,16 +1169,33 @@ heures restent celles de « La règle des heures ».
 **Aucune reprise.** Après une expiration côté `kb`, une reprise appellerait le modèle une seconde fois. Or `kb digest`
 et `kb trend-report` ne refusent que si le compte rendu du jour existe, ce qu'une exécution coupée n'a pas forcément
 écrit. Limite : Microsoft Learn conseille au moins une reprise, parce qu'une maintenance de la plateforme peut couper
-une exécution. Pour réduire le risque : la routine republie `veille` chaque jour ; une exécution manquée se relance à
-la main le même jour, dans les heures permises.
+une exécution. Pour réduire le risque :
+- la routine republie `veille` chaque jour : une fiche écrite mais pas publiée part le lendemain ;
+- une exécution coupée avant d'écrire une fiche se relance à la main le même jour, après celle du cron (« La règle
+  des heures »).
+
+Limite de cette parade : coupée après une fiche, la relance ne rattrape rien. `kb digest` refuse tous les sujets dès
+qu'une fiche du jour existe (`src/k_b/commands/digest_command.py`), et les sujets manquants attendent le passage
+suivant.
 
 **La fenêtre** : chaque compte rendu par sujet lit les items des 3 derniers jours, comptés depuis sa demande, par la
 date de la source ([fiches-veille.md](../docs/fiches-veille.md), « Fenêtre » ; décision de Sabine du 11/11, 3 jours
-et non 5). Limite : avec un passage le lundi et le jeudi, rien ne couvre du jeudi 10:00 au vendredi 10:00 UTC, ni les
-items datés du jeudi que la collecte du vendredi apporte. Ils n'entrent dans aucun compte rendu. Pour réduire le
-risque : la règle de Sabine du 26/10, qui fait partir chaque compte rendu du `until` du précédent et rejoue chaque
-créneau manqué ([tendances.md](../docs/tendances.md), fin de « Hors v1 »), codée par #565 (« Démarrer chaque compte
-rendu de veille à la fin du précédent de son sujet »), prévue en ligne avant le lundi 16/11 à 10:00 UTC.
+et non 5). Limite : deux pertes, chaque semaine.
+- **Le calendrier** : du lundi au jeudi, 3 jours ; du jeudi au lundi, 4. Rien ne couvre du jeudi 10:00 au vendredi
+  10:00 UTC.
+- **Le retard de collecte** : la base ne se remplit qu'à 08:00 UTC. Un item daté avant le début d'une fenêtre, mais
+  collecté après le compte rendu précédent, n'entre dans aucun des deux. C'est le cas des éditions TLDR et des entrées
+  KEV, datées de minuit : celle du lundi, collectée le mardi, tombe avant la fenêtre du jeudi (qui part du lundi
+  10:00) ; celle du jeudi, collectée le vendredi, avant celle du lundi.
+
+Pour réduire le risque :
+- #565 (« Démarrer chaque compte rendu de veille à la fin du précédent de son sujet »), qui code la règle de Sabine du
+  26/10 ([tendances.md](../docs/tendances.md), fin de « Hors v1 »), couvre le passage d'un compte rendu au suivant,
+  donc le calendrier, pas le retard de collecte. Celui-ci attend la lecture par date d'arrivée dans K-B, prévue après
+  l'oral blanc (décision de Sabine du 11/11).
+- Les items absents d'un compte rendu ne sont pas perdus pour K-B : ils restent 3 ans dans la base
+  ([registre](../docs/registre-traitements.md), fiche 1, « Durée de conservation ») et se lisent par l'API de données
+  (`GET /items?since=…`, [specs-api.md](../docs/specs-api.md)).
 
 Dans l'ordre :
 1. Le critère rouge : `az containerapp job show -n caj-kb-digest-watch -g "$RG"` répond `ResourceNotFound`.
@@ -1199,12 +1221,20 @@ Une seule passe ou écriture dans Azure à la fois : chacune se signale avant d'
 Si le job échoue sur « unable to fetch secret », ses rôles sur les secrets ne sont pas encore actifs : relancer la
 même commande 10 minutes plus tard.
 
+**La fusion de la PR et tout tag attendent une passe `Succeeded`** : sans le job, le tag suivant échouerait à « Sets the
+jobs to the image of the tag » (`.github/workflows/deploy.yml`), les apps déjà changées, et la sonde ne tournerait pas.
+
 Dès cette passe, chaque tag change aussi l'image de ce job (`deployment.json`). `id-kb-deploy` peut alors agir sous
 `id-kb-digest-watch` et lire ses deux clés. Ce n'est pas un accès nouveau : il atteint déjà `watch` et `job-data` par
-la routine, et les deux clés par Container Apps Contributor sur `ca-kb-ai-api`, qui permet `listSecrets` (registre des
+la routine, et les deux clés par Container Apps Contributor sur `ca-kb-ai-api`. Ce rôle change l'app, son image et sa
+commande comprises, donc exécute du code sous `id-kb-ai-api`, qui lit les deux clés dans le Key Vault (registre des
 traitements, ligne « Déploiement continu »).
 
 ### La première exécution
+
+Au moins 10 minutes après la passe : l'AcrPull et les deux Key Vault Secrets User qu'elle crée peuvent mettre jusqu'à
+10 minutes à s'appliquer, et chaque exécution tire l'image et lit ses secrets à son départ. Un mercredi, un vendredi,
+un samedi ou un dimanche, ou un lundi ou un jeudi après la fin du cron, hors des heures de « La règle des heures » :
 
 ```sh
 az containerapp job start -n caj-kb-digest-watch -g "$RG" --query name -o tsv
@@ -1250,4 +1280,6 @@ Sources (Microsoft Learn, lues le 2026-11-11) :
 [jobs de Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/jobs) (cron en UTC, « Set the replica
 retry limit to at least 1 » pour la maintenance de la plateforme, rôles qui lisent les secrets d'un job),
 [secrets de Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/manage-secrets) (« Permissions for
-managing secrets » : Container Apps Contributor permet `Microsoft.App/containerApps/listSecrets/action`).
+managing secrets » : les rôles Contributor des apps et des jobs couvrent `listSecrets`),
+[dépannage d'Azure RBAC](https://learn.microsoft.com/en-us/azure/role-based-access-control/troubleshooting) (« it can
+take up to 10 minutes for changes to take effect »).

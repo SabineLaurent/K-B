@@ -372,7 +372,8 @@ principales:
 
 Les deux API n'ont qu'une entrée interne, en HTTPS: elles n'ont pas d'adresse publique
 (`infra/modules/api-container-app.bicep:74-81`). Les apps et les jobs déclarés en ligne sont ceux
-d'`infra/deployment.json`: `ca-kb-data-api`, `ca-kb-ai-api`, `caj-kb-smoke-test` et `caj-kb-migrate-database`. Un
+d'`infra/deployment.json`: `ca-kb-data-api`, `ca-kb-ai-api`, `caj-kb-smoke-test`, `caj-kb-migrate-database`,
+`caj-kb-daily-routine` et `caj-kb-digest-watch`. Un
 tag de version sur `main` les met à jour ([la fiche de la livraison continue](livraison_continue_pour_docu.md)).
 
 ### Le déploiement sur Azure
@@ -447,9 +448,11 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
   (`infra/modules/api-container-app.bicep:74-81`); l'API IA joint l'API de données par son nom interne, en HTTPS
   (`infra/main.bicep:223`). Les journaux des conteneurs vont dans `log-kb`
   (`infra/modules/container-apps-environment.bicep:45-63`).
-- **Les secrets** (clés des API, clé du modèle, jeton GitHub, en-tête OTLP) sont dans le Key Vault; seules les deux API
-  en lisent, chacune les siens, par le rôle Key Vault Secrets User, un rôle par secret (`infra/main.bicep:133-153`,
-  `infra/modules/key-vault-secret-access.bicep:28-38`).
+- **Les secrets** (clés des API, clé du modèle, jetons GitHub, clé BigQuery, en-tête OTLP) sont dans le Key Vault; les
+  deux API et les deux jobs planifiés en lisent, chacun les siens, par le rôle Key Vault Secrets User, un rôle par
+  secret (`infra/main.bicep:133-153` au commit `cbada1e`, `:179-202` dans la PR de #423,
+  `infra/modules/key-vault-secret-access.bicep:28-38`): la routine, son jeton GitHub et la clé BigQuery (#330); le job
+  des comptes rendus, les clés des clients `KB_DIGEST` et `KB_TREND_REPORT` de l'API IA (#423).
 - **La base** est un serveur PostgreSQL 18 flexible, ouvert par Entra ID seul
   (`infra/modules/postgresql-server.bicep:17-31`). `id-kb-data-api` y lit par le rôle `kb_reader`, et
   `id-kb-migrate-database` possède les tables; la collecte quotidienne écrit par le rôle `kb_writer`, sous
@@ -483,13 +486,16 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
 
 ## Limites
 
-- **Les comptes rendus laissent un trou chaque semaine.** Chacun lit les 3 derniers jours, comptés depuis sa demande,
-  par la date de la source; avec un passage le lundi et le jeudi, rien ne couvre du jeudi 10:00 au vendredi 10:00 UTC,
-  ni les items du jeudi que la collecte du vendredi apporte (décision de Sabine du 2026-11-11). Sa parade: #565, qui
-  fait partir chaque compte rendu de la fin du précédent ([`infra/README.md`](../infra/README.md), « Les comptes
-  rendus en ligne »).
+- **Les comptes rendus laissent deux trous chaque semaine.** Chacun lit les 3 derniers jours, comptés depuis sa
+  demande, par la date de la source (décision de Sabine du 2026-11-11). Le calendrier: rien ne couvre du jeudi 10:00
+  au vendredi 10:00 UTC. Le retard de collecte: un item daté avant le début d'une fenêtre mais collecté après le
+  compte rendu précédent n'entre dans aucun, comme les éditions TLDR et les entrées KEV du lundi et du jeudi, datées
+  de minuit et collectées le lendemain. #565, qui fait partir chaque compte rendu de la fin du précédent, couvre le
+  calendrier; le retard de collecte attend la lecture par date d'arrivée dans K-B, prévue après l'oral blanc
+  ([`infra/README.md`](../infra/README.md), « Les comptes rendus en ligne »).
 - **Rien ne tient deux exécutions à l'écart**, sauf une consigne: les heures de départ à la main de
-  [`infra/README.md`](../infra/README.md), « La règle des heures », jusqu'au verrou de #426.
+  [`infra/README.md`](../infra/README.md), « La règle des heures ». Le verrou de #426 tiendra deux exécutions de la
+  routine à l'écart, pas le job des comptes rendus, qui ne touche pas la base.
 - **Zotero n'est pas collecté en ligne**: la copie de la bibliothèque dans un job est à venir, entre le miroir des
   clips et `kb collect` (#425, `commands/daily_routine_command.py:50`).
 - **L'interface web n'existe pas encore**: la fiche décrit `main`, où K-B se lit dans Obsidian et se lance dans le
@@ -497,7 +503,8 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
 
 ## Vérifier cette fiche
 
-Depuis la racine du dépôt, au commit `0292266` (`git switch --detach 0292266`):
+Depuis la racine du dépôt, au commit `0292266` (`git switch --detach 0292266`). Les références aux jobs planifiés et à
+leur stockage (#420, #330, #423) se lisent au commit de fusion de la PR de #423, sur `main`:
 
 ```sh
 # infra/ inchangé depuis cbada1e: aucune ligne attendue.

@@ -6700,7 +6700,8 @@ entrée.
   UTC et finit à 09:00 UTC au plus (« Routine quotidienne en ligne : `caj-kb-daily-routine` (#330) », 2026-11-10).
   **Inverse** le cron `0 5 * * 1,4` de l'issue, écrit quand la routine devait démarrer à 03:00. Limite : rien ne tient
   les deux jobs à l'écart l'un de l'autre, sauf une consigne sur les heures de départ à la main (`infra/README.md`,
-  « La règle des heures ») ; le verrou de #426 ne couvre que la base. — PR de #423
+  « La règle des heures ») ; le verrou de #426 ne couvrira que les commandes qui touchent la base, pas ce job.
+  — PR de #423
 - **L'expression cron est un paramètre de l'infra, `digestWatchCronExpression` dans `infra/main.bicep`, avec
   `0 10 * * 1,4` par défaut, passé au module sans défaut.** Décision de Sabine du 2026-11-11 : « l'expression cron en
   paramètre de l'infra, pas en dur ». Le défaut est un choix de la session : une passe qui ne donne pas le paramètre,
@@ -6721,14 +6722,18 @@ entrée.
   `kb digest` comme `kb trend-report` ne refusent que si le compte rendu du jour existe, ce qu'une exécution coupée n'a
   pas forcément écrit. Limite : Microsoft Learn conseille « Set the replica retry limit to at least `1` » à cause de la
   maintenance de la plateforme (« Jobs in Azure Container Apps », lu le 2026-11-11). Parade : la routine republie
-  `veille/` chaque jour, et une exécution manquée se relance à la main le même jour, dans les heures permises.
-  — PR de #423
+  `veille/` chaque jour, et une exécution coupée avant d'écrire une fiche se relance à la main le même jour, après
+  celle du cron. Limite de la parade : coupée après une fiche, la relance ne rattrape rien, car `kb digest` refuse
+  tous les sujets dès qu'une fiche du jour existe ; les sujets manquants attendent le passage suivant. — PR de #423
 - **La fenêtre des comptes rendus reste à 3 jours en ligne, le défaut : aucun `KB_DIGEST_WINDOW_DAYS`.** Décision de
-  Sabine du 2026-11-11 (« 5 jours c'est trop, je veux 3 »), sur une recommandation de 5 jours. Limite : avec un passage
-  le lundi et le jeudi, rien ne couvre du jeudi 10:00 au vendredi 10:00 UTC, ni les items du jeudi que la collecte du
-  vendredi apporte (la fenêtre suit la date de la source, `docs/fiches-veille.md`, « Fenêtre »). Parade : #565,
-  « Démarrer chaque compte rendu de veille à la fin du précédent de son sujet », qui code la règle de Sabine du
-  2026-10-26 (`docs/tendances.md`, fin de « Hors v1 »). Options écartées par la session avant la décision : 4 jours (le
+  Sabine du 2026-11-11 (« 5 jours c'est trop, je veux 3 »), sur une recommandation de 5 jours. Limite : deux pertes
+  chaque semaine, la fenêtre suivant la date de la source (`docs/fiches-veille.md`, « Fenêtre ») : le calendrier, rien
+  ne couvrant du jeudi 10:00 au vendredi 10:00 UTC ; le retard de collecte, un item daté avant le début d'une fenêtre
+  mais collecté après le compte rendu précédent n'entrant dans aucun (les éditions TLDR et les entrées KEV du lundi et
+  du jeudi, datées de minuit, collectées le lendemain). Parade : #565, « Démarrer chaque compte rendu de veille à la
+  fin du précédent de son sujet », qui code la règle de Sabine du 2026-10-26 (`docs/tendances.md`, fin de « Hors
+  v1 »), couvre le calendrier, pas le retard de collecte, qui attend la lecture par date d'arrivée dans K-B, prévue
+  après l'oral blanc (décision de Sabine du 2026-11-11). Options écartées par la session avant la décision : 4 jours (le
   TLDR et les entrées KEV du jeudi, datés de minuit et collectés le vendredi, restaient hors de toute fenêtre) ; un
   passage par jour (`kb trend-report` est prévu deux fois par semaine, « Tendances : un compte rendu deux fois par
   semaine », 2026-10-29). — PR de #423
