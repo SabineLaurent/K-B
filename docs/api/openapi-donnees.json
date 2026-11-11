@@ -3,7 +3,7 @@
   "info": {
     "title": "K-B data API",
     "description": "Thank you to arXiv for use of its open access interoperability.",
-    "version": "0.11.0"
+    "version": "0.12.0"
   },
   "paths": {
     "/items": {
@@ -484,7 +484,7 @@
               }
             ],
             "title": "Exploited",
-            "description": "The CVE is in the CISA KEV catalog, withdrawn since or not; false says absent from the catalog, not unexploited; null without CVE."
+            "description": "The CVE is in the CISA KEV catalog, withdrawn since or not, the withdrawal in withdrawn_at; false says absent from the catalog, not unexploited; null without CVE."
           },
           "packages": {
             "items": {
@@ -507,7 +507,8 @@
           "exploited",
           "packages"
         ],
-        "title": "AdvisoryDetailSchema"
+        "title": "AdvisoryDetailSchema",
+        "description": "An advisory serves nothing beyond the list."
       },
       "ClipDetailSchema": {
         "properties": {
@@ -690,7 +691,41 @@
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/ListedItemSchema"
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ListedPaperSchema"
+                },
+                {
+                  "$ref": "#/components/schemas/ListedVulnerabilitySchema"
+                },
+                {
+                  "$ref": "#/components/schemas/ListedReleaseSchema"
+                },
+                {
+                  "$ref": "#/components/schemas/ListedAdvisorySchema"
+                },
+                {
+                  "$ref": "#/components/schemas/ListedNewsletterArticleSchema"
+                },
+                {
+                  "$ref": "#/components/schemas/ListedZoteroEntrySchema"
+                },
+                {
+                  "$ref": "#/components/schemas/ListedClipSchema"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "advisory": "#/components/schemas/ListedAdvisorySchema",
+                  "clip": "#/components/schemas/ListedClipSchema",
+                  "newsletter_article": "#/components/schemas/ListedNewsletterArticleSchema",
+                  "paper": "#/components/schemas/ListedPaperSchema",
+                  "release": "#/components/schemas/ListedReleaseSchema",
+                  "vulnerability": "#/components/schemas/ListedVulnerabilitySchema",
+                  "zotero_entry": "#/components/schemas/ListedZoteroEntrySchema"
+                }
+              }
             },
             "type": "array",
             "title": "Items"
@@ -705,16 +740,22 @@
               }
             ],
             "title": "Next Offset"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "The items of kind, since and q, every page together: limit and offset do not change it."
           }
         },
         "type": "object",
         "required": [
           "items",
-          "next_offset"
+          "next_offset",
+          "total"
         ],
         "title": "ItemPageSchema"
       },
-      "ListedItemSchema": {
+      "ListedAdvisorySchema": {
         "properties": {
           "id": {
             "type": "integer",
@@ -722,15 +763,99 @@
           },
           "kind": {
             "type": "string",
-            "enum": [
-              "paper",
-              "vulnerability",
-              "newsletter_article",
-              "release",
-              "advisory",
-              "zotero_entry",
-              "clip"
+            "const": "advisory",
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source_date": {
+            "type": "string",
+            "title": "Source Date"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
+            "title": "Url"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At",
+            "description": "Withdrawn from a catalog (vulnerability, Zotero entry). A date of K-B: the collection that saw the change."
+          },
+          "ghsa_id": {
+            "type": "string",
+            "title": "Ghsa Id"
+          },
+          "cve_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cve Id"
+          },
+          "exploited": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exploited",
+            "description": "The CVE is in the CISA KEV catalog, withdrawn since or not, the withdrawal in withdrawn_at; false says absent from the catalog, not unexploited; null without CVE."
+          },
+          "packages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Packages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "source_date",
+          "url",
+          "withdrawn_at",
+          "ghsa_id",
+          "cve_id",
+          "exploited",
+          "packages"
+        ],
+        "title": "ListedAdvisorySchema"
+      },
+      "ListedClipSchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "clip",
             "title": "Kind"
           },
           "title": {
@@ -774,7 +899,309 @@
           "url",
           "withdrawn_at"
         ],
-        "title": "ListedItemSchema"
+        "title": "ListedClipSchema"
+      },
+      "ListedNewsletterArticleSchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "newsletter_article",
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source_date": {
+            "type": "string",
+            "title": "Source Date"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At",
+            "description": "Withdrawn from a catalog (vulnerability, Zotero entry). A date of K-B: the collection that saw the change."
+          },
+          "edition": {
+            "type": "string",
+            "title": "Edition",
+            "description": "The newsletter, such as ai; the day of the edition is source_date."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "source_date",
+          "url",
+          "withdrawn_at",
+          "edition"
+        ],
+        "title": "ListedNewsletterArticleSchema"
+      },
+      "ListedPaperSchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "paper",
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source_date": {
+            "type": "string",
+            "title": "Source Date"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At",
+            "description": "Withdrawn from a catalog (vulnerability, Zotero entry). A date of K-B: the collection that saw the change."
+          },
+          "arxiv_id": {
+            "type": "string",
+            "title": "Arxiv Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "source_date",
+          "url",
+          "withdrawn_at",
+          "arxiv_id"
+        ],
+        "title": "ListedPaperSchema"
+      },
+      "ListedReleaseSchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "release",
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source_date": {
+            "type": "string",
+            "title": "Source Date"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At",
+            "description": "Withdrawn from a catalog (vulnerability, Zotero entry). A date of K-B: the collection that saw the change."
+          },
+          "repository_name": {
+            "type": "string",
+            "title": "Repository Name"
+          },
+          "tag_name": {
+            "type": "string",
+            "title": "Tag Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "source_date",
+          "url",
+          "withdrawn_at",
+          "repository_name",
+          "tag_name"
+        ],
+        "title": "ListedReleaseSchema"
+      },
+      "ListedVulnerabilitySchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "vulnerability",
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source_date": {
+            "type": "string",
+            "title": "Source Date"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At",
+            "description": "Withdrawn from a catalog (vulnerability, Zotero entry). A date of K-B: the collection that saw the change."
+          },
+          "cve_id": {
+            "type": "string",
+            "title": "Cve Id"
+          },
+          "exploited": {
+            "type": "boolean",
+            "title": "Exploited",
+            "description": "The CVE is in the CISA KEV catalog, withdrawn since or not, the withdrawal in withdrawn_at; false says absent from the catalog, not unexploited; null without CVE."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "source_date",
+          "url",
+          "withdrawn_at",
+          "cve_id",
+          "exploited"
+        ],
+        "title": "ListedVulnerabilitySchema"
+      },
+      "ListedZoteroEntrySchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "zotero_entry",
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source_date": {
+            "type": "string",
+            "title": "Source Date"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At",
+            "description": "Withdrawn from a catalog (vulnerability, Zotero entry). A date of K-B: the collection that saw the change."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "source_date",
+          "url",
+          "withdrawn_at"
+        ],
+        "title": "ListedZoteroEntrySchema"
       },
       "NewsletterArticleDetailSchema": {
         "properties": {
@@ -820,7 +1247,8 @@
           },
           "edition": {
             "type": "string",
-            "title": "Edition"
+            "title": "Edition",
+            "description": "The newsletter, such as ai; the day of the edition is source_date."
           },
           "edition_date": {
             "type": "string",
@@ -970,10 +1398,6 @@
             "title": "Withdrawn At",
             "description": "Withdrawn from a catalog (vulnerability, Zotero entry). A date of K-B: the collection that saw the change."
           },
-          "release_id": {
-            "type": "integer",
-            "title": "Release Id"
-          },
           "repository_name": {
             "type": "string",
             "title": "Repository Name"
@@ -981,6 +1405,10 @@
           "tag_name": {
             "type": "string",
             "title": "Tag Name"
+          },
+          "release_id": {
+            "type": "integer",
+            "title": "Release Id"
           },
           "body": {
             "anyOf": [
@@ -1002,9 +1430,9 @@
           "source_date",
           "url",
           "withdrawn_at",
-          "release_id",
           "repository_name",
           "tag_name",
+          "release_id",
           "body"
         ],
         "title": "ReleaseDetailSchema"
@@ -1106,6 +1534,11 @@
             "type": "string",
             "title": "Cve Id"
           },
+          "exploited": {
+            "type": "boolean",
+            "title": "Exploited",
+            "description": "The CVE is in the CISA KEV catalog, withdrawn since or not, the withdrawal in withdrawn_at; false says absent from the catalog, not unexploited; null without CVE."
+          },
           "description": {
             "type": "string",
             "title": "Description"
@@ -1148,6 +1581,7 @@
           "url",
           "withdrawn_at",
           "cve_id",
+          "exploited",
           "description",
           "vendor",
           "product",

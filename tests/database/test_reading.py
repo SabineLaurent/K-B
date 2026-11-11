@@ -11,7 +11,6 @@ import pytest
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
 from k_b.database.engine import connect_database, connect_reader, open_readers
 from k_b.database.reading import (
-    AdvisoryDetail,
     ClipDetail,
     DetailBounds,
     ItemDetail,
@@ -60,10 +59,29 @@ def read_item(connection, item_id):
     )
 
 
+# The identifiers a listed item carries beyond its six fields, None outside of their kinds
+# (docs/specs-api.md, "Identifiants par sorte").
+IDENTIFIER_FIELDS = (
+    "arxiv_id",
+    "cve_id",
+    "exploited",
+    "ghsa_id",
+    "packages",
+    "repository_name",
+    "tag_name",
+    "edition",
+)
+
+
+def listed(*fields, **identifiers):
+    """A listed item: its six fields, then the identifiers of its kind, None for the others."""
+    return ListedItem(*fields, **{**dict.fromkeys(IDENTIFIER_FIELDS), **identifiers})
+
+
 @pytest.mark.parametrize(
     "listed_item",
     [
-        ListedItem(
+        listed(
             1,
             "paper",
             "Resource-Optimized and Energy-Aware Agentic AI Framework Anchored on Blockchain"
@@ -71,48 +89,60 @@ def read_item(connection, item_id):
             "2026-09-25T13:53:50Z",
             "https://arxiv.org/abs/2609.31282",
             None,
+            arxiv_id="2609.31282",
         ),
-        ListedItem(
+        listed(
             3,
             "vulnerability",
             "Apple Multiple Products Out-of-Bounds Write Vulnerability",
             "2026-09-29T00:00:00Z",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-86950",
             None,
+            cve_id="CVE-2026-86950",
+            exploited=True,
         ),
-        ListedItem(
+        listed(
             6,
             "release",
             "anthropics/claude-code Claude Code 2.1.287",
             "2026-10-01T18:00:22Z",
             "https://github.com/anthropics/claude-code/releases/tag/v2.1.287",
             None,
+            repository_name="anthropics/claude-code",
+            tag_name="v2.1.287",
         ),
-        ListedItem(
+        listed(
             9,
             "advisory",
             "LangGraph Checkpoint: Unsafe JSON deserialization in checkpoint loading",
             "2026-06-25T18:25:42Z",
             "https://github.com/advisories/GHSA-fjqc-hq36-qh5p",
             None,
+            ghsa_id="GHSA-fjqc-hq36-qh5p",
+            cve_id="CVE-2020-29583",
+            exploited=True,
+            packages=["langgraph-checkpoint"],
         ),
-        ListedItem(
+        listed(
             11,
             "newsletter_article",
             "Mistral Large 4 (9 minute read)",
             "2026-10-07T00:00:00Z",
             "https://mistral.ai/news/mistral-large-4/",
             None,
+            edition="ai",
         ),
-        ListedItem(
+        listed(
             14,
             "zotero_entry",
             "Prompt injection through tool results",
             "2026-10-01T08:15:00Z",
             "http://arxiv.org/abs/2609.00001",
             None,
+            # Its paper: read with the list, served by the detail only.
+            arxiv_id="2609.00001",
         ),
-        ListedItem(
+        listed(
             16,
             "zotero_entry",
             "A web page in the trash",
@@ -123,7 +153,9 @@ def read_item(connection, item_id):
     ],
     ids=lambda listed_item: f"{listed_item.kind}-{listed_item.id}",
 )
-def test_an_item_of_each_kind_has_its_title_url_and_date(connection, listed_item):
+def test_an_item_of_each_kind_has_its_title_url_date_and_identifiers(
+    connection, listed_item
+):
     assert read_item(connection, listed_item.id) == listed_item
 
 
@@ -308,6 +340,39 @@ def test_a_limit_or_an_offset_out_of_range_is_refused_by_its_bound(
     assert str(refusal.value) == message
 
 
+@pytest.mark.parametrize(
+    "filters",
+    [
+        {},
+        {"kinds": ["advisory"]},
+        {"kinds": ["paper", "clip"]},
+        {"since": datetime(2026, 10, 1, tzinfo=UTC)},
+        {"search_text": "lang"},
+        {"mode": "selected_library"},
+        {"kinds": ["release", "newsletter_article"], "search_text": "a"},
+        {"search_text": "no item holds this"},
+    ],
+)
+def test_the_total_counts_the_items_of_the_filters_on_every_page(connection, filters):
+    expected_total = len(read_ids(connection, **filters))
+
+    pages = [
+        read_items(connection, limit=2, offset=offset, **filters)
+        for offset in (0, 2, 100)
+    ]
+
+    assert [page.total for page in pages] == [expected_total] * 3
+    assert pages[2].items == []
+
+
+def test_the_list_ends_its_own_transaction_on_sqlite_only(connection, engine):
+    read_items(connection, limit=2)
+
+    # On PostgreSQL, the readers end it when the connection is given back to the pool
+    # (tests/database/test_reading_pool.py).
+    assert connection.in_transaction == (engine == "postgresql")
+
+
 def test_the_withdrawn_rows_are_listed_with_their_date(connection):
     assert read_item(connection, 5).withdrawn_at == "2026-10-06T09:30:00Z"
     assert read_item(connection, 15).withdrawn_at == "2026-10-06T09:30:00Z"
@@ -409,8 +474,8 @@ def test_the_detail_of_a_paper_reads_its_arxiv_date_in_revised_at(connection):
 
     assert detail is not None
     assert detail.listed.source_date == "2026-09-27T09:30:13Z"
+    assert detail.listed.arxiv_id == "2609.33401"
     assert detail.details._asdict() == {
-        "arxiv_id": "2609.33401",
         "authors": ["Lena Marsh"],
         "summary": "Model-based judges support agent security by detecting prompt"
         " injections, assessing interaction risks, and screening harmful requests.",
@@ -419,45 +484,40 @@ def test_the_detail_of_a_paper_reads_its_arxiv_date_in_revised_at(connection):
 
 
 @pytest.mark.parametrize(
-    ("item_id", "advisory"),
+    ("item_id", "cve_id", "exploited"),
     [
-        (
-            9,
-            AdvisoryDetail(
-                "GHSA-fjqc-hq36-qh5p", "CVE-2020-29583", True, ["langgraph-checkpoint"]
-            ),
-        ),
-        (
-            17,
-            AdvisoryDetail(
-                "GHSA-3644-q5cj-c5c7",
-                "CVE-2026-45134",
-                False,
-                ["langsmith", "langchain-classic", "langchain"],
-            ),
-        ),
-        (
-            10,
-            AdvisoryDetail(
-                "GHSA-gr75-jv2w-4656", None, None, ["langchain", "langchain-anthropic"]
-            ),
-        ),
+        (3, "CVE-2026-86950", True),
+        # Withdrawn from the catalog since: still exploited, the withdrawal in withdrawn_at.
+        (5, "CVE-2020-29583", True),
+        (9, "CVE-2020-29583", True),
+        (17, "CVE-2026-45134", False),
+        (10, None, None),
+        (1, None, None),
     ],
-    ids=["in-kev-withdrawn-since", "not-in-kev", "without-cve"],
+    ids=[
+        "vulnerability",
+        "vulnerability-withdrawn",
+        "advisory-in-kev-withdrawn-since",
+        "advisory-not-in-kev",
+        "advisory-without-cve",
+        "paper",
+    ],
 )
-def test_exploited_reads_the_kev_catalog_as_a_boolean(connection, item_id, advisory):
-    detail = read_item_detail(connection, item_id, BOUNDS)
+def test_exploited_reads_the_kev_catalog_as_a_boolean(
+    connection, item_id, cve_id, exploited
+):
+    item = read_item(connection, item_id)
 
-    assert detail is not None
-    assert detail.details == advisory
-    assert type(detail.details.exploited) is type(advisory.exploited)
+    assert item.cve_id == cve_id
+    # is, not ==: SQLite gives 0 or 1, which == True and False.
+    assert item.exploited is exploited
 
 
 def test_the_detail_of_a_zotero_entry_holds_its_paper_and_its_highlights(connection):
     detail = read_item_detail(connection, 14, BOUNDS)
 
     assert detail is not None
-    assert detail.details.arxiv_id == "2609.00001"
+    assert detail.listed.arxiv_id == "2609.00001"
     assert detail.details.revised_at == "2026-10-06T09:30:00Z"
     assert detail.details.highlights == read_highlights(
         connection, 14, BOUNDS.highlights
@@ -468,14 +528,14 @@ def test_a_zotero_entry_without_arxiv_reference_has_no_arxiv_id(connection):
     detail = read_item_detail(connection, 16, BOUNDS)
 
     assert detail is not None
-    assert detail.details.arxiv_id is None
+    assert detail.listed.arxiv_id is None
 
 
 def test_a_clip_is_listed_by_its_day_saved_and_detailed_with_its_text(connection):
     detail = read_item_detail(connection, 18, BOUNDS)
 
     assert detail == ItemDetail(
-        ListedItem(
+        listed(
             18,
             "clip",
             "7 Habits I Picked Up From Experienced Engineers",

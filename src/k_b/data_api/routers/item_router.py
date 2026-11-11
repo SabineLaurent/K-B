@@ -14,7 +14,6 @@ from k_b.data_api.errors import ERROR_RESPONSES
 from k_b.data_api.schemas.item_schema import (
     ItemDetailSchema,
     ItemPageSchema,
-    ListedItemSchema,
 )
 from k_b.database.reading import (
     ClipDetail,
@@ -111,9 +110,13 @@ def list_items(
         since=since,
         search_text=q,
     )
-    return ItemPageSchema(
-        items=[ListedItemSchema(**item._asdict()) for item in page.items],
-        next_offset=bound_next_offset(page.next_offset),
+    # The discriminator picks the schema of each kind; a field it does not name is not served.
+    return ItemPageSchema.model_validate(
+        {
+            "items": [item._asdict() for item in page.items],
+            "next_offset": bound_next_offset(page.next_offset),
+            "total": page.total,
+        }
     )
 
 

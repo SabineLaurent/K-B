@@ -16,6 +16,16 @@ ITEMS_DATABASE_SCRIPT = Path(__file__).parents[1] / "fixtures" / "items_database
 
 # The fields of an item of the list (docs/specs-api.md, "Réponse"): nothing else is served.
 LISTED_FIELDS = {"id", "kind", "title", "source_date", "url", "withdrawn_at"}
+# The identifiers each kind serves beyond them (docs/specs-api.md, "Identifiants par sorte").
+LISTED_IDENTIFIERS = {
+    "paper": {"arxiv_id"},
+    "vulnerability": {"cve_id", "exploited"},
+    "release": {"repository_name", "tag_name"},
+    "advisory": {"ghsa_id", "cve_id", "exploited", "packages"},
+    "newsletter_article": {"edition"},
+    "zotero_entry": set(),
+    "clip": set(),
+}
 
 
 @pytest.fixture
@@ -46,7 +56,88 @@ def test_each_kind_is_listed_with_the_fields_of_the_spec(client, authorization):
         "source_date": "2026-09-25T13:53:50Z",
         "url": "https://arxiv.org/abs/2609.31282",
         "withdrawn_at": None,
+        "arxiv_id": "2609.31282",
     }
+
+
+@pytest.mark.parametrize(
+    ("item_id", "identifiers"),
+    [
+        (5, {"cve_id": "CVE-2020-29583", "exploited": True}),
+        (
+            6,
+            {"repository_name": "anthropics/claude-code", "tag_name": "v2.1.287"},
+        ),
+        (
+            9,
+            {
+                "ghsa_id": "GHSA-fjqc-hq36-qh5p",
+                "cve_id": "CVE-2020-29583",
+                "exploited": True,
+                "packages": ["langgraph-checkpoint"],
+            },
+        ),
+        (
+            17,
+            {
+                "ghsa_id": "GHSA-3644-q5cj-c5c7",
+                "cve_id": "CVE-2026-45134",
+                "exploited": False,
+                "packages": ["langsmith", "langchain-classic", "langchain"],
+            },
+        ),
+        (
+            10,
+            {
+                "ghsa_id": "GHSA-gr75-jv2w-4656",
+                "cve_id": None,
+                "exploited": None,
+                "packages": ["langchain", "langchain-anthropic"],
+            },
+        ),
+        (11, {"edition": "ai"}),
+        (14, {}),
+    ],
+    ids=[
+        "vulnerability-withdrawn",
+        "release",
+        "advisory-in-kev",
+        "advisory-not-in-kev",
+        "advisory-without-cve",
+        "newsletter-article",
+        "zotero-entry",
+    ],
+)
+def test_each_kind_is_listed_with_its_identifiers(
+    client, authorization, item_id, identifiers
+):
+    items = client.get("/items", params={"limit": 100}, headers=authorization).json()[
+        "items"
+    ]
+
+    item = next(item for item in items if item["id"] == item_id)
+    assert {field: item[field] for field in set(item) - LISTED_FIELDS} == identifiers
+
+
+@pytest.mark.parametrize(
+    ("params", "expected_total"),
+    [
+        ({}, 18),
+        ({"kind": ["paper", "advisory"]}, 5),
+        ({"since": "2026-10-07T00:00:00+02:00"}, 2),
+        ({"q": "blockchain"}, 1),
+        ({"limit": 2, "offset": 2}, 18),
+        ({"offset": 10_000}, 18),
+        ({"q": "no item holds this"}, 0),
+    ],
+)
+def test_the_total_counts_the_items_of_the_filters_whatever_the_page(
+    client, authorization, params, expected_total
+):
+    response = client.get("/items", params=params, headers=authorization)
+
+    assert response.status_code == 200
+    assert response.json()["total"] == expected_total
 
 
 @pytest.mark.parametrize(
@@ -122,7 +213,9 @@ def test_next_offset_stops_at_the_offset_bound(
 ):
     # A base of 10 000 items is not written for it: the reading gives the next offset.
     monkeypatch.setattr(
-        item_router, "read_items", lambda *_, **__: ItemPage([], read_next_offset)
+        item_router,
+        "read_items",
+        lambda *_, **__: ItemPage([], read_next_offset, 10_200),
     )
 
     response = client.get(
@@ -130,17 +223,24 @@ def test_next_offset_stops_at_the_offset_bound(
     )
 
     assert response.status_code == 200
-    assert response.json() == {"items": [], "next_offset": expected_next_offset}
+    assert response.json() == {
+        "items": [],
+        "next_offset": expected_next_offset,
+        "total": 10_200,
+    }
 
 
-def test_the_list_serves_only_the_six_fields(client, authorization):
-    """API3: a whitelist of six fields; highlights, an author, a summary, a raw file path or a
-    collection date are never served."""
+def test_the_list_serves_only_the_fields_of_each_kind(client, authorization):
+    """API3: a whitelist of six fields and the identifiers of the kind; highlights, an author, a
+    summary, a raw file path, a collection date, or the paper of a Zotero entry are never
+    served."""
     response = client.get("/items", params={"limit": 100}, headers=authorization)
 
     items = response.json()["items"]
     assert 14 in {item["id"] for item in items}
-    assert all(set(item) == LISTED_FIELDS for item in items)
+    assert all(
+        set(item) == LISTED_FIELDS | LISTED_IDENTIFIERS[item["kind"]] for item in items
+    )
     for absent in (
         "A highlighted sentence on the first page.",
         "A comment on it.",
@@ -177,6 +277,7 @@ VULNERABILITY_4 = {
     "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-88772",
     "withdrawn_at": None,
     "cve_id": "CVE-2026-88772",
+    "exploited": True,
     "description": "Citrix NetScaler ADC and NetScaler Gateway contain an improper restriction of operations within the bounds of a memory buffer vulnerability that could allow for remote code execution or denial of service",
     "vendor": "Citrix",
     "product": "NetScaler",

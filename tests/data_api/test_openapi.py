@@ -28,7 +28,7 @@ def test_the_versioned_openapi_is_valid_and_declares_its_security_scheme():
     openapi = read_versioned_openapi()
 
     OpenAPIV31SpecValidator(openapi).validate()
-    assert openapi["info"]["version"] == "0.11.0"
+    assert openapi["info"]["version"] == "0.12.0"
     assert openapi["info"]["description"] == ARXIV_ACKNOWLEDGEMENT
     assert openapi["components"]["securitySchemes"] == {
         "HTTPBearer": {
@@ -93,6 +93,25 @@ def test_the_detail_is_a_union_discriminated_by_kind():
     assert len(schema["oneOf"]) == 7
 
 
+def test_a_listed_item_is_a_union_discriminated_by_kind_in_a_page_with_its_total():
+    schemas = read_versioned_openapi()["components"]["schemas"]
+    page = schemas["ItemPageSchema"]
+    listed = page["properties"]["items"]["items"]
+
+    assert listed["discriminator"]["propertyName"] == "kind"
+    assert set(listed["discriminator"]["mapping"]) == {
+        "paper",
+        "vulnerability",
+        "release",
+        "advisory",
+        "newsletter_article",
+        "zotero_entry",
+        "clip",
+    }
+    assert len(listed["oneOf"]) == 7
+    assert {"items", "next_offset", "total"} <= set(page["required"])
+
+
 @pytest.mark.parametrize(
     ("schema_name", "field", "said"),
     [
@@ -100,7 +119,7 @@ def test_the_detail_is_a_union_discriminated_by_kind():
         ("ZoteroEntryDetailSchema", "revised_at", "A date of K-B"),
         ("HighlightSchema", "revised_at", "A date of K-B"),
         ("HighlightSchema", "withdrawn_at", "A date of K-B"),
-        ("ListedItemSchema", "withdrawn_at", "A date of K-B"),
+        ("ListedVulnerabilitySchema", "withdrawn_at", "A date of K-B"),
         ("PaperDetailSchema", "arxiv_updated_at", "A date of arXiv"),
         ("HighlightSchema", "highlighted_at", "A date of Zotero"),
         ("ClipDetailSchema", "published_at", "A date of the page kept"),

@@ -7,7 +7,7 @@ erreurs et les exigences de sécurité. Les décisions et leur pourquoi sont dan
 [journal ADR](ADR/journal-decisions-projet.md) (entrées du 2026-10-14) ; la collecte, dans
 [specs-collecte.md](specs-collecte.md) ; la base, dans [stockage.md](stockage.md).
 
-**Version de la spec : 0.11.0**, la même que `info.version` de l'OpenAPI
+**Version de la spec : 0.12.0**, la même que `info.version` de l'OpenAPI
 (`docs/api/openapi-donnees.json`, que #184 écrit). Un changement de comportement visible par un client, comme
 l'ordre des résultats, change la version.
 
@@ -24,6 +24,7 @@ l'ordre des résultats, change la version.
 | 0.9.0 | `HEAD` refusé sur `/health`, et sur `/docs` et `/openapi.json` en `sandbox`, comme il l'était déjà sur les routes de données : 405 `method_not_allowed`, `Allow: GET` (#161) |
 | 0.10.0 | une requête a 5 s dans la base ; au-delà, 503 `query_timeout` ; le détail d'une entrée Zotero sert 100 surlignages et 125 000 caractères de leur texte et commentaire au plus, et celui d'un clip 125 000 caractères de son texte, la coupe dite par `highlights_truncated` et `body_truncated` (#331) |
 | 0.11.0 | la base PostgreSQL que nomme `KB_DATABASE_URL` servie, et non plus le fichier SQLite ; sur elle, une base injoignable ou sans tables répond 500 `database_error`, et non 503 `database_missing` ; au-delà de 4 lectures en même temps, une requête attend 2 s puis répond 500 `database_error` ; la recherche `q` rend les mêmes résultats qu'en SQLite (#418) |
+| 0.12.0 | `GET /items` sert, pour chaque item, les identifiants de sa sorte (`arxiv_id`, `cve_id`, `exploited`, `ghsa_id`, `packages`, `repository_name`, `tag_name`, `edition`, « Identifiants par sorte ») et, pour la page, `total`, le nombre des items des filtres ; le détail d'une faille sert aussi `exploited` (#550) |
 
 ## Règles communes
 
@@ -94,10 +95,14 @@ l'ordre des résultats, change la version.
   `options=-c statement_timeout` dans l'URL (refusé par un pooler comme PgBouncer) ; `SET LOCAL` à
   chaque requête (utile derrière un pooler en mode transaction seulement) ; `transaction_timeout`
   (il ferme la session). Journal ADR, 2026-11-06, « API de données sur PostgreSQL ». Limites :
-  - le délai compte par instruction, pas par requête : la liste et les tendances en font une, le
-    détail jusqu'à trois (15 s au plus en théorie) ;
+  - le délai compte par instruction, pas par requête : les tendances en font une, la liste deux (la
+    page et son total, 10 s au plus en théorie), le détail jusqu'à trois (15 s au plus en théorie) ;
   - l'attente d'une connexion (2 s au plus) s'ajoute : avec une instruction, 7 s, sous les 10 s du
-    client de l'API IA ;
+    client de l'API IA ; avec les deux de la liste, 12 s, au-delà (limite acceptée par Sabine le
+    2026-11-11, #550). Pour réduire le risque : compter dans l'instruction de la page, par
+    `count(*) OVER ()`, que PostgreSQL calcule sur les lignes du `WHERE`, avant `LIMIT`
+    (documentation de PostgreSQL 18, « Window Function Processing », lue le 2026-11-11) ; faisable
+    avec nos droits, du code seulement ;
   - une instruction annulée par un administrateur (`pg_cancel_backend`) lève aussi 57014 et
     répond aussi 503 `query_timeout`.
 - **Clé** : chaque route de données demande `Authorization: Bearer <clé>`. `/health` est public,
@@ -193,7 +198,7 @@ la route qui répond à chacun.
 | P1 | Quoi de neuf depuis N jours, toutes sources ou par thème ? | `GET /items?since=…`, avec `kind` ou `q` pour un thème | — |
 | P2 | Quelles nouvelles versions de mes outils ? | `GET /items?kind=release&q=<dépôt>` : le titre d'une release commence par son dépôt | — |
 | P3 | Quelles failles touchent mes outils, mes paquets ? | `GET /items?kind=advisory` : les alertes ne sont collectées que pour les paquets suivis (`affects=`, [specs-collecte.md](specs-collecte.md)) | le filtre par paquet : non planifié |
-| P4 | Cette faille est-elle exploitée activement ? | `GET /items/{item_id}` d'une alerte : `cve_id` et `exploited` | — ; limite : la liste n'a pas de `cve_id` et `q` ne cherche pas dans `cve_id`, on le lit au détail de l'alerte |
+| P4 | Cette faille est-elle exploitée activement ? | `GET /items?kind=advisory` : `cve_id` et `exploited` de chaque alerte | — ; limite : `q` ne cherche pas dans `cve_id` |
 | P5 | Quels dépôts ont le vent en poupe ? | `GET /trends?window_end=…` | — |
 | P6 | Quels papiers récents sur un sujet ? | `GET /items?kind=paper&q=…&since=…` | — |
 | P7 | Quels sont les dépôts les plus étoilés (top 10) ? | — | hors API : les tops sont hors base (journal ADR, 2026-10-07) ; `kb write-tops` en écrit une fiche par jour dans le coffre, `veille/tops/most_starred/` (#265) ; la commande `kb top`, décidée le 2026-10-08, n'est pas codée |
@@ -243,7 +248,14 @@ cette semaine n'apparaît pas dans « quoi de neuf » (limite assumée, journal 
 - La réponse donne `next_offset`, l'`offset` de la page suivante, nul à la dernière page, ou quand
   l'offset suivant dépasserait 10 000 : les items au-delà ne sont pas servis par la liste ; affiner
   par `since`, `kind` ou `q`.
-- Limite : un import qui écrit entre deux pages décale la pagination par `offset`.
+- La réponse donne aussi `total`, le nombre des items qui répondent à `kind`, `since` et `q`,
+  toutes pages ensemble : `limit` et `offset` ne le changent pas, et il compte les items au-delà de
+  l'offset 10 000, que la liste ne sert pas mais qui se lisent en affinant les filtres. Il ne compte
+  que des items que la liste sert, retirés compris. Il est compté par une requête `count(*)` sur
+  les mêmes filtres, sans tri ni `LIMIT`, dans la même transaction de lecture que la page : un
+  import entre les deux ne les fait pas diverger.
+- Limite : un import qui écrit entre deux pages décale la pagination par `offset`, et change le
+  `total` d'une page à l'autre.
 
 ### Réponse
 
@@ -256,10 +268,12 @@ cette semaine n'apparaît pas dans « quoi de neuf » (limite assumée, journal 
       "title": "…",
       "source_date": "2026-10-07T14:03:00Z",
       "url": "https://arxiv.org/abs/…",
-      "withdrawn_at": null
+      "withdrawn_at": null,
+      "arxiv_id": "…"
     }
   ],
-  "next_offset": 20
+  "next_offset": 20,
+  "total": 1234
 }
 ```
 
@@ -274,25 +288,47 @@ cette semaine n'apparaît pas dans « quoi de neuf » (limite assumée, journal 
 
 Les lignes retirées sont servies avec leur `withdrawn_at`, pas filtrées.
 
+### Identifiants par sorte
+
+Après ces six champs, chaque item sert les identifiants de sa sorte, sous les noms du détail, et
+aucun autre : `kind` dit le schéma suivi (`oneOf` et `discriminator` dans l'OpenAPI), comme au
+détail (#550).
+
+| Sorte (`kind`) | Identifiants |
+|---|---|
+| `paper` | `arxiv_id` |
+| `vulnerability` | `cve_id`, `exploited` (toujours vrai ; le retrait du catalogue se lit dans `withdrawn_at`) |
+| `release` | `repository_name`, `tag_name` |
+| `advisory` | `ghsa_id`, `cve_id` (nul si l'alerte ne cite aucune CVE), `exploited` (sens au détail, plus bas), `packages` (les paquets touchés) |
+| `newsletter_article` | `edition`, la lettre (`ai`, `infosec`…) ; le jour de l'édition est `source_date` |
+| `zotero_entry`, `clip` | aucun |
+
+Limite : `packages` est servi entier, 100 paquets de 255 caractères au plus par alerte, soit
+2 550 000 caractères au pire pour une page de 100 alertes (limite acceptée par Sabine le
+2026-11-11). Pour réduire le risque : n'en servir que les premiers dans la liste, la coupe dite par
+un `packages_truncated`, comme au détail d'une entrée Zotero ; faisable avec nos droits, du code
+seulement.
+
 **Pas dans la liste** : le résumé, la description, le corps d'une release, le texte d'un clip, les
-auteurs (texte long ou donnée personnelle, servis au détail), `raw_file_path` et `collected_at` (jamais servis).
+auteurs (texte long ou donnée personnelle, servis au détail), l'`arxiv_id` d'une entrée Zotero (servi au
+détail), `raw_file_path` et `collected_at` (jamais servis).
 
 ## `GET /items/{item_id}` : le détail
 
 `item.id` dans le chemin ; les clés naturelles sont des champs de la réponse. `item_id` est un
 entier écrit en chiffres, sans zéro en tête, sans `+`, sans espace ni décimale (`1`, `-1`, pas
 `01`, `1.0` ni `+1` : une seule URL par item), tenu sur 64 bits ; sinon 422 `invalid_parameter`.
-Un entier qu'aucun item ne porte rend 404 `item_not_found`. La réponse reprend les six champs de
-la liste et, selon la sorte (`kind`, qui dit le schéma suivi : `oneOf` et `discriminator` dans
-l'OpenAPI), exactement ceux-ci :
+Un entier qu'aucun item ne porte rend 404 `item_not_found`. La réponse reprend l'item de la liste,
+ses six champs et les identifiants de sa sorte, puis, selon la sorte (`kind`, qui dit le schéma
+suivi : `oneOf` et `discriminator` dans l'OpenAPI), exactement ceux-ci :
 
 | Sorte | Clés naturelles | En plus de la liste |
 |---|---|---|
-| `paper` | `arxiv_id` | `authors` (les noms, dans l'ordre d'arXiv), `summary`, `arxiv_updated_at` (colonne `publication.revised_at`, date arXiv) |
-| `vulnerability` | `cve_id` | `description`, `vendor`, `product`, `ransomware_use`, `revised_at` (date K-B) |
-| `release` | `release_id` | `repository_name`, `tag_name`, `body` (le corps) |
-| `advisory` | `ghsa_id` | `cve_id` (nul si l'alerte ne cite aucune CVE), `exploited`, `packages` (les paquets touchés) |
-| `newsletter_article` | `edition`, `edition_date`, `rank` | `summary` |
+| `paper` | `arxiv_id` (déjà dans la liste) | `authors` (les noms, dans l'ordre d'arXiv), `summary`, `arxiv_updated_at` (colonne `publication.revised_at`, date arXiv) |
+| `vulnerability` | `cve_id` (déjà dans la liste) | `description`, `vendor`, `product`, `ransomware_use`, `revised_at` (date K-B) |
+| `release` | `release_id` | `body` (le corps) |
+| `advisory` | `ghsa_id` (déjà dans la liste) | aucun : `cve_id`, `exploited` et `packages` sont déjà dans la liste |
+| `newsletter_article` | `edition` (déjà dans la liste), `edition_date`, `rank` | `summary` |
 | `zotero_entry` | `zotero_key` | `item_type`, `arxiv_id` (lu par `publication_id`, nul hors arXiv), `revised_at` (date K-B), `highlights` : les surlignages, retirés compris, par date de création, dans les bornes du détail ; `highlights_truncated` |
 | `clip` | `url` (déjà dans la liste) | `published_at` (date de la page gardée, un jour à minuit UTC, nulle si la page n'en donne pas), `body` (le texte gardé, Markdown, dans les bornes du détail) ; `body_truncated` |
 
@@ -331,11 +367,13 @@ des caractères sur les deux moteurs, la base PostgreSQL étant en UTF8.
 - En SQLite, le moteur tourne dans le processus de l'API : la borne vaut pour ce que Python reçoit,
   et ce que SQLite charge pour calculer `substr` n'est pas mesuré. En PostgreSQL, le serveur coupe.
 
-`exploited` vaut vrai si la CVE de l'alerte est au catalogue CISA KEV
-(`vulnerability.item_id IS NOT NULL`) : faux veut dire « absente du catalogue KEV », pas « non
-exploitée ». Il est nul pour une alerte sans CVE. Il reste vrai si la CVE a été retirée du
-catalogue depuis : le retrait se lit dans `withdrawn_at`, au détail de la vulnérabilité, que
-le détail de l'alerte ne désigne pas encore (« Hors de cette version »).
+`exploited`, servi pour une alerte et pour une faille, dans la liste comme au détail, vaut vrai si
+la CVE est au catalogue CISA KEV (`vulnerability.item_id IS NOT NULL`, journal ADR, 2026-10-07) :
+toujours vrai pour une faille. Pour une alerte, faux veut dire « absente du catalogue KEV », pas
+« non exploitée », et il est nul pour une alerte sans CVE. Il reste vrai si la CVE a été retirée du
+catalogue depuis (décision de Sabine du 2026-11-11, #550) : le retrait se lit dans `withdrawn_at` de
+la faille, dans la liste ou à son détail, que l'alerte ne désigne pas encore (« Hors de cette
+version »).
 
 `source_date` et `arxiv_updated_at` sont des noms de champs de l'API : ils ne renomment aucune
 colonne (décision ouverte « Noms des colonnes de date », journal ADR).
@@ -439,8 +477,8 @@ Selon le [registre des traitements](registre-traitements.md) :
 - les noms des auteurs d'un papier et les logins écrits dans le corps d'une release : au détail
   seulement, jamais dans la liste ni au journal ;
 - le login du propriétaire d'un dépôt, dans le nom du dépôt : servi par `/trends`
-  (`repository_name`), dans le titre d'une release (liste) et dans son `repository_name`
-  (détail) ;
+  (`repository_name`), dans le titre d'une release et dans son `repository_name` (liste et
+  détail) ;
 - les titres et dates des entrées Zotero de Sabine : dans la liste ; ses surlignages et
   commentaires : au détail de leur entrée ;
 - les titres et dates des clips de Sabine : dans la liste ; le texte d'un clip, qui peut nommer
@@ -464,8 +502,8 @@ de « non tenue » et d'« écart voulu, justifié » sont ceux de l'API IA
 |---|---|---|
 | API1:2023 Broken Object Level Authorization | Une seule propriétaire, Sabine : tout client authentifié lit tous les items. Un identifiant inconnu rend 404, jamais une erreur qui dirait autre chose. `item.id`, séquentiel, est dans l'URL : la recommandation d'identifiants difficiles à deviner est écartée tant que l'API n'a qu'une propriétaire (journal ADR, 2026-10-15). | **Tenue.** `test_each_client_is_served_with_its_key`, `test_an_unknown_item_id_gives_404_item_not_found`, `test_an_unknown_window_gives_404` |
 | API2:2023 Broken Authentication | Une clé par client, générée en 256 bits (minimum contrôlé : 32 caractères) ; pas de route de connexion ; comparaison en temps constant ; 401 testé sur chaque route de données. | **Écart voulu, justifié** pour l'anti-force brute et le TLS mutuel (« Ce qui manque, et comment le tenir ») ; le reste tenu : `test_every_data_route_refuses_a_missing_and_a_wrong_key_with_the_same_body` (chaque route, lue dans l'app par le parcours de FastAPI, routes hors OpenAPI comprises), `test_only_the_public_routes_answer_without_a_key` (`/docs`, `/openapi.json` et `/health`, aucune autre), `test_an_app_without_key_refuses_every_data_route`, `test_a_removed_key_gives_401_and_the_other_clients_are_still_served`, `test_serve_exits_2_and_names_the_variable_without_its_value` ; le temps constant n'est pas mesuré par un test (`hmac.compare_digest`, `src/k_b/core/api_access.py`) |
-| API3:2023 Broken Object Property Level Authorization | Réponses en liste blanche : ni `raw_file_path`, ni `collected_at`, ni texte long dans la liste ; au détail, les champs du tableau de sa sorte et rien d'autre. | **Tenue.** `test_the_list_serves_only_the_six_fields`, `test_each_kind_has_its_detail` (corps entier, une sorte par cas), `test_no_detail_serves_a_raw_file_path_or_a_collection_date`, `test_trends_without_window_end_give_the_latest_window`, `test_no_error_body_holds_a_raw_file_path_or_a_path`, `test_no_route_documents_a_raw_file_path_or_a_collection_date` |
-| API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000), `q` (200 caractères) et du nombre de `kind` (7) ; `/trends` rend 60 lignes au plus, sans pagination. Une limite de débit par client et par route (« Débit »). Un délai de 5 s par requête dans la base (« Délai ») ; au détail, 100 surlignages et 125 000 caractères de texte long au plus (« Bornes du détail »). | **Écart voulu, justifié** pour les redémarrages, les descripteurs et les processus (« Ce qui manque, et comment le tenir », API4) ; le reste tenu. Le délai : `test_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail` (la liste, le détail, les tendances : chaque route lit par la connexion qui porte le délai), `test_the_deadline_of_a_request_is_below_the_read_timeout_of_the_ai_api_client` ; sur PostgreSQL, `test_on_postgresql_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail` (les trois routes), `test_a_reading_past_its_deadline_is_stopped_and_its_connection_given_back_idle`, `test_a_deadline_below_one_millisecond_is_refused_as_statement_timeout_0_disables_it`, `test_serve_reads_the_postgresql_base_of_kb_database_url_with_the_deadline_it_logs` (le délai appliqué est celui du journal), et l'attente d'une connexion, `test_the_pool_lends_no_connection_beyond_its_wait`, `test_the_wait_for_a_connection_and_one_reading_hold_below_the_read_timeout_of_the_client` ; les bornes du détail : `test_the_highlights_beyond_their_number_are_cut_and_the_cut_is_said`, `test_the_highlights_beyond_their_length_are_cut_and_the_cut_is_said`, `test_the_text_of_a_clip_beyond_its_length_is_cut_and_the_cut_is_said` ; les bornes et la taille de page, `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_next_offset_stops_at_the_offset_bound`, `test_an_item_id_not_written_as_an_integer_gives_422`, `test_a_malformed_window_end_gives_422` ; le débit, pour les clients authentifiés, `test_beyond_its_limit_a_client_gets_429_with_its_wait_and_its_id`, `test_the_limit_is_per_client_and_per_route`, `test_every_data_route_has_its_limit` ; les 60 lignes d'une fenêtre sont bornées à la collecte (`gh_archive.py`), pas par l'API. Limites : les surlignages sont tous lus avant la coupe, bornés en temps par le délai, pas en mémoire ; une instruction seule de SQLite ne s'interrompt pas, et chaque contrôle du délai reprend le GIL ; sur PostgreSQL, le délai compte par instruction, et le détail en fait jusqu'à trois (« Délai ») ; le délai se multiplie par le débit (120 listes par minute, 5 s chacune au plus), sans plafond de requêtes en même temps en SQLite ; en PostgreSQL, 4 lectures en même temps au plus, les connexions du pool, et une requête de plus attend 2 s puis répond 500 `database_error`. La dépense : une alerte de facturation, `budget-kb` (« Ce qui manque, et comment le tenir », API4) |
+| API3:2023 Broken Object Property Level Authorization | Réponses en liste blanche : dans la liste, les six champs et les identifiants de sa sorte, ni `raw_file_path`, ni `collected_at`, ni texte long, ni auteur ; au détail, les champs du tableau de sa sorte et rien d'autre. `total` ne compte que des items que la liste sert. | **Tenue.** `test_the_list_serves_only_the_fields_of_each_kind`, `test_each_kind_is_listed_with_its_identifiers`, `test_the_total_counts_the_items_of_the_filters_on_every_page`, `test_each_kind_has_its_detail` (corps entier, une sorte par cas), `test_no_detail_serves_a_raw_file_path_or_a_collection_date`, `test_trends_without_window_end_give_the_latest_window`, `test_no_error_body_holds_a_raw_file_path_or_a_path`, `test_no_route_documents_a_raw_file_path_or_a_collection_date` |
+| API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000), `q` (200 caractères) et du nombre de `kind` (7) ; `/trends` rend 60 lignes au plus, sans pagination. Une limite de débit par client et par route (« Débit »). Un délai de 5 s par requête dans la base (« Délai ») ; au détail, 100 surlignages et 125 000 caractères de texte long au plus (« Bornes du détail »). `total` : une requête `count(*)` de plus, sous les mêmes filtres et le même délai ; `limit` et `offset` gardent leurs bornes. | **Écart voulu, justifié** pour les redémarrages, les descripteurs et les processus (« Ce qui manque, et comment le tenir », API4) ; le reste tenu. Le délai : `test_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail` (la liste, le détail, les tendances : chaque route lit par la connexion qui porte le délai), `test_the_deadline_of_a_request_is_below_the_read_timeout_of_the_ai_api_client` ; sur PostgreSQL, `test_on_postgresql_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail` (les trois routes), `test_a_reading_past_its_deadline_is_stopped_and_its_connection_given_back_idle`, `test_a_deadline_below_one_millisecond_is_refused_as_statement_timeout_0_disables_it`, `test_serve_reads_the_postgresql_base_of_kb_database_url_with_the_deadline_it_logs` (le délai appliqué est celui du journal), et l'attente d'une connexion, `test_the_pool_lends_no_connection_beyond_its_wait`, `test_the_wait_for_a_connection_and_one_reading_hold_below_the_read_timeout_of_the_client` ; les bornes du détail : `test_the_highlights_beyond_their_number_are_cut_and_the_cut_is_said`, `test_the_highlights_beyond_their_length_are_cut_and_the_cut_is_said`, `test_the_text_of_a_clip_beyond_its_length_is_cut_and_the_cut_is_said` ; les bornes et la taille de page, `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_next_offset_stops_at_the_offset_bound`, `test_an_item_id_not_written_as_an_integer_gives_422`, `test_a_malformed_window_end_gives_422` ; le débit, pour les clients authentifiés, `test_beyond_its_limit_a_client_gets_429_with_its_wait_and_its_id`, `test_the_limit_is_per_client_and_per_route`, `test_every_data_route_has_its_limit` ; les 60 lignes d'une fenêtre sont bornées à la collecte (`gh_archive.py`), pas par l'API. Limites : les surlignages sont tous lus avant la coupe, bornés en temps par le délai, pas en mémoire ; une instruction seule de SQLite ne s'interrompt pas, et chaque contrôle du délai reprend le GIL ; sur PostgreSQL, le délai compte par instruction, la liste en fait deux et le détail jusqu'à trois (« Délai ») ; `packages` est servi entier dans la liste (« Identifiants par sorte ») ; le délai se multiplie par le débit (120 listes par minute, 5 s chacune au plus), sans plafond de requêtes en même temps en SQLite ; en PostgreSQL, 4 lectures en même temps au plus, les connexions du pool, et une requête de plus attend 2 s puis répond 500 `database_error`. La dépense : une alerte de facturation, `budget-kb` (« Ce qui manque, et comment le tenir », API4) |
 | API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon, `HEAD` compris ; aucune route d'administration. | **Tenue.** `test_every_route_answers_get_only_and_405_to_any_other_method`, `test_the_routes_are_listed`, `test_docs_openapi_and_health_are_public_and_no_other_page_is_served`, `test_health_refuses_another_method_with_405` |
 | API6:2023 Unrestricted Access to Sensitive Business Flows | Sans objet : l'API n'a aucun flux métier à protéger (ni achat, ni réservation, ni création de compte), seulement des lectures. | Sans objet, sans test |
 | API7:2023 Server Side Request Forgery | Sans objet : l'API ne va chercher aucune adresse fournie par un client. | Sans objet, sans test |
@@ -570,10 +608,10 @@ avec ses sources.
 - Les filtres `source` et `in` : options de `kb search` seulement (#187).
 - Le filtre par paquet (P3).
 - Les tops P7 et P8.
-- **D'une alerte à sa vulnérabilité** : le détail d'une alerte dit `cve_id` et `exploited`, pas
-  l'`id` de l'item vulnérabilité ; la liste n'a pas `cve_id` et `q` ne le cherche pas. Un client
-  ne peut donc pas lire au détail de la vulnérabilité si elle a été retirée du catalogue KEV.
-  Signalé ; une issue sera créée.
+- **D'une alerte à sa vulnérabilité** : la liste et le détail d'une alerte disent `cve_id` et
+  `exploited`, pas l'`id` de l'item vulnérabilité, et `q` ne cherche pas dans `cve_id`. Pour savoir
+  si la faille a été retirée du catalogue KEV, un client lit les failles de la liste
+  (`kind=vulnerability`) et compare leur `cve_id`. Signalé ; une issue sera créée.
 
 ## Sources (consultées le 2026-10-14, sauf mention)
 
