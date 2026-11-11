@@ -183,7 +183,7 @@ refaire l'étape 3 d'« Installer », avant l'essai d'accessibilité.
 
 ## Journaux de l'application
 
-Écrit le 2026-11-09 pour #165 et revu le 2026-11-11 d'après le code de `main` au commit `d1b5400`. Le tableau et les alertes ci-dessus
+Écrit le 2026-11-09 pour #165 et revu le 2026-11-11 d'après le code de `main` au commit `33fa59c`. Le tableau et les alertes ci-dessus
 suivent le modèle; l'application se suit par ses journaux: ceux de `kb`, de `kb serve-data` (l'API de données) et de
 `kb serve-ai` (l'API IA). En local, ils ne demandent rien à installer: `kb` les écrit par le module `logging` de
 Python. En ligne, ils vont dans l'espace Log Analytics `log-kb`, qu'`infra/main.bicep` crée. Aucune alerte ne les lit
@@ -267,7 +267,7 @@ journaux et les journaux d'import dont le jour du nom a plus de 6 mois (`src/k_b
 par `src/k_b/purge/all_purges.py:63`; durée: `src/k_b/core/config.py:174-178`). En local, elle se lance à la main.
 En ligne, le job `caj-kb-daily-routine` la lance: `kb daily-routine` l'enchaîne après `kb import`
 (`src/k_b/commands/daily_routine_command.py:63`), et ne démarre pas sans les réglages du job, dont `AZURE_CLIENT_ID`
-(`src/k_b/commands/daily_routine_command.py:80-84`, `src/k_b/jobs/exchange_storage.py:101-105`).
+(`src/k_b/commands/daily_routine_command.py:80-84`, `src/k_b/exchange/storage.py:106-110`).
 
 ### En local: lire
 
@@ -365,7 +365,7 @@ période.
   fichier (`docs/specs-api.md`, « Journal »; `README.md:476`).
 - **L'export vers Grafana Cloud en ligne**: son jeton de production est l'objet de #522; aucune mesure de la
   production n'est relevée ici, faute d'appel au modèle en ligne sur la période.
-- **[WIP #423] Le job des fiches de veille, `caj-kb-digest-watch`**, n'est pas déclaré dans `infra/` au commit `d1b5400`;
+- **[WIP #423] Le job des fiches de veille, `caj-kb-digest-watch`**, n'est pas déclaré dans `infra/` au commit `33fa59c`;
   son identité, `id-kb-digest-watch`, y est déjà (`infra/main.bicep:46`). Ses journaux, quand il y sera, se liront
   comme ceux des autres jobs.
 
