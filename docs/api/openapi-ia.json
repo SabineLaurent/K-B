@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "K-B AI API",
-    "version": "0.12.0"
+    "version": "0.13.0"
   },
   "paths": {
     "/digests": {
@@ -446,7 +446,23 @@
               }
             ],
             "title": "Window Days",
-            "description": "Absent or null: the window of KB_DIGEST_WINDOW_DAYS."
+            "description": "The window of a subject without a start; absent or null: the window of KB_DIGEST_WINDOW_DAYS."
+          },
+          "since_by_subject": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since By Subject",
+            "description": "The start of a subject, the until of its previous digest; a subject absent starts window_days before the request, a start more than 14 days before is brought to that bound."
           }
         },
         "additionalProperties": false,
@@ -524,6 +540,15 @@
           "window": {
             "$ref": "#/components/schemas/WindowSchema"
           },
+          "since_by_subject": {
+            "additionalProperties": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "type": "object",
+            "title": "Since By Subject",
+            "description": "The start applied to each subject: its items dated from it, and before window.until, are its own."
+          },
           "digests": {
             "items": {
               "$ref": "#/components/schemas/DigestSchema"
@@ -537,6 +562,14 @@
             },
             "type": "array",
             "title": "Failed Subjects"
+          },
+          "subjects_without_items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subjects Without Items",
+            "description": "The subjects no item read and classified falls in, from their start."
           },
           "no_suitable_subject": {
             "items": {
@@ -566,6 +599,11 @@
             "type": "integer",
             "title": "Items Dropped Before Writing Stage"
           },
+          "items_before_subject_start": {
+            "type": "integer",
+            "title": "Items Before Subject Start",
+            "description": "Items classified in a subject but dated before its start."
+          },
           "items_capped": {
             "type": "boolean",
             "title": "Items Capped"
@@ -576,13 +614,16 @@
           "request_id",
           "model",
           "window",
+          "since_by_subject",
           "digests",
           "failed_subjects",
+          "subjects_without_items",
           "no_suitable_subject",
           "unanswered",
           "items_in",
           "items_truncated",
           "items_dropped_before_writing_stage",
+          "items_before_subject_start",
           "items_capped"
         ],
         "title": "DigestsSchema"
@@ -1152,12 +1193,14 @@
         "properties": {
           "days": {
             "type": "integer",
-            "title": "Days"
+            "title": "Days",
+            "description": "The window of a subject without a start, in days."
           },
           "since": {
             "type": "string",
             "format": "date-time",
-            "title": "Since"
+            "title": "Since",
+            "description": "The start of the reading: the oldest start of a subject."
           },
           "until": {
             "type": "string",

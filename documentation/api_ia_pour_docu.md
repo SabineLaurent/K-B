@@ -7,7 +7,8 @@
 Cette fiche dit ce qu'est l'API IA, comment elle est construite, ce que fait chacun de ses points de terminaison,
 qui peut l'appeler, et comment une clé se change. Le contrat de ses deux routes est l'OpenAPI versionnée,
 [`docs/api/openapi-ia.json`](../docs/api/openapi-ia.json): la fiche y renvoie et ne la remplace pas. Elle est écrite
-d'après le code de `main` au commit `875c638` (2026-11-08), et ses appelants en ligne d'après le code de la PR de #423. Les chemins du code de K-B (`ai_api/…`, `core/…`,
+d'après le code de `main` au commit `875c638` (2026-11-08), et ses appelants en ligne d'après le code de la PR de #423,
+et la fenêtre par sujet, par #565, d'après le code de sa PR. Les chemins du code de K-B (`ai_api/…`, `core/…`,
 `post/…`, `commands/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 ## Ce qu'est l'API IA
@@ -129,7 +130,7 @@ ici d'après le code.
 
 | Chemin | Dans le contrat | Accès | Corps de la demande | Réponse 200 |
 |---|---|---|---|---|
-| `POST /digests` | oui | clé du client `KB_DIGEST` | `DigestRequestSchema`: un objet JSON, avec `window_days` facultatif, un entier de 1 à 14 (`core/config.py:331-332`); absent ou `null`, la fenêtre de `KB_DIGEST_WINDOW_DAYS`, 3 jours par défaut (`:330`) | `DigestsSchema`: une fiche par sujet, les sujets en échec, la fenêtre lue |
+| `POST /digests` | oui | clé du client `KB_DIGEST` | `DigestRequestSchema`: un objet JSON, avec `window_days` facultatif, un entier de 1 à 14 (`core/config.py:349-350`), la fenêtre d'un sujet sans début; absent ou `null`, celle de `KB_DIGEST_WINDOW_DAYS`, 3 jours par défaut (`:348`); et `since_by_subject` facultatif, le début de chaque sujet, une date avec son fuseau, au plus l'instant de la demande, ramenée à 14 jours au plus (`ai_api/schemas/digest_schema.py:36`, `ai_api/routers/digest_router.py:118`) | `DigestsSchema`: une fiche par sujet, les sujets en échec, les sujets sans item, le début appliqué à chaque sujet, la fenêtre lue (`ai_api/schemas/digest_schema.py:88`) |
 | `POST /trend-reports` | oui | clé du client `KB_TREND_REPORT` | `TrendReportRequestSchema`: `after` et `previous_first_window`, tous deux requis, tous deux `null` (premier compte rendu) ou tous deux un jour; alors `previous_first_window` n'est pas après `after`, et les deux jours, compris, couvrent 15 fenêtres quotidiennes au plus (`ai_api/schemas/trend_report_schema.py:35-49`, `items.py:600-603`, `core/config.py:88`) | `TrendReportSchema`: la période, les dépôts qui remplissent un critère, ceux que le modèle a choisis, leurs textes |
 | `GET /health` | non | sans clé | aucun | `{"status": "ok"}` |
 | `GET /openapi.json` | non | sans clé, avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox` seulement; 404 sinon | aucun | l'OpenAPI de l'app |
@@ -281,7 +282,8 @@ Les deux clients de l'API IA sont des commandes de K-B. Voici comment elles appl
   contrôlent ni les clés en double ni l'égalité avec `KB_DATA_API_KEY_AI_DIGEST`, que seul `kb serve-ai` vérifie.
   Une clé absente ou refusée: rien n'est demandé, code de sortie 2 (`commands/digest_command.py:63-67`).
 - **À l'envoi.** La clé part dans `Authorization: Bearer` (`post/ai_api_client.py:184-197`), jamais dans l'URL.
-  `kb digest` envoie `{}`, la fenêtre par défaut (`post/ai_api_client.py:200-208`).
+  `kb digest` envoie le début de chaque sujet qui a une fiche, le `until` de sa dernière fiche
+  (`post/ai_api_client.py:206-224`, `post/digest_sheets.py:81`); un sujet sans fiche prend la fenêtre par défaut.
 - **À la réponse.** Un 401 devient l'état `ai_api_unauthorized`, un 403 `ai_api_forbidden`, un 429
   `ai_api_rate_limited`, un 5xx `ai_api_failed` (`post/ai_api_client.py:273-286`). Sur un 401 ou un 403, le
   message nomme la variable à vérifier, jamais la clé (`:367-373`), et la commande sort en code 1 sans rien
@@ -297,7 +299,7 @@ GitHub (`ai_api/connectors/github_client.py:158`) et du modèle (`ai_api/connect
 ## Le contrat OpenAPI
 
 [`docs/api/openapi-ia.json`](../docs/api/openapi-ia.json) est la référence de l'API au standard OpenAPI (3.1.0).
-Sa version, `0.12.0`, est celle de l'app (`ai_api/app.py:38`); un changement visible par un client change les
+Sa version, `0.13.0`, est celle de l'app (`ai_api/app.py:38`); un changement visible par un client change les
 deux. Il décrit les deux routes, leurs corps, leurs réponses, chaque état d'erreur, et le schéma de sécurité
 `HTTPBearer`.
 

@@ -5,7 +5,7 @@ qui l'appelle, sans lire le code. Ses contrats (demandes, réponses, contrôles,
 [fiches-veille.md](fiches-veille.md) pour `POST /digests` et dans [tendances.md](tendances.md) pour
 `POST /trend-reports`. Ce document ne les recopie pas.
 
-Chaque `fichier:ligne` vaut pour `main` au commit `56d013b`. Les chemins sans dossier de tête sont sous
+Chaque `fichier:ligne` vaut pour `main` au commit `56d013b`, et la fenêtre par sujet, par #565, d'après le code de sa PR. Les chemins sans dossier de tête sont sous
 `src/k_b/`, sauf `Dockerfile`, à la racine du dépôt. La section « Vérifier ce document » donne les commandes qui retrouvent ces faits.
 
 ## Vue d'ensemble
@@ -233,7 +233,7 @@ comprise, et chaque clé de l'API de données a les mêmes droits (`:60-64`).
 |---|---|---|---|---|
 | `KB_DATA_DIR` | dossier de données, obligatoire et existant (`cli.py:105-108`) ; reçoit le journal quand `KB_LOG_TO_FILE` le permet | `commands/environment.py:31` | aucun | `/var/lib/knowledge_base` (`:53`, `:212`) |
 | `KB_AI_API_HOST`, `KB_AI_API_PORT` | écoute | `ai_api/settings.py:17-18` | `127.0.0.1`, `8001` (`core/config.py:278-279`) | `0.0.0.0`, `8001` (`:213-214`) |
-| `KB_DIGEST_WINDOW_DAYS` | fenêtre par défaut des fiches | `ai_api/settings.py:19` | 3 jours (`core/config.py:325`) | défaut |
+| `KB_DIGEST_WINDOW_DAYS` | fenêtre d'un sujet sans début : le premier compte rendu d'un sujet sans fiche (#565, `ai_api/routers/digest_router.py:118`) | `ai_api/settings.py:19` | 3 jours (`core/config.py:325` ; `:348` par #565) | défaut |
 | `KB_LLM_PROVIDER`, `KB_LLM_BASE_URL`, `KB_LLM_MODEL`, `KB_LLM_REASONING_EFFORT` | modèle | `ai_api/connectors/llm_settings.py:24-28` | aucun pour les trois premiers | `:218-222` |
 | `KB_LLM_REPLAY_FILE` | réponses du rejeu | `ai_api/connectors/llm_settings.py:29` | aucun | non posé |
 | `KB_DATA_API_URL` | adresse de l'API de données | `ai_api/connectors/data_api_settings.py:13` | `http://127.0.0.1:8000` (`core/config.py:333`) | nom interne en HTTPS (`:223`) |

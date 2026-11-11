@@ -6743,6 +6743,69 @@ entrée.
   question, qu'aucun conteneur ne montait le coffre ; ces deux commandes appellent le modèle, leur place est le job
   des comptes rendus, pas la routine, qui reste le chemin sans modèle. — PR de #423
 
+### Fiches de veille : chaque sujet repart de la fin de sa fiche précédente (#565)
+
+Plan de la session K-B validé par Sabine le 2026-11-11 vers 16:00 UTC (D1, D2 ; commentaire de
+#565) ; écarts du code tranchés par time-knight sous la délégation de Sabine du 15/10.
+
+- **Un compte rendu de veille part du `until` de la fiche précédente de son sujet et finit à
+  l'instant de la demande : plus de fenêtre fixe.** Pourquoi : règle de Sabine du 2026-10-26
+  (`docs/tendances.md`, relayée par time-knight le 30/10), redite le 2026-11-11 : aucun item ne
+  doit tomber entre deux comptes rendus. Ils partent le lundi et le jeudi ; une fenêtre fixe de
+  3 jours perdait donc un jour chaque lundi. Hors de #565, après l'oral blanc du 13/11 : le rejeu
+  des créneaux manqués, et le compte à la date d'arrivée dans K-B (la lecture filtre sur la date de
+  la source). Limites et parades : `docs/fiches-veille.md`, « Limites de la fenêtre ». — PR de #565
+- **`kb digest` lit le `until` de la dernière fiche de chaque sujet dans le coffre (D1, option A) ;
+  un sujet sans item reçoit une fiche « Aucun item classé dans ce sujet. », pour que son début
+  avance.** Pourquoi : le coffre reste la seule source de la fin d'un compte rendu, et les fiches
+  déjà écrites à fenêtre fixe (le job en ligne du 11/11, et du 12/11 s'il tourne avant le
+  déploiement) doivent servir de précédent, exigence de Sabine du 11/11 ; aucun registre ne les
+  connaît. Écartée, l'option B : un registre `KB_DATA_DIR/digest_windows.json`, sur le modèle de
+  `trend_reports.json` ; il ferait deux sources de la même fin, et les fiches seraient relues quand
+  même à la reprise. **S'écarte, pour les seules fiches de veille, du choix des tendances** (2026-10-30,
+  « Le code garde un registre des comptes rendus »), qui écartait de lire la période dans
+  l'en-tête du dernier compte rendu pour que K-B ne relise pas le coffre. Ce qui a changé : des
+  fiches existent sans registre, et doivent être reprises. Le registre des tendances reste. Limite :
+  un `until` changé à la main décale le début du sujet ; après l'heure de `kb`, la demande est
+  refusée (`previous_sheet_invalid`, code 2). — PR de #565
+- **Le premier compte rendu d'un sujet sans fiche relit `KB_DIGEST_WINDOW_DAYS`, la variable
+  existante (D2), et non une variable nouvelle** (l'issue proposait `KB_DIGEST_FIRST_WINDOW_DAYS`).
+  Pourquoi : choix de Sabine du 2026-11-11, sur la recommandation de time-knight : une variable de
+  moins, déjà bornée de 1 à 14 et documentée, dont le sens devient « la fenêtre d'un sujet sans
+  début ». Limite : hors bornes, c'est `kb serve-ai` qui refuse de démarrer, pas `kb digest`. — PR de
+  #565
+- **L'API IA reste sans état : `POST /digests` reçoit le début de chaque sujet
+  (`since_by_subject`, facultatif), lit une fois depuis le plus ancien, classe une fois, et ne garde
+  pour chaque sujet que ses items datés de son début, avant la sélection des 60 items d'une
+  fiche.** Pourquoi : règle 7 de `.claude/rules/poc.md` (rien qui survive à un redémarrage), le
+  schéma de `after` pour `kb trend-report` ; une seule passe, parce que des débuts égaux donnent la
+  même lecture et le même nombre d'appels au modèle qu'avant : le jeu de référence de
+  `POST /digests` rejoue sans nouvel enregistrement. Écartée : deux passes de lecture, la plus
+  récente d'abord, retirée du plan par time-knight (v3) ; elle reste la parade de la limite « Une
+  seule passe de lecture ». Un début de plus de 14 jours (`MAX_DIGEST_WINDOW_DAYS`, la borne de
+  `window_days`) est ramené à la borne, et `kb` le journalise. Après une lecture plafonnée, le
+  compte rendu suivant part de `until`, pas de `covered_after` : sinon, les sortes rares déjà
+  écrites reviendraient en double ; ce que le plafond laisse de côté est perdu pour les fiches.
+  API IA 0.13.0. — PR de #565
+- **`kb digest` refuse une réponse dont un sujet commence avant le début envoyé
+  (`start_before_the_one_sent`), et les fiches perdent `window_days`.** Écarts du code au plan,
+  tranchés par time-knight. Pourquoi : la fiche d'un tel sujet redonnerait des items de la
+  précédente ; `window_days` n'était lu par aucun code, et une fenêtre n'a plus de durée fixe
+  (`since` est désormais le début du sujet). — PR de #565
+- **La fenêtre d'un sujet finit à `until`, exclu ; `kb digest` refuse un début plus tard que
+  l'envoyé, sauf à la borne des 14 jours (`start_after_the_one_sent`), et une réponse où un sujet
+  manque (`subject_missing`).** Tri de `/code-review` sur #565, par time-knight. Pourquoi : sans
+  borne haute, un item daté de `until` ou après serait dans la fiche et dans la suivante ; un début
+  plus tard qui n'est pas la borne laisserait des items hors de toute fiche, et le journal en
+  aurait donné une cause non observée ; un sujet absent des trois listes n'aurait ni fiche ni ligne
+  au bilan. Limite : un item daté après `until` n'est compté à part nulle part. — PR de #565
+- **Une lecture entièrement vide n'écrit aucune fiche, et garde le début de chaque sujet : une
+  ligne de journal, code de sortie 0.** Décision de Sabine du 2026-11-11, sur la recommandation de
+  la session (constat 6 de `/code-review` sur #565, posé par time-knight). Pourquoi : une base vide
+  ou un import pas lancé aurait donné neuf fiches « Aucun item classé dans ce sujet. », et avancé
+  chaque début sur des items jamais lus, perdus ensuite pour les fiches. Précise D1 : un sujet sans
+  item a sa fiche quand la lecture en a trouvé d'autres. — PR de #565
+
 ## Décisions encore ouvertes
 
 - **Le tri du fil** (2026-11-11, #550) : choisir l'ordre de `GET /items`, aujourd'hui du plus

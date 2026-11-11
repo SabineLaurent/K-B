@@ -1,5 +1,6 @@
 """kb digest: the digests asked of the AI API, the sheet of each subject written."""
 
+import json
 import logging
 import os
 import re
@@ -7,7 +8,7 @@ import secrets
 import signal
 import subprocess
 import sys
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from functools import partial
 
 import httpx2
@@ -21,16 +22,20 @@ from commands.cli_helpers import (
 from post.test_ai_api_client import (
     AGENT_DIGEST,
     REQUEST_ID,
+    SINCE,
+    SUBJECT_NAMES,
     TEST_API_KEY,
     TEST_MAX_ANSWER_BYTES,
+    UNTIL,
     answer_beyond_the_bound,
     bound_answers,
     make_response,
     to_body,
 )
+from post.test_digest_sheets import FIXED_WINDOW_SHEET
 
 from k_b import cli
-from k_b.ai_api.schemas.digest_schema import FailedSubjectSchema
+from k_b.ai_api.schemas.digest_schema import FailedSubjectSchema, WindowSchema
 from k_b.commands import (
     digest_command,
     wait_display,
@@ -112,6 +117,7 @@ def test_digest_writes_the_sheet_of_each_subject_and_says_so(
     assert list_sheets(vault_dir) == [
         "veille/agent_tools/2026-10-21.md",
         "veille/research/2026-10-21.md",
+        "veille/security_alerts/2026-10-21.md",
     ]
     assert capsys.readouterr().out == (
         "\n"
@@ -119,16 +125,205 @@ def test_digest_writes_the_sheet_of_each_subject_and_says_so(
         "--------------\n"
         "Window: 2026-10-18 → 2026-10-21, 4 items read\n"
         "\n"
-        "subject      status         sheet\n"
-        "agent_tools  sheet written  veille/agent_tools/2026-10-21.md\n"
-        "research     sheet written  veille/research/2026-10-21.md\n"
-        f"{'-' * 60}\n"
-        "total        written 2, failed 0\n"
+        "subject          status                  sheet\n"
+        "agent_tools      sheet written           veille/agent_tools/2026-10-21.md\n"
+        "research         sheet written           veille/research/2026-10-21.md\n"
+        "security_alerts  no item, sheet written  veille/security_alerts/2026-10-21.md\n"
+        f"{'-' * 77}\n"
+        "total            written 3, failed 0\n"
         "\n"
         "Model: gpt-6-luna\n"
         f"Request id: {REQUEST_ID}\n"
         "\n"
     )
+
+
+def answer_in_turn(*responses):
+    """Each request answered by the next response."""
+    waiting = list(responses)
+
+    def handle(request):
+        return httpx2.Response(200, content=to_body(waiting.pop(0)))
+
+    return handle
+
+
+def sent_starts(request):
+    return json.loads(request.content)["since_by_subject"]
+
+
+def response_until(until, digests, since=UNTIL, **changes):
+    """A response whose window ends at until, each subject starting at since, the until of
+    make_response by default."""
+    window = WindowSchema(
+        days=3, since=since, until=until, capped_kind=None, covered_after=None
+    )
+    return make_response(
+        digests,
+        **{"window": window, "since_by_subject": dict.fromkeys(SUBJECT_NAMES, since)}
+        | changes,
+    )
+
+
+def write_previous_sheet(vault_dir, subject, until):
+    """A sheet of subject written by a run before the tests, with a fixed window."""
+    sheet = vault_dir / "veille" / subject / f"{until.date().isoformat()}.md"
+    sheet.parent.mkdir(parents=True, exist_ok=True)
+    sheet.write_text(
+        FIXED_WINDOW_SHEET.replace(
+            "2026-11-11T16:02:41Z", until.strftime("%Y-%m-%dT%H:%M:%SZ")
+        ),
+        "utf-8",
+    )
+
+
+def test_a_first_digest_gives_no_start(monkeypatch, digest_environment):
+    requests = answer_digests(monkeypatch, answer_with())
+
+    assert cli.main(["digest"]) == cli.ExitCode.SUCCEEDED
+    assert sent_starts(requests[0]) == {}
+
+
+def test_two_digests_follow_each_other_without_a_gap(monkeypatch, digest_environment):
+    _, vault_dir = digest_environment
+    next_until = UNTIL + timedelta(days=3)
+    requests = answer_digests(
+        monkeypatch,
+        answer_in_turn(
+            make_response([AGENT_DIGEST, RESEARCH_DIGEST]),
+            response_until(next_until, [AGENT_DIGEST]),
+        ),
+    )
+
+    assert cli.main(["digest"]) == cli.ExitCode.SUCCEEDED
+    monkeypatch.setattr(digest_command, "read_today", lambda: next_until.date())
+    assert cli.main(["digest"]) == cli.ExitCode.SUCCEEDED
+
+    # Each subject starts at the until of its sheet, the sheet of security_alerts, which had no
+    # item, included.
+    assert sent_starts(requests[1]) == {
+        "security_alerts": "2026-10-21T16:30:00Z",
+        "agent_tools": "2026-10-21T16:30:00Z",
+        "research": "2026-10-21T16:30:00Z",
+    }
+    assert "veille/security_alerts/2026-10-21.md" in list_sheets(vault_dir)
+
+
+def test_a_sheet_written_with_a_fixed_window_gives_the_start_of_its_subject(
+    monkeypatch, digest_environment
+):
+    _, vault_dir = digest_environment
+    write_previous_sheet(
+        vault_dir, "research", datetime(2026, 10, 18, 10, 0, 7, tzinfo=UTC)
+    )
+    requests = answer_digests(monkeypatch, answer_with(status=503))
+
+    cli.main(["digest"])
+
+    assert sent_starts(requests[0]) == {"research": "2026-10-18T10:00:07Z"}
+
+
+def test_a_failed_subject_keeps_its_start_for_the_next_digest(
+    monkeypatch, digest_environment
+):
+    _, vault_dir = digest_environment
+    before = datetime(2026, 10, 18, 10, 0, 7, tzinfo=UTC)
+    write_previous_sheet(vault_dir, "research", before)
+    next_until = UNTIL + timedelta(days=3)
+    requests = answer_digests(
+        monkeypatch,
+        answer_in_turn(
+            make_response(
+                [AGENT_DIGEST],
+                [RESEARCH_FAILED],
+                since_by_subject=dict.fromkeys(SUBJECT_NAMES, SINCE)
+                | {"research": before},
+            ),
+            response_until(
+                next_until,
+                [AGENT_DIGEST, RESEARCH_DIGEST],
+                since=before,
+                since_by_subject=dict.fromkeys(SUBJECT_NAMES, UNTIL)
+                | {"research": before},
+            ),
+        ),
+    )
+
+    assert cli.main(["digest"]) == cli.ExitCode.PARTIAL_FAILURE
+    monkeypatch.setattr(digest_command, "read_today", lambda: next_until.date())
+    cli.main(["digest"])
+
+    assert sent_starts(requests[1])["research"] == "2026-10-18T10:00:07Z"
+    assert sent_starts(requests[1])["agent_tools"] == "2026-10-21T16:30:00Z"
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        FIXED_WINDOW_SHEET.replace("until: 2026-11-11T16:02:41Z\n", ""),
+        FIXED_WINDOW_SHEET.replace("2026-11-11T16:02:41Z", "2099-01-01T00:00:00Z"),
+    ],
+    ids=["no-until", "until-in-the-future"],
+)
+def test_a_previous_sheet_without_a_valid_until_asks_nothing_and_exits_2(
+    monkeypatch, digest_environment, content
+):
+    data_dir, vault_dir = digest_environment
+    requests = answer_digests(monkeypatch, answer_with())
+    sheet = vault_dir / "veille" / "research" / "2026-10-18.md"
+    sheet.parent.mkdir(parents=True)
+    sheet.write_text(content, "utf-8")
+
+    assert cli.main(["digest"]) == cli.ExitCode.NOT_STARTED
+    assert requests == []
+    assert re.search(
+        rf"^{LOG_LINE_DATE} ERROR k_b\.cli: no digest asked: previous_sheet_invalid:"
+        r" veille/research/2026-10-18\.md",
+        read_kb_log(data_dir),
+        re.MULTILINE,
+    )
+
+
+def test_a_start_brought_to_the_bound_is_logged_with_its_subject(
+    monkeypatch, digest_environment
+):
+    data_dir, vault_dir = digest_environment
+    write_previous_sheet(
+        vault_dir, "research", datetime(2026, 9, 1, 10, 0, 0, tzinfo=UTC)
+    )
+    # The AI API brings it to the bound, 14 days before its until (UNTIL).
+    bound = datetime(2026, 10, 7, 16, 30, 0, tzinfo=UTC)
+    answer_digests(
+        monkeypatch,
+        answer_with(
+            make_response(
+                since_by_subject=dict.fromkeys(SUBJECT_NAMES, SINCE)
+                | {"research": bound}
+            )
+        ),
+    )
+
+    cli.main(["digest"])
+
+    assert re.search(
+        rf"^{LOG_LINE_DATE} WARNING k_b\.cli: research: start 2026-09-01T10:00:00Z"
+        r" brought to 2026-10-07T16:30:00Z, the bound of 14 days$",
+        read_kb_log(data_dir),
+        re.MULTILINE,
+    )
+
+
+def test_a_response_whose_start_precedes_the_start_sent_writes_no_sheet(
+    monkeypatch, digest_environment
+):
+    _, vault_dir = digest_environment
+    write_previous_sheet(
+        vault_dir, "research", datetime(2026, 10, 19, 10, 0, 0, tzinfo=UTC)
+    )
+    answer_digests(monkeypatch, answer_with(make_response()))
+
+    assert cli.main(["digest"]) == cli.ExitCode.FAILED
+    assert list_sheets(vault_dir) == ["veille/research/2026-10-19.md"]
 
 
 def test_digest_logs_its_start_and_its_end_with_the_duration(
@@ -146,15 +341,42 @@ def test_digest_logs_its_start_and_its_end_with_the_duration(
         assert re.search(line, read_kb_log(data_dir), re.MULTILINE)
 
 
-def test_digest_without_digest_in_the_window_says_so_and_succeeds(
+def test_digest_without_items_writes_the_sheet_of_each_subject_and_succeeds(
     monkeypatch, digest_environment, capsys
 ):
     _, vault_dir = digest_environment
     answer_digests(monkeypatch, answer_with(make_response([])))
 
     assert cli.main(["digest"]) == cli.ExitCode.SUCCEEDED
-    assert "total    none in the window\n" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert (
+        "research         no item, sheet written  veille/research/2026-10-21.md\n"
+        in (output)
+    )
+    assert "total            written 3, failed 0\n" in output
+    assert list_sheets(vault_dir) == [
+        "veille/agent_tools/2026-10-21.md",
+        "veille/research/2026-10-21.md",
+        "veille/security_alerts/2026-10-21.md",
+    ]
+
+
+def test_an_empty_reading_writes_no_sheet_and_keeps_the_starts(
+    monkeypatch, digest_environment, capsys
+):
+    # An empty base, or an import not run: no sheet would move a start over items not read.
+    data_dir, vault_dir = digest_environment
+    answer_digests(monkeypatch, answer_with(make_response([], items_in=0)))
+
+    assert cli.main(["digest"]) == cli.ExitCode.SUCCEEDED
     assert list_sheets(vault_dir) == []
+    assert "total    written 0, failed 0\n" in capsys.readouterr().out
+    assert re.search(
+        rf"^{LOG_LINE_DATE} WARNING k_b\.cli: no item read: no sheet written, the start of"
+        r" each subject kept$",
+        read_kb_log(data_dir),
+        re.MULTILINE,
+    )
 
 
 def test_digest_with_a_sheet_of_the_day_asks_nothing_and_exits_2(
@@ -428,22 +650,30 @@ def test_digest_with_failed_subjects_writes_the_others_names_them_and_exits_4(
     )
 
     assert cli.main(["digest"]) == cli.ExitCode.PARTIAL_FAILURE
-    assert list_sheets(vault_dir) == ["veille/agent_tools/2026-10-21.md"]
+    assert list_sheets(vault_dir) == [
+        "veille/agent_tools/2026-10-21.md",
+        "veille/security_alerts/2026-10-21.md",
+    ]
     output = capsys.readouterr()
     assert "ERROR k_b.cli: research: digest failed: llm_timeout at the stage write" in (
         output.err
     )
     assert (
-        "subject      status         sheet\n"
-        "agent_tools  sheet written  veille/agent_tools/2026-10-21.md\n"
-        "research     digest failed\n"
+        "subject          status                  sheet\n"
+        "agent_tools      sheet written           veille/agent_tools/2026-10-21.md\n"
+        "security_alerts  no item, sheet written  veille/security_alerts/2026-10-21.md\n"
+        "research         digest failed\n"
     ) in output.out
-    assert "total        written 1, failed 1\n" in output.out
+    assert "total            written 2, failed 1\n" in output.out
 
 
 def test_digest_with_failed_subjects_only_exits_1(monkeypatch, digest_environment):
     _, vault_dir = digest_environment
-    answer_digests(monkeypatch, answer_with(make_response([], [RESEARCH_FAILED])))
+    each_failed = [
+        RESEARCH_FAILED.model_copy(update={"subject": subject})
+        for subject in SUBJECT_NAMES
+    ]
+    answer_digests(monkeypatch, answer_with(make_response([], each_failed)))
 
     assert cli.main(["digest"]) == cli.ExitCode.FAILED
     assert list_sheets(vault_dir) == []
@@ -466,7 +696,10 @@ def test_a_sheet_not_written_exits_4_and_the_other_sheet_is_written(
     monkeypatch.setattr(vault_files, "write_file_atomically", refuse_the_agent_tools)
 
     assert cli.main(["digest"]) == cli.ExitCode.PARTIAL_FAILURE
-    assert list_sheets(vault_dir) == ["veille/research/2026-10-21.md"]
+    assert list_sheets(vault_dir) == [
+        "veille/research/2026-10-21.md",
+        "veille/security_alerts/2026-10-21.md",
+    ]
     error_output = capsys.readouterr().err
     assert (
         "agent_tools: sheet not written: PermissionError (Permission denied)"
@@ -487,7 +720,10 @@ def test_a_temporary_file_left_of_a_sheet_fails_its_subject_and_digest_exits_4(
     claim.write_text("another run\n", "utf-8")
 
     assert cli.main(["digest"]) == cli.ExitCode.PARTIAL_FAILURE
-    assert list_sheets(vault_dir) == ["veille/research/2026-10-21.md"]
+    assert list_sheets(vault_dir) == [
+        "veille/research/2026-10-21.md",
+        "veille/security_alerts/2026-10-21.md",
+    ]
     assert claim.read_text("utf-8") == "another run\n"
     assert (
         "agent_tools: sheet not written: temporary_file_found:"

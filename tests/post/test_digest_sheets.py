@@ -2,6 +2,7 @@
 text; the responses are made by the schema of the AI API."""
 
 import json
+import os
 import re
 from datetime import UTC, date, datetime
 
@@ -20,13 +21,17 @@ from k_b.jobs.watch_download import find_sheet_text_refusal
 from k_b.post import digest_sheets
 from k_b.post.ai_api_client import DigestsResponse
 from k_b.post.digest_sheets import (
+    find_previous_until,
     refuse_written_sheets,
     render_digest_sheet,
     write_digest_sheet,
+    write_empty_sheet,
 )
 from k_b.post.vault_files import VaultEntryRefusedError, neutralize_digest_text
 
 DAY = date(2026, 10, 21)
+# The clock of kb digest in the tests of the previous sheet: after each until of its sheets.
+NOW = datetime(2026, 11, 12, tzinfo=UTC)
 SUBJECT_NAMES = ("security_alerts", "agent_tools", "research")
 # A bidirectional control, written by its code: never as itself in a source file.
 RIGHT_TO_LEFT_OVERRIDE = chr(0x202E)
@@ -70,7 +75,6 @@ def test_a_digest_gives_the_sheet_of_its_subject_and_of_the_day_of_its_window(
         "subject: agent_tools\n"
         "generated: 2026-10-21T16:30:00Z\n"
         'model: "gpt-6-luna"\n'
-        "window_days: 3\n"
         "since: 2026-10-18T16:30:00Z\n"
         "until: 2026-10-21T16:30:00Z\n"
         "items_capped: false\n"
@@ -92,6 +96,183 @@ def test_a_digest_gives_the_sheet_of_its_subject_and_of_the_day_of_its_window(
         "2. Resource-Optimized and Energy-Aware Agentic AI Framework Anchored on Blockchain"
         " for Secure Software Supply Chains — <https://arxiv.org/abs/2609.31282>\n"
     )
+
+
+def test_the_sheet_of_a_subject_starts_at_the_start_of_its_subject():
+    response = read(
+        make_response(
+            since_by_subject={
+                "security_alerts": datetime(2026, 10, 18, 16, 30, tzinfo=UTC),
+                "agent_tools": datetime(2026, 10, 20, 8, 0, 5, tzinfo=UTC),
+                "research": datetime(2026, 10, 18, 16, 30, tzinfo=UTC),
+            }
+        )
+    )
+
+    content = render_digest_sheet(response, response.digests[0])
+
+    assert "since: 2026-10-20T08:00:05Z\n" in content
+    assert "window_days" not in content
+
+
+def test_a_subject_without_items_gets_a_sheet_that_says_so(vault_dir):
+    response = read(make_response([]))
+
+    sheet = write_empty_sheet(vault_dir, response, "research")
+
+    assert sheet == "veille/research/2026-10-21.md"
+    assert (vault_dir / sheet).read_text("utf-8") == (
+        "---\n"
+        "subject: research\n"
+        "generated: 2026-10-21T16:30:00Z\n"
+        'model: "gpt-6-luna"\n'
+        "since: 2026-10-18T16:30:00Z\n"
+        "until: 2026-10-21T16:30:00Z\n"
+        "items_capped: false\n"
+        "capped_kind: null\n"
+        "covered_after: null\n"
+        "request_id: 1b4e28ba-2fa1-4d2e-9b5c-6c8e1f0a7d3e\n"
+        "---\n"
+        "\n"
+        "# Veille research du 2026-10-21\n"
+        "\n"
+        "Aucun item classé dans ce sujet.\n"
+    )
+
+
+def write_sheet(vault_dir, subject, name, content):
+    sheets_dir = vault_dir / "veille" / subject
+    sheets_dir.mkdir(parents=True, exist_ok=True)
+    (sheets_dir / name).write_text(content, "utf-8")
+
+
+# The front matter of a sheet written with a fixed window, before #565.
+FIXED_WINDOW_SHEET = (
+    "---\n"
+    "subject: research\n"
+    "generated: 2026-11-11T16:02:41Z\n"
+    'model: "gpt-6-luna"\n'
+    "window_days: 3\n"
+    "since: 2026-11-08T16:02:41Z\n"
+    "until: 2026-11-11T16:02:41Z\n"
+    "items_capped: false\n"
+    "capped_kind: null\n"
+    "covered_after: null\n"
+    "request_id: 1b4e28ba-2fa1-4d2e-9b5c-6c8e1f0a7d3e\n"
+    "---\n"
+    "\n"
+    "# Veille research du 2026-11-11\n"
+)
+
+
+def test_a_subject_without_a_sheet_has_no_previous_until(vault_dir):
+    assert find_previous_until(vault_dir, "research", NOW) is None
+
+
+def test_the_previous_until_is_the_one_of_the_last_sheet_written_with_a_fixed_window(
+    vault_dir,
+):
+    write_sheet(
+        vault_dir,
+        "research",
+        "2026-11-09.md",
+        FIXED_WINDOW_SHEET.replace("2026-11-11T16:02:41Z", "2026-11-09T10:00:00Z"),
+    )
+    write_sheet(vault_dir, "research", "2026-11-11.md", FIXED_WINDOW_SHEET)
+    # Not a sheet of kb: a note, a temporary file of a run, a day out of form.
+    write_sheet(vault_dir, "research", "notes.md", "until: 2030-01-01T00:00:00Z\n")
+    write_sheet(vault_dir, "research", ".2026-11-12.md.tmp", "")
+    write_sheet(vault_dir, "research", "2026-11-1.md", "")
+
+    assert find_previous_until(vault_dir, "research", NOW) == datetime(
+        2026, 11, 11, 16, 2, 41, tzinfo=UTC
+    )
+
+
+def test_the_previous_until_is_read_to_its_second_as_kb_sends_it(vault_dir):
+    write_sheet(
+        vault_dir,
+        "research",
+        "2026-11-11.md",
+        FIXED_WINDOW_SHEET.replace(
+            "until: 2026-11-11T16:02:41Z", "until: 2026-11-11T16:02:41.700Z"
+        ),
+    )
+
+    assert find_previous_until(vault_dir, "research", NOW) == datetime(
+        2026, 11, 11, 16, 2, 41, tzinfo=UTC
+    )
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        FIXED_WINDOW_SHEET.replace("until: 2026-11-11T16:02:41Z\n", ""),
+        FIXED_WINDOW_SHEET.replace("2026-11-11T16:02:41Z", "2026-11-11T16:02:41"),
+        FIXED_WINDOW_SHEET.replace("until: 2026-11-11T16:02:41Z", "until: tomorrow"),
+        FIXED_WINDOW_SHEET.replace("until: 2026-11-11T16:02:41Z", 'until: "x"'),
+        FIXED_WINDOW_SHEET.replace("---\nsubject", "subject"),
+        FIXED_WINDOW_SHEET.replace(
+            "until: 2026-11-11T16:02:41Z",
+            "until: 2026-11-11T16:02:41Z\nuntil: 2026-11-12T16:02:41Z",
+        ),
+        FIXED_WINDOW_SHEET.replace(
+            "until: 2026-11-11T16:02:41Z", "until: 0001-01-01T00:00:00+01:00"
+        ),
+        "",
+        "\xff\xfe",
+    ],
+    ids=[
+        "no-until",
+        "no-zone",
+        "not-a-date",
+        "quoted",
+        "no-front-matter",
+        "two-untils",
+        "out-of-range-in-utc",
+        "empty",
+        "not-utf-8",
+    ],
+)
+def test_a_last_sheet_without_a_valid_until_is_refused(vault_dir, content):
+    sheets_dir = vault_dir / "veille" / "research"
+    sheets_dir.mkdir(parents=True)
+    (sheets_dir / "2026-11-11.md").write_bytes(content.encode("latin-1"))
+
+    with pytest.raises(VaultEntryRefusedError) as raised:
+        find_previous_until(vault_dir, "research", NOW)
+
+    assert str(raised.value).startswith(
+        "previous_sheet_invalid: veille/research/2026-11-11.md"
+    )
+
+
+def test_a_pipe_slipped_under_the_last_sheet_after_its_check_is_refused_without_waiting(
+    vault_dir, monkeypatch
+):
+    sheets_dir = vault_dir / "veille" / "research"
+    sheets_dir.mkdir(parents=True)
+    os.mkfifo(sheets_dir / "2026-11-11.md")
+    # The pipe arrives after the check of the entry, read by lstat.
+    monkeypatch.setattr(digest_sheets, "has_sheet", lambda sheet_path, vault_dir: True)
+
+    with pytest.raises(VaultEntryRefusedError) as raised:
+        find_previous_until(vault_dir, "research", NOW)
+
+    assert str(raised.value) == (
+        "sheet_not_a_file: veille/research/2026-11-11.md is not a regular file"
+    )
+
+
+def test_a_last_sheet_linked_elsewhere_is_refused(vault_dir, tmp_path):
+    elsewhere = tmp_path / "elsewhere.md"
+    elsewhere.write_text(FIXED_WINDOW_SHEET, "utf-8")
+    sheets_dir = vault_dir / "veille" / "research"
+    sheets_dir.mkdir(parents=True)
+    (sheets_dir / "2026-11-11.md").symlink_to(elsewhere)
+
+    with pytest.raises(VaultEntryRefusedError, match="vault_link_refused"):
+        find_previous_until(vault_dir, "research", NOW)
 
 
 def test_the_same_response_gives_the_same_bytes():
@@ -190,13 +371,13 @@ def test_a_trapped_claim_is_written_as_text_on_its_own_line():
 
     lines = render_digest_sheet(response, digest).splitlines()
 
-    assert lines[15] == (
+    assert lines[14] == (
         '- \\`\\`\\`dataviewjs dv.paragraph("TÉMOIN POSITIF") \\`\\`\\` \\~\\~\\~ ---'
         " \\> \\[!note\\] callout \\[\\[note\\]\\] !\\[a\\](b) \\<b\\>bold\\</b\\>"
         ' \\`\\$= "TÉMOIN POSITIF"\\` key\\: \\: value http\\://evil.example.invalid'
         " www\\.evil.example.invalid (source 1)"
     )
-    assert lines[14:17] == ["", lines[15], ""]
+    assert lines[13:16] == ["", lines[14], ""]
 
 
 @pytest.mark.parametrize(
