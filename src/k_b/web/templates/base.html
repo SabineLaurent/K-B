@@ -18,6 +18,7 @@
 <div class="site-nav-links">
 {{ nav_link("/", "Veille") }}
 </div>
+{% if is_operator_checked %}<a class="site-logout" href="/.auth/logout">Se déconnecter</a>{% endif %}
 </nav>
 </header>
 <main id="contenu" class="{% block main_class %}page{% endblock %}">
@@ -28,7 +29,6 @@
 <ul class="site-footer-links" role="list">
 <li>{{ nav_link("/sources", "Sources et conditions d’utilisation") }}</li>
 <li>{{ nav_link("/accessibilite", "Accessibilité") }}</li>
-{% if is_operator_checked %}<li><a href="/.auth/logout">Se déconnecter</a></li>{% endif %}
 </ul>
 </footer>
 </body>

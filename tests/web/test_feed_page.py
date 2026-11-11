@@ -95,10 +95,62 @@ def test_the_links_of_the_pages_keep_the_filters():
     )
 
     assert "Page 2 sur 3" in response.text
-    assert 'href="/?q=lang&amp;kind=paper&amp;period=1" rel="prev"' in response.text
-    assert 'href="/?q=lang&amp;kind=paper&amp;period=1&amp;page=3" rel="next"' in (
-        response.text
+    assert (
+        'href="/?q=lang&amp;kind=paper&amp;period=1#resultats" rel="prev"'
+        in response.text
     )
+    assert (
+        'href="/?q=lang&amp;kind=paper&amp;period=1&amp;page=3#resultats" rel="next"'
+        in response.text
+    )
+
+
+def test_a_link_of_a_page_is_a_button_that_lands_on_the_line_of_the_results():
+    """Sabine, 2026-11-11: another page starts at its results, not at the top; the button of the
+    mockups, a target of 44 px. The form, sent again, starts at the top of the page."""
+    response = get_feed("page=2", handler=serve(make_page(20, total=45)))
+
+    assert '<p id="resultats" class="results-line">' in response.text
+    links = re.findall(r'<a ([^>]*)rel="(?:prev|next)"', response.text)
+    assert len(links) == 2
+    assert all(
+        'class="button-secondary"' in link and '#resultats"' in link for link in links
+    )
+    assert '<form class="feed-filters" method="get" action="/"' in response.text
+
+
+def test_the_first_line_of_a_card_gives_its_kind_its_date_its_identifiers_then_its_mark():
+    """Maquettes-fil.dc.html (2026-11-09): one line, which wraps on a phone."""
+    response = get_feed(handler=serve(ITEMS_PAGE))
+
+    lines = re.findall(r'<p class="card-meta">(.*?)</p>', response.text)
+    assert len(lines) == len(ITEMS_PAGE["items"])
+    assert all(
+        line.index('class="card-kind"')
+        < line.index("<time")
+        < line.index('class="card-identifiers"')
+        for line in lines
+    )
+    exploited = [line for line in lines if 'class="badge"' in line]
+    assert exploited
+    assert all(
+        line.index('class="card-identifiers"') < line.index('class="badge"')
+        for line in exploited
+    )
+    assert response.text.count('class="card-identifiers"') == len(lines)
+
+
+def test_the_link_of_a_card_is_short_its_announcement_in_it_smaller():
+    """Maquettes-fil.dc.html: « Lire sur arxiv.org ↗ »; the announcement of the new tab kept in
+    the link (Opquast 2025, rule 146), in a span of its own."""
+    response = get_feed(handler=serve(ITEMS_PAGE))
+
+    assert (
+        '<a class="card-link" href="https://arxiv.org/abs/2609.33401" hreflang="en"'
+        ' target="_blank" rel="noopener noreferrer">Lire sur arxiv.org<span'
+        ' aria-hidden="true"> ↗</span> <span class="link-note">(en anglais, site'
+        " externe, nouvel onglet)</span></a>"
+    ) in response.text
 
 
 def test_a_single_page_has_no_link_to_another():

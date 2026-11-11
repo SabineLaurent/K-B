@@ -247,17 +247,37 @@ def test_no_space_comes_before_a_colon_or_a_semicolon(name):
     assert re.findall(r".{0,20}\s[:;]", outline(PAGES[name]).text) == []
 
 
-def test_every_link_to_another_site_says_so():
-    """Opquast 2025, rule 142."""
-    links = [
+def find_links(is_to_another_site):
+    """The links of every page, to another site or within the site."""
+    return [
         link
         for page in map(outline, PAGES.values())
         for link in page.links
-        if (link.attributes["href"] or "").startswith("https://")
+        if (link.attributes["href"] or "").startswith("https://") == is_to_another_site
     ]
 
+
+def test_every_link_to_another_site_says_so_and_opens_a_new_tab_it_announces():
+    """Opquast 2025, rules 142 and 146 (Sabine, 2026-11-11: to stay in K-B): the new tab said in the
+    text of the link, which a screen reader reads too; noopener and noreferrer, so that the page
+    opened reaches neither the page of K-B nor its address."""
+    links = find_links(is_to_another_site=True)
+
     assert links
-    assert all("site externe" in link.text for link in links)
+    assert all("site externe, nouvel onglet" in link.text for link in links)
+    assert all(link.attributes.get("target") == "_blank" for link in links)
+    assert all(
+        {"noopener", "noreferrer"} <= set((link.attributes.get("rel") or "").split())
+        for link in links
+    )
+
+
+def test_a_link_within_the_site_opens_in_the_same_tab():
+    """Opquast 2025, rule 138: the links of the same nature behave the same."""
+    links = find_links(is_to_another_site=False)
+
+    assert links
+    assert all("target" not in link.attributes for link in links)
 
 
 def test_the_link_to_a_page_in_english_gives_its_language():

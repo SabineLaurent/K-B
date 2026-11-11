@@ -117,10 +117,13 @@ def test_without_the_check_a_page_needs_no_header_and_offers_no_sign_out():
     assert "/.auth/logout" not in response.text
 
 
-def test_with_the_check_a_page_offers_to_sign_out():
-    assert (
-        'href="/.auth/logout"' in make_client().get("/", headers=OPERATOR_HEADERS).text
-    )
+def test_with_the_check_a_page_offers_to_sign_out_once_in_its_header():
+    """Sabine, 2026-11-11: in the header, where she looks for it, and nowhere else on the page."""
+    text = make_client().get("/", headers=OPERATOR_HEADERS).text
+
+    header = text[text.index("<header") : text.index("</header>")]
+    assert 'href="/.auth/logout"' in header
+    assert text.count('href="/.auth/logout"') == 1
 
 
 @pytest.mark.parametrize("operator_id", [OPERATOR_ID, ANOTHER_ID])

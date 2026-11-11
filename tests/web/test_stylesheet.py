@@ -84,6 +84,74 @@ def test_every_font_size_is_in_rem():
     assert all(re.fullmatch(r"[0-9.]+rem", size) for size in sizes)
 
 
+def test_the_kind_of_a_card_is_framed_as_in_the_mockups():
+    """Maquettes-fil.dc.html (2026-11-09), at its three widths: a border of 1 px in the ink, corners
+    of 4 px, 2 by 8 px within (Sabine, 2026-11-11)."""
+    rule = re.search(r"\.card-kind\s*\{([^}]*)\}", STYLESHEET)
+
+    assert rule is not None
+    declarations = {
+        name: value.strip() for name, value in DECLARATION.findall(rule.group(1))
+    }
+    assert declarations["border"] == "1px solid var(--color-ink)"
+    assert declarations["border-radius"] == "4px"
+    assert declarations["padding"] == "0.125rem 0.5rem"
+
+
+def read_block(text, opening):
+    """The text between the brace that follows opening and the one that closes it."""
+    match = re.search(opening, text, re.MULTILINE)
+    assert match is not None, opening
+    depth = 1
+    for index in range(match.end(), len(text)):
+        depth += {"{": 1, "}": -1}.get(text[index], 0)
+        if not depth:
+            return text[match.end() : index]
+    raise AssertionError(f"{opening} is not closed")
+
+
+def read_rule(selector, media=None):
+    """The declarations of the rule of selector, or of its media query nested in it: a rule that
+    opens its line, nested by & or not; never one of another selector, such as & > .field-error."""
+    rule = read_block(STYLESHEET, rf"^\s*(?:& )?{re.escape(selector)}\s*\{{")
+    if media is None:
+        return rule
+    return read_block(rule, rf"@media {re.escape(media)}\s*\{{")
+
+
+@pytest.mark.parametrize(
+    ("selector", "media", "declaration"),
+    [
+        (".field-help", None, "margin: 0;"),
+        (".field-error", None, "margin: 0;"),
+        (".choices", None, "grid-template-columns: repeat(2, minmax(0, 1fr));"),
+        (
+            ".kind-choices",
+            "(width >= 48rem)",
+            "grid-template-columns: repeat(3, minmax(0, 1fr));",
+        ),
+        (".kind-choices", "(width >= 64rem)", "display: flex;"),
+        (".period-choices", "(width >= 48rem)", "display: flex;"),
+        (".period-group", "(width >= 48rem)", "display: flex;"),
+        (
+            ".period-field",
+            "(width >= 64rem)",
+            "grid-template-columns: auto minmax(10rem, 14rem);",
+        ),
+        (".results-line", None, "scroll-margin-block-start: 1rem;"),
+        (".card-link", None, "font-size: 0.875rem;"),
+        (".link-note", None, "font-size: 0.75rem;"),
+        (".site-logout", None, "margin-inline-start: auto;"),
+    ],
+)
+def test_the_layout_of_the_mockups_holds_at_each_width(selector, media, declaration):
+    """Maquettes-fil.dc.html (2026-11-09) at 390, 820 and 1280 px (Sabine, 2026-11-11): the helps
+    against their label, the choices in two columns on a phone, the kinds in three on a tablet and
+    one line on a computer, the start date after the radios, a page link landing on the results,
+    the link of a card short. The heights measured are in the PR; this test keeps each rule."""
+    assert declaration in read_rule(selector, media)
+
+
 def test_nothing_is_fetched_from_elsewhere():
     assert re.findall(r"@import|@font-face|url\(", STYLESHEET) == []
 

@@ -39,6 +39,9 @@ KIND_FIELD = "kind"
 PERIOD_FIELD = "period"
 START_FIELD = "start"
 PAGE_FIELD = "page"
+# The line of the results, where a link to another page lands (Sabine, 2026-11-11): the form, sent
+# again, starts at the top of the page.
+RESULTS_ID = "resultats"
 # The id, in the page, of each field or group an error points to.
 SEARCH_ID = "q"
 KINDS_ID = "kinds"
@@ -357,8 +360,12 @@ def build_listing(
         cards=tuple(build_card(item) for item in items),
         page=page,
         pages=pages,
-        previous_link=build_page_link(form, page - 1) if page > 1 else None,
-        next_link=build_page_link(form, page + 1) if page < pages else None,
+        previous_link=f"{build_page_link(form, page - 1)}#{RESULTS_ID}"
+        if page > 1
+        else None,
+        next_link=f"{build_page_link(form, page + 1)}#{RESULTS_ID}"
+        if page < pages
+        else None,
         wider_link=build_page_link(replace(form, period=WIDER_PERIOD), 1)
         if not total and is_shorter
         else None,
@@ -394,9 +401,10 @@ def build_card(item: FeedItem) -> FeedCard:
         title_lang=labels.title_lang,
         link=keep_https_link(item.url),
         link_label=labels.link_label,
-        link_note="site externe"
+        # Opened in a new tab, which the link says (Opquast 2025, rule 146; Sabine, 2026-11-11).
+        link_note="site externe, nouvel onglet"
         if labels.link_lang is None
-        else "en anglais, site externe",
+        else "en anglais, site externe, nouvel onglet",
         link_lang=labels.link_lang,
     )
 

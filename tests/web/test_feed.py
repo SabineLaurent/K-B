@@ -322,7 +322,7 @@ def test_the_card_of_a_paper():
     assert card.title_lang == "en"
     assert card.link == "https://arxiv.org/abs/2609.33401"
     assert card.link_label == "Lire sur arxiv.org"
-    assert card.link_note == "en anglais, site externe"
+    assert card.link_note == "en anglais, site externe, nouvel onglet"
     assert card.link_lang == "en"
 
 
@@ -402,7 +402,7 @@ def test_the_card_of_a_newsletter_article_does_not_say_the_language_of_its_link(
     assert card.identifiers == "TLDR AI"
     assert card.title_lang == "en"
     assert card.link_label == "Lire l’article d’origine"
-    assert card.link_note == "site externe"
+    assert card.link_note == "site externe, nouvel onglet"
     assert card.link_lang is None
 
 
