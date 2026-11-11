@@ -194,13 +194,13 @@ Python. En ligne, ils vont dans l'espace Log Analytics `log-kb`, qu'`infra/main.
 | Journal | Ce qu'il contient | En local | En ligne | Code |
 |---|---|---|---|---|
 | journal de `kb` | le déroulé d'une commande, réussites et échecs, une ligne datée par événement | sortie d'erreur et `<KB_DATA_DIR>/logs/kb.log` | sortie d'erreur du job, dans `log-kb` | `src/k_b/commands/run_log.py:21-23`, `:61-83` |
-| journal de `kb serve-data` | son démarrage, ses clients, son arrêt, une ligne par requête | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-data.log` | sortie d'erreur de `ca-kb-data-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/data_api/app.py:71` |
-| journal de `kb serve-ai` | de même, pour l'API IA | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-ai.log` | sortie d'erreur de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/ai_api/app.py:96` |
+| journal de `kb serve-data` | son démarrage, ses clients, son arrêt, une ligne par requête | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-data.log` | sortie d'erreur de `ca-kb-data-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/commands/serve_data_command.py:41-42`, `src/k_b/data_api/app.py:71` |
+| journal de `kb serve-ai` | de même, pour l'API IA | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-ai.log` | sortie d'erreur de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/commands/serve_ai_command.py:74-87`, `src/k_b/ai_api/app.py:96` |
 | ligne de mesure d'un appel au modèle | une ligne JSON par appel: durée, jetons, coût estimé, états; ni texte ni clé | sortie standard de `kb serve-ai`, aucun fichier | sortie standard de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/ai_api/observability/metrics.py:1-2`, `:35-51` |
 | résultat d'une commande | ce que la commande affiche par `print`, le bilan d'un import par exemple | sortie standard | sortie standard du job, dans `log-kb` | `.claude/rules/conventions.md`, règle 3 |
 
 Deux autres sorties ne sont pas des journaux de fonctionnement. Le journal d'import,
-`<KB_DATA_DIR>/journals/import-journal-<AAAA-MM-JJTHHMMSSZ>.jsonl` (`src/k_b/core/config.py:172-173`), dit ce qu'un
+`<KB_DATA_DIR>/journals/import-journal-<AAAA-MM-JJTHHMMSSZ>.jsonl` (`src/k_b/core/config.py:172-173`, `src/k_b/etl/pipeline.py:35`), dit ce qu'un
 import a décidé des données (`README.md:286-292`). Les traces et les enregistrements de l'API IA partent vers Grafana
 Cloud avec ses mesures, sous le même réglage (`docs/architecture-api-ia.md`, « Les métriques et les journaux »).
 
@@ -208,18 +208,23 @@ Cloud avec ses mesures, sous le même réglage (`docs/architecture-api-ia.md`, �
 
 Une ligne s'écrit `<date> <niveau> <module>: <message>` (`src/k_b/commands/run_log.py:30`), la date en ISO 8601, en
 UTC, à la seconde, avec son `Z` (`:84-86`). Le niveau est INFO ou au-dessus (`:95`). Les bibliothèques n'écrivent qu'à
-partir d'un niveau plus haut, car en dessous elles citent l'URL d'un blob ou la connexion à la base: `httpx2` dès
-WARNING; `azure`, `urllib3`, `psycopg` et `psycopg_pool` dès ERROR (`:31-55`, `:96-97`). uvicorn écrit par les mêmes
+partir d'un niveau plus haut, car en dessous elles citent ce que `kb` ne journalise pas: `httpx2` dès WARNING (l'URL
+du fournisseur du modèle); `azure` et `urllib3` dès ERROR (l'URL d'un blob, qui porte le titre d'un clip); `psycopg`
+et `psycopg_pool` dès ERROR (l'hôte, l'utilisateur et la base) (`:31-55`, `:96-97`). uvicorn écrit par les mêmes
 sorties, sans son propre journal d'accès (`log_config=None`, `access_log=False`:
 `src/k_b/commands/serve_data_command.py:55-56`, `src/k_b/commands/serve_ai_command.py:107-108`).
 
 La ligne d'une requête donne la méthode, le gabarit de la route (`/items/{item_id}`, jamais le chemin reçu), le
-statut, la durée en ms, le nom du client (`-` sans clé valide) et l'identifiant de la requête, rendu aussi dans
+statut, la durée en ms, le nom du client et l'identifiant de la requête, rendu aussi dans
 l'en-tête `X-Request-ID` de la réponse (`src/k_b/core/api_request_log.py:27-33`, `:56-81`). Jamais la clé, une
-valeur de paramètre ni un chemin brut (`:1-2`). Un `/health` qui répond 200 n'est pas écrit; une sonde en échec l'est
+valeur de paramètre ni un chemin brut (`:1-2`). Un champ vaut `-` quand rien n'a été vu: aucune route reconnue,
+aucun client nommé par une clé valide, aucune réponse envoyée (`:18-19`; la liste des cas: `docs/specs-api.md`,
+« Journal »). Un `/health` qui répond 200 n'est pas écrit; une sonde en échec l'est
 (`:36-38`). Une erreur de la base reprend le même identifiant (`src/k_b/data_api/errors.py:46-56`), et la ligne de
-mesure aussi (`src/k_b/ai_api/observability/metrics.py:65`): il relie une demande à ses erreurs et à ses appels au
-modèle.
+mesure de l'API IA aussi, en JSON (`"request_id": "…"`, `src/k_b/ai_api/observability/metrics.py:65`): il relie une
+demande à ses erreurs et à ses appels au modèle, dans une même API. Chaque API tire le sien
+(`src/k_b/core/api_request_log.py:27`): une demande de `kb digest` a un identifiant dans l'API IA, un autre dans l'API
+de données, sans lien entre eux (« Limites des journaux »).
 
 Relevé sur un `KB_DATA_DIR` neuf. Les deux premières lignes viennent de `logs/kb.log`, le 2026-11-11: `kb create-db`,
 `kb import`, puis `kb purge`. Les deux suivantes viennent de `logs/kb-serve-data.log`, le 2026-11-09: `kb serve-data` et
@@ -234,10 +239,13 @@ quatre requêtes (`/health`, puis trois `/items`, dont une sans clé); le `/heal
 
 ### En local: installer et configurer
 
-Rien à installer. Deux variables règlent les journaux:
+Rien à installer. Deux variables règlent les journaux. `kb` ne lit jamais un fichier `.env` lui-même: elles viennent
+de l'environnement, ou d'un fichier passé par `uv run --env-file .env kb …` (`src/k_b/commands/environment.py:21-22`).
 
-- `KB_DATA_DIR`, obligatoire et sans défaut: les journaux vont dans son dossier `logs/`
-  (`src/k_b/core/config.py:164-171`), créé au premier lancement (`src/k_b/commands/run_log.py:71-72`).
+- `KB_DATA_DIR`, obligatoire et sans défaut, un dossier qui existe déjà: sinon, `error: KB_DATA_DIR is not an existing
+  directory`, code 2, sans rien lancer (`src/k_b/commands/environment.py:38-42`, `src/k_b/cli.py:110-111`). Les
+  journaux vont dans son dossier `logs/` (`src/k_b/core/config.py:164-171`), créé au premier lancement
+  (`src/k_b/commands/run_log.py:71-72`).
 - `KB_LOG_TO_FILE`, `true` par défaut (`src/k_b/core/config.py:223-225`), lue par
   `src/k_b/commands/environment.py:46-58`: `false` écrit sur la sortie d'erreur seule, sans fichier. Une autre valeur
   arrête la commande en code 2, sans rien lancer: `error: KB_LOG_TO_FILE: 'oui' neither true nor false` (relevé le
@@ -248,20 +256,28 @@ Une commande dont le fichier de journal ne s'ouvre pas ne se lance pas: `error: 
 (`src/k_b/cli.py:103-116`). Chaque API a son fichier: une rotation faite par une autre commande laisserait un
 processus long écrire dans le fichier de la veille (`src/k_b/cli.py:66-67`; `docs/specs-api.md`, « Journal »).
 
-**Rotation et durée.** Chaque fichier tourne à minuit UTC: la veille passe dans `kb.log.<AAAA-MM-JJ>` (de même pour
-les deux autres), le jour courant reste dans `kb.log` (`src/k_b/commands/run_log.py:74-81`; nom daté:
-`src/k_b/purge/run_records.py:20-30`). La rotation ne supprime rien. `kb purge`, dernière de ses purges, supprime les
+**Rotation et durée.** Chaque fichier tourne à la première ligne écrite après minuit UTC: ses lignes passent dans
+`kb.log.<AAAA-MM-JJ>`, au jour de ces lignes (de même pour les deux autres), et les nouvelles vont dans un `kb.log`
+neuf (`src/k_b/commands/run_log.py:74-81`; nom daté: `src/k_b/purge/run_records.py:20-30`). La rotation ne supprime
+rien. Le fichier courant, sans date dans son nom, n'est jamais purgé (`src/k_b/purge/run_records.py:60-65`). `kb purge`, dernière de ses purges, supprime les
 journaux et les journaux d'import dont le jour du nom a plus de 6 mois (`src/k_b/purge/run_records.py:36-50`, appelée
-par `src/k_b/purge/all_purges.py:63`; durée: `src/k_b/core/config.py:174-178`). Elle se lance à la main, ou par
-`kb daily-routine`, qui l'enchaîne après `kb import` (`src/k_b/commands/daily_routine_command.py:63`).
+par `src/k_b/purge/all_purges.py:63`; durée: `src/k_b/core/config.py:174-178`). En local, elle se lance à la main.
+En ligne, le job `caj-kb-daily-routine` la lance: `kb daily-routine` l'enchaîne après `kb import`
+(`src/k_b/commands/daily_routine_command.py:63`), et ne démarre pas sans les réglages du job, dont `AZURE_CLIENT_ID`
+(`src/k_b/commands/daily_routine_command.py:80-84`, `src/k_b/jobs/exchange_storage.py:101-105`).
 
 ### En local: lire
 
 ```sh
 tail -f "$KB_DATA_DIR/logs/kb-serve-ai.log"                  # suivre l'API IA
-grep " ERROR " "$KB_DATA_DIR"/logs/kb.log*                   # les échecs des commandes, jours passés compris
+grep -E " (WARNING|ERROR) " "$KB_DATA_DIR"/logs/kb.log*    # avertissements et échecs des commandes, jours passés compris
 grep "request_id=<id>" "$KB_DATA_DIR"/logs/kb-serve-*.log    # les lignes d'une requête, par son X-Request-ID
 ```
+
+Un avertissement nomme un état, un délai de la base dépassé par exemple (`query_timeout`,
+`src/k_b/data_api/errors.py:55`). La trace d'une erreur imprévue suit sa ligne datée, sur des lignes sans date
+(`.claude/rules/conventions.md`, règle 3): `grep -A` la montre avec sa ligne. Le motif `request_id=` ne trouve que
+les lignes de requête et d'erreur; une ligne de mesure porte `"request_id"`, sur la sortie standard.
 
 Les lignes de mesure ne vont que sur la sortie standard de `kb serve-ai`: aucun fichier ne les garde
 (`src/k_b/ai_api/observability/metrics.py:50-51`). Les mêmes mesures partent vers Grafana Cloud quand l'export est
@@ -272,7 +288,9 @@ réglé (sections ci-dessus).
 Tout est posé par `infra/main.bicep`, que Sabine applique à la main (`infra/README.md`, « Appliquer »):
 
 - l'espace `log-kb` (`infra/modules/log-analytics.bicep:5-20`): 30 jours de rétention, et un plafond de 0,2 Go par
-  jour, au-delà duquel les journaux du jour sont perdus (`:13-19`);
+  jour (`:13-19`): atteint, l'espace cesse de recevoir jusqu'à son heure de remise à zéro, propre à chaque espace et
+  non réglable; ce qui est déjà reçu reste (Microsoft Learn, « Set daily cap on Log Analytics workspace », lu le
+  2026-11-11);
 - l'environnement `cae-kb` y envoie les journaux des conteneurs par Azure Monitor, sans clé partagée, par le paramètre
   de diagnostic `logs-to-log-kb`, en deux tables: `ContainerAppConsoleLogs` (sortie standard et sortie d'erreur des
   conteneurs) et `ContainerAppSystemLogs` (démarrage, tirage de l'image, réveil d'une app à 0 réplique)
@@ -290,12 +308,15 @@ Y écrivent les deux API, `ca-kb-data-api` et `ca-kb-ai-api` (`infra/main.bicep:
 
 Pour lire `log-kb`: l'Azure CLI, connectée à l'abonnement (`az login`), et son extension `log-analytics`, qui porte
 `az monitor log-analytics query` (`az extension add --name log-analytics`; message « This command is from the
-following extension: log-analytics », relevé le 2026-11-09 avec azure-cli 2.92.0 et l'extension 1.0.0b3, les dernières versions publiées le 2026-11-11).
-Les lecteurs de l'abonnement (rôle Lecteur) lisent `log-kb` (`docs/registre-traitements.md:199`).
+following extension: log-analytics », relevé le 2026-11-09 avec azure-cli 2.92.0 et l'extension 1.0.0b3, encore les
+dernières le 2026-11-11). Le rôle Lecteur (`*/read`) suffit à lire `log-kb` (`docs/registre-traitements.md:199`, source
+Microsoft Learn: `:293`). L'abonnement et `RG` se règlent comme pour l'application de l'infrastructure
+(`infra/README.md`, « 0. Les variables du shell »).
 
 ### En ligne: lire
 
-Une ligne arrive dans `log-kb` quelques minutes après son écriture (`infra/README.md:310`). Les journaux d'une API:
+Ce qu'a écrit un job se lit dans `log-kb` « quelques minutes après sa fin » (`infra/README.md:310`). Les journaux
+d'une API:
 
 ```sh
 RG=<groupe de ressources>
@@ -323,15 +344,24 @@ période.
   en ligne. Elles sont portées par #282, ouverte. Un échec ne se voit qu'en lisant le journal.
 - **En local, rien ne lance `kb purge` de lui-même**: une machine qui ne lance que les API, ou `kb import` sans
   `kb purge`, ne purge jamais `logs/`.
+- **La purge des journaux passe en dernier, et la première purge qui échoue arrête les suivantes**, par choix
+  (`src/k_b/purge/all_purges.py:1-3`, `:63`): sans base, `kb purge` ne lance aucune purge (`:49`, `:69-71`), et une purge
+  qui échoue avant celle des journaux laisse `logs/` et `journals/` tels quels. Pour réduire le risque: la purge
+  suivante relance toutes les purges (`:3`); en ligne, l'échec d'une étape donne son code à la routine
+  (`src/k_b/commands/job_routine.py:2`), et l'exécution du job se lit `Failed` (`infra/README.md:1059`).
 - **En ligne, `log-kb` est la seule copie**: aucun fichier dans le conteneur, et la purge à 6 mois ne s'y applique
-  pas. Log Analytics efface après 30 jours; au-delà de 0,2 Go dans la journée, les lignes du jour sont perdues.
+  pas. Log Analytics efface après 30 jours; au-delà de 0,2 Go dans la journée, les lignes qui arrivent jusqu'à la remise
+  à zéro du plafond sont perdues.
 - **Les lignes de mesure ne sont gardées nulle part en local**: la sortie standard de `kb serve-ai` va au terminal.
-- **Un seul `kb serve-data` par `KB_DATA_DIR`**: deux, sur deux ports, écriraient le même fichier
-  (`docs/specs-api.md`, « Journal »).
+- **Une demande ne se suit pas d'une API à l'autre**: l'API IA n'envoie pas son identifiant à l'API de données, qui
+  tire le sien (`src/k_b/core/api_request_log.py:27`). Les lignes des deux API se rapprochent par l'heure et par le nom du client que l'API de données journalise.
+- **Un seul `kb serve-data` et un seul `kb serve-ai` par `KB_DATA_DIR`**: deux, sur deux ports, écriraient le même
+  fichier (`docs/specs-api.md`, « Journal »; `README.md:476`).
 - **L'export vers Grafana Cloud en ligne**: son jeton de production est l'objet de #522; aucune mesure de la
   production n'est relevée ici, faute d'appel au modèle en ligne sur la période.
-- **[WIP #423] Le job des fiches de veille, `caj-kb-digest-watch`**, n'est pas dans `infra/` au commit `d1b5400`: ses
-  journaux, quand il y sera, se liront comme ceux des autres jobs.
+- **[WIP #423] Le job des fiches de veille, `caj-kb-digest-watch`**, n'est pas déclaré dans `infra/` au commit `d1b5400`;
+  son identité, `id-kb-digest-watch`, y est déjà (`infra/main.bicep:46`). Ses journaux, quand il y sera, se liront
+  comme ceux des autres jobs.
 
 ## Sources
 
