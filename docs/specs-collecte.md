@@ -773,8 +773,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
 3. **Normalisation** des items lus (`normalize_item`, `src/k_b/etl/normalize.py`) :
    - dates gardées telles quelles : elles sont déjà en UTC, converties à la lecture par le type
      `UtcDatetime` de l'item (`src/k_b/items.py`) ;
-   - URL normalisées : les paramètres `utm_*` sont retirés, les autres restent tels quels et
-     dans leur ordre.
+   - URL normalisées : les paramètres `utm_*` et les `&` en trop sont retirés, les autres
+     restent tels quels et dans leur ordre.
 
    `brief09_assistant-veille-tech` (relu le 2026-10-01) a servi d'indication, pas de modèle : il
    ne fait pas autorité. On y retrouve un modèle d'article commun et la date de révision arXiv. À

@@ -47,8 +47,9 @@ le coffre.
 
 - **Python 3.13 ou plus récent**: `requires-python = ">=3.13"` (`pyproject.toml`).
 - **uv**, qui installe Python, K-B et ses dépendances (README, « Installer et lancer »).
-- **La commande `kb`**: le point d'entrée `kb = "k_b.cli:main"` (`pyproject.toml`, `[project.scripts]`). Chaque
-  script de cette fiche est une sous-commande de `kb` (`cli.py:96-100`).
+- **La commande `kb`**: le point d'entrée `kb = "k_b.cli:main"` (`pyproject.toml`, `[project.scripts]`). `create-db`,
+  `migrate-database`, `import`, `purge`, `write-tops` et `daily-routine` en sont des sous-commandes, que lance la
+  table `RUN_BY_COMMAND` (`cli.py:95-103`).
 
 ```sh
 git clone https://github.com/SabineLaurent/K-B.git
@@ -58,7 +59,7 @@ uv sync
 
 ### Dépendances
 
-`kb` charge toutes ses commandes au démarrage (`cli.py:12-37`), et `kb import` déclare toutes les sources
+`kb` charge toutes ses commandes au démarrage (`cli.py:12-52`), et `kb import` déclare toutes les sources
 (`etl/source_kinds.py:11-29`), dont le client BigQuery de GH Archive (`etl/sources/gh_archive.py:14`). Chaque
 dépendance du `pyproject.toml` doit donc être installée, même celles que l'import n'appelle pas: `uv sync` les
 installe toutes. Celles dont se sert l'import, avec la version que fixe `uv.lock` au commit `94e3f4e`:
@@ -67,7 +68,7 @@ installe toutes. Celles dont se sert l'import, avec la version que fixe `uv.lock
 |---|---|---|---|
 | `sqlite3` | bibliothèque standard de Python | ouvre la base SQLite | `database/engine.py:36-40` |
 | `csv`, `json` | bibliothèque standard | lisent le catalogue CISA KEV (CSV), les réponses de GitHub et l'extrait Zotero (JSON) | `etl/sources/cisa_kev.py:122`, `etl/sources/github/releases.py:118`, `etl/sources/github/advisories.py:127`, `etl/sources/zotero.py:403` |
-| `pydantic` | 2.13.5 | valide chaque entrée en item, et chaque résultat de GH Archive | `items.py:399-421`, `etl/sources/gh_archive.py:308-311` |
+| `pydantic` | 2.13.5 | valide chaque entrée en item, et chaque résultat de GH Archive | `items.py:399-460`, `etl/sources/gh_archive.py:308-311` |
 | `pyyaml` | 6.0.3 | lit le frontmatter d'un clip, par `BaseLoader`, qui ne construit que du texte, des listes et des dictionnaires | `etl/sources/clipping.py:294-297` |
 | `defusedxml` | 0.7.1 | lit le flux Atom d'arXiv | `etl/sources/arxiv.py:10`, `etl/sources/arxiv.py:170` |
 | `beautifulsoup4` | 4.15.0 | lit la page HTML d'une édition de tldr.tech | `etl/sources/tldr.py:220` |
@@ -85,10 +86,17 @@ de `uv.lock` sans le mettre à jour.
 | `KB_DATABASE_AUTH` | non | `libpq` par défaut; `entra` en ligne, avec `AZURE_CLIENT_ID` | `database/location.py:12`, `database/location.py:138-155`, `core/config.py:197` |
 | `KB_VAULT_DIR` | pour `kb write-tops` | le dossier du coffre Obsidian | `etl/collected_sources.py:95` |
 
-Une valeur refusée n'est jamais citée: elle peut porter un mot de passe (`database/location.py:109-110`). Sont
-refusées une URL qui ne commence ni par `postgresql://` ni par `postgres://`, vide comprise
-(`database/location.py:124-128`), et une variable que libpq lirait en plus de l'URL, comme `PGHOST`
-(`database/location.py:129-134`). La commande sort alors en 2, sans rien lire.
+Une valeur refusée n'est jamais citée: elle peut porter un mot de passe (`database/location.py:109-110`). La
+commande sort en 2, sans rien lire, quand:
+
+- `KB_DATABASE_URL` ne commence ni par `postgresql://` ni par `postgres://`, vide comprise
+  (`database/location.py:124-128`);
+- une variable que libpq lirait en plus de l'URL est posée, comme `PGHOST` (`database/location.py:129-134`);
+- `KB_DATABASE_AUTH` n'est ni `libpq` ni `entra` (`database/location.py:121-122`, `database/location.py:146-147`);
+- `KB_DATABASE_AUTH=entra` est posée sans `KB_DATABASE_URL` (`database/location.py:116-120`), sans `AZURE_CLIENT_ID`,
+  ou avec un `AZURE_CLIENT_ID` qui n'est pas un GUID (`database/location.py:148-154`);
+- libpq ne lit pas l'URL: le refus vient à la première connexion, avant toute lecture
+  (`database/postgresql.py:161-170`, `commands/import_command.py:51-53`).
 
 ## Installer le système de gestion de base de données
 
@@ -110,7 +118,7 @@ KB_DATA_DIR=~/.knowledge_base uv run kb create-db
 3. crée les tables (`database/schema.sql`) puis les sept sources (`database/seed_sources.sql`)
    (`database/creation.py:57-62`);
 4. sur toute erreur, Ctrl-C compris, supprime le fichier et ses `-wal` et `-shm`: une base à moitié créée aurait
-   l'air valide (`database/creation.py:65-69`).
+   l'air valide (`database/creation.py:48-49`, `database/creation.py:65-69`).
 
 Chaque connexion active les clés étrangères, que SQLite ignore sinon (`database/engine.py:36-40`). La commande
 affiche `database created: <chemin>` (`commands/create_db_command.py:53`). Essayé le 2026-11-11 sur un dossier neuf:
@@ -120,8 +128,8 @@ code 0, puis code 2 au second lancement (`… already exists`).
 |---|---|---|
 | 0 | la base est créée | `commands/create_db_command.py:53-54` |
 | 1 | la création a échoué (erreur du moteur, du disque) | `commands/create_db_command.py:43-52` |
-| 2 | rien n'est fait: réglage refusé, ou la base existe déjà | `commands/create_db_command.py:29-42` |
-| 130 | Ctrl-C: aucun fichier de base ne reste | `commands/exit_codes.py:63-72` |
+| 2 | rien n'est fait: réglage refusé (une URL que libpq ne lit pas comprise), la base existe déjà, ou la base PostgreSQL n'est pas en UTF8 et en collation C | `commands/create_db_command.py:29-42` |
+| 130 | Ctrl-C: aucun fichier de base ne reste, sauf si un second Ctrl-C coupe sa suppression (README, « Créer la base ») | `commands/exit_codes.py:63-72` |
 
 ### Sur le Mac: PostgreSQL, pour essayer la branche en ligne
 
@@ -161,8 +169,10 @@ PostgreSQL (#421) »). Cette fiche n'en a lancé aucune commande.
    affiche `database created: …`; sur une base qui les a, il ne fait rien et affiche
    `database unchanged: … already has its tables` (`database/creation.py:86-109`,
    `commands/migrate_database_command.py:45-48`). Ce n'est pas une migration: K-B n'en a pas.
-4. **La connexion**: avec `KB_DATABASE_AUTH=entra`, chaque connexion nouvelle demande un jeton de l'identité
-   managée d'`AZURE_CLIENT_ID`, qui sert de mot de passe (`database/location.py:13-14`, `database/entra.py:1-2`).
+4. **La connexion**: avec `KB_DATABASE_AUTH=entra`, un jeton de l'identité managée d'`AZURE_CLIENT_ID` sert de mot
+   de passe (`database/location.py:13-14`, `database/entra.py:1-2`). Une connexion directe, celle de `kb import`,
+   demande le sien; un pool, celui de l'API de données, garde le sien jusqu'à la fin de sa validité
+   (`database/postgresql.py:198-200`).
    K-B refuse alors une URL qui porte un mot de passe, ou qui ne pose pas `sslmode=verify-full`
    (`database/postgresql.py:178-192`).
 
@@ -172,8 +182,9 @@ PostgreSQL (#421) »). Cette fiche n'en a lancé aucune commande.
 | `kb_reader` | l'API de données (`id-kb-data-api`, membre du rôle) | lecture (`SELECT`) |
 | `kb_writer` | la routine quotidienne (son identité, membre du rôle) | lecture et écriture (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) |
 
-Source du tableau: `infra/README.md`, « La base PostgreSQL (#421) »; `infra/postgresql/grant-roles.sql:7-8`,
-`infra/postgresql/create-daily-routine-principal.sql:8`.
+Source du tableau: `infra/README.md`, « La base PostgreSQL (#421) »; les rôles dans
+`infra/postgresql/grant-roles.sql:7-8` et `infra/postgresql/create-daily-routine-principal.sql:8`; leurs droits dans
+`database/grants_postgresql.sql:6-7`.
 
 ## Le script d'agrégation et d'import: `kb import`
 
@@ -250,8 +261,9 @@ la seule porte de l'import pour les commandes (`etl/pipeline.py:26-32`).
    n'est pas une date fait rejeter la collection (`etl/raw_reading.py:92-106`). Chaque page absente du registre est
    lue entière (`etl/raw_reading.py:107-113`): le lecteur de la sorte en tire les entrées, puis convertit chaque
    entrée en item (`etl/raw_reading.py:116-152`). Une page illisible est rejetée et pas inscrite: le prochain
-   import la relit (`etl/raw_reading.py:125-132`). Une entrée invalide est rejetée seule, son motif sans aucune
-   valeur (`without_values`, `etl/raw_reading.py:139-148`). Un fichier de tendances est lu entier, ou rejeté entier
+   import la relit (`etl/raw_reading.py:125-132`). Une entrée que le lecteur refuse est rejetée seule, avec le motif
+   qu'il écrit (`etl/raw_reading.py:134-136`); une entrée que la conversion en item refuse est rejetée seule, son
+   motif sans aucune valeur (`without_values`, `etl/raw_reading.py:139-148`). Un fichier de tendances est lu entier, ou rejeté entier
    (`etl/raw_reading.py:155-173`).
 4. **L'ordre.** Les fichiers d'items sont triés par date de collecte; à la même date, les pages gardent leur ordre
    (`etl/transform.py:64-65`).
@@ -268,8 +280,9 @@ la seule porte de l'import pour les commandes (`etl/pipeline.py:26-32`).
    ses items est écrit dans son `SAVEPOINT`, puis son catalogue marque retiré ce qu'il ne liste plus
    (`etl/file_writing.py:46-68`, `etl/file_writing.py:94-102`). Un fichier de tendances est inscrit et écrit dans
    un seul `SAVEPOINT` (`etl/file_writing.py:71-91`).
-8. **Le journal, puis la validation.** Si le journal de cette seconde existe déjà, l'import s'arrête, code 2
-   (`etl/load.py:127-129`, `etl/load.py:163-166`, `commands/import_command.py:48-50`). Sinon le journal est écrit,
+8. **Le journal, puis la validation.** Si le journal de cette seconde existe déjà, l'import s'arrête et sa
+   transaction est annulée: tout a été lu et écrit, rien n'est gardé, code 2 (`etl/load.py:127-129`,
+   `etl/load.py:163-166`, `etl/load.py:80-86`, `commands/import_command.py:48-50`). Sinon le journal est écrit,
    puis la base valide (`COMMIT`) (`etl/load.py:130-138`).
 9. **Le bilan**, affiché entre deux lignes vides (`commands/import_command.py:64`,
    `commands/import_command.py:68-74`).
@@ -283,24 +296,26 @@ la seule porte de l'import pour les commandes (`etl/pipeline.py:26-32`).
 - **Toute autre erreur** (moteur, disque) annule toute la transaction: rien n'est écrit, et le journal est supprimé
   (`etl/load.py:80-86`, `etl/load.py:139-146`). La commande sort en 1 (`commands/import_command.py:54-59`).
 - **Une interruption** (Ctrl-C, SIGTERM) reçue avant la validation n'écrit rien; reçue après, elle garde l'import et
-  son journal, et le journal le dit (`import committed, journal kept`). Sur PostgreSQL, une interruption pendant la
+  son journal, et le journal de fonctionnement le dit (`import committed, journal kept`). Sur PostgreSQL, une interruption pendant la
   validation laisse son issue inconnue: le journal est gardé, avec la ligne
   `import commit interrupted, outcome unknown` (`etl/load.py:139-160`).
-- **Le journal d'import**: une ligne JSON par rejet (`imported_at`, `raw_file_path`, `reason`), puis par item écarté
-  (`rule`, `source_code`, `source_item_id`, `raw_file_path` et la date comparée), puis par fenêtre de classement
-  écartée (`etl/import_journal.py:50-76`). Il est écrit par `write_file_atomically` (`etl/import_journal.py:9`);
-  observé en mode `0600` le 2026-11-11.
+- **Le journal d'import**: une ligne JSON par rejet (`imported_at`, `kind` à `rejection`, `raw_file_path`,
+  `reason`), puis par item écarté et par fenêtre de classement écartée (`imported_at`, `kind` à `discard`, `rule`,
+  `source_code`, `source_item_id`, `raw_file_path`, et la date comparée, dans `compared_with_collected_at` ou
+  `compared_with_revised_at` selon la règle) (`etl/import_journal.py:15-25`, `etl/import_journal.py:47-78`). Il est
+  écrit par `write_file_atomically` (`etl/import_journal.py:82-85`), en mode `0600`, lisible par sa seule
+  propriétaire (`core/atomic_write.py:17`, `core/atomic_write.py:90-92`).
 
 | Code | Sens | Où |
 |---|---|---|
 | 0 | l'import a réussi | `commands/import_command.py:60-65` |
 | 1 | l'import a échoué: rien n'est écrit, ni dans la base ni au journal | `commands/import_command.py:54-59` |
-| 2 | rien n'est lu: réglage refusé, base absente, ou journal de cette seconde déjà là | `commands/import_command.py:34-37`, `commands/import_command.py:45-53` |
-| 143, 130 | SIGTERM, SIGINT (Ctrl-C): ce qui est fait avant le signal est gardé | `commands/exit_codes.py:63-84` |
+| 2 | réglage refusé ou base absente: rien n'est lu; journal de cette seconde déjà là: tout est lu, rien n'est gardé | `commands/import_command.py:34-37`, `commands/import_command.py:45-53` |
+| 143, 130 | SIGTERM, SIGINT (Ctrl-C): reçu avant la validation, rien n'est gardé; reçu pendant ou après, l'import et son journal sont gardés. Un second Ctrl-C peut couper l'annulation, SIGTERM ignore un second signal (README, « Importer le brut dans la base ») | `etl/load.py:80-86`, `etl/load.py:139-160`, `commands/exit_codes.py:63-84` |
 
 ## Le nettoyage et l'homogénéisation des formats
 
-### Huit formats de brut, un seul modèle d'item
+### Cinq formats de brut, un seul modèle d'item
 
 | Source | Dossier de `raw/` (préfixe) | Format du brut | Ce qu'il en sort | Lecture |
 |---|---|---|---|---|
@@ -313,12 +328,13 @@ la seule porte de l'import pour les commandes (`etl/pipeline.py:26-32`).
 | Web Clipper | `selected_library/clipping` | Markdown à frontmatter YAML, marque d'ordre des octets ignorée | un clip | `etl/sources/clipping.py:286`, `etl/sources/clipping.py:297` |
 | GH Archive | `automated_watch/gh_archive` | JSON | des lignes de tendance (table `trend`), pas des items | `etl/sources/gh_archive.py:308-311` |
 
-Les classements GitHub (`github_most_starred`, `github_most_forked`) n'entrent pas dans la base: leur sorte n'a pas
+Huit flux, en cinq formats: CSV, JSON, Atom, HTML, Markdown à frontmatter YAML. Les classements GitHub
+(`github_most_starred`, `github_most_forked`) n'entrent pas dans la base: leur sorte n'a pas
 de lecteur (`etl/source_kinds.py:66-77`), et `kb write-tops` les lit.
 
 ### Les règles de nettoyage, écrites une fois dans le modèle
 
-Chaque lecteur rend un `Item` (`items.py:399-421`), le même pour toutes les sources. Le modèle est strict: une date
+Chaque lecteur rend un `Item` (`items.py:399-460`), le même pour toutes les sources. Le modèle est strict: une date
 donnée en texte est refusée, pas devinée, et un champ inconnu aussi (`items.py:402-405`). Une entrée qui enfreint une
 règle est rejetée, avec son champ et le type d'erreur, sans sa valeur (étape 3).
 
@@ -332,29 +348,53 @@ règle est rejetée, avec son champ et le type d'erreur, sans sa valeur (étape 
   un surrogate isolé (`items.py:114-124`, `items.py:180-182`).
 - **Longueurs maximales**, par sorte d'item et par champ (`items.py:314-344`), tenues aussi par un `CHECK` de la
   colonne; un test garde les deux égales (`items.py:310-312`).
-- **Champs obligatoires** par sorte d'item (`REQUIRED_FIELDS_BY_KIND`, `items.py:251`).
+- **Une sorte, une source, ses champs**: un item vient de la source de sa sorte (`check_source`,
+  `items.py:463-467`), remplit les champs obligatoires de sa sorte (`REQUIRED_FIELDS_BY_KIND`, `items.py:251`), et
+  aucun champ propre à une autre sorte (`FIELDS_OF_ONE_KIND`, `items.py:283-291`, `items.py:485`).
 - **Identifiants à leur forme**: CVE, nom de dépôt, édition de tldr.tech, identifiant arXiv, clé Zotero
-  (`items.py:194-203`). **Entiers** tenus sur 64 bits (`items.py:247`).
-- **URL** `http` ou `https`, gardée comme la source l'a donnée (`items.py:183-192`), puis sans ses paramètres
-  `utm_*`, les autres gardés tels quels et dans leur ordre (`etl/normalize.py:19-27`). L'item normalisé est validé
+  (`items.py:194-203`); l'identifiant d'une alerte (GHSA), d'une release (entier positif, sans zéro en tête) et d'une
+  entrée Zotero dans sa source (`SOURCE_ITEM_ID_BY_KIND`, `items.py:295-303`, `items.py:516`). **Entiers** tenus sur
+  64 bits (`items.py:247`).
+- **URL** en `https`; `http` n'est permis que pour une entrée Zotero et un clip, qui gardent l'URL d'où la page a été
+  enregistrée (`items.py:293-294`, `items.py:504-512`). Une URL que `urlsplit` refuse, ou qui n'a plus d'hôte une fois
+  ses `utm_*` retirés, est refusée (`items.py:101-111`). L'URL est gardée comme la source l'a donnée
+  (`items.py:183-192`), puis la normalisation retire ses paramètres `utm_*` et les `&` en trop (`a=1&&b=2` devient
+  `a=1&b=2`), et garde les autres paramètres tels quels et dans leur ordre, un `x=` sans valeur compris
+  (`etl/normalize.py:19-27`; essayé le 2026-11-11). L'item normalisé est validé
   de nouveau; une erreur à cette étape arrête tout l'import (`etl/transform.py:108-112`, `etl/normalize.py:15-16`).
 - **Tags d'un clip**: sans espaces autour, sans le `#` initial, en minuscules (`items.py:127-130`), chacun une fois,
-  rangés par nom, sans le tag `clippings` que pose le gabarit du Web Clipper (`etl/sources/clipping.py:271`,
-  `etl/sources/clipping.py:353-356`).
+  rangés par nom, sans le tag vide ni le tag `clippings` que pose le gabarit du Web Clipper
+  (`etl/sources/clipping.py:271`, `etl/sources/clipping.py:353-356`).
+
+### Le nettoyage propre à une source
+
+Chaque lecteur fait aussi un nettoyage que le modèle ne connaît pas:
+
+- **tldr.tech**: les morceaux du texte d'un élément séparés d'une espace, les blancs ramenés à une seule
+  (`etl/sources/tldr.py:278-281`); un `&amp;` qui reste dans un lien une fois la page lue devient `&`
+  (`etl/sources/tldr.py:303-305`).
+- **arXiv**: l'identifiant, le nom de chaque auteur et chaque champ de texte obligatoire sont débarrassés de leurs
+  blancs autour; un champ obligatoire vide fait refuser l'entrée (`etl/sources/arxiv.py:121`,
+  `etl/sources/arxiv.py:192-196`, `etl/sources/arxiv.py:215-219`).
+- **CISA KEV**: l'URL d'une vulnérabilité est construite vers sa page de la NVD, à partir de son CVE
+  (`etl/sources/cisa_kev.py:196`).
+- **Web Clipper**: la clé d'un clip est son URL sans ses paramètres `utm_*` (`etl/sources/clipping.py:381-382`).
 
 ### Les doublons, écartés par la base
 
 Les items arrivent dans l'ordre des collectes. La base ne trouve que le doublon exact, le même identifiant dans sa
-source (`etl/file_writing.py:4-5`). Ce qu'elle fait d'un item déjà vu dépend de la nature de sa source; la règle est
-une clause SQL de l'écrivain de sa sorte, et nulle part ailleurs.
+source (`etl/file_writing.py:4-5`). Ce qu'elle fait d'un item déjà vu dépend de la nature de sa source, et vit dans
+l'écrivain de sa sorte (`database/writers/`): une clause SQL le plus souvent, une comparaison en Python pour un clip
+(`database/writers/clip_writer.py:110-115`). Les retraits d'un catalogue se décident en Python: un catalogue qui a un
+rejet ne retire rien (`etl/withdrawals.py:24`, `etl/withdrawals.py:41`).
 
 | Nature de la source | Sources | Item déjà vu | Clause SQL |
 |---|---|---|---|
 | flux de nouveautés | releases, alertes GitHub, articles de tldr.tech | la première version vue est gardée | `INSERT … WHERE NOT EXISTS` (`database/writers/release_writer.py:17-21`, `database/writers/advisory_writer.py:12-16`, `database/writers/newsletter_article_writer.py:11-18`) |
 | flux de nouveautés, par fenêtre | classements GH Archive (table `trend`) | le premier classement vu d'une fenêtre est gardé entier | `WHERE NOT EXISTS … ON CONFLICT … DO NOTHING` (`database/writers/trend_writer.py:20-32`) |
 | flux avec révisions | arXiv | remplacé si sa révision est plus récente | `ON CONFLICT (arxiv_id) DO UPDATE … WHERE` (`database/writers/paper_writer.py:13-25`) |
-| catalogue d'état | CISA KEV | remplacé si son catalogue est collecté après le dernier importé et que son contenu diffère; une ligne absente est marquée retirée | `ON CONFLICT (cve_id) DO UPDATE … WHERE` (`database/writers/vulnerability_writer.py:18-45`), `etl/withdrawals.py:12` |
-| catalogue d'état, à deux niveaux | Zotero: l'entrée et chacun de ses surlignages | la même règle, pour l'entrée et pour chaque surlignage | `ON CONFLICT (zotero_key) DO UPDATE … WHERE` (`database/writers/zotero_entry_writer.py:24-46`, `database/writers/zotero_entry_writer.py:49-65`), `etl/withdrawals.py:35` |
+| catalogue d'état | CISA KEV | remplacé si son catalogue est collecté après le dernier importé, et que son contenu diffère ou qu'il était retiré (`database/writers/vulnerability_writer.py:37-38`); une ligne absente est marquée retirée | `ON CONFLICT (cve_id) DO UPDATE … WHERE` (`database/writers/vulnerability_writer.py:18-45`), `etl/withdrawals.py:12` |
+| catalogue d'état, à deux niveaux | Zotero: l'entrée et chacun de ses surlignages | la même règle, pour l'entrée et pour chaque surlignage (`database/writers/zotero_entry_writer.py:39-40`) | `ON CONFLICT (zotero_key) DO UPDATE … WHERE` (`database/writers/zotero_entry_writer.py:24-46`, `database/writers/zotero_entry_writer.py:49-65`), `etl/withdrawals.py:35` |
 | `.md` importé, par URL | clips du Web Clipper | réécrit en partie si son contenu a changé | `INSERT … WHERE NOT EXISTS` (`database/writers/clip_writer.py:14-18`), puis comparaison en Python |
 
 Le détail de chaque règle, ses dates comparées et ses limites sont dans `docs/specs-collecte.md`, « Du brut au jeu
@@ -368,19 +408,23 @@ KB_DATA_DIR=~/.knowledge_base KB_VAULT_DIR=<coffre> uv run kb write-tops
 
 `kb write-tops` écrit, pour le top des dépôts les plus étoilés et celui des plus forkés, une fiche Markdown par jour
 de collecte encore dans le brut, dans `veille/tops/` du coffre (`post/top_sheets.py:31`). Il ne lit pas la base,
-seulement les classements de `raw/` (`commands/write_tops_command.py:39`, `post/top_sheets.py:49-82`). Pour chaque
-top, dans l'ordre (`post/top_sheets.py:49-82`):
+seulement les classements de `raw/` (`commands/write_tops_command.py:39`, `post/top_sheets.py:57`). Pour chaque
+top, dans l'ordre (`post/top_sheets.py:49-81`):
 
 1. il liste une fois les relevés du top;
 2. il refuse un dossier ou une fiche du coffre qui serait un lien symbolique;
 3. il écrit la fiche de chaque jour qui n'en a pas: une fiche qui existe n'est jamais réécrite;
-4. il supprime du brut les relevés lisibles plus anciens que le dernier relevé lisible. Un relevé illisible est
+4. il refuse de nouveau un dossier du coffre qui serait un lien symbolique, puis une fiche manquante ou qui n'est
+   pas un fichier ordinaire: son relevé serait supprimé sans fiche (`post/top_sheets.py:71-72`,
+   `post/top_sheets.py:129-139`);
+5. il supprime du brut les relevés lisibles plus anciens que le dernier relevé lisible. Un relevé illisible est
    gardé.
 
 Un top qui échoue n'arrête pas l'autre (`commands/write_tops_command.py:46-62`). Sans `KB_VAULT_DIR`, rien n'est lu
 ni supprimé, et la commande sort en 2 (`commands/write_tops_command.py:29-35`). Elle sort en 0 si chaque top a réussi
-ou n'a aucun relevé, en 4 si un top a échoué et qu'un autre a abouti, en 1 si aucun n'a abouti
-(`commands/write_tops_command.py:73`, `commands/exit_codes.py:88-93`).
+ou n'a aucun relevé, en 1 si aucun n'a abouti, en 4 si l'un a échoué et l'un a abouti, ce que peut faire un seul
+top: il écrit ses fiches et garde un relevé illisible (`commands/write_tops_command.py:57-60`,
+`commands/write_tops_command.py:73`, `commands/exit_codes.py:88-93`).
 
 **Toute la chaîne.** Sur le Mac, chaque étape garde son propre code de sortie et tourne même si la précédente a
 échoué en partie (README, « Toute la chaîne en dev »):
@@ -391,9 +435,10 @@ uv run --env-file .env kb collect; uv run --env-file .env kb import; uv run --en
 uv run --env-file .env kb write-tops
 ```
 
-En ligne, `kb daily-routine` enchaîne les mêmes étapes dans le même processus: `kb collect`, `kb import`, qui ne
-tourne pas si `kb collect` sort en 1 ou en 2, `kb purge`, lancé même si l'import échoue, puis `kb write-tops`
-(`commands/daily_routine_command.py:44-75`). `kb import` ne purge rien: la purge du brut et de la base est
+En ligne, `kb daily-routine` enchaîne ses étapes dans le même processus: le miroir des clips vers le coffre,
+`kb collect`, `kb import`, qui ne tourne pas si `kb collect` sort en 1 ou en 2, `kb purge`, lancé même si l'import
+échoue, `kb write-tops`, puis la publication de `veille/` (`commands/daily_routine_command.py:44-75`). Elle ne
+démarre pas sans les réglages du stockage d'échange ni `KB_VAULT_DIR` (`commands/daily_routine_command.py:93-105`). `kb import` ne purge rien: la purge du brut et de la base est
 `kb purge`.
 
 ## Lire la base sans l'API
