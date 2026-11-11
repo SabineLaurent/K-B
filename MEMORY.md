@@ -162,6 +162,11 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   puis avec), par Sabine à la main, en suivant `infra/README.md`, « Appliquer ». Une session donne les commandes
   et lit l'état en lecture seule (`az … show`, `log-kb`), sans rien appliquer elle-même. Une API au repos met
   20 à 26 s à se réveiller (journal ADR, 2026-11-06, « Mise en ligne »).
+- **Site privé** (#571, 2026-11-11) : `ca-kb-web` derrière la connexion Entra de la plateforme. Toute passe porte
+  `webAuthClientId`, et tire `exposeWeb` de la connexion en ligne (`infra/README.md`, étape 5) : un site à créer naît
+  fermé et ne s'ouvre qu'à la passe suivante, sa connexion lue ; jamais `exposeWeb=true` en dur. Entra reste son seul
+  fournisseur d'identité. Le secret client de l'inscription « K-B site » **expire le 2027-05-11** : la rotation se fait avant,
+  avec `--append` (`infra/README.md`, « La rotation du secret client »).
 - **Tags de version** (#415, décision de Sabine du 2026-11-06) : aucune session ne pose ni ne pousse de tag sans une
   demande explicite de Sabine, et aucune n'approuve un déploiement en attente (`pending_deployments`). Un tag `vX.Y.Z` sur `main` déploie en ligne (`.github/workflows/deploy.yml`), sans
   validation jusqu'au 08/11 (risque accepté, registre, « Déploiement continu »). Après un déploiement par tag, une

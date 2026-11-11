@@ -7,6 +7,8 @@ param tags object
 @maxLength(8)
 param suffix string
 param smokeTestIdentityName string
+@description('Identity of kb serve-data: reads watch, for the site (#571).')
+param dataApiIdentityName string
 @description('Identity of kb daily-routine: reads clippings and zotero, writes watch.')
 param dailyRoutineIdentityName string
 @description('Identity of kb digest-watch: writes watch.')
@@ -111,13 +113,19 @@ resource digestWatchIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2
   name: digestWatchIdentityName
 }
 
+resource dataApiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
+  name: dataApiIdentityName
+}
+
 // The lock of direction (decision 4): a role per identity and container, none on the account. With the
-// key cut, a sync in the wrong direction fails with 403. The APIs and id-kb-migrate-database get none.
+// key cut, a sync in the wrong direction fails with 403. The data API reads watch, the only door of the
+// site to its sheets (#571); the AI API and id-kb-migrate-database get none.
 // The name of a role is known at the start of the deployment, a principalId only once the identity exists:
 // two tables.
 var principalKeys = {
   dailyRoutine: dailyRoutineIdentity.id
   digestWatch: digestWatchIdentity.id
+  dataApi: dataApiIdentity.id
   operator: operatorObjectId
 }
 var principals = {
@@ -127,6 +135,10 @@ var principals = {
   }
   digestWatch: {
     principalId: digestWatchIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+  dataApi: {
+    principalId: dataApiIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
   operator: {
@@ -154,6 +166,11 @@ var grants = [
     container: 'watch'
     principal: 'digestWatch'
     roleId: blobDataContributorRoleId
+  }
+  {
+    container: 'watch'
+    principal: 'dataApi'
+    roleId: blobDataReaderRoleId
   }
   {
     container: 'clippings'
