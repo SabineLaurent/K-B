@@ -49,9 +49,14 @@ class AnsweringAdapter(HTTPAdapter):
     def send(self, request, **kwargs):
         self.requests.append(request)
         status, headers, body = self.handle(request)
+        # A body is bytes, or a stream that gives its own Content-Length in headers.
+        is_bytes = isinstance(body, bytes)
         raw = urllib3.HTTPResponse(
-            body=io.BytesIO(body),
-            headers={"Content-Length": str(len(body)), **headers},
+            body=io.BytesIO(body) if is_bytes else body,
+            headers={
+                **({"Content-Length": str(len(body))} if is_bytes else {}),
+                **headers,
+            },
             status=status,
             reason=http.HTTPStatus(status).phrase,
             preload_content=False,
@@ -219,6 +224,10 @@ def format_http_date(moment):
     return formatdate(moment.timestamp(), usegmt=True)
 
 
+# The code the storage gives with the status of a Get Blob, when the test gives the status only.
+CODE_OF_NEXT_GET = {404: "BlobNotFound", 412: "ConditionNotMet"}
+
+
 class FakeContainer:
     """A container of the fake storage: List Blobs, Get Blob and Put Blob, answered as the REST API
     documents them (learn.microsoft.com/en-us/rest/api/storageservices/blob-service-rest-api);
@@ -230,7 +239,7 @@ class FakeContainer:
         self.blobs = dict(blobs or {})
         self.requests = []
         # The blobs whose next Get answers this status instead (a blob changed or removed between
-        # the listing and its download).
+        # the listing and its download), or this status and this code (a container removed).
         self.status_of_next_get = {}
 
     def handle(self, request):
@@ -269,11 +278,13 @@ class FakeContainer:
         return 200, XML_HEADERS, body.encode()
 
     def answer_get(self, blob_name, headers):
-        status = self.status_of_next_get.pop(blob_name, None)
-        if status is not None:
-            return answer_error(
-                status, http.HTTPStatus(status).phrase.replace(" ", ""), "Simulated."
-            )(None)
+        answer = self.status_of_next_get.pop(blob_name, None)
+        if answer is not None:
+            status, code = answer if isinstance(answer, tuple) else (answer, None)
+            code = code or CODE_OF_NEXT_GET.get(
+                status, http.HTTPStatus(status).phrase.replace(" ", "")
+            )
+            return answer_error(status, code, "Simulated.")(None)
         blob = self.blobs.get(blob_name)
         if blob is None:
             return answer_error(

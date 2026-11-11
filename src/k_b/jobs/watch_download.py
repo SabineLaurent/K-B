@@ -210,10 +210,7 @@ def download_sheet(
 ) -> bytes | None:
     """The bytes of the version listed, never decompressed; None when the blob was removed or
     changed since the listing, seen again by the next run."""
-    content = download_listed_version(container_client, sheet.blob)
-    if content is None or len(content) != sheet.blob.size:
-        return None
-    return content
+    return download_listed_version(container_client, sheet.blob, MAX_WATCH_SHEET_BYTES)
 
 
 def find_sheet_text_refusal(content: bytes) -> SheetRefusal | None:
