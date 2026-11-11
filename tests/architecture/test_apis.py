@@ -39,7 +39,7 @@ def list_forbidden_imports_of_the_data_api(imported: set[str]) -> set[str]:
     }
 
 
-def test_data_api_imports_only_data_api_database_items_and_core():
+def test_data_api_imports_only_data_api_database_items_core_and_exchange():
     for path in list_python_files("data_api"):
         imported = list_imported_modules(path, find_package(path))
         assert list_forbidden_imports_of_the_data_api(imported) == set(), path

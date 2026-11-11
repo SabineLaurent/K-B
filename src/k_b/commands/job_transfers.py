@@ -29,7 +29,8 @@ from k_b.jobs.watch_publication import WatchFolderRefusedError, publish_watch
 
 logger = logging.getLogger(LOGGER_NAME)
 
-# The clips as etl/sources/clipping.py reads them, given to jobs/, which imports only core.
+# The clips as etl/sources/clipping.py reads them, given to jobs/, which imports only exchange and
+# core.
 CLIP_RULES = ClipRules(extension=CLIP_EXTENSION, max_bytes=CLIP_MAX_BYTES)
 # The wait after a copy: the margin of etl/sources/clipping.py, and the gap of the clocks.
 CLIP_MIRROR_WAIT = CLIP_CHANGE_MARGIN + CLIP_MIRROR_CLOCK_SLACK

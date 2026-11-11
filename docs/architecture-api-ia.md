@@ -157,7 +157,7 @@ critères » et « Rédaction ».
 
 Les 35 modules de `ai_api/` sont rangés en 16 couches. Un module n'importe que les couches en dessous de la
 sienne : deux modules d'une même couche ne s'importent pas entre eux. La table vient de `AI_API_LAYERS`
-(`tests/architecture/test_apis.py:151-194`). Deux tests la tiennent : chaque module est dans une seule couche
+(`tests/architecture/test_apis.py:154-197`). Deux tests la tiennent : chaque module est dans une seule couche
 (`:212`), et aucun n'importe sa couche ni celles du dessus (`:223`). Le rangement par rôle date de #242 (journal ADR,
 « API IA : organisation par rôle »).
 
@@ -199,7 +199,7 @@ l'autre). La table donne le détail, de la couche la plus basse à la plus haute
 | 16 | `app` | L'application |
 
 Deux règles de plus tiennent l'app. `app.py` n'importe aucun routeur : il ne branche que `api_router`
-(`tests/architecture/test_apis.py:76-81`). Chaque routeur déclare son préfixe et ses étiquettes (`:87-99`).
+(`tests/architecture/test_apis.py:78-83`). Chaque routeur déclare son préfixe et ses étiquettes (`:89-101`).
 
 ## Clés, réglages et métriques
 
@@ -266,9 +266,9 @@ des attributs est dans [fiches-veille.md](fiches-veille.md), « Métriques » et
 
 | Interdit | Pourquoi | Ce qui le tient |
 |---|---|---|
-| Importer autre chose qu'`ai_api`, `items` et `core`, ou importer `core/atomic_write` | l'API IA lit la veille par l'API de données, jamais dans la base ; son paquet n'écrit aucun fichier | `AI_API_ALLOWED_MODULES` et `AI_API_FORBIDDEN_MODULES` (`tests/architecture/test_apis.py:105-106`, `:113`), testés par `:118-121` et `:124-146` |
+| Importer autre chose qu'`ai_api`, `items` et `core`, ou importer `core/atomic_write` | l'API IA lit la veille par l'API de données, jamais dans la base ; son paquet n'écrit aucun fichier | `AI_API_ALLOWED_MODULES` et `AI_API_FORBIDDEN_MODULES` (`tests/architecture/test_apis.py:107-108`, `:115`), testés par `:120-123` et `:126-149` |
 | Écrire ce qui doit survivre à son redémarrage | l'API doit pouvoir être déplacée et redémarrée sans rien perdre (règle 7 de `.claude/rules/poc.md`) | la commande de la règle 7 ne renvoie rien sur `src/k_b/ai_api` (« Vérifier ce document ») ; seul `kb` écrit le coffre |
-| Importer sa couche ou une couche au-dessus | un parcours se lit sans ouvrir ses étapes | `tests/architecture/test_apis.py:208`, `:223` |
+| Importer sa couche ou une couche au-dessus | un parcours se lit sans ouvrir ses étapes | `tests/architecture/test_apis.py:211`, `:226` |
 | Importer OpenTelemetry hors de quatre modules | les règles de l'export restent à un seul endroit | `tests/architecture/test_opentelemetry.py:52`, `:79` |
 | Démarrer avec une variable `OTEL_*` | le SDK la lirait sans que K-B la voie | `ai_api/connectors/metrics_export.py:105-112`, test `tests/ai_api/test_metrics_export.py:303` |
 | Envoyer tout le contenu des appels en production | ce sont des données personnelles chez Grafana | `ai_api/connectors/metrics_export.py:186-187`, cas `content-all-in-production` de `tests/ai_api/test_metrics_export.py:287` (`:257-258`, `:284`) |

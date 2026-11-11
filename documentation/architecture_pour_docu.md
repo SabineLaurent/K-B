@@ -208,10 +208,10 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
    `kb import`, `kb purge` et `kb write-tops`, puis publie `veille/`; `kb import` est sauté si `kb collect` échoue ou
    ne démarre pas, et `kb purge` tourne même si `kb import` échoue ou n'est pas lancé
    (`commands/daily_routine_command.py:44-75`, `:58`,
-   `:62-64`, `commands/job_transfers.py:38`, `jobs/clip_mirror.py:241`).
+   `:62-64`, `commands/job_transfers.py:39`, `jobs/clip_mirror.py:241`).
    `kb digest-watch` lance `kb digest` et `kb trend-report`, puis publie `veille/`
    (`commands/digest_watch_command.py:59-81`). La publication lit `veille/` et ajoute au conteneur `watch` les fiches
-   qui n'y sont pas, sans en remplacer (`commands/job_transfers.py:68`, `jobs/watch_publication.py:138`, `:146`). La
+   qui n'y sont pas, sans en remplacer (`commands/job_transfers.py:69`, `jobs/watch_publication.py:138`, `:146`). La
    copie de Zotero dans le job n'est pas encore codée: elle viendra entre le miroir des clips et `kb collect` (#425,
    `commands/daily_routine_command.py:50`). #425 la prévoit dans un dossier temporaire, que `KB_ZOTERO_DIR` nomme pour
    `kb collect`: la flèche « pose la copie » va vers ce dossier, pas vers le Zotero du Mac. Dans un job, le coffre est
@@ -230,7 +230,7 @@ leur nom (`purge/run_records.py:38`, `:75`). Ce sont les journaux de fonctionnem
 (`ai_api/observability/metrics.py:50`). Restent hors du dessin aussi deux appels qui ne portent pas de donnée de la
 veille: `GET /health`, par lequel `kb smoke-test` vérifie les deux API et `kb digest-watch` les réveille
 (`commands/smoke_test_command.py:80-81`, `commands/digest_watch_command.py:60-64`), et la demande d'un jeton à
-l'identité managée (`jobs/exchange_storage.py:157`, `database/entra.py:57`). `kb openapi` écrit le contrat des deux API
+l'identité managée (`exchange/storage.py:173`, `database/entra.py:57`). `kb openapi` écrit le contrat des deux API
 dans le dépôt, `docs/api/openapi-donnees.json` et `docs/api/openapi-ia.json` (`commands/openapi_command.py:30-32`,
 `:50`). Les contrôles du coffre avant une écriture restent hors du dessin aussi: ils ne lisent que l'état d'un fichier
 (existence, lien, date, taille). `kb digest` et `kb trend-report` refusent de redemander une fiche du jour déjà écrite
@@ -254,10 +254,11 @@ Les tests de `tests/architecture/` lisent les imports de chaque module et tienne
 | `etl/` | la collecte (`extract.py`) et l'import (`transform.py`, puis `load.py`); `pipeline.py` est la seule porte des deux parcours pour `commands/`; une source par module, dans `etl/sources/` | importer une API (`test_layers.py:200`), `post/` (`:232`) ou `purge/` (`:281`); qu'une étape importe une autre étape (`:130`) |
 | `post/` | ce qui suit le pipeline: les clients HTTP de l'API IA, les fiches du coffre, le registre des comptes rendus des tendances | importer une API (`test_layers.py:206`), une source ou la composition des sources (`:109`) |
 | `purge/` | les purges que lance `kb purge` | importer autre chose que `purge`, `core`, `items`, `database` hors de ses écrivains et de `database/writing`, `etl/raw_store.py` et `etl/raw_files.py` (`test_layers.py:257-265`, `:287`) |
-| `jobs/` | le code commun des jobs en ligne: le stockage d'échange par l'identité managée, le miroir des clips, la publication de `veille/`, l'appel de `GET /health` | importer autre chose que `core` (`test_layers.py:337`); être importé par un autre paquet que `commands` (`:343`) |
+| `jobs/` | le code commun des jobs en ligne: ce qu'ils font du stockage d'échange (le miroir des clips, la publication et le téléchargement de `veille/`), l'appel de `GET /health` | importer autre chose que `exchange` et `core` (`test_layers.py:338`); être importé par un autre paquet que `commands` (`:344`) |
+| `exchange/` | le client du stockage d'échange, Azure Blob Storage, par l'identité managée ou, sur le Mac, le compte d'`az login`: réglages, transport, erreurs nommées, téléchargement d'une version listée | importer autre chose que `core`, ou `core/atomic_write.py` (`test_layers.py:411`); être importé par un autre paquet que `jobs`, `commands` et `data_api` (`:417`) |
 | `database/` | tout le SQL de la base de K-B: création, lecture, écriture (`writers/`, une sorte d'item par module), purge, moteurs | importer autre chose que `database`, `items` et `core` (`test_layers.py:28`); hors de `database/`, atteindre `database/writers` (`:45`). Seul `database/` importe un pilote de base, avec `etl/sources/zotero.py` pour la base de Zotero (`tests/architecture/test_engine_imports.py:36`) |
-| `data_api/` | l'API de données | importer autre chose que `data_api`, `database`, `items` et `core`, ou les écrivains, la purge et l'écriture d'un fichier (`tests/architecture/test_apis.py:42`) |
-| `ai_api/` | l'API IA, rangée en 16 couches internes | importer autre chose que `ai_api`, `items` et `core` (`test_apis.py:118`); importer sa couche ou celles du dessus (`:223`) |
+| `data_api/` | l'API de données | importer autre chose que `data_api`, `database`, `items`, `core` et `exchange`, ou les écrivains, la purge et l'écriture d'un fichier (`tests/architecture/test_apis.py:42`) |
+| `ai_api/` | l'API IA, rangée en 16 couches internes | importer autre chose que `ai_api`, `items` et `core` (`test_apis.py:120`); importer sa couche ou celles du dessus (`:226`) |
 | `items.py`, `core/` | les types communs des items, les réglages par défaut, la citation d'une valeur au journal, le code commun des deux API | `core` n'importe rien de K-B (`test_layers.py:20`) |
 
 Deux tests tiennent la liste elle-même: les modules de premier niveau de K-B
@@ -339,7 +340,7 @@ source et une destination:
 Deux routines de job, codées mais pas encore en ligne, relancent ces commandes: `kb daily-routine` lance
 `kb write-tops`, et `kb digest-watch` lance `kb digest` et `kb trend-report` (`commands/daily_routine_command.py:59-62`,
 `commands/digest_watch_command.py:65-74`). `kb daily-routine` écrit aussi dans le coffre du job les clips de la
-lecture choisie, sous `Clippings/` (`commands/job_transfers.py:50-52`).
+lecture choisie, sous `Clippings/` (`commands/job_transfers.py:51-53`).
 
 Une fiche est écrite une fois, jamais par un lien symbolique que `kb` voit (`post/vault_files.py:1-2`); une fiche
 ou un lien apparus entre le contrôle et le renommage sont remplacés ou suivis, une limite acceptée (`:4-5`). Une

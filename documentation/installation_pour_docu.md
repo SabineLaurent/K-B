@@ -131,7 +131,7 @@ L'image n'installe pas le groupe `dev`: ses deux `uv sync` portent `--no-dev` (`
 
 | Paquet | Plancher | Borne haute | Version de `uv.lock` | Rôle dans K-B |
 |---|---|---|---|---|
-| `azure-identity` | 1.27.0 | — | 1.27.0 | le jeton de l'identité managée, en ligne: la base PostgreSQL avec `KB_DATABASE_AUTH=entra` (`database/entra.py`) et le stockage d'échange des jobs (`jobs/exchange_storage.py`) |
+| `azure-identity` | 1.27.0 | — | 1.27.0 | le jeton de l'identité managée, en ligne: la base PostgreSQL avec `KB_DATABASE_AUTH=entra` (`database/entra.py`) et le stockage d'échange des jobs (`exchange/storage.py`) |
 | `azure-storage-blob` | 12.31.1 | — | 12.31.1 | le stockage d'échange des jobs: le miroir des clips, la publication de `veille/`, la liste de `kb smoke-test` (`jobs/`) |
 | `beautifulsoup4` | 4.15.0 | — | 4.15.0 | la lecture des pages HTML de TLDR (`etl/sources/tldr.py`) |
 | `defusedxml` | 0.7.1 | — | 0.7.1 | la lecture du flux Atom d'arXiv, sans développer une entité déclarée dans le flux (`etl/sources/arxiv.py`) |

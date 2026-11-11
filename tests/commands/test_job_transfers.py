@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from functools import partial
 
 import pytest
-from jobs.storage_fakes import (
+from exchange.storage_fakes import (
     TEST_ACCOUNT_URL,
     TEST_CLIENT_ID,
     FakeBlob,

@@ -335,7 +335,7 @@ def list_imports_of_jobs(imported: set[str]) -> set[str]:
     return {name for name in imported if reaches(name, {"jobs"})}
 
 
-def test_jobs_imports_only_core():
+def test_jobs_imports_only_exchange_and_core():
     for path in list_python_files("jobs"):
         imported = list_imported_modules(path, find_package(path))
         assert list_forbidden_imports_of_jobs(imported) == set(), path
@@ -365,7 +365,7 @@ def test_only_commands_import_jobs():
         ("from k_b.exchange.storage import naming_storage_errors", False),
     ],
 )
-def test_the_rule_of_jobs_refuses_every_layer_but_core(code, is_refused):
+def test_the_rule_of_jobs_refuses_every_layer_but_exchange_and_core(code, is_refused):
     imported = parse_imported_modules(code, package="k_b.jobs")
 
     assert bool(list_forbidden_imports_of_jobs(imported)) is is_refused

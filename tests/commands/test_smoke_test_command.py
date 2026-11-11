@@ -7,7 +7,7 @@ from functools import partial
 
 import httpx2
 import pytest
-from jobs.storage_fakes import (
+from exchange.storage_fakes import (
     FORGED_LOG_LINE,
     SPOTTED_BLOB_NAME,
     TEST_ACCOUNT_URL,

@@ -2,7 +2,7 @@
 removed."""
 
 import pytest
-from jobs.storage_fakes import remove_online_variables
+from exchange.storage_fakes import remove_online_variables
 
 
 @pytest.fixture(autouse=True)

@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from jobs.storage_fakes import (
+from exchange.storage_fakes import (
     SPOTTED_BLOB_NAME,
     FakeBlob,
     FakeContainer,

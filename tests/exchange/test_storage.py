@@ -7,7 +7,7 @@ import pytest
 import requests
 from azure.core.credentials import AccessToken
 from azure.identity import AzureCliCredential
-from jobs.storage_fakes import (
+from exchange.storage_fakes import (
     SPOTTED_BLOB_NAME,
     TEST_ACCOUNT_URL,
     TEST_CLIENT_ID,

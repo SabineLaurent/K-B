@@ -5,7 +5,7 @@ import logging
 from datetime import UTC, datetime
 
 import pytest
-from jobs.storage_fakes import FakeBlob, FakeContainer, open_fake_container_client
+from exchange.storage_fakes import FakeBlob, FakeContainer, open_fake_container_client
 
 from k_b.jobs.watch_publication import WatchFolderRefusedError, publish_watch
 

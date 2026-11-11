@@ -141,7 +141,7 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   jamais dans un journal. `logging_to` tient `azure` et `urllib3` à ERROR (`LIBRARY_LOG_LEVELS`) ; une erreur du
   SDK passe par `naming_storage_errors`, jamais par `str(error)`. Un transport donné au SDK de stockage lui fait
   perdre ses délais (300 s au lieu de 20 et 60) : toujours `build_transport`. Les tests simulent le SDK par
-  `FakeTransport` et le point d'identité par `IDENTITY_ENDPOINT` (`tests/jobs/storage_fakes.py`), sans réseau ; un
+  `FakeTransport` et le point d'identité par `IDENTITY_ENDPOINT` (`tests/exchange/storage_fakes.py`), sans réseau ; un
   nom repérable se cherche brut et encodé dans une URL (`names_the_spotted_blob`). L'envoi et le téléchargement
   viennent avec #413.
 - Depuis #413, `kb daily-routine` et `kb digest-watch` enchaînent les commandes `kb` dans le même processus
@@ -149,7 +149,7 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   nouvelle est une `RoutineStep` de la liste de sa routine, appelée par une `lambda` (un test remplace la fonction
   dans le module) ; une règle `NotRunAfter` nomme une étape antérieure (tenu par un test). Une commande nouvelle
   lancée en job entre dans `COMMANDS_STOPPED_BY_SIGTERM`. Un blob refusé se cite par sa position
-  (`blob 12 of 120`). `FakeContainer` (`tests/jobs/storage_fakes.py`) simule liste, téléchargement et envoi ; un test
+  (`blob 12 of 120`). `FakeContainer` (`tests/exchange/storage_fakes.py`) simule liste, téléchargement et envoi ; un test
   qui lit le journal capte `caplog.at_level(logging.INFO, logger="k_b")`, car à INFO le SDK écrit l'URL d'un blob.
   En ligne, `kb purge`, l'étape de `kb daily-routine` qui suit `kb import`, purge le brut à 6 mois jusqu'à #390
   (journal ADR, 2026-11-06 et 2026-11-10).

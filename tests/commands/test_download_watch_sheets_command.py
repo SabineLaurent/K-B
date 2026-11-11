@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 import pytest
 from azure.core.credentials import AccessToken
 from azure.identity import CredentialUnavailableError
-from jobs.storage_fakes import (
+from exchange.storage_fakes import (
     TEST_ACCOUNT_URL,
     TEST_TOKEN,
     FakeBlob,

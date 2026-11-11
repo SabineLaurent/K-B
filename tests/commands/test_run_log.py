@@ -16,7 +16,7 @@ from commands.cli_helpers import (
     collected_kinds,
 )
 from etl.test_extract import BrokenSource, WorkingSource
-from jobs.storage_fakes import (
+from exchange.storage_fakes import (
     SPOTTED_BLOB_NAME,
     TEST_ACCOUNT_URL,
     FakeTransport,
