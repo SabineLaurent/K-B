@@ -138,6 +138,7 @@ def read_rule(selector, media=None):
             "(width >= 64rem)",
             "grid-template-columns: auto minmax(10rem, 14rem);",
         ),
+        (".period-field", "(width >= 64rem)", "grid-row: 1 / span 2;"),
         (".results-line", None, "scroll-margin-block-start: 1rem;"),
         (".card-link", None, "font-size: 0.875rem;"),
         (".link-note", None, "font-size: 0.75rem;"),

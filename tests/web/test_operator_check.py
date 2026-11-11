@@ -106,8 +106,12 @@ def test_a_refusal_is_logged_by_its_state_never_with_the_value(
     assert not any(ANOTHER_ID in line for line in lines)
 
 
-def test_the_refusal_offers_to_sign_out(client):
-    assert 'href="/.auth/logout"' in client.get("/").text
+def test_the_refusal_offers_to_sign_out_once_by_its_button(client):
+    """Its button is the action of the page: the header does not repeat it."""
+    text = client.get("/").text
+
+    assert text.count('href="/.auth/logout"') == 1
+    assert '<a class="button" href="/.auth/logout">' in text
 
 
 def test_without_the_check_a_page_needs_no_header_and_offers_no_sign_out():

@@ -148,7 +148,7 @@ def test_the_link_of_a_card_is_short_its_announcement_in_it_smaller():
     assert (
         '<a class="card-link" href="https://arxiv.org/abs/2609.33401" hreflang="en"'
         ' target="_blank" rel="noopener noreferrer">Lire sur arxiv.org<span'
-        ' aria-hidden="true"> ↗</span> <span class="link-note">(en anglais, site'
+        ' aria-hidden="true">&nbsp;↗</span> <span class="link-note">(en anglais, site'
         " externe, nouvel onglet)</span></a>"
     ) in response.text
 

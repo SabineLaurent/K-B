@@ -18,7 +18,7 @@
 <div class="site-nav-links">
 {{ nav_link("/", "Veille") }}
 </div>
-{% if is_operator_checked %}<a class="site-logout" href="/.auth/logout">Se déconnecter</a>{% endif %}
+{% block header_sign_out %}{% if is_operator_checked %}<a class="site-logout" href="/.auth/logout">Se déconnecter</a>{% endif %}{% endblock %}
 </nav>
 </header>
 <main id="contenu" class="{% block main_class %}page{% endblock %}">

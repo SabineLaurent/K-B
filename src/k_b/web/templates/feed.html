@@ -79,7 +79,7 @@
 <p class="card-meta"><span class="card-kind"{% if card.kind_lang %} lang="{{ card.kind_lang }}"{% endif %}>{{ card.kind_label }}</span> <time datetime="{{ card.day }}">{{ card.day_text }}</time> <span class="card-identifiers">{{ card.identifiers }}{% if card.withdrawn_text %}, {{ card.withdrawn_text }}{% endif %}</span>{% if card.is_exploited %} <span class="badge">Exploitée (KEV)</span>{% endif %}</p>
 <h2 class="card-title"{% if card.title_lang %} lang="{{ card.title_lang }}"{% endif %}>{{ card.title }}</h2>
 {% if card.link %}
-<a class="card-link" href="{{ card.link }}"{% if card.link_lang %} hreflang="{{ card.link_lang }}"{% endif %} target="_blank" rel="noopener noreferrer">{{ card.link_label }}<span aria-hidden="true"> ↗</span> <span class="link-note">({{ card.link_note }})</span></a>
+<a class="card-link" href="{{ card.link }}"{% if card.link_lang %} hreflang="{{ card.link_lang }}"{% endif %} target="_blank" rel="noopener noreferrer">{{ card.link_label }}<span aria-hidden="true">&nbsp;↗</span> <span class="link-note">({{ card.link_note }})</span></a>
 {% endif %}
 </li>
 {% endfor %}

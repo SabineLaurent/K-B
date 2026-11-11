@@ -248,13 +248,34 @@ def test_no_space_comes_before_a_colon_or_a_semicolon(name):
 
 
 def find_links(is_to_another_site):
-    """The links of every page, to another site or within the site."""
+    """The links of every page, to another site (http or https) or within the site."""
     return [
         link
         for page in map(outline, PAGES.values())
         for link in page.links
-        if (link.attributes["href"] or "").startswith("https://") == is_to_another_site
+        if (link.attributes["href"] or "").startswith(("http://", "https://"))
+        == is_to_another_site
     ]
+
+
+def test_every_link_to_another_site_has_the_same_form_its_arrow_held_to_its_text():
+    """Opquast 2025, rule 138: on the feed as on /sources, the arrow then the announcement, smaller;
+    a no-break space before the arrow, which never begins a line alone."""
+    links = re.findall(
+        r'<a [^>]*href="https?://[^"]*"[^>]*>(.*?)</a>',
+        "".join(PAGES.values()),
+        flags=re.DOTALL,
+    )
+
+    assert links
+    assert all(
+        re.search(
+            r'<span aria-hidden="true">&nbsp;↗</span> <span class="link-note">\(.*nouvel'
+            r" onglet\)</span>$",
+            link,
+        )
+        for link in links
+    )
 
 
 def test_every_link_to_another_site_says_so_and_opens_a_new_tab_it_announces():
