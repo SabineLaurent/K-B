@@ -4,7 +4,7 @@
 - Branche : `test/wait-for-the-reading-pool`
 - Issue : #581
 - Fichiers principaux : `tests/database/connected_readers.py` (nouveau), `tests/conftest.py`,
-  `tests/data_api/test_serve_data.py`, et huit autres modules de `tests/`
+  `tests/data_api/test_serve_data.py`, et sept autres modules de `tests/`
 - Série : [lire la base en PostgreSQL](2026-11-06-lire-la-base-en-postgresql.md), où le pool qui se connecte en
   arrière-plan a été choisi
 
