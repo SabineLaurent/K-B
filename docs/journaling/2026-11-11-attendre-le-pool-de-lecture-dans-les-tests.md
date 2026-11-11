@@ -8,8 +8,8 @@
 - Série : [lire la base en PostgreSQL](2026-11-06-lire-la-base-en-postgresql.md), où le pool qui se connecte en
   arrière-plan a été choisi
 
-Les commits de la branche, après son rebase sur `main` (`0a6ba26`), sont `3ae1bb3` (l'aide et les 12 premiers sites)
-et `9305015` (le test de `kb serve-data`, relevé par la revue). Les autres commits de la liste viennent de `main` :
+Les commits de la branche, après son rebase sur `main` (`ab4fde7`), sont `c4f9d04` (l'aide et les 12 premiers sites)
+et `9f1135a` (le test de `kb serve-data`, relevé par la revue). Les autres commits de la liste viennent de `main` :
 cette note n'en traite pas.
 
 ## Le pourquoi
@@ -35,7 +35,7 @@ L'API de données lit PostgreSQL par un pool de connexions, que `open_reading_po
     pool.open(wait=False)
 ```
 
-(`src/k_b/database/postgresql.py:257` et `:263`.) Le délai vaut 2 s, et le pool garde au moins une connexion :
+(`src/k_b/database/postgresql.py:257` et `:264`.) Le délai vaut 2 s, et le pool garde au moins une connexion :
 
 ```python
 READING_POOL_MIN_SIZE = 1
@@ -46,7 +46,7 @@ READING_POOL_WAIT_SECONDS = 2
 (`src/k_b/core/config.py:207-209`.) `open(wait=False)` rend la main tout de suite : le pool ouvre sa première
 connexion dans un fil à lui. Si une requête arrive avant, elle attend au plus `timeout`, puis reçoit `PoolTimeout`.
 C'est voulu en production : `kb serve-data` démarre sans attendre la base, comme sur SQLite (docstring de
-`open_reading_pool`, `src/k_b/database/postgresql.py:240-243`).
+`open_reading_pool`, `src/k_b/database/postgresql.py:240-242`).
 
 Les tests, eux, ouvraient le pool et lisaient aussitôt. Leur première requête faisait donc la course avec la
 connexion en arrière-plan. Sur un runner rapide, la connexion gagne toujours. Sur un runner lent, la requête peut
@@ -69,7 +69,7 @@ def open_connected_readers(location, query_timeout_seconds):
 `min_size` connexions, ici une. Au-delà de 30 s (le défaut de `wait`), `wait()` ferme le pool et lève `PoolTimeout`.
 Une fois l'aide passée, la première requête du test trouve une connexion prête : elle ne dépend plus du runner.
 
-Sur SQLite, `open_readers` rend le fichier lui-même (`src/k_b/database/engine.py:65-67`) : il n'y a rien à attendre.
+Sur SQLite, `open_readers` rend le fichier lui-même (`src/k_b/database/engine.py:64-66`) : il n'y a rien à attendre.
 L'aide fait le même test de type que `connect_reader`. Trois des sites tournent sur les deux moteurs
 (`tests/database/test_reading.py:47`, `tests/database/test_reading_on_both_engines.py:82`,
 `tests/etl/test_import_on_both_engines.py:184`).
@@ -87,7 +87,7 @@ toute connexion.
 
 (`tests/conftest.py:313-314`.) `tests/test_e2e_selection.py` charge `conftest.py` seul, sans le reste de `tests/`. Un
 import en tête du module y échouerait. Les deux autres aides que `conftest.py` utilise sont importées de la même façon
-(`tests/conftest.py:220`, `:243`).
+(`tests/conftest.py:221`, `:243`).
 
 ### Le test de `kb serve-data` : remplacer `open_readers` dans la commande
 
@@ -127,8 +127,8 @@ test seul. Le reste de la commande tourne tel quel.
 |---|---|
 | CI de #579, run 43078319143, tentative 1, `tests-postgresql` : `database_error: PoolTimeout`, `1 failed, 349 passed, 4508 deselected in 52.94s` | le rouge : la requête n'a pas reçu de connexion dans les 2 s |
 | Même run, tentative 2, même commit : `350 passed, 4508 deselected in 27.20s` ; la ligne de `test_api_errors.py` prend 10,5 s en tentative 1 et 2,7 s en tentative 2 | le même code passe sur un runner plus rapide : l'échec dépend du temps |
-| `uv run pytest` après le rebase : `4539 passed, 365 deselected` | la moitié SQLite, dont la branche `Path` de l'aide, passe |
-| `uv run pytest -m postgresql --collect-only -q` : `350/4904 tests collected` | les tests marqués `postgresql` se chargent avec leurs nouveaux imports, autant que la CI en lance |
+| `uv run pytest` après le rebase sur `ab4fde7` : `4757 passed, 365 deselected` | la moitié SQLite, dont la branche `Path` de l'aide, passe |
+| `uv run pytest -m postgresql --collect-only -q` : `350/5122 tests collected` | les tests marqués `postgresql` se chargent avec leurs nouveaux imports, autant que la CI en lance |
 | `wait()` dans `requests_while_serving` : `1 failed, 4492 passed` | pourquoi l'attente ne va pas dans la fixture partagée |
 | `uv run ruff check --no-cache`, `ruff format --check`, `mypy --strict` : verts | les contrôles du dépôt |
 | CI de la PR de #581, job `tests-postgresql` | le vert des 350 tests sur PostgreSQL, à lire dans la PR |
