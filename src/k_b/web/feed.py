@@ -16,7 +16,7 @@ from k_b.core.config import (
     DATA_API_MAX_SEARCH_LENGTH,
     FEED_PAGE_SIZE,
 )
-from k_b.items import NonEmptyText, at_midnight_utc
+from k_b.items import NonEmptyText
 from k_b.web.data_api_client import (
     FEED_KINDS,
     DataApiError,
@@ -62,7 +62,8 @@ PERIOD_LABELS: dict[Period, str] = {
 ERRORS_TITLE = "Quoi de neuf, filtre à corriger"
 NO_ITEM_TITLE = "Quoi de neuf, aucun item"
 
-# One address for each page (Opquast 2025, rule 169): neither 01 nor +1.
+# Neither 01 nor +1 (Opquast 2025, rule 169: one address for each page); page 1 is served at
+# page=1 too, which no link writes.
 PAGE_NUMBER = re.compile(r"[1-9][0-9]{0,2}")
 # The page at the offset 10,000, the last the data API serves.
 MAX_PAGE = DATA_API_MAX_OFFSET // FEED_PAGE_SIZE + 1
@@ -137,7 +138,7 @@ LABELS_BY_KIND: dict[FeedKind, KindLabels] = {
 # The name of each edition tracked, as TLDR writes it in the h1 of its page
 # (tests/fixtures/tldr_*_extract.html; docs/specs-collecte.md for tech; tldr.tech/infosec, read on
 # 2026-11-11): the mockups write TLDR AI (time-knight, 2026-11-11). An edition without a name here
-# shows its slug.
+# shows TLDR and its slug.
 NEWSLETTER_NAME_BY_EDITION = {
     "ai": "TLDR AI",
     "infosec": "TLDR InfoSec",
@@ -267,22 +268,21 @@ def build_query(form: FeedForm, now: datetime, page: int) -> FeedQuery:
     q."""
     return FeedQuery(
         kinds=form.kinds,
-        since=find_since(form, now),
+        since_day=find_since_day(form, now),
         q=form.q or None,
         offset=(page - 1) * FEED_PAGE_SIZE,
     )
 
 
-def find_since(form: FeedForm, now: datetime) -> datetime:
-    """Midnight UTC of the start date, or of the day N days before today in UTC: 1 day takes
-    yesterday and today."""
+def find_since_day(form: FeedForm, now: datetime) -> date:
+    """The start date, or the day N days before today in UTC: 1 day takes yesterday and today."""
     if form.period == DATE_PERIOD:
         start_day = read_start_day(form.start)
         if start_day is None:
             raise ValueError("start date refused by the form")
-        return at_midnight_utc(start_day)
+        return start_day
     today = now.astimezone(UTC).date()
-    return at_midnight_utc(today - timedelta(days=DAYS_BY_PERIOD[form.period]))
+    return today - timedelta(days=DAYS_BY_PERIOD[form.period])
 
 
 def count_pages(total: int) -> int:
@@ -328,7 +328,7 @@ def build_listing(
     is_shorter = form.period in DAYS_BY_PERIOD and form.period != WIDER_PERIOD
     return FeedListing(
         title=f"Quoi de neuf, page {page} sur {pages}" if total else NO_ITEM_TITLE,
-        line=write_results_line(total, query.since, page, pages),
+        line=write_results_line(total, query.since_day, page, pages),
         cards=tuple(build_card(item) for item in items),
         page=page,
         pages=pages,
@@ -341,9 +341,9 @@ def build_listing(
     )
 
 
-def write_results_line(total: int, since: datetime, page: int, pages: int) -> str:
+def write_results_line(total: int, since_day: date, page: int, pages: int) -> str:
     """The items found, the period applied and the page (Opquast 2025, rule 13)."""
-    day = write_day(since)
+    day = write_day(since_day)
     if total == 0:
         return f"Aucun item depuis le {day}."
     items = "1 item" if total == 1 else f"{total} items"
@@ -377,10 +377,11 @@ def build_card(item: FeedItem) -> FeedCard:
 
 
 def is_exploited(item: FeedItem) -> bool:
-    """A vulnerability always, being in the CISA KEV catalog; an advisory when its CVE is."""
-    if isinstance(item, FeedVulnerability):
-        return True
-    return isinstance(item, FeedAdvisory) and item.exploited is True
+    """By the field exploited of the data API: a vulnerability, always true, being in the CISA KEV
+    catalog; an advisory when its CVE is in it, withdrawn since or not."""
+    if isinstance(item, FeedVulnerability | FeedAdvisory):
+        return item.exploited is True
+    return False
 
 
 def write_identifiers(item: FeedItem) -> str:
@@ -408,7 +409,9 @@ def write_advisory_identifiers(advisory: FeedAdvisory) -> str:
 
 
 def keep_https_link(url: str | None) -> str | None:
-    """The URL if it is https to a host, printable and without space; else None, never a link."""
+    """The URL if it is https to a host, printable and without space; else None, never a link. An
+    answer of the data API is untrusted: a host urlsplit refuses ([oops) gives no link, never an
+    error."""
     if (
         url is None
         or not url.startswith("https://")
@@ -416,4 +419,8 @@ def keep_https_link(url: str | None) -> str | None:
         or " " in url
     ):
         return None
-    return url if urlsplit(url).hostname else None
+    try:
+        host = urlsplit(url).hostname
+    except ValueError:
+        return None
+    return url if host else None

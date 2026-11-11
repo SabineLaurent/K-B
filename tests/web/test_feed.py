@@ -2,7 +2,7 @@
 pages and the cards (docs/site-web.md, "Fil")."""
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from feed_fixture import ITEMS_PAGE
@@ -109,28 +109,24 @@ def test_a_search_holding_a_nul_is_refused_on_its_field():
 @pytest.mark.parametrize(
     ("query", "since"),
     [
-        ("", datetime(2026, 11, 10, tzinfo=UTC)),
-        ("period=1", datetime(2026, 11, 10, tzinfo=UTC)),
-        ("period=3", datetime(2026, 11, 8, tzinfo=UTC)),
-        ("period=7", datetime(2026, 11, 4, tzinfo=UTC)),
-        ("period=date&start=2026-10-07", datetime(2026, 10, 7, tzinfo=UTC)),
+        ("", date(2026, 11, 10)),
+        ("period=1", date(2026, 11, 10)),
+        ("period=3", date(2026, 11, 8)),
+        ("period=7", date(2026, 11, 4)),
+        ("period=date&start=2026-10-07", date(2026, 10, 7)),
     ],
 )
-def test_the_period_starts_at_midnight_utc(query, since):
-    """1 day takes yesterday and today, in days of UTC."""
-    assert build_query(read(query), NOW, page=1).since == since
+def test_the_period_starts_on_a_day_of_utc(query, since):
+    """1 day takes yesterday and today, in days of UTC; the data API reads its midnight UTC."""
+    assert build_query(read(query), NOW, page=1).since_day == since
 
 
 def test_the_period_follows_the_day_of_utc_at_its_edges():
     just_before = datetime(2026, 11, 11, 23, 59, 59, tzinfo=UTC)
     just_after = datetime(2026, 11, 12, 0, 0, 0, tzinfo=UTC)
 
-    assert build_query(read(""), just_before, page=1).since == datetime(
-        2026, 11, 10, tzinfo=UTC
-    )
-    assert build_query(read(""), just_after, page=1).since == datetime(
-        2026, 11, 11, tzinfo=UTC
-    )
+    assert build_query(read(""), just_before, page=1).since_day == date(2026, 11, 10)
+    assert build_query(read(""), just_after, page=1).since_day == date(2026, 11, 11)
 
 
 def test_a_start_date_without_date_checked_is_ignored():
@@ -139,7 +135,7 @@ def test_a_start_date_without_date_checked_is_ignored():
 
     assert form.errors == ()
     assert form.start == "2026-10-07"
-    assert build_query(form, NOW, page=1).since == datetime(2026, 11, 8, tzinfo=UTC)
+    assert build_query(form, NOW, page=1).since_day == date(2026, 11, 8)
 
 
 @pytest.mark.parametrize(
@@ -275,13 +271,13 @@ def test_the_line_of_the_results_gives_the_items_the_period_and_the_page(
     total, page, pages, line
 ):
     """Opquast 2025, rule 13; D4: the period applied."""
-    since = datetime(2026, 11, 10, tzinfo=UTC)
+    since = date(2026, 11, 10)
 
     assert write_results_line(total, since, page, pages) == line
 
 
 def test_the_line_of_no_result_gives_the_period():
-    since = datetime(2026, 11, 10, tzinfo=UTC)
+    since = date(2026, 11, 10)
 
     assert (
         write_results_line(0, since, 1, 1) == "Aucun item depuis le 10 novembre 2026."
@@ -315,6 +311,18 @@ def test_the_card_of_a_paper():
     assert card.link_label == "Lire sur arxiv.org"
     assert card.link_note == "en anglais, site externe"
     assert card.link_lang == "en"
+
+
+def test_the_mark_of_a_vulnerability_follows_the_field_exploited_of_the_api():
+    page = json.loads(json.dumps(ITEMS_PAGE))
+    vulnerability = next(item for item in page["items"] if item["id"] == 3)
+    vulnerability["exploited"] = False
+
+    [item] = [
+        item for item in PAGE.validate_json(json.dumps(page)).items if item.id == 3
+    ]
+
+    assert build_card(item).is_exploited is False
 
 
 def test_the_card_of_a_vulnerability_is_always_exploited_and_says_its_withdrawal():
@@ -402,6 +410,8 @@ def test_an_edition_without_name_shows_its_slug():
         "https:javascript:alert(1)",
         " https://arxiv.org/abs/2609.33401",
         "//arxiv.org/abs/2609.33401",
+        "https://[oops/x",
+        "https://[abc]/",
         None,
     ],
 )

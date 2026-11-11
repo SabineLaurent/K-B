@@ -3,7 +3,7 @@ simulated transport for the answers the base cannot give."""
 
 import json
 import secrets
-from datetime import UTC, datetime
+from datetime import date
 
 import httpx2
 import pytest
@@ -32,8 +32,8 @@ from k_b.web.settings import DataApiAccess
 # Made for the test: never a real key.
 TEST_API_KEY = secrets.token_urlsafe(32)
 # Before every date of the test base, the withdrawn vulnerability of 2021 included.
-SINCE_ALL = datetime(2020, 1, 1, tzinfo=UTC)
-QUERY = FeedQuery(kinds=FEED_KINDS, since=SINCE_ALL, q=None, offset=0)
+SINCE_ALL = date(2020, 1, 1)
+QUERY = FeedQuery(kinds=FEED_KINDS, since_day=SINCE_ALL, q=None, offset=0)
 
 
 def make_client(handler):
@@ -87,7 +87,7 @@ def test_the_query_sends_the_five_kinds_a_page_of_20_its_offset_and_since_in_utc
 ):
     query = FeedQuery(
         kinds=FEED_KINDS,
-        since=datetime(2026, 10, 7, tzinfo=UTC),
+        since_day=date(2026, 10, 7),
         q="langchain",
         offset=40,
     )
@@ -111,9 +111,7 @@ def test_since_writes_a_year_on_four_digits_whatever_the_c_library():
         requests.append(request)
         return httpx2.Response(200, json=ITEMS_PAGE)
 
-    query = FeedQuery(
-        kinds=FEED_KINDS, since=datetime(1, 1, 1, tzinfo=UTC), q=None, offset=0
-    )
+    query = FeedQuery(kinds=FEED_KINDS, since_day=date(1, 1, 1), q=None, offset=0)
     list_feed_items(make_client(handler), query)
 
     assert requests[0].url.params["since"] == "0001-01-01T00:00:00Z"

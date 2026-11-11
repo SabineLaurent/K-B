@@ -43,7 +43,7 @@ sinon dans le 422 JSON de FastAPI, qui recopie la valeur reçue.
 source, « (en anglais, site externe) » ou, pour une newsletter, « (site externe) ». Une URL qui n'est pas en
 `https` vers un hôte ne devient jamais un lien. Le titre n'est pas encore un lien : le détail vient avec
 #564. Une newsletter porte le nom que TLDR donne à son édition (`NEWSLETTER_NAME_BY_EDITION`, « TLDR AI »
-comme les maquettes ; time-knight, 2026-11-11), son identifiant d'API sinon.
+comme les maquettes ; time-knight, 2026-11-11), « TLDR » et son identifiant d'API sinon.
 
 **Les pages** : M = max(1, ⌈total ÷ 20⌉), 501 au plus ; au-delà de 10 020 items, une phrase dit d'affiner
 les filtres. Une page au-delà de M, ou hors de sa forme, rend la page 404. Les liens de page gardent les
@@ -57,15 +57,19 @@ la page 500, et le journal écrit `data_api_failed: <état> http_status=<n|-> re
 **Le client** de l'API (`web/data_api_client.py`) : 5 s de connexion, 30 s de lecture
 (`WEB_DATA_API_READ_TIMEOUT_SECONDS`), 10 s d'écriture, 5 s d'attente du pool ; une échéance de 35 s vérifiée
 entre deux morceaux du corps, borné à 1 Mo. Les 30 s couvrent le réveil de l'API à zéro réplique, 20 à 26 s
-(#414). Limite : rien n'est borné avant le premier morceau du corps (#436). Il ne suit aucune redirection et
+(#414). Limite : chaque délai borne une attente, et l'échéance ne se lit qu'entre deux morceaux ; rien n'est
+borné avant le premier morceau du corps (#436). Une requête peut donc durer environ 70 s au pire : la
+connexion et le pool, 30 s jusqu'aux en-têtes, puis 30 s jusqu'au premier morceau du corps. Il ne suit aucune redirection et
 ne lit pas l'environnement. Une réponse est lue par un modèle fermé aux cinq sortes ; un champ que l'API
 ajoute est ignoré.
 
 **Le réveil** : au démarrage, `kb serve-web` fait un `GET /health` de l'API de données dans un fil à part ;
 l'API se réveille pendant que Sabine se connecte. Le journal donne l'état (`data API wake-up: health ok`, ou
 l'état de l'échec), jamais l'URL. Risque accepté : après un repos, le premier affichage peut attendre
-environ 50 s (le site, puis l'API) ; au-delà de 35 s, la page 500. Pour réduire le risque : ce réveil, et
-ouvrir le site quelques minutes avant l'oral, faisables avec nos droits.
+environ 50 s (le site, puis l'API) ; une API qui répond lentement retient la page jusqu'à environ 70 s
+avant la page 500 (« Le client », ci-dessus). Pour réduire le risque : ce réveil, et ouvrir le site
+quelques minutes avant l'oral, faisables avec nos droits. Une borne totale de la requête demanderait une
+lecture asynchrone ou un fil à part : non faite (httpx2 ne change pas un délai en cours de lecture).
 
 **Le poids** (D2, RGESN 6.1) : 3 requêtes au plus, la page, la feuille de style et l'icône, et 30 Ko
 transférés, cache vide, gzip compris, mesurés sur 20 items de la fixture

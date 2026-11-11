@@ -4,7 +4,7 @@
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import date
 from typing import Annotated, Literal, get_args
 
 import httpx2
@@ -19,6 +19,7 @@ from k_b.core.config import (
     WEB_DATA_API_READ_TIMEOUT_SECONDS,
     WEB_DATA_API_REQUEST_DEADLINE_SECONDS,
 )
+from k_b.core.dates import format_day
 from k_b.core.outbound import (
     BodyTooLargeError,
     BodyTooLateError,
@@ -93,6 +94,8 @@ class FeedPaper(FeedItemBase):
 class FeedVulnerability(FeedItemBase):
     kind: Literal["vulnerability"]
     cve_id: CveId
+    # Always true by the data API: the catalog is CISA KEV; its withdrawal is in withdrawn_at.
+    exploited: bool
 
 
 class FeedAdvisory(FeedItemBase):
@@ -137,10 +140,11 @@ INVALID_PARAMETER = TypeAdapter(InvalidParameterBody)
 
 @dataclass(frozen=True)
 class FeedQuery:
-    """What the site asks of GET /items for a page of the feed."""
+    """What the site asks of GET /items for a page of the feed: the items dated since_day at
+    midnight UTC or later."""
 
     kinds: tuple[FeedKind, ...]
-    since: datetime
+    since_day: date
     q: str | None
     offset: int
 
@@ -166,7 +170,9 @@ def list_feed_items(
     query: FeedQuery,
     clock: Callable[[], float] = time.monotonic,
 ) -> FeedItemPage:
-    """A page of the feed, the most recent first, and the number of items of its filters."""
+    """A page of the feed, the most recent first, and the number of items of its filters. Each wait
+    is bounded by its timeout and the body by the deadline, checked between two of its pieces: at
+    worst about 70 s (connect and pool, 30 s for the headers, 30 s for a piece of the body)."""
     status, body = send(http_client, build_params(query), clock)
     if status != httpx2.codes.OK:
         raise name_failure(status, body)
@@ -178,12 +184,10 @@ def list_feed_items(
 
 def build_params(query: FeedQuery) -> dict[str, str | int | list[str]]:
     """The parameters of GET /items: kind always, so that the API never serves a Zotero entry nor
-    a clip; since in UTC, at the second, by isoformat, as strftime leaves the width of the year to
-    the C library."""
-    since = query.since.astimezone(UTC).replace(tzinfo=None)
+    a clip; since at midnight UTC, in the format of the base."""
     params: dict[str, str | int | list[str]] = {
         "kind": list(query.kinds),
-        "since": since.isoformat(timespec="seconds") + "Z",
+        "since": format_day(query.since_day),
         "limit": FEED_PAGE_SIZE,
         "offset": query.offset,
     }

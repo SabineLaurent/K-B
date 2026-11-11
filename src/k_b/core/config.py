@@ -307,7 +307,8 @@ WEB_ALLOWED_HOSTS = LOCAL_HOSTS
 # The reading of the feed by the site through the data API (web/data_api_client.py;
 # docs/site-web.md, "Fil"). 30 s of read: the data API at zero replicas wakes in 20 to 26 s (#414),
 # beyond the 10 s of DATA_API_READ_TIMEOUT_SECONDS. The deadline bounds the reading of a body,
-# checked between two pieces; nothing bounds the wait before the first one (#436).
+# checked between two pieces; nothing bounds the wait before the first one (#436): a request may
+# last about 70 s at worst (connect and pool, 30 s for the headers, 30 s for a piece of the body).
 WEB_DATA_API_READ_TIMEOUT_SECONDS = 30
 WEB_DATA_API_REQUEST_DEADLINE_SECONDS = 35
 # A page of 20 items weighs about 10 kB, 0.26 MB at worst with 10 packages of 255 characters for
