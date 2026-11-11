@@ -2,6 +2,7 @@
 of GET /items, the pages and the cards (docs/site-web.md, "Fil")."""
 
 import re
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
@@ -196,17 +197,20 @@ def read_page_number(params: QueryParams) -> int | None:
 
 def read_feed_form(params: QueryParams) -> FeedForm:
     """The form of the feed, each value refused named on its field."""
-    q = params.get(SEARCH_FIELD, "").strip()
+    received_q = params.get(SEARCH_FIELD, "").strip()
     kinds, kinds_error = read_kinds(params.getlist(KIND_FIELD))
     period, period_error = read_period(params.get(PERIOD_FIELD))
     start = params.get(START_FIELD, "")
     start_error = find_start_error(start) if period == DATE_PERIOD else None
-    errors = (find_search_error(q), kinds_error, period_error, start_error)
+    errors = (find_search_error(received_q), kinds_error, period_error, start_error)
     return FeedForm(
-        q=q,
+        # Without its control characters: one received is refused, so q is then shown, never sent.
+        q=drop_control_characters(received_q),
         kinds=kinds,
         period=period,
-        start=start,
+        # Shown again only in its form: an input type=date holds a day or nothing, and a value
+        # received is never sent back raw, whatever its length (D4: kept when the radio ignores it).
+        start=start if START_DAY.fullmatch(start) else "",
         errors=tuple(error for error in errors if error is not None),
     )
 
@@ -248,6 +252,16 @@ def read_start_day(start: str) -> date | None:
         return None
 
 
+def is_control_character(character: str) -> bool:
+    return unicodedata.category(character) == "Cc"
+
+
+def drop_control_characters(text: str) -> str:
+    return "".join(
+        character for character in text if not is_control_character(character)
+    )
+
+
 def find_search_error(q: str) -> FieldError | None:
     if len(q) > DATA_API_MAX_SEARCH_LENGTH:
         return FieldError(
@@ -256,6 +270,10 @@ def find_search_error(q: str) -> FieldError | None:
         )
     if not q:
         return None
+    # Sent back raw in value and in the links of the pages, a control character would make the
+    # HTML invalid; NonEmptyText refuses a NUL and a lone surrogate only.
+    if any(map(is_control_character, q)):
+        return FieldError(SEARCH_ID, SEARCH_CONTROL_REFUSED)
     try:
         SEARCH_TEXT.validate_python(q)
     except ValidationError:
@@ -385,8 +403,9 @@ def build_card(item: FeedItem) -> FeedCard:
 
 def is_exploited(item: FeedItem) -> bool:
     """By the field exploited of the data API: a vulnerability, always true, being in the CISA KEV
-    catalog; an advisory when its CVE is in it, withdrawn since or not. Withdrawn, the card drops the
-    mark, which its line of the withdrawal would contradict (Sabine, 2026-11-11)."""
+    catalog; an advisory when its CVE is in it, withdrawn since or not. A vulnerability withdrawn
+    drops the mark, which its line of the withdrawal would contradict (Sabine, 2026-11-11); an
+    advisory keeps it, the list serving no withdrawal of its CVE (a limit, said by #564)."""
     if isinstance(item, FeedVulnerability | FeedAdvisory):
         return item.exploited is True and item.withdrawn_at is None
     return False

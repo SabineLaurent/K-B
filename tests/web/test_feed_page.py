@@ -178,6 +178,19 @@ def test_a_search_of_200_characters_beyond_200_units_of_the_browser_drops_maxlen
     assert "maxlength" not in find_input(response.text, "q")
 
 
+def test_neither_a_control_character_nor_a_long_start_comes_back_in_the_page():
+    api = RecordingApi(ITEMS_PAGE)
+
+    refused = get_feed("q=a%01b", handler=api)
+    ignored = get_feed("period=1&start=" + "x" * 3000 + "%01", handler=api)
+
+    assert refused.status_code == 422
+    assert ignored.status_code == 200
+    assert chr(1) not in refused.text + ignored.text
+    assert "x" * 3000 not in ignored.text
+    assert len(api.requests) == 1
+
+
 def test_date_checked_without_date_is_refused_on_the_start_field():
     response = get_feed("period=date&start=", handler=serve(ITEMS_PAGE))
 

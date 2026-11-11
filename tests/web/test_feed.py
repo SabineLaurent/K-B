@@ -100,10 +100,23 @@ def test_a_search_of_200_characters_is_kept_201_refused():
     assert "200" in error.message
 
 
-def test_a_search_holding_a_nul_is_refused_on_its_field():
-    [error] = read("q=a%00b").errors
+@pytest.mark.parametrize("control", ["%00", "%01", "%1F", "%7F", "%0A", "%09"])
+def test_a_search_holding_a_control_character_is_refused_on_its_field(control):
+    """Sent back raw in value and in the links of the pages, it would make the HTML invalid."""
+    [error] = read(f"q=a{control}b").errors
 
     assert error.field == "q"
+
+
+@pytest.mark.parametrize(
+    "start",
+    ["x" * 3000, "2026-10-07%01", "07/10/2026", "2026-10-07T00:00"],
+    ids=["long", "control", "french-form", "with-time"],
+)
+def test_a_start_date_out_of_its_form_is_never_shown_again(start):
+    """Whatever the period: an input type=date holds a day of the form AAAA-MM-JJ or nothing."""
+    assert read(f"period=1&start={start}").start == ""
+    assert read(f"period=date&start={start}").start == ""
 
 
 @pytest.mark.parametrize(

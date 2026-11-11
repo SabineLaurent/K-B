@@ -1,7 +1,7 @@
 # Servir le fil de veille sur l'accueil du site
 
 - **Date** : 2026-11-11
-- **Branche** : `feat/web-feed`, commits `4e0adff` à `86ba8ab`, sur `main` à `94e3f4e`
+- **Branche** : `feat/web-feed`, à partir de `4e0adff`, sur `main` à `94e3f4e`
 - **Issue** : #563
 - **Note précédente de la série** : [Ouvrir le socle du site privé](2026-11-11-ouvrir-le-socle-du-site-prive.md) (#562)
 - **Fichiers principaux** : `src/k_b/web/data_api_client.py`, `src/k_b/web/feed.py`, `src/k_b/web/pages.py`,
@@ -10,7 +10,7 @@
 
 La liste des fichiers que donne le skill part d'un commit plus ancien que `main` : les commits antérieurs à
 `94e3f4e` (#562, #550, #558, #423…) appartiennent à des PR déjà fusionnées, chacune avec sa note. Cette note ne
-couvre que les neuf commits de la branche.
+couvre que les commits de la branche.
 
 ## Le pourquoi
 
@@ -101,6 +101,11 @@ La période part toujours d'un jour UTC :
 
 « 1 jour » donne hier : le fil prend hier et aujourd'hui, en jours UTC. `now` vient d'une horloge injectée
 (`app.state.clock`), ce qui rend les tests indépendants du moment où ils tournent.
+
+Ce que le formulaire réaffiche passe aussi par lui (second passage de la revue de code) :
+- une recherche qui porte un caractère de contrôle (catégorie Unicode `Cc`) est refusée, puis réaffichée sans
+  lui : renvoyé brut dans `value` et dans les liens de page, il rendrait le HTML invalide ;
+- la date de début n'est réaffichée que sous la forme `AAAA-MM-JJ`, jamais brute, quelle que soit sa longueur.
 
 ### 3. La route lit les paramètres bruts
 
@@ -213,6 +218,12 @@ Les décisions sont au journal ADR, 2026-11-11, « Site : le fil de veille (#563
 | Deux aides de plus que la maquette (time-knight) | WCAG 3.3.2 : sans script, `required` ne dit pas une obligation conditionnelle | rien écrit avant l'envoi |
 | Les bornes de l'API recopiées dans `core/config.py`, gardées égales par un test | `src/k_b/data_api/` est à la piste A | les importer dans l'API de données |
 
+Limites assumées, écrites dans la PR (tranchées par time-knight) :
+- un item hors du modèle fermé fait de toute la page une page 500, sans dire lequel ;
+- `q`, `period` ou `start` répété garde sa dernière valeur, alors qu'une `page` répétée rend la 404 ;
+- une alerte dont la CVE a quitté le catalogue garde sa pastille, la liste ne servant pas ce retrait (#564) ;
+- le lien d'un article de newsletter ne dit pas la langue de l'article, que K-B ne connaît pas.
+
 Imposés par les règles du dépôt :
 
 - le modèle fermé et la validation à la frontière (`code.md`, « Sécurité dès la conception ») ;
@@ -236,7 +247,7 @@ Imposés par les règles du dépôt :
 | Sur le Mac, `kb serve-data` sur la base de fixture et `kb serve-web` en `KB_WEB_AUTH=off` | `data API wake-up: health ok` ; fil vide en 200 ; 14 cartes depuis 2020 ; 404 au-delà ; 422 sur `kind=clip` |
 | La même chose, API arrêtée | page 500, `data_api_failed: data_api_unavailable http_status=- request_id=…`, sans la recherche |
 | Captures à 320 px (dans un `iframe`) et à 1280 px | la page tient sans défilement horizontal ; deux défauts vus et corrigés (`90b34df`) |
-| `uv run pytest` → 4701 passed ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` | les contrôles du dépôt |
+| `uv run pytest` → 4711 passed ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` | les contrôles du dépôt |
 
 Les tests ont été écrits avant le code, et leur échec a été montré dans la session. Trois exceptions sont
 dites telles quelles :

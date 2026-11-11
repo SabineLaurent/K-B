@@ -29,14 +29,16 @@ Chaque page fait un seul `GET /items` (`web/data_api_client.py`), avec `kind` to
 
 | Champ | Dans l'adresse | Règle |
 |---|---|---|
-| Rechercher | `q` | espaces autour retirées ; vide, aucune recherche ; 200 caractères au plus, sans caractère de contrôle (les règles de `q` de l'API) |
+| Rechercher | `q` | espaces autour retirées ; vide, aucune recherche ; 200 caractères au plus (la règle de `q` de l'API) ; un caractère de contrôle (catégorie Unicode `Cc`) est refusé, et la saisie réaffichée sans lui |
 | Sortes | `kind`, répété | les cinq cases cochées par défaut ; aucune cochée vaut les cinq, ce que dit l'aide du groupe ; une autre valeur est refusée, sans appel à l'API |
 | Depuis | `period` : `1`, `3`, `7` ou `date` | `1` par défaut (D3, Sabine, 2026-11-11) ; N jours donne minuit UTC du jour J−N : « 1 jour » prend hier et aujourd'hui |
-| Date de début | `start`, `AAAA-MM-JJ` | lue seulement si `date` est cochée (D4 : le bouton radio fait foi), ce que dit son aide (WCAG 3.3.2) ; son propre minuit UTC |
+| Date de début | `start`, `AAAA-MM-JJ` | lue seulement si `date` est cochée (D4 : le bouton radio fait foi), ce que dit son aide (WCAG 3.3.2) ; son propre minuit UTC ; réaffichée seulement sous cette forme, jamais brute |
 | page | `page` | `[1-9][0-9]{0,2}`, 501 au plus (l'`offset` 10 000 de l'API) ; absente, la page 1 |
 
 La route lit `request.query_params` brut, jamais des paramètres typés par FastAPI : un `page=abc` partirait
-sinon dans le 422 JSON de FastAPI, qui recopie la valeur reçue.
+sinon dans le 422 JSON de FastAPI, qui recopie la valeur reçue. Limite : `q`, `period` ou `start` répété garde
+sa dernière valeur, alors qu'une `page` répétée rend la 404 ; seule une adresse écrite à la main répète un
+champ.
 
 **La carte** d'un item donne sa sorte, sa date au mois en lettres (`<time>`), la pastille « Exploitée (KEV) »
 (lue dans `exploited` : une faille, une alerte dont la CVE est au catalogue ; une faille retirée du catalogue
@@ -63,7 +65,8 @@ entre deux morceaux du corps, borné à 1 Mo. Les 30 s couvrent le réveil de l'
 borné avant le premier morceau du corps (#436). Une requête peut donc durer environ 70 s au pire : la
 connexion et le pool, 30 s jusqu'aux en-têtes, puis 30 s jusqu'au premier morceau du corps. Il ne suit aucune redirection et
 ne lit pas l'environnement. Une réponse est lue par un modèle fermé aux cinq sortes ; un champ que l'API
-ajoute est ignoré.
+ajoute est ignoré. Limite : un seul item hors de ce modèle fait de toute la page une page 500, et le journal
+ne dit pas lequel ; la collecte valide les items par les mêmes types d'`items.py`.
 
 **Le réveil** : au démarrage, `kb serve-web` fait un `GET /health` de l'API de données dans un fil à part ;
 l'API se réveille pendant que Sabine se connecte. Le journal donne l'état (`data API wake-up: health ok`, ou
