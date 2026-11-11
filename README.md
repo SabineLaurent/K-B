@@ -609,9 +609,9 @@ injoignable, est `exchange_storage_no_token`. Code de sortie :
 - 143 : SIGTERM, 130 : SIGINT (Ctrl-C).
 
 **Les commandes des jobs planifiés** (#413) : en ligne, tout tournera dans des jobs, rien sur le Mac.
-`kb daily-routine` et `kb digest-watch`, commandes des jobs `caj-kb-daily-routine` (#330) et
-`caj-kb-digest-watch` (#423), pas encore déclarés dans `infra/`, enchaînent leurs étapes dans le
-même processus, chacune avec le code qu'elle rendrait seule :
+`kb daily-routine` et `kb digest-watch`, commandes des jobs `caj-kb-daily-routine` (#330, chaque jour à 08:00 UTC)
+et `caj-kb-digest-watch` (#423, le lundi et le jeudi à 10:00 UTC), déclarés dans `infra/`, enchaînent leurs étapes
+dans le même processus, chacune avec le code qu'elle rendrait seule :
 
 ```sh
 KB_DATA_DIR=<dossier> KB_VAULT_DIR=<coffre> KB_EXCHANGE_BLOB_URL=https://<compte>.blob.core.windows.net \

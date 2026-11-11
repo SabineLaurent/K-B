@@ -5,7 +5,8 @@
 Cette fiche décrit l'architecture applicative de K-B en entier: le flux des données de bout en bout, en bref puis en
 détail, les couches du code, puis chaque partie, de la collecte au déploiement sur Azure. Elle est écrite d'après le
 code de `main` au commit `0292266` (2026-11-09), dont `infra/` est celui du commit `cbada1e`, et la purge, sortie
-de `kb import` par #540, d'après le code de sa PR. Les chemins du
+de `kb import` par #540, d'après le code de sa PR, et les jobs planifiés en ligne et le stockage qu'ils utilisent
+(#420, #330, #423), d'après le code de la PR de #423. Les chemins du
 code de K-B (`etl/…`, `commands/…`, `database/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 L'installation de l'environnement de développement, les dépendances et leur configuration sont dans
@@ -115,18 +116,16 @@ flowchart LR
 flowchart LR
     subgraph exchange["Stockage d'échange en ligne, Azure Blob Storage"]
         smokeContainer[("conteneur<br>smoke-test")]
-        subgraph choice["Lecture choisie (clips, Zotero), prévue par #420"]
+        subgraph choice["Lecture choisie (clips, Zotero), créée par #420"]
             choiceClips[("clips")]
             choiceZotero[("copies de Zotero")]
         end
         watchContainer[("conteneur<br>watch")]
     end
-    style choice stroke-dasharray: 5 5
-    style watchContainer stroke-dasharray: 5 5
     mac("Mac")
     smokeTest["kb smoke-test<br>job caj-kb-smoke-test"]
-    dailyRoutine["kb daily-routine"]
-    digestWatch["kb digest-watch"]
+    dailyRoutine["kb daily-routine<br>job caj-kb-daily-routine"]
+    digestWatch["kb digest-watch<br>job caj-kb-digest-watch"]
     clippings[("coffre du job<br>Clippings/")]
     zotero[("copie de Zotero<br>dossier de KB_ZOTERO_DIR")]
     vault[("coffre du job<br>veille/")]
@@ -134,21 +133,21 @@ flowchart LR
     digestSteps["kb digest<br>kb trend-report"]
     smokeContainer -->|"liste, un compte seul"| smokeTest
     mac -.->|"make upload-library<br>pas encore codé (#542)"| choice
-    choiceClips -.->|"miroir des clips"| dailyRoutine
-    dailyRoutine -.->|"écrit les clips"| clippings
+    choiceClips -->|"miroir des clips"| dailyRoutine
+    dailyRoutine -->|"écrit les clips"| clippings
     choiceZotero -.->|"copie de Zotero<br>pas encore codé (#425)"| dailyRoutine
     dailyRoutine -.->|"pose la copie<br>pas encore codé (#425)"| zotero
-    dailyRoutine -.->|"lance"| steps
-    digestWatch -.->|"lance"| digestSteps
-    clippings -.->|"kb collect lit"| steps
+    dailyRoutine -->|"lance"| steps
+    digestWatch -->|"lance"| digestSteps
+    clippings -->|"kb collect lit"| steps
     zotero -.->|"kb collect lit"| steps
-    steps -.->|"kb write-tops<br>écrit veille/tops/"| vault
-    digestSteps -.->|"écrivent veille/"| vault
-    vault -.->|"lit veille/"| dailyRoutine
-    vault -.->|"lit veille/"| digestWatch
-    dailyRoutine -.->|"publie veille/"| watchContainer
-    digestWatch -.->|"publie veille/"| watchContainer
-    watchContainer -.->|"make<br>download-watch-sheets<br>(#424)"| mac
+    steps -->|"kb write-tops<br>écrit veille/tops/"| vault
+    digestSteps -->|"écrivent veille/"| vault
+    vault -->|"lit veille/"| dailyRoutine
+    vault -->|"lit veille/"| digestWatch
+    dailyRoutine -->|"publie veille/"| watchContainer
+    digestWatch -->|"publie veille/"| watchContainer
+    watchContainer -->|"make<br>download-watch-sheets<br>(#424)"| mac
 ```
 
 Les deux schémas se lisent ainsi, dans l'ordre des flux:
@@ -217,11 +216,13 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
    `kb collect`: la flèche « pose la copie » va vers ce dossier, pas vers le Zotero du Mac. Dans un job, le coffre est
    le dossier `KB_VAULT_DIR` du job, pas celui du Mac: `kb collect` y lit `Clippings/`, et lira la copie de Zotero dans
    le dossier de `KB_ZOTERO_DIR` (`etl/collected_sources.py:18-22`, `etl/sources/clipping.py:103`); `kb write-tops`,
-   `kb digest` et `kb trend-report` y écrivent `veille/`. Ces deux jobs ne sont déclarés en ligne ni dans
-   `infra/deployment.json`, ni dans `infra/main.bicep`. L'envoi des clips et des copies de Zotero depuis le Mac n'est pas encore
-   codé: il viendra par `make upload-library` (#542). La relecture de `watch` par le Mac passe par
-   `make download-watch-sheets` (#424, `commands/download_watch_sheets_command.py`), qui ne trouve aucune fiche tant
-   que les jobs ne publient pas.
+   `kb digest` et `kb trend-report` y écrivent `veille/`. Ces deux jobs sont déclarés en ligne: `caj-kb-daily-routine`
+   chaque jour à 08:00 UTC (#330), `caj-kb-digest-watch` le lundi et le jeudi à 10:00 UTC (#423), tous deux sur le
+   partage `job-data`, où restent le brut, l'état de la collecte, le registre des comptes rendus des tendances et le
+   coffre du job (`infra/main.bicep:306`, `:333`, `infra/deployment.json`). L'envoi des clips et des copies de Zotero
+   depuis le Mac n'est pas encore codé: il viendra par `make upload-library` (#542). La relecture de `watch` par le Mac
+   passe par `make download-watch-sheets` (#424, `commands/download_watch_sheets_command.py`), qui copie les fiches que
+   les jobs publient.
 
 Les journaux restent hors du dessin: aucune commande ne les relit, sauf la purge, qui les supprime d'après la date de
 leur nom (`purge/run_records.py:38`, `:75`). Ce sont les journaux de fonctionnement, sous `KB_DATA_DIR/logs/`
@@ -337,7 +338,7 @@ source et une destination:
 | `kb trend-report` | un compte rendu par jour, `veille/tendances/<jour>.md` (`post/trend_report_sheets.py:152`) | la réponse de `POST /trend-reports`; la période suivante est tenue par `KB_DATA_DIR/trend_reports.json`, jamais par une relecture du coffre (`post/trend_report_registry.py:1-3`, `:26`) |
 | `kb write-tops` | une fiche par classement et par jour de collecte, sous `veille/tops/` (`post/top_sheets.py:31`) | les deux classements du brut, puis les classements remplacés sont supprimés du brut (`commands/write_tops_command.py:39-70`) |
 
-Deux routines de job, codées mais pas encore en ligne, relancent ces commandes: `kb daily-routine` lance
+Deux routines de job, en ligne depuis #330 et #423, relancent ces commandes: `kb daily-routine` lance
 `kb write-tops`, et `kb digest-watch` lance `kb digest` et `kb trend-report` (`commands/daily_routine_command.py:59-62`,
 `commands/digest_watch_command.py:65-74`). `kb daily-routine` écrit aussi dans le coffre du job les clips de la
 lecture choisie, sous `Clippings/` (`commands/job_transfers.py:51-53`).
@@ -390,28 +391,23 @@ flowchart TB
             smokeJob["caj-kb-smoke-test<br>vérifie le déploiement<br>id-kb-smoke-test"]
             dataApi["ca-kb-data-api<br>API de données, sert les items<br>id-kb-data-api"]
             aiApi["ca-kb-ai-api<br>API IA, rédige les comptes rendus<br>id-kb-ai-api"]
-            dailyJob["caj-kb-daily-routine<br>collecte chaque jour<br>id-kb-daily-routine (#420)<br>prévu #330"]
-            digestJob["caj-kb-digest-watch<br>demande les comptes rendus<br>id-kb-digest-watch (#420)<br>prévu #423"]
+            dailyJob["caj-kb-daily-routine<br>collecte chaque jour, 08:00 UTC<br>id-kb-daily-routine (#330)"]
+            digestJob["caj-kb-digest-watch<br>demande les comptes rendus<br>lundi et jeudi, 10:00 UTC<br>id-kb-digest-watch (#423)"]
         end
         base[("pgsql-kb-…<br>Base, PostgreSQL 18<br>Entra ID seul")]
         subgraph exchange["Stockage d'échange en ligne, stkbexchange…"]
             smokeContainer[("conteneur<br>smoke-test")]
-            subgraph choice["Lecture choisie (clips, Zotero), prévue par #420"]
+            subgraph choice["Lecture choisie (clips, Zotero), créée par #420"]
                 clipContainer[("clips")]
                 zoteroContainer[("copies de Zotero")]
             end
             watchContainer[("conteneur<br>watch")]
         end
-        jobFiles[("stkbjobfiles…<br>partage job-data, /data<br>prévu #420")]
+        jobFiles[("stkbjobfiles…<br>partage job-data<br>/var/lib/knowledge_base des jobs")]
     end
     grafana("Grafana Cloud, Allemagne")
     githubApi("API GitHub")
     model("Modèle de langage<br>gpt-6-luna, Azure AI Foundry<br>France Central, zone de données UE")
-    style dailyJob stroke-dasharray: 5 5
-    style digestJob stroke-dasharray: 5 5
-    style choice stroke-dasharray: 5 5
-    style watchContainer stroke-dasharray: 5 5
-    style jobFiles stroke-dasharray: 5 5
     actions -->|"pousse l'image, AcrPush"| registry
     actions -->|"met à jour, lance les jobs"| cae
     registry -->|"image, AcrPull"| cae
@@ -427,19 +423,19 @@ flowchart TB
     smokeJob -->|"GET /health"| dataApi
     smokeJob -->|"GET /health"| aiApi
     mac -.->|"make upload-library<br>prévu #542"| choice
-    sources -.->|"collecte<br>prévu #330"| dailyJob
-    choice -.->|"clips et copie de Zotero"| dailyJob
-    dailyJob -.->|"écrit les items, kb_writer"| base
-    jobFiles <-.->|"fichiers bruts, état de la collecte<br>coffre du job"| dailyJob
-    jobFiles <-.->|"registre des comptes rendus<br>coffre du job"| digestJob
-    aiApi -.->|"POST /digests<br>POST /trend-reports"| digestJob
-    dailyJob -.->|"publie veille/"| watchContainer
-    digestJob -.->|"publie veille/"| watchContainer
-    watchContainer -.->|"make<br>download-watch-sheets<br>codé #424, sans fiche avant #330"| mac
+    sources -->|"collecte"| dailyJob
+    choice -->|"clips, Blob Data Reader<br>copie de Zotero: #425"| dailyJob
+    dailyJob -->|"écrit les items, kb_writer"| base
+    jobFiles <-->|"fichiers bruts, état de la collecte<br>coffre du job"| dailyJob
+    jobFiles <-->|"registre des comptes rendus<br>coffre du job"| digestJob
+    aiApi -->|"POST /digests<br>POST /trend-reports"| digestJob
+    dailyJob -->|"publie veille/, Blob Data Contributor"| watchContainer
+    digestJob -->|"publie veille/, Blob Data Contributor"| watchContainer
+    watchContainer -->|"make<br>download-watch-sheets (#424)"| mac
 ```
 
-Le schéma dit où est quoi en ligne, et ce qui s'y passe. Un trait plein est déployé; un trait ou un bord en pointillés
-est prévu, avec son issue. Une flèche suit le sens des données, comme dans le flux en détail; trois flèches sont des
+Le schéma dit où est quoi en ligne, et ce qui s'y passe. Un trait plein est déployé; un trait en pointillés est
+prévu, avec son issue. Une flèche suit le sens des données, comme dans le flux en détail; trois flèches sont des
 appels sans donnée de la veille: les deux `GET /health`, par lesquels le job de vérification teste les deux API, et
 « met à jour, lance les jobs », par laquelle le déploiement agit sur les apps et les jobs. Sur une app ou un job, le
 nœud porte son identité managée; sur une flèche, le rôle qui la permet.
@@ -456,14 +452,15 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
   `infra/modules/key-vault-secret-access.bicep:28-38`).
 - **La base** est un serveur PostgreSQL 18 flexible, ouvert par Entra ID seul
   (`infra/modules/postgresql-server.bicep:17-31`). `id-kb-data-api` y lit par le rôle `kb_reader`, et
-  `id-kb-migrate-database` possède les tables; la collecte quotidienne écrira par le rôle `kb_writer` (#330,
-  `infra/postgresql/grant-roles.sql:6-8`, `:31-58`).
-- **Le stockage d'échange** n'a que le conteneur `smoke-test`, que `id-kb-smoke-test` lit par le rôle Storage Blob Data
-  Reader (`infra/modules/exchange-storage.bicep:40-61`). #420 prévoit les conteneurs `clippings`, `zotero` et `watch`,
-  et un second compte, `stkbjobfiles`, dont le partage `job-data` sera monté sur `/data` des jobs. Il prévoit aussi
-  leurs rôles, un par conteneur: `id-kb-daily-routine` lit `clippings` et `zotero` (Storage Blob Data Reader) et écrit
-  `watch` (Storage Blob Data Contributor); `id-kb-digest-watch` écrit `watch`; le compte Entra de l'opératrice écrit
-  `clippings` et `zotero`, et lit `watch`.
+  `id-kb-migrate-database` possède les tables; la collecte quotidienne écrit par le rôle `kb_writer`, sous
+  `id-kb-daily-routine` (#330, `infra/postgresql/grant-roles.sql:6-8`, `:31-58`).
+- **Le stockage d'échange** a le conteneur `smoke-test`, que `id-kb-smoke-test` lit par le rôle Storage Blob Data
+  Reader, et les conteneurs `clippings`, `zotero` et `watch` (#420, `infra/modules/exchange-storage.bicep:65`, `:96`).
+  Un rôle par identité et par conteneur (`:137-191`): `id-kb-daily-routine` lit `clippings` et `zotero` (Storage Blob
+  Data Reader) et écrit `watch` (Storage Blob Data Contributor); `id-kb-digest-watch` écrit `watch`; le compte Entra
+  de l'opératrice écrit `clippings` et `zotero`, et lit `watch`. Un second compte, `stkbjobfiles`, porte le partage
+  `job-data`, que les deux jobs planifiés montent sur `/var/lib/knowledge_base` (`infra/modules/job-files-storage.bicep:60`,
+  `infra/main.bicep:61`, `infra/modules/daily-routine-job.bicep:119`, `infra/modules/digest-watch-job.bicep:106`).
 - **Le déploiement**: un tag `vX.Y.Z` sur `main` lance `deploy.yml`, qui se connecte par OIDC sous `id-kb-deploy`,
   pousse l'image, lance `caj-kb-migrate-database`, met à jour les apps et les jobs, puis lance `caj-kb-smoke-test`
   (`.github/workflows/deploy.yml:7-11`, `:97-133`, `:161-209`). `id-kb-deploy` a les rôles AcrPush et Reader sur le
@@ -481,15 +478,18 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
   (`docs/registre-traitements.md:85`, `:88`); les mesures et les traces vont à Grafana Cloud, pile `prod-eu-west-2`, en
   Allemagne (`docs/registre-traitements.md:123`, `:128`). Le Bicep n'en porte que les paramètres et les secrets
   (`infra/main.bicep:21-28`).
-- **Prévu**: `caj-kb-daily-routine` (#330) et `caj-kb-digest-watch` (#423) ne sont pas déclarés
-  (`infra/deployment.json`); l'envoi depuis le Mac viendra avec #542 (la relecture de `watch` est codée par #424), la copie de
-  Zotero avec #425.
+- **Prévu**: l'envoi depuis le Mac viendra avec #542 (la relecture de `watch` est codée par #424), la copie de Zotero
+  avec #425.
 
 ## Limites
 
-- **En ligne, rien ne collecte, n'importe ni n'écrit de fiche.** `kb daily-routine` et `kb digest-watch` sont codés
-  (`commands/daily_routine_command.py:43-69`, `commands/digest_watch_command.py:59-81`), mais leurs jobs ne sont pas
-  dans `infra/deployment.json`, et ni la lecture choisie ni le conteneur `watch` ne sont créés (#420).
+- **Les comptes rendus laissent un trou chaque semaine.** Chacun lit les 3 derniers jours, comptés depuis sa demande,
+  par la date de la source; avec un passage le lundi et le jeudi, rien ne couvre du jeudi 10:00 au vendredi 10:00 UTC,
+  ni les items du jeudi que la collecte du vendredi apporte (décision de Sabine du 2026-11-11). Sa parade: #565, qui
+  fait partir chaque compte rendu de la fin du précédent ([`infra/README.md`](../infra/README.md), « Les comptes
+  rendus en ligne »).
+- **Rien ne tient deux exécutions à l'écart**, sauf une consigne: les heures de départ à la main de
+  [`infra/README.md`](../infra/README.md), « La règle des heures », jusqu'au verrou de #426.
 - **Zotero n'est pas collecté en ligne**: la copie de la bibliothèque dans un job est à venir, entre le miroir des
   clips et `kb collect` (#425, `commands/daily_routine_command.py:50`).
 - **L'interface web n'existe pas encore**: la fiche décrit `main`, où K-B se lit dans Obsidian et se lance dans le
@@ -515,8 +515,9 @@ grep -c "^CREATE TABLE" src/k_b/database/schema.sql src/k_b/database/schema_post
 # Les apps et les jobs déclarés en ligne, puis le seul conteneur du stockage d'échange.
 cat infra/deployment.json
 grep -n -A2 "containers@" infra/modules/exchange-storage.bicep
-# Les étapes des deux jobs codés, pas encore en ligne.
+# Les étapes des deux jobs planifiés, puis leur heure de départ.
 grep -n "RoutineStep(" -A1 src/k_b/commands/daily_routine_command.py src/k_b/commands/digest_watch_command.py
+grep -n "cronExpression" infra/main.bicep infra/modules/daily-routine-job.bicep infra/modules/digest-watch-job.bicep
 ```
 
 Un `fichier:ligne` se relit sans changer de commit: `git show 0292266:<chemin> | sed -n '<début>,<fin>p'`, avec

@@ -1172,7 +1172,8 @@ date de la source ([fiches-veille.md](../docs/fiches-veille.md), « Fenêtre » 
 et non 5). Limite : avec un passage le lundi et le jeudi, rien ne couvre du jeudi 10:00 au vendredi 10:00 UTC, ni les
 items datés du jeudi que la collecte du vendredi apporte. Ils n'entrent dans aucun compte rendu. Pour réduire le
 risque : la règle de Sabine du 26/10, qui fait partir chaque compte rendu du `until` du précédent et rejoue chaque
-créneau manqué ([tendances.md](../docs/tendances.md), fin de « Hors v1 »), reste à coder.
+créneau manqué ([tendances.md](../docs/tendances.md), fin de « Hors v1 »), codée par #565 (« Démarrer chaque compte
+rendu de veille à la fin du précédent de son sujet »), prévue en ligne avant le lundi 16/11 à 10:00 UTC.
 
 Dans l'ordre :
 1. Le critère rouge : `az containerapp job show -n caj-kb-digest-watch -g "$RG"` répond `ResourceNotFound`.
