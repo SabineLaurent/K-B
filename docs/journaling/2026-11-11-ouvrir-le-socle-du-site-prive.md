@@ -8,10 +8,12 @@
   `docs/site-web.md`, `tests/web/`
 - **Décisions** : journal ADR, 2026-11-11, « Site : le socle privé de `kb serve-web` »
 
-Les commits de la branche sont 61da6bf (le socle), 8a513d5 (première revue de code), db8a795 (ligne Opquast de
-`conformite.md`), 1b017a8 (tri de sécurité, d'accessibilité et d'Opquast), 026d57c (renvoi après le rebase sur
-#558), aee1d92 (limite WebSocket) et 471bb33 (seconde revue de code). Les autres commits de la liste de la PR
-viennent de `main`, des PR déjà fusionnées (#556, #558 et avant) : cette note n'en parle pas.
+Les commits de la branche, après son rebase sur `main` (661f21c), sont 3ec0b47 (le socle), baf0035 (première
+revue de code), e0df4f4 (ligne Opquast de `conformite.md`), 5d7ec6e (tri de sécurité, d'accessibilité et
+d'Opquast), bbe5068 (renvoi après le rebase sur #558), b9f7306 (limite WebSocket), 7957bad (seconde revue de
+code) et da95ee0 (journal ADR, cette note, `MEMORY.md`). Les revues ont lu les commits d'avant le rebase :
+9491f6f, aujourd'hui 3ec0b47 ; 922679d, aujourd'hui baf0035 ; 026d57c, aujourd'hui bbe5068 ; aee1d92,
+aujourd'hui b9f7306.
 
 ## 1. Le pourquoi
 
@@ -316,7 +318,7 @@ Ces choix sont imposés par une consigne du dépôt :
   - pas vu à 390 ni 320 px : Chrome sans interface ne descend pas sous 500 px ;
   - pas de lecteur d'écran réel, pas de validateur Nu ;
   - ni Firefox, ni Safari, ni les couleurs forcées de Windows ;
-  - le relecteur d'accessibilité a mesuré 922679d, pas la feuille de style de 1b017a8.
+  - le relecteur d'accessibilité a mesuré 922679d (baf0035), pas la feuille de style de 5d7ec6e.
 - **Ce que fait `/.auth/logout`**, la durée de la session de la plateforme et son cookie : à voir en ligne
   (Opquast 23, 29, 172).
 - **L'en-tête `Server` que l'entrée d'Azure peut ajouter** : à voir en ligne.
