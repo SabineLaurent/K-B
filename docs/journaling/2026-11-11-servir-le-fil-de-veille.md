@@ -1,7 +1,7 @@
 # Servir le fil de veille sur l'accueil du site
 
 - **Date** : 2026-11-11
-- **Branche** : `feat/web-feed`, à partir de `4e0adff`, sur `main` à `94e3f4e`
+- **Branche** : `feat/web-feed`, commits `ca6eaf0` à `a58a48a` et le commit de cette mise à jour, rebasés sur `main` à `0a6ba26`
 - **Issue** : #563
 - **Note précédente de la série** : [Ouvrir le socle du site privé](2026-11-11-ouvrir-le-socle-du-site-prive.md) (#562)
 - **Fichiers principaux** : `src/k_b/web/data_api_client.py`, `src/k_b/web/feed.py`, `src/k_b/web/pages.py`,
@@ -9,7 +9,7 @@
   `src/k_b/web/settings.py`, `docs/site-web.md`, `docs/registre-traitements.md`
 
 La liste des fichiers que donne le skill part d'un commit plus ancien que `main` : les commits antérieurs à
-`94e3f4e` (#562, #550, #558, #423…) appartiennent à des PR déjà fusionnées, chacune avec sa note. Cette note ne
+`0a6ba26` (#562, #550, #558, #423, #579, #582…) appartiennent à des PR déjà fusionnées, chacune avec sa note. Cette note ne
 couvre que les commits de la branche.
 
 ## Le pourquoi
@@ -246,7 +246,7 @@ Imposés par les règles du dépôt :
 | `test_serve_web_wakes_the_data_api_at_its_start`, `test_the_wake_up_logs_its_state_never_the_url` (`tests/web/test_serve_web.py`) | le réveil est lancé, et son journal ne cite pas l'URL |
 | Sur le Mac, `kb serve-data` sur la base de fixture et `kb serve-web` en `KB_WEB_AUTH=off` | `data API wake-up: health ok` ; fil vide en 200 ; 14 cartes depuis 2020 ; 404 au-delà ; 422 sur `kind=clip` |
 | La même chose, API arrêtée | page 500, `data_api_failed: data_api_unavailable http_status=- request_id=…`, sans la recherche |
-| Captures à 320 px (dans un `iframe`) et à 1280 px | la page tient sans défilement horizontal ; deux défauts vus et corrigés (`90b34df`) |
+| Captures à 320 px (dans un `iframe`) et à 1280 px | la page tient sans défilement horizontal ; deux défauts vus et corrigés (`b560c83`) |
 | `uv run pytest` → 4711 passed ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` | les contrôles du dépôt |
 
 Les tests ont été écrits avant le code, et leur échec a été montré dans la session. Trois exceptions sont
