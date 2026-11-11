@@ -183,7 +183,8 @@ refaire l'étape 3 d'« Installer », avant l'essai d'accessibilité.
 
 ## Journaux de l'application
 
-Écrit le 2026-11-09 pour #165 et revu le 2026-11-11 d'après le code de `main` au commit `33fa59c`. Le tableau et les alertes ci-dessus
+Écrit le 2026-11-09 pour #165 et revu le 2026-11-11 d'après le code de `main` au commit `33fa59c`, et le commentaire
+du plafond, par #566, d'après le code de sa PR. Le tableau et les alertes ci-dessus
 suivent le modèle; l'application se suit par ses journaux: ceux de `kb`, de `kb serve-data` (l'API de données) et de
 `kb serve-ai` (l'API IA). En local, ils ne demandent rien à installer: `kb` les écrit par le module `logging` de
 Python. En ligne, ils vont dans l'espace Log Analytics `log-kb`, qu'`infra/main.bicep` crée. Aucune alerte ne les lit
@@ -292,8 +293,8 @@ réglé (sections ci-dessus).
 
 Tout est posé par `infra/main.bicep`, que Sabine applique à la main (`infra/README.md`, « Appliquer »):
 
-- l'espace `log-kb` (`infra/modules/log-analytics.bicep:5-20`): 30 jours de rétention, et un plafond de 0,2 Go par
-  jour (`:13-19`): atteint, la collecte s'arrête jusqu'à l'heure de remise à zéro, propre à chaque espace et non
+- l'espace `log-kb` (`infra/modules/log-analytics.bicep:5-23`): 30 jours de rétention, et un plafond de 0,2 Go par
+  jour (`:13-22`): atteint, la collecte s'arrête jusqu'à l'heure de remise à zéro, propre à chaque espace et non
   réglable (Microsoft Learn, « Set daily cap on Log Analytics workspace », lu le
   2026-11-11);
 - l'environnement `cae-kb` y envoie les journaux des conteneurs par Azure Monitor, sans clé partagée, par le paramètre

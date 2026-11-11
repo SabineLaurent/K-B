@@ -580,6 +580,9 @@ de la requête.
   méthode sur le chemin d'une route, `TRACE` et `CONNECT` compris, rend 405 `method_not_allowed`,
   comme l'API de données ; `CONNECT hôte:port` et `OPTIONS *` rendent 404 `route_not_found` (essayé
   sous uvicorn le 2026-11-05).
+- **Pas d'en-tête `Server`** (`server_header=False` d'uvicorn), qui nommerait le logiciel (Opquast
+  2025, règle 213), comme l'API de données : `test_serve_ai_sends_no_server_header`, essayé en local
+  le 2026-11-11 ; en ligne, l'en-tête que l'entrée d'ACA peut poser n'est pas constaté.
 - **Documentation** : `/docs` et `/openapi.json` ne sont servis que si
   `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, 404 sinon, comme l'API de données ([specs-api.md](specs-api.md), #393).
 - **Version** : `0.12.0` (`info.version` de `docs/api/openapi-ia.json`, écrite par `kb openapi`) ;

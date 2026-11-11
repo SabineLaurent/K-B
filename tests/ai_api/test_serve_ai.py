@@ -117,10 +117,23 @@ def test_serve_ai_listens_on_127_0_0_1_8001_by_default_with_the_real_subjects(
         "port": 8001,
         "log_config": None,
         "access_log": False,
+        "server_header": False,
     }
     assert app.state.default_window_days == 3
     assert app.state.subjects == DIGEST_SUBJECTS
     assert set(app.state.api_keys) == {"KB_DIGEST"}
+
+
+def test_serve_ai_sends_no_server_header(
+    monkeypatch, data_dir, uvicorn_calls, environment
+):
+    """uvicorn names itself in a header Server by default (Opquast 2025, rule 213)."""
+    set_environment(monkeypatch, environment)
+
+    cli.main(["serve-ai"])
+
+    [(_, options)] = uvicorn_calls
+    assert options["server_header"] is False
 
 
 def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
