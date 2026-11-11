@@ -487,9 +487,14 @@
       padding-inline-start: 1.25rem;
     }
 
+    & li + li {
+      margin-block-start: 0.5rem;
+    }
+
+    /* Inline, a target of 44 px in height by its padding, as a link in a text: the bullet stays on
+       its first line. */
     & a {
       padding-block: 0.625rem;
-      display: inline-block;
       color: var(--color-alert-deep);
     }
   }
@@ -561,11 +566,10 @@
     overflow-wrap: anywhere;
   }
 
+  /* A target of 44 px in height by its padding; its arrow follows its text when it wraps. */
   .card-link {
     justify-self: start;
-    min-block-size: var(--target-size);
-    display: inline-flex;
-    align-items: center;
+    padding-block: 0.625rem;
   }
 
   .pagination {
