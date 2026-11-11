@@ -497,5 +497,5 @@ output postgresqlServerName string = postgresqlServer.outputs.name
 output postgresqlServerHost string = databaseHost
 // The secret AZURE_CLIENT_ID of the repository (infra/README.md, « Déployer une version »).
 output deployIdentityClientId string = deployWorkloads ? deployAccess!.outputs.clientId : ''
-// The address of the site, for the checks of infra/README.md: internal until exposeWeb.
-output webAddress string = 'https://${webHost}'
+// The address of the site, for the checks of infra/README.md: internal until exposeWeb; empty in pass 1.
+output webAddress string = deployWorkloads ? 'https://${webHost}' : ''

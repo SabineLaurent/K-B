@@ -6907,7 +6907,9 @@ jour, avec ses quatre points ; relu par time-knight et par un sous-agent sans co
   l'a relevé, sans connexion rien ne retire un en-tête forgé. Le contrôle du code (#562) croirait alors un
   visiteur qui pose l'object ID de Sabine, que l'annuaire ne tient pas secret. ARM crée l'app avant son
   `authConfigs`, et un `authConfigs` qui échoue laisserait l'app ouverte. Un `exposeWeb` oublié ferme le site au lieu
-  de l'ouvrir. Option écartée : une seule passe, avec le site sans connexion le temps de sa création. **Précise
+  de l'ouvrir. Revues de la PR (tri de time-knight du 2026-11-11) : chaque passe tire `exposeWeb` de la connexion en
+  ligne (`az containerapp auth show`), si bien qu'une recréation du site le crée fermé ; et sans ID d'inscription,
+  le module ne pose ni connexion ni entrée externe (`hasSignIn` exige `clientId`). Option écartée : une seule passe, avec le site sans connexion le temps de sa création. **Précise
   l'entrée de #562 du même jour** : « l'authentification part dans le même déploiement que l'entrée externe »
   devient « avant l'entrée externe ». Règle d'arrêt : un `curl` qui rend 200 sans session, avec l'en-tête forgé ou
   non, ferme l'entrée (`az containerapp ingress disable`). — PR de #571
@@ -6939,8 +6941,9 @@ jour, avec ses quatre points ; relu par time-knight et par un sous-agent sans co
   — PR de #571
 - **`id-kb-deploy` reçoit Container Apps Contributor sur `ca-kb-web`, qui entre dans `deployment.json`.** Pourquoi :
   le Deploy met chaque app à l'image du tag. Limite assumée (plan validé par Sabine le 2026-11-11) : il peut lire le
-  secret client et la clé `WEB`, et peut-être retirer la connexion, ce qui rendrait le site public. Ses actions sont
-  à lire par `az role definition list`. Il n'y gagne aucune donnée : il tient déjà `ca-kb-data-api`. Pour réduire
+  secret client et la clé `WEB` (`listSecrets`), et retirer la connexion, ce qui rendrait le site public ; le rôle
+  porte `containerApps/*/write` et `*/action`, sans exclusion (Learn, « Azure built-in roles for Containers », mise
+  à jour le 2026-07-01). Il n'y gagne aucune donnée : il tient déjà `ca-kb-data-api`. Pour réduire
   le risque : les rulesets des tags et l'environnement `production` ; une alerte gratuite du journal d'activité sur
   `Microsoft.App/containerApps/authConfigs/write`, faisable, non posée (registre, « Déploiement continu »). — PR de
   #571
@@ -6953,7 +6956,10 @@ jour, avec ses quatre points ; relu par time-knight et par un sous-agent sans co
   2026-11-06**, tenue par #420 (« les API et `id-kb-migrate-database` n'ont rien ») : l'API de données lit
   désormais `watch` ; l'API IA et `id-kb-migrate-database` n'ont toujours rien. Le sens tient : un rôle de lecture,
   sur un conteneur, aucun sur le compte. Le verrou `CanNotDelete` n'empêche pas d'ajouter un rôle. Option écartée :
-  le site qui lit `watch` lui-même, avec un rôle Azure pour son code. Suit l'entrée de #558 du même jour, qui ouvre
+  le site qui lit `watch` lui-même, avec un rôle Azure pour son code. Limite assumée (consigne de time-knight du
+  2026-11-11, écart au moindre privilège accepté) : le rôle, `KB_EXCHANGE_BLOB_URL` et la clé `WEB` sont posés avant
+  leur code (#559 à #561, #563), pour éviter une seconde passe avant le fil. Pour réduire le risque : ils restent
+  sans code quelques jours, et #559 et #563 les utilisent ; le rôle ne permet que la lecture de `watch`. Suit l'entrée de #558 du même jour, qui ouvre
   le client du stockage d'échange à l'API de données. — PR de #571
 
 ## Décisions encore ouvertes

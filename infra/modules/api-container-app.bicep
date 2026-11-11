@@ -86,7 +86,9 @@ var signIn = entraSignIn ?? {
   clientSecretName: ''
   allowedObjectId: ''
 }
-var hasSignIn = entraSignIn != null
+// Without the ID of its registration, the app has no sign-in, so it stays internal: a sign-in that cannot work
+// would leave nothing in front of the code.
+var hasSignIn = entraSignIn != null && !empty(signIn.clientId)
 // The client secret is a secret of the app, for the sign-in only: it is in no variable of the container.
 var signInSecrets = hasSignIn
   ? [
