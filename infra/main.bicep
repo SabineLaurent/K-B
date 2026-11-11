@@ -1,7 +1,7 @@
 // K-B on Azure. Applied by hand by Sabine to her resource group (infra/README.md), checked by the CI.
 // Two passes: without imageTag, the foundation (logs, registry, vault, identities, the two storage accounts,
 // PostgreSQL server);
-// once the image is pushed and the secrets set, with imageTag, the two APIs and the two jobs.
+// once the image is pushed and the secrets set, with imageTag, the two APIs and the jobs.
 targetScope = 'resourceGroup'
 
 @description('Region of every K-B resource: the resource group\'s by default (France Central).')
@@ -28,6 +28,9 @@ param llmModel string = ''
 @description('Second pass: OTLP endpoint of the metrics and traces of the AI API (KB_OTLP_ENDPOINT), given by Sabine.')
 param otlpEndpoint string = ''
 
+@description('Second pass: when caj-kb-digest-watch starts, in UTC; by default Monday and Thursday at 10:00, once the routine of 08:00 is over (#423).')
+param digestWatchCronExpression string = '0 10 * * 1,4'
+
 var tags = {
   project: 'k-b'
 }
@@ -52,9 +55,9 @@ var deployment = loadJsonContent('deployment.json')
 // tokens carry the immutable form, owner and repository with their numeric IDs
 // (GET /repos/SabineLaurent/K-B/actions/oidc/customization/sub: use_immutable_subject).
 var githubDeploySubject = 'repo:SabineLaurent@189640103/K-B@1383589029:environment:production'
-// The image has no KB_DATA_DIR (journal ADR, 2026-11-06): each piece sets it. caj-kb-daily-routine mounts
-// the share job-data on it (#330); the other pieces keep the directory of the image, emptied at each
-// start, on purpose.
+// The image has no KB_DATA_DIR (journal ADR, 2026-11-06): each piece sets it. caj-kb-daily-routine (#330) and
+// caj-kb-digest-watch (#423) mount the share job-data on it; the other pieces keep the directory of the image,
+// emptied at each start, on purpose.
 var dataDir = '/var/lib/knowledge_base'
 // The ports of kb serve-data and kb serve-ai by default (core/config.py), set again on each app.
 var dataApiPort = 8000
@@ -93,6 +96,7 @@ module registry 'modules/container-registry.bicep' = {
       identityNames.dataApi
       identityNames.smokeTest
       identityNames.dailyRoutine
+      identityNames.digestWatch
     ]
   }
   dependsOn: [
@@ -167,6 +171,11 @@ var dailyRoutineSecretVariables = {
   KB_GITHUB_TOKEN: 'kb-github-token'
 }
 var bigQueryKeySecretName = 'kb-bigquery-key'
+// The reports (#423): the keys of the two clients of the AI API, the ones the API checks.
+var digestWatchSecretVariables = {
+  KB_AI_API_KEY_KB_DIGEST: aiApiSecretVariables.KB_AI_API_KEY_KB_DIGEST
+  KB_AI_API_KEY_KB_TREND_REPORT: aiApiSecretVariables.KB_AI_API_KEY_KB_TREND_REPORT
+}
 var secretGrants = concat(
   map(items(dataApiSecretVariables), variable => {
     secret: variable.value
@@ -185,7 +194,11 @@ var secretGrants = concat(
       secret: bigQueryKeySecretName
       identity: identityNames.dailyRoutine
     }
-  ]
+  ],
+  map(items(digestWatchSecretVariables), variable => {
+    secret: variable.value
+    identity: identityNames.digestWatch
+  })
 )
 
 module secretAccess 'modules/key-vault-secret-access.bicep' = if (deployWorkloads) {
@@ -317,6 +330,33 @@ module dailyRoutineJob 'modules/daily-routine-job.bicep' = if (deployWorkloads) 
   ]
 }
 
+module digestWatchJob 'modules/digest-watch-job.bicep' = if (deployWorkloads) {
+  params: {
+    location: location
+    tags: tags
+    environmentId: containerAppsEnvironment.outputs.id
+    identityName: identityNames.digestWatch
+    registryServer: registry.outputs.loginServer
+    image: image
+    cronExpression: digestWatchCronExpression
+    // No base: kb digest-watch reads the watch through the APIs.
+    environmentVariables: {
+      KB_DATA_DIR: dataDir
+      KB_VAULT_DIR: '${dataDir}/vault'
+      KB_EXCHANGE_BLOB_URL: exchangeStorage.outputs.blobEndpoint
+      KB_DATA_API_URL: 'https://${dataApiHost}'
+      KB_AI_API_URL: 'https://${aiApiHost}'
+    }
+    vaultEntries: digestWatchSecretVariables
+    vaultUri: keyVault.outputs.uri
+    jobDataStorageName: jobFilesStorage.outputs.storageName
+    dataDir: dataDir
+  }
+  dependsOn: [
+    secretAccess
+  ]
+}
+
 // The base online (#421): its name, created by infra/postgresql/create-principals.sql, and the TLS of
 // libpq: the token is a bearer secret, it goes only to a server whose certificate is checked against
 // the store of the image.
@@ -374,6 +414,7 @@ module deployAccess 'modules/deploy-access.bicep' = if (deployWorkloads) {
     smokeTestJob
     migrateDatabaseJob
     dailyRoutineJob
+    digestWatchJob
   ]
 }
 

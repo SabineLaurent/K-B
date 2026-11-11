@@ -1,4 +1,4 @@
 {
   "apps": ["ca-kb-data-api", "ca-kb-ai-api"],
-  "jobs": ["caj-kb-smoke-test", "caj-kb-migrate-database", "caj-kb-daily-routine"]
+  "jobs": ["caj-kb-smoke-test", "caj-kb-migrate-database", "caj-kb-daily-routine", "caj-kb-digest-watch"]
 }

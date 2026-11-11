@@ -3,8 +3,9 @@
 // one resource, never on the resource group; no role on the vault, the storage nor the data. But a job it may
 // change acts under the identity of that job: through caj-kb-daily-routine (#330), it may read the clips and the
 // Zotero library, write the base, reach the share job-data and get the two secrets of the routine, a risk accepted
-// by Sabine on 2026-11-10 (docs/registre-traitements.md, « Déploiement continu »). Second pass: the apps and the
-// jobs must exist.
+// by Sabine on 2026-11-10 (docs/registre-traitements.md, « Déploiement continu »). caj-kb-digest-watch (#423) adds no
+// access: watch and job-data through the routine, and its two keys through ca-kb-ai-api, which holds them. Second
+// pass: the apps and the jobs must exist.
 param deployIdentityName string
 param registryName string
 @description('The apps and the jobs whose image the deployment changes (infra/deployment.json).')
