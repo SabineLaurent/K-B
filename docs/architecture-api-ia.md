@@ -305,9 +305,10 @@ En ligne, l'API IA est l'app `ca-kb-ai-api`. Elle lance `kb serve-ai` depuis l'i
 par `GET /health` (`commands/smoke_test_command.py:118-127`, `infra/deployment.json`). La commande
 `kb digest-watch` existe (`commands/digest_watch_command.py` ; [README](../README.md), paragraphe « Les commandes
 des jobs planifiés ») : elle réveille les deux API par `GET /health`, lance `kb digest`, les réveille de nouveau,
-lance `kb trend-report`, puis publie `veille/` (même paragraphe du README). Son job, `caj-kb-digest-watch`, est prévu par
-#423, mais il n'est pas encore déclaré dans `infra/`. En ligne, aucune demande de fiches ni de compte rendu n'est
-donc encore planifiée.
+lance `kb trend-report`, puis publie `veille/` (même paragraphe du README). Depuis #423, d'après le code de sa PR, son
+job, `caj-kb-digest-watch`, est déclaré dans `infra/` (`infra/modules/digest-watch-job.bicep`, `infra/deployment.json`)
+et la lance le lundi et le jeudi à 10:00 UTC, par le nom interne de l'API IA, en HTTPS, avec les clés des clients
+`KB_DIGEST` et `KB_TREND_REPORT` ([infra/README.md](../infra/README.md), « Les comptes rendus en ligne »).
 
 ## Ce que ce document ne dit pas
 
@@ -331,7 +332,7 @@ grep -rnE "raw_store|writers|write_file_atomically|write_text|write_bytes|[^a-z_
 grep -rhoE "^(from|import) k_b\.[a-z_]+" src/k_b/ai_api | sort | uniq -c
 # Les modules qui importent OpenTelemetry : les quatre de l'API IA.
 grep -rlE "^(from|import) opentelemetry" src/k_b | sort
-# Les jobs déclarés en ligne : caj-kb-digest-watch n'y est pas.
+# Les jobs déclarés en ligne : au commit 56d013b, caj-kb-digest-watch n'y est pas ; depuis #423, il y est.
 cat infra/deployment.json; grep -rn "caj-kb-digest-watch" infra/
 ```
 

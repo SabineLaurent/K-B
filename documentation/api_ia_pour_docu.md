@@ -7,7 +7,7 @@
 Cette fiche dit ce qu'est l'API IA, comment elle est construite, ce que fait chacun de ses points de terminaison,
 qui peut l'appeler, et comment une clé se change. Le contrat de ses deux routes est l'OpenAPI versionnée,
 [`docs/api/openapi-ia.json`](../docs/api/openapi-ia.json): la fiche y renvoie et ne la remplace pas. Elle est écrite
-d'après le code de `main` au commit `875c638` (2026-11-08). Les chemins du code de K-B (`ai_api/…`, `core/…`,
+d'après le code de `main` au commit `875c638` (2026-11-08), et ses appelants en ligne d'après le code de la PR de #423. Les chemins du code de K-B (`ai_api/…`, `core/…`,
 `post/…`, `commands/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 ## Ce qu'est l'API IA
@@ -318,8 +318,11 @@ deux. Il décrit les deux routes, leurs corps, leurs réponses, chaque état d'e
 - Son entrée est interne, en HTTPS: elle n'a pas d'adresse publique (`infra/modules/api-container-app.bicep:74-81`).
 - `KB_DEPLOYMENT_ENVIRONMENT=production`: ni `/docs` ni `/openapi.json` (`infra/main.bicep:216`).
 - De 0 à 1 réplique (`infra/modules/api-container-app.bicep:147-152`).
-- Les jobs en ligne sont `caj-kb-smoke-test` et `caj-kb-migrate-database` (`infra/deployment.json`). Seul le
-  premier appelle l'API IA, par `GET /health` (`commands/smoke_test_command.py:80-81`, `:117-127`).
+- Les jobs en ligne sont `caj-kb-smoke-test`, `caj-kb-migrate-database`, `caj-kb-daily-routine` et
+  `caj-kb-digest-watch` (`infra/deployment.json`). Deux appellent l'API IA: la sonde, par `GET /health`
+  (`commands/smoke_test_command.py:80-81`, `:117-127`), et `caj-kb-digest-watch`, le lundi et le jeudi à 10:00 UTC,
+  qui demande les comptes rendus (`POST /digests`, `POST /trend-reports`) avec les clés des clients `KB_DIGEST` et
+  `KB_TREND_REPORT` (#423, `infra/modules/digest-watch-job.bicep`).
 
 ## Limites
 

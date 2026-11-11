@@ -8,7 +8,8 @@
 
 Cette fiche dit ce que fait la chaîne de livraison continue de K-B, comment on la déclenche, comment elle
 s'installe, se configure et se teste, et que faire quand une livraison échoue. Elle est écrite d'après le code de
-`main` au commit `b412323` (2026-11-08). Les exécutions citées se relisent par
+`main` au commit `b412323` (2026-11-08), et les jobs planifiés (#330, #423) d'après le code de la PR de #423. Les
+exécutions citées se relisent par
 `gh run view <id> --repo SabineLaurent/K-B`, et leur journal par `--log`.
 
 ## La chaîne en bref
@@ -36,7 +37,7 @@ L'image livrée est construite par `deploy`, depuis le commit du tag. Celle d'`i
 | Docker Buildx | construit l'image `linux/amd64`, lit son label et son digest (`docker buildx imagetools inspect`) | `deploy.yml` |
 | Azure Container Registry (`crkb…`) | garde les images `k-b:<tag>` | [infra/modules/container-registry.bicep](../infra/modules/container-registry.bicep) |
 | Azure CLI (`az`) | met les apps et les jobs à l'image, lance les jobs, lit leur état | `deploy.yml` |
-| Azure Container Apps | fait tourner `ca-kb-data-api`, `ca-kb-ai-api`, et les jobs `caj-kb-migrate-database` et `caj-kb-smoke-test` | `infra/main.bicep` et ses modules; [infra/deployment.json](../infra/deployment.json) liste ceux que la livraison met à jour |
+| Azure Container Apps | fait tourner `ca-kb-data-api`, `ca-kb-ai-api`, et les jobs `caj-kb-migrate-database`, `caj-kb-smoke-test`, `caj-kb-daily-routine` et `caj-kb-digest-watch` | `infra/main.bicep` et ses modules; [infra/deployment.json](../infra/deployment.json) liste ceux que la livraison met à jour |
 | `gh` et `jq` | `check` lit les exécutions de la CI du commit; `deploy` lit `deployment.json`, et l'état des apps et de leur dernière révision | `deploy.yml` |
 
 ### Les déclencheurs
@@ -188,7 +189,7 @@ connexion de `v0.1.0` l'a utilisé (plus bas).
 | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` | secrets du dépôt | l'identifiant client d'`id-kb-deploy`, le tenant et l'abonnement | la connexion OIDC de `azure/login` |
 | `KB_RESOURCE_GROUP`, `KB_REGISTRY` | secrets du dépôt | le groupe de ressources et le nom du registre | les cibles de chaque commande `az` |
 | environnement `production` | réglages du dépôt | une seule règle de déploiement: les tags `v*.*.*` | le seul job qui reçoit un jeton accepté par `id-kb-deploy` |
-| `infra/deployment.json` | dépôt | `apps`: `ca-kb-data-api`, `ca-kb-ai-api`; `jobs`: `caj-kb-smoke-test`, `caj-kb-migrate-database` | lu par le Bicep pour les rôles (`loadJsonContent`) et par le workflow pour les images (`jq`) |
+| `infra/deployment.json` | dépôt | `apps`: `ca-kb-data-api`, `ca-kb-ai-api`; `jobs`: `caj-kb-smoke-test`, `caj-kb-migrate-database`, `caj-kb-daily-routine`, `caj-kb-digest-watch` | lu par le Bicep pour les rôles (`loadJsonContent`) et par le workflow pour les images (`jq`) |
 | nombre de lectures et écart | `deploy.yml` | 52 et 72 lectures pour les jobs, 40 pour les révisions, 15 s | les attentes; celles d'un job suivent son `replicaTimeout` plus 180 s |
 
 Ces identifiants ne sont pas des mots de passe. Ils sont des secrets pour que GitHub les masque dans les journaux
@@ -321,5 +322,6 @@ Leurs valeurs sont dans `src/k_b/commands/exit_codes.py`.
 - **Pas de cache entre deux tags**: une version nouvelle se construit en entier.
 - **Une passe 2 faite à la main** repose l'image par son tag (`k-b:<TAG>`), une référence que l'on peut réécrire, et
   non par son digest. La livraison suivante la repinne par digest (#455).
-- **Les jobs planifiés ne sont pas livrés**: `kb daily-routine` et `kb digest-watch` existent, mais leurs jobs
-  (`caj-kb-daily-routine`, `caj-kb-digest-watch`) ne sont ni dans `infra/` ni dans `deployment.json`.
+- **Les jobs planifiés ne sont pas essayés par la livraison**: un tag change l'image de `caj-kb-daily-routine` et de
+  `caj-kb-digest-watch` (étape 7), sans les lancer. Une image fautive ne se voit qu'à leur exécution suivante, au cron
+  (`infra/README.md`, « Lire une exécution »).
