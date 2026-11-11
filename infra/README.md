@@ -14,7 +14,7 @@ deux passes, l'image est poussée dans le registre et les secrets sont posés da
 | `log-analytics.bicep` | espace Log Analytics `log-kb` : 30 jours de rétention, plafond de 0,2 Go par jour | 1 | #414 |
 | `container-apps-environment.bicep` | environnement Container Apps `cae-kb` : profil Consumption seul, sans VNet ; journaux vers `log-kb` par Azure Monitor, sans clé ; trafic chiffré entre les apps ; identité système, qui monte `job-data` | 1 | #411, #414, #420 |
 | `identities.bicep` | identités managées `id-kb-ai-api`, `id-kb-data-api`, `id-kb-smoke-test`, `id-kb-deploy` (le déploiement continu), `id-kb-daily-routine` et `id-kb-digest-watch` (les jobs planifiés), `id-kb-web` (le site) | 1 | #414, #415, #420, #571 |
-| `container-registry.bicep` | registre `crkb…` (ACR Basic), sans utilisateur admin ; AcrPull pour les identités des deux API, du site, de la sonde et des deux jobs planifiés | 1 | #414, #330, #423, #571 |
+| `container-registry.bicep` | registre `crkb…` (ACR Basic), sans utilisateur admin ; AcrPull pour les identités des apps et des jobs | 1 | #414, #330, #423, #571 |
 | `key-vault.bicep` | coffre `kv-kb-…` en RBAC, suppression réversible 7 jours ; Key Vault Secrets Officer pour l'opératrice | 1 | #414 |
 | `exchange-storage.bicep` | compte Blob `stkbexchange…`, clé partagée coupée ; conteneurs `smoke-test`, `clippings`, `zotero`, `watch`, un rôle par identité et par conteneur ; versions, suppression réversible, effacement des copies Zotero, verrou (« Le stockage ») | 1 | #414, #420, #571 |
 | `job-files-storage.bicep` | compte Files `stkbjobfiles…`, partage `job-data` des jobs, monté par l'identité de `cae-kb` ; verrou (« Le stockage ») | 1 | #420 |
@@ -282,7 +282,8 @@ L'aperçu attendu à la première passe 2, le 2026-11-06 (#414) :
 
 Une passe qui ajoute une pièce a son aperçu dans la section de la pièce : « Appliquer #420 sur le squelette en
 ligne », « La seconde passe, avec le tag » (#330), « La passe A : le site fermé » (#571). Une passe qui n'ajoute
-rien ne montre que ce bruit, et l'image si `TAG` change.
+rien ne montre que ce bruit, et l'image des apps et des jobs : après un déploiement par tag, `k-b@sha256:…` devient
+`k-b:<TAG>`, la même image si `TAG` est la version en ligne.
 
 Les rôles sur les secrets se créent dans le même déploiement que les apps. Si une app échoue sur
 « unable to fetch secret », c'est qu'ils ne sont pas encore actifs : relancer la même commande 10 minutes plus tard.
@@ -1347,7 +1348,9 @@ autre fournisseur à `ca-kb-web` demande d'abord de revoir ce contrôle.
 | Secret client | expire le **2027-05-11** (« La rotation du secret client ») |
 | API de données | `KB_EXCHANGE_BLOB_URL` et `KB_DATA_API_KEY_WEB` ; Storage Blob Data Reader sur `watch` seul |
 
-Dans l'ordre, une écriture dans Azure ou dans Entra à la fois :
+Dans l'ordre, une écriture dans Azure ou dans Entra à la fois, et jamais pendant une exécution d'un cron (« La règle
+des heures ») : **aucune passe entre 08:00 et 09:05 UTC, ni, le lundi et le jeudi, entre 10:00 et 10:35 UTC**. Une
+passe change les apps et les jobs au milieu d'une exécution, comme un tag.
 1. Le critère rouge.
 2. L'inscription d'application, puis son principal.
 3. Les deux secrets.
@@ -1433,9 +1436,11 @@ Aperçu attendu :
   - Container Apps Contributor d'`id-kb-deploy` sur `ca-kb-web`.
 - **à modifier** :
   - `ca-kb-data-api` : 2 variables (`KB_EXCHANGE_BLOB_URL`, `KB_DATA_API_KEY_WEB`) et 1 secret ;
-  - l'image des apps et des jobs si `TAG` est une autre version que celle en ligne ;
+  - l'image de `ca-kb-data-api`, de `ca-kb-ai-api` et des 4 jobs (`k-b@sha256:…` devient `k-b:<TAG>`, la même
+    image), même avec `TAG` = la version en ligne ;
   - le bruit de l'étape 5.
-- Tout autre écart arrête la passe, en particulier sur `cae-kb`, le stockage, les verrous ou `ca-kb-ai-api`.
+- Tout autre écart arrête la passe, en particulier sur `cae-kb`, le stockage, les verrous, ou `ca-kb-ai-api` hors de
+  son image.
 
 AcrPull et les rôles du coffre d'`id-kb-web` naissent dans la même passe que l'app. Si l'app échoue sur « unable to
 fetch secret », ou si le tirage de l'image est refusé, relancer la même commande 10 minutes plus tard.
