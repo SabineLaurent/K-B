@@ -463,7 +463,7 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
   Data Reader) et écrit `watch` (Storage Blob Data Contributor); `id-kb-digest-watch` écrit `watch`; le compte Entra
   de l'opératrice écrit `clippings` et `zotero`, et lit `watch`. Un second compte, `stkbjobfiles`, porte le partage
   `job-data`, que les deux jobs planifiés montent sur `/var/lib/knowledge_base` (`infra/modules/job-files-storage.bicep:60`,
-  `infra/main.bicep:61`, `infra/modules/daily-routine-job.bicep:119`, `infra/modules/digest-watch-job.bicep:106`).
+  `infra/main.bicep:61`, `infra/modules/daily-routine-job.bicep:119`, `infra/modules/digest-watch-job.bicep:107`).
 - **Le déploiement**: un tag `vX.Y.Z` sur `main` lance `deploy.yml`, qui se connecte par OIDC sous `id-kb-deploy`,
   pousse l'image, lance `caj-kb-migrate-database`, met à jour les apps et les jobs, puis lance `caj-kb-smoke-test`
   (`.github/workflows/deploy.yml:7-11`, `:97-133`, `:161-209`). `id-kb-deploy` a les rôles AcrPush et Reader sur le
