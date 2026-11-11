@@ -6534,7 +6534,69 @@ Plan validé par Sabine le 10/11 (sortie du mode plan à 10:48Z), relu par un so
   avec leur parade (« Écritures concurrentes en ligne ») : deux conteneurs qui écrivent en même temps, et la fraîcheur
   d'une écriture d'un client pour un autre. — PR de #330
 
+## 2026-11-11
+
+### API de données : la liste des items pour le fil (#550)
+
+Plan de la session K-B validé par Sabine le 2026-11-11 ; les points de revue, tranchés par
+time-knight sous la délégation de Sabine du 15/10.
+
+- **`GET /items` sert, pour chaque item, les identifiants de sa sorte sous les noms du détail :
+  `arxiv_id` (papier) ; `cve_id` et `exploited` (faille) ; `repository_name` et `tag_name`
+  (release) ; `ghsa_id`, `cve_id`, `exploited` et `packages` (alerte) ; `edition` (article) ; rien
+  de plus pour une entrée Zotero et un clip. La liste est une union discriminée par `kind`, et le
+  détail de chaque sorte est l'item listé de sa sorte, plus ses champs propres.** Pourquoi : la
+  carte du fil de l'interface web (décision de Sabine du 2026-11-09, maquettes validées) affiche
+  ces identifiants sous le titre, et Sabine a choisi de compléter la liste plutôt que d'appauvrir
+  les maquettes. Prolonge la liste blanche du détail (2026-10-15, « API de données : détail et
+  tendances ») : ni auteur, ni texte long dans la liste. Option écartée : un schéma plat aux
+  champs nuls, où un `null` dirait à la fois « pas de CVE » et « pas une alerte ». La spec passe
+  en 0.12.0.
+  - L'`arxiv_id` d'une entrée Zotero est lu par la liste, qui ne le sert pas (son schéma ne le
+    nomme pas), et servi par le détail. Pourquoi : un champ de sorte ne doit jamais porter le nom
+    d'un champ de la liste, sinon il le remplacerait sans bruit
+    (`test_no_field_of_a_kind_takes_the_name_of_a_field_of_the_list`, #185). Option écartée à la
+    revue : lire cet `arxiv_id` au seul détail, ce qui retirait de la liste un `LEFT JOIN` par la
+    clé primaire de `publication`, au coût jugé négligeable.
+- **`total`, le nombre des items qui répondent à `kind`, `since` et `q`, est compté par une
+  requête `count(*)` sur les mêmes filtres, sans tri ni `LIMIT`, dans la même transaction de
+  lecture que la page ; `limit` et `offset` gardent leurs bornes.** Pourquoi : le fil affiche
+  « n items » ; la transaction commune empêche un import entre les deux lectures de les faire
+  diverger. Option écartée : `count(*) OVER ()` dans la lecture de la page, car une page au-delà
+  de la fin n'a aucune ligne, donc aucun total, et il faudrait un second chemin. Limite acceptée
+  par Sabine le 2026-11-11 : en PostgreSQL, la liste fait deux instructions de 5 s chacune, plus
+  2 s d'attente du pool, soit 12 s au pire, au-delà des 10 s du client de l'API IA ; en SQLite,
+  la page et son total se partagent les 5 s de la requête (relevé à la revue de code). Pour réduire
+  le risque : `count(*) OVER ()`, une lecture au lieu de deux, que PostgreSQL et SQLite calculent
+  sur les lignes du `WHERE`, avant `LIMIT` (`docs/specs-api.md`, « Délai ») ; faisable, du code
+  seulement. Gardé à la revue : un total recompté à chaque page, même pour l'API IA, qui ne le lit
+  pas. Le compter à la seule première page changerait le contrat validé.
+- **`exploited` garde le sens de l'ADR du 2026-10-07 (« exploitée » se lit
+  `item_id IS NOT NULL`) : vrai pour toute faille du catalogue CISA KEV, retirée depuis ou non, le
+  retrait se lisant dans `withdrawn_at` ; pour une alerte, faux veut dire « absente du catalogue »,
+  et il est nul sans CVE. Il est servi dans la liste et, désormais, au détail d'une faille.**
+  Décision de Sabine du 2026-11-11. La règle est écrite dans les branches de `LISTED_ITEMS`, une
+  par sorte, et le détail la reprend de l'item listé (`SELECT_ADVISORY` disparaît).
+- **La liste sert les 10 premiers paquets d'une alerte, dans l'ordre de la base, et
+  `packages_truncated` dit qu'il en manque ; le détail les sert tous, avec
+  `packages_truncated` faux.** Décision de Sabine du 2026-11-11 : c'est la parade de la limite
+  (b) du plan. Servis entiers (l'import en permet 100 de 255 caractères), les paquets ajoutaient
+  environ 2,58 Mo à une page de 100 alertes, et la page passait, avec les 2 Mo de son pire estimé,
+  la borne de 4 000 000 octets que lit le client de l'API IA (`MAX_DATA_API_BODY_BYTES`). À 10,
+  ils ajoutent environ 0,26 Mo. La borne vit dans `item_router.py` (`MAX_LISTED_PACKAGES`), comme
+  celles du détail (#430) ; la description de `packages` dans l'OpenAPI l'écrit en chiffre, pour
+  qu'un client la lise, et le test qui l'écrit aussi en dur (`TEN_PACKAGES`) échoue si la constante
+  change, comme pour 100 surlignages et 125 000 caractères (tri de la revue). Options écartées à la
+  revue : une description sans chiffre (« up to the bound of the list », lue comme la borne de
+  `limit`) ; la constante déplacée dans le schéma pour l'écrire par f-string, contre le
+  rangement des bornes de #430. Limite :
+  la base lit tous les paquets avant la coupe, qui borne la réponse, pas la lecture.
+  — PR de #550
+
 ## Décisions encore ouvertes
+
+- **Le tri du fil** (2026-11-11, #550) : choisir l'ordre de `GET /items`, aujourd'hui du plus
+  récent au plus ancien par la date de la source ; à préciser par Sabine, hors de #550.
 
 - **Une limite de connexions du serveur** (2026-11-05, #161) : `limit_concurrency` d'uvicorn, écarté
   de la PR 2A parce qu'il compte les connexions muettes, à mesurer derrière l'entrée d'ACA. Laissée
