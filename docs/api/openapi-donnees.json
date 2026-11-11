@@ -491,12 +491,13 @@
               "type": "string"
             },
             "type": "array",
-            "title": "Packages"
+            "title": "Packages",
+            "description": "The packages affected: the first 10 in the list, every one in the detail."
           },
           "packages_truncated": {
             "type": "boolean",
             "title": "Packages Truncated",
-            "description": "Packages are left out: the list serves the first ones of an advisory, up to the bound of the list, its detail every one, and says false."
+            "description": "Packages are left out of packages; always false in the detail."
           }
         },
         "type": "object",
@@ -514,7 +515,7 @@
           "packages_truncated"
         ],
         "title": "AdvisoryDetailSchema",
-        "description": "The detail of an advisory serves every package, and packages_truncated false."
+        "description": "An advisory has no field beyond those of the list."
       },
       "ClipDetailSchema": {
         "properties": {
@@ -835,12 +836,13 @@
               "type": "string"
             },
             "type": "array",
-            "title": "Packages"
+            "title": "Packages",
+            "description": "The packages affected: the first 10 in the list, every one in the detail."
           },
           "packages_truncated": {
             "type": "boolean",
             "title": "Packages Truncated",
-            "description": "Packages are left out: the list serves the first ones of an advisory, up to the bound of the list, its detail every one, and says false."
+            "description": "Packages are left out of packages; always false in the detail."
           }
         },
         "type": "object",

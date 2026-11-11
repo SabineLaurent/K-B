@@ -55,10 +55,11 @@ class ListedAdvisorySchema(ListedItemSchema):
     ghsa_id: str
     cve_id: str | None
     exploited: bool | None = Field(description=EXPLOITED)
-    packages: list[str]
+    packages: list[str] = Field(
+        description="The packages affected: the first 10 in the list, every one in the detail."
+    )
     packages_truncated: bool = Field(
-        description="Packages are left out: the list serves the first ones of an advisory, up"
-        " to the bound of the list, its detail every one, and says false."
+        description="Packages are left out of packages; always false in the detail."
     )
 
 
@@ -124,7 +125,7 @@ class ReleaseDetailSchema(ListedReleaseSchema):
 
 
 class AdvisoryDetailSchema(ListedAdvisorySchema):
-    """The detail of an advisory serves every package, and packages_truncated false."""
+    """An advisory has no field beyond those of the list."""
 
 
 class NewsletterArticleDetailSchema(ListedNewsletterArticleSchema):

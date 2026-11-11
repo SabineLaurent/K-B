@@ -35,8 +35,8 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 ## Problèmes connus
 
-- **Le détail et la liste de l'API de données sont bornés en temps par instruction** (#331, #418,
-  #550) : depuis #430, la
+- **Le détail et la liste de l'API de données sont bornés en temps, par instruction en PostgreSQL**
+  (#331, #418, #550) : depuis #430, la
   lecture du détail est bornée à 101 surlignages (2 020 000 caractères de texte et de commentaire au
   plus) et à 125 001 caractères du texte d'un clip ; en SQLite, ce que le moteur charge pour calculer
   `substr` n'est pas mesuré (`docs/specs-api.md`, « Bornes du détail »). Le temps reste
