@@ -1266,6 +1266,18 @@ On y relève :
 Un sujet qui expire ne se rattrape pas le même jour : la fiche du jour d'un autre sujet bloque la relance de
 `kb digest`.
 
+**La première exécution, le 2026-11-11** (`caj-kb-digest-watch-suoshpa`, à la main, 16:21:16 → 16:25:25 UTC) :
+- image tirée en 4 s ; réveil de l'API de données en 22 s, de l'API IA en 20 s ;
+- `kb digest` : 141 items lus (fenêtre du 2026-11-08 au 2026-11-11), 2 min 13 s, 8 fiches sur 9. Le sujet
+  `coding_assistants` finit `llm_invalid_output`, après deux sorties refusées par le contrôle `markup` (journal de
+  l'API IA, `failed_check`). L'étape sort en 4 ;
+- `kb trend-report` : 39 s, 4 fenêtres (du 2026-11-07 au 2026-11-10), 27 dépôts, code 0 ;
+- publication : `13 sheets found: 9 sent, 4 already in watch` (les fiches des tops, publiées par la routine) ;
+- code de sortie 4, donc `Failed` pour Azure, sans heure de fin, comme une exécution `Failed` de la routine.
+
+Les journaux arrivent dans `log-kb` avec plusieurs minutes de retard : une exécution déjà `Failed` peut montrer un
+journal arrêté au milieu d'une étape. On attend avant de conclure.
+
 ### Les comptes rendus, sur le Mac
 
 ```sh
