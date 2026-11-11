@@ -6690,6 +6690,54 @@ time-knight sous la délégation de Sabine du 15/10, sauf ce qui est marqué Sab
   time-knight. Limite : la CSS n'est pas minifiée (Opquast 229), faute d'outil de build sans
   dépendance nouvelle. — PR de #562
 
+### Comptes rendus en ligne : `caj-kb-digest-watch` (#423)
+
+Plan de tn-codeur validé par Sabine le 2026-11-11, relu par un sous-agent neuf ; ses décisions sont citées entrée par
+entrée.
+
+- **`caj-kb-digest-watch` lance `kb digest-watch` le lundi et le jeudi à 10:00 UTC, une fois la routine finie.** Les
+  jours sont ceux de l'issue (plan de mise en ligne du 2026-11-06). L'heure suit la routine : celle-ci démarre à 08:00
+  UTC et finit à 09:00 UTC au plus (« Routine quotidienne en ligne : `caj-kb-daily-routine` (#330) », 2026-11-10).
+  **Inverse** le cron `0 5 * * 1,4` de l'issue, écrit quand la routine devait démarrer à 03:00. Limite : rien ne tient
+  les deux jobs à l'écart l'un de l'autre, sauf une consigne sur les heures de départ à la main (`infra/README.md`,
+  « La règle des heures ») ; le verrou de #426 ne couvre que la base. — PR de #423
+- **L'expression cron est un paramètre de l'infra, `digestWatchCronExpression` dans `infra/main.bicep`, avec
+  `0 10 * * 1,4` par défaut, passé au module sans défaut.** Décision de Sabine du 2026-11-11 : « l'expression cron en
+  paramètre de l'infra, pas en dur ». Le défaut est un choix de la session : une passe qui ne donne pas le paramètre,
+  CI comprise, garde le rythme décidé, et changer l'heure ne demande pas de toucher au code. Écarté : un paramètre sans
+  défaut, que chaque passe devrait donner. Limite : le cron de la routine reste écrit dans son module
+  (`infra/modules/daily-routine-job.bicep`). — PR de #423
+- **Le job monte `job-data` à sa racine, sur `KB_DATA_DIR`, comme la routine.** Décision de Sabine du 2026-11-11.
+  Pourquoi : `kb trend-report` tient le registre de ses comptes rendus dans `KB_DATA_DIR`
+  (`post/trend_report_registry.py:26`), et repartirait de zéro à chaque passage sans partage ; `kb digest` et
+  `kb trend-report` cherchent le compte rendu du jour dans le coffre avant toute demande. **Inverse en partie**
+  « `job-data` est monté par l'identité système de `cae-kb` » (2026-11-10, #420) : « Seuls les jobs de #330 le
+  déclareront » devient la routine et ce job. Écarté : un second partage, qui demande un second coffre, de nouveaux
+  gestes, et ôte le rattrapage par la routine, qui republie chaque jour `veille/` du coffre commun. Limite : le job voit
+  aussi le brut, l'état de la collecte et les journaux de la routine ; la parade par `subPath`, non appliquée, est au
+  registre des traitements (« Données personnelles avec #423 »). — PR de #423
+- **Aucune reprise (`replicaRetryLimit: 0`), un délai de 1 800 s.** Comme le veut l'issue (constat 14 du plan du
+  2026-11-06). Pourquoi : après une expiration côté `kb`, une reprise appellerait le modèle une seconde fois, et
+  `kb digest` comme `kb trend-report` ne refusent que si le compte rendu du jour existe, ce qu'une exécution coupée n'a
+  pas forcément écrit. Limite : Microsoft Learn conseille « Set the replica retry limit to at least `1` » à cause de la
+  maintenance de la plateforme (« Jobs in Azure Container Apps », lu le 2026-11-11). Parade : la routine republie
+  `veille/` chaque jour, et une exécution manquée se relance à la main le même jour, dans les heures permises.
+  — PR de #423
+- **La fenêtre des comptes rendus reste à 3 jours en ligne, le défaut : aucun `KB_DIGEST_WINDOW_DAYS`.** Décision de
+  Sabine du 2026-11-11 (« 5 jours c'est trop, je veux 3 »), sur une recommandation de 5 jours. Limite : avec un passage
+  le lundi et le jeudi, rien ne couvre du jeudi 10:00 au vendredi 10:00 UTC, ni les items du jeudi que la collecte du
+  vendredi apporte (la fenêtre suit la date de la source, `docs/fiches-veille.md`, « Fenêtre »). Parade : #565,
+  « Démarrer chaque compte rendu de veille à la fin du précédent de son sujet », qui code la règle de Sabine du
+  2026-10-26 (`docs/tendances.md`, fin de « Hors v1 »). Options écartées par la session avant la décision : 4 jours (le
+  TLDR et les entrées KEV du jeudi, datés de minuit et collectés le vendredi, restaient hors de toute fenêtre) ; un
+  passage par jour (`kb trend-report` est prévu deux fois par semaine, « Tendances : un compte rendu deux fois par
+  semaine », 2026-10-29). — PR de #423
+- **`kb digest` et `kb trend-report` tournent en ligne dans `caj-kb-digest-watch`.** Clôt la question « Où tourne
+  `kb write-tops` en ligne » (2026-10-19), étendue à `kb digest` (2026-10-21) et à `kb trend-report` (2026-10-30),
+  close pour `kb write-tops` le 2026-11-10 dans la routine. Pourquoi : le montage de `job-data` lève l'obstacle de la
+  question, qu'aucun conteneur ne montait le coffre ; ces deux commandes appellent le modèle, leur place est le job
+  des comptes rendus, pas la routine, qui reste le chemin sans modèle. — PR de #423
+
 ## Décisions encore ouvertes
 
 - **Le tri du fil** (2026-11-11, #550) : choisir l'ordre de `GET /items`, aujourd'hui du plus
@@ -6734,14 +6782,6 @@ time-knight sous la délégation de Sabine du 15/10, sauf ce qui est marqué Sab
   (2026-11-04) ; l'étape 8 de la procédure de tri n'en dépend plus depuis le 2026-11-04 (#83). `README.md` et `docs/stockage.md` (« Le SGBD ») y renvoient. **Close le 2026-11-06** :
   PostgreSQL en ligne (« Base : PostgreSQL en ligne, par un adaptateur maison (#417) ») ; la
   sauvegarde de la base et la purge qui en dépend passent à #390.
-
-- **Où tourne `kb write-tops` en ligne** (2026-10-19) : elle écrit le coffre, qu'aucun conteneur
-  ne monte au POC (règle 4 de `.claude/rules/poc.md`) ; à trancher avant la mise en ligne du
-  08/11 (« Tops : les fiches par `kb write-tops` »). La même question vaut pour `kb digest`
-  (2026-10-21, « Fiches de veille : `kb digest` les écrit dans le coffre »), et pour
-  `kb trend-report` (2026-10-30, « Tendances : un compte rendu deux fois par semaine »). **Close pour
-  `kb write-tops` le 2026-11-10** : dans `caj-kb-daily-routine` (« Routine quotidienne en ligne : `caj-kb-daily-routine`
-  (#330) ») ; reste ouverte pour `kb digest` et `kb trend-report`, jusqu'à #423 (`caj-kb-digest-watch`).
 
 - **Un code de sortie dédié à l'authentification**, pour toutes les commandes (2026-10-21) : à
   reconsidérer avec #160 (jetons qui expirent) ; une clé refusée sort aujourd'hui en 1.
