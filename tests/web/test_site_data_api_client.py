@@ -267,9 +267,7 @@ def test_a_failure_of_the_transport_is_a_named_state(raised, state):
 def test_a_body_beyond_its_bound_is_refused():
     body = b"x" * (MAX_WEB_DATA_API_BODY_BYTES + 1)
 
-    error = read_state(
-        make_client(lambda request: httpx2.Response(200, content=body))
-    )
+    error = read_state(make_client(lambda request: httpx2.Response(200, content=body)))
 
     assert error.state == "data_api_invalid_response"
 

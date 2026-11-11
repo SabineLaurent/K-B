@@ -165,7 +165,9 @@ def read_data_api_access_or_refusal(
         return f"{DATA_API_KEY_VARIABLE}: not set"
     refusal = find_internal_api_url_refusal(
         DATA_API_URL_VARIABLE, base_url, environ
-    ) or find_api_key_refusal(API_KEY_VARIABLE_PREFIX, DATA_API_KEY_VARIABLE, api_key, {})
+    ) or find_api_key_refusal(
+        API_KEY_VARIABLE_PREFIX, DATA_API_KEY_VARIABLE, api_key, {}
+    )
     if refusal is not None:
         return refusal
     return DataApiAccess(base_url=base_url, api_key=SecretStr(api_key))

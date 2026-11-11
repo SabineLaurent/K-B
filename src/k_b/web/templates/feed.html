@@ -1,0 +1,97 @@
+{%- macro field_error(field) -%}
+{%- if field in error_by_field %}
+<p id="{{ field }}-error" class="field-error">{{ error_by_field[field] }}</p>
+{%- endif -%}
+{%- endmacro -%}
+{%- macro invalid(field) -%}
+{%- if field in error_by_field %} aria-invalid="true"{% endif -%}
+{%- endmacro -%}
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block main_class %}page feed{% endblock %}
+{% block content %}
+<h1>Quoi de neuf</h1>
+<p class="page-intro">Collecte automatique: arXiv, catalogue KEV (<i lang="en">Known Exploited Vulnerabilities</i>) de la CISA (<i lang="en">Cybersecurity and Infrastructure Security Agency</i>), alertes GitHub, <span lang="en">releases</span>, newsletters.</p>
+<p class="page-intro">Site privé, réservé à son opératrice.</p>
+<form class="feed-filters" method="get" action="/" aria-label="Filtres">
+{% if errors %}
+<div class="error-summary">
+<h2>Filtre à corriger</h2>
+<ul>
+{% for error in errors %}
+<li><a href="#{{ error.field }}">{{ error.message }}</a></li>
+{% endfor %}
+</ul>
+</div>
+{% endif %}
+<div class="field">
+<label for="q">Rechercher</label>
+<p id="q-help" class="field-help">Un morceau du titre ou du résumé, en 200 caractères au plus. Les majuscules ne comptent pas, sauf sur une lettre accentuée.</p>
+{{ field_error("q") }}
+<input id="q" name="q" type="search" maxlength="200" value="{{ form.q }}" aria-describedby="q-help{% if 'q' in error_by_field %} q-error{% endif %}"{{ invalid("q") }}>
+</div>
+<fieldset id="kinds"{% if "kinds" in error_by_field %} aria-describedby="kinds-error"{% endif %}>
+<legend>Sortes</legend>
+{{ field_error("kinds") }}
+<div class="choices">
+{% for kind in feed_kinds %}
+{% set labels = labels_by_kind[kind] %}
+<div class="choice">
+<input id="kind-{{ kind }}" type="checkbox" name="kind" value="{{ kind }}"{% if kind in form.kinds %} checked{% endif %}>
+<label for="kind-{{ kind }}"{% if labels.label_lang %} lang="{{ labels.label_lang }}"{% endif %}>{{ labels.form_label }}</label>
+</div>
+{% endfor %}
+</div>
+</fieldset>
+<fieldset id="period"{% if "period" in error_by_field %} aria-describedby="period-error"{% endif %}>
+<legend>Depuis</legend>
+{{ field_error("period") }}
+<div class="choices">
+{% for period in periods %}
+<div class="choice">
+<input id="period-{{ period }}" type="radio" name="period" value="{{ period }}"{% if period == form.period %} checked{% endif %}>
+<label for="period-{{ period }}">{{ period_labels[period] }}</label>
+</div>
+{% endfor %}
+</div>
+<div class="field">
+<label for="start">Date de début</label>
+{{ field_error("start") }}
+<input id="start" name="start" type="date" value="{{ form.start }}"{% if "start" in error_by_field %} aria-describedby="start-error"{% endif %}{{ invalid("start") }}>
+</div>
+</fieldset>
+<div class="form-actions">
+<button class="button" type="submit">Filtrer</button>
+</div>
+</form>
+{% if listing %}
+<p class="results-line">{{ listing.line }}</p>
+{% if listing.has_unlisted_items %}
+<p class="results-note">Au-delà de la page {{ listing.pages }}, les items ne sont pas servis: affinez les filtres pour les lire.</p>
+{% endif %}
+{% if listing.cards %}
+{#- role="list": Safari drops the semantics of a list whose list-style is none. -#}
+<ul class="cards" role="list">
+{% for card in listing.cards %}
+<li class="card">
+<p class="card-meta"><span class="card-kind"{% if card.kind_lang %} lang="{{ card.kind_lang }}"{% endif %}>{{ card.kind_label }}</span> <time datetime="{{ card.day }}">{{ card.day_text }}</time>{% if card.is_exploited %} <span class="badge">Exploitée (KEV)</span>{% endif %}</p>
+<p class="card-identifiers">{{ card.identifiers }}{% if card.withdrawn_text %}, {{ card.withdrawn_text }}{% endif %}</p>
+<h2 class="card-title"{% if card.title_lang %} lang="{{ card.title_lang }}"{% endif %}>{{ card.title }}</h2>
+{% if card.link %}
+<a class="card-link" href="{{ card.link }}"{% if card.link_lang %} hreflang="{{ card.link_lang }}"{% endif %}>{{ card.link_label }} ({{ card.link_note }})<span aria-hidden="true"> ↗</span></a>
+{% endif %}
+</li>
+{% endfor %}
+</ul>
+{% elif listing.wider_link %}
+<p class="empty-actions"><a class="button-secondary" href="{{ listing.wider_link }}">Élargir à 7 jours</a></p>
+{% endif %}
+{% if listing.pages > 1 %}
+<nav class="pagination" aria-label="Pagination">
+{% if listing.previous_link %}<a href="{{ listing.previous_link }}" rel="prev"><span aria-hidden="true">←</span> Page précédente</a>{% endif %}
+<p class="pagination-current">Page {{ listing.page }} sur {{ listing.pages }}</p>
+{% if listing.next_link %}<a href="{{ listing.next_link }}" rel="next">Page suivante <span aria-hidden="true">→</span></a>{% endif %}
+</nav>
+{% endif %}
+{% endif %}
+{% endblock %}

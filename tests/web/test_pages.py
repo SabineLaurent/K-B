@@ -8,10 +8,9 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 from jinja2 import StrictUndefined
-from site_client import OPERATOR_HEADERS, PAGE_PATHS, make_client
+from site_client import OPERATOR_HEADERS, PAGE_PATHS, make_app, make_client
 
 from k_b.web import errors
-from k_b.web.app import create_app
 from k_b.web.french_dates import write_moment
 from k_b.web.rendering import templates
 
@@ -31,7 +30,7 @@ def client():
 @pytest.fixture
 def failing_client():
     """The site with one more route, which fails as no page should."""
-    app = create_app(operator_id=None)
+    app = make_app(operator_id=None)
 
     @app.get("/failing")
     def fail() -> None:
@@ -43,7 +42,7 @@ def failing_client():
 @pytest.mark.parametrize(
     ("path", "title"),
     [
-        ("/", "Quoi de neuf · K-B"),
+        ("/", "Quoi de neuf, page 1 sur 1 · K-B"),
         ("/sources", "Sources et conditions d’utilisation · K-B"),
         ("/accessibilite", "Accessibilité · K-B"),
     ],
@@ -181,7 +180,7 @@ def test_the_page_500_has_its_security_headers_and_is_not_kept(failing_client):
 
 def test_a_host_not_allowed_is_refused_with_the_security_headers():
     response = TestClient(
-        create_app(operator_id=None), base_url="http://example.org"
+        make_app(operator_id=None), base_url="http://example.org"
     ).get("/")
 
     assert response.status_code == 400
@@ -190,7 +189,7 @@ def test_a_host_not_allowed_is_refused_with_the_security_headers():
 
 def test_a_host_without_the_www_of_an_allowed_host_is_refused_never_redirected():
     """Starlette would build its redirection with the scheme it sees, http behind the ingress."""
-    app = create_app(operator_id=None, allowed_hosts=("www.example.org",))
+    app = make_app(operator_id=None, allowed_hosts=("www.example.org",))
     client = TestClient(app, base_url="http://example.org")
 
     assert client.get("/", follow_redirects=False).status_code == 400

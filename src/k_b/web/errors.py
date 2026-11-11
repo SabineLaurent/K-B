@@ -32,6 +32,8 @@ FALLBACK_SERVER_ERROR_PAGE = """<!DOCTYPE html>
 </body>
 </html>
 """
+
+
 def render_error_page(
     request: Request, status_code: int, headers: Mapping[str, str] | None = None
 ) -> Response:

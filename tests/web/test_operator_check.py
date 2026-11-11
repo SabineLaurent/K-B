@@ -5,9 +5,13 @@ import logging
 
 import pytest
 from fastapi.testclient import TestClient
-from site_client import OPERATOR_HEADER, OPERATOR_HEADERS, OPERATOR_ID, make_client
-
-from k_b.web.app import create_app
+from site_client import (
+    OPERATOR_HEADER,
+    OPERATOR_HEADERS,
+    OPERATOR_ID,
+    make_app,
+    make_client,
+)
 
 ANOTHER_ID = "11111111-2222-4333-8444-555555555555"
 
@@ -59,7 +63,7 @@ def test_health_answers_without_the_header(client):
 @pytest.mark.parametrize("path", ["/health%3F", "/health%23x", "/health%3Fa=1"])
 def test_a_path_that_only_reads_as_health_in_its_url_is_checked(path):
     """The router follows the path decoded, /health? here; its URL stops at the ?, /health."""
-    app = create_app(operator_id=OPERATOR_ID)
+    app = make_app(operator_id=OPERATOR_ID)
 
     @app.get("/{name}")
     def show_name(name: str) -> str:

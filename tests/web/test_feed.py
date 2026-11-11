@@ -246,22 +246,28 @@ def test_the_link_of_a_page_drops_a_start_date_the_radio_ignores():
             14,
             1,
             1,
-            "14 items depuis le 10 novembre 2026, du plus récent au plus ancien."
-            " Page 1 sur 1.",
+            (
+                "14 items depuis le 10 novembre 2026, du plus récent au plus ancien."
+                " Page 1 sur 1."
+            ),
         ),
         (
             1,
             1,
             1,
-            "1 item depuis le 10 novembre 2026, du plus récent au plus ancien."
-            " Page 1 sur 1.",
+            (
+                "1 item depuis le 10 novembre 2026, du plus récent au plus ancien."
+                " Page 1 sur 1."
+            ),
         ),
         (
             41,
             3,
             3,
-            "41 items depuis le 10 novembre 2026, du plus récent au plus ancien."
-            " Page 3 sur 3.",
+            (
+                "41 items depuis le 10 novembre 2026, du plus récent au plus ancien."
+                " Page 3 sur 3."
+            ),
         ),
     ],
 )
@@ -277,7 +283,9 @@ def test_the_line_of_the_results_gives_the_items_the_period_and_the_page(
 def test_the_line_of_no_result_gives_the_period():
     since = datetime(2026, 11, 10, tzinfo=UTC)
 
-    assert write_results_line(0, since, 1, 1) == "Aucun item depuis le 10 novembre 2026."
+    assert (
+        write_results_line(0, since, 1, 1) == "Aucun item depuis le 10 novembre 2026."
+    )
 
 
 @pytest.mark.parametrize(
@@ -325,7 +333,11 @@ def test_the_card_of_a_vulnerability_is_always_exploited_and_says_its_withdrawal
     ("item_id", "is_exploited", "identifiers"),
     [
         (9, True, "GHSA-fjqc-hq36-qh5p · CVE-2020-29583 · langgraph-checkpoint"),
-        (17, False, "GHSA-3644-q5cj-c5c7 · CVE-2026-45134 · langsmith, langchain-classic, langchain"),
+        (
+            17,
+            False,
+            "GHSA-3644-q5cj-c5c7 · CVE-2026-45134 · langsmith, langchain-classic, langchain",
+        ),
         (10, False, "GHSA-gr75-jv2w-4656 · langchain, langchain-anthropic"),
     ],
     ids=["in-kev", "not-in-kev", "without-cve"],

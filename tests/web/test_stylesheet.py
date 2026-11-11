@@ -24,6 +24,11 @@ PAIRS = [
     ("--color-on-teal", "--color-teal-deep", 4.5),
     # The focus ring, a component, on the background of the pages.
     ("--color-teal", "--color-paper", 3),
+    # The mark Exploitée (KEV), the messages of a field refused, the border of a field.
+    ("--color-on-alert", "--color-alert", 4.5),
+    ("--color-alert-deep", "--color-card", 4.5),
+    ("--color-alert-deep", "--color-paper", 4.5),
+    ("--color-field-border", "--color-card", 3),
 ]
 
 

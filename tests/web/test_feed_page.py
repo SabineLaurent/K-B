@@ -1,0 +1,288 @@
+"""The feed on the home page, its data API simulated: the cards, the filters kept, the pages, the
+errors, the empty feed, and a value received always escaped (docs/site-web.md, "Fil")."""
+
+import gzip
+import logging
+import re
+
+import httpx2
+import pytest
+from feed_fixture import ITEMS_PAGE, make_page
+from site_client import OPERATOR_HEADERS, make_client, serve
+
+from k_b.web.feed import FEED_PATH
+
+ALL_KINDS = (
+    "kind=paper&kind=vulnerability&kind=advisory&kind=release&kind=newsletter_article"
+)
+
+
+class RecordingApi:
+    """A data API that answers each request with the body given, and keeps the requests."""
+
+    def __init__(self, body, status_code=200):
+        self.body = body
+        self.status_code = status_code
+        self.requests = []
+
+    def __call__(self, request):
+        self.requests.append(request)
+        return httpx2.Response(self.status_code, json=self.body)
+
+
+def get_feed(query="", handler=None):
+    client = make_client(handler=handler)
+    return client.get(f"{FEED_PATH}?{query}", headers=OPERATOR_HEADERS)
+
+
+def find_input(text, input_id):
+    match = re.search(rf'<input id="{input_id}"[^>]*>', text)
+    assert match is not None, input_id
+    return match.group(0)
+
+
+def test_the_feed_shows_twenty_cards_the_results_and_the_page():
+    api = RecordingApi(make_page(20, total=45))
+
+    response = get_feed(handler=api)
+
+    assert response.status_code == 200
+    assert response.text.count('<li class="card">') == 20
+    assert (
+        "45 items depuis le 10 novembre 2026, du plus récent au plus ancien."
+        " Page 1 sur 3." in response.text
+    )
+    assert "<title>Quoi de neuf, page 1 sur 3 · K-B</title>" in response.text
+
+
+def test_the_feed_asks_the_data_api_the_five_kinds_since_yesterday_without_search():
+    api = RecordingApi(ITEMS_PAGE)
+
+    get_feed(handler=api)
+
+    [request] = api.requests
+    assert request.url.params.get_list("kind") == [
+        "paper",
+        "vulnerability",
+        "advisory",
+        "release",
+        "newsletter_article",
+    ]
+    assert request.url.params["since"] == "2026-11-10T00:00:00Z"
+    assert request.url.params["offset"] == "0"
+    assert "q" not in request.url.params
+
+
+def test_the_filters_are_sent_and_shown_again():
+    api = RecordingApi(ITEMS_PAGE)
+
+    response = get_feed("q=langchain&kind=paper&kind=release&period=3", handler=api)
+
+    [request] = api.requests
+    assert request.url.params["q"] == "langchain"
+    assert request.url.params.get_list("kind") == ["paper", "release"]
+    assert request.url.params["since"] == "2026-11-08T00:00:00Z"
+    assert 'value="langchain"' in find_input(response.text, "q")
+    assert "checked" in find_input(response.text, "kind-paper")
+    assert "checked" not in find_input(response.text, "kind-advisory")
+    assert "checked" in find_input(response.text, "period-3")
+    assert "checked" not in find_input(response.text, "period-1")
+
+
+def test_the_links_of_the_pages_keep_the_filters():
+    response = get_feed(
+        "q=lang&kind=paper&page=2", handler=serve(make_page(20, total=45))
+    )
+
+    assert "Page 2 sur 3" in response.text
+    assert 'href="/?q=lang&amp;kind=paper&amp;period=1" rel="prev"' in response.text
+    assert 'href="/?q=lang&amp;kind=paper&amp;period=1&amp;page=3" rel="next"' in (
+        response.text
+    )
+
+
+def test_a_single_page_has_no_link_to_another():
+    response = get_feed(handler=serve(ITEMS_PAGE))
+
+    assert 'rel="prev"' not in response.text
+    assert 'rel="next"' not in response.text
+
+
+def test_a_page_beyond_the_last_is_the_page_not_found():
+    api = RecordingApi(make_page(5, total=45))
+
+    response = get_feed("page=4", handler=api)
+
+    assert response.status_code == 404
+    assert "Page introuvable" in response.text
+    assert len(api.requests) == 1
+
+
+@pytest.mark.parametrize("page", ["502", "abc", "01", "0"])
+def test_a_page_out_of_its_form_is_the_page_not_found_without_asking_the_api(page):
+    api = RecordingApi(ITEMS_PAGE)
+
+    response = get_feed(f"page={page}", handler=api)
+
+    assert response.status_code == 404
+    assert response.headers["Content-Type"] == "text/html; charset=utf-8"
+    assert api.requests == []
+
+
+def test_a_kind_out_of_the_five_is_refused_in_html_without_asking_the_api():
+    """Never a Zotero entry nor a clip, even asked by the address."""
+    api = RecordingApi(ITEMS_PAGE)
+
+    response = get_feed("kind=clip", handler=api)
+
+    assert response.status_code == 422
+    assert response.headers["Content-Type"] == "text/html; charset=utf-8"
+    assert api.requests == []
+    assert '<fieldset id="kinds" aria-describedby="kinds-error">' in response.text
+    assert '<p id="kinds-error" class="field-error">Sorte inconnue' in response.text
+    assert '<li class="card">' not in response.text
+
+
+def test_a_search_too_long_is_refused_on_its_field_its_value_kept():
+    api = RecordingApi(ITEMS_PAGE)
+    search = "a" * 201
+
+    response = get_feed(f"q={search}", handler=api)
+
+    assert response.status_code == 422
+    assert api.requests == []
+    field = find_input(response.text, "q")
+    assert f'value="{search}"' in field
+    assert 'aria-invalid="true"' in field
+    assert 'aria-describedby="q-help q-error"' in field
+    assert '<p id="q-error" class="field-error">' in response.text
+    assert '<a href="#q">La recherche fait 201 caractères' in response.text
+    assert "<title>Quoi de neuf, filtre à corriger · K-B</title>" in response.text
+
+
+def test_date_checked_without_date_is_refused_on_the_start_field():
+    response = get_feed("period=date&start=", handler=serve(ITEMS_PAGE))
+
+    assert response.status_code == 422
+    assert 'aria-invalid="true"' in find_input(response.text, "start")
+    assert "checked" in find_input(response.text, "period-date")
+
+
+def test_a_search_the_data_api_refuses_lands_on_its_field():
+    api = RecordingApi({"error": "invalid_parameter", "parameters": ["q"]}, 422)
+
+    response = get_feed("q=langchain", handler=api)
+
+    assert response.status_code == 422
+    assert 'aria-invalid="true"' in find_input(response.text, "q")
+    assert "La base de K-B refuse cette recherche" in response.text
+
+
+@pytest.mark.parametrize(
+    ("handler", "state", "http_status"),
+    [
+        (serve({"error": "query_timeout"}, 503), "data_api_unavailable", "503"),
+        (serve({"error": "invalid_api_key"}, 401), "data_api_unauthorized", "401"),
+        (serve({"error": "rate_limit_exceeded"}, 429), "data_api_rate_limited", "429"),
+        (
+            serve({"error": "invalid_parameter", "parameters": ["kind"]}, 422),
+            "data_api_invalid_parameter",
+            "422",
+        ),
+        (serve({"items": "none"}), "data_api_invalid_response", "200"),
+    ],
+    ids=[
+        "unavailable",
+        "unauthorized",
+        "rate-limited",
+        "kind-refused",
+        "out-of-schema",
+    ],
+)
+def test_a_failure_of_the_data_api_is_the_page_500_logged_without_the_search(
+    caplog, handler, state, http_status
+):
+    with caplog.at_level(logging.INFO, logger="k_b"):
+        response = get_feed("q=secret-search", handler=handler)
+
+    request_id = response.headers["X-Request-ID"]
+    assert response.status_code == 500
+    assert "Erreur du serveur" in response.text
+    assert request_id in response.text
+    lines = [record.getMessage() for record in caplog.records]
+    assert (
+        f"data_api_failed: {state} http_status={http_status} request_id={request_id}"
+        in lines
+    )
+    assert not any("secret-search" in line for line in lines)
+
+
+def test_a_timeout_of_the_data_api_is_logged_without_status(caplog):
+    def handler(request):
+        raise httpx2.ReadTimeout("read")
+
+    with caplog.at_level(logging.INFO, logger="k_b"):
+        response = get_feed(handler=handler)
+
+    request_id = response.headers["X-Request-ID"]
+    assert response.status_code == 500
+    assert (
+        f"data_api_failed: data_api_timeout http_status=- request_id={request_id}"
+        in [record.getMessage() for record in caplog.records]
+    )
+
+
+def test_the_empty_feed_says_so_and_proposes_seven_days():
+    response = get_feed("q=nothing", handler=serve(make_page(0)))
+
+    assert response.status_code == 200
+    assert "Aucun item depuis le 10 novembre 2026." in response.text
+    assert (
+        f'href="/?q=nothing&amp;{ALL_KINDS.replace("&", "&amp;")}&amp;period=7"'
+        in response.text
+    )
+    assert "Élargir à 7 jours" in response.text
+    assert "<title>Quoi de neuf, aucun item · K-B</title>" in response.text
+
+
+def test_the_feed_beyond_the_last_page_served_says_to_refine():
+    response = get_feed(handler=serve(make_page(20, total=10_021)))
+
+    assert "Page 1 sur 501" in response.text
+    assert "affinez" in response.text
+
+
+def test_a_title_received_is_escaped_never_a_tag():
+    page = make_page(1)
+    page["items"][0]["title"] = '<script>alert("x")</script>'
+
+    response = get_feed(handler=serve(page))
+
+    assert "<script" not in response.text
+    assert "&lt;script&gt;alert(&#34;x&#34;)&lt;/script&gt;" in response.text
+
+
+def test_a_card_whose_url_is_not_https_has_no_link():
+    page = make_page(1)
+    page["items"][0]["url"] = "javascript:alert(1)"
+
+    response = get_feed(handler=serve(page))
+
+    assert "javascript:" not in response.text
+    assert 'class="card-link"' not in response.text
+
+
+def test_the_screen_of_the_feed_holds_three_requests_and_30_kb_at_most():
+    """D2 (Sabine, 2026-11-11; RGESN 6.1): the page, the stylesheet and the icon, cache empty,
+    compressed, on 20 items of the fixture."""
+    client = make_client(handler=serve(make_page(20, total=45)))
+    headers = {**OPERATOR_HEADERS, "Accept-Encoding": "gzip"}
+    page = client.get(FEED_PATH, headers=headers)
+    resources = re.findall(r"<(?:link|img|script|iframe|source)\b[^>]*>", page.text)
+    paths = [re.search(r'(?:href|src)="([^"]+)"', tag).group(1) for tag in resources]
+
+    assert paths == ["/static/site.css", "/static/favicon.svg"]
+    weights = [len(gzip.compress(page.content))] + [
+        client.get(path, headers=headers).num_bytes_downloaded for path in paths
+    ]
+    assert sum(weights) <= 30_000

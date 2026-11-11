@@ -2,7 +2,8 @@
 of GET /items, the pages and the cards (docs/site-web.md, "Fil")."""
 
 import re
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal, assert_never, get_args
 from urllib.parse import urlencode, urlsplit
@@ -51,6 +52,15 @@ DEFAULT_PERIOD: Period = "1"
 WIDER_PERIOD: Period = "7"
 DATE_PERIOD = "date"
 DAYS_BY_PERIOD = {"1": 1, "3": 3, "7": 7}
+PERIOD_LABELS: dict[Period, str] = {
+    "1": "1 jour",
+    "3": "3 jours",
+    "7": "7 jours",
+    "date": "Date",
+}
+# The title of the page in each state (RGAA 8.6).
+ERRORS_TITLE = "Quoi de neuf, filtre à corriger"
+NO_ITEM_TITLE = "Quoi de neuf, aucun item"
 
 # One address for each page (Opquast 2025, rule 169): neither 01 nor +1.
 PAGE_NUMBER = re.compile(r"[1-9][0-9]{0,2}")
@@ -154,6 +164,22 @@ class FeedCard:
     link_label: str
     link_note: str
     link_lang: str | None
+
+
+@dataclass(frozen=True)
+class FeedListing:
+    """A page of the feed as the page shows it: its line of results, its cards, its links."""
+
+    title: str
+    line: str
+    cards: tuple[FeedCard, ...]
+    page: int
+    pages: int
+    previous_link: str | None
+    next_link: str | None
+    # What the feed without item proposes: 7 days, from a shorter period.
+    wider_link: str | None
+    has_unlisted_items: bool
 
 
 def read_page_number(params: QueryParams) -> int | None:
@@ -292,6 +318,27 @@ def build_page_link(form: FeedForm, page: int) -> str:
     if page > 1:
         params.append((PAGE_FIELD, str(page)))
     return f"{FEED_PATH}?{urlencode(params)}"
+
+
+def build_listing(
+    form: FeedForm, query: FeedQuery, page: int, items: Sequence[FeedItem], total: int
+) -> FeedListing:
+    """The page of the feed of a form without error, page at most count_pages(total)."""
+    pages = count_pages(total)
+    is_shorter = form.period in DAYS_BY_PERIOD and form.period != WIDER_PERIOD
+    return FeedListing(
+        title=f"Quoi de neuf, page {page} sur {pages}" if total else NO_ITEM_TITLE,
+        line=write_results_line(total, query.since, page, pages),
+        cards=tuple(build_card(item) for item in items),
+        page=page,
+        pages=pages,
+        previous_link=build_page_link(form, page - 1) if page > 1 else None,
+        next_link=build_page_link(form, page + 1) if page < pages else None,
+        wider_link=build_page_link(replace(form, period=WIDER_PERIOD), 1)
+        if not total and is_shorter
+        else None,
+        has_unlisted_items=has_unlisted_items(total),
+    )
 
 
 def write_results_line(total: int, since: datetime, page: int, pages: int) -> str:

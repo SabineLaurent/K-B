@@ -17,4 +17,8 @@ def make_page(count, total=None):
         {**copy.deepcopy(item), "id": 1000 + index}
         for index, item in enumerate(islice(cycle(ITEMS_PAGE["items"]), count))
     ]
-    return {"items": items, "next_offset": None, "total": count if total is None else total}
+    return {
+        "items": items,
+        "next_offset": None,
+        "total": count if total is None else total,
+    }
