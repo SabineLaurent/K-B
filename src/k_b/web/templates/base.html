@@ -24,11 +24,12 @@
 {% block content %}{% endblock %}
 </main>
 <footer class="site-footer">
-<div class="site-footer-links">
-{{ nav_link("/sources", "Sources et conditions d’utilisation") }}
-{{ nav_link("/accessibilite", "Accessibilité") }}
-{% if is_operator_checked %}<a href="/.auth/logout">Se déconnecter</a>{% endif %}
-</div>
+{#- role="list": Safari drops the semantics of a list whose list-style is none. -#}
+<ul class="site-footer-links" role="list">
+<li>{{ nav_link("/sources", "Sources et conditions d’utilisation") }}</li>
+<li>{{ nav_link("/accessibilite", "Accessibilité") }}</li>
+{% if is_operator_checked %}<li><a href="/.auth/logout">Se déconnecter</a></li>{% endif %}
+</ul>
 </footer>
 </body>
 </html>

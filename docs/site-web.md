@@ -25,7 +25,9 @@ l'en-tête `X-MS-CLIENT-PRINCIPAL-ID`, l'identifiant d'objet de la personne conn
 cet en-tête venu d'un client ([Microsoft Learn, « Authentication and authorization in Azure Container
 Apps »](https://learn.microsoft.com/en-us/azure/container-apps/authentication), lu le 2026-11-11).
 
-Le code le vérifie aussi, sur chaque requête sauf `/health` (`web/operator_check.py`). L'en-tête doit être
+Le code le vérifie aussi, sur chaque requête sauf `/health` (`web/operator_check.py`). Le chemin comparé
+est celui que suit le routeur, décodé (`scope["path"]`) : `request.url.path` lit `/health` dans
+`/health%3F`. L'en-tête doit être
 présent une seule fois, être un GUID, et valoir `KB_WEB_OPERATOR_ID`, sans tenir compte de la casse. Sinon,
 la page 403 « Accès réservé » répond, avec un lien « Se déconnecter » (`/.auth/logout`). Le journal dit
 `operator_refused: header_absent|header_repeated|header_malformed|header_other request_id=…`, jamais la
@@ -63,12 +65,15 @@ Chaque réponse porte :
 - `Strict-Transport-Security: max-age=31536000`, `X-Content-Type-Options: nosniff` ;
 - `Referrer-Policy: no-referrer` : l'adresse d'une page ne part pas avec un lien vers arxiv.org ou GitHub.
 
+Aucune ne porte d'en-tête `Server` (`server_header=False` d'uvicorn), qui nommerait le logiciel (Opquast 2025,
+règle 213). En ligne, l'entrée d'Azure Container Apps peut en poser un.
+
 ## Cache
 
-Il n'y a pas de cache côté serveur : avec une seule lectrice, le cache de son navigateur fait le même travail.
+Aucune page n'est gardée, ni par le serveur ni par le navigateur (décision de Sabine du 2026-11-11) :
 
-- Une page : `private, max-age=300` (`WEB_PAGE_MAX_AGE_SECONDS`), gardée par le navigateur seul.
-- Une erreur et `/health` : `no-store`.
+- une page, une erreur et `/health` : `no-store`, que le navigateur ne garde pas même pour son bouton
+  Retour ;
 - `/static` : `no-cache`, revalidé par son ETag à chaque page.
 
 Une réponse de plus de 500 octets, page d'erreur comprise, est compressée en gzip si le navigateur
@@ -78,7 +83,8 @@ l'accepte.
 
 Chaque erreur rend une page HTML : 403, 404, 500, et une page qui donne le code pour les autres (405).
 Une exception : une requête dont le `Host` n'est pas dans `KB_WEB_ALLOWED_HOSTS` reçoit le 400 en texte
-brut de `TrustedHostMiddleware`, avant le site ; il ne vise qu'une sonde ou un réglage faux. Une
+brut de `TrustedHostMiddleware`, avant le site ; il ne vise qu'une sonde ou un réglage faux. Il ne redirige
+jamais vers le `www.` d'un hôte permis (`www_redirect=False`) : la redirection prendrait le schéma vu, `http`. Une
 exception imprévue rend la page 500, avec l'heure UTC et l'identifiant de la demande (`X-Request-ID`). Le
 journal en écrit le type, `internal_error: <Type> request_id=…`, jamais le message ni la pile. Le lien
 « Réessayer » pointe vers la page elle-même (`href=""`), jamais vers un chemin reçu.
@@ -95,19 +101,33 @@ Les gabarits sont lus dans le paquet. `tests/web/test_templates.py` vérifie qu'
 - un script, un style en ligne ni une ressource d'un autre site ;
 - un attribut sans guillemets.
 
+## Feuille de style
+
+`web/static/site.css` n'emploie que des fonctions CSS Baseline « Widely available » (données web-features
+3.45.0, lues le 2026-11-11) : l'imbrication, les couches (`@layer`), les propriétés logiques, `:where()`,
+les unités `dvb` et la syntaxe d'intervalle des media queries. `text-wrap: balance`, « Newly available »,
+ne fait qu'ajouter : un navigateur qui ne la connaît pas ne perd rien. Les trois largeurs des maquettes
+(390, 820 et 1280 px) se lisent par deux seuils, `48rem` et `64rem`. Une page s'imprime sans en-tête, pied
+de page ni boutons (`@media print`).
+
 ## Accessibilité
 
-La cible est le RGAA 4.1.2, soit WCAG 2.1 AA. La charte vient des maquettes du 2026-11-09.
+La cible est le RGAA 4.1.2, soit WCAG 2.1 AA, avec les règles du référentiel Opquast 2025 (version 5.0)
+qu'un test peut vérifier. La charte vient des maquettes du 2026-11-09.
 
 `tests/web/test_accessibility.py` vérifie sur chaque page :
-- la langue et un titre propre ;
+- la langue, celle des passages en anglais, et un titre propre ;
 - un seul `h1`, et des titres sans niveau sauté ;
 - les zones et le lien d'évitement ;
-- le lien courant ;
+- le lien courant, et les liens du pied de page en liste ;
 - les SVG décoratifs ;
-- l'absence de script.
+- l'absence de script ;
+- un lien vers un autre site dit « site externe », et sa langue quand elle n'est pas le français ;
+- la première abréviation d'une page suivie de son sens, une date au mois écrit en lettres ;
+- aucune espace avant « : » ni « ; » dans le texte (règle de Sabine).
 
-`tests/web/test_stylesheet.py` calcule les contrastes de la charte et vérifie l'anneau de focus.
+`tests/web/test_stylesheet.py` calcule les contrastes de la charte, celui des liens visités compris, et
+vérifie l'anneau de focus, la taille du lien d'évitement et la feuille d'impression.
 
 Le reste se contrôle à la main : la validité du code, le zoom à 200 %, la largeur de 320 px, l'espacement
 du texte, le clavier et le lecteur d'écran.

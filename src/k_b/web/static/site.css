@@ -1,269 +1,380 @@
 /* The stylesheet of the site of K-B: the chart of the mockups of 2026-11-09 (planche « Charte
-   graphique »). The fonts of the system, sizes in rem: the text follows the size chosen in the
-   browser. No image, no font, nothing fetched from elsewhere. */
+   graphique »), at their three widths: 390, 820 and 1280 px. The fonts of the system, sizes in rem:
+   the text follows the size chosen in the browser. No image, no font, nothing fetched from
+   elsewhere.
+   Only features Baseline "widely available" (web-features 3.45.0, read on 2026-11-11): nesting,
+   cascade layers, logical properties, :where(), the dynamic viewport units, the range syntax of
+   media queries. text-wrap: balance, "newly available", only adds: a browser without it loses
+   nothing (docs/site-web.md, "Feuille de style"). */
 
-:root {
-  --color-ink: #1C1E21;
-  --color-slate: #4A4F57;
-  --color-teal: #0F5E6B;
-  --color-teal-deep: #0A434C;
-  --color-paper: #FBFBF8;
-  --color-card: #FFFFFF;
-  --color-stone: #DADCD6;
-  --color-on-teal: #FFFFFF;
-  --font-text: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-code: ui-monospace, Menlo, Consolas, monospace;
-  --target-size: 2.75rem;
-  --page-width: 70rem;
+@layer reset, base, layout, components;
+
+@layer reset {
+  :where(*, *::before, *::after) {
+    box-sizing: border-box;
+  }
+
+  :where(body, h1, h2, p, ul, dl, dd, blockquote) {
+    margin: 0;
+  }
 }
 
-/* The focus ring of the chart, on every element reached by the keyboard. */
-:focus-visible {
-  outline: 3px solid var(--color-teal);
-  outline-offset: 2px;
+@layer base {
+  :root {
+    color-scheme: light;
+    --color-ink: #1C1E21;
+    --color-slate: #4A4F57;
+    --color-teal: #0F5E6B;
+    --color-teal-deep: #0A434C;
+    --color-paper: #FBFBF8;
+    --color-card: #FFFFFF;
+    --color-stone: #DADCD6;
+    --color-on-teal: #FFFFFF;
+    --font-text: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-code: ui-monospace, Menlo, Consolas, monospace;
+    --target-size: 2.75rem;
+    --page-width: 70rem;
+    --gutter: 1rem;
+  }
+
+  /* The focus ring of the chart, on every element reached by the keyboard. */
+  :focus-visible {
+    outline: 3px solid var(--color-teal);
+    outline-offset: 2px;
+  }
+
+  body {
+    min-block-size: 100dvb;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-text);
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  a {
+    color: var(--color-teal);
+    text-underline-offset: 0.15em;
+
+    &:hover {
+      color: var(--color-teal-deep);
+    }
+  }
+
+  h1,
+  h2 {
+    text-wrap: balance;
+  }
+
+  h1 {
+    margin-block-end: 1rem;
+    font-size: 1.625rem;
+    line-height: 1.25;
+
+    @media (width >= 48rem) {
+      font-size: 1.75rem;
+    }
+
+    @media (width >= 64rem) {
+      font-size: 1.875rem;
+    }
+  }
+
+  h2 {
+    margin-block: 1.5rem 0.5rem;
+    font-size: 1.1875rem;
+  }
+
+  p,
+  ul,
+  blockquote {
+    margin-block-end: 1rem;
+  }
+
+  blockquote {
+    padding-inline-start: 1rem;
+    border-inline-start: 3px solid var(--color-stone);
+
+    & p {
+      margin: 0;
+    }
+  }
+
+  /* The link of the current page: bold and underlined further, not by its colour alone. */
+  [aria-current="page"] {
+    font-weight: 600;
+    text-underline-offset: 6px;
+  }
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
+@layer layout {
+  /* Out of sight until the keyboard reaches it, first on the page. */
+  .skip-link {
+    position: absolute;
+    inset-block-start: 0.5rem;
+    inset-inline-start: 1rem;
+    min-block-size: var(--target-size);
+    padding-inline: 1rem;
+    display: inline-flex;
+    align-items: center;
+    background: var(--color-card);
+    transform: translateY(-200%);
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--color-paper);
-  color: var(--color-ink);
-  font-family: var(--font-text);
-  font-size: 1rem;
-  line-height: 1.5;
-}
+    &:focus {
+      transform: none;
+    }
+  }
 
-a {
-  color: var(--color-teal);
-  text-underline-offset: 0.15em;
-}
+  .site-header {
+    background: var(--color-card);
+    border-block-end: 1px solid var(--color-stone);
+  }
 
-a:hover {
-  color: var(--color-teal-deep);
-}
+  .site-nav {
+    max-inline-size: var(--page-width);
+    margin-inline: auto;
+    padding: 0.625rem var(--gutter);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.5rem;
 
-h1 {
-  margin: 0 0 1rem;
-  font-size: 1.875rem;
-  line-height: 1.25;
-}
+    @media (width >= 64rem) {
+      padding-block: 0.75rem;
+    }
+  }
 
-h2 {
-  margin: 1.5rem 0 0.5rem;
-  font-size: 1.1875rem;
-}
+  .site-nav-links {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+  }
 
-/* Out of sight until the keyboard reaches it, first on the page. */
-.skip-link {
-  position: absolute;
-  top: 0.5rem;
-  left: 1rem;
-  padding: 0.5rem 1rem;
-  background: var(--color-card);
-  transform: translateY(-200%);
-}
-
-.skip-link:focus {
-  transform: none;
-}
-
-.site-header {
-  background: var(--color-card);
-  border-bottom: 1px solid var(--color-stone);
-}
-
-.site-nav {
-  max-width: var(--page-width);
-  margin: 0 auto;
-  padding: 0.625rem 1rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1.5rem;
-}
-
-.site-nav-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem;
-  flex: 1 1 auto;
-}
-
-.site-nav a,
-.site-footer a {
-  min-height: var(--target-size);
-  display: inline-flex;
-  align-items: center;
-}
-
-.site-logo {
-  color: var(--color-ink);
-  font-size: 1.25rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-/* The link of the current page: bold and underlined further, not by its colour alone. */
-[aria-current="page"] {
-  font-weight: 600;
-  text-underline-offset: 6px;
-}
-
-main {
-  flex: 1 0 auto;
-  width: 100%;
-  max-width: var(--page-width);
-  margin: 0 auto;
-  padding: 1.5rem 1rem 2.5rem;
-}
-
-.prose {
-  max-width: 48rem;
-}
-
-.site-footer {
-  background: var(--color-card);
-  border-top: 1px solid var(--color-stone);
-}
-
-.site-footer-links {
-  max-width: var(--page-width);
-  margin: 0 auto;
-  padding: 0.625rem 1rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1.75rem;
-  font-size: 0.875rem;
-}
-
-.error-page {
-  max-width: 65rem;
-  padding: 3rem 1rem 4rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2rem 3.5rem;
-}
-
-.error-text {
-  flex: 1 1 20rem;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.error-text > * {
-  margin: 0;
-}
-
-.error-code {
-  color: var(--color-slate);
-  font-family: var(--font-code);
-  font-size: 0.9375rem;
-}
-
-.error-page h1 {
-  font-size: 2.125rem;
-}
-
-.error-quip {
-  font-size: 1.1875rem;
-}
-
-.error-explanation {
-  color: var(--color-slate);
-  line-height: 1.6;
-}
-
-.error-actions {
-  margin-top: 0.5rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1.25rem;
-}
-
-.button,
-.button-secondary {
-  min-height: var(--target-size);
-  padding: 0 1.25rem;
-  display: inline-flex;
-  align-items: center;
-  /* The space between the arrow and its text, which a flex container drops. */
-  gap: 0.5rem;
-  border-radius: 6px;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.button {
-  background: var(--color-teal);
-  color: var(--color-on-teal);
-}
-
-.button:hover {
-  background: var(--color-teal-deep);
-  color: var(--color-on-teal);
-}
-
-.button-secondary {
-  border: 1px solid var(--color-teal);
-}
-
-.incident {
-  padding: 1.125rem 1.25rem;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 0.75rem 1.5rem;
-  background: var(--color-card);
-  border: 1px solid var(--color-stone);
-  border-radius: 8px;
-}
-
-.incident dt,
-.incident-note {
-  color: var(--color-slate);
-  font-size: 0.875rem;
-}
-
-.incident dd {
-  margin: 0.25rem 0 0;
-}
-
-.request-id {
-  font-family: var(--font-code);
-  overflow-wrap: anywhere;
-}
-
-.illustration {
-  flex: 0 0 auto;
-  max-width: 100%;
-  height: auto;
-}
-
-@media (min-width: 48rem) {
   .site-nav,
-  .site-footer-links {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
+  .site-footer {
+    & a {
+      min-block-size: var(--target-size);
+      display: inline-flex;
+      align-items: center;
+    }
+  }
+
+  .site-logo {
+    color: var(--color-ink);
+    font-size: 1.25rem;
+    font-weight: 700;
+    text-decoration: none;
   }
 
   main {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
+    flex: 1 0 auto;
+    inline-size: 100%;
+    max-inline-size: var(--page-width);
+    margin-inline: auto;
+    padding: 1.5rem var(--gutter) 2.5rem;
+
+    @media (width >= 48rem) {
+      padding-block: 1.75rem 3rem;
+    }
+
+    @media (width >= 64rem) {
+      padding-block: 2rem 3.5rem;
+    }
+  }
+
+  /* The lines of a text stay short, aligned on the logo and the footer. */
+  .prose > * {
+    max-inline-size: 48rem;
+  }
+
+  .site-footer {
+    background: var(--color-card);
+    border-block-start: 1px solid var(--color-stone);
+  }
+
+  .site-footer-links {
+    max-inline-size: var(--page-width);
+    margin: 0 auto;
+    padding: 0.75rem var(--gutter);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+    list-style: none;
+    font-size: 0.875rem;
+
+    @media (width >= 48rem) {
+      gap: 0.25rem 1.5rem;
+    }
+
+    @media (width >= 64rem) {
+      padding-block: 0.625rem;
+      gap: 0.25rem 1.75rem;
+    }
+  }
+
+  @media (width >= 48rem) {
+    :root {
+      --gutter: 1.5rem;
+    }
+  }
+}
+
+@layer components {
+  .page-intro {
+    color: var(--color-slate);
+  }
+
+  /* A link in a text: visited in another colour of the chart, and a target of 44 px in height,
+     its padding over the lines around it (Opquast 2025, rules 141 and 186). */
+  .prose a {
+    padding-block: 0.625rem;
+
+    &:visited {
+      color: var(--color-slate);
+    }
+
+    &:hover {
+      color: var(--color-teal-deep);
+    }
   }
 
   .error-page {
-    padding-top: 4.5rem;
-    padding-bottom: 6rem;
+    max-inline-size: 65rem;
+    padding-block: 3rem 4rem;
+    display: flex;
+    flex-wrap: wrap;
+    /* The text starts under the header, as in the mockups, whatever the height of the window. */
+    align-content: flex-start;
+    align-items: center;
+    gap: 2rem 3.5rem;
+
+    & h1 {
+      margin: 0;
+      font-size: 2.125rem;
+    }
+
+    @media (width >= 48rem) {
+      padding-block: 4.5rem 6rem;
+    }
+  }
+
+  .error-text {
+    flex: 1 1 20rem;
+    min-inline-size: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+
+    & > p {
+      margin: 0;
+    }
+  }
+
+  .error-code {
+    color: var(--color-slate);
+    font-family: var(--font-code);
+    font-size: 0.9375rem;
+  }
+
+  .error-quip {
+    font-size: 1.1875rem;
+  }
+
+  .error-explanation {
+    color: var(--color-slate);
+    line-height: 1.6;
+  }
+
+  .error-actions {
+    margin-block-start: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+  }
+
+  .button,
+  .button-secondary {
+    min-block-size: var(--target-size);
+    padding-inline: 1.25rem;
+    display: inline-flex;
+    align-items: center;
+    /* The space between the arrow and its text, which a flex container drops. */
+    gap: 0.5rem;
+    /* Transparent, but drawn when Windows forces its colours: the button keeps its frame. */
+    border: 1px solid transparent;
+    border-radius: 6px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .button {
+    background: var(--color-teal);
+    color: var(--color-on-teal);
+
+    &:hover {
+      background: var(--color-teal-deep);
+      color: var(--color-on-teal);
+    }
+  }
+
+  .button-secondary {
+    border-color: var(--color-teal);
+  }
+
+  /* The card of the page 500: the time and the id of the request, then the note. */
+  .incident {
+    padding: 1.125rem 1.25rem;
+    display: grid;
+    gap: 0.75rem;
+    background: var(--color-card);
+    border: 1px solid var(--color-stone);
+    border-radius: 8px;
+
+    & dl {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+      gap: 0.75rem 1.5rem;
+    }
+
+    & dt {
+      color: var(--color-slate);
+      font-size: 0.875rem;
+    }
+
+    & dd {
+      margin-block-start: 0.25rem;
+    }
+  }
+
+  .incident-note {
+    margin: 0;
+    color: var(--color-slate);
+    font-size: 0.875rem;
+  }
+
+  .request-id {
+    font-family: var(--font-code);
+    overflow-wrap: anywhere;
+  }
+
+  .illustration {
+    flex: 0 0 auto;
+    max-inline-size: 100%;
+    block-size: auto;
+  }
+
+  /* A page prints its content alone (Opquast 2025, rules 195 and 196). */
+  @media print {
+    .skip-link,
+    .site-header,
+    .site-footer,
+    .error-actions,
+    .illustration {
+      display: none;
+    }
   }
 }

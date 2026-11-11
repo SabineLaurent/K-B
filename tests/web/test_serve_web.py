@@ -45,6 +45,7 @@ def test_serve_web_listens_on_127_0_0_1_8002_by_default_without_uvicorn_logging_
         "port": 8002,
         "log_config": None,
         "access_log": False,
+        "server_header": False,
     }
 
 

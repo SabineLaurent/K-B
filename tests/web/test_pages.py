@@ -11,6 +11,7 @@ from jinja2 import StrictUndefined
 from site_client import OPERATOR_HEADERS, PAGE_PATHS, make_client
 
 from k_b.web.app import create_app
+from k_b.web.errors import write_moment
 from k_b.web.rendering import templates
 
 CONTENT_SECURITY_POLICY = (
@@ -97,6 +98,19 @@ def test_an_unexpected_error_gets_the_page_500_without_its_detail(
     assert before <= datetime.fromisoformat(moment) <= before + timedelta(seconds=5)
 
 
+@pytest.mark.parametrize(
+    ("moment", "text"),
+    [
+        (datetime(2026, 11, 1, 9, 5, 59, tzinfo=UTC), "1er novembre 2026 à 09:05 UTC"),
+        (datetime(2026, 2, 28, 23, 0, tzinfo=UTC), "28 février 2026 à 23:00 UTC"),
+        (datetime(2027, 8, 15, 0, 30, tzinfo=UTC), "15 août 2027 à 00:30 UTC"),
+    ],
+)
+def test_the_time_of_an_error_gives_its_month_in_letters(moment, text):
+    """Opquast 2025, rule 4: 01/11/2026 reads 1 November or 11 January."""
+    assert write_moment(moment) == text
+
+
 def test_try_again_reloads_the_page_itself_never_a_path_received(failing_client):
     """A path received may be //host/x: written in a link, it would lead to another site."""
     response = failing_client.get("/failing")
@@ -108,7 +122,8 @@ def test_try_again_reloads_the_page_itself_never_a_path_received(failing_client)
 @pytest.mark.parametrize(
     ("path", "headers", "status_code", "cache_control"),
     [
-        ("/", OPERATOR_HEADERS, 200, "private, max-age=300"),
+        ("/", OPERATOR_HEADERS, 200, "no-store"),
+        ("/sources", OPERATOR_HEADERS, 200, "no-store"),
         ("/static/site.css", OPERATOR_HEADERS, 200, "no-cache"),
         ("/health", {}, 200, "no-store"),
         ("/", {}, 403, "no-store"),
@@ -142,6 +157,14 @@ def test_a_host_not_allowed_is_refused_with_the_security_headers():
 
     assert response.status_code == 400
     assert response.headers["Content-Security-Policy"] == CONTENT_SECURITY_POLICY
+
+
+def test_a_host_without_the_www_of_an_allowed_host_is_refused_never_redirected():
+    """Starlette would build its redirection with the scheme it sees, http behind the ingress."""
+    app = create_app(operator_id=None, allowed_hosts=("www.example.org",))
+    client = TestClient(app, base_url="http://example.org")
+
+    assert client.get("/", follow_redirects=False).status_code == 400
 
 
 @pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json", "/sources/"])

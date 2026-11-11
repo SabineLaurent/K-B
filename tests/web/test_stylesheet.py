@@ -81,3 +81,37 @@ def test_every_font_size_is_in_rem():
 
 def test_nothing_is_fetched_from_elsewhere():
     assert re.findall(r"@import|@font-face|url\(", STYLESHEET) == []
+
+
+def test_a_link_visited_in_a_text_has_a_colour_of_its_own_of_the_chart():
+    """Opquast 2025, rule 141; a menu is out of the rule. Its contrast on the pages: 4.5 at least."""
+    rule = re.search(r":visited\s*\{\s*color:\s*var\((--[a-z-]+)\);", STYLESHEET)
+    colours = read_colours()
+
+    assert rule is not None
+    assert colours[rule.group(1)] != colours["--color-teal"]
+    assert measure_contrast(colours[rule.group(1)], colours["--color-paper"]) >= 4.5
+
+
+def test_a_page_prints_without_its_navigation():
+    """Opquast 2025, rules 195 and 196."""
+    rule = re.search(r"@media print\s*\{\s*([^{]+)\{\s*display:\s*none;", STYLESHEET)
+
+    assert rule is not None
+    hidden = {selector.strip() for selector in rule.group(1).split(",")}
+    assert {".skip-link", ".site-header", ".site-footer", ".error-actions"} <= hidden
+
+
+def test_the_skip_link_is_a_target_of_the_size_of_the_others():
+    """Opquast 2025, rule 186: 44 by 44 pixels, the --target-size of the chart."""
+    assert re.search(
+        r"\.skip-link\s*\{[^}]*min-block-size:\s*var\(--target-size\);", STYLESHEET
+    )
+
+
+def test_a_button_keeps_a_border_in_the_forced_colours_of_windows():
+    """A transparent border, drawn in the colour of the text when the colours are forced."""
+    assert re.search(
+        r"\.button,\s*\.button-secondary\s*\{[^}]*border:\s*1px solid transparent;",
+        STYLESHEET,
+    )

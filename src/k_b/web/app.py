@@ -41,7 +41,11 @@ def create_app(
     # then the request id, the headers of every answer, the 500, and the host and the operator
     # checked before any page.
     app.middleware("http")(check_operator)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(allowed_hosts))
+    # www_redirect=False: Starlette would build its redirection with the scheme it sees, as for
+    # redirect_slashes above.
+    app.add_middleware(
+        TrustedHostMiddleware, allowed_hosts=list(allowed_hosts), www_redirect=False
+    )
     app.middleware("http")(respond_to_unexpected_error)
     app.middleware("http")(add_response_headers)
     app.middleware("http")(log_request)

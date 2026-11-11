@@ -14,6 +14,28 @@ from k_b.web.rendering import render_page
 ERROR_TEMPLATES = {403: "403.html", 404: "404.html", 500: "500.html"}
 # Any other status: a page that gives its code.
 OTHER_ERROR_TEMPLATE = "error.html"
+# The months in letters (Opquast 2025, rule 4): written by the site, never by the locale of the
+# machine, which may not be French.
+MONTHS = (
+    "janvier",
+    "février",
+    "mars",
+    "avril",
+    "mai",
+    "juin",
+    "juillet",
+    "août",
+    "septembre",
+    "octobre",
+    "novembre",
+    "décembre",
+)
+
+
+def write_moment(moment: datetime) -> str:
+    """A moment in UTC as the page 500 gives it: 1er novembre 2026 à 09:05 UTC."""
+    day = "1er" if moment.day == 1 else str(moment.day)
+    return f"{day} {MONTHS[moment.month - 1]} {moment.year} à {moment:%H:%M} UTC"
 
 
 def render_error_page(
@@ -28,7 +50,7 @@ def render_error_page(
             "status_code": status_code,
             "request_id": read_request_id(request),
             "occurred_at": occurred_at.isoformat().replace("+00:00", "Z"),
-            "occurred_at_text": f"{occurred_at:%d/%m/%Y à %H:%M} UTC",
+            "occurred_at_text": write_moment(occurred_at),
         },
         status_code=status_code,
         headers=headers,

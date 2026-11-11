@@ -7,10 +7,11 @@
 <h1>Erreur du serveur</h1>
 <p class="error-quip">Pourtant, ça marchait sur ma machine.</p>
 <p class="error-explanation">Le serveur de K-B n’a pas pu préparer cette page. Votre demande n’y est pour rien: vous pouvez réessayer dans un instant.</p>
-<dl class="incident">
+<div class="incident">
+<dl>
 <div>
 <dt>Heure de l’erreur</dt>
-<dd><time datetime="{{ occurred_at }}">{{ occurred_at_text }}</time></dd>
+<dd><time datetime="{{ occurred_at }}">{{ occurred_at_text }}</time> (temps universel coordonné)</dd>
 </div>
 <div>
 <dt>Identifiant de la demande</dt>
@@ -18,6 +19,7 @@
 </div>
 </dl>
 <p class="incident-note">Pour signaler l’incident, citez cette heure et cet identifiant.</p>
+</div>
 <div class="error-actions">
 <a class="button" href="/"><span aria-hidden="true">←</span> Retour au fil de veille</a>
 <a class="button-secondary" href="">Réessayer</a>

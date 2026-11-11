@@ -4,7 +4,10 @@ Azure Container Apps sets once she is signed in (docs/site-web.md, "Accès")."""
 import logging
 
 import pytest
+from fastapi.testclient import TestClient
 from site_client import OPERATOR_HEADER, OPERATOR_HEADERS, OPERATOR_ID, make_client
+
+from k_b.web.app import create_app
 
 ANOTHER_ID = "11111111-2222-4333-8444-555555555555"
 
@@ -51,6 +54,20 @@ def test_the_object_id_of_the_operator_is_let_through(client, value):
 
 def test_health_answers_without_the_header(client):
     assert client.get("/health").status_code == 200
+
+
+@pytest.mark.parametrize("path", ["/health%3F", "/health%23x", "/health%3Fa=1"])
+def test_a_path_that_only_reads_as_health_in_its_url_is_checked(path):
+    """The router follows the path decoded, /health? here; its URL stops at the ?, /health."""
+    app = create_app(operator_id=OPERATOR_ID)
+
+    @app.get("/{name}")
+    def show_name(name: str) -> str:
+        return name
+
+    client = TestClient(app, base_url="http://localhost", raise_server_exceptions=False)
+
+    assert client.get(path).status_code == 403
 
 
 @pytest.mark.parametrize("path", ["/static/site.css", "/no-such-page"])

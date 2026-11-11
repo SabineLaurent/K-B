@@ -48,7 +48,9 @@ async def check_operator(
     """Let through the requests of the operator, and /health, which holds no data; any other gets
     the page 403, logged by its state, never with the value received."""
     operator_id: str | None = request.app.state.operator_id
-    if operator_id is None or request.url.path == HEALTH_PATH:
+    # The path the router follows, decoded: request.url.path reads /health in /health%3F, which
+    # a route /{name} would serve.
+    if operator_id is None or request.scope["path"] == HEALTH_PATH:
         return await call_next(request)
     refusal = find_operator_refusal(
         request.headers.getlist(OPERATOR_ID_HEADER), operator_id

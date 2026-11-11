@@ -304,10 +304,6 @@ MAX_AI_API_BODY_BYTES = 1024
 WEB_HOST = "127.0.0.1"
 WEB_PORT = 8002
 WEB_ALLOWED_HOSTS = LOCAL_HOSTS
-# How long the browser of the operator keeps a page of the site (docs/site-web.md, "Cache"): the
-# watch changes once a day, and one reader only, so her browser does what a cache of the server
-# would (RGESN, decision of the plan of #562).
-WEB_PAGE_MAX_AGE_SECONDS = 300
 
 
 @dataclass(frozen=True)
