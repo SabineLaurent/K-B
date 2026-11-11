@@ -61,14 +61,25 @@ def test_the_placeholders_of_sqlite3_become_those_of_psycopg(sql, translated):
 
 def list_sql_texts():
     """Every SQL text of database/, as written in its module: a constant or the text given to
-    execute(), found in the syntax tree; a text the code builds by .format keeps its {…}."""
+    execute(), found in the syntax tree; a text the code builds by .format keeps its {…}.
+
+    The pieces of an f-string are left out: they are not texts, and the whole, made of constants
+    of its module, is run on PostgreSQL by the tests of the reading (fixture engine)."""
     texts = []
     for path in sorted(DATABASE_DIR.rglob("*.py")):
-        for node in ast.walk(ast.parse(path.read_text())):
+        tree = ast.parse(path.read_text())
+        pieces = {
+            piece
+            for node in ast.walk(tree)
+            if isinstance(node, ast.JoinedStr)
+            for piece in node.values
+        }
+        for node in ast.walk(tree):
             if (
                 isinstance(node, ast.Constant)
                 and isinstance(node.value, str)
                 and SQL_START.match(node.value)
+                and node not in pieces
             ):
                 texts.append(pytest.param(node.value, id=f"{path.name}:{node.lineno}"))
     return texts
