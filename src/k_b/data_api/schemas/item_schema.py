@@ -57,8 +57,8 @@ class ListedAdvisorySchema(ListedItemSchema):
     exploited: bool | None = Field(description=EXPLOITED)
     packages: list[str]
     packages_truncated: bool = Field(
-        description="Packages are left out: the list serves the first 10 of an advisory, its"
-        " detail every one, and says false."
+        description="Packages are left out: the list serves the first ones of an advisory, up"
+        " to the bound of the list, its detail every one, and says false."
     )
 
 
@@ -124,7 +124,7 @@ class ReleaseDetailSchema(ListedReleaseSchema):
 
 
 class AdvisoryDetailSchema(ListedAdvisorySchema):
-    """An advisory serves nothing beyond the list."""
+    """The detail of an advisory serves every package, and packages_truncated false."""
 
 
 class NewsletterArticleDetailSchema(ListedNewsletterArticleSchema):

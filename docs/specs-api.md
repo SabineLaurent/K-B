@@ -83,7 +83,15 @@ l'ordre des résultats, change la version.
   - sous charge, l'attente du pool, non comptée, peut porter la réponse au-delà des 10 s du client
     de l'API IA, qui lit alors `data_api_timeout` au lieu du 503 : une erreur dans les deux cas ;
   - à côté d'un fil Python qui calcule sans pause, une requête de 3 ms en prend 1,5 s à 1 000
-    instructions (essai du relecteur du plan).
+    instructions (essai du relecteur du plan) ;
+  - la page de la liste et son total, deux lectures sur les mêmes filtres, se partagent les 5 s :
+    une liste qui tenait dans le délai peut désormais répondre 503 `query_timeout`, dès que la page
+    lue avant #550 en prenait plus de 2,5 s, si le total coûte autant qu'elle (hypothèse, non
+    mesuré ; revue de code de #550). Pour réduire le risque : compter dans la lecture de la page, par `count(*) OVER ()`, que
+    SQLite calcule depuis 3.25.0 (documentation de SQLite, « Window Functions », lue le 2026-11-11)
+    sur les lignes du `WHERE`, avant `LIMIT` (essayé le 2026-11-11 sur le SQLite 3.50.4 de K-B) ;
+    faisable avec nos droits, du code seulement ; une page au-delà de la fin n'a alors aucune ligne,
+    donc aucun total, et demande un second chemin (raison de l'écarter au plan de #550).
 
   En PostgreSQL, le même délai est le `statement_timeout` de chaque connexion du pool, posé par
   K-B à son ouverture (`SET_STATEMENT_TIMEOUT`, `database/postgresql.py`), pas par le serveur : une
