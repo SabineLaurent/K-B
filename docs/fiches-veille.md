@@ -2014,8 +2014,10 @@ des tops).
    **Le début de chaque sujet** (#565) : le `until` de sa dernière fiche, celle du plus grand jour
    parmi les noms `AAAA-MM-JJ.md` de `veille/<sujet>/` ; un autre fichier du dossier (une note de
    Sabine, un temporaire caché) n'est pas une fiche. Seul l'en-tête est lu : 4 096 octets au plus,
-   sans suivre de lien (`O_NOFOLLOW`), après le refus d'un lien ou d'une entrée qui n'est pas un
-   fichier. Il doit tenir une seule ligne `until:`, une date avec son fuseau lue par
+   sans suivre de lien (`O_NOFOLLOW`) ni attendre un tube nommé (`O_NONBLOCK`), après le refus d'un
+   lien ou d'une entrée qui n'est pas un fichier ; l'entrée ouverte est recontrôlée (`fstat`), car
+   elle a pu être remplacée entre-temps (`read_sheet_head`, `post/vault_files.py`, qui porte la
+   lecture et l'écriture sûres du coffre). Il doit tenir une seule ligne `until:`, une date avec son fuseau lue par
    `parse_aware_datetime` (`items.py`, règle 4 de `conventions.md`), ramenée en UTC à la seconde,
    comme `kb` l'envoie, au plus l'heure de `kb`. Sinon (une date hors des dates possibles une fois
    en UTC comprise) :
@@ -2047,7 +2049,8 @@ des tops).
    (`subjects_not_the_list`) ; aucun début n'est avant celui envoyé (`start_before_the_one_sent` :
    la fiche redonnerait des items de la précédente), ni après, sauf à la borne des 14 jours,
    `window.until` moins 14 jours (`start_after_the_one_sent` : des items ne seraient dans aucune
-   fiche) ; chaque source est une fois dans sa fiche ; chaque affirmation cite des sources de sa
+   fiche) ; un sujet sans début envoyé part de `window.until` moins `window.days`
+   (`start_not_the_window`) ; chaque source est une fois dans sa fiche ; chaque affirmation cite des sources de sa
    fiche, chacune une fois. Un début ramené à la borne est journalisé, avec le sujet, son début et
    la borne (`<sujet>: start … brought to …, the bound of 14 days`), et la fiche est écrite.
    Hors de là : `ai_api_invalid_response`, aucune fiche écrite. L'erreur nomme la place et le
@@ -2057,7 +2060,10 @@ des tops).
    entièrement vide** (`items_in` vaut 0 : une base vide, un import pas lancé) n'écrit aucune
    fiche : chaque sujet garde son début, au lieu de l'avancer sur des items que l'API IA n'a pas
    lus ; `kb` le journalise (`no item read: no sheet written, the start of each subject kept`) et
-   sort en 0 (décision de Sabine du 2026-11-11, tri de `/code-review` sur #565). Le chemin d'une
+   sort en 0 (décision de Sabine du 2026-11-11, tri de `/code-review` sur #565). La garde ne vaut
+   que pour une lecture entièrement vide : si un sujet en échec a gardé un début plus ancien, la
+   lecture n'est pas vide, et un import pas lancé laisse les autres sujets sans item avancer leur
+   début (limite « La date de la source », section « Fenêtre »). Le chemin d'une
    fiche est fait de constantes, d'un sujet de la liste et d'un jour. Elle est écrite une fois :
    `kb` ne réécrit jamais une fiche qu'il voit, et ne suit jamais un lien qu'il voit ; les dossiers
    et la fiche sont recontrôlés juste avant l'écriture, par un temporaire caché au nom fixe, créé

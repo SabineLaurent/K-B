@@ -223,7 +223,7 @@ def render_digest_summary(
 
 
 def describe_counts(written_count: int, failed_count: int) -> str:
-    # Each subject has a row: written, without item and written, or failed (#565).
+    # A row per subject, written, without item and written, or failed; none when nothing is read.
     return f"written {written_count}, failed {failed_count}"
 
 

@@ -22,7 +22,9 @@ from k_b.core.config import (
     AI_API_READ_TIMEOUT_SECONDS,
     AI_API_REQUEST_DEADLINE_SECONDS,
     DIGEST_REQUEST_TIMEOUT_SECONDS,
+    DIGEST_SUBJECTS,
     MAX_AI_API_ANSWER_BYTES,
+    MAX_AI_API_BODY_BYTES,
     MAX_DIGEST_WINDOW_DAYS,
     TREND_REPORT_REQUEST_TIMEOUT_SECONDS,
 )
@@ -587,6 +589,32 @@ def test_a_start_after_the_one_sent_is_refused_unless_it_is_the_bound():
         "ai_api_invalid_response, HTTP 200, since_by_subject.research"
         f" (start_after_the_one_sent), request_id {REQUEST_ID}"
     )
+
+
+def test_a_subject_without_a_start_sent_is_refused_unless_it_starts_at_the_window():
+    # The window of make_response: 3 days before UNTIL, SINCE.
+    response = make_response(
+        since_by_subject=dict.fromkeys(SUBJECT_NAMES, SINCE)
+        | {"research": SINCE + timedelta(hours=1)}
+    )
+
+    failure = ask_and_fail(answer(content=to_body(response)))
+
+    assert str(failure) == (
+        "ai_api_invalid_response, HTTP 200, since_by_subject.research"
+        f" (start_not_the_window), request_id {REQUEST_ID}"
+    )
+
+
+def test_the_body_of_every_subject_of_the_list_holds_under_the_bound_of_the_ai_api():
+    subject_names = [subject.name for subject in DIGEST_SUBJECTS]
+    starts = dict.fromkeys(subject_names, datetime(2026, 11, 11, 10, 0, tzinfo=UTC))
+    http_client, requests = simulate(answer(status=500))
+
+    with http_client, pytest.raises(AiApiError):
+        request_digests(http_client, subject_names, starts)
+
+    assert len(requests[0].content) <= MAX_AI_API_BODY_BYTES
 
 
 def test_a_start_brought_to_the_bound_is_accepted():

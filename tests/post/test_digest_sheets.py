@@ -2,6 +2,7 @@
 text; the responses are made by the schema of the AI API."""
 
 import json
+import os
 import re
 from datetime import UTC, date, datetime
 
@@ -243,6 +244,23 @@ def test_a_last_sheet_without_a_valid_until_is_refused(vault_dir, content):
 
     assert str(raised.value).startswith(
         "previous_sheet_invalid: veille/research/2026-11-11.md"
+    )
+
+
+def test_a_pipe_slipped_under_the_last_sheet_after_its_check_is_refused_without_waiting(
+    vault_dir, monkeypatch
+):
+    sheets_dir = vault_dir / "veille" / "research"
+    sheets_dir.mkdir(parents=True)
+    os.mkfifo(sheets_dir / "2026-11-11.md")
+    # The pipe arrives after the check of the entry, read by lstat.
+    monkeypatch.setattr(digest_sheets, "has_sheet", lambda sheet_path, vault_dir: True)
+
+    with pytest.raises(VaultEntryRefusedError) as raised:
+        find_previous_until(vault_dir, "research", NOW)
+
+    assert str(raised.value) == (
+        "sheet_not_a_file: veille/research/2026-11-11.md is not a regular file"
     )
 
 

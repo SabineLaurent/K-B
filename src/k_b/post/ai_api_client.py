@@ -400,11 +400,17 @@ def refuse_moved_starts(
     response: DigestsResponse, since_by_subject: Mapping[str, datetime]
 ) -> None:
     """Refuse a subject started before the start sent, as its sheet would give again items of its
-    previous sheet; and one started later, unless at the bound of the AI API."""
+    previous sheet; one started later, unless at the bound of the AI API; and a subject without a
+    start sent that does not start at the window of the response, window.days before its until."""
+    window_start = response.window.until - timedelta(days=response.window.days)
     bound = response.window.until - timedelta(days=MAX_DIGEST_WINDOW_DAYS)
-    for subject, start in since_by_subject.items():
-        applied = response.since_by_subject[subject]
+    for subject, applied in response.since_by_subject.items():
         place = f"since_by_subject.{subject}"
+        start = since_by_subject.get(subject)
+        if start is None:
+            if applied != window_start:
+                raise_invalid(response.request_id, place, "start_not_the_window")
+            continue
         if applied < start:
             raise_invalid(response.request_id, place, "start_before_the_one_sent")
         if applied > start and applied != bound:

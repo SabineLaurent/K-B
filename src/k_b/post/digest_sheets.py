@@ -5,7 +5,6 @@ Its path is made of constants, a subject of the closed list and a day; each text
 is written as text, as the response is untrusted (OWASP LLM10)."""
 
 import json
-import os
 import re
 import unicodedata
 from collections.abc import Sequence
@@ -20,7 +19,9 @@ from k_b.post.ai_api_client import Digest, DigestsResponse, Source
 from k_b.post.vault_files import (
     VaultEntryRefusedError,
     has_sheet,
+    list_sheet_names,
     neutralize_digest_text,
+    read_sheet_head,
     refuse_linked_folders,
     write_new_sheet,
 )
@@ -96,19 +97,13 @@ def find_previous_until(
     """The until of the last sheet of subject, the one of the greatest day; None without a sheet.
     A last sheet that is a link, or without one valid until up to now, is refused."""
     sheets_dir = find_sheets_dir(vault_dir, subject)
-    try:
-        with os.scandir(sheets_dir) as entries:
-            names = [
-                entry.name for entry in entries if SHEET_NAME.fullmatch(entry.name)
-            ]
-    except FileNotFoundError:
-        return None
+    names = list_sheet_names(sheets_dir, SHEET_NAME)
     if not names:
         return None
     sheet_path = sheets_dir / max(names)
     # Refuses a link or another entry under the name of the sheet, read by lstat.
     has_sheet(sheet_path, vault_dir)
-    until = read_until(sheet_path)
+    until = read_until(read_sheet_head(sheet_path, vault_dir, MAX_FRONT_MATTER_BYTES))
     if until is None or until > now:
         raise VaultEntryRefusedError(
             f"previous_sheet_invalid: {sheet_path.relative_to(vault_dir).as_posix()} has no"
@@ -117,13 +112,9 @@ def find_previous_until(
     return until
 
 
-def read_until(sheet_path: Path) -> datetime | None:
-    """The until of the front matter of the sheet, read without following a link, in UTC to its
-    second as kb sends it; None when the front matter is not there, or holds none or more than one
-    until that is a date."""
-    descriptor = os.open(sheet_path, os.O_RDONLY | os.O_NOFOLLOW)
-    with os.fdopen(descriptor, "rb") as sheet:
-        head = sheet.read(MAX_FRONT_MATTER_BYTES)
+def read_until(head: bytes) -> datetime | None:
+    """The until of the front matter that opens head, in UTC to its second as kb sends it; None
+    when the front matter is not there, or holds none or more than one until that is a date."""
     end = head.find(FRONT_MATTER_CLOSING)
     if not head.startswith(FRONT_MATTER_OPENING) or end == -1:
         return None

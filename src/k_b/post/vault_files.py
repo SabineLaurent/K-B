@@ -1,11 +1,13 @@
 """The files kb writes in the vault, under veille/: written once, never through a symbolic link
-kb sees, each text of a source as text, each path named in the vault, never whole.
+kb sees, each text of a source as text, each path named in the vault, never whole; and the head
+of a sheet kb reads back, without following a link nor waiting on a pipe.
 
 Limits accepted by Sabine: a folder replaced by a symbolic link after refuse_linked_folders is
 followed (CWE-59), though a share of Azure Files mounted without mfsymlinks has no symbolic link;
 a file another program writes between the listing of the folder and the rename is replaced
 (CWE-367), as it takes no claim."""
 
+import os
 import re
 import stat
 import unicodedata
@@ -107,6 +109,28 @@ def has_sheet(sheet_path: Path, vault_dir: Path) -> bool:
     if not stat.S_ISREG(status.st_mode):
         raise VaultEntryRefusedError(f"sheet_not_a_file: {named} is not a regular file")
     return True
+
+
+def list_sheet_names(sheets_dir: Path, sheet_name: re.Pattern[str]) -> list[str]:
+    """The names of the folder that sheet_name matches whole; none without the folder."""
+    try:
+        with os.scandir(sheets_dir) as entries:
+            return [entry.name for entry in entries if sheet_name.fullmatch(entry.name)]
+    except FileNotFoundError:
+        return []
+
+
+def read_sheet_head(sheet_path: Path, vault_dir: Path, max_bytes: int) -> bytes:
+    """The first max_bytes of the sheet, opened without following a link nor waiting on a pipe;
+    an entry that is not a regular file once opened is refused, as by has_sheet."""
+    descriptor = os.open(sheet_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(descriptor, "rb") as sheet:
+        if not stat.S_ISREG(os.fstat(sheet.fileno()).st_mode):
+            named = sheet_path.relative_to(vault_dir).as_posix()
+            raise VaultEntryRefusedError(
+                f"sheet_not_a_file: {named} is not a regular file"
+            )
+        return sheet.read(max_bytes)
 
 
 def neutralize_text(text: str, escaped_characters: frozenset[str]) -> str:
