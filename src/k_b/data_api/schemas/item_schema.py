@@ -56,6 +56,10 @@ class ListedAdvisorySchema(ListedItemSchema):
     cve_id: str | None
     exploited: bool | None = Field(description=EXPLOITED)
     packages: list[str]
+    packages_truncated: bool = Field(
+        description="Packages are left out: the list serves the first 10 of an advisory, its"
+        " detail every one, and says false."
+    )
 
 
 class ListedNewsletterArticleSchema(ListedItemSchema):

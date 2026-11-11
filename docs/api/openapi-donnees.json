@@ -492,6 +492,11 @@
             },
             "type": "array",
             "title": "Packages"
+          },
+          "packages_truncated": {
+            "type": "boolean",
+            "title": "Packages Truncated",
+            "description": "Packages are left out: the list serves the first 10 of an advisory, its detail every one, and says false."
           }
         },
         "type": "object",
@@ -505,7 +510,8 @@
           "ghsa_id",
           "cve_id",
           "exploited",
-          "packages"
+          "packages",
+          "packages_truncated"
         ],
         "title": "AdvisoryDetailSchema",
         "description": "An advisory serves nothing beyond the list."
@@ -830,6 +836,11 @@
             },
             "type": "array",
             "title": "Packages"
+          },
+          "packages_truncated": {
+            "type": "boolean",
+            "title": "Packages Truncated",
+            "description": "Packages are left out: the list serves the first 10 of an advisory, its detail every one, and says false."
           }
         },
         "type": "object",
@@ -843,7 +854,8 @@
           "ghsa_id",
           "cve_id",
           "exploited",
-          "packages"
+          "packages",
+          "packages_truncated"
         ],
         "title": "ListedAdvisorySchema"
       },

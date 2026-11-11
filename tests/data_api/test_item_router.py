@@ -1,6 +1,7 @@
 """GET /items on the test base (tests/fixtures/items_database.sql), whose ids the tests name, on
 each engine."""
 
+import json
 from pathlib import Path
 from typing import get_args
 
@@ -21,7 +22,7 @@ LISTED_IDENTIFIERS = {
     "paper": {"arxiv_id"},
     "vulnerability": {"cve_id", "exploited"},
     "release": {"repository_name", "tag_name"},
-    "advisory": {"ghsa_id", "cve_id", "exploited", "packages"},
+    "advisory": {"ghsa_id", "cve_id", "exploited", "packages", "packages_truncated"},
     "newsletter_article": {"edition"},
     "zotero_entry": set(),
     "clip": set(),
@@ -75,6 +76,7 @@ def test_each_kind_is_listed_with_the_fields_of_the_spec(client, authorization):
                 "cve_id": "CVE-2020-29583",
                 "exploited": True,
                 "packages": ["langgraph-checkpoint"],
+                "packages_truncated": False,
             },
         ),
         (
@@ -84,6 +86,7 @@ def test_each_kind_is_listed_with_the_fields_of_the_spec(client, authorization):
                 "cve_id": "CVE-2026-45134",
                 "exploited": False,
                 "packages": ["langsmith", "langchain-classic", "langchain"],
+                "packages_truncated": False,
             },
         ),
         (
@@ -93,6 +96,7 @@ def test_each_kind_is_listed_with_the_fields_of_the_spec(client, authorization):
                 "cve_id": None,
                 "exploited": None,
                 "packages": ["langchain", "langchain-anthropic"],
+                "packages_truncated": False,
             },
         ),
         (11, {"edition": "ai"}),
@@ -307,6 +311,7 @@ ADVISORY_9 = {
     "cve_id": "CVE-2020-29583",
     "exploited": True,
     "packages": ["langgraph-checkpoint"],
+    "packages_truncated": False,
 }
 NEWSLETTER_ARTICLE_11 = {
     "id": 11,
@@ -509,6 +514,54 @@ def test_the_detail_reads_one_more_than_it_serves_and_says_the_cut(
     assert entry["highlights_truncated"] is True
     assert clip["body"] == "é" * 125_000
     assert clip["body_truncated"] is True
+
+
+# The packages of advisories 10 and 17 of the test base, at and beyond the bound of the list.
+TEN_PACKAGES = [f"package-{number}" for number in range(10)]
+ELEVEN_PACKAGES = [*TEN_PACKAGES, "package-10"]
+
+
+@pytest.fixture
+def client_beyond_the_list_bound(engine, new_base, make_client, api_keys):
+    """The data API on the test base with advisory 10 of 10 packages and advisory 17 of 11, on the
+    engine of the test."""
+    connection = connect_database(new_base)
+    try:
+        connection.executescript(ITEMS_DATABASE_SCRIPT.read_text())
+        for item_id, packages in ((10, TEN_PACKAGES), (17, ELEVEN_PACKAGES)):
+            connection.execute(
+                "UPDATE advisory SET packages = ? WHERE item_id = ?",
+                (json.dumps(packages), item_id),
+            )
+        connection.commit()
+    finally:
+        connection.close()
+    if engine == "sqlite":
+        yield make_client(new_base, api_keys)
+        return
+    with open_readers(new_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
+        yield make_client(readers, api_keys)
+
+
+def test_the_list_serves_ten_packages_of_an_advisory_and_says_the_cut(
+    client_beyond_the_list_bound, authorization
+):
+    """OWASP API4: a page of 100 advisories stays below the bound of the AI API client; the
+    detail serves every package."""
+    items = client_beyond_the_list_bound.get(
+        "/items", params={"kind": "advisory"}, headers=authorization
+    ).json()["items"]
+    detail = client_beyond_the_list_bound.get("/items/17", headers=authorization).json()
+
+    packages_by_id = {
+        item["id"]: (item["packages"], item["packages_truncated"]) for item in items
+    }
+    assert packages_by_id[10] == (TEN_PACKAGES, False)
+    assert packages_by_id[17] == (TEN_PACKAGES, True)
+    assert (detail["packages"], detail["packages_truncated"]) == (
+        ELEVEN_PACKAGES,
+        False,
+    )
 
 
 def test_a_withdrawn_highlight_is_served_with_its_withdrawn_at(client, authorization):

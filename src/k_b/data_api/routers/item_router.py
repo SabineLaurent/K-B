@@ -16,9 +16,11 @@ from k_b.data_api.schemas.item_schema import (
     ItemPageSchema,
 )
 from k_b.database.reading import (
+    AdvisoryDetail,
     ClipDetail,
     DetailBounds,
     KindDetail,
+    ListedItem,
     StoredHighlight,
     ZoteroEntryDetail,
     format_since,
@@ -46,6 +48,10 @@ MAX_KINDS = len(get_args(ItemKind))
 # API does not move with a bound of the import.
 MAX_SERVED_HIGHLIGHTS = 100
 MAX_SERVED_TEXT_LENGTH = 125_000
+# The packages of an advisory the list serves (OWASP API4:2023): 100 of 255 characters each, as
+# the import allows, would bring a page of 100 advisories beyond the bound of the AI API client
+# (MAX_DATA_API_BODY_BYTES); the detail serves them all.
+MAX_LISTED_PACKAGES = 10
 
 
 def read_since_text(since: object) -> datetime:
@@ -113,11 +119,23 @@ def list_items(
     # The discriminator picks the schema of each kind; a field it does not name is not served.
     return ItemPageSchema.model_validate(
         {
-            "items": [item._asdict() for item in page.items],
+            "items": [bound_packages(item) for item in page.items],
             "next_offset": bound_next_offset(page.next_offset),
             "total": page.total,
         }
     )
+
+
+def bound_packages(item: ListedItem) -> dict[str, Any]:
+    """The fields of a listed item, the packages of an advisory cut at their bound, the cut said."""
+    fields = item._asdict()
+    if item.packages is None:
+        return fields
+    return {
+        **fields,
+        "packages": item.packages[:MAX_LISTED_PACKAGES],
+        "packages_truncated": len(item.packages) > MAX_LISTED_PACKAGES,
+    }
 
 
 def bound_next_offset(next_offset: int | None) -> int | None:
@@ -158,6 +176,9 @@ def bound_details(details: KindDetail) -> dict[str, Any]:
             "highlights": highlights,
             "highlights_truncated": len(highlights) < len(details.highlights),
         }
+    if isinstance(details, AdvisoryDetail):
+        # The detail serves every package of the list.
+        return {"packages_truncated": False}
     if isinstance(details, ClipDetail):
         return {
             **details._asdict(),
