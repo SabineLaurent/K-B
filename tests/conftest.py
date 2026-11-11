@@ -16,7 +16,7 @@ import pytest
 from k_b.core.api_settings import DEPLOYMENT_ENVIRONMENT_VARIABLE
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
 from k_b.database.creation import create_database
-from k_b.database.engine import connect_database, open_readers
+from k_b.database.engine import connect_database
 from k_b.database.location import LIBPQ_VARIABLES, PostgresUrl
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -310,7 +310,12 @@ def items_postgresql_base(postgresql_server_url):
 @pytest.fixture(scope="session")
 def items_postgresql_readers(items_postgresql_base):
     """The pool of the data API on the test base of the readers on PostgreSQL."""
-    with open_readers(items_postgresql_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
+    # Imported here: tests/test_e2e_selection.py runs this file without the rest of tests/.
+    from database.connected_readers import open_connected_readers
+
+    with open_connected_readers(
+        items_postgresql_base, DATA_API_QUERY_TIMEOUT_SECONDS
+    ) as readers:
         yield readers
 
 

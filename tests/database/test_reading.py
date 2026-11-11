@@ -7,9 +7,10 @@ from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta, timezone, tzinfo
 
 import pytest
+from database.connected_readers import open_connected_readers
 
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
-from k_b.database.engine import connect_database, connect_reader, open_readers
+from k_b.database.engine import connect_database, connect_reader
 from k_b.database.reading import (
     ClipDetail,
     DetailBounds,
@@ -43,7 +44,7 @@ def connection(items_readers):
 def reading(location):
     """A connection of the data API on a base of the test."""
     with (
-        open_readers(location, DATA_API_QUERY_TIMEOUT_SECONDS) as readers,
+        open_connected_readers(location, DATA_API_QUERY_TIMEOUT_SECONDS) as readers,
         connect_reader(readers, DATA_API_QUERY_TIMEOUT_SECONDS) as connection,
     ):
         yield connection
