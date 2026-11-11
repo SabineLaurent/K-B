@@ -1,5 +1,5 @@
-"""The exchange storage of the jobs: its settings, the identity of the job, the listing and its
-errors, named without the text the storage answers."""
+"""The exchange storage: its settings, the identity of the job, the listing and its errors, named
+without the text the storage answers."""
 
 from urllib.parse import parse_qs, urlsplit
 
@@ -7,7 +7,7 @@ import pytest
 import requests
 from azure.core.credentials import AccessToken
 from azure.identity import AzureCliCredential
-from jobs.storage_fakes import (
+from exchange.storage_fakes import (
     SPOTTED_BLOB_NAME,
     TEST_ACCOUNT_URL,
     TEST_CLIENT_ID,
@@ -25,8 +25,8 @@ from jobs.storage_fakes import (
 )
 
 from k_b.core.config import MAX_LISTED_BLOBS
-from k_b.jobs import exchange_storage
-from k_b.jobs.exchange_storage import (
+from k_b.exchange import storage as exchange_storage
+from k_b.exchange.storage import (
     ExchangeStorageError,
     ExchangeStorageSettings,
     build_cli_credential,

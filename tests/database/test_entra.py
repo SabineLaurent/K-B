@@ -4,7 +4,7 @@ endpoint: its scope, its identity, and a failure named without what the endpoint
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from jobs.storage_fakes import (
+from exchange.storage_fakes import (
     FORGED_LOG_LINE,
     TEST_CLIENT_ID,
     TEST_TOKEN,

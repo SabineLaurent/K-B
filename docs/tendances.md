@@ -48,7 +48,7 @@ rédaction. Le chemin d'un README est construit par le code depuis le nom associ
 candidat, jamais depuis la sortie du modèle.
 
 **Un client GitHub neuf.** L'API IA n'importe que `ai_api`, `items` et `core`
-(`tests/architecture/test_apis.py:102`), et `post` n'importe ni les sources
+(`tests/architecture/test_apis.py:104`), et `post` n'importe ni les sources
 (`tests/architecture/test_layers.py:109`) ni les API (`:207`) : le client de la collecte
 (`etl/sources/github/api.py`) n'est pas joignable. Le client neuf repose sur `open_http_client`
 (`core/outbound.py:45-53` : aucune redirection suivie, aucun proxy lu). Ce que les deux partagent

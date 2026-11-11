@@ -1,7 +1,7 @@
 """What the tests of the jobs share: the variables of a run online removed."""
 
 import pytest
-from jobs.storage_fakes import remove_online_variables
+from exchange.storage_fakes import remove_online_variables
 
 
 @pytest.fixture(autouse=True)

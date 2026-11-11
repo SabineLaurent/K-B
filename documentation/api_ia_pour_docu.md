@@ -45,7 +45,7 @@ Le schéma se lit ainsi:
 - **L'API IA lit la veille par l'API de données**, jamais dans la base. Elle appelle `GET /items`,
   `GET /items/{item_id}` et `GET /trends` (`ai_api/connectors/data_api_client.py:268`, `:289`, `:308`) avec la
   clé du client `AI_DIGEST` de l'API de données (`ai_api/connectors/data_api_settings.py:15`). Un test refuse
-  qu'elle importe autre chose que `ai_api`, `items` et `core` (`tests/architecture/test_apis.py:118`).
+  qu'elle importe autre chose que `ai_api`, `items` et `core` (`tests/architecture/test_apis.py:120`).
 - **Elle appelle le modèle** par une interface compatible OpenAI, sur le chemin `chat/completions`
   (`ai_api/connectors/llm_client.py:40`). Le fournisseur est `openai_compatible`, ou `replay`, qui rejoue des
   réponses d'un fichier, sans réseau (`ai_api/connectors/llm_settings.py:31`).
@@ -54,7 +54,7 @@ Le schéma se lit ainsi:
 - **Elle envoie ses mesures et ses traces en OpenTelemetry** vers Grafana Cloud, quand l'export est réglé. Ce
   qu'elles contiennent et comment les lire: [`monitoring_pour_docu.md`](monitoring_pour_docu.md).
 - **Les deux commandes écrivent le coffre** à partir de la réponse. Le paquet `ai_api` n'écrit aucun fichier
-  (règle 7 de `.claude/rules/poc.md`): ses imports sont tenus par `tests/architecture/test_apis.py:118` et `:141`;
+  (règle 7 de `.claude/rules/poc.md`): ses imports sont tenus par `tests/architecture/test_apis.py:120` et `:144`;
   son écriture se vérifie à la main par la commande `grep` de la règle 7 (« Vérifier cette fiche »). Le processus
   `kb serve-ai` tient son journal, `logs/kb-serve-ai.log` dans `KB_DATA_DIR` (`commands/run_log.py:29`,
   `cli.py:68`), sauf avec `KB_LOG_TO_FILE=false` (`commands/environment.py:16`).
@@ -114,7 +114,7 @@ cités, `items_removed_by_checks` (`ai_api/stages/checking.py:63-119`).
 
 ### Les couches du code
 
-Les 35 modules de `ai_api/` sont rangés en 16 couches (`AI_API_LAYERS`, `tests/architecture/test_apis.py:151-194`):
+Les 35 modules de `ai_api/` sont rangés en 16 couches (`AI_API_LAYERS`, `tests/architecture/test_apis.py:154-197`):
 du code pur en bas, puis les clients sortants (`connectors/`), les étapes du modèle (`stages/`), le parcours de
 chaque route (`digests.py`, `trend_reports.py`), les contrats (`schemas/`), les routeurs (`routers/`) et l'app
 (`app.py`). Deux tests tiennent la table: chaque module est dans une seule couche (`:212`), et aucun n'importe sa

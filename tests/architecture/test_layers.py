@@ -319,10 +319,11 @@ def test_no_module_of_the_sources_imports_the_composition():
         } == set(), path
 
 
-# The code the jobs of Azure Container Apps share (#412): the exchange storage and the health of the
-# APIs, below commands; the Mac reaches the exchange storage by it too (kb download-watch-sheets, #424). It imports only core; only commands import it: neither the pipeline nor the
-# APIs, which have no access to the exchange storage.
-JOBS_ALLOWED_MODULES = {"jobs", "core"}
+# The code the jobs of Azure Container Apps share (#412): what they do with the exchange storage and
+# the health of the APIs, below commands; the Mac reaches the exchange storage by it too (kb
+# download-watch-sheets, #424). It imports only exchange and core; only commands import it: neither
+# the pipeline nor the APIs.
+JOBS_ALLOWED_MODULES = {"jobs", "exchange", "core"}
 JOBS_IMPORTERS = {"jobs", "commands"}
 
 
@@ -334,7 +335,7 @@ def list_imports_of_jobs(imported: set[str]) -> set[str]:
     return {name for name in imported if reaches(name, {"jobs"})}
 
 
-def test_jobs_imports_only_core():
+def test_jobs_imports_only_exchange_and_core():
     for path in list_python_files("jobs"):
         imported = list_imported_modules(path, find_package(path))
         assert list_forbidden_imports_of_jobs(imported) == set(), path
@@ -361,9 +362,10 @@ def test_only_commands_import_jobs():
         ("from ..commands.run_log import LOGGER_NAME", True),
         ("from k_b.core.outbound import open_http_client", False),
         ("from .api_health import check_health", False),
+        ("from k_b.exchange.storage import naming_storage_errors", False),
     ],
 )
-def test_the_rule_of_jobs_refuses_every_layer_but_core(code, is_refused):
+def test_the_rule_of_jobs_refuses_every_layer_but_exchange_and_core(code, is_refused):
     imported = parse_imported_modules(code, package="k_b.jobs")
 
     assert bool(list_forbidden_imports_of_jobs(imported)) is is_refused
@@ -372,11 +374,7 @@ def test_the_rule_of_jobs_refuses_every_layer_but_core(code, is_refused):
 @pytest.mark.parametrize(
     ("package", "code", "is_refused"),
     [
-        (
-            "k_b.ai_api",
-            "from k_b.jobs.exchange_storage import open_container_client",
-            True,
-        ),
+        ("k_b.ai_api", "from k_b.jobs.watch_download import list_watch_sheets", True),
         ("k_b.etl", "from k_b import jobs", True),
         ("k_b.data_api", "from ..jobs import api_health", True),
         ("k_b.commands", "from k_b.core.outbound import open_http_client", False),
@@ -386,3 +384,83 @@ def test_the_rule_of_jobs_refuses_every_way_to_it(package, code, is_refused):
     imported = parse_imported_modules(code, package=package)
 
     assert bool(list_imports_of_jobs(imported)) is is_refused
+
+
+# The client of the exchange storage, Azure Blob Storage (#558): the jobs and the Mac reach it
+# through jobs, the data API reads by it the container watch (#559). It imports only core, never
+# core.atomic_write: it gives the bytes of a blob, their writing stays in jobs, and the data API
+# writes no file. Neither the pipeline, the base nor the AI API reach the exchange storage.
+EXCHANGE_ALLOWED_MODULES = {"exchange", "core"}
+EXCHANGE_FORBIDDEN_MODULES = {"core.atomic_write"}
+EXCHANGE_IMPORTERS = {"exchange", "jobs", "commands", "data_api"}
+
+
+def list_forbidden_imports_of_exchange(imported: set[str]) -> set[str]:
+    return {
+        name
+        for name in imported
+        if not is_within(name, EXCHANGE_ALLOWED_MODULES)
+        or reaches(name, EXCHANGE_FORBIDDEN_MODULES)
+    }
+
+
+def list_imports_of_exchange(imported: set[str]) -> set[str]:
+    return {name for name in imported if reaches(name, {"exchange"})}
+
+
+def test_exchange_imports_only_core_and_never_the_writing_of_a_file():
+    for path in list_python_files("exchange"):
+        imported = list_imported_modules(path, find_package(path))
+        assert list_forbidden_imports_of_exchange(imported) == set(), path
+
+
+def test_only_jobs_commands_and_the_data_api_import_exchange():
+    paths = [
+        path.relative_to(PACKAGE_DIR).as_posix()
+        for path in sorted(PACKAGE_DIR.rglob("*.py"))
+        if path.relative_to(PACKAGE_DIR).parts[0].removesuffix(".py")
+        not in EXCHANGE_IMPORTERS
+        and list_imports_of_exchange(list_imported_modules(path, find_package(path)))
+    ]
+
+    assert paths == []
+
+
+@pytest.mark.parametrize(
+    ("code", "is_refused"),
+    [
+        ("from k_b.core.atomic_write import write_file_atomically", True),
+        ("from k_b.core import atomic_write", True),
+        ("from k_b import core", True),
+        ("from k_b.jobs.clip_mirror import mirror_clips", True),
+        ("from k_b.database.engine import connect_database", True),
+        ("from k_b.core.outbound import find_url_refusal", False),
+        ("from k_b.core.config import MAX_LISTED_BLOBS", False),
+    ],
+)
+def test_the_rule_of_exchange_refuses_every_layer_and_the_writing_of_a_file(
+    code, is_refused
+):
+    imported = parse_imported_modules(code, package="k_b.exchange")
+
+    assert bool(list_forbidden_imports_of_exchange(imported)) is is_refused
+
+
+@pytest.mark.parametrize(
+    ("package", "code", "is_refused"),
+    [
+        ("k_b.ai_api", "from k_b.exchange.storage import open_container_client", True),
+        ("k_b.etl", "from k_b import exchange", True),
+        ("k_b.database", "from ..exchange import storage", True),
+        ("k_b.post", "from k_b.exchange.storage import naming_storage_errors", True),
+        ("k_b.purge", "from k_b.exchange.storage import ExchangeStorageError", True),
+        ("k_b.core", "from ..exchange.storage import build_transport", True),
+        ("k_b.etl", "from k_b.core.config import WATCH_CONTAINER", False),
+    ],
+)
+def test_the_rule_of_exchange_refuses_every_way_to_it_but_its_importers(
+    package, code, is_refused
+):
+    imported = parse_imported_modules(code, package=package)
+
+    assert bool(list_imports_of_exchange(imported)) is is_refused

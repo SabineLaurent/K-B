@@ -19,7 +19,7 @@ UNKNOWN_AUTH_REFUSAL = (
     f"{DATABASE_AUTH_VARIABLE} is neither {LIBPQ_AUTH} nor {ENTRA_AUTH}"
 )
 # The client id of the user-assigned identity, the variable azure-identity reads, as
-# jobs/exchange_storage.py does: a job that reaches the storage and the base has one GUID.
+# exchange/storage.py does: a job that reaches the storage and the base has one GUID.
 CLIENT_ID_VARIABLE = "AZURE_CLIENT_ID"
 # A client id as Azure gives it: a GUID, without braces.
 CLIENT_ID = re.compile(r"[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")

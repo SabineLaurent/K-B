@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 import pytest
 from azure.core.credentials import AccessToken
 from azure.identity import CredentialUnavailableError
-from jobs.storage_fakes import (
+from exchange.storage_fakes import (
     TEST_ACCOUNT_URL,
     TEST_TOKEN,
     FakeBlob,
@@ -25,7 +25,7 @@ from k_b.commands.download_watch_sheets_command import WATCH_SHEET_FOLDERS
 from k_b.commands.sigterm import COMMANDS_STOPPED_BY_SIGTERM
 from k_b.core.config import DIGEST_SUBJECTS
 from k_b.etl.source_kinds import TOPS
-from k_b.jobs.exchange_storage import open_container_client
+from k_b.exchange.storage import open_container_client
 from k_b.post import digest_sheets, top_sheets, trend_report_sheets
 
 ExitCode = cli.ExitCode

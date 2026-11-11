@@ -1,8 +1,8 @@
 """The token of the managed identity for its PostgreSQL base (Microsoft Entra), which libpq sends as
 the password of a new connection: asked for at each one, never logged.
 
-The transport and the client id are those of jobs/exchange_storage.py, written a second time
-rather than shared: the base may not import the jobs (conventions.md, rule 5)."""
+The transport and the client id are those of exchange/storage.py, written a second time
+rather than shared: the base may not import exchange (conventions.md, rule 5)."""
 
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import AzureError
@@ -49,7 +49,7 @@ def build_database_credential(
 def fetch_database_token(credential: TokenCredential) -> str:
     """A token of the base for the identity of the credential.
 
-    Any failure is database_no_token, as for the exchange storage (jobs/exchange_storage.py): the
+    Any failure is database_no_token, as for the exchange storage (exchange/storage.py): the
     class of an error of azure-identity does not tell a refusal from an outage. ValueError and
     AttributeError: an answer that is not a JSON object, which azure-identity does not turn into an
     AzureError."""

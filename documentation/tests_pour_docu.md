@@ -31,8 +31,8 @@ versions de `uv.lock`, sans le mettre à jour.
 réglages de `kb` qu'un terminal peut exporter (`KB_SETTINGS_VARIABLES`, dont `KB_DATABASE_URL` et
 `KB_DEPLOYMENT_ENVIRONMENT`) et les variables que lit libpq (`LIBPQ_VARIABLES`): une variable de ces deux listes,
 exportée par le terminal, ne change ni ce que les tests vérifient, ni la base où ils écrivent. Cette fixture ne
-retire pas les autres variables d'un `.env` exporté; `tests/commands/conftest.py` et `tests/jobs/conftest.py` en
-retirent d'autres, pour leurs seuls tests.
+retire pas les autres variables d'un `.env` exporté; `tests/commands/conftest.py`, `tests/jobs/conftest.py` et
+`tests/exchange/conftest.py` en retirent d'autres, pour leurs seuls tests.
 
 **Pour les tests marqués `postgresql`**: un serveur PostgreSQL de test, nommé par `KB_TEST_POSTGRESQL_URL`. C'est
 un serveur de la machine (sur le Mac, le PostgreSQL de Homebrew, sans conteneur) ou le service de la CI, jamais la

@@ -4,7 +4,11 @@ wake again, kb trend-report, then the publication of veille."""
 import signal
 
 import pytest
-from jobs.storage_fakes import TEST_ACCOUNT_URL, TEST_CLIENT_ID, remove_online_variables
+from exchange.storage_fakes import (
+    TEST_ACCOUNT_URL,
+    TEST_CLIENT_ID,
+    remove_online_variables,
+)
 
 from k_b import cli
 from k_b.commands import digest_watch_command
