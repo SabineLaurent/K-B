@@ -124,6 +124,18 @@ LABELS_BY_KIND: dict[FeedKind, KindLabels] = {
 }
 
 
+# The name of each edition tracked, as TLDR writes it in the h1 of its page
+# (tests/fixtures/tldr_*_extract.html; docs/specs-collecte.md for tech; tldr.tech/infosec, read on
+# 2026-11-11): the mockups write TLDR AI (time-knight, 2026-11-11). An edition without a name here
+# shows its slug.
+NEWSLETTER_NAME_BY_EDITION = {
+    "ai": "TLDR AI",
+    "infosec": "TLDR InfoSec",
+    "dev": "TLDR Dev",
+    "tech": "TLDR",
+}
+
+
 @dataclass(frozen=True)
 class FeedCard:
     """An item as its card shows it; day is the ISO day of its time element."""
@@ -335,7 +347,7 @@ def write_identifiers(item: FeedItem) -> str:
         case FeedRelease():
             return item.repository_name
         case FeedNewsletterArticle():
-            return f"TLDR {item.edition}"
+            return NEWSLETTER_NAME_BY_EDITION.get(item.edition, f"TLDR {item.edition}")
         case _:
             assert_never(item)
 

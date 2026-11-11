@@ -8,11 +8,16 @@ import pytest
 from feed_fixture import ITEMS_PAGE
 from starlette.datastructures import QueryParams
 
-from k_b.core.config import DATA_API_MAX_OFFSET, DATA_API_MAX_SEARCH_LENGTH
+from k_b.core.config import (
+    DATA_API_MAX_OFFSET,
+    DATA_API_MAX_SEARCH_LENGTH,
+    TLDR_TRACKED_EDITIONS,
+)
 from k_b.data_api.routers import item_router
 from k_b.web.data_api_client import FEED_KINDS, PAGE, DataApiError
 from k_b.web.feed import (
     MAX_PAGE,
+    NEWSLETTER_NAME_BY_EDITION,
     FieldError,
     build_card,
     build_page_link,
@@ -359,11 +364,22 @@ def test_the_card_of_a_newsletter_article_does_not_say_the_language_of_its_link(
     card = build_card(ITEMS[12])
 
     assert card.kind_label == "Newsletter"
-    assert card.identifiers == "TLDR ai"
+    assert card.identifiers == "TLDR AI"
     assert card.title_lang == "en"
     assert card.link_label == "Lire l’article d’origine"
     assert card.link_note == "site externe"
     assert card.link_lang is None
+
+
+def test_each_edition_tracked_has_the_name_tldr_gives_it():
+    """As in the mockups (time-knight, 2026-11-11); the slug of the data API is unchanged."""
+    assert set(NEWSLETTER_NAME_BY_EDITION) == set(TLDR_TRACKED_EDITIONS)
+
+
+def test_an_edition_without_name_shows_its_slug():
+    article = ITEMS[12].model_copy(update={"edition": "design"})
+
+    assert build_card(article).identifiers == "TLDR design"
 
 
 @pytest.mark.parametrize(
