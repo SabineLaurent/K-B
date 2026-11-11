@@ -12,10 +12,10 @@
   [Écrire une fiche une fois, même à deux](2026-11-10-ecrire-une-fiche-une-fois-meme-a-deux.md) (#295) et
   [Purger par sa propre commande](2026-11-10-purger-par-sa-propre-commande.md) (#540).
 
-Tous les commits de la branche sont couverts. Le premier commit du job (`a322357`) le planifiait à 03:00 UTC ;
-`d03ecc8` le déplace à 08:00 UTC, et seul ce second réglage reste dans le code. Les commits de documentation (README
+Tous les commits de la branche sont couverts. Le premier commit du job (`d5df721`) le planifiait à 03:00 UTC ;
+`1266398` le déplace à 08:00 UTC, et seul ce second réglage reste dans le code. Les commits de documentation (README
 d'infra, registre, journal ADR) se retrouvent dans « Choix faits » et « Preuve » ; ceux des revues et du rebase sur
-`kb purge` (`7d2bb6a`, `0a14827`, `a720c86`, `f9c2537`), dans « Preuve ».
+`kb purge` (`7f43ba8`, `1c8117a`, `dcd29e9`, `b967df0`), dans « Preuve ».
 
 ## Le pourquoi
 
@@ -161,8 +161,8 @@ On a ainsi éprouvé l'écriture « une fois » sur un vrai partage SMB, entre d
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| `tests/database/test_grants.py:66` et `:77`, rouges sans le `GRANT` de `grant-roles.sql` (« permission denied for database », `5ec9961`) | Le script appliqué en ligne suffit : la routine écrit les données et ne change aucune table |
-| `tests/commands/test_purge_command.py:221`, rouge sur deux sorties faussées exprès, puis vert (`f9c2537`) | Sous le rôle de la routine, `kb import` écrit, puis `kb purge` supprime items, lignes du brut et du registre |
+| `tests/database/test_grants.py:66` et `:77`, rouges sans le `GRANT` de `grant-roles.sql` (« permission denied for database », `488e1af`) | Le script appliqué en ligne suffit : la routine écrit les données et ne change aucune table |
+| `tests/commands/test_purge_command.py:221`, rouge sur deux sorties faussées exprès, puis vert (`b967df0`) | Sous le rôle de la routine, `kb import` écrit, puis `kb purge` supprime items, lignes du brut et du registre |
 | 4 111 tests, plus 323 sur PostgreSQL ; ruff, format, mypy ; compilation du Bicep | Rien d'autre n'a bougé |
 | `/security-review` xhigh : 0 constat ; `/code-review high` : 8 constats, puis 7 sur le rebase, triés par time-knight | Revues faites, tri écrit dans la PR |
 | `az containerapp job show` : `ResourceNotFound` avant la passe | Le critère rouge de l'issue |
