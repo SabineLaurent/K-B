@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 import uvicorn.config
+from database.connected_readers import open_connected_readers
 from fastapi.testclient import TestClient
 
 from k_b import cli
@@ -368,6 +369,9 @@ def test_serve_reads_the_postgresql_base_of_kb_database_url_with_the_deadline_it
 ):
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv(DATABASE_URL_VARIABLE, items_postgresql_base.value)
+    # The pool kb serve-data opens connects in the background: the request of the test waits
+    # for its first connection, as the other tests that read through the pool do.
+    monkeypatch.setattr(serve_data_command, "open_readers", open_connected_readers)
 
     assert cli.main(["serve-data"]) == 0
 
