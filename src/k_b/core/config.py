@@ -228,7 +228,7 @@ COMPOSE_HOSTS = ("api-donnees", "api-ia")
 MIN_API_KEY_LENGTH = 32
 API_KEY_CHARACTERS = re.compile(r"[A-Za-z0-9_-]+")
 # An id as Microsoft Entra and Azure give it, a GUID without braces: the client id of a managed
-# identity (database/location.py, jobs/exchange_storage.py) and the object id of the operator of the
+# identity (database/location.py, exchange/storage.py) and the object id of the operator of the
 # site (web/settings.py, web/operator_check.py).
 GUID = re.compile(r"[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
 # The log of kb in a file of the data directory as well as on stderr; KB_LOG_TO_FILE=false for
