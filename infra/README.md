@@ -1576,11 +1576,10 @@ Puis, dans l'ordre :
   l'en-tête d'identité, ce qui ne se forge pas sans la clé d'Entra (issue à ouvrir après l'oral blanc, demandée par
   Sabine ; une dépendance de plus, sur son accord) ; un environnement à part pour le site couperait le réseau commun
   (faisable avec nos droits, non retenu pour le 13/11).
-- **Des droits posés avant leur code** (consigne de time-knight du 2026-11-11). Le rôle de lecture sur `watch`,
-  `KB_EXCHANGE_BLOB_URL`, `KB_DATA_API_URL` et la clé `WEB` existent avant que l'API de données et le site les lisent
-  (#559 à #561, #563). Pourquoi : éviter une seconde passe avant le fil. Pour réduire le risque : ils restent sans
-  code quelques jours, et #559 et #563 les utilisent ; le rôle ne donne que la lecture de `watch`, et la clé ne sert
-  que l'API de données, interne.
+- **Des droits posés avant leur code** (consigne de time-knight du 2026-11-11, pour éviter une seconde passe). Depuis
+  #563 (fusionnée le 2026-11-11), le site lit `KB_DATA_API_URL` et la clé `WEB`. Seuls le rôle de lecture sur `watch` et
+  `KB_EXCHANGE_BLOB_URL` existent encore avant que l'API de données les lise (#559 à #561). Pour réduire le risque :
+  ils restent sans code quelques jours, et #559 les utilise ; le rôle ne donne que la lecture de `watch`.
 
 Sources (lues le 2026-11-11) :
 - Microsoft Learn :

@@ -11,15 +11,15 @@
 - **Note précédente de la série** : [Ouvrir le socle du site privé](2026-11-11-ouvrir-le-socle-du-site-prive.md)
   (#562), le contrôle de l'en-tête dans le code
 
-Les commits de la branche, rebasée sur `main` (0a6ba26, après #577 et #582), sont :
-- 8d81b44, le Bicep ;
-- 1257b89, le README ;
-- fd94f65, le registre ;
-- 7f88f60, l'ADR et `MEMORY.md` ;
-- 2fa8a57, le tri des trois revues ;
-- 0deb60e, cette note ;
-- 6c06c0e, le risque A4 accepté par Sabine, avec ses deux parades à venir ;
-- 5de7a7a, la relecture de tn-codeur : l'image attendue à l'aperçu de chaque passe, et la règle des heures pour
+Les commits de la branche, rebasée sur `main` (ab4fde7, après #577, #582 et #583), sont :
+- f43677d, le Bicep ;
+- 02ac260, le README ;
+- b9ed3df, le registre ;
+- c0b6c6b, l'ADR et `MEMORY.md` ;
+- 0a60818, le tri des trois revues ;
+- f0f0445, cette note ;
+- cd8c240, le risque A4 accepté par Sabine, avec ses deux parades à venir ;
+- 1548a86, la relecture de tn-codeur : l'image attendue à l'aperçu de chaque passe, et la règle des heures pour
   les passes du site.
 
 S'y ajoutent les commits qui tiennent à jour la liste ci-dessus.
@@ -248,5 +248,5 @@ Les codes de réponse :
   ensuite les constats en ligne, puis la fusion.
 - **Une issue après cette PR**, pour lire le site à chaque Deploy, avec le `curl` à l'en-tête forgé.
 - **Le rôle Log Analytics Reader** pour les chiffres du back office : décision encore ouverte (journal ADR).
-- **Le code qui lit la clé `WEB` et `watch`** : #563 (le fil) et #559 à #561 (l'API de données).
+- **Le code qui lit `watch`** : #559 à #561 (l'API de données). Le site lit la clé `WEB` depuis #563 (le fil).
 - **La rotation du secret client** avant le 2027-05-11 (`infra/README.md`, « La rotation du secret client »).

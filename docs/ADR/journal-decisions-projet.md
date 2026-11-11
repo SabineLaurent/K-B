@@ -6959,7 +6959,9 @@ jour, avec ses quatre points ; relu par time-knight et par un sous-agent sans co
   le site qui lit `watch` lui-même, avec un rôle Azure pour son code. Limite assumée (consigne de time-knight du
   2026-11-11, écart au moindre privilège accepté) : le rôle, `KB_EXCHANGE_BLOB_URL` et la clé `WEB` sont posés avant
   leur code (#559 à #561, #563), pour éviter une seconde passe avant le fil. Pour réduire le risque : ils restent
-  sans code quelques jours, et #559 et #563 les utilisent ; le rôle ne permet que la lecture de `watch`. Suit l'entrée de #558 du même jour, qui ouvre
+  sans code quelques jours, et #559 et #563 les utilisent ; le rôle ne permet que la lecture de `watch`. Depuis #563,
+  fusionnée le même jour, le site lit la clé `WEB` : seuls le rôle et `KB_EXCHANGE_BLOB_URL` précèdent encore leur code
+  (#559 à #561). Suit l'entrée de #558 du même jour, qui ouvre
   le client du stockage d'échange à l'API de données. — PR de #571
 
 ## Décisions encore ouvertes
