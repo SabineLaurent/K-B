@@ -24,7 +24,7 @@ from k_b.core.config import (
 from k_b.core.quoting import name_os_error
 from k_b.etl.collected_sources import read_vault_dir_or_refusal
 from k_b.etl.source_kinds import TOPS
-from k_b.jobs.exchange_storage import (
+from k_b.exchange.storage import (
     EXCHANGE_BLOB_URL_VARIABLE,
     ExchangeStorageError,
     build_cli_credential,

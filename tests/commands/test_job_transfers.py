@@ -21,7 +21,7 @@ from jobs.storage_fakes import (
 from k_b.commands import job_transfers
 from k_b.commands.exit_codes import ExitCode
 from k_b.core.config import CLIP_CHANGE_MARGIN, CLIP_MIRROR_CLOCK_SLACK
-from k_b.jobs.exchange_storage import (
+from k_b.exchange.storage import (
     ExchangeStorageSettings,
     build_managed_identity_credential,
     open_container_client,

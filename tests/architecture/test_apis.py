@@ -17,9 +17,9 @@ from module_imports import (
     reaches,
 )
 
-# The data API reads the base: never the pipeline, the writers nor their door (conventions.md,
-# rule 5), nor the writing of a file.
-DATA_API_ALLOWED_MODULES = {"data_api", "database", "items", "core"}
+# The data API reads the base, and the exchange storage (#558): never the pipeline, the writers nor
+# their door (conventions.md, rule 5), nor the writing of a file.
+DATA_API_ALLOWED_MODULES = {"data_api", "database", "items", "core", "exchange"}
 DATA_API_FORBIDDEN_MODULES = {
     "database.writers",
     "database.writing",
@@ -63,6 +63,8 @@ def test_data_api_imports_only_data_api_database_items_and_core():
         ("from k_b.database import reading", False),
         ("from k_b.database.reading import read_items", False),
         ("from k_b.data_api.errors import ApiError", False),
+        ("from k_b.exchange.storage import open_container_client", False),
+        ("from k_b.jobs.watch_download import list_watch_sheets", True),
     ],
 )
 def test_the_data_api_rule_refuses_etl_and_the_writers(code, is_refused):
@@ -133,6 +135,7 @@ def test_ai_api_imports_only_ai_api_items_and_core():
         ("from k_b.core import atomic_write", True),
         ("from k_b import data_api", True),
         ("from k_b import cli", True),
+        ("from k_b.exchange.storage import open_container_client", True),
         ("from k_b.core.config import LLM_CALL_TIMEOUT_SECONDS", False),
         ("from k_b.core.quoting import quote_value", False),
         ("from .llm_replay import ReplayTransport", False),

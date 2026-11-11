@@ -22,8 +22,12 @@ from k_b.core.config import (
     MAX_WATCH_LISTED_BLOBS,
     MAX_WATCH_SHEET_BYTES,
 )
-from k_b.jobs.clip_mirror import describe_counter, download_listed_version
-from k_b.jobs.exchange_storage import ExchangeStorageError, naming_storage_errors
+from k_b.exchange.storage import (
+    ExchangeStorageError,
+    download_listed_version,
+    naming_storage_errors,
+)
+from k_b.jobs.clip_mirror import describe_counter
 
 logger = logging.getLogger(__name__)
 

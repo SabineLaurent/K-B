@@ -32,7 +32,7 @@ LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 # provider) and without the id of the request of kb serve-ai: from WARNING only.
 HTTP_CLIENT_LOGGER_NAME = "httpx2"
 # The Azure SDK logs each request at INFO, with its URL, which names the blob of a transfer: the
-# title of a clip (jobs/exchange_storage.py, #412). At WARNING, it quotes the text of an answer,
+# title of a clip (exchange/storage.py, #412). At WARNING, it quotes the text of an answer,
 # unescaped (the failure of a token, a value of the storage), and kb logs each failure itself: from
 # ERROR only, where it writes fixed texts (review of #412, decided by time-knight on 2026-11-06).
 AZURE_SDK_LOGGER_NAME = "azure"

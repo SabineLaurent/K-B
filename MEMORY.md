@@ -133,15 +133,17 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   *fine-grained* (`github_pat_`, `docs/jeton-github.md`) : l'API IA lit la fiche GitHub de chaque
   candidat d'un compte rendu. Aucun test n'appelle GitHub : `make_app` des tests de la route sert la
   fixture par un GitHub simulé.
-- Depuis #412, `kb smoke-test` (job `caj-kb-smoke-test`) et le paquet `jobs/`, le code commun aux
-  commandes des jobs (stockage d'échange par l'identité managée, `/health`) : seul `commands` l'importe,
-  il n'importe que `core` (`test_layers`). Le nom d'un blob est le titre d'un clip : jamais dans un
-  journal. `logging_to` tient `azure` et `urllib3` à ERROR (`LIBRARY_LOG_LEVELS`) ; une erreur du SDK
-  passe par `naming_storage_errors`, jamais par `str(error)`. Un transport donné au SDK de stockage
-  lui fait perdre ses délais (300 s au lieu de 20 et 60) : toujours `build_transport`. Les tests
-  simulent le SDK par `FakeTransport` et le point d'identité par `IDENTITY_ENDPOINT`
-  (`tests/jobs/storage_fakes.py`), sans réseau ; un nom repérable se cherche brut et encodé dans une
-  URL (`names_the_spotted_blob`). L'envoi et le téléchargement viennent avec #413.
+- Depuis #412, `kb smoke-test` (job `caj-kb-smoke-test`) et le paquet `jobs/`, le code commun aux commandes des
+  jobs (ce qu'ils font du stockage d'échange, `/health`) : seul `commands` l'importe, il n'importe que `exchange`
+  et `core` (`test_layers`). Depuis #558, le client du stockage d'échange (identité managée, transport, erreurs
+  nommées, téléchargement d'une version listée) est le paquet `exchange/` : seuls `jobs`, `commands` et `data_api`
+  l'importent, il n'importe que `core`, jamais `core.atomic_write`. Le nom d'un blob est le titre d'un clip :
+  jamais dans un journal. `logging_to` tient `azure` et `urllib3` à ERROR (`LIBRARY_LOG_LEVELS`) ; une erreur du
+  SDK passe par `naming_storage_errors`, jamais par `str(error)`. Un transport donné au SDK de stockage lui fait
+  perdre ses délais (300 s au lieu de 20 et 60) : toujours `build_transport`. Les tests simulent le SDK par
+  `FakeTransport` et le point d'identité par `IDENTITY_ENDPOINT` (`tests/jobs/storage_fakes.py`), sans réseau ; un
+  nom repérable se cherche brut et encodé dans une URL (`names_the_spotted_blob`). L'envoi et le téléchargement
+  viennent avec #413.
 - Depuis #413, `kb daily-routine` et `kb digest-watch` enchaînent les commandes `kb` dans le même processus
   (`commands/job_routine.py`), jamais par sous-processus : `kb` est le PID 1, seul à recevoir SIGTERM. Une étape
   nouvelle est une `RoutineStep` de la liste de sa routine, appelée par une `lambda` (un test remplace la fonction

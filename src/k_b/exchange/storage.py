@@ -1,6 +1,6 @@
 """The exchange storage, Azure Blob Storage, reached by the managed identity of a job, or on the Mac
-by the account of az login: its settings, its clients, and its errors named without what the
-storage answers.
+by the account of az login: its settings, its clients, the download of a blob as listed, and its
+errors named without what the storage answers.
 
 A blob is named by its path, the title of a clip for one (etl/sources/clipping.py): K-B never
 writes it, and keeps the SDK, which logs the URL of a request at INFO, at ERROR
@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Literal
 
+from azure.core import MatchConditions
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import (
     AzureError,
@@ -21,7 +22,7 @@ from azure.core.exceptions import (
 )
 from azure.core.pipeline.transport import RequestsTransport
 from azure.identity import AzureCliCredential, ManagedIdentityCredential
-from azure.storage.blob import ContainerClient
+from azure.storage.blob import BlobProperties, ContainerClient
 
 from k_b.core.config import (
     EXCHANGE_STORAGE_CONNECT_TIMEOUT_SECONDS,
@@ -60,6 +61,8 @@ STATE_BY_STATUS: dict[int, ExchangeStorageState] = {
     403: "exchange_storage_forbidden",
     404: "exchange_storage_not_found",
 }
+# A download answered 404 or 412: the blob was removed or changed since the listing.
+STATUS_CHANGED_SINCE_LISTING = frozenset({404, 412})
 
 
 @dataclass(frozen=True)
@@ -181,6 +184,27 @@ def count_listed_blobs(container_client: ContainerClient) -> int:
         results_per_page=MAX_LISTED_BLOBS
     ).by_page()
     return sum(1 for _ in next(pages, ()))
+
+
+def download_listed_version(
+    container_client: ContainerClient, blob: BlobProperties
+) -> bytes | None:
+    """The bytes of the version listed, as stored: never decompressed, as a blob sent with
+    Content-Encoding: gzip would pass any bound once inflated. None when the blob was removed or
+    changed since the listing."""
+    try:
+        with naming_storage_errors():
+            downloader = container_client.download_blob(
+                blob.name,
+                etag=blob.etag,
+                match_condition=MatchConditions.IfNotModified,
+                decompress=False,
+            )
+            return downloader.readall()
+    except ExchangeStorageError as error:
+        if error.http_status in STATUS_CHANGED_SINCE_LISTING:
+            return None
+        raise
 
 
 @contextmanager

@@ -20,8 +20,7 @@ from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME, value_or_log_refusal
 from k_b.core.config import AI_API_URL, DATA_API_URL, SMOKE_TEST_CONTAINER
 from k_b.core.outbound import find_internal_api_url_refusal
-from k_b.jobs.api_health import HealthCheckError, build_health_client, check_health
-from k_b.jobs.exchange_storage import (
+from k_b.exchange.storage import (
     ExchangeStorageError,
     ExchangeStorageSettings,
     build_managed_identity_credential,
@@ -31,6 +30,7 @@ from k_b.jobs.exchange_storage import (
     open_container_client,
     read_exchange_storage_settings_or_refusal,
 )
+from k_b.jobs.api_health import HealthCheckError, build_health_client, check_health
 from k_b.post.ai_api_client import AI_API_URL_VARIABLE
 
 logger = logging.getLogger(LOGGER_NAME)

@@ -60,7 +60,7 @@ from k_b.commands import (
     smoke_test_command,
     trend_report_command,
 )
-from k_b.jobs.exchange_storage import (
+from k_b.exchange.storage import (
     build_managed_identity_credential,
     open_container_client,
 )

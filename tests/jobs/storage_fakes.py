@@ -16,7 +16,7 @@ from azure.core.credentials import AccessToken
 from azure.core.pipeline.transport import RequestsTransport
 from requests.adapters import HTTPAdapter
 
-from k_b.jobs.exchange_storage import open_container_client
+from k_b.exchange.storage import open_container_client
 
 # The name of a clip is its title (etl/sources/clipping.py), the file name Web Clipper gives it:
 # spotted in a log, it would name what Sabine reads.
@@ -148,7 +148,7 @@ def answer_identity_with(status, content_type, body):
     return handle
 
 
-# The variables of a run online: those of the job (jobs/exchange_storage.py), and those
+# The variables of a run online: those of the job (exchange/storage.py), and those
 # ManagedIdentityCredential reads to choose its way to a token (azure/identity/_constants.py,
 # EnvironmentVariables, azure-identity 1.27.0).
 ONLINE_VARIABLES = (
