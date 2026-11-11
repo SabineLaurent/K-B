@@ -314,9 +314,10 @@ WEB_DATA_API_REQUEST_DEADLINE_SECONDS = 35
 # each advisory (docs/specs-api.md, "Borne des paquets").
 MAX_WEB_DATA_API_BODY_BYTES = 1_000_000
 FEED_PAGE_SIZE = 20
-# The bound of offset of GET /items (MAX_OFFSET, data_api/routers/item_router.py, which web may not
-# import): a test keeps them equal.
+# The bounds of offset and of q of GET /items (MAX_OFFSET and MAX_SEARCH_LENGTH,
+# data_api/routers/item_router.py, which web may not import): a test keeps them equal.
 DATA_API_MAX_OFFSET = 10_000
+DATA_API_MAX_SEARCH_LENGTH = 200
 
 
 @dataclass(frozen=True)

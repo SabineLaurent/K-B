@@ -12,7 +12,7 @@ from site_client import OPERATOR_HEADERS, PAGE_PATHS, make_client
 
 from k_b.web import errors
 from k_b.web.app import create_app
-from k_b.web.errors import write_moment
+from k_b.web.french_dates import write_moment
 from k_b.web.rendering import templates
 
 CONTENT_SECURITY_POLICY = (
