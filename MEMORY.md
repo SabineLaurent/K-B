@@ -35,13 +35,15 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
 
 ## Problèmes connus
 
-- **Le détail de l'API de données est borné en temps par instruction** (#331, #418) : depuis #430, la
+- **Le détail et la liste de l'API de données sont bornés en temps, par instruction en PostgreSQL**
+  (#331, #418, #550) : depuis #430, la
   lecture du détail est bornée à 101 surlignages (2 020 000 caractères de texte et de commentaire au
   plus) et à 125 001 caractères du texte d'un clip ; en SQLite, ce que le moteur charge pour calculer
   `substr` n'est pas mesuré (`docs/specs-api.md`, « Bornes du détail »). Le temps reste
-  borné ainsi : 5 s par requête en SQLite ; en PostgreSQL, 5 s par
-  instruction (`statement_timeout`, #418), et le détail en fait jusqu'à trois, 15 s en théorie, plus
-  2 s d'attente du pool, au-delà des 10 s du client de l'API IA (limite choisie au plan de #418).
+  borné ainsi : 5 s par requête en SQLite, que la page de la liste et son total se partagent ; en
+  PostgreSQL, 5 s par instruction (`statement_timeout`, #418) : le détail en fait jusqu'à trois, 15 s
+  en théorie, et la liste deux, la page et son total, 10 s en théorie ; plus 2 s d'attente du pool,
+  c'est au-delà des 10 s du client de l'API IA (limites choisies aux plans de #418 et de #550).
 - **La base est la seule copie au-delà de 6 mois, et K-B n'a pas de migration** (#83, décision de
   Sabine du 2026-11-04) : la purge supprime le brut de plus de 6 mois, et la base n'a pas encore de
   sauvegarde (règle du 2026-10-19 écrite au registre, étape 3, pas codée). Dès que le plus ancien

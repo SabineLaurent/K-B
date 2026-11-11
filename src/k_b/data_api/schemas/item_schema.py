@@ -10,6 +10,10 @@ from k_b.items import ItemKind, RansomwareUse
 # The dates the response names by where they come from: a date of K-B is the collection that saw
 # a catalog row change, not a date of the source.
 DATE_OF_K_B = "A date of K-B: the collection that saw the change."
+EXPLOITED = (
+    "The CVE is in the CISA KEV catalog, withdrawn since or not, the withdrawal in withdrawn_at;"
+    " false says absent from the catalog, not unexploited; null without CVE."
+)
 
 
 class ListedItemSchema(BaseModel):
@@ -24,19 +28,82 @@ class ListedItemSchema(BaseModel):
     )
 
 
-class ItemPageSchema(BaseModel):
-    items: list[ListedItemSchema]
-    # The offset of the next page; null on the last one, or beyond the bound of offset.
-    next_offset: int | None
+# The item of the list of each kind: the six fields, then the identifiers of its kind
+# (docs/specs-api.md, "Identifiants par sorte"). kind narrowed to one value tells pydantic, and
+# the OpenAPI, which schema an item follows.
 
 
-# The detail of each kind: the fields of the list, then those of its kind. kind narrowed to one
-# value tells pydantic, and the OpenAPI, which schema a response follows.
-
-
-class PaperDetailSchema(ListedItemSchema):
+class ListedPaperSchema(ListedItemSchema):
     kind: Literal["paper"]
     arxiv_id: str
+
+
+class ListedVulnerabilitySchema(ListedItemSchema):
+    kind: Literal["vulnerability"]
+    cve_id: str
+    exploited: bool = Field(description=EXPLOITED)
+
+
+class ListedReleaseSchema(ListedItemSchema):
+    kind: Literal["release"]
+    repository_name: str
+    tag_name: str
+
+
+class ListedAdvisorySchema(ListedItemSchema):
+    kind: Literal["advisory"]
+    ghsa_id: str
+    cve_id: str | None
+    exploited: bool | None = Field(description=EXPLOITED)
+    packages: list[str] = Field(
+        description="The packages affected: the first 10 in the list, every one in the detail."
+    )
+    packages_truncated: bool = Field(
+        description="Packages are left out of packages; always false in the detail."
+    )
+
+
+class ListedNewsletterArticleSchema(ListedItemSchema):
+    kind: Literal["newsletter_article"]
+    edition: str = Field(
+        description="The newsletter, such as ai; the day of the edition is source_date."
+    )
+
+
+class ListedZoteroEntrySchema(ListedItemSchema):
+    kind: Literal["zotero_entry"]
+
+
+class ListedClipSchema(ListedItemSchema):
+    kind: Literal["clip"]
+
+
+ListedItemOfKindSchema = Annotated[
+    ListedPaperSchema
+    | ListedVulnerabilitySchema
+    | ListedReleaseSchema
+    | ListedAdvisorySchema
+    | ListedNewsletterArticleSchema
+    | ListedZoteroEntrySchema
+    | ListedClipSchema,
+    Field(discriminator="kind"),
+]
+
+
+class ItemPageSchema(BaseModel):
+    items: list[ListedItemOfKindSchema]
+    # The offset of the next page; null on the last one, or beyond the bound of offset.
+    next_offset: int | None
+    total: int = Field(
+        description="The items of kind, since and q, every page together: limit and offset do"
+        " not change it."
+    )
+
+
+# The detail of each kind: the item of the list of its kind, then the fields of the detail.
+
+
+class PaperDetailSchema(ListedPaperSchema):
     authors: list[str]
     summary: str
     arxiv_updated_at: str = Field(
@@ -44,9 +111,7 @@ class PaperDetailSchema(ListedItemSchema):
     )
 
 
-class VulnerabilityDetailSchema(ListedItemSchema):
-    kind: Literal["vulnerability"]
-    cve_id: str
+class VulnerabilityDetailSchema(ListedVulnerabilitySchema):
     description: str
     vendor: str
     product: str
@@ -54,28 +119,16 @@ class VulnerabilityDetailSchema(ListedItemSchema):
     revised_at: str | None = Field(description=DATE_OF_K_B)
 
 
-class ReleaseDetailSchema(ListedItemSchema):
-    kind: Literal["release"]
+class ReleaseDetailSchema(ListedReleaseSchema):
     release_id: int
-    repository_name: str
-    tag_name: str
     body: str | None
 
 
-class AdvisoryDetailSchema(ListedItemSchema):
-    kind: Literal["advisory"]
-    ghsa_id: str
-    cve_id: str | None
-    exploited: bool | None = Field(
-        description="The CVE is in the CISA KEV catalog, withdrawn since or not; false says"
-        " absent from the catalog, not unexploited; null without CVE."
-    )
-    packages: list[str]
+class AdvisoryDetailSchema(ListedAdvisorySchema):
+    """An advisory has no field beyond those of the list."""
 
 
-class NewsletterArticleDetailSchema(ListedItemSchema):
-    kind: Literal["newsletter_article"]
-    edition: str
+class NewsletterArticleDetailSchema(ListedNewsletterArticleSchema):
     edition_date: str
     rank: int
     summary: str
@@ -92,8 +145,7 @@ class HighlightSchema(BaseModel):
     withdrawn_at: str | None = Field(description=DATE_OF_K_B)
 
 
-class ZoteroEntryDetailSchema(ListedItemSchema):
-    kind: Literal["zotero_entry"]
+class ZoteroEntryDetailSchema(ListedZoteroEntrySchema):
     zotero_key: str
     item_type: str
     arxiv_id: str | None
@@ -106,8 +158,7 @@ class ZoteroEntryDetailSchema(ListedItemSchema):
     )
 
 
-class ClipDetailSchema(ListedItemSchema):
-    kind: Literal["clip"]
+class ClipDetailSchema(ListedClipSchema):
     published_at: str | None = Field(
         description="A date of the page kept (published of Web Clipper): a day, at midnight"
         " UTC; null when the page gives none."

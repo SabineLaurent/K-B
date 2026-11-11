@@ -195,7 +195,10 @@ du 2026-10-15), et s'arrête en `data_api_timeout` au-delà (« Durée totale »
 flux et refusée (`data_api_invalid_response`, sans rien citer du corps) au-delà de
 `MAX_DATA_API_BODY_BYTES = 4 000 000` octets décodés, avant toute lecture quand `Content-Length`
 l'annonce déjà ; au-dessus du pire honnête, estimé à environ 2 Mo pour une page de liste et
-0,75 Mo pour un détail. Défense en profondeur (OWASP API4:2023, API10:2023), décision de Sabine
+0,75 Mo pour un détail. Depuis #550, la liste sert les identifiants de chaque item, dont 10 paquets
+d'une alerte au plus : environ 0,26 Mo de plus pour une page de 100 alertes (100 × 10 × 258
+caractères ASCII), sous la borne ; servis entiers, les 100 paquets permis en ajoutaient 2,58 Mo, au-delà
+(`docs/specs-api.md`, « Identifiants par sorte »). Défense en profondeur (OWASP API4:2023, API10:2023), décision de Sabine
 du 2026-10-15 : une borne dès maintenant, à corriger plus tard si besoin. **Offset** : `GET /items` rend `next_offset` nul
 au-delà de l'offset 10 000 ; une entrée retirée ne prenant pas de place sous le plafond, une sorte
 qui compterait plus de 10 000 entrées retirées dans la fenêtre serait coupée sans `capped_kind`.
